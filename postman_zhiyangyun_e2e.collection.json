@@ -1,0 +1,276 @@
+{
+  "info": {
+    "name": "智养云 E2E 流程测试",
+    "_postman_id": "7f7e8c2e-1d2f-4a1c-9a7e-9d86c9f1b3a1",
+    "description": "智慧养老OA 后端业务流程闭环测试",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('login success', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().code).to.eql(0);",
+                  "  pm.expect(pm.response.json().data.token).to.be.a('string');",
+                  "});",
+                  "pm.environment.set('token', pm.response.json().data.token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('me ok', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(pm.response.json().code).to.eql(0);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Care Task",
+      "item": [
+        {
+          "name": "Today Tasks",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/care/tasks/today?staffId=500",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "care", "tasks", "today"],
+              "query": [
+                { "key": "staffId", "value": "500" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Execute Task",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"taskDailyId\": 400,\n  \"staffId\": 500,\n  \"bedQrCode\": \"QR1\",\n  \"remark\": \"ok\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/care/tasks/execute",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "care", "tasks", "execute"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Store Risk & Order",
+      "item": [
+        {
+          "name": "Preview - Diabetes buy sugar (blocked)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"elderId\": 4001,\n  \"productId\": 6001,\n  \"qty\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/store/order/preview",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "store", "order", "preview"]
+            }
+          }
+        },
+        {
+          "name": "Preview - Normal buy milk (allowed)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"elderId\": 4003,\n  \"productId\": 6003,\n  \"qty\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/store/order/preview",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "store", "order", "preview"]
+            }
+          }
+        },
+        {
+          "name": "Submit - Normal buy milk",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"elderId\": 4003,\n  \"productId\": 6003,\n  \"qty\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/store/order/submit",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "store", "order", "submit"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Visit",
+      "item": [
+        {
+          "name": "Family Book Visit",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"elderId\": 200,\n  \"visitTime\": \"2026-02-08T10:00:00\",\n  \"visitorCount\": 2,\n  \"carPlate\": \"粤B12345\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/family/visit/book",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "family", "visit", "book"]
+            }
+          }
+        },
+        {
+          "name": "Guard Today",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/guard/visit/today",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "guard", "visit", "today"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Vital Signs",
+      "item": [
+        {
+          "name": "Record Vital",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"elderId\": 200,\n  \"type\": \"TEMP\",\n  \"valueJson\": {\"temp\": 36.8},\n  \"measuredAt\": \"2026-02-07T09:00:00\",\n  \"remark\": \"ok\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/vital/record",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vital", "record"]
+            }
+          }
+        },
+        {
+          "name": "Vital Latest",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/vital/elder/200/latest",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vital", "elder", "200", "latest"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Billing",
+      "item": [
+        {
+          "name": "Generate Bill (2026-01)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/bill/generate?month=2026-01",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bill", "generate"],
+              "query": [
+                { "key": "month", "value": "2026-01" }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

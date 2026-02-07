@@ -1,0 +1,47 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: smartcare-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: zhiyangyun
+      TZ: Asia/Shanghai
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  redis:
+    image: redis:7.2
+    container_name: smartcare-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  backend:
+    image: eclipse-temurin:17-jre
+    container_name: smartcare-backend
+    restart: unless-stopped
+    working_dir: /app
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+    volumes:
+      - ./target/care-task-1.0.0.jar:/app/app.jar:ro
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mysql
+      - redis
+    command: ["java", "-jar", "/app/app.jar"]
+
+volumes:
+  mysql_data:
+  redis_data:

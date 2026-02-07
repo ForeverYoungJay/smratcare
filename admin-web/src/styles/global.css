@@ -1,0 +1,110 @@
+:root {
+  color-scheme: light;
+  --bg: #f5f7fb;
+  --bg-2: #eef2f8;
+  --ink: #0f172a;
+  --muted: #64748b;
+  --primary: #1677ff;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --border: rgba(148, 163, 184, 0.35);
+  --glass: rgba(255, 255, 255, 0.86);
+  --shadow-sm: 0 6px 16px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 14px 36px rgba(15, 23, 42, 0.12);
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
+  background: radial-gradient(1200px 520px at 10% -10%, rgba(56, 189, 248, 0.2), transparent 60%),
+              radial-gradient(1000px 400px at 90% 0%, rgba(34, 211, 238, 0.18), transparent 55%),
+              var(--bg);
+  color: var(--ink);
+}
+
+#app {
+  min-height: 100vh;
+}
+
+.page-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.card-elevated {
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(12px);
+}
+
+.ant-card {
+  border-radius: var(--radius-lg);
+  border-color: var(--border);
+  box-shadow: var(--shadow-sm);
+}
+
+.ant-table {
+  border-radius: var(--radius-lg);
+}
+
+.ant-table-thead > tr > th {
+  background: #f1f5f9 !important;
+  color: #0f172a;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.ant-table-tbody > tr > td {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.ant-input,
+.ant-input-password,
+.ant-select-selector,
+.ant-picker {
+  border-radius: var(--radius-md) !important;
+}
+
+.ant-btn {
+  border-radius: var(--radius-md) !important;
+}
+
+.ant-btn-primary {
+  background: linear-gradient(135deg, #1677ff, #22d3ee) !important;
+  border: none !important;
+  box-shadow: 0 10px 18px rgba(22, 119, 255, 0.25);
+}
+
+.ant-badge-status-text {
+  color: var(--muted) !important;
+}
+
+.ant-page-header {
+  padding: 0 !important;
+}
+
+.empty-wrap {
+  padding: 24px 0;
+}
+
+@media (max-width: 768px) {
+  .ant-table {
+    font-size: 12px;
+  }
+}
