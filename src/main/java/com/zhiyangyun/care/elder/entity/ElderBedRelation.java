@@ -14,6 +14,7 @@ import lombok.Data;
 public class ElderBedRelation {
   @TableId(type = IdType.ASSIGN_ID)
   private Long id;
+  private Long tenantId;
   private Long orgId;
   private Long elderId;
   private Long bedId;
@@ -21,6 +22,7 @@ public class ElderBedRelation {
   private LocalDate endDate;
   private Integer activeFlag;
   private String remark;
+  private Long createdBy;
   @TableField(value = "create_time", fill = FieldFill.INSERT)
   private LocalDateTime createTime;
   @TableField(value = "update_time", fill = FieldFill.INSERT_UPDATE)

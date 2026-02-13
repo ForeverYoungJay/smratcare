@@ -1,6 +1,6 @@
-import request from '../utils/request'
-import type { ApiResult, PageResult, RoleItem } from '../types/api'
+import { fetchPage } from '../utils/request'
+import type { RoleItem } from '../types'
 
 export function getRolePage(params: any) {
-  return request.get<ApiResult<PageResult<RoleItem>>>('/api/admin/roles', { params })
+  return fetchPage<RoleItem>('/api/admin/roles', params)
 }

@@ -6,10 +6,12 @@ import lombok.Data;
 
 @Data
 public class BedRequest {
+  private Long tenantId;
   private Long orgId;
   @NotNull
   private Long roomId;
   @NotBlank
   private String bedNo;
   private Integer status = 1;
+  private Long createdBy;
 }

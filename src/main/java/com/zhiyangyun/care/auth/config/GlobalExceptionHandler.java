@@ -44,6 +44,13 @@ public class GlobalExceptionHandler {
     return Result.error(400, "Validation error");
   }
 
+  @ExceptionHandler(IllegalArgumentException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public Result<Void> handleIllegalArgument(IllegalArgumentException ex) {
+    log.warn("Bad request: {}", ex.getMessage());
+    return Result.error(400, ex.getMessage());
+  }
+
   @ExceptionHandler(Exception.class)
   @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
   public Result<Void> handleOther(Exception ex) {

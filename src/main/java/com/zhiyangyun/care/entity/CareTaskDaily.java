@@ -14,6 +14,8 @@ public class CareTaskDaily {
   @TableId(type = IdType.ASSIGN_ID)
   private Long id;
 
+  private Long tenantId;
+
   private Long orgId;
 
   private Long elderId;
@@ -29,6 +31,12 @@ public class CareTaskDaily {
   private String status;
 
   private Long assignedStaffId;
+
+  private String sourceType;
+
+  private Long sourceId;
+
+  private Long createdBy;
 
   @TableField("create_time")
   private LocalDateTime createTime;

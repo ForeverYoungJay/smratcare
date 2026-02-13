@@ -1,1 +1,2542 @@
-{"openapi":"3.0.1","info":{"title":"OpenAPI definition","version":"v0"},"servers":[{"url":"http://localhost:8080","description":"Generated server url"}],"paths":{"/api/room/{id}":{"get":{"tags":["room-controller"],"operationId":"get","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultRoomResponse"}}}}}},"put":{"tags":["room-controller"],"operationId":"update","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/RoomRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultRoomResponse"}}}}}},"delete":{"tags":["room-controller"],"operationId":"delete","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}}}}},"/api/elder/{id}":{"get":{"tags":["elder-controller"],"operationId":"get_1","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultElderResponse"}}}}}},"put":{"tags":["elder-controller"],"operationId":"update_1","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ElderUpdateRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultElderResponse"}}}}}}},"/api/elder/{elderId}/diseases":{"get":{"tags":["elder-disease-controller"],"operationId":"listDiseases","parameters":[{"name":"elderId","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultListLong"}}}}}},"put":{"tags":["elder-disease-controller"],"operationId":"updateDiseases","parameters":[{"name":"elderId","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ElderDiseaseRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}}}}},"/api/bed/{id}":{"get":{"tags":["bed-controller"],"operationId":"get_2","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultBedResponse"}}}}}},"put":{"tags":["bed-controller"],"operationId":"update_2","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/BedRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultBedResponse"}}}}}},"delete":{"tags":["bed-controller"],"operationId":"delete_1","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}}}}},"/api/admin/staff":{"get":{"tags":["admin-staff-controller"],"operationId":"list_1","parameters":[{"name":"page","in":"query","required":false,"schema":{"type":"integer","format":"int64","default":1}},{"name":"size","in":"query","required":false,"schema":{"type":"integer","format":"int64","default":20}},{"name":"keyword","in":"query","required":false,"schema":{"type":"string"}},{"name":"sortBy","in":"query","required":false,"schema":{"type":"string"}},{"name":"order","in":"query","required":false,"schema":{"type":"string","default":"desc"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultIPageStaffAccount"}}}}}},"put":{"tags":["admin-staff-controller"],"operationId":"update_3","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/StaffUpdateRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultStaffAccount"}}}}}},"post":{"tags":["admin-staff-controller"],"operationId":"create_3","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/StaffCreateRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultStaffAccount"}}}}}}},"/api/admin/roles/{id}":{"get":{"tags":["admin-role-controller"],"operationId":"get_4","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultRole"}}}}}},"put":{"tags":["admin-role-controller"],"operationId":"update_4","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/RoleRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultRole"}}}}}},"delete":{"tags":["admin-role-controller"],"operationId":"delete_3","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}}}}},"/api/admin/product-tag/{id}":{"get":{"tags":["admin-product-tag-controller"],"operationId":"get_5","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultProductTag"}}}}}},"put":{"tags":["admin-product-tag-controller"],"operationId":"update_5","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProductTagRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultProductTag"}}}}}},"delete":{"tags":["admin-product-tag-controller"],"operationId":"delete_4","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}}}}},"/api/admin/orgs/{id}":{"get":{"tags":["admin-org-controller"],"operationId":"get_6","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultOrg"}}}}}},"put":{"tags":["admin-org-controller"],"operationId":"update_6","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/OrgRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultOrg"}}}}}},"delete":{"tags":["admin-org-controller"],"operationId":"delete_5","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}}}}},"/api/admin/disease/{id}":{"get":{"tags":["admin-disease-controller"],"operationId":"get_7","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultDisease"}}}}}},"put":{"tags":["admin-disease-controller"],"operationId":"update_7","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/DiseaseRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultDisease"}}}}}},"delete":{"tags":["admin-disease-controller"],"operationId":"delete_6","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}}}}},"/api/admin/disease/{id}/forbidden-tags":{"get":{"tags":["admin-disease-forbidden-controller"],"operationId":"getForbiddenTags","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultForbiddenTagsResponse"}}}}}},"put":{"tags":["admin-disease-forbidden-controller"],"operationId":"saveForbiddenTags","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ForbiddenTagsRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}}}}},"/api/admin/departments/{id}":{"get":{"tags":["admin-department-controller"],"operationId":"get_8","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultDepartment"}}}}}},"put":{"tags":["admin-department-controller"],"operationId":"update_8","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/DepartmentRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultDepartment"}}}}}},"delete":{"tags":["admin-department-controller"],"operationId":"delete_7","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}}}}},"/api/vital/record":{"post":{"tags":["vital-sign-controller"],"operationId":"record","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/VitalRecordRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVitalRecordResponse"}}}}}}},"/api/store/order/submit":{"post":{"tags":["store-order-controller"],"operationId":"submit","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/OrderPreviewRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/OrderSubmitResponse"}}}}}}},"/api/store/order/refund":{"post":{"tags":["store-order-lifecycle-controller"],"operationId":"refund","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/OrderRefundRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}}}}},"/api/store/order/preview":{"post":{"tags":["store-order-controller"],"operationId":"preview","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/OrderPreviewRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/OrderPreviewResponse"}}}}}}},"/api/store/order/cancel":{"post":{"tags":["store-order-lifecycle-controller"],"operationId":"cancel","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/OrderCancelRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}}}}},"/api/room":{"get":{"tags":["room-controller"],"operationId":"page","parameters":[{"name":"pageNo","in":"query","required":false,"schema":{"type":"integer","format":"int64","default":1}},{"name":"pageSize","in":"query","required":false,"schema":{"type":"integer","format":"int64","default":20}},{"name":"keyword","in":"query","required":false,"schema":{"type":"string"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultIPageRoomResponse"}}}}}},"post":{"tags":["room-controller"],"operationId":"create","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/RoomRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultRoomResponse"}}}}}}},"/api/inventory/adjust":{"post":{"tags":["inventory-controller"],"operationId":"adjust","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/InventoryAdjustRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}}}}},"/api/guard/visit/checkin":{"post":{"tags":["guard-visit-controller"],"operationId":"checkin","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/VisitCheckInRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVisitCheckInResponse"}}}}}}},"/api/finance/reconcile":{"post":{"tags":["reconciliation-controller"],"operationId":"reconcile","parameters":[{"name":"date","in":"query","required":true,"schema":{"type":"string","format":"date"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultReconcileResponse"}}}}}}},"/api/family/visit/book":{"post":{"tags":["family-visit-controller"],"operationId":"book","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/VisitBookRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVisitBookingResponse"}}}}}}},"/api/family/register":{"post":{"tags":["family-controller"],"operationId":"register","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/FamilyRegisterRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultFamilyUser"}}}}}}},"/api/family/bindElder":{"post":{"tags":["family-controller"],"operationId":"bindElder","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/FamilyBindRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultElderFamily"}}}}}}},"/api/elder":{"post":{"tags":["elder-controller"],"operationId":"create_1","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ElderCreateRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultElderResponse"}}}}}}},"/api/elder/{id}/unbindBed":{"post":{"tags":["elder-controller"],"operationId":"unbindBed","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}},{"name":"endDate","in":"query","required":false,"schema":{"type":"string","format":"date"}},{"name":"reason","in":"query","required":false,"schema":{"type":"string"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultElderResponse"}}}}}}},"/api/elder/{id}/assignBed":{"post":{"tags":["elder-controller"],"operationId":"assignBed","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/AssignBedRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultElderResponse"}}}}}}},"/api/care/tasks/execute":{"post":{"tags":["care-task-controller"],"operationId":"executeTask","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ExecuteTaskRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ExecuteTaskResponse"}}}}}}},"/api/bill/{billId}/pay":{"post":{"tags":["bill-payment-controller"],"operationId":"pay","parameters":[{"name":"billId","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/PaymentRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultPaymentResponse"}}}}}}},"/api/bill/generate":{"post":{"tags":["bill-controller"],"operationId":"generate","parameters":[{"name":"month","in":"query","required":true,"schema":{"pattern":"\\d{4}-\\d{2}","type":"string"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/BillGenerateResponse"}}}}}}},"/api/bed":{"get":{"tags":["bed-controller"],"operationId":"page_2","parameters":[{"name":"pageNo","in":"query","required":false,"schema":{"type":"integer","format":"int64","default":1}},{"name":"pageSize","in":"query","required":false,"schema":{"type":"integer","format":"int64","default":20}},{"name":"keyword","in":"query","required":false,"schema":{"type":"string"}},{"name":"status","in":"query","required":false,"schema":{"type":"integer","format":"int32"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultIPageBedResponse"}}}}}},"post":{"tags":["bed-controller"],"operationId":"create_2","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/BedRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultBedResponse"}}}}}}},"/api/auth/logout":{"post":{"tags":["auth-controller"],"operationId":"logout","responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}}}}},"/api/auth/login":{"post":{"tags":["auth-controller"],"operationId":"login","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/LoginRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultLoginResponse"}}}}}}},"/api/auth/family/login":{"post":{"tags":["auth-controller"],"operationId":"familyLogin","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/FamilyLoginRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultFamilyLoginResponse"}}}}}}},"/api/admin/staff-roles/assign":{"post":{"tags":["admin-staff-role-controller"],"operationId":"assignRoles","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/StaffRoleAssignRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}}}}},"/api/admin/staff-roles/add":{"post":{"tags":["admin-staff-role-controller"],"operationId":"addRole","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/StaffRoleChangeRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}}}}},"/api/admin/roles":{"get":{"tags":["admin-role-controller"],"operationId":"list_2","parameters":[{"name":"page","in":"query","required":false,"schema":{"type":"integer","format":"int64","default":1}},{"name":"size","in":"query","required":false,"schema":{"type":"integer","format":"int64","default":20}},{"name":"keyword","in":"query","required":false,"schema":{"type":"string"}},{"name":"sortBy","in":"query","required":false,"schema":{"type":"string"}},{"name":"order","in":"query","required":false,"schema":{"type":"string","default":"desc"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultIPageRole"}}}}}},"post":{"tags":["admin-role-controller"],"operationId":"create_4","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/RoleRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultRole"}}}}}}},"/api/admin/product-tag":{"get":{"tags":["admin-product-tag-controller"],"operationId":"page_3","parameters":[{"name":"page","in":"query","required":false,"schema":{"type":"integer","format":"int64","default":1}},{"name":"size","in":"query","required":false,"schema":{"type":"integer","format":"int64","default":20}},{"name":"keyword","in":"query","required":false,"schema":{"type":"string"}},{"name":"sortBy","in":"query","required":false,"schema":{"type":"string"}},{"name":"order","in":"query","required":false,"schema":{"type":"string","default":"desc"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultIPageProductTag"}}}}}},"post":{"tags":["admin-product-tag-controller"],"operationId":"create_5","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ProductTagRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultProductTag"}}}}}}},"/api/admin/orgs":{"get":{"tags":["admin-org-controller"],"operationId":"list_3","parameters":[{"name":"page","in":"query","required":false,"schema":{"type":"integer","format":"int64","default":1}},{"name":"size","in":"query","required":false,"schema":{"type":"integer","format":"int64","default":20}},{"name":"keyword","in":"query","required":false,"schema":{"type":"string"}},{"name":"sortBy","in":"query","required":false,"schema":{"type":"string"}},{"name":"order","in":"query","required":false,"schema":{"type":"string","default":"desc"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultIPageOrg"}}}}}},"post":{"tags":["admin-org-controller"],"operationId":"create_6","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/OrgRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultOrg"}}}}}}},"/api/admin/disease":{"get":{"tags":["admin-disease-controller"],"operationId":"page_4","parameters":[{"name":"page","in":"query","required":false,"schema":{"type":"integer","format":"int64","default":1}},{"name":"size","in":"query","required":false,"schema":{"type":"integer","format":"int64","default":20}},{"name":"keyword","in":"query","required":false,"schema":{"type":"string"}},{"name":"sortBy","in":"query","required":false,"schema":{"type":"string"}},{"name":"order","in":"query","required":false,"schema":{"type":"string","default":"desc"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultIPageDisease"}}}}}},"post":{"tags":["admin-disease-controller"],"operationId":"create_7","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/DiseaseRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultDisease"}}}}}}},"/api/admin/departments":{"get":{"tags":["admin-department-controller"],"operationId":"list_4","parameters":[{"name":"page","in":"query","required":false,"schema":{"type":"integer","format":"int64","default":1}},{"name":"size","in":"query","required":false,"schema":{"type":"integer","format":"int64","default":20}},{"name":"keyword","in":"query","required":false,"schema":{"type":"string"}},{"name":"sortBy","in":"query","required":false,"schema":{"type":"string"}},{"name":"order","in":"query","required":false,"schema":{"type":"string","default":"desc"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultIPageDepartment"}}}}}},"post":{"tags":["admin-department-controller"],"operationId":"create_8","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/DepartmentRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultDepartment"}}}}}}},"/api/admin/billing/config":{"get":{"tags":["billing-admin-controller"],"operationId":"listConfigs","parameters":[{"name":"orgId","in":"query","required":true,"schema":{"type":"integer","format":"int64"}},{"name":"month","in":"query","required":false,"schema":{"pattern":"\\d{4}-\\d{2}","type":"string"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/BillingConfigResponse"}}}}}}},"post":{"tags":["billing-admin-controller"],"operationId":"upsertConfig","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/BillingConfigRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/BillingConfigResponse"}}}}}}},"/api/admin/billing/care-level":{"get":{"tags":["billing-admin-controller"],"operationId":"listCareLevels","parameters":[{"name":"orgId","in":"query","required":true,"schema":{"type":"integer","format":"int64"}},{"name":"month","in":"query","required":false,"schema":{"pattern":"\\d{4}-\\d{2}","type":"string"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/BillingCareLevelFeeResponse"}}}}}}},"post":{"tags":["billing-admin-controller"],"operationId":"upsertCareLevel","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/BillingCareLevelFeeRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/BillingCareLevelFeeResponse"}}}}}}},"/api/vital/elder/{elderId}":{"get":{"tags":["vital-sign-controller"],"operationId":"list","parameters":[{"name":"elderId","in":"path","required":true,"schema":{"type":"integer","format":"int64"}},{"name":"from","in":"query","required":false,"schema":{"type":"string","format":"date-time"}},{"name":"to","in":"query","required":false,"schema":{"type":"string","format":"date-time"}},{"name":"type","in":"query","required":false,"schema":{"type":"string"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultListVitalRecordResponse"}}}}}}},"/api/vital/elder/{elderId}/latest":{"get":{"tags":["vital-sign-controller"],"operationId":"latest","parameters":[{"name":"elderId","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVitalRecordResponse"}}}}}}},"/api/vital/abnormal/today":{"get":{"tags":["vital-sign-controller"],"operationId":"abnormalToday","responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultListVitalRecordResponse"}}}}}}},"/api/inventory/expiry-alerts":{"get":{"tags":["inventory-controller"],"operationId":"expiryAlerts","parameters":[{"name":"days","in":"query","required":false,"schema":{"type":"integer","format":"int32","default":30}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultListInventoryExpiryAlertItem"}}}}}}},"/api/inventory/alerts":{"get":{"tags":["inventory-controller"],"operationId":"alerts","responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultListInventoryAlertItem"}}}}}}},"/api/guard/visit/today":{"get":{"tags":["guard-visit-controller"],"operationId":"today","responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultListVisitBookingResponse"}}}}}}},"/api/family/visit/my":{"get":{"tags":["family-visit-controller"],"operationId":"my","responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultListVisitBookingResponse"}}}}}}},"/api/family/my-elders":{"get":{"tags":["family-controller"],"operationId":"myElders","responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultListFamilyElderItem"}}}}}}},"/api/elder/page":{"get":{"tags":["elder-controller"],"operationId":"page_1","parameters":[{"name":"pageNo","in":"query","required":false,"schema":{"type":"integer","format":"int64","default":1}},{"name":"pageSize","in":"query","required":false,"schema":{"type":"integer","format":"int64","default":20}},{"name":"keyword","in":"query","required":false,"schema":{"type":"string"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultIPageElderResponse"}}}}}}},"/api/care/tasks/today":{"get":{"tags":["care-task-controller"],"operationId":"getTodayTasks","parameters":[{"name":"staffId","in":"query","required":false,"schema":{"type":"integer","format":"int64"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"type":"array","items":{"$ref":"#/components/schemas/CareTaskTodayItem"}}}}}}}},"/api/bill/{elderId}":{"get":{"tags":["bill-controller"],"operationId":"detail","parameters":[{"name":"elderId","in":"path","required":true,"schema":{"type":"integer","format":"int64"}},{"name":"month","in":"query","required":true,"schema":{"pattern":"\\d{4}-\\d{2}","type":"string"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/BillDetailResponse"}}}}}}},"/api/auth/me":{"get":{"tags":["auth-controller"],"operationId":"me","responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultStaffInfo"}}}}}}},"/api/admin/staff/{id}":{"get":{"tags":["admin-staff-controller"],"operationId":"get_3","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultStaffAccount"}}}}}},"delete":{"tags":["admin-staff-controller"],"operationId":"delete_2","parameters":[{"name":"id","in":"path","required":true,"schema":{"type":"integer","format":"int64"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}}}}},"/api/admin/staff-roles":{"get":{"tags":["admin-staff-role-controller"],"operationId":"listByStaff","parameters":[{"name":"staffId","in":"query","required":true,"schema":{"type":"integer","format":"int64"}},{"name":"orgId","in":"query","required":true,"schema":{"type":"integer","format":"int64"}}],"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultListStaffRole"}}}}}}},"/api/admin/staff-roles/remove":{"delete":{"tags":["admin-staff-role-controller"],"operationId":"removeRole","requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/StaffRoleChangeRequest"}}},"required":true},"responses":{"401":{"description":"Unauthorized","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"403":{"description":"Forbidden","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"400":{"description":"Bad Request","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"500":{"description":"Internal Server Error","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}},"200":{"description":"OK","content":{"*/*":{"schema":{"$ref":"#/components/schemas/ResultVoid"}}}}}}}},"components":{"schemas":{"ResultVoid":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"type":"object"}}},"RoomRequest":{"required":["roomNo"],"type":"object","properties":{"orgId":{"type":"integer","format":"int64"},"building":{"type":"string"},"floorNo":{"type":"string"},"roomNo":{"type":"string"},"roomType":{"type":"string"},"capacity":{"type":"integer","format":"int32"},"status":{"type":"integer","format":"int32"}}},"ResultRoomResponse":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/RoomResponse"}}},"RoomResponse":{"type":"object","properties":{"id":{"type":"integer","format":"int64"},"orgId":{"type":"integer","format":"int64"},"building":{"type":"string"},"floorNo":{"type":"string"},"roomNo":{"type":"string"},"roomType":{"type":"string"},"capacity":{"type":"integer","format":"int32"},"status":{"type":"integer","format":"int32"}}},"ElderUpdateRequest":{"type":"object","properties":{"fullName":{"type":"string"},"idCardNo":{"type":"string"},"gender":{"type":"integer","format":"int32"},"birthDate":{"type":"string","format":"date"},"phone":{"type":"string"},"admissionDate":{"type":"string","format":"date"},"status":{"type":"integer","format":"int32"},"careLevel":{"type":"string"},"remark":{"type":"string"}}},"BedResponse":{"type":"object","properties":{"id":{"type":"integer","format":"int64"},"orgId":{"type":"integer","format":"int64"},"roomId":{"type":"integer","format":"int64"},"bedNo":{"type":"string"},"bedQrCode":{"type":"string"},"status":{"type":"integer","format":"int32"},"elderId":{"type":"integer","format":"int64"}}},"ElderResponse":{"type":"object","properties":{"id":{"type":"integer","format":"int64"},"orgId":{"type":"integer","format":"int64"},"elderCode":{"type":"string"},"elderQrCode":{"type":"string"},"fullName":{"type":"string"},"idCardNo":{"type":"string"},"gender":{"type":"integer","format":"int32"},"birthDate":{"type":"string","format":"date"},"phone":{"type":"string"},"admissionDate":{"type":"string","format":"date"},"status":{"type":"integer","format":"int32"},"bedId":{"type":"integer","format":"int64"},"careLevel":{"type":"string"},"remark":{"type":"string"},"currentBed":{"$ref":"#/components/schemas/BedResponse"}}},"ResultElderResponse":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/ElderResponse"}}},"ElderDiseaseRequest":{"required":["diseaseIds"],"type":"object","properties":{"diseaseIds":{"type":"array","items":{"type":"integer","format":"int64"}}}},"BedRequest":{"required":["bedNo","roomId"],"type":"object","properties":{"orgId":{"type":"integer","format":"int64"},"roomId":{"type":"integer","format":"int64"},"bedNo":{"type":"string"},"status":{"type":"integer","format":"int32"}}},"ResultBedResponse":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/BedResponse"}}},"StaffUpdateRequest":{"required":["id"],"type":"object","properties":{"id":{"type":"integer","format":"int64"},"departmentId":{"type":"integer","format":"int64"},"password":{"type":"string"},"realName":{"type":"string"},"phone":{"type":"string"},"email":{"type":"string"},"gender":{"type":"integer","format":"int32"},"status":{"type":"integer","format":"int32"}}},"ResultStaffAccount":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/StaffAccount"}}},"StaffAccount":{"type":"object","properties":{"id":{"type":"integer","format":"int64"},"orgId":{"type":"integer","format":"int64"},"departmentId":{"type":"integer","format":"int64"},"staffNo":{"type":"string"},"username":{"type":"string"},"passwordHash":{"type":"string"},"realName":{"type":"string"},"phone":{"type":"string"},"email":{"type":"string"},"gender":{"type":"integer","format":"int32"},"status":{"type":"integer","format":"int32"},"lastLoginTime":{"type":"string","format":"date-time"},"createTime":{"type":"string","format":"date-time"},"updateTime":{"type":"string","format":"date-time"},"isDeleted":{"type":"integer","format":"int32"}}},"RoleRequest":{"required":["roleCode","roleName"],"type":"object","properties":{"orgId":{"type":"integer","format":"int64"},"roleName":{"type":"string"},"roleCode":{"type":"string"},"roleDesc":{"type":"string"},"status":{"type":"integer","format":"int32"}}},"ResultRole":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/Role"}}},"Role":{"type":"object","properties":{"id":{"type":"integer","format":"int64"},"orgId":{"type":"integer","format":"int64"},"roleName":{"type":"string"},"roleCode":{"type":"string"},"roleDesc":{"type":"string"},"status":{"type":"integer","format":"int32"},"createTime":{"type":"string","format":"date-time"},"updateTime":{"type":"string","format":"date-time"},"isDeleted":{"type":"integer","format":"int32"}}},"ProductTagRequest":{"required":["tagCode","tagName"],"type":"object","properties":{"orgId":{"type":"integer","format":"int64"},"tagCode":{"type":"string"},"tagName":{"type":"string"},"tagType":{"type":"string"}}},"ProductTag":{"type":"object","properties":{"id":{"type":"integer","format":"int64"},"orgId":{"type":"integer","format":"int64"},"tagCode":{"type":"string"},"tagName":{"type":"string"},"tagType":{"type":"string"},"createTime":{"type":"string","format":"date-time"},"updateTime":{"type":"string","format":"date-time"},"isDeleted":{"type":"integer","format":"int32"}}},"ResultProductTag":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/ProductTag"}}},"OrgRequest":{"required":["orgCode","orgName","orgType"],"type":"object","properties":{"orgCode":{"type":"string"},"orgName":{"type":"string"},"orgType":{"type":"string"},"status":{"type":"integer","format":"int32"},"contactName":{"type":"string"},"contactPhone":{"type":"string"},"address":{"type":"string"}}},"Org":{"type":"object","properties":{"id":{"type":"integer","format":"int64"},"orgCode":{"type":"string"},"orgName":{"type":"string"},"orgType":{"type":"string"},"status":{"type":"integer","format":"int32"},"contactName":{"type":"string"},"contactPhone":{"type":"string"},"address":{"type":"string"},"createTime":{"type":"string","format":"date-time"},"updateTime":{"type":"string","format":"date-time"},"isDeleted":{"type":"integer","format":"int32"}}},"ResultOrg":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/Org"}}},"DiseaseRequest":{"required":["diseaseCode","diseaseName"],"type":"object","properties":{"orgId":{"type":"integer","format":"int64"},"diseaseCode":{"type":"string"},"diseaseName":{"type":"string"},"remark":{"type":"string"}}},"Disease":{"type":"object","properties":{"id":{"type":"integer","format":"int64"},"orgId":{"type":"integer","format":"int64"},"diseaseCode":{"type":"string"},"diseaseName":{"type":"string"},"remark":{"type":"string"},"createTime":{"type":"string","format":"date-time"},"updateTime":{"type":"string","format":"date-time"},"isDeleted":{"type":"integer","format":"int32"}}},"ResultDisease":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/Disease"}}},"ForbiddenTagsRequest":{"required":["tagIds"],"type":"object","properties":{"tagIds":{"type":"array","items":{"type":"integer","format":"int64"}}}},"DepartmentRequest":{"required":["deptName"],"type":"object","properties":{"orgId":{"type":"integer","format":"int64"},"parentId":{"type":"integer","format":"int64"},"deptName":{"type":"string"},"deptCode":{"type":"string"},"sortNo":{"type":"integer","format":"int32"},"status":{"type":"integer","format":"int32"}}},"Department":{"type":"object","properties":{"id":{"type":"integer","format":"int64"},"orgId":{"type":"integer","format":"int64"},"parentId":{"type":"integer","format":"int64"},"deptName":{"type":"string"},"deptCode":{"type":"string"},"sortNo":{"type":"integer","format":"int32"},"status":{"type":"integer","format":"int32"},"createTime":{"type":"string","format":"date-time"},"updateTime":{"type":"string","format":"date-time"},"isDeleted":{"type":"integer","format":"int32"}}},"ResultDepartment":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/Department"}}},"VitalRecordRequest":{"required":["elderId","measuredAt","type","valueJson"],"type":"object","properties":{"elderId":{"type":"integer","format":"int64"},"type":{"type":"string"},"valueJson":{"type":"string"},"measuredAt":{"type":"string","format":"date-time"},"recordedByStaffId":{"type":"integer","format":"int64"},"remark":{"type":"string"}}},"ResultVitalRecordResponse":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/VitalRecordResponse"}}},"VitalRecordResponse":{"type":"object","properties":{"id":{"type":"integer","format":"int64"},"elderId":{"type":"integer","format":"int64"},"type":{"type":"string"},"valueJson":{"type":"string"},"measuredAt":{"type":"string","format":"date-time"},"recordedByStaffId":{"type":"integer","format":"int64"},"abnormalFlag":{"type":"boolean"},"abnormalReason":{"type":"string"},"remark":{"type":"string"}}},"OrderPreviewRequest":{"required":["elderId","productId","qty"],"type":"object","properties":{"elderId":{"type":"integer","format":"int64"},"productId":{"type":"integer","format":"int64"},"qty":{"minimum":1,"type":"integer","format":"int32"}}},"ForbiddenReason":{"type":"object","properties":{"diseaseId":{"type":"integer","format":"int64"},"diseaseName":{"type":"string"},"tagId":{"type":"integer","format":"int64"},"tagCode":{"type":"string"},"tagName":{"type":"string"}}},"OrderPreviewResponse":{"type":"object","properties":{"status":{"type":"string"},"allowed":{"type":"boolean"},"elderId":{"type":"integer","format":"int64"},"productId":{"type":"integer","format":"int64"},"productName":{"type":"string"},"qty":{"type":"integer","format":"int32"},"pointsRequired":{"type":"integer","format":"int32"},"reasons":{"type":"array","items":{"$ref":"#/components/schemas/ForbiddenReason"}},"message":{"type":"string"}}},"OrderSubmitResponse":{"type":"object","properties":{"status":{"type":"string"},"allowed":{"type":"boolean"},"orderId":{"type":"integer","format":"int64"},"orderNo":{"type":"string"},"pointsDeducted":{"type":"integer","format":"int32"},"balanceAfter":{"type":"integer","format":"int32"},"preview":{"$ref":"#/components/schemas/OrderPreviewResponse"},"message":{"type":"string"}}},"OrderRefundRequest":{"required":["orderId"],"type":"object","properties":{"orderId":{"type":"integer","format":"int64"}}},"OrderCancelRequest":{"required":["orderId"],"type":"object","properties":{"orderId":{"type":"integer","format":"int64"}}},"InventoryAdjustRequest":{"required":["adjustQty","adjustType","productId"],"type":"object","properties":{"orgId":{"type":"integer","format":"int64"},"productId":{"type":"integer","format":"int64"},"batchId":{"type":"integer","format":"int64"},"adjustType":{"type":"string"},"adjustQty":{"type":"integer","format":"int32"},"reason":{"type":"string"},"operatorStaffId":{"type":"integer","format":"int64"}}},"VisitCheckInRequest":{"required":["orgId"],"type":"object","properties":{"orgId":{"type":"integer","format":"int64"},"bookingId":{"type":"integer","format":"int64"},"visitCode":{"type":"string"},"remark":{"type":"string"}}},"ResultVisitCheckInResponse":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/VisitCheckInResponse"}}},"VisitCheckInResponse":{"type":"object","properties":{"bookingId":{"type":"integer","format":"int64"},"guardStaffId":{"type":"integer","format":"int64"},"checkTime":{"type":"string","format":"date-time"},"status":{"type":"integer","format":"int32"}}},"ReconcileResponse":{"type":"object","properties":{"date":{"type":"string","format":"date"},"totalReceived":{"type":"number"},"mismatch":{"type":"boolean"}}},"ResultReconcileResponse":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/ReconcileResponse"}}},"VisitBookRequest":{"required":["elderId","visitTime","visitTimeSlot"],"type":"object","properties":{"orgId":{"type":"integer","format":"int64"},"elderId":{"type":"integer","format":"int64"},"familyUserId":{"type":"integer","format":"int64"},"visitTime":{"type":"string","format":"date-time"},"visitTimeSlot":{"type":"string"},"visitorCount":{"type":"integer","format":"int32"},"carPlate":{"type":"string"},"remark":{"type":"string"}}},"ResultVisitBookingResponse":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/VisitBookingResponse"}}},"VisitBookingResponse":{"type":"object","properties":{"id":{"type":"integer","format":"int64"},"orgId":{"type":"integer","format":"int64"},"elderId":{"type":"integer","format":"int64"},"elderName":{"type":"string"},"familyUserId":{"type":"integer","format":"int64"},"visitDate":{"type":"string","format":"date"},"visitTime":{"type":"string","format":"date-time"},"visitTimeSlot":{"type":"string"},"visitorCount":{"type":"integer","format":"int32"},"carPlate":{"type":"string"},"status":{"type":"integer","format":"int32"},"visitCode":{"type":"string"},"remark":{"type":"string"}}},"FamilyRegisterRequest":{"required":["orgId","phone","verifyCode"],"type":"object","properties":{"orgId":{"type":"integer","format":"int64"},"phone":{"type":"string"},"verifyCode":{"type":"string"},"realName":{"type":"string"}}},"FamilyUser":{"type":"object","properties":{"id":{"type":"integer","format":"int64"},"orgId":{"type":"integer","format":"int64"},"openId":{"type":"string"},"username":{"type":"string"},"passwordHash":{"type":"string"},"realName":{"type":"string"},"phone":{"type":"string"},"idCardNo":{"type":"string"},"status":{"type":"integer","format":"int32"},"createTime":{"type":"string","format":"date-time"},"updateTime":{"type":"string","format":"date-time"},"isDeleted":{"type":"integer","format":"int32"}}},"ResultFamilyUser":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/FamilyUser"}}},"FamilyBindRequest":{"required":["elderId","relation"],"type":"object","properties":{"orgId":{"type":"integer","format":"int64"},"familyUserId":{"type":"integer","format":"int64"},"elderId":{"type":"integer","format":"int64"},"relation":{"type":"string"},"isPrimary":{"type":"integer","format":"int32"},"remark":{"type":"string"}}},"ElderFamily":{"type":"object","properties":{"id":{"type":"integer","format":"int64"},"orgId":{"type":"integer","format":"int64"},"elderId":{"type":"integer","format":"int64"},"familyUserId":{"type":"integer","format":"int64"},"relation":{"type":"string"},"isPrimary":{"type":"integer","format":"int32"},"remark":{"type":"string"},"createTime":{"type":"string","format":"date-time"},"updateTime":{"type":"string","format":"date-time"},"isDeleted":{"type":"integer","format":"int32"}}},"ResultElderFamily":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/ElderFamily"}}},"ElderCreateRequest":{"required":["elderCode","fullName"],"type":"object","properties":{"orgId":{"type":"integer","format":"int64"},"elderCode":{"type":"string"},"fullName":{"type":"string"},"idCardNo":{"type":"string"},"gender":{"type":"integer","format":"int32"},"birthDate":{"type":"string","format":"date"},"phone":{"type":"string"},"admissionDate":{"type":"string","format":"date"},"status":{"type":"integer","format":"int32"},"careLevel":{"type":"string"},"remark":{"type":"string"}}},"AssignBedRequest":{"required":["bedId","startDate"],"type":"object","properties":{"bedId":{"type":"integer","format":"int64"},"startDate":{"type":"string","format":"date"}}},"ExecuteTaskRequest":{"required":["bedQrCode","staffId","taskDailyId"],"type":"object","properties":{"taskDailyId":{"type":"integer","format":"int64"},"staffId":{"type":"integer","format":"int64"},"bedQrCode":{"type":"string"},"remark":{"type":"string"}}},"ExecuteTaskResponse":{"type":"object","properties":{"taskDailyId":{"type":"integer","format":"int64"},"status":{"type":"string"},"abnormal":{"type":"boolean"},"suspicious":{"type":"boolean"},"message":{"type":"string"}}},"PaymentRequest":{"required":["amount","method","paidAt"],"type":"object","properties":{"amount":{"type":"number"},"method":{"type":"string"},"paidAt":{"type":"string","format":"date-time"},"remark":{"type":"string"},"externalTxnId":{"type":"string"}}},"PaymentResponse":{"type":"object","properties":{"billId":{"type":"integer","format":"int64"},"paidAmount":{"type":"number"},"outstandingAmount":{"type":"number"},"status":{"type":"string"}}},"ResultPaymentResponse":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/PaymentResponse"}}},"BillGenerateResponse":{"type":"object","properties":{"billMonth":{"type":"string"},"generatedCount":{"type":"integer","format":"int32"},"skippedCount":{"type":"integer","format":"int32"},"billIds":{"type":"array","items":{"type":"integer","format":"int64"}},"message":{"type":"string"}}},"LoginRequest":{"required":["password","username"],"type":"object","properties":{"username":{"type":"string"},"password":{"type":"string"}}},"LoginResponse":{"type":"object","properties":{"token":{"type":"string"},"staffInfo":{"$ref":"#/components/schemas/StaffInfo"},"roles":{"type":"array","items":{"type":"string"}}}},"ResultLoginResponse":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/LoginResponse"}}},"StaffInfo":{"type":"object","properties":{"id":{"type":"integer","format":"int64"},"orgId":{"type":"integer","format":"int64"},"departmentId":{"type":"integer","format":"int64"},"username":{"type":"string"},"realName":{"type":"string"},"phone":{"type":"string"},"status":{"type":"integer","format":"int32"}}},"FamilyLoginRequest":{"required":["orgId","phone","verifyCode"],"type":"object","properties":{"orgId":{"type":"integer","format":"int64"},"phone":{"type":"string"},"verifyCode":{"type":"string"}}},"FamilyLoginResponse":{"type":"object","properties":{"token":{"type":"string"},"familyUserId":{"type":"integer","format":"int64"},"phone":{"type":"string"},"realName":{"type":"string"}}},"ResultFamilyLoginResponse":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/FamilyLoginResponse"}}},"StaffCreateRequest":{"required":["departmentId","password","realName","staffNo","username"],"type":"object","properties":{"orgId":{"type":"integer","format":"int64"},"departmentId":{"type":"integer","format":"int64"},"staffNo":{"type":"string"},"username":{"type":"string"},"password":{"type":"string"},"realName":{"type":"string"},"phone":{"type":"string"},"email":{"type":"string"},"gender":{"type":"integer","format":"int32"},"status":{"type":"integer","format":"int32"}}},"StaffRoleAssignRequest":{"required":["roleIds","staffId"],"type":"object","properties":{"orgId":{"type":"integer","format":"int64"},"staffId":{"type":"integer","format":"int64"},"roleIds":{"type":"array","items":{"type":"integer","format":"int64"}}}},"StaffRoleChangeRequest":{"required":["orgId","roleId","staffId"],"type":"object","properties":{"orgId":{"type":"integer","format":"int64"},"staffId":{"type":"integer","format":"int64"},"roleId":{"type":"integer","format":"int64"}}},"BillingConfigRequest":{"required":["configKey","configValue","effectiveMonth","orgId"],"type":"object","properties":{"orgId":{"type":"integer","format":"int64"},"configKey":{"type":"string"},"configValue":{"type":"number"},"effectiveMonth":{"pattern":"\\d{4}-\\d{2}","type":"string"},"status":{"type":"integer","format":"int32"},"remark":{"type":"string"}}},"BillingConfigResponse":{"type":"object","properties":{"id":{"type":"integer","format":"int64"},"orgId":{"type":"integer","format":"int64"},"configKey":{"type":"string"},"configValue":{"type":"number"},"effectiveMonth":{"type":"string"},"status":{"type":"integer","format":"int32"},"remark":{"type":"string"}}},"BillingCareLevelFeeRequest":{"required":["careLevel","effectiveMonth","feeMonthly","orgId"],"type":"object","properties":{"orgId":{"type":"integer","format":"int64"},"careLevel":{"type":"string"},"feeMonthly":{"type":"number"},"effectiveMonth":{"pattern":"\\d{4}-\\d{2}","type":"string"},"status":{"type":"integer","format":"int32"},"remark":{"type":"string"}}},"BillingCareLevelFeeResponse":{"type":"object","properties":{"id":{"type":"integer","format":"int64"},"orgId":{"type":"integer","format":"int64"},"careLevel":{"type":"string"},"feeMonthly":{"type":"number"},"effectiveMonth":{"type":"string"},"status":{"type":"integer","format":"int32"},"remark":{"type":"string"}}},"ResultListVitalRecordResponse":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"type":"array","items":{"$ref":"#/components/schemas/VitalRecordResponse"}}}},"IPageRoomResponse":{"type":"object","properties":{"total":{"type":"integer","format":"int64"},"records":{"type":"array","items":{"$ref":"#/components/schemas/RoomResponse"}},"pages":{"type":"integer","format":"int64"},"current":{"type":"integer","format":"int64"},"size":{"type":"integer","format":"int64"}}},"ResultIPageRoomResponse":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/IPageRoomResponse"}}},"InventoryExpiryAlertItem":{"type":"object","properties":{"productId":{"type":"integer","format":"int64"},"productName":{"type":"string"},"batchId":{"type":"integer","format":"int64"},"batchNo":{"type":"string"},"quantity":{"type":"integer","format":"int32"},"expireDate":{"type":"string","format":"date"},"daysToExpire":{"type":"integer","format":"int32"}}},"ResultListInventoryExpiryAlertItem":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"type":"array","items":{"$ref":"#/components/schemas/InventoryExpiryAlertItem"}}}},"InventoryAlertItem":{"type":"object","properties":{"productId":{"type":"integer","format":"int64"},"productName":{"type":"string"},"safetyStock":{"type":"integer","format":"int32"},"currentStock":{"type":"integer","format":"int32"}}},"ResultListInventoryAlertItem":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"type":"array","items":{"$ref":"#/components/schemas/InventoryAlertItem"}}}},"ResultListVisitBookingResponse":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"type":"array","items":{"$ref":"#/components/schemas/VisitBookingResponse"}}}},"FamilyElderItem":{"type":"object","properties":{"elderId":{"type":"integer","format":"int64"},"elderName":{"type":"string"},"relation":{"type":"string"},"isPrimary":{"type":"integer","format":"int32"}}},"ResultListFamilyElderItem":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"type":"array","items":{"$ref":"#/components/schemas/FamilyElderItem"}}}},"ResultListLong":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"type":"array","items":{"type":"integer","format":"int64"}}}},"IPageElderResponse":{"type":"object","properties":{"total":{"type":"integer","format":"int64"},"records":{"type":"array","items":{"$ref":"#/components/schemas/ElderResponse"}},"pages":{"type":"integer","format":"int64"},"current":{"type":"integer","format":"int64"},"size":{"type":"integer","format":"int64"}}},"ResultIPageElderResponse":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/IPageElderResponse"}}},"CareTaskTodayItem":{"type":"object","properties":{"taskDailyId":{"type":"integer","format":"int64"},"elderId":{"type":"integer","format":"int64"},"elderName":{"type":"string"},"bedId":{"type":"integer","format":"int64"},"roomNo":{"type":"string"},"taskName":{"type":"string"},"planTime":{"type":"string","format":"date-time"},"status":{"type":"string"}}},"BillDetailResponse":{"type":"object","properties":{"billId":{"type":"integer","format":"int64"},"elderId":{"type":"integer","format":"int64"},"billMonth":{"type":"string"},"totalAmount":{"type":"number"},"items":{"type":"array","items":{"$ref":"#/components/schemas/BillItemDetail"}},"message":{"type":"string"}}},"BillItemDetail":{"type":"object","properties":{"itemType":{"type":"string"},"itemName":{"type":"string"},"amount":{"type":"number"},"basis":{"type":"string"}}},"IPageBedResponse":{"type":"object","properties":{"total":{"type":"integer","format":"int64"},"records":{"type":"array","items":{"$ref":"#/components/schemas/BedResponse"}},"pages":{"type":"integer","format":"int64"},"current":{"type":"integer","format":"int64"},"size":{"type":"integer","format":"int64"}}},"ResultIPageBedResponse":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/IPageBedResponse"}}},"ResultStaffInfo":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/StaffInfo"}}},"IPageStaffAccount":{"type":"object","properties":{"total":{"type":"integer","format":"int64"},"records":{"type":"array","items":{"$ref":"#/components/schemas/StaffAccount"}},"pages":{"type":"integer","format":"int64"},"current":{"type":"integer","format":"int64"},"size":{"type":"integer","format":"int64"}}},"ResultIPageStaffAccount":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/IPageStaffAccount"}}},"ResultListStaffRole":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"type":"array","items":{"$ref":"#/components/schemas/StaffRole"}}}},"StaffRole":{"type":"object","properties":{"id":{"type":"integer","format":"int64"},"orgId":{"type":"integer","format":"int64"},"staffId":{"type":"integer","format":"int64"},"roleId":{"type":"integer","format":"int64"},"createTime":{"type":"string","format":"date-time"},"updateTime":{"type":"string","format":"date-time"},"isDeleted":{"type":"integer","format":"int32"}}},"IPageRole":{"type":"object","properties":{"total":{"type":"integer","format":"int64"},"records":{"type":"array","items":{"$ref":"#/components/schemas/Role"}},"pages":{"type":"integer","format":"int64"},"current":{"type":"integer","format":"int64"},"size":{"type":"integer","format":"int64"}}},"ResultIPageRole":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/IPageRole"}}},"IPageProductTag":{"type":"object","properties":{"total":{"type":"integer","format":"int64"},"records":{"type":"array","items":{"$ref":"#/components/schemas/ProductTag"}},"pages":{"type":"integer","format":"int64"},"current":{"type":"integer","format":"int64"},"size":{"type":"integer","format":"int64"}}},"ResultIPageProductTag":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/IPageProductTag"}}},"IPageOrg":{"type":"object","properties":{"total":{"type":"integer","format":"int64"},"records":{"type":"array","items":{"$ref":"#/components/schemas/Org"}},"pages":{"type":"integer","format":"int64"},"current":{"type":"integer","format":"int64"},"size":{"type":"integer","format":"int64"}}},"ResultIPageOrg":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/IPageOrg"}}},"IPageDisease":{"type":"object","properties":{"total":{"type":"integer","format":"int64"},"records":{"type":"array","items":{"$ref":"#/components/schemas/Disease"}},"pages":{"type":"integer","format":"int64"},"current":{"type":"integer","format":"int64"},"size":{"type":"integer","format":"int64"}}},"ResultIPageDisease":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/IPageDisease"}}},"ForbiddenTagsResponse":{"type":"object","properties":{"diseaseId":{"type":"integer","format":"int64"},"selectedTagIds":{"type":"array","items":{"type":"integer","format":"int64"}},"groups":{"type":"array","items":{"$ref":"#/components/schemas/TagGroup"}}}},"ResultForbiddenTagsResponse":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/ForbiddenTagsResponse"}}},"TagGroup":{"type":"object","properties":{"tagType":{"type":"string"},"tags":{"type":"array","items":{"$ref":"#/components/schemas/TagItem"}}}},"TagItem":{"type":"object","properties":{"id":{"type":"integer","format":"int64"},"tagCode":{"type":"string"},"tagName":{"type":"string"},"tagType":{"type":"string"}}},"IPageDepartment":{"type":"object","properties":{"total":{"type":"integer","format":"int64"},"records":{"type":"array","items":{"$ref":"#/components/schemas/Department"}},"pages":{"type":"integer","format":"int64"},"current":{"type":"integer","format":"int64"},"size":{"type":"integer","format":"int64"}}},"ResultIPageDepartment":{"type":"object","properties":{"code":{"type":"integer","format":"int32"},"message":{"type":"string"},"data":{"$ref":"#/components/schemas/IPageDepartment"}}}}}}
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "智养云·智慧养老OA平台 API",
+    "version": "1.0.0",
+    "description": "后端全量接口 Swagger 风格模板（可直接补充字段与示例）。\n统一响应：{ code, message, data }\n"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": [
+
+      ]
+    }
+  ],
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "登录",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResultLogin"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "登出",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "当前用户",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/auth/family/login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "summary": "家属登录",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FamilyLoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/orgs": {
+      "get": {
+        "tags": [
+          "Org"
+        ],
+        "summary": "组织分页/搜索",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageNo"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          },
+          {
+            "$ref": "#/components/parameters/Keyword"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Org"
+        ],
+        "summary": "创建组织",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Org"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/orgs/{id}": {
+      "put": {
+        "tags": [
+          "Org"
+        ],
+        "summary": "更新组织",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Org"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Org"
+        ],
+        "summary": "删除组织",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/departments": {
+      "get": {
+        "tags": [
+          "Department"
+        ],
+        "summary": "部门分页/搜索",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageNo"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          },
+          {
+            "$ref": "#/components/parameters/Keyword"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Department"
+        ],
+        "summary": "创建部门",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Department"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/departments/{id}": {
+      "put": {
+        "tags": [
+          "Department"
+        ],
+        "summary": "更新部门",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Department"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Department"
+        ],
+        "summary": "删除部门",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/roles": {
+      "get": {
+        "tags": [
+          "Role"
+        ],
+        "summary": "角色分页/搜索",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageNo"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          },
+          {
+            "$ref": "#/components/parameters/Keyword"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Role"
+        ],
+        "summary": "创建角色",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Role"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/roles/{id}": {
+      "put": {
+        "tags": [
+          "Role"
+        ],
+        "summary": "更新角色",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Role"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Role"
+        ],
+        "summary": "删除角色",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/staff": {
+      "get": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "员工分页/搜索",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageNo"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          },
+          {
+            "$ref": "#/components/parameters/Keyword"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "创建员工",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Staff"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/staff/{id}": {
+      "put": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "更新员工",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Staff"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "删除员工",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/staff/{id}/roles": {
+      "put": {
+        "tags": [
+          "Staff"
+        ],
+        "summary": "分配员工角色",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "roleIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/elder": {
+      "post": {
+        "tags": [
+          "Elder"
+        ],
+        "summary": "创建老人",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Elder"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/elder/{id}": {
+      "get": {
+        "tags": [
+          "Elder"
+        ],
+        "summary": "老人详情",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Elder"
+        ],
+        "summary": "更新老人",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Elder"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/elder/page": {
+      "get": {
+        "tags": [
+          "Elder"
+        ],
+        "summary": "老人分页/搜索",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageNo"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          },
+          {
+            "$ref": "#/components/parameters/Keyword"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/elder/{id}/assignBed": {
+      "post": {
+        "tags": [
+          "Elder"
+        ],
+        "summary": "分配床位",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "bedId": {
+                    "type": "integer"
+                  },
+                  "startDate": {
+                    "type": "string",
+                    "format": "date"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/elder/{id}/unbindBed": {
+      "post": {
+        "tags": [
+          "Elder"
+        ],
+        "summary": "退住/解绑床位",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "endDate": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/family/register": {
+      "post": {
+        "tags": [
+          "Family"
+        ],
+        "summary": "家属注册",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FamilyRegister"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/family/bindElder": {
+      "post": {
+        "tags": [
+          "Family"
+        ],
+        "summary": "绑定老人",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FamilyBind"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/family/visit/book": {
+      "post": {
+        "tags": [
+          "Visit"
+        ],
+        "summary": "家属预约探视",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VisitBook"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/family/visit/my": {
+      "get": {
+        "tags": [
+          "Visit"
+        ],
+        "summary": "家属我的预约",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/family/elder/my": {
+      "get": {
+        "tags": [
+          "Family"
+        ],
+        "summary": "家属我的老人",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/guard/visit/today": {
+      "get": {
+        "tags": [
+          "Visit"
+        ],
+        "summary": "门卫今日预约列表",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/guard/visit/checkin": {
+      "post": {
+        "tags": [
+          "Visit"
+        ],
+        "summary": "门卫核验",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VisitCheckin"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/room/list": {
+      "get": {
+        "tags": [
+          "Bed"
+        ],
+        "summary": "房间列表",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/room/page": {
+      "get": {
+        "tags": [
+          "Bed"
+        ],
+        "summary": "房间分页",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageNo"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/bed/list": {
+      "get": {
+        "tags": [
+          "Bed"
+        ],
+        "summary": "床位列表",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/bed/page": {
+      "get": {
+        "tags": [
+          "Bed"
+        ],
+        "summary": "床位分页",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageNo"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/bed/map": {
+      "get": {
+        "tags": [
+          "Bed"
+        ],
+        "summary": "床位房态图",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/care/tasks/today": {
+      "get": {
+        "tags": [
+          "Care"
+        ],
+        "summary": "今日护理任务",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageNo"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          },
+          {
+            "name": "staffId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/care/tasks/page": {
+      "get": {
+        "tags": [
+          "Care"
+        ],
+        "summary": "护理任务分页",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageNo"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/care/tasks/execute": {
+      "post": {
+        "tags": [
+          "Care"
+        ],
+        "summary": "扫码执行护理任务",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CareExecute"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/care/tasks/generate": {
+      "post": {
+        "tags": [
+          "Care"
+        ],
+        "summary": "生成护理任务",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/vital/record": {
+      "post": {
+        "tags": [
+          "Vital"
+        ],
+        "summary": "生命体征录入",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VitalRecord"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/vital/elder/{elderId}": {
+      "get": {
+        "tags": [
+          "Vital"
+        ],
+        "summary": "生命体征查询",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ElderIdPath"
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/vital/elder/{elderId}/latest": {
+      "get": {
+        "tags": [
+          "Vital"
+        ],
+        "summary": "生命体征最新",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ElderIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/vital/abnormal/today": {
+      "get": {
+        "tags": [
+          "Vital"
+        ],
+        "summary": "今日异常体征",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/disease": {
+      "get": {
+        "tags": [
+          "Disease"
+        ],
+        "summary": "疾病列表",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Disease"
+        ],
+        "summary": "创建疾病",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Disease"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/disease/{id}": {
+      "put": {
+        "tags": [
+          "Disease"
+        ],
+        "summary": "更新疾病",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Disease"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Disease"
+        ],
+        "summary": "删除疾病",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/product-tag": {
+      "get": {
+        "tags": [
+          "Disease"
+        ],
+        "summary": "商品标签列表",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Disease"
+        ],
+        "summary": "创建商品标签",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductTag"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/product-tag/{id}": {
+      "put": {
+        "tags": [
+          "Disease"
+        ],
+        "summary": "更新商品标签",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductTag"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Disease"
+        ],
+        "summary": "删除商品标签",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/admin/disease/{id}/forbidden-tags": {
+      "get": {
+        "tags": [
+          "Disease"
+        ],
+        "summary": "查询禁忌标签",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Disease"
+        ],
+        "summary": "保存禁忌标签",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tagIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/elder/{elderId}/diseases": {
+      "get": {
+        "tags": [
+          "Disease"
+        ],
+        "summary": "老人疾病查询",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ElderIdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Disease"
+        ],
+        "summary": "老人疾病保存",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ElderIdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "diseaseIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/store/order/preview": {
+      "post": {
+        "tags": [
+          "Store"
+        ],
+        "summary": "下单预览",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoreOrderPreview"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/store/order/submit": {
+      "post": {
+        "tags": [
+          "Store"
+        ],
+        "summary": "下单提交",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoreOrderSubmit"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/store/order/page": {
+      "get": {
+        "tags": [
+          "Store"
+        ],
+        "summary": "订单分页",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageNo"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/store/order/{id}": {
+      "get": {
+        "tags": [
+          "Store"
+        ],
+        "summary": "订单详情",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/store/order/cancel": {
+      "post": {
+        "tags": [
+          "Store"
+        ],
+        "summary": "取消订单",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderCancel"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/store/order/refund": {
+      "post": {
+        "tags": [
+          "Store"
+        ],
+        "summary": "退货",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderRefund"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/store/product/page": {
+      "get": {
+        "tags": [
+          "Store"
+        ],
+        "summary": "商品分页",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageNo"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/store/product": {
+      "post": {
+        "tags": [
+          "Store"
+        ],
+        "summary": "创建商品",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Product"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/store/product/{id}": {
+      "put": {
+        "tags": [
+          "Store"
+        ],
+        "summary": "更新商品",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdPath"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Product"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/inventory/page": {
+      "get": {
+        "tags": [
+          "Inventory"
+        ],
+        "summary": "库存分页",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageNo"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/inventory/alerts": {
+      "get": {
+        "tags": [
+          "Inventory"
+        ],
+        "summary": "低库存预警",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/inventory/expiry-alerts": {
+      "get": {
+        "tags": [
+          "Inventory"
+        ],
+        "summary": "临期预警",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/inventory/adjust": {
+      "post": {
+        "tags": [
+          "Inventory"
+        ],
+        "summary": "库存盘点调整",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryAdjust"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/bill/page": {
+      "get": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "账单分页",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageNo"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/bill/{elderId}": {
+      "get": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "老人账单",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ElderIdPath"
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/bill/generate": {
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "生成账单",
+        "parameters": [
+          {
+            "name": "month",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/bill/{billId}/pay": {
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "支付登记",
+        "parameters": [
+          {
+            "name": "billId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/finance/reconcile": {
+      "post": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "每日对账",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/finance/reconcile/page": {
+      "get": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "对账历史分页",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageNo"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          },
+          {
+            "name": "dateFrom",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "dateTo",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/finance/bill/{billId}": {
+      "get": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "账单详情（含明细/支付/商城消费）",
+        "parameters": [
+          {
+            "name": "billId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/finance/payment/page": {
+      "get": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "支付记录分页",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageNo"
+          },
+          {
+            "$ref": "#/components/parameters/PageSize"
+          },
+          {
+            "name": "billId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "elderId",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/finance/report/monthly-revenue": {
+      "get": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "月营收趋势",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/finance/report/arrears-top": {
+      "get": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "欠费排行",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/finance/report/store-sales": {
+      "get": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "商城销售统计",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/api/dashboard/summary": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "仪表盘统计",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "parameters": {
+      "PageNo": {
+        "name": "pageNo",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "default": 1
+        }
+      },
+      "PageSize": {
+        "name": "pageSize",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "default": 10
+        }
+      },
+      "Keyword": {
+        "name": "keyword",
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "IdPath": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "ElderIdPath": {
+        "name": "elderId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "integer"
+        }
+      }
+    },
+    "schemas": {
+      "ApiResultLogin": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/LoginResponse"
+          }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "staffInfo": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "orgId": {
+                "type": "integer"
+              },
+              "departmentId": {
+                "type": "integer"
+              },
+              "username": {
+                "type": "string"
+              },
+              "realName": {
+                "type": "string"
+              },
+              "phone": {
+                "type": "string"
+              },
+              "status": {
+                "type": "integer"
+              }
+            }
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "FamilyLoginRequest": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          }
+        }
+      },
+      "Org": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "orgName": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          }
+        }
+      },
+      "Department": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "deptName": {
+            "type": "string"
+          },
+          "orgId": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "integer"
+          }
+        }
+      },
+      "Role": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "roleName": {
+            "type": "string"
+          },
+          "roleCode": {
+            "type": "string"
+          },
+          "roleDesc": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          }
+        }
+      },
+      "Staff": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "username": {
+            "type": "string"
+          },
+          "realName": {
+            "type": "string"
+          },
+          "departmentId": {
+            "type": "integer"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          }
+        }
+      },
+      "Elder": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "elderCode": {
+            "type": "string"
+          },
+          "careLevel": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          }
+        }
+      },
+      "FamilyRegister": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          }
+        }
+      },
+      "FamilyBind": {
+        "type": "object",
+        "properties": {
+          "familyUserId": {
+            "type": "integer"
+          },
+          "elderId": {
+            "type": "integer"
+          },
+          "relation": {
+            "type": "string"
+          }
+        }
+      },
+      "VisitBook": {
+        "type": "object",
+        "properties": {
+          "elderId": {
+            "type": "integer"
+          },
+          "visitTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "visitorCount": {
+            "type": "integer"
+          },
+          "carPlate": {
+            "type": "string"
+          }
+        }
+      },
+      "VisitCheckin": {
+        "type": "object",
+        "properties": {
+          "bookingId": {
+            "type": "integer"
+          },
+          "visitCode": {
+            "type": "string"
+          }
+        }
+      },
+      "CareExecute": {
+        "type": "object",
+        "properties": {
+          "taskDailyId": {
+            "type": "integer"
+          },
+          "staffId": {
+            "type": "integer"
+          },
+          "bedQrCode": {
+            "type": "string"
+          },
+          "remark": {
+            "type": "string"
+          }
+        }
+      },
+      "VitalRecord": {
+        "type": "object",
+        "properties": {
+          "elderId": {
+            "type": "integer"
+          },
+          "type": {
+            "type": "string"
+          },
+          "valueJson": {
+            "type": "object"
+          },
+          "measuredAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "remark": {
+            "type": "string"
+          }
+        }
+      },
+      "Disease": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "diseaseName": {
+            "type": "string"
+          }
+        }
+      },
+      "ProductTag": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "tagCode": {
+            "type": "string"
+          },
+          "tagName": {
+            "type": "string"
+          },
+          "tagType": {
+            "type": "string"
+          }
+        }
+      },
+      "StoreOrderPreview": {
+        "type": "object",
+        "properties": {
+          "elderId": {
+            "type": "integer"
+          },
+          "productId": {
+            "type": "integer"
+          },
+          "qty": {
+            "type": "integer"
+          }
+        }
+      },
+      "StoreOrderSubmit": {
+        "type": "object",
+        "properties": {
+          "elderId": {
+            "type": "integer"
+          },
+          "productId": {
+            "type": "integer"
+          },
+          "qty": {
+            "type": "integer"
+          }
+        }
+      },
+      "OrderCancel": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "integer"
+          }
+        }
+      },
+      "OrderRefund": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "integer"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "Product": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "productCode": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "pointsPrice": {
+            "type": "number"
+          },
+          "safetyStock": {
+            "type": "integer"
+          },
+          "status": {
+            "type": "integer"
+          }
+        }
+      },
+      "InventoryAdjust": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "integer"
+          },
+          "adjustQty": {
+            "type": "integer"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "PayRequest": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number"
+          },
+          "method": {
+            "type": "string"
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "remark": {
+            "type": "string"
+          }
+        }
+      },
+      "FinanceBillDetailResponse": {
+        "type": "object",
+        "properties": {
+          "bill": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "elderId": {
+                "type": "integer"
+              },
+              "elderName": {
+                "type": "string"
+              },
+              "billMonth": {
+                "type": "string"
+              },
+              "totalAmount": {
+                "type": "number"
+              },
+              "paidAmount": {
+                "type": "number"
+              },
+              "outstandingAmount": {
+                "type": "number"
+              },
+              "status": {
+                "type": "string"
+              },
+              "createTime": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "itemType": {
+                  "type": "string"
+                },
+                "itemName": {
+                  "type": "string"
+                },
+                "amount": {
+                  "type": "number"
+                },
+                "calcBasis": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "storeOrders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StoreOrderSummary"
+            }
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentRecordItem"
+            }
+          }
+        }
+      },
+      "PaymentRecordItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "billMonthlyId": {
+            "type": "integer"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "payMethod": {
+            "type": "string"
+          },
+          "paidAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "operatorStaffId": {
+            "type": "integer"
+          },
+          "remark": {
+            "type": "string"
+          },
+          "externalTxnId": {
+            "type": "string"
+          }
+        }
+      },
+      "StoreOrderSummary": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "integer"
+          },
+          "orderNo": {
+            "type": "string"
+          },
+          "totalAmount": {
+            "type": "number"
+          },
+          "createTime": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FinanceReportMonthlyItem": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string"
+          },
+          "totalAmount": {
+            "type": "number"
+          }
+        }
+      },
+      "FinanceArrearsItem": {
+        "type": "object",
+        "properties": {
+          "elderId": {
+            "type": "integer"
+          },
+          "elderName": {
+            "type": "string"
+          },
+          "outstandingAmount": {
+            "type": "number"
+          }
+        }
+      },
+      "FinanceStoreSalesItem": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "integer"
+          },
+          "productName": {
+            "type": "string"
+          },
+          "totalQty": {
+            "type": "integer"
+          },
+          "totalAmount": {
+            "type": "number"
+          }
+        }
+      },
+      "ReconciliationDaily": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "reconcileDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "totalReceived": {
+            "type": "number"
+          },
+          "mismatchFlag": {
+            "type": "integer"
+          }
+        }
+      }
+    }
+  }
+}

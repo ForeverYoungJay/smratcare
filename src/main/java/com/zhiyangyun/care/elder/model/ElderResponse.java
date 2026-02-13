@@ -6,6 +6,7 @@ import lombok.Data;
 @Data
 public class ElderResponse {
   private Long id;
+  private Long tenantId;
   private Long orgId;
   private String elderCode;
   private String elderQrCode;

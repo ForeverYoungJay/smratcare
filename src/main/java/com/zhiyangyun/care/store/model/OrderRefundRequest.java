@@ -7,4 +7,6 @@ import lombok.Data;
 public class OrderRefundRequest {
   @NotNull
   private Long orderId;
+
+  private String reason;
 }

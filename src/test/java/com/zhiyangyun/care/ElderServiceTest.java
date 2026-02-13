@@ -58,13 +58,13 @@ class ElderServiceTest {
     var bound = elderService.assignBed(200L, request);
     assertEquals(newBed.getId(), bound.getBedId());
 
-    var unbound = elderService.unbindBed(200L, LocalDate.now(), "discharge");
+    var unbound = elderService.unbindBed(200L, LocalDate.now(), "discharge", null, null);
     assertNull(unbound.getBedId());
   }
 
   @Test
   void page_query() {
-    var page = elderService.page(1, 10, "Elder");
+    var page = elderService.page(null, 1, 10, "Elder");
     assertNotNull(page);
     assertEquals(1, page.getCurrent());
   }

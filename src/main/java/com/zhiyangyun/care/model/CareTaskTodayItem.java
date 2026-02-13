@@ -11,7 +11,10 @@ public class CareTaskTodayItem {
   private Long bedId;
   private String roomNo;
   private Long staffId;
+  private String staffName;
   private String taskName;
   private LocalDateTime planTime;
   private String status;
+  private String careLevel;
+  private Boolean suspiciousFlag;
 }

@@ -93,6 +93,7 @@ CREATE TABLE staff_role (
 -- 老人档案
 CREATE TABLE elder (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
   elder_code VARCHAR(64) NOT NULL COMMENT '老人编号',
   elder_qr_code VARCHAR(128) NOT NULL COMMENT '老人二维码字符串',
@@ -106,11 +107,13 @@ CREATE TABLE elder (
   bed_id BIGINT DEFAULT NULL COMMENT '床位ID',
   care_level VARCHAR(32) DEFAULT NULL COMMENT '护理等级',
   remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
   create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
   UNIQUE KEY uk_elder_org_code (org_id, elder_code),
   UNIQUE KEY uk_elder_org_qr (org_id, elder_qr_code),
+  KEY idx_elder_tenant_id (tenant_id),
   KEY idx_elder_org_id (org_id),
   KEY idx_elder_bed_id (bed_id),
   KEY idx_elder_id_card_no (id_card_no)
@@ -154,6 +157,7 @@ CREATE TABLE elder_family (
 -- 老人床位关系（历史）
 CREATE TABLE elder_bed_relation (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
   elder_id BIGINT NOT NULL COMMENT '老人ID',
   bed_id BIGINT NOT NULL COMMENT '床位ID',
@@ -161,49 +165,192 @@ CREATE TABLE elder_bed_relation (
   end_date DATE DEFAULT NULL COMMENT '结束日期',
   active_flag TINYINT NOT NULL DEFAULT 1 COMMENT '当前有效 1是 0否',
   remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
   create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  KEY idx_elder_bed_rel_tenant_id (tenant_id),
   KEY idx_elder_bed_rel_elder_id (elder_id),
   KEY idx_elder_bed_rel_bed_id (bed_id),
   KEY idx_elder_bed_rel_active (active_flag)
 ) COMMENT='老人床位关系';
 
+-- CRM线索
+CREATE TABLE crm_lead (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  name VARCHAR(64) NOT NULL COMMENT '姓名',
+  phone VARCHAR(32) DEFAULT NULL COMMENT '电话',
+  source VARCHAR(64) DEFAULT NULL COMMENT '来源',
+  status TINYINT NOT NULL DEFAULT 0 COMMENT '状态 0新建 1跟进中 2已签约 3流失',
+  next_follow_date DATE DEFAULT NULL COMMENT '下次跟进日期',
+  remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  KEY idx_crm_lead_tenant_id (tenant_id),
+  KEY idx_crm_lead_org_id (org_id),
+  KEY idx_crm_lead_status (status)
+) COMMENT='CRM线索';
+
+-- 入院办理
+CREATE TABLE elder_admission (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  elder_id BIGINT NOT NULL COMMENT '老人ID',
+  admission_date DATE NOT NULL COMMENT '入院日期',
+  contract_no VARCHAR(64) DEFAULT NULL COMMENT '合同号',
+  deposit_amount DECIMAL(12,2) DEFAULT NULL COMMENT '押金金额',
+  remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  KEY idx_admission_tenant_id (tenant_id),
+  KEY idx_admission_org_id (org_id),
+  KEY idx_admission_elder_id (elder_id)
+) COMMENT='入院办理';
+
+-- 变更记录
+CREATE TABLE elder_change_log (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  elder_id BIGINT NOT NULL COMMENT '老人ID',
+  change_type VARCHAR(32) NOT NULL COMMENT '变更类型 BED_CHANGE/CARE_LEVEL/STATUS/ROOM',
+  before_value VARCHAR(128) DEFAULT NULL COMMENT '变更前',
+  after_value VARCHAR(128) DEFAULT NULL COMMENT '变更后',
+  reason VARCHAR(255) DEFAULT NULL COMMENT '原因',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  KEY idx_change_tenant_id (tenant_id),
+  KEY idx_change_org_id (org_id),
+  KEY idx_change_elder_id (elder_id)
+) COMMENT='长者变更记录';
+
+-- 退院记录
+CREATE TABLE elder_discharge (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  elder_id BIGINT NOT NULL COMMENT '老人ID',
+  discharge_date DATE NOT NULL COMMENT '退院日期',
+  reason VARCHAR(255) DEFAULT NULL COMMENT '原因',
+  settle_amount DECIMAL(12,2) DEFAULT NULL COMMENT '结算金额',
+  remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  KEY idx_discharge_tenant_id (tenant_id),
+  KEY idx_discharge_org_id (org_id),
+  KEY idx_discharge_elder_id (elder_id)
+) COMMENT='退院记录';
+
+-- 楼栋
+CREATE TABLE building (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  name VARCHAR(64) NOT NULL COMMENT '楼栋名称',
+  code VARCHAR(32) DEFAULT NULL COMMENT '楼栋编码',
+  status TINYINT NOT NULL DEFAULT 1 COMMENT '状态 1启用 0停用',
+  sort_no INT NOT NULL DEFAULT 0 COMMENT '排序',
+  remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  UNIQUE KEY uk_building_tenant_name (tenant_id, name),
+  UNIQUE KEY uk_building_tenant_code (tenant_id, code),
+  KEY idx_building_tenant_id (tenant_id),
+  KEY idx_building_org_id (org_id)
+) COMMENT='楼栋';
+
+-- 楼层
+CREATE TABLE floor (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  building_id BIGINT NOT NULL COMMENT '楼栋ID',
+  floor_no VARCHAR(32) NOT NULL COMMENT '楼层编号',
+  name VARCHAR(64) DEFAULT NULL COMMENT '楼层名称',
+  status TINYINT NOT NULL DEFAULT 1 COMMENT '状态 1启用 0停用',
+  sort_no INT NOT NULL DEFAULT 0 COMMENT '排序',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  UNIQUE KEY uk_floor_tenant_building_floor (tenant_id, building_id, floor_no),
+  KEY idx_floor_tenant_id (tenant_id),
+  KEY idx_floor_org_id (org_id),
+  KEY idx_floor_building_id (building_id)
+) COMMENT='楼层';
+
 -- 房间
 CREATE TABLE room (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
+  building_id BIGINT DEFAULT NULL COMMENT '楼栋ID',
+  floor_id BIGINT DEFAULT NULL COMMENT '楼层ID',
   building VARCHAR(64) DEFAULT NULL COMMENT '楼栋',
   floor_no VARCHAR(32) DEFAULT NULL COMMENT '楼层',
   room_no VARCHAR(32) NOT NULL COMMENT '房间号',
   room_type VARCHAR(32) DEFAULT NULL COMMENT '房间类型',
   capacity INT NOT NULL DEFAULT 1 COMMENT '床位容量',
   status TINYINT NOT NULL DEFAULT 1 COMMENT '状态 1可用 0停用',
+  room_qr_code VARCHAR(128) DEFAULT NULL COMMENT '房间二维码字符串',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
   create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
   UNIQUE KEY uk_room_org_room_no (org_id, room_no),
+  UNIQUE KEY uk_room_tenant_room_no (tenant_id, room_no),
   KEY idx_room_org_id (org_id)
 ) COMMENT='房间';
 
 -- 床位
 CREATE TABLE bed (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
   room_id BIGINT NOT NULL COMMENT '房间ID',
   bed_no VARCHAR(32) NOT NULL COMMENT '床位号',
   bed_qr_code VARCHAR(128) NOT NULL COMMENT '床位二维码字符串',
   status TINYINT NOT NULL DEFAULT 1 COMMENT '状态 1空闲 2占用 3维修',
   elder_id BIGINT DEFAULT NULL COMMENT '当前老人ID',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
   create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
   UNIQUE KEY uk_bed_org_room_bed_no (org_id, room_id, bed_no),
   UNIQUE KEY uk_bed_org_qr_code (org_id, bed_qr_code),
+  UNIQUE KEY uk_bed_tenant_qr_code (tenant_id, bed_qr_code),
   KEY idx_bed_org_id (org_id),
   KEY idx_bed_room_id (room_id),
   KEY idx_bed_elder_id (elder_id)
 ) COMMENT='床位';
+
+-- 审计日志
+CREATE TABLE audit_log (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  actor_id BIGINT DEFAULT NULL COMMENT '操作人ID',
+  actor_name VARCHAR(64) DEFAULT NULL COMMENT '操作人姓名',
+  action_type VARCHAR(64) NOT NULL COMMENT '动作类型',
+  entity_type VARCHAR(64) NOT NULL COMMENT '实体类型',
+  entity_id BIGINT DEFAULT NULL COMMENT '实体ID',
+  detail VARCHAR(512) DEFAULT NULL COMMENT '详情',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  KEY idx_audit_tenant_id (tenant_id),
+  KEY idx_audit_org_id (org_id),
+  KEY idx_audit_entity (entity_type, entity_id)
+) COMMENT='审计日志';
 
 -- 护理任务模板
 CREATE TABLE care_task_template (
@@ -264,6 +411,26 @@ CREATE TABLE care_task_execute_log (
   KEY idx_care_task_execute_staff_id (staff_id),
   KEY idx_care_task_execute_time (execute_time)
 ) COMMENT='护理任务执行日志';
+
+-- 护理任务评价
+CREATE TABLE care_task_review (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  task_daily_id BIGINT NOT NULL COMMENT '日任务ID',
+  staff_id BIGINT NOT NULL COMMENT '护工ID',
+  score INT NOT NULL COMMENT '评分 1-5',
+  comment VARCHAR(500) DEFAULT NULL COMMENT '评价内容',
+  reviewer_type VARCHAR(32) DEFAULT NULL COMMENT '评价人类型',
+  reviewer_id BIGINT DEFAULT NULL COMMENT '评价人ID',
+  reviewer_name VARCHAR(64) DEFAULT NULL COMMENT '评价人姓名',
+  review_time DATETIME NOT NULL COMMENT '评价时间',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  KEY idx_care_task_review_task_daily_id (task_daily_id),
+  KEY idx_care_task_review_staff_id (staff_id),
+  KEY idx_care_task_review_time (review_time)
+) COMMENT='护理任务评价';
 
 -- 生命体征记录
 CREATE TABLE vital_sign_record (
@@ -340,6 +507,7 @@ CREATE TABLE product_tag (
   tag_code VARCHAR(64) NOT NULL COMMENT '标签编码',
   tag_name VARCHAR(128) NOT NULL COMMENT '标签名称',
   tag_type VARCHAR(32) DEFAULT NULL COMMENT '标签类型',
+  status TINYINT NOT NULL DEFAULT 1 COMMENT '状态 1启用 0停用',
   create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
@@ -428,6 +596,9 @@ CREATE TABLE inventory_log (
   change_qty INT NOT NULL COMMENT '变更数量',
   ref_order_id BIGINT DEFAULT NULL COMMENT '关联订单ID',
   ref_adjustment_id BIGINT DEFAULT NULL COMMENT '关联盘点ID',
+  product_code_snapshot VARCHAR(64) DEFAULT NULL COMMENT '商品编码快照',
+  product_name_snapshot VARCHAR(128) DEFAULT NULL COMMENT '商品名称快照',
+  biz_type VARCHAR(32) DEFAULT NULL COMMENT '业务类型 INBOUND/ORDER/CONSUME/RETURN/ADJUST',
   remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
   create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -481,6 +652,8 @@ CREATE TABLE order_item (
   order_id BIGINT NOT NULL COMMENT '订单ID',
   product_id BIGINT NOT NULL COMMENT '商品ID',
   product_name VARCHAR(128) NOT NULL COMMENT '商品名称',
+  product_code_snapshot VARCHAR(64) DEFAULT NULL COMMENT '商品编码快照',
+  product_name_snapshot VARCHAR(128) DEFAULT NULL COMMENT '商品名称快照',
   unit_price DECIMAL(10,2) NOT NULL DEFAULT 0 COMMENT '单价',
   quantity INT NOT NULL DEFAULT 1 COMMENT '数量',
   total_amount DECIMAL(10,2) NOT NULL DEFAULT 0 COMMENT '小计',
@@ -668,3 +841,95 @@ CREATE TABLE billing_care_level_fee (
   KEY idx_billing_care_level (care_level),
   KEY idx_billing_care_month (effective_month)
 ) COMMENT='护理等级计费';
+
+-- M3 服务与护理标准化
+ALTER TABLE care_task_template
+  ADD COLUMN tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  ADD COLUMN created_by BIGINT DEFAULT NULL COMMENT '创建人';
+
+ALTER TABLE care_task_daily
+  ADD COLUMN tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  ADD COLUMN source_type VARCHAR(32) DEFAULT NULL COMMENT '来源类型',
+  ADD COLUMN source_id BIGINT DEFAULT NULL COMMENT '来源ID',
+  ADD COLUMN created_by BIGINT DEFAULT NULL COMMENT '创建人';
+
+ALTER TABLE care_task_execute_log
+  ADD COLUMN tenant_id BIGINT NOT NULL COMMENT '租户ID';
+
+ALTER TABLE care_task_review
+  ADD COLUMN tenant_id BIGINT NOT NULL COMMENT '租户ID';
+
+CREATE TABLE service_item (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  name VARCHAR(128) NOT NULL COMMENT '服务名称',
+  category VARCHAR(64) DEFAULT NULL COMMENT '分类',
+  default_duration INT DEFAULT NULL COMMENT '默认时长(分钟)',
+  default_points INT DEFAULT NULL COMMENT '默认积分/费用',
+  enabled TINYINT NOT NULL DEFAULT 1 COMMENT '是否启用',
+  remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  UNIQUE KEY uk_service_item_tenant_name (tenant_id, name),
+  KEY idx_service_item_tenant_id (tenant_id),
+  KEY idx_service_item_org_id (org_id)
+) COMMENT='服务项目库';
+
+CREATE TABLE care_package (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  name VARCHAR(128) NOT NULL COMMENT '套餐名称',
+  care_level VARCHAR(32) DEFAULT NULL COMMENT '护理等级',
+  cycle_days INT NOT NULL DEFAULT 1 COMMENT '周期天数',
+  enabled TINYINT NOT NULL DEFAULT 1 COMMENT '是否启用',
+  remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  UNIQUE KEY uk_care_package_tenant_name (tenant_id, name),
+  KEY idx_care_package_tenant_id (tenant_id),
+  KEY idx_care_package_org_id (org_id)
+) COMMENT='护理套餐';
+
+CREATE TABLE care_package_item (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  package_id BIGINT NOT NULL COMMENT '套餐ID',
+  item_id BIGINT NOT NULL COMMENT '服务项ID',
+  frequency_per_day INT NOT NULL DEFAULT 1 COMMENT '每日频次',
+  enabled TINYINT NOT NULL DEFAULT 1 COMMENT '是否启用',
+  sort_no INT NOT NULL DEFAULT 0 COMMENT '排序',
+  remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  UNIQUE KEY uk_package_item_tenant_package_item (tenant_id, package_id, item_id),
+  KEY idx_package_item_tenant_id (tenant_id),
+  KEY idx_package_item_package_id (package_id)
+) COMMENT='套餐明细';
+
+CREATE TABLE elder_package (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  elder_id BIGINT NOT NULL COMMENT '老人ID',
+  package_id BIGINT NOT NULL COMMENT '套餐ID',
+  start_date DATE NOT NULL COMMENT '开始日期',
+  end_date DATE DEFAULT NULL COMMENT '结束日期',
+  status TINYINT NOT NULL DEFAULT 1 COMMENT '状态 1启用 0停用',
+  remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  KEY idx_elder_package_tenant_id (tenant_id),
+  KEY idx_elder_package_elder_id (elder_id),
+  KEY idx_elder_package_package_id (package_id)
+) COMMENT='老人套餐';

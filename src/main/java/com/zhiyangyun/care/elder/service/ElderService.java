@@ -12,11 +12,11 @@ public interface ElderService {
 
   ElderResponse update(Long id, ElderUpdateRequest request);
 
-  ElderResponse get(Long id);
+  ElderResponse get(Long id, Long tenantId);
 
-  IPage<ElderResponse> page(long pageNo, long pageSize, String keyword);
+  IPage<ElderResponse> page(Long tenantId, long pageNo, long pageSize, String keyword);
 
   ElderResponse assignBed(Long elderId, AssignBedRequest request);
 
-  ElderResponse unbindBed(Long elderId, LocalDate endDate, String reason);
+  ElderResponse unbindBed(Long elderId, LocalDate endDate, String reason, Long tenantId, Long createdBy);
 }

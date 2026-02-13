@@ -1,0 +1,245 @@
+<template>
+  <PageContainer title="日程与任务" subTitle="任务列表与日历视图">
+    <a-tabs v-model:activeKey="activeKey">
+      <a-tab-pane key="list" tab="任务列表">
+        <SearchForm :model="query" @search="fetchData" @reset="onReset">
+          <a-form-item label="状态">
+            <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 160px" />
+          </a-form-item>
+          <template #extra>
+            <a-button type="primary" @click="openCreate">新增任务</a-button>
+          </template>
+        </SearchForm>
+
+        <DataTable
+          rowKey="id"
+          :columns="columns"
+          :data-source="rows"
+          :loading="loading"
+          :pagination="pagination"
+          @change="handleTableChange"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'status'">
+              <a-tag :color="record.status === 'DONE' ? 'green' : 'orange'">
+                {{ record.status === 'DONE' ? '已完成' : '进行中' }}
+              </a-tag>
+            </template>
+            <template v-else-if="column.key === 'priority'">
+              <a-tag :color="record.priority === 'HIGH' ? 'red' : record.priority === 'LOW' ? 'blue' : 'gold'">
+                {{ priorityLabel(record.priority) }}
+              </a-tag>
+            </template>
+            <template v-else-if="column.key === 'action'">
+              <a-space>
+                <a-button type="link" @click="openEdit(record)">编辑</a-button>
+                <a-button type="link" @click="done(record)">完成</a-button>
+                <a-button type="link" danger @click="remove(record)">删除</a-button>
+              </a-space>
+            </template>
+          </template>
+        </DataTable>
+      </a-tab-pane>
+      <a-tab-pane key="calendar" tab="日历视图">
+        <a-card class="card-elevated" :bordered="false">
+          <FullCalendar :options="calendarOptions" />
+        </a-card>
+      </a-tab-pane>
+    </a-tabs>
+
+    <a-modal v-model:open="editOpen" title="任务" @ok="submit" :confirm-loading="saving" width="640px">
+      <a-form layout="vertical">
+        <a-form-item label="标题" required>
+          <a-input v-model:value="form.title" />
+        </a-form-item>
+        <a-form-item label="描述">
+          <a-textarea v-model:value="form.description" :rows="3" />
+        </a-form-item>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="开始时间">
+              <a-date-picker v-model:value="form.startTime" show-time style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="结束时间">
+              <a-date-picker v-model:value="form.endTime" show-time style="width: 100%" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="负责人">
+              <a-input v-model:value="form.assigneeName" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="优先级">
+              <a-select v-model:value="form.priority" :options="priorityOptions" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-form-item label="状态">
+          <a-select v-model:value="form.status" :options="statusOptions" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+  </PageContainer>
+</template>
+
+<script setup lang="ts">
+import { reactive, ref, computed } from 'vue'
+import dayjs from 'dayjs'
+import PageContainer from '../../components/PageContainer.vue'
+import SearchForm from '../../components/SearchForm.vue'
+import DataTable from '../../components/DataTable.vue'
+import { getOaTaskPage, createOaTask, updateOaTask, completeOaTask, deleteOaTask } from '../../api/oa'
+import type { OaTask, PageResult } from '../../types'
+import FullCalendar from '@fullcalendar/vue3'
+import dayGridPlugin from '@fullcalendar/daygrid'
+import interactionPlugin from '@fullcalendar/interaction'
+
+const activeKey = ref('list')
+const loading = ref(false)
+const rows = ref<OaTask[]>([])
+const query = reactive({ status: undefined as string | undefined, pageNo: 1, pageSize: 10 })
+const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
+
+const columns = [
+  { title: '标题', dataIndex: 'title', key: 'title', width: 200 },
+  { title: '负责人', dataIndex: 'assigneeName', key: 'assigneeName', width: 120 },
+  { title: '开始时间', dataIndex: 'startTime', key: 'startTime', width: 160 },
+  { title: '结束时间', dataIndex: 'endTime', key: 'endTime', width: 160 },
+  { title: '优先级', dataIndex: 'priority', key: 'priority', width: 100 },
+  { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
+  { title: '操作', key: 'action', width: 180 }
+]
+
+const editOpen = ref(false)
+const saving = ref(false)
+const form = reactive({
+  id: undefined as number | undefined,
+  title: '',
+  description: '',
+  startTime: undefined as any,
+  endTime: undefined as any,
+  assigneeName: '',
+  priority: 'NORMAL',
+  status: 'OPEN'
+})
+
+const statusOptions = [
+  { label: '进行中', value: 'OPEN' },
+  { label: '已完成', value: 'DONE' }
+]
+const priorityOptions = [
+  { label: '低', value: 'LOW' },
+  { label: '普通', value: 'NORMAL' },
+  { label: '高', value: 'HIGH' }
+]
+
+function priorityLabel(priority?: string) {
+  if (priority === 'HIGH') return '高'
+  if (priority === 'LOW') return '低'
+  return '普通'
+}
+
+const calendarOptions = computed(() => ({
+  plugins: [dayGridPlugin, interactionPlugin],
+  initialView: 'dayGridMonth',
+  events: rows.value.map((task) => ({
+    title: task.title,
+    date: task.startTime ? task.startTime.slice(0, 10) : undefined
+  }))
+}))
+
+async function fetchData() {
+  loading.value = true
+  try {
+    const res: PageResult<OaTask> = await getOaTaskPage({
+      pageNo: query.pageNo,
+      pageSize: query.pageSize,
+      status: query.status
+    })
+    rows.value = res.list
+    pagination.total = res.total || res.list.length
+  } finally {
+    loading.value = false
+  }
+}
+
+function handleTableChange(pag: any) {
+  pagination.current = pag.current
+  pagination.pageSize = pag.pageSize
+  query.pageNo = pag.current
+  query.pageSize = pag.pageSize
+  fetchData()
+}
+
+function onReset() {
+  query.status = undefined
+  query.pageNo = 1
+  pagination.current = 1
+  fetchData()
+}
+
+function openCreate() {
+  form.id = undefined
+  form.title = ''
+  form.description = ''
+  form.startTime = undefined
+  form.endTime = undefined
+  form.assigneeName = ''
+  form.priority = 'NORMAL'
+  form.status = 'OPEN'
+  editOpen.value = true
+}
+
+function openEdit(record: OaTask) {
+  form.id = record.id
+  form.title = record.title
+  form.description = record.description || ''
+  form.startTime = record.startTime ? dayjs(record.startTime) : undefined
+  form.endTime = record.endTime ? dayjs(record.endTime) : undefined
+  form.assigneeName = record.assigneeName || ''
+  form.priority = record.priority || 'NORMAL'
+  form.status = record.status || 'OPEN'
+  editOpen.value = true
+}
+
+async function submit() {
+  const payload = {
+    title: form.title,
+    description: form.description,
+    startTime: form.startTime ? dayjs(form.startTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
+    endTime: form.endTime ? dayjs(form.endTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
+    assigneeName: form.assigneeName,
+    priority: form.priority,
+    status: form.status
+  }
+  saving.value = true
+  try {
+    if (form.id) {
+      await updateOaTask(form.id, payload)
+    } else {
+      await createOaTask(payload)
+    }
+    editOpen.value = false
+    fetchData()
+  } finally {
+    saving.value = false
+  }
+}
+
+async function done(record: OaTask) {
+  await completeOaTask(record.id)
+  fetchData()
+}
+
+async function remove(record: OaTask) {
+  await deleteOaTask(record.id)
+  fetchData()
+}
+
+fetchData()
+</script>

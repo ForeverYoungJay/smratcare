@@ -7,4 +7,6 @@ public interface BillService {
   BillGenerateResponse generateMonthlyBills(String billMonth);
 
   BillDetailResponse getBillDetail(Long elderId, String billMonth);
+
+  BillDetailResponse getBillDetailById(Long billId);
 }

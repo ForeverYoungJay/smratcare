@@ -10,11 +10,12 @@ public interface RoomService {
 
   RoomResponse update(Long id, RoomRequest request);
 
-  RoomResponse get(Long id);
+  RoomResponse get(Long id, Long tenantId);
 
-  IPage<RoomResponse> page(Long orgId, long pageNo, long pageSize, String keyword);
+  IPage<RoomResponse> page(Long tenantId, long pageNo, long pageSize,
+      String keyword, String roomNo, String building, String floorNo, Long buildingId, Long floorId, Integer status);
 
-  java.util.List<RoomResponse> list(Long orgId);
+  java.util.List<RoomResponse> list(Long tenantId);
 
-  void delete(Long id);
+  void delete(Long id, Long tenantId);
 }

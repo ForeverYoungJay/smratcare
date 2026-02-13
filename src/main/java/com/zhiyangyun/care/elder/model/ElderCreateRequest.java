@@ -6,8 +6,9 @@ import lombok.Data;
 
 @Data
 public class ElderCreateRequest {
+  private Long tenantId;
   private Long orgId;
-  @NotBlank
+  private Long createdBy;
   private String elderCode;
   @NotBlank
   private String fullName;
@@ -19,4 +20,6 @@ public class ElderCreateRequest {
   private Integer status = 1;
   private String careLevel;
   private String remark;
+  private Long bedId;
+  private LocalDate bedStartDate;
 }

@@ -12,6 +12,12 @@ import com.zhiyangyun.care.store.mapper.ProductMapper;
 import com.zhiyangyun.care.store.model.InventoryAdjustRequest;
 import com.zhiyangyun.care.store.model.InventoryAlertItem;
 import com.zhiyangyun.care.store.model.InventoryExpiryAlertItem;
+import com.zhiyangyun.care.store.model.InventoryInboundRequest;
+import com.zhiyangyun.care.store.model.InventoryOutboundRequest;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Random;
 import com.zhiyangyun.care.store.service.InventoryService;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
@@ -80,8 +86,151 @@ public class InventoryServiceImpl implements InventoryService {
     log.setChangeType("ADJUST");
     log.setChangeQty(delta);
     log.setRefAdjustmentId(adjustment.getId());
+    log.setBizType("ADJUST");
+    fillProductSnapshot(log, request.getOrgId(), request.getProductId());
     log.setRemark(request.getReason());
     logMapper.insert(log);
+  }
+
+  @Override
+  @Transactional
+  public void inbound(InventoryInboundRequest request) {
+    String batchNo = request.getBatchNo();
+    if (batchNo == null || batchNo.isBlank()) {
+      String date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+      int rand = new Random().nextInt(9000) + 1000;
+      batchNo = "IN-" + date + "-" + rand;
+    }
+    InventoryBatch batch = batchMapper.selectOne(
+        Wrappers.lambdaQuery(InventoryBatch.class)
+            .eq(InventoryBatch::getOrgId, request.getOrgId())
+            .eq(InventoryBatch::getProductId, request.getProductId())
+            .eq(InventoryBatch::getBatchNo, batchNo)
+            .eq(InventoryBatch::getIsDeleted, 0));
+    if (batch == null) {
+      batch = new InventoryBatch();
+      batch.setOrgId(request.getOrgId());
+      batch.setProductId(request.getProductId());
+      batch.setBatchNo(batchNo);
+      batch.setQuantity(request.getQuantity());
+      batch.setCostPrice(request.getCostPrice() == null ? BigDecimal.ZERO : request.getCostPrice());
+      batch.setExpireDate(request.getExpireDate());
+      batch.setWarehouseLocation(request.getWarehouseLocation());
+      batchMapper.insert(batch);
+    } else {
+      int current = batch.getQuantity() == null ? 0 : batch.getQuantity();
+      batch.setQuantity(current + request.getQuantity());
+      if (request.getCostPrice() != null) {
+        batch.setCostPrice(request.getCostPrice());
+      }
+      if (request.getExpireDate() != null) {
+        batch.setExpireDate(request.getExpireDate());
+      }
+      if (request.getWarehouseLocation() != null) {
+        batch.setWarehouseLocation(request.getWarehouseLocation());
+      }
+      batchMapper.updateById(batch);
+    }
+
+    InventoryLog log = new InventoryLog();
+    log.setOrgId(request.getOrgId());
+    log.setProductId(request.getProductId());
+    log.setBatchId(batch.getId());
+    log.setChangeType("IN");
+    log.setChangeQty(request.getQuantity());
+    log.setBizType("INBOUND");
+    fillProductSnapshot(log, request.getOrgId(), request.getProductId());
+    log.setRemark(request.getRemark());
+    logMapper.insert(log);
+  }
+
+  @Override
+  @Transactional
+  public void outbound(InventoryOutboundRequest request) {
+    if (request.getQuantity() == null || request.getQuantity() <= 0) {
+      throw new IllegalArgumentException("quantity must be positive");
+    }
+    if (request.getBatchId() != null) {
+      InventoryBatch batch = batchMapper.selectById(request.getBatchId());
+      if (batch == null) {
+        throw new IllegalArgumentException("batch not found");
+      }
+      if (request.getOrgId() != null && !request.getOrgId().equals(batch.getOrgId())) {
+        throw new IllegalStateException("org mismatch");
+      }
+      int current = batch.getQuantity() == null ? 0 : batch.getQuantity();
+      if (current < request.getQuantity()) {
+        throw new IllegalStateException("insufficient stock");
+      }
+      batch.setQuantity(current - request.getQuantity());
+      batchMapper.updateById(batch);
+
+      InventoryLog log = new InventoryLog();
+      log.setOrgId(request.getOrgId());
+      log.setProductId(request.getProductId());
+      log.setBatchId(batch.getId());
+      log.setChangeType("OUT");
+      log.setChangeQty(request.getQuantity());
+      log.setBizType("CONSUME");
+      fillProductSnapshot(log, request.getOrgId(), request.getProductId());
+      log.setRemark(request.getReason());
+      logMapper.insert(log);
+      return;
+    }
+
+    int remaining = request.getQuantity();
+    List<InventoryBatch> batches = batchMapper.selectList(
+        Wrappers.lambdaQuery(InventoryBatch.class)
+            .eq(InventoryBatch::getOrgId, request.getOrgId())
+            .eq(InventoryBatch::getProductId, request.getProductId())
+            .orderByAsc(InventoryBatch::getExpireDate)
+            .orderByAsc(InventoryBatch::getId));
+    int total = 0;
+    for (InventoryBatch batch : batches) {
+      total += batch.getQuantity() == null ? 0 : batch.getQuantity();
+    }
+    if (total < remaining) {
+      throw new IllegalStateException("insufficient stock");
+    }
+    for (InventoryBatch batch : batches) {
+      if (remaining <= 0) {
+        break;
+      }
+      int available = batch.getQuantity() == null ? 0 : batch.getQuantity();
+      if (available <= 0) {
+        continue;
+      }
+      int used = Math.min(available, remaining);
+      batch.setQuantity(available - used);
+      batchMapper.updateById(batch);
+
+      InventoryLog log = new InventoryLog();
+      log.setOrgId(request.getOrgId());
+      log.setProductId(request.getProductId());
+      log.setBatchId(batch.getId());
+      log.setChangeType("OUT");
+      log.setChangeQty(used);
+      log.setBizType("CONSUME");
+      fillProductSnapshot(log, request.getOrgId(), request.getProductId());
+      log.setRemark(request.getReason());
+      logMapper.insert(log);
+      remaining -= used;
+    }
+  }
+
+  private void fillProductSnapshot(InventoryLog log, Long orgId, Long productId) {
+    if (productId == null) {
+      return;
+    }
+    Product product = productMapper.selectById(productId);
+    if (product == null) {
+      return;
+    }
+    if (orgId != null && product.getOrgId() != null && !orgId.equals(product.getOrgId())) {
+      return;
+    }
+    log.setProductCodeSnapshot(product.getProductCode());
+    log.setProductNameSnapshot(product.getProductName());
   }
 
   @Override

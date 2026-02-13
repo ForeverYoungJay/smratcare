@@ -15,6 +15,6 @@ public class CareTaskScheduler {
 
   @Scheduled(cron = "0 5 0 * * ?")
   public void generateDailyTasks() {
-    careTaskService.generateDailyTasks(LocalDate.now(), false);
+    careTaskService.generateDailyTasks(null, LocalDate.now(), false);
   }
 }

@@ -3,6 +3,8 @@ package com.zhiyangyun.care.vital.service.impl;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zhiyangyun.care.auth.entity.StaffAccount;
+import com.zhiyangyun.care.auth.mapper.StaffMapper;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.vital.entity.VitalSignRecord;
@@ -26,15 +28,18 @@ public class VitalSignServiceImpl implements VitalSignService {
   private final VitalSignRecordMapper recordMapper;
   private final VitalThresholdConfigMapper thresholdMapper;
   private final ElderMapper elderMapper;
+  private final StaffMapper staffMapper;
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   public VitalSignServiceImpl(
       VitalSignRecordMapper recordMapper,
       VitalThresholdConfigMapper thresholdMapper,
-      ElderMapper elderMapper) {
+      ElderMapper elderMapper,
+      StaffMapper staffMapper) {
     this.recordMapper = recordMapper;
     this.thresholdMapper = thresholdMapper;
     this.elderMapper = elderMapper;
+    this.staffMapper = staffMapper;
   }
 
   @Override
@@ -58,7 +63,9 @@ public class VitalSignServiceImpl implements VitalSignService {
     record.setRemark(request.getRemark());
     recordMapper.insert(record);
 
-    return toResponse(record, abnormal.reason);
+    String elderName = elder == null ? null : elder.getFullName();
+    String staffName = resolveStaffName(record.getRecordedByStaffId());
+    return toResponse(record, abnormal.reason, elderName, staffName);
   }
 
   @Override
@@ -71,10 +78,13 @@ public class VitalSignServiceImpl implements VitalSignService {
         .le(to != null, VitalSignRecord::getMeasuredAt, to)
         .orderByDesc(VitalSignRecord::getMeasuredAt);
     List<VitalSignRecord> records = recordMapper.selectList(wrapper);
+    ElderProfile elder = elderMapper.selectById(elderId);
+    String elderName = elder == null ? null : elder.getFullName();
+    Map<Long, String> staffNameMap = resolveStaffNames(records);
     List<VitalRecordResponse> responses = new ArrayList<>();
     for (VitalSignRecord record : records) {
       AbnormalResult abnormal = evaluateAbnormal(record.getOrgId(), record.getType(), record.getValueJson());
-      responses.add(toResponse(record, abnormal.reason));
+      responses.add(toResponse(record, abnormal.reason, elderName, staffNameMap.get(record.getRecordedByStaffId())));
     }
     return responses;
   }
@@ -91,7 +101,10 @@ public class VitalSignServiceImpl implements VitalSignService {
       return null;
     }
     AbnormalResult abnormal = evaluateAbnormal(record.getOrgId(), record.getType(), record.getValueJson());
-    return toResponse(record, abnormal.reason);
+    ElderProfile elder = elderMapper.selectById(record.getElderId());
+    String elderName = elder == null ? null : elder.getFullName();
+    String staffName = resolveStaffName(record.getRecordedByStaffId());
+    return toResponse(record, abnormal.reason, elderName, staffName);
   }
 
   @Override
@@ -106,26 +119,74 @@ public class VitalSignServiceImpl implements VitalSignService {
             .lt(VitalSignRecord::getMeasuredAt, end)
             .eq(VitalSignRecord::getIsDeleted, 0)
             .orderByDesc(VitalSignRecord::getMeasuredAt));
+    Map<Long, String> elderNameMap = resolveElderNames(records);
+    Map<Long, String> staffNameMap = resolveStaffNames(records);
     List<VitalRecordResponse> responses = new ArrayList<>();
     for (VitalSignRecord record : records) {
       AbnormalResult abnormal = evaluateAbnormal(record.getOrgId(), record.getType(), record.getValueJson());
-      responses.add(toResponse(record, abnormal.reason));
+      responses.add(toResponse(record, abnormal.reason,
+          elderNameMap.get(record.getElderId()),
+          staffNameMap.get(record.getRecordedByStaffId())));
     }
     return responses;
   }
 
-  private VitalRecordResponse toResponse(VitalSignRecord record, String abnormalReason) {
+  private VitalRecordResponse toResponse(VitalSignRecord record, String abnormalReason, String elderName,
+                                         String staffName) {
     VitalRecordResponse response = new VitalRecordResponse();
     response.setId(record.getId());
     response.setElderId(record.getElderId());
+    response.setElderName(elderName);
     response.setType(record.getType());
     response.setValueJson(record.getValueJson());
     response.setMeasuredAt(record.getMeasuredAt());
     response.setRecordedByStaffId(record.getRecordedByStaffId());
+    response.setRecordedByStaffName(staffName);
     response.setAbnormalFlag(record.getAbnormalFlag() != null && record.getAbnormalFlag() == 1);
     response.setAbnormalReason(abnormalReason);
     response.setRemark(record.getRemark());
     return response;
+  }
+
+  private String resolveStaffName(Long staffId) {
+    if (staffId == null) {
+      return null;
+    }
+    StaffAccount staff = staffMapper.selectById(staffId);
+    if (staff == null || staff.getIsDeleted() != null && staff.getIsDeleted() == 1) {
+      return null;
+    }
+    return staff.getRealName();
+  }
+
+  private Map<Long, String> resolveStaffNames(List<VitalSignRecord> records) {
+    List<Long> staffIds = records.stream()
+        .map(VitalSignRecord::getRecordedByStaffId)
+        .filter(java.util.Objects::nonNull)
+        .distinct()
+        .toList();
+    if (staffIds.isEmpty()) {
+      return Map.of();
+    }
+    return staffMapper.selectList(Wrappers.lambdaQuery(StaffAccount.class)
+            .in(StaffAccount::getId, staffIds)
+            .eq(StaffAccount::getIsDeleted, 0))
+        .stream()
+        .collect(java.util.stream.Collectors.toMap(StaffAccount::getId, StaffAccount::getRealName, (a, b) -> a));
+  }
+
+  private Map<Long, String> resolveElderNames(List<VitalSignRecord> records) {
+    List<Long> elderIds = records.stream()
+        .map(VitalSignRecord::getElderId)
+        .filter(java.util.Objects::nonNull)
+        .distinct()
+        .toList();
+    if (elderIds.isEmpty()) {
+      return Map.of();
+    }
+    return elderMapper.selectBatchIds(elderIds)
+        .stream()
+        .collect(java.util.stream.Collectors.toMap(ElderProfile::getId, ElderProfile::getFullName, (a, b) -> a));
   }
 
   private AbnormalResult evaluateAbnormal(Long orgId, String type, String valueJson) {

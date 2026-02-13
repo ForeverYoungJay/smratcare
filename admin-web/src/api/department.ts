@@ -1,6 +1,6 @@
-import request from '../utils/request'
-import type { ApiResult, PageResult, DepartmentItem } from '../types/api'
+import { fetchPage } from '../utils/request'
+import type { DepartmentItem } from '../types'
 
 export function getDepartmentPage(params: any) {
-  return request.get<ApiResult<PageResult<DepartmentItem>>>('/api/admin/departments', { params })
+  return fetchPage<DepartmentItem>('/api/admin/departments', params)
 }

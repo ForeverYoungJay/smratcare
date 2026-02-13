@@ -12,12 +12,12 @@
         theme="dark"
         mode="inline"
         :selectedKeys="selectedKeys"
+        :openKeys="openKeys"
+        @openChange="onOpenChange"
+        :items="menuItems"
+        @click="onMenuClick"
         class="side-menu"
-      >
-        <a-menu-item v-for="item in filteredMenu" :key="item.path" @click="go(item.path)">
-          <span>{{ item.label }}</span>
-        </a-menu-item>
-      </a-menu>
+      />
     </a-layout-sider>
 
     <a-layout class="app-main">
@@ -25,8 +25,9 @@
         <div class="header-left">
           <div class="page-title">{{ currentTitle || '工作台' }}</div>
           <a-breadcrumb class="breadcrumb">
-            <a-breadcrumb-item>首页</a-breadcrumb-item>
-            <a-breadcrumb-item>{{ currentTitle || 'Dashboard' }}</a-breadcrumb-item>
+            <a-breadcrumb-item v-for="(bc, idx) in breadcrumbs" :key="idx">
+              {{ bc }}
+            </a-breadcrumb-item>
           </a-breadcrumb>
         </div>
         <div class="header-right">
@@ -51,30 +52,81 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../stores/user'
-import { menuItems } from '../router/menu'
+import { getMenuTree } from './menu'
 
 const collapsed = ref(false)
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const openKeys = ref<string[]>([])
 
 const filteredMenu = computed(() => {
-  if (!userStore.roles || userStore.roles.length === 0) return menuItems
-  return menuItems.filter((m) => !m.roles || m.roles.some((r) => userStore.roles.includes(r)))
+  const roles = userStore.roles || []
+  return getMenuTree(roles)
+})
+
+const menuItems = computed(() => {
+  const map = (items: any[]): any[] =>
+    items.map((item) => ({
+      key: item.path || item.key,
+      label: item.label,
+      children: item.children ? map(item.children) : undefined
+    }))
+  return map(filteredMenu.value)
 })
 
 const selectedKeys = computed(() => [route.path])
 
 const currentTitle = computed(() => {
-  const item = menuItems.find((m) => m.path === route.path)
-  return item?.label || ''
+  const title = route.meta?.title as string | undefined
+  return title || ''
 })
 
-function go(path: string) {
-  router.push(path)
+const breadcrumbs = computed(() => {
+  const titles = route.matched
+    .map((r) => r.meta?.title as string | undefined)
+    .filter((t) => t && t.length > 0) as string[]
+  return ['首页', ...titles]
+})
+
+watch(
+  () => route.path,
+  (path) => {
+    const trail = findMenuTrail(path)
+    if (trail.length > 1) {
+      openKeys.value = trail.slice(0, trail.length - 1).map((t) => t.key)
+    } else {
+      openKeys.value = []
+    }
+  },
+  { immediate: true }
+)
+
+function onOpenChange(keys: string[]) {
+  openKeys.value = keys
+}
+
+function onMenuClick(info: any) {
+  if (typeof info.key === 'string') {
+    router.push(info.key)
+  }
+}
+
+function findMenuTrail(path: string) {
+  const walk = (items: any[], trail: any[] = []): any[] => {
+    for (const item of items) {
+      if (item.path === path) return [...trail, item]
+      if (item.children) {
+        const found = walk(item.children, [...trail, item])
+        if (found.length) return found
+      }
+    }
+    return []
+  }
+  return walk(filteredMenu.value)
 }
 
 function logout() {
@@ -90,8 +142,8 @@ function logout() {
 }
 
 .app-sider {
-  background: linear-gradient(180deg, #0f172a 0%, #0b3b54 100%);
-  border-right: 1px solid rgba(148, 163, 184, 0.2);
+  background: linear-gradient(180deg, #0b2f6b 0%, #0a4aa2 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .brand {
@@ -106,8 +158,8 @@ function logout() {
   width: 40px;
   height: 40px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #38bdf8, #22d3ee);
-  color: #0f172a;
+  background: #ffffff;
+  color: #0b2f6b;
   font-weight: 700;
   display: grid;
   place-items: center;
@@ -128,13 +180,14 @@ function logout() {
   border-inline-end: none !important;
 }
 
-.side-menu .ant-menu-item {
+.side-menu .ant-menu-item,
+.side-menu .ant-menu-submenu-title {
   border-radius: 10px;
   margin: 6px 12px;
 }
 
 .side-menu .ant-menu-item-selected {
-  background: rgba(56, 189, 248, 0.2) !important;
+  background: rgba(255, 255, 255, 0.18) !important;
 }
 
 .app-main {
@@ -145,14 +198,13 @@ function logout() {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: var(--glass);
+  background: var(--card);
   border-bottom: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0 24px;
   height: 64px;
-  backdrop-filter: blur(14px);
   box-shadow: var(--shadow-sm);
 }
 

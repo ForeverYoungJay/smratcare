@@ -1,100 +1,109 @@
-import request from '../utils/request'
-import type { ApiResult, PageResult, ProductItem, InventoryItem, OrderItem, InventoryAlertItem } from '../types/api'
+import request, { fetchPage } from '../utils/request'
+import type {
+  ProductItem,
+  OrderItem,
+  ProductTagItem,
+  DiseaseItem,
+  ForbiddenTagGroup,
+  StoreOrderPreviewRequest,
+  StoreOrderSubmitRequest,
+  OrderCancelRequest,
+  OrderRefundRequest,
+  PointsAccountItem,
+  PointsLogItem,
+  PointsAdjustRequest
+} from '../types'
 
 export function getProductPage(params: any) {
-  return request.get<ApiResult<PageResult<ProductItem>>>('/api/store/product/page', { params })
-    .catch(() => mockProductPage())
+  return fetchPage<ProductItem>('/api/store/product/page', params)
 }
 
 export function createProduct(data: Partial<ProductItem>) {
-  return request.post<ApiResult<void>>('/api/store/product', data)
+  return request.post<void>('/api/store/product', data)
 }
 
 export function updateProduct(id: number, data: Partial<ProductItem>) {
-  return request.put<ApiResult<void>>(`/api/store/product/${id}`, data)
-}
-
-export function getInventoryPage(params: any) {
-  return request.get<ApiResult<PageResult<InventoryItem>>>('/api/inventory/page', { params })
-    .catch(() => mockInventoryPage())
-}
-
-export function getInventoryAlerts() {
-  return request.get<ApiResult<InventoryAlertItem[]>>('/api/inventory/alerts')
-    .catch(() => mockInventoryAlerts())
-}
-
-export function getInventoryExpiryAlerts() {
-  return request.get<ApiResult<InventoryAlertItem[]>>('/api/inventory/expiry-alerts')
-    .catch(() => mockInventoryExpiryAlerts())
+  return request.put<void>(`/api/store/product/${id}`, data)
 }
 
 export function getOrderPage(params: any) {
-  return request.get<ApiResult<PageResult<OrderItem>>>('/api/store/order/page', { params })
-    .catch(() => mockOrderPage())
+  return fetchPage<OrderItem>('/api/store/order/page', params)
 }
 
 export function getOrderDetail(id: number) {
-  return request.get<ApiResult<OrderItem>>(`/api/store/order/${id}`)
+  return request.get<OrderItem>(`/api/store/order/${id}`)
 }
 
-function mockProductPage(): ApiResult<PageResult<ProductItem>> {
-  return {
-    code: 0,
-    message: 'OK',
-    data: {
-      records: [
-        { id: 6001, productName: '白砂糖', pointsPrice: 10, status: 1 },
-        { id: 6003, productName: '纯牛奶', pointsPrice: 5, status: 1 }
-      ],
-      total: 2
-    }
-  }
+export function previewOrder(data: StoreOrderPreviewRequest) {
+  return request.post<any>('/api/store/order/preview', data)
 }
 
-function mockInventoryPage(): ApiResult<PageResult<InventoryItem>> {
-  return {
-    code: 0,
-    message: 'OK',
-    data: {
-      records: [
-        { id: 8001, productId: 6003, quantity: 10, expireDate: '2026-03-10' }
-      ],
-      total: 1
-    }
-  }
+export function submitOrder(data: StoreOrderSubmitRequest) {
+  return request.post<any>('/api/store/order/submit', data)
 }
 
-function mockInventoryAlerts(): ApiResult<InventoryAlertItem[]> {
-  return {
-    code: 0,
-    message: 'OK',
-    data: [
-      { id: 1, productName: '营养奶粉', productCode: 'NP-001', alertType: 'LOW', stock: 8, safetyStock: 15, remark: '低库存' },
-      { id: 2, productName: '护理手套', productCode: 'GT-102', alertType: 'LOW', stock: 30, safetyStock: 50, remark: '低库存' }
-    ]
-  }
+export function cancelOrder(data: OrderCancelRequest) {
+  return request.post<void>('/api/store/order/cancel', data)
 }
 
-function mockInventoryExpiryAlerts(): ApiResult<InventoryAlertItem[]> {
-  return {
-    code: 0,
-    message: 'OK',
-    data: [
-      { id: 3, productName: '营养液', productCode: 'NY-008', alertType: 'EXPIRY', stock: 20, safetyStock: 10, remark: '30天内到期' }
-    ]
-  }
+export function refundOrder(data: OrderRefundRequest) {
+  return request.post<void>('/api/store/order/refund', data)
 }
 
-function mockOrderPage(): ApiResult<PageResult<OrderItem>> {
-  return {
-    code: 0,
-    message: 'OK',
-    data: {
-      records: [
-        { id: 9001, elderId: 4003, totalPoints: 5, status: 'PAID' }
-      ],
-      total: 1
-    }
-  }
+export function fulfillOrder(orderId: number) {
+  return request.post<void>('/api/store/order/fulfill', { orderId })
+}
+
+export async function getDiseaseList() {
+  const res = await fetchPage<DiseaseItem>('/api/admin/disease', { pageNo: 1, pageSize: 200 })
+  return res.list
+}
+
+export function createDisease(data: Partial<DiseaseItem>) {
+  return request.post<void>('/api/admin/disease', data)
+}
+
+export function updateDisease(id: number, data: Partial<DiseaseItem>) {
+  return request.put<void>(`/api/admin/disease/${id}`, data)
+}
+
+export function deleteDisease(id: number) {
+  return request.delete<void>(`/api/admin/disease/${id}`)
+}
+
+export async function getProductTagList() {
+  const res = await fetchPage<ProductTagItem>('/api/admin/product-tag', { pageNo: 1, pageSize: 500 })
+  return res.list
+}
+
+export function createProductTag(data: Partial<ProductTagItem>) {
+  return request.post<void>('/api/admin/product-tag', data)
+}
+
+export function updateProductTag(id: number, data: Partial<ProductTagItem>) {
+  return request.put<void>(`/api/admin/product-tag/${id}`, data)
+}
+
+export function deleteProductTag(id: number) {
+  return request.delete<void>(`/api/admin/product-tag/${id}`)
+}
+
+export function getForbiddenTags(diseaseId: number) {
+  return request.get<ForbiddenTagGroup>(`/api/admin/disease/${diseaseId}/forbidden-tags`)
+}
+
+export function updateForbiddenTags(diseaseId: number, tagIds: number[]) {
+  return request.put<void>(`/api/admin/disease/${diseaseId}/forbidden-tags`, { tagIds })
+}
+
+export function getPointsAccountPage(params: any) {
+  return fetchPage<PointsAccountItem>('/api/store/points/page', params)
+}
+
+export function getPointsLogPage(params: any) {
+  return fetchPage<PointsLogItem>('/api/store/points/log/page', params)
+}
+
+export function adjustPoints(data: PointsAdjustRequest) {
+  return request.post<void>('/api/store/points/adjust', data)
 }

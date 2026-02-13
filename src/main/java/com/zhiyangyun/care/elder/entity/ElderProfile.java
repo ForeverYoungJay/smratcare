@@ -15,6 +15,8 @@ public class ElderProfile {
   @TableId(type = IdType.ASSIGN_ID)
   private Long id;
 
+  private Long tenantId;
+
   private Long orgId;
 
   private String elderCode;
@@ -40,6 +42,8 @@ public class ElderProfile {
   private String careLevel;
 
   private String remark;
+
+  private Long createdBy;
 
   @TableField(value = "create_time", fill = FieldFill.INSERT)
   private LocalDateTime createTime;

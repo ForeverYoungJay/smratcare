@@ -13,13 +13,18 @@ import lombok.Data;
 public class Room {
   @TableId(type = IdType.ASSIGN_ID)
   private Long id;
+  private Long tenantId;
   private Long orgId;
+  private Long buildingId;
+  private Long floorId;
   private String building;
   private String floorNo;
   private String roomNo;
   private String roomType;
   private Integer capacity;
   private Integer status;
+  private String roomQrCode;
+  private Long createdBy;
   @TableField(value = "create_time", fill = FieldFill.INSERT)
   private LocalDateTime createTime;
   @TableField(value = "update_time", fill = FieldFill.INSERT_UPDATE)

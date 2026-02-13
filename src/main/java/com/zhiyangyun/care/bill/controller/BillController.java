@@ -9,8 +9,15 @@ import com.zhiyangyun.care.bill.entity.BillMonthly;
 import com.zhiyangyun.care.bill.mapper.BillMonthlyMapper;
 import com.zhiyangyun.care.bill.model.BillDetailResponse;
 import com.zhiyangyun.care.bill.model.BillGenerateResponse;
+import com.zhiyangyun.care.bill.model.BillMonthlyView;
 import com.zhiyangyun.care.bill.service.BillService;
+import com.zhiyangyun.care.elder.entity.ElderProfile;
+import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import jakarta.validation.constraints.Pattern;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,10 +30,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class BillController {
   private final BillService billService;
   private final BillMonthlyMapper billMonthlyMapper;
+  private final ElderMapper elderMapper;
 
-  public BillController(BillService billService, BillMonthlyMapper billMonthlyMapper) {
+  public BillController(BillService billService, BillMonthlyMapper billMonthlyMapper, ElderMapper elderMapper) {
     this.billService = billService;
     this.billMonthlyMapper = billMonthlyMapper;
+    this.elderMapper = elderMapper;
   }
 
   @PostMapping("/generate")
@@ -43,11 +52,12 @@ public class BillController {
   }
 
   @GetMapping("/page")
-  public Result<IPage<BillMonthly>> page(
+  public Result<IPage<BillMonthlyView>> page(
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) String month,
-      @RequestParam(required = false) Long elderId) {
+      @RequestParam(required = false) Long elderId,
+      @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
     var wrapper = Wrappers.lambdaQuery(BillMonthly.class)
         .eq(BillMonthly::getIsDeleted, 0)
@@ -58,7 +68,50 @@ public class BillController {
     if (elderId != null) {
       wrapper.eq(BillMonthly::getElderId, elderId);
     }
+    if (keyword != null && !keyword.isBlank()) {
+      List<Long> elderIds = elderMapper.selectList(
+              Wrappers.lambdaQuery(ElderProfile.class)
+                  .eq(ElderProfile::getIsDeleted, 0)
+                  .eq(orgId != null, ElderProfile::getOrgId, orgId)
+                  .like(ElderProfile::getFullName, keyword))
+          .stream().map(ElderProfile::getId).toList();
+      if (elderIds.isEmpty()) {
+        return Result.ok(new Page<>(pageNo, pageSize, 0));
+      }
+      wrapper.in(BillMonthly::getElderId, elderIds);
+    }
     wrapper.orderByDesc(BillMonthly::getBillMonth);
-    return Result.ok(billMonthlyMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
+    IPage<BillMonthly> page = billMonthlyMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
+    List<Long> elderIds = page.getRecords().stream()
+        .map(BillMonthly::getElderId)
+        .distinct()
+        .toList();
+    Map<Long, ElderProfile> elderMap = elderIds.isEmpty()
+        ? Map.of()
+        : elderMapper.selectList(
+            Wrappers.lambdaQuery(ElderProfile.class)
+                .in(ElderProfile::getId, elderIds))
+            .stream()
+            .collect(Collectors.toMap(ElderProfile::getId, Function.identity(), (a, b) -> a));
+
+    IPage<BillMonthlyView> viewPage = new Page<>(pageNo, pageSize);
+    viewPage.setTotal(page.getTotal());
+    viewPage.setRecords(page.getRecords().stream().map(record -> {
+      BillMonthlyView view = new BillMonthlyView();
+      view.setId(record.getId());
+      view.setOrgId(record.getOrgId());
+      view.setElderId(record.getElderId());
+      ElderProfile elder = elderMap.get(record.getElderId());
+      view.setElderName(elder == null ? null : elder.getFullName());
+      view.setBillMonth(record.getBillMonth());
+      view.setTotalAmount(record.getTotalAmount());
+      view.setPaidAmount(record.getPaidAmount());
+      view.setOutstandingAmount(record.getOutstandingAmount());
+      view.setStatus(record.getStatus());
+      view.setCreateTime(record.getCreateTime());
+      view.setUpdateTime(record.getUpdateTime());
+      return view;
+    }).toList());
+    return Result.ok(viewPage);
   }
 }

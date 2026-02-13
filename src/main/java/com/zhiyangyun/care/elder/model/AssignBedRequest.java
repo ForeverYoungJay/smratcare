@@ -6,6 +6,8 @@ import lombok.Data;
 
 @Data
 public class AssignBedRequest {
+  private Long tenantId;
+  private Long createdBy;
   @NotNull
   private Long bedId;
   @NotNull

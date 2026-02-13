@@ -13,12 +13,14 @@ import lombok.Data;
 public class Bed {
   @TableId(type = IdType.ASSIGN_ID)
   private Long id;
+  private Long tenantId;
   private Long orgId;
   private Long roomId;
   private String bedNo;
   private String bedQrCode;
   private Integer status;
   private Long elderId;
+  private Long createdBy;
   @TableField(value = "create_time", fill = FieldFill.INSERT)
   private LocalDateTime createTime;
   @TableField(value = "update_time", fill = FieldFill.INSERT_UPDATE)

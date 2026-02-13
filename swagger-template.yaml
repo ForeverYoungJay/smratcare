@@ -741,6 +741,53 @@ paths:
       parameters: [{ name: date, in: query, schema: { type: string, format: date } }]
       responses:
         '200': { description: OK }
+  /api/finance/reconcile/page:
+    get:
+      tags: [Finance]
+      summary: 对账历史分页
+      parameters: [{ $ref: '#/components/parameters/PageNo' }, { $ref: '#/components/parameters/PageSize' }, { name: dateFrom, in: query, schema: { type: string, format: date } }, { name: dateTo, in: query, schema: { type: string, format: date } }]
+      responses:
+        '200': { description: OK }
+
+  /api/finance/bill/{billId}:
+    get:
+      tags: [Finance]
+      summary: 账单详情（含明细/支付/商城消费）
+      parameters: [{ name: billId, in: path, required: true, schema: { type: integer } }]
+      responses:
+        '200': { description: OK }
+
+  /api/finance/payment/page:
+    get:
+      tags: [Finance]
+      summary: 支付记录分页
+      parameters: [{ $ref: '#/components/parameters/PageNo' }, { $ref: '#/components/parameters/PageSize' }, { name: billId, in: query, schema: { type: integer } }, { name: elderId, in: query, schema: { type: integer } }]
+      responses:
+        '200': { description: OK }
+
+  /api/finance/report/monthly-revenue:
+    get:
+      tags: [Finance]
+      summary: 月营收趋势
+      parameters: [{ name: from, in: query, schema: { type: string } }, { name: to, in: query, schema: { type: string } }]
+      responses:
+        '200': { description: OK }
+
+  /api/finance/report/arrears-top:
+    get:
+      tags: [Finance]
+      summary: 欠费排行
+      parameters: [{ name: limit, in: query, schema: { type: integer, default: 10 } }]
+      responses:
+        '200': { description: OK }
+
+  /api/finance/report/store-sales:
+    get:
+      tags: [Finance]
+      summary: 商城销售统计
+      parameters: [{ name: from, in: query, schema: { type: string } }, { name: to, in: query, schema: { type: string } }]
+      responses:
+        '200': { description: OK }
 
   /api/dashboard/summary:
     get:
@@ -944,3 +991,78 @@ components:
         method: { type: string }
         paidAt: { type: string, format: date-time }
         remark: { type: string }
+    FinanceBillDetailResponse:
+      type: object
+      properties:
+        bill:
+          type: object
+          properties:
+            id: { type: integer }
+            elderId: { type: integer }
+            elderName: { type: string }
+            billMonth: { type: string }
+            totalAmount: { type: number }
+            paidAmount: { type: number }
+            outstandingAmount: { type: number }
+            status: { type: string }
+            createTime: { type: string, format: date-time }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              itemType: { type: string }
+              itemName: { type: string }
+              amount: { type: number }
+              calcBasis: { type: string }
+        storeOrders:
+          type: array
+          items:
+            $ref: '#/components/schemas/StoreOrderSummary'
+        payments:
+          type: array
+          items:
+            $ref: '#/components/schemas/PaymentRecordItem'
+    PaymentRecordItem:
+      type: object
+      properties:
+        id: { type: integer }
+        billMonthlyId: { type: integer }
+        amount: { type: number }
+        payMethod: { type: string }
+        paidAt: { type: string, format: date-time }
+        operatorStaffId: { type: integer }
+        remark: { type: string }
+        externalTxnId: { type: string }
+    StoreOrderSummary:
+      type: object
+      properties:
+        orderId: { type: integer }
+        orderNo: { type: string }
+        totalAmount: { type: number }
+        createTime: { type: string, format: date-time }
+    FinanceReportMonthlyItem:
+      type: object
+      properties:
+        month: { type: string }
+        totalAmount: { type: number }
+    FinanceArrearsItem:
+      type: object
+      properties:
+        elderId: { type: integer }
+        elderName: { type: string }
+        outstandingAmount: { type: number }
+    FinanceStoreSalesItem:
+      type: object
+      properties:
+        productId: { type: integer }
+        productName: { type: string }
+        totalQty: { type: integer }
+        totalAmount: { type: number }
+    ReconciliationDaily:
+      type: object
+      properties:
+        id: { type: integer }
+        reconcileDate: { type: string, format: date }
+        totalReceived: { type: number }
+        mismatchFlag: { type: integer }

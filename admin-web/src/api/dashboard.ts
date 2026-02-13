@@ -1,6 +1,12 @@
 import request from '../utils/request'
-import type { ApiResult, DashboardSummary } from '../types/api'
+
+export interface DashboardSummary {
+  careTasksToday: number
+  abnormalTasksToday: number
+  inventoryAlerts: number
+  unpaidBills: number
+}
 
 export function getDashboardSummary() {
-  return request.get<ApiResult<DashboardSummary>>('/api/dashboard/summary')
+  return request.get<DashboardSummary>('/api/dashboard/summary')
 }

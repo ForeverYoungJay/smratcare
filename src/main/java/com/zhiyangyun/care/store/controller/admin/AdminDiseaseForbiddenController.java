@@ -6,6 +6,7 @@ import com.zhiyangyun.care.store.model.admin.ForbiddenTagsRequest;
 import com.zhiyangyun.care.store.model.admin.ForbiddenTagsResponse;
 import com.zhiyangyun.care.store.service.DiseaseRuleService;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,7 +31,7 @@ public class AdminDiseaseForbiddenController {
       @PathVariable Long id,
       @Valid @RequestBody ForbiddenTagsRequest request) {
     Long orgId = AuthContext.getOrgId();
-    diseaseRuleService.saveForbiddenTags(orgId, id, request.getTagIds());
+    diseaseRuleService.saveForbiddenTags(orgId, id, request.getTagIds() == null ? List.of() : request.getTagIds());
     return Result.ok(null);
   }
 

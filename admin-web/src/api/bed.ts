@@ -1,59 +1,90 @@
-import request from '../utils/request'
-import type { ApiResult, PageResult, RoomItem, BedItem } from '../types/api'
-
-export function getRoomList() {
-  return request.get<any>('/api/room/list').then((res) => normalizeList<RoomItem>(res))
-}
-
-export function getBedList() {
-  return request.get<any>('/api/bed/list').then((res) => normalizeList<BedItem>(res))
-}
-
-export function getBedMap() {
-  return request.get<any>('/api/bed/list').then((res) => normalizeList<BedItem>(res))
-}
+import request, { fetchPage } from '../utils/request'
+import type { RoomItem, BedItem, BuildingItem, FloorItem, AssetTreeNode } from '../types'
 
 export function getRoomPage(params: any) {
-  return request.get<ApiResult<PageResult<RoomItem>>>('/api/room', { params })
+  return fetchPage<RoomItem>('/api/room/page', params)
 }
 
 export function getBedPage(params: any) {
-  return request.get<ApiResult<PageResult<BedItem>>>('/api/bed', { params })
+  return fetchPage<BedItem>('/api/bed/page', params)
+}
+
+export function getRoomList() {
+  return request.get<RoomItem[]>('/api/room/list')
+}
+
+export function getBedList() {
+  return request.get<BedItem[]>('/api/bed/list')
+}
+
+export function getBedMap() {
+  return request.get<BedItem[]>('/api/bed/map')
+}
+
+export function getBuildingPage(params: any) {
+  return fetchPage<BuildingItem>('/api/asset/buildings/page', params)
+}
+
+export function getBuildingList() {
+  return request.get<BuildingItem[]>('/api/asset/buildings/list')
+}
+
+export function createBuilding(data: Partial<BuildingItem>) {
+  return request.post<void>('/api/asset/buildings', data)
+}
+
+export function updateBuilding(id: number, data: Partial<BuildingItem>) {
+  return request.put<void>(`/api/asset/buildings/${id}`, data)
+}
+
+export function deleteBuilding(id: number) {
+  return request.delete<void>(`/api/asset/buildings/${id}`)
+}
+
+export function getFloorPage(params: any) {
+  return fetchPage<FloorItem>('/api/asset/floors/page', params)
+}
+
+export function getFloorList(params?: any) {
+  return request.get<FloorItem[]>('/api/asset/floors/list', { params })
+}
+
+export function createFloor(data: Partial<FloorItem>) {
+  return request.post<void>('/api/asset/floors', data)
+}
+
+export function updateFloor(id: number, data: Partial<FloorItem>) {
+  return request.put<void>(`/api/asset/floors/${id}`, data)
+}
+
+export function deleteFloor(id: number) {
+  return request.delete<void>(`/api/asset/floors/${id}`)
+}
+
+export function getAssetTree() {
+  return request.get<AssetTreeNode[]>('/api/asset/tree')
 }
 
 export function createRoom(data: Partial<RoomItem>) {
-  return request.post<ApiResult<void>>('/api/room', data)
+  return request.post<void>('/api/room', data)
 }
 
 export function updateRoom(id: number, data: Partial<RoomItem>) {
-  return request.put<ApiResult<void>>(`/api/room/${id}`, data)
+  return request.put<void>(`/api/room/${id}`, data)
 }
 
 export function deleteRoom(id: number) {
-  return request.delete<ApiResult<void>>(`/api/room/${id}`)
+  return request.delete<void>(`/api/room/${id}`)
 }
 
 export function createBed(data: Partial<BedItem>) {
-  return request.post<ApiResult<void>>('/api/bed', data)
+  return request.post<void>('/api/bed', data)
 }
 
 export function updateBed(id: number, data: Partial<BedItem>) {
-  return request.put<ApiResult<void>>(`/api/bed/${id}`, data)
+  return request.put<void>(`/api/bed/${id}`, data)
 }
 
 export function deleteBed(id: number) {
-  return request.delete<ApiResult<void>>(`/api/bed/${id}`)
-}
-
-function normalizeList<T>(res: any): ApiResult<T[]> {
-  if (Array.isArray(res)) {
-    return { code: 0, message: 'OK', data: res }
-  }
-  if (res?.data && Array.isArray(res.data)) {
-    return { code: 0, message: 'OK', data: res.data }
-  }
-  if (res?.data?.records && Array.isArray(res.data.records)) {
-    return { code: 0, message: 'OK', data: res.data.records }
-  }
-  return { code: 0, message: 'OK', data: [] }
+  return request.delete<void>(`/api/bed/${id}`)
 }

@@ -27,6 +27,12 @@ public class InventoryLog {
 
   private Long refAdjustmentId;
 
+  private String productCodeSnapshot;
+
+  private String productNameSnapshot;
+
+  private String bizType;
+
   private String remark;
 
   @TableField("create_time")

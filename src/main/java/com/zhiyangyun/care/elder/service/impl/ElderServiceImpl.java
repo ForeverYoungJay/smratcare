@@ -10,6 +10,7 @@ import com.zhiyangyun.care.elder.mapper.BedMapper;
 import com.zhiyangyun.care.elder.mapper.ElderBedRelationMapper;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.RoomMapper;
+import com.zhiyangyun.care.elder.mapper.lifecycle.ElderChangeLogMapper;
 import com.zhiyangyun.care.elder.model.AssignBedRequest;
 import com.zhiyangyun.care.elder.model.BedResponse;
 import com.zhiyangyun.care.elder.model.ElderCreateRequest;
@@ -27,20 +28,27 @@ public class ElderServiceImpl implements ElderService {
   private final BedMapper bedMapper;
   private final ElderBedRelationMapper relationMapper;
   private final RoomMapper roomMapper;
+  private final ElderChangeLogMapper changeLogMapper;
 
   public ElderServiceImpl(ElderMapper elderMapper, BedMapper bedMapper,
-      ElderBedRelationMapper relationMapper, RoomMapper roomMapper) {
+      ElderBedRelationMapper relationMapper, RoomMapper roomMapper, ElderChangeLogMapper changeLogMapper) {
     this.elderMapper = elderMapper;
     this.bedMapper = bedMapper;
     this.relationMapper = relationMapper;
     this.roomMapper = roomMapper;
+    this.changeLogMapper = changeLogMapper;
   }
 
   @Override
   public ElderResponse create(ElderCreateRequest request) {
     ElderProfile elder = new ElderProfile();
+    elder.setTenantId(request.getTenantId());
     elder.setOrgId(request.getOrgId());
-    elder.setElderCode(request.getElderCode());
+    String elderCode = request.getElderCode();
+    if (elderCode == null || elderCode.isBlank()) {
+      elderCode = generateElderCode(request.getOrgId());
+    }
+    elder.setElderCode(elderCode);
     elder.setElderQrCode(QrCodeUtil.generate());
     elder.setFullName(request.getFullName());
     elder.setIdCardNo(request.getIdCardNo());
@@ -51,7 +59,21 @@ public class ElderServiceImpl implements ElderService {
     elder.setStatus(request.getStatus());
     elder.setCareLevel(request.getCareLevel());
     elder.setRemark(request.getRemark());
+    elder.setCreatedBy(request.getCreatedBy());
     elderMapper.insert(elder);
+    if (request.getBedId() != null) {
+      AssignBedRequest assign = new AssignBedRequest();
+      assign.setTenantId(request.getTenantId());
+      assign.setCreatedBy(request.getCreatedBy());
+      assign.setBedId(request.getBedId());
+      LocalDate startDate = request.getBedStartDate();
+      if (startDate == null) {
+        startDate = request.getAdmissionDate() == null ? LocalDate.now() : request.getAdmissionDate();
+      }
+      assign.setStartDate(startDate);
+      ElderResponse assigned = assignBed(elder.getId(), assign);
+      return assigned == null ? toResponse(elder, null) : assigned;
+    }
     return toResponse(elder, null);
   }
 
@@ -60,6 +82,9 @@ public class ElderServiceImpl implements ElderService {
     ElderProfile elder = elderMapper.selectById(id);
     if (elder == null) {
       return null;
+    }
+    if (request.getTenantId() != null && !request.getTenantId().equals(elder.getTenantId())) {
+      throw new IllegalArgumentException("无权限访问该老人");
     }
     if (request.getFullName() != null) {
       elder.setFullName(request.getFullName());
@@ -89,14 +114,33 @@ public class ElderServiceImpl implements ElderService {
       elder.setRemark(request.getRemark());
     }
     elderMapper.updateById(elder);
+    if (request.getStatus() != null && request.getStatus() == 3 && elder.getBedId() != null) {
+      return unbindBed(elder.getId(), LocalDate.now(), "状态变更退住", request.getTenantId(), request.getUpdatedBy());
+    }
+    if (request.getBedId() != null && !request.getBedId().equals(elder.getBedId())) {
+      AssignBedRequest assign = new AssignBedRequest();
+      assign.setTenantId(request.getTenantId());
+      assign.setCreatedBy(request.getUpdatedBy());
+      assign.setBedId(request.getBedId());
+      LocalDate startDate = request.getBedStartDate();
+      if (startDate == null) {
+        startDate = LocalDate.now();
+      }
+      assign.setStartDate(startDate);
+      ElderResponse assigned = assignBed(elder.getId(), assign);
+      return assigned == null ? toResponse(elder, null) : assigned;
+    }
     Bed bed = elder.getBedId() == null ? null : bedMapper.selectById(elder.getBedId());
     return toResponse(elder, bed);
   }
 
   @Override
-  public ElderResponse get(Long id) {
+  public ElderResponse get(Long id, Long tenantId) {
     ElderProfile elder = elderMapper.selectById(id);
     if (elder == null) {
+      return null;
+    }
+    if (tenantId != null && !tenantId.equals(elder.getTenantId())) {
       return null;
     }
     Bed bed = elder.getBedId() == null ? null : bedMapper.selectById(elder.getBedId());
@@ -104,14 +148,16 @@ public class ElderServiceImpl implements ElderService {
   }
 
   @Override
-  public IPage<ElderResponse> page(long pageNo, long pageSize, String keyword) {
+  public IPage<ElderResponse> page(Long tenantId, long pageNo, long pageSize, String keyword) {
     var wrapper = Wrappers.lambdaQuery(ElderProfile.class)
-        .eq(ElderProfile::getIsDeleted, 0);
+        .eq(ElderProfile::getIsDeleted, 0)
+        .eq(tenantId != null, ElderProfile::getTenantId, tenantId);
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(ElderProfile::getFullName, keyword)
           .or().like(ElderProfile::getElderCode, keyword)
           .or().like(ElderProfile::getPhone, keyword));
     }
+    wrapper.orderByDesc(ElderProfile::getCreateTime);
     IPage<ElderProfile> page = elderMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
     return page.convert(elder -> {
       Bed bed = elder.getBedId() == null ? null : bedMapper.selectById(elder.getBedId());
@@ -126,9 +172,15 @@ public class ElderServiceImpl implements ElderService {
     if (elder == null) {
       return null;
     }
+    if (request.getTenantId() != null && !request.getTenantId().equals(elder.getTenantId())) {
+      throw new IllegalStateException("Org mismatch");
+    }
     Bed bed = bedMapper.selectById(request.getBedId());
     if (bed == null) {
       return null;
+    }
+    if (request.getTenantId() != null && !request.getTenantId().equals(bed.getTenantId())) {
+      throw new IllegalStateException("Org mismatch");
     }
     if (!elder.getOrgId().equals(bed.getOrgId())) {
       throw new IllegalStateException("Org mismatch");
@@ -145,6 +197,7 @@ public class ElderServiceImpl implements ElderService {
     ElderBedRelation bedActive = relationMapper.selectOne(
         Wrappers.lambdaQuery(ElderBedRelation.class)
             .eq(ElderBedRelation::getOrgId, elder.getOrgId())
+            .eq(ElderBedRelation::getTenantId, elder.getTenantId())
             .eq(ElderBedRelation::getBedId, bed.getId())
             .eq(ElderBedRelation::getActiveFlag, 1)
             .eq(ElderBedRelation::getIsDeleted, 0));
@@ -161,6 +214,7 @@ public class ElderServiceImpl implements ElderService {
     ElderBedRelation elderActive = relationMapper.selectOne(
         Wrappers.lambdaQuery(ElderBedRelation.class)
             .eq(ElderBedRelation::getOrgId, elder.getOrgId())
+            .eq(ElderBedRelation::getTenantId, elder.getTenantId())
             .eq(ElderBedRelation::getElderId, elder.getId())
             .eq(ElderBedRelation::getActiveFlag, 1)
             .eq(ElderBedRelation::getIsDeleted, 0));
@@ -178,11 +232,13 @@ public class ElderServiceImpl implements ElderService {
     }
 
     ElderBedRelation relation = new ElderBedRelation();
+    relation.setTenantId(elder.getTenantId());
     relation.setOrgId(elder.getOrgId());
     relation.setElderId(elder.getId());
     relation.setBedId(bed.getId());
     relation.setStartDate(request.getStartDate());
     relation.setActiveFlag(1);
+    relation.setCreatedBy(request.getCreatedBy());
     relationMapper.insert(relation);
 
     bed.setElderId(elder.getId());
@@ -190,13 +246,19 @@ public class ElderServiceImpl implements ElderService {
     bedMapper.updateById(bed);
 
     elder.setBedId(bed.getId());
+    if (elder.getStatus() == null || elder.getStatus() == 3) {
+      elder.setStatus(1);
+    }
     elderMapper.updateById(elder);
+
+    insertChangeLog(elder.getTenantId(), elder.getOrgId(), elder.getId(), request.getCreatedBy(),
+        "BED_CHANGE", null, String.valueOf(bed.getId()), "床位分配");
     return toResponse(elder, bed);
   }
 
   @Override
   @Transactional
-  public ElderResponse unbindBed(Long elderId, LocalDate endDate, String reason) {
+  public ElderResponse unbindBed(Long elderId, LocalDate endDate, String reason, Long tenantId, Long createdBy) {
     ElderProfile elder = elderMapper.selectById(elderId);
     if (elder == null) {
       return null;
@@ -204,6 +266,7 @@ public class ElderServiceImpl implements ElderService {
     ElderBedRelation elderActive = relationMapper.selectOne(
         Wrappers.lambdaQuery(ElderBedRelation.class)
             .eq(ElderBedRelation::getOrgId, elder.getOrgId())
+            .eq(ElderBedRelation::getTenantId, elder.getTenantId())
             .eq(ElderBedRelation::getElderId, elder.getId())
             .eq(ElderBedRelation::getActiveFlag, 1)
             .eq(ElderBedRelation::getIsDeleted, 0));
@@ -225,15 +288,37 @@ public class ElderServiceImpl implements ElderService {
       }
     }
 
+    Long previousBedId = elder.getBedId();
     elder.setBedId(null);
     elder.setStatus(3);
     elderMapper.updateById(elder);
+    insertChangeLog(elder.getTenantId(), elder.getOrgId(), elder.getId(), createdBy,
+        "BED_CHANGE", previousBedId == null ? null : String.valueOf(previousBedId), null, reason);
     return toResponse(elder, null);
+  }
+
+  private void insertChangeLog(Long tenantId, Long orgId, Long elderId, Long createdBy, String changeType,
+                               String beforeValue, String afterValue, String reason) {
+    if (tenantId == null || orgId == null || elderId == null) {
+      return;
+    }
+    com.zhiyangyun.care.elder.entity.lifecycle.ElderChangeLog log =
+        new com.zhiyangyun.care.elder.entity.lifecycle.ElderChangeLog();
+    log.setTenantId(tenantId);
+    log.setOrgId(orgId);
+    log.setElderId(elderId);
+    log.setChangeType(changeType);
+    log.setBeforeValue(beforeValue);
+    log.setAfterValue(afterValue);
+    log.setReason(reason);
+    log.setCreatedBy(createdBy);
+    changeLogMapper.insert(log);
   }
 
   private ElderResponse toResponse(ElderProfile elder, Bed bed) {
     ElderResponse response = new ElderResponse();
     response.setId(elder.getId());
+    response.setTenantId(elder.getTenantId());
     response.setOrgId(elder.getOrgId());
     response.setElderCode(elder.getElderCode());
     response.setElderQrCode(elder.getElderQrCode());
@@ -259,5 +344,11 @@ public class ElderServiceImpl implements ElderService {
       response.setCurrentBed(bedResponse);
     }
     return response;
+  }
+
+  private String generateElderCode(Long orgId) {
+    Integer max = elderMapper.selectMaxElderCodeNumber(orgId);
+    int next = (max == null ? 1000 : max) + 1;
+    return "E" + next;
   }
 }

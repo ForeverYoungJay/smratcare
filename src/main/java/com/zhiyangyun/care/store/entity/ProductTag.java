@@ -21,6 +21,8 @@ public class ProductTag {
 
   private String tagType;
 
+  private Integer status;
+
   @TableField("create_time")
   private LocalDateTime createTime;
 

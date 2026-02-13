@@ -22,6 +22,10 @@ public class OrderItem {
 
   private String productName;
 
+  private String productCodeSnapshot;
+
+  private String productNameSnapshot;
+
   private BigDecimal unitPrice;
 
   private Integer quantity;

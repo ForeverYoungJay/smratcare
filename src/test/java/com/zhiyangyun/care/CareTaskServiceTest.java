@@ -27,7 +27,7 @@ class CareTaskServiceTest {
     request.setBedQrCode("QR1");
     request.setRemark("ok");
 
-    ExecuteTaskResponse response = careTaskService.executeTask(request);
+    ExecuteTaskResponse response = careTaskService.executeTask(null, request);
     assertEquals(TaskStatus.DONE.name(), response.getStatus());
     assertFalse(response.isAbnormal());
     assertFalse(response.isSuspicious());
@@ -41,7 +41,7 @@ class CareTaskServiceTest {
     request.setBedQrCode("QR1");
     request.setRemark("check");
 
-    ExecuteTaskResponse response = careTaskService.executeTask(request);
+    ExecuteTaskResponse response = careTaskService.executeTask(null, request);
     assertEquals(TaskStatus.DONE.name(), response.getStatus());
     assertFalse(response.isAbnormal());
     assertTrue(response.isSuspicious());

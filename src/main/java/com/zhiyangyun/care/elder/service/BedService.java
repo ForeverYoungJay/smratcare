@@ -9,11 +9,14 @@ public interface BedService {
 
   BedResponse update(Long id, BedRequest request);
 
-  BedResponse get(Long id);
+  BedResponse get(Long id, Long tenantId);
 
-  IPage<BedResponse> page(Long orgId, long pageNo, long pageSize, String keyword, Integer status);
+  IPage<BedResponse> page(Long orgId, long pageNo, long pageSize,
+      String keyword, Integer status, String bedNo, String roomNo, String elderName);
 
   java.util.List<BedResponse> list(Long orgId);
 
-  void delete(Long id);
+  java.util.List<BedResponse> map(Long orgId);
+
+  void delete(Long id, Long tenantId);
 }

@@ -40,6 +40,9 @@ public class DiseaseRuleServiceImpl implements DiseaseRuleService {
   @Override
   @Transactional
   public void saveForbiddenTags(Long orgId, Long diseaseId, List<Long> tagIds) {
+    if (tagIds == null) {
+      tagIds = List.of();
+    }
     List<Long> before = forbiddenTagMapper.selectList(
             Wrappers.lambdaQuery(DiseaseForbiddenTag.class)
                 .eq(DiseaseForbiddenTag::getOrgId, orgId)
