@@ -348,7 +348,10 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
     }
     List<OrderItem> items = orderItemMapper.selectList(
         Wrappers.lambdaQuery(OrderItem.class).eq(OrderItem::getOrderId, order.getId()));
-    // 未出库前不回滚库存、不回滚积分
+    rollbackInventory(items, order);
+    if (order.getPayStatus() != null && order.getPayStatus() == 1) {
+      rollbackPoints(order);
+    }
     order.setOrderStatus(4); // CANCELLED
     order.setPayStatus(2);
     orderMapper.updateById(order);
@@ -360,9 +363,6 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
   public void refund(OrderRefundRequest request) {
     StoreOrder order = orderMapper.selectById(request.getOrderId());
     if (order == null) {
-      return;
-    }
-    if (order.getOrderStatus() == null || order.getOrderStatus() < 3) {
       return;
     }
     if (order.getOrderStatus() != null && order.getOrderStatus() == 5) {
