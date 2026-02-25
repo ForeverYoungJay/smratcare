@@ -3,7 +3,14 @@ import { getAdmissionRecords } from './elderLifecycle'
 import request from '../utils/request'
 import type {
   AdmissionRecordItem,
+  CallbackExecuteRequest,
+  CallbackPlanCreateRequest,
+  CallbackPlanItem,
+  ContractAttachmentCreateRequest,
+  ContractAttachmentItem,
   CrmLeadItem,
+  LeadBatchDeleteRequest,
+  LeadBatchStatusRequest,
   MarketingCallbackReport,
   MarketingChannelReportItem,
   MarketingConsultationTrendItem,
@@ -11,13 +18,59 @@ import type {
   MarketingDataQualityReport,
   MarketingFollowupReport,
   MarketingReportQuery,
-  PageResult
+  PageResult,
+  SmsTaskCreateRequest,
+  SmsTaskItem
 } from '../types'
 
 export { createCrmLead, updateCrmLead, deleteCrmLead }
 
 export function getLeadPage(params: any) {
   return getCrmLeadPage(params)
+}
+
+export function batchUpdateLeadStatus(data: LeadBatchStatusRequest) {
+  return request.post<number>('/api/crm/leads/batch/status', data)
+}
+
+export function batchDeleteLeads(data: LeadBatchDeleteRequest) {
+  return request.post<number>('/api/crm/leads/batch/delete', data)
+}
+
+export function createLeadCallbackPlan(leadId: number, data: CallbackPlanCreateRequest) {
+  return request.post<CallbackPlanItem>(`/api/crm/leads/${leadId}/callback-plans`, data)
+}
+
+export function getLeadCallbackPlans(leadId: number) {
+  return request.get<CallbackPlanItem[]>(`/api/crm/leads/${leadId}/callback-plans`)
+}
+
+export function executeCallbackPlan(planId: number, data: CallbackExecuteRequest) {
+  return request.post<CallbackPlanItem>(`/api/crm/leads/callback-plans/${planId}/execute`, data)
+}
+
+export function createLeadAttachment(leadId: number, data: ContractAttachmentCreateRequest) {
+  return request.post<ContractAttachmentItem>(`/api/crm/leads/${leadId}/attachments`, data)
+}
+
+export function getLeadAttachments(leadId: number) {
+  return request.get<ContractAttachmentItem[]>(`/api/crm/leads/${leadId}/attachments`)
+}
+
+export function deleteLeadAttachment(attachmentId: number) {
+  return request.delete<void>(`/api/crm/leads/attachments/${attachmentId}`)
+}
+
+export function createSmsTasks(data: SmsTaskCreateRequest) {
+  return request.post<SmsTaskItem[]>('/api/crm/leads/sms/tasks', data)
+}
+
+export function getSmsTasks(leadId?: number) {
+  return request.get<SmsTaskItem[]>('/api/crm/leads/sms/tasks', { params: { leadId } })
+}
+
+export function sendSmsTask(taskId: number) {
+  return request.post<SmsTaskItem>(`/api/crm/leads/sms/tasks/${taskId}/send`)
 }
 
 export async function getAllLeads(pageSize = 200): Promise<CrmLeadItem[]> {

@@ -31,7 +31,15 @@
           <a-button @click="settingReminder">到期提醒设置</a-button>
         </a-space>
       </div>
-      <a-table :data-source="rows" :columns="columns" :loading="loading" :pagination="false" row-key="id" :scroll="{ x: 1800 }">
+      <a-table
+        :data-source="rows"
+        :columns="columns"
+        :loading="loading"
+        :pagination="false"
+        row-key="id"
+        :row-selection="rowSelection"
+        :scroll="{ x: 1800 }"
+      >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'countdownDays'">
             <span>{{ calcCountdown(record.contractExpiryDate) }}</span>
@@ -51,20 +59,32 @@
         @showSizeChange="onPageSizeChange"
       />
     </a-card>
+
+    <a-modal v-model:open="smsTaskOpen" title="短信任务记录" :footer="null" width="760px">
+      <a-table :data-source="smsTasks" :columns="smsTaskColumns" :pagination="false" row-key="id" size="small">
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'operation'">
+            <a-button v-if="record.status !== 'SENT'" type="link" @click="sendTask(record.id)">立即发送</a-button>
+            <span v-else>-</span>
+          </template>
+        </template>
+      </a-table>
+    </a-modal>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
-import { getLeadPage, updateCrmLead } from '../../api/marketing'
-import type { CrmLeadItem, PageResult } from '../../types'
+import { createSmsTasks, getLeadPage, getSmsTasks, sendSmsTask } from '../../api/marketing'
+import type { CrmLeadItem, PageResult, SmsTaskItem } from '../../types'
 
 const loading = ref(false)
 const rows = ref<CrmLeadItem[]>([])
 const total = ref(0)
+const selectedRowKeys = ref<number[]>([])
 
 const query = reactive({
   contractNo: '',
@@ -89,6 +109,32 @@ const columns = [
   { title: '倒计时', key: 'countdownDays', width: 100 },
   { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 },
   { title: '操作', key: 'operation', fixed: 'right', width: 100 }
+]
+
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: (number | string)[]) => {
+    selectedRowKeys.value = keys.map((item) => Number(item))
+  }
+}))
+
+const reminderConfig = reactive({
+  beforeDays: 30,
+  templateName: '合同到期提醒',
+  content: '您好，您的合同即将到期，请及时联系机构续签。'
+})
+
+const smsTaskOpen = ref(false)
+const smsTasks = ref<SmsTaskItem[]>([])
+const smsTaskColumns = [
+  { title: '任务ID', dataIndex: 'id', key: 'id', width: 100 },
+  { title: '手机号', dataIndex: 'phone', key: 'phone', width: 120 },
+  { title: '模板', dataIndex: 'templateName', key: 'templateName', width: 120 },
+  { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
+  { title: '计划发送时间', dataIndex: 'planSendTime', key: 'planSendTime', width: 170 },
+  { title: '发送时间', dataIndex: 'sendTime', key: 'sendTime', width: 170 },
+  { title: '结果', dataIndex: 'resultMessage', key: 'resultMessage', width: 140 },
+  { title: '操作', key: 'operation', width: 100 }
 ]
 
 async function fetchData() {
@@ -122,6 +168,7 @@ function reset() {
   query.elderPhone = ''
   query.marketerName = ''
   query.pageNo = 1
+  selectedRowKeys.value = []
   fetchData()
 }
 
@@ -136,29 +183,49 @@ function onPageSizeChange(_current: number, size: number) {
   fetchData()
 }
 
-function sendSms(record: CrmLeadItem) {
-  updateCrmLead(record.id, { ...record, smsSendCount: (record.smsSendCount || 0) + 1 })
-    .then(() => {
-      message.success('短信发送成功')
-      fetchData()
-    })
-    .catch(() => message.error('短信发送失败'))
+async function sendSms(record: CrmLeadItem) {
+  const tasks = await createSmsTasks({
+    leadIds: [record.id],
+    templateName: reminderConfig.templateName,
+    content: reminderConfig.content,
+    planSendTime: dayjs().format('YYYY-MM-DD HH:mm:ss')
+  })
+  if (tasks?.[0]?.id) {
+    await sendSmsTask(tasks[0].id)
+  }
+  message.success('短信发送成功')
+  fetchData()
 }
 
-function batchSms() {
-  if (!rows.value.length) {
-    message.info('暂无可发送合同')
+async function batchSms() {
+  if (!selectedRowKeys.value.length) {
+    message.info('请先勾选合同')
     return
   }
-  sendSms(rows.value[0])
+  const tasks = await createSmsTasks({
+    leadIds: selectedRowKeys.value,
+    templateName: reminderConfig.templateName,
+    content: reminderConfig.content,
+    planSendTime: dayjs().format('YYYY-MM-DD HH:mm:ss')
+  })
+  await Promise.all((tasks || []).map((item) => sendSmsTask(item.id)))
+  message.success(`已批量发送 ${tasks.length} 条短信`)
+  fetchData()
 }
 
 function exportList() {
   message.success('导出任务已提交')
 }
 
-function settingReminder() {
-  message.info('到期提醒默认提前30天')
+async function settingReminder() {
+  smsTasks.value = await getSmsTasks()
+  smsTaskOpen.value = true
+}
+
+async function sendTask(taskId: number) {
+  await sendSmsTask(taskId)
+  smsTasks.value = await getSmsTasks()
+  fetchData()
 }
 
 onMounted(fetchData)

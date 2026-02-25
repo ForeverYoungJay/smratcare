@@ -92,6 +92,7 @@
         :loading="loading"
         :pagination="false"
         row-key="id"
+        :row-selection="rowSelection"
         :scroll="{ x: 1600 }"
       >
         <template #bodyCell="{ column, record }">
@@ -217,12 +218,7 @@
           </a-col>
           <a-col :span="12">
             <a-form-item label="收款时间">
-              <a-date-picker
-                v-model:value="form.paymentTime"
-                value-format="YYYY-MM-DD HH:mm:ss"
-                show-time
-                style="width: 100%"
-              />
+              <a-date-picker v-model:value="form.paymentTime" value-format="YYYY-MM-DD HH:mm:ss" show-time style="width: 100%" />
             </a-form-item>
           </a-col>
           <a-col :span="12">
@@ -248,6 +244,20 @@
         </a-row>
       </a-form>
     </a-modal>
+
+    <a-modal v-model:open="planOpen" title="新增回访计划" :confirm-loading="planSubmitting" @ok="submitCallbackPlan">
+      <a-form :model="planForm" layout="vertical">
+        <a-form-item label="计划标题">
+          <a-input v-model:value="planForm.title" />
+        </a-form-item>
+        <a-form-item label="计划执行时间">
+          <a-date-picker v-model:value="planForm.planExecuteTime" value-format="YYYY-MM-DD HH:mm:ss" show-time style="width: 100%" />
+        </a-form-item>
+        <a-form-item label="跟进人">
+          <a-input v-model:value="planForm.executorName" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </PageContainer>
 </template>
 
@@ -258,7 +268,17 @@ import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import PageContainer from '../../../components/PageContainer.vue'
-import { createCrmLead, deleteCrmLead, getLeadPage, updateCrmLead } from '../../../api/marketing'
+import {
+  batchDeleteLeads,
+  batchUpdateLeadStatus,
+  createCrmLead,
+  createLeadCallbackPlan,
+  deleteCrmLead,
+  executeCallbackPlan,
+  getLeadCallbackPlans,
+  getLeadPage,
+  updateCrmLead
+} from '../../../api/marketing'
 import type { CrmLeadItem, PageResult } from '../../../types'
 
 const props = withDefaults(defineProps<{
@@ -273,6 +293,7 @@ const router = useRouter()
 const loading = ref(false)
 const rows = ref<CrmLeadItem[]>([])
 const total = ref(0)
+const selectedRowKeys = ref<number[]>([])
 
 const query = reactive({
   consultantName: '',
@@ -294,10 +315,25 @@ const submitting = ref(false)
 const formRef = ref<FormInstance>()
 const form = reactive<Partial<CrmLeadItem>>({})
 
+const planOpen = ref(false)
+const planSubmitting = ref(false)
+const planForm = reactive({
+  title: '回访',
+  planExecuteTime: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+  executorName: ''
+})
+
 const rules: FormRules = {
   consultantName: [{ required: true, message: '请输入咨询人姓名' }],
   elderName: [{ required: true, message: '请输入老人姓名' }]
 }
+
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: (string | number)[]) => {
+    selectedRowKeys.value = keys.map((item) => Number(item))
+  }
+}))
 
 const modalTitle = computed(() => form.id ? '编辑客户' : '新增客户')
 
@@ -404,9 +440,7 @@ const actionButtons = computed(() => {
   if (props.mode === 'invalid') {
     return [{ key: 'recover', label: '恢复客户', type: 'primary' as const }]
   }
-  return [
-    { key: 'deletePlan', label: '删除', type: 'default' as const }
-  ]
+  return [{ key: 'deletePlan', label: '删除', type: 'default' as const }]
 })
 
 const callbackRows = computed(() => rows.value.filter((item) => !!item.nextFollowDate))
@@ -415,6 +449,13 @@ const displayRows = computed(() => {
   return list.map((item, index) => ({ ...item, index: index + 1 }))
 })
 const displayTotal = computed(() => props.mode === 'callback' ? callbackRows.value.length : total.value)
+
+function selectedIds() {
+  if (selectedRowKeys.value.length) {
+    return [...selectedRowKeys.value]
+  }
+  return []
+}
 
 function defaultStatus(mode: string) {
   if (mode === 'consultation') return 0
@@ -472,6 +513,7 @@ function reset() {
   query.customerTag = ''
   query.marketerName = ''
   query.pageNo = 1
+  selectedRowKeys.value = []
   fetchData()
 }
 
@@ -486,29 +528,64 @@ function onPageSizeChange(_current: number, size: number) {
   fetchData()
 }
 
-function handleTopAction(key: string) {
+async function handleTopAction(key: string) {
   if (key === 'create') {
     openForm()
     return
   }
   if (key === 'abandon') {
-    batchMoveToInvalid()
+    await batchMoveToInvalid()
     return
   }
   if (key === 'recover') {
-    message.info('请在列表中选择具体客户执行恢复')
+    const ids = selectedIds()
+    if (!ids.length) {
+      message.info('请先勾选要恢复的客户')
+      return
+    }
+    await batchUpdateLeadStatus({ ids, status: 1 })
+    message.success(`已恢复 ${ids.length} 条客户`)
+    selectedRowKeys.value = []
+    fetchData()
     return
   }
   if (key === 'callback') {
-    message.info('可在编辑里填写计划执行时间与计划标题')
+    const ids = selectedIds()
+    if (!ids.length) {
+      message.info('请先勾选要添加计划的客户')
+      return
+    }
+    planForm.title = '回访'
+    planForm.planExecuteTime = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    planForm.executorName = ''
+    planOpen.value = true
     return
   }
   if (key === 'tag') {
-    message.info('可在编辑里设置客户标签')
+    const ids = selectedIds()
+    if (!ids.length) {
+      message.info('请先勾选客户')
+      return
+    }
+    await Promise.all(ids.map((id) => {
+      const row = rows.value.find((item) => item.id === id)
+      if (!row) return Promise.resolve()
+      return updateCrmLead(id, { ...row, customerTag: row.customerTag || 'BBB' })
+    }))
+    message.success(`已设置 ${ids.length} 条客户标签`)
+    fetchData()
     return
   }
   if (key === 'batchDelete' || key === 'deletePlan') {
-    message.info('请在列表中逐条删除')
+    const ids = selectedIds()
+    if (!ids.length) {
+      message.info('请先勾选要删除的数据')
+      return
+    }
+    await batchDeleteLeads({ ids })
+    message.success(`已删除 ${ids.length} 条记录`)
+    selectedRowKeys.value = []
+    fetchData()
   }
 }
 
@@ -574,6 +651,27 @@ async function submit() {
   }
 }
 
+async function submitCallbackPlan() {
+  const ids = selectedIds()
+  if (!ids.length) {
+    message.info('请先勾选客户')
+    return
+  }
+  if (!planForm.title || !planForm.planExecuteTime) {
+    message.error('请填写计划标题与执行时间')
+    return
+  }
+  planSubmitting.value = true
+  try {
+    await Promise.all(ids.map((id) => createLeadCallbackPlan(id, { ...planForm })))
+    message.success(`已新增 ${ids.length} 条回访计划`)
+    planOpen.value = false
+    fetchData()
+  } finally {
+    planSubmitting.value = false
+  }
+}
+
 function viewMore(record: CrmLeadItem) {
   Modal.info({
     title: '客户详情',
@@ -590,24 +688,32 @@ function transferToAdmission(record: CrmLeadItem) {
     .catch(() => message.error('转入住失败'))
 }
 
-function executeCallback(record: CrmLeadItem) {
-  updateCrmLead(record.id, { ...record, followupStatus: '已回访', nextFollowDate: dayjs().format('YYYY-MM-DD') })
-    .then(() => {
-      message.success('已执行回访')
-      fetchData()
+async function executeCallback(record: CrmLeadItem) {
+  try {
+    const plans = await getLeadCallbackPlans(record.id)
+    const pending = (plans || []).find((item) => item.status === 'PENDING')
+    if (!pending) {
+      message.info('该客户暂无待执行回访计划')
+      return
+    }
+    await executeCallbackPlan(pending.id, {
+      executeNote: '页面执行',
+      nextFollowDate: record.nextFollowDate
     })
-    .catch(() => message.error('执行失败'))
+    message.success('已执行回访计划')
+    fetchData()
+  } catch {
+    message.error('执行失败')
+  }
 }
 
 function recoverLead(record: CrmLeadItem) {
-  updateCrmLead(record.id, {
-    ...record,
-    status: 1,
-    invalidTime: undefined
-  }).then(() => {
-    message.success('客户已恢复到意向客户')
-    fetchData()
-  }).catch(() => message.error('恢复失败'))
+  batchUpdateLeadStatus({ ids: [record.id], status: 1 })
+    .then(() => {
+      message.success('客户已恢复到意向客户')
+      fetchData()
+    })
+    .catch(() => message.error('恢复失败'))
 }
 
 function toggleRefund(record: CrmLeadItem) {
@@ -619,18 +725,20 @@ function toggleRefund(record: CrmLeadItem) {
     .catch(() => message.error('更新失败'))
 }
 
-function batchMoveToInvalid() {
-  if (!rows.value.length) {
-    message.info('暂无可处理客户')
+async function batchMoveToInvalid() {
+  const ids = selectedIds()
+  if (!ids.length) {
+    message.info('请先勾选要放弃的客户')
     return
   }
-  const first = rows.value[0]
-  updateCrmLead(first.id, { ...first, status: 3, invalidTime: dayjs().format('YYYY-MM-DD HH:mm:ss') })
-    .then(() => {
-      message.success('已放弃1条客户')
-      fetchData()
-    })
-    .catch(() => message.error('放弃失败'))
+  await batchUpdateLeadStatus({
+    ids,
+    status: 3,
+    invalidTime: dayjs().format('YYYY-MM-DD HH:mm:ss')
+  })
+  message.success(`已放弃 ${ids.length} 条客户`)
+  selectedRowKeys.value = []
+  fetchData()
 }
 
 function remove(id: number) {

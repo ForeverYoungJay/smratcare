@@ -37,13 +37,21 @@
           <a-button danger @click="batchDelete">删除</a-button>
         </a-space>
       </div>
-      <a-table :data-source="rows" :columns="columns" :loading="loading" :pagination="false" row-key="id" :scroll="{ x: 1800 }">
+      <a-table
+        :data-source="rows"
+        :columns="columns"
+        :loading="loading"
+        :pagination="false"
+        row-key="id"
+        :row-selection="rowSelection"
+        :scroll="{ x: 1800 }"
+      >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'operation'">
             <a-space wrap>
               <a-button type="link" @click="view(record)">查看</a-button>
               <a-button type="link" @click="openForm(record)">编辑</a-button>
-              <a-button type="link" @click="uploadAttachment(record)">附件</a-button>
+              <a-button type="link" @click="openAttachment(record)">附件</a-button>
             </a-space>
           </template>
         </template>
@@ -123,17 +131,44 @@
         </a-row>
       </a-form>
     </a-modal>
+
+    <a-modal v-model:open="attachmentOpen" title="合同附件" width="760px" :footer="null">
+      <a-space style="margin-bottom: 12px;">
+        <a-input v-model:value="attachmentForm.fileName" placeholder="附件名称" style="width: 180px" />
+        <a-input v-model:value="attachmentForm.fileUrl" placeholder="附件链接(URL)" style="width: 220px" />
+        <a-input v-model:value="attachmentForm.fileType" placeholder="文件类型" style="width: 120px" />
+        <a-button type="primary" :loading="attachmentSubmitting" @click="submitAttachment">新增附件</a-button>
+      </a-space>
+      <a-table :data-source="attachments" :columns="attachmentColumns" :pagination="false" row-key="id" size="small">
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'fileUrl'">
+            <a :href="record.fileUrl" target="_blank">{{ record.fileUrl || '-' }}</a>
+          </template>
+          <template v-else-if="column.key === 'operation'">
+            <a-button type="link" danger @click="removeAttachment(record.id)">删除</a-button>
+          </template>
+        </template>
+      </a-table>
+    </a-modal>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
-import { createCrmLead, deleteCrmLead, getLeadPage, updateCrmLead } from '../../api/marketing'
-import type { CrmLeadItem, PageResult } from '../../types'
+import {
+  batchDeleteLeads,
+  createCrmLead,
+  createLeadAttachment,
+  getLeadAttachments,
+  getLeadPage,
+  updateCrmLead,
+  deleteLeadAttachment
+} from '../../api/marketing'
+import type { ContractAttachmentItem, CrmLeadItem, PageResult } from '../../types'
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -141,6 +176,7 @@ const open = ref(false)
 const formRef = ref<FormInstance>()
 const rows = ref<CrmLeadItem[]>([])
 const total = ref(0)
+const selectedRowKeys = ref<number[]>([])
 
 const query = reactive({
   contractNo: '',
@@ -160,6 +196,13 @@ const rules: FormRules = {
   elderName: [{ required: true, message: '请输入姓名' }]
 }
 
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: (number | string)[]) => {
+    selectedRowKeys.value = keys.map((item) => Number(item))
+  }
+}))
+
 const columns = [
   { title: '合同编号', dataIndex: 'contractNo', key: 'contractNo', width: 170 },
   { title: '签约房号', dataIndex: 'reservationRoomNo', key: 'reservationRoomNo', width: 140 },
@@ -175,11 +218,23 @@ const columns = [
   { title: '操作', key: 'operation', fixed: 'right', width: 180 }
 ]
 
-function genderText(gender?: number) {
-  if (gender === 1) return '男'
-  if (gender === 2) return '女'
-  return '-'
-}
+const attachmentOpen = ref(false)
+const attachmentSubmitting = ref(false)
+const currentAttachmentLeadId = ref<number>()
+const attachments = ref<ContractAttachmentItem[]>([])
+const attachmentForm = reactive({
+  fileName: '',
+  fileUrl: '',
+  fileType: ''
+})
+
+const attachmentColumns = [
+  { title: '文件名', dataIndex: 'fileName', key: 'fileName', width: 160 },
+  { title: '文件链接', dataIndex: 'fileUrl', key: 'fileUrl', width: 280 },
+  { title: '文件类型', dataIndex: 'fileType', key: 'fileType', width: 120 },
+  { title: '上传时间', dataIndex: 'createTime', key: 'createTime', width: 160 },
+  { title: '操作', key: 'operation', width: 80 }
+]
 
 async function fetchData() {
   loading.value = true
@@ -194,7 +249,7 @@ async function fetchData() {
       marketerName: query.marketerName || undefined,
       contractStatus: query.contractStatus || undefined
     })
-    rows.value = (page.list || []).map((item) => ({ ...item, gender: item.gender, genderText: genderText(item.gender) } as any))
+    rows.value = page.list || []
     total.value = page.total || 0
   } finally {
     loading.value = false
@@ -209,6 +264,7 @@ function reset() {
   query.marketerName = ''
   query.contractStatus = ''
   query.pageNo = 1
+  selectedRowKeys.value = []
   fetchData()
 }
 
@@ -267,29 +323,32 @@ async function submit() {
   }
 }
 
-function batchApprove() {
-  if (!rows.value.length) {
-    message.info('暂无待审批合同')
+async function batchApprove() {
+  const ids = selectedRowKeys.value
+  if (!ids.length) {
+    message.info('请先勾选合同')
     return
   }
-  const target = rows.value[0]
-  updateCrmLead(target.id, { ...target, contractStatus: '已审批,已通过' })
-    .then(() => {
-      message.success('已审批1条合同')
-      fetchData()
-    })
-    .catch(() => message.error('审批失败'))
+  await Promise.all(ids.map((id) => {
+    const row = rows.value.find((item) => item.id === id)
+    if (!row) return Promise.resolve()
+    return updateCrmLead(row.id, { ...row, contractStatus: '已审批,已通过' })
+  }))
+  message.success(`已审批 ${ids.length} 条合同`)
+  fetchData()
 }
 
 function batchDelete() {
-  if (!rows.value.length) {
-    message.info('暂无可删除合同')
+  const ids = selectedRowKeys.value
+  if (!ids.length) {
+    message.info('请先勾选要删除的合同')
     return
   }
   Modal.confirm({
-    title: '确认删除第一条合同记录吗？',
+    title: `确认删除 ${ids.length} 条合同记录吗？`,
     onOk: async () => {
-      await deleteCrmLead(rows.value[0].id)
+      await batchDeleteLeads({ ids })
+      selectedRowKeys.value = []
       message.success('删除成功')
       fetchData()
     }
@@ -303,8 +362,44 @@ function view(record: CrmLeadItem) {
   })
 }
 
-function uploadAttachment(_record: CrmLeadItem) {
-  message.info('附件功能已预留，后续可接入文件中心')
+async function openAttachment(record: CrmLeadItem) {
+  currentAttachmentLeadId.value = record.id
+  attachmentForm.fileName = ''
+  attachmentForm.fileUrl = ''
+  attachmentForm.fileType = ''
+  attachments.value = await getLeadAttachments(record.id)
+  attachmentOpen.value = true
+}
+
+async function submitAttachment() {
+  if (!currentAttachmentLeadId.value) return
+  if (!attachmentForm.fileName) {
+    message.error('请填写附件名称')
+    return
+  }
+  attachmentSubmitting.value = true
+  try {
+    await createLeadAttachment(currentAttachmentLeadId.value, {
+      fileName: attachmentForm.fileName,
+      fileUrl: attachmentForm.fileUrl,
+      fileType: attachmentForm.fileType
+    })
+    attachments.value = await getLeadAttachments(currentAttachmentLeadId.value)
+    attachmentForm.fileName = ''
+    attachmentForm.fileUrl = ''
+    attachmentForm.fileType = ''
+    message.success('附件已保存')
+  } finally {
+    attachmentSubmitting.value = false
+  }
+}
+
+async function removeAttachment(attachmentId: number) {
+  await deleteLeadAttachment(attachmentId)
+  if (currentAttachmentLeadId.value) {
+    attachments.value = await getLeadAttachments(currentAttachmentLeadId.value)
+  }
+  message.success('附件已删除')
 }
 
 onMounted(fetchData)

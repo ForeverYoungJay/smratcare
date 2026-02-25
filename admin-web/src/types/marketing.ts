@@ -69,3 +69,78 @@ export interface MarketingDataQualityReport {
   missingNextFollowDateCount: number
   nonStandardSourceCount: number
 }
+
+export interface LeadBatchStatusRequest {
+  ids: number[]
+  status: number
+  followupStatus?: string
+  invalidTime?: string
+}
+
+export interface LeadBatchDeleteRequest {
+  ids: number[]
+}
+
+export interface CallbackPlanItem {
+  id: number
+  leadId: number
+  title: string
+  planExecuteTime: string
+  executorName?: string
+  status: string
+  executedTime?: string
+  executeNote?: string
+  createTime?: string
+}
+
+export interface CallbackPlanCreateRequest {
+  title: string
+  planExecuteTime: string
+  executorName?: string
+}
+
+export interface CallbackExecuteRequest {
+  executeNote?: string
+  nextFollowDate?: string
+}
+
+export interface ContractAttachmentItem {
+  id: number
+  leadId: number
+  contractNo?: string
+  fileName: string
+  fileUrl?: string
+  fileType?: string
+  fileSize?: number
+  remark?: string
+  createTime?: string
+}
+
+export interface ContractAttachmentCreateRequest {
+  contractNo?: string
+  fileName: string
+  fileUrl?: string
+  fileType?: string
+  fileSize?: number
+  remark?: string
+}
+
+export interface SmsTaskItem {
+  id: number
+  leadId: number
+  phone?: string
+  templateName?: string
+  content?: string
+  planSendTime?: string
+  status: string
+  sendTime?: string
+  resultMessage?: string
+  createTime?: string
+}
+
+export interface SmsTaskCreateRequest {
+  leadIds: number[]
+  templateName?: string
+  content?: string
+  planSendTime?: string
+}
