@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -25,8 +26,13 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
     if (file == null || file.isEmpty()) {
       throw new IllegalArgumentException("上传文件不能为空");
     }
+    if (file.getSize() > properties.getMaxSizeBytes()) {
+      throw new IllegalArgumentException("文件大小超限，最大支持 " + (properties.getMaxSizeBytes() / 1024 / 1024) + "MB");
+    }
+    String originalName = safeFileName(file.getOriginalFilename());
+    String extension = resolveExtension(originalName);
+    validateExtension(extension);
     String safeBizType = sanitizeBizType(bizType);
-    String extension = resolveExtension(file.getOriginalFilename());
     String storageName = UUID.randomUUID().toString().replace("-", "") + extension;
     LocalDate today = LocalDate.now();
     Path dir = Paths.get(properties.getBaseDir(), safeBizType, String.valueOf(today.getYear()),
@@ -45,7 +51,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
 
     UploadFileResponse response = new UploadFileResponse();
     response.setFileName(storageName);
-    response.setOriginalFileName(file.getOriginalFilename());
+    response.setOriginalFileName(originalName);
     response.setFileUrl(normalizePrefix(properties.getUrlPrefix()) + relativePath);
     response.setFileType(file.getContentType());
     response.setFileSize(file.getSize());
@@ -70,6 +76,28 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
     }
     String ext = originalName.substring(idx).toLowerCase();
     return ext.length() > 12 ? "" : ext;
+  }
+
+  private void validateExtension(String extension) {
+    if (extension == null || extension.isBlank()) {
+      throw new IllegalArgumentException("文件类型不支持");
+    }
+    String ext = extension.startsWith(".") ? extension.substring(1) : extension;
+    List<String> allowed = properties.getAllowedExtensions();
+    if (allowed == null || allowed.isEmpty()) {
+      return;
+    }
+    boolean matched = allowed.stream().anyMatch(item -> item != null && item.equalsIgnoreCase(ext));
+    if (!matched) {
+      throw new IllegalArgumentException("文件类型不支持，允许类型: " + String.join(", ", allowed));
+    }
+  }
+
+  private String safeFileName(String originalName) {
+    if (originalName == null || originalName.isBlank()) {
+      return "unnamed";
+    }
+    return originalName.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
   }
 
   private String normalizePrefix(String prefix) {

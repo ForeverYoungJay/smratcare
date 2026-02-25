@@ -67,6 +67,8 @@ curl -s -X POST http://localhost:8080/api/auth/login \
 注意：
 - MySQL 端口使用 `3307`（见 `docker-compose.yml`），应用已配置为 `127.0.0.1:3307`。
 - 如需重新初始化容器数据卷：`docker compose down -v` 后再执行上述步骤。
+- 合同附件上传默认落盘到 `${user.home}/smartcare-uploads`，访问路径前缀为 `/uploads/**`。
+- 上传白名单：`jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,txt,zip`，单文件上限 `10MB`。
 
 ## 常见问题排查
 ### 1) 3306 端口冲突

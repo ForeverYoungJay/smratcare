@@ -167,12 +167,25 @@ public class CrmLeadActionServiceImpl implements CrmLeadActionService {
     if (!isOwnedLead(lead, tenantId)) {
       return null;
     }
+    String fileName = blankToDefault(request == null ? null : request.getFileName(), "未命名附件");
+    List<CrmContractAttachment> existingAttachments = attachmentMapper.selectList(Wrappers.lambdaQuery(CrmContractAttachment.class)
+        .eq(CrmContractAttachment::getIsDeleted, 0)
+        .eq(CrmContractAttachment::getTenantId, tenantId)
+        .eq(CrmContractAttachment::getLeadId, leadId));
+    boolean duplicated = existingAttachments.stream()
+        .map(CrmContractAttachment::getFileName)
+        .filter(item -> item != null && !item.isBlank())
+        .anyMatch(item -> item.trim().equalsIgnoreCase(fileName));
+    if (duplicated) {
+      throw new IllegalArgumentException("附件重名，请修改文件名后重试");
+    }
+
     CrmContractAttachment attachment = new CrmContractAttachment();
     attachment.setTenantId(tenantId);
     attachment.setOrgId(orgId);
     attachment.setLeadId(leadId);
     attachment.setContractNo(blankToDefault(request == null ? null : request.getContractNo(), lead.getContractNo()));
-    attachment.setFileName(blankToDefault(request == null ? null : request.getFileName(), "未命名附件"));
+    attachment.setFileName(fileName);
     attachment.setFileUrl(blankToNull(request == null ? null : request.getFileUrl()));
     attachment.setFileType(blankToNull(request == null ? null : request.getFileType()));
     attachment.setFileSize(request == null ? null : request.getFileSize());

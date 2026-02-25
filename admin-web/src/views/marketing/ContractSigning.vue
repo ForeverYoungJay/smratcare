@@ -87,14 +87,32 @@
 
     <a-modal v-model:open="attachmentOpen" title="合同附件" width="820px" :footer="null">
       <a-space style="margin-bottom: 12px;">
-        <a-upload :show-upload-list="false" :custom-request="handleUpload">
+        <a-upload
+          :show-upload-list="false"
+          :custom-request="handleUpload"
+          :before-upload="beforeUpload"
+          :accept="uploadAccept"
+        >
           <a-button type="primary" :loading="attachmentSubmitting">上传附件</a-button>
         </a-upload>
       </a-space>
       <a-table :data-source="attachments" :columns="attachmentColumns" :pagination="false" row-key="id" size="small">
         <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'fileUrl'">
+          <template v-if="column.key === 'preview'">
+            <a-image
+              v-if="isImageAttachment(record)"
+              :src="record.fileUrl"
+              :width="40"
+              :height="40"
+              style="object-fit: cover; border-radius: 4px;"
+            />
+            <span v-else>-</span>
+          </template>
+          <template v-else-if="column.key === 'fileUrl'">
             <a :href="record.fileUrl" target="_blank">{{ record.fileName }}</a>
+          </template>
+          <template v-else-if="column.key === 'fileSize'">
+            {{ formatFileSize(record.fileSize) }}
           </template>
           <template v-else-if="column.key === 'operation'">
             <a-button type="link" danger @click="removeAttachment(record.id)">删除</a-button>
@@ -174,10 +192,13 @@ const attachmentOpen = ref(false)
 const attachmentSubmitting = ref(false)
 const currentAttachmentLead = ref<CrmLeadItem>()
 const attachments = ref<ContractAttachmentItem[]>([])
+const uploadAccept = '.jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip'
 const attachmentColumns = [
+  { title: '预览', dataIndex: 'preview', key: 'preview', width: 80 },
   { title: '文件名', dataIndex: 'fileName', key: 'fileName', width: 220 },
   { title: '文件链接', dataIndex: 'fileUrl', key: 'fileUrl', width: 320 },
   { title: '文件类型', dataIndex: 'fileType', key: 'fileType', width: 120 },
+  { title: '文件大小', dataIndex: 'fileSize', key: 'fileSize', width: 110 },
   { title: '上传时间', dataIndex: 'createTime', key: 'createTime', width: 160 },
   { title: '操作', key: 'operation', width: 80 }
 ]
@@ -314,6 +335,21 @@ async function openAttachment(record: CrmLeadItem) {
   attachmentOpen.value = true
 }
 
+function beforeUpload(file: File) {
+  const allowExt = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'zip']
+  const ext = file.name?.split('.').pop()?.toLowerCase() || ''
+  if (!allowExt.includes(ext)) {
+    message.error(`文件类型不支持，仅允许: ${allowExt.join(', ')}`)
+    return false
+  }
+  const maxSize = 10 * 1024 * 1024
+  if (file.size > maxSize) {
+    message.error('文件大小超限，最大支持 10MB')
+    return false
+  }
+  return true
+}
+
 async function handleUpload(option: any) {
   const file = option?.file as File
   if (!file || !currentAttachmentLead.value) {
@@ -338,6 +374,20 @@ async function handleUpload(option: any) {
   } finally {
     attachmentSubmitting.value = false
   }
+}
+
+function isImageAttachment(record: ContractAttachmentItem) {
+  const type = (record.fileType || '').toLowerCase()
+  if (type.startsWith('image/')) return true
+  const url = (record.fileUrl || '').toLowerCase()
+  return ['.jpg', '.jpeg', '.png', '.gif', '.webp'].some((suffix) => url.endsWith(suffix))
+}
+
+function formatFileSize(size?: number) {
+  if (size == null || Number.isNaN(size)) return '-'
+  if (size < 1024) return `${size}B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)}KB`
+  return `${(size / 1024 / 1024).toFixed(2)}MB`
 }
 
 async function removeAttachment(attachmentId: number) {
