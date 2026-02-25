@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="商品管理" subTitle="维护商品信息、标签与安全库存">
+  <PageContainer :title="pageTitle" :subTitle="pageSubTitle">
     <a-card class="card-elevated" :bordered="false">
       <a-form layout="inline" :model="query" class="search-form">
         <a-form-item label="关键词">
@@ -126,6 +126,17 @@ import PageContainer from '../../components/PageContainer.vue'
 import { exportCsv } from '../../utils/export'
 import { getProductPage, createProduct, updateProduct, getProductTagList } from '../../api/store'
 import type { PageResult, ProductItem, ProductTagItem } from '../../types'
+
+const props = withDefaults(defineProps<{
+  title?: string
+  subTitle?: string
+}>(), {
+  title: '商品管理',
+  subTitle: '维护商品信息、标签与安全库存'
+})
+
+const pageTitle = props.title
+const pageSubTitle = props.subTitle
 
 const loading = ref(false)
 const saving = ref(false)

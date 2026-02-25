@@ -19,6 +19,8 @@ public class InventoryLog {
 
   private Long batchId;
 
+  private Long warehouseId;
+
   private String changeType;
 
   private Integer changeQty;

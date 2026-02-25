@@ -1,0 +1,62 @@
+CREATE TABLE oa_album (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  title VARCHAR(128) NOT NULL COMMENT '相册标题',
+  category VARCHAR(64) DEFAULT NULL COMMENT '分类',
+  cover_url VARCHAR(512) DEFAULT NULL COMMENT '封面地址',
+  photo_count INT NOT NULL DEFAULT 0 COMMENT '照片数量',
+  shoot_date DATE DEFAULT NULL COMMENT '拍摄日期',
+  status VARCHAR(16) NOT NULL DEFAULT 'DRAFT' COMMENT '状态 DRAFT/PUBLISHED/ARCHIVED',
+  remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  KEY idx_oa_album_org_status (org_id, status),
+  KEY idx_oa_album_org_date (org_id, shoot_date)
+) COMMENT='相册管理';
+
+CREATE TABLE oa_knowledge (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  title VARCHAR(200) NOT NULL COMMENT '知识标题',
+  category VARCHAR(64) DEFAULT NULL COMMENT '分类',
+  tags VARCHAR(255) DEFAULT NULL COMMENT '标签，逗号分隔',
+  content TEXT NOT NULL COMMENT '正文',
+  author_id BIGINT DEFAULT NULL COMMENT '作者ID',
+  author_name VARCHAR(64) DEFAULT NULL COMMENT '作者姓名',
+  status VARCHAR(16) NOT NULL DEFAULT 'DRAFT' COMMENT '状态 DRAFT/PUBLISHED/ARCHIVED',
+  published_at DATETIME DEFAULT NULL COMMENT '发布时间',
+  remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  KEY idx_oa_knowledge_org_status (org_id, status),
+  KEY idx_oa_knowledge_org_category (org_id, category)
+) COMMENT='知识库文章';
+
+CREATE TABLE staff_reward_punishment (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  staff_id BIGINT NOT NULL COMMENT '员工ID',
+  staff_name VARCHAR(64) DEFAULT NULL COMMENT '员工姓名',
+  type VARCHAR(16) NOT NULL COMMENT '类型 REWARD/PUNISH',
+  level VARCHAR(32) DEFAULT NULL COMMENT '级别',
+  title VARCHAR(128) NOT NULL COMMENT '标题',
+  reason VARCHAR(512) DEFAULT NULL COMMENT '原因',
+  amount DECIMAL(12,2) DEFAULT NULL COMMENT '金额',
+  points INT DEFAULT NULL COMMENT '积分',
+  occurred_date DATE NOT NULL COMMENT '发生日期',
+  status VARCHAR(16) NOT NULL DEFAULT 'EFFECTIVE' COMMENT '状态 EFFECTIVE/CANCELLED',
+  remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  KEY idx_staff_reward_org_type (org_id, type),
+  KEY idx_staff_reward_org_staff (org_id, staff_id),
+  KEY idx_staff_reward_org_date (org_id, occurred_date)
+) COMMENT='员工奖惩记录';

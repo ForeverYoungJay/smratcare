@@ -8,6 +8,18 @@
         <a-form-item label="商品ID">
           <a-input-number v-model:value="query.productId" style="width: 140px" />
         </a-form-item>
+        <a-form-item label="仓库">
+          <a-select v-model:value="query.warehouseId" :options="warehouseOptions" allow-clear style="width: 180px" />
+        </a-form-item>
+        <a-form-item label="分类">
+          <a-select v-model:value="query.category" :options="categoryOptions" allow-clear style="width: 180px" />
+        </a-form-item>
+        <a-form-item label="临期天数<=">
+          <a-input-number v-model:value="query.expiryDays" :min="0" style="width: 120px" />
+        </a-form-item>
+        <a-form-item label="仅低库存">
+          <a-switch v-model:checked="query.lowStockOnly" />
+        </a-form-item>
         <a-form-item>
           <a-space>
             <a-button type="primary" @click="fetchData">搜索</a-button>
@@ -95,6 +107,8 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportCsv } from '../../utils/export'
 import { adjustInventory, getInventoryBatchPage } from '../../api/inventory'
+import { getWarehousePage } from '../../api/material'
+import { getProductPage } from '../../api/store'
 import type { InventoryBatchItem, InventoryAdjustRequest, PageResult } from '../../types'
 
 const loading = ref(false)
@@ -104,9 +118,15 @@ const total = ref(0)
 const query = reactive({
   keyword: '',
   productId: undefined as number | undefined,
+  warehouseId: undefined as number | undefined,
+  category: undefined as string | undefined,
+  expiryDays: undefined as number | undefined,
+  lowStockOnly: false,
   pageNo: 1,
   pageSize: 10
 })
+const warehouseOptions = ref<Array<{ label: string; value: number }>>([])
+const categoryOptions = ref<Array<{ label: string; value: string }>>([])
 
 const adjustOpen = ref(false)
 const adjusting = ref(false)
@@ -144,6 +164,10 @@ async function fetchData() {
       pageNo: query.pageNo,
       pageSize: query.pageSize,
       productId: query.productId,
+      warehouseId: query.warehouseId,
+      category: query.category,
+      expiryDays: query.expiryDays,
+      lowStockOnly: query.lowStockOnly,
       keyword: query.keyword || undefined
     })
     rows.value = res.list
@@ -156,6 +180,10 @@ async function fetchData() {
 function reset() {
   query.keyword = ''
   query.productId = undefined
+  query.warehouseId = undefined
+  query.category = undefined
+  query.expiryDays = undefined
+  query.lowStockOnly = false
   query.pageNo = 1
   fetchData()
 }
@@ -205,6 +233,19 @@ async function submitAdjust() {
 }
 
 onMounted(fetchData)
+
+onMounted(async () => {
+  const [warehouseRes, productRes] = await Promise.all([
+    getWarehousePage({ pageNo: 1, pageSize: 500 }),
+    getProductPage({ pageNo: 1, pageSize: 500 })
+  ])
+  warehouseOptions.value = warehouseRes.list.map((it: { id: number; warehouseName?: string }) => ({ label: it.warehouseName || `仓库${it.id}`, value: it.id }))
+  const categorySet = new Set<string>()
+  for (const row of productRes.list || []) {
+    if (row.category) categorySet.add(row.category)
+  }
+  categoryOptions.value = Array.from(categorySet).map((it) => ({ label: it, value: it }))
+})
 </script>
 
 <style scoped>

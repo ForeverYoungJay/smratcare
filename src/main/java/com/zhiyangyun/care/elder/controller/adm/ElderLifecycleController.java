@@ -5,6 +5,7 @@ import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.audit.service.AuditLogService;
 import com.zhiyangyun.care.elder.model.lifecycle.AdmissionRequest;
+import com.zhiyangyun.care.elder.model.lifecycle.AdmissionRecordResponse;
 import com.zhiyangyun.care.elder.model.lifecycle.AdmissionResponse;
 import com.zhiyangyun.care.elder.model.lifecycle.ChangeLogResponse;
 import com.zhiyangyun.care.elder.model.lifecycle.DischargeRequest;
@@ -60,5 +61,16 @@ public class ElderLifecycleController {
       @RequestParam(required = false) Long elderId) {
     Long tenantId = AuthContext.getOrgId();
     return Result.ok(lifecycleService.changeLogs(tenantId, pageNo, pageSize, elderId));
+  }
+
+  @GetMapping("/admissions/page")
+  public Result<IPage<AdmissionRecordResponse>> admissions(
+      @RequestParam(defaultValue = "1") long pageNo,
+      @RequestParam(defaultValue = "20") long pageSize,
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String contractNo,
+      @RequestParam(required = false) Integer elderStatus) {
+    Long tenantId = AuthContext.getOrgId();
+    return Result.ok(lifecycleService.admissionPage(tenantId, pageNo, pageSize, keyword, contractNo, elderStatus));
   }
 }

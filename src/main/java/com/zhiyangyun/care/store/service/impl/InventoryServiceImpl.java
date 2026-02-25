@@ -62,10 +62,17 @@ public class InventoryServiceImpl implements InventoryService {
     if (request.getBatchId() != null) {
       batch = batchMapper.selectById(request.getBatchId());
     }
+    if (batch != null
+        && request.getWarehouseId() != null
+        && batch.getWarehouseId() != null
+        && !request.getWarehouseId().equals(batch.getWarehouseId())) {
+      throw new IllegalStateException("warehouse mismatch");
+    }
     if (batch == null) {
       batch = new InventoryBatch();
       batch.setOrgId(request.getOrgId());
       batch.setProductId(request.getProductId());
+      batch.setWarehouseId(request.getWarehouseId());
       batch.setBatchNo("ADJUST-" + adjustment.getId());
       batch.setQuantity(0);
       batchMapper.insert(batch);
@@ -83,6 +90,7 @@ public class InventoryServiceImpl implements InventoryService {
     log.setOrgId(request.getOrgId());
     log.setProductId(request.getProductId());
     log.setBatchId(batch.getId());
+    log.setWarehouseId(batch.getWarehouseId());
     log.setChangeType("ADJUST");
     log.setChangeQty(delta);
     log.setRefAdjustmentId(adjustment.getId());
@@ -105,12 +113,14 @@ public class InventoryServiceImpl implements InventoryService {
         Wrappers.lambdaQuery(InventoryBatch.class)
             .eq(InventoryBatch::getOrgId, request.getOrgId())
             .eq(InventoryBatch::getProductId, request.getProductId())
+            .eq(request.getWarehouseId() != null, InventoryBatch::getWarehouseId, request.getWarehouseId())
             .eq(InventoryBatch::getBatchNo, batchNo)
             .eq(InventoryBatch::getIsDeleted, 0));
     if (batch == null) {
       batch = new InventoryBatch();
       batch.setOrgId(request.getOrgId());
       batch.setProductId(request.getProductId());
+      batch.setWarehouseId(request.getWarehouseId());
       batch.setBatchNo(batchNo);
       batch.setQuantity(request.getQuantity());
       batch.setCostPrice(request.getCostPrice() == null ? BigDecimal.ZERO : request.getCostPrice());
@@ -136,6 +146,7 @@ public class InventoryServiceImpl implements InventoryService {
     log.setOrgId(request.getOrgId());
     log.setProductId(request.getProductId());
     log.setBatchId(batch.getId());
+    log.setWarehouseId(batch.getWarehouseId());
     log.setChangeType("IN");
     log.setChangeQty(request.getQuantity());
     log.setBizType("INBOUND");
@@ -158,6 +169,11 @@ public class InventoryServiceImpl implements InventoryService {
       if (request.getOrgId() != null && !request.getOrgId().equals(batch.getOrgId())) {
         throw new IllegalStateException("org mismatch");
       }
+      if (request.getWarehouseId() != null
+          && batch.getWarehouseId() != null
+          && !request.getWarehouseId().equals(batch.getWarehouseId())) {
+        throw new IllegalStateException("warehouse mismatch");
+      }
       int current = batch.getQuantity() == null ? 0 : batch.getQuantity();
       if (current < request.getQuantity()) {
         throw new IllegalStateException("insufficient stock");
@@ -169,6 +185,7 @@ public class InventoryServiceImpl implements InventoryService {
       log.setOrgId(request.getOrgId());
       log.setProductId(request.getProductId());
       log.setBatchId(batch.getId());
+      log.setWarehouseId(batch.getWarehouseId());
       log.setChangeType("OUT");
       log.setChangeQty(request.getQuantity());
       log.setBizType("CONSUME");
@@ -183,6 +200,7 @@ public class InventoryServiceImpl implements InventoryService {
         Wrappers.lambdaQuery(InventoryBatch.class)
             .eq(InventoryBatch::getOrgId, request.getOrgId())
             .eq(InventoryBatch::getProductId, request.getProductId())
+            .eq(request.getWarehouseId() != null, InventoryBatch::getWarehouseId, request.getWarehouseId())
             .orderByAsc(InventoryBatch::getExpireDate)
             .orderByAsc(InventoryBatch::getId));
     int total = 0;
@@ -208,6 +226,7 @@ public class InventoryServiceImpl implements InventoryService {
       log.setOrgId(request.getOrgId());
       log.setProductId(request.getProductId());
       log.setBatchId(batch.getId());
+      log.setWarehouseId(batch.getWarehouseId());
       log.setChangeType("OUT");
       log.setChangeQty(used);
       log.setBizType("CONSUME");

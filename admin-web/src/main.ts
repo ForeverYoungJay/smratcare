@@ -11,7 +11,7 @@ import { setupFullCalendar } from './plugins/fullcalendar'
 import { setupEditor } from './plugins/editor'
 import { setupFlow } from './plugins/flow'
 import { setupAntdx } from './plugins/antdx'
-import { permission } from './directives'
+import { permission, permissionCode } from './directives'
 
 const app = createApp(App)
 app.use(createPinia())
@@ -24,4 +24,5 @@ setupEditor(app)
 setupFlow(app)
 setupAntdx(app)
 app.directive('permission', permission)
+app.directive('permission-code', permissionCode)
 app.mount('#app')

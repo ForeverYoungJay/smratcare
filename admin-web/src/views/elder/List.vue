@@ -94,7 +94,11 @@
           <a-date-picker v-model:value="checkoutForm.endDate" value-format="YYYY-MM-DD" style="width: 100%" />
         </a-form-item>
         <a-form-item label="原因" name="reason">
-          <a-input v-model:value="checkoutForm.reason" />
+          <a-select v-model:value="checkoutForm.reason" placeholder="请选择退住费用设置">
+            <a-select-option v-for="item in dischargeFeeConfigOptions" :key="item.value" :value="item.value">
+              {{ item.label }}
+            </a-select-option>
+          </a-select>
         </a-form-item>
       </a-form>
     </a-modal>
@@ -141,11 +145,12 @@ import { message } from 'ant-design-vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import QRCode from 'qrcode'
 import PageContainer from '../../components/PageContainer.vue'
+import { getBaseConfigItemList } from '../../api/baseConfig'
 import { exportCsv } from '../../utils/export'
 import { getElderPage, assignBed, unbindBed, bindFamily } from '../../api/elder'
 import { getBedList } from '../../api/bed'
 import { getFamilyUserPage } from '../../api/family'
-import type { BedItem, ElderItem, FamilyBindRequest, PageResult, FamilyUserItem } from '../../types/api'
+import type { BaseConfigItem, BedItem, ElderItem, FamilyBindRequest, PageResult, FamilyUserItem } from '../../types/api'
 
 const router = useRouter()
 const loading = ref(false)
@@ -191,6 +196,7 @@ const changeBedRules: FormRules = {
 const checkoutOpen = ref(false)
 const checkoutFormRef = ref<FormInstance>()
 const checkoutForm = reactive<{ elderId?: number; endDate?: string; reason?: string }>({})
+const dischargeFeeConfigOptions = ref<Array<{ label: string; value: string }>>([])
 const checkoutRules: FormRules = {
   endDate: [{ required: true, message: '请选择退住日期' }]
 }
@@ -255,6 +261,18 @@ async function loadBeds() {
     beds.value = await getBedList()
   } catch {
     beds.value = []
+  }
+}
+
+async function loadDischargeFeeConfigOptions() {
+  try {
+    const options = await getBaseConfigItemList({ configGroup: 'DISCHARGE_FEE_CONFIG', status: 1 })
+    dischargeFeeConfigOptions.value = (options || []).map((item: BaseConfigItem) => ({
+      label: item.itemName,
+      value: item.itemName
+    }))
+  } catch {
+    dischargeFeeConfigOptions.value = []
   }
 }
 
@@ -416,6 +434,7 @@ function printQr() {
 }
 
 onMounted(() => {
+  loadDischargeFeeConfigOptions()
   fetchData()
   loadBeds()
 })

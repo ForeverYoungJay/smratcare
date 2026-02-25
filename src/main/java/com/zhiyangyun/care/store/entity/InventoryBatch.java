@@ -19,6 +19,8 @@ public class InventoryBatch {
 
   private Long productId;
 
+  private Long warehouseId;
+
   private String batchNo;
 
   private Integer quantity;

@@ -3,6 +3,7 @@ export interface ProductItem {
   idStr?: string
   productCode?: string
   productName: string
+  category?: string
   price?: number
   pointsPrice: number
   safetyStock?: number

@@ -6,6 +6,7 @@ import type {
   InventoryBatchItem,
   InventoryLogItem,
   InventoryAdjustmentItem,
+  InventoryAdjustmentDiffItem,
   InventoryInboundRequest,
   InventoryOutboundRequest
 } from '../types'
@@ -28,6 +29,10 @@ export function getInventoryOutboundPage(params: any) {
 
 export function getInventoryAdjustmentPage(params: any) {
   return fetchPage<InventoryAdjustmentItem>('/api/inventory/adjustment/page', params)
+}
+
+export function getInventoryAdjustmentDiffReport(params: any) {
+  return request.get<InventoryAdjustmentDiffItem[]>('/api/inventory/adjustment/diff-report', { params })
 }
 
 export function createInbound(data: InventoryInboundRequest) {

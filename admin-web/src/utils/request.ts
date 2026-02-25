@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { message } from 'ant-design-vue'
 import router from '../router'
-import { getToken, clearToken, clearRoles } from './auth'
+import { getToken, clearToken, clearRoles, clearPermissions } from './auth'
 import type { PageResult } from '../types/common'
 
 const request = axios.create({
@@ -39,6 +39,7 @@ request.interceptors.response.use(
     if (status === 401) {
       clearToken()
       clearRoles()
+      clearPermissions()
       router.push('/login')
       return Promise.reject(error)
     }

@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="人力资源" subTitle="护理员档案与岗位信息">
+  <PageContainer :title="pageTitle" :subTitle="pageSubTitle">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="姓名/工号/手机号" allow-clear />
@@ -121,6 +121,17 @@ import DataTable from '../../components/DataTable.vue'
 import { getHrStaffPage, getHrProfile, upsertHrProfile, terminateStaff, reinstateStaff } from '../../api/hr'
 import { getStaffPage } from '../../api/rbac'
 import type { HrStaffProfile, PageResult, StaffItem } from '../../types'
+
+const props = withDefaults(defineProps<{
+  title?: string
+  subTitle?: string
+}>(), {
+  title: '人力资源',
+  subTitle: '护理员档案与岗位信息'
+})
+
+const pageTitle = props.title
+const pageSubTitle = props.subTitle
 
 const query = reactive({ keyword: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const rows = ref<HrStaffProfile[]>([])

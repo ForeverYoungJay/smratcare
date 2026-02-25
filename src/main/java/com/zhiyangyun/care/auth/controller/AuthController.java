@@ -12,6 +12,7 @@ import com.zhiyangyun.care.auth.model.FamilyLoginRequest;
 import com.zhiyangyun.care.auth.model.FamilyLoginResponse;
 import com.zhiyangyun.care.auth.security.TokenBlacklistService;
 import com.zhiyangyun.care.auth.security.TokenProvider;
+import com.zhiyangyun.care.auth.security.PermissionRegistry;
 import com.zhiyangyun.care.elder.entity.FamilyUser;
 import com.zhiyangyun.care.elder.mapper.FamilyUserMapper;
 import jakarta.validation.Valid;
@@ -37,19 +38,22 @@ public class AuthController {
   private final RoleMapper roleMapper;
   private final TokenBlacklistService tokenBlacklistService;
   private final FamilyUserMapper familyUserMapper;
+  private final PermissionRegistry permissionRegistry;
 
   public AuthController(AuthenticationManager authenticationManager,
       TokenProvider tokenProvider,
       StaffMapper staffMapper,
       RoleMapper roleMapper,
       TokenBlacklistService tokenBlacklistService,
-      FamilyUserMapper familyUserMapper) {
+      FamilyUserMapper familyUserMapper,
+      PermissionRegistry permissionRegistry) {
     this.authenticationManager = authenticationManager;
     this.tokenProvider = tokenProvider;
     this.staffMapper = staffMapper;
     this.roleMapper = roleMapper;
     this.tokenBlacklistService = tokenBlacklistService;
     this.familyUserMapper = familyUserMapper;
+    this.permissionRegistry = permissionRegistry;
   }
 
   @PostMapping("/login")
@@ -68,6 +72,7 @@ public class AuthController {
     LoginResponse response = new LoginResponse();
     response.setToken(token);
     response.setRoles(roles);
+    response.setPermissions(permissionRegistry.getPermissionsByRoles(roles));
     response.setStaffInfo(toStaffInfo(staff));
     return Result.ok(response);
   }

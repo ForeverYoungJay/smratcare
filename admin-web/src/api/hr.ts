@@ -6,7 +6,8 @@ import type {
   StaffPointsLog,
   StaffPerformanceSummary,
   StaffPerformanceRankItem,
-  StaffPointsRule
+  StaffPointsRule,
+  StaffRewardPunishment
 } from '../types'
 
 export function getHrStaffPage(params: any) {
@@ -71,4 +72,20 @@ export function upsertPointsRule(data: Partial<StaffPointsRule>) {
 
 export function deletePointsRule(id: number) {
   return request.delete<void>(`/api/admin/hr/points/rule/${id}`)
+}
+
+export function getRewardPunishmentPage(params: any) {
+  return fetchPage<StaffRewardPunishment>('/api/admin/hr/reward-punishment/page', params)
+}
+
+export function createRewardPunishment(data: Partial<StaffRewardPunishment>) {
+  return request.post<StaffRewardPunishment>('/api/admin/hr/reward-punishment', data)
+}
+
+export function updateRewardPunishment(id: number, data: Partial<StaffRewardPunishment>) {
+  return request.put<StaffRewardPunishment>(`/api/admin/hr/reward-punishment/${id}`, data)
+}
+
+export function deleteRewardPunishment(id: number) {
+  return request.delete<void>(`/api/admin/hr/reward-punishment/${id}`)
 }

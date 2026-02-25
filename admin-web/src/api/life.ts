@@ -1,5 +1,13 @@
 import request, { fetchPage } from '../utils/request'
-import type { MealPlan, ActivityEvent, IncidentReport, HealthBasicRecord } from '../types'
+import type {
+  MealPlan,
+  ActivityEvent,
+  IncidentReport,
+  HealthBasicRecord,
+  BirthdayReminder,
+  RoomCleaningTask,
+  MaintenanceRequest
+} from '../types'
 
 export function getMealPlanPage(params: any) {
   return fetchPage<MealPlan>('/api/life/meal-plan/page', params)
@@ -67,4 +75,48 @@ export function updateHealthBasic(id: number, data: Partial<HealthBasicRecord>) 
 
 export function deleteHealthBasic(id: number) {
   return request.delete<void>(`/api/life/health-basic/${id}`)
+}
+
+export function getBirthdayPage(params: any) {
+  return fetchPage<BirthdayReminder>('/api/life/birthday/page', params)
+}
+
+export function getRoomCleaningPage(params: any) {
+  return fetchPage<RoomCleaningTask>('/api/life/room-cleaning/page', params)
+}
+
+export function createRoomCleaning(data: Partial<RoomCleaningTask>) {
+  return request.post<RoomCleaningTask>('/api/life/room-cleaning', data)
+}
+
+export function updateRoomCleaning(id: number, data: Partial<RoomCleaningTask>) {
+  return request.put<RoomCleaningTask>(`/api/life/room-cleaning/${id}`, data)
+}
+
+export function completeRoomCleaning(id: number) {
+  return request.put<RoomCleaningTask>(`/api/life/room-cleaning/${id}/done`)
+}
+
+export function deleteRoomCleaning(id: number) {
+  return request.delete<void>(`/api/life/room-cleaning/${id}`)
+}
+
+export function getMaintenancePage(params: any) {
+  return fetchPage<MaintenanceRequest>('/api/life/maintenance/page', params)
+}
+
+export function createMaintenance(data: Partial<MaintenanceRequest>) {
+  return request.post<MaintenanceRequest>('/api/life/maintenance', data)
+}
+
+export function updateMaintenance(id: number, data: Partial<MaintenanceRequest>) {
+  return request.put<MaintenanceRequest>(`/api/life/maintenance/${id}`, data)
+}
+
+export function completeMaintenance(id: number) {
+  return request.put<MaintenanceRequest>(`/api/life/maintenance/${id}/complete`)
+}
+
+export function deleteMaintenance(id: number) {
+  return request.delete<void>(`/api/life/maintenance/${id}`)
 }

@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.zhiyangyun.care.bill.entity.BillMonthly;
 import com.zhiyangyun.care.bill.mapper.BillMonthlyMapper;
+import com.zhiyangyun.care.finance.entity.ReconciliationDaily;
+import com.zhiyangyun.care.finance.mapper.ReconciliationDailyMapper;
 import com.zhiyangyun.care.finance.model.PaymentRequest;
 import com.zhiyangyun.care.finance.service.FinanceService;
 import java.math.BigDecimal;
@@ -22,6 +24,9 @@ class FinanceReconcileTest {
 
   @Autowired
   private BillMonthlyMapper billMonthlyMapper;
+
+  @Autowired
+  private ReconciliationDailyMapper reconciliationDailyMapper;
 
   @Test
   void reconcile_counts_payments() {
@@ -43,5 +48,26 @@ class FinanceReconcileTest {
 
     var resp = financeService.reconcile(1L, LocalDate.now());
     assertEquals(0, resp.isMismatch() ? 1 : 0);
+  }
+
+  @Test
+  void reconcile_updates_existing_daily_record_instead_of_inserting_duplicate() {
+    LocalDate today = LocalDate.now();
+    ReconciliationDaily existing = new ReconciliationDaily();
+    existing.setOrgId(1L);
+    existing.setReconcileDate(today);
+    existing.setTotalReceived(BigDecimal.TEN);
+    existing.setMismatchFlag(0);
+    reconciliationDailyMapper.insert(existing);
+
+    var resp = financeService.reconcile(1L, today);
+    assertEquals(today, resp.getDate());
+
+    long count = reconciliationDailyMapper.selectCount(
+        com.baomidou.mybatisplus.core.toolkit.Wrappers.lambdaQuery(ReconciliationDaily.class)
+            .eq(ReconciliationDaily::getOrgId, 1L)
+            .eq(ReconciliationDaily::getReconcileDate, today)
+            .eq(ReconciliationDaily::getIsDeleted, 0));
+    assertEquals(1L, count);
   }
 }

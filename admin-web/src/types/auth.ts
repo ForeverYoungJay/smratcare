@@ -15,4 +15,5 @@ export interface LoginResponse {
     status: number
   }
   roles: string[]
+  permissions?: string[]
 }

@@ -19,7 +19,11 @@ public class CrmLead {
   private String name;
   private String phone;
   private String source;
+  private String customerTag;
   private Integer status;
+  private Integer contractSignedFlag;
+  private LocalDateTime contractSignedAt;
+  private String contractNo;
   private LocalDate nextFollowDate;
   private String remark;
   private Long createdBy;

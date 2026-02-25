@@ -35,12 +35,19 @@ public class FinanceServiceImpl implements FinanceService {
   @Override
   @Transactional
   public PaymentResponse pay(Long billId, PaymentRequest request, Long operatorStaffId) {
+    if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+      throw new IllegalArgumentException("Payment amount must be positive");
+    }
     if (request.getExternalTxnId() != null && !request.getExternalTxnId().isBlank()) {
       PaymentRecord existing = paymentRecordMapper.selectOne(
           Wrappers.lambdaQuery(PaymentRecord.class)
+              .eq(PaymentRecord::getBillMonthlyId, billId)
               .eq(PaymentRecord::getExternalTxnId, request.getExternalTxnId()));
       if (existing != null) {
         BillMonthly bill = billMonthlyMapper.selectById(existing.getBillMonthlyId());
+        if (bill == null) {
+          throw new IllegalStateException("Payment exists but bill is missing");
+        }
         return toResponse(bill);
       }
     }
@@ -108,10 +115,14 @@ public class FinanceServiceImpl implements FinanceService {
       daily = new ReconciliationDaily();
       daily.setOrgId(orgId);
       daily.setReconcileDate(date);
+      daily.setTotalReceived(total);
+      daily.setMismatchFlag(0);
+      reconciliationDailyMapper.insert(daily);
+    } else {
+      daily.setTotalReceived(total);
+      daily.setMismatchFlag(0);
+      reconciliationDailyMapper.updateById(daily);
     }
-    daily.setTotalReceived(total);
-    daily.setMismatchFlag(0);
-    reconciliationDailyMapper.insert(daily);
 
     ReconcileResponse response = new ReconcileResponse();
     response.setDate(date);

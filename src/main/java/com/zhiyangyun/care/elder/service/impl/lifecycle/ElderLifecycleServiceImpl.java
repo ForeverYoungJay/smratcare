@@ -19,6 +19,7 @@ import com.zhiyangyun.care.elder.mapper.lifecycle.ElderAdmissionMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderChangeLogMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeMapper;
 import com.zhiyangyun.care.elder.model.lifecycle.AdmissionRequest;
+import com.zhiyangyun.care.elder.model.lifecycle.AdmissionRecordResponse;
 import com.zhiyangyun.care.elder.model.lifecycle.AdmissionResponse;
 import com.zhiyangyun.care.elder.model.lifecycle.ChangeLogResponse;
 import com.zhiyangyun.care.elder.model.lifecycle.DischargeRequest;
@@ -33,6 +34,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -253,6 +255,63 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
       response.setCreateTime(log.getCreateTime() == null ? null : log.getCreateTime().toString());
       return response;
     });
+  }
+
+  @Override
+  public IPage<AdmissionRecordResponse> admissionPage(Long tenantId, long pageNo, long pageSize,
+      String keyword, String contractNo, Integer elderStatus) {
+    var wrapper = Wrappers.lambdaQuery(ElderAdmission.class)
+        .eq(ElderAdmission::getIsDeleted, 0)
+        .eq(tenantId != null, ElderAdmission::getTenantId, tenantId)
+        .like(contractNo != null && !contractNo.isBlank(), ElderAdmission::getContractNo, contractNo)
+        .orderByDesc(ElderAdmission::getAdmissionDate)
+        .orderByDesc(ElderAdmission::getCreateTime);
+
+    if ((keyword != null && !keyword.isBlank()) || elderStatus != null) {
+      var elderWrapper = Wrappers.lambdaQuery(ElderProfile.class)
+          .eq(ElderProfile::getIsDeleted, 0)
+          .eq(tenantId != null, ElderProfile::getTenantId, tenantId)
+          .like(keyword != null && !keyword.isBlank(), ElderProfile::getFullName, keyword)
+          .eq(elderStatus != null, ElderProfile::getStatus, elderStatus);
+      List<Long> elderIds = elderMapper.selectList(elderWrapper).stream().map(ElderProfile::getId).toList();
+      if (elderIds.isEmpty()) {
+        return new Page<>(pageNo, pageSize, 0);
+      }
+      wrapper.in(ElderAdmission::getElderId, elderIds);
+    }
+
+    IPage<ElderAdmission> page = admissionMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
+    List<Long> elderIds = page.getRecords().stream()
+        .map(ElderAdmission::getElderId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList();
+    Map<Long, ElderProfile> elderMap = elderIds.isEmpty()
+        ? Map.of()
+        : elderMapper.selectList(Wrappers.lambdaQuery(ElderProfile.class)
+            .in(ElderProfile::getId, elderIds)
+            .eq(ElderProfile::getIsDeleted, 0))
+            .stream()
+            .collect(java.util.stream.Collectors.toMap(ElderProfile::getId, item -> item, (a, b) -> a));
+
+    List<AdmissionRecordResponse> records = page.getRecords().stream().map(item -> {
+      AdmissionRecordResponse response = new AdmissionRecordResponse();
+      response.setId(item.getId());
+      response.setElderId(item.getElderId());
+      response.setContractNo(item.getContractNo());
+      response.setAdmissionDate(item.getAdmissionDate());
+      response.setDepositAmount(item.getDepositAmount());
+      response.setRemark(item.getRemark());
+      response.setCreateTime(item.getCreateTime());
+      ElderProfile elder = elderMap.get(item.getElderId());
+      response.setElderName(elder == null ? null : elder.getFullName());
+      response.setElderStatus(elder == null ? null : elder.getStatus());
+      return response;
+    }).toList();
+
+    IPage<AdmissionRecordResponse> resp = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
+    resp.setRecords(records);
+    return resp;
   }
 
   private void insertChangeLog(Long tenantId, Long orgId, Long elderId, Long createdBy, String changeType,

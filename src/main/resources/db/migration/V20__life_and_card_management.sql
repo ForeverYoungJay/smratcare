@@ -1,0 +1,63 @@
+CREATE TABLE life_room_cleaning_task (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  room_id BIGINT NOT NULL COMMENT '房间ID',
+  room_no VARCHAR(64) DEFAULT NULL COMMENT '房间号',
+  cleaner_name VARCHAR(64) DEFAULT NULL COMMENT '保洁员',
+  plan_date DATE NOT NULL COMMENT '计划日期',
+  cleaned_at DATETIME DEFAULT NULL COMMENT '完成时间',
+  status VARCHAR(16) NOT NULL DEFAULT 'PENDING' COMMENT '状态 PENDING/DONE',
+  remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  KEY idx_room_cleaning_org_plan_date (org_id, plan_date),
+  KEY idx_room_cleaning_org_status (org_id, status),
+  KEY idx_room_cleaning_org_room (org_id, room_id)
+) COMMENT='房间打扫任务';
+
+CREATE TABLE life_maintenance_request (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  room_id BIGINT DEFAULT NULL COMMENT '房间ID',
+  room_no VARCHAR(64) DEFAULT NULL COMMENT '房间号',
+  reporter_name VARCHAR(64) NOT NULL COMMENT '报修人',
+  assignee_name VARCHAR(64) DEFAULT NULL COMMENT '维修负责人',
+  issue_type VARCHAR(32) NOT NULL COMMENT '故障类型',
+  description VARCHAR(512) NOT NULL COMMENT '故障描述',
+  priority VARCHAR(16) NOT NULL DEFAULT 'NORMAL' COMMENT '优先级 LOW/NORMAL/HIGH',
+  status VARCHAR(16) NOT NULL DEFAULT 'OPEN' COMMENT '状态 OPEN/PROCESSING/COMPLETED/CANCELLED',
+  reported_at DATETIME NOT NULL COMMENT '报修时间',
+  completed_at DATETIME DEFAULT NULL COMMENT '完成时间',
+  remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  KEY idx_maintenance_org_reported_at (org_id, reported_at),
+  KEY idx_maintenance_org_status (org_id, status),
+  KEY idx_maintenance_org_room (org_id, room_id)
+) COMMENT='维修管理';
+
+CREATE TABLE one_card_account (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  elder_id BIGINT NOT NULL COMMENT '老人ID',
+  card_no VARCHAR(64) NOT NULL COMMENT '卡号',
+  status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE' COMMENT '状态 ACTIVE/FROZEN/CANCELLED',
+  loss_flag TINYINT NOT NULL DEFAULT 0 COMMENT '挂失标记 1是 0否',
+  open_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '开卡时间',
+  last_recharge_time DATETIME DEFAULT NULL COMMENT '最近充值时间',
+  remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  UNIQUE KEY uk_one_card_org_card_no (org_id, card_no),
+  UNIQUE KEY uk_one_card_org_elder (org_id, elder_id),
+  KEY idx_one_card_org_status (org_id, status)
+) COMMENT='一卡通账户';

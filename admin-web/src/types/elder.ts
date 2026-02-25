@@ -94,9 +94,14 @@ export interface CrmLeadItem {
   name: string
   phone?: string
   source?: string
+  customerTag?: string
   status?: number
+  contractSignedFlag?: number
+  contractSignedAt?: string
+  contractNo?: string
   nextFollowDate?: string
   remark?: string
+  createTime?: string
 }
 
 export interface AdmissionRequest {
@@ -126,4 +131,100 @@ export interface ChangeLogItem {
   afterValue?: string
   reason?: string
   createTime?: string
+}
+
+export interface AdmissionRecordItem {
+  id: number
+  elderId: number
+  elderName?: string
+  contractNo?: string
+  admissionDate?: string
+  depositAmount?: number
+  remark?: string
+  elderStatus?: number
+  createTime?: string
+}
+
+export interface OutingItem {
+  id: number
+  elderId: number
+  elderName?: string
+  outingDate: string
+  expectedReturnTime?: string
+  actualReturnTime?: string
+  companion?: string
+  reason?: string
+  status?: string
+  remark?: string
+  createTime?: string
+}
+
+export interface OutingCreateRequest {
+  elderId: number
+  outingDate: string
+  expectedReturnTime?: string
+  companion?: string
+  reason?: string
+  remark?: string
+}
+
+export interface OutingReturnRequest {
+  actualReturnTime?: string
+  remark?: string
+}
+
+export interface TrialStayItem {
+  id: number
+  elderId: number
+  elderName?: string
+  trialStartDate: string
+  trialEndDate: string
+  channel?: string
+  trialPackage?: string
+  intentLevel?: string
+  status?: string
+  careLevel?: string
+  remark?: string
+  createTime?: string
+}
+
+export interface TrialStayRequest {
+  elderId: number
+  trialStartDate: string
+  trialEndDate: string
+  channel?: string
+  trialPackage?: string
+  intentLevel?: string
+  status?: string
+  careLevel?: string
+  remark?: string
+}
+
+export interface DischargeApplyItem {
+  id: number
+  elderId: number
+  elderName?: string
+  applyDate?: string
+  plannedDischargeDate: string
+  reason: string
+  status?: string
+  linkedDischargeId?: number
+  autoDischargeStatus?: 'SUCCESS' | 'FAILED'
+  autoDischargeMessage?: string
+  reviewRemark?: string
+  reviewedBy?: number
+  reviewedByName?: string
+  reviewedTime?: string
+  createTime?: string
+}
+
+export interface DischargeApplyCreateRequest {
+  elderId: number
+  plannedDischargeDate: string
+  reason: string
+}
+
+export interface DischargeApplyReviewRequest {
+  status: 'APPROVED' | 'REJECTED'
+  reviewRemark?: string
 }

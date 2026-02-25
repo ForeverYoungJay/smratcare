@@ -9,6 +9,7 @@ public class InventoryAdjustRequest {
   private Long orgId;
   @NotNull
   private Long productId;
+  private Long warehouseId;
   private Long batchId;
   @NotBlank
   private String adjustType; // GAIN/LOSS

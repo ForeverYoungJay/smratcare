@@ -8,7 +8,10 @@ public class InventoryAdjustmentResponse {
   private Long id;
   private Long productId;
   private String productName;
+  private String category;
   private Long batchId;
+  private Long warehouseId;
+  private String warehouseName;
   private String adjustType;
   private Integer adjustQty;
   private String reason;

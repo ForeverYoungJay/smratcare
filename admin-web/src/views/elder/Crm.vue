@@ -13,6 +13,16 @@
             <a-select-option :value="3">流失</a-select-option>
           </a-select>
         </a-form-item>
+        <a-form-item label="来源渠道">
+          <a-select v-model:value="query.source" allow-clear style="width: 160px">
+            <a-select-option v-for="item in sourceOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="客户标签">
+          <a-select v-model:value="query.customerTag" allow-clear style="width: 160px">
+            <a-select-option v-for="item in customerTagOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
+          </a-select>
+        </a-form-item>
         <a-form-item>
           <a-space>
             <a-button type="primary" @click="fetchData">查询</a-button>
@@ -68,7 +78,14 @@
           <a-input v-model:value="form.phone" />
         </a-form-item>
         <a-form-item label="来源" name="source">
-          <a-input v-model:value="form.source" />
+          <a-select v-model:value="form.source" allow-clear>
+            <a-select-option v-for="item in sourceOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="客户标签" name="customerTag">
+          <a-select v-model:value="form.customerTag" allow-clear>
+            <a-select-option v-for="item in customerTagOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
+          </a-select>
         </a-form-item>
         <a-form-item label="状态" name="status">
           <a-select v-model:value="form.status">
@@ -94,16 +111,21 @@ import { onMounted, reactive, ref } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
+import { getBaseConfigItemList } from '../../api/baseConfig'
 import { getCrmLeadPage, createCrmLead, updateCrmLead, deleteCrmLead } from '../../api/crm'
-import type { CrmLeadItem, PageResult } from '../../types'
+import type { BaseConfigItem, CrmLeadItem, PageResult } from '../../types'
 
 const loading = ref(false)
 const rows = ref<CrmLeadItem[]>([])
 const total = ref(0)
+const sourceOptions = ref<{ label: string; value: string }[]>([])
+const customerTagOptions = ref<{ label: string; value: string }[]>([])
 
 const query = reactive({
   keyword: '',
   status: undefined as number | undefined,
+  source: undefined as string | undefined,
+  customerTag: undefined as string | undefined,
   pageNo: 1,
   pageSize: 10
 })
@@ -121,6 +143,7 @@ const columns = [
   { title: '姓名', dataIndex: 'name', key: 'name', width: 140 },
   { title: '电话', dataIndex: 'phone', key: 'phone', width: 140 },
   { title: '来源', dataIndex: 'source', key: 'source', width: 140 },
+  { title: '客户标签', dataIndex: 'customerTag', key: 'customerTag', width: 140 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 120 },
   { title: '下次跟进', dataIndex: 'nextFollowDate', key: 'nextFollowDate', width: 140 },
   { title: '备注', dataIndex: 'remark', key: 'remark' },
@@ -142,6 +165,15 @@ function statusTag(status?: number) {
   return 'default'
 }
 
+async function loadDictOptions() {
+  const [sourceItems, tagItems] = await Promise.all([
+    getBaseConfigItemList({ configGroup: 'MARKETING_SOURCE_CHANNEL', status: 1 }),
+    getBaseConfigItemList({ configGroup: 'MARKETING_CUSTOMER_TAG', status: 1 })
+  ])
+  sourceOptions.value = (sourceItems || []).map((item: BaseConfigItem) => ({ label: item.itemName, value: item.itemName }))
+  customerTagOptions.value = (tagItems || []).map((item: BaseConfigItem) => ({ label: item.itemName, value: item.itemName }))
+}
+
 async function fetchData() {
   loading.value = true
   try {
@@ -149,7 +181,9 @@ async function fetchData() {
       pageNo: query.pageNo,
       pageSize: query.pageSize,
       keyword: query.keyword,
-      status: query.status
+      status: query.status,
+      source: query.source,
+      customerTag: query.customerTag
     })
     rows.value = res.list
     total.value = res.total
@@ -161,6 +195,8 @@ async function fetchData() {
 function reset() {
   query.keyword = ''
   query.status = undefined
+  query.source = undefined
+  query.customerTag = undefined
   query.pageNo = 1
   fetchData()
 }
@@ -181,6 +217,7 @@ function openForm(row?: CrmLeadItem) {
     Object.assign(form, row)
   } else {
     Object.assign(form, { id: undefined, name: '', phone: '', source: '', status: 0, nextFollowDate: '', remark: '' })
+    form.customerTag = ''
   }
   open.value = true
 }
@@ -217,7 +254,10 @@ async function remove(id: number) {
   })
 }
 
-onMounted(fetchData)
+onMounted(async () => {
+  await loadDictOptions()
+  await fetchData()
+})
 </script>
 
 <style scoped>

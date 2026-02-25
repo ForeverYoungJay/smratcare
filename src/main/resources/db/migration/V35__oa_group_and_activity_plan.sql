@@ -1,0 +1,40 @@
+CREATE TABLE oa_group_setting (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  group_name VARCHAR(128) NOT NULL COMMENT '分组名称',
+  group_type VARCHAR(32) DEFAULT NULL COMMENT '分组类型',
+  leader_id BIGINT DEFAULT NULL COMMENT '组长ID',
+  leader_name VARCHAR(64) DEFAULT NULL COMMENT '组长姓名',
+  member_count INT NOT NULL DEFAULT 0 COMMENT '成员数量',
+  status VARCHAR(16) NOT NULL DEFAULT 'ENABLED' COMMENT '状态 ENABLED/DISABLED',
+  remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  KEY idx_oa_group_setting_org_type (org_id, group_type),
+  KEY idx_oa_group_setting_org_status (org_id, status)
+) COMMENT='OA分组设置';
+
+CREATE TABLE oa_activity_plan (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  title VARCHAR(128) NOT NULL COMMENT '活动计划标题',
+  plan_date DATE NOT NULL COMMENT '计划日期',
+  start_time DATETIME DEFAULT NULL COMMENT '开始时间',
+  end_time DATETIME DEFAULT NULL COMMENT '结束时间',
+  location VARCHAR(128) DEFAULT NULL COMMENT '地点',
+  organizer VARCHAR(64) DEFAULT NULL COMMENT '组织人',
+  participant_target VARCHAR(128) DEFAULT NULL COMMENT '参与对象',
+  status VARCHAR(16) NOT NULL DEFAULT 'PLANNED' COMMENT '状态 PLANNED/IN_PROGRESS/DONE/CANCELLED',
+  content VARCHAR(1024) DEFAULT NULL COMMENT '计划内容',
+  remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  KEY idx_oa_activity_plan_org_date (org_id, plan_date),
+  KEY idx_oa_activity_plan_org_status (org_id, status)
+) COMMENT='OA活动计划';

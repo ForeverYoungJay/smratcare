@@ -92,3 +92,19 @@ export interface StaffPointsRule {
   remark?: string
   updateTime?: string
 }
+
+export interface StaffRewardPunishment {
+  id?: number
+  staffId?: number
+  staffName?: string
+  type?: 'REWARD' | 'PUNISH'
+  level?: string
+  title?: string
+  reason?: string
+  amount?: number
+  points?: number
+  occurredDate?: string
+  status?: string
+  remark?: string
+  createTime?: string
+}

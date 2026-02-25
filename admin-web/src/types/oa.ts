@@ -40,6 +40,54 @@ export interface OaDocument {
   remark?: string
 }
 
+export interface OaAlbum {
+  id: number
+  title: string
+  category?: string
+  coverUrl?: string
+  photoCount?: number
+  shootDate?: string
+  status?: string
+  remark?: string
+}
+
+export interface OaKnowledge {
+  id: number
+  title: string
+  category?: string
+  tags?: string
+  content?: string
+  authorName?: string
+  status?: string
+  publishedAt?: string
+  remark?: string
+}
+
+export interface OaGroupSetting {
+  id: number
+  groupName: string
+  groupType?: string
+  leaderId?: number
+  leaderName?: string
+  memberCount?: number
+  status?: string
+  remark?: string
+}
+
+export interface OaActivityPlan {
+  id: number
+  title: string
+  planDate?: string
+  startTime?: string
+  endTime?: string
+  location?: string
+  organizer?: string
+  participantTarget?: string
+  status?: string
+  content?: string
+  remark?: string
+}
+
 export interface OaTask {
   id: number
   title: string
@@ -54,4 +102,20 @@ export interface OaTask {
 export interface OaPortalSummary {
   notices: OaNotice[]
   todos: OaTodo[]
+}
+
+export interface OaWorkReport {
+  id: number
+  title: string
+  reportType: string
+  reportDate?: string
+  periodStartDate?: string
+  periodEndDate?: string
+  contentSummary?: string
+  completedWork?: string
+  riskIssue?: string
+  nextPlan?: string
+  status?: string
+  reporterId?: number
+  reporterName?: string
 }

@@ -45,3 +45,40 @@ export interface HealthBasicRecord {
   heartRate?: number
   remark?: string
 }
+
+export interface BirthdayReminder {
+  elderId: number
+  elderName: string
+  birthDate?: string
+  nextBirthday?: string
+  daysUntil?: number
+  ageOnNextBirthday?: number
+  roomNo?: string
+  bedNo?: string
+}
+
+export interface RoomCleaningTask {
+  id: number
+  roomId: number
+  roomNo?: string
+  cleanerName?: string
+  planDate: string
+  cleanedAt?: string
+  status?: string
+  remark?: string
+}
+
+export interface MaintenanceRequest {
+  id: number
+  roomId?: number
+  roomNo?: string
+  reporterName: string
+  assigneeName?: string
+  issueType: string
+  description: string
+  priority?: string
+  status?: string
+  reportedAt?: string
+  completedAt?: string
+  remark?: string
+}

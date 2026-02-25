@@ -10,10 +10,12 @@ import com.zhiyangyun.care.audit.service.AuditLogService;
 import com.zhiyangyun.care.store.entity.InventoryBatch;
 import com.zhiyangyun.care.store.entity.InventoryLog;
 import com.zhiyangyun.care.store.entity.InventoryAdjustment;
+import com.zhiyangyun.care.store.entity.MaterialWarehouse;
 import com.zhiyangyun.care.store.entity.Product;
 import com.zhiyangyun.care.store.mapper.InventoryBatchMapper;
 import com.zhiyangyun.care.store.mapper.InventoryAdjustmentMapper;
 import com.zhiyangyun.care.store.mapper.InventoryLogMapper;
+import com.zhiyangyun.care.store.mapper.MaterialWarehouseMapper;
 import com.zhiyangyun.care.store.mapper.ProductMapper;
 import com.zhiyangyun.care.store.model.InventoryAdjustRequest;
 import com.zhiyangyun.care.store.model.InventoryAlertItem;
@@ -22,6 +24,7 @@ import com.zhiyangyun.care.store.model.InventoryExpiryAlertItem;
 import com.zhiyangyun.care.store.model.InventoryInboundRequest;
 import com.zhiyangyun.care.store.model.InventoryOutboundRequest;
 import com.zhiyangyun.care.store.model.InventoryAdjustmentResponse;
+import com.zhiyangyun.care.store.model.InventoryAdjustmentDiffItem;
 import com.zhiyangyun.care.store.model.InventoryLogResponse;
 import com.zhiyangyun.care.store.service.InventoryService;
 import jakarta.validation.Valid;
@@ -30,6 +33,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.stream.Collectors;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -46,6 +50,7 @@ public class InventoryController {
   private final InventoryAdjustmentMapper inventoryAdjustmentMapper;
   private final InventoryLogMapper inventoryLogMapper;
   private final ProductMapper productMapper;
+  private final MaterialWarehouseMapper materialWarehouseMapper;
   private final AuditLogService auditLogService;
 
   public InventoryController(InventoryService inventoryService,
@@ -53,12 +58,14 @@ public class InventoryController {
       InventoryAdjustmentMapper inventoryAdjustmentMapper,
       InventoryLogMapper inventoryLogMapper,
       ProductMapper productMapper,
+      MaterialWarehouseMapper materialWarehouseMapper,
       AuditLogService auditLogService) {
     this.inventoryService = inventoryService;
     this.inventoryBatchMapper = inventoryBatchMapper;
     this.inventoryAdjustmentMapper = inventoryAdjustmentMapper;
     this.inventoryLogMapper = inventoryLogMapper;
     this.productMapper = productMapper;
+    this.materialWarehouseMapper = materialWarehouseMapper;
     this.auditLogService = auditLogService;
   }
 
@@ -110,12 +117,31 @@ public class InventoryController {
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) Long productId,
-      @RequestParam(required = false) String keyword) {
+      @RequestParam(required = false) Long warehouseId,
+      @RequestParam(required = false) String category,
+      @RequestParam(required = false) String keyword,
+      @RequestParam(defaultValue = "false") boolean lowStockOnly,
+      @RequestParam(required = false) Integer expiryDays) {
     Long orgId = AuthContext.getOrgId();
     LambdaQueryWrapper<InventoryBatch> wrapper = new LambdaQueryWrapper<>();
     wrapper.eq(orgId != null, InventoryBatch::getOrgId, orgId)
         .eq(InventoryBatch::getIsDeleted, 0)
-        .eq(productId != null, InventoryBatch::getProductId, productId);
+        .eq(productId != null, InventoryBatch::getProductId, productId)
+        .eq(warehouseId != null, InventoryBatch::getWarehouseId, warehouseId);
+    if (category != null && !category.isBlank()) {
+      List<Long> categoryProductIds = productMapper.selectList(
+          Wrappers.lambdaQuery(Product.class)
+              .eq(Product::getIsDeleted, 0)
+              .eq(orgId != null, Product::getOrgId, orgId)
+              .like(Product::getCategory, category))
+          .stream()
+          .map(Product::getId)
+          .toList();
+      if (categoryProductIds.isEmpty()) {
+        return Result.ok(new Page<>(pageNo, pageSize, 0));
+      }
+      wrapper.in(InventoryBatch::getProductId, categoryProductIds);
+    }
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(InventoryBatch::getBatchNo, keyword));
       List<Product> products = productMapper.selectList(
@@ -141,14 +167,27 @@ public class InventoryController {
         : productMapper.selectBatchIds(batchProductIds)
             .stream()
             .collect(Collectors.toMap(Product::getId, p -> p));
+    Map<Long, MaterialWarehouse> warehouseMap = page.getRecords().stream()
+        .map(InventoryBatch::getWarehouseId)
+        .filter(java.util.Objects::nonNull)
+        .distinct()
+        .collect(Collectors.toMap(
+            id -> id,
+            id -> materialWarehouseMapper.selectById(id),
+            (a, b) -> a));
     IPage<InventoryBatchResponse> resp = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
-    resp.setRecords(page.getRecords().stream().map(batch -> {
+    List<InventoryBatchResponse> records = page.getRecords().stream().map(batch -> {
       InventoryBatchResponse item = new InventoryBatchResponse();
       Product product = productMap.get(batch.getProductId());
+      MaterialWarehouse warehouse =
+          batch.getWarehouseId() == null ? null : warehouseMap.get(batch.getWarehouseId());
       item.setId(batch.getId());
       item.setProductId(batch.getProductId());
       item.setProductName(product == null ? null : product.getProductName());
+      item.setCategory(product == null ? null : product.getCategory());
       item.setSafetyStock(product == null ? null : product.getSafetyStock());
+      item.setWarehouseId(batch.getWarehouseId());
+      item.setWarehouseName(warehouse == null ? null : warehouse.getWarehouseName());
       item.setBatchNo(batch.getBatchNo());
       item.setQuantity(batch.getQuantity());
       item.setCostPrice(batch.getCostPrice());
@@ -156,7 +195,19 @@ public class InventoryController {
       item.setWarehouseLocation(batch.getWarehouseLocation());
       item.setCreateTime(batch.getCreateTime());
       return item;
-    }).toList());
+    }).toList();
+    if (lowStockOnly) {
+      records = records.stream()
+          .filter(row -> row.getSafetyStock() != null && row.getQuantity() != null && row.getQuantity() < row.getSafetyStock())
+          .toList();
+    }
+    if (expiryDays != null && expiryDays >= 0) {
+      LocalDate threshold = LocalDate.now().plusDays(expiryDays);
+      records = records.stream()
+          .filter(row -> row.getExpireDate() != null && !row.getExpireDate().isAfter(threshold))
+          .toList();
+    }
+    resp.setRecords(records);
     return Result.ok(resp);
   }
 
@@ -165,6 +216,7 @@ public class InventoryController {
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) Long productId,
+      @RequestParam(required = false) Long warehouseId,
       @RequestParam(required = false) String changeType,
       @RequestParam(required = false) String outType,
       @RequestParam(required = false) String dateFrom,
@@ -174,6 +226,7 @@ public class InventoryController {
     wrapper.eq(orgId != null, InventoryLog::getOrgId, orgId)
         .eq(InventoryLog::getIsDeleted, 0)
         .eq(productId != null, InventoryLog::getProductId, productId)
+        .eq(warehouseId != null, InventoryLog::getWarehouseId, warehouseId)
         .eq(changeType != null && !changeType.isBlank(), InventoryLog::getChangeType, changeType);
     if (outType != null && !outType.isBlank()) {
       if ("SALE".equalsIgnoreCase(outType)) {
@@ -222,6 +275,7 @@ public class InventoryController {
       String snapshotName = log.getProductNameSnapshot();
       item.setProductName(snapshotName != null ? snapshotName : (product == null ? null : product.getProductName()));
       item.setBatchId(log.getBatchId());
+      item.setWarehouseId(log.getWarehouseId());
       item.setBatchNo(batch == null ? null : batch.getBatchNo());
       item.setChangeType(log.getChangeType());
       item.setChangeQty(log.getChangeQty());
@@ -242,9 +296,10 @@ public class InventoryController {
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) Long productId,
+      @RequestParam(required = false) Long warehouseId,
       @RequestParam(required = false) String dateFrom,
       @RequestParam(required = false) String dateTo) {
-    return logPage(pageNo, pageSize, productId, "IN", null, dateFrom, dateTo);
+    return logPage(pageNo, pageSize, productId, warehouseId, "IN", null, dateFrom, dateTo);
   }
 
   @GetMapping("/outbound/page")
@@ -252,10 +307,11 @@ public class InventoryController {
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) Long productId,
+      @RequestParam(required = false) Long warehouseId,
       @RequestParam(required = false) String outType,
       @RequestParam(required = false) String dateFrom,
       @RequestParam(required = false) String dateTo) {
-    return logPage(pageNo, pageSize, productId, "OUT", outType, dateFrom, dateTo);
+    return logPage(pageNo, pageSize, productId, warehouseId, "OUT", outType, dateFrom, dateTo);
   }
 
   @GetMapping("/adjustment/page")
@@ -263,14 +319,26 @@ public class InventoryController {
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) Long productId,
-      @RequestParam(required = false) String adjustType) {
+      @RequestParam(required = false) Long warehouseId,
+      @RequestParam(required = false) String category,
+      @RequestParam(required = false) String adjustType,
+      @RequestParam(required = false) String dateFrom,
+      @RequestParam(required = false) String dateTo) {
     Long orgId = AuthContext.getOrgId();
     LambdaQueryWrapper<InventoryAdjustment> wrapper = new LambdaQueryWrapper<>();
     wrapper.eq(orgId != null, InventoryAdjustment::getOrgId, orgId)
         .eq(InventoryAdjustment::getIsDeleted, 0)
         .eq(productId != null, InventoryAdjustment::getProductId, productId)
-        .eq(adjustType != null && !adjustType.isBlank(), InventoryAdjustment::getAdjustType, adjustType)
-        .orderByDesc(InventoryAdjustment::getCreateTime);
+        .eq(adjustType != null && !adjustType.isBlank(), InventoryAdjustment::getAdjustType, adjustType);
+    if (dateFrom != null && !dateFrom.isBlank()) {
+      LocalDate start = LocalDate.parse(dateFrom);
+      wrapper.ge(InventoryAdjustment::getCreateTime, LocalDateTime.of(start, LocalTime.MIN));
+    }
+    if (dateTo != null && !dateTo.isBlank()) {
+      LocalDate end = LocalDate.parse(dateTo);
+      wrapper.le(InventoryAdjustment::getCreateTime, LocalDateTime.of(end, LocalTime.MAX));
+    }
+    wrapper.orderByDesc(InventoryAdjustment::getCreateTime);
     IPage<InventoryAdjustment> page =
         inventoryAdjustmentMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
     List<Long> productIds = page.getRecords().stream()
@@ -283,22 +351,146 @@ public class InventoryController {
         : productMapper.selectBatchIds(productIds)
             .stream()
             .collect(Collectors.toMap(Product::getId, p -> p));
+    List<Long> batchIds = page.getRecords().stream()
+        .map(InventoryAdjustment::getBatchId)
+        .filter(java.util.Objects::nonNull)
+        .distinct()
+        .toList();
+    Map<Long, InventoryBatch> batchMap = batchIds.isEmpty()
+        ? Map.of()
+        : inventoryBatchMapper.selectBatchIds(batchIds)
+            .stream()
+            .collect(Collectors.toMap(InventoryBatch::getId, b -> b));
+    Map<Long, MaterialWarehouse> warehouseMap = batchMap.values().stream()
+        .map(InventoryBatch::getWarehouseId)
+        .filter(java.util.Objects::nonNull)
+        .distinct()
+        .collect(Collectors.toMap(
+            id -> id,
+            id -> materialWarehouseMapper.selectById(id),
+            (a, b) -> a));
     IPage<InventoryAdjustmentResponse> resp = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
-    resp.setRecords(page.getRecords().stream().map(adjust -> {
+    List<InventoryAdjustmentResponse> records = page.getRecords().stream().map(adjust -> {
       InventoryAdjustmentResponse item = new InventoryAdjustmentResponse();
       Product product = productMap.get(adjust.getProductId());
+      InventoryBatch batch = adjust.getBatchId() == null ? null : batchMap.get(adjust.getBatchId());
+      MaterialWarehouse warehouse = batch == null || batch.getWarehouseId() == null
+          ? null : warehouseMap.get(batch.getWarehouseId());
       item.setId(adjust.getId());
       item.setProductId(adjust.getProductId());
       item.setProductName(product == null ? null : product.getProductName());
+      item.setCategory(product == null ? null : product.getCategory());
       item.setBatchId(adjust.getBatchId());
+      item.setWarehouseId(batch == null ? null : batch.getWarehouseId());
+      item.setWarehouseName(warehouse == null ? null : warehouse.getWarehouseName());
       item.setAdjustType(adjust.getAdjustType());
       item.setAdjustQty(adjust.getAdjustQty());
       item.setReason(adjust.getReason());
       item.setOperatorStaffId(adjust.getOperatorStaffId());
       item.setCreateTime(adjust.getCreateTime());
       return item;
-    }).toList());
+    }).toList();
+    if (warehouseId != null) {
+      records = records.stream()
+          .filter(row -> warehouseId.equals(row.getWarehouseId()))
+          .toList();
+    }
+    if (category != null && !category.isBlank()) {
+      records = records.stream()
+          .filter(row -> row.getCategory() != null && row.getCategory().contains(category))
+          .toList();
+    }
+    resp.setRecords(records);
     return Result.ok(resp);
+  }
+
+  @GetMapping("/adjustment/diff-report")
+  public Result<List<InventoryAdjustmentDiffItem>> adjustmentDiffReport(
+      @RequestParam(required = false) Long warehouseId,
+      @RequestParam(required = false) String category,
+      @RequestParam(required = false) String dateFrom,
+      @RequestParam(required = false) String dateTo) {
+    Long orgId = AuthContext.getOrgId();
+    LambdaQueryWrapper<InventoryAdjustment> wrapper = Wrappers.lambdaQuery(InventoryAdjustment.class)
+        .eq(InventoryAdjustment::getIsDeleted, 0)
+        .eq(orgId != null, InventoryAdjustment::getOrgId, orgId);
+    if (dateFrom != null && !dateFrom.isBlank()) {
+      LocalDate start = LocalDate.parse(dateFrom);
+      wrapper.ge(InventoryAdjustment::getCreateTime, LocalDateTime.of(start, LocalTime.MIN));
+    }
+    if (dateTo != null && !dateTo.isBlank()) {
+      LocalDate end = LocalDate.parse(dateTo);
+      wrapper.le(InventoryAdjustment::getCreateTime, LocalDateTime.of(end, LocalTime.MAX));
+    }
+    List<InventoryAdjustment> adjustments = inventoryAdjustmentMapper.selectList(wrapper);
+    if (adjustments.isEmpty()) {
+      return Result.ok(List.of());
+    }
+    List<Long> productIds = adjustments.stream()
+        .map(InventoryAdjustment::getProductId)
+        .filter(java.util.Objects::nonNull)
+        .distinct()
+        .toList();
+    Map<Long, Product> productMap = productIds.isEmpty()
+        ? Map.of()
+        : productMapper.selectBatchIds(productIds).stream()
+            .collect(Collectors.toMap(Product::getId, p -> p));
+    List<Long> batchIds = adjustments.stream()
+        .map(InventoryAdjustment::getBatchId)
+        .filter(java.util.Objects::nonNull)
+        .distinct()
+        .toList();
+    Map<Long, InventoryBatch> batchMap = batchIds.isEmpty()
+        ? Map.of()
+        : inventoryBatchMapper.selectBatchIds(batchIds).stream()
+            .collect(Collectors.toMap(InventoryBatch::getId, b -> b));
+    Map<Long, MaterialWarehouse> warehouseMap = batchMap.values().stream()
+        .map(InventoryBatch::getWarehouseId)
+        .filter(java.util.Objects::nonNull)
+        .distinct()
+        .collect(Collectors.toMap(
+            id -> id,
+            id -> materialWarehouseMapper.selectById(id),
+            (a, b) -> a));
+
+    Map<String, InventoryAdjustmentDiffItem> resultMap = new HashMap<>();
+    for (InventoryAdjustment row : adjustments) {
+      Product product = productMap.get(row.getProductId());
+      InventoryBatch batch = row.getBatchId() == null ? null : batchMap.get(row.getBatchId());
+      Long rowWarehouseId = batch == null ? null : batch.getWarehouseId();
+      String rowCategory = product == null ? null : product.getCategory();
+      if (warehouseId != null && !warehouseId.equals(rowWarehouseId)) {
+        continue;
+      }
+      if (category != null && !category.isBlank() && (rowCategory == null || !rowCategory.contains(category))) {
+        continue;
+      }
+      String key = row.getProductId() + "-" + (rowWarehouseId == null ? "0" : rowWarehouseId);
+      InventoryAdjustmentDiffItem item = resultMap.computeIfAbsent(key, k -> {
+        InventoryAdjustmentDiffItem it = new InventoryAdjustmentDiffItem();
+        it.setProductId(row.getProductId());
+        it.setProductName(product == null ? null : product.getProductName());
+        it.setCategory(rowCategory);
+        it.setWarehouseId(rowWarehouseId);
+        MaterialWarehouse warehouse = rowWarehouseId == null ? null : warehouseMap.get(rowWarehouseId);
+        it.setWarehouseName(warehouse == null ? null : warehouse.getWarehouseName());
+        it.setGainQty(0);
+        it.setLossQty(0);
+        it.setDiffQty(0);
+        return it;
+      });
+      int qty = row.getAdjustQty() == null ? 0 : row.getAdjustQty();
+      if ("GAIN".equalsIgnoreCase(row.getAdjustType())) {
+        item.setGainQty(item.getGainQty() + qty);
+        item.setDiffQty(item.getDiffQty() + qty);
+      } else {
+        item.setLossQty(item.getLossQty() + qty);
+        item.setDiffQty(item.getDiffQty() - qty);
+      }
+    }
+    return Result.ok(resultMap.values().stream()
+        .sorted((a, b) -> Integer.compare(Math.abs(b.getDiffQty()), Math.abs(a.getDiffQty())))
+        .toList());
   }
 
   @GetMapping("/page")

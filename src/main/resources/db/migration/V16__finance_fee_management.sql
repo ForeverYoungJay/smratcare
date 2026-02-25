@@ -1,0 +1,112 @@
+-- 费用管理：入住费用审核、退住费用审核、退住结算、消费登记、月分摊费
+
+CREATE TABLE IF NOT EXISTS finance_admission_fee_audit (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  elder_id BIGINT NOT NULL COMMENT '老人ID',
+  elder_name VARCHAR(64) DEFAULT NULL COMMENT '老人姓名',
+  admission_id BIGINT DEFAULT NULL COMMENT '入院记录ID',
+  total_amount DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT '费用总额',
+  deposit_amount DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT '押金金额',
+  status VARCHAR(16) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/APPROVED/REJECTED',
+  audit_remark VARCHAR(255) DEFAULT NULL COMMENT '审核备注',
+  reviewed_by BIGINT DEFAULT NULL COMMENT '审核人',
+  reviewed_time DATETIME DEFAULT NULL COMMENT '审核时间',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  KEY idx_fin_admission_audit_org (org_id),
+  KEY idx_fin_admission_audit_elder (elder_id),
+  KEY idx_fin_admission_audit_status (status)
+) COMMENT='入住费用审核';
+
+CREATE TABLE IF NOT EXISTS finance_discharge_fee_audit (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  elder_id BIGINT NOT NULL COMMENT '老人ID',
+  elder_name VARCHAR(64) DEFAULT NULL COMMENT '老人姓名',
+  discharge_apply_id BIGINT DEFAULT NULL COMMENT '退住申请ID',
+  payable_amount DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT '应收应付金额',
+  status VARCHAR(16) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/APPROVED/REJECTED',
+  audit_remark VARCHAR(255) DEFAULT NULL COMMENT '审核备注',
+  reviewed_by BIGINT DEFAULT NULL COMMENT '审核人',
+  reviewed_time DATETIME DEFAULT NULL COMMENT '审核时间',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  KEY idx_fin_discharge_audit_org (org_id),
+  KEY idx_fin_discharge_audit_elder (elder_id),
+  KEY idx_fin_discharge_audit_status (status)
+) COMMENT='退住费用审核';
+
+CREATE TABLE IF NOT EXISTS finance_discharge_settlement (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  elder_id BIGINT NOT NULL COMMENT '老人ID',
+  elder_name VARCHAR(64) DEFAULT NULL COMMENT '老人姓名',
+  discharge_apply_id BIGINT DEFAULT NULL COMMENT '退住申请ID',
+  payable_amount DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT '结算应收金额',
+  fee_item VARCHAR(64) DEFAULT NULL COMMENT '费用项',
+  discharge_fee_config VARCHAR(255) DEFAULT NULL COMMENT '退住费用配置说明',
+  from_deposit_amount DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT '押金抵扣金额',
+  refund_amount DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT '应退款金额',
+  supplement_amount DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT '需补缴金额',
+  status VARCHAR(16) NOT NULL DEFAULT 'PENDING_CONFIRM' COMMENT 'PENDING_CONFIRM/PROCESSING/SETTLED/CANCELLED',
+  remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  settled_by BIGINT DEFAULT NULL COMMENT '结算人',
+  settled_time DATETIME DEFAULT NULL COMMENT '结算时间',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  KEY idx_fin_settlement_org (org_id),
+  KEY idx_fin_settlement_elder (elder_id),
+  KEY idx_fin_settlement_status (status),
+  UNIQUE KEY uk_fin_settlement_apply_del (org_id, discharge_apply_id, is_deleted)
+) COMMENT='退住结算';
+
+CREATE TABLE IF NOT EXISTS finance_consumption_record (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  elder_id BIGINT NOT NULL COMMENT '老人ID',
+  elder_name VARCHAR(64) DEFAULT NULL COMMENT '老人姓名',
+  consume_date DATE NOT NULL COMMENT '消费日期',
+  amount DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT '消费金额',
+  category VARCHAR(64) DEFAULT NULL COMMENT '消费类别',
+  source_type VARCHAR(32) DEFAULT NULL COMMENT '来源类型 MANUAL/STORE/MEDICAL',
+  source_id BIGINT DEFAULT NULL COMMENT '来源单据ID',
+  remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  KEY idx_fin_consumption_org_date (org_id, consume_date),
+  KEY idx_fin_consumption_elder (elder_id)
+) COMMENT='消费登记';
+
+CREATE TABLE IF NOT EXISTS finance_monthly_allocation (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  allocation_month CHAR(7) NOT NULL COMMENT '分摊月份 YYYY-MM',
+  allocation_name VARCHAR(64) NOT NULL COMMENT '分摊项目名称',
+  total_amount DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT '分摊总金额',
+  target_count INT NOT NULL DEFAULT 0 COMMENT '目标人数',
+  status VARCHAR(16) NOT NULL DEFAULT 'DRAFT' COMMENT 'DRAFT/CONFIRMED/CANCELLED',
+  remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  reviewed_by BIGINT DEFAULT NULL COMMENT '审核人',
+  reviewed_time DATETIME DEFAULT NULL COMMENT '审核时间',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  KEY idx_fin_allocation_org_month (org_id, allocation_month),
+  KEY idx_fin_allocation_status (status),
+  UNIQUE KEY uk_fin_allocation_month_name_del (org_id, allocation_month, allocation_name, is_deleted)
+) COMMENT='月分摊费';

@@ -122,3 +122,10 @@ curl -s http://localhost:8080/v3/api-docs -o openapi.json
 - `DEPLOYMENT_CHECKLIST.md`
 
 已验证部署成功（登录接口返回 `code=0`）。
+
+## Flyway 版本冲突检查
+多人并行开发时，建议在提交前执行：
+```
+./scripts/check_flyway_versions.sh
+```
+如果输出 `Duplicate Flyway versions found`，需要先统一迁移版本号后再合并。

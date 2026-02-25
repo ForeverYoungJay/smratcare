@@ -9,6 +9,7 @@ public class InventoryLogResponse {
   private Long productId;
   private String productName;
   private Long batchId;
+  private Long warehouseId;
   private String batchNo;
   private String changeType;
   private Integer changeQty;

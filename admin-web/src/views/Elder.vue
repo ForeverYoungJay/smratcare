@@ -93,7 +93,11 @@
           <a-date-picker v-model:value="unbindForm.endDate" value-format="YYYY-MM-DD" style="width: 100%" />
         </a-form-item>
         <a-form-item label="原因">
-          <a-input v-model:value="unbindForm.reason" />
+          <a-select v-model:value="unbindForm.reason" allow-clear placeholder="请选择退住费用设置">
+            <a-select-option v-for="item in dischargeFeeConfigOptions" :key="item.value" :value="item.value">
+              {{ item.label }}
+            </a-select-option>
+          </a-select>
         </a-form-item>
       </a-form>
     </a-modal>
@@ -107,9 +111,10 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../components/PageContainer.vue'
 import SearchForm from '../components/SearchForm.vue'
 import DataTable from '../components/DataTable.vue'
+import { getBaseConfigItemList } from '../api/baseConfig'
 import { getElderPage, createElder, updateElder, assignBed, unbindBed } from '../api/elder'
 import { getBedList } from '../api/bed'
-import type { ElderItem, PageResult, BedItem } from '../types/api'
+import type { BaseConfigItem, ElderItem, PageResult, BedItem } from '../types/api'
 
 const query = reactive({ keyword: undefined as string | undefined, status: undefined as number | undefined, pageNo: 1, pageSize: 10 })
 const list = ref<ElderItem[]>([])
@@ -136,6 +141,7 @@ const current = ref<ElderItem | null>(null)
 const beds = ref<BedItem[]>([])
 const assignForm = reactive<{ elderId?: number; bedId?: number; startDate?: string }>({})
 const unbindForm = reactive<{ elderId?: number; endDate?: string; reason?: string }>({})
+const dischargeFeeConfigOptions = ref<Array<{ label: string; value: string }>>([])
 
 const rules = {
   fullName: [{ required: true, message: '请输入姓名' }],
@@ -156,6 +162,18 @@ const bedOptions = computed(() =>
 )
 
 const drawerTitle = computed(() => (form.id ? '编辑老人' : '新增老人'))
+
+async function loadDischargeFeeConfigOptions() {
+  try {
+    const options = await getBaseConfigItemList({ configGroup: 'DISCHARGE_FEE_CONFIG', status: 1 })
+    dischargeFeeConfigOptions.value = (options || []).map((item: BaseConfigItem) => ({
+      label: item.itemName,
+      value: item.itemName
+    }))
+  } catch {
+    dischargeFeeConfigOptions.value = []
+  }
+}
 
 async function load() {
   loading.value = true
@@ -293,5 +311,6 @@ function statusText(status?: number) {
   return '-'
 }
 
+loadDischargeFeeConfigOptions()
 load()
 </script>

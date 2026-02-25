@@ -129,6 +129,24 @@
         </a-tab-pane>
       </a-tabs>
     </a-drawer>
+
+    <a-modal
+      v-model:open="refundOpen"
+      title="订单退款"
+      :confirm-loading="refundSubmitting"
+      @ok="submitRefund"
+      @cancel="closeRefund"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="退款原因" required>
+          <a-select v-model:value="refundReason" placeholder="请选择退款原因">
+            <a-select-option v-for="item in refundReasonOptions" :key="item.value" :value="item.value">
+              {{ item.label }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </PageContainer>
 </template>
 
@@ -136,9 +154,10 @@
 import { onMounted, reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
+import { getBaseConfigItemList } from '../../api/baseConfig'
 import { exportCsv } from '../../utils/export'
 import { getOrderPage, getOrderDetail, cancelOrder, refundOrder, fulfillOrder } from '../../api/store'
-import type { OrderItem, PageResult } from '../../types'
+import type { BaseConfigItem, OrderItem, PageResult } from '../../types'
 
 const loading = ref(false)
 const rows = ref<OrderItem[]>([])
@@ -146,6 +165,11 @@ const total = ref(0)
 const detailOpen = ref(false)
 const detail = ref<OrderItem | null>(null)
 const fulfillingIds = ref<Set<number>>(new Set())
+const refundOpen = ref(false)
+const refundSubmitting = ref(false)
+const refundOrderId = ref<number | null>(null)
+const refundReason = ref('')
+const refundReasonOptions = ref<{ label: string; value: string }[]>([])
 
 const query = reactive({
   keyword: '',
@@ -186,6 +210,14 @@ async function fetchData() {
   } finally {
     loading.value = false
   }
+}
+
+async function loadRefundReasons() {
+  const options = await getBaseConfigItemList({ configGroup: 'REFUND_REASON', status: 1 })
+  refundReasonOptions.value = (options || []).map((item: BaseConfigItem) => ({
+    label: item.itemName,
+    value: item.itemName
+  }))
 }
 
 function reset() {
@@ -245,14 +277,34 @@ function handleRefund(row: OrderItem) {
     message.info('当前状态不可退款')
     return
   }
-  Modal.confirm({
-    title: '确认退款？',
-    onOk: async () => {
-      await refundOrder({ orderId: row.id })
-      message.success('已退款')
-      fetchData()
-    }
-  })
+  refundOrderId.value = row.id
+  refundReason.value = ''
+  refundOpen.value = true
+}
+
+function closeRefund() {
+  refundOpen.value = false
+  refundOrderId.value = null
+  refundReason.value = ''
+}
+
+async function submitRefund() {
+  if (!refundOrderId.value) {
+    return
+  }
+  if (!refundReason.value) {
+    message.error('请选择退款原因')
+    return
+  }
+  refundSubmitting.value = true
+  try {
+    await refundOrder({ orderId: refundOrderId.value, reason: refundReason.value })
+    message.success('已退款')
+    closeRefund()
+    fetchData()
+  } finally {
+    refundSubmitting.value = false
+  }
 }
 
 function handleFulfill(row: OrderItem) {
@@ -290,7 +342,10 @@ function isRefundDisabled(row: OrderItem) {
   return row.orderStatus === undefined || row.orderStatus < 3
 }
 
-onMounted(fetchData)
+onMounted(async () => {
+  await loadRefundReasons()
+  await fetchData()
+})
 </script>
 
 <style scoped>

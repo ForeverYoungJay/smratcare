@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="月账单中心" subTitle="按月查询、生成与收款登记">
+  <PageContainer :title="pageTitle" :subTitle="pageSubTitle">
     <a-card class="card-elevated" :bordered="false">
       <a-form layout="inline" :model="query" class="search-form">
         <a-form-item label="月份">
@@ -114,6 +114,17 @@ import { exportCsv } from '../../utils/export'
 import { getBillPage, generateBill, payBill } from '../../api/bill'
 import type { BillItem, PageResult } from '../../types'
 import router from '../../router'
+
+const props = withDefaults(defineProps<{
+  title?: string
+  subTitle?: string
+}>(), {
+  title: '月账单中心',
+  subTitle: '按月查询、生成与收款登记'
+})
+
+const pageTitle = props.title
+const pageSubTitle = props.subTitle
 
 const loading = ref(false)
 const rows = ref<BillItem[]>([])

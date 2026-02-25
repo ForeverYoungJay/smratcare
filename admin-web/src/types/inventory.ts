@@ -2,7 +2,10 @@ export interface InventoryBatchItem {
   id: number
   productId: number
   productName?: string
+  category?: string
   safetyStock?: number
+  warehouseId?: number
+  warehouseName?: string
   batchNo?: string
   quantity: number
   costPrice?: number
@@ -16,6 +19,7 @@ export interface InventoryLogItem {
   productId: number
   productName?: string
   batchId?: number
+  warehouseId?: number
   batchNo?: string
   changeType: 'IN' | 'OUT' | 'ADJUST'
   changeQty: number
@@ -45,6 +49,7 @@ export interface InventoryExpiryAlertItem {
 
 export interface InventoryAdjustRequest {
   productId: number
+  warehouseId?: number
   batchId?: number
   adjustType: 'GAIN' | 'LOSS'
   adjustQty: number
@@ -53,6 +58,7 @@ export interface InventoryAdjustRequest {
 
 export interface InventoryInboundRequest {
   productId: number | string
+  warehouseId?: number
   batchNo?: string
   quantity: number
   costPrice?: number
@@ -63,6 +69,7 @@ export interface InventoryInboundRequest {
 
 export interface InventoryOutboundRequest {
   productId: number | string
+  warehouseId?: number
   batchId?: number
   quantity: number
   reason?: string
@@ -72,10 +79,24 @@ export interface InventoryAdjustmentItem {
   id: number
   productId: number
   productName?: string
+  category?: string
   batchId?: number
+  warehouseId?: number
+  warehouseName?: string
   adjustType: 'GAIN' | 'LOSS'
   adjustQty: number
   reason?: string
   operatorStaffId?: number
   createTime?: string
+}
+
+export interface InventoryAdjustmentDiffItem {
+  productId: number
+  productName?: string
+  category?: string
+  warehouseId?: number
+  warehouseName?: string
+  gainQty: number
+  lossQty: number
+  diffQty: number
 }

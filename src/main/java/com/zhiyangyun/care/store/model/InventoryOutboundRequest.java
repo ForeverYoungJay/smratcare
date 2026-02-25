@@ -8,6 +8,7 @@ public class InventoryOutboundRequest {
   private Long orgId;
   @NotNull
   private Long productId;
+  private Long warehouseId;
   private Long batchId;
   @NotNull
   private Integer quantity;

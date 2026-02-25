@@ -62,9 +62,11 @@ public class CrmLeadController {
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) String keyword,
-      @RequestParam(required = false) Integer status) {
+      @RequestParam(required = false) Integer status,
+      @RequestParam(required = false) String source,
+      @RequestParam(required = false) String customerTag) {
     Long tenantId = AuthContext.getOrgId();
-    return Result.ok(leadService.page(tenantId, pageNo, pageSize, keyword, status));
+    return Result.ok(leadService.page(tenantId, pageNo, pageSize, keyword, status, source, customerTag));
   }
 
   @DeleteMapping("/{id}")

@@ -10,6 +10,7 @@ public class InventoryInboundRequest {
   private Long orgId;
   @NotNull
   private Long productId;
+  private Long warehouseId;
   private String batchNo;
   @NotNull
   private Integer quantity;
