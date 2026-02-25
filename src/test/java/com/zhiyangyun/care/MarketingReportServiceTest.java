@@ -15,7 +15,6 @@ import com.zhiyangyun.care.crm.model.report.MarketingConversionReportResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingDataQualityResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingFollowupReportResponse;
 import com.zhiyangyun.care.crm.service.impl.MarketingReportServiceImpl;
-import com.zhiyangyun.care.elder.mapper.lifecycle.ElderAdmissionMapper;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -30,20 +29,17 @@ class MarketingReportServiceTest {
 
   @Mock
   private CrmLeadMapper crmLeadMapper;
-  @Mock
-  private ElderAdmissionMapper admissionMapper;
 
   private MarketingReportServiceImpl service;
 
   @BeforeEach
   void setUp() {
-    service = new MarketingReportServiceImpl(crmLeadMapper, admissionMapper);
+    service = new MarketingReportServiceImpl(crmLeadMapper);
   }
 
   @Test
   void conversionShouldReturnExpectedCountsAndRates() {
-    when(crmLeadMapper.selectCount(any())).thenReturn(10L, 4L, 3L, 2L, 1L);
-    when(admissionMapper.selectCount(any())).thenReturn(2L);
+    when(crmLeadMapper.selectCount(any())).thenReturn(10L, 4L, 3L, 2L, 1L, 2L);
 
     MarketingConversionReportResponse response =
         service.conversion(1L, "2026-01-01", "2026-01-31", null, null);
