@@ -70,79 +70,31 @@
     <a-modal v-model:open="open" :title="form.id ? '编辑合同' : '新增合同'" width="760px" :confirm-loading="submitting" @ok="submit">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-row :gutter="16">
-          <a-col :span="12">
-            <a-form-item label="合同编号" name="contractNo">
-              <a-input v-model:value="form.contractNo" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="签约房号">
-              <a-input v-model:value="form.reservationRoomNo" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="姓名" name="elderName">
-              <a-input v-model:value="form.elderName" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="联系电话">
-              <a-input v-model:value="form.elderPhone" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="性别">
-              <a-select v-model:value="form.gender" allow-clear>
-                <a-select-option :value="1">男</a-select-option>
-                <a-select-option :value="2">女</a-select-option>
-              </a-select>
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="年龄">
-              <a-input-number v-model:value="form.age" :min="0" :max="120" style="width: 100%" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="签约日期">
-              <a-date-picker v-model:value="form.contractSignedAt" value-format="YYYY-MM-DD HH:mm:ss" show-time style="width: 100%" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="合同有效期止">
-              <a-date-picker v-model:value="form.contractExpiryDate" value-format="YYYY-MM-DD" style="width: 100%" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="合同状态">
-              <a-input v-model:value="form.contractStatus" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="营销人员">
-              <a-input v-model:value="form.marketerName" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="所属机构">
-              <a-input v-model:value="form.orgName" />
-            </a-form-item>
-          </a-col>
+          <a-col :span="12"><a-form-item label="合同编号" name="contractNo"><a-input v-model:value="form.contractNo" /></a-form-item></a-col>
+          <a-col :span="12"><a-form-item label="签约房号"><a-input v-model:value="form.reservationRoomNo" /></a-form-item></a-col>
+          <a-col :span="12"><a-form-item label="姓名" name="elderName"><a-input v-model:value="form.elderName" /></a-form-item></a-col>
+          <a-col :span="12"><a-form-item label="联系电话"><a-input v-model:value="form.elderPhone" /></a-form-item></a-col>
+          <a-col :span="8"><a-form-item label="性别"><a-select v-model:value="form.gender" allow-clear><a-select-option :value="1">男</a-select-option><a-select-option :value="2">女</a-select-option></a-select></a-form-item></a-col>
+          <a-col :span="8"><a-form-item label="年龄"><a-input-number v-model:value="form.age" :min="0" :max="120" style="width: 100%" /></a-form-item></a-col>
+          <a-col :span="8"><a-form-item label="签约日期"><a-date-picker v-model:value="form.contractSignedAt" value-format="YYYY-MM-DD HH:mm:ss" show-time style="width: 100%" /></a-form-item></a-col>
+          <a-col :span="12"><a-form-item label="合同有效期止"><a-date-picker v-model:value="form.contractExpiryDate" value-format="YYYY-MM-DD" style="width: 100%" /></a-form-item></a-col>
+          <a-col :span="12"><a-form-item label="合同状态"><a-input v-model:value="form.contractStatus" /></a-form-item></a-col>
+          <a-col :span="12"><a-form-item label="营销人员"><a-input v-model:value="form.marketerName" /></a-form-item></a-col>
+          <a-col :span="12"><a-form-item label="所属机构"><a-input v-model:value="form.orgName" /></a-form-item></a-col>
         </a-row>
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="attachmentOpen" title="合同附件" width="760px" :footer="null">
+    <a-modal v-model:open="attachmentOpen" title="合同附件" width="820px" :footer="null">
       <a-space style="margin-bottom: 12px;">
-        <a-input v-model:value="attachmentForm.fileName" placeholder="附件名称" style="width: 180px" />
-        <a-input v-model:value="attachmentForm.fileUrl" placeholder="附件链接(URL)" style="width: 220px" />
-        <a-input v-model:value="attachmentForm.fileType" placeholder="文件类型" style="width: 120px" />
-        <a-button type="primary" :loading="attachmentSubmitting" @click="submitAttachment">新增附件</a-button>
+        <a-upload :show-upload-list="false" :custom-request="handleUpload">
+          <a-button type="primary" :loading="attachmentSubmitting">上传附件</a-button>
+        </a-upload>
       </a-space>
       <a-table :data-source="attachments" :columns="attachmentColumns" :pagination="false" row-key="id" size="small">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'fileUrl'">
-            <a :href="record.fileUrl" target="_blank">{{ record.fileUrl || '-' }}</a>
+            <a :href="record.fileUrl" target="_blank">{{ record.fileName }}</a>
           </template>
           <template v-else-if="column.key === 'operation'">
             <a-button type="link" danger @click="removeAttachment(record.id)">删除</a-button>
@@ -163,10 +115,11 @@ import {
   batchDeleteLeads,
   createCrmLead,
   createLeadAttachment,
+  deleteLeadAttachment,
   getLeadAttachments,
   getLeadPage,
   updateCrmLead,
-  deleteLeadAttachment
+  uploadMarketingFile
 } from '../../api/marketing'
 import type { ContractAttachmentItem, CrmLeadItem, PageResult } from '../../types'
 
@@ -190,7 +143,6 @@ const query = reactive({
 })
 
 const form = reactive<Partial<CrmLeadItem>>({})
-
 const rules: FormRules = {
   contractNo: [{ required: true, message: '请输入合同编号' }],
   elderName: [{ required: true, message: '请输入姓名' }]
@@ -220,17 +172,11 @@ const columns = [
 
 const attachmentOpen = ref(false)
 const attachmentSubmitting = ref(false)
-const currentAttachmentLeadId = ref<number>()
+const currentAttachmentLead = ref<CrmLeadItem>()
 const attachments = ref<ContractAttachmentItem[]>([])
-const attachmentForm = reactive({
-  fileName: '',
-  fileUrl: '',
-  fileType: ''
-})
-
 const attachmentColumns = [
-  { title: '文件名', dataIndex: 'fileName', key: 'fileName', width: 160 },
-  { title: '文件链接', dataIndex: 'fileUrl', key: 'fileUrl', width: 280 },
+  { title: '文件名', dataIndex: 'fileName', key: 'fileName', width: 220 },
+  { title: '文件链接', dataIndex: 'fileUrl', key: 'fileUrl', width: 320 },
   { title: '文件类型', dataIndex: 'fileType', key: 'fileType', width: 120 },
   { title: '上传时间', dataIndex: 'createTime', key: 'createTime', width: 160 },
   { title: '操作', key: 'operation', width: 80 }
@@ -363,32 +309,32 @@ function view(record: CrmLeadItem) {
 }
 
 async function openAttachment(record: CrmLeadItem) {
-  currentAttachmentLeadId.value = record.id
-  attachmentForm.fileName = ''
-  attachmentForm.fileUrl = ''
-  attachmentForm.fileType = ''
+  currentAttachmentLead.value = record
   attachments.value = await getLeadAttachments(record.id)
   attachmentOpen.value = true
 }
 
-async function submitAttachment() {
-  if (!currentAttachmentLeadId.value) return
-  if (!attachmentForm.fileName) {
-    message.error('请填写附件名称')
+async function handleUpload(option: any) {
+  const file = option?.file as File
+  if (!file || !currentAttachmentLead.value) {
+    option?.onError?.(new Error('未选择合同或文件'))
     return
   }
   attachmentSubmitting.value = true
   try {
-    await createLeadAttachment(currentAttachmentLeadId.value, {
-      fileName: attachmentForm.fileName,
-      fileUrl: attachmentForm.fileUrl,
-      fileType: attachmentForm.fileType
+    const uploaded = await uploadMarketingFile(file, 'marketing-contract')
+    await createLeadAttachment(currentAttachmentLead.value.id, {
+      contractNo: currentAttachmentLead.value.contractNo,
+      fileName: uploaded.originalFileName || uploaded.fileName,
+      fileUrl: uploaded.fileUrl,
+      fileType: uploaded.fileType,
+      fileSize: uploaded.fileSize
     })
-    attachments.value = await getLeadAttachments(currentAttachmentLeadId.value)
-    attachmentForm.fileName = ''
-    attachmentForm.fileUrl = ''
-    attachmentForm.fileType = ''
-    message.success('附件已保存')
+    attachments.value = await getLeadAttachments(currentAttachmentLead.value.id)
+    message.success('附件上传成功')
+    option?.onSuccess?.(uploaded)
+  } catch (error) {
+    option?.onError?.(error)
   } finally {
     attachmentSubmitting.value = false
   }
@@ -396,8 +342,8 @@ async function submitAttachment() {
 
 async function removeAttachment(attachmentId: number) {
   await deleteLeadAttachment(attachmentId)
-  if (currentAttachmentLeadId.value) {
-    attachments.value = await getLeadAttachments(currentAttachmentLeadId.value)
+  if (currentAttachmentLead.value) {
+    attachments.value = await getLeadAttachments(currentAttachmentLead.value.id)
   }
   message.success('附件已删除')
 }

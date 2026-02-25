@@ -144,3 +144,11 @@ export interface SmsTaskCreateRequest {
   content?: string
   planSendTime?: string
 }
+
+export interface UploadedFileResult {
+  fileName: string
+  originalFileName?: string
+  fileUrl: string
+  fileType?: string
+  fileSize?: number
+}

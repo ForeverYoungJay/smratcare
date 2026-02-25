@@ -41,3 +41,8 @@ logging:
   level:
     root: INFO
     com.zhiyangyun.care: INFO
+
+app:
+  file-storage:
+    base-dir: /app/uploads
+    url-prefix: /uploads

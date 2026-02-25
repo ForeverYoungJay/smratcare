@@ -20,7 +20,8 @@ import type {
   MarketingReportQuery,
   PageResult,
   SmsTaskCreateRequest,
-  SmsTaskItem
+  SmsTaskItem,
+  UploadedFileResult
 } from '../types'
 
 export { createCrmLead, updateCrmLead, deleteCrmLead }
@@ -71,6 +72,15 @@ export function getSmsTasks(leadId?: number) {
 
 export function sendSmsTask(taskId: number) {
   return request.post<SmsTaskItem>(`/api/crm/leads/sms/tasks/${taskId}/send`)
+}
+
+export function uploadMarketingFile(file: File, bizType = 'marketing-contract') {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('bizType', bizType)
+  return request.post<UploadedFileResult>('/api/files/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
 }
 
 export async function getAllLeads(pageSize = 200): Promise<CrmLeadItem[]> {

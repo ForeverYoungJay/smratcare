@@ -35,6 +35,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
     volumes:
       - ./target/care-task-1.0.0.jar:/app/app.jar:ro
+      - ./output/uploads:/app/uploads
     ports:
       - "8080:8080"
     depends_on:

@@ -36,3 +36,8 @@ security:
     secret: "change-me-please-change-me-please-change-me"
     expiration-minutes: 120
     blacklist-enabled: true
+
+app:
+  file-storage:
+    base-dir: ${user.home}/smartcare-uploads
+    url-prefix: /uploads
