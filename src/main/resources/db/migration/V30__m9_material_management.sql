@@ -1,6 +1,6 @@
 -- M9 物资管理主数据与采购/调拨单
 
-CREATE TABLE material_warehouse (
+CREATE TABLE IF NOT EXISTS material_warehouse (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
   warehouse_code VARCHAR(64) NOT NULL COMMENT '仓库编码',
@@ -17,7 +17,7 @@ CREATE TABLE material_warehouse (
   KEY idx_material_warehouse_name (warehouse_name)
 ) COMMENT='物资仓库';
 
-CREATE TABLE material_supplier (
+CREATE TABLE IF NOT EXISTS material_supplier (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
   supplier_code VARCHAR(64) NOT NULL COMMENT '供应商编码',
@@ -34,7 +34,7 @@ CREATE TABLE material_supplier (
   KEY idx_material_supplier_name (supplier_name)
 ) COMMENT='物资供应商';
 
-CREATE TABLE material_purchase_order (
+CREATE TABLE IF NOT EXISTS material_purchase_order (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
   order_no VARCHAR(64) NOT NULL COMMENT '采购单号',
@@ -52,7 +52,7 @@ CREATE TABLE material_purchase_order (
   KEY idx_material_po_order_date (order_date)
 ) COMMENT='物资采购单';
 
-CREATE TABLE material_purchase_order_item (
+CREATE TABLE IF NOT EXISTS material_purchase_order_item (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
   order_id BIGINT NOT NULL COMMENT '采购单ID',
@@ -68,7 +68,7 @@ CREATE TABLE material_purchase_order_item (
   KEY idx_material_po_item_product (product_id)
 ) COMMENT='物资采购单明细';
 
-CREATE TABLE material_transfer_order (
+CREATE TABLE IF NOT EXISTS material_transfer_order (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
   transfer_no VARCHAR(64) NOT NULL COMMENT '调拨单号',
@@ -83,7 +83,7 @@ CREATE TABLE material_transfer_order (
   KEY idx_material_transfer_status (status)
 ) COMMENT='物资调拨单';
 
-CREATE TABLE material_transfer_item (
+CREATE TABLE IF NOT EXISTS material_transfer_item (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
   transfer_id BIGINT NOT NULL COMMENT '调拨单ID',

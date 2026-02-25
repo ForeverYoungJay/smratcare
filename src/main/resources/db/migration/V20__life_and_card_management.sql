@@ -1,4 +1,4 @@
-CREATE TABLE life_room_cleaning_task (
+CREATE TABLE IF NOT EXISTS life_room_cleaning_task (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -18,7 +18,7 @@ CREATE TABLE life_room_cleaning_task (
   KEY idx_room_cleaning_org_room (org_id, room_id)
 ) COMMENT='房间打扫任务';
 
-CREATE TABLE life_maintenance_request (
+CREATE TABLE IF NOT EXISTS life_maintenance_request (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -42,7 +42,7 @@ CREATE TABLE life_maintenance_request (
   KEY idx_maintenance_org_room (org_id, room_id)
 ) COMMENT='维修管理';
 
-CREATE TABLE one_card_account (
+CREATE TABLE IF NOT EXISTS one_card_account (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',

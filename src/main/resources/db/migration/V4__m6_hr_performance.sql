@@ -1,6 +1,6 @@
 -- M6 人力资源与绩效
 
-CREATE TABLE staff_profile (
+CREATE TABLE IF NOT EXISTS staff_profile (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -22,7 +22,7 @@ CREATE TABLE staff_profile (
   KEY idx_staff_profile_staff_id (staff_id)
 ) COMMENT='员工档案扩展';
 
-CREATE TABLE staff_training_record (
+CREATE TABLE IF NOT EXISTS staff_training_record (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -45,7 +45,7 @@ CREATE TABLE staff_training_record (
   KEY idx_staff_training_org_id (org_id)
 ) COMMENT='员工培训记录';
 
-CREATE TABLE staff_points_account (
+CREATE TABLE IF NOT EXISTS staff_points_account (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -62,7 +62,7 @@ CREATE TABLE staff_points_account (
   KEY idx_staff_points_account_staff_id (staff_id)
 ) COMMENT='员工积分账户';
 
-CREATE TABLE staff_points_log (
+CREATE TABLE IF NOT EXISTS staff_points_log (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',

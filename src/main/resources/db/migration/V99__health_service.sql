@@ -1,6 +1,6 @@
 -- 健康服务模块：用药服务、健康管理、健康巡检、护理日志
 
-CREATE TABLE health_drug_dictionary (
+CREATE TABLE IF NOT EXISTS health_drug_dictionary (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -19,7 +19,7 @@ CREATE TABLE health_drug_dictionary (
   KEY idx_health_drug_org_code (org_id, drug_code)
 ) COMMENT='药品字典';
 
-CREATE TABLE health_medication_deposit (
+CREATE TABLE IF NOT EXISTS health_medication_deposit (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -41,7 +41,7 @@ CREATE TABLE health_medication_deposit (
   KEY idx_health_med_deposit_org_drug (org_id, drug_name)
 ) COMMENT='药品缴存';
 
-CREATE TABLE health_medication_setting (
+CREATE TABLE IF NOT EXISTS health_medication_setting (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -64,7 +64,7 @@ CREATE TABLE health_medication_setting (
   KEY idx_health_med_setting_org_drug (org_id, drug_name)
 ) COMMENT='用药设置';
 
-CREATE TABLE health_medication_registration (
+CREATE TABLE IF NOT EXISTS health_medication_registration (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -85,7 +85,7 @@ CREATE TABLE health_medication_registration (
   KEY idx_health_med_reg_org_drug (org_id, drug_name)
 ) COMMENT='用药登记';
 
-CREATE TABLE health_archive (
+CREATE TABLE IF NOT EXISTS health_archive (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -105,7 +105,7 @@ CREATE TABLE health_archive (
   KEY idx_health_archive_org_elder (org_id, elder_id)
 ) COMMENT='健康档案';
 
-CREATE TABLE health_data_record (
+CREATE TABLE IF NOT EXISTS health_data_record (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -125,7 +125,7 @@ CREATE TABLE health_data_record (
   KEY idx_health_data_org_type (org_id, data_type)
 ) COMMENT='健康数据';
 
-CREATE TABLE health_inspection (
+CREATE TABLE IF NOT EXISTS health_inspection (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -146,7 +146,7 @@ CREATE TABLE health_inspection (
   KEY idx_health_inspection_org_status (org_id, status)
 ) COMMENT='健康巡检';
 
-CREATE TABLE health_nursing_log (
+CREATE TABLE IF NOT EXISTS health_nursing_log (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -168,7 +168,7 @@ CREATE TABLE health_nursing_log (
   KEY idx_health_nursing_log_org_source_inspection (org_id, source_inspection_id)
 ) COMMENT='护理日志';
 
-CREATE TABLE health_medication_task (
+CREATE TABLE IF NOT EXISTS health_medication_task (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',

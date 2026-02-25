@@ -1,4 +1,4 @@
-CREATE TABLE oa_work_report (
+CREATE TABLE IF NOT EXISTS oa_work_report (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',

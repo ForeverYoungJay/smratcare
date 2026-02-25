@@ -1,4 +1,4 @@
-CREATE TABLE oa_group_setting (
+CREATE TABLE IF NOT EXISTS oa_group_setting (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -17,7 +17,7 @@ CREATE TABLE oa_group_setting (
   KEY idx_oa_group_setting_org_status (org_id, status)
 ) COMMENT='OA分组设置';
 
-CREATE TABLE oa_activity_plan (
+CREATE TABLE IF NOT EXISTS oa_activity_plan (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',

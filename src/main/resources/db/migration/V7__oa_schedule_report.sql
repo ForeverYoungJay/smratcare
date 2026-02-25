@@ -1,6 +1,6 @@
 -- OA 日程、考勤、报表
 
-CREATE TABLE staff_schedule (
+CREATE TABLE IF NOT EXISTS staff_schedule (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -19,7 +19,7 @@ CREATE TABLE staff_schedule (
   KEY idx_staff_schedule_staff_date (staff_id, duty_date)
 ) COMMENT='员工日程';
 
-CREATE TABLE attendance_record (
+CREATE TABLE IF NOT EXISTS attendance_record (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -36,7 +36,7 @@ CREATE TABLE attendance_record (
   KEY idx_attendance_staff_time (staff_id, check_in_time)
 ) COMMENT='考勤记录';
 
-CREATE TABLE report_record (
+CREATE TABLE IF NOT EXISTS report_record (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',

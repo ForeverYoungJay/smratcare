@@ -56,24 +56,24 @@ CREATE TABLE IF NOT EXISTS audit_log (
 ) COMMENT='审计日志';
 
 -- 房间表补齐 tenant_id / 楼栋楼层ID / 二维码
-ALTER TABLE room ADD COLUMN tenant_id BIGINT NOT NULL DEFAULT 0;
-ALTER TABLE room ADD COLUMN building_id BIGINT DEFAULT NULL;
-ALTER TABLE room ADD COLUMN floor_id BIGINT DEFAULT NULL;
-ALTER TABLE room ADD COLUMN room_qr_code VARCHAR(128) DEFAULT NULL;
-ALTER TABLE room ADD COLUMN created_by BIGINT DEFAULT NULL;
+ALTER TABLE room ADD COLUMN IF NOT EXISTS tenant_id BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE room ADD COLUMN IF NOT EXISTS building_id BIGINT DEFAULT NULL;
+ALTER TABLE room ADD COLUMN IF NOT EXISTS floor_id BIGINT DEFAULT NULL;
+ALTER TABLE room ADD COLUMN IF NOT EXISTS room_qr_code VARCHAR(128) DEFAULT NULL;
+ALTER TABLE room ADD COLUMN IF NOT EXISTS created_by BIGINT DEFAULT NULL;
 
 UPDATE room SET tenant_id = org_id WHERE tenant_id = 0;
 
-CREATE INDEX idx_room_tenant_id ON room (tenant_id);
-CREATE INDEX idx_room_building_id ON room (building_id);
-CREATE INDEX idx_room_floor_id ON room (floor_id);
-CREATE UNIQUE INDEX uk_room_tenant_room_no ON room (tenant_id, room_no);
+CREATE INDEX IF NOT EXISTS idx_room_tenant_id ON room (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_room_building_id ON room (building_id);
+CREATE INDEX IF NOT EXISTS idx_room_floor_id ON room (floor_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_room_tenant_room_no ON room (tenant_id, room_no);
 
 -- 床位表补齐 tenant_id
-ALTER TABLE bed ADD COLUMN tenant_id BIGINT NOT NULL DEFAULT 0;
-ALTER TABLE bed ADD COLUMN created_by BIGINT DEFAULT NULL;
+ALTER TABLE bed ADD COLUMN IF NOT EXISTS tenant_id BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE bed ADD COLUMN IF NOT EXISTS created_by BIGINT DEFAULT NULL;
 
 UPDATE bed SET tenant_id = org_id WHERE tenant_id = 0;
 
-CREATE INDEX idx_bed_tenant_id ON bed (tenant_id);
-CREATE UNIQUE INDEX uk_bed_tenant_qr_code ON bed (tenant_id, bed_qr_code);
+CREATE INDEX IF NOT EXISTS idx_bed_tenant_id ON bed (tenant_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_bed_tenant_qr_code ON bed (tenant_id, bed_qr_code);

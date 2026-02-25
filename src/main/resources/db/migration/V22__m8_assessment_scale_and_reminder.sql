@@ -5,7 +5,7 @@ ALTER TABLE assessment_record
   ADD COLUMN detail_json TEXT DEFAULT NULL COMMENT '评估明细JSON' AFTER suggestion,
   ADD COLUMN score_auto TINYINT NOT NULL DEFAULT 1 COMMENT '是否自动评分 1是0否' AFTER detail_json;
 
-CREATE TABLE assessment_scale_template (
+CREATE TABLE IF NOT EXISTS assessment_scale_template (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -27,7 +27,7 @@ CREATE TABLE assessment_scale_template (
   KEY idx_assessment_scale_tpl_status (status)
 ) COMMENT='评估量表模板';
 
-CREATE TABLE assessment_reminder_log (
+CREATE TABLE IF NOT EXISTS assessment_reminder_log (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',

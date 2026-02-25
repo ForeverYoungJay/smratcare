@@ -1,6 +1,6 @@
 -- M8 评估管理
 
-CREATE TABLE assessment_record (
+CREATE TABLE IF NOT EXISTS assessment_record (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',

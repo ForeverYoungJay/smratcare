@@ -1,5 +1,5 @@
 -- M5 餐饮管理扩展（菜品/点餐/食谱/备餐/送餐）
-CREATE TABLE dining_dish (
+CREATE TABLE IF NOT EXISTS dining_dish (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -20,7 +20,7 @@ CREATE TABLE dining_dish (
   KEY idx_dining_dish_org_status (org_id, status)
 ) COMMENT='菜品管理';
 
-CREATE TABLE dining_recipe (
+CREATE TABLE IF NOT EXISTS dining_recipe (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -40,7 +40,7 @@ CREATE TABLE dining_recipe (
   KEY idx_dining_recipe_org_status (org_id, status)
 ) COMMENT='食谱管理';
 
-CREATE TABLE dining_prep_zone (
+CREATE TABLE IF NOT EXISTS dining_prep_zone (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -59,7 +59,7 @@ CREATE TABLE dining_prep_zone (
   KEY idx_dining_prep_zone_org_status (org_id, status)
 ) COMMENT='分区备餐';
 
-CREATE TABLE dining_delivery_area (
+CREATE TABLE IF NOT EXISTS dining_delivery_area (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -79,7 +79,7 @@ CREATE TABLE dining_delivery_area (
   KEY idx_dining_delivery_area_org_status (org_id, status)
 ) COMMENT='送餐区域';
 
-CREATE TABLE dining_meal_order (
+CREATE TABLE IF NOT EXISTS dining_meal_order (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -107,7 +107,7 @@ CREATE TABLE dining_meal_order (
   KEY idx_dining_meal_order_elder (elder_id)
 ) COMMENT='点餐管理';
 
-CREATE TABLE dining_delivery_record (
+CREATE TABLE IF NOT EXISTS dining_delivery_record (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',

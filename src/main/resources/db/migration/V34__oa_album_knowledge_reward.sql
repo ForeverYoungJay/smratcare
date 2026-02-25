@@ -1,4 +1,4 @@
-CREATE TABLE oa_album (
+CREATE TABLE IF NOT EXISTS oa_album (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -17,7 +17,7 @@ CREATE TABLE oa_album (
   KEY idx_oa_album_org_date (org_id, shoot_date)
 ) COMMENT='相册管理';
 
-CREATE TABLE oa_knowledge (
+CREATE TABLE IF NOT EXISTS oa_knowledge (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -38,7 +38,7 @@ CREATE TABLE oa_knowledge (
   KEY idx_oa_knowledge_org_category (org_id, category)
 ) COMMENT='知识库文章';
 
-CREATE TABLE staff_reward_punishment (
+CREATE TABLE IF NOT EXISTS staff_reward_punishment (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
   staff_id BIGINT NOT NULL COMMENT '员工ID',

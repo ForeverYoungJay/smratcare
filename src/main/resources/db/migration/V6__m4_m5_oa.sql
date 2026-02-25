@@ -1,5 +1,5 @@
 -- M4 财务一体化（老人账户/流水/任务扣费/余额预警）
-CREATE TABLE elder_account (
+CREATE TABLE IF NOT EXISTS elder_account (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -18,7 +18,7 @@ CREATE TABLE elder_account (
   KEY idx_elder_account_tenant_id (tenant_id)
 ) COMMENT='老人账户';
 
-CREATE TABLE elder_account_log (
+CREATE TABLE IF NOT EXISTS elder_account_log (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -43,7 +43,7 @@ ALTER TABLE care_task_template
   ADD COLUMN charge_amount DECIMAL(12,2) NOT NULL DEFAULT 0 COMMENT '任务收费金额';
 
 -- M5 生活与健康管理
-CREATE TABLE meal_plan (
+CREATE TABLE IF NOT EXISTS meal_plan (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -59,7 +59,7 @@ CREATE TABLE meal_plan (
   KEY idx_meal_plan_org_date (org_id, plan_date)
 ) COMMENT='膳食计划';
 
-CREATE TABLE activity_event (
+CREATE TABLE IF NOT EXISTS activity_event (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -79,7 +79,7 @@ CREATE TABLE activity_event (
   KEY idx_activity_event_org_date (org_id, event_date)
 ) COMMENT='活动管理';
 
-CREATE TABLE incident_report (
+CREATE TABLE IF NOT EXISTS incident_report (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -100,7 +100,7 @@ CREATE TABLE incident_report (
   KEY idx_incident_elder (elder_id)
 ) COMMENT='事故登记';
 
-CREATE TABLE health_basic_record (
+CREATE TABLE IF NOT EXISTS health_basic_record (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -122,7 +122,7 @@ CREATE TABLE health_basic_record (
 ) COMMENT='基础健康记录';
 
 -- OA 模块
-CREATE TABLE oa_notice (
+CREATE TABLE IF NOT EXISTS oa_notice (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -138,7 +138,7 @@ CREATE TABLE oa_notice (
   KEY idx_notice_org_time (org_id, publish_time)
 ) COMMENT='公告';
 
-CREATE TABLE oa_todo (
+CREATE TABLE IF NOT EXISTS oa_todo (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -155,7 +155,7 @@ CREATE TABLE oa_todo (
   KEY idx_todo_org_status (org_id, status)
 ) COMMENT='待办';
 
-CREATE TABLE oa_approval (
+CREATE TABLE IF NOT EXISTS oa_approval (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -176,7 +176,7 @@ CREATE TABLE oa_approval (
   KEY idx_approval_org_status (org_id, status)
 ) COMMENT='审批单';
 
-CREATE TABLE oa_document (
+CREATE TABLE IF NOT EXISTS oa_document (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -195,7 +195,7 @@ CREATE TABLE oa_document (
   KEY idx_document_org_folder (org_id, folder)
 ) COMMENT='文档管理';
 
-CREATE TABLE oa_task (
+CREATE TABLE IF NOT EXISTS oa_task (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',

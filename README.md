@@ -18,11 +18,19 @@
 docker compose up -d
 ```
 
-### 2) 初始化数据库结构与测试数据（UTF-8）
+### 2) 初始化数据库（推荐：Flyway 自动建表）
+推荐顺序：
+1. 先启动后端，让 Flyway 自动执行 `src/main/resources/db/migration` 下迁移建表
+2. 再导入测试数据
+
+导入测试数据命令：
 ```
-docker exec -i smartcare-mysql mysql -uroot -proot zhiyangyun < docker/mysql/init/1_schema.sql
 docker exec -i smartcare-mysql mysql --default-character-set=utf8mb4 -uroot -proot zhiyangyun < docker/mysql/init/2_data.sql
 ```
+
+如需使用快照结构（`docker/mysql/init/1_schema.sql`），请二选一：
+- 方案A：导入 `1_schema.sql` 后关闭 Flyway（`spring.flyway.enabled=false`）
+- 方案B：不导入 `1_schema.sql`，仅使用 Flyway 迁移（推荐）
 
 如需重置数据（测试环境）：
 ```

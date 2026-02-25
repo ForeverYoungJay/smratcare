@@ -1,6 +1,6 @@
 -- M6 积分规则配置
 
-CREATE TABLE staff_points_rule (
+CREATE TABLE IF NOT EXISTS staff_points_rule (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
   template_id BIGINT DEFAULT NULL COMMENT '护理模板ID(为空表示默认规则)',

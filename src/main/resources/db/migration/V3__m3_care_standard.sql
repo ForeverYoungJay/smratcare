@@ -1,34 +1,34 @@
 -- M3 服务与护理标准化
 
 -- care_task_template / daily / execute_log / review 补齐 tenant_id
-ALTER TABLE care_task_template ADD COLUMN tenant_id BIGINT NOT NULL DEFAULT 0;
-ALTER TABLE care_task_template ADD COLUMN created_by BIGINT DEFAULT NULL;
+ALTER TABLE care_task_template ADD COLUMN IF NOT EXISTS tenant_id BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE care_task_template ADD COLUMN IF NOT EXISTS created_by BIGINT DEFAULT NULL;
 
 UPDATE care_task_template SET tenant_id = org_id WHERE tenant_id = 0;
 
-CREATE INDEX idx_care_task_template_tenant_id ON care_task_template (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_care_task_template_tenant_id ON care_task_template (tenant_id);
 
-ALTER TABLE care_task_daily ADD COLUMN tenant_id BIGINT NOT NULL DEFAULT 0;
-ALTER TABLE care_task_daily ADD COLUMN source_type VARCHAR(32) DEFAULT NULL;
-ALTER TABLE care_task_daily ADD COLUMN source_id BIGINT DEFAULT NULL;
-ALTER TABLE care_task_daily ADD COLUMN created_by BIGINT DEFAULT NULL;
+ALTER TABLE care_task_daily ADD COLUMN IF NOT EXISTS tenant_id BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE care_task_daily ADD COLUMN IF NOT EXISTS source_type VARCHAR(32) DEFAULT NULL;
+ALTER TABLE care_task_daily ADD COLUMN IF NOT EXISTS source_id BIGINT DEFAULT NULL;
+ALTER TABLE care_task_daily ADD COLUMN IF NOT EXISTS created_by BIGINT DEFAULT NULL;
 
 UPDATE care_task_daily SET tenant_id = org_id WHERE tenant_id = 0;
 
-CREATE INDEX idx_care_task_daily_tenant_id ON care_task_daily (tenant_id);
-CREATE INDEX idx_care_task_daily_source ON care_task_daily (source_type, source_id);
+CREATE INDEX IF NOT EXISTS idx_care_task_daily_tenant_id ON care_task_daily (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_care_task_daily_source ON care_task_daily (source_type, source_id);
 
-ALTER TABLE care_task_execute_log ADD COLUMN tenant_id BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE care_task_execute_log ADD COLUMN IF NOT EXISTS tenant_id BIGINT NOT NULL DEFAULT 0;
 
 UPDATE care_task_execute_log SET tenant_id = org_id WHERE tenant_id = 0;
 
-CREATE INDEX idx_care_task_execute_tenant_id ON care_task_execute_log (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_care_task_execute_tenant_id ON care_task_execute_log (tenant_id);
 
-ALTER TABLE care_task_review ADD COLUMN tenant_id BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE care_task_review ADD COLUMN IF NOT EXISTS tenant_id BIGINT NOT NULL DEFAULT 0;
 
 UPDATE care_task_review SET tenant_id = org_id WHERE tenant_id = 0;
 
-CREATE INDEX idx_care_task_review_tenant_id ON care_task_review (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_care_task_review_tenant_id ON care_task_review (tenant_id);
 
 -- 服务项目库
 CREATE TABLE IF NOT EXISTS service_item (

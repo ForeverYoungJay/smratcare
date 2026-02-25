@@ -1,6 +1,6 @@
 -- M7 问卷与持续改进
 
-CREATE TABLE survey_question_bank (
+CREATE TABLE IF NOT EXISTS survey_question_bank (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -22,7 +22,7 @@ CREATE TABLE survey_question_bank (
   KEY idx_survey_question_type (question_type)
 ) COMMENT='问卷题库';
 
-CREATE TABLE survey_template (
+CREATE TABLE IF NOT EXISTS survey_template (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -47,7 +47,7 @@ CREATE TABLE survey_template (
   KEY idx_survey_template_status (status)
 ) COMMENT='问卷模板';
 
-CREATE TABLE survey_template_question (
+CREATE TABLE IF NOT EXISTS survey_template_question (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -65,7 +65,7 @@ CREATE TABLE survey_template_question (
   KEY idx_survey_question_id (question_id)
 ) COMMENT='问卷模板-题目';
 
-CREATE TABLE survey_submission (
+CREATE TABLE IF NOT EXISTS survey_submission (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -90,7 +90,7 @@ CREATE TABLE survey_submission (
   KEY idx_survey_submission_staff (related_staff_id)
 ) COMMENT='问卷提交';
 
-CREATE TABLE survey_submission_item (
+CREATE TABLE IF NOT EXISTS survey_submission_item (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL DEFAULT 0 COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',

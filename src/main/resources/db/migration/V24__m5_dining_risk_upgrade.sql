@@ -5,7 +5,7 @@ ALTER TABLE dining_dish
 ALTER TABLE dining_meal_order
   ADD COLUMN override_id BIGINT DEFAULT NULL COMMENT '放行审批ID' AFTER delivery_area_name;
 
-CREATE TABLE dining_risk_threshold_config (
+CREATE TABLE IF NOT EXISTS dining_risk_threshold_config (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -22,7 +22,7 @@ CREATE TABLE dining_risk_threshold_config (
   KEY idx_dining_risk_threshold_org (org_id)
 ) COMMENT='餐饮风险阈值配置';
 
-CREATE TABLE dining_risk_intercept_log (
+CREATE TABLE IF NOT EXISTS dining_risk_intercept_log (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
@@ -39,7 +39,7 @@ CREATE TABLE dining_risk_intercept_log (
   KEY idx_dining_risk_intercept_elder (elder_id)
 ) COMMENT='餐饮风险拦截日志';
 
-CREATE TABLE dining_risk_override (
+CREATE TABLE IF NOT EXISTS dining_risk_override (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
   tenant_id BIGINT NOT NULL COMMENT '租户ID',
   org_id BIGINT NOT NULL COMMENT '机构ID',
