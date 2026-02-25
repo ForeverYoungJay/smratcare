@@ -2,6 +2,8 @@ package com.zhiyangyun.care.service;
 
 import com.zhiyangyun.care.model.CareTaskTodayItem;
 import com.zhiyangyun.care.model.CareTaskCreateRequest;
+import com.zhiyangyun.care.model.CareTaskExecuteLogItem;
+import com.zhiyangyun.care.model.CareTaskSummaryResponse;
 import com.zhiyangyun.care.model.ExecuteTaskRequest;
 import com.zhiyangyun.care.model.ExecuteTaskResponse;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -12,8 +14,14 @@ import java.util.List;
 public interface CareTaskService {
   List<CareTaskTodayItem> getTodayTasks(Long tenantId, Long staffId, LocalDate date);
 
+  List<CareTaskExecuteLogItem> listExecuteLogs(Long tenantId, Long taskDailyId);
+
   IPage<CareTaskTodayItem> page(Long tenantId, long pageNo, long pageSize, LocalDate dateFrom,
-      LocalDate dateTo, Long staffId, String roomNo, String careLevel, String status, String keyword);
+      LocalDate dateTo, Long staffId, String roomNo, String careLevel, String status, String keyword,
+      Boolean overdueOnly);
+
+  CareTaskSummaryResponse summary(Long tenantId, LocalDate dateFrom, LocalDate dateTo, Long staffId,
+      String roomNo, String careLevel, String status, String keyword, Boolean overdueOnly);
 
   void assignTask(Long tenantId, Long taskDailyId, Long staffId, boolean force);
 

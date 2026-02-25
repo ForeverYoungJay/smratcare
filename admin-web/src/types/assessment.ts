@@ -11,7 +11,15 @@ export interface AssessmentRecord {
   id: number
   elderId?: number
   elderName: string
+  gender?: number
+  genderLabel?: string
+  age?: number
+  phone?: string
+  address?: string
+  orgId?: number
+  orgName?: string
   assessmentType: AssessmentType
+  assessmentTypeLabel?: string
   templateId?: number
   levelCode?: string
   score?: number
@@ -20,6 +28,7 @@ export interface AssessmentRecord {
   assessorId?: number
   assessorName?: string
   status?: string
+  statusLabel?: string
   resultSummary?: string
   suggestion?: string
   detailJson?: string

@@ -14,7 +14,9 @@
         <template v-if="column.key === 'action'">
           <a-space>
             <a-button type="link" @click="openEdit(record)">编辑</a-button>
-            <a-button type="link" danger @click="remove(record)">删除</a-button>
+            <a-popconfirm title="确认删除该记录吗？" ok-text="确认" cancel-text="取消" @confirm="remove(record)">
+              <a-button type="link" danger>删除</a-button>
+            </a-popconfirm>
           </a-space>
         </template>
       </template>
@@ -99,6 +101,7 @@ function handleTableChange(pag: any) {
 function onReset() {
   query.keyword = ''
   query.pageNo = 1
+  query.pageSize = pagination.pageSize
   pagination.current = 1
   fetchData()
 }
@@ -155,6 +158,7 @@ async function submit() {
     } else {
       await createHealthArchive(payload)
     }
+    message.success('保存成功')
     editOpen.value = false
     fetchData()
   } finally {
@@ -164,6 +168,7 @@ async function submit() {
 
 async function remove(record: HealthArchive) {
   await deleteHealthArchive(record.id)
+  message.success('删除成功')
   fetchData()
 }
 

@@ -12,11 +12,17 @@
       </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openEdit()">新增计划</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" @click="batchStart">批量开始</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" @click="batchDone">批量完成</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" @click="batchCancel">批量取消</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+        <a-button @click="downloadExport">导出CSV</a-button>
       </template>
     </SearchForm>
 
     <DataTable
       rowKey="id"
+      :row-selection="rowSelection"
       :columns="columns"
       :data-source="rows"
       :loading="loading"
@@ -29,7 +35,10 @@
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
-            <a @click="openEdit(record)">编辑</a>
+            <a :style="{ color: (record.status === 'DONE' || record.status === 'CANCELLED') ? '#999' : '' }" @click="openEdit(record)">编辑</a>
+            <a :style="{ color: record.status !== 'PLANNED' ? '#999' : '' }" @click="start(record)">开始</a>
+            <a :style="{ color: record.status !== 'IN_PROGRESS' ? '#999' : '' }" @click="done(record)">完成</a>
+            <a :style="{ color: (record.status === 'DONE' || record.status === 'CANCELLED') ? '#999' : '' }" @click="cancel(record)">取消</a>
             <a @click="remove(record)" style="color: #ff4d4f">删除</a>
           </a-space>
         </template>
@@ -92,12 +101,26 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
+import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
-import { createActivityPlan, deleteActivityPlan, getActivityPlanPage, updateActivityPlan } from '../../api/oa'
+import {
+  batchCancelActivityPlan,
+  batchCompleteActivityPlan,
+  batchDeleteActivityPlan,
+  batchStartActivityPlan,
+  cancelActivityPlan,
+  completeActivityPlan,
+  createActivityPlan,
+  deleteActivityPlan,
+  exportActivityPlan,
+  getActivityPlanPage,
+  startActivityPlan,
+  updateActivityPlan
+} from '../../api/oa'
 import type { OaActivityPlan, PageResult } from '../../types'
 
 const loading = ref(false)
@@ -111,6 +134,7 @@ const query = reactive({
   pageSize: 10
 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
+const selectedRowKeys = ref<number[]>([])
 
 const columns = [
   { title: '计划标题', dataIndex: 'title', key: 'title', width: 200 },
@@ -134,6 +158,12 @@ const planDate = ref<Dayjs | undefined>()
 const startTime = ref<Dayjs | undefined>()
 const endTime = ref<Dayjs | undefined>()
 const form = reactive<Partial<OaActivityPlan>>({ status: 'PLANNED' })
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: (string | number)[]) => {
+    selectedRowKeys.value = keys.map((item) => Number(item))
+  }
+}))
 
 function statusText(status?: string) {
   if (status === 'IN_PROGRESS') return '进行中'
@@ -161,6 +191,7 @@ async function fetchData() {
     const res: PageResult<OaActivityPlan> = await getActivityPlanPage(params)
     rows.value = res.list
     pagination.total = res.total || res.list.length
+    selectedRowKeys.value = []
   } finally {
     loading.value = false
   }
@@ -184,6 +215,7 @@ function onReset() {
 }
 
 function openEdit(record?: OaActivityPlan) {
+  if (record && (record.status === 'DONE' || record.status === 'CANCELLED')) return
   Object.assign(form, record || { status: 'PLANNED', title: '', location: '', organizer: '', participantTarget: '', content: '', remark: '' })
   planDate.value = form.planDate ? dayjs(form.planDate) : undefined
   startTime.value = form.startTime ? dayjs(form.startTime) : undefined
@@ -216,6 +248,72 @@ async function submit() {
 async function remove(record: OaActivityPlan) {
   await deleteActivityPlan(record.id)
   fetchData()
+}
+
+async function start(record: OaActivityPlan) {
+  if (record.status !== 'PLANNED') return
+  await startActivityPlan(record.id)
+  fetchData()
+}
+
+async function done(record: OaActivityPlan) {
+  if (record.status !== 'IN_PROGRESS') return
+  await completeActivityPlan(record.id)
+  fetchData()
+}
+
+async function cancel(record: OaActivityPlan) {
+  if (record.status === 'DONE' || record.status === 'CANCELLED') return
+  await cancelActivityPlan(record.id)
+  fetchData()
+}
+
+async function batchStart() {
+  if (selectedRowKeys.value.length === 0) return
+  const affected = await batchStartActivityPlan(selectedRowKeys.value)
+  message.success(`批量开始，共处理 ${affected || 0} 条`)
+  fetchData()
+}
+
+async function batchDone() {
+  if (selectedRowKeys.value.length === 0) return
+  const affected = await batchCompleteActivityPlan(selectedRowKeys.value)
+  message.success(`批量完成，共处理 ${affected || 0} 条`)
+  fetchData()
+}
+
+async function batchCancel() {
+  if (selectedRowKeys.value.length === 0) return
+  const affected = await batchCancelActivityPlan(selectedRowKeys.value)
+  message.success(`批量取消，共处理 ${affected || 0} 条`)
+  fetchData()
+}
+
+async function batchRemove() {
+  if (selectedRowKeys.value.length === 0) return
+  const affected = await batchDeleteActivityPlan(selectedRowKeys.value)
+  message.success(`批量删除，共处理 ${affected || 0} 条`)
+  fetchData()
+}
+
+async function downloadExport() {
+  const params: any = {
+    keyword: query.keyword || undefined,
+    status: query.status
+  }
+  if (query.range) {
+    params.dateFrom = query.range[0].format('YYYY-MM-DD')
+    params.dateTo = query.range[1].format('YYYY-MM-DD')
+  }
+  const blob = await exportActivityPlan(params)
+  const href = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = href
+  link.download = `oa-activity-plan-${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(href)
 }
 
 fetchData()

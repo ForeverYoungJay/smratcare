@@ -12,7 +12,13 @@
       </template>
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange" />
+    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+      <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'avgAmount'">
+          {{ calcAvgAmount(record.totalAmount, record.targetCount) }}
+        </template>
+      </template>
+    </DataTable>
 
     <a-modal v-model:open="createOpen" title="新建月分摊" :confirm-loading="creating" @ok="submitCreate">
       <a-form layout="vertical">
@@ -62,6 +68,7 @@ const columns = [
   { title: '分摊项目', dataIndex: 'allocationName', key: 'allocationName', width: 160 },
   { title: '总金额', dataIndex: 'totalAmount', key: 'totalAmount', width: 120 },
   { title: '目标人数', dataIndex: 'targetCount', key: 'targetCount', width: 100 },
+  { title: '人均金额', key: 'avgAmount', width: 120 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 120 },
   { title: '备注', dataIndex: 'remark', key: 'remark' },
   { title: '创建时间', dataIndex: 'createTime', key: 'createTime', width: 180 }
@@ -118,6 +125,13 @@ function openCreate() {
   createOpen.value = true
 }
 
+function calcAvgAmount(totalAmount: number, targetCount: number) {
+  if (!targetCount || targetCount <= 0) {
+    return '--'
+  }
+  return (Number(totalAmount || 0) / targetCount).toFixed(2)
+}
+
 async function submitCreate() {
   if (!createForm.allocationMonth) {
     message.error('请选择月份')
@@ -125,6 +139,10 @@ async function submitCreate() {
   }
   if (!createForm.allocationName) {
     message.error('请输入分摊项目')
+    return
+  }
+  if (createForm.totalAmount > 0 && createForm.targetCount <= 0) {
+    message.error('总金额大于0时，目标人数必须大于0')
     return
   }
   if (createForm.totalAmount < 0 || createForm.targetCount < 0) {

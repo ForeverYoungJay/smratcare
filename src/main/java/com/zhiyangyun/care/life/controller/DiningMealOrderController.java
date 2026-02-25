@@ -8,12 +8,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zhiyangyun.care.audit.service.AuditLogService;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
+import com.zhiyangyun.care.life.entity.DiningDeliveryArea;
 import com.zhiyangyun.care.life.entity.DiningMealOrder;
+import com.zhiyangyun.care.life.entity.DiningPrepZone;
 import com.zhiyangyun.care.life.entity.DiningRiskInterceptLog;
 import com.zhiyangyun.care.life.entity.DiningRiskOverride;
+import com.zhiyangyun.care.life.mapper.DiningDeliveryAreaMapper;
 import com.zhiyangyun.care.life.mapper.DiningMealOrderMapper;
+import com.zhiyangyun.care.life.mapper.DiningPrepZoneMapper;
 import com.zhiyangyun.care.life.mapper.DiningRiskInterceptLogMapper;
 import com.zhiyangyun.care.life.mapper.DiningRiskOverrideMapper;
+import com.zhiyangyun.care.life.model.DiningConstants;
 import com.zhiyangyun.care.life.model.DiningMealOrderRequest;
 import com.zhiyangyun.care.life.model.DiningRiskCheckResponse;
 import com.zhiyangyun.care.life.service.DiningRiskService;
@@ -37,14 +42,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/life/dining/order")
 public class DiningMealOrderController {
-  private static final Map<String, Set<String>> STATUS_TRANSITIONS = Map.of(
-      "CREATED", Set.of("PREPARING", "CANCELLED"),
-      "PREPARING", Set.of("DELIVERING", "CANCELLED"),
-      "DELIVERING", Set.of("DELIVERED", "CANCELLED"),
-      "DELIVERED", Set.of(),
-      "CANCELLED", Set.of());
-
   private final DiningMealOrderMapper mealOrderMapper;
+  private final DiningPrepZoneMapper prepZoneMapper;
+  private final DiningDeliveryAreaMapper deliveryAreaMapper;
   private final DiningRiskService diningRiskService;
   private final DiningRiskInterceptLogMapper riskInterceptLogMapper;
   private final DiningRiskOverrideMapper riskOverrideMapper;
@@ -53,12 +53,16 @@ public class DiningMealOrderController {
 
   public DiningMealOrderController(
       DiningMealOrderMapper mealOrderMapper,
+      DiningPrepZoneMapper prepZoneMapper,
+      DiningDeliveryAreaMapper deliveryAreaMapper,
       DiningRiskService diningRiskService,
       DiningRiskInterceptLogMapper riskInterceptLogMapper,
       DiningRiskOverrideMapper riskOverrideMapper,
       AuditLogService auditLogService,
       ObjectMapper objectMapper) {
     this.mealOrderMapper = mealOrderMapper;
+    this.prepZoneMapper = prepZoneMapper;
+    this.deliveryAreaMapper = deliveryAreaMapper;
     this.diningRiskService = diningRiskService;
     this.riskInterceptLogMapper = riskInterceptLogMapper;
     this.riskOverrideMapper = riskOverrideMapper;
@@ -75,6 +79,9 @@ public class DiningMealOrderController {
       @RequestParam(required = false) String mealType,
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String keyword) {
+    if (dateFrom != null && dateTo != null && dateFrom.isAfter(dateTo)) {
+      throw new IllegalArgumentException(DiningConstants.MSG_INVALID_DATE_RANGE);
+    }
     Long orgId = AuthContext.getOrgId();
     var wrapper = Wrappers.lambdaQuery(DiningMealOrder.class)
         .eq(DiningMealOrder::getIsDeleted, 0)
@@ -129,12 +136,12 @@ public class DiningMealOrderController {
 
   @PutMapping("/{id}")
   public Result<DiningMealOrder> update(@PathVariable Long id, @Valid @RequestBody DiningMealOrderRequest request) {
-    DiningMealOrder order = mealOrderMapper.selectById(id);
-    if (order == null || order.getIsDeleted() != null && order.getIsDeleted() == 1) {
+    Long orgId = AuthContext.getOrgId();
+    DiningMealOrder order = getOrderInOrg(id, orgId);
+    if (order == null) {
       return Result.ok(null);
     }
 
-    Long orgId = AuthContext.getOrgId();
     DiningRiskCheckResponse risk = enforceRiskOrOverride(orgId, request, "ORDER_UPDATE");
     fillOrderFields(order, request, false);
     order.setElderId(risk.getElderId());
@@ -148,14 +155,14 @@ public class DiningMealOrderController {
 
   @PutMapping("/{id}/status")
   public Result<DiningMealOrder> updateStatus(@PathVariable Long id, @RequestParam String status) {
-    DiningMealOrder order = mealOrderMapper.selectById(id);
-    if (order == null || order.getIsDeleted() != null && order.getIsDeleted() == 1) {
+    Long orgId = AuthContext.getOrgId();
+    DiningMealOrder order = getOrderInOrg(id, orgId);
+    if (order == null) {
       return Result.ok(null);
     }
     assertValidStatusTransition(order.getStatus(), status);
     order.setStatus(status);
     mealOrderMapper.updateById(order);
-    Long orgId = AuthContext.getOrgId();
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "UPDATE_STATUS", "DINING_MEAL_ORDER", order.getId(), "点餐状态变更为" + status);
     return Result.ok(order);
@@ -163,7 +170,7 @@ public class DiningMealOrderController {
 
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
-    DiningMealOrder order = mealOrderMapper.selectById(id);
+    DiningMealOrder order = getOrderInOrg(id, AuthContext.getOrgId());
     if (order != null) {
       order.setIsDeleted(1);
       mealOrderMapper.updateById(order);
@@ -197,7 +204,7 @@ public class DiningMealOrderController {
     if (override == null) {
       return false;
     }
-    if (!"APPROVED".equals(override.getReviewStatus())) {
+    if (!DiningConstants.OVERRIDE_STATUS_APPROVED.equals(override.getReviewStatus())) {
       return false;
     }
     if (override.getEffectiveUntil() != null && override.getEffectiveUntil().isBefore(LocalDateTime.now())) {
@@ -223,22 +230,57 @@ public class DiningMealOrderController {
   }
 
   private void fillOrderFields(DiningMealOrder order, DiningMealOrderRequest request, boolean create) {
+    Long orgId = AuthContext.getOrgId();
     order.setOrderDate(request.getOrderDate());
     order.setMealType(request.getMealType());
     order.setDishIds(request.getDishIds());
     order.setDishNames(request.getDishNames());
     order.setTotalAmount(request.getTotalAmount());
-    order.setPrepZoneId(request.getPrepZoneId());
-    order.setPrepZoneName(request.getPrepZoneName());
-    order.setDeliveryAreaId(request.getDeliveryAreaId());
-    order.setDeliveryAreaName(request.getDeliveryAreaName());
+    applyPrepZone(order, orgId, request.getPrepZoneId(), request.getPrepZoneName());
+    applyDeliveryArea(order, orgId, request.getDeliveryAreaId(), request.getDeliveryAreaName());
     if (create) {
-      order.setStatus(request.getStatus() == null ? "CREATED" : request.getStatus());
+      order.setStatus(request.getStatus() == null ? DiningConstants.ORDER_STATUS_CREATED : request.getStatus());
     } else if (request.getStatus() != null && !request.getStatus().equals(order.getStatus())) {
       assertValidStatusTransition(order.getStatus(), request.getStatus());
       order.setStatus(request.getStatus());
     }
     order.setRemark(request.getRemark());
+  }
+
+  private void applyPrepZone(DiningMealOrder order, Long orgId, Long prepZoneId, String prepZoneName) {
+    if (prepZoneId == null) {
+      order.setPrepZoneId(null);
+      order.setPrepZoneName(normalizeText(prepZoneName));
+      return;
+    }
+    DiningPrepZone zone = prepZoneMapper.selectOne(Wrappers.lambdaQuery(DiningPrepZone.class)
+        .eq(DiningPrepZone::getId, prepZoneId)
+        .eq(DiningPrepZone::getIsDeleted, 0)
+        .eq(orgId != null, DiningPrepZone::getOrgId, orgId)
+        .last("LIMIT 1"));
+    if (zone == null) {
+      throw new IllegalArgumentException(DiningConstants.MSG_PREP_ZONE_NOT_FOUND_OR_FORBIDDEN);
+    }
+    order.setPrepZoneId(zone.getId());
+    order.setPrepZoneName(zone.getZoneName());
+  }
+
+  private void applyDeliveryArea(DiningMealOrder order, Long orgId, Long deliveryAreaId, String deliveryAreaName) {
+    if (deliveryAreaId == null) {
+      order.setDeliveryAreaId(null);
+      order.setDeliveryAreaName(normalizeText(deliveryAreaName));
+      return;
+    }
+    DiningDeliveryArea area = deliveryAreaMapper.selectOne(Wrappers.lambdaQuery(DiningDeliveryArea.class)
+        .eq(DiningDeliveryArea::getId, deliveryAreaId)
+        .eq(DiningDeliveryArea::getIsDeleted, 0)
+        .eq(orgId != null, DiningDeliveryArea::getOrgId, orgId)
+        .last("LIMIT 1"));
+    if (area == null) {
+      throw new IllegalArgumentException(DiningConstants.MSG_DELIVERY_AREA_NOT_FOUND_OR_FORBIDDEN);
+    }
+    order.setDeliveryAreaId(area.getId());
+    order.setDeliveryAreaName(area.getAreaName());
   }
 
   private void assertValidStatusTransition(String fromStatus, String toStatus) {
@@ -248,7 +290,10 @@ public class DiningMealOrderController {
     if (fromStatus == null || fromStatus.isBlank() || fromStatus.equals(toStatus)) {
       return;
     }
-    Set<String> allowed = STATUS_TRANSITIONS.get(fromStatus);
+    if (!DiningConstants.ORDER_STATUS_SET.contains(toStatus)) {
+      throw new IllegalArgumentException("非法状态值：" + toStatus);
+    }
+    Set<String> allowed = DiningConstants.ORDER_STATUS_TRANSITIONS.get(fromStatus);
     if (allowed == null || !allowed.contains(toStatus)) {
       throw new IllegalArgumentException("非法状态流转：" + fromStatus + " -> " + toStatus);
     }
@@ -267,5 +312,21 @@ public class DiningMealOrderController {
       fallback.put("message", "serialize_failed");
       return fallback.toString();
     }
+  }
+
+  private DiningMealOrder getOrderInOrg(Long id, Long orgId) {
+    return mealOrderMapper.selectOne(Wrappers.lambdaQuery(DiningMealOrder.class)
+        .eq(DiningMealOrder::getId, id)
+        .eq(DiningMealOrder::getIsDeleted, 0)
+        .eq(orgId != null, DiningMealOrder::getOrgId, orgId)
+        .last("LIMIT 1"));
+  }
+
+  private String normalizeText(String text) {
+    if (text == null) {
+      return null;
+    }
+    String trimmed = text.trim();
+    return trimmed.isEmpty() ? null : trimmed;
   }
 }

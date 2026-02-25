@@ -17,4 +17,5 @@ public class CareTaskTodayItem {
   private String status;
   private String careLevel;
   private Boolean suspiciousFlag;
+  private Boolean overdueFlag;
 }

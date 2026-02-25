@@ -8,15 +8,22 @@
             <a-select-option value="CONSUME">领用</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="商品ID">
-          <a-input-number v-model:value="query.productId" style="width: 140px" />
+        <a-form-item label="商品">
+          <a-select
+            v-model:value="query.productId"
+            :options="productOptions"
+            allow-clear
+            show-search
+            option-filter-prop="label"
+            style="width: 220px"
+          />
         </a-form-item>
         <a-form-item label="日期">
           <a-range-picker v-model:value="query.range" />
         </a-form-item>
         <a-form-item>
           <a-space>
-            <a-button type="primary" @click="fetchData">搜索</a-button>
+            <a-button type="primary" @click="handleSearch">搜索</a-button>
             <a-button @click="reset">重置</a-button>
           </a-space>
         </a-form-item>
@@ -94,14 +101,20 @@
 
     <a-modal v-model:open="outboundOpen" title="新增领用出库" @ok="submitOutbound" :confirm-loading="outboundSubmitting">
       <a-form layout="vertical" :model="outboundForm" :rules="outboundRules" ref="outboundFormRef">
-        <a-form-item label="商品ID" name="productId">
-          <a-input-number v-model:value="outboundForm.productId" style="width: 100%" />
+        <a-form-item label="商品" name="productId">
+          <a-select
+            v-model:value="outboundForm.productId"
+            :options="productOptions"
+            allow-clear
+            show-search
+            option-filter-prop="label"
+          />
         </a-form-item>
         <a-form-item label="批次ID">
           <a-input-number v-model:value="outboundForm.batchId" style="width: 100%" />
         </a-form-item>
         <a-form-item label="出库数量" name="quantity">
-          <a-input-number v-model:value="outboundForm.quantity" style="width: 100%" />
+          <a-input-number v-model:value="outboundForm.quantity" :min="1" style="width: 100%" />
         </a-form-item>
         <a-form-item label="备注">
           <a-input v-model:value="outboundForm.reason" />
@@ -112,26 +125,27 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportCsv } from '../../utils/export'
 import { getInventoryOutboundPage, createOutbound } from '../../api/inventory'
-import { getOrderDetail } from '../../api/store'
+import { getOrderDetail, getProductPage } from '../../api/store'
 import { message } from 'ant-design-vue'
-import type { InventoryLogItem, InventoryOutboundRequest, PageResult } from '../../types'
+import type { InventoryLogItem, InventoryOutboundRequest, PageResult, ProductItem } from '../../types'
 
 const loading = ref(false)
 const rows = ref<InventoryLogItem[]>([])
 const total = ref(0)
+const products = ref<ProductItem[]>([])
 const detailOpen = ref(false)
 const detail = ref<InventoryLogItem | null>(null)
 const outboundOpen = ref(false)
 const outboundSubmitting = ref(false)
 const outboundFormRef = ref()
 const outboundForm = reactive<InventoryOutboundRequest>({
-  productId: 0,
+  productId: '',
   batchId: undefined,
-  quantity: 0,
+  quantity: 1,
   reason: ''
 })
 const outboundRules = {
@@ -146,6 +160,17 @@ const query = reactive({
   pageNo: 1,
   pageSize: 10
 })
+const productOptions = computed(() =>
+  products.value.map((p) => ({
+    label: `${p.productName} (ID:${p.idStr || p.id})`,
+    value: p.id
+  }))
+)
+
+async function fetchProducts() {
+  const res: PageResult<ProductItem> = await getProductPage({ pageNo: 1, pageSize: 200 })
+  products.value = res.list
+}
 
 async function fetchData() {
   loading.value = true
@@ -169,6 +194,11 @@ function reset() {
   query.outType = undefined
   query.productId = undefined
   query.range = undefined
+  query.pageNo = 1
+  fetchData()
+}
+
+function handleSearch() {
   query.pageNo = 1
   fetchData()
 }
@@ -206,7 +236,7 @@ function openDetail(row: InventoryLogItem) {
 }
 
 function openOutbound() {
-  Object.assign(outboundForm, { productId: 0, batchId: undefined, quantity: 0, reason: '' })
+  Object.assign(outboundForm, { productId: '', batchId: undefined, quantity: 1, reason: '' })
   outboundOpen.value = true
 }
 
@@ -214,7 +244,10 @@ async function submitOutbound() {
   await outboundFormRef.value?.validate()
   outboundSubmitting.value = true
   try {
-    await createOutbound(outboundForm)
+    await createOutbound({
+      ...outboundForm,
+      productId: String(outboundForm.productId)
+    })
     message.success('出库成功')
     outboundOpen.value = false
     fetchData()
@@ -232,7 +265,10 @@ async function openOrderDetail() {
   message.success('订单详情已拉取，可在订单管理查看')
 }
 
-onMounted(fetchData)
+onMounted(() => {
+  fetchProducts()
+  fetchData()
+})
 </script>
 
 <style scoped>

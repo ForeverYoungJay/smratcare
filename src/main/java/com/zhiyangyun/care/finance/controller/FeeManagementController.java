@@ -45,9 +45,10 @@ public class FeeManagementController {
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) Long elderId,
-      @RequestParam(required = false) String status) {
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
-    return Result.ok(feeManagementService.admissionAuditPage(orgId, pageNo, pageSize, elderId, status));
+    return Result.ok(feeManagementService.admissionAuditPage(orgId, pageNo, pageSize, elderId, status, keyword));
   }
 
   @PostMapping("/admission-audit")
@@ -77,9 +78,10 @@ public class FeeManagementController {
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) Long elderId,
-      @RequestParam(required = false) String status) {
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
-    return Result.ok(feeManagementService.dischargeAuditPage(orgId, pageNo, pageSize, elderId, status));
+    return Result.ok(feeManagementService.dischargeAuditPage(orgId, pageNo, pageSize, elderId, status, keyword));
   }
 
   @PostMapping("/discharge-audit")
@@ -109,9 +111,10 @@ public class FeeManagementController {
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) Long elderId,
-      @RequestParam(required = false) String status) {
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
-    return Result.ok(feeManagementService.dischargeSettlementPage(orgId, pageNo, pageSize, elderId, status));
+    return Result.ok(feeManagementService.dischargeSettlementPage(orgId, pageNo, pageSize, elderId, status, keyword));
   }
 
   @PostMapping("/discharge-settlement")
@@ -144,9 +147,10 @@ public class FeeManagementController {
       @RequestParam(required = false) Long elderId,
       @RequestParam(required = false) String from,
       @RequestParam(required = false) String to,
-      @RequestParam(required = false) String category) {
+      @RequestParam(required = false) String category,
+      @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
-    return Result.ok(feeManagementService.consumptionPage(orgId, pageNo, pageSize, elderId, from, to, category));
+    return Result.ok(feeManagementService.consumptionPage(orgId, pageNo, pageSize, elderId, from, to, category, keyword));
   }
 
   @PostMapping("/consumption")

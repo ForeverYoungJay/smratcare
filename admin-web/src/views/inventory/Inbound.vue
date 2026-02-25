@@ -2,15 +2,22 @@
   <PageContainer title="入库管理" subTitle="新增入库单与入库记录">
     <a-card class="card-elevated" :bordered="false">
       <a-form layout="inline" :model="query" class="search-form">
-        <a-form-item label="商品ID">
-          <a-input-number v-model:value="query.productId" style="width: 140px" />
+        <a-form-item label="商品">
+          <a-select
+            v-model:value="query.productId"
+            :options="productOptions"
+            allow-clear
+            show-search
+            option-filter-prop="label"
+            style="width: 220px"
+          />
         </a-form-item>
         <a-form-item label="日期">
           <a-range-picker v-model:value="query.range" />
         </a-form-item>
         <a-form-item>
           <a-space>
-            <a-button type="primary" @click="fetchData">搜索</a-button>
+            <a-button type="primary" @click="handleSearch">搜索</a-button>
             <a-button @click="reset">重置</a-button>
           </a-space>
         </a-form-item>
@@ -64,10 +71,10 @@
           <a-input v-model:value="form.batchNo" placeholder="留空自动生成" />
         </a-form-item>
         <a-form-item label="数量" name="quantity">
-          <a-input-number v-model:value="form.quantity" style="width: 100%" />
+          <a-input-number v-model:value="form.quantity" :min="1" style="width: 100%" />
         </a-form-item>
         <a-form-item label="成本价">
-          <a-input-number v-model:value="form.costPrice" style="width: 100%" />
+          <a-input-number v-model:value="form.costPrice" :min="0" style="width: 100%" />
         </a-form-item>
         <a-form-item label="有效期">
           <a-date-picker v-model:value="form.expireDate" style="width: 100%" />
@@ -131,7 +138,7 @@ const rules = {
 const productOptions = computed(() =>
   products.value.map((p) => ({
     label: `${p.productName} (ID:${p.idStr || p.id})`,
-    value: p.idStr || String(p.id)
+    value: p.id
   }))
 )
 
@@ -160,6 +167,11 @@ async function fetchData() {
 function reset() {
   query.productId = undefined
   query.range = undefined
+  query.pageNo = 1
+  fetchData()
+}
+
+function handleSearch() {
   query.pageNo = 1
   fetchData()
 }

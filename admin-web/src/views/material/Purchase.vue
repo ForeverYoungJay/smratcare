@@ -31,13 +31,15 @@
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
-            <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
+            <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
           </template>
           <template v-if="column.key === 'actions'">
             <a-space>
               <a @click="viewDetail(record.id)">明细</a>
-              <a v-if="record.status === 'DRAFT'" @click="approve(record.id)">审核</a>
-              <a v-if="record.status === 'APPROVED'" @click="complete(record.id)">完成</a>
+              <a v-if="record.status === ORDER_STATUS.DRAFT" @click="openEdit(record.id)">编辑</a>
+              <a v-if="record.status === ORDER_STATUS.DRAFT" @click="approve(record.id)">审核</a>
+              <a v-if="record.status === ORDER_STATUS.APPROVED" @click="complete(record.id)">完成</a>
+              <a v-if="record.status === ORDER_STATUS.DRAFT || record.status === ORDER_STATUS.APPROVED" @click="cancel(record.id)">作废</a>
             </a-space>
           </template>
         </template>
@@ -55,7 +57,7 @@
 
     <a-modal
       v-model:open="editorOpen"
-      title="新建采购单"
+      :title="editingId ? '编辑采购单' : '新建采购单'"
       width="900px"
       :confirm-loading="saving"
       @ok="submit"
@@ -111,7 +113,7 @@
     <a-drawer v-model:open="detailOpen" title="采购单明细" width="680">
       <a-descriptions bordered :column="2" size="small" v-if="detail">
         <a-descriptions-item label="采购单号">{{ detail.orderNo }}</a-descriptions-item>
-        <a-descriptions-item label="状态">{{ detail.status }}</a-descriptions-item>
+        <a-descriptions-item label="状态">{{ statusLabel(detail.status) }}</a-descriptions-item>
         <a-descriptions-item label="仓库">{{ detail.warehouseName || '-' }}</a-descriptions-item>
         <a-descriptions-item label="供应商">{{ detail.supplierName || '-' }}</a-descriptions-item>
         <a-descriptions-item label="下单日期">{{ detail.orderDate || '-' }}</a-descriptions-item>
@@ -126,18 +128,27 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import { getProductPage } from '../../api/store'
 import {
+  MATERIAL_ORDER_STATUS,
+  MATERIAL_PURCHASE_STATUS_OPTIONS,
+  type MaterialOrderStatus,
+  materialOrderStatusColor,
+  materialOrderStatusLabel
+} from '../../utils/materialStatus'
+import {
   approvePurchase,
+  cancelPurchase,
   completePurchase,
   createPurchase,
   getPurchaseDetail,
   getPurchasePage,
   getSupplierPage,
-  getWarehousePage
+  getWarehousePage,
+  updatePurchase
 } from '../../api/material'
 import type {
   MaterialPurchaseOrder,
@@ -154,9 +165,10 @@ const rows = ref<MaterialPurchaseOrder[]>([])
 const total = ref(0)
 const detailOpen = ref(false)
 const detail = ref<MaterialPurchaseOrder>()
+const ORDER_STATUS = MATERIAL_ORDER_STATUS
 
 const query = reactive({
-  status: undefined as string | undefined,
+  status: undefined as MaterialOrderStatus | undefined,
   keyword: '',
   pageNo: 1,
   pageSize: 10
@@ -188,12 +200,7 @@ const itemColumns = [
   { title: '操作', key: 'actions', width: 80 }
 ]
 
-const statusOptions = [
-  { label: '草稿', value: 'DRAFT' },
-  { label: '已审核', value: 'APPROVED' },
-  { label: '已完成', value: 'COMPLETED' },
-  { label: '已作废', value: 'CANCELLED' }
-]
+const statusOptions = MATERIAL_PURCHASE_STATUS_OPTIONS
 
 const warehouses = ref<MaterialWarehouseItem[]>([])
 const suppliers = ref<MaterialSupplierItem[]>([])
@@ -206,6 +213,7 @@ const productOptions = computed(() =>
 )
 
 const editorOpen = ref(false)
+const editingId = ref<number>()
 const form = reactive({
   warehouseId: undefined as number | undefined,
   supplierId: undefined as number | undefined,
@@ -215,10 +223,11 @@ const form = reactive({
 })
 
 function statusColor(status?: string) {
-  if (status === 'DRAFT') return 'default'
-  if (status === 'APPROVED') return 'blue'
-  if (status === 'COMPLETED') return 'green'
-  return 'red'
+  return materialOrderStatusColor(status)
+}
+
+function statusLabel(status?: string) {
+  return materialOrderStatusLabel(status)
 }
 
 async function fetchData() {
@@ -234,8 +243,8 @@ async function fetchData() {
 
 async function loadOptions() {
   const [wRes, sRes, pRes] = await Promise.all([
-    getWarehousePage({ pageNo: 1, pageSize: 200 }),
-    getSupplierPage({ pageNo: 1, pageSize: 200 }),
+    getWarehousePage({ pageNo: 1, pageSize: 200, enabledOnly: true }),
+    getSupplierPage({ pageNo: 1, pageSize: 200, enabledOnly: true }),
     getProductPage({ pageNo: 1, pageSize: 500 })
   ])
   warehouses.value = wRes.list
@@ -261,7 +270,9 @@ function onPageSizeChange(_page: number, size: number) {
   fetchData()
 }
 
-function openCreate() {
+async function openCreate() {
+  await loadOptions()
+  editingId.value = undefined
   Object.assign(form, {
     warehouseId: undefined,
     supplierId: undefined,
@@ -270,6 +281,43 @@ function openCreate() {
     items: [{ _idx: Date.now(), productId: 0, quantity: 1, unitPrice: 0 }]
   })
   editorOpen.value = true
+}
+
+async function openEdit(id: number) {
+  await loadOptions()
+  const order = await getPurchaseDetail(id)
+  if (order.status !== ORDER_STATUS.DRAFT) {
+    message.warning('仅草稿采购单可编辑')
+    return
+  }
+  editingId.value = id
+  Object.assign(form, {
+    warehouseId: order.warehouseId,
+    supplierId: order.supplierId,
+    orderDate: order.orderDate ? dayjs(order.orderDate) : dayjs(),
+    remark: order.remark || '',
+    items: (order.items || []).map((it, idx) => ({
+      _idx: Date.now() + idx,
+      productId: it.productId,
+      quantity: it.quantity,
+      unitPrice: it.unitPrice || 0
+    }))
+  })
+  sanitizeDisabledSelections()
+  editorOpen.value = true
+}
+
+function sanitizeDisabledSelections() {
+  const selectedWarehouse = warehouses.value.find((it) => it.id === form.warehouseId)
+  if (form.warehouseId && !selectedWarehouse) {
+    form.warehouseId = undefined
+    message.warning('原采购单仓库不可用，已自动清空，请重新选择（原因：仓库已停用或不存在）')
+  }
+  const selectedSupplier = suppliers.value.find((it) => it.id === form.supplierId)
+  if (form.supplierId && !selectedSupplier) {
+    form.supplierId = undefined
+    message.warning('原采购单供应商不可用，已自动清空，请重新选择（原因：供应商已停用或不存在）')
+  }
 }
 
 function addItem() {
@@ -281,25 +329,56 @@ function removeItem(index: number) {
 }
 
 async function submit() {
+  if (!form.warehouseId) {
+    message.warning('请选择仓库')
+    return
+  }
+  if (!form.supplierId) {
+    message.warning('请选择供应商')
+    return
+  }
+  const selectedWarehouse = warehouses.value.find((it) => it.id === form.warehouseId)
+  if (!selectedWarehouse) {
+    message.warning('当前仓库不可用，请选择启用中的仓库（原因：仓库已停用或不存在）')
+    form.warehouseId = undefined
+    return
+  }
+  const selectedSupplier = suppliers.value.find((it) => it.id === form.supplierId)
+  if (!selectedSupplier) {
+    message.warning('当前供应商不可用，请选择启用中的供应商（原因：供应商已停用或不存在）')
+    form.supplierId = undefined
+    return
+  }
   if (!form.items.length) {
     message.warning('请至少添加一条明细')
     return
   }
-  const invalid = form.items.some((it) => !it.productId || !it.quantity || it.quantity <= 0)
+  const invalid = form.items.some((it) => !it.productId || !it.quantity || it.quantity <= 0 || it.unitPrice < 0)
   if (invalid) {
-    message.warning('请完善明细中的物资与数量')
+    message.warning('请完善明细中的物资、数量与单价')
+    return
+  }
+  const productIds = form.items.map((it) => Number(it.productId))
+  if (new Set(productIds).size !== productIds.length) {
+    message.warning('同一物资不能重复添加')
     return
   }
   saving.value = true
   try {
-    await createPurchase({
+    const payload = {
       warehouseId: form.warehouseId,
       supplierId: form.supplierId,
       orderDate: form.orderDate?.format?.('YYYY-MM-DD'),
       remark: form.remark,
       items: form.items.map((it) => ({ productId: it.productId, quantity: it.quantity, unitPrice: it.unitPrice }))
-    })
-    message.success('采购单创建成功')
+    }
+    if (editingId.value) {
+      await updatePurchase(editingId.value, payload)
+      message.success('采购单已更新')
+    } else {
+      await createPurchase(payload)
+      message.success('采购单创建成功')
+    }
     editorOpen.value = false
     fetchData()
   } finally {
@@ -313,15 +392,44 @@ async function viewDetail(id: number) {
 }
 
 async function approve(id: number) {
+  const confirmed = await confirmAction('确认审核采购单？', '审核后可执行入库流程')
+  if (!confirmed) {
+    return
+  }
   await approvePurchase(id)
   message.success('已审核')
   fetchData()
 }
 
 async function complete(id: number) {
+  const confirmed = await confirmAction('确认完成采购单？', '完成后将执行采购入库并更新库存')
+  if (!confirmed) {
+    return
+  }
   await completePurchase(id)
   message.success('已完成')
   fetchData()
+}
+
+async function cancel(id: number) {
+  const confirmed = await confirmAction('确认作废采购单？', '作废后该单据不可继续审核或完成')
+  if (!confirmed) {
+    return
+  }
+  await cancelPurchase(id)
+  message.success('已作废')
+  fetchData()
+}
+
+async function confirmAction(title: string, content: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    Modal.confirm({
+      title,
+      content,
+      onOk: () => resolve(true),
+      onCancel: () => resolve(false)
+    })
+  })
 }
 
 onMounted(async () => {

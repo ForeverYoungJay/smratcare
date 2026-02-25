@@ -14,7 +14,9 @@
         <template v-if="column.key === 'action'">
           <a-space>
             <a-button type="link" @click="openEdit(record)">编辑</a-button>
-            <a-button type="link" danger @click="remove(record)">删除</a-button>
+            <a-popconfirm title="确认删除该记录吗？" ok-text="确认" cancel-text="取消" @confirm="remove(record)">
+              <a-button type="link" danger>删除</a-button>
+            </a-popconfirm>
           </a-space>
         </template>
       </template>
@@ -109,6 +111,7 @@ function handleTableChange(pag: any) {
 function onReset() {
   query.keyword = ''
   query.pageNo = 1
+  query.pageSize = pagination.pageSize
   pagination.current = 1
   fetchData()
 }
@@ -130,7 +133,7 @@ function openEdit(record: HealthMedicationDeposit) {
   form.id = record.id
   form.elderName = record.elderName || ''
   form.drugName = record.drugName
-  form.depositDate = dayjs(record.depositDate)
+  form.depositDate = record.depositDate ? dayjs(record.depositDate) : dayjs()
   form.quantity = record.quantity
   form.unit = record.unit || ''
   form.expireDate = record.expireDate ? dayjs(record.expireDate) : undefined
@@ -169,6 +172,7 @@ async function submit() {
     } else {
       await createHealthMedicationDeposit(payload)
     }
+    message.success('保存成功')
     editOpen.value = false
     fetchData()
   } finally {
@@ -178,6 +182,7 @@ async function submit() {
 
 async function remove(record: HealthMedicationDeposit) {
   await deleteHealthMedicationDeposit(record.id)
+  message.success('删除成功')
   fetchData()
 }
 

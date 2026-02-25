@@ -32,6 +32,7 @@ import com.zhiyangyun.care.store.entity.ElderPointsAccount;
 import com.zhiyangyun.care.store.mapper.ElderPointsAccountMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -223,10 +224,29 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
   }
 
   @Override
-  public IPage<ChangeLogResponse> changeLogs(Long tenantId, long pageNo, long pageSize, Long elderId) {
+  public IPage<ChangeLogResponse> changeLogs(
+      Long tenantId,
+      long pageNo,
+      long pageSize,
+      Long elderId,
+      String changeType,
+      String reason,
+      LocalDateTime startTime,
+      LocalDateTime endTime) {
+    LocalDateTime actualStartTime = startTime;
+    LocalDateTime actualEndTime = endTime;
+    if (actualStartTime != null && actualEndTime != null && actualStartTime.isAfter(actualEndTime)) {
+      LocalDateTime temp = actualStartTime;
+      actualStartTime = actualEndTime;
+      actualEndTime = temp;
+    }
     var wrapper = Wrappers.lambdaQuery(ElderChangeLog.class)
         .eq(tenantId != null, ElderChangeLog::getTenantId, tenantId)
         .eq(elderId != null, ElderChangeLog::getElderId, elderId)
+        .eq(changeType != null && !changeType.isBlank(), ElderChangeLog::getChangeType, changeType)
+        .like(reason != null && !reason.isBlank(), ElderChangeLog::getReason, reason)
+        .ge(actualStartTime != null, ElderChangeLog::getCreateTime, actualStartTime)
+        .le(actualEndTime != null, ElderChangeLog::getCreateTime, actualEndTime)
         .orderByDesc(ElderChangeLog::getCreateTime);
     IPage<ElderChangeLog> page = changeLogMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
     List<Long> elderIds = page.getRecords().stream()
@@ -259,11 +279,20 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
 
   @Override
   public IPage<AdmissionRecordResponse> admissionPage(Long tenantId, long pageNo, long pageSize,
-      String keyword, String contractNo, Integer elderStatus) {
+      String keyword, String contractNo, Integer elderStatus, LocalDate admissionDateStart, LocalDate admissionDateEnd) {
+    LocalDate actualStartDate = admissionDateStart;
+    LocalDate actualEndDate = admissionDateEnd;
+    if (actualStartDate != null && actualEndDate != null && actualStartDate.isAfter(actualEndDate)) {
+      LocalDate temp = actualStartDate;
+      actualStartDate = actualEndDate;
+      actualEndDate = temp;
+    }
     var wrapper = Wrappers.lambdaQuery(ElderAdmission.class)
         .eq(ElderAdmission::getIsDeleted, 0)
         .eq(tenantId != null, ElderAdmission::getTenantId, tenantId)
         .like(contractNo != null && !contractNo.isBlank(), ElderAdmission::getContractNo, contractNo)
+        .ge(actualStartDate != null, ElderAdmission::getAdmissionDate, actualStartDate)
+        .le(actualEndDate != null, ElderAdmission::getAdmissionDate, actualEndDate)
         .orderByDesc(ElderAdmission::getAdmissionDate)
         .orderByDesc(ElderAdmission::getCreateTime);
 

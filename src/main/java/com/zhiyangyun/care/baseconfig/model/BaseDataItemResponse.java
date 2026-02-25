@@ -6,6 +6,7 @@ import lombok.Data;
 public class BaseDataItemResponse {
   private Long id;
   private String configGroup;
+  private String configGroupLabel;
   private String itemCode;
   private String itemName;
   private Integer status;

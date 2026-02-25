@@ -16,6 +16,7 @@ public class ElderCreateRequest {
   private Integer gender;
   private LocalDate birthDate;
   private String phone;
+  private String homeAddress;
   private LocalDate admissionDate;
   private Integer status = 1;
   private String careLevel;

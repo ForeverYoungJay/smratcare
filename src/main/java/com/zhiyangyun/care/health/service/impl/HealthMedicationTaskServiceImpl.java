@@ -87,6 +87,7 @@ public class HealthMedicationTaskServiceImpl implements HealthMedicationTaskServ
         || registration.getRegisterTime() == null) {
       return;
     }
+    clearLinkedTask(registration);
     LocalDate date = registration.getRegisterTime().toLocalDate();
     HealthMedicationTask task = taskMapper.selectOne(Wrappers.lambdaQuery(HealthMedicationTask.class)
         .eq(HealthMedicationTask::getIsDeleted, 0)
@@ -122,6 +123,15 @@ public class HealthMedicationTaskServiceImpl implements HealthMedicationTaskServ
     }
   }
 
+  @Override
+  @Transactional
+  public void unlinkTaskByRegistration(HealthMedicationRegistration registration) {
+    if (registration == null) {
+      return;
+    }
+    clearLinkedTask(registration);
+  }
+
   private List<LocalTime> resolveTimes(HealthMedicationSetting setting) {
     List<LocalTime> times = new ArrayList<>();
     if (setting.getMedicationTime() != null && !setting.getMedicationTime().isBlank()) {
@@ -149,5 +159,21 @@ public class HealthMedicationTaskServiceImpl implements HealthMedicationTaskServ
       case "PRN" -> List.of(LocalTime.of(9, 0));
       default -> List.of(LocalTime.of(9, 0));
     };
+  }
+
+  private void clearLinkedTask(HealthMedicationRegistration registration) {
+    if (registration.getId() == null || registration.getOrgId() == null) {
+      return;
+    }
+    List<HealthMedicationTask> linkedTasks = taskMapper.selectList(Wrappers.lambdaQuery(HealthMedicationTask.class)
+        .eq(HealthMedicationTask::getIsDeleted, 0)
+        .eq(HealthMedicationTask::getOrgId, registration.getOrgId())
+        .eq(HealthMedicationTask::getRegistrationId, registration.getId()));
+    for (HealthMedicationTask linkedTask : linkedTasks) {
+      linkedTask.setStatus("PENDING");
+      linkedTask.setRegistrationId(null);
+      linkedTask.setDoneTime(null);
+      taskMapper.updateById(linkedTask);
+    }
   }
 }

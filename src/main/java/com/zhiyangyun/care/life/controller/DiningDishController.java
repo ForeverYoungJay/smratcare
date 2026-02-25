@@ -7,8 +7,10 @@ import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.life.entity.DiningDish;
 import com.zhiyangyun.care.life.mapper.DiningDishMapper;
+import com.zhiyangyun.care.life.model.DiningConstants;
 import com.zhiyangyun.care.life.model.DiningDishRequest;
 import jakarta.validation.Valid;
+import java.math.BigDecimal;
 import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -66,19 +68,22 @@ public class DiningDishController {
   @PostMapping
   public Result<DiningDish> create(@Valid @RequestBody DiningDishRequest request) {
     Long orgId = AuthContext.getOrgId();
+    validateUnitPrice(request.getUnitPrice());
     DiningDish dish = new DiningDish();
     dish.setTenantId(orgId);
     dish.setOrgId(orgId);
-    dish.setDishName(request.getDishName());
-    dish.setDishCategory(request.getDishCategory());
-    dish.setMealType(request.getMealType());
+    dish.setDishName(request.getDishName().trim());
+    dish.setDishCategory(normalizeText(request.getDishCategory()));
+    dish.setMealType(normalizeText(request.getMealType()));
     dish.setUnitPrice(request.getUnitPrice());
     dish.setCalories(request.getCalories());
-    dish.setNutritionInfo(request.getNutritionInfo());
-    dish.setAllergenTags(request.getAllergenTags());
-    dish.setTagIds(request.getTagIds());
-    dish.setStatus(request.getStatus() == null ? "ENABLED" : request.getStatus());
-    dish.setRemark(request.getRemark());
+    dish.setNutritionInfo(normalizeText(request.getNutritionInfo()));
+    dish.setAllergenTags(normalizeText(request.getAllergenTags()));
+    dish.setTagIds(normalizeText(request.getTagIds()));
+    String status = request.getStatus() == null ? DiningConstants.STATUS_ENABLED : request.getStatus();
+    validateStatus(status);
+    dish.setStatus(status);
+    dish.setRemark(normalizeText(request.getRemark()));
     dish.setCreatedBy(AuthContext.getStaffId());
     dishMapper.insert(dish);
     return Result.ok(dish);
@@ -86,30 +91,35 @@ public class DiningDishController {
 
   @PutMapping("/{id}")
   public Result<DiningDish> update(@PathVariable Long id, @Valid @RequestBody DiningDishRequest request) {
-    DiningDish dish = dishMapper.selectById(id);
-    if (dish == null || dish.getIsDeleted() != null && dish.getIsDeleted() == 1) {
+    DiningDish dish = getDishInOrg(id, AuthContext.getOrgId());
+    if (dish == null) {
       return Result.ok(null);
     }
-    dish.setDishName(request.getDishName());
-    dish.setDishCategory(request.getDishCategory());
-    dish.setMealType(request.getMealType());
+    validateUnitPrice(request.getUnitPrice());
+    dish.setDishName(request.getDishName().trim());
+    dish.setDishCategory(normalizeText(request.getDishCategory()));
+    dish.setMealType(normalizeText(request.getMealType()));
     dish.setUnitPrice(request.getUnitPrice());
     dish.setCalories(request.getCalories());
-    dish.setNutritionInfo(request.getNutritionInfo());
-    dish.setAllergenTags(request.getAllergenTags());
-    dish.setTagIds(request.getTagIds());
-    dish.setStatus(request.getStatus() == null ? dish.getStatus() : request.getStatus());
-    dish.setRemark(request.getRemark());
+    dish.setNutritionInfo(normalizeText(request.getNutritionInfo()));
+    dish.setAllergenTags(normalizeText(request.getAllergenTags()));
+    dish.setTagIds(normalizeText(request.getTagIds()));
+    if (request.getStatus() != null) {
+      validateStatus(request.getStatus());
+      dish.setStatus(request.getStatus());
+    }
+    dish.setRemark(normalizeText(request.getRemark()));
     dishMapper.updateById(dish);
     return Result.ok(dish);
   }
 
   @PutMapping("/{id}/status")
   public Result<DiningDish> changeStatus(@PathVariable Long id, @RequestParam String status) {
-    DiningDish dish = dishMapper.selectById(id);
-    if (dish == null || dish.getIsDeleted() != null && dish.getIsDeleted() == 1) {
+    DiningDish dish = getDishInOrg(id, AuthContext.getOrgId());
+    if (dish == null) {
       return Result.ok(null);
     }
+    validateStatus(status);
     dish.setStatus(status);
     dishMapper.updateById(dish);
     return Result.ok(dish);
@@ -117,11 +127,39 @@ public class DiningDishController {
 
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
-    DiningDish dish = dishMapper.selectById(id);
+    DiningDish dish = getDishInOrg(id, AuthContext.getOrgId());
     if (dish != null) {
       dish.setIsDeleted(1);
       dishMapper.updateById(dish);
     }
     return Result.ok(null);
+  }
+
+  private DiningDish getDishInOrg(Long id, Long orgId) {
+    return dishMapper.selectOne(Wrappers.lambdaQuery(DiningDish.class)
+        .eq(DiningDish::getId, id)
+        .eq(DiningDish::getIsDeleted, 0)
+        .eq(orgId != null, DiningDish::getOrgId, orgId)
+        .last("LIMIT 1"));
+  }
+
+  private void validateStatus(String status) {
+    if (status == null || !DiningConstants.ENABLE_DISABLE_STATUS_SET.contains(status)) {
+      throw new IllegalArgumentException(DiningConstants.MSG_INVALID_ENABLE_STATUS);
+    }
+  }
+
+  private void validateUnitPrice(BigDecimal unitPrice) {
+    if (unitPrice == null || unitPrice.compareTo(BigDecimal.ZERO) < 0) {
+      throw new IllegalArgumentException("单价不能小于0");
+    }
+  }
+
+  private String normalizeText(String value) {
+    if (value == null) {
+      return null;
+    }
+    String trimmed = value.trim();
+    return trimmed.isEmpty() ? null : trimmed;
   }
 }

@@ -15,19 +15,22 @@ import com.zhiyangyun.care.finance.model.FeeAuditReviewRequest;
 import com.zhiyangyun.care.finance.model.MonthlyAllocationCreateRequest;
 
 public interface FeeManagementService {
-  IPage<AdmissionFeeAudit> admissionAuditPage(Long orgId, long pageNo, long pageSize, Long elderId, String status);
+  IPage<AdmissionFeeAudit> admissionAuditPage(Long orgId, long pageNo, long pageSize, Long elderId, String status,
+      String keyword);
 
   AdmissionFeeAudit createAdmissionAudit(Long orgId, Long operatorId, AdmissionFeeAuditCreateRequest request);
 
   AdmissionFeeAudit reviewAdmissionAudit(Long orgId, Long operatorId, Long id, FeeAuditReviewRequest request);
 
-  IPage<DischargeFeeAudit> dischargeAuditPage(Long orgId, long pageNo, long pageSize, Long elderId, String status);
+  IPage<DischargeFeeAudit> dischargeAuditPage(Long orgId, long pageNo, long pageSize, Long elderId, String status,
+      String keyword);
 
   DischargeFeeAudit createDischargeAudit(Long orgId, Long operatorId, DischargeFeeAuditCreateRequest request);
 
   DischargeFeeAudit reviewDischargeAudit(Long orgId, Long operatorId, Long id, FeeAuditReviewRequest request);
 
-  IPage<DischargeSettlement> dischargeSettlementPage(Long orgId, long pageNo, long pageSize, Long elderId, String status);
+  IPage<DischargeSettlement> dischargeSettlementPage(Long orgId, long pageNo, long pageSize, Long elderId,
+      String status, String keyword);
 
   DischargeSettlement createDischargeSettlement(Long orgId, Long operatorId, DischargeSettlementCreateRequest request);
 
@@ -35,7 +38,7 @@ public interface FeeManagementService {
       DischargeSettlementConfirmRequest request);
 
   IPage<ConsumptionRecord> consumptionPage(Long orgId, long pageNo, long pageSize, Long elderId,
-      String from, String to, String category);
+      String from, String to, String category, String keyword);
 
   ConsumptionRecord createConsumption(Long orgId, Long operatorId, ConsumptionRecordCreateRequest request);
 

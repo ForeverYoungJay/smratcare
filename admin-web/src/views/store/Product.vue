@@ -13,7 +13,7 @@
         </a-form-item>
         <a-form-item>
           <a-space>
-            <a-button type="primary" @click="fetchData">搜索</a-button>
+            <a-button type="primary" @click="handleSearch">搜索</a-button>
             <a-button @click="reset">重置</a-button>
           </a-space>
         </a-form-item>
@@ -93,13 +93,13 @@
           <a-input v-model:value="form.productCode" placeholder="留空自动生成" />
         </a-form-item>
         <a-form-item label="售价">
-          <a-input-number v-model:value="form.price" style="width: 100%" />
+          <a-input-number v-model:value="form.price" :min="0" style="width: 100%" />
         </a-form-item>
         <a-form-item label="积分价" name="pointsPrice" required>
-          <a-input-number v-model:value="form.pointsPrice" style="width: 100%" />
+          <a-input-number v-model:value="form.pointsPrice" :min="0" style="width: 100%" />
         </a-form-item>
         <a-form-item label="安全库存">
-          <a-input-number v-model:value="form.safetyStock" style="width: 100%" />
+          <a-input-number v-model:value="form.safetyStock" :min="0" style="width: 100%" />
         </a-form-item>
         <a-form-item label="商品标签">
           <a-select v-model:value="form.tagIds" mode="multiple" :options="tagOptions" allow-clear />
@@ -202,6 +202,11 @@ async function fetchData() {
 function reset() {
   query.keyword = ''
   query.status = undefined
+  query.pageNo = 1
+  fetchData()
+}
+
+function handleSearch() {
   query.pageNo = 1
   fetchData()
 }

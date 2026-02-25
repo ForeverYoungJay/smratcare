@@ -29,6 +29,8 @@ import com.zhiyangyun.care.store.model.material.MaterialPurchaseOrderDetailRespo
 import com.zhiyangyun.care.store.model.material.MaterialPurchaseOrderItemRequest;
 import com.zhiyangyun.care.store.model.material.MaterialPurchaseOrderItemResponse;
 import com.zhiyangyun.care.store.model.material.MaterialPurchaseOrderRequest;
+import com.zhiyangyun.care.store.model.material.MaterialEnableStatus;
+import com.zhiyangyun.care.store.model.material.MaterialOrderStatus;
 import com.zhiyangyun.care.store.model.material.MaterialStockAmountItem;
 import com.zhiyangyun.care.store.model.material.MaterialSupplierRequest;
 import com.zhiyangyun.care.store.model.material.MaterialTransferItemRequest;
@@ -42,10 +44,13 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -99,11 +104,13 @@ public class MaterialController {
   public Result<IPage<MaterialWarehouse>> warehousePage(
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
+      @RequestParam(required = false) Boolean enabledOnly,
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
     LambdaQueryWrapper<MaterialWarehouse> wrapper = Wrappers.lambdaQuery(MaterialWarehouse.class)
         .eq(MaterialWarehouse::getIsDeleted, 0)
         .eq(orgId != null, MaterialWarehouse::getOrgId, orgId)
+        .eq(Boolean.TRUE.equals(enabledOnly), MaterialWarehouse::getStatus, MaterialEnableStatus.ENABLED.code())
         .orderByDesc(MaterialWarehouse::getCreateTime);
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(MaterialWarehouse::getWarehouseName, keyword)
@@ -116,15 +123,19 @@ public class MaterialController {
   @PostMapping("/warehouse")
   public Result<MaterialWarehouse> createWarehouse(@Valid @RequestBody MaterialWarehouseRequest request) {
     Long orgId = AuthContext.getOrgId();
+    String warehouseCode = normalizeText(request.getWarehouseCode());
+    String warehouseName = normalizeText(request.getWarehouseName());
+    validateStatusFlag(request.getStatus(), "warehouse status");
+    ensureWarehouseCodeUnique(orgId, warehouseCode, null);
     MaterialWarehouse row = new MaterialWarehouse();
     row.setOrgId(orgId);
-    row.setWarehouseCode(request.getWarehouseCode());
-    row.setWarehouseName(request.getWarehouseName());
-    row.setManagerName(request.getManagerName());
-    row.setManagerPhone(request.getManagerPhone());
-    row.setAddress(request.getAddress());
-    row.setStatus(request.getStatus() == null ? 1 : request.getStatus());
-    row.setRemark(request.getRemark());
+    row.setWarehouseCode(warehouseCode);
+    row.setWarehouseName(warehouseName);
+    row.setManagerName(normalizeNullableText(request.getManagerName()));
+    row.setManagerPhone(normalizeNullableText(request.getManagerPhone()));
+    row.setAddress(normalizeNullableText(request.getAddress()));
+    row.setStatus(request.getStatus() == null ? MaterialEnableStatus.ENABLED.code() : request.getStatus());
+    row.setRemark(normalizeNullableText(request.getRemark()));
     warehouseMapper.insert(row);
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "CREATE", "MATERIAL_WAREHOUSE", row.getId(), "新增仓库");
@@ -141,13 +152,17 @@ public class MaterialController {
       throw new IllegalArgumentException("warehouse not found");
     }
     ensureSameOrg(existing.getOrgId());
-    existing.setWarehouseCode(request.getWarehouseCode());
-    existing.setWarehouseName(request.getWarehouseName());
-    existing.setManagerName(request.getManagerName());
-    existing.setManagerPhone(request.getManagerPhone());
-    existing.setAddress(request.getAddress());
-    existing.setStatus(request.getStatus() == null ? 1 : request.getStatus());
-    existing.setRemark(request.getRemark());
+    String warehouseCode = normalizeText(request.getWarehouseCode());
+    String warehouseName = normalizeText(request.getWarehouseName());
+    validateStatusFlag(request.getStatus(), "warehouse status");
+    ensureWarehouseCodeUnique(orgId, warehouseCode, id);
+    existing.setWarehouseCode(warehouseCode);
+    existing.setWarehouseName(warehouseName);
+    existing.setManagerName(normalizeNullableText(request.getManagerName()));
+    existing.setManagerPhone(normalizeNullableText(request.getManagerPhone()));
+    existing.setAddress(normalizeNullableText(request.getAddress()));
+    existing.setStatus(request.getStatus() == null ? MaterialEnableStatus.ENABLED.code() : request.getStatus());
+    existing.setRemark(normalizeNullableText(request.getRemark()));
     warehouseMapper.updateById(existing);
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "UPDATE", "MATERIAL_WAREHOUSE", id, "更新仓库");
@@ -160,6 +175,25 @@ public class MaterialController {
     MaterialWarehouse existing = warehouseMapper.selectById(id);
     if (existing != null && (existing.getIsDeleted() == null || existing.getIsDeleted() == 0)) {
       ensureSameOrg(existing.getOrgId());
+      long purchaseRefCount = purchaseOrderMapper.selectCount(
+          Wrappers.lambdaQuery(MaterialPurchaseOrder.class)
+              .eq(MaterialPurchaseOrder::getWarehouseId, id)
+              .eq(MaterialPurchaseOrder::getIsDeleted, 0)
+              .eq(existing.getOrgId() != null, MaterialPurchaseOrder::getOrgId, existing.getOrgId()));
+      long transferRefCount = transferOrderMapper.selectCount(
+          Wrappers.lambdaQuery(MaterialTransferOrder.class)
+              .eq(MaterialTransferOrder::getIsDeleted, 0)
+              .eq(existing.getOrgId() != null, MaterialTransferOrder::getOrgId, existing.getOrgId())
+              .and(w -> w.eq(MaterialTransferOrder::getFromWarehouseId, id)
+                  .or().eq(MaterialTransferOrder::getToWarehouseId, id)));
+      long batchRefCount = inventoryBatchMapper.selectCount(
+          Wrappers.lambdaQuery(InventoryBatch.class)
+              .eq(InventoryBatch::getWarehouseId, id)
+              .eq(InventoryBatch::getIsDeleted, 0)
+              .eq(existing.getOrgId() != null, InventoryBatch::getOrgId, existing.getOrgId()));
+      if (purchaseRefCount > 0 || transferRefCount > 0 || batchRefCount > 0) {
+        throw new IllegalStateException("warehouse is referenced and cannot be deleted");
+      }
       existing.setIsDeleted(1);
       warehouseMapper.updateById(existing);
     }
@@ -172,11 +206,13 @@ public class MaterialController {
   public Result<IPage<MaterialSupplier>> supplierPage(
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
+      @RequestParam(required = false) Boolean enabledOnly,
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
     LambdaQueryWrapper<MaterialSupplier> wrapper = Wrappers.lambdaQuery(MaterialSupplier.class)
         .eq(MaterialSupplier::getIsDeleted, 0)
         .eq(orgId != null, MaterialSupplier::getOrgId, orgId)
+        .eq(Boolean.TRUE.equals(enabledOnly), MaterialSupplier::getStatus, MaterialEnableStatus.ENABLED.code())
         .orderByDesc(MaterialSupplier::getCreateTime);
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(MaterialSupplier::getSupplierName, keyword)
@@ -189,15 +225,19 @@ public class MaterialController {
   @PostMapping("/supplier")
   public Result<MaterialSupplier> createSupplier(@Valid @RequestBody MaterialSupplierRequest request) {
     Long orgId = AuthContext.getOrgId();
+    String supplierCode = normalizeText(request.getSupplierCode());
+    String supplierName = normalizeText(request.getSupplierName());
+    validateStatusFlag(request.getStatus(), "supplier status");
+    ensureSupplierCodeUnique(orgId, supplierCode, null);
     MaterialSupplier row = new MaterialSupplier();
     row.setOrgId(orgId);
-    row.setSupplierCode(request.getSupplierCode());
-    row.setSupplierName(request.getSupplierName());
-    row.setContactName(request.getContactName());
-    row.setContactPhone(request.getContactPhone());
-    row.setAddress(request.getAddress());
-    row.setStatus(request.getStatus() == null ? 1 : request.getStatus());
-    row.setRemark(request.getRemark());
+    row.setSupplierCode(supplierCode);
+    row.setSupplierName(supplierName);
+    row.setContactName(normalizeNullableText(request.getContactName()));
+    row.setContactPhone(normalizeNullableText(request.getContactPhone()));
+    row.setAddress(normalizeNullableText(request.getAddress()));
+    row.setStatus(request.getStatus() == null ? MaterialEnableStatus.ENABLED.code() : request.getStatus());
+    row.setRemark(normalizeNullableText(request.getRemark()));
     supplierMapper.insert(row);
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "CREATE", "MATERIAL_SUPPLIER", row.getId(), "新增供应商");
@@ -214,13 +254,17 @@ public class MaterialController {
       throw new IllegalArgumentException("supplier not found");
     }
     ensureSameOrg(existing.getOrgId());
-    existing.setSupplierCode(request.getSupplierCode());
-    existing.setSupplierName(request.getSupplierName());
-    existing.setContactName(request.getContactName());
-    existing.setContactPhone(request.getContactPhone());
-    existing.setAddress(request.getAddress());
-    existing.setStatus(request.getStatus() == null ? 1 : request.getStatus());
-    existing.setRemark(request.getRemark());
+    String supplierCode = normalizeText(request.getSupplierCode());
+    String supplierName = normalizeText(request.getSupplierName());
+    validateStatusFlag(request.getStatus(), "supplier status");
+    ensureSupplierCodeUnique(orgId, supplierCode, id);
+    existing.setSupplierCode(supplierCode);
+    existing.setSupplierName(supplierName);
+    existing.setContactName(normalizeNullableText(request.getContactName()));
+    existing.setContactPhone(normalizeNullableText(request.getContactPhone()));
+    existing.setAddress(normalizeNullableText(request.getAddress()));
+    existing.setStatus(request.getStatus() == null ? MaterialEnableStatus.ENABLED.code() : request.getStatus());
+    existing.setRemark(normalizeNullableText(request.getRemark()));
     supplierMapper.updateById(existing);
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "UPDATE", "MATERIAL_SUPPLIER", id, "更新供应商");
@@ -233,6 +277,14 @@ public class MaterialController {
     MaterialSupplier existing = supplierMapper.selectById(id);
     if (existing != null && (existing.getIsDeleted() == null || existing.getIsDeleted() == 0)) {
       ensureSameOrg(existing.getOrgId());
+      long purchaseRefCount = purchaseOrderMapper.selectCount(
+          Wrappers.lambdaQuery(MaterialPurchaseOrder.class)
+              .eq(MaterialPurchaseOrder::getSupplierId, id)
+              .eq(MaterialPurchaseOrder::getIsDeleted, 0)
+              .eq(existing.getOrgId() != null, MaterialPurchaseOrder::getOrgId, existing.getOrgId()));
+      if (purchaseRefCount > 0) {
+        throw new IllegalStateException("supplier is referenced and cannot be deleted");
+      }
       existing.setIsDeleted(1);
       supplierMapper.updateById(existing);
     }
@@ -250,12 +302,13 @@ public class MaterialController {
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
+    MaterialOrderStatus queryStatus = MaterialOrderStatus.from(status);
     LambdaQueryWrapper<MaterialPurchaseOrder> wrapper = Wrappers.lambdaQuery(MaterialPurchaseOrder.class)
         .eq(MaterialPurchaseOrder::getIsDeleted, 0)
         .eq(orgId != null, MaterialPurchaseOrder::getOrgId, orgId)
         .eq(warehouseId != null, MaterialPurchaseOrder::getWarehouseId, warehouseId)
         .eq(supplierId != null, MaterialPurchaseOrder::getSupplierId, supplierId)
-        .eq(status != null && !status.isBlank(), MaterialPurchaseOrder::getStatus, status)
+        .eq(queryStatus != null, MaterialPurchaseOrder::getStatus, queryStatus.code())
         .orderByDesc(MaterialPurchaseOrder::getCreateTime);
     if (keyword != null && !keyword.isBlank()) {
       wrapper.like(MaterialPurchaseOrder::getOrderNo, keyword);
@@ -264,12 +317,12 @@ public class MaterialController {
     IPage<MaterialPurchaseOrderDetailResponse> resp = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
     List<Long> warehouseIds = page.getRecords().stream()
         .map(MaterialPurchaseOrder::getWarehouseId)
-        .filter(java.util.Objects::nonNull)
+        .filter(Objects::nonNull)
         .distinct()
         .toList();
     List<Long> supplierIds = page.getRecords().stream()
         .map(MaterialPurchaseOrder::getSupplierId)
-        .filter(java.util.Objects::nonNull)
+        .filter(Objects::nonNull)
         .distinct()
         .toList();
     Map<Long, String> warehouseMap = warehouseIds.isEmpty()
@@ -314,14 +367,16 @@ public class MaterialController {
   public Result<MaterialPurchaseOrderDetailResponse> createPurchase(
       @Valid @RequestBody MaterialPurchaseOrderRequest request) {
     Long orgId = AuthContext.getOrgId();
+    MaterialWarehouse warehouse = requireWarehouse(orgId, request.getWarehouseId(), true);
+    MaterialSupplier supplier = requireSupplier(orgId, request.getSupplierId(), true);
     MaterialPurchaseOrder order = new MaterialPurchaseOrder();
     order.setOrgId(orgId);
     order.setOrderNo(generateNo("PO"));
-    order.setWarehouseId(request.getWarehouseId());
-    order.setSupplierId(request.getSupplierId());
+    order.setWarehouseId(warehouse.getId());
+    order.setSupplierId(supplier.getId());
     order.setOrderDate(request.getOrderDate() == null ? LocalDate.now() : request.getOrderDate());
-    order.setStatus("DRAFT");
-    order.setRemark(request.getRemark());
+    order.setStatus(MaterialOrderStatus.DRAFT.code());
+    order.setRemark(normalizeNullableText(request.getRemark()));
     order.setTotalAmount(BigDecimal.ZERO);
     purchaseOrderMapper.insert(order);
 
@@ -345,13 +400,15 @@ public class MaterialController {
       throw new IllegalArgumentException("purchase order not found");
     }
     ensureSameOrg(order.getOrgId());
-    if (!"DRAFT".equalsIgnoreCase(order.getStatus())) {
+    if (!MaterialOrderStatus.DRAFT.code().equalsIgnoreCase(order.getStatus())) {
       throw new IllegalStateException("only draft purchase order can be updated");
     }
-    order.setWarehouseId(request.getWarehouseId());
-    order.setSupplierId(request.getSupplierId());
+    MaterialWarehouse warehouse = requireWarehouse(orgId, request.getWarehouseId(), true);
+    MaterialSupplier supplier = requireSupplier(orgId, request.getSupplierId(), true);
+    order.setWarehouseId(warehouse.getId());
+    order.setSupplierId(supplier.getId());
     order.setOrderDate(request.getOrderDate() == null ? LocalDate.now() : request.getOrderDate());
-    order.setRemark(request.getRemark());
+    order.setRemark(normalizeNullableText(request.getRemark()));
 
     purchaseOrderItemMapper.update(
         null,
@@ -376,7 +433,10 @@ public class MaterialController {
       throw new IllegalArgumentException("purchase order not found");
     }
     ensureSameOrg(order.getOrgId());
-    order.setStatus("APPROVED");
+    if (!MaterialOrderStatus.DRAFT.code().equalsIgnoreCase(order.getStatus())) {
+      throw new IllegalStateException("only draft purchase order can be approved");
+    }
+    order.setStatus(MaterialOrderStatus.APPROVED.code());
     purchaseOrderMapper.updateById(order);
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "APPROVE", "MATERIAL_PURCHASE_ORDER", id, "审核采购单");
@@ -392,17 +452,39 @@ public class MaterialController {
       throw new IllegalArgumentException("purchase order not found");
     }
     ensureSameOrg(order.getOrgId());
-    if (!"APPROVED".equalsIgnoreCase(order.getStatus())) {
+    if (!MaterialOrderStatus.APPROVED.code().equalsIgnoreCase(order.getStatus())) {
       throw new IllegalStateException("only approved purchase order can be completed");
     }
     if (order.getWarehouseId() == null) {
       throw new IllegalStateException("purchase warehouse is required for inbound execution");
     }
+    requireWarehouse(order.getOrgId(), order.getWarehouseId(), false);
     executePurchaseInbound(order);
-    order.setStatus("COMPLETED");
+    order.setStatus(MaterialOrderStatus.COMPLETED.code());
     purchaseOrderMapper.updateById(order);
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "COMPLETE", "MATERIAL_PURCHASE_ORDER", id, "采购单完成");
+    return Result.ok(null);
+  }
+
+  @PostMapping("/purchase/{id}/cancel")
+  public Result<Void> cancelPurchase(@PathVariable Long id) {
+    Long orgId = AuthContext.getOrgId();
+    MaterialPurchaseOrder order = purchaseOrderMapper.selectById(id);
+    if (order == null || order.getIsDeleted() != null && order.getIsDeleted() == 1) {
+      throw new IllegalArgumentException("purchase order not found");
+    }
+    ensureSameOrg(order.getOrgId());
+    if (MaterialOrderStatus.COMPLETED.code().equalsIgnoreCase(order.getStatus())) {
+      throw new IllegalStateException("completed purchase order cannot be cancelled");
+    }
+    if (MaterialOrderStatus.CANCELLED.code().equalsIgnoreCase(order.getStatus())) {
+      throw new IllegalStateException("purchase order is already cancelled");
+    }
+    order.setStatus(MaterialOrderStatus.CANCELLED.code());
+    purchaseOrderMapper.updateById(order);
+    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "CANCEL", "MATERIAL_PURCHASE_ORDER", id, "采购单作废");
     return Result.ok(null);
   }
 
@@ -413,10 +495,14 @@ public class MaterialController {
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
+    MaterialOrderStatus queryStatus = MaterialOrderStatus.from(status);
+    if (queryStatus == MaterialOrderStatus.APPROVED) {
+      throw new IllegalArgumentException("transfer status does not support APPROVED");
+    }
     LambdaQueryWrapper<MaterialTransferOrder> wrapper = Wrappers.lambdaQuery(MaterialTransferOrder.class)
         .eq(MaterialTransferOrder::getIsDeleted, 0)
         .eq(orgId != null, MaterialTransferOrder::getOrgId, orgId)
-        .eq(status != null && !status.isBlank(), MaterialTransferOrder::getStatus, status)
+        .eq(queryStatus != null, MaterialTransferOrder::getStatus, queryStatus.code())
         .orderByDesc(MaterialTransferOrder::getCreateTime);
     if (keyword != null && !keyword.isBlank()) {
       wrapper.like(MaterialTransferOrder::getTransferNo, keyword);
@@ -473,17 +559,56 @@ public class MaterialController {
     if (request.getFromWarehouseId().equals(request.getToWarehouseId())) {
       throw new IllegalArgumentException("from warehouse and to warehouse cannot be same");
     }
+    MaterialWarehouse fromWarehouse = requireWarehouse(orgId, request.getFromWarehouseId(), true);
+    MaterialWarehouse toWarehouse = requireWarehouse(orgId, request.getToWarehouseId(), true);
     MaterialTransferOrder order = new MaterialTransferOrder();
     order.setOrgId(orgId);
     order.setTransferNo(generateNo("TR"));
-    order.setFromWarehouseId(request.getFromWarehouseId());
-    order.setToWarehouseId(request.getToWarehouseId());
-    order.setStatus("DRAFT");
-    order.setRemark(request.getRemark());
+    order.setFromWarehouseId(fromWarehouse.getId());
+    order.setToWarehouseId(toWarehouse.getId());
+    order.setStatus(MaterialOrderStatus.DRAFT.code());
+    order.setRemark(normalizeNullableText(request.getRemark()));
     transferOrderMapper.insert(order);
     saveTransferItems(orgId, order.getId(), request.getItems());
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "CREATE", "MATERIAL_TRANSFER_ORDER", order.getId(), "新增调拨单");
+    return Result.ok(buildTransferDetail(order));
+  }
+
+  @PutMapping("/transfer/{id}")
+  @Transactional
+  public Result<MaterialTransferOrderDetailResponse> updateTransfer(
+      @PathVariable Long id,
+      @Valid @RequestBody MaterialTransferOrderRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    MaterialTransferOrder order = transferOrderMapper.selectById(id);
+    if (order == null || order.getIsDeleted() != null && order.getIsDeleted() == 1) {
+      throw new IllegalArgumentException("transfer order not found");
+    }
+    ensureSameOrg(order.getOrgId());
+    if (!MaterialOrderStatus.DRAFT.code().equalsIgnoreCase(order.getStatus())) {
+      throw new IllegalStateException("only draft transfer order can be updated");
+    }
+    if (request.getFromWarehouseId().equals(request.getToWarehouseId())) {
+      throw new IllegalArgumentException("from warehouse and to warehouse cannot be same");
+    }
+    MaterialWarehouse fromWarehouse = requireWarehouse(orgId, request.getFromWarehouseId(), true);
+    MaterialWarehouse toWarehouse = requireWarehouse(orgId, request.getToWarehouseId(), true);
+    order.setFromWarehouseId(fromWarehouse.getId());
+    order.setToWarehouseId(toWarehouse.getId());
+    order.setRemark(normalizeNullableText(request.getRemark()));
+    transferOrderMapper.updateById(order);
+
+    transferItemMapper.update(
+        null,
+        Wrappers.lambdaUpdate(MaterialTransferItem.class)
+            .set(MaterialTransferItem::getIsDeleted, 1)
+            .eq(MaterialTransferItem::getTransferId, id)
+            .eq(MaterialTransferItem::getIsDeleted, 0));
+    saveTransferItems(orgId, id, request.getItems());
+
+    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "UPDATE", "MATERIAL_TRANSFER_ORDER", id, "更新调拨单");
     return Result.ok(buildTransferDetail(order));
   }
 
@@ -496,14 +621,37 @@ public class MaterialController {
       throw new IllegalArgumentException("transfer order not found");
     }
     ensureSameOrg(order.getOrgId());
-    if (!"DRAFT".equalsIgnoreCase(order.getStatus())) {
+    if (!MaterialOrderStatus.DRAFT.code().equalsIgnoreCase(order.getStatus())) {
       throw new IllegalStateException("only draft transfer order can be completed");
     }
+    requireWarehouse(order.getOrgId(), order.getFromWarehouseId(), false);
+    requireWarehouse(order.getOrgId(), order.getToWarehouseId(), false);
     executeTransfer(order);
-    order.setStatus("COMPLETED");
+    order.setStatus(MaterialOrderStatus.COMPLETED.code());
     transferOrderMapper.updateById(order);
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "COMPLETE", "MATERIAL_TRANSFER_ORDER", id, "调拨单完成");
+    return Result.ok(null);
+  }
+
+  @PostMapping("/transfer/{id}/cancel")
+  public Result<Void> cancelTransfer(@PathVariable Long id) {
+    Long orgId = AuthContext.getOrgId();
+    MaterialTransferOrder order = transferOrderMapper.selectById(id);
+    if (order == null || order.getIsDeleted() != null && order.getIsDeleted() == 1) {
+      throw new IllegalArgumentException("transfer order not found");
+    }
+    ensureSameOrg(order.getOrgId());
+    if (MaterialOrderStatus.COMPLETED.code().equalsIgnoreCase(order.getStatus())) {
+      throw new IllegalStateException("completed transfer order cannot be cancelled");
+    }
+    if (MaterialOrderStatus.CANCELLED.code().equalsIgnoreCase(order.getStatus())) {
+      throw new IllegalStateException("transfer order is already cancelled");
+    }
+    order.setStatus(MaterialOrderStatus.CANCELLED.code());
+    transferOrderMapper.updateById(order);
+    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "CANCEL", "MATERIAL_TRANSFER_ORDER", id, "调拨单作废");
     return Result.ok(null);
   }
 
@@ -513,6 +661,7 @@ public class MaterialController {
       @RequestParam(required = false) Long warehouseId,
       @RequestParam(required = false) String category) {
     Long orgId = AuthContext.getOrgId();
+    String dim = normalizeStockDimension(dimension);
     List<InventoryBatch> batches = inventoryBatchMapper.selectList(
         Wrappers.lambdaQuery(InventoryBatch.class)
             .eq(InventoryBatch::getIsDeleted, 0)
@@ -520,7 +669,7 @@ public class MaterialController {
             .eq(orgId != null, InventoryBatch::getOrgId, orgId));
     List<Long> productIds = batches.stream()
         .map(InventoryBatch::getProductId)
-        .filter(java.util.Objects::nonNull)
+        .filter(Objects::nonNull)
         .distinct()
         .toList();
     Map<Long, Product> productMap = productIds.isEmpty()
@@ -529,15 +678,17 @@ public class MaterialController {
             .collect(Collectors.toMap(Product::getId, p -> p));
     Map<Long, MaterialWarehouse> warehouseMap = batches.stream()
         .map(InventoryBatch::getWarehouseId)
-        .filter(java.util.Objects::nonNull)
+        .filter(Objects::nonNull)
         .distinct()
-        .collect(Collectors.toMap(
-            id -> id,
-            id -> warehouseMapper.selectById(id),
-            (a, b) -> a));
+        .collect(Collectors.collectingAndThen(
+            Collectors.toList(),
+            ids -> ids.isEmpty()
+                ? Map.<Long, MaterialWarehouse>of()
+                : warehouseMapper.selectBatchIds(ids).stream()
+                    .filter(row -> row.getIsDeleted() == null || row.getIsDeleted() == 0)
+                    .collect(Collectors.toMap(MaterialWarehouse::getId, row -> row))));
 
     Map<String, MaterialStockAmountItem> resultMap = new HashMap<>();
-    String dim = dimension == null ? "PRODUCT" : dimension.toUpperCase();
     for (InventoryBatch batch : batches) {
       Product product = productMap.get(batch.getProductId());
       if (category != null && !category.isBlank()) {
@@ -631,6 +782,7 @@ public class MaterialController {
   }
 
   private BigDecimal savePurchaseItems(Long orgId, Long orderId, List<MaterialPurchaseOrderItemRequest> items) {
+    ensureNoDuplicateProduct(items.stream().map(MaterialPurchaseOrderItemRequest::getProductId).toList(), "purchase");
     List<Long> productIds = items.stream()
         .map(MaterialPurchaseOrderItemRequest::getProductId)
         .distinct()
@@ -647,6 +799,9 @@ public class MaterialController {
         throw new IllegalArgumentException("purchase quantity must be positive");
       }
       BigDecimal unitPrice = req.getUnitPrice() == null ? BigDecimal.ZERO : req.getUnitPrice();
+      if (unitPrice.compareTo(BigDecimal.ZERO) < 0) {
+        throw new IllegalArgumentException("unit price must not be negative");
+      }
       BigDecimal amount = unitPrice.multiply(BigDecimal.valueOf(qty));
       totalAmount = totalAmount.add(amount);
 
@@ -654,7 +809,7 @@ public class MaterialController {
       row.setOrgId(orgId);
       row.setOrderId(orderId);
       row.setProductId(req.getProductId());
-      Product product = productMap.get(req.getProductId());
+      Product product = requireProduct(orgId, productMap.get(req.getProductId()));
       row.setProductNameSnapshot(product == null ? null : product.getProductName());
       row.setQuantity(qty);
       row.setUnitPrice(unitPrice);
@@ -696,6 +851,7 @@ public class MaterialController {
   }
 
   private void saveTransferItems(Long orgId, Long orderId, List<MaterialTransferItemRequest> items) {
+    ensureNoDuplicateProduct(items.stream().map(MaterialTransferItemRequest::getProductId).toList(), "transfer");
     List<Long> productIds = items.stream()
         .map(MaterialTransferItemRequest::getProductId)
         .distinct()
@@ -714,7 +870,7 @@ public class MaterialController {
       row.setOrgId(orgId);
       row.setTransferId(orderId);
       row.setProductId(req.getProductId());
-      Product product = productMap.get(req.getProductId());
+      Product product = requireProduct(orgId, productMap.get(req.getProductId()));
       row.setProductNameSnapshot(product == null ? null : product.getProductName());
       row.setQuantity(qty);
       transferItemMapper.insert(row);
@@ -874,10 +1030,120 @@ public class MaterialController {
     }
   }
 
+  private void ensureWarehouseCodeUnique(Long orgId, String warehouseCode, Long excludeId) {
+    LambdaQueryWrapper<MaterialWarehouse> wrapper = Wrappers.lambdaQuery(MaterialWarehouse.class)
+        .eq(MaterialWarehouse::getWarehouseCode, warehouseCode)
+        .eq(MaterialWarehouse::getIsDeleted, 0)
+        .eq(orgId != null, MaterialWarehouse::getOrgId, orgId)
+        .ne(excludeId != null, MaterialWarehouse::getId, excludeId);
+    long count = warehouseMapper.selectCount(wrapper);
+    if (count > 0) {
+      throw new IllegalArgumentException("warehouse code already exists");
+    }
+  }
+
+  private void ensureSupplierCodeUnique(Long orgId, String supplierCode, Long excludeId) {
+    LambdaQueryWrapper<MaterialSupplier> wrapper = Wrappers.lambdaQuery(MaterialSupplier.class)
+        .eq(MaterialSupplier::getSupplierCode, supplierCode)
+        .eq(MaterialSupplier::getIsDeleted, 0)
+        .eq(orgId != null, MaterialSupplier::getOrgId, orgId)
+        .ne(excludeId != null, MaterialSupplier::getId, excludeId);
+    long count = supplierMapper.selectCount(wrapper);
+    if (count > 0) {
+      throw new IllegalArgumentException("supplier code already exists");
+    }
+  }
+
+  private MaterialWarehouse requireWarehouse(Long orgId, Long warehouseId, boolean mustEnabled) {
+    if (warehouseId == null) {
+      throw new IllegalArgumentException("warehouse is required");
+    }
+    MaterialWarehouse warehouse = warehouseMapper.selectById(warehouseId);
+    if (warehouse == null || warehouse.getIsDeleted() != null && warehouse.getIsDeleted() == 1) {
+      throw new IllegalArgumentException("warehouse not found");
+    }
+    if (orgId != null && warehouse.getOrgId() != null && !orgId.equals(warehouse.getOrgId())) {
+      throw new IllegalStateException("warehouse org mismatch");
+    }
+    if (mustEnabled && Integer.valueOf(MaterialEnableStatus.DISABLED.code()).equals(warehouse.getStatus())) {
+      throw new IllegalStateException("warehouse is disabled");
+    }
+    return warehouse;
+  }
+
+  private MaterialSupplier requireSupplier(Long orgId, Long supplierId, boolean mustEnabled) {
+    if (supplierId == null) {
+      throw new IllegalArgumentException("supplier is required");
+    }
+    MaterialSupplier supplier = supplierMapper.selectById(supplierId);
+    if (supplier == null || supplier.getIsDeleted() != null && supplier.getIsDeleted() == 1) {
+      throw new IllegalArgumentException("supplier not found");
+    }
+    if (orgId != null && supplier.getOrgId() != null && !orgId.equals(supplier.getOrgId())) {
+      throw new IllegalStateException("supplier org mismatch");
+    }
+    if (mustEnabled && Integer.valueOf(MaterialEnableStatus.DISABLED.code()).equals(supplier.getStatus())) {
+      throw new IllegalStateException("supplier is disabled");
+    }
+    return supplier;
+  }
+
+  private Product requireProduct(Long orgId, Product product) {
+    if (product == null || product.getIsDeleted() != null && product.getIsDeleted() == 1) {
+      throw new IllegalArgumentException("product not found");
+    }
+    if (orgId != null && product.getOrgId() != null && !orgId.equals(product.getOrgId())) {
+      throw new IllegalStateException("product org mismatch");
+    }
+    if (Integer.valueOf(MaterialEnableStatus.DISABLED.code()).equals(product.getStatus())) {
+      throw new IllegalStateException("product is disabled");
+    }
+    return product;
+  }
+
+  private void ensureNoDuplicateProduct(List<Long> productIds, String bizName) {
+    Set<Long> unique = new HashSet<>();
+    for (Long productId : productIds) {
+      if (!unique.add(productId)) {
+        throw new IllegalArgumentException(bizName + " items contain duplicate product");
+      }
+    }
+  }
+
+  private void validateStatusFlag(Integer status, String fieldName) {
+    if (status == null) {
+      return;
+    }
+    MaterialEnableStatus.from(status);
+  }
+
+  private String normalizeText(String value) {
+    if (value == null) {
+      return null;
+    }
+    return value.trim();
+  }
+
+  private String normalizeNullableText(String value) {
+    if (value == null) {
+      return null;
+    }
+    String normalized = value.trim();
+    return normalized.isEmpty() ? null : normalized;
+  }
+
   private String generateNo(String prefix) {
     String date = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
-    int rand = new Random().nextInt(9000) + 1000;
+    int rand = ThreadLocalRandom.current().nextInt(1000, 10000);
     return prefix + date + rand;
+  }
+
+  private String normalizeStockDimension(String dimension) {
+    String dim = dimension == null ? "PRODUCT" : dimension.trim().toUpperCase();
+    if (!"PRODUCT".equals(dim) && !"WAREHOUSE".equals(dim) && !"CATEGORY".equals(dim)) {
+      throw new IllegalArgumentException("dimension must be PRODUCT, WAREHOUSE or CATEGORY");
+    }
+    return dim;
   }
 
   private void ensureSameOrg(Long dataOrgId) {

@@ -2,23 +2,30 @@
   <PageContainer title="试住登记" subTitle="试住周期与意向跟进">
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
-        <a-form-item label="老人">
-          <a-select v-model:value="query.elderId" allow-clear style="width: 180px">
+        <a-form-item label="老人姓名">
+          <a-select v-model:value="query.elderId" allow-clear style="width: 180px" placeholder="请选择老人姓名">
             <a-select-option v-for="item in elders" :key="item.id" :value="item.id">{{ item.fullName }}</a-select-option>
           </a-select>
         </a-form-item>
+        <a-form-item label="关键词">
+          <a-input v-model:value="query.keyword" allow-clear placeholder="请输入老人姓名/护理等级/来源渠道" style="width: 260px" />
+        </a-form-item>
         <a-form-item label="状态">
-          <a-select v-model:value="query.status" allow-clear style="width: 180px">
+          <a-select v-model:value="query.status" allow-clear style="width: 180px" placeholder="请选择状态">
             <a-select-option value="REGISTERED">已登记</a-select-option>
             <a-select-option value="FINISHED">已结束</a-select-option>
             <a-select-option value="CONVERTED">已转签约</a-select-option>
             <a-select-option value="CANCELLED">已取消</a-select-option>
           </a-select>
         </a-form-item>
+        <a-form-item label="试住开始日期">
+          <a-range-picker v-model:value="query.trialStartDateRange" value-format="YYYY-MM-DD" />
+        </a-form-item>
         <a-form-item>
           <a-space>
-            <a-button type="primary" @click="fetchData">查询</a-button>
-            <a-button @click="reset">重置</a-button>
+            <a-button type="primary" @click="fetchData">搜索</a-button>
+            <a-button @click="reset">清空</a-button>
+            <a-button @click="exportRows">导出</a-button>
             <a-button type="primary" ghost @click="openCreate">新增试住</a-button>
           </a-space>
         </a-form-item>
@@ -29,7 +36,7 @@
       <a-table :data-source="rows" :columns="columns" :loading="loading" :pagination="false" row-key="id">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
-            <a-tag>{{ record.status || '-' }}</a-tag>
+            <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
           </template>
           <template v-else-if="column.key === 'action'">
             <a-button type="link" @click="openEdit(record)">编辑</a-button>
@@ -103,8 +110,8 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { getBaseConfigItemList } from '../../api/baseConfig'
 import { getElderPage } from '../../api/elder'
-import { createTrialStay, getTrialStayPage, updateTrialStay } from '../../api/elderResidence'
-import type { BaseConfigItem, ElderItem, PageResult, TrialStayItem, TrialStayRequest } from '../../types'
+import { createTrialStay, exportTrialStay, getTrialStayPage, updateTrialStay } from '../../api/elderResidence'
+import type { BaseConfigItem, ElderItem, PageResult, TrialStayItem, TrialStayRequest, TrialStayStatus } from '../../types'
 
 const loading = ref(false)
 const rows = ref<TrialStayItem[]>([])
@@ -119,7 +126,9 @@ const trialPackageOptions = ref<{ label: string; value: string }[]>([])
 
 const query = reactive({
   elderId: undefined as number | undefined,
-  status: undefined as string | undefined,
+  keyword: undefined as string | undefined,
+  status: undefined as TrialStayStatus | undefined,
+  trialStartDateRange: undefined as [string, string] | undefined,
   pageNo: 1,
   pageSize: 10
 })
@@ -143,9 +152,9 @@ const rules: FormRules = {
 }
 
 const columns = [
-  { title: '老人', dataIndex: 'elderName', key: 'elderName', width: 120 },
-  { title: '开始日期', dataIndex: 'trialStartDate', key: 'trialStartDate', width: 120 },
-  { title: '结束日期', dataIndex: 'trialEndDate', key: 'trialEndDate', width: 120 },
+  { title: '老人姓名', dataIndex: 'elderName', key: 'elderName', width: 120 },
+  { title: '试住开始日期', dataIndex: 'trialStartDate', key: 'trialStartDate', width: 120 },
+  { title: '试住结束日期', dataIndex: 'trialEndDate', key: 'trialEndDate', width: 120 },
   { title: '来源渠道', dataIndex: 'channel', key: 'channel', width: 140 },
   { title: '试住套餐', dataIndex: 'trialPackage', key: 'trialPackage', width: 140 },
   { title: '意向等级', dataIndex: 'intentLevel', key: 'intentLevel', width: 100 },
@@ -154,6 +163,33 @@ const columns = [
   { title: '备注', dataIndex: 'remark', key: 'remark' },
   { title: '操作', key: 'action', width: 100 }
 ]
+
+function statusText(status?: string) {
+  if (status === 'REGISTERED') return '已登记'
+  if (status === 'FINISHED') return '已结束'
+  if (status === 'CONVERTED') return '已转签约'
+  if (status === 'CANCELLED') return '已取消'
+  return '-'
+}
+
+function statusColor(status?: string) {
+  if (status === 'REGISTERED') return 'blue'
+  if (status === 'FINISHED') return 'default'
+  if (status === 'CONVERTED') return 'green'
+  if (status === 'CANCELLED') return 'red'
+  return 'default'
+}
+
+async function exportRows() {
+  const [trialStartDateFrom, trialStartDateTo] = query.trialStartDateRange || []
+  await exportTrialStay({
+    elderId: query.elderId,
+    keyword: query.keyword,
+    status: query.status,
+    trialStartDateFrom,
+    trialStartDateTo
+  })
+}
 
 async function loadElders() {
   const res: PageResult<ElderItem> = await getElderPage({ pageNo: 1, pageSize: 200 })
@@ -172,7 +208,16 @@ async function loadDictOptions() {
 async function fetchData() {
   loading.value = true
   try {
-    const res: PageResult<TrialStayItem> = await getTrialStayPage(query)
+    const [trialStartDateFrom, trialStartDateTo] = query.trialStartDateRange || []
+    const res: PageResult<TrialStayItem> = await getTrialStayPage({
+      pageNo: query.pageNo,
+      pageSize: query.pageSize,
+      elderId: query.elderId,
+      keyword: query.keyword,
+      status: query.status,
+      trialStartDateFrom,
+      trialStartDateTo
+    })
     rows.value = res.list
     total.value = res.total
   } finally {
@@ -182,7 +227,9 @@ async function fetchData() {
 
 function reset() {
   query.elderId = undefined
+  query.keyword = undefined
   query.status = undefined
+  query.trialStartDateRange = undefined
   query.pageNo = 1
   fetchData()
 }

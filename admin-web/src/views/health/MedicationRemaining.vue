@@ -61,6 +61,7 @@ function handleTableChange(pag: any) {
 function onReset() {
   query.keyword = ''
   query.pageNo = 1
+  query.pageSize = pagination.pageSize
   pagination.current = 1
   fetchData()
 }

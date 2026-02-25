@@ -4,6 +4,8 @@
       :columns="columns"
       :data-source="dataSource"
       :row-key="rowKey"
+      :row-class-name="rowClassName"
+      :row-selection="rowSelection"
       :loading="loading"
       :pagination="pagination"
       :scroll="scroll"
@@ -28,6 +30,8 @@ defineProps<{
   columns: any[]
   dataSource: any[]
   rowKey: string
+  rowClassName?: (record: any, index: number) => string
+  rowSelection?: any
   loading?: boolean
   pagination?: TablePaginationConfig
   scroll?: any

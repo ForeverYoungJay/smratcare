@@ -5,6 +5,7 @@ import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.life.entity.DiningMealOrder;
 import com.zhiyangyun.care.life.mapper.DiningMealOrderMapper;
+import com.zhiyangyun.care.life.model.DiningConstants;
 import com.zhiyangyun.care.life.model.DiningStatsMealTypeItem;
 import com.zhiyangyun.care.life.model.DiningStatsSummaryResponse;
 import java.math.BigDecimal;
@@ -51,10 +52,10 @@ public class DiningStatsController {
       if (order.getTotalAmount() != null) {
         totalAmount = totalAmount.add(order.getTotalAmount());
       }
-      if ("DELIVERED".equals(order.getStatus())) {
+      if (DiningConstants.ORDER_STATUS_DELIVERED.equals(order.getStatus())) {
         deliveredOrders++;
       }
-      String mealType = order.getMealType() == null ? "UNKNOWN" : order.getMealType();
+      String mealType = order.getMealType() == null ? DiningConstants.MEAL_TYPE_UNKNOWN : order.getMealType();
       mealTypeCounter.put(mealType, mealTypeCounter.getOrDefault(mealType, 0L) + 1L);
     }
 

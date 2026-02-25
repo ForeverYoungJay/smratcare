@@ -7,6 +7,9 @@
       <a-form-item label="餐次">
         <a-select v-model:value="query.mealType" :options="mealOptions" allow-clear style="width: 160px" />
       </a-form-item>
+      <a-form-item label="状态">
+        <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 140px" />
+      </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openCreate">新增菜品</a-button>
       </template>
@@ -21,15 +24,18 @@
       @change="handleTableChange"
     >
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'status'">
-          <a-tag :color="record.status === 'ENABLED' ? 'green' : 'default'">
-            {{ record.status === 'ENABLED' ? '启用' : '停用' }}
+        <template v-if="column.key === 'mealType'">
+          {{ mealTypeLabel(record.mealType) }}
+        </template>
+        <template v-else-if="column.key === 'status'">
+          <a-tag :color="record.status === DINING_STATUS.enabled ? 'green' : 'default'">
+            {{ getDiningEnableStatusLabel(record.status) }}
           </a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
             <a-button type="link" @click="openEdit(record)">编辑</a-button>
-            <a-button type="link" @click="toggleStatus(record)">{{ record.status === 'ENABLED' ? '停用' : '启用' }}</a-button>
+            <a-button type="link" @click="toggleStatus(record)">{{ record.status === DINING_STATUS.enabled ? '停用' : '启用' }}</a-button>
             <a-button type="link" danger @click="remove(record)">删除</a-button>
           </a-space>
         </template>
@@ -46,6 +52,9 @@
         </a-form-item>
         <a-form-item label="餐次">
           <a-select v-model:value="form.mealType" :options="mealOptions" />
+        </a-form-item>
+        <a-form-item label="状态">
+          <a-select v-model:value="form.status" :options="statusOptions" />
         </a-form-item>
         <a-form-item label="单价(元)" required>
           <a-input-number v-model:value="form.unitPrice" :min="0" :precision="2" style="width: 100%" />
@@ -81,6 +90,14 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import {
+  DINING_ENABLE_STATUS_OPTIONS,
+  DINING_MEAL_TYPE_OPTIONS,
+  DINING_MESSAGES,
+  DINING_STATUS,
+  getDiningEnableStatusLabel,
+  getDiningMealTypeLabel
+} from '../../constants/dining'
 import { getProductTagList } from '../../api/store'
 import {
   getDiningDishPage,
@@ -91,17 +108,19 @@ import {
 } from '../../api/dining'
 import type { DiningDish, PageResult } from '../../types'
 
-const mealOptions = [
-  { label: '早餐', value: 'BREAKFAST' },
-  { label: '午餐', value: 'LUNCH' },
-  { label: '晚餐', value: 'DINNER' },
-  { label: '加餐', value: 'SNACK' }
-]
+const mealOptions = DINING_MEAL_TYPE_OPTIONS
+const statusOptions = DINING_ENABLE_STATUS_OPTIONS
 
 const loading = ref(false)
 const rows = ref<DiningDish[]>([])
 const tagOptions = ref<{ label: string; value: string }[]>([])
-const query = reactive({ keyword: '', mealType: undefined as string | undefined, pageNo: 1, pageSize: 10 })
+const query = reactive({
+  keyword: '',
+  mealType: undefined as string | undefined,
+  status: undefined as string | undefined,
+  pageNo: 1,
+  pageSize: 10
+})
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const editOpen = ref(false)
 const saving = ref(false)
@@ -115,6 +134,7 @@ const form = reactive({
   allergenTags: '',
   tagIds: [] as string[],
   nutritionInfo: '',
+  status: DINING_STATUS.enabled,
   remark: ''
 })
 
@@ -139,6 +159,8 @@ async function fetchData() {
   }
 }
 
+const mealTypeLabel = getDiningMealTypeLabel
+
 function handleTableChange(pag: any) {
   query.pageNo = pag.current
   query.pageSize = pag.pageSize
@@ -150,6 +172,7 @@ function handleTableChange(pag: any) {
 function onReset() {
   query.keyword = ''
   query.mealType = undefined
+  query.status = undefined
   query.pageNo = 1
   pagination.current = 1
   fetchData()
@@ -165,6 +188,7 @@ function openCreate() {
   form.allergenTags = ''
   form.tagIds = []
   form.nutritionInfo = ''
+  form.status = DINING_STATUS.enabled
   form.remark = ''
   editOpen.value = true
 }
@@ -182,27 +206,33 @@ function openEdit(record: DiningDish) {
     .map((item) => item.trim())
     .filter((item) => !!item)
   form.nutritionInfo = record.nutritionInfo || ''
+  form.status = record.status || DINING_STATUS.enabled
   form.remark = record.remark || ''
   editOpen.value = true
 }
 
 async function submit() {
-  if (!form.dishName) {
-    message.error('请输入菜品名称')
+  if (!form.dishName.trim()) {
+    message.error(DINING_MESSAGES.requiredDishName)
+    return
+  }
+  if (form.unitPrice < 0) {
+    message.error(DINING_MESSAGES.invalidDishPrice)
     return
   }
   saving.value = true
   try {
     const payload = {
-      dishName: form.dishName,
-      dishCategory: form.dishCategory,
+      dishName: form.dishName.trim(),
+      dishCategory: form.dishCategory.trim() || undefined,
       mealType: form.mealType,
       unitPrice: form.unitPrice,
       calories: form.calories,
-      allergenTags: form.allergenTags,
+      allergenTags: form.allergenTags.trim() || undefined,
       tagIds: form.tagIds.join(','),
-      nutritionInfo: form.nutritionInfo,
-      remark: form.remark
+      nutritionInfo: form.nutritionInfo.trim() || undefined,
+      status: form.status,
+      remark: form.remark.trim() || undefined
     }
     if (form.id) {
       await updateDiningDish(form.id, payload)
@@ -217,7 +247,7 @@ async function submit() {
 }
 
 async function toggleStatus(record: DiningDish) {
-  await updateDiningDishStatus(record.id, record.status === 'ENABLED' ? 'DISABLED' : 'ENABLED')
+  await updateDiningDishStatus(record.id, record.status === DINING_STATUS.enabled ? DINING_STATUS.disabled : DINING_STATUS.enabled)
   fetchData()
 }
 

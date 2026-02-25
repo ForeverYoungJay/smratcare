@@ -1,26 +1,31 @@
+export type DiningMealType = 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACK' | 'UNKNOWN'
+export type DiningEnableStatus = 'ENABLED' | 'DISABLED'
+export type DiningOrderStatus = 'CREATED' | 'PREPARING' | 'DELIVERING' | 'DELIVERED' | 'CANCELLED'
+export type DiningDeliveryStatus = 'PENDING' | 'DELIVERED' | 'FAILED'
+
 export interface DiningDish {
   id: number
   dishName: string
   dishCategory?: string
-  mealType?: string
+  mealType?: DiningMealType
   unitPrice: number
   calories?: number
   nutritionInfo?: string
   allergenTags?: string
   tagIds?: string
-  status?: string
+  status?: DiningEnableStatus
   remark?: string
 }
 
 export interface DiningRecipe {
   id: number
   recipeName: string
-  mealType?: string
+  mealType?: DiningMealType
   dishIds?: string
   dishNames: string
   planDate?: string
   suitableCrowd?: string
-  status?: string
+  status?: DiningEnableStatus
   remark?: string
 }
 
@@ -31,7 +36,7 @@ export interface DiningPrepZone {
   kitchenArea?: string
   capacity?: number
   managerName?: string
-  status?: string
+  status?: DiningEnableStatus
   remark?: string
 }
 
@@ -43,7 +48,7 @@ export interface DiningDeliveryArea {
   floorNo?: string
   roomScope?: string
   managerName?: string
-  status?: string
+  status?: DiningEnableStatus
   remark?: string
 }
 
@@ -53,7 +58,7 @@ export interface DiningMealOrder {
   elderId?: number
   elderName?: string
   orderDate: string
-  mealType: string
+  mealType: DiningMealType
   dishIds?: string
   dishNames: string
   totalAmount: number
@@ -62,7 +67,7 @@ export interface DiningMealOrder {
   deliveryAreaId?: number
   deliveryAreaName?: string
   overrideId?: number
-  status?: string
+  status?: DiningOrderStatus
   remark?: string
 }
 
@@ -75,12 +80,12 @@ export interface DiningDeliveryRecord {
   deliveredBy?: number
   deliveredByName?: string
   deliveredAt?: string
-  status?: string
+  status?: DiningDeliveryStatus
   remark?: string
 }
 
 export interface DiningStatsMealTypeItem {
-  mealType: string
+  mealType: DiningMealType
   orderCount: number
 }
 

@@ -1,15 +1,15 @@
 <template>
-  <PageContainer title="房态图" subTitle="床位状态一览">
+  <PageContainer title="床位全景" subTitle="床位状态一览">
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item label="床位号">
-          <a-input v-model:value="query.bedNo" placeholder="床位号" allow-clear />
+          <a-input v-model:value="query.bedNo" placeholder="请输入床位号" allow-clear />
         </a-form-item>
         <a-form-item label="房间号">
-          <a-input v-model:value="query.roomNo" placeholder="房间号" allow-clear />
+          <a-input v-model:value="query.roomNo" placeholder="请输入房间号" allow-clear />
         </a-form-item>
         <a-form-item label="老人">
-          <a-input v-model:value="query.elderName" placeholder="姓名" allow-clear />
+          <a-input v-model:value="query.elderName" placeholder="请输入老人姓名" allow-clear />
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="query.status" allow-clear style="width: 120px">
@@ -33,11 +33,41 @@
         </a-form-item>
         <a-form-item>
           <a-space>
-            <a-button type="primary" @click="applySearch">查询</a-button>
-            <a-button @click="reset">重置</a-button>
+            <a-button type="primary" @click="applySearch">搜索</a-button>
+            <a-button @click="reset">清空</a-button>
           </a-space>
         </a-form-item>
       </a-form>
+
+      <a-row :gutter="[16, 16]" class="overview-cards">
+        <a-col :xs="24" :sm="12" :md="8" :lg="4">
+          <a-card size="small">
+            <a-statistic title="已满员房间（间）" :value="fullRoomsCount" />
+          </a-card>
+        </a-col>
+        <a-col :xs="24" :sm="12" :md="8" :lg="5">
+          <a-card size="small">
+            <a-statistic title="空房（间）" :value="emptyRoomsCount" />
+            <div class="overview-sub">空床 {{ emptyRoomBedsCount }} 张</div>
+          </a-card>
+        </a-col>
+        <a-col :xs="24" :sm="12" :md="8" :lg="5">
+          <a-card size="small">
+            <a-statistic title="未满员房间（间）" :value="partialRoomsCount" />
+            <div class="overview-sub">可用床 {{ partialRoomAvailableBedsCount }} 张</div>
+          </a-card>
+        </a-col>
+        <a-col :xs="24" :sm="12" :md="8" :lg="5">
+          <a-card size="small">
+            <a-statistic title="已入住/占用床位（张）" :value="occupiedBedsCount" />
+          </a-card>
+        </a-col>
+        <a-col :xs="24" :sm="12" :md="8" :lg="5">
+          <a-card size="small">
+            <a-statistic title="空闲床位（张）" :value="idleBedsCount" />
+          </a-card>
+        </a-col>
+      </a-row>
 
       <a-row :gutter="16">
         <a-col v-for="bed in pagedBeds" :key="bed.id" :xs="24" :sm="12" :md="8" :lg="6">
@@ -119,6 +149,59 @@ const filteredBeds = computed(() => {
   })
 })
 
+const roomBuckets = computed(() => {
+  const map = new Map<string, BedItem[]>()
+  beds.value.forEach((bed) => {
+    const roomKey = bed.roomNo || String(bed.roomId || '')
+    const bucket = map.get(roomKey) || []
+    bucket.push(bed)
+    map.set(roomKey, bucket)
+  })
+  return Array.from(map.values())
+})
+
+function isOccupiedBed(bed: BedItem) {
+  return Boolean(bed.elderId) || bed.status === 2
+}
+
+function isIdleBed(bed: BedItem) {
+  return !isOccupiedBed(bed) && (bed.status === 1 || bed.status === undefined)
+}
+
+const fullRoomsCount = computed(() =>
+  roomBuckets.value.filter((roomBeds) => roomBeds.length > 0 && roomBeds.every((bed) => isOccupiedBed(bed))).length
+)
+
+const emptyRoomsCount = computed(() =>
+  roomBuckets.value.filter((roomBeds) => roomBeds.length > 0 && roomBeds.every((bed) => !isOccupiedBed(bed))).length
+)
+
+const emptyRoomBedsCount = computed(() =>
+  roomBuckets.value
+    .filter((roomBeds) => roomBeds.length > 0 && roomBeds.every((bed) => !isOccupiedBed(bed)))
+    .reduce((sum, roomBeds) => sum + roomBeds.length, 0)
+)
+
+const partialRoomsCount = computed(() =>
+  roomBuckets.value.filter((roomBeds) => {
+    const occupied = roomBeds.filter((bed) => isOccupiedBed(bed)).length
+    return occupied > 0 && occupied < roomBeds.length
+  }).length
+)
+
+const partialRoomAvailableBedsCount = computed(() =>
+  roomBuckets.value.reduce((sum, roomBeds) => {
+    const occupied = roomBeds.filter((bed) => isOccupiedBed(bed)).length
+    if (occupied > 0 && occupied < roomBeds.length) {
+      return sum + roomBeds.filter((bed) => isIdleBed(bed)).length
+    }
+    return sum
+  }, 0)
+)
+
+const occupiedBedsCount = computed(() => beds.value.filter((bed) => isOccupiedBed(bed)).length)
+const idleBedsCount = computed(() => beds.value.filter((bed) => isIdleBed(bed)).length)
+
 const pagedBeds = computed(() => {
   const start = (query.pageNo - 1) * query.pageSize
   return filteredBeds.value.slice(start, start + query.pageSize)
@@ -194,6 +277,14 @@ onMounted(load)
 <style scoped>
 .search-bar {
   margin-bottom: 12px;
+}
+.overview-cards {
+  margin-bottom: 16px;
+}
+.overview-sub {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
 }
 .bed-card {
   margin-bottom: 16px;

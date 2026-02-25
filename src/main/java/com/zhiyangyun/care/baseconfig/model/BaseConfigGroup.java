@@ -3,6 +3,7 @@ package com.zhiyangyun.care.baseconfig.model;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -41,5 +42,12 @@ public enum BaseConfigGroup {
     return Arrays.stream(values())
         .map(item -> Map.of("code", item.name(), "label", item.getLabel()))
         .toList();
+  }
+
+  public static Optional<BaseConfigGroup> fromCode(String code) {
+    if (code == null || code.isBlank()) {
+      return Optional.empty();
+    }
+    return Arrays.stream(values()).filter(item -> item.name().equals(code.trim())).findFirst();
   }
 }

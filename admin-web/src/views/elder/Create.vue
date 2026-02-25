@@ -11,6 +11,9 @@
         <a-form-item label="手机号" name="phone">
           <a-input v-model:value="form.phone" />
         </a-form-item>
+        <a-form-item label="家庭地址" name="homeAddress">
+          <a-input v-model:value="form.homeAddress" />
+        </a-form-item>
         <a-form-item label="性别" name="gender">
           <a-select v-model:value="form.gender" placeholder="请选择">
             <a-select-option :value="1">男</a-select-option>
@@ -103,6 +106,7 @@ const form = reactive<ElderCreateRequest & { contractNo?: string; depositAmount?
   fullName: '',
   idCardNo: '',
   phone: '',
+  homeAddress: '',
   gender: undefined,
   birthDate: undefined,
   admissionDate: undefined,
@@ -165,6 +169,7 @@ async function submit() {
       fullName: form.fullName,
       idCardNo: form.idCardNo,
       phone: form.phone,
+      homeAddress: form.homeAddress,
       gender: form.gender,
       birthDate: form.birthDate,
       admissionDate: form.admissionDate,

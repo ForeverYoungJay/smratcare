@@ -20,9 +20,23 @@
       </a-form>
     </a-card>
 
-    <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <a-statistic title="期间总收入" :value="stats.totalRevenue || 0" :precision="2" />
-    </a-card>
+    <a-row :gutter="16" style="margin-top: 16px;">
+      <a-col :span="8">
+        <a-card class="card-elevated" :bordered="false">
+          <a-statistic title="期间总收入" :value="stats.totalRevenue || 0" :precision="2" />
+        </a-card>
+      </a-col>
+      <a-col :span="8">
+        <a-card class="card-elevated" :bordered="false">
+          <a-statistic title="月均收入" :value="stats.averageMonthlyRevenue || 0" :precision="2" />
+        </a-card>
+      </a-col>
+      <a-col :span="8">
+        <a-card class="card-elevated" :bordered="false">
+          <a-statistic title="最近环比(%)" :value="stats.revenueGrowthRate || 0" :precision="2" />
+        </a-card>
+      </a-col>
+    </a-row>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="收入趋势">
       <div ref="lineRef" style="height: 320px;"></div>
@@ -44,6 +58,7 @@ import PageContainer from '../../components/PageContainer.vue'
 import { getMonthlyRevenueStats } from '../../api/stats'
 import type { MonthlyRevenueStatsResponse } from '../../types'
 import { useECharts } from '../../plugins/echarts'
+import { message } from 'ant-design-vue'
 
 const query = reactive({
   from: dayjs().subtract(5, 'month') as Dayjs,
@@ -52,23 +67,33 @@ const query = reactive({
 })
 const stats = reactive<MonthlyRevenueStatsResponse>({
   totalRevenue: 0,
+  averageMonthlyRevenue: 0,
+  revenueGrowthRate: 0,
   monthlyRevenue: []
 })
 const { chartRef: lineRef, setOption } = useECharts()
 
 async function loadData() {
-  const data = await getMonthlyRevenueStats({
-    from: dayjs(query.from).format('YYYY-MM'),
-    to: dayjs(query.to).format('YYYY-MM'),
-    orgId: query.orgId
-  })
-  Object.assign(stats, data)
-  setOption({
-    tooltip: { trigger: 'axis' },
-    xAxis: { type: 'category', data: data.monthlyRevenue.map(item => item.month) },
-    yAxis: { type: 'value' },
-    series: [{ name: '收入', type: 'line', smooth: true, data: data.monthlyRevenue.map(item => item.amount) }]
-  })
+  if (query.from.isAfter(query.to, 'month')) {
+    message.warning('起始月份不能晚于结束月份')
+    return
+  }
+  try {
+    const data = await getMonthlyRevenueStats({
+      from: dayjs(query.from).format('YYYY-MM'),
+      to: dayjs(query.to).format('YYYY-MM'),
+      orgId: query.orgId
+    })
+    Object.assign(stats, data)
+    setOption({
+      tooltip: { trigger: 'axis' },
+      xAxis: { type: 'category', data: data.monthlyRevenue.map(item => item.month) },
+      yAxis: { type: 'value' },
+      series: [{ name: '收入', type: 'line', smooth: true, data: data.monthlyRevenue.map(item => item.amount) }]
+    })
+  } catch (error: any) {
+    message.error(error?.message || '加载收入统计失败')
+  }
 }
 
 function reset() {

@@ -41,6 +41,7 @@ import PageContainer from '../../components/PageContainer.vue'
 import { getOrgElderFlow } from '../../api/stats'
 import type { MonthFlowItem } from '../../types'
 import { useECharts } from '../../plugins/echarts'
+import { message } from 'ant-design-vue'
 
 const query = ref({
   from: dayjs().subtract(5, 'month') as Dayjs,
@@ -52,21 +53,29 @@ const rows = ref<MonthFlowItem[]>([])
 const { chartRef: trendRef, setOption } = useECharts()
 
 async function loadData() {
-  rows.value = await getOrgElderFlow({
-    from: dayjs(query.value.from).format('YYYY-MM'),
-    to: dayjs(query.value.to).format('YYYY-MM'),
-    orgId: query.value.orgId
-  })
-  setOption({
-    tooltip: { trigger: 'axis' },
-    legend: { data: ['入住', '离院'] },
-    xAxis: { type: 'category', data: rows.value.map(item => item.month) },
-    yAxis: { type: 'value' },
-    series: [
-      { name: '入住', type: 'bar', data: rows.value.map(item => item.admissions) },
-      { name: '离院', type: 'bar', data: rows.value.map(item => item.discharges) }
-    ]
-  })
+  if (query.value.from.isAfter(query.value.to, 'month')) {
+    message.warning('起始月份不能晚于结束月份')
+    return
+  }
+  try {
+    rows.value = await getOrgElderFlow({
+      from: dayjs(query.value.from).format('YYYY-MM'),
+      to: dayjs(query.value.to).format('YYYY-MM'),
+      orgId: query.value.orgId
+    })
+    setOption({
+      tooltip: { trigger: 'axis' },
+      legend: { data: ['入住', '离院'] },
+      xAxis: { type: 'category', data: rows.value.map(item => item.month) },
+      yAxis: { type: 'value' },
+      series: [
+        { name: '入住', type: 'bar', data: rows.value.map(item => item.admissions) },
+        { name: '离院', type: 'bar', data: rows.value.map(item => item.discharges) }
+      ]
+    })
+  } catch (error: any) {
+    message.error(error?.message || '加载老人出入统计失败')
+  }
 }
 
 function reset() {

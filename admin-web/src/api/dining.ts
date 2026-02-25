@@ -56,6 +56,10 @@ export function getDiningPrepZonePage(params: any) {
   return fetchPage<DiningPrepZone>('/api/life/dining/prep-zone/page', params)
 }
 
+export function getDiningPrepZoneList(params: any) {
+  return request.get<DiningPrepZone[]>('/api/life/dining/prep-zone/list', { params })
+}
+
 export function createDiningPrepZone(data: Partial<DiningPrepZone>) {
   return request.post<DiningPrepZone>('/api/life/dining/prep-zone', data)
 }
@@ -70,6 +74,10 @@ export function deleteDiningPrepZone(id: number) {
 
 export function getDiningDeliveryAreaPage(params: any) {
   return fetchPage<DiningDeliveryArea>('/api/life/dining/delivery-area/page', params)
+}
+
+export function getDiningDeliveryAreaList(params: any) {
+  return request.get<DiningDeliveryArea[]>('/api/life/dining/delivery-area/list', { params })
 }
 
 export function createDiningDeliveryArea(data: Partial<DiningDeliveryArea>) {

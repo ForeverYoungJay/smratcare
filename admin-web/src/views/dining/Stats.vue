@@ -40,6 +40,7 @@ import type { Dayjs } from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import { getDiningMealTypeLabel } from '../../constants/dining'
 import { getDiningStatsSummary } from '../../api/dining'
 import type { DiningStatsSummary } from '../../types'
 
@@ -54,7 +55,7 @@ const summary = reactive<DiningStatsSummary>({
 })
 
 const columns = [
-  { title: '餐次', dataIndex: 'mealType', key: 'mealType', width: 120 },
+  { title: '餐次', dataIndex: 'mealType', key: 'mealType', width: 120, customRender: ({ text }: any) => getDiningMealTypeLabel(text) },
   { title: '订单数', dataIndex: 'orderCount', key: 'orderCount', width: 120 }
 ]
 

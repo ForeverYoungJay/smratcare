@@ -1,6 +1,9 @@
 <template>
   <PageContainer title="退住费用审核" subTitle="审核通过后自动生成退住结算单">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
+      <a-form-item label="关键字">
+        <a-input v-model:value="query.keyword" allow-clear placeholder="老人/费用项/备注" style="width: 220px" />
+      </a-form-item>
       <a-form-item label="状态">
         <a-select v-model:value="query.status" allow-clear style="width: 180px" :options="statusOptions" />
       </a-form-item>
@@ -57,8 +60,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
-import { message, Modal } from 'ant-design-vue'
+import { h, onMounted, reactive, ref } from 'vue'
+import { Input, message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
@@ -69,7 +72,7 @@ import type { BaseConfigItem, DischargeFeeAuditItem, PageResult } from '../../ty
 
 const loading = ref(false)
 const rows = ref<DischargeFeeAuditItem[]>([])
-const query = reactive({ pageNo: 1, pageSize: 10, status: undefined as string | undefined })
+const query = reactive({ pageNo: 1, pageSize: 10, status: undefined as string | undefined, keyword: '' })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const statusOptions = [
   { label: '待审核', value: 'PENDING' },
@@ -108,7 +111,8 @@ async function fetchData() {
     const res: PageResult<DischargeFeeAuditItem> = await getDischargeFeeAuditPage({
       pageNo: query.pageNo,
       pageSize: query.pageSize,
-      status: query.status
+      status: query.status,
+      keyword: query.keyword || undefined
     })
     rows.value = res.list
     pagination.total = res.total || res.list.length
@@ -120,6 +124,7 @@ async function fetchData() {
 function onReset() {
   query.pageNo = 1
   query.status = undefined
+  query.keyword = ''
   pagination.current = 1
   fetchData()
 }
@@ -197,8 +202,33 @@ async function submitCreate() {
 }
 
 function review(record: DischargeFeeAuditItem, status: 'APPROVED' | 'REJECTED') {
+  if (status === 'REJECTED') {
+    let reviewRemark = ''
+    Modal.confirm({
+      title: '确认驳回该审核单？',
+      okText: '确认驳回',
+      okButtonProps: { danger: true },
+      content: h(Input.TextArea, {
+        rows: 4,
+        placeholder: '请输入驳回原因（必填）',
+        onChange: (event: any) => {
+          reviewRemark = event?.target?.value || ''
+        }
+      }),
+      onOk: async () => {
+        if (!reviewRemark.trim()) {
+          message.error('驳回时请填写审核备注')
+          return Promise.reject()
+        }
+        await reviewDischargeFeeAudit(record.id, { status, reviewRemark: reviewRemark.trim() })
+        message.success('已驳回')
+        fetchData()
+      }
+    })
+    return
+  }
   Modal.confirm({
-    title: `确认${status === 'APPROVED' ? '通过' : '驳回'}该审核单？`,
+    title: '确认通过该审核单？',
     onOk: async () => {
       await reviewDischargeFeeAudit(record.id, { status })
       message.success(status === 'APPROVED' ? '审核通过，已自动生成结算单' : '已驳回')

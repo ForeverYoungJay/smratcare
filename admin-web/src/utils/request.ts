@@ -9,6 +9,15 @@ const request = axios.create({
   timeout: 15000
 })
 
+function resolveErrorMessage(payload: any, fallback = '请求失败') {
+  if (!payload) return fallback
+  if (typeof payload === 'string') return payload || fallback
+  if (typeof payload?.msg === 'string' && payload.msg) return payload.msg
+  if (typeof payload?.message === 'string' && payload.message) return payload.message
+  if (typeof payload?.error === 'string' && payload.error) return payload.error
+  return fallback
+}
+
 request.interceptors.request.use((config) => {
   const token = getToken()
   if (token) {
@@ -27,7 +36,7 @@ request.interceptors.response.use(
     const data = response.data
     if (data && typeof data.code !== 'undefined') {
       if (data.code !== 0) {
-        message.error(data.msg || '请求失败')
+        message.error(resolveErrorMessage(data))
         return Promise.reject(data)
       }
       return data.data
@@ -43,8 +52,8 @@ request.interceptors.response.use(
       router.push('/login')
       return Promise.reject(error)
     }
-    const msg = error?.response?.data?.msg || error?.response?.data?.message || error?.message || '请求失败'
-    message.error(msg)
+    const payload = error?.response?.data
+    message.error(resolveErrorMessage(payload, error?.message || '请求失败'))
     return Promise.reject(error)
   }
 )

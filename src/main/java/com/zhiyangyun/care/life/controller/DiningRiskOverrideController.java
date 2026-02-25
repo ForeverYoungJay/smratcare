@@ -10,6 +10,7 @@ import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.life.entity.DiningRiskOverride;
 import com.zhiyangyun.care.life.mapper.DiningRiskOverrideMapper;
+import com.zhiyangyun.care.life.model.DiningConstants;
 import com.zhiyangyun.care.life.model.DiningRiskCheckResponse;
 import com.zhiyangyun.care.life.model.DiningRiskOverrideApplyRequest;
 import com.zhiyangyun.care.life.model.DiningRiskOverrideReviewRequest;
@@ -81,7 +82,7 @@ public class DiningRiskOverrideController {
     override.setRiskDetail(toJson(risk));
     override.setApplyReason(request.getApplyReason());
     override.setApplyStaffId(AuthContext.getStaffId());
-    override.setReviewStatus("PENDING");
+    override.setReviewStatus(DiningConstants.OVERRIDE_STATUS_PENDING);
     override.setCreatedBy(AuthContext.getStaffId());
     riskOverrideMapper.insert(override);
 
@@ -101,18 +102,19 @@ public class DiningRiskOverrideController {
     if (override == null) {
       return Result.ok(null);
     }
-    if (!"PENDING".equals(override.getReviewStatus())) {
-      throw new IllegalArgumentException("该申请已处理，不能重复审批");
+    if (!DiningConstants.OVERRIDE_STATUS_PENDING.equals(override.getReviewStatus())) {
+      throw new IllegalArgumentException(DiningConstants.MSG_OVERRIDE_ALREADY_REVIEWED);
     }
-    if (!"APPROVED".equals(request.getReviewStatus()) && !"REJECTED".equals(request.getReviewStatus())) {
-      throw new IllegalArgumentException("reviewStatus 仅支持 APPROVED 或 REJECTED");
+    if (!DiningConstants.OVERRIDE_STATUS_APPROVED.equals(request.getReviewStatus())
+        && !DiningConstants.OVERRIDE_STATUS_REJECTED.equals(request.getReviewStatus())) {
+      throw new IllegalArgumentException(DiningConstants.MSG_INVALID_OVERRIDE_REVIEW_STATUS);
     }
 
     override.setReviewStatus(request.getReviewStatus());
     override.setReviewRemark(request.getReviewRemark());
     override.setReviewStaffId(AuthContext.getStaffId());
     override.setReviewedAt(LocalDateTime.now());
-    if ("APPROVED".equals(request.getReviewStatus())) {
+    if (DiningConstants.OVERRIDE_STATUS_APPROVED.equals(request.getReviewStatus())) {
       override.setEffectiveUntil(request.getEffectiveUntil() == null ? LocalDateTime.now().plusHours(2) : request.getEffectiveUntil());
     }
     riskOverrideMapper.updateById(override);

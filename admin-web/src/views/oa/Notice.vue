@@ -4,13 +4,20 @@
       <a-form-item label="关键词">
         <a-input v-model:value="query.keyword" placeholder="标题/内容" allow-clear />
       </a-form-item>
+      <a-form-item label="状态">
+        <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 160px" />
+      </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openCreate">新增公告</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" @click="batchPublish">批量发布</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+        <a-button @click="downloadExport">导出CSV</a-button>
       </template>
     </SearchForm>
 
     <DataTable
       rowKey="id"
+      :row-selection="rowSelection"
       :columns="columns"
       :data-source="rows"
       :loading="loading"
@@ -25,8 +32,8 @@
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
-            <a-button type="link" @click="openEdit(record)">编辑</a-button>
-            <a-button type="link" @click="publish(record)">发布</a-button>
+            <a-button type="link" :disabled="record.status !== 'DRAFT'" @click="openEdit(record)">编辑</a-button>
+            <a-button type="link" :disabled="record.status !== 'DRAFT'" @click="publish(record)">发布</a-button>
             <a-button type="link" danger @click="remove(record)">删除</a-button>
           </a-space>
         </template>
@@ -50,17 +57,28 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
+import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
-import { getNoticePage, createNotice, updateNotice, publishNotice, deleteNotice } from '../../api/oa'
+import {
+  getNoticePage,
+  createNotice,
+  updateNotice,
+  publishNotice,
+  deleteNotice,
+  batchPublishNotice,
+  batchDeleteNotice,
+  exportNotice
+} from '../../api/oa'
 import type { OaNotice, PageResult } from '../../types'
 
 const loading = ref(false)
 const rows = ref<OaNotice[]>([])
-const query = reactive({ keyword: '', pageNo: 1, pageSize: 10 })
+const query = reactive({ keyword: '', status: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
+const selectedRowKeys = ref<number[]>([])
 
 const columns = [
   { title: '标题', dataIndex: 'title', key: 'title', width: 240 },
@@ -77,6 +95,12 @@ const statusOptions = [
   { label: '草稿', value: 'DRAFT' },
   { label: '已发布', value: 'PUBLISHED' }
 ]
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: (string | number)[]) => {
+    selectedRowKeys.value = keys.map((item) => Number(item))
+  }
+}))
 
 async function fetchData() {
   loading.value = true
@@ -84,10 +108,12 @@ async function fetchData() {
     const res: PageResult<OaNotice> = await getNoticePage({
       pageNo: query.pageNo,
       pageSize: query.pageSize,
-      keyword: query.keyword
+      keyword: query.keyword,
+      status: query.status
     })
     rows.value = res.list
     pagination.total = res.total || res.list.length
+    selectedRowKeys.value = []
   } finally {
     loading.value = false
   }
@@ -103,6 +129,7 @@ function handleTableChange(pag: any) {
 
 function onReset() {
   query.keyword = ''
+  query.status = undefined
   query.pageNo = 1
   pagination.current = 1
   fetchData()
@@ -141,6 +168,7 @@ async function submit() {
 }
 
 async function publish(record: OaNotice) {
+  if (record.status !== 'DRAFT') return
   await publishNotice(record.id)
   fetchData()
 }
@@ -148,6 +176,32 @@ async function publish(record: OaNotice) {
 async function remove(record: OaNotice) {
   await deleteNotice(record.id)
   fetchData()
+}
+
+async function batchPublish() {
+  if (selectedRowKeys.value.length === 0) return
+  const affected = await batchPublishNotice(selectedRowKeys.value)
+  message.success(`批量发布完成，共处理 ${affected || 0} 条`)
+  fetchData()
+}
+
+async function batchRemove() {
+  if (selectedRowKeys.value.length === 0) return
+  const affected = await batchDeleteNotice(selectedRowKeys.value)
+  message.success(`批量删除完成，共处理 ${affected || 0} 条`)
+  fetchData()
+}
+
+async function downloadExport() {
+  const blob = await exportNotice({ keyword: query.keyword || undefined, status: query.status })
+  const href = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = href
+  link.download = `oa-notice-${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(href)
 }
 
 fetchData()

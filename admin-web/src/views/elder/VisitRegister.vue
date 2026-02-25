@@ -1,9 +1,25 @@
 <template>
   <PageContainer title="来访登记" subTitle="访客预约核销与到访记录">
     <a-card class="card-elevated" :bordered="false">
-      <a-space>
-        <a-button type="primary" :loading="loading" @click="fetchData">刷新今日来访</a-button>
-      </a-space>
+      <a-form :model="query" layout="inline" class="search-bar">
+        <a-form-item label="老人姓名">
+          <a-select v-model:value="query.elderId" allow-clear style="width: 180px" placeholder="请选择老人姓名">
+            <a-select-option v-for="item in elders" :key="item.id" :value="item.id">{{ item.fullName }}</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="来访状态">
+          <a-select v-model:value="query.status" allow-clear style="width: 160px" placeholder="请选择来访状态">
+            <a-select-option :value="0">待登记</a-select-option>
+            <a-select-option :value="1">已登记</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item>
+          <a-space>
+            <a-button type="primary" :loading="loading" @click="fetchData">搜索</a-button>
+            <a-button @click="reset">清空</a-button>
+          </a-space>
+        </a-form-item>
+      </a-form>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
@@ -24,17 +40,23 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
+import { getElderPage } from '../../api/elder'
 import { guardCheckin, guardTodayVisits } from '../../api/visit'
-import type { VisitBookingItem } from '../../types'
+import type { ElderItem, PageResult, VisitBookingItem } from '../../types'
 
 const loading = ref(false)
 const rows = ref<VisitBookingItem[]>([])
+const elders = ref<ElderItem[]>([])
+const query = reactive({
+  elderId: undefined as number | undefined,
+  status: undefined as number | undefined
+})
 
 const columns = [
-  { title: '老人ID', dataIndex: 'elderId', key: 'elderId', width: 100 },
+  { title: '老人姓名', dataIndex: 'elderName', key: 'elderName', width: 120 },
   { title: '来访时间', dataIndex: 'visitTime', key: 'visitTime', width: 180 },
   { title: '访客人数', dataIndex: 'visitorCount', key: 'visitorCount', width: 100 },
   { title: '车牌', dataIndex: 'carPlate', key: 'carPlate', width: 120 },
@@ -43,13 +65,36 @@ const columns = [
   { title: '操作', key: 'action', width: 120 }
 ]
 
+async function loadElders() {
+  const res: PageResult<ElderItem> = await getElderPage({ pageNo: 1, pageSize: 200 })
+  elders.value = res.list
+}
+
+function resolveElderName(elderId?: number) {
+  const elder = elders.value.find((item) => item.id === elderId)
+  return elder?.fullName || `#${elderId || '-'}`
+}
+
 async function fetchData() {
   loading.value = true
   try {
-    rows.value = await guardTodayVisits()
+    const source = await guardTodayVisits()
+    rows.value = source
+      .filter((item) => (query.elderId ? item.elderId === query.elderId : true))
+      .filter((item) => (query.status !== undefined ? item.status === query.status : true))
+      .map((item) => ({
+        ...item,
+        elderName: resolveElderName(item.elderId)
+      }))
   } finally {
     loading.value = false
   }
+}
+
+function reset() {
+  query.elderId = undefined
+  query.status = undefined
+  fetchData()
 }
 
 async function checkin(record: VisitBookingItem) {
@@ -58,5 +103,14 @@ async function checkin(record: VisitBookingItem) {
   fetchData()
 }
 
-onMounted(fetchData)
+onMounted(async () => {
+  await loadElders()
+  await fetchData()
+})
 </script>
+
+<style scoped>
+.search-bar {
+  margin-bottom: 12px;
+}
+</style>

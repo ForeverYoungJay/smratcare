@@ -3,16 +3,23 @@
     <a-tabs v-model:activeKey="activeKey">
       <a-tab-pane key="list" tab="任务列表">
         <SearchForm :model="query" @search="fetchData" @reset="onReset">
+          <a-form-item label="关键字">
+            <a-input v-model:value="query.keyword" placeholder="标题/描述/负责人" allow-clear style="width: 240px" />
+          </a-form-item>
           <a-form-item label="状态">
             <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 160px" />
           </a-form-item>
           <template #extra>
             <a-button type="primary" @click="openCreate">新增任务</a-button>
+            <a-button :disabled="selectedRowKeys.length === 0" @click="batchDone">批量完成</a-button>
+            <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+            <a-button @click="downloadExport">导出CSV</a-button>
           </template>
         </SearchForm>
 
         <DataTable
           rowKey="id"
+          :row-selection="rowSelection"
           :columns="columns"
           :data-source="rows"
           :loading="loading"
@@ -32,8 +39,8 @@
             </template>
             <template v-else-if="column.key === 'action'">
               <a-space>
-                <a-button type="link" @click="openEdit(record)">编辑</a-button>
-                <a-button type="link" @click="done(record)">完成</a-button>
+                <a-button type="link" :disabled="record.status !== 'OPEN'" @click="openEdit(record)">编辑</a-button>
+                <a-button type="link" :disabled="record.status !== 'OPEN'" @click="done(record)">完成</a-button>
                 <a-button type="link" danger @click="remove(record)">删除</a-button>
               </a-space>
             </template>
@@ -80,7 +87,7 @@
           </a-col>
         </a-row>
         <a-form-item label="状态">
-          <a-select v-model:value="form.status" :options="statusOptions" />
+          <a-select v-model:value="form.status" :options="editableStatusOptions" disabled />
         </a-form-item>
       </a-form>
     </a-modal>
@@ -90,10 +97,20 @@
 <script setup lang="ts">
 import { reactive, ref, computed } from 'vue'
 import dayjs from 'dayjs'
+import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
-import { getOaTaskPage, createOaTask, updateOaTask, completeOaTask, deleteOaTask } from '../../api/oa'
+import {
+  getOaTaskPage,
+  createOaTask,
+  updateOaTask,
+  completeOaTask,
+  deleteOaTask,
+  batchCompleteOaTask,
+  batchDeleteOaTask,
+  exportOaTask
+} from '../../api/oa'
 import type { OaTask, PageResult } from '../../types'
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
@@ -102,8 +119,9 @@ import interactionPlugin from '@fullcalendar/interaction'
 const activeKey = ref('list')
 const loading = ref(false)
 const rows = ref<OaTask[]>([])
-const query = reactive({ status: undefined as string | undefined, pageNo: 1, pageSize: 10 })
+const query = reactive({ keyword: '', status: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
+const selectedRowKeys = ref<number[]>([])
 
 const columns = [
   { title: '标题', dataIndex: 'title', key: 'title', width: 200 },
@@ -132,6 +150,7 @@ const statusOptions = [
   { label: '进行中', value: 'OPEN' },
   { label: '已完成', value: 'DONE' }
 ]
+const editableStatusOptions = [{ label: '进行中', value: 'OPEN' }]
 const priorityOptions = [
   { label: '低', value: 'LOW' },
   { label: '普通', value: 'NORMAL' },
@@ -152,6 +171,12 @@ const calendarOptions = computed(() => ({
     date: task.startTime ? task.startTime.slice(0, 10) : undefined
   }))
 }))
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: (string | number)[]) => {
+    selectedRowKeys.value = keys.map((item) => Number(item))
+  }
+}))
 
 async function fetchData() {
   loading.value = true
@@ -159,10 +184,12 @@ async function fetchData() {
     const res: PageResult<OaTask> = await getOaTaskPage({
       pageNo: query.pageNo,
       pageSize: query.pageSize,
-      status: query.status
+      status: query.status,
+      keyword: query.keyword || undefined
     })
     rows.value = res.list
     pagination.total = res.total || res.list.length
+    selectedRowKeys.value = []
   } finally {
     loading.value = false
   }
@@ -177,6 +204,7 @@ function handleTableChange(pag: any) {
 }
 
 function onReset() {
+  query.keyword = ''
   query.status = undefined
   query.pageNo = 1
   pagination.current = 1
@@ -215,7 +243,7 @@ async function submit() {
     endTime: form.endTime ? dayjs(form.endTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
     assigneeName: form.assigneeName,
     priority: form.priority,
-    status: form.status
+    status: 'OPEN'
   }
   saving.value = true
   try {
@@ -232,6 +260,7 @@ async function submit() {
 }
 
 async function done(record: OaTask) {
+  if (record.status !== 'OPEN') return
   await completeOaTask(record.id)
   fetchData()
 }
@@ -239,6 +268,35 @@ async function done(record: OaTask) {
 async function remove(record: OaTask) {
   await deleteOaTask(record.id)
   fetchData()
+}
+
+async function batchDone() {
+  if (selectedRowKeys.value.length === 0) return
+  const affected = await batchCompleteOaTask(selectedRowKeys.value)
+  message.success(`批量完成，共处理 ${affected || 0} 条`)
+  fetchData()
+}
+
+async function batchRemove() {
+  if (selectedRowKeys.value.length === 0) return
+  const affected = await batchDeleteOaTask(selectedRowKeys.value)
+  message.success(`批量删除，共处理 ${affected || 0} 条`)
+  fetchData()
+}
+
+async function downloadExport() {
+  const blob = await exportOaTask({
+    keyword: query.keyword || undefined,
+    status: query.status
+  })
+  const href = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = href
+  link.download = `oa-task-${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(href)
 }
 
 fetchData()

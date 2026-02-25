@@ -8,6 +8,7 @@
         <a-descriptions-item label="护理等级">{{ elder?.careLevel || '-' }}</a-descriptions-item>
         <a-descriptions-item label="状态">{{ statusText(elder?.status) }}</a-descriptions-item>
         <a-descriptions-item label="入院日期">{{ elder?.admissionDate || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="家庭地址" :span="2">{{ elder?.homeAddress || '-' }}</a-descriptions-item>
       </a-descriptions>
     </a-card>
 
@@ -26,6 +27,9 @@
             </a-form-item>
             <a-form-item label="手机号" name="phone">
               <a-input v-model:value="baseForm.phone" />
+            </a-form-item>
+            <a-form-item label="家庭地址" name="homeAddress">
+              <a-input v-model:value="baseForm.homeAddress" />
             </a-form-item>
             <a-form-item label="护理等级" name="careLevel">
               <a-input v-model:value="baseForm.careLevel" />

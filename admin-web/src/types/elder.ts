@@ -4,6 +4,7 @@ export interface ElderItem {
   idCard?: string
   idCardNo?: string
   phone?: string
+  homeAddress?: string
   elderCode?: string
   gender?: number
   birthDate?: string
@@ -24,6 +25,7 @@ export interface ElderCreateRequest {
   idCard?: string
   idCardNo?: string
   phone?: string
+  homeAddress?: string
   elderCode?: string
   gender?: number
   birthDate?: string
@@ -160,6 +162,57 @@ export interface ChangeLogItem {
   createTime?: string
 }
 
+export type TrialStayStatus = 'REGISTERED' | 'FINISHED' | 'CONVERTED' | 'CANCELLED'
+export type DischargeApplyStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
+export type OutingStatus = 'OUT' | 'RETURNED'
+
+export interface AdmissionRecordQuery {
+  pageNo?: number
+  pageSize?: number
+  keyword?: string
+  contractNo?: string
+  elderStatus?: number
+  admissionDateStart?: string
+  admissionDateEnd?: string
+}
+
+export interface ChangeLogQuery {
+  pageNo?: number
+  pageSize?: number
+  elderId?: number
+  changeType?: string
+  reason?: string
+  startTime?: string
+  endTime?: string
+}
+
+export interface OutingQuery {
+  pageNo?: number
+  pageSize?: number
+  elderId?: number
+  status?: OutingStatus
+}
+
+export interface TrialStayQuery {
+  pageNo?: number
+  pageSize?: number
+  elderId?: number
+  status?: TrialStayStatus
+  keyword?: string
+  trialStartDateFrom?: string
+  trialStartDateTo?: string
+}
+
+export interface DischargeApplyQuery {
+  pageNo?: number
+  pageSize?: number
+  elderId?: number
+  status?: DischargeApplyStatus
+  keyword?: string
+  plannedDateFrom?: string
+  plannedDateTo?: string
+}
+
 export interface AdmissionRecordItem {
   id: number
   elderId: number
@@ -181,7 +234,7 @@ export interface OutingItem {
   actualReturnTime?: string
   companion?: string
   reason?: string
-  status?: string
+  status?: OutingStatus
   remark?: string
   createTime?: string
 }
@@ -209,7 +262,7 @@ export interface TrialStayItem {
   channel?: string
   trialPackage?: string
   intentLevel?: string
-  status?: string
+  status?: TrialStayStatus
   careLevel?: string
   remark?: string
   createTime?: string
@@ -222,7 +275,7 @@ export interface TrialStayRequest {
   channel?: string
   trialPackage?: string
   intentLevel?: string
-  status?: string
+  status?: TrialStayStatus
   careLevel?: string
   remark?: string
 }
@@ -234,7 +287,7 @@ export interface DischargeApplyItem {
   applyDate?: string
   plannedDischargeDate: string
   reason: string
-  status?: string
+  status?: DischargeApplyStatus
   linkedDischargeId?: number
   autoDischargeStatus?: 'SUCCESS' | 'FAILED'
   autoDischargeMessage?: string
@@ -252,6 +305,6 @@ export interface DischargeApplyCreateRequest {
 }
 
 export interface DischargeApplyReviewRequest {
-  status: 'APPROVED' | 'REJECTED'
+  status: Exclude<DischargeApplyStatus, 'PENDING'>
   reviewRemark?: string
 }

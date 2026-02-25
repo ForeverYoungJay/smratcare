@@ -4,6 +4,9 @@
       <a-form-item label="关键词">
         <a-input v-model:value="query.keyword" placeholder="区域编码/名称/负责人" allow-clear />
       </a-form-item>
+      <a-form-item label="状态">
+        <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 140px" />
+      </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openCreate">新增区域</a-button>
       </template>
@@ -11,7 +14,12 @@
 
     <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'action'">
+        <template v-if="column.key === 'status'">
+          <a-tag :color="record.status === DINING_STATUS.enabled ? 'green' : 'default'">
+            {{ getDiningEnableStatusLabel(record.status) }}
+          </a-tag>
+        </template>
+        <template v-else-if="column.key === 'action'">
           <a-space>
             <a-button type="link" @click="openEdit(record)">编辑</a-button>
             <a-button type="link" danger @click="remove(record)">删除</a-button>
@@ -40,6 +48,9 @@
         <a-form-item label="负责人">
           <a-input v-model:value="form.managerName" />
         </a-form-item>
+        <a-form-item label="状态">
+          <a-select v-model:value="form.status" :options="statusOptions" />
+        </a-form-item>
       </a-form>
     </a-modal>
   </PageContainer>
@@ -51,12 +62,20 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import {
+  DINING_ENABLE_STATUS_OPTIONS,
+  DINING_MESSAGES,
+  DINING_STATUS,
+  getDiningEnableStatusLabel
+} from '../../constants/dining'
 import { getDiningDeliveryAreaPage, createDiningDeliveryArea, updateDiningDeliveryArea, deleteDiningDeliveryArea } from '../../api/dining'
 import type { DiningDeliveryArea, PageResult } from '../../types'
 
+const statusOptions = DINING_ENABLE_STATUS_OPTIONS
+
 const loading = ref(false)
 const rows = ref<DiningDeliveryArea[]>([])
-const query = reactive({ keyword: '', pageNo: 1, pageSize: 10 })
+const query = reactive({ keyword: '', status: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const editOpen = ref(false)
 const saving = ref(false)
@@ -67,7 +86,8 @@ const form = reactive({
   buildingName: '',
   floorNo: '',
   roomScope: '',
-  managerName: ''
+  managerName: '',
+  status: DINING_STATUS.enabled
 })
 
 const columns = [
@@ -77,6 +97,7 @@ const columns = [
   { title: '楼层', dataIndex: 'floorNo', key: 'floorNo', width: 100 },
   { title: '覆盖房间', dataIndex: 'roomScope', key: 'roomScope', width: 150 },
   { title: '负责人', dataIndex: 'managerName', key: 'managerName', width: 120 },
+  { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
   { title: '操作', key: 'action', width: 140 }
 ]
 
@@ -101,6 +122,7 @@ function handleTableChange(pag: any) {
 
 function onReset() {
   query.keyword = ''
+  query.status = undefined
   query.pageNo = 1
   pagination.current = 1
   fetchData()
@@ -114,6 +136,7 @@ function openCreate() {
   form.floorNo = ''
   form.roomScope = ''
   form.managerName = ''
+  form.status = DINING_STATUS.enabled
   editOpen.value = true
 }
 
@@ -125,23 +148,25 @@ function openEdit(record: DiningDeliveryArea) {
   form.floorNo = record.floorNo || ''
   form.roomScope = record.roomScope || ''
   form.managerName = record.managerName || ''
+  form.status = record.status || DINING_STATUS.enabled
   editOpen.value = true
 }
 
 async function submit() {
-  if (!form.areaCode || !form.areaName) {
-    message.error('请填写区域编码和名称')
+  if (!form.areaCode.trim() || !form.areaName.trim()) {
+    message.error(DINING_MESSAGES.requiredDeliveryAreaFields)
     return
   }
   saving.value = true
   try {
     const payload = {
-      areaCode: form.areaCode,
-      areaName: form.areaName,
-      buildingName: form.buildingName,
-      floorNo: form.floorNo,
-      roomScope: form.roomScope,
-      managerName: form.managerName
+      areaCode: form.areaCode.trim(),
+      areaName: form.areaName.trim(),
+      buildingName: form.buildingName.trim() || undefined,
+      floorNo: form.floorNo.trim() || undefined,
+      roomScope: form.roomScope.trim() || undefined,
+      managerName: form.managerName.trim() || undefined,
+      status: form.status
     }
     if (form.id) {
       await updateDiningDeliveryArea(form.id, payload)

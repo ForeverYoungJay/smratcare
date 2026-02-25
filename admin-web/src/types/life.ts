@@ -33,6 +33,22 @@ export interface IncidentReport {
   status?: string
 }
 
+export type IncidentLevel = 'NORMAL' | 'MAJOR'
+export type IncidentStatus = 'OPEN' | 'CLOSED'
+
+export interface IncidentQuery {
+  pageNo?: number
+  pageSize?: number
+  keyword?: string
+  elderName?: string
+  incidentType?: string
+  reporterName?: string
+  level?: IncidentLevel
+  status?: IncidentStatus
+  incidentTimeStart?: string
+  incidentTimeEnd?: string
+}
+
 export interface HealthBasicRecord {
   id: number
   elderId: number

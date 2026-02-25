@@ -12,11 +12,16 @@
       </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openEdit()">新增分组</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" @click="batchEnable">批量启用</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" @click="batchDisable">批量停用</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+        <a-button @click="downloadExport">导出CSV</a-button>
       </template>
     </SearchForm>
 
     <DataTable
       rowKey="id"
+      :row-selection="rowSelection"
       :columns="columns"
       :data-source="rows"
       :loading="loading"
@@ -32,6 +37,8 @@
         <template v-else-if="column.key === 'action'">
           <a-space>
             <a @click="openEdit(record)">编辑</a>
+            <a :style="{ color: record.status === 'ENABLED' ? '#999' : '' }" @click="enable(record)">启用</a>
+            <a :style="{ color: record.status === 'DISABLED' ? '#999' : '' }" @click="disable(record)">停用</a>
             <a @click="remove(record)" style="color: #ff4d4f">删除</a>
           </a-space>
         </template>
@@ -76,11 +83,23 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
+import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
-import { createGroupSetting, deleteGroupSetting, getGroupSettingPage, updateGroupSetting } from '../../api/oa'
+import {
+  batchDeleteGroupSetting,
+  batchDisableGroupSetting,
+  batchEnableGroupSetting,
+  createGroupSetting,
+  deleteGroupSetting,
+  disableGroupSetting,
+  enableGroupSetting,
+  exportGroupSetting,
+  getGroupSettingPage,
+  updateGroupSetting
+} from '../../api/oa'
 import type { OaGroupSetting, PageResult } from '../../types'
 
 const loading = ref(false)
@@ -88,6 +107,7 @@ const saving = ref(false)
 const rows = ref<OaGroupSetting[]>([])
 const query = reactive({ keyword: '', groupType: '', status: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
+const selectedRowKeys = ref<number[]>([])
 
 const columns = [
   { title: '分组名称', dataIndex: 'groupName', key: 'groupName', width: 180 },
@@ -106,6 +126,12 @@ const statusOptions = [
 
 const editOpen = ref(false)
 const form = reactive<Partial<OaGroupSetting>>({ status: 'ENABLED', memberCount: 0 })
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: (string | number)[]) => {
+    selectedRowKeys.value = keys.map((item) => Number(item))
+  }
+}))
 
 async function fetchData() {
   loading.value = true
@@ -113,6 +139,7 @@ async function fetchData() {
     const res: PageResult<OaGroupSetting> = await getGroupSettingPage(query)
     rows.value = res.list
     pagination.total = res.total || res.list.length
+    selectedRowKeys.value = []
   } finally {
     loading.value = false
   }
@@ -159,6 +186,55 @@ async function submit() {
 async function remove(record: OaGroupSetting) {
   await deleteGroupSetting(record.id)
   fetchData()
+}
+
+async function enable(record: OaGroupSetting) {
+  if (record.status === 'ENABLED') return
+  await enableGroupSetting(record.id)
+  fetchData()
+}
+
+async function disable(record: OaGroupSetting) {
+  if (record.status === 'DISABLED') return
+  await disableGroupSetting(record.id)
+  fetchData()
+}
+
+async function batchEnable() {
+  if (selectedRowKeys.value.length === 0) return
+  const affected = await batchEnableGroupSetting(selectedRowKeys.value)
+  message.success(`批量启用，共处理 ${affected || 0} 条`)
+  fetchData()
+}
+
+async function batchDisable() {
+  if (selectedRowKeys.value.length === 0) return
+  const affected = await batchDisableGroupSetting(selectedRowKeys.value)
+  message.success(`批量停用，共处理 ${affected || 0} 条`)
+  fetchData()
+}
+
+async function batchRemove() {
+  if (selectedRowKeys.value.length === 0) return
+  const affected = await batchDeleteGroupSetting(selectedRowKeys.value)
+  message.success(`批量删除，共处理 ${affected || 0} 条`)
+  fetchData()
+}
+
+async function downloadExport() {
+  const blob = await exportGroupSetting({
+    keyword: query.keyword || undefined,
+    groupType: query.groupType || undefined,
+    status: query.status
+  })
+  const href = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = href
+  link.download = `oa-group-setting-${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(href)
 }
 
 fetchData()

@@ -1,8 +1,10 @@
 import request, { fetchPage } from '../utils/request'
+import { exportCsvByRequest } from '../utils/export'
 import type {
   MealPlan,
   ActivityEvent,
   IncidentReport,
+  IncidentQuery,
   HealthBasicRecord,
   BirthdayReminder,
   RoomCleaningTask,
@@ -41,7 +43,7 @@ export function deleteActivity(id: number) {
   return request.delete<void>(`/api/life/activity/${id}`)
 }
 
-export function getIncidentPage(params: any) {
+export function getIncidentPage(params: IncidentQuery) {
   return fetchPage<IncidentReport>('/api/life/incident/page', params)
 }
 
@@ -59,6 +61,10 @@ export function closeIncident(id: number) {
 
 export function deleteIncident(id: number) {
   return request.delete<void>(`/api/life/incident/${id}`)
+}
+
+export function exportIncidentPage(params: IncidentQuery) {
+  return exportCsvByRequest('/api/life/incident/export', params, '事故登记.csv')
 }
 
 export function getHealthBasicPage(params: any) {

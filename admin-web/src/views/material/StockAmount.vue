@@ -87,8 +87,9 @@ async function fetchData() {
 }
 
 onMounted(async () => {
-  const warehouseRes = await getWarehousePage({ pageNo: 1, pageSize: 500 })
-  warehouseOptions.value = warehouseRes.list.map((it: { id: number; warehouseName?: string }) => ({ label: it.warehouseName || `仓库${it.id}`, value: it.id }))
+  const warehouseRes = await getWarehousePage({ pageNo: 1, pageSize: 500, enabledOnly: true })
+  warehouseOptions.value = (warehouseRes.list || [])
+    .map((it: { id: number; warehouseName?: string }) => ({ label: it.warehouseName || `仓库${it.id}`, value: it.id }))
   fetchData()
 })
 </script>

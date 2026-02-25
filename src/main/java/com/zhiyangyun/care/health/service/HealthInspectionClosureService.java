@@ -7,4 +7,6 @@ public interface HealthInspectionClosureService {
   void syncFromInspection(HealthInspection inspection, Long createdBy);
 
   void syncFromNursingLog(HealthNursingLog nursingLog);
+
+  void syncAfterNursingLogDeleted(Long orgId, Long sourceInspectionId);
 }

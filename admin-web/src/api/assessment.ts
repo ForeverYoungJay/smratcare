@@ -21,6 +21,17 @@ export function deleteAssessmentRecord(id: number) {
   return request.delete<void>(`/api/assessment/records/${id}`)
 }
 
+export function batchDeleteAssessmentRecord(ids: number[]) {
+  return request.post<number>('/api/assessment/records/batch-delete', ids)
+}
+
+export function exportAssessmentRecord(params: any) {
+  return request.get<Blob>('/api/assessment/records/export', {
+    params,
+    responseType: 'blob' as any
+  })
+}
+
 export function getAssessmentTemplatePage(params: any) {
   return fetchPage<AssessmentScaleTemplate>('/api/assessment/templates/page', params)
 }

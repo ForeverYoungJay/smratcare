@@ -51,6 +51,20 @@ export interface HealthMedicationRegistration {
   remark?: string
 }
 
+export interface HealthNameCountStat {
+  name: string
+  totalCount: number
+}
+
+export interface HealthMedicationRegistrationSummary {
+  totalCount: number
+  todayCount: number
+  totalDosage: number
+  doneTaskCount: number
+  pendingTaskCount: number
+  nurseStats: HealthNameCountStat[]
+}
+
 export interface HealthMedicationRemainingItem {
   elderId?: number
   elderName?: string
@@ -89,6 +103,22 @@ export interface HealthDataRecord {
   remark?: string
 }
 
+export interface HealthDataTypeStat {
+  dataType: string
+  totalCount: number
+  abnormalCount: number
+  abnormalRate: number
+}
+
+export interface HealthDataSummary {
+  totalCount: number
+  abnormalCount: number
+  normalCount: number
+  abnormalRate: number
+  latestMeasuredAt?: string
+  typeStats: HealthDataTypeStat[]
+}
+
 export interface HealthInspection {
   id: number
   elderId?: number
@@ -102,6 +132,15 @@ export interface HealthInspection {
   remark?: string
 }
 
+export interface HealthInspectionSummary {
+  totalCount: number
+  abnormalCount: number
+  followingCount: number
+  closedCount: number
+  linkedLogCount: number
+  statusStats: HealthNameCountStat[]
+}
+
 export interface HealthNursingLog {
   id: number
   elderId?: number
@@ -113,6 +152,15 @@ export interface HealthNursingLog {
   staffName?: string
   status?: string
   remark?: string
+}
+
+export interface HealthNursingLogSummary {
+  totalCount: number
+  pendingCount: number
+  doneCount: number
+  closedCount: number
+  linkedInspectionCount: number
+  logTypeStats: HealthNameCountStat[]
 }
 
 export interface HealthMedicationTask {

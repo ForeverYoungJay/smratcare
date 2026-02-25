@@ -26,9 +26,12 @@
         <a-form-item label="状态">
           <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 140px" />
         </a-form-item>
+        <a-form-item label="关键词">
+          <a-input v-model:value="query.keyword" placeholder="任务ID/床位ID" allow-clear @pressEnter="searchFromFilters" />
+        </a-form-item>
         <a-form-item>
           <a-space>
-            <a-button type="primary" @click="search">查询</a-button>
+            <a-button type="primary" @click="searchFromFilters">查询</a-button>
             <a-button @click="reset">重置</a-button>
             <a-button type="primary" @click="openAction">新增/派发任务</a-button>
             <a-button @click="exportCsvData">导出CSV</a-button>
@@ -36,12 +39,58 @@
         </a-form-item>
       </a-form>
 
+      <a-row :gutter="12" class="metrics-row">
+        <a-col :span="4">
+          <a-card :bordered="false" class="metric-card clickable" :class="{ active: activeMetric === 'total' }" @click="applyMetricFilter('total')">
+            <div class="metric-label">任务总数</div>
+            <div class="metric-value">{{ summary.totalCount || 0 }}</div>
+          </a-card>
+        </a-col>
+        <a-col :span="4">
+          <a-card :bordered="false" class="metric-card clickable" :class="{ active: activeMetric === 'pending' }" @click="applyMetricFilter('pending')">
+            <div class="metric-label">待执行</div>
+            <div class="metric-value">{{ summary.pendingCount || 0 }}</div>
+          </a-card>
+        </a-col>
+        <a-col :span="4">
+          <a-card :bordered="false" class="metric-card clickable" :class="{ active: activeMetric === 'done' }" @click="applyMetricFilter('done')">
+            <div class="metric-label">已完成</div>
+            <div class="metric-value">{{ summary.doneCount || 0 }}</div>
+          </a-card>
+        </a-col>
+        <a-col :span="4">
+          <a-card :bordered="false" class="metric-card clickable" :class="{ active: activeMetric === 'exception' }" @click="applyMetricFilter('exception')">
+            <div class="metric-label">异常</div>
+            <div class="metric-value">{{ summary.exceptionCount || 0 }}</div>
+          </a-card>
+        </a-col>
+        <a-col :span="4">
+          <a-card :bordered="false" class="metric-card clickable" :class="{ active: activeMetric === 'overdue' }" @click="applyMetricFilter('overdue')">
+            <div class="metric-label">逾期</div>
+            <div class="metric-value text-warning">{{ summary.overdueCount || 0 }}</div>
+          </a-card>
+        </a-col>
+        <a-col :span="4">
+          <a-card :bordered="false" class="metric-card clickable" :class="{ active: activeMetric === 'done' }" @click="applyMetricFilter('done')">
+            <div class="metric-label">完成率</div>
+            <div class="metric-value">{{ pct(summary.completionRate) }}</div>
+          </a-card>
+        </a-col>
+      </a-row>
+      <a-space v-if="activeMetric !== 'total'" class="quick-filter-bar">
+        <a-tag color="processing" closable @close.prevent="clearMetricFilter">
+          快速筛选：{{ metricLabel(activeMetric) }}
+        </a-tag>
+      </a-space>
+      <div class="summary-tip">统计卡片基于当前查询条件；点击卡片仅影响下方任务列表。</div>
+
       <vxe-table
         border
         stripe
         height="520"
         :loading="loading"
         :data="tasks"
+        :row-class-name="resolveRowClassName"
         :column-config="{ resizable: true }"
       >
         <vxe-column field="elderName" title="老人" width="140" fixed="left"></vxe-column>
@@ -50,12 +99,16 @@
         <vxe-column field="planTime" title="计划时间" width="160"></vxe-column>
         <vxe-column field="staffId" title="护工" width="140">
           <template #default="{ row }">
-            <span>{{ staffName(row.staffId) }}</span>
+            <span>{{ row.staffName || staffName(row.staffId) }}</span>
           </template>
         </vxe-column>
-        <vxe-column field="status" title="状态" width="100">
+        <vxe-column field="status" title="状态" width="220">
           <template #default="{ row }">
-            <a-tag :color="statusColor(row.status)">{{ statusLabel(row.status) }}</a-tag>
+            <a-space size="small">
+              <a-tag :color="statusColor(row.status)">{{ statusLabel(row.status) }}</a-tag>
+              <a-tag v-if="row.overdueFlag" color="orange">逾期</a-tag>
+              <a-tag v-if="row.suspiciousFlag" color="gold">可疑</a-tag>
+            </a-space>
           </template>
         </vxe-column>
         <vxe-column title="操作" width="200" fixed="right">
@@ -74,8 +127,8 @@
           v-model:pageSize="page.pageSize"
           :total="page.total"
           show-size-changer
-          @change="search"
-          @showSizeChange="search"
+          @change="handlePageChange"
+          @showSizeChange="handlePageSizeChange"
         />
       </div>
     </a-card>
@@ -86,12 +139,47 @@
         <a-descriptions-item label="房间">{{ current?.roomNo }}</a-descriptions-item>
         <a-descriptions-item label="任务">{{ current?.taskName }}</a-descriptions-item>
         <a-descriptions-item label="计划时间">{{ current?.planTime }}</a-descriptions-item>
-        <a-descriptions-item label="护工">{{ staffName(current?.staffId) }}</a-descriptions-item>
+        <a-descriptions-item label="护工">{{ current?.staffName || staffName(current?.staffId) }}</a-descriptions-item>
         <a-descriptions-item label="状态">{{ statusLabel(current?.status) }}</a-descriptions-item>
       </a-descriptions>
       <a-divider />
-      <a-typography-title :level="5">执行日志</a-typography-title>
-      <a-empty description="暂无执行日志" />
+      <div class="log-toolbar">
+        <a-typography-title :level="5" style="margin: 0">执行日志</a-typography-title>
+        <a-space>
+          <a-radio-group v-model:value="logResultFilter" size="small">
+            <a-radio-button value="ALL">全部</a-radio-button>
+            <a-radio-button value="SUCCESS">成功</a-radio-button>
+            <a-radio-button value="FAIL">失败</a-radio-button>
+          </a-radio-group>
+          <a-button size="small" @click="exportLogCsvData" :disabled="filteredExecuteLogs.length === 0">导出日志</a-button>
+        </a-space>
+      </div>
+      <a-table
+        :data-source="filteredExecuteLogs"
+        :columns="logColumns"
+        :loading="logsLoading"
+        :locale="{ emptyText: '暂无执行日志' }"
+        row-key="id"
+        size="small"
+        :pagination="false"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'executeTime'">
+            {{ record.executeTime ? dayjs(record.executeTime).format('YYYY-MM-DD HH:mm:ss') : '-' }}
+          </template>
+          <template v-else-if="column.key === 'resultStatus'">
+            <a-tag v-if="record.resultStatus != null" :color="Number(record.resultStatus) === 1 ? 'green' : 'red'">
+              {{ Number(record.resultStatus) === 1 ? '成功' : '失败' }}
+            </a-tag>
+            <span v-else>-</span>
+          </template>
+          <template v-else-if="column.key === 'suspiciousFlag'">
+            <a-tag :color="record.suspiciousFlag ? 'gold' : 'default'">
+              {{ record.suspiciousFlag ? '可疑' : '正常' }}
+            </a-tag>
+          </template>
+        </template>
+      </a-table>
     </a-drawer>
 
     <a-modal v-model:open="assignOpen" title="派发任务" @ok="submitAssign" :confirm-loading="assigning">
@@ -289,17 +377,41 @@
 import { reactive, ref, computed } from 'vue'
 import dayjs from 'dayjs'
 import { Modal, message } from 'ant-design-vue'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
-import { getTaskPage, assignTask, assignTaskBatch, reviewTask, generateTasks, getTemplatePage, createTask } from '../../api/care'
+import {
+  getTaskPage,
+  getTaskSummary,
+  getTaskExecuteLogs,
+  assignTask,
+  assignTaskBatch,
+  reviewTask,
+  generateTasks,
+  getTemplatePage,
+  createTask
+} from '../../api/care'
 import { getStaffPage } from '../../api/rbac'
 import { getElderPage } from '../../api/elder'
-import type { CareTaskItem, PageResult, CareTaskAssignRequest, CareTaskBatchAssignRequest, CareTaskReviewRequest } from '../../types'
+import type {
+  CareTaskItem,
+  CareExecuteLogItem,
+  CareTaskSummary,
+  PageResult,
+  CareTaskAssignRequest,
+  CareTaskBatchAssignRequest,
+  CareTaskReviewRequest
+} from '../../types'
 import { exportCsv } from '../../utils/export'
 
+const route = useRoute()
+const router = useRouter()
 const tasks = ref<CareTaskItem[]>([])
 const loading = ref(false)
 const detailOpen = ref(false)
 const current = ref<CareTaskItem | null>(null)
+const executeLogs = ref<CareExecuteLogItem[]>([])
+const logsLoading = ref(false)
+const logResultFilter = ref<'ALL' | 'SUCCESS' | 'FAIL'>('ALL')
 const assignOpen = ref(false)
 const reviewOpen = ref(false)
 const assigning = ref(false)
@@ -318,16 +430,47 @@ const staffOptions = ref<{ label: string; value: number }[]>([])
 const elderOptions = ref<{ label: string; value: number }[]>([])
 const staffMap = ref<Record<number, string>>({})
 const elderMap = ref<Record<number, string>>({})
+const summary = reactive<CareTaskSummary>({
+  totalCount: 0,
+  pendingCount: 0,
+  doneCount: 0,
+  exceptionCount: 0,
+  overdueCount: 0,
+  suspiciousCount: 0,
+  assignedCount: 0,
+  unassignedCount: 0,
+  completionRate: 0,
+  exceptionRate: 0
+})
+const activeMetric = ref<'total' | 'pending' | 'done' | 'exception' | 'overdue'>('total')
 
 const query = reactive({
   range: [dayjs().subtract(1, 'day'), dayjs().add(1, 'day')] as any,
   staffId: undefined as number | undefined,
   roomNo: '',
   careLevel: '',
-  status: undefined as string | undefined
+  status: undefined as string | undefined,
+  keyword: ''
 })
 
 const page = reactive({ pageNo: 1, pageSize: 10, total: 0 })
+const logColumns = [
+  { title: '执行时间', dataIndex: 'executeTime', key: 'executeTime', width: 160 },
+  { title: '护工', dataIndex: 'staffName', key: 'staffName', width: 100 },
+  { title: '结果', dataIndex: 'resultStatus', key: 'resultStatus', width: 80 },
+  { title: '识别', dataIndex: 'suspiciousFlag', key: 'suspiciousFlag', width: 80 },
+  { title: '床位码', dataIndex: 'bedQrCode', key: 'bedQrCode', width: 120 },
+  { title: '备注', dataIndex: 'remark', key: 'remark' }
+]
+const filteredExecuteLogs = computed(() => {
+  if (logResultFilter.value === 'SUCCESS') {
+    return executeLogs.value.filter((item) => Number(item.resultStatus) === 1)
+  }
+  if (logResultFilter.value === 'FAIL') {
+    return executeLogs.value.filter((item) => Number(item.resultStatus) !== 1)
+  }
+  return executeLogs.value
+})
 
 const statusOptions = [
   { label: '待执行', value: 'PENDING' },
@@ -432,22 +575,107 @@ function statusColor(status?: string) {
 async function search() {
   loading.value = true
   try {
-    const res: PageResult<CareTaskItem> = await getTaskPage({
+    const trimmedKeyword = query.keyword?.trim() || ''
+    const trimmedRoomNo = query.roomNo?.trim() || ''
+    const trimmedCareLevel = query.careLevel?.trim() || ''
+    const baseParams = {
       pageNo: page.pageNo,
       pageSize: page.pageSize,
       dateFrom: query.range?.[0] ? query.range[0].format('YYYY-MM-DD') : undefined,
       dateTo: query.range?.[1] ? query.range[1].format('YYYY-MM-DD') : undefined,
       staffId: query.staffId || undefined,
-      roomNo: query.roomNo || undefined,
-      careLevel: query.careLevel || undefined,
-      status: query.status
-    })
-    tasks.value = res.list
-    page.total = res.total
-    await loadStaffOptions()
+      roomNo: trimmedRoomNo || undefined,
+      careLevel: trimmedCareLevel || undefined,
+      status: query.status,
+      keyword: trimmedKeyword || undefined
+    }
+    const metricStatus = resolveMetricStatus(activeMetric.value)
+    const pageParams = {
+      ...baseParams,
+      status: activeMetric.value === 'overdue' ? undefined : (metricStatus || baseParams.status),
+      overdueOnly: activeMetric.value === 'overdue' ? true : undefined
+    }
+    syncQueryToRoute()
+    const [pageRes, summaryRes]: [PageResult<CareTaskItem>, CareTaskSummary] = await Promise.all([
+      getTaskPage(pageParams),
+      getTaskSummary(baseParams)
+    ])
+    tasks.value = pageRes.list
+    page.total = pageRes.total
+    const taskStaffMap = tasks.value.reduce((acc, item) => {
+      if (item.staffId && item.staffName) {
+        acc[item.staffId] = item.staffName
+      }
+      return acc
+    }, {} as Record<number, string>)
+    staffMap.value = { ...staffMap.value, ...taskStaffMap }
+    Object.assign(summary, {
+      totalCount: 0,
+      pendingCount: 0,
+      doneCount: 0,
+      exceptionCount: 0,
+      overdueCount: 0,
+      suspiciousCount: 0,
+      assignedCount: 0,
+      unassignedCount: 0,
+      completionRate: 0,
+      exceptionRate: 0
+    }, summaryRes || {})
+    query.keyword = trimmedKeyword
+    query.roomNo = trimmedRoomNo
+    query.careLevel = trimmedCareLevel
   } finally {
     loading.value = false
   }
+}
+
+function searchFromFilters() {
+  page.pageNo = 1
+  search()
+}
+
+function syncQueryToRoute() {
+  const nextQuery: Record<string, any> = {}
+  if (query.range?.[0]) nextQuery.dateFrom = query.range[0].format('YYYY-MM-DD')
+  if (query.range?.[1]) nextQuery.dateTo = query.range[1].format('YYYY-MM-DD')
+  if (query.staffId) nextQuery.staffId = String(query.staffId)
+  if (query.roomNo) nextQuery.roomNo = query.roomNo
+  if (query.careLevel) nextQuery.careLevel = query.careLevel
+  if (query.status) nextQuery.status = query.status
+  if (query.keyword) nextQuery.keyword = query.keyword
+  if (activeMetric.value !== 'total') nextQuery.metric = activeMetric.value
+  if (page.pageNo > 1) nextQuery.pageNo = String(page.pageNo)
+  if (page.pageSize !== 10) nextQuery.pageSize = String(page.pageSize)
+  void router.replace({ query: nextQuery })
+}
+
+function initFromRoute() {
+  const dateFrom = route.query.dateFrom ? String(route.query.dateFrom) : ''
+  const dateTo = route.query.dateTo ? String(route.query.dateTo) : ''
+  const start = dateFrom ? dayjs(dateFrom) : query.range[0]
+  const end = dateTo ? dayjs(dateTo) : query.range[1]
+  if (start?.isValid?.() && end?.isValid?.()) {
+    query.range = [start, end] as any
+  }
+  query.staffId = parsePositiveInt(route.query.staffId)
+  query.roomNo = route.query.roomNo ? String(route.query.roomNo) : ''
+  query.careLevel = route.query.careLevel ? String(route.query.careLevel) : ''
+  const routeStatus = route.query.status ? String(route.query.status) : undefined
+  query.status = statusOptions.some((item) => item.value === routeStatus) ? routeStatus : undefined
+  query.keyword = route.query.keyword ? String(route.query.keyword) : ''
+  const metric = route.query.metric ? String(route.query.metric) : 'total'
+  if (['total', 'pending', 'done', 'exception', 'overdue'].includes(metric)) {
+    activeMetric.value = metric as 'total' | 'pending' | 'done' | 'exception' | 'overdue'
+  }
+  page.pageNo = parsePositiveInt(route.query.pageNo) || 1
+  page.pageSize = parsePositiveInt(route.query.pageSize) || 10
+}
+
+function parsePositiveInt(value: unknown) {
+  if (value == null) return undefined
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed <= 0) return undefined
+  return Math.floor(parsed)
 }
 
 function reset() {
@@ -456,8 +684,51 @@ function reset() {
   query.roomNo = ''
   query.careLevel = ''
   query.status = undefined
+  query.keyword = ''
+  activeMetric.value = 'total'
   page.pageNo = 1
   search()
+}
+
+function applyMetricFilter(metric: 'total' | 'pending' | 'done' | 'exception' | 'overdue') {
+  activeMetric.value = activeMetric.value === metric ? 'total' : metric
+  page.pageNo = 1
+  search()
+}
+
+function clearMetricFilter() {
+  if (activeMetric.value === 'total') return
+  activeMetric.value = 'total'
+  page.pageNo = 1
+  search()
+}
+
+function resolveMetricStatus(metric: 'total' | 'pending' | 'done' | 'exception' | 'overdue') {
+  switch (metric) {
+    case 'pending':
+      return 'PENDING'
+    case 'done':
+      return 'DONE'
+    case 'exception':
+      return 'EXCEPTION'
+    default:
+      return undefined
+  }
+}
+
+function metricLabel(metric: 'total' | 'pending' | 'done' | 'exception' | 'overdue') {
+  switch (metric) {
+    case 'pending':
+      return '待执行'
+    case 'done':
+      return '已完成'
+    case 'exception':
+      return '异常'
+    case 'overdue':
+      return '逾期'
+    default:
+      return '全部'
+  }
 }
 
 function exportCsvData() {
@@ -468,15 +739,78 @@ function exportCsvData() {
       任务: t.taskName,
       计划时间: t.planTime,
       护工: staffName(t.staffId),
-      状态: statusLabel(t.status)
+      状态: statusLabel(t.status),
+      是否逾期: t.overdueFlag ? '是' : '否',
+      是否可疑: t.suspiciousFlag ? '是' : '否'
     })),
     '护理任务_今日'
   )
 }
 
-function openDetail(row: CareTaskItem) {
+function exportLogCsvData() {
+  if (!current.value) {
+    return
+  }
+  const filterLabel = logResultFilter.value === 'SUCCESS'
+    ? '成功'
+    : logResultFilter.value === 'FAIL'
+      ? '失败'
+      : '全部'
+  const timestamp = dayjs().format('YYYYMMDD_HHmmss')
+  exportCsv(
+    filteredExecuteLogs.value.map((item) => ({
+      任务ID: item.taskDailyId,
+      老人: current.value?.elderName || '-',
+      房间: current.value?.roomNo || '-',
+      执行时间: item.executeTime ? dayjs(item.executeTime).format('YYYY-MM-DD HH:mm:ss') : '-',
+      护工: item.staffName || staffName(item.staffId),
+      结果: Number(item.resultStatus) === 1 ? '成功' : '失败',
+      是否可疑: item.suspiciousFlag ? '是' : '否',
+      床位码: item.bedQrCode || '',
+      备注: item.remark || ''
+    })),
+    `护理执行日志_${current.value.taskDailyId}_${filterLabel}_${timestamp}`
+  )
+}
+
+function handlePageChange(current: number, pageSize?: number) {
+  page.pageNo = current
+  if (pageSize && pageSize > 0) {
+    page.pageSize = pageSize
+  }
+  search()
+}
+
+function handlePageSizeChange(_current: number, size: number) {
+  page.pageNo = 1
+  page.pageSize = size
+  search()
+}
+
+function pct(value?: number | null) {
+  if (value == null) return '0%'
+  return `${(value * 100).toFixed(1)}%`
+}
+
+async function openDetail(row: CareTaskItem) {
   current.value = row
+  logResultFilter.value = 'ALL'
   detailOpen.value = true
+  await loadExecuteLogs(row.taskDailyId)
+}
+
+async function loadExecuteLogs(taskDailyId?: number) {
+  if (!taskDailyId) {
+    executeLogs.value = []
+    return
+  }
+  executeLogs.value = []
+  logsLoading.value = true
+  try {
+    executeLogs.value = await getTaskExecuteLogs(taskDailyId)
+  } finally {
+    logsLoading.value = false
+  }
 }
 
 function openAssign(row: CareTaskItem) {
@@ -659,15 +993,22 @@ async function loadTemplates() {
 }
 
 async function loadStaffOptions(keyword = '') {
-  const res = await getStaffPage({ pageNo: 1, pageSize: 200, keyword })
-  staffOptions.value = res.list.map((item: any) => ({
-    label: item.realName || item.username || `员工#${item.id}`,
-    value: item.id
-  }))
-  staffMap.value = staffOptions.value.reduce((acc, cur) => {
-    acc[cur.value] = cur.label
-    return acc
-  }, {} as Record<number, string>)
+  try {
+    const res = await getStaffPage({ pageNo: 1, pageSize: 200, keyword })
+    staffOptions.value = res.list.map((item: any) => ({
+      label: item.realName || item.username || `员工#${item.id}`,
+      value: item.id
+    }))
+    staffMap.value = staffOptions.value.reduce((acc, cur) => {
+      acc[cur.value] = cur.label
+      return acc
+    }, {} as Record<number, string>)
+  } catch {
+    if (!keyword) {
+      staffOptions.value = []
+      staffMap.value = {}
+    }
+  }
 }
 
 async function searchStaff(keyword: string) {
@@ -679,15 +1020,19 @@ async function searchElders(keyword: string) {
     elderOptions.value = []
     return
   }
-  const res = await getElderPage({ pageNo: 1, pageSize: 50, keyword })
-  elderOptions.value = res.list.map((item: any) => ({
-    label: item.fullName || '未知老人',
-    value: item.id
-  }))
-  elderMap.value = elderOptions.value.reduce((acc, cur) => {
-    acc[cur.value] = cur.label
-    return acc
-  }, {} as Record<number, string>)
+  try {
+    const res = await getElderPage({ pageNo: 1, pageSize: 50, keyword })
+    elderOptions.value = res.list.map((item: any) => ({
+      label: item.fullName || '未知老人',
+      value: item.id
+    }))
+    elderMap.value = elderOptions.value.reduce((acc, cur) => {
+      acc[cur.value] = cur.label
+      return acc
+    }, {} as Record<number, string>)
+  } catch {
+    elderOptions.value = []
+  }
 }
 
 function staffName(staffId?: number) {
@@ -700,7 +1045,13 @@ function elderName(elderId?: number) {
   return elderMap.value[elderId] || '未知老人'
 }
 
+function resolveRowClassName({ row }: { row: CareTaskItem }) {
+  return row?.overdueFlag ? 'row-overdue' : ''
+}
+
+initFromRoute()
 loadTemplates()
+loadStaffOptions()
 search()
 </script>
 
@@ -708,6 +1059,49 @@ search()
 .search-bar {
   margin-bottom: 12px;
   row-gap: 8px;
+}
+.metrics-row {
+  margin-bottom: 12px;
+}
+.metric-card {
+  border-radius: 10px;
+  transition: all .2s ease;
+}
+.metric-card.clickable {
+  cursor: pointer;
+}
+.metric-card.clickable:hover {
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+.metric-card.active {
+  border: 1px solid #1677ff;
+  box-shadow: 0 8px 20px rgba(22, 119, 255, 0.12);
+}
+.metric-label {
+  color: #64748b;
+  font-size: 12px;
+}
+.metric-value {
+  margin-top: 4px;
+  font-size: 22px;
+  font-weight: 700;
+}
+.text-warning {
+  color: #d97706;
+}
+.quick-filter-bar {
+  margin-bottom: 8px;
+}
+.summary-tip {
+  margin-bottom: 8px;
+  color: #64748b;
+  font-size: 12px;
+}
+.log-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
 }
 .stepbar {
   margin-bottom: 16px;
@@ -723,5 +1117,9 @@ search()
   display: flex;
   justify-content: flex-end;
   margin-top: 12px;
+}
+
+:deep(.vxe-body--row.row-overdue) {
+  background: #fff7e6;
 }
 </style>

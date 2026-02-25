@@ -9,4 +9,9 @@ import lombok.Data;
 public class OaPortalSummary {
   private List<OaNotice> notices;
   private List<OaTodo> todos;
+  private Long openTodoCount;
+  private Long overdueTodoCount;
+  private Long pendingApprovalCount;
+  private Long ongoingTaskCount;
+  private Long submittedReportCount;
 }

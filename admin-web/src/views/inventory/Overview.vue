@@ -5,8 +5,15 @@
         <a-form-item label="关键词">
           <a-input v-model:value="query.keyword" placeholder="商品名/编码/批次号" allow-clear />
         </a-form-item>
-        <a-form-item label="商品ID">
-          <a-input-number v-model:value="query.productId" style="width: 140px" />
+        <a-form-item label="商品">
+          <a-select
+            v-model:value="query.productId"
+            :options="productOptions"
+            allow-clear
+            show-search
+            option-filter-prop="label"
+            style="width: 220px"
+          />
         </a-form-item>
         <a-form-item label="仓库">
           <a-select v-model:value="query.warehouseId" :options="warehouseOptions" allow-clear style="width: 180px" />
@@ -22,7 +29,7 @@
         </a-form-item>
         <a-form-item>
           <a-space>
-            <a-button type="primary" @click="fetchData">搜索</a-button>
+            <a-button type="primary" @click="handleSearch">搜索</a-button>
             <a-button @click="reset">重置</a-button>
           </a-space>
         </a-form-item>
@@ -78,11 +85,17 @@
 
     <a-modal v-model:open="adjustOpen" title="盘点调整" @ok="submitAdjust" :confirm-loading="adjusting">
       <a-form layout="vertical" :model="adjustForm" :rules="adjustRules" ref="adjustFormRef">
-        <a-form-item label="商品ID" name="productId">
-          <a-input-number v-model:value="adjustForm.productId" style="width: 100%" />
+        <a-form-item label="商品" name="productId">
+          <a-select
+            v-model:value="adjustForm.productId"
+            :options="productOptions"
+            allow-clear
+            show-search
+            option-filter-prop="label"
+          />
         </a-form-item>
         <a-form-item label="批次ID">
-          <a-input-number v-model:value="adjustForm.batchId" style="width: 100%" />
+          <a-input-number v-model:value="adjustForm.batchId" :min="1" style="width: 100%" />
         </a-form-item>
         <a-form-item label="调整类型" name="adjustType">
           <a-select v-model:value="adjustForm.adjustType">
@@ -91,7 +104,7 @@
           </a-select>
         </a-form-item>
         <a-form-item label="调整数量" name="adjustQty">
-          <a-input-number v-model:value="adjustForm.adjustQty" style="width: 100%" />
+          <a-input-number v-model:value="adjustForm.adjustQty" :min="1" style="width: 100%" />
         </a-form-item>
         <a-form-item label="原因">
           <a-input v-model:value="adjustForm.reason" />
@@ -102,18 +115,19 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportCsv } from '../../utils/export'
 import { adjustInventory, getInventoryBatchPage } from '../../api/inventory'
 import { getWarehousePage } from '../../api/material'
 import { getProductPage } from '../../api/store'
-import type { InventoryBatchItem, InventoryAdjustRequest, PageResult } from '../../types'
+import type { InventoryBatchItem, PageResult, ProductItem } from '../../types'
 
 const loading = ref(false)
 const rows = ref<InventoryBatchItem[]>([])
 const total = ref(0)
+const products = ref<ProductItem[]>([])
 
 const query = reactive({
   keyword: '',
@@ -127,19 +141,31 @@ const query = reactive({
 })
 const warehouseOptions = ref<Array<{ label: string; value: number }>>([])
 const categoryOptions = ref<Array<{ label: string; value: string }>>([])
+const productOptions = computed(() =>
+  products.value.map((p) => ({
+    label: `${p.productName} (ID:${p.idStr || p.id})`,
+    value: p.id
+  }))
+)
 
 const adjustOpen = ref(false)
 const adjusting = ref(false)
 const adjustFormRef = ref()
-const adjustForm = reactive<InventoryAdjustRequest>({
-  productId: 0,
+const adjustForm = reactive<{
+  productId?: number
+  batchId?: number
+  adjustType: 'GAIN' | 'LOSS'
+  adjustQty: number
+  reason: string
+}>({
+  productId: undefined,
   batchId: undefined,
   adjustType: 'GAIN',
-  adjustQty: 0,
+  adjustQty: 1,
   reason: ''
 })
 const adjustRules = {
-  productId: [{ required: true, message: '请输入商品ID' }],
+  productId: [{ required: true, message: '请选择商品' }],
   adjustType: [{ required: true, message: '请选择类型' }],
   adjustQty: [{ required: true, message: '请输入数量' }]
 }
@@ -188,6 +214,11 @@ function reset() {
   fetchData()
 }
 
+function handleSearch() {
+  query.pageNo = 1
+  fetchData()
+}
+
 function onPageChange(page: number) {
   query.pageNo = page
   fetchData()
@@ -215,7 +246,7 @@ function exportCsvData() {
 }
 
 function openAdjust() {
-  Object.assign(adjustForm, { productId: 0, batchId: undefined, adjustType: 'GAIN', adjustQty: 0, reason: '' })
+  Object.assign(adjustForm, { productId: undefined, batchId: undefined, adjustType: 'GAIN', adjustQty: 1, reason: '' })
   adjustOpen.value = true
 }
 
@@ -223,7 +254,13 @@ async function submitAdjust() {
   await adjustFormRef.value?.validate()
   adjusting.value = true
   try {
-    await adjustInventory(adjustForm)
+    await adjustInventory({
+      productId: Number(adjustForm.productId),
+      batchId: adjustForm.batchId,
+      adjustType: adjustForm.adjustType,
+      adjustQty: adjustForm.adjustQty,
+      reason: adjustForm.reason
+    })
     message.success('调整成功')
     adjustOpen.value = false
     fetchData()
@@ -240,8 +277,9 @@ onMounted(async () => {
     getProductPage({ pageNo: 1, pageSize: 500 })
   ])
   warehouseOptions.value = warehouseRes.list.map((it: { id: number; warehouseName?: string }) => ({ label: it.warehouseName || `仓库${it.id}`, value: it.id }))
+  products.value = productRes.list || []
   const categorySet = new Set<string>()
-  for (const row of productRes.list || []) {
+  for (const row of products.value) {
     if (row.category) categorySet.add(row.category)
   }
   categoryOptions.value = Array.from(categorySet).map((it) => ({ label: it, value: it }))

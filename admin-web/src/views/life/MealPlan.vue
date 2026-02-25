@@ -60,6 +60,7 @@ import type { Dayjs } from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import { DINING_MEAL_TYPES, DINING_MEAL_TYPE_OPTIONS, getDiningMealTypeLabel } from '../../constants/dining'
 import { getMealPlanPage, createMealPlan, updateMealPlan, deleteMealPlan } from '../../api/life'
 import type { MealPlan, PageResult } from '../../types'
 
@@ -75,7 +76,7 @@ const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChange
 
 const columns = [
   { title: '日期', dataIndex: 'planDate', key: 'planDate', width: 120 },
-  { title: '餐次', dataIndex: 'mealType', key: 'mealType', width: 120 },
+  { title: '餐次', dataIndex: 'mealType', key: 'mealType', width: 120, customRender: ({ text }: any) => getDiningMealTypeLabel(text) },
   { title: '菜单', dataIndex: 'menu', key: 'menu' },
   { title: '热量', dataIndex: 'calories', key: 'calories', width: 100 },
   { title: '备注', dataIndex: 'remark', key: 'remark', width: 160 },
@@ -87,17 +88,12 @@ const saving = ref(false)
 const form = reactive({
   id: undefined as number | undefined,
   planDate: dayjs(),
-  mealType: 'BREAKFAST',
+  mealType: DINING_MEAL_TYPES.breakfast,
   menu: '',
   calories: undefined as number | undefined,
   remark: ''
 })
-const mealOptions = [
-  { label: '早餐', value: 'BREAKFAST' },
-  { label: '午餐', value: 'LUNCH' },
-  { label: '晚餐', value: 'DINNER' },
-  { label: '加餐', value: 'SNACK' }
-]
+const mealOptions = DINING_MEAL_TYPE_OPTIONS
 
 async function fetchData() {
   loading.value = true
@@ -138,7 +134,7 @@ function onReset() {
 function openCreate() {
   form.id = undefined
   form.planDate = dayjs()
-  form.mealType = 'BREAKFAST'
+  form.mealType = DINING_MEAL_TYPES.breakfast
   form.menu = ''
   form.calories = undefined
   form.remark = ''

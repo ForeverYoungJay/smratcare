@@ -55,6 +55,7 @@ public class ElderServiceImpl implements ElderService {
     elder.setGender(request.getGender());
     elder.setBirthDate(request.getBirthDate());
     elder.setPhone(request.getPhone());
+    elder.setHomeAddress(request.getHomeAddress());
     elder.setAdmissionDate(request.getAdmissionDate());
     elder.setStatus(request.getStatus());
     elder.setCareLevel(request.getCareLevel());
@@ -100,6 +101,9 @@ public class ElderServiceImpl implements ElderService {
     }
     if (request.getPhone() != null) {
       elder.setPhone(request.getPhone());
+    }
+    if (request.getHomeAddress() != null) {
+      elder.setHomeAddress(request.getHomeAddress());
     }
     if (request.getAdmissionDate() != null) {
       elder.setAdmissionDate(request.getAdmissionDate());
@@ -327,6 +331,7 @@ public class ElderServiceImpl implements ElderService {
     response.setGender(elder.getGender());
     response.setBirthDate(elder.getBirthDate());
     response.setPhone(elder.getPhone());
+    response.setHomeAddress(elder.getHomeAddress());
     response.setAdmissionDate(elder.getAdmissionDate());
     response.setStatus(elder.getStatus());
     response.setBedId(elder.getBedId());

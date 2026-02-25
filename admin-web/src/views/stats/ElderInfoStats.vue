@@ -22,12 +22,12 @@
       </a-col>
       <a-col :span="8">
         <a-card class="card-elevated" :bordered="false">
-          <a-statistic title="在院人数" :value="statusCount('在院')" />
+          <a-statistic title="在院人数" :value="stats.inHospitalCount || 0" />
         </a-card>
       </a-col>
       <a-col :span="8">
         <a-card class="card-elevated" :bordered="false">
-          <a-statistic title="离院人数" :value="statusCount('离院')" />
+          <a-statistic title="离院人数" :value="stats.dischargedCount || 0" />
         </a-card>
       </a-col>
     </a-row>
@@ -61,14 +61,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive } from 'vue'
+import { onMounted, reactive } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { getElderInfoStats } from '../../api/stats'
 import type { ElderInfoStatsResponse, NameCountItem } from '../../types'
 import { useECharts } from '../../plugins/echarts'
+import { message } from 'ant-design-vue'
 
 const stats = reactive<ElderInfoStatsResponse>({
   totalElders: 0,
+  inHospitalCount: 0,
+  dischargedCount: 0,
   genderDistribution: [],
   ageDistribution: [],
   careLevelDistribution: [],
@@ -82,17 +85,6 @@ const { chartRef: genderRef, setOption: setGenderOption } = useECharts()
 const { chartRef: ageRef, setOption: setAgeOption } = useECharts()
 const { chartRef: careLevelRef, setOption: setCareLevelOption } = useECharts()
 const { chartRef: statusRef, setOption: setStatusOption } = useECharts()
-
-const statusMap = computed(() =>
-  (stats.statusDistribution || []).reduce<Record<string, number>>((acc, item) => {
-    acc[item.name] = item.count
-    return acc
-  }, {})
-)
-
-function statusCount(name: string) {
-  return statusMap.value[name] || 0
-}
 
 function toPieData(data: NameCountItem[]) {
   return (data || []).map(item => ({ name: item.name, value: item.count }))
@@ -108,20 +100,24 @@ function toBarOption(data: NameCountItem[], color: string) {
 }
 
 async function loadData() {
-  const data = await getElderInfoStats({ orgId: query.orgId })
-  Object.assign(stats, data)
-  setGenderOption({
-    tooltip: { trigger: 'item' },
-    legend: { bottom: 0 },
-    series: [{ type: 'pie', radius: ['36%', '66%'], data: toPieData(data.genderDistribution || []) }]
-  })
-  setAgeOption(toBarOption(data.ageDistribution || [], '#13c2c2'))
-  setCareLevelOption(toBarOption(data.careLevelDistribution || [], '#1677ff'))
-  setStatusOption({
-    tooltip: { trigger: 'item' },
-    legend: { bottom: 0 },
-    series: [{ type: 'pie', radius: '65%', data: toPieData(data.statusDistribution || []) }]
-  })
+  try {
+    const data = await getElderInfoStats({ orgId: query.orgId })
+    Object.assign(stats, data)
+    setGenderOption({
+      tooltip: { trigger: 'item' },
+      legend: { bottom: 0 },
+      series: [{ type: 'pie', radius: ['36%', '66%'], data: toPieData(data.genderDistribution || []) }]
+    })
+    setAgeOption(toBarOption(data.ageDistribution || [], '#13c2c2'))
+    setCareLevelOption(toBarOption(data.careLevelDistribution || [], '#1677ff'))
+    setStatusOption({
+      tooltip: { trigger: 'item' },
+      legend: { bottom: 0 },
+      series: [{ type: 'pie', radius: '65%', data: toPieData(data.statusDistribution || []) }]
+    })
+  } catch (error: any) {
+    message.error(error?.message || '加载老人信息统计失败')
+  }
 }
 
 function reset() {

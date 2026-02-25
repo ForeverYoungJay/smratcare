@@ -4,6 +4,9 @@
       <a-form-item label="日期范围">
         <a-range-picker v-model:value="query.range" />
       </a-form-item>
+      <a-form-item label="状态">
+        <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 140px" />
+      </a-form-item>
       <a-form-item label="关键词">
         <a-input v-model:value="query.keyword" placeholder="订单号/区域/送餐人" allow-clear />
       </a-form-item>
@@ -15,8 +18,8 @@
     <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
-          <a-tag :color="record.status === 'DELIVERED' ? 'green' : record.status === 'FAILED' ? 'red' : 'orange'">
-            {{ record.status }}
+          <a-tag :color="getDiningDeliveryStatusColor(record.status)">
+            {{ statusLabel(record.status) }}
           </a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
@@ -30,14 +33,28 @@
 
     <a-modal v-model:open="editOpen" title="送餐记录" :confirm-loading="saving" @ok="submit">
       <a-form layout="vertical">
-        <a-form-item label="点餐单ID" required>
-          <a-input-number v-model:value="form.mealOrderId" :min="1" style="width: 100%" />
+        <a-form-item label="点餐单" required>
+          <a-select
+            v-model:value="form.mealOrderId"
+            show-search
+            :filter-option="false"
+            :options="mealOrderOptions"
+            placeholder="请输入订单号或老人姓名搜索"
+            @search="searchMealOrders"
+            @change="onMealOrderChange"
+          />
         </a-form-item>
         <a-form-item label="订单号" required>
-          <a-input v-model:value="form.orderNo" />
+          <a-input v-model:value="form.orderNo" readonly />
         </a-form-item>
         <a-form-item label="送餐区域">
-          <a-input v-model:value="form.deliveryAreaName" />
+          <a-select
+            v-model:value="form.deliveryAreaId"
+            :options="deliveryAreaOptions"
+            allow-clear
+            placeholder="请选择送餐区域"
+            @change="onDeliveryAreaChange"
+          />
         </a-form-item>
         <a-form-item label="送餐人">
           <a-input v-model:value="form.deliveredByName" />
@@ -65,22 +82,35 @@ import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import {
+  DINING_DELIVERY_STATUS_OPTIONS,
+  DINING_MESSAGES,
+  DINING_STATUS,
+  getDiningDeliveryStatusColor,
+  getDiningDeliveryStatusLabel
+} from '../../constants/dining'
+import {
   getDiningDeliveryRecordPage,
   createDiningDeliveryRecord,
   updateDiningDeliveryRecord,
-  deleteDiningDeliveryRecord
+  deleteDiningDeliveryRecord,
+  getDiningMealOrderPage,
+  getDiningDeliveryAreaList
 } from '../../api/dining'
-import type { DiningDeliveryRecord, PageResult } from '../../types'
+import type { DiningDeliveryRecord, DiningMealOrder, PageResult } from '../../types'
 
-const statusOptions = [
-  { label: '待送达', value: 'PENDING' },
-  { label: '已送达', value: 'DELIVERED' },
-  { label: '送达失败', value: 'FAILED' }
-]
+const statusOptions = DINING_DELIVERY_STATUS_OPTIONS
 
 const loading = ref(false)
 const rows = ref<DiningDeliveryRecord[]>([])
-const query = reactive({ range: undefined as [Dayjs, Dayjs] | undefined, keyword: '', pageNo: 1, pageSize: 10 })
+const mealOrderOptions = ref<{ label: string; value: number; orderNo: string; deliveryAreaId?: number; deliveryAreaName?: string }[]>([])
+const deliveryAreaOptions = ref<{ label: string; value: number; name: string }[]>([])
+const query = reactive({
+  range: undefined as [Dayjs, Dayjs] | undefined,
+  status: undefined as string | undefined,
+  keyword: '',
+  pageNo: 1,
+  pageSize: 10
+})
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const editOpen = ref(false)
 const saving = ref(false)
@@ -88,10 +118,11 @@ const form = reactive({
   id: undefined as number | undefined,
   mealOrderId: undefined as number | undefined,
   orderNo: '',
+  deliveryAreaId: undefined as number | undefined,
   deliveryAreaName: '',
   deliveredByName: '',
   deliveredAt: undefined as Dayjs | undefined,
-  status: 'PENDING',
+  status: DINING_STATUS.pending,
   remark: ''
 })
 
@@ -108,7 +139,7 @@ const columns = [
 async function fetchData() {
   loading.value = true
   try {
-    const params: any = { pageNo: query.pageNo, pageSize: query.pageSize, keyword: query.keyword }
+    const params: any = { pageNo: query.pageNo, pageSize: query.pageSize, keyword: query.keyword, status: query.status }
     if (query.range) {
       params.dateFrom = query.range[0].format('YYYY-MM-DD')
       params.dateTo = query.range[1].format('YYYY-MM-DD')
@@ -121,6 +152,10 @@ async function fetchData() {
   }
 }
 
+function statusLabel(status?: string) {
+  return getDiningDeliveryStatusLabel(status)
+}
+
 function handleTableChange(pag: any) {
   query.pageNo = pag.current
   query.pageSize = pag.pageSize
@@ -131,39 +166,80 @@ function handleTableChange(pag: any) {
 
 function onReset() {
   query.range = undefined
+  query.status = undefined
   query.keyword = ''
   query.pageNo = 1
   pagination.current = 1
   fetchData()
 }
 
-function openCreate() {
+async function loadDeliveryAreaOptions() {
+  const list = await getDiningDeliveryAreaList({})
+  deliveryAreaOptions.value = (list || []).map((item: any) => ({
+    label: `${item.areaCode}-${item.areaName}`,
+    value: Number(item.id),
+    name: item.areaName
+  }))
+}
+
+async function searchMealOrders(keyword = '') {
+  const page = await getDiningMealOrderPage({ pageNo: 1, pageSize: 30, keyword })
+  mealOrderOptions.value = (page.list || []).map((item: DiningMealOrder) => ({
+    label: `${item.orderNo} / ${item.elderName || ''}`,
+    value: Number(item.id),
+    orderNo: item.orderNo,
+    deliveryAreaId: item.deliveryAreaId,
+    deliveryAreaName: item.deliveryAreaName
+  }))
+}
+
+function onMealOrderChange(value: number | undefined) {
+  const selected = mealOrderOptions.value.find((item) => item.value === value)
+  form.orderNo = selected?.orderNo || ''
+  form.deliveryAreaId = undefined
+  form.deliveryAreaName = ''
+  if (selected?.deliveryAreaId) {
+    form.deliveryAreaId = selected.deliveryAreaId
+    form.deliveryAreaName = selected.deliveryAreaName || ''
+  }
+}
+
+function onDeliveryAreaChange(value: number | undefined) {
+  const selected = deliveryAreaOptions.value.find((item) => item.value === value)
+  form.deliveryAreaName = selected?.name || ''
+}
+
+async function openCreate() {
   form.id = undefined
   form.mealOrderId = undefined
   form.orderNo = ''
+  form.deliveryAreaId = undefined
   form.deliveryAreaName = ''
   form.deliveredByName = ''
   form.deliveredAt = undefined
-  form.status = 'PENDING'
+  form.status = DINING_STATUS.pending
   form.remark = ''
+  await Promise.all([searchMealOrders(), loadDeliveryAreaOptions()])
   editOpen.value = true
 }
 
-function openEdit(record: DiningDeliveryRecord) {
+async function openEdit(record: DiningDeliveryRecord) {
   form.id = record.id
   form.mealOrderId = record.mealOrderId
   form.orderNo = record.orderNo
+  form.deliveryAreaId = record.deliveryAreaId
   form.deliveryAreaName = record.deliveryAreaName || ''
   form.deliveredByName = record.deliveredByName || ''
   form.deliveredAt = record.deliveredAt ? dayjs(record.deliveredAt) : undefined
-  form.status = record.status || 'PENDING'
+  form.status = record.status || DINING_STATUS.pending
   form.remark = record.remark || ''
+  await Promise.all([searchMealOrders(record.orderNo || ''), loadDeliveryAreaOptions()])
   editOpen.value = true
 }
 
 async function submit() {
   if (!form.mealOrderId || !form.orderNo) {
-    message.error('请填写点餐单ID和订单号')
+    message.error(DINING_MESSAGES.requiredMealOrder)
     return
   }
   saving.value = true
@@ -171,11 +247,12 @@ async function submit() {
     const payload = {
       mealOrderId: form.mealOrderId,
       orderNo: form.orderNo,
+      deliveryAreaId: form.deliveryAreaId,
       deliveryAreaName: form.deliveryAreaName,
-      deliveredByName: form.deliveredByName,
+      deliveredByName: form.deliveredByName.trim() || undefined,
       deliveredAt: form.deliveredAt ? dayjs(form.deliveredAt).format('YYYY-MM-DD HH:mm:ss') : undefined,
       status: form.status,
-      remark: form.remark
+      remark: form.remark.trim() || undefined
     }
     if (form.id) {
       await updateDiningDeliveryRecord(form.id, payload)
@@ -194,5 +271,7 @@ async function remove(record: DiningDeliveryRecord) {
   fetchData()
 }
 
+searchMealOrders()
+loadDeliveryAreaOptions()
 fetchData()
 </script>

@@ -119,6 +119,8 @@ public class StatisticsController {
     CheckInStatsResponse response = new CheckInStatsResponse();
     response.setTotalAdmissions((long) admissions.size());
     response.setTotalDischarges((long) discharges.size());
+    response.setNetIncrease(response.getTotalAdmissions() - response.getTotalDischarges());
+    response.setDischargeToAdmissionRate(calculateRate(response.getTotalDischarges(), response.getTotalAdmissions()));
     response.setCurrentResidents(elderMapper.selectCount(
         Wrappers.lambdaQuery(ElderProfile.class)
             .eq(ElderProfile::getIsDeleted, 0)
@@ -126,6 +128,7 @@ public class StatisticsController {
             .eq(ElderProfile::getStatus, 1)));
     response.setMonthlyAdmissions(toMonthCountList(admissionMap));
     response.setMonthlyDischarges(toMonthCountList(dischargeMap));
+    response.setMonthlyNetIncrease(toMonthNetCountList(admissionMap, dischargeMap));
     return Result.ok(response);
   }
 
@@ -199,8 +202,14 @@ public class StatisticsController {
     ConsumptionStatsResponse response = new ConsumptionStatsResponse();
     response.setTotalBillConsumption(totalBill);
     response.setTotalStoreConsumption(totalStore);
+    BigDecimal totalConsumption = totalBill.add(totalStore);
+    response.setTotalConsumption(totalConsumption);
+    response.setBillConsumptionRatio(calculateShareRate(totalBill, totalConsumption));
+    response.setStoreConsumptionRatio(calculateShareRate(totalStore, totalConsumption));
+    response.setAverageMonthlyConsumption(calculateAverage(totalConsumption, billByMonth.size()));
     response.setMonthlyBillConsumption(toMonthAmountList(billByMonth));
     response.setMonthlyStoreConsumption(toMonthAmountList(storeByMonth));
+    response.setMonthlyTotalConsumption(toMergedMonthAmountList(billByMonth, storeByMonth));
     response.setTopConsumerElders(topElders);
     return Result.ok(response);
   }
@@ -251,6 +260,8 @@ public class StatisticsController {
 
     ElderInfoStatsResponse response = new ElderInfoStatsResponse();
     response.setTotalElders((long) elders.size());
+    response.setInHospitalCount(elderStatus.getOrDefault("在院", 0L));
+    response.setDischargedCount(elderStatus.getOrDefault("离院", 0L));
     response.setGenderDistribution(toNameCountList(gender));
     response.setAgeDistribution(toNameCountList(ageBuckets));
     response.setCareLevelDistribution(toNameCountList(careLevel));
@@ -374,6 +385,8 @@ public class StatisticsController {
     response.setMaintenanceBeds(maintenance);
     response.setAvailableBeds(available);
     response.setOccupancyRate(calculateRate(occupied, total));
+    response.setMaintenanceRate(calculateRate(maintenance, total));
+    response.setAvailableRate(calculateRate(available, total));
     return Result.ok(response);
   }
 
@@ -405,6 +418,8 @@ public class StatisticsController {
     MonthlyRevenueStatsResponse response = new MonthlyRevenueStatsResponse();
     response.setTotalRevenue(total);
     response.setMonthlyRevenue(toMonthAmountList(monthMap));
+    response.setAverageMonthlyRevenue(calculateAverage(total, monthMap.size()));
+    response.setRevenueGrowthRate(calculateMonthOverMonthGrowth(monthMap));
     return Result.ok(response);
   }
 
@@ -744,6 +759,27 @@ public class StatisticsController {
     return result;
   }
 
+  private List<MonthAmountItem> toMergedMonthAmountList(
+      Map<String, BigDecimal> first, Map<String, BigDecimal> second) {
+    Map<String, BigDecimal> merged = new LinkedHashMap<>();
+    for (Map.Entry<String, BigDecimal> entry : first.entrySet()) {
+      String month = entry.getKey();
+      merged.put(month, safeAmount(entry.getValue()).add(safeAmount(second.get(month))));
+    }
+    return toMonthAmountList(merged);
+  }
+
+  private List<MonthCountItem> toMonthNetCountList(Map<String, Long> income, Map<String, Long> outcome) {
+    List<MonthCountItem> result = new ArrayList<>();
+    for (Map.Entry<String, Long> entry : income.entrySet()) {
+      MonthCountItem item = new MonthCountItem();
+      item.setMonth(entry.getKey());
+      item.setCount(entry.getValue() - outcome.getOrDefault(entry.getKey(), 0L));
+      result.add(item);
+    }
+    return result;
+  }
+
   private List<NameCountItem> toNameCountList(Map<String, Long> data) {
     List<NameCountItem> result = new ArrayList<>();
     for (Map.Entry<String, Long> entry : data.entrySet()) {
@@ -762,6 +798,37 @@ public class StatisticsController {
     return BigDecimal.valueOf(numerator)
         .multiply(BigDecimal.valueOf(100))
         .divide(BigDecimal.valueOf(denominator), 2, RoundingMode.HALF_UP);
+  }
+
+  private BigDecimal calculateShareRate(BigDecimal part, BigDecimal total) {
+    if (total == null || total.compareTo(BigDecimal.ZERO) <= 0) {
+      return BigDecimal.ZERO;
+    }
+    return safeAmount(part)
+        .multiply(BigDecimal.valueOf(100))
+        .divide(total, 2, RoundingMode.HALF_UP);
+  }
+
+  private BigDecimal calculateAverage(BigDecimal total, int periodCount) {
+    if (periodCount <= 0) {
+      return BigDecimal.ZERO;
+    }
+    return safeAmount(total).divide(BigDecimal.valueOf(periodCount), 2, RoundingMode.HALF_UP);
+  }
+
+  private BigDecimal calculateMonthOverMonthGrowth(Map<String, BigDecimal> monthMap) {
+    if (monthMap == null || monthMap.size() < 2) {
+      return BigDecimal.ZERO;
+    }
+    List<BigDecimal> values = new ArrayList<>(monthMap.values());
+    BigDecimal previous = safeAmount(values.get(values.size() - 2));
+    BigDecimal current = safeAmount(values.get(values.size() - 1));
+    if (previous.compareTo(BigDecimal.ZERO) <= 0) {
+      return current.compareTo(BigDecimal.ZERO) > 0 ? BigDecimal.valueOf(100) : BigDecimal.ZERO;
+    }
+    return current.subtract(previous)
+        .multiply(BigDecimal.valueOf(100))
+        .divide(previous, 2, RoundingMode.HALF_UP);
   }
 
   private YearMonth parseYearMonth(String value, YearMonth fallback) {
@@ -865,23 +932,33 @@ public class StatisticsController {
   public static class CheckInStatsResponse {
     private Long totalAdmissions;
     private Long totalDischarges;
+    private Long netIncrease;
+    private BigDecimal dischargeToAdmissionRate;
     private Long currentResidents;
     private List<MonthCountItem> monthlyAdmissions;
     private List<MonthCountItem> monthlyDischarges;
+    private List<MonthCountItem> monthlyNetIncrease;
   }
 
   @Data
   public static class ConsumptionStatsResponse {
     private BigDecimal totalBillConsumption;
     private BigDecimal totalStoreConsumption;
+    private BigDecimal totalConsumption;
+    private BigDecimal billConsumptionRatio;
+    private BigDecimal storeConsumptionRatio;
+    private BigDecimal averageMonthlyConsumption;
     private List<MonthAmountItem> monthlyBillConsumption;
     private List<MonthAmountItem> monthlyStoreConsumption;
+    private List<MonthAmountItem> monthlyTotalConsumption;
     private List<ElderAmountItem> topConsumerElders;
   }
 
   @Data
   public static class ElderInfoStatsResponse {
     private Long totalElders;
+    private Long inHospitalCount;
+    private Long dischargedCount;
     private List<NameCountItem> genderDistribution;
     private List<NameCountItem> ageDistribution;
     private List<NameCountItem> careLevelDistribution;
@@ -915,11 +992,15 @@ public class StatisticsController {
     private Long availableBeds;
     private Long maintenanceBeds;
     private BigDecimal occupancyRate;
+    private BigDecimal maintenanceRate;
+    private BigDecimal availableRate;
   }
 
   @Data
   public static class MonthlyRevenueStatsResponse {
     private BigDecimal totalRevenue;
+    private BigDecimal averageMonthlyRevenue;
+    private BigDecimal revenueGrowthRate;
     private List<MonthAmountItem> monthlyRevenue;
   }
 

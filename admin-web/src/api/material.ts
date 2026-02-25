@@ -8,8 +8,14 @@ import type {
   MaterialPurchaseOrderItem,
   MaterialTransferItem
 } from '../types'
+import type { MaterialOrderStatus } from '../utils/materialStatus'
 
-export function getWarehousePage(params: any) {
+export function getWarehousePage(params: {
+  pageNo?: number
+  pageSize?: number
+  keyword?: string
+  enabledOnly?: boolean
+}) {
   return fetchPage<MaterialWarehouseItem>('/api/material/warehouse/page', params)
 }
 
@@ -25,7 +31,12 @@ export function deleteWarehouse(id: number) {
   return request.delete<void>(`/api/material/warehouse/${id}`)
 }
 
-export function getSupplierPage(params: any) {
+export function getSupplierPage(params: {
+  pageNo?: number
+  pageSize?: number
+  keyword?: string
+  enabledOnly?: boolean
+}) {
   return fetchPage<MaterialSupplierItem>('/api/material/supplier/page', params)
 }
 
@@ -41,7 +52,14 @@ export function deleteSupplier(id: number) {
   return request.delete<void>(`/api/material/supplier/${id}`)
 }
 
-export function getPurchasePage(params: any) {
+export function getPurchasePage(params: {
+  pageNo?: number
+  pageSize?: number
+  warehouseId?: number
+  supplierId?: number
+  status?: MaterialOrderStatus
+  keyword?: string
+}) {
   return fetchPage<MaterialPurchaseOrder>('/api/material/purchase/page', params)
 }
 
@@ -59,6 +77,19 @@ export function createPurchase(data: {
   return request.post<void>('/api/material/purchase', data)
 }
 
+export function updatePurchase(
+  id: number,
+  data: {
+    warehouseId?: number
+    supplierId?: number
+    orderDate?: string
+    remark?: string
+    items: MaterialPurchaseOrderItem[]
+  }
+) {
+  return request.put<void>(`/api/material/purchase/${id}`, data)
+}
+
 export function approvePurchase(id: number) {
   return request.post<void>(`/api/material/purchase/${id}/approve`)
 }
@@ -67,7 +98,16 @@ export function completePurchase(id: number) {
   return request.post<void>(`/api/material/purchase/${id}/complete`)
 }
 
-export function getTransferPage(params: any) {
+export function cancelPurchase(id: number) {
+  return request.post<void>(`/api/material/purchase/${id}/cancel`)
+}
+
+export function getTransferPage(params: {
+  pageNo?: number
+  pageSize?: number
+  status?: MaterialOrderStatus
+  keyword?: string
+}) {
   return fetchPage<MaterialTransferOrder>('/api/material/transfer/page', params)
 }
 
@@ -84,8 +124,24 @@ export function createTransfer(data: {
   return request.post<void>('/api/material/transfer', data)
 }
 
+export function updateTransfer(
+  id: number,
+  data: {
+    fromWarehouseId: number
+    toWarehouseId: number
+    remark?: string
+    items: MaterialTransferItem[]
+  }
+) {
+  return request.put<void>(`/api/material/transfer/${id}`, data)
+}
+
 export function completeTransfer(id: number) {
   return request.post<void>(`/api/material/transfer/${id}/complete`)
+}
+
+export function cancelTransfer(id: number) {
+  return request.post<void>(`/api/material/transfer/${id}/cancel`)
 }
 
 export function getStockAmount(params?: {

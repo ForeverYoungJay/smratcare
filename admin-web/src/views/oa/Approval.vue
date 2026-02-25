@@ -1,6 +1,9 @@
 <template>
   <PageContainer title="审批流程" subTitle="请假/报销/采购固定审批">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
+      <a-form-item label="关键字">
+        <a-input v-model:value="query.keyword" placeholder="标题/申请人/备注" allow-clear style="width: 240px" />
+      </a-form-item>
       <a-form-item label="类型">
         <a-select v-model:value="query.type" :options="typeOptions" allow-clear style="width: 160px" />
       </a-form-item>
@@ -9,11 +12,16 @@
       </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openCreate">新增审批</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" @click="batchApprove">批量通过</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" @click="batchReject">批量驳回</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+        <a-button @click="downloadExport">导出CSV</a-button>
       </template>
     </SearchForm>
 
     <DataTable
       rowKey="id"
+      :row-selection="rowSelection"
       :columns="columns"
       :data-source="rows"
       :loading="loading"
@@ -28,9 +36,9 @@
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
-            <a-button type="link" @click="openEdit(record)">编辑</a-button>
-            <a-button type="link" @click="approve(record)">通过</a-button>
-            <a-button type="link" @click="reject(record)">驳回</a-button>
+            <a-button type="link" :disabled="record.status !== 'PENDING'" @click="openEdit(record)">编辑</a-button>
+            <a-button type="link" :disabled="record.status !== 'PENDING'" @click="approve(record)">通过</a-button>
+            <a-button type="link" :disabled="record.status !== 'PENDING'" @click="reject(record)">驳回</a-button>
             <a-button type="link" danger @click="remove(record)">删除</a-button>
           </a-space>
         </template>
@@ -56,7 +64,7 @@
           </a-col>
           <a-col :span="12">
             <a-form-item label="状态">
-              <a-select v-model:value="form.status" :options="statusOptions" />
+              <a-select v-model:value="form.status" :options="editableStatusOptions" disabled />
             </a-form-item>
           </a-col>
         </a-row>
@@ -84,18 +92,37 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
+import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
-import { getApprovalPage, createApproval, updateApproval, approveApproval, rejectApproval, deleteApproval } from '../../api/oa'
+import {
+  getApprovalPage,
+  createApproval,
+  updateApproval,
+  approveApproval,
+  rejectApproval,
+  deleteApproval,
+  batchApproveApproval,
+  batchRejectApproval,
+  batchDeleteApproval,
+  exportApproval
+} from '../../api/oa'
 import type { OaApproval, PageResult } from '../../types'
 
 const loading = ref(false)
 const rows = ref<OaApproval[]>([])
-const query = reactive({ type: undefined as string | undefined, status: undefined as string | undefined, pageNo: 1, pageSize: 10 })
+const query = reactive({
+  keyword: '',
+  type: undefined as string | undefined,
+  status: undefined as string | undefined,
+  pageNo: 1,
+  pageSize: 10
+})
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
+const selectedRowKeys = ref<number[]>([])
 
 const columns = [
   { title: '类型', dataIndex: 'approvalType', key: 'approvalType', width: 120 },
@@ -131,6 +158,13 @@ const statusOptions = [
   { label: '已通过', value: 'APPROVED' },
   { label: '已驳回', value: 'REJECTED' }
 ]
+const editableStatusOptions = [{ label: '待审批', value: 'PENDING' }]
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: (string | number)[]) => {
+    selectedRowKeys.value = keys.map((item) => Number(item))
+  }
+}))
 
 function statusLabel(status?: string) {
   if (status === 'APPROVED') return '已通过'
@@ -145,10 +179,12 @@ async function fetchData() {
       pageNo: query.pageNo,
       pageSize: query.pageSize,
       status: query.status,
-      type: query.type
+      type: query.type,
+      keyword: query.keyword || undefined
     })
     rows.value = res.list
     pagination.total = res.total || res.list.length
+    selectedRowKeys.value = []
   } finally {
     loading.value = false
   }
@@ -163,6 +199,7 @@ function handleTableChange(pag: any) {
 }
 
 function onReset() {
+  query.keyword = ''
   query.status = undefined
   query.type = undefined
   query.pageNo = 1
@@ -225,18 +262,61 @@ async function submit() {
 }
 
 async function approve(record: OaApproval) {
+  if (record.status !== 'PENDING') return
   await approveApproval(record.id)
   fetchData()
 }
 
 async function reject(record: OaApproval) {
-  await rejectApproval(record.id, '未通过')
+  if (record.status !== 'PENDING') return
+  const remark = window.prompt('请输入驳回原因', '未通过')
+  if (remark === null) return
+  await rejectApproval(record.id, remark)
   fetchData()
 }
 
 async function remove(record: OaApproval) {
   await deleteApproval(record.id)
   fetchData()
+}
+
+async function batchApprove() {
+  if (selectedRowKeys.value.length === 0) return
+  const affected = await batchApproveApproval(selectedRowKeys.value)
+  message.success(`批量通过完成，共处理 ${affected || 0} 条`)
+  fetchData()
+}
+
+async function batchReject() {
+  if (selectedRowKeys.value.length === 0) return
+  const remark = window.prompt('请输入批量驳回原因', '批量未通过')
+  if (remark === null) return
+  const affected = await batchRejectApproval(selectedRowKeys.value, remark)
+  message.success(`批量驳回完成，共处理 ${affected || 0} 条`)
+  fetchData()
+}
+
+async function batchRemove() {
+  if (selectedRowKeys.value.length === 0) return
+  const affected = await batchDeleteApproval(selectedRowKeys.value)
+  message.success(`批量删除完成，共处理 ${affected || 0} 条`)
+  fetchData()
+}
+
+async function downloadExport() {
+  const blob = await exportApproval({
+    keyword: query.keyword || undefined,
+    type: query.type,
+    status: query.status
+  })
+  const href = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = href
+  link.download = `oa-approval-${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(href)
 }
 
 fetchData()

@@ -9,11 +9,14 @@
       </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openCreate">新增文档</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+        <a-button @click="downloadExport">导出CSV</a-button>
       </template>
     </SearchForm>
 
     <DataTable
       rowKey="id"
+      :row-selection="rowSelection"
       :columns="columns"
       :data-source="rows"
       :loading="loading"
@@ -62,17 +65,26 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
+import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
-import { getDocumentPage, createDocument, updateDocument, deleteDocument } from '../../api/oa'
+import {
+  getDocumentPage,
+  createDocument,
+  updateDocument,
+  deleteDocument,
+  batchDeleteDocument,
+  exportDocument
+} from '../../api/oa'
 import type { OaDocument, PageResult } from '../../types'
 
 const loading = ref(false)
 const rows = ref<OaDocument[]>([])
 const query = reactive({ folder: '', keyword: '', pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
+const selectedRowKeys = ref<number[]>([])
 
 const columns = [
   { title: '文件名', dataIndex: 'name', key: 'name', width: 200 },
@@ -94,6 +106,12 @@ const form = reactive({
   uploaderName: '',
   remark: ''
 })
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: (string | number)[]) => {
+    selectedRowKeys.value = keys.map((item) => Number(item))
+  }
+}))
 
 async function fetchData() {
   loading.value = true
@@ -106,6 +124,7 @@ async function fetchData() {
     })
     rows.value = res.list
     pagination.total = res.total || res.list.length
+    selectedRowKeys.value = []
   } finally {
     loading.value = false
   }
@@ -175,6 +194,28 @@ async function submit() {
 async function remove(record: OaDocument) {
   await deleteDocument(record.id)
   fetchData()
+}
+
+async function batchRemove() {
+  if (selectedRowKeys.value.length === 0) return
+  const affected = await batchDeleteDocument(selectedRowKeys.value)
+  message.success(`批量删除，共处理 ${affected || 0} 条`)
+  fetchData()
+}
+
+async function downloadExport() {
+  const blob = await exportDocument({
+    folder: query.folder || undefined,
+    keyword: query.keyword || undefined
+  })
+  const href = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = href
+  link.download = `oa-document-${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(href)
 }
 
 fetchData()

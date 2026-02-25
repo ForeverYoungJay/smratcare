@@ -4,6 +4,12 @@
       <a-form-item label="日期范围">
         <a-range-picker v-model:value="query.range" />
       </a-form-item>
+      <a-form-item label="餐次">
+        <a-select v-model:value="query.mealType" :options="mealOptions" allow-clear style="width: 140px" />
+      </a-form-item>
+      <a-form-item label="状态">
+        <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 140px" />
+      </a-form-item>
       <a-form-item label="关键词">
         <a-input v-model:value="query.keyword" placeholder="订单号/老人/菜品" allow-clear />
       </a-form-item>
@@ -14,8 +20,11 @@
 
     <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'status'">
-          <a-tag :color="statusColor(record.status)">{{ record.status }}</a-tag>
+        <template v-if="column.key === 'mealType'">
+          {{ getDiningMealTypeLabel(record.mealType) }}
+        </template>
+        <template v-else-if="column.key === 'status'">
+          <a-tag :color="statusColor(record.status)">{{ getDiningOrderStatusLabel(record.status) }}</a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
@@ -24,11 +33,7 @@
               <a-button type="link">状态</a-button>
               <template #overlay>
                 <a-menu @click="({ key }: any) => updateStatus(record, key)">
-                  <a-menu-item key="CREATED">已创建</a-menu-item>
-                  <a-menu-item key="PREPARING">备餐中</a-menu-item>
-                  <a-menu-item key="DELIVERING">配送中</a-menu-item>
-                  <a-menu-item key="DELIVERED">已送达</a-menu-item>
-                  <a-menu-item key="CANCELLED">已取消</a-menu-item>
+                  <a-menu-item v-for="item in statusOptions" :key="item.value">{{ item.label }}</a-menu-item>
                 </a-menu>
               </template>
             </a-dropdown>
@@ -60,7 +65,7 @@
           </a-col>
           <a-col :span="12">
             <a-form-item label="餐次" required>
-              <a-select v-model:value="form.mealType" :options="mealOptions" @change="loadDishOptions" />
+              <a-select v-model:value="form.mealType" :options="mealOptions" @change="onMealTypeChange" />
             </a-form-item>
           </a-col>
           <a-col :span="12">
@@ -83,12 +88,24 @@
         <a-row :gutter="12">
           <a-col :span="12">
             <a-form-item label="备餐分区">
-              <a-input v-model:value="form.prepZoneName" />
+              <a-select
+                v-model:value="form.prepZoneId"
+                :options="prepZoneOptions"
+                allow-clear
+                placeholder="请选择备餐分区"
+                @change="onPrepZoneChange"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="12">
             <a-form-item label="送餐区域">
-              <a-input v-model:value="form.deliveryAreaName" />
+              <a-select
+                v-model:value="form.deliveryAreaId"
+                :options="deliveryAreaOptions"
+                allow-clear
+                placeholder="请选择送餐区域"
+                @change="onDeliveryAreaChange"
+              />
             </a-form-item>
           </a-col>
         </a-row>
@@ -136,6 +153,16 @@ import type { Dayjs } from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import {
+  DINING_MEAL_TYPES,
+  DINING_MEAL_TYPE_OPTIONS,
+  DINING_MESSAGES,
+  DINING_ORDER_STATUS_OPTIONS,
+  DINING_STATUS,
+  getDiningMealTypeLabel,
+  getDiningOrderStatusColor,
+  getDiningOrderStatusLabel
+} from '../../constants/dining'
 import { getElderPage } from '../../api/elder'
 import {
   getDiningMealOrderPage,
@@ -144,22 +171,22 @@ import {
   updateDiningMealOrderStatus,
   deleteDiningMealOrder,
   getDiningDishList,
+  getDiningPrepZoneList,
+  getDiningDeliveryAreaList,
   checkDiningMealOrderRisk,
   applyDiningRiskOverride
 } from '../../api/dining'
 import type { DiningMealOrder, DiningRiskCheckResponse, PageResult } from '../../types'
 
-const mealOptions = [
-  { label: '早餐', value: 'BREAKFAST' },
-  { label: '午餐', value: 'LUNCH' },
-  { label: '晚餐', value: 'DINNER' },
-  { label: '加餐', value: 'SNACK' }
-]
+const mealOptions = DINING_MEAL_TYPE_OPTIONS
+const statusOptions = DINING_ORDER_STATUS_OPTIONS
 
 const loading = ref(false)
 const rows = ref<DiningMealOrder[]>([])
 const query = reactive({
   range: undefined as [Dayjs, Dayjs] | undefined,
+  mealType: undefined as string | undefined,
+  status: undefined as string | undefined,
   keyword: '',
   pageNo: 1,
   pageSize: 10
@@ -169,6 +196,8 @@ const editOpen = ref(false)
 const saving = ref(false)
 const elderOptions = ref<{ label: string; value: number }[]>([])
 const dishOptions = ref<{ label: string; value: number; price: number }[]>([])
+const prepZoneOptions = ref<{ label: string; value: number; name: string }[]>([])
+const deliveryAreaOptions = ref<{ label: string; value: number; name: string }[]>([])
 const riskResult = ref<DiningRiskCheckResponse | null>(null)
 
 const form = reactive({
@@ -176,11 +205,13 @@ const form = reactive({
   elderId: undefined as number | undefined,
   elderName: '',
   orderDate: dayjs(),
-  mealType: 'LUNCH',
+  mealType: DINING_MEAL_TYPES.lunch,
   dishIdList: [] as number[],
   dishNames: '',
   totalAmount: 0,
+  prepZoneId: undefined as number | undefined,
   prepZoneName: '',
+  deliveryAreaId: undefined as number | undefined,
   deliveryAreaName: '',
   overrideId: undefined as number | undefined,
   overrideApplyReason: '',
@@ -206,16 +237,19 @@ const riskDescription = computed(() => {
 })
 
 function statusColor(status?: string) {
-  if (status === 'DELIVERED') return 'green'
-  if (status === 'CANCELLED') return 'red'
-  if (status === 'DELIVERING') return 'blue'
-  return 'orange'
+  return getDiningOrderStatusColor(status)
 }
 
 async function fetchData() {
   loading.value = true
   try {
     const params: any = { pageNo: query.pageNo, pageSize: query.pageSize, keyword: query.keyword }
+    if (query.mealType) {
+      params.mealType = query.mealType
+    }
+    if (query.status) {
+      params.status = query.status
+    }
     if (query.range) {
       params.dateFrom = query.range[0].format('YYYY-MM-DD')
       params.dateTo = query.range[1].format('YYYY-MM-DD')
@@ -237,11 +271,29 @@ async function loadElders() {
 }
 
 async function loadDishOptions() {
-  const list = await getDiningDishList({ mealType: form.mealType, status: 'ENABLED' })
+  const list = await getDiningDishList({ mealType: form.mealType, status: DINING_STATUS.enabled })
   dishOptions.value = (list || []).map((item: any) => ({
     label: `${item.dishName} ¥${item.unitPrice || 0}`,
     value: Number(item.id),
     price: Number(item.unitPrice || 0)
+  }))
+}
+
+async function loadPrepZones() {
+  const list = await getDiningPrepZoneList({})
+  prepZoneOptions.value = (list || []).map((item: any) => ({
+    label: `${item.zoneCode}-${item.zoneName}`,
+    value: Number(item.id),
+    name: item.zoneName
+  }))
+}
+
+async function loadDeliveryAreas() {
+  const list = await getDiningDeliveryAreaList({})
+  deliveryAreaOptions.value = (list || []).map((item: any) => ({
+    label: `${item.areaCode}-${item.areaName}`,
+    value: Number(item.id),
+    name: item.areaName
   }))
 }
 
@@ -250,10 +302,29 @@ function onElderChange(value: number) {
   form.elderName = selected?.label?.split('(')[0] || ''
 }
 
+function onMealTypeChange() {
+  form.dishIdList = []
+  form.dishNames = ''
+  form.totalAmount = 0
+  riskResult.value = null
+  loadDishOptions()
+}
+
 function onDishChange(values: number[]) {
   const selected = dishOptions.value.filter((item) => values.includes(item.value))
   form.dishNames = selected.map((item) => item.label.split(' ¥')[0]).join(',')
   form.totalAmount = Number(selected.reduce((sum, item) => sum + item.price, 0).toFixed(2))
+  riskResult.value = null
+}
+
+function onPrepZoneChange(value: number | undefined) {
+  const selected = prepZoneOptions.value.find((item) => item.value === value)
+  form.prepZoneName = selected?.name || ''
+}
+
+function onDeliveryAreaChange(value: number | undefined) {
+  const selected = deliveryAreaOptions.value.find((item) => item.value === value)
+  form.deliveryAreaName = selected?.name || ''
 }
 
 function handleTableChange(pag: any) {
@@ -266,6 +337,8 @@ function handleTableChange(pag: any) {
 
 function onReset() {
   query.range = undefined
+  query.mealType = undefined
+  query.status = undefined
   query.keyword = ''
   query.pageNo = 1
   pagination.current = 1
@@ -277,17 +350,19 @@ async function openCreate() {
   form.elderId = undefined
   form.elderName = ''
   form.orderDate = dayjs()
-  form.mealType = 'LUNCH'
+  form.mealType = DINING_MEAL_TYPES.lunch
   form.dishIdList = []
   form.dishNames = ''
   form.totalAmount = 0
+  form.prepZoneId = undefined
   form.prepZoneName = ''
+  form.deliveryAreaId = undefined
   form.deliveryAreaName = ''
   form.overrideId = undefined
   form.overrideApplyReason = ''
   form.remark = ''
   riskResult.value = null
-  await loadDishOptions()
+  await Promise.all([loadDishOptions(), loadPrepZones(), loadDeliveryAreas()])
   editOpen.value = true
 }
 
@@ -297,15 +372,17 @@ async function openEdit(record: DiningMealOrder) {
   form.elderName = record.elderName || ''
   form.orderDate = dayjs(record.orderDate)
   form.mealType = record.mealType
-  await loadDishOptions()
+  form.prepZoneId = record.prepZoneId
+  form.prepZoneName = record.prepZoneName || ''
+  form.deliveryAreaId = record.deliveryAreaId
+  form.deliveryAreaName = record.deliveryAreaName || ''
+  await Promise.all([loadDishOptions(), loadPrepZones(), loadDeliveryAreas()])
   form.dishIdList = (record.dishIds || '')
     .split(',')
     .map((item) => Number(item.trim()))
     .filter((item) => !!item)
   form.dishNames = record.dishNames
   form.totalAmount = record.totalAmount || 0
-  form.prepZoneName = record.prepZoneName || ''
-  form.deliveryAreaName = record.deliveryAreaName || ''
   form.overrideId = record.overrideId
   form.overrideApplyReason = ''
   form.remark = record.remark || ''
@@ -314,8 +391,8 @@ async function openEdit(record: DiningMealOrder) {
 }
 
 async function runRiskCheck() {
-  if (!form.elderId || !form.orderDate || !form.mealType || !form.dishNames) {
-    message.error('请先填写老人、餐次和菜品')
+  if (!form.elderId || !form.orderDate || !form.mealType || form.dishIdList.length === 0) {
+    message.error(DINING_MESSAGES.requiredOrderMealDish)
     return
   }
   riskResult.value = await checkDiningMealOrderRisk({
@@ -331,11 +408,11 @@ async function runRiskCheck() {
 
 async function applyOverride() {
   if (!riskResult.value || riskResult.value.allowed) {
-    message.warning('当前无需申请放行')
+    message.warning(DINING_MESSAGES.noNeedOverride)
     return
   }
   if (!form.overrideApplyReason) {
-    message.error('请输入放行申请原因')
+    message.error(DINING_MESSAGES.requiredOverrideReason)
     return
   }
   const res = await applyDiningRiskOverride({
@@ -345,12 +422,12 @@ async function applyOverride() {
     applyReason: form.overrideApplyReason
   })
   form.overrideId = res.id
-  message.success(`放行申请已提交，审批单ID: ${res.id}`)
+  message.success(`${DINING_MESSAGES.overrideAppliedPrefix} ${res.id}`)
 }
 
 async function submit() {
-  if (!form.elderId || !form.orderDate || !form.mealType || !form.dishNames) {
-    message.error('请填写完整点餐信息')
+  if (!form.elderId || !form.orderDate || !form.mealType || form.dishIdList.length === 0) {
+    message.error(DINING_MESSAGES.requiredOrderFields)
     return
   }
   saving.value = true
@@ -359,7 +436,7 @@ async function submit() {
       await runRiskCheck()
     }
     if (riskResult.value && !riskResult.value.allowed && !form.overrideId) {
-      message.error('风险预检未通过，请先申请放行审批并填写审批ID')
+      message.error(DINING_MESSAGES.requiredOverrideId)
       return
     }
 
@@ -371,7 +448,9 @@ async function submit() {
       dishIds: form.dishIdList.join(','),
       dishNames: form.dishNames,
       totalAmount: form.totalAmount,
+      prepZoneId: form.prepZoneId,
       prepZoneName: form.prepZoneName,
+      deliveryAreaId: form.deliveryAreaId,
       deliveryAreaName: form.deliveryAreaName,
       overrideId: form.overrideId,
       remark: form.remark
@@ -399,5 +478,7 @@ async function remove(record: DiningMealOrder) {
 }
 
 loadElders()
+loadPrepZones()
+loadDeliveryAreas()
 fetchData()
 </script>

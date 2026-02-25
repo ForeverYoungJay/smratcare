@@ -25,12 +25,21 @@ import com.zhiyangyun.care.elder.model.lifecycle.ResidenceLifecycleConstants;
 import com.zhiyangyun.care.elder.model.lifecycle.TrialStayRequest;
 import com.zhiyangyun.care.elder.service.lifecycle.ElderLifecycleService;
 import jakarta.validation.Valid;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -132,16 +141,82 @@ public class ElderResidenceController {
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) Long elderId,
-      @RequestParam(required = false) String status) {
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) String keyword,
+      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+      @RequestParam(required = false) LocalDate trialStartDateFrom,
+      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+      @RequestParam(required = false) LocalDate trialStartDateTo) {
     Long orgId = AuthContext.getOrgId();
+    String normalizedStatus = normalizeTrialStatusForQuery(status);
+    LocalDate startDate = trialStartDateFrom;
+    LocalDate endDate = trialStartDateTo;
+    if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+      LocalDate temp = startDate;
+      startDate = endDate;
+      endDate = temp;
+    }
     var wrapper = Wrappers.lambdaQuery(ElderTrialStay.class)
         .eq(ElderTrialStay::getIsDeleted, 0)
         .eq(orgId != null, ElderTrialStay::getOrgId, orgId)
         .eq(elderId != null, ElderTrialStay::getElderId, elderId)
-        .eq(status != null && !status.isBlank(), ElderTrialStay::getStatus, status)
+        .eq(normalizedStatus != null, ElderTrialStay::getStatus, normalizedStatus)
+        .and(keyword != null && !keyword.isBlank(), w -> w.like(ElderTrialStay::getElderName, keyword)
+            .or().like(ElderTrialStay::getCareLevel, keyword)
+            .or().like(ElderTrialStay::getChannel, keyword))
+        .ge(startDate != null, ElderTrialStay::getTrialStartDate, startDate)
+        .le(endDate != null, ElderTrialStay::getTrialStartDate, endDate)
         .orderByDesc(ElderTrialStay::getTrialStartDate)
         .orderByDesc(ElderTrialStay::getCreateTime);
     return Result.ok(trialStayMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
+  }
+
+  @GetMapping(value = "/trial-stay/export", produces = "text/csv;charset=UTF-8")
+  public ResponseEntity<byte[]> exportTrialStay(
+      @RequestParam(required = false) Long elderId,
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) String keyword,
+      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+      @RequestParam(required = false) LocalDate trialStartDateFrom,
+      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+      @RequestParam(required = false) LocalDate trialStartDateTo) {
+    Long orgId = AuthContext.getOrgId();
+    String normalizedStatus = normalizeTrialStatusForQuery(status);
+    LocalDate startDate = trialStartDateFrom;
+    LocalDate endDate = trialStartDateTo;
+    if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+      LocalDate temp = startDate;
+      startDate = endDate;
+      endDate = temp;
+    }
+    var wrapper = Wrappers.lambdaQuery(ElderTrialStay.class)
+        .eq(ElderTrialStay::getIsDeleted, 0)
+        .eq(orgId != null, ElderTrialStay::getOrgId, orgId)
+        .eq(elderId != null, ElderTrialStay::getElderId, elderId)
+        .eq(normalizedStatus != null, ElderTrialStay::getStatus, normalizedStatus)
+        .and(keyword != null && !keyword.isBlank(), w -> w.like(ElderTrialStay::getElderName, keyword)
+            .or().like(ElderTrialStay::getCareLevel, keyword)
+            .or().like(ElderTrialStay::getChannel, keyword))
+        .ge(startDate != null, ElderTrialStay::getTrialStartDate, startDate)
+        .le(endDate != null, ElderTrialStay::getTrialStartDate, endDate)
+        .orderByDesc(ElderTrialStay::getTrialStartDate)
+        .orderByDesc(ElderTrialStay::getCreateTime);
+    List<ElderTrialStay> records = trialStayMapper.selectList(wrapper);
+    List<String> headers = List.of("老人姓名", "试住开始日期", "试住结束日期", "来源渠道", "试住套餐", "意向等级", "状态", "护理等级", "备注", "创建时间");
+    List<List<String>> rows = records.stream()
+        .map(item -> List.of(
+            safe(item.getElderName()),
+            safe(item.getTrialStartDate()),
+            safe(item.getTrialEndDate()),
+            safe(item.getChannel()),
+            safe(item.getTrialPackage()),
+            safe(item.getIntentLevel()),
+            trialStatusText(item.getStatus()),
+            safe(item.getCareLevel()),
+            safe(item.getRemark()),
+            safe(item.getCreateTime())))
+        .toList();
+    return csvResponse("elder-trial-stay", headers, rows);
   }
 
   @PostMapping("/trial-stay")
@@ -202,16 +277,83 @@ public class ElderResidenceController {
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) Long elderId,
-      @RequestParam(required = false) String status) {
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) String keyword,
+      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+      @RequestParam(required = false) LocalDate plannedDateFrom,
+      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+      @RequestParam(required = false) LocalDate plannedDateTo) {
     Long orgId = AuthContext.getOrgId();
+    String normalizedStatus = normalizeApplyStatusForQuery(status);
+    LocalDate startDate = plannedDateFrom;
+    LocalDate endDate = plannedDateTo;
+    if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+      LocalDate temp = startDate;
+      startDate = endDate;
+      endDate = temp;
+    }
     var wrapper = Wrappers.lambdaQuery(ElderDischargeApply.class)
         .eq(ElderDischargeApply::getIsDeleted, 0)
         .eq(orgId != null, ElderDischargeApply::getOrgId, orgId)
         .eq(elderId != null, ElderDischargeApply::getElderId, elderId)
-        .eq(status != null && !status.isBlank(), ElderDischargeApply::getStatus, status)
+        .eq(normalizedStatus != null, ElderDischargeApply::getStatus, normalizedStatus)
+        .and(keyword != null && !keyword.isBlank(), w -> w.like(ElderDischargeApply::getElderName, keyword)
+            .or().like(ElderDischargeApply::getReason, keyword)
+            .or().like(ElderDischargeApply::getReviewRemark, keyword))
+        .ge(startDate != null, ElderDischargeApply::getPlannedDischargeDate, startDate)
+        .le(endDate != null, ElderDischargeApply::getPlannedDischargeDate, endDate)
         .orderByDesc(ElderDischargeApply::getApplyDate)
         .orderByDesc(ElderDischargeApply::getCreateTime);
     return Result.ok(dischargeApplyMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
+  }
+
+  @GetMapping(value = "/discharge-apply/export", produces = "text/csv;charset=UTF-8")
+  public ResponseEntity<byte[]> exportDischargeApply(
+      @RequestParam(required = false) Long elderId,
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) String keyword,
+      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+      @RequestParam(required = false) LocalDate plannedDateFrom,
+      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+      @RequestParam(required = false) LocalDate plannedDateTo) {
+    Long orgId = AuthContext.getOrgId();
+    String normalizedStatus = normalizeApplyStatusForQuery(status);
+    LocalDate startDate = plannedDateFrom;
+    LocalDate endDate = plannedDateTo;
+    if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+      LocalDate temp = startDate;
+      startDate = endDate;
+      endDate = temp;
+    }
+    var wrapper = Wrappers.lambdaQuery(ElderDischargeApply.class)
+        .eq(ElderDischargeApply::getIsDeleted, 0)
+        .eq(orgId != null, ElderDischargeApply::getOrgId, orgId)
+        .eq(elderId != null, ElderDischargeApply::getElderId, elderId)
+        .eq(normalizedStatus != null, ElderDischargeApply::getStatus, normalizedStatus)
+        .and(keyword != null && !keyword.isBlank(), w -> w.like(ElderDischargeApply::getElderName, keyword)
+            .or().like(ElderDischargeApply::getReason, keyword)
+            .or().like(ElderDischargeApply::getReviewRemark, keyword))
+        .ge(startDate != null, ElderDischargeApply::getPlannedDischargeDate, startDate)
+        .le(endDate != null, ElderDischargeApply::getPlannedDischargeDate, endDate)
+        .orderByDesc(ElderDischargeApply::getApplyDate)
+        .orderByDesc(ElderDischargeApply::getCreateTime);
+    List<ElderDischargeApply> records = dischargeApplyMapper.selectList(wrapper);
+    List<String> headers = List.of("老人姓名", "申请日期", "计划退住日期", "申请原因", "自动退住状态", "自动退住说明", "退住单号", "审核人", "审核备注", "审核状态", "审核时间");
+    List<List<String>> rows = records.stream()
+        .map(item -> List.of(
+            safe(item.getElderName()),
+            safe(item.getApplyDate()),
+            safe(item.getPlannedDischargeDate()),
+            safe(item.getReason()),
+            safe(item.getAutoDischargeStatus()),
+            safe(item.getAutoDischargeMessage()),
+            safe(item.getLinkedDischargeId()),
+            safe(item.getReviewedByName()),
+            safe(item.getReviewRemark()),
+            applyStatusText(item.getStatus()),
+            safe(item.getReviewedTime())))
+        .toList();
+    return csvResponse("elder-discharge-apply", headers, rows);
   }
 
   @PostMapping("/discharge-apply")
@@ -364,6 +506,93 @@ public class ElderResidenceController {
       throw new IllegalArgumentException("审核状态不能为空");
     }
     return status.trim().toUpperCase();
+  }
+
+  private String normalizeTrialStatusForQuery(String status) {
+    if (status == null || status.isBlank()) {
+      return null;
+    }
+    String normalized = status.trim().toUpperCase();
+    if (!isTrialStatusValid(normalized)) {
+      throw new IllegalArgumentException("试住状态仅支持 REGISTERED/FINISHED/CONVERTED/CANCELLED");
+    }
+    return normalized;
+  }
+
+  private String normalizeApplyStatusForQuery(String status) {
+    if (status == null || status.isBlank()) {
+      return null;
+    }
+    String normalized = status.trim().toUpperCase();
+    if (!ResidenceLifecycleConstants.DISCHARGE_APPLY_PENDING.equals(normalized)
+        && !ResidenceLifecycleConstants.DISCHARGE_APPLY_APPROVED.equals(normalized)
+        && !ResidenceLifecycleConstants.DISCHARGE_APPLY_REJECTED.equals(normalized)) {
+      throw new IllegalArgumentException("审核状态仅支持 PENDING/APPROVED/REJECTED");
+    }
+    return normalized;
+  }
+
+  private String trialStatusText(String status) {
+    if (ResidenceLifecycleConstants.TRIAL_REGISTERED.equals(status)) {
+      return "已登记";
+    }
+    if (ResidenceLifecycleConstants.TRIAL_FINISHED.equals(status)) {
+      return "已结束";
+    }
+    if (ResidenceLifecycleConstants.TRIAL_CONVERTED.equals(status)) {
+      return "已转签约";
+    }
+    if (ResidenceLifecycleConstants.TRIAL_CANCELLED.equals(status)) {
+      return "已取消";
+    }
+    return safe(status);
+  }
+
+  private String applyStatusText(String status) {
+    if (ResidenceLifecycleConstants.DISCHARGE_APPLY_PENDING.equals(status)) {
+      return "待审核";
+    }
+    if (ResidenceLifecycleConstants.DISCHARGE_APPLY_APPROVED.equals(status)) {
+      return "已通过";
+    }
+    if (ResidenceLifecycleConstants.DISCHARGE_APPLY_REJECTED.equals(status)) {
+      return "已驳回";
+    }
+    return safe(status);
+  }
+
+  private String safe(Object value) {
+    return value == null ? "" : String.valueOf(value);
+  }
+
+  private ResponseEntity<byte[]> csvResponse(String filenameBase, List<String> headers, List<List<String>> rows) {
+    StringBuilder sb = new StringBuilder();
+    sb.append('\uFEFF');
+    sb.append(toCsvLine(headers)).append('\n');
+    for (List<String> row : rows) {
+      sb.append(toCsvLine(row)).append('\n');
+    }
+    byte[] bytes = sb.toString().getBytes(StandardCharsets.UTF_8);
+    String filename = filenameBase + "-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")) + ".csv";
+    return ResponseEntity.ok()
+        .header(HttpHeaders.CONTENT_DISPOSITION,
+            "attachment; filename*=UTF-8''" + URLEncoder.encode(filename, StandardCharsets.UTF_8))
+        .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))
+        .contentLength(bytes.length)
+        .body(bytes);
+  }
+
+  private String toCsvLine(List<String> fields) {
+    List<String> escaped = new ArrayList<>();
+    for (String field : fields) {
+      String value = field == null ? "" : field;
+      value = value.replace("\"", "\"\"");
+      if (value.contains(",") || value.contains("\n") || value.contains("\r") || value.contains("\"")) {
+        value = "\"" + value + "\"";
+      }
+      escaped.add(value);
+    }
+    return String.join(",", escaped);
   }
 
   private String resolveElderName(Long elderId) {

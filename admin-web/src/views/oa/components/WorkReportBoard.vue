@@ -1,6 +1,9 @@
 <template>
   <PageContainer :title="title" :subTitle="subTitle">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
+      <a-form-item label="关键字">
+        <a-input v-model:value="query.keyword" placeholder="标题/概述/完成工作/风险/计划/总结人" allow-clear style="width: 280px" />
+      </a-form-item>
       <a-form-item label="状态">
         <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 160px" />
       </a-form-item>
@@ -29,7 +32,7 @@
         <template v-else-if="column.key === 'action'">
           <a-space>
             <a-button type="link" @click="openEdit(record)">编辑</a-button>
-            <a-button type="link" @click="submitReport(record)">提交</a-button>
+            <a-button type="link" :disabled="record.status === 'SUBMITTED'" @click="submitReport(record)">提交</a-button>
             <a-button type="link" danger @click="remove(record)">删除</a-button>
           </a-space>
         </template>
@@ -109,7 +112,7 @@ const subTitle = '统一模板，按维度沉淀执行复盘'
 const loading = ref(false)
 const rows = ref<OaWorkReport[]>([])
 const dateRange = ref<[Dayjs, Dayjs] | undefined>()
-const query = reactive({ status: undefined as string | undefined, pageNo: 1, pageSize: 10 })
+const query = reactive({ keyword: '', status: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 
 const columns = [
@@ -145,6 +148,7 @@ async function fetchData() {
     const params = {
       pageNo: query.pageNo,
       pageSize: query.pageSize,
+      keyword: query.keyword || undefined,
       status: query.status,
       startDate: dateRange.value?.[0] ? dayjs(dateRange.value[0]).format('YYYY-MM-DD') : undefined,
       endDate: dateRange.value?.[1] ? dayjs(dateRange.value[1]).format('YYYY-MM-DD') : undefined
@@ -175,6 +179,7 @@ function handleTableChange(pag: any) {
 }
 
 function onReset() {
+  query.keyword = ''
   query.status = undefined
   query.pageNo = 1
   pagination.current = 1

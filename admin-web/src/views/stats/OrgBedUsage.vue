@@ -15,24 +15,34 @@
     </a-card>
 
     <a-row :gutter="16">
-      <a-col :span="6">
+      <a-col :span="4">
         <a-card class="card-elevated" :bordered="false">
           <a-statistic title="总床位" :value="stats.totalBeds || 0" />
         </a-card>
       </a-col>
-      <a-col :span="6">
+      <a-col :span="4">
         <a-card class="card-elevated" :bordered="false">
           <a-statistic title="已使用床位" :value="stats.occupiedBeds || 0" />
         </a-card>
       </a-col>
-      <a-col :span="6">
+      <a-col :span="4">
         <a-card class="card-elevated" :bordered="false">
           <a-statistic title="空闲床位" :value="stats.availableBeds || 0" />
         </a-card>
       </a-col>
-      <a-col :span="6">
+      <a-col :span="4">
+        <a-card class="card-elevated" :bordered="false">
+          <a-statistic title="维护床位" :value="stats.maintenanceBeds || 0" />
+        </a-card>
+      </a-col>
+      <a-col :span="4">
         <a-card class="card-elevated" :bordered="false">
           <a-statistic title="使用率(%)" :value="stats.occupancyRate || 0" :precision="2" />
+        </a-card>
+      </a-col>
+      <a-col :span="4">
+        <a-card class="card-elevated" :bordered="false">
+          <a-statistic title="空闲率(%)" :value="stats.availableRate || 0" :precision="2" />
         </a-card>
       </a-col>
     </a-row>
@@ -49,13 +59,16 @@ import PageContainer from '../../components/PageContainer.vue'
 import { getOrgBedUsage } from '../../api/stats'
 import type { BedUsageStatsResponse } from '../../types'
 import { useECharts } from '../../plugins/echarts'
+import { message } from 'ant-design-vue'
 
 const stats = reactive<BedUsageStatsResponse>({
   totalBeds: 0,
   occupiedBeds: 0,
   availableBeds: 0,
   maintenanceBeds: 0,
-  occupancyRate: 0
+  occupancyRate: 0,
+  maintenanceRate: 0,
+  availableRate: 0
 })
 const query = reactive({
   orgId: undefined as number | undefined
@@ -63,23 +76,27 @@ const query = reactive({
 const { chartRef: pieRef, setOption } = useECharts()
 
 async function loadData() {
-  const data = await getOrgBedUsage({ orgId: query.orgId })
-  Object.assign(stats, data)
-  setOption({
-    tooltip: { trigger: 'item' },
-    legend: { bottom: 0 },
-    series: [
-      {
-        type: 'pie',
-        radius: ['36%', '66%'],
-        data: [
-          { name: '已使用', value: data.occupiedBeds || 0 },
-          { name: '空闲', value: data.availableBeds || 0 },
-          { name: '维护', value: data.maintenanceBeds || 0 }
-        ]
-      }
-    ]
-  })
+  try {
+    const data = await getOrgBedUsage({ orgId: query.orgId })
+    Object.assign(stats, data)
+    setOption({
+      tooltip: { trigger: 'item' },
+      legend: { bottom: 0 },
+      series: [
+        {
+          type: 'pie',
+          radius: ['36%', '66%'],
+          data: [
+            { name: '已使用', value: data.occupiedBeds || 0 },
+            { name: '空闲', value: data.availableBeds || 0 },
+            { name: '维护', value: data.maintenanceBeds || 0 }
+          ]
+        }
+      ]
+    })
+  } catch (error: any) {
+    message.error(error?.message || '加载床位统计失败')
+  }
 }
 
 function reset() {

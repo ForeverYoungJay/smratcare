@@ -57,25 +57,37 @@ const rows = ref<OrgMonthlyOperationItem[]>([])
 const { chartRef: trendRef, setOption } = useECharts()
 
 async function loadData() {
-  rows.value = await getOrgMonthlyOperation({
-    from: dayjs(query.value.from).format('YYYY-MM'),
-    to: dayjs(query.value.to).format('YYYY-MM'),
-    orgId: query.value.orgId
-  })
-  setOption({
-    tooltip: { trigger: 'axis' },
-    legend: { data: ['入住', '离院', '营收'] },
-    xAxis: { type: 'category', data: rows.value.map(item => item.month) },
-    yAxis: [{ type: 'value' }, { type: 'value' }],
-    series: [
-      { name: '入住', type: 'bar', data: rows.value.map(item => item.admissions) },
-      { name: '离院', type: 'bar', data: rows.value.map(item => item.discharges) },
-      { name: '营收', type: 'line', yAxisIndex: 1, smooth: true, data: rows.value.map(item => item.revenue) }
-    ]
-  })
+  if (query.value.from.isAfter(query.value.to, 'month')) {
+    message.warning('起始月份不能晚于结束月份')
+    return
+  }
+  try {
+    rows.value = await getOrgMonthlyOperation({
+      from: dayjs(query.value.from).format('YYYY-MM'),
+      to: dayjs(query.value.to).format('YYYY-MM'),
+      orgId: query.value.orgId
+    })
+    setOption({
+      tooltip: { trigger: 'axis' },
+      legend: { data: ['入住', '离院', '营收'] },
+      xAxis: { type: 'category', data: rows.value.map(item => item.month) },
+      yAxis: [{ type: 'value' }, { type: 'value' }],
+      series: [
+        { name: '入住', type: 'bar', data: rows.value.map(item => item.admissions) },
+        { name: '离院', type: 'bar', data: rows.value.map(item => item.discharges) },
+        { name: '营收', type: 'line', yAxisIndex: 1, smooth: true, data: rows.value.map(item => item.revenue) }
+      ]
+    })
+  } catch (error: any) {
+    message.error(error?.message || '加载机构月运营统计失败')
+  }
 }
 
 async function exportCsvReport() {
+  if (query.value.from.isAfter(query.value.to, 'month')) {
+    message.warning('起始月份不能晚于结束月份')
+    return
+  }
   try {
     await exportOrgMonthlyOperationCsv({
       from: dayjs(query.value.from).format('YYYY-MM'),

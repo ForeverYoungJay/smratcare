@@ -102,6 +102,11 @@ export interface OaTask {
 export interface OaPortalSummary {
   notices: OaNotice[]
   todos: OaTodo[]
+  openTodoCount?: number
+  overdueTodoCount?: number
+  pendingApprovalCount?: number
+  ongoingTaskCount?: number
+  submittedReportCount?: number
 }
 
 export interface OaWorkReport {

@@ -2,22 +2,29 @@
   <PageContainer title="退住申请" subTitle="退住流程前置申请与审核">
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
-        <a-form-item label="老人">
-          <a-select v-model:value="query.elderId" allow-clear style="width: 180px">
+        <a-form-item label="老人姓名">
+          <a-select v-model:value="query.elderId" allow-clear style="width: 180px" placeholder="请选择老人姓名">
             <a-select-option v-for="item in elders" :key="item.id" :value="item.id">{{ item.fullName }}</a-select-option>
           </a-select>
         </a-form-item>
+        <a-form-item label="关键词">
+          <a-input v-model:value="query.keyword" allow-clear placeholder="请输入老人姓名/申请原因/审核备注" style="width: 280px" />
+        </a-form-item>
         <a-form-item label="状态">
-          <a-select v-model:value="query.status" allow-clear style="width: 160px">
+          <a-select v-model:value="query.status" allow-clear style="width: 160px" placeholder="请选择状态">
             <a-select-option value="PENDING">待审核</a-select-option>
             <a-select-option value="APPROVED">已通过</a-select-option>
             <a-select-option value="REJECTED">已驳回</a-select-option>
           </a-select>
         </a-form-item>
+        <a-form-item label="计划退住日期">
+          <a-range-picker v-model:value="query.plannedDateRange" value-format="YYYY-MM-DD" />
+        </a-form-item>
         <a-form-item>
           <a-space>
-            <a-button type="primary" @click="fetchData">查询</a-button>
-            <a-button @click="reset">重置</a-button>
+            <a-button type="primary" @click="fetchData">搜索</a-button>
+            <a-button @click="reset">清空</a-button>
+            <a-button @click="exportRows">导出</a-button>
             <a-button type="primary" ghost @click="openCreate">新增申请</a-button>
           </a-space>
         </a-form-item>
@@ -92,11 +99,12 @@ import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { getBaseConfigItemList } from '../../api/baseConfig'
 import { getElderPage } from '../../api/elder'
-import { createDischargeApply, getDischargeApplyPage, reviewDischargeApply } from '../../api/elderResidence'
+import { createDischargeApply, exportDischargeApply, getDischargeApplyPage, reviewDischargeApply } from '../../api/elderResidence'
 import type {
   BaseConfigItem,
   DischargeApplyCreateRequest,
   DischargeApplyItem,
+  DischargeApplyStatus,
   ElderItem,
   PageResult
 } from '../../types'
@@ -118,7 +126,9 @@ const dischargeFeeConfigOptions = ref<{ label: string; value: string }[]>([])
 
 const query = reactive({
   elderId: undefined as number | undefined,
-  status: undefined as string | undefined,
+  keyword: undefined as string | undefined,
+  status: undefined as DischargeApplyStatus | undefined,
+  plannedDateRange: undefined as [string, string] | undefined,
   pageNo: 1,
   pageSize: 10
 })
@@ -136,16 +146,16 @@ const rules: FormRules = {
 }
 
 const columns = [
-  { title: '老人', dataIndex: 'elderName', key: 'elderName', width: 120 },
+  { title: '老人姓名', dataIndex: 'elderName', key: 'elderName', width: 120 },
   { title: '申请日期', dataIndex: 'applyDate', key: 'applyDate', width: 120 },
-  { title: '计划退住', dataIndex: 'plannedDischargeDate', key: 'plannedDischargeDate', width: 120 },
+  { title: '计划退住日期', dataIndex: 'plannedDischargeDate', key: 'plannedDischargeDate', width: 120 },
   { title: '申请原因', dataIndex: 'reason', key: 'reason' },
-  { title: '自动退住', key: 'autoDischargeStatus', width: 100 },
+  { title: '自动退住状态', key: 'autoDischargeStatus', width: 100 },
   { title: '自动退住说明', dataIndex: 'autoDischargeMessage', key: 'autoDischargeMessage', width: 180 },
   { title: '退住单号', dataIndex: 'linkedDischargeId', key: 'linkedDischargeId', width: 120 },
-  { title: '审核人', dataIndex: 'reviewedByName', key: 'reviewedByName', width: 120 },
+  { title: '审核人', dataIndex: 'reviewedByName', key: 'reviewedByName', width: 100 },
   { title: '审核备注', dataIndex: 'reviewRemark', key: 'reviewRemark' },
-  { title: '状态', key: 'status', width: 100 },
+  { title: '审核状态', key: 'status', width: 100 },
   { title: '操作', key: 'action', width: 140 }
 ]
 
@@ -165,7 +175,16 @@ async function loadDischargeFeeConfigOptions() {
 async function fetchData() {
   loading.value = true
   try {
-    const res: PageResult<DischargeApplyItem> = await getDischargeApplyPage(query)
+    const [plannedDateFrom, plannedDateTo] = query.plannedDateRange || []
+    const res: PageResult<DischargeApplyItem> = await getDischargeApplyPage({
+      pageNo: query.pageNo,
+      pageSize: query.pageSize,
+      elderId: query.elderId,
+      keyword: query.keyword,
+      status: query.status,
+      plannedDateFrom,
+      plannedDateTo
+    })
     rows.value = res.list
     total.value = res.total
   } finally {
@@ -175,7 +194,9 @@ async function fetchData() {
 
 function reset() {
   query.elderId = undefined
+  query.keyword = undefined
   query.status = undefined
+  query.plannedDateRange = undefined
   query.pageNo = 1
   fetchData()
 }
@@ -246,6 +267,17 @@ function statusColor(status?: string) {
   if (status === 'APPROVED') return 'green'
   if (status === 'REJECTED') return 'red'
   return 'orange'
+}
+
+async function exportRows() {
+  const [plannedDateFrom, plannedDateTo] = query.plannedDateRange || []
+  await exportDischargeApply({
+    elderId: query.elderId,
+    keyword: query.keyword,
+    status: query.status,
+    plannedDateFrom,
+    plannedDateTo
+  })
 }
 
 function onPageChange(page: number) {

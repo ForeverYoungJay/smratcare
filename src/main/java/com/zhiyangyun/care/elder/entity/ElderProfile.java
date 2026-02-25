@@ -33,6 +33,8 @@ public class ElderProfile {
 
   private String phone;
 
+  private String homeAddress;
+
   private LocalDate admissionDate;
 
   private Integer status;

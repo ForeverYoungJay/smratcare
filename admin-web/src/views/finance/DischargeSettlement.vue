@@ -2,7 +2,7 @@
   <PageContainer title="退住结算" subTitle="预存账户抵扣、退款与结算确认">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="老人姓名">
-        <a-input v-model:value="query.keyword" placeholder="输入姓名" allow-clear />
+        <a-input v-model:value="query.keyword" placeholder="输入老人/费用项/备注" allow-clear />
       </a-form-item>
       <a-form-item label="状态">
         <a-select v-model:value="query.status" allow-clear style="width: 180px" :options="statusOptions" />
@@ -145,19 +145,14 @@ async function fetchData() {
     const res: PageResult<DischargeSettlementItem> = await getDischargeSettlementPage({
       pageNo: query.pageNo,
       pageSize: query.pageSize,
-      status: query.status
+      status: query.status,
+      keyword: query.keyword || undefined
     })
-    rows.value = filterByKeyword(res.list, query.keyword)
-    pagination.total = res.total || rows.value.length
+    rows.value = res.list
+    pagination.total = res.total || res.list.length
   } finally {
     loading.value = false
   }
-}
-
-function filterByKeyword(list: DischargeSettlementItem[], keyword: string) {
-  if (!keyword) return list
-  const key = keyword.trim()
-  return list.filter((item) => (item.elderName || '').includes(key))
 }
 
 function handleTableChange(pag: any) {

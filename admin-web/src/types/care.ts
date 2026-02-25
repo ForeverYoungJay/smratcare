@@ -10,7 +10,21 @@ export interface CareTaskItem {
   planTime: string
   status: string
   suspiciousFlag?: boolean
+  overdueFlag?: boolean
   careLevel?: string
+}
+
+export interface CareTaskSummary {
+  totalCount?: number
+  pendingCount?: number
+  doneCount?: number
+  exceptionCount?: number
+  overdueCount?: number
+  suspiciousCount?: number
+  assignedCount?: number
+  unassignedCount?: number
+  completionRate?: number
+  exceptionRate?: number
 }
 
 export interface CareGenerateRequest {
@@ -73,10 +87,11 @@ export interface CareTaskTemplate {
 export interface CareExecuteLogItem {
   id: number
   taskDailyId: number
-  staffId: number
-  elderId: number
-  bedId: number
+  staffId?: number
+  staffName?: string
   executeTime: string
+  bedQrCode?: string
+  resultStatus?: number
   suspiciousFlag?: boolean
   remark?: string
 }

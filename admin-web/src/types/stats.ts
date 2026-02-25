@@ -22,21 +22,31 @@ export interface ElderAmountItem {
 export interface CheckInStatsResponse {
   totalAdmissions: number
   totalDischarges: number
+  netIncrease: number
+  dischargeToAdmissionRate: number
   currentResidents: number
   monthlyAdmissions: MonthCountItem[]
   monthlyDischarges: MonthCountItem[]
+  monthlyNetIncrease: MonthCountItem[]
 }
 
 export interface ConsumptionStatsResponse {
   totalBillConsumption: number
   totalStoreConsumption: number
+  totalConsumption: number
+  billConsumptionRatio: number
+  storeConsumptionRatio: number
+  averageMonthlyConsumption: number
   monthlyBillConsumption: MonthAmountItem[]
   monthlyStoreConsumption: MonthAmountItem[]
+  monthlyTotalConsumption: MonthAmountItem[]
   topConsumerElders: ElderAmountItem[]
 }
 
 export interface ElderInfoStatsResponse {
   totalElders: number
+  inHospitalCount: number
+  dischargedCount: number
   genderDistribution: NameCountItem[]
   ageDistribution: NameCountItem[]
   careLevelDistribution: NameCountItem[]
@@ -67,10 +77,14 @@ export interface BedUsageStatsResponse {
   availableBeds: number
   maintenanceBeds: number
   occupancyRate: number
+  maintenanceRate: number
+  availableRate: number
 }
 
 export interface MonthlyRevenueStatsResponse {
   totalRevenue: number
+  averageMonthlyRevenue: number
+  revenueGrowthRate: number
   monthlyRevenue: MonthAmountItem[]
 }
 

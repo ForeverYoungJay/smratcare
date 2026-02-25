@@ -2,8 +2,15 @@
   <PageContainer title="盘点调整记录" subTitle="盘盈盘亏历史记录">
     <a-card class="card-elevated" :bordered="false">
       <a-form layout="inline" :model="query" class="search-form">
-        <a-form-item label="商品ID">
-          <a-input-number v-model:value="query.productId" style="width: 140px" />
+        <a-form-item label="商品">
+          <a-select
+            v-model:value="query.productId"
+            :options="productOptions"
+            allow-clear
+            show-search
+            option-filter-prop="label"
+            style="width: 220px"
+          />
         </a-form-item>
         <a-form-item label="仓库">
           <a-select v-model:value="query.warehouseId" :options="warehouseOptions" allow-clear style="width: 180px" />
@@ -99,21 +106,28 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportCsv } from '../../utils/export'
 import { getInventoryAdjustmentDiffReport, getInventoryAdjustmentPage } from '../../api/inventory'
 import { getWarehousePage } from '../../api/material'
 import { getProductPage } from '../../api/store'
-import type { InventoryAdjustmentDiffItem, InventoryAdjustmentItem, PageResult } from '../../types'
+import type { InventoryAdjustmentDiffItem, InventoryAdjustmentItem, PageResult, ProductItem } from '../../types'
 
 const loading = ref(false)
 const rows = ref<InventoryAdjustmentItem[]>([])
 const total = ref(0)
+const products = ref<ProductItem[]>([])
 const loadingReport = ref(false)
 const reportRows = ref<Array<InventoryAdjustmentDiffItem & { key: string }>>([])
 const warehouseOptions = ref<Array<{ label: string; value: number }>>([])
 const categoryOptions = ref<Array<{ label: string; value: string }>>([])
+const productOptions = computed(() =>
+  products.value.map((p) => ({
+    label: `${p.productName} (ID:${p.idStr || p.id})`,
+    value: p.id
+  }))
+)
 
 const query = reactive({
   productId: undefined as number | undefined,
@@ -237,8 +251,9 @@ onMounted(async () => {
     getProductPage({ pageNo: 1, pageSize: 500 })
   ])
   warehouseOptions.value = warehouseRes.list.map((it: { id: number; warehouseName?: string }) => ({ label: it.warehouseName || `仓库${it.id}`, value: it.id }))
+  products.value = productRes.list || []
   const categorySet = new Set<string>()
-  for (const row of productRes.list || []) {
+  for (const row of products.value) {
     if (row.category) categorySet.add(row.category)
   }
   categoryOptions.value = Array.from(categorySet).map((it) => ({ label: it, value: it }))

@@ -67,7 +67,9 @@ public class HealthDrugDictionaryController {
   @PutMapping("/{id}")
   public Result<HealthDrugDictionary> update(@PathVariable Long id, @Valid @RequestBody HealthDrugDictionaryRequest request) {
     HealthDrugDictionary item = mapper.selectById(id);
-    if (item == null) {
+    Long orgId = AuthContext.getOrgId();
+    if (item == null || item.getIsDeleted() != null && item.getIsDeleted() == 1
+        || orgId != null && !orgId.equals(item.getOrgId())) {
       return Result.ok(null);
     }
     item.setDrugCode(request.getDrugCode());
@@ -84,7 +86,9 @@ public class HealthDrugDictionaryController {
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
     HealthDrugDictionary item = mapper.selectById(id);
-    if (item != null) {
+    Long orgId = AuthContext.getOrgId();
+    if (item != null && (item.getIsDeleted() == null || item.getIsDeleted() == 0)
+        && (orgId == null || orgId.equals(item.getOrgId()))) {
       item.setIsDeleted(1);
       mapper.updateById(item);
     }

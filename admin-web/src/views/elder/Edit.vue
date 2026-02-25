@@ -11,6 +11,9 @@
         <a-form-item label="手机号" name="phone">
           <a-input v-model:value="form.phone" />
         </a-form-item>
+        <a-form-item label="家庭地址" name="homeAddress">
+          <a-input v-model:value="form.homeAddress" />
+        </a-form-item>
         <a-form-item label="性别" name="gender">
           <a-select v-model:value="form.gender" placeholder="请选择">
             <a-select-option :value="1">男</a-select-option>
@@ -99,6 +102,7 @@ const form = reactive<Partial<ElderItem>>({
   elderCode: '',
   idCardNo: '',
   phone: '',
+  homeAddress: '',
   gender: undefined,
   birthDate: undefined,
   admissionDate: undefined,

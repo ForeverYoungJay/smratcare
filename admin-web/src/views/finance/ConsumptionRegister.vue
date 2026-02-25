@@ -10,6 +10,9 @@
       <a-form-item label="类别">
         <a-input v-model:value="query.category" placeholder="如 餐饮/医护/商城" allow-clear />
       </a-form-item>
+      <a-form-item label="关键字">
+        <a-input v-model:value="query.keyword" placeholder="老人/类别/备注" allow-clear />
+      </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openCreate">新增消费</a-button>
       </template>
@@ -55,7 +58,7 @@ import type { ConsumptionRecordItem, PageResult } from '../../types'
 
 const loading = ref(false)
 const rows = ref<ConsumptionRecordItem[]>([])
-const query = reactive({ pageNo: 1, pageSize: 10, from: undefined as any, to: undefined as any, category: '' })
+const query = reactive({ pageNo: 1, pageSize: 10, from: undefined as any, to: undefined as any, category: '', keyword: '' })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 
 const columns = [
@@ -86,6 +89,10 @@ const createForm = reactive({
 })
 
 async function fetchData() {
+  if (query.from && query.to && dayjs(query.from).isAfter(dayjs(query.to), 'day')) {
+    message.error('开始日期不能晚于结束日期')
+    return
+  }
   loading.value = true
   try {
     const res: PageResult<ConsumptionRecordItem> = await getConsumptionPage({
@@ -93,7 +100,8 @@ async function fetchData() {
       pageSize: query.pageSize,
       from: query.from ? dayjs(query.from).format('YYYY-MM-DD') : undefined,
       to: query.to ? dayjs(query.to).format('YYYY-MM-DD') : undefined,
-      category: query.category || undefined
+      category: query.category || undefined,
+      keyword: query.keyword || undefined
     })
     rows.value = res.list
     pagination.total = res.total || res.list.length
@@ -107,6 +115,7 @@ function onReset() {
   query.from = undefined
   query.to = undefined
   query.category = ''
+  query.keyword = ''
   pagination.current = 1
   fetchData()
 }

@@ -12,11 +12,16 @@
       </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openEdit()">新增文章</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" @click="batchPublish">批量发布</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" @click="batchArchive">批量归档</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+        <a-button @click="downloadExport">导出CSV</a-button>
       </template>
     </SearchForm>
 
     <DataTable
       rowKey="id"
+      :row-selection="rowSelection"
       :columns="columns"
       :data-source="rows"
       :loading="loading"
@@ -32,7 +37,9 @@
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
-            <a @click="openEdit(record)">编辑</a>
+            <a :style="{ color: record.status === 'ARCHIVED' ? '#999' : '' }" @click="openEdit(record)">编辑</a>
+            <a :style="{ color: record.status !== 'DRAFT' ? '#999' : '' }" @click="publish(record)">发布</a>
+            <a :style="{ color: record.status === 'ARCHIVED' ? '#999' : '' }" @click="archive(record)">归档</a>
             <a @click="remove(record)" style="color: #ff4d4f">删除</a>
           </a-space>
         </template>
@@ -64,7 +71,7 @@
           </a-col>
           <a-col :span="12">
             <a-form-item label="状态">
-              <a-select v-model:value="form.status" :options="statusOptions" />
+              <a-select v-model:value="form.status" :options="editableStatusOptions" />
             </a-form-item>
           </a-col>
         </a-row>
@@ -80,11 +87,23 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
+import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
-import { createKnowledge, deleteKnowledge, getKnowledgePage, updateKnowledge } from '../../api/oa'
+import {
+  archiveKnowledge,
+  batchArchiveKnowledge,
+  batchDeleteKnowledge,
+  batchPublishKnowledge,
+  createKnowledge,
+  deleteKnowledge,
+  exportKnowledge,
+  getKnowledgePage,
+  publishKnowledge,
+  updateKnowledge
+} from '../../api/oa'
 import type { OaKnowledge, PageResult } from '../../types'
 
 const loading = ref(false)
@@ -92,6 +111,7 @@ const saving = ref(false)
 const rows = ref<OaKnowledge[]>([])
 const query = reactive({ keyword: '', category: '', status: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
+const selectedRowKeys = ref<number[]>([])
 
 const columns = [
   { title: '标题', dataIndex: 'title', key: 'title', width: 220 },
@@ -109,9 +129,19 @@ const statusOptions = [
   { label: '已发布', value: 'PUBLISHED' },
   { label: '已归档', value: 'ARCHIVED' }
 ]
+const editableStatusOptions = [
+  { label: '草稿', value: 'DRAFT' },
+  { label: '已发布', value: 'PUBLISHED' }
+]
 
 const editOpen = ref(false)
 const form = reactive<Partial<OaKnowledge>>({ status: 'DRAFT' })
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: (string | number)[]) => {
+    selectedRowKeys.value = keys.map((item) => Number(item))
+  }
+}))
 
 function statusText(status?: string) {
   if (status === 'PUBLISHED') return '已发布'
@@ -131,6 +161,7 @@ async function fetchData() {
     const res: PageResult<OaKnowledge> = await getKnowledgePage(query)
     rows.value = res.list
     pagination.total = res.total || res.list.length
+    selectedRowKeys.value = []
   } finally {
     loading.value = false
   }
@@ -154,6 +185,7 @@ function onReset() {
 }
 
 function openEdit(record?: OaKnowledge) {
+  if (record?.status === 'ARCHIVED') return
   Object.assign(form, record || { status: 'DRAFT', title: '', category: '', tags: '', content: '', authorName: '', remark: '' })
   editOpen.value = true
 }
@@ -176,6 +208,55 @@ async function submit() {
 async function remove(record: OaKnowledge) {
   await deleteKnowledge(record.id)
   fetchData()
+}
+
+async function publish(record: OaKnowledge) {
+  if (record.status !== 'DRAFT') return
+  await publishKnowledge(record.id)
+  fetchData()
+}
+
+async function archive(record: OaKnowledge) {
+  if (record.status === 'ARCHIVED') return
+  await archiveKnowledge(record.id)
+  fetchData()
+}
+
+async function batchPublish() {
+  if (selectedRowKeys.value.length === 0) return
+  const affected = await batchPublishKnowledge(selectedRowKeys.value)
+  message.success(`批量发布，共处理 ${affected || 0} 条`)
+  fetchData()
+}
+
+async function batchArchive() {
+  if (selectedRowKeys.value.length === 0) return
+  const affected = await batchArchiveKnowledge(selectedRowKeys.value)
+  message.success(`批量归档，共处理 ${affected || 0} 条`)
+  fetchData()
+}
+
+async function batchRemove() {
+  if (selectedRowKeys.value.length === 0) return
+  const affected = await batchDeleteKnowledge(selectedRowKeys.value)
+  message.success(`批量删除，共处理 ${affected || 0} 条`)
+  fetchData()
+}
+
+async function downloadExport() {
+  const blob = await exportKnowledge({
+    keyword: query.keyword || undefined,
+    category: query.category || undefined,
+    status: query.status
+  })
+  const href = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = href
+  link.download = `oa-knowledge-${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(href)
 }
 
 fetchData()

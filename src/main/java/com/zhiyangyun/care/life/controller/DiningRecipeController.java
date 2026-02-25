@@ -7,6 +7,7 @@ import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.life.entity.DiningRecipe;
 import com.zhiyangyun.care.life.mapper.DiningRecipeMapper;
+import com.zhiyangyun.care.life.model.DiningConstants;
 import com.zhiyangyun.care.life.model.DiningRecipeRequest;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
@@ -35,13 +36,18 @@ public class DiningRecipeController {
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) String keyword,
       @RequestParam(required = false) String mealType,
+      @RequestParam(required = false) String status,
       @RequestParam(required = false) LocalDate dateFrom,
       @RequestParam(required = false) LocalDate dateTo) {
+    if (dateFrom != null && dateTo != null && dateFrom.isAfter(dateTo)) {
+      throw new IllegalArgumentException(DiningConstants.MSG_INVALID_DATE_RANGE);
+    }
     Long orgId = AuthContext.getOrgId();
     var wrapper = Wrappers.lambdaQuery(DiningRecipe.class)
         .eq(DiningRecipe::getIsDeleted, 0)
         .eq(orgId != null, DiningRecipe::getOrgId, orgId)
-        .eq(mealType != null && !mealType.isBlank(), DiningRecipe::getMealType, mealType);
+        .eq(mealType != null && !mealType.isBlank(), DiningRecipe::getMealType, mealType)
+        .eq(status != null && !status.isBlank(), DiningRecipe::getStatus, status);
     if (dateFrom != null && dateTo != null) {
       wrapper.between(DiningRecipe::getPlanDate, dateFrom, dateTo);
     } else if (dateFrom != null) {
@@ -63,14 +69,16 @@ public class DiningRecipeController {
     DiningRecipe recipe = new DiningRecipe();
     recipe.setTenantId(orgId);
     recipe.setOrgId(orgId);
-    recipe.setRecipeName(request.getRecipeName());
-    recipe.setMealType(request.getMealType());
-    recipe.setDishIds(request.getDishIds());
-    recipe.setDishNames(request.getDishNames());
+    recipe.setRecipeName(request.getRecipeName().trim());
+    recipe.setMealType(normalizeText(request.getMealType()));
+    recipe.setDishIds(normalizeText(request.getDishIds()));
+    recipe.setDishNames(request.getDishNames().trim());
     recipe.setPlanDate(request.getPlanDate());
-    recipe.setSuitableCrowd(request.getSuitableCrowd());
-    recipe.setStatus(request.getStatus() == null ? "ENABLED" : request.getStatus());
-    recipe.setRemark(request.getRemark());
+    recipe.setSuitableCrowd(normalizeText(request.getSuitableCrowd()));
+    String status = request.getStatus() == null ? DiningConstants.STATUS_ENABLED : request.getStatus();
+    validateStatus(status);
+    recipe.setStatus(status);
+    recipe.setRemark(normalizeText(request.getRemark()));
     recipe.setCreatedBy(AuthContext.getStaffId());
     recipeMapper.insert(recipe);
     return Result.ok(recipe);
@@ -78,29 +86,54 @@ public class DiningRecipeController {
 
   @PutMapping("/{id}")
   public Result<DiningRecipe> update(@PathVariable Long id, @Valid @RequestBody DiningRecipeRequest request) {
-    DiningRecipe recipe = recipeMapper.selectById(id);
-    if (recipe == null || recipe.getIsDeleted() != null && recipe.getIsDeleted() == 1) {
+    DiningRecipe recipe = getRecipeInOrg(id, AuthContext.getOrgId());
+    if (recipe == null) {
       return Result.ok(null);
     }
-    recipe.setRecipeName(request.getRecipeName());
-    recipe.setMealType(request.getMealType());
-    recipe.setDishIds(request.getDishIds());
-    recipe.setDishNames(request.getDishNames());
+    recipe.setRecipeName(request.getRecipeName().trim());
+    recipe.setMealType(normalizeText(request.getMealType()));
+    recipe.setDishIds(normalizeText(request.getDishIds()));
+    recipe.setDishNames(request.getDishNames().trim());
     recipe.setPlanDate(request.getPlanDate());
-    recipe.setSuitableCrowd(request.getSuitableCrowd());
-    recipe.setStatus(request.getStatus() == null ? recipe.getStatus() : request.getStatus());
-    recipe.setRemark(request.getRemark());
+    recipe.setSuitableCrowd(normalizeText(request.getSuitableCrowd()));
+    if (request.getStatus() != null) {
+      validateStatus(request.getStatus());
+      recipe.setStatus(request.getStatus());
+    }
+    recipe.setRemark(normalizeText(request.getRemark()));
     recipeMapper.updateById(recipe);
     return Result.ok(recipe);
   }
 
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
-    DiningRecipe recipe = recipeMapper.selectById(id);
+    DiningRecipe recipe = getRecipeInOrg(id, AuthContext.getOrgId());
     if (recipe != null) {
       recipe.setIsDeleted(1);
       recipeMapper.updateById(recipe);
     }
     return Result.ok(null);
+  }
+
+  private DiningRecipe getRecipeInOrg(Long id, Long orgId) {
+    return recipeMapper.selectOne(Wrappers.lambdaQuery(DiningRecipe.class)
+        .eq(DiningRecipe::getId, id)
+        .eq(DiningRecipe::getIsDeleted, 0)
+        .eq(orgId != null, DiningRecipe::getOrgId, orgId)
+        .last("LIMIT 1"));
+  }
+
+  private void validateStatus(String status) {
+    if (status == null || !DiningConstants.ENABLE_DISABLE_STATUS_SET.contains(status)) {
+      throw new IllegalArgumentException(DiningConstants.MSG_INVALID_ENABLE_STATUS);
+    }
+  }
+
+  private String normalizeText(String value) {
+    if (value == null) {
+      return null;
+    }
+    String trimmed = value.trim();
+    return trimmed.isEmpty() ? null : trimmed;
   }
 }

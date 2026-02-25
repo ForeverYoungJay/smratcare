@@ -10,4 +10,6 @@ public interface HealthMedicationTaskService {
   void generateTasksForSetting(HealthMedicationSetting setting, LocalDate date);
 
   void completeTaskByRegistration(HealthMedicationRegistration registration);
+
+  void unlinkTaskByRegistration(HealthMedicationRegistration registration);
 }

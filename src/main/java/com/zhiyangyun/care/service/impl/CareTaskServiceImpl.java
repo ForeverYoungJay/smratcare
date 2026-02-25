@@ -22,6 +22,8 @@ import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import com.zhiyangyun.care.model.CareTaskTodayItem;
 import com.zhiyangyun.care.model.CareTaskCreateRequest;
+import com.zhiyangyun.care.model.CareTaskExecuteLogItem;
+import com.zhiyangyun.care.model.CareTaskSummaryResponse;
 import com.zhiyangyun.care.model.ExecuteTaskRequest;
 import com.zhiyangyun.care.model.ExecuteTaskResponse;
 import com.zhiyangyun.care.model.TaskStatus;
@@ -38,9 +40,11 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -165,10 +169,59 @@ public class CareTaskServiceImpl implements CareTaskService {
       item.setPlanTime(task.getPlanTime());
       item.setStatus(task.getStatus());
       item.setSuspiciousFlag(suspiciousMap.getOrDefault(task.getId(), false));
+      item.setOverdueFlag(isOverdue(task));
       result.add(item);
     }
 
     return result;
+  }
+
+  @Override
+  public List<CareTaskExecuteLogItem> listExecuteLogs(Long tenantId, Long taskDailyId) {
+    if (taskDailyId == null) {
+      return List.of();
+    }
+    CareTaskDaily task = dailyMapper.selectById(taskDailyId);
+    if (task == null || (tenantId != null && !tenantId.equals(task.getTenantId()))) {
+      return List.of();
+    }
+    List<CareTaskExecuteLog> logs = logMapper.selectList(Wrappers.lambdaQuery(CareTaskExecuteLog.class)
+        .eq(CareTaskExecuteLog::getIsDeleted, 0)
+        .eq(CareTaskExecuteLog::getTaskDailyId, taskDailyId)
+        .eq(tenantId != null, CareTaskExecuteLog::getTenantId, tenantId)
+        .orderByDesc(CareTaskExecuteLog::getExecuteTime)
+        .orderByDesc(CareTaskExecuteLog::getCreateTime)
+        .last("LIMIT 100"));
+    if (logs.isEmpty()) {
+      return List.of();
+    }
+    List<Long> staffIds = logs.stream()
+        .map(CareTaskExecuteLog::getStaffId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList();
+    Map<Long, StaffAccount> staffMap = staffIds.isEmpty()
+        ? Map.of()
+        : staffMapper.selectList(Wrappers.lambdaQuery(StaffAccount.class)
+            .in(StaffAccount::getId, staffIds)
+            .eq(StaffAccount::getIsDeleted, 0))
+            .stream()
+            .collect(Collectors.toMap(StaffAccount::getId, Function.identity(), (a, b) -> a));
+
+    return logs.stream().map(log -> {
+      CareTaskExecuteLogItem item = new CareTaskExecuteLogItem();
+      item.setId(log.getId());
+      item.setTaskDailyId(log.getTaskDailyId());
+      item.setStaffId(log.getStaffId());
+      StaffAccount staff = staffMap.get(log.getStaffId());
+      item.setStaffName(staff == null ? null : staff.getRealName());
+      item.setExecuteTime(log.getExecuteTime());
+      item.setBedQrCode(log.getBedQrCode());
+      item.setResultStatus(log.getResultStatus());
+      item.setSuspiciousFlag(log.getSuspiciousFlag() != null && log.getSuspiciousFlag() == 1);
+      item.setRemark(log.getRemark());
+      return item;
+    }).toList();
   }
 
   private <K, V> V safeGet(Map<K, V> map, K key) {
@@ -180,61 +233,10 @@ public class CareTaskServiceImpl implements CareTaskService {
 
   @Override
   public IPage<CareTaskTodayItem> page(Long tenantId, long pageNo, long pageSize, LocalDate dateFrom,
-      LocalDate dateTo, Long staffId, String roomNo, String careLevel, String status, String keyword) {
-    LambdaQueryWrapper<CareTaskDaily> wrapper = Wrappers.lambdaQuery();
-    wrapper.eq(CareTaskDaily::getIsDeleted, 0);
-    if (tenantId != null) {
-      wrapper.eq(CareTaskDaily::getTenantId, tenantId);
-    }
-    if (dateFrom != null && dateTo != null) {
-      wrapper.between(CareTaskDaily::getTaskDate, dateFrom, dateTo);
-    } else if (dateFrom != null) {
-      wrapper.ge(CareTaskDaily::getTaskDate, dateFrom);
-    } else if (dateTo != null) {
-      wrapper.le(CareTaskDaily::getTaskDate, dateTo);
-    }
-    if (staffId != null) {
-      wrapper.eq(CareTaskDaily::getAssignedStaffId, staffId);
-    }
-    if (status != null && !status.isBlank()) {
-      wrapper.eq(CareTaskDaily::getStatus, status);
-    }
-    if (keyword != null && !keyword.isBlank()) {
-      wrapper.and(w -> w.like(CareTaskDaily::getId, keyword)
-          .or().like(CareTaskDaily::getBedId, keyword));
-    }
-
-    if (roomNo != null && !roomNo.isBlank()) {
-      List<Long> roomIds = roomMapper.selectList(Wrappers.lambdaQuery(Room.class)
-              .eq(Room::getIsDeleted, 0)
-              .eq(tenantId != null, Room::getTenantId, tenantId)
-              .like(Room::getRoomNo, roomNo))
-          .stream().map(Room::getId).toList();
-      if (roomIds.isEmpty()) {
-        return new Page<>(pageNo, pageSize);
-      }
-      List<Long> bedIds = bedMapper.selectList(Wrappers.lambdaQuery(Bed.class)
-              .eq(Bed::getIsDeleted, 0)
-              .eq(tenantId != null, Bed::getTenantId, tenantId)
-              .in(Bed::getRoomId, roomIds))
-          .stream().map(Bed::getId).toList();
-      if (bedIds.isEmpty()) {
-        return new Page<>(pageNo, pageSize);
-      }
-      wrapper.in(CareTaskDaily::getBedId, bedIds);
-    }
-
-    if (careLevel != null && !careLevel.isBlank()) {
-      List<Long> elderIds = elderMapper.selectList(Wrappers.lambdaQuery(ElderProfile.class)
-              .eq(ElderProfile::getIsDeleted, 0)
-              .eq(tenantId != null, ElderProfile::getTenantId, tenantId)
-              .eq(ElderProfile::getCareLevel, careLevel))
-          .stream().map(ElderProfile::getId).toList();
-      if (elderIds.isEmpty()) {
-        return new Page<>(pageNo, pageSize);
-      }
-      wrapper.in(CareTaskDaily::getElderId, elderIds);
-    }
+      LocalDate dateTo, Long staffId, String roomNo, String careLevel, String status, String keyword,
+      Boolean overdueOnly) {
+    LambdaQueryWrapper<CareTaskDaily> wrapper = buildTaskFilterWrapper(tenantId, dateFrom, dateTo, staffId,
+        roomNo, careLevel, status, keyword, overdueOnly);
 
     IPage<CareTaskDaily> page = dailyMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
     List<CareTaskDaily> tasks = page.getRecords();
@@ -319,6 +321,7 @@ public class CareTaskServiceImpl implements CareTaskService {
       item.setPlanTime(task.getPlanTime());
       item.setStatus(task.getStatus());
       item.setSuspiciousFlag(suspiciousMap.getOrDefault(task.getId(), false));
+      item.setOverdueFlag(isOverdue(task));
       return item;
     }).toList();
 
@@ -326,6 +329,48 @@ public class CareTaskServiceImpl implements CareTaskService {
     result.setTotal(page.getTotal());
     result.setRecords(items);
     return result;
+  }
+
+  @Override
+  public CareTaskSummaryResponse summary(Long tenantId, LocalDate dateFrom, LocalDate dateTo, Long staffId,
+      String roomNo, String careLevel, String status, String keyword, Boolean overdueOnly) {
+    LambdaQueryWrapper<CareTaskDaily> wrapper = buildTaskFilterWrapper(tenantId, dateFrom, dateTo, staffId,
+        roomNo, careLevel, status, keyword, overdueOnly);
+    List<CareTaskDaily> tasks = dailyMapper.selectList(wrapper);
+
+    long total = tasks.size();
+    long pending = tasks.stream().filter(t -> TaskStatus.PENDING.name().equals(t.getStatus())).count();
+    long done = tasks.stream().filter(t -> TaskStatus.DONE.name().equals(t.getStatus())).count();
+    long exception = tasks.stream().filter(t -> TaskStatus.EXCEPTION.name().equals(t.getStatus())).count();
+    long assigned = tasks.stream().filter(t -> t.getAssignedStaffId() != null).count();
+    long overdue = tasks.stream().filter(this::isOverdue).count();
+
+    List<Long> taskIds = tasks.stream().map(CareTaskDaily::getId).filter(Objects::nonNull).toList();
+    long suspicious = 0;
+    if (!taskIds.isEmpty()) {
+      Set<Long> suspiciousTaskIds = logMapper.selectList(Wrappers.lambdaQuery(CareTaskExecuteLog.class)
+              .eq(CareTaskExecuteLog::getIsDeleted, 0)
+              .in(CareTaskExecuteLog::getTaskDailyId, taskIds)
+              .eq(CareTaskExecuteLog::getSuspiciousFlag, 1))
+          .stream()
+          .map(CareTaskExecuteLog::getTaskDailyId)
+          .filter(Objects::nonNull)
+          .collect(Collectors.toCollection(HashSet::new));
+      suspicious = suspiciousTaskIds.size();
+    }
+
+    CareTaskSummaryResponse response = new CareTaskSummaryResponse();
+    response.setTotalCount(total);
+    response.setPendingCount(pending);
+    response.setDoneCount(done);
+    response.setExceptionCount(exception);
+    response.setOverdueCount(overdue);
+    response.setSuspiciousCount(suspicious);
+    response.setAssignedCount(assigned);
+    response.setUnassignedCount(total - assigned);
+    response.setCompletionRate(total == 0 ? 0D : (double) done / total);
+    response.setExceptionRate(total == 0 ? 0D : (double) exception / total);
+    return response;
   }
 
   @Override
@@ -611,6 +656,79 @@ public class CareTaskServiceImpl implements CareTaskService {
 
     Duration duration = Duration.between(lastLog.getExecuteTime(), LocalDateTime.now());
     return duration.toMinutes() < 3;
+  }
+
+  private boolean isOverdue(CareTaskDaily task) {
+    if (task == null || task.getPlanTime() == null) {
+      return false;
+    }
+    return TaskStatus.PENDING.name().equals(task.getStatus())
+        && task.getPlanTime().isBefore(LocalDateTime.now());
+  }
+
+  private LambdaQueryWrapper<CareTaskDaily> buildTaskFilterWrapper(Long tenantId, LocalDate dateFrom,
+      LocalDate dateTo, Long staffId, String roomNo, String careLevel, String status, String keyword,
+      Boolean overdueOnly) {
+    LambdaQueryWrapper<CareTaskDaily> wrapper = Wrappers.lambdaQuery();
+    wrapper.eq(CareTaskDaily::getIsDeleted, 0);
+    if (tenantId != null) {
+      wrapper.eq(CareTaskDaily::getTenantId, tenantId);
+    }
+    if (dateFrom != null && dateTo != null) {
+      wrapper.between(CareTaskDaily::getTaskDate, dateFrom, dateTo);
+    } else if (dateFrom != null) {
+      wrapper.ge(CareTaskDaily::getTaskDate, dateFrom);
+    } else if (dateTo != null) {
+      wrapper.le(CareTaskDaily::getTaskDate, dateTo);
+    }
+    if (staffId != null) {
+      wrapper.eq(CareTaskDaily::getAssignedStaffId, staffId);
+    }
+    if (status != null && !status.isBlank()) {
+      wrapper.eq(CareTaskDaily::getStatus, status);
+    }
+    if (Boolean.TRUE.equals(overdueOnly)) {
+      wrapper.eq(CareTaskDaily::getStatus, TaskStatus.PENDING.name())
+          .lt(CareTaskDaily::getPlanTime, LocalDateTime.now());
+    }
+    if (keyword != null && !keyword.isBlank()) {
+      wrapper.and(w -> w.like(CareTaskDaily::getId, keyword)
+          .or().like(CareTaskDaily::getBedId, keyword));
+    }
+
+    if (roomNo != null && !roomNo.isBlank()) {
+      List<Long> roomIds = roomMapper.selectList(Wrappers.lambdaQuery(Room.class)
+              .eq(Room::getIsDeleted, 0)
+              .eq(tenantId != null, Room::getTenantId, tenantId)
+              .like(Room::getRoomNo, roomNo))
+          .stream().map(Room::getId).toList();
+      if (roomIds.isEmpty()) {
+        return wrapper.eq(CareTaskDaily::getId, -1L);
+      }
+      List<Long> bedIds = bedMapper.selectList(Wrappers.lambdaQuery(Bed.class)
+              .eq(Bed::getIsDeleted, 0)
+              .eq(tenantId != null, Bed::getTenantId, tenantId)
+              .in(Bed::getRoomId, roomIds))
+          .stream().map(Bed::getId).toList();
+      if (bedIds.isEmpty()) {
+        return wrapper.eq(CareTaskDaily::getId, -1L);
+      }
+      wrapper.in(CareTaskDaily::getBedId, bedIds);
+    }
+
+    if (careLevel != null && !careLevel.isBlank()) {
+      List<Long> elderIds = elderMapper.selectList(Wrappers.lambdaQuery(ElderProfile.class)
+              .eq(ElderProfile::getIsDeleted, 0)
+              .eq(tenantId != null, ElderProfile::getTenantId, tenantId)
+              .eq(ElderProfile::getCareLevel, careLevel))
+          .stream().map(ElderProfile::getId).toList();
+      if (elderIds.isEmpty()) {
+        return wrapper.eq(CareTaskDaily::getId, -1L);
+      }
+      wrapper.in(CareTaskDaily::getElderId, elderIds);
+    }
+
+    return wrapper;
   }
 
   @Override

@@ -5,6 +5,9 @@
         <a-form-item label="关键词">
           <a-input v-model:value="query.keyword" placeholder="仓库编码/名称/负责人" allow-clear />
         </a-form-item>
+        <a-form-item label="仅启用">
+          <a-switch v-model:checked="query.enabledOnly" />
+        </a-form-item>
         <a-form-item>
           <a-space>
             <a-button type="primary" @click="fetchData">查询</a-button>
@@ -28,7 +31,7 @@
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
-            <a-tag :color="record.status === 1 ? 'green' : 'default'">{{ record.status === 1 ? '启用' : '停用' }}</a-tag>
+            <a-tag :color="materialEnableStatusColor(record.status)">{{ materialEnableStatusLabel(record.status) }}</a-tag>
           </template>
           <template v-if="column.key === 'actions'">
             <a-space>
@@ -89,6 +92,11 @@ import { onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { createWarehouse, deleteWarehouse, getWarehousePage, updateWarehouse } from '../../api/material'
+import {
+  MATERIAL_ENABLE_STATUS_OPTIONS,
+  materialEnableStatusColor,
+  materialEnableStatusLabel
+} from '../../utils/materialStatus'
 import type { MaterialWarehouseItem, PageResult } from '../../types'
 
 const loading = ref(false)
@@ -98,6 +106,7 @@ const total = ref(0)
 
 const query = reactive({
   keyword: '',
+  enabledOnly: false,
   pageNo: 1,
   pageSize: 10
 })
@@ -112,10 +121,7 @@ const columns = [
   { title: '操作', key: 'actions', width: 140, fixed: 'right' }
 ]
 
-const statusOptions = [
-  { label: '启用', value: 1 },
-  { label: '停用', value: 0 }
-]
+const statusOptions = MATERIAL_ENABLE_STATUS_OPTIONS
 
 const editorOpen = ref(false)
 const formRef = ref()
@@ -138,7 +144,12 @@ const rules = {
 async function fetchData() {
   loading.value = true
   try {
-    const res: PageResult<MaterialWarehouseItem> = await getWarehousePage(query)
+    const res: PageResult<MaterialWarehouseItem> = await getWarehousePage({
+      keyword: query.keyword,
+      enabledOnly: query.enabledOnly,
+      pageNo: query.pageNo,
+      pageSize: query.pageSize
+    })
     rows.value = res.list
     total.value = res.total
   } finally {
@@ -148,6 +159,7 @@ async function fetchData() {
 
 function reset() {
   query.keyword = ''
+  query.enabledOnly = false
   query.pageNo = 1
   fetchData()
 }

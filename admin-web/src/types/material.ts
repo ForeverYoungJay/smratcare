@@ -1,3 +1,5 @@
+import type { MaterialEnableStatus, MaterialOrderStatus } from '../utils/materialStatus'
+
 export interface MaterialWarehouseItem {
   id: number
   warehouseCode: string
@@ -5,7 +7,7 @@ export interface MaterialWarehouseItem {
   managerName?: string
   managerPhone?: string
   address?: string
-  status?: number
+  status?: MaterialEnableStatus
   remark?: string
   createTime?: string
 }
@@ -17,7 +19,7 @@ export interface MaterialSupplierItem {
   contactName?: string
   contactPhone?: string
   address?: string
-  status?: number
+  status?: MaterialEnableStatus
   remark?: string
   createTime?: string
 }
@@ -39,7 +41,7 @@ export interface MaterialPurchaseOrder {
   supplierId?: number
   supplierName?: string
   orderDate?: string
-  status?: string
+  status?: MaterialOrderStatus
   totalAmount?: number
   remark?: string
   createTime?: string
@@ -60,7 +62,7 @@ export interface MaterialTransferOrder {
   fromWarehouseName?: string
   toWarehouseId: number
   toWarehouseName?: string
-  status?: string
+  status?: MaterialOrderStatus
   remark?: string
   createTime?: string
   items?: MaterialTransferItem[]

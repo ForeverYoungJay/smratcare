@@ -3,20 +3,27 @@
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item label="老人">
-          <a-select v-model:value="query.elderId" allow-clear style="width: 180px">
+          <a-select v-model:value="query.elderId" allow-clear style="width: 180px" placeholder="请选择老人姓名">
             <a-select-option v-for="item in elders" :key="item.id" :value="item.id">{{ item.fullName }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="状态">
-          <a-select v-model:value="query.status" allow-clear style="width: 140px">
+          <a-select v-model:value="query.status" allow-clear style="width: 140px" placeholder="请选择状态">
             <a-select-option value="OUT">外出中</a-select-option>
             <a-select-option value="RETURNED">已返院</a-select-option>
           </a-select>
         </a-form-item>
+        <a-form-item label="计划外出时间">
+          <a-range-picker
+            v-model:value="query.planTimeRange"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            show-time
+          />
+        </a-form-item>
         <a-form-item>
           <a-space>
-            <a-button type="primary" @click="fetchData">查询</a-button>
-            <a-button @click="reset">重置</a-button>
+            <a-button type="primary" @click="fetchData">搜索</a-button>
+            <a-button @click="reset">清空</a-button>
             <a-button type="primary" ghost @click="openCreate">新增外出</a-button>
           </a-space>
         </a-form-item>
@@ -81,6 +88,7 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import dayjs from 'dayjs'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
@@ -99,6 +107,7 @@ const formRef = ref<FormInstance>()
 const query = reactive({
   elderId: undefined as number | undefined,
   status: undefined as string | undefined,
+  planTimeRange: undefined as [string, string] | undefined,
   pageNo: 1,
   pageSize: 10
 })
@@ -136,8 +145,14 @@ async function fetchData() {
   loading.value = true
   try {
     const res: PageResult<OutingItem> = await getOutingPage(query)
-    rows.value = res.list
-    total.value = res.total
+    rows.value = (res.list || []).filter((item) => {
+      if (!query.planTimeRange?.length) return true
+      const [start, end] = query.planTimeRange
+      if (!start || !end || !item.outingDate) return true
+      const target = dayjs(item.outingDate)
+      return target.isSame(dayjs(start)) || target.isSame(dayjs(end)) || (target.isAfter(dayjs(start)) && target.isBefore(dayjs(end)))
+    })
+    total.value = query.planTimeRange?.length ? rows.value.length : res.total
   } finally {
     loading.value = false
   }
@@ -146,6 +161,7 @@ async function fetchData() {
 function reset() {
   query.elderId = undefined
   query.status = undefined
+  query.planTimeRange = undefined
   query.pageNo = 1
   fetchData()
 }

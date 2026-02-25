@@ -24,12 +24,14 @@
       <a-table row-key="id" :loading="loading" :data-source="rows" :pagination="false" :columns="columns" size="middle">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
-            <a-tag :color="record.status === 'COMPLETED' ? 'green' : 'blue'">{{ record.status }}</a-tag>
+            <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
           </template>
           <template v-if="column.key === 'actions'">
             <a-space>
               <a @click="viewDetail(record.id)">明细</a>
-              <a v-if="record.status === 'DRAFT'" @click="complete(record.id)">执行完成</a>
+              <a v-if="record.status === ORDER_STATUS.DRAFT" @click="openEdit(record.id)">编辑</a>
+              <a v-if="record.status === ORDER_STATUS.DRAFT" @click="complete(record.id)">执行完成</a>
+              <a v-if="record.status === ORDER_STATUS.DRAFT" @click="cancel(record.id)">作废</a>
             </a-space>
           </template>
         </template>
@@ -45,7 +47,7 @@
       />
     </a-card>
 
-    <a-modal v-model:open="editorOpen" title="新建调拨单" width="860px" :confirm-loading="saving" @ok="submit">
+    <a-modal v-model:open="editorOpen" :title="editingId ? '编辑调拨单' : '新建调拨单'" width="860px" :confirm-loading="saving" @ok="submit">
       <a-form layout="vertical" :model="form">
         <a-row :gutter="12">
           <a-col :span="12">
@@ -86,7 +88,7 @@
     <a-drawer v-model:open="detailOpen" title="调拨单明细" width="640">
       <a-descriptions bordered :column="2" size="small" v-if="detail">
         <a-descriptions-item label="调拨单号">{{ detail.transferNo }}</a-descriptions-item>
-        <a-descriptions-item label="状态">{{ detail.status }}</a-descriptions-item>
+        <a-descriptions-item label="状态">{{ statusLabel(detail.status) }}</a-descriptions-item>
         <a-descriptions-item label="调出仓库">{{ detail.fromWarehouseName || '-' }}</a-descriptions-item>
         <a-descriptions-item label="调入仓库">{{ detail.toWarehouseName || '-' }}</a-descriptions-item>
         <a-descriptions-item label="备注" :span="2">{{ detail.remark || '-' }}</a-descriptions-item>
@@ -98,15 +100,24 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { getProductPage } from '../../api/store'
 import {
+  MATERIAL_ORDER_STATUS,
+  MATERIAL_TRANSFER_STATUS_OPTIONS,
+  type MaterialOrderStatus,
+  materialOrderStatusColor,
+  materialOrderStatusLabel
+} from '../../utils/materialStatus'
+import {
+  cancelTransfer,
   completeTransfer,
   createTransfer,
   getTransferDetail,
   getTransferPage,
-  getWarehousePage
+  getWarehousePage,
+  updateTransfer
 } from '../../api/material'
 import type { MaterialTransferOrder, MaterialWarehouseItem, PageResult, ProductItem } from '../../types'
 
@@ -116,9 +127,10 @@ const rows = ref<MaterialTransferOrder[]>([])
 const total = ref(0)
 const detailOpen = ref(false)
 const detail = ref<MaterialTransferOrder>()
+const ORDER_STATUS = MATERIAL_ORDER_STATUS
 
 const query = reactive({
-  status: undefined as string | undefined,
+  status: undefined as MaterialOrderStatus | undefined,
   keyword: '',
   pageNo: 1,
   pageSize: 10
@@ -145,11 +157,7 @@ const itemColumns = [
   { title: '操作', key: 'actions', width: 80 }
 ]
 
-const statusOptions = [
-  { label: '草稿', value: 'DRAFT' },
-  { label: '已完成', value: 'COMPLETED' },
-  { label: '已作废', value: 'CANCELLED' }
-]
+const statusOptions = MATERIAL_TRANSFER_STATUS_OPTIONS
 
 const warehouses = ref<MaterialWarehouseItem[]>([])
 const products = ref<ProductItem[]>([])
@@ -159,12 +167,21 @@ const productOptions = computed(() =>
 )
 
 const editorOpen = ref(false)
+const editingId = ref<number>()
 const form = reactive({
   fromWarehouseId: undefined as number | undefined,
   toWarehouseId: undefined as number | undefined,
   remark: '',
   items: [] as Array<{ _idx: number; productId: number; quantity: number }>
 })
+
+function statusColor(status?: string) {
+  return materialOrderStatusColor(status)
+}
+
+function statusLabel(status?: string) {
+  return materialOrderStatusLabel(status)
+}
 
 async function fetchData() {
   loading.value = true
@@ -179,7 +196,7 @@ async function fetchData() {
 
 async function loadOptions() {
   const [wRes, pRes] = await Promise.all([
-    getWarehousePage({ pageNo: 1, pageSize: 200 }),
+    getWarehousePage({ pageNo: 1, pageSize: 200, enabledOnly: true }),
     getProductPage({ pageNo: 1, pageSize: 500 })
   ])
   warehouses.value = wRes.list
@@ -204,7 +221,9 @@ function onPageSizeChange(_page: number, size: number) {
   fetchData()
 }
 
-function openCreate() {
+async function openCreate() {
+  await loadOptions()
+  editingId.value = undefined
   Object.assign(form, {
     fromWarehouseId: undefined,
     toWarehouseId: undefined,
@@ -212,6 +231,41 @@ function openCreate() {
     items: [{ _idx: Date.now(), productId: 0, quantity: 1 }]
   })
   editorOpen.value = true
+}
+
+async function openEdit(id: number) {
+  await loadOptions()
+  const order = await getTransferDetail(id)
+  if (order.status !== ORDER_STATUS.DRAFT) {
+    message.warning('仅草稿调拨单可编辑')
+    return
+  }
+  editingId.value = id
+  Object.assign(form, {
+    fromWarehouseId: order.fromWarehouseId,
+    toWarehouseId: order.toWarehouseId,
+    remark: order.remark || '',
+    items: (order.items || []).map((it, idx) => ({
+      _idx: Date.now() + idx,
+      productId: it.productId,
+      quantity: it.quantity
+    }))
+  })
+  sanitizeDisabledWarehouseSelection()
+  editorOpen.value = true
+}
+
+function sanitizeDisabledWarehouseSelection() {
+  const fromWarehouse = warehouses.value.find((it) => it.id === form.fromWarehouseId)
+  if (form.fromWarehouseId && !fromWarehouse) {
+    form.fromWarehouseId = undefined
+    message.warning('原调出仓库不可用，已自动清空，请重新选择（原因：仓库已停用或不存在）')
+  }
+  const toWarehouse = warehouses.value.find((it) => it.id === form.toWarehouseId)
+  if (form.toWarehouseId && !toWarehouse) {
+    form.toWarehouseId = undefined
+    message.warning('原调入仓库不可用，已自动清空，请重新选择（原因：仓库已停用或不存在）')
+  }
 }
 
 function addItem() {
@@ -227,6 +281,18 @@ async function submit() {
     message.warning('请选择调出和调入仓库')
     return
   }
+  const fromWarehouse = warehouses.value.find((it) => it.id === form.fromWarehouseId)
+  if (!fromWarehouse) {
+    message.warning('调出仓库不可用，请选择启用中的仓库（原因：仓库已停用或不存在）')
+    form.fromWarehouseId = undefined
+    return
+  }
+  const toWarehouse = warehouses.value.find((it) => it.id === form.toWarehouseId)
+  if (!toWarehouse) {
+    message.warning('调入仓库不可用，请选择启用中的仓库（原因：仓库已停用或不存在）')
+    form.toWarehouseId = undefined
+    return
+  }
   if (form.fromWarehouseId === form.toWarehouseId) {
     message.warning('调出和调入仓库不能相同')
     return
@@ -240,16 +306,27 @@ async function submit() {
     message.warning('请完善明细中的物资和数量')
     return
   }
+  const productIds = form.items.map((it) => Number(it.productId))
+  if (new Set(productIds).size !== productIds.length) {
+    message.warning('同一物资不能重复添加')
+    return
+  }
 
   saving.value = true
   try {
-    await createTransfer({
+    const payload = {
       fromWarehouseId: form.fromWarehouseId,
       toWarehouseId: form.toWarehouseId,
       remark: form.remark,
       items: form.items.map((it) => ({ productId: it.productId, quantity: it.quantity }))
-    })
-    message.success('调拨单创建成功')
+    }
+    if (editingId.value) {
+      await updateTransfer(editingId.value, payload)
+      message.success('调拨单已更新')
+    } else {
+      await createTransfer(payload)
+      message.success('调拨单创建成功')
+    }
     editorOpen.value = false
     fetchData()
   } finally {
@@ -263,9 +340,34 @@ async function viewDetail(id: number) {
 }
 
 async function complete(id: number) {
+  const confirmed = await confirmAction('确认执行调拨完成？', '执行后将同步扣减调出仓并增加调入仓库存')
+  if (!confirmed) {
+    return
+  }
   await completeTransfer(id)
   message.success('调拨已完成')
   fetchData()
+}
+
+async function cancel(id: number) {
+  const confirmed = await confirmAction('确认作废调拨单？', '作废后该单据不可继续执行')
+  if (!confirmed) {
+    return
+  }
+  await cancelTransfer(id)
+  message.success('调拨单已作废')
+  fetchData()
+}
+
+async function confirmAction(title: string, content: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    Modal.confirm({
+      title,
+      content,
+      onOk: () => resolve(true),
+      onCancel: () => resolve(false)
+    })
+  })
 }
 
 onMounted(async () => {

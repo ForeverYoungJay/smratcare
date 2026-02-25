@@ -37,8 +37,20 @@ export function publishNotice(id: number) {
   return request.put<OaNotice>(`/api/oa/notice/${id}/publish`)
 }
 
+export function batchPublishNotice(ids: number[]) {
+  return request.put<number>('/api/oa/notice/batch/publish', { ids })
+}
+
 export function deleteNotice(id: number) {
   return request.delete<void>(`/api/oa/notice/${id}`)
+}
+
+export function batchDeleteNotice(ids: number[]) {
+  return request.delete<number>('/api/oa/notice/batch', { data: { ids } })
+}
+
+export function exportNotice(params: any) {
+  return request.get<Blob>('/api/oa/notice/export', { params, responseType: 'blob' })
 }
 
 export function getTodoPage(params: any) {
@@ -57,8 +69,20 @@ export function completeTodo(id: number) {
   return request.put<OaTodo>(`/api/oa/todo/${id}/done`)
 }
 
+export function batchCompleteTodo(ids: number[]) {
+  return request.put<number>('/api/oa/todo/batch/done', { ids })
+}
+
 export function deleteTodo(id: number) {
   return request.delete<void>(`/api/oa/todo/${id}`)
+}
+
+export function batchDeleteTodo(ids: number[]) {
+  return request.delete<number>('/api/oa/todo/batch', { data: { ids } })
+}
+
+export function exportTodo(params: any) {
+  return request.get<Blob>('/api/oa/todo/export', { params, responseType: 'blob' })
 }
 
 export function getApprovalPage(params: any) {
@@ -77,12 +101,28 @@ export function approveApproval(id: number) {
   return request.put<OaApproval>(`/api/oa/approval/${id}/approve`)
 }
 
+export function batchApproveApproval(ids: number[]) {
+  return request.put<number>('/api/oa/approval/batch/approve', { ids })
+}
+
 export function rejectApproval(id: number, remark?: string) {
   return request.put<OaApproval>(`/api/oa/approval/${id}/reject`, null, { params: { remark } })
 }
 
+export function batchRejectApproval(ids: number[], remark?: string) {
+  return request.put<number>('/api/oa/approval/batch/reject', { ids, remark })
+}
+
 export function deleteApproval(id: number) {
   return request.delete<void>(`/api/oa/approval/${id}`)
+}
+
+export function batchDeleteApproval(ids: number[]) {
+  return request.delete<number>('/api/oa/approval/batch', { data: { ids } })
+}
+
+export function exportApproval(params: any) {
+  return request.get<Blob>('/api/oa/approval/export', { params, responseType: 'blob' })
 }
 
 export function getDocumentPage(params: any) {
@@ -99,6 +139,14 @@ export function updateDocument(id: number, data: Partial<OaDocument>) {
 
 export function deleteDocument(id: number) {
   return request.delete<void>(`/api/oa/document/${id}`)
+}
+
+export function batchDeleteDocument(ids: number[]) {
+  return request.delete<number>('/api/oa/document/batch', { data: { ids } })
+}
+
+export function exportDocument(params: any) {
+  return request.get<Blob>('/api/oa/document/export', { params, responseType: 'blob' })
 }
 
 export function getAlbumPage(params: any) {
@@ -129,8 +177,32 @@ export function updateKnowledge(id: number, data: Partial<OaKnowledge>) {
   return request.put<OaKnowledge>(`/api/oa/knowledge/${id}`, data)
 }
 
+export function publishKnowledge(id: number) {
+  return request.put<OaKnowledge>(`/api/oa/knowledge/${id}/publish`)
+}
+
+export function archiveKnowledge(id: number) {
+  return request.put<OaKnowledge>(`/api/oa/knowledge/${id}/archive`)
+}
+
+export function batchPublishKnowledge(ids: number[]) {
+  return request.put<number>('/api/oa/knowledge/batch/publish', { ids })
+}
+
+export function batchArchiveKnowledge(ids: number[]) {
+  return request.put<number>('/api/oa/knowledge/batch/archive', { ids })
+}
+
 export function deleteKnowledge(id: number) {
   return request.delete<void>(`/api/oa/knowledge/${id}`)
+}
+
+export function batchDeleteKnowledge(ids: number[]) {
+  return request.delete<number>('/api/oa/knowledge/batch', { data: { ids } })
+}
+
+export function exportKnowledge(params: any) {
+  return request.get<Blob>('/api/oa/knowledge/export', { params, responseType: 'blob' })
 }
 
 export function getGroupSettingPage(params: any) {
@@ -145,8 +217,32 @@ export function updateGroupSetting(id: number, data: Partial<OaGroupSetting>) {
   return request.put<OaGroupSetting>(`/api/oa/group-setting/${id}`, data)
 }
 
+export function enableGroupSetting(id: number) {
+  return request.put<OaGroupSetting>(`/api/oa/group-setting/${id}/enable`)
+}
+
+export function disableGroupSetting(id: number) {
+  return request.put<OaGroupSetting>(`/api/oa/group-setting/${id}/disable`)
+}
+
+export function batchEnableGroupSetting(ids: number[]) {
+  return request.put<number>('/api/oa/group-setting/batch/enable', { ids })
+}
+
+export function batchDisableGroupSetting(ids: number[]) {
+  return request.put<number>('/api/oa/group-setting/batch/disable', { ids })
+}
+
 export function deleteGroupSetting(id: number) {
   return request.delete<void>(`/api/oa/group-setting/${id}`)
+}
+
+export function batchDeleteGroupSetting(ids: number[]) {
+  return request.delete<number>('/api/oa/group-setting/batch', { data: { ids } })
+}
+
+export function exportGroupSetting(params: any) {
+  return request.get<Blob>('/api/oa/group-setting/export', { params, responseType: 'blob' })
 }
 
 export function getActivityPlanPage(params: any) {
@@ -161,8 +257,40 @@ export function updateActivityPlan(id: number, data: Partial<OaActivityPlan>) {
   return request.put<OaActivityPlan>(`/api/oa/activity-plan/${id}`, data)
 }
 
+export function startActivityPlan(id: number) {
+  return request.put<OaActivityPlan>(`/api/oa/activity-plan/${id}/start`)
+}
+
+export function completeActivityPlan(id: number) {
+  return request.put<OaActivityPlan>(`/api/oa/activity-plan/${id}/done`)
+}
+
+export function cancelActivityPlan(id: number) {
+  return request.put<OaActivityPlan>(`/api/oa/activity-plan/${id}/cancel`)
+}
+
+export function batchStartActivityPlan(ids: number[]) {
+  return request.put<number>('/api/oa/activity-plan/batch/start', { ids })
+}
+
+export function batchCompleteActivityPlan(ids: number[]) {
+  return request.put<number>('/api/oa/activity-plan/batch/done', { ids })
+}
+
+export function batchCancelActivityPlan(ids: number[]) {
+  return request.put<number>('/api/oa/activity-plan/batch/cancel', { ids })
+}
+
 export function deleteActivityPlan(id: number) {
   return request.delete<void>(`/api/oa/activity-plan/${id}`)
+}
+
+export function batchDeleteActivityPlan(ids: number[]) {
+  return request.delete<number>('/api/oa/activity-plan/batch', { data: { ids } })
+}
+
+export function exportActivityPlan(params: any) {
+  return request.get<Blob>('/api/oa/activity-plan/export', { params, responseType: 'blob' })
 }
 
 export function getOaTaskPage(params: any) {
@@ -185,8 +313,20 @@ export function completeOaTask(id: number) {
   return request.put<OaTask>(`/api/oa/task/${id}/done`)
 }
 
+export function batchCompleteOaTask(ids: number[]) {
+  return request.put<number>('/api/oa/task/batch/done', { ids })
+}
+
 export function deleteOaTask(id: number) {
   return request.delete<void>(`/api/oa/task/${id}`)
+}
+
+export function batchDeleteOaTask(ids: number[]) {
+  return request.delete<number>('/api/oa/task/batch', { data: { ids } })
+}
+
+export function exportOaTask(params: any) {
+  return request.get<Blob>('/api/oa/task/export', { params, responseType: 'blob' })
 }
 
 export function getOaWorkReportPage(params: any) {

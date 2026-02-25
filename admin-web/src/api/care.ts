@@ -1,5 +1,15 @@
 import request, { fetchPage } from '../utils/request'
-import type { CareTaskItem, CareExecuteRequest, CareTaskTemplate, CareTaskAssignRequest, CareTaskBatchAssignRequest, CareTaskReviewRequest, CareTaskCreateRequest } from '../types'
+import type {
+  CareTaskItem,
+  CareExecuteRequest,
+  CareTaskTemplate,
+  CareTaskAssignRequest,
+  CareTaskBatchAssignRequest,
+  CareTaskReviewRequest,
+  CareTaskCreateRequest,
+  CareTaskSummary,
+  CareExecuteLogItem
+} from '../types'
 
 export function getTodayTasks(params: any) {
   return fetchPage<CareTaskItem>('/api/care/tasks/today', params)
@@ -7,6 +17,14 @@ export function getTodayTasks(params: any) {
 
 export function getTaskPage(params: any) {
   return fetchPage<CareTaskItem>('/api/care/tasks/page', params)
+}
+
+export function getTaskSummary(params: any) {
+  return request.get<CareTaskSummary>('/api/care/tasks/summary', { params })
+}
+
+export function getTaskExecuteLogs(taskDailyId: number) {
+  return request.get<CareExecuteLogItem[]>('/api/care/tasks/logs', { params: { taskDailyId } })
 }
 
 export function executeTask(data: CareExecuteRequest) {

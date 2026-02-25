@@ -4,6 +4,9 @@
       <a-form-item label="关键词">
         <a-input v-model:value="query.keyword" placeholder="分区编码/名称/负责人" allow-clear />
       </a-form-item>
+      <a-form-item label="状态">
+        <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 140px" />
+      </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openCreate">新增分区</a-button>
       </template>
@@ -11,7 +14,12 @@
 
     <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'action'">
+        <template v-if="column.key === 'status'">
+          <a-tag :color="record.status === DINING_STATUS.enabled ? 'green' : 'default'">
+            {{ getDiningEnableStatusLabel(record.status) }}
+          </a-tag>
+        </template>
+        <template v-else-if="column.key === 'action'">
           <a-space>
             <a-button type="link" @click="openEdit(record)">编辑</a-button>
             <a-button type="link" danger @click="remove(record)">删除</a-button>
@@ -37,6 +45,9 @@
         <a-form-item label="负责人">
           <a-input v-model:value="form.managerName" />
         </a-form-item>
+        <a-form-item label="状态">
+          <a-select v-model:value="form.status" :options="statusOptions" />
+        </a-form-item>
         <a-form-item label="备注">
           <a-input v-model:value="form.remark" />
         </a-form-item>
@@ -51,12 +62,20 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import {
+  DINING_ENABLE_STATUS_OPTIONS,
+  DINING_MESSAGES,
+  DINING_STATUS,
+  getDiningEnableStatusLabel
+} from '../../constants/dining'
 import { getDiningPrepZonePage, createDiningPrepZone, updateDiningPrepZone, deleteDiningPrepZone } from '../../api/dining'
 import type { DiningPrepZone, PageResult } from '../../types'
 
+const statusOptions = DINING_ENABLE_STATUS_OPTIONS
+
 const loading = ref(false)
 const rows = ref<DiningPrepZone[]>([])
-const query = reactive({ keyword: '', pageNo: 1, pageSize: 10 })
+const query = reactive({ keyword: '', status: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const editOpen = ref(false)
 const saving = ref(false)
@@ -67,6 +86,7 @@ const form = reactive({
   kitchenArea: '',
   capacity: undefined as number | undefined,
   managerName: '',
+  status: DINING_STATUS.enabled,
   remark: ''
 })
 
@@ -76,6 +96,7 @@ const columns = [
   { title: '厨房区域', dataIndex: 'kitchenArea', key: 'kitchenArea', width: 160 },
   { title: '备餐能力', dataIndex: 'capacity', key: 'capacity', width: 120 },
   { title: '负责人', dataIndex: 'managerName', key: 'managerName', width: 120 },
+  { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
   { title: '备注', dataIndex: 'remark', key: 'remark' },
   { title: '操作', key: 'action', width: 140 }
 ]
@@ -101,6 +122,7 @@ function handleTableChange(pag: any) {
 
 function onReset() {
   query.keyword = ''
+  query.status = undefined
   query.pageNo = 1
   pagination.current = 1
   fetchData()
@@ -113,6 +135,7 @@ function openCreate() {
   form.kitchenArea = ''
   form.capacity = undefined
   form.managerName = ''
+  form.status = DINING_STATUS.enabled
   form.remark = ''
   editOpen.value = true
 }
@@ -124,24 +147,30 @@ function openEdit(record: DiningPrepZone) {
   form.kitchenArea = record.kitchenArea || ''
   form.capacity = record.capacity
   form.managerName = record.managerName || ''
+  form.status = record.status || DINING_STATUS.enabled
   form.remark = record.remark || ''
   editOpen.value = true
 }
 
 async function submit() {
-  if (!form.zoneCode || !form.zoneName) {
-    message.error('请填写分区编码和名称')
+  if (!form.zoneCode.trim() || !form.zoneName.trim()) {
+    message.error(DINING_MESSAGES.requiredPrepZoneFields)
+    return
+  }
+  if (form.capacity != null && form.capacity < 0) {
+    message.error(DINING_MESSAGES.invalidPrepCapacity)
     return
   }
   saving.value = true
   try {
     const payload = {
-      zoneCode: form.zoneCode,
-      zoneName: form.zoneName,
-      kitchenArea: form.kitchenArea,
+      zoneCode: form.zoneCode.trim(),
+      zoneName: form.zoneName.trim(),
+      kitchenArea: form.kitchenArea.trim() || undefined,
       capacity: form.capacity,
-      managerName: form.managerName,
-      remark: form.remark
+      managerName: form.managerName.trim() || undefined,
+      status: form.status,
+      remark: form.remark.trim() || undefined
     }
     if (form.id) {
       await updateDiningPrepZone(form.id, payload)

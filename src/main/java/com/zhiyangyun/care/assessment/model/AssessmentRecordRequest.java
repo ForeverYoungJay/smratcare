@@ -10,7 +10,6 @@ import lombok.Data;
 public class AssessmentRecordRequest {
   private Long elderId;
 
-  @NotBlank
   private String elderName;
 
   @NotBlank

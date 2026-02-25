@@ -75,6 +75,39 @@ public class HealthInspectionClosureServiceImpl implements HealthInspectionClosu
     inspectionMapper.updateById(inspection);
   }
 
+  @Override
+  @Transactional
+  public void syncAfterNursingLogDeleted(Long orgId, Long sourceInspectionId) {
+    if (orgId == null || sourceInspectionId == null) {
+      return;
+    }
+    HealthInspection inspection = inspectionMapper.selectOne(Wrappers.lambdaQuery(HealthInspection.class)
+        .eq(HealthInspection::getIsDeleted, 0)
+        .eq(HealthInspection::getOrgId, orgId)
+        .eq(HealthInspection::getId, sourceInspectionId)
+        .last("LIMIT 1"));
+    if (inspection == null) {
+      return;
+    }
+    long totalLogs = nursingLogMapper.selectCount(Wrappers.lambdaQuery(HealthNursingLog.class)
+        .eq(HealthNursingLog::getIsDeleted, 0)
+        .eq(HealthNursingLog::getOrgId, orgId)
+        .eq(HealthNursingLog::getSourceInspectionId, sourceInspectionId));
+    long closedLogs = nursingLogMapper.selectCount(Wrappers.lambdaQuery(HealthNursingLog.class)
+        .eq(HealthNursingLog::getIsDeleted, 0)
+        .eq(HealthNursingLog::getOrgId, orgId)
+        .eq(HealthNursingLog::getSourceInspectionId, sourceInspectionId)
+        .in(HealthNursingLog::getStatus, "DONE", "CLOSED"));
+    if (closedLogs > 0) {
+      inspection.setStatus("CLOSED");
+    } else if (totalLogs > 0) {
+      inspection.setStatus("FOLLOWING");
+    } else {
+      inspection.setStatus(isAbnormal(inspection) ? "ABNORMAL" : "NORMAL");
+    }
+    inspectionMapper.updateById(inspection);
+  }
+
   private static boolean isAbnormal(HealthInspection inspection) {
     if (inspection.getStatus() != null && "ABNORMAL".equalsIgnoreCase(inspection.getStatus())) {
       return true;

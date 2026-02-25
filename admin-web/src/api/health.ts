@@ -4,12 +4,16 @@ import type {
   HealthMedicationDeposit,
   HealthMedicationSetting,
   HealthMedicationRegistration,
+  HealthMedicationRegistrationSummary,
   HealthMedicationTask,
   HealthMedicationRemainingItem,
   HealthArchive,
   HealthDataRecord,
+  HealthDataSummary,
   HealthInspection,
-  HealthNursingLog
+  HealthInspectionSummary,
+  HealthNursingLog,
+  HealthNursingLogSummary
 } from '../types'
 
 export function getHealthDrugDictionaryPage(params: any) {
@@ -64,6 +68,10 @@ export function getHealthMedicationRegistrationPage(params: any) {
   return fetchPage<HealthMedicationRegistration>('/api/health/medication/registration/page', params)
 }
 
+export function getHealthMedicationRegistrationSummary(params: any) {
+  return request.get<HealthMedicationRegistrationSummary>('/api/health/medication/registration/summary', { params })
+}
+
 export function createHealthMedicationRegistration(data: Partial<HealthMedicationRegistration>) {
   return request.post<HealthMedicationRegistration>('/api/health/medication/registration', data)
 }
@@ -104,6 +112,10 @@ export function getHealthDataRecordPage(params: any) {
   return fetchPage<HealthDataRecord>('/api/health/data/page', params)
 }
 
+export function getHealthDataSummary(params: any) {
+  return request.get<HealthDataSummary>('/api/health/data/summary', { params })
+}
+
 export function createHealthDataRecord(data: Partial<HealthDataRecord>) {
   return request.post<HealthDataRecord>('/api/health/data', data)
 }
@@ -120,6 +132,10 @@ export function getHealthInspectionPage(params: any) {
   return fetchPage<HealthInspection>('/api/health/inspection/page', params)
 }
 
+export function getHealthInspectionSummary(params: any) {
+  return request.get<HealthInspectionSummary>('/api/health/inspection/summary', { params })
+}
+
 export function createHealthInspection(data: Partial<HealthInspection>) {
   return request.post<HealthInspection>('/api/health/inspection', data)
 }
@@ -134,6 +150,10 @@ export function deleteHealthInspection(id: number) {
 
 export function getHealthNursingLogPage(params: any) {
   return fetchPage<HealthNursingLog>('/api/health/nursing-log/page', params)
+}
+
+export function getHealthNursingLogSummary(params: any) {
+  return request.get<HealthNursingLogSummary>('/api/health/nursing-log/summary', { params })
 }
 
 export function createHealthNursingLog(data: Partial<HealthNursingLog>) {

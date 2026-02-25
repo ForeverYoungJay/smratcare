@@ -84,17 +84,25 @@ const rows = ref<FlowReportItem[]>([])
 const total = ref(0)
 
 async function loadData() {
-  const res = await getElderFlowReport({
-    fromDate: dayjs(query.value.fromDate).format('YYYY-MM-DD'),
-    toDate: dayjs(query.value.toDate).format('YYYY-MM-DD'),
-    eventType: query.value.eventType,
-    keyword: query.value.keyword,
-    pageNo: query.value.pageNo,
-    pageSize: query.value.pageSize,
-    orgId: query.value.orgId
-  })
-  rows.value = res.list || []
-  total.value = Number(res.total || 0)
+  if (query.value.fromDate.isAfter(query.value.toDate, 'day')) {
+    message.warning('开始日期不能晚于结束日期')
+    return
+  }
+  try {
+    const res = await getElderFlowReport({
+      fromDate: dayjs(query.value.fromDate).format('YYYY-MM-DD'),
+      toDate: dayjs(query.value.toDate).format('YYYY-MM-DD'),
+      eventType: query.value.eventType,
+      keyword: query.value.keyword,
+      pageNo: query.value.pageNo,
+      pageSize: query.value.pageSize,
+      orgId: query.value.orgId
+    })
+    rows.value = res.list || []
+    total.value = Number(res.total || 0)
+  } catch (error: any) {
+    message.error(error?.message || '加载老人出入报表失败')
+  }
 }
 
 function search() {
@@ -120,14 +128,22 @@ function onPageSizeChange(_: number, pageSize: number) {
 }
 
 async function exportCsvReport() {
-  await exportElderFlowReportCsv({
-    fromDate: dayjs(query.value.fromDate).format('YYYY-MM-DD'),
-    toDate: dayjs(query.value.toDate).format('YYYY-MM-DD'),
-    eventType: query.value.eventType,
-    keyword: query.value.keyword,
-    orgId: query.value.orgId
-  })
-  message.success('报表导出成功')
+  if (query.value.fromDate.isAfter(query.value.toDate, 'day')) {
+    message.warning('开始日期不能晚于结束日期')
+    return
+  }
+  try {
+    await exportElderFlowReportCsv({
+      fromDate: dayjs(query.value.fromDate).format('YYYY-MM-DD'),
+      toDate: dayjs(query.value.toDate).format('YYYY-MM-DD'),
+      eventType: query.value.eventType,
+      keyword: query.value.keyword,
+      orgId: query.value.orgId
+    })
+    message.success('报表导出成功')
+  } catch (error: any) {
+    message.error(error?.message || '报表导出失败')
+  }
 }
 
 onMounted(loadData)

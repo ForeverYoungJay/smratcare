@@ -102,6 +102,7 @@ CREATE TABLE elder (
   gender TINYINT DEFAULT NULL COMMENT '性别 1男 2女 0未知',
   birth_date DATE DEFAULT NULL COMMENT '出生日期',
   phone VARCHAR(32) DEFAULT NULL COMMENT '联系电话',
+  home_address VARCHAR(255) DEFAULT NULL COMMENT '家庭地址',
   admission_date DATE DEFAULT NULL COMMENT '入院日期',
   status TINYINT NOT NULL DEFAULT 1 COMMENT '状态 1在院 2请假 3离院',
   bed_id BIGINT DEFAULT NULL COMMENT '床位ID',

@@ -74,12 +74,17 @@ public class FeeManagementServiceImpl implements FeeManagementService {
 
   @Override
   public IPage<AdmissionFeeAudit> admissionAuditPage(Long orgId, long pageNo, long pageSize, Long elderId,
-      String status) {
+      String status, String keyword) {
+    String normalizedKeyword = normalizeOptionalText(keyword);
     var wrapper = Wrappers.lambdaQuery(AdmissionFeeAudit.class)
         .eq(AdmissionFeeAudit::getIsDeleted, 0)
         .eq(orgId != null, AdmissionFeeAudit::getOrgId, orgId)
         .eq(elderId != null, AdmissionFeeAudit::getElderId, elderId)
         .eq(hasText(status), AdmissionFeeAudit::getStatus, normalizeStatus(status))
+        .and(hasText(normalizedKeyword),
+            q -> q.like(AdmissionFeeAudit::getElderName, normalizedKeyword)
+                .or()
+                .like(AdmissionFeeAudit::getAuditRemark, normalizedKeyword))
         .orderByDesc(AdmissionFeeAudit::getCreateTime);
     return admissionFeeAuditMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
   }
@@ -90,6 +95,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     validatePositiveAmount(request.getTotalAmount(), "totalAmount");
     validateNonNegativeAmount(request.getDepositAmount(), "depositAmount");
     ElderProfile elder = getElder(orgId, request.getElderId());
+    ensureNoPendingAdmissionAudit(orgId, elder.getId(), request.getAdmissionId());
 
     AdmissionFeeAudit audit = new AdmissionFeeAudit();
     audit.setTenantId(orgId);
@@ -100,7 +106,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     audit.setTotalAmount(request.getTotalAmount());
     audit.setDepositAmount(request.getDepositAmount());
     audit.setStatus(FeeWorkflowConstants.AUDIT_PENDING);
-    audit.setAuditRemark(request.getRemark());
+    audit.setAuditRemark(normalizeOptionalText(request.getRemark()));
     audit.setCreatedBy(operatorId);
     admissionFeeAuditMapper.insert(audit);
     return audit;
@@ -122,7 +128,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
       throw new IllegalArgumentException("驳回时请填写审核备注");
     }
     audit.setStatus(status);
-    audit.setAuditRemark(request.getReviewRemark());
+    audit.setAuditRemark(normalizeOptionalText(request.getReviewRemark()));
     audit.setReviewedBy(operatorId);
     audit.setReviewedTime(LocalDateTime.now());
     admissionFeeAuditMapper.updateById(audit);
@@ -131,12 +137,21 @@ public class FeeManagementServiceImpl implements FeeManagementService {
 
   @Override
   public IPage<DischargeFeeAudit> dischargeAuditPage(Long orgId, long pageNo, long pageSize, Long elderId,
-      String status) {
+      String status, String keyword) {
+    String normalizedKeyword = normalizeOptionalText(keyword);
     var wrapper = Wrappers.lambdaQuery(DischargeFeeAudit.class)
         .eq(DischargeFeeAudit::getIsDeleted, 0)
         .eq(orgId != null, DischargeFeeAudit::getOrgId, orgId)
         .eq(elderId != null, DischargeFeeAudit::getElderId, elderId)
         .eq(hasText(status), DischargeFeeAudit::getStatus, normalizeStatus(status))
+        .and(hasText(normalizedKeyword),
+            q -> q.like(DischargeFeeAudit::getElderName, normalizedKeyword)
+                .or()
+                .like(DischargeFeeAudit::getFeeItem, normalizedKeyword)
+                .or()
+                .like(DischargeFeeAudit::getDischargeFeeConfig, normalizedKeyword)
+                .or()
+                .like(DischargeFeeAudit::getAuditRemark, normalizedKeyword))
         .orderByDesc(DischargeFeeAudit::getCreateTime);
     return dischargeFeeAuditMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
   }
@@ -146,6 +161,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
   public DischargeFeeAudit createDischargeAudit(Long orgId, Long operatorId, DischargeFeeAuditCreateRequest request) {
     validateNonNegativeAmount(request.getPayableAmount(), "payableAmount");
     ElderProfile elder = getElder(orgId, request.getElderId());
+    ensureNoPendingDischargeAudit(orgId, elder.getId(), request.getDischargeApplyId());
     if (request.getDischargeApplyId() != null) {
       assertDischargeApplyApproved(orgId, request.getDischargeApplyId(), elder.getId());
     }
@@ -157,10 +173,10 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     audit.setElderName(elder.getFullName());
     audit.setDischargeApplyId(request.getDischargeApplyId());
     audit.setPayableAmount(request.getPayableAmount());
-    audit.setFeeItem(request.getFeeItem());
-    audit.setDischargeFeeConfig(request.getDischargeFeeConfig());
+    audit.setFeeItem(normalizeOptionalText(request.getFeeItem()));
+    audit.setDischargeFeeConfig(normalizeOptionalText(request.getDischargeFeeConfig()));
     audit.setStatus(FeeWorkflowConstants.AUDIT_PENDING);
-    audit.setAuditRemark(request.getRemark());
+    audit.setAuditRemark(normalizeOptionalText(request.getRemark()));
     audit.setCreatedBy(operatorId);
     dischargeFeeAuditMapper.insert(audit);
     return audit;
@@ -184,7 +200,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     }
 
     audit.setStatus(status);
-    audit.setAuditRemark(request.getReviewRemark());
+    audit.setAuditRemark(normalizeOptionalText(request.getReviewRemark()));
     audit.setReviewedBy(operatorId);
     audit.setReviewedTime(LocalDateTime.now());
     dischargeFeeAuditMapper.updateById(audit);
@@ -197,12 +213,21 @@ public class FeeManagementServiceImpl implements FeeManagementService {
 
   @Override
   public IPage<DischargeSettlement> dischargeSettlementPage(Long orgId, long pageNo, long pageSize, Long elderId,
-      String status) {
+      String status, String keyword) {
+    String normalizedKeyword = normalizeOptionalText(keyword);
     var wrapper = Wrappers.lambdaQuery(DischargeSettlement.class)
         .eq(DischargeSettlement::getIsDeleted, 0)
         .eq(orgId != null, DischargeSettlement::getOrgId, orgId)
         .eq(elderId != null, DischargeSettlement::getElderId, elderId)
         .eq(hasText(status), DischargeSettlement::getStatus, normalizeStatus(status))
+        .and(hasText(normalizedKeyword),
+            q -> q.like(DischargeSettlement::getElderName, normalizedKeyword)
+                .or()
+                .like(DischargeSettlement::getFeeItem, normalizedKeyword)
+                .or()
+                .like(DischargeSettlement::getDischargeFeeConfig, normalizedKeyword)
+                .or()
+                .like(DischargeSettlement::getRemark, normalizedKeyword))
         .orderByDesc(DischargeSettlement::getCreateTime);
     return dischargeSettlementMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
   }
@@ -229,13 +254,13 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     settlement.setElderName(elder.getFullName());
     settlement.setDischargeApplyId(request.getDischargeApplyId());
     settlement.setPayableAmount(request.getPayableAmount());
-    settlement.setFeeItem(request.getFeeItem());
-    settlement.setDischargeFeeConfig(request.getDischargeFeeConfig());
+    settlement.setFeeItem(normalizeOptionalText(request.getFeeItem()));
+    settlement.setDischargeFeeConfig(normalizeOptionalText(request.getDischargeFeeConfig()));
     settlement.setFromDepositAmount(amounts.fromDepositAmount());
     settlement.setRefundAmount(amounts.refundAmount());
     settlement.setSupplementAmount(amounts.supplementAmount());
     settlement.setStatus(FeeWorkflowConstants.SETTLEMENT_PENDING_CONFIRM);
-    settlement.setRemark(request.getRemark());
+    settlement.setRemark(normalizeOptionalText(request.getRemark()));
     settlement.setCreatedBy(operatorId);
     dischargeSettlementMapper.insert(settlement);
     return settlement;
@@ -307,7 +332,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     current.setSettledBy(operatorId);
     current.setSettledTime(LocalDateTime.now());
     if (request != null && hasText(request.getRemark())) {
-      current.setRemark(request.getRemark());
+      current.setRemark(normalizeOptionalText(request.getRemark()));
     }
     dischargeSettlementMapper.updateById(current);
     return current;
@@ -315,19 +340,34 @@ public class FeeManagementServiceImpl implements FeeManagementService {
 
   @Override
   public IPage<ConsumptionRecord> consumptionPage(Long orgId, long pageNo, long pageSize, Long elderId,
-      String from, String to, String category) {
+      String from, String to, String category, String keyword) {
+    LocalDate fromDate = parseDateOrNull(from, "from");
+    LocalDate toDate = parseDateOrNull(to, "to");
+    if (fromDate != null && toDate != null && fromDate.isAfter(toDate)) {
+      throw new IllegalArgumentException("开始日期不能晚于结束日期");
+    }
+    String normalizedCategory = normalizeOptionalText(category);
+    String normalizedKeyword = normalizeOptionalText(keyword);
     var wrapper = Wrappers.lambdaQuery(ConsumptionRecord.class)
         .eq(ConsumptionRecord::getIsDeleted, 0)
         .eq(orgId != null, ConsumptionRecord::getOrgId, orgId)
         .eq(elderId != null, ConsumptionRecord::getElderId, elderId)
-        .eq(hasText(category), ConsumptionRecord::getCategory, category)
+        .eq(hasText(normalizedCategory), ConsumptionRecord::getCategory, normalizedCategory)
+        .and(hasText(normalizedKeyword),
+            q -> q.like(ConsumptionRecord::getElderName, normalizedKeyword)
+                .or()
+                .like(ConsumptionRecord::getCategory, normalizedKeyword)
+                .or()
+                .like(ConsumptionRecord::getSourceType, normalizedKeyword)
+                .or()
+                .like(ConsumptionRecord::getRemark, normalizedKeyword))
         .orderByDesc(ConsumptionRecord::getConsumeDate)
         .orderByDesc(ConsumptionRecord::getCreateTime);
-    if (hasText(from)) {
-      wrapper.ge(ConsumptionRecord::getConsumeDate, LocalDate.parse(from));
+    if (fromDate != null) {
+      wrapper.ge(ConsumptionRecord::getConsumeDate, fromDate);
     }
-    if (hasText(to)) {
-      wrapper.le(ConsumptionRecord::getConsumeDate, LocalDate.parse(to));
+    if (toDate != null) {
+      wrapper.le(ConsumptionRecord::getConsumeDate, toDate);
     }
     return consumptionRecordMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
   }
@@ -345,10 +385,10 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     record.setElderName(elder.getFullName());
     record.setConsumeDate(request.getConsumeDate());
     record.setAmount(request.getAmount());
-    record.setCategory(request.getCategory());
-    record.setSourceType(request.getSourceType());
+    record.setCategory(normalizeOptionalText(request.getCategory()));
+    record.setSourceType(normalizeOptionalText(request.getSourceType()));
     record.setSourceId(request.getSourceId());
-    record.setRemark(request.getRemark());
+    record.setRemark(normalizeOptionalText(request.getRemark()));
     record.setCreatedBy(operatorId);
     consumptionRecordMapper.insert(record);
     return record;
@@ -373,16 +413,19 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     if (request.getTargetCount() == null || request.getTargetCount() < 0) {
       throw new IllegalArgumentException("targetCount must be >= 0");
     }
+    if (request.getTotalAmount().compareTo(BigDecimal.ZERO) > 0 && request.getTargetCount() == 0) {
+      throw new IllegalArgumentException("totalAmount > 0 时 targetCount 不能为 0");
+    }
 
     MonthlyAllocation allocation = new MonthlyAllocation();
     allocation.setTenantId(orgId);
     allocation.setOrgId(orgId);
     allocation.setAllocationMonth(request.getAllocationMonth());
-    allocation.setAllocationName(request.getAllocationName());
+    allocation.setAllocationName(normalizeOptionalText(request.getAllocationName()));
     allocation.setTotalAmount(request.getTotalAmount());
     allocation.setTargetCount(request.getTargetCount());
     allocation.setStatus("DRAFT");
-    allocation.setRemark(request.getRemark());
+    allocation.setRemark(normalizeOptionalText(request.getRemark()));
     allocation.setCreatedBy(operatorId);
     monthlyAllocationMapper.insert(allocation);
     return allocation;
@@ -409,6 +452,36 @@ public class FeeManagementServiceImpl implements FeeManagementService {
         .eq(DischargeSettlement::getDischargeApplyId, dischargeApplyId));
     if (exists > 0) {
       throw new IllegalStateException("该退住申请已存在结算单");
+    }
+  }
+
+  private void ensureNoPendingAdmissionAudit(Long orgId, Long elderId, Long admissionId) {
+    var query = Wrappers.lambdaQuery(AdmissionFeeAudit.class)
+        .eq(AdmissionFeeAudit::getIsDeleted, 0)
+        .eq(orgId != null, AdmissionFeeAudit::getOrgId, orgId)
+        .eq(AdmissionFeeAudit::getElderId, elderId)
+        .eq(AdmissionFeeAudit::getStatus, FeeWorkflowConstants.AUDIT_PENDING);
+    if (admissionId != null) {
+      query.eq(AdmissionFeeAudit::getAdmissionId, admissionId);
+    }
+    long exists = admissionFeeAuditMapper.selectCount(query);
+    if (exists > 0) {
+      throw new IllegalStateException("存在待审核的入住费用单，请先完成审核");
+    }
+  }
+
+  private void ensureNoPendingDischargeAudit(Long orgId, Long elderId, Long dischargeApplyId) {
+    var query = Wrappers.lambdaQuery(DischargeFeeAudit.class)
+        .eq(DischargeFeeAudit::getIsDeleted, 0)
+        .eq(orgId != null, DischargeFeeAudit::getOrgId, orgId)
+        .eq(DischargeFeeAudit::getElderId, elderId)
+        .eq(DischargeFeeAudit::getStatus, FeeWorkflowConstants.AUDIT_PENDING);
+    if (dischargeApplyId != null) {
+      query.eq(DischargeFeeAudit::getDischargeApplyId, dischargeApplyId);
+    }
+    long exists = dischargeFeeAuditMapper.selectCount(query);
+    if (exists > 0) {
+      throw new IllegalStateException("存在待审核的退住费用单，请先完成审核");
     }
   }
 
@@ -488,6 +561,25 @@ public class FeeManagementServiceImpl implements FeeManagementService {
 
   private String normalizeStatus(String status) {
     return status == null ? null : status.trim().toUpperCase(Locale.ROOT);
+  }
+
+  private String normalizeOptionalText(String value) {
+    if (value == null) {
+      return null;
+    }
+    String trimmed = value.trim();
+    return trimmed.isEmpty() ? null : trimmed;
+  }
+
+  private LocalDate parseDateOrNull(String rawDate, String fieldName) {
+    if (!hasText(rawDate)) {
+      return null;
+    }
+    try {
+      return LocalDate.parse(rawDate);
+    } catch (Exception exception) {
+      throw new IllegalArgumentException(fieldName + " 格式错误，期望 YYYY-MM-DD");
+    }
   }
 
   private boolean hasText(String value) {

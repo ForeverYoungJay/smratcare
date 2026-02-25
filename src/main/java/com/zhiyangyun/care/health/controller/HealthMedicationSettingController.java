@@ -84,10 +84,12 @@ public class HealthMedicationSettingController {
   @PutMapping("/{id}")
   public Result<HealthMedicationSetting> update(@PathVariable Long id, @Valid @RequestBody HealthMedicationSettingRequest request) {
     HealthMedicationSetting item = mapper.selectById(id);
-    if (item == null) {
+    Long orgId = AuthContext.getOrgId();
+    if (item == null || item.getIsDeleted() != null && item.getIsDeleted() == 1
+        || orgId != null && !orgId.equals(item.getOrgId())) {
       return Result.ok(null);
     }
-    Long elderId = elderResolveSupport.resolveElderId(AuthContext.getOrgId(), request.getElderId(), request.getElderName());
+    Long elderId = elderResolveSupport.resolveElderId(orgId, request.getElderId(), request.getElderName());
     item.setElderId(elderId);
     item.setElderName(elderResolveSupport.resolveElderName(elderId, request.getElderName()));
     item.setDrugId(request.getDrugId());
@@ -107,7 +109,9 @@ public class HealthMedicationSettingController {
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
     HealthMedicationSetting item = mapper.selectById(id);
-    if (item != null) {
+    Long orgId = AuthContext.getOrgId();
+    if (item != null && (item.getIsDeleted() == null || item.getIsDeleted() == 0)
+        && (orgId == null || orgId.equals(item.getOrgId()))) {
       item.setIsDeleted(1);
       mapper.updateById(item);
     }
