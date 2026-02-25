@@ -107,11 +107,14 @@ public class FinanceServiceImpl implements FinanceService {
       total = total.add(record.getAmount());
     }
 
-    ReconciliationDaily daily = reconciliationDailyMapper.selectOne(
+    List<ReconciliationDaily> existingList = reconciliationDailyMapper.selectList(
         Wrappers.lambdaQuery(ReconciliationDaily.class)
             .eq(ReconciliationDaily::getOrgId, orgId)
-            .eq(ReconciliationDaily::getReconcileDate, date));
-    if (daily == null) {
+            .eq(ReconciliationDaily::getReconcileDate, date)
+            .eq(ReconciliationDaily::getIsDeleted, 0)
+            .orderByDesc(ReconciliationDaily::getId));
+    ReconciliationDaily daily;
+    if (existingList == null || existingList.isEmpty()) {
       daily = new ReconciliationDaily();
       daily.setOrgId(orgId);
       daily.setReconcileDate(date);
@@ -119,9 +122,15 @@ public class FinanceServiceImpl implements FinanceService {
       daily.setMismatchFlag(0);
       reconciliationDailyMapper.insert(daily);
     } else {
+      daily = existingList.get(0);
       daily.setTotalReceived(total);
       daily.setMismatchFlag(0);
       reconciliationDailyMapper.updateById(daily);
+      for (int i = 1; i < existingList.size(); i++) {
+        ReconciliationDaily duplicate = existingList.get(i);
+        duplicate.setIsDeleted(1);
+        reconciliationDailyMapper.updateById(duplicate);
+      }
     }
 
     ReconcileResponse response = new ReconcileResponse();

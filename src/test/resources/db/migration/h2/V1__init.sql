@@ -1,10 +1,12 @@
 DROP TABLE IF EXISTS care_task_execute_log;
 DROP TABLE IF EXISTS care_task_review;
+DROP TABLE IF EXISTS audit_log;
 DROP TABLE IF EXISTS care_task_daily;
 DROP TABLE IF EXISTS care_task_template;
 DROP TABLE IF EXISTS elder_family;
 DROP TABLE IF EXISTS family_user;
 DROP TABLE IF EXISTS elder_change_log;
+DROP TABLE IF EXISTS elder_discharge_apply;
 DROP TABLE IF EXISTS elder_bed_relation;
 DROP TABLE IF EXISTS elder;
 DROP TABLE IF EXISTS bed;
@@ -38,6 +40,9 @@ DROP TABLE IF EXISTS elder_points_account;
 DROP TABLE IF EXISTS points_log;
 DROP TABLE IF EXISTS billing_config;
 DROP TABLE IF EXISTS billing_care_level_fee;
+DROP TABLE IF EXISTS elder_account_log;
+DROP TABLE IF EXISTS elder_account;
+DROP TABLE IF EXISTS staff_points_rule;
 
 CREATE TABLE care_task_template (
   id BIGINT NOT NULL PRIMARY KEY,
@@ -46,6 +51,7 @@ CREATE TABLE care_task_template (
   task_name VARCHAR(128) NOT NULL,
   frequency_per_day INT NOT NULL DEFAULT 1,
   care_level_required VARCHAR(32) DEFAULT NULL,
+  charge_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
   enabled TINYINT NOT NULL DEFAULT 1,
   created_by BIGINT DEFAULT NULL,
   create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -107,12 +113,25 @@ CREATE TABLE care_task_review (
   is_deleted TINYINT NOT NULL DEFAULT 0
 );
 
+CREATE TABLE audit_log (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL DEFAULT 1,
+  org_id BIGINT NOT NULL,
+  actor_id BIGINT DEFAULT NULL,
+  actor_name VARCHAR(64) DEFAULT NULL,
+  action_type VARCHAR(64) NOT NULL,
+  entity_type VARCHAR(64) NOT NULL,
+  entity_id BIGINT DEFAULT NULL,
+  detail VARCHAR(1000) DEFAULT NULL,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE elder (
   id BIGINT NOT NULL PRIMARY KEY,
   tenant_id BIGINT NOT NULL DEFAULT 1,
   org_id BIGINT NOT NULL,
-  elder_code VARCHAR(64) NOT NULL,
-  elder_qr_code VARCHAR(128) NOT NULL,
+  elder_code VARCHAR(64) DEFAULT NULL,
+  elder_qr_code VARCHAR(128) DEFAULT NULL,
   full_name VARCHAR(64) NOT NULL,
   id_card_no VARCHAR(32) DEFAULT NULL,
   gender TINYINT DEFAULT NULL,
@@ -191,6 +210,29 @@ CREATE TABLE elder_change_log (
   reason VARCHAR(255) DEFAULT NULL,
   created_by BIGINT DEFAULT NULL,
   create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE elder_discharge_apply (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL DEFAULT 1,
+  org_id BIGINT NOT NULL,
+  elder_id BIGINT NOT NULL,
+  elder_name VARCHAR(64) DEFAULT NULL,
+  apply_date DATE DEFAULT NULL,
+  planned_discharge_date DATE DEFAULT NULL,
+  reason VARCHAR(255) DEFAULT NULL,
+  status VARCHAR(32) DEFAULT NULL,
+  linked_discharge_id BIGINT DEFAULT NULL,
+  auto_discharge_status VARCHAR(32) DEFAULT NULL,
+  auto_discharge_message VARCHAR(255) DEFAULT NULL,
+  review_remark VARCHAR(255) DEFAULT NULL,
+  reviewed_by BIGINT DEFAULT NULL,
+  reviewed_by_name VARCHAR(64) DEFAULT NULL,
+  reviewed_time DATETIME DEFAULT NULL,
+  created_by BIGINT DEFAULT NULL,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   is_deleted TINYINT NOT NULL DEFAULT 0
 );
 
@@ -456,6 +498,55 @@ CREATE TABLE staff_points_log (
   source_type VARCHAR(32) DEFAULT NULL,
   source_id BIGINT DEFAULT NULL,
   remark VARCHAR(255) DEFAULT NULL,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE staff_points_rule (
+  id BIGINT NOT NULL PRIMARY KEY,
+  org_id BIGINT NOT NULL,
+  template_id BIGINT NOT NULL,
+  base_points INT NOT NULL DEFAULT 0,
+  score_weight DECIMAL(10,2) NOT NULL DEFAULT 0,
+  suspicious_penalty INT NOT NULL DEFAULT 0,
+  fail_points INT NOT NULL DEFAULT 0,
+  status TINYINT NOT NULL DEFAULT 1,
+  remark VARCHAR(255) DEFAULT NULL,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE elder_account (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL DEFAULT 1,
+  org_id BIGINT NOT NULL,
+  elder_id BIGINT NOT NULL,
+  balance DECIMAL(12,2) NOT NULL DEFAULT 0,
+  credit_limit DECIMAL(12,2) NOT NULL DEFAULT 0,
+  warn_threshold DECIMAL(12,2) NOT NULL DEFAULT 0,
+  status TINYINT NOT NULL DEFAULT 1,
+  remark VARCHAR(255) DEFAULT NULL,
+  created_by BIGINT DEFAULT NULL,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE elder_account_log (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL DEFAULT 1,
+  org_id BIGINT NOT NULL,
+  elder_id BIGINT NOT NULL,
+  account_id BIGINT NOT NULL,
+  amount DECIMAL(12,2) NOT NULL,
+  balance_after DECIMAL(12,2) NOT NULL,
+  direction VARCHAR(16) NOT NULL,
+  source_type VARCHAR(32) DEFAULT NULL,
+  source_id BIGINT DEFAULT NULL,
+  remark VARCHAR(255) DEFAULT NULL,
+  created_by BIGINT DEFAULT NULL,
   create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   is_deleted TINYINT NOT NULL DEFAULT 0

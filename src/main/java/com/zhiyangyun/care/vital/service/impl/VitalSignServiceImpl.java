@@ -166,7 +166,7 @@ public class VitalSignServiceImpl implements VitalSignService {
         .distinct()
         .toList();
     if (staffIds.isEmpty()) {
-      return Map.of();
+      return java.util.Collections.emptyMap();
     }
     return staffMapper.selectList(Wrappers.lambdaQuery(StaffAccount.class)
             .in(StaffAccount::getId, staffIds)
@@ -182,7 +182,7 @@ public class VitalSignServiceImpl implements VitalSignService {
         .distinct()
         .toList();
     if (elderIds.isEmpty()) {
-      return Map.of();
+      return java.util.Collections.emptyMap();
     }
     return elderMapper.selectBatchIds(elderIds)
         .stream()

@@ -559,7 +559,8 @@ public class CareTaskServiceImpl implements CareTaskService {
     }
 
     ElderProfile elder = elderMapper.selectById(task.getElderId());
-    Bed elderBed = elder != null ? bedMapper.selectById(elder.getBedId()) : null;
+    Long bedIdForCheck = task.getBedId() != null ? task.getBedId() : (elder == null ? null : elder.getBedId());
+    Bed elderBed = bedIdForCheck == null ? null : bedMapper.selectById(bedIdForCheck);
     if (elderBed == null || elderBed.getBedQrCode() == null
         || !elderBed.getBedQrCode().equals(request.getBedQrCode())) {
       task.setStatus(TaskStatus.EXCEPTION.name());
