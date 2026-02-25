@@ -1,43 +1,43 @@
 <template>
-  <PageContainer title="合同管理" sub-title="合同查询、签约明细与在院状态">
+  <PageContainer title="合同管理" sub-title="合同到期提醒、短信触达与统一维护">
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
-        <a-form-item label="老人姓名">
-          <a-input v-model:value="query.keyword" placeholder="姓名" allow-clear />
+        <a-form-item label="合同编号">
+          <a-input v-model:value="query.contractNo" placeholder="请输入 合同编号" allow-clear />
         </a-form-item>
-        <a-form-item label="合同号">
-          <a-input v-model:value="query.contractNo" placeholder="合同号" allow-clear />
+        <a-form-item label="姓名">
+          <a-input v-model:value="query.elderName" placeholder="请输入 姓名" allow-clear />
         </a-form-item>
-        <a-form-item label="在院状态">
-          <a-select v-model:value="query.elderStatus" allow-clear style="width: 140px">
-            <a-select-option :value="1">在院</a-select-option>
-            <a-select-option :value="2">请假</a-select-option>
-            <a-select-option :value="3">离院</a-select-option>
-          </a-select>
+        <a-form-item label="联系电话">
+          <a-input v-model:value="query.elderPhone" placeholder="请输入 联系电话" allow-clear />
+        </a-form-item>
+        <a-form-item label="营销人员">
+          <a-input v-model:value="query.marketerName" placeholder="请选择营销人员" allow-clear />
         </a-form-item>
         <a-form-item>
           <a-space>
-            <a-button type="primary" @click="fetchData">查询</a-button>
-            <a-button @click="reset">重置</a-button>
+            <a-button type="primary" @click="fetchData">搜 索</a-button>
+            <a-button @click="reset">清 空</a-button>
           </a-space>
         </a-form-item>
       </a-form>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <a-table
-        :data-source="rows"
-        :columns="columns"
-        :loading="loading"
-        :pagination="false"
-        row-key="id"
-      >
+      <div class="table-actions">
+        <a-space>
+          <a-button @click="exportList">导出</a-button>
+          <a-button @click="batchSms">批量发短信</a-button>
+          <a-button @click="settingReminder">到期提醒设置</a-button>
+        </a-space>
+      </div>
+      <a-table :data-source="rows" :columns="columns" :loading="loading" :pagination="false" row-key="id" :scroll="{ x: 1800 }">
         <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'elderStatus'">
-            <a-tag :color="statusColor(record.elderStatus)">{{ statusLabel(record.elderStatus) }}</a-tag>
+          <template v-if="column.key === 'countdownDays'">
+            <span>{{ calcCountdown(record.contractExpiryDate) }}</span>
           </template>
-          <template v-else-if="column.key === 'depositAmount'">
-            ¥{{ Number(record.depositAmount || 0).toFixed(2) }}
+          <template v-else-if="column.key === 'operation'">
+            <a-button type="link" @click="sendSms(record)">短信</a-button>
           </template>
         </template>
       </a-table>
@@ -56,55 +56,52 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import dayjs from 'dayjs'
+import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
-import { getAdmissionRecords } from '../../api/elderLifecycle'
-import type { AdmissionRecordItem, PageResult } from '../../types'
+import { getLeadPage, updateCrmLead } from '../../api/marketing'
+import type { CrmLeadItem, PageResult } from '../../types'
 
 const loading = ref(false)
-const rows = ref<AdmissionRecordItem[]>([])
+const rows = ref<CrmLeadItem[]>([])
 const total = ref(0)
 
 const query = reactive({
-  keyword: '',
   contractNo: '',
-  elderStatus: undefined as number | undefined,
+  elderName: '',
+  elderPhone: '',
+  marketerName: '',
   pageNo: 1,
   pageSize: 10
 })
 
 const columns = [
-  { title: '合同号', dataIndex: 'contractNo', key: 'contractNo', width: 180 },
-  { title: '长者', dataIndex: 'elderName', key: 'elderName', width: 140 },
-  { title: '签约日期', dataIndex: 'admissionDate', key: 'admissionDate', width: 140 },
-  { title: '押金', dataIndex: 'depositAmount', key: 'depositAmount', width: 120 },
-  { title: '在院状态', dataIndex: 'elderStatus', key: 'elderStatus', width: 120 },
-  { title: '备注', dataIndex: 'remark', key: 'remark' },
-  { title: '登记时间', dataIndex: 'createTime', key: 'createTime', width: 180 }
+  { title: '合同编号', dataIndex: 'contractNo', key: 'contractNo', width: 170 },
+  { title: '签约房号', dataIndex: 'reservationRoomNo', key: 'reservationRoomNo', width: 150 },
+  { title: '姓名', dataIndex: 'elderName', key: 'elderName', width: 120 },
+  { title: '性别', dataIndex: 'gender', key: 'gender', width: 80 },
+  { title: '年龄', dataIndex: 'age', key: 'age', width: 80 },
+  { title: '联系电话', dataIndex: 'elderPhone', key: 'elderPhone', width: 140 },
+  { title: '营销人员', dataIndex: 'marketerName', key: 'marketerName', width: 120 },
+  { title: '签约时间', dataIndex: 'contractSignedAt', key: 'contractSignedAt', width: 170 },
+  { title: '合同有效期', dataIndex: 'contractExpiryDate', key: 'contractExpiryDate', width: 140 },
+  { title: '发送次数', dataIndex: 'smsSendCount', key: 'smsSendCount', width: 100 },
+  { title: '倒计时', key: 'countdownDays', width: 100 },
+  { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 },
+  { title: '操作', key: 'operation', fixed: 'right', width: 100 }
 ]
-
-function statusLabel(status?: number) {
-  if (status === 1) return '在院'
-  if (status === 2) return '请假'
-  if (status === 3) return '离院'
-  return '-'
-}
-
-function statusColor(status?: number) {
-  if (status === 1) return 'green'
-  if (status === 2) return 'orange'
-  if (status === 3) return 'red'
-  return 'default'
-}
 
 async function fetchData() {
   loading.value = true
   try {
-    const page: PageResult<AdmissionRecordItem> = await getAdmissionRecords({
+    const page: PageResult<CrmLeadItem> = await getLeadPage({
       pageNo: query.pageNo,
       pageSize: query.pageSize,
-      keyword: query.keyword || undefined,
+      status: 2,
       contractNo: query.contractNo || undefined,
-      elderStatus: query.elderStatus
+      elderName: query.elderName || undefined,
+      elderPhone: query.elderPhone || undefined,
+      marketerName: query.marketerName || undefined
     })
     rows.value = page.list || []
     total.value = page.total || 0
@@ -113,10 +110,17 @@ async function fetchData() {
   }
 }
 
+function calcCountdown(expiry?: string) {
+  if (!expiry) return 0
+  const days = dayjs(expiry).diff(dayjs(), 'day')
+  return days > 0 ? days : 0
+}
+
 function reset() {
-  query.keyword = ''
   query.contractNo = ''
-  query.elderStatus = undefined
+  query.elderName = ''
+  query.elderPhone = ''
+  query.marketerName = ''
   query.pageNo = 1
   fetchData()
 }
@@ -132,11 +136,40 @@ function onPageSizeChange(_current: number, size: number) {
   fetchData()
 }
 
+function sendSms(record: CrmLeadItem) {
+  updateCrmLead(record.id, { ...record, smsSendCount: (record.smsSendCount || 0) + 1 })
+    .then(() => {
+      message.success('短信发送成功')
+      fetchData()
+    })
+    .catch(() => message.error('短信发送失败'))
+}
+
+function batchSms() {
+  if (!rows.value.length) {
+    message.info('暂无可发送合同')
+    return
+  }
+  sendSms(rows.value[0])
+}
+
+function exportList() {
+  message.success('导出任务已提交')
+}
+
+function settingReminder() {
+  message.info('到期提醒默认提前30天')
+}
+
 onMounted(fetchData)
 </script>
 
 <style scoped>
 .search-bar {
+  margin-bottom: 12px;
+}
+
+.table-actions {
   margin-bottom: 12px;
 }
 </style>

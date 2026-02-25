@@ -93,12 +93,39 @@ export interface CrmLeadItem {
   id: number
   name: string
   phone?: string
+  consultantName?: string
+  consultantPhone?: string
+  elderName?: string
+  elderPhone?: string
+  gender?: number
+  age?: number
+  consultDate?: string
+  consultType?: string
+  mediaChannel?: string
+  infoSource?: string
+  receptionistName?: string
+  homeAddress?: string
+  marketerName?: string
+  followupStatus?: string
+  referralChannel?: string
+  invalidTime?: string
+  idCardNo?: string
+  reservationAmount?: number
+  reservationRoomNo?: string
+  paymentTime?: string
+  refunded?: number
+  reservationChannel?: string
+  reservationStatus?: string
+  orgName?: string
   source?: string
   customerTag?: string
   status?: number
   contractSignedFlag?: number
   contractSignedAt?: string
   contractNo?: string
+  contractStatus?: string
+  contractExpiryDate?: string
+  smsSendCount?: number
   nextFollowDate?: string
   remark?: string
   createTime?: string

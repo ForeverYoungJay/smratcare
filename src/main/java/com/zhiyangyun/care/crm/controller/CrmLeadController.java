@@ -64,9 +64,28 @@ public class CrmLeadController {
       @RequestParam(required = false) String keyword,
       @RequestParam(required = false) Integer status,
       @RequestParam(required = false) String source,
-      @RequestParam(required = false) String customerTag) {
+      @RequestParam(required = false) String customerTag,
+      @RequestParam(required = false) String consultantName,
+      @RequestParam(required = false) String consultantPhone,
+      @RequestParam(required = false) String elderName,
+      @RequestParam(required = false) String elderPhone,
+      @RequestParam(required = false) String consultDateFrom,
+      @RequestParam(required = false) String consultDateTo,
+      @RequestParam(required = false) String consultType,
+      @RequestParam(required = false) String mediaChannel,
+      @RequestParam(required = false) String infoSource,
+      @RequestParam(required = false) String marketerName,
+      @RequestParam(required = false) String followupStatus,
+      @RequestParam(required = false) String reservationChannel,
+      @RequestParam(required = false) String contractNo,
+      @RequestParam(required = false) String contractStatus) {
     Long tenantId = AuthContext.getOrgId();
-    return Result.ok(leadService.page(tenantId, pageNo, pageSize, keyword, status, source, customerTag));
+    return Result.ok(leadService.page(
+        tenantId, pageNo, pageSize, keyword, status, source, customerTag,
+        consultantName, consultantPhone, elderName, elderPhone,
+        consultDateFrom, consultDateTo, consultType, mediaChannel,
+        infoSource, marketerName, followupStatus, reservationChannel,
+        contractNo, contractStatus));
   }
 
   @DeleteMapping("/{id}")
