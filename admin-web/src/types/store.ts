@@ -77,6 +77,14 @@ export interface ProductTagItem {
   status?: number
 }
 
+export interface ProductCategoryItem {
+  id: number
+  categoryCode: string
+  categoryName: string
+  status?: number
+  remark?: string
+}
+
 export interface DiseaseItem {
   id: number
   diseaseName: string

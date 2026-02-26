@@ -1,9 +1,15 @@
 <template>
-  <PageContainer title="商品标签" subTitle="维护标签与分类">
+  <PageContainer title="商品大类" subTitle="维护机构商城商品大类">
     <a-card class="card-elevated" :bordered="false">
       <a-form layout="inline" class="search-form" :model="query">
         <a-form-item label="关键词">
-          <a-input v-model:value="query.keyword" placeholder="标签名称/编码" allow-clear />
+          <a-input v-model:value="query.keyword" placeholder="分类名称/编码" allow-clear />
+        </a-form-item>
+        <a-form-item label="状态">
+          <a-select v-model:value="query.status" allow-clear style="width: 120px">
+            <a-select-option :value="1">启用</a-select-option>
+            <a-select-option :value="0">停用</a-select-option>
+          </a-select>
         </a-form-item>
         <a-form-item>
           <a-space>
@@ -17,50 +23,43 @@
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
       <div class="table-actions">
         <a-space>
-          <a-button type="primary" @click="openCreate">新增标签</a-button>
+          <a-button type="primary" @click="openCreate">新增大类</a-button>
           <a-button @click="exportCsvData">导出CSV</a-button>
         </a-space>
       </div>
 
       <vxe-toolbar custom export></vxe-toolbar>
-      <vxe-table
-        border
-        stripe
-        show-overflow
-        height="520"
-        :loading="loading"
-        :data="rows"
-        :column-config="{ resizable: true }"
-      >
-        <vxe-column field="tagCode" title="标签编码" width="160" />
-        <vxe-column field="tagName" title="标签名称" min-width="180" />
-        <vxe-column field="tagType" title="标签类型" width="160" />
+      <vxe-table border stripe show-overflow height="520" :loading="loading" :data="rows" :column-config="{ resizable: true }">
+        <vxe-column field="categoryCode" title="分类编码" width="180" />
+        <vxe-column field="categoryName" title="分类名称" min-width="180" />
+        <vxe-column field="remark" title="备注" min-width="200" />
         <vxe-column field="status" title="状态" width="100">
           <template #default="{ row }">
             <a-tag :color="row.status === 1 ? 'green' : 'default'">{{ row.status === 1 ? '启用' : '停用' }}</a-tag>
           </template>
         </vxe-column>
-        <vxe-column title="操作" width="200" fixed="right">
+        <vxe-column title="操作" width="220" fixed="right">
           <template #default="{ row }">
             <a-space>
               <a @click="openEdit(row)">编辑</a>
               <a @click="toggleStatus(row)">{{ row.status === 1 ? '停用' : '启用' }}</a>
+              <a style="color: #ff4d4f" @click="remove(row)">删除</a>
             </a-space>
           </template>
         </vxe-column>
       </vxe-table>
     </a-card>
 
-    <a-drawer v-model:open="editorOpen" title="标签信息" width="420">
+    <a-drawer v-model:open="editorOpen" title="商品大类信息" width="460">
       <a-form layout="vertical" :model="form" :rules="rules" ref="formRef">
-        <a-form-item label="标签名称" name="tagName" required>
-          <a-input v-model:value="form.tagName" />
+        <a-form-item label="分类名称" name="categoryName" required>
+          <a-input v-model:value="form.categoryName" />
         </a-form-item>
-        <a-form-item label="标签编码" name="tagCode">
-          <a-input v-model:value="form.tagCode" placeholder="留空自动生成" />
+        <a-form-item label="分类编码" name="categoryCode" required>
+          <a-input v-model:value="form.categoryCode" />
         </a-form-item>
-        <a-form-item label="标签类型">
-          <a-input v-model:value="form.tagType" placeholder="如 SUGAR/SEAFOOD" />
+        <a-form-item label="备注">
+          <a-input v-model:value="form.remark" />
         </a-form-item>
         <a-form-item label="状态">
           <a-switch v-model:checked="form.status" checked-children="启用" un-checked-children="停用" />
@@ -82,32 +81,42 @@ import { onMounted, reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportCsv } from '../../utils/export'
-import { getProductTagList, createProductTag, updateProductTag } from '../../api/store'
-import type { ProductTagItem } from '../../types'
+import { getProductCategoryList, createProductCategory, updateProductCategory, deleteProductCategory } from '../../api/store'
+import type { ProductCategoryItem } from '../../types'
 
 const loading = ref(false)
 const saving = ref(false)
-const rows = ref<ProductTagItem[]>([])
+const rows = ref<ProductCategoryItem[]>([])
 const editorOpen = ref(false)
 const formRef = ref()
 
-const query = reactive({ keyword: '' })
-const form = reactive<any>({ id: undefined, tagCode: '', tagName: '', tagType: '', status: true })
+const query = reactive({
+  keyword: '',
+  status: undefined as number | undefined
+})
+const form = reactive<any>({
+  id: undefined,
+  categoryCode: '',
+  categoryName: '',
+  remark: '',
+  status: true
+})
 
 const rules = {
-  tagName: [{ required: true, message: '请输入标签名称' }],
-  tagCode: [
-    { pattern: /^[A-Za-z0-9_]*$/, message: '标签编码仅允许字母/数字/下划线' }
+  categoryName: [{ required: true, message: '请输入分类名称' }],
+  categoryCode: [
+    { required: true, message: '请输入分类编码' },
+    { pattern: /^[A-Za-z0-9_-]+$/, message: '分类编码仅允许字母/数字/下划线/中划线' }
   ]
 }
 
 async function fetchData() {
   loading.value = true
   try {
-    const list = await getProductTagList()
-    rows.value = query.keyword
-      ? list.filter((t) => (t.tagName || '').includes(query.keyword) || (t.tagCode || '').includes(query.keyword))
-      : list
+    rows.value = await getProductCategoryList({
+      keyword: query.keyword || undefined,
+      status: query.status
+    })
   } finally {
     loading.value = false
   }
@@ -115,32 +124,33 @@ async function fetchData() {
 
 function reset() {
   query.keyword = ''
+  query.status = undefined
   fetchData()
 }
 
 function exportCsvData() {
   exportCsv(
     rows.value.map((t) => ({
-      编码: t.tagCode,
-      名称: t.tagName,
-      类型: t.tagType,
+      编码: t.categoryCode,
+      名称: t.categoryName,
+      备注: t.remark,
       状态: t.status === 1 ? '启用' : '停用'
     })),
-    '商品标签'
+    '商品大类'
   )
 }
 
 function openCreate() {
-  Object.assign(form, { id: undefined, tagCode: '', tagName: '', tagType: '', status: true })
+  Object.assign(form, { id: undefined, categoryCode: '', categoryName: '', remark: '', status: true })
   editorOpen.value = true
 }
 
-function openEdit(row: ProductTagItem) {
+function openEdit(row: ProductCategoryItem) {
   Object.assign(form, {
     id: row.id,
-    tagCode: row.tagCode,
-    tagName: row.tagName,
-    tagType: row.tagType,
+    categoryCode: row.categoryCode,
+    categoryName: row.categoryName,
+    remark: row.remark,
     status: row.status === 1
   })
   editorOpen.value = true
@@ -151,16 +161,16 @@ async function submit() {
   saving.value = true
   try {
     const payload = {
-      tagCode: form.tagCode,
-      tagName: form.tagName,
-      tagType: form.tagType,
+      categoryCode: form.categoryCode,
+      categoryName: form.categoryName,
+      remark: form.remark,
       status: form.status ? 1 : 0
     }
     if (form.id) {
-      await updateProductTag(form.id, payload)
+      await updateProductCategory(form.id, payload)
       message.success('保存成功')
     } else {
-      await createProductTag(payload)
+      await createProductCategory(payload)
       message.success('创建成功')
     }
     editorOpen.value = false
@@ -170,17 +180,28 @@ async function submit() {
   }
 }
 
-function toggleStatus(row: ProductTagItem) {
+function toggleStatus(row: ProductCategoryItem) {
   Modal.confirm({
-    title: row.status === 1 ? '确认停用该标签？' : '确认启用该标签？',
+    title: row.status === 1 ? '确认停用该分类？' : '确认启用该分类？',
     onOk: async () => {
-      await updateProductTag(row.id, {
-        tagCode: row.tagCode,
-        tagName: row.tagName,
-        tagType: row.tagType,
+      await updateProductCategory(row.id, {
+        categoryCode: row.categoryCode,
+        categoryName: row.categoryName,
+        remark: row.remark,
         status: row.status === 1 ? 0 : 1
       })
       message.success('操作成功')
+      fetchData()
+    }
+  })
+}
+
+function remove(row: ProductCategoryItem) {
+  Modal.confirm({
+    title: `确认删除分类「${row.categoryName}」？`,
+    onOk: async () => {
+      await deleteProductCategory(row.id)
+      message.success('删除成功')
       fetchData()
     }
   })

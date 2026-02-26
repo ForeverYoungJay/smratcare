@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS fire_safety_record (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  record_type VARCHAR(32) NOT NULL COMMENT '记录类型 FACILITY/CONTROL_ROOM_DUTY/MONTHLY_CHECK/DAY_PATROL/NIGHT_PATROL/MAINTENANCE_REPORT/FAULT_MAINTENANCE',
+  title VARCHAR(128) NOT NULL COMMENT '标题',
+  location VARCHAR(128) DEFAULT NULL COMMENT '位置/区域',
+  inspector_name VARCHAR(64) NOT NULL COMMENT '检查/值班人',
+  check_time DATETIME NOT NULL COMMENT '检查时间',
+  status VARCHAR(16) NOT NULL DEFAULT 'OPEN' COMMENT '状态 OPEN/CLOSED',
+  issue_description VARCHAR(1024) DEFAULT NULL COMMENT '问题描述',
+  action_taken VARCHAR(1024) DEFAULT NULL COMMENT '处置措施',
+  next_check_date DATE DEFAULT NULL COMMENT '下次检查日期',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  KEY idx_fire_record_org_type_time (org_id, record_type, check_time),
+  KEY idx_fire_record_org_status (org_id, status),
+  KEY idx_fire_record_org_next_check (org_id, next_check_date)
+) COMMENT='消防安全管理记录';

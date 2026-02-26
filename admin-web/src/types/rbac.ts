@@ -18,19 +18,28 @@ export interface RoleItem {
   roleName: string
   roleCode: string
   roleDesc?: string
+  orgId?: number
   status?: number
 }
 
 export interface DepartmentItem {
   id: number
   deptName: string
+  deptCode?: string
+  parentId?: number
+  sortNo?: number
   orgId?: number
   status?: number
 }
 
 export interface OrgItem {
   id: number
+  orgCode?: string
   orgName: string
+  orgType?: string
+  contactName?: string
+  contactPhone?: string
+  address?: string
   status?: number
 }
 

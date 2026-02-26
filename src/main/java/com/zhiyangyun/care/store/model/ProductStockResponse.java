@@ -11,6 +11,7 @@ public class ProductStockResponse {
   private Long orgId;
   private String productCode;
   private String productName;
+  private String category;
   private BigDecimal price;
   private Integer pointsPrice;
   private Integer safetyStock;

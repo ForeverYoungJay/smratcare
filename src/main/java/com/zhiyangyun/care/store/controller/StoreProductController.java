@@ -45,11 +45,15 @@ public class StoreProductController {
   public Result<IPage<ProductStockResponse>> page(
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
-      @RequestParam(required = false) String keyword) {
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) Integer status,
+      @RequestParam(required = false) String category) {
     Long orgId = AuthContext.getOrgId();
     LambdaQueryWrapper<Product> wrapper = new LambdaQueryWrapper<>();
     wrapper.eq(orgId != null, Product::getOrgId, orgId)
-        .eq(Product::getIsDeleted, 0);
+        .eq(Product::getIsDeleted, 0)
+        .eq(status != null, Product::getStatus, status)
+        .like(category != null && !category.isBlank(), Product::getCategory, category);
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(Product::getProductName, keyword)
           .or().like(Product::getProductCode, keyword));
@@ -77,6 +81,7 @@ public class StoreProductController {
       item.setOrgId(product.getOrgId());
       item.setProductCode(product.getProductCode());
       item.setProductName(product.getProductName());
+      item.setCategory(product.getCategory());
       item.setPrice(product.getPrice());
       item.setPointsPrice(product.getPointsPrice());
       item.setSafetyStock(product.getSafetyStock());

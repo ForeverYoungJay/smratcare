@@ -22,7 +22,13 @@ public enum BaseConfigGroup {
   DISCHARGE_FEE_CONFIG("退住费用设置"),
   FEE_TYPE("费用"),
   REFUND_REASON("退款原因"),
-  TRIAL_STAY_PACKAGE("试住套餐");
+  TRIAL_STAY_PACKAGE("试住套餐"),
+  SYSTEM_ORG_INTRO("机构介绍"),
+  SYSTEM_ORG_NEWS("机构动态"),
+  SYSTEM_LIFE_ENTERTAINMENT("生活娱乐"),
+  SYSTEM_APP_VERSION("APP版本管理"),
+  SYSTEM_DICTIONARY("系统字典"),
+  SYSTEM_MESSAGE("留言管理");
 
   private final String label;
 

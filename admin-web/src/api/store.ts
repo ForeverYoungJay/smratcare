@@ -3,6 +3,7 @@ import type {
   ProductItem,
   OrderItem,
   ProductTagItem,
+  ProductCategoryItem,
   DiseaseItem,
   ForbiddenTagGroup,
   StoreOrderPreviewRequest,
@@ -74,6 +75,23 @@ export function deleteDisease(id: number) {
 export async function getProductTagList() {
   const res = await fetchPage<ProductTagItem>('/api/admin/product-tag', { pageNo: 1, pageSize: 500 })
   return res.list
+}
+
+export async function getProductCategoryList(params?: Record<string, any>) {
+  const res = await fetchPage<ProductCategoryItem>('/api/admin/product-category', { pageNo: 1, pageSize: 500, ...(params || {}) })
+  return res.list
+}
+
+export function createProductCategory(data: Partial<ProductCategoryItem>) {
+  return request.post<void>('/api/admin/product-category', data)
+}
+
+export function updateProductCategory(id: number, data: Partial<ProductCategoryItem>) {
+  return request.put<void>(`/api/admin/product-category/${id}`, data)
+}
+
+export function deleteProductCategory(id: number) {
+  return request.delete<void>(`/api/admin/product-category/${id}`)
 }
 
 export function createProductTag(data: Partial<ProductTagItem>) {

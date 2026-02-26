@@ -16,6 +16,7 @@ import com.zhiyangyun.care.health.service.HealthInspectionClosureService;
 import com.zhiyangyun.care.health.support.ElderResolveSupport;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Locale;
@@ -74,6 +75,8 @@ public class HealthInspectionController {
     Long orgId = AuthContext.getOrgId();
     LocalDate from = parseDate(inspectionFrom);
     LocalDate to = parseDate(inspectionTo);
+    LocalDateTime fromStart = from == null ? null : from.atStartOfDay();
+    LocalDateTime toEndExclusive = to == null ? null : to.plusDays(1).atStartOfDay();
     var wrapper = buildQuery(orgId, elderId, status, inspectionFrom, inspectionTo, keyword);
     long totalCount = mapper.selectCount(wrapper);
     long abnormalCount = mapper.selectCount(buildQuery(orgId, elderId, "ABNORMAL", inspectionFrom, inspectionTo, keyword));
@@ -85,8 +88,8 @@ public class HealthInspectionController {
         .eq(orgId != null, HealthNursingLog::getOrgId, orgId)
         .eq(elderId != null, HealthNursingLog::getElderId, elderId)
         .isNotNull(HealthNursingLog::getSourceInspectionId)
-        .ge(from != null, HealthNursingLog::getLogTime, from.atStartOfDay())
-        .le(to != null, HealthNursingLog::getLogTime, to.plusDays(1).atStartOfDay()));
+        .ge(fromStart != null, HealthNursingLog::getLogTime, fromStart)
+        .le(toEndExclusive != null, HealthNursingLog::getLogTime, toEndExclusive));
 
     var statusStatWrapper = Wrappers.query(HealthInspection.class)
         .select("status AS name", "COUNT(1) AS totalCount")

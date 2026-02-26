@@ -11,6 +11,9 @@
             <a-select-option :value="0">下架</a-select-option>
           </a-select>
         </a-form-item>
+        <a-form-item label="商品大类">
+          <a-select v-model:value="query.category" allow-clear style="width: 180px" :options="categoryOptions" />
+        </a-form-item>
         <a-form-item>
           <a-space>
             <a-button type="primary" @click="handleSearch">搜索</a-button>
@@ -41,6 +44,7 @@
       >
         <vxe-column field="productCode" title="编码" width="140" />
         <vxe-column field="productName" title="商品名称" min-width="180" />
+        <vxe-column field="category" title="商品大类" width="140" />
         <vxe-column field="price" title="售价" width="120" />
         <vxe-column field="pointsPrice" title="积分价" width="120" />
         <vxe-column field="safetyStock" title="安全库存" width="120" />
@@ -98,6 +102,9 @@
         <a-form-item label="积分价" name="pointsPrice" required>
           <a-input-number v-model:value="form.pointsPrice" :min="0" style="width: 100%" />
         </a-form-item>
+        <a-form-item label="商品大类">
+          <a-select v-model:value="form.category" :options="categoryOptions" allow-clear />
+        </a-form-item>
         <a-form-item label="安全库存">
           <a-input-number v-model:value="form.safetyStock" :min="0" style="width: 100%" />
         </a-form-item>
@@ -124,8 +131,8 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportCsv } from '../../utils/export'
-import { getProductPage, createProduct, updateProduct, getProductTagList } from '../../api/store'
-import type { PageResult, ProductItem, ProductTagItem } from '../../types'
+import { getProductPage, createProduct, updateProduct, getProductTagList, getProductCategoryList } from '../../api/store'
+import type { PageResult, ProductItem, ProductTagItem, ProductCategoryItem } from '../../types'
 
 const props = withDefaults(defineProps<{
   title?: string
@@ -143,10 +150,12 @@ const saving = ref(false)
 const rows = ref<ProductItem[]>([])
 const total = ref(0)
 const tags = ref<ProductTagItem[]>([])
+const categories = ref<ProductCategoryItem[]>([])
 
 const query = reactive({
   keyword: '',
   status: undefined as number | undefined,
+  category: undefined as string | undefined,
   pageNo: 1,
   pageSize: 10
 })
@@ -159,6 +168,7 @@ const form = reactive<any>({
   productCode: '',
   price: 0,
   pointsPrice: 0,
+  category: undefined as string | undefined,
   safetyStock: 0,
   tagIds: [] as number[],
   status: true
@@ -170,6 +180,11 @@ const rules = {
 }
 
 const tagOptions = computed(() => tags.value.map((t) => ({ label: t.tagName, value: t.id })))
+const categoryOptions = computed(() =>
+  categories.value
+    .filter((c) => c.status === 1)
+    .map((c) => ({ label: c.categoryName, value: c.categoryName }))
+)
 
 function resolveTags(row: ProductItem) {
   const ids = String((row as any).tagIds || '')
@@ -183,6 +198,10 @@ async function fetchTags() {
   tags.value = await getProductTagList()
 }
 
+async function fetchCategories() {
+  categories.value = await getProductCategoryList()
+}
+
 async function fetchData() {
   loading.value = true
   try {
@@ -190,7 +209,8 @@ async function fetchData() {
       pageNo: query.pageNo,
       pageSize: query.pageSize,
       keyword: query.keyword || undefined,
-      status: query.status
+      status: query.status,
+      category: query.category
     })
     rows.value = res.list
     total.value = res.total
@@ -202,6 +222,7 @@ async function fetchData() {
 function reset() {
   query.keyword = ''
   query.status = undefined
+  query.category = undefined
   query.pageNo = 1
   fetchData()
 }
@@ -227,6 +248,7 @@ function exportCsvData() {
     rows.value.map((p) => ({
       编码: p.productCode,
       名称: p.productName,
+      大类: p.category,
       售价: p.price,
       积分价: p.pointsPrice,
       安全库存: p.safetyStock,
@@ -243,6 +265,7 @@ function openCreate() {
     productCode: '',
     price: 0,
     pointsPrice: 0,
+    category: undefined,
     safetyStock: 0,
     tagIds: [],
     status: true
@@ -257,6 +280,7 @@ function openEdit(row: ProductItem) {
     productCode: row.productCode,
     price: row.price ?? 0,
     pointsPrice: row.pointsPrice ?? 0,
+    category: row.category,
     safetyStock: row.safetyStock ?? 0,
     tagIds: String((row as any).tagIds || '')
       .split(',')
@@ -280,6 +304,7 @@ async function submit() {
       productCode: form.productCode || undefined,
       price: form.price,
       pointsPrice: form.pointsPrice,
+      category: form.category || undefined,
       safetyStock: form.safetyStock,
       status: form.status ? 1 : 0,
       tagIds: (form.tagIds || []).join(',')
@@ -311,6 +336,7 @@ function toggleStatus(row: ProductItem) {
 
 onMounted(() => {
   fetchTags()
+  fetchCategories()
   fetchData()
 })
 </script>

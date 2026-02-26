@@ -303,12 +303,13 @@ public class MaterialController {
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
     MaterialOrderStatus queryStatus = MaterialOrderStatus.from(status);
+    String queryStatusCode = queryStatus == null ? null : queryStatus.code();
     LambdaQueryWrapper<MaterialPurchaseOrder> wrapper = Wrappers.lambdaQuery(MaterialPurchaseOrder.class)
         .eq(MaterialPurchaseOrder::getIsDeleted, 0)
         .eq(orgId != null, MaterialPurchaseOrder::getOrgId, orgId)
         .eq(warehouseId != null, MaterialPurchaseOrder::getWarehouseId, warehouseId)
         .eq(supplierId != null, MaterialPurchaseOrder::getSupplierId, supplierId)
-        .eq(queryStatus != null, MaterialPurchaseOrder::getStatus, queryStatus.code())
+        .eq(queryStatusCode != null, MaterialPurchaseOrder::getStatus, queryStatusCode)
         .orderByDesc(MaterialPurchaseOrder::getCreateTime);
     if (keyword != null && !keyword.isBlank()) {
       wrapper.like(MaterialPurchaseOrder::getOrderNo, keyword);
@@ -496,13 +497,14 @@ public class MaterialController {
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
     MaterialOrderStatus queryStatus = MaterialOrderStatus.from(status);
+    String queryStatusCode = queryStatus == null ? null : queryStatus.code();
     if (queryStatus == MaterialOrderStatus.APPROVED) {
       throw new IllegalArgumentException("transfer status does not support APPROVED");
     }
     LambdaQueryWrapper<MaterialTransferOrder> wrapper = Wrappers.lambdaQuery(MaterialTransferOrder.class)
         .eq(MaterialTransferOrder::getIsDeleted, 0)
         .eq(orgId != null, MaterialTransferOrder::getOrgId, orgId)
-        .eq(queryStatus != null, MaterialTransferOrder::getStatus, queryStatus.code())
+        .eq(queryStatusCode != null, MaterialTransferOrder::getStatus, queryStatusCode)
         .orderByDesc(MaterialTransferOrder::getCreateTime);
     if (keyword != null && !keyword.isBlank()) {
       wrapper.like(MaterialTransferOrder::getTransferNo, keyword);

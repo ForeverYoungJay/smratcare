@@ -475,8 +475,14 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'store',
         name: 'Store',
-        meta: { title: '商城与库存', icon: 'ShopOutlined', hidden: true },
+        meta: { title: '商城与库存', icon: 'ShopOutlined' },
         children: [
+          {
+            path: 'category',
+            name: 'StoreCategory',
+            component: () => import('../views/store/Category.vue'),
+            meta: { title: '商品大类' }
+          },
           {
             path: 'product',
             name: 'StoreProduct',
@@ -512,7 +518,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'inventory',
         name: 'Inventory',
-        meta: { title: '库存管理', icon: 'AlertOutlined', hidden: true },
+        meta: { title: '库存管理', icon: 'AlertOutlined' },
         children: [
           {
             path: '',
@@ -769,6 +775,62 @@ export const routes: RouteRecordRaw[] = [
             path: 'data',
             redirect: '/health/management/data',
             meta: { hidden: true }
+          }
+        ]
+      },
+      {
+        path: 'fire',
+        name: 'FireSafety',
+        meta: { title: '消防安全管理', icon: 'SafetyOutlined' },
+        redirect: '/fire/facility-management',
+        children: [
+          {
+            path: 'facility-management',
+            name: 'FireFacilityManagement',
+            component: () => import('../views/fire/FacilityManagement.vue'),
+            meta: { title: '消防设施管理' }
+          },
+          {
+            path: 'control-room-duty',
+            name: 'FireControlRoomDuty',
+            component: () => import('../views/fire/ControlRoomDuty.vue'),
+            meta: { title: '控制室值班记录' }
+          },
+          {
+            path: 'monthly-check',
+            name: 'FireMonthlyCheck',
+            component: () => import('../views/fire/MonthlyCheck.vue'),
+            meta: { title: '每月防火检查' }
+          },
+          {
+            path: 'day-patrol',
+            name: 'FireDayPatrol',
+            component: () => import('../views/fire/DayPatrol.vue'),
+            meta: { title: '日间防火巡查' }
+          },
+          {
+            path: 'night-patrol',
+            name: 'FireNightPatrol',
+            component: () => import('../views/fire/NightPatrol.vue'),
+            meta: { title: '夜间防火巡查' }
+          },
+          {
+            path: 'maintenance-report',
+            name: 'FireMaintenanceReport',
+            component: () => import('../views/fire/MaintenanceReport.vue'),
+            meta: { title: '消防设施维护保养报告' }
+          },
+          {
+            path: 'fault-maintenance',
+            name: 'FireFaultMaintenance',
+            component: () => import('../views/fire/FaultMaintenance.vue'),
+            meta: { title: '建筑消防设施故障维护' }
+          },
+          {
+            path: 'data-stats',
+            name: 'FireDataStats',
+            component: () => import('../views/fire/DataStats.vue'),
+            meta: { title: '数据报表统计' }
           }
         ]
       },
@@ -1477,8 +1539,77 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'system',
         name: 'System',
-        meta: { title: '系统管理', icon: 'SettingOutlined', roles: ['ADMIN'], hidden: true },
+        meta: { title: '系统管理', icon: 'SettingOutlined', roles: ['ADMIN'] },
+        redirect: '/system/org-info',
         children: [
+          {
+            path: 'org-info',
+            name: 'SystemOrgInfo',
+            component: () => import('../views/System/OrgInfo.vue'),
+            meta: { title: '机构信息', roles: ['ADMIN'] }
+          },
+          {
+            path: 'org-manage',
+            name: 'SystemOrgManage',
+            meta: { title: '机构管理', roles: ['ADMIN'] },
+            redirect: '/system/org-manage/intro',
+            children: [
+              {
+                path: 'intro',
+                name: 'SystemOrgIntro',
+                component: () => import('../views/base-config/Index.vue'),
+                props: { title: '机构介绍', groupCode: 'SYSTEM_ORG_INTRO' },
+                meta: { title: '机构介绍', roles: ['ADMIN'] }
+              },
+              {
+                path: 'news',
+                name: 'SystemOrgNews',
+                component: () => import('../views/base-config/Index.vue'),
+                props: { title: '机构动态', groupCode: 'SYSTEM_ORG_NEWS' },
+                meta: { title: '机构动态', roles: ['ADMIN'] }
+              },
+              {
+                path: 'life',
+                name: 'SystemLifeEntertainment',
+                component: () => import('../views/base-config/Index.vue'),
+                props: { title: '生活娱乐', groupCode: 'SYSTEM_LIFE_ENTERTAINMENT' },
+                meta: { title: '生活娱乐', roles: ['ADMIN'] }
+              }
+            ]
+          },
+          {
+            path: 'role',
+            name: 'SystemRoleManage',
+            component: () => import('../views/System/RoleManage.vue'),
+            meta: { title: '角色管理', roles: ['ADMIN'] }
+          },
+          {
+            path: 'department',
+            name: 'SystemDepartmentManage',
+            component: () => import('../views/System/DepartmentManage.vue'),
+            meta: { title: '部门管理', roles: ['ADMIN'] }
+          },
+          {
+            path: 'app-version',
+            name: 'SystemAppVersion',
+            component: () => import('../views/base-config/Index.vue'),
+            props: { title: 'APP版本管理', groupCode: 'SYSTEM_APP_VERSION' },
+            meta: { title: 'APP版本管理', roles: ['ADMIN'] }
+          },
+          {
+            path: 'dict',
+            name: 'SystemDictionary',
+            component: () => import('../views/base-config/Index.vue'),
+            props: { title: '系统字典', groupCode: 'SYSTEM_DICTIONARY' },
+            meta: { title: '系统字典', roles: ['ADMIN'] }
+          },
+          {
+            path: 'message',
+            name: 'SystemMessageManage',
+            component: () => import('../views/base-config/Index.vue'),
+            props: { title: '留言管理', groupCode: 'SYSTEM_MESSAGE' },
+            meta: { title: '留言管理', roles: ['ADMIN'] }
+          },
           {
             path: 'staff',
             name: 'SystemStaff',
