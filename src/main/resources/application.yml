@@ -21,6 +21,7 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
     baseline-version: 11
+    out-of-order: true
 
 mybatis-plus:
   configuration:

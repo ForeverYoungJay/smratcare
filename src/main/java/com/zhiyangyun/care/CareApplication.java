@@ -30,7 +30,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
     "com.zhiyangyun.care.assessment.mapper",
     "com.zhiyangyun.care.health.mapper",
     "com.zhiyangyun.care.nursing.mapper",
-    "com.zhiyangyun.care.baseconfig.mapper"
+    "com.zhiyangyun.care.baseconfig.mapper",
+    "com.zhiyangyun.care.fire.mapper"
 })
 public class CareApplication {
   public static void main(String[] args) {
