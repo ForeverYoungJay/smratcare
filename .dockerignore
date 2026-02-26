@@ -1,0 +1,11 @@
+.git
+.idea
+.vscode
+node_modules
+admin-web/node_modules
+admin-web/dist
+target
+output
+.m2
+.mvn/repository
+*.log

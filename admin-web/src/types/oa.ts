@@ -107,6 +107,29 @@ export interface OaPortalSummary {
   pendingApprovalCount?: number
   ongoingTaskCount?: number
   submittedReportCount?: number
+  todayScheduleCount?: number
+  attendanceAbnormalCount?: number
+  leavePendingCount?: number
+  reimbursePendingCount?: number
+  purchasePendingCount?: number
+  contractPendingCount?: number
+  myExpenseCount?: number
+  deptExpenseCount?: number
+  invoiceFolderCount?: number
+  documentCount?: number
+  inventoryLowStockCount?: number
+  approvalTimeoutCount?: number
+  elderAbnormalCount?: number
+  healthAbnormalCount?: number
+  incidentOpenCount?: number
+  materialTransferDraftCount?: number
+  materialPurchaseDraftCount?: number
+  inHospitalElderCount?: number
+  suggestionCount?: number
+  workflowTodos?: OaWorkflowTodoItem[]
+  marketingChannels?: OaMarketingChannelItem[]
+  collaborationGantt?: OaCollaborationGanttItem[]
+  latestSuggestions?: OaSuggestion[]
 }
 
 export interface OaWorkReport {
@@ -123,4 +146,35 @@ export interface OaWorkReport {
   status?: string
   reporterId?: number
   reporterName?: string
+}
+
+export interface OaWorkflowTodoItem {
+  code: string
+  name: string
+  count: number
+  route: string
+}
+
+export interface OaMarketingChannelItem {
+  source: string
+  leadCount: number
+  contractCount: number
+}
+
+export interface OaCollaborationGanttItem {
+  taskId: number
+  title: string
+  status: string
+  startTime?: string
+  endTime?: string
+  progress?: number
+}
+
+export interface OaSuggestion {
+  id: number
+  content: string
+  proposerName?: string
+  contact?: string
+  status?: string
+  createTime?: string
 }

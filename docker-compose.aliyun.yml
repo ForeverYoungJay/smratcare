@@ -4,23 +4,20 @@ services:
     container_name: smartcare-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: zhiyangyun
-      MYSQL_USER: app
-      MYSQL_PASSWORD: app123456
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
       TZ: Asia/Shanghai
-    ports:
-      - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./docker/mysql/init:/docker-entrypoint-initdb.d
+      - ./docker/mysql/init/1_schema.sql:/docker-entrypoint-initdb.d/1_schema.sql:ro
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
   redis:
     image: redis:7.2
     container_name: smartcare-redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
 
@@ -32,13 +29,11 @@ services:
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      DB_USER: app
-      DB_PASSWORD: app123456
-      JWT_SECRET: change-me-please-change-me-please-change-me
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
     volumes:
       - ./output/uploads:/app/uploads
-    ports:
-      - "8080:8080"
     depends_on:
       - mysql
       - redis
@@ -50,9 +45,10 @@ services:
     container_name: smartcare-frontend
     restart: unless-stopped
     ports:
-      - "5173:80"
+      - "80:80"
     depends_on:
       - backend
+
 volumes:
   mysql_data:
   redis_data:

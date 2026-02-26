@@ -2,254 +2,295 @@
   <div class="portal-page">
     <div class="portal-hero card-elevated">
       <div>
-        <div class="hero-title">信息门户</div>
-        <div class="hero-subtitle">一站式入口，快速进入各业务模块</div>
+        <div class="hero-title">智慧养老 OA 工作台</div>
+        <div class="hero-subtitle">提醒中心、协同任务、行政审批、经营看板统一入口</div>
       </div>
       <div class="hero-meta">
         <div class="meta-item">
-          <div class="meta-label">当前登录</div>
+          <div class="meta-label">当前用户</div>
           <div class="meta-value">{{ userStore.staffInfo?.realName || '管理员' }}</div>
         </div>
         <div class="meta-item">
-          <div class="meta-label">角色</div>
-          <div class="meta-value">{{ roleLabel }}</div>
+          <div class="meta-label">刷新时间</div>
+          <div class="meta-value">{{ refreshedAt || '--' }}</div>
         </div>
       </div>
     </div>
 
-    <a-card class="card-elevated" :bordered="false" title="运营总览（统计统一口径：近6个月）">
-      <template #extra>
-        <span class="overview-extra">更新时间：{{ refreshedAt || '--' }}</span>
-      </template>
-      <div class="overview-hint">
-        口径说明：近6个月；总消费=账单消费+商城消费；总收入=账单总额。
-      </div>
-      <a-row :gutter="[16, 16]">
-        <a-col :xs="24" :sm="12" :lg="6" v-for="item in overviewCards" :key="item.title">
-          <PermissionGuardCard
-            size="small"
-            :can-access="item.canAccess"
-            :required-roles="item.requiredRoles"
-            card-class="overview-clickable"
-            @click="go(item.route)"
-          >
-            <a-statistic :title="item.title" :value="item.value" :precision="item.precision" :suffix="item.suffix" />
-            <div class="overview-meta">
-              <a-tag :color="item.color">{{ item.tag }}</a-tag>
-              <span>{{ item.desc }}</span>
+    <a-row :gutter="[16, 16]">
+      <a-col :xs="24" :sm="12" :lg="6" v-for="item in topStats" :key="item.title">
+        <a-card :bordered="false" class="card-elevated stat-card" hoverable @click="go(item.route)">
+          <a-statistic :title="item.title" :value="item.value" />
+          <div class="stat-desc">{{ item.desc }}</div>
+        </a-card>
+      </a-col>
+    </a-row>
+
+    <a-row :gutter="[16, 16]">
+      <a-col :xs="24" :lg="14">
+        <a-card title="提醒中心" :bordered="false" class="card-elevated">
+          <a-list :data-source="reminderItems" :locale="{ emptyText: '暂无提醒' }">
+            <template #renderItem="{ item }">
+              <a-list-item>
+                <a-list-item-meta :title="item.title" :description="item.desc" />
+                <template #actions>
+                  <a-button type="link" @click="go(item.route)">处理</a-button>
+                </template>
+              </a-list-item>
+            </template>
+          </a-list>
+        </a-card>
+      </a-col>
+      <a-col :xs="24" :lg="10">
+        <a-card title="异常提醒" :bordered="false" class="card-elevated">
+          <a-space direction="vertical" style="width: 100%">
+            <a-alert v-for="item in abnormalItems" :key="item.title" :message="item.title" :description="item.desc" type="warning" show-icon />
+          </a-space>
+        </a-card>
+      </a-col>
+    </a-row>
+
+    <a-row :gutter="[16, 16]">
+      <a-col :xs="24" :lg="12">
+        <a-card title="我的协同（任务/项目/甘特图/工作小结）" :bordered="false" class="card-elevated">
+          <div class="collab-meta">
+            <a-tag color="processing">进行中任务 {{ summary.ongoingTaskCount || 0 }}</a-tag>
+            <a-tag color="success">近30天总结 {{ summary.submittedReportCount || 0 }}</a-tag>
+            <a-button size="small" type="link" @click="go('/oa/work-execution/task')">查看任务</a-button>
+          </div>
+          <div v-if="(summary.collaborationGantt || []).length" class="gantt-wrap">
+            <div v-for="item in summary.collaborationGantt" :key="item.taskId" class="gantt-row">
+              <div class="gantt-title">{{ item.title }}</div>
+              <div class="gantt-bar">
+                <div class="gantt-progress" :style="{ width: `${item.progress || 0}%` }"></div>
+              </div>
+              <div class="gantt-percent">{{ item.progress || 0 }}%</div>
             </div>
-          </PermissionGuardCard>
-        </a-col>
-      </a-row>
-    </a-card>
+          </div>
+          <a-empty v-else description="暂无甘特任务" />
+        </a-card>
+      </a-col>
+      <a-col :xs="24" :lg="12">
+        <a-card title="待办与流程入口（工作流引擎）" :bordered="false" class="card-elevated">
+          <a-list :data-source="summary.workflowTodos || []" :locale="{ emptyText: '暂无流程待办' }">
+            <template #renderItem="{ item }">
+              <a-list-item>
+                <div>{{ item.name }}</div>
+                <a-space>
+                  <a-badge :count="item.count || 0" />
+                  <a-button type="link" @click="go(item.route)">进入</a-button>
+                </a-space>
+              </a-list-item>
+            </template>
+          </a-list>
+          <div class="quick-launch">
+            <div class="sub-title">快捷发起</div>
+            <a-space wrap>
+              <a-button v-for="item in quickLaunches" :key="item.label" size="small" @click="go(item.route)">{{ item.label }}</a-button>
+            </a-space>
+          </div>
+        </a-card>
+      </a-col>
+    </a-row>
 
-    <div v-for="group in menuGroups" :key="group.key" class="portal-group">
-      <div class="group-title">{{ group.label }}</div>
-      <div class="group-grid">
-        <div
-          v-for="item in group.items"
-          :key="item.path"
-          class="portal-tile"
-          :style="{ background: item.color }"
-          @click="go(item.path)"
-        >
-          <div class="tile-icon">{{ item.abbr }}</div>
-          <div class="tile-title">{{ item.label }}</div>
-          <div class="tile-desc">{{ group.label }}</div>
-        </div>
-      </div>
-    </div>
+    <a-row :gutter="[16, 16]">
+      <a-col :xs="24" :lg="8">
+        <a-card title="行政日程" :bordered="false" class="card-elevated module-card">
+          <div class="module-main">{{ summary.todayScheduleCount || 0 }}</div>
+          <div class="module-sub">今日排班任务</div>
+          <a-button type="link" @click="go('/care/scheduling/shift-calendar')">进入行政日程</a-button>
+        </a-card>
+      </a-col>
+      <a-col :xs="24" :lg="8">
+        <a-card title="考勤与请假" :bordered="false" class="card-elevated module-card">
+          <div class="module-main">{{ summary.attendanceAbnormalCount || 0 }}</div>
+          <div class="module-sub">今日考勤异常</div>
+          <a-space>
+            <a-button size="small" @click="go('/hr/staff')">考勤管理</a-button>
+            <a-button size="small" @click="go('/oa/approval')">请假审批</a-button>
+          </a-space>
+        </a-card>
+      </a-col>
+      <a-col :xs="24" :lg="8">
+        <a-card title="费用管理（我的/部门/发票夹）" :bordered="false" class="card-elevated module-card">
+          <div class="module-main">{{ summary.myExpenseCount || 0 }}</div>
+          <div class="module-sub">账户数量 / 30天流水 {{ summary.deptExpenseCount || 0 }} / 发票夹 {{ summary.invoiceFolderCount || 0 }}</div>
+          <a-button type="link" @click="go('/finance/account')">进入费用管理</a-button>
+        </a-card>
+      </a-col>
+    </a-row>
+
+    <a-row :gutter="[16, 16]">
+      <a-col :xs="24" :lg="12">
+        <a-card title="营销绩效（客户渠道+业绩完成度甘特图）" :bordered="false" class="card-elevated">
+          <a-list :data-source="summary.marketingChannels || []" :locale="{ emptyText: '暂无渠道数据' }">
+            <template #renderItem="{ item }">
+              <a-list-item>
+                <a-list-item-meta :title="item.source" :description="`线索 ${item.leadCount || 0} / 签约 ${item.contractCount || 0}`" />
+              </a-list-item>
+            </template>
+          </a-list>
+          <a-space>
+            <a-button size="small" @click="go('/marketing/reports/channel')">来源渠道</a-button>
+            <a-button size="small" @click="go('/marketing/reports/followup')">业绩完成度</a-button>
+          </a-space>
+        </a-card>
+      </a-col>
+      <a-col :xs="24" :lg="12">
+        <a-card title="文档中心（制度/项目/合同扫描件）" :bordered="false" class="card-elevated">
+          <div class="module-main">{{ summary.documentCount || 0 }}</div>
+          <div class="module-sub">发票夹 {{ summary.invoiceFolderCount || 0 }}，可集中管理制度、项目和合同扫描件</div>
+          <a-button type="link" @click="go('/oa/document')">进入文档中心</a-button>
+        </a-card>
+        <a-card title="数据看板（院长/部门报表入口）" :bordered="false" class="card-elevated board-card">
+          <a-space wrap>
+            <a-button size="small" @click="go('/stats/org/monthly-operation')">院长总览</a-button>
+            <a-button size="small" @click="go('/stats/consumption')">部门消费</a-button>
+            <a-button size="small" @click="go('/finance/report')">财务报表</a-button>
+            <a-button size="small" @click="go('/stats/check-in')">入住报表</a-button>
+          </a-space>
+        </a-card>
+      </a-col>
+    </a-row>
+
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { getMenuTree } from '../layouts/menu'
-import { useUserStore } from '../stores/user'
-import { getDashboardSummary, type DashboardSummary } from '../api/dashboard'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import PermissionGuardCard from '../components/PermissionGuardCard.vue'
-import { resolveRouteAccess } from '../utils/routeAccess'
+import { useUserStore } from '../stores/user'
+import { getPortalSummary } from '../api/oa'
+import type { OaPortalSummary } from '../types'
 
 const router = useRouter()
 const userStore = useUserStore()
 const refreshedAt = ref('')
-const dashboard = ref<DashboardSummary>({
-  careTasksToday: 0,
-  abnormalTasksToday: 0,
-  inventoryAlerts: 0,
-  unpaidBills: 0,
-  totalAdmissions: 0,
-  totalDischarges: 0,
-  checkInNetIncrease: 0,
-  dischargeToAdmissionRate: 0,
-  totalBillConsumption: 0,
-  totalStoreConsumption: 0,
-  totalConsumption: 0,
-  averageMonthlyConsumption: 0,
-  billConsumptionRatio: 0,
-  storeConsumptionRatio: 0,
-  inHospitalCount: 0,
-  dischargedCount: 0,
-  totalBeds: 0,
-  occupiedBeds: 0,
-  availableBeds: 0,
-  bedOccupancyRate: 0,
-  bedAvailableRate: 0,
-  totalRevenue: 0,
-  averageMonthlyRevenue: 0,
-  revenueGrowthRate: 0
+
+const summary = reactive<OaPortalSummary>({
+  notices: [],
+  todos: [],
+  workflowTodos: [],
+  marketingChannels: [],
+  collaborationGantt: [],
+  latestSuggestions: []
 })
 
-const palette = [
-  '#2b5db8',
-  '#7a3db8',
-  '#1f7dcf',
-  '#e4572e',
-  '#118a7e',
-  '#6d4af5',
-  '#f59e0b',
-  '#4c6ef5',
-  '#0ea5e9',
-  '#ef4444',
-  '#10b981',
-  '#6366f1'
+const quickLaunches = [
+  { label: '签到/签退', route: '/hr/staff' },
+  { label: '请假', route: '/oa/approval' },
+  { label: '加班', route: '/oa/approval' },
+  { label: '报销', route: '/oa/approval' },
+  { label: '采购', route: '/material/purchase' },
+  { label: '用章', route: '/oa/approval' },
+  { label: '收入证明', route: '/oa/approval' },
+  { label: '物资申领', route: '/material/transfer' }
 ]
 
-const roleLabel = computed(() => {
-  const roles = userStore.roles || []
-  if (roles.length === 0) return '普通用户'
-  return roles.join(' / ')
-})
-
-const overviewCards = computed(() => {
-  const cardDefs = [
-    {
-      title: '入住净增长',
-      value: dashboard.value.checkInNetIncrease || 0,
-      precision: 0,
-      suffix: '',
-      color: 'blue',
-      tag: '入住统计',
-      desc: `离院/入住 ${fmtPercent(dashboard.value.dischargeToAdmissionRate)}%`,
-      route: '/stats/check-in'
-    },
-    {
-      title: '总消费',
-      value: dashboard.value.totalConsumption || 0,
-      precision: 2,
-      suffix: '元',
-      color: 'purple',
-      tag: '消费统计',
-      desc: `月均 ${fmtAmount(dashboard.value.averageMonthlyConsumption)} 元`,
-      route: '/stats/consumption'
-    },
-    {
-      title: '床位使用率',
-      value: dashboard.value.bedOccupancyRate || 0,
-      precision: 2,
-      suffix: '%',
-      color: 'green',
-      tag: '床位统计',
-      desc: `空闲率 ${fmtPercent(dashboard.value.bedAvailableRate)}%`,
-      route: '/stats/org/bed-usage'
-    },
-    {
-      title: '总收入',
-      value: dashboard.value.totalRevenue || 0,
-      precision: 2,
-      suffix: '元',
-      color: 'gold',
-      tag: '收入统计',
-      desc: `环比 ${fmtPercent(dashboard.value.revenueGrowthRate)}%`,
-      route: '/stats/monthly-revenue'
-    }
-  ]
-  const roles = userStore.roles || []
-  return cardDefs.map((item) => {
-    const access = resolveRouteAccess(router, roles, item.route)
-    return { ...item, ...access }
-  })
-})
-
-const menuGroups = computed(() => {
-  const roles = userStore.roles || []
-  const tree = getMenuTree(roles)
-  let colorIndex = 0
-  const rootLeaves = tree
-    .filter((node) => !node.children && node.path)
-    .map((node) => {
-      const color = palette[colorIndex % palette.length]
-      colorIndex += 1
-      return {
-        label: node.label,
-        path: node.path as string,
-        color,
-        abbr: String(node.label).slice(0, 1)
-      }
-    })
-
-  const groups = tree
-    .filter((group) => group.children && group.children.length > 0)
-    .map((group) => ({
-      key: group.key,
-      label: group.label,
-      items: (group.children || [])
-        .filter((child) => !!child.path)
-        .map((child) => {
-          const color = palette[colorIndex % palette.length]
-          colorIndex += 1
-          return {
-            label: child.label,
-            path: child.path as string,
-            color,
-            abbr: String(child.label).slice(0, 1)
-          }
-        })
-    }))
-
-  if (rootLeaves.length > 0) {
-    groups.unshift({
-      key: 'quick',
-      label: '常用入口',
-      items: rootLeaves
-    })
+const topStats = computed(() => [
+  {
+    title: '我的待办',
+    value: summary.openTodoCount || 0,
+    desc: `超期 ${summary.overdueTodoCount || 0} 条`,
+    route: '/oa/todo'
+  },
+  {
+    title: '流程待审批',
+    value: summary.pendingApprovalCount || 0,
+    desc: `超时 ${summary.approvalTimeoutCount || 0} 条`,
+    route: '/oa/approval'
+  },
+  {
+    title: '库存预警',
+    value: summary.inventoryLowStockCount || 0,
+    desc: `采购草稿 ${summary.materialPurchaseDraftCount || 0} 条`,
+    route: '/inventory/alerts'
+  },
+  {
+    title: '长者状态异常',
+    value: summary.elderAbnormalCount || 0,
+    desc: `在住长者 ${summary.inHospitalElderCount || 0} 人`,
+    route: '/health/inspection'
+  },
+  {
+    title: '事故未闭环',
+    value: summary.incidentOpenCount || 0,
+    desc: `调拨草稿 ${summary.materialTransferDraftCount || 0} 条`,
+    route: '/life/incident'
+  },
+  {
+    title: '文档归档',
+    value: summary.documentCount || 0,
+    desc: `发票夹 ${summary.invoiceFolderCount || 0} 个`,
+    route: '/oa/document'
   }
+])
 
-  return groups
+const reminderItems = computed(() => {
+  const noticeItems = (summary.notices || []).map((notice) => ({
+    title: `公告：${notice.title}`,
+    desc: `${notice.publisherName || '系统'} · ${formatTime(notice.publishTime)}`,
+    route: '/oa/notice'
+  }))
+  const todoItems = (summary.todos || []).map((todo) => ({
+    title: `待办：${todo.title}`,
+    desc: `截止时间 ${formatTime(todo.dueTime)}`,
+    route: '/oa/todo'
+  }))
+  return [...todoItems, ...noticeItems].slice(0, 10)
 })
+
+const abnormalItems = computed(() => [
+  {
+    title: '考勤异常',
+    desc: `今日异常 ${summary.attendanceAbnormalCount || 0} 条`
+  },
+  {
+    title: '审批超时',
+    desc: `超 48 小时未处理 ${summary.approvalTimeoutCount || 0} 条`
+  },
+  {
+    title: '库存不足',
+    desc: `低于安全库存 ${summary.inventoryLowStockCount || 0} 项`
+  },
+  {
+    title: '长者状态异常',
+    desc: `健康巡检异常 ${summary.healthAbnormalCount || 0} 条`
+  }
+])
 
 function go(path: string) {
   router.push(path)
 }
 
-async function loadDashboardSummary() {
+function formatTime(value?: string) {
+  return value ? dayjs(value).format('YYYY-MM-DD HH:mm') : '--'
+}
+
+async function loadSummary() {
+  const data = await getPortalSummary()
+  Object.assign(summary, data)
+  refreshedAt.value = dayjs().format('YYYY-MM-DD HH:mm:ss')
+}
+
+async function init() {
   try {
-    dashboard.value = await getDashboardSummary()
-    refreshedAt.value = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    await loadSummary()
   } catch (error: any) {
-    message.error(error?.message || '加载首页运营总览失败')
+    message.error(error?.message || '加载首页失败')
   }
 }
 
-function fmtAmount(value?: number) {
-  return Number(value || 0).toFixed(2)
-}
-
-function fmtPercent(value?: number) {
-  return Number(value || 0).toFixed(2)
-}
-
-onMounted(loadDashboardSummary)
+onMounted(init)
 </script>
 
 <style scoped>
 .portal-page {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 18px;
 }
 
 .portal-hero {
@@ -289,86 +330,90 @@ onMounted(loadDashboardSummary)
   font-weight: 600;
 }
 
-.portal-group {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.stat-card {
+  cursor: pointer;
+  min-height: 132px;
 }
 
-.overview-meta {
+.stat-desc {
   margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.collab-meta {
+  margin-bottom: 12px;
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--muted);
-  font-size: 12px;
 }
 
-.overview-hint {
-  color: var(--muted);
-  font-size: 12px;
-  margin-bottom: 12px;
-}
-
-.overview-extra {
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.overview-clickable:hover {
-  box-shadow: var(--shadow-sm);
-}
-
-.group-title {
-  font-weight: 600;
-  font-size: 15px;
-  color: #1f2937;
-}
-
-.group-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 16px;
-}
-
-.portal-tile {
-  color: #fff;
-  padding: 16px;
-  border-radius: 12px;
-  box-shadow: var(--shadow-sm);
-  cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-  min-height: 110px;
+.gantt-wrap {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  gap: 10px;
 }
 
-.portal-tile:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-}
-
-.tile-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.2);
+.gantt-row {
   display: grid;
-  place-items: center;
-  font-weight: 700;
-  font-size: 18px;
+  grid-template-columns: 120px 1fr 48px;
+  gap: 8px;
+  align-items: center;
 }
 
-.tile-title {
-  margin-top: 10px;
-  font-size: 14px;
+.gantt-title {
+  font-size: 12px;
+  color: #334155;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gantt-bar {
+  height: 10px;
+  border-radius: 6px;
+  background: #eef2ff;
+}
+
+.gantt-progress {
+  height: 10px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #2b5db8, #22c55e);
+}
+
+.gantt-percent {
+  text-align: right;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.quick-launch {
+  margin-top: 12px;
+}
+
+.sub-title {
+  margin-bottom: 8px;
   font-weight: 600;
 }
 
-.tile-desc {
+.module-card {
+  min-height: 204px;
+}
+
+.module-main {
+  font-size: 30px;
+  font-weight: 700;
+  color: #1d4ed8;
+}
+
+.module-sub {
+  margin: 8px 0 12px;
+  color: #64748b;
   font-size: 12px;
-  opacity: 0.8;
+}
+
+.board-card {
+  margin-top: 16px;
 }
 
 @media (max-width: 768px) {

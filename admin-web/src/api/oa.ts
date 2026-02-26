@@ -10,11 +10,20 @@ import type {
   OaAlbum,
   OaKnowledge,
   OaGroupSetting,
-  OaActivityPlan
+  OaActivityPlan,
+  OaSuggestion
 } from '../types'
 
 export function getPortalSummary() {
   return request.get<OaPortalSummary>('/api/oa/portal/summary')
+}
+
+export function getSuggestionPage(params: any) {
+  return fetchPage<OaSuggestion>('/api/oa/suggestion/page', params)
+}
+
+export function createSuggestion(data: Partial<OaSuggestion>) {
+  return request.post<OaSuggestion>('/api/oa/suggestion', data)
 }
 
 export function getNoticePage(params: any) {
