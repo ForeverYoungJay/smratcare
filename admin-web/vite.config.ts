@@ -1,6 +1,8 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
+const apiProxyTarget = process.env.VITE_API_PROXY_TARGET || 'http://localhost:8080'
+
 export default defineConfig({
   plugins: [vue()],
   test: {
@@ -15,7 +17,7 @@ export default defineConfig({
     allowedHosts: ['considerable-modified-census-sussex.trycloudflare.com'],
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: apiProxyTarget,
         changeOrigin: true
       }
     }

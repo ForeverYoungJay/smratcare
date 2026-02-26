@@ -1,9 +1,52 @@
 -- M8 评估管理增强：量表模板、自动评分、复评提醒
 
-ALTER TABLE assessment_record
-  ADD COLUMN template_id BIGINT DEFAULT NULL COMMENT '量表模板ID' AFTER assessment_type,
-  ADD COLUMN detail_json TEXT DEFAULT NULL COMMENT '评估明细JSON' AFTER suggestion,
-  ADD COLUMN score_auto TINYINT NOT NULL DEFAULT 1 COMMENT '是否自动评分 1是0否' AFTER detail_json;
+SET @assessment_template_id_exists = (
+  SELECT COUNT(1)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'assessment_record'
+    AND COLUMN_NAME = 'template_id'
+);
+SET @ddl = IF(
+  @assessment_template_id_exists = 0,
+  'ALTER TABLE assessment_record ADD COLUMN template_id BIGINT DEFAULT NULL COMMENT ''量表模板ID'' AFTER assessment_type',
+  'SELECT 1'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @assessment_detail_json_exists = (
+  SELECT COUNT(1)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'assessment_record'
+    AND COLUMN_NAME = 'detail_json'
+);
+SET @ddl = IF(
+  @assessment_detail_json_exists = 0,
+  'ALTER TABLE assessment_record ADD COLUMN detail_json TEXT DEFAULT NULL COMMENT ''评估明细JSON'' AFTER suggestion',
+  'SELECT 1'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @assessment_score_auto_exists = (
+  SELECT COUNT(1)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'assessment_record'
+    AND COLUMN_NAME = 'score_auto'
+);
+SET @ddl = IF(
+  @assessment_score_auto_exists = 0,
+  'ALTER TABLE assessment_record ADD COLUMN score_auto TINYINT NOT NULL DEFAULT 1 COMMENT ''是否自动评分 1是0否'' AFTER detail_json',
+  'SELECT 1'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS assessment_scale_template (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',

@@ -1,9 +1,36 @@
 -- 餐饮风险能力增强：结构化标签、阈值配置、拦截日志、放行审批
-ALTER TABLE dining_dish
-  ADD COLUMN tag_ids VARCHAR(255) DEFAULT NULL COMMENT '结构化标签ID，逗号分隔' AFTER allergen_tags;
 
-ALTER TABLE dining_meal_order
-  ADD COLUMN override_id BIGINT DEFAULT NULL COMMENT '放行审批ID' AFTER delivery_area_name;
+SET @dish_tag_ids_exists = (
+  SELECT COUNT(1)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'dining_dish'
+    AND COLUMN_NAME = 'tag_ids'
+);
+SET @ddl = IF(
+  @dish_tag_ids_exists = 0,
+  'ALTER TABLE dining_dish ADD COLUMN tag_ids VARCHAR(255) DEFAULT NULL COMMENT ''结构化标签ID，逗号分隔'' AFTER allergen_tags',
+  'SELECT 1'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @meal_order_override_exists = (
+  SELECT COUNT(1)
+  FROM information_schema.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'dining_meal_order'
+    AND COLUMN_NAME = 'override_id'
+);
+SET @ddl = IF(
+  @meal_order_override_exists = 0,
+  'ALTER TABLE dining_meal_order ADD COLUMN override_id BIGINT DEFAULT NULL COMMENT ''放行审批ID'' AFTER delivery_area_name',
+  'SELECT 1'
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 CREATE TABLE IF NOT EXISTS dining_risk_threshold_config (
   id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
