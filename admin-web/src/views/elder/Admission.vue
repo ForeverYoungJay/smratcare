@@ -1,7 +1,7 @@
 <template>
-  <PageContainer title="入住签约" subTitle="办理入住签约与合同信息">
+  <PageContainer title="入住办理" subTitle="分床、押金账户、合同信息与二维码配置">
     <a-card class="card-elevated" :bordered="false">
-      <h3>办理入住签约</h3>
+      <h3>办理入住流程</h3>
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="老人姓名" name="elderId">
           <a-select v-model:value="form.elderId" placeholder="请选择老人姓名">
@@ -50,7 +50,7 @@
         </a-form-item>
       </a-form>
       <div style="text-align: right; margin-top: 8px;">
-        <a-button type="primary" :loading="submitting" @click="submit">提交入住签约</a-button>
+        <a-button type="primary" :loading="submitting" @click="submit">提交入住办理</a-button>
       </div>
     </a-card>
 
@@ -207,7 +207,7 @@ async function submit() {
       form.bedStartDate = form.admissionDate || new Date().toISOString().slice(0, 10)
     }
     await admitElder(form)
-    message.success('入住签约办理成功')
+    message.success('入住办理成功')
     await fetchAdmissionRecords()
   } catch {
     message.error('提交失败')

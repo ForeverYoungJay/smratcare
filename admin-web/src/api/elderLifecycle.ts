@@ -30,5 +30,5 @@ export function exportChangeLogs(params: ChangeLogQuery) {
 }
 
 export function exportAdmissionRecords(params: AdmissionRecordQuery) {
-  return exportCsvByRequest('/api/elder/lifecycle/admissions/export', params, '入住签约记录.csv')
+  return exportCsvByRequest('/api/elder/lifecycle/admissions/export', params, '入住办理记录.csv')
 }

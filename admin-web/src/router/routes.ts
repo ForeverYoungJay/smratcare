@@ -34,14 +34,62 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'elder',
         name: 'Elder',
-        meta: { title: '入住服务', icon: 'TeamOutlined' },
-        redirect: '/elder/bed-panorama',
+        meta: { title: '长者管理 Resident 360', icon: 'TeamOutlined' },
+        redirect: '/elder/resident-360',
         children: [
+          {
+            path: 'resident-360',
+            name: 'ElderResident360',
+            component: () => import('../views/elder/Resident360.vue'),
+            meta: { title: 'Resident 360', hidden: true }
+          },
+          {
+            path: 'bed-panorama',
+            name: 'ElderBedPanorama',
+            component: () => import('../views/elder/BedPanorama360.vue'),
+            meta: { title: '床态全景' }
+          },
           {
             path: 'list',
             name: 'ElderList',
             component: () => import('../views/elder/List.vue'),
-            meta: { title: '老人列表', hidden: true }
+            meta: { title: '长者列表' }
+          },
+          {
+            path: 'admission-assessment',
+            name: 'ElderAdmissionAssessment',
+            component: () => import('../views/elder/AdmissionAssessment.vue'),
+            meta: { title: '入住评估' }
+          },
+          {
+            path: 'contracts-invoices',
+            name: 'ElderContractsInvoices',
+            component: () => import('../views/elder/ContractsInvoices.vue'),
+            meta: { title: '合同与票据' }
+          },
+          {
+            path: 'admission-processing',
+            name: 'ElderAdmissionProcessing',
+            component: () => import('../views/elder/Admission.vue'),
+            meta: { title: '入住办理' }
+          },
+          {
+            path: 'in-hospital-overview',
+            name: 'ElderInHospitalOverview',
+            component: () => import('../views/elder/InHospitalOverview.vue'),
+            meta: { title: '在院服务总览' }
+          },
+          {
+            path: 'status-change',
+            name: 'ElderStatusChangeCenter',
+            component: () => import('../views/elder/StatusChangeCenter.vue'),
+            meta: { title: '入住状态变更' }
+          },
+          {
+            path: 'discharge-settlement',
+            name: 'ElderDischargeSettlement',
+            component: () => import('../views/elder/DischargeSettlement.vue'),
+            meta: { title: '退院结算' }
           },
           {
             path: 'create',
@@ -68,58 +116,52 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: 'CRM线索(旧)', hidden: true }
           },
           {
-            path: 'bed-panorama',
-            name: 'ElderBedPanorama',
-            component: () => import('../views/bed/Map.vue'),
-            meta: { title: '床位全景' }
-          },
-          {
             path: 'admission',
             name: 'ElderAdmission',
-            component: () => import('../views/elder/Admission.vue'),
-            meta: { title: '入住签约' }
+            redirect: '/elder/admission-processing',
+            meta: { hidden: true }
           },
           {
             path: 'outing',
             name: 'ElderOuting',
             component: () => import('../views/elder/Outing.vue'),
-            meta: { title: '外出登记' }
+            meta: { title: '外出登记', hidden: true }
           },
           {
             path: 'visit-register',
             name: 'ElderVisitRegister',
             component: () => import('../views/elder/VisitRegister.vue'),
-            meta: { title: '来访登记' }
+            meta: { title: '来访登记', hidden: true }
           },
           {
             path: 'incident',
             name: 'ElderIncident',
             component: () => import('../views/life/Incident.vue'),
-            meta: { title: '事故登记' }
+            meta: { title: '事故登记', hidden: true }
           },
           {
             path: 'discharge-apply',
             name: 'ElderDischargeApply',
             component: () => import('../views/elder/DischargeApply.vue'),
-            meta: { title: '退住申请' }
+            meta: { title: '退住申请', hidden: true }
           },
           {
             path: 'discharge',
             name: 'ElderDischarge',
             component: () => import('../views/elder/Discharge.vue'),
-            meta: { title: '退住登记' }
+            meta: { title: '退住登记', hidden: true }
           },
           {
             path: 'trial-stay',
             name: 'ElderTrialStay',
             component: () => import('../views/elder/TrialStay.vue'),
-            meta: { title: '试住登记' }
+            meta: { title: '试住登记', hidden: true }
           },
           {
             path: 'change-log',
             name: 'ElderChangeLog',
             component: () => import('../views/elder/ChangeLog.vue'),
-            meta: { title: '变更记录' }
+            meta: { title: '变更记录', hidden: true }
           }
         ]
       },
