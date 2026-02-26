@@ -1,47 +1,35 @@
-# 测试记录（TESTING）
+# 测试说明（TESTING）
 
-## 环境
-- Java: 17
-- Spring Boot: 3.2.6
-- MySQL: 8.x（Docker）
-- Redis: 7.2（Docker）
-- 端口：MySQL 3307 → 容器 3306；应用 8080
+## 测试栈
+- JUnit 5 + Spring Boot Test
+- H2 内存数据库（`src/test/resources/application-test.yml`）
+- Flyway H2 迁移目录：`src/test/resources/db/migration/h2`
 
-## 初始化步骤
-1) 启动容器
-```
-docker compose up -d
-```
-
-2) 初始化结构与数据（UTF-8）
-```
-docker exec -i smartcare-mysql mysql -uroot -proot zhiyangyun < docker/mysql/init/1_schema.sql
-docker exec -i smartcare-mysql mysql --default-character-set=utf8mb4 -uroot -proot zhiyangyun < docker/mysql/init/2_data.sql
-```
-
-3) 启动后端
-```
-mvn spring-boot:run
-```
-
-## 测试执行
-- 单元/集成测试：
-```
+## 执行方式
+在仓库根目录运行：
+```bash
 mvn test
 ```
-- Postman E2E 集合：
-  - `postman_zhiyangyun_e2e.collection.json`
-  - `postman_zhiyangyun_e2e.environment.json`
 
-## 结果
-- 全部测试通过（BUILD SUCCESS）
-- 冒烟流程通过：登录、护理任务、商城禁忌预览/下单、探视、生命体征、账单生成
+仅执行单个测试类：
+```bash
+mvn -Dtest=AuthSecurityTest test
+```
 
-## 生产部署验证
-- 部署方式：`docker-compose.prod.yml`
-- 结果：后端容器启动成功，登录接口返回 `code=0`
+## 当前测试范围（按代码现状）
+- 认证与权限：`AuthSecurityTest`、`FamilyAuthTest`
+- 长者与入住流转：`ElderServiceTest`、`ElderResidenceFlowTest`
+- 护理与健康：`CareTaskServiceTest`、`HealthWorkflowIntegrationTest`、`VitalSignServiceTest`
+- 商城与库存：`StoreOrderServiceTest`、`InventoryFlowTest`、`InventoryAlertTest`
+- 财务与费用：`FinancePaymentTest`、`FinanceReconcileTest`、`FeeManagementServiceTest`、`FeeManagementControllerTest`
+- 评估与统计：`AssessmentApiIntegrationTest`、`StatisticsControllerTest`、`MarketingReportServiceTest`
+- 其它模块：`VisitModuleTest`、`DiseaseRuleServiceTest` 等
 
-## 常见问题
-- 3306 端口冲突：改用 3307（见 `docker-compose.yml` 和 `application.yml`）
-- 中文乱码：使用 `--default-character-set=utf8mb4` 导入数据
-- 账号认证失败：确保测试数据哈希为 `$2a$` 格式
+## 前置依赖
+- 后端单元/集成测试默认使用 H2，不依赖本地 MySQL。
+- 若测试用例涉及 Redis 行为，请先确认本地 `localhost:6379` 可用。
+
+## 建议流程
+1. 提交前执行 `mvn test`。
+2. 涉及 Flyway 迁移时，额外执行 `./scripts/check_flyway_versions.sh`。
+3. 联调改动后，补充关键接口冒烟（登录、核心业务写接口）。

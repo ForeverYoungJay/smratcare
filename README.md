@@ -1,141 +1,130 @@
-# 智养云（智慧养老OA）数据库说明
+# 智养云（SmartCare）
 
-## 假设
-- 多租户 `tenant_id` 在 M1 资产与房间管理阶段先对楼栋/楼层/房间/床位与审计日志表落地，`tenant_id` 取当前 `org_id`；其它业务表在后续模块迭代中逐步补齐。
-- 若数据库已存在基础表结构，Flyway 采用 `baselineVersion=0` 进行迁移，V1 会补齐 M1 所需字段与表。
-- 入院办理会自动初始化老人财务账户与商城积分账户；护理套餐需在入院后由业务人员选择配置（未自动分配默认套餐）。
+智慧养老机构一体化管理系统，前后端分离，覆盖长者生命周期、护理、健康、营销、财务、OA、物资与库存等业务域。
 
-## 数据库结构
-- 以总库为准：`zhi_yang_yun_schema.sql`
-- 子模块不再单独维护 SQL
+## 技术栈
+- 后端：Java 17、Spring Boot 3.2.6、Spring Security、MyBatis-Plus、Flyway、Redis、MySQL 8
+- 前端：Vue 3、Vite、TypeScript、Pinia、Vue Router、Ant Design Vue
+- 部署：Docker / Docker Compose
 
-## 使用方式
-- 初始化数据库时直接执行 `zhi_yang_yun_schema.sql`
+## 仓库结构
+- `src/main/java`：后端业务代码
+- `src/main/resources/db/migration`：MySQL Flyway 迁移脚本（后端数据库演进基准）
+- `src/test`：后端测试（H2 + SpringBootTest）
+- `admin-web`：管理后台前端
+- `docker-compose.yml`：本地一键启动（MySQL/Redis/后端/前端）
+- `docker-compose.prod.yml`：生产 compose（环境变量注入）
+- `docker-compose.aliyun.yml`：阿里云 ECS 场景 compose
 
-## 本地环境初始化（Docker + 后端）
-### 1) 启动数据库与缓存
-```
-docker compose up -d
-```
+## 本地开发
 
-### 2) 初始化数据库（推荐：Flyway 自动建表）
-推荐顺序：
-1. 先启动后端，让 Flyway 自动执行 `src/main/resources/db/migration` 下迁移建表
-2. 再导入测试数据
-
-导入测试数据命令：
-```
-docker exec -i smartcare-mysql mysql --default-character-set=utf8mb4 -uroot -proot zhiyangyun < docker/mysql/init/2_data.sql
+### 1) 启动依赖与服务（推荐）
+```bash
+docker compose up -d --build
 ```
 
-如需使用快照结构（`docker/mysql/init/1_schema.sql`），请二选一：
-- 方案A：导入 `1_schema.sql` 后关闭 Flyway（`spring.flyway.enabled=false`）
-- 方案B：不导入 `1_schema.sql`，仅使用 Flyway 迁移（推荐）
+默认端口：
+- 前端：`http://localhost:5173`
+- 后端：`http://localhost:8080`
+- MySQL：`127.0.0.1:3307`
+- Redis：`127.0.0.1:6379`
 
-如需重置数据（测试环境）：
-```
-docker exec -it smartcare-mysql mysql -uroot -proot -e "
-SET FOREIGN_KEY_CHECKS=0;
-TRUNCATE TABLE zhiyangyun.room;
-TRUNCATE TABLE zhiyangyun.bed;
-TRUNCATE TABLE zhiyangyun.elder;
-TRUNCATE TABLE zhiyangyun.org;
-TRUNCATE TABLE zhiyangyun.department;
-TRUNCATE TABLE zhiyangyun.role;
-TRUNCATE TABLE zhiyangyun.staff;
-TRUNCATE TABLE zhiyangyun.staff_role;
-TRUNCATE TABLE zhiyangyun.care_task_template;
-TRUNCATE TABLE zhiyangyun.care_task_daily;
-TRUNCATE TABLE zhiyangyun.care_task_execute_log;
-TRUNCATE TABLE zhiyangyun.disease;
-TRUNCATE TABLE zhiyangyun.product_tag;
-TRUNCATE TABLE zhiyangyun.disease_forbidden_tag;
-TRUNCATE TABLE zhiyangyun.elder_disease;
-TRUNCATE TABLE zhiyangyun.product;
-TRUNCATE TABLE zhiyangyun.elder_points_account;
-TRUNCATE TABLE zhiyangyun.inventory_batch;
-TRUNCATE TABLE zhiyangyun.vital_threshold_config;
-SET FOREIGN_KEY_CHECKS=1;
-"
+### 2) 分开启动（可选）
+仅启动数据库和缓存：
+```bash
+docker compose up -d mysql redis
 ```
 
-### 3) 启动后端
-```
+本地启动后端：
+```bash
 mvn spring-boot:run
 ```
 
-### 4) 冒烟验证（示例）
-登录：
+本地启动前端：
+```bash
+cd admin-web
+npm install
+npm run dev
 ```
+
+## 数据库说明
+- 后端运行时会执行 Flyway（`src/main/resources/db/migration`）。
+- MySQL init 脚本只在 **MySQL 新数据卷首次初始化** 时执行：
+  - 本地 `docker-compose.yml`：`1_schema.sql` + `2_data.sql`
+  - 生产 `docker-compose.prod.yml` / `docker-compose.aliyun.yml`：仅 `1_schema.sql`
+- 如需重置 MySQL 初始化状态：
+```bash
+docker compose down -v
+docker compose up -d
+```
+
+## 常用命令
+后端测试：
+```bash
+mvn test
+```
+
+后端打包：
+```bash
+mvn -DskipTests package
+```
+
+前端构建：
+```bash
+cd admin-web
+npm run build
+```
+
+Flyway 版本冲突检查：
+```bash
+./scripts/check_flyway_versions.sh
+```
+
+## 接口与鉴权
+登录接口：
+- `POST /api/auth/login`
+- `POST /api/auth/family/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+
+管理员登录请求示例：
+```bash
 curl -s -X POST http://localhost:8080/api/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"123456"}'
 ```
 
-注意：
-- MySQL 端口使用 `3307`（见 `docker-compose.yml`），应用已配置为 `127.0.0.1:3307`。
-- 如需重新初始化容器数据卷：`docker compose down -v` 后再执行上述步骤。
-- 合同附件上传默认落盘到 `${user.home}/smartcare-uploads`，访问路径前缀为 `/uploads/**`。
-- 上传白名单：`jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,txt,zip`，单文件上限 `10MB`。
+管理员登录请求字段（`LoginRequest`）：
+- `username`：`string`，必填
+- `password`：`string`，必填
 
-## 常见问题排查
-### 1) 3306 端口冲突
-如果本机已有 MySQL 占用 3306，Docker MySQL 会冲突。当前已将 Docker 映射到 3307：
-```
-docker compose ps
-```
-确认 MySQL 端口为 `3307:3306`，并确保 `application.yml` 中 JDBC 指向 `127.0.0.1:3307`。
+管理员登录响应字段（`LoginResponse`）：
+- `token`：`string`
+- `roles`：`string[]`
+- `permissions`：`string[]`
+- `staffInfo`：对象（`id/orgId/departmentId/username/realName/phone/status`）
 
-### 2) 中文乱码
-通常是导入数据时字符集不一致导致。请使用 UTF‑8 导入：
-```
-docker exec -i smartcare-mysql mysql --default-character-set=utf8mb4 -uroot -proot zhiyangyun < docker/mysql/init/2_data.sql
-```
-如果已导入过，请先清表再导入（见上面的“重置数据”步骤）。
+家属登录请求字段（`FamilyLoginRequest`）：
+- `orgId`：`number`，必填
+- `phone`：`string`，必填
+- `verifyCode`：`string`，必填
 
-### 3) root 账号无法连接
-如果出现 `Access denied for user 'root'@'localhost'`：
-```
-docker exec smartcare-mysql mysql -uroot -proot -e "SELECT 1;"
-```
-若此命令失败，说明容器初始化时 root 密码不是 `root`，需要重建容器数据卷：
-```
-docker compose down -v
-docker compose up -d
-```
+说明：当前后端对 `verifyCode` 仅保留占位校验逻辑。
 
-## OpenAPI 导出
-启动服务后可通过以下接口导出 OpenAPI：
+统一响应结构：
+- `code`：`number`（`0` 表示成功）
+- `message`：`string`
+- `data`：业务数据
+
+OpenAPI：
 - JSON：`http://localhost:8080/v3/api-docs`
 - YAML：`http://localhost:8080/v3/api-docs.yaml`
 
-示例导出（JSON）：
-```
-curl -s http://localhost:8080/v3/api-docs -o openapi.json
-```
+## 部署文档
+- 阿里云部署：`DEPLOY_ALIYUN.md`
+- 部署检查清单：`DEPLOYMENT_CHECKLIST.md`
+- 测试执行说明：`TESTING.md`
 
-## Postman 闭环测试
-已提供 Postman 集合与环境：
-- `postman_zhiyangyun_e2e.collection.json`
-- `postman_zhiyangyun_e2e.environment.json`
-
-使用步骤：
-1) Postman → Import → 选择上述两个 JSON  
-2) 选择环境 `zhiyangyun-local`  
-3) 先运行 `Auth/Login`（会自动写入 `token`）  
-4) 按顺序运行其它请求完成业务闭环测试
-
-## 部署（生产）
-参考：
-- `src/main/resources/application-prod.yml`
-- `docker-compose.prod.yml`
-- `DEPLOYMENT_CHECKLIST.md`
-
-已验证部署成功（登录接口返回 `code=0`）。
-
-## Flyway 版本冲突检查
-多人并行开发时，建议在提交前执行：
-```
-./scripts/check_flyway_versions.sh
-```
-如果输出 `Duplicate Flyway versions found`，需要先统一迁移版本号后再合并。
+## 备注
+- 上传文件默认映射目录：`output/uploads`（容器内 `/app/uploads`）
+- 默认 JWT 密钥仅用于开发环境，生产必须替换为高强度随机值

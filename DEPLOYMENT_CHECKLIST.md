@@ -1,25 +1,30 @@
 # 部署前检查清单
 
 ## 配置与安全
-- [ ] `application-prod.yml` 已配置并通过环境变量注入敏感信息
-- [ ] `JWT_SECRET` 已替换为高强度随机值（不小于 32 字符）
-- [ ] 生产环境关闭测试数据导入与调试日志
+- [ ] `docker-compose.prod.yml` 或 `docker-compose.aliyun.yml` 使用了真实环境变量
+- [ ] `JWT_SECRET` 已替换为 32 位以上强随机字符串
+- [ ] 数据库密码和 root 密码均已替换默认值
+- [ ] 生产环境不暴露 MySQL/Redis 到公网
 
-## 数据库与缓存
-- [ ] MySQL 已初始化（UTF‑8）
-- [ ] 数据库连接账号权限最小化（非 root 账号）
-- [ ] Redis 可用，黑名单功能正常
+## 数据库与迁移
+- [ ] 已确认初始化方式（`docker/mysql/init` 与 Flyway）
+- [ ] 生产 compose 仅挂载 `docker/mysql/init/1_schema.sql`，未挂载测试数据脚本
+- [ ] 首次部署后检查 Flyway 执行状态与 schema 版本
+- [ ] 已验证字符集为 `utf8mb4`
 
 ## 构建与发布
-- [ ] `mvn test` 全绿
-- [ ] `mvn -DskipTests package` 生成 `target/care-task-1.0.0.jar`
-- [ ] `docker-compose.prod.yml` 环境变量已填
+- [ ] 后端测试通过：`mvn test`
+- [ ] 后端镜像可构建（`Dockerfile`）
+- [ ] 前端镜像可构建（`admin-web/Dockerfile`）
+- [ ] 生产 compose 可正常拉起全部容器
 
 ## 运行验证
-- [ ] 服务启动成功，日志无 ERROR
-- [ ] 关键接口冒烟：登录、护理任务、商城预览/下单、生命体征
+- [ ] `/api/auth/login` 返回 `code=0`（有效账号）
+- [ ] 前端首页可访问并可正常调用 `/api/**`
+- [ ] 上传与访问 `/uploads/**` 正常
 - [ ] OpenAPI 可访问：`/v3/api-docs`
 
-## 备份与监控
-- [ ] MySQL 备份策略（每日/每周）
-- [ ] 关键指标监控（连接池、错误率、慢查询）
+## 运维与恢复
+- [ ] MySQL 已配置备份策略（全量 + 增量）
+- [ ] 容器日志采集与错误告警已配置
+- [ ] 已准备回滚方案（镜像版本或 Git tag）
