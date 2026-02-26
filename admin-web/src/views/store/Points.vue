@@ -68,8 +68,16 @@
 
     <a-modal v-model:open="adjustOpen" title="积分调整" @ok="submitAdjust" :confirm-loading="adjusting">
       <a-form layout="vertical" :model="adjustForm" :rules="adjustRules" ref="adjustFormRef">
-        <a-form-item label="老人ID" name="elderId">
-          <a-input-number v-model:value="adjustForm.elderId" style="width: 100%" />
+        <a-form-item label="老人" name="elderId">
+          <a-select
+            v-model:value="adjustForm.elderId"
+            show-search
+            placeholder="输入姓名搜索"
+            :filter-option="false"
+            :options="elderOptions"
+            @search="searchElders"
+            @focus="() => !elderOptions.length && searchElders('')"
+          />
         </a-form-item>
         <a-form-item label="调整方向" name="direction">
           <a-select v-model:value="adjustForm.direction">
@@ -112,8 +120,9 @@
 import { onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
+import { useElderOptions } from '../../composables/useElderOptions'
 import { adjustPoints, getPointsAccountPage, getPointsLogPage } from '../../api/store'
-import type { PageResult, PointsAccountItem, PointsAdjustRequest, PointsLogItem } from '../../types'
+import type { PageResult, PointsAccountItem, PointsLogItem } from '../../types'
 
 const loading = ref(false)
 const rows = ref<PointsAccountItem[]>([])
@@ -128,14 +137,20 @@ const query = reactive({
 const adjustOpen = ref(false)
 const adjusting = ref(false)
 const adjustFormRef = ref()
-const adjustForm = reactive<PointsAdjustRequest>({
-  elderId: 0,
+const { elderOptions, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
+const adjustForm = reactive<{
+  elderId: number | undefined
+  points: number
+  direction: 'CREDIT' | 'DEBIT'
+  remark: string
+}>({
+  elderId: undefined,
   points: 0,
   direction: 'CREDIT',
   remark: ''
 })
 const adjustRules = {
-  elderId: [{ required: true, message: '请输入老人ID' }],
+  elderId: [{ required: true, message: '请选择老人' }],
   points: [{ required: true, message: '请输入积分数量' }],
   direction: [{ required: true, message: '请选择方向' }]
 }
@@ -184,15 +199,24 @@ function onPageSizeChange(_page: number, size: number) {
 }
 
 function openAdjust() {
-  Object.assign(adjustForm, { elderId: 0, points: 0, direction: 'CREDIT', remark: '' })
+  Object.assign(adjustForm, { elderId: undefined, points: 0, direction: 'CREDIT', remark: '' })
   adjustOpen.value = true
 }
 
 async function submitAdjust() {
   await adjustFormRef.value?.validate()
+  if (!adjustForm.elderId) {
+    message.error('请选择老人')
+    return
+  }
   adjusting.value = true
   try {
-    await adjustPoints(adjustForm)
+    await adjustPoints({
+      elderId: adjustForm.elderId,
+      points: adjustForm.points,
+      direction: adjustForm.direction,
+      remark: adjustForm.remark
+    })
     message.success('调整成功')
     adjustOpen.value = false
     fetchData()
@@ -202,6 +226,7 @@ async function submitAdjust() {
 }
 
 async function openLogs(row: PointsAccountItem) {
+  ensureSelectedElder(row.elderId, row.elderName || findElderName(row.elderId))
   logQuery.elderId = row.elderId
   logQuery.pageNo = 1
   logOpen.value = true

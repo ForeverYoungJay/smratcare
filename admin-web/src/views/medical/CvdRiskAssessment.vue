@@ -40,7 +40,20 @@
     <a-modal v-model:open="editOpen" :title="form.id ? '编辑心血管风险评估' : '新建心血管风险评估'" width="900px" @ok="submit" :confirm-loading="saving">
       <a-form layout="vertical">
         <a-row :gutter="16">
-          <a-col :span="8"><a-form-item label="长者姓名" required><a-input v-model:value="form.elderName" /></a-form-item></a-col>
+          <a-col :span="8">
+            <a-form-item label="长者" required>
+              <a-select
+                v-model:value="form.elderId"
+                show-search
+                :filter-option="false"
+                :options="elderOptions"
+                placeholder="请输入姓名搜索"
+                @search="searchElders"
+                @focus="() => !elderOptions.length && searchElders('')"
+                @change="onElderChange"
+              />
+            </a-form-item>
+          </a-col>
           <a-col :span="8"><a-form-item label="评估日期" required><a-date-picker v-model:value="form.assessmentDate" style="width: 100%" /></a-form-item></a-col>
           <a-col :span="8"><a-form-item label="评估人"><a-input v-model:value="form.assessorName" /></a-form-item></a-col>
         </a-row>
@@ -80,6 +93,7 @@ import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import { useElderOptions } from '../../composables/useElderOptions'
 import { createCvdAssessment, deleteCvdAssessment, getCvdAssessmentPage, publishCvdAssessment, updateCvdAssessment } from '../../api/medicalCare'
 import type { MedicalCvdAssessment, PageResult } from '../../types'
 
@@ -110,6 +124,7 @@ const riskOptions = [
 const editOpen = ref(false)
 const saving = ref(false)
 const form = reactive<any>({})
+const { elderOptions, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
 
 const publishOpen = ref(false)
 const publishing = ref(false)
@@ -134,6 +149,7 @@ function riskColor(value?: string) {
 
 function resetForm() {
   form.id = undefined
+  form.elderId = undefined
   form.elderName = ''
   form.assessmentDate = dayjs()
   form.assessorName = ''
@@ -150,6 +166,10 @@ function resetForm() {
 
 function openCreate() {
   resetForm()
+  if (route.query.residentId) {
+    form.elderId = Number(route.query.residentId)
+    ensureSelectedElder(form.elderId, route.query.residentName ? String(route.query.residentName) : undefined)
+  }
   if (route.query.residentName) {
     form.elderName = String(route.query.residentName)
   }
@@ -163,7 +183,12 @@ function openEdit(record: MedicalCvdAssessment) {
     assessmentDate: record.assessmentDate ? dayjs(record.assessmentDate) : dayjs(),
     needFollowup: record.needFollowup === 1
   })
+  ensureSelectedElder(record.elderId, record.elderName)
   editOpen.value = true
+}
+
+function onElderChange(elderId?: number) {
+  form.elderName = findElderName(elderId)
 }
 
 function buildParams() {
@@ -214,15 +239,15 @@ function onReset() {
 }
 
 async function submit() {
-  if (!form.elderName || !form.assessmentDate || !form.riskLevel) {
+  if (!form.elderId || !form.assessmentDate || !form.riskLevel) {
     message.error('请填写必填项')
     return
   }
   saving.value = true
   try {
     const payload = {
-      elderId: route.query.residentId ? Number(route.query.residentId) : undefined,
-      elderName: form.elderName,
+      elderId: form.elderId,
+      elderName: findElderName(form.elderId) || form.elderName,
       assessmentDate: dayjs(form.assessmentDate).format('YYYY-MM-DD'),
       assessorName: form.assessorName,
       riskLevel: form.riskLevel,
@@ -293,6 +318,7 @@ async function remove(record: MedicalCvdAssessment) {
 
 onMounted(() => {
   resetForm()
+  searchElders('')
   fetchData()
 })
 </script>

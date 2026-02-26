@@ -6,14 +6,16 @@
       </a-form-item>
     </SearchForm>
 
-    <DataTable
-      rowKey="id"
-      :columns="columns"
-      :data-source="rows"
-      :loading="loading"
-      :pagination="pagination"
-      @change="handleTableChange"
-    />
+    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+      <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'rechargeMethod'">
+          {{ parseRechargeMethod(record.remark) || '-' }}
+        </template>
+        <template v-else-if="column.key === 'rechargeTime'">
+          {{ parseRechargeTime(record.remark) || record.createTime || '-' }}
+        </template>
+      </template>
+    </DataTable>
   </PageContainer>
 </template>
 
@@ -45,9 +47,28 @@ const columns = [
   { title: '金额', dataIndex: 'amount', key: 'amount', width: 120 },
   { title: '余额', dataIndex: 'balanceAfter', key: 'balanceAfter', width: 120 },
   { title: '来源', dataIndex: 'sourceType', key: 'sourceType', width: 120 },
+  { title: '充值方式', key: 'rechargeMethod', width: 120 },
+  { title: '充值时间', key: 'rechargeTime', width: 180 },
   { title: '时间', dataIndex: 'createTime', key: 'createTime', width: 180 },
   { title: '备注', dataIndex: 'remark', key: 'remark', width: 200 }
 ]
+
+function parseRechargeMethod(remark?: string) {
+  const match = String(remark || '').match(/充值方式:([^|]+)/)
+  if (!match?.[1]) return ''
+  const raw = match[1].trim().toUpperCase()
+  if (raw === 'ALIPAY') return '支付宝'
+  if (raw === 'WECHAT') return '微信'
+  if (raw === 'QR_CODE') return '扫码'
+  if (raw === 'CASH') return '现金'
+  if (raw === 'BANK') return '转账'
+  return raw
+}
+
+function parseRechargeTime(remark?: string) {
+  const match = String(remark || '').match(/充值时间:([0-9\-: ]+)/)
+  return match?.[1]?.trim() || ''
+}
 
 async function fetchData() {
   loading.value = true

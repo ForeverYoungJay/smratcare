@@ -10,10 +10,23 @@
             :filter-option="false"
             :options="elderOptions"
             @search="searchElders"
+            @focus="() => !elderOptions.length && searchElders('')"
           />
         </a-form-item>
         <a-form-item label="充值金额(元)" required>
           <a-input-number v-model:value="form.amount" :min="0.01" :precision="2" style="width: 100%" />
+        </a-form-item>
+        <a-form-item label="充值方式" required>
+          <a-select v-model:value="form.rechargeMethod">
+            <a-select-option value="ALIPAY">支付宝</a-select-option>
+            <a-select-option value="WECHAT">微信</a-select-option>
+            <a-select-option value="CASH">现金</a-select-option>
+            <a-select-option value="QR_CODE">扫码</a-select-option>
+            <a-select-option value="BANK">转账</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="充值时间" required>
+          <a-date-picker v-model:value="form.rechargeTime" show-time style="width: 100%" />
         </a-form-item>
         <a-form-item label="备注">
           <a-textarea v-model:value="form.remark" :rows="3" />
@@ -31,8 +44,9 @@
 import { reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
+import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
-import { getElderPage } from '../../api/elder'
+import { useElderOptions } from '../../composables/useElderOptions'
 import { adjustElderAccount } from '../../api/finance'
 
 const router = useRouter()
@@ -40,21 +54,15 @@ const router = useRouter()
 const form = reactive({
   elderId: undefined as number | undefined,
   amount: 0,
+  rechargeMethod: 'ALIPAY',
+  rechargeTime: dayjs(),
   remark: '预存充值'
 })
-const elderOptions = ref<{ label: string; value: number }[]>([])
+const { elderOptions, searchElders: searchElderOptions, findElderName } = useElderOptions({ pageSize: 20 })
 const submitting = ref(false)
 
 async function searchElders(keyword: string) {
-  if (!keyword) {
-    elderOptions.value = []
-    return
-  }
-  const res = await getElderPage({ pageNo: 1, pageSize: 20, keyword })
-  elderOptions.value = res.list.map((item: any) => ({
-    label: item.fullName || item.elderName || item.name || '未知老人',
-    value: item.id
-  }))
+  await searchElderOptions(keyword)
 }
 
 async function submit() {
@@ -66,15 +74,23 @@ async function submit() {
     message.error('请输入有效金额')
     return
   }
+  if (!form.rechargeMethod) {
+    message.error('请选择充值方式')
+    return
+  }
+  if (!form.rechargeTime) {
+    message.error('请选择充值时间')
+    return
+  }
   submitting.value = true
   try {
-    const selected = elderOptions.value.find((item) => item.value === form.elderId)
+    const rechargeTimeText = dayjs(form.rechargeTime).format('YYYY-MM-DD HH:mm:ss')
     await adjustElderAccount({
       elderId: form.elderId,
-      elderName: selected?.label,
+      elderName: findElderName(form.elderId),
       amount: form.amount,
       direction: 'CREDIT',
-      remark: form.remark
+      remark: `${form.remark || '预存充值'} | 充值方式:${form.rechargeMethod} | 充值时间:${rechargeTimeText}`
     })
     message.success('充值成功')
     router.push({ name: 'FinanceDepositManagement' })

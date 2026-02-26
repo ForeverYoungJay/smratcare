@@ -70,7 +70,20 @@
     <a-modal v-model:open="editOpen" title="护理日志" @ok="submit" :confirm-loading="saving" width="760px">
       <a-form layout="vertical">
         <a-row :gutter="16">
-          <a-col :span="12"><a-form-item label="老人姓名" required><a-input v-model:value="form.elderName" /></a-form-item></a-col>
+          <a-col :span="12">
+            <a-form-item label="老人" required>
+              <a-select
+                v-model:value="form.elderId"
+                show-search
+                :filter-option="false"
+                :options="elderOptions"
+                placeholder="请输入姓名搜索"
+                @search="searchElders"
+                @focus="() => !elderOptions.length && searchElders('')"
+                @change="onElderChange"
+              />
+            </a-form-item>
+          </a-col>
           <a-col :span="12"><a-form-item label="日志时间" required><a-date-picker v-model:value="form.logTime" show-time style="width: 100%" /></a-form-item></a-col>
         </a-row>
         <a-row :gutter="16">
@@ -95,6 +108,7 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import { useElderOptions } from '../../composables/useElderOptions'
 import { mapHealthExportRows, nursingLogExportColumns } from '../../constants/healthExport'
 import { exportCsv, exportExcel } from '../../utils/export'
 import {
@@ -139,8 +153,10 @@ const columns = [
 
 const editOpen = ref(false)
 const saving = ref(false)
+const { elderOptions, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
 const form = reactive({
   id: undefined as number | undefined,
+  elderId: undefined as number | undefined,
   elderName: '',
   sourceInspectionId: undefined as number | undefined,
   logTime: dayjs(),
@@ -203,6 +219,7 @@ function onReset() {
 
 function openCreate() {
   form.id = undefined
+  form.elderId = undefined
   form.elderName = ''
   form.sourceInspectionId = undefined
   form.logTime = dayjs()
@@ -216,7 +233,9 @@ function openCreate() {
 
 function openEdit(record: HealthNursingLog) {
   form.id = record.id
+  form.elderId = record.elderId
   form.elderName = record.elderName || ''
+  ensureSelectedElder(record.elderId, record.elderName)
   form.sourceInspectionId = record.sourceInspectionId
   form.logTime = record.logTime ? dayjs(record.logTime) : dayjs()
   form.logType = record.logType
@@ -227,8 +246,12 @@ function openEdit(record: HealthNursingLog) {
   editOpen.value = true
 }
 
+function onElderChange(elderId?: number) {
+  form.elderName = findElderName(elderId)
+}
+
 async function submit() {
-  if (!form.elderName || !form.logType || !form.content) {
+  if (!form.elderId || !form.logType || !form.content) {
     message.error('请补全必填项')
     return
   }
@@ -243,7 +266,8 @@ async function submit() {
   saving.value = true
   try {
     const payload = {
-      elderName: form.elderName,
+      elderId: form.elderId,
+      elderName: findElderName(form.elderId) || form.elderName,
       sourceInspectionId: form.sourceInspectionId,
       logTime: dayjs(form.logTime).format('YYYY-MM-DD HH:mm:ss'),
       logType: form.logType,
@@ -367,6 +391,7 @@ async function loadExportRecords() {
 }
 
 fetchData()
+searchElders('')
 </script>
 
 <style scoped>

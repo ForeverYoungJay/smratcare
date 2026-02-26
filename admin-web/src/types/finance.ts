@@ -2,7 +2,7 @@ export interface PaymentRecordItem {
   id: number
   billMonthlyId: number
   amount: number
-  payMethod: 'CASH' | 'BANK' | 'WECHAT_OFFLINE'
+  payMethod: 'CASH' | 'BANK' | 'WECHAT_OFFLINE' | 'ALIPAY' | 'WECHAT' | 'QR_CODE'
   paidAt: string
   operatorStaffId?: number
   operatorStaffName?: string

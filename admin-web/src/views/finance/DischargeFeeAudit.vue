@@ -29,7 +29,7 @@
     <a-modal v-model:open="createOpen" title="新建退住费用审核" :confirm-loading="creating" @ok="submitCreate">
       <a-form layout="vertical">
         <a-form-item label="老人" required>
-          <a-select v-model:value="createForm.elderId" show-search :filter-option="false" :options="elderOptions" @search="searchElders" />
+          <a-select v-model:value="createForm.elderId" show-search :filter-option="false" :options="elderOptions" @search="searchElders" @focus="() => !elderOptions.length && searchElders('')" />
         </a-form-item>
         <a-form-item label="退住申请ID">
           <a-input-number v-model:value="createForm.dischargeApplyId" :min="1" style="width: 100%" />
@@ -65,8 +65,8 @@ import { Input, message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import { useElderOptions } from '../../composables/useElderOptions'
 import { getBaseConfigItemList } from '../../api/baseConfig'
-import { getElderPage } from '../../api/elder'
 import { createDischargeFeeAudit, getDischargeFeeAuditPage, reviewDischargeFeeAudit } from '../../api/financeFee'
 import type { BaseConfigItem, DischargeFeeAuditItem, PageResult } from '../../types'
 
@@ -93,7 +93,7 @@ const columns = [
 
 const createOpen = ref(false)
 const creating = ref(false)
-const elderOptions = ref<{ label: string; value: number }[]>([])
+const { elderOptions, searchElders: searchElderOptions } = useElderOptions({ pageSize: 20 })
 const feeItemOptions = ref<{ label: string; value: string }[]>([])
 const dischargeFeeConfigOptions = ref<{ label: string; value: string }[]>([])
 const createForm = reactive({
@@ -160,12 +160,7 @@ async function loadOptions() {
 }
 
 async function searchElders(keyword: string) {
-  if (!keyword) {
-    elderOptions.value = []
-    return
-  }
-  const res = await getElderPage({ pageNo: 1, pageSize: 20, keyword })
-  elderOptions.value = res.list.map((item: any) => ({ label: item.fullName || item.name || '未知老人', value: item.id }))
+  await searchElderOptions(keyword)
 }
 
 async function submitCreate() {

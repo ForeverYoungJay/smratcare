@@ -41,11 +41,20 @@
             <span>{{ row.elderName || '未知老人' }}</span>
           </template>
         </vxe-column>
+        <vxe-column field="careLevel" title="护理级别" width="120" />
         <vxe-column field="totalAmount" title="总额" width="120" />
+        <vxe-column field="nursingFee" title="护理费" width="120" />
+        <vxe-column field="bedFee" title="床位费" width="120" />
+        <vxe-column field="insuranceFee" title="保险费" width="120" />
         <vxe-column field="paidAmount" title="已付" width="120" />
         <vxe-column field="outstandingAmount" title="欠费" width="120">
           <template #default="{ row }">
             <a-tag :color="row.outstandingAmount > 0 ? 'red' : 'green'">{{ row.outstandingAmount ?? 0 }}</a-tag>
+          </template>
+        </vxe-column>
+        <vxe-column field="lastPayMethod" title="收款方式" width="130">
+          <template #default="{ row }">
+            <span>{{ payMethodText(row.lastPayMethod) }}</span>
           </template>
         </vxe-column>
         <vxe-column field="status" title="状态" width="140">
@@ -91,7 +100,10 @@
           <a-select v-model:value="payForm.method">
             <a-select-option value="CASH">现金</a-select-option>
             <a-select-option value="BANK">转账</a-select-option>
+            <a-select-option value="ALIPAY">支付宝</a-select-option>
+            <a-select-option value="WECHAT">微信</a-select-option>
             <a-select-option value="WECHAT_OFFLINE">微信线下</a-select-option>
+            <a-select-option value="QR_CODE">扫码</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="收款时间" name="paidAt">
@@ -179,6 +191,18 @@ function statusColor(status?: number) {
   return 'red'
 }
 
+function payMethodText(method?: string) {
+  const text = String(method || '').toUpperCase()
+  if (!text) return '-'
+  if (text === 'ALIPAY') return '支付宝'
+  if (text === 'WECHAT') return '微信'
+  if (text === 'WECHAT_OFFLINE') return '微信线下'
+  if (text === 'QR_CODE') return '扫码'
+  if (text === 'BANK') return '转账'
+  if (text === 'CASH') return '现金'
+  return text
+}
+
 async function fetchData() {
   loading.value = true
   try {
@@ -214,7 +238,19 @@ function onPageSizeChange(current: number, size: number) {
 }
 
 function exportCsvData() {
-  exportCsv(rows.value, `bill-${dayjs().format('YYYYMMDD')}.csv`)
+  const data = rows.value.map((row) => ({
+    老人: row.elderName || '未知老人',
+    护理级别: row.careLevel || '-',
+    总费用: row.totalAmount ?? 0,
+    护理费: row.nursingFee ?? 0,
+    床位费: row.bedFee ?? 0,
+    保险费: row.insuranceFee ?? 0,
+    已付: row.paidAmount ?? 0,
+    欠费: row.outstandingAmount ?? 0,
+    状态: statusText(row.status),
+    收款方式: payMethodText(row.lastPayMethod)
+  }))
+  exportCsv(data, `在住账单缴费-${dayjs().format('YYYYMMDD-HHmmss')}.csv`)
 }
 
 function openGenerate() {

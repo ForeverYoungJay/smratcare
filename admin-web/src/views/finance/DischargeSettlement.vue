@@ -27,13 +27,21 @@
           </a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-button
-            type="link"
-            :disabled="record.status !== 'PENDING_CONFIRM'"
-            @click="confirmSettlement(record)"
-          >
-            确认结算
-          </a-button>
+          <a-space>
+            <a-button type="link" :disabled="record.frontdeskApproved === 1" @click="approveFrontdesk(record)">
+              前台签字
+            </a-button>
+            <a-button type="link" :disabled="record.nursingApproved === 1" @click="approveNursing(record)">
+              护理部签字
+            </a-button>
+            <a-button
+              type="link"
+              :disabled="record.frontdeskApproved !== 1 || record.nursingApproved !== 1 || record.financeRefunded === 1"
+              @click="confirmSettlement(record)"
+            >
+              财务退款
+            </a-button>
+          </a-space>
         </template>
       </template>
     </DataTable>
@@ -53,6 +61,7 @@
             :filter-option="false"
             :options="elderOptions"
             @search="searchElders"
+            @focus="() => !elderOptions.length && searchElders('')"
           />
         </a-form-item>
         <a-form-item label="退住申请ID">
@@ -89,8 +98,8 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import { useElderOptions } from '../../composables/useElderOptions'
 import { getBaseConfigItemList } from '../../api/baseConfig'
-import { getElderPage } from '../../api/elder'
 import { createDischargeSettlement, getDischargeSettlementPage, confirmDischargeSettlement } from '../../api/financeFee'
 import type { BaseConfigItem, DischargeSettlementItem, PageResult } from '../../types'
 
@@ -113,6 +122,7 @@ const statusOptions = [
 ]
 
 const columns = [
+  { title: '退住明细单号', dataIndex: 'detailNo', key: 'detailNo', width: 180 },
   { title: '老人', dataIndex: 'elderName', key: 'elderName', width: 140 },
   { title: '费用项', dataIndex: 'feeItem', key: 'feeItem', width: 140 },
   { title: '退住费用设置', dataIndex: 'dischargeFeeConfig', key: 'dischargeFeeConfig', width: 160 },
@@ -120,9 +130,12 @@ const columns = [
   { title: '押金抵扣', dataIndex: 'fromDepositAmount', key: 'fromDepositAmount', width: 120 },
   { title: '应退款', dataIndex: 'refundAmount', key: 'refundAmount', width: 120 },
   { title: '需补缴', dataIndex: 'supplementAmount', key: 'supplementAmount', width: 120 },
+  { title: '前台签字', dataIndex: 'frontdeskSignedTime', key: 'frontdeskSignedTime', width: 170 },
+  { title: '护理部签字', dataIndex: 'nursingSignedTime', key: 'nursingSignedTime', width: 170 },
+  { title: '财务退款时间', dataIndex: 'financeRefundTime', key: 'financeRefundTime', width: 170 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 140 },
   { title: '创建时间', dataIndex: 'createTime', key: 'createTime', width: 180 },
-  { title: '操作', key: 'action', width: 120 }
+  { title: '操作', key: 'action', width: 280 }
 ]
 
 const createOpen = ref(false)
@@ -135,7 +148,7 @@ const createForm = reactive({
   dischargeFeeConfig: '',
   remark: ''
 })
-const elderOptions = ref<{ label: string; value: number }[]>([])
+const { elderOptions, searchElders: searchElderOptions } = useElderOptions({ pageSize: 20 })
 const feeItemOptions = ref<{ label: string; value: string }[]>([])
 const dischargeFeeConfigOptions = ref<{ label: string; value: string }[]>([])
 
@@ -194,15 +207,7 @@ async function loadOptions() {
 }
 
 async function searchElders(keyword: string) {
-  if (!keyword) {
-    elderOptions.value = []
-    return
-  }
-  const res = await getElderPage({ pageNo: 1, pageSize: 20, keyword })
-  elderOptions.value = res.list.map((item: any) => ({
-    label: item.fullName || item.elderName || item.name || '未知老人',
-    value: item.id
-  }))
+  await searchElderOptions(keyword)
 }
 
 async function submitCreate() {
@@ -241,8 +246,35 @@ async function submitCreate() {
 }
 
 async function confirmSettlement(record: DischargeSettlementItem) {
-  await confirmDischargeSettlement(record.id)
-  message.success('结算完成')
+  const signerName = window.prompt('请输入财务签字人', '') || undefined
+  await confirmDischargeSettlement(record.id, {
+    action: 'FINANCE_REFUND',
+    signerName,
+    remark: '财务退款完成'
+  })
+  message.success('财务退款已完成')
+  fetchData()
+}
+
+async function approveFrontdesk(record: DischargeSettlementItem) {
+  const signerName = window.prompt('请输入前台签字人', '') || undefined
+  await confirmDischargeSettlement(record.id, {
+    action: 'FRONTDESK_APPROVE',
+    signerName,
+    remark: '前台审核签字'
+  })
+  message.success('前台签字已完成')
+  fetchData()
+}
+
+async function approveNursing(record: DischargeSettlementItem) {
+  const signerName = window.prompt('请输入护理部签字人', '') || undefined
+  await confirmDischargeSettlement(record.id, {
+    action: 'NURSING_APPROVE',
+    signerName,
+    remark: '护理部审核签字'
+  })
+  message.success('护理部签字已完成')
   fetchData()
 }
 

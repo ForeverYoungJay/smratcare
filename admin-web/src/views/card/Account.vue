@@ -78,13 +78,13 @@ import { reactive, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
-import { getElderPage } from '../../api/elder'
+import { useElderOptions } from '../../composables/useElderOptions'
 import { getCardAccountPage, createCardAccount, updateCardAccount, deleteCardAccount } from '../../api/card'
 import type { CardAccount, PageResult } from '../../types'
 
 const loading = ref(false)
 const rows = ref<CardAccount[]>([])
-const elderOptions = ref<any[]>([])
+const { elderOptions, searchElders, ensureSelectedElder } = useElderOptions({ pageSize: 200 })
 const query = reactive({ status: undefined as string | undefined, keyword: '', pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 
@@ -123,11 +123,6 @@ function statusLabel(status?: string) {
   if (status === 'FROZEN') return '冻结'
   if (status === 'CANCELLED') return '注销'
   return '正常'
-}
-
-async function loadElders() {
-  const res = await getElderPage({ pageNo: 1, pageSize: 200 })
-  elderOptions.value = res.list.map((item: any) => ({ label: item.fullName, value: item.id }))
 }
 
 async function fetchData() {
@@ -173,6 +168,7 @@ function openCreate() {
 }
 
 function openEdit(record: CardAccount) {
+  ensureSelectedElder(record.elderId, record.elderName)
   form.id = record.id
   form.elderId = record.elderId
   form.cardNo = record.cardNo
@@ -209,6 +205,6 @@ async function remove(record: CardAccount) {
   fetchData()
 }
 
-loadElders()
+searchElders('')
 fetchData()
 </script>

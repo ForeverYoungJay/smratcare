@@ -14,6 +14,7 @@ import lombok.Data;
 public class DischargeSettlement {
   @TableId(type = IdType.ASSIGN_ID)
   private Long id;
+  private String detailNo;
   private Long tenantId;
   private Long orgId;
   private Long elderId;
@@ -26,6 +27,15 @@ public class DischargeSettlement {
   private BigDecimal refundAmount;
   private BigDecimal supplementAmount;
   private String status;
+  private Integer frontdeskApproved;
+  private String frontdeskSignerName;
+  private LocalDateTime frontdeskSignedTime;
+  private Integer nursingApproved;
+  private String nursingSignerName;
+  private LocalDateTime nursingSignedTime;
+  private Integer financeRefunded;
+  private String financeRefundOperatorName;
+  private LocalDateTime financeRefundTime;
   private String remark;
   private Long settledBy;
   private LocalDateTime settledTime;

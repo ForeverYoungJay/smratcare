@@ -24,7 +24,18 @@
 
     <a-modal v-model:open="editOpen" title="健康档案" @ok="submit" :confirm-loading="saving" width="760px">
       <a-form layout="vertical">
-        <a-form-item label="老人姓名" required><a-input v-model:value="form.elderName" /></a-form-item>
+        <a-form-item label="老人" required>
+          <a-select
+            v-model:value="form.elderId"
+            show-search
+            :filter-option="false"
+            :options="elderOptions"
+            placeholder="请输入姓名搜索"
+            @search="searchElders"
+            @focus="() => !elderOptions.length && searchElders('')"
+            @change="onElderChange"
+          />
+        </a-form-item>
         <a-row :gutter="16">
           <a-col :span="12"><a-form-item label="血型"><a-input v-model:value="form.bloodType" /></a-form-item></a-col>
           <a-col :span="12"><a-form-item label="慢病史"><a-input v-model:value="form.chronicDisease" /></a-form-item></a-col>
@@ -47,6 +58,7 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import { useElderOptions } from '../../composables/useElderOptions'
 import { getHealthArchivePage, createHealthArchive, updateHealthArchive, deleteHealthArchive } from '../../api/health'
 import type { HealthArchive, PageResult } from '../../types'
 
@@ -67,8 +79,10 @@ const columns = [
 
 const editOpen = ref(false)
 const saving = ref(false)
+const { elderOptions, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
 const form = reactive({
   id: undefined as number | undefined,
+  elderId: undefined as number | undefined,
   elderName: '',
   bloodType: '',
   allergyHistory: '',
@@ -108,6 +122,7 @@ function onReset() {
 
 function openCreate() {
   form.id = undefined
+  form.elderId = undefined
   form.elderName = ''
   form.bloodType = ''
   form.allergyHistory = ''
@@ -121,7 +136,9 @@ function openCreate() {
 
 function openEdit(record: HealthArchive) {
   form.id = record.id
+  form.elderId = record.elderId
   form.elderName = record.elderName || ''
+  ensureSelectedElder(record.elderId, record.elderName)
   form.bloodType = record.bloodType || ''
   form.allergyHistory = record.allergyHistory || ''
   form.chronicDisease = record.chronicDisease || ''
@@ -132,9 +149,13 @@ function openEdit(record: HealthArchive) {
   editOpen.value = true
 }
 
+function onElderChange(elderId?: number) {
+  form.elderName = findElderName(elderId)
+}
+
 async function submit() {
-  if (!form.elderName) {
-    message.error('请输入老人姓名')
+  if (!form.elderId) {
+    message.error('请选择老人')
     return
   }
   if (form.emergencyPhone && !/^[0-9-]{6,20}$/.test(form.emergencyPhone)) {
@@ -144,7 +165,8 @@ async function submit() {
   saving.value = true
   try {
     const payload = {
-      elderName: form.elderName,
+      elderId: form.elderId,
+      elderName: findElderName(form.elderId) || form.elderName,
       bloodType: form.bloodType,
       allergyHistory: form.allergyHistory,
       chronicDisease: form.chronicDisease,
@@ -173,4 +195,5 @@ async function remove(record: HealthArchive) {
 }
 
 fetchData()
+searchElders('')
 </script>

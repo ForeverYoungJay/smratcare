@@ -68,8 +68,17 @@
 
     <a-modal v-model:open="editOpen" title="事故登记" @ok="submit" :confirm-loading="saving" width="640px">
       <a-form layout="vertical">
-        <a-form-item label="老人姓名" required>
-          <a-input v-model:value="form.elderName" placeholder="输入老人姓名" />
+        <a-form-item label="老人" required>
+          <a-select
+            v-model:value="form.elderId"
+            show-search
+            :filter-option="false"
+            :options="elderOptions"
+            placeholder="请输入姓名搜索"
+            @search="searchElders"
+            @focus="() => !elderOptions.length && searchElders('')"
+            @change="onElderChange"
+          />
         </a-form-item>
         <a-form-item label="报告人" required>
           <a-input v-model:value="form.reporterName" />
@@ -104,6 +113,7 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import { useElderOptions } from '../../composables/useElderOptions'
 import { getIncidentPage, createIncident, updateIncident, deleteIncident, closeIncident, exportIncidentPage } from '../../api/life'
 import type { IncidentLevel, IncidentReport, IncidentStatus, PageResult } from '../../types'
 
@@ -134,8 +144,10 @@ const columns = [
 
 const editOpen = ref(false)
 const saving = ref(false)
+const { elderOptions, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
 const form = reactive({
   id: undefined as number | undefined,
+  elderId: undefined as number | undefined,
   elderName: '',
   reporterName: '',
   incidentTime: dayjs(),
@@ -201,6 +213,7 @@ function onReset() {
 
 function openCreate() {
   form.id = undefined
+  form.elderId = undefined
   form.elderName = ''
   form.reporterName = ''
   form.incidentTime = dayjs()
@@ -214,7 +227,9 @@ function openCreate() {
 
 function openEdit(record: IncidentReport) {
   form.id = record.id
+  form.elderId = record.elderId
   form.elderName = record.elderName || ''
+  ensureSelectedElder(record.elderId, record.elderName)
   form.reporterName = record.reporterName
   form.incidentTime = dayjs(record.incidentTime)
   form.incidentType = record.incidentType
@@ -225,15 +240,20 @@ function openEdit(record: IncidentReport) {
   editOpen.value = true
 }
 
+function onElderChange(elderId?: number) {
+  form.elderName = findElderName(elderId)
+}
+
 async function submit() {
-  if (!form.elderName) {
-    message.error('请输入老人姓名')
+  if (!form.elderId) {
+    message.error('请选择老人')
     return
   }
   saving.value = true
   try {
     const payload = {
-      elderName: form.elderName,
+      elderId: form.elderId,
+      elderName: findElderName(form.elderId) || form.elderName,
       reporterName: form.reporterName,
       incidentTime: dayjs(form.incidentTime).format('YYYY-MM-DDTHH:mm:ss'),
       incidentType: form.incidentType,
@@ -278,4 +298,5 @@ async function exportRows() {
 }
 
 fetchData()
+searchElders('')
 </script>

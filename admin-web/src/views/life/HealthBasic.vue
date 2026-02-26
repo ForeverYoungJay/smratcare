@@ -29,8 +29,17 @@
 
     <a-modal v-model:open="editOpen" title="健康记录" @ok="submit" :confirm-loading="saving" width="640px">
       <a-form layout="vertical">
-        <a-form-item label="老人姓名" required>
-          <a-input v-model:value="form.elderName" />
+        <a-form-item label="老人" required>
+          <a-select
+            v-model:value="form.elderId"
+            show-search
+            :filter-option="false"
+            :options="elderOptions"
+            placeholder="请输入姓名搜索"
+            @search="searchElders"
+            @focus="() => !elderOptions.length && searchElders('')"
+            @change="onElderChange"
+          />
         </a-form-item>
         <a-form-item label="记录日期" required>
           <a-date-picker v-model:value="form.recordDate" style="width: 100%" />
@@ -77,6 +86,7 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import { useElderOptions } from '../../composables/useElderOptions'
 import { getHealthBasicPage, createHealthBasic, updateHealthBasic, deleteHealthBasic } from '../../api/life'
 import type { HealthBasicRecord, PageResult } from '../../types'
 
@@ -99,8 +109,10 @@ const columns = [
 
 const editOpen = ref(false)
 const saving = ref(false)
+const { elderOptions, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
 const form = reactive({
   id: undefined as number | undefined,
+  elderId: undefined as number | undefined,
   elderName: '',
   recordDate: dayjs(),
   heightCm: undefined as number | undefined,
@@ -143,6 +155,7 @@ function onReset() {
 
 function openCreate() {
   form.id = undefined
+  form.elderId = undefined
   form.elderName = ''
   form.recordDate = dayjs()
   form.heightCm = undefined
@@ -156,7 +169,9 @@ function openCreate() {
 
 function openEdit(record: HealthBasicRecord) {
   form.id = record.id
+  form.elderId = record.elderId
   form.elderName = record.elderName || ''
+  ensureSelectedElder(record.elderId, record.elderName)
   form.recordDate = dayjs(record.recordDate)
   form.heightCm = record.heightCm
   form.weightKg = record.weightKg
@@ -167,13 +182,18 @@ function openEdit(record: HealthBasicRecord) {
   editOpen.value = true
 }
 
+function onElderChange(elderId?: number) {
+  form.elderName = findElderName(elderId)
+}
+
 async function submit() {
-  if (!form.elderName) {
-    message.error('请输入老人姓名')
+  if (!form.elderId) {
+    message.error('请选择老人')
     return
   }
   const payload = {
-    elderName: form.elderName,
+    elderId: form.elderId,
+    elderName: findElderName(form.elderId) || form.elderName,
     recordDate: dayjs(form.recordDate).format('YYYY-MM-DD'),
     heightCm: form.heightCm,
     weightKg: form.weightKg,
@@ -202,4 +222,5 @@ async function remove(record: HealthBasicRecord) {
 }
 
 fetchData()
+searchElders('')
 </script>

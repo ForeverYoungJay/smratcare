@@ -29,7 +29,7 @@
     <a-modal v-model:open="createOpen" title="新建入住费用审核" :confirm-loading="creating" @ok="submitCreate">
       <a-form layout="vertical">
         <a-form-item label="老人" required>
-          <a-select v-model:value="createForm.elderId" show-search :filter-option="false" :options="elderOptions" @search="searchElders" />
+          <a-select v-model:value="createForm.elderId" show-search :filter-option="false" :options="elderOptions" @search="searchElders" @focus="() => !elderOptions.length && searchElders('')" />
         </a-form-item>
         <a-form-item label="入院记录ID">
           <a-input-number v-model:value="createForm.admissionId" :min="1" style="width: 100%" />
@@ -54,7 +54,7 @@ import { Input, message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
-import { getElderPage } from '../../api/elder'
+import { useElderOptions } from '../../composables/useElderOptions'
 import { createAdmissionFeeAudit, getAdmissionFeeAuditPage, reviewAdmissionFeeAudit } from '../../api/financeFee'
 import type { AdmissionFeeAuditItem, PageResult } from '../../types'
 
@@ -79,7 +79,7 @@ const columns = [
 
 const createOpen = ref(false)
 const creating = ref(false)
-const elderOptions = ref<{ label: string; value: number }[]>([])
+const { elderOptions, searchElders: searchElderOptions } = useElderOptions({ pageSize: 20 })
 const createForm = reactive({
   elderId: undefined as number | undefined,
   admissionId: undefined as number | undefined,
@@ -130,12 +130,7 @@ function openCreate() {
 }
 
 async function searchElders(keyword: string) {
-  if (!keyword) {
-    elderOptions.value = []
-    return
-  }
-  const res = await getElderPage({ pageNo: 1, pageSize: 20, keyword })
-  elderOptions.value = res.list.map((item: any) => ({ label: item.fullName || item.name || '未知老人', value: item.id }))
+  await searchElderOptions(keyword)
 }
 
 async function submitCreate() {

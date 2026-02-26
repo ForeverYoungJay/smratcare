@@ -126,11 +126,11 @@ import { computed, reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import type { FormInstance } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
-import { getElderPage } from '../../api/elder'
+import { useElderOptions } from '../../composables/useElderOptions'
 import { getStaffPage } from '../../api/rbac'
 import { listServiceItems } from '../../api/standard'
 import { createServicePlan, deleteServicePlan, getCareLevelList, getServicePlanPage, updateServicePlan } from '../../api/nursing'
-import type { CareLevelItem, ElderItem, PageResult, ServiceItem, ServicePlanItem, StaffItem } from '../../types'
+import type { CareLevelItem, PageResult, ServiceItem, ServicePlanItem, StaffItem } from '../../types'
 
 const rows = ref<ServicePlanItem[]>([])
 const loading = ref(false)
@@ -138,7 +138,7 @@ const modalOpen = ref(false)
 const submitting = ref(false)
 const formRef = ref<FormInstance>()
 
-const elderOptions = ref<Array<{ label: string; value: number }>>([])
+const { elderOptions, searchElders, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
 const staffOptions = ref<Array<{ label: string; value: number }>>([])
 const careLevelOptions = ref<Array<{ label: string; value: number }>>([])
 const serviceItemOptions = ref<Array<{ label: string; value: number }>>([])
@@ -223,6 +223,7 @@ function openModal(record?: ServicePlanItem) {
   resetForm()
   if (record) {
     Object.assign(form, record)
+    ensureSelectedElder(record.elderId, record.elderName)
   }
   modalOpen.value = true
 }
@@ -287,8 +288,7 @@ function reset() {
 }
 
 async function searchElder(keyword: string) {
-  const res: PageResult<ElderItem> = await getElderPage({ pageNo: 1, pageSize: 50, keyword })
-  elderOptions.value = res.list.map((item) => ({ label: item.fullName || String(item.id), value: item.id }))
+  await searchElders(keyword)
 }
 
 async function searchStaff(keyword: string) {
@@ -303,7 +303,7 @@ async function loadBaseOptions() {
   ])
   careLevelOptions.value = careLevels.map((item) => ({ label: `${item.levelCode} - ${item.levelName}`, value: item.id }))
   serviceItemOptions.value = serviceItems.map((item) => ({ label: item.name, value: item.id }))
-  await Promise.all([searchElder(''), searchStaff('')])
+  await Promise.all([searchElders(''), searchStaff('')])
 }
 
 async function load() {

@@ -8,7 +8,7 @@
         <a-date-picker v-model:value="query.to" />
       </a-form-item>
       <a-form-item label="类别">
-        <a-input v-model:value="query.category" placeholder="如 餐饮/医护/商城" allow-clear />
+        <a-select v-model:value="query.category" :options="categoryOptions" style="width: 180px" allow-clear />
       </a-form-item>
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="老人/类别/备注" allow-clear />
@@ -23,7 +23,7 @@
     <a-modal v-model:open="createOpen" title="新增消费登记" :confirm-loading="creating" @ok="submitCreate">
       <a-form layout="vertical">
         <a-form-item label="老人" required>
-          <a-select v-model:value="createForm.elderId" show-search :filter-option="false" :options="elderOptions" @search="searchElders" />
+          <a-select v-model:value="createForm.elderId" show-search :filter-option="false" :options="elderOptions" @search="searchElders" @focus="() => !elderOptions.length && searchElders('')" />
         </a-form-item>
         <a-form-item label="消费日期" required>
           <a-date-picker v-model:value="createForm.consumeDate" style="width: 100%" />
@@ -32,7 +32,7 @@
           <a-input-number v-model:value="createForm.amount" :min="0.01" :precision="2" style="width: 100%" />
         </a-form-item>
         <a-form-item label="类别">
-          <a-input v-model:value="createForm.category" />
+          <a-select v-model:value="createForm.category" :options="categoryOptions" allow-clear />
         </a-form-item>
         <a-form-item label="来源类型">
           <a-select v-model:value="createForm.sourceType" allow-clear :options="sourceTypeOptions" />
@@ -52,7 +52,7 @@ import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
-import { getElderPage } from '../../api/elder'
+import { useElderOptions } from '../../composables/useElderOptions'
 import { createConsumption, getConsumptionPage } from '../../api/financeFee'
 import type { ConsumptionRecordItem, PageResult } from '../../types'
 
@@ -73,11 +73,19 @@ const columns = [
 
 const createOpen = ref(false)
 const creating = ref(false)
-const elderOptions = ref<{ label: string; value: number }[]>([])
+const { elderOptions, searchElders: searchElderOptions } = useElderOptions({ pageSize: 20 })
 const sourceTypeOptions = [
   { label: '手工', value: 'MANUAL' },
   { label: '商城', value: 'STORE' },
   { label: '医护', value: 'MEDICAL' }
+]
+const categoryOptions = [
+  { label: '餐饮消费', value: 'DINING' },
+  { label: '床位消费', value: 'BED' },
+  { label: '护理消费', value: 'NURSING' },
+  { label: '押金消费', value: 'DEPOSIT' },
+  { label: '药品消费', value: 'MEDICINE' },
+  { label: '其他消费', value: 'OTHER' }
 ]
 const createForm = reactive({
   elderId: undefined as number | undefined,
@@ -132,19 +140,14 @@ function openCreate() {
   createForm.elderId = undefined
   createForm.consumeDate = dayjs()
   createForm.amount = 0
-  createForm.category = ''
+  createForm.category = 'OTHER'
   createForm.sourceType = 'MANUAL'
   createForm.remark = ''
   createOpen.value = true
 }
 
 async function searchElders(keyword: string) {
-  if (!keyword) {
-    elderOptions.value = []
-    return
-  }
-  const res = await getElderPage({ pageNo: 1, pageSize: 20, keyword })
-  elderOptions.value = res.list.map((item: any) => ({ label: item.fullName || item.name || '未知老人', value: item.id }))
+  await searchElderOptions(keyword)
 }
 
 async function submitCreate() {

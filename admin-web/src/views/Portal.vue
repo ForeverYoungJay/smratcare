@@ -4,6 +4,18 @@
       <div>
         <div class="hero-title">智慧养老 OA 工作台</div>
         <div class="hero-subtitle">提醒中心、协同任务、行政审批、经营看板统一入口</div>
+        <div class="hero-search">
+          <a-auto-complete
+            v-model:value="searchKeyword"
+            :options="searchOptions"
+            style="width: 420px"
+            placeholder="一键搜索页面（如：请假审批、退住结算、消防月报）"
+            @search="onSearchChange"
+            @select="onSearchSelect"
+          >
+            <a-input-search enter-button="搜索" @search="submitSearch" />
+          </a-auto-complete>
+        </div>
       </div>
       <div class="hero-meta">
         <div class="meta-item">
@@ -94,11 +106,21 @@
     </a-row>
 
     <a-row :gutter="[16, 16]">
+      <a-col :xs="24">
+        <a-card title="行政日历" :bordered="false" class="card-elevated">
+          <a-spin :spinning="calendarLoading">
+            <FullCalendar :options="calendarOptions" />
+          </a-spin>
+        </a-card>
+      </a-col>
+    </a-row>
+
+    <a-row :gutter="[16, 16]">
       <a-col :xs="24" :lg="8">
         <a-card title="行政日程" :bordered="false" class="card-elevated module-card">
           <div class="module-main">{{ summary.todayScheduleCount || 0 }}</div>
           <div class="module-sub">今日行政日历事项（含节日/生日提醒）</div>
-          <a-button type="link" @click="go('/oa/work-execution/calendar')">进入行政日历</a-button>
+          <a-tag color="blue">已在首页展示</a-tag>
         </a-card>
       </a-col>
       <a-col :xs="24" :lg="8">
@@ -168,14 +190,19 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
+import FullCalendar from '@fullcalendar/vue3'
+import dayGridPlugin from '@fullcalendar/daygrid'
+import interactionPlugin from '@fullcalendar/interaction'
 import { useUserStore } from '../stores/user'
-import { getPortalSummary } from '../api/oa'
+import { getOaTaskCalendar, getPortalSummary } from '../api/oa'
 import { useLiveSyncRefresh } from '../composables/useLiveSyncRefresh'
-import type { OaPortalSummary } from '../types'
+import type { OaPortalSummary, OaTask } from '../types'
 
 const router = useRouter()
 const userStore = useUserStore()
 const refreshedAt = ref('')
+const calendarLoading = ref(false)
+const calendarRows = ref<OaTask[]>([])
 
 const summary = reactive<OaPortalSummary>({
   notices: [],
@@ -191,10 +218,28 @@ const quickLaunches = [
   { label: '请假', route: '/oa/approval?type=LEAVE&quick=1' },
   { label: '加班', route: '/oa/approval?type=OVERTIME&quick=1' },
   { label: '报销', route: '/oa/approval?type=REIMBURSE&quick=1' },
-  { label: '采购', route: '/material/purchase?quick=1' },
+  { label: '采购', route: '/oa/approval?type=PURCHASE&quick=1' },
   { label: '用章', route: '/oa/approval?type=OFFICIAL_SEAL&quick=1' },
   { label: '收入证明', route: '/oa/approval?type=INCOME_PROOF&quick=1' },
-  { label: '物资申领', route: '/oa/approval?type=MATERIAL_APPLY&quick=1' }
+  { label: '物资申请', route: '/oa/approval?type=MATERIAL_APPLY&quick=1' }
+]
+
+const searchKeyword = ref('')
+const searchOptions = ref<{ value: string; label: string; route: string }[]>([])
+const searchRouteMap = [
+  { label: '签到签退', route: '/oa/attendance-leave?action=clock' },
+  { label: '请假审批', route: '/oa/approval?type=LEAVE&quick=1' },
+  { label: '加班审批', route: '/oa/approval?type=OVERTIME&quick=1' },
+  { label: '报销审批', route: '/oa/approval?type=REIMBURSE&quick=1' },
+  { label: '采购审批', route: '/oa/approval?type=PURCHASE&quick=1' },
+  { label: '收入证明审批', route: '/oa/approval?type=INCOME_PROOF&quick=1' },
+  { label: '物资申请审批', route: '/oa/approval?type=MATERIAL_APPLY&quick=1' },
+  { label: '退住结算', route: '/finance/discharge-settlement' },
+  { label: '在住账单缴费', route: '/finance/resident-bill-payment' },
+  { label: '健康服务与医护账户一体化', route: '/medical-care/integrated-account' },
+  { label: '消防报表统计', route: '/fire/data-stats' },
+  { label: '消防日间巡查', route: '/fire/day-patrol' },
+  { label: 'Resident 360', route: '/elder/resident-360' }
 ]
 
 const topStats = computed(() => [
@@ -269,8 +314,70 @@ const abnormalItems = computed(() => [
   }
 ])
 
+const calendarOptions = computed(() => ({
+  plugins: [dayGridPlugin, interactionPlugin],
+  initialView: 'dayGridMonth',
+  locale: 'zh-cn',
+  height: 'auto',
+  headerToolbar: {
+    left: 'prev,next today',
+    center: 'title',
+    right: 'dayGridMonth,dayGridWeek'
+  },
+  buttonText: {
+    today: '今天',
+    month: '月视图',
+    week: '周视图'
+  },
+  events: calendarRows.value.map((task) => ({
+    id: String(task.id),
+    title: `${task.title}${task.assigneeName ? `（${task.assigneeName}）` : ''}`,
+    start: task.startTime || task.endTime,
+    end: task.endTime || task.startTime,
+    color: task.status === 'DONE' ? '#52c41a' : '#1677ff'
+  }))
+}))
+
 function go(path: string) {
   router.push(path)
+}
+
+function onSearchChange(keyword: string) {
+  const text = String(keyword || '').trim()
+  if (!text) {
+    searchOptions.value = searchRouteMap.slice(0, 8).map((item) => ({
+      value: item.label,
+      label: `${item.label} - ${item.route}`,
+      route: item.route
+    }))
+    return
+  }
+  const lower = text.toLowerCase()
+  searchOptions.value = searchRouteMap
+    .filter((item) => item.label.includes(text) || item.route.toLowerCase().includes(lower))
+    .slice(0, 12)
+    .map((item) => ({
+      value: item.label,
+      label: `${item.label} - ${item.route}`,
+      route: item.route
+    }))
+}
+
+function onSearchSelect(_value: string, option: any) {
+  if (option?.route) {
+    go(option.route)
+  }
+}
+
+function submitSearch(value: string) {
+  const text = String(value || searchKeyword.value || '').trim()
+  if (!text) return
+  const match = searchRouteMap.find((item) => item.label.includes(text) || item.route.includes(text))
+  if (match) {
+    go(match.route)
+    return
+  }
+  message.warning('未匹配到页面，请换个关键词')
 }
 
 function formatTime(value?: string) {
@@ -283,17 +390,30 @@ async function loadSummary() {
   refreshedAt.value = dayjs().format('YYYY-MM-DD HH:mm:ss')
 }
 
+async function loadCalendar() {
+  calendarLoading.value = true
+  try {
+    calendarRows.value = await getOaTaskCalendar({
+      startDate: dayjs().startOf('month').format('YYYY-MM-DD'),
+      endDate: dayjs().endOf('month').format('YYYY-MM-DD')
+    })
+  } finally {
+    calendarLoading.value = false
+  }
+}
+
 useLiveSyncRefresh({
   topics: ['elder', 'bed', 'lifecycle', 'finance', 'care', 'health', 'dining', 'marketing', 'oa'],
   refresh: () => {
     loadSummary()
+    loadCalendar()
   },
   debounceMs: 800
 })
 
 async function init() {
   try {
-    await loadSummary()
+    await Promise.all([loadSummary(), loadCalendar()])
   } catch (error: any) {
     message.error(error?.message || '加载首页失败')
   }
@@ -325,6 +445,10 @@ onMounted(init)
   margin-top: 6px;
   color: var(--muted);
   font-size: 13px;
+}
+
+.hero-search {
+  margin-top: 12px;
 }
 
 .hero-meta {
@@ -458,6 +582,11 @@ onMounted(init)
   .hero-meta {
     width: 100%;
     justify-content: space-between;
+  }
+
+  .hero-search :deep(.ant-select),
+  .hero-search :deep(.ant-input-search) {
+    width: 100% !important;
   }
 }
 </style>

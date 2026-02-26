@@ -101,8 +101,8 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import { useElderOptions } from '../../composables/useElderOptions'
 import { getElderAccountPage, adjustElderAccount, getElderAccountWarnings, updateElderAccount } from '../../api/finance'
-import { getElderPage } from '../../api/elder'
 import type { ElderAccount, PageResult } from '../../types'
 import router from '../../router'
 
@@ -155,7 +155,7 @@ const adjustForm = reactive({
   amount: 0,
   remark: ''
 })
-const elderOptions = ref<{ label: string; value: number }[]>([])
+const { elderOptions, searchElders: searchElderOptions, findElderName } = useElderOptions({ pageSize: 20 })
 const directionOptions = [
   { label: '充值', value: 'CREDIT' },
   { label: '扣费', value: 'DEBIT' }
@@ -200,6 +200,7 @@ function openAdjust() {
   adjustForm.direction = 'CREDIT'
   adjustForm.amount = 0
   adjustForm.remark = ''
+  searchElderOptions('')
   adjustOpen.value = true
 }
 
@@ -214,10 +215,9 @@ async function submitAdjust() {
   }
   adjusting.value = true
   try {
-    const selected = elderOptions.value.find((opt) => opt.value === adjustForm.elderId)
     await adjustElderAccount({
       elderId: adjustForm.elderId,
-      elderName: selected?.label,
+      elderName: findElderName(adjustForm.elderId),
       amount: adjustForm.amount,
       direction: adjustForm.direction as 'DEBIT' | 'CREDIT',
       remark: adjustForm.remark
@@ -273,15 +273,7 @@ async function openWarnings() {
 }
 
 async function searchElders(keyword: string) {
-  if (!keyword) {
-    elderOptions.value = []
-    return
-  }
-  const res = await getElderPage({ pageNo: 1, pageSize: 20, keyword })
-  elderOptions.value = res.list.map((item: any) => ({
-    label: item.fullName || item.elderName || item.name || '未知老人',
-    value: item.id
-  }))
+  await searchElderOptions(keyword)
 }
 
 fetchData()

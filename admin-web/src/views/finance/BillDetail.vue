@@ -117,7 +117,10 @@
           <a-select v-model:value="payForm.method">
             <a-select-option value="CASH">现金</a-select-option>
             <a-select-option value="BANK">转账</a-select-option>
+            <a-select-option value="ALIPAY">支付宝</a-select-option>
+            <a-select-option value="WECHAT">微信</a-select-option>
             <a-select-option value="WECHAT_OFFLINE">微信线下</a-select-option>
+            <a-select-option value="QR_CODE">扫码</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="收款时间" name="paidAt">

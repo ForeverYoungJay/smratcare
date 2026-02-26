@@ -243,6 +243,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
+import { useElderOptions } from '../../composables/useElderOptions'
 import {
   getAssessmentRecordPage,
   createAssessmentRecord,
@@ -253,8 +254,7 @@ import {
   getAssessmentTemplateList,
   previewAssessmentScore
 } from '../../api/assessment'
-import { getElderPage } from '../../api/elder'
-import type { AssessmentRecord, AssessmentType, AssessmentScaleTemplate, ElderItem, PageResult } from '../../types'
+import type { AssessmentRecord, AssessmentType, AssessmentScaleTemplate, PageResult } from '../../types'
 
 const props = defineProps<{
   title: string
@@ -266,7 +266,12 @@ const loading = ref(false)
 const rows = ref<AssessmentRecord[]>([])
 const total = ref(0)
 const templates = ref<AssessmentScaleTemplate[]>([])
-const elderOptions = ref<Array<{ label: string; value: number }>>([])
+const {
+  elderOptions,
+  searchElders: loadElderOptions,
+  findElderName,
+  ensureSelectedElder
+} = useElderOptions({ pageSize: 30 })
 
 type ActionType = 'assign' | 'edit' | 'view' | 'delete'
 
@@ -630,25 +635,12 @@ function onPageSizeChange(current: number, size: number) {
   fetchData()
 }
 
-async function loadElderOptions(keyword?: string) {
-  const res: PageResult<ElderItem> = await getElderPage({
-    pageNo: 1,
-    pageSize: 30,
-    keyword
-  })
-  elderOptions.value = res.list.map((item) => ({
-    value: item.id,
-    label: `${item.fullName}${item.elderCode ? `（${item.elderCode}）` : ''}`
-  }))
-}
-
 async function searchElderOptions(keyword: string) {
   await loadElderOptions(keyword)
 }
 
 function onElderChange(elderId?: number) {
-  const selected = elderOptions.value.find((item) => item.value === elderId)
-  form.elderName = selected ? selected.label.replace(/（.*?）$/, '') : ''
+  form.elderName = findElderName(elderId)
 }
 
 function assignRecord(record: AssessmentRecord) {
@@ -661,12 +653,7 @@ function openForm(record?: AssessmentRecord, readonly = false) {
   if (record) {
     Object.assign(form, record)
     form.scoreAuto = record.scoreAuto === 0 ? 0 : 1
-    if (record.elderId && record.elderName && !elderOptions.value.some((item) => item.value === record.elderId)) {
-      elderOptions.value.unshift({
-        value: record.elderId,
-        label: record.elderName
-      })
-    }
+    ensureSelectedElder(record.elderId, record.elderName)
     scoreAutoChecked.value = record.scoreAuto !== 0
   } else {
     Object.assign(form, {
@@ -738,12 +725,11 @@ async function submit() {
   await formRef.value?.validate()
   submitting.value = true
   try {
-    const selected = elderOptions.value.find((item) => item.value === form.elderId)
     const payload = {
       elderId: form.elderId,
       assessmentType: props.assessmentType,
       templateId: form.templateId,
-      elderName: selected ? selected.label.replace(/（.*?）$/, '') : form.elderName,
+      elderName: findElderName(form.elderId) || form.elderName,
       levelCode: form.levelCode,
       score: form.score,
       assessmentDate: form.assessmentDate,

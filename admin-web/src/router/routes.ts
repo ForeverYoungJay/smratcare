@@ -711,13 +711,13 @@ export const routes: RouteRecordRaw[] = [
             path: 'account',
             name: 'FinanceAccount',
             component: () => import('../views/finance/Account.vue'),
-            meta: { title: '老人账户', hidden: true }
+            meta: { title: '老人账户' }
           },
           {
             path: 'account-log',
             name: 'FinanceAccountLog',
             component: () => import('../views/finance/AccountLog.vue'),
-            meta: { title: '账户流水', hidden: true }
+            meta: { title: '账户流水' }
           },
           {
             path: 'bill',
@@ -1425,37 +1425,37 @@ export const routes: RouteRecordRaw[] = [
             path: 'portal',
             name: 'OaPortal',
             component: () => import('../views/oa/Portal.vue'),
-            meta: { title: '门户与待办', hidden: true }
+            meta: { title: '门户与待办' }
           },
           {
             path: 'todo',
             name: 'OaTodo',
             component: () => import('../views/oa/Todo.vue'),
-            meta: { title: '待办事项', hidden: true }
+            meta: { title: '待办事项' }
           },
           {
             path: 'approval',
             name: 'OaApproval',
             component: () => import('../views/oa/Approval.vue'),
-            meta: { title: '固定审批', hidden: true }
+            meta: { title: '固定审批' }
           },
           {
             path: 'attendance-leave',
             name: 'OaAttendanceLeave',
             component: () => import('../views/oa/AttendanceLeave.vue'),
-            meta: { title: '考勤与请假', hidden: true }
+            meta: { title: '考勤与请假' }
           },
           {
             path: 'document',
             name: 'OaDocument',
             component: () => import('../views/oa/Document.vue'),
-            meta: { title: '文档管理', hidden: true }
+            meta: { title: '文档管理' }
           },
           {
             path: 'work-report',
             name: 'OaWorkReport',
             component: () => import('../views/oa/WorkReport.vue'),
-            meta: { title: '工作总结', hidden: true }
+            meta: { title: '工作总结' }
           }
         ]
       },

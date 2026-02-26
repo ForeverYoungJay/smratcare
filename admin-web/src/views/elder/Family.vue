@@ -96,9 +96,10 @@ import { onMounted, reactive, ref } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
+import { useElderOptions } from '../../composables/useElderOptions'
 import { getFamilyUserPage } from '../../api/family'
-import { bindFamily, getElderPage } from '../../api/elder'
-import type { FamilyBindRequest, FamilyUserItem, PageResult, ElderItem } from '../../types/api'
+import { bindFamily } from '../../api/elder'
+import type { FamilyBindRequest, FamilyUserItem, PageResult } from '../../types/api'
 
 const loading = ref(false)
 const rows = ref<FamilyUserItem[]>([])
@@ -131,7 +132,7 @@ const bindRules: FormRules = {
   elderId: [{ required: true, message: '请选择老人' }],
   relation: [{ required: true, message: '请输入关系' }]
 }
-const elderOptions = ref<Array<{ label: string; value: number }>>([])
+const { elderOptions, searchElders: searchElderOptions } = useElderOptions({ pageSize: 200 })
 
 async function fetchData() {
   loading.value = true
@@ -156,13 +157,8 @@ async function fetchData() {
   }
 }
 
-async function loadElders(keyword?: string) {
-  const res: PageResult<ElderItem> = await getElderPage({ pageNo: 1, pageSize: 200, keyword })
-  elderOptions.value = res.list.map((item) => ({ label: item.fullName, value: item.id }))
-}
-
 async function searchElders(val: string) {
-  await loadElders(val)
+  await searchElderOptions(val)
 }
 
 function reset() {
@@ -215,7 +211,7 @@ async function submitBind() {
 }
 
 onMounted(async () => {
-  await loadElders()
+  await searchElderOptions('')
   await fetchData()
 })
 </script>

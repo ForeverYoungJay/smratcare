@@ -74,7 +74,20 @@
     <a-modal v-model:open="editOpen" title="用药登记" @ok="submit" :confirm-loading="saving" width="680px">
       <a-form layout="vertical">
         <a-row :gutter="16">
-          <a-col :span="12"><a-form-item label="老人姓名" required><a-input v-model:value="form.elderName" /></a-form-item></a-col>
+          <a-col :span="12">
+            <a-form-item label="老人" required>
+              <a-select
+                v-model:value="form.elderId"
+                show-search
+                :filter-option="false"
+                :options="elderOptions"
+                placeholder="请输入姓名搜索"
+                @search="searchElders"
+                @focus="() => !elderOptions.length && searchElders('')"
+                @change="onElderChange"
+              />
+            </a-form-item>
+          </a-col>
           <a-col :span="12"><a-form-item label="药品名称" required><a-input v-model:value="form.drugName" /></a-form-item></a-col>
         </a-row>
         <a-row :gutter="16">
@@ -98,6 +111,7 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import { useElderOptions } from '../../composables/useElderOptions'
 import { mapHealthExportRows, medicationRegistrationExportColumns } from '../../constants/healthExport'
 import { exportCsv, exportExcel } from '../../utils/export'
 import {
@@ -143,8 +157,10 @@ const columns = [
 
 const editOpen = ref(false)
 const saving = ref(false)
+const { elderOptions, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
 const form = reactive({
   id: undefined as number | undefined,
+  elderId: undefined as number | undefined,
   elderName: '',
   drugName: '',
   registerTime: dayjs(),
@@ -196,6 +212,7 @@ function onReset() {
 
 function openCreate() {
   form.id = undefined
+  form.elderId = undefined
   form.elderName = ''
   form.drugName = ''
   form.registerTime = dayjs()
@@ -208,7 +225,9 @@ function openCreate() {
 
 function openEdit(record: HealthMedicationRegistration) {
   form.id = record.id
+  form.elderId = record.elderId
   form.elderName = record.elderName || ''
+  ensureSelectedElder(record.elderId, record.elderName)
   form.drugName = record.drugName
   form.registerTime = record.registerTime ? dayjs(record.registerTime) : dayjs()
   form.dosageTaken = record.dosageTaken
@@ -218,8 +237,12 @@ function openEdit(record: HealthMedicationRegistration) {
   editOpen.value = true
 }
 
+function onElderChange(elderId?: number) {
+  form.elderName = findElderName(elderId)
+}
+
 async function submit() {
-  if (!form.elderName || !form.drugName) {
+  if (!form.elderId || !form.drugName) {
     message.error('请填写老人和药品')
     return
   }
@@ -234,7 +257,8 @@ async function submit() {
   saving.value = true
   try {
     const payload = {
-      elderName: form.elderName,
+      elderId: form.elderId,
+      elderName: findElderName(form.elderId) || form.elderName,
       drugName: form.drugName,
       registerTime: dayjs(form.registerTime).format('YYYY-MM-DD HH:mm:ss'),
       dosageTaken: form.dosageTaken,
@@ -339,6 +363,7 @@ async function loadExportRecords() {
 }
 
 fetchData()
+searchElders('')
 </script>
 
 <style scoped>

@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="审批流程" subTitle="请假/报销/采购固定审批">
+  <PageContainer title="审批流程" subTitle="请假/加班/报销/采购/收入证明/物资申请/用章审批">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="标题/申请人/备注" allow-clear style="width: 240px" />

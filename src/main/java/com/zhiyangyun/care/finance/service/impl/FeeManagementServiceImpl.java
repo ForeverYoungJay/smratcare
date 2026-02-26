@@ -250,6 +250,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     DischargeSettlement settlement = new DischargeSettlement();
     settlement.setTenantId(orgId);
     settlement.setOrgId(orgId);
+    settlement.setDetailNo(generateDetailNo(elder.getId()));
     settlement.setElderId(elder.getId());
     settlement.setElderName(elder.getFullName());
     settlement.setDischargeApplyId(request.getDischargeApplyId());
@@ -260,6 +261,9 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     settlement.setRefundAmount(amounts.refundAmount());
     settlement.setSupplementAmount(amounts.supplementAmount());
     settlement.setStatus(FeeWorkflowConstants.SETTLEMENT_PENDING_CONFIRM);
+    settlement.setFrontdeskApproved(0);
+    settlement.setNursingApproved(0);
+    settlement.setFinanceRefunded(0);
     settlement.setRemark(normalizeOptionalText(request.getRemark()));
     settlement.setCreatedBy(operatorId);
     dischargeSettlementMapper.insert(settlement);
@@ -283,15 +287,52 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     if (FeeWorkflowConstants.SETTLEMENT_SETTLED.equals(current.getStatus())) {
       return current;
     }
-    if (!FeeWorkflowConstants.SETTLEMENT_PENDING_CONFIRM.equals(current.getStatus())) {
-      throw new IllegalStateException("当前状态不允许确认结算");
+
+    String action = request == null || !hasText(request.getAction())
+        ? "FINANCE_REFUND"
+        : request.getAction().trim().toUpperCase(Locale.ROOT);
+    String signerName = request == null ? null : normalizeOptionalText(request.getSignerName());
+    String remark = request == null ? null : normalizeOptionalText(request.getRemark());
+
+    if ("FRONTDESK_APPROVE".equals(action)) {
+      current.setFrontdeskApproved(1);
+      current.setFrontdeskSignerName(hasText(signerName) ? signerName : "前台");
+      current.setFrontdeskSignedTime(LocalDateTime.now());
+      current.setStatus(FeeWorkflowConstants.SETTLEMENT_PROCESSING);
+      if (hasText(remark)) {
+        current.setRemark(remark);
+      }
+      dischargeSettlementMapper.updateById(current);
+      return current;
+    }
+
+    if ("NURSING_APPROVE".equals(action)) {
+      current.setNursingApproved(1);
+      current.setNursingSignerName(hasText(signerName) ? signerName : "护理部");
+      current.setNursingSignedTime(LocalDateTime.now());
+      current.setStatus(FeeWorkflowConstants.SETTLEMENT_PROCESSING);
+      if (hasText(remark)) {
+        current.setRemark(remark);
+      }
+      dischargeSettlementMapper.updateById(current);
+      return current;
+    }
+
+    if (!"FINANCE_REFUND".equals(action)) {
+      throw new IllegalArgumentException("action 仅支持 FRONTDESK_APPROVE/NURSING_APPROVE/FINANCE_REFUND");
+    }
+
+    if (!Integer.valueOf(1).equals(current.getFrontdeskApproved())
+        || !Integer.valueOf(1).equals(current.getNursingApproved())) {
+      throw new IllegalStateException("需前台与护理部审核签字后，方可财务退款");
     }
 
     int claimed = dischargeSettlementMapper.update(
         null,
         Wrappers.lambdaUpdate(DischargeSettlement.class)
             .eq(DischargeSettlement::getId, id)
-            .eq(DischargeSettlement::getStatus, FeeWorkflowConstants.SETTLEMENT_PENDING_CONFIRM)
+            .in(DischargeSettlement::getStatus, FeeWorkflowConstants.SETTLEMENT_PENDING_CONFIRM,
+                FeeWorkflowConstants.SETTLEMENT_PROCESSING)
             .set(DischargeSettlement::getStatus, FeeWorkflowConstants.SETTLEMENT_PROCESSING));
     if (claimed != 1) {
       DischargeSettlement latest = dischargeSettlementMapper.selectById(id);
@@ -329,10 +370,13 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     current.setRefundAmount(amounts.refundAmount());
     current.setSupplementAmount(amounts.supplementAmount());
     current.setStatus(FeeWorkflowConstants.SETTLEMENT_SETTLED);
+    current.setFinanceRefunded(1);
+    current.setFinanceRefundOperatorName(hasText(signerName) ? signerName : "财务");
+    current.setFinanceRefundTime(LocalDateTime.now());
     current.setSettledBy(operatorId);
     current.setSettledTime(LocalDateTime.now());
-    if (request != null && hasText(request.getRemark())) {
-      current.setRemark(normalizeOptionalText(request.getRemark()));
+    if (hasText(remark)) {
+      current.setRemark(remark);
     }
     dischargeSettlementMapper.updateById(current);
     return current;
@@ -346,7 +390,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     if (fromDate != null && toDate != null && fromDate.isAfter(toDate)) {
       throw new IllegalArgumentException("开始日期不能晚于结束日期");
     }
-    String normalizedCategory = normalizeOptionalText(category);
+    String normalizedCategory = normalizeConsumptionCategory(category);
     String normalizedKeyword = normalizeOptionalText(keyword);
     var wrapper = Wrappers.lambdaQuery(ConsumptionRecord.class)
         .eq(ConsumptionRecord::getIsDeleted, 0)
@@ -385,7 +429,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     record.setElderName(elder.getFullName());
     record.setConsumeDate(request.getConsumeDate());
     record.setAmount(request.getAmount());
-    record.setCategory(normalizeOptionalText(request.getCategory()));
+    record.setCategory(normalizeConsumptionCategory(request.getCategory()));
     record.setSourceType(normalizeOptionalText(request.getSourceType()));
     record.setSourceId(request.getSourceId());
     record.setRemark(normalizeOptionalText(request.getRemark()));
@@ -561,6 +605,27 @@ public class FeeManagementServiceImpl implements FeeManagementService {
 
   private String normalizeStatus(String status) {
     return status == null ? null : status.trim().toUpperCase(Locale.ROOT);
+  }
+
+  private String generateDetailNo(Long elderId) {
+    long tail = elderId == null ? 0L : Math.abs(elderId % 1000);
+    return "DS" + System.currentTimeMillis() + String.format("%03d", tail);
+  }
+
+  private String normalizeConsumptionCategory(String category) {
+    if (!hasText(category)) {
+      return null;
+    }
+    String normalized = category.trim().toUpperCase(Locale.ROOT);
+    return switch (normalized) {
+      case "DINING", "餐饮", "餐饮消费" -> "DINING";
+      case "BED", "床位", "床位消费" -> "BED";
+      case "NURSING", "护理", "护理消费" -> "NURSING";
+      case "DEPOSIT", "押金", "押金消费" -> "DEPOSIT";
+      case "MEDICINE", "药品", "药品消费" -> "MEDICINE";
+      case "OTHER", "其他", "其他消费" -> "OTHER";
+      default -> normalized;
+    };
   }
 
   private String normalizeOptionalText(String value) {

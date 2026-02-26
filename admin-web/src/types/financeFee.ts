@@ -29,6 +29,7 @@ export interface DischargeFeeAuditItem {
 
 export interface DischargeSettlementItem {
   id: number
+  detailNo?: string
   elderId: number
   elderName?: string
   dischargeApplyId?: number
@@ -39,6 +40,15 @@ export interface DischargeSettlementItem {
   refundAmount: number
   supplementAmount: number
   status: string
+  frontdeskApproved?: number
+  frontdeskSignerName?: string
+  frontdeskSignedTime?: string
+  nursingApproved?: number
+  nursingSignerName?: string
+  nursingSignedTime?: string
+  financeRefunded?: number
+  financeRefundOperatorName?: string
+  financeRefundTime?: string
   remark?: string
   settledBy?: number
   settledTime?: string
@@ -101,6 +111,8 @@ export interface DischargeSettlementCreateRequest {
 }
 
 export interface DischargeSettlementConfirmRequest {
+  action?: 'FRONTDESK_APPROVE' | 'NURSING_APPROVE' | 'FINANCE_REFUND'
+  signerName?: string
   remark?: string
 }
 

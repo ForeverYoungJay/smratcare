@@ -71,7 +71,20 @@
     <a-modal v-model:open="editOpen" title="健康数据" @ok="submit" :confirm-loading="saving" width="680px">
       <a-form layout="vertical">
         <a-row :gutter="16">
-          <a-col :span="12"><a-form-item label="老人姓名" required><a-input v-model:value="form.elderName" /></a-form-item></a-col>
+          <a-col :span="12">
+            <a-form-item label="老人" required>
+              <a-select
+                v-model:value="form.elderId"
+                show-search
+                :filter-option="false"
+                :options="elderOptions"
+                placeholder="请输入姓名搜索"
+                @search="searchElders"
+                @focus="() => !elderOptions.length && searchElders('')"
+                @change="onElderChange"
+              />
+            </a-form-item>
+          </a-col>
           <a-col :span="12"><a-form-item label="数据类型" required><a-select v-model:value="form.dataType" :options="dataTypeOptions" /></a-form-item></a-col>
         </a-row>
         <a-row :gutter="16">
@@ -95,6 +108,7 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import { useElderOptions } from '../../composables/useElderOptions'
 import {
   getHealthDataRecordPage,
   getHealthDataSummary,
@@ -136,8 +150,10 @@ const columns = [
 
 const editOpen = ref(false)
 const saving = ref(false)
+const { elderOptions, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
 const form = reactive({
   id: undefined as number | undefined,
+  elderId: undefined as number | undefined,
   elderName: '',
   dataType: '',
   dataValue: '',
@@ -202,6 +218,7 @@ function onReset() {
 
 function openCreate() {
   form.id = undefined
+  form.elderId = undefined
   form.elderName = ''
   form.dataType = ''
   form.dataValue = ''
@@ -214,7 +231,9 @@ function openCreate() {
 
 function openEdit(record: HealthDataRecord) {
   form.id = record.id
+  form.elderId = record.elderId
   form.elderName = record.elderName || ''
+  ensureSelectedElder(record.elderId, record.elderName)
   form.dataType = record.dataType
   form.dataValue = record.dataValue
   form.measuredAt = record.measuredAt ? dayjs(record.measuredAt) : dayjs()
@@ -224,8 +243,12 @@ function openEdit(record: HealthDataRecord) {
   editOpen.value = true
 }
 
+function onElderChange(elderId?: number) {
+  form.elderName = findElderName(elderId)
+}
+
 async function submit() {
-  if (!form.elderName || !form.dataType || !form.dataValue) {
+  if (!form.elderId || !form.dataType || !form.dataValue) {
     message.error('请补全必填项')
     return
   }
@@ -239,7 +262,8 @@ async function submit() {
     const measuredAt = dayjs(form.measuredAt).format('YYYY-MM-DD HH:mm:ss')
     const recommendedAbnormal = recommendAbnormalFlag(form.dataType, form.dataValue)
     const payload = {
-      elderName: form.elderName,
+      elderId: form.elderId,
+      elderName: findElderName(form.elderId) || form.elderName,
       dataType: form.dataType,
       dataValue: form.dataValue,
       measuredAt,
@@ -327,6 +351,7 @@ function recommendAbnormalFlag(dataType: string, value: string) {
 }
 
 fetchData()
+searchElders('')
 </script>
 
 <style scoped>

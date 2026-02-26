@@ -1,8 +1,18 @@
 <template>
   <PageContainer title="护理记录" subTitle="服务预约、执行日志、结果留痕">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
-      <a-form-item label="老人ID">
-        <a-input-number v-model:value="query.elderId" :min="1" style="width: 140px" />
+      <a-form-item label="老人">
+        <a-select
+          v-model:value="query.elderId"
+          style="width: 220px"
+          allow-clear
+          show-search
+          placeholder="输入姓名搜索"
+          :filter-option="false"
+          :options="elderOptions"
+          @search="searchElders"
+          @focus="() => !elderOptions.length && searchElders('')"
+        />
       </a-form-item>
       <a-form-item label="员工ID">
         <a-input-number v-model:value="query.staffId" :min="1" style="width: 140px" />
@@ -35,16 +45,18 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import { useElderOptions } from '../../composables/useElderOptions'
 import { getNursingRecordPage } from '../../api/nursing'
 import type { NursingRecordItem, PageResult } from '../../types'
 
 const loading = ref(false)
 const rows = ref<NursingRecordItem[]>([])
+const { elderOptions, searchElders } = useElderOptions({ pageSize: 50 })
 const query = reactive({
   elderId: undefined as number | undefined,
   staffId: undefined as number | undefined,
@@ -104,5 +116,8 @@ function onReset() {
   fetchData()
 }
 
-fetchData()
+onMounted(async () => {
+  await searchElders('')
+  fetchData()
+})
 </script>

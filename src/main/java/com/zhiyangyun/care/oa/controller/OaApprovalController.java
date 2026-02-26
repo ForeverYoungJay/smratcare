@@ -285,8 +285,15 @@ public class OaApprovalController {
       return null;
     }
     String normalized = type.trim().toUpperCase();
-    if (!"LEAVE".equals(normalized) && !"REIMBURSE".equals(normalized) && !"PURCHASE".equals(normalized)) {
-      throw new IllegalArgumentException("approvalType 仅支持 LEAVE/REIMBURSE/PURCHASE");
+    if (!"LEAVE".equals(normalized)
+        && !"REIMBURSE".equals(normalized)
+        && !"PURCHASE".equals(normalized)
+        && !"OVERTIME".equals(normalized)
+        && !"INCOME_PROOF".equals(normalized)
+        && !"MATERIAL_APPLY".equals(normalized)
+        && !"OFFICIAL_SEAL".equals(normalized)) {
+      throw new IllegalArgumentException(
+          "approvalType 仅支持 LEAVE/OVERTIME/REIMBURSE/PURCHASE/INCOME_PROOF/MATERIAL_APPLY/OFFICIAL_SEAL");
     }
     return normalized;
   }
