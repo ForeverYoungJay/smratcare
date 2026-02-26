@@ -321,6 +321,7 @@ public class InventoryController {
       @RequestParam(required = false) Long productId,
       @RequestParam(required = false) Long warehouseId,
       @RequestParam(required = false) String category,
+      @RequestParam(required = false) String inventoryType,
       @RequestParam(required = false) String adjustType,
       @RequestParam(required = false) String dateFrom,
       @RequestParam(required = false) String dateTo) {
@@ -329,6 +330,7 @@ public class InventoryController {
     wrapper.eq(orgId != null, InventoryAdjustment::getOrgId, orgId)
         .eq(InventoryAdjustment::getIsDeleted, 0)
         .eq(productId != null, InventoryAdjustment::getProductId, productId)
+        .eq(inventoryType != null && !inventoryType.isBlank(), InventoryAdjustment::getInventoryType, inventoryType)
         .eq(adjustType != null && !adjustType.isBlank(), InventoryAdjustment::getAdjustType, adjustType);
     if (dateFrom != null && !dateFrom.isBlank()) {
       LocalDate start = LocalDate.parse(dateFrom);
@@ -383,6 +385,7 @@ public class InventoryController {
       item.setBatchId(adjust.getBatchId());
       item.setWarehouseId(batch == null ? null : batch.getWarehouseId());
       item.setWarehouseName(warehouse == null ? null : warehouse.getWarehouseName());
+      item.setInventoryType(adjust.getInventoryType());
       item.setAdjustType(adjust.getAdjustType());
       item.setAdjustQty(adjust.getAdjustQty());
       item.setReason(adjust.getReason());
@@ -408,6 +411,7 @@ public class InventoryController {
   public Result<List<InventoryAdjustmentDiffItem>> adjustmentDiffReport(
       @RequestParam(required = false) Long warehouseId,
       @RequestParam(required = false) String category,
+      @RequestParam(required = false) String inventoryType,
       @RequestParam(required = false) String dateFrom,
       @RequestParam(required = false) String dateTo) {
     Long orgId = AuthContext.getOrgId();
@@ -465,12 +469,17 @@ public class InventoryController {
       if (category != null && !category.isBlank() && (rowCategory == null || !rowCategory.contains(category))) {
         continue;
       }
+      if (inventoryType != null && !inventoryType.isBlank()
+          && (row.getInventoryType() == null || !inventoryType.equalsIgnoreCase(row.getInventoryType()))) {
+        continue;
+      }
       String key = row.getProductId() + "-" + (rowWarehouseId == null ? "0" : rowWarehouseId);
       InventoryAdjustmentDiffItem item = resultMap.computeIfAbsent(key, k -> {
         InventoryAdjustmentDiffItem it = new InventoryAdjustmentDiffItem();
         it.setProductId(row.getProductId());
         it.setProductName(product == null ? null : product.getProductName());
         it.setCategory(rowCategory);
+        it.setInventoryType(row.getInventoryType());
         it.setWarehouseId(rowWarehouseId);
         MaterialWarehouse warehouse = rowWarehouseId == null ? null : warehouseMap.get(rowWarehouseId);
         it.setWarehouseName(warehouse == null ? null : warehouse.getWarehouseName());

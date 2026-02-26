@@ -14,6 +14,10 @@ public class ShiftTemplateResponse {
   private LocalTime endTime;
   private Integer crossDay;
   private Integer requiredStaffCount;
+  private String recurrenceType;
+  private Long executeStaffId;
+  private String executeStaffName;
+  private Integer attendanceLinked;
   private Integer enabled;
   private String remark;
 }

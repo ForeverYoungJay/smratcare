@@ -103,6 +103,13 @@
             <a-select-option value="LOSS">盘亏</a-select-option>
           </a-select>
         </a-form-item>
+        <a-form-item label="盘点类型" name="inventoryType">
+          <a-select v-model:value="adjustForm.inventoryType">
+            <a-select-option value="ASSET">中心不动产盘点</a-select-option>
+            <a-select-option value="MATERIAL">物资盘点</a-select-option>
+            <a-select-option value="CONSUMABLE">损耗品盘点</a-select-option>
+          </a-select>
+        </a-form-item>
         <a-form-item label="调整数量" name="adjustQty">
           <a-input-number v-model:value="adjustForm.adjustQty" :min="1" style="width: 100%" />
         </a-form-item>
@@ -154,12 +161,14 @@ const adjustFormRef = ref()
 const adjustForm = reactive<{
   productId?: number
   batchId?: number
+  inventoryType: 'ASSET' | 'MATERIAL' | 'CONSUMABLE'
   adjustType: 'GAIN' | 'LOSS'
   adjustQty: number
   reason: string
 }>({
   productId: undefined,
   batchId: undefined,
+  inventoryType: 'MATERIAL',
   adjustType: 'GAIN',
   adjustQty: 1,
   reason: ''
@@ -246,7 +255,7 @@ function exportCsvData() {
 }
 
 function openAdjust() {
-  Object.assign(adjustForm, { productId: undefined, batchId: undefined, adjustType: 'GAIN', adjustQty: 1, reason: '' })
+  Object.assign(adjustForm, { productId: undefined, batchId: undefined, inventoryType: 'MATERIAL', adjustType: 'GAIN', adjustQty: 1, reason: '' })
   adjustOpen.value = true
 }
 
@@ -257,6 +266,7 @@ async function submitAdjust() {
     await adjustInventory({
       productId: Number(adjustForm.productId),
       batchId: adjustForm.batchId,
+      inventoryType: adjustForm.inventoryType,
       adjustType: adjustForm.adjustType,
       adjustQty: adjustForm.adjustQty,
       reason: adjustForm.reason

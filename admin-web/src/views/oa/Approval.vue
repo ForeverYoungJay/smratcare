@@ -92,8 +92,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
+import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
@@ -114,6 +115,7 @@ import type { OaApproval, PageResult } from '../../types'
 
 const loading = ref(false)
 const rows = ref<OaApproval[]>([])
+const route = useRoute()
 const query = reactive({
   keyword: '',
   type: undefined as string | undefined,
@@ -150,8 +152,12 @@ const form = reactive({
 
 const typeOptions = [
   { label: '请假', value: 'LEAVE' },
+  { label: '加班', value: 'OVERTIME' },
   { label: '报销', value: 'REIMBURSE' },
-  { label: '采购', value: 'PURCHASE' }
+  { label: '采购', value: 'PURCHASE' },
+  { label: '收入证明', value: 'INCOME_PROOF' },
+  { label: '物资申领', value: 'MATERIAL_APPLY' },
+  { label: '用章申请', value: 'OFFICIAL_SEAL' }
 ]
 const statusOptions = [
   { label: '待审批', value: 'PENDING' },
@@ -209,7 +215,7 @@ function onReset() {
 
 function openCreate() {
   form.id = undefined
-  form.approvalType = 'LEAVE'
+  form.approvalType = (query.type || 'LEAVE') as string
   form.title = ''
   form.applicantName = ''
   form.amount = undefined
@@ -320,4 +326,16 @@ async function downloadExport() {
 }
 
 fetchData()
+
+onMounted(() => {
+  const type = String(route.query.type || '').toUpperCase()
+  const quick = String(route.query.quick || '')
+  if (type && typeOptions.some((item) => item.value === type)) {
+    query.type = type
+    form.approvalType = type
+  }
+  if (quick === '1') {
+    openCreate()
+  }
+})
 </script>

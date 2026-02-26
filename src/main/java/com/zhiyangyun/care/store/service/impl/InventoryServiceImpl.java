@@ -52,6 +52,7 @@ public class InventoryServiceImpl implements InventoryService {
     adjustment.setOrgId(request.getOrgId());
     adjustment.setProductId(request.getProductId());
     adjustment.setBatchId(request.getBatchId());
+    adjustment.setInventoryType(request.getInventoryType());
     adjustment.setAdjustType(request.getAdjustType());
     adjustment.setAdjustQty(request.getAdjustQty());
     adjustment.setReason(request.getReason());

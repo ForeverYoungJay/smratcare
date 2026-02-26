@@ -36,6 +36,22 @@ public class FireSafetyRecord {
 
   private LocalDate nextCheckDate;
 
+  private String qrToken;
+
+  private LocalDateTime qrGeneratedAt;
+
+  private LocalDateTime scanCompletedAt;
+
+  private String dutyRecord;
+
+  private LocalDateTime handoverPunchTime;
+
+  private String equipmentBatchNo;
+
+  private String equipmentUpdateNote;
+
+  private String equipmentAgingDisposal;
+
   private Long createdBy;
 
   @TableField("create_time")

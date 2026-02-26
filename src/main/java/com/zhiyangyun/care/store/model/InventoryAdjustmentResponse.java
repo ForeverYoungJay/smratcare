@@ -12,6 +12,7 @@ public class InventoryAdjustmentResponse {
   private Long batchId;
   private Long warehouseId;
   private String warehouseName;
+  private String inventoryType;
   private String adjustType;
   private Integer adjustQty;
   private String reason;

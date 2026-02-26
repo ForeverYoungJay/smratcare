@@ -29,4 +29,14 @@ public class FireSafetyRecordRequest {
   private String actionTaken;
 
   private LocalDate nextCheckDate;
+
+  private String dutyRecord;
+
+  private LocalDateTime handoverPunchTime;
+
+  private String equipmentBatchNo;
+
+  private String equipmentUpdateNote;
+
+  private String equipmentAgingDisposal;
 }

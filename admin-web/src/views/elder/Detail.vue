@@ -7,6 +7,7 @@
         <a-descriptions-item label="床位">{{ elder?.bedNo || '-' }}</a-descriptions-item>
         <a-descriptions-item label="护理等级">{{ elder?.careLevel || '-' }}</a-descriptions-item>
         <a-descriptions-item label="状态">{{ statusText(elder?.status) }}</a-descriptions-item>
+        <a-descriptions-item label="生日">{{ elder?.birthDate || '-' }}</a-descriptions-item>
         <a-descriptions-item label="入院日期">{{ elder?.admissionDate || '-' }}</a-descriptions-item>
         <a-descriptions-item label="家庭地址" :span="2">{{ elder?.homeAddress || '-' }}</a-descriptions-item>
       </a-descriptions>
@@ -27,6 +28,9 @@
             </a-form-item>
             <a-form-item label="手机号" name="phone">
               <a-input v-model:value="baseForm.phone" />
+            </a-form-item>
+            <a-form-item label="生日" name="birthDate">
+              <a-date-picker v-model:value="baseForm.birthDate" value-format="YYYY-MM-DD" style="width: 100%" />
             </a-form-item>
             <a-form-item label="家庭地址" name="homeAddress">
               <a-input v-model:value="baseForm.homeAddress" />

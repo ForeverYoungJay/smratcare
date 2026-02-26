@@ -16,6 +16,10 @@ export interface ShiftTemplateItem {
   endTime: string
   crossDay?: number
   requiredStaffCount?: number
+  recurrenceType?: 'DAILY_ONCE' | 'WEEKLY_ONCE' | 'WEEKLY_TWICE'
+  executeStaffId?: number
+  executeStaffName?: string
+  attendanceLinked?: number
   enabled?: number
   remark?: string
 }
@@ -29,7 +33,9 @@ export interface ShiftHandoverItem {
   toStaffId: number
   toStaffName?: string
   summary?: string
+  onDutySummary?: string
   riskNote?: string
+  attentionNote?: string
   todoNote?: string
   status?: string
   handoverTime?: string

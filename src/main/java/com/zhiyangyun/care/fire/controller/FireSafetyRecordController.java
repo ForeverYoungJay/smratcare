@@ -5,19 +5,29 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
+import com.zhiyangyun.care.elder.util.QrCodeUtil;
 import com.zhiyangyun.care.fire.entity.FireSafetyRecord;
 import com.zhiyangyun.care.fire.mapper.FireSafetyRecordMapper;
+import com.zhiyangyun.care.fire.model.FireSafetyQrResponse;
+import com.zhiyangyun.care.fire.model.FireSafetyReportDetailResponse;
 import com.zhiyangyun.care.fire.model.FireSafetyRecordRequest;
 import com.zhiyangyun.care.fire.model.FireSafetyReportSummaryResponse;
+import com.zhiyangyun.care.fire.model.FireSafetyScanCompleteRequest;
 import com.zhiyangyun.care.fire.model.FireSafetyTypeCount;
 import jakarta.validation.Valid;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,6 +42,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/fire/records")
 public class FireSafetyRecordController {
+  private static final DateTimeFormatter DATETIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
   private static final Set<String> ALLOWED_TYPES = Set.of(
       "FACILITY",
       "CONTROL_ROOM_DUTY",
@@ -90,6 +101,11 @@ public class FireSafetyRecordController {
     record.setIssueDescription(request.getIssueDescription());
     record.setActionTaken(request.getActionTaken());
     record.setNextCheckDate(request.getNextCheckDate());
+    record.setDutyRecord(request.getDutyRecord());
+    record.setHandoverPunchTime(request.getHandoverPunchTime());
+    record.setEquipmentBatchNo(request.getEquipmentBatchNo());
+    record.setEquipmentUpdateNote(request.getEquipmentUpdateNote());
+    record.setEquipmentAgingDisposal(request.getEquipmentAgingDisposal());
     record.setCreatedBy(AuthContext.getStaffId());
     recordMapper.insert(record);
     return Result.ok(record);
@@ -110,6 +126,11 @@ public class FireSafetyRecordController {
     existing.setIssueDescription(request.getIssueDescription());
     existing.setActionTaken(request.getActionTaken());
     existing.setNextCheckDate(request.getNextCheckDate());
+    existing.setDutyRecord(request.getDutyRecord());
+    existing.setHandoverPunchTime(request.getHandoverPunchTime());
+    existing.setEquipmentBatchNo(request.getEquipmentBatchNo());
+    existing.setEquipmentUpdateNote(request.getEquipmentUpdateNote());
+    existing.setEquipmentAgingDisposal(request.getEquipmentAgingDisposal());
     recordMapper.updateById(existing);
     return Result.ok(existing);
   }
@@ -122,6 +143,52 @@ public class FireSafetyRecordController {
     }
     existing.setStatus("CLOSED");
     existing.setUpdateTime(LocalDateTime.now());
+    recordMapper.updateById(existing);
+    return Result.ok(existing);
+  }
+
+  @PostMapping("/{id}/qr/generate")
+  public Result<FireSafetyQrResponse> generateQr(@PathVariable Long id) {
+    FireSafetyRecord existing = findAccessibleRecord(id);
+    if (existing == null) {
+      return Result.ok(null);
+    }
+    LocalDateTime now = LocalDateTime.now();
+    String token = QrCodeUtil.generate();
+    existing.setQrToken(token);
+    existing.setQrGeneratedAt(now);
+    recordMapper.updateById(existing);
+
+    FireSafetyQrResponse response = new FireSafetyQrResponse();
+    response.setRecordId(existing.getId());
+    response.setQrToken(token);
+    response.setQrContent("FIRE_PATROL:" + existing.getId() + ":" + token);
+    response.setGeneratedAt(now);
+    return Result.ok(response);
+  }
+
+  @PostMapping("/scan/complete")
+  public Result<FireSafetyRecord> scanComplete(@Valid @RequestBody FireSafetyScanCompleteRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    String token = request.getQrToken() == null ? null : request.getQrToken().trim();
+    if (token == null || token.isBlank()) {
+      throw new IllegalArgumentException("qrToken 不能为空");
+    }
+    FireSafetyRecord existing = recordMapper.selectOne(Wrappers.lambdaQuery(FireSafetyRecord.class)
+        .eq(FireSafetyRecord::getIsDeleted, 0)
+        .eq(orgId != null, FireSafetyRecord::getOrgId, orgId)
+        .eq(FireSafetyRecord::getQrToken, token));
+    if (existing == null) {
+      return Result.ok(null);
+    }
+    existing.setScanCompletedAt(LocalDateTime.now());
+    existing.setStatus("CLOSED");
+    if (request.getInspectorName() != null && !request.getInspectorName().isBlank()) {
+      existing.setInspectorName(request.getInspectorName().trim());
+    }
+    if (request.getActionTaken() != null && !request.getActionTaken().isBlank()) {
+      existing.setActionTaken(request.getActionTaken().trim());
+    }
     recordMapper.updateById(existing);
     return Result.ok(existing);
   }
@@ -211,8 +278,167 @@ public class FireSafetyRecordController {
     response.setOpenCount(openCount);
     response.setClosedCount(closedCount);
     response.setOverdueCount(overdueCount);
+    response.setDailyCompletedCount(recordMapper.selectCount(Wrappers.lambdaQuery(FireSafetyRecord.class)
+        .eq(FireSafetyRecord::getIsDeleted, 0)
+        .eq(orgId != null, FireSafetyRecord::getOrgId, orgId)
+        .ge(startTime != null, FireSafetyRecord::getCheckTime, startTime)
+        .le(endTime != null, FireSafetyRecord::getCheckTime, endTime)
+        .eq(FireSafetyRecord::getRecordType, "DAY_PATROL")
+        .isNotNull(FireSafetyRecord::getScanCompletedAt)));
+    response.setMonthlyCompletedCount(recordMapper.selectCount(Wrappers.lambdaQuery(FireSafetyRecord.class)
+        .eq(FireSafetyRecord::getIsDeleted, 0)
+        .eq(orgId != null, FireSafetyRecord::getOrgId, orgId)
+        .ge(startTime != null, FireSafetyRecord::getCheckTime, startTime)
+        .le(endTime != null, FireSafetyRecord::getCheckTime, endTime)
+        .eq(FireSafetyRecord::getRecordType, "MONTHLY_CHECK")
+        .isNotNull(FireSafetyRecord::getScanCompletedAt)));
+    response.setDutyRecordCount(recordMapper.selectCount(Wrappers.lambdaQuery(FireSafetyRecord.class)
+        .eq(FireSafetyRecord::getIsDeleted, 0)
+        .eq(orgId != null, FireSafetyRecord::getOrgId, orgId)
+        .ge(startTime != null, FireSafetyRecord::getCheckTime, startTime)
+        .le(endTime != null, FireSafetyRecord::getCheckTime, endTime)
+        .eq(FireSafetyRecord::getRecordType, "CONTROL_ROOM_DUTY")
+        .isNotNull(FireSafetyRecord::getDutyRecord)
+        .ne(FireSafetyRecord::getDutyRecord, "")));
+    response.setHandoverPunchCount(recordMapper.selectCount(Wrappers.lambdaQuery(FireSafetyRecord.class)
+        .eq(FireSafetyRecord::getIsDeleted, 0)
+        .eq(orgId != null, FireSafetyRecord::getOrgId, orgId)
+        .ge(startTime != null, FireSafetyRecord::getCheckTime, startTime)
+        .le(endTime != null, FireSafetyRecord::getCheckTime, endTime)
+        .isNotNull(FireSafetyRecord::getHandoverPunchTime)));
+    response.setEquipmentUpdateCount(recordMapper.selectCount(Wrappers.lambdaQuery(FireSafetyRecord.class)
+        .eq(FireSafetyRecord::getIsDeleted, 0)
+        .eq(orgId != null, FireSafetyRecord::getOrgId, orgId)
+        .ge(startTime != null, FireSafetyRecord::getCheckTime, startTime)
+        .le(endTime != null, FireSafetyRecord::getCheckTime, endTime)
+        .eq(FireSafetyRecord::getRecordType, "FACILITY")
+        .isNotNull(FireSafetyRecord::getEquipmentBatchNo)
+        .ne(FireSafetyRecord::getEquipmentBatchNo, "")));
+    response.setEquipmentAgingDisposalCount(recordMapper.selectCount(Wrappers.lambdaQuery(FireSafetyRecord.class)
+        .eq(FireSafetyRecord::getIsDeleted, 0)
+        .eq(orgId != null, FireSafetyRecord::getOrgId, orgId)
+        .ge(startTime != null, FireSafetyRecord::getCheckTime, startTime)
+        .le(endTime != null, FireSafetyRecord::getCheckTime, endTime)
+        .eq(FireSafetyRecord::getRecordType, "FACILITY")
+        .isNotNull(FireSafetyRecord::getEquipmentAgingDisposal)
+        .ne(FireSafetyRecord::getEquipmentAgingDisposal, "")));
     response.setTypeStats(typeStats);
     return Result.ok(response);
+  }
+
+  @GetMapping("/report/detail")
+  public Result<FireSafetyReportDetailResponse> detail(
+      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+      @RequestParam(required = false) LocalDate dateFrom,
+      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+      @RequestParam(required = false) LocalDate dateTo,
+      @RequestParam(defaultValue = "100") int limit) {
+    LocalDate startDate = dateFrom;
+    LocalDate endDate = dateTo;
+    if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+      LocalDate temp = startDate;
+      startDate = endDate;
+      endDate = temp;
+    }
+    LocalDateTime startTime = startDate == null ? null : startDate.atStartOfDay();
+    LocalDateTime endTime = endDate == null ? null : endDate.plusDays(1).atStartOfDay().minusNanos(1);
+    int safeLimit = Math.max(1, Math.min(limit, 1000));
+    Long orgId = AuthContext.getOrgId();
+
+    List<FireSafetyRecord> records = recordMapper.selectList(Wrappers.lambdaQuery(FireSafetyRecord.class)
+        .eq(FireSafetyRecord::getIsDeleted, 0)
+        .eq(orgId != null, FireSafetyRecord::getOrgId, orgId)
+        .ge(startTime != null, FireSafetyRecord::getCheckTime, startTime)
+        .le(endTime != null, FireSafetyRecord::getCheckTime, endTime)
+        .orderByDesc(FireSafetyRecord::getCheckTime)
+        .last("limit " + safeLimit));
+
+    FireSafetyReportDetailResponse response = new FireSafetyReportDetailResponse();
+    response.setTotalCount((long) records.size());
+    response.setDailyCompletedCount(records.stream()
+        .filter(r -> "DAY_PATROL".equals(r.getRecordType()) && r.getScanCompletedAt() != null)
+        .count());
+    response.setMonthlyCompletedCount(records.stream()
+        .filter(r -> "MONTHLY_CHECK".equals(r.getRecordType()) && r.getScanCompletedAt() != null)
+        .count());
+    response.setDutyRecordCount(records.stream()
+        .filter(r -> "CONTROL_ROOM_DUTY".equals(r.getRecordType()) && notBlank(r.getDutyRecord()))
+        .count());
+    response.setHandoverPunchCount(records.stream()
+        .filter(r -> r.getHandoverPunchTime() != null)
+        .count());
+    response.setEquipmentUpdateCount(records.stream()
+        .filter(r -> "FACILITY".equals(r.getRecordType()) && notBlank(r.getEquipmentBatchNo()))
+        .count());
+    response.setEquipmentAgingDisposalCount(records.stream()
+        .filter(r -> "FACILITY".equals(r.getRecordType()) && notBlank(r.getEquipmentAgingDisposal()))
+        .count());
+
+    List<FireSafetyReportDetailResponse.FireSafetyReportRecordItem> items = new ArrayList<>();
+    for (FireSafetyRecord record : records) {
+      FireSafetyReportDetailResponse.FireSafetyReportRecordItem item =
+          new FireSafetyReportDetailResponse.FireSafetyReportRecordItem();
+      item.setId(record.getId());
+      item.setRecordType(record.getRecordType());
+      item.setTitle(record.getTitle());
+      item.setLocation(record.getLocation());
+      item.setInspectorName(record.getInspectorName());
+      item.setCheckTime(formatDateTime(record.getCheckTime()));
+      item.setStatus(record.getStatus());
+      item.setScanCompletedAt(formatDateTime(record.getScanCompletedAt()));
+      item.setDutyRecord(record.getDutyRecord());
+      item.setHandoverPunchTime(formatDateTime(record.getHandoverPunchTime()));
+      item.setEquipmentBatchNo(record.getEquipmentBatchNo());
+      item.setEquipmentUpdateNote(record.getEquipmentUpdateNote());
+      item.setEquipmentAgingDisposal(record.getEquipmentAgingDisposal());
+      item.setIssueDescription(record.getIssueDescription());
+      item.setActionTaken(record.getActionTaken());
+      items.add(item);
+    }
+    response.setRecords(items);
+    return Result.ok(response);
+  }
+
+  @GetMapping(value = "/report/export", produces = "text/csv;charset=UTF-8")
+  public ResponseEntity<byte[]> export(
+      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+      @RequestParam(required = false) LocalDate dateFrom,
+      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+      @RequestParam(required = false) LocalDate dateTo) {
+    FireSafetyReportDetailResponse detail = detail(dateFrom, dateTo, 1000).getData();
+    List<String> headers = List.of(
+        "记录ID",
+        "类型",
+        "标题",
+        "位置",
+        "负责人",
+        "检查时间",
+        "扫码完成时间",
+        "状态",
+        "值班记录",
+        "交接班打卡",
+        "设备批号",
+        "设备更新记录",
+        "设备老化处置",
+        "问题描述",
+        "处置措施");
+    List<List<String>> rows = detail.getRecords().stream().map(item -> List.of(
+        stringOf(item.getId()),
+        stringOf(item.getRecordType()),
+        stringOf(item.getTitle()),
+        stringOf(item.getLocation()),
+        stringOf(item.getInspectorName()),
+        stringOf(item.getCheckTime()),
+        stringOf(item.getScanCompletedAt()),
+        stringOf(item.getStatus()),
+        stringOf(item.getDutyRecord()),
+        stringOf(item.getHandoverPunchTime()),
+        stringOf(item.getEquipmentBatchNo()),
+        stringOf(item.getEquipmentUpdateNote()),
+        stringOf(item.getEquipmentAgingDisposal()),
+        stringOf(item.getIssueDescription()),
+        stringOf(item.getActionTaken()))).toList();
+    return csvResponse("fire-safety-report", headers, rows);
   }
 
   private FireSafetyRecord findAccessibleRecord(Long id) {
@@ -296,5 +522,40 @@ public class FireSafetyRecordController {
     }
     String normalized = normalizeStatus(status);
     return normalized == null ? "OPEN" : normalized;
+  }
+
+  private boolean notBlank(String text) {
+    return text != null && !text.isBlank();
+  }
+
+  private String formatDateTime(LocalDateTime value) {
+    return value == null ? "" : value.format(DATETIME_FORMAT);
+  }
+
+  private String stringOf(Object value) {
+    return value == null ? "" : String.valueOf(value);
+  }
+
+  private ResponseEntity<byte[]> csvResponse(String filenameBase, List<String> headers, List<List<String>> rows) {
+    StringBuilder sb = new StringBuilder();
+    sb.append("\uFEFF");
+    sb.append(headers.stream().map(this::escapeCsv).collect(Collectors.joining(","))).append('\n');
+    for (List<String> row : rows) {
+      sb.append(row.stream().map(this::escapeCsv).collect(Collectors.joining(","))).append('\n');
+    }
+    byte[] bytes = sb.toString().getBytes(StandardCharsets.UTF_8);
+    HttpHeaders responseHeaders = new HttpHeaders();
+    responseHeaders.setContentType(new MediaType("text", "csv", StandardCharsets.UTF_8));
+    String filename = filenameBase + "-" + LocalDate.now() + ".csv";
+    responseHeaders.setContentDispositionFormData("attachment", filename);
+    return ResponseEntity.ok().headers(responseHeaders).body(bytes);
+  }
+
+  private String escapeCsv(String value) {
+    String text = value == null ? "" : value;
+    if (text.contains(",") || text.contains("\"") || text.contains("\n") || text.contains("\r")) {
+      return "\"" + text.replace("\"", "\"\"") + "\"";
+    }
+    return text;
   }
 }

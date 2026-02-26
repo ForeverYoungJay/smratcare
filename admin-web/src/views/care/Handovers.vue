@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="交接班" subTitle="班次交接记录与风险待办追踪">
+  <PageContainer title="交接日志" subTitle="在岗工作日志、注意事项与待办追踪">
     <a-card :bordered="false" class="card-elevated">
       <a-form layout="inline" @submit.prevent>
         <a-form-item label="日期范围">
@@ -15,7 +15,7 @@
           <a-space>
             <a-button type="primary" @click="search">查询</a-button>
             <a-button @click="reset">重置</a-button>
-            <a-button type="primary" @click="openModal()">新增交接班</a-button>
+            <a-button type="primary" @click="openModal()">新增交接日志</a-button>
           </a-space>
         </a-form-item>
       </a-form>
@@ -42,7 +42,7 @@
       </a-table>
     </a-card>
 
-    <a-modal v-model:open="modalOpen" title="交接班" :confirm-loading="submitting" width="760" @ok="submit">
+    <a-modal v-model:open="modalOpen" title="交接日志" :confirm-loading="submitting" width="760" @ok="submit">
       <a-form ref="formRef" layout="vertical" :model="form" :rules="rules">
         <a-row :gutter="16">
           <a-col :span="12">
@@ -84,11 +84,11 @@
           </a-col>
         </a-row>
 
-        <a-form-item label="交接摘要" name="summary">
-          <a-textarea v-model:value="form.summary" :rows="3" />
+        <a-form-item label="在岗期间做了什么" name="onDutySummary">
+          <a-textarea v-model:value="form.onDutySummary" :rows="3" />
         </a-form-item>
-        <a-form-item label="风险提醒" name="riskNote">
-          <a-textarea v-model:value="form.riskNote" :rows="2" />
+        <a-form-item label="注意事项" name="attentionNote">
+          <a-textarea v-model:value="form.attentionNote" :rows="2" />
         </a-form-item>
         <a-form-item label="待办事项" name="todoNote">
           <a-textarea v-model:value="form.todoNote" :rows="2" />
@@ -147,7 +147,9 @@ const form = reactive<Partial<ShiftHandoverItem>>({
   fromStaffId: undefined,
   toStaffId: undefined,
   summary: '',
+  onDutySummary: '',
   riskNote: '',
+  attentionNote: '',
   todoNote: '',
   status: 'DRAFT',
   handoverTime: undefined,
@@ -173,7 +175,7 @@ const columns = [
   { title: '交班人', dataIndex: 'fromStaffName', key: 'fromStaffName', width: 120 },
   { title: '接班人', dataIndex: 'toStaffName', key: 'toStaffName', width: 120 },
   { title: '状态', key: 'status', width: 110 },
-  { title: '风险提醒', dataIndex: 'riskNote', key: 'riskNote' },
+  { title: '注意事项', dataIndex: 'attentionNote', key: 'attentionNote' },
   { title: '操作', key: 'actions', width: 140 }
 ]
 
@@ -212,6 +214,8 @@ function resetForm() {
   form.toStaffId = undefined
   form.summary = ''
   form.riskNote = ''
+  form.onDutySummary = ''
+  form.attentionNote = ''
   form.todoNote = ''
   form.status = 'DRAFT'
   form.handoverTime = undefined
@@ -244,8 +248,8 @@ async function submit() {
       shiftCode: form.shiftCode,
       fromStaffId: form.fromStaffId,
       toStaffId: form.toStaffId,
-      summary: form.summary,
-      riskNote: form.riskNote,
+      summary: form.onDutySummary || form.summary,
+      riskNote: form.attentionNote || form.riskNote,
       todoNote: form.todoNote,
       status: form.status,
       handoverTime: form.handoverTime,
@@ -266,7 +270,7 @@ async function submit() {
 
 async function remove(id: number) {
   Modal.confirm({
-    title: '确认删除该交接班记录？',
+    title: '确认删除该交接日志？',
     onOk: async () => {
       await deleteShiftHandover(id)
       message.success('删除成功')
@@ -305,7 +309,11 @@ async function load() {
       shiftCode: query.shiftCode,
       status: query.status
     })
-    rows.value = res.list
+    rows.value = res.list.map((item) => ({
+      ...item,
+      onDutySummary: item.onDutySummary || item.summary,
+      attentionNote: item.attentionNote || item.riskNote
+    }))
     query.total = res.total
   } finally {
     loading.value = false

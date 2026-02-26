@@ -19,6 +19,9 @@ public class ShiftTemplateRequest {
   private LocalTime endTime;
   private Integer crossDay = 0;
   private Integer requiredStaffCount = 1;
+  private String recurrenceType = "WEEKLY_ONCE";
+  private Long executeStaffId;
+  private Integer attendanceLinked = 1;
   private Integer enabled = 1;
   private String remark;
   private Long createdBy;

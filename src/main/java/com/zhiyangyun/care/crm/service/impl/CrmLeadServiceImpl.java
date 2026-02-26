@@ -59,7 +59,7 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     lead.setCustomerTag(request.getCustomerTag());
     lead.setStatus(request.getStatus());
     lead.setContractSignedFlag(normalizeSignedFlag(request.getContractSignedFlag()));
-    lead.setContractSignedAt(resolveContractTime(request.getContractSignedAt(), request.getContractSignedFlag()));
+    lead.setContractSignedAt(resolveContractTime(parseDateTime(request.getContractSignedAt()), request.getContractSignedFlag()));
     lead.setContractNo(blankToNull(request.getContractNo()));
     lead.setContractStatus(blankToNull(request.getContractStatus()));
     lead.setContractExpiryDate(parseDate(request.getContractExpiryDate()));
@@ -107,7 +107,7 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     lead.setCustomerTag(request.getCustomerTag());
     lead.setStatus(request.getStatus());
     lead.setContractSignedFlag(normalizeSignedFlag(request.getContractSignedFlag()));
-    lead.setContractSignedAt(resolveContractTime(request.getContractSignedAt(), request.getContractSignedFlag()));
+    lead.setContractSignedAt(resolveContractTime(parseDateTime(request.getContractSignedAt()), request.getContractSignedFlag()));
     lead.setContractNo(blankToNull(request.getContractNo()));
     lead.setContractStatus(blankToNull(request.getContractStatus()));
     lead.setContractExpiryDate(parseDate(request.getContractExpiryDate()));

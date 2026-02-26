@@ -50,6 +50,10 @@ export function deleteShiftTemplate(id: number) {
   return request.delete<void>(`/api/nursing/shift-templates/${id}`)
 }
 
+export function applyShiftTemplate(id: number, data: { startDate: string; endDate: string }) {
+  return request.post<number>(`/api/nursing/shift-templates/${id}/apply`, data)
+}
+
 export function getShiftHandoverPage(params: any) {
   return fetchPage<ShiftHandoverItem>('/api/nursing/handovers/page', params)
 }

@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="排班方案" subTitle="标准班次与时段配置">
+  <PageContainer title="排班方案" subTitle="标准班次、周期执行人与打卡联动配置">
     <a-card :bordered="false" class="card-elevated">
       <a-form layout="inline" @submit.prevent>
         <a-form-item label="关键字">
@@ -29,8 +29,15 @@
           <template v-if="column.key === 'enabled'">
             <a-tag :color="record.enabled === 1 ? 'green' : 'default'">{{ record.enabled === 1 ? '启用' : '停用' }}</a-tag>
           </template>
+          <template v-else-if="column.key === 'recurrenceType'">
+            {{ recurrenceLabel(record.recurrenceType) }}
+          </template>
+          <template v-else-if="column.key === 'attendanceLinked'">
+            <a-tag :color="record.attendanceLinked === 1 ? 'blue' : 'default'">{{ record.attendanceLinked === 1 ? '联动打卡' : '不联动' }}</a-tag>
+          </template>
           <template v-else-if="column.key === 'actions'">
             <a-space>
+              <a @click="openApply(record)">实施</a>
               <a @click="openModal(record)">编辑</a>
               <a class="danger-text" @click="remove(record.id)">删除</a>
             </a-space>
@@ -59,11 +66,51 @@
         <a-form-item label="建议人数" name="requiredStaffCount">
           <a-input-number v-model:value="form.requiredStaffCount" :min="1" style="width: 100%" />
         </a-form-item>
+        <a-form-item label="执行周期" name="recurrenceType">
+          <a-select v-model:value="form.recurrenceType">
+            <a-select-option value="WEEKLY_ONCE">一周一次</a-select-option>
+            <a-select-option value="WEEKLY_TWICE">一周两次</a-select-option>
+            <a-select-option value="DAILY_ONCE">每天一次</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="执行人" name="executeStaffId">
+          <a-select
+            v-model:value="form.executeStaffId"
+            show-search
+            :filter-option="false"
+            placeholder="输入姓名搜索"
+            :options="staffOptions"
+            @search="searchStaff"
+          />
+        </a-form-item>
+        <a-form-item label="联动上班打卡" name="attendanceLinked">
+          <a-switch v-model:checked="form.attendanceLinked" :checked-value="1" :un-checked-value="0" />
+        </a-form-item>
         <a-form-item label="启用状态" name="enabled">
           <a-switch v-model:checked="form.enabled" :checked-value="1" :un-checked-value="0" />
         </a-form-item>
         <a-form-item label="备注" name="remark">
           <a-textarea v-model:value="form.remark" :rows="3" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <a-modal v-model:open="applyOpen" title="实施排班方案" :confirm-loading="applying" @ok="submitApply">
+      <a-form layout="vertical">
+        <a-form-item label="方案名称">
+          <a-input :value="applyTarget?.name" disabled />
+        </a-form-item>
+        <a-form-item label="执行周期">
+          <a-input :value="recurrenceLabel(applyTarget?.recurrenceType)" disabled />
+        </a-form-item>
+        <a-form-item label="执行人">
+          <a-input :value="applyTarget?.executeStaffName || '-'" disabled />
+        </a-form-item>
+        <a-form-item label="开始日期" required>
+          <a-date-picker v-model:value="applyForm.startDate" value-format="YYYY-MM-DD" style="width: 100%" />
+        </a-form-item>
+        <a-form-item label="结束日期" required>
+          <a-date-picker v-model:value="applyForm.endDate" value-format="YYYY-MM-DD" style="width: 100%" />
         </a-form-item>
       </a-form>
     </a-modal>
@@ -75,14 +122,19 @@ import { computed, reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import type { FormInstance } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
-import { createShiftTemplate, deleteShiftTemplate, getShiftTemplatePage, updateShiftTemplate } from '../../api/nursing'
-import type { PageResult, ShiftTemplateItem } from '../../types'
+import { getStaffPage } from '../../api/rbac'
+import { applyShiftTemplate, createShiftTemplate, deleteShiftTemplate, getShiftTemplatePage, updateShiftTemplate } from '../../api/nursing'
+import type { PageResult, ShiftTemplateItem, StaffItem } from '../../types'
 
 const rows = ref<ShiftTemplateItem[]>([])
 const loading = ref(false)
 const modalOpen = ref(false)
 const submitting = ref(false)
+const applying = ref(false)
+const applyOpen = ref(false)
+const applyTarget = ref<ShiftTemplateItem>()
 const formRef = ref<FormInstance>()
+const staffOptions = ref<Array<{ label: string; value: number }>>([])
 
 const query = reactive({
   pageNo: 1,
@@ -99,8 +151,15 @@ const form = reactive<Partial<ShiftTemplateItem>>({
   endTime: '16:00:00',
   crossDay: 0,
   requiredStaffCount: 1,
+  recurrenceType: 'WEEKLY_ONCE',
+  executeStaffId: undefined,
+  attendanceLinked: 1,
   enabled: 1,
   remark: ''
+})
+const applyForm = reactive({
+  startDate: '',
+  endDate: ''
 })
 
 const enabledOptions = [
@@ -112,7 +171,8 @@ const rules = {
   name: [{ required: true, message: '请输入方案名称', trigger: 'blur' }],
   shiftCode: [{ required: true, message: '请输入班次编码', trigger: 'blur' }],
   startTime: [{ required: true, message: '请选择开始时间', trigger: 'change' }],
-  endTime: [{ required: true, message: '请选择结束时间', trigger: 'change' }]
+  endTime: [{ required: true, message: '请选择结束时间', trigger: 'change' }],
+  executeStaffId: [{ required: true, message: '请选择执行人', trigger: 'change' }]
 }
 
 const columns = [
@@ -122,8 +182,11 @@ const columns = [
   { title: '结束时间', dataIndex: 'endTime', key: 'endTime', width: 120 },
   { title: '跨天', key: 'crossDay', width: 80, customRender: ({ record }: { record: ShiftTemplateItem }) => (record.crossDay === 1 ? '是' : '否') },
   { title: '建议人数', dataIndex: 'requiredStaffCount', key: 'requiredStaffCount', width: 100 },
+  { title: '周期', key: 'recurrenceType', width: 120 },
+  { title: '执行人', dataIndex: 'executeStaffName', key: 'executeStaffName', width: 140 },
+  { title: '打卡联动', key: 'attendanceLinked', width: 120 },
   { title: '状态', key: 'enabled', width: 100 },
-  { title: '操作', key: 'actions', width: 140 }
+  { title: '操作', key: 'actions', width: 180 }
 ]
 
 const pagination = computed(() => ({
@@ -141,6 +204,9 @@ function resetForm() {
   form.endTime = '16:00:00'
   form.crossDay = 0
   form.requiredStaffCount = 1
+  form.recurrenceType = 'WEEKLY_ONCE'
+  form.executeStaffId = undefined
+  form.attendanceLinked = 1
   form.enabled = 1
   form.remark = ''
 }
@@ -164,6 +230,9 @@ async function submit() {
       endTime: form.endTime,
       crossDay: form.crossDay,
       requiredStaffCount: form.requiredStaffCount,
+      recurrenceType: form.recurrenceType,
+      executeStaffId: form.executeStaffId,
+      attendanceLinked: form.attendanceLinked,
       enabled: form.enabled,
       remark: form.remark
     }
@@ -209,6 +278,54 @@ function reset() {
   load()
 }
 
+function recurrenceLabel(type?: string) {
+  if (type === 'DAILY_ONCE') return '每天一次'
+  if (type === 'WEEKLY_TWICE') return '一周两次'
+  return '一周一次'
+}
+
+function openApply(record: ShiftTemplateItem) {
+  if (!record.executeStaffId) {
+    message.warning('请先为方案设置执行人')
+    return
+  }
+  applyTarget.value = record
+  const today = new Date().toISOString().slice(0, 10)
+  applyForm.startDate = today
+  applyForm.endDate = today
+  applyOpen.value = true
+}
+
+async function submitApply() {
+  if (!applyTarget.value?.id || !applyForm.startDate || !applyForm.endDate) {
+    message.warning('请选择完整实施日期')
+    return
+  }
+  applying.value = true
+  try {
+    const count = await applyShiftTemplate(applyTarget.value.id, {
+      startDate: applyForm.startDate,
+      endDate: applyForm.endDate
+    })
+    message.success(`实施完成，已生成 ${count || 0} 条排班`)
+    applyOpen.value = false
+  } finally {
+    applying.value = false
+  }
+}
+
+async function loadStaffOptions(keyword?: string) {
+  const res: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: 50, keyword })
+  staffOptions.value = (res.list || []).map((item) => ({
+    label: item.realName || item.username || `员工${item.id}`,
+    value: item.id
+  }))
+}
+
+async function searchStaff(keyword: string) {
+  await loadStaffOptions(keyword)
+}
+
 async function load() {
   loading.value = true
   try {
@@ -226,6 +343,7 @@ async function load() {
 }
 
 load()
+loadStaffOptions()
 </script>
 
 <style scoped>

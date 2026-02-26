@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -35,6 +36,13 @@ public class GlobalExceptionHandler {
   public Result<Void> handleValidation(MethodArgumentNotValidException ex) {
     log.warn("Validation error: {}", ex.getMessage());
     return Result.error(400, "Validation error");
+  }
+
+  @ExceptionHandler(HttpMessageNotReadableException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public Result<Void> handleNotReadable(HttpMessageNotReadableException ex) {
+    log.warn("Bad request body: {}", ex.getMessage());
+    return Result.error(400, "Invalid request body");
   }
 
   @ExceptionHandler(ConstraintViolationException.class)

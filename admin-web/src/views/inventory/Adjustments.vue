@@ -18,6 +18,13 @@
         <a-form-item label="分类">
           <a-select v-model:value="query.category" :options="categoryOptions" allow-clear style="width: 160px" />
         </a-form-item>
+        <a-form-item label="盘点类型">
+          <a-select v-model:value="query.inventoryType" allow-clear style="width: 180px">
+            <a-select-option value="ASSET">中心不动产盘点</a-select-option>
+            <a-select-option value="MATERIAL">物资盘点</a-select-option>
+            <a-select-option value="CONSUMABLE">损耗品盘点</a-select-option>
+          </a-select>
+        </a-form-item>
         <a-form-item label="类型">
           <a-select v-model:value="query.adjustType" allow-clear style="width: 120px">
             <a-select-option value="GAIN">盘盈</a-select-option>
@@ -57,6 +64,11 @@
         <vxe-column field="productName" title="商品名称" min-width="160" />
         <vxe-column field="productId" title="商品ID" width="120" />
         <vxe-column field="batchId" title="批次ID" width="120" />
+        <vxe-column field="inventoryType" title="盘点类型" width="160">
+          <template #default="{ row }">
+            {{ inventoryTypeLabel(row.inventoryType) }}
+          </template>
+        </vxe-column>
         <vxe-column field="adjustType" title="类型" width="120">
           <template #default="{ row }">
             <a-tag :color="row.adjustType === 'GAIN' ? 'green' : 'volcano'">
@@ -96,6 +108,9 @@
         :columns="reportColumns"
       >
         <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'inventoryType'">
+            {{ inventoryTypeLabel(record.inventoryType) }}
+          </template>
           <template v-if="column.key === 'diffQty'">
             <a-tag :color="record.diffQty >= 0 ? 'green' : 'volcano'">{{ record.diffQty }}</a-tag>
           </template>
@@ -133,6 +148,7 @@ const query = reactive({
   productId: undefined as number | undefined,
   warehouseId: undefined as number | undefined,
   category: undefined as string | undefined,
+  inventoryType: undefined as 'ASSET' | 'MATERIAL' | 'CONSUMABLE' | undefined,
   adjustType: undefined as 'GAIN' | 'LOSS' | undefined,
   range: undefined as any,
   pageNo: 1,
@@ -142,6 +158,7 @@ const query = reactive({
 const reportColumns = [
   { title: '商品ID', dataIndex: 'productId', key: 'productId', width: 100 },
   { title: '商品名称', dataIndex: 'productName', key: 'productName' },
+  { title: '盘点类型', dataIndex: 'inventoryType', key: 'inventoryType', width: 140 },
   { title: '分类', dataIndex: 'category', key: 'category', width: 120 },
   { title: '仓库', dataIndex: 'warehouseName', key: 'warehouseName', width: 160 },
   { title: '盘盈', dataIndex: 'gainQty', key: 'gainQty', width: 100 },
@@ -158,6 +175,7 @@ async function fetchData() {
       productId: query.productId,
       warehouseId: query.warehouseId,
       category: query.category,
+      inventoryType: query.inventoryType,
       adjustType: query.adjustType,
       dateFrom: query.range?.[0]?.format?.('YYYY-MM-DD'),
       dateTo: query.range?.[1]?.format?.('YYYY-MM-DD')
@@ -175,6 +193,7 @@ async function fetchDiffReport() {
     const res = await getInventoryAdjustmentDiffReport({
       warehouseId: query.warehouseId,
       category: query.category,
+      inventoryType: query.inventoryType,
       dateFrom: query.range?.[0]?.format?.('YYYY-MM-DD'),
       dateTo: query.range?.[1]?.format?.('YYYY-MM-DD')
     })
@@ -191,6 +210,7 @@ function reset() {
   query.productId = undefined
   query.warehouseId = undefined
   query.category = undefined
+  query.inventoryType = undefined
   query.adjustType = undefined
   query.range = undefined
   query.pageNo = 1
@@ -222,6 +242,7 @@ function exportCsvData() {
       商品名称: r.productName,
       商品ID: r.productId,
       批次ID: r.batchId,
+      盘点类型: inventoryTypeLabel(r.inventoryType),
       类型: r.adjustType === 'GAIN' ? '盘盈' : '盘亏',
       数量: r.adjustQty,
       原因: r.reason
@@ -235,6 +256,7 @@ function exportDiffCsvData() {
     reportRows.value.map((r) => ({
       商品ID: r.productId,
       商品名称: r.productName,
+      盘点类型: inventoryTypeLabel(r.inventoryType),
       分类: r.category,
       仓库: r.warehouseName,
       盘盈: r.gainQty,
@@ -243,6 +265,12 @@ function exportDiffCsvData() {
     })),
     '盘点差异报表'
   )
+}
+
+function inventoryTypeLabel(type?: string) {
+  if (type === 'ASSET') return '中心不动产盘点'
+  if (type === 'CONSUMABLE') return '损耗品盘点'
+  return type === 'MATERIAL' ? '物资盘点' : '-'
 }
 
 onMounted(async () => {

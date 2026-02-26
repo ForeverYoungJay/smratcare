@@ -97,8 +97,8 @@
       <a-col :xs="24" :lg="8">
         <a-card title="行政日程" :bordered="false" class="card-elevated module-card">
           <div class="module-main">{{ summary.todayScheduleCount || 0 }}</div>
-          <div class="module-sub">今日排班任务</div>
-          <a-button type="link" @click="go('/care/scheduling/shift-calendar')">进入行政日程</a-button>
+          <div class="module-sub">今日行政日历事项（含节日/生日提醒）</div>
+          <a-button type="link" @click="go('/oa/work-execution/calendar')">进入行政日历</a-button>
         </a-card>
       </a-col>
       <a-col :xs="24" :lg="8">
@@ -106,8 +106,8 @@
           <div class="module-main">{{ summary.attendanceAbnormalCount || 0 }}</div>
           <div class="module-sub">今日考勤异常</div>
           <a-space>
-            <a-button size="small" @click="go('/hr/staff')">考勤管理</a-button>
-            <a-button size="small" @click="go('/oa/approval')">请假审批</a-button>
+            <a-button size="small" @click="go('/oa/attendance-leave')">考勤管理</a-button>
+            <a-button size="small" @click="go('/oa/approval?type=LEAVE&quick=1')">请假审批</a-button>
           </a-space>
         </a-card>
       </a-col>
@@ -123,13 +123,20 @@
     <a-row :gutter="[16, 16]">
       <a-col :xs="24" :lg="12">
         <a-card title="营销绩效（客户渠道+业绩完成度甘特图）" :bordered="false" class="card-elevated">
-          <a-list :data-source="summary.marketingChannels || []" :locale="{ emptyText: '暂无渠道数据' }">
-            <template #renderItem="{ item }">
-              <a-list-item>
-                <a-list-item-meta :title="item.source" :description="`线索 ${item.leadCount || 0} / 签约 ${item.contractCount || 0}`" />
-              </a-list-item>
-            </template>
-          </a-list>
+          <a-row :gutter="[12, 12]">
+            <a-col :xs="12" :sm="8" v-for="item in (summary.marketingChannels || [])" :key="item.source">
+              <div class="channel-progress">
+                <a-progress
+                  type="circle"
+                  :size="82"
+                  :percent="Math.min(100, Math.round(((item.contractCount || 0) / Math.max(1, item.leadCount || 0)) * 100))"
+                />
+                <div class="channel-name">{{ item.source }}</div>
+                <div class="channel-meta">线索 {{ item.leadCount || 0 }} / 签约 {{ item.contractCount || 0 }}</div>
+              </div>
+            </a-col>
+          </a-row>
+          <a-empty v-if="!(summary.marketingChannels || []).length" description="暂无渠道数据" />
           <a-space>
             <a-button size="small" @click="go('/marketing/reports/channel')">来源渠道</a-button>
             <a-button size="small" @click="go('/marketing/reports/followup')">业绩完成度</a-button>
@@ -180,14 +187,14 @@ const summary = reactive<OaPortalSummary>({
 })
 
 const quickLaunches = [
-  { label: '签到/签退', route: '/hr/staff' },
-  { label: '请假', route: '/oa/approval' },
-  { label: '加班', route: '/oa/approval' },
-  { label: '报销', route: '/oa/approval' },
-  { label: '采购', route: '/material/purchase' },
-  { label: '用章', route: '/oa/approval' },
-  { label: '收入证明', route: '/oa/approval' },
-  { label: '物资申领', route: '/material/transfer' }
+  { label: '签到/签退', route: '/oa/attendance-leave?action=clock' },
+  { label: '请假', route: '/oa/approval?type=LEAVE&quick=1' },
+  { label: '加班', route: '/oa/approval?type=OVERTIME&quick=1' },
+  { label: '报销', route: '/oa/approval?type=REIMBURSE&quick=1' },
+  { label: '采购', route: '/material/purchase?quick=1' },
+  { label: '用章', route: '/oa/approval?type=OFFICIAL_SEAL&quick=1' },
+  { label: '收入证明', route: '/oa/approval?type=INCOME_PROOF&quick=1' },
+  { label: '物资申领', route: '/oa/approval?type=MATERIAL_APPLY&quick=1' }
 ]
 
 const topStats = computed(() => [
@@ -419,6 +426,22 @@ onMounted(init)
   margin: 8px 0 12px;
   color: #64748b;
   font-size: 12px;
+}
+
+.channel-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.channel-name {
+  font-weight: 600;
+}
+
+.channel-meta {
+  font-size: 12px;
+  color: #64748b;
 }
 
 .board-card {

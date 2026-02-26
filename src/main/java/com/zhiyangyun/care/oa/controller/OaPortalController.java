@@ -31,9 +31,7 @@ import com.zhiyangyun.care.oa.mapper.OaTodoMapper;
 import com.zhiyangyun.care.oa.mapper.OaWorkReportMapper;
 import com.zhiyangyun.care.oa.model.OaPortalSummary;
 import com.zhiyangyun.care.schedule.entity.AttendanceRecord;
-import com.zhiyangyun.care.schedule.entity.StaffSchedule;
 import com.zhiyangyun.care.schedule.mapper.AttendanceRecordMapper;
-import com.zhiyangyun.care.schedule.mapper.StaffScheduleMapper;
 import com.zhiyangyun.care.store.entity.InventoryBatch;
 import com.zhiyangyun.care.store.entity.MaterialPurchaseOrder;
 import com.zhiyangyun.care.store.entity.MaterialTransferOrder;
@@ -63,7 +61,6 @@ public class OaPortalController {
   private final OaWorkReportMapper workReportMapper;
   private final OaDocumentMapper documentMapper;
   private final OaSuggestionMapper suggestionMapper;
-  private final StaffScheduleMapper scheduleMapper;
   private final AttendanceRecordMapper attendanceRecordMapper;
   private final ElderAccountMapper elderAccountMapper;
   private final ElderAccountLogMapper elderAccountLogMapper;
@@ -84,7 +81,6 @@ public class OaPortalController {
       OaWorkReportMapper workReportMapper,
       OaDocumentMapper documentMapper,
       OaSuggestionMapper suggestionMapper,
-      StaffScheduleMapper scheduleMapper,
       AttendanceRecordMapper attendanceRecordMapper,
       ElderAccountMapper elderAccountMapper,
       ElderAccountLogMapper elderAccountLogMapper,
@@ -103,7 +99,6 @@ public class OaPortalController {
     this.workReportMapper = workReportMapper;
     this.documentMapper = documentMapper;
     this.suggestionMapper = suggestionMapper;
-    this.scheduleMapper = scheduleMapper;
     this.attendanceRecordMapper = attendanceRecordMapper;
     this.elderAccountMapper = elderAccountMapper;
     this.elderAccountLogMapper = elderAccountLogMapper;
@@ -158,10 +153,12 @@ public class OaPortalController {
         .eq(OaWorkReport::getStatus, "SUBMITTED")
         .ge(OaWorkReport::getReportDate, today.minusDays(30))));
 
-    Long todayScheduleCount = count(scheduleMapper.selectCount(Wrappers.lambdaQuery(StaffSchedule.class)
-        .eq(StaffSchedule::getIsDeleted, 0)
-        .eq(orgId != null, StaffSchedule::getOrgId, orgId)
-        .eq(StaffSchedule::getDutyDate, today)));
+    Long todayScheduleCount = count(taskMapper.selectCount(Wrappers.lambdaQuery(OaTask.class)
+        .eq(OaTask::getIsDeleted, 0)
+        .eq(orgId != null, OaTask::getOrgId, orgId)
+        .eq(OaTask::getStatus, "OPEN")
+        .ge(OaTask::getStartTime, today.atStartOfDay())
+        .lt(OaTask::getStartTime, today.plusDays(1).atStartOfDay())));
     Long attendanceAbnormalCount = count(attendanceRecordMapper.selectCount(Wrappers.lambdaQuery(AttendanceRecord.class)
         .eq(AttendanceRecord::getIsDeleted, 0)
         .eq(orgId != null, AttendanceRecord::getOrgId, orgId)

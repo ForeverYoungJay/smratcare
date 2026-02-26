@@ -16,6 +16,7 @@ public class InventoryAdjustment {
   private Long orgId;
   private Long productId;
   private Long batchId;
+  private String inventoryType;
   private String adjustType;
   private Integer adjustQty;
   private String reason;

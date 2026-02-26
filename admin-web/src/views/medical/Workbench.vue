@@ -108,7 +108,8 @@ const cards = computed(() => [
     actions: [
       { label: '待执行医嘱', route: '/health/medication/medication-registration?filter=to_execute&date=today' },
       { label: '超时任务', route: '/care/workbench/task-board?date=today&filter=overdue' },
-      { label: '巡查待完成', route: '/health/inspection?filter=pending&date=today' }
+      { label: '巡查待完成', route: '/health/inspection?filter=pending&date=today' },
+      { label: '账户联动', route: '/medical-care/integrated-account' }
     ]
   },
   {

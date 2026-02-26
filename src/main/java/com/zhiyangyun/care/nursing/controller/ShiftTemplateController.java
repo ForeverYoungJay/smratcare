@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.zhiyangyun.care.audit.service.AuditLogService;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
+import com.zhiyangyun.care.nursing.model.ShiftTemplateApplyRequest;
 import com.zhiyangyun.care.nursing.model.ShiftTemplateRequest;
 import com.zhiyangyun.care.nursing.model.ShiftTemplateResponse;
 import com.zhiyangyun.care.nursing.service.ShiftTemplateService;
@@ -76,6 +77,16 @@ public class ShiftTemplateController {
   @GetMapping("/list")
   public Result<List<ShiftTemplateResponse>> list(@RequestParam(required = false) Integer enabled) {
     return Result.ok(shiftTemplateService.list(AuthContext.getOrgId(), enabled));
+  }
+
+  @PreAuthorize("hasRole('ADMIN')")
+  @PostMapping("/{id}/apply")
+  public Result<Integer> apply(@PathVariable Long id, @Valid @RequestBody ShiftTemplateApplyRequest request) {
+    Long tenantId = AuthContext.getOrgId();
+    int count = shiftTemplateService.apply(id, tenantId, AuthContext.getStaffId(), request);
+    auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "APPLY", "SHIFT_TEMPLATE", id, "实施排班方案");
+    return Result.ok(count);
   }
 
   @PreAuthorize("hasRole('ADMIN')")

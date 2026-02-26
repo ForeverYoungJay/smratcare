@@ -11,6 +11,7 @@ public class InventoryAdjustRequest {
   private Long productId;
   private Long warehouseId;
   private Long batchId;
+  private String inventoryType;
   @NotBlank
   private String adjustType; // GAIN/LOSS
   @NotNull

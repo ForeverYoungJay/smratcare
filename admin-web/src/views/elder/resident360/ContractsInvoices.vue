@@ -4,11 +4,20 @@
       <a-col :xs="24" :lg="14">
         <a-card title="附件中心" class="card-elevated" :bordered="false">
           <a-space wrap style="margin-bottom: 12px">
-            <a-button type="primary">上传合同</a-button>
-            <a-button>上传收据/发票</a-button>
-            <a-button>手机拍照上传</a-button>
-            <a-button>下载打包</a-button>
+            <a-button type="primary" @click="openFilePicker('contract')">上传合同</a-button>
+            <a-button @click="openFilePicker('invoice')">上传收据/发票</a-button>
+            <a-button @click="downloadBundle">下载打包</a-button>
+            <a-button @click="downloadTemplate('contract')">下载空白合同</a-button>
+            <a-button @click="downloadTemplate('invoice')">下载空白发票</a-button>
+            <a-button @click="downloadTemplate('assessment')">下载空白评估报告</a-button>
           </a-space>
+          <input
+            ref="fileInputRef"
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+            style="display: none"
+            @change="onFileSelected"
+          />
           <a-table :columns="columns" :data-source="rows" row-key="id" :pagination="false" />
         </a-card>
       </a-col>
@@ -41,10 +50,14 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { message } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
 
 const router = useRouter()
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const uploadType = ref<'contract' | 'invoice'>('contract')
 
 const columns = [
   { title: '类型', dataIndex: 'type', key: 'type', width: 120 },
@@ -62,5 +75,91 @@ const rows = [
 
 function go(path: string) {
   router.push(path)
+}
+
+function openFilePicker(type: 'contract' | 'invoice') {
+  uploadType.value = type
+  fileInputRef.value?.click()
+}
+
+function onFileSelected(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+  const typeText = uploadType.value === 'contract' ? '合同' : '收据/发票'
+  message.success(`${typeText}文件已选择：${file.name}（演示环境）`)
+  target.value = ''
+}
+
+function downloadBundle() {
+  const content = rows
+    .map((item) => `${item.type},${item.name},${item.version},${item.operator},${item.time}`)
+    .join('\n')
+  const csv = `类型,文件名,版本,上传人,上传时间\n${content}`
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = '合同与票据-附件清单.csv'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+  message.success('附件清单已下载')
+}
+
+function downloadTemplate(type: 'contract' | 'invoice' | 'assessment') {
+  const templates = {
+    contract: {
+      name: '空白合同模板.txt',
+      content: `【长者入住合同（空白模板）】
+合同编号：
+甲方（机构）：
+乙方（长者/监护人）：
+入住日期：
+护理等级：
+服务套餐：
+费用条款：
+押金：
+付款周期：
+双方签字：
+日期：`
+    },
+    invoice: {
+      name: '空白发票模板.txt',
+      content: `【发票信息登记模板】
+发票抬头：
+税号：
+开票金额：
+项目名称：
+合同编号：
+开票日期：
+备注：`
+    },
+    assessment: {
+      name: '空白评估报告模板.txt',
+      content: `【入住评估报告（空白模板）】
+评估日期：
+评估人：
+自理能力：
+认知能力：
+风险评估：
+护理需求：
+评估结论：
+建议护理等级：
+备注：`
+    }
+  } as const
+  const item = templates[type]
+  const blob = new Blob([item.content], { type: 'text/plain;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = item.name
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+  message.success('模板已下载')
 }
 </script>

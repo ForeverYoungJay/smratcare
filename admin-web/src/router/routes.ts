@@ -867,6 +867,12 @@ export const routes: RouteRecordRaw[] = [
             name: 'MedicalCareCvdAssessment',
             component: () => import('../views/medical/CvdRiskAssessment.vue'),
             meta: { title: '心血管风险评估' }
+          },
+          {
+            path: 'integrated-account',
+            name: 'MedicalCareIntegratedAccount',
+            component: () => import('../views/medical/IntegratedHealthAccount.vue'),
+            meta: { title: '健康服务与医护账户一体化' }
           }
         ]
       },
@@ -1432,6 +1438,12 @@ export const routes: RouteRecordRaw[] = [
             name: 'OaApproval',
             component: () => import('../views/oa/Approval.vue'),
             meta: { title: '固定审批', hidden: true }
+          },
+          {
+            path: 'attendance-leave',
+            name: 'OaAttendanceLeave',
+            component: () => import('../views/oa/AttendanceLeave.vue'),
+            meta: { title: '考勤与请假', hidden: true }
           },
           {
             path: 'document',

@@ -20,6 +20,14 @@ export interface FireSafetyRecord {
   issueDescription?: string
   actionTaken?: string
   nextCheckDate?: string
+  qrToken?: string
+  qrGeneratedAt?: string
+  scanCompletedAt?: string
+  dutyRecord?: string
+  handoverPunchTime?: string
+  equipmentBatchNo?: string
+  equipmentUpdateNote?: string
+  equipmentAgingDisposal?: string
 }
 
 export interface FireSafetyRecordQuery {
@@ -43,5 +51,47 @@ export interface FireSafetyReportSummary {
   openCount: number
   closedCount: number
   overdueCount: number
+  dailyCompletedCount: number
+  monthlyCompletedCount: number
+  dutyRecordCount: number
+  handoverPunchCount: number
+  equipmentUpdateCount: number
+  equipmentAgingDisposalCount: number
   typeStats: FireSafetyTypeCount[]
+}
+
+export interface FireSafetyQrPayload {
+  recordId: number
+  qrToken: string
+  qrContent: string
+  generatedAt: string
+}
+
+export interface FireSafetyReportRecordItem {
+  id: number
+  recordType: FireSafetyRecordType
+  title: string
+  location?: string
+  inspectorName?: string
+  checkTime?: string
+  status?: FireSafetyStatus
+  scanCompletedAt?: string
+  dutyRecord?: string
+  handoverPunchTime?: string
+  equipmentBatchNo?: string
+  equipmentUpdateNote?: string
+  equipmentAgingDisposal?: string
+  issueDescription?: string
+  actionTaken?: string
+}
+
+export interface FireSafetyReportDetail {
+  totalCount: number
+  dailyCompletedCount: number
+  monthlyCompletedCount: number
+  dutyRecordCount: number
+  handoverPunchCount: number
+  equipmentUpdateCount: number
+  equipmentAgingDisposalCount: number
+  records: FireSafetyReportRecordItem[]
 }

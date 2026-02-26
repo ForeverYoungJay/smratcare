@@ -173,6 +173,7 @@ const query = reactive({
 const columns = [
   { title: '姓名', dataIndex: 'fullName', key: 'fullName', width: 120, sorter: true },
   { title: '身份证', dataIndex: 'idCardNo', key: 'idCardNo', width: 180 },
+  { title: '生日', dataIndex: 'birthDate', key: 'birthDate', width: 130, sorter: true },
   { title: '家庭地址', dataIndex: 'homeAddress', key: 'homeAddress', width: 220 },
   { title: '床位号', dataIndex: 'bedNo', key: 'bedNo', width: 120, sorter: true },
   { title: '护理等级', dataIndex: 'careLevel', key: 'careLevel', width: 120, sorter: true },
@@ -336,6 +337,7 @@ function exportCsvData() {
     rows.value.map((r) => ({
       姓名: r.fullName,
       身份证: r.idCardNo || '',
+      生日: r.birthDate || '',
       家庭地址: r.homeAddress || '',
       床位号: r.bedNo || '',
       护理等级: r.careLevel || '',

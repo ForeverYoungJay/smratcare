@@ -1,6 +1,5 @@
 package com.zhiyangyun.care.crm.model;
 
-import java.time.LocalDateTime;
 import lombok.Data;
 
 @Data
@@ -37,7 +36,7 @@ public class CrmLeadRequest {
   private String customerTag;
   private Integer status = 0;
   private Integer contractSignedFlag;
-  private LocalDateTime contractSignedAt;
+  private String contractSignedAt;
   private String contractNo;
   private String contractStatus;
   private String contractExpiryDate;
