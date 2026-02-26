@@ -40,13 +40,13 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'resident-360',
             name: 'ElderResident360',
-            component: () => import('../views/elder/Resident360.vue'),
+            component: () => import('../views/elder/resident360/Resident360.vue'),
             meta: { title: 'Resident 360', hidden: true }
           },
           {
             path: 'bed-panorama',
             name: 'ElderBedPanorama',
-            component: () => import('../views/elder/BedPanorama360.vue'),
+            component: () => import('../views/elder/resident360/BedPanorama.vue'),
             meta: { title: '床态全景' }
           },
           {
@@ -58,13 +58,13 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'admission-assessment',
             name: 'ElderAdmissionAssessment',
-            component: () => import('../views/elder/AdmissionAssessment.vue'),
+            component: () => import('../views/elder/resident360/AdmissionAssessment.vue'),
             meta: { title: '入住评估' }
           },
           {
             path: 'contracts-invoices',
             name: 'ElderContractsInvoices',
-            component: () => import('../views/elder/ContractsInvoices.vue'),
+            component: () => import('../views/elder/resident360/ContractsInvoices.vue'),
             meta: { title: '合同与票据' }
           },
           {
@@ -76,19 +76,19 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'in-hospital-overview',
             name: 'ElderInHospitalOverview',
-            component: () => import('../views/elder/InHospitalOverview.vue'),
+            component: () => import('../views/elder/resident360/InHospitalOverview.vue'),
             meta: { title: '在院服务总览' }
           },
           {
             path: 'status-change',
             name: 'ElderStatusChangeCenter',
-            component: () => import('../views/elder/StatusChangeCenter.vue'),
+            component: () => import('../views/elder/resident360/StatusChangeCenter.vue'),
             meta: { title: '入住状态变更' }
           },
           {
             path: 'discharge-settlement',
             name: 'ElderDischargeSettlement',
-            component: () => import('../views/elder/DischargeSettlement.vue'),
+            component: () => import('../views/elder/resident360/DischargeSettlement.vue'),
             meta: { title: '退院结算' }
           },
           {
@@ -443,6 +443,30 @@ export const routes: RouteRecordRaw[] = [
             name: 'CareAudit',
             component: () => import('../views/care/Audit.vue'),
             meta: { title: '防作弊审计', hidden: true }
+          },
+          {
+            path: 'workbench/task-board',
+            name: 'CareWorkbenchTaskBoard',
+            component: () => import('../views/care/workbench/TaskBoard.vue'),
+            meta: { title: '照护任务看板', hidden: true }
+          },
+          {
+            path: 'workbench/plan',
+            name: 'CareWorkbenchPlan',
+            component: () => import('../views/care/workbench/CarePlan.vue'),
+            meta: { title: '照护计划', hidden: true }
+          },
+          {
+            path: 'workbench/qr',
+            name: 'CareWorkbenchQr',
+            component: () => import('../views/care/workbench/ScanExecute.vue'),
+            meta: { title: '护工扫码执行', hidden: true }
+          },
+          {
+            path: 'workbench/task',
+            name: 'CareWorkbenchTask',
+            component: () => import('../views/care/workbench/ServiceBooking.vue'),
+            meta: { title: '服务预约', hidden: true }
           }
         ]
       },

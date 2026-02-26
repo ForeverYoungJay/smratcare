@@ -43,7 +43,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import PageContainer from '../../components/PageContainer.vue'
+import PageContainer from '../../../components/PageContainer.vue'
 
 const router = useRouter()
 
@@ -153,10 +153,10 @@ const cards = [
       '近 3 笔交易：缴费 2000 / 扣费 500 / 退款 200'
     ],
     actions: [
-      { label: '查看账单', path: `/finance/resident-bill?residentId=${residentId}&period=this_month`, primary: true },
+      { label: '查看账单', path: `/finance/bill?residentId=${residentId}&period=this_month`, primary: true },
       { label: '缴费/充值', path: `/finance/resident-bill-payment?residentId=${residentId}` },
       { label: '退住结算', path: `/elder/discharge-settlement?residentId=${residentId}` },
-      { label: '费用明细', path: `/finance/resident-bill-log?residentId=${residentId}` }
+      { label: '费用明细', path: `/finance/account-log?residentId=${residentId}` }
     ]
   },
   {

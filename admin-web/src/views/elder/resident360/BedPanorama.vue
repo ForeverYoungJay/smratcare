@@ -66,9 +66,9 @@
 import { computed, onMounted, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
-import PageContainer from '../../components/PageContainer.vue'
-import { getBedMap } from '../../api/bed'
-import type { BedItem } from '../../types'
+import PageContainer from '../../../components/PageContainer.vue'
+import { getBedMap } from '../../../api/bed'
+import type { BedItem } from '../../../types'
 
 type TreeNode = { title: string; key: string; children?: TreeNode[] }
 

@@ -47,7 +47,7 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import PageContainer from '../../components/PageContainer.vue'
+import PageContainer from '../../../components/PageContainer.vue'
 
 const router = useRouter()
 
