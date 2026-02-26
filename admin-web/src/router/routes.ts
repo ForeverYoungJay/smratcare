@@ -1291,6 +1291,12 @@ export const routes: RouteRecordRaw[] = [
                 name: 'OaYearlyReport',
                 component: () => import('../views/oa/YearlyReport.vue'),
                 meta: { title: '年总结' }
+              },
+              {
+                path: 'attendance-leave',
+                name: 'OaWorkExecutionAttendanceLeave',
+                redirect: '/oa/attendance-leave',
+                meta: { title: '考勤与请假' }
               }
             ]
           },
