@@ -68,6 +68,7 @@ import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../../components/PageContainer.vue'
 import { getBedMap } from '../../../api/bed'
+import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
 import type { BedItem } from '../../../types'
 
 type TreeNode = { title: string; key: string; children?: TreeNode[] }
@@ -190,9 +191,23 @@ function goScan() {
   router.push(`/care/workbench/qr?bedId=${selectedBed.value?.id || ''}`)
 }
 
-onMounted(async () => {
+async function loadBeds() {
   beds.value = await getBedMap()
-  selectedBed.value = beds.value[0] || null
+  if (!selectedBed.value && beds.value.length > 0) {
+    selectedBed.value = beds.value[0]
+  }
+}
+
+useLiveSyncRefresh({
+  topics: ['elder', 'bed', 'lifecycle', 'finance', 'care', 'dining'],
+  refresh: () => {
+    loadBeds()
+  }
+})
+
+onMounted(async () => {
+  await loadBeds()
+  selectedBed.value = selectedBed.value || null
 })
 </script>
 

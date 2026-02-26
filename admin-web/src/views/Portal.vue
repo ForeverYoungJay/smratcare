@@ -163,6 +163,7 @@ import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { useUserStore } from '../stores/user'
 import { getPortalSummary } from '../api/oa'
+import { useLiveSyncRefresh } from '../composables/useLiveSyncRefresh'
 import type { OaPortalSummary } from '../types'
 
 const router = useRouter()
@@ -274,6 +275,14 @@ async function loadSummary() {
   Object.assign(summary, data)
   refreshedAt.value = dayjs().format('YYYY-MM-DD HH:mm:ss')
 }
+
+useLiveSyncRefresh({
+  topics: ['elder', 'bed', 'lifecycle', 'finance', 'care', 'health', 'dining', 'marketing', 'oa'],
+  refresh: () => {
+    loadSummary()
+  },
+  debounceMs: 800
+})
 
 async function init() {
   try {

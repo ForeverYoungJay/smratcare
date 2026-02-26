@@ -145,6 +145,7 @@ import { message } from 'ant-design-vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import QRCode from 'qrcode'
 import PageContainer from '../../components/PageContainer.vue'
+import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { getBaseConfigItemList } from '../../api/baseConfig'
 import { exportCsv } from '../../utils/export'
 import { getElderPage, assignBed, unbindBed, bindFamily } from '../../api/elder'
@@ -434,6 +435,15 @@ function printQr() {
   win.print()
   win.close()
 }
+
+useLiveSyncRefresh({
+  topics: ['elder', 'bed', 'lifecycle', 'finance'],
+  refresh: () => {
+    fetchData()
+    loadBeds()
+  },
+  debounceMs: 600
+})
 
 onMounted(() => {
   loadDischargeFeeConfigOptions()

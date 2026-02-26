@@ -110,6 +110,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
+import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { getElderPage } from '../../api/elder'
 import { getBedList, getBuildingList, getFloorList, getRoomList } from '../../api/bed'
 import { admitElder, exportAdmissionRecords, getAdmissionRecords } from '../../api/elderLifecycle'
@@ -308,6 +309,16 @@ watch(
     form.bedId = undefined
   }
 )
+
+useLiveSyncRefresh({
+  topics: ['elder', 'bed', 'lifecycle', 'finance', 'care'],
+  refresh: () => {
+    loadElders()
+    loadAssets()
+    fetchAdmissionRecords()
+  },
+  debounceMs: 700
+})
 
 onMounted(async () => {
   await loadElders()

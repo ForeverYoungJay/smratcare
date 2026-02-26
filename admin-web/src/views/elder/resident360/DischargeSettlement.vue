@@ -10,8 +10,8 @@
             <a-descriptions-item label="床位释放">结算完成后自动释放并回写床态</a-descriptions-item>
           </a-descriptions>
           <a-space style="margin-top: 12px">
-            <a-button type="primary" @click="go('/finance/resident-bill?period=this_month')">查看账单</a-button>
-            <a-button @click="go('/finance/resident-bill-log')">费用明细</a-button>
+            <a-button type="primary" @click="go('/finance/bill?period=this_month')">查看账单</a-button>
+            <a-button @click="go('/finance/account-log')">费用明细</a-button>
             <a-button danger @click="go('/elder/discharge')">确认退院登记</a-button>
           </a-space>
         </a-card>

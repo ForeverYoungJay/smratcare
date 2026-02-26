@@ -86,6 +86,8 @@ const cards = [
     ],
     actions: [
       { label: '做评估', path: `/assessment/ability/admission?residentId=${residentId}&template=GBT42195`, primary: true },
+      { label: '中医体质评估', path: `/medical-care/assessment/tcm?residentId=${residentId}&from=resident360` },
+      { label: '心血管风险评估', path: `/medical-care/assessment/cvd?residentId=${residentId}&from=resident360` },
       { label: '创建风险处置任务', path: `/oa/work-execution/task?residentId=${residentId}&category=risk` },
       { label: '查看历史评估', path: `/assessment/ability/archive?residentId=${residentId}` }
     ]

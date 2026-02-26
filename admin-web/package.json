@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "echo 'no lint configured'",
+    "check:navigation": "node scripts/check-navigation.mjs",
     "test:unit": "vitest run"
   },
   "dependencies": {

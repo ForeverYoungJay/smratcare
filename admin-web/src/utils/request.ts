@@ -3,6 +3,7 @@ import { message } from 'ant-design-vue'
 import router from '../router'
 import { getToken, clearToken, clearRoles, clearPermissions } from './auth'
 import type { PageResult } from '../types/common'
+import { emitLiveSync, inferLiveSyncTopics } from './liveSync'
 
 const request = axios.create({
   baseURL: '/',
@@ -33,13 +34,31 @@ request.interceptors.request.use((config) => {
 
 request.interceptors.response.use(
   (response) => {
+    const method = String(response.config?.method || 'GET').toUpperCase()
+    const url = String(response.config?.url || '')
     const data = response.data
     if (data && typeof data.code !== 'undefined') {
       if (data.code !== 0) {
         message.error(resolveErrorMessage(data))
         return Promise.reject(data)
       }
+      if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+        emitLiveSync({
+          topics: inferLiveSyncTopics(url),
+          method,
+          url,
+          at: Date.now()
+        })
+      }
       return data.data
+    }
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+      emitLiveSync({
+        topics: inferLiveSyncTopics(url),
+        method,
+        url,
+        at: Date.now()
+      })
     }
     return data
   },

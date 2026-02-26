@@ -31,7 +31,7 @@
           </a-typography-paragraph>
           <a-space direction="vertical" style="width: 100%">
             <a-button block type="primary" @click="go('/marketing/contract-management')">查看合同详情</a-button>
-            <a-button block @click="go('/finance/resident-bill')">前往费用账单</a-button>
+            <a-button block @click="go('/finance/bill')">前往费用账单</a-button>
             <a-button block @click="go('/elder/admission-processing')">返回入住办理</a-button>
           </a-space>
         </a-card>

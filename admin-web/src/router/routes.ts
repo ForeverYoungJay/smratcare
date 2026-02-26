@@ -845,6 +845,32 @@ export const routes: RouteRecordRaw[] = [
         ]
       },
       {
+        path: 'medical-care',
+        name: 'MedicalCare',
+        meta: { title: '医护照护一体化', icon: 'MedicineBoxOutlined' },
+        redirect: '/medical-care/workbench',
+        children: [
+          {
+            path: 'workbench',
+            name: 'MedicalCareWorkbench',
+            component: () => import('../views/medical/Workbench.vue'),
+            meta: { title: '医护照护工作台' }
+          },
+          {
+            path: 'assessment/tcm',
+            name: 'MedicalCareTcmAssessment',
+            component: () => import('../views/medical/TcmAssessment.vue'),
+            meta: { title: '中医体质评估' }
+          },
+          {
+            path: 'assessment/cvd',
+            name: 'MedicalCareCvdAssessment',
+            component: () => import('../views/medical/CvdRiskAssessment.vue'),
+            meta: { title: '心血管风险评估' }
+          }
+        ]
+      },
+      {
         path: 'fire',
         name: 'FireSafety',
         meta: { title: '消防安全管理', icon: 'SafetyOutlined' },
