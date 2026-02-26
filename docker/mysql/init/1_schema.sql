@@ -614,6 +614,7 @@ CREATE TABLE inventory_adjustment (
   org_id BIGINT NOT NULL COMMENT '机构ID',
   product_id BIGINT NOT NULL COMMENT '商品ID',
   batch_id BIGINT DEFAULT NULL COMMENT '批次ID',
+  inventory_type VARCHAR(32) DEFAULT NULL COMMENT '盘点类型 ASSET/MATERIAL/CONSUMABLE',
   adjust_type VARCHAR(32) NOT NULL COMMENT '盘点类型 GAIN/LOSS',
   adjust_qty INT NOT NULL COMMENT '调整数量',
   reason VARCHAR(255) DEFAULT NULL COMMENT '原因',
