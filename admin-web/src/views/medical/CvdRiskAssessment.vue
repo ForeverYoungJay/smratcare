@@ -273,6 +273,10 @@ async function confirmPublish() {
       router.push(result.inspectionRoute)
       return
     }
+    if (publishActions.generateFollowupTask && result.careTaskRoute) {
+      router.push(result.careTaskRoute)
+      return
+    }
     if (publishActions.suggestMedicalOrder && result.medicalOrderRoute) {
       router.push(result.medicalOrderRoute)
     }

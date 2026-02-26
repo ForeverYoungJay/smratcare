@@ -41,22 +41,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../../components/PageContainer.vue'
+import { getResidentRiskCard } from '../../../api/medicalCare'
+import type { MedicalResidentRiskCard } from '../../../types'
 
 const router = useRouter()
+const route = useRoute()
 
-const residentId = 1001
+const residentId = Number(route.query.residentId || 1001)
 const eventId = 8801
 const currentStatus = ref<'INTENT' | 'TRIAL' | 'IN' | 'OUT' | 'MEDICAL_OUT' | 'DISCHARGE_PENDING' | 'DISCHARGED' | 'DECEASED'>('OUT')
 const hasUnclosedIncident = ref(true)
+const riskCard = ref<MedicalResidentRiskCard | null>(null)
 
 function go(path: string) {
   router.push(path)
 }
 
-const cards = [
+const cards = ref([
   {
     key: 'status-event',
     title: '卡片1：状态与事件总览',
@@ -80,9 +84,9 @@ const cards = [
     tag: '风险驱动',
     tagColor: 'red',
     lines: [
-      '风险标签：跌倒(红) / 压疮(黄) / 过敏(绿)，更新时间 2026-02-26 08:00',
-      '最新评估：2026-02-20，评估等级 B，建议护理等级 N3',
-      '风险处置任务：2 条未完成，1 条待复评'
+      '风险标签：评估数据加载中...',
+      '最新评估：--',
+      '风险处置任务：--'
     ],
     actions: [
       { label: '做评估', path: `/assessment/ability/admission?residentId=${residentId}&template=GBT42195`, primary: true },
@@ -262,7 +266,29 @@ const cards = [
       { label: '关联到事件/合同/账单', path: `/elder/contracts-invoices?residentId=${residentId}&action=bind` }
     ]
   }
-]
+])
+
+function riskLabel(value?: string) {
+  if (value === 'VERY_HIGH') return '极高风险'
+  if (value === 'HIGH') return '高风险'
+  if (value === 'MEDIUM') return '中风险'
+  if (value === 'LOW') return '低风险'
+  return value || '未分层'
+}
+
+async function loadRiskCard() {
+  const data = await getResidentRiskCard(residentId)
+  riskCard.value = data
+  const target = cards.value.find((item) => item.key === 'risk-level')
+  if (!target) return
+  target.lines = [
+    `风险标签：心血管${riskLabel(data.latestCvdRiskLevel)} / 体质${data.latestTcmPrimary || '-'}，更新时间 ${data.latestCvdDate || data.latestTcmDate || '--'}`,
+    `最新评估：体质 ${data.latestTcmPrimary || '-'}-${data.latestTcmSecondary || '-'}；心血管 ${riskLabel(data.latestCvdRiskLevel)}`,
+    `风险处置任务：待办 ${data.pendingCareTaskCount || 0} 条，异常体征24h ${data.abnormalVital24hCount || 0} 条`
+  ]
+}
+
+onMounted(loadRiskCard)
 </script>
 
 <style scoped>

@@ -6,18 +6,23 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
+import com.zhiyangyun.care.entity.CareTaskDaily;
 import com.zhiyangyun.care.health.entity.HealthInspection;
 import com.zhiyangyun.care.health.entity.HealthNursingLog;
 import com.zhiyangyun.care.health.mapper.HealthInspectionMapper;
 import com.zhiyangyun.care.health.mapper.HealthNursingLogMapper;
 import com.zhiyangyun.care.health.support.ElderResolveSupport;
+import com.zhiyangyun.care.mapper.CareTaskDailyMapper;
 import com.zhiyangyun.care.medicalcare.entity.MedicalCvdRiskAssessment;
 import com.zhiyangyun.care.medicalcare.mapper.MedicalCvdRiskAssessmentMapper;
 import com.zhiyangyun.care.medicalcare.model.CvdPublishActionRequest;
 import com.zhiyangyun.care.medicalcare.model.MedicalCvdRiskAssessmentRequest;
+import com.zhiyangyun.care.model.CareTaskCreateRequest;
+import com.zhiyangyun.care.service.CareTaskService;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -37,16 +42,22 @@ public class MedicalCvdRiskAssessmentController {
   private final ElderResolveSupport elderResolveSupport;
   private final HealthInspectionMapper inspectionMapper;
   private final HealthNursingLogMapper nursingLogMapper;
+  private final CareTaskService careTaskService;
+  private final CareTaskDailyMapper careTaskDailyMapper;
 
   public MedicalCvdRiskAssessmentController(
       MedicalCvdRiskAssessmentMapper mapper,
       ElderResolveSupport elderResolveSupport,
       HealthInspectionMapper inspectionMapper,
-      HealthNursingLogMapper nursingLogMapper) {
+      HealthNursingLogMapper nursingLogMapper,
+      CareTaskService careTaskService,
+      CareTaskDailyMapper careTaskDailyMapper) {
     this.mapper = mapper;
     this.elderResolveSupport = elderResolveSupport;
     this.inspectionMapper = inspectionMapper;
     this.nursingLogMapper = nursingLogMapper;
+    this.careTaskService = careTaskService;
+    this.careTaskDailyMapper = careTaskDailyMapper;
   }
 
   @GetMapping("/page")
@@ -114,11 +125,13 @@ public class MedicalCvdRiskAssessmentController {
 
     Long inspectionId = null;
     Long nursingLogId = null;
+    Long careTaskId = null;
     if (item.getGenerateInspectionPlan() != null && item.getGenerateInspectionPlan() == 1) {
       inspectionId = createInspectionPlan(item);
     }
     if (item.getGenerateFollowupTask() != null && item.getGenerateFollowupTask() == 1) {
       nursingLogId = createFollowupTask(item, inspectionId);
+      careTaskId = createCareFollowTask(item);
     }
 
     Map<String, Object> response = new HashMap<>();
@@ -126,6 +139,8 @@ public class MedicalCvdRiskAssessmentController {
     response.put("status", item.getStatus());
     response.put("inspectionId", inspectionId);
     response.put("nursingLogId", nursingLogId);
+    response.put("careTaskId", careTaskId);
+    response.put("careTaskRoute", "/care/workbench/task-board?date=today&residentId=" + item.getElderId());
     response.put("inspectionRoute", "/health/inspection?residentId=" + item.getElderId() + "&template=cvd_high_risk");
     response.put("medicalOrderRoute", "/life/health-basic?residentId=" + item.getElderId() + "&from=cvd_risk_assessment");
     return Result.ok(response);
@@ -181,6 +196,22 @@ public class MedicalCvdRiskAssessmentController {
     nursingLog.setIsDeleted(0);
     nursingLogMapper.insert(nursingLog);
     return nursingLog.getId();
+  }
+
+  private Long createCareFollowTask(MedicalCvdRiskAssessment item) {
+    CareTaskCreateRequest request = new CareTaskCreateRequest();
+    request.setElderId(item.getElderId());
+    request.setTaskName("心血管高风险医护随访");
+    request.setPlanTime(LocalDateTime.now().plusHours(1).format(DateTimeFormatter.ISO_DATE_TIME));
+    request.setStatus("PENDING");
+    Long taskId = careTaskService.createTask(item.getOrgId(), request);
+    CareTaskDaily taskDaily = careTaskDailyMapper.selectById(taskId);
+    if (taskDaily != null) {
+      taskDaily.setSourceType("CVD_RISK");
+      taskDaily.setSourceId(item.getId());
+      careTaskDailyMapper.updateById(taskDaily);
+    }
+    return taskId;
   }
 
   private void fillFromRequest(MedicalCvdRiskAssessment item, MedicalCvdRiskAssessmentRequest request, Long elderId) {

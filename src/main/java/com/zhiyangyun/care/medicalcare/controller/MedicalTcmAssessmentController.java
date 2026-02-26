@@ -6,12 +6,18 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
+import com.zhiyangyun.care.entity.CareTaskDaily;
 import com.zhiyangyun.care.health.support.ElderResolveSupport;
+import com.zhiyangyun.care.mapper.CareTaskDailyMapper;
 import com.zhiyangyun.care.medicalcare.entity.MedicalTcmAssessment;
 import com.zhiyangyun.care.medicalcare.mapper.MedicalTcmAssessmentMapper;
 import com.zhiyangyun.care.medicalcare.model.MedicalTcmAssessmentRequest;
+import com.zhiyangyun.care.model.CareTaskCreateRequest;
+import com.zhiyangyun.care.service.CareTaskService;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,10 +33,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class MedicalTcmAssessmentController {
   private final MedicalTcmAssessmentMapper mapper;
   private final ElderResolveSupport elderResolveSupport;
+  private final CareTaskService careTaskService;
+  private final CareTaskDailyMapper careTaskDailyMapper;
 
-  public MedicalTcmAssessmentController(MedicalTcmAssessmentMapper mapper, ElderResolveSupport elderResolveSupport) {
+  public MedicalTcmAssessmentController(
+      MedicalTcmAssessmentMapper mapper,
+      ElderResolveSupport elderResolveSupport,
+      CareTaskService careTaskService,
+      CareTaskDailyMapper careTaskDailyMapper) {
     this.mapper = mapper;
     this.elderResolveSupport = elderResolveSupport;
+    this.careTaskService = careTaskService;
+    this.careTaskDailyMapper = careTaskDailyMapper;
   }
 
   @GetMapping("/page")
@@ -92,6 +106,9 @@ public class MedicalTcmAssessmentController {
     }
     item.setStatus("PUBLISHED");
     mapper.updateById(item);
+    if (item.getGenerateNursingTask() != null && item.getGenerateNursingTask() == 1) {
+      createTcmCareTask(item);
+    }
     return Result.ok(item);
   }
 
@@ -175,5 +192,20 @@ public class MedicalTcmAssessmentController {
       return null;
     }
     return LocalDate.parse(date);
+  }
+
+  private void createTcmCareTask(MedicalTcmAssessment item) {
+    CareTaskCreateRequest request = new CareTaskCreateRequest();
+    request.setElderId(item.getElderId());
+    request.setTaskName("体质调养护理任务");
+    request.setPlanTime(LocalDateTime.now().plusHours(1).format(DateTimeFormatter.ISO_DATE_TIME));
+    request.setStatus("PENDING");
+    Long taskId = careTaskService.createTask(item.getOrgId(), request);
+    CareTaskDaily taskDaily = careTaskDailyMapper.selectById(taskId);
+    if (taskDaily != null) {
+      taskDaily.setSourceType("TCM_CONSTITUTION");
+      taskDaily.setSourceId(item.getId());
+      careTaskDailyMapper.updateById(taskDaily);
+    }
   }
 }

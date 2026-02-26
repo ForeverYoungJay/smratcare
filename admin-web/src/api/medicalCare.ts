@@ -1,5 +1,5 @@
 import request, { fetchPage } from '../utils/request'
-import type { MedicalCareWorkbenchSummary, MedicalCvdAssessment, MedicalTcmAssessment } from '../types'
+import type { MedicalCareWorkbenchSummary, MedicalCvdAssessment, MedicalResidentRiskCard, MedicalTcmAssessment } from '../types'
 
 export function getMedicalCareWorkbenchSummary() {
   return request.get<MedicalCareWorkbenchSummary>('/api/medical-care/workbench/summary')
@@ -41,9 +41,16 @@ export function publishCvdAssessment(
   id: number,
   actions: { generateInspectionPlan?: number; generateFollowupTask?: number; suggestMedicalOrder?: number }
 ) {
-  return request.post<{ inspectionRoute?: string; medicalOrderRoute?: string }>(`/api/medical-care/cvd-assessments/${id}/publish`, actions)
+  return request.post<{ inspectionRoute?: string; medicalOrderRoute?: string; careTaskRoute?: string }>(
+    `/api/medical-care/cvd-assessments/${id}/publish`,
+    actions
+  )
 }
 
 export function deleteCvdAssessment(id: number) {
   return request.delete<void>(`/api/medical-care/cvd-assessments/${id}`)
+}
+
+export function getResidentRiskCard(residentId: number) {
+  return request.get<MedicalResidentRiskCard>('/api/medical-care/resident360/risk-card', { params: { residentId } })
 }

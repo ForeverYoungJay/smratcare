@@ -57,6 +57,42 @@ export interface MedicalCareRiskResident {
 }
 
 export interface MedicalCareWorkbenchSummary {
+  pendingMedicalOrderCount: number
+  pendingReviewCount: number
+  pendingAuditCount: number
+  unclosedAbnormalCount: number
+  todayInspectionTodoCount: number
+  topRiskResidentCount: number
+  abnormalVital24hCount: number
+  abnormalEvent24hCount: number
+  medicalOrderShouldCount: number
+  medicalOrderDoneCount: number
+  medicalOrderPendingCount: number
+  medicalOrderAbnormalCount: number
+  orderCheckRate: number
+  medicationShouldCount: number
+  medicationDoneCount: number
+  medicationUndoneCount: number
+  medicationLowStockCount: number
+  medicationRequestPendingCount: number
+  careTaskShouldCount: number
+  careTaskDoneCount: number
+  careTaskOverdueCount: number
+  scanExecuteRate: number
+  todayInspectionPlanCount: number
+  nursingLogPendingCount: number
+  handoverPendingCount: number
+  handoverDoneCount: number
+  handoverRiskCount: number
+  handoverTodoCount: number
+  incidentOpenCount: number
+  incident30dCount: number
+  incident30dRate: number
+  lowScoreSurveyCount: number
+  rectifyInProgressCount: number
+  rectifyOverdueCount: number
+  aiReportGeneratedCount: number
+  aiReportPublishedCount: number
   pendingCareTaskCount: number
   overdueCareTaskCount: number
   todayInspectionPendingCount: number
@@ -68,4 +104,23 @@ export interface MedicalCareWorkbenchSummary {
   cvdHighRiskCount: number
   cvdNeedFollowupCount: number
   keyResidents: MedicalCareRiskResident[]
+}
+
+export interface MedicalResidentRiskCard {
+  elderId?: number
+  elderName?: string
+  latestTcmPrimary?: string
+  latestTcmSecondary?: string
+  latestTcmDate?: string
+  latestTcmSuggestion?: string
+  latestCvdRiskLevel?: string
+  latestCvdDate?: string
+  latestCvdFactors?: string
+  latestCvdConclusion?: string
+  abnormalVital24hCount: number
+  abnormalInspectionOpenCount: number
+  openIncidentCount: number
+  pendingCareTaskCount: number
+  tcmAssessmentRoute?: string
+  cvdAssessmentRoute?: string
 }
