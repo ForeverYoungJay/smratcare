@@ -7,6 +7,7 @@ import type {
   OaTask,
   OaPortalSummary,
   OaWorkReport,
+  OaWorkReportSummary,
   OaAlbum,
   OaKnowledge,
   OaGroupSetting,
@@ -351,6 +352,10 @@ export function exportOaTask(params: any) {
 
 export function getOaWorkReportPage(params: any) {
   return fetchPage<OaWorkReport>('/api/oa/report/page', params)
+}
+
+export function getOaWorkReportSummary(params: any) {
+  return request.get<OaWorkReportSummary>('/api/oa/report/summary', { params })
 }
 
 export function getDailyWorkReportPage(params: any) {

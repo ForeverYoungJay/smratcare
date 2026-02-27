@@ -17,25 +17,45 @@
       </template>
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="onTableChange">
-      <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'riskLevel'">
-          <a-tag :color="riskColor(record.riskLevel)">{{ riskLabel(record.riskLevel) }}</a-tag>
+    <StatefulBlock :loading="summaryLoading" :error="summaryError" :empty="false" @retry="fetchData">
+      <a-row :gutter="[12, 12]" style="margin-bottom: 12px">
+        <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="总评估" :value="summary.totalCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已发布" :value="summary.publishedCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="草稿" :value="summary.draftCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="高风险" :value="summary.highRiskCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="极高风险" :value="summary.veryHighRiskCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="随访逾期" :value="summary.followupOverdueCount || 0" /></a-card></a-col>
+      </a-row>
+      <a-alert
+        v-if="(summary.veryHighRiskCount || 0) > 0 || (summary.followupOverdueCount || 0) > 0"
+        type="warning"
+        show-icon
+        style="margin-bottom: 12px"
+        :message="`风险提醒：极高风险 ${summary.veryHighRiskCount || 0} 条，随访逾期 ${summary.followupOverdueCount || 0} 条。`"
+      />
+    </StatefulBlock>
+
+    <StatefulBlock :loading="loading" :error="tableError" :empty="!loading && !tableError && rows.length === 0" empty-text="暂无心血管风险评估记录" @retry="fetchData">
+      <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="false" :pagination="pagination" @change="onTableChange">
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'riskLevel'">
+            <a-tag :color="riskColor(record.riskLevel)">{{ riskLabel(record.riskLevel) }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'status'">
+            <a-tag :color="record.status === 'PUBLISHED' ? 'green' : 'blue'">{{ record.status === 'PUBLISHED' ? '已发布' : '草稿' }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'action'">
+            <a-space>
+              <a-button type="link" @click="openEdit(record)">编辑</a-button>
+              <a-button type="link" @click="openPublish(record)" :disabled="record.status === 'PUBLISHED'">发布</a-button>
+              <a-popconfirm title="确认删除该记录?" @confirm="remove(record)">
+                <a-button danger type="link">删除</a-button>
+              </a-popconfirm>
+            </a-space>
+          </template>
         </template>
-        <template v-else-if="column.key === 'status'">
-          <a-tag :color="record.status === 'PUBLISHED' ? 'green' : 'blue'">{{ record.status === 'PUBLISHED' ? '已发布' : '草稿' }}</a-tag>
-        </template>
-        <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" @click="openEdit(record)">编辑</a-button>
-            <a-button type="link" @click="openPublish(record)" :disabled="record.status === 'PUBLISHED'">发布</a-button>
-            <a-popconfirm title="确认删除该记录?" @confirm="remove(record)">
-              <a-button danger type="link">删除</a-button>
-            </a-popconfirm>
-          </a-space>
-        </template>
-      </template>
-    </DataTable>
+      </DataTable>
+    </StatefulBlock>
 
     <a-modal v-model:open="editOpen" :title="form.id ? '编辑心血管风险评估' : '新建心血管风险评估'" width="900px" @ok="submit" :confirm-loading="saving">
       <a-form layout="vertical">
@@ -93,16 +113,36 @@ import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import StatefulBlock from '../../components/StatefulBlock.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
-import { createCvdAssessment, deleteCvdAssessment, getCvdAssessmentPage, publishCvdAssessment, updateCvdAssessment } from '../../api/medicalCare'
-import type { MedicalCvdAssessment, PageResult } from '../../types'
+import {
+  createCvdAssessment,
+  deleteCvdAssessment,
+  getCvdAssessmentPage,
+  getCvdAssessmentSummary,
+  publishCvdAssessment,
+  updateCvdAssessment
+} from '../../api/medicalCare'
+import type { MedicalCvdAssessment, MedicalCvdAssessmentSummary } from '../../types'
 
 const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
+const tableError = ref('')
+const summaryLoading = ref(false)
+const summaryError = ref('')
 const rows = ref<MedicalCvdAssessment[]>([])
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const query = reactive({ keyword: '', riskLevel: '', needFollowup: undefined as number | undefined, dateRange: [] as any[], pageNo: 1, pageSize: 10 })
+const summary = reactive<MedicalCvdAssessmentSummary>({
+  totalCount: 0,
+  draftCount: 0,
+  publishedCount: 0,
+  highRiskCount: 0,
+  veryHighRiskCount: 0,
+  needFollowupCount: 0,
+  followupOverdueCount: 0
+})
 
 const columns = [
   { title: '长者', dataIndex: 'elderName', key: 'elderName', width: 120 },
@@ -211,12 +251,25 @@ function buildParams() {
 
 async function fetchData() {
   loading.value = true
+  summaryLoading.value = true
+  tableError.value = ''
+  summaryError.value = ''
   try {
-    const res = (await getCvdAssessmentPage(buildParams())) as PageResult<MedicalCvdAssessment>
+    const params = buildParams()
+    const [res, sum] = await Promise.all([
+      getCvdAssessmentPage(params),
+      getCvdAssessmentSummary(params)
+    ])
     rows.value = res.list || []
     pagination.total = res.total || 0
+    Object.assign(summary, sum || {})
+  } catch (error: any) {
+    const text = error?.message || '加载失败，请稍后重试'
+    tableError.value = text
+    summaryError.value = text
   } finally {
     loading.value = false
+    summaryLoading.value = false
   }
 }
 

@@ -1,48 +1,60 @@
 <template>
   <PageContainer title="医护照护工作台" subTitle="Medical & Care 一体化管理">
-    <a-row :gutter="16">
-      <a-col :xs="24" :md="12" :xl="8" v-for="card in cards" :key="card.key" style="margin-bottom: 16px">
-        <a-card :title="card.title" :bordered="false" class="card-elevated card-click" @click="go(card.route)">
-          <template #extra>
-            <a-tag color="blue">{{ card.badge }}</a-tag>
-          </template>
-          <div v-for="line in card.lines" :key="line" class="line">{{ line }}</div>
-          <a-space wrap style="margin-top: 12px">
-            <a-button v-for="action in card.actions" :key="action.label" size="small" @click.stop="go(action.route)">
-              {{ action.label }}
-            </a-button>
-          </a-space>
-        </a-card>
-      </a-col>
-    </a-row>
-
-    <a-card title="卡片B：今日长者重点关注 Top" :bordered="false" class="card-elevated">
-      <a-empty v-if="!summary.keyResidents?.length" description="暂无高风险长者" />
-      <a-list v-else :data-source="summary.keyResidents">
-        <template #renderItem="{ item }">
-          <a-list-item>
-            <a-list-item-meta
-              :title="`${item.elderName || '-'}（${riskLabel(item.riskLevel)}）`"
-              :description="`${item.keyRiskFactors || '暂无因子说明'} · ${item.assessmentDate || '-'}`"
-            />
-            <template #actions>
-              <a-button type="link" @click="go(`/elder/resident-360?residentId=${item.elderId}&from=medicalCare`)">Resident360</a-button>
+    <StatefulBlock :loading="loading" :error="errorText" :empty="false" @retry="load">
+      <a-alert
+        v-if="summary.overdueCareTaskCount > 0 || summary.unclosedAbnormalCount > 0 || summary.abnormalInspectionCount > 0"
+        type="warning"
+        show-icon
+        style="margin-bottom: 12px"
+        :message="`异常提醒：超时任务 ${summary.overdueCareTaskCount} 条，未闭环异常 ${summary.unclosedAbnormalCount} 条，异常巡检 ${summary.abnormalInspectionCount} 条。`"
+      />
+      <a-row :gutter="16">
+        <a-col :xs="24" :md="12" :xl="8" v-for="card in cards" :key="card.key" style="margin-bottom: 16px">
+          <a-card :title="card.title" :bordered="false" class="card-elevated card-click" @click="go(card.route)">
+            <template #extra>
+              <a-tag color="blue">{{ card.badge }}</a-tag>
             </template>
-          </a-list-item>
-        </template>
-      </a-list>
-    </a-card>
+            <div v-for="line in card.lines" :key="line" class="line">{{ line }}</div>
+            <a-space wrap style="margin-top: 12px">
+              <a-button v-for="action in card.actions" :key="action.label" size="small" @click.stop="go(action.route)">
+                {{ action.label }}
+              </a-button>
+            </a-space>
+          </a-card>
+        </a-col>
+      </a-row>
+
+      <a-card title="卡片B：今日长者重点关注 Top" :bordered="false" class="card-elevated">
+        <a-empty v-if="!summary.keyResidents?.length" description="暂无高风险长者" />
+        <a-list v-else :data-source="summary.keyResidents">
+          <template #renderItem="{ item }">
+            <a-list-item>
+              <a-list-item-meta
+                :title="`${item.elderName || '-'}（${riskLabel(item.riskLevel)}）`"
+                :description="`${item.keyRiskFactors || '暂无因子说明'} · ${item.assessmentDate || '-'}`"
+              />
+              <template #actions>
+                <a-button type="link" @click="go(`/elder/resident-360?residentId=${item.elderId}&from=medicalCare`)">Resident360</a-button>
+              </template>
+            </a-list-item>
+          </template>
+        </a-list>
+      </a-card>
+    </StatefulBlock>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
+import StatefulBlock from '../../components/StatefulBlock.vue'
 import { getMedicalCareWorkbenchSummary } from '../../api/medicalCare'
 import type { MedicalCareWorkbenchSummary } from '../../types'
 
 const router = useRouter()
+const loading = ref(false)
+const errorText = ref('')
 
 const summary = reactive<MedicalCareWorkbenchSummary>({
   pendingMedicalOrderCount: 0,
@@ -237,8 +249,16 @@ function riskLabel(value?: string) {
 }
 
 async function load() {
-  const data = await getMedicalCareWorkbenchSummary()
-  Object.assign(summary, data)
+  loading.value = true
+  errorText.value = ''
+  try {
+    const data = await getMedicalCareWorkbenchSummary()
+    Object.assign(summary, data || {})
+  } catch (error: any) {
+    errorText.value = error?.message || '加载失败，请稍后重试'
+  } finally {
+    loading.value = false
+  }
 }
 
 onMounted(load)

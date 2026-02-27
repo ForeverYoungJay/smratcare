@@ -1,49 +1,61 @@
 <template>
   <PageContainer title="OA 门户" subTitle="公告与待办一览">
-    <a-row :gutter="16" class="overview-row">
-      <a-col :span="6">
-        <a-card :bordered="false" class="card-elevated stat-card">
-          <a-statistic title="待办总数" :value="summary.openTodoCount || 0" />
-        </a-card>
-      </a-col>
-      <a-col :span="6">
-        <a-card :bordered="false" class="card-elevated stat-card">
-          <a-statistic title="超期待办" :value="summary.overdueTodoCount || 0" :value-style="{ color: '#cf1322' }" />
-        </a-card>
-      </a-col>
-      <a-col :span="6">
-        <a-card :bordered="false" class="card-elevated stat-card">
-          <a-statistic title="待审批单" :value="summary.pendingApprovalCount || 0" />
-        </a-card>
-      </a-col>
-      <a-col :span="6">
-        <a-card :bordered="false" class="card-elevated stat-card">
-          <a-statistic title="进行中任务" :value="summary.ongoingTaskCount || 0" />
-        </a-card>
-      </a-col>
-    </a-row>
-    <a-row :gutter="16">
-      <a-col :span="14">
-        <a-card title="最新公告" :bordered="false" class="card-elevated">
-          <a-list :data-source="summary.notices" :render-item="renderNotice" :locale="{ emptyText: '暂无公告' }" />
-        </a-card>
-      </a-col>
-      <a-col :span="10">
-        <a-card :title="`我的待办（近30天已提交总结 ${summary.submittedReportCount || 0} 条）`" :bordered="false" class="card-elevated">
-          <a-list :data-source="summary.todos" :render-item="renderTodo" :locale="{ emptyText: '暂无待办' }" />
-        </a-card>
-      </a-col>
-    </a-row>
+    <StatefulBlock :loading="loading" :error="errorText" :empty="false" @retry="load">
+      <a-alert
+        v-if="(summary.overdueTodoCount || 0) > 0 || (summary.approvalTimeoutCount || 0) > 0 || (summary.healthAbnormalCount || 0) > 0"
+        type="warning"
+        show-icon
+        style="margin-bottom: 12px"
+        :message="`协同提醒：超期待办 ${summary.overdueTodoCount || 0} 条，审批超时 ${summary.approvalTimeoutCount || 0} 条，健康异常 ${summary.healthAbnormalCount || 0} 条。`"
+      />
+      <a-row :gutter="16" class="overview-row">
+        <a-col :span="6">
+          <a-card :bordered="false" class="card-elevated stat-card">
+            <a-statistic title="待办总数" :value="summary.openTodoCount || 0" />
+          </a-card>
+        </a-col>
+        <a-col :span="6">
+          <a-card :bordered="false" class="card-elevated stat-card">
+            <a-statistic title="超期待办" :value="summary.overdueTodoCount || 0" :value-style="{ color: '#cf1322' }" />
+          </a-card>
+        </a-col>
+        <a-col :span="6">
+          <a-card :bordered="false" class="card-elevated stat-card">
+            <a-statistic title="待审批单" :value="summary.pendingApprovalCount || 0" />
+          </a-card>
+        </a-col>
+        <a-col :span="6">
+          <a-card :bordered="false" class="card-elevated stat-card">
+            <a-statistic title="进行中任务" :value="summary.ongoingTaskCount || 0" />
+          </a-card>
+        </a-col>
+      </a-row>
+      <a-row :gutter="16">
+        <a-col :span="14">
+          <a-card title="最新公告" :bordered="false" class="card-elevated">
+            <a-list :data-source="summary.notices" :render-item="renderNotice" :locale="{ emptyText: '暂无公告' }" />
+          </a-card>
+        </a-col>
+        <a-col :span="10">
+          <a-card :title="`我的待办（近30天已提交总结 ${summary.submittedReportCount || 0} 条）`" :bordered="false" class="card-elevated">
+            <a-list :data-source="summary.todos" :render-item="renderTodo" :locale="{ emptyText: '暂无待办' }" />
+          </a-card>
+        </a-col>
+      </a-row>
+    </StatefulBlock>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
-import { reactive, h } from 'vue'
+import { reactive, h, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
+import StatefulBlock from '../../components/StatefulBlock.vue'
 import { getPortalSummary } from '../../api/oa'
 import type { OaPortalSummary, OaNotice, OaTodo } from '../../types'
 
 const summary = reactive<OaPortalSummary>({ notices: [], todos: [] })
+const loading = ref(false)
+const errorText = ref('')
 
 function renderNotice(item: OaNotice) {
   return h('div', { class: 'list-item' }, [
@@ -60,9 +72,18 @@ function renderTodo(item: OaTodo) {
 }
 
 async function load() {
-  const res = await getPortalSummary()
-  summary.notices = res.notices || []
-  summary.todos = res.todos || []
+  loading.value = true
+  errorText.value = ''
+  try {
+    const res = await getPortalSummary()
+    Object.assign(summary, res || {})
+    summary.notices = res.notices || []
+    summary.todos = res.todos || []
+  } catch (error: any) {
+    errorText.value = error?.message || '加载失败，请稍后重试'
+  } finally {
+    loading.value = false
+  }
 }
 
 load()

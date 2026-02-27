@@ -16,6 +16,7 @@ import com.zhiyangyun.care.mapper.CareTaskDailyMapper;
 import com.zhiyangyun.care.medicalcare.entity.MedicalCvdRiskAssessment;
 import com.zhiyangyun.care.medicalcare.mapper.MedicalCvdRiskAssessmentMapper;
 import com.zhiyangyun.care.medicalcare.model.CvdPublishActionRequest;
+import com.zhiyangyun.care.medicalcare.model.MedicalCvdAssessmentSummaryResponse;
 import com.zhiyangyun.care.medicalcare.model.MedicalCvdRiskAssessmentRequest;
 import com.zhiyangyun.care.model.CareTaskCreateRequest;
 import com.zhiyangyun.care.service.CareTaskService;
@@ -24,6 +25,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -76,6 +78,52 @@ public class MedicalCvdRiskAssessmentController {
     var wrapper = buildQuery(orgId, elderId, riskLevel, needFollowup, assessorName, status, dateFrom, dateTo, keyword);
     wrapper.orderByDesc(MedicalCvdRiskAssessment::getAssessmentDate).orderByDesc(MedicalCvdRiskAssessment::getUpdateTime);
     return Result.ok(mapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
+  }
+
+  @GetMapping("/summary")
+  public Result<MedicalCvdAssessmentSummaryResponse> summary(
+      @RequestParam(required = false) Long elderId,
+      @RequestParam(required = false) String riskLevel,
+      @RequestParam(required = false) Integer needFollowup,
+      @RequestParam(required = false) String assessorName,
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) String dateFrom,
+      @RequestParam(required = false) String dateTo,
+      @RequestParam(required = false) String keyword) {
+    Long orgId = AuthContext.getOrgId();
+    LambdaQueryWrapper<MedicalCvdRiskAssessment> baseWrapper =
+        buildQuery(orgId, elderId, riskLevel, needFollowup, assessorName, status, dateFrom, dateTo, keyword);
+
+    long total = mapper.selectCount(baseWrapper);
+    long draft = mapper.selectCount(buildQuery(orgId, elderId, riskLevel, needFollowup, assessorName, "DRAFT", dateFrom, dateTo,
+        keyword));
+    long published = mapper.selectCount(buildQuery(orgId, elderId, riskLevel, needFollowup, assessorName, "PUBLISHED", dateFrom,
+        dateTo, keyword));
+    long highRisk = mapper.selectCount(buildQuery(orgId, elderId, "HIGH", needFollowup, assessorName, status, dateFrom, dateTo,
+        keyword));
+    long veryHighRisk = mapper.selectCount(buildQuery(orgId, elderId, "VERY_HIGH", needFollowup, assessorName, status, dateFrom,
+        dateTo, keyword));
+    long followupNeeded = mapper.selectCount(buildQuery(orgId, elderId, riskLevel, 1, assessorName, status, dateFrom, dateTo,
+        keyword));
+
+    List<MedicalCvdRiskAssessment> followupCandidates = mapper.selectList(buildQuery(orgId, elderId, riskLevel, 1, assessorName, status,
+        dateFrom, dateTo, keyword));
+    LocalDate today = LocalDate.now();
+    long followupOverdue = followupCandidates.stream()
+        .filter(item -> item.getAssessmentDate() != null)
+        .filter(item -> item.getFollowupDays() != null && item.getFollowupDays() > 0)
+        .filter(item -> item.getAssessmentDate().plusDays(item.getFollowupDays()).isBefore(today))
+        .count();
+
+    MedicalCvdAssessmentSummaryResponse response = new MedicalCvdAssessmentSummaryResponse();
+    response.setTotalCount(total);
+    response.setDraftCount(draft);
+    response.setPublishedCount(published);
+    response.setHighRiskCount(highRisk);
+    response.setVeryHighRiskCount(veryHighRisk);
+    response.setNeedFollowupCount(followupNeeded);
+    response.setFollowupOverdueCount(followupOverdue);
+    return Result.ok(response);
   }
 
   @PostMapping

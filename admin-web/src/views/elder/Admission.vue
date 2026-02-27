@@ -107,13 +107,16 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message } from 'ant-design-vue'
+import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { getElderPage } from '../../api/elder'
 import { getBedList, getBuildingList, getFloorList, getRoomList } from '../../api/bed'
 import { admitElder, exportAdmissionRecords, getAdmissionRecords } from '../../api/elderLifecycle'
+import { getCrmLead, updateCrmLead } from '../../api/crm'
 import type {
   AdmissionRecordItem,
   AdmissionRequest,
@@ -125,9 +128,11 @@ import type {
   RoomItem
 } from '../../types'
 
+const route = useRoute()
 const formRef = ref<FormInstance>()
 const form = reactive<AdmissionRequest>({ elderId: 0, admissionDate: '', bedId: undefined, bedStartDate: undefined })
 const submitting = ref(false)
+const linkedLeadId = ref<number>()
 const elders = ref<ElderItem[]>([])
 const buildings = ref<BuildingItem[]>([])
 const floors = ref<FloorItem[]>([])
@@ -208,6 +213,7 @@ async function submit() {
       form.bedStartDate = form.admissionDate || new Date().toISOString().slice(0, 10)
     }
     await admitElder(form)
+    await syncLeadStageAfterAdmission()
     message.success('入住办理成功')
     await fetchAdmissionRecords()
   } catch {
@@ -277,6 +283,45 @@ async function loadAssets() {
   }
 }
 
+function applyRoutePrefill() {
+  const residentId = Number(route.query.residentId || 0)
+  const leadId = Number(route.query.leadId || 0)
+  const contractNo = String(route.query.contractNo || '').trim()
+  if (residentId > 0) {
+    form.elderId = residentId
+    recordQuery.keyword = elders.value.find((item) => item.id === residentId)?.fullName
+  }
+  if (leadId > 0) {
+    linkedLeadId.value = leadId
+  }
+  if (contractNo) {
+    form.contractNo = contractNo
+    recordQuery.contractNo = contractNo
+  }
+  if (!form.admissionDate) {
+    form.admissionDate = dayjs().format('YYYY-MM-DD')
+  }
+}
+
+async function syncLeadStageAfterAdmission() {
+  if (!linkedLeadId.value) return
+  try {
+    const lead = await getCrmLead(linkedLeadId.value)
+    if (!lead?.id) return
+    await updateCrmLead(lead.id, {
+      ...lead,
+      contractNo: form.contractNo || lead.contractNo,
+      reservationBedId: form.bedId || lead.reservationBedId,
+      flowStage: 'PENDING_SIGN',
+      currentOwnerDept: 'MARKETING',
+      contractStatus: '待签署',
+      status: 2
+    })
+  } catch {
+    message.warning('入住成功，但合同流程状态同步失败，请返回合同签约页重试')
+  }
+}
+
 function onPageChange(page: number) {
   recordQuery.pageNo = page
   fetchAdmissionRecords()
@@ -323,6 +368,7 @@ useLiveSyncRefresh({
 onMounted(async () => {
   await loadElders()
   await loadAssets()
+  applyRoutePrefill()
   await fetchAdmissionRecords()
 })
 </script>

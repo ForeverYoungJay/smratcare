@@ -19,25 +19,45 @@
       </template>
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="onTableChange">
-      <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'constitution'">
-          {{ constitutionLabel(record.constitutionPrimary) }} / {{ constitutionLabel(record.constitutionSecondary) }}
+    <StatefulBlock :loading="summaryLoading" :error="summaryError" :empty="false" @retry="fetchData">
+      <a-row :gutter="[12, 12]" style="margin-bottom: 12px">
+        <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="总评估" :value="summary.totalCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已发布" :value="summary.publishedCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="复评记录" :value="summary.reassessmentCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="家属可见" :value="summary.familyVisibleCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="偏颇体质" :value="summary.biasedConstitutionCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="低置信度" :value="summary.lowConfidenceCount || 0" /></a-card></a-col>
+      </a-row>
+      <a-alert
+        v-if="(summary.lowConfidenceCount || 0) > 0 || (summary.draftCount || 0) > 0"
+        type="warning"
+        show-icon
+        style="margin-bottom: 12px"
+        :message="`评估质量提醒：低置信度 ${summary.lowConfidenceCount || 0} 条，草稿待发布 ${summary.draftCount || 0} 条。`"
+      />
+    </StatefulBlock>
+
+    <StatefulBlock :loading="loading" :error="tableError" :empty="!loading && !tableError && rows.length === 0" empty-text="暂无中医体质评估记录" @retry="fetchData">
+      <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="false" :pagination="pagination" @change="onTableChange">
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'constitution'">
+            {{ constitutionLabel(record.constitutionPrimary) }} / {{ constitutionLabel(record.constitutionSecondary) }}
+          </template>
+          <template v-else-if="column.key === 'status'">
+            <a-tag :color="record.status === 'PUBLISHED' ? 'green' : 'blue'">{{ record.status === 'PUBLISHED' ? '已发布' : '草稿' }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'action'">
+            <a-space>
+              <a-button type="link" @click="openEdit(record)">编辑</a-button>
+              <a-button type="link" @click="publish(record)" :disabled="record.status === 'PUBLISHED'">发布</a-button>
+              <a-popconfirm title="确认删除该评估?" @confirm="remove(record)">
+                <a-button danger type="link">删除</a-button>
+              </a-popconfirm>
+            </a-space>
+          </template>
         </template>
-        <template v-else-if="column.key === 'status'">
-          <a-tag :color="record.status === 'PUBLISHED' ? 'green' : 'blue'">{{ record.status === 'PUBLISHED' ? '已发布' : '草稿' }}</a-tag>
-        </template>
-        <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" @click="openEdit(record)">编辑</a-button>
-            <a-button type="link" @click="publish(record)" :disabled="record.status === 'PUBLISHED'">发布</a-button>
-            <a-popconfirm title="确认删除该评估?" @confirm="remove(record)">
-              <a-button danger type="link">删除</a-button>
-            </a-popconfirm>
-          </a-space>
-        </template>
-      </template>
-    </DataTable>
+      </DataTable>
+    </StatefulBlock>
 
     <a-modal v-model:open="editOpen" :title="form.id ? '编辑中医体质评估' : '新建中医体质评估'" width="900px" @ok="submit" :confirm-loading="saving">
       <a-form layout="vertical">
@@ -103,21 +123,37 @@ import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import StatefulBlock from '../../components/StatefulBlock.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import {
   createTcmAssessment,
   deleteTcmAssessment,
   getTcmAssessmentPage,
+  getTcmAssessmentSummary,
   publishTcmAssessment,
   updateTcmAssessment
 } from '../../api/medicalCare'
-import type { MedicalTcmAssessment, PageResult } from '../../types'
+import type { MedicalTcmAssessment, MedicalTcmAssessmentSummary } from '../../types'
 
 const route = useRoute()
 const loading = ref(false)
+const tableError = ref('')
+const summaryLoading = ref(false)
+const summaryError = ref('')
 const rows = ref<MedicalTcmAssessment[]>([])
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const query = reactive({ keyword: '', constitutionType: '', status: '', dateRange: [] as any[], pageNo: 1, pageSize: 10 })
+const summary = reactive<MedicalTcmAssessmentSummary>({
+  totalCount: 0,
+  draftCount: 0,
+  publishedCount: 0,
+  reassessmentCount: 0,
+  familyVisibleCount: 0,
+  nursingTaskSuggestedCount: 0,
+  balancedConstitutionCount: 0,
+  biasedConstitutionCount: 0,
+  lowConfidenceCount: 0
+})
 
 const columns = [
   { title: '长者', dataIndex: 'elderName', key: 'elderName', width: 120 },
@@ -248,12 +284,25 @@ function buildParams() {
 
 async function fetchData() {
   loading.value = true
+  summaryLoading.value = true
+  tableError.value = ''
+  summaryError.value = ''
   try {
-    const res = (await getTcmAssessmentPage(buildParams())) as PageResult<MedicalTcmAssessment>
+    const params = buildParams()
+    const [res, sum] = await Promise.all([
+      getTcmAssessmentPage(params),
+      getTcmAssessmentSummary(params)
+    ])
     rows.value = res.list || []
     pagination.total = res.total || 0
+    Object.assign(summary, sum || {})
+  } catch (error: any) {
+    const text = error?.message || '加载失败，请稍后重试'
+    tableError.value = text
+    summaryError.value = text
   } finally {
     loading.value = false
+    summaryLoading.value = false
   }
 }
 

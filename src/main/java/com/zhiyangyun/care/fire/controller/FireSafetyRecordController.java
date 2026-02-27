@@ -579,6 +579,10 @@ public class FireSafetyRecordController {
     return normalized;
   }
 
+  private String normalizeRecordTypeForQuery(String recordType) {
+    return normalizeRecordType(recordType);
+  }
+
   private String normalizeRecordTypeForWrite(String recordType) {
     String normalized = normalizeRecordType(recordType);
     if (normalized == null) {

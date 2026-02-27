@@ -8,6 +8,7 @@ import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.oa.entity.OaWorkReport;
 import com.zhiyangyun.care.oa.mapper.OaWorkReportMapper;
 import com.zhiyangyun.care.oa.model.OaWorkReportRequest;
+import com.zhiyangyun.care.oa.model.OaWorkReportSummaryResponse;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -69,6 +70,66 @@ public class OaWorkReportController {
         .orderByDesc(OaWorkReport::getReportDate)
         .orderByDesc(OaWorkReport::getCreateTime);
     return Result.ok(reportMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
+  }
+
+  @GetMapping("/summary")
+  public Result<OaWorkReportSummaryResponse> summary(
+      @RequestParam(required = false) String reportType,
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) String keyword,
+      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+      @RequestParam(required = false) LocalDate startDate,
+      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+      @RequestParam(required = false) LocalDate endDate) {
+    if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+      throw new IllegalArgumentException("开始日期不能晚于结束日期");
+    }
+    Long orgId = AuthContext.getOrgId();
+    String normalizedType = normalizeReportType(reportType);
+    String normalizedStatus = normalizeStatus(status);
+
+    var baseWrapper = buildSummaryWrapper(orgId, normalizedType, normalizedStatus, keyword, startDate, endDate);
+
+    LocalDate today = LocalDate.now();
+    LocalDate weekStart = today.minusDays(today.getDayOfWeek().getValue() - 1L);
+    LocalDate monthStart = today.withDayOfMonth(1);
+
+    OaWorkReportSummaryResponse response = new OaWorkReportSummaryResponse();
+    response.setTotalCount(count(reportMapper.selectCount(baseWrapper)));
+    response.setDraftCount(count(reportMapper.selectCount(
+        buildSummaryWrapper(orgId, normalizedType, "DRAFT", keyword, startDate, endDate))));
+    response.setSubmittedCount(count(reportMapper.selectCount(
+        buildSummaryWrapper(orgId, normalizedType, "SUBMITTED", keyword, startDate, endDate))));
+    response.setTodaySubmittedCount(count(reportMapper.selectCount(Wrappers.lambdaQuery(OaWorkReport.class)
+        .eq(OaWorkReport::getIsDeleted, 0)
+        .eq(orgId != null, OaWorkReport::getOrgId, orgId)
+        .eq(normalizedType != null, OaWorkReport::getReportType, normalizedType)
+        .eq(OaWorkReport::getStatus, "SUBMITTED")
+        .eq(OaWorkReport::getReportDate, today))));
+    response.setWeekSubmittedCount(count(reportMapper.selectCount(Wrappers.lambdaQuery(OaWorkReport.class)
+        .eq(OaWorkReport::getIsDeleted, 0)
+        .eq(orgId != null, OaWorkReport::getOrgId, orgId)
+        .eq(normalizedType != null, OaWorkReport::getReportType, normalizedType)
+        .eq(OaWorkReport::getStatus, "SUBMITTED")
+        .ge(OaWorkReport::getReportDate, weekStart))));
+    response.setMonthSubmittedCount(count(reportMapper.selectCount(Wrappers.lambdaQuery(OaWorkReport.class)
+        .eq(OaWorkReport::getIsDeleted, 0)
+        .eq(orgId != null, OaWorkReport::getOrgId, orgId)
+        .eq(normalizedType != null, OaWorkReport::getReportType, normalizedType)
+        .eq(OaWorkReport::getStatus, "SUBMITTED")
+        .ge(OaWorkReport::getReportDate, monthStart))));
+    response.setDayTypeCount(count(reportMapper.selectCount(
+        buildSummaryWrapper(orgId, "DAY", normalizedStatus, keyword, startDate, endDate))));
+    response.setWeekTypeCount(count(reportMapper.selectCount(
+        buildSummaryWrapper(orgId, "WEEK", normalizedStatus, keyword, startDate, endDate))));
+    response.setMonthTypeCount(count(reportMapper.selectCount(
+        buildSummaryWrapper(orgId, "MONTH", normalizedStatus, keyword, startDate, endDate))));
+    response.setYearTypeCount(count(reportMapper.selectCount(
+        buildSummaryWrapper(orgId, "YEAR", normalizedStatus, keyword, startDate, endDate))));
+    response.setMissingSummaryCount(count(reportMapper.selectCount(
+        buildSummaryWrapper(orgId, normalizedType, normalizedStatus, keyword, startDate, endDate)
+            .and(w -> w.isNull(OaWorkReport::getContentSummary).or().eq(OaWorkReport::getContentSummary, "")))));
+    return Result.ok(response);
   }
 
   @GetMapping("/daily/page")
@@ -226,5 +287,27 @@ public class OaWorkReportController {
       throw new IllegalArgumentException("status 仅支持 DRAFT/SUBMITTED");
     }
     return normalized;
+  }
+
+  private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OaWorkReport> buildSummaryWrapper(
+      Long orgId, String reportType, String status, String keyword, LocalDate startDate, LocalDate endDate) {
+    return Wrappers.lambdaQuery(OaWorkReport.class)
+        .eq(OaWorkReport::getIsDeleted, 0)
+        .eq(orgId != null, OaWorkReport::getOrgId, orgId)
+        .eq(reportType != null, OaWorkReport::getReportType, reportType)
+        .eq(status != null, OaWorkReport::getStatus, status)
+        .and(keyword != null && !keyword.isBlank(), q -> q
+            .like(OaWorkReport::getTitle, keyword)
+            .or().like(OaWorkReport::getContentSummary, keyword)
+            .or().like(OaWorkReport::getCompletedWork, keyword)
+            .or().like(OaWorkReport::getRiskIssue, keyword)
+            .or().like(OaWorkReport::getNextPlan, keyword)
+            .or().like(OaWorkReport::getReporterName, keyword))
+        .ge(startDate != null, OaWorkReport::getReportDate, startDate)
+        .le(endDate != null, OaWorkReport::getReportDate, endDate);
+  }
+
+  private long count(Long value) {
+    return value == null ? 0L : value;
   }
 }

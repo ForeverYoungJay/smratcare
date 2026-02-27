@@ -152,6 +152,20 @@ export interface OaWorkReport {
   reporterName?: string
 }
 
+export interface OaWorkReportSummary {
+  totalCount: number
+  draftCount: number
+  submittedCount: number
+  todaySubmittedCount: number
+  weekSubmittedCount: number
+  monthSubmittedCount: number
+  dayTypeCount: number
+  weekTypeCount: number
+  monthTypeCount: number
+  yearTypeCount: number
+  missingSummaryCount: number
+}
+
 export interface OaWorkflowTodoItem {
   code: string
   name: string

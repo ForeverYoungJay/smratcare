@@ -12,12 +12,15 @@ import com.zhiyangyun.care.mapper.CareTaskDailyMapper;
 import com.zhiyangyun.care.medicalcare.entity.MedicalTcmAssessment;
 import com.zhiyangyun.care.medicalcare.mapper.MedicalTcmAssessmentMapper;
 import com.zhiyangyun.care.medicalcare.model.MedicalTcmAssessmentRequest;
+import com.zhiyangyun.care.medicalcare.model.MedicalTcmAssessmentSummaryResponse;
 import com.zhiyangyun.care.model.CareTaskCreateRequest;
 import com.zhiyangyun.care.service.CareTaskService;
 import jakarta.validation.Valid;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -65,6 +68,59 @@ public class MedicalTcmAssessmentController {
         keyword);
     wrapper.orderByDesc(MedicalTcmAssessment::getAssessmentDate).orderByDesc(MedicalTcmAssessment::getUpdateTime);
     return Result.ok(mapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
+  }
+
+  @GetMapping("/summary")
+  public Result<MedicalTcmAssessmentSummaryResponse> summary(
+      @RequestParam(required = false) Long elderId,
+      @RequestParam(required = false) String constitutionType,
+      @RequestParam(required = false) String assessorName,
+      @RequestParam(required = false) Integer isReassessment,
+      @RequestParam(required = false) Integer familyVisible,
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) String dateFrom,
+      @RequestParam(required = false) String dateTo,
+      @RequestParam(required = false) String keyword) {
+    Long orgId = AuthContext.getOrgId();
+    LambdaQueryWrapper<MedicalTcmAssessment> baseWrapper = buildQuery(orgId, elderId, constitutionType, assessorName, isReassessment,
+        familyVisible, status, dateFrom, dateTo, keyword);
+
+    long total = mapper.selectCount(baseWrapper);
+    long draft = mapper.selectCount(buildQuery(orgId, elderId, constitutionType, assessorName, isReassessment, familyVisible, "DRAFT",
+        dateFrom, dateTo, keyword));
+    long published = mapper.selectCount(buildQuery(orgId, elderId, constitutionType, assessorName, isReassessment, familyVisible,
+        "PUBLISHED", dateFrom, dateTo, keyword));
+    long reassessmentCount = mapper.selectCount(buildQuery(orgId, elderId, constitutionType, assessorName, 1, familyVisible, status,
+        dateFrom, dateTo, keyword));
+    long familyVisibleCount = mapper.selectCount(buildQuery(orgId, elderId, constitutionType, assessorName, isReassessment, 1, status,
+        dateFrom, dateTo, keyword));
+
+    List<MedicalTcmAssessment> rows = mapper.selectList(baseWrapper);
+    long nursingTaskSuggestedCount = rows.stream()
+        .filter(item -> item.getGenerateNursingTask() != null && item.getGenerateNursingTask() == 1)
+        .count();
+    long balancedCount = rows.stream()
+        .filter(item -> "BALANCED".equals(item.getConstitutionPrimary()))
+        .count();
+    long biasedCount = rows.stream()
+        .filter(item -> item.getConstitutionPrimary() != null && !"BALANCED".equals(item.getConstitutionPrimary()))
+        .count();
+    long lowConfidenceCount = rows.stream()
+        .filter(item -> item.getConfidence() != null)
+        .filter(item -> item.getConfidence().compareTo(BigDecimal.valueOf(60)) < 0)
+        .count();
+
+    MedicalTcmAssessmentSummaryResponse response = new MedicalTcmAssessmentSummaryResponse();
+    response.setTotalCount(total);
+    response.setDraftCount(draft);
+    response.setPublishedCount(published);
+    response.setReassessmentCount(reassessmentCount);
+    response.setFamilyVisibleCount(familyVisibleCount);
+    response.setNursingTaskSuggestedCount(nursingTaskSuggestedCount);
+    response.setBalancedConstitutionCount(balancedCount);
+    response.setBiasedConstitutionCount(biasedCount);
+    response.setLowConfidenceCount(lowConfidenceCount);
+    return Result.ok(response);
   }
 
   @PostMapping

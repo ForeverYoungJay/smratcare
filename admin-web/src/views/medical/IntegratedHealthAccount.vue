@@ -1,32 +1,41 @@
 <template>
   <PageContainer title="健康服务与医护账户一体化" subTitle="医护执行 + 老人账户联动总览">
-    <a-row :gutter="16" style="margin-bottom: 16px">
-      <a-col :span="6"><a-card><a-statistic title="今日待执行医嘱" :value="medicalSummary.pendingMedicalOrderCount" /></a-card></a-col>
-      <a-col :span="6"><a-card><a-statistic title="护理超时任务" :value="medicalSummary.overdueCareTaskCount" /></a-card></a-col>
-      <a-col :span="6"><a-card><a-statistic title="余额预警人数" :value="warningCount" /></a-card></a-col>
-      <a-col :span="6"><a-card><a-statistic title="今日巡查待完成" :value="medicalSummary.todayInspectionPendingCount" /></a-card></a-col>
-    </a-row>
+    <StatefulBlock :loading="loading" :error="errorText" :empty="false" @retry="load">
+      <a-alert
+        v-if="warningCount > 0 || medicalSummary.overdueCareTaskCount > 0 || medicalSummary.todayMedicationPendingCount > 0"
+        type="warning"
+        show-icon
+        style="margin-bottom: 12px"
+        :message="`协同提醒：余额预警 ${warningCount} 人，护理超时 ${medicalSummary.overdueCareTaskCount} 条，用药待执行 ${medicalSummary.todayMedicationPendingCount} 条。`"
+      />
+      <a-row :gutter="16" style="margin-bottom: 16px">
+        <a-col :span="6"><a-card><a-statistic title="今日待执行医嘱" :value="medicalSummary.pendingMedicalOrderCount" /></a-card></a-col>
+        <a-col :span="6"><a-card><a-statistic title="护理超时任务" :value="medicalSummary.overdueCareTaskCount" /></a-card></a-col>
+        <a-col :span="6"><a-card><a-statistic title="余额预警人数" :value="warningCount" /></a-card></a-col>
+        <a-col :span="6"><a-card><a-statistic title="今日巡查待完成" :value="medicalSummary.todayInspectionPendingCount" /></a-card></a-col>
+      </a-row>
 
-    <a-card title="账户预警与医护协同" style="margin-bottom: 16px">
-      <template #extra>
-        <a-space>
-          <a-button @click="go('/finance/account')">老人账户</a-button>
-          <a-button @click="go('/health/medication/medication-registration?date=today')">用药登记</a-button>
-          <a-button type="primary" @click="go('/care/workbench/task-board?date=today')">护理任务看板</a-button>
-        </a-space>
-      </template>
-      <a-table :columns="warningColumns" :data-source="warningRows" :pagination="false" row-key="id" size="small">
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'balance'">
-            <a-tag :color="Number(record.balance) <= Number(record.warnThreshold) ? 'red' : 'green'">{{ record.balance }}</a-tag>
-          </template>
+      <a-card title="账户预警与医护协同" style="margin-bottom: 16px">
+        <template #extra>
+          <a-space>
+            <a-button @click="go('/finance/account')">老人账户</a-button>
+            <a-button @click="go('/health/medication/medication-registration?date=today')">用药登记</a-button>
+            <a-button type="primary" @click="go('/care/workbench/task-board?date=today')">护理任务看板</a-button>
+          </a-space>
         </template>
-      </a-table>
-    </a-card>
+        <a-table :columns="warningColumns" :data-source="warningRows" :pagination="false" row-key="id" size="small">
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'balance'">
+              <a-tag :color="Number(record.balance) <= Number(record.warnThreshold) ? 'red' : 'green'">{{ record.balance }}</a-tag>
+            </template>
+          </template>
+        </a-table>
+      </a-card>
 
-    <a-card title="最近账户流水（用于医护收费核对）">
-      <a-table :columns="logColumns" :data-source="logRows" :pagination="false" row-key="id" size="small" />
-    </a-card>
+      <a-card title="最近账户流水（用于医护收费核对）">
+        <a-table :columns="logColumns" :data-source="logRows" :pagination="false" row-key="id" size="small" />
+      </a-card>
+    </StatefulBlock>
   </PageContainer>
 </template>
 
@@ -34,11 +43,14 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
+import StatefulBlock from '../../components/StatefulBlock.vue'
 import { getElderAccountLogPage, getElderAccountWarnings } from '../../api/finance'
 import { getMedicalCareWorkbenchSummary } from '../../api/medicalCare'
 import type { ElderAccount, ElderAccountLog, MedicalCareWorkbenchSummary, PageResult } from '../../types'
 
 const router = useRouter()
+const loading = ref(false)
+const errorText = ref('')
 
 const medicalSummary = ref<MedicalCareWorkbenchSummary>({
   pendingMedicalOrderCount: 0,
@@ -117,15 +129,23 @@ function go(path: string) {
 }
 
 async function load() {
-  const [medicalData, warningData, logData] = await Promise.all([
-    getMedicalCareWorkbenchSummary(),
-    getElderAccountWarnings(),
-    getElderAccountLogPage({ pageNo: 1, pageSize: 10 })
-  ])
-  medicalSummary.value = medicalData
-  warningRows.value = warningData || []
-  const page = logData as PageResult<ElderAccountLog>
-  logRows.value = page?.list || []
+  loading.value = true
+  errorText.value = ''
+  try {
+    const [medicalData, warningData, logData] = await Promise.all([
+      getMedicalCareWorkbenchSummary(),
+      getElderAccountWarnings(),
+      getElderAccountLogPage({ pageNo: 1, pageSize: 10 })
+    ])
+    medicalSummary.value = medicalData
+    warningRows.value = warningData || []
+    const page = logData as PageResult<ElderAccountLog>
+    logRows.value = page?.list || []
+  } catch (error: any) {
+    errorText.value = error?.message || '加载失败，请稍后重试'
+  } finally {
+    loading.value = false
+  }
 }
 
 onMounted(load)

@@ -48,6 +48,28 @@ export interface MedicalCvdAssessment {
   updateTime?: string
 }
 
+export interface MedicalCvdAssessmentSummary {
+  totalCount: number
+  draftCount: number
+  publishedCount: number
+  highRiskCount: number
+  veryHighRiskCount: number
+  needFollowupCount: number
+  followupOverdueCount: number
+}
+
+export interface MedicalTcmAssessmentSummary {
+  totalCount: number
+  draftCount: number
+  publishedCount: number
+  reassessmentCount: number
+  familyVisibleCount: number
+  nursingTaskSuggestedCount: number
+  balancedConstitutionCount: number
+  biasedConstitutionCount: number
+  lowConfidenceCount: number
+}
+
 export interface MedicalCareRiskResident {
   elderId?: number
   elderName?: string

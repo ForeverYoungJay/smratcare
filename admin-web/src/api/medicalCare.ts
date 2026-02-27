@@ -2,9 +2,11 @@ import request, { fetchPage } from '../utils/request'
 import type {
   MedicalCareWorkbenchSummary,
   MedicalCvdAssessment,
+  MedicalCvdAssessmentSummary,
   MedicalResidentOverview,
   MedicalResidentRiskCard,
-  MedicalTcmAssessment
+  MedicalTcmAssessment,
+  MedicalTcmAssessmentSummary
 } from '../types'
 
 export function getMedicalCareWorkbenchSummary() {
@@ -21,6 +23,10 @@ export function getMedicalHealthCenterSummary(params?: {
 
 export function getTcmAssessmentPage(params: any) {
   return fetchPage<MedicalTcmAssessment>('/api/medical-care/tcm-assessments/page', params)
+}
+
+export function getTcmAssessmentSummary(params: any) {
+  return request.get<MedicalTcmAssessmentSummary>('/api/medical-care/tcm-assessments/summary', { params })
 }
 
 export function createTcmAssessment(data: Partial<MedicalTcmAssessment>) {
@@ -41,6 +47,10 @@ export function deleteTcmAssessment(id: number) {
 
 export function getCvdAssessmentPage(params: any) {
   return fetchPage<MedicalCvdAssessment>('/api/medical-care/cvd-assessments/page', params)
+}
+
+export function getCvdAssessmentSummary(params: any) {
+  return request.get<MedicalCvdAssessmentSummary>('/api/medical-care/cvd-assessments/summary', { params })
 }
 
 export function createCvdAssessment(data: Partial<MedicalCvdAssessment>) {
