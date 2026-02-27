@@ -11,6 +11,7 @@ import com.zhiyangyun.care.crm.model.action.CrmLeadBatchDeleteRequest;
 import com.zhiyangyun.care.crm.model.action.CrmLeadBatchStatusRequest;
 import com.zhiyangyun.care.crm.model.action.CrmSmsTaskCreateRequest;
 import com.zhiyangyun.care.crm.model.action.CrmSmsTaskResponse;
+import com.zhiyangyun.care.crm.model.CrmLeadResponse;
 import com.zhiyangyun.care.crm.service.CrmLeadActionService;
 import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -39,6 +40,11 @@ public class CrmLeadActionController {
   @PostMapping("/batch/delete")
   public Result<Integer> batchDelete(@RequestBody CrmLeadBatchDeleteRequest request) {
     return Result.ok(leadActionService.batchDelete(AuthContext.getOrgId(), request));
+  }
+
+  @PostMapping("/contract/{contractNo}/handoff-assessment")
+  public Result<CrmLeadResponse> handoffAssessment(@PathVariable String contractNo) {
+    return Result.ok(leadActionService.handoffToAssessment(AuthContext.getOrgId(), contractNo));
   }
 
   @PostMapping("/{leadId}/callback-plans")

@@ -89,6 +89,7 @@ const loading = ref(false)
 const rows = ref<CrmLeadItem[]>([])
 const total = ref(0)
 const selectedRowKeys = ref<number[]>([])
+const selectedContracts = ref<CrmLeadItem[]>([])
 
 const query = reactive({
   contractNo: '',
@@ -117,8 +118,9 @@ const columns = [
 
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
-  onChange: (keys: (number | string)[]) => {
+  onChange: (keys: (number | string)[], selectedRows: CrmLeadItem[]) => {
     selectedRowKeys.value = keys.map((item) => Number(item))
+    selectedContracts.value = selectedRows
   }
 }))
 
@@ -173,6 +175,7 @@ function reset() {
   query.marketerName = ''
   query.pageNo = 1
   selectedRowKeys.value = []
+  selectedContracts.value = []
   fetchData()
 }
 
@@ -184,6 +187,7 @@ function onPageChange(page: number) {
 function onPageSizeChange(_current: number, size: number) {
   query.pageNo = 1
   query.pageSize = size
+  selectedContracts.value = []
   fetchData()
 }
 
@@ -221,8 +225,13 @@ function removeRow(record: CrmLeadItem) {
   Modal.confirm({
     title: `确认删除合同 ${record.contractNo || '-'} 吗？`,
     onOk: async () => {
-      await deleteCrmLead(record.id)
+      if (record.contractNo) {
+        await batchDeleteLeads({ contractNos: [record.contractNo] })
+      } else {
+        await deleteCrmLead(record.id)
+      }
       selectedRowKeys.value = selectedRowKeys.value.filter((id) => id !== record.id)
+      selectedContracts.value = selectedContracts.value.filter((item) => item.contractNo !== record.contractNo)
       message.success('合同已删除')
       fetchData()
     }
@@ -230,16 +239,23 @@ function removeRow(record: CrmLeadItem) {
 }
 
 function batchDelete() {
-  const ids = selectedRowKeys.value
-  if (!ids.length) {
+  const contractNos = selectedContracts.value
+    .map((item) => item.contractNo)
+    .filter((item): item is string => Boolean(item))
+  if (!contractNos.length && !selectedRowKeys.value.length) {
     message.info('请先勾选合同')
     return
   }
   Modal.confirm({
-    title: `确认删除选中的 ${ids.length} 条合同吗？`,
+    title: `确认删除选中的 ${selectedRowKeys.value.length} 条合同吗？`,
     onOk: async () => {
-      await batchDeleteLeads({ ids })
+      if (contractNos.length) {
+        await batchDeleteLeads({ contractNos })
+      } else {
+        await batchDeleteLeads({ ids: selectedRowKeys.value })
+      }
       selectedRowKeys.value = []
+      selectedContracts.value = []
       message.success('批量删除成功')
       fetchData()
     }

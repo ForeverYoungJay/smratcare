@@ -9,11 +9,13 @@ import com.zhiyangyun.care.crm.model.action.CrmLeadBatchDeleteRequest;
 import com.zhiyangyun.care.crm.model.action.CrmLeadBatchStatusRequest;
 import com.zhiyangyun.care.crm.model.action.CrmSmsTaskCreateRequest;
 import com.zhiyangyun.care.crm.model.action.CrmSmsTaskResponse;
+import com.zhiyangyun.care.crm.model.CrmLeadResponse;
 import java.util.List;
 
 public interface CrmLeadActionService {
   int batchUpdateStatus(Long tenantId, CrmLeadBatchStatusRequest request);
   int batchDelete(Long tenantId, CrmLeadBatchDeleteRequest request);
+  CrmLeadResponse handoffToAssessment(Long tenantId, String contractNo);
 
   CrmCallbackPlanResponse createCallbackPlan(Long tenantId, Long orgId, Long staffId, Long leadId, CrmCallbackPlanRequest request);
   List<CrmCallbackPlanResponse> listCallbackPlan(Long tenantId, Long leadId);

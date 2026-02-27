@@ -234,6 +234,7 @@ import {
   deleteLeadAttachment,
   getLeadAttachments,
   getLeadPage,
+  handoffLeadToAssessment,
   updateCrmLead,
   uploadMarketingFile
 } from '../../api/marketing'
@@ -250,6 +251,7 @@ const rows = ref<CrmLeadItem[]>([])
 const localRows = ref<CrmLeadItem[]>([])
 const total = ref(0)
 const selectedRowKeys = ref<number[]>([])
+const selectedRows = ref<CrmLeadItem[]>([])
 const onlyMineDept = ref(false)
 const mineDept = ref<'MARKETING' | 'ASSESSMENT'>('MARKETING')
 const onlyOverdue = ref(false)
@@ -286,8 +288,9 @@ const rules: FormRules = {
 
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
-  onChange: (keys: (number | string)[]) => {
+  onChange: (keys: (number | string)[], rows: CrmLeadItem[]) => {
     selectedRowKeys.value = keys.map((item) => Number(item))
+    selectedRows.value = rows
   }
 }))
 
@@ -580,6 +583,7 @@ function reset() {
   onlyOverdue.value = false
   sortByOverdue.value = false
   selectedRowKeys.value = []
+  selectedRows.value = []
   fetchData()
 }
 
@@ -694,11 +698,19 @@ function batchDelete() {
     message.info('请先勾选要删除的合同')
     return
   }
+  const contractNos = selectedRows.value
+    .map((item) => item.contractNo)
+    .filter((item): item is string => Boolean(item))
   Modal.confirm({
     title: `确认删除 ${ids.length} 条合同记录吗？`,
     onOk: async () => {
-      await batchDeleteLeads({ ids })
+      if (contractNos.length) {
+        await batchDeleteLeads({ contractNos })
+      } else {
+        await batchDeleteLeads({ ids })
+      }
       selectedRowKeys.value = []
+      selectedRows.value = []
       message.success('删除成功')
       fetchData()
     }
@@ -714,18 +726,18 @@ function view(record: CrmLeadItem) {
 
 async function startAdmissionAssessment(record: CrmLeadItem) {
   try {
-    const lead = await ensureContractNo(record)
-    const handed = await updateCrmLead(lead.id, {
-      ...lead,
-      flowStage: 'PENDING_ASSESSMENT',
-      currentOwnerDept: 'ASSESSMENT',
-      contractStatus: '待评估',
-      status: 2
-    })
-    const elder = await ensureElderFromLead(handed)
+    if (!record.contractNo) {
+      message.warning('请先保存合同并生成合同编号后再移交')
+      return
+    }
+    const handed = await handoffLeadToAssessment(record.contractNo)
+    if (!handed) {
+      throw new Error('未找到可移交的合同记录')
+    }
+    const elder = await ensureElderFromLeadBasic(handed)
     await fetchData()
     message.success('已移交评估部，请在长者管理完成入住评估')
-    router.push(`/elder/admission-assessment?residentId=${elder.id}&leadId=${handed.id}&contractNo=${handed.contractNo || ''}`)
+    router.push(`/elder/admission-assessment?residentId=${elder.id}&leadId=${handed.id || ''}&contractNo=${handed.contractNo || ''}`)
   } catch (error: any) {
     message.error(error?.message || '移交评估部失败')
   }
@@ -925,6 +937,27 @@ async function ensureElderFromLead(lead: CrmLeadItem): Promise<ElderItem> {
     medicalRecordFileUrl: pickLatestAttachment(leadAttachments, 'MEDICAL_RECORD')?.fileUrl,
     medicalInsuranceCopyUrl: pickLatestAttachment(leadAttachments, 'MEDICAL_INSURANCE')?.fileUrl,
     householdCopyUrl: pickLatestAttachment(leadAttachments, 'HOUSEHOLD')?.fileUrl,
+    remark: lead.remark
+  }
+  if (existing?.id) {
+    await updateElder(existing.id, elderPayload)
+    return { ...existing, ...elderPayload, id: existing.id }
+  }
+  return createElder({
+    ...elderPayload,
+    admissionDate: dayjs().format('YYYY-MM-DD'),
+    status: 1
+  })
+}
+
+async function ensureElderFromLeadBasic(lead: CrmLeadItem): Promise<ElderItem> {
+  const existing = await findExistingElderByLead(lead)
+  const elderPayload = {
+    fullName: normalizeLeadName(lead),
+    idCardNo: lead.idCardNo,
+    gender: lead.gender,
+    phone: lead.elderPhone || lead.phone,
+    homeAddress: lead.homeAddress,
     remark: lead.remark
   }
   if (existing?.id) {

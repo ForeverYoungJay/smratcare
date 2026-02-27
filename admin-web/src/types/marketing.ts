@@ -98,7 +98,8 @@ export interface LeadBatchStatusRequest {
 }
 
 export interface LeadBatchDeleteRequest {
-  ids: number[]
+  ids?: number[]
+  contractNos?: string[]
 }
 
 export interface CallbackPlanItem {

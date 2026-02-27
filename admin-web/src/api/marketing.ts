@@ -45,6 +45,10 @@ export function batchDeleteLeads(data: LeadBatchDeleteRequest) {
   return request.post<number>('/api/crm/leads/batch/delete', data)
 }
 
+export function handoffLeadToAssessment(contractNo: string) {
+  return request.post<CrmLeadItem>(`/api/crm/leads/contract/${encodeURIComponent(contractNo)}/handoff-assessment`)
+}
+
 export function createLeadCallbackPlan(leadId: number, data: CallbackPlanCreateRequest) {
   return request.post<CallbackPlanItem>(`/api/crm/leads/${leadId}/callback-plans`, data)
 }

@@ -6,4 +6,5 @@ import lombok.Data;
 @Data
 public class CrmLeadBatchDeleteRequest {
   private List<Long> ids;
+  private List<String> contractNos;
 }

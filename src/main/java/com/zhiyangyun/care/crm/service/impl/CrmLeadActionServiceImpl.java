@@ -9,6 +9,7 @@ import com.zhiyangyun.care.crm.mapper.CrmCallbackPlanMapper;
 import com.zhiyangyun.care.crm.mapper.CrmContractAttachmentMapper;
 import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
 import com.zhiyangyun.care.crm.mapper.CrmSmsTaskMapper;
+import com.zhiyangyun.care.crm.model.CrmLeadResponse;
 import com.zhiyangyun.care.crm.model.action.CrmCallbackPlanExecuteRequest;
 import com.zhiyangyun.care.crm.model.action.CrmCallbackPlanRequest;
 import com.zhiyangyun.care.crm.model.action.CrmCallbackPlanResponse;
@@ -81,20 +82,74 @@ public class CrmLeadActionServiceImpl implements CrmLeadActionService {
   @Override
   @Transactional
   public int batchDelete(Long tenantId, CrmLeadBatchDeleteRequest request) {
-    if (request == null || request.getIds() == null || request.getIds().isEmpty()) {
+    if (request == null) {
+      return 0;
+    }
+    List<Long> ids = request.getIds();
+    List<String> contractNos = request.getContractNos();
+    boolean hasIds = ids != null && !ids.isEmpty();
+    boolean hasContractNos = contractNos != null && contractNos.stream().anyMatch(item -> item != null && !item.isBlank());
+    if (!hasIds && !hasContractNos) {
       return 0;
     }
     int updated = 0;
-    for (Long id : request.getIds()) {
-      CrmLead lead = leadMapper.selectById(id);
-      if (!isOwnedLead(lead, tenantId)) {
-        continue;
+    if (hasIds) {
+      for (Long id : ids) {
+        CrmLead lead = leadMapper.selectById(id);
+        if (!isOwnedLead(lead, tenantId)) {
+          continue;
+        }
+        lead.setIsDeleted(1);
+        leadMapper.updateById(lead);
+        updated++;
       }
-      lead.setIsDeleted(1);
-      leadMapper.updateById(lead);
-      updated++;
+    }
+    if (hasContractNos) {
+      for (String contractNo : contractNos) {
+        if (contractNo == null || contractNo.isBlank()) {
+          continue;
+        }
+        CrmLead lead = leadMapper.selectOne(Wrappers.lambdaQuery(CrmLead.class)
+            .eq(CrmLead::getTenantId, tenantId)
+            .eq(CrmLead::getIsDeleted, 0)
+            .eq(CrmLead::getContractNo, contractNo.trim())
+            .orderByDesc(CrmLead::getUpdateTime)
+            .last("LIMIT 1"));
+        if (lead == null) {
+          continue;
+        }
+        if (Integer.valueOf(1).equals(lead.getIsDeleted())) {
+          continue;
+        }
+        lead.setIsDeleted(1);
+        leadMapper.updateById(lead);
+        updated++;
+      }
     }
     return updated;
+  }
+
+  @Override
+  @Transactional
+  public CrmLeadResponse handoffToAssessment(Long tenantId, String contractNo) {
+    if (tenantId == null || contractNo == null || contractNo.isBlank()) {
+      return null;
+    }
+    CrmLead lead = leadMapper.selectOne(Wrappers.lambdaQuery(CrmLead.class)
+        .eq(CrmLead::getTenantId, tenantId)
+        .eq(CrmLead::getIsDeleted, 0)
+        .eq(CrmLead::getContractNo, contractNo.trim())
+        .orderByDesc(CrmLead::getUpdateTime)
+        .last("LIMIT 1"));
+    if (!isOwnedLead(lead, tenantId)) {
+      return null;
+    }
+    lead.setStatus(2);
+    lead.setFlowStage("PENDING_ASSESSMENT");
+    lead.setCurrentOwnerDept("ASSESSMENT");
+    lead.setContractStatus("待评估");
+    leadMapper.updateById(lead);
+    return toLeadResponse(lead);
   }
 
   @Override
@@ -324,6 +379,34 @@ public class CrmLeadActionServiceImpl implements CrmLeadActionService {
     response.setSendTime(task.getSendTime());
     response.setResultMessage(task.getResultMessage());
     response.setCreateTime(task.getCreateTime());
+    return response;
+  }
+
+  private CrmLeadResponse toLeadResponse(CrmLead lead) {
+    CrmLeadResponse response = new CrmLeadResponse();
+    response.setId(lead.getId());
+    response.setTenantId(lead.getTenantId());
+    response.setOrgId(lead.getOrgId());
+    response.setName(lead.getName());
+    response.setPhone(lead.getPhone());
+    response.setElderName(lead.getElderName());
+    response.setElderPhone(lead.getElderPhone());
+    response.setGender(lead.getGender());
+    response.setAge(lead.getAge());
+    response.setMarketerName(lead.getMarketerName());
+    response.setIdCardNo(lead.getIdCardNo());
+    response.setHomeAddress(lead.getHomeAddress());
+    response.setOrgName(lead.getOrgName());
+    response.setStatus(lead.getStatus());
+    response.setContractNo(lead.getContractNo());
+    response.setContractStatus(lead.getContractStatus());
+    response.setFlowStage(lead.getFlowStage());
+    response.setCurrentOwnerDept(lead.getCurrentOwnerDept());
+    response.setContractSignedAt(lead.getContractSignedAt());
+    response.setContractExpiryDate(lead.getContractExpiryDate() == null ? null : lead.getContractExpiryDate().toString());
+    response.setRemark(lead.getRemark());
+    response.setCreateTime(lead.getCreateTime());
+    response.setUpdateTime(lead.getUpdateTime());
     return response;
   }
 
