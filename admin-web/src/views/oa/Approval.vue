@@ -80,6 +80,45 @@
             </a-form-item>
           </a-col>
         </a-row>
+        <template v-if="form.approvalType === 'LEAVE'">
+          <a-alert
+            type="info"
+            show-icon
+            message="管理制度：龟峰颐养中心请假申请须知"
+            style="margin-bottom: 12px"
+          />
+          <a-card size="small" class="leave-policy-card" style="margin-bottom: 12px">
+            <a-typography-paragraph>
+              为规范管理，员工请假须提前在系统提交申请，注明事由及起止时间，经审批通过后方可休假。3天以内由部门主管审批，3天以上报中心负责人审批。紧急情况应先行报备，并于返岗后1个工作日内补办手续。
+            </a-typography-paragraph>
+            <a-typography-paragraph>
+              事假须提供相关证明材料；病假须提交三级甲等及以上医院出具的就诊病例或医嘱单；婚假须为在职期间依法登记结婚，并提供结婚证复印件。产假、护理假按国家及地方规定执行，需提交医院证明；直系亲属去世可申请丧假，并提供相关证明材料。
+            </a-typography-paragraph>
+            <a-typography-paragraph>
+              所有材料须真实有效，未履行审批手续擅自离岗者按旷工处理。请提前做好工作交接。
+            </a-typography-paragraph>
+          </a-card>
+          <a-space style="margin-bottom: 10px" wrap>
+            <a-button size="small" @click="openPolicy('/oa/knowledge?category=制度规范')">查看管理制度</a-button>
+            <a-button size="small" @click="openPolicy('/oa/document?folder=请假制度')">查看制度文档</a-button>
+          </a-space>
+          <a-form-item label="请假证明上传">
+            <a-upload :show-upload-list="false" :before-upload="beforeUploadLeaveProof">
+              <a-button :loading="proofUploading">上传证明</a-button>
+            </a-upload>
+            <div v-if="leaveProofs.length" class="proof-list">
+              <div v-for="(file, idx) in leaveProofs" :key="`${file.url}-${idx}`" class="proof-item">
+                <a :href="file.url" target="_blank" rel="noopener noreferrer">{{ file.name }}</a>
+                <a-button type="link" danger size="small" @click="removeLeaveProof(idx)">删除</a-button>
+              </div>
+            </div>
+          </a-form-item>
+          <a-form-item>
+            <a-checkbox v-model:checked="leavePolicyAcknowledged">
+              我已阅读并同意制度
+            </a-checkbox>
+          </a-form-item>
+        </template>
         <a-form-item label="表单数据(JSON)">
           <a-textarea v-model:value="form.formData" :rows="3" />
         </a-form-item>
@@ -109,7 +148,8 @@ import {
   batchApproveApproval,
   batchRejectApproval,
   batchDeleteApproval,
-  exportApproval
+  exportApproval,
+  uploadOaFile
 } from '../../api/oa'
 import type { OaApproval, PageResult } from '../../types'
 
@@ -137,6 +177,9 @@ const columns = [
 
 const editOpen = ref(false)
 const saving = ref(false)
+const proofUploading = ref(false)
+const leaveProofs = ref<Array<{ name: string; url: string }>>([])
+const leavePolicyAcknowledged = ref(false)
 const form = reactive({
   id: undefined as number | undefined,
   approvalType: 'LEAVE',
@@ -224,6 +267,8 @@ function openCreate() {
   form.formData = ''
   form.status = 'PENDING'
   form.remark = ''
+  leaveProofs.value = []
+  leavePolicyAcknowledged.value = false
   editOpen.value = true
 }
 
@@ -238,10 +283,17 @@ function openEdit(record: OaApproval) {
   form.formData = record.formData || ''
   form.status = record.status || 'PENDING'
   form.remark = record.remark || ''
+  leaveProofs.value = extractLeaveProofs(record.formData)
+  leavePolicyAcknowledged.value = extractPolicyAcknowledged(record.formData)
   editOpen.value = true
 }
 
 async function submit() {
+  if (form.approvalType === 'LEAVE' && !leavePolicyAcknowledged.value) {
+    message.warning('请先勾选“我已阅读并同意制度”')
+    return
+  }
+  const formDataForSubmit = mergeLeaveProofsIntoFormData(form.formData)
   const payload = {
     approvalType: form.approvalType,
     title: form.title,
@@ -249,7 +301,7 @@ async function submit() {
     amount: form.amount,
     startTime: form.startTime ? dayjs(form.startTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
     endTime: form.endTime ? dayjs(form.endTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
-    formData: form.formData,
+    formData: formDataForSubmit,
     status: form.status,
     remark: form.remark
   }
@@ -265,6 +317,76 @@ async function submit() {
   } finally {
     saving.value = false
   }
+}
+
+function extractLeaveProofs(formData?: string) {
+  if (!formData) return []
+  try {
+    const parsed = JSON.parse(formData)
+    const proofs = Array.isArray(parsed?.leaveProofs) ? parsed.leaveProofs : []
+    return proofs
+      .filter((item: any) => item && item.url)
+      .map((item: any) => ({ name: String(item.name || '请假证明'), url: String(item.url) }))
+  } catch {
+    return []
+  }
+}
+
+function extractPolicyAcknowledged(formData?: string) {
+  if (!formData) return false
+  try {
+    const parsed = JSON.parse(formData)
+    return Boolean(parsed?.policyAcknowledged)
+  } catch {
+    return false
+  }
+}
+
+function mergeLeaveProofsIntoFormData(raw?: string) {
+  if (form.approvalType !== 'LEAVE') {
+    return raw
+  }
+  let parsed: Record<string, any> = {}
+  if (raw && raw.trim()) {
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      parsed = { rawText: raw }
+    }
+  }
+  parsed.leaveProofs = leaveProofs.value
+  parsed.policyAcknowledged = leavePolicyAcknowledged.value
+  return JSON.stringify(parsed)
+}
+
+async function beforeUploadLeaveProof(file: File) {
+  proofUploading.value = true
+  try {
+    const uploaded = await uploadOaFile(file, 'oa-leave-proof')
+    const url = uploaded?.fileUrl || ''
+    if (!url) {
+      message.error('上传失败：未返回文件地址')
+      return false
+    }
+    leaveProofs.value.push({
+      name: uploaded.originalFileName || uploaded.fileName || file.name,
+      url
+    })
+    message.success('证明上传成功')
+  } catch (error: any) {
+    message.error(error?.message || '证明上传失败')
+  } finally {
+    proofUploading.value = false
+  }
+  return false
+}
+
+function removeLeaveProof(index: number) {
+  leaveProofs.value.splice(index, 1)
+}
+
+function openPolicy(path: string) {
+  window.open(path, '_blank')
 }
 
 async function approve(record: OaApproval) {
@@ -339,3 +461,26 @@ onMounted(() => {
   }
 })
 </script>
+
+<style scoped>
+.proof-list {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.leave-policy-card :deep(.ant-typography) {
+  margin-bottom: 8px;
+}
+
+.proof-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+}
+</style>

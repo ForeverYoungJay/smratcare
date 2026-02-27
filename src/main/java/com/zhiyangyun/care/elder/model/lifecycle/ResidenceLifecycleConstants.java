@@ -5,6 +5,8 @@ public final class ResidenceLifecycleConstants {
 
   public static final String OUTING_OUT = "OUT";
   public static final String OUTING_RETURNED = "RETURNED";
+  public static final String MEDICAL_OUTING_OUT = "OUT";
+  public static final String MEDICAL_OUTING_RETURNED = "RETURNED";
 
   public static final String TRIAL_REGISTERED = "REGISTERED";
   public static final String TRIAL_FINISHED = "FINISHED";
@@ -17,4 +19,7 @@ public final class ResidenceLifecycleConstants {
 
   public static final String AUTO_DISCHARGE_SUCCESS = "SUCCESS";
   public static final String AUTO_DISCHARGE_FAILED = "FAILED";
+
+  public static final String DEATH_REGISTERED = "REGISTERED";
+  public static final String DEATH_CANCELLED = "CANCELLED";
 }

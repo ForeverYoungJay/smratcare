@@ -284,6 +284,7 @@ public class InventoryController {
       if ("OUT".equalsIgnoreCase(log.getChangeType())) {
         item.setOutType(log.getRefOrderId() != null ? "SALE" : "CONSUME");
       }
+      item.setReceiverName(log.getReceiverName());
       item.setRemark(log.getRemark());
       item.setCreateTime(log.getCreateTime());
       return item;

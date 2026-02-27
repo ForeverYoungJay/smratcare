@@ -91,7 +91,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
-import { createWarehouse, deleteWarehouse, getWarehousePage, updateWarehouse } from '../../api/material'
+import { createWarehouse, deleteWarehouse, getWarehousePage, updateWarehouse } from '../../api/materialCenter'
 import {
   MATERIAL_ENABLE_STATUS_OPTIONS,
   materialEnableStatusColor,

@@ -139,7 +139,7 @@ const cards = computed(() => [
     ],
     actions: [
       { label: '用药登记', route: '/health/medication/medication-registration?date=today&filter=pending' },
-      { label: '库存预警', route: '/inventory/alerts?filter=low_or_expiring' },
+      { label: '库存预警', route: '/material/alerts?filter=low_or_expiring' },
       { label: '领药申请', route: '/material/purchase?filter=pending' }
     ]
   },

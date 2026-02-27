@@ -26,6 +26,7 @@ public class CrmLeadRequest {
   private String invalidTime;
   private String idCardNo;
   private String reservationRoomNo;
+  private Long reservationBedId;
   private String reservationChannel;
   private String reservationStatus;
   private Integer refunded;
@@ -39,6 +40,8 @@ public class CrmLeadRequest {
   private String contractSignedAt;
   private String contractNo;
   private String contractStatus;
+  private String flowStage;
+  private String currentOwnerDept;
   private String contractExpiryDate;
   private Integer smsSendCount;
   private String nextFollowDate;

@@ -6,6 +6,7 @@ import com.zhiyangyun.care.crm.model.report.MarketingConsultationTrendItem;
 import com.zhiyangyun.care.crm.model.report.MarketingConversionReportResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingFollowupReportResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingDataQualityResponse;
+import com.zhiyangyun.care.crm.model.report.MarketingLeadEntrySummaryResponse;
 import java.util.List;
 
 public interface MarketingReportService {
@@ -26,4 +27,9 @@ public interface MarketingReportService {
   MarketingDataQualityResponse dataQuality(Long tenantId);
 
   int normalizeSources(Long tenantId);
+
+  MarketingLeadEntrySummaryResponse leadEntrySummary(
+      Long tenantId, String mode, String keyword, String consultantName, String consultantPhone,
+      String elderName, String elderPhone, String consultDateFrom, String consultDateTo, String consultType,
+      String mediaChannel, String infoSource, String customerTag, String marketerName);
 }

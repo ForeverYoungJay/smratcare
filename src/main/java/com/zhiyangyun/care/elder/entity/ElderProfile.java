@@ -34,6 +34,9 @@ public class ElderProfile {
   private String phone;
 
   private String homeAddress;
+  private String medicalInsuranceCopyUrl;
+  private String householdCopyUrl;
+  private String medicalRecordFileUrl;
 
   private LocalDate admissionDate;
 

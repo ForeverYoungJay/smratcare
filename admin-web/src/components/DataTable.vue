@@ -1,5 +1,5 @@
 <template>
-  <a-card class="card-elevated" :bordered="false">
+  <a-card class="card-elevated table-card" :bordered="false">
     <a-table
       :columns="columns"
       :data-source="dataSource"
@@ -7,7 +7,7 @@
       :row-class-name="rowClassName"
       :row-selection="rowSelection"
       :loading="loading"
-      :pagination="pagination"
+      :pagination="mergedPagination"
       :scroll="scroll"
       @change="onChange"
     >
@@ -25,17 +25,30 @@
 
 <script setup lang="ts">
 import type { TablePaginationConfig } from 'ant-design-vue'
+import { computed } from 'vue'
 
-defineProps<{
+const props = defineProps<{
   columns: any[]
   dataSource: any[]
   rowKey: string
   rowClassName?: (record: any, index: number) => string
   rowSelection?: any
   loading?: boolean
-  pagination?: TablePaginationConfig
+  pagination?: TablePaginationConfig | false
   scroll?: any
 }>()
+
+const mergedPagination = computed<TablePaginationConfig | false>(() => {
+  if (props.pagination === false) {
+    return false
+  }
+  return {
+    showSizeChanger: true,
+    showQuickJumper: true,
+    showTotal: (total) => `共 ${total} 条`,
+    ...(props.pagination || {})
+  }
+})
 
 const emit = defineEmits<{ (e: 'change', pagination: TablePaginationConfig, filters: any, sorter: any): void }>()
 

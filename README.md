@@ -124,6 +124,7 @@ OpenAPI：
 - 阿里云部署：`DEPLOY_ALIYUN.md`
 - 部署检查清单：`DEPLOYMENT_CHECKLIST.md`
 - 测试执行说明：`TESTING.md`
+- 物资中心合并说明：`docs/MATERIAL_CENTER_MERGE.md`
 
 ## 备注
 - 上传文件默认映射目录：`output/uploads`（容器内 `/app/uploads`）

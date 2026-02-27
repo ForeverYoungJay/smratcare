@@ -114,6 +114,7 @@ export interface CrmLeadItem {
   idCardNo?: string
   reservationAmount?: number
   reservationRoomNo?: string
+  reservationBedId?: number
   paymentTime?: string
   refunded?: number
   reservationChannel?: string
@@ -126,11 +127,14 @@ export interface CrmLeadItem {
   contractSignedAt?: string
   contractNo?: string
   contractStatus?: string
+  flowStage?: 'PENDING_ASSESSMENT' | 'PENDING_BED_SELECT' | 'PENDING_SIGN' | 'SIGNED'
+  currentOwnerDept?: 'MARKETING' | 'ASSESSMENT'
   contractExpiryDate?: string
   smsSendCount?: number
   nextFollowDate?: string
   remark?: string
   createTime?: string
+  updateTime?: string
 }
 
 export interface AdmissionRequest {
@@ -165,6 +169,8 @@ export interface ChangeLogItem {
 export type TrialStayStatus = 'REGISTERED' | 'FINISHED' | 'CONVERTED' | 'CANCELLED'
 export type DischargeApplyStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
 export type OutingStatus = 'OUT' | 'RETURNED'
+export type MedicalOutingStatus = 'OUT' | 'RETURNED'
+export type DeathRegisterStatus = 'REGISTERED' | 'CANCELLED'
 
 export interface AdmissionRecordQuery {
   pageNo?: number
@@ -213,6 +219,35 @@ export interface DischargeApplyQuery {
   plannedDateTo?: string
 }
 
+export interface MedicalOutingQuery {
+  pageNo?: number
+  pageSize?: number
+  elderId?: number
+  status?: MedicalOutingStatus
+  keyword?: string
+}
+
+export interface DeathRegisterQuery {
+  pageNo?: number
+  pageSize?: number
+  elderId?: number
+  status?: DeathRegisterStatus
+  keyword?: string
+}
+
+export interface ResidenceStatusSummary {
+  intentCount: number
+  trialCount: number
+  inHospitalCount: number
+  outingCount: number
+  medicalOutingCount: number
+  dischargePendingCount: number
+  dischargedCount: number
+  deathCount: number
+  openIncidentCount: number
+  overdueOutingCount: number
+}
+
 export interface AdmissionRecordItem {
   id: number
   elderId: number
@@ -249,6 +284,40 @@ export interface OutingCreateRequest {
 }
 
 export interface OutingReturnRequest {
+  actualReturnTime?: string
+  remark?: string
+}
+
+export interface MedicalOutingItem {
+  id: number
+  elderId: number
+  elderName?: string
+  outingDate: string
+  expectedReturnTime?: string
+  actualReturnTime?: string
+  hospitalName?: string
+  department?: string
+  diagnosis?: string
+  companion?: string
+  reason?: string
+  status?: MedicalOutingStatus
+  remark?: string
+  createTime?: string
+}
+
+export interface MedicalOutingCreateRequest {
+  elderId: number
+  outingDate: string
+  expectedReturnTime?: string
+  hospitalName?: string
+  department?: string
+  diagnosis?: string
+  companion?: string
+  reason?: string
+  remark?: string
+}
+
+export interface MedicalOutingReturnRequest {
   actualReturnTime?: string
   remark?: string
 }
@@ -307,4 +376,51 @@ export interface DischargeApplyCreateRequest {
 export interface DischargeApplyReviewRequest {
   status: Exclude<DischargeApplyStatus, 'PENDING'>
   reviewRemark?: string
+}
+
+export interface DeathRegisterItem {
+  id: number
+  elderId: number
+  elderName?: string
+  deathDate: string
+  deathTime?: string
+  place?: string
+  cause?: string
+  certificateNo?: string
+  reportedBy?: string
+  reportedTime?: string
+  beforeStatus?: number
+  status?: DeathRegisterStatus
+  remark?: string
+  updatedBy?: number
+  cancelledBy?: number
+  cancelledTime?: string
+  createTime?: string
+}
+
+export interface DeathRegisterCreateRequest {
+  elderId: number
+  deathDate: string
+  deathTime?: string
+  place?: string
+  cause?: string
+  certificateNo?: string
+  reportedBy?: string
+  reportedTime?: string
+  remark?: string
+}
+
+export interface DeathRegisterUpdateRequest {
+  deathDate: string
+  deathTime?: string
+  place?: string
+  cause?: string
+  certificateNo?: string
+  reportedBy?: string
+  reportedTime?: string
+  remark?: string
+}
+
+export interface DeathRegisterCancelRequest {
+  remark?: string
 }

@@ -36,6 +36,12 @@ public class FireSafetyRecordRequest {
 
   private String equipmentBatchNo;
 
+  private LocalDate productProductionDate;
+
+  private LocalDate productExpiryDate;
+
+  private Integer checkCycleDays;
+
   private String equipmentUpdateNote;
 
   private String equipmentAgingDisposal;

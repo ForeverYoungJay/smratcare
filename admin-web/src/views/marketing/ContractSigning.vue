@@ -1,6 +1,35 @@
 <template>
-  <PageContainer title="合同签约" sub-title="合同新增、审批与签约状态跟踪">
+  <PageContainer title="合同签约" sub-title="营销建合同 -> 评估部评估 -> 长者选床 -> 营销最终签署">
     <a-card class="card-elevated" :bordered="false">
+      <a-row :gutter="12">
+        <a-col :span="6">
+          <div class="board-item">
+            <div class="board-title">待评估 <a-badge :count="stageBoard.pendingAssessmentOverdue" color="#ff4d4f" /></div>
+            <div class="board-value">{{ stageBoard.pendingAssessment }}</div>
+          </div>
+        </a-col>
+        <a-col :span="6">
+          <div class="board-item">
+            <div class="board-title">待选床</div>
+            <div class="board-value">{{ stageBoard.pendingBedSelect }}</div>
+          </div>
+        </a-col>
+        <a-col :span="6">
+          <div class="board-item">
+            <div class="board-title">待签署 <a-badge :count="stageBoard.pendingSignOverdue" color="#ff4d4f" /></div>
+            <div class="board-value">{{ stageBoard.pendingSign }}</div>
+          </div>
+        </a-col>
+        <a-col :span="6">
+          <div class="board-item">
+            <div class="board-title">已签署</div>
+            <div class="board-value">{{ stageBoard.signed }}</div>
+          </div>
+        </a-col>
+      </a-row>
+    </a-card>
+
+    <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item label="合同编号">
           <a-input v-model:value="query.contractNo" placeholder="请输入 合同编号" allow-clear />
@@ -17,8 +46,30 @@
         <a-form-item label="营销人员">
           <a-input v-model:value="query.marketerName" placeholder="请输入 营销人员" allow-clear />
         </a-form-item>
-        <a-form-item label="合同状态">
-          <a-input v-model:value="query.contractStatus" placeholder="请选择 合同状态" allow-clear />
+        <a-form-item label="流程阶段">
+          <a-select v-model:value="query.flowStage" style="width: 150px" allow-clear>
+            <a-select-option value="PENDING_ASSESSMENT">待评估</a-select-option>
+            <a-select-option value="PENDING_BED_SELECT">待选床</a-select-option>
+            <a-select-option value="PENDING_SIGN">待签署</a-select-option>
+            <a-select-option value="SIGNED">已签署</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="仅看我负责">
+          <a-switch v-model:checked="onlyMineDept" @change="onMineSwitchChange" />
+        </a-form-item>
+        <a-form-item label="责任部门">
+          <a-segmented
+            v-model:value="mineDept"
+            :options="mineDeptOptions"
+            :disabled="!onlyMineDept"
+            @change="onMineDeptChange"
+          />
+        </a-form-item>
+        <a-form-item label="只看超时">
+          <a-switch v-model:checked="onlyOverdue" @change="onOverdueSwitchChange" />
+        </a-form-item>
+        <a-form-item label="超时排序">
+          <a-switch v-model:checked="sortByOverdue" @change="onSortSwitchChange" />
         </a-form-item>
         <a-form-item>
           <a-space>
@@ -38,20 +89,33 @@
         </a-space>
       </div>
       <a-table
-        :data-source="rows"
+        :data-source="tableRows"
         :columns="columns"
         :loading="loading"
         :pagination="false"
         row-key="id"
         :row-selection="rowSelection"
-        :scroll="{ x: 1800 }"
+        :scroll="{ x: 2300 }"
       >
         <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'operation'">
+          <template v-if="column.key === 'flowStage'">
+            <a-tag :color="flowStageColor(record.flowStage)">{{ flowStageText(record.flowStage) }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'slaWarning'">
+            <a-tag v-if="getOverdueLevel(record) === 'high'" color="red">{{ overdueText(record) }}</a-tag>
+            <span v-else>-</span>
+          </template>
+          <template v-else-if="column.key === 'currentOwnerDept'">
+            <a-tag>{{ ownerDeptText(record.currentOwnerDept) }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'operation'">
             <a-space wrap>
               <a-button type="link" @click="view(record)">查看</a-button>
               <a-button type="link" @click="openForm(record)">编辑</a-button>
               <a-button type="link" @click="openAttachment(record)">附件</a-button>
+              <a-button v-if="record.flowStage !== 'SIGNED'" type="link" @click="startAdmissionAssessment(record)">移交评估部</a-button>
+              <a-button v-if="record.flowStage === 'PENDING_BED_SELECT'" type="link" @click="openBedSelection(record)">选择床位</a-button>
+              <a-button v-if="record.flowStage === 'PENDING_SIGN'" type="link" @click="openFinalize(record)">最终签署</a-button>
             </a-space>
           </template>
         </template>
@@ -60,7 +124,7 @@
         style="margin-top: 16px; text-align: right;"
         :current="query.pageNo"
         :page-size="query.pageSize"
-        :total="total"
+        :total="displayTotal"
         show-size-changer
         @change="onPageChange"
         @showSizeChange="onPageSizeChange"
@@ -70,7 +134,11 @@
     <a-modal v-model:open="open" :title="form.id ? '编辑合同' : '新增合同'" width="760px" :confirm-loading="submitting" @ok="submit">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-row :gutter="16">
-          <a-col :span="12"><a-form-item label="合同编号" name="contractNo"><a-input v-model:value="form.contractNo" /></a-form-item></a-col>
+          <a-col :span="12">
+            <a-form-item label="合同编号" name="contractNo">
+              <a-input v-model:value="form.contractNo" :disabled="!form.id" placeholder="后端自动生成（gfyy+年月日+编号）" />
+            </a-form-item>
+          </a-col>
           <a-col :span="12"><a-form-item label="签约房号"><a-input v-model:value="form.reservationRoomNo" /></a-form-item></a-col>
           <a-col :span="12"><a-form-item label="姓名" name="elderName"><a-input v-model:value="form.elderName" /></a-form-item></a-col>
           <a-col :span="12"><a-form-item label="联系电话"><a-input v-model:value="form.elderPhone" /></a-form-item></a-col>
@@ -80,13 +148,20 @@
           <a-col :span="12"><a-form-item label="合同有效期止"><a-date-picker v-model:value="form.contractExpiryDate" value-format="YYYY-MM-DD" style="width: 100%" /></a-form-item></a-col>
           <a-col :span="12"><a-form-item label="合同状态"><a-input v-model:value="form.contractStatus" /></a-form-item></a-col>
           <a-col :span="12"><a-form-item label="营销人员"><a-input v-model:value="form.marketerName" /></a-form-item></a-col>
-          <a-col :span="12"><a-form-item label="所属机构"><a-input v-model:value="form.orgName" /></a-form-item></a-col>
+          <a-col :span="12"><a-form-item label="优惠政策"><a-input v-model:value="form.orgName" placeholder="请输入优惠政策" /></a-form-item></a-col>
         </a-row>
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="attachmentOpen" title="合同附件" width="820px" :footer="null">
-      <a-space style="margin-bottom: 12px;">
+    <a-modal v-model:open="attachmentOpen" title="合同附件（病历/医保/户口等）" width="860px" :footer="null">
+      <a-space style="margin-bottom: 12px;" wrap>
+        <a-select v-model:value="attachmentType" style="width: 180px">
+          <a-select-option value="MEDICAL_RECORD">病历资料</a-select-option>
+          <a-select-option value="MEDICAL_INSURANCE">医保复印件</a-select-option>
+          <a-select-option value="HOUSEHOLD">户口复印件</a-select-option>
+          <a-select-option value="CONTRACT">合同附件</a-select-option>
+          <a-select-option value="OTHER">其他附件</a-select-option>
+        </a-select>
         <a-upload
           :show-upload-list="false"
           :custom-request="handleUpload"
@@ -108,6 +183,9 @@
             />
             <span v-else>-</span>
           </template>
+          <template v-else-if="column.key === 'remark'">
+            {{ attachmentTypeLabel(record.remark) }}
+          </template>
           <template v-else-if="column.key === 'fileUrl'">
             <a :href="record.fileUrl" target="_blank">{{ record.fileName }}</a>
           </template>
@@ -120,11 +198,58 @@
         </template>
       </a-table>
     </a-modal>
+
+    <a-modal v-model:open="bedSelectOpen" title="选床（评估完成后）" width="760px" :confirm-loading="bedSelecting" @ok="submitBedSelection">
+      <a-form layout="vertical" :model="bedSelectForm">
+        <a-alert
+          type="info"
+          show-icon
+          style="margin-bottom: 12px;"
+          :message="`评估结论：${bedSelectForm.assessmentSummary || '暂无'}`"
+          :description="`评估等级：${bedSelectForm.assessmentLevel || '-'}；建议优先选择匹配护理等级床位。`"
+        />
+        <a-form-item label="选择床位（空闲）">
+          <a-select v-model:value="bedSelectForm.bedId" placeholder="请选择床位">
+            <a-select-option v-for="bed in recommendedBeds" :key="bed.id" :value="bed.id">
+              {{ bed.roomNo || '-' }} / {{ bed.bedNo }} {{ matchAssessmentLevel(bed) ? '(推荐)' : '' }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <a-modal v-model:open="finalizeOpen" title="最终签署与入住" width="760px" :confirm-loading="finalizing" @ok="submitFinalize">
+      <a-form layout="vertical" :model="finalizeForm">
+        <a-alert
+          type="info"
+          show-icon
+          style="margin-bottom: 12px;"
+          :message="`评估结论：${finalizeForm.assessmentSummary || '未完成入住评估'}`"
+          :description="`评估等级：${finalizeForm.assessmentLevel || '-'}；确认签署后将办理入住并占用床位。`"
+        />
+        <a-row :gutter="16">
+          <a-col :span="12"><a-form-item label="合同编号"><a-input :value="finalizeForm.contractNo" disabled /></a-form-item></a-col>
+          <a-col :span="12"><a-form-item label="老人ID"><a-input :value="finalizeForm.elderId" disabled /></a-form-item></a-col>
+          <a-col :span="12"><a-form-item label="入住日期"><a-date-picker v-model:value="finalizeForm.admissionDate" value-format="YYYY-MM-DD" style="width: 100%" /></a-form-item></a-col>
+          <a-col :span="12"><a-form-item label="押金"><a-input-number v-model:value="finalizeForm.depositAmount" :min="0" style="width: 100%" /></a-form-item></a-col>
+          <a-col :span="24">
+            <a-form-item label="床位（已选）">
+              <a-select v-model:value="finalizeForm.bedId" placeholder="请先完成选床">
+                <a-select-option v-for="bed in recommendedBeds" :key="bed.id" :value="bed.id">
+                  {{ bed.roomNo || '-' }} / {{ bed.bedNo }} {{ matchAssessmentLevel(bed) ? '(推荐)' : '' }}
+                </a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+        </a-row>
+      </a-form>
+    </a-modal>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
@@ -139,15 +264,39 @@ import {
   updateCrmLead,
   uploadMarketingFile
 } from '../../api/marketing'
-import type { ContractAttachmentItem, CrmLeadItem, PageResult } from '../../types'
+import { createElder, getElderPage, updateElder } from '../../api/elder'
+import { getAssessmentRecordPage } from '../../api/assessment'
+import { getBedList } from '../../api/bed'
+import { admitElder } from '../../api/elderLifecycle'
+import type { AssessmentRecord, BedItem, ContractAttachmentItem, CrmLeadItem, ElderItem, PageResult } from '../../types'
 
+const router = useRouter()
 const loading = ref(false)
 const submitting = ref(false)
 const open = ref(false)
 const formRef = ref<FormInstance>()
 const rows = ref<CrmLeadItem[]>([])
+const localRows = ref<CrmLeadItem[]>([])
 const total = ref(0)
 const selectedRowKeys = ref<number[]>([])
+const onlyMineDept = ref(false)
+const mineDept = ref<'MARKETING' | 'ASSESSMENT'>('MARKETING')
+const onlyOverdue = ref(false)
+const sortByOverdue = ref(false)
+
+const stageBoard = reactive({
+  pendingAssessment: 0,
+  pendingBedSelect: 0,
+  pendingSign: 0,
+  signed: 0,
+  pendingAssessmentOverdue: 0,
+  pendingSignOverdue: 0
+})
+
+const mineDeptOptions = [
+  { label: '营销部', value: 'MARKETING' },
+  { label: '评估部', value: 'ASSESSMENT' }
+]
 
 const query = reactive({
   contractNo: '',
@@ -156,13 +305,13 @@ const query = reactive({
   elderPhone: '',
   marketerName: '',
   contractStatus: '',
+  flowStage: undefined as CrmLeadItem['flowStage'] | undefined,
   pageNo: 1,
   pageSize: 10
 })
 
 const form = reactive<Partial<CrmLeadItem>>({})
 const rules: FormRules = {
-  contractNo: [{ required: true, message: '请输入合同编号' }],
   elderName: [{ required: true, message: '请输入姓名' }]
 }
 
@@ -175,52 +324,252 @@ const rowSelection = computed(() => ({
 
 const columns = [
   { title: '合同编号', dataIndex: 'contractNo', key: 'contractNo', width: 170 },
+  { title: '流程阶段', dataIndex: 'flowStage', key: 'flowStage', width: 120 },
+  { title: '超时预警', dataIndex: 'slaWarning', key: 'slaWarning', width: 150 },
+  { title: '当前责任部门', dataIndex: 'currentOwnerDept', key: 'currentOwnerDept', width: 130 },
   { title: '签约房号', dataIndex: 'reservationRoomNo', key: 'reservationRoomNo', width: 140 },
   { title: '姓名', dataIndex: 'elderName', key: 'elderName', width: 120 },
-  { title: '性别', dataIndex: 'gender', key: 'gender', width: 80 },
-  { title: '年龄', dataIndex: 'age', key: 'age', width: 80 },
   { title: '联系电话', dataIndex: 'elderPhone', key: 'elderPhone', width: 140 },
   { title: '营销人员', dataIndex: 'marketerName', key: 'marketerName', width: 120 },
   { title: '签约日期', dataIndex: 'contractSignedAt', key: 'contractSignedAt', width: 170 },
-  { title: '合同有效期止', dataIndex: 'contractExpiryDate', key: 'contractExpiryDate', width: 140 },
-  { title: '合同状态', dataIndex: 'contractStatus', key: 'contractStatus', width: 140 },
-  { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 },
-  { title: '操作', key: 'operation', fixed: 'right', width: 180 }
+  { title: '合同状态', dataIndex: 'contractStatus', key: 'contractStatus', width: 130 },
+  { title: '操作', key: 'operation', fixed: 'right', width: 420 }
 ]
 
 const attachmentOpen = ref(false)
 const attachmentSubmitting = ref(false)
+const attachmentType = ref<'MEDICAL_RECORD' | 'MEDICAL_INSURANCE' | 'HOUSEHOLD' | 'CONTRACT' | 'OTHER'>('CONTRACT')
 const currentAttachmentLead = ref<CrmLeadItem>()
 const attachments = ref<ContractAttachmentItem[]>([])
 const uploadAccept = '.jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip'
 const attachmentColumns = [
   { title: '预览', dataIndex: 'preview', key: 'preview', width: 80 },
-  { title: '文件名', dataIndex: 'fileName', key: 'fileName', width: 220 },
-  { title: '文件链接', dataIndex: 'fileUrl', key: 'fileUrl', width: 320 },
+  { title: '类型', dataIndex: 'remark', key: 'remark', width: 120 },
+  { title: '文件名', dataIndex: 'fileName', key: 'fileName', width: 200 },
+  { title: '文件链接', dataIndex: 'fileUrl', key: 'fileUrl', width: 280 },
   { title: '文件类型', dataIndex: 'fileType', key: 'fileType', width: 120 },
-  { title: '文件大小', dataIndex: 'fileSize', key: 'fileSize', width: 110 },
+  { title: '文件大小', dataIndex: 'fileSize', key: 'fileSize', width: 100 },
   { title: '上传时间', dataIndex: 'createTime', key: 'createTime', width: 160 },
   { title: '操作', key: 'operation', width: 80 }
 ]
 
+const bedSelectOpen = ref(false)
+const bedSelecting = ref(false)
+const bedSelectLead = ref<CrmLeadItem>()
+const bedSelectBeds = ref<BedItem[]>([])
+const bedSelectForm = reactive({
+  elderId: 0,
+  bedId: undefined as number | undefined,
+  assessmentLevel: '',
+  assessmentSummary: ''
+})
+
+const finalizeOpen = ref(false)
+const finalizing = ref(false)
+const finalizeLead = ref<CrmLeadItem>()
+const finalizeBeds = ref<BedItem[]>([])
+const finalizeForm = reactive({
+  leadId: 0,
+  elderId: 0,
+  contractNo: '',
+  admissionDate: dayjs().format('YYYY-MM-DD'),
+  depositAmount: 0,
+  bedId: undefined as number | undefined,
+  assessmentLevel: '',
+  assessmentSummary: ''
+})
+
+const recommendedBeds = computed(() => {
+  const source = bedSelectOpen.value ? bedSelectBeds.value : finalizeBeds.value
+  return [...source].sort((a, b) => Number(matchAssessmentLevel(b)) - Number(matchAssessmentLevel(a)))
+})
+
+const processedRows = computed(() => {
+  let list = onlyOverdue.value
+    ? localRows.value.filter((item) => getOverdueLevel(item) === 'high')
+    : [...localRows.value]
+  if (sortByOverdue.value) {
+    list = list.sort((a, b) => overdueHours(b) - overdueHours(a))
+  }
+  return list
+})
+
+const tableRows = computed(() => {
+  if (!onlyOverdue.value && !sortByOverdue.value) {
+    return rows.value
+  }
+  const start = (query.pageNo - 1) * query.pageSize
+  return processedRows.value.slice(start, start + query.pageSize)
+})
+
+const displayTotal = computed(() => {
+  if (!onlyOverdue.value && !sortByOverdue.value) {
+    return total.value
+  }
+  return processedRows.value.length
+})
+
+function flowStageText(stage?: CrmLeadItem['flowStage']) {
+  if (stage === 'PENDING_ASSESSMENT') return '待评估'
+  if (stage === 'PENDING_BED_SELECT') return '待选床'
+  if (stage === 'PENDING_SIGN') return '待签署'
+  if (stage === 'SIGNED') return '已签署'
+  return '待评估'
+}
+
+function flowStageColor(stage?: CrmLeadItem['flowStage']) {
+  if (stage === 'PENDING_ASSESSMENT') return 'gold'
+  if (stage === 'PENDING_BED_SELECT') return 'blue'
+  if (stage === 'PENDING_SIGN') return 'purple'
+  if (stage === 'SIGNED') return 'green'
+  return 'default'
+}
+
+function ownerDeptText(dept?: CrmLeadItem['currentOwnerDept']) {
+  if (dept === 'ASSESSMENT') return '评估部'
+  if (dept === 'MARKETING') return '营销部'
+  return '-'
+}
+
+function hoursFrom(timeText?: string) {
+  if (!timeText) return 0
+  const t = dayjs(timeText)
+  if (!t.isValid()) return 0
+  return dayjs().diff(t, 'hour')
+}
+
+function overdueHours(record: CrmLeadItem) {
+  if (record.flowStage === 'PENDING_ASSESSMENT') {
+    return hoursFrom(record.createTime)
+  }
+  if (record.flowStage === 'PENDING_SIGN') {
+    return hoursFrom(record.updateTime || record.createTime)
+  }
+  return 0
+}
+
+function getOverdueLevel(record: CrmLeadItem): 'none' | 'high' {
+  const hours = overdueHours(record)
+  if (record.flowStage === 'PENDING_ASSESSMENT') {
+    if (hours >= 24) return 'high'
+    return 'none'
+  }
+  if (record.flowStage === 'PENDING_SIGN') {
+    if (hours >= 48) return 'high'
+    return 'none'
+  }
+  return 'none'
+}
+
+function overdueText(record: CrmLeadItem) {
+  const hours = overdueHours(record)
+  if (record.flowStage === 'PENDING_ASSESSMENT') {
+    return `待评估超时 ${hours}h`
+  }
+  if (record.flowStage === 'PENDING_SIGN') {
+    return `待签署超时 ${hours}h`
+  }
+  return ''
+}
+
+async function fetchBoardSummary() {
+  const stages: CrmLeadItem['flowStage'][] = ['PENDING_ASSESSMENT', 'PENDING_BED_SELECT', 'PENDING_SIGN', 'SIGNED']
+  const [a, b, c, d] = await Promise.all(stages.map((flowStage) => getLeadPage({
+    pageNo: 1,
+    pageSize: 1,
+    status: 2,
+    flowStage,
+    currentOwnerDept: onlyMineDept.value ? mineDept.value : undefined
+  })))
+  stageBoard.pendingAssessment = a.total || 0
+  stageBoard.pendingBedSelect = b.total || 0
+  stageBoard.pendingSign = c.total || 0
+  stageBoard.signed = d.total || 0
+  const [assessmentOverdue, signOverdue] = await Promise.all([
+    fetchOverdueCount('PENDING_ASSESSMENT'),
+    fetchOverdueCount('PENDING_SIGN')
+  ])
+  stageBoard.pendingAssessmentOverdue = assessmentOverdue
+  stageBoard.pendingSignOverdue = signOverdue
+}
+
 async function fetchData() {
   loading.value = true
   try {
+    if (onlyOverdue.value || sortByOverdue.value) {
+      localRows.value = await fetchAllLeadRows()
+      rows.value = []
+      total.value = 0
+    } else {
+      const page: PageResult<CrmLeadItem> = await getLeadPage({
+        pageNo: query.pageNo,
+        pageSize: query.pageSize,
+        status: 2,
+        contractNo: query.contractNo || undefined,
+        elderName: query.elderName || undefined,
+        elderPhone: query.elderPhone || undefined,
+        marketerName: query.marketerName || undefined,
+        contractStatus: query.contractStatus || undefined,
+        flowStage: query.flowStage || undefined,
+        currentOwnerDept: onlyMineDept.value ? mineDept.value : undefined
+      })
+      rows.value = page.list || []
+      total.value = page.total || 0
+      localRows.value = []
+    }
+    await fetchBoardSummary()
+  } finally {
+    loading.value = false
+  }
+}
+
+async function fetchAllLeadRows() {
+  const pageSize = 200
+  let pageNo = 1
+  let all: CrmLeadItem[] = []
+  let totalRows = 0
+  do {
     const page: PageResult<CrmLeadItem> = await getLeadPage({
-      pageNo: query.pageNo,
-      pageSize: query.pageSize,
+      pageNo,
+      pageSize,
       status: 2,
       contractNo: query.contractNo || undefined,
       elderName: query.elderName || undefined,
       elderPhone: query.elderPhone || undefined,
       marketerName: query.marketerName || undefined,
-      contractStatus: query.contractStatus || undefined
+      contractStatus: query.contractStatus || undefined,
+      flowStage: query.flowStage || undefined,
+      currentOwnerDept: onlyMineDept.value ? mineDept.value : undefined
     })
-    rows.value = page.list || []
-    total.value = page.total || 0
-  } finally {
-    loading.value = false
-  }
+    const list = page.list || []
+    all = all.concat(list)
+    totalRows = page.total || 0
+    pageNo += 1
+    if (pageNo > 50) break
+  } while (all.length < totalRows)
+  return all
+}
+
+async function fetchOverdueCount(flowStage: 'PENDING_ASSESSMENT' | 'PENDING_SIGN') {
+  const pageSize = 200
+  let pageNo = 1
+  let totalRows = 0
+  let count = 0
+  do {
+    const page: PageResult<CrmLeadItem> = await getLeadPage({
+      pageNo,
+      pageSize,
+      status: 2,
+      flowStage,
+      currentOwnerDept: onlyMineDept.value ? mineDept.value : undefined
+    })
+    const list = page.list || []
+    count += list.filter((item) => getOverdueLevel(item) === 'high').length
+    totalRows = page.total || 0
+    pageNo += 1
+    if (pageNo > 50) break
+  } while ((pageNo - 1) * pageSize < totalRows)
+  return count
 }
 
 function reset() {
@@ -230,19 +579,51 @@ function reset() {
   query.elderPhone = ''
   query.marketerName = ''
   query.contractStatus = ''
+  query.flowStage = undefined
+  onlyMineDept.value = false
+  mineDept.value = 'MARKETING'
   query.pageNo = 1
+  onlyOverdue.value = false
+  sortByOverdue.value = false
   selectedRowKeys.value = []
   fetchData()
 }
 
 function onPageChange(page: number) {
   query.pageNo = page
-  fetchData()
+  if (!onlyOverdue.value && !sortByOverdue.value) {
+    fetchData()
+  }
 }
 
 function onPageSizeChange(_current: number, size: number) {
   query.pageNo = 1
   query.pageSize = size
+  if (!onlyOverdue.value && !sortByOverdue.value) {
+    fetchData()
+  }
+}
+
+function onOverdueSwitchChange() {
+  query.pageNo = 1
+  fetchData()
+}
+
+function onSortSwitchChange() {
+  query.pageNo = 1
+  fetchData()
+}
+
+function onMineSwitchChange() {
+  query.pageNo = 1
+  fetchData()
+}
+
+function onMineDeptChange() {
+  if (!onlyMineDept.value) {
+    return
+  }
+  query.pageNo = 1
   fetchData()
 }
 
@@ -253,11 +634,12 @@ function openForm(record?: CrmLeadItem) {
     Object.assign(form, {
       id: undefined,
       status: 2,
-      contractSignedFlag: 1,
-      contractNo: `HT${dayjs().format('YYYYMMDDHHmmss')}`,
+      contractSignedFlag: 0,
       contractSignedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-      contractStatus: '未提交',
-      orgName: '德合养老院'
+      contractStatus: '待评估',
+      flowStage: 'PENDING_ASSESSMENT',
+      currentOwnerDept: 'ASSESSMENT',
+      orgName: '新签优惠待确认'
     } as Partial<CrmLeadItem>)
   }
   open.value = true
@@ -273,16 +655,23 @@ async function submit() {
       name: form.elderName || form.name || '签约客户',
       phone: form.elderPhone || form.phone,
       status: 2,
-      contractSignedFlag: 1
+      contractSignedFlag: 0,
+      flowStage: form.flowStage || 'PENDING_ASSESSMENT',
+      currentOwnerDept: form.currentOwnerDept || 'ASSESSMENT',
+      contractStatus: form.contractStatus || '待评估'
     }
+    let saved: CrmLeadItem
     if (form.id) {
-      await updateCrmLead(form.id, payload)
+      saved = await updateCrmLead(form.id, payload)
     } else {
-      await createCrmLead(payload)
+      saved = await createCrmLead(payload)
     }
     message.success('合同保存成功')
     open.value = false
-    fetchData()
+    await fetchData()
+    if (!form.id) {
+      await startAdmissionAssessment(saved)
+    }
   } catch {
     message.error('保存失败')
   } finally {
@@ -299,7 +688,7 @@ async function batchApprove() {
   await Promise.all(ids.map((id) => {
     const row = rows.value.find((item) => item.id === id)
     if (!row) return Promise.resolve()
-    return updateCrmLead(row.id, { ...row, contractStatus: '已审批,已通过' })
+    return updateCrmLead(row.id, { ...row, contractStatus: '已审批' })
   }))
   message.success(`已审批 ${ids.length} 条合同`)
   fetchData()
@@ -325,8 +714,137 @@ function batchDelete() {
 function view(record: CrmLeadItem) {
   Modal.info({
     title: '合同详情',
-    content: `${record.contractNo || '-'} / ${record.elderName || '-'} / ${record.contractStatus || '-'}`
+    content: `${record.contractNo || '-'} / ${record.elderName || '-'} / ${flowStageText(record.flowStage)} / ${ownerDeptText(record.currentOwnerDept)}`
   })
+}
+
+async function startAdmissionAssessment(record: CrmLeadItem) {
+  const lead = await ensureContractNo(record)
+  const handed = await updateCrmLead(lead.id, {
+    ...lead,
+    flowStage: 'PENDING_ASSESSMENT',
+    currentOwnerDept: 'ASSESSMENT',
+    contractStatus: '待评估'
+  })
+  const elder = await ensureElderFromLead(handed)
+  message.success('已移交评估部')
+  router.push(`/assessment/ability/admission?residentId=${elder.id}&mode=new&autoOpen=1&fromLeadId=${handed.id}`)
+}
+
+async function openBedSelection(record: CrmLeadItem) {
+  const lead = await ensureContractNo(record)
+  const elder = await ensureElderFromLead(lead)
+  const assessment = await loadLatestAdmissionAssessment(elder.id)
+  if (!assessment) {
+    message.warning('请先完成入住评估，再进行选床')
+    router.push(`/assessment/ability/admission?residentId=${elder.id}&mode=new&autoOpen=1&fromLeadId=${lead.id}`)
+    return
+  }
+  const bedList = await getBedList()
+  bedSelectBeds.value = (bedList || []).filter((item) => !item.elderId && (item.status === 1 || item.status == null))
+
+  bedSelectLead.value = lead
+  bedSelectForm.elderId = elder.id
+  bedSelectForm.assessmentLevel = assessment.levelCode || ''
+  bedSelectForm.assessmentSummary = assessment.resultSummary || '评估已完成'
+  bedSelectForm.bedId = lead.reservationBedId
+  bedSelectOpen.value = true
+}
+
+async function submitBedSelection() {
+  if (!bedSelectLead.value || !bedSelectForm.bedId) {
+    message.warning('请选择床位')
+    return
+  }
+  bedSelecting.value = true
+  try {
+    const selectedBed = bedSelectBeds.value.find((item) => item.id === bedSelectForm.bedId)
+    await updateCrmLead(bedSelectLead.value.id, {
+      ...bedSelectLead.value,
+      reservationBedId: bedSelectForm.bedId,
+      reservationRoomNo: selectedBed?.roomNo || bedSelectLead.value.reservationRoomNo,
+      reservationStatus: '已选床',
+      flowStage: 'PENDING_SIGN',
+      currentOwnerDept: 'MARKETING',
+      contractStatus: '待签署'
+    })
+    message.success('选床成功，已流转营销部待签署')
+    bedSelectOpen.value = false
+    await fetchData()
+  } finally {
+    bedSelecting.value = false
+  }
+}
+
+async function openFinalize(record: CrmLeadItem) {
+  const lead = await ensureContractNo(record)
+  if (lead.flowStage === 'PENDING_BED_SELECT' || !lead.reservationBedId) {
+    message.info('请先完成选床，再进行最终签署')
+    await openBedSelection(lead)
+    return
+  }
+  const elder = await ensureElderFromLead(lead)
+  const assessment = await loadLatestAdmissionAssessment(elder.id)
+  if (!assessment) {
+    message.warning('请先完成入住评估，再进行最终签署')
+    router.push(`/assessment/ability/admission?residentId=${elder.id}&mode=new&autoOpen=1&fromLeadId=${lead.id}`)
+    return
+  }
+
+  const bedList = await getBedList()
+  finalizeBeds.value = (bedList || []).filter((item) => !item.elderId && (item.status === 1 || item.status == null))
+
+  finalizeLead.value = lead
+  finalizeForm.leadId = lead.id
+  finalizeForm.elderId = elder.id
+  finalizeForm.contractNo = lead.contractNo || ''
+  finalizeForm.admissionDate = dayjs().format('YYYY-MM-DD')
+  finalizeForm.depositAmount = Number(lead.reservationAmount || 0)
+  finalizeForm.bedId = lead.reservationBedId
+  finalizeForm.assessmentLevel = assessment.levelCode || ''
+  finalizeForm.assessmentSummary = assessment.resultSummary || '评估已完成'
+  finalizeOpen.value = true
+}
+
+async function submitFinalize() {
+  if (!finalizeLead.value || !finalizeForm.bedId || !finalizeForm.elderId) {
+    message.warning('请先完善签署信息')
+    return
+  }
+  finalizing.value = true
+  try {
+    const selectedBed = finalizeBeds.value.find((item) => item.id === finalizeForm.bedId)
+    await admitElder({
+      elderId: finalizeForm.elderId,
+      admissionDate: finalizeForm.admissionDate,
+      contractNo: finalizeForm.contractNo,
+      depositAmount: finalizeForm.depositAmount,
+      bedId: finalizeForm.bedId,
+      bedStartDate: finalizeForm.admissionDate,
+      remark: '营销签署最终合约'
+    })
+
+    await updateCrmLead(finalizeLead.value.id, {
+      ...finalizeLead.value,
+      contractSignedFlag: 1,
+      contractSignedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+      contractStatus: '已签署',
+      reservationStatus: '已入住',
+      reservationBedId: finalizeForm.bedId,
+      reservationRoomNo: selectedBed?.roomNo || finalizeLead.value.reservationRoomNo,
+      flowStage: 'SIGNED',
+      currentOwnerDept: 'MARKETING',
+      status: 2
+    })
+
+    message.success('已完成签署并办理入住')
+    finalizeOpen.value = false
+    await fetchData()
+  } catch {
+    message.error('最终签署失败，请检查评估和床位状态')
+  } finally {
+    finalizing.value = false
+  }
 }
 
 async function openAttachment(record: CrmLeadItem) {
@@ -364,7 +882,8 @@ async function handleUpload(option: any) {
       fileName: uploaded.originalFileName || uploaded.fileName,
       fileUrl: uploaded.fileUrl,
       fileType: uploaded.fileType,
-      fileSize: uploaded.fileSize
+      fileSize: uploaded.fileSize,
+      remark: attachmentType.value
     })
     attachments.value = await getLeadAttachments(currentAttachmentLead.value.id)
     message.success('附件上传成功')
@@ -374,6 +893,15 @@ async function handleUpload(option: any) {
   } finally {
     attachmentSubmitting.value = false
   }
+}
+
+function attachmentTypeLabel(value?: string) {
+  if (value === 'MEDICAL_RECORD') return '病历资料'
+  if (value === 'MEDICAL_INSURANCE') return '医保复印件'
+  if (value === 'HOUSEHOLD') return '户口复印件'
+  if (value === 'CONTRACT') return '合同附件'
+  if (value === 'OTHER') return '其他附件'
+  return value || '未分类'
 }
 
 function isImageAttachment(record: ContractAttachmentItem) {
@@ -398,6 +926,82 @@ async function removeAttachment(attachmentId: number) {
   message.success('附件已删除')
 }
 
+function matchAssessmentLevel(bed: BedItem) {
+  const level = (bedSelectOpen.value ? bedSelectForm.assessmentLevel : finalizeForm.assessmentLevel).trim()
+  if (!level) return false
+  const bedLevel = (bed.careLevel || '').trim()
+  if (!bedLevel) return false
+  return bedLevel.includes(level) || level.includes(bedLevel)
+}
+
+function normalizeLeadName(lead: CrmLeadItem) {
+  return (lead.elderName || lead.name || '').trim() || '未命名长者'
+}
+
+async function ensureContractNo(record: CrmLeadItem) {
+  if (record.contractNo) {
+    return record
+  }
+  return updateCrmLead(record.id, {
+    ...record,
+    status: 2,
+    flowStage: record.flowStage || 'PENDING_ASSESSMENT',
+    currentOwnerDept: record.currentOwnerDept || 'ASSESSMENT',
+    contractStatus: record.contractStatus || '待评估'
+  })
+}
+
+function pickLatestAttachment(leadAttachments: ContractAttachmentItem[], type: string) {
+  return leadAttachments.find((item) => item.remark === type)
+}
+
+async function findExistingElderByLead(lead: CrmLeadItem): Promise<ElderItem | undefined> {
+  const page = await getElderPage({ pageNo: 1, pageSize: 300, keyword: normalizeLeadName(lead) })
+  const list = page.list || []
+  const byIdCard = lead.idCardNo ? list.find((item) => item.idCardNo === lead.idCardNo) : undefined
+  if (byIdCard) return byIdCard
+  return list.find((item) => item.fullName === normalizeLeadName(lead) && item.phone === (lead.elderPhone || lead.phone))
+}
+
+async function ensureElderFromLead(lead: CrmLeadItem): Promise<ElderItem> {
+  const leadAttachments = await getLeadAttachments(lead.id)
+  const existing = await findExistingElderByLead(lead)
+
+  const elderPayload = {
+    fullName: normalizeLeadName(lead),
+    idCardNo: lead.idCardNo,
+    gender: lead.gender,
+    phone: lead.elderPhone || lead.phone,
+    homeAddress: lead.homeAddress,
+    medicalRecordFileUrl: pickLatestAttachment(leadAttachments, 'MEDICAL_RECORD')?.fileUrl,
+    medicalInsuranceCopyUrl: pickLatestAttachment(leadAttachments, 'MEDICAL_INSURANCE')?.fileUrl,
+    householdCopyUrl: pickLatestAttachment(leadAttachments, 'HOUSEHOLD')?.fileUrl,
+    remark: lead.remark
+  }
+
+  if (existing?.id) {
+    await updateElder(existing.id, elderPayload)
+    return { ...existing, ...elderPayload, id: existing.id }
+  }
+
+  return createElder({
+    ...elderPayload,
+    admissionDate: dayjs().format('YYYY-MM-DD'),
+    status: 1
+  })
+}
+
+async function loadLatestAdmissionAssessment(elderId: number): Promise<AssessmentRecord | undefined> {
+  const page = await getAssessmentRecordPage({
+    pageNo: 1,
+    pageSize: 20,
+    assessmentType: 'ADMISSION',
+    elderId
+  })
+  const list = page.list || []
+  return list.find((item) => item.status && item.status !== 'DRAFT') || list[0]
+}
+
 onMounted(fetchData)
 </script>
 
@@ -408,5 +1012,22 @@ onMounted(fetchData)
 
 .table-actions {
   margin-bottom: 12px;
+}
+
+.board-item {
+  padding: 10px 12px;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+}
+
+.board-title {
+  color: rgba(0, 0, 0, 0.65);
+  font-size: 13px;
+}
+
+.board-value {
+  margin-top: 6px;
+  font-size: 24px;
+  font-weight: 600;
 }
 </style>

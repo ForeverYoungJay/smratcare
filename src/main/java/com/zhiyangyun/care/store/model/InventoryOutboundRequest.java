@@ -13,5 +13,6 @@ public class InventoryOutboundRequest {
   @NotNull
   private Integer quantity;
   private String reason;
+  private String receiverName;
   private Long operatorStaffId;
 }

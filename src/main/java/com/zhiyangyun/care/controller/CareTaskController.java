@@ -37,11 +37,12 @@ public class CareTaskController {
   @GetMapping("/today")
   public List<CareTaskTodayItem> getTodayTasks(
       @RequestParam(required = false) Long staffId,
+      @RequestParam(required = false) Long elderId,
       @RequestParam(required = false) String date) {
     LocalDate target = date == null || date.isBlank()
         ? LocalDate.now()
         : LocalDate.parse(date, DateTimeFormatter.ISO_DATE);
-    return careTaskService.getTodayTasks(AuthContext.getOrgId(), staffId, target);
+    return careTaskService.getTodayTasks(AuthContext.getOrgId(), staffId, elderId, target);
   }
 
   @GetMapping("/logs")
@@ -57,6 +58,7 @@ public class CareTaskController {
       @RequestParam(required = false) String dateFrom,
       @RequestParam(required = false) String dateTo,
       @RequestParam(required = false) Long staffId,
+      @RequestParam(required = false) Long elderId,
       @RequestParam(required = false) String roomNo,
       @RequestParam(required = false) String careLevel,
       @RequestParam(required = false) String status,
@@ -69,7 +71,7 @@ public class CareTaskController {
       from = parsedDate;
       to = parsedDate;
     }
-    return Result.ok(careTaskService.page(AuthContext.getOrgId(), pageNo, pageSize, from, to, staffId,
+    return Result.ok(careTaskService.page(AuthContext.getOrgId(), pageNo, pageSize, from, to, staffId, elderId,
         roomNo, careLevel, status, keyword, overdueOnly));
   }
 
@@ -79,6 +81,7 @@ public class CareTaskController {
       @RequestParam(required = false) String dateFrom,
       @RequestParam(required = false) String dateTo,
       @RequestParam(required = false) Long staffId,
+      @RequestParam(required = false) Long elderId,
       @RequestParam(required = false) String roomNo,
       @RequestParam(required = false) String careLevel,
       @RequestParam(required = false) String status,
@@ -91,7 +94,7 @@ public class CareTaskController {
       from = parsedDate;
       to = parsedDate;
     }
-    return Result.ok(careTaskService.summary(AuthContext.getOrgId(), from, to, staffId, roomNo, careLevel,
+    return Result.ok(careTaskService.summary(AuthContext.getOrgId(), from, to, staffId, elderId, roomNo, careLevel,
         status, keyword, overdueOnly));
   }
 

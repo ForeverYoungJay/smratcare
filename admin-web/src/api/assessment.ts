@@ -1,8 +1,12 @@
 import request, { fetchPage } from '../utils/request'
-import type { AssessmentRecord, AssessmentScaleTemplate, AssessmentScorePreview } from '../types'
+import type { AssessmentRecord, AssessmentRecordSummary, AssessmentScaleTemplate, AssessmentScorePreview } from '../types'
 
 export function getAssessmentRecordPage(params: any) {
   return fetchPage<AssessmentRecord>('/api/assessment/records/page', params)
+}
+
+export function getAssessmentRecordSummary(params: any) {
+  return request.get<AssessmentRecordSummary>('/api/assessment/records/summary', { params })
 }
 
 export function getAssessmentRecord(id: number) {

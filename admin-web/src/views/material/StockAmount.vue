@@ -35,7 +35,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
-import { getStockAmount, getWarehousePage } from '../../api/material'
+import { getStockAmount, getWarehousePage } from '../../api/materialCenter'
 import type { MaterialStockAmountItem } from '../../types'
 
 const loading = ref(false)

@@ -34,6 +34,7 @@ public class InventoryLog {
   private String productNameSnapshot;
 
   private String bizType;
+  private String receiverName;
 
   private String remark;
 

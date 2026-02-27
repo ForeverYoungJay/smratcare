@@ -1,48 +1,59 @@
 <template>
-  <PageContainer title="合同与票据" subTitle="合同/收据/发票/评估报告/身份证明统一归档，支持上传扫描件、版本与权限控制">
+  <PageContainer title="合同与票据" subTitle="合同、票据、账单按同一合同号联动">
     <a-row :gutter="16">
       <a-col :xs="24" :lg="14">
         <a-card title="附件中心" class="card-elevated" :bordered="false">
           <a-space wrap style="margin-bottom: 12px">
-            <a-button type="primary" @click="openFilePicker('contract')">上传合同</a-button>
-            <a-button @click="openFilePicker('invoice')">上传收据/发票</a-button>
-            <a-button @click="downloadBundle">下载打包</a-button>
-            <a-button @click="downloadTemplate('contract')">下载空白合同</a-button>
-            <a-button @click="downloadTemplate('invoice')">下载空白发票</a-button>
-            <a-button @click="downloadTemplate('assessment')">下载空白评估报告</a-button>
+            <a-button type="primary" @click="openFilePicker('contract')" :disabled="!linkage?.leadId">上传合同</a-button>
+            <a-button @click="openFilePicker('invoice')" :disabled="!linkage?.leadId">上传收据/发票</a-button>
+            <a-button @click="downloadBundle">下载清单</a-button>
+            <a-button @click="goContractManagement">查看合同详情</a-button>
+            <a-button @click="go('/finance/bill')">前往费用账单</a-button>
           </a-space>
           <input
             ref="fileInputRef"
             type="file"
-            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.txt,.zip"
             style="display: none"
             @change="onFileSelected"
           />
-          <a-table :columns="columns" :data-source="rows" row-key="id" :pagination="false" />
+          <a-alert
+            v-if="!linkage?.leadId"
+            type="warning"
+            show-icon
+            message="当前长者未关联营销合同线索，无法上传附件，请先在营销-合同签约完成签约。"
+            style="margin-bottom: 12px"
+          />
+          <StatefulBlock :loading="loading" :error="errorMessage" :empty="!rows.length" empty-text="暂无附件" @retry="loadLinkage">
+            <a-table :columns="columns" :data-source="rows" row-key="id" :pagination="false" />
+          </StatefulBlock>
         </a-card>
       </a-col>
 
       <a-col :xs="24" :lg="10">
         <a-card title="结构化字段" class="card-elevated" :bordered="false" style="margin-bottom: 16px">
-          <a-descriptions :column="1" size="small" bordered>
-            <a-descriptions-item label="合同号">HT-2026-0012</a-descriptions-item>
-            <a-descriptions-item label="起止日期">2026-01-01 ~ 2026-12-31</a-descriptions-item>
-            <a-descriptions-item label="费用项">床位费、护理费、膳食费、增值服务</a-descriptions-item>
-            <a-descriptions-item label="押金">6000</a-descriptions-item>
-            <a-descriptions-item label="付款周期">月付</a-descriptions-item>
-            <a-descriptions-item label="签署状态">已签署</a-descriptions-item>
-          </a-descriptions>
+          <StatefulBlock :loading="loading" :error="errorMessage" @retry="loadLinkage">
+            <a-descriptions :column="1" size="small" bordered>
+              <a-descriptions-item label="合同号">{{ linkage?.contractNo || '-' }}</a-descriptions-item>
+              <a-descriptions-item label="签约状态">{{ linkage?.contractStatus || '-' }}</a-descriptions-item>
+              <a-descriptions-item label="签约时间">{{ linkage?.contractSignedAt || '-' }}</a-descriptions-item>
+              <a-descriptions-item label="合同有效期止">{{ linkage?.contractExpiryDate || '-' }}</a-descriptions-item>
+              <a-descriptions-item label="入住日期">{{ linkage?.admissionDate || '-' }}</a-descriptions-item>
+              <a-descriptions-item label="押金">{{ formatAmount(linkage?.depositAmount) }}</a-descriptions-item>
+            </a-descriptions>
+          </StatefulBlock>
         </a-card>
 
-        <a-card title="发票夹联动" class="card-elevated" :bordered="false">
-          <a-typography-paragraph>
-            从费用管理发票夹选择发票并挂接到当前长者/合同，支持权限分级与版本追溯。
-          </a-typography-paragraph>
-          <a-space direction="vertical" style="width: 100%">
-            <a-button block type="primary" @click="go('/marketing/contract-management')">查看合同详情</a-button>
-            <a-button block @click="go('/finance/bill')">前往费用账单</a-button>
-            <a-button block @click="go('/elder/admission-processing')">返回入住办理</a-button>
-          </a-space>
+        <a-card title="票据联动摘要" class="card-elevated" :bordered="false">
+          <StatefulBlock :loading="loading" :error="errorMessage" @retry="loadLinkage">
+            <a-descriptions :column="1" size="small" bordered>
+              <a-descriptions-item label="账单数量">{{ linkage?.billCount ?? 0 }}</a-descriptions-item>
+              <a-descriptions-item label="账单总额">{{ formatAmount(linkage?.billTotalAmount) }}</a-descriptions-item>
+              <a-descriptions-item label="已收金额">{{ formatAmount(linkage?.billPaidAmount) }}</a-descriptions-item>
+              <a-descriptions-item label="未收金额">{{ formatAmount(linkage?.billOutstandingAmount) }}</a-descriptions-item>
+              <a-descriptions-item label="附件数量">{{ linkage?.attachmentCount ?? 0 }}</a-descriptions-item>
+            </a-descriptions>
+          </StatefulBlock>
         </a-card>
       </a-col>
     </a-row>
@@ -50,52 +61,112 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
+import StatefulBlock from '../../../components/StatefulBlock.vue'
+import {
+  createLeadAttachment,
+  getContractLinkageByElder,
+  uploadMarketingFile
+} from '../../../api/marketing'
+import type { ContractAttachmentItem, ContractLinkageSummary } from '../../../types'
 
 const router = useRouter()
+const route = useRoute()
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const uploadType = ref<'contract' | 'invoice'>('contract')
+const loading = ref(false)
+const errorMessage = ref('')
+const linkage = ref<ContractLinkageSummary>()
 
 const columns = [
   { title: '类型', dataIndex: 'type', key: 'type', width: 120 },
   { title: '文件名', dataIndex: 'name', key: 'name' },
-  { title: '版本', dataIndex: 'version', key: 'version', width: 90 },
-  { title: '上传人', dataIndex: 'operator', key: 'operator', width: 120 },
+  { title: '文件链接', dataIndex: 'url', key: 'url', width: 260 },
+  { title: '大小', dataIndex: 'size', key: 'size', width: 120 },
   { title: '上传时间', dataIndex: 'time', key: 'time', width: 180 }
 ]
 
-const rows = [
-  { id: 1, type: '合同', name: '入住合同-v2.pdf', version: 'v2', operator: '前台A', time: '2026-02-24 11:20' },
-  { id: 2, type: '发票', name: '2026-02发票.pdf', version: 'v1', operator: '财务B', time: '2026-02-25 09:10' },
-  { id: 3, type: '评估报告', name: '入院评估报告.pdf', version: 'v1', operator: '护理C', time: '2026-02-25 15:08' }
-]
+const rows = computed(() => {
+  const attachments = linkage.value?.attachments || []
+  return attachments.map((item) => ({
+    id: item.id,
+    type: normalizeType(item),
+    name: item.fileName,
+    url: item.fileUrl,
+    size: formatFileSize(item.fileSize),
+    time: item.createTime || '-'
+  }))
+})
+
+function normalizeType(item: ContractAttachmentItem) {
+  const fileName = (item.fileName || '').toLowerCase()
+  if (fileName.includes('发票') || fileName.includes('invoice') || fileName.includes('receipt')) {
+    return '收据/发票'
+  }
+  if (fileName.includes('合同') || fileName.includes('contract')) {
+    return '合同'
+  }
+  return item.fileType || '附件'
+}
 
 function go(path: string) {
   router.push(path)
 }
 
+function goContractManagement() {
+  if (linkage.value?.contractNo) {
+    router.push(`/marketing/contract-management?contractNo=${encodeURIComponent(linkage.value.contractNo)}`)
+    return
+  }
+  router.push('/marketing/contract-management')
+}
+
 function openFilePicker(type: 'contract' | 'invoice') {
   uploadType.value = type
+  if (!linkage.value?.leadId) {
+    message.warning('当前长者尚未关联营销合同，无法上传。')
+    return
+  }
   fileInputRef.value?.click()
 }
 
-function onFileSelected(event: Event) {
+async function onFileSelected(event: Event) {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
   if (!file) return
-  const typeText = uploadType.value === 'contract' ? '合同' : '收据/发票'
-  message.success(`${typeText}文件已选择：${file.name}（演示环境）`)
-  target.value = ''
+  const leadId = linkage.value?.leadId
+  if (!leadId) {
+    message.warning('缺少合同线索，无法上传。')
+    target.value = ''
+    return
+  }
+  try {
+    const uploaded = await uploadMarketingFile(file, 'marketing-contract')
+    await createLeadAttachment(leadId, {
+      contractNo: linkage.value?.contractNo,
+      fileName: uploaded.originalFileName || uploaded.fileName || file.name,
+      fileUrl: uploaded.fileUrl,
+      fileType: uploaded.fileType || file.type,
+      fileSize: uploaded.fileSize || file.size,
+      remark: uploadType.value === 'contract' ? '合同附件' : '票据附件'
+    })
+    message.success('附件上传成功')
+    await loadLinkage()
+  } catch (error: any) {
+    message.error(error?.message || '附件上传失败')
+  } finally {
+    target.value = ''
+  }
 }
 
 function downloadBundle() {
-  const content = rows
-    .map((item) => `${item.type},${item.name},${item.version},${item.operator},${item.time}`)
+  const content = rows.value
+    .map((item) => `${item.type},${item.name},${item.url || '-'},${item.size},${item.time}`)
     .join('\n')
-  const csv = `类型,文件名,版本,上传人,上传时间\n${content}`
+  const csv = `类型,文件名,文件链接,大小,上传时间\n${content}`
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -105,61 +176,38 @@ function downloadBundle() {
   link.click()
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
-  message.success('附件清单已下载')
 }
 
-function downloadTemplate(type: 'contract' | 'invoice' | 'assessment') {
-  const templates = {
-    contract: {
-      name: '空白合同模板.txt',
-      content: `【长者入住合同（空白模板）】
-合同编号：
-甲方（机构）：
-乙方（长者/监护人）：
-入住日期：
-护理等级：
-服务套餐：
-费用条款：
-押金：
-付款周期：
-双方签字：
-日期：`
-    },
-    invoice: {
-      name: '空白发票模板.txt',
-      content: `【发票信息登记模板】
-发票抬头：
-税号：
-开票金额：
-项目名称：
-合同编号：
-开票日期：
-备注：`
-    },
-    assessment: {
-      name: '空白评估报告模板.txt',
-      content: `【入住评估报告（空白模板）】
-评估日期：
-评估人：
-自理能力：
-认知能力：
-风险评估：
-护理需求：
-评估结论：
-建议护理等级：
-备注：`
-    }
-  } as const
-  const item = templates[type]
-  const blob = new Blob([item.content], { type: 'text/plain;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = item.name
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
-  message.success('模板已下载')
+function formatFileSize(size?: number) {
+  if (!size || size <= 0) return '-'
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`
 }
+
+function formatAmount(value?: number) {
+  const amount = value ?? 0
+  return amount.toFixed(2)
+}
+
+async function loadLinkage() {
+  const residentId = Number(route.query.residentId || route.query.elderId)
+  if (!residentId) {
+    linkage.value = undefined
+    return
+  }
+  loading.value = true
+  errorMessage.value = ''
+  try {
+    linkage.value = await getContractLinkageByElder(residentId)
+  } catch (error: any) {
+    errorMessage.value = error?.message || '加载合同与票据失败'
+    linkage.value = undefined
+    message.error(errorMessage.value)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(loadLinkage)
 </script>

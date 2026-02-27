@@ -9,6 +9,7 @@ import com.zhiyangyun.care.crm.model.report.MarketingConsultationTrendItem;
 import com.zhiyangyun.care.crm.model.report.MarketingConversionReportResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingDataQualityResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingFollowupReportResponse;
+import com.zhiyangyun.care.crm.model.report.MarketingLeadEntrySummaryResponse;
 import com.zhiyangyun.care.crm.service.MarketingReportService;
 import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -27,6 +28,30 @@ public class MarketingReportController {
   public MarketingReportController(MarketingReportService marketingReportService, AuditLogService auditLogService) {
     this.marketingReportService = marketingReportService;
     this.auditLogService = auditLogService;
+  }
+
+  @PreAuthorize("hasAnyRole('ADMIN','MANAGER','OPERATOR')")
+  @GetMapping("/lead-entry-summary")
+  public Result<MarketingLeadEntrySummaryResponse> leadEntrySummary(
+      @RequestParam String mode,
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String consultantName,
+      @RequestParam(required = false) String consultantPhone,
+      @RequestParam(required = false) String elderName,
+      @RequestParam(required = false) String elderPhone,
+      @RequestParam(required = false) String consultDateFrom,
+      @RequestParam(required = false) String consultDateTo,
+      @RequestParam(required = false) String consultType,
+      @RequestParam(required = false) String mediaChannel,
+      @RequestParam(required = false) String infoSource,
+      @RequestParam(required = false) String customerTag,
+      @RequestParam(required = false) String marketerName) {
+    Long orgId = AuthContext.getOrgId();
+    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "MARKETING_REPORT_QUERY", "MARKETING_LEAD_ENTRY_SUMMARY", null, "lead entry summary");
+    return Result.ok(marketingReportService.leadEntrySummary(
+        orgId, mode, keyword, consultantName, consultantPhone, elderName, elderPhone,
+        consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName));
   }
 
   @PreAuthorize("hasAnyRole('ADMIN','MANAGER','OPERATOR')")

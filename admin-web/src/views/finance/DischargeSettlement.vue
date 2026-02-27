@@ -26,6 +26,19 @@
             {{ record.status }}
           </a-tag>
         </template>
+        <template v-else-if="column.key === 'reconcileStatus'">
+          <a-tag :color="extractLinkage(record.remark, '自动对账:').includes('失败') ? 'red' : 'blue'">
+            {{ extractLinkage(record.remark, '自动对账:') || (record.financeRefunded === 1 ? '已触发' : '待结算') }}
+          </a-tag>
+        </template>
+        <template v-else-if="column.key === 'depositProcess'">
+          <span>{{ extractLinkage(record.remark, '押金处理:') || '待结算' }}</span>
+        </template>
+        <template v-else-if="column.key === 'bedRelease'">
+          <a-tag :color="extractLinkage(record.remark, '床位释放:').includes('已释放') ? 'green' : 'default'">
+            {{ extractLinkage(record.remark, '床位释放:') || (record.financeRefunded === 1 ? '已回写' : '待回写') }}
+          </a-tag>
+        </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
             <a-button type="link" :disabled="record.frontdeskApproved === 1" @click="approveFrontdesk(record)">
@@ -130,6 +143,9 @@ const columns = [
   { title: '押金抵扣', dataIndex: 'fromDepositAmount', key: 'fromDepositAmount', width: 120 },
   { title: '应退款', dataIndex: 'refundAmount', key: 'refundAmount', width: 120 },
   { title: '需补缴', dataIndex: 'supplementAmount', key: 'supplementAmount', width: 120 },
+  { title: '押金处理', key: 'depositProcess', width: 220 },
+  { title: '自动对账', key: 'reconcileStatus', width: 220 },
+  { title: '床位释放', key: 'bedRelease', width: 180 },
   { title: '前台签字', dataIndex: 'frontdeskSignedTime', key: 'frontdeskSignedTime', width: 170 },
   { title: '护理部签字', dataIndex: 'nursingSignedTime', key: 'nursingSignedTime', width: 170 },
   { title: '财务退款时间', dataIndex: 'financeRefundTime', key: 'financeRefundTime', width: 170 },
@@ -276,6 +292,15 @@ async function approveNursing(record: DischargeSettlementItem) {
   })
   message.success('护理部签字已完成')
   fetchData()
+}
+
+function extractLinkage(remark: string | undefined, prefix: string) {
+  if (!remark) {
+    return ''
+  }
+  const parts = remark.split('；')
+  const matched = parts.find((item) => item.trim().startsWith(prefix))
+  return matched ? matched.trim().slice(prefix.length).trim() : ''
 }
 
 onMounted(async () => {

@@ -124,8 +124,8 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportCsv } from '../../utils/export'
-import { getInventoryAdjustmentDiffReport, getInventoryAdjustmentPage } from '../../api/inventory'
-import { getWarehousePage } from '../../api/material'
+import { getInventoryAdjustmentDiffReport, getInventoryAdjustmentPage } from '../../api/materialCenter'
+import { getWarehousePage } from '../../api/materialCenter'
 import { getProductPage } from '../../api/store'
 import type { InventoryAdjustmentDiffItem, InventoryAdjustmentItem, PageResult, ProductItem } from '../../types'
 

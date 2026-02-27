@@ -190,6 +190,7 @@ public class InventoryServiceImpl implements InventoryService {
       log.setChangeType("OUT");
       log.setChangeQty(request.getQuantity());
       log.setBizType("CONSUME");
+      log.setReceiverName(request.getReceiverName());
       fillProductSnapshot(log, request.getOrgId(), request.getProductId());
       log.setRemark(request.getReason());
       logMapper.insert(log);
@@ -231,6 +232,7 @@ public class InventoryServiceImpl implements InventoryService {
       log.setChangeType("OUT");
       log.setChangeQty(used);
       log.setBizType("CONSUME");
+      log.setReceiverName(request.getReceiverName());
       fillProductSnapshot(log, request.getOrgId(), request.getProductId());
       log.setRemark(request.getReason());
       logMapper.insert(log);

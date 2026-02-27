@@ -8,20 +8,36 @@ import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
 import com.zhiyangyun.care.crm.model.CrmLeadRequest;
 import com.zhiyangyun.care.crm.model.CrmLeadResponse;
 import com.zhiyangyun.care.crm.service.CrmLeadService;
+import com.zhiyangyun.care.elder.entity.ElderProfile;
+import com.zhiyangyun.care.elder.entity.lifecycle.ElderAdmission;
+import com.zhiyangyun.care.elder.mapper.ElderMapper;
+import com.zhiyangyun.care.elder.mapper.lifecycle.ElderAdmissionMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.List;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 
 @Service
 public class CrmLeadServiceImpl implements CrmLeadService {
+  private static final Pattern CONTRACT_SEQ_PATTERN = Pattern.compile("^(gfyy\\d{8})(\\d{3,})$");
+  private static final String FLOW_PENDING_ASSESSMENT = "PENDING_ASSESSMENT";
+  private static final String FLOW_PENDING_BED_SELECT = "PENDING_BED_SELECT";
+  private static final String FLOW_PENDING_SIGN = "PENDING_SIGN";
+  private static final String FLOW_SIGNED = "SIGNED";
   private final CrmLeadMapper leadMapper;
+  private final ElderMapper elderMapper;
+  private final ElderAdmissionMapper admissionMapper;
 
-  public CrmLeadServiceImpl(CrmLeadMapper leadMapper) {
+  public CrmLeadServiceImpl(CrmLeadMapper leadMapper, ElderMapper elderMapper, ElderAdmissionMapper admissionMapper) {
     this.leadMapper = leadMapper;
+    this.elderMapper = elderMapper;
+    this.admissionMapper = admissionMapper;
   }
 
   @Override
@@ -49,6 +65,7 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     lead.setInvalidTime(parseDateTime(request.getInvalidTime()));
     lead.setIdCardNo(blankToNull(request.getIdCardNo()));
     lead.setReservationRoomNo(blankToNull(request.getReservationRoomNo()));
+    lead.setReservationBedId(request.getReservationBedId());
     lead.setReservationChannel(blankToNull(request.getReservationChannel()));
     lead.setReservationStatus(blankToNull(request.getReservationStatus()));
     lead.setRefunded(normalizeBooleanFlag(request.getRefunded()));
@@ -60,14 +77,17 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     lead.setStatus(request.getStatus());
     lead.setContractSignedFlag(normalizeSignedFlag(request.getContractSignedFlag()));
     lead.setContractSignedAt(resolveContractTime(parseDateTime(request.getContractSignedAt()), request.getContractSignedFlag()));
-    lead.setContractNo(blankToNull(request.getContractNo()));
+    lead.setContractNo(resolveContractNo(request, null));
     lead.setContractStatus(blankToNull(request.getContractStatus()));
+    lead.setFlowStage(resolveFlowStage(request, null));
+    lead.setCurrentOwnerDept(resolveOwnerDept(lead.getFlowStage(), blankToNull(request.getCurrentOwnerDept())));
     lead.setContractExpiryDate(parseDate(request.getContractExpiryDate()));
     lead.setSmsSendCount(request.getSmsSendCount() == null ? 0 : Math.max(0, request.getSmsSendCount()));
     lead.setNextFollowDate(parseDate(request.getNextFollowDate()));
     lead.setRemark(request.getRemark());
     lead.setCreatedBy(request.getCreatedBy());
     leadMapper.insert(lead);
+    syncContractToAdmission(lead);
     return toResponse(lead);
   }
 
@@ -97,6 +117,7 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     lead.setInvalidTime(parseDateTime(request.getInvalidTime()));
     lead.setIdCardNo(blankToNull(request.getIdCardNo()));
     lead.setReservationRoomNo(blankToNull(request.getReservationRoomNo()));
+    lead.setReservationBedId(request.getReservationBedId());
     lead.setReservationChannel(blankToNull(request.getReservationChannel()));
     lead.setReservationStatus(blankToNull(request.getReservationStatus()));
     lead.setRefunded(normalizeBooleanFlag(request.getRefunded()));
@@ -108,13 +129,16 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     lead.setStatus(request.getStatus());
     lead.setContractSignedFlag(normalizeSignedFlag(request.getContractSignedFlag()));
     lead.setContractSignedAt(resolveContractTime(parseDateTime(request.getContractSignedAt()), request.getContractSignedFlag()));
-    lead.setContractNo(blankToNull(request.getContractNo()));
+    lead.setContractNo(resolveContractNo(request, lead));
     lead.setContractStatus(blankToNull(request.getContractStatus()));
+    lead.setFlowStage(resolveFlowStage(request, lead));
+    lead.setCurrentOwnerDept(resolveOwnerDept(lead.getFlowStage(), blankToNull(request.getCurrentOwnerDept())));
     lead.setContractExpiryDate(parseDate(request.getContractExpiryDate()));
     lead.setSmsSendCount(request.getSmsSendCount() == null ? 0 : Math.max(0, request.getSmsSendCount()));
     lead.setNextFollowDate(parseDate(request.getNextFollowDate()));
     lead.setRemark(request.getRemark());
     leadMapper.updateById(lead);
+    syncContractToAdmission(lead);
     return toResponse(lead);
   }
 
@@ -132,7 +156,8 @@ public class CrmLeadServiceImpl implements CrmLeadService {
                                      String consultantName, String consultantPhone, String elderName, String elderPhone,
                                      String consultDateFrom, String consultDateTo, String consultType, String mediaChannel,
                                      String infoSource, String marketerName, String followupStatus, String reservationChannel,
-                                     String contractNo, String contractStatus) {
+                                     String contractNo, String contractStatus, String flowStage, String currentOwnerDept,
+                                     String followupDateFrom, String followupDateTo, Boolean followupDueOnly) {
     var wrapper = Wrappers.lambdaQuery(CrmLead.class)
         .eq(CrmLead::getIsDeleted, 0)
         .eq(tenantId != null, CrmLead::getTenantId, tenantId);
@@ -181,13 +206,32 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     if (contractStatus != null && !contractStatus.isBlank()) {
       wrapper.eq(CrmLead::getContractStatus, contractStatus);
     }
+    if (flowStage != null && !flowStage.isBlank()) {
+      wrapper.eq(CrmLead::getFlowStage, flowStage);
+    }
+    if (currentOwnerDept != null && !currentOwnerDept.isBlank()) {
+      wrapper.eq(CrmLead::getCurrentOwnerDept, currentOwnerDept);
+    }
     LocalDate consultFrom = parseDate(consultDateFrom);
     LocalDate consultTo = parseDate(consultDateTo);
+    LocalDate followupFrom = parseDate(followupDateFrom);
+    LocalDate followupTo = parseDate(followupDateTo);
     if (consultFrom != null) {
       wrapper.ge(CrmLead::getConsultDate, consultFrom);
     }
     if (consultTo != null) {
       wrapper.le(CrmLead::getConsultDate, consultTo);
+    }
+    if (followupFrom != null) {
+      wrapper.ge(CrmLead::getNextFollowDate, followupFrom);
+    }
+    if (followupTo != null) {
+      wrapper.le(CrmLead::getNextFollowDate, followupTo);
+    }
+    if (Boolean.TRUE.equals(followupDueOnly)) {
+      wrapper.in(CrmLead::getStatus, List.of(0, 1))
+          .isNotNull(CrmLead::getNextFollowDate)
+          .le(CrmLead::getNextFollowDate, LocalDate.now());
     }
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(CrmLead::getName, keyword)
@@ -236,6 +280,7 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     response.setInvalidTime(lead.getInvalidTime());
     response.setIdCardNo(lead.getIdCardNo());
     response.setReservationRoomNo(lead.getReservationRoomNo());
+    response.setReservationBedId(lead.getReservationBedId());
     response.setReservationChannel(lead.getReservationChannel());
     response.setReservationStatus(lead.getReservationStatus());
     response.setRefunded(lead.getRefunded());
@@ -249,11 +294,14 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     response.setContractSignedAt(lead.getContractSignedAt());
     response.setContractNo(lead.getContractNo());
     response.setContractStatus(lead.getContractStatus());
+    response.setFlowStage(lead.getFlowStage());
+    response.setCurrentOwnerDept(lead.getCurrentOwnerDept());
     response.setContractExpiryDate(lead.getContractExpiryDate() == null ? null : lead.getContractExpiryDate().toString());
     response.setSmsSendCount(lead.getSmsSendCount());
     response.setNextFollowDate(lead.getNextFollowDate() == null ? null : lead.getNextFollowDate().toString());
     response.setRemark(lead.getRemark());
     response.setCreateTime(lead.getCreateTime());
+    response.setUpdateTime(lead.getUpdateTime());
     return response;
   }
 
@@ -363,5 +411,163 @@ public class CrmLeadServiceImpl implements CrmLeadService {
       return value;
     }
     return blankToNull(request.getConsultantPhone());
+  }
+
+  private String resolveContractNo(CrmLeadRequest request, CrmLead existingLead) {
+    String existingContractNo = existingLead == null ? null : blankToNull(existingLead.getContractNo());
+    String requestedContractNo = blankToNull(request.getContractNo());
+    if (requestedContractNo != null) {
+      return requestedContractNo;
+    }
+    if (existingContractNo != null) {
+      return existingContractNo;
+    }
+    if (!needGenerateContractNo(request)) {
+      return null;
+    }
+    Long tenantId = request.getTenantId();
+    if (tenantId == null) {
+      return null;
+    }
+    return generateContractNo(tenantId);
+  }
+
+  private String resolveFlowStage(CrmLeadRequest request, CrmLead existingLead) {
+    String requested = blankToNull(request.getFlowStage());
+    if (requested != null) {
+      return requested;
+    }
+    Integer signedFlag = normalizeSignedFlag(request.getContractSignedFlag());
+    if (signedFlag == 1) {
+      return FLOW_SIGNED;
+    }
+    if (existingLead != null) {
+      String existingStage = blankToNull(existingLead.getFlowStage());
+      if (existingStage != null) {
+        return existingStage;
+      }
+    }
+    return FLOW_PENDING_ASSESSMENT;
+  }
+
+  private String resolveOwnerDept(String flowStage, String fallback) {
+    String stage = blankToNull(flowStage);
+    if (FLOW_PENDING_ASSESSMENT.equals(stage)) {
+      return "ASSESSMENT";
+    }
+    if (FLOW_PENDING_BED_SELECT.equals(stage) || FLOW_PENDING_SIGN.equals(stage) || FLOW_SIGNED.equals(stage)) {
+      return "MARKETING";
+    }
+    return fallback;
+  }
+
+  private boolean needGenerateContractNo(CrmLeadRequest request) {
+    if (request == null) {
+      return false;
+    }
+    if (request.getContractSignedFlag() != null && request.getContractSignedFlag() == 1) {
+      return true;
+    }
+    if (request.getStatus() != null && request.getStatus() >= 2) {
+      return true;
+    }
+    if (blankToNull(request.getContractStatus()) != null) {
+      return true;
+    }
+    return blankToNull(request.getReservationRoomNo()) != null;
+  }
+
+  private String generateContractNo(Long tenantId) {
+    String prefix = "gfyy" + LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
+    CrmLead maxLead = leadMapper.selectOne(Wrappers.lambdaQuery(CrmLead.class)
+        .select(CrmLead::getContractNo)
+        .eq(CrmLead::getTenantId, tenantId)
+        .eq(CrmLead::getIsDeleted, 0)
+        .likeRight(CrmLead::getContractNo, prefix)
+        .orderByDesc(CrmLead::getContractNo)
+        .last("LIMIT 1"));
+    String currentMax = maxLead == null ? null : maxLead.getContractNo();
+
+    int nextSeq = 1;
+    if (currentMax != null) {
+      Matcher matcher = CONTRACT_SEQ_PATTERN.matcher(currentMax);
+      if (matcher.matches() && prefix.equals(matcher.group(1))) {
+        nextSeq = Integer.parseInt(matcher.group(2)) + 1;
+      }
+    }
+    return prefix + String.format("%03d", nextSeq);
+  }
+
+  private void syncContractToAdmission(CrmLead lead) {
+    if (lead == null || lead.getTenantId() == null) {
+      return;
+    }
+    if (lead.getContractSignedFlag() == null || lead.getContractSignedFlag() != 1) {
+      return;
+    }
+    String contractNo = blankToNull(lead.getContractNo());
+    if (contractNo == null) {
+      return;
+    }
+    ElderProfile elder = findLinkedElder(lead);
+    if (elder == null) {
+      return;
+    }
+
+    ElderAdmission admission = admissionMapper.selectOne(Wrappers.lambdaQuery(ElderAdmission.class)
+        .eq(ElderAdmission::getTenantId, lead.getTenantId())
+        .eq(ElderAdmission::getElderId, elder.getId())
+        .eq(ElderAdmission::getIsDeleted, 0)
+        .orderByDesc(ElderAdmission::getAdmissionDate)
+        .orderByDesc(ElderAdmission::getCreateTime)
+        .last("LIMIT 1"));
+
+    if (admission == null) {
+      admission = new ElderAdmission();
+      admission.setTenantId(lead.getTenantId());
+      admission.setOrgId(lead.getOrgId());
+      admission.setElderId(elder.getId());
+      LocalDate admissionDate = lead.getContractSignedAt() == null ? elder.getAdmissionDate() : lead.getContractSignedAt().toLocalDate();
+      admission.setAdmissionDate(admissionDate == null ? LocalDate.now() : admissionDate);
+      admission.setContractNo(contractNo);
+      admission.setDepositAmount(lead.getReservationAmount());
+      admission.setRemark("营销签约自动同步");
+      admission.setCreatedBy(lead.getCreatedBy());
+      admissionMapper.insert(admission);
+      return;
+    }
+
+    admission.setContractNo(contractNo);
+    if (admission.getDepositAmount() == null && lead.getReservationAmount() != null) {
+      admission.setDepositAmount(lead.getReservationAmount());
+    }
+    admissionMapper.updateById(admission);
+  }
+
+  private ElderProfile findLinkedElder(CrmLead lead) {
+    if (lead.getIdCardNo() != null && !lead.getIdCardNo().isBlank()) {
+      ElderProfile byIdCard = elderMapper.selectOne(Wrappers.lambdaQuery(ElderProfile.class)
+          .eq(ElderProfile::getTenantId, lead.getTenantId())
+          .eq(ElderProfile::getIsDeleted, 0)
+          .eq(ElderProfile::getIdCardNo, lead.getIdCardNo())
+          .last("LIMIT 1"));
+      if (byIdCard != null) {
+        return byIdCard;
+      }
+    }
+
+    String elderName = blankToNull(lead.getElderName());
+    String elderPhone = blankToNull(lead.getElderPhone());
+    if (elderName == null || elderPhone == null) {
+      return null;
+    }
+    return elderMapper.selectOne(Wrappers.lambdaQuery(ElderProfile.class)
+        .eq(ElderProfile::getTenantId, lead.getTenantId())
+        .eq(ElderProfile::getIsDeleted, 0)
+        .eq(ElderProfile::getFullName, elderName)
+        .eq(ElderProfile::getPhone, elderPhone)
+        .orderByDesc(ElderProfile::getAdmissionDate)
+        .orderByDesc(ElderProfile::getCreateTime)
+        .last("LIMIT 1"));
   }
 }

@@ -3,8 +3,10 @@ package com.zhiyangyun.care.finance.service.impl;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.zhiyangyun.care.elder.entity.Bed;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderDischargeApply;
+import com.zhiyangyun.care.elder.mapper.BedMapper;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeApplyMapper;
 import com.zhiyangyun.care.elder.model.lifecycle.ResidenceLifecycleConstants;
@@ -29,11 +31,16 @@ import com.zhiyangyun.care.finance.model.ElderAccountAdjustRequest;
 import com.zhiyangyun.care.finance.model.FeeAuditReviewRequest;
 import com.zhiyangyun.care.finance.model.FeeWorkflowConstants;
 import com.zhiyangyun.care.finance.model.MonthlyAllocationCreateRequest;
+import com.zhiyangyun.care.finance.model.ReconcileResponse;
 import com.zhiyangyun.care.finance.service.ElderAccountService;
 import com.zhiyangyun.care.finance.service.FeeManagementService;
+import com.zhiyangyun.care.finance.service.FinanceService;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import org.springframework.stereotype.Service;
@@ -46,10 +53,12 @@ public class FeeManagementServiceImpl implements FeeManagementService {
   private final DischargeSettlementMapper dischargeSettlementMapper;
   private final ConsumptionRecordMapper consumptionRecordMapper;
   private final MonthlyAllocationMapper monthlyAllocationMapper;
+  private final BedMapper bedMapper;
   private final ElderMapper elderMapper;
   private final ElderAccountMapper elderAccountMapper;
   private final ElderDischargeApplyMapper elderDischargeApplyMapper;
   private final ElderAccountService elderAccountService;
+  private final FinanceService financeService;
 
   public FeeManagementServiceImpl(
       AdmissionFeeAuditMapper admissionFeeAuditMapper,
@@ -57,19 +66,23 @@ public class FeeManagementServiceImpl implements FeeManagementService {
       DischargeSettlementMapper dischargeSettlementMapper,
       ConsumptionRecordMapper consumptionRecordMapper,
       MonthlyAllocationMapper monthlyAllocationMapper,
+      BedMapper bedMapper,
       ElderMapper elderMapper,
       ElderAccountMapper elderAccountMapper,
       ElderDischargeApplyMapper elderDischargeApplyMapper,
-      ElderAccountService elderAccountService) {
+      ElderAccountService elderAccountService,
+      FinanceService financeService) {
     this.admissionFeeAuditMapper = admissionFeeAuditMapper;
     this.dischargeFeeAuditMapper = dischargeFeeAuditMapper;
     this.dischargeSettlementMapper = dischargeSettlementMapper;
     this.consumptionRecordMapper = consumptionRecordMapper;
     this.monthlyAllocationMapper = monthlyAllocationMapper;
+    this.bedMapper = bedMapper;
     this.elderMapper = elderMapper;
     this.elderAccountMapper = elderAccountMapper;
     this.elderDischargeApplyMapper = elderDischargeApplyMapper;
     this.elderAccountService = elderAccountService;
+    this.financeService = financeService;
   }
 
   @Override
@@ -300,7 +313,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
       current.setFrontdeskSignedTime(LocalDateTime.now());
       current.setStatus(FeeWorkflowConstants.SETTLEMENT_PROCESSING);
       if (hasText(remark)) {
-        current.setRemark(remark);
+        current.setRemark(mergeRemark(current.getRemark(), remark));
       }
       dischargeSettlementMapper.updateById(current);
       return current;
@@ -312,7 +325,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
       current.setNursingSignedTime(LocalDateTime.now());
       current.setStatus(FeeWorkflowConstants.SETTLEMENT_PROCESSING);
       if (hasText(remark)) {
-        current.setRemark(remark);
+        current.setRemark(mergeRemark(current.getRemark(), remark));
       }
       dischargeSettlementMapper.updateById(current);
       return current;
@@ -366,6 +379,12 @@ public class FeeManagementServiceImpl implements FeeManagementService {
       elderAccountService.adjust(orgId, operatorId, debitRefund);
     }
 
+    List<String> linkageDetails = new ArrayList<>();
+    linkageDetails.add("费用清单:" + buildFeeSnapshot(current, amounts));
+    linkageDetails.add("押金处理:" + buildDepositSummary(amounts));
+    linkageDetails.add("床位释放:" + releaseBedAndSyncElder(orgId, current.getElderId()));
+    linkageDetails.add("自动对账:" + runDailyReconcile(orgId));
+
     current.setFromDepositAmount(amounts.fromDepositAmount());
     current.setRefundAmount(amounts.refundAmount());
     current.setSupplementAmount(amounts.supplementAmount());
@@ -375,9 +394,12 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     current.setFinanceRefundTime(LocalDateTime.now());
     current.setSettledBy(operatorId);
     current.setSettledTime(LocalDateTime.now());
+    String linkageRemark = String.join("；", linkageDetails);
+    String mergedRemark = mergeRemark(current.getRemark(), linkageRemark);
     if (hasText(remark)) {
-      current.setRemark(remark);
+      mergedRemark = mergeRemark(mergedRemark, remark);
     }
+    current.setRemark(mergedRemark);
     dischargeSettlementMapper.updateById(current);
     return current;
   }
@@ -592,6 +614,100 @@ public class FeeManagementServiceImpl implements FeeManagementService {
       refund = BigDecimal.ZERO;
     }
     return new SettlementAmounts(fromDeposit, refund, supplement);
+  }
+
+  private String runDailyReconcile(Long orgId) {
+    try {
+      ReconcileResponse response = financeService.reconcile(orgId, LocalDate.now());
+      String mismatch = response.isMismatch() ? "有异常" : "无异常";
+      return response.getDate() + " 收款" + money(response.getTotalReceived()) + "，" + mismatch;
+    } catch (RuntimeException exception) {
+      return "失败(" + exception.getMessage() + ")";
+    }
+  }
+
+  private String buildFeeSnapshot(DischargeSettlement settlement, SettlementAmounts amounts) {
+    String feeItem = hasText(settlement.getFeeItem()) ? settlement.getFeeItem() : "未配置";
+    String config = hasText(settlement.getDischargeFeeConfig()) ? settlement.getDischargeFeeConfig() : "未配置";
+    return "费用项=" + feeItem
+        + "，配置=" + config
+        + "，应收=" + money(settlement.getPayableAmount())
+        + "，押金抵扣=" + money(amounts.fromDepositAmount())
+        + "，退款=" + money(amounts.refundAmount())
+        + "，补缴=" + money(amounts.supplementAmount());
+  }
+
+  private String buildDepositSummary(SettlementAmounts amounts) {
+    if (amounts.fromDepositAmount().compareTo(BigDecimal.ZERO) == 0
+        && amounts.refundAmount().compareTo(BigDecimal.ZERO) == 0
+        && amounts.supplementAmount().compareTo(BigDecimal.ZERO) == 0) {
+      return "无押金变动";
+    }
+    if (amounts.supplementAmount().compareTo(BigDecimal.ZERO) > 0) {
+      return "余额不足，需补缴" + money(amounts.supplementAmount());
+    }
+    if (amounts.refundAmount().compareTo(BigDecimal.ZERO) > 0) {
+      return "押金抵扣" + money(amounts.fromDepositAmount()) + "，应退" + money(amounts.refundAmount());
+    }
+    return "押金抵扣" + money(amounts.fromDepositAmount()) + "，无需退款";
+  }
+
+  private String releaseBedAndSyncElder(Long orgId, Long elderId) {
+    ElderProfile elder = elderMapper.selectOne(Wrappers.lambdaQuery(ElderProfile.class)
+        .eq(ElderProfile::getIsDeleted, 0)
+        .eq(orgId != null, ElderProfile::getOrgId, orgId)
+        .eq(ElderProfile::getId, elderId)
+        .last("FOR UPDATE"));
+    if (elder == null) {
+      return "老人不存在";
+    }
+
+    String bedRelease = "无需释放";
+    if (elder.getBedId() != null) {
+      Bed bed = bedMapper.selectById(elder.getBedId());
+      if (bed != null
+          && !Integer.valueOf(1).equals(bed.getIsDeleted())
+          && (orgId == null || Objects.equals(bed.getOrgId(), orgId))) {
+        bed.setElderId(null);
+        bed.setStatus(1);
+        bedMapper.updateById(bed);
+        bedRelease = "已释放床位#" + bed.getId();
+      } else {
+        bedRelease = "床位不存在或不在本机构";
+      }
+      elder.setBedId(null);
+    }
+
+    if (elder.getStatus() == null || elder.getStatus() != 3) {
+      elder.setStatus(3);
+    }
+    elderMapper.updateById(elder);
+    return bedRelease + "，老人状态已回写离院";
+  }
+
+  private String mergeRemark(String origin, String append) {
+    String base = normalizeOptionalText(origin);
+    String extra = normalizeOptionalText(append);
+    if (!hasText(base)) {
+      return truncateRemark(extra);
+    }
+    if (!hasText(extra)) {
+      return truncateRemark(base);
+    }
+    return truncateRemark(base + "；" + extra);
+  }
+
+  private String truncateRemark(String remark) {
+    String normalized = normalizeOptionalText(remark);
+    if (!hasText(normalized)) {
+      return null;
+    }
+    return normalized.length() <= 255 ? normalized : normalized.substring(0, 255);
+  }
+
+  private String money(BigDecimal amount) {
+    BigDecimal value = amount == null ? BigDecimal.ZERO : amount;
+    return value.setScale(2, RoundingMode.HALF_UP).toPlainString();
   }
 
   private String normalizeReviewStatus(String status) {

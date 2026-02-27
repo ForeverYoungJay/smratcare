@@ -16,19 +16,16 @@ import com.zhiyangyun.care.elder.mapper.lifecycle.ElderAdmissionMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeMapper;
 import com.zhiyangyun.care.entity.CareTaskDaily;
 import com.zhiyangyun.care.mapper.CareTaskDailyMapper;
-import com.zhiyangyun.care.store.entity.InventoryBatch;
-import com.zhiyangyun.care.store.entity.Product;
 import com.zhiyangyun.care.store.entity.StoreOrder;
-import com.zhiyangyun.care.store.mapper.InventoryBatchMapper;
-import com.zhiyangyun.care.store.mapper.ProductMapper;
 import com.zhiyangyun.care.store.mapper.StoreOrderMapper;
+import com.zhiyangyun.care.store.model.MaterialCenterOverviewResponse;
+import com.zhiyangyun.care.store.service.MaterialCenterOverviewService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,35 +37,33 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/dashboard")
 public class DashboardController {
   private static final int SUMMARY_MONTH_SPAN = 6;
+  private static final int INVENTORY_EXPIRY_DAYS = 30;
 
   private final CareTaskDailyMapper careTaskDailyMapper;
-  private final ProductMapper productMapper;
-  private final InventoryBatchMapper inventoryBatchMapper;
   private final BillMonthlyMapper billMonthlyMapper;
   private final ElderAdmissionMapper elderAdmissionMapper;
   private final ElderDischargeMapper elderDischargeMapper;
   private final StoreOrderMapper storeOrderMapper;
   private final BedMapper bedMapper;
   private final ElderMapper elderMapper;
+  private final MaterialCenterOverviewService materialCenterOverviewService;
 
   public DashboardController(CareTaskDailyMapper careTaskDailyMapper,
-      ProductMapper productMapper,
-      InventoryBatchMapper inventoryBatchMapper,
       BillMonthlyMapper billMonthlyMapper,
       ElderAdmissionMapper elderAdmissionMapper,
       ElderDischargeMapper elderDischargeMapper,
       StoreOrderMapper storeOrderMapper,
       BedMapper bedMapper,
-      ElderMapper elderMapper) {
+      ElderMapper elderMapper,
+      MaterialCenterOverviewService materialCenterOverviewService) {
     this.careTaskDailyMapper = careTaskDailyMapper;
-    this.productMapper = productMapper;
-    this.inventoryBatchMapper = inventoryBatchMapper;
     this.billMonthlyMapper = billMonthlyMapper;
     this.elderAdmissionMapper = elderAdmissionMapper;
     this.elderDischargeMapper = elderDischargeMapper;
     this.storeOrderMapper = storeOrderMapper;
     this.bedMapper = bedMapper;
     this.elderMapper = elderMapper;
+    this.materialCenterOverviewService = materialCenterOverviewService;
   }
 
   @GetMapping("/summary")
@@ -87,26 +82,8 @@ public class DashboardController {
         .eq(orgId != null, CareTaskDaily::getOrgId, orgId)
         .eq(CareTaskDaily::getStatus, "EXCEPTION"));
 
-    List<Product> products = productMapper.selectList(Wrappers.lambdaQuery(Product.class)
-        .eq(Product::getIsDeleted, 0)
-        .eq(orgId != null, Product::getOrgId, orgId));
-    List<InventoryBatch> batches = inventoryBatchMapper.selectList(Wrappers.lambdaQuery(InventoryBatch.class)
-        .eq(InventoryBatch::getIsDeleted, 0)
-        .eq(orgId != null, InventoryBatch::getOrgId, orgId));
-
-    Map<Long, Integer> qtyByProduct = new HashMap<>();
-    for (InventoryBatch batch : batches) {
-      if (batch.getProductId() == null) continue;
-      qtyByProduct.merge(batch.getProductId(), batch.getQuantity() == null ? 0 : batch.getQuantity(), Integer::sum);
-    }
-
-    long inventoryAlerts = products.stream()
-        .filter(p -> {
-          int qty = qtyByProduct.getOrDefault(p.getId(), 0);
-          int safety = p.getSafetyStock() == null ? 0 : p.getSafetyStock();
-          return qty < safety;
-        })
-        .count();
+    MaterialCenterOverviewResponse materialOverview = materialCenterOverviewService.overview(orgId, INVENTORY_EXPIRY_DAYS);
+    long inventoryAlerts = materialOverview.getLowStockCount();
 
     long unpaidBills = billMonthlyMapper.selectCount(Wrappers.lambdaQuery(BillMonthly.class)
         .eq(BillMonthly::getIsDeleted, 0)

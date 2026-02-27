@@ -149,7 +149,7 @@ import {
   getSupplierPage,
   getWarehousePage,
   updatePurchase
-} from '../../api/material'
+} from '../../api/materialCenter'
 import type {
   MaterialPurchaseOrder,
   MaterialPurchaseOrderItem,

@@ -32,21 +32,13 @@ import com.zhiyangyun.care.oa.mapper.OaWorkReportMapper;
 import com.zhiyangyun.care.oa.model.OaPortalSummary;
 import com.zhiyangyun.care.schedule.entity.AttendanceRecord;
 import com.zhiyangyun.care.schedule.mapper.AttendanceRecordMapper;
-import com.zhiyangyun.care.store.entity.InventoryBatch;
-import com.zhiyangyun.care.store.entity.MaterialPurchaseOrder;
-import com.zhiyangyun.care.store.entity.MaterialTransferOrder;
-import com.zhiyangyun.care.store.entity.Product;
-import com.zhiyangyun.care.store.mapper.InventoryBatchMapper;
-import com.zhiyangyun.care.store.mapper.MaterialPurchaseOrderMapper;
-import com.zhiyangyun.care.store.mapper.MaterialTransferOrderMapper;
-import com.zhiyangyun.care.store.mapper.ProductMapper;
+import com.zhiyangyun.care.store.model.MaterialCenterOverviewResponse;
+import com.zhiyangyun.care.store.service.MaterialCenterOverviewService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -65,10 +57,7 @@ public class OaPortalController {
   private final ElderAccountMapper elderAccountMapper;
   private final ElderAccountLogMapper elderAccountLogMapper;
   private final IncidentReportMapper incidentReportMapper;
-  private final MaterialTransferOrderMapper transferOrderMapper;
-  private final MaterialPurchaseOrderMapper purchaseOrderMapper;
-  private final ProductMapper productMapper;
-  private final InventoryBatchMapper inventoryBatchMapper;
+  private final MaterialCenterOverviewService materialCenterOverviewService;
   private final HealthInspectionMapper healthInspectionMapper;
   private final ElderMapper elderMapper;
   private final CrmLeadMapper crmLeadMapper;
@@ -85,10 +74,7 @@ public class OaPortalController {
       ElderAccountMapper elderAccountMapper,
       ElderAccountLogMapper elderAccountLogMapper,
       IncidentReportMapper incidentReportMapper,
-      MaterialTransferOrderMapper transferOrderMapper,
-      MaterialPurchaseOrderMapper purchaseOrderMapper,
-      ProductMapper productMapper,
-      InventoryBatchMapper inventoryBatchMapper,
+      MaterialCenterOverviewService materialCenterOverviewService,
       HealthInspectionMapper healthInspectionMapper,
       ElderMapper elderMapper,
       CrmLeadMapper crmLeadMapper) {
@@ -103,10 +89,7 @@ public class OaPortalController {
     this.elderAccountMapper = elderAccountMapper;
     this.elderAccountLogMapper = elderAccountLogMapper;
     this.incidentReportMapper = incidentReportMapper;
-    this.transferOrderMapper = transferOrderMapper;
-    this.purchaseOrderMapper = purchaseOrderMapper;
-    this.productMapper = productMapper;
-    this.inventoryBatchMapper = inventoryBatchMapper;
+    this.materialCenterOverviewService = materialCenterOverviewService;
     this.healthInspectionMapper = healthInspectionMapper;
     this.elderMapper = elderMapper;
     this.crmLeadMapper = crmLeadMapper;
@@ -195,14 +178,9 @@ public class OaPortalController {
         .eq(IncidentReport::getIsDeleted, 0)
         .eq(orgId != null, IncidentReport::getOrgId, orgId)
         .ne(IncidentReport::getStatus, "CLOSED")));
-    Long materialTransferDraftCount = count(transferOrderMapper.selectCount(Wrappers.lambdaQuery(MaterialTransferOrder.class)
-        .eq(MaterialTransferOrder::getIsDeleted, 0)
-        .eq(orgId != null, MaterialTransferOrder::getOrgId, orgId)
-        .eq(MaterialTransferOrder::getStatus, "DRAFT")));
-    Long materialPurchaseDraftCount = count(purchaseOrderMapper.selectCount(Wrappers.lambdaQuery(MaterialPurchaseOrder.class)
-        .eq(MaterialPurchaseOrder::getIsDeleted, 0)
-        .eq(orgId != null, MaterialPurchaseOrder::getOrgId, orgId)
-        .eq(MaterialPurchaseOrder::getStatus, "DRAFT")));
+    MaterialCenterOverviewResponse materialOverview = materialCenterOverviewService.overview(orgId, 30);
+    Long materialTransferDraftCount = materialOverview.getMaterialTransferDraftCount();
+    Long materialPurchaseDraftCount = materialOverview.getMaterialPurchaseDraftCount();
     Long approvalTimeoutCount = count(approvalMapper.selectCount(Wrappers.lambdaQuery(OaApproval.class)
         .eq(OaApproval::getIsDeleted, 0)
         .eq(orgId != null, OaApproval::getOrgId, orgId)
@@ -218,7 +196,7 @@ public class OaPortalController {
         .eq(orgId != null, ElderProfile::getOrgId, orgId)
         .eq(ElderProfile::getStatus, 1)));
 
-    Long inventoryLowStockCount = inventoryAlertCount(orgId);
+    Long inventoryLowStockCount = materialOverview.getLowStockCount();
 
     List<OaPortalSummary.MarketingChannelItem> marketingChannels = queryMarketingChannels(orgId);
     List<OaPortalSummary.CollaborationGanttItem> collaborationGantt = queryCollaborationGantt(orgId);
@@ -269,31 +247,6 @@ public class OaPortalController {
         .eq(orgId != null, OaApproval::getOrgId, orgId)
         .eq(OaApproval::getStatus, "PENDING")
         .eq(OaApproval::getApprovalType, type)));
-  }
-
-  private Long inventoryAlertCount(Long orgId) {
-    List<Product> products = productMapper.selectList(Wrappers.lambdaQuery(Product.class)
-        .eq(Product::getIsDeleted, 0)
-        .eq(orgId != null, Product::getOrgId, orgId));
-    if (products.isEmpty()) {
-      return 0L;
-    }
-    List<InventoryBatch> batches = inventoryBatchMapper.selectList(Wrappers.lambdaQuery(InventoryBatch.class)
-        .eq(InventoryBatch::getIsDeleted, 0)
-        .eq(orgId != null, InventoryBatch::getOrgId, orgId));
-    Map<Long, Integer> qtyByProduct = new HashMap<>();
-    for (InventoryBatch batch : batches) {
-      if (batch.getProductId() == null) {
-        continue;
-      }
-      qtyByProduct.merge(batch.getProductId(), batch.getQuantity() == null ? 0 : batch.getQuantity(), Integer::sum);
-    }
-    long count = products.stream().filter(p -> {
-      int current = qtyByProduct.getOrDefault(p.getId(), 0);
-      int safety = p.getSafetyStock() == null ? 0 : p.getSafetyStock();
-      return current < safety;
-    }).count();
-    return count < 0 ? 0L : count;
   }
 
   private List<OaPortalSummary.WorkflowTodoItem> buildWorkflowTodos(

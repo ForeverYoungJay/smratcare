@@ -1,0 +1,50 @@
+-- M2 入住状态变更扩展：外出就医登记 / 死亡登记（专用表）
+
+CREATE TABLE IF NOT EXISTS elder_medical_outing_record (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  elder_id BIGINT NOT NULL COMMENT '老人ID',
+  elder_name VARCHAR(64) DEFAULT NULL COMMENT '老人姓名',
+  outing_date DATE NOT NULL COMMENT '外出就医日期',
+  expected_return_time DATETIME DEFAULT NULL COMMENT '预计返院时间',
+  actual_return_time DATETIME DEFAULT NULL COMMENT '实际返院时间',
+  hospital_name VARCHAR(128) DEFAULT NULL COMMENT '就医医院',
+  department VARCHAR(64) DEFAULT NULL COMMENT '就诊科室',
+  diagnosis VARCHAR(255) DEFAULT NULL COMMENT '初步诊断',
+  companion VARCHAR(64) DEFAULT NULL COMMENT '陪同人',
+  reason VARCHAR(255) DEFAULT NULL COMMENT '就医原因',
+  status VARCHAR(16) NOT NULL DEFAULT 'OUT' COMMENT '状态 OUT/RETURNED',
+  remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  KEY idx_medical_outing_org_date (org_id, outing_date),
+  KEY idx_medical_outing_elder (elder_id),
+  KEY idx_medical_outing_status (status)
+) COMMENT='老人外出就医登记';
+
+CREATE TABLE IF NOT EXISTS elder_death_register (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  elder_id BIGINT NOT NULL COMMENT '老人ID',
+  elder_name VARCHAR(64) DEFAULT NULL COMMENT '老人姓名',
+  death_date DATE NOT NULL COMMENT '死亡日期',
+  death_time DATETIME DEFAULT NULL COMMENT '死亡时间',
+  place VARCHAR(128) DEFAULT NULL COMMENT '地点',
+  cause VARCHAR(255) DEFAULT NULL COMMENT '死亡原因',
+  certificate_no VARCHAR(64) DEFAULT NULL COMMENT '死亡证明编号',
+  reported_by VARCHAR(64) DEFAULT NULL COMMENT '上报人',
+  reported_time DATETIME DEFAULT NULL COMMENT '上报时间',
+  status VARCHAR(16) NOT NULL DEFAULT 'REGISTERED' COMMENT '状态 REGISTERED/CANCELLED',
+  remark VARCHAR(255) DEFAULT NULL COMMENT '备注',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  KEY idx_death_register_org_date (org_id, death_date),
+  KEY idx_death_register_elder (elder_id),
+  KEY idx_death_register_status (status)
+) COMMENT='老人死亡登记';

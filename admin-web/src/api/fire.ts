@@ -1,6 +1,13 @@
 import request, { fetchPage } from '../utils/request'
 import { exportCsvByRequest } from '../utils/export'
-import type { FireSafetyQrPayload, FireSafetyRecord, FireSafetyRecordQuery, FireSafetyReportDetail, FireSafetyReportSummary } from '../types'
+import type {
+  FireSafetyQrPayload,
+  FireSafetyRecord,
+  FireSafetyRecordQuery,
+  FireSafetyRecordType,
+  FireSafetyReportDetail,
+  FireSafetyReportSummary
+} from '../types'
 
 export function getFireSafetyRecordPage(params: FireSafetyRecordQuery) {
   return fetchPage<FireSafetyRecord>('/api/fire/records/page', params)
@@ -22,7 +29,7 @@ export function deleteFireSafetyRecord(id: number) {
   return request.delete<void>(`/api/fire/records/${id}`)
 }
 
-export function getFireSafetySummary(params?: { dateFrom?: string; dateTo?: string }) {
+export function getFireSafetySummary(params?: { dateFrom?: string; dateTo?: string; recordType?: FireSafetyRecordType }) {
   return request.get<FireSafetyReportSummary>('/api/fire/records/summary', { params })
 }
 
@@ -40,4 +47,14 @@ export function getFireSafetyReportDetail(params?: { dateFrom?: string; dateTo?:
 
 export function exportFireSafetyReport(params?: { dateFrom?: string; dateTo?: string }) {
   return exportCsvByRequest('/api/fire/records/report/export', params, '消防巡查报表.csv')
+}
+
+export function exportFireSafetyMaintenanceLog(params?: {
+  keyword?: string
+  inspectorName?: string
+  status?: string
+  checkTimeStart?: string
+  checkTimeEnd?: string
+}) {
+  return exportCsvByRequest('/api/fire/records/maintenance/export', params, '消防设施维护保养日志.csv')
 }

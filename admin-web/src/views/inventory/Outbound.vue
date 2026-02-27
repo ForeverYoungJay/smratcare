@@ -53,6 +53,7 @@
         <vxe-column field="productId" title="商品ID" width="120" />
         <vxe-column field="batchNo" title="批次号" min-width="160" />
         <vxe-column field="changeQty" title="出库数量" width="120" />
+        <vxe-column field="receiverName" title="领取人" width="120" />
         <vxe-column field="outType" title="类型" width="120">
           <template #default="{ row }">
             <a-tag :color="row.outType === 'SALE' ? 'blue' : 'purple'">
@@ -89,6 +90,7 @@
         <a-descriptions-item label="类型">
           {{ detail?.outType === 'SALE' ? '销售' : '领用' }}
         </a-descriptions-item>
+        <a-descriptions-item label="领取人">{{ detail?.receiverName || '-' }}</a-descriptions-item>
         <a-descriptions-item label="出库时间">{{ detail?.createTime }}</a-descriptions-item>
         <a-descriptions-item label="订单ID">{{ detail?.refOrderId || '-' }}</a-descriptions-item>
         <a-descriptions-item label="备注">{{ detail?.remark || '-' }}</a-descriptions-item>
@@ -116,6 +118,9 @@
         <a-form-item label="出库数量" name="quantity">
           <a-input-number v-model:value="outboundForm.quantity" :min="1" style="width: 100%" />
         </a-form-item>
+        <a-form-item label="领取人" name="receiverName">
+          <a-input v-model:value="outboundForm.receiverName" />
+        </a-form-item>
         <a-form-item label="备注">
           <a-input v-model:value="outboundForm.reason" />
         </a-form-item>
@@ -128,7 +133,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportCsv } from '../../utils/export'
-import { getInventoryOutboundPage, createOutbound } from '../../api/inventory'
+import { getInventoryOutboundPage, createOutbound } from '../../api/materialCenter'
 import { getOrderDetail, getProductPage } from '../../api/store'
 import { message } from 'ant-design-vue'
 import type { InventoryLogItem, InventoryOutboundRequest, PageResult, ProductItem } from '../../types'
@@ -146,11 +151,13 @@ const outboundForm = reactive<InventoryOutboundRequest>({
   productId: '',
   batchId: undefined,
   quantity: 1,
+  receiverName: '',
   reason: ''
 })
 const outboundRules = {
   productId: [{ required: true, message: '请输入商品ID' }],
-  quantity: [{ required: true, message: '请输入数量' }]
+  quantity: [{ required: true, message: '请输入数量' }],
+  receiverName: [{ required: true, message: '请输入领取人' }]
 }
 
 const query = reactive({
@@ -222,6 +229,7 @@ function exportCsvData() {
       商品ID: r.productId,
       批次号: r.batchNo,
       出库数量: r.changeQty,
+      领取人: r.receiverName,
       类型: r.outType === 'SALE' ? '销售' : '领用',
       订单ID: r.refOrderId,
       备注: r.remark
@@ -236,7 +244,7 @@ function openDetail(row: InventoryLogItem) {
 }
 
 function openOutbound() {
-  Object.assign(outboundForm, { productId: '', batchId: undefined, quantity: 1, reason: '' })
+  Object.assign(outboundForm, { productId: '', batchId: undefined, quantity: 1, receiverName: '', reason: '' })
   outboundOpen.value = true
 }
 

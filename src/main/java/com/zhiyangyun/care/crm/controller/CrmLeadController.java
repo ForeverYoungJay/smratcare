@@ -78,14 +78,20 @@ public class CrmLeadController {
       @RequestParam(required = false) String followupStatus,
       @RequestParam(required = false) String reservationChannel,
       @RequestParam(required = false) String contractNo,
-      @RequestParam(required = false) String contractStatus) {
+      @RequestParam(required = false) String contractStatus,
+      @RequestParam(required = false) String flowStage,
+      @RequestParam(required = false) String currentOwnerDept,
+      @RequestParam(required = false) String followupDateFrom,
+      @RequestParam(required = false) String followupDateTo,
+      @RequestParam(required = false) Boolean followupDueOnly) {
     Long tenantId = AuthContext.getOrgId();
     return Result.ok(leadService.page(
         tenantId, pageNo, pageSize, keyword, status, source, customerTag,
         consultantName, consultantPhone, elderName, elderPhone,
         consultDateFrom, consultDateTo, consultType, mediaChannel,
         infoSource, marketerName, followupStatus, reservationChannel,
-        contractNo, contractStatus));
+        contractNo, contractStatus, flowStage, currentOwnerDept,
+        followupDateFrom, followupDateTo, followupDueOnly));
   }
 
   @DeleteMapping("/{id}")

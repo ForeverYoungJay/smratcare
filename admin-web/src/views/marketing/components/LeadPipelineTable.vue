@@ -71,12 +71,29 @@
 
         <a-form-item>
           <a-space>
-            <a-button type="primary" @click="fetchData">搜 索</a-button>
+            <a-button type="primary" @click="onSearch">搜 索</a-button>
             <a-button @click="reset">清 空</a-button>
           </a-space>
         </a-form-item>
       </a-form>
     </a-card>
+
+    <StatefulBlock :loading="summaryLoading" :error="summaryError" :empty="false" @retry="fetchData">
+      <a-row :gutter="[12, 12]" style="margin-top: 16px">
+        <a-col v-for="card in summaryCards" :key="card.title" :xs="12" :lg="6">
+          <a-card class="card-elevated" :bordered="false" size="small">
+            <a-statistic :title="card.title" :value="card.value || 0" />
+          </a-card>
+        </a-col>
+      </a-row>
+      <a-alert
+        v-if="warningMessage"
+        type="warning"
+        show-icon
+        style="margin-top: 12px"
+        :message="warningMessage"
+      />
+    </StatefulBlock>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
       <div class="table-actions">
@@ -86,48 +103,56 @@
           </a-button>
         </a-space>
       </div>
-      <a-table
-        :data-source="displayRows"
-        :columns="columns"
+      <StatefulBlock
         :loading="loading"
-        :pagination="false"
-        row-key="id"
-        :row-selection="rowSelection"
-        :scroll="{ x: 1600 }"
+        :error="tableError"
+        :empty="!loading && !tableError && displayRows.length === 0"
+        empty-text="暂无匹配的客户数据"
+        @retry="fetchData"
       >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'gender'">
-            {{ genderText(record.gender) }}
+        <a-table
+          :data-source="displayRows"
+          :columns="columns"
+          :loading="loading"
+          :pagination="false"
+          row-key="id"
+          :row-selection="rowSelection"
+          :scroll="{ x: 1600 }"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'gender'">
+              {{ genderText(record.gender) }}
+            </template>
+            <template v-else-if="column.key === 'refunded'">
+              {{ record.refunded === 1 ? '是' : '否' }}
+            </template>
+            <template v-else-if="column.key === 'reservationAmount'">
+              {{ record.reservationAmount == null ? '-' : `¥${Number(record.reservationAmount).toFixed(2)}` }}
+            </template>
+            <template v-else-if="column.key === 'operation'">
+              <a-space wrap>
+                <a-button type="link" @click="openForm(record)">编辑</a-button>
+                <a-button v-if="mode === 'consultation' || mode === 'intent' || mode === 'reservation'" type="link" @click="viewMore(record)">查看更多</a-button>
+                <a-button v-if="mode === 'reservation'" type="link" @click="toggleRefund(record)">退款</a-button>
+                <a-button v-if="mode === 'reservation'" type="link" @click="transferToAdmission(record)">转入住</a-button>
+                <a-button v-if="mode === 'invalid'" type="link" @click="viewMore(record)">查看</a-button>
+                <a-button v-if="mode === 'invalid'" type="link" @click="recoverLead(record)">恢复客户</a-button>
+                <a-button v-if="mode === 'callback'" type="link" @click="executeCallback(record)">执行</a-button>
+                <a-button type="link" danger @click="remove(record.id)">删除</a-button>
+              </a-space>
+            </template>
           </template>
-          <template v-else-if="column.key === 'refunded'">
-            {{ record.refunded === 1 ? '是' : '否' }}
-          </template>
-          <template v-else-if="column.key === 'reservationAmount'">
-            {{ record.reservationAmount == null ? '-' : `¥${Number(record.reservationAmount).toFixed(2)}` }}
-          </template>
-          <template v-else-if="column.key === 'operation'">
-            <a-space wrap>
-              <a-button type="link" @click="openForm(record)">编辑</a-button>
-              <a-button v-if="mode === 'consultation' || mode === 'intent' || mode === 'reservation'" type="link" @click="viewMore(record)">查看更多</a-button>
-              <a-button v-if="mode === 'reservation'" type="link" @click="toggleRefund(record)">退款</a-button>
-              <a-button v-if="mode === 'reservation'" type="link" @click="transferToAdmission(record)">转入住</a-button>
-              <a-button v-if="mode === 'invalid'" type="link" @click="viewMore(record)">查看</a-button>
-              <a-button v-if="mode === 'invalid'" type="link" @click="recoverLead(record)">恢复客户</a-button>
-              <a-button v-if="mode === 'callback'" type="link" @click="executeCallback(record)">执行</a-button>
-              <a-button type="link" danger @click="remove(record.id)">删除</a-button>
-            </a-space>
-          </template>
-        </template>
-      </a-table>
-      <a-pagination
-        style="margin-top: 16px; text-align: right;"
-        :current="query.pageNo"
-        :page-size="query.pageSize"
-        :total="displayTotal"
-        show-size-changer
-        @change="onPageChange"
-        @showSizeChange="onPageSizeChange"
-      />
+        </a-table>
+        <a-pagination
+          style="margin-top: 16px; text-align: right;"
+          :current="query.pageNo"
+          :page-size="query.pageSize"
+          :total="displayTotal"
+          show-size-changer
+          @change="onPageChange"
+          @showSizeChange="onPageSizeChange"
+        />
+      </StatefulBlock>
     </a-card>
 
     <a-modal v-model:open="open" :title="modalTitle" width="820px" :confirm-loading="submitting" @ok="submit">
@@ -268,6 +293,7 @@ import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import PageContainer from '../../../components/PageContainer.vue'
+import StatefulBlock from '../../../components/StatefulBlock.vue'
 import {
   batchDeleteLeads,
   batchUpdateLeadStatus,
@@ -276,10 +302,11 @@ import {
   deleteCrmLead,
   executeCallbackPlan,
   getLeadCallbackPlans,
+  getMarketingLeadEntrySummary,
   getLeadPage,
   updateCrmLead
 } from '../../../api/marketing'
-import type { CrmLeadItem, PageResult } from '../../../types'
+import type { CrmLeadItem, MarketingLeadEntrySummary, MarketingLeadMode, PageResult } from '../../../types'
 
 const props = withDefaults(defineProps<{
   mode: 'consultation' | 'intent' | 'reservation' | 'invalid' | 'callback'
@@ -291,9 +318,29 @@ const props = withDefaults(defineProps<{
 
 const router = useRouter()
 const loading = ref(false)
+const tableError = ref('')
 const rows = ref<CrmLeadItem[]>([])
 const total = ref(0)
 const selectedRowKeys = ref<number[]>([])
+const summaryLoading = ref(false)
+const summaryError = ref('')
+const summary = reactive<MarketingLeadEntrySummary>({
+  totalCount: 0,
+  modeCount: 0,
+  consultCount: 0,
+  intentCount: 0,
+  reservationCount: 0,
+  invalidCount: 0,
+  signedContractCount: 0,
+  unsignedReservationCount: 0,
+  refundedReservationCount: 0,
+  callbackDueTodayCount: 0,
+  callbackOverdueCount: 0,
+  callbackPendingCount: 0,
+  missingSourceCount: 0,
+  missingNextFollowDateCount: 0,
+  nonStandardSourceCount: 0
+})
 
 const query = reactive({
   consultantName: '',
@@ -443,12 +490,64 @@ const actionButtons = computed(() => {
   return [{ key: 'deletePlan', label: '删除', type: 'default' as const }]
 })
 
-const callbackRows = computed(() => rows.value.filter((item) => !!item.nextFollowDate))
-const displayRows = computed(() => {
-  const list = props.mode === 'callback' ? callbackRows.value : rows.value
-  return list.map((item, index) => ({ ...item, index: index + 1 }))
+const displayRows = computed(() => rows.value.map((item, index) => ({ ...item, index: index + 1 })))
+const displayTotal = computed(() => total.value)
+const summaryCards = computed(() => {
+  if (props.mode === 'consultation') {
+    return [
+      { title: '当前咨询池', value: summary.modeCount },
+      { title: '总线索数', value: summary.totalCount },
+      { title: '缺失来源', value: summary.missingSourceCount },
+      { title: '非标准来源', value: summary.nonStandardSourceCount }
+    ]
+  }
+  if (props.mode === 'intent') {
+    return [
+      { title: '当前意向客户', value: summary.modeCount },
+      { title: '待回访总量', value: summary.callbackPendingCount },
+      { title: '逾期回访', value: summary.callbackOverdueCount },
+      { title: '缺少下次回访', value: summary.missingNextFollowDateCount }
+    ]
+  }
+  if (props.mode === 'reservation') {
+    return [
+      { title: '当前预订客户', value: summary.modeCount },
+      { title: '已签约', value: summary.signedContractCount },
+      { title: '待签约预订', value: summary.unsignedReservationCount },
+      { title: '退款预订', value: summary.refundedReservationCount }
+    ]
+  }
+  if (props.mode === 'invalid') {
+    return [
+      { title: '失效客户', value: summary.modeCount },
+      { title: '咨询客户', value: summary.consultCount },
+      { title: '意向客户', value: summary.intentCount },
+      { title: '预订客户', value: summary.reservationCount }
+    ]
+  }
+  return [
+    { title: '待回访总量', value: summary.modeCount },
+    { title: '今日到期', value: summary.callbackDueTodayCount },
+    { title: '逾期回访', value: summary.callbackOverdueCount },
+    { title: '缺少下次回访', value: summary.missingNextFollowDateCount }
+  ]
 })
-const displayTotal = computed(() => props.mode === 'callback' ? callbackRows.value.length : total.value)
+
+const warningMessage = computed(() => {
+  if (props.mode === 'consultation' && (summary.missingSourceCount > 0 || summary.nonStandardSourceCount > 0)) {
+    return `数据质量提醒：缺失来源 ${summary.missingSourceCount} 条，非标准来源 ${summary.nonStandardSourceCount} 条。`
+  }
+  if (props.mode === 'intent' && (summary.callbackOverdueCount > 0 || summary.missingNextFollowDateCount > 0)) {
+    return `跟进风险提醒：逾期回访 ${summary.callbackOverdueCount} 条，缺失下次回访日期 ${summary.missingNextFollowDateCount} 条。`
+  }
+  if (props.mode === 'reservation' && (summary.unsignedReservationCount > 0 || summary.refundedReservationCount > 0)) {
+    return `签约闭环提醒：待签约预订 ${summary.unsignedReservationCount} 条，退款预订 ${summary.refundedReservationCount} 条。`
+  }
+  if (props.mode === 'callback' && (summary.callbackOverdueCount > 0 || summary.callbackDueTodayCount > 0)) {
+    return `回访提醒：今日到期 ${summary.callbackDueTodayCount} 条，逾期 ${summary.callbackOverdueCount} 条。`
+  }
+  return ''
+})
 
 function selectedIds() {
   if (selectedRowKeys.value.length) {
@@ -472,10 +571,30 @@ function genderText(gender?: number) {
 }
 
 function buildQueryParams() {
+  const isCallback = props.mode === 'callback'
   return {
     pageNo: query.pageNo,
     pageSize: query.pageSize,
-    status: defaultStatus(props.mode),
+    status: isCallback ? undefined : defaultStatus(props.mode),
+    consultantName: query.consultantName || undefined,
+    consultantPhone: query.consultantPhone || undefined,
+    elderName: query.elderName || undefined,
+    elderPhone: query.elderPhone || undefined,
+    consultDateFrom: query.consultDateRange?.[0] || undefined,
+    consultDateTo: query.consultDateRange?.[1] || undefined,
+    consultType: query.consultType || undefined,
+    mediaChannel: query.mediaChannel || undefined,
+    infoSource: query.infoSource || undefined,
+    customerTag: query.customerTag || undefined,
+    marketerName: query.marketerName || undefined,
+    followupDueOnly: isCallback ? true : undefined,
+    followupDateTo: isCallback ? dayjs().format('YYYY-MM-DD') : undefined
+  }
+}
+
+function buildSummaryParams() {
+  return {
+    mode: props.mode as MarketingLeadMode,
     consultantName: query.consultantName || undefined,
     consultantPhone: query.consultantPhone || undefined,
     elderName: query.elderName || undefined,
@@ -492,13 +611,31 @@ function buildQueryParams() {
 
 async function fetchData() {
   loading.value = true
+  summaryLoading.value = true
+  tableError.value = ''
+  summaryError.value = ''
   try {
-    const page: PageResult<CrmLeadItem> = await getLeadPage(buildQueryParams())
+    const [page, summaryRes] = await Promise.all([
+      getLeadPage(buildQueryParams()),
+      getMarketingLeadEntrySummary(buildSummaryParams())
+    ])
     rows.value = page.list || []
     total.value = page.total || 0
+    Object.assign(summary, summaryRes || {})
+  } catch (error: any) {
+    const text = error?.message || '请求失败，请稍后重试'
+    tableError.value = text
+    summaryError.value = text
   } finally {
     loading.value = false
+    summaryLoading.value = false
   }
+}
+
+function onSearch() {
+  query.pageNo = 1
+  selectedRowKeys.value = []
+  fetchData()
 }
 
 function reset() {
@@ -513,6 +650,7 @@ function reset() {
   query.customerTag = ''
   query.marketerName = ''
   query.pageNo = 1
+  query.pageSize = 10
   selectedRowKeys.value = []
   fetchData()
 }

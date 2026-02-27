@@ -13,6 +13,7 @@ import com.zhiyangyun.care.crm.model.report.MarketingConsultationTrendItem;
 import com.zhiyangyun.care.crm.model.report.MarketingConversionReportResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingDataQualityResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingFollowupReportResponse;
+import com.zhiyangyun.care.crm.model.report.MarketingLeadEntrySummaryResponse;
 import com.zhiyangyun.care.crm.service.MarketingReportService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -283,6 +284,108 @@ public class MarketingReportServiceImpl implements MarketingReportService {
     return updated;
   }
 
+  @Override
+  public MarketingLeadEntrySummaryResponse leadEntrySummary(
+      Long tenantId, String mode, String keyword, String consultantName, String consultantPhone,
+      String elderName, String elderPhone, String consultDateFrom, String consultDateTo, String consultType,
+      String mediaChannel, String infoSource, String customerTag, String marketerName) {
+    String normalizedMode = normalizeMode(mode);
+    LocalDate today = LocalDate.now();
+
+    long total = crmLeadMapper.selectCount(buildLeadEntryWrapper(
+        tenantId, keyword, null, consultantName, consultantPhone, elderName, elderPhone,
+        consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName));
+    long consultCount = crmLeadMapper.selectCount(buildLeadEntryWrapper(
+        tenantId, keyword, 0, consultantName, consultantPhone, elderName, elderPhone,
+        consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName));
+    long intentCount = crmLeadMapper.selectCount(buildLeadEntryWrapper(
+        tenantId, keyword, 1, consultantName, consultantPhone, elderName, elderPhone,
+        consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName));
+    long reservationCount = crmLeadMapper.selectCount(buildLeadEntryWrapper(
+        tenantId, keyword, 2, consultantName, consultantPhone, elderName, elderPhone,
+        consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName));
+    long invalidCount = crmLeadMapper.selectCount(buildLeadEntryWrapper(
+        tenantId, keyword, 3, consultantName, consultantPhone, elderName, elderPhone,
+        consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName));
+
+    long modeCount = switch (normalizedMode) {
+      case "CONSULTATION" -> consultCount;
+      case "INTENT" -> intentCount;
+      case "RESERVATION" -> reservationCount;
+      case "INVALID" -> invalidCount;
+      case "CALLBACK" -> crmLeadMapper.selectCount(buildLeadEntryWrapper(
+          tenantId, keyword, null, consultantName, consultantPhone, elderName, elderPhone,
+          consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName)
+          .in(CrmLead::getStatus, List.of(0, 1))
+          .isNotNull(CrmLead::getNextFollowDate)
+          .le(CrmLead::getNextFollowDate, today));
+      default -> total;
+    };
+
+    long signedContractCount = crmLeadMapper.selectCount(buildLeadEntryWrapper(
+        tenantId, keyword, null, consultantName, consultantPhone, elderName, elderPhone,
+        consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName)
+        .eq(CrmLead::getContractSignedFlag, 1));
+    long unsignedReservationCount = crmLeadMapper.selectCount(buildLeadEntryWrapper(
+        tenantId, keyword, 2, consultantName, consultantPhone, elderName, elderPhone,
+        consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName)
+        .ne(CrmLead::getContractSignedFlag, 1));
+    long refundedReservationCount = crmLeadMapper.selectCount(buildLeadEntryWrapper(
+        tenantId, keyword, 2, consultantName, consultantPhone, elderName, elderPhone,
+        consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName)
+        .eq(CrmLead::getRefunded, 1));
+
+    long callbackDueTodayCount = crmLeadMapper.selectCount(buildLeadEntryWrapper(
+        tenantId, keyword, null, consultantName, consultantPhone, elderName, elderPhone,
+        consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName)
+        .in(CrmLead::getStatus, List.of(0, 1))
+        .eq(CrmLead::getNextFollowDate, today));
+    long callbackOverdueCount = crmLeadMapper.selectCount(buildLeadEntryWrapper(
+        tenantId, keyword, null, consultantName, consultantPhone, elderName, elderPhone,
+        consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName)
+        .in(CrmLead::getStatus, List.of(0, 1))
+        .isNotNull(CrmLead::getNextFollowDate)
+        .lt(CrmLead::getNextFollowDate, today));
+
+    long missingSourceCount = crmLeadMapper.selectCount(buildLeadEntryWrapper(
+        tenantId, keyword, null, consultantName, consultantPhone, elderName, elderPhone,
+        consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName)
+        .and(w -> w.isNull(CrmLead::getSource).or().eq(CrmLead::getSource, "")));
+    long missingNextFollowDateCount = crmLeadMapper.selectCount(buildLeadEntryWrapper(
+        tenantId, keyword, null, consultantName, consultantPhone, elderName, elderPhone,
+        consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName)
+        .in(CrmLead::getStatus, List.of(0, 1))
+        .isNull(CrmLead::getNextFollowDate));
+
+    List<CrmLead> sourceLeads = crmLeadMapper.selectList(buildLeadEntryWrapper(
+        tenantId, keyword, null, consultantName, consultantPhone, elderName, elderPhone,
+        consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName)
+        .isNotNull(CrmLead::getSource));
+    long nonStandardSourceCount = sourceLeads.stream()
+        .map(CrmLead::getSource)
+        .filter(value -> value != null && !value.isBlank())
+        .filter(value -> !STANDARD_SOURCES.contains(normalizeSource(value)))
+        .count();
+
+    MarketingLeadEntrySummaryResponse response = new MarketingLeadEntrySummaryResponse();
+    response.setTotalCount(total);
+    response.setModeCount(modeCount);
+    response.setConsultCount(consultCount);
+    response.setIntentCount(intentCount);
+    response.setReservationCount(reservationCount);
+    response.setInvalidCount(invalidCount);
+    response.setSignedContractCount(signedContractCount);
+    response.setUnsignedReservationCount(unsignedReservationCount);
+    response.setRefundedReservationCount(refundedReservationCount);
+    response.setCallbackDueTodayCount(callbackDueTodayCount);
+    response.setCallbackOverdueCount(callbackOverdueCount);
+    response.setCallbackPendingCount(callbackDueTodayCount + callbackOverdueCount);
+    response.setMissingSourceCount(missingSourceCount);
+    response.setMissingNextFollowDateCount(missingNextFollowDateCount);
+    response.setNonStandardSourceCount(nonStandardSourceCount);
+    return response;
+  }
+
   private long countByStatus(
       Long tenantId, String dateFrom, String dateTo, String source, Long staffId, int status) {
     return crmLeadMapper.selectCount(
@@ -309,6 +412,49 @@ public class MarketingReportServiceImpl implements MarketingReportService {
         .eq(staffId != null, CrmLead::getCreatedBy, staffId)
         .ge(fromTime != null, CrmLead::getCreateTime, fromTime)
         .lt(toTime != null, CrmLead::getCreateTime, toTime);
+  }
+
+  private LambdaQueryWrapper<CrmLead> buildLeadEntryWrapper(
+      Long tenantId, String keyword, Integer status, String consultantName, String consultantPhone,
+      String elderName, String elderPhone, String consultDateFrom, String consultDateTo, String consultType,
+      String mediaChannel, String infoSource, String customerTag, String marketerName) {
+    LambdaQueryWrapper<CrmLead> wrapper = Wrappers.lambdaQuery(CrmLead.class)
+        .eq(CrmLead::getIsDeleted, 0)
+        .eq(tenantId != null, CrmLead::getTenantId, tenantId)
+        .eq(status != null, CrmLead::getStatus, status)
+        .like(consultantName != null && !consultantName.isBlank(), CrmLead::getConsultantName, consultantName)
+        .like(consultantPhone != null && !consultantPhone.isBlank(), CrmLead::getConsultantPhone, consultantPhone)
+        .like(elderName != null && !elderName.isBlank(), CrmLead::getElderName, elderName)
+        .like(elderPhone != null && !elderPhone.isBlank(), CrmLead::getElderPhone, elderPhone)
+        .eq(consultType != null && !consultType.isBlank(), CrmLead::getConsultType, consultType)
+        .eq(mediaChannel != null && !mediaChannel.isBlank(), CrmLead::getMediaChannel, mediaChannel)
+        .eq(infoSource != null && !infoSource.isBlank(), CrmLead::getInfoSource, infoSource)
+        .eq(customerTag != null && !customerTag.isBlank(), CrmLead::getCustomerTag, customerTag)
+        .like(marketerName != null && !marketerName.isBlank(), CrmLead::getMarketerName, marketerName);
+    LocalDate consultFrom = parseDateOrNull(consultDateFrom);
+    LocalDate consultTo = parseDateOrNull(consultDateTo);
+    wrapper.ge(consultFrom != null, CrmLead::getConsultDate, consultFrom);
+    wrapper.le(consultTo != null, CrmLead::getConsultDate, consultTo);
+    if (keyword != null && !keyword.isBlank()) {
+      wrapper.and(w -> w.like(CrmLead::getName, keyword)
+          .or().like(CrmLead::getPhone, keyword)
+          .or().like(CrmLead::getConsultantName, keyword)
+          .or().like(CrmLead::getConsultantPhone, keyword)
+          .or().like(CrmLead::getElderName, keyword)
+          .or().like(CrmLead::getElderPhone, keyword));
+    }
+    return wrapper;
+  }
+
+  private String normalizeMode(String mode) {
+    if (mode == null || mode.isBlank()) {
+      return "ALL";
+    }
+    String value = mode.trim().toUpperCase(Locale.ROOT);
+    return switch (value) {
+      case "CONSULTATION", "INTENT", "RESERVATION", "INVALID", "CALLBACK" -> value;
+      default -> "ALL";
+    };
   }
 
   private List<MarketingFollowupReportResponse.StageItem> buildStages(

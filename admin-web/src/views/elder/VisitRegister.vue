@@ -56,7 +56,10 @@ const query = reactive({
 })
 
 const columns = [
+  { title: '家属姓名', dataIndex: 'familyName', key: 'familyName', width: 120 },
   { title: '老人姓名', dataIndex: 'elderName', key: 'elderName', width: 120 },
+  { title: '居住楼层', dataIndex: 'floorNo', key: 'floorNo', width: 120 },
+  { title: '房号', dataIndex: 'roomNo', key: 'roomNo', width: 120 },
   { title: '来访时间', dataIndex: 'visitTime', key: 'visitTime', width: 180 },
   { title: '访客人数', dataIndex: 'visitorCount', key: 'visitorCount', width: 100 },
   { title: '车牌', dataIndex: 'carPlate', key: 'carPlate', width: 120 },
@@ -84,7 +87,7 @@ async function fetchData() {
       .filter((item) => (query.status !== undefined ? item.status === query.status : true))
       .map((item) => ({
         ...item,
-        elderName: resolveElderName(item.elderId)
+        elderName: item.elderName || resolveElderName(item.elderId)
       }))
   } finally {
     loading.value = false

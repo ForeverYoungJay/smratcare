@@ -26,6 +26,7 @@ export interface InventoryLogItem {
   refOrderId?: number
   refAdjustmentId?: number
   outType?: 'SALE' | 'CONSUME'
+  receiverName?: string
   remark?: string
   createTime?: string
 }
@@ -73,6 +74,7 @@ export interface InventoryOutboundRequest {
   warehouseId?: number
   batchId?: number
   quantity: number
+  receiverName?: string
   reason?: string
 }
 

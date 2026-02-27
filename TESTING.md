@@ -20,7 +20,7 @@ mvn -Dtest=AuthSecurityTest test
 - 认证与权限：`AuthSecurityTest`、`FamilyAuthTest`
 - 长者与入住流转：`ElderServiceTest`、`ElderResidenceFlowTest`
 - 护理与健康：`CareTaskServiceTest`、`HealthWorkflowIntegrationTest`、`VitalSignServiceTest`
-- 商城与库存：`StoreOrderServiceTest`、`InventoryFlowTest`、`InventoryAlertTest`
+- 商城与物资中心：`StoreOrderServiceTest`、`InventoryFlowTest`、`InventoryAlertTest`
 - 财务与费用：`FinancePaymentTest`、`FinanceReconcileTest`、`FeeManagementServiceTest`、`FeeManagementControllerTest`
 - 评估与统计：`AssessmentApiIntegrationTest`、`StatisticsControllerTest`、`MarketingReportServiceTest`
 - 其它模块：`VisitModuleTest`、`DiseaseRuleServiceTest` 等

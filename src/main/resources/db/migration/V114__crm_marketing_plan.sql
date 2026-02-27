@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS crm_marketing_plan (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID',
+  org_id BIGINT NOT NULL COMMENT '机构ID',
+  module_type VARCHAR(32) NOT NULL COMMENT '模块类型 SPEECH/POLICY',
+  title VARCHAR(128) NOT NULL COMMENT '标题',
+  summary VARCHAR(255) DEFAULT NULL COMMENT '摘要',
+  content TEXT DEFAULT NULL COMMENT '内容',
+  quarter_label VARCHAR(32) DEFAULT NULL COMMENT '季度标签',
+  target VARCHAR(255) DEFAULT NULL COMMENT '运营目标',
+  owner VARCHAR(64) DEFAULT NULL COMMENT '责任部门',
+  priority INT NOT NULL DEFAULT 50 COMMENT '优先级，越小越靠前',
+  status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE' COMMENT '状态 ACTIVE/INACTIVE',
+  effective_date DATE DEFAULT NULL COMMENT '生效日期',
+  created_by BIGINT DEFAULT NULL COMMENT '创建人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  KEY idx_crm_marketing_plan_org (org_id, is_deleted, module_type, priority),
+  KEY idx_crm_marketing_plan_status (org_id, is_deleted, status, effective_date)
+) COMMENT='营销方案与话术库';

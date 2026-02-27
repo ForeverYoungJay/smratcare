@@ -6,24 +6,38 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.audit.service.AuditLogService;
+import com.zhiyangyun.care.elder.entity.lifecycle.ElderDeathRegister;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
+import com.zhiyangyun.care.elder.entity.lifecycle.ElderChangeLog;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderDischargeApply;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderDischarge;
+import com.zhiyangyun.care.elder.entity.lifecycle.ElderMedicalOutingRecord;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderOutingRecord;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderTrialStay;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
+import com.zhiyangyun.care.elder.mapper.lifecycle.ElderChangeLogMapper;
+import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDeathRegisterMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeApplyMapper;
+import com.zhiyangyun.care.elder.mapper.lifecycle.ElderMedicalOutingRecordMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderOutingRecordMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderTrialStayMapper;
+import com.zhiyangyun.care.elder.model.lifecycle.DeathRegisterCancelRequest;
+import com.zhiyangyun.care.elder.model.lifecycle.DeathRegisterCreateRequest;
+import com.zhiyangyun.care.elder.model.lifecycle.DeathRegisterUpdateRequest;
 import com.zhiyangyun.care.elder.model.lifecycle.DischargeApplyCreateRequest;
 import com.zhiyangyun.care.elder.model.lifecycle.DischargeApplyReviewRequest;
 import com.zhiyangyun.care.elder.model.lifecycle.DischargeRequest;
+import com.zhiyangyun.care.elder.model.lifecycle.MedicalOutingCreateRequest;
+import com.zhiyangyun.care.elder.model.lifecycle.MedicalOutingReturnRequest;
 import com.zhiyangyun.care.elder.model.lifecycle.OutingCreateRequest;
 import com.zhiyangyun.care.elder.model.lifecycle.OutingReturnRequest;
 import com.zhiyangyun.care.elder.model.lifecycle.ResidenceLifecycleConstants;
+import com.zhiyangyun.care.elder.model.lifecycle.ResidenceStatusSummaryResponse;
 import com.zhiyangyun.care.elder.model.lifecycle.TrialStayRequest;
 import com.zhiyangyun.care.elder.service.lifecycle.ElderLifecycleService;
+import com.zhiyangyun.care.life.entity.IncidentReport;
+import com.zhiyangyun.care.life.mapper.IncidentReportMapper;
 import jakarta.validation.Valid;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -56,27 +70,109 @@ public class ElderResidenceController {
   private static final Logger log = LoggerFactory.getLogger(ElderResidenceController.class);
 
   private final ElderOutingRecordMapper outingMapper;
+  private final ElderChangeLogMapper changeLogMapper;
+  private final ElderMedicalOutingRecordMapper medicalOutingMapper;
+  private final ElderDeathRegisterMapper deathRegisterMapper;
   private final ElderTrialStayMapper trialStayMapper;
   private final ElderDischargeApplyMapper dischargeApplyMapper;
   private final ElderDischargeMapper dischargeMapper;
   private final ElderMapper elderMapper;
+  private final IncidentReportMapper incidentReportMapper;
   private final ElderLifecycleService lifecycleService;
   private final AuditLogService auditLogService;
 
   public ElderResidenceController(ElderOutingRecordMapper outingMapper,
+                                  ElderChangeLogMapper changeLogMapper,
+                                  ElderMedicalOutingRecordMapper medicalOutingMapper,
+                                  ElderDeathRegisterMapper deathRegisterMapper,
                                   ElderTrialStayMapper trialStayMapper,
                                   ElderDischargeApplyMapper dischargeApplyMapper,
                                   ElderDischargeMapper dischargeMapper,
                                   ElderMapper elderMapper,
+                                  IncidentReportMapper incidentReportMapper,
                                   ElderLifecycleService lifecycleService,
                                   AuditLogService auditLogService) {
     this.outingMapper = outingMapper;
+    this.changeLogMapper = changeLogMapper;
+    this.medicalOutingMapper = medicalOutingMapper;
+    this.deathRegisterMapper = deathRegisterMapper;
     this.trialStayMapper = trialStayMapper;
     this.dischargeApplyMapper = dischargeApplyMapper;
     this.dischargeMapper = dischargeMapper;
     this.elderMapper = elderMapper;
+    this.incidentReportMapper = incidentReportMapper;
     this.lifecycleService = lifecycleService;
     this.auditLogService = auditLogService;
+  }
+
+  @GetMapping("/status-summary")
+  public Result<ResidenceStatusSummaryResponse> statusSummary() {
+    Long orgId = AuthContext.getOrgId();
+    ResidenceStatusSummaryResponse response = new ResidenceStatusSummaryResponse();
+
+    long inHospital = elderMapper.selectCount(Wrappers.lambdaQuery(ElderProfile.class)
+        .eq(ElderProfile::getIsDeleted, 0)
+        .eq(orgId != null, ElderProfile::getOrgId, orgId)
+        .eq(ElderProfile::getStatus, 1));
+    long outing = elderMapper.selectCount(Wrappers.lambdaQuery(ElderProfile.class)
+        .eq(ElderProfile::getIsDeleted, 0)
+        .eq(orgId != null, ElderProfile::getOrgId, orgId)
+        .eq(ElderProfile::getStatus, 2));
+    long discharged = elderMapper.selectCount(Wrappers.lambdaQuery(ElderProfile.class)
+        .eq(ElderProfile::getIsDeleted, 0)
+        .eq(orgId != null, ElderProfile::getOrgId, orgId)
+        .eq(ElderProfile::getStatus, 3));
+    long intent = elderMapper.selectCount(Wrappers.lambdaQuery(ElderProfile.class)
+        .eq(ElderProfile::getIsDeleted, 0)
+        .eq(orgId != null, ElderProfile::getOrgId, orgId)
+        .notIn(ElderProfile::getStatus, 1, 2, 3));
+
+    long trial = trialStayMapper.selectCount(Wrappers.lambdaQuery(ElderTrialStay.class)
+        .eq(ElderTrialStay::getIsDeleted, 0)
+        .eq(orgId != null, ElderTrialStay::getOrgId, orgId)
+        .eq(ElderTrialStay::getStatus, ResidenceLifecycleConstants.TRIAL_REGISTERED));
+    long medicalOuting = medicalOutingMapper.selectCount(Wrappers.lambdaQuery(ElderMedicalOutingRecord.class)
+        .eq(ElderMedicalOutingRecord::getIsDeleted, 0)
+        .eq(orgId != null, ElderMedicalOutingRecord::getOrgId, orgId)
+        .eq(ElderMedicalOutingRecord::getStatus, ResidenceLifecycleConstants.MEDICAL_OUTING_OUT));
+    long dischargePending = dischargeApplyMapper.selectCount(Wrappers.lambdaQuery(ElderDischargeApply.class)
+        .eq(ElderDischargeApply::getIsDeleted, 0)
+        .eq(orgId != null, ElderDischargeApply::getOrgId, orgId)
+        .eq(ElderDischargeApply::getStatus, ResidenceLifecycleConstants.DISCHARGE_APPLY_PENDING));
+    long death = deathRegisterMapper.selectCount(Wrappers.lambdaQuery(ElderDeathRegister.class)
+        .eq(ElderDeathRegister::getIsDeleted, 0)
+        .eq(orgId != null, ElderDeathRegister::getOrgId, orgId)
+        .eq(ElderDeathRegister::getStatus, ResidenceLifecycleConstants.DEATH_REGISTERED));
+
+    LocalDateTime now = LocalDateTime.now();
+    long overdueOuting = outingMapper.selectCount(Wrappers.lambdaQuery(ElderOutingRecord.class)
+        .eq(ElderOutingRecord::getIsDeleted, 0)
+        .eq(orgId != null, ElderOutingRecord::getOrgId, orgId)
+        .eq(ElderOutingRecord::getStatus, ResidenceLifecycleConstants.OUTING_OUT)
+        .isNotNull(ElderOutingRecord::getExpectedReturnTime)
+        .lt(ElderOutingRecord::getExpectedReturnTime, now))
+        + medicalOutingMapper.selectCount(Wrappers.lambdaQuery(ElderMedicalOutingRecord.class)
+            .eq(ElderMedicalOutingRecord::getIsDeleted, 0)
+            .eq(orgId != null, ElderMedicalOutingRecord::getOrgId, orgId)
+            .eq(ElderMedicalOutingRecord::getStatus, ResidenceLifecycleConstants.MEDICAL_OUTING_OUT)
+            .isNotNull(ElderMedicalOutingRecord::getExpectedReturnTime)
+            .lt(ElderMedicalOutingRecord::getExpectedReturnTime, now));
+    long openIncident = incidentReportMapper.selectCount(Wrappers.lambdaQuery(IncidentReport.class)
+        .eq(IncidentReport::getIsDeleted, 0)
+        .eq(orgId != null, IncidentReport::getOrgId, orgId)
+        .eq(IncidentReport::getStatus, "OPEN"));
+
+    response.setIntentCount(intent);
+    response.setTrialCount(trial);
+    response.setInHospitalCount(inHospital);
+    response.setOutingCount(outing);
+    response.setMedicalOutingCount(medicalOuting);
+    response.setDischargePendingCount(dischargePending);
+    response.setDischargedCount(discharged);
+    response.setDeathCount(death);
+    response.setOpenIncidentCount(openIncident);
+    response.setOverdueOutingCount(overdueOuting);
+    return Result.ok(response);
   }
 
   @GetMapping("/outing/page")
@@ -99,6 +195,7 @@ public class ElderResidenceController {
   @PostMapping("/outing")
   public Result<ElderOutingRecord> createOuting(@Valid @RequestBody OutingCreateRequest request) {
     Long orgId = AuthContext.getOrgId();
+    ensureNoActiveOuting(request.getElderId(), orgId);
     ElderOutingRecord record = new ElderOutingRecord();
     record.setTenantId(orgId);
     record.setOrgId(orgId);
@@ -131,9 +228,292 @@ public class ElderResidenceController {
       record.setRemark(payload.getRemark());
     }
     outingMapper.updateById(record);
+    ElderProfile elder = resolveElder(record.getElderId());
+    Integer beforeStatus = elder.getStatus();
+    if (!hasAnyActiveOuting(record.getElderId(), orgId)) {
+      updateElderStatus(elder, 1);
+      recordStatusChange(record.getElderId(), beforeStatus, 1, "外出返院");
+    }
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "OUTING_RETURN", "ELDER", record.getElderId(), "外出返院登记");
     return Result.ok(record);
+  }
+
+  @GetMapping("/medical-outing/page")
+  public Result<IPage<ElderMedicalOutingRecord>> medicalOutingPage(
+      @RequestParam(defaultValue = "1") long pageNo,
+      @RequestParam(defaultValue = "20") long pageSize,
+      @RequestParam(required = false) Long elderId,
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) String keyword) {
+    Long orgId = AuthContext.getOrgId();
+    String normalizedStatus = normalizeMedicalOutingStatusForQuery(status);
+    var wrapper = Wrappers.lambdaQuery(ElderMedicalOutingRecord.class)
+        .eq(ElderMedicalOutingRecord::getIsDeleted, 0)
+        .eq(orgId != null, ElderMedicalOutingRecord::getOrgId, orgId)
+        .eq(elderId != null, ElderMedicalOutingRecord::getElderId, elderId)
+        .eq(normalizedStatus != null, ElderMedicalOutingRecord::getStatus, normalizedStatus)
+        .and(keyword != null && !keyword.isBlank(),
+            w -> w.like(ElderMedicalOutingRecord::getElderName, keyword)
+                .or().like(ElderMedicalOutingRecord::getHospitalName, keyword)
+                .or().like(ElderMedicalOutingRecord::getDepartment, keyword)
+                .or().like(ElderMedicalOutingRecord::getDiagnosis, keyword)
+                .or().like(ElderMedicalOutingRecord::getReason, keyword))
+        .orderByDesc(ElderMedicalOutingRecord::getOutingDate)
+        .orderByDesc(ElderMedicalOutingRecord::getCreateTime);
+    return Result.ok(medicalOutingMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
+  }
+
+  @PostMapping("/medical-outing")
+  @PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+  public Result<ElderMedicalOutingRecord> createMedicalOuting(@Valid @RequestBody MedicalOutingCreateRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    ensureNoActiveOuting(request.getElderId(), orgId);
+    ElderProfile elder = resolveElder(request.getElderId());
+    Integer beforeStatus = elder.getStatus();
+    ElderMedicalOutingRecord record = new ElderMedicalOutingRecord();
+    record.setTenantId(orgId);
+    record.setOrgId(orgId);
+    record.setElderId(request.getElderId());
+    record.setElderName(resolveElderName(request.getElderId()));
+    record.setOutingDate(request.getOutingDate());
+    record.setExpectedReturnTime(request.getExpectedReturnTime());
+    record.setHospitalName(request.getHospitalName());
+    record.setDepartment(request.getDepartment());
+    record.setDiagnosis(request.getDiagnosis());
+    record.setCompanion(request.getCompanion());
+    record.setReason(request.getReason());
+    record.setStatus(ResidenceLifecycleConstants.MEDICAL_OUTING_OUT);
+    record.setRemark(request.getRemark());
+    record.setCreatedBy(AuthContext.getStaffId());
+    medicalOutingMapper.insert(record);
+    updateElderStatus(elder, 2);
+    recordStatusChange(request.getElderId(), beforeStatus, 2, "外出就医登记");
+    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "MEDICAL_OUTING_CREATE", "ELDER", request.getElderId(), "外出就医登记");
+    return Result.ok(record);
+  }
+
+  @PutMapping("/medical-outing/{id}/return")
+  @PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+  public Result<ElderMedicalOutingRecord> returnFromMedicalOuting(@PathVariable Long id,
+                                                                   @RequestBody MedicalOutingReturnRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    ElderMedicalOutingRecord record = medicalOutingMapper.selectById(id);
+    if (record == null || !Objects.equals(orgId, record.getOrgId()) || Integer.valueOf(1).equals(record.getIsDeleted())) {
+      throw new IllegalArgumentException("记录不存在");
+    }
+    ElderProfile elder = resolveElder(record.getElderId());
+    Integer beforeStatus = elder.getStatus();
+    MedicalOutingReturnRequest payload = request == null ? new MedicalOutingReturnRequest() : request;
+    record.setStatus(ResidenceLifecycleConstants.MEDICAL_OUTING_RETURNED);
+    record.setActualReturnTime(payload.getActualReturnTime() == null ? LocalDateTime.now() : payload.getActualReturnTime());
+    if (payload.getRemark() != null && !payload.getRemark().isBlank()) {
+      record.setRemark(payload.getRemark());
+    }
+    medicalOutingMapper.updateById(record);
+    if (!hasAnyActiveOuting(record.getElderId(), orgId)) {
+      updateElderStatus(elder, 1);
+      recordStatusChange(record.getElderId(), beforeStatus, 1, "外出就医返院");
+    }
+    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "MEDICAL_OUTING_RETURN", "ELDER", record.getElderId(), "外出就医返院登记");
+    return Result.ok(record);
+  }
+
+  @GetMapping(value = "/medical-outing/export", produces = "text/csv;charset=UTF-8")
+  @PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+  public ResponseEntity<byte[]> exportMedicalOuting(
+      @RequestParam(required = false) Long elderId,
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) String keyword) {
+    Long orgId = AuthContext.getOrgId();
+    String normalizedStatus = normalizeMedicalOutingStatusForQuery(status);
+    var wrapper = Wrappers.lambdaQuery(ElderMedicalOutingRecord.class)
+        .eq(ElderMedicalOutingRecord::getIsDeleted, 0)
+        .eq(orgId != null, ElderMedicalOutingRecord::getOrgId, orgId)
+        .eq(elderId != null, ElderMedicalOutingRecord::getElderId, elderId)
+        .eq(normalizedStatus != null, ElderMedicalOutingRecord::getStatus, normalizedStatus)
+        .and(keyword != null && !keyword.isBlank(),
+            w -> w.like(ElderMedicalOutingRecord::getElderName, keyword)
+                .or().like(ElderMedicalOutingRecord::getHospitalName, keyword)
+                .or().like(ElderMedicalOutingRecord::getDepartment, keyword)
+                .or().like(ElderMedicalOutingRecord::getDiagnosis, keyword)
+                .or().like(ElderMedicalOutingRecord::getReason, keyword))
+        .orderByDesc(ElderMedicalOutingRecord::getOutingDate)
+        .orderByDesc(ElderMedicalOutingRecord::getCreateTime);
+    List<ElderMedicalOutingRecord> records = medicalOutingMapper.selectList(wrapper);
+    List<String> headers = List.of("老人姓名", "外出日期", "预计返院", "实际返院", "医院", "科室", "诊断", "原因", "状态", "备注");
+    List<List<String>> rows = records.stream()
+        .map(item -> List.of(
+            safe(item.getElderName()),
+            safe(item.getOutingDate()),
+            safe(item.getExpectedReturnTime()),
+            safe(item.getActualReturnTime()),
+            safe(item.getHospitalName()),
+            safe(item.getDepartment()),
+            safe(item.getDiagnosis()),
+            safe(item.getReason()),
+            safe(item.getStatus()),
+            safe(item.getRemark())))
+        .toList();
+    return csvResponse("elder-medical-outing", headers, rows);
+  }
+
+  @GetMapping("/death-register/page")
+  public Result<IPage<ElderDeathRegister>> deathRegisterPage(
+      @RequestParam(defaultValue = "1") long pageNo,
+      @RequestParam(defaultValue = "20") long pageSize,
+      @RequestParam(required = false) Long elderId,
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) String keyword) {
+    Long orgId = AuthContext.getOrgId();
+    String normalizedStatus = normalizeDeathStatusForQuery(status);
+    var wrapper = Wrappers.lambdaQuery(ElderDeathRegister.class)
+        .eq(ElderDeathRegister::getIsDeleted, 0)
+        .eq(orgId != null, ElderDeathRegister::getOrgId, orgId)
+        .eq(elderId != null, ElderDeathRegister::getElderId, elderId)
+        .eq(normalizedStatus != null, ElderDeathRegister::getStatus, normalizedStatus)
+        .and(keyword != null && !keyword.isBlank(),
+            w -> w.like(ElderDeathRegister::getElderName, keyword)
+                .or().like(ElderDeathRegister::getCause, keyword)
+                .or().like(ElderDeathRegister::getCertificateNo, keyword)
+                .or().like(ElderDeathRegister::getReportedBy, keyword))
+        .orderByDesc(ElderDeathRegister::getDeathDate)
+        .orderByDesc(ElderDeathRegister::getCreateTime);
+    return Result.ok(deathRegisterMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
+  }
+
+  @PostMapping("/death-register")
+  @PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+  public Result<ElderDeathRegister> createDeathRegister(@Valid @RequestBody DeathRegisterCreateRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    long activeCount = deathRegisterMapper.selectCount(Wrappers.lambdaQuery(ElderDeathRegister.class)
+        .eq(ElderDeathRegister::getIsDeleted, 0)
+        .eq(ElderDeathRegister::getOrgId, orgId)
+        .eq(ElderDeathRegister::getElderId, request.getElderId())
+        .eq(ElderDeathRegister::getStatus, ResidenceLifecycleConstants.DEATH_REGISTERED));
+    if (activeCount > 0) {
+      throw new IllegalStateException("该老人已有有效死亡登记");
+    }
+    ElderProfile elder = resolveElder(request.getElderId());
+    Integer beforeStatus = elder.getStatus();
+    ElderDeathRegister record = new ElderDeathRegister();
+    record.setTenantId(orgId);
+    record.setOrgId(orgId);
+    record.setElderId(request.getElderId());
+    record.setElderName(resolveElderName(request.getElderId()));
+    record.setDeathDate(request.getDeathDate());
+    record.setDeathTime(request.getDeathTime());
+    record.setPlace(request.getPlace());
+    record.setCause(request.getCause());
+    record.setCertificateNo(request.getCertificateNo());
+    record.setReportedBy(request.getReportedBy());
+    record.setReportedTime(request.getReportedTime() == null ? LocalDateTime.now() : request.getReportedTime());
+    record.setBeforeStatus(beforeStatus);
+    record.setStatus(ResidenceLifecycleConstants.DEATH_REGISTERED);
+    record.setRemark(request.getRemark());
+    record.setCreatedBy(AuthContext.getStaffId());
+    deathRegisterMapper.insert(record);
+    updateElderStatus(elder, 3);
+    recordStatusChange(request.getElderId(), beforeStatus, 3, "死亡登记");
+    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "DEATH_REGISTER_CREATE", "ELDER", request.getElderId(), "死亡登记");
+    return Result.ok(record);
+  }
+
+  @PutMapping("/death-register/{id}")
+  @PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+  public Result<ElderDeathRegister> updateDeathRegister(@PathVariable Long id,
+                                                        @Valid @RequestBody DeathRegisterUpdateRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    ElderDeathRegister record = deathRegisterMapper.selectById(id);
+    if (record == null || !Objects.equals(orgId, record.getOrgId()) || Integer.valueOf(1).equals(record.getIsDeleted())) {
+      throw new IllegalArgumentException("记录不存在");
+    }
+    if (ResidenceLifecycleConstants.DEATH_CANCELLED.equals(record.getStatus())) {
+      throw new IllegalStateException("已取消的死亡登记不可更正");
+    }
+    record.setDeathDate(request.getDeathDate());
+    record.setDeathTime(request.getDeathTime());
+    record.setPlace(request.getPlace());
+    record.setCause(request.getCause());
+    record.setCertificateNo(request.getCertificateNo());
+    record.setReportedBy(request.getReportedBy());
+    record.setReportedTime(request.getReportedTime());
+    record.setRemark(request.getRemark());
+    record.setUpdatedBy(AuthContext.getStaffId());
+    deathRegisterMapper.updateById(record);
+    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "DEATH_REGISTER_UPDATE", "ELDER", record.getElderId(), "死亡登记更正");
+    return Result.ok(record);
+  }
+
+  @PutMapping("/death-register/{id}/cancel")
+  @PreAuthorize("hasRole('ADMIN')")
+  public Result<ElderDeathRegister> cancelDeathRegister(@PathVariable Long id,
+                                                        @RequestBody(required = false) DeathRegisterCancelRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    ElderDeathRegister record = deathRegisterMapper.selectById(id);
+    if (record == null || !Objects.equals(orgId, record.getOrgId()) || Integer.valueOf(1).equals(record.getIsDeleted())) {
+      throw new IllegalArgumentException("记录不存在");
+    }
+    if (ResidenceLifecycleConstants.DEATH_CANCELLED.equals(record.getStatus())) {
+      return Result.ok(record);
+    }
+    ElderProfile elder = resolveElder(record.getElderId());
+    Integer beforeStatus = elder.getStatus();
+    record.setStatus(ResidenceLifecycleConstants.DEATH_CANCELLED);
+    if (request != null && request.getRemark() != null && !request.getRemark().isBlank()) {
+      record.setRemark(request.getRemark());
+    }
+    record.setCancelledBy(AuthContext.getStaffId());
+    record.setCancelledTime(LocalDateTime.now());
+    deathRegisterMapper.updateById(record);
+    Integer rollbackStatus = record.getBeforeStatus() == null ? 1 : record.getBeforeStatus();
+    updateElderStatus(elder, rollbackStatus);
+    recordStatusChange(record.getElderId(), beforeStatus, rollbackStatus, "死亡登记作废");
+    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "DEATH_REGISTER_CANCEL", "ELDER", record.getElderId(), "死亡登记作废");
+    return Result.ok(record);
+  }
+
+  @GetMapping(value = "/death-register/export", produces = "text/csv;charset=UTF-8")
+  @PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+  public ResponseEntity<byte[]> exportDeathRegister(
+      @RequestParam(required = false) Long elderId,
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) String keyword) {
+    Long orgId = AuthContext.getOrgId();
+    String normalizedStatus = normalizeDeathStatusForQuery(status);
+    var wrapper = Wrappers.lambdaQuery(ElderDeathRegister.class)
+        .eq(ElderDeathRegister::getIsDeleted, 0)
+        .eq(orgId != null, ElderDeathRegister::getOrgId, orgId)
+        .eq(elderId != null, ElderDeathRegister::getElderId, elderId)
+        .eq(normalizedStatus != null, ElderDeathRegister::getStatus, normalizedStatus)
+        .and(keyword != null && !keyword.isBlank(),
+            w -> w.like(ElderDeathRegister::getElderName, keyword)
+                .or().like(ElderDeathRegister::getCause, keyword)
+                .or().like(ElderDeathRegister::getCertificateNo, keyword)
+                .or().like(ElderDeathRegister::getReportedBy, keyword))
+        .orderByDesc(ElderDeathRegister::getDeathDate)
+        .orderByDesc(ElderDeathRegister::getCreateTime);
+    List<ElderDeathRegister> records = deathRegisterMapper.selectList(wrapper);
+    List<String> headers = List.of("老人姓名", "死亡日期", "死亡时间", "地点", "死亡原因", "证明编号", "上报人", "上报时间", "状态", "备注");
+    List<List<String>> rows = records.stream()
+        .map(item -> List.of(
+            safe(item.getElderName()),
+            safe(item.getDeathDate()),
+            safe(item.getDeathTime()),
+            safe(item.getPlace()),
+            safe(item.getCause()),
+            safe(item.getCertificateNo()),
+            safe(item.getReportedBy()),
+            safe(item.getReportedTime()),
+            safe(item.getStatus()),
+            safe(item.getRemark())))
+        .toList();
+    return csvResponse("elder-death-register", headers, rows);
   }
 
   @GetMapping("/trial-stay/page")
@@ -532,6 +912,30 @@ public class ElderResidenceController {
     return normalized;
   }
 
+  private String normalizeMedicalOutingStatusForQuery(String status) {
+    if (status == null || status.isBlank()) {
+      return null;
+    }
+    String normalized = status.trim().toUpperCase();
+    if (!ResidenceLifecycleConstants.MEDICAL_OUTING_OUT.equals(normalized)
+        && !ResidenceLifecycleConstants.MEDICAL_OUTING_RETURNED.equals(normalized)) {
+      throw new IllegalArgumentException("外出就医状态仅支持 OUT/RETURNED");
+    }
+    return normalized;
+  }
+
+  private String normalizeDeathStatusForQuery(String status) {
+    if (status == null || status.isBlank()) {
+      return null;
+    }
+    String normalized = status.trim().toUpperCase();
+    if (!ResidenceLifecycleConstants.DEATH_REGISTERED.equals(normalized)
+        && !ResidenceLifecycleConstants.DEATH_CANCELLED.equals(normalized)) {
+      throw new IllegalArgumentException("死亡登记状态仅支持 REGISTERED/CANCELLED");
+    }
+    return normalized;
+  }
+
   private String trialStatusText(String status) {
     if (ResidenceLifecycleConstants.TRIAL_REGISTERED.equals(status)) {
       return "已登记";
@@ -595,15 +999,75 @@ public class ElderResidenceController {
     return String.join(",", escaped);
   }
 
-  private String resolveElderName(Long elderId) {
+  private void updateElderStatus(ElderProfile elder, Integer status) {
+    if (elder == null || status == null) {
+      return;
+    }
+    elder.setStatus(status);
+    elderMapper.updateById(elder);
+  }
+
+  private boolean hasAnyActiveOuting(Long elderId, Long orgId) {
+    if (elderId == null || orgId == null) {
+      return false;
+    }
+    long outingCount = outingMapper.selectCount(Wrappers.lambdaQuery(ElderOutingRecord.class)
+        .eq(ElderOutingRecord::getIsDeleted, 0)
+        .eq(ElderOutingRecord::getOrgId, orgId)
+        .eq(ElderOutingRecord::getElderId, elderId)
+        .eq(ElderOutingRecord::getStatus, ResidenceLifecycleConstants.OUTING_OUT));
+    long medicalOutingCount = medicalOutingMapper.selectCount(Wrappers.lambdaQuery(ElderMedicalOutingRecord.class)
+        .eq(ElderMedicalOutingRecord::getIsDeleted, 0)
+        .eq(ElderMedicalOutingRecord::getOrgId, orgId)
+        .eq(ElderMedicalOutingRecord::getElderId, elderId)
+        .eq(ElderMedicalOutingRecord::getStatus, ResidenceLifecycleConstants.MEDICAL_OUTING_OUT));
+    return outingCount + medicalOutingCount > 0;
+  }
+
+  private void ensureNoActiveOuting(Long elderId, Long orgId) {
+    if (hasAnyActiveOuting(elderId, orgId)) {
+      throw new IllegalStateException("该老人已有外出中的记录，请先返院后再登记");
+    }
+  }
+
+  private void recordStatusChange(Long elderId, Integer beforeStatus, Integer afterStatus, String reason) {
+    Long orgId = AuthContext.getOrgId();
+    if (elderId == null || orgId == null) {
+      return;
+    }
+    ElderChangeLog logRecord = new ElderChangeLog();
+    logRecord.setTenantId(orgId);
+    logRecord.setOrgId(orgId);
+    logRecord.setElderId(elderId);
+    logRecord.setChangeType("STATUS");
+    logRecord.setBeforeValue(elderStatusText(beforeStatus));
+    logRecord.setAfterValue(elderStatusText(afterStatus));
+    logRecord.setReason(reason);
+    logRecord.setCreatedBy(AuthContext.getStaffId());
+    changeLogMapper.insert(logRecord);
+  }
+
+  private String elderStatusText(Integer status) {
+    if (status == null) return "";
+    if (status == 1) return "在院";
+    if (status == 2) return "外出";
+    if (status == 3) return "离院";
+    return String.valueOf(status);
+  }
+
+  private ElderProfile resolveElder(Long elderId) {
     if (elderId == null) {
-      return null;
+      throw new IllegalArgumentException("老人不存在");
     }
     ElderProfile elder = elderMapper.selectById(elderId);
     Long orgId = AuthContext.getOrgId();
     if (elder == null || Integer.valueOf(1).equals(elder.getIsDeleted()) || !Objects.equals(orgId, elder.getOrgId())) {
       throw new IllegalArgumentException("老人不存在");
     }
-    return elder.getFullName();
+    return elder;
+  }
+
+  private String resolveElderName(Long elderId) {
+    return resolveElder(elderId).getFullName();
   }
 }

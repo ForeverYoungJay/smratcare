@@ -32,16 +32,23 @@ import com.zhiyangyun.care.survey.mapper.SurveySubmissionMapper;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/medical-care/workbench")
+@RequestMapping({"/api/medical-care/workbench", "/api/medical-care/center"})
 public class MedicalCareWorkbenchController {
+  private static final Logger log = LoggerFactory.getLogger(MedicalCareWorkbenchController.class);
+
   private final CareTaskDailyMapper careTaskDailyMapper;
   private final CareTaskExecuteLogMapper careTaskExecuteLogMapper;
   private final ElderMapper elderMapper;
@@ -86,65 +93,83 @@ public class MedicalCareWorkbenchController {
   }
 
   @GetMapping("/summary")
-  public Result<MedicalCareWorkbenchSummaryResponse> summary() {
+  public Result<MedicalCareWorkbenchSummaryResponse> summary(
+      @RequestParam(required = false) Long elderId,
+      @RequestParam(required = false) String date,
+      @RequestParam(required = false) String status) {
     Long orgId = AuthContext.getOrgId();
-    LocalDate today = LocalDate.now();
+    LocalDate today = parseDateOrDefault(date);
     LocalDateTime now = LocalDateTime.now();
     LocalDateTime startOfDay = today.atStartOfDay();
     LocalDateTime startOfTomorrow = today.plusDays(1).atStartOfDay();
     LocalDateTime startOf30Days = now.minusDays(30);
+    boolean hasStatus = status != null && !status.isBlank();
 
     MedicalCareWorkbenchSummaryResponse response = new MedicalCareWorkbenchSummaryResponse();
 
-    Long pendingCare = careTaskDailyMapper.selectCount(Wrappers.lambdaQuery(CareTaskDaily.class)
+    try {
+      Long pendingCare = careTaskDailyMapper.selectCount(Wrappers.lambdaQuery(CareTaskDaily.class)
         .eq(CareTaskDaily::getIsDeleted, 0)
         .eq(orgId != null, CareTaskDaily::getOrgId, orgId)
+        .eq(elderId != null, CareTaskDaily::getElderId, elderId)
         .eq(CareTaskDaily::getTaskDate, today)
-        .in(CareTaskDaily::getStatus, "TODO", "PENDING", "ASSIGNED"));
-    response.setPendingCareTaskCount(pendingCare);
+        .eq(hasStatus, CareTaskDaily::getStatus, status)
+        .in(!hasStatus, CareTaskDaily::getStatus, "TODO", "PENDING", "ASSIGNED"));
+      response.setPendingCareTaskCount(pendingCare);
 
     Long overdueCare = careTaskDailyMapper.selectCount(Wrappers.lambdaQuery(CareTaskDaily.class)
         .eq(CareTaskDaily::getIsDeleted, 0)
         .eq(orgId != null, CareTaskDaily::getOrgId, orgId)
+        .eq(elderId != null, CareTaskDaily::getElderId, elderId)
         .eq(CareTaskDaily::getTaskDate, today)
         .lt(CareTaskDaily::getPlanTime, now)
-        .notIn(CareTaskDaily::getStatus, "DONE", "COMPLETED"));
+        .eq(hasStatus, CareTaskDaily::getStatus, status)
+        .notIn(!hasStatus, CareTaskDaily::getStatus, "DONE", "COMPLETED"));
     response.setOverdueCareTaskCount(overdueCare);
 
     Long inspectionPending = healthInspectionMapper.selectCount(Wrappers.lambdaQuery(HealthInspection.class)
         .eq(HealthInspection::getIsDeleted, 0)
         .eq(orgId != null, HealthInspection::getOrgId, orgId)
+        .eq(elderId != null, HealthInspection::getElderId, elderId)
         .eq(HealthInspection::getInspectionDate, today)
-        .in(HealthInspection::getStatus, "FOLLOWING", "ABNORMAL"));
+        .eq(hasStatus, HealthInspection::getStatus, status)
+        .in(!hasStatus, HealthInspection::getStatus, "FOLLOWING", "ABNORMAL"));
     response.setTodayInspectionPendingCount(inspectionPending);
     response.setTodayInspectionTodoCount(inspectionPending);
 
     Long inspectionDone = healthInspectionMapper.selectCount(Wrappers.lambdaQuery(HealthInspection.class)
         .eq(HealthInspection::getIsDeleted, 0)
         .eq(orgId != null, HealthInspection::getOrgId, orgId)
+        .eq(elderId != null, HealthInspection::getElderId, elderId)
         .eq(HealthInspection::getInspectionDate, today)
-        .in(HealthInspection::getStatus, "NORMAL", "CLOSED"));
+        .eq(hasStatus, HealthInspection::getStatus, status)
+        .in(!hasStatus, HealthInspection::getStatus, "NORMAL", "CLOSED"));
     response.setTodayInspectionDoneCount(inspectionDone);
     response.setTodayInspectionPlanCount(inspectionPending + inspectionDone);
 
     Long abnormalInspection = healthInspectionMapper.selectCount(Wrappers.lambdaQuery(HealthInspection.class)
         .eq(HealthInspection::getIsDeleted, 0)
         .eq(orgId != null, HealthInspection::getOrgId, orgId)
+        .eq(elderId != null, HealthInspection::getElderId, elderId)
         .eq(HealthInspection::getStatus, "ABNORMAL"));
     response.setAbnormalInspectionCount(abnormalInspection);
 
     Long medicationPending = healthMedicationTaskMapper.selectCount(Wrappers.lambdaQuery(HealthMedicationTask.class)
         .eq(HealthMedicationTask::getIsDeleted, 0)
         .eq(orgId != null, HealthMedicationTask::getOrgId, orgId)
+        .eq(elderId != null, HealthMedicationTask::getElderId, elderId)
         .eq(HealthMedicationTask::getTaskDate, today)
-        .eq(HealthMedicationTask::getStatus, "PENDING"));
+        .eq(hasStatus, HealthMedicationTask::getStatus, status)
+        .eq(!hasStatus, HealthMedicationTask::getStatus, "PENDING"));
     response.setTodayMedicationPendingCount(medicationPending);
 
     Long medicationDone = healthMedicationTaskMapper.selectCount(Wrappers.lambdaQuery(HealthMedicationTask.class)
         .eq(HealthMedicationTask::getIsDeleted, 0)
         .eq(orgId != null, HealthMedicationTask::getOrgId, orgId)
+        .eq(elderId != null, HealthMedicationTask::getElderId, elderId)
         .eq(HealthMedicationTask::getTaskDate, today)
-        .eq(HealthMedicationTask::getStatus, "DONE"));
+        .eq(hasStatus, HealthMedicationTask::getStatus, status)
+        .eq(!hasStatus, HealthMedicationTask::getStatus, "DONE"));
     response.setTodayMedicationDoneCount(medicationDone);
 
     response.setTcmPublishedCount(tcmAssessmentMapper.selectCount(Wrappers.lambdaQuery(MedicalTcmAssessment.class)
@@ -176,6 +201,7 @@ public class MedicalCareWorkbenchController {
     Long abnormalVital24h = healthDataRecordMapper.selectCount(Wrappers.lambdaQuery(HealthDataRecord.class)
         .eq(HealthDataRecord::getIsDeleted, 0)
         .eq(orgId != null, HealthDataRecord::getOrgId, orgId)
+        .eq(elderId != null, HealthDataRecord::getElderId, elderId)
         .eq(HealthDataRecord::getAbnormalFlag, 1)
         .ge(HealthDataRecord::getMeasuredAt, now.minusHours(24)));
     response.setAbnormalVital24hCount(abnormalVital24h);
@@ -193,8 +219,10 @@ public class MedicalCareWorkbenchController {
     Long medAbnormal = healthMedicationTaskMapper.selectCount(Wrappers.lambdaQuery(HealthMedicationTask.class)
         .eq(HealthMedicationTask::getIsDeleted, 0)
         .eq(orgId != null, HealthMedicationTask::getOrgId, orgId)
+        .eq(elderId != null, HealthMedicationTask::getElderId, elderId)
         .eq(HealthMedicationTask::getTaskDate, today)
-        .notIn(HealthMedicationTask::getStatus, "PENDING", "DONE"));
+        .eq(hasStatus, HealthMedicationTask::getStatus, status)
+        .notIn(!hasStatus, HealthMedicationTask::getStatus, "PENDING", "DONE"));
     response.setMedicalOrderAbnormalCount(medAbnormal);
     response.setOrderCheckRate(medShould == 0 ? 0D : (double) medicationDone * 100D / medShould);
 
@@ -208,8 +236,10 @@ public class MedicalCareWorkbenchController {
     Long careDone = careTaskDailyMapper.selectCount(Wrappers.lambdaQuery(CareTaskDaily.class)
         .eq(CareTaskDaily::getIsDeleted, 0)
         .eq(orgId != null, CareTaskDaily::getOrgId, orgId)
+        .eq(elderId != null, CareTaskDaily::getElderId, elderId)
         .eq(CareTaskDaily::getTaskDate, today)
-        .in(CareTaskDaily::getStatus, "DONE", "COMPLETED"));
+        .eq(hasStatus, CareTaskDaily::getStatus, status)
+        .in(!hasStatus, CareTaskDaily::getStatus, "DONE", "COMPLETED"));
     Long careShould = pendingCare + careDone;
     response.setCareTaskShouldCount(careShould);
     response.setCareTaskDoneCount(careDone);
@@ -217,6 +247,7 @@ public class MedicalCareWorkbenchController {
     Long scanDone = careTaskExecuteLogMapper.selectCount(Wrappers.lambdaQuery(CareTaskExecuteLog.class)
         .eq(CareTaskExecuteLog::getIsDeleted, 0)
         .eq(orgId != null, CareTaskExecuteLog::getOrgId, orgId)
+        .eq(elderId != null, CareTaskExecuteLog::getElderId, elderId)
         .eq(CareTaskExecuteLog::getResultStatus, 1)
         .isNotNull(CareTaskExecuteLog::getBedQrCode)
         .ge(CareTaskExecuteLog::getExecuteTime, startOfDay)
@@ -227,7 +258,9 @@ public class MedicalCareWorkbenchController {
     Long nursingLogPending = healthNursingLogMapper.selectCount(Wrappers.lambdaQuery(HealthNursingLog.class)
         .eq(HealthNursingLog::getIsDeleted, 0)
         .eq(orgId != null, HealthNursingLog::getOrgId, orgId)
-        .eq(HealthNursingLog::getStatus, "PENDING"));
+        .eq(elderId != null, HealthNursingLog::getElderId, elderId)
+        .eq(hasStatus, HealthNursingLog::getStatus, status)
+        .eq(!hasStatus, HealthNursingLog::getStatus, "PENDING"));
     response.setNursingLogPendingCount(nursingLogPending);
 
     // Card G
@@ -264,6 +297,7 @@ public class MedicalCareWorkbenchController {
     Long incident30d = incidentReportMapper.selectCount(Wrappers.lambdaQuery(IncidentReport.class)
         .eq(IncidentReport::getIsDeleted, 0)
         .eq(orgId != null, IncidentReport::getOrgId, orgId)
+        .eq(elderId != null, IncidentReport::getElderId, elderId)
         .ge(IncidentReport::getIncidentTime, startOf30Days));
     Long inHospital = elderMapper.selectCount(Wrappers.lambdaQuery(ElderProfile.class)
         .eq(ElderProfile::getIsDeleted, 0)
@@ -306,30 +340,46 @@ public class MedicalCareWorkbenchController {
     List<MedicalCvdRiskAssessment> topList = cvdRiskAssessmentMapper.selectList(Wrappers.lambdaQuery(MedicalCvdRiskAssessment.class)
         .eq(MedicalCvdRiskAssessment::getIsDeleted, 0)
         .eq(orgId != null, MedicalCvdRiskAssessment::getOrgId, orgId)
+        .eq(elderId != null, MedicalCvdRiskAssessment::getElderId, elderId)
         .in(MedicalCvdRiskAssessment::getRiskLevel, "VERY_HIGH", "HIGH")
         .orderByDesc(MedicalCvdRiskAssessment::getAssessmentDate)
         .last("LIMIT 20"));
 
     Map<Long, MedicalCareWorkbenchSummaryResponse.ResidentRiskItem> deduplicated = new LinkedHashMap<>();
     for (MedicalCvdRiskAssessment item : topList) {
-      Long elderId = item.getElderId();
-      if (elderId == null || deduplicated.containsKey(elderId)) {
+      Long riskElderId = item.getElderId();
+      if (riskElderId == null || deduplicated.containsKey(riskElderId)) {
         continue;
       }
       MedicalCareWorkbenchSummaryResponse.ResidentRiskItem riskItem = new MedicalCareWorkbenchSummaryResponse.ResidentRiskItem();
-      riskItem.setElderId(elderId);
+      riskItem.setElderId(riskElderId);
       riskItem.setElderName(item.getElderName());
       riskItem.setRiskLevel(item.getRiskLevel());
       riskItem.setKeyRiskFactors(item.getKeyRiskFactors());
       riskItem.setAssessmentDate(item.getAssessmentDate() == null ? null : item.getAssessmentDate().toString());
-      deduplicated.put(elderId, riskItem);
+      deduplicated.put(riskElderId, riskItem);
       if (deduplicated.size() >= 5) {
         break;
       }
     }
     response.setKeyResidents(deduplicated.values().stream().toList());
-    response.setTopRiskResidentCount((long) response.getKeyResidents().size());
+      response.setTopRiskResidentCount((long) response.getKeyResidents().size());
+    } catch (Exception exception) {
+      log.error("Medical care summary fallback with default values. orgId={}, elderId={}, date={}, status={}",
+          orgId, elderId, date, status, exception);
+    }
 
     return Result.ok(response);
+  }
+
+  private LocalDate parseDateOrDefault(String date) {
+    if (date == null || date.isBlank()) {
+      return LocalDate.now();
+    }
+    try {
+      return LocalDate.parse(date, DateTimeFormatter.ISO_DATE);
+    } catch (DateTimeParseException ignore) {
+      return LocalDate.now();
+    }
   }
 }

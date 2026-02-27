@@ -1,5 +1,5 @@
 <template>
-  <a-card class="card-elevated" :bordered="false">
+  <a-card class="card-elevated table-card" :bordered="false">
     <div v-if="$slots.search" class="search-slot">
       <slot name="search" />
     </div>
@@ -9,6 +9,7 @@
       :row-key="rowKey"
       :loading="loading"
       :pagination="pagination"
+      :scroll="{ x: 'max-content' }"
       @change="onChange"
     >
       <template #bodyCell="slotProps">
@@ -26,6 +27,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import type { TablePaginationConfig } from 'ant-design-vue'
+import { message } from 'ant-design-vue'
 
 const props = defineProps<{
   columns: any[]
@@ -66,6 +68,8 @@ async function load(extra?: Record<string, any>) {
       dataSource.value = []
       pagination.total = 0
     }
+  } catch (error: any) {
+    message.error(error?.message || '表格加载失败')
   } finally {
     loading.value = false
   }

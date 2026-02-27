@@ -12,6 +12,7 @@ import com.zhiyangyun.care.schedule.service.AttendanceService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -50,8 +51,10 @@ public class AttendanceServiceImpl implements AttendanceService {
 
     IPage<AttendanceRecord> page = attendanceMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
     List<Long> staffIds = page.getRecords().stream().map(AttendanceRecord::getStaffId).distinct().toList();
-    Map<Long, StaffAccount> staffMap = staffMapper.selectBatchIds(staffIds).stream()
-        .collect(Collectors.toMap(StaffAccount::getId, s -> s, (a, b) -> a));
+    Map<Long, StaffAccount> staffMap = staffIds.isEmpty()
+        ? Collections.emptyMap()
+        : staffMapper.selectBatchIds(staffIds).stream()
+            .collect(Collectors.toMap(StaffAccount::getId, s -> s, (a, b) -> a));
 
     IPage<AttendanceResponse> resp = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
     resp.setRecords(page.getRecords().stream().map(item -> {

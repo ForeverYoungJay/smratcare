@@ -13,6 +13,7 @@ import com.zhiyangyun.care.schedule.service.ScheduleService;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Collections;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
@@ -48,8 +49,10 @@ public class ScheduleServiceImpl implements ScheduleService {
 
     IPage<StaffSchedule> page = scheduleMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
     List<Long> staffIds = page.getRecords().stream().map(StaffSchedule::getStaffId).distinct().toList();
-    Map<Long, StaffAccount> staffMap = staffMapper.selectBatchIds(staffIds).stream()
-        .collect(Collectors.toMap(StaffAccount::getId, s -> s, (a, b) -> a));
+    Map<Long, StaffAccount> staffMap = staffIds.isEmpty()
+        ? Collections.emptyMap()
+        : staffMapper.selectBatchIds(staffIds).stream()
+            .collect(Collectors.toMap(StaffAccount::getId, s -> s, (a, b) -> a));
 
     IPage<ScheduleResponse> resp = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
     resp.setRecords(page.getRecords().stream().map(item -> {

@@ -15,11 +15,29 @@
       </a-form-item>
       <template #extra>
         <a-space>
+          <a-button v-if="props.recordType === 'MAINTENANCE_REPORT'" @click="downloadMaintenanceLog">一键下载维护保养日志</a-button>
           <a-button @click="openScan">扫码完成</a-button>
           <a-button type="primary" @click="openCreate">新增记录</a-button>
         </a-space>
       </template>
     </SearchForm>
+
+    <a-row :gutter="[12, 12]">
+      <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="记录总数" :value="summary.totalCount || 0" /></a-card></a-col>
+      <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="处理中" :value="summary.openCount || 0" /></a-card></a-col>
+      <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已关闭" :value="summary.closedCount || 0" /></a-card></a-col>
+      <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="逾期项" :value="summary.overdueCount || 0" /></a-card></a-col>
+      <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="7天内待检" :value="summary.nextCheckDueSoonCount || 0" /></a-card></a-col>
+      <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="30天内到期" :value="summary.expiringSoonCount || 0" /></a-card></a-col>
+    </a-row>
+
+    <a-alert
+      v-if="(summary.overdueCount || 0) > 0 || (summary.expiringSoonCount || 0) > 0"
+      type="warning"
+      show-icon
+      style="margin-top: 12px"
+      :message="`异常提醒：逾期 ${summary.overdueCount || 0} 项，30天内到期 ${summary.expiringSoonCount || 0} 项，请优先处理。`"
+    />
 
     <DataTable
       rowKey="id"
@@ -106,14 +124,35 @@
             </a-form-item>
           </a-col>
           <a-col :span="12">
+            <a-form-item label="产品生产时间">
+              <a-date-picker v-model:value="form.productProductionDate" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="产品过期时间">
+              <a-date-picker v-model:value="form.productExpiryDate" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="检查周期(天)">
+              <a-input-number v-model:value="form.checkCycleDays" :min="1" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="16">
+          <a-col :span="12">
             <a-form-item label="设备更新记录">
               <a-input v-model:value="form.equipmentUpdateNote" placeholder="设备更新内容" />
             </a-form-item>
           </a-col>
+          <a-col :span="12">
+            <a-form-item label="设备老化处置记录">
+              <a-textarea v-model:value="form.equipmentAgingDisposal" :rows="2" />
+            </a-form-item>
+          </a-col>
         </a-row>
-        <a-form-item label="设备老化处置记录">
-          <a-textarea v-model:value="form.equipmentAgingDisposal" :rows="2" />
-        </a-form-item>
         <a-form-item label="问题描述">
           <a-textarea v-model:value="form.issueDescription" :rows="3" />
         </a-form-item>
@@ -180,11 +219,13 @@ import {
   completeFireSafetyByScan,
   createFireSafetyRecord,
   deleteFireSafetyRecord,
+  exportFireSafetyMaintenanceLog,
   generateFireSafetyQr,
   getFireSafetyRecordPage,
+  getFireSafetySummary,
   updateFireSafetyRecord
 } from '../../../api/fire'
-import type { FireSafetyRecord, FireSafetyRecordType, FireSafetyStatus, PageResult } from '../../../types'
+import type { FireSafetyRecord, FireSafetyRecordType, FireSafetyReportSummary, FireSafetyStatus, PageResult } from '../../../types'
 
 const props = defineProps<{
   title: string
@@ -203,6 +244,21 @@ const query = reactive({
   pageSize: 10
 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
+const summary = reactive<FireSafetyReportSummary>({
+  totalCount: 0,
+  openCount: 0,
+  closedCount: 0,
+  overdueCount: 0,
+  dailyCompletedCount: 0,
+  monthlyCompletedCount: 0,
+  dutyRecordCount: 0,
+  handoverPunchCount: 0,
+  equipmentUpdateCount: 0,
+  equipmentAgingDisposalCount: 0,
+  expiringSoonCount: 0,
+  nextCheckDueSoonCount: 0,
+  typeStats: []
+})
 
 const columns = [
   { title: '标题', dataIndex: 'title', key: 'title', width: 180 },
@@ -210,6 +266,9 @@ const columns = [
   { title: '负责人', dataIndex: 'inspectorName', key: 'inspectorName', width: 100 },
   { title: '检查时间', dataIndex: 'checkTime', key: 'checkTime', width: 170 },
   { title: '设备批号', dataIndex: 'equipmentBatchNo', key: 'equipmentBatchNo', width: 140 },
+  { title: '生产时间', dataIndex: 'productProductionDate', key: 'productProductionDate', width: 120 },
+  { title: '过期时间', dataIndex: 'productExpiryDate', key: 'productExpiryDate', width: 120 },
+  { title: '检查周期(天)', dataIndex: 'checkCycleDays', key: 'checkCycleDays', width: 110 },
   { title: '二维码令牌', dataIndex: 'qrToken', key: 'qrToken', width: 140 },
   { title: '扫码完成时间', dataIndex: 'scanCompletedAt', key: 'scanCompletedAt', width: 160 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 90 },
@@ -231,6 +290,9 @@ const form = reactive({
   dutyRecord: '',
   handoverPunchTime: undefined as Dayjs | undefined,
   equipmentBatchNo: '',
+  productProductionDate: undefined as Dayjs | undefined,
+  productExpiryDate: undefined as Dayjs | undefined,
+  checkCycleDays: undefined as number | undefined,
   equipmentUpdateNote: '',
   equipmentAgingDisposal: ''
 })
@@ -259,18 +321,26 @@ async function fetchData() {
   loading.value = true
   try {
     const [checkTimeStart, checkTimeEnd] = query.checkTimeRange || []
-    const res: PageResult<FireSafetyRecord> = await getFireSafetyRecordPage({
-      pageNo: query.pageNo,
-      pageSize: query.pageSize,
-      keyword: query.keyword,
-      recordType: props.recordType,
-      inspectorName: query.inspectorName,
-      status: query.status,
-      checkTimeStart,
-      checkTimeEnd
-    })
+    const [res, sum] = await Promise.all([
+      getFireSafetyRecordPage({
+        pageNo: query.pageNo,
+        pageSize: query.pageSize,
+        keyword: query.keyword,
+        recordType: props.recordType,
+        inspectorName: query.inspectorName,
+        status: query.status,
+        checkTimeStart,
+        checkTimeEnd
+      }),
+      getFireSafetySummary({
+        recordType: props.recordType,
+        dateFrom: checkTimeStart ? dayjs(checkTimeStart).format('YYYY-MM-DD') : undefined,
+        dateTo: checkTimeEnd ? dayjs(checkTimeEnd).format('YYYY-MM-DD') : undefined
+      })
+    ])
     rows.value = res.list
     pagination.total = res.total || res.list.length
+    Object.assign(summary, sum || {})
   } finally {
     loading.value = false
   }
@@ -309,6 +379,9 @@ function openCreate() {
   form.dutyRecord = ''
   form.handoverPunchTime = undefined
   form.equipmentBatchNo = ''
+  form.productProductionDate = undefined
+  form.productExpiryDate = undefined
+  form.checkCycleDays = undefined
   form.equipmentUpdateNote = ''
   form.equipmentAgingDisposal = ''
   editOpen.value = true
@@ -327,6 +400,9 @@ function openEdit(record: FireSafetyRecord) {
   form.dutyRecord = record.dutyRecord || ''
   form.handoverPunchTime = record.handoverPunchTime ? dayjs(record.handoverPunchTime) : undefined
   form.equipmentBatchNo = record.equipmentBatchNo || ''
+  form.productProductionDate = record.productProductionDate ? dayjs(record.productProductionDate) : undefined
+  form.productExpiryDate = record.productExpiryDate ? dayjs(record.productExpiryDate) : undefined
+  form.checkCycleDays = record.checkCycleDays
   form.equipmentUpdateNote = record.equipmentUpdateNote || ''
   form.equipmentAgingDisposal = record.equipmentAgingDisposal || ''
   editOpen.value = true
@@ -346,6 +422,9 @@ async function submit() {
     dutyRecord: form.dutyRecord || undefined,
     handoverPunchTime: form.handoverPunchTime ? dayjs(form.handoverPunchTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
     equipmentBatchNo: form.equipmentBatchNo || undefined,
+    productProductionDate: form.productProductionDate ? dayjs(form.productProductionDate).format('YYYY-MM-DD') : undefined,
+    productExpiryDate: form.productExpiryDate ? dayjs(form.productExpiryDate).format('YYYY-MM-DD') : undefined,
+    checkCycleDays: form.checkCycleDays,
     equipmentUpdateNote: form.equipmentUpdateNote || undefined,
     equipmentAgingDisposal: form.equipmentAgingDisposal || undefined
   }
@@ -466,6 +545,17 @@ async function closeRecord(record: FireSafetyRecord) {
 async function remove(record: FireSafetyRecord) {
   await deleteFireSafetyRecord(record.id)
   fetchData()
+}
+
+async function downloadMaintenanceLog() {
+  const [checkTimeStart, checkTimeEnd] = query.checkTimeRange || []
+  await exportFireSafetyMaintenanceLog({
+    keyword: query.keyword,
+    inspectorName: query.inspectorName,
+    status: query.status,
+    checkTimeStart,
+    checkTimeEnd
+  })
 }
 
 onMounted(() => {

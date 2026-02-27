@@ -36,7 +36,7 @@
 import { onMounted, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportCsv } from '../../utils/export'
-import { getInventoryAlerts, getInventoryExpiryAlerts } from '../../api/inventory'
+import { getInventoryAlerts, getInventoryExpiryAlerts } from '../../api/materialCenter'
 import type { InventoryAlertItem, InventoryExpiryAlertItem } from '../../types'
 
 const activeKey = ref('low')

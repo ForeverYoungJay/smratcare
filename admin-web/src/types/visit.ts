@@ -1,6 +1,10 @@
 export interface VisitBookingItem {
   id: number
   elderId: number
+  elderName?: string
+  familyName?: string
+  floorNo?: string
+  roomNo?: string
   visitTime: string
   visitorCount: number
   carPlate?: string

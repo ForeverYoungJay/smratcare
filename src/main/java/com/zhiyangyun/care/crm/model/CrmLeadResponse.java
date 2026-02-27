@@ -28,6 +28,7 @@ public class CrmLeadResponse {
   private LocalDateTime invalidTime;
   private String idCardNo;
   private String reservationRoomNo;
+  private Long reservationBedId;
   private String reservationChannel;
   private String reservationStatus;
   private Integer refunded;
@@ -41,9 +42,12 @@ public class CrmLeadResponse {
   private LocalDateTime contractSignedAt;
   private String contractNo;
   private String contractStatus;
+  private String flowStage;
+  private String currentOwnerDept;
   private String contractExpiryDate;
   private Integer smsSendCount;
   private String nextFollowDate;
   private String remark;
   private LocalDateTime createTime;
+  private LocalDateTime updateTime;
 }

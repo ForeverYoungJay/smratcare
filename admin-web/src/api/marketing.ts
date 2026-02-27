@@ -1,6 +1,6 @@
 import { getCrmLeadPage, createCrmLead, updateCrmLead, deleteCrmLead } from './crm'
 import { getAdmissionRecords } from './elderLifecycle'
-import request from '../utils/request'
+import request, { fetchPage } from '../utils/request'
 import type {
   AdmissionRecordItem,
   CallbackExecuteRequest,
@@ -12,16 +12,22 @@ import type {
   LeadBatchDeleteRequest,
   LeadBatchStatusRequest,
   MarketingCallbackReport,
+  MarketingPlanItem,
+  MarketingPlanPayload,
+  MarketingPlanQuery,
   MarketingChannelReportItem,
   MarketingConsultationTrendItem,
   MarketingConversionReport,
   MarketingDataQualityReport,
   MarketingFollowupReport,
+  MarketingLeadEntrySummary,
+  MarketingLeadMode,
   MarketingReportQuery,
   PageResult,
   SmsTaskCreateRequest,
   SmsTaskItem,
-  UploadedFileResult
+  UploadedFileResult,
+  ContractLinkageSummary
 } from '../types'
 
 export { createCrmLead, updateCrmLead, deleteCrmLead }
@@ -135,6 +141,52 @@ export function getMarketingDataQualityReport() {
   return request.get<MarketingDataQualityReport>('/api/marketing/report/data-quality')
 }
 
+export function getMarketingLeadEntrySummary(params: {
+  mode: MarketingLeadMode
+  keyword?: string
+  consultantName?: string
+  consultantPhone?: string
+  elderName?: string
+  elderPhone?: string
+  consultDateFrom?: string
+  consultDateTo?: string
+  consultType?: string
+  mediaChannel?: string
+  infoSource?: string
+  customerTag?: string
+  marketerName?: string
+}) {
+  return request.get<MarketingLeadEntrySummary>('/api/marketing/report/lead-entry-summary', { params })
+}
+
 export function normalizeMarketingSources() {
   return request.post<number>('/api/marketing/report/data-quality/normalize-source')
+}
+
+export function getContractLinkageByElder(elderId: number) {
+  return request.get<ContractLinkageSummary>('/api/crm/contracts/linkage', { params: { elderId } })
+}
+
+export function getContractLinkageByLead(leadId: number) {
+  return request.get<ContractLinkageSummary>(`/api/crm/contracts/${leadId}/linkage`)
+}
+
+export function getMarketingPlanPage(params: MarketingPlanQuery) {
+  return fetchPage<MarketingPlanItem>('/api/marketing/plans/page', params as Record<string, any>)
+}
+
+export function getMarketingPlanList(moduleType?: 'SPEECH' | 'POLICY') {
+  return request.get<MarketingPlanItem[]>('/api/marketing/plans', { params: { moduleType } })
+}
+
+export function createMarketingPlan(data: MarketingPlanPayload) {
+  return request.post<MarketingPlanItem>('/api/marketing/plans', data)
+}
+
+export function updateMarketingPlan(id: number, data: MarketingPlanPayload) {
+  return request.put<MarketingPlanItem>(`/api/marketing/plans/${id}`, data)
+}
+
+export function deleteMarketingPlan(id: number) {
+  return request.delete<void>(`/api/marketing/plans/${id}`)
 }

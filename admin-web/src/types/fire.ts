@@ -26,6 +26,9 @@ export interface FireSafetyRecord {
   dutyRecord?: string
   handoverPunchTime?: string
   equipmentBatchNo?: string
+  productProductionDate?: string
+  productExpiryDate?: string
+  checkCycleDays?: number
   equipmentUpdateNote?: string
   equipmentAgingDisposal?: string
 }
@@ -57,6 +60,8 @@ export interface FireSafetyReportSummary {
   handoverPunchCount: number
   equipmentUpdateCount: number
   equipmentAgingDisposalCount: number
+  expiringSoonCount: number
+  nextCheckDueSoonCount: number
   typeStats: FireSafetyTypeCount[]
 }
 
@@ -79,6 +84,9 @@ export interface FireSafetyReportRecordItem {
   dutyRecord?: string
   handoverPunchTime?: string
   equipmentBatchNo?: string
+  productProductionDate?: string
+  productExpiryDate?: string
+  checkCycleDays?: number
   equipmentUpdateNote?: string
   equipmentAgingDisposal?: string
   issueDescription?: string

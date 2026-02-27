@@ -16,6 +16,9 @@ public class ElderResponse {
   private LocalDate birthDate;
   private String phone;
   private String homeAddress;
+  private String medicalInsuranceCopyUrl;
+  private String householdCopyUrl;
+  private String medicalRecordFileUrl;
   private LocalDate admissionDate;
   private Integer status;
   private Long bedId;

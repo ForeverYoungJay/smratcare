@@ -118,7 +118,7 @@ import {
   getTransferPage,
   getWarehousePage,
   updateTransfer
-} from '../../api/material'
+} from '../../api/materialCenter'
 import type { MaterialTransferOrder, MaterialWarehouseItem, PageResult, ProductItem } from '../../types'
 
 const loading = ref(false)

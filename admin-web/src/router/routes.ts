@@ -125,13 +125,13 @@ export const routes: RouteRecordRaw[] = [
             path: 'outing',
             name: 'ElderOuting',
             component: () => import('../views/elder/Outing.vue'),
-            meta: { title: '外出登记', hidden: true }
+            meta: { title: '外出登记' }
           },
           {
             path: 'visit-register',
             name: 'ElderVisitRegister',
             component: () => import('../views/elder/VisitRegister.vue'),
-            meta: { title: '来访登记', hidden: true }
+            meta: { title: '来访登记' }
           },
           {
             path: 'incident',
@@ -143,7 +143,7 @@ export const routes: RouteRecordRaw[] = [
             path: 'discharge-apply',
             name: 'ElderDischargeApply',
             component: () => import('../views/elder/DischargeApply.vue'),
-            meta: { title: '退住申请', hidden: true }
+            meta: { title: '退住申请' }
           },
           {
             path: 'discharge',
@@ -155,7 +155,19 @@ export const routes: RouteRecordRaw[] = [
             path: 'trial-stay',
             name: 'ElderTrialStay',
             component: () => import('../views/elder/TrialStay.vue'),
-            meta: { title: '试住登记', hidden: true }
+            meta: { title: '试住登记' }
+          },
+          {
+            path: 'medical-outing',
+            name: 'ElderMedicalOutingRegister',
+            component: () => import('../views/elder/MedicalOuting.vue'),
+            meta: { title: '外出就医登记', roles: ['ADMIN', 'STAFF'] }
+          },
+          {
+            path: 'death-register',
+            name: 'ElderDeathRegister',
+            component: () => import('../views/elder/DeathRegister.vue'),
+            meta: { title: '死亡登记', roles: ['ADMIN', 'STAFF'] }
           },
           {
             path: 'change-log',
@@ -228,6 +240,12 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: '合同管理' }
           },
           {
+            path: 'plan',
+            name: 'MarketingPlan',
+            component: () => import('../views/marketing/MarketingPlan.vue'),
+            meta: { title: '营销方案' }
+          },
+          {
             path: 'reports',
             name: 'MarketingReports',
             meta: { title: '销售报表' },
@@ -265,12 +283,6 @@ export const routes: RouteRecordRaw[] = [
               }
             ]
           },
-          {
-            path: 'elder-profile',
-            name: 'MarketingElderProfile',
-            component: () => import('../views/marketing/ElderProfile.vue'),
-            meta: { title: '长者档案' }
-          }
         ]
       },
       {
@@ -296,7 +308,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'care',
         name: 'Care',
-        meta: { title: '照护管理', icon: 'ScheduleOutlined' },
+        meta: { title: '照护管理', icon: 'ScheduleOutlined', hidden: true },
         redirect: '/care/staff/caregiver-info',
         children: [
           {
@@ -385,7 +397,7 @@ export const routes: RouteRecordRaw[] = [
               {
                 path: 'handovers',
                 name: 'ShiftHandovers',
-                component: () => import('../views/care/Handovers.vue'),
+                redirect: (to: any) => ({ path: '/medical-care/handovers', query: to.query }),
                 meta: { title: '交接班' }
               }
             ]
@@ -447,7 +459,7 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'workbench/task-board',
             name: 'CareWorkbenchTaskBoard',
-            component: () => import('../views/care/workbench/TaskBoard.vue'),
+            redirect: (to: any) => ({ path: '/medical-care/care-task-board', query: to.query }),
             meta: { title: '照护任务看板', hidden: true }
           },
           {
@@ -473,14 +485,13 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'material',
         name: 'Material',
-        meta: { title: '物资管理', icon: 'DatabaseOutlined' },
+        meta: { title: '物资中心', icon: 'DatabaseOutlined' },
         children: [
           {
             path: 'info',
             name: 'MaterialInfo',
-            component: () => import('../views/store/Product.vue'),
-            props: { title: '物资信息', subTitle: '维护物资主数据、库存策略与上下架状态' },
-            meta: { title: '物资信息' }
+            redirect: '/store/product',
+            meta: { title: '商品档案(商城)' }
           },
           {
             path: 'warehouse',
@@ -513,6 +524,12 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: '库存查询' }
           },
           {
+            path: 'alerts',
+            name: 'MaterialAlerts',
+            component: () => import('../views/inventory/Alerts.vue'),
+            meta: { title: '库存预警' }
+          },
+          {
             path: 'transfer',
             name: 'MaterialTransfer',
             component: () => import('../views/material/Transfer.vue'),
@@ -541,7 +558,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'store',
         name: 'Store',
-        meta: { title: '商城与库存', icon: 'ShopOutlined' },
+        meta: { title: '商城', icon: 'ShopOutlined' },
         children: [
           {
             path: 'category',
@@ -584,41 +601,36 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'inventory',
         name: 'Inventory',
-        meta: { title: '库存管理', icon: 'AlertOutlined' },
+        meta: { title: '库存管理', icon: 'AlertOutlined', hidden: true },
         children: [
           {
             path: '',
-            redirect: '/inventory/overview',
+            redirect: '/material/stock-query',
             meta: { hidden: true }
           },
           {
             path: 'overview',
-            name: 'InventoryOverview',
-            component: () => import('../views/inventory/Overview.vue'),
+            redirect: '/material/stock-query',
             meta: { title: '库存总览' }
           },
           {
             path: 'inbound',
-            name: 'InventoryInbound',
-            component: () => import('../views/inventory/Inbound.vue'),
+            redirect: '/material/inbound',
             meta: { title: '入库管理' }
           },
           {
             path: 'outbound',
-            name: 'InventoryOutbound',
-            component: () => import('../views/inventory/Outbound.vue'),
+            redirect: '/material/outbound',
             meta: { title: '出库记录' }
           },
           {
             path: 'alerts',
-            name: 'InventoryAlerts',
-            component: () => import('../views/inventory/Alerts.vue'),
+            redirect: '/material/alerts',
             meta: { title: '预警中心' }
           },
           {
             path: 'adjustments',
-            name: 'InventoryAdjustments',
-            component: () => import('../views/inventory/Adjustments.vue'),
+            redirect: '/material/stock-check',
             meta: { title: '盘点记录' }
           }
         ]
@@ -734,7 +746,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'health',
         name: 'Health',
-        meta: { title: '健康服务', icon: 'HeartOutlined' },
+        meta: { title: '健康服务', icon: 'HeartOutlined', hidden: true },
         redirect: '/health/medication/drug-dictionary',
         children: [
           {
@@ -764,7 +776,7 @@ export const routes: RouteRecordRaw[] = [
               {
                 path: 'medication-registration',
                 name: 'HealthMedicationRegistration',
-                component: () => import('../views/health/MedicationRegistration.vue'),
+                redirect: (to: any) => ({ path: '/medical-care/medication-registration', query: to.query }),
                 meta: { title: '用药登记' }
               },
               {
@@ -798,13 +810,13 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'inspection',
             name: 'HealthInspection',
-            component: () => import('../views/health/Inspection.vue'),
+            redirect: (to: any) => ({ path: '/medical-care/inspection', query: to.query }),
             meta: { title: '健康巡检' }
           },
           {
             path: 'nursing-log',
             name: 'HealthNursingLog',
-            component: () => import('../views/health/NursingLog.vue'),
+            redirect: (to: any) => ({ path: '/medical-care/nursing-log', query: to.query }),
             meta: { title: '护理日志' }
           },
           {
@@ -847,14 +859,50 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'medical-care',
         name: 'MedicalCare',
-        meta: { title: '医护照护一体化', icon: 'MedicineBoxOutlined' },
-        redirect: '/medical-care/workbench',
+        meta: { title: '医护健康服务', icon: 'MedicineBoxOutlined' },
+        redirect: '/medical-care/center',
         children: [
+          {
+            path: 'center',
+            name: 'MedicalCareCenter',
+            component: () => import('../views/medical/MedicalHealthCenter.vue'),
+            meta: { title: '服务中心' }
+          },
           {
             path: 'workbench',
             name: 'MedicalCareWorkbench',
             component: () => import('../views/medical/Workbench.vue'),
-            meta: { title: '医护照护工作台' }
+            meta: { title: '医护照护工作台', hidden: true }
+          },
+          {
+            path: 'care-task-board',
+            name: 'MedicalCareTaskBoard',
+            component: () => import('../views/care/workbench/TaskBoard.vue'),
+            meta: { title: '护理任务看板' }
+          },
+          {
+            path: 'inspection',
+            name: 'MedicalCareInspection',
+            component: () => import('../views/health/Inspection.vue'),
+            meta: { title: '健康巡检' }
+          },
+          {
+            path: 'medication-registration',
+            name: 'MedicalCareMedicationRegistration',
+            component: () => import('../views/health/MedicationRegistration.vue'),
+            meta: { title: '用药登记' }
+          },
+          {
+            path: 'nursing-log',
+            name: 'MedicalCareNursingLog',
+            component: () => import('../views/health/NursingLog.vue'),
+            meta: { title: '护理日志' }
+          },
+          {
+            path: 'handovers',
+            name: 'MedicalCareHandovers',
+            component: () => import('../views/care/Handovers.vue'),
+            meta: { title: '交接班' }
           },
           {
             path: 'assessment/tcm',

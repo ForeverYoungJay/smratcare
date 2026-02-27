@@ -56,6 +56,9 @@ public class ElderServiceImpl implements ElderService {
     elder.setBirthDate(request.getBirthDate());
     elder.setPhone(request.getPhone());
     elder.setHomeAddress(request.getHomeAddress());
+    elder.setMedicalInsuranceCopyUrl(request.getMedicalInsuranceCopyUrl());
+    elder.setHouseholdCopyUrl(request.getHouseholdCopyUrl());
+    elder.setMedicalRecordFileUrl(request.getMedicalRecordFileUrl());
     elder.setAdmissionDate(request.getAdmissionDate());
     elder.setStatus(request.getStatus());
     elder.setCareLevel(request.getCareLevel());
@@ -104,6 +107,15 @@ public class ElderServiceImpl implements ElderService {
     }
     if (request.getHomeAddress() != null) {
       elder.setHomeAddress(request.getHomeAddress());
+    }
+    if (request.getMedicalInsuranceCopyUrl() != null) {
+      elder.setMedicalInsuranceCopyUrl(request.getMedicalInsuranceCopyUrl());
+    }
+    if (request.getHouseholdCopyUrl() != null) {
+      elder.setHouseholdCopyUrl(request.getHouseholdCopyUrl());
+    }
+    if (request.getMedicalRecordFileUrl() != null) {
+      elder.setMedicalRecordFileUrl(request.getMedicalRecordFileUrl());
     }
     if (request.getAdmissionDate() != null) {
       elder.setAdmissionDate(request.getAdmissionDate());
@@ -332,6 +344,9 @@ public class ElderServiceImpl implements ElderService {
     response.setBirthDate(elder.getBirthDate());
     response.setPhone(elder.getPhone());
     response.setHomeAddress(elder.getHomeAddress());
+    response.setMedicalInsuranceCopyUrl(elder.getMedicalInsuranceCopyUrl());
+    response.setHouseholdCopyUrl(elder.getHouseholdCopyUrl());
+    response.setMedicalRecordFileUrl(elder.getMedicalRecordFileUrl());
     response.setAdmissionDate(elder.getAdmissionDate());
     response.setStatus(elder.getStatus());
     response.setBedId(elder.getBedId());

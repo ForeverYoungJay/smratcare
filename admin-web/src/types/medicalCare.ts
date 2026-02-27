@@ -124,3 +124,27 @@ export interface MedicalResidentRiskCard {
   tcmAssessmentRoute?: string
   cvdAssessmentRoute?: string
 }
+
+export interface MedicalResidentOverviewAction {
+  label: string
+  path: string
+  primary?: boolean
+}
+
+export interface MedicalResidentOverviewCard {
+  key: string
+  title: string
+  tag: string
+  tagColor: string
+  description?: string
+  lines: string[]
+  actions: MedicalResidentOverviewAction[]
+}
+
+export interface MedicalResidentOverview {
+  elderId?: number
+  elderName?: string
+  currentStatus?: string
+  hasUnclosedIncident?: boolean
+  cards: MedicalResidentOverviewCard[]
+}

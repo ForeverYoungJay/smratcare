@@ -130,6 +130,10 @@ export interface OaPortalSummary {
   marketingChannels?: OaMarketingChannelItem[]
   collaborationGantt?: OaCollaborationGanttItem[]
   latestSuggestions?: OaSuggestion[]
+  mySalaryAmount?: number
+  salaryPayDate?: string
+  myPerformanceScore?: number
+  myPerformanceLevel?: string
 }
 
 export interface OaWorkReport {

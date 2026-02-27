@@ -70,6 +70,26 @@ export interface MarketingDataQualityReport {
   nonStandardSourceCount: number
 }
 
+export type MarketingLeadMode = 'consultation' | 'intent' | 'reservation' | 'invalid' | 'callback'
+
+export interface MarketingLeadEntrySummary {
+  totalCount: number
+  modeCount: number
+  consultCount: number
+  intentCount: number
+  reservationCount: number
+  invalidCount: number
+  signedContractCount: number
+  unsignedReservationCount: number
+  refundedReservationCount: number
+  callbackDueTodayCount: number
+  callbackOverdueCount: number
+  callbackPendingCount: number
+  missingSourceCount: number
+  missingNextFollowDateCount: number
+  nonStandardSourceCount: number
+}
+
 export interface LeadBatchStatusRequest {
   ids: number[]
   status: number
@@ -151,4 +171,65 @@ export interface UploadedFileResult {
   fileUrl: string
   fileType?: string
   fileSize?: number
+}
+
+export interface ContractLinkageSummary {
+  leadId?: number
+  elderId?: number
+  elderName?: string
+  elderPhone?: string
+  orgName?: string
+  marketerName?: string
+  contractNo?: string
+  contractStatus?: string
+  contractSignedAt?: string
+  contractExpiryDate?: string
+  admissionDate?: string
+  depositAmount?: number
+  billCount?: number
+  billTotalAmount?: number
+  billPaidAmount?: number
+  billOutstandingAmount?: number
+  attachmentCount?: number
+  attachments?: ContractAttachmentItem[]
+}
+
+export type MarketingPlanModuleType = 'SPEECH' | 'POLICY'
+export type MarketingPlanStatus = 'ACTIVE' | 'INACTIVE'
+
+export interface MarketingPlanItem {
+  id: number
+  moduleType: MarketingPlanModuleType
+  title: string
+  summary?: string
+  content?: string
+  quarterLabel?: string
+  target?: string
+  owner?: string
+  priority: number
+  status: MarketingPlanStatus
+  effectiveDate?: string
+  createTime?: string
+  updateTime?: string
+}
+
+export interface MarketingPlanQuery {
+  pageNo?: number
+  pageSize?: number
+  moduleType?: MarketingPlanModuleType
+  status?: MarketingPlanStatus
+  keyword?: string
+}
+
+export interface MarketingPlanPayload {
+  moduleType: MarketingPlanModuleType
+  title: string
+  summary?: string
+  content?: string
+  quarterLabel?: string
+  target?: string
+  owner?: string
+  priority?: number
+  status?: MarketingPlanStatus
+  effectiveDate?: string
 }

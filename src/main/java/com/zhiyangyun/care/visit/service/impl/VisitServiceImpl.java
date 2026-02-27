@@ -2,7 +2,13 @@ package com.zhiyangyun.care.visit.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
+import com.zhiyangyun.care.elder.entity.FamilyUser;
+import com.zhiyangyun.care.elder.entity.Room;
+import com.zhiyangyun.care.elder.entity.Bed;
+import com.zhiyangyun.care.elder.mapper.BedMapper;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
+import com.zhiyangyun.care.elder.mapper.FamilyUserMapper;
+import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import com.zhiyangyun.care.visit.entity.VisitBooking;
 import com.zhiyangyun.care.visit.entity.VisitCheckLog;
 import com.zhiyangyun.care.visit.mapper.VisitBookingMapper;
@@ -25,13 +31,22 @@ public class VisitServiceImpl implements VisitService {
   private final VisitBookingMapper bookingMapper;
   private final VisitCheckLogMapper checkLogMapper;
   private final ElderMapper elderMapper;
+  private final FamilyUserMapper familyUserMapper;
+  private final BedMapper bedMapper;
+  private final RoomMapper roomMapper;
 
   public VisitServiceImpl(VisitBookingMapper bookingMapper,
       VisitCheckLogMapper checkLogMapper,
-      ElderMapper elderMapper) {
+      ElderMapper elderMapper,
+      FamilyUserMapper familyUserMapper,
+      BedMapper bedMapper,
+      RoomMapper roomMapper) {
     this.bookingMapper = bookingMapper;
     this.checkLogMapper = checkLogMapper;
     this.elderMapper = elderMapper;
+    this.familyUserMapper = familyUserMapper;
+    this.bedMapper = bedMapper;
+    this.roomMapper = roomMapper;
   }
 
   @Override
@@ -56,7 +71,8 @@ public class VisitServiceImpl implements VisitService {
     booking.setRemark(request.getRemark());
     bookingMapper.insert(booking);
 
-    return toResponse(booking, elder.getFullName());
+    FamilyUser familyUser = familyUserMapper.selectById(booking.getFamilyUserId());
+    return toResponse(booking, elder, familyUser);
   }
 
   @Override
@@ -72,7 +88,8 @@ public class VisitServiceImpl implements VisitService {
     List<VisitBookingResponse> responses = new ArrayList<>();
     for (VisitBooking booking : bookings) {
       ElderProfile elder = elderMapper.selectById(booking.getElderId());
-      responses.add(toResponse(booking, elder == null ? null : elder.getFullName()));
+      FamilyUser familyUser = familyUserMapper.selectById(booking.getFamilyUserId());
+      responses.add(toResponse(booking, elder, familyUser));
     }
     return responses;
   }
@@ -88,7 +105,8 @@ public class VisitServiceImpl implements VisitService {
     List<VisitBookingResponse> responses = new ArrayList<>();
     for (VisitBooking booking : bookings) {
       ElderProfile elder = elderMapper.selectById(booking.getElderId());
-      responses.add(toResponse(booking, elder == null ? null : elder.getFullName()));
+      FamilyUser familyUser = familyUserMapper.selectById(booking.getFamilyUserId());
+      responses.add(toResponse(booking, elder, familyUser));
     }
     return responses;
   }
@@ -147,13 +165,24 @@ public class VisitServiceImpl implements VisitService {
     return UUID.randomUUID().toString().replace("-", "").toUpperCase();
   }
 
-  private VisitBookingResponse toResponse(VisitBooking booking, String elderName) {
+  private VisitBookingResponse toResponse(VisitBooking booking, ElderProfile elder, FamilyUser familyUser) {
     VisitBookingResponse response = new VisitBookingResponse();
     response.setId(booking.getId());
     response.setOrgId(booking.getOrgId());
     response.setElderId(booking.getElderId());
-    response.setElderName(elderName);
+    response.setElderName(elder == null ? null : elder.getFullName());
     response.setFamilyUserId(booking.getFamilyUserId());
+    response.setFamilyName(familyUser == null ? null : familyUser.getRealName());
+    if (elder != null && elder.getBedId() != null) {
+      Bed bed = bedMapper.selectById(elder.getBedId());
+      if (bed != null && bed.getRoomId() != null) {
+        Room room = roomMapper.selectById(bed.getRoomId());
+        if (room != null) {
+          response.setFloorNo(room.getFloorNo());
+          response.setRoomNo(room.getRoomNo());
+        }
+      }
+    }
     response.setVisitDate(booking.getVisitDate());
     response.setVisitTime(booking.getVisitTime());
     response.setVisitTimeSlot(booking.getVisitTimeSlot());

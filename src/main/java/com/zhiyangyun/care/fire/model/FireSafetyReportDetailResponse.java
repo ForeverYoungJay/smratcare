@@ -28,6 +28,9 @@ public class FireSafetyReportDetailResponse {
     private String dutyRecord;
     private String handoverPunchTime;
     private String equipmentBatchNo;
+    private String productProductionDate;
+    private String productExpiryDate;
+    private Integer checkCycleDays;
     private String equipmentUpdateNote;
     private String equipmentAgingDisposal;
     private String issueDescription;

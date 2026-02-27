@@ -36,6 +36,7 @@ public class CrmLead {
   private LocalDateTime invalidTime;
   private String idCardNo;
   private String reservationRoomNo;
+  private Long reservationBedId;
   private String reservationChannel;
   private String reservationStatus;
   private Integer refunded;
@@ -49,6 +50,8 @@ public class CrmLead {
   private LocalDateTime contractSignedAt;
   private String contractNo;
   private String contractStatus;
+  private String flowStage;
+  private String currentOwnerDept;
   private LocalDate contractExpiryDate;
   private Integer smsSendCount;
   private LocalDate nextFollowDate;

@@ -18,6 +18,17 @@ export function getPortalSummary() {
   return request.get<OaPortalSummary>('/api/oa/portal/summary')
 }
 
+export function uploadOaFile(file: File, bizType = 'oa-approval-proof') {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('bizType', bizType)
+  return request.post<{ fileName?: string; originalFileName?: string; fileUrl?: string; fileType?: string; fileSize?: number }>(
+    '/api/files/upload',
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  )
+}
+
 export function getSuggestionPage(params: any) {
   return fetchPage<OaSuggestion>('/api/oa/suggestion/page', params)
 }

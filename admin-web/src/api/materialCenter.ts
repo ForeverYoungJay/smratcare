@@ -1,12 +1,21 @@
 import request, { fetchPage } from '../utils/request'
 import type {
-  MaterialWarehouseItem,
-  MaterialSupplierItem,
+  InventoryAdjustRequest,
+  InventoryAdjustmentDiffItem,
+  InventoryAdjustmentItem,
+  InventoryAlertItem,
+  InventoryBatchItem,
+  InventoryExpiryAlertItem,
+  InventoryInboundRequest,
+  InventoryLogItem,
+  InventoryOutboundRequest,
   MaterialPurchaseOrder,
-  MaterialTransferOrder,
-  MaterialStockAmountItem,
   MaterialPurchaseOrderItem,
-  MaterialTransferItem
+  MaterialStockAmountItem,
+  MaterialSupplierItem,
+  MaterialTransferItem,
+  MaterialTransferOrder,
+  MaterialWarehouseItem
 } from '../types'
 import type { MaterialOrderStatus } from '../utils/materialStatus'
 
@@ -150,4 +159,57 @@ export function getStockAmount(params?: {
   category?: string
 }) {
   return request.get<MaterialStockAmountItem[]>('/api/material/stock/amount', { params })
+}
+
+export function getInventoryBatchPage(params: any) {
+  return fetchPage<InventoryBatchItem>('/api/inventory/batch/page', params)
+}
+
+export function getInventoryLogPage(params: any) {
+  return fetchPage<InventoryLogItem>('/api/inventory/log/page', params)
+}
+
+export function getInventoryInboundPage(params: any) {
+  return fetchPage<InventoryLogItem>('/api/inventory/inbound/page', params)
+}
+
+export function getInventoryOutboundPage(params: any) {
+  return fetchPage<InventoryLogItem>('/api/inventory/outbound/page', params)
+}
+
+export function getInventoryAdjustmentPage(params: any) {
+  return fetchPage<InventoryAdjustmentItem>('/api/inventory/adjustment/page', params)
+}
+
+export function getInventoryAdjustmentDiffReport(params: any) {
+  return request.get<InventoryAdjustmentDiffItem[]>('/api/inventory/adjustment/diff-report', { params })
+}
+
+export function createInbound(data: InventoryInboundRequest) {
+  return request.post<void>('/api/inventory/inbound', data)
+}
+
+export function adjustInventory(data: InventoryAdjustRequest) {
+  return request.post<void>('/api/inventory/adjust', data)
+}
+
+export function createOutbound(data: InventoryOutboundRequest) {
+  return request.post<void>('/api/inventory/outbound', data)
+}
+
+export function getInventoryAlerts() {
+  return request.get<InventoryAlertItem[]>('/api/inventory/alerts')
+}
+
+export function getInventoryExpiryAlerts() {
+  return request.get<InventoryExpiryAlertItem[]>('/api/inventory/expiry-alerts')
+}
+
+export function getMaterialCenterOverview(params?: { expiryDays?: number }) {
+  return request.get<{
+    lowStockCount: number
+    expiryAlertCount: number
+    materialPurchaseDraftCount: number
+    materialTransferDraftCount: number
+  }>('/api/material-center/overview', { params })
 }

@@ -16,6 +16,8 @@ public interface ElderAccountService {
   IPage<ElderAccountLogResponse> logPage(Long orgId, long pageNo, long pageSize, Long elderId,
       Long accountId, String keyword);
 
+  byte[] exportLogPdf(Long orgId, Long operatorId, Long elderId, Long accountId, String keyword);
+
   ElderAccountResponse adjust(Long orgId, Long operatorId, ElderAccountAdjustRequest request);
 
   ElderAccountResponse updateAccount(Long orgId, Long operatorId, ElderAccountUpdateRequest request);

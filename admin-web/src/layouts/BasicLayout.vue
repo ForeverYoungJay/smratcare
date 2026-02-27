@@ -31,6 +31,7 @@
           </a-breadcrumb>
         </div>
         <div class="header-right">
+          <span class="today-label">{{ todayLabel }}</span>
           <a-badge status="processing" text="系统运行中" class="system-status" />
           <span class="system-name">智养云·管理后台</span>
           <a-dropdown>
@@ -92,6 +93,11 @@ const breadcrumbs = computed(() => {
   return ['首页', ...titles]
 })
 
+const todayLabel = computed(() => {
+  const now = new Date()
+  return now.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit', weekday: 'short' })
+})
+
 watch(
   () => route.path,
   (path) => {
@@ -142,7 +148,7 @@ function logout() {
 }
 
 .app-sider {
-  background: linear-gradient(180deg, #0b2f6b 0%, #0a4aa2 100%);
+  background: linear-gradient(180deg, #08316d 0%, #0e4a99 100%);
   border-right: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -198,7 +204,8 @@ function logout() {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: var(--card);
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.92) 0%, rgba(244, 249, 255, 0.92) 100%);
+  backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
@@ -231,6 +238,14 @@ function logout() {
   gap: 12px;
 }
 
+.today-label {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 999px;
+  color: #2455a8;
+  background: rgba(39, 111, 229, 0.12);
+}
+
 .system-name {
   color: var(--muted);
   font-size: 12px;
@@ -247,5 +262,20 @@ function logout() {
 .app-content {
   padding: 24px;
   min-height: calc(100vh - 64px);
+}
+
+@media (max-width: 992px) {
+  .app-header {
+    padding: 0 14px;
+  }
+
+  .today-label,
+  .system-name {
+    display: none;
+  }
+
+  .app-content {
+    padding: 14px;
+  }
 }
 </style>

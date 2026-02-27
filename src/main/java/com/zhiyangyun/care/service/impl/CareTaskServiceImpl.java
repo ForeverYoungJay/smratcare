@@ -92,7 +92,7 @@ public class CareTaskServiceImpl implements CareTaskService {
   }
 
   @Override
-  public List<CareTaskTodayItem> getTodayTasks(Long tenantId, Long staffId, LocalDate date) {
+  public List<CareTaskTodayItem> getTodayTasks(Long tenantId, Long staffId, Long elderId, LocalDate date) {
     LambdaQueryWrapper<CareTaskDaily> wrapper = Wrappers.lambdaQuery();
     wrapper.eq(CareTaskDaily::getTaskDate, date);
     wrapper.eq(CareTaskDaily::getIsDeleted, 0);
@@ -102,6 +102,9 @@ public class CareTaskServiceImpl implements CareTaskService {
     if (staffId != null) {
       wrapper.and(w -> w.eq(CareTaskDaily::getAssignedStaffId, staffId)
           .or().isNull(CareTaskDaily::getAssignedStaffId));
+    }
+    if (elderId != null) {
+      wrapper.eq(CareTaskDaily::getElderId, elderId);
     }
     List<CareTaskDaily> tasks = dailyMapper.selectList(wrapper);
 
@@ -233,9 +236,9 @@ public class CareTaskServiceImpl implements CareTaskService {
 
   @Override
   public IPage<CareTaskTodayItem> page(Long tenantId, long pageNo, long pageSize, LocalDate dateFrom,
-      LocalDate dateTo, Long staffId, String roomNo, String careLevel, String status, String keyword,
+      LocalDate dateTo, Long staffId, Long elderId, String roomNo, String careLevel, String status, String keyword,
       Boolean overdueOnly) {
-    LambdaQueryWrapper<CareTaskDaily> wrapper = buildTaskFilterWrapper(tenantId, dateFrom, dateTo, staffId,
+    LambdaQueryWrapper<CareTaskDaily> wrapper = buildTaskFilterWrapper(tenantId, dateFrom, dateTo, staffId, elderId,
         roomNo, careLevel, status, keyword, overdueOnly);
 
     IPage<CareTaskDaily> page = dailyMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
@@ -333,8 +336,9 @@ public class CareTaskServiceImpl implements CareTaskService {
 
   @Override
   public CareTaskSummaryResponse summary(Long tenantId, LocalDate dateFrom, LocalDate dateTo, Long staffId,
+      Long elderId,
       String roomNo, String careLevel, String status, String keyword, Boolean overdueOnly) {
-    LambdaQueryWrapper<CareTaskDaily> wrapper = buildTaskFilterWrapper(tenantId, dateFrom, dateTo, staffId,
+    LambdaQueryWrapper<CareTaskDaily> wrapper = buildTaskFilterWrapper(tenantId, dateFrom, dateTo, staffId, elderId,
         roomNo, careLevel, status, keyword, overdueOnly);
     List<CareTaskDaily> tasks = dailyMapper.selectList(wrapper);
 
@@ -668,7 +672,7 @@ public class CareTaskServiceImpl implements CareTaskService {
   }
 
   private LambdaQueryWrapper<CareTaskDaily> buildTaskFilterWrapper(Long tenantId, LocalDate dateFrom,
-      LocalDate dateTo, Long staffId, String roomNo, String careLevel, String status, String keyword,
+      LocalDate dateTo, Long staffId, Long elderId, String roomNo, String careLevel, String status, String keyword,
       Boolean overdueOnly) {
     LambdaQueryWrapper<CareTaskDaily> wrapper = Wrappers.lambdaQuery();
     wrapper.eq(CareTaskDaily::getIsDeleted, 0);
@@ -684,6 +688,9 @@ public class CareTaskServiceImpl implements CareTaskService {
     }
     if (staffId != null) {
       wrapper.eq(CareTaskDaily::getAssignedStaffId, staffId);
+    }
+    if (elderId != null) {
+      wrapper.eq(CareTaskDaily::getElderId, elderId);
     }
     if (status != null && !status.isBlank()) {
       wrapper.eq(CareTaskDaily::getStatus, status);

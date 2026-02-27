@@ -15,5 +15,7 @@ public class FireSafetyReportSummaryResponse {
   private Long handoverPunchCount;
   private Long equipmentUpdateCount;
   private Long equipmentAgingDisposalCount;
+  private Long expiringSoonCount;
+  private Long nextCheckDueSoonCount;
   private List<FireSafetyTypeCount> typeStats;
 }

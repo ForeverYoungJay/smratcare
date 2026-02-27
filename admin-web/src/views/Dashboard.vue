@@ -1,6 +1,6 @@
 <template>
   <PageContainer title="运营看板" subTitle="实时掌握机构运行情况">
-    <a-skeleton active :loading="loading">
+    <StatefulBlock :loading="loading" :error="errorMessage" @retry="loadSummary">
       <a-row :gutter="16">
         <a-col :xs="24" :sm="12" :lg="6" v-for="card in coreCards" :key="card.title">
           <PermissionGuardCard
@@ -87,7 +87,7 @@
           </a-card>
         </a-col>
       </a-row>
-    </a-skeleton>
+    </StatefulBlock>
   </PageContainer>
 </template>
 
@@ -102,8 +102,10 @@ import dayjs from 'dayjs'
 import { useUserStore } from '../stores/user'
 import PermissionGuardCard from '../components/PermissionGuardCard.vue'
 import { resolveRouteAccess } from '../utils/routeAccess'
+import StatefulBlock from '../components/StatefulBlock.vue'
 
 const loading = ref(true)
+const errorMessage = ref('')
 const router = useRouter()
 const userStore = useUserStore()
 const refreshedAt = ref('')
@@ -136,11 +138,13 @@ const summary = ref<DashboardSummary>({
 
 async function loadSummary() {
   loading.value = true
+  errorMessage.value = ''
   try {
     summary.value = await getDashboardSummary()
     refreshedAt.value = dayjs().format('YYYY-MM-DD HH:mm:ss')
   } catch (error: any) {
-    message.error(error?.message || '加载运营看板失败')
+    errorMessage.value = error?.message || '加载运营看板失败'
+    message.error(errorMessage.value)
   } finally {
     loading.value = false
   }
@@ -162,7 +166,7 @@ const coreCards = computed(() => {
       tag: '低库存商品',
       color: 'orange',
       trend: '需及时补货',
-      route: '/inventory/overview'
+      route: '/material/stock-query'
     },
     {
       title: '未支付账单',

@@ -49,6 +49,10 @@ export function getElderAccountLogPage(params: any) {
   return fetchPage<ElderAccountLog>('/api/finance/account/log/page', params)
 }
 
+export function printElderAccountLogPdf(params: { elderId: number; accountId?: number; keyword?: string }) {
+  return request.get<Blob>('/api/finance/account/log/print', { params, responseType: 'blob' as any })
+}
+
 export function adjustElderAccount(data: ElderAccountAdjustRequest) {
   return request.post<ElderAccount>('/api/finance/account/adjust', data)
 }

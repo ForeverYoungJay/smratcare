@@ -4,7 +4,10 @@ import { setupPermission } from './permission'
 
 const router = createRouter({
   history: createWebHistory(),
-  routes
+  routes,
+  scrollBehavior() {
+    return { left: 0, top: 0 }
+  }
 })
 
 setupPermission(router)

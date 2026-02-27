@@ -1,5 +1,5 @@
 <template>
-  <a-card class="card-elevated" :bordered="false">
+  <a-card class="card-elevated search-form-card" :bordered="false">
     <a-form :model="model" layout="inline" @finish="onSearch" class="search-form">
       <slot />
       <slot name="extra" />
@@ -14,15 +14,24 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted } from 'vue'
+
 const props = defineProps<{ model: Record<string, any> }>()
 const emit = defineEmits<{ (e: 'search'): void; (e: 'reset'): void }>()
+const initialModel: Record<string, any> = {}
+
+onMounted(() => {
+  Object.keys(props.model).forEach((key) => {
+    initialModel[key] = props.model[key]
+  })
+})
 
 function onSearch() {
   emit('search')
 }
 
 function onReset() {
-  Object.keys(props.model).forEach((k) => (props.model[k] = undefined))
+  Object.keys(props.model).forEach((k) => (props.model[k] = initialModel[k]))
   emit('reset')
 }
 </script>
@@ -31,6 +40,13 @@ function onReset() {
 .search-form {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px 10px;
+}
+
+@media (max-width: 768px) {
+  .search-form :deep(.ant-form-item) {
+    width: 100%;
+    margin-inline-end: 0;
+  }
 }
 </style>

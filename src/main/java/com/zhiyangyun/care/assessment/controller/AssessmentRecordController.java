@@ -9,7 +9,10 @@ import com.zhiyangyun.care.assessment.mapper.AssessmentRecordMapper;
 import com.zhiyangyun.care.assessment.model.AssessmentRecordRequest;
 import com.zhiyangyun.care.assessment.model.AssessmentRecordResponse;
 import com.zhiyangyun.care.assessment.model.AssessmentScoreResult;
+import com.zhiyangyun.care.assessment.model.AssessmentRecordSummaryResponse;
 import com.zhiyangyun.care.assessment.service.AssessmentScoringService;
+import com.zhiyangyun.care.crm.entity.CrmLead;
+import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
 import com.zhiyangyun.care.auth.entity.Org;
 import com.zhiyangyun.care.auth.mapper.OrgMapper;
 import com.zhiyangyun.care.auth.model.Result;
@@ -50,13 +53,15 @@ public class AssessmentRecordController {
   private final ElderMapper elderMapper;
   private final OrgMapper orgMapper;
   private final AssessmentScoringService scoringService;
+  private final CrmLeadMapper crmLeadMapper;
 
   public AssessmentRecordController(AssessmentRecordMapper recordMapper, ElderMapper elderMapper, OrgMapper orgMapper,
-      AssessmentScoringService scoringService) {
+      AssessmentScoringService scoringService, CrmLeadMapper crmLeadMapper) {
     this.recordMapper = recordMapper;
     this.elderMapper = elderMapper;
     this.orgMapper = orgMapper;
     this.scoringService = scoringService;
+    this.crmLeadMapper = crmLeadMapper;
   }
 
   @GetMapping("/page")
@@ -75,6 +80,40 @@ public class AssessmentRecordController {
     wrapper.orderByDesc(AssessmentRecord::getAssessmentDate).orderByDesc(AssessmentRecord::getUpdateTime);
     IPage<AssessmentRecord> page = recordMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
     return Result.ok(convertPage(page));
+  }
+
+  @GetMapping("/summary")
+  public Result<AssessmentRecordSummaryResponse> summary(
+      @RequestParam(required = false) String assessmentType,
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) Long elderId,
+      @RequestParam(required = false) Long templateId,
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String dateFrom,
+      @RequestParam(required = false) String dateTo) {
+    Long orgId = AuthContext.getOrgId();
+    var baseQuery = buildPageQuery(orgId, assessmentType, status, elderId, templateId, keyword, dateFrom, dateTo);
+    long total = recordMapper.selectCount(baseQuery);
+    long draft = recordMapper.selectCount(buildPageQuery(orgId, assessmentType, "DRAFT", elderId, templateId, keyword, dateFrom, dateTo));
+    long completed = recordMapper.selectCount(buildPageQuery(orgId, assessmentType, "COMPLETED", elderId, templateId, keyword, dateFrom, dateTo));
+    long archived = recordMapper.selectCount(buildPageQuery(orgId, assessmentType, "ARCHIVED", elderId, templateId, keyword, dateFrom, dateTo));
+    long overdue = recordMapper.selectCount(buildPageQuery(orgId, assessmentType, status, elderId, templateId, keyword, dateFrom, dateTo)
+        .isNotNull(AssessmentRecord::getNextAssessmentDate)
+        .lt(AssessmentRecord::getNextAssessmentDate, LocalDate.now())
+        .ne(AssessmentRecord::getStatus, "ARCHIVED"));
+    long highRisk = recordMapper.selectCount(buildPageQuery(orgId, assessmentType, status, elderId, templateId, keyword, dateFrom, dateTo)
+        .and(w -> w.like(AssessmentRecord::getLevelCode, "高")
+            .or().like(AssessmentRecord::getLevelCode, "重")
+            .or().eq(AssessmentRecord::getLevelCode, "A")));
+
+    AssessmentRecordSummaryResponse response = new AssessmentRecordSummaryResponse();
+    response.setTotalCount(total);
+    response.setDraftCount(draft);
+    response.setCompletedCount(completed);
+    response.setArchivedCount(archived);
+    response.setReassessOverdueCount(overdue);
+    response.setHighRiskCount(highRisk);
+    return Result.ok(response);
   }
 
   @GetMapping("/{id}")
@@ -122,6 +161,7 @@ public class AssessmentRecordController {
     record.setCreatedBy(AuthContext.getStaffId());
     record.setIsDeleted(0);
     recordMapper.insert(record);
+    syncLeadFlowAfterAssessment(record);
     return Result.ok(toResponse(record, selectElder(record.getElderId()), selectOrg(record.getOrgId())));
   }
 
@@ -157,6 +197,7 @@ public class AssessmentRecordController {
     }
 
     recordMapper.updateById(record);
+    syncLeadFlowAfterAssessment(record);
     return Result.ok(toResponse(record, selectElder(record.getElderId()), selectOrg(record.getOrgId())));
   }
 
@@ -516,5 +557,53 @@ public class AssessmentRecordController {
   private String csvValue(String value) {
     String normalized = value == null ? "" : value;
     return "\"" + normalized.replace("\"", "\"\"") + "\"";
+  }
+
+  private void syncLeadFlowAfterAssessment(AssessmentRecord record) {
+    if (record == null) {
+      return;
+    }
+    if (!"ADMISSION".equals(record.getAssessmentType())) {
+      return;
+    }
+    if ("DRAFT".equals(record.getStatus())) {
+      return;
+    }
+    ElderProfile elder = selectElder(record.getElderId());
+    if (elder == null || elder.getTenantId() == null) {
+      return;
+    }
+
+    CrmLead lead = null;
+    if (elder.getIdCardNo() != null && !elder.getIdCardNo().isBlank()) {
+      lead = crmLeadMapper.selectOne(Wrappers.lambdaQuery(CrmLead.class)
+          .eq(CrmLead::getTenantId, elder.getTenantId())
+          .eq(CrmLead::getIsDeleted, 0)
+          .eq(CrmLead::getIdCardNo, elder.getIdCardNo())
+          .orderByDesc(CrmLead::getUpdateTime)
+          .last("LIMIT 1"));
+    }
+    if (lead == null && elder.getFullName() != null && elder.getPhone() != null) {
+      lead = crmLeadMapper.selectOne(Wrappers.lambdaQuery(CrmLead.class)
+          .eq(CrmLead::getTenantId, elder.getTenantId())
+          .eq(CrmLead::getIsDeleted, 0)
+          .eq(CrmLead::getElderName, elder.getFullName())
+          .eq(CrmLead::getElderPhone, elder.getPhone())
+          .orderByDesc(CrmLead::getUpdateTime)
+          .last("LIMIT 1"));
+    }
+    if (lead == null) {
+      return;
+    }
+    if (lead.getContractSignedFlag() != null && lead.getContractSignedFlag() == 1) {
+      return;
+    }
+
+    lead.setFlowStage("PENDING_BED_SELECT");
+    lead.setCurrentOwnerDept("MARKETING");
+    if (lead.getContractStatus() == null || lead.getContractStatus().isBlank() || "待评估".equals(lead.getContractStatus())) {
+      lead.setContractStatus("评估完成待选床");
+    }
+    crmLeadMapper.updateById(lead);
   }
 }

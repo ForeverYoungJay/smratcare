@@ -29,164 +29,159 @@
       </div>
     </div>
 
-    <a-row :gutter="[16, 16]">
-      <a-col :xs="24" :sm="12" :lg="6" v-for="item in topStats" :key="item.title">
-        <a-card :bordered="false" class="card-elevated stat-card" hoverable @click="go(item.route)">
+    <a-row :gutter="[10, 10]" class="summary-strip">
+      <a-col :xs="24" :sm="12" :lg="6">
+        <a-card :bordered="false" class="card-elevated mini-card" hoverable @click="go('/hr/performance')">
+          <a-statistic title="我的工资" :value="summary.mySalaryAmount || 0" suffix="元" :precision="2" />
+          <div class="stat-desc">发放日 {{ summary.salaryPayDate || '每月固定日期' }}</div>
+        </a-card>
+      </a-col>
+      <a-col :xs="24" :sm="12" :lg="6">
+        <a-card :bordered="false" class="card-elevated mini-card" hoverable @click="go('/hr/performance')">
+          <a-statistic title="我的绩效" :value="summary.myPerformanceScore || 0" suffix="分" :precision="1" />
+          <div class="stat-desc">等级 {{ summary.myPerformanceLevel || '--' }}</div>
+        </a-card>
+      </a-col>
+      <a-col :xs="12" :sm="6" :lg="3" v-for="item in topStats.slice(0, 4)" :key="item.title">
+        <a-card :bordered="false" class="card-elevated micro-card" hoverable @click="go(item.route)">
           <a-statistic :title="item.title" :value="item.value" />
           <div class="stat-desc">{{ item.desc }}</div>
         </a-card>
       </a-col>
     </a-row>
 
-    <a-row :gutter="[16, 16]">
-      <a-col :xs="24" :lg="14">
-        <a-card title="提醒中心" :bordered="false" class="card-elevated">
-          <a-list :data-source="reminderItems" :locale="{ emptyText: '暂无提醒' }">
-            <template #renderItem="{ item }">
-              <a-list-item>
-                <a-list-item-meta :title="item.title" :description="item.desc" />
-                <template #actions>
-                  <a-button type="link" @click="go(item.route)">处理</a-button>
-                </template>
-              </a-list-item>
-            </template>
-          </a-list>
-        </a-card>
-      </a-col>
-      <a-col :xs="24" :lg="10">
-        <a-card title="异常提醒" :bordered="false" class="card-elevated">
-          <a-space direction="vertical" style="width: 100%">
-            <a-alert v-for="item in abnormalItems" :key="item.title" :message="item.title" :description="item.desc" type="warning" show-icon />
-          </a-space>
-        </a-card>
-      </a-col>
-    </a-row>
-
-    <a-row :gutter="[16, 16]">
-      <a-col :xs="24" :lg="12">
-        <a-card title="我的协同（任务/项目/甘特图/工作小结）" :bordered="false" class="card-elevated">
-          <div class="collab-meta">
-            <a-tag color="processing">进行中任务 {{ summary.ongoingTaskCount || 0 }}</a-tag>
-            <a-tag color="success">近30天总结 {{ summary.submittedReportCount || 0 }}</a-tag>
-            <a-button size="small" type="link" @click="go('/oa/work-execution/task')">查看任务</a-button>
-          </div>
-          <div v-if="(summary.collaborationGantt || []).length" class="gantt-wrap">
-            <div v-for="item in summary.collaborationGantt" :key="item.taskId" class="gantt-row">
-              <div class="gantt-title">{{ item.title }}</div>
-              <div class="gantt-bar">
-                <div class="gantt-progress" :style="{ width: `${item.progress || 0}%` }"></div>
-              </div>
-              <div class="gantt-percent">{{ item.progress || 0 }}%</div>
-            </div>
-          </div>
-          <a-empty v-else description="暂无甘特任务" />
-        </a-card>
-      </a-col>
-      <a-col :xs="24" :lg="12">
-        <a-card title="待办与流程入口（工作流引擎）" :bordered="false" class="card-elevated">
-          <a-list :data-source="summary.workflowTodos || []" :locale="{ emptyText: '暂无流程待办' }">
-            <template #renderItem="{ item }">
-              <a-list-item>
-                <div>{{ item.name }}</div>
-                <a-space>
-                  <a-badge :count="item.count || 0" />
-                  <a-button type="link" @click="go(item.route)">进入</a-button>
-                </a-space>
-              </a-list-item>
-            </template>
-          </a-list>
-          <div class="quick-launch">
-            <div class="sub-title">快捷发起</div>
-            <a-space wrap>
-              <a-button v-for="item in quickLaunches" :key="item.label" size="small" @click="go(item.route)">{{ item.label }}</a-button>
+    <a-row :gutter="[10, 10]" class="compact-main-row">
+      <a-col :xs="24" :lg="15" class="stretch-col">
+        <a-card :bordered="false" class="card-elevated compact-calendar-card full-height-card">
+          <template #title>
+            <a-button type="link" class="calendar-title-link" @click="goToOaCalendar">行政日历（协同日历）</a-button>
+          </template>
+          <template #extra>
+            <a-space size="small">
+              <a-button size="small" @click="openCreateSchedule()">新增日程</a-button>
+              <a-button size="small" type="link" @click="goToOaCalendar">进入协同日历</a-button>
             </a-space>
-          </div>
-        </a-card>
-      </a-col>
-    </a-row>
-
-    <a-row :gutter="[16, 16]">
-      <a-col :xs="24">
-        <a-card title="行政日历" :bordered="false" class="card-elevated">
-          <a-spin :spinning="calendarLoading">
+          </template>
+          <StatefulBlock :loading="calendarLoading || loading" :error="pageError" :empty="!calendarRows.length" empty-text="暂无日历事项" @retry="init">
             <FullCalendar :options="calendarOptions" />
-          </a-spin>
+          </StatefulBlock>
         </a-card>
       </a-col>
-    </a-row>
-
-    <a-row :gutter="[16, 16]">
-      <a-col :xs="24" :lg="8">
-        <a-card title="行政日程" :bordered="false" class="card-elevated module-card">
-          <div class="module-main">{{ summary.todayScheduleCount || 0 }}</div>
-          <div class="module-sub">今日行政日历事项（含节日/生日提醒）</div>
-          <a-tag color="blue">已在首页展示</a-tag>
-        </a-card>
-      </a-col>
-      <a-col :xs="24" :lg="8">
-        <a-card title="考勤与请假" :bordered="false" class="card-elevated module-card">
-          <div class="module-main">{{ summary.attendanceAbnormalCount || 0 }}</div>
-          <div class="module-sub">今日考勤异常</div>
-          <a-space>
-            <a-button size="small" @click="go('/oa/attendance-leave')">考勤管理</a-button>
-            <a-button size="small" @click="go('/oa/approval?type=LEAVE&quick=1')">请假审批</a-button>
-          </a-space>
-        </a-card>
-      </a-col>
-      <a-col :xs="24" :lg="8">
-        <a-card title="费用管理（我的/部门/发票夹）" :bordered="false" class="card-elevated module-card">
-          <div class="module-main">{{ summary.myExpenseCount || 0 }}</div>
-          <div class="module-sub">账户数量 / 30天流水 {{ summary.deptExpenseCount || 0 }} / 发票夹 {{ summary.invoiceFolderCount || 0 }}</div>
-          <a-button type="link" @click="go('/finance/account')">进入费用管理</a-button>
-        </a-card>
-      </a-col>
-    </a-row>
-
-    <a-row :gutter="[16, 16]">
-      <a-col :xs="24" :lg="12">
-        <a-card title="营销绩效（客户渠道+业绩完成度甘特图）" :bordered="false" class="card-elevated">
-          <a-row :gutter="[12, 12]">
-            <a-col :xs="12" :sm="8" v-for="item in (summary.marketingChannels || [])" :key="item.source">
-              <div class="channel-progress">
-                <a-progress
-                  type="circle"
-                  :size="82"
-                  :percent="Math.min(100, Math.round(((item.contractCount || 0) / Math.max(1, item.leadCount || 0)) * 100))"
-                />
-                <div class="channel-name">{{ item.source }}</div>
-                <div class="channel-meta">线索 {{ item.leadCount || 0 }} / 签约 {{ item.contractCount || 0 }}</div>
+      <a-col :xs="24" :lg="9" class="stretch-col">
+        <a-card title="协同总览与快捷入口" :bordered="false" class="card-elevated full-height-card side-card">
+          <StatefulBlock :loading="loading" :error="pageError" @retry="init">
+            <div class="panel-section">
+              <div class="section-head">
+                <span>提醒中心</span>
+                <a-button type="link" size="small" @click="go('/oa/todo')">更多</a-button>
               </div>
-            </a-col>
-          </a-row>
-          <a-empty v-if="!(summary.marketingChannels || []).length" description="暂无渠道数据" />
-          <a-space>
-            <a-button size="small" @click="go('/marketing/reports/channel')">来源渠道</a-button>
-            <a-button size="small" @click="go('/marketing/reports/followup')">业绩完成度</a-button>
-          </a-space>
-        </a-card>
-      </a-col>
-      <a-col :xs="24" :lg="12">
-        <a-card title="文档中心（制度/项目/合同扫描件）" :bordered="false" class="card-elevated">
-          <div class="module-main">{{ summary.documentCount || 0 }}</div>
-          <div class="module-sub">发票夹 {{ summary.invoiceFolderCount || 0 }}，可集中管理制度、项目和合同扫描件</div>
-          <a-button type="link" @click="go('/oa/document')">进入文档中心</a-button>
-        </a-card>
-        <a-card title="数据看板（院长/部门报表入口）" :bordered="false" class="card-elevated board-card">
-          <a-space wrap>
-            <a-button size="small" @click="go('/stats/org/monthly-operation')">院长总览</a-button>
-            <a-button size="small" @click="go('/stats/consumption')">部门消费</a-button>
-            <a-button size="small" @click="go('/finance/report')">财务报表</a-button>
-            <a-button size="small" @click="go('/stats/check-in')">入住报表</a-button>
-          </a-space>
+              <div class="scroll-list">
+                <a-list size="small" :data-source="reminderItems.slice(0, 5)" :locale="{ emptyText: '暂无提醒' }">
+                  <template #renderItem="{ item }">
+                    <a-list-item>
+                      <a-list-item-meta :title="item.title" :description="item.desc" />
+                      <template #actions>
+                        <a-button type="link" @click="go(item.route)">处理</a-button>
+                      </template>
+                    </a-list-item>
+                  </template>
+                </a-list>
+              </div>
+            </div>
+
+            <div class="panel-section">
+              <div class="section-head">
+                <span>流程待办</span>
+                <a-button type="link" size="small" @click="go('/oa/approval')">进入审批</a-button>
+              </div>
+              <a-space wrap>
+                <a-tag color="processing">进行中任务 {{ summary.ongoingTaskCount || 0 }}</a-tag>
+                <a-tag color="success">总结 {{ summary.submittedReportCount || 0 }}</a-tag>
+                <a-tag color="warning">超时 {{ summary.approvalTimeoutCount || 0 }}</a-tag>
+              </a-space>
+              <div class="workflow-line">
+                <div v-for="item in (summary.workflowTodos || []).slice(0, 4)" :key="item.name" class="workflow-item">
+                  <span class="workflow-name">{{ item.name }}</span>
+                  <a-badge :count="item.count || 0" />
+                </div>
+              </div>
+            </div>
+
+            <div class="panel-section">
+              <div class="section-head">
+                <span>异常提醒</span>
+                <a-button type="link" size="small" @click="go('/health/inspection')">查看详情</a-button>
+              </div>
+              <a-space wrap>
+                <a-tag v-for="item in abnormalItems" :key="item.title" color="orange">{{ item.title }}：{{ item.desc }}</a-tag>
+              </a-space>
+            </div>
+
+            <div class="panel-section">
+              <div class="section-head">
+                <span>常用功能</span>
+              </div>
+              <a-space wrap>
+                <a-button v-for="item in quickLaunches.slice(0, 6)" :key="item.label" size="small" @click="go(item.route)">{{ item.label }}</a-button>
+                <a-button size="small" @click="go('/oa/attendance-leave')">考勤管理</a-button>
+                <a-button size="small" @click="go('/finance/account')">费用管理</a-button>
+                <a-button size="small" @click="go('/oa/document')">文档中心</a-button>
+                <a-button size="small" @click="go('/stats/org/monthly-operation')">院长总览</a-button>
+                <a-button size="small" @click="go('/marketing/reports/channel')">渠道统计</a-button>
+              </a-space>
+            </div>
+          </StatefulBlock>
         </a-card>
       </a-col>
     </a-row>
+
+    <a-modal
+      v-model:open="scheduleOpen"
+      title="新增行政日程"
+      width="620px"
+      :confirm-loading="scheduleSaving"
+      @ok="submitSchedule"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="标题" required>
+          <a-input v-model:value="scheduleForm.title" placeholder="例如：月度行政例会" />
+        </a-form-item>
+        <a-row :gutter="12">
+          <a-col :span="12">
+            <a-form-item label="开始时间" required>
+              <a-date-picker v-model:value="scheduleForm.startTime" show-time style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="结束时间">
+              <a-date-picker v-model:value="scheduleForm.endTime" show-time style="width: 100%" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="12">
+          <a-col :span="12">
+            <a-form-item label="负责人">
+              <a-input v-model:value="scheduleForm.assigneeName" placeholder="例如：行政部" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="优先级">
+              <a-select v-model:value="scheduleForm.priority" :options="priorityOptions" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-form-item label="备注">
+          <a-textarea v-model:value="scheduleForm.description" :rows="3" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
 
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import type { Dayjs } from 'dayjs'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
@@ -194,15 +189,28 @@ import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
 import { useUserStore } from '../stores/user'
-import { getOaTaskCalendar, getPortalSummary } from '../api/oa'
+import { createOaTask, getOaTaskCalendar, getPortalSummary } from '../api/oa'
 import { useLiveSyncRefresh } from '../composables/useLiveSyncRefresh'
 import type { OaPortalSummary, OaTask } from '../types'
+import StatefulBlock from '../components/StatefulBlock.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
 const refreshedAt = ref('')
 const calendarLoading = ref(false)
+const scheduleOpen = ref(false)
+const scheduleSaving = ref(false)
+const loading = ref(false)
+const pageError = ref('')
 const calendarRows = ref<OaTask[]>([])
+const scheduleForm = reactive({
+  title: '',
+  startTime: undefined as Dayjs | undefined,
+  endTime: undefined as Dayjs | undefined,
+  assigneeName: '',
+  priority: 'NORMAL',
+  description: ''
+})
 
 const summary = reactive<OaPortalSummary>({
   notices: [],
@@ -222,6 +230,12 @@ const quickLaunches = [
   { label: '用章', route: '/oa/approval?type=OFFICIAL_SEAL&quick=1' },
   { label: '收入证明', route: '/oa/approval?type=INCOME_PROOF&quick=1' },
   { label: '物资申请', route: '/oa/approval?type=MATERIAL_APPLY&quick=1' }
+]
+
+const priorityOptions = [
+  { label: '低', value: 'LOW' },
+  { label: '中', value: 'NORMAL' },
+  { label: '高', value: 'HIGH' }
 ]
 
 const searchKeyword = ref('')
@@ -259,7 +273,7 @@ const topStats = computed(() => [
     title: '库存预警',
     value: summary.inventoryLowStockCount || 0,
     desc: `采购草稿 ${summary.materialPurchaseDraftCount || 0} 条`,
-    route: '/inventory/alerts'
+    route: '/material/alerts'
   },
   {
     title: '长者状态异常',
@@ -318,16 +332,22 @@ const calendarOptions = computed(() => ({
   plugins: [dayGridPlugin, interactionPlugin],
   initialView: 'dayGridMonth',
   locale: 'zh-cn',
-  height: 'auto',
+  height: 320,
   headerToolbar: {
     left: 'prev,next today',
     center: 'title',
-    right: 'dayGridMonth,dayGridWeek'
+    right: 'dayGridMonth'
   },
   buttonText: {
     today: '今天',
     month: '月视图',
     week: '周视图'
+  },
+  dateClick: (arg: any) => {
+    openCreateSchedule(dayjs(arg.dateStr))
+  },
+  eventClick: () => {
+    goToOaCalendar()
   },
   events: calendarRows.value.map((task) => ({
     id: String(task.id),
@@ -340,6 +360,48 @@ const calendarOptions = computed(() => ({
 
 function go(path: string) {
   router.push(path)
+}
+
+function goToOaCalendar() {
+  go('/oa/work-execution/calendar')
+}
+
+function openCreateSchedule(date?: Dayjs) {
+  scheduleForm.title = ''
+  scheduleForm.startTime = date ? date.hour(9).minute(0).second(0) : undefined
+  scheduleForm.endTime = date ? date.hour(10).minute(0).second(0) : undefined
+  scheduleForm.assigneeName = ''
+  scheduleForm.priority = 'NORMAL'
+  scheduleForm.description = ''
+  scheduleOpen.value = true
+}
+
+async function submitSchedule() {
+  if (!scheduleForm.title.trim()) {
+    message.warning('请填写标题')
+    return
+  }
+  if (!scheduleForm.startTime) {
+    message.warning('请选择开始时间')
+    return
+  }
+  scheduleSaving.value = true
+  try {
+    await createOaTask({
+      title: scheduleForm.title.trim(),
+      description: scheduleForm.description || undefined,
+      startTime: dayjs(scheduleForm.startTime).format('YYYY-MM-DDTHH:mm:ss'),
+      endTime: scheduleForm.endTime ? dayjs(scheduleForm.endTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
+      priority: scheduleForm.priority,
+      status: 'OPEN',
+      assigneeName: scheduleForm.assigneeName || undefined
+    })
+    scheduleOpen.value = false
+    message.success('日程已新增')
+    await loadCalendar()
+  } finally {
+    scheduleSaving.value = false
+  }
 }
 
 function onSearchChange(keyword: string) {
@@ -412,10 +474,15 @@ useLiveSyncRefresh({
 })
 
 async function init() {
+  loading.value = true
+  pageError.value = ''
   try {
     await Promise.all([loadSummary(), loadCalendar()])
   } catch (error: any) {
-    message.error(error?.message || '加载首页失败')
+    pageError.value = error?.message || '加载首页失败'
+    message.error(pageError.value)
+  } finally {
+    loading.value = false
   }
 }
 
@@ -426,29 +493,32 @@ onMounted(init)
 .portal-page {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 10px;
+  height: calc(100vh - 132px);
+  min-height: calc(100vh - 132px);
+  overflow: hidden;
 }
 
 .portal-hero {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 24px;
+  padding: 12px 16px;
 }
 
 .hero-title {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
 }
 
 .hero-subtitle {
-  margin-top: 6px;
+  margin-top: 4px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .hero-search {
-  margin-top: 12px;
+  margin-top: 8px;
 }
 
 .hero-meta {
@@ -466,113 +536,132 @@ onMounted(init)
 }
 
 .meta-value {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
 }
 
-.stat-card {
+.summary-strip {
+  flex-shrink: 0;
+}
+
+.mini-card,
+.micro-card {
   cursor: pointer;
-  min-height: 132px;
+  min-height: 86px;
+}
+
+.micro-card {
+  min-height: 86px;
 }
 
 .stat-desc {
-  margin-top: 8px;
+  margin-top: 6px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
 }
 
-.collab-meta {
-  margin-bottom: 12px;
+.compact-main-row {
+  flex: 1;
+  min-height: 0;
+}
+
+.stretch-col {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  min-height: 0;
 }
 
-.gantt-wrap {
+.full-height-card {
+  width: 100%;
+  height: 100%;
+}
+
+.full-height-card :deep(.ant-card-head) {
+  min-height: 48px;
+  padding: 0 12px;
+}
+
+.full-height-card :deep(.ant-card-body) {
+  padding: 10px 12px;
+}
+
+.side-card :deep(.ant-card-body) {
+  max-height: calc(100% - 48px);
+  overflow: auto;
+}
+
+.panel-section + .panel-section {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.scroll-list {
+  max-height: 124px;
+  overflow: auto;
+}
+
+.workflow-line {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
+  margin-top: 8px;
 }
 
-.gantt-row {
-  display: grid;
-  grid-template-columns: 120px 1fr 48px;
-  gap: 8px;
+.workflow-item {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
 }
 
-.gantt-title {
+.workflow-name {
   font-size: 12px;
   color: #334155;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.gantt-bar {
-  height: 10px;
-  border-radius: 6px;
-  background: #eef2ff;
+.compact-calendar-card :deep(.fc .fc-daygrid-day-frame) {
+  min-height: 40px;
 }
 
-.gantt-progress {
-  height: 10px;
-  border-radius: 6px;
-  background: linear-gradient(90deg, #2b5db8, #22c55e);
+.compact-calendar-card :deep(.fc .fc-toolbar.fc-header-toolbar) {
+  margin-bottom: 0.35em;
 }
 
-.gantt-percent {
-  text-align: right;
-  font-size: 12px;
-  color: #64748b;
+.compact-calendar-card :deep(.fc .fc-toolbar-title) {
+  font-size: 16px;
 }
 
-.quick-launch {
-  margin-top: 12px;
+.compact-calendar-card :deep(.fc .fc-button) {
+  padding: 0.2em 0.45em;
 }
 
-.sub-title {
-  margin-bottom: 8px;
-  font-weight: 600;
-}
-
-.module-card {
-  min-height: 204px;
-}
-
-.module-main {
-  font-size: 30px;
-  font-weight: 700;
-  color: #1d4ed8;
-}
-
-.module-sub {
-  margin: 8px 0 12px;
-  color: #64748b;
+.compact-calendar-card :deep(.fc .fc-daygrid-day-number) {
   font-size: 12px;
 }
 
-.channel-progress {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
+.compact-calendar-card :deep(.fc .fc-daygrid-event) {
+  font-size: 11px;
 }
 
-.channel-name {
-  font-weight: 600;
-}
-
-.channel-meta {
-  font-size: 12px;
-  color: #64748b;
-}
-
-.board-card {
-  margin-top: 16px;
+.compact-calendar-card :deep(.fc .fc-view-harness) {
+  min-height: 310px;
 }
 
 @media (max-width: 768px) {
+  .portal-page {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
   .portal-hero {
     flex-direction: column;
     align-items: flex-start;

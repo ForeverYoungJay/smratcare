@@ -1,20 +1,21 @@
 :root {
   color-scheme: light;
-  --bg: #f3f6fb;
-  --bg-2: #e9eef7;
+  --bg: #f5f7fc;
+  --bg-2: #ecf2fc;
   --ink: #101828;
   --muted: #667085;
-  --primary: #1f6feb;
+  --primary: #1b66d6;
   --success: #22c55e;
   --warning: #f59e0b;
   --danger: #ef4444;
-  --border: rgba(148, 163, 184, 0.35);
+  --border: rgba(148, 163, 184, 0.28);
   --card: #ffffff;
-  --shadow-sm: 0 10px 24px rgba(15, 23, 42, 0.06);
-  --shadow-md: 0 18px 40px rgba(15, 23, 42, 0.12);
+  --card-soft: rgba(255, 255, 255, 0.9);
+  --shadow-sm: 0 10px 26px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 18px 42px rgba(15, 23, 42, 0.1);
   --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-lg: 12px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
   --space-1: 8px;
   --space-2: 16px;
   --space-3: 24px;
@@ -29,17 +30,23 @@
   --muted: #94a3b8;
   --border: rgba(148, 163, 184, 0.25);
   --card: rgba(15, 23, 42, 0.8);
+  --card-soft: rgba(15, 23, 42, 0.78);
 }
 
 * {
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
+  min-height: 100vh;
   font-family: 'HarmonyOS Sans SC', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
-  background: var(--bg);
+  background:
+    radial-gradient(1200px 460px at 8% -16%, rgba(111, 166, 255, 0.2), transparent 62%),
+    radial-gradient(800px 380px at 98% -12%, rgba(68, 196, 184, 0.2), transparent 55%),
+    linear-gradient(180deg, #f8fbff 0%, var(--bg) 42%, #f2f6ff 100%);
   color: var(--ink);
 }
 
@@ -54,17 +61,23 @@ html, body {
 }
 
 .card-elevated {
-  background: var(--card);
+  background: var(--card-soft);
+  backdrop-filter: blur(8px);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
+  transition: box-shadow .2s ease, transform .2s ease;
+}
+
+.card-elevated:hover {
+  box-shadow: var(--shadow-md);
 }
 
 .ant-card {
   border-radius: var(--radius-lg);
   border-color: var(--border);
   box-shadow: var(--shadow-sm);
-  background: var(--card);
+  background: var(--card-soft);
 }
 
 .ant-table {
@@ -72,10 +85,14 @@ html, body {
 }
 
 .ant-table-thead > tr > th {
-  background: #f8fafc !important;
+  background: rgba(240, 246, 255, 0.88) !important;
   color: #101828;
   border-bottom: 1px solid var(--border);
   font-weight: 600;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background: rgba(237, 246, 255, 0.62) !important;
 }
 
 .ant-table-tbody > tr > td {
@@ -96,7 +113,7 @@ html, body {
 .ant-btn-primary {
   background: var(--primary) !important;
   border: none !important;
-  box-shadow: 0 10px 18px rgba(31, 111, 235, 0.22);
+  box-shadow: 0 10px 20px rgba(27, 102, 214, 0.26);
 }
 
 .ant-badge-status-text {
@@ -114,5 +131,9 @@ html, body {
 @media (max-width: 768px) {
   .ant-table {
     font-size: 12px;
+  }
+
+  .page-container {
+    gap: 12px;
   }
 }

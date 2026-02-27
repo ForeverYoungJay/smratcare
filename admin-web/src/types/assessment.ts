@@ -54,3 +54,12 @@ export interface AssessmentScorePreview {
   levelCode?: string
   reason?: string
 }
+
+export interface AssessmentRecordSummary {
+  totalCount: number
+  draftCount: number
+  completedCount: number
+  archivedCount: number
+  reassessOverdueCount: number
+  highRiskCount: number
+}

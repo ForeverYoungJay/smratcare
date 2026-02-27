@@ -4,6 +4,9 @@
       <a-form-item label="老人姓名">
         <a-input v-model:value="query.keyword" placeholder="输入姓名" allow-clear />
       </a-form-item>
+      <template #extra>
+        <a-button @click="printCurrentElderLogs">打印当前流水</a-button>
+      </template>
     </SearchForm>
 
     <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
@@ -24,9 +27,10 @@ import { reactive, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
-import { getElderAccountLogPage } from '../../api/finance'
+import { getElderAccountLogPage, printElderAccountLogPdf } from '../../api/finance'
 import type { ElderAccountLog, PageResult } from '../../types'
 import { useRoute } from 'vue-router'
+import { message } from 'ant-design-vue'
 
 const route = useRoute()
 const loading = ref(false)
@@ -100,6 +104,26 @@ function onReset() {
   query.pageNo = 1
   pagination.current = 1
   fetchData()
+}
+
+async function printCurrentElderLogs() {
+  if (!query.elderId) {
+    message.warning('请先从老人账户进入流水页，或指定某个老人后再打印')
+    return
+  }
+  const elderName = rows.value[0]?.elderName || `老人${query.elderId}`
+  const blob = await printElderAccountLogPdf({
+    elderId: query.elderId,
+    keyword: query.keyword || undefined
+  })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `账户流水_${elderName}_${new Date().toISOString().slice(0, 10)}.pdf`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
 }
 
 fetchData()

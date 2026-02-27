@@ -104,6 +104,9 @@ public class FireSafetyRecordController {
     record.setDutyRecord(request.getDutyRecord());
     record.setHandoverPunchTime(request.getHandoverPunchTime());
     record.setEquipmentBatchNo(request.getEquipmentBatchNo());
+    record.setProductProductionDate(request.getProductProductionDate());
+    record.setProductExpiryDate(request.getProductExpiryDate());
+    record.setCheckCycleDays(request.getCheckCycleDays());
     record.setEquipmentUpdateNote(request.getEquipmentUpdateNote());
     record.setEquipmentAgingDisposal(request.getEquipmentAgingDisposal());
     record.setCreatedBy(AuthContext.getStaffId());
@@ -129,6 +132,9 @@ public class FireSafetyRecordController {
     existing.setDutyRecord(request.getDutyRecord());
     existing.setHandoverPunchTime(request.getHandoverPunchTime());
     existing.setEquipmentBatchNo(request.getEquipmentBatchNo());
+    existing.setProductProductionDate(request.getProductProductionDate());
+    existing.setProductExpiryDate(request.getProductExpiryDate());
+    existing.setCheckCycleDays(request.getCheckCycleDays());
     existing.setEquipmentUpdateNote(request.getEquipmentUpdateNote());
     existing.setEquipmentAgingDisposal(request.getEquipmentAgingDisposal());
     recordMapper.updateById(existing);
@@ -208,7 +214,8 @@ public class FireSafetyRecordController {
       @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
       @RequestParam(required = false) LocalDate dateFrom,
       @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-      @RequestParam(required = false) LocalDate dateTo) {
+      @RequestParam(required = false) LocalDate dateTo,
+      @RequestParam(required = false) String recordType) {
     Long orgId = AuthContext.getOrgId();
     LocalDate startDate = dateFrom;
     LocalDate endDate = dateTo;
@@ -220,10 +227,12 @@ public class FireSafetyRecordController {
 
     LocalDateTime startTime = startDate == null ? null : startDate.atStartOfDay();
     LocalDateTime endTime = endDate == null ? null : endDate.plusDays(1).atStartOfDay().minusNanos(1);
+    String normalizedRecordType = normalizeRecordTypeForQuery(recordType);
 
     var baseWrapper = Wrappers.lambdaQuery(FireSafetyRecord.class)
         .eq(FireSafetyRecord::getIsDeleted, 0)
         .eq(orgId != null, FireSafetyRecord::getOrgId, orgId)
+        .eq(normalizedRecordType != null, FireSafetyRecord::getRecordType, normalizedRecordType)
         .ge(startTime != null, FireSafetyRecord::getCheckTime, startTime)
         .le(endTime != null, FireSafetyRecord::getCheckTime, endTime);
 
@@ -232,6 +241,7 @@ public class FireSafetyRecordController {
     long openCount = recordMapper.selectCount(Wrappers.lambdaQuery(FireSafetyRecord.class)
         .eq(FireSafetyRecord::getIsDeleted, 0)
         .eq(orgId != null, FireSafetyRecord::getOrgId, orgId)
+        .eq(normalizedRecordType != null, FireSafetyRecord::getRecordType, normalizedRecordType)
         .ge(startTime != null, FireSafetyRecord::getCheckTime, startTime)
         .le(endTime != null, FireSafetyRecord::getCheckTime, endTime)
         .eq(FireSafetyRecord::getStatus, "OPEN"));
@@ -239,6 +249,7 @@ public class FireSafetyRecordController {
     long closedCount = recordMapper.selectCount(Wrappers.lambdaQuery(FireSafetyRecord.class)
         .eq(FireSafetyRecord::getIsDeleted, 0)
         .eq(orgId != null, FireSafetyRecord::getOrgId, orgId)
+        .eq(normalizedRecordType != null, FireSafetyRecord::getRecordType, normalizedRecordType)
         .ge(startTime != null, FireSafetyRecord::getCheckTime, startTime)
         .le(endTime != null, FireSafetyRecord::getCheckTime, endTime)
         .eq(FireSafetyRecord::getStatus, "CLOSED"));
@@ -246,6 +257,7 @@ public class FireSafetyRecordController {
     long overdueCount = recordMapper.selectCount(Wrappers.lambdaQuery(FireSafetyRecord.class)
         .eq(FireSafetyRecord::getIsDeleted, 0)
         .eq(orgId != null, FireSafetyRecord::getOrgId, orgId)
+        .eq(normalizedRecordType != null, FireSafetyRecord::getRecordType, normalizedRecordType)
         .ge(startTime != null, FireSafetyRecord::getCheckTime, startTime)
         .le(endTime != null, FireSafetyRecord::getCheckTime, endTime)
         .eq(FireSafetyRecord::getStatus, "OPEN")
@@ -256,6 +268,7 @@ public class FireSafetyRecordController {
         .select("record_type as recordType", "count(1) as cnt")
         .eq("is_deleted", 0)
         .eq(orgId != null, "org_id", orgId)
+        .eq(normalizedRecordType != null, "record_type", normalizedRecordType)
         .ge(startTime != null, "check_time", startTime)
         .le(endTime != null, "check_time", endTime)
         .groupBy("record_type"));
@@ -281,6 +294,7 @@ public class FireSafetyRecordController {
     response.setDailyCompletedCount(recordMapper.selectCount(Wrappers.lambdaQuery(FireSafetyRecord.class)
         .eq(FireSafetyRecord::getIsDeleted, 0)
         .eq(orgId != null, FireSafetyRecord::getOrgId, orgId)
+        .eq(normalizedRecordType != null, FireSafetyRecord::getRecordType, normalizedRecordType)
         .ge(startTime != null, FireSafetyRecord::getCheckTime, startTime)
         .le(endTime != null, FireSafetyRecord::getCheckTime, endTime)
         .eq(FireSafetyRecord::getRecordType, "DAY_PATROL")
@@ -288,6 +302,7 @@ public class FireSafetyRecordController {
     response.setMonthlyCompletedCount(recordMapper.selectCount(Wrappers.lambdaQuery(FireSafetyRecord.class)
         .eq(FireSafetyRecord::getIsDeleted, 0)
         .eq(orgId != null, FireSafetyRecord::getOrgId, orgId)
+        .eq(normalizedRecordType != null, FireSafetyRecord::getRecordType, normalizedRecordType)
         .ge(startTime != null, FireSafetyRecord::getCheckTime, startTime)
         .le(endTime != null, FireSafetyRecord::getCheckTime, endTime)
         .eq(FireSafetyRecord::getRecordType, "MONTHLY_CHECK")
@@ -295,6 +310,7 @@ public class FireSafetyRecordController {
     response.setDutyRecordCount(recordMapper.selectCount(Wrappers.lambdaQuery(FireSafetyRecord.class)
         .eq(FireSafetyRecord::getIsDeleted, 0)
         .eq(orgId != null, FireSafetyRecord::getOrgId, orgId)
+        .eq(normalizedRecordType != null, FireSafetyRecord::getRecordType, normalizedRecordType)
         .ge(startTime != null, FireSafetyRecord::getCheckTime, startTime)
         .le(endTime != null, FireSafetyRecord::getCheckTime, endTime)
         .eq(FireSafetyRecord::getRecordType, "CONTROL_ROOM_DUTY")
@@ -303,12 +319,14 @@ public class FireSafetyRecordController {
     response.setHandoverPunchCount(recordMapper.selectCount(Wrappers.lambdaQuery(FireSafetyRecord.class)
         .eq(FireSafetyRecord::getIsDeleted, 0)
         .eq(orgId != null, FireSafetyRecord::getOrgId, orgId)
+        .eq(normalizedRecordType != null, FireSafetyRecord::getRecordType, normalizedRecordType)
         .ge(startTime != null, FireSafetyRecord::getCheckTime, startTime)
         .le(endTime != null, FireSafetyRecord::getCheckTime, endTime)
         .isNotNull(FireSafetyRecord::getHandoverPunchTime)));
     response.setEquipmentUpdateCount(recordMapper.selectCount(Wrappers.lambdaQuery(FireSafetyRecord.class)
         .eq(FireSafetyRecord::getIsDeleted, 0)
         .eq(orgId != null, FireSafetyRecord::getOrgId, orgId)
+        .eq(normalizedRecordType != null, FireSafetyRecord::getRecordType, normalizedRecordType)
         .ge(startTime != null, FireSafetyRecord::getCheckTime, startTime)
         .le(endTime != null, FireSafetyRecord::getCheckTime, endTime)
         .eq(FireSafetyRecord::getRecordType, "FACILITY")
@@ -317,11 +335,25 @@ public class FireSafetyRecordController {
     response.setEquipmentAgingDisposalCount(recordMapper.selectCount(Wrappers.lambdaQuery(FireSafetyRecord.class)
         .eq(FireSafetyRecord::getIsDeleted, 0)
         .eq(orgId != null, FireSafetyRecord::getOrgId, orgId)
+        .eq(normalizedRecordType != null, FireSafetyRecord::getRecordType, normalizedRecordType)
         .ge(startTime != null, FireSafetyRecord::getCheckTime, startTime)
         .le(endTime != null, FireSafetyRecord::getCheckTime, endTime)
         .eq(FireSafetyRecord::getRecordType, "FACILITY")
         .isNotNull(FireSafetyRecord::getEquipmentAgingDisposal)
         .ne(FireSafetyRecord::getEquipmentAgingDisposal, "")));
+    response.setExpiringSoonCount(recordMapper.selectCount(Wrappers.lambdaQuery(FireSafetyRecord.class)
+        .eq(FireSafetyRecord::getIsDeleted, 0)
+        .eq(orgId != null, FireSafetyRecord::getOrgId, orgId)
+        .eq(normalizedRecordType != null, FireSafetyRecord::getRecordType, normalizedRecordType)
+        .isNotNull(FireSafetyRecord::getProductExpiryDate)
+        .between(FireSafetyRecord::getProductExpiryDate, LocalDate.now(), LocalDate.now().plusDays(30))));
+    response.setNextCheckDueSoonCount(recordMapper.selectCount(Wrappers.lambdaQuery(FireSafetyRecord.class)
+        .eq(FireSafetyRecord::getIsDeleted, 0)
+        .eq(orgId != null, FireSafetyRecord::getOrgId, orgId)
+        .eq(normalizedRecordType != null, FireSafetyRecord::getRecordType, normalizedRecordType)
+        .eq(FireSafetyRecord::getStatus, "OPEN")
+        .isNotNull(FireSafetyRecord::getNextCheckDate)
+        .between(FireSafetyRecord::getNextCheckDate, LocalDate.now(), LocalDate.now().plusDays(7))));
     response.setTypeStats(typeStats);
     return Result.ok(response);
   }
@@ -389,6 +421,9 @@ public class FireSafetyRecordController {
       item.setDutyRecord(record.getDutyRecord());
       item.setHandoverPunchTime(formatDateTime(record.getHandoverPunchTime()));
       item.setEquipmentBatchNo(record.getEquipmentBatchNo());
+      item.setProductProductionDate(formatDate(record.getProductProductionDate()));
+      item.setProductExpiryDate(formatDate(record.getProductExpiryDate()));
+      item.setCheckCycleDays(record.getCheckCycleDays());
       item.setEquipmentUpdateNote(record.getEquipmentUpdateNote());
       item.setEquipmentAgingDisposal(record.getEquipmentAgingDisposal());
       item.setIssueDescription(record.getIssueDescription());
@@ -418,6 +453,9 @@ public class FireSafetyRecordController {
         "值班记录",
         "交接班打卡",
         "设备批号",
+        "产品生产日期",
+        "产品过期日期",
+        "检查周期(天)",
         "设备更新记录",
         "设备老化处置",
         "问题描述",
@@ -434,11 +472,55 @@ public class FireSafetyRecordController {
         stringOf(item.getDutyRecord()),
         stringOf(item.getHandoverPunchTime()),
         stringOf(item.getEquipmentBatchNo()),
+        stringOf(item.getProductProductionDate()),
+        stringOf(item.getProductExpiryDate()),
+        stringOf(item.getCheckCycleDays()),
         stringOf(item.getEquipmentUpdateNote()),
         stringOf(item.getEquipmentAgingDisposal()),
         stringOf(item.getIssueDescription()),
         stringOf(item.getActionTaken()))).toList();
     return csvResponse("fire-safety-report", headers, rows);
+  }
+
+  @GetMapping(value = "/maintenance/export", produces = "text/csv;charset=UTF-8")
+  public ResponseEntity<byte[]> exportMaintenanceLog(
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String inspectorName,
+      @RequestParam(required = false) String status,
+      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+      @RequestParam(required = false) LocalDateTime checkTimeStart,
+      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+      @RequestParam(required = false) LocalDateTime checkTimeEnd) {
+    var wrapper = buildQueryWrapper(keyword, "MAINTENANCE_REPORT", inspectorName, status, checkTimeStart, checkTimeEnd);
+    wrapper.orderByDesc(FireSafetyRecord::getCheckTime).last("limit 5000");
+    List<FireSafetyRecord> records = recordMapper.selectList(wrapper);
+    List<String> headers = List.of(
+        "记录ID",
+        "标题",
+        "区域",
+        "负责人",
+        "检查时间",
+        "设备批号",
+        "产品生产日期",
+        "产品过期日期",
+        "检查周期(天)",
+        "状态",
+        "问题描述",
+        "处置措施");
+    List<List<String>> rows = records.stream().map(item -> List.of(
+        stringOf(item.getId()),
+        stringOf(item.getTitle()),
+        stringOf(item.getLocation()),
+        stringOf(item.getInspectorName()),
+        formatDateTime(item.getCheckTime()),
+        stringOf(item.getEquipmentBatchNo()),
+        formatDate(item.getProductProductionDate()),
+        formatDate(item.getProductExpiryDate()),
+        stringOf(item.getCheckCycleDays()),
+        stringOf(item.getStatus()),
+        stringOf(item.getIssueDescription()),
+        stringOf(item.getActionTaken()))).toList();
+    return csvResponse("fire-maintenance-log", headers, rows);
   }
 
   private FireSafetyRecord findAccessibleRecord(Long id) {
@@ -530,6 +612,10 @@ public class FireSafetyRecordController {
 
   private String formatDateTime(LocalDateTime value) {
     return value == null ? "" : value.format(DATETIME_FORMAT);
+  }
+
+  private String formatDate(LocalDate value) {
+    return value == null ? "" : value.toString();
   }
 
   private String stringOf(Object value) {

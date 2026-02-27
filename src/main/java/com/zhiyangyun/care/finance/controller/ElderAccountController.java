@@ -9,7 +9,12 @@ import com.zhiyangyun.care.finance.model.ElderAccountResponse;
 import com.zhiyangyun.care.finance.model.ElderAccountUpdateRequest;
 import com.zhiyangyun.care.finance.service.ElderAccountService;
 import jakarta.validation.Valid;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -42,6 +47,21 @@ public class ElderAccountController {
       @RequestParam(required = false) Long accountId,
       @RequestParam(required = false) String keyword) {
     return Result.ok(accountService.logPage(AuthContext.getOrgId(), pageNo, pageSize, elderId, accountId, keyword));
+  }
+
+  @GetMapping("/log/print")
+  public ResponseEntity<byte[]> printLog(
+      @RequestParam(required = false) Long elderId,
+      @RequestParam(required = false) Long accountId,
+      @RequestParam(required = false) String keyword) {
+    byte[] pdf = accountService.exportLogPdf(AuthContext.getOrgId(), AuthContext.getStaffId(), elderId, accountId, keyword);
+    String filename = "elder-account-log-" + System.currentTimeMillis() + ".pdf";
+    return ResponseEntity.ok()
+        .contentType(MediaType.APPLICATION_PDF)
+        .header(
+            HttpHeaders.CONTENT_DISPOSITION,
+            "attachment; filename*=UTF-8''" + URLEncoder.encode(filename, StandardCharsets.UTF_8))
+        .body(pdf);
   }
 
   @PostMapping("/adjust")

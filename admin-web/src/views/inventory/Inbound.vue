@@ -101,7 +101,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportCsv } from '../../utils/export'
-import { createInbound, getInventoryInboundPage } from '../../api/inventory'
+import { createInbound, getInventoryInboundPage } from '../../api/materialCenter'
 import { getProductPage } from '../../api/store'
 import type { InventoryInboundRequest, InventoryLogItem, PageResult, ProductItem } from '../../types'
 

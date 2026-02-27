@@ -12,15 +12,15 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public interface CareTaskService {
-  List<CareTaskTodayItem> getTodayTasks(Long tenantId, Long staffId, LocalDate date);
+  List<CareTaskTodayItem> getTodayTasks(Long tenantId, Long staffId, Long elderId, LocalDate date);
 
   List<CareTaskExecuteLogItem> listExecuteLogs(Long tenantId, Long taskDailyId);
 
   IPage<CareTaskTodayItem> page(Long tenantId, long pageNo, long pageSize, LocalDate dateFrom,
-      LocalDate dateTo, Long staffId, String roomNo, String careLevel, String status, String keyword,
+      LocalDate dateTo, Long staffId, Long elderId, String roomNo, String careLevel, String status, String keyword,
       Boolean overdueOnly);
 
-  CareTaskSummaryResponse summary(Long tenantId, LocalDate dateFrom, LocalDate dateTo, Long staffId,
+  CareTaskSummaryResponse summary(Long tenantId, LocalDate dateFrom, LocalDate dateTo, Long staffId, Long elderId,
       String roomNo, String careLevel, String status, String keyword, Boolean overdueOnly);
 
   void assignTask(Long tenantId, Long taskDailyId, Long staffId, boolean force);
