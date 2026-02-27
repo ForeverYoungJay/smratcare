@@ -9,6 +9,7 @@ import com.zhiyangyun.care.oa.entity.OaApproval;
 import com.zhiyangyun.care.oa.mapper.OaApprovalMapper;
 import com.zhiyangyun.care.oa.model.OaApprovalBatchRejectRequest;
 import com.zhiyangyun.care.oa.model.OaBatchIdsRequest;
+import com.zhiyangyun.care.oa.model.OaApprovalSummaryResponse;
 import com.zhiyangyun.care.oa.model.OaApprovalRequest;
 import jakarta.validation.Valid;
 import java.nio.charset.StandardCharsets;
@@ -49,21 +50,31 @@ public class OaApprovalController {
     Long orgId = AuthContext.getOrgId();
     String normalizedStatus = normalizeStatus(status);
     String normalizedType = normalizeType(type);
-    var wrapper = Wrappers.lambdaQuery(OaApproval.class)
-        .eq(OaApproval::getIsDeleted, 0)
-        .eq(orgId != null, OaApproval::getOrgId, orgId)
-        .eq(normalizedStatus != null, OaApproval::getStatus, normalizedStatus)
-        .eq(normalizedType != null, OaApproval::getApprovalType, normalizedType);
-    if (keyword != null && !keyword.isBlank()) {
-      wrapper.and(w -> w.like(OaApproval::getTitle, keyword)
-          .or()
-          .like(OaApproval::getApplicantName, keyword)
-          .or()
-          .like(OaApproval::getRemark, keyword));
-    }
-    wrapper
-        .orderByDesc(OaApproval::getCreateTime);
+    var wrapper = buildQuery(orgId, normalizedStatus, normalizedType, keyword).orderByDesc(OaApproval::getCreateTime);
     return Result.ok(approvalMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
+  }
+
+  @GetMapping("/summary")
+  public Result<OaApprovalSummaryResponse> summary(
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) String type,
+      @RequestParam(required = false) String keyword) {
+    Long orgId = AuthContext.getOrgId();
+    String normalizedStatus = normalizeStatus(status);
+    String normalizedType = normalizeType(type);
+    LocalDateTime now = LocalDateTime.now();
+
+    OaApprovalSummaryResponse response = new OaApprovalSummaryResponse();
+    response.setTotalCount(count(approvalMapper.selectCount(buildQuery(orgId, normalizedStatus, normalizedType, keyword))));
+    response.setPendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", normalizedType, keyword))));
+    response.setApprovedCount(count(approvalMapper.selectCount(buildQuery(orgId, "APPROVED", normalizedType, keyword))));
+    response.setRejectedCount(count(approvalMapper.selectCount(buildQuery(orgId, "REJECTED", normalizedType, keyword))));
+    response.setTimeoutPendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", normalizedType, keyword)
+        .lt(OaApproval::getCreateTime, now.minusHours(48)))));
+    response.setLeavePendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", "LEAVE", keyword))));
+    response.setReimbursePendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", "REIMBURSE", keyword))));
+    response.setPurchasePendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", "PURCHASE", keyword))));
+    return Result.ok(response);
   }
 
   @PostMapping
@@ -354,5 +365,24 @@ public class OaApprovalController {
       escaped.add(value);
     }
     return String.join(",", escaped);
+  }
+
+  private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OaApproval> buildQuery(
+      Long orgId, String normalizedStatus, String normalizedType, String keyword) {
+    var wrapper = Wrappers.lambdaQuery(OaApproval.class)
+        .eq(OaApproval::getIsDeleted, 0)
+        .eq(orgId != null, OaApproval::getOrgId, orgId)
+        .eq(normalizedStatus != null, OaApproval::getStatus, normalizedStatus)
+        .eq(normalizedType != null, OaApproval::getApprovalType, normalizedType);
+    if (keyword != null && !keyword.isBlank()) {
+      wrapper.and(w -> w.like(OaApproval::getTitle, keyword)
+          .or().like(OaApproval::getApplicantName, keyword)
+          .or().like(OaApproval::getRemark, keyword));
+    }
+    return wrapper;
+  }
+
+  private long count(Long value) {
+    return value == null ? 0L : value;
   }
 }

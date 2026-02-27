@@ -9,6 +9,7 @@ import com.zhiyangyun.care.oa.entity.OaTask;
 import com.zhiyangyun.care.oa.mapper.OaTaskMapper;
 import com.zhiyangyun.care.oa.model.OaBatchIdsRequest;
 import com.zhiyangyun.care.oa.model.OaTaskRequest;
+import com.zhiyangyun.care.oa.model.OaTaskSummaryResponse;
 import com.zhiyangyun.care.oa.model.OaTaskTrendItem;
 import jakarta.validation.Valid;
 import java.nio.charset.StandardCharsets;
@@ -54,17 +55,39 @@ public class OaTaskController {
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
     String normalizedStatus = normalizeStatus(status);
-    var wrapper = Wrappers.lambdaQuery(OaTask.class)
-        .eq(OaTask::getIsDeleted, 0)
-        .eq(orgId != null, OaTask::getOrgId, orgId)
-        .eq(normalizedStatus != null, OaTask::getStatus, normalizedStatus)
-        .orderByDesc(OaTask::getStartTime);
-    if (keyword != null && !keyword.isBlank()) {
-      wrapper.and(w -> w.like(OaTask::getTitle, keyword)
-          .or().like(OaTask::getDescription, keyword)
-          .or().like(OaTask::getAssigneeName, keyword));
-    }
+    var wrapper = buildQuery(orgId, normalizedStatus, keyword).orderByDesc(OaTask::getStartTime);
     return Result.ok(taskMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
+  }
+
+  @GetMapping("/summary")
+  @PreAuthorize("@perm.has('oa.calendar.view')")
+  public Result<OaTaskSummaryResponse> summary(
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) String keyword) {
+    Long orgId = AuthContext.getOrgId();
+    String normalizedStatus = normalizeStatus(status);
+    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime startOfToday = now.toLocalDate().atStartOfDay();
+    LocalDateTime endOfToday = startOfToday.plusDays(1);
+
+    OaTaskSummaryResponse response = new OaTaskSummaryResponse();
+    response.setTotalCount(count(taskMapper.selectCount(buildQuery(orgId, normalizedStatus, keyword))));
+    response.setOpenCount(count(taskMapper.selectCount(buildQuery(orgId, "OPEN", keyword))));
+    response.setDoneCount(count(taskMapper.selectCount(buildQuery(orgId, "DONE", keyword))));
+    response.setHighPriorityCount(count(taskMapper.selectCount(buildQuery(orgId, normalizedStatus, keyword)
+        .eq(OaTask::getPriority, "HIGH"))));
+    response.setDueTodayCount(count(taskMapper.selectCount(buildQuery(orgId, normalizedStatus, keyword)
+        .eq(OaTask::getStatus, "OPEN")
+        .isNotNull(OaTask::getEndTime)
+        .ge(OaTask::getEndTime, startOfToday)
+        .lt(OaTask::getEndTime, endOfToday))));
+    response.setOverdueCount(count(taskMapper.selectCount(buildQuery(orgId, normalizedStatus, keyword)
+        .eq(OaTask::getStatus, "OPEN")
+        .isNotNull(OaTask::getEndTime)
+        .lt(OaTask::getEndTime, now))));
+    response.setUnassignedCount(count(taskMapper.selectCount(buildQuery(orgId, normalizedStatus, keyword)
+        .and(w -> w.isNull(OaTask::getAssigneeName).or().eq(OaTask::getAssigneeName, "")))));
+    return Result.ok(response);
   }
 
   @GetMapping("/calendar")
@@ -379,6 +402,24 @@ public class OaTaskController {
       escaped.add(value);
     }
     return String.join(",", escaped);
+  }
+
+  private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OaTask> buildQuery(
+      Long orgId, String normalizedStatus, String keyword) {
+    var wrapper = Wrappers.lambdaQuery(OaTask.class)
+        .eq(OaTask::getIsDeleted, 0)
+        .eq(orgId != null, OaTask::getOrgId, orgId)
+        .eq(normalizedStatus != null, OaTask::getStatus, normalizedStatus);
+    if (keyword != null && !keyword.isBlank()) {
+      wrapper.and(w -> w.like(OaTask::getTitle, keyword)
+          .or().like(OaTask::getDescription, keyword)
+          .or().like(OaTask::getAssigneeName, keyword));
+    }
+    return wrapper;
+  }
+
+  private long count(Long value) {
+    return value == null ? 0L : value;
   }
 
   private String toPeriod(LocalDateTime time, String dimension) {

@@ -8,6 +8,7 @@ import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.oa.entity.OaTodo;
 import com.zhiyangyun.care.oa.mapper.OaTodoMapper;
 import com.zhiyangyun.care.oa.model.OaBatchIdsRequest;
+import com.zhiyangyun.care.oa.model.OaTodoSummaryResponse;
 import com.zhiyangyun.care.oa.model.OaTodoRequest;
 import jakarta.validation.Valid;
 import java.nio.charset.StandardCharsets;
@@ -46,17 +47,36 @@ public class OaTodoController {
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
     String normalizedStatus = normalizeStatus(status);
-    var wrapper = Wrappers.lambdaQuery(OaTodo.class)
-        .eq(OaTodo::getIsDeleted, 0)
-        .eq(orgId != null, OaTodo::getOrgId, orgId)
-        .eq(normalizedStatus != null, OaTodo::getStatus, normalizedStatus)
-        .orderByDesc(OaTodo::getCreateTime);
-    if (keyword != null && !keyword.isBlank()) {
-      wrapper.and(w -> w.like(OaTodo::getTitle, keyword)
-          .or().like(OaTodo::getContent, keyword)
-          .or().like(OaTodo::getAssigneeName, keyword));
-    }
+    var wrapper = buildQuery(orgId, normalizedStatus, keyword).orderByDesc(OaTodo::getCreateTime);
     return Result.ok(todoMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
+  }
+
+  @GetMapping("/summary")
+  public Result<OaTodoSummaryResponse> summary(
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) String keyword) {
+    Long orgId = AuthContext.getOrgId();
+    String normalizedStatus = normalizeStatus(status);
+    LocalDateTime now = LocalDateTime.now();
+    LocalDateTime startOfToday = now.toLocalDate().atStartOfDay();
+    LocalDateTime endOfToday = startOfToday.plusDays(1);
+
+    OaTodoSummaryResponse response = new OaTodoSummaryResponse();
+    response.setTotalCount(count(todoMapper.selectCount(buildQuery(orgId, normalizedStatus, keyword))));
+    response.setOpenCount(count(todoMapper.selectCount(buildQuery(orgId, "OPEN", keyword))));
+    response.setDoneCount(count(todoMapper.selectCount(buildQuery(orgId, "DONE", keyword))));
+    response.setDueTodayCount(count(todoMapper.selectCount(buildQuery(orgId, normalizedStatus, keyword)
+        .eq(OaTodo::getStatus, "OPEN")
+        .isNotNull(OaTodo::getDueTime)
+        .ge(OaTodo::getDueTime, startOfToday)
+        .lt(OaTodo::getDueTime, endOfToday))));
+    response.setOverdueCount(count(todoMapper.selectCount(buildQuery(orgId, normalizedStatus, keyword)
+        .eq(OaTodo::getStatus, "OPEN")
+        .isNotNull(OaTodo::getDueTime)
+        .lt(OaTodo::getDueTime, now))));
+    response.setUnassignedCount(count(todoMapper.selectCount(buildQuery(orgId, normalizedStatus, keyword)
+        .and(w -> w.isNull(OaTodo::getAssigneeName).or().eq(OaTodo::getAssigneeName, "")))));
+    return Result.ok(response);
   }
 
   @PostMapping
@@ -263,5 +283,23 @@ public class OaTodoController {
       escaped.add(value);
     }
     return String.join(",", escaped);
+  }
+
+  private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OaTodo> buildQuery(
+      Long orgId, String normalizedStatus, String keyword) {
+    var wrapper = Wrappers.lambdaQuery(OaTodo.class)
+        .eq(OaTodo::getIsDeleted, 0)
+        .eq(orgId != null, OaTodo::getOrgId, orgId)
+        .eq(normalizedStatus != null, OaTodo::getStatus, normalizedStatus);
+    if (keyword != null && !keyword.isBlank()) {
+      wrapper.and(w -> w.like(OaTodo::getTitle, keyword)
+          .or().like(OaTodo::getContent, keyword)
+          .or().like(OaTodo::getAssigneeName, keyword));
+    }
+    return wrapper;
+  }
+
+  private long count(Long value) {
+    return value == null ? 0L : value;
   }
 }

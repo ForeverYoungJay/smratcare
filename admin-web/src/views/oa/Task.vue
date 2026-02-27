@@ -17,35 +17,55 @@
           </template>
         </SearchForm>
 
-        <DataTable
-          rowKey="id"
-          :row-selection="rowSelection"
-          :columns="columns"
-          :data-source="rows"
-          :loading="loading"
-          :pagination="pagination"
-          @change="handleTableChange"
-        >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'status'">
-              <a-tag :color="record.status === 'DONE' ? 'green' : 'orange'">
-                {{ record.status === 'DONE' ? '已完成' : '进行中' }}
-              </a-tag>
+        <StatefulBlock :loading="summaryLoading" :error="summaryError" :empty="false" @retry="fetchData">
+          <a-row :gutter="[12, 12]" style="margin-bottom: 12px">
+            <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="总任务" :value="summary.totalCount || 0" /></a-card></a-col>
+            <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="进行中" :value="summary.openCount || 0" /></a-card></a-col>
+            <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已完成" :value="summary.doneCount || 0" /></a-card></a-col>
+            <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="高优先级" :value="summary.highPriorityCount || 0" /></a-card></a-col>
+            <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="今日到期" :value="summary.dueTodayCount || 0" /></a-card></a-col>
+            <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已逾期" :value="summary.overdueCount || 0" /></a-card></a-col>
+          </a-row>
+          <a-alert
+            v-if="(summary.overdueCount || 0) > 0 || (summary.highPriorityCount || 0) > 0"
+            type="warning"
+            show-icon
+            style="margin-bottom: 12px"
+            :message="`任务提醒：逾期 ${summary.overdueCount || 0} 条，高优先级 ${summary.highPriorityCount || 0} 条。`"
+          />
+        </StatefulBlock>
+
+        <StatefulBlock :loading="loading" :error="tableError" :empty="!loading && !tableError && rows.length === 0" empty-text="暂无任务记录" @retry="fetchData">
+          <DataTable
+            rowKey="id"
+            :row-selection="rowSelection"
+            :columns="columns"
+            :data-source="rows"
+            :loading="false"
+            :pagination="pagination"
+            @change="handleTableChange"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'status'">
+                <a-tag :color="record.status === 'DONE' ? 'green' : 'orange'">
+                  {{ record.status === 'DONE' ? '已完成' : '进行中' }}
+                </a-tag>
+              </template>
+              <template v-else-if="column.key === 'priority'">
+                <a-tag :color="record.priority === 'HIGH' ? 'red' : record.priority === 'LOW' ? 'blue' : 'gold'">
+                  {{ priorityLabel(record.priority) }}
+                </a-tag>
+              </template>
+              <template v-else-if="column.key === 'action'">
+                <a-space>
+                  <a-button type="link" :disabled="record.status !== 'OPEN'" @click="openEdit(record)">编辑</a-button>
+                  <a-button type="link" :disabled="record.status !== 'OPEN'" @click="done(record)">完成</a-button>
+                  <a-button type="link" danger @click="remove(record)">删除</a-button>
+                </a-space>
+              </template>
             </template>
-            <template v-else-if="column.key === 'priority'">
-              <a-tag :color="record.priority === 'HIGH' ? 'red' : record.priority === 'LOW' ? 'blue' : 'gold'">
-                {{ priorityLabel(record.priority) }}
-              </a-tag>
-            </template>
-            <template v-else-if="column.key === 'action'">
-              <a-space>
-                <a-button type="link" :disabled="record.status !== 'OPEN'" @click="openEdit(record)">编辑</a-button>
-                <a-button type="link" :disabled="record.status !== 'OPEN'" @click="done(record)">完成</a-button>
-                <a-button type="link" danger @click="remove(record)">删除</a-button>
-              </a-space>
-            </template>
-          </template>
-        </DataTable>
+          </DataTable>
+        </StatefulBlock>
       </a-tab-pane>
       <a-tab-pane key="calendar" tab="日历视图">
         <a-card class="card-elevated" :bordered="false">
@@ -101,7 +121,9 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import StatefulBlock from '../../components/StatefulBlock.vue'
 import {
+  getOaTaskSummary,
   getOaTaskPage,
   createOaTask,
   updateOaTask,
@@ -111,17 +133,29 @@ import {
   batchDeleteOaTask,
   exportOaTask
 } from '../../api/oa'
-import type { OaTask, PageResult } from '../../types'
+import type { OaTask, OaTaskSummary, PageResult } from '../../types'
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
 
 const activeKey = ref('list')
 const loading = ref(false)
+const tableError = ref('')
+const summaryLoading = ref(false)
+const summaryError = ref('')
 const rows = ref<OaTask[]>([])
 const query = reactive({ keyword: '', status: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const selectedRowKeys = ref<number[]>([])
+const summary = reactive<OaTaskSummary>({
+  totalCount: 0,
+  openCount: 0,
+  doneCount: 0,
+  highPriorityCount: 0,
+  dueTodayCount: 0,
+  overdueCount: 0,
+  unassignedCount: 0
+})
 
 const columns = [
   { title: '标题', dataIndex: 'title', key: 'title', width: 200 },
@@ -180,18 +214,31 @@ const rowSelection = computed(() => ({
 
 async function fetchData() {
   loading.value = true
+  summaryLoading.value = true
+  tableError.value = ''
+  summaryError.value = ''
   try {
-    const res: PageResult<OaTask> = await getOaTaskPage({
+    const params = {
       pageNo: query.pageNo,
       pageSize: query.pageSize,
       status: query.status,
       keyword: query.keyword || undefined
-    })
+    }
+    const [res, sum] = await Promise.all([
+      getOaTaskPage(params),
+      getOaTaskSummary(params)
+    ])
     rows.value = res.list
     pagination.total = res.total || res.list.length
     selectedRowKeys.value = []
+    Object.assign(summary, sum || {})
+  } catch (error: any) {
+    const text = error?.message || '加载失败，请稍后重试'
+    tableError.value = text
+    summaryError.value = text
   } finally {
     loading.value = false
+    summaryLoading.value = false
   }
 }
 

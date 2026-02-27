@@ -5,6 +5,9 @@ const apiProxyTarget = process.env.VITE_API_PROXY_TARGET || 'http://localhost:80
 
 export default defineConfig({
   plugins: [vue()],
+  resolve: {
+    extensions: ['.ts', '.tsx', '.mts', '.js', '.jsx', '.mjs', '.json']
+  },
   test: {
     environment: 'jsdom',
     globals: true,

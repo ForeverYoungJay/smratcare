@@ -16,6 +16,15 @@ export interface OaTodo {
   assigneeName?: string
 }
 
+export interface OaTodoSummary {
+  totalCount: number
+  openCount: number
+  doneCount: number
+  dueTodayCount: number
+  overdueCount: number
+  unassignedCount: number
+}
+
 export interface OaApproval {
   id: number
   approvalType: string
@@ -27,6 +36,17 @@ export interface OaApproval {
   formData?: string
   status?: string
   remark?: string
+}
+
+export interface OaApprovalSummary {
+  totalCount: number
+  pendingCount: number
+  approvedCount: number
+  rejectedCount: number
+  timeoutPendingCount: number
+  leavePendingCount: number
+  reimbursePendingCount: number
+  purchasePendingCount: number
 }
 
 export interface OaDocument {
@@ -97,6 +117,16 @@ export interface OaTask {
   priority?: string
   status?: string
   assigneeName?: string
+}
+
+export interface OaTaskSummary {
+  totalCount: number
+  openCount: number
+  doneCount: number
+  highPriorityCount: number
+  dueTodayCount: number
+  overdueCount: number
+  unassignedCount: number
 }
 
 export interface OaPortalSummary {

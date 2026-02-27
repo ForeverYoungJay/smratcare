@@ -19,31 +19,53 @@
       </template>
     </SearchForm>
 
-    <DataTable
-      rowKey="id"
-      :row-selection="rowSelection"
-      :columns="columns"
-      :data-source="rows"
-      :loading="loading"
-      :pagination="pagination"
-      @change="handleTableChange"
-    >
-      <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'status'">
-          <a-tag :color="record.status === 'APPROVED' ? 'green' : record.status === 'REJECTED' ? 'red' : 'orange'">
-            {{ statusLabel(record.status) }}
-          </a-tag>
+    <StatefulBlock :loading="summaryLoading" :error="summaryError" :empty="false" @retry="fetchData">
+      <a-row :gutter="[12, 12]" style="margin-bottom: 12px">
+        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="总单数" :value="summary.totalCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="待审批" :value="summary.pendingCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已通过" :value="summary.approvedCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已驳回" :value="summary.rejectedCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="超时待审" :value="summary.timeoutPendingCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="请假待审" :value="summary.leavePendingCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="报销待审" :value="summary.reimbursePendingCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="采购待审" :value="summary.purchasePendingCount || 0" /></a-card></a-col>
+      </a-row>
+      <a-alert
+        v-if="(summary.timeoutPendingCount || 0) > 0"
+        type="warning"
+        show-icon
+        style="margin-bottom: 12px"
+        :message="`审批提醒：存在 ${summary.timeoutPendingCount || 0} 条超时待审批单。`"
+      />
+    </StatefulBlock>
+
+    <StatefulBlock :loading="loading" :error="tableError" :empty="!loading && !tableError && rows.length === 0" empty-text="暂无审批记录" @retry="fetchData">
+      <DataTable
+        rowKey="id"
+        :row-selection="rowSelection"
+        :columns="columns"
+        :data-source="rows"
+        :loading="false"
+        :pagination="pagination"
+        @change="handleTableChange"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'status'">
+            <a-tag :color="record.status === 'APPROVED' ? 'green' : record.status === 'REJECTED' ? 'red' : 'orange'">
+              {{ statusLabel(record.status) }}
+            </a-tag>
+          </template>
+          <template v-else-if="column.key === 'action'">
+            <a-space>
+              <a-button type="link" :disabled="record.status !== 'PENDING'" @click="openEdit(record)">编辑</a-button>
+              <a-button type="link" :disabled="record.status !== 'PENDING'" @click="approve(record)">通过</a-button>
+              <a-button type="link" :disabled="record.status !== 'PENDING'" @click="reject(record)">驳回</a-button>
+              <a-button type="link" danger @click="remove(record)">删除</a-button>
+            </a-space>
+          </template>
         </template>
-        <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" :disabled="record.status !== 'PENDING'" @click="openEdit(record)">编辑</a-button>
-            <a-button type="link" :disabled="record.status !== 'PENDING'" @click="approve(record)">通过</a-button>
-            <a-button type="link" :disabled="record.status !== 'PENDING'" @click="reject(record)">驳回</a-button>
-            <a-button type="link" danger @click="remove(record)">删除</a-button>
-          </a-space>
-        </template>
-      </template>
-    </DataTable>
+      </DataTable>
+    </StatefulBlock>
 
     <a-modal v-model:open="editOpen" title="审批" @ok="submit" :confirm-loading="saving" width="700px">
       <a-form layout="vertical">
@@ -138,7 +160,9 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import StatefulBlock from '../../components/StatefulBlock.vue'
 import {
+  getApprovalSummary,
   getApprovalPage,
   createApproval,
   updateApproval,
@@ -151,9 +175,12 @@ import {
   exportApproval,
   uploadOaFile
 } from '../../api/oa'
-import type { OaApproval, PageResult } from '../../types'
+import type { OaApproval, OaApprovalSummary, PageResult } from '../../types'
 
 const loading = ref(false)
+const tableError = ref('')
+const summaryLoading = ref(false)
+const summaryError = ref('')
 const rows = ref<OaApproval[]>([])
 const route = useRoute()
 const query = reactive({
@@ -165,6 +192,16 @@ const query = reactive({
 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const selectedRowKeys = ref<number[]>([])
+const summary = reactive<OaApprovalSummary>({
+  totalCount: 0,
+  pendingCount: 0,
+  approvedCount: 0,
+  rejectedCount: 0,
+  timeoutPendingCount: 0,
+  leavePendingCount: 0,
+  reimbursePendingCount: 0,
+  purchasePendingCount: 0
+})
 
 const columns = [
   { title: '类型', dataIndex: 'approvalType', key: 'approvalType', width: 120 },
@@ -223,19 +260,32 @@ function statusLabel(status?: string) {
 
 async function fetchData() {
   loading.value = true
+  summaryLoading.value = true
+  tableError.value = ''
+  summaryError.value = ''
   try {
-    const res: PageResult<OaApproval> = await getApprovalPage({
+    const params = {
       pageNo: query.pageNo,
       pageSize: query.pageSize,
       status: query.status,
       type: query.type,
       keyword: query.keyword || undefined
-    })
+    }
+    const [res, sum] = await Promise.all([
+      getApprovalPage(params),
+      getApprovalSummary(params)
+    ])
     rows.value = res.list
     pagination.total = res.total || res.list.length
     selectedRowKeys.value = []
+    Object.assign(summary, sum || {})
+  } catch (error: any) {
+    const text = error?.message || '加载失败，请稍后重试'
+    tableError.value = text
+    summaryError.value = text
   } finally {
     loading.value = false
+    summaryLoading.value = false
   }
 }
 

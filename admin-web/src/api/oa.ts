@@ -2,9 +2,12 @@ import request, { fetchPage } from '../utils/request'
 import type {
   OaNotice,
   OaTodo,
+  OaTodoSummary,
   OaApproval,
+  OaApprovalSummary,
   OaDocument,
   OaTask,
+  OaTaskSummary,
   OaPortalSummary,
   OaWorkReport,
   OaWorkReportSummary,
@@ -78,6 +81,10 @@ export function getTodoPage(params: any) {
   return fetchPage<OaTodo>('/api/oa/todo/page', params)
 }
 
+export function getTodoSummary(params: any) {
+  return request.get<OaTodoSummary>('/api/oa/todo/summary', { params })
+}
+
 export function createTodo(data: Partial<OaTodo>) {
   return request.post<OaTodo>('/api/oa/todo', data)
 }
@@ -108,6 +115,10 @@ export function exportTodo(params: any) {
 
 export function getApprovalPage(params: any) {
   return fetchPage<OaApproval>('/api/oa/approval/page', params)
+}
+
+export function getApprovalSummary(params: any) {
+  return request.get<OaApprovalSummary>('/api/oa/approval/summary', { params })
 }
 
 export function createApproval(data: Partial<OaApproval>) {
@@ -316,6 +327,10 @@ export function exportActivityPlan(params: any) {
 
 export function getOaTaskPage(params: any) {
   return fetchPage<OaTask>('/api/oa/task/page', params)
+}
+
+export function getOaTaskSummary(params: any) {
+  return request.get<OaTaskSummary>('/api/oa/task/summary', { params })
 }
 
 export function getOaTaskCalendar(params: any) {
