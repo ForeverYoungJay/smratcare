@@ -2,6 +2,7 @@ package com.zhiyangyun.care.crm.controller;
 
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
+import com.zhiyangyun.care.crm.model.CrmContractAssessmentOverviewResponse;
 import com.zhiyangyun.care.crm.model.CrmContractLinkageResponse;
 import com.zhiyangyun.care.crm.service.CrmContractLinkageService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,5 +28,12 @@ public class CrmContractLinkageController {
   @GetMapping("/{leadId}/linkage")
   public Result<CrmContractLinkageResponse> linkageByLead(@PathVariable Long leadId) {
     return Result.ok(linkageService.getByLeadId(AuthContext.getOrgId(), leadId));
+  }
+
+  @GetMapping("/assessment-overview")
+  public Result<CrmContractAssessmentOverviewResponse> assessmentOverview(
+      @RequestParam(required = false) Long elderId,
+      @RequestParam(required = false) Long leadId) {
+    return Result.ok(linkageService.getAssessmentOverview(AuthContext.getOrgId(), elderId, leadId));
   }
 }

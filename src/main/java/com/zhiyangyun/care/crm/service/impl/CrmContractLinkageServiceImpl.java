@@ -1,12 +1,17 @@
 package com.zhiyangyun.care.crm.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.zhiyangyun.care.assessment.entity.AssessmentRecord;
+import com.zhiyangyun.care.assessment.mapper.AssessmentRecordMapper;
 import com.zhiyangyun.care.bill.entity.BillMonthly;
 import com.zhiyangyun.care.bill.mapper.BillMonthlyMapper;
 import com.zhiyangyun.care.crm.entity.CrmContractAttachment;
 import com.zhiyangyun.care.crm.entity.CrmLead;
 import com.zhiyangyun.care.crm.mapper.CrmContractAttachmentMapper;
 import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
+import com.zhiyangyun.care.crm.model.CrmContractAssessmentContractItem;
+import com.zhiyangyun.care.crm.model.CrmContractAssessmentOverviewResponse;
+import com.zhiyangyun.care.crm.model.CrmContractAssessmentReportItem;
 import com.zhiyangyun.care.crm.model.CrmContractLinkageResponse;
 import com.zhiyangyun.care.crm.model.action.CrmContractAttachmentResponse;
 import com.zhiyangyun.care.crm.service.CrmContractLinkageService;
@@ -15,7 +20,10 @@ import com.zhiyangyun.care.elder.entity.lifecycle.ElderAdmission;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderAdmissionMapper;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -26,18 +34,21 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
   private final ElderMapper elderMapper;
   private final ElderAdmissionMapper admissionMapper;
   private final BillMonthlyMapper billMonthlyMapper;
+  private final AssessmentRecordMapper assessmentRecordMapper;
 
   public CrmContractLinkageServiceImpl(
       CrmLeadMapper leadMapper,
       CrmContractAttachmentMapper attachmentMapper,
       ElderMapper elderMapper,
       ElderAdmissionMapper admissionMapper,
-      BillMonthlyMapper billMonthlyMapper) {
+      BillMonthlyMapper billMonthlyMapper,
+      AssessmentRecordMapper assessmentRecordMapper) {
     this.leadMapper = leadMapper;
     this.attachmentMapper = attachmentMapper;
     this.elderMapper = elderMapper;
     this.admissionMapper = admissionMapper;
     this.billMonthlyMapper = billMonthlyMapper;
+    this.assessmentRecordMapper = assessmentRecordMapper;
   }
 
   @Override
@@ -116,6 +127,39 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
     }
 
     fillAttachments(response, tenantId, leadId, response.getContractNo());
+    return response;
+  }
+
+  @Override
+  public CrmContractAssessmentOverviewResponse getAssessmentOverview(Long tenantId, Long elderId, Long leadId) {
+    if (tenantId == null) {
+      return null;
+    }
+    ElderProfile elder = resolveElderForOverview(tenantId, elderId, leadId);
+    CrmContractAssessmentOverviewResponse response = new CrmContractAssessmentOverviewResponse();
+    if (elder == null) {
+      return response;
+    }
+    response.setElderId(elder.getId());
+    response.setElderName(elder.getFullName());
+    response.setElderPhone(elder.getPhone());
+
+    List<CrmLead> contracts = listContractsByElder(tenantId, elder);
+    List<CrmContractAssessmentContractItem> contractItems = contracts.stream()
+        .map(this::toContractItem)
+        .toList();
+    response.setContracts(contractItems);
+    response.setTotalContractCount(contractItems.size());
+
+    List<AssessmentRecord> records = assessmentRecordMapper.selectList(Wrappers.lambdaQuery(AssessmentRecord.class)
+        .eq(AssessmentRecord::getIsDeleted, 0)
+        .eq(AssessmentRecord::getOrgId, tenantId)
+        .eq(AssessmentRecord::getElderId, elder.getId())
+        .eq(AssessmentRecord::getAssessmentType, "ADMISSION")
+        .orderByDesc(AssessmentRecord::getAssessmentDate)
+        .orderByDesc(AssessmentRecord::getUpdateTime));
+    response.setTotalReportCount(records.size());
+    attachReportsByContract(contractItems, records, response);
     return response;
   }
 
@@ -201,6 +245,146 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
         .orderByDesc(ElderProfile::getAdmissionDate)
         .orderByDesc(ElderProfile::getCreateTime)
         .last("LIMIT 1"));
+  }
+
+  private ElderProfile resolveElderForOverview(Long tenantId, Long elderId, Long leadId) {
+    if (elderId != null) {
+      ElderProfile elder = elderMapper.selectById(elderId);
+      if (elder != null && Integer.valueOf(0).equals(elder.getIsDeleted()) && tenantId.equals(elder.getTenantId())) {
+        return elder;
+      }
+    }
+    if (leadId != null) {
+      CrmLead lead = leadMapper.selectById(leadId);
+      if (!isOwnedLead(lead, tenantId)) {
+        return null;
+      }
+      return findElderByLead(tenantId, lead);
+    }
+    return null;
+  }
+
+  private boolean isOwnedLead(CrmLead lead, Long tenantId) {
+    return lead != null && Integer.valueOf(0).equals(lead.getIsDeleted()) && tenantId.equals(lead.getTenantId());
+  }
+
+  private List<CrmLead> listContractsByElder(Long tenantId, ElderProfile elder) {
+    if (elder == null) {
+      return Collections.emptyList();
+    }
+    var wrapper = Wrappers.lambdaQuery(CrmLead.class)
+        .eq(CrmLead::getTenantId, tenantId)
+        .eq(CrmLead::getIsDeleted, 0)
+        .eq(CrmLead::getStatus, 2)
+        .orderByDesc(CrmLead::getContractSignedAt)
+        .orderByDesc(CrmLead::getCreateTime);
+    if (elder.getIdCardNo() != null && !elder.getIdCardNo().isBlank()) {
+      wrapper.and(w -> w.eq(CrmLead::getIdCardNo, elder.getIdCardNo())
+          .or(p -> p.eq(CrmLead::getElderName, elder.getFullName())
+              .eq(CrmLead::getElderPhone, elder.getPhone())));
+    } else {
+      wrapper.eq(CrmLead::getElderName, elder.getFullName())
+          .eq(CrmLead::getElderPhone, elder.getPhone());
+    }
+    List<CrmLead> list = leadMapper.selectList(wrapper);
+    if (list == null || list.isEmpty()) {
+      return Collections.emptyList();
+    }
+    LinkedHashMap<String, CrmLead> byContract = new LinkedHashMap<>();
+    for (CrmLead lead : list) {
+      if (lead.getContractNo() == null || lead.getContractNo().isBlank()) {
+        continue;
+      }
+      byContract.putIfAbsent(lead.getContractNo(), lead);
+    }
+    return byContract.values().stream().toList();
+  }
+
+  private CrmContractAssessmentContractItem toContractItem(CrmLead lead) {
+    CrmContractAssessmentContractItem item = new CrmContractAssessmentContractItem();
+    item.setLeadId(lead.getId());
+    item.setContractNo(lead.getContractNo());
+    item.setContractStatus(lead.getContractStatus());
+    item.setFlowStage(lead.getFlowStage());
+    item.setCurrentOwnerDept(lead.getCurrentOwnerDept());
+    item.setMarketerName(lead.getMarketerName());
+    item.setOrgName(lead.getOrgName());
+    item.setContractSignedAt(lead.getContractSignedAt());
+    item.setContractExpiryDate(lead.getContractExpiryDate());
+    return item;
+  }
+
+  private void attachReportsByContract(
+      List<CrmContractAssessmentContractItem> contracts,
+      List<AssessmentRecord> records,
+      CrmContractAssessmentOverviewResponse response) {
+    if (records == null || records.isEmpty()) {
+      return;
+    }
+    if (contracts == null || contracts.isEmpty()) {
+      response.setUnassignedReports(records.stream().map(this::toReportItem).toList());
+      return;
+    }
+    List<CrmContractAssessmentContractItem> sortedContracts = contracts.stream()
+        .sorted(Comparator.comparing(this::contractSignedDateSafe))
+        .toList();
+    for (AssessmentRecord record : records) {
+      CrmContractAssessmentContractItem matched = findMatchingContract(sortedContracts, record.getAssessmentDate());
+      if (matched == null) {
+        response.getUnassignedReports().add(toReportItem(record));
+        continue;
+      }
+      matched.getReports().add(toReportItem(record));
+    }
+    for (CrmContractAssessmentContractItem contract : contracts) {
+      contract.getReports().sort((a, b) -> {
+        LocalDate d1 = a.getAssessmentDate() == null ? LocalDate.MIN : a.getAssessmentDate();
+        LocalDate d2 = b.getAssessmentDate() == null ? LocalDate.MIN : b.getAssessmentDate();
+        return d2.compareTo(d1);
+      });
+    }
+  }
+
+  private LocalDate contractSignedDateSafe(CrmContractAssessmentContractItem item) {
+    if (item == null || item.getContractSignedAt() == null) {
+      return LocalDate.MIN;
+    }
+    return item.getContractSignedAt().toLocalDate();
+  }
+
+  private CrmContractAssessmentContractItem findMatchingContract(
+      List<CrmContractAssessmentContractItem> contracts, LocalDate assessmentDate) {
+    if (contracts == null || contracts.isEmpty()) {
+      return null;
+    }
+    if (assessmentDate == null) {
+      return contracts.get(contracts.size() - 1);
+    }
+    CrmContractAssessmentContractItem target = null;
+    for (CrmContractAssessmentContractItem item : contracts) {
+      LocalDate signedDate = contractSignedDateSafe(item);
+      if (signedDate.isAfter(assessmentDate)) {
+        continue;
+      }
+      target = item;
+    }
+    if (target != null) {
+      return target;
+    }
+    return contracts.get(0);
+  }
+
+  private CrmContractAssessmentReportItem toReportItem(AssessmentRecord record) {
+    CrmContractAssessmentReportItem item = new CrmContractAssessmentReportItem();
+    item.setRecordId(record.getId());
+    item.setAssessmentType(record.getAssessmentType());
+    item.setAssessmentDate(record.getAssessmentDate());
+    item.setStatus(record.getStatus());
+    item.setScore(record.getScore());
+    item.setLevelCode(record.getLevelCode());
+    item.setResultSummary(record.getResultSummary());
+    item.setNextAssessmentDate(record.getNextAssessmentDate());
+    return item;
   }
 
   private void fillBillingSummary(CrmContractLinkageResponse response, Long elderId, Long tenantId) {

@@ -28,6 +28,7 @@
         <a-space>
           <a-button @click="exportList">导出</a-button>
           <a-button @click="batchSms">批量发短信</a-button>
+          <a-button danger @click="batchDelete">批量删除</a-button>
           <a-button @click="settingReminder">到期提醒设置</a-button>
         </a-space>
       </div>
@@ -45,7 +46,10 @@
             <span>{{ calcCountdown(record.contractExpiryDate) }}</span>
           </template>
           <template v-else-if="column.key === 'operation'">
-            <a-button type="link" @click="sendSms(record)">短信</a-button>
+            <a-space>
+              <a-button type="link" @click="sendSms(record)">短信</a-button>
+              <a-button type="link" danger @click="removeRow(record)">删除</a-button>
+            </a-space>
           </template>
         </template>
       </a-table>
@@ -76,9 +80,9 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
-import { createSmsTasks, getLeadPage, getSmsTasks, sendSmsTask } from '../../api/marketing'
+import { batchDeleteLeads, createSmsTasks, deleteCrmLead, getLeadPage, getSmsTasks, sendSmsTask } from '../../api/marketing'
 import type { CrmLeadItem, PageResult, SmsTaskItem } from '../../types'
 
 const loading = ref(false)
@@ -108,7 +112,7 @@ const columns = [
   { title: '发送次数', dataIndex: 'smsSendCount', key: 'smsSendCount', width: 100 },
   { title: '倒计时', key: 'countdownDays', width: 100 },
   { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 },
-  { title: '操作', key: 'operation', fixed: 'right', width: 100 }
+  { title: '操作', key: 'operation', fixed: 'right', width: 150 }
 ]
 
 const rowSelection = computed(() => ({
@@ -211,6 +215,35 @@ async function batchSms() {
   await Promise.all((tasks || []).map((item) => sendSmsTask(item.id)))
   message.success(`已批量发送 ${tasks.length} 条短信`)
   fetchData()
+}
+
+function removeRow(record: CrmLeadItem) {
+  Modal.confirm({
+    title: `确认删除合同 ${record.contractNo || '-'} 吗？`,
+    onOk: async () => {
+      await deleteCrmLead(record.id)
+      selectedRowKeys.value = selectedRowKeys.value.filter((id) => id !== record.id)
+      message.success('合同已删除')
+      fetchData()
+    }
+  })
+}
+
+function batchDelete() {
+  const ids = selectedRowKeys.value
+  if (!ids.length) {
+    message.info('请先勾选合同')
+    return
+  }
+  Modal.confirm({
+    title: `确认删除选中的 ${ids.length} 条合同吗？`,
+    onOk: async () => {
+      await batchDeleteLeads({ ids })
+      selectedRowKeys.value = []
+      message.success('批量删除成功')
+      fetchData()
+    }
+  })
 }
 
 function exportList() {

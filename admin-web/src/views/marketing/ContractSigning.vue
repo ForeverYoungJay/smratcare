@@ -719,9 +719,11 @@ async function startAdmissionAssessment(record: CrmLeadItem) {
       ...lead,
       flowStage: 'PENDING_ASSESSMENT',
       currentOwnerDept: 'ASSESSMENT',
-      contractStatus: '待评估'
+      contractStatus: '待评估',
+      status: 2
     })
     const elder = await ensureElderFromLead(handed)
+    await fetchData()
     message.success('已移交评估部，请在长者管理完成入住评估')
     router.push(`/elder/admission-assessment?residentId=${elder.id}&leadId=${handed.id}&contractNo=${handed.contractNo || ''}`)
   } catch (error: any) {

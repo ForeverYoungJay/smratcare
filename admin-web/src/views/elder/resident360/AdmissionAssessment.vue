@@ -8,6 +8,24 @@
         style="margin-bottom: 12px"
       />
       <StatefulBlock :loading="loading" :error="errorMessage" @retry="loadLatestRecord">
+        <a-alert
+          v-if="contracts.length === 0"
+          type="warning"
+          show-icon
+          message="当前未匹配到合同信息，建议先在合同签约页执行“移交评估部”。"
+          style="margin-bottom: 12px"
+        />
+        <a-row :gutter="12" style="margin-bottom: 12px">
+          <a-col :xs="24" :sm="8">
+            <a-card size="small"><a-statistic title="合同数" :value="overview?.totalContractCount || 0" /></a-card>
+          </a-col>
+          <a-col :xs="24" :sm="8">
+            <a-card size="small"><a-statistic title="评估报告数" :value="overview?.totalReportCount || 0" /></a-card>
+          </a-col>
+          <a-col :xs="24" :sm="8">
+            <a-card size="small"><a-statistic title="待评估合同" :value="pendingAssessmentCount" /></a-card>
+          </a-col>
+        </a-row>
         <a-descriptions :column="1" size="small" bordered style="margin-bottom: 12px">
           <a-descriptions-item label="最近评估日期">{{ latestRecord?.assessmentDate || '-' }}</a-descriptions-item>
           <a-descriptions-item label="最近评估状态">{{ latestRecord?.status || '无记录' }}</a-descriptions-item>
@@ -17,6 +35,40 @@
             {{ isReassessOverdue ? '已到复评日期' : latestRecord?.nextAssessmentDate ? `下次复评 ${latestRecord?.nextAssessmentDate}` : '未设置' }}
           </a-descriptions-item>
         </a-descriptions>
+        <a-table
+          :data-source="contracts"
+          :columns="contractColumns"
+          :pagination="false"
+          row-key="contractNo"
+          size="small"
+          style="margin-bottom: 12px"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'flowStage'">
+              <a-tag :color="flowStageColor(record.flowStage)">{{ flowStageText(record.flowStage) }}</a-tag>
+            </template>
+            <template v-else-if="column.key === 'reportCount'">
+              {{ (record.reports || []).length }}
+            </template>
+          </template>
+          <template #expandedRowRender="{ record }">
+            <a-table
+              :data-source="record.reports || []"
+              :columns="reportColumns"
+              :pagination="false"
+              row-key="recordId"
+              size="small"
+              :locale="{ emptyText: '该合同暂未产生入住评估报告' }"
+            />
+          </template>
+        </a-table>
+        <a-alert
+          v-if="(overview?.unassignedReports || []).length"
+          type="warning"
+          show-icon
+          style="margin-bottom: 12px"
+          :message="`有 ${(overview?.unassignedReports || []).length} 条评估报告尚未匹配到具体合同，已纳入长者总评估记录。`"
+        />
         <a-typography-paragraph>
           输出：评估等级、建议护理套餐/服务频次、人力配置建议、评估报告下载并归档到长者档案。
         </a-typography-paragraph>
@@ -41,14 +93,38 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
 import { getAssessmentRecordPage } from '../../../api/assessment'
-import type { AssessmentRecord, PageResult } from '../../../types'
+import { getContractAssessmentOverview } from '../../../api/marketing'
+import type { AssessmentRecord, ContractAssessmentContractItem, ContractAssessmentOverview, PageResult } from '../../../types'
 
 const router = useRouter()
 const route = useRoute()
 const residentId = computed(() => Number(route.query.residentId || 0))
+const leadId = computed(() => Number(route.query.leadId || 0))
 const latestRecord = ref<AssessmentRecord | null>(null)
+const overview = ref<ContractAssessmentOverview | null>(null)
 const loading = ref(false)
 const errorMessage = ref('')
+const contracts = computed<ContractAssessmentContractItem[]>(() => overview.value?.contracts || [])
+const pendingAssessmentCount = computed(() =>
+  contracts.value.filter((item) => item.flowStage === 'PENDING_ASSESSMENT').length
+)
+
+const contractColumns = [
+  { title: '合同编号', dataIndex: 'contractNo', key: 'contractNo', width: 170 },
+  { title: '合同状态', dataIndex: 'contractStatus', key: 'contractStatus', width: 120 },
+  { title: '流程阶段', dataIndex: 'flowStage', key: 'flowStage', width: 120 },
+  { title: '签约时间', dataIndex: 'contractSignedAt', key: 'contractSignedAt', width: 170 },
+  { title: '到期日期', dataIndex: 'contractExpiryDate', key: 'contractExpiryDate', width: 120 },
+  { title: '报告数', dataIndex: 'reportCount', key: 'reportCount', width: 90 }
+]
+
+const reportColumns = [
+  { title: '评估日期', dataIndex: 'assessmentDate', key: 'assessmentDate', width: 120 },
+  { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
+  { title: '分值', dataIndex: 'score', key: 'score', width: 90 },
+  { title: '等级', dataIndex: 'levelCode', key: 'levelCode', width: 90 },
+  { title: '结论', dataIndex: 'resultSummary', key: 'resultSummary' }
+]
 
 const admissionPath = computed(() =>
   residentId.value ? `/elder/admission-processing?residentId=${residentId.value}` : '/elder/admission-processing'
@@ -87,29 +163,59 @@ function go(path: string) {
 }
 
 async function loadLatestRecord() {
-  loading.value = true
   errorMessage.value = ''
-  if (!residentId.value) {
-    latestRecord.value = null
-    loading.value = false
-    return
-  }
+  loading.value = true
   try {
-    const res: PageResult<AssessmentRecord> = await getAssessmentRecordPage({
-      pageNo: 1,
-      pageSize: 10,
-      assessmentType: 'ADMISSION',
-      elderId: residentId.value
-    })
-    const list = res.list || []
-    const draft = list.find((item) => item.status === 'DRAFT')
-    latestRecord.value = draft || list[0] || null
+    await Promise.all([loadContractOverview(), loadAssessmentRecord()])
   } catch (error: any) {
     errorMessage.value = error?.message || '加载入住评估失败'
     message.error(errorMessage.value)
   } finally {
     loading.value = false
   }
+}
+
+async function loadContractOverview() {
+  if (!residentId.value && !leadId.value) {
+    overview.value = null
+    return
+  }
+  overview.value = await getContractAssessmentOverview({
+    elderId: residentId.value || undefined,
+    leadId: leadId.value || undefined
+  })
+}
+
+async function loadAssessmentRecord() {
+  if (!residentId.value) {
+    latestRecord.value = null
+    return
+  }
+  const res: PageResult<AssessmentRecord> = await getAssessmentRecordPage({
+    pageNo: 1,
+    pageSize: 10,
+    assessmentType: 'ADMISSION',
+    elderId: residentId.value
+  })
+  const list = res.list || []
+  const draft = list.find((item) => item.status === 'DRAFT')
+  latestRecord.value = draft || list[0] || null
+}
+
+function flowStageText(stage?: string) {
+  if (stage === 'PENDING_ASSESSMENT') return '待评估'
+  if (stage === 'PENDING_BED_SELECT') return '待办理入住'
+  if (stage === 'PENDING_SIGN') return '待签署'
+  if (stage === 'SIGNED') return '已签署'
+  return stage || '-'
+}
+
+function flowStageColor(stage?: string) {
+  if (stage === 'PENDING_ASSESSMENT') return 'gold'
+  if (stage === 'PENDING_BED_SELECT') return 'blue'
+  if (stage === 'PENDING_SIGN') return 'purple'
+  if (stage === 'SIGNED') return 'green'
+  return 'default'
 }
 
 function downloadLatestReport() {
@@ -146,7 +252,7 @@ onMounted(() => {
 })
 
 watch(
-  () => residentId.value,
+  () => `${residentId.value}-${leadId.value}`,
   () => {
     loadLatestRecord()
   }

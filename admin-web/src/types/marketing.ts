@@ -194,6 +194,40 @@ export interface ContractLinkageSummary {
   attachments?: ContractAttachmentItem[]
 }
 
+export interface ContractAssessmentReportItem {
+  recordId: number
+  assessmentType?: string
+  assessmentDate?: string
+  status?: string
+  score?: number
+  levelCode?: string
+  resultSummary?: string
+  nextAssessmentDate?: string
+}
+
+export interface ContractAssessmentContractItem {
+  leadId?: number
+  contractNo?: string
+  contractStatus?: string
+  flowStage?: string
+  currentOwnerDept?: string
+  marketerName?: string
+  orgName?: string
+  contractSignedAt?: string
+  contractExpiryDate?: string
+  reports?: ContractAssessmentReportItem[]
+}
+
+export interface ContractAssessmentOverview {
+  elderId?: number
+  elderName?: string
+  elderPhone?: string
+  totalContractCount?: number
+  totalReportCount?: number
+  contracts?: ContractAssessmentContractItem[]
+  unassignedReports?: ContractAssessmentReportItem[]
+}
+
 export type MarketingPlanModuleType = 'SPEECH' | 'POLICY'
 export type MarketingPlanStatus = 'ACTIVE' | 'INACTIVE'
 

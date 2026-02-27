@@ -27,7 +27,8 @@ import type {
   SmsTaskCreateRequest,
   SmsTaskItem,
   UploadedFileResult,
-  ContractLinkageSummary
+  ContractLinkageSummary,
+  ContractAssessmentOverview
 } from '../types'
 
 export { createCrmLead, updateCrmLead, deleteCrmLead }
@@ -169,6 +170,10 @@ export function getContractLinkageByElder(elderId: number) {
 
 export function getContractLinkageByLead(leadId: number) {
   return request.get<ContractLinkageSummary>(`/api/crm/contracts/${leadId}/linkage`)
+}
+
+export function getContractAssessmentOverview(params: { elderId?: number; leadId?: number }) {
+  return request.get<ContractAssessmentOverview>('/api/crm/contracts/assessment-overview', { params })
 }
 
 export function getMarketingPlanPage(params: MarketingPlanQuery) {
