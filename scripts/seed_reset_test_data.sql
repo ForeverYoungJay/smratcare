@@ -1,3 +1,8 @@
+SET NAMES utf8mb4;
+SET character_set_client = utf8mb4;
+SET character_set_connection = utf8mb4;
+SET character_set_results = utf8mb4;
+
 SET FOREIGN_KEY_CHECKS=0;
 
 TRUNCATE TABLE crm_sms_task;
@@ -147,4 +152,3 @@ VALUES
   (7003, 1, 1, 2003, '王五', 'ADMISSION', NULL, '1级', 76.00,
    '2026-02-11', '2026-03-11', 303, '评估专员', 'COMPLETED', '评估通过，可进入稳定在院服务。', '建议按月复评，维持现有护理频次。',
    '{"mobility":4,"cognitive":4}', 1, 'AR20260228003', 'resident360', 303, 0);
-

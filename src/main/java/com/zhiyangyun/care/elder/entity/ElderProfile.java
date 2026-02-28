@@ -46,6 +46,8 @@ public class ElderProfile {
 
   private String careLevel;
 
+  private String riskPrecommit;
+
   private String remark;
 
   private Long createdBy;

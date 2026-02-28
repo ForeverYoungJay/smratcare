@@ -23,6 +23,7 @@ public class ElderResponse {
   private Integer status;
   private Long bedId;
   private String careLevel;
+  private String riskPrecommit;
   private String remark;
   private BedResponse currentBed;
 }

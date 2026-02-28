@@ -40,6 +40,12 @@
             <a-select-option value="D">D</a-select-option>
           </a-select>
         </a-form-item>
+        <a-form-item label="风险预担" name="riskPrecommit">
+          <a-select v-model:value="form.riskPrecommit" placeholder="请选择突发风险处置优先策略" allow-clear>
+            <a-select-option value="RESCUE_FIRST">第一时间抢救</a-select-option>
+            <a-select-option value="NOTIFY_FAMILY_FIRST">第一时间通知家属</a-select-option>
+          </a-select>
+        </a-form-item>
         <a-form-item label="楼栋" name="buildingId">
           <a-select v-model:value="assetSelect.buildingId" allow-clear placeholder="选择楼栋">
             <a-select-option v-for="item in buildingOptions" :key="item.value" :value="item.value">
@@ -113,6 +119,7 @@ const form = reactive<ElderCreateRequest & { contractNo?: string; depositAmount?
   contractNo: '',
   depositAmount: undefined,
   careLevel: '',
+  riskPrecommit: undefined,
   status: 1,
   remark: '',
   bedId: undefined,
@@ -174,6 +181,7 @@ async function submit() {
       birthDate: form.birthDate,
       admissionDate: form.admissionDate,
       careLevel: form.careLevel,
+      riskPrecommit: form.riskPrecommit,
       status: form.status,
       remark: form.remark
     }

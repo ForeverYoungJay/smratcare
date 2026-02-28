@@ -95,7 +95,8 @@
 import { onMounted, reactive, ref } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message } from 'ant-design-vue'
-import { useRouter } from 'vue-router'
+import dayjs from 'dayjs'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { getBaseConfigItemList } from '../../api/baseConfig'
 import { getElderPage } from '../../api/elder'
@@ -121,6 +122,7 @@ const reviewSubmitting = ref(false)
 const reviewId = ref<number | undefined>(undefined)
 const reviewStatus = ref<'APPROVED' | 'REJECTED'>('APPROVED')
 const reviewRemark = ref('')
+const route = useRoute()
 const router = useRouter()
 const dischargeFeeConfigOptions = ref<{ label: string; value: string }[]>([])
 
@@ -205,6 +207,18 @@ function openCreate() {
   createOpen.value = true
   form.elderId = 0
   form.plannedDischargeDate = ''
+  form.reason = ''
+}
+
+function tryOpenCreateFromRoute() {
+  const elderId = Number(route.query.elderId || 0)
+  const openCreateFlag = String(route.query.openCreate || '') === '1'
+  if (!elderId) return
+  query.elderId = elderId
+  if (!openCreateFlag) return
+  createOpen.value = true
+  form.elderId = elderId
+  form.plannedDischargeDate = dayjs().format('YYYY-MM-DD')
   form.reason = ''
 }
 
@@ -294,6 +308,7 @@ function onPageSizeChange(current: number, size: number) {
 onMounted(async () => {
   await loadDischargeFeeConfigOptions()
   await loadElders()
+  tryOpenCreateFromRoute()
   await fetchData()
 })
 </script>

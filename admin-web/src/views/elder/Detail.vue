@@ -8,6 +8,7 @@
         <a-descriptions-item label="护理等级">{{ elder?.careLevel || '-' }}</a-descriptions-item>
         <a-descriptions-item label="状态">{{ statusText(elder?.status) }}</a-descriptions-item>
         <a-descriptions-item label="生日">{{ elder?.birthDate || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="风险预担">{{ riskPrecommitText(elder?.riskPrecommit) }}</a-descriptions-item>
         <a-descriptions-item label="入院日期">{{ elder?.admissionDate || '-' }}</a-descriptions-item>
         <a-descriptions-item label="家庭地址" :span="2">{{ elder?.homeAddress || '-' }}</a-descriptions-item>
       </a-descriptions>
@@ -43,6 +44,12 @@
                 <a-select-option :value="1">在院</a-select-option>
                 <a-select-option :value="2">请假</a-select-option>
                 <a-select-option :value="3">离院</a-select-option>
+              </a-select>
+            </a-form-item>
+            <a-form-item label="风险预担" name="riskPrecommit">
+              <a-select v-model:value="baseForm.riskPrecommit" placeholder="请选择突发风险处置优先策略" allow-clear>
+                <a-select-option value="RESCUE_FIRST">第一时间抢救</a-select-option>
+                <a-select-option value="NOTIFY_FAMILY_FIRST">第一时间通知家属</a-select-option>
               </a-select>
             </a-form-item>
             <a-form-item label="备注" name="remark">
@@ -207,6 +214,12 @@ function statusText(status?: number) {
   if (status === 1) return '在院'
   if (status === 2) return '请假'
   if (status === 3) return '离院'
+  return '-'
+}
+
+function riskPrecommitText(value?: string) {
+  if (value === 'RESCUE_FIRST') return '第一时间抢救'
+  if (value === 'NOTIFY_FAMILY_FIRST') return '第一时间通知家属'
   return '-'
 }
 

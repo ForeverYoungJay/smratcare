@@ -1,0 +1,2 @@
+ALTER TABLE elder
+  ADD COLUMN risk_precommit VARCHAR(32) NULL COMMENT '突发风险预担策略: RESCUE_FIRST/NOTIFY_FAMILY_FIRST' AFTER care_level;

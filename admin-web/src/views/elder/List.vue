@@ -56,7 +56,7 @@
               <a-button type="link" @click="goDetail(record.id)">详情</a-button>
               <a-button type="link" @click="goEdit(record.id)">编辑</a-button>
               <a-button type="link" @click="openChangeBed(record)">换床</a-button>
-              <a-button type="link" @click="openCheckout(record)">退住</a-button>
+              <a-button type="link" @click="openCheckout(record)">退住申请</a-button>
               <a-button type="link" @click="openBindFamily(record)">绑定家属</a-button>
               <a-button type="link" @click="printElderQr(record)">打印二维码</a-button>
             </a-space>
@@ -84,21 +84,6 @@
         </a-form-item>
         <a-form-item label="开始日期" name="startDate">
           <a-date-picker v-model:value="changeBedForm.startDate" value-format="YYYY-MM-DD" style="width: 100%" />
-        </a-form-item>
-      </a-form>
-    </a-modal>
-
-    <a-modal v-model:open="checkoutOpen" title="退住" width="420px" @ok="submitCheckout" @cancel="() => (checkoutOpen = false)">
-      <a-form ref="checkoutFormRef" :model="checkoutForm" :rules="checkoutRules" layout="vertical">
-        <a-form-item label="退住日期" name="endDate">
-          <a-date-picker v-model:value="checkoutForm.endDate" value-format="YYYY-MM-DD" style="width: 100%" />
-        </a-form-item>
-        <a-form-item label="原因" name="reason">
-          <a-select v-model:value="checkoutForm.reason" placeholder="请选择退住费用设置">
-            <a-select-option v-for="item in dischargeFeeConfigOptions" :key="item.value" :value="item.value">
-              {{ item.label }}
-            </a-select-option>
-          </a-select>
         </a-form-item>
       </a-form>
     </a-modal>
@@ -146,12 +131,11 @@ import type { FormInstance, FormRules } from 'ant-design-vue'
 import QRCode from 'qrcode'
 import PageContainer from '../../components/PageContainer.vue'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
-import { getBaseConfigItemList } from '../../api/baseConfig'
 import { exportCsv } from '../../utils/export'
-import { getElderPage, assignBed, unbindBed, bindFamily } from '../../api/elder'
+import { getElderPage, assignBed, bindFamily } from '../../api/elder'
 import { getBedList } from '../../api/bed'
 import { getFamilyUserPage } from '../../api/family'
-import type { BaseConfigItem, BedItem, ElderItem, FamilyBindRequest, PageResult, FamilyUserItem } from '../../types/api'
+import type { BedItem, ElderItem, FamilyBindRequest, PageResult, FamilyUserItem } from '../../types/api'
 
 const router = useRouter()
 const loading = ref(false)
@@ -194,14 +178,6 @@ const changeBedForm = reactive<{ elderId?: number; bedId?: number; startDate?: s
 const changeBedRules: FormRules = {
   bedId: [{ required: true, message: '请选择床位' }],
   startDate: [{ required: true, message: '请选择开始日期' }]
-}
-
-const checkoutOpen = ref(false)
-const checkoutFormRef = ref<FormInstance>()
-const checkoutForm = reactive<{ elderId?: number; endDate?: string; reason?: string }>({})
-const dischargeFeeConfigOptions = ref<Array<{ label: string; value: string }>>([])
-const checkoutRules: FormRules = {
-  endDate: [{ required: true, message: '请选择退住日期' }]
 }
 
 const bindOpen = ref(false)
@@ -264,18 +240,6 @@ async function loadBeds() {
     beds.value = await getBedList()
   } catch {
     beds.value = []
-  }
-}
-
-async function loadDischargeFeeConfigOptions() {
-  try {
-    const options = await getBaseConfigItemList({ configGroup: 'DISCHARGE_FEE_CONFIG', status: 1 })
-    dischargeFeeConfigOptions.value = (options || []).map((item: BaseConfigItem) => ({
-      label: item.itemName,
-      value: item.itemName
-    }))
-  } catch {
-    dischargeFeeConfigOptions.value = []
   }
 }
 
@@ -381,23 +345,13 @@ async function submitChangeBed() {
 }
 
 function openCheckout(row: ElderItem) {
-  checkoutForm.elderId = row.id
-  checkoutForm.endDate = undefined
-  checkoutForm.reason = ''
-  checkoutOpen.value = true
-}
-
-async function submitCheckout() {
-  if (!checkoutFormRef.value || !checkoutForm.elderId) return
-  try {
-    await checkoutFormRef.value.validate()
-    await unbindBed(checkoutForm.elderId as number, checkoutForm.endDate, checkoutForm.reason)
-    message.success('已退住')
-    checkoutOpen.value = false
-    fetchData()
-  } catch {
-    message.error('退住失败')
-  }
+  router.push({
+    path: '/elder/discharge-apply',
+    query: {
+      elderId: String(row.id),
+      openCreate: '1'
+    }
+  })
 }
 
 function openBindFamily(row: ElderItem) {
@@ -448,7 +402,6 @@ useLiveSyncRefresh({
 })
 
 onMounted(() => {
-  loadDischargeFeeConfigOptions()
   fetchData()
   loadBeds()
 })

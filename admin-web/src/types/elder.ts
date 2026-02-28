@@ -10,6 +10,7 @@ export interface ElderItem {
   birthDate?: string
   admissionDate?: string
   careLevel?: string
+  riskPrecommit?: 'RESCUE_FIRST' | 'NOTIFY_FAMILY_FIRST'
   status?: number
   bedId?: number
   bedStartDate?: string
@@ -31,6 +32,7 @@ export interface ElderCreateRequest {
   birthDate?: string
   admissionDate?: string
   careLevel?: string
+  riskPrecommit?: 'RESCUE_FIRST' | 'NOTIFY_FAMILY_FIRST'
   status?: number
   remark?: string
   bedId?: number

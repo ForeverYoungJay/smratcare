@@ -62,6 +62,7 @@ public class ElderServiceImpl implements ElderService {
     elder.setAdmissionDate(request.getAdmissionDate());
     elder.setStatus(request.getStatus());
     elder.setCareLevel(request.getCareLevel());
+    elder.setRiskPrecommit(request.getRiskPrecommit());
     elder.setRemark(request.getRemark());
     elder.setCreatedBy(request.getCreatedBy());
     elderMapper.insert(elder);
@@ -125,6 +126,9 @@ public class ElderServiceImpl implements ElderService {
     }
     if (request.getCareLevel() != null) {
       elder.setCareLevel(request.getCareLevel());
+    }
+    if (request.getRiskPrecommit() != null) {
+      elder.setRiskPrecommit(request.getRiskPrecommit());
     }
     if (request.getRemark() != null) {
       elder.setRemark(request.getRemark());
@@ -351,6 +355,7 @@ public class ElderServiceImpl implements ElderService {
     response.setStatus(elder.getStatus());
     response.setBedId(elder.getBedId());
     response.setCareLevel(elder.getCareLevel());
+    response.setRiskPrecommit(elder.getRiskPrecommit());
     response.setRemark(elder.getRemark());
     if (bed != null) {
       BedResponse bedResponse = new BedResponse();

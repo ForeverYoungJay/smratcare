@@ -19,6 +19,7 @@ public class ElderUpdateRequest {
   private LocalDate admissionDate;
   private Integer status;
   private String careLevel;
+  private String riskPrecommit;
   private String remark;
   private Long bedId;
   private LocalDate bedStartDate;

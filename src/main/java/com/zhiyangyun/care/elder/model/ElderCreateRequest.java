@@ -23,6 +23,7 @@ public class ElderCreateRequest {
   private LocalDate admissionDate;
   private Integer status = 1;
   private String careLevel;
+  private String riskPrecommit;
   private String remark;
   private Long bedId;
   private LocalDate bedStartDate;
