@@ -94,7 +94,7 @@ export interface FamilyBindRequest {
 }
 
 export interface CrmLeadItem {
-  id: number
+  id: number | string
   name: string
   phone?: string
   consultantName?: string

@@ -91,20 +91,20 @@ export interface MarketingLeadEntrySummary {
 }
 
 export interface LeadBatchStatusRequest {
-  ids: number[]
+  ids: Array<number | string>
   status: number
   followupStatus?: string
   invalidTime?: string
 }
 
 export interface LeadBatchDeleteRequest {
-  ids?: number[]
+  ids?: Array<number | string>
   contractNos?: string[]
 }
 
 export interface CallbackPlanItem {
-  id: number
-  leadId: number
+  id: number | string
+  leadId: number | string
   title: string
   followupContent?: string
   planExecuteTime: string
@@ -130,9 +130,11 @@ export interface CallbackExecuteRequest {
 }
 
 export interface ContractAttachmentItem {
-  id: number
-  leadId: number
+  id: number | string
+  leadId: number | string
+  contractId?: number
   contractNo?: string
+  attachmentType?: string
   fileName: string
   fileUrl?: string
   fileType?: string
@@ -142,7 +144,9 @@ export interface ContractAttachmentItem {
 }
 
 export interface ContractAttachmentCreateRequest {
+  contractId?: number
   contractNo?: string
+  attachmentType?: string
   fileName: string
   fileUrl?: string
   fileType?: string
@@ -151,8 +155,9 @@ export interface ContractAttachmentCreateRequest {
 }
 
 export interface SmsTaskItem {
-  id: number
-  leadId: number
+  id: number | string
+  leadId: number | string
+  contractId?: number
   phone?: string
   templateName?: string
   content?: string
@@ -164,10 +169,73 @@ export interface SmsTaskItem {
 }
 
 export interface SmsTaskCreateRequest {
-  leadIds: number[]
+  leadIds?: number[]
+  contractIds?: number[]
   templateName?: string
   content?: string
   planSendTime?: string
+}
+
+export interface CrmContractItem {
+  [key: string]: any
+  id: number | string
+  name?: string
+  phone?: string
+  leadId?: number
+  elderId?: number
+  idCardNo?: string
+  homeAddress?: string
+  contractNo?: string
+  reservationRoomNo?: string
+  reservationBedId?: number
+  elderName?: string
+  elderPhone?: string
+  gender?: number
+  age?: number
+  marketerName?: string
+  contractSignedAt?: string
+  contractExpiryDate?: string
+  contractStatus?: string
+  flowStage?: 'PENDING_ASSESSMENT' | 'PENDING_BED_SELECT' | 'PENDING_SIGN' | 'SIGNED'
+  currentOwnerDept?: 'MARKETING' | 'ASSESSMENT'
+  orgName?: string
+  status?: string
+  smsSendCount?: number
+  remark?: string
+  createTime?: string
+  updateTime?: string
+}
+
+export interface CrmContractPayload {
+  [key: string]: any
+  name?: string
+  phone?: string
+  leadId?: number
+  elderId?: number
+  idCardNo?: string
+  homeAddress?: string
+  contractNo?: string
+  reservationRoomNo?: string
+  reservationBedId?: number
+  elderName?: string
+  elderPhone?: string
+  gender?: number
+  age?: number
+  marketerName?: string
+  contractSignedAt?: string
+  contractExpiryDate?: string
+  contractStatus?: string
+  flowStage?: CrmContractItem['flowStage']
+  currentOwnerDept?: CrmContractItem['currentOwnerDept']
+  orgName?: string
+  status?: string
+  smsSendCount?: number
+  remark?: string
+}
+
+export interface ContractBatchDeleteRequest {
+  ids?: number[]
+  contractNos?: string[]
 }
 
 export interface UploadedFileResult {
@@ -179,6 +247,7 @@ export interface UploadedFileResult {
 }
 
 export interface ContractLinkageSummary {
+  contractId?: number
   leadId?: number
   elderId?: number
   elderName?: string
@@ -243,7 +312,7 @@ export type MarketingPlanStatus =
   | 'INACTIVE'
 
 export interface MarketingPlanItem {
-  id: number
+  id: number | string
   moduleType: MarketingPlanModuleType
   title: string
   summary?: string
@@ -302,7 +371,7 @@ export interface MarketingPlanReadConfirmPayload {
 }
 
 export interface MarketingPlanReceiptItem {
-  staffId: number
+  staffId: number | string
   staffName?: string
   readTime?: string
   action?: 'AGREE' | 'IMPROVE'
@@ -311,7 +380,7 @@ export interface MarketingPlanReceiptItem {
 }
 
 export interface MarketingPlanWorkflowSummary {
-  planId: number
+  planId: number | string
   totalStaffCount: number
   readCount: number
   unreadCount: number

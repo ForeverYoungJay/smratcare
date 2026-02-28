@@ -189,7 +189,7 @@
             <span v-else>-</span>
           </template>
           <template v-else-if="column.key === 'remark'">
-            {{ attachmentTypeLabel(record.remark) }}
+            {{ attachmentTypeLabel(record.attachmentType || record.remark) }}
           </template>
           <template v-else-if="column.key === 'fileUrl'">
             <a :href="record.fileUrl" target="_blank">{{ record.fileName }}</a>
@@ -229,31 +229,32 @@ import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import {
-  batchDeleteLeads,
-  createCrmLead,
-  createLeadAttachment,
-  deleteCrmLead,
-  deleteLeadAttachment,
-  getLeadAttachments,
-  getLeadPage,
-  handoffLeadToAssessment,
-  updateCrmLead,
+  batchDeleteContracts,
+  createContractAttachment,
+  createCrmContract,
+  deleteContractAttachment,
+  deleteCrmContract,
+  finalizeContract,
+  getContractAttachments,
+  getContractPage,
+  handoffContractToAssessment,
+  updateCrmContract,
   uploadMarketingFile
 } from '../../api/marketing'
 import { createElder, getElderPage, updateElder } from '../../api/elder'
 import { getAdmissionRecords } from '../../api/elderLifecycle'
-import type { ContractAttachmentItem, CrmLeadItem, ElderItem, PageResult } from '../../types'
+import type { ContractAttachmentItem, CrmContractItem, ElderItem, PageResult } from '../../types'
 
 const router = useRouter()
 const loading = ref(false)
 const submitting = ref(false)
 const open = ref(false)
 const formRef = ref<FormInstance>()
-const rows = ref<CrmLeadItem[]>([])
-const localRows = ref<CrmLeadItem[]>([])
+const rows = ref<CrmContractItem[]>([])
+const localRows = ref<CrmContractItem[]>([])
 const total = ref(0)
-const selectedRowKeys = ref<number[]>([])
-const selectedRows = ref<CrmLeadItem[]>([])
+const selectedRowKeys = ref<Array<number | string>>([])
+const selectedRows = ref<CrmContractItem[]>([])
 const onlyMineDept = ref(false)
 const mineDept = ref<'MARKETING' | 'ASSESSMENT'>('MARKETING')
 const onlyOverdue = ref(false)
@@ -278,23 +279,28 @@ const query = reactive({
   elderName: '',
   elderPhone: '',
   marketerName: '',
-  flowStage: undefined as CrmLeadItem['flowStage'] | undefined,
+  flowStage: undefined as CrmContractItem['flowStage'] | undefined,
   pageNo: 1,
   pageSize: 10
 })
 
-const form = reactive<Partial<CrmLeadItem>>({})
+const form = reactive<Partial<CrmContractItem>>({})
 const rules: FormRules = {
   elderName: [{ required: true, message: '请输入姓名' }]
 }
 
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
-  onChange: (keys: (number | string)[], rows: CrmLeadItem[]) => {
-    selectedRowKeys.value = keys.map((item) => Number(item))
+  onChange: (keys: (number | string)[], rows: CrmContractItem[]) => {
+    selectedRowKeys.value = keys
     selectedRows.value = rows
   }
 }))
+
+function sameId(left: number | string | undefined, right: number | string | undefined) {
+  if (left == null || right == null) return false
+  return String(left) === String(right)
+}
 
 const columns = [
   { title: '合同编号', dataIndex: 'contractNo', key: 'contractNo', width: 170 },
@@ -312,7 +318,7 @@ const columns = [
 const attachmentOpen = ref(false)
 const attachmentSubmitting = ref(false)
 const attachmentType = ref<'MEDICAL_RECORD' | 'MEDICAL_INSURANCE' | 'HOUSEHOLD' | 'CONTRACT' | 'OTHER'>('CONTRACT')
-const currentAttachmentLead = ref<CrmLeadItem>()
+const currentAttachmentLead = ref<CrmContractItem>()
 const attachments = ref<ContractAttachmentItem[]>([])
 const uploadAccept = '.jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip'
 const attachmentColumns = [
@@ -328,7 +334,7 @@ const attachmentColumns = [
 
 const finalizeOpen = ref(false)
 const finalizing = ref(false)
-const finalizeLead = ref<CrmLeadItem>()
+const finalizeLead = ref<CrmContractItem>()
 const finalizeReadyMap = ref<Record<number, boolean>>({})
 const finalizeCheckingMap = ref<Record<number, boolean>>({})
 const finalizeForm = reactive({
@@ -363,16 +369,16 @@ const displayTotal = computed(() => {
   return processedRows.value.length
 })
 
-function normalizedFlowStage(record: CrmLeadItem): CrmLeadItem['flowStage'] {
-  return (record.flowStage || 'PENDING_ASSESSMENT') as CrmLeadItem['flowStage']
+function normalizedFlowStage(record: CrmContractItem): CrmContractItem['flowStage'] {
+  return (record.flowStage || 'PENDING_ASSESSMENT') as CrmContractItem['flowStage']
 }
 
-function normalizedOwnerDept(record: CrmLeadItem): CrmLeadItem['currentOwnerDept'] {
+function normalizedOwnerDept(record: CrmContractItem): CrmContractItem['currentOwnerDept'] {
   if (record.currentOwnerDept) return record.currentOwnerDept
   return normalizedFlowStage(record) === 'PENDING_ASSESSMENT' ? 'ASSESSMENT' : 'MARKETING'
 }
 
-function flowStageText(stage?: CrmLeadItem['flowStage']) {
+function flowStageText(stage?: CrmContractItem['flowStage']) {
   if (stage === 'PENDING_ASSESSMENT') return '待评估'
   if (stage === 'PENDING_BED_SELECT') return '待办理入住'
   if (stage === 'PENDING_SIGN') return '待签署'
@@ -380,7 +386,7 @@ function flowStageText(stage?: CrmLeadItem['flowStage']) {
   return '待评估'
 }
 
-function flowStageColor(stage?: CrmLeadItem['flowStage']) {
+function flowStageColor(stage?: CrmContractItem['flowStage']) {
   if (stage === 'PENDING_ASSESSMENT') return 'gold'
   if (stage === 'PENDING_BED_SELECT') return 'blue'
   if (stage === 'PENDING_SIGN') return 'purple'
@@ -388,7 +394,7 @@ function flowStageColor(stage?: CrmLeadItem['flowStage']) {
   return 'default'
 }
 
-function ownerDeptText(dept?: CrmLeadItem['currentOwnerDept']) {
+function ownerDeptText(dept?: CrmContractItem['currentOwnerDept']) {
   if (dept === 'ASSESSMENT') return '评估部'
   if (dept === 'MARKETING') return '营销部'
   return '-'
@@ -401,7 +407,7 @@ function hoursFrom(timeText?: string) {
   return dayjs().diff(t, 'hour')
 }
 
-function overdueHours(record: CrmLeadItem) {
+function overdueHours(record: CrmContractItem) {
   const stage = normalizedFlowStage(record)
   if (stage === 'PENDING_ASSESSMENT') {
     return hoursFrom(record.createTime)
@@ -412,7 +418,7 @@ function overdueHours(record: CrmLeadItem) {
   return 0
 }
 
-function getOverdueLevel(record: CrmLeadItem): 'none' | 'high' {
+function getOverdueLevel(record: CrmContractItem): 'none' | 'high' {
   const stage = normalizedFlowStage(record)
   const hours = overdueHours(record)
   if (stage === 'PENDING_ASSESSMENT') {
@@ -424,7 +430,7 @@ function getOverdueLevel(record: CrmLeadItem): 'none' | 'high' {
   return 'none'
 }
 
-function overdueText(record: CrmLeadItem) {
+function overdueText(record: CrmContractItem) {
   const stage = normalizedFlowStage(record)
   const hours = overdueHours(record)
   if (stage === 'PENDING_ASSESSMENT') return `待评估超时 ${hours}h`
@@ -432,14 +438,14 @@ function overdueText(record: CrmLeadItem) {
   return ''
 }
 
-function isFinalizeDisabled(record: CrmLeadItem) {
+function isFinalizeDisabled(record: CrmContractItem) {
   const id = Number(record.id || 0)
   if (!id) return true
   if (finalizeCheckingMap.value[id]) return true
   return !finalizeReadyMap.value[id]
 }
 
-function finalizeDisabledReason(record: CrmLeadItem) {
+function finalizeDisabledReason(record: CrmContractItem) {
   const id = Number(record.id || 0)
   if (!id) return '合同数据异常，无法签署'
   if (finalizeCheckingMap.value[id]) return '正在校验是否已办理入住...'
@@ -447,7 +453,7 @@ function finalizeDisabledReason(record: CrmLeadItem) {
   return '请先在“入住办理”完成办理后再签署'
 }
 
-async function checkFinalizeReady(record: CrmLeadItem) {
+async function checkFinalizeReady(record: CrmContractItem) {
   if (!record.id || !record.contractNo) return false
   const admissionPage = await getAdmissionRecords({
     pageNo: 1,
@@ -458,7 +464,7 @@ async function checkFinalizeReady(record: CrmLeadItem) {
   return (admissionPage.list || []).length > 0
 }
 
-async function refreshFinalizeReady(rowsForCheck: CrmLeadItem[]) {
+async function refreshFinalizeReady(rowsForCheck: CrmContractItem[]) {
   const targets = rowsForCheck.filter((item) => normalizedFlowStage(item) !== 'SIGNED')
   await Promise.all(targets.map(async (item) => {
     const id = Number(item.id || 0)
@@ -475,11 +481,10 @@ async function refreshFinalizeReady(rowsForCheck: CrmLeadItem[]) {
 }
 
 async function fetchBoardSummary() {
-  const stages: CrmLeadItem['flowStage'][] = ['PENDING_ASSESSMENT', 'PENDING_BED_SELECT', 'PENDING_SIGN', 'SIGNED']
-  const [a, b, c, d] = await Promise.all(stages.map((flowStage) => getLeadPage({
+  const stages: CrmContractItem['flowStage'][] = ['PENDING_ASSESSMENT', 'PENDING_BED_SELECT', 'PENDING_SIGN', 'SIGNED']
+  const [a, b, c, d] = await Promise.all(stages.map((flowStage) => getContractPage({
     pageNo: 1,
     pageSize: 1,
-    status: 2,
     flowStage,
     currentOwnerDept: onlyMineDept.value ? mineDept.value : undefined
   })))
@@ -503,10 +508,9 @@ async function fetchData() {
       rows.value = []
       total.value = 0
     } else {
-      const page: PageResult<CrmLeadItem> = await getLeadPage({
+      const page: PageResult<CrmContractItem> = await getContractPage({
         pageNo: query.pageNo,
         pageSize: query.pageSize,
-        status: 2,
         contractNo: query.contractNo || undefined,
         elderName: query.elderName || undefined,
         elderPhone: query.elderPhone || undefined,
@@ -528,13 +532,12 @@ async function fetchData() {
 async function fetchAllLeadRows() {
   const pageSize = 200
   let pageNo = 1
-  let all: CrmLeadItem[] = []
+  let all: CrmContractItem[] = []
   let totalRows = 0
   do {
-    const page: PageResult<CrmLeadItem> = await getLeadPage({
+    const page: PageResult<CrmContractItem> = await getContractPage({
       pageNo,
       pageSize,
-      status: 2,
       contractNo: query.contractNo || undefined,
       elderName: query.elderName || undefined,
       elderPhone: query.elderPhone || undefined,
@@ -557,10 +560,9 @@ async function fetchOverdueCount(flowStage: 'PENDING_ASSESSMENT' | 'PENDING_SIGN
   let totalRows = 0
   let count = 0
   do {
-    const page: PageResult<CrmLeadItem> = await getLeadPage({
+    const page: PageResult<CrmContractItem> = await getContractPage({
       pageNo,
       pageSize,
-      status: 2,
       flowStage,
       currentOwnerDept: onlyMineDept.value ? mineDept.value : undefined
     })
@@ -625,7 +627,7 @@ function onMineDeptChange() {
   fetchData()
 }
 
-function openForm(record?: CrmLeadItem) {
+function openForm(record?: CrmContractItem) {
   Object.keys(form).forEach((key) => {
     delete (form as Record<string, any>)[key]
   })
@@ -635,14 +637,14 @@ function openForm(record?: CrmLeadItem) {
     Object.assign(form, {
       id: undefined,
       contractNo: undefined,
-      status: 2,
+      status: 'DRAFT',
       contractSignedFlag: 0,
       contractSignedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
       contractStatus: '待评估',
       flowStage: 'PENDING_ASSESSMENT',
       currentOwnerDept: 'ASSESSMENT',
       orgName: '新签优惠待确认'
-    } as Partial<CrmLeadItem>)
+    } as Partial<CrmContractItem>)
   }
   open.value = true
 }
@@ -652,22 +654,22 @@ async function submit() {
   try {
     await formRef.value.validate()
     submitting.value = true
-    const payload: Partial<CrmLeadItem> = {
+    const payload: Partial<CrmContractItem> = {
       ...form,
       name: form.elderName || form.name || '签约客户',
       phone: form.elderPhone || form.phone,
       contractNo: form.id ? form.contractNo : undefined,
-      status: 2,
+      status: form.status || 'DRAFT',
       contractSignedFlag: 0,
       flowStage: form.flowStage || 'PENDING_ASSESSMENT',
       currentOwnerDept: form.currentOwnerDept || 'ASSESSMENT',
       contractStatus: form.contractStatus || '待评估'
     }
-    let saved: CrmLeadItem
+    let saved: CrmContractItem
     if (form.id) {
-      saved = await updateCrmLead(form.id, payload)
+      saved = await updateCrmContract(form.id, payload)
     } else {
-      saved = await createCrmLead(payload)
+      saved = await createCrmContract(payload)
     }
     message.success(`保存成功，合同号：${saved?.contractNo || '生成中'}`)
     open.value = false
@@ -686,9 +688,15 @@ async function batchApprove() {
     return
   }
   await Promise.all(ids.map((id) => {
-    const row = rows.value.find((item) => item.id === id)
+    const row = rows.value.find((item) => sameId(item.id, id))
     if (!row) return Promise.resolve()
-    return updateCrmLead(row.id, { ...row, contractStatus: '已审批' })
+    return updateCrmContract(row.id, {
+      ...row,
+      status: row.status === 'SIGNED' ? 'SIGNED' : 'APPROVED',
+      flowStage: row.flowStage === 'SIGNED' ? 'SIGNED' : 'PENDING_SIGN',
+      currentOwnerDept: 'MARKETING',
+      contractStatus: row.contractStatus || '费用预审通过'
+    })
   }))
   message.success(`已审批 ${ids.length} 条合同`)
   fetchData()
@@ -707,10 +715,10 @@ function batchDelete() {
     title: `确认删除 ${ids.length} 条合同记录吗？`,
     onOk: async () => {
       let affected = contractNos.length
-        ? await batchDeleteLeads({ contractNos })
-        : await batchDeleteLeads({ ids })
+        ? await batchDeleteContracts({ contractNos })
+        : await batchDeleteContracts({ ids })
       if (!affected && ids.length) {
-        await Promise.all(ids.map((id) => deleteCrmLead(id)))
+        await Promise.all(ids.map((id) => deleteCrmContract(id)))
         affected = ids.length
       }
       selectedRowKeys.value = []
@@ -725,16 +733,16 @@ function batchDelete() {
   })
 }
 
-function removeContract(record: CrmLeadItem) {
+function removeContract(record: CrmContractItem) {
   Modal.confirm({
     title: `确认删除合同 ${record.contractNo || '-'} 吗？`,
     onOk: async () => {
       let affected = 0
       if (record.contractNo) {
-        affected = await batchDeleteLeads({ contractNos: [record.contractNo] })
+        affected = await batchDeleteContracts({ contractNos: [record.contractNo] })
       }
       if (!affected) {
-        await deleteCrmLead(record.id)
+        await deleteCrmContract(record.id)
         affected = 1
       }
       if (!affected) {
@@ -747,20 +755,20 @@ function removeContract(record: CrmLeadItem) {
   })
 }
 
-function view(record: CrmLeadItem) {
+function view(record: CrmContractItem) {
   Modal.info({
     title: '合同详情',
     content: `${record.contractNo || '-'} / ${record.elderName || '-'} / ${flowStageText(normalizedFlowStage(record))} / ${ownerDeptText(normalizedOwnerDept(record))}`
   })
 }
 
-async function startAdmissionAssessment(record: CrmLeadItem) {
+async function startAdmissionAssessment(record: CrmContractItem) {
   try {
-    if (!record.contractNo) {
-      message.warning('请先保存合同并生成合同编号后再移交')
+    if (!record.id) {
+      message.warning('请先保存合同后再移交')
       return
     }
-    const handed = await handoffLeadToAssessment(record.contractNo)
+    const handed = await handoffContractToAssessment(record.id)
     if (!handed) {
       throw new Error('未找到可移交的合同记录')
     }
@@ -772,23 +780,23 @@ async function startAdmissionAssessment(record: CrmLeadItem) {
   }
 }
 
-async function goAdmissionProcessing(record: CrmLeadItem) {
+async function goAdmissionProcessing(record: CrmContractItem) {
   try {
     const lead = await ensureContractNo(record)
     const elder = await ensureElderFromLead(lead)
-    await updateCrmLead(lead.id, {
+    await updateCrmContract(lead.id, {
       ...lead,
       flowStage: 'PENDING_BED_SELECT',
       currentOwnerDept: 'MARKETING',
       contractStatus: '待办理入住'
     })
-    router.push(`/elder/admission-processing?residentId=${elder.id}&leadId=${lead.id}&contractNo=${lead.contractNo || ''}`)
+    router.push(`/elder/admission-processing?residentId=${elder.id}&leadId=${lead.leadId || lead.id}&contractNo=${lead.contractNo || ''}`)
   } catch (error: any) {
     message.error(error?.message || '跳转入住办理失败')
   }
 }
 
-async function openFinalize(record: CrmLeadItem) {
+async function openFinalize(record: CrmContractItem) {
   try {
     const lead = await ensureContractNo(record)
     const elder = await ensureElderFromLead(lead)
@@ -801,12 +809,12 @@ async function openFinalize(record: CrmLeadItem) {
     const hasAdmission = (admissionPage.list || []).some((item) => item.elderId === elder.id)
     if (!hasAdmission) {
       message.warning('请先在“入住办理”完成办理，再执行最终签署')
-      router.push(`/elder/admission-processing?residentId=${elder.id}&leadId=${lead.id}&contractNo=${lead.contractNo || ''}`)
+      router.push(`/elder/admission-processing?residentId=${elder.id}&leadId=${lead.leadId || lead.id}&contractNo=${lead.contractNo || ''}`)
       return
     }
     const signingLead = normalizedFlowStage(lead) === 'PENDING_SIGN'
       ? lead
-      : await updateCrmLead(lead.id, {
+      : await updateCrmContract(lead.id, {
         ...lead,
         flowStage: 'PENDING_SIGN',
         currentOwnerDept: 'MARKETING',
@@ -827,17 +835,7 @@ async function submitFinalize() {
   if (!finalizeLead.value) return
   finalizing.value = true
   try {
-    await updateCrmLead(finalizeLead.value.id, {
-      ...finalizeLead.value,
-      contractSignedFlag: 1,
-      contractSignedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-      contractStatus: '已签署',
-      reservationStatus: '已入住',
-      flowStage: 'SIGNED',
-      currentOwnerDept: 'MARKETING',
-      remark: finalizeForm.remark || finalizeLead.value.remark,
-      status: 2
-    })
+    await finalizeContract(finalizeLead.value.id, finalizeForm.remark || finalizeLead.value.remark)
     message.success('最终签署完成')
     finalizeOpen.value = false
     await fetchData()
@@ -848,9 +846,9 @@ async function submitFinalize() {
   }
 }
 
-async function openAttachment(record: CrmLeadItem) {
+async function openAttachment(record: CrmContractItem) {
   currentAttachmentLead.value = record
-  attachments.value = await getLeadAttachments(record.id)
+  attachments.value = await getContractAttachments(record.id)
   attachmentOpen.value = true
 }
 
@@ -878,15 +876,16 @@ async function handleUpload(option: any) {
   attachmentSubmitting.value = true
   try {
     const uploaded = await uploadMarketingFile(file, 'marketing-contract')
-    await createLeadAttachment(currentAttachmentLead.value.id, {
+    await createContractAttachment(currentAttachmentLead.value.id, {
       contractNo: currentAttachmentLead.value.contractNo,
+      attachmentType: attachmentType.value,
       fileName: uploaded.originalFileName || uploaded.fileName,
       fileUrl: uploaded.fileUrl,
       fileType: uploaded.fileType,
       fileSize: uploaded.fileSize,
       remark: attachmentType.value
     })
-    attachments.value = await getLeadAttachments(currentAttachmentLead.value.id)
+    attachments.value = await getContractAttachments(currentAttachmentLead.value.id)
     message.success('附件上传成功')
     option?.onSuccess?.(uploaded)
   } catch (error) {
@@ -920,22 +919,22 @@ function formatFileSize(size?: number) {
 }
 
 async function removeAttachment(attachmentId: number) {
-  await deleteLeadAttachment(attachmentId)
+  await deleteContractAttachment(attachmentId)
   if (currentAttachmentLead.value) {
-    attachments.value = await getLeadAttachments(currentAttachmentLead.value.id)
+    attachments.value = await getContractAttachments(currentAttachmentLead.value.id)
   }
   message.success('附件已删除')
 }
 
-function normalizeLeadName(lead: CrmLeadItem) {
+function normalizeLeadName(lead: CrmContractItem) {
   return (lead.elderName || lead.name || '').trim() || '未命名长者'
 }
 
-async function ensureContractNo(record: CrmLeadItem) {
+async function ensureContractNo(record: CrmContractItem) {
   if (record.contractNo) return record
-  return updateCrmLead(record.id, {
+  return updateCrmContract(record.id, {
     ...record,
-    status: 2,
+    status: record.status || 'DRAFT',
     flowStage: normalizedFlowStage(record),
     currentOwnerDept: normalizedOwnerDept(record),
     contractStatus: record.contractStatus || '待评估'
@@ -943,10 +942,10 @@ async function ensureContractNo(record: CrmLeadItem) {
 }
 
 function pickLatestAttachment(leadAttachments: ContractAttachmentItem[], type: string) {
-  return leadAttachments.find((item) => item.remark === type)
+  return leadAttachments.find((item) => (item.attachmentType || item.remark) === type)
 }
 
-async function findExistingElderByLead(lead: CrmLeadItem): Promise<ElderItem | undefined> {
+async function findExistingElderByLead(lead: CrmContractItem): Promise<ElderItem | undefined> {
   const page = await getElderPage({ pageNo: 1, pageSize: 300, keyword: normalizeLeadName(lead) })
   const list = page.list || []
   const byIdCard = lead.idCardNo ? list.find((item) => item.idCardNo === lead.idCardNo) : undefined
@@ -954,8 +953,8 @@ async function findExistingElderByLead(lead: CrmLeadItem): Promise<ElderItem | u
   return list.find((item) => item.fullName === normalizeLeadName(lead) && item.phone === (lead.elderPhone || lead.phone))
 }
 
-async function ensureElderFromLead(lead: CrmLeadItem): Promise<ElderItem> {
-  const leadAttachments = await getLeadAttachments(lead.id)
+async function ensureElderFromLead(lead: CrmContractItem): Promise<ElderItem> {
+  const leadAttachments = await getContractAttachments(lead.id)
   const existing = await findExistingElderByLead(lead)
   const elderPayload = {
     fullName: normalizeLeadName(lead),
@@ -979,7 +978,7 @@ async function ensureElderFromLead(lead: CrmLeadItem): Promise<ElderItem> {
   })
 }
 
-async function ensureElderFromLeadBasic(lead: CrmLeadItem): Promise<ElderItem> {
+async function ensureElderFromLeadBasic(lead: CrmContractItem): Promise<ElderItem> {
   const existing = await findExistingElderByLead(lead)
   const elderPayload = {
     fullName: normalizeLeadName(lead),

@@ -82,14 +82,21 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
-import { batchDeleteLeads, createSmsTasks, deleteCrmLead, getLeadPage, getSmsTasks, sendSmsTask } from '../../api/marketing'
-import type { CrmLeadItem, PageResult, SmsTaskItem } from '../../types'
+import {
+  batchDeleteContracts,
+  createContractSmsTasks,
+  deleteCrmContract,
+  getContractPage,
+  getContractSmsTasks,
+  sendContractSmsTask
+} from '../../api/marketing'
+import type { CrmContractItem, PageResult, SmsTaskItem } from '../../types'
 
 const loading = ref(false)
-const rows = ref<CrmLeadItem[]>([])
+const rows = ref<CrmContractItem[]>([])
 const total = ref(0)
-const selectedRowKeys = ref<number[]>([])
-const selectedContracts = ref<CrmLeadItem[]>([])
+const selectedRowKeys = ref<Array<number | string>>([])
+const selectedContracts = ref<CrmContractItem[]>([])
 
 const query = reactive({
   contractNo: '',
@@ -118,8 +125,8 @@ const columns = [
 
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
-  onChange: (keys: (number | string)[], selectedRows: CrmLeadItem[]) => {
-    selectedRowKeys.value = keys.map((item) => Number(item))
+  onChange: (keys: (number | string)[], selectedRows: CrmContractItem[]) => {
+    selectedRowKeys.value = keys
     selectedContracts.value = selectedRows
   }
 }))
@@ -146,10 +153,9 @@ const smsTaskColumns = [
 async function fetchData() {
   loading.value = true
   try {
-    const page: PageResult<CrmLeadItem> = await getLeadPage({
+    const page: PageResult<CrmContractItem> = await getContractPage({
       pageNo: query.pageNo,
       pageSize: query.pageSize,
-      status: 2,
       contractNo: query.contractNo || undefined,
       elderName: query.elderName || undefined,
       elderPhone: query.elderPhone || undefined,
@@ -191,15 +197,15 @@ function onPageSizeChange(_current: number, size: number) {
   fetchData()
 }
 
-async function sendSms(record: CrmLeadItem) {
-  const tasks = await createSmsTasks({
-    leadIds: [record.id],
+async function sendSms(record: CrmContractItem) {
+  const tasks = await createContractSmsTasks({
+    contractIds: [record.id],
     templateName: reminderConfig.templateName,
     content: reminderConfig.content,
     planSendTime: dayjs().format('YYYY-MM-DD HH:mm:ss')
   })
   if (tasks?.[0]?.id) {
-    await sendSmsTask(tasks[0].id)
+    await sendContractSmsTask(tasks[0].id)
   }
   message.success('短信发送成功')
   fetchData()
@@ -210,27 +216,27 @@ async function batchSms() {
     message.info('请先勾选合同')
     return
   }
-  const tasks = await createSmsTasks({
-    leadIds: selectedRowKeys.value,
+  const tasks = await createContractSmsTasks({
+    contractIds: selectedRowKeys.value,
     templateName: reminderConfig.templateName,
     content: reminderConfig.content,
     planSendTime: dayjs().format('YYYY-MM-DD HH:mm:ss')
   })
-  await Promise.all((tasks || []).map((item) => sendSmsTask(item.id)))
+  await Promise.all((tasks || []).map((item) => sendContractSmsTask(item.id)))
   message.success(`已批量发送 ${tasks.length} 条短信`)
   fetchData()
 }
 
-function removeRow(record: CrmLeadItem) {
+function removeRow(record: CrmContractItem) {
   Modal.confirm({
     title: `确认删除合同 ${record.contractNo || '-'} 吗？`,
     onOk: async () => {
       if (record.contractNo) {
-        await batchDeleteLeads({ contractNos: [record.contractNo] })
+        await batchDeleteContracts({ contractNos: [record.contractNo] })
       } else {
-        await deleteCrmLead(record.id)
+        await deleteCrmContract(record.id)
       }
-      selectedRowKeys.value = selectedRowKeys.value.filter((id) => id !== record.id)
+      selectedRowKeys.value = selectedRowKeys.value.filter((id) => String(id) !== String(record.id))
       selectedContracts.value = selectedContracts.value.filter((item) => item.contractNo !== record.contractNo)
       message.success('合同已删除')
       fetchData()
@@ -249,9 +255,9 @@ function batchDelete() {
   Modal.confirm({
     title: `确认删除选中的 ${selectedRowKeys.value.length} 条合同吗？`,
     onOk: async () => {
-      const affected = contractNos.length
-        ? await batchDeleteLeads({ contractNos })
-        : await batchDeleteLeads({ ids: selectedRowKeys.value })
+      const affected = await batchDeleteContracts(
+        contractNos.length ? { contractNos } : { ids: selectedRowKeys.value }
+      )
       selectedRowKeys.value = []
       selectedContracts.value = []
       if (!affected) {
@@ -269,13 +275,13 @@ function exportList() {
 }
 
 async function settingReminder() {
-  smsTasks.value = await getSmsTasks()
+  smsTasks.value = await getContractSmsTasks()
   smsTaskOpen.value = true
 }
 
 async function sendTask(taskId: number) {
-  await sendSmsTask(taskId)
-  smsTasks.value = await getSmsTasks()
+  await sendContractSmsTask(taskId)
+  smsTasks.value = await getContractSmsTasks()
   fetchData()
 }
 
