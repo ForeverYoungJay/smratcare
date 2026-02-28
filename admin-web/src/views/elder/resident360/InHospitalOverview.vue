@@ -27,11 +27,12 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
 import { getResidentOverview } from '../../../api/medicalCare'
+import { getElderPage } from '../../../api/elder'
 import type { MedicalResidentOverview } from '../../../types'
 
 const router = useRouter()
 const route = useRoute()
-const residentId = Number(route.query.residentId || 1001)
+const residentId = ref(0)
 const loading = ref(false)
 const errorMessage = ref('')
 const overview = ref<MedicalResidentOverview>()
@@ -50,11 +51,28 @@ function go(path: string) {
   router.push(path)
 }
 
+async function resolveResidentId() {
+  const fromRoute = Number(route.query.residentId || 0)
+  if (fromRoute > 0) {
+    residentId.value = fromRoute
+    return
+  }
+  const page = await getElderPage({ pageNo: 1, pageSize: 1 })
+  const first = page.list?.[0]
+  residentId.value = Number(first?.id || 0)
+}
+
 async function loadModules() {
   loading.value = true
   errorMessage.value = ''
   try {
-    overview.value = await getResidentOverview(residentId)
+    await resolveResidentId()
+    if (!residentId.value) {
+      overview.value = undefined
+      errorMessage.value = "暂无可用长者，请先创建长者档案"
+      return
+    }
+    overview.value = await getResidentOverview(residentId.value)
   } catch (error: any) {
     errorMessage.value = error?.message || '加载在院服务总览失败'
     message.error(errorMessage.value)

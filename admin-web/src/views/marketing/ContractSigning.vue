@@ -112,6 +112,7 @@
               <a-button type="link" @click="openAttachment(record)">附件</a-button>
               <a-button type="link" @click="startAdmissionAssessment(record)">移交评估部</a-button>
               <a-button type="link" @click="goAdmissionProcessing(record)">入住办理</a-button>
+              <a-button type="link" danger @click="removeContract(record)">删除</a-button>
               <a-tooltip
                 v-if="normalizedFlowStage(record) !== 'SIGNED'"
                 :title="isFinalizeDisabled(record) ? finalizeDisabledReason(record) : null"
@@ -231,6 +232,7 @@ import {
   batchDeleteLeads,
   createCrmLead,
   createLeadAttachment,
+  deleteCrmLead,
   deleteLeadAttachment,
   getLeadAttachments,
   getLeadPage,
@@ -704,15 +706,43 @@ function batchDelete() {
   Modal.confirm({
     title: `确认删除 ${ids.length} 条合同记录吗？`,
     onOk: async () => {
-      if (contractNos.length) {
-        await batchDeleteLeads({ contractNos })
-      } else {
-        await batchDeleteLeads({ ids })
+      let affected = contractNos.length
+        ? await batchDeleteLeads({ contractNos })
+        : await batchDeleteLeads({ ids })
+      if (!affected && ids.length) {
+        await Promise.all(ids.map((id) => deleteCrmLead(id)))
+        affected = ids.length
       }
       selectedRowKeys.value = []
       selectedRows.value = []
-      message.success('删除成功')
+      if (!affected) {
+        message.warning('未删除任何合同，请刷新后重试')
+        return
+      }
+      message.success(`删除成功（${affected} 条）`)
       fetchData()
+    }
+  })
+}
+
+function removeContract(record: CrmLeadItem) {
+  Modal.confirm({
+    title: `确认删除合同 ${record.contractNo || '-'} 吗？`,
+    onOk: async () => {
+      let affected = 0
+      if (record.contractNo) {
+        affected = await batchDeleteLeads({ contractNos: [record.contractNo] })
+      }
+      if (!affected) {
+        await deleteCrmLead(record.id)
+        affected = 1
+      }
+      if (!affected) {
+        message.warning('未删除任何合同，请刷新后重试')
+        return
+      }
+      message.success('删除成功')
+      await fetchData()
     }
   })
 }
@@ -734,10 +764,9 @@ async function startAdmissionAssessment(record: CrmLeadItem) {
     if (!handed) {
       throw new Error('未找到可移交的合同记录')
     }
-    const elder = await ensureElderFromLeadBasic(handed)
+    await ensureElderFromLeadBasic(handed)
     await fetchData()
-    message.success('已移交评估部，请在长者管理完成入住评估')
-    router.push(`/elder/admission-assessment?residentId=${elder.id}&leadId=${handed.id || ''}&contractNo=${handed.contractNo || ''}`)
+    message.success('已移交评估部，请到“长者管理/入住评估”选择该合同继续评估')
   } catch (error: any) {
     message.error(error?.message || '移交评估部失败')
   }

@@ -41,6 +41,8 @@
           :pagination="false"
           row-key="contractNo"
           size="small"
+          :row-class-name="contractRowClassName"
+          :custom-row="contractCustomRow"
           style="margin-bottom: 12px"
         >
           <template #bodyCell="{ column, record }">
@@ -69,6 +71,20 @@
           style="margin-bottom: 12px"
           :message="`有 ${(overview?.unassignedReports || []).length} 条评估报告尚未匹配到具体合同，已纳入长者总评估记录。`"
         />
+        <a-alert
+          v-if="selectedContract"
+          type="success"
+          show-icon
+          style="margin-bottom: 12px"
+          :message="`当前已选合同：${selectedContract.contractNo || '-'}，可执行开始评估、下载报告、入住办理。`"
+        />
+        <a-alert
+          v-else
+          type="warning"
+          show-icon
+          style="margin-bottom: 12px"
+          message="请先在上方合同列表选择一个合同，再进行评估或入住办理。"
+        />
         <a-typography-paragraph>
           输出：评估等级、建议护理套餐/服务频次、人力配置建议、评估报告下载并归档到长者档案。
         </a-typography-paragraph>
@@ -76,10 +92,10 @@
           联动：评估完成后自动创建“待签约/待入院办理”任务，并同步护理端生成个性化任务规则。
         </a-typography-paragraph>
         <a-space direction="vertical" style="width: 100%">
-          <a-button block type="primary" @click="go(primaryActionPath)">{{ primaryActionText }}</a-button>
+          <a-button block type="primary" :disabled="!selectedContract" @click="go(primaryActionPath)">{{ primaryActionText }}</a-button>
           <a-button block @click="go(historyPath)">查看历史评估报告</a-button>
-          <a-button block :disabled="!latestRecord" @click="downloadLatestReport">下载最近评估报告</a-button>
-          <a-button block @click="go(admissionPath)">进入入住办理</a-button>
+          <a-button block :disabled="!selectedLatestRecord" @click="downloadLatestReport">下载最近评估报告</a-button>
+          <a-button block :disabled="!selectedContract" @click="go(admissionPath)">进入入住办理</a-button>
         </a-space>
       </StatefulBlock>
     </a-card>
@@ -93,8 +109,8 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
 import { getAssessmentRecordPage } from '../../../api/assessment'
-import { getContractAssessmentOverview } from '../../../api/marketing'
-import type { AssessmentRecord, ContractAssessmentContractItem, ContractAssessmentOverview, PageResult } from '../../../types'
+import { getContractAssessmentOverview, getLeadPage } from '../../../api/marketing'
+import type { AssessmentRecord, ContractAssessmentContractItem, ContractAssessmentOverview, CrmLeadItem, PageResult } from '../../../types'
 
 const router = useRouter()
 const route = useRoute()
@@ -104,10 +120,22 @@ const latestRecord = ref<AssessmentRecord | null>(null)
 const overview = ref<ContractAssessmentOverview | null>(null)
 const loading = ref(false)
 const errorMessage = ref('')
-const contracts = computed<ContractAssessmentContractItem[]>(() => overview.value?.contracts || [])
+const fallbackContracts = ref<ContractAssessmentContractItem[]>([])
+const contracts = computed<ContractAssessmentContractItem[]>(() =>
+  (overview.value?.contracts && overview.value.contracts.length ? overview.value.contracts : fallbackContracts.value) || []
+)
+const selectedContractNo = ref('')
 const pendingAssessmentCount = computed(() =>
   contracts.value.filter((item) => item.flowStage === 'PENDING_ASSESSMENT').length
 )
+const selectedContract = computed(() =>
+  contracts.value.find((item) => item.contractNo === selectedContractNo.value)
+)
+const selectedLatestRecord = computed(() => {
+  const contractReports = selectedContract.value?.reports || []
+  const draft = contractReports.find((item) => item.status === 'DRAFT')
+  return draft || contractReports[0] || latestRecord.value || null
+})
 
 const contractColumns = [
   { title: '合同编号', dataIndex: 'contractNo', key: 'contractNo', width: 170 },
@@ -127,7 +155,9 @@ const reportColumns = [
 ]
 
 const admissionPath = computed(() =>
-  residentId.value ? `/elder/admission-processing?residentId=${residentId.value}` : '/elder/admission-processing'
+  residentId.value
+    ? `/elder/admission-processing?residentId=${residentId.value}&contractNo=${selectedContractNo.value || ''}`
+    : `/elder/admission-processing?contractNo=${selectedContractNo.value || ''}`
 )
 
 const historyPath = computed(() =>
@@ -135,27 +165,27 @@ const historyPath = computed(() =>
 )
 
 const isReassessOverdue = computed(() => {
-  const nextDate = latestRecord.value?.nextAssessmentDate
+  const nextDate = selectedLatestRecord.value?.nextAssessmentDate
   if (!nextDate) return false
   const today = new Date().toISOString().slice(0, 10)
   return nextDate < today
 })
 
 const primaryActionText = computed(() => {
-  if (!latestRecord.value) return '开始入住评估'
-  if (latestRecord.value.status === 'DRAFT') return '继续填写入住评估'
+  if (!selectedLatestRecord.value) return '开始入住评估'
+  if (selectedLatestRecord.value.status === 'DRAFT') return '继续填写入住评估'
   if (isReassessOverdue.value) return '发起复评'
   return '新建入住评估'
 })
 
 const primaryActionPath = computed(() => {
-  const mode = latestRecord.value?.status === 'DRAFT'
+  const mode = selectedLatestRecord.value?.status === 'DRAFT'
     ? 'continue'
     : isReassessOverdue.value
       ? 'reassess'
       : 'new'
   if (!residentId.value) return '/assessment/ability/admission'
-  return `/assessment/ability/admission?residentId=${residentId.value}&autoOpen=1&mode=${mode}`
+  return `/assessment/ability/admission?residentId=${residentId.value}&autoOpen=1&mode=${mode}&contractNo=${selectedContractNo.value || ''}`
 })
 
 function go(path: string) {
@@ -176,14 +206,24 @@ async function loadLatestRecord() {
 }
 
 async function loadContractOverview() {
-  if (!residentId.value && !leadId.value) {
+  fallbackContracts.value = []
+  if (residentId.value || leadId.value) {
+    overview.value = await getContractAssessmentOverview({
+      elderId: residentId.value || undefined,
+      leadId: leadId.value || undefined
+    })
+  } else {
     overview.value = null
+    fallbackContracts.value = await loadPendingContracts()
+  }
+  const allContracts = contracts.value
+  const contractFromQuery = String(route.query.contractNo || '')
+  if (contractFromQuery && allContracts.some((item) => item.contractNo === contractFromQuery)) {
+    selectedContractNo.value = contractFromQuery
     return
   }
-  overview.value = await getContractAssessmentOverview({
-    elderId: residentId.value || undefined,
-    leadId: leadId.value || undefined
-  })
+  const pending = allContracts.find((item) => item.flowStage === 'PENDING_ASSESSMENT')
+  selectedContractNo.value = pending?.contractNo || allContracts[0]?.contractNo || ''
 }
 
 async function loadAssessmentRecord() {
@@ -200,6 +240,30 @@ async function loadAssessmentRecord() {
   const list = res.list || []
   const draft = list.find((item) => item.status === 'DRAFT')
   latestRecord.value = draft || list[0] || null
+}
+
+async function loadPendingContracts() {
+  const page = await getLeadPage({
+    pageNo: 1,
+    pageSize: 200,
+    status: 2,
+    flowStage: 'PENDING_ASSESSMENT'
+  })
+  const list: CrmLeadItem[] = page?.list || []
+  return list
+    .filter((item) => item.contractNo)
+    .map((item) => ({
+      leadId: item.id,
+      contractNo: item.contractNo,
+      contractStatus: item.contractStatus,
+      flowStage: item.flowStage,
+      currentOwnerDept: item.currentOwnerDept,
+      marketerName: item.marketerName,
+      orgName: item.orgName,
+      contractSignedAt: item.contractSignedAt,
+      contractExpiryDate: item.contractExpiryDate,
+      reports: []
+    } as ContractAssessmentContractItem))
 }
 
 function flowStageText(stage?: string) {
@@ -219,32 +283,46 @@ function flowStageColor(stage?: string) {
 }
 
 function downloadLatestReport() {
-  if (!latestRecord.value) {
+  if (!selectedLatestRecord.value) {
     message.warning('暂无可下载评估记录')
     return
   }
-  const record = latestRecord.value
+  const record = selectedLatestRecord.value
+  const elderName = latestRecord.value?.elderName || overview.value?.elderName || '长者'
+  const suggestion = 'suggestion' in record ? record.suggestion : latestRecord.value?.suggestion
   const lines = [
     '入住评估报告',
-    `老人姓名：${record.elderName || '-'}`,
+    `老人姓名：${elderName || '-'}`,
     `评估日期：${record.assessmentDate || '-'}`,
     `评估状态：${record.status || '-'}`,
     `评估分值：${record.score ?? '-'}`,
     `评估等级：${record.levelCode || '-'}`,
     `评估结论：${record.resultSummary || '-'}`,
-    `护理建议：${record.suggestion || '-'}`,
+    `护理建议：${suggestion || '-'}`,
     `下次评估日期：${record.nextAssessmentDate || '-'}`
   ]
   const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `入住评估报告_${record.elderName || '长者'}_${record.assessmentDate || new Date().toISOString().slice(0, 10)}.txt`
+  link.download = `入住评估报告_${elderName || '长者'}_${record.assessmentDate || new Date().toISOString().slice(0, 10)}.txt`
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
   message.success('最近评估报告已下载')
+}
+
+function contractCustomRow(record: ContractAssessmentContractItem) {
+  return {
+    onClick: () => {
+      selectedContractNo.value = record.contractNo || ''
+    }
+  }
+}
+
+function contractRowClassName(record: ContractAssessmentContractItem) {
+  return record.contractNo && record.contractNo === selectedContractNo.value ? 'selected-contract-row' : ''
 }
 
 onMounted(() => {
@@ -258,3 +336,9 @@ watch(
   }
 )
 </script>
+
+<style scoped>
+:deep(.selected-contract-row > td) {
+  background: #e6f7ff !important;
+}
+</style>

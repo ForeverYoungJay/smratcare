@@ -249,14 +249,16 @@ function batchDelete() {
   Modal.confirm({
     title: `确认删除选中的 ${selectedRowKeys.value.length} 条合同吗？`,
     onOk: async () => {
-      if (contractNos.length) {
-        await batchDeleteLeads({ contractNos })
-      } else {
-        await batchDeleteLeads({ ids: selectedRowKeys.value })
-      }
+      const affected = contractNos.length
+        ? await batchDeleteLeads({ contractNos })
+        : await batchDeleteLeads({ ids: selectedRowKeys.value })
       selectedRowKeys.value = []
       selectedContracts.value = []
-      message.success('批量删除成功')
+      if (!affected) {
+        message.warning('未删除任何合同，请刷新后重试')
+        return
+      }
+      message.success(`批量删除成功（${affected} 条）`)
       fetchData()
     }
   })
