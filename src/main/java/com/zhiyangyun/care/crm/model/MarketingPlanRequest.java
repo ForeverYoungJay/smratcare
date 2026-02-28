@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
+import java.util.List;
 import lombok.Data;
 
 @Data
@@ -36,8 +37,12 @@ public class MarketingPlanRequest {
   @Max(value = 999, message = "优先级最大为 999")
   private Integer priority;
 
-  @Pattern(regexp = "ACTIVE|INACTIVE", message = "状态仅支持 ACTIVE 或 INACTIVE")
+  @Pattern(
+      regexp = "DRAFT|PENDING_APPROVAL|REJECTED|APPROVED|PUBLISHED|ACTIVE|INACTIVE",
+      message = "状态仅支持 DRAFT/PENDING_APPROVAL/REJECTED/APPROVED/PUBLISHED/ACTIVE/INACTIVE")
   private String status;
 
   private LocalDate effectiveDate;
+
+  private List<Long> linkedDepartmentIds;
 }

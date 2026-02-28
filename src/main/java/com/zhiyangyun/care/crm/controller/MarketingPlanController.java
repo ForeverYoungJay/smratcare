@@ -3,8 +3,12 @@ package com.zhiyangyun.care.crm.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
+import com.zhiyangyun.care.crm.model.MarketingPlanApprovalRequest;
+import com.zhiyangyun.care.crm.model.MarketingPlanReadConfirmRequest;
+import com.zhiyangyun.care.crm.model.MarketingPlanReceiptResponse;
 import com.zhiyangyun.care.crm.model.MarketingPlanRequest;
 import com.zhiyangyun.care.crm.model.MarketingPlanResponse;
+import com.zhiyangyun.care.crm.model.MarketingPlanWorkflowSummaryResponse;
 import com.zhiyangyun.care.crm.service.MarketingPlanService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -47,6 +51,14 @@ public class MarketingPlanController {
     return Result.ok(marketingPlanService.listByModule(orgId, moduleType));
   }
 
+  @PreAuthorize("hasAnyRole('ADMIN','MANAGER','OPERATOR','STAFF')")
+  @GetMapping("/{id}")
+  public Result<MarketingPlanResponse> detail(@PathVariable Long id) {
+    Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
+    return Result.ok(marketingPlanService.detail(orgId, staffId, id));
+  }
+
   @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
   @PostMapping
   public Result<MarketingPlanResponse> create(@Valid @RequestBody MarketingPlanRequest request) {
@@ -60,6 +72,63 @@ public class MarketingPlanController {
   public Result<MarketingPlanResponse> update(@PathVariable Long id, @Valid @RequestBody MarketingPlanRequest request) {
     Long orgId = AuthContext.getOrgId();
     return Result.ok(marketingPlanService.update(orgId, id, request));
+  }
+
+  @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+  @PostMapping("/{id}/submit")
+  public Result<MarketingPlanResponse> submit(@PathVariable Long id) {
+    Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
+    return Result.ok(marketingPlanService.submit(orgId, staffId, id));
+  }
+
+  @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+  @PostMapping("/{id}/approve")
+  public Result<MarketingPlanResponse> approve(
+      @PathVariable Long id, @RequestBody(required = false) MarketingPlanApprovalRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
+    return Result.ok(marketingPlanService.approve(orgId, staffId, id, request));
+  }
+
+  @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+  @PostMapping("/{id}/reject")
+  public Result<MarketingPlanResponse> reject(
+      @PathVariable Long id, @RequestBody(required = false) MarketingPlanApprovalRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
+    return Result.ok(marketingPlanService.reject(orgId, staffId, id, request));
+  }
+
+  @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+  @PostMapping("/{id}/publish")
+  public Result<MarketingPlanResponse> publish(@PathVariable Long id) {
+    Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
+    return Result.ok(marketingPlanService.publish(orgId, staffId, id));
+  }
+
+  @PreAuthorize("hasAnyRole('ADMIN','MANAGER','OPERATOR','STAFF')")
+  @PostMapping("/{id}/receipt")
+  public Result<MarketingPlanResponse> confirmRead(
+      @PathVariable Long id, @Valid @RequestBody MarketingPlanReadConfirmRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
+    return Result.ok(marketingPlanService.confirmRead(orgId, staffId, id, request));
+  }
+
+  @PreAuthorize("hasAnyRole('ADMIN','MANAGER','OPERATOR')")
+  @GetMapping("/{id}/receipts")
+  public Result<List<MarketingPlanReceiptResponse>> listReceipts(@PathVariable Long id) {
+    Long orgId = AuthContext.getOrgId();
+    return Result.ok(marketingPlanService.listReceipts(orgId, id));
+  }
+
+  @PreAuthorize("hasAnyRole('ADMIN','MANAGER','OPERATOR')")
+  @GetMapping("/{id}/workflow-summary")
+  public Result<MarketingPlanWorkflowSummaryResponse> workflowSummary(@PathVariable Long id) {
+    Long orgId = AuthContext.getOrgId();
+    return Result.ok(marketingPlanService.workflowSummary(orgId, id));
   }
 
   @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")

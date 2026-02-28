@@ -13,8 +13,12 @@ import type {
   LeadBatchStatusRequest,
   MarketingCallbackReport,
   MarketingPlanItem,
+  MarketingPlanApprovalPayload,
+  MarketingPlanReadConfirmPayload,
+  MarketingPlanReceiptItem,
   MarketingPlanPayload,
   MarketingPlanQuery,
+  MarketingPlanWorkflowSummary,
   MarketingChannelReportItem,
   MarketingConsultationTrendItem,
   MarketingConversionReport,
@@ -198,4 +202,36 @@ export function updateMarketingPlan(id: number, data: MarketingPlanPayload) {
 
 export function deleteMarketingPlan(id: number) {
   return request.delete<void>(`/api/marketing/plans/${id}`)
+}
+
+export function getMarketingPlanDetail(id: number) {
+  return request.get<MarketingPlanItem>(`/api/marketing/plans/${id}`)
+}
+
+export function submitMarketingPlan(id: number) {
+  return request.post<MarketingPlanItem>(`/api/marketing/plans/${id}/submit`)
+}
+
+export function approveMarketingPlan(id: number, data?: MarketingPlanApprovalPayload) {
+  return request.post<MarketingPlanItem>(`/api/marketing/plans/${id}/approve`, data || {})
+}
+
+export function rejectMarketingPlan(id: number, data?: MarketingPlanApprovalPayload) {
+  return request.post<MarketingPlanItem>(`/api/marketing/plans/${id}/reject`, data || {})
+}
+
+export function publishMarketingPlan(id: number) {
+  return request.post<MarketingPlanItem>(`/api/marketing/plans/${id}/publish`)
+}
+
+export function confirmMarketingPlanRead(id: number, data: MarketingPlanReadConfirmPayload) {
+  return request.post<MarketingPlanItem>(`/api/marketing/plans/${id}/receipt`, data)
+}
+
+export function getMarketingPlanReceipts(id: number) {
+  return request.get<MarketingPlanReceiptItem[]>(`/api/marketing/plans/${id}/receipts`)
+}
+
+export function getMarketingPlanWorkflowSummary(id: number) {
+  return request.get<MarketingPlanWorkflowSummary>(`/api/marketing/plans/${id}/workflow-summary`)
 }

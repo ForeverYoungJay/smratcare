@@ -165,6 +165,7 @@ public class CrmLeadActionServiceImpl implements CrmLeadActionService {
     plan.setOrgId(orgId);
     plan.setLeadId(leadId);
     plan.setTitle(blankToDefault(request == null ? null : request.getTitle(), "回访"));
+    plan.setFollowupContent(blankToNull(request == null ? null : request.getFollowupContent()));
     plan.setPlanExecuteTime(parseDateTime(request == null ? null : request.getPlanExecuteTime()));
     if (plan.getPlanExecuteTime() == null) {
       plan.setPlanExecuteTime(LocalDateTime.now());
@@ -203,6 +204,7 @@ public class CrmLeadActionServiceImpl implements CrmLeadActionService {
     plan.setStatus("DONE");
     plan.setExecutedTime(LocalDateTime.now());
     plan.setExecuteNote(blankToNull(request == null ? null : request.getExecuteNote()));
+    plan.setFollowupResult(blankToNull(request == null ? null : request.getFollowupResult()));
     callbackPlanMapper.updateById(plan);
 
     CrmLead lead = leadMapper.selectById(plan.getLeadId());
@@ -344,11 +346,13 @@ public class CrmLeadActionServiceImpl implements CrmLeadActionService {
     response.setId(plan.getId());
     response.setLeadId(plan.getLeadId());
     response.setTitle(plan.getTitle());
+    response.setFollowupContent(plan.getFollowupContent());
     response.setPlanExecuteTime(plan.getPlanExecuteTime());
     response.setExecutorName(plan.getExecutorName());
     response.setStatus(plan.getStatus());
     response.setExecutedTime(plan.getExecutedTime());
     response.setExecuteNote(plan.getExecuteNote());
+    response.setFollowupResult(plan.getFollowupResult());
     response.setCreateTime(plan.getCreateTime());
     return response;
   }

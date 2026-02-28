@@ -123,8 +123,8 @@ function exportData() {
 }
 
 function drillDown(stage: string) {
-  if (stage === '咨询管理') router.push('/marketing/sales/consultation')
-  if (stage === '意向客户') router.push('/marketing/sales/intent')
+  if (stage === '咨询管理') router.push({ path: '/marketing/sales/pipeline', query: { tab: 'consultation' } })
+  if (stage === '意向客户') router.push({ path: '/marketing/sales/pipeline', query: { tab: 'intent' } })
   if (stage === '预订管理') router.push('/marketing/sales/reservation')
   if (stage === '失效用户') router.push('/marketing/sales/invalid')
 }

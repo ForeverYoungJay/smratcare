@@ -106,22 +106,26 @@ export interface CallbackPlanItem {
   id: number
   leadId: number
   title: string
+  followupContent?: string
   planExecuteTime: string
   executorName?: string
   status: string
   executedTime?: string
   executeNote?: string
+  followupResult?: string
   createTime?: string
 }
 
 export interface CallbackPlanCreateRequest {
   title: string
+  followupContent?: string
   planExecuteTime: string
   executorName?: string
 }
 
 export interface CallbackExecuteRequest {
   executeNote?: string
+  followupResult?: string
   nextFollowDate?: string
 }
 
@@ -230,7 +234,13 @@ export interface ContractAssessmentOverview {
 }
 
 export type MarketingPlanModuleType = 'SPEECH' | 'POLICY'
-export type MarketingPlanStatus = 'ACTIVE' | 'INACTIVE'
+export type MarketingPlanStatus =
+  | 'DRAFT'
+  | 'PENDING_APPROVAL'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'PUBLISHED'
+  | 'INACTIVE'
 
 export interface MarketingPlanItem {
   id: number
@@ -244,6 +254,18 @@ export interface MarketingPlanItem {
   priority: number
   status: MarketingPlanStatus
   effectiveDate?: string
+  linkedDepartmentIds?: number[]
+  linkedDepartmentNames?: string[]
+  latestApprovalStatus?: 'APPROVED' | 'REJECTED'
+  latestApprovalRemark?: string
+  latestApprovalTime?: string
+  totalStaffCount?: number
+  readCount?: number
+  unreadCount?: number
+  agreeCount?: number
+  improveCount?: number
+  currentUserRead?: boolean
+  currentUserAction?: 'AGREE' | 'IMPROVE'
   createTime?: string
   updateTime?: string
 }
@@ -267,4 +289,33 @@ export interface MarketingPlanPayload {
   priority?: number
   status?: MarketingPlanStatus
   effectiveDate?: string
+  linkedDepartmentIds?: number[]
+}
+
+export interface MarketingPlanApprovalPayload {
+  remark?: string
+}
+
+export interface MarketingPlanReadConfirmPayload {
+  action: 'AGREE' | 'IMPROVE'
+  actionDetail?: string
+}
+
+export interface MarketingPlanReceiptItem {
+  staffId: number
+  staffName?: string
+  readTime?: string
+  action?: 'AGREE' | 'IMPROVE'
+  actionDetail?: string
+  actionTime?: string
+}
+
+export interface MarketingPlanWorkflowSummary {
+  planId: number
+  totalStaffCount: number
+  readCount: number
+  unreadCount: number
+  agreeCount: number
+  improveCount: number
+  receipts: MarketingPlanReceiptItem[]
 }

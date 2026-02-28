@@ -9,22 +9,19 @@ import java.time.LocalDateTime;
 import lombok.Data;
 
 @Data
-@TableName("crm_callback_plan")
-public class CrmCallbackPlan {
+@TableName("crm_marketing_plan_receipt")
+public class CrmMarketingPlanReceipt {
   @TableId(type = IdType.ASSIGN_ID)
   private Long id;
   private Long tenantId;
   private Long orgId;
-  private Long leadId;
-  private String title;
-  private String followupContent;
-  private LocalDateTime planExecuteTime;
-  private String executorName;
-  private String status;
-  private LocalDateTime executedTime;
-  private String executeNote;
-  private String followupResult;
-  private Long createdBy;
+  private Long planId;
+  private Long staffId;
+  private String staffName;
+  private LocalDateTime readTime;
+  private String action;
+  private String actionDetail;
+  private LocalDateTime actionTime;
   @TableField(value = "create_time", fill = FieldFill.INSERT)
   private LocalDateTime createTime;
   @TableField(value = "update_time", fill = FieldFill.INSERT_UPDATE)

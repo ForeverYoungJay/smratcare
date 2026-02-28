@@ -5,5 +5,6 @@ import lombok.Data;
 @Data
 public class CrmCallbackPlanExecuteRequest {
   private String executeNote;
+  private String followupResult;
   private String nextFollowDate;
 }

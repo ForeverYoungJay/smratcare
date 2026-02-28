@@ -181,25 +181,31 @@ export const routes: RouteRecordRaw[] = [
         path: 'marketing',
         name: 'Marketing',
         meta: { title: '营销管理', icon: 'FundProjectionScreenOutlined' },
-        redirect: '/marketing/sales/consultation',
+        redirect: '/marketing/sales/pipeline',
         children: [
           {
             path: 'sales',
             name: 'MarketingSales',
             meta: { title: '销售跟进' },
-            redirect: '/marketing/sales/consultation',
+            redirect: '/marketing/sales/pipeline',
             children: [
+              {
+                path: 'pipeline',
+                name: 'MarketingSalesPipeline',
+                component: () => import('../views/marketing/SalesPipeline.vue'),
+                meta: { title: '线索跟进池' }
+              },
               {
                 path: 'consultation',
                 name: 'MarketingSalesConsultation',
-                component: () => import('../views/marketing/SalesConsultation.vue'),
-                meta: { title: '咨询管理' }
+                redirect: '/marketing/sales/pipeline?tab=consultation',
+                meta: { title: '咨询管理', hidden: true }
               },
               {
                 path: 'intent',
                 name: 'MarketingSalesIntent',
-                component: () => import('../views/marketing/SalesIntent.vue'),
-                meta: { title: '意向客户' }
+                redirect: '/marketing/sales/pipeline?tab=intent',
+                meta: { title: '意向客户', hidden: true }
               },
               {
                 path: 'reservation',
@@ -216,8 +222,8 @@ export const routes: RouteRecordRaw[] = [
               {
                 path: 'callback',
                 name: 'MarketingSalesCallback',
-                component: () => import('../views/marketing/SalesCallback.vue'),
-                meta: { title: '待回访提醒' }
+                redirect: '/marketing/sales/pipeline?tab=callback',
+                meta: { title: '待回访提醒', hidden: true }
               }
             ]
           },

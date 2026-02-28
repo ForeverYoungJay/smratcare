@@ -2,7 +2,15 @@
   <PageContainer :title="title" :sub-title="subTitle">
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
-        <template v-if="mode === 'consultation'">
+        <a-form-item v-if="props.mode === 'pipeline'" label="线索视图">
+          <a-radio-group v-model:value="pipelineTab" button-style="solid" @change="onPipelineTabChange">
+            <a-radio-button value="consultation">咨询</a-radio-button>
+            <a-radio-button value="intent">意向</a-radio-button>
+            <a-radio-button value="callback">待回访</a-radio-button>
+          </a-radio-group>
+        </a-form-item>
+
+        <template v-if="effectiveMode === 'consultation'">
           <a-form-item label="咨询人姓名">
             <a-input v-model:value="query.consultantName" placeholder="请输入 咨询人姓名" allow-clear />
           </a-form-item>
@@ -30,7 +38,7 @@
           </a-form-item>
         </template>
 
-        <template v-else-if="mode === 'intent' || mode === 'invalid'">
+        <template v-else-if="effectiveMode === 'intent' || effectiveMode === 'invalid'">
           <a-form-item label="老人姓名">
             <a-input v-model:value="query.elderName" placeholder="请输入 老人姓名" allow-clear />
           </a-form-item>
@@ -48,7 +56,7 @@
           </a-form-item>
         </template>
 
-        <template v-else-if="mode === 'reservation'">
+        <template v-else-if="effectiveMode === 'reservation'">
           <a-form-item label="姓名">
             <a-input v-model:value="query.elderName" placeholder="请输入 姓名" allow-clear />
           </a-form-item>
@@ -132,12 +140,28 @@
             <template v-else-if="column.key === 'operation'">
               <a-space wrap>
                 <a-button type="link" @click="openForm(record)">编辑</a-button>
-                <a-button v-if="mode === 'consultation' || mode === 'intent' || mode === 'reservation'" type="link" @click="viewMore(record)">查看更多</a-button>
-                <a-button v-if="mode === 'reservation'" type="link" @click="toggleRefund(record)">退款</a-button>
-                <a-button v-if="mode === 'reservation'" type="link" @click="transferToAdmission(record)">转入住</a-button>
-                <a-button v-if="mode === 'invalid'" type="link" @click="viewMore(record)">查看</a-button>
-                <a-button v-if="mode === 'invalid'" type="link" @click="recoverLead(record)">恢复客户</a-button>
-                <a-button v-if="mode === 'callback'" type="link" @click="executeCallback(record)">执行</a-button>
+                <a-button
+                  v-if="effectiveMode === 'consultation' || effectiveMode === 'intent' || effectiveMode === 'reservation'"
+                  type="link"
+                  @click="viewMore(record)"
+                >
+                  查看更多
+                </a-button>
+                <a-button v-if="effectiveMode === 'consultation'" type="link" @click="moveToIntent(record)">设为意向</a-button>
+                <a-button v-if="effectiveMode === 'intent'" type="link" @click="moveToReservation(record)">转预订</a-button>
+                <a-button
+                  v-if="effectiveMode === 'consultation' || effectiveMode === 'intent' || effectiveMode === 'callback'"
+                  type="link"
+                  danger
+                  @click="abandonLead(record)"
+                >
+                  放弃
+                </a-button>
+                <a-button v-if="effectiveMode === 'reservation'" type="link" @click="toggleRefund(record)">退款</a-button>
+                <a-button v-if="effectiveMode === 'reservation'" type="link" @click="transferToAdmission(record)">转入住</a-button>
+                <a-button v-if="effectiveMode === 'invalid'" type="link" @click="viewMore(record)">查看</a-button>
+                <a-button v-if="effectiveMode === 'invalid'" type="link" @click="recoverLead(record)">恢复客户</a-button>
+                <a-button v-if="effectiveMode === 'callback'" type="link" @click="executeCallback(record)">执行</a-button>
                 <a-button type="link" danger @click="remove(record.id)">删除</a-button>
               </a-space>
             </template>
@@ -275,6 +299,9 @@
         <a-form-item label="计划标题">
           <a-input v-model:value="planForm.title" />
         </a-form-item>
+        <a-form-item label="回访内容">
+          <a-textarea v-model:value="planForm.followupContent" :rows="3" placeholder="填写本次回访重点内容" />
+        </a-form-item>
         <a-form-item label="计划执行时间">
           <a-date-picker v-model:value="planForm.planExecuteTime" value-format="YYYY-MM-DD HH:mm:ss" show-time style="width: 100%" />
         </a-form-item>
@@ -283,12 +310,26 @@
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <a-modal v-model:open="executeOpen" title="执行回访计划" :confirm-loading="executeSubmitting" @ok="submitExecuteCallback">
+      <a-form :model="executeForm" layout="vertical">
+        <a-form-item label="执行备注">
+          <a-textarea v-model:value="executeForm.executeNote" :rows="2" />
+        </a-form-item>
+        <a-form-item label="回访结果">
+          <a-textarea v-model:value="executeForm.followupResult" :rows="3" placeholder="填写回访结果或改进结论" />
+        </a-form-item>
+        <a-form-item label="下次回访日期">
+          <a-date-picker v-model:value="executeForm.nextFollowDate" value-format="YYYY-MM-DD" style="width: 100%" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
@@ -309,7 +350,7 @@ import {
 import type { CrmLeadItem, MarketingLeadEntrySummary, MarketingLeadMode, PageResult } from '../../../types'
 
 const props = withDefaults(defineProps<{
-  mode: 'consultation' | 'intent' | 'reservation' | 'invalid' | 'callback'
+  mode: 'consultation' | 'intent' | 'reservation' | 'invalid' | 'callback' | 'pipeline'
   title: string
   subTitle: string
 }>(), {
@@ -317,6 +358,11 @@ const props = withDefaults(defineProps<{
 })
 
 const router = useRouter()
+const route = useRoute()
+const pipelineTab = ref<'consultation' | 'intent' | 'callback'>('consultation')
+const effectiveMode = computed<'consultation' | 'intent' | 'reservation' | 'invalid' | 'callback'>(() => {
+  return props.mode === 'pipeline' ? pipelineTab.value : props.mode
+})
 const loading = ref(false)
 const tableError = ref('')
 const rows = ref<CrmLeadItem[]>([])
@@ -366,9 +412,19 @@ const planOpen = ref(false)
 const planSubmitting = ref(false)
 const planForm = reactive({
   title: '回访',
+  followupContent: '',
   planExecuteTime: dayjs().format('YYYY-MM-DD HH:mm:ss'),
   executorName: ''
 })
+const executeOpen = ref(false)
+const executeSubmitting = ref(false)
+const pendingExecutePlanId = ref<number>()
+const executeForm = reactive({
+  executeNote: '页面执行',
+  followupResult: '',
+  nextFollowDate: ''
+})
+const callbackSnapshot = ref<Record<number, { title?: string; followupContent?: string; followupResult?: string; planId?: number }>>({})
 
 const rules: FormRules = {
   consultantName: [{ required: true, message: '请输入咨询人姓名' }],
@@ -385,7 +441,8 @@ const rowSelection = computed(() => ({
 const modalTitle = computed(() => form.id ? '编辑客户' : '新增客户')
 
 const columns = computed(() => {
-  if (props.mode === 'consultation') {
+  const mode = effectiveMode.value
+  if (mode === 'consultation') {
     return [
       { title: '咨询人姓名', dataIndex: 'consultantName', key: 'consultantName', width: 130 },
       { title: '联系电话', dataIndex: 'consultantPhone', key: 'consultantPhone', width: 130 },
@@ -403,7 +460,7 @@ const columns = computed(() => {
       { title: '操作', key: 'operation', fixed: 'right', width: 220 }
     ]
   }
-  if (props.mode === 'intent') {
+  if (mode === 'intent') {
     return [
       { title: '老人姓名', dataIndex: 'elderName', key: 'elderName', width: 120 },
       { title: '老人联系电话', dataIndex: 'elderPhone', key: 'elderPhone', width: 140 },
@@ -411,6 +468,8 @@ const columns = computed(() => {
       { title: '性别', dataIndex: 'gender', key: 'gender', width: 80 },
       { title: '年龄', dataIndex: 'age', key: 'age', width: 80 },
       { title: '回访状态', dataIndex: 'followupStatus', key: 'followupStatus', width: 120 },
+      { title: '回访内容', dataIndex: 'followupContent', key: 'followupContent', width: 180 },
+      { title: '回访结果', dataIndex: 'followupResult', key: 'followupResult', width: 180 },
       { title: '推荐渠道', dataIndex: 'referralChannel', key: 'referralChannel', width: 120 },
       { title: '客户标签', dataIndex: 'customerTag', key: 'customerTag', width: 120 },
       { title: '归属营销人员', dataIndex: 'marketerName', key: 'marketerName', width: 140 },
@@ -418,7 +477,7 @@ const columns = computed(() => {
       { title: '操作', key: 'operation', fixed: 'right', width: 180 }
     ]
   }
-  if (props.mode === 'reservation') {
+  if (mode === 'reservation') {
     return [
       { title: '姓名', dataIndex: 'elderName', key: 'elderName', width: 120 },
       { title: '性别', dataIndex: 'gender', key: 'gender', width: 80 },
@@ -436,7 +495,7 @@ const columns = computed(() => {
       { title: '操作', key: 'operation', fixed: 'right', width: 260 }
     ]
   }
-  if (props.mode === 'invalid') {
+  if (mode === 'invalid') {
     return [
       { title: '序号', dataIndex: 'index', key: 'index', width: 80 },
       { title: '老人姓名', dataIndex: 'elderName', key: 'elderName', width: 120 },
@@ -457,43 +516,65 @@ const columns = computed(() => {
     { title: '联系电话', dataIndex: 'elderPhone', key: 'elderPhone', width: 140 },
     { title: '跟进人', dataIndex: 'marketerName', key: 'marketerName', width: 120 },
     { title: '计划执行时间', dataIndex: 'nextFollowDate', key: 'nextFollowDate', width: 170 },
-    { title: '计划标题', dataIndex: 'remark', key: 'remark', width: 160 },
+    { title: '计划标题', dataIndex: 'planTitle', key: 'planTitle', width: 160 },
+    { title: '回访内容', dataIndex: 'followupContent', key: 'followupContent', width: 220 },
+    { title: '回访结果', dataIndex: 'followupResult', key: 'followupResult', width: 220 },
     { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 },
-    { title: '操作', key: 'operation', fixed: 'right', width: 140 }
+    { title: '操作', key: 'operation', fixed: 'right', width: 180 }
   ]
 })
 
 const actionButtons = computed(() => {
-  if (props.mode === 'consultation') {
+  const mode = effectiveMode.value
+  if (mode === 'consultation') {
     return [
       { key: 'create', label: '新增', type: 'primary' as const },
+      { key: 'setIntent', label: '设为意向', type: 'default' as const },
       { key: 'abandon', label: '放弃客户', type: 'default' as const }
     ]
   }
-  if (props.mode === 'intent') {
+  if (mode === 'intent') {
     return [
       { key: 'create', label: '新增', type: 'primary' as const },
+      { key: 'toReservation', label: '转预订', type: 'default' as const },
       { key: 'tag', label: '设置客户标签', type: 'default' as const },
       { key: 'callback', label: '添加回访计划', type: 'default' as const },
       { key: 'abandon', label: '放弃客户', type: 'default' as const }
     ]
   }
-  if (props.mode === 'reservation') {
+  if (mode === 'reservation') {
     return [
       { key: 'create', label: '新增', type: 'primary' as const },
       { key: 'batchDelete', label: '删除', type: 'default' as const }
     ]
   }
-  if (props.mode === 'invalid') {
+  if (mode === 'invalid') {
     return [{ key: 'recover', label: '恢复客户', type: 'primary' as const }]
+  }
+  if (mode === 'callback') {
+    return [
+      { key: 'callback', label: '添加回访计划', type: 'default' as const },
+      { key: 'toReservation', label: '转预订', type: 'default' as const },
+      { key: 'abandon', label: '放弃客户', type: 'default' as const }
+    ]
   }
   return [{ key: 'deletePlan', label: '删除', type: 'default' as const }]
 })
 
-const displayRows = computed(() => rows.value.map((item, index) => ({ ...item, index: index + 1 })))
+const displayRows = computed(() => rows.value.map((item, index) => {
+  const snapshot = callbackSnapshot.value[item.id] || {}
+  return {
+    ...item,
+    index: index + 1,
+    planTitle: snapshot.title || item.remark,
+    followupContent: snapshot.followupContent,
+    followupResult: snapshot.followupResult
+  }
+}))
 const displayTotal = computed(() => total.value)
 const summaryCards = computed(() => {
-  if (props.mode === 'consultation') {
+  const mode = effectiveMode.value
+  if (mode === 'consultation') {
     return [
       { title: '当前咨询池', value: summary.modeCount },
       { title: '总线索数', value: summary.totalCount },
@@ -501,7 +582,7 @@ const summaryCards = computed(() => {
       { title: '非标准来源', value: summary.nonStandardSourceCount }
     ]
   }
-  if (props.mode === 'intent') {
+  if (mode === 'intent') {
     return [
       { title: '当前意向客户', value: summary.modeCount },
       { title: '待回访总量', value: summary.callbackPendingCount },
@@ -509,7 +590,7 @@ const summaryCards = computed(() => {
       { title: '缺少下次回访', value: summary.missingNextFollowDateCount }
     ]
   }
-  if (props.mode === 'reservation') {
+  if (mode === 'reservation') {
     return [
       { title: '当前预订客户', value: summary.modeCount },
       { title: '已签约', value: summary.signedContractCount },
@@ -517,7 +598,7 @@ const summaryCards = computed(() => {
       { title: '退款预订', value: summary.refundedReservationCount }
     ]
   }
-  if (props.mode === 'invalid') {
+  if (mode === 'invalid') {
     return [
       { title: '失效客户', value: summary.modeCount },
       { title: '咨询客户', value: summary.consultCount },
@@ -534,16 +615,17 @@ const summaryCards = computed(() => {
 })
 
 const warningMessage = computed(() => {
-  if (props.mode === 'consultation' && (summary.missingSourceCount > 0 || summary.nonStandardSourceCount > 0)) {
+  const mode = effectiveMode.value
+  if (mode === 'consultation' && (summary.missingSourceCount > 0 || summary.nonStandardSourceCount > 0)) {
     return `数据质量提醒：缺失来源 ${summary.missingSourceCount} 条，非标准来源 ${summary.nonStandardSourceCount} 条。`
   }
-  if (props.mode === 'intent' && (summary.callbackOverdueCount > 0 || summary.missingNextFollowDateCount > 0)) {
+  if (mode === 'intent' && (summary.callbackOverdueCount > 0 || summary.missingNextFollowDateCount > 0)) {
     return `跟进风险提醒：逾期回访 ${summary.callbackOverdueCount} 条，缺失下次回访日期 ${summary.missingNextFollowDateCount} 条。`
   }
-  if (props.mode === 'reservation' && (summary.unsignedReservationCount > 0 || summary.refundedReservationCount > 0)) {
+  if (mode === 'reservation' && (summary.unsignedReservationCount > 0 || summary.refundedReservationCount > 0)) {
     return `签约闭环提醒：待签约预订 ${summary.unsignedReservationCount} 条，退款预订 ${summary.refundedReservationCount} 条。`
   }
-  if (props.mode === 'callback' && (summary.callbackOverdueCount > 0 || summary.callbackDueTodayCount > 0)) {
+  if (mode === 'callback' && (summary.callbackOverdueCount > 0 || summary.callbackDueTodayCount > 0)) {
     return `回访提醒：今日到期 ${summary.callbackDueTodayCount} 条，逾期 ${summary.callbackOverdueCount} 条。`
   }
   return ''
@@ -571,11 +653,12 @@ function genderText(gender?: number) {
 }
 
 function buildQueryParams() {
-  const isCallback = props.mode === 'callback'
+  const mode = effectiveMode.value
+  const isCallback = mode === 'callback'
   return {
     pageNo: query.pageNo,
     pageSize: query.pageSize,
-    status: isCallback ? undefined : defaultStatus(props.mode),
+    status: isCallback ? undefined : defaultStatus(mode),
     consultantName: query.consultantName || undefined,
     consultantPhone: query.consultantPhone || undefined,
     elderName: query.elderName || undefined,
@@ -593,8 +676,9 @@ function buildQueryParams() {
 }
 
 function buildSummaryParams() {
+  const mode = effectiveMode.value
   return {
-    mode: props.mode as MarketingLeadMode,
+    mode: mode as MarketingLeadMode,
     consultantName: query.consultantName || undefined,
     consultantPhone: query.consultantPhone || undefined,
     elderName: query.elderName || undefined,
@@ -622,6 +706,7 @@ async function fetchData() {
     rows.value = page.list || []
     total.value = page.total || 0
     Object.assign(summary, summaryRes || {})
+    await hydrateCallbackSnapshot(rows.value)
   } catch (error: any) {
     const text = error?.message || '请求失败，请稍后重试'
     tableError.value = text
@@ -630,6 +715,30 @@ async function fetchData() {
     loading.value = false
     summaryLoading.value = false
   }
+}
+
+async function hydrateCallbackSnapshot(list: CrmLeadItem[]) {
+  const mode = effectiveMode.value
+  if (mode !== 'intent' && mode !== 'callback') {
+    callbackSnapshot.value = {}
+    return
+  }
+  const pairs = await Promise.all(list.map(async (item) => {
+    try {
+      const plans = await getLeadCallbackPlans(item.id)
+      const latest = (plans || [])[0]
+      const pending = (plans || []).find((plan) => plan.status === 'PENDING')
+      return [item.id, {
+        title: latest?.title,
+        followupContent: latest?.followupContent,
+        followupResult: latest?.followupResult,
+        planId: pending?.id || latest?.id
+      }] as const
+    } catch {
+      return [item.id, {}] as const
+    }
+  }))
+  callbackSnapshot.value = Object.fromEntries(pairs)
 }
 
 function onSearch() {
@@ -655,6 +764,24 @@ function reset() {
   fetchData()
 }
 
+function syncPipelineTabByRoute() {
+  if (props.mode !== 'pipeline') return
+  const tab = String(route.query.tab || '')
+  if (tab === 'intent' || tab === 'callback' || tab === 'consultation') {
+    pipelineTab.value = tab
+  } else {
+    pipelineTab.value = 'consultation'
+  }
+}
+
+function onPipelineTabChange() {
+  if (props.mode !== 'pipeline') return
+  router.replace({ path: route.path, query: { ...route.query, tab: pipelineTab.value } })
+  query.pageNo = 1
+  selectedRowKeys.value = []
+  fetchData()
+}
+
 function onPageChange(page: number) {
   query.pageNo = page
   fetchData()
@@ -669,6 +796,14 @@ function onPageSizeChange(_current: number, size: number) {
 async function handleTopAction(key: string) {
   if (key === 'create') {
     openForm()
+    return
+  }
+  if (key === 'setIntent') {
+    await batchMoveToIntent()
+    return
+  }
+  if (key === 'toReservation') {
+    await batchMoveToReservation()
     return
   }
   if (key === 'abandon') {
@@ -694,6 +829,7 @@ async function handleTopAction(key: string) {
       return
     }
     planForm.title = '回访'
+    planForm.followupContent = ''
     planForm.planExecuteTime = dayjs().format('YYYY-MM-DD HH:mm:ss')
     planForm.executorName = ''
     planOpen.value = true
@@ -727,6 +863,38 @@ async function handleTopAction(key: string) {
   }
 }
 
+async function moveToIntent(record: CrmLeadItem) {
+  await batchUpdateLeadStatus({ ids: [record.id], status: 1, followupStatus: record.followupStatus || '待回访' })
+  message.success('已转为意向客户')
+  fetchData()
+}
+
+async function moveToReservation(record: CrmLeadItem) {
+  await updateCrmLead(record.id, {
+    ...record,
+    status: 2,
+    reservationStatus: record.reservationStatus || '预定'
+  })
+  message.success('已转入预订管理')
+  fetchData()
+}
+
+function abandonLead(record: CrmLeadItem) {
+  Modal.confirm({
+    title: `确认放弃客户「${record.elderName || record.name || record.id}」吗？`,
+    content: '放弃后将进入失效用户池，可后续恢复。',
+    onOk: async () => {
+      await batchUpdateLeadStatus({
+        ids: [record.id],
+        status: 3,
+        invalidTime: dayjs().format('YYYY-MM-DD HH:mm:ss')
+      })
+      message.success('已放弃客户并转入失效用户')
+      fetchData()
+    }
+  })
+}
+
 function openForm(row?: CrmLeadItem) {
   if (row) {
     Object.assign(form, row)
@@ -754,10 +922,10 @@ function openForm(row?: CrmLeadItem) {
       reservationAmount: undefined,
       reservationRoomNo: '',
       reservationChannel: '',
-      reservationStatus: props.mode === 'reservation' ? '预定' : '',
+      reservationStatus: effectiveMode.value === 'reservation' ? '预定' : '',
       refunded: 0,
       orgName: '德合养老院',
-      status: defaultStatus(props.mode) ?? 0
+      status: defaultStatus(effectiveMode.value) ?? 0
     } as Partial<CrmLeadItem>)
   }
   open.value = true
@@ -772,7 +940,7 @@ async function submit() {
       ...form,
       name: form.name || form.elderName || form.consultantName || '未命名线索',
       phone: form.phone || form.elderPhone || form.consultantPhone,
-      status: defaultStatus(props.mode) ?? form.status ?? 0
+      status: defaultStatus(effectiveMode.value) ?? form.status ?? 0
     }
     if (form.id) {
       await updateCrmLead(form.id, payload)
@@ -834,14 +1002,36 @@ async function executeCallback(record: CrmLeadItem) {
       message.info('该客户暂无待执行回访计划')
       return
     }
-    await executeCallbackPlan(pending.id, {
-      executeNote: '页面执行',
-      nextFollowDate: record.nextFollowDate
+    pendingExecutePlanId.value = pending.id
+    executeForm.executeNote = '页面执行'
+    executeForm.followupResult = pending.followupResult || ''
+    executeForm.nextFollowDate = record.nextFollowDate || ''
+    executeOpen.value = true
+  } catch {
+    message.error('执行失败')
+  }
+}
+
+async function submitExecuteCallback() {
+  if (!pendingExecutePlanId.value) {
+    message.error('未找到待执行计划')
+    return
+  }
+  executeSubmitting.value = true
+  try {
+    await executeCallbackPlan(pendingExecutePlanId.value, {
+      executeNote: executeForm.executeNote,
+      followupResult: executeForm.followupResult,
+      nextFollowDate: executeForm.nextFollowDate || undefined
     })
     message.success('已执行回访计划')
+    executeOpen.value = false
+    pendingExecutePlanId.value = undefined
     fetchData()
   } catch {
     message.error('执行失败')
+  } finally {
+    executeSubmitting.value = false
   }
 }
 
@@ -879,6 +1069,39 @@ async function batchMoveToInvalid() {
   fetchData()
 }
 
+async function batchMoveToIntent() {
+  const ids = selectedIds()
+  if (!ids.length) {
+    message.info('请先勾选要转为意向的客户')
+    return
+  }
+  await batchUpdateLeadStatus({ ids, status: 1, followupStatus: '待回访' })
+  message.success(`已转为意向客户 ${ids.length} 条`)
+  selectedRowKeys.value = []
+  fetchData()
+}
+
+async function batchMoveToReservation() {
+  const ids = selectedIds()
+  if (!ids.length) {
+    message.info('请先勾选要转预订的客户')
+    return
+  }
+  const selectedRows = rows.value.filter((item) => ids.includes(item.id))
+  await Promise.all(
+    selectedRows.map((item) =>
+      updateCrmLead(item.id, {
+        ...item,
+        status: 2,
+        reservationStatus: item.reservationStatus || '预定'
+      })
+    )
+  )
+  message.success(`已转入预订管理 ${selectedRows.length} 条`)
+  selectedRowKeys.value = []
+  fetchData()
+}
+
 function remove(id: number) {
   Modal.confirm({
     title: '确认删除该客户记录吗？',
@@ -890,7 +1113,24 @@ function remove(id: number) {
   })
 }
 
-onMounted(fetchData)
+watch(
+  () => route.query.tab,
+  () => {
+    if (props.mode !== 'pipeline') return
+    const before = pipelineTab.value
+    syncPipelineTabByRoute()
+    if (pipelineTab.value !== before) {
+      query.pageNo = 1
+      selectedRowKeys.value = []
+      fetchData()
+    }
+  }
+)
+
+onMounted(() => {
+  syncPipelineTabByRoute()
+  fetchData()
+})
 </script>
 
 <style scoped>

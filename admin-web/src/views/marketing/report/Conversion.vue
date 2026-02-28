@@ -132,8 +132,8 @@ const funnelOption = computed(() => ({
 }))
 
 function drillDown(stage: string) {
-  if (stage === '咨询') router.push({ path: '/marketing/sales/consultation' })
-  if (stage === '意向') router.push({ path: '/marketing/sales/intent' })
+  if (stage === '咨询') router.push({ path: '/marketing/sales/pipeline', query: { tab: 'consultation' } })
+  if (stage === '意向') router.push({ path: '/marketing/sales/pipeline', query: { tab: 'intent' } })
   if (stage === '预订') router.push({ path: '/marketing/sales/reservation' })
   if (stage === '失效') router.push({ path: '/marketing/sales/invalid' })
   if (stage === '签约') router.push({ path: '/marketing/contract-management' })
