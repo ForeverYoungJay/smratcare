@@ -4,24 +4,14 @@
       <a-col :xs="24" :lg="14">
         <a-card title="附件中心" class="card-elevated" :bordered="false">
           <a-space wrap style="margin-bottom: 12px">
-            <a-button type="primary" @click="openFilePicker('contract')" :disabled="!linkage?.leadId">上传合同</a-button>
-            <a-button @click="openFilePicker('invoice')" :disabled="!linkage?.leadId">上传收据/发票</a-button>
             <a-button @click="downloadBundle">下载清单</a-button>
             <a-button @click="goContractManagement">查看合同详情</a-button>
             <a-button @click="go('/finance/bill')">前往费用账单</a-button>
           </a-space>
-          <input
-            ref="fileInputRef"
-            type="file"
-            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.txt,.zip"
-            style="display: none"
-            @change="onFileSelected"
-          />
           <a-alert
-            v-if="!linkage?.leadId"
-            type="warning"
+            type="info"
             show-icon
-            message="当前长者未关联营销合同线索，无法上传附件，请先在营销-合同签约完成签约。"
+            message="合同签署与附件上传统一在【营销管理-合同签约】中完成，本页面仅做已签署合同与票据只读展示。"
             style="margin-bottom: 12px"
           />
           <StatefulBlock :loading="loading" :error="errorMessage" :empty="!rows.length" empty-text="暂无附件" @retry="loadLinkage">
@@ -66,17 +56,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
-import {
-  createLeadAttachment,
-  getContractLinkageByElder,
-  uploadMarketingFile
-} from '../../../api/marketing'
+import { getContractLinkageByElder } from '../../../api/marketing'
 import type { ContractAttachmentItem, ContractLinkageSummary } from '../../../types'
 
 const router = useRouter()
 const route = useRoute()
-const fileInputRef = ref<HTMLInputElement | null>(null)
-const uploadType = ref<'contract' | 'invoice'>('contract')
 const loading = ref(false)
 const errorMessage = ref('')
 const linkage = ref<ContractLinkageSummary>()
@@ -122,44 +106,6 @@ function goContractManagement() {
     return
   }
   router.push('/marketing/contract-management')
-}
-
-function openFilePicker(type: 'contract' | 'invoice') {
-  uploadType.value = type
-  if (!linkage.value?.leadId) {
-    message.warning('当前长者尚未关联营销合同，无法上传。')
-    return
-  }
-  fileInputRef.value?.click()
-}
-
-async function onFileSelected(event: Event) {
-  const target = event.target as HTMLInputElement
-  const file = target.files?.[0]
-  if (!file) return
-  const leadId = linkage.value?.leadId
-  if (!leadId) {
-    message.warning('缺少合同线索，无法上传。')
-    target.value = ''
-    return
-  }
-  try {
-    const uploaded = await uploadMarketingFile(file, 'marketing-contract')
-    await createLeadAttachment(leadId, {
-      contractNo: linkage.value?.contractNo,
-      fileName: uploaded.originalFileName || uploaded.fileName || file.name,
-      fileUrl: uploaded.fileUrl,
-      fileType: uploaded.fileType || file.type,
-      fileSize: uploaded.fileSize || file.size,
-      remark: uploadType.value === 'contract' ? '合同附件' : '票据附件'
-    })
-    message.success('附件上传成功')
-    await loadLinkage()
-  } catch (error: any) {
-    message.error(error?.message || '附件上传失败')
-  } finally {
-    target.value = ''
-  }
 }
 
 function downloadBundle() {

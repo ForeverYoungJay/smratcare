@@ -10,6 +10,10 @@ import com.zhiyangyun.care.bill.model.BillGenerateResponse;
 import com.zhiyangyun.care.bill.model.BillItemDetail;
 import com.zhiyangyun.care.bill.service.BillService;
 import com.zhiyangyun.care.bill.service.BillingConfigService;
+import com.zhiyangyun.care.crm.entity.CrmLead;
+import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
+import com.zhiyangyun.care.elder.entity.lifecycle.ElderAdmission;
+import com.zhiyangyun.care.elder.mapper.lifecycle.ElderAdmissionMapper;
 import com.zhiyangyun.care.store.entity.StoreOrder;
 import com.zhiyangyun.care.store.mapper.StoreOrderMapper;
 import com.zhiyangyun.care.store.entity.ElderProfile;
@@ -31,18 +35,24 @@ public class BillServiceImpl implements BillService {
   private final ElderProfileMapper elderMapper;
   private final StoreOrderMapper orderMapper;
   private final BillingConfigService billingConfigService;
+  private final ElderAdmissionMapper elderAdmissionMapper;
+  private final CrmLeadMapper crmLeadMapper;
 
   public BillServiceImpl(
       BillMonthlyMapper billMonthlyMapper,
       BillItemMapper billItemMapper,
       ElderProfileMapper elderMapper,
       StoreOrderMapper orderMapper,
-      BillingConfigService billingConfigService) {
+      BillingConfigService billingConfigService,
+      ElderAdmissionMapper elderAdmissionMapper,
+      CrmLeadMapper crmLeadMapper) {
     this.billMonthlyMapper = billMonthlyMapper;
     this.billItemMapper = billItemMapper;
     this.elderMapper = elderMapper;
     this.orderMapper = orderMapper;
     this.billingConfigService = billingConfigService;
+    this.elderAdmissionMapper = elderAdmissionMapper;
+    this.crmLeadMapper = crmLeadMapper;
   }
 
   @Override
@@ -60,6 +70,11 @@ public class BillServiceImpl implements BillService {
     response.setBillMonth(billMonth);
 
     for (ElderProfile elder : elders) {
+      String signedContractNo = resolveSignedContractNo(elder.getOrgId(), elder.getId());
+      if (signedContractNo == null) {
+        response.setSkippedCount(response.getSkippedCount() + 1);
+        continue;
+      }
       BillMonthly existing = billMonthlyMapper.selectOne(
           Wrappers.lambdaQuery(BillMonthly.class)
               .eq(BillMonthly::getOrgId, elder.getOrgId())
@@ -81,6 +96,7 @@ public class BillServiceImpl implements BillService {
           existing.setPaidAmount(BigDecimal.ZERO);
         }
         existing.setOutstandingAmount(total.subtract(existing.getPaidAmount()));
+        existing.setContractNoSnapshot(signedContractNo);
         billMonthlyMapper.updateById(existing);
         response.setGeneratedCount(response.getGeneratedCount() + 1);
         response.getBillIds().add(existing.getId());
@@ -93,6 +109,7 @@ public class BillServiceImpl implements BillService {
       monthly.setBillMonth(billMonth);
       monthly.setTotalAmount(BigDecimal.ZERO);
       monthly.setStatus(0);
+      monthly.setContractNoSnapshot(signedContractNo);
       billMonthlyMapper.insert(monthly);
 
       BigDecimal total = appendBillItems(monthly, elder, startDate, endDate, ym, billMonth);
@@ -103,8 +120,37 @@ public class BillServiceImpl implements BillService {
       response.getBillIds().add(monthly.getId());
     }
 
-    response.setMessage("Generated monthly bills");
+    if (response.getSkippedCount() > 0) {
+      response.setMessage("Generated monthly bills; skipped elders without signed contracts: " + response.getSkippedCount());
+    } else {
+      response.setMessage("Generated monthly bills");
+    }
     return response;
+  }
+
+  private String resolveSignedContractNo(Long orgId, Long elderId) {
+    ElderAdmission admission = elderAdmissionMapper.selectOne(
+        Wrappers.lambdaQuery(ElderAdmission.class)
+            .eq(ElderAdmission::getOrgId, orgId)
+            .eq(ElderAdmission::getElderId, elderId)
+            .eq(ElderAdmission::getIsDeleted, 0)
+            .isNotNull(ElderAdmission::getContractNo)
+            .orderByDesc(ElderAdmission::getAdmissionDate)
+            .orderByDesc(ElderAdmission::getCreateTime)
+            .last("LIMIT 1"));
+    if (admission == null || admission.getContractNo() == null || admission.getContractNo().isBlank()) {
+      return null;
+    }
+    CrmLead lead = crmLeadMapper.selectOne(Wrappers.lambdaQuery(CrmLead.class)
+        .eq(CrmLead::getOrgId, orgId)
+        .eq(CrmLead::getIsDeleted, 0)
+        .eq(CrmLead::getContractNo, admission.getContractNo())
+        .eq(CrmLead::getContractSignedFlag, 1)
+        .in(CrmLead::getContractStatus, List.of("已审批,已通过", "费用预审通过", "SIGNED", "EFFECTIVE"))
+        .orderByDesc(CrmLead::getContractSignedAt)
+        .orderByDesc(CrmLead::getCreateTime)
+        .last("LIMIT 1"));
+    return lead == null ? null : admission.getContractNo();
   }
 
   private BigDecimal appendBillItems(BillMonthly monthly, ElderProfile elder, LocalDate startDate,

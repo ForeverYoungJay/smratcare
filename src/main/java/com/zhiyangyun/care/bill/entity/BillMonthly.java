@@ -17,6 +17,8 @@ public class BillMonthly {
   private Long orgId;
 
   private Long elderId;
+  private Long elderContractId;
+  private String contractNoSnapshot;
 
   private String billMonth;
 
