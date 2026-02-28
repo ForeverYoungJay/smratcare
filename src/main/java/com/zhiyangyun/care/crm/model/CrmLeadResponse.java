@@ -1,12 +1,17 @@
 package com.zhiyangyun.care.crm.model;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import java.time.LocalDateTime;
 import lombok.Data;
 
 @Data
 public class CrmLeadResponse {
+  @JsonSerialize(using = ToStringSerializer.class)
   private Long id;
+  @JsonSerialize(using = ToStringSerializer.class)
   private Long tenantId;
+  @JsonSerialize(using = ToStringSerializer.class)
   private Long orgId;
   private String name;
   private String phone;
@@ -28,6 +33,7 @@ public class CrmLeadResponse {
   private LocalDateTime invalidTime;
   private String idCardNo;
   private String reservationRoomNo;
+  @JsonSerialize(using = ToStringSerializer.class)
   private Long reservationBedId;
   private String reservationChannel;
   private String reservationStatus;

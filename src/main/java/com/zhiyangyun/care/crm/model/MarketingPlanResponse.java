@@ -1,5 +1,7 @@
 package com.zhiyangyun.care.crm.model;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -7,6 +9,7 @@ import lombok.Data;
 
 @Data
 public class MarketingPlanResponse {
+  @JsonSerialize(using = ToStringSerializer.class)
   private Long id;
   private String moduleType;
   private String title;

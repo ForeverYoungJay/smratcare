@@ -367,7 +367,7 @@ const loading = ref(false)
 const tableError = ref('')
 const rows = ref<CrmLeadItem[]>([])
 const total = ref(0)
-const selectedRowKeys = ref<number[]>([])
+const selectedRowKeys = ref<Array<string | number>>([])
 const summaryLoading = ref(false)
 const summaryError = ref('')
 const summary = reactive<MarketingLeadEntrySummary>({
@@ -418,13 +418,13 @@ const planForm = reactive({
 })
 const executeOpen = ref(false)
 const executeSubmitting = ref(false)
-const pendingExecutePlanId = ref<number>()
+const pendingExecutePlanId = ref<string | number>()
 const executeForm = reactive({
   executeNote: '页面执行',
   followupResult: '',
   nextFollowDate: ''
 })
-const callbackSnapshot = ref<Record<number, { title?: string; followupContent?: string; followupResult?: string; planId?: number }>>({})
+const callbackSnapshot = ref<Record<string, { title?: string; followupContent?: string; followupResult?: string; planId?: string | number }>>({})
 
 const rules: FormRules = {
   consultantName: [{ required: true, message: '请输入咨询人姓名' }],
@@ -434,7 +434,7 @@ const rules: FormRules = {
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: (string | number)[]) => {
-    selectedRowKeys.value = keys.map((item) => Number(item))
+    selectedRowKeys.value = keys
   }
 }))
 
@@ -636,6 +636,11 @@ function selectedIds() {
     return [...selectedRowKeys.value]
   }
   return []
+}
+
+function sameId(left: string | number | undefined, right: string | number | undefined) {
+  if (left == null || right == null) return false
+  return String(left) === String(right)
 }
 
 function defaultStatus(mode: string) {
@@ -842,7 +847,7 @@ async function handleTopAction(key: string) {
       return
     }
     await Promise.all(ids.map((id) => {
-      const row = rows.value.find((item) => item.id === id)
+      const row = rows.value.find((item) => sameId(item.id, id))
       if (!row) return Promise.resolve()
       return updateCrmLead(id, { ...row, customerTag: row.customerTag || 'BBB' })
     }))
@@ -1087,7 +1092,7 @@ async function batchMoveToReservation() {
     message.info('请先勾选要转预订的客户')
     return
   }
-  const selectedRows = rows.value.filter((item) => ids.includes(item.id))
+  const selectedRows = rows.value.filter((item) => ids.some((id) => sameId(item.id, id)))
   await Promise.all(
     selectedRows.map((item) =>
       updateCrmLead(item.id, {
