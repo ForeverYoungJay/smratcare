@@ -76,6 +76,7 @@ public class AssetTreeServiceImpl implements AssetTreeService {
       buildingNode.setId(building.getId());
       buildingNode.setName(building.getName());
       buildingNode.setStatus(building.getStatus());
+      buildingNode.setBuildingId(building.getId());
 
       List<Floor> floorList = floorByBuilding.getOrDefault(building.getId(), List.of());
       for (Floor floor : floorList) {
@@ -84,6 +85,8 @@ public class AssetTreeServiceImpl implements AssetTreeService {
         floorNode.setId(floor.getId());
         floorNode.setName(floor.getFloorNo());
         floorNode.setStatus(floor.getStatus());
+        floorNode.setBuildingId(building.getId());
+        floorNode.setFloorId(floor.getId());
 
         List<Room> roomList = roomByFloor.getOrDefault(floor.getId(), List.of());
         for (Room room : roomList) {
@@ -91,6 +94,8 @@ public class AssetTreeServiceImpl implements AssetTreeService {
           roomNode.setType("ROOM");
           roomNode.setId(room.getId());
           roomNode.setName(room.getRoomNo());
+          roomNode.setBuildingId(building.getId());
+          roomNode.setFloorId(floor.getId());
           roomNode.setRoomNo(room.getRoomNo());
           roomNode.setQrCode(room.getRoomQrCode());
           roomNode.setStatus(room.getStatus());
@@ -101,6 +106,8 @@ public class AssetTreeServiceImpl implements AssetTreeService {
             bedNode.setType("BED");
             bedNode.setId(bed.getId());
             bedNode.setName(bed.getBedNo());
+            bedNode.setBuildingId(building.getId());
+            bedNode.setFloorId(floor.getId());
             bedNode.setBedNo(bed.getBedNo());
             bedNode.setQrCode(bed.getBedQrCode());
             bedNode.setStatus(bed.getStatus());
@@ -122,6 +129,8 @@ public class AssetTreeServiceImpl implements AssetTreeService {
         roomNode.setType("ROOM");
         roomNode.setId(room.getId());
         roomNode.setName(room.getRoomNo());
+        roomNode.setBuildingId(room.getBuildingId());
+        roomNode.setFloorId(room.getFloorId());
         roomNode.setRoomNo(room.getRoomNo());
         roomNode.setQrCode(room.getRoomQrCode());
         roomNode.setStatus(room.getStatus());

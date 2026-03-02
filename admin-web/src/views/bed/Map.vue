@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="床位全景" subTitle="楼号横向 + 楼层纵向二维图">
+  <PageContainer title="床位全景" subTitle="楼号横向 + 楼层纵向二维图（V120联动）">
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item label="床位号">
@@ -16,6 +16,21 @@
             <a-select-option :value="1">空床</a-select-option>
             <a-select-option :value="2">入住</a-select-option>
             <a-select-option :value="3">维修</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="区域">
+          <a-select v-model:value="query.areaCode" allow-clear style="width: 140px" placeholder="区域">
+            <a-select-option v-for="item in areaOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="房型">
+          <a-select v-model:value="query.roomType" allow-clear style="width: 140px" placeholder="房型">
+            <a-select-option v-for="item in roomTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="床型">
+          <a-select v-model:value="query.bedType" allow-clear style="width: 140px" placeholder="床型">
+            <a-select-option v-for="item in bedTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item>
@@ -44,7 +59,7 @@
         </a-col>
         <a-col :xs="24" :sm="12" :md="8" :lg="4">
           <a-card size="small">
-            <a-statistic title="床位" :value="filteredBeds.length" />
+            <a-statistic title="床位" :value="scopedBeds.length" />
           </a-card>
         </a-col>
         <a-col :xs="24" :sm="12" :md="8" :lg="4">
@@ -60,10 +75,14 @@
       </a-row>
 
       <div class="view-switch">
-        <a-radio-group v-model:value="viewMode" button-style="solid">
-          <a-radio-button value="grid">二维楼层图</a-radio-button>
-          <a-radio-button value="list">卡片列表</a-radio-button>
-        </a-radio-group>
+        <a-space wrap>
+          <a-radio-group v-model:value="viewMode" button-style="solid">
+            <a-radio-button value="grid">二维楼层图</a-radio-button>
+            <a-radio-button value="list">卡片列表</a-radio-button>
+          </a-radio-group>
+          <a-button @click="openBedManage">床位管理管理</a-button>
+          <a-button type="primary" ghost @click="openElderBedPanorama">长者管理床态全景</a-button>
+        </a-space>
         <a-radio-group
           v-if="viewMode === 'grid'"
           v-model:value="matrixQuickFilter"
@@ -75,16 +94,38 @@
           <a-radio-button value="occupied">仅入住</a-radio-button>
         </a-radio-group>
       </div>
+      <div class="matrix-selection-bar" v-if="viewMode === 'grid'">
+        <a-space wrap>
+          <a-tag color="blue" v-if="selectedBuilding">楼栋：{{ selectedBuilding }}</a-tag>
+          <a-tag color="cyan" v-if="selectedFloor">楼层：{{ selectedFloor }}</a-tag>
+          <span v-if="!selectedBuilding && !selectedFloor" class="matrix-tip">可点击楼栋表头与楼层坐标进行筛选</span>
+          <a-button size="small" v-if="selectedBuilding || selectedFloor" @click="clearMatrixSelection">清除楼层筛选</a-button>
+        </a-space>
+      </div>
 
       <div v-if="viewMode === 'grid'" class="matrix-viewport">
         <div class="matrix-grid" :style="{ gridTemplateColumns: `130px repeat(${matrixColumnCount}, minmax(280px, 1fr))` }">
           <div class="matrix-corner">楼层 \\ 楼栋</div>
-          <div v-for="building in matrixBuildings" :key="building.key" class="matrix-building-head">
+          <button
+            v-for="building in matrixBuildings"
+            :key="building.key"
+            type="button"
+            class="matrix-building-head"
+            :class="{ active: selectedBuilding === building.name }"
+            @click="toggleBuilding(building.name)"
+          >
             <div class="building-name">{{ building.name }}</div>
             <div class="building-kpi">{{ building.floors.length }} 层 · {{ building.roomCount }} 间 · {{ building.bedCount }} 床</div>
-          </div>
+          </button>
           <template v-for="floor in matrixFloors" :key="floor">
-            <div class="matrix-floor-axis">{{ floor }}</div>
+            <button
+              type="button"
+              class="matrix-floor-axis"
+              :class="{ active: selectedFloor === floor }"
+              @click="toggleFloor(floor)"
+            >
+              {{ floor }}
+            </button>
             <div v-for="building in matrixBuildings" :key="`${building.key}-${floor}`" class="matrix-cell">
               <template v-if="roomsAt(building.name, floor).length">
                 <div v-for="room in roomsAt(building.name, floor)" :key="room.key" class="room-cube">
@@ -119,7 +160,9 @@
                 <a-tag :color="statusTag(bed.status, bed.elderId)">{{ statusText(bed.status, bed.elderId) }}</a-tag>
               </div>
               <div class="bed-meta">楼栋/楼层：{{ bed.building || '-' }} / {{ bed.floorNo || '-' }}</div>
+              <div class="bed-meta">区域/房型：{{ bed.areaName || '-' }} / {{ resolveRoomTypeLabel(bed.roomType) }}</div>
               <div class="bed-meta">房间：{{ bed.roomNo || '-' }}</div>
+              <div class="bed-meta">床型：{{ resolveBedTypeLabel(bed.bedType) }}</div>
               <div class="bed-meta">老人：{{ bed.elderName || '-' }}</div>
             </a-card>
           </a-col>
@@ -129,7 +172,7 @@
           style="margin-top: 16px; text-align: right;"
           :current="query.pageNo"
           :page-size="query.pageSize"
-          :total="filteredBeds.length"
+          :total="scopedBeds.length"
           show-size-changer
           @change="onPageChange"
           @showSizeChange="onPageSizeChange"
@@ -148,8 +191,11 @@
       <a-descriptions bordered :column="2" size="small">
         <a-descriptions-item label="楼栋">{{ current?.building || '-' }}</a-descriptions-item>
         <a-descriptions-item label="楼层">{{ current?.floorNo || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="区域">{{ current?.areaName || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="房型">{{ resolveRoomTypeLabel(current?.roomType) }}</a-descriptions-item>
         <a-descriptions-item label="房间">{{ current?.roomNo || current?.roomId || '-' }}</a-descriptions-item>
         <a-descriptions-item label="床位">{{ current?.bedNo || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="床型">{{ resolveBedTypeLabel(current?.bedType) }}</a-descriptions-item>
         <a-descriptions-item label="状态">{{ statusText(current?.status, current?.elderId) }}</a-descriptions-item>
         <a-descriptions-item label="护理等级">{{ current?.careLevel || elderDetail?.careLevel || '-' }}</a-descriptions-item>
       </a-descriptions>
@@ -176,13 +222,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
+import { useRouter } from 'vue-router'
 import QRCode from 'qrcode'
 import PageContainer from '../../components/PageContainer.vue'
+import { getBaseConfigItemList } from '../../api/baseConfig'
 import { getBedMap } from '../../api/bed'
 import { getElderDetail } from '../../api/elder'
-import type { BedItem, ElderItem } from '../../types/api'
+import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
+import type { BaseConfigItem, BedItem, ElderItem } from '../../types/api'
 
 type RoomScene = {
   key: string
@@ -208,23 +257,47 @@ type BuildingScene = {
   bedCount: number
 }
 
+const router = useRouter()
 const beds = ref<BedItem[]>([])
 const detailOpen = ref(false)
 const current = ref<BedItem | null>(null)
 const qrDataUrl = ref('')
 const elderLoading = ref(false)
 const elderDetail = ref<ElderItem | null>(null)
+const roomTypeItems = ref<BaseConfigItem[]>([])
+const bedTypeItems = ref<BaseConfigItem[]>([])
+const areaItems = ref<BaseConfigItem[]>([])
 const viewMode = ref<'grid' | 'list'>('grid')
 const matrixQuickFilter = ref<'all' | 'idle' | 'occupied'>('all')
+const selectedBuilding = ref<string>('')
+const selectedFloor = ref<string>('')
 
 const query = reactive({
   bedNo: '',
   roomNo: '',
   elderName: '',
   status: undefined as number | undefined,
+  areaCode: undefined as string | undefined,
+  roomType: undefined as string | undefined,
+  bedType: undefined as string | undefined,
   pageNo: 1,
   pageSize: 12
 })
+const roomTypeLabelMap = computed(() =>
+  roomTypeItems.value.reduce((acc, item) => {
+    acc[item.itemCode] = item.itemName
+    return acc
+  }, {} as Record<string, string>)
+)
+const bedTypeLabelMap = computed(() =>
+  bedTypeItems.value.reduce((acc, item) => {
+    acc[item.itemCode] = item.itemName
+    return acc
+  }, {} as Record<string, string>)
+)
+const roomTypeOptions = computed(() => roomTypeItems.value.map((item) => ({ value: item.itemCode, label: item.itemName })))
+const bedTypeOptions = computed(() => bedTypeItems.value.map((item) => ({ value: item.itemCode, label: item.itemName })))
+const areaOptions = computed(() => areaItems.value.map((item) => ({ value: item.itemCode, label: item.itemName })))
 
 const filteredBeds = computed(() => {
   return beds.value.filter((bed) => {
@@ -232,13 +305,24 @@ const filteredBeds = computed(() => {
     if (query.roomNo && !String(bed.roomNo || '').includes(query.roomNo)) return false
     if (query.elderName && !String(bed.elderName || '').includes(query.elderName)) return false
     if (query.status && bed.status !== query.status) return false
+    if (query.areaCode && String(bed.areaCode || '') !== query.areaCode) return false
+    if (query.roomType && String(bed.roomType || '') !== query.roomType) return false
+    if (query.bedType && String(bed.bedType || '') !== query.bedType) return false
+    return true
+  })
+})
+
+const scopedBeds = computed(() => {
+  return filteredBeds.value.filter((bed) => {
+    if (selectedBuilding.value && String(bed.building || '') !== selectedBuilding.value) return false
+    if (selectedFloor.value && String(bed.floorNo || '') !== selectedFloor.value) return false
     return true
   })
 })
 
 const buildingScenes = computed<BuildingScene[]>(() => {
   const buildingMap = new Map<string, Map<string, Map<string, BedItem[]>>>()
-  filteredBeds.value.forEach((bed) => {
+  scopedBeds.value.forEach((bed) => {
     const building = (bed.building || '未分配楼栋').trim() || '未分配楼栋'
     const floor = (bed.floorNo || '未知楼层').trim() || '未知楼层'
     const roomNo = (bed.roomNo || `房间-${bed.roomId || '-'}`).trim() || `房间-${bed.roomId || '-'}`
@@ -290,8 +374,8 @@ const buildingScenes = computed<BuildingScene[]>(() => {
 const buildingCount = computed(() => buildingScenes.value.length)
 const floorCount = computed(() => buildingScenes.value.reduce((sum, building) => sum + building.floors.length, 0))
 const roomCount = computed(() => buildingScenes.value.reduce((sum, building) => sum + building.roomCount, 0))
-const occupiedBedsCount = computed(() => filteredBeds.value.filter((bed) => isOccupiedBed(bed)).length)
-const idleBedsCount = computed(() => filteredBeds.value.filter((bed) => isIdleBed(bed)).length)
+const occupiedBedsCount = computed(() => scopedBeds.value.filter((bed) => isOccupiedBed(bed)).length)
+const idleBedsCount = computed(() => scopedBeds.value.filter((bed) => isIdleBed(bed)).length)
 const matrixBuildings = computed(() => buildingScenes.value)
 const matrixColumnCount = computed(() => Math.max(matrixBuildings.value.length, 1))
 const matrixFloors = computed(() => {
@@ -345,7 +429,7 @@ const matrixRoomLookup = computed(() => {
 
 const pagedBeds = computed(() => {
   const start = (query.pageNo - 1) * query.pageSize
-  return filteredBeds.value.slice(start, start + query.pageSize)
+  return scopedBeds.value.slice(start, start + query.pageSize)
 })
 
 function floorSortValue(text: string) {
@@ -446,9 +530,21 @@ function genderText(gender?: number) {
 
 async function load() {
   try {
-    beds.value = await getBedMap()
+    const [bedMap, roomTypes, bedTypes, areas] = await Promise.all([
+      getBedMap(),
+      getBaseConfigItemList({ configGroup: 'ADMISSION_ROOM_TYPE', status: 1 }),
+      getBaseConfigItemList({ configGroup: 'ADMISSION_BED_TYPE', status: 1 }),
+      getBaseConfigItemList({ configGroup: 'ADMISSION_AREA', status: 1 })
+    ])
+    beds.value = bedMap
+    roomTypeItems.value = roomTypes
+    bedTypeItems.value = bedTypes
+    areaItems.value = areas
   } catch {
     beds.value = []
+    roomTypeItems.value = []
+    bedTypeItems.value = []
+    areaItems.value = []
   }
 }
 
@@ -461,7 +557,11 @@ function reset() {
   query.roomNo = ''
   query.elderName = ''
   query.status = undefined
+  query.areaCode = undefined
+  query.roomType = undefined
+  query.bedType = undefined
   query.pageNo = 1
+  clearMatrixSelection()
 }
 
 function onPageChange(page: number) {
@@ -477,10 +577,36 @@ function roomsAt(building: string, floor: string) {
   return matrixRoomLookup.value.get(building)?.get(floor) || []
 }
 
+function toggleBuilding(name: string) {
+  selectedBuilding.value = selectedBuilding.value === name ? '' : name
+  query.pageNo = 1
+}
+
+function toggleFloor(floor: string) {
+  selectedFloor.value = selectedFloor.value === floor ? '' : floor
+  query.pageNo = 1
+}
+
+function clearMatrixSelection() {
+  selectedBuilding.value = ''
+  selectedFloor.value = ''
+  query.pageNo = 1
+}
+
 function matchMatrixFilter(bed: BedItem) {
   if (matrixQuickFilter.value === 'idle') return isIdleBed(bed)
   if (matrixQuickFilter.value === 'occupied') return isOccupiedBed(bed)
   return true
+}
+
+function resolveRoomTypeLabel(roomType?: string) {
+  if (!roomType) return '-'
+  return roomTypeLabelMap.value[roomType] || roomType
+}
+
+function resolveBedTypeLabel(bedType?: string) {
+  if (!bedType) return '-'
+  return bedTypeLabelMap.value[bedType] || bedType
 }
 
 async function openBed(bed: BedItem) {
@@ -515,7 +641,29 @@ function printBedQr() {
   win.close()
 }
 
+function openBedManage() {
+  router.push('/bed/manage')
+}
+
+function openElderBedPanorama() {
+  router.push('/elder/bed-panorama')
+}
+
+useLiveSyncRefresh({
+  topics: ['bed', 'elder'],
+  refresh: load
+})
+
 onMounted(load)
+
+watch(filteredBeds, () => {
+  if (selectedBuilding.value && !filteredBeds.value.some((bed) => String(bed.building || '') === selectedBuilding.value)) {
+    selectedBuilding.value = ''
+  }
+  if (selectedFloor.value && !filteredBeds.value.some((bed) => String(bed.floorNo || '') === selectedFloor.value)) {
+    selectedFloor.value = ''
+  }
+})
 </script>
 
 <style scoped>
@@ -538,6 +686,14 @@ onMounted(load)
 
 .matrix-filter-switch {
   margin-left: auto;
+}
+
+.matrix-selection-bar {
+  margin-bottom: 12px;
+}
+
+.matrix-tip {
+  color: #7385ab;
 }
 
 .matrix-viewport {
@@ -585,6 +741,14 @@ onMounted(load)
   border-bottom: 1px solid #d5dff2;
   border-right: 1px solid #e3eaf8;
   background: #f7faff;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.matrix-building-head.active {
+  background: #dfeaff;
+  box-shadow: inset 0 0 0 1px #5b8def;
 }
 
 .matrix-floor-axis {
@@ -599,17 +763,28 @@ onMounted(load)
   background: #f7faff;
   border-right: 1px solid #d5dff2;
   border-bottom: 1px solid #e3eaf8;
-  min-height: 120px;
+  min-height: 220px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.matrix-floor-axis.active {
+  background: #dfeaff;
+  color: #154391;
 }
 
 .matrix-cell {
   padding: 10px;
   border-right: 1px solid #e3eaf8;
   border-bottom: 1px solid #e3eaf8;
-  min-height: 120px;
+  min-height: 220px;
+  max-height: 220px;
   background: #fbfdff;
   display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  align-content: start;
   gap: 8px;
+  overflow: auto;
 }
 
 .matrix-empty {
@@ -624,7 +799,7 @@ onMounted(load)
 .room-cube {
   border: 1px solid #cad8f5;
   border-radius: 10px;
-  padding: 8px;
+  padding: 6px;
   background: #ffffff;
   box-shadow: inset 0 1px 0 #ffffff, 0 6px 10px rgba(42, 87, 166, 0.08);
 }
@@ -639,7 +814,7 @@ onMounted(load)
   font-size: 11px;
   color: #6b7ea5;
   margin-top: 2px;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .bed-grid {
@@ -651,9 +826,9 @@ onMounted(load)
 .bed-pill {
   border: none;
   border-radius: 14px;
-  height: 24px;
-  padding: 0 8px;
-  font-size: 11px;
+  height: 22px;
+  padding: 0 7px;
+  font-size: 10px;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }

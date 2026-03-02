@@ -9,6 +9,8 @@ public class BuildingResponse {
   private Long orgId;
   private String name;
   private String code;
+  private String areaCode;
+  private String areaName;
   private Integer status;
   private Integer sortNo;
   private String remark;

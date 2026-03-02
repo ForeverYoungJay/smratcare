@@ -12,13 +12,18 @@
 - `src/main/resources/db/migration`：MySQL Flyway 迁移脚本（后端数据库演进基准）
 - `src/test`：后端测试（H2 + SpringBootTest）
 - `admin-web`：管理后台前端
-- `docker-compose.yml`：本地一键启动（MySQL/Redis/后端/前端）
-- `docker-compose.prod.yml`：生产 compose（环境变量注入）
-- `docker-compose.aliyun.yml`：阿里云 ECS 场景 compose
+- `docker-compose.yml`：唯一 Docker 编排文件（MySQL/Redis/后端/前端）
+- `.env.example`：环境变量模板
 
 ## 本地开发
 
 ### 1) 启动依赖与服务（推荐）
+首次使用先准备环境变量（可直接使用默认值）：
+```bash
+cp .env.example .env
+```
+
+启动服务：
 ```bash
 docker compose up -d --build
 ```
@@ -50,8 +55,7 @@ npm run dev
 ## 数据库说明
 - 后端运行时会执行 Flyway（`src/main/resources/db/migration`）。
 - MySQL init 脚本只在 **MySQL 新数据卷首次初始化** 时执行：
-  - 本地 `docker-compose.yml`：`1_schema.sql` + `2_data.sql`
-  - 生产 `docker-compose.prod.yml` / `docker-compose.aliyun.yml`：仅 `1_schema.sql`
+  - `docker-compose.yml`：`1_schema.sql` + `2_data.sql`
 - 如需重置 MySQL 初始化状态：
 ```bash
 docker compose down -v
@@ -121,7 +125,6 @@ OpenAPI：
 - YAML：`http://localhost:8080/v3/api-docs.yaml`
 
 ## 部署文档
-- 阿里云部署：`DEPLOY_ALIYUN.md`
 - 部署检查清单：`DEPLOYMENT_CHECKLIST.md`
 - 测试执行说明：`TESTING.md`
 - 物资中心合并说明：`docs/MATERIAL_CENTER_MERGE.md`

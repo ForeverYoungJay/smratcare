@@ -22,6 +22,10 @@
             <a-button type="primary" ghost @click="openCreate" :disabled="!activeGroup">新增配置项</a-button>
             <a-button :disabled="selectedRowKeys.length === 0" @click="batchToggleStatus(1)">批量启用</a-button>
             <a-button :disabled="selectedRowKeys.length === 0" @click="batchToggleStatus(0)">批量停用</a-button>
+            <a-button v-if="showResidencePresetAction" @click="fillResidencePresets" :disabled="!activeGroup">一键补全默认项</a-button>
+            <a-button v-if="showBuildingSyncAction" @click="syncBuildingsToPanorama" :loading="syncingBuildings" :disabled="!activeGroup">
+              同步到床态全景
+            </a-button>
             <a-button @click="downloadExport" :disabled="!activeGroup">导出CSV</a-button>
             <a-button @click="downloadImportTemplate">导入模板</a-button>
             <a-upload :before-upload="beforeImport" :show-upload-list="false" accept=".csv" :disabled="!activeGroup">
@@ -167,11 +171,13 @@ import {
   downloadBaseConfigImportTemplate,
   exportBaseConfigItems,
   getBaseConfigGroups,
+  getBaseConfigItemList,
   getBaseConfigItemPage,
   importBaseConfigItems,
   previewImportBaseConfigItems,
   updateBaseConfigItem
 } from '../../api/baseConfig'
+import { createBuilding, getBuildingList, updateBuilding } from '../../api/bed'
 import type {
   BaseConfigImportErrorItem,
   BaseConfigGroupOption,
@@ -195,6 +201,7 @@ const submitting = ref(false)
 const importSubmitting = ref(false)
 const editorOpen = ref(false)
 const importPreviewOpen = ref(false)
+const syncingBuildings = ref(false)
 const formRef = ref<FormInstance>()
 const editingId = ref<number>()
 
@@ -245,6 +252,37 @@ const columns = computed(() => [
 const pageTitle = computed(() => props.title || '基础数据配置')
 
 const showTabs = computed(() => !props.groupCode)
+const residencePresetGroups = new Set([
+  'ADMISSION_BED_TYPE',
+  'ADMISSION_ROOM_TYPE',
+  'ADMISSION_AREA',
+  'ADMISSION_BUILDING'
+])
+const residencePresets: Record<string, { itemCode: string; itemName: string; sortNo: number; remark?: string }[]> = {
+  ADMISSION_BED_TYPE: [
+    { itemCode: 'BED_STANDARD', itemName: '标准床', sortNo: 10 },
+    { itemCode: 'BED_CARE', itemName: '护理床', sortNo: 20 },
+    { itemCode: 'BED_ELECTRIC', itemName: '电动床', sortNo: 30 }
+  ],
+  ADMISSION_ROOM_TYPE: [
+    { itemCode: 'ROOM_SINGLE', itemName: '单人间', sortNo: 10 },
+    { itemCode: 'ROOM_DOUBLE', itemName: '双人间', sortNo: 20 },
+    { itemCode: 'ROOM_TRIPLE', itemName: '三人间', sortNo: 30 },
+    { itemCode: 'ROOM_CARE', itemName: '护理房', sortNo: 40 }
+  ],
+  ADMISSION_AREA: [
+    { itemCode: 'AREA_A', itemName: 'A区', sortNo: 10 },
+    { itemCode: 'AREA_B', itemName: 'B区', sortNo: 20 },
+    { itemCode: 'AREA_C', itemName: 'C区', sortNo: 30 }
+  ],
+  ADMISSION_BUILDING: [
+    { itemCode: 'BUILDING_1', itemName: '1号楼', sortNo: 10 },
+    { itemCode: 'BUILDING_2', itemName: '2号楼', sortNo: 20 },
+    { itemCode: 'BUILDING_3', itemName: '3号楼', sortNo: 30 }
+  ]
+}
+const showResidencePresetAction = computed(() => residencePresetGroups.has(activeGroup.value))
+const showBuildingSyncAction = computed(() => activeGroup.value === 'ADMISSION_BUILDING')
 
 const displayGroups = computed(() => {
   if (!props.groupCode) {
@@ -413,6 +451,80 @@ async function batchToggleStatus(status: number) {
 async function downloadImportTemplate() {
   const blob = await downloadBaseConfigImportTemplate()
   downloadBlob(blob, 'base-config-import-template.csv')
+}
+
+async function fillResidencePresets() {
+  const groupCode = activeGroup.value
+  const presets = residencePresets[groupCode] || []
+  if (!groupCode || !presets.length) {
+    message.warning('当前分组暂无预置项')
+    return
+  }
+  const existing = await getBaseConfigItemList({ configGroup: groupCode })
+  const existingCodeSet = new Set(existing.map((item) => String(item.itemCode || '').toUpperCase()))
+  const pending = presets.filter((item) => !existingCodeSet.has(item.itemCode))
+  if (!pending.length) {
+    message.success('默认项已齐全，无需补全')
+    return
+  }
+  for (const item of pending) {
+    await createBaseConfigItem({
+      configGroup: groupCode,
+      itemCode: item.itemCode,
+      itemName: item.itemName,
+      status: 1,
+      sortNo: item.sortNo,
+      remark: item.remark
+    })
+  }
+  message.success(`已补全 ${pending.length} 项默认配置`)
+  fetchData()
+}
+
+async function syncBuildingsToPanorama() {
+  if (activeGroup.value !== 'ADMISSION_BUILDING') {
+    return
+  }
+  syncingBuildings.value = true
+  try {
+    const configs = await getBaseConfigItemList({ configGroup: 'ADMISSION_BUILDING', status: 1 })
+    if (!configs.length) {
+      message.warning('请先维护并启用楼栋配置项')
+      return
+    }
+    const buildings = await getBuildingList()
+    const byName = new Map(buildings.map((item) => [String(item.name || '').trim(), item]))
+    const byCode = new Map(
+      buildings
+        .filter((item) => String(item.code || '').trim())
+        .map((item) => [String(item.code || '').trim().toUpperCase(), item])
+    )
+    let created = 0
+    let updated = 0
+    for (const item of configs) {
+      const code = String(item.itemCode || '').trim().toUpperCase()
+      const name = String(item.itemName || '').trim()
+      if (!name) continue
+      const matched = byCode.get(code) || byName.get(name)
+      const payload = {
+        name,
+        code: code || undefined,
+        status: item.status ?? 1,
+        sortNo: item.sortNo ?? 0,
+        remark: item.remark || undefined
+      }
+      if (matched?.id) {
+        await updateBuilding(matched.id, payload)
+        updated += 1
+      } else {
+        await createBuilding(payload)
+        created += 1
+      }
+    }
+    message.success(`同步完成：新增${created}个，更新${updated}个，床态全景将自动使用最新楼栋数据`)
+  } finally {
+    syncingBuildings.value = false
+  }
 }
 
 async function downloadExport() {

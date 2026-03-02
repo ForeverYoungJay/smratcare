@@ -8,21 +8,26 @@ import com.zhiyangyun.care.asset.entity.Floor;
 import com.zhiyangyun.care.asset.mapper.BuildingMapper;
 import com.zhiyangyun.care.asset.mapper.FloorMapper;
 import com.zhiyangyun.care.elder.entity.Room;
+import com.zhiyangyun.care.elder.entity.Bed;
+import com.zhiyangyun.care.elder.mapper.BedMapper;
 import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import com.zhiyangyun.care.elder.model.RoomRequest;
 import com.zhiyangyun.care.elder.model.RoomResponse;
 import com.zhiyangyun.care.elder.service.RoomService;
 import com.zhiyangyun.care.elder.util.QrCodeUtil;
+import java.util.Objects;
 import org.springframework.stereotype.Service;
 
 @Service
 public class RoomServiceImpl implements RoomService {
   private final RoomMapper roomMapper;
+  private final BedMapper bedMapper;
   private final BuildingMapper buildingMapper;
   private final FloorMapper floorMapper;
 
-  public RoomServiceImpl(RoomMapper roomMapper, BuildingMapper buildingMapper, FloorMapper floorMapper) {
+  public RoomServiceImpl(RoomMapper roomMapper, BedMapper bedMapper, BuildingMapper buildingMapper, FloorMapper floorMapper) {
     this.roomMapper = roomMapper;
+    this.bedMapper = bedMapper;
     this.buildingMapper = buildingMapper;
     this.floorMapper = floorMapper;
   }
@@ -59,6 +64,7 @@ public class RoomServiceImpl implements RoomService {
       return null;
     }
     ensureRoomNoUnique(id, request.getTenantId(), request.getRoomNo());
+    ensureCapacityNotLessThanOccupied(id, request.getTenantId(), request.getCapacity());
     room.setTenantId(request.getTenantId());
     room.setOrgId(request.getOrgId());
     room.setBuildingId(request.getBuildingId());
@@ -130,10 +136,21 @@ public class RoomServiceImpl implements RoomService {
   @Override
   public void delete(Long id, Long tenantId) {
     Room room = roomMapper.selectById(id);
-    if (room != null && (tenantId == null || tenantId.equals(room.getTenantId()))) {
-      room.setIsDeleted(1);
-      roomMapper.updateById(room);
+    if (room == null || Integer.valueOf(1).equals(room.getIsDeleted())) {
+      throw new IllegalArgumentException("房间不存在或已删除");
     }
+    if (tenantId == null || !tenantId.equals(room.getTenantId())) {
+      throw new IllegalArgumentException("无权限删除该房间");
+    }
+    long bedCount = bedMapper.selectCount(Wrappers.lambdaQuery(Bed.class)
+        .eq(Bed::getIsDeleted, 0)
+        .eq(Bed::getTenantId, room.getTenantId())
+        .eq(Bed::getRoomId, room.getId()));
+    if (bedCount > 0) {
+      throw new IllegalArgumentException("当前房间下仍存在床位，请先删除或迁移床位");
+    }
+    room.setIsDeleted(1);
+    roomMapper.updateById(room);
   }
 
   private RoomResponse toResponse(Room room) {
@@ -169,6 +186,20 @@ public class RoomServiceImpl implements RoomService {
     }
   }
 
+  private void ensureCapacityNotLessThanOccupied(Long roomId, Long tenantId, Integer capacity) {
+    if (roomId == null || tenantId == null || capacity == null) {
+      return;
+    }
+    long occupiedCount = bedMapper.selectCount(Wrappers.lambdaQuery(Bed.class)
+        .eq(Bed::getIsDeleted, 0)
+        .eq(Bed::getTenantId, tenantId)
+        .eq(Bed::getRoomId, roomId)
+        .isNotNull(Bed::getElderId));
+    if (capacity < occupiedCount) {
+      throw new IllegalArgumentException("房间容量不能小于当前入住床位数");
+    }
+  }
+
   private void applyBuildingFloor(Room room, Long tenantId, Long buildingId, Long floorId,
                                   String fallbackBuilding, String fallbackFloorNo) {
     if (buildingId != null) {
@@ -179,7 +210,9 @@ public class RoomServiceImpl implements RoomService {
           buildingMapper.updateById(building);
         }
       }
-      if (building == null || (tenantId != null && !tenantId.equals(building.getTenantId()))) {
+      if (building == null
+          || (tenantId != null && !tenantId.equals(building.getTenantId()))
+          || Integer.valueOf(1).equals(building.getIsDeleted())) {
         throw new IllegalArgumentException("楼栋不存在或无权限");
       }
       room.setBuilding(building.getName());
@@ -194,8 +227,13 @@ public class RoomServiceImpl implements RoomService {
           floorMapper.updateById(floor);
         }
       }
-      if (floor == null || (tenantId != null && !tenantId.equals(floor.getTenantId()))) {
+      if (floor == null
+          || (tenantId != null && !tenantId.equals(floor.getTenantId()))
+          || Integer.valueOf(1).equals(floor.getIsDeleted())) {
         throw new IllegalArgumentException("楼层不存在或无权限");
+      }
+      if (buildingId != null && floor.getBuildingId() != null && !Objects.equals(buildingId, floor.getBuildingId())) {
+        throw new IllegalArgumentException("楼层不属于当前楼栋");
       }
       room.setFloorNo(floor.getFloorNo());
     } else {

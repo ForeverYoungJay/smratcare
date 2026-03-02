@@ -3,7 +3,10 @@ package com.zhiyangyun.care.asset.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.zhiyangyun.care.asset.model.BuildingRequest;
 import com.zhiyangyun.care.asset.model.BuildingResponse;
+import com.zhiyangyun.care.asset.model.ResidenceBootstrapRequest;
+import com.zhiyangyun.care.asset.model.ResidenceBootstrapResponse;
 import com.zhiyangyun.care.asset.service.BuildingService;
+import com.zhiyangyun.care.asset.service.ResidenceBootstrapService;
 import com.zhiyangyun.care.audit.service.AuditLogService;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
@@ -22,10 +25,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/asset/buildings")
 public class BuildingController {
   private final BuildingService buildingService;
+  private final ResidenceBootstrapService residenceBootstrapService;
   private final AuditLogService auditLogService;
 
-  public BuildingController(BuildingService buildingService, AuditLogService auditLogService) {
+  public BuildingController(
+      BuildingService buildingService,
+      ResidenceBootstrapService residenceBootstrapService,
+      AuditLogService auditLogService) {
     this.buildingService = buildingService;
+    this.residenceBootstrapService = residenceBootstrapService;
     this.auditLogService = auditLogService;
   }
 
@@ -80,5 +88,14 @@ public class BuildingController {
     auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "DELETE", "BUILDING", id, "删除楼栋");
     return Result.ok(null);
+  }
+
+  @PostMapping("/bootstrap-residence")
+  public Result<ResidenceBootstrapResponse> bootstrapResidence(@Valid @RequestBody ResidenceBootstrapRequest request) {
+    Long tenantId = AuthContext.getOrgId();
+    ResidenceBootstrapResponse response = residenceBootstrapService.bootstrap(tenantId, AuthContext.getStaffId(), request);
+    auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "CREATE", "RESIDENCE_BOOTSTRAP", null, "一键生成楼层房床");
+    return Result.ok(response);
   }
 }

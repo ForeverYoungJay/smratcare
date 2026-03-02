@@ -4,11 +4,11 @@ services:
     container_name: smartcare-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: zhiyangyun
-      MYSQL_USER: app
-      MYSQL_PASSWORD: app123456
-      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-zhiyangyun}
+      MYSQL_USER: ${DB_USER:-app}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-app123456}
+      TZ: ${TZ:-Asia/Shanghai}
     ports:
       - "3307:3306"
     volumes:
@@ -32,10 +32,10 @@ services:
     container_name: smartcare-backend
     restart: unless-stopped
     environment:
-      SPRING_PROFILES_ACTIVE: prod
-      DB_USER: app
-      DB_PASSWORD: app123456
-      JWT_SECRET: change-me-please-change-me-please-change-me
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      DB_USER: ${DB_USER:-app}
+      DB_PASSWORD: ${DB_PASSWORD:-app123456}
+      JWT_SECRET: ${JWT_SECRET:-change-me-please-change-me-please-change-me}
     volumes:
       - ./output/uploads:/app/uploads
     ports:

@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="资产与床位" subTitle="楼栋/楼层/房间/床位统一维护">
+  <PageContainer title="床位管理" subTitle="楼栋/楼层/房间/床位统一维护（V120联动）">
     <a-row :gutter="16" class="summary-row">
       <a-col :xs="24" :md="8">
         <a-card class="summary-card" :bordered="false">
@@ -25,6 +25,12 @@
         </a-card>
       </a-col>
     </a-row>
+    <div class="entry-actions">
+      <a-space wrap>
+        <a-button @click="openBedMap">查看床位全景</a-button>
+        <a-button type="primary" ghost @click="openElderBedPanorama">打开长者管理床态全景</a-button>
+      </a-space>
+    </div>
 
     <a-row :gutter="16">
       <a-col :xs="24" :md="6">
@@ -34,8 +40,8 @@
             <a-button size="small" @click="refreshTree">刷新</a-button>
           </div>
           <a-tree
-            :tree-data="assetTree"
-            :field-names="{ title: 'name', key: 'id', children: 'children' }"
+            :tree-data="treeData"
+            :field-names="{ title: 'name', key: 'treeKey', children: 'children' }"
             :loading="treeLoading"
             show-line
             @select="(_, info) => onTreeSelect(info.node)"
@@ -74,6 +80,7 @@
               <div class="table-actions">
                 <a-space>
                   <a-button type="primary" @click="openBuilding()">新增楼栋</a-button>
+                  <a-button type="primary" ghost @click="openBootstrap">一键生成楼层房床</a-button>
                   <a-button @click="refreshBuildings">刷新</a-button>
                 </a-space>
               </div>
@@ -337,6 +344,11 @@
         <a-form-item label="编码" name="code">
           <a-input v-model:value="buildingForm.code" placeholder="如 B1" />
         </a-form-item>
+        <a-form-item label="区域" name="areaCode">
+          <a-select v-model:value="buildingForm.areaCode" allow-clear placeholder="请选择区域">
+            <a-select-option v-for="item in areaOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
+          </a-select>
+        </a-form-item>
         <a-form-item label="排序" name="sortNo">
           <a-input-number v-model:value="buildingForm.sortNo" style="width: 100%" :min="0" />
         </a-form-item>
@@ -383,13 +395,18 @@
           <a-input v-model:value="roomForm.roomNo" placeholder="如 A101" />
         </a-form-item>
         <a-form-item label="楼栋" name="buildingId">
-          <a-select v-model:value="roomForm.buildingId" placeholder="请选择">
+          <a-select v-model:value="roomForm.buildingId" placeholder="请选择" show-search option-filter-prop="label">
             <a-select-option v-for="b in buildingList" :key="b.id" :value="b.id">{{ b.name }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="楼层" name="floorId">
           <a-select v-model:value="roomForm.floorId" placeholder="请选择">
-            <a-select-option v-for="f in floorList" :key="f.id" :value="f.id">{{ f.floorNo }}</a-select-option>
+            <a-select-option v-for="f in roomFloorOptions" :key="f.id" :value="f.id">{{ f.floorNo }}</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="房间类型" name="roomType">
+          <a-select v-model:value="roomForm.roomType" allow-clear placeholder="请选择">
+            <a-select-option v-for="item in roomTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="床位容量" name="capacity">
@@ -414,6 +431,11 @@
         <a-form-item label="床位号" name="bedNo">
           <a-input v-model:value="bedForm.bedNo" placeholder="如 01" />
         </a-form-item>
+        <a-form-item label="床位类型" name="bedType">
+          <a-select v-model:value="bedForm.bedType" allow-clear placeholder="请选择">
+            <a-select-option v-for="item in bedTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
+          </a-select>
+        </a-form-item>
         <a-form-item label="状态" name="status">
           <a-select v-model:value="bedForm.status" placeholder="请选择">
             <a-select-option :value="1">空床</a-select-option>
@@ -433,16 +455,103 @@
         </div>
       </div>
     </a-modal>
+
+    <a-modal
+      v-model:open="bootstrapOpen"
+      title="一键生成楼层房床"
+      width="520px"
+      :confirm-loading="bootstrapSubmitting"
+      @ok="submitBootstrap"
+      @cancel="() => (bootstrapOpen = false)"
+    >
+      <a-form :model="bootstrapForm" layout="vertical">
+        <div class="bootstrap-presets">
+          <a-space wrap>
+            <a-button size="small" @click="applyBootstrapPreset('AB_F1_6_R101_130_B01_03')">
+              模板：A栋/B栋 1F-6F 101-130 01-03床
+            </a-button>
+            <a-button size="small" @click="applyBootstrapPreset('CUSTOM')">模板：自定义参数</a-button>
+          </a-space>
+          <div class="bootstrap-hint" v-if="bootstrapForm.templateCode === 'AB_F1_6_R101_130_B01_03'">
+            说明：房间号按 A101-A130/A201-A230...、B101-B130/B201-B230... 自动生成，床位号 01-03。
+          </div>
+        </div>
+        <a-row :gutter="12">
+          <a-col :span="12">
+            <a-form-item label="楼栋数量">
+              <a-input-number v-model:value="bootstrapForm.buildingCount" :min="1" :max="20" style="width: 100%" :disabled="bootstrapForm.templateCode === 'AB_F1_6_R101_130_B01_03'" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="每栋楼层数">
+              <a-input-number v-model:value="bootstrapForm.floorsPerBuilding" :min="1" :max="20" style="width: 100%" :disabled="bootstrapForm.templateCode === 'AB_F1_6_R101_130_B01_03'" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="每层房间数">
+              <a-input-number v-model:value="bootstrapForm.roomsPerFloor" :min="1" :max="200" style="width: 100%" :disabled="bootstrapForm.templateCode === 'AB_F1_6_R101_130_B01_03'" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="每房床位数">
+              <a-input-number v-model:value="bootstrapForm.bedsPerRoom" :min="1" :max="12" style="width: 100%" :disabled="bootstrapForm.templateCode === 'AB_F1_6_R101_130_B01_03'" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="起始编号">
+              <a-input-number v-model:value="bootstrapForm.startNo" :min="1" :max="9999" style="width: 100%" :disabled="bootstrapForm.templateCode === 'AB_F1_6_R101_130_B01_03'" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="房间类型">
+              <a-select v-model:value="bootstrapForm.roomType" allow-clear placeholder="默认取系统首个启用房型">
+                <a-select-option v-for="item in roomTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="床位类型">
+              <a-select v-model:value="bootstrapForm.bedType" allow-clear placeholder="默认取系统首个启用床型">
+                <a-select-option v-for="item in bedTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="楼栋前缀">
+              <a-input v-model:value="bootstrapForm.buildingPrefix" :disabled="bootstrapForm.templateCode === 'AB_F1_6_R101_130_B01_03'" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="楼层前缀">
+              <a-input v-model:value="bootstrapForm.floorPrefix" :disabled="bootstrapForm.templateCode === 'AB_F1_6_R101_130_B01_03'" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="房间前缀">
+              <a-input v-model:value="bootstrapForm.roomPrefix" :disabled="bootstrapForm.templateCode === 'AB_F1_6_R101_130_B01_03'" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="床位前缀">
+              <a-input v-model:value="bootstrapForm.bedPrefix" :disabled="bootstrapForm.templateCode === 'AB_F1_6_R101_130_B01_03'" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+      </a-form>
+    </a-modal>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
+import { useRouter } from 'vue-router'
 import QRCode from 'qrcode'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportCsv } from '../../utils/export'
+import { getBaseConfigItemList } from '../../api/baseConfig'
+import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import {
   getRoomPage,
   getBedPage,
@@ -459,6 +568,7 @@ import {
   createBuilding,
   updateBuilding,
   deleteBuilding,
+  bootstrapResidence,
   getFloorPage,
   getFloorList,
   createFloor,
@@ -466,8 +576,18 @@ import {
   deleteFloor,
   getAssetTree
 } from '../../api/bed'
-import type { BedItem, RoomItem, BuildingItem, FloorItem, AssetTreeNode, PageResult } from '../../types'
+import type {
+  BaseConfigItem,
+  BedItem,
+  RoomItem,
+  BuildingItem,
+  FloorItem,
+  AssetTreeNode,
+  PageResult,
+  ResidenceBootstrapRequest
+} from '../../types'
 
+const router = useRouter()
 const rooms = ref<RoomItem[]>([])
 const beds = ref<BedItem[]>([])
 const roomList = ref<RoomItem[]>([])
@@ -500,9 +620,42 @@ const roomSubmitting = ref(false)
 const bedSubmitting = ref(false)
 const buildingSubmitting = ref(false)
 const floorSubmitting = ref(false)
+const bootstrapOpen = ref(false)
+const bootstrapSubmitting = ref(false)
 
 const assetTree = ref<AssetTreeNode[]>([])
 const treeLoading = ref(false)
+const roomTypeItems = ref<BaseConfigItem[]>([])
+const bedTypeItems = ref<BaseConfigItem[]>([])
+const areaItems = ref<BaseConfigItem[]>([])
+type TreeNode = AssetTreeNode & { treeKey: string; children?: TreeNode[] }
+
+const fallbackRoomTypes: BaseConfigItem[] = [
+  { id: -1, configGroup: 'ADMISSION_ROOM_TYPE', itemCode: 'ROOM_SINGLE', itemName: '单人间', status: 1, sortNo: 10 },
+  { id: -2, configGroup: 'ADMISSION_ROOM_TYPE', itemCode: 'ROOM_DOUBLE', itemName: '双人间', status: 1, sortNo: 20 },
+  { id: -3, configGroup: 'ADMISSION_ROOM_TYPE', itemCode: 'ROOM_TRIPLE', itemName: '三人间', status: 1, sortNo: 30 }
+]
+const fallbackBedTypes: BaseConfigItem[] = [
+  { id: -11, configGroup: 'ADMISSION_BED_TYPE', itemCode: 'BED_STANDARD', itemName: '标准床', status: 1, sortNo: 10 },
+  { id: -12, configGroup: 'ADMISSION_BED_TYPE', itemCode: 'BED_CARE', itemName: '护理床', status: 1, sortNo: 20 }
+]
+const fallbackAreas: BaseConfigItem[] = [
+  { id: -21, configGroup: 'ADMISSION_AREA', itemCode: 'AREA_A', itemName: 'A区', status: 1, sortNo: 10 },
+  { id: -22, configGroup: 'ADMISSION_AREA', itemCode: 'AREA_B', itemName: 'B区', status: 1, sortNo: 20 }
+]
+
+const bootstrapForm = reactive<ResidenceBootstrapRequest>({
+  buildingCount: 1,
+  floorsPerBuilding: 3,
+  roomsPerFloor: 10,
+  bedsPerRoom: 2,
+  startNo: 1,
+  buildingPrefix: '楼栋',
+  floorPrefix: 'F',
+  roomPrefix: 'R',
+  bedPrefix: 'B',
+  templateCode: 'CUSTOM'
+})
 
 const roomQuery = reactive({
   roomNo: '',
@@ -539,6 +692,20 @@ const floorPage = reactive({ pageNo: 1, pageSize: 10, total: 0 })
 
 const roomOptions = computed(() =>
   roomList.value.map((r) => ({ label: `${r.roomNo}${r.building ? '-' + r.building : ''}`, value: r.id }))
+)
+const roomTypeOptions = computed(() => roomTypeItems.value.map((item) => ({ label: item.itemName, value: item.itemCode })))
+const bedTypeOptions = computed(() => bedTypeItems.value.map((item) => ({ label: item.itemName, value: item.itemCode })))
+const areaOptions = computed(() => areaItems.value.map((item) => ({ label: item.itemName, value: item.itemCode })))
+const roomFloorOptions = computed(() => {
+  if (!roomForm.buildingId) return floorList.value
+  return floorList.value.filter((item) => item.buildingId === roomForm.buildingId)
+})
+const treeData = computed<TreeNode[]>(() => buildTreeKey(assetTree.value, 'ROOT'))
+const areaNameByCode = computed(() =>
+  areaItems.value.reduce((acc, item) => {
+    acc[item.itemCode] = item.itemName
+    return acc
+  }, {} as Record<string, string>)
 )
 
 const buildingNameMap = computed(() =>
@@ -594,6 +761,7 @@ const bedRules: FormRules = {
 const buildingColumns = [
   { title: '楼栋名称', dataIndex: 'name', key: 'name', width: 160 },
   { title: '编码', dataIndex: 'code', key: 'code', width: 120 },
+  { title: '区域', dataIndex: 'areaName', key: 'areaName', width: 140 },
   { title: '排序', dataIndex: 'sortNo', key: 'sortNo', width: 100 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 120 },
   { title: '备注', dataIndex: 'remark', key: 'remark' },
@@ -613,6 +781,7 @@ const roomColumns = [
   { title: '房间号', dataIndex: 'roomNo', key: 'roomNo', width: 120, sorter: true },
   { title: '楼栋', dataIndex: 'building', key: 'building', width: 120, sorter: true },
   { title: '楼层', dataIndex: 'floorNo', key: 'floorNo', width: 100, sorter: true },
+  { title: '房型', dataIndex: 'roomType', key: 'roomType', width: 120 },
   { title: '容量', dataIndex: 'capacity', key: 'capacity', width: 100, sorter: true },
   { title: '状态', dataIndex: 'status', key: 'status', width: 120, sorter: true },
   { title: '操作', key: 'action', width: 200, fixed: 'right' as const }
@@ -620,6 +789,7 @@ const roomColumns = [
 
 const bedColumns = [
   { title: '床位号', dataIndex: 'bedNo', key: 'bedNo', width: 100, sorter: true },
+  { title: '床位类型', dataIndex: 'bedType', key: 'bedType', width: 120 },
   { title: '房间', dataIndex: 'roomNo', key: 'roomNo', width: 120, sorter: true },
   { title: '楼栋', dataIndex: 'building', key: 'building', width: 120 },
   { title: '楼层', dataIndex: 'floorNo', key: 'floorNo', width: 100 },
@@ -747,25 +917,38 @@ async function refreshTree() {
 function onTreeSelect(node: any) {
   const data = node?.dataRef || node
   if (data.type === 'BUILDING') {
+    roomQuery.roomNo = ''
+    roomQuery.building = ''
+    roomQuery.floorNo = ''
     roomQuery.buildingId = data.id
     roomQuery.floorId = undefined
+    bedQuery.bedNo = ''
+    bedQuery.roomNo = ''
     activeTab.value = 'rooms'
     searchRooms()
     return
   }
   if (data.type === 'FLOOR') {
+    roomQuery.roomNo = ''
+    roomQuery.building = ''
+    roomQuery.floorNo = ''
+    roomQuery.buildingId = data.buildingId
     roomQuery.floorId = data.id
+    bedQuery.bedNo = ''
+    bedQuery.roomNo = ''
     activeTab.value = 'rooms'
     searchRooms()
     return
   }
   if (data.type === 'ROOM') {
+    bedQuery.bedNo = ''
     bedQuery.roomNo = data.roomNo || data.name
     activeTab.value = 'beds'
     searchBeds()
     return
   }
   if (data.type === 'BED') {
+    bedQuery.roomNo = ''
     bedQuery.bedNo = data.bedNo || data.name
     activeTab.value = 'beds'
     searchBeds()
@@ -893,7 +1076,7 @@ function openBuilding(row?: BuildingItem) {
   if (row) {
     Object.assign(buildingForm, row)
   } else {
-    Object.assign(buildingForm, { id: undefined, name: '', code: '', status: 1, sortNo: 0, remark: '' })
+    Object.assign(buildingForm, { id: undefined, name: '', code: '', areaCode: undefined, areaName: undefined, status: 1, sortNo: 0, remark: '' })
   }
   buildingOpen.value = true
 }
@@ -903,17 +1086,21 @@ async function submitBuilding() {
   try {
     await buildingFormRef.value.validate()
     buildingSubmitting.value = true
+    const payload = {
+      ...buildingForm,
+      areaName: buildingForm.areaCode ? areaNameByCode.value[buildingForm.areaCode] : undefined
+    }
     if (buildingForm.id) {
-      await updateBuilding(buildingForm.id, buildingForm)
+      await updateBuilding(buildingForm.id, payload)
     } else {
-      await createBuilding(buildingForm)
+      await createBuilding(payload)
     }
     message.success('保存成功')
     buildingOpen.value = false
     await refreshBuildings()
     await loadBuildingList()
-  } catch {
-    message.error('保存失败')
+  } catch (error: any) {
+    message.error(errorMessage(error, '保存失败'))
   } finally {
     buildingSubmitting.value = false
   }
@@ -942,8 +1129,8 @@ async function submitFloor() {
     floorOpen.value = false
     await refreshFloors()
     await loadFloorList()
-  } catch {
-    message.error('保存失败')
+  } catch (error: any) {
+    message.error(errorMessage(error, '保存失败'))
   } finally {
     floorSubmitting.value = false
   }
@@ -953,7 +1140,7 @@ function openRoom(row?: RoomItem) {
   if (row) {
     Object.assign(roomForm, row)
   } else {
-    Object.assign(roomForm, { id: undefined, roomNo: '', buildingId: undefined, floorId: undefined, capacity: 1, status: 1 })
+    Object.assign(roomForm, { id: undefined, roomNo: '', buildingId: undefined, floorId: undefined, roomType: undefined, capacity: 1, status: 1 })
   }
   roomOpen.value = true
 }
@@ -972,8 +1159,8 @@ async function submitRoom() {
     roomOpen.value = false
     await refreshRooms()
     await loadRoomList()
-  } catch {
-    message.error('保存失败')
+  } catch (error: any) {
+    message.error(errorMessage(error, '保存失败'))
   } finally {
     roomSubmitting.value = false
   }
@@ -983,7 +1170,7 @@ function openBed(row?: BedItem) {
   if (row) {
     Object.assign(bedForm, row)
   } else {
-    Object.assign(bedForm, { id: undefined, roomId: undefined, bedNo: '', status: 1 })
+    Object.assign(bedForm, { id: undefined, roomId: undefined, bedNo: '', bedType: undefined, status: 1 })
   }
   bedOpen.value = true
 }
@@ -1002,25 +1189,33 @@ async function submitBed() {
     bedOpen.value = false
     await refreshBeds()
     await loadBedList()
-  } catch {
-    message.error('保存失败')
+  } catch (error: any) {
+    message.error(errorMessage(error, '保存失败'))
   } finally {
     bedSubmitting.value = false
   }
 }
 
 async function toggleRoomStatus(row: RoomItem) {
-  const nextStatus = row.status === 1 ? 0 : 1
-  await updateRoom(row.id, { ...row, status: nextStatus })
-  await refreshRooms()
-  await loadRoomList()
+  try {
+    const nextStatus = row.status === 1 ? 0 : 1
+    await updateRoom(row.id, { ...row, status: nextStatus })
+    await refreshRooms()
+    await loadRoomList()
+  } catch (error: any) {
+    message.warning(errorMessage(error, '更新房间状态失败'))
+  }
 }
 
 async function toggleBedStatus(row: BedItem) {
-  const nextStatus = row.status === 1 ? 0 : 1
-  await updateBed(row.id, { ...row, status: nextStatus })
-  await refreshBeds()
-  await loadBedList()
+  try {
+    const nextStatus = row.status === 1 ? 0 : 1
+    await updateBed(row.id, { ...row, status: nextStatus })
+    await refreshBeds()
+    await loadBedList()
+  } catch (error: any) {
+    message.warning(errorMessage(error, '更新床位状态失败'))
+  }
 }
 
 function confirmAction(content: string, title = '提示') {
@@ -1034,6 +1229,68 @@ function confirmAction(content: string, title = '提示') {
   })
 }
 
+function errorMessage(error: any, fallback: string) {
+  return error?.message || error?.msg || error?.response?.data?.message || fallback
+}
+
+function buildTreeKey(nodes: AssetTreeNode[], parentKey: string): TreeNode[] {
+  return nodes.map((node) => {
+    const type = node.type || 'NODE'
+    const key = `${parentKey}-${type}-${node.id}`
+    const children = node.children ? buildTreeKey(node.children, key) : undefined
+    return { ...node, treeKey: key, children }
+  })
+}
+
+function openBootstrap() {
+  bootstrapOpen.value = true
+}
+
+function applyBootstrapPreset(preset: 'AB_F1_6_R101_130_B01_03' | 'CUSTOM') {
+  if (preset === 'AB_F1_6_R101_130_B01_03') {
+    Object.assign(bootstrapForm, {
+      templateCode: preset,
+      buildingCount: 2,
+      floorsPerBuilding: 6,
+      roomsPerFloor: 30,
+      bedsPerRoom: 3,
+      startNo: 1,
+      buildingPrefix: '楼栋',
+      floorPrefix: 'F',
+      roomPrefix: 'R',
+      bedPrefix: 'B'
+    })
+    return
+  }
+  Object.assign(bootstrapForm, {
+    templateCode: 'CUSTOM'
+  })
+}
+
+async function submitBootstrap() {
+  try {
+    bootstrapSubmitting.value = true
+    const result = await bootstrapResidence(bootstrapForm)
+    bootstrapOpen.value = false
+    message.success(`已生成 ${result.buildingCount} 栋 / ${result.floorCount} 层 / ${result.roomCount} 间 / ${result.bedCount} 床`)
+    await Promise.all([
+      refreshTree(),
+      searchBuildings(),
+      searchFloors(),
+      searchRooms(),
+      searchBeds(),
+      loadRoomList(),
+      loadBedList(),
+      loadBuildingList(),
+      loadFloorList()
+    ])
+  } catch (error: any) {
+    message.error(errorMessage(error, '一键生成失败'))
+  } finally {
+    bootstrapSubmitting.value = false
+  }
+}
+
 async function removeBuilding(id: number) {
   try {
     await confirmAction('确认删除该楼栋吗？', '提示')
@@ -1041,8 +1298,9 @@ async function removeBuilding(id: number) {
     message.success('已删除')
     await refreshBuildings()
     await loadBuildingList()
-  } catch {
-    // ignore
+  } catch (error: any) {
+    if (!error) return
+    message.warning(errorMessage(error, '删除失败'))
   }
 }
 
@@ -1053,8 +1311,9 @@ async function removeFloor(id: number) {
     message.success('已删除')
     await refreshFloors()
     await loadFloorList()
-  } catch {
-    // ignore
+  } catch (error: any) {
+    if (!error) return
+    message.warning(errorMessage(error, '删除失败'))
   }
 }
 
@@ -1065,8 +1324,9 @@ async function removeRoom(id: number) {
     message.success('已删除')
     await refreshRooms()
     await loadRoomList()
-  } catch {
-    // ignore
+  } catch (error: any) {
+    if (!error) return
+    message.warning(errorMessage(error, '删除失败'))
   }
 }
 
@@ -1077,8 +1337,9 @@ async function removeBed(id: number) {
     message.success('已删除')
     await refreshBeds()
     await loadBedList()
-  } catch {
-    // ignore
+  } catch (error: any) {
+    if (!error) return
+    message.warning(errorMessage(error, '删除失败'))
   }
 }
 
@@ -1124,10 +1385,19 @@ function print() {
   win.close()
 }
 
+function openBedMap() {
+  router.push('/bed/map')
+}
+
+function openElderBedPanorama() {
+  router.push('/elder/bed-panorama')
+}
+
 function exportBedCsv() {
   exportCsv(
     beds.value.map((b) => ({
       床位号: b.bedNo,
+      床位类型: b.bedType || '',
       房间: b.roomNo || '',
       老人: b.elderName || '',
       护理等级: b.careLevel || '',
@@ -1153,6 +1423,50 @@ async function loadFloorList() {
   floorList.value = await getFloorList()
 }
 
+async function loadResidenceConfigOptions() {
+  try {
+    const [roomTypes, bedTypes, areas] = await Promise.all([
+      getBaseConfigItemList({ configGroup: 'ADMISSION_ROOM_TYPE', status: 1 }),
+      getBaseConfigItemList({ configGroup: 'ADMISSION_BED_TYPE', status: 1 }),
+      getBaseConfigItemList({ configGroup: 'ADMISSION_AREA', status: 1 })
+    ])
+    roomTypeItems.value = roomTypes.length ? roomTypes : fallbackRoomTypes
+    bedTypeItems.value = bedTypes.length ? bedTypes : fallbackBedTypes
+    areaItems.value = areas.length ? areas : fallbackAreas
+  } catch {
+    roomTypeItems.value = fallbackRoomTypes
+    bedTypeItems.value = fallbackBedTypes
+    areaItems.value = fallbackAreas
+    message.warning('加载入住基础配置失败，已使用默认房型/床型/区域')
+  }
+}
+
+watch(
+  () => roomForm.buildingId,
+  () => {
+    if (!roomForm.floorId) return
+    const exists = roomFloorOptions.value.some((item) => item.id === roomForm.floorId)
+    if (!exists) roomForm.floorId = undefined
+  }
+)
+
+useLiveSyncRefresh({
+  topics: ['bed', 'elder'],
+  refresh: async () => {
+    await Promise.all([
+      refreshTree(),
+      searchBuildings(),
+      searchFloors(),
+      searchRooms(),
+      searchBeds(),
+      loadRoomList(),
+      loadBedList(),
+      loadBuildingList(),
+      loadFloorList()
+    ])
+  }
+})
+
 onMounted(async () => {
   await refreshTree()
   await searchBuildings()
@@ -1163,12 +1477,16 @@ onMounted(async () => {
   await loadBedList()
   await loadBuildingList()
   await loadFloorList()
+  await loadResidenceConfigOptions()
 })
 </script>
 
 <style scoped>
 .summary-row {
   margin-bottom: 16px;
+}
+.entry-actions {
+  margin-bottom: 12px;
 }
 .summary-card {
   padding: 16px;
@@ -1208,6 +1526,14 @@ onMounted(async () => {
   width: 200px;
   text-align: center;
   margin: 8px;
+}
+.bootstrap-presets {
+  margin-bottom: 12px;
+}
+.bootstrap-hint {
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 12px;
 }
 .print-text {
   font-size: 12px;

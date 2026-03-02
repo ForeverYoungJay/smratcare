@@ -29,6 +29,9 @@ export function updateBuilding(id, data) {
 export function deleteBuilding(id) {
     return request.delete(`/api/asset/buildings/${id}`);
 }
+export function bootstrapResidence(data) {
+    return request.post('/api/asset/buildings/bootstrap-residence', data);
+}
 export function getFloorPage(params) {
     return fetchPage('/api/asset/floors/page', params);
 }

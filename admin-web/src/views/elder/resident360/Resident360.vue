@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="长者管理 Resident 360" subTitle="长者全周期管理：售前跟进 → 入院办理 → 在院服务 → 变更与退院">
+  <PageContainer title="长者管理" subTitle="长者全周期管理：售前跟进 → 入院办理 → 在院服务 → 变更与退院">
     <a-alert
       type="info"
       show-icon

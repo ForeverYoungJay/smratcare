@@ -8,14 +8,18 @@ import com.zhiyangyun.care.asset.mapper.FloorMapper;
 import com.zhiyangyun.care.asset.model.FloorRequest;
 import com.zhiyangyun.care.asset.model.FloorResponse;
 import com.zhiyangyun.care.asset.service.FloorService;
+import com.zhiyangyun.care.elder.entity.Room;
+import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import org.springframework.stereotype.Service;
 
 @Service
 public class FloorServiceImpl implements FloorService {
   private final FloorMapper floorMapper;
+  private final RoomMapper roomMapper;
 
-  public FloorServiceImpl(FloorMapper floorMapper) {
+  public FloorServiceImpl(FloorMapper floorMapper, RoomMapper roomMapper) {
     this.floorMapper = floorMapper;
+    this.roomMapper = roomMapper;
   }
 
   @Override
@@ -50,6 +54,7 @@ public class FloorServiceImpl implements FloorService {
     floor.setStatus(request.getStatus());
     floor.setSortNo(request.getSortNo());
     floorMapper.updateById(floor);
+    syncRoomFloorNo(floor);
     return toResponse(floor);
   }
 
@@ -89,10 +94,35 @@ public class FloorServiceImpl implements FloorService {
   @Override
   public void delete(Long id, Long tenantId) {
     Floor floor = floorMapper.selectById(id);
-    if (floor != null && tenantId != null && tenantId.equals(floor.getTenantId())) {
-      floor.setIsDeleted(1);
-      floorMapper.updateById(floor);
+    if (floor == null || Integer.valueOf(1).equals(floor.getIsDeleted())) {
+      throw new IllegalArgumentException("楼层不存在或已删除");
     }
+    if (tenantId == null || !tenantId.equals(floor.getTenantId())) {
+      throw new IllegalArgumentException("无权限删除该楼层");
+    }
+    long roomCount = roomMapper.selectCount(Wrappers.lambdaQuery(Room.class)
+        .eq(Room::getIsDeleted, 0)
+        .eq(Room::getTenantId, tenantId)
+        .eq(Room::getFloorId, id));
+    if (roomCount > 0) {
+      throw new IllegalArgumentException("当前楼层下仍存在房间，请先删除或迁移房间");
+    }
+    floor.setIsDeleted(1);
+    floorMapper.updateById(floor);
+  }
+
+  private void syncRoomFloorNo(Floor floor) {
+    if (floor == null || floor.getId() == null) {
+      return;
+    }
+    roomMapper.selectList(Wrappers.lambdaQuery(Room.class)
+            .eq(Room::getIsDeleted, 0)
+            .eq(Room::getTenantId, floor.getTenantId())
+            .eq(Room::getFloorId, floor.getId()))
+        .forEach(room -> {
+          room.setFloorNo(floor.getFloorNo());
+          roomMapper.updateById(room);
+        });
   }
 
   private void ensureFloorUnique(Long id, Long tenantId, Long buildingId, String floorNo) {

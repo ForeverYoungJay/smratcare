@@ -10,6 +10,8 @@ public class BuildingRequest {
   @NotBlank
   private String name;
   private String code;
+  private String areaCode;
+  private String areaName;
   private Integer status = 1;
   private Integer sortNo = 0;
   private String remark;

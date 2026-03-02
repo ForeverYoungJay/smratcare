@@ -24,6 +24,7 @@ const topicRules: Array<{ pattern: RegExp; topics: LiveSyncTopic[] }> = [
   { pattern: /^\/api\/elder\//, topics: ['elder'] },
   { pattern: /^\/api\/elder\/lifecycle\//, topics: ['elder', 'lifecycle', 'bed', 'finance', 'care', 'dining'] },
   { pattern: /^\/api\/bed\//, topics: ['bed', 'elder'] },
+  { pattern: /^\/api\/room\//, topics: ['bed', 'elder'] },
   { pattern: /^\/api\/asset\//, topics: ['bed'] },
   { pattern: /^\/api\/finance\//, topics: ['finance', 'elder'] },
   { pattern: /^\/api\/care\//, topics: ['care', 'elder'] },
@@ -88,4 +89,3 @@ export function subscribeLiveSync(listener: (payload: LiveSyncPayload) => void) 
     if (channel) channel.close()
   }
 }
-

@@ -17,6 +17,7 @@ public class Bed {
   private Long orgId;
   private Long roomId;
   private String bedNo;
+  private String bedType;
   private String bedQrCode;
   private Integer status;
   private Long elderId;

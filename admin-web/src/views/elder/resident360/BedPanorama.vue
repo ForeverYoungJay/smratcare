@@ -1,6 +1,6 @@
 <template>
-  <PageContainer title="床态全景" subTitle="楼号/楼层平面图联动，空床优先与风险角标可视化">
-    <a-card title="楼层平面图" class="card-elevated" :bordered="false">
+  <PageContainer title="床态全景" subTitle="楼号横向 + 楼层纵向二维图（长者管理）">
+    <a-card title="楼层二维矩阵" class="card-elevated" :bordered="false">
       <a-space wrap style="margin-bottom: 12px">
         <a-tag color="default">空闲 {{ stats.idle }}</a-tag>
         <a-tag color="processing">预定 {{ stats.reserved }}</a-tag>
@@ -16,12 +16,8 @@
           <a-input-search v-model:value="keyword" placeholder="搜索房间号/长者名" allow-clear style="width: 260px" />
         </div>
         <div class="selector-group">
-          <div class="selector-label">楼号</div>
-          <a-segmented v-model:value="selectedBuilding" :options="buildingOptions" @change="onBuildingChange" />
-        </div>
-        <div class="selector-group">
-          <div class="selector-label">层数</div>
-          <a-segmented v-model:value="selectedFloor" :options="floorOptions" />
+          <div class="selector-label">床位筛选</div>
+          <a-segmented v-model:value="quickFilter" :options="quickFilterOptions" />
         </div>
         <div class="selector-group">
           <div class="selector-label">风险筛选</div>
@@ -32,38 +28,79 @@
             :options="riskLevelOptions"
           />
         </div>
+        <div class="selector-group">
+          <a-button @click="openBedMap">查看床位全景</a-button>
+          <a-button type="primary" ghost @click="openBedManage">床位管理管理</a-button>
+        </div>
+      </div>
+
+      <div class="matrix-selection-bar">
+        <a-space wrap>
+          <a-tag color="blue" v-if="selectedBuilding">楼栋：{{ selectedBuilding }}</a-tag>
+          <a-tag color="cyan" v-if="selectedFloor">楼层：{{ selectedFloor }}</a-tag>
+          <span v-if="!selectedBuilding && !selectedFloor" class="matrix-tip">可点击楼栋与楼层快速聚焦</span>
+          <a-button size="small" v-if="selectedBuilding || selectedFloor" @click="clearMatrixSelection">清除楼层筛选</a-button>
+        </a-space>
       </div>
 
       <div class="plan-stage">
-        <a-empty v-if="!selectedBuilding || !selectedFloor || !planRooms.length" description="当前楼层暂无床位数据" />
-        <div v-else class="plan-grid">
-          <div
-            v-for="room in planRooms"
-            :key="room.key"
-            class="room-block"
-            :style="{ gridColumn: `span ${room.autoSpan}` }"
-          >
-            <div class="room-head">
-              <div class="room-title">{{ room.roomNo }}</div>
-              <div class="room-type">{{ room.roomType }} · {{ room.capacity }}床</div>
-            </div>
-            <div class="room-meta">
-              {{ room.occupiedBeds }}/{{ room.totalBeds }} 床 · {{ room.elderCount }} 人 · 空床 {{ room.emptyBeds }}
-            </div>
-            <div class="bed-matrix">
+        <a-empty v-if="!matrixBuildings.length || !matrixFloors.length" description="暂无床位数据" />
+        <div v-else class="matrix-viewport">
+          <div class="matrix-grid" :style="{ gridTemplateColumns: `140px repeat(${Math.max(matrixBuildings.length, 1)}, minmax(300px, 1fr))` }">
+            <div class="matrix-corner">楼层 \\ 楼栋</div>
+            <button
+              v-for="building in matrixBuildings"
+              :key="building"
+              type="button"
+              class="matrix-building-head"
+              :class="{ active: selectedBuilding === building }"
+              @click="toggleBuilding(building)"
+            >
+              {{ building }}
+            </button>
+            <template v-for="floor in matrixFloors" :key="floor">
               <button
-                v-for="bed in room.beds"
-                :key="bed.id"
                 type="button"
-                class="bed-tile"
-                :class="[statusClass(resolveStatus(bed)), { 'empty-priority': isEmptyBed(bed) }]"
-                @click="selectBed(bed)"
+                class="matrix-floor-axis"
+                :class="{ active: selectedFloor === floor }"
+                @click="toggleFloor(floor)"
               >
-                <span v-if="bedRiskLabel(bed)" class="risk-corner" :class="`risk-${bedRiskLevel(bed)}`">{{ bedRiskLabel(bed) }}</span>
-                <span class="bed-no">{{ bed.bedNo }}</span>
-                <span class="bed-name">{{ bed.elderName || '空床' }}</span>
+                {{ floor }}
               </button>
-            </div>
+              <div v-for="building in matrixBuildings" :key="`${building}-${floor}`" class="matrix-cell">
+                <template v-if="roomsAt(building, floor).length">
+                  <div
+                    v-for="room in roomsAt(building, floor)"
+                    :key="room.key"
+                    class="room-block"
+                    :style="{ gridColumn: `span ${room.autoSpan}` }"
+                  >
+                    <div class="room-head">
+                      <div class="room-title">{{ room.roomNo }}</div>
+                      <div class="room-type">{{ room.roomType }} · {{ room.capacity }}床</div>
+                    </div>
+                    <div class="room-meta">
+                      {{ room.occupiedBeds }}/{{ room.totalBeds }} 床 · {{ room.elderCount }} 人 · 空床 {{ room.emptyBeds }}
+                    </div>
+                    <div class="bed-matrix">
+                      <button
+                        v-for="bed in room.beds"
+                        :key="bed.id"
+                        type="button"
+                        class="bed-tile"
+                        :class="[statusClass(resolveStatus(bed)), { 'empty-priority': isEmptyBed(bed) }]"
+                        @click="selectBed(bed)"
+                      >
+                        <span v-if="bedRiskLabel(bed)" class="risk-corner" :class="`risk-${bedRiskLevel(bed)}`">{{ bedRiskLabel(bed) }}</span>
+                        <span class="bed-no">{{ bed.bedNo }}</span>
+                        <span class="bed-name">{{ bed.elderName || '空床' }}</span>
+                      </button>
+                    </div>
+                  </div>
+                </template>
+                <div v-else class="matrix-empty">-</div>
+              </div>
+            </template>
           </div>
         </div>
       </div>
@@ -94,7 +131,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../../components/PageContainer.vue'
@@ -122,10 +159,16 @@ const roomCapacityMap = ref<Record<number, number>>({})
 const keyword = ref('')
 const selectedBed = ref<BedItem | null>(null)
 const detailOpen = ref(false)
-const selectedBuilding = ref('')
-const selectedFloor = ref('')
+const quickFilter = ref<'ALL' | 'IDLE' | 'OCCUPIED'>('ALL')
 const riskFilterEnabled = ref(false)
 const riskFilterLevel = ref<'ALL' | 'HIGH' | 'MEDIUM' | 'LOW'>('ALL')
+const selectedBuilding = ref('')
+const selectedFloor = ref('')
+const quickFilterOptions = [
+  { label: '全部', value: 'ALL' },
+  { label: '仅空床', value: 'IDLE' },
+  { label: '仅入住', value: 'OCCUPIED' }
+]
 const riskLevelOptions = [
   { label: '全部风险', value: 'ALL' },
   { label: '高风险', value: 'HIGH' },
@@ -141,29 +184,31 @@ const filteredBeds = computed(() => beds.value.filter((b) => {
   return true
 }))
 
+const scopedBeds = computed(() => sourceBeds.value.filter((item) => {
+  if (selectedBuilding.value && String(item.building || '') !== selectedBuilding.value) return false
+  if (selectedFloor.value && String(item.floorNo || '') !== selectedFloor.value) return false
+  return true
+}))
+
 const buildingList = computed(() => {
   const set = new Set<string>()
-  beds.value.forEach((item) => set.add((item.building || '未分配楼栋').trim() || '未分配楼栋'))
-  return Array.from(set)
+  scopedBeds.value.forEach((item) => set.add((item.building || '未分配楼栋').trim() || '未分配楼栋'))
+  return Array.from(set).sort((a, b) => a.localeCompare(b, 'zh-CN'))
 })
 
-const buildingOptions = computed(() => buildingList.value.map((item) => ({ label: item, value: item })))
+const matrixBuildings = computed(() => buildingList.value)
 
 const floorList = computed(() => {
-  if (!selectedBuilding.value) return []
   const set = new Set<string>()
-  beds.value
-    .filter((item) => ((item.building || '未分配楼栋').trim() || '未分配楼栋') === selectedBuilding.value)
-    .forEach((item) => set.add((item.floorNo || '未知楼层').trim() || '未知楼层'))
+  scopedBeds.value.forEach((item) => set.add((item.floorNo || '未知楼层').trim() || '未知楼层'))
   return Array.from(set).sort((a, b) => {
-    const n1 = Number(String(a).replace(/[^0-9.-]/g, ''))
-    const n2 = Number(String(b).replace(/[^0-9.-]/g, ''))
-    if (Number.isNaN(n1) || Number.isNaN(n2)) return String(a).localeCompare(String(b))
-    return n2 - n1
+    const diff = floorSortValue(b) - floorSortValue(a)
+    if (diff !== 0) return diff
+    return String(a).localeCompare(String(b), 'zh-CN')
   })
 })
 
-const floorOptions = computed(() => floorList.value.map((item) => ({ label: item, value: item })))
+const matrixFloors = computed(() => floorList.value)
 
 const stats = computed(() => {
   const s = { idle: 0, reserved: 0, occupied: 0, maintenance: 0, cleaning: 0, locked: 0 }
@@ -179,62 +224,131 @@ const stats = computed(() => {
   return s
 })
 
-const planRooms = computed<RoomScene[]>(() => {
-  if (!selectedBuilding.value || !selectedFloor.value) return []
-  const sourceBeds = riskFilterEnabled.value
-    ? filteredBeds.value.filter((item) => {
-      if (!item.riskLevel) return false
-      if (riskFilterLevel.value === 'ALL') return true
-      return item.riskLevel === riskFilterLevel.value
-    })
-    : filteredBeds.value
+const sourceBeds = computed(() => {
+  const bedsByQuick = filteredBeds.value.filter((item) => {
+    if (quickFilter.value === 'IDLE') return isEmptyBed(item)
+    if (quickFilter.value === 'OCCUPIED') return !!item.elderId
+    return true
+  })
+  if (!riskFilterEnabled.value) return bedsByQuick
+  return bedsByQuick.filter((item) => {
+    if (!item.riskLevel) return false
+    if (riskFilterLevel.value === 'ALL') return true
+    return item.riskLevel === riskFilterLevel.value
+  })
+})
+
+const roomSceneLookup = computed(() => {
+  const lookup = new Map<string, RoomScene[]>()
   const roomMap = new Map<string, BedItem[]>()
-  sourceBeds.forEach((bed) => {
+  scopedBeds.value.forEach((bed) => {
     const building = (bed.building || '未分配楼栋').trim() || '未分配楼栋'
     const floor = (bed.floorNo || '未知楼层').trim() || '未知楼层'
-    if (building !== selectedBuilding.value || floor !== selectedFloor.value) return
     const roomNo = (bed.roomNo || `房间-${bed.roomId || '-'}`).trim() || `房间-${bed.roomId || '-'}`
-    if (!roomMap.has(roomNo)) roomMap.set(roomNo, [])
-    roomMap.get(roomNo)!.push(bed)
+    const key = `${building}@@${floor}@@${roomNo}`
+    if (!roomMap.has(key)) roomMap.set(key, [])
+    roomMap.get(key)!.push(bed)
   })
 
-  return Array.from(roomMap.entries())
-    .map(([roomNo, roomBeds]) => {
-      const roomId = Number(roomBeds[0]?.roomId || 0)
-      const sortedBeds = [...roomBeds].sort((a, b) => {
-        const aEmpty = isEmptyBed(a) ? 0 : 1
-        const bEmpty = isEmptyBed(b) ? 0 : 1
-        if (aEmpty !== bEmpty) return aEmpty - bEmpty
-        return String(a.bedNo || '').localeCompare(String(b.bedNo || ''))
-      })
-      const totalBeds = roomBeds.length
-      const occupiedBeds = roomBeds.filter((b) => !!b.elderId).length
-      const elderCount = roomBeds.filter((b) => !!b.elderName).length
-      const emptyBeds = totalBeds - occupiedBeds
-      const capacity = roomCapacityMap.value[roomId] || totalBeds || 1
-      const autoSpan: 1 | 2 = capacity >= 3 ? 2 : 1
-      return {
-        key: `${selectedBuilding.value}-${selectedFloor.value}-${roomNo}`,
-        roomNo,
-        roomType: roomTypeMap.value[roomId] || '标准间',
-        capacity,
-        autoSpan,
-        beds: sortedBeds,
-        totalBeds,
-        occupiedBeds,
-        elderCount,
-        emptyBeds
-      }
+  roomMap.forEach((roomBeds, key) => {
+    const [building, floor, roomNo] = key.split('@@')
+    const lookupKey = `${building}@@${floor}`
+    if (!lookup.has(lookupKey)) lookup.set(lookupKey, [])
+    const roomId = Number(roomBeds[0]?.roomId || 0)
+    const sortedBeds = [...roomBeds].sort((a, b) => {
+      const aEmpty = isEmptyBed(a) ? 0 : 1
+      const bEmpty = isEmptyBed(b) ? 0 : 1
+      if (aEmpty !== bEmpty) return aEmpty - bEmpty
+      return String(a.bedNo || '').localeCompare(String(b.bedNo || ''))
     })
-    .sort((a, b) => {
+    const totalBeds = roomBeds.length
+    const occupiedBeds = roomBeds.filter((b) => !!b.elderId).length
+    const elderCount = roomBeds.filter((b) => !!b.elderName).length
+    const emptyBeds = totalBeds - occupiedBeds
+    const capacity = roomCapacityMap.value[roomId] || totalBeds || 1
+    const autoSpan: 1 | 2 = capacity >= 3 ? 2 : 1
+    lookup.get(lookupKey)!.push({
+      key,
+      roomNo,
+      roomType: roomTypeMap.value[roomId] || '标准间',
+      capacity,
+      autoSpan,
+      beds: sortedBeds,
+      totalBeds,
+      occupiedBeds,
+      elderCount,
+      emptyBeds
+    })
+  })
+
+  lookup.forEach((rooms) => {
+    rooms.sort((a, b) => {
       if (a.capacity !== b.capacity) return b.capacity - a.capacity
       if (a.emptyBeds !== b.emptyBeds) return b.emptyBeds - a.emptyBeds
       return String(a.roomNo).localeCompare(String(b.roomNo))
     })
+  })
+  return lookup
 })
 
-function onBuildingChange() {
-  selectedFloor.value = floorList.value[0] || ''
+function roomsAt(building: string, floor: string) {
+  return roomSceneLookup.value.get(`${building}@@${floor}`) || []
+}
+
+function toggleBuilding(building: string) {
+  selectedBuilding.value = selectedBuilding.value === building ? '' : building
+}
+
+function toggleFloor(floor: string) {
+  selectedFloor.value = selectedFloor.value === floor ? '' : floor
+}
+
+function clearMatrixSelection() {
+  selectedBuilding.value = ''
+  selectedFloor.value = ''
+}
+
+function floorSortValue(text: string) {
+  const raw = String(text || '').trim()
+  if (!raw) return -999
+  const normalized = raw.replace(/\s+/g, '').toUpperCase()
+  if (/^(ROOF|RF|屋顶|天台)$/.test(normalized)) return 999
+  const basement = normalized.match(/(?:地下|负|B)([0-9]+|[一二三四五六七八九十百两]+)/)
+  if (basement) return -parseFloorToken(basement[1])
+  const match = normalized.match(/([0-9]+|[一二三四五六七八九十百两]+)(?:F|楼|层)?/)
+  if (match) return parseFloorToken(match[1])
+  return -999
+}
+
+function parseFloorToken(token: string) {
+  if (/^\d+$/.test(token)) return Number(token)
+  const value = parseChineseNumber(token)
+  return value > 0 ? value : 0
+}
+
+function parseChineseNumber(text: string) {
+  const chars = text.split('')
+  const digitMap: Record<string, number> = { 零: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 }
+  if (!chars.length) return 0
+  if (chars.length === 1) return digitMap[chars[0]] ?? 0
+  let section = 0
+  let number = 0
+  chars.forEach((char) => {
+    if (digitMap[char] !== undefined) {
+      number = digitMap[char]
+      return
+    }
+    if (char === '十') {
+      section += (number || 1) * 10
+      number = 0
+      return
+    }
+    if (char === '百') {
+      section += (number || 1) * 100
+      number = 0
+    }
+  })
+  return section + number
 }
 
 function resolveStatus(bed: BedItem): '空闲' | '预定' | '在住' | '维修' | '清洁中' | '锁定' {
@@ -309,10 +423,16 @@ function goScan() {
   router.push(`/care/workbench/qr?bedId=${selectedBed.value?.id || ''}`)
 }
 
+function openBedMap() {
+  router.push('/bed/map')
+}
+
+function openBedManage() {
+  router.push('/bed/manage')
+}
+
 async function loadBeds() {
   beds.value = await getBedMap()
-  if (!selectedBuilding.value) selectedBuilding.value = buildingList.value[0] || ''
-  if (!selectedFloor.value) selectedFloor.value = floorList.value[0] || ''
 }
 
 async function loadRooms() {
@@ -329,14 +449,22 @@ async function loadRooms() {
 
 useLiveSyncRefresh({
   topics: ['elder', 'bed', 'lifecycle', 'finance', 'care', 'dining'],
-  refresh: () => {
-    loadBeds()
-    loadRooms()
+  refresh: async () => {
+    await Promise.all([loadBeds(), loadRooms()])
   }
 })
 
 onMounted(async () => {
   await Promise.all([loadBeds(), loadRooms()])
+})
+
+watch(sourceBeds, () => {
+  if (selectedBuilding.value && !sourceBeds.value.some((item) => String(item.building || '') === selectedBuilding.value)) {
+    selectedBuilding.value = ''
+  }
+  if (selectedFloor.value && !sourceBeds.value.some((item) => String(item.floorNo || '') === selectedFloor.value)) {
+    selectedFloor.value = ''
+  }
 })
 </script>
 
@@ -360,26 +488,126 @@ onMounted(async () => {
   font-weight: 600;
 }
 
+.matrix-selection-bar {
+  margin-bottom: 12px;
+}
+
+.matrix-tip {
+  color: #64748b;
+}
+
 .plan-stage {
-  min-height: 420px;
+  min-height: 460px;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   background: linear-gradient(145deg, #f8fbff 0%, #ffffff 75%);
   padding: 12px;
 }
 
-.plan-grid {
+.matrix-viewport {
+  overflow-x: auto;
+}
+
+.matrix-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  min-width: max-content;
+}
+
+.matrix-corner,
+.matrix-building-head,
+.matrix-floor-axis,
+.matrix-cell {
+  border-right: 1px solid #e5e7eb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.matrix-corner {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 64px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.matrix-building-head {
+  border: 0;
+  appearance: none;
+  background: #f8fafc;
+  min-height: 64px;
+  width: 100%;
+  padding: 10px 12px;
+  font-weight: 700;
+  color: #0f172a;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.matrix-building-head.active {
+  background: #dbeafe;
+  box-shadow: inset 0 0 0 1px #60a5fa;
+}
+
+.matrix-floor-axis {
+  border: 0;
+  appearance: none;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #f8fafc;
+  min-height: 220px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #334155;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.matrix-floor-axis.active {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.matrix-cell {
+  background: #fff;
+  min-height: 220px;
+  max-height: 220px;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
   gap: 12px;
+  overflow: auto;
+}
+
+.matrix-empty {
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60px;
 }
 
 .room-block {
   border: 1px solid #dbeafe;
   border-radius: 10px;
   background: #ffffff;
-  padding: 10px;
+  padding: 8px;
   box-shadow: 0 6px 14px rgba(15, 23, 42, 0.06);
+}
+
+.bed-matrix {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .room-head {
@@ -399,21 +627,15 @@ onMounted(async () => {
 }
 
 .room-meta {
-  margin: 6px 0 8px;
+  margin: 6px 0 6px;
   color: #64748b;
-  font-size: 12px;
-}
-
-.bed-matrix {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  font-size: 11px;
 }
 
 .bed-tile {
   border: 0;
   border-radius: 8px;
-  padding: 8px 6px;
+  padding: 6px 5px;
   text-align: left;
   cursor: pointer;
   display: flex;
@@ -491,20 +713,14 @@ onMounted(async () => {
 }
 
 @media (max-width: 1400px) {
-  .plan-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 980px) {
-  .plan-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .matrix-cell {
+    grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 640px) {
-  .plan-grid {
-    grid-template-columns: 1fr;
+  .selector-label {
+    min-width: 58px;
   }
 
   .room-block {

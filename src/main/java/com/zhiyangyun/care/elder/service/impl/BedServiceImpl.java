@@ -5,6 +5,10 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zhiyangyun.care.assessment.entity.AssessmentRecord;
 import com.zhiyangyun.care.assessment.mapper.AssessmentRecordMapper;
+import com.zhiyangyun.care.asset.entity.Building;
+import com.zhiyangyun.care.asset.entity.Floor;
+import com.zhiyangyun.care.asset.mapper.BuildingMapper;
+import com.zhiyangyun.care.asset.mapper.FloorMapper;
 import com.zhiyangyun.care.elder.entity.Bed;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.entity.Room;
@@ -30,6 +34,8 @@ public class BedServiceImpl implements BedService {
   private final BedMapper bedMapper;
   private final RoomMapper roomMapper;
   private final ElderMapper elderMapper;
+  private final BuildingMapper buildingMapper;
+  private final FloorMapper floorMapper;
   private final AssessmentRecordMapper assessmentRecordMapper;
   private final HealthDataRecordMapper healthDataRecordMapper;
 
@@ -37,22 +43,28 @@ public class BedServiceImpl implements BedService {
       BedMapper bedMapper,
       RoomMapper roomMapper,
       ElderMapper elderMapper,
+      BuildingMapper buildingMapper,
+      FloorMapper floorMapper,
       AssessmentRecordMapper assessmentRecordMapper,
       HealthDataRecordMapper healthDataRecordMapper) {
     this.bedMapper = bedMapper;
     this.roomMapper = roomMapper;
     this.elderMapper = elderMapper;
+    this.buildingMapper = buildingMapper;
+    this.floorMapper = floorMapper;
     this.assessmentRecordMapper = assessmentRecordMapper;
     this.healthDataRecordMapper = healthDataRecordMapper;
   }
 
   @Override
   public BedResponse create(BedRequest request) {
+    ensureBedNoUnique(null, request.getTenantId(), request.getRoomId(), request.getBedNo());
     Bed bed = new Bed();
     bed.setTenantId(request.getTenantId());
     bed.setOrgId(request.getOrgId());
     bed.setRoomId(request.getRoomId());
     bed.setBedNo(request.getBedNo());
+    bed.setBedType(request.getBedType());
     bed.setBedQrCode(QrCodeUtil.generate());
     bed.setStatus(request.getStatus());
     bed.setCreatedBy(request.getCreatedBy());
@@ -67,10 +79,18 @@ public class BedServiceImpl implements BedService {
     if (bed == null) {
       return null;
     }
+    if (bed.getElderId() != null && !Objects.equals(bed.getRoomId(), request.getRoomId())) {
+      throw new IllegalArgumentException("当前床位已绑定长者，不可直接变更所属房间");
+    }
+    if (bed.getElderId() != null && request.getStatus() != null && request.getStatus() != 2) {
+      throw new IllegalArgumentException("当前床位已入住，状态只能保持“入住”");
+    }
+    ensureBedNoUnique(id, request.getTenantId(), request.getRoomId(), request.getBedNo());
     bed.setTenantId(request.getTenantId());
     bed.setOrgId(request.getOrgId());
     bed.setRoomId(request.getRoomId());
     bed.setBedNo(request.getBedNo());
+    bed.setBedType(request.getBedType());
     bed.setStatus(request.getStatus());
     ensureRoomTenant(request.getTenantId(), request.getRoomId());
     bedMapper.updateById(bed);
@@ -90,9 +110,14 @@ public class BedServiceImpl implements BedService {
   public IPage<BedResponse> page(Long orgId, long pageNo, long pageSize,
       String keyword, Integer status, String bedNo, String roomNo, String elderName) {
     Long tenantId = orgId;
+    List<Long> activeRoomIds = resolveActiveRoomIds(tenantId);
+    if (activeRoomIds.isEmpty()) {
+      return new Page<>(pageNo, pageSize);
+    }
     var wrapper = Wrappers.lambdaQuery(Bed.class)
         .eq(Bed::getIsDeleted, 0)
-        .eq(tenantId != null, Bed::getTenantId, tenantId);
+        .eq(tenantId != null, Bed::getTenantId, tenantId)
+        .in(Bed::getRoomId, activeRoomIds);
     if (status != null) {
       wrapper.eq(Bed::getStatus, status);
     }
@@ -134,9 +159,13 @@ public class BedServiceImpl implements BedService {
         .toList();
     Map<Long, Room> roomMap = roomIds.isEmpty()
         ? Map.of()
-        : roomMapper.selectBatchIds(roomIds)
+        : roomMapper.selectList(Wrappers.lambdaQuery(Room.class)
+                .eq(Room::getIsDeleted, 0)
+                .in(Room::getId, roomIds))
             .stream()
             .collect(Collectors.toMap(Room::getId, Function.identity()));
+    Map<Long, Building> buildingMap = resolveBuildingMap(roomMap);
+    Map<Long, Floor> floorMap = resolveFloorMap(roomMap);
     List<Long> elderIds = records.stream()
         .map(Bed::getElderId)
         .filter(Objects::nonNull)
@@ -151,12 +180,17 @@ public class BedServiceImpl implements BedService {
       BedResponse response = toResponse(bed);
       Room room = roomMap.get(bed.getRoomId());
       if (room != null) {
+        Building building = room.getBuildingId() == null ? null : buildingMap.get(room.getBuildingId());
+        Floor floor = room.getFloorId() == null ? null : floorMap.get(room.getFloorId());
         response.setRoomNo(room.getRoomNo());
-        response.setBuilding(room.getBuilding());
-        response.setFloorNo(room.getFloorNo());
+        response.setBuilding(building != null ? building.getName() : room.getBuilding());
+        response.setFloorNo(floor != null ? floor.getFloorNo() : room.getFloorNo());
+        response.setRoomType(room.getRoomType());
+        response.setAreaCode(building == null ? null : building.getAreaCode());
+        response.setAreaName(building == null ? null : building.getAreaName());
         response.setRoomQrCode(room.getRoomQrCode());
       }
-      ElderProfile elder = elderMap.get(bed.getElderId());
+      ElderProfile elder = bed.getElderId() == null ? null : elderMap.get(bed.getElderId());
       if (elder != null) {
         response.setElderName(elder.getFullName());
         response.setCareLevel(elder.getCareLevel());
@@ -172,9 +206,14 @@ public class BedServiceImpl implements BedService {
   @Override
   public java.util.List<BedResponse> list(Long orgId) {
     Long tenantId = orgId;
+    List<Long> activeRoomIds = resolveActiveRoomIds(tenantId);
+    if (activeRoomIds.isEmpty()) {
+      return List.of();
+    }
     var wrapper = Wrappers.lambdaQuery(Bed.class)
         .eq(Bed::getIsDeleted, 0)
         .eq(tenantId != null, Bed::getTenantId, tenantId)
+        .in(Bed::getRoomId, activeRoomIds)
         .orderByAsc(Bed::getRoomId)
         .orderByAsc(Bed::getBedNo);
     return bedMapper.selectList(wrapper).stream().map(this::toResponse).toList();
@@ -183,9 +222,14 @@ public class BedServiceImpl implements BedService {
   @Override
   public List<BedResponse> map(Long orgId) {
     Long tenantId = orgId;
+    List<Long> activeRoomIds = resolveActiveRoomIds(tenantId);
+    if (activeRoomIds.isEmpty()) {
+      return List.of();
+    }
     var wrapper = Wrappers.lambdaQuery(Bed.class)
         .eq(Bed::getIsDeleted, 0)
         .eq(tenantId != null, Bed::getTenantId, tenantId)
+        .in(Bed::getRoomId, activeRoomIds)
         .orderByAsc(Bed::getRoomId)
         .orderByAsc(Bed::getBedNo);
     List<Bed> beds = bedMapper.selectList(wrapper);
@@ -196,9 +240,13 @@ public class BedServiceImpl implements BedService {
         .toList();
     Map<Long, Room> roomMap = roomIds.isEmpty()
         ? Map.of()
-        : roomMapper.selectBatchIds(roomIds)
+        : roomMapper.selectList(Wrappers.lambdaQuery(Room.class)
+                .eq(Room::getIsDeleted, 0)
+                .in(Room::getId, roomIds))
             .stream()
             .collect(Collectors.toMap(Room::getId, Function.identity()));
+    Map<Long, Building> buildingMap = resolveBuildingMap(roomMap);
+    Map<Long, Floor> floorMap = resolveFloorMap(roomMap);
     List<Long> elderIds = beds.stream()
         .map(Bed::getElderId)
         .filter(Objects::nonNull)
@@ -213,12 +261,17 @@ public class BedServiceImpl implements BedService {
       BedResponse response = toResponse(bed);
       Room room = roomMap.get(bed.getRoomId());
       if (room != null) {
+        Building building = room.getBuildingId() == null ? null : buildingMap.get(room.getBuildingId());
+        Floor floor = room.getFloorId() == null ? null : floorMap.get(room.getFloorId());
         response.setRoomNo(room.getRoomNo());
-        response.setBuilding(room.getBuilding());
-        response.setFloorNo(room.getFloorNo());
+        response.setBuilding(building != null ? building.getName() : room.getBuilding());
+        response.setFloorNo(floor != null ? floor.getFloorNo() : room.getFloorNo());
+        response.setRoomType(room.getRoomType());
+        response.setAreaCode(building == null ? null : building.getAreaCode());
+        response.setAreaName(building == null ? null : building.getAreaName());
         response.setRoomQrCode(room.getRoomQrCode());
       }
-      ElderProfile elder = elderMap.get(bed.getElderId());
+      ElderProfile elder = bed.getElderId() == null ? null : elderMap.get(bed.getElderId());
       if (elder != null) {
         response.setElderName(elder.getFullName());
         response.setCareLevel(elder.getCareLevel());
@@ -232,10 +285,17 @@ public class BedServiceImpl implements BedService {
   @Override
   public void delete(Long id, Long tenantId) {
     Bed bed = bedMapper.selectById(id);
-    if (bed != null && (tenantId == null || tenantId.equals(bed.getTenantId()))) {
-      bed.setIsDeleted(1);
-      bedMapper.updateById(bed);
+    if (bed == null || Integer.valueOf(1).equals(bed.getIsDeleted())) {
+      throw new IllegalArgumentException("床位不存在或已删除");
     }
+    if (tenantId == null || !tenantId.equals(bed.getTenantId())) {
+      throw new IllegalArgumentException("无权限删除该床位");
+    }
+    if (bed.getElderId() != null) {
+      throw new IllegalArgumentException("当前床位已绑定长者，请先办理退床或换床");
+    }
+    bed.setIsDeleted(1);
+    bedMapper.updateById(bed);
   }
 
   private BedResponse toResponse(Bed bed) {
@@ -245,10 +305,49 @@ public class BedServiceImpl implements BedService {
     response.setOrgId(bed.getOrgId());
     response.setRoomId(bed.getRoomId());
     response.setBedNo(bed.getBedNo());
+    response.setBedType(bed.getBedType());
     response.setBedQrCode(bed.getBedQrCode());
     response.setStatus(bed.getStatus());
     response.setElderId(bed.getElderId());
     return response;
+  }
+
+  private Map<Long, Building> resolveBuildingMap(Map<Long, Room> roomMap) {
+    if (roomMap == null || roomMap.isEmpty()) {
+      return Map.of();
+    }
+    List<Long> buildingIds = roomMap.values().stream()
+        .map(Room::getBuildingId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList();
+    if (buildingIds.isEmpty()) {
+      return Map.of();
+    }
+    return buildingMapper.selectList(Wrappers.lambdaQuery(Building.class)
+            .eq(Building::getIsDeleted, 0)
+            .in(Building::getId, buildingIds))
+        .stream()
+        .collect(Collectors.toMap(Building::getId, Function.identity()));
+  }
+
+  private Map<Long, Floor> resolveFloorMap(Map<Long, Room> roomMap) {
+    if (roomMap == null || roomMap.isEmpty()) {
+      return Map.of();
+    }
+    List<Long> floorIds = roomMap.values().stream()
+        .map(Room::getFloorId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList();
+    if (floorIds.isEmpty()) {
+      return Map.of();
+    }
+    return floorMapper.selectList(Wrappers.lambdaQuery(Floor.class)
+            .eq(Floor::getIsDeleted, 0)
+            .in(Floor::getId, floorIds))
+        .stream()
+        .collect(Collectors.toMap(Floor::getId, Function.identity()));
   }
 
   private void enrichRiskInfo(Long orgId, List<BedResponse> responses) {
@@ -354,8 +453,37 @@ public class BedServiceImpl implements BedService {
       return;
     }
     Room room = roomMapper.selectById(roomId);
-    if (room == null || !tenantId.equals(room.getTenantId())) {
+    if (room == null
+        || !tenantId.equals(room.getTenantId())
+        || Integer.valueOf(1).equals(room.getIsDeleted())) {
       throw new IllegalArgumentException("房间不存在或无权限");
     }
+  }
+
+  private void ensureBedNoUnique(Long id, Long tenantId, Long roomId, String bedNo) {
+    if (tenantId == null || roomId == null || bedNo == null || bedNo.isBlank()) {
+      return;
+    }
+    var wrapper = Wrappers.lambdaQuery(Bed.class)
+        .eq(Bed::getIsDeleted, 0)
+        .eq(Bed::getTenantId, tenantId)
+        .eq(Bed::getRoomId, roomId)
+        .eq(Bed::getBedNo, bedNo);
+    if (id != null) {
+      wrapper.ne(Bed::getId, id);
+    }
+    if (bedMapper.selectCount(wrapper) > 0) {
+      throw new IllegalArgumentException("同一房间内床位号已存在");
+    }
+  }
+
+  private List<Long> resolveActiveRoomIds(Long tenantId) {
+    return roomMapper.selectList(Wrappers.lambdaQuery(Room.class)
+            .eq(Room::getIsDeleted, 0)
+            .eq(tenantId != null, Room::getTenantId, tenantId))
+        .stream()
+        .map(Room::getId)
+        .filter(Objects::nonNull)
+        .toList();
   }
 }

@@ -4,18 +4,26 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zhiyangyun.care.asset.entity.Building;
+import com.zhiyangyun.care.asset.entity.Floor;
 import com.zhiyangyun.care.asset.mapper.BuildingMapper;
+import com.zhiyangyun.care.asset.mapper.FloorMapper;
 import com.zhiyangyun.care.asset.model.BuildingRequest;
 import com.zhiyangyun.care.asset.model.BuildingResponse;
 import com.zhiyangyun.care.asset.service.BuildingService;
+import com.zhiyangyun.care.elder.entity.Room;
+import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import org.springframework.stereotype.Service;
 
 @Service
 public class BuildingServiceImpl implements BuildingService {
   private final BuildingMapper buildingMapper;
+  private final FloorMapper floorMapper;
+  private final RoomMapper roomMapper;
 
-  public BuildingServiceImpl(BuildingMapper buildingMapper) {
+  public BuildingServiceImpl(BuildingMapper buildingMapper, FloorMapper floorMapper, RoomMapper roomMapper) {
     this.buildingMapper = buildingMapper;
+    this.floorMapper = floorMapper;
+    this.roomMapper = roomMapper;
   }
 
   @Override
@@ -26,6 +34,8 @@ public class BuildingServiceImpl implements BuildingService {
     building.setOrgId(request.getOrgId());
     building.setName(request.getName());
     building.setCode(request.getCode());
+    building.setAreaCode(request.getAreaCode());
+    building.setAreaName(request.getAreaName());
     building.setStatus(request.getStatus());
     building.setSortNo(request.getSortNo());
     building.setRemark(request.getRemark());
@@ -46,10 +56,13 @@ public class BuildingServiceImpl implements BuildingService {
     ensureNameUnique(id, request.getTenantId(), request.getName());
     building.setName(request.getName());
     building.setCode(request.getCode());
+    building.setAreaCode(request.getAreaCode());
+    building.setAreaName(request.getAreaName());
     building.setStatus(request.getStatus());
     building.setSortNo(request.getSortNo());
     building.setRemark(request.getRemark());
     buildingMapper.updateById(building);
+    syncRoomBuildingName(building);
     return toResponse(building);
   }
 
@@ -87,10 +100,42 @@ public class BuildingServiceImpl implements BuildingService {
   @Override
   public void delete(Long id, Long tenantId) {
     Building building = buildingMapper.selectById(id);
-    if (building != null && tenantId != null && tenantId.equals(building.getTenantId())) {
-      building.setIsDeleted(1);
-      buildingMapper.updateById(building);
+    if (building == null || Integer.valueOf(1).equals(building.getIsDeleted())) {
+      throw new IllegalArgumentException("楼栋不存在或已删除");
     }
+    if (tenantId == null || !tenantId.equals(building.getTenantId())) {
+      throw new IllegalArgumentException("无权限删除该楼栋");
+    }
+    long floorCount = floorMapper.selectCount(Wrappers.lambdaQuery(Floor.class)
+        .eq(Floor::getIsDeleted, 0)
+        .eq(Floor::getTenantId, tenantId)
+        .eq(Floor::getBuildingId, id));
+    if (floorCount > 0) {
+      throw new IllegalArgumentException("当前楼栋下仍存在楼层，请先删除或迁移楼层");
+    }
+    long roomCount = roomMapper.selectCount(Wrappers.lambdaQuery(Room.class)
+        .eq(Room::getIsDeleted, 0)
+        .eq(Room::getTenantId, tenantId)
+        .eq(Room::getBuildingId, id));
+    if (roomCount > 0) {
+      throw new IllegalArgumentException("当前楼栋下仍存在房间，请先删除或迁移房间");
+    }
+    building.setIsDeleted(1);
+    buildingMapper.updateById(building);
+  }
+
+  private void syncRoomBuildingName(Building building) {
+    if (building == null || building.getId() == null) {
+      return;
+    }
+    roomMapper.selectList(Wrappers.lambdaQuery(Room.class)
+            .eq(Room::getIsDeleted, 0)
+            .eq(Room::getTenantId, building.getTenantId())
+            .eq(Room::getBuildingId, building.getId()))
+        .forEach(room -> {
+          room.setBuilding(building.getName());
+          roomMapper.updateById(room);
+        });
   }
 
   private void ensureNameUnique(Long id, Long tenantId, String name) {
@@ -116,6 +161,8 @@ public class BuildingServiceImpl implements BuildingService {
     response.setOrgId(building.getOrgId());
     response.setName(building.getName());
     response.setCode(building.getCode());
+    response.setAreaCode(building.getAreaCode());
+    response.setAreaName(building.getAreaName());
     response.setStatus(building.getStatus());
     response.setSortNo(building.getSortNo());
     response.setRemark(building.getRemark());

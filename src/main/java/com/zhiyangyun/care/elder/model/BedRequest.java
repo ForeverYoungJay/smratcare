@@ -12,6 +12,7 @@ public class BedRequest {
   private Long roomId;
   @NotBlank
   private String bedNo;
+  private String bedType;
   private Integer status = 1;
   private Long createdBy;
 }

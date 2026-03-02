@@ -1,5 +1,13 @@
 import request, { fetchPage } from '../utils/request'
-import type { RoomItem, BedItem, BuildingItem, FloorItem, AssetTreeNode } from '../types'
+import type {
+  RoomItem,
+  BedItem,
+  BuildingItem,
+  FloorItem,
+  AssetTreeNode,
+  ResidenceBootstrapRequest,
+  ResidenceBootstrapResponse
+} from '../types'
 
 export function getRoomPage(params: any) {
   return fetchPage<RoomItem>('/api/room/page', params)
@@ -39,6 +47,10 @@ export function updateBuilding(id: number, data: Partial<BuildingItem>) {
 
 export function deleteBuilding(id: number) {
   return request.delete<void>(`/api/asset/buildings/${id}`)
+}
+
+export function bootstrapResidence(data: ResidenceBootstrapRequest) {
+  return request.post<ResidenceBootstrapResponse>('/api/asset/buildings/bootstrap-residence', data)
 }
 
 export function getFloorPage(params: any) {

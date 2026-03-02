@@ -32,7 +32,7 @@ export const routes = [
             {
                 path: 'elder',
                 name: 'Elder',
-                meta: { title: '长者管理 Resident 360', icon: 'TeamOutlined' },
+                meta: { title: '长者管理', icon: 'TeamOutlined' },
                 redirect: '/elder/resident-360',
                 children: [
                     {
@@ -292,7 +292,7 @@ export const routes = [
             {
                 path: 'bed',
                 name: 'Bed',
-                meta: { title: '床位房态', icon: 'HomeOutlined', hidden: true },
+                meta: { title: '床位管理', icon: 'HomeOutlined' },
                 redirect: '/bed/map',
                 children: [
                     {
