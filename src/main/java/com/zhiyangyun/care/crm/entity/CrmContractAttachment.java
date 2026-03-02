@@ -16,6 +16,8 @@ public class CrmContractAttachment {
   private Long tenantId;
   private Long orgId;
   private Long leadId;
+  private Long contractId;
+  private String attachmentType;
   private String contractNo;
   private String fileName;
   private String fileUrl;

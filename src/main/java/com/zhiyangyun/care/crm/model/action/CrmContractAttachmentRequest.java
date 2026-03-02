@@ -4,7 +4,9 @@ import lombok.Data;
 
 @Data
 public class CrmContractAttachmentRequest {
+  private Long contractId;
   private String contractNo;
+  private String attachmentType;
   private String fileName;
   private String fileUrl;
   private String fileType;

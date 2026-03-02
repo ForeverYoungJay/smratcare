@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="床位全景" subTitle="3D楼栋视图 + 床位状态一览">
+  <PageContainer title="床位全景" subTitle="楼号横向 + 楼层纵向二维图">
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item label="床位号">
@@ -61,42 +61,52 @@
 
       <div class="view-switch">
         <a-radio-group v-model:value="viewMode" button-style="solid">
-          <a-radio-button value="3d">3D全景</a-radio-button>
+          <a-radio-button value="grid">二维楼层图</a-radio-button>
           <a-radio-button value="list">卡片列表</a-radio-button>
+        </a-radio-group>
+        <a-radio-group
+          v-if="viewMode === 'grid'"
+          v-model:value="matrixQuickFilter"
+          size="small"
+          class="matrix-filter-switch"
+        >
+          <a-radio-button value="all">全部</a-radio-button>
+          <a-radio-button value="idle">仅空床</a-radio-button>
+          <a-radio-button value="occupied">仅入住</a-radio-button>
         </a-radio-group>
       </div>
 
-      <div v-if="viewMode === '3d'" class="city-viewport">
-        <div class="city-scene">
-          <div v-for="building in buildingScenes" :key="building.key" class="building-shell">
-            <div class="building-head">
-              <div class="building-name">{{ building.name }}</div>
-              <div class="building-kpi">{{ building.floors.length }} 层 · {{ building.roomCount }} 间 · {{ building.bedCount }} 床</div>
-            </div>
-            <div class="building-stack">
-              <div v-for="floor in building.floors" :key="floor.key" class="floor-deck">
-                <div class="floor-axis">{{ floor.label }}</div>
-                <div class="room-lane">
-                  <div v-for="room in floor.rooms" :key="room.key" class="room-cube">
-                    <div class="room-title">{{ room.roomNo }}</div>
-                    <div class="room-meta">{{ room.occupiedBeds }}/{{ room.totalBeds }} 床 · {{ room.elderCount }} 人</div>
-                    <div class="bed-grid">
-                      <button
-                        v-for="bed in room.beds"
-                        :key="bed.id"
-                        type="button"
-                        class="bed-pill"
-                        :class="statusClass(bed.status, bed.elderId)"
-                        @click="openBed(bed)"
-                      >
-                        {{ bed.bedNo }}
-                      </button>
-                    </div>
+      <div v-if="viewMode === 'grid'" class="matrix-viewport">
+        <div class="matrix-grid" :style="{ gridTemplateColumns: `130px repeat(${matrixColumnCount}, minmax(280px, 1fr))` }">
+          <div class="matrix-corner">楼层 \\ 楼栋</div>
+          <div v-for="building in matrixBuildings" :key="building.key" class="matrix-building-head">
+            <div class="building-name">{{ building.name }}</div>
+            <div class="building-kpi">{{ building.floors.length }} 层 · {{ building.roomCount }} 间 · {{ building.bedCount }} 床</div>
+          </div>
+          <template v-for="floor in matrixFloors" :key="floor">
+            <div class="matrix-floor-axis">{{ floor }}</div>
+            <div v-for="building in matrixBuildings" :key="`${building.key}-${floor}`" class="matrix-cell">
+              <template v-if="roomsAt(building.name, floor).length">
+                <div v-for="room in roomsAt(building.name, floor)" :key="room.key" class="room-cube">
+                  <div class="room-title">{{ room.roomNo }}</div>
+                  <div class="room-meta">{{ room.occupiedBeds }}/{{ room.totalBeds }} 床 · {{ room.elderCount }} 人</div>
+                  <div class="bed-grid">
+                    <button
+                      v-for="bed in room.beds"
+                      :key="bed.id"
+                      type="button"
+                      class="bed-pill"
+                      :class="statusClass(bed.status, bed.elderId)"
+                      @click="openBed(bed)"
+                    >
+                      {{ bed.bedNo }}
+                    </button>
                   </div>
                 </div>
-              </div>
+              </template>
+              <div v-else class="matrix-empty">-</div>
             </div>
-          </div>
+          </template>
         </div>
       </div>
 
@@ -204,7 +214,8 @@ const current = ref<BedItem | null>(null)
 const qrDataUrl = ref('')
 const elderLoading = ref(false)
 const elderDetail = ref<ElderItem | null>(null)
-const viewMode = ref<'3d' | 'list'>('3d')
+const viewMode = ref<'grid' | 'list'>('grid')
+const matrixQuickFilter = ref<'all' | 'idle' | 'occupied'>('all')
 
 const query = reactive({
   bedNo: '',
@@ -281,6 +292,56 @@ const floorCount = computed(() => buildingScenes.value.reduce((sum, building) =>
 const roomCount = computed(() => buildingScenes.value.reduce((sum, building) => sum + building.roomCount, 0))
 const occupiedBedsCount = computed(() => filteredBeds.value.filter((bed) => isOccupiedBed(bed)).length)
 const idleBedsCount = computed(() => filteredBeds.value.filter((bed) => isIdleBed(bed)).length)
+const matrixBuildings = computed(() => buildingScenes.value)
+const matrixColumnCount = computed(() => Math.max(matrixBuildings.value.length, 1))
+const matrixFloors = computed(() => {
+  const floorSet = new Set<string>()
+  buildingScenes.value.forEach((building) => {
+    building.floors.forEach((floor) => floorSet.add(floor.label))
+  })
+  return Array.from(floorSet).sort((a, b) => {
+    const diff = floorSortValue(b) - floorSortValue(a)
+    if (diff !== 0) return diff
+    return a.localeCompare(b, 'zh-CN')
+  })
+})
+const roomLookup = computed(() => {
+  const map = new Map<string, Map<string, RoomScene[]>>()
+  buildingScenes.value.forEach((building) => {
+    const floorMap = new Map<string, RoomScene[]>()
+    building.floors.forEach((floor) => {
+      floorMap.set(floor.label, floor.rooms)
+    })
+    map.set(building.name, floorMap)
+  })
+  return map
+})
+const matrixRoomLookup = computed(() => {
+  if (matrixQuickFilter.value === 'all') return roomLookup.value
+  const map = new Map<string, Map<string, RoomScene[]>>()
+  roomLookup.value.forEach((floorMap, buildingName) => {
+    const nextFloorMap = new Map<string, RoomScene[]>()
+    floorMap.forEach((rooms, floorLabel) => {
+      const nextRooms = rooms
+        .map((room) => {
+          const nextBeds = room.beds.filter((bed) => matchMatrixFilter(bed))
+          if (!nextBeds.length) return null
+          const occupiedBeds = nextBeds.filter((bed) => isOccupiedBed(bed)).length
+          return {
+            ...room,
+            beds: nextBeds,
+            totalBeds: nextBeds.length,
+            occupiedBeds,
+            elderCount: nextBeds.filter((bed) => !!bed.elderId).length
+          }
+        })
+        .filter((room): room is RoomScene => room !== null)
+      nextFloorMap.set(floorLabel, nextRooms)
+    })
+    map.set(buildingName, nextFloorMap)
+  })
+  return map
+})
 
 const pagedBeds = computed(() => {
   const start = (query.pageNo - 1) * query.pageSize
@@ -288,8 +349,65 @@ const pagedBeds = computed(() => {
 })
 
 function floorSortValue(text: string) {
-  const match = text.match(/-?\d+/)
-  return match ? Number(match[0]) : 0
+  const raw = String(text || '').trim()
+  if (!raw) return -999
+  const normalized = raw.replace(/\s+/g, '').toUpperCase()
+  if (/^(ROOF|RF|屋顶|天台)$/.test(normalized)) return 999
+
+  const basement = normalized.match(/(?:地下|负|B)([0-9]+|[一二三四五六七八九十百两]+)/)
+  if (basement) return -parseFloorToken(basement[1])
+
+  const match = normalized.match(/([0-9]+|[一二三四五六七八九十百两]+)(?:F|楼|层)?/)
+  if (match) return parseFloorToken(match[1])
+
+  if (/夹层|M/.test(normalized)) return 0.5
+  return -999
+}
+
+function parseFloorToken(token: string) {
+  if (/^\d+$/.test(token)) return Number(token)
+  const value = parseChineseNumber(token)
+  return value > 0 ? value : 0
+}
+
+function parseChineseNumber(text: string) {
+  const chars = text.split('')
+  const digitMap: Record<string, number> = {
+    零: 0,
+    一: 1,
+    二: 2,
+    两: 2,
+    三: 3,
+    四: 4,
+    五: 5,
+    六: 6,
+    七: 7,
+    八: 8,
+    九: 9
+  }
+  if (!chars.length) return 0
+  if (chars.length === 1) return digitMap[chars[0]] ?? 0
+
+  let result = 0
+  let section = 0
+  let number = 0
+  chars.forEach((char) => {
+    if (digitMap[char] !== undefined) {
+      number = digitMap[char]
+      return
+    }
+    if (char === '十') {
+      section += (number || 1) * 10
+      number = 0
+      return
+    }
+    if (char === '百') {
+      section += (number || 1) * 100
+      number = 0
+    }
+  })
+  result += section + number
+  return result
 }
 
 function isOccupiedBed(bed: BedItem) {
@@ -355,6 +473,16 @@ function onPageSizeChange(_current: number, size: number) {
   query.pageSize = size
 }
 
+function roomsAt(building: string, floor: string) {
+  return matrixRoomLookup.value.get(building)?.get(floor) || []
+}
+
+function matchMatrixFilter(bed: BedItem) {
+  if (matrixQuickFilter.value === 'idle') return isIdleBed(bed)
+  if (matrixQuickFilter.value === 'occupied') return isOccupiedBed(bed)
+  return true
+}
+
 async function openBed(bed: BedItem) {
   current.value = bed
   detailOpen.value = true
@@ -401,30 +529,20 @@ onMounted(load)
 
 .view-switch {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
   margin-bottom: 12px;
 }
 
-.city-viewport {
+.matrix-filter-switch {
+  margin-left: auto;
+}
+
+.matrix-viewport {
   overflow-x: auto;
-  padding: 12px 4px 20px;
-  perspective: 1300px;
-}
-
-.city-scene {
-  display: flex;
-  gap: 22px;
-  align-items: flex-end;
-  min-width: max-content;
-}
-
-.building-shell {
-  min-width: 420px;
-  max-width: 540px;
-}
-
-.building-head {
-  margin-bottom: 8px;
+  padding: 4px 0 20px;
 }
 
 .building-name {
@@ -438,39 +556,69 @@ onMounted(load)
   font-size: 12px;
 }
 
-.building-stack {
-  background: linear-gradient(160deg, #eff5ff 0%, #f7fbff 55%, #ffffff 100%);
-  border: 1px solid #d7e3ff;
-  border-radius: 16px;
-  padding: 10px;
-  box-shadow: 0 14px 26px rgba(30, 77, 178, 0.12);
-  transform: rotateX(14deg) rotateY(-10deg);
-  transform-origin: center bottom;
-}
-
-.floor-deck {
-  margin-bottom: 12px;
-  border-radius: 12px;
-  border: 1px solid #d3ddf6;
-  background: linear-gradient(180deg, #ffffff 0%, #f0f5ff 100%);
-  padding: 8px;
-}
-
-.floor-deck:last-child {
-  margin-bottom: 0;
-}
-
-.floor-axis {
-  font-size: 12px;
-  color: #4c5f87;
-  margin-bottom: 6px;
-  font-weight: 600;
-}
-
-.room-lane {
+.matrix-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  min-width: max-content;
+  border: 1px solid #d5dff2;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.matrix-corner {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: #31456d;
+  background: #f2f6ff;
+  border-right: 1px solid #d5dff2;
+  border-bottom: 1px solid #d5dff2;
+  min-height: 68px;
+}
+
+.matrix-building-head {
+  padding: 10px 12px;
+  border-bottom: 1px solid #d5dff2;
+  border-right: 1px solid #e3eaf8;
+  background: #f7faff;
+}
+
+.matrix-floor-axis {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: #31456d;
+  background: #f7faff;
+  border-right: 1px solid #d5dff2;
+  border-bottom: 1px solid #e3eaf8;
+  min-height: 120px;
+}
+
+.matrix-cell {
+  padding: 10px;
+  border-right: 1px solid #e3eaf8;
+  border-bottom: 1px solid #e3eaf8;
+  min-height: 120px;
+  background: #fbfdff;
+  display: grid;
   gap: 8px;
+}
+
+.matrix-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #9aa8c8;
+  font-size: 12px;
+  min-height: 48px;
 }
 
 .room-cube {
@@ -559,12 +707,16 @@ onMounted(load)
 }
 
 @media (max-width: 768px) {
-  .building-shell {
-    min-width: 320px;
+  .view-switch {
+    justify-content: flex-start;
   }
 
-  .building-stack {
-    transform: none;
+  .matrix-filter-switch {
+    margin-left: 0;
+  }
+
+  .matrix-grid {
+    grid-auto-rows: minmax(96px, auto);
   }
 }
 </style>

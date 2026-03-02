@@ -24,6 +24,12 @@ export interface BedItem {
   building?: string
   floorNo?: string
   roomQrCode?: string
+  riskLevel?: '' | 'HIGH' | 'MEDIUM' | 'LOW'
+  riskLabel?: string
+  riskSource?: string
+  abnormalVital24hCount?: number
+  latestAssessmentLevel?: string
+  latestAssessmentDate?: string
 }
 
 export interface BuildingItem {

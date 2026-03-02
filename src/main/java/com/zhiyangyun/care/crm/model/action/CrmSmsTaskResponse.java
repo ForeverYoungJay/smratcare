@@ -7,6 +7,7 @@ import lombok.Data;
 public class CrmSmsTaskResponse {
   private Long id;
   private Long leadId;
+  private Long contractId;
   private String phone;
   private String templateName;
   private String content;

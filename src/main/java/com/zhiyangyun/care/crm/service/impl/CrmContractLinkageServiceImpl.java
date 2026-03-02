@@ -5,9 +5,11 @@ import com.zhiyangyun.care.assessment.entity.AssessmentRecord;
 import com.zhiyangyun.care.assessment.mapper.AssessmentRecordMapper;
 import com.zhiyangyun.care.bill.entity.BillMonthly;
 import com.zhiyangyun.care.bill.mapper.BillMonthlyMapper;
+import com.zhiyangyun.care.crm.entity.CrmContract;
 import com.zhiyangyun.care.crm.entity.CrmContractAttachment;
 import com.zhiyangyun.care.crm.entity.CrmLead;
 import com.zhiyangyun.care.crm.mapper.CrmContractAttachmentMapper;
+import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
 import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
 import com.zhiyangyun.care.crm.model.CrmContractAssessmentContractItem;
 import com.zhiyangyun.care.crm.model.CrmContractAssessmentOverviewResponse;
@@ -30,6 +32,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class CrmContractLinkageServiceImpl implements CrmContractLinkageService {
   private final CrmLeadMapper leadMapper;
+  private final CrmContractMapper contractMapper;
   private final CrmContractAttachmentMapper attachmentMapper;
   private final ElderMapper elderMapper;
   private final ElderAdmissionMapper admissionMapper;
@@ -38,12 +41,14 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
 
   public CrmContractLinkageServiceImpl(
       CrmLeadMapper leadMapper,
+      CrmContractMapper contractMapper,
       CrmContractAttachmentMapper attachmentMapper,
       ElderMapper elderMapper,
       ElderAdmissionMapper admissionMapper,
       BillMonthlyMapper billMonthlyMapper,
       AssessmentRecordMapper assessmentRecordMapper) {
     this.leadMapper = leadMapper;
+    this.contractMapper = contractMapper;
     this.attachmentMapper = attachmentMapper;
     this.elderMapper = elderMapper;
     this.admissionMapper = admissionMapper;
@@ -63,7 +68,8 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
     }
 
     ElderAdmission admission = loadLatestAdmission(tenantId, elderId);
-    CrmLead lead = loadLinkedLead(tenantId, elder, admission == null ? null : admission.getContractNo());
+    CrmContract contract = loadLinkedContract(tenantId, elder, admission == null ? null : admission.getContractNo(), null);
+    CrmLead lead = loadLinkedLead(tenantId, elder, contract == null ? null : contract.getContractNo());
 
     CrmContractLinkageResponse response = new CrmContractLinkageResponse();
     response.setElderId(elderId);
@@ -74,6 +80,16 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
       response.setContractNo(admission.getContractNo());
       response.setAdmissionDate(admission.getAdmissionDate());
       response.setDepositAmount(admission.getDepositAmount());
+    }
+    if (contract != null) {
+      response.setContractId(contract.getId());
+      response.setLeadId(contract.getLeadId());
+      response.setOrgName(contract.getOrgName());
+      response.setMarketerName(contract.getMarketerName());
+      response.setContractNo(firstNonBlank(response.getContractNo(), contract.getContractNo()));
+      response.setContractStatus(contract.getContractStatus());
+      response.setContractSignedAt(contract.getSignedAt());
+      response.setContractExpiryDate(contract.getEffectiveTo());
     }
     if (lead != null) {
       response.setLeadId(lead.getId());
@@ -86,7 +102,7 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
     }
 
     fillBillingSummary(response, elderId, tenantId);
-    fillAttachments(response, tenantId, lead == null ? null : lead.getId(), response.getContractNo());
+    fillAttachments(response, tenantId, contract == null ? null : contract.getId(), lead == null ? null : lead.getId(), response.getContractNo());
     return response;
   }
 
@@ -100,17 +116,21 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
       return null;
     }
 
+    CrmContract contract = loadLinkedContract(tenantId, null, lead.getContractNo(), lead.getId());
     ElderProfile elder = findElderByLead(tenantId, lead);
     ElderAdmission admission = elder == null ? null : loadLatestAdmission(tenantId, elder.getId());
 
     CrmContractLinkageResponse response = new CrmContractLinkageResponse();
     response.setLeadId(lead.getId());
-    response.setContractNo(lead.getContractNo());
-    response.setContractStatus(lead.getContractStatus());
-    response.setContractSignedAt(lead.getContractSignedAt());
-    response.setContractExpiryDate(lead.getContractExpiryDate());
-    response.setOrgName(lead.getOrgName());
-    response.setMarketerName(lead.getMarketerName());
+    if (contract != null) {
+      response.setContractId(contract.getId());
+    }
+    response.setContractNo(contract == null ? lead.getContractNo() : contract.getContractNo());
+    response.setContractStatus(contract == null ? lead.getContractStatus() : contract.getContractStatus());
+    response.setContractSignedAt(contract == null ? lead.getContractSignedAt() : contract.getSignedAt());
+    response.setContractExpiryDate(contract == null ? lead.getContractExpiryDate() : contract.getEffectiveTo());
+    response.setOrgName(contract == null ? lead.getOrgName() : firstNonBlank(contract.getOrgName(), lead.getOrgName()));
+    response.setMarketerName(contract == null ? lead.getMarketerName() : firstNonBlank(contract.getMarketerName(), lead.getMarketerName()));
     response.setElderName(firstNonBlank(lead.getElderName(), lead.getName()));
     response.setElderPhone(firstNonBlank(lead.getElderPhone(), lead.getPhone()));
 
@@ -126,7 +146,41 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
       response.setContractNo(firstNonBlank(response.getContractNo(), admission.getContractNo()));
     }
 
-    fillAttachments(response, tenantId, leadId, response.getContractNo());
+    fillAttachments(response, tenantId, contract == null ? null : contract.getId(), leadId, response.getContractNo());
+    return response;
+  }
+
+  @Override
+  public CrmContractLinkageResponse getByContractId(Long tenantId, Long contractId) {
+    if (tenantId == null || contractId == null) {
+      return null;
+    }
+    CrmContract contract = contractMapper.selectById(contractId);
+    if (contract == null || Integer.valueOf(1).equals(contract.getIsDeleted()) || !tenantId.equals(contract.getTenantId())) {
+      return null;
+    }
+    if (contract.getLeadId() != null) {
+      CrmContractLinkageResponse byLead = getByLeadId(tenantId, contract.getLeadId());
+      if (byLead != null) {
+        return byLead;
+      }
+    }
+    CrmContractLinkageResponse response = new CrmContractLinkageResponse();
+    response.setLeadId(contract.getLeadId());
+    response.setContractId(contract.getId());
+    response.setElderId(contract.getElderId());
+    response.setElderName(contract.getElderName());
+    response.setElderPhone(contract.getElderPhone());
+    response.setOrgName(contract.getOrgName());
+    response.setMarketerName(contract.getMarketerName());
+    response.setContractNo(contract.getContractNo());
+    response.setContractStatus(contract.getContractStatus());
+    response.setContractSignedAt(contract.getSignedAt());
+    response.setContractExpiryDate(contract.getEffectiveTo());
+    if (contract.getElderId() != null) {
+      fillBillingSummary(response, contract.getElderId(), tenantId);
+    }
+    fillAttachments(response, tenantId, contractId, contract.getLeadId(), contract.getContractNo());
     return response;
   }
 
@@ -144,10 +198,7 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
     response.setElderName(elder.getFullName());
     response.setElderPhone(elder.getPhone());
 
-    List<CrmLead> contracts = listContractsByElder(tenantId, elder);
-    List<CrmContractAssessmentContractItem> contractItems = contracts.stream()
-        .map(this::toContractItem)
-        .toList();
+    List<CrmContractAssessmentContractItem> contractItems = listContractsByElder(tenantId, elder);
     response.setContracts(contractItems);
     response.setTotalContractCount(contractItems.size());
 
@@ -171,6 +222,96 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
         .orderByDesc(ElderAdmission::getAdmissionDate)
         .orderByDesc(ElderAdmission::getCreateTime)
         .last("LIMIT 1"));
+  }
+
+  private CrmContract loadLinkedContract(Long tenantId, ElderProfile elder, String contractNo, Long leadId) {
+    if (contractNo != null && !contractNo.isBlank()) {
+      CrmContract byContractNo = contractMapper.selectOne(Wrappers.lambdaQuery(CrmContract.class)
+          .eq(CrmContract::getTenantId, tenantId)
+          .eq(CrmContract::getIsDeleted, 0)
+          .eq(CrmContract::getContractNo, contractNo)
+          .in(CrmContract::getStatus, List.of("SIGNED", "EFFECTIVE"))
+          .orderByDesc(CrmContract::getSignedAt)
+          .orderByDesc(CrmContract::getUpdateTime)
+          .last("LIMIT 1"));
+      if (byContractNo != null) {
+        return byContractNo;
+      }
+      byContractNo = contractMapper.selectOne(Wrappers.lambdaQuery(CrmContract.class)
+          .eq(CrmContract::getTenantId, tenantId)
+          .eq(CrmContract::getIsDeleted, 0)
+          .eq(CrmContract::getContractNo, contractNo)
+          .orderByDesc(CrmContract::getUpdateTime)
+          .last("LIMIT 1"));
+      if (byContractNo != null) {
+        return byContractNo;
+      }
+    }
+    if (leadId != null) {
+      CrmContract byLead = contractMapper.selectOne(Wrappers.lambdaQuery(CrmContract.class)
+          .eq(CrmContract::getTenantId, tenantId)
+          .eq(CrmContract::getIsDeleted, 0)
+          .eq(CrmContract::getLeadId, leadId)
+          .in(CrmContract::getStatus, List.of("SIGNED", "EFFECTIVE"))
+          .orderByDesc(CrmContract::getSignedAt)
+          .orderByDesc(CrmContract::getUpdateTime)
+          .last("LIMIT 1"));
+      if (byLead != null) {
+        return byLead;
+      }
+      byLead = contractMapper.selectOne(Wrappers.lambdaQuery(CrmContract.class)
+          .eq(CrmContract::getTenantId, tenantId)
+          .eq(CrmContract::getIsDeleted, 0)
+          .eq(CrmContract::getLeadId, leadId)
+          .orderByDesc(CrmContract::getUpdateTime)
+          .last("LIMIT 1"));
+      if (byLead != null) {
+        return byLead;
+      }
+    }
+    if (elder != null && elder.getId() != null) {
+      CrmContract byElder = contractMapper.selectOne(Wrappers.lambdaQuery(CrmContract.class)
+          .eq(CrmContract::getTenantId, tenantId)
+          .eq(CrmContract::getIsDeleted, 0)
+          .eq(CrmContract::getElderId, elder.getId())
+          .in(CrmContract::getStatus, List.of("SIGNED", "EFFECTIVE"))
+          .orderByDesc(CrmContract::getSignedAt)
+          .orderByDesc(CrmContract::getUpdateTime)
+          .last("LIMIT 1"));
+      if (byElder != null) {
+        return byElder;
+      }
+      return contractMapper.selectOne(Wrappers.lambdaQuery(CrmContract.class)
+          .eq(CrmContract::getTenantId, tenantId)
+          .eq(CrmContract::getIsDeleted, 0)
+          .eq(CrmContract::getElderId, elder.getId())
+          .orderByDesc(CrmContract::getSignedAt)
+          .orderByDesc(CrmContract::getUpdateTime)
+          .last("LIMIT 1"));
+    }
+    if (elder != null && elder.getIdCardNo() != null && !elder.getIdCardNo().isBlank()) {
+      CrmContract byIdCard = contractMapper.selectOne(Wrappers.lambdaQuery(CrmContract.class)
+          .eq(CrmContract::getTenantId, tenantId)
+          .eq(CrmContract::getIsDeleted, 0)
+          .eq(CrmContract::getIdCardNo, elder.getIdCardNo())
+          .orderByDesc(CrmContract::getSignedAt)
+          .orderByDesc(CrmContract::getUpdateTime)
+          .last("LIMIT 1"));
+      if (byIdCard != null) {
+        return byIdCard;
+      }
+    }
+    if (elder != null && elder.getFullName() != null && elder.getPhone() != null) {
+      return contractMapper.selectOne(Wrappers.lambdaQuery(CrmContract.class)
+          .eq(CrmContract::getTenantId, tenantId)
+          .eq(CrmContract::getIsDeleted, 0)
+          .eq(CrmContract::getElderName, elder.getFullName())
+          .eq(CrmContract::getElderPhone, elder.getPhone())
+          .orderByDesc(CrmContract::getSignedAt)
+          .orderByDesc(CrmContract::getUpdateTime)
+          .last("LIMIT 1"));
+    }
+    return null;
   }
 
   private CrmLead loadLinkedLead(Long tenantId, ElderProfile elder, String contractNo) {
@@ -268,9 +409,28 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
     return lead != null && Integer.valueOf(0).equals(lead.getIsDeleted()) && tenantId.equals(lead.getTenantId());
   }
 
-  private List<CrmLead> listContractsByElder(Long tenantId, ElderProfile elder) {
+  private List<CrmContractAssessmentContractItem> listContractsByElder(Long tenantId, ElderProfile elder) {
     if (elder == null) {
       return Collections.emptyList();
+    }
+    var contractWrapper = Wrappers.lambdaQuery(CrmContract.class)
+        .eq(CrmContract::getTenantId, tenantId)
+        .eq(CrmContract::getIsDeleted, 0)
+        .orderByDesc(CrmContract::getSignedAt)
+        .orderByDesc(CrmContract::getCreateTime);
+    contractWrapper.and(w -> {
+      w.eq(CrmContract::getElderId, elder.getId());
+      if (elder.getIdCardNo() != null && !elder.getIdCardNo().isBlank()) {
+        w.or(p -> p.eq(CrmContract::getIdCardNo, elder.getIdCardNo()));
+      }
+      if (elder.getFullName() != null && !elder.getFullName().isBlank() && elder.getPhone() != null && !elder.getPhone().isBlank()) {
+        w.or(p -> p.eq(CrmContract::getElderName, elder.getFullName()).eq(CrmContract::getElderPhone, elder.getPhone()));
+        w.or(p -> p.eq(CrmContract::getName, elder.getFullName()).eq(CrmContract::getPhone, elder.getPhone()));
+      }
+    });
+    List<CrmContract> contracts = contractMapper.selectList(contractWrapper);
+    if (contracts != null && !contracts.isEmpty()) {
+      return contracts.stream().map(this::toContractItem).toList();
     }
     var wrapper = Wrappers.lambdaQuery(CrmLead.class)
         .eq(CrmLead::getTenantId, tenantId)
@@ -297,12 +457,17 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
       }
       byContract.putIfAbsent(lead.getContractNo(), lead);
     }
-    return byContract.values().stream().toList();
+    return byContract.values().stream().map(this::toContractItem).toList();
   }
 
   private CrmContractAssessmentContractItem toContractItem(CrmLead lead) {
     CrmContractAssessmentContractItem item = new CrmContractAssessmentContractItem();
+    item.setContractId(null);
     item.setLeadId(lead.getId());
+    item.setElderName(firstNonBlank(lead.getElderName(), lead.getName()));
+    item.setElderPhone(firstNonBlank(lead.getElderPhone(), lead.getPhone()));
+    item.setIdCardNo(lead.getIdCardNo());
+    item.setHomeAddress(lead.getHomeAddress());
     item.setContractNo(lead.getContractNo());
     item.setContractStatus(lead.getContractStatus());
     item.setFlowStage(lead.getFlowStage());
@@ -311,6 +476,25 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
     item.setOrgName(lead.getOrgName());
     item.setContractSignedAt(lead.getContractSignedAt());
     item.setContractExpiryDate(lead.getContractExpiryDate());
+    return item;
+  }
+
+  private CrmContractAssessmentContractItem toContractItem(CrmContract contract) {
+    CrmContractAssessmentContractItem item = new CrmContractAssessmentContractItem();
+    item.setContractId(contract.getId());
+    item.setLeadId(contract.getLeadId());
+    item.setElderName(firstNonBlank(contract.getElderName(), contract.getName()));
+    item.setElderPhone(firstNonBlank(contract.getElderPhone(), contract.getPhone()));
+    item.setIdCardNo(contract.getIdCardNo());
+    item.setHomeAddress(contract.getHomeAddress());
+    item.setContractNo(contract.getContractNo());
+    item.setContractStatus(contract.getContractStatus());
+    item.setFlowStage(contract.getFlowStage());
+    item.setCurrentOwnerDept(contract.getCurrentOwnerDept());
+    item.setMarketerName(contract.getMarketerName());
+    item.setOrgName(contract.getOrgName());
+    item.setContractSignedAt(contract.getSignedAt());
+    item.setContractExpiryDate(contract.getEffectiveTo());
     return item;
   }
 
@@ -406,9 +590,16 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
     response.setBillOutstandingAmount(outstanding);
   }
 
-  private void fillAttachments(CrmContractLinkageResponse response, Long tenantId, Long leadId, String contractNo) {
+  private void fillAttachments(
+      CrmContractLinkageResponse response, Long tenantId, Long contractId, Long leadId, String contractNo) {
     List<CrmContractAttachment> attachments;
-    if (leadId != null) {
+    if (contractId != null) {
+      attachments = attachmentMapper.selectList(Wrappers.lambdaQuery(CrmContractAttachment.class)
+          .eq(CrmContractAttachment::getTenantId, tenantId)
+          .eq(CrmContractAttachment::getContractId, contractId)
+          .eq(CrmContractAttachment::getIsDeleted, 0)
+          .orderByDesc(CrmContractAttachment::getCreateTime));
+    } else if (leadId != null) {
       attachments = attachmentMapper.selectList(Wrappers.lambdaQuery(CrmContractAttachment.class)
           .eq(CrmContractAttachment::getTenantId, tenantId)
           .eq(CrmContractAttachment::getLeadId, leadId)
@@ -428,7 +619,9 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
       CrmContractAttachmentResponse resp = new CrmContractAttachmentResponse();
       resp.setId(item.getId());
       resp.setLeadId(item.getLeadId());
+      resp.setContractId(item.getContractId());
       resp.setContractNo(item.getContractNo());
+      resp.setAttachmentType(item.getAttachmentType());
       resp.setFileName(item.getFileName());
       resp.setFileUrl(item.getFileUrl());
       resp.setFileType(item.getFileType());

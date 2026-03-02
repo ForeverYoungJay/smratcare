@@ -110,8 +110,14 @@
               <a-button type="link" @click="view(record)">查看</a-button>
               <a-button type="link" @click="openForm(record)">编辑</a-button>
               <a-button type="link" @click="openAttachment(record)">附件</a-button>
-              <a-button type="link" @click="startAdmissionAssessment(record)">移交评估部</a-button>
-              <a-button type="link" @click="goAdmissionProcessing(record)">入住办理</a-button>
+              <a-button type="link" @click="approveRow(record)">审批通过</a-button>
+              <a-button type="link" danger @click="rejectRow(record)">驳回</a-button>
+              <a-button type="link" danger @click="voidRow(record)">作废</a-button>
+              <a-tooltip :title="isAdmissionDisabled(record) ? admissionDisabledReason(record) : null">
+                <span>
+                  <a-button type="link" :disabled="isAdmissionDisabled(record)" @click="goAdmissionProcessing(record)">入住办理</a-button>
+                </span>
+              </a-tooltip>
               <a-button type="link" danger @click="removeContract(record)">删除</a-button>
               <a-tooltip
                 v-if="normalizedFlowStage(record) !== 'SIGNED'"
@@ -147,6 +153,8 @@
           <a-col :span="12"><a-form-item label="签约房号"><a-input v-model:value="form.reservationRoomNo" /></a-form-item></a-col>
           <a-col :span="12"><a-form-item label="姓名" name="elderName"><a-input v-model:value="form.elderName" /></a-form-item></a-col>
           <a-col :span="12"><a-form-item label="联系电话"><a-input v-model:value="form.elderPhone" /></a-form-item></a-col>
+          <a-col :span="12"><a-form-item label="身份证号"><a-input v-model:value="form.idCardNo" /></a-form-item></a-col>
+          <a-col :span="12"><a-form-item label="家庭地址"><a-input v-model:value="form.homeAddress" /></a-form-item></a-col>
           <a-col :span="8"><a-form-item label="性别"><a-select v-model:value="form.gender" allow-clear><a-select-option :value="1">男</a-select-option><a-select-option :value="2">女</a-select-option></a-select></a-form-item></a-col>
           <a-col :span="8"><a-form-item label="年龄"><a-input-number v-model:value="form.age" :min="0" :max="120" style="width: 100%" /></a-form-item></a-col>
           <a-col :span="8"><a-form-item label="签约日期"><a-date-picker v-model:value="form.contractSignedAt" value-format="YYYY-MM-DD HH:mm:ss" show-time style="width: 100%" /></a-form-item></a-col>
@@ -229,16 +237,19 @@ import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import {
+  approveContract,
   batchDeleteContracts,
   createContractAttachment,
   createCrmContract,
   deleteContractAttachment,
   deleteCrmContract,
   finalizeContract,
+  getContractAssessmentOverview,
   getContractAttachments,
   getContractPage,
-  handoffContractToAssessment,
+  rejectContract,
   updateCrmContract,
+  voidContract,
   uploadMarketingFile
 } from '../../api/marketing'
 import { createElder, getElderPage, updateElder } from '../../api/elder'
@@ -312,7 +323,7 @@ const columns = [
   { title: '联系电话', dataIndex: 'elderPhone', key: 'elderPhone', width: 140 },
   { title: '营销人员', dataIndex: 'marketerName', key: 'marketerName', width: 120 },
   { title: '合同状态', dataIndex: 'contractStatus', key: 'contractStatus', width: 130 },
-  { title: '操作', key: 'operation', fixed: 'right', width: 520 }
+  { title: '操作', key: 'operation', fixed: 'right', width: 760 }
 ]
 
 const attachmentOpen = ref(false)
@@ -337,6 +348,8 @@ const finalizing = ref(false)
 const finalizeLead = ref<CrmContractItem>()
 const finalizeReadyMap = ref<Record<number, boolean>>({})
 const finalizeCheckingMap = ref<Record<number, boolean>>({})
+const assessmentReadyMap = ref<Record<number, boolean>>({})
+const assessmentCheckingMap = ref<Record<number, boolean>>({})
 const finalizeForm = reactive({
   contractNo: '',
   elderName: '',
@@ -438,6 +451,21 @@ function overdueText(record: CrmContractItem) {
   return ''
 }
 
+function isAdmissionDisabled(record: CrmContractItem) {
+  const id = Number(record.id || 0)
+  if (!id) return true
+  if (assessmentCheckingMap.value[id]) return true
+  return !assessmentReadyMap.value[id]
+}
+
+function admissionDisabledReason(record: CrmContractItem) {
+  const id = Number(record.id || 0)
+  if (!id) return '合同数据异常，无法办理入住'
+  if (assessmentCheckingMap.value[id]) return '正在校验是否已完成入住评估...'
+  if (!record.contractNo) return '请先保存并生成合同号'
+  return '仅完成入住评估后的合同才可办理入住'
+}
+
 function isFinalizeDisabled(record: CrmContractItem) {
   const id = Number(record.id || 0)
   if (!id) return true
@@ -476,6 +504,22 @@ async function refreshFinalizeReady(rowsForCheck: CrmContractItem[]) {
       finalizeReadyMap.value[id] = false
     } finally {
       finalizeCheckingMap.value[id] = false
+    }
+  }))
+}
+
+async function refreshAssessmentReady(rowsForCheck: CrmContractItem[]) {
+  const targets = rowsForCheck.filter((item) => normalizedFlowStage(item) !== 'SIGNED' && item.status !== 'VOID')
+  await Promise.all(targets.map(async (item) => {
+    const id = Number(item.id || 0)
+    if (!id) return
+    assessmentCheckingMap.value[id] = true
+    try {
+      assessmentReadyMap.value[id] = await checkAssessmentReady(item)
+    } catch {
+      assessmentReadyMap.value[id] = false
+    } finally {
+      assessmentCheckingMap.value[id] = false
     }
   }))
 }
@@ -522,7 +566,10 @@ async function fetchData() {
       total.value = page.total || 0
       localRows.value = []
     }
-    await refreshFinalizeReady(tableRows.value)
+    await Promise.all([
+      refreshFinalizeReady(tableRows.value),
+      refreshAssessmentReady(tableRows.value)
+    ])
     await fetchBoardSummary()
   } finally {
     loading.value = false
@@ -690,16 +737,44 @@ async function batchApprove() {
   await Promise.all(ids.map((id) => {
     const row = rows.value.find((item) => sameId(item.id, id))
     if (!row) return Promise.resolve()
-    return updateCrmContract(row.id, {
-      ...row,
-      status: row.status === 'SIGNED' ? 'SIGNED' : 'APPROVED',
-      flowStage: row.flowStage === 'SIGNED' ? 'SIGNED' : 'PENDING_SIGN',
-      currentOwnerDept: 'MARKETING',
-      contractStatus: row.contractStatus || '费用预审通过'
-    })
+    if (row.status === 'SIGNED') return Promise.resolve(row)
+    return approveContract(row.id)
   }))
   message.success(`已审批 ${ids.length} 条合同`)
   fetchData()
+}
+
+async function approveRow(record: CrmContractItem) {
+  if (record.status === 'VOID') {
+    message.warning('作废合同不允许审批')
+    return
+  }
+  await approveContract(record.id)
+  message.success('审批通过')
+  fetchData()
+}
+
+function rejectRow(record: CrmContractItem) {
+  Modal.confirm({
+    title: `确认驳回合同 ${record.contractNo || '-'} 吗？`,
+    onOk: async () => {
+      await rejectContract(record.id)
+      message.success('已驳回')
+      fetchData()
+    }
+  })
+}
+
+function voidRow(record: CrmContractItem) {
+  Modal.confirm({
+    title: `确认作废合同 ${record.contractNo || '-'} 吗？`,
+    content: '作废后不可最终签署，请谨慎操作',
+    onOk: async () => {
+      await voidContract(record.id)
+      message.success('合同已作废')
+      fetchData()
+    }
+  })
 }
 
 function batchDelete() {
@@ -762,26 +837,13 @@ function view(record: CrmContractItem) {
   })
 }
 
-async function startAdmissionAssessment(record: CrmContractItem) {
-  try {
-    if (!record.id) {
-      message.warning('请先保存合同后再移交')
-      return
-    }
-    const handed = await handoffContractToAssessment(record.id)
-    if (!handed) {
-      throw new Error('未找到可移交的合同记录')
-    }
-    await ensureElderFromLeadBasic(handed)
-    await fetchData()
-    message.success('已移交评估部，请到“长者管理/入住评估”选择该合同继续评估')
-  } catch (error: any) {
-    message.error(error?.message || '移交评估部失败')
-  }
-}
-
 async function goAdmissionProcessing(record: CrmContractItem) {
   try {
+    const hasCompletedAssessment = await checkAssessmentReady(record)
+    if (!hasCompletedAssessment) {
+      message.warning('仅完成入住评估后的合同才可办理入住，请先在入住评估中完成评估并保存结果')
+      return
+    }
     const lead = await ensureContractNo(record)
     const elder = await ensureElderFromLead(lead)
     await updateCrmContract(lead.id, {
@@ -794,6 +856,19 @@ async function goAdmissionProcessing(record: CrmContractItem) {
   } catch (error: any) {
     message.error(error?.message || '跳转入住办理失败')
   }
+}
+
+async function checkAssessmentReady(record: CrmContractItem) {
+  const leadId = record.leadId || record.id
+  if (!leadId) return false
+  const overview = await getContractAssessmentOverview({ leadId })
+  const contract = (overview?.contracts || []).find((item) => {
+    if (record.id && item.contractId && item.contractId === record.id) return true
+    if (record.contractNo && item.contractNo) return item.contractNo === record.contractNo
+    return false
+  })
+  if (!contract) return false
+  return (contract.reports || []).some((item) => item.status && item.status !== 'DRAFT')
 }
 
 async function openFinalize(record: CrmContractItem) {
@@ -965,27 +1040,6 @@ async function ensureElderFromLead(lead: CrmContractItem): Promise<ElderItem> {
     medicalRecordFileUrl: pickLatestAttachment(leadAttachments, 'MEDICAL_RECORD')?.fileUrl,
     medicalInsuranceCopyUrl: pickLatestAttachment(leadAttachments, 'MEDICAL_INSURANCE')?.fileUrl,
     householdCopyUrl: pickLatestAttachment(leadAttachments, 'HOUSEHOLD')?.fileUrl,
-    remark: lead.remark
-  }
-  if (existing?.id) {
-    await updateElder(existing.id, elderPayload)
-    return { ...existing, ...elderPayload, id: existing.id }
-  }
-  return createElder({
-    ...elderPayload,
-    admissionDate: dayjs().format('YYYY-MM-DD'),
-    status: 1
-  })
-}
-
-async function ensureElderFromLeadBasic(lead: CrmContractItem): Promise<ElderItem> {
-  const existing = await findExistingElderByLead(lead)
-  const elderPayload = {
-    fullName: normalizeLeadName(lead),
-    idCardNo: lead.idCardNo,
-    gender: lead.gender,
-    phone: lead.elderPhone || lead.phone,
-    homeAddress: lead.homeAddress,
     remark: lead.remark
   }
   if (existing?.id) {

@@ -30,6 +30,11 @@ public class CrmContractLinkageController {
     return Result.ok(linkageService.getByLeadId(AuthContext.getOrgId(), leadId));
   }
 
+  @GetMapping("/{contractId}/linkage-by-contract")
+  public Result<CrmContractLinkageResponse> linkageByContract(@PathVariable Long contractId) {
+    return Result.ok(linkageService.getByContractId(AuthContext.getOrgId(), contractId));
+  }
+
   @GetMapping("/assessment-overview")
   public Result<CrmContractAssessmentOverviewResponse> assessmentOverview(
       @RequestParam(required = false) Long elderId,

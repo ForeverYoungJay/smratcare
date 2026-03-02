@@ -10,6 +10,7 @@ import lombok.Data;
 
 @Data
 public class CrmContractLinkageResponse {
+  private Long contractId;
   private Long leadId;
   private Long elderId;
   private String elderName;

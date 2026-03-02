@@ -76,6 +76,18 @@ export function finalizeContract(contractId: number | string, remark?: string) {
   return request.post<CrmContractItem>(`/api/crm/contracts/${contractId}/finalize`, { remark })
 }
 
+export function approveContract(contractId: number | string, remark?: string) {
+  return request.post<CrmContractItem>(`/api/crm/contracts/${contractId}/approve`, { remark })
+}
+
+export function rejectContract(contractId: number | string, remark?: string) {
+  return request.post<CrmContractItem>(`/api/crm/contracts/${contractId}/reject`, { remark })
+}
+
+export function voidContract(contractId: number | string, remark?: string) {
+  return request.post<CrmContractItem>(`/api/crm/contracts/${contractId}/void`, { remark })
+}
+
 export function batchUpdateLeadStatus(data: LeadBatchStatusRequest) {
   return request.post<number>('/api/crm/leads/batch/status', data)
 }

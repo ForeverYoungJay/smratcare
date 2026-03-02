@@ -1,0 +1,10 @@
+package com.zhiyangyun.care.crm.model.action;
+
+import java.util.List;
+import lombok.Data;
+
+@Data
+public class CrmContractBatchDeleteRequest {
+  private List<Long> ids;
+  private List<String> contractNos;
+}

@@ -162,8 +162,9 @@ public class MarketingPlanServiceImpl implements MarketingPlanService {
     }
     CrmMarketingPlanApproval approval = buildApproval(orgId, id, staffId, "APPROVED", request == null ? null : request.getRemark());
     approvalMapper.insert(approval);
-    entity.setStatus("APPROVED");
+    entity.setStatus("PUBLISHED");
     marketingPlanMapper.updateById(entity);
+    syncPublishLinkages(orgId, staffId, entity);
     return toResponse(entity, staffId);
   }
 
@@ -185,8 +186,10 @@ public class MarketingPlanServiceImpl implements MarketingPlanService {
   @Transactional
   public MarketingPlanResponse publish(Long orgId, Long staffId, Long id) {
     CrmMarketingPlan entity = getById(orgId, id);
-    if (!"APPROVED".equals(entity.getStatus()) && !"ACTIVE".equals(entity.getStatus())) {
-      throw new IllegalArgumentException("仅审批通过方案可发布");
+    if (!"APPROVED".equals(entity.getStatus())
+        && !"ACTIVE".equals(entity.getStatus())
+        && !"PUBLISHED".equals(entity.getStatus())) {
+      throw new IllegalArgumentException("仅审批通过或已发布方案可发布");
     }
     entity.setStatus("PUBLISHED");
     marketingPlanMapper.updateById(entity);
@@ -238,6 +241,7 @@ public class MarketingPlanServiceImpl implements MarketingPlanService {
       receipt.setStaffName(staffName);
       receiptMapper.updateById(receipt);
     }
+    syncPerformanceOnRead(orgId, id, staffId, staffName, action);
     return toResponse(entity, staffId);
   }
 
@@ -327,17 +331,53 @@ public class MarketingPlanServiceImpl implements MarketingPlanService {
       }
 
       OaTodo todo = new OaTodo();
-      todo.setTenantId(orgId);
-      todo.setOrgId(orgId);
-      todo.setTitle("营销方案待阅读：" + safeText(plan.getTitle(), "未命名方案"));
-      todo.setContent("请阅读并确认是否同意方案，若需优化请填写改进建议。");
-      todo.setDueTime(dueTime);
-      todo.setStatus("OPEN");
-      todo.setAssigneeId(staff.getId());
-      todo.setAssigneeName(trimToNull(staff.getRealName()));
-      todo.setCreatedBy(staffId);
-      todoMapper.insert(todo);
+      String todoTitle = "营销方案待阅读：" + safeText(plan.getTitle(), "未命名方案");
+      OaTodo existingTodo = todoMapper.selectOne(Wrappers.lambdaQuery(OaTodo.class)
+          .eq(OaTodo::getIsDeleted, 0)
+          .eq(OaTodo::getOrgId, orgId)
+          .eq(OaTodo::getAssigneeId, staff.getId())
+          .eq(OaTodo::getTitle, todoTitle)
+          .eq(OaTodo::getStatus, "OPEN")
+          .last("LIMIT 1"));
+      if (existingTodo == null) {
+        todo.setTenantId(orgId);
+        todo.setOrgId(orgId);
+        todo.setTitle(todoTitle);
+        todo.setContent("请阅读并确认是否同意方案，若需优化请填写改进建议。");
+        todo.setDueTime(dueTime);
+        todo.setStatus("OPEN");
+        todo.setAssigneeId(staff.getId());
+        todo.setAssigneeName(trimToNull(staff.getRealName()));
+        todo.setCreatedBy(staffId);
+        todoMapper.insert(todo);
+      }
     }
+  }
+
+  private void syncPerformanceOnRead(Long orgId, Long planId, Long staffId, String staffName, String action) {
+    CrmMarketingPlanPerformance performance = performanceMapper.selectOne(Wrappers.lambdaQuery(CrmMarketingPlanPerformance.class)
+        .eq(CrmMarketingPlanPerformance::getIsDeleted, 0)
+        .eq(CrmMarketingPlanPerformance::getOrgId, orgId)
+        .eq(CrmMarketingPlanPerformance::getPlanId, planId)
+        .eq(CrmMarketingPlanPerformance::getStaffId, staffId)
+        .last("LIMIT 1"));
+    if (performance == null) {
+      performance = new CrmMarketingPlanPerformance();
+      performance.setTenantId(orgId);
+      performance.setOrgId(orgId);
+      performance.setPlanId(planId);
+      performance.setStaffId(staffId);
+      performance.setStaffName(staffName);
+      performance.setMetric("MARKETING_PLAN_READ");
+      performance.setSource("MARKETING_PLAN");
+      performance.setScore(BigDecimal.ZERO);
+      performance.setStatus("PENDING");
+      performanceMapper.insert(performance);
+    }
+    performance.setStaffName(staffName);
+    performance.setStatus("CONFIRMED");
+    performance.setScore("AGREE".equals(action) ? BigDecimal.ONE : new BigDecimal("0.50"));
+    performanceMapper.updateById(performance);
   }
 
   private List<StaffAccount> listActiveStaff(Long orgId) {

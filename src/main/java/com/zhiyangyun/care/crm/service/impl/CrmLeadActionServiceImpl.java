@@ -241,6 +241,8 @@ public class CrmLeadActionServiceImpl implements CrmLeadActionService {
     attachment.setTenantId(tenantId);
     attachment.setOrgId(orgId);
     attachment.setLeadId(leadId);
+    attachment.setContractId(request == null ? null : request.getContractId());
+    attachment.setAttachmentType(blankToDefault(request == null ? null : request.getAttachmentType(), "CONTRACT"));
     attachment.setContractNo(blankToDefault(request == null ? null : request.getContractNo(), lead.getContractNo()));
     attachment.setFileName(fileName);
     attachment.setFileUrl(blankToNull(request == null ? null : request.getFileUrl()));
@@ -361,7 +363,9 @@ public class CrmLeadActionServiceImpl implements CrmLeadActionService {
     CrmContractAttachmentResponse response = new CrmContractAttachmentResponse();
     response.setId(attachment.getId());
     response.setLeadId(attachment.getLeadId());
+    response.setContractId(attachment.getContractId());
     response.setContractNo(attachment.getContractNo());
+    response.setAttachmentType(attachment.getAttachmentType());
     response.setFileName(attachment.getFileName());
     response.setFileUrl(attachment.getFileUrl());
     response.setFileType(attachment.getFileType());
@@ -375,6 +379,7 @@ public class CrmLeadActionServiceImpl implements CrmLeadActionService {
     CrmSmsTaskResponse response = new CrmSmsTaskResponse();
     response.setId(task.getId());
     response.setLeadId(task.getLeadId());
+    response.setContractId(task.getContractId());
     response.setPhone(task.getPhone());
     response.setTemplateName(task.getTemplateName());
     response.setContent(task.getContent());

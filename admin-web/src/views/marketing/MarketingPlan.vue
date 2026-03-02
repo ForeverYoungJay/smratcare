@@ -259,7 +259,7 @@ const modalOpen = ref(false)
 const previewOpen = ref(false)
 const confirmOpen = ref(false)
 const previewRecord = ref<MarketingPlanItem>()
-const editingId = ref<number>()
+const editingId = ref<number | string>()
 const formRef = ref<FormInstance>()
 const receipts = ref<MarketingPlanReceiptItem[]>([])
 const departmentOptions = ref<{ label: string; value: number }[]>([])
@@ -442,7 +442,7 @@ async function submitForm() {
   }
 }
 
-async function onDelete(id: number) {
+async function onDelete(id: number | string) {
   try {
     await deleteMarketingPlan(id)
     message.success('删除成功')
@@ -500,7 +500,7 @@ async function publishPlan(item: MarketingPlanItem) {
   }
 }
 
-async function refreshWorkflow(id: number) {
+async function refreshWorkflow(id: number | string) {
   try {
     const [detail, receiptList] = await Promise.all([getMarketingPlanDetail(id), getMarketingPlanReceipts(id)])
     previewRecord.value = detail

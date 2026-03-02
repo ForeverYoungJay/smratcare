@@ -199,7 +199,7 @@ export interface CrmContractItem {
   flowStage?: 'PENDING_ASSESSMENT' | 'PENDING_BED_SELECT' | 'PENDING_SIGN' | 'SIGNED'
   currentOwnerDept?: 'MARKETING' | 'ASSESSMENT'
   orgName?: string
-  status?: string
+  status?: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'SIGNED' | 'EFFECTIVE' | 'VOID'
   smsSendCount?: number
   remark?: string
   createTime?: string
@@ -228,7 +228,7 @@ export interface CrmContractPayload {
   flowStage?: CrmContractItem['flowStage']
   currentOwnerDept?: CrmContractItem['currentOwnerDept']
   orgName?: string
-  status?: string
+  status?: CrmContractItem['status']
   smsSendCount?: number
   remark?: string
 }
@@ -280,7 +280,12 @@ export interface ContractAssessmentReportItem {
 }
 
 export interface ContractAssessmentContractItem {
+  contractId?: number
   leadId?: number
+  elderName?: string
+  elderPhone?: string
+  idCardNo?: string
+  homeAddress?: string
   contractNo?: string
   contractStatus?: string
   flowStage?: string
@@ -309,6 +314,7 @@ export type MarketingPlanStatus =
   | 'APPROVED'
   | 'REJECTED'
   | 'PUBLISHED'
+  | 'ACTIVE'
   | 'INACTIVE'
 
 export interface MarketingPlanItem {

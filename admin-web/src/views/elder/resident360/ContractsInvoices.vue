@@ -86,6 +86,22 @@ const rows = computed(() => {
 })
 
 function normalizeType(item: ContractAttachmentItem) {
+  const attachmentType = item.attachmentType || item.remark
+  if (attachmentType === 'INVOICE') {
+    return '收据/发票'
+  }
+  if (attachmentType === 'CONTRACT') {
+    return '合同'
+  }
+  if (attachmentType === 'MEDICAL_RECORD') {
+    return '病历资料'
+  }
+  if (attachmentType === 'MEDICAL_INSURANCE') {
+    return '医保复印件'
+  }
+  if (attachmentType === 'HOUSEHOLD') {
+    return '户口复印件'
+  }
   const fileName = (item.fileName || '').toLowerCase()
   if (fileName.includes('发票') || fileName.includes('invoice') || fileName.includes('receipt')) {
     return '收据/发票'

@@ -304,6 +304,7 @@ import { message, Modal } from 'ant-design-vue'
 import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
+import { getElderPage } from '../../api/elder'
 import {
   getAssessmentRecordPage,
   getAssessmentRecordSummary,
@@ -315,7 +316,7 @@ import {
   getAssessmentTemplateList,
   previewAssessmentScore
 } from '../../api/assessment'
-import type { AssessmentRecord, AssessmentRecordSummary, AssessmentType, AssessmentScaleTemplate, PageResult } from '../../types'
+import type { AssessmentRecord, AssessmentRecordSummary, AssessmentType, AssessmentScaleTemplate, ElderItem, PageResult } from '../../types'
 
 const props = defineProps<{
   title: string

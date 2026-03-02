@@ -8,7 +8,12 @@ import lombok.Data;
 
 @Data
 public class CrmContractAssessmentContractItem {
+  private Long contractId;
   private Long leadId;
+  private String elderName;
+  private String elderPhone;
+  private String idCardNo;
+  private String homeAddress;
   private String contractNo;
   private String contractStatus;
   private String flowStage;

@@ -45,6 +45,9 @@
           <template v-if="column.key === 'countdownDays'">
             <span>{{ calcCountdown(record.contractExpiryDate) }}</span>
           </template>
+          <template v-else-if="column.key === 'status'">
+            <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
+          </template>
           <template v-else-if="column.key === 'operation'">
             <a-space>
               <a-button type="link" @click="sendSms(record)">短信</a-button>
@@ -117,6 +120,7 @@ const columns = [
   { title: '营销人员', dataIndex: 'marketerName', key: 'marketerName', width: 120 },
   { title: '签约时间', dataIndex: 'contractSignedAt', key: 'contractSignedAt', width: 170 },
   { title: '合同有效期', dataIndex: 'contractExpiryDate', key: 'contractExpiryDate', width: 140 },
+  { title: '域状态', dataIndex: 'status', key: 'status', width: 110 },
   { title: '发送次数', dataIndex: 'smsSendCount', key: 'smsSendCount', width: 100 },
   { title: '倒计时', key: 'countdownDays', width: 100 },
   { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 },
@@ -149,6 +153,26 @@ const smsTaskColumns = [
   { title: '结果', dataIndex: 'resultMessage', key: 'resultMessage', width: 140 },
   { title: '操作', key: 'operation', width: 100 }
 ]
+
+function statusText(status?: CrmContractItem['status']) {
+  if (status === 'DRAFT') return '草稿'
+  if (status === 'PENDING_APPROVAL') return '待审批'
+  if (status === 'APPROVED') return '已审批'
+  if (status === 'REJECTED') return '已驳回'
+  if (status === 'SIGNED') return '已签署'
+  if (status === 'EFFECTIVE') return '已生效'
+  if (status === 'VOID') return '已作废'
+  return status || '-'
+}
+
+function statusColor(status?: CrmContractItem['status']) {
+  if (status === 'SIGNED' || status === 'EFFECTIVE') return 'green'
+  if (status === 'APPROVED') return 'blue'
+  if (status === 'PENDING_APPROVAL') return 'gold'
+  if (status === 'REJECTED') return 'volcano'
+  if (status === 'VOID') return 'default'
+  return 'default'
+}
 
 async function fetchData() {
   loading.value = true
@@ -198,6 +222,10 @@ function onPageSizeChange(_current: number, size: number) {
 }
 
 async function sendSms(record: CrmContractItem) {
+  if (record.status === 'VOID') {
+    message.warning('作废合同不可发送短信')
+    return
+  }
   const tasks = await createContractSmsTasks({
     contractIds: [record.id],
     templateName: reminderConfig.templateName,
@@ -216,8 +244,15 @@ async function batchSms() {
     message.info('请先勾选合同')
     return
   }
+  const targetIds = selectedContracts.value
+    .filter((item) => item.status !== 'VOID')
+    .map((item) => item.id)
+  if (!targetIds.length) {
+    message.warning('选中合同均为作废状态，无法发送短信')
+    return
+  }
   const tasks = await createContractSmsTasks({
-    contractIds: selectedRowKeys.value,
+    contractIds: targetIds,
     templateName: reminderConfig.templateName,
     content: reminderConfig.content,
     planSendTime: dayjs().format('YYYY-MM-DD HH:mm:ss')

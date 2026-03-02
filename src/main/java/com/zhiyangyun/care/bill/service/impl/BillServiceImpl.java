@@ -10,7 +10,9 @@ import com.zhiyangyun.care.bill.model.BillGenerateResponse;
 import com.zhiyangyun.care.bill.model.BillItemDetail;
 import com.zhiyangyun.care.bill.service.BillService;
 import com.zhiyangyun.care.bill.service.BillingConfigService;
+import com.zhiyangyun.care.crm.entity.CrmContract;
 import com.zhiyangyun.care.crm.entity.CrmLead;
+import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
 import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderAdmission;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderAdmissionMapper;
@@ -36,6 +38,7 @@ public class BillServiceImpl implements BillService {
   private final StoreOrderMapper orderMapper;
   private final BillingConfigService billingConfigService;
   private final ElderAdmissionMapper elderAdmissionMapper;
+  private final CrmContractMapper crmContractMapper;
   private final CrmLeadMapper crmLeadMapper;
 
   public BillServiceImpl(
@@ -45,6 +48,7 @@ public class BillServiceImpl implements BillService {
       StoreOrderMapper orderMapper,
       BillingConfigService billingConfigService,
       ElderAdmissionMapper elderAdmissionMapper,
+      CrmContractMapper crmContractMapper,
       CrmLeadMapper crmLeadMapper) {
     this.billMonthlyMapper = billMonthlyMapper;
     this.billItemMapper = billItemMapper;
@@ -52,6 +56,7 @@ public class BillServiceImpl implements BillService {
     this.orderMapper = orderMapper;
     this.billingConfigService = billingConfigService;
     this.elderAdmissionMapper = elderAdmissionMapper;
+    this.crmContractMapper = crmContractMapper;
     this.crmLeadMapper = crmLeadMapper;
   }
 
@@ -70,8 +75,8 @@ public class BillServiceImpl implements BillService {
     response.setBillMonth(billMonth);
 
     for (ElderProfile elder : elders) {
-      String signedContractNo = resolveSignedContractNo(elder.getOrgId(), elder.getId());
-      if (signedContractNo == null) {
+      CrmContract signedContract = resolveSignedContract(elder.getOrgId(), elder.getId());
+      if (signedContract == null || signedContract.getContractNo() == null) {
         response.setSkippedCount(response.getSkippedCount() + 1);
         continue;
       }
@@ -96,7 +101,8 @@ public class BillServiceImpl implements BillService {
           existing.setPaidAmount(BigDecimal.ZERO);
         }
         existing.setOutstandingAmount(total.subtract(existing.getPaidAmount()));
-        existing.setContractNoSnapshot(signedContractNo);
+        existing.setElderContractId(signedContract.getId());
+        existing.setContractNoSnapshot(signedContract.getContractNo());
         billMonthlyMapper.updateById(existing);
         response.setGeneratedCount(response.getGeneratedCount() + 1);
         response.getBillIds().add(existing.getId());
@@ -109,7 +115,8 @@ public class BillServiceImpl implements BillService {
       monthly.setBillMonth(billMonth);
       monthly.setTotalAmount(BigDecimal.ZERO);
       monthly.setStatus(0);
-      monthly.setContractNoSnapshot(signedContractNo);
+      monthly.setElderContractId(signedContract.getId());
+      monthly.setContractNoSnapshot(signedContract.getContractNo());
       billMonthlyMapper.insert(monthly);
 
       BigDecimal total = appendBillItems(monthly, elder, startDate, endDate, ym, billMonth);
@@ -128,7 +135,7 @@ public class BillServiceImpl implements BillService {
     return response;
   }
 
-  private String resolveSignedContractNo(Long orgId, Long elderId) {
+  private CrmContract resolveSignedContract(Long orgId, Long elderId) {
     ElderAdmission admission = elderAdmissionMapper.selectOne(
         Wrappers.lambdaQuery(ElderAdmission.class)
             .eq(ElderAdmission::getOrgId, orgId)
@@ -141,6 +148,17 @@ public class BillServiceImpl implements BillService {
     if (admission == null || admission.getContractNo() == null || admission.getContractNo().isBlank()) {
       return null;
     }
+    CrmContract contract = crmContractMapper.selectOne(Wrappers.lambdaQuery(CrmContract.class)
+        .eq(CrmContract::getOrgId, orgId)
+        .eq(CrmContract::getIsDeleted, 0)
+        .eq(CrmContract::getContractNo, admission.getContractNo())
+        .in(CrmContract::getStatus, List.of("SIGNED", "EFFECTIVE"))
+        .orderByDesc(CrmContract::getSignedAt)
+        .orderByDesc(CrmContract::getUpdateTime)
+        .last("LIMIT 1"));
+    if (contract != null) {
+      return contract;
+    }
     CrmLead lead = crmLeadMapper.selectOne(Wrappers.lambdaQuery(CrmLead.class)
         .eq(CrmLead::getOrgId, orgId)
         .eq(CrmLead::getIsDeleted, 0)
@@ -150,7 +168,12 @@ public class BillServiceImpl implements BillService {
         .orderByDesc(CrmLead::getContractSignedAt)
         .orderByDesc(CrmLead::getCreateTime)
         .last("LIMIT 1"));
-    return lead == null ? null : admission.getContractNo();
+    if (lead == null) {
+      return null;
+    }
+    CrmContract fallback = new CrmContract();
+    fallback.setContractNo(admission.getContractNo());
+    return fallback;
   }
 
   private BigDecimal appendBillItems(BillMonthly monthly, ElderProfile elder, LocalDate startDate,

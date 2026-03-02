@@ -12,7 +12,7 @@
           v-if="contracts.length === 0"
           type="warning"
           show-icon
-          message="当前未匹配到合同信息，建议先在合同签约页执行“移交评估部”。"
+          message="当前未匹配到待评估合同，请先在合同签约中新增合同，系统会自动进入待评估列表。"
           style="margin-bottom: 12px"
         />
         <a-row :gutter="12" style="margin-bottom: 12px">
@@ -109,8 +109,8 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
 import { getAssessmentRecordPage } from '../../../api/assessment'
-import { getContractAssessmentOverview, getLeadPage } from '../../../api/marketing'
-import type { AssessmentRecord, ContractAssessmentContractItem, ContractAssessmentOverview, CrmLeadItem, PageResult } from '../../../types'
+import { getContractAssessmentOverview, getContractPage } from '../../../api/marketing'
+import type { AssessmentRecord, ContractAssessmentContractItem, ContractAssessmentOverview, CrmContractItem, PageResult } from '../../../types'
 
 const router = useRouter()
 const route = useRoute()
@@ -184,8 +184,19 @@ const primaryActionPath = computed(() => {
     : isReassessOverdue.value
       ? 'reassess'
       : 'new'
-  if (!residentId.value) return '/assessment/ability/admission'
-  return `/assessment/ability/admission?residentId=${residentId.value}&autoOpen=1&mode=${mode}&contractNo=${selectedContractNo.value || ''}`
+  const contract = selectedContract.value
+  const params = new URLSearchParams()
+  params.set('autoOpen', '1')
+  params.set('mode', mode)
+  if (residentId.value) params.set('residentId', String(residentId.value))
+  if (selectedContractNo.value) params.set('contractNo', selectedContractNo.value)
+  if (contract?.contractId != null) params.set('contractId', String(contract.contractId))
+  if (contract?.leadId != null) params.set('leadId', String(contract.leadId))
+  if (contract?.elderName) params.set('elderName', contract.elderName)
+  if (contract?.elderPhone) params.set('elderPhone', contract.elderPhone)
+  if (contract?.idCardNo) params.set('idCardNo', contract.idCardNo)
+  if (contract?.homeAddress) params.set('homeAddress', contract.homeAddress)
+  return `/assessment/ability/admission?${params.toString()}`
 })
 
 function go(path: string) {
@@ -243,17 +254,22 @@ async function loadAssessmentRecord() {
 }
 
 async function loadPendingContracts() {
-  const page = await getLeadPage({
+  const page: PageResult<CrmContractItem> = await getContractPage({
     pageNo: 1,
     pageSize: 200,
-    status: 2,
-    flowStage: 'PENDING_ASSESSMENT'
+    flowStage: 'PENDING_ASSESSMENT',
+    currentOwnerDept: 'ASSESSMENT'
   })
-  const list: CrmLeadItem[] = page?.list || []
+  const list: CrmContractItem[] = page?.list || []
   return list
     .filter((item) => item.contractNo)
     .map((item) => ({
-      leadId: item.id,
+      contractId: item.id,
+      leadId: item.leadId,
+      elderName: item.elderName,
+      elderPhone: item.elderPhone,
+      idCardNo: item.idCardNo,
+      homeAddress: item.homeAddress,
       contractNo: item.contractNo,
       contractStatus: item.contractStatus,
       flowStage: item.flowStage,

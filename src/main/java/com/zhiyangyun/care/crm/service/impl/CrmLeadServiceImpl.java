@@ -3,7 +3,9 @@ package com.zhiyangyun.care.crm.service.impl;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.zhiyangyun.care.crm.entity.CrmContract;
 import com.zhiyangyun.care.crm.entity.CrmLead;
+import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
 import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
 import com.zhiyangyun.care.crm.model.CrmLeadRequest;
 import com.zhiyangyun.care.crm.model.CrmLeadResponse;
@@ -31,11 +33,17 @@ public class CrmLeadServiceImpl implements CrmLeadService {
   private static final String FLOW_PENDING_SIGN = "PENDING_SIGN";
   private static final String FLOW_SIGNED = "SIGNED";
   private final CrmLeadMapper leadMapper;
+  private final CrmContractMapper contractMapper;
   private final ElderMapper elderMapper;
   private final ElderAdmissionMapper admissionMapper;
 
-  public CrmLeadServiceImpl(CrmLeadMapper leadMapper, ElderMapper elderMapper, ElderAdmissionMapper admissionMapper) {
+  public CrmLeadServiceImpl(
+      CrmLeadMapper leadMapper,
+      CrmContractMapper contractMapper,
+      ElderMapper elderMapper,
+      ElderAdmissionMapper admissionMapper) {
     this.leadMapper = leadMapper;
+    this.contractMapper = contractMapper;
     this.elderMapper = elderMapper;
     this.admissionMapper = admissionMapper;
   }
@@ -88,6 +96,7 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     lead.setCreatedBy(request.getCreatedBy());
     leadMapper.insert(lead);
     syncContractToAdmission(lead);
+    syncLeadToContract(lead);
     return toResponse(lead);
   }
 
@@ -139,6 +148,7 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     lead.setRemark(request.getRemark());
     leadMapper.updateById(lead);
     syncContractToAdmission(lead);
+    syncLeadToContract(lead);
     return toResponse(lead);
   }
 
@@ -252,6 +262,7 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     if (lead != null && tenantId != null && tenantId.equals(lead.getTenantId())) {
       lead.setIsDeleted(1);
       leadMapper.updateById(lead);
+      syncLeadDeleteToContract(lead);
     }
   }
 
@@ -542,6 +553,89 @@ public class CrmLeadServiceImpl implements CrmLeadService {
       admission.setDepositAmount(lead.getReservationAmount());
     }
     admissionMapper.updateById(admission);
+  }
+
+  private void syncLeadToContract(CrmLead lead) {
+    if (lead == null || lead.getTenantId() == null) {
+      return;
+    }
+    String contractNo = blankToNull(lead.getContractNo());
+    if (contractNo == null) {
+      return;
+    }
+    CrmContract contract = contractMapper.selectOne(Wrappers.lambdaQuery(CrmContract.class)
+        .eq(CrmContract::getTenantId, lead.getTenantId())
+        .eq(CrmContract::getIsDeleted, 0)
+        .eq(CrmContract::getContractNo, contractNo)
+        .last("LIMIT 1"));
+    if (contract == null) {
+      contract = new CrmContract();
+      contract.setTenantId(lead.getTenantId());
+      contract.setOrgId(lead.getOrgId());
+      contract.setLeadId(lead.getId());
+      contract.setContractNo(contractNo);
+      contract.setCreatedBy(lead.getCreatedBy());
+      contract.setIsDeleted(0);
+    }
+    contract.setLeadId(lead.getId());
+    contract.setName(lead.getName());
+    contract.setPhone(lead.getPhone());
+    contract.setIdCardNo(lead.getIdCardNo());
+    contract.setHomeAddress(lead.getHomeAddress());
+    contract.setElderName(blankToNull(lead.getElderName()) == null ? blankToNull(lead.getName()) : blankToNull(lead.getElderName()));
+    contract.setElderPhone(blankToNull(lead.getElderPhone()) == null ? blankToNull(lead.getPhone()) : blankToNull(lead.getElderPhone()));
+    contract.setGender(lead.getGender());
+    contract.setAge(lead.getAge());
+    contract.setMarketerName(lead.getMarketerName());
+    contract.setReservationRoomNo(lead.getReservationRoomNo());
+    contract.setReservationBedId(lead.getReservationBedId());
+    contract.setContractStatus(lead.getContractStatus());
+    contract.setFlowStage(lead.getFlowStage());
+    contract.setCurrentOwnerDept(lead.getCurrentOwnerDept());
+    contract.setOrgName(lead.getOrgName());
+    contract.setSignedAt(lead.getContractSignedAt());
+    contract.setEffectiveTo(lead.getContractExpiryDate());
+    contract.setSmsSendCount(lead.getSmsSendCount() == null ? 0 : lead.getSmsSendCount());
+    contract.setRemark(lead.getRemark());
+    contract.setStatus(resolveContractDomainStatus(lead));
+    if (contract.getId() == null) {
+      contractMapper.insert(contract);
+    } else {
+      contractMapper.updateById(contract);
+    }
+  }
+
+  private void syncLeadDeleteToContract(CrmLead lead) {
+    if (lead == null || lead.getTenantId() == null) {
+      return;
+    }
+    CrmContract contract = contractMapper.selectOne(Wrappers.lambdaQuery(CrmContract.class)
+        .eq(CrmContract::getTenantId, lead.getTenantId())
+        .eq(CrmContract::getIsDeleted, 0)
+        .eq(blankToNull(lead.getContractNo()) != null, CrmContract::getContractNo, lead.getContractNo())
+        .eq(blankToNull(lead.getContractNo()) == null, CrmContract::getLeadId, lead.getId())
+        .last("LIMIT 1"));
+    if (contract == null) {
+      return;
+    }
+    contract.setIsDeleted(1);
+    contractMapper.updateById(contract);
+  }
+
+  private String resolveContractDomainStatus(CrmLead lead) {
+    if (lead.getContractSignedFlag() != null && lead.getContractSignedFlag() == 1) {
+      return "SIGNED";
+    }
+    if (FLOW_SIGNED.equals(lead.getFlowStage())) {
+      return "SIGNED";
+    }
+    if (FLOW_PENDING_SIGN.equals(lead.getFlowStage())) {
+      return "APPROVED";
+    }
+    if (FLOW_PENDING_BED_SELECT.equals(lead.getFlowStage())) {
+      return "PENDING_APPROVAL";
+    }
+    return "DRAFT";
   }
 
   private ElderProfile findLinkedElder(CrmLead lead) {
