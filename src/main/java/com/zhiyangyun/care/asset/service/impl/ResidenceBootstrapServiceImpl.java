@@ -58,13 +58,12 @@ public class ResidenceBootstrapServiceImpl implements ResidenceBootstrapService 
     String roomPrefix = normalizePrefix(request.getRoomPrefix(), "R");
     String bedPrefix = normalizePrefix(request.getBedPrefix(), "B");
 
-    String roomType = normalizeValue(
-        request.getRoomType(),
-        resolveDefaultConfigCode(tenantId, "ADMISSION_ROOM_TYPE", "ROOM_DOUBLE"));
+    String preferredRoomType = normalizeValue(request.getRoomType(), "");
     String bedType = normalizeValue(
         request.getBedType(),
         resolveDefaultConfigCode(tenantId, "ADMISSION_BED_TYPE", "BED_STANDARD"));
-    int bedsPerRoom = resolveBedsPerRoom(roomType, request.getBedsPerRoom());
+    int bedsPerRoom = resolveBedsPerRoom(preferredRoomType, request.getBedsPerRoom());
+    String roomType = resolveRoomType(tenantId, preferredRoomType, bedsPerRoom);
 
     String templateCode = normalizeValue(request.getTemplateCode(), "");
     if ("AB_F1_6_R101_130_B01_03".equals(templateCode)) {
@@ -292,6 +291,17 @@ public class ResidenceBootstrapServiceImpl implements ResidenceBootstrapService 
     return fallbackBedsPerRoom;
   }
 
+  private String resolveRoomType(Long tenantId, String roomType, int bedsPerRoom) {
+    if (roomType != null && !roomType.isBlank()) {
+      return roomType;
+    }
+    String inferred = inferRoomTypeByCapacity(tenantId, bedsPerRoom);
+    if (inferred != null && !inferred.isBlank()) {
+      return inferred;
+    }
+    return resolveDefaultConfigCode(tenantId, "ADMISSION_ROOM_TYPE", "ROOM_DOUBLE");
+  }
+
   private Integer inferCapacityByRoomType(String roomType) {
     if (roomType == null || roomType.isBlank()) {
       return null;
@@ -316,5 +326,34 @@ public class ResidenceBootstrapServiceImpl implements ResidenceBootstrapService 
       return 3;
     }
     return null;
+  }
+
+  private String inferRoomTypeByCapacity(Long tenantId, int bedsPerRoom) {
+    String preferredName = bedsPerRoom == 1 ? "单人间" : bedsPerRoom == 2 ? "双人间" : bedsPerRoom == 3 ? "三人间" : null;
+    String fallbackCode = bedsPerRoom == 1 ? "ROOM_SINGLE" : bedsPerRoom == 2 ? "ROOM_DOUBLE" : bedsPerRoom == 3 ? "ROOM_TRIPLE" : null;
+    if (preferredName == null) {
+      return null;
+    }
+    List<BaseDataItem> items = baseDataItemMapper.selectList(Wrappers.lambdaQuery(BaseDataItem.class)
+        .eq(BaseDataItem::getIsDeleted, 0)
+        .eq(BaseDataItem::getTenantId, tenantId)
+        .eq(BaseDataItem::getConfigGroup, "ADMISSION_ROOM_TYPE")
+        .eq(BaseDataItem::getStatus, 1)
+        .orderByAsc(BaseDataItem::getSortNo));
+    BaseDataItem byName = items.stream()
+        .filter(item -> preferredName.equals(item.getItemName()))
+        .findFirst()
+        .orElse(null);
+    if (byName != null && byName.getItemCode() != null && !byName.getItemCode().isBlank()) {
+      return byName.getItemCode();
+    }
+    BaseDataItem byCode = items.stream()
+        .filter(item -> fallbackCode.equals(item.getItemCode()))
+        .findFirst()
+        .orElse(null);
+    if (byCode != null && byCode.getItemCode() != null && !byCode.getItemCode().isBlank()) {
+      return byCode.getItemCode();
+    }
+    return fallbackCode;
   }
 }

@@ -36,6 +36,7 @@ public class RoomServiceImpl implements RoomService {
   public RoomResponse create(RoomRequest request) {
     ensureRoomNoUnique(null, request.getTenantId(), request.getRoomNo());
     Integer normalizedCapacity = normalizeCapacityByRoomType(request.getRoomType(), request.getCapacity());
+    String normalizedRoomType = normalizeRoomTypeByCapacity(request.getRoomType(), normalizedCapacity);
     Room room = new Room();
     room.setTenantId(request.getTenantId());
     room.setOrgId(request.getOrgId());
@@ -44,7 +45,7 @@ public class RoomServiceImpl implements RoomService {
     room.setBuilding(request.getBuilding());
     room.setFloorNo(request.getFloorNo());
     room.setRoomNo(request.getRoomNo());
-    room.setRoomType(request.getRoomType());
+    room.setRoomType(normalizedRoomType);
     room.setCapacity(normalizedCapacity);
     room.setStatus(request.getStatus());
     room.setRoomQrCode(request.getRoomQrCode());
@@ -66,6 +67,7 @@ public class RoomServiceImpl implements RoomService {
     }
     ensureRoomNoUnique(id, request.getTenantId(), request.getRoomNo());
     Integer normalizedCapacity = normalizeCapacityByRoomType(request.getRoomType(), request.getCapacity());
+    String normalizedRoomType = normalizeRoomTypeByCapacity(request.getRoomType(), normalizedCapacity);
     ensureCapacityNotLessThanOccupied(id, request.getTenantId(), normalizedCapacity);
     room.setTenantId(request.getTenantId());
     room.setOrgId(request.getOrgId());
@@ -74,7 +76,7 @@ public class RoomServiceImpl implements RoomService {
     room.setBuilding(request.getBuilding());
     room.setFloorNo(request.getFloorNo());
     room.setRoomNo(request.getRoomNo());
-    room.setRoomType(request.getRoomType());
+    room.setRoomType(normalizedRoomType);
     room.setCapacity(normalizedCapacity);
     room.setStatus(request.getStatus());
     room.setRoomQrCode(request.getRoomQrCode());
@@ -237,6 +239,25 @@ public class RoomServiceImpl implements RoomService {
       return 3;
     }
     return null;
+  }
+
+  private String normalizeRoomTypeByCapacity(String roomType, Integer capacity) {
+    if (roomType != null && !roomType.isBlank()) {
+      return roomType;
+    }
+    if (capacity == null) {
+      return roomType;
+    }
+    if (capacity == 1) {
+      return "ROOM_SINGLE";
+    }
+    if (capacity == 2) {
+      return "ROOM_DOUBLE";
+    }
+    if (capacity == 3) {
+      return "ROOM_TRIPLE";
+    }
+    return roomType;
   }
 
   private void applyBuildingFloor(Room room, Long tenantId, Long buildingId, Long floorId,

@@ -78,10 +78,17 @@
               </a-form>
 
               <div class="table-actions">
-                <a-space>
+                <a-space wrap>
                   <a-button type="primary" @click="openBuilding()">新增楼栋</a-button>
+                  <a-button @click="quickGenerateBuildings">一键生成</a-button>
+                  <a-button danger @click="quickDeleteBuildings">一键删除</a-button>
                   <a-button type="primary" @click="openBootstrap">一键生成楼层房床</a-button>
                   <a-button @click="refreshBuildings">刷新</a-button>
+                </a-space>
+                <a-space wrap>
+                  <div class="selection-info">已选 {{ selectedBuildings.length }} 个楼栋</div>
+                  <a-button :disabled="!selectedBuildings.length" @click="batchUpdateBuildingsStatus(1)">批量启用</a-button>
+                  <a-button :disabled="!selectedBuildings.length" @click="batchUpdateBuildingsStatus(0)">批量停用</a-button>
                 </a-space>
               </div>
 
@@ -92,6 +99,7 @@
                 :pagination="false"
                 row-key="id"
                 :scroll="{ y: 420 }"
+                :row-selection="buildingRowSelection"
               >
                 <template #bodyCell="{ column, record }">
                   <template v-if="column.key === 'status'">
@@ -144,9 +152,16 @@
               </a-form>
 
               <div class="table-actions">
-                <a-space>
+                <a-space wrap>
                   <a-button type="primary" @click="openFloor()">新增楼层</a-button>
+                  <a-button @click="quickGenerateFloors">一键生成</a-button>
+                  <a-button danger @click="quickDeleteFloors">一键删除</a-button>
                   <a-button @click="refreshFloors">刷新</a-button>
+                </a-space>
+                <a-space wrap>
+                  <div class="selection-info">已选 {{ selectedFloors.length }} 个楼层</div>
+                  <a-button :disabled="!selectedFloors.length" @click="batchUpdateFloorsStatus(1)">批量启用</a-button>
+                  <a-button :disabled="!selectedFloors.length" @click="batchUpdateFloorsStatus(0)">批量停用</a-button>
                 </a-space>
               </div>
 
@@ -157,6 +172,7 @@
                 :pagination="false"
                 row-key="id"
                 :scroll="{ y: 420 }"
+                :row-selection="floorRowSelection"
               >
                 <template #bodyCell="{ column, record }">
                   <template v-if="column.key === 'buildingId'">
@@ -222,9 +238,16 @@
               </a-form>
 
               <div class="table-actions">
-                <a-space>
+                <a-space wrap>
                   <a-button type="primary" @click="openRoom()">新增房间</a-button>
+                  <a-button @click="quickGenerateRooms">一键生成</a-button>
+                  <a-button danger @click="quickDeleteRooms">一键删除</a-button>
                   <a-button @click="refreshRooms">刷新</a-button>
+                </a-space>
+                <a-space wrap>
+                  <div class="selection-info">已选 {{ selectedRooms.length }} 个房间</div>
+                  <a-button :disabled="!selectedRooms.length" @click="batchUpdateRoomsStatus(1)">批量启用</a-button>
+                  <a-button :disabled="!selectedRooms.length" @click="batchUpdateRoomsStatus(0)">批量停用</a-button>
                 </a-space>
               </div>
 
@@ -235,6 +258,7 @@
                 :pagination="false"
                 row-key="id"
                 :scroll="{ y: 420 }"
+                :row-selection="roomRowSelection"
                 @change="onRoomTableChange"
               >
                 <template #bodyCell="{ column, record }">
@@ -311,13 +335,19 @@
               </a-form>
 
               <div class="table-actions">
-                <a-space>
+                <a-space wrap>
                   <a-button type="primary" @click="openBed()">新增床位</a-button>
+                  <a-button @click="quickGenerateBeds">一键生成</a-button>
+                  <a-button danger @click="quickDeleteBeds">一键删除</a-button>
                   <a-button @click="batchQr">批量二维码</a-button>
                   <a-button @click="exportBedCsv">导出CSV</a-button>
                   <a-button @click="refreshBeds">刷新</a-button>
                 </a-space>
-                <div class="selection-info">已选 {{ selected.length }} 个床位</div>
+                <a-space wrap>
+                  <div class="selection-info">已选 {{ selected.length }} 个床位</div>
+                  <a-button :disabled="!selected.length" @click="batchUpdateBedsStatus(1)">批量启用</a-button>
+                  <a-button :disabled="!selected.length" @click="batchUpdateBedsStatus(0)">批量停用</a-button>
+                </a-space>
               </div>
 
               <a-table
@@ -431,11 +461,6 @@
             <a-select-option v-for="f in roomFloorOptions" :key="f.id" :value="f.id">{{ f.floorNo }}</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="房间类型" name="roomType">
-          <a-select v-model:value="roomForm.roomType" allow-clear placeholder="请选择">
-            <a-select-option v-for="item in roomTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
-          </a-select>
-        </a-form-item>
         <a-form-item label="床位容量" name="capacity">
           <a-input-number v-model:value="roomForm.capacity" style="width: 100%" :min="1" />
         </a-form-item>
@@ -530,13 +555,6 @@
             </a-form-item>
           </a-col>
           <a-col :span="12">
-            <a-form-item label="房间类型">
-              <a-select v-model:value="bootstrapForm.roomType" allow-clear placeholder="默认取系统首个启用房型">
-                <a-select-option v-for="item in roomTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
-              </a-select>
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
             <a-form-item label="床位类型">
               <a-select v-model:value="bootstrapForm.bedType" allow-clear placeholder="默认取系统首个启用床型">
                 <a-select-option v-for="item in bedTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
@@ -626,6 +644,12 @@ const floors = ref<FloorItem[]>([])
 const floorList = ref<FloorItem[]>([])
 const selected = ref<BedItem[]>([])
 const selectedRowKeys = ref<Id[]>([])
+const selectedBuildings = ref<BuildingItem[]>([])
+const selectedBuildingRowKeys = ref<Id[]>([])
+const selectedFloors = ref<FloorItem[]>([])
+const selectedFloorRowKeys = ref<Id[]>([])
+const selectedRooms = ref<RoomItem[]>([])
+const selectedRoomRowKeys = ref<Id[]>([])
 const loadingRooms = ref(false)
 const loadingBeds = ref(false)
 const loadingBuildings = ref(false)
@@ -850,6 +874,30 @@ const bedRowSelection = computed(() => ({
   }
 }))
 
+const buildingRowSelection = computed(() => ({
+  selectedRowKeys: selectedBuildingRowKeys.value,
+  onChange: (keys: Id[], rows: BuildingItem[]) => {
+    selectedBuildingRowKeys.value = keys
+    selectedBuildings.value = rows
+  }
+}))
+
+const floorRowSelection = computed(() => ({
+  selectedRowKeys: selectedFloorRowKeys.value,
+  onChange: (keys: Id[], rows: FloorItem[]) => {
+    selectedFloorRowKeys.value = keys
+    selectedFloors.value = rows
+  }
+}))
+
+const roomRowSelection = computed(() => ({
+  selectedRowKeys: selectedRoomRowKeys.value,
+  onChange: (keys: Id[], rows: RoomItem[]) => {
+    selectedRoomRowKeys.value = keys
+    selectedRooms.value = rows
+  }
+}))
+
 function statusLabel(status?: number) {
   if (status === 1) return '空床'
   if (status === 2) return '入住'
@@ -936,6 +984,8 @@ async function searchBuildings() {
     })
     buildings.value = res.list
     buildingPage.total = res.total
+    selectedBuildingRowKeys.value = selectedBuildingRowKeys.value.filter((id) => buildings.value.some((item) => item.id === id))
+    selectedBuildings.value = selectedBuildings.value.filter((item) => selectedBuildingRowKeys.value.includes(item.id))
   } finally {
     loadingBuildings.value = false
   }
@@ -953,6 +1003,8 @@ async function searchFloors() {
     })
     floors.value = res.list
     floorPage.total = res.total
+    selectedFloorRowKeys.value = selectedFloorRowKeys.value.filter((id) => floors.value.some((item) => item.id === id))
+    selectedFloors.value = selectedFloors.value.filter((item) => selectedFloorRowKeys.value.includes(item.id))
   } finally {
     loadingFloors.value = false
   }
@@ -976,6 +1028,8 @@ async function searchRooms() {
     })
     rooms.value = res.list
     roomPage.total = res.total
+    selectedRoomRowKeys.value = selectedRoomRowKeys.value.filter((id) => rooms.value.some((item) => item.id === id))
+    selectedRooms.value = selectedRooms.value.filter((item) => selectedRoomRowKeys.value.includes(item.id))
   } finally {
     loadingRooms.value = false
   }
@@ -1254,6 +1308,10 @@ async function submitRoom() {
   if (!roomFormRef.value) return
   try {
     await roomFormRef.value.validate()
+    const inferredRoomType = inferRoomTypeByCapacity(Number(roomForm.capacity || 0))
+    if (inferredRoomType) {
+      roomForm.roomType = inferredRoomType
+    }
     roomSubmitting.value = true
     if (roomForm.id) {
       await updateRoom(roomForm.id, roomForm)
@@ -1374,6 +1432,10 @@ function applyBootstrapPreset(preset: 'AB_F1_6_R101_130_B01_03' | 'CUSTOM') {
 
 async function submitBootstrap() {
   try {
+    const inferredRoomType = inferRoomTypeByCapacity(Number(bootstrapForm.bedsPerRoom || 0))
+    if (inferredRoomType) {
+      bootstrapForm.roomType = inferredRoomType
+    }
     bootstrapSubmitting.value = true
     const result = await bootstrapResidence(bootstrapForm)
     bootstrapOpen.value = false
@@ -1393,6 +1455,358 @@ async function submitBootstrap() {
     message.error(errorMessage(error, '一键生成失败'))
   } finally {
     bootstrapSubmitting.value = false
+  }
+}
+
+async function batchUpdateBuildingsStatus(status: 1 | 0) {
+  const selectedTargets = selectedBuildings.value
+  if (!selectedTargets.length) {
+    message.warning('请先勾选楼栋')
+    return
+  }
+  const actionLabel = status === 1 ? '启用' : '停用'
+  const targets = selectedTargets.filter((item) => Number(item.status ?? 0) !== status)
+  if (!targets.length) {
+    message.info(`已选楼栋都已是${actionLabel}状态`)
+    return
+  }
+  try {
+    const skipped = selectedTargets.length - targets.length
+    await confirmAction(
+      skipped > 0
+        ? `确认批量${actionLabel} ${targets.length} 个楼栋吗？（${skipped} 个状态一致已跳过）`
+        : `确认批量${actionLabel} ${targets.length} 个楼栋吗？`,
+      `批量${actionLabel}楼栋`
+    )
+    const results = await Promise.allSettled(targets.map((item) => updateBuilding(item.id, { status })))
+    const success = results.filter((item) => item.status === 'fulfilled').length
+    const failed = results.length - success
+    message.info(`楼栋批量${actionLabel}完成：成功 ${success}，失败 ${failed}`)
+    selectedBuildingRowKeys.value = []
+    selectedBuildings.value = []
+    await Promise.all([refreshBuildings(), loadBuildingList(), refreshTree()])
+  } catch (error: any) {
+    if (!error) return
+    message.error(errorMessage(error, `楼栋批量${actionLabel}失败`))
+  }
+}
+
+async function batchUpdateFloorsStatus(status: 1 | 0) {
+  const selectedTargets = selectedFloors.value
+  if (!selectedTargets.length) {
+    message.warning('请先勾选楼层')
+    return
+  }
+  const actionLabel = status === 1 ? '启用' : '停用'
+  const targets = selectedTargets.filter((item) => Number(item.status ?? 0) !== status)
+  if (!targets.length) {
+    message.info(`已选楼层都已是${actionLabel}状态`)
+    return
+  }
+  try {
+    const skipped = selectedTargets.length - targets.length
+    await confirmAction(
+      skipped > 0
+        ? `确认批量${actionLabel} ${targets.length} 个楼层吗？（${skipped} 个状态一致已跳过）`
+        : `确认批量${actionLabel} ${targets.length} 个楼层吗？`,
+      `批量${actionLabel}楼层`
+    )
+    const results = await Promise.allSettled(targets.map((item) => updateFloor(item.id, { status })))
+    const success = results.filter((item) => item.status === 'fulfilled').length
+    const failed = results.length - success
+    message.info(`楼层批量${actionLabel}完成：成功 ${success}，失败 ${failed}`)
+    selectedFloorRowKeys.value = []
+    selectedFloors.value = []
+    await Promise.all([refreshFloors(), loadFloorList(), refreshTree()])
+  } catch (error: any) {
+    if (!error) return
+    message.error(errorMessage(error, `楼层批量${actionLabel}失败`))
+  }
+}
+
+async function batchUpdateRoomsStatus(status: 1 | 0) {
+  const selectedTargets = selectedRooms.value
+  if (!selectedTargets.length) {
+    message.warning('请先勾选房间')
+    return
+  }
+  const actionLabel = status === 1 ? '启用' : '停用'
+  const targets = selectedTargets.filter((item) => Number(item.status ?? 0) !== status)
+  if (!targets.length) {
+    message.info(`已选房间都已是${actionLabel}状态`)
+    return
+  }
+  try {
+    const skipped = selectedTargets.length - targets.length
+    await confirmAction(
+      skipped > 0
+        ? `确认批量${actionLabel} ${targets.length} 个房间吗？（${skipped} 个状态一致已跳过）`
+        : `确认批量${actionLabel} ${targets.length} 个房间吗？`,
+      `批量${actionLabel}房间`
+    )
+    const results = await Promise.allSettled(targets.map((item) => updateRoom(item.id, { status })))
+    const success = results.filter((item) => item.status === 'fulfilled').length
+    const failed = results.length - success
+    message.info(`房间批量${actionLabel}完成：成功 ${success}，失败 ${failed}`)
+    selectedRoomRowKeys.value = []
+    selectedRooms.value = []
+    await Promise.all([refreshRooms(), loadRoomList(), refreshTree()])
+  } catch (error: any) {
+    if (!error) return
+    message.error(errorMessage(error, `房间批量${actionLabel}失败`))
+  }
+}
+
+async function batchUpdateBedsStatus(status: 1 | 0) {
+  const selectedTargets = selected.value
+  if (!selectedTargets.length) {
+    message.warning('请先勾选床位')
+    return
+  }
+  const actionLabel = status === 1 ? '启用' : '停用'
+  const targets = selectedTargets.filter((item) => Number(item.status ?? 0) !== status)
+  if (!targets.length) {
+    message.info(`已选床位都已是${actionLabel}状态`)
+    return
+  }
+  try {
+    const skipped = selectedTargets.length - targets.length
+    await confirmAction(
+      skipped > 0
+        ? `确认批量${actionLabel} ${targets.length} 个床位吗？（${skipped} 个状态一致已跳过）`
+        : `确认批量${actionLabel} ${targets.length} 个床位吗？`,
+      `批量${actionLabel}床位`
+    )
+    const results = await Promise.allSettled(targets.map((item) => updateBed(item.id, { status })))
+    const success = results.filter((item) => item.status === 'fulfilled').length
+    const failed = results.length - success
+    message.info(`床位批量${actionLabel}完成：成功 ${success}，失败 ${failed}`)
+    selectedRowKeys.value = []
+    selected.value = []
+    await Promise.all([refreshBeds(), loadBedList(), refreshTree()])
+  } catch (error: any) {
+    if (!error) return
+    message.error(errorMessage(error, `床位批量${actionLabel}失败`))
+  }
+}
+
+async function quickGenerateBuildings() {
+  try {
+    const numbers = buildingList.value
+      .map((item) => Number(String(item.name || '').match(/\d+/)?.[0] || 0))
+      .filter((item) => item > 0)
+    const nextNo = (numbers.length ? Math.max(...numbers) : 0) + 1
+    const name = `楼栋${nextNo}`
+    await createBuilding({
+      name,
+      code: `B${nextNo}`,
+      status: 1,
+      sortNo: nextNo
+    })
+    message.success(`已生成 ${name}`)
+    await Promise.all([refreshBuildings(), loadBuildingList(), refreshTree()])
+  } catch (error: any) {
+    message.error(errorMessage(error, '一键生成楼栋失败'))
+  }
+}
+
+async function quickDeleteBuildings() {
+  const targets = selectedBuildings.value.length ? selectedBuildings.value : buildings.value
+  if (!targets.length) {
+    message.warning('当前页没有可删除楼栋')
+    return
+  }
+  try {
+    await confirmAction(`确认删除 ${targets.length} 个楼栋吗？`, '一键删除楼栋')
+    const results = await Promise.allSettled(targets.map((item) => deleteBuilding(item.id)))
+    const success = results.filter((item) => item.status === 'fulfilled').length
+    const failed = results.length - success
+    message.info(`楼栋一键删除完成：成功 ${success}，失败 ${failed}`)
+    selectedBuildingRowKeys.value = []
+    selectedBuildings.value = []
+    await Promise.all([refreshBuildings(), loadBuildingList(), refreshTree()])
+  } catch (error: any) {
+    if (!error) return
+    message.error(errorMessage(error, '一键删除楼栋失败'))
+  }
+}
+
+async function quickGenerateFloors() {
+  const buildingId = floorQuery.buildingId || buildingList.value[0]?.id
+  if (!buildingId) {
+    message.warning('请先新增楼栋')
+    return
+  }
+  try {
+    const allFloors = await getFloorList({ buildingId })
+    const existed = new Set(allFloors.map((item) => String(item.floorNo || '').toUpperCase()))
+    const tasks: Promise<void>[] = []
+    for (let i = 1; i <= 6; i++) {
+      const floorNo = `${i}F`
+      if (existed.has(floorNo)) continue
+      tasks.push(
+        createFloor({
+          buildingId,
+          floorNo,
+          name: `${i}F`,
+          status: 1,
+          sortNo: i
+        })
+      )
+    }
+    if (!tasks.length) {
+      message.info('当前楼栋楼层已齐全（1F-6F）')
+      return
+    }
+    await Promise.all(tasks)
+    message.success(`已生成 ${tasks.length} 层`)
+    await Promise.all([refreshFloors(), loadFloorList(), refreshTree()])
+  } catch (error: any) {
+    message.error(errorMessage(error, '一键生成楼层失败'))
+  }
+}
+
+async function quickDeleteFloors() {
+  const targets = selectedFloors.value.length ? selectedFloors.value : floors.value
+  if (!targets.length) {
+    message.warning('当前页没有可删除楼层')
+    return
+  }
+  try {
+    await confirmAction(`确认删除 ${targets.length} 个楼层吗？`, '一键删除楼层')
+    const results = await Promise.allSettled(targets.map((item) => deleteFloor(item.id)))
+    const success = results.filter((item) => item.status === 'fulfilled').length
+    const failed = results.length - success
+    message.info(`楼层一键删除完成：成功 ${success}，失败 ${failed}`)
+    selectedFloorRowKeys.value = []
+    selectedFloors.value = []
+    await Promise.all([refreshFloors(), loadFloorList(), refreshTree()])
+  } catch (error: any) {
+    if (!error) return
+    message.error(errorMessage(error, '一键删除楼层失败'))
+  }
+}
+
+async function quickGenerateRooms() {
+  const floorId = roomQuery.floorId || floorList.value[0]?.id
+  if (!floorId) {
+    message.warning('请先选择楼层或先新增楼层')
+    return
+  }
+  const floor = floorList.value.find((item) => item.id === floorId)
+  const building = buildingList.value.find((item) => item.id === floor?.buildingId)
+  if (!floor || !building) {
+    message.warning('楼栋/楼层信息缺失，请刷新后重试')
+    return
+  }
+  const floorNoNumeric = Number(String(floor.floorNo || '').replace(/[^\d]/g, '') || 1)
+  const head = String(building.name || 'A').slice(0, 1).toUpperCase()
+  const existed = new Set(roomList.value.map((item) => item.roomNo))
+  const tasks: Promise<void>[] = []
+  for (let i = 1; i <= 30; i++) {
+    const roomNo = `${head}${floorNoNumeric}${String(i).padStart(2, '0')}`
+    if (existed.has(roomNo)) continue
+    tasks.push(
+      createRoom({
+        buildingId: building.id,
+        floorId: floor.id,
+        roomNo,
+        capacity: 2,
+        roomType: inferRoomTypeByCapacity(2),
+        status: 1
+      })
+    )
+  }
+  if (!tasks.length) {
+    message.info('当前楼层房间已齐全（01-30）')
+    return
+  }
+  try {
+    await Promise.all(tasks)
+    message.success(`已生成 ${tasks.length} 间房`)
+    await Promise.all([refreshRooms(), loadRoomList(), refreshTree()])
+  } catch (error: any) {
+    message.error(errorMessage(error, '一键生成房间失败'))
+  }
+}
+
+async function quickDeleteRooms() {
+  const targets = selectedRooms.value.length ? selectedRooms.value : rooms.value
+  if (!targets.length) {
+    message.warning('当前页没有可删除房间')
+    return
+  }
+  try {
+    await confirmAction(`确认删除 ${targets.length} 个房间吗？`, '一键删除房间')
+    const results = await Promise.allSettled(targets.map((item) => deleteRoom(item.id)))
+    const success = results.filter((item) => item.status === 'fulfilled').length
+    const failed = results.length - success
+    message.info(`房间一键删除完成：成功 ${success}，失败 ${failed}`)
+    selectedRoomRowKeys.value = []
+    selectedRooms.value = []
+    await Promise.all([refreshRooms(), loadRoomList(), refreshTree()])
+  } catch (error: any) {
+    if (!error) return
+    message.error(errorMessage(error, '一键删除房间失败'))
+  }
+}
+
+async function quickGenerateBeds() {
+  const roomMap = new Map(roomList.value.map((item) => [item.id, item]))
+  const bedCountByRoom = bedList.value.reduce((acc, item) => {
+    acc[item.roomId] = (acc[item.roomId] || 0) + 1
+    return acc
+  }, {} as Record<string | number, number>)
+  const targets = (rooms.value.length ? rooms.value : roomList.value).slice(0, 80)
+  const bedType = bedTypeOptions.value[0]?.value
+  const tasks: Promise<void>[] = []
+  targets.forEach((room) => {
+    const roomData = roomMap.get(room.id) || room
+    const capacity = Number(resolveRoomCapacity(roomData) || 0)
+    if (!capacity) return
+    const existing = Number(bedCountByRoom[room.id] || 0)
+    for (let i = existing + 1; i <= capacity; i++) {
+      tasks.push(
+        createBed({
+          roomId: room.id,
+          bedNo: String(i).padStart(2, '0'),
+          bedType,
+          status: 1
+        })
+      )
+    }
+  })
+  if (!tasks.length) {
+    message.info('当前范围内床位已与房间容量一致')
+    return
+  }
+  try {
+    await Promise.all(tasks)
+    message.success(`已生成 ${tasks.length} 个床位`)
+    await Promise.all([refreshBeds(), loadBedList(), refreshTree()])
+  } catch (error: any) {
+    message.error(errorMessage(error, '一键生成床位失败'))
+  }
+}
+
+async function quickDeleteBeds() {
+  const targets = selected.value.length ? selected.value : beds.value
+  if (!targets.length) {
+    message.warning('当前页没有可删除床位')
+    return
+  }
+  try {
+    await confirmAction(`确认删除 ${targets.length} 个床位吗？`, '一键删除床位')
+    const results = await Promise.allSettled(targets.map((item) => deleteBed(item.id)))
+    const success = results.filter((item) => item.status === 'fulfilled').length
+    const failed = results.length - success
+    message.info(`床位一键删除完成：成功 ${success}，失败 ${failed}`)
+    selectedRowKeys.value = []
+    selected.value = []
+    await Promise.all([refreshBeds(), loadBedList(), refreshTree()])
+  } catch (error: any) {
+    if (!error) return
+    message.error(errorMessage(error, '一键删除床位失败'))
   }
 }
 
@@ -1578,18 +1992,6 @@ watch(
 )
 
 watch(
-  () => bootstrapForm.roomType,
-  (roomType) => {
-    if (bootstrapForm.templateCode === 'AB_F1_6_R101_130_B01_03') return
-    const next = inferCapacityByRoomType(roomType)
-    if (!next) return
-    if (bootstrapForm.bedsPerRoom !== next) {
-      bootstrapForm.bedsPerRoom = next
-    }
-  }
-)
-
-watch(
   () => bootstrapForm.bedsPerRoom,
   (bedsPerRoom) => {
     if (bootstrapForm.templateCode === 'AB_F1_6_R101_130_B01_03') return
@@ -1660,10 +2062,15 @@ onMounted(async () => {
 .table-actions {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-bottom: 12px;
 }
 .selection-info {
   color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
 }
 .pager {
   margin-top: 12px;
