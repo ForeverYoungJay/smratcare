@@ -47,7 +47,7 @@ import type { DischargeSettlementItem, PageResult } from '../../../types'
 
 const router = useRouter()
 const route = useRoute()
-const residentId = computed(() => Number(route.query.residentId || 0))
+const residentId = computed(() => String(route.query.residentId || '').trim())
 const settlement = ref<DischargeSettlementItem | null>(null)
 const loading = ref(false)
 const errorMessage = ref('')

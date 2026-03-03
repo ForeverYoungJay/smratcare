@@ -31,15 +31,24 @@
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <a-table :data-source="rows" :columns="columns" :loading="loading" :pagination="false" row-key="id">
+      <a-space style="margin-bottom: 12px" wrap>
+        <a-tag color="blue">已选 {{ selectedRowKeys.length }} 条</a-tag>
+        <a-button :disabled="selectedRowKeys.length !== 1" @click="markReturnSelected">返院登记</a-button>
+        <a-button danger :disabled="selectedRowKeys.length === 0" @click="deleteSelected">删除</a-button>
+      </a-space>
+      <a-table
+        :data-source="rows"
+        :columns="columns"
+        :loading="loading"
+        :pagination="false"
+        row-key="id"
+        :row-selection="rowSelection"
+      >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
             <a-tag :color="record.status === 'RETURNED' ? 'green' : 'orange'">
               {{ record.status === 'RETURNED' ? '已返院' : '外出中' }}
             </a-tag>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <a-button type="link" :disabled="record.status === 'RETURNED'" @click="markReturn(record)">返院登记</a-button>
           </template>
         </template>
       </a-table>
@@ -87,13 +96,14 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import type { FormInstance, FormRules } from 'ant-design-vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
+import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { getElderPage } from '../../api/elder'
-import { createOuting, getOutingPage, returnOuting } from '../../api/elderResidence'
+import { createOuting, deleteOuting, getOutingPage, returnOuting } from '../../api/elderResidence'
 import type { ElderItem, OutingCreateRequest, OutingItem, PageResult } from '../../types'
 
 const loading = ref(false)
@@ -103,6 +113,14 @@ const elders = ref<ElderItem[]>([])
 const createOpen = ref(false)
 const submitting = ref(false)
 const formRef = ref<FormInstance>()
+const selectedRowKeys = ref<number[]>([])
+const route = useRoute()
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: (string | number)[]) => {
+    selectedRowKeys.value = keys as number[]
+  }
+}))
 
 const query = reactive({
   elderId: undefined as number | undefined,
@@ -132,8 +150,7 @@ const columns = [
   { title: '预计返院', dataIndex: 'expectedReturnTime', key: 'expectedReturnTime', width: 180 },
   { title: '实际返院', dataIndex: 'actualReturnTime', key: 'actualReturnTime', width: 180 },
   { title: '外出事由', dataIndex: 'reason', key: 'reason' },
-  { title: '状态', key: 'status', width: 100 },
-  { title: '操作', key: 'action', width: 120 }
+  { title: '状态', key: 'status', width: 100 }
 ]
 
 async function loadElders() {
@@ -153,6 +170,7 @@ async function fetchData() {
       return target.isSame(dayjs(start)) || target.isSame(dayjs(end)) || (target.isAfter(dayjs(start)) && target.isBefore(dayjs(end)))
     })
     total.value = query.planTimeRange?.length ? rows.value.length : res.total
+    selectedRowKeys.value = selectedRowKeys.value.filter((id) => rows.value.some((item) => item.id === id))
   } finally {
     loading.value = false
   }
@@ -196,6 +214,37 @@ async function markReturn(record: OutingItem) {
   fetchData()
 }
 
+function getSelectedRecord() {
+  if (selectedRowKeys.value.length !== 1) return undefined
+  return rows.value.find((item) => item.id === selectedRowKeys.value[0])
+}
+
+async function markReturnSelected() {
+  const record = getSelectedRecord()
+  if (!record) return
+  if (record.status === 'RETURNED') {
+    message.warning('该记录已返院，无需重复登记')
+    return
+  }
+  await markReturn(record)
+}
+
+function deleteSelected() {
+  if (!selectedRowKeys.value.length) return
+  Modal.confirm({
+    title: '确认删除外出记录？',
+    content: `将删除 ${selectedRowKeys.value.length} 条外出记录`,
+    okText: '确认删除',
+    okType: 'danger',
+    async onOk() {
+      await Promise.all(selectedRowKeys.value.map((id) => deleteOuting(id)))
+      message.success('删除成功')
+      selectedRowKeys.value = []
+      await fetchData()
+    }
+  })
+}
+
 function onPageChange(page: number) {
   query.pageNo = page
   fetchData()
@@ -209,6 +258,10 @@ function onPageSizeChange(current: number, size: number) {
 
 onMounted(async () => {
   await loadElders()
+  const elderId = Number(route.query.elderId || 0)
+  if (elderId > 0) {
+    query.elderId = elderId
+  }
   await fetchData()
 })
 </script>

@@ -14,4 +14,8 @@ public interface VisitService {
   List<VisitBookingResponse> todayList(Long orgId);
 
   VisitCheckInResponse checkIn(VisitCheckInRequest request, Long guardStaffId);
+
+  VisitBookingResponse updateBooking(Long orgId, Long bookingId, VisitBookRequest request);
+
+  void deleteBooking(Long orgId, Long bookingId);
 }

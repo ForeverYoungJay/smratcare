@@ -22,6 +22,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -150,6 +151,45 @@ public class VisitServiceImpl implements VisitService {
     response.setCheckTime(log.getCheckTime());
     response.setStatus(booking.getStatus());
     return response;
+  }
+
+  @Override
+  public VisitBookingResponse updateBooking(Long orgId, Long bookingId, VisitBookRequest request) {
+    VisitBooking booking = bookingMapper.selectById(bookingId);
+    if (booking == null || !Objects.equals(booking.getOrgId(), orgId) || Integer.valueOf(1).equals(booking.getIsDeleted())) {
+      throw new IllegalArgumentException("Booking not found");
+    }
+    if (booking.getStatus() != null && booking.getStatus() == 1) {
+      throw new IllegalStateException("已登记到访记录不可编辑");
+    }
+    ElderProfile elder = elderMapper.selectById(request.getElderId());
+    if (elder == null) {
+      throw new IllegalArgumentException("Elder not found");
+    }
+    booking.setElderId(request.getElderId());
+    booking.setFamilyUserId(request.getFamilyUserId());
+    booking.setVisitTime(request.getVisitTime());
+    booking.setVisitDate(request.getVisitTime().toLocalDate());
+    booking.setVisitTimeSlot(request.getVisitTimeSlot());
+    booking.setVisitorCount(request.getVisitorCount());
+    booking.setCarPlate(request.getCarPlate());
+    booking.setRemark(request.getRemark());
+    bookingMapper.updateById(booking);
+    FamilyUser familyUser = familyUserMapper.selectById(booking.getFamilyUserId());
+    return toResponse(booking, elder, familyUser);
+  }
+
+  @Override
+  public void deleteBooking(Long orgId, Long bookingId) {
+    VisitBooking booking = bookingMapper.selectById(bookingId);
+    if (booking == null || !Objects.equals(booking.getOrgId(), orgId) || Integer.valueOf(1).equals(booking.getIsDeleted())) {
+      throw new IllegalArgumentException("Booking not found");
+    }
+    if (booking.getStatus() != null && booking.getStatus() == 1) {
+      throw new IllegalStateException("已登记到访记录不可删除");
+    }
+    booking.setIsDeleted(1);
+    bookingMapper.updateById(booking);
   }
 
   private String generateUniqueCode(Long orgId) {

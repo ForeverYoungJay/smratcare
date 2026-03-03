@@ -32,7 +32,20 @@
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <a-table :data-source="rows" :columns="columns" :loading="loading" :pagination="false" row-key="id">
+      <a-space style="margin-bottom: 12px" wrap>
+        <a-tag color="blue">已选 {{ selectedRowKeys.length }} 条</a-tag>
+        <a-button :disabled="!canReviewSelected" @click="reviewSelected('APPROVED')">通过</a-button>
+        <a-button danger :disabled="!canReviewSelected" @click="reviewSelected('REJECTED')">驳回</a-button>
+        <a-button danger :disabled="selectedRowKeys.length === 0" @click="deleteSelected">删除</a-button>
+      </a-space>
+      <a-table
+        :data-source="rows"
+        :columns="columns"
+        :loading="loading"
+        :pagination="false"
+        row-key="id"
+        :row-selection="rowSelection"
+      >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
             <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
@@ -41,12 +54,6 @@
             <a-tag v-if="record.autoDischargeStatus === 'SUCCESS'" color="green">成功</a-tag>
             <a-tag v-else-if="record.autoDischargeStatus === 'FAILED'" color="red">失败</a-tag>
             <span v-else>-</span>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <a-space>
-              <a-button type="link" :disabled="record.status !== 'PENDING'" @click="openReview(record, 'APPROVED')">通过</a-button>
-              <a-button type="link" danger :disabled="record.status !== 'PENDING'" @click="openReview(record, 'REJECTED')">驳回</a-button>
-            </a-space>
           </template>
         </template>
       </a-table>
@@ -92,15 +99,21 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { getBaseConfigItemList } from '../../api/baseConfig'
 import { getElderPage } from '../../api/elder'
-import { createDischargeApply, exportDischargeApply, getDischargeApplyPage, reviewDischargeApply } from '../../api/elderResidence'
+import {
+  createDischargeApply,
+  deleteDischargeApply,
+  exportDischargeApply,
+  getDischargeApplyPage,
+  reviewDischargeApply
+} from '../../api/elderResidence'
 import type {
   BaseConfigItem,
   DischargeApplyCreateRequest,
@@ -125,6 +138,13 @@ const reviewRemark = ref('')
 const route = useRoute()
 const router = useRouter()
 const dischargeFeeConfigOptions = ref<{ label: string; value: string }[]>([])
+const selectedRowKeys = ref<number[]>([])
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: (string | number)[]) => {
+    selectedRowKeys.value = keys as number[]
+  }
+}))
 
 const query = reactive({
   elderId: undefined as number | undefined,
@@ -157,9 +177,12 @@ const columns = [
   { title: '退住单号', dataIndex: 'linkedDischargeId', key: 'linkedDischargeId', width: 120 },
   { title: '审核人', dataIndex: 'reviewedByName', key: 'reviewedByName', width: 100 },
   { title: '审核备注', dataIndex: 'reviewRemark', key: 'reviewRemark' },
-  { title: '审核状态', key: 'status', width: 100 },
-  { title: '操作', key: 'action', width: 140 }
+  { title: '审核状态', key: 'status', width: 100 }
 ]
+const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(item.id)))
+const canReviewSelected = computed(
+  () => selectedRecords.value.length === 1 && selectedRecords.value[0]?.status === 'PENDING'
+)
 
 async function loadElders() {
   const res: PageResult<ElderItem> = await getElderPage({ pageNo: 1, pageSize: 200 })
@@ -189,6 +212,7 @@ async function fetchData() {
     })
     rows.value = res.list
     total.value = res.total
+    selectedRowKeys.value = selectedRowKeys.value.filter((id) => rows.value.some((item) => item.id === id))
   } finally {
     loading.value = false
   }
@@ -243,6 +267,12 @@ function openReview(record: DischargeApplyItem, status: 'APPROVED' | 'REJECTED')
   reviewOpen.value = true
 }
 
+function reviewSelected(status: 'APPROVED' | 'REJECTED') {
+  const record = selectedRecords.value[0]
+  if (!record) return
+  openReview(record, status)
+}
+
 async function submitReview() {
   if (!reviewId.value) return
   if (reviewStatus.value === 'REJECTED' && !reviewRemark.value.trim()) {
@@ -291,6 +321,22 @@ async function exportRows() {
     status: query.status,
     plannedDateFrom,
     plannedDateTo
+  })
+}
+
+function deleteSelected() {
+  if (!selectedRowKeys.value.length) return
+  Modal.confirm({
+    title: '确认删除退住申请？',
+    content: `将删除 ${selectedRowKeys.value.length} 条申请记录（已通过申请不可删除）`,
+    okText: '确认删除',
+    okType: 'danger',
+    async onOk() {
+      await Promise.all(selectedRowKeys.value.map((id) => deleteDischargeApply(id)))
+      message.success('删除成功')
+      selectedRowKeys.value = []
+      await fetchData()
+    }
   })
 }
 

@@ -59,6 +59,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -239,6 +240,28 @@ public class ElderResidenceController {
     return Result.ok(record);
   }
 
+  @DeleteMapping("/outing/{id}")
+  @PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+  public Result<Boolean> deleteOuting(@PathVariable Long id) {
+    Long orgId = AuthContext.getOrgId();
+    ElderOutingRecord record = outingMapper.selectById(id);
+    if (record == null || !Objects.equals(orgId, record.getOrgId()) || Integer.valueOf(1).equals(record.getIsDeleted())) {
+      throw new IllegalArgumentException("记录不存在");
+    }
+    boolean wasOut = ResidenceLifecycleConstants.OUTING_OUT.equals(record.getStatus());
+    record.setIsDeleted(1);
+    outingMapper.updateById(record);
+    if (wasOut && !hasAnyActiveOuting(record.getElderId(), orgId)) {
+      ElderProfile elder = resolveElder(record.getElderId());
+      Integer beforeStatus = elder.getStatus();
+      updateElderStatus(elder, 1);
+      recordStatusChange(record.getElderId(), beforeStatus, 1, "删除外出记录");
+    }
+    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "OUTING_DELETE", "ELDER", record.getElderId(), "删除外出登记");
+    return Result.ok(true);
+  }
+
   @GetMapping("/medical-outing/page")
   public Result<IPage<ElderMedicalOutingRecord>> medicalOutingPage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -319,6 +342,28 @@ public class ElderResidenceController {
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "MEDICAL_OUTING_RETURN", "ELDER", record.getElderId(), "外出就医返院登记");
     return Result.ok(record);
+  }
+
+  @DeleteMapping("/medical-outing/{id}")
+  @PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+  public Result<Boolean> deleteMedicalOuting(@PathVariable Long id) {
+    Long orgId = AuthContext.getOrgId();
+    ElderMedicalOutingRecord record = medicalOutingMapper.selectById(id);
+    if (record == null || !Objects.equals(orgId, record.getOrgId()) || Integer.valueOf(1).equals(record.getIsDeleted())) {
+      throw new IllegalArgumentException("记录不存在");
+    }
+    boolean wasOut = ResidenceLifecycleConstants.MEDICAL_OUTING_OUT.equals(record.getStatus());
+    record.setIsDeleted(1);
+    medicalOutingMapper.updateById(record);
+    if (wasOut && !hasAnyActiveOuting(record.getElderId(), orgId)) {
+      ElderProfile elder = resolveElder(record.getElderId());
+      Integer beforeStatus = elder.getStatus();
+      updateElderStatus(elder, 1);
+      recordStatusChange(record.getElderId(), beforeStatus, 1, "删除外出就医记录");
+    }
+    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "MEDICAL_OUTING_DELETE", "ELDER", record.getElderId(), "删除外出就医登记");
+    return Result.ok(true);
   }
 
   @GetMapping(value = "/medical-outing/export", produces = "text/csv;charset=UTF-8")
@@ -476,6 +521,24 @@ public class ElderResidenceController {
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "DEATH_REGISTER_CANCEL", "ELDER", record.getElderId(), "死亡登记作废");
     return Result.ok(record);
+  }
+
+  @DeleteMapping("/death-register/{id}")
+  @PreAuthorize("hasRole('ADMIN')")
+  public Result<Boolean> deleteDeathRegister(@PathVariable Long id) {
+    Long orgId = AuthContext.getOrgId();
+    ElderDeathRegister record = deathRegisterMapper.selectById(id);
+    if (record == null || !Objects.equals(orgId, record.getOrgId()) || Integer.valueOf(1).equals(record.getIsDeleted())) {
+      throw new IllegalArgumentException("记录不存在");
+    }
+    if (!ResidenceLifecycleConstants.DEATH_CANCELLED.equals(record.getStatus())) {
+      throw new IllegalStateException("仅允许删除已作废的死亡登记");
+    }
+    record.setIsDeleted(1);
+    deathRegisterMapper.updateById(record);
+    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "DEATH_REGISTER_DELETE", "ELDER", record.getElderId(), "删除死亡登记");
+    return Result.ok(true);
   }
 
   @GetMapping(value = "/death-register/export", produces = "text/csv;charset=UTF-8")
@@ -650,6 +713,21 @@ public class ElderResidenceController {
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "TRIAL_STAY_UPDATE", "ELDER", request.getElderId(), "试住登记更新");
     return Result.ok(record);
+  }
+
+  @DeleteMapping("/trial-stay/{id}")
+  @PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+  public Result<Boolean> deleteTrialStay(@PathVariable Long id) {
+    Long orgId = AuthContext.getOrgId();
+    ElderTrialStay record = trialStayMapper.selectById(id);
+    if (record == null || !Objects.equals(orgId, record.getOrgId()) || Integer.valueOf(1).equals(record.getIsDeleted())) {
+      throw new IllegalArgumentException("记录不存在");
+    }
+    record.setIsDeleted(1);
+    trialStayMapper.updateById(record);
+    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "TRIAL_STAY_DELETE", "ELDER", record.getElderId(), "删除试住登记");
+    return Result.ok(true);
   }
 
   @GetMapping("/discharge-apply/page")
@@ -861,6 +939,24 @@ public class ElderResidenceController {
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "DISCHARGE_APPLY_REVIEW", "ELDER", record.getElderId(), "退住申请审核:" + status);
     return Result.ok(record);
+  }
+
+  @DeleteMapping("/discharge-apply/{id}")
+  @PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+  public Result<Boolean> deleteDischargeApply(@PathVariable Long id) {
+    Long orgId = AuthContext.getOrgId();
+    ElderDischargeApply record = dischargeApplyMapper.selectById(id);
+    if (record == null || !Objects.equals(orgId, record.getOrgId()) || Integer.valueOf(1).equals(record.getIsDeleted())) {
+      throw new IllegalArgumentException("记录不存在");
+    }
+    if (ResidenceLifecycleConstants.DISCHARGE_APPLY_APPROVED.equals(record.getStatus())) {
+      throw new IllegalStateException("已通过的退住申请不可删除");
+    }
+    record.setIsDeleted(1);
+    dischargeApplyMapper.updateById(record);
+    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "DISCHARGE_APPLY_DELETE", "ELDER", record.getElderId(), "删除退住申请");
+    return Result.ok(true);
   }
 
   private boolean isTrialStatusValid(String status) {

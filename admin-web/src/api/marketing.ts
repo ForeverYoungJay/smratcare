@@ -255,7 +255,7 @@ export function getContractLinkageByContract(contractId: number | string) {
   return request.get<ContractLinkageSummary>(`/api/crm/contracts/${contractId}/linkage-by-contract`)
 }
 
-export function getContractAssessmentOverview(params: { elderId?: number; leadId?: number }) {
+export function getContractAssessmentOverview(params: { elderId?: number | string; leadId?: number | string }) {
   return request.get<ContractAssessmentOverview>('/api/crm/contracts/assessment-overview', { params })
 }
 

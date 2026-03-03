@@ -15,7 +15,15 @@
             style="margin-bottom: 12px"
           />
           <StatefulBlock :loading="loading" :error="errorMessage" :empty="!rows.length" empty-text="暂无附件" @retry="loadLinkage">
-            <a-table :columns="columns" :data-source="rows" row-key="id" :pagination="false" />
+            <a-table :columns="columns" :data-source="rows" row-key="id" :pagination="false">
+              <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'url'">
+                  <a v-if="record.url" :href="record.url" target="_blank" rel="noopener noreferrer">查看</a>
+                  <a v-else-if="record.route" @click.prevent="go(record.route)">查看评估</a>
+                  <span v-else>-</span>
+                </template>
+              </template>
+            </a-table>
           </StatefulBlock>
         </a-card>
       </a-col>
@@ -41,7 +49,9 @@
               <a-descriptions-item label="账单总额">{{ formatAmount(linkage?.billTotalAmount) }}</a-descriptions-item>
               <a-descriptions-item label="已收金额">{{ formatAmount(linkage?.billPaidAmount) }}</a-descriptions-item>
               <a-descriptions-item label="未收金额">{{ formatAmount(linkage?.billOutstandingAmount) }}</a-descriptions-item>
-              <a-descriptions-item label="附件数量">{{ linkage?.attachmentCount ?? 0 }}</a-descriptions-item>
+              <a-descriptions-item label="合同附件">{{ linkage?.attachmentCount ?? 0 }}</a-descriptions-item>
+              <a-descriptions-item label="评估报告">{{ assessmentReportCount }}</a-descriptions-item>
+              <a-descriptions-item label="总资料数">{{ totalDocumentCount }}</a-descriptions-item>
             </a-descriptions>
           </StatefulBlock>
         </a-card>
@@ -56,14 +66,20 @@ import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
-import { getContractLinkageByElder } from '../../../api/marketing'
-import type { ContractAttachmentItem, ContractLinkageSummary } from '../../../types'
+import { getContractAssessmentOverview, getContractLinkageByElder } from '../../../api/marketing'
+import type {
+  ContractAssessmentOverview,
+  ContractAssessmentReportItem,
+  ContractAttachmentItem,
+  ContractLinkageSummary
+} from '../../../types'
 
 const router = useRouter()
 const route = useRoute()
 const loading = ref(false)
 const errorMessage = ref('')
 const linkage = ref<ContractLinkageSummary>()
+const assessmentOverview = ref<ContractAssessmentOverview>()
 
 const columns = [
   { title: '类型', dataIndex: 'type', key: 'type', width: 120 },
@@ -75,15 +91,28 @@ const columns = [
 
 const rows = computed(() => {
   const attachments = linkage.value?.attachments || []
-  return attachments.map((item) => ({
+  const attachmentRows = attachments.map((item) => ({
     id: item.id,
     type: normalizeType(item),
     name: item.fileName,
     url: item.fileUrl,
+    route: '',
     size: formatFileSize(item.fileSize),
     time: item.createTime || '-'
   }))
+  const reportRows = flattenReports(assessmentOverview.value).map((item) => ({
+    id: `report-${item.recordId}`,
+    type: '评估报告',
+    name: buildAssessmentReportName(item),
+    url: '',
+    route: `/assessment/ability/archive?elderId=${encodeURIComponent(String(linkage.value?.elderId || ''))}`,
+    size: '-',
+    time: item.assessmentDate || '-'
+  }))
+  return [...attachmentRows, ...reportRows]
 })
+const assessmentReportCount = computed(() => flattenReports(assessmentOverview.value).length)
+const totalDocumentCount = computed(() => (linkage.value?.attachmentCount || 0) + assessmentReportCount.value)
 
 function normalizeType(item: ContractAttachmentItem) {
   const attachmentType = item.attachmentType || item.remark
@@ -110,6 +139,38 @@ function normalizeType(item: ContractAttachmentItem) {
     return '合同'
   }
   return item.fileType || '附件'
+}
+
+function flattenReports(source?: ContractAssessmentOverview) {
+  const contracts = source?.contracts || []
+  const reportList: ContractAssessmentReportItem[] = []
+  contracts.forEach((item) => {
+    if (item.reports?.length) {
+      reportList.push(...item.reports)
+    }
+  })
+  if (source?.unassignedReports?.length) {
+    reportList.push(...source.unassignedReports)
+  }
+  return reportList
+}
+
+function buildAssessmentReportName(report: ContractAssessmentReportItem) {
+  const typeLabel = mapAssessmentType(report.assessmentType)
+  const level = report.levelCode ? `-${report.levelCode}` : ''
+  const score = report.score !== undefined && report.score !== null ? `-${report.score}分` : ''
+  return `${typeLabel}报告${level}${score}`
+}
+
+function mapAssessmentType(type?: string) {
+  if (type === 'ADMISSION') return '入住评估'
+  if (type === 'REGISTRATION') return '登记评估'
+  if (type === 'CONTINUOUS') return '持续评估'
+  if (type === 'ARCHIVE') return '评估档案'
+  if (type === 'COGNITIVE') return '认知评估'
+  if (type === 'SELF_CARE') return '自理能力评估'
+  if (type === 'OTHER_SCALE') return '其他量表评估'
+  return '评估'
 }
 
 function go(path: string) {
@@ -153,18 +214,22 @@ function formatAmount(value?: number) {
 }
 
 async function loadLinkage() {
-  const residentId = Number(route.query.residentId || route.query.elderId)
+  const residentId = String(route.query.residentId || route.query.elderId || '').trim()
   if (!residentId) {
     linkage.value = undefined
+    assessmentOverview.value = undefined
     return
   }
   loading.value = true
   errorMessage.value = ''
   try {
     linkage.value = await getContractLinkageByElder(residentId)
+    const elderIdForAssessment = String(linkage.value?.elderId || residentId)
+    assessmentOverview.value = await getContractAssessmentOverview({ elderId: elderIdForAssessment })
   } catch (error: any) {
     errorMessage.value = error?.message || '加载合同与票据失败'
     linkage.value = undefined
+    assessmentOverview.value = undefined
     message.error(errorMessage.value)
   } finally {
     loading.value = false

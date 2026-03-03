@@ -33,13 +33,22 @@
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <a-table :data-source="rows" :columns="columns" :loading="loading" :pagination="false" row-key="id">
+      <a-space style="margin-bottom: 12px" wrap>
+        <a-tag color="blue">已选 {{ selectedRowKeys.length }} 条</a-tag>
+        <a-button :disabled="selectedRowKeys.length !== 1" @click="openEditSelected">编辑</a-button>
+        <a-button danger :disabled="selectedRowKeys.length === 0" @click="deleteSelected">删除</a-button>
+      </a-space>
+      <a-table
+        :data-source="rows"
+        :columns="columns"
+        :loading="loading"
+        :pagination="false"
+        row-key="id"
+        :row-selection="rowSelection"
+      >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
             <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <a-button type="link" @click="openEdit(record)">编辑</a-button>
           </template>
         </template>
       </a-table>
@@ -104,13 +113,14 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
+import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { getBaseConfigItemList } from '../../api/baseConfig'
 import { getElderPage } from '../../api/elder'
-import { createTrialStay, exportTrialStay, getTrialStayPage, updateTrialStay } from '../../api/elderResidence'
+import { createTrialStay, deleteTrialStay, exportTrialStay, getTrialStayPage, updateTrialStay } from '../../api/elderResidence'
 import type { BaseConfigItem, ElderItem, PageResult, TrialStayItem, TrialStayRequest, TrialStayStatus } from '../../types'
 
 const loading = ref(false)
@@ -121,6 +131,14 @@ const editOpen = ref(false)
 const editId = ref<number | undefined>(undefined)
 const submitting = ref(false)
 const formRef = ref<FormInstance>()
+const selectedRowKeys = ref<number[]>([])
+const route = useRoute()
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: (string | number)[]) => {
+    selectedRowKeys.value = keys as number[]
+  }
+}))
 const channelOptions = ref<{ label: string; value: string }[]>([])
 const trialPackageOptions = ref<{ label: string; value: string }[]>([])
 
@@ -160,8 +178,7 @@ const columns = [
   { title: '意向等级', dataIndex: 'intentLevel', key: 'intentLevel', width: 100 },
   { title: '状态', key: 'status', width: 120 },
   { title: '护理等级', dataIndex: 'careLevel', key: 'careLevel', width: 120 },
-  { title: '备注', dataIndex: 'remark', key: 'remark' },
-  { title: '操作', key: 'action', width: 100 }
+  { title: '备注', dataIndex: 'remark', key: 'remark' }
 ]
 
 function statusText(status?: string) {
@@ -220,6 +237,7 @@ async function fetchData() {
     })
     rows.value = res.list
     total.value = res.total
+    selectedRowKeys.value = selectedRowKeys.value.filter((id) => rows.value.some((item) => item.id === id))
   } finally {
     loading.value = false
   }
@@ -262,6 +280,33 @@ function openEdit(record: TrialStayItem) {
   form.remark = record.remark || ''
 }
 
+function getSelectedRecord() {
+  if (selectedRowKeys.value.length !== 1) return undefined
+  return rows.value.find((item) => item.id === selectedRowKeys.value[0])
+}
+
+function openEditSelected() {
+  const record = getSelectedRecord()
+  if (!record) return
+  openEdit(record)
+}
+
+function deleteSelected() {
+  if (!selectedRowKeys.value.length) return
+  Modal.confirm({
+    title: '确认删除试住登记？',
+    content: `将删除 ${selectedRowKeys.value.length} 条试住记录`,
+    okText: '确认删除',
+    okType: 'danger',
+    async onOk() {
+      await Promise.all(selectedRowKeys.value.map((id) => deleteTrialStay(id)))
+      message.success('删除成功')
+      selectedRowKeys.value = []
+      await fetchData()
+    }
+  })
+}
+
 async function submit() {
   if (!formRef.value) return
   await formRef.value.validate()
@@ -295,6 +340,10 @@ function onPageSizeChange(current: number, size: number) {
 onMounted(async () => {
   await loadDictOptions()
   await loadElders()
+  const elderId = Number(route.query.elderId || 0)
+  if (elderId > 0) {
+    query.elderId = elderId
+  }
   await fetchData()
 })
 </script>

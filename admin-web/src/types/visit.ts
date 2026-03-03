@@ -14,9 +14,12 @@ export interface VisitBookingItem {
 
 export interface VisitBookRequest {
   elderId: number
+  familyUserId?: number
   visitTime: string
+  visitTimeSlot: string
   visitorCount: number
   carPlate?: string
+  remark?: string
 }
 
 export interface VisitCheckinRequest {

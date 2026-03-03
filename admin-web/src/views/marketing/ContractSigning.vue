@@ -222,8 +222,7 @@
           type="info"
           show-icon
           style="margin-bottom: 12px;"
-          :message="`请先在“入住办理”完成选床和办理，再执行最终签署。`"
-          :description="`当前合同：${finalizeForm.contractNo || '-'}；长者：${finalizeForm.elderName || '-'}。`"
+          :message="`当前合同：${finalizeForm.contractNo || '-'}；长者：${finalizeForm.elderName || '-'}。`"
         />
         <a-form-item label="签署备注">
           <a-input v-model:value="finalizeForm.remark" placeholder="可填写最终签署说明" />
@@ -402,14 +401,14 @@ function sameId(left: number | string | undefined, right: number | string | unde
 
 const columns = [
   { title: '合同编号', dataIndex: 'contractNo', key: 'contractNo', width: 170 },
+  { title: '姓名', dataIndex: 'elderName', key: 'elderName', width: 120 },
   { title: '流程阶段', dataIndex: 'flowStage', key: 'flowStage', width: 120 },
-  { title: '超时预警', dataIndex: 'slaWarning', key: 'slaWarning', width: 150 },
   { title: '当前责任部门', dataIndex: 'currentOwnerDept', key: 'currentOwnerDept', width: 130 },
   { title: '签约房号', dataIndex: 'reservationRoomNo', key: 'reservationRoomNo', width: 140 },
-  { title: '姓名', dataIndex: 'elderName', key: 'elderName', width: 120 },
   { title: '联系电话', dataIndex: 'elderPhone', key: 'elderPhone', width: 140 },
   { title: '营销人员', dataIndex: 'marketerName', key: 'marketerName', width: 120 },
-  { title: '合同状态', dataIndex: 'contractStatus', key: 'contractStatus', width: 130 }
+  { title: '合同状态', dataIndex: 'contractStatus', key: 'contractStatus', width: 130 },
+  { title: '超时预警', dataIndex: 'slaWarning', key: 'slaWarning', width: 150 }
 ]
 
 const attachmentOpen = ref(false)
@@ -564,7 +563,7 @@ function finalizeDisabledReason(record: CrmContractItem) {
   if (!id) return '合同数据异常，无法签署'
   if (finalizeCheckingMap.value[id]) return '正在校验是否已办理入住...'
   if (!record.contractNo) return '请先保存并生成合同号'
-  return '请先在“入住办理”完成办理后再签署'
+  return '当前合同暂不可签署'
 }
 
 async function checkFinalizeReady(record: CrmContractItem) {
@@ -826,7 +825,7 @@ function openForm(record?: CrmContractItem) {
       flowStage: 'PENDING_ASSESSMENT',
       currentOwnerDept: 'ASSESSMENT',
       reservationRoomNo: undefined,
-      orgName: '新签优惠待确认'
+      orgName: '弋阳龟峰颐养中心'
     } as Partial<CrmContractItem>)
   }
   open.value = true
@@ -996,7 +995,6 @@ async function openFinalize(record: CrmContractItem) {
     })
     const hasAdmission = (admissionPage.list || []).length > 0
     if (!hasAdmission) {
-      message.warning('请先在“入住办理”完成办理，再执行最终签署')
       const elder = await ensureElderFromLead(lead)
       router.push(
         `/elder/admission-processing?residentId=${elder.id}&leadId=${lead.leadId || lead.id}&contractNo=${lead.contractNo || ''}&elderName=${encodeURIComponent(elder.fullName || lead.elderName || '')}`

@@ -32,7 +32,7 @@ import type { MedicalResidentOverview } from '../../../types'
 
 const router = useRouter()
 const route = useRoute()
-const residentId = ref(0)
+const residentId = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
 const overview = ref<MedicalResidentOverview>()
@@ -52,14 +52,14 @@ function go(path: string) {
 }
 
 async function resolveResidentId() {
-  const fromRoute = Number(route.query.residentId || 0)
-  if (fromRoute > 0) {
+  const fromRoute = String(route.query.residentId || '').trim()
+  if (fromRoute) {
     residentId.value = fromRoute
     return
   }
   const page = await getElderPage({ pageNo: 1, pageSize: 1 })
   const first = page.list?.[0]
-  residentId.value = Number(first?.id || 0)
+  residentId.value = String(first?.id || '')
 }
 
 async function loadModules() {
@@ -67,7 +67,7 @@ async function loadModules() {
   errorMessage.value = ''
   try {
     await resolveResidentId()
-    if (!residentId.value) {
+    if (!residentId.value.trim()) {
       overview.value = undefined
       errorMessage.value = "暂无可用长者，请先创建长者档案"
       return

@@ -16,3 +16,15 @@ export function guardTodayVisits() {
 export function guardCheckin(data: VisitCheckinRequest) {
   return request.post<void>('/api/guard/visit/checkin', data)
 }
+
+export function guardBookVisit(data: VisitBookRequest) {
+  return request.post<VisitBookingItem>('/api/guard/visit/book', data)
+}
+
+export function guardUpdateVisit(id: number, data: VisitBookRequest) {
+  return request.put<VisitBookingItem>(`/api/guard/visit/${id}`, data)
+}
+
+export function guardDeleteVisit(id: number) {
+  return request.delete<void>(`/api/guard/visit/${id}`)
+}

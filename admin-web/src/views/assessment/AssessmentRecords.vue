@@ -183,8 +183,12 @@
             </a-form-item>
           </a-col>
           <a-col :span="12">
-            <a-form-item label="评估等级">
-              <a-input v-model:value="form.levelCode" placeholder="如 A/B/C 或 轻/中/重" :disabled="formReadonly" />
+            <a-form-item v-if="!isAdmissionAssessment" label="评估等级">
+              <a-input
+                v-model:value="form.levelCode"
+                placeholder="如 A/B/C 或 轻/中/重"
+                :disabled="formReadonly"
+              />
             </a-form-item>
           </a-col>
         </a-row>
@@ -256,11 +260,6 @@
               <div style="margin-top: 8px; color: rgba(0,0,0,0.65);">
                 等级规则：0级(90)，1级(66-89)，2级(46-65)，3级(30-45)，4级(0-29)
               </div>
-              <a-space style="margin-top: 12px;">
-                <a-button :disabled="formReadonly || !canDownloadAdmissionReport" @click="downloadAdmissionReport">
-                  下载评估报告
-                </a-button>
-              </a-space>
             </a-card>
           </a-space>
         </a-form-item>
@@ -270,6 +269,22 @@
               <a-input-number v-model:value="form.score" :min="0" :max="999" :step="0.5" style="width: 100%" :disabled="formReadonly" />
             </a-form-item>
           </a-col>
+          <a-col v-if="isAdmissionAssessment" :span="12">
+            <a-form-item label="评估等级（能力等级）">
+              <a-input :value="admissionLevelText === '待完成评分' ? '' : admissionLevelText" disabled placeholder="自动计算" />
+            </a-form-item>
+          </a-col>
+          <a-col v-else :span="12">
+            <a-form-item label="评估状态" name="status">
+              <a-select v-model:value="form.status" :disabled="formReadonly">
+                <a-select-option value="DRAFT">草稿</a-select-option>
+                <a-select-option value="COMPLETED">已完成</a-select-option>
+                <a-select-option value="ARCHIVED">已归档</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row v-if="isAdmissionAssessment" :gutter="16">
           <a-col :span="12">
             <a-form-item label="评估状态" name="status">
               <a-select v-model:value="form.status" :disabled="formReadonly">
@@ -872,7 +887,6 @@ const admissionLevelText = computed(() => {
 const admissionMissingItems = computed(() =>
   admissionScoreItemList.filter((item) => admissionScores[item.id] === undefined && Math.max(...item.options.map((opt) => opt.score)) > 0)
 )
-const canDownloadAdmissionReport = computed(() => admissionMissingItems.value.length === 0)
 const admissionResidentIdFromRoute = computed(() => Number(route.query.residentId || route.query.elderId || 0))
 const admissionContractNoFromRoute = computed(() => String(route.query.contractNo || '').trim())
 const admissionElderNameFromRoute = computed(() => String(route.query.elderName || '').trim())
@@ -1155,6 +1169,14 @@ function resetAdmissionScores() {
   })
 }
 
+function applyAdmissionDefaultTemplate() {
+  admissionScoreItemList.forEach((item) => {
+    const defaultOption = item.options[0]
+    if (!defaultOption) return
+    admissionScores[item.id] = defaultOption.score
+  })
+}
+
 function loadAdmissionScoresFromDetail(detailJson?: string) {
   resetAdmissionScores()
   if (!detailJson) return
@@ -1187,43 +1209,6 @@ function buildAdmissionDetailJson() {
     normalizedScore: admissionTotalScore.value,
     level: admissionLevelText.value
   })
-}
-
-function downloadAdmissionReport() {
-  if (!canDownloadAdmissionReport.value) {
-    message.warning(`还有 ${admissionMissingItems.value.length} 项未评分，无法下载`)
-    return
-  }
-  const elderName = findElderName(form.elderId) || form.elderName || '未命名长者'
-  const lines: string[] = []
-  lines.push('老年人能力评估报告（入住评估）')
-  lines.push(`老人姓名：${elderName}`)
-  lines.push(`评估日期：${form.assessmentDate || '-'}`)
-  lines.push(`评估人：${form.assessorName || '-'}`)
-  lines.push(`总分（90分制）：${admissionTotalScore.value}`)
-  lines.push(`能力等级：${admissionLevelText.value}`)
-  lines.push('')
-  admissionAbilityGroups.forEach((group) => {
-    lines.push(group.title)
-    group.items.forEach((item) => {
-      const score = admissionScores[item.id]
-      const selected = item.options.find((opt) => opt.score === score)
-      lines.push(`${item.id}. ${item.title}：${score ?? '-'}分 ${selected ? `(${selected.label})` : ''}`)
-      lines.push(`  指标说明：${item.description}`)
-    })
-    lines.push('')
-  })
-  lines.push('等级划分：0级(90)，1级(66-89)，2级(46-65)，3级(30-45)，4级(0-29)')
-  const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `入住评估报告_${elderName}_${form.assessmentDate || new Date().toISOString().slice(0, 10)}.txt`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
-  message.success('评估报告已下载')
 }
 
 function assignRecord(record: AssessmentRecord) {
@@ -1264,9 +1249,9 @@ function openForm(record?: AssessmentRecord, readonly = false) {
     })
     scoreAutoChecked.value = true
     if (isAdmissionAssessment.value) {
-      resetAdmissionScores()
-      form.score = 0
-      form.levelCode = ''
+      applyAdmissionDefaultTemplate()
+      form.score = admissionTotalScore.value
+      form.levelCode = admissionLevelText.value === '待完成评分' ? '' : admissionLevelText.value.split('：')[0]
       if (!form.status) {
         form.status = 'DRAFT'
       }

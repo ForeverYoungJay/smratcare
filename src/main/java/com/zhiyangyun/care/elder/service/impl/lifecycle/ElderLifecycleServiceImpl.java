@@ -11,12 +11,14 @@ import com.zhiyangyun.care.elder.model.AssignBedRequest;
 import com.zhiyangyun.care.elder.entity.Bed;
 import com.zhiyangyun.care.elder.entity.ElderBedRelation;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
+import com.zhiyangyun.care.elder.entity.Room;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderAdmission;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderChangeLog;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderDischarge;
 import com.zhiyangyun.care.elder.mapper.BedMapper;
 import com.zhiyangyun.care.elder.mapper.ElderBedRelationMapper;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
+import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderAdmissionMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderChangeLogMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeMapper;
@@ -49,6 +51,7 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
   private final ElderMapper elderMapper;
   private final BedMapper bedMapper;
   private final ElderBedRelationMapper relationMapper;
+  private final RoomMapper roomMapper;
   private final ElderService elderService;
   private final ElderAccountService accountService;
   private final BillMonthlyMapper billMonthlyMapper;
@@ -61,6 +64,7 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
                                    ElderMapper elderMapper,
                                    BedMapper bedMapper,
                                    ElderBedRelationMapper relationMapper,
+                                   RoomMapper roomMapper,
                                    ElderService elderService,
                                    ElderAccountService accountService,
                                    BillMonthlyMapper billMonthlyMapper,
@@ -72,6 +76,7 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
     this.elderMapper = elderMapper;
     this.bedMapper = bedMapper;
     this.relationMapper = relationMapper;
+    this.roomMapper = roomMapper;
     this.elderService = elderService;
     this.accountService = accountService;
     this.billMonthlyMapper = billMonthlyMapper;
@@ -193,9 +198,21 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
       contract.setElderId(request.getElderId());
       changed = true;
     }
-    if (request.getBedId() != null && contract.getReservationBedId() == null) {
-      contract.setReservationBedId(request.getBedId());
-      changed = true;
+    if (request.getBedId() != null) {
+      if (contract.getReservationBedId() == null) {
+        contract.setReservationBedId(request.getBedId());
+        changed = true;
+      }
+      if (contract.getReservationRoomNo() == null || contract.getReservationRoomNo().isBlank()) {
+        Bed bed = bedMapper.selectById(request.getBedId());
+        if (bed != null && bed.getRoomId() != null) {
+          Room room = roomMapper.selectById(bed.getRoomId());
+          if (room != null && room.getRoomNo() != null && !room.getRoomNo().isBlank()) {
+            contract.setReservationRoomNo(room.getRoomNo());
+            changed = true;
+          }
+        }
+      }
     }
     if (!"PENDING_SIGN".equals(contract.getFlowStage())) {
       contract.setFlowStage("PENDING_SIGN");

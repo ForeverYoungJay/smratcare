@@ -28,26 +28,25 @@
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <a-table :data-source="rows" :columns="columns" :loading="loading" :pagination="false" row-key="id">
+      <a-space style="margin-bottom: 12px" wrap>
+        <a-tag color="blue">已选 {{ selectedRowKeys.length }} 条</a-tag>
+        <a-button v-if="canManage" :disabled="selectedRowKeys.length !== 1" @click="openEditSelected">更正</a-button>
+        <a-button v-if="canCancel" danger :disabled="!canCancelSelected" @click="cancelSelected">作废</a-button>
+        <a-button v-if="canCancel" danger :disabled="selectedRowKeys.length === 0" @click="deleteSelected">删除</a-button>
+      </a-space>
+      <a-table
+        :data-source="rows"
+        :columns="columns"
+        :loading="loading"
+        :pagination="false"
+        row-key="id"
+        :row-selection="rowSelection"
+      >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
             <a-tag :color="record.status === 'CANCELLED' ? 'default' : 'red'">
               {{ record.status === 'CANCELLED' ? '已取消' : '已登记' }}
             </a-tag>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <a-space v-if="canManage">
-              <a-button type="link" :disabled="record.status === 'CANCELLED'" @click="openEdit(record)">更正</a-button>
-              <a-button
-                v-if="canCancel"
-                type="link"
-                danger
-                :disabled="record.status === 'CANCELLED'"
-                @click="cancelRecord(record)"
-              >
-                作废
-              </a-button>
-            </a-space>
           </template>
         </template>
       </a-table>
@@ -104,12 +103,20 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
+import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { getElderPage } from '../../api/elder'
-import { cancelDeathRegister, createDeathRegister, exportDeathRegister, getDeathRegisterPage, updateDeathRegister } from '../../api/elderResidence'
+import {
+  cancelDeathRegister,
+  createDeathRegister,
+  deleteDeathRegister,
+  exportDeathRegister,
+  getDeathRegisterPage,
+  updateDeathRegister
+} from '../../api/elderResidence'
 import { getRoles } from '../../utils/auth'
 import type { DeathRegisterCreateRequest, DeathRegisterItem, ElderItem, PageResult } from '../../types'
 
@@ -121,6 +128,14 @@ const createOpen = ref(false)
 const submitting = ref(false)
 const formRef = ref<FormInstance>()
 const editingId = ref<number | undefined>(undefined)
+const selectedRowKeys = ref<number[]>([])
+const route = useRoute()
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: (string | number)[]) => {
+    selectedRowKeys.value = keys as number[]
+  }
+}))
 const roles = getRoles()
 const canManage = roles.includes('ADMIN') || roles.includes('STAFF')
 const canCancel = roles.includes('ADMIN')
@@ -161,9 +176,14 @@ const columns = [
   { title: '上报时间', dataIndex: 'reportedTime', key: 'reportedTime', width: 180 },
   { title: '作废时间', dataIndex: 'cancelledTime', key: 'cancelledTime', width: 180 },
   { title: '状态', key: 'status', width: 100 },
-  { title: '备注', dataIndex: 'remark', key: 'remark' },
-  { title: '操作', key: 'action', width: 140 }
+  { title: '备注', dataIndex: 'remark', key: 'remark' }
 ]
+const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(item.id)))
+const canCancelSelected = computed(
+  () =>
+    selectedRecords.value.length === 1 &&
+    selectedRecords.value[0]?.status !== 'CANCELLED'
+)
 
 async function loadElders() {
   const res: PageResult<ElderItem> = await getElderPage({ pageNo: 1, pageSize: 200 })
@@ -176,6 +196,7 @@ async function fetchData() {
     const res: PageResult<DeathRegisterItem> = await getDeathRegisterPage(query)
     rows.value = res.list || []
     total.value = res.total
+    selectedRowKeys.value = selectedRowKeys.value.filter((id) => rows.value.some((item) => item.id === id))
   } finally {
     loading.value = false
   }
@@ -217,6 +238,16 @@ function openEdit(record: DeathRegisterItem) {
   form.remark = record.remark || ''
 }
 
+function openEditSelected() {
+  const record = selectedRecords.value[0]
+  if (!record) return
+  if (record.status === 'CANCELLED') {
+    message.warning('已作废记录不可更正')
+    return
+  }
+  openEdit(record)
+}
+
 async function submitCreate() {
   if (!formRef.value) return
   await formRef.value.validate()
@@ -251,11 +282,33 @@ async function cancelRecord(record: DeathRegisterItem) {
   fetchData()
 }
 
+async function cancelSelected() {
+  const record = selectedRecords.value[0]
+  if (!record) return
+  await cancelRecord(record)
+}
+
 async function exportRows() {
   await exportDeathRegister({
     elderId: query.elderId,
     status: query.status,
     keyword: query.keyword
+  })
+}
+
+function deleteSelected() {
+  if (!selectedRowKeys.value.length) return
+  Modal.confirm({
+    title: '确认删除死亡登记？',
+    content: `将删除 ${selectedRowKeys.value.length} 条记录（仅允许删除已作废记录）`,
+    okText: '确认删除',
+    okType: 'danger',
+    async onOk() {
+      await Promise.all(selectedRowKeys.value.map((id) => deleteDeathRegister(id)))
+      message.success('删除成功')
+      selectedRowKeys.value = []
+      await fetchData()
+    }
   })
 }
 
@@ -272,6 +325,10 @@ function onPageSizeChange(current: number, size: number) {
 
 onMounted(async () => {
   await loadElders()
+  const elderId = Number(route.query.elderId || 0)
+  if (elderId > 0) {
+    query.elderId = elderId
+  }
   await fetchData()
 })
 </script>

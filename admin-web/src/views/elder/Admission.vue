@@ -302,8 +302,8 @@ async function submit() {
     await syncLeadStageAfterAdmission()
     message.success('入住办理成功')
     await fetchAdmissionRecords()
-  } catch {
-    message.error('提交失败')
+  } catch (error: any) {
+    message.error(error?.message || '提交失败')
   } finally {
     submitting.value = false
   }
@@ -339,12 +339,19 @@ async function validateAdmissionGuard() {
       message.warning('作废合同不可办理入住')
       return false
     }
-    if (contract.elderId && Number(form.elderId) !== Number(contract.elderId)) {
+    if (contract.elderId && String(form.elderId) !== String(contract.elderId)) {
       message.warning('当前选择的老人和合同绑定老人不一致，请检查后重试')
       return false
     }
     if (contract.elderId) {
-      form.elderId = Number(contract.elderId)
+      form.elderId = contract.elderId as any
+      const hasOption = elders.value.some((item) => String(item.id) === String(contract.elderId))
+      if (!hasOption) {
+        elders.value.unshift({
+          id: contract.elderId as any,
+          fullName: contract.elderName || `长者${String(contract.elderId)}`
+        } as ElderItem)
+      }
     }
     if (contract.leadId && !linkedLeadId.value) {
       linkedLeadId.value = Number(contract.leadId)
@@ -370,6 +377,19 @@ async function loadContractGuardState() {
       contractNo
     })
     guardContract.value = (page.list || []).find((item) => item.contractNo === contractNo) || null
+    if (guardContract.value?.elderId) {
+      form.elderId = guardContract.value.elderId as any
+      const hasOption = elders.value.some((item) => String(item.id) === String(guardContract.value?.elderId))
+      if (!hasOption) {
+        elders.value.unshift({
+          id: guardContract.value.elderId as any,
+          fullName: guardContract.value.elderName || `长者${String(guardContract.value.elderId)}`
+        } as ElderItem)
+      }
+      if (!recordQuery.keyword && guardContract.value.elderName) {
+        recordQuery.keyword = guardContract.value.elderName
+      }
+    }
   } catch {
     guardContract.value = null
   }
@@ -436,22 +456,21 @@ async function loadAssets() {
 }
 
 function applyRoutePrefill() {
-  const residentIdText = String(route.query.residentId || '')
-  const residentId = Number(residentIdText || 0)
+  const residentIdText = String(route.query.residentId || '').trim()
   const leadId = Number(route.query.leadId || 0)
   const contractNo = String(route.query.contractNo || '').trim()
   const elderName = String(route.query.elderName || '').trim()
-  if (residentId > 0) {
-    const matched = elders.value.find((item) => String(item.id) === String(residentId))
+  if (residentIdText) {
+    const matched = elders.value.find((item) => String(item.id) === residentIdText)
     if (matched) {
       form.elderId = matched.id
       recordQuery.keyword = matched.fullName
     } else {
-      form.elderId = residentId as any
+      form.elderId = residentIdText as any
       recordQuery.keyword = elderName || residentIdText
       if (elderName) {
         elders.value.unshift({
-          id: residentId as any,
+          id: residentIdText as any,
           fullName: elderName
         } as ElderItem)
       }

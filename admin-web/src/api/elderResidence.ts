@@ -36,6 +36,10 @@ export function returnOuting(id: number, data: OutingReturnRequest) {
   return request.put<OutingItem>(`/api/elder/lifecycle/outing/${id}/return`, data)
 }
 
+export function deleteOuting(id: number) {
+  return request.delete<boolean>(`/api/elder/lifecycle/outing/${id}`)
+}
+
 export function getMedicalOutingPage(params: MedicalOutingQuery) {
   return fetchPage<MedicalOutingItem>('/api/elder/lifecycle/medical-outing/page', params)
 }
@@ -46,6 +50,10 @@ export function createMedicalOuting(data: MedicalOutingCreateRequest) {
 
 export function returnMedicalOuting(id: number, data: MedicalOutingReturnRequest) {
   return request.put<MedicalOutingItem>(`/api/elder/lifecycle/medical-outing/${id}/return`, data)
+}
+
+export function deleteMedicalOuting(id: number) {
+  return request.delete<boolean>(`/api/elder/lifecycle/medical-outing/${id}`)
 }
 
 export function getTrialStayPage(params: TrialStayQuery) {
@@ -60,6 +68,10 @@ export function updateTrialStay(id: number, data: TrialStayRequest) {
   return request.put<TrialStayItem>(`/api/elder/lifecycle/trial-stay/${id}`, data)
 }
 
+export function deleteTrialStay(id: number) {
+  return request.delete<boolean>(`/api/elder/lifecycle/trial-stay/${id}`)
+}
+
 export function getDischargeApplyPage(params: DischargeApplyQuery) {
   return fetchPage<DischargeApplyItem>('/api/elder/lifecycle/discharge-apply/page', params)
 }
@@ -70,6 +82,10 @@ export function createDischargeApply(data: DischargeApplyCreateRequest) {
 
 export function reviewDischargeApply(id: number, data: DischargeApplyReviewRequest) {
   return request.put<DischargeApplyItem>(`/api/elder/lifecycle/discharge-apply/${id}/review`, data)
+}
+
+export function deleteDischargeApply(id: number) {
+  return request.delete<boolean>(`/api/elder/lifecycle/discharge-apply/${id}`)
 }
 
 export function getDeathRegisterPage(params: DeathRegisterQuery) {
@@ -86,6 +102,10 @@ export function updateDeathRegister(id: number, data: DeathRegisterUpdateRequest
 
 export function cancelDeathRegister(id: number, data?: DeathRegisterCancelRequest) {
   return request.put<DeathRegisterItem>(`/api/elder/lifecycle/death-register/${id}/cancel`, data || {})
+}
+
+export function deleteDeathRegister(id: number) {
+  return request.delete<boolean>(`/api/elder/lifecycle/death-register/${id}`)
 }
 
 export function exportMedicalOuting(params: MedicalOutingQuery) {

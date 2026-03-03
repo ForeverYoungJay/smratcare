@@ -14,7 +14,7 @@ export function getMedicalCareWorkbenchSummary() {
 }
 
 export function getMedicalHealthCenterSummary(params?: {
-  elderId?: number
+  elderId?: number | string
   date?: string
   status?: string
 }) {
@@ -75,10 +75,10 @@ export function deleteCvdAssessment(id: number) {
   return request.delete<void>(`/api/medical-care/cvd-assessments/${id}`)
 }
 
-export function getResidentRiskCard(residentId: number) {
+export function getResidentRiskCard(residentId: number | string) {
   return request.get<MedicalResidentRiskCard>('/api/medical-care/resident360/risk-card', { params: { residentId } })
 }
 
-export function getResidentOverview(residentId: number) {
+export function getResidentOverview(residentId: number | string) {
   return request.get<MedicalResidentOverview>('/api/medical-care/resident360/overview', { params: { residentId } })
 }

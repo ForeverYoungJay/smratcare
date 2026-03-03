@@ -942,7 +942,7 @@ function openForm(row?: CrmLeadItem) {
       reservationChannel: '',
       reservationStatus: effectiveMode.value === 'reservation' ? '预定' : '',
       refunded: 0,
-      orgName: '德合养老院',
+      orgName: '弋阳龟峰颐养中心',
       status: defaultStatus(effectiveMode.value) ?? 0
     } as Partial<CrmLeadItem>)
   }

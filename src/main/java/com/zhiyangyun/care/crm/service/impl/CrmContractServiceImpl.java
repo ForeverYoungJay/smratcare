@@ -349,6 +349,15 @@ public class CrmContractServiceImpl implements CrmContractService {
       if (admission != null) {
         return true;
       }
+      ElderAdmission trimmedAdmission = admissionMapper.selectOne(Wrappers.lambdaQuery(ElderAdmission.class)
+          .eq(ElderAdmission::getTenantId, contract.getTenantId())
+          .eq(ElderAdmission::getIsDeleted, 0)
+          .apply("TRIM(contract_no) = {0}", contractNo)
+          .orderByDesc(ElderAdmission::getCreateTime)
+          .last("LIMIT 1"));
+      if (trimmedAdmission != null) {
+        return true;
+      }
     }
     if (contract.getElderId() != null) {
       ElderAdmission admissionByElder = admissionMapper.selectOne(Wrappers.lambdaQuery(ElderAdmission.class)
@@ -566,7 +575,7 @@ public class CrmContractServiceImpl implements CrmContractService {
 
   private static Map<String, Set<String>> buildStatusTransitionRules() {
     Map<String, Set<String>> rules = new HashMap<>();
-    rules.put("DRAFT", Set.of("DRAFT", "PENDING_APPROVAL", "APPROVED", "VOID"));
+    rules.put("DRAFT", Set.of("DRAFT", "PENDING_APPROVAL", "APPROVED", "SIGNED", "VOID"));
     rules.put("PENDING_APPROVAL", Set.of("PENDING_APPROVAL", "APPROVED", "REJECTED", "VOID"));
     rules.put("REJECTED", Set.of("REJECTED", "PENDING_APPROVAL", "VOID"));
     rules.put("APPROVED", Set.of("APPROVED", "SIGNED", "EFFECTIVE", "VOID"));
