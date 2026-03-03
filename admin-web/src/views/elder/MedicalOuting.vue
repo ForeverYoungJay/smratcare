@@ -21,7 +21,7 @@
             <a-button type="primary" @click="fetchData">搜索</a-button>
             <a-button @click="reset">清空</a-button>
             <a-button v-if="canManage" @click="exportRows">导出</a-button>
-            <a-button v-if="canManage" type="primary" ghost @click="openCreate">新增外出就医</a-button>
+            <a-button v-if="canManage" type="primary" @click="openCreate">新增外出就医</a-button>
           </a-space>
         </a-form-item>
       </a-form>

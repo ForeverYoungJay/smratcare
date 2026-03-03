@@ -1,59 +1,111 @@
 <template>
-  <PageContainer title="合同与票据" subTitle="合同、票据、账单按同一合同号联动">
+  <PageContainer title="合同与票据" subTitle="合同附件、票据与评估报告统一归档">
+    <a-row :gutter="16" style="margin-bottom: 12px">
+      <a-col :xs="24" :sm="12" :lg="6">
+        <a-card class="card-elevated" :bordered="false" size="small">
+          <a-statistic title="合同附件" :value="contractAttachmentCount" />
+        </a-card>
+      </a-col>
+      <a-col :xs="24" :sm="12" :lg="6">
+        <a-card class="card-elevated" :bordered="false" size="small">
+          <a-statistic title="评估报告" :value="assessmentReportCount" />
+        </a-card>
+      </a-col>
+      <a-col :xs="24" :sm="12" :lg="6">
+        <a-card class="card-elevated" :bordered="false" size="small">
+          <a-statistic title="总资料数" :value="documents.length" />
+        </a-card>
+      </a-col>
+      <a-col :xs="24" :sm="12" :lg="6">
+        <a-card class="card-elevated" :bordered="false" size="small">
+          <a-statistic title="账单未收金额" :value="formatAmount(linkage?.billOutstandingAmount)" suffix="元" />
+        </a-card>
+      </a-col>
+    </a-row>
+
     <a-row :gutter="16">
-      <a-col :xs="24" :lg="14">
-        <a-card title="附件中心" class="card-elevated" :bordered="false">
-          <a-space wrap style="margin-bottom: 12px">
-            <a-button @click="downloadBundle">下载清单</a-button>
-            <a-button @click="goContractManagement">查看合同详情</a-button>
-            <a-button @click="go('/finance/bill')">前往费用账单</a-button>
-          </a-space>
-          <a-alert
-            type="info"
-            show-icon
-            message="合同签署与附件上传统一在【营销管理-合同签约】中完成，本页面仅做已签署合同与票据只读展示。"
-            style="margin-bottom: 12px"
-          />
-          <StatefulBlock :loading="loading" :error="errorMessage" :empty="!rows.length" empty-text="暂无附件" @retry="loadLinkage">
-            <a-table :columns="columns" :data-source="rows" row-key="id" :pagination="false">
+      <a-col :xs="24" :lg="16">
+        <a-card class="card-elevated" :bordered="false" title="资料清单">
+          <template #extra>
+            <a-space wrap>
+              <a-button @click="loadAll">刷新</a-button>
+              <a-button @click="downloadBundle" :disabled="!filteredDocuments.length">导出清单</a-button>
+              <a-button type="primary" @click="goContractSigning">去上传附件</a-button>
+            </a-space>
+          </template>
+
+          <a-form layout="inline" class="search-bar" :model="filters">
+            <a-form-item label="资料类型">
+              <a-select v-model:value="filters.kind" style="width: 140px">
+                <a-select-option value="ALL">全部</a-select-option>
+                <a-select-option value="ATTACHMENT">合同附件</a-select-option>
+                <a-select-option value="ASSESSMENT">评估报告</a-select-option>
+              </a-select>
+            </a-form-item>
+            <a-form-item label="关键字">
+              <a-input v-model:value="filters.keyword" allow-clear placeholder="文件名/类型" style="width: 220px" />
+            </a-form-item>
+            <a-form-item>
+              <a-space>
+                <a-button type="primary" @click="applyFilters">搜索</a-button>
+                <a-button @click="resetFilters">清空</a-button>
+              </a-space>
+            </a-form-item>
+          </a-form>
+
+          <StatefulBlock :loading="loading" :error="errorMessage" :empty="!filteredDocuments.length" empty-text="暂无合同附件或评估报告" @retry="loadAll">
+            <a-table :columns="columns" :data-source="filteredDocuments" row-key="id" :pagination="false" :scroll="{ x: 980 }">
               <template #bodyCell="{ column, record }">
-                <template v-if="column.key === 'url'">
-                  <a v-if="record.url" :href="record.url" target="_blank" rel="noopener noreferrer">查看</a>
-                  <a v-else-if="record.route" @click.prevent="go(record.route)">查看评估</a>
-                  <span v-else>-</span>
+                <template v-if="column.key === 'kind'">
+                  <a-tag :color="record.kind === 'ASSESSMENT' ? 'purple' : 'blue'">
+                    {{ record.kind === 'ASSESSMENT' ? '评估报告' : '合同附件' }}
+                  </a-tag>
+                </template>
+                <template v-else-if="column.key === 'type'">
+                  <a-tag>{{ record.type }}</a-tag>
+                </template>
+                <template v-else-if="column.key === 'action'">
+                  <a-space>
+                    <a v-if="record.url" :href="record.url" target="_blank" rel="noopener noreferrer">查看</a>
+                    <a v-else-if="record.route" @click.prevent="go(record.route)">查看评估</a>
+                    <span v-else>-</span>
+                  </a-space>
                 </template>
               </template>
             </a-table>
           </StatefulBlock>
+
+          <a-alert
+            v-if="!loading && !errorMessage && !documents.length"
+            type="warning"
+            show-icon
+            style="margin-top: 12px"
+            message="未检索到资料"
+            description="请先在营销管理-合同签约上传合同附件；入住评估完成后，评估报告会自动在此展示。"
+          />
         </a-card>
       </a-col>
 
-      <a-col :xs="24" :lg="10">
-        <a-card title="结构化字段" class="card-elevated" :bordered="false" style="margin-bottom: 16px">
-          <StatefulBlock :loading="loading" :error="errorMessage" @retry="loadLinkage">
+      <a-col :xs="24" :lg="8">
+        <a-card title="合同结构化信息" class="card-elevated" :bordered="false" style="margin-bottom: 16px">
+          <StatefulBlock :loading="loading" :error="errorMessage" @retry="loadAll">
             <a-descriptions :column="1" size="small" bordered>
               <a-descriptions-item label="合同号">{{ linkage?.contractNo || '-' }}</a-descriptions-item>
               <a-descriptions-item label="签约状态">{{ linkage?.contractStatus || '-' }}</a-descriptions-item>
               <a-descriptions-item label="签约时间">{{ linkage?.contractSignedAt || '-' }}</a-descriptions-item>
               <a-descriptions-item label="合同有效期止">{{ linkage?.contractExpiryDate || '-' }}</a-descriptions-item>
               <a-descriptions-item label="入住日期">{{ linkage?.admissionDate || '-' }}</a-descriptions-item>
-              <a-descriptions-item label="押金">{{ formatAmount(linkage?.depositAmount) }}</a-descriptions-item>
+              <a-descriptions-item label="押金">{{ formatAmount(linkage?.depositAmount) }} 元</a-descriptions-item>
             </a-descriptions>
           </StatefulBlock>
         </a-card>
 
-        <a-card title="票据联动摘要" class="card-elevated" :bordered="false">
-          <StatefulBlock :loading="loading" :error="errorMessage" @retry="loadLinkage">
-            <a-descriptions :column="1" size="small" bordered>
-              <a-descriptions-item label="账单数量">{{ linkage?.billCount ?? 0 }}</a-descriptions-item>
-              <a-descriptions-item label="账单总额">{{ formatAmount(linkage?.billTotalAmount) }}</a-descriptions-item>
-              <a-descriptions-item label="已收金额">{{ formatAmount(linkage?.billPaidAmount) }}</a-descriptions-item>
-              <a-descriptions-item label="未收金额">{{ formatAmount(linkage?.billOutstandingAmount) }}</a-descriptions-item>
-              <a-descriptions-item label="合同附件">{{ linkage?.attachmentCount ?? 0 }}</a-descriptions-item>
-              <a-descriptions-item label="评估报告">{{ assessmentReportCount }}</a-descriptions-item>
-              <a-descriptions-item label="总资料数">{{ totalDocumentCount }}</a-descriptions-item>
-            </a-descriptions>
-          </StatefulBlock>
+        <a-card title="快捷入口" class="card-elevated" :bordered="false">
+          <a-space direction="vertical" style="width: 100%">
+            <a-button block @click="goContractManagement">合同到期管理</a-button>
+            <a-button block @click="goAssessmentArchive">评估档案</a-button>
+            <a-button block @click="go('/finance/resident-bill-payment')">费用账单</a-button>
+          </a-space>
         </a-card>
       </a-col>
     </a-row>
@@ -61,12 +113,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
-import { getContractAssessmentOverview, getContractLinkageByElder } from '../../../api/marketing'
+import {
+  getContractAssessmentOverview,
+  getContractLinkageByContract,
+  getContractLinkageByElder,
+  getContractLinkageByLead
+} from '../../../api/marketing'
 import type {
   ContractAssessmentOverview,
   ContractAssessmentReportItem,
@@ -74,107 +131,102 @@ import type {
   ContractLinkageSummary
 } from '../../../types'
 
+type DocumentKind = 'ATTACHMENT' | 'ASSESSMENT'
+
+interface DocumentItem {
+  id: string
+  kind: DocumentKind
+  type: string
+  name: string
+  url?: string
+  route?: string
+  size: string
+  time: string
+}
+
 const router = useRouter()
 const route = useRoute()
 const loading = ref(false)
 const errorMessage = ref('')
 const linkage = ref<ContractLinkageSummary>()
 const assessmentOverview = ref<ContractAssessmentOverview>()
+const filters = reactive({
+  kind: 'ALL',
+  keyword: ''
+})
+const searchSnapshot = reactive({
+  kind: 'ALL',
+  keyword: ''
+})
 
 const columns = [
-  { title: '类型', dataIndex: 'type', key: 'type', width: 120 },
+  { title: '来源', dataIndex: 'kind', key: 'kind', width: 110 },
+  { title: '资料类型', dataIndex: 'type', key: 'type', width: 140 },
   { title: '文件名', dataIndex: 'name', key: 'name' },
-  { title: '文件链接', dataIndex: 'url', key: 'url', width: 260 },
-  { title: '大小', dataIndex: 'size', key: 'size', width: 120 },
-  { title: '上传时间', dataIndex: 'time', key: 'time', width: 180 }
+  { title: '大小', dataIndex: 'size', key: 'size', width: 110 },
+  { title: '时间', dataIndex: 'time', key: 'time', width: 150 },
+  { title: '操作', key: 'action', width: 100, fixed: 'right' }
 ]
 
-const rows = computed(() => {
-  const attachments = linkage.value?.attachments || []
-  const attachmentRows = attachments.map((item) => ({
-    id: item.id,
-    type: normalizeType(item),
-    name: item.fileName,
+const documents = computed<DocumentItem[]>(() => {
+  const attachments = (linkage.value?.attachments || []).map((item) => ({
+    id: `att-${item.id}`,
+    kind: 'ATTACHMENT' as DocumentKind,
+    type: normalizeAttachmentType(item),
+    name: item.fileName || '未命名附件',
     url: item.fileUrl,
     route: '',
     size: formatFileSize(item.fileSize),
     time: item.createTime || '-'
   }))
-  const reportRows = flattenReports(assessmentOverview.value).map((item) => ({
-    id: `report-${item.recordId}`,
-    type: '评估报告',
-    name: buildAssessmentReportName(item),
+  const reports = flattenReports(assessmentOverview.value).map((report) => ({
+    id: `report-${report.recordId}`,
+    kind: 'ASSESSMENT' as DocumentKind,
+    type: mapAssessmentType(report.assessmentType),
+    name: buildAssessmentReportName(report),
     url: '',
     route: `/assessment/ability/archive?elderId=${encodeURIComponent(String(linkage.value?.elderId || ''))}`,
     size: '-',
-    time: item.assessmentDate || '-'
+    time: report.assessmentDate || '-'
   }))
-  return [...attachmentRows, ...reportRows]
+  return [...attachments, ...reports]
 })
-const assessmentReportCount = computed(() => flattenReports(assessmentOverview.value).length)
-const totalDocumentCount = computed(() => (linkage.value?.attachmentCount || 0) + assessmentReportCount.value)
 
-function normalizeType(item: ContractAttachmentItem) {
-  const attachmentType = item.attachmentType || item.remark
-  if (attachmentType === 'INVOICE') {
-    return '收据/发票'
-  }
-  if (attachmentType === 'CONTRACT') {
-    return '合同'
-  }
-  if (attachmentType === 'MEDICAL_RECORD') {
-    return '病历资料'
-  }
-  if (attachmentType === 'MEDICAL_INSURANCE') {
-    return '医保复印件'
-  }
-  if (attachmentType === 'HOUSEHOLD') {
-    return '户口复印件'
-  }
-  const fileName = (item.fileName || '').toLowerCase()
-  if (fileName.includes('发票') || fileName.includes('invoice') || fileName.includes('receipt')) {
-    return '收据/发票'
-  }
-  if (fileName.includes('合同') || fileName.includes('contract')) {
-    return '合同'
-  }
-  return item.fileType || '附件'
-}
-
-function flattenReports(source?: ContractAssessmentOverview) {
-  const contracts = source?.contracts || []
-  const reportList: ContractAssessmentReportItem[] = []
-  contracts.forEach((item) => {
-    if (item.reports?.length) {
-      reportList.push(...item.reports)
-    }
+const filteredDocuments = computed(() => {
+  const keyword = searchSnapshot.keyword.trim().toLowerCase()
+  return documents.value.filter((item) => {
+    const kindMatch = searchSnapshot.kind === 'ALL' ? true : item.kind === searchSnapshot.kind
+    const keywordMatch = !keyword
+      ? true
+      : item.name.toLowerCase().includes(keyword) || item.type.toLowerCase().includes(keyword)
+    return kindMatch && keywordMatch
   })
-  if (source?.unassignedReports?.length) {
-    reportList.push(...source.unassignedReports)
-  }
-  return reportList
+})
+
+const contractAttachmentCount = computed(() => linkage.value?.attachmentCount || 0)
+const assessmentReportCount = computed(() => flattenReports(assessmentOverview.value).length)
+
+function applyFilters() {
+  searchSnapshot.kind = filters.kind
+  searchSnapshot.keyword = filters.keyword
 }
 
-function buildAssessmentReportName(report: ContractAssessmentReportItem) {
-  const typeLabel = mapAssessmentType(report.assessmentType)
-  const level = report.levelCode ? `-${report.levelCode}` : ''
-  const score = report.score !== undefined && report.score !== null ? `-${report.score}分` : ''
-  return `${typeLabel}报告${level}${score}`
-}
-
-function mapAssessmentType(type?: string) {
-  if (type === 'ADMISSION') return '入住评估'
-  if (type === 'REGISTRATION') return '登记评估'
-  if (type === 'CONTINUOUS') return '持续评估'
-  if (type === 'ARCHIVE') return '评估档案'
-  if (type === 'COGNITIVE') return '认知评估'
-  if (type === 'SELF_CARE') return '自理能力评估'
-  if (type === 'OTHER_SCALE') return '其他量表评估'
-  return '评估'
+function resetFilters() {
+  filters.kind = 'ALL'
+  filters.keyword = ''
+  applyFilters()
 }
 
 function go(path: string) {
   router.push(path)
+}
+
+function goContractSigning() {
+  if (linkage.value?.contractNo) {
+    router.push(`/marketing/contract-signing?contractNo=${encodeURIComponent(linkage.value.contractNo)}`)
+    return
+  }
+  router.push('/marketing/contract-signing')
 }
 
 function goContractManagement() {
@@ -185,20 +237,58 @@ function goContractManagement() {
   router.push('/marketing/contract-management')
 }
 
-function downloadBundle() {
-  const content = rows.value
-    .map((item) => `${item.type},${item.name},${item.url || '-'},${item.size},${item.time}`)
-    .join('\n')
-  const csv = `类型,文件名,文件链接,大小,上传时间\n${content}`
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = '合同与票据-附件清单.csv'
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
+function goAssessmentArchive() {
+  const elderId = linkage.value?.elderId
+  if (elderId) {
+    router.push(`/assessment/ability/archive?elderId=${elderId}`)
+    return
+  }
+  router.push('/assessment/ability/archive')
+}
+
+function flattenReports(source?: ContractAssessmentOverview) {
+  const contracts = source?.contracts || []
+  const list: ContractAssessmentReportItem[] = []
+  contracts.forEach((item) => {
+    if (item.reports?.length) {
+      list.push(...item.reports)
+    }
+  })
+  if (source?.unassignedReports?.length) {
+    list.push(...source.unassignedReports)
+  }
+  return list
+}
+
+function normalizeAttachmentType(item: ContractAttachmentItem) {
+  const type = (item.attachmentType || '').toUpperCase()
+  if (type === 'INVOICE') return '收据/发票'
+  if (type === 'CONTRACT') return '合同'
+  if (type === 'MEDICAL_RECORD') return '病历资料'
+  if (type === 'MEDICAL_INSURANCE') return '医保复印件'
+  if (type === 'HOUSEHOLD') return '户口复印件'
+  const fileName = (item.fileName || '').toLowerCase()
+  if (fileName.includes('发票') || fileName.includes('invoice') || fileName.includes('receipt')) return '收据/发票'
+  if (fileName.includes('合同') || fileName.includes('contract')) return '合同'
+  return item.fileType || '附件'
+}
+
+function buildAssessmentReportName(report: ContractAssessmentReportItem) {
+  const typeLabel = mapAssessmentType(report.assessmentType)
+  const score = report.score === undefined || report.score === null ? '' : `-${report.score}分`
+  const level = report.levelCode ? `-${report.levelCode}` : ''
+  return `${typeLabel}报告${level}${score}`
+}
+
+function mapAssessmentType(type?: string) {
+  if (type === 'ADMISSION') return '入住评估'
+  if (type === 'REGISTRATION') return '登记评估'
+  if (type === 'CONTINUOUS') return '持续评估'
+  if (type === 'ARCHIVE') return '评估档案'
+  if (type === 'COGNITIVE') return '认知评估'
+  if (type === 'SELF_CARE') return '自理能力评估'
+  if (type === 'OTHER_SCALE') return '其他量表'
+  return '评估'
 }
 
 function formatFileSize(size?: number) {
@@ -209,32 +299,114 @@ function formatFileSize(size?: number) {
 }
 
 function formatAmount(value?: number) {
-  const amount = value ?? 0
-  return amount.toFixed(2)
+  return Number(value || 0).toFixed(2)
 }
 
-async function loadLinkage() {
-  const residentId = String(route.query.residentId || route.query.elderId || '').trim()
-  if (!residentId) {
-    linkage.value = undefined
-    assessmentOverview.value = undefined
-    return
+function downloadBundle() {
+  const content = filteredDocuments.value
+    .map((item) => `${item.kind === 'ASSESSMENT' ? '评估报告' : '合同附件'},${item.type},${item.name},${item.time}`)
+    .join('\n')
+  const csv = `来源,资料类型,文件名,时间\n${content}`
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = '合同与票据清单.csv'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+async function safeLinkageByElder(elderId: string) {
+  try {
+    return await getContractLinkageByElder(elderId)
+  } catch {
+    return undefined
   }
+}
+
+async function safeLinkageByContract(contractId: string) {
+  try {
+    return await getContractLinkageByContract(contractId)
+  } catch {
+    return undefined
+  }
+}
+
+async function safeLinkageByLead(leadId: string) {
+  try {
+    return await getContractLinkageByLead(leadId)
+  } catch {
+    return undefined
+  }
+}
+
+async function resolveLinkage() {
+  const elderId = String(route.query.elderId || '').trim()
+  const residentId = String(route.query.residentId || '').trim()
+  const contractId = String(route.query.contractId || '').trim()
+  const leadId = String(route.query.leadId || '').trim()
+
+  const byElder = elderId || residentId
+  if (byElder) {
+    const linked = await safeLinkageByElder(byElder)
+    if (linked) return linked
+  }
+
+  const byContract = contractId || residentId
+  if (byContract) {
+    const linked = await safeLinkageByContract(byContract)
+    if (linked) return linked
+  }
+
+  const byLead = leadId || residentId
+  if (byLead) {
+    const linked = await safeLinkageByLead(byLead)
+    if (linked) return linked
+  }
+
+  return undefined
+}
+
+async function loadAll() {
   loading.value = true
   errorMessage.value = ''
   try {
-    linkage.value = await getContractLinkageByElder(residentId)
-    const elderIdForAssessment = String(linkage.value?.elderId || residentId)
-    assessmentOverview.value = await getContractAssessmentOverview({ elderId: elderIdForAssessment })
+    linkage.value = await resolveLinkage()
+    if (!linkage.value) {
+      assessmentOverview.value = undefined
+      return
+    }
+
+    const elderId = linkage.value.elderId
+    const leadId = linkage.value.leadId
+    if (elderId || leadId) {
+      assessmentOverview.value = await getContractAssessmentOverview({
+        elderId: elderId ? String(elderId) : undefined,
+        leadId: leadId ? String(leadId) : undefined
+      })
+    } else {
+      assessmentOverview.value = undefined
+    }
   } catch (error: any) {
-    errorMessage.value = error?.message || '加载合同与票据失败'
     linkage.value = undefined
     assessmentOverview.value = undefined
+    errorMessage.value = error?.message || '加载合同与票据失败'
     message.error(errorMessage.value)
   } finally {
     loading.value = false
   }
 }
 
-onMounted(loadLinkage)
+onMounted(async () => {
+  applyFilters()
+  await loadAll()
+})
 </script>
+
+<style scoped>
+.search-bar {
+  margin-bottom: 12px;
+}
+</style>

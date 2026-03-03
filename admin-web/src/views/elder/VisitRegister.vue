@@ -17,7 +17,7 @@
           <a-space>
             <a-button type="primary" :loading="loading" @click="fetchData">搜索</a-button>
             <a-button @click="reset">清空</a-button>
-            <a-button type="primary" ghost @click="openCreate">新增来访</a-button>
+            <a-button type="primary" @click="openCreate">新增来访</a-button>
           </a-space>
         </a-form-item>
       </a-form>

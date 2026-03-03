@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="合同管理" sub-title="合同到期提醒、短信触达与统一维护">
+  <PageContainer title="合同到期管理" sub-title="合同到期提醒、短信触达与统一维护">
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item label="合同编号">

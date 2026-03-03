@@ -241,7 +241,7 @@ export const routes = [
                         path: 'contract-management',
                         name: 'MarketingContractManagement',
                         component: () => import('../views/marketing/ContractManagement.vue'),
-                        meta: { title: '合同管理' }
+                        meta: { title: '合同到期管理' }
                     },
                     {
                         path: 'plan',

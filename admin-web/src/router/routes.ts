@@ -82,14 +82,65 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'status-change',
             name: 'ElderStatusChangeCenter',
-            component: () => import('../views/elder/resident360/StatusChangeCenter.vue'),
-            meta: { title: '入住状态变更' }
+            component: () => import('../layouts/RouteView.vue'),
+            meta: { title: '入住状态变更' },
+            redirect: '/elder/status-change/center',
+            children: [
+              {
+                path: 'center',
+                name: 'ElderStatusChangeOverview',
+                component: () => import('../views/elder/resident360/StatusChangeCenter.vue'),
+                meta: { title: '变更总览' }
+              },
+              {
+                path: 'outing',
+                name: 'ElderStatusChangeOuting',
+                component: () => import('../views/elder/Outing.vue'),
+                meta: { title: '外出登记' }
+              },
+              {
+                path: 'visit-register',
+                name: 'ElderStatusChangeVisitRegister',
+                component: () => import('../views/elder/VisitRegister.vue'),
+                meta: { title: '来访登记' }
+              },
+              {
+                path: 'discharge-apply',
+                name: 'ElderStatusChangeDischargeApply',
+                component: () => import('../views/elder/DischargeApply.vue'),
+                meta: { title: '退住申请' }
+              },
+              {
+                path: 'trial-stay',
+                name: 'ElderStatusChangeTrialStay',
+                component: () => import('../views/elder/TrialStay.vue'),
+                meta: { title: '试住登记' }
+              },
+              {
+                path: 'medical-outing',
+                name: 'ElderStatusChangeMedicalOuting',
+                component: () => import('../views/elder/MedicalOuting.vue'),
+                meta: { title: '外出就医登记', roles: ['ADMIN', 'STAFF'] }
+              },
+              {
+                path: 'death-register',
+                name: 'ElderStatusChangeDeathRegister',
+                component: () => import('../views/elder/DeathRegister.vue'),
+                meta: { title: '死亡登记', roles: ['ADMIN', 'STAFF'] }
+              },
+              {
+                path: 'discharge-settlement',
+                name: 'ElderStatusChangeDischargeSettlement',
+                component: () => import('../views/elder/resident360/DischargeSettlement.vue'),
+                meta: { title: '退院结算' }
+              }
+            ]
           },
           {
             path: 'discharge-settlement',
             name: 'ElderDischargeSettlement',
-            component: () => import('../views/elder/resident360/DischargeSettlement.vue'),
-            meta: { title: '退院结算' }
+            redirect: '/elder/status-change/discharge-settlement',
+            meta: { hidden: true }
           },
           {
             path: 'create',
@@ -124,14 +175,14 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'outing',
             name: 'ElderOuting',
-            component: () => import('../views/elder/Outing.vue'),
-            meta: { title: '外出登记' }
+            redirect: '/elder/status-change/outing',
+            meta: { hidden: true }
           },
           {
             path: 'visit-register',
             name: 'ElderVisitRegister',
-            component: () => import('../views/elder/VisitRegister.vue'),
-            meta: { title: '来访登记' }
+            redirect: '/elder/status-change/visit-register',
+            meta: { hidden: true }
           },
           {
             path: 'incident',
@@ -142,8 +193,8 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'discharge-apply',
             name: 'ElderDischargeApply',
-            component: () => import('../views/elder/DischargeApply.vue'),
-            meta: { title: '退住申请' }
+            redirect: '/elder/status-change/discharge-apply',
+            meta: { hidden: true }
           },
           {
             path: 'discharge',
@@ -154,20 +205,20 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'trial-stay',
             name: 'ElderTrialStay',
-            component: () => import('../views/elder/TrialStay.vue'),
-            meta: { title: '试住登记' }
+            redirect: '/elder/status-change/trial-stay',
+            meta: { hidden: true }
           },
           {
             path: 'medical-outing',
             name: 'ElderMedicalOutingRegister',
-            component: () => import('../views/elder/MedicalOuting.vue'),
-            meta: { title: '外出就医登记', roles: ['ADMIN', 'STAFF'] }
+            redirect: '/elder/status-change/medical-outing',
+            meta: { hidden: true }
           },
           {
             path: 'death-register',
             name: 'ElderDeathRegister',
-            component: () => import('../views/elder/DeathRegister.vue'),
-            meta: { title: '死亡登记', roles: ['ADMIN', 'STAFF'] }
+            redirect: '/elder/status-change/death-register',
+            meta: { hidden: true }
           },
           {
             path: 'change-log',
@@ -243,7 +294,7 @@ export const routes: RouteRecordRaw[] = [
             path: 'contract-management',
             name: 'MarketingContractManagement',
             component: () => import('../views/marketing/ContractManagement.vue'),
-            meta: { title: '合同管理' }
+            meta: { title: '合同到期管理' }
           },
           {
             path: 'plan',
