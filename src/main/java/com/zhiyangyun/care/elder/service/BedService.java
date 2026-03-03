@@ -12,7 +12,7 @@ public interface BedService {
   BedResponse get(Long id, Long tenantId);
 
   IPage<BedResponse> page(Long orgId, long pageNo, long pageSize,
-      String keyword, Integer status, String bedNo, String roomNo, String elderName);
+      String keyword, Integer status, String bedNo, String roomNo, String elderName, String roomType, String bedType);
 
   java.util.List<BedResponse> list(Long orgId);
 

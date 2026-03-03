@@ -135,7 +135,7 @@ import { exportCsv } from '../../utils/export'
 import { getElderPage, assignBed, bindFamily } from '../../api/elder'
 import { getBedList } from '../../api/bed'
 import { getFamilyUserPage } from '../../api/family'
-import type { BedItem, ElderItem, FamilyBindRequest, PageResult, FamilyUserItem } from '../../types/api'
+import type { BedItem, ElderItem, FamilyBindRequest, PageResult, FamilyUserItem, Id } from '../../types/api'
 
 const router = useRouter()
 const loading = ref(false)
@@ -174,7 +174,7 @@ const bedOptions = computed(() =>
 
 const changeBedOpen = ref(false)
 const changeBedFormRef = ref<FormInstance>()
-const changeBedForm = reactive<{ elderId?: number; bedId?: number; startDate?: string }>({})
+const changeBedForm = reactive<{ elderId?: Id; bedId?: Id; startDate?: string }>({})
 const changeBedRules: FormRules = {
   bedId: [{ required: true, message: '请选择床位' }],
   startDate: [{ required: true, message: '请选择开始日期' }]
@@ -182,12 +182,12 @@ const changeBedRules: FormRules = {
 
 const bindOpen = ref(false)
 const bindFormRef = ref<FormInstance>()
-const bindForm = reactive<FamilyBindRequest>({ familyUserId: 0, elderId: 0, relation: '', isPrimary: false })
+const bindForm = reactive<FamilyBindRequest>({ familyUserId: '', elderId: '', relation: '', isPrimary: false })
 const bindRules: FormRules = {
   familyUserId: [{ required: true, message: '请选择家属' }],
   relation: [{ required: true, message: '请输入关系' }]
 }
-const familyOptions = ref<Array<{ label: string; value: number }>>([])
+const familyOptions = ref<Array<{ label: string; value: Id }>>([])
 
 const qrOpen = ref(false)
 const qrDataUrl = ref('')
@@ -315,11 +315,11 @@ function goCreate() {
   router.push('/elder/create')
 }
 
-function goEdit(id: number) {
+function goEdit(id: Id) {
   router.push(`/elder/edit/${id}`)
 }
 
-function goDetail(id: number) {
+function goDetail(id: Id) {
   router.push(`/elder/detail/${id}`)
 }
 
@@ -356,7 +356,7 @@ function openCheckout(row: ElderItem) {
 
 function openBindFamily(row: ElderItem) {
   bindForm.elderId = row.id
-  bindForm.familyUserId = 0
+  bindForm.familyUserId = ''
   bindForm.relation = ''
   bindForm.isPrimary = false
   loadFamilyUsers()

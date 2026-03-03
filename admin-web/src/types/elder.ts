@@ -1,5 +1,7 @@
+import type { Id } from './common'
+
 export interface ElderItem {
-  id: number
+  id: Id
   fullName: string
   idCard?: string
   idCardNo?: string
@@ -12,7 +14,7 @@ export interface ElderItem {
   careLevel?: string
   riskPrecommit?: 'RESCUE_FIRST' | 'NOTIFY_FAMILY_FIRST'
   status?: number
-  bedId?: number
+  bedId?: Id
   bedStartDate?: string
   bedNo?: string
   roomNo?: string
@@ -35,12 +37,12 @@ export interface ElderCreateRequest {
   riskPrecommit?: 'RESCUE_FIRST' | 'NOTIFY_FAMILY_FIRST'
   status?: number
   remark?: string
-  bedId?: number
+  bedId?: Id
   bedStartDate?: string
 }
 
 export interface ElderAssignBedRequest {
-  bedId: number
+  bedId: Id
   startDate: string
 }
 
@@ -50,8 +52,8 @@ export interface ElderUnbindRequest {
 }
 
 export interface ElderDiseaseItem {
-  id: number
-  diseaseId: number
+  id: Id
+  diseaseId: Id
   diseaseName?: string
 }
 
@@ -60,8 +62,8 @@ export interface ElderDiseaseUpdateRequest {
 }
 
 export interface FamilyBindingItem {
-  id: number
-  familyUserId: number
+  id: Id
+  familyUserId: Id
   familyName?: string
   phone?: string
   relation?: string
@@ -69,7 +71,7 @@ export interface FamilyBindingItem {
 }
 
 export interface FamilyUserItem {
-  id: number
+  id: Id
   realName?: string
   phone?: string
   idCardNo?: string
@@ -78,8 +80,8 @@ export interface FamilyUserItem {
 }
 
 export interface FamilyRelationItem {
-  id: number
-  familyUserId: number
+  id: Id
+  familyUserId: Id
   realName?: string
   phone?: string
   relation?: string
@@ -87,14 +89,14 @@ export interface FamilyRelationItem {
 }
 
 export interface FamilyBindRequest {
-  familyUserId: number
-  elderId: number
+  familyUserId: Id
+  elderId: Id
   relation: string
   isPrimary?: boolean
 }
 
 export interface CrmLeadItem {
-  id: number | string
+  id: Id
   name: string
   phone?: string
   consultantName?: string
@@ -116,7 +118,7 @@ export interface CrmLeadItem {
   idCardNo?: string
   reservationAmount?: number
   reservationRoomNo?: string
-  reservationBedId?: number
+  reservationBedId?: Id
   paymentTime?: string
   refunded?: number
   reservationChannel?: string
@@ -140,17 +142,17 @@ export interface CrmLeadItem {
 }
 
 export interface AdmissionRequest {
-  elderId: number
+  elderId: Id
   admissionDate: string
   contractNo?: string
   depositAmount?: number
-  bedId?: number
+  bedId?: Id
   bedStartDate?: string
   remark?: string
 }
 
 export interface DischargeRequest {
-  elderId: number
+  elderId: Id
   dischargeDate: string
   reason?: string
   settleAmount?: number
@@ -158,8 +160,8 @@ export interface DischargeRequest {
 }
 
 export interface ChangeLogItem {
-  id: number
-  elderId: number
+  id: Id
+  elderId: Id
   elderName?: string
   changeType: string
   beforeValue?: string
@@ -187,7 +189,7 @@ export interface AdmissionRecordQuery {
 export interface ChangeLogQuery {
   pageNo?: number
   pageSize?: number
-  elderId?: number
+  elderId?: Id
   changeType?: string
   reason?: string
   startTime?: string
@@ -197,14 +199,14 @@ export interface ChangeLogQuery {
 export interface OutingQuery {
   pageNo?: number
   pageSize?: number
-  elderId?: number
+  elderId?: Id
   status?: OutingStatus
 }
 
 export interface TrialStayQuery {
   pageNo?: number
   pageSize?: number
-  elderId?: number
+  elderId?: Id
   status?: TrialStayStatus
   keyword?: string
   trialStartDateFrom?: string
@@ -214,7 +216,7 @@ export interface TrialStayQuery {
 export interface DischargeApplyQuery {
   pageNo?: number
   pageSize?: number
-  elderId?: number
+  elderId?: Id
   status?: DischargeApplyStatus
   keyword?: string
   plannedDateFrom?: string
@@ -224,7 +226,7 @@ export interface DischargeApplyQuery {
 export interface MedicalOutingQuery {
   pageNo?: number
   pageSize?: number
-  elderId?: number
+  elderId?: Id
   status?: MedicalOutingStatus
   keyword?: string
 }
@@ -232,7 +234,7 @@ export interface MedicalOutingQuery {
 export interface DeathRegisterQuery {
   pageNo?: number
   pageSize?: number
-  elderId?: number
+  elderId?: Id
   status?: DeathRegisterStatus
   keyword?: string
 }
@@ -251,8 +253,8 @@ export interface ResidenceStatusSummary {
 }
 
 export interface AdmissionRecordItem {
-  id: number
-  elderId: number
+  id: Id
+  elderId: Id
   elderName?: string
   contractNo?: string
   admissionDate?: string
@@ -263,8 +265,8 @@ export interface AdmissionRecordItem {
 }
 
 export interface OutingItem {
-  id: number
-  elderId: number
+  id: Id
+  elderId: Id
   elderName?: string
   outingDate: string
   expectedReturnTime?: string
@@ -277,7 +279,7 @@ export interface OutingItem {
 }
 
 export interface OutingCreateRequest {
-  elderId: number
+  elderId: Id
   outingDate: string
   expectedReturnTime?: string
   companion?: string
@@ -291,8 +293,8 @@ export interface OutingReturnRequest {
 }
 
 export interface MedicalOutingItem {
-  id: number
-  elderId: number
+  id: Id
+  elderId: Id
   elderName?: string
   outingDate: string
   expectedReturnTime?: string
@@ -308,7 +310,7 @@ export interface MedicalOutingItem {
 }
 
 export interface MedicalOutingCreateRequest {
-  elderId: number
+  elderId: Id
   outingDate: string
   expectedReturnTime?: string
   hospitalName?: string
@@ -325,8 +327,8 @@ export interface MedicalOutingReturnRequest {
 }
 
 export interface TrialStayItem {
-  id: number
-  elderId: number
+  id: Id
+  elderId: Id
   elderName?: string
   trialStartDate: string
   trialEndDate: string
@@ -340,7 +342,7 @@ export interface TrialStayItem {
 }
 
 export interface TrialStayRequest {
-  elderId: number
+  elderId: Id
   trialStartDate: string
   trialEndDate: string
   channel?: string
@@ -352,14 +354,14 @@ export interface TrialStayRequest {
 }
 
 export interface DischargeApplyItem {
-  id: number
-  elderId: number
+  id: Id
+  elderId: Id
   elderName?: string
   applyDate?: string
   plannedDischargeDate: string
   reason: string
   status?: DischargeApplyStatus
-  linkedDischargeId?: number
+  linkedDischargeId?: Id
   autoDischargeStatus?: 'SUCCESS' | 'FAILED'
   autoDischargeMessage?: string
   reviewRemark?: string
@@ -370,7 +372,7 @@ export interface DischargeApplyItem {
 }
 
 export interface DischargeApplyCreateRequest {
-  elderId: number
+  elderId: Id
   plannedDischargeDate: string
   reason: string
 }
@@ -381,8 +383,8 @@ export interface DischargeApplyReviewRequest {
 }
 
 export interface DeathRegisterItem {
-  id: number
-  elderId: number
+  id: Id
+  elderId: Id
   elderName?: string
   deathDate: string
   deathTime?: string
@@ -401,7 +403,7 @@ export interface DeathRegisterItem {
 }
 
 export interface DeathRegisterCreateRequest {
-  elderId: number
+  elderId: Id
   deathDate: string
   deathTime?: string
   place?: string

@@ -154,8 +154,8 @@ type RoomScene = {
 
 const router = useRouter()
 const beds = ref<BedItem[]>([])
-const roomTypeMap = ref<Record<number, string>>({})
-const roomCapacityMap = ref<Record<number, number>>({})
+const roomTypeMap = ref<Record<string, string>>({})
+const roomCapacityMap = ref<Record<string, number>>({})
 const keyword = ref('')
 const selectedBed = ref<BedItem | null>(null)
 const detailOpen = ref(false)
@@ -254,7 +254,7 @@ const roomSceneLookup = computed(() => {
     const [building, floor, roomNo] = key.split('@@')
     const lookupKey = `${building}@@${floor}`
     if (!lookup.has(lookupKey)) lookup.set(lookupKey, [])
-    const roomId = Number(roomBeds[0]?.roomId || 0)
+    const roomId = String(roomBeds[0]?.roomId || '')
     const sortedBeds = [...roomBeds].sort((a, b) => {
       const aEmpty = isEmptyBed(a) ? 0 : 1
       const bEmpty = isEmptyBed(b) ? 0 : 1
@@ -437,11 +437,12 @@ async function loadBeds() {
 
 async function loadRooms() {
   const rooms: RoomItem[] = await getRoomList()
-  const typeMap: Record<number, string> = {}
-  const capMap: Record<number, number> = {}
+  const typeMap: Record<string, string> = {}
+  const capMap: Record<string, number> = {}
   rooms.forEach((item) => {
-    typeMap[item.id] = item.roomType || '标准间'
-    capMap[item.id] = Number(item.capacity || 1)
+    const id = String(item.id)
+    typeMap[id] = item.roomType || '标准间'
+    capMap[id] = Number(item.capacity || 1)
   })
   roomTypeMap.value = typeMap
   roomCapacityMap.value = capMap

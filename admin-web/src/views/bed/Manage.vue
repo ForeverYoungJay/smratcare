@@ -208,6 +208,11 @@
                     <a-select-option :value="0">停用</a-select-option>
                   </a-select>
                 </a-form-item>
+                <a-form-item label="房型">
+                  <a-select v-model:value="roomQuery.roomType" allow-clear style="min-width: 160px" placeholder="全部房型">
+                    <a-select-option v-for="item in roomTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
+                  </a-select>
+                </a-form-item>
                 <a-form-item>
                   <a-space>
                     <a-button type="primary" @click="searchRooms">查询</a-button>
@@ -233,7 +238,10 @@
                 @change="onRoomTableChange"
               >
                 <template #bodyCell="{ column, record }">
-                  <template v-if="column.key === 'status'">
+                  <template v-if="column.key === 'roomType'">
+                    {{ resolveRoomTypeLabel(record.roomType) }}
+                  </template>
+                  <template v-else-if="column.key === 'status'">
                     <a-tag :color="record.status === 1 ? 'green' : 'default'">
                       {{ record.status === 1 ? '可用' : '停用' }}
                     </a-tag>
@@ -278,6 +286,16 @@
                     <a-select-option :value="0">停用</a-select-option>
                   </a-select>
                 </a-form-item>
+                <a-form-item label="房型">
+                  <a-select v-model:value="bedQuery.roomType" allow-clear style="min-width: 160px" placeholder="全部房型">
+                    <a-select-option v-for="item in roomTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
+                  </a-select>
+                </a-form-item>
+                <a-form-item label="床型">
+                  <a-select v-model:value="bedQuery.bedType" allow-clear style="min-width: 160px" placeholder="全部床型">
+                    <a-select-option v-for="item in bedTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
+                  </a-select>
+                </a-form-item>
                 <a-form-item>
                   <a-space>
                     <a-button type="primary" @click="searchBeds">查询</a-button>
@@ -307,7 +325,10 @@
                 @change="onBedTableChange"
               >
                 <template #bodyCell="{ column, record }">
-                  <template v-if="column.key === 'status'">
+                  <template v-if="column.key === 'bedType'">
+                    {{ resolveBedTypeLabel(record.bedType) }}
+                  </template>
+                  <template v-else-if="column.key === 'status'">
                     <a-tag :color="statusTag(record.status)">{{ statusLabel(record.status) }}</a-tag>
                   </template>
                   <template v-else-if="column.key === 'action'">
@@ -584,7 +605,8 @@ import type {
   FloorItem,
   AssetTreeNode,
   PageResult,
-  ResidenceBootstrapRequest
+  ResidenceBootstrapRequest,
+  Id
 } from '../../types'
 
 const router = useRouter()
@@ -597,7 +619,7 @@ const buildingList = ref<BuildingItem[]>([])
 const floors = ref<FloorItem[]>([])
 const floorList = ref<FloorItem[]>([])
 const selected = ref<BedItem[]>([])
-const selectedRowKeys = ref<(string | number)[]>([])
+const selectedRowKeys = ref<Id[]>([])
 const loadingRooms = ref(false)
 const loadingBeds = ref(false)
 const loadingBuildings = ref(false)
@@ -661,8 +683,9 @@ const roomQuery = reactive({
   roomNo: '',
   building: '',
   floorNo: '',
-  buildingId: undefined as number | undefined,
-  floorId: undefined as number | undefined,
+  buildingId: undefined as Id | undefined,
+  floorId: undefined as Id | undefined,
+  roomType: undefined as string | undefined,
   status: undefined as number | undefined,
   sortBy: undefined as string | undefined,
   sortOrder: undefined as string | undefined
@@ -671,6 +694,8 @@ const bedQuery = reactive({
   bedNo: '',
   roomNo: '',
   elderName: '',
+  roomType: undefined as string | undefined,
+  bedType: undefined as string | undefined,
   status: undefined as number | undefined,
   sortBy: undefined as string | undefined,
   sortOrder: undefined as string | undefined
@@ -680,7 +705,7 @@ const buildingQuery = reactive({
   status: undefined as number | undefined
 })
 const floorQuery = reactive({
-  buildingId: undefined as number | undefined,
+  buildingId: undefined as Id | undefined,
   keyword: '',
   status: undefined as number | undefined
 })
@@ -696,6 +721,18 @@ const roomOptions = computed(() =>
 const roomTypeOptions = computed(() => roomTypeItems.value.map((item) => ({ label: item.itemName, value: item.itemCode })))
 const bedTypeOptions = computed(() => bedTypeItems.value.map((item) => ({ label: item.itemName, value: item.itemCode })))
 const areaOptions = computed(() => areaItems.value.map((item) => ({ label: item.itemName, value: item.itemCode })))
+const roomTypeLabelMap = computed(() =>
+  roomTypeItems.value.reduce((acc, item) => {
+    acc[item.itemCode] = item.itemName
+    return acc
+  }, {} as Record<string, string>)
+)
+const bedTypeLabelMap = computed(() =>
+  bedTypeItems.value.reduce((acc, item) => {
+    acc[item.itemCode] = item.itemName
+    return acc
+  }, {} as Record<string, string>)
+)
 const roomFloorOptions = computed(() => {
   if (!roomForm.buildingId) return floorList.value
   return floorList.value.filter((item) => item.buildingId === roomForm.buildingId)
@@ -712,7 +749,7 @@ const buildingNameMap = computed(() =>
   buildingList.value.reduce((acc, item) => {
     acc[item.id] = item.name
     return acc
-  }, {} as Record<number, string>)
+  }, {} as Record<string, string>)
 )
 
 const roomStats = computed(() => {
@@ -801,7 +838,7 @@ const bedColumns = [
 
 const bedRowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
-  onChange: (keys: (string | number)[], rows: BedItem[]) => {
+  onChange: (keys: Id[], rows: BedItem[]) => {
     selectedRowKeys.value = keys
     selected.value = rows
   }
@@ -820,6 +857,37 @@ function statusTag(status?: number) {
   if (status === 2) return 'orange'
   if (status === 3) return 'red'
   return 'default'
+}
+
+function resolveRoomTypeLabel(roomType?: string) {
+  if (!roomType) return '-'
+  return roomTypeLabelMap.value[roomType] || roomType
+}
+
+function resolveBedTypeLabel(bedType?: string) {
+  if (!bedType) return '-'
+  return bedTypeLabelMap.value[bedType] || bedType
+}
+
+function inferCapacityByRoomType(roomType?: string) {
+  const normalized = String(roomType || '').toUpperCase()
+  if (!normalized) return undefined
+  if (normalized.includes('SINGLE') || normalized.includes('ROOM_SINGLE')) return 1
+  if (normalized.includes('DOUBLE') || normalized.includes('ROOM_DOUBLE')) return 2
+  if (normalized.includes('TRIPLE') || normalized.includes('ROOM_TRIPLE')) return 3
+  return undefined
+}
+
+function inferRoomTypeByCapacity(capacity?: number) {
+  if (![1, 2, 3].includes(Number(capacity || 0))) return undefined
+  const fallbackCode = capacity === 1 ? 'ROOM_SINGLE' : capacity === 2 ? 'ROOM_DOUBLE' : 'ROOM_TRIPLE'
+  const preferredName = capacity === 1 ? '单人间' : capacity === 2 ? '双人间' : '三人间'
+  const exact = roomTypeItems.value.find((item) => item.itemName === preferredName)
+  if (exact) return exact.itemCode
+  const fallback = roomTypeItems.value.find((item) => item.itemCode === fallbackCode)
+  if (fallback) return fallback.itemCode
+  const fuzzy = roomTypeItems.value.find((item) => String(item.itemName || '').includes(preferredName.slice(0, 1)))
+  return fuzzy?.itemCode
 }
 
 function treeTypeLabel(type?: string) {
@@ -874,6 +942,7 @@ async function searchRooms() {
       floorNo: roomQuery.floorNo,
       buildingId: roomQuery.buildingId,
       floorId: roomQuery.floorId,
+      roomType: roomQuery.roomType,
       status: roomQuery.status,
       sortBy: roomQuery.sortBy,
       sortOrder: roomQuery.sortOrder
@@ -894,6 +963,8 @@ async function searchBeds() {
       bedNo: bedQuery.bedNo,
       roomNo: bedQuery.roomNo,
       elderName: bedQuery.elderName,
+      roomType: bedQuery.roomType,
+      bedType: bedQuery.bedType,
       status: bedQuery.status,
       sortBy: bedQuery.sortBy,
       sortOrder: bedQuery.sortOrder
@@ -996,6 +1067,7 @@ function resetRooms() {
   roomQuery.floorNo = ''
   roomQuery.buildingId = undefined
   roomQuery.floorId = undefined
+  roomQuery.roomType = undefined
   roomQuery.status = undefined
   roomQuery.sortBy = undefined
   roomQuery.sortOrder = undefined
@@ -1007,6 +1079,8 @@ function resetBeds() {
   bedQuery.bedNo = ''
   bedQuery.roomNo = ''
   bedQuery.elderName = ''
+  bedQuery.roomType = undefined
+  bedQuery.bedType = undefined
   bedQuery.status = undefined
   bedQuery.sortBy = undefined
   bedQuery.sortOrder = undefined
@@ -1291,7 +1365,7 @@ async function submitBootstrap() {
   }
 }
 
-async function removeBuilding(id: number) {
+async function removeBuilding(id: Id) {
   try {
     await confirmAction('确认删除该楼栋吗？', '提示')
     await deleteBuilding(id)
@@ -1304,7 +1378,7 @@ async function removeBuilding(id: number) {
   }
 }
 
-async function removeFloor(id: number) {
+async function removeFloor(id: Id) {
   try {
     await confirmAction('确认删除该楼层吗？', '提示')
     await deleteFloor(id)
@@ -1317,7 +1391,7 @@ async function removeFloor(id: number) {
   }
 }
 
-async function removeRoom(id: number) {
+async function removeRoom(id: Id) {
   try {
     await confirmAction('确认删除该房间吗？', '提示')
     await deleteRoom(id)
@@ -1330,7 +1404,7 @@ async function removeRoom(id: number) {
   }
 }
 
-async function removeBed(id: number) {
+async function removeBed(id: Id) {
   try {
     await confirmAction('确认删除该床位吗？', '提示')
     await deleteBed(id)
@@ -1344,7 +1418,7 @@ async function removeBed(id: number) {
 }
 
 const printOpen = ref(false)
-const printList = ref<{ id: number; qr: string; text: string }[]>([])
+const printList = ref<{ id: Id; qr: string; text: string }[]>([])
 
 async function printSingle(row: BedItem) {
   const text = `BED:${row.id}`
@@ -1397,7 +1471,7 @@ function exportBedCsv() {
   exportCsv(
     beds.value.map((b) => ({
       床位号: b.bedNo,
-      床位类型: b.bedType || '',
+      床位类型: resolveBedTypeLabel(b.bedType),
       房间: b.roomNo || '',
       老人: b.elderName || '',
       护理等级: b.careLevel || '',
@@ -1447,6 +1521,52 @@ watch(
     if (!roomForm.floorId) return
     const exists = roomFloorOptions.value.some((item) => item.id === roomForm.floorId)
     if (!exists) roomForm.floorId = undefined
+  }
+)
+
+watch(
+  () => roomForm.roomType,
+  (roomType) => {
+    const nextCapacity = inferCapacityByRoomType(roomType)
+    if (!nextCapacity) return
+    if (roomForm.capacity !== nextCapacity) {
+      roomForm.capacity = nextCapacity
+    }
+  }
+)
+
+watch(
+  () => roomForm.capacity,
+  (capacity) => {
+    const nextRoomType = inferRoomTypeByCapacity(Number(capacity || 0))
+    if (!nextRoomType) return
+    if (roomForm.roomType !== nextRoomType) {
+      roomForm.roomType = nextRoomType
+    }
+  }
+)
+
+watch(
+  () => bootstrapForm.roomType,
+  (roomType) => {
+    if (bootstrapForm.templateCode === 'AB_F1_6_R101_130_B01_03') return
+    const next = inferCapacityByRoomType(roomType)
+    if (!next) return
+    if (bootstrapForm.bedsPerRoom !== next) {
+      bootstrapForm.bedsPerRoom = next
+    }
+  }
+)
+
+watch(
+  () => bootstrapForm.bedsPerRoom,
+  (bedsPerRoom) => {
+    if (bootstrapForm.templateCode === 'AB_F1_6_R101_130_B01_03') return
+    const next = inferRoomTypeByCapacity(Number(bedsPerRoom || 0))
+    if (!next) return
+    if (bootstrapForm.roomType !== next) {
+      bootstrapForm.roomType = next
+    }
   }
 )
 

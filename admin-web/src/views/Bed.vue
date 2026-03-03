@@ -120,7 +120,7 @@ import PageContainer from '../components/PageContainer.vue'
 import SearchForm from '../components/SearchForm.vue'
 import DataTable from '../components/DataTable.vue'
 import { getRoomPage, getBedPage, getRoomList, getBedList, createRoom, updateRoom, deleteRoom, createBed, updateBed, deleteBed } from '../api/bed'
-import type { RoomItem, BedItem, PageResult } from '../types/api'
+import type { RoomItem, BedItem, PageResult, Id } from '../types/api'
 
 const rooms = ref<RoomItem[]>([])
 const roomAll = ref<RoomItem[]>([])
@@ -173,13 +173,13 @@ async function load() {
     bedAll.value = bedListRes
   } catch {
     rooms.value = [
-      { id: 10, roomNo: 'A101' },
-      { id: 11, roomNo: 'A102' }
+      { id: '10', roomNo: 'A101' },
+      { id: '11', roomNo: 'A102' }
     ]
     roomAll.value = rooms.value
     beds.value = [
-      { id: 100, bedNo: '01', roomId: 10, status: 1 },
-      { id: 101, bedNo: '02', roomId: 11, status: 1 }
+      { id: '100', bedNo: '01', roomId: '10', status: 1 },
+      { id: '101', bedNo: '02', roomId: '11', status: 1 }
     ]
     bedAll.value = beds.value
   } finally {
@@ -256,7 +256,7 @@ async function submitBed() {
   }
 }
 
-async function removeRoom(id: number) {
+async function removeRoom(id: Id) {
   try {
     await deleteRoom(id)
     message.success('已删除')
@@ -266,7 +266,7 @@ async function removeRoom(id: number) {
   }
 }
 
-async function removeBed(id: number) {
+async function removeBed(id: Id) {
   try {
     await deleteBed(id)
     message.success('已删除')

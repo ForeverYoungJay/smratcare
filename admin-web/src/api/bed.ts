@@ -6,7 +6,8 @@ import type {
   FloorItem,
   AssetTreeNode,
   ResidenceBootstrapRequest,
-  ResidenceBootstrapResponse
+  ResidenceBootstrapResponse,
+  Id
 } from '../types'
 
 export function getRoomPage(params: any) {
@@ -41,11 +42,11 @@ export function createBuilding(data: Partial<BuildingItem>) {
   return request.post<void>('/api/asset/buildings', data)
 }
 
-export function updateBuilding(id: number, data: Partial<BuildingItem>) {
+export function updateBuilding(id: Id, data: Partial<BuildingItem>) {
   return request.put<void>(`/api/asset/buildings/${id}`, data)
 }
 
-export function deleteBuilding(id: number) {
+export function deleteBuilding(id: Id) {
   return request.delete<void>(`/api/asset/buildings/${id}`)
 }
 
@@ -65,11 +66,11 @@ export function createFloor(data: Partial<FloorItem>) {
   return request.post<void>('/api/asset/floors', data)
 }
 
-export function updateFloor(id: number, data: Partial<FloorItem>) {
+export function updateFloor(id: Id, data: Partial<FloorItem>) {
   return request.put<void>(`/api/asset/floors/${id}`, data)
 }
 
-export function deleteFloor(id: number) {
+export function deleteFloor(id: Id) {
   return request.delete<void>(`/api/asset/floors/${id}`)
 }
 
@@ -81,11 +82,11 @@ export function createRoom(data: Partial<RoomItem>) {
   return request.post<void>('/api/room', data)
 }
 
-export function updateRoom(id: number, data: Partial<RoomItem>) {
+export function updateRoom(id: Id, data: Partial<RoomItem>) {
   return request.put<void>(`/api/room/${id}`, data)
 }
 
-export function deleteRoom(id: number) {
+export function deleteRoom(id: Id) {
   return request.delete<void>(`/api/room/${id}`)
 }
 
@@ -93,10 +94,10 @@ export function createBed(data: Partial<BedItem>) {
   return request.post<void>('/api/bed', data)
 }
 
-export function updateBed(id: number, data: Partial<BedItem>) {
+export function updateBed(id: Id, data: Partial<BedItem>) {
   return request.put<void>(`/api/bed/${id}`, data)
 }
 
-export function deleteBed(id: number) {
+export function deleteBed(id: Id) {
   return request.delete<void>(`/api/bed/${id}`)
 }

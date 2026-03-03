@@ -1,7 +1,9 @@
+import type { Id } from './common'
+
 export interface RoomItem {
-  id: number
-  buildingId?: number
-  floorId?: number
+  id: Id
+  buildingId?: Id
+  floorId?: Id
   roomNo: string
   building?: string
   floorNo?: string
@@ -12,13 +14,13 @@ export interface RoomItem {
 }
 
 export interface BedItem {
-  id: number
+  id: Id
   bedNo: string
-  roomId: number
+  roomId: Id
   bedType?: string
   status?: 0 | 1 | 2 | 3
   bedQrCode?: string
-  elderId?: number
+  elderId?: Id
   elderName?: string
   careLevel?: string
   roomNo?: string
@@ -37,7 +39,7 @@ export interface BedItem {
 }
 
 export interface BuildingItem {
-  id: number
+  id: Id
   name: string
   code?: string
   areaCode?: string
@@ -48,8 +50,8 @@ export interface BuildingItem {
 }
 
 export interface FloorItem {
-  id: number
-  buildingId: number
+  id: Id
+  buildingId: Id
   floorNo: string
   name?: string
   status?: number
@@ -57,12 +59,12 @@ export interface FloorItem {
 }
 
 export interface AssetTreeNode {
-  id: number
+  id: Id
   type: 'BUILDING' | 'FLOOR' | 'ROOM' | 'BED'
   name: string
   status?: number
-  buildingId?: number
-  floorId?: number
+  buildingId?: Id
+  floorId?: Id
   roomNo?: string
   bedNo?: string
   qrCode?: string

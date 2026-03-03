@@ -13,7 +13,7 @@ public interface RoomService {
   RoomResponse get(Long id, Long tenantId);
 
   IPage<RoomResponse> page(Long tenantId, long pageNo, long pageSize,
-      String keyword, String roomNo, String building, String floorNo, Long buildingId, Long floorId, Integer status);
+      String keyword, String roomNo, String building, String floorNo, Long buildingId, Long floorId, String roomType, Integer status);
 
   java.util.List<RoomResponse> list(Long tenantId);
 

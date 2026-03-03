@@ -114,7 +114,7 @@ import DataTable from '../components/DataTable.vue'
 import { getBaseConfigItemList } from '../api/baseConfig'
 import { getElderPage, createElder, updateElder, assignBed, unbindBed } from '../api/elder'
 import { getBedList } from '../api/bed'
-import type { BaseConfigItem, ElderItem, PageResult, BedItem } from '../types/api'
+import type { BaseConfigItem, ElderItem, PageResult, BedItem, Id } from '../types/api'
 
 const query = reactive({ keyword: undefined as string | undefined, status: undefined as number | undefined, pageNo: 1, pageSize: 10 })
 const list = ref<ElderItem[]>([])
@@ -139,8 +139,8 @@ const saving = ref(false)
 const form = reactive<Partial<ElderItem>>({})
 const current = ref<ElderItem | null>(null)
 const beds = ref<BedItem[]>([])
-const assignForm = reactive<{ elderId?: number; bedId?: number; startDate?: string }>({})
-const unbindForm = reactive<{ elderId?: number; endDate?: string; reason?: string }>({})
+const assignForm = reactive<{ elderId?: Id; bedId?: Id; startDate?: string }>({})
+const unbindForm = reactive<{ elderId?: Id; endDate?: string; reason?: string }>({})
 const dischargeFeeConfigOptions = ref<Array<{ label: string; value: string }>>([])
 
 const rules = {
@@ -198,13 +198,13 @@ async function load() {
     beds.value = bedRes
   } catch {
     list.value = [
-      { id: 1, fullName: '张三', elderCode: 'E1001', careLevel: 'A', status: 1 },
-      { id: 2, fullName: '李四', elderCode: 'E1002', careLevel: 'B', status: 2 }
+      { id: '1', fullName: '张三', elderCode: 'E1001', careLevel: 'A', status: 1 },
+      { id: '2', fullName: '李四', elderCode: 'E1002', careLevel: 'B', status: 2 }
     ]
     pagination.total = list.value.length
     beds.value = [
-      { id: 100, bedNo: '01', roomId: 10, status: 1 },
-      { id: 101, bedNo: '02', roomId: 11, status: 1 }
+      { id: '100', bedNo: '01', roomId: '10', status: 1 },
+      { id: '101', bedNo: '02', roomId: '11', status: 1 }
     ]
   } finally {
     loading.value = false

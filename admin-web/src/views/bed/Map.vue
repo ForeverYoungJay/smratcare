@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="床位全景" subTitle="楼号横向 + 楼层纵向二维图（V120联动）">
+  <PageContainer :title="pageTitle" :subTitle="pageSubTitle">
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item label="床位号">
@@ -80,8 +80,8 @@
             <a-radio-button value="grid">二维楼层图</a-radio-button>
             <a-radio-button value="list">卡片列表</a-radio-button>
           </a-radio-group>
-          <a-button @click="openBedManage">床位管理管理</a-button>
-          <a-button type="primary" ghost @click="openElderBedPanorama">长者管理床态全景</a-button>
+          <a-button @click="openBedManage">{{ isMarketingMode ? '床位管理' : '床位管理管理' }}</a-button>
+          <a-button v-if="!isMarketingMode" type="primary" ghost @click="openElderBedPanorama">长者管理床态全景</a-button>
         </a-space>
         <a-radio-group
           v-if="viewMode === 'grid'"
@@ -224,7 +224,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import QRCode from 'qrcode'
 import PageContainer from '../../components/PageContainer.vue'
 import { getBaseConfigItemList } from '../../api/baseConfig'
@@ -258,6 +258,7 @@ type BuildingScene = {
 }
 
 const router = useRouter()
+const route = useRoute()
 const beds = ref<BedItem[]>([])
 const detailOpen = ref(false)
 const current = ref<BedItem | null>(null)
@@ -271,6 +272,13 @@ const viewMode = ref<'grid' | 'list'>('grid')
 const matrixQuickFilter = ref<'all' | 'idle' | 'occupied'>('all')
 const selectedBuilding = ref<string>('')
 const selectedFloor = ref<string>('')
+const isMarketingMode = computed(() => route.name === 'MarketingRoomPanorama' || route.path.startsWith('/marketing/'))
+const pageTitle = computed(() => (isMarketingMode.value ? '房态全景' : '床位全景'))
+const pageSubTitle = computed(() =>
+  isMarketingMode.value
+    ? '营销视角：楼号横向 + 楼层纵向二维房态图'
+    : '楼号横向 + 楼层纵向二维图（V120联动）'
+)
 
 const query = reactive({
   bedNo: '',

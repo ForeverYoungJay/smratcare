@@ -93,7 +93,7 @@ public class RoomServiceImpl implements RoomService {
 
   @Override
   public IPage<RoomResponse> page(Long tenantId, long pageNo, long pageSize,
-      String keyword, String roomNo, String building, String floorNo, Long buildingId, Long floorId, Integer status) {
+      String keyword, String roomNo, String building, String floorNo, Long buildingId, Long floorId, String roomType, Integer status) {
     var wrapper = Wrappers.lambdaQuery(Room.class)
         .eq(Room::getIsDeleted, 0)
         .eq(tenantId != null, Room::getTenantId, tenantId);
@@ -114,6 +114,9 @@ public class RoomServiceImpl implements RoomService {
     }
     if (floorId != null) {
       wrapper.eq(Room::getFloorId, floorId);
+    }
+    if (roomType != null && !roomType.isBlank()) {
+      wrapper.eq(Room::getRoomType, roomType);
     }
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(Room::getRoomNo, keyword)

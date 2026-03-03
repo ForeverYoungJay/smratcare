@@ -108,7 +108,7 @@ public class BedServiceImpl implements BedService {
 
   @Override
   public IPage<BedResponse> page(Long orgId, long pageNo, long pageSize,
-      String keyword, Integer status, String bedNo, String roomNo, String elderName) {
+      String keyword, Integer status, String bedNo, String roomNo, String elderName, String roomType, String bedType) {
     Long tenantId = orgId;
     List<Long> activeRoomIds = resolveActiveRoomIds(tenantId);
     if (activeRoomIds.isEmpty()) {
@@ -134,6 +134,20 @@ public class BedServiceImpl implements BedService {
         return new Page<>(pageNo, pageSize);
       }
       wrapper.in(Bed::getRoomId, roomIds);
+    }
+    if (roomType != null && !roomType.isBlank()) {
+      List<Long> roomIds = roomMapper.selectList(Wrappers.lambdaQuery(Room.class)
+              .eq(Room::getIsDeleted, 0)
+              .eq(tenantId != null, Room::getTenantId, tenantId)
+              .eq(Room::getRoomType, roomType))
+          .stream().map(Room::getId).toList();
+      if (roomIds.isEmpty()) {
+        return new Page<>(pageNo, pageSize);
+      }
+      wrapper.in(Bed::getRoomId, roomIds);
+    }
+    if (bedType != null && !bedType.isBlank()) {
+      wrapper.eq(Bed::getBedType, bedType);
     }
     if (elderName != null && !elderName.isBlank()) {
       List<Long> elderIds = elderMapper.selectList(Wrappers.lambdaQuery(ElderProfile.class)

@@ -7,14 +7,15 @@ import type {
   ElderUnbindRequest,
   ElderDiseaseUpdateRequest,
   ElderDiseaseItem,
-  FamilyBindRequest
+  FamilyBindRequest,
+  Id
 } from '../types'
 
 export function getElderPage(params: any) {
   return fetchPage<ElderItem>('/api/elder/page', params)
 }
 
-export function getElderDetail(id: number) {
+export function getElderDetail(id: Id) {
   return request.get<ElderItem>(`/api/elder/${id}`)
 }
 
@@ -22,25 +23,25 @@ export function createElder(data: ElderCreateRequest) {
   return request.post<ElderItem>('/api/elder', data)
 }
 
-export function updateElder(id: number, data: Partial<ElderCreateRequest>) {
+export function updateElder(id: Id, data: Partial<ElderCreateRequest>) {
   return request.put<void>(`/api/elder/${id}`, data)
 }
 
-export function assignBed(elderId: number, bedId: number, startDate: string) {
+export function assignBed(elderId: Id, bedId: Id, startDate: string) {
   const body: ElderAssignBedRequest = { bedId, startDate }
   return request.post<void>(`/api/elder/${elderId}/assignBed`, body)
 }
 
-export function unbindBed(elderId: number, endDate?: string, reason?: string) {
+export function unbindBed(elderId: Id, endDate?: string, reason?: string) {
   const body: ElderUnbindRequest = { endDate, reason }
   return request.post<void>(`/api/elder/${elderId}/unbindBed`, body)
 }
 
-export function getElderDiseases(elderId: number) {
+export function getElderDiseases(elderId: Id) {
   return request.get<ElderDiseaseItem[]>(`/api/elder/${elderId}/diseases`)
 }
 
-export function updateElderDiseases(elderId: number, diseaseIds: number[]) {
+export function updateElderDiseases(elderId: Id, diseaseIds: number[]) {
   const body: ElderDiseaseUpdateRequest = { diseaseIds }
   return request.put<void>(`/api/elder/${elderId}/diseases`, body)
 }

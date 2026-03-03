@@ -71,8 +71,10 @@ public class BedController {
       @RequestParam(required = false) Integer status,
       @RequestParam(required = false) String bedNo,
       @RequestParam(required = false) String roomNo,
-      @RequestParam(required = false) String elderName) {
-    return Result.ok(bedService.page(AuthContext.getOrgId(), pageNo, pageSize, keyword, status, bedNo, roomNo, elderName));
+      @RequestParam(required = false) String elderName,
+      @RequestParam(required = false) String roomType,
+      @RequestParam(required = false) String bedType) {
+    return Result.ok(bedService.page(AuthContext.getOrgId(), pageNo, pageSize, keyword, status, bedNo, roomNo, elderName, roomType, bedType));
   }
 
   @GetMapping("/{id}")
@@ -88,8 +90,10 @@ public class BedController {
       @RequestParam(required = false) Integer status,
       @RequestParam(required = false) String bedNo,
       @RequestParam(required = false) String roomNo,
-      @RequestParam(required = false) String elderName) {
-    return Result.ok(bedService.page(AuthContext.getOrgId(), pageNo, pageSize, keyword, status, bedNo, roomNo, elderName));
+      @RequestParam(required = false) String elderName,
+      @RequestParam(required = false) String roomType,
+      @RequestParam(required = false) String bedType) {
+    return Result.ok(bedService.page(AuthContext.getOrgId(), pageNo, pageSize, keyword, status, bedNo, roomNo, elderName, roomType, bedType));
   }
 
   @GetMapping("/list")

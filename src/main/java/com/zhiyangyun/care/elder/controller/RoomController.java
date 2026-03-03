@@ -73,8 +73,9 @@ public class RoomController {
       @RequestParam(required = false) String floorNo,
       @RequestParam(required = false) Long buildingId,
       @RequestParam(required = false) Long floorId,
+      @RequestParam(required = false) String roomType,
       @RequestParam(required = false) Integer status) {
-    return Result.ok(roomService.page(AuthContext.getOrgId(), pageNo, pageSize, keyword, roomNo, building, floorNo, buildingId, floorId, status));
+    return Result.ok(roomService.page(AuthContext.getOrgId(), pageNo, pageSize, keyword, roomNo, building, floorNo, buildingId, floorId, roomType, status));
   }
 
   @GetMapping
@@ -87,8 +88,9 @@ public class RoomController {
       @RequestParam(required = false) String floorNo,
       @RequestParam(required = false) Long buildingId,
       @RequestParam(required = false) Long floorId,
+      @RequestParam(required = false) String roomType,
       @RequestParam(required = false) Integer status) {
-    return Result.ok(roomService.page(AuthContext.getOrgId(), pageNo, pageSize, keyword, roomNo, building, floorNo, buildingId, floorId, status));
+    return Result.ok(roomService.page(AuthContext.getOrgId(), pageNo, pageSize, keyword, roomNo, building, floorNo, buildingId, floorId, roomType, status));
   }
 
   @GetMapping("/list")

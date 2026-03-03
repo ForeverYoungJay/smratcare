@@ -138,10 +138,10 @@ import PageContainer from '../../components/PageContainer.vue'
 import { getElderDetail, updateElder, getElderDiseases, updateElderDiseases, bindFamily } from '../../api/elder'
 import { getDiseaseList } from '../../api/store'
 import { getFamilyRelations, getFamilyUserPage } from '../../api/family'
-import type { DiseaseItem, ElderItem, FamilyRelationItem, FamilyBindRequest, FamilyUserItem, PageResult } from '../../types/api'
+import type { DiseaseItem, ElderItem, FamilyRelationItem, FamilyBindRequest, FamilyUserItem, PageResult, Id } from '../../types/api'
 
 const route = useRoute()
-const elderId = computed(() => Number(route.params.id))
+const elderId = computed(() => String(route.params.id || ''))
 
 const elder = ref<ElderItem | null>(null)
 const baseForm = reactive<Partial<ElderItem>>({})
@@ -174,12 +174,12 @@ const familyColumns = [
 
 const familyBindOpen = ref(false)
 const familyBindRef = ref<FormInstance>()
-const familyBind = reactive<FamilyBindRequest>({ familyUserId: 0, elderId: 0, relation: '', isPrimary: false })
+const familyBind = reactive<FamilyBindRequest>({ familyUserId: '', elderId: '', relation: '', isPrimary: false })
 const familyBindRules: FormRules = {
   familyUserId: [{ required: true, message: '请选择家属' }],
   relation: [{ required: true, message: '请输入关系' }]
 }
-const familyOptions = ref<Array<{ label: string; value: number }>>([])
+const familyOptions = ref<Array<{ label: string; value: Id }>>([])
 
 const diseaseIds = ref<number[]>([])
 const diseaseOptions = ref<{ label: string; value: number }[]>([])
@@ -290,7 +290,7 @@ async function saveBase() {
 }
 
 function openFamilyBind() {
-  familyBind.familyUserId = 0
+  familyBind.familyUserId = ''
   familyBind.relation = ''
   familyBind.isPrimary = false
   loadFamilyUsers()

@@ -95,13 +95,13 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { getElderDetail, updateElder } from '../../api/elder'
 import { getBedList, getBuildingList, getFloorList, getRoomList } from '../../api/bed'
-import type { BedItem, BuildingItem, ElderItem, FloorItem, RoomItem } from '../../types/api'
+import type { BedItem, BuildingItem, ElderItem, FloorItem, RoomItem, Id } from '../../types/api'
 
 const route = useRoute()
 const router = useRouter()
 const formRef = ref<FormInstance>()
 const saving = ref(false)
-const currentElderId = computed(() => Number(route.params.id))
+const currentElderId = computed(() => String(route.params.id || ''))
 
 const form = reactive<Partial<ElderItem>>({
   fullName: '',
@@ -126,9 +126,9 @@ const rooms = ref<RoomItem[]>([])
 const beds = ref<BedItem[]>([])
 
 const assetSelect = reactive({
-  buildingId: undefined as number | undefined,
-  floorId: undefined as number | undefined,
-  roomId: undefined as number | undefined
+  buildingId: undefined as Id | undefined,
+  floorId: undefined as Id | undefined,
+  roomId: undefined as Id | undefined
 })
 
 const buildingOptions = computed(() =>
@@ -161,7 +161,7 @@ function back() {
 }
 
 async function load() {
-  const id = Number(route.params.id)
+  const id = String(route.params.id || '')
   if (!id) return
   try {
     const data = await getElderDetail(id)
@@ -179,7 +179,7 @@ async function submit() {
     if (form.bedId && !form.bedStartDate) {
       form.bedStartDate = form.admissionDate || new Date().toISOString().slice(0, 10)
     }
-    await updateElder(Number(route.params.id), form)
+    await updateElder(String(route.params.id || ''), form)
     message.success('保存成功')
     router.push('/elder/list')
   } catch {
@@ -217,7 +217,7 @@ async function loadAssets() {
   }
 }
 
-function syncAssetSelectionByBed(bedId?: number) {
+function syncAssetSelectionByBed(bedId?: Id) {
   if (!bedId) return
   const bed = beds.value.find((b) => b.id === bedId)
   if (!bed) return
@@ -252,6 +252,6 @@ watch(
 
 onMounted(async () => {
   await Promise.all([load(), loadAssets()])
-  syncAssetSelectionByBed(form.bedId as number | undefined)
+  syncAssetSelectionByBed(form.bedId as Id | undefined)
 })
 </script>

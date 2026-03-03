@@ -4,6 +4,8 @@ export interface Result<T> {
   data: T
 }
 
+export type Id = string
+
 export type ApiResult<T> = Result<T>
 
 export interface PageResult<T> {

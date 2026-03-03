@@ -228,7 +228,7 @@ export const routes = [
                     {
                         path: 'room-panorama',
                         name: 'MarketingRoomPanorama',
-                        component: () => import('../views/marketing/RoomPanorama.vue'),
+                        component: () => import('../views/bed/Map.vue'),
                         meta: { title: '房态全景' }
                     },
                     {
