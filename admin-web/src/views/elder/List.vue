@@ -35,6 +35,13 @@
         <a-space>
           <a-button type="primary" @click="goCreate">新增老人</a-button>
           <a-button @click="exportCsvData">导出CSV</a-button>
+          <a-button :disabled="selectedCount !== 1" @click="goDetailSelected">详情</a-button>
+          <a-button :disabled="selectedCount !== 1" @click="goEditSelected">编辑</a-button>
+          <a-button :disabled="selectedCount !== 1" @click="openChangeBedSelected">换床</a-button>
+          <a-button :disabled="selectedCount !== 1" @click="openCheckoutSelected">退住申请</a-button>
+          <a-button :disabled="selectedCount !== 1" @click="openBindFamilySelected">绑定家属</a-button>
+          <a-button :disabled="selectedCount !== 1" @click="printElderQrSelected">打印二维码</a-button>
+          <span class="selection-tip">已勾选 {{ selectedCount }} 条</span>
         </a-space>
       </div>
 
@@ -44,22 +51,13 @@
         :loading="loading"
         :pagination="false"
         row-key="id"
+        :row-selection="rowSelection"
         :scroll="{ y: 520 }"
         @change="onTableChange"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
             <a-tag :color="statusTag(record.status)">{{ statusText(record.status) }}</a-tag>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <a-space>
-              <a-button type="link" @click="goDetail(record.id)">详情</a-button>
-              <a-button type="link" @click="goEdit(record.id)">编辑</a-button>
-              <a-button type="link" @click="openChangeBed(record)">换床</a-button>
-              <a-button type="link" @click="openCheckout(record)">退住申请</a-button>
-              <a-button type="link" @click="openBindFamily(record)">绑定家属</a-button>
-              <a-button type="link" @click="printElderQr(record)">打印二维码</a-button>
-            </a-space>
           </template>
         </template>
       </a-table>
@@ -141,6 +139,7 @@ const router = useRouter()
 const loading = ref(false)
 const rows = ref<ElderItem[]>([])
 const total = ref(0)
+const selectedRowKeys = ref<Id[]>([])
 
 const query = reactive({
   fullName: undefined as string | undefined,
@@ -161,9 +160,16 @@ const columns = [
   { title: '家庭地址', dataIndex: 'homeAddress', key: 'homeAddress', width: 220 },
   { title: '床位号', dataIndex: 'bedNo', key: 'bedNo', width: 120, sorter: true },
   { title: '护理等级', dataIndex: 'careLevel', key: 'careLevel', width: 120, sorter: true },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 100, sorter: true },
-  { title: '操作', key: 'action', width: 360, fixed: 'right' as const }
+  { title: '状态', dataIndex: 'status', key: 'status', width: 100, sorter: true }
 ]
+const selectedCount = computed(() => selectedRowKeys.value.length)
+const selectedRows = computed(() => rows.value.filter((item) => selectedRowKeys.value.some((id) => String(id) === String(item.id))))
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: Id[]) => {
+    selectedRowKeys.value = keys
+  }
+}))
 
 const beds = ref<BedItem[]>([])
 const bedOptions = computed(() =>
@@ -207,8 +213,17 @@ function statusTag(status?: number) {
   return 'default'
 }
 
+function requireSingleSelection(actionLabel: string) {
+  if (selectedRows.value.length !== 1) {
+    message.info(`请先勾选 1 位长者后再${actionLabel}`)
+    return null
+  }
+  return selectedRows.value[0]
+}
+
 async function fetchData() {
   loading.value = true
+  selectedRowKeys.value = []
   try {
     const res: PageResult<ElderItem> = await getElderPage({
       pageNo: query.pageNo,
@@ -275,6 +290,7 @@ function reset() {
   query.status = undefined
   query.sortBy = undefined
   query.sortOrder = undefined
+  selectedRowKeys.value = []
   fetchData()
 }
 
@@ -286,6 +302,7 @@ function onPageChange(page: number) {
 function onPageSizeChange(current: number, size: number) {
   query.pageNo = 1
   query.pageSize = size
+  selectedRowKeys.value = []
   fetchData()
 }
 
@@ -323,11 +340,29 @@ function goDetail(id: Id) {
   router.push(`/elder/detail/${id}`)
 }
 
+function goEditSelected() {
+  const row = requireSingleSelection('编辑')
+  if (!row) return
+  goEdit(row.id)
+}
+
+function goDetailSelected() {
+  const row = requireSingleSelection('查看详情')
+  if (!row) return
+  goDetail(row.id)
+}
+
 function openChangeBed(row: ElderItem) {
   changeBedForm.elderId = row.id
   changeBedForm.bedId = undefined
   changeBedForm.startDate = undefined
   changeBedOpen.value = true
+}
+
+function openChangeBedSelected() {
+  const row = requireSingleSelection('换床')
+  if (!row) return
+  openChangeBed(row)
 }
 
 async function submitChangeBed() {
@@ -354,6 +389,12 @@ function openCheckout(row: ElderItem) {
   })
 }
 
+function openCheckoutSelected() {
+  const row = requireSingleSelection('提交退住申请')
+  if (!row) return
+  openCheckout(row)
+}
+
 function openBindFamily(row: ElderItem) {
   bindForm.elderId = row.id
   bindForm.familyUserId = ''
@@ -361,6 +402,12 @@ function openBindFamily(row: ElderItem) {
   bindForm.isPrimary = false
   loadFamilyUsers()
   bindOpen.value = true
+}
+
+function openBindFamilySelected() {
+  const row = requireSingleSelection('绑定家属')
+  if (!row) return
+  openBindFamily(row)
 }
 
 async function submitBindFamily() {
@@ -380,6 +427,12 @@ async function printElderQr(row: ElderItem) {
   qrText.value = `ELDER:${row.id}`
   qrDataUrl.value = await QRCode.toDataURL(qrText.value)
   qrOpen.value = true
+}
+
+function printElderQrSelected() {
+  const row = requireSingleSelection('打印二维码')
+  if (!row) return
+  printElderQr(row)
 }
 
 function printQr() {
@@ -415,6 +468,10 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   margin-bottom: 12px;
+}
+.selection-tip {
+  color: var(--muted);
+  font-size: 12px;
 }
 .qr-preview {
   display: grid;

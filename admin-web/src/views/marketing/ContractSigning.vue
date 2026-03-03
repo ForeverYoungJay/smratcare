@@ -81,8 +81,17 @@
       <div class="table-actions">
         <a-space>
           <a-button type="primary" @click="openForm()">新增合同</a-button>
-          <a-button @click="batchApprove">审批</a-button>
-          <a-button danger @click="batchDelete">删除</a-button>
+          <a-button :disabled="!hasSingleSelection" @click="viewSelected">查看</a-button>
+          <a-button :disabled="!hasSingleSelection" @click="editSelected">编辑</a-button>
+          <a-button :disabled="!hasSingleSelection" @click="openAttachmentSelected">附件</a-button>
+          <a-button :disabled="!hasSingleSelection" @click="approveSelected">审批通过</a-button>
+          <a-button :disabled="!hasSingleSelection" @click="rejectSelected">驳回</a-button>
+          <a-button :disabled="!hasSingleSelection" @click="voidSelected">作废</a-button>
+          <a-button :disabled="!hasSingleSelection" @click="admissionSelected">入住办理</a-button>
+          <a-button :disabled="!hasSingleSelection" @click="finalizeSelected">最终签署</a-button>
+          <a-button :disabled="selectedCount === 0" @click="batchApprove">批量审批</a-button>
+          <a-button :disabled="selectedCount === 0" danger @click="batchDelete">删除</a-button>
+          <span class="selection-tip">已勾选 {{ selectedCount }} 条</span>
         </a-space>
       </div>
       <a-table
@@ -104,30 +113,6 @@
           </template>
           <template v-else-if="column.key === 'currentOwnerDept'">
             <a-tag>{{ ownerDeptText(normalizedOwnerDept(record)) }}</a-tag>
-          </template>
-          <template v-else-if="column.key === 'operation'">
-            <a-space wrap>
-              <a-button type="link" @click="view(record)">查看</a-button>
-              <a-button type="link" @click="openForm(record)">编辑</a-button>
-              <a-button type="link" @click="openAttachment(record)">附件</a-button>
-              <a-button type="link" @click="approveRow(record)">审批通过</a-button>
-              <a-button type="link" danger @click="rejectRow(record)">驳回</a-button>
-              <a-button type="link" danger @click="voidRow(record)">作废</a-button>
-              <a-tooltip :title="isAdmissionDisabled(record) ? admissionDisabledReason(record) : null">
-                <span>
-                  <a-button type="link" :disabled="isAdmissionDisabled(record)" @click="goAdmissionProcessing(record)">入住办理</a-button>
-                </span>
-              </a-tooltip>
-              <a-button type="link" danger @click="removeContract(record)">删除</a-button>
-              <a-tooltip
-                v-if="normalizedFlowStage(record) !== 'SIGNED'"
-                :title="isFinalizeDisabled(record) ? finalizeDisabledReason(record) : null"
-              >
-                <span>
-                  <a-button type="link" :disabled="isFinalizeDisabled(record)" @click="openFinalize(record)">最终签署</a-button>
-                </span>
-              </a-tooltip>
-            </a-space>
           </template>
         </template>
       </a-table>
@@ -307,6 +292,8 @@ const rowSelection = computed(() => ({
     selectedRows.value = rows
   }
 }))
+const selectedCount = computed(() => selectedRowKeys.value.length)
+const hasSingleSelection = computed(() => selectedCount.value === 1)
 
 function sameId(left: number | string | undefined, right: number | string | undefined) {
   if (left == null || right == null) return false
@@ -322,8 +309,7 @@ const columns = [
   { title: '姓名', dataIndex: 'elderName', key: 'elderName', width: 120 },
   { title: '联系电话', dataIndex: 'elderPhone', key: 'elderPhone', width: 140 },
   { title: '营销人员', dataIndex: 'marketerName', key: 'marketerName', width: 120 },
-  { title: '合同状态', dataIndex: 'contractStatus', key: 'contractStatus', width: 130 },
-  { title: '操作', key: 'operation', fixed: 'right', width: 760 }
+  { title: '合同状态', dataIndex: 'contractStatus', key: 'contractStatus', width: 130 }
 ]
 
 const attachmentOpen = ref(false)
@@ -672,6 +658,72 @@ function onMineDeptChange() {
   if (!onlyMineDept.value) return
   query.pageNo = 1
   fetchData()
+}
+
+function requireSingleSelection(actionLabel: string) {
+  if (selectedRowKeys.value.length !== 1) {
+    message.info(`请先勾选 1 条合同再执行“${actionLabel}”`)
+    return null
+  }
+  const key = selectedRowKeys.value[0]
+  const row =
+    selectedRows.value.find((item) => sameId(item.id, key)) ||
+    tableRows.value.find((item) => sameId(item.id, key)) ||
+    rows.value.find((item) => sameId(item.id, key)) ||
+    localRows.value.find((item) => sameId(item.id, key))
+  if (!row) {
+    message.warning('未找到选中的合同，请刷新后重试')
+    return null
+  }
+  return row
+}
+
+function viewSelected() {
+  const row = requireSingleSelection('查看')
+  if (!row) return
+  view(row)
+}
+
+function editSelected() {
+  const row = requireSingleSelection('编辑')
+  if (!row) return
+  openForm(row)
+}
+
+async function openAttachmentSelected() {
+  const row = requireSingleSelection('附件')
+  if (!row) return
+  await openAttachment(row)
+}
+
+async function approveSelected() {
+  const row = requireSingleSelection('审批通过')
+  if (!row) return
+  await approveRow(row)
+}
+
+function rejectSelected() {
+  const row = requireSingleSelection('驳回')
+  if (!row) return
+  rejectRow(row)
+}
+
+function voidSelected() {
+  const row = requireSingleSelection('作废')
+  if (!row) return
+  voidRow(row)
+}
+
+async function admissionSelected() {
+  const row = requireSingleSelection('入住办理')
+  if (!row) return
+  await goAdmissionProcessing(row)
+}
+
+async function finalizeSelected() {
+  const row = requireSingleSelection('最终签署')
+  if (!row) return
+  await openFinalize(row)
 }
 
 function openForm(record?: CrmContractItem) {
@@ -1070,6 +1122,11 @@ watch(
 
 .table-actions {
   margin-bottom: 12px;
+}
+
+.selection-tip {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
 }
 
 .board-item {

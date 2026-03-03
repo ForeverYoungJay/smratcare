@@ -27,9 +27,12 @@
       <div class="table-actions">
         <a-space>
           <a-button @click="exportList">导出</a-button>
-          <a-button @click="batchSms">批量发短信</a-button>
-          <a-button danger @click="batchDelete">批量删除</a-button>
+          <a-button :disabled="selectedCount !== 1" @click="sendSmsSelected">短信</a-button>
+          <a-button :disabled="selectedCount === 0" @click="batchSms">批量发短信</a-button>
+          <a-button :disabled="selectedCount !== 1" danger @click="removeSelected">删除</a-button>
+          <a-button :disabled="selectedCount === 0" danger @click="batchDelete">批量删除</a-button>
           <a-button @click="settingReminder">到期提醒设置</a-button>
+          <span class="selection-tip">已勾选 {{ selectedCount }} 条</span>
         </a-space>
       </div>
       <a-table
@@ -47,12 +50,6 @@
           </template>
           <template v-else-if="column.key === 'status'">
             <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
-          </template>
-          <template v-else-if="column.key === 'operation'">
-            <a-space>
-              <a-button type="link" @click="sendSms(record)">短信</a-button>
-              <a-button type="link" danger @click="removeRow(record)">删除</a-button>
-            </a-space>
           </template>
         </template>
       </a-table>
@@ -123,8 +120,7 @@ const columns = [
   { title: '域状态', dataIndex: 'status', key: 'status', width: 110 },
   { title: '发送次数', dataIndex: 'smsSendCount', key: 'smsSendCount', width: 100 },
   { title: '倒计时', key: 'countdownDays', width: 100 },
-  { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 },
-  { title: '操作', key: 'operation', fixed: 'right', width: 150 }
+  { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 }
 ]
 
 const rowSelection = computed(() => ({
@@ -134,6 +130,15 @@ const rowSelection = computed(() => ({
     selectedContracts.value = selectedRows
   }
 }))
+const selectedCount = computed(() => selectedRowKeys.value.length)
+
+function requireSingleSelection(actionLabel: string) {
+  if (selectedContracts.value.length !== 1) {
+    message.info(`请先勾选 1 条合同后再${actionLabel}`)
+    return null
+  }
+  return selectedContracts.value[0]
+}
 
 const reminderConfig = reactive({
   beforeDays: 30,
@@ -262,6 +267,12 @@ async function batchSms() {
   fetchData()
 }
 
+async function sendSmsSelected() {
+  const contract = requireSingleSelection('发送短信')
+  if (!contract) return
+  await sendSms(contract)
+}
+
 function removeRow(record: CrmContractItem) {
   Modal.confirm({
     title: `确认删除合同 ${record.contractNo || '-'} 吗？`,
@@ -277,6 +288,12 @@ function removeRow(record: CrmContractItem) {
       fetchData()
     }
   })
+}
+
+function removeSelected() {
+  const contract = requireSingleSelection('删除')
+  if (!contract) return
+  removeRow(contract)
 }
 
 function batchDelete() {
@@ -330,5 +347,10 @@ onMounted(fetchData)
 
 .table-actions {
   margin-bottom: 12px;
+}
+
+.selection-tip {
+  color: var(--muted);
+  font-size: 12px;
 }
 </style>

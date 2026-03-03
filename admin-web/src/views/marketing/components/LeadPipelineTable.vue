@@ -106,9 +106,17 @@
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
       <div class="table-actions">
         <a-space>
-          <a-button v-for="item in actionButtons" :key="item.key" :type="item.type" @click="handleTopAction(item.key)">
+          <a-button
+            v-for="item in actionButtons"
+            :key="item.key"
+            :type="item.type"
+            :danger="item.danger"
+            :disabled="item.disabled"
+            @click="handleTopAction(item.key)"
+          >
             {{ item.label }}
           </a-button>
+          <span class="selection-tip">已勾选 {{ selectedCount }} 条</span>
         </a-space>
       </div>
       <StatefulBlock
@@ -136,34 +144,6 @@
             </template>
             <template v-else-if="column.key === 'reservationAmount'">
               {{ record.reservationAmount == null ? '-' : `¥${Number(record.reservationAmount).toFixed(2)}` }}
-            </template>
-            <template v-else-if="column.key === 'operation'">
-              <a-space wrap>
-                <a-button type="link" @click="openForm(record)">编辑</a-button>
-                <a-button
-                  v-if="effectiveMode === 'consultation' || effectiveMode === 'intent' || effectiveMode === 'reservation'"
-                  type="link"
-                  @click="viewMore(record)"
-                >
-                  查看更多
-                </a-button>
-                <a-button v-if="effectiveMode === 'consultation'" type="link" @click="moveToIntent(record)">设为意向</a-button>
-                <a-button v-if="effectiveMode === 'intent'" type="link" @click="moveToReservation(record)">转预订</a-button>
-                <a-button
-                  v-if="effectiveMode === 'consultation' || effectiveMode === 'intent' || effectiveMode === 'callback'"
-                  type="link"
-                  danger
-                  @click="abandonLead(record)"
-                >
-                  放弃
-                </a-button>
-                <a-button v-if="effectiveMode === 'reservation'" type="link" @click="toggleRefund(record)">退款</a-button>
-                <a-button v-if="effectiveMode === 'reservation'" type="link" @click="transferToAdmission(record)">转入住</a-button>
-                <a-button v-if="effectiveMode === 'invalid'" type="link" @click="viewMore(record)">查看</a-button>
-                <a-button v-if="effectiveMode === 'invalid'" type="link" @click="recoverLead(record)">恢复客户</a-button>
-                <a-button v-if="effectiveMode === 'callback'" type="link" @click="executeCallback(record)">执行</a-button>
-                <a-button type="link" danger @click="remove(record.id)">删除</a-button>
-              </a-space>
             </template>
           </template>
         </a-table>
@@ -340,7 +320,6 @@ import {
   batchUpdateLeadStatus,
   createCrmLead,
   createLeadCallbackPlan,
-  deleteCrmLead,
   executeCallbackPlan,
   getLeadCallbackPlans,
   getMarketingLeadEntrySummary,
@@ -437,6 +416,8 @@ const rowSelection = computed(() => ({
     selectedRowKeys.value = keys
   }
 }))
+const selectedCount = computed(() => selectedRowKeys.value.length)
+const selectedRows = computed(() => rows.value.filter((item) => selectedRowKeys.value.some((id) => sameId(item.id, id))))
 
 const modalTitle = computed(() => form.id ? '编辑客户' : '新增客户')
 
@@ -456,8 +437,7 @@ const columns = computed(() => {
       { title: '信息来源', dataIndex: 'infoSource', key: 'infoSource', width: 120 },
       { title: '接待人', dataIndex: 'receptionistName', key: 'receptionistName', width: 120 },
       { title: '家庭地址', dataIndex: 'homeAddress', key: 'homeAddress', width: 160 },
-      { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 },
-      { title: '操作', key: 'operation', fixed: 'right', width: 220 }
+      { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 }
     ]
   }
   if (mode === 'intent') {
@@ -473,8 +453,7 @@ const columns = computed(() => {
       { title: '推荐渠道', dataIndex: 'referralChannel', key: 'referralChannel', width: 120 },
       { title: '客户标签', dataIndex: 'customerTag', key: 'customerTag', width: 120 },
       { title: '归属营销人员', dataIndex: 'marketerName', key: 'marketerName', width: 140 },
-      { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 },
-      { title: '操作', key: 'operation', fixed: 'right', width: 180 }
+      { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 }
     ]
   }
   if (mode === 'reservation') {
@@ -491,8 +470,7 @@ const columns = computed(() => {
       { title: '是否退款', dataIndex: 'refunded', key: 'refunded', width: 100 },
       { title: '预约渠道', dataIndex: 'reservationChannel', key: 'reservationChannel', width: 120 },
       { title: '状态', dataIndex: 'reservationStatus', key: 'reservationStatus', width: 100 },
-      { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 },
-      { title: '操作', key: 'operation', fixed: 'right', width: 260 }
+      { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 }
     ]
   }
   if (mode === 'invalid') {
@@ -507,8 +485,7 @@ const columns = computed(() => {
       { title: '客户标签', dataIndex: 'customerTag', key: 'customerTag', width: 120 },
       { title: '归属营销人员', dataIndex: 'marketerName', key: 'marketerName', width: 140 },
       { title: '失效时间', dataIndex: 'invalidTime', key: 'invalidTime', width: 170 },
-      { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 },
-      { title: '操作', key: 'operation', fixed: 'right', width: 200 }
+      { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 }
     ]
   }
   return [
@@ -519,8 +496,7 @@ const columns = computed(() => {
     { title: '计划标题', dataIndex: 'planTitle', key: 'planTitle', width: 160 },
     { title: '回访内容', dataIndex: 'followupContent', key: 'followupContent', width: 220 },
     { title: '回访结果', dataIndex: 'followupResult', key: 'followupResult', width: 220 },
-    { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 },
-    { title: '操作', key: 'operation', fixed: 'right', width: 180 }
+    { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 }
   ]
 })
 
@@ -529,36 +505,62 @@ const actionButtons = computed(() => {
   if (mode === 'consultation') {
     return [
       { key: 'create', label: '新增', type: 'primary' as const },
-      { key: 'setIntent', label: '设为意向', type: 'default' as const },
-      { key: 'abandon', label: '放弃客户', type: 'default' as const }
+      { key: 'edit', label: '编辑', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'detail', label: '查看更多', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'setIntent', label: '设为意向', type: 'default' as const, disabled: selectedCount.value === 0 },
+      { key: 'abandon', label: '放弃客户', type: 'default' as const, disabled: selectedCount.value === 0, danger: true },
+      { key: 'delete', label: '删除', type: 'default' as const, disabled: selectedCount.value === 0, danger: true }
     ]
   }
   if (mode === 'intent') {
     return [
       { key: 'create', label: '新增', type: 'primary' as const },
-      { key: 'toReservation', label: '转预订', type: 'default' as const },
-      { key: 'tag', label: '设置客户标签', type: 'default' as const },
-      { key: 'callback', label: '添加回访计划', type: 'default' as const },
-      { key: 'abandon', label: '放弃客户', type: 'default' as const }
+      { key: 'edit', label: '编辑', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'detail', label: '查看更多', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'toReservation', label: '转预订', type: 'default' as const, disabled: selectedCount.value === 0 },
+      { key: 'tag', label: '设置客户标签', type: 'default' as const, disabled: selectedCount.value === 0 },
+      { key: 'callback', label: '添加回访计划', type: 'default' as const, disabled: selectedCount.value === 0 },
+      { key: 'abandon', label: '放弃客户', type: 'default' as const, disabled: selectedCount.value === 0, danger: true },
+      { key: 'delete', label: '删除', type: 'default' as const, disabled: selectedCount.value === 0, danger: true }
     ]
   }
   if (mode === 'reservation') {
     return [
       { key: 'create', label: '新增', type: 'primary' as const },
-      { key: 'batchDelete', label: '删除', type: 'default' as const }
+      { key: 'edit', label: '编辑', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'detail', label: '查看更多', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'toggleRefund', label: '退款切换', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'toAdmission', label: '转入住', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'delete', label: '删除', type: 'default' as const, disabled: selectedCount.value === 0, danger: true }
     ]
   }
   if (mode === 'invalid') {
-    return [{ key: 'recover', label: '恢复客户', type: 'primary' as const }]
+    return [
+      { key: 'detail', label: '查看详情', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'recover', label: '恢复客户', type: 'primary' as const, disabled: selectedCount.value === 0 },
+      { key: 'delete', label: '删除', type: 'default' as const, disabled: selectedCount.value === 0, danger: true }
+    ]
   }
   if (mode === 'callback') {
     return [
-      { key: 'callback', label: '添加回访计划', type: 'default' as const },
-      { key: 'toReservation', label: '转预订', type: 'default' as const },
-      { key: 'abandon', label: '放弃客户', type: 'default' as const }
+      { key: 'edit', label: '编辑', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'detail', label: '查看详情', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'execute', label: '执行回访', type: 'primary' as const, disabled: selectedCount.value !== 1 },
+      { key: 'callback', label: '添加回访计划', type: 'default' as const, disabled: selectedCount.value === 0 },
+      { key: 'toReservation', label: '转预订', type: 'default' as const, disabled: selectedCount.value === 0 },
+      { key: 'abandon', label: '放弃客户', type: 'default' as const, disabled: selectedCount.value === 0, danger: true },
+      { key: 'delete', label: '删除', type: 'default' as const, disabled: selectedCount.value === 0, danger: true }
     ]
   }
-  return [{ key: 'deletePlan', label: '删除', type: 'default' as const }]
+  return [
+    { key: 'edit', label: '编辑', type: 'default' as const, disabled: selectedCount.value !== 1 },
+    { key: 'detail', label: '查看详情', type: 'default' as const, disabled: selectedCount.value !== 1 },
+    { key: 'execute', label: '执行回访', type: 'primary' as const, disabled: selectedCount.value !== 1 },
+    { key: 'callback', label: '添加回访计划', type: 'default' as const, disabled: selectedCount.value === 0 },
+    { key: 'toReservation', label: '转预订', type: 'default' as const, disabled: selectedCount.value === 0 },
+    { key: 'abandon', label: '放弃客户', type: 'default' as const, disabled: selectedCount.value === 0, danger: true },
+    { key: 'delete', label: '删除', type: 'default' as const, disabled: selectedCount.value === 0, danger: true }
+  ]
 })
 
 const displayRows = computed(() => rows.value.map((item, index) => {
@@ -636,6 +638,14 @@ function selectedIds() {
     return [...selectedRowKeys.value]
   }
   return []
+}
+
+function requireSingleSelection(actionLabel: string) {
+  if (selectedRows.value.length !== 1) {
+    message.info(`请先勾选 1 条客户后再${actionLabel}`)
+    return null
+  }
+  return selectedRows.value[0]
 }
 
 function sameId(left: string | number | undefined, right: string | number | undefined) {
@@ -803,6 +813,24 @@ async function handleTopAction(key: string) {
     openForm()
     return
   }
+  if (key === 'edit') {
+    const row = requireSingleSelection('编辑')
+    if (!row) return
+    openForm(row)
+    return
+  }
+  if (key === 'detail') {
+    const row = requireSingleSelection('查看详情')
+    if (!row) return
+    viewMore(row)
+    return
+  }
+  if (key === 'execute') {
+    const row = requireSingleSelection('执行回访')
+    if (!row) return
+    await executeCallback(row)
+    return
+  }
   if (key === 'setIntent') {
     await batchMoveToIntent()
     return
@@ -825,6 +853,18 @@ async function handleTopAction(key: string) {
     message.success(`已恢复 ${ids.length} 条客户`)
     selectedRowKeys.value = []
     fetchData()
+    return
+  }
+  if (key === 'toggleRefund') {
+    const row = requireSingleSelection('切换退款状态')
+    if (!row) return
+    toggleRefund(row)
+    return
+  }
+  if (key === 'toAdmission') {
+    const row = requireSingleSelection('转入住')
+    if (!row) return
+    transferToAdmission(row)
     return
   }
   if (key === 'callback') {
@@ -855,49 +895,22 @@ async function handleTopAction(key: string) {
     fetchData()
     return
   }
-  if (key === 'batchDelete' || key === 'deletePlan') {
+  if (key === 'delete') {
     const ids = selectedIds()
     if (!ids.length) {
       message.info('请先勾选要删除的数据')
       return
     }
-    await batchDeleteLeads({ ids })
-    message.success(`已删除 ${ids.length} 条记录`)
-    selectedRowKeys.value = []
-    fetchData()
+    Modal.confirm({
+      title: `确认删除选中的 ${ids.length} 条客户记录吗？`,
+      onOk: async () => {
+        await batchDeleteLeads({ ids })
+        message.success(`已删除 ${ids.length} 条记录`)
+        selectedRowKeys.value = []
+        fetchData()
+      }
+    })
   }
-}
-
-async function moveToIntent(record: CrmLeadItem) {
-  await batchUpdateLeadStatus({ ids: [record.id], status: 1, followupStatus: record.followupStatus || '待回访' })
-  message.success('已转为意向客户')
-  fetchData()
-}
-
-async function moveToReservation(record: CrmLeadItem) {
-  await updateCrmLead(record.id, {
-    ...record,
-    status: 2,
-    reservationStatus: record.reservationStatus || '预定'
-  })
-  message.success('已转入预订管理')
-  fetchData()
-}
-
-function abandonLead(record: CrmLeadItem) {
-  Modal.confirm({
-    title: `确认放弃客户「${record.elderName || record.name || record.id}」吗？`,
-    content: '放弃后将进入失效用户池，可后续恢复。',
-    onOk: async () => {
-      await batchUpdateLeadStatus({
-        ids: [record.id],
-        status: 3,
-        invalidTime: dayjs().format('YYYY-MM-DD HH:mm:ss')
-      })
-      message.success('已放弃客户并转入失效用户')
-      fetchData()
-    }
-  })
 }
 
 function openForm(row?: CrmLeadItem) {
@@ -1040,15 +1053,6 @@ async function submitExecuteCallback() {
   }
 }
 
-function recoverLead(record: CrmLeadItem) {
-  batchUpdateLeadStatus({ ids: [record.id], status: 1 })
-    .then(() => {
-      message.success('客户已恢复到意向客户')
-      fetchData()
-    })
-    .catch(() => message.error('恢复失败'))
-}
-
 function toggleRefund(record: CrmLeadItem) {
   updateCrmLead(record.id, { ...record, refunded: record.refunded === 1 ? 0 : 1 })
     .then(() => {
@@ -1064,14 +1068,20 @@ async function batchMoveToInvalid() {
     message.info('请先勾选要放弃的客户')
     return
   }
-  await batchUpdateLeadStatus({
-    ids,
-    status: 3,
-    invalidTime: dayjs().format('YYYY-MM-DD HH:mm:ss')
+  Modal.confirm({
+    title: `确认放弃选中的 ${ids.length} 条客户吗？`,
+    content: '放弃后将进入失效用户池，可后续恢复。',
+    onOk: async () => {
+      await batchUpdateLeadStatus({
+        ids,
+        status: 3,
+        invalidTime: dayjs().format('YYYY-MM-DD HH:mm:ss')
+      })
+      message.success(`已放弃 ${ids.length} 条客户`)
+      selectedRowKeys.value = []
+      fetchData()
+    }
   })
-  message.success(`已放弃 ${ids.length} 条客户`)
-  selectedRowKeys.value = []
-  fetchData()
 }
 
 async function batchMoveToIntent() {
@@ -1107,17 +1117,6 @@ async function batchMoveToReservation() {
   fetchData()
 }
 
-function remove(id: number) {
-  Modal.confirm({
-    title: '确认删除该客户记录吗？',
-    onOk: async () => {
-      await deleteCrmLead(id)
-      message.success('已删除')
-      fetchData()
-    }
-  })
-}
-
 watch(
   () => route.query.tab,
   () => {
@@ -1147,5 +1146,10 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   margin-bottom: 12px;
+}
+
+.selection-tip {
+  color: var(--muted);
+  font-size: 12px;
 }
 </style>

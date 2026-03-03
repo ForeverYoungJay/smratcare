@@ -67,12 +67,25 @@
 
       <a-tab-pane key="POLICY" tab="季度运营政策">
         <a-card class="card-elevated" :bordered="false">
+          <div class="table-actions">
+            <a-space>
+              <a-button :disabled="selectedCount !== 1" @click="previewSelected">详情</a-button>
+              <a-button :disabled="selectedCount !== 1" @click="editSelected">编辑</a-button>
+              <a-button :disabled="selectedCount !== 1" @click="submitSelected">提交审批</a-button>
+              <a-button :disabled="selectedCount !== 1" @click="approveSelected">审批通过</a-button>
+              <a-button :disabled="selectedCount !== 1" @click="rejectSelected">驳回</a-button>
+              <a-button :disabled="selectedCount !== 1" @click="publishSelected">发布</a-button>
+              <a-button :disabled="selectedCount === 0" danger @click="deleteSelected">删除</a-button>
+              <span class="selection-tip">已勾选 {{ selectedCount }} 条</span>
+            </a-space>
+          </div>
           <a-table
             :loading="loading"
             :data-source="policyRows"
             :columns="policyColumns"
             :pagination="pagination"
             row-key="id"
+            :row-selection="rowSelection"
             @change="onTableChange"
           >
             <template #bodyCell="{ column, record }">
@@ -81,26 +94,6 @@
               </template>
               <template v-else-if="column.key === 'workflow'">
                 <span>阅读 {{ record.readCount || 0 }}/{{ record.totalStaffCount || 0 }}</span>
-              </template>
-              <template v-else-if="column.key === 'action'">
-                <a-space>
-                  <a-button type="link" size="small" @click="openPreview(record)">详情</a-button>
-                  <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
-                  <a-dropdown>
-                    <a-button type="link" size="small">流程</a-button>
-                    <template #overlay>
-                      <a-menu>
-                        <a-menu-item @click="submitPlan(record)">提交审批</a-menu-item>
-                        <a-menu-item @click="approvePlan(record)">审批通过</a-menu-item>
-                        <a-menu-item @click="rejectPlan(record)">驳回</a-menu-item>
-                        <a-menu-item @click="publishPlan(record)">发布</a-menu-item>
-                      </a-menu>
-                    </template>
-                  </a-dropdown>
-                  <a-popconfirm title="确认删除该政策吗？" @confirm="onDelete(record.id)">
-                    <a-button type="link" size="small" danger>删除</a-button>
-                  </a-popconfirm>
-                </a-space>
               </template>
             </template>
           </a-table>
@@ -279,6 +272,7 @@ const pagination = reactive<TablePaginationConfig>({
 })
 
 const rows = ref<MarketingPlanItem[]>([])
+const selectedRowKeys = ref<Array<number | string>>([])
 
 const policyColumns = [
   { title: '季度', dataIndex: 'quarterLabel', key: 'quarterLabel', width: 120 },
@@ -286,8 +280,7 @@ const policyColumns = [
   { title: '运营目标', dataIndex: 'target', key: 'target', width: 240 },
   { title: '责任部门', dataIndex: 'owner', key: 'owner', width: 120 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 110 },
-  { title: '阅读', key: 'workflow', width: 130 },
-  { title: '操作', key: 'action', width: 220, fixed: 'right' }
+  { title: '阅读', key: 'workflow', width: 130 }
 ]
 
 const receiptColumns = [
@@ -325,9 +318,26 @@ const formRules = {
 
 const speechCards = computed(() => rows.value)
 const policyRows = computed(() => rows.value)
+const selectedCount = computed(() => selectedRowKeys.value.length)
+const selectedPlans = computed(() => policyRows.value.filter((item) => selectedRowKeys.value.some((id) => String(id) === String(item.id))))
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: Array<number | string>) => {
+    selectedRowKeys.value = keys
+  }
+}))
+
+function requireSingleSelection(actionLabel: string) {
+  if (selectedPlans.value.length !== 1) {
+    message.info(`请先勾选 1 条政策后再${actionLabel}`)
+    return null
+  }
+  return selectedPlans.value[0]
+}
 
 async function fetchData() {
   loading.value = true
+  selectedRowKeys.value = []
   try {
     const params: MarketingPlanQuery = {
       pageNo: pagination.current || 1,
@@ -362,12 +372,14 @@ async function fetchDepartments() {
 function onModuleChange(tab: string) {
   activeModule.value = tab as 'SPEECH' | 'POLICY'
   pagination.current = 1
+  selectedRowKeys.value = []
   fetchData()
 }
 
 function onTableChange(pag: TablePaginationConfig) {
   pagination.current = pag.current || 1
   pagination.pageSize = pag.pageSize || 10
+  selectedRowKeys.value = []
   fetchData()
 }
 
@@ -453,6 +465,59 @@ async function onDelete(id: number | string) {
   } catch (error: any) {
     message.error(error?.message || '删除失败')
   }
+}
+
+function previewSelected() {
+  const plan = requireSingleSelection('查看详情')
+  if (!plan) return
+  openPreview(plan)
+}
+
+function editSelected() {
+  const plan = requireSingleSelection('编辑')
+  if (!plan) return
+  openEdit(plan)
+}
+
+async function submitSelected() {
+  const plan = requireSingleSelection('提交审批')
+  if (!plan) return
+  await submitPlan(plan)
+}
+
+async function approveSelected() {
+  const plan = requireSingleSelection('审批通过')
+  if (!plan) return
+  await approvePlan(plan)
+}
+
+function rejectSelected() {
+  const plan = requireSingleSelection('驳回')
+  if (!plan) return
+  rejectPlan(plan)
+}
+
+async function publishSelected() {
+  const plan = requireSingleSelection('发布')
+  if (!plan) return
+  await publishPlan(plan)
+}
+
+function deleteSelected() {
+  const ids = selectedPlans.value.map((item) => item.id)
+  if (!ids.length) {
+    message.info('请先勾选要删除的政策')
+    return
+  }
+  Modal.confirm({
+    title: `确认删除选中的 ${ids.length} 条政策吗？`,
+    onOk: async () => {
+      await Promise.all(ids.map((id) => deleteMarketingPlan(id)))
+      message.success(`删除成功（${ids.length} 条）`)
+      selectedRowKeys.value = []
+      fetchData()
+    }
+  })
 }
 
 async function submitPlan(item: MarketingPlanItem) {
@@ -575,6 +640,15 @@ onMounted(() => {
 <style scoped>
 .plan-tabs {
   margin-top: 6px;
+}
+
+.table-actions {
+  margin-bottom: 12px;
+}
+
+.selection-tip {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .plan-card {
