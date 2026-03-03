@@ -24,7 +24,6 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -77,7 +76,7 @@ public class CrmContractServiceImpl implements CrmContractService {
         contractMapper.insert(contract);
         syncLeadProjection(contract, true);
         return toResponse(contract);
-      } catch (DuplicateKeyException | DataIntegrityViolationException ex) {
+      } catch (DataIntegrityViolationException ex) {
         if (!isContractNoDuplicate(ex) || (requestedNo != null && !requestedNo.isBlank()) || attempt >= 5) {
           throw ex;
         }
