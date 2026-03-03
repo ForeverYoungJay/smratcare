@@ -4,16 +4,17 @@ WORKDIR /build
 
 COPY pom.xml .
 RUN --mount=type=cache,target=/root/.m2 \
-    mvn -B -DskipTests dependency:go-offline
+    mvn -B -DskipTests -Dmaven.repo.local=/root/.m2/repository dependency:go-offline
 
 COPY src ./src
 RUN --mount=type=cache,target=/root/.m2 \
-    mvn -B -DskipTests package
+    mvn -B -DskipTests -Dmaven.repo.local=/root/.m2/repository package
 
 FROM eclipse-temurin:17-jre
 WORKDIR /app
 
-COPY --from=builder /build/target/care-task-1.0.0.jar /app/app.jar
+# 不再写死版本号
+COPY --from=builder /build/target/*.jar /app/app.jar
 
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

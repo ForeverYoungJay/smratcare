@@ -5,3 +5,7 @@ node_modules
 target/
 admin-web/node_modules/
 output/uploads/
+.git
+.idea
+*.iml
+*.log

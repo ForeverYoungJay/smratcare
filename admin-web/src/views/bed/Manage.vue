@@ -28,7 +28,7 @@
     <div class="entry-actions">
       <a-space wrap>
         <a-button @click="openBedMap">查看床位全景</a-button>
-        <a-button type="primary" ghost @click="openElderBedPanorama">打开长者管理床态全景</a-button>
+        <a-button type="primary" @click="openElderBedPanorama">打开长者管理床态全景</a-button>
       </a-space>
     </div>
 
@@ -80,7 +80,7 @@
               <div class="table-actions">
                 <a-space>
                   <a-button type="primary" @click="openBuilding()">新增楼栋</a-button>
-                  <a-button type="primary" ghost @click="openBootstrap">一键生成楼层房床</a-button>
+                  <a-button type="primary" @click="openBootstrap">一键生成楼层房床</a-button>
                   <a-button @click="refreshBuildings">刷新</a-button>
                 </a-space>
               </div>
@@ -240,6 +240,12 @@
                 <template #bodyCell="{ column, record }">
                   <template v-if="column.key === 'roomType'">
                     {{ resolveRoomTypeLabel(record.roomType) }}
+                  </template>
+                  <template v-else-if="column.key === 'capacity'">
+                    <a-tag v-if="resolveCapacityMismatch(record)" color="gold">
+                      {{ resolveRoomCapacity(record) }}（已按房型修正）
+                    </a-tag>
+                    <span v-else>{{ resolveRoomCapacity(record) }}</span>
                   </template>
                   <template v-else-if="column.key === 'status'">
                     <a-tag :color="record.status === 1 ? 'green' : 'default'">
@@ -870,12 +876,33 @@ function resolveBedTypeLabel(bedType?: string) {
 }
 
 function inferCapacityByRoomType(roomType?: string) {
-  const normalized = String(roomType || '').toUpperCase()
+  const raw = String(roomType || '')
+  const normalized = raw.toUpperCase()
   if (!normalized) return undefined
-  if (normalized.includes('SINGLE') || normalized.includes('ROOM_SINGLE')) return 1
-  if (normalized.includes('DOUBLE') || normalized.includes('ROOM_DOUBLE')) return 2
-  if (normalized.includes('TRIPLE') || normalized.includes('ROOM_TRIPLE')) return 3
+  if (normalized === '1' || normalized.includes('SINGLE') || normalized.includes('ROOM_SINGLE') || raw.includes('单人')) return 1
+  if (normalized === '2' || normalized.includes('DOUBLE') || normalized.includes('ROOM_DOUBLE') || raw.includes('双人')) return 2
+  if (normalized === '3' || normalized.includes('TRIPLE') || normalized.includes('ROOM_TRIPLE') || raw.includes('三人')) return 3
+  const matched = roomTypeItems.value.find((item) => item.itemCode === raw || item.itemName === raw)
+  if (matched) {
+    const name = String(matched.itemName || '')
+    if (name.includes('单人')) return 1
+    if (name.includes('双人')) return 2
+    if (name.includes('三人')) return 3
+  }
   return undefined
+}
+
+function resolveRoomCapacity(room: RoomItem) {
+  const inferred = inferCapacityByRoomType(room.roomType)
+  if (inferred) return inferred
+  return Number(room.capacity || 0) || '-'
+}
+
+function resolveCapacityMismatch(room: RoomItem) {
+  const inferred = inferCapacityByRoomType(room.roomType)
+  if (!inferred) return false
+  const current = Number(room.capacity || 0)
+  return current > 0 && current !== inferred
 }
 
 function inferRoomTypeByCapacity(capacity?: number) {
@@ -1213,6 +1240,10 @@ async function submitFloor() {
 function openRoom(row?: RoomItem) {
   if (row) {
     Object.assign(roomForm, row)
+    const inferred = inferCapacityByRoomType(row.roomType)
+    if (inferred && roomForm.capacity !== inferred) {
+      roomForm.capacity = inferred
+    }
   } else {
     Object.assign(roomForm, { id: undefined, roomNo: '', buildingId: undefined, floorId: undefined, roomType: undefined, capacity: 1, status: 1 })
   }

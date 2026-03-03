@@ -59,6 +59,8 @@ public class BedServiceImpl implements BedService {
   @Override
   public BedResponse create(BedRequest request) {
     ensureBedNoUnique(null, request.getTenantId(), request.getRoomId(), request.getBedNo());
+    ensureRoomTenant(request.getTenantId(), request.getRoomId());
+    ensureRoomBedQuota(request.getTenantId(), request.getRoomId(), null);
     Bed bed = new Bed();
     bed.setTenantId(request.getTenantId());
     bed.setOrgId(request.getOrgId());
@@ -68,7 +70,6 @@ public class BedServiceImpl implements BedService {
     bed.setBedQrCode(QrCodeUtil.generate());
     bed.setStatus(request.getStatus());
     bed.setCreatedBy(request.getCreatedBy());
-    ensureRoomTenant(request.getTenantId(), request.getRoomId());
     bedMapper.insert(bed);
     return toResponse(bed);
   }
@@ -86,13 +87,14 @@ public class BedServiceImpl implements BedService {
       throw new IllegalArgumentException("当前床位已入住，状态只能保持“入住”");
     }
     ensureBedNoUnique(id, request.getTenantId(), request.getRoomId(), request.getBedNo());
+    ensureRoomTenant(request.getTenantId(), request.getRoomId());
+    ensureRoomBedQuota(request.getTenantId(), request.getRoomId(), id);
     bed.setTenantId(request.getTenantId());
     bed.setOrgId(request.getOrgId());
     bed.setRoomId(request.getRoomId());
     bed.setBedNo(request.getBedNo());
     bed.setBedType(request.getBedType());
     bed.setStatus(request.getStatus());
-    ensureRoomTenant(request.getTenantId(), request.getRoomId());
     bedMapper.updateById(bed);
     return toResponse(bed);
   }
@@ -472,6 +474,62 @@ public class BedServiceImpl implements BedService {
         || Integer.valueOf(1).equals(room.getIsDeleted())) {
       throw new IllegalArgumentException("房间不存在或无权限");
     }
+  }
+
+  private void ensureRoomBedQuota(Long tenantId, Long roomId, Long bedIdToExclude) {
+    if (tenantId == null || roomId == null) {
+      return;
+    }
+    Room room = roomMapper.selectById(roomId);
+    if (room == null || Integer.valueOf(1).equals(room.getIsDeleted()) || !tenantId.equals(room.getTenantId())) {
+      throw new IllegalArgumentException("房间不存在或无权限");
+    }
+    int roomCapacity = resolveRoomCapacity(room);
+    var query = Wrappers.lambdaQuery(Bed.class)
+        .eq(Bed::getIsDeleted, 0)
+        .eq(Bed::getTenantId, tenantId)
+        .eq(Bed::getRoomId, roomId);
+    if (bedIdToExclude != null) {
+      query.ne(Bed::getId, bedIdToExclude);
+    }
+    long existingBedCount = bedMapper.selectCount(query);
+    if (existingBedCount >= roomCapacity) {
+      throw new IllegalArgumentException("床位数不能超过房间容量(" + roomCapacity + ")");
+    }
+  }
+
+  private int resolveRoomCapacity(Room room) {
+    Integer inferred = inferCapacityByRoomType(room.getRoomType());
+    if (inferred != null) {
+      return inferred;
+    }
+    return room.getCapacity() == null || room.getCapacity() <= 0 ? 1 : room.getCapacity();
+  }
+
+  private Integer inferCapacityByRoomType(String roomType) {
+    if (roomType == null || roomType.isBlank()) {
+      return null;
+    }
+    String normalized = roomType.trim().toUpperCase();
+    if ("1".equals(normalized)
+        || normalized.contains("SINGLE")
+        || normalized.contains("ROOM_SINGLE")
+        || roomType.contains("单人")) {
+      return 1;
+    }
+    if ("2".equals(normalized)
+        || normalized.contains("DOUBLE")
+        || normalized.contains("ROOM_DOUBLE")
+        || roomType.contains("双人")) {
+      return 2;
+    }
+    if ("3".equals(normalized)
+        || normalized.contains("TRIPLE")
+        || normalized.contains("ROOM_TRIPLE")
+        || roomType.contains("三人")) {
+      return 3;
+    }
+    return null;
   }
 
   private void ensureBedNoUnique(Long id, Long tenantId, Long roomId, String bedNo) {

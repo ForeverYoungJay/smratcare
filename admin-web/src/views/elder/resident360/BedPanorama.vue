@@ -30,7 +30,7 @@
         </div>
         <div class="selector-group">
           <a-button @click="openBedMap">查看床位全景</a-button>
-          <a-button type="primary" ghost @click="openBedManage">床位管理管理</a-button>
+          <a-button type="primary" @click="openBedManage">床位管理管理</a-button>
         </div>
       </div>
 

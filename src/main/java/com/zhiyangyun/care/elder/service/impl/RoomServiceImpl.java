@@ -35,6 +35,7 @@ public class RoomServiceImpl implements RoomService {
   @Override
   public RoomResponse create(RoomRequest request) {
     ensureRoomNoUnique(null, request.getTenantId(), request.getRoomNo());
+    Integer normalizedCapacity = normalizeCapacityByRoomType(request.getRoomType(), request.getCapacity());
     Room room = new Room();
     room.setTenantId(request.getTenantId());
     room.setOrgId(request.getOrgId());
@@ -44,7 +45,7 @@ public class RoomServiceImpl implements RoomService {
     room.setFloorNo(request.getFloorNo());
     room.setRoomNo(request.getRoomNo());
     room.setRoomType(request.getRoomType());
-    room.setCapacity(request.getCapacity());
+    room.setCapacity(normalizedCapacity);
     room.setStatus(request.getStatus());
     room.setRoomQrCode(request.getRoomQrCode());
     room.setCreatedBy(request.getCreatedBy());
@@ -64,7 +65,8 @@ public class RoomServiceImpl implements RoomService {
       return null;
     }
     ensureRoomNoUnique(id, request.getTenantId(), request.getRoomNo());
-    ensureCapacityNotLessThanOccupied(id, request.getTenantId(), request.getCapacity());
+    Integer normalizedCapacity = normalizeCapacityByRoomType(request.getRoomType(), request.getCapacity());
+    ensureCapacityNotLessThanOccupied(id, request.getTenantId(), normalizedCapacity);
     room.setTenantId(request.getTenantId());
     room.setOrgId(request.getOrgId());
     room.setBuildingId(request.getBuildingId());
@@ -73,7 +75,7 @@ public class RoomServiceImpl implements RoomService {
     room.setFloorNo(request.getFloorNo());
     room.setRoomNo(request.getRoomNo());
     room.setRoomType(request.getRoomType());
-    room.setCapacity(request.getCapacity());
+    room.setCapacity(normalizedCapacity);
     room.setStatus(request.getStatus());
     room.setRoomQrCode(request.getRoomQrCode());
     applyBuildingFloor(room, request.getTenantId(), request.getBuildingId(), request.getFloorId(),
@@ -201,6 +203,40 @@ public class RoomServiceImpl implements RoomService {
     if (capacity < occupiedCount) {
       throw new IllegalArgumentException("房间容量不能小于当前入住床位数");
     }
+  }
+
+  private Integer normalizeCapacityByRoomType(String roomType, Integer fallbackCapacity) {
+    Integer inferred = inferCapacityByRoomType(roomType);
+    if (inferred != null) {
+      return inferred;
+    }
+    return fallbackCapacity == null || fallbackCapacity <= 0 ? 1 : fallbackCapacity;
+  }
+
+  private Integer inferCapacityByRoomType(String roomType) {
+    if (roomType == null || roomType.isBlank()) {
+      return null;
+    }
+    String normalized = roomType.trim().toUpperCase();
+    if ("1".equals(normalized)
+        || normalized.contains("SINGLE")
+        || normalized.contains("ROOM_SINGLE")
+        || roomType.contains("单人")) {
+      return 1;
+    }
+    if ("2".equals(normalized)
+        || normalized.contains("DOUBLE")
+        || normalized.contains("ROOM_DOUBLE")
+        || roomType.contains("双人")) {
+      return 2;
+    }
+    if ("3".equals(normalized)
+        || normalized.contains("TRIPLE")
+        || normalized.contains("ROOM_TRIPLE")
+        || roomType.contains("三人")) {
+      return 3;
+    }
+    return null;
   }
 
   private void applyBuildingFloor(Room room, Long tenantId, Long buildingId, Long floorId,

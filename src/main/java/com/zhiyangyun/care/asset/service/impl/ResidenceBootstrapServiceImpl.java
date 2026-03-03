@@ -51,7 +51,6 @@ public class ResidenceBootstrapServiceImpl implements ResidenceBootstrapService 
     int buildingCount = request.getBuildingCount() == null ? 1 : request.getBuildingCount();
     int floorsPerBuilding = request.getFloorsPerBuilding() == null ? 3 : request.getFloorsPerBuilding();
     int roomsPerFloor = request.getRoomsPerFloor() == null ? 10 : request.getRoomsPerFloor();
-    int bedsPerRoom = request.getBedsPerRoom() == null ? 2 : request.getBedsPerRoom();
     int seed = request.getStartNo() == null ? 1 : request.getStartNo();
 
     String buildingPrefix = normalizePrefix(request.getBuildingPrefix(), "楼栋");
@@ -65,10 +64,11 @@ public class ResidenceBootstrapServiceImpl implements ResidenceBootstrapService 
     String bedType = normalizeValue(
         request.getBedType(),
         resolveDefaultConfigCode(tenantId, "ADMISSION_BED_TYPE", "BED_STANDARD"));
+    int bedsPerRoom = resolveBedsPerRoom(roomType, request.getBedsPerRoom());
 
     String templateCode = normalizeValue(request.getTemplateCode(), "");
     if ("AB_F1_6_R101_130_B01_03".equals(templateCode)) {
-      return bootstrapTemplateAb(tenantId, createdBy, roomType, bedType);
+      return bootstrapTemplateAb(tenantId, createdBy, roomType, bedType, bedsPerRoom);
     }
 
     int createdBuilding = 0;
@@ -163,7 +163,7 @@ public class ResidenceBootstrapServiceImpl implements ResidenceBootstrapService 
         .eq(Building::getIsDeleted, 1));
   }
 
-  private ResidenceBootstrapResponse bootstrapTemplateAb(Long tenantId, Long createdBy, String roomType, String bedType) {
+  private ResidenceBootstrapResponse bootstrapTemplateAb(Long tenantId, Long createdBy, String roomType, String bedType, int bedsPerRoom) {
     int createdBuilding = 0;
     int createdFloor = 0;
     int createdRoom = 0;
@@ -213,14 +213,14 @@ public class ResidenceBootstrapServiceImpl implements ResidenceBootstrapService 
           room.setFloorNo(floor.getFloorNo());
           room.setRoomNo(roomNo);
           room.setRoomType(roomType);
-          room.setCapacity(3);
+          room.setCapacity(bedsPerRoom);
           room.setStatus(1);
           room.setRoomQrCode(QrCodeUtil.generate());
           room.setCreatedBy(createdBy);
           roomMapper.insert(room);
           createdRoom++;
 
-          for (int bedNo = 1; bedNo <= 3; bedNo++) {
+          for (int bedNo = 1; bedNo <= bedsPerRoom; bedNo++) {
             Bed bed = new Bed();
             bed.setTenantId(tenantId);
             bed.setOrgId(tenantId);
@@ -279,5 +279,42 @@ public class ResidenceBootstrapServiceImpl implements ResidenceBootstrapService 
   private String normalizeValue(String value, String fallback) {
     if (value == null || value.isBlank()) return fallback;
     return value.trim();
+  }
+
+  private int resolveBedsPerRoom(String roomType, Integer fallbackBedsPerRoom) {
+    Integer inferred = inferCapacityByRoomType(roomType);
+    if (inferred != null) {
+      return inferred;
+    }
+    if (fallbackBedsPerRoom == null || fallbackBedsPerRoom <= 0) {
+      return 1;
+    }
+    return fallbackBedsPerRoom;
+  }
+
+  private Integer inferCapacityByRoomType(String roomType) {
+    if (roomType == null || roomType.isBlank()) {
+      return null;
+    }
+    String normalized = roomType.trim().toUpperCase();
+    if ("1".equals(normalized)
+        || normalized.contains("SINGLE")
+        || normalized.contains("ROOM_SINGLE")
+        || roomType.contains("单人")) {
+      return 1;
+    }
+    if ("2".equals(normalized)
+        || normalized.contains("DOUBLE")
+        || normalized.contains("ROOM_DOUBLE")
+        || roomType.contains("双人")) {
+      return 2;
+    }
+    if ("3".equals(normalized)
+        || normalized.contains("TRIPLE")
+        || normalized.contains("ROOM_TRIPLE")
+        || roomType.contains("三人")) {
+      return 3;
+    }
+    return null;
   }
 }

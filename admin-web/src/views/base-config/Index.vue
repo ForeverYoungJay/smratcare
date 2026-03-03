@@ -19,7 +19,7 @@
           <a-space>
             <a-button type="primary" @click="fetchData">查询</a-button>
             <a-button @click="reset">重置</a-button>
-            <a-button type="primary" ghost @click="openCreate" :disabled="!activeGroup">新增配置项</a-button>
+            <a-button type="primary" @click="openCreate" :disabled="!activeGroup">新增配置项</a-button>
             <a-button :disabled="selectedRowKeys.length === 0" @click="batchToggleStatus(1)">批量启用</a-button>
             <a-button :disabled="selectedRowKeys.length === 0" @click="batchToggleStatus(0)">批量停用</a-button>
             <a-button v-if="showResidencePresetAction" @click="fillResidencePresets" :disabled="!activeGroup">一键补全默认项</a-button>

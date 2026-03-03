@@ -81,7 +81,7 @@
             <a-radio-button value="list">卡片列表</a-radio-button>
           </a-radio-group>
           <a-button @click="openBedManage">{{ isMarketingMode ? '床位管理' : '床位管理管理' }}</a-button>
-          <a-button v-if="!isMarketingMode" type="primary" ghost @click="openElderBedPanorama">长者管理床态全景</a-button>
+          <a-button v-if="!isMarketingMode" type="primary" @click="openElderBedPanorama">长者管理床态全景</a-button>
         </a-space>
         <a-radio-group
           v-if="viewMode === 'grid'"
