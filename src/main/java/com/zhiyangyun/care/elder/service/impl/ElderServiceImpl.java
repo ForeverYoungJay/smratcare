@@ -3,6 +3,8 @@ package com.zhiyangyun.care.elder.service.impl;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.zhiyangyun.care.crm.entity.CrmContract;
+import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
 import com.zhiyangyun.care.elder.entity.Bed;
 import com.zhiyangyun.care.elder.entity.ElderBedRelation;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
@@ -19,6 +21,10 @@ import com.zhiyangyun.care.elder.model.ElderUpdateRequest;
 import com.zhiyangyun.care.elder.service.ElderService;
 import com.zhiyangyun.care.elder.util.QrCodeUtil;
 import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,14 +35,17 @@ public class ElderServiceImpl implements ElderService {
   private final ElderBedRelationMapper relationMapper;
   private final RoomMapper roomMapper;
   private final ElderChangeLogMapper changeLogMapper;
+  private final CrmContractMapper crmContractMapper;
 
   public ElderServiceImpl(ElderMapper elderMapper, BedMapper bedMapper,
-      ElderBedRelationMapper relationMapper, RoomMapper roomMapper, ElderChangeLogMapper changeLogMapper) {
+      ElderBedRelationMapper relationMapper, RoomMapper roomMapper, ElderChangeLogMapper changeLogMapper,
+      CrmContractMapper crmContractMapper) {
     this.elderMapper = elderMapper;
     this.bedMapper = bedMapper;
     this.relationMapper = relationMapper;
     this.roomMapper = roomMapper;
     this.changeLogMapper = changeLogMapper;
+    this.crmContractMapper = crmContractMapper;
   }
 
   @Override
@@ -168,10 +177,25 @@ public class ElderServiceImpl implements ElderService {
   }
 
   @Override
-  public IPage<ElderResponse> page(Long tenantId, long pageNo, long pageSize, String keyword) {
+  public IPage<ElderResponse> page(Long tenantId, long pageNo, long pageSize, String keyword, Boolean signedOnly) {
     var wrapper = Wrappers.lambdaQuery(ElderProfile.class)
         .eq(ElderProfile::getIsDeleted, 0)
         .eq(tenantId != null, ElderProfile::getTenantId, tenantId);
+    if (Boolean.TRUE.equals(signedOnly)) {
+      List<CrmContract> signedContracts = crmContractMapper.selectList(Wrappers.lambdaQuery(CrmContract.class)
+          .eq(CrmContract::getIsDeleted, 0)
+          .eq(tenantId != null, CrmContract::getTenantId, tenantId)
+          .isNotNull(CrmContract::getElderId)
+          .in(CrmContract::getStatus, List.of("SIGNED", "EFFECTIVE")));
+      Set<Long> signedElderIds = new HashSet<>(signedContracts.stream()
+          .map(CrmContract::getElderId)
+          .filter(Objects::nonNull)
+          .toList());
+      if (signedElderIds.isEmpty()) {
+        return new Page<>(pageNo, pageSize);
+      }
+      wrapper.in(ElderProfile::getId, signedElderIds);
+    }
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(ElderProfile::getFullName, keyword)
           .or().like(ElderProfile::getElderCode, keyword)

@@ -31,6 +31,17 @@
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
+      <FlowGuardBar
+        title="长者入院守卫"
+        :subject="elderFlowSubject"
+        :stage-text="elderFlowStageText"
+        :stage-color="elderFlowStageColor"
+        :steps="elderFlowSteps"
+        :current-index="elderFlowCurrentIndex"
+        :blockers="elderFlowBlockers"
+        :hint="elderFlowHint"
+        style="margin-bottom: 12px"
+      />
       <div class="table-actions">
         <a-space>
           <a-button type="primary" @click="goCreate">新增老人</a-button>
@@ -128,6 +139,7 @@ import { message } from 'ant-design-vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import QRCode from 'qrcode'
 import PageContainer from '../../components/PageContainer.vue'
+import FlowGuardBar from '../../components/FlowGuardBar.vue'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { exportCsv } from '../../utils/export'
 import { getElderPage, assignBed, bindFamily } from '../../api/elder'
@@ -164,6 +176,39 @@ const columns = [
 ]
 const selectedCount = computed(() => selectedRowKeys.value.length)
 const selectedRows = computed(() => rows.value.filter((item) => selectedRowKeys.value.some((id) => String(id) === String(item.id))))
+const elderFlowSteps = ['合同最终签署', '长者入院', '在院管理']
+const elderFlowCurrentIndex = computed(() => {
+  if (!selectedRows.value.length) return 2
+  const row = selectedRows.value[0]
+  if (row.status === 1 || row.status === 2) return 2
+  return 1
+})
+const elderFlowStageText = computed(() => {
+  if (!selectedRows.value.length) return '已过滤为签署后长者'
+  return statusText(selectedRows.value[0].status)
+})
+const elderFlowStageColor = computed(() => {
+  if (!selectedRows.value.length) return 'blue'
+  const status = selectedRows.value[0].status
+  if (status === 1) return 'green'
+  if (status === 2) return 'orange'
+  return 'default'
+})
+const elderFlowSubject = computed(() => {
+  if (!selectedRows.value.length) return `当前列表共 ${total.value} 位，均来源于已签署合同`
+  const row = selectedRows.value[0]
+  return `长者 ${row.fullName} / 床位 ${row.bedNo || '-'}`
+})
+const elderFlowBlockers = computed(() => {
+  if (!selectedRows.value.length) return []
+  const row = selectedRows.value[0]
+  if (!row.bedNo) return ['未分配床位']
+  return []
+})
+const elderFlowHint = computed(() => {
+  if (!selectedRows.value.length) return '系统仅展示最终签署成功合同对应长者'
+  return '可执行换床、退住、家属绑定等在院操作'
+})
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: Id[]) => {
@@ -228,6 +273,7 @@ async function fetchData() {
     const res: PageResult<ElderItem> = await getElderPage({
       pageNo: query.pageNo,
       pageSize: query.pageSize,
+      signedOnly: true,
       fullName: query.fullName,
       idCardNo: query.idCardNo,
       bedNo: query.bedNo,

@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zhiyangyun.care.bill.entity.BillMonthly;
 import com.zhiyangyun.care.bill.mapper.BillMonthlyMapper;
+import com.zhiyangyun.care.crm.entity.CrmContract;
+import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
 import com.zhiyangyun.care.elder.model.AssignBedRequest;
 import com.zhiyangyun.care.elder.entity.Bed;
 import com.zhiyangyun.care.elder.entity.ElderBedRelation;
@@ -51,6 +53,7 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
   private final ElderAccountService accountService;
   private final BillMonthlyMapper billMonthlyMapper;
   private final ElderPointsAccountMapper pointsAccountMapper;
+  private final CrmContractMapper crmContractMapper;
 
   public ElderLifecycleServiceImpl(ElderAdmissionMapper admissionMapper,
                                    ElderDischargeMapper dischargeMapper,
@@ -61,7 +64,8 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
                                    ElderService elderService,
                                    ElderAccountService accountService,
                                    BillMonthlyMapper billMonthlyMapper,
-                                   ElderPointsAccountMapper pointsAccountMapper) {
+                                   ElderPointsAccountMapper pointsAccountMapper,
+                                   CrmContractMapper crmContractMapper) {
     this.admissionMapper = admissionMapper;
     this.dischargeMapper = dischargeMapper;
     this.changeLogMapper = changeLogMapper;
@@ -72,6 +76,7 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
     this.accountService = accountService;
     this.billMonthlyMapper = billMonthlyMapper;
     this.pointsAccountMapper = pointsAccountMapper;
+    this.crmContractMapper = crmContractMapper;
   }
 
   @Override
@@ -81,6 +86,7 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
     if (elder == null || !request.getTenantId().equals(elder.getTenantId())) {
       throw new IllegalArgumentException("老人不存在或无权限");
     }
+    CrmContract contract = validateAdmissionContractGuard(request, elder);
     ElderAdmission admission = new ElderAdmission();
     admission.setTenantId(request.getTenantId());
     admission.setOrgId(request.getOrgId());
@@ -133,6 +139,7 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
       accountService.adjust(request.getOrgId(), request.getCreatedBy(), adjust);
     }
     ensurePointsAccount(request.getOrgId(), request.getElderId());
+    syncContractAfterAdmission(contract, request);
 
     AdmissionResponse response = new AdmissionResponse();
     response.setId(admission.getId());
@@ -144,6 +151,65 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
     response.setDepositAmount(admission.getDepositAmount());
     response.setRemark(admission.getRemark());
     return response;
+  }
+
+  private CrmContract validateAdmissionContractGuard(AdmissionRequest request, ElderProfile elder) {
+    String contractNo = request.getContractNo();
+    if (contractNo == null || contractNo.isBlank()) {
+      throw new IllegalStateException("请先填写合同号并完成入住评估");
+    }
+    CrmContract contract = crmContractMapper.selectOne(Wrappers.lambdaQuery(CrmContract.class)
+        .eq(CrmContract::getIsDeleted, 0)
+        .eq(CrmContract::getTenantId, request.getTenantId())
+        .eq(CrmContract::getContractNo, contractNo)
+        .orderByDesc(CrmContract::getUpdateTime)
+        .last("LIMIT 1"));
+    if (contract == null) {
+      throw new IllegalStateException("合同不存在，请先完成合同签约");
+    }
+    if ("VOID".equals(contract.getStatus())) {
+      throw new IllegalStateException("作废合同不可办理入住");
+    }
+    if ("SIGNED".equals(contract.getStatus()) || "EFFECTIVE".equals(contract.getStatus()) || "SIGNED".equals(contract.getFlowStage())) {
+      throw new IllegalStateException("合同已完成最终签署，无需重复办理入住");
+    }
+    if ("PENDING_ASSESSMENT".equals(contract.getFlowStage())) {
+      throw new IllegalStateException("合同尚未完成入住评估，请先完成评估");
+    }
+    if (contract.getElderId() != null && !contract.getElderId().equals(elder.getId())) {
+      throw new IllegalStateException("合同绑定老人和当前办理老人不一致");
+    }
+    return contract;
+  }
+
+  private void syncContractAfterAdmission(CrmContract contract, AdmissionRequest request) {
+    if (contract == null) {
+      return;
+    }
+    boolean changed = false;
+    if (contract.getElderId() == null && request.getElderId() != null) {
+      contract.setElderId(request.getElderId());
+      changed = true;
+    }
+    if (request.getBedId() != null && contract.getReservationBedId() == null) {
+      contract.setReservationBedId(request.getBedId());
+      changed = true;
+    }
+    if (!"PENDING_SIGN".equals(contract.getFlowStage())) {
+      contract.setFlowStage("PENDING_SIGN");
+      changed = true;
+    }
+    if (!"MARKETING".equals(contract.getCurrentOwnerDept())) {
+      contract.setCurrentOwnerDept("MARKETING");
+      changed = true;
+    }
+    if (!"待签署".equals(contract.getContractStatus())) {
+      contract.setContractStatus("待签署");
+      changed = true;
+    }
+    if (changed) {
+      crmContractMapper.updateById(contract);
+    }
   }
 
   @Override

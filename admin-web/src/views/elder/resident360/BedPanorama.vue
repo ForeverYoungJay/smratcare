@@ -42,6 +42,18 @@
           <a-button size="small" v-if="selectedBuilding || selectedFloor" @click="clearMatrixSelection">清除楼层筛选</a-button>
         </a-space>
       </div>
+      <FlowGuardBar
+        title="在院床态守卫"
+        :subject="bedGuardSubject"
+        :stage-text="bedGuardStageText"
+        :stage-color="bedGuardStageColor"
+        :steps="bedGuardSteps"
+        :current-index="bedGuardCurrentIndex"
+        :blockers="bedGuardBlockers"
+        :hint="bedGuardHint"
+        @action="handleBedGuardAction"
+        style="margin-bottom: 12px"
+      />
 
       <div class="plan-stage">
         <a-empty v-if="!matrixBuildings.length || !matrixFloors.length" description="暂无床位数据" />
@@ -135,6 +147,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../../components/PageContainer.vue'
+import FlowGuardBar from '../../../components/FlowGuardBar.vue'
 import { getBedMap, getRoomList } from '../../../api/bed'
 import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
 import type { BedItem, RoomItem } from '../../../types'
@@ -175,6 +188,7 @@ const riskLevelOptions = [
   { label: '中风险', value: 'MEDIUM' },
   { label: '低风险', value: 'LOW' }
 ]
+const bedGuardSteps = ['合同签署入院', '入住选床完成', '在住照护执行', '风险干预闭环']
 
 const filteredBeds = computed(() => beds.value.filter((b) => {
   if (keyword.value) {
@@ -223,6 +237,56 @@ const stats = computed(() => {
   })
   return s
 })
+const bedGuardCurrentIndex = computed(() => {
+  if (!selectedBed.value) return 2
+  if (isEmptyBed(selectedBed.value)) return 1
+  if (selectedBed.value.riskLevel === 'HIGH') return 3
+  return 2
+})
+const bedGuardStageText = computed(() => {
+  if (!selectedBed.value) return '在院运行中'
+  if (isEmptyBed(selectedBed.value)) return '空床待分配'
+  if (selectedBed.value.riskLevel === 'HIGH') return '高风险干预中'
+  return '照护执行中'
+})
+const bedGuardStageColor = computed(() => {
+  if (!selectedBed.value) return 'blue'
+  if (isEmptyBed(selectedBed.value)) return 'gold'
+  if (selectedBed.value.riskLevel === 'HIGH') return 'red'
+  return 'green'
+})
+const bedGuardSubject = computed(() => {
+  if (selectedBed.value) {
+    return `床位 ${selectedBed.value.bedNo || '-'} / 房间 ${selectedBed.value.roomNo || '-'} / 长者 ${selectedBed.value.elderName || '空床'}`
+  }
+  return `当前范围：${selectedBuilding.value || '全部楼栋'} ${selectedFloor.value || '全部楼层'}`
+})
+const bedGuardBlockers = computed(() => {
+  const blockers: Array<{ code: string; text: string; actionLabel?: string; actionKey?: string }> = []
+  if (selectedBed.value) {
+    if (isEmptyBed(selectedBed.value)) blockers.push({ code: 'B201', text: '当前为空床，需通过入住办理分配', actionLabel: '去入住办理', actionKey: 'go-admission' })
+    if (selectedBed.value.status === 2) blockers.push({ code: 'B301', text: '床位处于维修状态' })
+    if (selectedBed.value.riskLevel === 'HIGH') blockers.push({ code: 'B401', text: '高风险长者需优先处置并建任务', actionLabel: '生成提醒', actionKey: 'create-alert' })
+    return blockers
+  }
+  if (quickFilter.value === 'IDLE' && stats.value.idle === 0) blockers.push({ code: 'B202', text: '暂无可分配空床' })
+  if (quickFilter.value === 'OCCUPIED' && stats.value.occupied === 0) blockers.push({ code: 'B203', text: '当前无在住床位' })
+  return blockers
+})
+const bedGuardHint = computed(() => {
+  if (selectedBed.value?.elderId) return '可打开长者档案，检查评估、护理任务与异常提醒'
+  return '建议点击床位查看详情，执行分配或风险干预动作'
+})
+
+function handleBedGuardAction(item: { actionKey?: string }) {
+  if (item.actionKey === 'go-admission') {
+    allocateBed()
+    return
+  }
+  if (item.actionKey === 'create-alert') {
+    createAlert()
+  }
+}
 
 const sourceBeds = computed(() => {
   const bedsByQuick = filteredBeds.value.filter((item) => {

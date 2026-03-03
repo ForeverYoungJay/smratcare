@@ -282,6 +282,7 @@ export interface ContractAssessmentReportItem {
 export interface ContractAssessmentContractItem {
   contractId?: number
   leadId?: number
+  elderId?: number | string
   elderName?: string
   elderPhone?: string
   idCardNo?: string

@@ -55,6 +55,18 @@
           <a-button size="small" v-if="selectedBuilding || selectedFloor" @click="clearSelection">清除筛选</a-button>
         </a-space>
       </div>
+      <FlowGuardBar
+        title="营销房态守卫"
+        :subject="marketingGuardSubject"
+        :stage-text="marketingGuardStageText"
+        :stage-color="marketingGuardStageColor"
+        :steps="marketingGuardSteps"
+        :current-index="marketingGuardCurrentIndex"
+        :blockers="marketingGuardBlockers"
+        :hint="marketingGuardHint"
+        @action="handleMarketingGuardAction"
+        style="margin-bottom: 12px"
+      />
 
       <div class="matrix-viewport" v-if="matrixBuildings.length && matrixFloors.length">
         <div class="matrix-grid" :style="{ gridTemplateColumns: `120px repeat(${Math.max(matrixBuildings.length, 1)}, minmax(260px, 1fr))` }">
@@ -126,6 +138,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
+import FlowGuardBar from '../../components/FlowGuardBar.vue'
 import { getBedMap, getRoomList } from '../../api/bed'
 import { getBaseConfigItemList } from '../../api/baseConfig'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
@@ -154,6 +167,7 @@ const query = reactive({
   status: undefined as number | undefined,
   roomType: undefined as string | undefined
 })
+const marketingGuardSteps = ['待评估签约', '完成入住评估', '办理入住选床', '最终签署转在住']
 
 const columns = [
   { title: '楼栋', dataIndex: 'building', key: 'building', width: 120 },
@@ -222,11 +236,53 @@ const listRows = computed(() =>
 )
 
 const occupiedCount = computed(() => scopedBeds.value.filter((item) => item.status === 2 || !!item.elderId).length)
+const freeCount = computed(() => Math.max(scopedBeds.value.length - occupiedCount.value, 0))
 const freeRate = computed(() => {
   const total = scopedBeds.value.length
   if (!total) return 0
   return Number((((total - occupiedCount.value) / total) * 100).toFixed(1))
 })
+const marketingGuardCurrentIndex = computed(() => {
+  if (!scopedBeds.value.length) return 0
+  if (freeCount.value === 0) return 3
+  if (occupiedCount.value > 0) return 2
+  return 1
+})
+const marketingGuardStageText = computed(() => {
+  if (!scopedBeds.value.length) return '暂无可售库存'
+  if (freeCount.value === 0) return '满床在住'
+  if (occupiedCount.value === 0) return '库存待转化'
+  return '转化进行中'
+})
+const marketingGuardStageColor = computed(() => {
+  if (!scopedBeds.value.length) return 'default'
+  if (freeCount.value === 0) return 'green'
+  if (occupiedCount.value === 0) return 'gold'
+  return 'blue'
+})
+const marketingGuardSubject = computed(() => {
+  return `范围：${selectedBuilding.value || '全部楼栋'} ${selectedFloor.value || '全部楼层'} · 床位 ${scopedBeds.value.length} 个`
+})
+const marketingGuardBlockers = computed(() => {
+  const blockers: Array<{ code: string; text: string; actionLabel?: string; actionKey?: string }> = []
+  if (!scopedBeds.value.length) blockers.push({ code: 'M001', text: '当前筛选条件下无房态数据' })
+  if (query.status === 1 && freeCount.value === 0) {
+    blockers.push({ code: 'M201', text: '空床库存不足，无法继续转化', actionLabel: '去合同签约', actionKey: 'go-contract' })
+  }
+  if (query.status === 2 && occupiedCount.value === 0) blockers.push({ code: 'M202', text: '当前无入住样本' })
+  return blockers
+})
+const marketingGuardHint = computed(() => {
+  if (!scopedBeds.value.length) return ''
+  if (freeCount.value > 0) return `当前仍有 ${freeCount.value} 个空床，可继续推进合同签约与评估入住`
+  return '建议关注退住排期与房源周转，释放可售库存'
+})
+
+function handleMarketingGuardAction(item: { actionKey?: string }) {
+  if (item.actionKey === 'go-contract') {
+    router.push('/marketing/contract-signing')
+  }
+}
 
 const matrixBuildings = computed(() => {
   const set = new Set<string>()

@@ -2,6 +2,18 @@
   <PageContainer title="入住办理" subTitle="分床、押金账户、合同信息与二维码配置">
     <a-card class="card-elevated" :bordered="false">
       <h3>办理入住流程</h3>
+      <FlowGuardBar
+        :title="'入住办理守卫'"
+        :subject="admissionFlowSubject"
+        :stage-text="admissionFlowStageText"
+        :stage-color="admissionFlowStageColor"
+        :steps="admissionFlowSteps"
+        :current-index="admissionFlowIndex"
+        :blockers="admissionFlowBlockers"
+        :hint="admissionFlowHint"
+        @action="handleAdmissionGuardAction"
+        style="margin-bottom: 12px"
+      />
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="老人姓名" name="elderId">
           <a-select v-model:value="form.elderId" placeholder="请选择老人姓名">
@@ -107,21 +119,24 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
+import FlowGuardBar from '../../components/FlowGuardBar.vue'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { getElderPage } from '../../api/elder'
 import { getBedList, getBuildingList, getFloorList, getRoomList } from '../../api/bed'
 import { admitElder, exportAdmissionRecords, getAdmissionRecords } from '../../api/elderLifecycle'
+import { getContractPage } from '../../api/marketing'
 import { getCrmLead, updateCrmLead } from '../../api/crm'
 import type {
   AdmissionRecordItem,
   AdmissionRequest,
   BedItem,
   BuildingItem,
+  CrmContractItem,
   ElderItem,
   FloorItem,
   PageResult,
@@ -129,10 +144,12 @@ import type {
 } from '../../types'
 
 const route = useRoute()
+const router = useRouter()
 const formRef = ref<FormInstance>()
 const form = reactive<AdmissionRequest>({ elderId: 0, admissionDate: '', bedId: undefined, bedStartDate: undefined })
 const submitting = ref(false)
 const linkedLeadId = ref<number>()
+const guardContract = ref<CrmContractItem | null>(null)
 const elders = ref<ElderItem[]>([])
 const buildings = ref<BuildingItem[]>([])
 const floors = ref<FloorItem[]>([])
@@ -167,7 +184,8 @@ const bedOptions = computed(() =>
 
 const rules: FormRules = {
   elderId: [{ required: true, message: '请选择老人姓名' }],
-  admissionDate: [{ required: true, message: '请选择收费开始日期' }]
+  admissionDate: [{ required: true, message: '请选择收费开始日期' }],
+  contractNo: [{ required: true, message: '请输入合同号' }]
 }
 
 const recordLoading = ref(false)
@@ -191,6 +209,72 @@ const columns = [
   { title: '备注', dataIndex: 'remark', key: 'remark' },
   { title: '登记时间', dataIndex: 'createTime', key: 'createTime', width: 180 }
 ]
+const admissionFlowSteps = ['合同完成评估', '办理入住选床', '进入待签署', '最终签署']
+const admissionFlowIndex = computed(() => {
+  if (!guardContract.value) return 0
+  if (guardContract.value.flowStage === 'PENDING_ASSESSMENT') return 0
+  if (guardContract.value.flowStage === 'PENDING_BED_SELECT') return 1
+  if (guardContract.value.flowStage === 'PENDING_SIGN') return 2
+  return 3
+})
+const admissionFlowStageText = computed(() => {
+  if (!form.contractNo) return '待输入合同号'
+  if (!guardContract.value) return '合同未找到'
+  if (guardContract.value.flowStage === 'PENDING_ASSESSMENT') return '待评估'
+  if (guardContract.value.flowStage === 'PENDING_BED_SELECT') return '待办理入住'
+  if (guardContract.value.flowStage === 'PENDING_SIGN') return '待签署'
+  if (guardContract.value.flowStage === 'SIGNED') return '已签署'
+  return guardContract.value.flowStage || '-'
+})
+const admissionFlowStageColor = computed(() => {
+  if (!guardContract.value) return 'default'
+  if (guardContract.value.flowStage === 'PENDING_ASSESSMENT') return 'gold'
+  if (guardContract.value.flowStage === 'PENDING_BED_SELECT') return 'blue'
+  if (guardContract.value.flowStage === 'PENDING_SIGN') return 'purple'
+  if (guardContract.value.flowStage === 'SIGNED') return 'green'
+  return 'default'
+})
+const admissionFlowSubject = computed(() => {
+  if (!form.contractNo) return '请输入合同号后系统自动校验流程'
+  if (!guardContract.value) return `合同号 ${form.contractNo} 未匹配`
+  return `合同 ${guardContract.value.contractNo || '-'} / 长者 ${guardContract.value.elderName || '-'}`
+})
+const admissionFlowBlockers = computed(() => {
+  if (!form.contractNo) return [{ code: 'G100', text: '未输入合同号，请先输入合同号', actionLabel: '填写合同号', actionKey: 'focus-contract' }]
+  if (!guardContract.value) return [{ code: 'G102', text: '合同不存在或已删除', actionLabel: '去合同签约', actionKey: 'go-contract' }]
+  const blockers: Array<{ code: string; text: string; actionLabel?: string; actionKey?: string }> = []
+  if (guardContract.value.status === 'VOID') blockers.push({ code: 'G401', text: '合同已作废' })
+  if (guardContract.value.flowStage === 'PENDING_ASSESSMENT') {
+    blockers.push({ code: 'G201', text: '尚未完成入住评估', actionLabel: '去评估', actionKey: 'go-assessment' })
+  }
+  if (guardContract.value.flowStage === 'SIGNED' || guardContract.value.status === 'SIGNED' || guardContract.value.status === 'EFFECTIVE') {
+    blockers.push({ code: 'G402', text: '合同已签署，不能重复办理入住' })
+  }
+  return blockers
+})
+const admissionFlowHint = computed(() => {
+  if (!guardContract.value) return ''
+  if (guardContract.value.flowStage === 'PENDING_BED_SELECT') return '当前可提交入住办理并同步推进到待签署'
+  if (guardContract.value.flowStage === 'PENDING_SIGN') return '已满足入住环节，可回到合同签约执行最终签署'
+  if (guardContract.value.flowStage === 'SIGNED') return '当前合同流程已完成'
+  return ''
+})
+
+function handleAdmissionGuardAction(item: { actionKey?: string }) {
+  if (item.actionKey === 'go-contract') {
+    router.push('/marketing/contract-signing')
+    return
+  }
+  if (item.actionKey === 'go-assessment') {
+    const params = new URLSearchParams()
+    params.set('autoOpen', '1')
+    params.set('mode', 'new')
+    if (form.contractNo) params.set('contractNo', String(form.contractNo))
+    if (guardContract.value?.leadId) params.set('leadId', String(guardContract.value.leadId))
+    if (guardContract.value?.elderName) params.set('elderName', String(guardContract.value.elderName))
+    router.push(`/assessment/ability/admission?${params.toString()}`)
+  }
+}
 
 function statusText(status?: number) {
   if (status === 1) return '在院'
@@ -208,6 +292,8 @@ async function submit() {
   if (!formRef.value) return
   try {
     await formRef.value.validate()
+    const canContinue = await validateAdmissionGuard()
+    if (!canContinue) return
     submitting.value = true
     if (form.bedId && !form.bedStartDate) {
       form.bedStartDate = form.admissionDate || new Date().toISOString().slice(0, 10)
@@ -220,6 +306,72 @@ async function submit() {
     message.error('提交失败')
   } finally {
     submitting.value = false
+  }
+}
+
+async function validateAdmissionGuard() {
+  const contractNo = String(form.contractNo || '').trim()
+  if (!contractNo) {
+    message.warning('请先填写合同号，再办理入住')
+    return false
+  }
+  try {
+    const page: PageResult<CrmContractItem> = await getContractPage({
+      pageNo: 1,
+      pageSize: 20,
+      contractNo
+    })
+    const contract = (page.list || []).find((item) => item.contractNo === contractNo)
+    guardContract.value = contract || null
+    if (!contract) {
+      message.warning('未找到该合同号，请先在合同签约中确认')
+      return false
+    }
+    if (contract.flowStage === 'PENDING_ASSESSMENT') {
+      message.warning('合同尚未完成入住评估，请先完成评估后再办理入住')
+      return false
+    }
+    if (contract.flowStage === 'SIGNED' || contract.status === 'SIGNED' || contract.status === 'EFFECTIVE') {
+      message.warning('该合同已完成签署，无法重复办理入住')
+      return false
+    }
+    if (contract.status === 'VOID') {
+      message.warning('作废合同不可办理入住')
+      return false
+    }
+    if (contract.elderId && Number(form.elderId) !== Number(contract.elderId)) {
+      message.warning('当前选择的老人和合同绑定老人不一致，请检查后重试')
+      return false
+    }
+    if (contract.elderId) {
+      form.elderId = Number(contract.elderId)
+    }
+    if (contract.leadId && !linkedLeadId.value) {
+      linkedLeadId.value = Number(contract.leadId)
+    }
+    return true
+  } catch {
+    guardContract.value = null
+    message.warning('合同流程校验失败，请稍后重试')
+    return false
+  }
+}
+
+async function loadContractGuardState() {
+  const contractNo = String(form.contractNo || '').trim()
+  if (!contractNo) {
+    guardContract.value = null
+    return
+  }
+  try {
+    const page: PageResult<CrmContractItem> = await getContractPage({
+      pageNo: 1,
+      pageSize: 20,
+      contractNo
+    })
+    guardContract.value = (page.list || []).find((item) => item.contractNo === contractNo) || null
+  } catch {
+    guardContract.value = null
   }
 }
 
@@ -352,6 +504,12 @@ watch(
   () => assetSelect.roomId,
   () => {
     form.bedId = undefined
+  }
+)
+watch(
+  () => form.contractNo,
+  () => {
+    loadContractGuardState()
   }
 )
 

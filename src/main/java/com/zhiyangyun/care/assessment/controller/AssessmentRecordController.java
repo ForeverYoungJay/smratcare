@@ -11,7 +11,9 @@ import com.zhiyangyun.care.assessment.model.AssessmentRecordResponse;
 import com.zhiyangyun.care.assessment.model.AssessmentScoreResult;
 import com.zhiyangyun.care.assessment.model.AssessmentRecordSummaryResponse;
 import com.zhiyangyun.care.assessment.service.AssessmentScoringService;
+import com.zhiyangyun.care.crm.entity.CrmContract;
 import com.zhiyangyun.care.crm.entity.CrmLead;
+import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
 import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
 import com.zhiyangyun.care.auth.entity.Org;
 import com.zhiyangyun.care.auth.mapper.OrgMapper;
@@ -54,14 +56,16 @@ public class AssessmentRecordController {
   private final OrgMapper orgMapper;
   private final AssessmentScoringService scoringService;
   private final CrmLeadMapper crmLeadMapper;
+  private final CrmContractMapper crmContractMapper;
 
   public AssessmentRecordController(AssessmentRecordMapper recordMapper, ElderMapper elderMapper, OrgMapper orgMapper,
-      AssessmentScoringService scoringService, CrmLeadMapper crmLeadMapper) {
+      AssessmentScoringService scoringService, CrmLeadMapper crmLeadMapper, CrmContractMapper crmContractMapper) {
     this.recordMapper = recordMapper;
     this.elderMapper = elderMapper;
     this.orgMapper = orgMapper;
     this.scoringService = scoringService;
     this.crmLeadMapper = crmLeadMapper;
+    this.crmContractMapper = crmContractMapper;
   }
 
   @GetMapping("/page")
@@ -133,7 +137,7 @@ public class AssessmentRecordController {
   public Result<AssessmentRecordResponse> create(@Valid @RequestBody AssessmentRecordRequest request) {
     validateRequest(request);
     Long orgId = AuthContext.getOrgId();
-    Long elderId = resolveElderId(orgId, request.getElderId(), request.getElderName());
+    Long elderId = resolveElderId(orgId, request.getElderId(), request.getElderName(), request.getAssessmentType());
 
     AssessmentRecord record = new AssessmentRecord();
     record.setTenantId(orgId);
@@ -177,7 +181,7 @@ public class AssessmentRecordController {
       throw new IllegalArgumentException("无权限访问该评估记录");
     }
 
-    Long elderId = resolveElderId(orgId, request.getElderId(), request.getElderName());
+    Long elderId = resolveElderId(orgId, request.getElderId(), request.getElderName(), request.getAssessmentType());
     record.setElderId(elderId);
     record.setElderName(resolveElderName(elderId, request.getElderName()));
     patchFromRequest(record, request);
@@ -346,11 +350,15 @@ public class AssessmentRecordController {
     record.setScoreAuto(1);
   }
 
-  private Long resolveElderId(Long orgId, Long elderId, String elderName) {
+  private Long resolveElderId(Long orgId, Long elderId, String elderName, String assessmentType) {
     if (elderId != null) {
       return elderId;
     }
+    boolean admissionAssessment = "ADMISSION".equalsIgnoreCase(assessmentType);
     if (elderName == null || elderName.isBlank()) {
+      if (admissionAssessment) {
+        return null;
+      }
       throw new IllegalArgumentException("elderName required");
     }
     ElderProfile elder = elderMapper.selectOne(Wrappers.lambdaQuery(ElderProfile.class)
@@ -359,6 +367,9 @@ public class AssessmentRecordController {
         .eq(ElderProfile::getFullName, elderName)
         .last("LIMIT 1"));
     if (elder == null) {
+      if (admissionAssessment) {
+        return null;
+      }
       throw new IllegalArgumentException("elder not found");
     }
     return elder.getId();
@@ -570,22 +581,54 @@ public class AssessmentRecordController {
       return;
     }
     ElderProfile elder = selectElder(record.getElderId());
-    if (elder == null || elder.getTenantId() == null) {
+    Long tenantId = elder == null ? record.getTenantId() : elder.getTenantId();
+    if (tenantId == null) {
       return;
     }
 
+    CrmContract contract = resolveContractForAssessment(record, elder, tenantId);
+    if (contract != null) {
+      boolean changed = false;
+      if (record.getElderId() != null && contract.getElderId() == null) {
+        contract.setElderId(record.getElderId());
+        changed = true;
+      }
+      if (contract.getFlowStage() == null || "PENDING_ASSESSMENT".equals(contract.getFlowStage())) {
+        contract.setFlowStage("PENDING_BED_SELECT");
+        changed = true;
+      }
+      if (contract.getCurrentOwnerDept() == null || "ASSESSMENT".equals(contract.getCurrentOwnerDept())) {
+        contract.setCurrentOwnerDept("MARKETING");
+        changed = true;
+      }
+      if (contract.getContractStatus() == null || contract.getContractStatus().isBlank() || "待评估".equals(contract.getContractStatus())) {
+        contract.setContractStatus("评估完成待选床");
+        changed = true;
+      }
+      if (changed) {
+        crmContractMapper.updateById(contract);
+      }
+    }
+
     CrmLead lead = null;
-    if (elder.getIdCardNo() != null && !elder.getIdCardNo().isBlank()) {
+    if (contract != null && contract.getLeadId() != null) {
       lead = crmLeadMapper.selectOne(Wrappers.lambdaQuery(CrmLead.class)
-          .eq(CrmLead::getTenantId, elder.getTenantId())
+          .eq(CrmLead::getTenantId, tenantId)
+          .eq(CrmLead::getIsDeleted, 0)
+          .eq(CrmLead::getId, contract.getLeadId())
+          .last("LIMIT 1"));
+    }
+    if (lead == null && elder != null && elder.getIdCardNo() != null && !elder.getIdCardNo().isBlank()) {
+      lead = crmLeadMapper.selectOne(Wrappers.lambdaQuery(CrmLead.class)
+          .eq(CrmLead::getTenantId, tenantId)
           .eq(CrmLead::getIsDeleted, 0)
           .eq(CrmLead::getIdCardNo, elder.getIdCardNo())
           .orderByDesc(CrmLead::getUpdateTime)
           .last("LIMIT 1"));
     }
-    if (lead == null && elder.getFullName() != null && elder.getPhone() != null) {
+    if (lead == null && elder != null && elder.getFullName() != null && elder.getPhone() != null) {
       lead = crmLeadMapper.selectOne(Wrappers.lambdaQuery(CrmLead.class)
-          .eq(CrmLead::getTenantId, elder.getTenantId())
+          .eq(CrmLead::getTenantId, tenantId)
           .eq(CrmLead::getIsDeleted, 0)
           .eq(CrmLead::getElderName, elder.getFullName())
           .eq(CrmLead::getElderPhone, elder.getPhone())
@@ -605,5 +648,43 @@ public class AssessmentRecordController {
       lead.setContractStatus("评估完成待选床");
     }
     crmLeadMapper.updateById(lead);
+  }
+
+  private CrmContract resolveContractForAssessment(AssessmentRecord record, ElderProfile elder, Long tenantId) {
+    String archiveNo = record.getArchiveNo();
+    if (archiveNo != null && !archiveNo.isBlank()) {
+      CrmContract byContractNo = crmContractMapper.selectOne(Wrappers.lambdaQuery(CrmContract.class)
+          .eq(CrmContract::getTenantId, tenantId)
+          .eq(CrmContract::getIsDeleted, 0)
+          .eq(CrmContract::getContractNo, archiveNo)
+          .orderByDesc(CrmContract::getUpdateTime)
+          .last("LIMIT 1"));
+      if (byContractNo != null) {
+        return byContractNo;
+      }
+    }
+    if (record.getElderId() != null) {
+      CrmContract byElder = crmContractMapper.selectOne(Wrappers.lambdaQuery(CrmContract.class)
+          .eq(CrmContract::getTenantId, tenantId)
+          .eq(CrmContract::getIsDeleted, 0)
+          .eq(CrmContract::getElderId, record.getElderId())
+          .orderByDesc(CrmContract::getUpdateTime)
+          .last("LIMIT 1"));
+      if (byElder != null) {
+        return byElder;
+      }
+    }
+    if (elder != null && elder.getIdCardNo() != null && !elder.getIdCardNo().isBlank()) {
+      CrmContract byIdCard = crmContractMapper.selectOne(Wrappers.lambdaQuery(CrmContract.class)
+          .eq(CrmContract::getTenantId, tenantId)
+          .eq(CrmContract::getIsDeleted, 0)
+          .eq(CrmContract::getIdCardNo, elder.getIdCardNo())
+          .orderByDesc(CrmContract::getUpdateTime)
+          .last("LIMIT 1"));
+      if (byIdCard != null) {
+        return byIdCard;
+      }
+    }
+    return null;
   }
 }

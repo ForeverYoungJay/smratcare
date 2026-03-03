@@ -85,6 +85,18 @@
           style="margin-bottom: 12px"
           message="请先在上方合同列表选择一个合同，再进行评估或入住办理。"
         />
+        <FlowGuardBar
+          :title="'入住链路状态'"
+          :subject="flowSubject"
+          :stage-text="flowStageLabel"
+          :stage-color="flowStageTagColor"
+          :steps="flowSteps"
+          :current-index="flowCurrentIndex"
+          :blockers="flowBlockers"
+          :hint="flowHint"
+          @action="handleFlowGuardAction"
+          style="margin-bottom: 12px"
+        />
         <a-typography-paragraph>
           输出：评估等级、建议护理套餐/服务频次、人力配置建议、评估报告下载并归档到长者档案。
         </a-typography-paragraph>
@@ -107,6 +119,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
+import FlowGuardBar from '../../../components/FlowGuardBar.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
 import { getAssessmentRecordPage } from '../../../api/assessment'
 import { getContractAssessmentOverview, getContractPage } from '../../../api/marketing'
@@ -136,6 +149,62 @@ const selectedLatestRecord = computed(() => {
   const draft = contractReports.find((item) => item.status === 'DRAFT')
   return draft || contractReports[0] || latestRecord.value || null
 })
+const flowSteps = ['合同待评估', '完成入住评估', '办理入住选床', '最终签署']
+const flowCurrentIndex = computed(() => {
+  const contract = selectedContract.value
+  if (!contract) return 0
+  if (contract.flowStage === 'PENDING_ASSESSMENT') return 0
+  if (contract.flowStage === 'PENDING_BED_SELECT') return 1
+  if (contract.flowStage === 'PENDING_SIGN') return 2
+  return 3
+})
+const flowStageLabel = computed(() => {
+  const contract = selectedContract.value
+  if (!contract) return '未选择合同'
+  return flowStageText(contract.flowStage)
+})
+const flowStageTagColor = computed(() => {
+  const contract = selectedContract.value
+  if (!contract) return 'default'
+  return flowStageColor(contract.flowStage)
+})
+const flowSubject = computed(() => {
+  const contract = selectedContract.value
+  if (!contract) return '请先在上方表格选择合同'
+  return `合同 ${contract.contractNo || '-'} / 长者 ${contract.elderName || '-'}`
+})
+const flowBlockers = computed(() => {
+  const contract = selectedContract.value
+  if (!contract) return [{ code: 'G001', text: '未选择合同', actionLabel: '选择合同', actionKey: 'pick-contract' }]
+  const blockers: Array<{ code: string; text: string; actionLabel?: string; actionKey?: string }> = []
+  if (contract.flowStage === 'PENDING_ASSESSMENT') {
+    blockers.push({ code: 'G201', text: '请先点击“开始入住评估”并完成保存', actionLabel: '开始评估', actionKey: 'start-assessment' })
+  }
+  if (contract.flowStage === 'PENDING_BED_SELECT' && !selectedLatestRecord.value) {
+    blockers.push({ code: 'G203', text: '缺少评估报告，请先补充评估结果', actionLabel: '补评估', actionKey: 'start-assessment' })
+  }
+  if (contract.flowStage === 'PENDING_SIGN') {
+    blockers.push({ code: 'G301', text: '请前往入住办理完成选床后最终签署', actionLabel: '去入住办理', actionKey: 'go-admission' })
+  }
+  return blockers
+})
+const flowHint = computed(() => {
+  const contract = selectedContract.value
+  if (!contract) return ''
+  if (contract.flowStage === 'PENDING_BED_SELECT') return '当前可进入入住办理并选择床位'
+  if (contract.flowStage === 'SIGNED') return '流程已完成闭环'
+  return '按提示完成当前节点后系统将自动推进下一阶段'
+})
+
+function handleFlowGuardAction(item: { actionKey?: string }) {
+  if (item.actionKey === 'start-assessment') {
+    go(primaryActionPath.value)
+    return
+  }
+  if (item.actionKey === 'go-admission') {
+    go(admissionPath.value)
+  }
+}
 
 const contractColumns = [
   { title: '合同编号', dataIndex: 'contractNo', key: 'contractNo', width: 170 },
@@ -185,10 +254,14 @@ const primaryActionPath = computed(() => {
       ? 'reassess'
       : 'new'
   const contract = selectedContract.value
+  const selectedElderId = contract?.elderId || overview.value?.elderId || residentId.value || undefined
   const params = new URLSearchParams()
   params.set('autoOpen', '1')
   params.set('mode', mode)
   if (residentId.value) params.set('residentId', String(residentId.value))
+  if (selectedElderId != null && String(selectedElderId) !== '0') {
+    params.set('elderId', String(selectedElderId))
+  }
   if (selectedContractNo.value) params.set('contractNo', selectedContractNo.value)
   if (contract?.contractId != null) params.set('contractId', String(contract.contractId))
   if (contract?.leadId != null) params.set('leadId', String(contract.leadId))
@@ -266,6 +339,7 @@ async function loadPendingContracts() {
     .map((item) => ({
       contractId: item.id,
       leadId: item.leadId,
+      elderId: item.elderId,
       elderName: item.elderName,
       elderPhone: item.elderPhone,
       idCardNo: item.idCardNo,

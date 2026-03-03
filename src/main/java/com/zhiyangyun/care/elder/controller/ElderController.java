@@ -63,8 +63,9 @@ public class ElderController {
   public Result<IPage<ElderResponse>> page(
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
-      @RequestParam(required = false) String keyword) {
-    return Result.ok(elderService.page(AuthContext.getOrgId(), pageNo, pageSize, keyword));
+      @RequestParam(required = false) String keyword,
+      @RequestParam(defaultValue = "false") Boolean signedOnly) {
+    return Result.ok(elderService.page(AuthContext.getOrgId(), pageNo, pageSize, keyword, signedOnly));
   }
 
   @PostMapping("/{id}/assignBed")

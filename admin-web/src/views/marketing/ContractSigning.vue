@@ -78,18 +78,25 @@
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
+      <FlowGuardBar
+        :title="'合同流程守卫'"
+        :subject="flowGuardSubject"
+        :stage-text="flowGuardStageText"
+        :stage-color="flowGuardStageColor"
+        :steps="flowSteps"
+        :current-index="flowGuardCurrentIndex"
+        :blockers="flowGuardBlockers"
+        :hint="flowGuardHint"
+        @action="handleFlowGuardAction"
+      />
       <div class="table-actions">
         <a-space>
           <a-button type="primary" @click="openForm()">新增合同</a-button>
           <a-button :disabled="!hasSingleSelection" @click="viewSelected">查看</a-button>
           <a-button :disabled="!hasSingleSelection" @click="editSelected">编辑</a-button>
           <a-button :disabled="!hasSingleSelection" @click="openAttachmentSelected">附件</a-button>
-          <a-button :disabled="!hasSingleSelection" @click="approveSelected">审批通过</a-button>
-          <a-button :disabled="!hasSingleSelection" @click="rejectSelected">驳回</a-button>
-          <a-button :disabled="!hasSingleSelection" @click="voidSelected">作废</a-button>
           <a-button :disabled="!hasSingleSelection" @click="admissionSelected">入住办理</a-button>
           <a-button :disabled="!hasSingleSelection" @click="finalizeSelected">最终签署</a-button>
-          <a-button :disabled="selectedCount === 0" @click="batchApprove">批量审批</a-button>
           <a-button :disabled="selectedCount === 0" danger @click="batchDelete">删除</a-button>
           <span class="selection-tip">已勾选 {{ selectedCount }} 条</span>
         </a-space>
@@ -135,7 +142,15 @@
               <a-input :value="form.contractNo" disabled placeholder="保存后后端自动生成（gfyy+年月日+编号）" />
             </a-form-item>
           </a-col>
-          <a-col :span="12"><a-form-item label="签约房号"><a-input v-model:value="form.reservationRoomNo" /></a-form-item></a-col>
+          <a-col :span="12">
+            <a-form-item label="签约房号">
+              <a-input
+                v-model:value="form.reservationRoomNo"
+                :disabled="!form.id"
+                :placeholder="form.id ? '入住办理后自动回填，可手动修正' : '新增合同无需填写，入住办理时自动选择'"
+              />
+            </a-form-item>
+          </a-col>
           <a-col :span="12"><a-form-item label="姓名" name="elderName"><a-input v-model:value="form.elderName" /></a-form-item></a-col>
           <a-col :span="12"><a-form-item label="联系电话"><a-input v-model:value="form.elderPhone" /></a-form-item></a-col>
           <a-col :span="12"><a-form-item label="身份证号"><a-input v-model:value="form.idCardNo" /></a-form-item></a-col>
@@ -144,7 +159,11 @@
           <a-col :span="8"><a-form-item label="年龄"><a-input-number v-model:value="form.age" :min="0" :max="120" style="width: 100%" /></a-form-item></a-col>
           <a-col :span="8"><a-form-item label="签约日期"><a-date-picker v-model:value="form.contractSignedAt" value-format="YYYY-MM-DD HH:mm:ss" show-time style="width: 100%" /></a-form-item></a-col>
           <a-col :span="12"><a-form-item label="合同有效期止"><a-date-picker v-model:value="form.contractExpiryDate" value-format="YYYY-MM-DD" style="width: 100%" /></a-form-item></a-col>
-          <a-col :span="12"><a-form-item label="合同状态"><a-input v-model:value="form.contractStatus" /></a-form-item></a-col>
+          <a-col :span="12">
+            <a-form-item label="合同状态">
+              <a-input v-model:value="form.contractStatus" disabled />
+            </a-form-item>
+          </a-col>
           <a-col :span="12"><a-form-item label="营销人员"><a-input v-model:value="form.marketerName" /></a-form-item></a-col>
           <a-col :span="12"><a-form-item label="优惠政策"><a-input v-model:value="form.orgName" placeholder="请输入优惠政策" /></a-form-item></a-col>
         </a-row>
@@ -221,8 +240,8 @@ import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
+import FlowGuardBar from '../../components/FlowGuardBar.vue'
 import {
-  approveContract,
   batchDeleteContracts,
   createContractAttachment,
   createCrmContract,
@@ -232,9 +251,7 @@ import {
   getContractAssessmentOverview,
   getContractAttachments,
   getContractPage,
-  rejectContract,
   updateCrmContract,
-  voidContract,
   uploadMarketingFile
 } from '../../api/marketing'
 import { createElder, getElderPage, updateElder } from '../../api/elder'
@@ -294,6 +311,89 @@ const rowSelection = computed(() => ({
 }))
 const selectedCount = computed(() => selectedRowKeys.value.length)
 const hasSingleSelection = computed(() => selectedCount.value === 1)
+const flowSteps = ['待评估', '待办理入住', '待签署', '已签署']
+const selectedContractForFlow = computed(() => {
+  if (selectedRowKeys.value.length !== 1) return null
+  const key = selectedRowKeys.value[0]
+  return (
+    selectedRows.value.find((item) => sameId(item.id, key)) ||
+    tableRows.value.find((item) => sameId(item.id, key)) ||
+    rows.value.find((item) => sameId(item.id, key)) ||
+    localRows.value.find((item) => sameId(item.id, key)) ||
+    null
+  )
+})
+
+const flowGuardCurrentIndex = computed(() => {
+  const record = selectedContractForFlow.value
+  if (!record) return 0
+  const stage = normalizedFlowStage(record)
+  if (stage === 'PENDING_ASSESSMENT') return 0
+  if (stage === 'PENDING_BED_SELECT') return 1
+  if (stage === 'PENDING_SIGN') return 2
+  return 3
+})
+const flowGuardStageText = computed(() => {
+  const record = selectedContractForFlow.value
+  if (!record) return '未选择合同'
+  return flowStageText(normalizedFlowStage(record))
+})
+const flowGuardStageColor = computed(() => {
+  const record = selectedContractForFlow.value
+  if (!record) return 'default'
+  return flowStageColor(normalizedFlowStage(record))
+})
+const flowGuardSubject = computed(() => {
+  const record = selectedContractForFlow.value
+  if (!record) return '请先在表格中勾选 1 条合同查看流程状态'
+  return `合同号 ${record.contractNo || '-'} / 长者 ${record.elderName || '-'}`
+})
+const flowGuardBlockers = computed(() => {
+  const record = selectedContractForFlow.value
+  if (!record) return [{ code: 'G001', text: '未选择合同，请先勾选 1 条合同', actionLabel: '定位合同', actionKey: 'focus-row' }]
+  const blockers: Array<{ code: string; text: string; actionLabel?: string; actionKey?: string }> = []
+  if (record.status === 'VOID') blockers.push({ code: 'G401', text: '合同已作废，不可继续办理' })
+  if (!record.contractNo) blockers.push({ code: 'G101', text: '合同号未生成', actionLabel: '编辑合同', actionKey: 'edit' })
+  const stage = normalizedFlowStage(record)
+  if (stage === 'PENDING_ASSESSMENT') {
+    blockers.push({ code: 'G201', text: '需先完成入住评估', actionLabel: '去评估', actionKey: 'go-assessment' })
+  }
+  if (stage === 'PENDING_BED_SELECT') {
+    blockers.push({ code: 'G202', text: '需先办理入住并完成选床', actionLabel: '去入住办理', actionKey: 'go-admission' })
+  }
+  return blockers
+})
+const flowGuardHint = computed(() => {
+  const record = selectedContractForFlow.value
+  if (!record) return ''
+  if (record.status === 'VOID') return ''
+  const stage = normalizedFlowStage(record)
+  if (stage === 'PENDING_SIGN') return '当前可执行最终签署'
+  if (stage === 'SIGNED') return '合同流程已闭环完成'
+  return '请按流程完成上一环节后继续'
+})
+
+function handleFlowGuardAction(item: { actionKey?: string }) {
+  const record = selectedContractForFlow.value
+  if (!record) return
+  if (item.actionKey === 'edit') {
+    openForm(record)
+    return
+  }
+  if (item.actionKey === 'go-assessment') {
+    const params = new URLSearchParams()
+    params.set('autoOpen', '1')
+    params.set('mode', 'new')
+    if (record.leadId) params.set('leadId', String(record.leadId))
+    if (record.contractNo) params.set('contractNo', record.contractNo)
+    if (record.elderName) params.set('elderName', record.elderName)
+    router.push(`/elder/resident360/admission-assessment?${params.toString()}`)
+    return
+  }
+  if (item.actionKey === 'go-admission') {
+    admissionSelected()
+  }
+}
 
 function sameId(left: number | string | undefined, right: number | string | undefined) {
   if (left == null || right == null) return false
@@ -696,24 +796,6 @@ async function openAttachmentSelected() {
   await openAttachment(row)
 }
 
-async function approveSelected() {
-  const row = requireSingleSelection('审批通过')
-  if (!row) return
-  await approveRow(row)
-}
-
-function rejectSelected() {
-  const row = requireSingleSelection('驳回')
-  if (!row) return
-  rejectRow(row)
-}
-
-function voidSelected() {
-  const row = requireSingleSelection('作废')
-  if (!row) return
-  voidRow(row)
-}
-
 async function admissionSelected() {
   const row = requireSingleSelection('入住办理')
   if (!row) return
@@ -732,6 +814,7 @@ function openForm(record?: CrmContractItem) {
   })
   if (record) {
     Object.assign(form, record)
+    form.contractStatus = record.contractStatus || '待评估'
   } else {
     Object.assign(form, {
       id: undefined,
@@ -742,6 +825,7 @@ function openForm(record?: CrmContractItem) {
       contractStatus: '待评估',
       flowStage: 'PENDING_ASSESSMENT',
       currentOwnerDept: 'ASSESSMENT',
+      reservationRoomNo: undefined,
       orgName: '新签优惠待确认'
     } as Partial<CrmContractItem>)
   }
@@ -753,16 +837,18 @@ async function submit() {
   try {
     await formRef.value.validate()
     submitting.value = true
+    const isCreate = !form.id
     const payload: Partial<CrmContractItem> = {
       ...form,
       name: form.elderName || form.name || '签约客户',
       phone: form.elderPhone || form.phone,
-      contractNo: form.id ? form.contractNo : undefined,
+      contractNo: isCreate ? undefined : form.contractNo,
       status: form.status || 'DRAFT',
       contractSignedFlag: 0,
-      flowStage: form.flowStage || 'PENDING_ASSESSMENT',
-      currentOwnerDept: form.currentOwnerDept || 'ASSESSMENT',
-      contractStatus: form.contractStatus || '待评估'
+      flowStage: isCreate ? 'PENDING_ASSESSMENT' : (form.flowStage || 'PENDING_ASSESSMENT'),
+      currentOwnerDept: isCreate ? 'ASSESSMENT' : (form.currentOwnerDept || 'ASSESSMENT'),
+      contractStatus: isCreate ? '待评估' : (form.contractStatus || '待评估'),
+      reservationRoomNo: isCreate ? undefined : form.reservationRoomNo
     }
     let saved: CrmContractItem
     if (form.id) {
@@ -778,55 +864,6 @@ async function submit() {
   } finally {
     submitting.value = false
   }
-}
-
-async function batchApprove() {
-  const ids = selectedRowKeys.value
-  if (!ids.length) {
-    message.info('请先勾选合同')
-    return
-  }
-  await Promise.all(ids.map((id) => {
-    const row = rows.value.find((item) => sameId(item.id, id))
-    if (!row) return Promise.resolve()
-    if (row.status === 'SIGNED') return Promise.resolve(row)
-    return approveContract(row.id)
-  }))
-  message.success(`已审批 ${ids.length} 条合同`)
-  fetchData()
-}
-
-async function approveRow(record: CrmContractItem) {
-  if (record.status === 'VOID') {
-    message.warning('作废合同不允许审批')
-    return
-  }
-  await approveContract(record.id)
-  message.success('审批通过')
-  fetchData()
-}
-
-function rejectRow(record: CrmContractItem) {
-  Modal.confirm({
-    title: `确认驳回合同 ${record.contractNo || '-'} 吗？`,
-    onOk: async () => {
-      await rejectContract(record.id)
-      message.success('已驳回')
-      fetchData()
-    }
-  })
-}
-
-function voidRow(record: CrmContractItem) {
-  Modal.confirm({
-    title: `确认作废合同 ${record.contractNo || '-'} 吗？`,
-    content: '作废后不可最终签署，请谨慎操作',
-    onOk: async () => {
-      await voidContract(record.id)
-      message.success('合同已作废')
-      fetchData()
-    }
-  })
 }
 
 function batchDelete() {
@@ -891,6 +928,14 @@ function view(record: CrmContractItem) {
 
 async function goAdmissionProcessing(record: CrmContractItem) {
   try {
+    if (record.status === 'VOID') {
+      message.warning('作废合同不可办理入住')
+      return
+    }
+    if (normalizedFlowStage(record) === 'SIGNED' || record.status === 'SIGNED' || record.status === 'EFFECTIVE') {
+      message.warning('合同已完成最终签署，无需重复办理入住')
+      return
+    }
     const hasCompletedAssessment = await checkAssessmentReady(record)
     if (!hasCompletedAssessment) {
       message.warning('仅完成入住评估后的合同才可办理入住，请先在入住评估中完成评估并保存结果')
@@ -925,6 +970,14 @@ async function checkAssessmentReady(record: CrmContractItem) {
 
 async function openFinalize(record: CrmContractItem) {
   try {
+    if (record.status === 'VOID') {
+      message.warning('作废合同不可最终签署')
+      return
+    }
+    if (normalizedFlowStage(record) === 'PENDING_ASSESSMENT') {
+      message.warning('请先完成入住评估，再进行后续办理')
+      return
+    }
     const lead = await ensureContractNo(record)
     const elder = await ensureElderFromLead(lead)
     const admissionPage = await getAdmissionRecords({
@@ -1121,6 +1174,7 @@ watch(
 }
 
 .table-actions {
+  margin-top: 12px;
   margin-bottom: 12px;
 }
 

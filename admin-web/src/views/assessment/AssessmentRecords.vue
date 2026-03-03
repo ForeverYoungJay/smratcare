@@ -49,6 +49,19 @@
       style="margin-top: 12px"
       :message="`风险提醒：复评逾期 ${summary.reassessOverdueCount || 0} 条，高风险等级 ${summary.highRiskCount || 0} 条。`"
     />
+    <FlowGuardBar
+      v-if="isAdmissionAssessment"
+      title="入住评估守卫"
+      :subject="admissionGuardSubject"
+      :stage-text="admissionGuardStageText"
+      :stage-color="admissionGuardStageColor"
+      :steps="admissionGuardSteps"
+      :current-index="admissionGuardCurrentIndex"
+      :blockers="admissionGuardBlockers"
+      :hint="admissionGuardHint"
+      @action="handleAdmissionGuardAction"
+      style="margin-top: 12px"
+    />
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
       <div class="table-actions">
@@ -144,8 +157,9 @@
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">
-            <a-form-item label="老人姓名" name="elderId">
+            <a-form-item label="老人姓名" :name="isAdmissionAssessment ? 'elderName' : 'elderId'">
               <a-select
+                v-if="!isAdmissionAssessment"
                 v-model:value="form.elderId"
                 :disabled="formReadonly"
                 allow-clear
@@ -160,6 +174,12 @@
                   {{ item.label }}
                 </a-select-option>
               </a-select>
+              <a-input
+                v-else
+                v-model:value="form.elderName"
+                :disabled="formReadonly"
+                placeholder="请输入合同中的老人姓名"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="12">
@@ -298,13 +318,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
+import FlowGuardBar from '../../components/FlowGuardBar.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { getElderPage } from '../../api/elder'
+import { getContractPage } from '../../api/marketing'
 import {
   getAssessmentRecordPage,
   getAssessmentRecordSummary,
@@ -316,7 +338,7 @@ import {
   getAssessmentTemplateList,
   previewAssessmentScore
 } from '../../api/assessment'
-import type { AssessmentRecord, AssessmentRecordSummary, AssessmentType, AssessmentScaleTemplate, ElderItem, PageResult } from '../../types'
+import type { AssessmentRecord, AssessmentRecordSummary, AssessmentType, AssessmentScaleTemplate, CrmContractItem, ElderItem, PageResult } from '../../types'
 
 const props = defineProps<{
   title: string
@@ -846,7 +868,9 @@ const admissionMissingItems = computed(() =>
   admissionScoreItemList.filter((item) => admissionScores[item.id] === undefined && Math.max(...item.options.map((opt) => opt.score)) > 0)
 )
 const canDownloadAdmissionReport = computed(() => admissionMissingItems.value.length === 0)
-const admissionResidentIdFromRoute = computed(() => Number(route.query.residentId || 0))
+const admissionResidentIdFromRoute = computed(() => Number(route.query.residentId || route.query.elderId || 0))
+const admissionContractNoFromRoute = computed(() => String(route.query.contractNo || '').trim())
+const admissionElderNameFromRoute = computed(() => String(route.query.elderName || '').trim())
 const admissionAutoOpenMode = computed(() => String(route.query.mode || 'new'))
 const admissionShouldAutoOpen = computed(() => String(route.query.autoOpen || '') === '1')
 const admissionRouteHandled = ref(false)
@@ -886,12 +910,89 @@ const submitting = ref(false)
 const scoreAutoChecked = ref(true)
 
 const rules: FormRules = {
-  elderId: [{ required: true, message: '请选择老人' }],
   assessmentDate: [{ required: true, message: '请选择评估日期' }],
   status: [{ required: true, message: '请选择状态' }]
 }
 
 const tableColumns = computed(() => pageConfig.value.columns)
+const admissionGuardSteps = ['合同待评估', '完成入住评估登记', '办理入住选床', '合同最终签署']
+const selectedAdmissionRecord = computed(() => {
+  if (selectedRowKeys.value.length !== 1) return null
+  const key = Number(selectedRowKeys.value[0])
+  return rows.value.find((item) => Number(item.id) === key) || null
+})
+const admissionGuardCurrentIndex = computed(() => {
+  if (!isAdmissionAssessment.value) return 0
+  const selected = selectedAdmissionRecord.value
+  if (!selected) return 0
+  if (selected.status === 'DRAFT') return 0
+  return 1
+})
+const admissionGuardStageText = computed(() => {
+  if (!isAdmissionAssessment.value) return ''
+  const selected = selectedAdmissionRecord.value
+  if (selected) {
+    return selected.status === 'DRAFT' ? '评估草稿中' : '评估已完成'
+  }
+  return admissionShouldAutoOpen.value ? '待创建评估草稿' : '未选择评估记录'
+})
+const admissionGuardStageColor = computed(() => {
+  if (!isAdmissionAssessment.value) return 'default'
+  const selected = selectedAdmissionRecord.value
+  if (!selected) return 'default'
+  return selected.status === 'DRAFT' ? 'gold' : 'green'
+})
+const admissionGuardSubject = computed(() => {
+  if (!isAdmissionAssessment.value) return ''
+  const selected = selectedAdmissionRecord.value
+  if (selected) {
+    return `合同号 ${selected.archiveNo || admissionContractNoFromRoute.value || '-'} / 老人 ${selected.elderName || '-'}`
+  }
+  if (admissionContractNoFromRoute.value || admissionElderNameFromRoute.value) {
+    return `合同号 ${admissionContractNoFromRoute.value || '-'} / 老人 ${admissionElderNameFromRoute.value || '-'}`
+  }
+  return '请先选择或新建入住评估登记'
+})
+const admissionGuardBlockers = computed(() => {
+  if (!isAdmissionAssessment.value) return []
+  const blockers: Array<{ code: string; text: string; actionLabel?: string; actionKey?: string }> = []
+  const selected = selectedAdmissionRecord.value
+  if (!selected && !admissionShouldAutoOpen.value) {
+    blockers.push({ code: 'G001', text: '未选择评估记录', actionLabel: '新建评估', actionKey: 'new-assessment' })
+  }
+  if (selected?.status === 'DRAFT') {
+    blockers.push({ code: 'G204', text: '评估仍是草稿，需完成并保存', actionLabel: '继续填写', actionKey: 'edit-draft' })
+  }
+  if (selected && !selected.archiveNo) {
+    blockers.push({ code: 'G205', text: '缺少合同编号，请补齐档案编号' })
+  }
+  return blockers
+})
+const admissionGuardHint = computed(() => {
+  if (!isAdmissionAssessment.value) return ''
+  const selected = selectedAdmissionRecord.value
+  if (selected && selected.status !== 'DRAFT') {
+    return '评估已完成，可前往入住办理并选择床位'
+  }
+  return '完成评估保存后，系统会自动推进到待办理入住'
+})
+
+function handleAdmissionGuardAction(item: { actionKey?: string }) {
+  if (item.actionKey === 'new-assessment') {
+    openForm()
+    if (admissionContractNoFromRoute.value) {
+      form.archiveNo = admissionContractNoFromRoute.value
+    }
+    if (admissionElderNameFromRoute.value) {
+      form.elderName = admissionElderNameFromRoute.value
+    }
+    form.status = 'DRAFT'
+    return
+  }
+  if (item.actionKey === 'edit-draft' && selectedAdmissionRecord.value) {
+    openForm(selectedAdmissionRecord.value)
+  }
+}
 const rowSelection = computed(() => {
   if (!pageConfig.value.showBatchDelete) {
     return undefined
@@ -1001,8 +1102,35 @@ async function searchElderOptions(keyword: string) {
   await loadElderOptions(keyword)
 }
 
-function onElderChange(elderId?: number) {
-  form.elderName = findElderName(elderId)
+async function resolveContractNoByElder(elderId?: number | string) {
+  if (!elderId) return ''
+  const normalizedElderId = Number(elderId)
+  if (!normalizedElderId) return ''
+  try {
+    const page: PageResult<CrmContractItem> = await getContractPage({
+      pageNo: 1,
+      pageSize: 20,
+      elderId: normalizedElderId
+    })
+    const list = page.list || []
+    const active = list.find((item) => item.contractNo && item.status !== 'VOID')
+    return (active || list.find((item) => item.contractNo))?.contractNo || ''
+  } catch {
+    return ''
+  }
+}
+
+async function onElderChange(elderId?: number | string) {
+  form.elderName = findElderName(Number(elderId) || undefined)
+  if (!elderId || formReadonly.value) return
+  if (admissionContractNoFromRoute.value) {
+    form.archiveNo = admissionContractNoFromRoute.value
+    return
+  }
+  const contractNo = await resolveContractNoByElder(elderId)
+  if (contractNo) {
+    form.archiveNo = contractNo
+  }
 }
 
 function resolveAbilityLevel(totalScore: number) {
@@ -1119,7 +1247,7 @@ function openForm(record?: AssessmentRecord, readonly = false) {
       elderName: '',
       levelCode: '',
       score: undefined,
-      assessmentDate: '',
+      assessmentDate: new Date().toISOString().slice(0, 10),
       nextAssessmentDate: undefined,
       status: 'COMPLETED',
       assessorName: '',
@@ -1134,6 +1262,9 @@ function openForm(record?: AssessmentRecord, readonly = false) {
       resetAdmissionScores()
       form.score = 0
       form.levelCode = '4级'
+      if (!form.status) {
+        form.status = 'DRAFT'
+      }
     }
   }
   open.value = true
@@ -1142,6 +1273,25 @@ function openForm(record?: AssessmentRecord, readonly = false) {
 function onScoreAutoChange(checked: boolean) {
   form.scoreAuto = checked ? 1 : 0
 }
+
+watch(
+  () => admissionTotalScore.value,
+  (val) => {
+    if (!isAdmissionAssessment.value || !open.value) return
+    form.score = val
+  }
+)
+
+watch(
+  () => admissionLevelText.value,
+  (val) => {
+    if (!isAdmissionAssessment.value || !open.value) return
+    form.levelCode = val.split('：')[0]
+    if (!form.resultSummary) {
+      form.resultSummary = val
+    }
+  }
+)
 
 async function previewScore() {
   if (!form.templateId) {
@@ -1181,6 +1331,14 @@ async function submit() {
       message.warning('自动评分开启时必须填写量表明细JSON')
       return
     }
+  }
+  if (!isAdmissionAssessment.value && !form.elderId) {
+    message.warning('请选择老人')
+    return
+  }
+  if (isAdmissionAssessment.value && !String(form.elderName || '').trim() && !form.elderId) {
+    message.warning('请填写合同中的老人姓名')
+    return
   }
   await formRef.value?.validate()
   if (isAdmissionAssessment.value) {
@@ -1234,37 +1392,60 @@ async function autoOpenAdmissionFromRoute() {
     return
   }
   const residentId = admissionResidentIdFromRoute.value
-  if (!residentId) {
-    return
-  }
+  const contractNoFromRoute = admissionContractNoFromRoute.value
+  const elderNameFromRoute = admissionElderNameFromRoute.value
   admissionRouteHandled.value = true
 
   const mode = admissionAutoOpenMode.value
-  const res: PageResult<AssessmentRecord> = await getAssessmentRecordPage({
-    pageNo: 1,
-    pageSize: 20,
-    assessmentType: 'ADMISSION',
-    elderId: residentId
-  })
-  const list = res.list || []
-  const draft = list.find((item) => item.status === 'DRAFT')
-  const latest = list[0]
+  let draft: AssessmentRecord | undefined
+  let latest: AssessmentRecord | undefined
+  if (residentId) {
+    const res: PageResult<AssessmentRecord> = await getAssessmentRecordPage({
+      pageNo: 1,
+      pageSize: 20,
+      assessmentType: 'ADMISSION',
+      elderId: residentId
+    })
+    const list = res.list || []
+    draft = list.find((item) => item.status === 'DRAFT')
+    latest = list[0]
+  }
 
   if (mode === 'continue' && draft) {
     openForm(draft)
+    if (!form.archiveNo && contractNoFromRoute) {
+      form.archiveNo = contractNoFromRoute
+    }
     return
   }
 
   if (mode === 'continue' && latest) {
     openForm(latest)
+    if (!form.archiveNo && contractNoFromRoute) {
+      form.archiveNo = contractNoFromRoute
+    }
     return
   }
 
   openForm()
-  form.elderId = residentId
-  form.elderName = findElderName(residentId) || ''
-  ensureSelectedElder(residentId, form.elderName || `长者${residentId}`)
   form.status = 'DRAFT'
+  form.assessmentDate = form.assessmentDate || new Date().toISOString().slice(0, 10)
+  if (residentId) {
+    form.elderId = residentId
+    const elderName = findElderName(residentId) || elderNameFromRoute || ''
+    form.elderName = elderName
+    ensureSelectedElder(residentId, elderName || `长者${residentId}`)
+  } else if (elderNameFromRoute) {
+    form.elderName = elderNameFromRoute
+  }
+  if (contractNoFromRoute) {
+    form.archiveNo = contractNoFromRoute
+  } else if (residentId) {
+    const autoContractNo = await resolveContractNoByElder(residentId)
+    if (autoContractNo) {
+      form.archiveNo = autoContractNo
+    }
+  }
 }
 
 function remove(id: number) {
