@@ -23,6 +23,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,27 +53,37 @@ public class CrmContractServiceImpl implements CrmContractService {
   @Override
   @Transactional
   public CrmContractResponse create(Long tenantId, Long orgId, Long staffId, CrmContractRequest request) {
-    CrmContract contract = new CrmContract();
-    contract.setTenantId(tenantId);
-    contract.setOrgId(orgId);
-    applyRequest(contract, request, null);
-    contract.setContractNo(resolveContractNo(request == null ? null : request.getContractNo(), null));
-    if (contract.getFlowStage() == null) {
-      contract.setFlowStage(FLOW_PENDING_ASSESSMENT);
+    final String requestedNo = request == null ? null : request.getContractNo();
+    for (int attempt = 0; attempt < 6; attempt++) {
+      CrmContract contract = new CrmContract();
+      contract.setTenantId(tenantId);
+      contract.setOrgId(orgId);
+      applyRequest(contract, request, null);
+      contract.setContractNo(resolveContractNo(tenantId, requestedNo, null));
+      if (contract.getFlowStage() == null) {
+        contract.setFlowStage(FLOW_PENDING_ASSESSMENT);
+      }
+      if (contract.getCurrentOwnerDept() == null) {
+        contract.setCurrentOwnerDept(resolveOwnerDept(contract.getFlowStage()));
+      }
+      if (contract.getStatus() == null) {
+        contract.setStatus(resolveStatus(contract));
+      }
+      if (contract.getContractStatus() == null || contract.getContractStatus().isBlank()) {
+        contract.setContractStatus(resolveContractStatus(contract.getFlowStage(), contract.getStatus()));
+      }
+      contract.setCreatedBy(staffId);
+      try {
+        contractMapper.insert(contract);
+        syncLeadProjection(contract, true);
+        return toResponse(contract);
+      } catch (DuplicateKeyException | DataIntegrityViolationException ex) {
+        if (!isContractNoDuplicate(ex) || (requestedNo != null && !requestedNo.isBlank()) || attempt >= 5) {
+          throw ex;
+        }
+      }
     }
-    if (contract.getCurrentOwnerDept() == null) {
-      contract.setCurrentOwnerDept(resolveOwnerDept(contract.getFlowStage()));
-    }
-    if (contract.getStatus() == null) {
-      contract.setStatus(resolveStatus(contract));
-    }
-    if (contract.getContractStatus() == null || contract.getContractStatus().isBlank()) {
-      contract.setContractStatus(resolveContractStatus(contract.getFlowStage(), contract.getStatus()));
-    }
-    contract.setCreatedBy(staffId);
-    contractMapper.insert(contract);
-    syncLeadProjection(contract, true);
-    return toResponse(contract);
+    throw new IllegalStateException("合同编号生成失败，请重试");
   }
 
   @Override
@@ -84,7 +96,7 @@ public class CrmContractServiceImpl implements CrmContractService {
     CrmContract before = cloneContract(existing);
     String previousNo = existing.getContractNo();
     applyRequest(existing, request, existing);
-    existing.setContractNo(resolveContractNo(request == null ? null : request.getContractNo(), existing));
+    existing.setContractNo(resolveContractNo(tenantId, request == null ? null : request.getContractNo(), existing));
     if (existing.getCurrentOwnerDept() == null) {
       existing.setCurrentOwnerDept(resolveOwnerDept(existing.getFlowStage()));
     }
@@ -327,16 +339,28 @@ public class CrmContractServiceImpl implements CrmContractService {
   }
 
   private boolean hasAdmission(CrmContract contract) {
-    if (contract.getContractNo() == null || contract.getContractNo().isBlank()) {
-      return false;
+    String contractNo = blankToNull(contract.getContractNo());
+    if (contractNo != null) {
+      ElderAdmission admission = admissionMapper.selectOne(Wrappers.lambdaQuery(ElderAdmission.class)
+          .eq(ElderAdmission::getTenantId, contract.getTenantId())
+          .eq(ElderAdmission::getIsDeleted, 0)
+          .eq(ElderAdmission::getContractNo, contractNo)
+          .orderByDesc(ElderAdmission::getCreateTime)
+          .last("LIMIT 1"));
+      if (admission != null) {
+        return true;
+      }
     }
-    ElderAdmission admission = admissionMapper.selectOne(Wrappers.lambdaQuery(ElderAdmission.class)
-        .eq(ElderAdmission::getTenantId, contract.getTenantId())
-        .eq(ElderAdmission::getIsDeleted, 0)
-        .eq(ElderAdmission::getContractNo, contract.getContractNo())
-        .orderByDesc(ElderAdmission::getCreateTime)
-        .last("LIMIT 1"));
-    return admission != null;
+    if (contract.getElderId() != null) {
+      ElderAdmission admissionByElder = admissionMapper.selectOne(Wrappers.lambdaQuery(ElderAdmission.class)
+          .eq(ElderAdmission::getTenantId, contract.getTenantId())
+          .eq(ElderAdmission::getIsDeleted, 0)
+          .eq(ElderAdmission::getElderId, contract.getElderId())
+          .orderByDesc(ElderAdmission::getCreateTime)
+          .last("LIMIT 1"));
+      return admissionByElder != null;
+    }
+    return false;
   }
 
   private void applyRequest(CrmContract target, CrmContractRequest request, CrmContract current) {
@@ -478,7 +502,7 @@ public class CrmContractServiceImpl implements CrmContractService {
     }
   }
 
-  private String resolveContractNo(String candidate, CrmContract current) {
+  private String resolveContractNo(Long tenantId, String candidate, CrmContract current) {
     if (candidate != null && !candidate.isBlank()) {
       return candidate.trim();
     }
@@ -491,6 +515,7 @@ public class CrmContractServiceImpl implements CrmContractService {
     String nextSeq = "001";
 
     CrmContract latest = contractMapper.selectOne(Wrappers.lambdaQuery(CrmContract.class)
+        .eq(tenantId != null, CrmContract::getTenantId, tenantId)
         .eq(CrmContract::getIsDeleted, 0)
         .likeRight(CrmContract::getContractNo, prefix)
         .orderByDesc(CrmContract::getContractNo)
@@ -507,6 +532,21 @@ public class CrmContractServiceImpl implements CrmContractService {
       }
     }
     return prefix + nextSeq;
+  }
+
+  private boolean isContractNoDuplicate(Throwable ex) {
+    if (ex == null) {
+      return false;
+    }
+    String message = ex.getMessage();
+    if (message != null && message.contains("uk_crm_contract_tenant_no")) {
+      return true;
+    }
+    Throwable cause = ex.getCause();
+    if (cause != null && cause != ex) {
+      return isContractNoDuplicate(cause);
+    }
+    return false;
   }
 
   private String resolveStatus(CrmContract contract) {

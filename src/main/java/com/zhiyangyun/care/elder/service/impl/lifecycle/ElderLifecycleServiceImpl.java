@@ -86,13 +86,15 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
     if (elder == null || !request.getTenantId().equals(elder.getTenantId())) {
       throw new IllegalArgumentException("老人不存在或无权限");
     }
+    String normalizedContractNo = request.getContractNo() == null ? null : request.getContractNo().trim();
+    request.setContractNo(normalizedContractNo);
     CrmContract contract = validateAdmissionContractGuard(request, elder);
     ElderAdmission admission = new ElderAdmission();
     admission.setTenantId(request.getTenantId());
     admission.setOrgId(request.getOrgId());
     admission.setElderId(request.getElderId());
     admission.setAdmissionDate(request.getAdmissionDate());
-    admission.setContractNo(request.getContractNo());
+    admission.setContractNo(normalizedContractNo);
     admission.setDepositAmount(request.getDepositAmount());
     admission.setRemark(request.getRemark());
     admission.setCreatedBy(request.getCreatedBy());
@@ -154,7 +156,7 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
   }
 
   private CrmContract validateAdmissionContractGuard(AdmissionRequest request, ElderProfile elder) {
-    String contractNo = request.getContractNo();
+    String contractNo = request.getContractNo() == null ? null : request.getContractNo().trim();
     if (contractNo == null || contractNo.isBlank()) {
       throw new IllegalStateException("请先填写合同号并完成入住评估");
     }

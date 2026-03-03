@@ -436,12 +436,29 @@ async function loadAssets() {
 }
 
 function applyRoutePrefill() {
-  const residentId = Number(route.query.residentId || 0)
+  const residentIdText = String(route.query.residentId || '')
+  const residentId = Number(residentIdText || 0)
   const leadId = Number(route.query.leadId || 0)
   const contractNo = String(route.query.contractNo || '').trim()
+  const elderName = String(route.query.elderName || '').trim()
   if (residentId > 0) {
-    form.elderId = residentId
-    recordQuery.keyword = elders.value.find((item) => item.id === residentId)?.fullName
+    const matched = elders.value.find((item) => String(item.id) === String(residentId))
+    if (matched) {
+      form.elderId = matched.id
+      recordQuery.keyword = matched.fullName
+    } else {
+      form.elderId = residentId as any
+      recordQuery.keyword = elderName || residentIdText
+      if (elderName) {
+        elders.value.unshift({
+          id: residentId as any,
+          fullName: elderName
+        } as ElderItem)
+      }
+    }
+  }
+  if (!recordQuery.keyword && elderName) {
+    recordQuery.keyword = elderName
   }
   if (leadId > 0) {
     linkedLeadId.value = leadId

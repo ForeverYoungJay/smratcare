@@ -863,7 +863,12 @@ const admissionTotalScore = computed(() => {
   return Number(normalized.toFixed(1))
 })
 
-const admissionLevelText = computed(() => resolveAbilityLevel(admissionTotalScore.value))
+const admissionLevelText = computed(() => {
+  if (admissionMissingItems.value.length > 0) {
+    return '待完成评分'
+  }
+  return resolveAbilityLevel(admissionTotalScore.value)
+})
 const admissionMissingItems = computed(() =>
   admissionScoreItemList.filter((item) => admissionScores[item.id] === undefined && Math.max(...item.options.map((opt) => opt.score)) > 0)
 )
@@ -1261,7 +1266,7 @@ function openForm(record?: AssessmentRecord, readonly = false) {
     if (isAdmissionAssessment.value) {
       resetAdmissionScores()
       form.score = 0
-      form.levelCode = '4级'
+      form.levelCode = ''
       if (!form.status) {
         form.status = 'DRAFT'
       }
@@ -1286,6 +1291,10 @@ watch(
   () => admissionLevelText.value,
   (val) => {
     if (!isAdmissionAssessment.value || !open.value) return
+    if (admissionMissingItems.value.length > 0) {
+      form.levelCode = ''
+      return
+    }
     form.levelCode = val.split('：')[0]
     if (!form.resultSummary) {
       form.resultSummary = val

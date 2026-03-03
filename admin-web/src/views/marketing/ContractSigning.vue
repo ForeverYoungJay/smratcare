@@ -949,19 +949,29 @@ async function goAdmissionProcessing(record: CrmContractItem) {
       currentOwnerDept: 'MARKETING',
       contractStatus: '待办理入住'
     })
-    router.push(`/elder/admission-processing?residentId=${elder.id}&leadId=${lead.leadId || lead.id}&contractNo=${lead.contractNo || ''}`)
+    router.push(
+      `/elder/admission-processing?residentId=${elder.id}&leadId=${lead.leadId || lead.id}&contractNo=${lead.contractNo || ''}&elderName=${encodeURIComponent(elder.fullName || lead.elderName || '')}`
+    )
   } catch (error: any) {
     message.error(error?.message || '跳转入住办理失败')
   }
 }
 
 async function checkAssessmentReady(record: CrmContractItem) {
+  const stage = normalizedFlowStage(record)
+  if (stage === 'PENDING_BED_SELECT' || stage === 'PENDING_SIGN' || stage === 'SIGNED') {
+    return true
+  }
   const leadId = record.leadId || record.id
-  if (!leadId) return false
-  const overview = await getContractAssessmentOverview({ leadId })
+  const elderId = record.elderId
+  if (!leadId && !elderId) return false
+  const overview = await getContractAssessmentOverview({
+    leadId: leadId ? Number(leadId) : undefined,
+    elderId: elderId ? Number(elderId) : undefined
+  })
   const contract = (overview?.contracts || []).find((item) => {
-    if (record.id && item.contractId && item.contractId === record.id) return true
-    if (record.contractNo && item.contractNo) return item.contractNo === record.contractNo
+    if (record.id && item.contractId && String(item.contractId) === String(record.id)) return true
+    if (record.contractNo && item.contractNo) return String(item.contractNo) === String(record.contractNo)
     return false
   })
   if (!contract) return false
@@ -979,19 +989,21 @@ async function openFinalize(record: CrmContractItem) {
       return
     }
     const lead = await ensureContractNo(record)
-    const elder = await ensureElderFromLead(lead)
     const admissionPage = await getAdmissionRecords({
       pageNo: 1,
       pageSize: 20,
-      keyword: elder.fullName,
       contractNo: lead.contractNo
     })
-    const hasAdmission = (admissionPage.list || []).some((item) => item.elderId === elder.id)
+    const hasAdmission = (admissionPage.list || []).length > 0
     if (!hasAdmission) {
       message.warning('请先在“入住办理”完成办理，再执行最终签署')
-      router.push(`/elder/admission-processing?residentId=${elder.id}&leadId=${lead.leadId || lead.id}&contractNo=${lead.contractNo || ''}`)
+      const elder = await ensureElderFromLead(lead)
+      router.push(
+        `/elder/admission-processing?residentId=${elder.id}&leadId=${lead.leadId || lead.id}&contractNo=${lead.contractNo || ''}&elderName=${encodeURIComponent(elder.fullName || lead.elderName || '')}`
+      )
       return
     }
+    const elder = await ensureElderFromLead(lead)
     const signingLead = normalizedFlowStage(lead) === 'PENDING_SIGN'
       ? lead
       : await updateCrmContract(lead.id, {
