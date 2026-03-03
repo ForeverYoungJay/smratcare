@@ -34,6 +34,26 @@
             </a-space>
           </template>
 
+          <a-form layout="inline" class="search-bar" :model="selector">
+            <a-form-item label="长者">
+              <a-select
+                v-model:value="selector.elderId"
+                style="width: 220px"
+                show-search
+                allow-clear
+                placeholder="请选择长者"
+                :filter-option="filterElderOption"
+              >
+                <a-select-option v-for="item in elders" :key="item.id" :value="String(item.id)">
+                  {{ item.fullName }}（{{ item.id }}）
+                </a-select-option>
+              </a-select>
+            </a-form-item>
+            <a-form-item>
+              <a-button type="primary" @click="loadBySelectedElder">加载资料</a-button>
+            </a-form-item>
+          </a-form>
+
           <a-form layout="inline" class="search-bar" :model="filters">
             <a-form-item label="资料类型">
               <a-select v-model:value="filters.kind" style="width: 140px">
@@ -118,6 +138,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
+import { getElderPage } from '../../../api/elder'
 import {
   getContractAssessmentOverview,
   getContractLinkageByContract,
@@ -128,7 +149,9 @@ import type {
   ContractAssessmentOverview,
   ContractAssessmentReportItem,
   ContractAttachmentItem,
-  ContractLinkageSummary
+  ContractLinkageSummary,
+  ElderItem,
+  PageResult
 } from '../../../types'
 
 type DocumentKind = 'ATTACHMENT' | 'ASSESSMENT'
@@ -150,6 +173,10 @@ const loading = ref(false)
 const errorMessage = ref('')
 const linkage = ref<ContractLinkageSummary>()
 const assessmentOverview = ref<ContractAssessmentOverview>()
+const elders = ref<ElderItem[]>([])
+const selector = reactive({
+  elderId: ''
+})
 const filters = reactive({
   kind: 'ALL',
   keyword: ''
@@ -219,6 +246,11 @@ function resetFilters() {
 
 function go(path: string) {
   router.push(path)
+}
+
+function filterElderOption(input: string, option: any) {
+  const label = String(option?.children?.join?.('') || option?.children || '').toLowerCase()
+  return label.includes(input.toLowerCase())
 }
 
 function goContractSigning() {
@@ -343,7 +375,7 @@ async function safeLinkageByLead(leadId: string) {
 }
 
 async function resolveLinkage() {
-  const elderId = String(route.query.elderId || '').trim()
+  const elderId = selector.elderId || String(route.query.elderId || '').trim()
   const residentId = String(route.query.residentId || '').trim()
   const contractId = String(route.query.contractId || '').trim()
   const leadId = String(route.query.leadId || '').trim()
@@ -367,6 +399,19 @@ async function resolveLinkage() {
   }
 
   return undefined
+}
+
+async function loadElders() {
+  const page: PageResult<ElderItem> = await getElderPage({ pageNo: 1, pageSize: 200 })
+  elders.value = page.list || []
+}
+
+async function loadBySelectedElder() {
+  if (!selector.elderId) {
+    message.warning('请先选择长者')
+    return
+  }
+  await loadAll()
 }
 
 async function loadAll() {
@@ -401,6 +446,11 @@ async function loadAll() {
 
 onMounted(async () => {
   applyFilters()
+  await loadElders()
+  if (!selector.elderId) {
+    const fromRoute = String(route.query.elderId || route.query.residentId || '').trim()
+    selector.elderId = fromRoute || String(elders.value[0]?.id || '')
+  }
   await loadAll()
 })
 </script>
