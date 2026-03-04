@@ -1,5 +1,6 @@
 <template>
-  <PageContainer title="回访统计" sub-title="今日待回访、逾期回访与完成情况">
+  <PageContainer :title="pageTitle" :sub-title="pageSubTitle">
+    <MarketingQuickNav parent-path="/marketing/reports" />
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline">
         <a-form-item label="开始日期">
@@ -23,16 +24,19 @@
       <a-col :xs="24" :sm="8">
         <a-card class="card-elevated" :bordered="false">
           <a-statistic title="今日待回访" :value="todayDue" />
+          <a style="font-size: 12px;" @click="goToday">查看明细</a>
         </a-card>
       </a-col>
       <a-col :xs="24" :sm="8">
         <a-card class="card-elevated" :bordered="false">
           <a-statistic title="逾期回访" :value="overdue" />
+          <a style="font-size: 12px;" @click="goOverdue">查看明细</a>
         </a-card>
       </a-col>
       <a-col :xs="24" :sm="8">
         <a-card class="card-elevated" :bordered="false">
           <a-statistic title="已完成（预订）" :value="completed" />
+          <a style="font-size: 12px;" @click="goList">查看清单</a>
         </a-card>
       </a-col>
     </a-row>
@@ -61,14 +65,20 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../../components/PageContainer.vue'
+import MarketingQuickNav from '../components/MarketingQuickNav.vue'
 import { getMarketingCallbackReport } from '../../../api/marketing'
+import { useReportQueryCache } from '../../../composables/useReportQueryCache'
+import { buildFollowupRoute } from '../../../utils/marketingNav'
 import { exportCsv } from '../../../utils/export'
 import type { MarketingCallbackItem, MarketingReportQuery } from '../../../types'
 
 const today = dayjs().format('YYYY-MM-DD')
+const route = useRoute()
+const router = useRouter()
 const rows = ref<MarketingCallbackItem[]>([])
 const total = ref(0)
 const todayDue = ref(0)
@@ -82,6 +92,22 @@ const query = reactive({
   dateTo: undefined as MarketingReportQuery['dateTo'],
   source: undefined as MarketingReportQuery['source'],
   staffId: undefined as MarketingReportQuery['staffId']
+})
+const callbackType = computed(() => String(route.query.type || '').trim())
+const queryCacheKey = computed(() => `callback-${callbackType.value || 'all'}`)
+const pageTitle = computed(() => {
+  if (callbackType.value === 'checkin') return '入住后回访'
+  if (callbackType.value === 'trial') return '试住回访'
+  if (callbackType.value === 'discharge') return '退住回访'
+  if (callbackType.value === 'score') return '回访质量评分'
+  return '回访统计'
+})
+const pageSubTitle = computed(() => {
+  if (callbackType.value === 'checkin') return '入住后回访任务与完成情况'
+  if (callbackType.value === 'trial') return '试住客户回访任务与完成情况'
+  if (callbackType.value === 'discharge') return '退住客户回访任务与完成情况'
+  if (callbackType.value === 'score') return '回访评分与低分预警'
+  return '今日待回访、逾期回访与完成情况'
 })
 
 const columns = [
@@ -100,6 +126,39 @@ async function loadData() {
   todayDue.value = report.todayDue || 0
   overdue.value = report.overdue || 0
   completed.value = report.completed || 0
+}
+
+function persistQuery() {
+  const cache = useReportQueryCache<typeof query>(queryCacheKey.value)
+  cache.persist({
+    pageNo: query.pageNo,
+    pageSize: query.pageSize,
+    dateFrom: query.dateFrom,
+    dateTo: query.dateTo,
+    source: query.source,
+    staffId: query.staffId
+  })
+}
+
+function restoreQuery() {
+  const cache = useReportQueryCache<typeof query>(queryCacheKey.value)
+  const restored = cache.restore({
+    pageNo: 1,
+    pageSize: 10
+  })
+  Object.assign(query, restored)
+}
+
+function goToday() {
+  router.push(buildFollowupRoute('today', { source: query.source }))
+}
+
+function goOverdue() {
+  router.push(buildFollowupRoute('overdue', { source: query.source }))
+}
+
+function goList() {
+  router.push(buildFollowupRoute('records', { source: query.source }))
 }
 
 function exportData() {
@@ -123,5 +182,31 @@ function onPageSizeChange(_current: number, size: number) {
   loadData()
 }
 
-onMounted(loadData)
+onMounted(() => {
+  restoreQuery()
+  loadData()
+})
+
+watch(
+  () => ({
+    pageNo: query.pageNo,
+    pageSize: query.pageSize,
+    dateFrom: query.dateFrom,
+    dateTo: query.dateTo,
+    source: query.source,
+    staffId: query.staffId
+  }),
+  () => {
+    persistQuery()
+  },
+  { deep: true }
+)
+
+watch(
+  () => callbackType.value,
+  () => {
+    restoreQuery()
+    loadData()
+  }
+)
 </script>

@@ -112,12 +112,26 @@ watch(
 )
 
 function onOpenChange(keys: string[]) {
+  const previousKeys = [...openKeys.value]
   openKeys.value = keys
+  const addedKey = keys.find((key) => !previousKeys.includes(key))
+  if (!addedKey) {
+    return
+  }
+  const isTopLevel = filteredMenu.value.some((item) => item.key === addedKey)
+  if (!isTopLevel) {
+    return
+  }
+  const targetPath = resolveMenuPathByKey(addedKey, filteredMenu.value)
+  if (targetPath && route.path !== targetPath) {
+    router.push(targetPath)
+  }
 }
 
 function onMenuClick(info: any) {
-  if (typeof info.key === 'string') {
-    router.push(info.key)
+  if (typeof info.key === 'string' && info.key.length > 0) {
+    const targetPath = resolveMenuPathByKey(info.key, filteredMenu.value)
+    router.push(targetPath || info.key)
   }
 }
 
@@ -133,6 +147,30 @@ function findMenuTrail(path: string) {
     return []
   }
   return walk(filteredMenu.value)
+}
+
+function resolveMenuPathByKey(key: string, items: any[]): string | null {
+  for (const item of items || []) {
+    if (item.key === key) {
+      return item.path || firstLeafPath(item.children || [])
+    }
+    if (item.children && item.children.length > 0) {
+      const found = resolveMenuPathByKey(key, item.children)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+function firstLeafPath(items: any[]): string | null {
+  for (const item of items || []) {
+    if (item.path) return item.path
+    if (item.children && item.children.length > 0) {
+      const found = firstLeafPath(item.children)
+      if (found) return found
+    }
+  }
+  return null
 }
 
 function logout() {

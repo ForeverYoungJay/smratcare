@@ -64,6 +64,7 @@
           <template #default="{ row }">
             <a-space>
               <a @click="openDetail(row)">详情</a>
+              <a @click="goStockByOrder(row)">查库存</a>
               <a
                 @click="handleFulfill(row)"
                 :style="{ color: isFulfillDisabled(row) ? '#999' : '' }"
@@ -102,7 +103,13 @@
           <a-list v-else :data-source="detail.items">
             <template #renderItem="{ item }">
               <a-list-item>
-                {{ item.productName || item.productId }} × {{ item.quantity }}
+                <div class="item-line">
+                  <span>{{ item.productName || item.productId }} × {{ item.quantity }}</span>
+                  <a-space>
+                    <a @click="goStockByItem(item)">查库存</a>
+                    <a @click="createPurchaseByItem(item)">发起采购</a>
+                  </a-space>
+                </div>
               </a-list-item>
             </template>
           </a-list>
@@ -152,6 +159,7 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { getBaseConfigItemList } from '../../api/baseConfig'
@@ -160,6 +168,7 @@ import { getOrderPage, getOrderDetail, cancelOrder, refundOrder, fulfillOrder } 
 import type { BaseConfigItem, OrderItem, PageResult } from '../../types'
 
 const loading = ref(false)
+const router = useRouter()
 const rows = ref<OrderItem[]>([])
 const total = ref(0)
 const detailOpen = ref(false)
@@ -342,6 +351,39 @@ function isRefundDisabled(row: OrderItem) {
   return row.orderStatus === undefined || row.orderStatus < 3
 }
 
+function goStockByOrder(row: OrderItem) {
+  router.push({
+    path: '/logistics/storage/stock-query',
+    query: {
+      keyword: row.orderNo || row.elderName || '',
+      source: 'store_order'
+    }
+  })
+}
+
+function goStockByItem(item: any) {
+  router.push({
+    path: '/logistics/storage/stock-query',
+    query: {
+      productId: item.productId,
+      keyword: item.productName || '',
+      source: 'store_order_item'
+    }
+  })
+}
+
+function createPurchaseByItem(item: any) {
+  router.push({
+    path: '/logistics/storage/purchase',
+    query: {
+      autoCreate: '1',
+      productId: item.productId,
+      quantity: Math.max(Number(item.quantity || 1), 1),
+      source: 'store_order_item'
+    }
+  })
+}
+
 onMounted(async () => {
   await loadRefundReasons()
   await fetchData()
@@ -356,5 +398,12 @@ onMounted(async () => {
   display: flex;
   justify-content: flex-end;
   margin-bottom: 8px;
+}
+.item-line {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 </style>

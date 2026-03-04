@@ -9,5 +9,7 @@ public class MedicalResidentOverviewResponse {
   private String elderName;
   private String currentStatus;
   private Boolean hasUnclosedIncident;
+  private Integer alertCardCount;
+  private Integer alertTotalCount;
   private List<MedicalResidentOverviewCardResponse> cards;
 }

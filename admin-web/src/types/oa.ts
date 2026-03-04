@@ -1,5 +1,5 @@
 export interface OaNotice {
-  id: number
+  id: string | number
   title: string
   content: string
   publisherName?: string
@@ -8,7 +8,7 @@ export interface OaNotice {
 }
 
 export interface OaTodo {
-  id: number
+  id: string | number
   title: string
   content?: string
   dueTime?: string
@@ -26,7 +26,7 @@ export interface OaTodoSummary {
 }
 
 export interface OaApproval {
-  id: number
+  id: string | number
   approvalType: string
   title: string
   applicantName: string
@@ -50,7 +50,7 @@ export interface OaApprovalSummary {
 }
 
 export interface OaDocument {
-  id: number
+  id: string | number
   name: string
   folder?: string
   url?: string
@@ -61,7 +61,7 @@ export interface OaDocument {
 }
 
 export interface OaAlbum {
-  id: number
+  id: string | number
   title: string
   category?: string
   coverUrl?: string
@@ -72,7 +72,7 @@ export interface OaAlbum {
 }
 
 export interface OaKnowledge {
-  id: number
+  id: string | number
   title: string
   category?: string
   tags?: string
@@ -84,7 +84,7 @@ export interface OaKnowledge {
 }
 
 export interface OaGroupSetting {
-  id: number
+  id: string | number
   groupName: string
   groupType?: string
   leaderId?: number
@@ -95,7 +95,7 @@ export interface OaGroupSetting {
 }
 
 export interface OaActivityPlan {
-  id: number
+  id: string | number
   title: string
   planDate?: string
   startTime?: string
@@ -109,13 +109,23 @@ export interface OaActivityPlan {
 }
 
 export interface OaTask {
-  id: number
+  id: string | number
   title: string
   description?: string
   startTime?: string
   endTime?: string
   priority?: string
   status?: string
+  calendarType?: 'PERSONAL' | 'WORK' | 'DAILY' | 'COLLAB'
+  planCategory?: string
+  urgency?: 'NORMAL' | 'EMERGENCY'
+  eventColor?: string
+  collaboratorIds?: Array<string | number> | string
+  collaboratorNames?: string[] | string
+  recurring?: boolean
+  recurrenceRule?: 'DAILY' | 'WEEKLY' | 'MONTHLY'
+  recurrenceInterval?: number
+  recurrenceCount?: number
   assigneeName?: string
 }
 
@@ -167,7 +177,7 @@ export interface OaPortalSummary {
 }
 
 export interface OaWorkReport {
-  id: number
+  id: string | number
   title: string
   reportType: string
   reportDate?: string
@@ -210,7 +220,7 @@ export interface OaMarketingChannelItem {
 }
 
 export interface OaCollaborationGanttItem {
-  taskId: number
+  taskId: string | number
   title: string
   status: string
   startTime?: string
@@ -219,7 +229,7 @@ export interface OaCollaborationGanttItem {
 }
 
 export interface OaSuggestion {
-  id: number
+  id: string | number
   content: string
   proposerName?: string
   contact?: string

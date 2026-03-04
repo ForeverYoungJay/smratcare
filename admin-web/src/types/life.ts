@@ -92,6 +92,9 @@ export interface MaintenanceRequest {
   assigneeName?: string
   issueType: string
   description: string
+  laborCost?: number
+  materialCost?: number
+  totalCost?: number
   priority?: string
   status?: string
   reportedAt?: string

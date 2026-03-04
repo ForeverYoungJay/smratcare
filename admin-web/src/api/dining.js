@@ -95,6 +95,9 @@ export function createDiningDeliveryRecord(data) {
 export function updateDiningDeliveryRecord(id, data) {
     return request.put(`/api/life/dining/delivery-record/${id}`, data);
 }
+export function redispatchDiningDeliveryRecord(id, data) {
+    return request.put(`/api/life/dining/delivery-record/${id}/redispatch`, data);
+}
 export function deleteDiningDeliveryRecord(id) {
     return request.delete(`/api/life/dining/delivery-record/${id}`);
 }

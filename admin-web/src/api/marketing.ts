@@ -299,6 +299,10 @@ export function publishMarketingPlan(id: number | string) {
   return request.post<MarketingPlanItem>(`/api/marketing/plans/${id}/publish`)
 }
 
+export function deactivateMarketingPlan(id: number | string) {
+  return request.post<MarketingPlanItem>(`/api/marketing/plans/${id}/deactivate`)
+}
+
 export function confirmMarketingPlanRead(id: number | string, data: MarketingPlanReadConfirmPayload) {
   return request.post<MarketingPlanItem>(`/api/marketing/plans/${id}/receipt`, data)
 }

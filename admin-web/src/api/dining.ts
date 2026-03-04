@@ -140,6 +140,10 @@ export function updateDiningDeliveryRecord(id: number, data: Partial<DiningDeliv
   return request.put<DiningDeliveryRecord>(`/api/life/dining/delivery-record/${id}`, data)
 }
 
+export function redispatchDiningDeliveryRecord(id: number, data: any) {
+  return request.put<DiningDeliveryRecord>(`/api/life/dining/delivery-record/${id}/redispatch`, data)
+}
+
 export function deleteDiningDeliveryRecord(id: number) {
   return request.delete<void>(`/api/life/dining/delivery-record/${id}`)
 }

@@ -128,6 +128,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
@@ -160,6 +161,8 @@ import type {
 } from '../../types'
 
 const loading = ref(false)
+const route = useRoute()
+const router = useRouter()
 const saving = ref(false)
 const rows = ref<MaterialPurchaseOrder[]>([])
 const total = ref(0)
@@ -273,12 +276,13 @@ function onPageSizeChange(_page: number, size: number) {
 async function openCreate() {
   await loadOptions()
   editingId.value = undefined
+  const routePrefill = getRoutePrefillItems()
   Object.assign(form, {
     warehouseId: undefined,
     supplierId: undefined,
     orderDate: dayjs(),
     remark: '',
-    items: [{ _idx: Date.now(), productId: 0, quantity: 1, unitPrice: 0 }]
+    items: routePrefill.length ? routePrefill : [{ _idx: Date.now(), productId: 0, quantity: 1, unitPrice: 0 }]
   })
   editorOpen.value = true
 }
@@ -432,9 +436,45 @@ async function confirmAction(title: string, content: string): Promise<boolean> {
   })
 }
 
+function parseQueryNumber(value: unknown): number | undefined {
+  const raw = Array.isArray(value) ? value[0] : value
+  if (raw === undefined || raw === null || raw === '') return undefined
+  const n = Number(raw)
+  return Number.isNaN(n) ? undefined : n
+}
+
+function getRoutePrefillItems() {
+  const productId = parseQueryNumber(route.query.productId)
+  const quantity = Math.max(parseQueryNumber(route.query.quantity) || 1, 1)
+  if (!productId) return []
+  return [{ _idx: Date.now(), productId, quantity, unitPrice: 0 }]
+}
+
+function applyRouteFilters() {
+  const statusRaw = Array.isArray(route.query.status) ? route.query.status[0] : route.query.status
+  const keywordRaw = Array.isArray(route.query.keyword) ? route.query.keyword[0] : route.query.keyword
+  if (statusRaw) {
+    query.status = String(statusRaw) as MaterialOrderStatus
+  }
+  if (typeof keywordRaw === 'string') {
+    query.keyword = keywordRaw
+  }
+}
+
+async function autoOpenFromRouteIfNeeded() {
+  const autoCreate = String(Array.isArray(route.query.autoCreate) ? route.query.autoCreate[0] : route.query.autoCreate || '')
+  if (autoCreate !== '1') return
+  await openCreate()
+  const nextQuery = { ...route.query }
+  delete (nextQuery as any).autoCreate
+  await router.replace({ path: route.path, query: nextQuery })
+}
+
 onMounted(async () => {
+  applyRouteFilters()
   await loadOptions()
-  fetchData()
+  await fetchData()
+  await autoOpenFromRouteIfNeeded()
 })
 </script>
 

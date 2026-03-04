@@ -23,4 +23,12 @@ export function setupPermission(router: Router) {
 
     next()
   })
+
+  router.afterEach(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+    const content = document.querySelector('.app-content') as HTMLElement | null
+    if (content) {
+      content.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+    }
+  })
 }

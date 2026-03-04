@@ -1,5 +1,6 @@
 <template>
   <PageContainer title="来源渠道统计" sub-title="各渠道线索贡献与签约贡献">
+    <MarketingQuickNav parent-path="/marketing/reports" />
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline">
         <a-form-item label="开始日期">
@@ -20,21 +21,33 @@
       <v-chart :option="pieOption" autoresize style="height: 280px" />
     </a-card>
     <a-card class="card-elevated" :bordered="false">
-      <a-table :columns="columns" :data-source="rows" row-key="source" :pagination="false" />
+      <a-table :columns="columns" :data-source="rows" row-key="source" :pagination="false">
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'source'">
+            <a @click="goSourceLeads(record.source)">{{ record.source }}</a>
+          </template>
+        </template>
+      </a-table>
     </a-card>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import VChart from 'vue-echarts'
 import PageContainer from '../../../components/PageContainer.vue'
+import MarketingQuickNav from '../components/MarketingQuickNav.vue'
 import { getMarketingChannelReport } from '../../../api/marketing'
+import { useReportQueryCache } from '../../../composables/useReportQueryCache'
+import { routeToUnknownSourceOrAll } from '../../../utils/marketingNav'
 import { exportCsv } from '../../../utils/export'
 import type { MarketingChannelReportItem, MarketingReportQuery } from '../../../types'
 
+const router = useRouter()
 const rows = ref<Array<{ source: string; leadCount: number; reservationCount: number; contractCount: number }>>([])
 const query = reactive<MarketingReportQuery>({})
+const queryCache = useReportQueryCache<MarketingReportQuery>('channel')
 
 const columns = [
   { title: '来源渠道', dataIndex: 'source', key: 'source' },
@@ -58,11 +71,15 @@ const pieOption = computed(() => ({
 async function loadData() {
   const report: MarketingChannelReportItem[] = await getMarketingChannelReport(query)
   rows.value = report.map((item) => ({
-    source: item.source,
+    source: item.source || '未标记渠道',
     leadCount: item.leadCount,
     reservationCount: item.reservationCount,
     contractCount: item.contractCount
   }))
+}
+
+function goSourceLeads(source: string) {
+  router.push(routeToUnknownSourceOrAll(source))
 }
 
 function exportData() {
@@ -74,5 +91,16 @@ function exportData() {
   })), `marketing-channel-${Date.now()}.csv`)
 }
 
-onMounted(loadData)
+onMounted(() => {
+  Object.assign(query, queryCache.restore())
+  loadData()
+})
+
+watch(
+  () => ({ ...query }),
+  (value) => {
+    queryCache.persist(value)
+  },
+  { deep: true }
+)
 </script>

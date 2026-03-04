@@ -1,5 +1,6 @@
 <template>
   <PageContainer title="房态全景" sub-title="营销视角：可售房源、在住占用、楼栋楼层一图查看">
+    <MarketingQuickNav parent-path="/marketing/reservation" />
     <a-row :gutter="16">
       <a-col :xs="24" :sm="8">
         <a-card class="card-elevated" :bordered="false">
@@ -117,11 +118,19 @@
       <a-empty v-else description="暂无房态数据" />
 
       <a-divider />
+      <MarketingListToolbar :tip="`当前选中 ${selectedRowKeys.length} 条床位`">
+        <a-space>
+          <a-button @click="router.push('/marketing/reservation/records')">预定记录</a-button>
+          <a-button @click="router.push('/marketing/reservation/lock')">锁床管理</a-button>
+          <a-button :disabled="scopedBeds.length === 0" @click="exportCurrentScope">导出当前视图</a-button>
+        </a-space>
+      </MarketingListToolbar>
       <a-table
         :columns="columns"
         :data-source="listRows"
         :loading="loading"
         row-key="id"
+        :row-selection="rowSelection"
         :pagination="{ pageSize: 12 }"
       >
         <template #bodyCell="{ column, record }">
@@ -136,12 +145,16 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import FlowGuardBar from '../../components/FlowGuardBar.vue'
+import MarketingQuickNav from './components/MarketingQuickNav.vue'
+import MarketingListToolbar from './components/MarketingListToolbar.vue'
 import { getBedMap, getRoomList } from '../../api/bed'
 import { getBaseConfigItemList } from '../../api/baseConfig'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
+import { buildContractRoute } from '../../utils/marketingNav'
+import { exportCsv } from '../../utils/export'
 import type { BaseConfigItem, BedItem, RoomItem } from '../../types'
 
 type RoomScene = {
@@ -155,12 +168,14 @@ type RoomScene = {
 }
 
 const router = useRouter()
+const route = useRoute()
 const loading = ref(false)
 const rows = ref<BedItem[]>([])
 const rooms = ref<RoomItem[]>([])
 const roomTypeItems = ref<BaseConfigItem[]>([])
 const selectedBuilding = ref('')
 const selectedFloor = ref('')
+const selectedRowKeys = ref<string[]>([])
 const query = reactive({
   roomNo: '',
   elderName: '',
@@ -186,6 +201,7 @@ const roomTypeOptions = computed(() => {
   roomTypeItems.value.forEach((item) => {
     map.set(item.itemName, item.itemName)
   })
+  map.set('premium', '高端房型')
   ;['单人间', '双人间', '三人间', '标准间'].forEach((label) => map.set(label, label))
   return Array.from(map.values()).map((label) => ({ label, value: label }))
 })
@@ -196,8 +212,9 @@ const filteredRows = computed(() => rows.value.filter((item) => {
   if (query.status && item.status !== query.status) return false
   if (query.roomType) {
     const room = roomMetaMap.value.get(String(item.roomId || ''))
+    if (query.roomType === '高端房型' && !isPremiumRoom(item, room)) return false
     const capacity = Number(room?.capacity || 0)
-    if (resolveRoomTypeLabel(item.roomType, capacity) !== query.roomType) return false
+    if (query.roomType !== '高端房型' && resolveRoomTypeLabel(item.roomType, capacity) !== query.roomType) return false
   }
   return true
 }))
@@ -234,6 +251,12 @@ const listRows = computed(() =>
     }
   })
 )
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: Array<string | number>) => {
+    selectedRowKeys.value = keys.map((item) => String(item))
+  }
+}))
 
 const occupiedCount = computed(() => scopedBeds.value.filter((item) => item.status === 2 || !!item.elderId).length)
 const freeCount = computed(() => Math.max(scopedBeds.value.length - occupiedCount.value, 0))
@@ -280,7 +303,7 @@ const marketingGuardHint = computed(() => {
 
 function handleMarketingGuardAction(item: { actionKey?: string }) {
   if (item.actionKey === 'go-contract') {
-    router.push('/marketing/contract-signing')
+    router.push(buildContractRoute('pending'))
   }
 }
 
@@ -385,6 +408,7 @@ function toggleFloor(floor: string) {
 function clearSelection() {
   selectedBuilding.value = ''
   selectedFloor.value = ''
+  selectedRowKeys.value = []
 }
 
 function resolveRoomTypeLabel(roomType?: string, capacity?: number) {
@@ -395,8 +419,52 @@ function resolveRoomTypeLabel(roomType?: string, capacity?: number) {
   return roomType || '标准间'
 }
 
+function isPremiumRoom(item: BedItem, room?: RoomItem) {
+  return String(item.roomType || '').includes('高')
+    || String(item.roomNo || '').startsWith('V')
+    || String(room?.roomNo || '').startsWith('V')
+    || Number(room?.capacity || 0) >= 3
+}
+
 function openAssetMap() {
   router.push('/bed/map')
+}
+
+function exportCurrentScope() {
+  const exportRows = listRows.value.map((item) => ({
+    楼栋: item.building || '-',
+    楼层: item.floorNo || '-',
+    房间号: item.roomNo || '-',
+    房型: item.roomTypeLabel || '-',
+    容量: item.capacity || '-',
+    床位号: item.bedNo || '-',
+    长者: item.elderName || '-',
+    状态: statusText(item)
+  }))
+  exportCsv(exportRows, `marketing-room-panorama-${Date.now()}.csv`)
+}
+
+function initQueryFromRoute() {
+  const queryFromRoute = route.query || {}
+  if (typeof queryFromRoute.roomType === 'string' && queryFromRoute.roomType) {
+    query.roomType = queryFromRoute.roomType === 'premium' ? '高端房型' : queryFromRoute.roomType
+  }
+  if (typeof queryFromRoute.roomNo === 'string' && queryFromRoute.roomNo) {
+    query.roomNo = queryFromRoute.roomNo
+  }
+  if (typeof queryFromRoute.elderName === 'string' && queryFromRoute.elderName) {
+    query.elderName = queryFromRoute.elderName
+  }
+  if (typeof queryFromRoute.building === 'string' && queryFromRoute.building) {
+    selectedBuilding.value = queryFromRoute.building
+  }
+  if (typeof queryFromRoute.floor === 'string' && queryFromRoute.floor) {
+    selectedFloor.value = queryFromRoute.floor
+  }
+  if (typeof queryFromRoute.status === 'string' && queryFromRoute.status) {
+    const parsedStatus = Number(queryFromRoute.status)
+    if (!Number.isNaN(parsedStatus)) query.status = parsedStatus
+  }
 }
 
 async function fetchData() {
@@ -410,10 +478,12 @@ async function fetchData() {
     rows.value = bedRows
     rooms.value = roomRows
     roomTypeItems.value = roomTypes
+    selectedRowKeys.value = []
   } catch {
     rows.value = []
     rooms.value = []
     roomTypeItems.value = []
+    selectedRowKeys.value = []
   } finally {
     loading.value = false
   }
@@ -428,12 +498,18 @@ watch(filteredRows, () => {
   }
 })
 
+watch(scopedBeds, () => {
+  const validIds = new Set(scopedBeds.value.map((item) => String(item.id)))
+  selectedRowKeys.value = selectedRowKeys.value.filter((item) => validIds.has(item))
+})
+
 useLiveSyncRefresh({
   topics: ['bed', 'elder'],
   refresh: fetchData
 })
 
 onMounted(fetchData)
+initQueryFromRoute()
 </script>
 
 <style scoped>

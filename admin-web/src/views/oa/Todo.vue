@@ -9,11 +9,41 @@
       </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openCreate">新增待办</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" @click="batchDone">批量完成</a-button>
+        <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="editSelected">编辑</a-button>
+        <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="doneSelected">完成</a-button>
+        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+        <a-button :disabled="selectedOpenCount === 0" @click="batchDone">批量完成</a-button>
         <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
         <a-button @click="downloadExport">导出CSV</a-button>
+        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条，批量完成仅对“待处理”生效</span>
       </template>
     </SearchForm>
+
+    <a-card class="card-elevated" :bordered="false" style="margin-bottom: 12px">
+      <a-space wrap>
+        <a-tag color="blue">代办新增/完成会自动同步到行政日历</a-tag>
+        <a-form layout="inline">
+          <a-form-item label="自动更新周期">
+            <a-select v-model:value="policyForm.cycle" style="width: 180px">
+              <a-select-option value="DAILY">每天</a-select-option>
+              <a-select-option value="WEEKLY">每周</a-select-option>
+              <a-select-option value="MONTHLY">每月</a-select-option>
+              <a-select-option value="YEARLY">每年</a-select-option>
+              <a-select-option value="MANUAL">手动</a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item label="自动清理已完成">
+            <a-switch v-model:checked="policyForm.autoClearDone" />
+          </a-form-item>
+          <a-form-item>
+            <a-button @click="savePolicy">保存策略</a-button>
+          </a-form-item>
+          <a-form-item>
+            <a-button danger @click="runPolicyNow">立即执行清理</a-button>
+          </a-form-item>
+        </a-form>
+      </a-space>
+    </a-card>
 
     <StatefulBlock :loading="summaryLoading" :error="summaryError" :empty="false" @retry="fetchData">
       <a-row :gutter="[12, 12]" style="margin-bottom: 12px">
@@ -49,13 +79,6 @@
               {{ record.status === 'DONE' ? '已完成' : '待处理' }}
             </a-tag>
           </template>
-          <template v-else-if="column.key === 'action'">
-            <a-space>
-              <a-button type="link" :disabled="record.status !== 'OPEN'" @click="openEdit(record)">编辑</a-button>
-              <a-button type="link" :disabled="record.status !== 'OPEN'" @click="done(record)">完成</a-button>
-              <a-button type="link" danger @click="remove(record)">删除</a-button>
-            </a-space>
-          </template>
         </template>
       </DataTable>
     </StatefulBlock>
@@ -83,7 +106,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
@@ -110,7 +133,7 @@ const summaryError = ref('')
 const rows = ref<OaTodo[]>([])
 const query = reactive({ keyword: '', status: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
-const selectedRowKeys = ref<number[]>([])
+const selectedRowKeys = ref<string[]>([])
 const summary = reactive<OaTodoSummary>({
   totalCount: 0,
   openCount: 0,
@@ -124,14 +147,13 @@ const columns = [
   { title: '标题', dataIndex: 'title', key: 'title', width: 200 },
   { title: '负责人', dataIndex: 'assigneeName', key: 'assigneeName', width: 120 },
   { title: '截止时间', dataIndex: 'dueTime', key: 'dueTime', width: 160 },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
-  { title: '操作', key: 'action', width: 180 }
+  { title: '状态', dataIndex: 'status', key: 'status', width: 100 }
 ]
 
 const editOpen = ref(false)
 const saving = ref(false)
 const form = reactive({
-  id: undefined as number | undefined,
+  id: undefined as string | undefined,
   title: '',
   content: '',
   dueTime: undefined as any,
@@ -147,9 +169,19 @@ const editableStatusOptions = [{ label: '待处理', value: 'OPEN' }]
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: (string | number)[]) => {
-    selectedRowKeys.value = keys.map((item) => Number(item))
+    selectedRowKeys.value = keys.map((item) => String(item))
   }
 }))
+const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(String(item.id))))
+const selectedSingleRecord = computed(() => (selectedRecords.value.length === 1 ? selectedRecords.value[0] : null))
+const isSelectedSingleOpen = computed(() => selectedSingleRecord.value?.status === 'OPEN')
+const selectedOpenIds = computed(() => selectedRecords.value.filter((item) => item.status === 'OPEN').map((item) => String(item.id)))
+const selectedOpenCount = computed(() => selectedOpenIds.value.length)
+const policyStorageKey = 'oa-todo-policy-v1'
+const policyForm = reactive({
+  cycle: 'WEEKLY',
+  autoClearDone: false
+})
 
 async function fetchData() {
   loading.value = true
@@ -167,7 +199,10 @@ async function fetchData() {
       getTodoPage(params),
       getTodoSummary(params)
     ])
-    rows.value = res.list
+    rows.value = (res.list || []).map((item) => ({
+      ...item,
+      id: String(item.id)
+    }))
     pagination.total = res.total || res.list.length
     selectedRowKeys.value = []
     Object.assign(summary, sum || {})
@@ -208,7 +243,7 @@ function openCreate() {
 }
 
 function openEdit(record: OaTodo) {
-  form.id = record.id
+  form.id = String(record.id)
   form.title = record.title
   form.content = record.content || ''
   form.dueTime = record.dueTime ? dayjs(record.dueTime) : undefined
@@ -241,18 +276,51 @@ async function submit() {
 
 async function done(record: OaTodo) {
   if (record.status !== 'OPEN') return
-  await completeTodo(record.id)
+  await completeTodo(String(record.id))
   fetchData()
 }
 
 async function remove(record: OaTodo) {
-  await deleteTodo(record.id)
+  await deleteTodo(String(record.id))
   fetchData()
 }
 
+function requireSingleSelection(action: string) {
+  if (!selectedSingleRecord.value) {
+    message.info(`请先勾选 1 条待办后再${action}`)
+    return null
+  }
+  return selectedSingleRecord.value
+}
+
+function editSelected() {
+  const record = requireSingleSelection('编辑')
+  if (!record) return
+  if (record.status !== 'OPEN') {
+    message.warning('仅待处理待办可编辑')
+    return
+  }
+  openEdit(record)
+}
+
+async function doneSelected() {
+  const record = requireSingleSelection('完成')
+  if (!record) return
+  await done(record)
+}
+
+async function removeSelected() {
+  const record = requireSingleSelection('删除')
+  if (!record) return
+  await remove(record)
+}
+
 async function batchDone() {
-  if (selectedRowKeys.value.length === 0) return
-  const affected = await batchCompleteTodo(selectedRowKeys.value)
+  if (selectedOpenIds.value.length === 0) {
+    message.info('勾选项中没有“待处理”记录')
+    return
+  }
+  const affected = await batchCompleteTodo(selectedOpenIds.value)
   message.success(`批量完成，共处理 ${affected || 0} 条`)
   fetchData()
 }
@@ -279,5 +347,78 @@ async function downloadExport() {
   URL.revokeObjectURL(href)
 }
 
-fetchData()
+function loadPolicy() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(policyStorageKey) || '{}')
+    if (saved?.cycle) policyForm.cycle = saved.cycle
+    if (saved?.autoClearDone !== undefined) policyForm.autoClearDone = Boolean(saved.autoClearDone)
+  } catch {
+    policyForm.cycle = 'WEEKLY'
+    policyForm.autoClearDone = false
+  }
+}
+
+function savePolicy() {
+  localStorage.setItem(policyStorageKey, JSON.stringify(policyForm))
+  message.success('更新策略已保存')
+}
+
+function policyShouldRun(cycle: string) {
+  if (cycle === 'MANUAL') return false
+  const today = new Date()
+  const markerKey = `${policyStorageKey}-last`
+  const last = localStorage.getItem(markerKey)
+  const marker = cycleMarker(cycle, today)
+  if (last === marker) return false
+  localStorage.setItem(markerKey, marker)
+  return true
+}
+
+function cycleMarker(cycle: string, date: Date) {
+  const year = date.getFullYear()
+  if (cycle === 'YEARLY') return `${year}`
+  if (cycle === 'MONTHLY') return `${year}-${String(date.getMonth() + 1).padStart(2, '0')}`
+  if (cycle === 'WEEKLY') {
+    const jan1 = new Date(year, 0, 1)
+    const days = Math.floor((date.getTime() - jan1.getTime()) / (24 * 3600 * 1000))
+    const week = Math.ceil((days + jan1.getDay() + 1) / 7)
+    return `${year}-W${week}`
+  }
+  return `${year}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+async function clearDoneTodos() {
+  const donePage: PageResult<OaTodo> = await getTodoPage({ pageNo: 1, pageSize: 1000, status: 'DONE' })
+  const ids = (donePage.list || []).map((item) => item.id).filter(Boolean)
+  if (!ids.length) {
+    message.info('暂无可清理的已完成待办')
+    return
+  }
+  const affected = await batchDeleteTodo(ids)
+  message.success(`已清理 ${affected || 0} 条已完成待办`)
+  await fetchData()
+}
+
+async function runPolicyNow() {
+  if (!policyForm.autoClearDone) {
+    message.info('当前未开启自动清理，已跳过')
+    return
+  }
+  await clearDoneTodos()
+}
+
+onMounted(async () => {
+  loadPolicy()
+  await fetchData()
+  if (policyForm.autoClearDone && policyShouldRun(policyForm.cycle)) {
+    await clearDoneTodos()
+  }
+})
 </script>
+
+<style scoped>
+.selection-tip {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+</style>

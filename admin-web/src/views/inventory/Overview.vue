@@ -123,6 +123,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportCsv } from '../../utils/export'
@@ -132,6 +133,7 @@ import { getProductPage } from '../../api/store'
 import type { InventoryBatchItem, PageResult, ProductItem } from '../../types'
 
 const loading = ref(false)
+const route = useRoute()
 const rows = ref<InventoryBatchItem[]>([])
 const total = ref(0)
 const products = ref<ProductItem[]>([])
@@ -279,9 +281,39 @@ async function submitAdjust() {
   }
 }
 
-onMounted(fetchData)
+function applyRouteQuery() {
+  const q = route.query || {}
+  const queryKeyword = typeof q.keyword === 'string' ? q.keyword : ''
+  const queryCategory = typeof q.category === 'string' ? q.category : undefined
+  const productIdRaw = Array.isArray(q.productId) ? q.productId[0] : q.productId
+  const expiryDaysRaw = Array.isArray(q.expiryDays) ? q.expiryDays[0] : q.expiryDays
+  const lowStockRaw = Array.isArray(q.lowStockOnly) ? q.lowStockOnly[0] : q.lowStockOnly
+  const filterRaw = Array.isArray(q.filter) ? q.filter[0] : q.filter
+
+  if (queryKeyword) query.keyword = queryKeyword
+  if (queryCategory) query.category = queryCategory
+  if (productIdRaw !== undefined) {
+    const parsed = Number(productIdRaw)
+    query.productId = Number.isNaN(parsed) ? undefined : parsed
+  }
+  if (expiryDaysRaw !== undefined) {
+    const parsed = Number(expiryDaysRaw)
+    query.expiryDays = Number.isNaN(parsed) ? undefined : parsed
+  }
+  if (lowStockRaw !== undefined) {
+    query.lowStockOnly = String(lowStockRaw) === '1' || String(lowStockRaw).toLowerCase() === 'true'
+  }
+  if (String(filterRaw || '') === 'low_stock') {
+    query.lowStockOnly = true
+  }
+  if (String(filterRaw || '') === 'expiring' && query.expiryDays === undefined) {
+    query.expiryDays = 30
+  }
+}
 
 onMounted(async () => {
+  applyRouteQuery()
+  fetchData()
   const [warehouseRes, productRes] = await Promise.all([
     getWarehousePage({ pageNo: 1, pageSize: 500 }),
     getProductPage({ pageNo: 1, pageSize: 500 })

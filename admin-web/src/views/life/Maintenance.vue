@@ -31,6 +31,9 @@
             {{ record.priority === 'HIGH' ? '高' : record.priority === 'LOW' ? '低' : '普通' }}
           </a-tag>
         </template>
+        <template v-else-if="column.key === 'totalCost'">
+          {{ Number(record.totalCost || 0).toFixed(2) }}
+        </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
             <a-button type="link" @click="openEdit(record)">编辑</a-button>
@@ -80,6 +83,35 @@
         <a-form-item label="故障描述" required>
           <a-textarea v-model:value="form.description" :rows="3" />
         </a-form-item>
+        <a-row :gutter="16">
+          <a-col :span="8">
+            <a-form-item label="人工成本(元)">
+              <a-input-number
+                v-model:value="form.laborCost"
+                :min="0"
+                :precision="2"
+                style="width: 100%"
+                @change="recalcTotalCost"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item label="物料成本(元)">
+              <a-input-number
+                v-model:value="form.materialCost"
+                :min="0"
+                :precision="2"
+                style="width: 100%"
+                @change="recalcTotalCost"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item label="总成本(元)">
+              <a-input-number v-model:value="form.totalCost" :min="0" :precision="2" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+        </a-row>
         <a-form-item label="状态">
           <a-select v-model:value="form.status" :options="statusOptions" />
         </a-form-item>
@@ -112,6 +144,7 @@ const columns = [
   { title: '维修负责人', dataIndex: 'assigneeName', key: 'assigneeName', width: 120 },
   { title: '优先级', dataIndex: 'priority', key: 'priority', width: 90 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 110 },
+  { title: '总成本(元)', dataIndex: 'totalCost', key: 'totalCost', width: 120 },
   { title: '报修时间', dataIndex: 'reportedAt', key: 'reportedAt', width: 170 },
   { title: '操作', key: 'action', width: 180 }
 ]
@@ -137,6 +170,9 @@ const form = reactive({
   assigneeName: '',
   issueType: '',
   description: '',
+  laborCost: 0,
+  materialCost: 0,
+  totalCost: 0,
   priority: 'NORMAL',
   status: 'OPEN',
   remark: ''
@@ -193,6 +229,9 @@ function openCreate() {
   form.assigneeName = ''
   form.issueType = ''
   form.description = ''
+  form.laborCost = 0
+  form.materialCost = 0
+  form.totalCost = 0
   form.priority = 'NORMAL'
   form.status = 'OPEN'
   form.remark = ''
@@ -206,10 +245,25 @@ function openEdit(record: MaintenanceRequest) {
   form.assigneeName = record.assigneeName || ''
   form.issueType = record.issueType
   form.description = record.description
+  form.laborCost = Number(record.laborCost || 0)
+  form.materialCost = Number(record.materialCost || 0)
+  form.totalCost = Number(record.totalCost || 0)
   form.priority = record.priority || 'NORMAL'
   form.status = record.status || 'OPEN'
   form.remark = record.remark || ''
   editOpen.value = true
+}
+
+function toNumber(value?: number | null) {
+  const n = Number(value || 0)
+  if (!Number.isFinite(n) || n < 0) {
+    return 0
+  }
+  return Math.round(n * 100) / 100
+}
+
+function recalcTotalCost() {
+  form.totalCost = Math.round((toNumber(form.laborCost) + toNumber(form.materialCost)) * 100) / 100
 }
 
 async function submit() {
@@ -219,6 +273,9 @@ async function submit() {
     assigneeName: form.assigneeName,
     issueType: form.issueType,
     description: form.description,
+    laborCost: toNumber(form.laborCost),
+    materialCost: toNumber(form.materialCost),
+    totalCost: toNumber(form.totalCost),
     priority: form.priority,
     status: form.status,
     remark: form.remark

@@ -14,4 +14,5 @@ public class StaffPerformanceSummaryResponse {
   private Integer pointsBalance;
   private Integer pointsEarned;
   private Integer pointsDeducted;
+  private Integer redeemableCash;
 }

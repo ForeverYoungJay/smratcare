@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.Data;
 
@@ -28,6 +29,12 @@ public class MaintenanceRequest {
   private String issueType;
 
   private String description;
+
+  private BigDecimal laborCost;
+
+  private BigDecimal materialCost;
+
+  private BigDecimal totalCost;
 
   private String priority;
 

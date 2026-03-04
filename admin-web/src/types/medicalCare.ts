@@ -161,6 +161,9 @@ export interface MedicalResidentOverviewCard {
   description?: string
   lines: string[]
   actions: MedicalResidentOverviewAction[]
+  dangerCount?: number
+  warningCount?: number
+  alertCount?: number
 }
 
 export interface MedicalResidentOverview {
@@ -168,5 +171,7 @@ export interface MedicalResidentOverview {
   elderName?: string
   currentStatus?: string
   hasUnclosedIncident?: boolean
+  alertCardCount?: number
+  alertTotalCount?: number
   cards: MedicalResidentOverviewCard[]
 }

@@ -40,7 +40,7 @@ import org.springframework.util.StringUtils;
 
 @Service
 public class MarketingPlanServiceImpl implements MarketingPlanService {
-  private static final Set<String> EDITABLE_STATUSES = Set.of("DRAFT", "REJECTED", "INACTIVE", "ACTIVE");
+  private static final Set<String> EDITABLE_STATUSES = Set.of("DRAFT", "REJECTED", "INACTIVE");
 
   private final CrmMarketingPlanMapper marketingPlanMapper;
   private final CrmMarketingPlanDepartmentMapper planDepartmentMapper;
@@ -162,9 +162,8 @@ public class MarketingPlanServiceImpl implements MarketingPlanService {
     }
     CrmMarketingPlanApproval approval = buildApproval(orgId, id, staffId, "APPROVED", request == null ? null : request.getRemark());
     approvalMapper.insert(approval);
-    entity.setStatus("PUBLISHED");
+    entity.setStatus("APPROVED");
     marketingPlanMapper.updateById(entity);
-    syncPublishLinkages(orgId, staffId, entity);
     return toResponse(entity, staffId);
   }
 
@@ -187,13 +186,25 @@ public class MarketingPlanServiceImpl implements MarketingPlanService {
   public MarketingPlanResponse publish(Long orgId, Long staffId, Long id) {
     CrmMarketingPlan entity = getById(orgId, id);
     if (!"APPROVED".equals(entity.getStatus())
-        && !"ACTIVE".equals(entity.getStatus())
+        && !"INACTIVE".equals(entity.getStatus())
         && !"PUBLISHED".equals(entity.getStatus())) {
-      throw new IllegalArgumentException("仅审批通过或已发布方案可发布");
+      throw new IllegalArgumentException("仅审批通过/停用/已发布方案可发布");
     }
     entity.setStatus("PUBLISHED");
     marketingPlanMapper.updateById(entity);
     syncPublishLinkages(orgId, staffId, entity);
+    return toResponse(entity, staffId);
+  }
+
+  @Override
+  @Transactional
+  public MarketingPlanResponse deactivate(Long orgId, Long staffId, Long id) {
+    CrmMarketingPlan entity = getById(orgId, id);
+    if (!"PUBLISHED".equals(entity.getStatus())) {
+      throw new IllegalArgumentException("仅已发布方案可停用");
+    }
+    entity.setStatus("INACTIVE");
+    marketingPlanMapper.updateById(entity);
     return toResponse(entity, staffId);
   }
 

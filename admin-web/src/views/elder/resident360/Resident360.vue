@@ -89,7 +89,7 @@ async function loadOverview() {
     }
     overview.value = await getResidentOverview(residentId.value)
   } catch (error: any) {
-    errorMessage.value = error?.message || '加载 Resident 360 失败'
+    errorMessage.value = error?.message || '加载长者总览失败'
     message.error(errorMessage.value)
   } finally {
     loading.value = false

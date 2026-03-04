@@ -3,8 +3,12 @@ package com.zhiyangyun.care.oa.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
+import com.zhiyangyun.care.hr.model.StaffPointsAdjustRequest;
+import com.zhiyangyun.care.hr.service.StaffPointsService;
 import com.zhiyangyun.care.oa.entity.OaApproval;
 import com.zhiyangyun.care.oa.mapper.OaApprovalMapper;
 import com.zhiyangyun.care.oa.model.OaApprovalBatchRejectRequest;
@@ -13,10 +17,12 @@ import com.zhiyangyun.care.oa.model.OaApprovalSummaryResponse;
 import com.zhiyangyun.care.oa.model.OaApprovalRequest;
 import jakarta.validation.Valid;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -35,9 +41,16 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/oa/approval")
 public class OaApprovalController {
   private final OaApprovalMapper approvalMapper;
+  private final StaffPointsService staffPointsService;
+  private final ObjectMapper objectMapper;
 
-  public OaApprovalController(OaApprovalMapper approvalMapper) {
+  public OaApprovalController(
+      OaApprovalMapper approvalMapper,
+      StaffPointsService staffPointsService,
+      ObjectMapper objectMapper) {
     this.approvalMapper = approvalMapper;
+    this.staffPointsService = staffPointsService;
+    this.objectMapper = objectMapper;
   }
 
   @GetMapping("/page")
@@ -91,7 +104,7 @@ public class OaApprovalController {
     approval.setAmount(request.getAmount());
     approval.setStartTime(request.getStartTime());
     approval.setEndTime(request.getEndTime());
-    approval.setFormData(request.getFormData());
+    approval.setFormData(enrichWorkflowData(request));
     String normalizedStatus = normalizeStatus(request.getStatus());
     if (normalizedStatus != null && !"PENDING".equals(normalizedStatus)) {
       throw new IllegalArgumentException("创建审批单仅支持 PENDING 状态");
@@ -120,7 +133,7 @@ public class OaApprovalController {
     approval.setAmount(request.getAmount());
     approval.setStartTime(request.getStartTime());
     approval.setEndTime(request.getEndTime());
-    approval.setFormData(request.getFormData());
+    approval.setFormData(enrichWorkflowData(request));
     String normalizedStatus = normalizeStatus(request.getStatus());
     if (normalizedStatus != null && !"PENDING".equals(normalizedStatus)) {
       throw new IllegalArgumentException("编辑审批单仅支持保持 PENDING 状态");
@@ -140,6 +153,7 @@ public class OaApprovalController {
     ensurePending(approval);
     approval.setStatus("APPROVED");
     approvalMapper.updateById(approval);
+    handleAfterApproved(approval);
     return Result.ok(approval);
   }
 
@@ -174,6 +188,7 @@ public class OaApprovalController {
       }
       approval.setStatus("APPROVED");
       approvalMapper.updateById(approval);
+      handleAfterApproved(approval);
       count++;
     }
     return Result.ok(count);
@@ -301,10 +316,12 @@ public class OaApprovalController {
         && !"PURCHASE".equals(normalized)
         && !"OVERTIME".equals(normalized)
         && !"INCOME_PROOF".equals(normalized)
+        && !"BANK_CARD".equals(normalized)
+        && !"POINTS_CASH".equals(normalized)
         && !"MATERIAL_APPLY".equals(normalized)
         && !"OFFICIAL_SEAL".equals(normalized)) {
       throw new IllegalArgumentException(
-          "approvalType 仅支持 LEAVE/OVERTIME/REIMBURSE/PURCHASE/INCOME_PROOF/MATERIAL_APPLY/OFFICIAL_SEAL");
+          "approvalType 仅支持 LEAVE/OVERTIME/REIMBURSE/PURCHASE/INCOME_PROOF/BANK_CARD/POINTS_CASH/MATERIAL_APPLY/OFFICIAL_SEAL");
     }
     return normalized;
   }
@@ -384,5 +401,195 @@ public class OaApprovalController {
 
   private long count(Long value) {
     return value == null ? 0L : value;
+  }
+
+  private String enrichWorkflowData(OaApprovalRequest request) {
+    Map<String, Object> map = readFormMap(request.getFormData());
+    String type = normalizeType(request.getApprovalType());
+    validateWorkflowRequest(type, request, map);
+    map.put("workflowType", type);
+    map.put("workflowVersion", "2026-Q1");
+    map.put("submittedAt", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+    map.put("approvalPath", approvalPath(type, request));
+    if ("LEAVE".equals(type) && request.getStartTime() != null && request.getEndTime() != null) {
+      long leaveHours = Duration.between(request.getStartTime(), request.getEndTime()).toHours();
+      long leaveDays = (long) Math.ceil(Math.max(leaveHours, 0) / 24.0);
+      map.put("leaveDays", leaveDays);
+      map.put("needDeanApproval", leaveDays > 3);
+      if (leaveDays > 3) {
+        map.put("flowHint", "超过3天自动加院长审批，流程较长请提前规划");
+      }
+    }
+    return writeFormMap(map);
+  }
+
+  private void validateWorkflowRequest(String type, OaApprovalRequest request, Map<String, Object> map) {
+    if ("LEAVE".equals(type)) {
+      if (request.getStartTime() == null || request.getEndTime() == null) {
+        throw new IllegalArgumentException("请假审批需填写开始时间和结束时间");
+      }
+      if (!parseBoolean(map.get("policyAcknowledged"))) {
+        throw new IllegalArgumentException("请先阅读并确认请假制度");
+      }
+      String leaveType = parseString(map.get("leaveType"));
+      map.put("leaveType", leaveType == null ? "ANNUAL" : leaveType);
+      return;
+    }
+    if ("POINTS_CASH".equals(type)) {
+      Long staffId = parseLong(map.get("staffId"));
+      if (staffId == null) {
+        staffId = request.getApplicantId();
+      }
+      Integer redeemPoints = parseInteger(map.get("redeemPoints"));
+      if (staffId == null || redeemPoints == null || redeemPoints <= 0 || redeemPoints % 300 != 0) {
+        throw new IllegalArgumentException("积分兑现金需提供员工和300整数倍积分");
+      }
+      map.put("staffId", staffId);
+      map.put("redeemPoints", redeemPoints);
+      map.put("redeemCash", (redeemPoints / 300) * 10);
+      map.put("exchangeRate", "300:10");
+      return;
+    }
+    if ("PURCHASE".equals(type)) {
+      String purchaseCategory = parseString(map.get("purchaseCategory"));
+      map.put("purchaseCategory", purchaseCategory == null ? "FOOD" : purchaseCategory);
+    } else if ("MATERIAL_APPLY".equals(type)) {
+      String materialCategory = parseString(map.get("materialCategory"));
+      map.put("materialCategory", materialCategory == null ? "CARE" : materialCategory);
+    } else if ("INCOME_PROOF".equals(type) || "BANK_CARD".equals(type)) {
+      String proofNo = parseString(map.get("proofNo"));
+      if (proofNo == null) {
+        proofNo = "PF-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
+      }
+      map.put("proofNo", proofNo);
+    }
+    if (request.getAmount() != null && request.getAmount().signum() < 0) {
+      throw new IllegalArgumentException("审批金额不能为负数");
+    }
+  }
+
+  private List<String> approvalPath(String type, OaApprovalRequest request) {
+    if ("LEAVE".equals(type)) {
+      boolean needDean = false;
+      if (request.getStartTime() != null && request.getEndTime() != null) {
+        long leaveHours = Duration.between(request.getStartTime(), request.getEndTime()).toHours();
+        long leaveDays = (long) Math.ceil(Math.max(leaveHours, 0) / 24.0);
+        needDean = leaveDays > 3;
+      }
+      List<String> path = new ArrayList<>();
+      path.add("员工发起");
+      path.add("部门主管审批");
+      path.add("人事确认");
+      if (needDean) {
+        path.add("院长审批");
+      }
+      path.add("归档");
+      return path;
+    }
+    if ("REIMBURSE".equals(type) || "OVERTIME".equals(type)) {
+      return List.of("申请人提交", "部门主管审批", "财务审核", "院长审批", "出纳付款", "归档");
+    }
+    if ("PURCHASE".equals(type)) {
+      return List.of("申请人提交", "部门主管审批", "仓库确认库存", "财务预算确认", "院长审批", "采购执行", "入库验收");
+    }
+    if ("MATERIAL_APPLY".equals(type)) {
+      return List.of("申请人提交", "部门主管审批", "仓库审核", "出库确认", "归档");
+    }
+    if ("INCOME_PROOF".equals(type) || "BANK_CARD".equals(type)) {
+      return List.of("员工申请", "人事审核", "财务确认", "行政盖章", "归档");
+    }
+    if ("POINTS_CASH".equals(type)) {
+      return List.of("员工申请", "院长审批", "积分扣减", "财务发放", "归档");
+    }
+    return List.of("申请人提交", "审批", "归档");
+  }
+
+  private void handleAfterApproved(OaApproval approval) {
+    if (approval == null || approval.getApprovalType() == null) {
+      return;
+    }
+    if ("POINTS_CASH".equalsIgnoreCase(approval.getApprovalType())) {
+      applyPointsCashRedeem(approval);
+    }
+  }
+
+  private void applyPointsCashRedeem(OaApproval approval) {
+    Map<String, Object> map = readFormMap(approval.getFormData());
+    Long staffId = parseLong(map.get("staffId"));
+    Integer redeemPoints = parseInteger(map.get("redeemPoints"));
+    if (staffId == null || redeemPoints == null || redeemPoints <= 0) {
+      return;
+    }
+    StaffPointsAdjustRequest adjustRequest = new StaffPointsAdjustRequest();
+    adjustRequest.setStaffId(staffId);
+    adjustRequest.setChangeType("DEDUCT");
+    adjustRequest.setChangePoints(redeemPoints);
+    adjustRequest.setSourceType("POINTS_CASH");
+    adjustRequest.setSourceId(approval.getId());
+    adjustRequest.setRemark("积分兑现金审批通过，审批单#" + approval.getId());
+    var adjusted = staffPointsService.adjust(approval.getOrgId(), AuthContext.getStaffId(), adjustRequest);
+    if (adjusted == null) {
+      throw new IllegalArgumentException("积分余额不足，无法完成兑现金审批");
+    }
+  }
+
+  private Map<String, Object> readFormMap(String formData) {
+    if (formData == null || formData.isBlank()) {
+      return new java.util.LinkedHashMap<>();
+    }
+    try {
+      return objectMapper.readValue(formData, new TypeReference<Map<String, Object>>() {});
+    } catch (Exception ignore) {
+      Map<String, Object> map = new java.util.LinkedHashMap<>();
+      map.put("rawText", formData);
+      return map;
+    }
+  }
+
+  private String writeFormMap(Map<String, Object> map) {
+    try {
+      return objectMapper.writeValueAsString(map);
+    } catch (Exception ignore) {
+      return null;
+    }
+  }
+
+  private Long parseLong(Object value) {
+    if (value == null) return null;
+    if (value instanceof Number number) {
+      return number.longValue();
+    }
+    try {
+      return Long.parseLong(String.valueOf(value));
+    } catch (Exception ignore) {
+      return null;
+    }
+  }
+
+  private Integer parseInteger(Object value) {
+    if (value == null) return null;
+    if (value instanceof Number number) {
+      return number.intValue();
+    }
+    try {
+      return Integer.parseInt(String.valueOf(value));
+    } catch (Exception ignore) {
+      return null;
+    }
+  }
+
+  private boolean parseBoolean(Object value) {
+    if (value == null) return false;
+    if (value instanceof Boolean bool) {
+      return bool;
+    }
+    String text = String.valueOf(value).trim().toLowerCase();
+    return "true".equals(text) || "1".equals(text) || "yes".equals(text) || "y".equals(text);
+  }
+
+  private String parseString(Object value) {
+    if (value == null) return null;
+    String text = String.valueOf(value).trim();
+    return text.isEmpty() ? null : text;
   }
 }

@@ -11,9 +11,13 @@
           </a-form-item>
           <template #extra>
             <a-button type="primary" @click="openCreate">新增任务</a-button>
-            <a-button :disabled="selectedRowKeys.length === 0" @click="batchDone">批量完成</a-button>
+            <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="editSelected">编辑</a-button>
+            <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="doneSelected">完成</a-button>
+            <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+            <a-button :disabled="selectedOpenCount === 0" @click="batchDone">批量完成</a-button>
             <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
             <a-button @click="downloadExport">导出CSV</a-button>
+            <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条，批量完成仅对“进行中”生效</span>
           </template>
         </SearchForm>
 
@@ -55,13 +59,6 @@
                 <a-tag :color="record.priority === 'HIGH' ? 'red' : record.priority === 'LOW' ? 'blue' : 'gold'">
                   {{ priorityLabel(record.priority) }}
                 </a-tag>
-              </template>
-              <template v-else-if="column.key === 'action'">
-                <a-space>
-                  <a-button type="link" :disabled="record.status !== 'OPEN'" @click="openEdit(record)">编辑</a-button>
-                  <a-button type="link" :disabled="record.status !== 'OPEN'" @click="done(record)">完成</a-button>
-                  <a-button type="link" danger @click="remove(record)">删除</a-button>
-                </a-space>
               </template>
             </template>
           </DataTable>
@@ -146,7 +143,7 @@ const summaryError = ref('')
 const rows = ref<OaTask[]>([])
 const query = reactive({ keyword: '', status: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
-const selectedRowKeys = ref<number[]>([])
+const selectedRowKeys = ref<string[]>([])
 const summary = reactive<OaTaskSummary>({
   totalCount: 0,
   openCount: 0,
@@ -163,14 +160,13 @@ const columns = [
   { title: '开始时间', dataIndex: 'startTime', key: 'startTime', width: 160 },
   { title: '结束时间', dataIndex: 'endTime', key: 'endTime', width: 160 },
   { title: '优先级', dataIndex: 'priority', key: 'priority', width: 100 },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
-  { title: '操作', key: 'action', width: 180 }
+  { title: '状态', dataIndex: 'status', key: 'status', width: 100 }
 ]
 
 const editOpen = ref(false)
 const saving = ref(false)
 const form = reactive({
-  id: undefined as number | undefined,
+  id: undefined as string | undefined,
   title: '',
   description: '',
   startTime: undefined as any,
@@ -208,9 +204,14 @@ const calendarOptions = computed(() => ({
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: (string | number)[]) => {
-    selectedRowKeys.value = keys.map((item) => Number(item))
+    selectedRowKeys.value = keys.map((item) => String(item))
   }
 }))
+const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(String(item.id))))
+const selectedSingleRecord = computed(() => (selectedRecords.value.length === 1 ? selectedRecords.value[0] : null))
+const isSelectedSingleOpen = computed(() => selectedSingleRecord.value?.status === 'OPEN')
+const selectedOpenIds = computed(() => selectedRecords.value.filter((item) => item.status === 'OPEN').map((item) => String(item.id)))
+const selectedOpenCount = computed(() => selectedOpenIds.value.length)
 
 async function fetchData() {
   loading.value = true
@@ -228,7 +229,10 @@ async function fetchData() {
       getOaTaskPage(params),
       getOaTaskSummary(params)
     ])
-    rows.value = res.list
+    rows.value = (res.list || []).map((item) => ({
+      ...item,
+      id: String(item.id)
+    }))
     pagination.total = res.total || res.list.length
     selectedRowKeys.value = []
     Object.assign(summary, sum || {})
@@ -271,7 +275,7 @@ function openCreate() {
 }
 
 function openEdit(record: OaTask) {
-  form.id = record.id
+  form.id = String(record.id)
   form.title = record.title
   form.description = record.description || ''
   form.startTime = record.startTime ? dayjs(record.startTime) : undefined
@@ -308,18 +312,51 @@ async function submit() {
 
 async function done(record: OaTask) {
   if (record.status !== 'OPEN') return
-  await completeOaTask(record.id)
+  await completeOaTask(String(record.id))
   fetchData()
 }
 
 async function remove(record: OaTask) {
-  await deleteOaTask(record.id)
+  await deleteOaTask(String(record.id))
   fetchData()
 }
 
+function requireSingleSelection(action: string) {
+  if (!selectedSingleRecord.value) {
+    message.info(`请先勾选 1 条任务后再${action}`)
+    return null
+  }
+  return selectedSingleRecord.value
+}
+
+function editSelected() {
+  const record = requireSingleSelection('编辑')
+  if (!record) return
+  if (record.status !== 'OPEN') {
+    message.warning('仅进行中任务可编辑')
+    return
+  }
+  openEdit(record)
+}
+
+async function doneSelected() {
+  const record = requireSingleSelection('完成')
+  if (!record) return
+  await done(record)
+}
+
+async function removeSelected() {
+  const record = requireSingleSelection('删除')
+  if (!record) return
+  await remove(record)
+}
+
 async function batchDone() {
-  if (selectedRowKeys.value.length === 0) return
-  const affected = await batchCompleteOaTask(selectedRowKeys.value)
+  if (selectedOpenIds.value.length === 0) {
+    message.info('勾选项中没有“进行中”任务')
+    return
+  }
+  const affected = await batchCompleteOaTask(selectedOpenIds.value)
   message.success(`批量完成，共处理 ${affected || 0} 条`)
   fetchData()
 }
@@ -348,3 +385,10 @@ async function downloadExport() {
 
 fetchData()
 </script>
+
+<style scoped>
+.selection-tip {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+</style>

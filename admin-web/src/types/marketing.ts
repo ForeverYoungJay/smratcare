@@ -330,7 +330,7 @@ export interface MarketingPlanItem {
   priority: number
   status: MarketingPlanStatus
   effectiveDate?: string
-  linkedDepartmentIds?: number[]
+  linkedDepartmentIds?: Array<string | number>
   linkedDepartmentNames?: string[]
   latestApprovalStatus?: 'APPROVED' | 'REJECTED'
   latestApprovalRemark?: string
@@ -365,7 +365,7 @@ export interface MarketingPlanPayload {
   priority?: number
   status?: MarketingPlanStatus
   effectiveDate?: string
-  linkedDepartmentIds?: number[]
+  linkedDepartmentIds?: Array<string | number>
 }
 
 export interface MarketingPlanApprovalPayload {

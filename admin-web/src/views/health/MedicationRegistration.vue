@@ -106,6 +106,7 @@
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
@@ -125,6 +126,7 @@ import type { HealthMedicationRegistration, HealthMedicationRegistrationSummary,
 
 const loading = ref(false)
 const exporting = ref(false)
+const route = useRoute()
 const rows = ref<HealthMedicationRegistration[]>([])
 const query = reactive({
   keyword: '',
@@ -211,9 +213,12 @@ function onReset() {
 }
 
 function openCreate() {
+  const residentId = route.query.residentId ?? route.query.elderId
+  const residentName = typeof route.query.residentName === 'string' ? route.query.residentName : ''
   form.id = undefined
-  form.elderId = undefined
-  form.elderName = ''
+  form.elderId = residentId ? Number(residentId) : undefined
+  form.elderName = residentName
+  ensureSelectedElder(form.elderId, residentName)
   form.drugName = ''
   form.registerTime = dayjs()
   form.dosageTaken = 0
@@ -306,12 +311,16 @@ async function exportExcelData() {
 }
 
 function buildQueryParams() {
+  const residentId = route.query.residentId ?? route.query.elderId
   const params: Record<string, any> = {
     keyword: query.keyword || undefined,
     drugName: query.drugName || undefined,
     nurseName: query.nurseName || undefined,
     pageNo: query.pageNo,
     pageSize: query.pageSize
+  }
+  if (residentId) {
+    params.elderId = Number(residentId)
   }
   if (Array.isArray(query.registerRange) && query.registerRange.length === 2) {
     params.registerFrom = dayjs(query.registerRange[0]).format('YYYY-MM-DD HH:mm:ss')

@@ -33,6 +33,28 @@ public class OaTask {
 
   private String assigneeName;
 
+  private String calendarType;
+
+  private String planCategory;
+
+  private String urgency;
+
+  private String eventColor;
+
+  private String collaboratorIds;
+
+  private String collaboratorNames;
+
+  private Integer isRecurring;
+
+  private String recurrenceRule;
+
+  private Integer recurrenceInterval;
+
+  private Integer recurrenceCount;
+
+  private Long sourceTodoId;
+
   private Long createdBy;
 
   @TableField("create_time")

@@ -2,6 +2,7 @@
   <PageContainer title="心血管风险评估" subTitle="评估中心 > 缺血性心血管病风险评估">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="长者"><a-input v-model:value="query.keyword" placeholder="姓名/风险因子/评估人" allow-clear /></a-form-item>
+      <a-form-item label="评估人"><a-input v-model:value="query.assessorName" placeholder="评估人姓名" allow-clear style="width: 140px" /></a-form-item>
       <a-form-item label="风险等级"><a-select v-model:value="query.riskLevel" allow-clear style="width: 140px" :options="riskOptions" /></a-form-item>
       <a-form-item label="需要随访">
         <a-select v-model:value="query.needFollowup" allow-clear style="width: 120px">
@@ -38,8 +39,14 @@
     <StatefulBlock :loading="loading" :error="tableError" :empty="!loading && !tableError && rows.length === 0" empty-text="暂无心血管风险评估记录" @retry="fetchData">
       <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="false" :pagination="pagination" @change="onTableChange">
         <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'riskLevel'">
+          <template v-if="column.key === 'elderBed'">
+            {{ record.elderName || '-' }} / {{ bedNoMap[record.elderId || 0] || '-' }}
+          </template>
+          <template v-else-if="column.key === 'riskLevel'">
             <a-tag :color="riskColor(record.riskLevel)">{{ riskLabel(record.riskLevel) }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'needFollowup'">
+            <a-tag :color="record.needFollowup === 1 ? 'orange' : 'default'">{{ record.needFollowup === 1 ? '需要' : '无需' }}</a-tag>
           </template>
           <template v-else-if="column.key === 'status'">
             <a-tag :color="record.status === 'PUBLISHED' ? 'green' : 'blue'">{{ record.status === 'PUBLISHED' ? '已发布' : '草稿' }}</a-tag>
@@ -115,6 +122,7 @@ import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
+import { getElderDetail } from '../../api/elder'
 import {
   createCvdAssessment,
   deleteCvdAssessment,
@@ -131,9 +139,18 @@ const loading = ref(false)
 const tableError = ref('')
 const summaryLoading = ref(false)
 const summaryError = ref('')
+const bedNoMap = reactive<Record<number, string>>({})
 const rows = ref<MedicalCvdAssessment[]>([])
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
-const query = reactive({ keyword: '', riskLevel: '', needFollowup: undefined as number | undefined, dateRange: [] as any[], pageNo: 1, pageSize: 10 })
+const query = reactive({
+  keyword: '',
+  assessorName: '',
+  riskLevel: '',
+  needFollowup: undefined as number | undefined,
+  dateRange: [] as any[],
+  pageNo: 1,
+  pageSize: 10
+})
 const summary = reactive<MedicalCvdAssessmentSummary>({
   totalCount: 0,
   draftCount: 0,
@@ -145,10 +162,12 @@ const summary = reactive<MedicalCvdAssessmentSummary>({
 })
 
 const columns = [
-  { title: '长者', dataIndex: 'elderName', key: 'elderName', width: 120 },
+  { title: '长者/床位', key: 'elderBed', width: 200 },
   { title: '风险等级', key: 'riskLevel', width: 120 },
+  { title: '评估日期', dataIndex: 'assessmentDate', key: 'assessmentDate', width: 120 },
   { title: '关键风险因子', dataIndex: 'keyRiskFactors', key: 'keyRiskFactors' },
   { title: '建议', dataIndex: 'medicalAdvice', key: 'medicalAdvice' },
+  { title: '随访', key: 'needFollowup', width: 80 },
   { title: '评估人', dataIndex: 'assessorName', key: 'assessorName', width: 120 },
   { title: '状态', key: 'status', width: 100 },
   { title: '操作', key: 'action', width: 180 }
@@ -206,8 +225,9 @@ function resetForm() {
 
 function openCreate() {
   resetForm()
-  if (route.query.residentId) {
-    form.elderId = Number(route.query.residentId)
+  const residentId = route.query.residentId ?? route.query.elderId
+  if (residentId) {
+    form.elderId = Number(residentId)
     ensureSelectedElder(form.elderId, route.query.residentName ? String(route.query.residentName) : undefined)
   }
   if (route.query.residentName) {
@@ -232,10 +252,12 @@ function onElderChange(elderId?: number) {
 }
 
 function buildParams() {
+  const residentId = route.query.residentId ?? route.query.elderId
   const params: any = {
     pageNo: query.pageNo,
     pageSize: query.pageSize,
     keyword: query.keyword || undefined,
+    assessorName: query.assessorName || undefined,
     riskLevel: query.riskLevel || undefined,
     needFollowup: query.needFollowup
   }
@@ -243,10 +265,25 @@ function buildParams() {
     params.dateFrom = dayjs(query.dateRange[0]).format('YYYY-MM-DD')
     params.dateTo = dayjs(query.dateRange[1]).format('YYYY-MM-DD')
   }
-  if (route.query.residentId) {
-    params.elderId = Number(route.query.residentId)
+  if (residentId) {
+    params.elderId = Number(residentId)
   }
   return params
+}
+
+async function loadBedNos(records: MedicalCvdAssessment[]) {
+  const elderIds = Array.from(new Set(records.map((item) => Number(item.elderId)).filter((id) => Number.isFinite(id) && id > 0)))
+  await Promise.all(
+    elderIds.map(async (elderId) => {
+      if (bedNoMap[elderId]) return
+      try {
+        const detail = await getElderDetail(elderId) as any
+        bedNoMap[elderId] = detail?.bedNo || '-'
+      } catch {
+        bedNoMap[elderId] = '-'
+      }
+    })
+  )
 }
 
 async function fetchData() {
@@ -261,6 +298,7 @@ async function fetchData() {
       getCvdAssessmentSummary(params)
     ])
     rows.value = res.list || []
+    await loadBedNos(rows.value)
     pagination.total = res.total || 0
     Object.assign(summary, sum || {})
   } catch (error: any) {
@@ -283,10 +321,12 @@ function onTableChange(pag: any) {
 
 function onReset() {
   query.keyword = ''
+  query.assessorName = ''
   query.riskLevel = ''
   query.needFollowup = undefined
   query.dateRange = []
   query.pageNo = 1
+  query.pageSize = pagination.pageSize
   pagination.current = 1
   fetchData()
 }
@@ -373,5 +413,8 @@ onMounted(() => {
   resetForm()
   searchElders('')
   fetchData()
+  if ((route.query.from === 'resident360' || route.query.from === 'medicalCare') && (route.query.residentId || route.query.elderId)) {
+    openCreate()
+  }
 })
 </script>

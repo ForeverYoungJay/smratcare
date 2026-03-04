@@ -53,9 +53,16 @@ public class StaffPointsServiceImpl implements StaffPointsService {
     if (newBalance < 0) {
       return null;
     }
+    String sourceType = request.getSourceType() == null || request.getSourceType().isBlank()
+        ? "MANUAL"
+        : request.getSourceType().trim().toUpperCase();
+    Long sourceId = request.getSourceId();
+    if (sourceId == null || sourceId <= 0) {
+      sourceId = operatorId;
+    }
 
     applyChange(account, orgId, request.getStaffId(), changeType, effectiveChange, newBalance,
-        "MANUAL", operatorId, request.getRemark());
+        sourceType, sourceId, request.getRemark());
 
     StaffPointsAccountResponse response = new StaffPointsAccountResponse();
     response.setStaffId(account.getStaffId());
@@ -123,11 +130,15 @@ public class StaffPointsServiceImpl implements StaffPointsService {
 
   @Override
   public IPage<StaffPointsLogResponse> pageLogs(Long orgId, long pageNo, long pageSize, Long staffId,
-      String dateFrom, String dateTo) {
+      String dateFrom, String dateTo, String sourceType) {
+    String normalizedSourceType = sourceType == null || sourceType.isBlank()
+        ? null
+        : sourceType.trim().toUpperCase();
     var wrapper = Wrappers.lambdaQuery(StaffPointsLog.class)
         .eq(StaffPointsLog::getIsDeleted, 0)
         .eq(orgId != null, StaffPointsLog::getOrgId, orgId)
-        .eq(staffId != null, StaffPointsLog::getStaffId, staffId);
+        .eq(staffId != null, StaffPointsLog::getStaffId, staffId)
+        .eq(normalizedSourceType != null, StaffPointsLog::getSourceType, normalizedSourceType);
     if (dateFrom != null && !dateFrom.isBlank()) {
       LocalDate start = LocalDate.parse(dateFrom);
       wrapper.ge(StaffPointsLog::getCreateTime, LocalDateTime.of(start, LocalTime.MIN));

@@ -13,7 +13,7 @@ public interface StaffPointsService {
   StaffPointsAccountResponse awardForReview(Long orgId, Long staffId, Long taskDailyId, int points, String remark);
 
   IPage<StaffPointsLogResponse> pageLogs(Long orgId, long pageNo, long pageSize, Long staffId,
-      String dateFrom, String dateTo);
+      String dateFrom, String dateTo, String sourceType);
 
   void awardSurveyPoints(Long orgId, Long staffId, Long submissionId, Integer points, String remark);
 }

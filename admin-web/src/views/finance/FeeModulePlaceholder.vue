@@ -4,18 +4,26 @@
       <StatefulBlock :loading="loading" :error="errorMessage" @retry="loadData">
         <a-row :gutter="[12, 12]">
           <a-col :xs="12" :lg="6">
-            <a-statistic title="月收入" :value="currentMonthRevenue" suffix="元" :precision="2" />
+            <a-statistic title="今日金额" :value="summary.todayAmount" suffix="元" :precision="2" />
           </a-col>
           <a-col :xs="12" :lg="6">
-            <a-statistic title="欠费人数" :value="arrearsCount" />
+            <a-statistic title="本月金额" :value="summary.monthAmount" suffix="元" :precision="2" />
           </a-col>
           <a-col :xs="12" :lg="6">
-            <a-statistic title="账户预警" :value="warningCount" />
+            <a-statistic title="待处理" :value="summary.pendingCount" />
           </a-col>
           <a-col :xs="12" :lg="6">
-            <a-statistic title="最近月收入环比" :value="revenueGrowthRate" suffix="%" :precision="2" />
+            <a-statistic title="异常数" :value="summary.exceptionCount" />
           </a-col>
         </a-row>
+        <a-alert v-if="summary.warningMessage" style="margin-top: 12px;" type="warning" show-icon :message="summary.warningMessage" />
+        <a-card style="margin-top: 12px;" size="small" :bordered="false" title="摘要明细">
+          <vxe-table border stripe show-overflow :data="summary.topItems || []" height="220">
+            <vxe-column field="label" title="维度" min-width="180" />
+            <vxe-column field="count" title="数量" width="120" />
+            <vxe-column field="amount" title="金额（元）" width="160" />
+          </vxe-table>
+        </a-card>
         <a-divider />
         <a-space wrap>
           <a-button v-for="item in props.links" :key="item.to" @click="go(item.to)">{{ item.label }}</a-button>
@@ -28,13 +36,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, withDefaults } from 'vue'
+import { onMounted, ref, withDefaults } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
-import { getElderAccountWarnings, getFinanceArrearsTop, getFinanceMonthlyRevenue } from '../../api/finance'
-import type { FinanceReportMonthlyItem } from '../../types'
+import { getFinanceModuleEntrySummary } from '../../api/finance'
+import type { FinanceModuleEntrySummary } from '../../types'
 
 type QuickLink = {
   label: string
@@ -44,10 +52,12 @@ type QuickLink = {
 const props = withDefaults(
   defineProps<{
     moduleName: string
+    moduleKey?: string
     description?: string
     links?: QuickLink[]
   }>(),
   {
+    moduleKey: 'GENERAL',
     description: '',
     links: () => []
   }
@@ -56,18 +66,16 @@ const props = withDefaults(
 const router = useRouter()
 const loading = ref(false)
 const errorMessage = ref('')
-const monthlyRows = ref<FinanceReportMonthlyItem[]>([])
-const arrearsCount = ref(0)
-const warningCount = ref(0)
-
-const currentMonthRevenue = computed(() => Number(monthlyRows.value[monthlyRows.value.length - 1]?.amount || 0))
-const revenueGrowthRate = computed(() => {
-  const rows = monthlyRows.value
-  if (rows.length < 2) return 0
-  const curr = Number(rows[rows.length - 1]?.amount || 0)
-  const prev = Number(rows[rows.length - 2]?.amount || 0)
-  if (!prev) return curr > 0 ? 100 : 0
-  return ((curr - prev) / prev) * 100
+const summary = ref<FinanceModuleEntrySummary>({
+  moduleKey: 'GENERAL',
+  bizDate: '',
+  todayAmount: 0,
+  monthAmount: 0,
+  totalCount: 0,
+  pendingCount: 0,
+  exceptionCount: 0,
+  warningMessage: '',
+  topItems: []
 })
 
 function go(path: string) {
@@ -78,14 +86,9 @@ async function loadData() {
   loading.value = true
   errorMessage.value = ''
   try {
-    const [monthly, arrearsTop, warnings] = await Promise.all([
-      getFinanceMonthlyRevenue({ months: 6 }),
-      getFinanceArrearsTop({ limit: 50 }),
-      getElderAccountWarnings()
-    ])
-    monthlyRows.value = monthly || []
-    arrearsCount.value = (arrearsTop || []).length
-    warningCount.value = (warnings || []).length
+    summary.value = await getFinanceModuleEntrySummary({
+      moduleKey: props.moduleKey || 'GENERAL'
+    })
   } catch (error: any) {
     errorMessage.value = error?.message || '加载费用概览失败'
     message.error(errorMessage.value)

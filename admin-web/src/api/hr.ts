@@ -1,5 +1,19 @@
 import request, { fetchPage } from '../utils/request'
 import type {
+  HrAttendanceAbnormalItem,
+  HrContractReminderItem,
+  HrPolicyAlertItem,
+  HrProfileContractItem,
+  HrProfileDocumentItem,
+  HrRecruitmentNeedItem,
+  HrAccessControlRecordItem,
+  HrCardSyncItem,
+  HrExpenseItem,
+  HrExpenseApprovalRequest,
+  HrGenericApprovalItem,
+  HrAttendanceRecordItem,
+  HrStaffCertificateItem,
+  HrWorkbenchSummary,
   HrStaffProfile,
   StaffTrainingRecord,
   StaffPointsAccount,
@@ -14,7 +28,119 @@ export function getHrStaffPage(params: any) {
   return fetchPage<HrStaffProfile>('/api/admin/hr/staff/page', params)
 }
 
-export function getHrProfile(staffId: number) {
+export function getHrWorkbenchSummary(params?: { warningDays?: number }) {
+  return request.get<HrWorkbenchSummary>('/api/admin/hr/workbench/summary', { params })
+}
+
+export function getHrContractReminderPage(params: any) {
+  return fetchPage<HrContractReminderItem>('/api/admin/hr/contract/reminder/page', params)
+}
+
+export function getHrAttendanceAbnormalPage(params: any) {
+  return fetchPage<HrAttendanceAbnormalItem>('/api/admin/hr/attendance/abnormal/page', params)
+}
+
+export function getHrRecruitmentNeedPage(params: any) {
+  return fetchPage<HrRecruitmentNeedItem>('/api/admin/hr/recruitment/need/page', params)
+}
+
+export function createHrRecruitmentNeed(data: Partial<HrRecruitmentNeedItem>) {
+  return request.post<HrRecruitmentNeedItem>('/api/admin/hr/recruitment/need', data)
+}
+
+export function getHrPolicyPage(params: any) {
+  return fetchPage<HrProfileDocumentItem>('/api/admin/hr/policy/page', params)
+}
+
+export function getHrPolicyAlertPage(params: any) {
+  return fetchPage<HrPolicyAlertItem>('/api/admin/hr/policy-alert/page', params)
+}
+
+export function getHrProfileContractPage(params: any) {
+  return fetchPage<HrProfileContractItem>('/api/admin/hr/profile/contract/page', params)
+}
+
+export function getHrProfileTemplatePage(params: any) {
+  return fetchPage<HrProfileDocumentItem>('/api/admin/hr/profile/template/page', params)
+}
+
+export function createHrProfileTemplate(data: Partial<HrProfileDocumentItem>) {
+  return request.post<HrProfileDocumentItem>('/api/admin/hr/profile/template', data)
+}
+
+export function getHrProfileAttachmentPage(params: any) {
+  return fetchPage<HrProfileDocumentItem>('/api/admin/hr/profile/attachment/page', params)
+}
+
+export function createHrProfileAttachment(data: Partial<HrProfileDocumentItem>) {
+  return request.post<HrProfileDocumentItem>('/api/admin/hr/profile/attachment', data)
+}
+
+export function getHrProfileCertificatePage(params: any) {
+  return fetchPage<HrStaffCertificateItem>('/api/admin/hr/profile/certificate/page', params)
+}
+
+export function createHrProfileCertificate(data: Partial<HrStaffCertificateItem>) {
+  return request.post<HrStaffCertificateItem>('/api/admin/hr/profile/certificate', data)
+}
+
+export function getHrProfileCertificateReminderPage(params: any) {
+  return fetchPage<HrStaffCertificateItem>('/api/admin/hr/profile/certificate/reminder/page', params)
+}
+
+export function getHrAccessControlPage(params: any) {
+  return fetchPage<HrAccessControlRecordItem>('/api/admin/hr/integration/access-control/page', params)
+}
+
+export function getHrCardSyncPage(params: any) {
+  return fetchPage<HrCardSyncItem>('/api/admin/hr/integration/card-sync/page', params)
+}
+
+export function getHrMealFeePage(params: any) {
+  return fetchPage<HrExpenseItem>('/api/admin/hr/expense/meal-fee/page', params)
+}
+
+export function getHrElectricityFeePage(params: any) {
+  return fetchPage<HrExpenseItem>('/api/admin/hr/expense/electricity-fee/page', params)
+}
+
+export function getHrTrainingReimbursePage(params: any) {
+  return fetchPage<HrExpenseItem>('/api/admin/hr/expense/training-reimburse/page', params)
+}
+
+export function getHrSubsidyPage(params: any) {
+  return fetchPage<HrExpenseItem>('/api/admin/hr/expense/subsidy/page', params)
+}
+
+export function getHrSalarySubsidyPage(params: any) {
+  return fetchPage<HrExpenseItem>('/api/admin/hr/expense/salary-subsidy/page', params)
+}
+
+export function getHrExpenseApprovalFlowPage(params: any) {
+  return fetchPage<HrExpenseItem>('/api/admin/hr/expense/approval-flow/page', params)
+}
+
+export function createHrExpenseApprovalFlow(data: HrExpenseApprovalRequest) {
+  return request.post<HrExpenseItem>('/api/admin/hr/expense/approval-flow', data)
+}
+
+export function getHrAttendanceLeavePage(params: any) {
+  return fetchPage<HrGenericApprovalItem>('/api/admin/hr/attendance/leave/page', params)
+}
+
+export function getHrAttendanceShiftChangePage(params: any) {
+  return fetchPage<HrGenericApprovalItem>('/api/admin/hr/attendance/shift-change/page', params)
+}
+
+export function getHrAttendanceOvertimePage(params: any) {
+  return fetchPage<HrGenericApprovalItem>('/api/admin/hr/attendance/overtime/page', params)
+}
+
+export function getHrAttendanceRecordPage(params: any) {
+  return fetchPage<HrAttendanceRecordItem>('/api/admin/hr/attendance/record/page', params)
+}
+
+export function getHrProfile(staffId: string | number) {
   return request.get<HrStaffProfile>(`/api/admin/hr/profile/${staffId}`)
 }
 
@@ -30,23 +156,23 @@ export function createHrTraining(data: Partial<StaffTrainingRecord>) {
   return request.post<StaffTrainingRecord>('/api/admin/hr/training', data)
 }
 
-export function updateHrTraining(id: number, data: Partial<StaffTrainingRecord>) {
+export function updateHrTraining(id: string | number, data: Partial<StaffTrainingRecord>) {
   return request.put<StaffTrainingRecord>(`/api/admin/hr/training/${id}`, data)
 }
 
-export function deleteHrTraining(id: number) {
+export function deleteHrTraining(id: string | number) {
   return request.delete<void>(`/api/admin/hr/training/${id}`)
 }
 
-export function adjustStaffPoints(data: { staffId: number; changeType: string; changePoints: number; remark?: string }) {
+export function adjustStaffPoints(data: { staffId: string | number; changeType: string; changePoints: number; remark?: string }) {
   return request.post<StaffPointsAccount>('/api/admin/hr/points/adjust', data)
 }
 
-export function terminateStaff(params: { staffId: number; leaveDate?: string; leaveReason?: string }) {
+export function terminateStaff(params: { staffId: string | number; leaveDate?: string; leaveReason?: string }) {
   return request.post<void>('/api/admin/hr/terminate', null, { params })
 }
 
-export function reinstateStaff(params: { staffId: number }) {
+export function reinstateStaff(params: { staffId: string | number }) {
   return request.post<void>('/api/admin/hr/reinstate', null, { params })
 }
 
@@ -54,11 +180,11 @@ export function getStaffPointsLog(params: any) {
   return fetchPage<StaffPointsLog>('/api/admin/hr/points/log/page', params)
 }
 
-export function getPerformanceSummary(params: { staffId: number; dateFrom?: string; dateTo?: string }) {
+export function getPerformanceSummary(params: { staffId: string | number; dateFrom?: string; dateTo?: string }) {
   return request.get<StaffPerformanceSummary>('/api/admin/hr/performance/summary', { params })
 }
 
-export function getPerformanceRanking(params?: { dateFrom?: string; dateTo?: string; sortBy?: string }) {
+export function getPerformanceRanking(params?: { dateFrom?: string; dateTo?: string; sortBy?: string; staffCategory?: string }) {
   return request.get<StaffPerformanceRankItem[]>('/api/admin/hr/performance/ranking', { params })
 }
 
@@ -70,7 +196,7 @@ export function upsertPointsRule(data: Partial<StaffPointsRule>) {
   return request.post<StaffPointsRule>('/api/admin/hr/points/rule', data)
 }
 
-export function deletePointsRule(id: number) {
+export function deletePointsRule(id: string | number) {
   return request.delete<void>(`/api/admin/hr/points/rule/${id}`)
 }
 
@@ -82,10 +208,10 @@ export function createRewardPunishment(data: Partial<StaffRewardPunishment>) {
   return request.post<StaffRewardPunishment>('/api/admin/hr/reward-punishment', data)
 }
 
-export function updateRewardPunishment(id: number, data: Partial<StaffRewardPunishment>) {
+export function updateRewardPunishment(id: string | number, data: Partial<StaffRewardPunishment>) {
   return request.put<StaffRewardPunishment>(`/api/admin/hr/reward-punishment/${id}`, data)
 }
 
-export function deleteRewardPunishment(id: number) {
+export function deleteRewardPunishment(id: string | number) {
   return request.delete<void>(`/api/admin/hr/reward-punishment/${id}`)
 }

@@ -203,12 +203,16 @@ async function submit() {
       if (admission.bedId && !admission.bedStartDate) {
         admission.bedStartDate = admission.admissionDate
       }
-      await admitElder(admission)
+      try {
+        await admitElder(admission)
+      } catch (admitError: any) {
+        message.warning(admitError?.message || '老人档案已创建，但自动办理入住失败，请到“入住办理”继续处理')
+      }
     }
     message.success('保存成功')
     router.push('/elder/list')
-  } catch {
-    message.error('保存失败')
+  } catch (error: any) {
+    message.error(error?.message || error?.response?.data?.message || '保存失败')
   } finally {
     saving.value = false
   }

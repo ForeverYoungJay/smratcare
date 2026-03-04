@@ -33,6 +33,14 @@
       <div class="table-actions">
         <a-space>
           <a-button type="primary" @click="openForm()">新增题目</a-button>
+          <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
+          <a-button :disabled="!canEnableSingle" @click="enableSelected">启用</a-button>
+          <a-button :disabled="!canDisableSingle" @click="disableSelected">停用</a-button>
+          <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+          <a-button :disabled="selectedRowKeys.length === 0" @click="batchEnable">批量启用</a-button>
+          <a-button :disabled="selectedRowKeys.length === 0" @click="batchDisable">批量停用</a-button>
+          <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+          <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
         </a-space>
       </div>
       <a-table
@@ -41,6 +49,7 @@
         :loading="loading"
         :pagination="false"
         row-key="id"
+        :row-selection="rowSelection"
         :scroll="{ y: 520 }"
       >
         <template #bodyCell="{ column, record }">
@@ -61,12 +70,6 @@
             <a-tag :color="record.status === 1 ? 'green' : 'default'">
               {{ record.status === 1 ? '启用' : '停用' }}
             </a-tag>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <a-space>
-              <a-button type="link" @click="openForm(record)">编辑</a-button>
-              <a-button type="link" danger @click="remove(record.id)">删除</a-button>
-            </a-space>
           </template>
         </template>
       </a-table>
@@ -125,7 +128,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
@@ -135,6 +138,7 @@ import type { SurveyQuestion, PageResult } from '../../types'
 const loading = ref(false)
 const rows = ref<SurveyQuestion[]>([])
 const total = ref(0)
+const selectedRowKeys = ref<string[]>([])
 
 const query = reactive({
   keyword: '',
@@ -170,9 +174,18 @@ const columns = [
   { title: '必答', dataIndex: 'requiredFlag', key: 'requiredFlag', width: 100 },
   { title: '计分', dataIndex: 'scoreEnabled', key: 'scoreEnabled', width: 100 },
   { title: '最高分', dataIndex: 'maxScore', key: 'maxScore', width: 100 },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
-  { title: '操作', key: 'action', width: 200 }
+  { title: '状态', dataIndex: 'status', key: 'status', width: 100 }
 ]
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: (string | number)[]) => {
+    selectedRowKeys.value = keys.map((item) => String(item))
+  }
+}))
+const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(String(item.id))))
+const selectedSingleRecord = computed(() => (selectedRecords.value.length === 1 ? selectedRecords.value[0] : null))
+const canEnableSingle = computed(() => !!selectedSingleRecord.value && Number(selectedSingleRecord.value.status) !== 1)
+const canDisableSingle = computed(() => !!selectedSingleRecord.value && Number(selectedSingleRecord.value.status) === 1)
 
 function typeLabel(type?: string) {
   if (type === 'SINGLE') return '单选'
@@ -193,8 +206,12 @@ async function fetchData() {
       questionType: query.questionType,
       status: query.status
     })
-    rows.value = res.list
+    rows.value = (res.list || []).map((item) => ({
+      ...item,
+      id: String(item.id)
+    }))
     total.value = res.total
+    selectedRowKeys.value = []
   } finally {
     loading.value = false
   }
@@ -233,7 +250,7 @@ async function submit() {
   try {
     await formRef.value.validate()
     submitting.value = true
-    if (form.id) {
+    if (form.id !== undefined && form.id !== null) {
       await updateSurveyQuestion(form.id, form)
     } else {
       await createSurveyQuestion(form)
@@ -248,13 +265,98 @@ async function submit() {
   }
 }
 
-async function remove(id: number) {
+async function remove(id: string | number) {
   Modal.confirm({
     title: '提示',
     content: '确认删除该题目吗？',
     async onOk() {
       await deleteSurveyQuestion(id)
       message.success('已删除')
+      await fetchData()
+    }
+  })
+}
+
+function requireSingleSelection(action: string) {
+  if (!selectedSingleRecord.value) {
+    message.info(`请先勾选 1 条题目后再${action}`)
+    return null
+  }
+  return selectedSingleRecord.value
+}
+
+function editSelected() {
+  const record = requireSingleSelection('编辑')
+  if (!record) return
+  openForm(record)
+}
+
+async function toggleStatus(record: SurveyQuestion, status: number) {
+  await updateSurveyQuestion(String(record.id), { ...record, status })
+}
+
+async function enableSelected() {
+  const record = requireSingleSelection('启用')
+  if (!record) return
+  if (Number(record.status) === 1) {
+    message.info('所选题目已启用')
+    return
+  }
+  await toggleStatus(record, 1)
+  message.success('启用成功')
+  await fetchData()
+}
+
+async function disableSelected() {
+  const record = requireSingleSelection('停用')
+  if (!record) return
+  if (Number(record.status) !== 1) {
+    message.info('所选题目已停用')
+    return
+  }
+  await toggleStatus(record, 0)
+  message.success('停用成功')
+  await fetchData()
+}
+
+async function removeSelected() {
+  const record = requireSingleSelection('删除')
+  if (!record) return
+  await remove(String(record.id))
+}
+
+async function batchEnable() {
+  if (selectedRowKeys.value.length === 0) return
+  const validRecords = selectedRecords.value.filter((item) => Number(item.status) !== 1)
+  if (validRecords.length === 0) {
+    message.info('勾选项中没有可启用题目')
+    return
+  }
+  await Promise.all(validRecords.map((item) => toggleStatus(item, 1)))
+  message.success(`批量启用完成，共处理 ${validRecords.length} 条`)
+  await fetchData()
+}
+
+async function batchDisable() {
+  if (selectedRowKeys.value.length === 0) return
+  const validRecords = selectedRecords.value.filter((item) => Number(item.status) === 1)
+  if (validRecords.length === 0) {
+    message.info('勾选项中没有可停用题目')
+    return
+  }
+  await Promise.all(validRecords.map((item) => toggleStatus(item, 0)))
+  message.success(`批量停用完成，共处理 ${validRecords.length} 条`)
+  await fetchData()
+}
+
+async function batchRemove() {
+  if (selectedRowKeys.value.length === 0) return
+  Modal.confirm({
+    title: '提示',
+    content: `确认删除选中的 ${selectedRecords.value.length} 条题目吗？`,
+    async onOk() {
+      await Promise.all(selectedRecords.value.map((item) => deleteSurveyQuestion(String(item.id))))
+      message.success(`批量删除完成，共处理 ${selectedRecords.value.length} 条`)
       await fetchData()
     }
   })
@@ -271,5 +373,9 @@ onMounted(fetchData)
   display: flex;
   justify-content: space-between;
   margin-bottom: 12px;
+}
+.selection-tip {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
 }
 </style>

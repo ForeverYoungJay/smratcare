@@ -10,7 +10,21 @@ import type {
   ElderAccountUpdateRequest,
   PaymentRecordItem,
   ReconcileDailyItem,
-  ReconcileRequest
+  ReconcileRequest,
+  FinanceWorkbenchOverview,
+  FinanceInvoiceReceiptItem,
+  FinanceAutoDebitExceptionItem,
+  FinanceRoomOpsDetailResponse,
+  FinanceAllocationRuleItem,
+  FinanceReconcileExceptionItem,
+  FinanceMasterDataOverview,
+  FinanceBillingConfigEntry,
+  FinanceBillingConfigUpsertRequest,
+  FinanceBillingConfigBatchUpsertRequest,
+  FinanceConfigChangeLogItem,
+  FinanceBillingConfigRollbackRequest,
+  FinanceBillingConfigSnapshotItem,
+  FinanceModuleEntrySummary
 } from '../types'
 
 export function getPaymentRecordPage(params: any) {
@@ -63,4 +77,60 @@ export function updateElderAccount(data: ElderAccountUpdateRequest) {
 
 export function getElderAccountWarnings() {
   return request.get<ElderAccount[]>('/api/finance/account/warnings')
+}
+
+export function getFinanceWorkbenchOverview() {
+  return request.get<FinanceWorkbenchOverview>('/api/finance/workbench/overview')
+}
+
+export function getFinanceInvoiceReceiptPage(params: any) {
+  return fetchPage<FinanceInvoiceReceiptItem>('/api/finance/workbench/invoice/page', params)
+}
+
+export function getFinanceAutoDebitExceptions(params?: { date?: string }) {
+  return request.get<FinanceAutoDebitExceptionItem[]>('/api/finance/workbench/auto-deduct/exceptions', { params })
+}
+
+export function getFinanceRoomOpsDetail(params?: { period?: string; building?: string; room?: string }) {
+  return request.get<FinanceRoomOpsDetailResponse>('/api/finance/workbench/room-ops/detail', { params })
+}
+
+export function getFinanceAllocationRules(params?: { month?: string }) {
+  return request.get<FinanceAllocationRuleItem[]>('/api/finance/workbench/allocation/rules', { params })
+}
+
+export function getFinanceReconcileExceptions(params?: { date?: string; type?: string }) {
+  return request.get<FinanceReconcileExceptionItem[]>('/api/finance/workbench/reconcile/exceptions', { params })
+}
+
+export function getFinanceMasterDataOverview(params?: { month?: string }) {
+  return request.get<FinanceMasterDataOverview>('/api/finance/workbench/config/overview', { params })
+}
+
+export function getFinanceBillingConfig(params?: { month?: string; keyPrefix?: string }) {
+  return request.get<FinanceBillingConfigEntry[]>('/api/finance/workbench/billing-config', { params })
+}
+
+export function upsertFinanceBillingConfig(data: FinanceBillingConfigUpsertRequest) {
+  return request.post<FinanceBillingConfigEntry>('/api/finance/workbench/billing-config', data)
+}
+
+export function batchUpsertFinanceBillingConfig(data: FinanceBillingConfigBatchUpsertRequest) {
+  return request.post<FinanceBillingConfigEntry[]>('/api/finance/workbench/billing-config/batch', data)
+}
+
+export function getFinanceConfigChangeLogPage(params: any) {
+  return fetchPage<FinanceConfigChangeLogItem>('/api/finance/workbench/config/change-log/page', params)
+}
+
+export function rollbackFinanceBillingConfig(data: FinanceBillingConfigRollbackRequest) {
+  return request.post<FinanceBillingConfigEntry>('/api/finance/workbench/billing-config/rollback', data)
+}
+
+export function getFinanceBillingConfigSnapshots() {
+  return request.get<FinanceBillingConfigSnapshotItem[]>('/api/finance/workbench/billing-config/snapshots')
+}
+
+export function getFinanceModuleEntrySummary(params: { moduleKey: string }) {
+  return request.get<FinanceModuleEntrySummary>('/api/finance/workbench/module-entry', { params })
 }

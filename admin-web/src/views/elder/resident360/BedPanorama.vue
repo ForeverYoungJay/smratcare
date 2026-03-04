@@ -8,6 +8,8 @@
         <a-tag color="orange">维修 {{ stats.maintenance }}</a-tag>
         <a-tag color="cyan">清洁中 {{ stats.cleaning }}</a-tag>
         <a-tag color="red">锁定 {{ stats.locked }}</a-tag>
+        <a-tag color="#ff85c0">女性长者</a-tag>
+        <a-tag color="#69b1ff">男性长者</a-tag>
       </a-space>
 
       <div class="selector-strip">
@@ -100,7 +102,7 @@
                         :key="bed.id"
                         type="button"
                         class="bed-tile"
-                        :class="[statusClass(resolveStatus(bed)), { 'empty-priority': isEmptyBed(bed) }]"
+                        :class="[statusClass(resolveStatus(bed)), genderClass(bed), { 'empty-priority': isEmptyBed(bed) }]"
                         @click="selectBed(bed)"
                       >
                         <span v-if="bedRiskLabel(bed)" class="risk-corner" :class="`risk-${bedRiskLevel(bed)}`">{{ bedRiskLabel(bed) }}</span>
@@ -433,6 +435,13 @@ function statusClass(status: string) {
   return 'is-idle'
 }
 
+function genderClass(bed: BedItem) {
+  if (!bed.elderId) return ''
+  if (Number(bed.elderGender) === 2) return 'gender-female'
+  if (Number(bed.elderGender) === 1) return 'gender-male'
+  return ''
+}
+
 function isEmptyBed(bed: BedItem) {
   return !bed.elderId && resolveStatus(bed) === '空闲'
 }
@@ -760,6 +769,14 @@ watch(sourceBeds, () => {
 .is-occupied {
   background: #dcfce7;
   color: #166534;
+}
+
+.gender-female {
+  box-shadow: inset 0 0 0 2px #ff85c0;
+}
+
+.gender-male {
+  box-shadow: inset 0 0 0 2px #69b1ff;
 }
 
 .is-maintenance {

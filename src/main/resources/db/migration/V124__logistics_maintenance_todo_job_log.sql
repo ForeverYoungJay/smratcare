@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS logistics_maintenance_todo_job_log (
+  id BIGINT NOT NULL PRIMARY KEY COMMENT '主键ID',
+  tenant_id BIGINT DEFAULT NULL COMMENT '租户ID',
+  org_id BIGINT DEFAULT NULL COMMENT '机构ID，空表示全机构',
+  trigger_type VARCHAR(16) NOT NULL COMMENT '触发方式 MANUAL/SCHEDULED',
+  status VARCHAR(16) NOT NULL COMMENT '执行状态 SUCCESS/FAILED',
+  days INTEGER NOT NULL DEFAULT 30 COMMENT '扫描天数',
+  total_matched BIGINT NOT NULL DEFAULT 0 COMMENT '命中设备数',
+  created_count BIGINT NOT NULL DEFAULT 0 COMMENT '新建待办数',
+  skipped_count BIGINT NOT NULL DEFAULT 0 COMMENT '跳过重复数',
+  error_message VARCHAR(500) DEFAULT NULL COMMENT '错误信息',
+  executed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '执行时间',
+  created_by BIGINT DEFAULT NULL COMMENT '触发人',
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  is_deleted TINYINT NOT NULL DEFAULT 0 COMMENT '逻辑删除 0否 1是',
+  KEY idx_logistics_mtjl_org_exec (org_id, executed_at),
+  KEY idx_logistics_mtjl_trigger (trigger_type, executed_at),
+  KEY idx_logistics_mtjl_status (status, executed_at)
+) COMMENT='后勤维保待办执行日志';

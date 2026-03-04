@@ -9,9 +9,13 @@
       </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openCreate">新增公告</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" @click="batchPublish">批量发布</a-button>
+        <a-button :disabled="!selectedSingleRecord || !isSelectedSingleDraft" @click="editSelected">编辑</a-button>
+        <a-button :disabled="!selectedSingleRecord || !isSelectedSingleDraft" @click="publishSelected">发布</a-button>
+        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+        <a-button :disabled="selectedDraftCount === 0" @click="batchPublish">批量发布</a-button>
         <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
         <a-button @click="downloadExport">导出CSV</a-button>
+        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条，批量发布仅对“草稿”生效</span>
       </template>
     </SearchForm>
 
@@ -29,13 +33,6 @@
           <a-tag :color="record.status === 'PUBLISHED' ? 'green' : 'orange'">
             {{ record.status === 'PUBLISHED' ? '已发布' : '草稿' }}
           </a-tag>
-        </template>
-        <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" :disabled="record.status !== 'DRAFT'" @click="openEdit(record)">编辑</a-button>
-            <a-button type="link" :disabled="record.status !== 'DRAFT'" @click="publish(record)">发布</a-button>
-            <a-button type="link" danger @click="remove(record)">删除</a-button>
-          </a-space>
         </template>
       </template>
     </DataTable>
@@ -78,19 +75,18 @@ const loading = ref(false)
 const rows = ref<OaNotice[]>([])
 const query = reactive({ keyword: '', status: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
-const selectedRowKeys = ref<number[]>([])
+const selectedRowKeys = ref<string[]>([])
 
 const columns = [
   { title: '标题', dataIndex: 'title', key: 'title', width: 240 },
   { title: '发布人', dataIndex: 'publisherName', key: 'publisherName', width: 120 },
   { title: '发布时间', dataIndex: 'publishTime', key: 'publishTime', width: 160 },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
-  { title: '操作', key: 'action', width: 200 }
+  { title: '状态', dataIndex: 'status', key: 'status', width: 100 }
 ]
 
 const editOpen = ref(false)
 const saving = ref(false)
-const form = reactive({ id: undefined as number | undefined, title: '', content: '', status: 'DRAFT' })
+const form = reactive({ id: undefined as string | undefined, title: '', content: '', status: 'DRAFT' })
 const statusOptions = [
   { label: '草稿', value: 'DRAFT' },
   { label: '已发布', value: 'PUBLISHED' }
@@ -98,9 +94,16 @@ const statusOptions = [
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: (string | number)[]) => {
-    selectedRowKeys.value = keys.map((item) => Number(item))
+    selectedRowKeys.value = keys.map((item) => String(item))
   }
 }))
+const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(String(item.id))))
+const selectedSingleRecord = computed(() => (selectedRecords.value.length === 1 ? selectedRecords.value[0] : null))
+const isSelectedSingleDraft = computed(() => selectedSingleRecord.value?.status === 'DRAFT')
+const selectedDraftIds = computed(() =>
+  selectedRecords.value.filter((item) => item.status === 'DRAFT').map((item) => String(item.id))
+)
+const selectedDraftCount = computed(() => selectedDraftIds.value.length)
 
 async function fetchData() {
   loading.value = true
@@ -111,7 +114,10 @@ async function fetchData() {
       keyword: query.keyword,
       status: query.status
     })
-    rows.value = res.list
+    rows.value = (res.list || []).map((item) => ({
+      ...item,
+      id: String(item.id)
+    }))
     pagination.total = res.total || res.list.length
     selectedRowKeys.value = []
   } finally {
@@ -144,7 +150,7 @@ function openCreate() {
 }
 
 function openEdit(record: OaNotice) {
-  form.id = record.id
+  form.id = String(record.id)
   form.title = record.title
   form.content = record.content
   form.status = record.status || 'DRAFT'
@@ -169,18 +175,51 @@ async function submit() {
 
 async function publish(record: OaNotice) {
   if (record.status !== 'DRAFT') return
-  await publishNotice(record.id)
+  await publishNotice(String(record.id))
   fetchData()
 }
 
 async function remove(record: OaNotice) {
-  await deleteNotice(record.id)
+  await deleteNotice(String(record.id))
   fetchData()
 }
 
+function requireSingleSelection(action: string) {
+  if (!selectedSingleRecord.value) {
+    message.info(`请先勾选 1 条公告后再${action}`)
+    return null
+  }
+  return selectedSingleRecord.value
+}
+
+function editSelected() {
+  const record = requireSingleSelection('编辑')
+  if (!record) return
+  if (record.status !== 'DRAFT') {
+    message.warning('仅草稿状态可编辑')
+    return
+  }
+  openEdit(record)
+}
+
+async function publishSelected() {
+  const record = requireSingleSelection('发布')
+  if (!record) return
+  await publish(record)
+}
+
+async function removeSelected() {
+  const record = requireSingleSelection('删除')
+  if (!record) return
+  await remove(record)
+}
+
 async function batchPublish() {
-  if (selectedRowKeys.value.length === 0) return
-  const affected = await batchPublishNotice(selectedRowKeys.value)
+  if (selectedDraftIds.value.length === 0) {
+    message.info('勾选项中没有“草稿”公告')
+    return
+  }
+  const affected = await batchPublishNotice(selectedDraftIds.value)
   message.success(`批量发布完成，共处理 ${affected || 0} 条`)
   fetchData()
 }
@@ -206,3 +245,10 @@ async function downloadExport() {
 
 fetchData()
 </script>
+
+<style scoped>
+.selection-tip {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+</style>

@@ -22,6 +22,7 @@ public class BedResponse {
   private String areaName;
   private String roomQrCode;
   private String elderName;
+  private Integer elderGender;
   private String careLevel;
   private String riskLevel;
   private String riskLabel;

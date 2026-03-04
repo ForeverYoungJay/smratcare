@@ -12,10 +12,16 @@
       </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openCreate">新增审批</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" @click="batchApprove">批量通过</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" @click="batchReject">批量驳回</a-button>
+        <a-button :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="editSelected">编辑</a-button>
+        <a-button :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="approveSelected">通过</a-button>
+        <a-button :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="rejectSelected">驳回</a-button>
+        <a-button :disabled="!selectedSingleRecord || !isSelectedSingleRejected" @click="resubmitSelected">驳回后重提</a-button>
+        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+        <a-button :disabled="selectedPendingCount === 0" @click="batchApprove">批量通过</a-button>
+        <a-button :disabled="selectedPendingCount === 0" @click="batchReject">批量驳回</a-button>
         <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
         <a-button @click="downloadExport">导出CSV</a-button>
+        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条，批量审批仅对“待审批”生效</span>
       </template>
     </SearchForm>
 
@@ -54,14 +60,6 @@
             <a-tag :color="record.status === 'APPROVED' ? 'green' : record.status === 'REJECTED' ? 'red' : 'orange'">
               {{ statusLabel(record.status) }}
             </a-tag>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <a-space>
-              <a-button type="link" :disabled="record.status !== 'PENDING'" @click="openEdit(record)">编辑</a-button>
-              <a-button type="link" :disabled="record.status !== 'PENDING'" @click="approve(record)">通过</a-button>
-              <a-button type="link" :disabled="record.status !== 'PENDING'" @click="reject(record)">驳回</a-button>
-              <a-button type="link" danger @click="remove(record)">删除</a-button>
-            </a-space>
           </template>
         </template>
       </DataTable>
@@ -102,7 +100,46 @@
             </a-form-item>
           </a-col>
         </a-row>
+        <a-alert
+          show-icon
+          type="info"
+          style="margin-bottom: 12px"
+          :message="workflowTitle"
+          :description="workflowHint"
+        />
+        <a-steps size="small" :current="Math.max(0, workflowSteps.length - 1)" style="margin-bottom: 12px">
+          <a-step v-for="step in workflowSteps" :key="step" :title="step" />
+        </a-steps>
         <template v-if="form.approvalType === 'LEAVE'">
+          <a-row :gutter="16">
+            <a-col :span="8">
+              <a-form-item label="请假类型">
+                <a-select v-model:value="workflowForm.leaveType">
+                  <a-select-option value="ANNUAL">年假</a-select-option>
+                  <a-select-option value="SICK">病假</a-select-option>
+                  <a-select-option value="PERSONAL">事假</a-select-option>
+                  <a-select-option value="COMPENSATORY">调休</a-select-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="是否影响排班">
+                <a-switch v-model:checked="workflowForm.shiftAffected" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="交接人">
+                <a-input v-model:value="workflowForm.handoverName" placeholder="填写交接同事" />
+              </a-form-item>
+            </a-col>
+          </a-row>
+          <a-alert
+            type="warning"
+            show-icon
+            style="margin-bottom: 12px"
+            :message="`系统自动计算请假天数：${leaveDays} 天`"
+            :description="needDeanApproval ? '超过 3 天，已自动追加院长审批节点。' : '3 天及以内，按部门主管 + 人事流程。'"
+          />
           <a-alert
             type="info"
             show-icon
@@ -141,8 +178,146 @@
             </a-checkbox>
           </a-form-item>
         </template>
-        <a-form-item label="表单数据(JSON)">
-          <a-textarea v-model:value="form.formData" :rows="3" />
+        <template v-if="form.approvalType === 'REIMBURSE' || form.approvalType === 'OVERTIME'">
+          <a-row :gutter="16">
+            <a-col :span="8">
+              <a-form-item label="报销类别">
+                <a-select v-model:value="workflowForm.reimburseCategory">
+                  <a-select-option value="TRAVEL">差旅</a-select-option>
+                  <a-select-option value="PURCHASE">采购</a-select-option>
+                  <a-select-option value="ACTIVITY">活动费用</a-select-option>
+                  <a-select-option value="OVERTIME">加班</a-select-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="是否有预算">
+                <a-switch v-model:checked="workflowForm.hasBudget" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="发票张数">
+                <a-input-number v-model:value="workflowForm.invoiceCount" :min="0" style="width: 100%" />
+              </a-form-item>
+            </a-col>
+          </a-row>
+        </template>
+        <template v-if="form.approvalType === 'PURCHASE'">
+          <a-row :gutter="16">
+            <a-col :span="8">
+              <a-form-item label="采购品类">
+                <a-select v-model:value="workflowForm.purchaseCategory">
+                  <a-select-option value="FOOD">食材</a-select-option>
+                  <a-select-option value="MEDICAL">医疗耗材</a-select-option>
+                  <a-select-option value="CARE">护理用品</a-select-option>
+                  <a-select-option value="ASSET">固定资产</a-select-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="仓库是否已核库存">
+                <a-switch v-model:checked="workflowForm.stockChecked" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="是否超预算">
+                <a-switch v-model:checked="workflowForm.overBudget" />
+              </a-form-item>
+            </a-col>
+          </a-row>
+        </template>
+        <template v-if="form.approvalType === 'MATERIAL_APPLY'">
+          <a-row :gutter="16">
+            <a-col :span="12">
+              <a-form-item label="物资类型">
+                <a-select v-model:value="workflowForm.materialCategory">
+                  <a-select-option value="CARE">护理用品</a-select-option>
+                  <a-select-option value="OFFICE">办公用品</a-select-option>
+                  <a-select-option value="MEDICAL">医疗耗材</a-select-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="低库存自动触发采购">
+                <a-switch v-model:checked="workflowForm.autoPurchaseWhenLowStock" />
+              </a-form-item>
+            </a-col>
+          </a-row>
+        </template>
+        <template v-if="form.approvalType === 'INCOME_PROOF' || form.approvalType === 'BANK_CARD'">
+          <a-row :gutter="16">
+            <a-col :span="12">
+              <a-form-item label="证明编号">
+                <a-input v-model:value="workflowForm.proofNo" placeholder="系统可自动回填编号" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="行政盖章方式">
+                <a-select v-model:value="workflowForm.sealMode">
+                  <a-select-option value="ONLINE">电子章</a-select-option>
+                  <a-select-option value="OFFLINE">线下盖章</a-select-option>
+                </a-select>
+              </a-form-item>
+            </a-col>
+          </a-row>
+        </template>
+        <template v-if="form.approvalType === 'POINTS_CASH'">
+          <a-alert
+            type="warning"
+            show-icon
+            style="margin-bottom: 12px"
+            message="积分兑现金规则：每 300 积分可兑换 10 元，需院长审批后自动扣减积分。"
+          />
+          <a-row :gutter="16">
+            <a-col :span="12">
+              <a-form-item label="兑换积分">
+                <a-input-number v-model:value="workflowForm.redeemPoints" :min="300" :step="300" style="width: 100%" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="可兑现金额(元)">
+                <a-input-number :value="redeemCash" disabled style="width: 100%" />
+              </a-form-item>
+            </a-col>
+          </a-row>
+        </template>
+        <a-form-item label="附件上传">
+          <a-upload :show-upload-list="false" :before-upload="beforeUploadCommonProof">
+            <a-button :loading="proofUploading">上传附件</a-button>
+          </a-upload>
+          <div v-if="commonProofs.length" class="proof-list">
+            <div v-for="(file, idx) in commonProofs" :key="`${file.url}-${idx}`" class="proof-item">
+              <a :href="file.url" target="_blank" rel="noopener noreferrer">{{ file.name }}</a>
+              <a-button type="link" danger size="small" @click="removeCommonProof(idx)">删除</a-button>
+            </div>
+          </div>
+        </a-form-item>
+        <a-divider orientation="left" plain>驳回后补充材料（支持二次提交）</a-divider>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="事件证明人（院内）">
+              <a-input v-model:value="workflowForm.insideWitness" placeholder="姓名 + 联系方式" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="事件证明人（院外）">
+              <a-input v-model:value="workflowForm.outsideWitness" placeholder="姓名 + 联系方式" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-form-item label="补充证明上传">
+          <a-upload :show-upload-list="false" :before-upload="beforeUploadSupplementProof">
+            <a-button :loading="proofUploading">上传补充证明</a-button>
+          </a-upload>
+          <div v-if="supplementProofs.length" class="proof-list">
+            <div v-for="(file, idx) in supplementProofs" :key="`${file.url}-${idx}`" class="proof-item">
+              <a :href="file.url" target="_blank" rel="noopener noreferrer">{{ file.name }}</a>
+              <a-button type="link" danger size="small" @click="removeSupplementProof(idx)">删除</a-button>
+            </div>
+          </div>
+        </a-form-item>
+        <a-form-item label="扩展表单(JSON，可选)">
+          <a-textarea v-model:value="form.formData" :rows="2" placeholder='可留空，系统会自动生成流程字段' />
         </a-form-item>
         <a-form-item label="备注">
           <a-input v-model:value="form.remark" />
@@ -161,6 +336,7 @@ import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
+import { useUserStore } from '../../stores/user'
 import {
   getApprovalSummary,
   getApprovalPage,
@@ -175,8 +351,11 @@ import {
   exportApproval,
   uploadOaFile
 } from '../../api/oa'
-import type { OaApproval, OaApprovalSummary, PageResult } from '../../types'
+import type { OaApproval, OaApprovalSummary } from '../../types'
 
+type ProofFile = { name: string; url: string }
+
+const userStore = useUserStore()
 const loading = ref(false)
 const tableError = ref('')
 const summaryLoading = ref(false)
@@ -191,7 +370,7 @@ const query = reactive({
   pageSize: 10
 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
-const selectedRowKeys = ref<number[]>([])
+const selectedRowKeys = ref<string[]>([])
 const summary = reactive<OaApprovalSummary>({
   totalCount: 0,
   pendingCount: 0,
@@ -207,18 +386,19 @@ const columns = [
   { title: '类型', dataIndex: 'approvalType', key: 'approvalType', width: 120 },
   { title: '标题', dataIndex: 'title', key: 'title', width: 200 },
   { title: '申请人', dataIndex: 'applicantName', key: 'applicantName', width: 120 },
-  { title: '金额', dataIndex: 'amount', key: 'amount', width: 100 },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
-  { title: '操作', key: 'action', width: 220 }
+  { title: '金额', dataIndex: 'amount', key: 'amount', width: 120 },
+  { title: '状态', dataIndex: 'status', key: 'status', width: 100 }
 ]
 
 const editOpen = ref(false)
 const saving = ref(false)
 const proofUploading = ref(false)
-const leaveProofs = ref<Array<{ name: string; url: string }>>([])
+const leaveProofs = ref<ProofFile[]>([])
+const commonProofs = ref<ProofFile[]>([])
+const supplementProofs = ref<ProofFile[]>([])
 const leavePolicyAcknowledged = ref(false)
 const form = reactive({
-  id: undefined as number | undefined,
+  id: undefined as string | undefined,
   approvalType: 'LEAVE',
   title: '',
   applicantName: '',
@@ -229,6 +409,24 @@ const form = reactive({
   status: 'PENDING',
   remark: ''
 })
+const workflowForm = reactive({
+  leaveType: 'ANNUAL',
+  shiftAffected: false,
+  handoverName: '',
+  reimburseCategory: 'TRAVEL',
+  hasBudget: true,
+  invoiceCount: 0,
+  purchaseCategory: 'FOOD',
+  stockChecked: false,
+  overBudget: false,
+  materialCategory: 'CARE',
+  autoPurchaseWhenLowStock: true,
+  proofNo: '',
+  sealMode: 'ONLINE',
+  insideWitness: '',
+  outsideWitness: '',
+  redeemPoints: 300
+})
 
 const typeOptions = [
   { label: '请假', value: 'LEAVE' },
@@ -236,6 +434,8 @@ const typeOptions = [
   { label: '报销', value: 'REIMBURSE' },
   { label: '采购', value: 'PURCHASE' },
   { label: '收入证明', value: 'INCOME_PROOF' },
+  { label: '银行卡申请', value: 'BANK_CARD' },
+  { label: '积分兑现金', value: 'POINTS_CASH' },
   { label: '物资申领', value: 'MATERIAL_APPLY' },
   { label: '用章申请', value: 'OFFICIAL_SEAL' }
 ]
@@ -248,9 +448,53 @@ const editableStatusOptions = [{ label: '待审批', value: 'PENDING' }]
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: (string | number)[]) => {
-    selectedRowKeys.value = keys.map((item) => Number(item))
+    selectedRowKeys.value = keys.map((item) => String(item))
   }
 }))
+const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(String(item.id))))
+const selectedSingleRecord = computed(() => (selectedRecords.value.length === 1 ? selectedRecords.value[0] : null))
+const isSelectedSinglePending = computed(() => selectedSingleRecord.value?.status === 'PENDING')
+const isSelectedSingleRejected = computed(() => selectedSingleRecord.value?.status === 'REJECTED')
+const selectedPendingCount = computed(() => selectedRecords.value.filter((item) => item.status === 'PENDING').length)
+const selectedPendingIds = computed(() =>
+  selectedRecords.value.filter((item) => item.status === 'PENDING').map((item) => String(item.id))
+)
+
+const workflowStepsMap: Record<string, string[]> = {
+  LEAVE: ['员工发起申请', '部门主管审批', '人事确认', '必要时院长审批', '自动归档'],
+  OVERTIME: ['申请人提交', '部门主管', '财务审核', '院长审批', '出纳付款', '归档'],
+  REIMBURSE: ['申请人提交', '部门主管', '财务审核', '院长审批', '出纳付款', '归档'],
+  PURCHASE: ['申请人', '部门主管', '仓库确认库存', '财务确认预算', '院长审批', '采购执行', '入库验收'],
+  MATERIAL_APPLY: ['申请人', '部门主管', '仓库审核', '出库确认', '归档'],
+  INCOME_PROOF: ['员工申请', '人事审核', '财务确认收入', '行政盖章', '归档'],
+  BANK_CARD: ['员工申请', '人事审核', '财务确认收入', '行政盖章', '归档'],
+  POINTS_CASH: ['员工申请', '院长审批', '自动扣减积分', '财务发放现金', '归档'],
+  OFFICIAL_SEAL: ['申请人提交', '行政审核', '院长审批', '盖章归档']
+}
+const workflowHintMap: Record<string, string> = {
+  LEAVE: '请假时间系统自动计算，超过3天会自动追加院长审批提醒。',
+  OVERTIME: '加班/报销需校验预算、发票合规性与是否重复报销。',
+  REIMBURSE: '报销单会进入财务核验，异常项需补充票据和证明人。',
+  PURCHASE: '采购审批通过后建议同步生成采购单和入库单。',
+  MATERIAL_APPLY: '领用会触发库存扣减，低于安全库存时建议自动触发采购流程。',
+  INCOME_PROOF: '系统应自动生成标准模板并记录证明编号，电子归档至人事档案。',
+  BANK_CARD: '银行卡办理同收入证明流程，支持追加辅助证明材料。',
+  POINTS_CASH: '按 300 积分 = 10 元自动换算，审批通过后自动扣减积分余额。',
+  OFFICIAL_SEAL: '请明确用途、对象、时间，避免跨用途盖章风险。'
+}
+const workflowSteps = computed(() => workflowStepsMap[form.approvalType] || ['申请', '审批', '归档'])
+const workflowTitle = computed(() => {
+  const item = typeOptions.find((option) => option.value === form.approvalType)
+  return `流程模板：${item?.label || '审批'}`
+})
+const workflowHint = computed(() => workflowHintMap[form.approvalType] || '按基础审批流程执行。')
+const leaveDays = computed(() => {
+  if (!form.startTime || !form.endTime) return 0
+  const diffHours = Math.max(0, dayjs(form.endTime).diff(dayjs(form.startTime), 'hour', true))
+  return Math.max(1, Math.ceil(diffHours / 24))
+})
+const needDeanApproval = computed(() => leaveDays.value > 3)
+const redeemCash = computed(() => Math.floor(Number(workflowForm.redeemPoints || 0) / 300) * 10)
 
 function statusLabel(status?: string) {
   if (status === 'APPROVED') return '已通过'
@@ -275,7 +519,10 @@ async function fetchData() {
       getApprovalPage(params),
       getApprovalSummary(params)
     ])
-    rows.value = res.list
+    rows.value = (res.list || []).map((item) => ({
+      ...item,
+      id: String(item.id)
+    }))
     pagination.total = res.total || res.list.length
     selectedRowKeys.value = []
     Object.assign(summary, sum || {})
@@ -306,24 +553,79 @@ function onReset() {
   fetchData()
 }
 
+function resetWorkflowForm() {
+  workflowForm.leaveType = 'ANNUAL'
+  workflowForm.shiftAffected = false
+  workflowForm.handoverName = ''
+  workflowForm.reimburseCategory = 'TRAVEL'
+  workflowForm.hasBudget = true
+  workflowForm.invoiceCount = 0
+  workflowForm.purchaseCategory = 'FOOD'
+  workflowForm.stockChecked = false
+  workflowForm.overBudget = false
+  workflowForm.materialCategory = 'CARE'
+  workflowForm.autoPurchaseWhenLowStock = true
+  workflowForm.proofNo = ''
+  workflowForm.sealMode = 'ONLINE'
+  workflowForm.insideWitness = ''
+  workflowForm.outsideWitness = ''
+  workflowForm.redeemPoints = 300
+}
+
+function parseFormData(raw?: string) {
+  if (!raw || !raw.trim()) return {} as Record<string, any>
+  try {
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function applyWorkflowData(parsed: Record<string, any>) {
+  workflowForm.leaveType = parsed.leaveType || 'ANNUAL'
+  workflowForm.shiftAffected = Boolean(parsed.shiftAffected)
+  workflowForm.handoverName = parsed.handoverName || ''
+  workflowForm.reimburseCategory = parsed.reimburseCategory || 'TRAVEL'
+  workflowForm.hasBudget = parsed.hasBudget !== undefined ? Boolean(parsed.hasBudget) : true
+  workflowForm.invoiceCount = Number(parsed.invoiceCount || 0)
+  workflowForm.purchaseCategory = parsed.purchaseCategory || 'FOOD'
+  workflowForm.stockChecked = Boolean(parsed.stockChecked)
+  workflowForm.overBudget = Boolean(parsed.overBudget)
+  workflowForm.materialCategory = parsed.materialCategory || 'CARE'
+  workflowForm.autoPurchaseWhenLowStock = parsed.autoPurchaseWhenLowStock !== undefined ? Boolean(parsed.autoPurchaseWhenLowStock) : true
+  workflowForm.proofNo = parsed.proofNo || ''
+  workflowForm.sealMode = parsed.sealMode || 'ONLINE'
+  workflowForm.insideWitness = parsed.insideWitness || ''
+  workflowForm.outsideWitness = parsed.outsideWitness || ''
+  workflowForm.redeemPoints = Number(parsed.redeemPoints || 300)
+  leavePolicyAcknowledged.value = Boolean(parsed.policyAcknowledged)
+  leaveProofs.value = Array.isArray(parsed.leaveProofs) ? parsed.leaveProofs.filter((item: any) => item?.url) : []
+  commonProofs.value = Array.isArray(parsed.commonProofs) ? parsed.commonProofs.filter((item: any) => item?.url) : []
+  supplementProofs.value = Array.isArray(parsed.supplementProofs) ? parsed.supplementProofs.filter((item: any) => item?.url) : []
+}
+
 function openCreate() {
   form.id = undefined
   form.approvalType = (query.type || 'LEAVE') as string
   form.title = ''
-  form.applicantName = ''
+  form.applicantName = userStore.staffInfo?.realName || userStore.staffInfo?.username || ''
   form.amount = undefined
   form.startTime = undefined
   form.endTime = undefined
   form.formData = ''
   form.status = 'PENDING'
   form.remark = ''
-  leaveProofs.value = []
   leavePolicyAcknowledged.value = false
+  leaveProofs.value = []
+  commonProofs.value = []
+  supplementProofs.value = []
+  resetWorkflowForm()
   editOpen.value = true
 }
 
 function openEdit(record: OaApproval) {
-  form.id = record.id
+  form.id = String(record.id)
   form.approvalType = record.approvalType
   form.title = record.title
   form.applicantName = record.applicantName
@@ -333,25 +635,87 @@ function openEdit(record: OaApproval) {
   form.formData = record.formData || ''
   form.status = record.status || 'PENDING'
   form.remark = record.remark || ''
-  leaveProofs.value = extractLeaveProofs(record.formData)
-  leavePolicyAcknowledged.value = extractPolicyAcknowledged(record.formData)
+  applyWorkflowData(parseFormData(record.formData))
   editOpen.value = true
 }
 
+function resubmit(record: OaApproval) {
+  openCreate()
+  form.approvalType = record.approvalType
+  form.title = `【重提】${record.title || ''}`
+  form.applicantName = userStore.staffInfo?.realName || record.applicantName || ''
+  form.amount = record.amount
+  form.startTime = record.startTime ? dayjs(record.startTime) : undefined
+  form.endTime = record.endTime ? dayjs(record.endTime) : undefined
+  form.remark = `驳回后重提：${record.remark || '已补充材料'}`
+  applyWorkflowData(parseFormData(record.formData))
+  editOpen.value = true
+}
+
+function buildWorkflowData() {
+  const parsed = parseFormData(form.formData)
+  parsed.leaveType = workflowForm.leaveType
+  parsed.shiftAffected = workflowForm.shiftAffected
+  parsed.handoverName = workflowForm.handoverName
+  parsed.reimburseCategory = workflowForm.reimburseCategory
+  parsed.hasBudget = workflowForm.hasBudget
+  parsed.invoiceCount = workflowForm.invoiceCount
+  parsed.purchaseCategory = workflowForm.purchaseCategory
+  parsed.stockChecked = workflowForm.stockChecked
+  parsed.overBudget = workflowForm.overBudget
+  parsed.materialCategory = workflowForm.materialCategory
+  parsed.autoPurchaseWhenLowStock = workflowForm.autoPurchaseWhenLowStock
+  parsed.proofNo = workflowForm.proofNo
+  parsed.sealMode = workflowForm.sealMode
+  parsed.insideWitness = workflowForm.insideWitness
+  parsed.outsideWitness = workflowForm.outsideWitness
+  parsed.leaveProofs = leaveProofs.value
+  parsed.commonProofs = commonProofs.value
+  parsed.supplementProofs = supplementProofs.value
+  parsed.policyAcknowledged = leavePolicyAcknowledged.value
+  parsed.leaveDays = leaveDays.value
+  parsed.needDeanApproval = needDeanApproval.value
+  if (form.approvalType === 'POINTS_CASH') {
+    parsed.staffId = userStore.staffInfo?.id
+    parsed.redeemPoints = workflowForm.redeemPoints
+    parsed.redeemCash = redeemCash.value
+    parsed.exchangeRate = '300:10'
+  }
+  return JSON.stringify(parsed)
+}
+
 async function submit() {
+  if (!form.title.trim()) {
+    message.warning('请填写标题')
+    return
+  }
+  if (!form.applicantName.trim()) {
+    message.warning('请填写申请人')
+    return
+  }
   if (form.approvalType === 'LEAVE' && !leavePolicyAcknowledged.value) {
     message.warning('请先勾选“我已阅读并同意制度”')
     return
   }
-  const formDataForSubmit = mergeLeaveProofsIntoFormData(form.formData)
+  if (form.approvalType === 'POINTS_CASH') {
+    if (!workflowForm.redeemPoints || workflowForm.redeemPoints < 300 || workflowForm.redeemPoints % 300 !== 0) {
+      message.warning('积分兑现金需按 300 的整数倍填写')
+      return
+    }
+    if (redeemCash.value <= 0) {
+      message.warning('当前积分不足以兑换现金')
+      return
+    }
+  }
   const payload = {
     approvalType: form.approvalType,
     title: form.title,
+    applicantId: userStore.staffInfo?.id,
     applicantName: form.applicantName,
-    amount: form.amount,
+    amount: form.approvalType === 'POINTS_CASH' ? redeemCash.value : form.amount,
     startTime: form.startTime ? dayjs(form.startTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
     endTime: form.endTime ? dayjs(form.endTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
-    formData: formDataForSubmit,
+    formData: buildWorkflowData(),
     status: form.status,
     remark: form.remark
   }
@@ -363,76 +727,59 @@ async function submit() {
       await createApproval(payload)
     }
     editOpen.value = false
-    fetchData()
+    await fetchData()
+    message.success('审批单已保存')
+  } catch (error: any) {
+    message.error(error?.message || '审批单保存失败')
   } finally {
     saving.value = false
   }
 }
 
-function extractLeaveProofs(formData?: string) {
-  if (!formData) return []
-  try {
-    const parsed = JSON.parse(formData)
-    const proofs = Array.isArray(parsed?.leaveProofs) ? parsed.leaveProofs : []
-    return proofs
-      .filter((item: any) => item && item.url)
-      .map((item: any) => ({ name: String(item.name || '请假证明'), url: String(item.url) }))
-  } catch {
-    return []
-  }
-}
-
-function extractPolicyAcknowledged(formData?: string) {
-  if (!formData) return false
-  try {
-    const parsed = JSON.parse(formData)
-    return Boolean(parsed?.policyAcknowledged)
-  } catch {
-    return false
-  }
-}
-
-function mergeLeaveProofsIntoFormData(raw?: string) {
-  if (form.approvalType !== 'LEAVE') {
-    return raw
-  }
-  let parsed: Record<string, any> = {}
-  if (raw && raw.trim()) {
-    try {
-      parsed = JSON.parse(raw)
-    } catch {
-      parsed = { rawText: raw }
-    }
-  }
-  parsed.leaveProofs = leaveProofs.value
-  parsed.policyAcknowledged = leavePolicyAcknowledged.value
-  return JSON.stringify(parsed)
-}
-
-async function beforeUploadLeaveProof(file: File) {
+async function uploadProof(target: { value: ProofFile[] }, file: File, bizType: string, successText: string) {
   proofUploading.value = true
   try {
-    const uploaded = await uploadOaFile(file, 'oa-leave-proof')
+    const uploaded = await uploadOaFile(file, bizType)
     const url = uploaded?.fileUrl || ''
     if (!url) {
       message.error('上传失败：未返回文件地址')
       return false
     }
-    leaveProofs.value.push({
+    target.value.push({
       name: uploaded.originalFileName || uploaded.fileName || file.name,
       url
     })
-    message.success('证明上传成功')
+    message.success(successText)
   } catch (error: any) {
-    message.error(error?.message || '证明上传失败')
+    message.error(error?.message || '上传失败')
   } finally {
     proofUploading.value = false
   }
   return false
 }
 
+async function beforeUploadLeaveProof(file: File) {
+  return uploadProof(leaveProofs, file, 'oa-leave-proof', '请假证明上传成功')
+}
+
+async function beforeUploadCommonProof(file: File) {
+  return uploadProof(commonProofs, file, 'oa-approval-proof', '审批附件上传成功')
+}
+
+async function beforeUploadSupplementProof(file: File) {
+  return uploadProof(supplementProofs, file, 'oa-approval-supplement', '补充证明上传成功')
+}
+
 function removeLeaveProof(index: number) {
   leaveProofs.value.splice(index, 1)
+}
+
+function removeCommonProof(index: number) {
+  commonProofs.value.splice(index, 1)
+}
+
+function removeSupplementProof(index: number) {
+  supplementProofs.value.splice(index, 1)
 }
 
 function openPolicy(path: string) {
@@ -441,35 +788,102 @@ function openPolicy(path: string) {
 
 async function approve(record: OaApproval) {
   if (record.status !== 'PENDING') return
-  await approveApproval(record.id)
-  fetchData()
+  try {
+    await approveApproval(String(record.id))
+    message.success('审批已通过')
+    await fetchData()
+  } catch (error: any) {
+    message.error(error?.message || '审批失败')
+  }
 }
 
 async function reject(record: OaApproval) {
   if (record.status !== 'PENDING') return
-  const remark = window.prompt('请输入驳回原因', '未通过')
+  const remark = window.prompt('请输入驳回原因', '请补充材料后重提')
   if (remark === null) return
-  await rejectApproval(record.id, remark)
-  fetchData()
+  try {
+    await rejectApproval(String(record.id), remark)
+    message.success('已驳回')
+    await fetchData()
+  } catch (error: any) {
+    message.error(error?.message || '驳回失败')
+  }
 }
 
 async function remove(record: OaApproval) {
-  await deleteApproval(record.id)
-  fetchData()
+  try {
+    await deleteApproval(String(record.id))
+    message.success('已删除')
+    await fetchData()
+  } catch (error: any) {
+    message.error(error?.message || '删除失败')
+  }
+}
+
+function requireSingleSelection(action: string) {
+  if (!selectedSingleRecord.value) {
+    message.info(`请先勾选 1 条审批后再${action}`)
+    return null
+  }
+  return selectedSingleRecord.value
+}
+
+function editSelected() {
+  const record = requireSingleSelection('编辑')
+  if (!record) return
+  if (record.status !== 'PENDING') {
+    message.warning('仅待审批状态可编辑')
+    return
+  }
+  openEdit(record)
+}
+
+async function approveSelected() {
+  const record = requireSingleSelection('通过')
+  if (!record) return
+  await approve(record)
+}
+
+async function rejectSelected() {
+  const record = requireSingleSelection('驳回')
+  if (!record) return
+  await reject(record)
+}
+
+function resubmitSelected() {
+  const record = requireSingleSelection('驳回后重提')
+  if (!record) return
+  if (record.status !== 'REJECTED') {
+    message.warning('仅已驳回审批支持重提')
+    return
+  }
+  resubmit(record)
+}
+
+async function removeSelected() {
+  const record = requireSingleSelection('删除')
+  if (!record) return
+  await remove(record)
 }
 
 async function batchApprove() {
-  if (selectedRowKeys.value.length === 0) return
-  const affected = await batchApproveApproval(selectedRowKeys.value)
+  if (selectedPendingIds.value.length === 0) {
+    message.info('勾选项中没有“待审批”记录')
+    return
+  }
+  const affected = await batchApproveApproval(selectedPendingIds.value)
   message.success(`批量通过完成，共处理 ${affected || 0} 条`)
   fetchData()
 }
 
 async function batchReject() {
-  if (selectedRowKeys.value.length === 0) return
-  const remark = window.prompt('请输入批量驳回原因', '批量未通过')
+  if (selectedPendingIds.value.length === 0) {
+    message.info('勾选项中没有“待审批”记录')
+    return
+  }
+  const remark = window.prompt('请输入批量驳回原因', '批量未通过，请补充材料后重提')
   if (remark === null) return
-  const affected = await batchRejectApproval(selectedRowKeys.value, remark)
+  const affected = await batchRejectApproval(selectedPendingIds.value, remark)
   message.success(`批量驳回完成，共处理 ${affected || 0} 条`)
   fetchData()
 }
@@ -518,6 +932,11 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.selection-tip {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
 }
 
 .leave-policy-card :deep(.ant-typography) {

@@ -44,3 +44,8 @@ app:
     url-prefix: /uploads
     max-size-bytes: 10485760
     allowed-extensions: jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,txt,zip
+  logistics:
+    maintenance-todo:
+      enabled: true
+      cron: "0 0 8 * * ?"
+      days: 30

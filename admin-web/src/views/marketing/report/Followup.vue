@@ -1,5 +1,6 @@
 <template>
   <PageContainer title="营销跟进统计" sub-title="按状态查看跟进推进情况">
+    <MarketingQuickNav parent-path="/marketing/reports" />
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline">
         <a-form-item label="开始日期">
@@ -23,6 +24,7 @@
       <a-col :xs="24" :sm="6" v-for="item in cards" :key="item.title">
         <a-card class="card-elevated" :bordered="false">
           <a-statistic :title="item.title" :value="item.value" />
+          <a style="font-size: 12px;" @click="drillDown(item.stage)">查看明细</a>
         </a-card>
       </a-col>
     </a-row>
@@ -55,15 +57,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../../components/PageContainer.vue'
+import MarketingQuickNav from '../components/MarketingQuickNav.vue'
 import {
   getMarketingDataQualityReport,
   getMarketingFollowupReport,
   normalizeMarketingSources
 } from '../../../api/marketing'
+import { useReportQueryCache } from '../../../composables/useReportQueryCache'
+import { buildFollowupRoute, buildLeadRoute, buildReservationRoute } from '../../../utils/marketingNav'
 import { exportCsv } from '../../../utils/export'
 import type { MarketingDataQualityReport, MarketingFollowupReport, MarketingReportQuery } from '../../../types'
 
@@ -82,13 +87,14 @@ const quality = ref<MarketingDataQualityReport>({
   missingNextFollowDateCount: 0,
   nonStandardSourceCount: 0
 })
-const query = ref<MarketingReportQuery>({})
+const query = reactive<MarketingReportQuery>({})
+const queryCache = useReportQueryCache<MarketingReportQuery>('followup')
 
 const cards = computed(() => [
-  { title: '总线索', value: report.value.totalLeads },
-  { title: '咨询中', value: report.value.consultCount },
-  { title: '意向中', value: report.value.intentCount },
-  { title: '逾期回访', value: report.value.overdueCount }
+  { title: '总线索', value: report.value.totalLeads, stage: '总览' },
+  { title: '咨询中', value: report.value.consultCount, stage: '咨询管理' },
+  { title: '意向中', value: report.value.intentCount, stage: '意向客户' },
+  { title: '逾期回访', value: report.value.overdueCount, stage: '逾期回访' }
 ])
 
 const columns = [
@@ -107,7 +113,7 @@ const rows = computed(() => {
 
 async function loadData() {
   const [followup, qualityData] = await Promise.all([
-    getMarketingFollowupReport(query.value),
+    getMarketingFollowupReport(query),
     getMarketingDataQualityReport()
   ])
   report.value = followup
@@ -123,10 +129,12 @@ function exportData() {
 }
 
 function drillDown(stage: string) {
-  if (stage === '咨询管理') router.push({ path: '/marketing/sales/pipeline', query: { tab: 'consultation' } })
-  if (stage === '意向客户') router.push({ path: '/marketing/sales/pipeline', query: { tab: 'intent' } })
-  if (stage === '预订管理') router.push('/marketing/sales/reservation')
-  if (stage === '失效用户') router.push('/marketing/sales/invalid')
+  if (stage === '咨询管理') router.push(buildLeadRoute('all', { tab: 'consultation', source: query.source }))
+  if (stage === '意向客户') router.push(buildLeadRoute('intent', { source: query.source }))
+  if (stage === '预订管理') router.push(buildReservationRoute('records'))
+  if (stage === '失效用户') router.push(buildLeadRoute('invalid', { source: query.source }))
+  if (stage === '逾期回访') router.push(buildFollowupRoute('overdue', { source: query.source }))
+  if (stage === '总览') router.push(buildFollowupRoute('records', { source: query.source }))
 }
 
 async function normalizeSource() {
@@ -135,5 +143,16 @@ async function normalizeSource() {
   await loadData()
 }
 
-onMounted(loadData)
+onMounted(() => {
+  Object.assign(query, queryCache.restore())
+  loadData()
+})
+
+watch(
+  () => ({ ...query }),
+  (value) => {
+    queryCache.persist(value)
+  },
+  { deep: true }
+)
 </script>

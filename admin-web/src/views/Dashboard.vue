@@ -166,7 +166,7 @@ const coreCards = computed(() => {
       tag: '低库存商品',
       color: 'orange',
       trend: '需及时补货',
-      route: '/material/stock-query'
+      route: '/logistics/storage/stock-query'
     },
     {
       title: '未支付账单',

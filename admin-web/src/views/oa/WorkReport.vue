@@ -12,11 +12,18 @@
       </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openCreate">新增总结</a-button>
+        <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
+        <a-button :disabled="!canSubmitSingle" @click="submitSelected">提交</a-button>
+        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" @click="batchSubmit">批量提交</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
       </template>
     </SearchForm>
 
     <DataTable
       rowKey="id"
+      :row-selection="rowSelection"
       :columns="columns"
       :data-source="rows"
       :loading="loading"
@@ -31,13 +38,6 @@
           <a-tag :color="record.status === 'SUBMITTED' ? 'green' : 'orange'">
             {{ record.status === 'SUBMITTED' ? '已提交' : '草稿' }}
           </a-tag>
-        </template>
-        <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" @click="openEdit(record)">编辑</a-button>
-            <a-button type="link" @click="submitReport(record)">提交</a-button>
-            <a-button type="link" danger @click="remove(record)">删除</a-button>
-          </a-space>
         </template>
       </template>
     </DataTable>
@@ -98,8 +98,9 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import dayjs, { Dayjs } from 'dayjs'
+import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
@@ -108,6 +109,7 @@ import type { OaWorkReport, PageResult } from '../../types'
 
 const loading = ref(false)
 const rows = ref<OaWorkReport[]>([])
+const selectedRowKeys = ref<string[]>([])
 const dateRange = ref<[Dayjs, Dayjs] | undefined>()
 const query = reactive({
   reportType: undefined as string | undefined,
@@ -122,8 +124,7 @@ const columns = [
   { title: '类型', dataIndex: 'reportType', key: 'reportType', width: 100 },
   { title: '总结日期', dataIndex: 'reportDate', key: 'reportDate', width: 120 },
   { title: '总结人', dataIndex: 'reporterName', key: 'reporterName', width: 120 },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
-  { title: '操作', key: 'action', width: 180 }
+  { title: '状态', dataIndex: 'status', key: 'status', width: 100 }
 ]
 
 const reportTypeOptions = [
@@ -141,7 +142,7 @@ const statusOptions = [
 const editOpen = ref(false)
 const saving = ref(false)
 const form = reactive({
-  id: undefined as number | undefined,
+  id: undefined as string | number | undefined,
   title: '',
   reportType: 'DAY',
   reportDate: undefined as Dayjs | undefined,
@@ -153,6 +154,15 @@ const form = reactive({
   reporterName: '',
   status: 'DRAFT'
 })
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: (string | number)[]) => {
+    selectedRowKeys.value = keys.map((item) => String(item))
+  }
+}))
+const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(String(item.id))))
+const selectedSingleRecord = computed(() => (selectedRecords.value.length === 1 ? selectedRecords.value[0] : null))
+const canSubmitSingle = computed(() => !!selectedSingleRecord.value && selectedSingleRecord.value.status !== 'SUBMITTED')
 
 function reportTypeLabel(reportType?: string) {
   if (reportType === 'WEEK') return '周总结'
@@ -172,8 +182,12 @@ async function fetchData() {
       startDate: dateRange.value?.[0] ? dayjs(dateRange.value[0]).format('YYYY-MM-DD') : undefined,
       endDate: dateRange.value?.[1] ? dayjs(dateRange.value[1]).format('YYYY-MM-DD') : undefined
     })
-    rows.value = res.list
+    rows.value = (res.list || []).map((item) => ({
+      ...item,
+      id: String(item.id)
+    }))
     pagination.total = res.total || res.list.length
+    selectedRowKeys.value = []
   } finally {
     loading.value = false
   }
@@ -245,7 +259,7 @@ async function submit() {
   saving.value = true
   try {
     if (form.id) {
-      await updateOaWorkReport(form.id, payload)
+      await updateOaWorkReport(String(form.id), payload)
     } else {
       await createOaWorkReport(payload)
     }
@@ -257,14 +271,70 @@ async function submit() {
 }
 
 async function submitReport(record: OaWorkReport) {
-  await submitOaWorkReport(record.id)
+  await submitOaWorkReport(String(record.id))
   fetchData()
 }
 
 async function remove(record: OaWorkReport) {
-  await deleteOaWorkReport(record.id)
+  await deleteOaWorkReport(String(record.id))
+  fetchData()
+}
+
+function requireSingleSelection(action: string) {
+  if (!selectedSingleRecord.value) {
+    message.info(`请先勾选 1 条总结后再${action}`)
+    return null
+  }
+  return selectedSingleRecord.value
+}
+
+function editSelected() {
+  const record = requireSingleSelection('编辑')
+  if (!record) return
+  openEdit(record)
+}
+
+async function submitSelected() {
+  const record = requireSingleSelection('提交')
+  if (!record) return
+  if (record.status === 'SUBMITTED') {
+    message.info('当前总结已提交')
+    return
+  }
+  await submitReport(record)
+}
+
+async function removeSelected() {
+  const record = requireSingleSelection('删除')
+  if (!record) return
+  await remove(record)
+}
+
+async function batchSubmit() {
+  if (selectedRowKeys.value.length === 0) return
+  const validRecords = selectedRecords.value.filter((item) => item.status !== 'SUBMITTED')
+  if (validRecords.length === 0) {
+    message.info('所选记录均为已提交，无需重复提交')
+    return
+  }
+  await Promise.all(validRecords.map((item) => submitOaWorkReport(String(item.id))))
+  message.success(`批量提交完成，共处理 ${validRecords.length} 条`)
+  fetchData()
+}
+
+async function batchRemove() {
+  if (selectedRowKeys.value.length === 0) return
+  await Promise.all(selectedRecords.value.map((item) => deleteOaWorkReport(String(item.id))))
+  message.success(`批量删除完成，共处理 ${selectedRecords.value.length} 条`)
   fetchData()
 }
 
 fetchData()
 </script>
+
+<style scoped>
+.selection-tip {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+</style>

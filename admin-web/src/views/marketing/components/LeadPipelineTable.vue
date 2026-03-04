@@ -1,5 +1,6 @@
 <template>
   <PageContainer :title="title" :sub-title="subTitle">
+    <MarketingQuickNav />
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item v-if="props.mode === 'pipeline'" label="线索视图">
@@ -104,7 +105,7 @@
     </StatefulBlock>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <div class="table-actions">
+      <MarketingListToolbar :tip="selectedCount > 0 ? `已勾选 ${selectedCount} 条，批量状态操作仅处理状态不同项` : `已勾选 ${selectedCount} 条`">
         <a-space>
           <a-button
             v-for="item in actionButtons"
@@ -116,9 +117,8 @@
           >
             {{ item.label }}
           </a-button>
-          <span class="selection-tip">已勾选 {{ selectedCount }} 条</span>
         </a-space>
-      </div>
+      </MarketingListToolbar>
       <StatefulBlock
         :loading="loading"
         :error="tableError"
@@ -315,6 +315,8 @@ import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
+import MarketingQuickNav from './MarketingQuickNav.vue'
+import MarketingListToolbar from './MarketingListToolbar.vue'
 import {
   batchDeleteLeads,
   batchUpdateLeadStatus,
@@ -332,6 +334,7 @@ const props = withDefaults(defineProps<{
   mode: 'consultation' | 'intent' | 'reservation' | 'invalid' | 'callback' | 'pipeline'
   title: string
   subTitle: string
+  scenario?: string
 }>(), {
   mode: 'consultation'
 })
@@ -404,6 +407,7 @@ const executeForm = reactive({
   nextFollowDate: ''
 })
 const callbackSnapshot = ref<Record<string, { title?: string; followupContent?: string; followupResult?: string; planId?: string | number }>>({})
+const todayText = dayjs().format('YYYY-MM-DD')
 
 const rules: FormRules = {
   consultantName: [{ required: true, message: '请输入咨询人姓名' }],
@@ -546,6 +550,9 @@ const actionButtons = computed(() => {
       { key: 'edit', label: '编辑', type: 'default' as const, disabled: selectedCount.value !== 1 },
       { key: 'detail', label: '查看详情', type: 'default' as const, disabled: selectedCount.value !== 1 },
       { key: 'execute', label: '执行回访', type: 'primary' as const, disabled: selectedCount.value !== 1 },
+      { key: 'setTodayFollow', label: '设今日回访', type: 'default' as const, disabled: selectedCount.value === 0 },
+      { key: 'postponeFollow', label: '顺延3天', type: 'default' as const, disabled: selectedCount.value === 0 },
+      { key: 'markFollowed', label: '标记已回访', type: 'default' as const, disabled: selectedCount.value === 0 },
       { key: 'callback', label: '添加回访计划', type: 'default' as const, disabled: selectedCount.value === 0 },
       { key: 'toReservation', label: '转预订', type: 'default' as const, disabled: selectedCount.value === 0 },
       { key: 'abandon', label: '放弃客户', type: 'default' as const, disabled: selectedCount.value === 0, danger: true },
@@ -556,6 +563,9 @@ const actionButtons = computed(() => {
     { key: 'edit', label: '编辑', type: 'default' as const, disabled: selectedCount.value !== 1 },
     { key: 'detail', label: '查看详情', type: 'default' as const, disabled: selectedCount.value !== 1 },
     { key: 'execute', label: '执行回访', type: 'primary' as const, disabled: selectedCount.value !== 1 },
+    { key: 'setTodayFollow', label: '设今日回访', type: 'default' as const, disabled: selectedCount.value === 0 },
+    { key: 'postponeFollow', label: '顺延3天', type: 'default' as const, disabled: selectedCount.value === 0 },
+    { key: 'markFollowed', label: '标记已回访', type: 'default' as const, disabled: selectedCount.value === 0 },
     { key: 'callback', label: '添加回访计划', type: 'default' as const, disabled: selectedCount.value === 0 },
     { key: 'toReservation', label: '转预订', type: 'default' as const, disabled: selectedCount.value === 0 },
     { key: 'abandon', label: '放弃客户', type: 'default' as const, disabled: selectedCount.value === 0, danger: true },
@@ -633,6 +643,67 @@ const warningMessage = computed(() => {
   return ''
 })
 
+function textContains(value: unknown, keyword: string) {
+  return String(value || '').toLowerCase().includes(keyword.toLowerCase())
+}
+
+function applyScenarioFilters(list: CrmLeadItem[]) {
+  const scenario = String(props.scenario || route.query.scenario || '').trim()
+  const source = String(route.query.source || '').trim()
+  const filter = String(route.query.filter || '').trim()
+  const stage = String(route.query.stage || '').trim()
+
+  return (list || []).filter((item) => {
+    const nextFollow = String(item.nextFollowDate || '').slice(0, 10)
+    const infoSource = String(item.infoSource || '')
+    const mediaChannel = String(item.mediaChannel || '')
+    const customerTag = String(item.customerTag || '')
+    const reservationStatus = String(item.reservationStatus || '')
+
+    if (source === 'medical') {
+      const isMedicalSource = textContains(infoSource, '医') || textContains(infoSource, '门诊') || textContains(mediaChannel, '医')
+      if (!isMedicalSource) return false
+    }
+
+    if (filter === 'today' && nextFollow !== todayText) return false
+    if (filter === 'overdue' && (!nextFollow || nextFollow >= todayText)) return false
+    if (filter === 'unassigned' && String(item.marketerName || '').trim()) return false
+    if (filter === 'expiring') {
+      if (!textContains(reservationStatus, '锁')) return false
+      if (!nextFollow || nextFollow < todayText || dayjs(nextFollow).diff(dayjs(todayText), 'day') > 3) return false
+    }
+
+    if (scenario === 'blacklist') {
+      if (!textContains(customerTag, '黑')) return false
+    }
+    if (scenario === 'source_unknown') {
+      if (infoSource.trim()) return false
+    }
+    if (scenario === 'source_medical') {
+      const isMedical = textContains(infoSource, '医') || textContains(infoSource, '门诊') || textContains(mediaChannel, '医')
+      if (!isMedical) return false
+    }
+    if (scenario === 'follow_today') {
+      if (!nextFollow || nextFollow !== todayText) return false
+    }
+    if (scenario === 'follow_overdue') {
+      if (!nextFollow || nextFollow >= todayText) return false
+    }
+    if (scenario === 'lock_bed') {
+      if (!textContains(reservationStatus, '锁')) return false
+    }
+    if (scenario === 'expiring_lock') {
+      if (!textContains(reservationStatus, '锁')) return false
+      if (!nextFollow || nextFollow < todayText || dayjs(nextFollow).diff(dayjs(todayText), 'day') > 3) return false
+    }
+    if (stage === 'consultation' && Number(item.status) !== 0) return false
+    if (stage === 'evaluation' && Number(item.status) !== 1) return false
+    if (stage === 'signing' && Number(item.status) !== 2) return false
+    if (stage === 'lost' && Number(item.status) !== 3) return false
+    return true
+  })
+}
+
 function selectedIds() {
   if (selectedRowKeys.value.length) {
     return [...selectedRowKeys.value]
@@ -670,6 +741,11 @@ function genderText(gender?: number) {
 function buildQueryParams() {
   const mode = effectiveMode.value
   const isCallback = mode === 'callback'
+  const callbackScenario = String(props.scenario || route.query.scenario || '').trim()
+  const callbackFilter = String(route.query.filter || '').trim()
+  const callbackDueOnly = isCallback && (!!callbackScenario || !!callbackFilter)
+  const routeSource = String(route.query.source || '').trim()
+  const normalizedSource = query.infoSource || routeSource || undefined
   return {
     pageNo: query.pageNo,
     pageSize: query.pageSize,
@@ -682,11 +758,11 @@ function buildQueryParams() {
     consultDateTo: query.consultDateRange?.[1] || undefined,
     consultType: query.consultType || undefined,
     mediaChannel: query.mediaChannel || undefined,
-    infoSource: query.infoSource || undefined,
+    infoSource: normalizedSource,
     customerTag: query.customerTag || undefined,
     marketerName: query.marketerName || undefined,
-    followupDueOnly: isCallback ? true : undefined,
-    followupDateTo: isCallback ? dayjs().format('YYYY-MM-DD') : undefined
+    followupDueOnly: callbackDueOnly ? true : undefined,
+    followupDateTo: callbackDueOnly ? dayjs().format('YYYY-MM-DD') : undefined
   }
 }
 
@@ -718,8 +794,9 @@ async function fetchData() {
       getLeadPage(buildQueryParams()),
       getMarketingLeadEntrySummary(buildSummaryParams())
     ])
-    rows.value = page.list || []
-    total.value = page.total || 0
+    const rawList = (page.list || []).map((item) => ({ ...item, id: String(item.id) }))
+    rows.value = applyScenarioFilters(rawList)
+    total.value = rows.value.length
     Object.assign(summary, summaryRes || {})
     await hydrateCallbackSnapshot(rows.value)
   } catch (error: any) {
@@ -782,10 +859,36 @@ function reset() {
 function syncPipelineTabByRoute() {
   if (props.mode !== 'pipeline') return
   const tab = String(route.query.tab || '')
+  const stage = String(route.query.stage || '').trim()
+  const scenario = String(props.scenario || route.query.scenario || '').trim()
+  const filter = String(route.query.filter || '').trim()
   if (tab === 'intent' || tab === 'callback' || tab === 'consultation') {
     pipelineTab.value = tab
+    return
+  }
+  if (stage === 'evaluation') {
+    pipelineTab.value = 'intent'
+    return
+  }
+  if (scenario === 'follow_today' || scenario === 'follow_overdue' || filter === 'today' || filter === 'overdue') {
+    pipelineTab.value = 'callback'
+    return
+  }
+  pipelineTab.value = 'consultation'
+}
+
+function syncQueryFiltersByRoute() {
+  const routeSource = String(route.query.source || '').trim()
+  query.infoSource = routeSource || ''
+  query.elderName = String(route.query.elderName || '').trim()
+  query.elderPhone = String(route.query.elderPhone || '').trim()
+  query.marketerName = String(route.query.marketerName || '').trim()
+  const consultDateFrom = String(route.query.consultDateFrom || '').trim()
+  const consultDateTo = String(route.query.consultDateTo || '').trim()
+  if (consultDateFrom || consultDateTo) {
+    query.consultDateRange = [consultDateFrom || consultDateTo, consultDateTo || consultDateFrom].filter(Boolean)
   } else {
-    pipelineTab.value = 'consultation'
+    query.consultDateRange = []
   }
 }
 
@@ -843,14 +946,32 @@ async function handleTopAction(key: string) {
     await batchMoveToInvalid()
     return
   }
+  if (key === 'setTodayFollow') {
+    await batchSetTodayFollow()
+    return
+  }
+  if (key === 'postponeFollow') {
+    await batchPostponeFollow(3)
+    return
+  }
+  if (key === 'markFollowed') {
+    await batchMarkFollowed()
+    return
+  }
   if (key === 'recover') {
-    const ids = selectedIds()
-    if (!ids.length) {
+    const selectedIdsValue = selectedIds()
+    if (!selectedIdsValue.length) {
       message.info('请先勾选要恢复的客户')
       return
     }
+    const targets = selectedRows.value.filter((item) => Number(item.status) !== 1)
+    if (!targets.length) {
+      message.info('选中客户已是意向状态，无需重复恢复')
+      return
+    }
+    const ids = targets.map((item) => item.id)
     await batchUpdateLeadStatus({ ids, status: 1 })
-    message.success(`已恢复 ${ids.length} 条客户`)
+    message.success(`已恢复 ${targets.length} 条客户（仅处理状态不同项）`)
     selectedRowKeys.value = []
     fetchData()
     return
@@ -1068,16 +1189,21 @@ async function batchMoveToInvalid() {
     message.info('请先勾选要放弃的客户')
     return
   }
+  const targets = rows.value.filter((item) => ids.some((id) => sameId(item.id, id)) && Number(item.status) !== 3)
+  if (!targets.length) {
+    message.info('选中客户已是失效状态，无需重复操作')
+    return
+  }
   Modal.confirm({
-    title: `确认放弃选中的 ${ids.length} 条客户吗？`,
+    title: `确认放弃选中的 ${targets.length} 条客户吗？`,
     content: '放弃后将进入失效用户池，可后续恢复。',
     onOk: async () => {
       await batchUpdateLeadStatus({
-        ids,
+        ids: targets.map((item) => item.id),
         status: 3,
         invalidTime: dayjs().format('YYYY-MM-DD HH:mm:ss')
       })
-      message.success(`已放弃 ${ids.length} 条客户`)
+      message.success(`已放弃 ${targets.length} 条客户（仅处理状态不同项）`)
       selectedRowKeys.value = []
       fetchData()
     }
@@ -1090,8 +1216,13 @@ async function batchMoveToIntent() {
     message.info('请先勾选要转为意向的客户')
     return
   }
-  await batchUpdateLeadStatus({ ids, status: 1, followupStatus: '待回访' })
-  message.success(`已转为意向客户 ${ids.length} 条`)
+  const targets = rows.value.filter((item) => ids.some((id) => sameId(item.id, id)) && Number(item.status) !== 1)
+  if (!targets.length) {
+    message.info('选中客户已是意向状态，无需重复操作')
+    return
+  }
+  await batchUpdateLeadStatus({ ids: targets.map((item) => item.id), status: 1, followupStatus: '待回访' })
+  message.success(`已转为意向客户 ${targets.length} 条（仅处理状态不同项）`)
   selectedRowKeys.value = []
   fetchData()
 }
@@ -1102,7 +1233,11 @@ async function batchMoveToReservation() {
     message.info('请先勾选要转预订的客户')
     return
   }
-  const selectedRows = rows.value.filter((item) => ids.some((id) => sameId(item.id, id)))
+  const selectedRows = rows.value.filter((item) => ids.some((id) => sameId(item.id, id)) && Number(item.status) !== 2)
+  if (!selectedRows.length) {
+    message.info('选中客户已是预订状态，无需重复操作')
+    return
+  }
   await Promise.all(
     selectedRows.map((item) =>
       updateCrmLead(item.id, {
@@ -1112,27 +1247,91 @@ async function batchMoveToReservation() {
       })
     )
   )
-  message.success(`已转入预订管理 ${selectedRows.length} 条`)
+  message.success(`已转入预订管理 ${selectedRows.length} 条（仅处理状态不同项）`)
+  selectedRowKeys.value = []
+  fetchData()
+}
+
+async function batchSetTodayFollow() {
+  const targetRows = selectedRows.value
+    .filter((item) => String(item.nextFollowDate || '').slice(0, 10) !== todayText)
+  if (!targetRows.length) {
+    message.info('选中客户的回访日期已是今天，无需重复设置')
+    return
+  }
+  await Promise.all(
+    targetRows.map((item) =>
+      updateCrmLead(item.id, {
+        ...item,
+        followupStatus: '待回访',
+        nextFollowDate: todayText
+      })
+    )
+  )
+  message.success(`已设置 ${targetRows.length} 条为今日回访`)
+  selectedRowKeys.value = []
+  fetchData()
+}
+
+async function batchPostponeFollow(days: number) {
+  const targetRows = selectedRows.value
+    .filter((item) => String(item.followupStatus || '') !== '已回访')
+  if (!targetRows.length) {
+    message.info('选中客户均为已回访，无需顺延')
+    return
+  }
+  await Promise.all(
+    targetRows.map((item) => {
+      const current = String(item.nextFollowDate || '').slice(0, 10)
+      const base = current && current > todayText ? current : todayText
+      const nextFollowDate = dayjs(base).add(days, 'day').format('YYYY-MM-DD')
+      return updateCrmLead(item.id, {
+        ...item,
+        followupStatus: '待回访',
+        nextFollowDate
+      })
+    })
+  )
+  message.success(`已顺延 ${targetRows.length} 条回访计划（+${days}天）`)
+  selectedRowKeys.value = []
+  fetchData()
+}
+
+async function batchMarkFollowed() {
+  const targetRows = selectedRows.value
+    .filter((item) => String(item.followupStatus || '') !== '已回访')
+  if (!targetRows.length) {
+    message.info('选中客户已全部为已回访状态')
+    return
+  }
+  await Promise.all(
+    targetRows.map((item) =>
+      updateCrmLead(item.id, {
+        ...item,
+        followupStatus: '已回访',
+        followupResult: item.followupResult || '已完成回访'
+      })
+    )
+  )
+  message.success(`已标记 ${targetRows.length} 条为已回访`)
   selectedRowKeys.value = []
   fetchData()
 }
 
 watch(
-  () => route.query.tab,
+  () => route.query,
   () => {
-    if (props.mode !== 'pipeline') return
-    const before = pipelineTab.value
     syncPipelineTabByRoute()
-    if (pipelineTab.value !== before) {
-      query.pageNo = 1
-      selectedRowKeys.value = []
-      fetchData()
-    }
+    syncQueryFiltersByRoute()
+    query.pageNo = 1
+    selectedRowKeys.value = []
+    fetchData()
   }
 )
 
 onMounted(() => {
   syncPipelineTabByRoute()
+  syncQueryFiltersByRoute()
   fetchData()
 })
 </script>
@@ -1140,16 +1339,5 @@ onMounted(() => {
 <style scoped>
 .search-bar {
   margin-bottom: 12px;
-}
-
-.table-actions {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.selection-tip {
-  color: var(--muted);
-  font-size: 12px;
 }
 </style>

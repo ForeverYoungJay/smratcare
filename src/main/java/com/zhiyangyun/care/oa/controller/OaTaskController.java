@@ -17,6 +17,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -94,6 +95,8 @@ public class OaTaskController {
   @PreAuthorize("@perm.has('oa.calendar.view')")
   public Result<List<OaTask>> calendar(
       @RequestParam(required = false) String status,
+      @RequestParam(required = false) String calendarType,
+      @RequestParam(required = false) String urgency,
       @RequestParam(required = false) String assigneeName,
       @RequestParam(required = false) String keyword,
       @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
@@ -101,16 +104,27 @@ public class OaTaskController {
       @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
       @RequestParam(required = false) LocalDate endDate) {
     Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
     String normalizedStatus = normalizeStatus(status);
+    String normalizedCalendarType = normalizeCalendarType(calendarType);
+    String normalizedUrgency = normalizeUrgency(urgency);
     var wrapper = Wrappers.lambdaQuery(OaTask.class)
         .eq(OaTask::getIsDeleted, 0)
         .eq(orgId != null, OaTask::getOrgId, orgId)
         .eq(normalizedStatus != null, OaTask::getStatus, normalizedStatus)
+        .eq(normalizedCalendarType != null, OaTask::getCalendarType, normalizedCalendarType)
+        .eq(normalizedUrgency != null, OaTask::getUrgency, normalizedUrgency)
         .like(assigneeName != null && !assigneeName.isBlank(), OaTask::getAssigneeName, assigneeName)
         .ge(startDate != null, OaTask::getStartTime, startDate == null ? null : startDate.atStartOfDay())
         .lt(endDate != null, OaTask::getStartTime, endDate == null ? null : endDate.plusDays(1).atStartOfDay())
         .orderByAsc(OaTask::getStartTime)
         .last("LIMIT 1000");
+    if (!AuthContext.isAdmin() && staffId != null) {
+      wrapper.and(w -> w.ne(OaTask::getCalendarType, "PERSONAL")
+          .or().eq(OaTask::getCreatedBy, staffId)
+          .or().eq(OaTask::getAssigneeId, staffId)
+          .or().apply("FIND_IN_SET({0}, collaborator_ids)", staffId));
+    }
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(OaTask::getTitle, keyword)
           .or().like(OaTask::getDescription, keyword));
@@ -185,6 +199,16 @@ public class OaTaskController {
     task.setStatus(normalizedStatus == null ? "OPEN" : normalizedStatus);
     task.setAssigneeId(request.getAssigneeId());
     task.setAssigneeName(request.getAssigneeName());
+    task.setCalendarType(defaultIfBlank(normalizeCalendarType(request.getCalendarType()), "WORK"));
+    task.setPlanCategory(trimToNull(request.getPlanCategory()));
+    task.setUrgency(defaultIfBlank(normalizeUrgency(request.getUrgency()), "NORMAL"));
+    task.setEventColor(defaultTaskColor(task.getUrgency(), request.getEventColor()));
+    task.setCollaboratorIds(joinLongList(request.getCollaboratorIds()));
+    task.setCollaboratorNames(joinStringList(request.getCollaboratorNames()));
+    task.setIsRecurring(Boolean.TRUE.equals(request.getRecurring()) ? 1 : 0);
+    task.setRecurrenceRule(normalizeRecurrenceRule(request.getRecurrenceRule()));
+    task.setRecurrenceInterval(normalizeRecurrenceInterval(request.getRecurrenceInterval()));
+    task.setRecurrenceCount(normalizeRecurrenceCount(request.getRecurrenceCount()));
     task.setCreatedBy(AuthContext.getStaffId());
     taskMapper.insert(task);
     return Result.ok(task);
@@ -214,6 +238,16 @@ public class OaTaskController {
     task.setStatus("OPEN");
     task.setAssigneeId(request.getAssigneeId());
     task.setAssigneeName(request.getAssigneeName());
+    task.setCalendarType(defaultIfBlank(normalizeCalendarType(request.getCalendarType()), defaultIfBlank(task.getCalendarType(), "WORK")));
+    task.setPlanCategory(trimToNull(request.getPlanCategory()));
+    task.setUrgency(defaultIfBlank(normalizeUrgency(request.getUrgency()), defaultIfBlank(task.getUrgency(), "NORMAL")));
+    task.setEventColor(defaultTaskColor(task.getUrgency(), request.getEventColor()));
+    task.setCollaboratorIds(joinLongList(request.getCollaboratorIds()));
+    task.setCollaboratorNames(joinStringList(request.getCollaboratorNames()));
+    task.setIsRecurring(Boolean.TRUE.equals(request.getRecurring()) ? 1 : 0);
+    task.setRecurrenceRule(normalizeRecurrenceRule(request.getRecurrenceRule()));
+    task.setRecurrenceInterval(normalizeRecurrenceInterval(request.getRecurrenceInterval()));
+    task.setRecurrenceCount(normalizeRecurrenceCount(request.getRecurrenceCount()));
     taskMapper.updateById(task);
     return Result.ok(task);
   }
@@ -294,12 +328,16 @@ public class OaTaskController {
           .or().like(OaTask::getAssigneeName, keyword));
     }
     List<OaTask> tasks = taskMapper.selectList(wrapper);
-    List<String> headers = List.of("ID", "标题", "负责人", "开始时间", "结束时间", "优先级", "状态", "描述");
+    List<String> headers = List.of("ID", "标题", "负责人", "日历种类", "计划分类", "紧急程度", "协同成员", "开始时间", "结束时间", "优先级", "状态", "描述");
     List<List<String>> rows = tasks.stream()
         .map(item -> List.of(
             safe(item.getId()),
             safe(item.getTitle()),
             safe(item.getAssigneeName()),
+            safe(item.getCalendarType()),
+            safe(item.getPlanCategory()),
+            safe(item.getUrgency()),
+            safe(item.getCollaboratorNames()),
             formatDateTime(item.getStartTime()),
             formatDateTime(item.getEndTime()),
             safe(item.getPriority()),
@@ -355,6 +393,127 @@ public class OaTaskController {
       throw new IllegalArgumentException("status 仅支持 OPEN/DONE");
     }
     return normalized;
+  }
+
+  private String normalizeCalendarType(String calendarType) {
+    if (calendarType == null || calendarType.isBlank()) {
+      return null;
+    }
+    String normalized = calendarType.trim().toUpperCase();
+    if (!"PERSONAL".equals(normalized)
+        && !"WORK".equals(normalized)
+        && !"DAILY".equals(normalized)
+        && !"COLLAB".equals(normalized)) {
+      throw new IllegalArgumentException("calendarType 仅支持 PERSONAL/WORK/DAILY/COLLAB");
+    }
+    return normalized;
+  }
+
+  private String normalizeUrgency(String urgency) {
+    if (urgency == null || urgency.isBlank()) {
+      return null;
+    }
+    String normalized = urgency.trim().toUpperCase();
+    if (!"NORMAL".equals(normalized) && !"EMERGENCY".equals(normalized)) {
+      throw new IllegalArgumentException("urgency 仅支持 NORMAL/EMERGENCY");
+    }
+    return normalized;
+  }
+
+  private String normalizeRecurrenceRule(String recurrenceRule) {
+    if (recurrenceRule == null || recurrenceRule.isBlank()) {
+      return null;
+    }
+    String normalized = recurrenceRule.trim().toUpperCase();
+    if (!"DAILY".equals(normalized) && !"WEEKLY".equals(normalized) && !"MONTHLY".equals(normalized)) {
+      throw new IllegalArgumentException("recurrenceRule 仅支持 DAILY/WEEKLY/MONTHLY");
+    }
+    return normalized;
+  }
+
+  private Integer normalizeRecurrenceInterval(Integer interval) {
+    if (interval == null) {
+      return null;
+    }
+    if (interval <= 0 || interval > 365) {
+      throw new IllegalArgumentException("recurrenceInterval 取值范围 1-365");
+    }
+    return interval;
+  }
+
+  private Integer normalizeRecurrenceCount(Integer count) {
+    if (count == null) {
+      return null;
+    }
+    if (count <= 0 || count > 365) {
+      throw new IllegalArgumentException("recurrenceCount 取值范围 1-365");
+    }
+    return count;
+  }
+
+  private String joinLongList(List<Long> values) {
+    if (values == null || values.isEmpty()) {
+      return null;
+    }
+    return values.stream()
+        .filter(v -> v != null && v > 0)
+        .distinct()
+        .map(String::valueOf)
+        .collect(Collectors.joining(","));
+  }
+
+  private String joinStringList(List<String> values) {
+    if (values == null || values.isEmpty()) {
+      return null;
+    }
+    return values.stream()
+        .map(this::trimToNull)
+        .filter(v -> v != null && !v.isBlank())
+        .distinct()
+        .collect(Collectors.joining(","));
+  }
+
+  private String trimToNull(String value) {
+    if (value == null) {
+      return null;
+    }
+    String trimmed = value.trim();
+    return trimmed.isEmpty() ? null : trimmed;
+  }
+
+  private String defaultIfBlank(String value, String fallback) {
+    if (value == null || value.isBlank()) {
+      return fallback;
+    }
+    return value;
+  }
+
+  private String defaultTaskColor(String urgency, String requestedColor) {
+    String normalizedColor = normalizeColor(requestedColor);
+    if (normalizedColor != null) {
+      return normalizedColor;
+    }
+    if ("EMERGENCY".equalsIgnoreCase(urgency)) {
+      return "#ff4d4f";
+    }
+    return "#1677ff";
+  }
+
+  private String normalizeColor(String color) {
+    if (color == null || color.isBlank()) {
+      return null;
+    }
+    String value = color.trim();
+    if (value.matches("^#[0-9a-fA-F]{6}$")) {
+      return value.toLowerCase();
+    }
+    List<String> preset = Arrays.asList("#1677ff", "#52c41a", "#faad14", "#ff4d4f", "#722ed1");
+    for (String item : preset) {
+      if (item.equalsIgnoreCase(value)) {
+        return item;
+      }
+    }
+    throw new IllegalArgumentException("eventColor 必须是 #RRGGBB 格式");
   }
 
   private List<Long> sanitizeIds(List<Long> ids) {

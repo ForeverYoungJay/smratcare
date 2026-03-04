@@ -1,5 +1,6 @@
 <template>
   <PageContainer title="营销方案" sub-title="方案起草-审批-发布-全员阅读闭环">
+    <MarketingQuickNav />
     <template #extra>
       <a-space>
         <a-input-search
@@ -43,15 +44,16 @@
               </div>
               <div class="plan-card-actions">
                 <a-button type="link" size="small" @click="openPreview(item)">查看详情</a-button>
-                <a-button type="link" size="small" @click="openEdit(item)">编辑</a-button>
+                <a-button type="link" size="small" :disabled="!canEdit(item)" @click="openEdit(item)">编辑</a-button>
                 <a-dropdown>
                   <a-button type="link" size="small">流程操作</a-button>
                   <template #overlay>
                     <a-menu>
-                      <a-menu-item @click="submitPlan(item)">提交审批</a-menu-item>
-                      <a-menu-item @click="approvePlan(item)">审批通过</a-menu-item>
-                      <a-menu-item @click="rejectPlan(item)">驳回</a-menu-item>
-                      <a-menu-item @click="publishPlan(item)">发布</a-menu-item>
+                      <a-menu-item :disabled="!canSubmit(item)" @click="submitPlan(item)">提交审批</a-menu-item>
+                      <a-menu-item :disabled="!canApprove(item)" @click="approvePlan(item)">审批通过</a-menu-item>
+                      <a-menu-item :disabled="!canReject(item)" @click="rejectPlan(item)">驳回</a-menu-item>
+                      <a-menu-item :disabled="!canPublish(item)" @click="publishPlan(item)">{{ publishActionLabel(item) }}</a-menu-item>
+                      <a-menu-item :disabled="!canDeactivate(item)" @click="deactivatePlan(item)">停用</a-menu-item>
                     </a-menu>
                   </template>
                 </a-dropdown>
@@ -67,18 +69,18 @@
 
       <a-tab-pane key="POLICY" tab="季度运营政策">
         <a-card class="card-elevated" :bordered="false">
-          <div class="table-actions">
+          <MarketingListToolbar :tip="`已勾选 ${selectedCount} 条，审批通过后可发布，停用后可重新发布`">
             <a-space>
-              <a-button :disabled="selectedCount !== 1" @click="previewSelected">详情</a-button>
-              <a-button :disabled="selectedCount !== 1" @click="editSelected">编辑</a-button>
-              <a-button :disabled="selectedCount !== 1" @click="submitSelected">提交审批</a-button>
-              <a-button :disabled="selectedCount !== 1" @click="approveSelected">审批通过</a-button>
-              <a-button :disabled="selectedCount !== 1" @click="rejectSelected">驳回</a-button>
-              <a-button :disabled="selectedCount !== 1" @click="publishSelected">发布</a-button>
+              <a-button :disabled="!selectedPlan" @click="previewSelected">详情</a-button>
+              <a-button :disabled="!canEditSelected" @click="editSelected">编辑</a-button>
+              <a-button :disabled="!canSubmitSelected" @click="submitSelected">提交审批</a-button>
+              <a-button :disabled="!canApproveSelected" @click="approveSelected">审批通过</a-button>
+              <a-button :disabled="!canRejectSelected" @click="rejectSelected">驳回</a-button>
+              <a-button :disabled="!canPublishSelected" @click="publishSelected">{{ selectedPublishLabel }}</a-button>
+              <a-button :disabled="!canDeactivateSelected" @click="deactivateSelected">停用</a-button>
               <a-button :disabled="selectedCount === 0" danger @click="deleteSelected">删除</a-button>
-              <span class="selection-tip">已勾选 {{ selectedCount }} 条</span>
             </a-space>
-          </div>
+          </MarketingListToolbar>
           <a-table
             :loading="loading"
             :data-source="policyRows"
@@ -222,10 +224,13 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import type { FormInstance, TablePaginationConfig } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
+import MarketingListToolbar from './components/MarketingListToolbar.vue'
+import MarketingQuickNav from './components/MarketingQuickNav.vue'
 import {
   approveMarketingPlan,
   confirmMarketingPlanRead,
   createMarketingPlan,
+  deactivateMarketingPlan,
   deleteMarketingPlan,
   getMarketingPlanDetail,
   getMarketingPlanPage,
@@ -255,7 +260,7 @@ const previewRecord = ref<MarketingPlanItem>()
 const editingId = ref<number | string>()
 const formRef = ref<FormInstance>()
 const receipts = ref<MarketingPlanReceiptItem[]>([])
-const departmentOptions = ref<{ label: string; value: number }[]>([])
+const departmentOptions = ref<{ label: string; value: string }[]>([])
 
 const query = reactive<MarketingPlanQuery>({
   pageNo: 1,
@@ -272,7 +277,7 @@ const pagination = reactive<TablePaginationConfig>({
 })
 
 const rows = ref<MarketingPlanItem[]>([])
-const selectedRowKeys = ref<Array<number | string>>([])
+const selectedRowKeys = ref<string[]>([])
 
 const policyColumns = [
   { title: '季度', dataIndex: 'quarterLabel', key: 'quarterLabel', width: 120 },
@@ -298,7 +303,7 @@ const form = reactive({
   quarterLabel: '',
   target: '',
   owner: '',
-  linkedDepartmentIds: [] as number[],
+  linkedDepartmentIds: [] as string[],
   priority: 50,
   status: 'DRAFT' as MarketingPlanStatus,
   effectiveDate: undefined as string | undefined
@@ -320,19 +325,58 @@ const speechCards = computed(() => rows.value)
 const policyRows = computed(() => rows.value)
 const selectedCount = computed(() => selectedRowKeys.value.length)
 const selectedPlans = computed(() => policyRows.value.filter((item) => selectedRowKeys.value.some((id) => String(id) === String(item.id))))
+const selectedPlan = computed(() => (selectedPlans.value.length === 1 ? selectedPlans.value[0] : null))
+const selectedPublishLabel = computed(() => {
+  if (!selectedPlan.value) return '发布'
+  return publishActionLabel(selectedPlan.value)
+})
+const canEditSelected = computed(() => (selectedPlan.value ? canEdit(selectedPlan.value) : false))
+const canSubmitSelected = computed(() => (selectedPlan.value ? canSubmit(selectedPlan.value) : false))
+const canApproveSelected = computed(() => (selectedPlan.value ? canApprove(selectedPlan.value) : false))
+const canRejectSelected = computed(() => (selectedPlan.value ? canReject(selectedPlan.value) : false))
+const canPublishSelected = computed(() => (selectedPlan.value ? canPublish(selectedPlan.value) : false))
+const canDeactivateSelected = computed(() => (selectedPlan.value ? canDeactivate(selectedPlan.value) : false))
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: Array<number | string>) => {
-    selectedRowKeys.value = keys
+    selectedRowKeys.value = keys.map((key) => String(key))
   }
 }))
 
+function canSubmit(item: MarketingPlanItem) {
+  return ['DRAFT', 'REJECTED', 'INACTIVE'].includes(item.status || '')
+}
+
+function canEdit(item: MarketingPlanItem) {
+  return ['DRAFT', 'REJECTED', 'INACTIVE'].includes(item.status || '')
+}
+
+function canApprove(item: MarketingPlanItem) {
+  return item.status === 'PENDING_APPROVAL'
+}
+
+function canReject(item: MarketingPlanItem) {
+  return item.status === 'PENDING_APPROVAL'
+}
+
+function canPublish(item: MarketingPlanItem) {
+  return ['APPROVED', 'INACTIVE'].includes(item.status || '')
+}
+
+function canDeactivate(item: MarketingPlanItem) {
+  return item.status === 'PUBLISHED'
+}
+
+function publishActionLabel(item: MarketingPlanItem) {
+  return item.status === 'INACTIVE' ? '重新发布' : '发布'
+}
+
 function requireSingleSelection(actionLabel: string) {
-  if (selectedPlans.value.length !== 1) {
+  if (!selectedPlan.value) {
     message.info(`请先勾选 1 条政策后再${actionLabel}`)
     return null
   }
-  return selectedPlans.value[0]
+  return selectedPlan.value
 }
 
 async function fetchData() {
@@ -347,7 +391,11 @@ async function fetchData() {
       keyword: query.keyword?.trim()
     }
     const page = await getMarketingPlanPage(params)
-    rows.value = page.list || []
+    rows.value = (page.list || []).map((item) => ({
+      ...item,
+      id: String(item.id),
+      linkedDepartmentIds: (item.linkedDepartmentIds || []).map((deptId) => String(deptId))
+    }))
     pagination.total = page.total || 0
   } catch (error: any) {
     message.error(error?.message || '加载营销方案失败')
@@ -362,7 +410,7 @@ async function fetchDepartments() {
     const list = page.list || []
     departmentOptions.value = list.map((item: DepartmentItem) => ({
       label: item.deptName || `部门${item.id}`,
-      value: item.id
+      value: String(item.id)
     }))
   } catch {
     departmentOptions.value = []
@@ -400,6 +448,10 @@ function openCreate() {
 }
 
 function openEdit(item: MarketingPlanItem) {
+  if (!canEdit(item)) {
+    message.warning(`当前状态【${statusLabel(item.status)}】不能编辑`)
+    return
+  }
   editingId.value = item.id
   form.moduleType = item.moduleType
   form.title = item.title || ''
@@ -476,31 +528,61 @@ function previewSelected() {
 function editSelected() {
   const plan = requireSingleSelection('编辑')
   if (!plan) return
+  if (!canEdit(plan)) {
+    message.warning(`当前状态【${statusLabel(plan.status)}】不能编辑`)
+    return
+  }
   openEdit(plan)
 }
 
 async function submitSelected() {
   const plan = requireSingleSelection('提交审批')
   if (!plan) return
+  if (!canSubmit(plan)) {
+    message.warning(`当前状态【${statusLabel(plan.status)}】不能提交审批`)
+    return
+  }
   await submitPlan(plan)
 }
 
 async function approveSelected() {
   const plan = requireSingleSelection('审批通过')
   if (!plan) return
+  if (!canApprove(plan)) {
+    message.warning(`当前状态【${statusLabel(plan.status)}】不能审批通过`)
+    return
+  }
   await approvePlan(plan)
 }
 
 function rejectSelected() {
   const plan = requireSingleSelection('驳回')
   if (!plan) return
+  if (!canReject(plan)) {
+    message.warning(`当前状态【${statusLabel(plan.status)}】不能驳回`)
+    return
+  }
   rejectPlan(plan)
 }
 
 async function publishSelected() {
-  const plan = requireSingleSelection('发布')
+  const plan = requireSingleSelection(selectedPublishLabel.value)
   if (!plan) return
+  if (!canPublish(plan)) {
+    message.warning(`当前状态【${statusLabel(plan.status)}】不能${selectedPublishLabel.value}`)
+    return
+  }
   await publishPlan(plan)
+}
+
+async function deactivateSelected() {
+  const plan = requireSingleSelection('停用')
+  if (!plan) return
+  if (!canDeactivate(plan)) {
+    message.warning(`当前状态【${statusLabel(plan.status)}】不能停用`)
+    return
+  }
+  await deactivatePlan(plan)
 }
 
 function deleteSelected() {
@@ -521,6 +603,10 @@ function deleteSelected() {
 }
 
 async function submitPlan(item: MarketingPlanItem) {
+  if (!canSubmit(item)) {
+    message.warning(`当前状态【${statusLabel(item.status)}】不能提交审批`)
+    return
+  }
   try {
     await submitMarketingPlan(item.id)
     message.success('已提交审批')
@@ -531,17 +617,25 @@ async function submitPlan(item: MarketingPlanItem) {
 }
 
 async function approvePlan(item: MarketingPlanItem) {
+  if (!canApprove(item)) {
+    message.warning(`当前状态【${statusLabel(item.status)}】不能审批通过`)
+    return
+  }
   try {
     await approveMarketingPlan(item.id, { remark: '院长审批通过' })
     message.success('已审批通过')
     fetchData()
-    if (previewRecord.value?.id === item.id) await refreshWorkflow(item.id)
+    if (String(previewRecord.value?.id || '') === String(item.id)) await refreshWorkflow(item.id)
   } catch (error: any) {
     message.error(error?.message || '审批失败')
   }
 }
 
 function rejectPlan(item: MarketingPlanItem) {
+  if (!canReject(item)) {
+    message.warning(`当前状态【${statusLabel(item.status)}】不能驳回`)
+    return
+  }
   Modal.confirm({
     title: '确认驳回当前方案吗？',
     content: '驳回后可回到草稿继续修改。',
@@ -549,19 +643,38 @@ function rejectPlan(item: MarketingPlanItem) {
       await rejectMarketingPlan(item.id, { remark: '请补充执行细节后重新提交' })
       message.success('已驳回')
       fetchData()
-      if (previewRecord.value?.id === item.id) await refreshWorkflow(item.id)
+      if (String(previewRecord.value?.id || '') === String(item.id)) await refreshWorkflow(item.id)
     }
   })
 }
 
 async function publishPlan(item: MarketingPlanItem) {
+  if (!canPublish(item)) {
+    message.warning(`当前状态【${statusLabel(item.status)}】不能发布`)
+    return
+  }
   try {
     await publishMarketingPlan(item.id)
     message.success('已发布，已同步生成待办和绩效联动记录')
     fetchData()
-    if (previewRecord.value?.id === item.id) await refreshWorkflow(item.id)
+    if (String(previewRecord.value?.id || '') === String(item.id)) await refreshWorkflow(item.id)
   } catch (error: any) {
     message.error(error?.message || '发布失败')
+  }
+}
+
+async function deactivatePlan(item: MarketingPlanItem) {
+  if (!canDeactivate(item)) {
+    message.warning(`当前状态【${statusLabel(item.status)}】不能停用`)
+    return
+  }
+  try {
+    await deactivateMarketingPlan(item.id)
+    message.success('方案已停用')
+    fetchData()
+    if (String(previewRecord.value?.id || '') === String(item.id)) await refreshWorkflow(item.id)
+  } catch (error: any) {
+    message.error(error?.message || '停用失败')
   }
 }
 
@@ -609,7 +722,7 @@ function statusLabel(status?: string) {
   const map: Record<string, string> = {
     DRAFT: '草稿',
     PENDING_APPROVAL: '待审批',
-    APPROVED: '审批通过',
+    APPROVED: '审批通过（待发布）',
     REJECTED: '已驳回',
     PUBLISHED: '已发布',
     INACTIVE: '停用',
@@ -640,15 +753,6 @@ onMounted(() => {
 <style scoped>
 .plan-tabs {
   margin-top: 6px;
-}
-
-.table-actions {
-  margin-bottom: 12px;
-}
-
-.selection-tip {
-  color: var(--muted);
-  font-size: 12px;
 }
 
 .plan-card {

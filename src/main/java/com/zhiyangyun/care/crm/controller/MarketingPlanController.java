@@ -108,6 +108,14 @@ public class MarketingPlanController {
     return Result.ok(marketingPlanService.publish(orgId, staffId, id));
   }
 
+  @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+  @PostMapping("/{id}/deactivate")
+  public Result<MarketingPlanResponse> deactivate(@PathVariable Long id) {
+    Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
+    return Result.ok(marketingPlanService.deactivate(orgId, staffId, id));
+  }
+
   @PreAuthorize("hasAnyRole('ADMIN','MANAGER','OPERATOR','STAFF')")
   @PostMapping("/{id}/receipt")
   public Result<MarketingPlanResponse> confirmRead(

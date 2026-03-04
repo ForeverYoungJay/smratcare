@@ -6,11 +6,19 @@
       </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openDrawer()">新增档案</a-button>
+        <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑档案</a-button>
+        <a-button :disabled="!selectedSingleRecord" @click="viewSelected">查看</a-button>
+        <a-button :disabled="!canTerminateSingle" @click="terminateSelected">离职</a-button>
+        <a-button :disabled="!canReinstateSingle" @click="reinstateSelected">复职</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" @click="batchTerminate">批量离职</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" @click="batchReinstate">批量复职</a-button>
+        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
       </template>
     </SearchForm>
 
     <DataTable
       rowKey="staffId"
+      :row-selection="rowSelection"
       :columns="columns"
       :data-source="rows"
       :loading="loading"
@@ -22,14 +30,6 @@
           <a-tag :color="record.status === 1 ? 'green' : 'default'">
             {{ record.status === 1 ? '在职' : '离职' }}
           </a-tag>
-        </template>
-        <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a @click="openDrawer(record)">编辑档案</a>
-            <a @click="viewProfile(record)">查看</a>
-            <a v-if="record.status === 1" @click="openTerminate(record)">离职</a>
-            <a v-else @click="submitReinstate(record)">复职</a>
-          </a-space>
         </template>
       </template>
     </DataTable>
@@ -138,7 +138,8 @@ const rows = ref<HrStaffProfile[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
-const staffOptions = ref<Array<{ label: string; value: number }>>([])
+const staffOptions = ref<Array<{ label: string; value: string | number }>>([])
+const selectedRowKeys = ref<string[]>([])
 
 const columns = [
   { title: '工号', dataIndex: 'staffNo', key: 'staffNo', width: 120 },
@@ -147,8 +148,7 @@ const columns = [
   { title: '岗位', dataIndex: 'jobTitle', key: 'jobTitle', width: 140 },
   { title: '用工类型', dataIndex: 'employmentType', key: 'employmentType', width: 120 },
   { title: '离职日期', dataIndex: 'leaveDate', key: 'leaveDate', width: 120 },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
-  { title: '操作', key: 'action', width: 160 }
+  { title: '状态', dataIndex: 'status', key: 'status', width: 100 }
 ]
 
 const drawerOpen = ref(false)
@@ -164,13 +164,27 @@ const employmentOptions = [
 ]
 
 const drawerTitle = computed(() => (form.staffId ? '编辑档案' : '新增档案'))
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: (string | number)[]) => {
+    selectedRowKeys.value = keys.map((item) => String(item))
+  }
+}))
+const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(String(item.staffId))))
+const selectedSingleRecord = computed(() => (selectedRecords.value.length === 1 ? selectedRecords.value[0] : null))
+const canTerminateSingle = computed(() => !!selectedSingleRecord.value && Number(selectedSingleRecord.value.status) === 1)
+const canReinstateSingle = computed(() => !!selectedSingleRecord.value && Number(selectedSingleRecord.value.status) !== 1)
 
 async function fetchData() {
   loading.value = true
   try {
     const res: PageResult<HrStaffProfile> = await getHrStaffPage(query)
-    rows.value = res.list
+    rows.value = (res.list || []).map((item) => ({
+      ...item,
+      staffId: String(item.staffId)
+    }))
     pagination.total = res.total || res.list.length
+    selectedRowKeys.value = []
   } catch {
     rows.value = []
   } finally {
@@ -194,15 +208,15 @@ function onReset() {
 
 async function loadStaffOptions(keyword?: string) {
   const res: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: 50, keyword })
-  staffOptions.value = res.list.map((item) => ({ label: item.realName || item.username, value: item.id }))
+  staffOptions.value = res.list.map((item) => ({ label: item.realName || item.username, value: String(item.id) }))
 }
 
 async function searchStaff(val: string) {
   await loadStaffOptions(val)
 }
 
-function onStaffChange(val: number) {
-  const selected = staffOptions.value.find((item) => item.value === val)
+function onStaffChange(val: string | number) {
+  const selected = staffOptions.value.find((item) => String(item.value) === String(val))
   if (selected) {
     form.realName = selected.label
   }
@@ -217,13 +231,13 @@ async function openDrawer(record?: HrStaffProfile) {
     await loadStaffOptions()
   }
   if (record?.staffId && record?.realName) {
-    if (!staffOptions.value.some((item) => item.value === record.staffId)) {
-      staffOptions.value = [{ label: record.realName, value: record.staffId }, ...staffOptions.value]
+    if (!staffOptions.value.some((item) => String(item.value) === String(record.staffId))) {
+      staffOptions.value = [{ label: record.realName, value: String(record.staffId) }, ...staffOptions.value]
     }
   }
   if (record?.staffId) {
     try {
-      const profile = await getHrProfile(record.staffId)
+      const profile = await getHrProfile(String(record.staffId))
       Object.assign(form, profile)
     } catch {
       // ignore
@@ -269,7 +283,7 @@ async function submit() {
 
 const terminateOpen = ref(false)
 const terminating = ref(false)
-const terminateForm = reactive<{ staffId?: number; leaveDate?: any; leaveReason?: string }>({})
+const terminateForm = reactive<{ staffId?: string | number; leaveDate?: any; leaveReason?: string }>({})
 
 function openTerminate(record: HrStaffProfile) {
   terminateForm.staffId = record.staffId
@@ -289,7 +303,7 @@ async function submitTerminate() {
     if (terminateForm.leaveReason) {
       params.leaveReason = terminateForm.leaveReason
     }
-    await terminateStaff(params)
+    await terminateStaff({ ...params, staffId: String(params.staffId) })
     message.success('已设置离职')
     terminateOpen.value = false
     fetchData()
@@ -303,7 +317,7 @@ async function submitTerminate() {
 async function submitReinstate(record: HrStaffProfile) {
   if (!record.staffId) return
   try {
-    await reinstateStaff({ staffId: record.staffId })
+    await reinstateStaff({ staffId: String(record.staffId) })
     message.success('已复职')
     fetchData()
   } catch {
@@ -311,6 +325,85 @@ async function submitReinstate(record: HrStaffProfile) {
   }
 }
 
+function requireSingleSelection(action: string) {
+  if (!selectedSingleRecord.value) {
+    message.info(`请先勾选 1 条员工档案后再${action}`)
+    return null
+  }
+  return selectedSingleRecord.value
+}
+
+async function editSelected() {
+  const record = requireSingleSelection('编辑')
+  if (!record) return
+  await openDrawer(record)
+}
+
+async function viewSelected() {
+  const record = requireSingleSelection('查看')
+  if (!record) return
+  await viewProfile(record)
+}
+
+function terminateSelected() {
+  const record = requireSingleSelection('离职')
+  if (!record) return
+  if (Number(record.status) !== 1) {
+    message.info('所选员工已是离职状态')
+    return
+  }
+  openTerminate(record)
+}
+
+async function reinstateSelected() {
+  const record = requireSingleSelection('复职')
+  if (!record) return
+  if (Number(record.status) === 1) {
+    message.info('所选员工已是在职状态')
+    return
+  }
+  await submitReinstate(record)
+}
+
+async function batchTerminate() {
+  if (selectedRowKeys.value.length === 0) return
+  const validRecords = selectedRecords.value.filter((item) => Number(item.status) === 1)
+  if (validRecords.length === 0) {
+    message.info('勾选项中没有在职员工，无需批量离职')
+    return
+  }
+  try {
+    await Promise.all(validRecords.map((item) => terminateStaff({ staffId: String(item.staffId) })))
+    message.success(`批量离职完成，共处理 ${validRecords.length} 条`)
+    fetchData()
+  } catch {
+    message.error('批量离职失败')
+  }
+}
+
+async function batchReinstate() {
+  if (selectedRowKeys.value.length === 0) return
+  const validRecords = selectedRecords.value.filter((item) => Number(item.status) !== 1)
+  if (validRecords.length === 0) {
+    message.info('勾选项中没有离职员工，无需批量复职')
+    return
+  }
+  try {
+    await Promise.all(validRecords.map((item) => reinstateStaff({ staffId: String(item.staffId) })))
+    message.success(`批量复职完成，共处理 ${validRecords.length} 条`)
+    fetchData()
+  } catch {
+    message.error('批量复职失败')
+  }
+}
+
 loadStaffOptions()
 fetchData()
 </script>
+
+<style scoped>
+.selection-tip {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+</style>

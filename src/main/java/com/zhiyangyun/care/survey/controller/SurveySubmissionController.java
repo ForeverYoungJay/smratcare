@@ -6,12 +6,15 @@ import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.audit.service.AuditLogService;
 import com.zhiyangyun.care.survey.entity.SurveySubmission;
 import com.zhiyangyun.care.survey.entity.SurveySubmissionItem;
+import com.zhiyangyun.care.survey.entity.SurveyTemplate;
 import com.zhiyangyun.care.survey.model.SurveyPerformanceItem;
 import com.zhiyangyun.care.survey.model.SurveyStatsSummaryResponse;
 import com.zhiyangyun.care.survey.model.SurveySubmissionAnswerItem;
 import com.zhiyangyun.care.survey.model.SurveySubmissionRequest;
 import com.zhiyangyun.care.survey.model.SurveySubmissionResponse;
 import com.zhiyangyun.care.survey.service.SurveySubmissionService;
+import com.zhiyangyun.care.survey.model.SurveyTemplateDetailResponse;
+import com.zhiyangyun.care.survey.service.SurveyTemplateService;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -19,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,11 +34,34 @@ import org.springframework.web.bind.annotation.RestController;
 @PreAuthorize("hasAnyRole('ADMIN','STAFF','GUARD','FAMILY')")
 public class SurveySubmissionController {
   private final SurveySubmissionService submissionService;
+  private final SurveyTemplateService templateService;
   private final AuditLogService auditLogService;
 
-  public SurveySubmissionController(SurveySubmissionService submissionService, AuditLogService auditLogService) {
+  public SurveySubmissionController(
+      SurveySubmissionService submissionService,
+      SurveyTemplateService templateService,
+      AuditLogService auditLogService) {
     this.submissionService = submissionService;
+    this.templateService = templateService;
     this.auditLogService = auditLogService;
+  }
+
+  @GetMapping("/templates/page")
+  public Result<IPage<SurveyTemplate>> publishedTemplatePage(
+      @RequestParam(defaultValue = "1") long pageNo,
+      @RequestParam(defaultValue = "20") long pageSize,
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String targetType) {
+    return Result.ok(templateService.page(AuthContext.getOrgId(), pageNo, pageSize, keyword, 1, targetType));
+  }
+
+  @GetMapping("/templates/{id}")
+  public Result<SurveyTemplateDetailResponse> publishedTemplateDetail(@PathVariable Long id) {
+    SurveyTemplateDetailResponse detail = templateService.getDetail(AuthContext.getOrgId(), id);
+    if (detail == null || detail.getStatus() == null || detail.getStatus() != 1) {
+      return Result.error(404, "Template not found");
+    }
+    return Result.ok(detail);
   }
 
   @PostMapping("/submissions")

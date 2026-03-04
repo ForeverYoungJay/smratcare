@@ -2,8 +2,21 @@
   <PageContainer title="中医体质评估" subTitle="评估中心 > 中医体质评估">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="长者"><a-input v-model:value="query.keyword" placeholder="姓名/建议要点/评估人" allow-clear /></a-form-item>
+      <a-form-item label="评估人"><a-input v-model:value="query.assessorName" placeholder="评估人姓名" allow-clear style="width: 140px" /></a-form-item>
       <a-form-item label="体质类型">
         <a-select v-model:value="query.constitutionType" allow-clear style="width: 180px" :options="constitutionOptions" />
+      </a-form-item>
+      <a-form-item label="是否复评">
+        <a-select v-model:value="query.isReassessment" allow-clear style="width: 120px">
+          <a-select-option :value="1">是</a-select-option>
+          <a-select-option :value="0">否</a-select-option>
+        </a-select>
+      </a-form-item>
+      <a-form-item label="家属可见">
+        <a-select v-model:value="query.familyVisible" allow-clear style="width: 120px">
+          <a-select-option :value="1">是</a-select-option>
+          <a-select-option :value="0">否</a-select-option>
+        </a-select>
       </a-form-item>
       <a-form-item label="状态">
         <a-select v-model:value="query.status" allow-clear style="width: 120px">
@@ -40,7 +53,10 @@
     <StatefulBlock :loading="loading" :error="tableError" :empty="!loading && !tableError && rows.length === 0" empty-text="暂无中医体质评估记录" @retry="fetchData">
       <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="false" :pagination="pagination" @change="onTableChange">
         <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'constitution'">
+          <template v-if="column.key === 'elderBed'">
+            {{ record.elderName || '-' }} / {{ bedNoMap[record.elderId || 0] || '-' }}
+          </template>
+          <template v-else-if="column.key === 'constitution'">
             {{ constitutionLabel(record.constitutionPrimary) }} / {{ constitutionLabel(record.constitutionSecondary) }}
           </template>
           <template v-else-if="column.key === 'status'">
@@ -125,6 +141,7 @@ import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
+import { getElderDetail } from '../../api/elder'
 import {
   createTcmAssessment,
   deleteTcmAssessment,
@@ -140,9 +157,20 @@ const loading = ref(false)
 const tableError = ref('')
 const summaryLoading = ref(false)
 const summaryError = ref('')
+const bedNoMap = reactive<Record<number, string>>({})
 const rows = ref<MedicalTcmAssessment[]>([])
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
-const query = reactive({ keyword: '', constitutionType: '', status: '', dateRange: [] as any[], pageNo: 1, pageSize: 10 })
+const query = reactive({
+  keyword: '',
+  assessorName: '',
+  constitutionType: '',
+  isReassessment: undefined as number | undefined,
+  familyVisible: undefined as number | undefined,
+  status: '',
+  dateRange: [] as any[],
+  pageNo: 1,
+  pageSize: 10
+})
 const summary = reactive<MedicalTcmAssessmentSummary>({
   totalCount: 0,
   draftCount: 0,
@@ -156,7 +184,7 @@ const summary = reactive<MedicalTcmAssessmentSummary>({
 })
 
 const columns = [
-  { title: '长者', dataIndex: 'elderName', key: 'elderName', width: 120 },
+  { title: '长者/床位', key: 'elderBed', width: 200 },
   { title: '体质结论', key: 'constitution', width: 220 },
   { title: '建议要点', dataIndex: 'suggestionPoints', key: 'suggestionPoints' },
   { title: '评估时间', dataIndex: 'assessmentDate', key: 'assessmentDate', width: 120 },
@@ -217,8 +245,9 @@ function resetForm() {
 
 function openCreate() {
   resetForm()
-  if (route.query.residentId) {
-    form.elderId = Number(route.query.residentId)
+  const residentId = route.query.residentId ?? route.query.elderId
+  if (residentId) {
+    form.elderId = Number(residentId)
     ensureSelectedElder(form.elderId, route.query.residentName ? String(route.query.residentName) : undefined)
   }
   if (route.query.residentName) {
@@ -265,21 +294,40 @@ function autoCompute() {
 }
 
 function buildParams() {
+  const residentId = route.query.residentId ?? route.query.elderId
   const params: any = {
     pageNo: query.pageNo,
     pageSize: query.pageSize,
     keyword: query.keyword || undefined,
+    assessorName: query.assessorName || undefined,
     constitutionType: query.constitutionType || undefined,
+    isReassessment: query.isReassessment,
+    familyVisible: query.familyVisible,
     status: query.status || undefined
   }
   if (query.dateRange?.length === 2) {
     params.dateFrom = dayjs(query.dateRange[0]).format('YYYY-MM-DD')
     params.dateTo = dayjs(query.dateRange[1]).format('YYYY-MM-DD')
   }
-  if (route.query.residentId) {
-    params.elderId = Number(route.query.residentId)
+  if (residentId) {
+    params.elderId = Number(residentId)
   }
   return params
+}
+
+async function loadBedNos(records: MedicalTcmAssessment[]) {
+  const elderIds = Array.from(new Set(records.map((item) => Number(item.elderId)).filter((id) => Number.isFinite(id) && id > 0)))
+  await Promise.all(
+    elderIds.map(async (elderId) => {
+      if (bedNoMap[elderId]) return
+      try {
+        const detail = await getElderDetail(elderId) as any
+        bedNoMap[elderId] = detail?.bedNo || '-'
+      } catch {
+        bedNoMap[elderId] = '-'
+      }
+    })
+  )
 }
 
 async function fetchData() {
@@ -294,6 +342,7 @@ async function fetchData() {
       getTcmAssessmentSummary(params)
     ])
     rows.value = res.list || []
+    await loadBedNos(rows.value)
     pagination.total = res.total || 0
     Object.assign(summary, sum || {})
   } catch (error: any) {
@@ -316,10 +365,14 @@ function onTableChange(pag: any) {
 
 function onReset() {
   query.keyword = ''
+  query.assessorName = ''
   query.constitutionType = ''
+  query.isReassessment = undefined
+  query.familyVisible = undefined
   query.status = ''
   query.dateRange = []
   query.pageNo = 1
+  query.pageSize = pagination.pageSize
   pagination.current = 1
   fetchData()
 }
@@ -369,7 +422,7 @@ async function submit() {
 
 async function publish(record: MedicalTcmAssessment) {
   await publishTcmAssessment(record.id)
-  message.success('发布成功，已可回写 Resident360 风险卡')
+  message.success('发布成功，已可回写长者总览风险卡')
   fetchData()
 }
 
@@ -383,5 +436,8 @@ onMounted(() => {
   resetForm()
   searchElders('')
   fetchData()
+  if ((route.query.from === 'resident360' || route.query.from === 'medicalCare') && (route.query.residentId || route.query.elderId)) {
+    openCreate()
+  }
 })
 </script>

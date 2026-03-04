@@ -1,5 +1,6 @@
 <template>
-  <PageContainer title="合同签约" sub-title="营销建合同 -> 长者管理入住评估 -> 入住办理 -> 最终签署">
+  <PageContainer :title="pageTitle" :sub-title="pageSubTitle">
+    <MarketingQuickNav />
     <a-card class="card-elevated" :bordered="false">
       <a-row :gutter="12">
         <a-col :span="6">
@@ -89,7 +90,7 @@
         :hint="flowGuardHint"
         @action="handleFlowGuardAction"
       />
-      <div class="table-actions">
+      <MarketingListToolbar :tip="`已勾选 ${selectedCount} 条`">
         <a-space>
           <a-button type="primary" @click="openForm()">新增合同</a-button>
           <a-button :disabled="!hasSingleSelection" @click="viewSelected">查看</a-button>
@@ -98,9 +99,8 @@
           <a-button :disabled="!hasSingleSelection" @click="admissionSelected">入住办理</a-button>
           <a-button :disabled="!hasSingleSelection" @click="finalizeSelected">最终签署</a-button>
           <a-button :disabled="selectedCount === 0" danger @click="batchDelete">删除</a-button>
-          <span class="selection-tip">已勾选 {{ selectedCount }} 条</span>
         </a-space>
-      </div>
+      </MarketingListToolbar>
       <a-table
         :data-source="tableRows"
         :columns="columns"
@@ -234,12 +234,14 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import FlowGuardBar from '../../components/FlowGuardBar.vue'
+import MarketingQuickNav from './components/MarketingQuickNav.vue'
+import MarketingListToolbar from './components/MarketingListToolbar.vue'
 import {
   batchDeleteContracts,
   createContractAttachment,
@@ -258,6 +260,18 @@ import { getAdmissionRecords } from '../../api/elderLifecycle'
 import type { ContractAttachmentItem, CrmContractItem, ElderItem, PageResult } from '../../types'
 
 const router = useRouter()
+const route = useRoute()
+const props = withDefaults(defineProps<{
+  statusPreset?: 'pending_sign' | 'signed' | 'pending_assessment' | 'pending_bed_select' | ''
+  title?: string
+  subTitle?: string
+}>(), {
+  statusPreset: '',
+  title: '合同签约',
+  subTitle: '营销建合同 -> 长者管理入住评估 -> 入住办理 -> 最终签署'
+})
+const pageTitle = computed(() => props.title || '合同签约')
+const pageSubTitle = computed(() => props.subTitle || '营销建合同 -> 长者管理入住评估 -> 入住办理 -> 最终签署')
 const loading = ref(false)
 const submitting = ref(false)
 const open = ref(false)
@@ -295,6 +309,27 @@ const query = reactive({
   pageNo: 1,
   pageSize: 10
 })
+
+function applyStatusPreset() {
+  const statusPreset = String(props.statusPreset || route.query.status || '').trim()
+  if (statusPreset === 'pending_sign') {
+    query.flowStage = 'PENDING_SIGN'
+    return
+  }
+  if (statusPreset === 'signed') {
+    query.flowStage = 'SIGNED'
+    return
+  }
+  if (statusPreset === 'pending_assessment') {
+    query.flowStage = 'PENDING_ASSESSMENT'
+    return
+  }
+  if (statusPreset === 'pending_bed_select') {
+    query.flowStage = 'PENDING_BED_SELECT'
+    return
+  }
+  query.flowStage = undefined
+}
 
 const form = reactive<Partial<CrmContractItem>>({})
 const rules: FormRules = {
@@ -380,13 +415,11 @@ function handleFlowGuardAction(item: { actionKey?: string }) {
     return
   }
   if (item.actionKey === 'go-assessment') {
-    const params = new URLSearchParams()
-    params.set('autoOpen', '1')
-    params.set('mode', 'new')
-    if (record.leadId) params.set('leadId', String(record.leadId))
-    if (record.contractNo) params.set('contractNo', record.contractNo)
-    if (record.elderName) params.set('elderName', record.elderName)
-    router.push(`/elder/resident360/admission-assessment?${params.toString()}`)
+    const query: Record<string, string> = { autoOpen: '1', mode: 'new' }
+    if (record.leadId) query.leadId = String(record.leadId)
+    if (record.contractNo) query.contractNo = record.contractNo
+    if (record.elderName) query.elderName = record.elderName
+    router.push({ path: '/elder/admission-assessment', query })
     return
   }
   if (item.actionKey === 'go-admission') {
@@ -1168,7 +1201,27 @@ async function ensureElderFromLead(lead: CrmContractItem): Promise<ElderItem> {
   })
 }
 
-onMounted(fetchData)
+onMounted(() => {
+  applyStatusPreset()
+  fetchData()
+})
+
+watch(
+  () => route.query.status,
+  () => {
+    applyStatusPreset()
+    query.pageNo = 1
+    fetchData()
+  }
+)
+watch(
+  () => props.statusPreset,
+  () => {
+    applyStatusPreset()
+    query.pageNo = 1
+    fetchData()
+  }
+)
 
 watch(
   () => tableRows.value.map((item) => `${item.id}-${item.contractNo || ''}`).join(','),
@@ -1181,16 +1234,6 @@ watch(
 <style scoped>
 .search-bar {
   margin-bottom: 12px;
-}
-
-.table-actions {
-  margin-top: 12px;
-  margin-bottom: 12px;
-}
-
-.selection-tip {
-  color: rgba(0, 0, 0, 0.45);
-  font-size: 12px;
 }
 
 .board-item {

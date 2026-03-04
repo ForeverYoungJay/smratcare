@@ -253,7 +253,7 @@ const searchRouteMap = [
   { label: '健康服务与医护账户一体化', route: '/medical-care/integrated-account' },
   { label: '消防报表统计', route: '/fire/data-stats' },
   { label: '消防日间巡查', route: '/fire/day-patrol' },
-  { label: 'Resident 360', route: '/elder/resident-360' }
+  { label: '长者总览', route: '/elder/resident-360' }
 ]
 
 const topStats = computed(() => [
@@ -273,7 +273,7 @@ const topStats = computed(() => [
     title: '库存预警',
     value: summary.inventoryLowStockCount || 0,
     desc: `采购草稿 ${summary.materialPurchaseDraftCount || 0} 条`,
-    route: '/material/alerts'
+    route: '/logistics/storage/alerts'
   },
   {
     title: '长者状态异常',

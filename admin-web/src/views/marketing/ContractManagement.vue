@@ -1,5 +1,6 @@
 <template>
   <PageContainer title="合同到期管理" sub-title="合同到期提醒、短信触达与统一维护">
+    <MarketingQuickNav parent-path="/marketing/contracts" />
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item label="合同编号">
@@ -24,7 +25,7 @@
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <div class="table-actions">
+      <MarketingListToolbar :tip="`已勾选 ${selectedCount} 条`">
         <a-space>
           <a-button @click="exportList">导出</a-button>
           <a-button :disabled="selectedCount !== 1" @click="sendSmsSelected">短信</a-button>
@@ -32,9 +33,8 @@
           <a-button :disabled="selectedCount !== 1" danger @click="removeSelected">删除</a-button>
           <a-button :disabled="selectedCount === 0" danger @click="batchDelete">批量删除</a-button>
           <a-button @click="settingReminder">到期提醒设置</a-button>
-          <span class="selection-tip">已勾选 {{ selectedCount }} 条</span>
         </a-space>
-      </div>
+      </MarketingListToolbar>
       <a-table
         :data-source="rows"
         :columns="columns"
@@ -82,6 +82,8 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
+import MarketingQuickNav from './components/MarketingQuickNav.vue'
+import MarketingListToolbar from './components/MarketingListToolbar.vue'
 import {
   batchDeleteContracts,
   createContractSmsTasks,
@@ -343,14 +345,5 @@ onMounted(fetchData)
 <style scoped>
 .search-bar {
   margin-bottom: 12px;
-}
-
-.table-actions {
-  margin-bottom: 12px;
-}
-
-.selection-tip {
-  color: var(--muted);
-  font-size: 12px;
 }
 </style>

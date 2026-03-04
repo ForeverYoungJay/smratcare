@@ -11,6 +11,7 @@ import com.zhiyangyun.care.life.entity.MaintenanceRequest;
 import com.zhiyangyun.care.life.mapper.MaintenanceRequestMapper;
 import com.zhiyangyun.care.life.model.MaintenanceRequestCreateRequest;
 import jakarta.validation.Valid;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -78,6 +79,9 @@ public class MaintenanceController {
     entity.setAssigneeName(request.getAssigneeName());
     entity.setIssueType(request.getIssueType());
     entity.setDescription(request.getDescription());
+    entity.setLaborCost(safeAmount(request.getLaborCost()));
+    entity.setMaterialCost(safeAmount(request.getMaterialCost()));
+    entity.setTotalCost(resolveTotalCost(request.getTotalCost(), request.getLaborCost(), request.getMaterialCost()));
     entity.setPriority(request.getPriority() == null ? "NORMAL" : request.getPriority());
     entity.setStatus(request.getStatus() == null ? "OPEN" : request.getStatus());
     entity.setReportedAt(request.getReportedAt() == null ? LocalDateTime.now() : request.getReportedAt());
@@ -99,6 +103,9 @@ public class MaintenanceController {
     entity.setAssigneeName(request.getAssigneeName());
     entity.setIssueType(request.getIssueType());
     entity.setDescription(request.getDescription());
+    entity.setLaborCost(safeAmount(request.getLaborCost()));
+    entity.setMaterialCost(safeAmount(request.getMaterialCost()));
+    entity.setTotalCost(resolveTotalCost(request.getTotalCost(), request.getLaborCost(), request.getMaterialCost()));
     entity.setPriority(request.getPriority() == null ? entity.getPriority() : request.getPriority());
     entity.setStatus(request.getStatus() == null ? entity.getStatus() : request.getStatus());
     entity.setReportedAt(request.getReportedAt() == null ? entity.getReportedAt() : request.getReportedAt());
@@ -135,5 +142,21 @@ public class MaintenanceController {
     }
     Room room = roomMapper.selectById(roomId);
     return room == null ? null : room.getRoomNo();
+  }
+
+  private BigDecimal safeAmount(BigDecimal value) {
+    if (value == null || value.compareTo(BigDecimal.ZERO) < 0) {
+      return BigDecimal.ZERO;
+    }
+    return value;
+  }
+
+  private BigDecimal resolveTotalCost(BigDecimal totalCost, BigDecimal laborCost, BigDecimal materialCost) {
+    BigDecimal safeLabor = safeAmount(laborCost);
+    BigDecimal safeMaterial = safeAmount(materialCost);
+    if (totalCost == null || totalCost.compareTo(BigDecimal.ZERO) < 0) {
+      return safeLabor.add(safeMaterial);
+    }
+    return totalCost;
   }
 }

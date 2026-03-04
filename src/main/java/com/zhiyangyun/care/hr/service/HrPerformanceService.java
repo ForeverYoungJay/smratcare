@@ -7,5 +7,5 @@ import com.zhiyangyun.care.hr.model.StaffPerformanceSummaryResponse;
 public interface HrPerformanceService {
   StaffPerformanceSummaryResponse summary(Long orgId, Long staffId, String dateFrom, String dateTo);
 
-  List<StaffPerformanceRankItem> ranking(Long orgId, String dateFrom, String dateTo, String sortBy);
+  List<StaffPerformanceRankItem> ranking(Long orgId, String dateFrom, String dateTo, String sortBy, String staffCategory);
 }

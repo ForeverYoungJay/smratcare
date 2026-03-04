@@ -34,6 +34,8 @@ public interface MarketingPlanService {
 
   MarketingPlanResponse publish(Long orgId, Long staffId, Long id);
 
+  MarketingPlanResponse deactivate(Long orgId, Long staffId, Long id);
+
   MarketingPlanResponse confirmRead(Long orgId, Long staffId, Long id, MarketingPlanReadConfirmRequest request);
 
   List<MarketingPlanReceiptResponse> listReceipts(Long orgId, Long id);

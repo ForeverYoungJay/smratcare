@@ -12,11 +12,17 @@
       </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openEdit()">新增计划</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" @click="batchStart">批量开始</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" @click="batchDone">批量完成</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" @click="batchCancel">批量取消</a-button>
+        <a-button :disabled="!selectedSingleRecord || !canEditSelected" @click="editSelected">编辑</a-button>
+        <a-button :disabled="!selectedSingleRecord || !canStartSelected" @click="startSelected">开始</a-button>
+        <a-button :disabled="!selectedSingleRecord || !canDoneSelected" @click="doneSelected">完成</a-button>
+        <a-button :disabled="!selectedSingleRecord || !canCancelSelected" @click="cancelSelected">取消</a-button>
+        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+        <a-button :disabled="selectedStartIds.length === 0" @click="batchStart">批量开始</a-button>
+        <a-button :disabled="selectedDoneIds.length === 0" @click="batchDone">批量完成</a-button>
+        <a-button :disabled="selectedCancelIds.length === 0" @click="batchCancel">批量取消</a-button>
         <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
         <a-button @click="downloadExport">导出CSV</a-button>
+        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条，批量状态流转按当前状态自动过滤</span>
       </template>
     </SearchForm>
 
@@ -32,15 +38,6 @@
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
           <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
-        </template>
-        <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a :style="{ color: (record.status === 'DONE' || record.status === 'CANCELLED') ? '#999' : '' }" @click="openEdit(record)">编辑</a>
-            <a :style="{ color: record.status !== 'PLANNED' ? '#999' : '' }" @click="start(record)">开始</a>
-            <a :style="{ color: record.status !== 'IN_PROGRESS' ? '#999' : '' }" @click="done(record)">完成</a>
-            <a :style="{ color: (record.status === 'DONE' || record.status === 'CANCELLED') ? '#999' : '' }" @click="cancel(record)">取消</a>
-            <a @click="remove(record)" style="color: #ff4d4f">删除</a>
-          </a-space>
         </template>
       </template>
     </DataTable>
@@ -134,7 +131,7 @@ const query = reactive({
   pageSize: 10
 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
-const selectedRowKeys = ref<number[]>([])
+const selectedRowKeys = ref<string[]>([])
 
 const columns = [
   { title: '计划标题', dataIndex: 'title', key: 'title', width: 200 },
@@ -142,8 +139,7 @@ const columns = [
   { title: '组织人', dataIndex: 'organizer', key: 'organizer', width: 120 },
   { title: '地点', dataIndex: 'location', key: 'location', width: 140 },
   { title: '参与对象', dataIndex: 'participantTarget', key: 'participantTarget', width: 160 },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 110 },
-  { title: '操作', key: 'action', width: 140 }
+  { title: '状态', dataIndex: 'status', key: 'status', width: 110 }
 ]
 
 const statusOptions = [
@@ -161,9 +157,24 @@ const form = reactive<Partial<OaActivityPlan>>({ status: 'PLANNED' })
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: (string | number)[]) => {
-    selectedRowKeys.value = keys.map((item) => Number(item))
+    selectedRowKeys.value = keys.map((item) => String(item))
   }
 }))
+const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(String(item.id))))
+const selectedSingleRecord = computed(() => (selectedRecords.value.length === 1 ? selectedRecords.value[0] : null))
+const canEditSelected = computed(() => !!selectedSingleRecord.value && selectedSingleRecord.value.status !== 'DONE' && selectedSingleRecord.value.status !== 'CANCELLED')
+const canStartSelected = computed(() => selectedSingleRecord.value?.status === 'PLANNED')
+const canDoneSelected = computed(() => selectedSingleRecord.value?.status === 'IN_PROGRESS')
+const canCancelSelected = computed(() => !!selectedSingleRecord.value && selectedSingleRecord.value.status !== 'DONE' && selectedSingleRecord.value.status !== 'CANCELLED')
+const selectedStartIds = computed(() =>
+  selectedRecords.value.filter((item) => item.status === 'PLANNED').map((item) => String(item.id))
+)
+const selectedDoneIds = computed(() =>
+  selectedRecords.value.filter((item) => item.status === 'IN_PROGRESS').map((item) => String(item.id))
+)
+const selectedCancelIds = computed(() =>
+  selectedRecords.value.filter((item) => item.status !== 'DONE' && item.status !== 'CANCELLED').map((item) => String(item.id))
+)
 
 function statusText(status?: string) {
   if (status === 'IN_PROGRESS') return '进行中'
@@ -189,7 +200,10 @@ async function fetchData() {
     }
     delete params.range
     const res: PageResult<OaActivityPlan> = await getActivityPlanPage(params)
-    rows.value = res.list
+    rows.value = (res.list || []).map((item) => ({
+      ...item,
+      id: String(item.id)
+    }))
     pagination.total = res.total || res.list.length
     selectedRowKeys.value = []
   } finally {
@@ -246,45 +260,92 @@ async function submit() {
 }
 
 async function remove(record: OaActivityPlan) {
-  await deleteActivityPlan(record.id)
+  await deleteActivityPlan(String(record.id))
   fetchData()
 }
 
 async function start(record: OaActivityPlan) {
   if (record.status !== 'PLANNED') return
-  await startActivityPlan(record.id)
+  await startActivityPlan(String(record.id))
   fetchData()
 }
 
 async function done(record: OaActivityPlan) {
   if (record.status !== 'IN_PROGRESS') return
-  await completeActivityPlan(record.id)
+  await completeActivityPlan(String(record.id))
   fetchData()
 }
 
 async function cancel(record: OaActivityPlan) {
   if (record.status === 'DONE' || record.status === 'CANCELLED') return
-  await cancelActivityPlan(record.id)
+  await cancelActivityPlan(String(record.id))
   fetchData()
 }
 
+function requireSingleSelection(action: string) {
+  if (!selectedSingleRecord.value) {
+    message.info(`请先勾选 1 条计划后再${action}`)
+    return null
+  }
+  return selectedSingleRecord.value
+}
+
+function editSelected() {
+  const record = requireSingleSelection('编辑')
+  if (!record) return
+  openEdit(record)
+}
+
+async function startSelected() {
+  const record = requireSingleSelection('开始')
+  if (!record) return
+  await start(record)
+}
+
+async function doneSelected() {
+  const record = requireSingleSelection('完成')
+  if (!record) return
+  await done(record)
+}
+
+async function cancelSelected() {
+  const record = requireSingleSelection('取消')
+  if (!record) return
+  await cancel(record)
+}
+
+async function removeSelected() {
+  const record = requireSingleSelection('删除')
+  if (!record) return
+  await remove(record)
+}
+
 async function batchStart() {
-  if (selectedRowKeys.value.length === 0) return
-  const affected = await batchStartActivityPlan(selectedRowKeys.value)
+  if (selectedStartIds.value.length === 0) {
+    message.info('勾选项中没有可开始计划')
+    return
+  }
+  const affected = await batchStartActivityPlan(selectedStartIds.value)
   message.success(`批量开始，共处理 ${affected || 0} 条`)
   fetchData()
 }
 
 async function batchDone() {
-  if (selectedRowKeys.value.length === 0) return
-  const affected = await batchCompleteActivityPlan(selectedRowKeys.value)
+  if (selectedDoneIds.value.length === 0) {
+    message.info('勾选项中没有可完成计划')
+    return
+  }
+  const affected = await batchCompleteActivityPlan(selectedDoneIds.value)
   message.success(`批量完成，共处理 ${affected || 0} 条`)
   fetchData()
 }
 
 async function batchCancel() {
-  if (selectedRowKeys.value.length === 0) return
-  const affected = await batchCancelActivityPlan(selectedRowKeys.value)
+  if (selectedCancelIds.value.length === 0) {
+    message.info('勾选项中没有可取消计划')
+    return
+  }
+  const affected = await batchCancelActivityPlan(selectedCancelIds.value)
   message.success(`批量取消，共处理 ${affected || 0} 条`)
   fetchData()
 }
@@ -318,3 +379,10 @@ async function downloadExport() {
 
 fetchData()
 </script>
+
+<style scoped>
+.selection-tip {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+</style>

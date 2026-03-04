@@ -1,5 +1,6 @@
 <template>
   <PageContainer title="转换率统计" sub-title="线索到签约的漏斗转化分析">
+    <MarketingQuickNav parent-path="/marketing/reports" />
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline">
         <a-form-item label="开始日期">
@@ -40,6 +41,7 @@
       <a-col :xs="12" :sm="6" v-for="item in cards" :key="item.title">
         <a-card class="card-elevated" :bordered="false">
           <a-statistic :title="item.title" :value="item.value" />
+          <a style="font-size: 12px;" @click="drillDown(item.stage)">查看明细</a>
         </a-card>
       </a-col>
     </a-row>
@@ -59,12 +61,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import VChart from 'vue-echarts'
 import PageContainer from '../../../components/PageContainer.vue'
+import MarketingQuickNav from '../components/MarketingQuickNav.vue'
 import { getMarketingConversionReport } from '../../../api/marketing'
 import { getStaffPage } from '../../../api/staff'
+import { useReportQueryCache } from '../../../composables/useReportQueryCache'
+import { buildContractRoute, buildLeadRoute, buildReservationRoute } from '../../../utils/marketingNav'
 import { exportCsv } from '../../../utils/export'
 import type { MarketingConversionReport, MarketingReportQuery, PageResult, StaffItem } from '../../../types'
 
@@ -81,13 +86,14 @@ const report = ref<MarketingConversionReport>({
   contractRate: 0
 })
 const query = reactive<MarketingReportQuery>({})
+const queryCache = useReportQueryCache<MarketingReportQuery>('conversion')
 const staffOptions = ref<Array<{ label: string; value: number }>>([])
 
 const cards = computed(() => [
-  { title: '咨询总量', value: report.value.consultCount },
-  { title: '意向总量', value: report.value.intentCount },
-  { title: '预订总量', value: report.value.reservationCount },
-  { title: '签约总量', value: report.value.contractCount }
+  { title: '咨询总量', value: report.value.consultCount, stage: '咨询' },
+  { title: '意向总量', value: report.value.intentCount, stage: '意向' },
+  { title: '预订总量', value: report.value.reservationCount, stage: '预订' },
+  { title: '签约总量', value: report.value.contractCount, stage: '签约' }
 ])
 
 const columns = [
@@ -132,11 +138,16 @@ const funnelOption = computed(() => ({
 }))
 
 function drillDown(stage: string) {
-  if (stage === '咨询') router.push({ path: '/marketing/sales/pipeline', query: { tab: 'consultation' } })
-  if (stage === '意向') router.push({ path: '/marketing/sales/pipeline', query: { tab: 'intent' } })
-  if (stage === '预订') router.push({ path: '/marketing/sales/reservation' })
-  if (stage === '失效') router.push({ path: '/marketing/sales/invalid' })
-  if (stage === '签约') router.push({ path: '/marketing/contract-management' })
+  const commonQuery = {
+    source: query.source,
+    consultDateFrom: query.dateFrom,
+    consultDateTo: query.dateTo
+  }
+  if (stage === '咨询') router.push(buildLeadRoute('all', { tab: 'consultation', ...commonQuery }))
+  if (stage === '意向') router.push(buildLeadRoute('intent', commonQuery))
+  if (stage === '预订') router.push(buildReservationRoute('records', commonQuery))
+  if (stage === '失效') router.push(buildLeadRoute('invalid', commonQuery))
+  if (stage === '签约') router.push(buildContractRoute('signed'))
 }
 
 function exportData() {
@@ -152,6 +163,7 @@ function reset() {
   query.dateTo = undefined
   query.source = undefined
   query.staffId = undefined
+  queryCache.clear()
   loadData()
 }
 
@@ -172,7 +184,16 @@ async function loadStaff() {
 }
 
 onMounted(async () => {
+  Object.assign(query, queryCache.restore())
   await loadStaff()
   await loadData()
 })
+
+watch(
+  () => ({ ...query }),
+  (value) => {
+    queryCache.persist(value)
+  },
+  { deep: true }
+)
 </script>

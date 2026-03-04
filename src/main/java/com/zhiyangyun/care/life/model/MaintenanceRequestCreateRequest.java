@@ -1,6 +1,7 @@
 package com.zhiyangyun.care.life.model;
 
 import jakarta.validation.constraints.NotBlank;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.Data;
 
@@ -18,6 +19,12 @@ public class MaintenanceRequestCreateRequest {
 
   @NotBlank
   private String description;
+
+  private BigDecimal laborCost;
+
+  private BigDecimal materialCost;
+
+  private BigDecimal totalCost;
 
   private String priority;
 

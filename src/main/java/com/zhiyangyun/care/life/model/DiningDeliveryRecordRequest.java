@@ -25,5 +25,15 @@ public class DiningDeliveryRecordRequest {
 
   private String status;
 
+  private String failureReason;
+
+  private String redispatchStatus;
+
+  private LocalDateTime redispatchAt;
+
+  private String redispatchByName;
+
+  private String redispatchRemark;
+
   private String remark;
 }

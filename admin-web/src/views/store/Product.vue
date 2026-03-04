@@ -1,5 +1,23 @@
 <template>
   <PageContainer :title="pageTitle" :subTitle="pageSubTitle">
+    <a-card v-if="isStorageMode" class="card-elevated" :bordered="false" style="margin-bottom: 16px;">
+      <a-alert
+        type="info"
+        show-icon
+        message="当前为仓储视角：商品主数据与商城共享，商品维护统一在「商城与商品 > 商品管理」完成。"
+      />
+      <div class="link-actions">
+        <a-space wrap>
+          <a-button type="primary" @click="goToCommerceProduct">去商城维护商品</a-button>
+          <a-button @click="goToCategory">商品大类</a-button>
+          <a-button @click="goToTag">商品标签</a-button>
+          <a-button @click="goToStockQuery">库存查询</a-button>
+          <a-button @click="goToInbound">入库管理</a-button>
+          <a-button @click="goToOutbound">出库管理</a-button>
+        </a-space>
+      </div>
+    </a-card>
+
     <a-card class="card-elevated" :bordered="false">
       <a-form layout="inline" :model="query" class="search-form">
         <a-form-item label="关键词">
@@ -26,7 +44,8 @@
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
       <div class="table-actions">
         <a-space>
-          <a-button type="primary" @click="openCreate">新增商品</a-button>
+          <a-button v-if="!isStorageMode" type="primary" @click="openCreate">新增商品</a-button>
+          <a-button v-else type="primary" @click="goToCommerceProduct">去商城维护</a-button>
           <a-button @click="exportCsvData">导出CSV</a-button>
         </a-space>
       </div>
@@ -67,11 +86,13 @@
             </a-space>
           </template>
         </vxe-column>
-        <vxe-column title="操作" width="220" fixed="right">
+        <vxe-column :title="isStorageMode ? '联动操作' : '操作'" :width="isStorageMode ? 280 : 220" fixed="right">
           <template #default="{ row }">
             <a-space>
-              <a @click="openEdit(row)">编辑</a>
-              <a @click="toggleStatus(row)">{{ row.status === 1 ? '下架' : '上架' }}</a>
+              <a v-if="!isStorageMode" @click="openEdit(row)">编辑</a>
+              <a v-if="!isStorageMode" @click="toggleStatus(row)">{{ row.status === 1 ? '下架' : '上架' }}</a>
+              <a v-if="isStorageMode" @click="goToStockQuery">查看库存</a>
+              <a v-if="isStorageMode" @click="goToCommerceProduct">商品维护</a>
             </a-space>
           </template>
         </vxe-column>
@@ -88,7 +109,7 @@
       />
     </a-card>
 
-    <a-drawer v-model:open="editorOpen" title="商品信息" width="520" @close="resetEditor">
+    <a-drawer v-if="!isStorageMode" v-model:open="editorOpen" title="商品信息" width="520" @close="resetEditor">
       <a-form layout="vertical" :model="form" :rules="rules" ref="formRef">
         <a-form-item label="商品名称" name="productName" required>
           <a-input v-model:value="form.productName" />
@@ -129,6 +150,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
+import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportCsv } from '../../utils/export'
 import { getProductPage, createProduct, updateProduct, getProductTagList, getProductCategoryList } from '../../api/store'
@@ -137,11 +159,15 @@ import type { PageResult, ProductItem, ProductTagItem, ProductCategoryItem } fro
 const props = withDefaults(defineProps<{
   title?: string
   subTitle?: string
+  mode?: 'storage' | 'commerce'
 }>(), {
   title: '商品管理',
-  subTitle: '维护商品信息、标签与安全库存'
+  subTitle: '维护商品信息、标签与安全库存',
+  mode: 'commerce'
 })
 
+const router = useRouter()
+const isStorageMode = computed(() => props.mode === 'storage')
 const pageTitle = props.title
 const pageSubTitle = props.subTitle
 
@@ -259,6 +285,10 @@ function exportCsvData() {
 }
 
 function openCreate() {
+  if (isStorageMode.value) {
+    goToCommerceProduct()
+    return
+  }
   Object.assign(form, {
     id: undefined,
     productName: '',
@@ -274,6 +304,10 @@ function openCreate() {
 }
 
 function openEdit(row: ProductItem) {
+  if (isStorageMode.value) {
+    goToCommerceProduct()
+    return
+  }
   Object.assign(form, {
     id: row.id,
     productName: row.productName,
@@ -296,6 +330,10 @@ function resetEditor() {
 }
 
 async function submit() {
+  if (isStorageMode.value) {
+    goToCommerceProduct()
+    return
+  }
   try {
     await formRef.value?.validate()
     saving.value = true
@@ -324,6 +362,10 @@ async function submit() {
 }
 
 function toggleStatus(row: ProductItem) {
+  if (isStorageMode.value) {
+    goToCommerceProduct()
+    return
+  }
   Modal.confirm({
     title: row.status === 1 ? '确认下架该商品？' : '确认上架该商品？',
     onOk: async () => {
@@ -332,6 +374,30 @@ function toggleStatus(row: ProductItem) {
       fetchData()
     }
   })
+}
+
+function goToCommerceProduct() {
+  router.push('/logistics/commerce/product')
+}
+
+function goToCategory() {
+  router.push('/logistics/commerce/category')
+}
+
+function goToTag() {
+  router.push('/logistics/commerce/tag')
+}
+
+function goToStockQuery() {
+  router.push('/logistics/storage/stock-query')
+}
+
+function goToInbound() {
+  router.push('/logistics/storage/inbound')
+}
+
+function goToOutbound() {
+  router.push('/logistics/storage/outbound')
 }
 
 onMounted(() => {
@@ -349,6 +415,9 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   margin-bottom: 8px;
+}
+.link-actions {
+  margin-top: 12px;
 }
 .drawer-footer {
   margin-top: 16px;

@@ -24,11 +24,16 @@
       </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openDrawer()">新增培训</a-button>
+        <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
+        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
       </template>
     </SearchForm>
 
     <DataTable
       rowKey="id"
+      :row-selection="rowSelection"
       :columns="columns"
       :data-source="rows"
       :loading="loading"
@@ -40,12 +45,6 @@
           <a-tag :color="record.status === 1 ? 'green' : 'default'">
             {{ record.status === 1 ? '完成' : '未完成' }}
           </a-tag>
-        </template>
-        <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a @click="openDrawer(record)">编辑</a>
-            <a @click="remove(record)">删除</a>
-          </a-space>
         </template>
       </template>
     </DataTable>
@@ -106,7 +105,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
@@ -117,7 +116,7 @@ import { getStaffPage } from '../../api/rbac'
 import type { StaffTrainingRecord, PageResult, StaffItem } from '../../types'
 
 const query = reactive({
-  staffId: undefined as number | undefined,
+  staffId: undefined as string | number | undefined,
   keyword: undefined as string | undefined,
   range: undefined as [Dayjs, Dayjs] | undefined,
   pageNo: 1,
@@ -127,6 +126,7 @@ const rows = ref<StaffTrainingRecord[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
+const selectedRowKeys = ref<string[]>([])
 
 const columns = [
   { title: '员工', dataIndex: 'staffName', key: 'staffName', width: 120 },
@@ -137,18 +137,25 @@ const columns = [
   { title: '结束日期', dataIndex: 'endDate', key: 'endDate', width: 120 },
   { title: '时长', dataIndex: 'hours', key: 'hours', width: 100 },
   { title: '成绩', dataIndex: 'score', key: 'score', width: 100 },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
-  { title: '操作', key: 'action', width: 140 }
+  { title: '状态', dataIndex: 'status', key: 'status', width: 100 }
 ]
 
 const drawerOpen = ref(false)
 const form = reactive<Partial<StaffTrainingRecord>>({ status: 1 })
 const formRange = ref<[Dayjs, Dayjs] | undefined>()
-const staffOptions = ref<Array<{ label: string; value: number }>>([])
+const staffOptions = ref<Array<{ label: string; value: string | number }>>([])
 const statusOptions = [
   { label: '完成', value: 1 },
   { label: '未完成', value: 0 }
 ]
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: (string | number)[]) => {
+    selectedRowKeys.value = keys.map((item) => String(item))
+  }
+}))
+const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(String(item.id))))
+const selectedSingleRecord = computed(() => (selectedRecords.value.length === 1 ? selectedRecords.value[0] : null))
 
 const drawerTitle = computed(() => (form.id ? '编辑培训' : '新增培训'))
 
@@ -166,8 +173,13 @@ async function fetchData() {
       params.dateTo = query.range[1].format('YYYY-MM-DD')
     }
     const res: PageResult<StaffTrainingRecord> = await getHrTrainingPage(params)
-    rows.value = res.list
+    rows.value = (res.list || []).map((item) => ({
+      ...item,
+      id: String(item.id),
+      staffId: item.staffId == null ? item.staffId : String(item.staffId)
+    }))
     pagination.total = res.total || res.list.length
+    selectedRowKeys.value = []
   } catch {
     rows.value = []
   } finally {
@@ -207,12 +219,12 @@ function openDrawer(record?: StaffTrainingRecord) {
 
 async function loadStaffOptions(keyword?: string) {
   const res: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: 50, keyword })
-  staffOptions.value = res.list.map((item) => ({ label: item.realName || item.username, value: item.id }))
+  staffOptions.value = res.list.map((item) => ({ label: item.realName || item.username, value: String(item.id) }))
 }
 
-function ensureStaffOption(id: number, name: string) {
-  if (!staffOptions.value.some((item) => item.value === id)) {
-    staffOptions.value = [{ label: name, value: id }, ...staffOptions.value]
+function ensureStaffOption(id: string | number, name: string) {
+  if (!staffOptions.value.some((item) => String(item.value) === String(id))) {
+    staffOptions.value = [{ label: name, value: String(id) }, ...staffOptions.value]
   }
 }
 
@@ -257,6 +269,62 @@ async function remove(record: StaffTrainingRecord) {
   }
 }
 
+function requireSingleSelection(action: string) {
+  if (!selectedSingleRecord.value) {
+    message.info(`请先勾选 1 条培训记录后再${action}`)
+    return null
+  }
+  return selectedSingleRecord.value
+}
+
+function editSelected() {
+  const record = requireSingleSelection('编辑')
+  if (!record) return
+  openDrawer(record)
+}
+
+async function removeSelected() {
+  const record = requireSingleSelection('删除')
+  if (!record) return
+  Modal.confirm({
+    title: '确认删除培训记录？',
+    content: `将删除「${record.trainingName || '未命名培训'}」记录，删除后不可恢复。`,
+    okText: '确认删除',
+    okType: 'danger',
+    cancelText: '取消',
+    onOk: async () => {
+      await remove(record)
+    }
+  })
+}
+
+async function batchRemove() {
+  if (selectedRowKeys.value.length === 0) return
+  Modal.confirm({
+    title: '确认批量删除培训记录？',
+    content: `将删除 ${selectedRecords.value.length} 条培训记录，删除后不可恢复。`,
+    okText: '确认删除',
+    okType: 'danger',
+    cancelText: '取消',
+    onOk: async () => {
+      try {
+        await Promise.all(selectedRecords.value.map((record) => deleteHrTraining(String(record.id))))
+        message.success(`批量删除成功，共处理 ${selectedRecords.value.length} 条`)
+        fetchData()
+      } catch {
+        message.error('批量删除失败')
+      }
+    }
+  })
+}
+
 loadStaffOptions()
 fetchData()
 </script>
+
+<style scoped>
+.selection-tip {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+</style>

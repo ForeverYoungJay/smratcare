@@ -3,12 +3,19 @@
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="form" layout="inline" class="search-bar">
         <a-form-item label="模板">
-          <a-select v-model:value="form.templateId" show-search placeholder="请选择模板" style="width: 240px" @change="onTemplateChange">
+          <a-select
+            v-model:value="form.templateId"
+            show-search
+            placeholder="请选择模板"
+            style="width: 240px"
+            :disabled="fromQr"
+            @change="onTemplateChange"
+          >
             <a-select-option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">{{ tpl.templateName }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="对象类型">
-          <a-select v-model:value="form.targetType" style="width: 160px">
+          <a-select v-model:value="form.targetType" style="width: 160px" :disabled="fromQr" @change="loadTemplates">
             <a-select-option value="ELDER">老人</a-select-option>
             <a-select-option value="STAFF">员工</a-select-option>
             <a-select-option value="FAMILY">家属</a-select-option>
@@ -22,9 +29,16 @@
           <a-input v-model:value="form.relatedStaffId" placeholder="可选" style="width: 160px" />
         </a-form-item>
         <a-form-item label="匿名">
-          <a-switch v-model:checked="form.anonymousFlag" :checked-value="1" :un-checked-value="0" />
+          <a-switch v-model:checked="form.anonymousFlag" :checked-value="1" :un-checked-value="0" :disabled="fromQr" />
         </a-form-item>
       </a-form>
+      <a-alert
+        v-if="fromQr"
+        type="info"
+        show-icon
+        style="margin-top: 8px"
+        message="当前通过家属端二维码进入，模板与对象已自动锁定。"
+      />
     </a-card>
 
     <a-card v-if="detail" class="card-elevated" :bordered="false" style="margin-top: 16px;">
@@ -105,38 +119,100 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
-import { getSurveyTemplatePage, getSurveyTemplateDetail, submitSurvey } from '../../api/survey'
+import {
+  getSurveyPublishedTemplateDetail,
+  getSurveyPublishedTemplatePage,
+  submitSurvey
+} from '../../api/survey'
 import type { SurveyTemplate, SurveyTemplateDetail, SurveySubmissionRequest, SurveySubmissionAnswerItem, PageResult } from '../../types'
 
+const route = useRoute()
 const templates = ref<SurveyTemplate[]>([])
 const detail = ref<SurveyTemplateDetail | null>(null)
 const submitting = ref(false)
+const fromQr = ref(false)
 
 const form = reactive({
-  templateId: undefined as number | undefined,
+  templateId: undefined as string | undefined,
   targetType: 'ELDER',
-  targetId: undefined as number | undefined,
-  relatedStaffId: undefined as number | undefined,
+  targetId: undefined as string | undefined,
+  relatedStaffId: undefined as string | undefined,
   anonymousFlag: 0
 })
 
-const answers = reactive<Record<number, any>>({})
-const scores = reactive<Record<number, number | undefined>>({})
+const answers = reactive<Record<string, any>>({})
+const scores = reactive<Record<string, number | undefined>>({})
 
 const optionCache = new Map<string, { label: string; value: any }[]>()
 
 async function loadTemplates() {
-  const res: PageResult<SurveyTemplate> = await getSurveyTemplatePage({ pageNo: 1, pageSize: 200, status: 1 })
-  templates.value = res.list
+  const res: PageResult<SurveyTemplate> = await getSurveyPublishedTemplatePage({
+    pageNo: 1,
+    pageSize: 200,
+    targetType: form.targetType
+  })
+  templates.value = (res.list || []).map((item) => ({
+    ...item,
+    id: String(item.id)
+  }))
+}
+
+function normalizeId(value: unknown) {
+  const text = String(value || '').trim()
+  return text ? text : undefined
+}
+
+function normalizeTargetType(value: unknown) {
+  const text = String(value || '').trim().toUpperCase()
+  if (['ELDER', 'STAFF', 'FAMILY', 'OTHER'].includes(text)) {
+    return text
+  }
+  return undefined
+}
+
+async function initByQuery() {
+  const templateId = normalizeId(route.query.templateId)
+  const targetType = normalizeTargetType(route.query.targetType)
+  const anonymous = String(route.query.anonymous || '').trim()
+  const targetId = normalizeId(route.query.targetId)
+  const relatedStaffId = normalizeId(route.query.relatedStaffId)
+  let shouldReloadTemplates = false
+  if (targetType) {
+    shouldReloadTemplates = targetType !== form.targetType
+    form.targetType = targetType
+  }
+  if (shouldReloadTemplates) {
+    await loadTemplates()
+  }
+  if (targetId) {
+    form.targetId = targetId
+  }
+  if (relatedStaffId) {
+    form.relatedStaffId = relatedStaffId
+  }
+  if (anonymous === '1' || anonymous.toLowerCase() === 'true') {
+    form.anonymousFlag = 1
+  }
+  if (templateId) {
+    form.templateId = templateId
+    fromQr.value = true
+    await onTemplateChange()
+  }
 }
 
 async function onTemplateChange() {
   if (!form.templateId) return
-  detail.value = await getSurveyTemplateDetail(form.templateId)
-  Object.keys(answers).forEach((key) => delete answers[Number(key)])
-  Object.keys(scores).forEach((key) => delete scores[Number(key)])
+  try {
+    detail.value = await getSurveyPublishedTemplateDetail(form.templateId)
+    Object.keys(answers).forEach((key) => delete answers[key])
+    Object.keys(scores).forEach((key) => delete scores[key])
+  } catch (error: any) {
+    detail.value = null
+    message.error(error?.message || '模板加载失败')
+  }
 }
 
 function parseOptions(optionsJson?: string | null) {
@@ -181,7 +257,7 @@ function buildAnswers(): SurveySubmissionAnswerItem[] {
       item.answerText = value
     }
     if (detail.value?.scoreEnabled === 1 && q.scoreEnabled === 1 && q.questionType !== 'RATING' && q.questionType !== 'SCORE') {
-      item.score = scores[q.questionId]
+      item.score = scores[String(q.questionId)]
     }
     return item
   })
@@ -191,7 +267,7 @@ function validateRequired(): boolean {
   if (!detail.value) return false
   for (const q of detail.value.questions) {
     if (q.requiredFlag === 1) {
-      const val = answers[q.questionId]
+      const val = answers[String(q.questionId)]
       if (val === undefined || val === null || (Array.isArray(val) && val.length === 0) || (typeof val === 'string' && val.trim() === '')) {
         message.warning(`请完成必答题：${q.title}`)
         return false
@@ -209,21 +285,24 @@ async function submit() {
     const payload: SurveySubmissionRequest = {
       templateId: form.templateId,
       targetType: form.targetType,
-      targetId: form.targetId,
-      relatedStaffId: form.relatedStaffId,
+      targetId: normalizeId(form.targetId),
+      relatedStaffId: normalizeId(form.relatedStaffId),
       anonymousFlag: form.anonymousFlag,
       answers: buildAnswers()
     }
     const res = await submitSurvey(payload)
     message.success(`提交成功，得分：${res.scoreTotal ?? 0}`)
-  } catch {
-    message.error('提交失败')
+  } catch (error: any) {
+    message.error(error?.message || '提交失败')
   } finally {
     submitting.value = false
   }
 }
 
-onMounted(loadTemplates)
+onMounted(async () => {
+  await loadTemplates()
+  await initByQuery()
+})
 </script>
 
 <style scoped>

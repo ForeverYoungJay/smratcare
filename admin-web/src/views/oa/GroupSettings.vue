@@ -12,10 +12,15 @@
       </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openEdit()">新增分组</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" @click="batchEnable">批量启用</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" @click="batchDisable">批量停用</a-button>
+        <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
+        <a-button :disabled="!selectedSingleRecord || !canEnableSelected" @click="enableSelected">启用</a-button>
+        <a-button :disabled="!selectedSingleRecord || !canDisableSelected" @click="disableSelected">停用</a-button>
+        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+        <a-button :disabled="selectedEnableIds.length === 0" @click="batchEnable">批量启用</a-button>
+        <a-button :disabled="selectedDisableIds.length === 0" @click="batchDisable">批量停用</a-button>
         <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
         <a-button @click="downloadExport">导出CSV</a-button>
+        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条，批量启停只对状态不同项生效</span>
       </template>
     </SearchForm>
 
@@ -33,14 +38,6 @@
           <a-tag :color="record.status === 'ENABLED' ? 'green' : 'default'">
             {{ record.status === 'ENABLED' ? '启用' : '停用' }}
           </a-tag>
-        </template>
-        <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a @click="openEdit(record)">编辑</a>
-            <a :style="{ color: record.status === 'ENABLED' ? '#999' : '' }" @click="enable(record)">启用</a>
-            <a :style="{ color: record.status === 'DISABLED' ? '#999' : '' }" @click="disable(record)">停用</a>
-            <a @click="remove(record)" style="color: #ff4d4f">删除</a>
-          </a-space>
         </template>
       </template>
     </DataTable>
@@ -107,7 +104,7 @@ const saving = ref(false)
 const rows = ref<OaGroupSetting[]>([])
 const query = reactive({ keyword: '', groupType: '', status: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
-const selectedRowKeys = ref<number[]>([])
+const selectedRowKeys = ref<string[]>([])
 
 const columns = [
   { title: '分组名称', dataIndex: 'groupName', key: 'groupName', width: 180 },
@@ -115,8 +112,7 @@ const columns = [
   { title: '组长', dataIndex: 'leaderName', key: 'leaderName', width: 120 },
   { title: '成员数', dataIndex: 'memberCount', key: 'memberCount', width: 100 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
-  { title: '备注', dataIndex: 'remark', key: 'remark' },
-  { title: '操作', key: 'action', width: 140 }
+  { title: '备注', dataIndex: 'remark', key: 'remark' }
 ]
 
 const statusOptions = [
@@ -125,19 +121,32 @@ const statusOptions = [
 ]
 
 const editOpen = ref(false)
-const form = reactive<Partial<OaGroupSetting>>({ status: 'ENABLED', memberCount: 0 })
+const form = reactive<Partial<OaGroupSetting>>({ id: undefined, status: 'ENABLED', memberCount: 0 })
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: (string | number)[]) => {
-    selectedRowKeys.value = keys.map((item) => Number(item))
+    selectedRowKeys.value = keys.map((item) => String(item))
   }
 }))
+const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(String(item.id))))
+const selectedSingleRecord = computed(() => (selectedRecords.value.length === 1 ? selectedRecords.value[0] : null))
+const canEnableSelected = computed(() => selectedSingleRecord.value?.status === 'DISABLED')
+const canDisableSelected = computed(() => selectedSingleRecord.value?.status === 'ENABLED')
+const selectedEnableIds = computed(() =>
+  selectedRecords.value.filter((item) => item.status === 'DISABLED').map((item) => String(item.id))
+)
+const selectedDisableIds = computed(() =>
+  selectedRecords.value.filter((item) => item.status === 'ENABLED').map((item) => String(item.id))
+)
 
 async function fetchData() {
   loading.value = true
   try {
     const res: PageResult<OaGroupSetting> = await getGroupSettingPage(query)
-    rows.value = res.list
+    rows.value = (res.list || []).map((item) => ({
+      ...item,
+      id: String(item.id)
+    }))
     pagination.total = res.total || res.list.length
     selectedRowKeys.value = []
   } finally {
@@ -184,32 +193,70 @@ async function submit() {
 }
 
 async function remove(record: OaGroupSetting) {
-  await deleteGroupSetting(record.id)
+  await deleteGroupSetting(String(record.id))
   fetchData()
 }
 
 async function enable(record: OaGroupSetting) {
   if (record.status === 'ENABLED') return
-  await enableGroupSetting(record.id)
+  await enableGroupSetting(String(record.id))
   fetchData()
 }
 
 async function disable(record: OaGroupSetting) {
   if (record.status === 'DISABLED') return
-  await disableGroupSetting(record.id)
+  await disableGroupSetting(String(record.id))
   fetchData()
 }
 
+function requireSingleSelection(action: string) {
+  if (!selectedSingleRecord.value) {
+    message.info(`请先勾选 1 条分组后再${action}`)
+    return null
+  }
+  return selectedSingleRecord.value
+}
+
+function editSelected() {
+  const record = requireSingleSelection('编辑')
+  if (!record) return
+  openEdit(record)
+}
+
+async function enableSelected() {
+  const record = requireSingleSelection('启用')
+  if (!record) return
+  await enable(record)
+}
+
+async function disableSelected() {
+  const record = requireSingleSelection('停用')
+  if (!record) return
+  await disable(record)
+}
+
+async function removeSelected() {
+  const record = requireSingleSelection('删除')
+  if (!record) return
+  await remove(record)
+}
+
 async function batchEnable() {
-  if (selectedRowKeys.value.length === 0) return
-  const affected = await batchEnableGroupSetting(selectedRowKeys.value)
+  if (selectedEnableIds.value.length === 0) {
+    message.info('勾选项中没有可启用分组')
+    return
+  }
+  const affected = await batchEnableGroupSetting(selectedEnableIds.value)
   message.success(`批量启用，共处理 ${affected || 0} 条`)
   fetchData()
 }
 
 async function batchDisable() {
-  if (selectedRowKeys.value.length === 0) return
-  const affected = await batchDisableGroupSetting(selectedRowKeys.value)
+  if (selectedDisableIds.value.length === 0) {
+    message.info('勾选项中没有可停用分组')
+    return
+  }
+  const affected = await batchDisableGroupSetting(selectedDisableIds.value)
   message.success(`批量停用，共处理 ${affected || 0} 条`)
   fetchData()
 }
@@ -239,3 +286,10 @@ async function downloadExport() {
 
 fetchData()
 </script>
+
+<style scoped>
+.selection-tip {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+</style>

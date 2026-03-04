@@ -34,7 +34,7 @@
                 :description="`${item.keyRiskFactors || '暂无因子说明'} · ${item.assessmentDate || '-'}`"
               />
               <template #actions>
-                <a-button type="link" @click="go(`/elder/resident-360?residentId=${item.elderId}&from=medicalCare`)">Resident360</a-button>
+                <a-button type="link" @click="go(`/elder/resident-360?residentId=${item.elderId}&from=medicalCare`)">长者总览</a-button>
               </template>
             </a-list-item>
           </template>
@@ -111,16 +111,16 @@ const cards = computed(() => [
     key: 'A',
     title: '卡片A：我的待办',
     badge: `${summary.pendingCareTaskCount}`,
-    route: '/care/workbench/task-board?date=today',
+    route: '/medical-care/orders?date=today&scope=todo',
     lines: [
       `待执行医嘱 ${summary.pendingMedicalOrderCount} · 待查对 ${summary.pendingReviewCount} · 待审核 ${summary.pendingAuditCount}`,
       `超时任务 ${summary.overdueCareTaskCount} · 未闭环异常 ${summary.unclosedAbnormalCount}`,
       `今日巡查待完成 ${summary.todayInspectionTodoCount}`
     ],
     actions: [
-      { label: '待执行医嘱', route: '/health/medication/medication-registration?filter=to_execute&date=today' },
-      { label: '超时任务', route: '/care/workbench/task-board?date=today&filter=overdue' },
-      { label: '巡查待完成', route: '/health/inspection?filter=pending&date=today' },
+      { label: '待执行医嘱', route: '/medical-care/orders?filter=to_execute&assignee=me&date=today' },
+      { label: '超时任务', route: '/medical-care/care-task-board?date=today&filter=overdue&assignee=me' },
+      { label: '巡查待完成', route: '/medical-care/inspection?filter=pending&assignee=me&date=today' },
       { label: '账户联动', route: '/medical-care/integrated-account' }
     ]
   },
@@ -128,31 +128,31 @@ const cards = computed(() => [
     key: 'C',
     title: '卡片C：医嘱执行概览',
     badge: `${summary.medicalOrderPendingCount}`,
-    route: '/health/medication/medication-registration?date=today',
+    route: '/medical-care/orders?date=today&filter=pending_or_abnormal',
     lines: [
       `今日医嘱 应执行 ${summary.medicalOrderShouldCount} / 已执行 ${summary.medicalOrderDoneCount}`,
       `待执行 ${summary.medicalOrderPendingCount} · 异常 ${summary.medicalOrderAbnormalCount}`,
       `查对完成率 ${summary.orderCheckRate.toFixed(1)}%`
     ],
     actions: [
-      { label: '待执行/异常', route: '/health/medication/medication-registration?date=today&filter=pending_or_abnormal' },
-      { label: '医嘱执行单', route: '/health/medication/medication-registration?date=today&view=ward' }
+      { label: '待执行/异常', route: '/medical-care/orders?date=today&filter=pending_or_abnormal' },
+      { label: '医嘱执行单', route: '/medical-care/orders?date=today&view=ward' }
     ]
   },
   {
     key: 'D',
     title: '卡片D：用药与药品预警',
     badge: `${summary.medicationUndoneCount}`,
-    route: '/health/medication/medication-registration?date=today',
+    route: '/medical-care/nursing-quality?tab=medication&date=today',
     lines: [
       `今日应服 ${summary.medicationShouldCount} · 已服 ${summary.medicationDoneCount} · 未服 ${summary.medicationUndoneCount}`,
       `药库预警 缺药/临期 ${summary.medicationLowStockCount}`,
       `领药申请待处理 ${summary.medicationRequestPendingCount}`
     ],
     actions: [
-      { label: '用药登记', route: '/health/medication/medication-registration?date=today&filter=pending' },
-      { label: '库存预警', route: '/material/alerts?filter=low_or_expiring' },
-      { label: '领药申请', route: '/material/purchase?filter=pending' }
+      { label: '用药登记', route: '/medical-care/medication-registration?date=today&filter=pending' },
+      { label: '库存预警', route: '/logistics/storage/alerts?filter=low_or_expiring' },
+      { label: '领药申请', route: '/logistics/storage/purchase?filter=pending' }
     ]
   },
   {
@@ -175,16 +175,16 @@ const cards = computed(() => [
     key: 'F',
     title: '卡片F：巡查与生命体征',
     badge: `${summary.abnormalInspectionCount}`,
-    route: '/health/inspection?date=today',
+    route: '/medical-care/nursing-quality?tab=vital&date=today',
     lines: [
       `巡查计划 应巡查 ${summary.todayInspectionPlanCount} · 已巡查 ${summary.todayInspectionDoneCount} · 未巡查 ${summary.todayInspectionPendingCount}`,
       `生命体征异常 ${summary.abnormalVital24hCount}`,
       `护理日志待补录 ${summary.nursingLogPendingCount}`
     ],
     actions: [
-      { label: '健康巡查', route: '/health/inspection?date=today' },
+      { label: '健康巡查', route: '/medical-care/inspection?date=today' },
       { label: '健康数据', route: '/health/management/data?date=today' },
-      { label: '护理日志', route: '/health/nursing-log?filter=pending' }
+      { label: '护理日志', route: '/medical-care/nursing-log?filter=pending' }
     ]
   },
   {
@@ -222,15 +222,15 @@ const cards = computed(() => [
     key: 'I',
     title: '卡片I：报表速览',
     badge: `${summary.aiReportGeneratedCount}`,
-    route: '/stats/org/monthly-operation',
+    route: '/medical-care/ai-reports',
     lines: [
       `AI健康评估报告 生成记录 ${summary.aiReportGeneratedCount} · 已发布 ${summary.aiReportPublishedCount}`,
       `高风险心血管提示 ${summary.cvdHighRiskCount} · 需随访 ${summary.cvdNeedFollowupCount}`,
       `支持一键生成巡检/随访/护理干预任务`
     ],
     actions: [
-      { label: '生成巡检任务', route: '/health/inspection?filter=generated_from_ai' },
-      { label: '医护待办', route: '/care/workbench/task-board?filter=generated_from_ai' },
+      { label: '生成巡检任务', route: '/medical-care/inspection?filter=generated_from_ai' },
+      { label: '医护待办', route: '/medical-care/care-task-board?filter=generated_from_ai' },
       { label: '护理任务', route: '/care/workbench/task-board?filter=generated_from_ai' }
     ]
   }

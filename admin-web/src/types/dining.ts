@@ -81,6 +81,11 @@ export interface DiningDeliveryRecord {
   deliveredByName?: string
   deliveredAt?: string
   status?: DiningDeliveryStatus
+  failureReason?: string
+  redispatchStatus?: 'NONE' | 'REDISPATCHED'
+  redispatchAt?: string
+  redispatchByName?: string
+  redispatchRemark?: string
   remark?: string
 }
 

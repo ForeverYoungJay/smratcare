@@ -35,11 +35,14 @@
         <a-col :xs="24" :xl="12" style="margin-bottom: 16px">
           <a-card title="统一作业流" :bordered="false" class="card-elevated">
             <a-space wrap>
+              <a-button @click="go('/medical-care/residents')">长者患者列表</a-button>
+              <a-button @click="go('/medical-care/orders')">医嘱管理</a-button>
               <a-button type="primary" @click="go('/medical-care/care-task-board')">护理任务看板</a-button>
               <a-button @click="go('/medical-care/inspection')">健康巡检</a-button>
               <a-button @click="go('/medical-care/medication-registration')">用药登记</a-button>
               <a-button @click="go('/medical-care/nursing-log')">护理日志</a-button>
               <a-button @click="go('/medical-care/handovers')">交接班</a-button>
+              <a-button @click="go('/medical-care/nursing-quality?tab=medication')">护理与质量中心</a-button>
             </a-space>
           </a-card>
         </a-col>
@@ -48,12 +51,27 @@
             <a-space wrap>
               <a-button @click="go('/medical-care/assessment/tcm')">中医体质评估</a-button>
               <a-button @click="go('/medical-care/assessment/cvd')">心血管风险评估</a-button>
+              <a-button @click="go('/medical-care/ai-reports')">AI健康评估报告</a-button>
               <a-button @click="go('/medical-care/integrated-account')">医护账户联动</a-button>
               <a-button @click="go('/medical-care/workbench')">高级工作台</a-button>
             </a-space>
           </a-card>
         </a-col>
       </a-row>
+
+      <a-card title="全模块入口（3~10）" :bordered="false" class="card-elevated" style="margin-bottom: 16px">
+        <a-space wrap>
+          <a-button type="primary" @click="go('/medical-care/orders')">3. 医嘱管理</a-button>
+          <a-button @click="go('/medical-care/nursing-quality?tab=medication')">4. 用药管理</a-button>
+          <a-button @click="go('/medical-care/nursing-quality?tab=vital')">5. 健康数据与巡查</a-button>
+          <a-button @click="go('/medical-care/nursing-quality?tab=plan')">6. 护理计划与等级</a-button>
+          <a-button @click="go('/medical-care/nursing-quality?tab=task')">7. 护理任务与扫码执行</a-button>
+          <a-button @click="go('/medical-care/nursing-quality?tab=handover')">8. 交接班与班组</a-button>
+          <a-button @click="go('/medical-care/nursing-quality?tab=pharmacy')">9. 药库与药品主数据</a-button>
+          <a-button @click="go('/medical-care/nursing-quality?tab=quality')">10. 质量与报表中心</a-button>
+          <a-button @click="go('/medical-care/ai-reports')">AI健康评估报告</a-button>
+        </a-space>
+      </a-card>
 
       <a-card title="重点提醒" :bordered="false" class="card-elevated">
         <a-descriptions :column="2" bordered size="small">
@@ -145,7 +163,7 @@ const summary = reactive<MedicalCareWorkbenchSummary>({
 })
 
 function currentFilters() {
-  const elderIdRaw = route.query.elderId
+  const elderIdRaw = route.query.elderId ?? route.query.residentId
   const elderId = elderIdRaw == null ? undefined : Number(elderIdRaw)
   const date = typeof route.query.date === 'string' ? route.query.date : undefined
   const status = typeof route.query.status === 'string' ? route.query.status : undefined

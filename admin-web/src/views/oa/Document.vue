@@ -9,8 +9,11 @@
       </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openCreate">新增文档</a-button>
+        <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
+        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
         <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
         <a-button @click="downloadExport">导出CSV</a-button>
+        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
       </template>
     </SearchForm>
 
@@ -22,16 +25,7 @@
       :loading="loading"
       :pagination="pagination"
       @change="handleTableChange"
-    >
-      <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'action'">
-          <a-space>
-            <a-button type="link" @click="openEdit(record)">编辑</a-button>
-            <a-button type="link" danger @click="remove(record)">删除</a-button>
-          </a-space>
-        </template>
-      </template>
-    </DataTable>
+    />
 
     <a-modal v-model:open="editOpen" title="文档" @ok="submit" :confirm-loading="saving" width="640px">
       <a-form layout="vertical">
@@ -84,21 +78,20 @@ const loading = ref(false)
 const rows = ref<OaDocument[]>([])
 const query = reactive({ folder: '', keyword: '', pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
-const selectedRowKeys = ref<number[]>([])
+const selectedRowKeys = ref<string[]>([])
 
 const columns = [
   { title: '文件名', dataIndex: 'name', key: 'name', width: 200 },
   { title: '目录', dataIndex: 'folder', key: 'folder', width: 120 },
   { title: '上传人', dataIndex: 'uploaderName', key: 'uploaderName', width: 120 },
   { title: '上传时间', dataIndex: 'uploadedAt', key: 'uploadedAt', width: 160 },
-  { title: '备注', dataIndex: 'remark', key: 'remark' },
-  { title: '操作', key: 'action', width: 140 }
+  { title: '备注', dataIndex: 'remark', key: 'remark' }
 ]
 
 const editOpen = ref(false)
 const saving = ref(false)
 const form = reactive({
-  id: undefined as number | undefined,
+  id: undefined as string | undefined,
   name: '',
   folder: '',
   url: '',
@@ -109,9 +102,11 @@ const form = reactive({
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: (string | number)[]) => {
-    selectedRowKeys.value = keys.map((item) => Number(item))
+    selectedRowKeys.value = keys.map((item) => String(item))
   }
 }))
+const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(String(item.id))))
+const selectedSingleRecord = computed(() => (selectedRecords.value.length === 1 ? selectedRecords.value[0] : null))
 
 async function fetchData() {
   loading.value = true
@@ -122,7 +117,10 @@ async function fetchData() {
       folder: query.folder,
       keyword: query.keyword
     })
-    rows.value = res.list
+    rows.value = (res.list || []).map((item) => ({
+      ...item,
+      id: String(item.id)
+    }))
     pagination.total = res.total || res.list.length
     selectedRowKeys.value = []
   } finally {
@@ -158,7 +156,7 @@ function openCreate() {
 }
 
 function openEdit(record: OaDocument) {
-  form.id = record.id
+  form.id = String(record.id)
   form.name = record.name
   form.folder = record.folder || ''
   form.url = record.url || ''
@@ -192,8 +190,28 @@ async function submit() {
 }
 
 async function remove(record: OaDocument) {
-  await deleteDocument(record.id)
+  await deleteDocument(String(record.id))
   fetchData()
+}
+
+function requireSingleSelection(action: string) {
+  if (!selectedSingleRecord.value) {
+    message.info(`请先勾选 1 条文档后再${action}`)
+    return null
+  }
+  return selectedSingleRecord.value
+}
+
+function editSelected() {
+  const record = requireSingleSelection('编辑')
+  if (!record) return
+  openEdit(record)
+}
+
+async function removeSelected() {
+  const record = requireSingleSelection('删除')
+  if (!record) return
+  await remove(record)
 }
 
 async function batchRemove() {
@@ -220,3 +238,10 @@ async function downloadExport() {
 
 fetchData()
 </script>
+
+<style scoped>
+.selection-tip {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+</style>

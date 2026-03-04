@@ -209,6 +209,7 @@ public class BedServiceImpl implements BedService {
       ElderProfile elder = bed.getElderId() == null ? null : elderMap.get(bed.getElderId());
       if (elder != null) {
         response.setElderName(elder.getFullName());
+        response.setElderGender(elder.getGender());
         response.setCareLevel(elder.getCareLevel());
       }
       return response;
@@ -290,6 +291,7 @@ public class BedServiceImpl implements BedService {
       ElderProfile elder = bed.getElderId() == null ? null : elderMap.get(bed.getElderId());
       if (elder != null) {
         response.setElderName(elder.getFullName());
+        response.setElderGender(elder.getGender());
         response.setCareLevel(elder.getCareLevel());
       }
       return response;

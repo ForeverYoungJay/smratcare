@@ -45,7 +45,7 @@ export function getNoticePage(params: any) {
   return fetchPage<OaNotice>('/api/oa/notice/page', params)
 }
 
-export function getNotice(id: number) {
+export function getNotice(id: string | number) {
   return request.get<OaNotice>(`/api/oa/notice/${id}`)
 }
 
@@ -53,23 +53,23 @@ export function createNotice(data: Partial<OaNotice>) {
   return request.post<OaNotice>('/api/oa/notice', data)
 }
 
-export function updateNotice(id: number, data: Partial<OaNotice>) {
+export function updateNotice(id: string | number, data: Partial<OaNotice>) {
   return request.put<OaNotice>(`/api/oa/notice/${id}`, data)
 }
 
-export function publishNotice(id: number) {
+export function publishNotice(id: string | number) {
   return request.put<OaNotice>(`/api/oa/notice/${id}/publish`)
 }
 
-export function batchPublishNotice(ids: number[]) {
+export function batchPublishNotice(ids: Array<string | number>) {
   return request.put<number>('/api/oa/notice/batch/publish', { ids })
 }
 
-export function deleteNotice(id: number) {
+export function deleteNotice(id: string | number) {
   return request.delete<void>(`/api/oa/notice/${id}`)
 }
 
-export function batchDeleteNotice(ids: number[]) {
+export function batchDeleteNotice(ids: Array<string | number>) {
   return request.delete<number>('/api/oa/notice/batch', { data: { ids } })
 }
 
@@ -89,23 +89,23 @@ export function createTodo(data: Partial<OaTodo>) {
   return request.post<OaTodo>('/api/oa/todo', data)
 }
 
-export function updateTodo(id: number, data: Partial<OaTodo>) {
+export function updateTodo(id: string | number, data: Partial<OaTodo>) {
   return request.put<OaTodo>(`/api/oa/todo/${id}`, data)
 }
 
-export function completeTodo(id: number) {
+export function completeTodo(id: string | number) {
   return request.put<OaTodo>(`/api/oa/todo/${id}/done`)
 }
 
-export function batchCompleteTodo(ids: number[]) {
+export function batchCompleteTodo(ids: Array<string | number>) {
   return request.put<number>('/api/oa/todo/batch/done', { ids })
 }
 
-export function deleteTodo(id: number) {
+export function deleteTodo(id: string | number) {
   return request.delete<void>(`/api/oa/todo/${id}`)
 }
 
-export function batchDeleteTodo(ids: number[]) {
+export function batchDeleteTodo(ids: Array<string | number>) {
   return request.delete<number>('/api/oa/todo/batch', { data: { ids } })
 }
 
@@ -125,31 +125,31 @@ export function createApproval(data: Partial<OaApproval>) {
   return request.post<OaApproval>('/api/oa/approval', data)
 }
 
-export function updateApproval(id: number, data: Partial<OaApproval>) {
+export function updateApproval(id: string | number, data: Partial<OaApproval>) {
   return request.put<OaApproval>(`/api/oa/approval/${id}`, data)
 }
 
-export function approveApproval(id: number) {
+export function approveApproval(id: string | number) {
   return request.put<OaApproval>(`/api/oa/approval/${id}/approve`)
 }
 
-export function batchApproveApproval(ids: number[]) {
+export function batchApproveApproval(ids: Array<string | number>) {
   return request.put<number>('/api/oa/approval/batch/approve', { ids })
 }
 
-export function rejectApproval(id: number, remark?: string) {
+export function rejectApproval(id: string | number, remark?: string) {
   return request.put<OaApproval>(`/api/oa/approval/${id}/reject`, null, { params: { remark } })
 }
 
-export function batchRejectApproval(ids: number[], remark?: string) {
+export function batchRejectApproval(ids: Array<string | number>, remark?: string) {
   return request.put<number>('/api/oa/approval/batch/reject', { ids, remark })
 }
 
-export function deleteApproval(id: number) {
+export function deleteApproval(id: string | number) {
   return request.delete<void>(`/api/oa/approval/${id}`)
 }
 
-export function batchDeleteApproval(ids: number[]) {
+export function batchDeleteApproval(ids: Array<string | number>) {
   return request.delete<number>('/api/oa/approval/batch', { data: { ids } })
 }
 
@@ -165,15 +165,15 @@ export function createDocument(data: Partial<OaDocument>) {
   return request.post<OaDocument>('/api/oa/document', data)
 }
 
-export function updateDocument(id: number, data: Partial<OaDocument>) {
+export function updateDocument(id: string | number, data: Partial<OaDocument>) {
   return request.put<OaDocument>(`/api/oa/document/${id}`, data)
 }
 
-export function deleteDocument(id: number) {
+export function deleteDocument(id: string | number) {
   return request.delete<void>(`/api/oa/document/${id}`)
 }
 
-export function batchDeleteDocument(ids: number[]) {
+export function batchDeleteDocument(ids: Array<string | number>) {
   return request.delete<number>('/api/oa/document/batch', { data: { ids } })
 }
 
@@ -189,11 +189,11 @@ export function createAlbum(data: Partial<OaAlbum>) {
   return request.post<OaAlbum>('/api/oa/album', data)
 }
 
-export function updateAlbum(id: number, data: Partial<OaAlbum>) {
+export function updateAlbum(id: string | number, data: Partial<OaAlbum>) {
   return request.put<OaAlbum>(`/api/oa/album/${id}`, data)
 }
 
-export function deleteAlbum(id: number) {
+export function deleteAlbum(id: string | number) {
   return request.delete<void>(`/api/oa/album/${id}`)
 }
 
@@ -205,31 +205,31 @@ export function createKnowledge(data: Partial<OaKnowledge>) {
   return request.post<OaKnowledge>('/api/oa/knowledge', data)
 }
 
-export function updateKnowledge(id: number, data: Partial<OaKnowledge>) {
+export function updateKnowledge(id: string | number, data: Partial<OaKnowledge>) {
   return request.put<OaKnowledge>(`/api/oa/knowledge/${id}`, data)
 }
 
-export function publishKnowledge(id: number) {
+export function publishKnowledge(id: string | number) {
   return request.put<OaKnowledge>(`/api/oa/knowledge/${id}/publish`)
 }
 
-export function archiveKnowledge(id: number) {
+export function archiveKnowledge(id: string | number) {
   return request.put<OaKnowledge>(`/api/oa/knowledge/${id}/archive`)
 }
 
-export function batchPublishKnowledge(ids: number[]) {
+export function batchPublishKnowledge(ids: Array<string | number>) {
   return request.put<number>('/api/oa/knowledge/batch/publish', { ids })
 }
 
-export function batchArchiveKnowledge(ids: number[]) {
+export function batchArchiveKnowledge(ids: Array<string | number>) {
   return request.put<number>('/api/oa/knowledge/batch/archive', { ids })
 }
 
-export function deleteKnowledge(id: number) {
+export function deleteKnowledge(id: string | number) {
   return request.delete<void>(`/api/oa/knowledge/${id}`)
 }
 
-export function batchDeleteKnowledge(ids: number[]) {
+export function batchDeleteKnowledge(ids: Array<string | number>) {
   return request.delete<number>('/api/oa/knowledge/batch', { data: { ids } })
 }
 
@@ -245,31 +245,31 @@ export function createGroupSetting(data: Partial<OaGroupSetting>) {
   return request.post<OaGroupSetting>('/api/oa/group-setting', data)
 }
 
-export function updateGroupSetting(id: number, data: Partial<OaGroupSetting>) {
+export function updateGroupSetting(id: string | number, data: Partial<OaGroupSetting>) {
   return request.put<OaGroupSetting>(`/api/oa/group-setting/${id}`, data)
 }
 
-export function enableGroupSetting(id: number) {
+export function enableGroupSetting(id: string | number) {
   return request.put<OaGroupSetting>(`/api/oa/group-setting/${id}/enable`)
 }
 
-export function disableGroupSetting(id: number) {
+export function disableGroupSetting(id: string | number) {
   return request.put<OaGroupSetting>(`/api/oa/group-setting/${id}/disable`)
 }
 
-export function batchEnableGroupSetting(ids: number[]) {
+export function batchEnableGroupSetting(ids: Array<string | number>) {
   return request.put<number>('/api/oa/group-setting/batch/enable', { ids })
 }
 
-export function batchDisableGroupSetting(ids: number[]) {
+export function batchDisableGroupSetting(ids: Array<string | number>) {
   return request.put<number>('/api/oa/group-setting/batch/disable', { ids })
 }
 
-export function deleteGroupSetting(id: number) {
+export function deleteGroupSetting(id: string | number) {
   return request.delete<void>(`/api/oa/group-setting/${id}`)
 }
 
-export function batchDeleteGroupSetting(ids: number[]) {
+export function batchDeleteGroupSetting(ids: Array<string | number>) {
   return request.delete<number>('/api/oa/group-setting/batch', { data: { ids } })
 }
 
@@ -285,39 +285,39 @@ export function createActivityPlan(data: Partial<OaActivityPlan>) {
   return request.post<OaActivityPlan>('/api/oa/activity-plan', data)
 }
 
-export function updateActivityPlan(id: number, data: Partial<OaActivityPlan>) {
+export function updateActivityPlan(id: string | number, data: Partial<OaActivityPlan>) {
   return request.put<OaActivityPlan>(`/api/oa/activity-plan/${id}`, data)
 }
 
-export function startActivityPlan(id: number) {
+export function startActivityPlan(id: string | number) {
   return request.put<OaActivityPlan>(`/api/oa/activity-plan/${id}/start`)
 }
 
-export function completeActivityPlan(id: number) {
+export function completeActivityPlan(id: string | number) {
   return request.put<OaActivityPlan>(`/api/oa/activity-plan/${id}/done`)
 }
 
-export function cancelActivityPlan(id: number) {
+export function cancelActivityPlan(id: string | number) {
   return request.put<OaActivityPlan>(`/api/oa/activity-plan/${id}/cancel`)
 }
 
-export function batchStartActivityPlan(ids: number[]) {
+export function batchStartActivityPlan(ids: Array<string | number>) {
   return request.put<number>('/api/oa/activity-plan/batch/start', { ids })
 }
 
-export function batchCompleteActivityPlan(ids: number[]) {
+export function batchCompleteActivityPlan(ids: Array<string | number>) {
   return request.put<number>('/api/oa/activity-plan/batch/done', { ids })
 }
 
-export function batchCancelActivityPlan(ids: number[]) {
+export function batchCancelActivityPlan(ids: Array<string | number>) {
   return request.put<number>('/api/oa/activity-plan/batch/cancel', { ids })
 }
 
-export function deleteActivityPlan(id: number) {
+export function deleteActivityPlan(id: string | number) {
   return request.delete<void>(`/api/oa/activity-plan/${id}`)
 }
 
-export function batchDeleteActivityPlan(ids: number[]) {
+export function batchDeleteActivityPlan(ids: Array<string | number>) {
   return request.delete<number>('/api/oa/activity-plan/batch', { data: { ids } })
 }
 
@@ -341,23 +341,23 @@ export function createOaTask(data: Partial<OaTask>) {
   return request.post<OaTask>('/api/oa/task', data)
 }
 
-export function updateOaTask(id: number, data: Partial<OaTask>) {
+export function updateOaTask(id: string | number, data: Partial<OaTask>) {
   return request.put<OaTask>(`/api/oa/task/${id}`, data)
 }
 
-export function completeOaTask(id: number) {
+export function completeOaTask(id: string | number) {
   return request.put<OaTask>(`/api/oa/task/${id}/done`)
 }
 
-export function batchCompleteOaTask(ids: number[]) {
+export function batchCompleteOaTask(ids: Array<string | number>) {
   return request.put<number>('/api/oa/task/batch/done', { ids })
 }
 
-export function deleteOaTask(id: number) {
+export function deleteOaTask(id: string | number) {
   return request.delete<void>(`/api/oa/task/${id}`)
 }
 
-export function batchDeleteOaTask(ids: number[]) {
+export function batchDeleteOaTask(ids: Array<string | number>) {
   return request.delete<number>('/api/oa/task/batch', { data: { ids } })
 }
 
@@ -393,14 +393,14 @@ export function createOaWorkReport(data: Partial<OaWorkReport>) {
   return request.post<OaWorkReport>('/api/oa/report', data)
 }
 
-export function updateOaWorkReport(id: number, data: Partial<OaWorkReport>) {
+export function updateOaWorkReport(id: string | number, data: Partial<OaWorkReport>) {
   return request.put<OaWorkReport>(`/api/oa/report/${id}`, data)
 }
 
-export function submitOaWorkReport(id: number) {
+export function submitOaWorkReport(id: string | number) {
   return request.put<OaWorkReport>(`/api/oa/report/${id}/submit`)
 }
 
-export function deleteOaWorkReport(id: number) {
+export function deleteOaWorkReport(id: string | number) {
   return request.delete<void>(`/api/oa/report/${id}`)
 }

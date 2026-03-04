@@ -30,7 +30,7 @@
       </a-card>
       <a-card class="summary" :bordered="false">
         <div class="label">平均分</div>
-        <div class="value">{{ summary.averageScore.toFixed(2) }}</div>
+        <div class="value">{{ Number(summary.averageScore || 0).toFixed(2) }}</div>
       </a-card>
     </div>
 
@@ -42,7 +42,13 @@
         :pagination="false"
         row-key="id"
         :scroll="{ y: 520 }"
-      />
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'targetType'">
+            {{ targetTypeLabel(record.targetType) }}
+          </template>
+        </template>
+      </a-table>
       <a-pagination
         style="margin-top: 16px; text-align: right;"
         :current="query.pageNo"
@@ -60,17 +66,17 @@
 import { onMounted, reactive, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { getSurveyTemplatePage, getSurveyStatsSummary, getSurveySubmissionPage } from '../../api/survey'
-import type { SurveyTemplate, SurveyStatsSummary, PageResult } from '../../types'
+import type { SurveyTemplate, SurveyStatsSummary, SurveySubmissionItem, PageResult } from '../../types'
 
 const templates = ref<SurveyTemplate[]>([])
 const summary = reactive<SurveyStatsSummary>({ totalSubmissions: 0, averageScore: 0, scoreTotal: 0 })
 
 const loading = ref(false)
-const rows = ref<any[]>([])
+const rows = ref<SurveySubmissionItem[]>([])
 const total = ref(0)
 
 const query = reactive({
-  templateId: undefined as number | undefined,
+  templateId: undefined as string | number | undefined,
   dateRange: [] as string[],
   pageNo: 1,
   pageSize: 10
@@ -86,9 +92,20 @@ const columns = [
   { title: '提交时间', dataIndex: 'createTime', key: 'createTime' }
 ]
 
+function targetTypeLabel(value?: string) {
+  if (value === 'ELDER') return '老人'
+  if (value === 'STAFF') return '员工'
+  if (value === 'FAMILY') return '家属'
+  if (value === 'OTHER') return '其他'
+  return value || '-'
+}
+
 async function loadTemplates() {
   const res: PageResult<SurveyTemplate> = await getSurveyTemplatePage({ pageNo: 1, pageSize: 200 })
-  templates.value = res.list
+  templates.value = (res.list || []).map((item) => ({
+    ...item,
+    id: String(item.id)
+  }))
 }
 
 function getDateParams() {
@@ -112,7 +129,12 @@ async function fetchPage() {
       pageSize: query.pageSize,
       templateId: query.templateId
     })
-    rows.value = res.list
+    rows.value = (res.list || []).map((item) => ({
+      ...item,
+      id: String(item.id),
+      templateId: item.templateId == null ? item.templateId : String(item.templateId),
+      targetId: item.targetId == null ? item.targetId : String(item.targetId)
+    }))
     total.value = res.total
   } finally {
     loading.value = false

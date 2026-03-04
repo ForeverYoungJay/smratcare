@@ -69,16 +69,16 @@ public class OaAlbumController {
 
   @PutMapping("/{id}")
   public Result<OaAlbum> update(@PathVariable Long id, @Valid @RequestBody OaAlbumRequest request) {
-    OaAlbum album = albumMapper.selectById(id);
+    OaAlbum album = findAccessibleAlbum(id);
     if (album == null) {
       return Result.ok(null);
     }
     album.setTitle(request.getTitle());
     album.setCategory(request.getCategory());
     album.setCoverUrl(request.getCoverUrl());
-    album.setPhotoCount(request.getPhotoCount());
+    album.setPhotoCount(request.getPhotoCount() == null ? album.getPhotoCount() : request.getPhotoCount());
     album.setShootDate(request.getShootDate());
-    album.setStatus(request.getStatus());
+    album.setStatus(request.getStatus() == null ? album.getStatus() : request.getStatus());
     album.setRemark(request.getRemark());
     albumMapper.updateById(album);
     return Result.ok(album);
@@ -86,11 +86,20 @@ public class OaAlbumController {
 
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
-    OaAlbum album = albumMapper.selectById(id);
+    OaAlbum album = findAccessibleAlbum(id);
     if (album != null) {
       album.setIsDeleted(1);
       albumMapper.updateById(album);
     }
     return Result.ok(null);
+  }
+
+  private OaAlbum findAccessibleAlbum(Long id) {
+    Long orgId = AuthContext.getOrgId();
+    return albumMapper.selectOne(Wrappers.lambdaQuery(OaAlbum.class)
+        .eq(OaAlbum::getId, id)
+        .eq(OaAlbum::getIsDeleted, 0)
+        .eq(orgId != null, OaAlbum::getOrgId, orgId)
+        .last("LIMIT 1"));
   }
 }

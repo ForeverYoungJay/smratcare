@@ -33,6 +33,16 @@
       <div class="table-actions">
         <a-space>
           <a-button type="primary" @click="openForm()">新增模板</a-button>
+          <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
+          <a-button :disabled="!selectedSingleRecord" @click="configQuestionsSelected">配置题目</a-button>
+          <a-button :disabled="!selectedSingleRecord" @click="openQrSelected">二维码</a-button>
+          <a-button :disabled="!canPublishSingle" @click="publishSelected">发布</a-button>
+          <a-button :disabled="!canDisableSingle" @click="disableSelected">停用</a-button>
+          <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+          <a-button :disabled="selectedRowKeys.length === 0" @click="batchPublish">批量发布</a-button>
+          <a-button :disabled="selectedRowKeys.length === 0" @click="batchDisable">批量停用</a-button>
+          <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+          <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
         </a-space>
       </div>
       <a-table
@@ -41,6 +51,7 @@
         :loading="loading"
         :pagination="false"
         row-key="id"
+        :row-selection="tableRowSelection"
         :scroll="{ y: 520 }"
       >
         <template #bodyCell="{ column, record }">
@@ -54,13 +65,6 @@
             <a-tag :color="record.scoreEnabled === 1 ? 'green' : 'default'">
               {{ record.scoreEnabled === 1 ? '是' : '否' }}
             </a-tag>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <a-space>
-              <a-button type="link" @click="openForm(record)">编辑</a-button>
-              <a-button type="link" @click="openQuestions(record)">配置题目</a-button>
-              <a-button type="link" danger @click="remove(record.id)">删除</a-button>
-            </a-space>
           </template>
         </template>
       </a-table>
@@ -132,7 +136,7 @@
         :columns="questionColumns"
         :pagination="false"
         row-key="id"
-        :row-selection="rowSelection"
+        :row-selection="questionRowSelection"
         :scroll="{ y: 520 }"
       >
         <template #bodyCell="{ column, record }">
@@ -141,23 +145,36 @@
           </template>
           <template v-else-if="column.key === 'requiredFlag'">
             <a-switch
-              v-model:checked="questionConfig[record.id].requiredFlag"
+              v-model:checked="questionConfig[questionKey(record)].requiredFlag"
               :checked-value="1"
               :un-checked-value="0"
-              :disabled="!selectedSet.has(record.id)"
+              :disabled="!selectedSet.has(questionKey(record))"
             />
           </template>
           <template v-else-if="column.key === 'weight'">
             <a-input-number
-              v-model:value="questionConfig[record.id].weight"
+              v-model:value="questionConfig[questionKey(record)].weight"
               :min="0"
               :max="10"
               :step="0.1"
-              :disabled="!selectedSet.has(record.id)"
+              :disabled="!selectedSet.has(questionKey(record))"
             />
           </template>
         </template>
       </a-table>
+    </a-modal>
+
+    <a-modal v-model:open="qrOpen" title="家属端问卷二维码" :footer="null" width="460px">
+      <a-space direction="vertical" style="width: 100%" align="center">
+        <img v-if="qrDataUrl" :src="qrDataUrl" alt="问卷二维码" class="qr-img" />
+        <a-empty v-else description="二维码生成中" />
+        <a-typography-text type="secondary">扫码后自动进入家属端问卷填写页</a-typography-text>
+        <a-input v-model:value="qrLink" readonly />
+        <a-space>
+          <a-button @click="copyQrLink">复制链接</a-button>
+          <a-button @click="openQrLink">打开链接</a-button>
+        </a-space>
+      </a-space>
     </a-modal>
   </PageContainer>
 </template>
@@ -166,6 +183,7 @@
 import { onMounted, reactive, ref, computed } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
+import QRCode from 'qrcode'
 import PageContainer from '../../components/PageContainer.vue'
 import {
   getSurveyTemplatePage,
@@ -181,6 +199,7 @@ import type { SurveyTemplate, SurveyQuestion, SurveyTemplateQuestionItem, PageRe
 const loading = ref(false)
 const rows = ref<SurveyTemplate[]>([])
 const total = ref(0)
+const selectedRowKeys = ref<string[]>([])
 
 const query = reactive({
   keyword: '',
@@ -207,10 +226,13 @@ const questionOpen = ref(false)
 const questionList = ref<SurveyQuestion[]>([])
 const questionSaving = ref(false)
 const questionKeyword = ref('')
-const selectedIds = ref<number[]>([])
-const selectedSet = ref(new Set<number>())
-const questionConfig = reactive<Record<number, { requiredFlag: number; weight?: number | null }>>({})
-let activeTemplateId: number | null = null
+const selectedIds = ref<string[]>([])
+const selectedSet = ref(new Set<string>())
+const questionConfig = reactive<Record<string, { requiredFlag: number; weight?: number | null }>>({})
+let activeTemplateId: string | null = null
+const qrOpen = ref(false)
+const qrDataUrl = ref('')
+const qrLink = ref('')
 
 const rules: FormRules = {
   templateCode: [{ required: true, message: '请输入模板编码' }],
@@ -225,8 +247,7 @@ const columns = [
   { title: '状态', dataIndex: 'status', key: 'status', width: 120 },
   { title: '开始日期', dataIndex: 'startDate', key: 'startDate', width: 140 },
   { title: '结束日期', dataIndex: 'endDate', key: 'endDate', width: 140 },
-  { title: '计分', dataIndex: 'scoreEnabled', key: 'scoreEnabled', width: 100 },
-  { title: '操作', key: 'action', width: 240 }
+  { title: '计分', dataIndex: 'scoreEnabled', key: 'scoreEnabled', width: 100 }
 ]
 
 const questionColumns = [
@@ -237,13 +258,23 @@ const questionColumns = [
   { title: '权重', key: 'weight', width: 120 }
 ]
 
-const rowSelection = computed(() => ({
+const questionRowSelection = computed(() => ({
   selectedRowKeys: selectedIds.value,
   onChange: (keys: (string | number)[]) => {
-    selectedIds.value = keys.map((k) => Number(k))
+    selectedIds.value = keys.map((k) => String(k))
     selectedSet.value = new Set(selectedIds.value)
   }
 }))
+const tableRowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: (string | number)[]) => {
+    selectedRowKeys.value = keys.map((k) => String(k))
+  }
+}))
+const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(String(item.id))))
+const selectedSingleRecord = computed(() => (selectedRecords.value.length === 1 ? selectedRecords.value[0] : null))
+const canPublishSingle = computed(() => !!selectedSingleRecord.value && selectedSingleRecord.value.status !== 1)
+const canDisableSingle = computed(() => !!selectedSingleRecord.value && selectedSingleRecord.value.status === 1)
 
 function statusLabel(status?: number) {
   if (status === 0) return '草稿'
@@ -275,6 +306,10 @@ function typeLabel(type?: string) {
   return '-'
 }
 
+function questionKey(question: SurveyQuestion) {
+  return String(question.id)
+}
+
 async function fetchData() {
   loading.value = true
   try {
@@ -285,8 +320,12 @@ async function fetchData() {
       status: query.status,
       targetType: query.targetType
     })
-    rows.value = res.list
+    rows.value = (res.list || []).map((item) => ({
+      ...item,
+      id: String(item.id)
+    }))
     total.value = res.total
+    selectedRowKeys.value = []
   } finally {
     loading.value = false
   }
@@ -333,14 +372,14 @@ async function submit() {
     message.success('保存成功')
     open.value = false
     await fetchData()
-  } catch {
-    message.error('保存失败')
+  } catch (error: any) {
+    message.error(error?.message || '保存失败')
   } finally {
     submitting.value = false
   }
 }
 
-async function remove(id: number) {
+async function remove(id: string | number) {
   Modal.confirm({
     title: '提示',
     content: '确认删除该模板吗？',
@@ -352,8 +391,175 @@ async function remove(id: number) {
   })
 }
 
+async function quickPublish(row: SurveyTemplate) {
+  try {
+    const detail = await getSurveyTemplateDetail(row.id)
+    if (!detail.questions?.length) {
+      message.warning('请先配置题目后再发布')
+      return
+    }
+    await updateSurveyTemplate(row.id, {
+      ...row,
+      status: 1
+    })
+    message.success('模板已发布')
+    await fetchData()
+  } catch (error: any) {
+    message.error(error?.message || '发布失败')
+  }
+}
+
+async function quickDisable(row: SurveyTemplate) {
+  try {
+    await updateSurveyTemplate(row.id, {
+      ...row,
+      status: 2
+    })
+    message.success('模板已停用')
+    await fetchData()
+  } catch (error: any) {
+    message.error(error?.message || '停用失败')
+  }
+}
+
+function requireSingleSelection(action: string) {
+  if (!selectedSingleRecord.value) {
+    message.info(`请先勾选 1 条模板后再${action}`)
+    return null
+  }
+  return selectedSingleRecord.value
+}
+
+function editSelected() {
+  const record = requireSingleSelection('编辑')
+  if (!record) return
+  openForm(record)
+}
+
+async function configQuestionsSelected() {
+  const record = requireSingleSelection('配置题目')
+  if (!record) return
+  await openQuestions(record)
+}
+
+async function openQrSelected() {
+  const record = requireSingleSelection('查看二维码')
+  if (!record) return
+  await openQr(record)
+}
+
+async function publishSelected() {
+  const record = requireSingleSelection('发布')
+  if (!record) return
+  if (record.status === 1) {
+    message.info('所选模板已发布')
+    return
+  }
+  await quickPublish(record)
+}
+
+async function disableSelected() {
+  const record = requireSingleSelection('停用')
+  if (!record) return
+  if (record.status !== 1) {
+    message.info('所选模板不是发布状态')
+    return
+  }
+  await quickDisable(record)
+}
+
+async function removeSelected() {
+  const record = requireSingleSelection('删除')
+  if (!record) return
+  await remove(String(record.id))
+}
+
+async function batchPublish() {
+  if (selectedRowKeys.value.length === 0) return
+  const validRecords = selectedRecords.value.filter((item) => item.status !== 1)
+  if (validRecords.length === 0) {
+    message.info('勾选项中没有可发布模板')
+    return
+  }
+  let successCount = 0
+  for (const record of validRecords) {
+    try {
+      const detail = await getSurveyTemplateDetail(String(record.id))
+      if (!detail.questions?.length) {
+        continue
+      }
+      await updateSurveyTemplate(String(record.id), { ...record, status: 1 })
+      successCount += 1
+    } catch {
+      // ignore single failure
+    }
+  }
+  if (successCount === 0) {
+    message.warning('批量发布未成功：请确认模板已配置题目')
+    return
+  }
+  message.success(`批量发布完成，共处理 ${successCount} 条`)
+  await fetchData()
+}
+
+async function batchDisable() {
+  if (selectedRowKeys.value.length === 0) return
+  const validRecords = selectedRecords.value.filter((item) => item.status === 1)
+  if (validRecords.length === 0) {
+    message.info('勾选项中没有可停用模板')
+    return
+  }
+  await Promise.all(validRecords.map((item) => updateSurveyTemplate(String(item.id), { ...item, status: 2 })))
+  message.success(`批量停用完成，共处理 ${validRecords.length} 条`)
+  await fetchData()
+}
+
+async function batchRemove() {
+  if (selectedRowKeys.value.length === 0) return
+  Modal.confirm({
+    title: '提示',
+    content: `确认删除选中的 ${selectedRecords.value.length} 条模板吗？`,
+    async onOk() {
+      await Promise.all(selectedRecords.value.map((item) => deleteSurveyTemplate(String(item.id))))
+      message.success(`批量删除完成，共处理 ${selectedRecords.value.length} 条`)
+      await fetchData()
+    }
+  })
+}
+
+async function openQr(row: SurveyTemplate) {
+  const base = `${window.location.origin}/#/survey/submit`
+  const link = `${base}?templateId=${encodeURIComponent(String(row.id))}&targetType=FAMILY&anonymous=1`
+  qrLink.value = link
+  qrOpen.value = true
+  try {
+    qrDataUrl.value = await QRCode.toDataURL(link, {
+      width: 280,
+      margin: 1
+    })
+  } catch {
+    qrDataUrl.value = ''
+    message.error('二维码生成失败，请稍后重试')
+  }
+}
+
+async function copyQrLink() {
+  if (!qrLink.value) return
+  try {
+    await navigator.clipboard.writeText(qrLink.value)
+    message.success('链接已复制')
+  } catch {
+    message.warning('复制失败，请手动复制链接')
+  }
+}
+
+function openQrLink() {
+  if (!qrLink.value) return
+  window.open(qrLink.value, '_blank')
+}
+
 async function openQuestions(row: SurveyTemplate) {
-  activeTemplateId = row.id
+  activeTemplateId = String(row.id)
   questionOpen.value = true
   questionKeyword.value = ''
   await loadQuestions()
@@ -361,19 +567,24 @@ async function openQuestions(row: SurveyTemplate) {
 
 async function loadQuestions() {
   const res: PageResult<SurveyQuestion> = await getSurveyQuestionPage({ pageNo: 1, pageSize: 200, keyword: questionKeyword.value })
-  questionList.value = res.list
+  questionList.value = (res.list || []).map((item) => ({
+    ...item,
+    id: String(item.id)
+  }))
   questionList.value.forEach((q) => {
-    if (!questionConfig[q.id]) {
-      questionConfig[q.id] = { requiredFlag: q.requiredFlag || 0, weight: undefined }
+    const key = String(q.id)
+    if (!questionConfig[key]) {
+      questionConfig[key] = { requiredFlag: q.requiredFlag || 0, weight: undefined }
     }
   })
   if (activeTemplateId) {
     const detail = await getSurveyTemplateDetail(activeTemplateId)
-    const selected = detail.questions.map((q) => q.questionId)
+    const selected = detail.questions.map((q) => String(q.questionId))
     selectedIds.value = selected
     selectedSet.value = new Set(selected)
     detail.questions.forEach((q) => {
-      questionConfig[q.questionId] = { requiredFlag: q.requiredFlag || 0, weight: q.weight ?? undefined }
+      const key = String(q.questionId)
+      questionConfig[key] = { requiredFlag: q.requiredFlag || 0, weight: q.weight ?? undefined }
     })
   }
 }
@@ -395,8 +606,8 @@ async function saveQuestions() {
     await updateSurveyTemplateQuestions(activeTemplateId, items)
     message.success('题目配置已保存')
     questionOpen.value = false
-  } catch {
-    message.error('保存失败')
+  } catch (error: any) {
+    message.error(error?.message || '保存失败')
   } finally {
     questionSaving.value = false
   }
@@ -414,6 +625,10 @@ onMounted(fetchData)
   justify-content: space-between;
   margin-bottom: 12px;
 }
+.selection-tip {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
 .question-toolbar {
   display: flex;
   align-items: center;
@@ -422,5 +637,11 @@ onMounted(fetchData)
 }
 .hint {
   color: rgba(0, 0, 0, 0.6);
+}
+.qr-img {
+  width: 280px;
+  height: 280px;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
 }
 </style>

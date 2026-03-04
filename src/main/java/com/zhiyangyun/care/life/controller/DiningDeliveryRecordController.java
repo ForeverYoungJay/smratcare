@@ -12,6 +12,7 @@ import com.zhiyangyun.care.life.mapper.DiningDeliveryAreaMapper;
 import com.zhiyangyun.care.life.mapper.DiningDeliveryRecordMapper;
 import com.zhiyangyun.care.life.mapper.DiningMealOrderMapper;
 import com.zhiyangyun.care.life.model.DiningConstants;
+import com.zhiyangyun.care.life.model.DiningDeliveryRedispatchRequest;
 import com.zhiyangyun.care.life.model.DiningDeliveryRecordRequest;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
@@ -101,6 +102,26 @@ public class DiningDeliveryRecordController {
     return Result.ok(record);
   }
 
+  @PutMapping("/{id}/redispatch")
+  public Result<DiningDeliveryRecord> redispatch(
+      @PathVariable Long id,
+      @RequestBody DiningDeliveryRedispatchRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    DiningDeliveryRecord record = getRecordInOrg(id, orgId);
+    if (record == null) {
+      return Result.ok(null);
+    }
+    record.setStatus(DiningConstants.DELIVERY_STATUS_PENDING);
+    record.setDeliveredAt(null);
+    record.setRedispatchStatus("REDISPATCHED");
+    record.setRedispatchAt(request == null ? LocalDateTime.now() : request.getRedispatchAt());
+    record.setRedispatchByName(request == null ? null : normalizeText(request.getRedispatchByName()));
+    record.setRedispatchRemark(request == null ? null : normalizeText(request.getRedispatchRemark()));
+    deliveryRecordMapper.updateById(record);
+    syncOrderStatus(record);
+    return Result.ok(record);
+  }
+
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
     DiningDeliveryRecord record = getRecordInOrg(id, AuthContext.getOrgId());
@@ -123,6 +144,15 @@ public class DiningDeliveryRecordController {
         : request.getStatus();
     validateStatus(status);
     record.setStatus(status);
+    record.setFailureReason(normalizeText(request.getFailureReason()));
+    record.setRedispatchStatus(resolveRedispatchStatus(request.getRedispatchStatus(), record.getRedispatchStatus(), create));
+    record.setRedispatchAt(request.getRedispatchAt() == null ? record.getRedispatchAt() : request.getRedispatchAt());
+    record.setRedispatchByName(normalizeText(request.getRedispatchByName()) == null
+        ? record.getRedispatchByName()
+        : normalizeText(request.getRedispatchByName()));
+    record.setRedispatchRemark(normalizeText(request.getRedispatchRemark()) == null
+        ? record.getRedispatchRemark()
+        : normalizeText(request.getRedispatchRemark()));
     record.setDeliveredAt(resolveDeliveredAt(request.getDeliveredAt(), status, record.getDeliveredAt()));
     if (create) {
       if (record.getDeliveryAreaId() == null && order.getDeliveryAreaId() != null) {
@@ -142,6 +172,10 @@ public class DiningDeliveryRecordController {
       order.setStatus(DiningConstants.ORDER_STATUS_DELIVERED);
       mealOrderMapper.updateById(order);
     } else if (DiningConstants.DELIVERY_STATUS_FAILED.equals(record.getStatus())
+        && DiningConstants.ORDER_STATUS_DELIVERED.equals(order.getStatus())) {
+      order.setStatus(DiningConstants.ORDER_STATUS_DELIVERING);
+      mealOrderMapper.updateById(order);
+    } else if (DiningConstants.DELIVERY_STATUS_PENDING.equals(record.getStatus())
         && DiningConstants.ORDER_STATUS_DELIVERED.equals(order.getStatus())) {
       order.setStatus(DiningConstants.ORDER_STATUS_DELIVERING);
       mealOrderMapper.updateById(order);
@@ -209,5 +243,19 @@ public class DiningDeliveryRecordController {
     }
     String trimmed = value.trim();
     return trimmed.isEmpty() ? null : trimmed;
+  }
+
+  private String resolveRedispatchStatus(String requestValue, String currentValue, boolean create) {
+    String value = normalizeText(requestValue);
+    if (value == null) {
+      if (create) {
+        return "NONE";
+      }
+      return currentValue == null ? "NONE" : currentValue;
+    }
+    if (!"NONE".equals(value) && !"REDISPATCHED".equals(value)) {
+      throw new IllegalArgumentException("重派状态不合法");
+    }
+    return value;
   }
 }

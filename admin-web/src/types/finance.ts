@@ -120,3 +120,270 @@ export interface ElderAccountUpdateRequest {
   status?: number
   remark?: string
 }
+
+export interface FinanceWorkbenchOverview {
+  bizDate: string
+  cashier: FinanceCashierCard
+  risk: FinanceRiskCard
+  pending: FinancePendingCard
+  revenueStructure: FinanceRevenueStructureCard
+  roomOps: FinanceRoomOpsCard
+  autoDebit: FinanceAutoDebitCard
+  medicalFlow: FinanceMedicalFlowCard
+  allocation: FinanceAllocationCard
+  reconcile: FinanceReconcileCard
+  quickEntries: FinanceQuickEntry[]
+}
+
+export interface FinanceCashierCard {
+  todayCollectedTotal: number
+  todayInvoiceAmount: number
+  todayRefundAmount: number
+  paymentMethods: FinancePaymentMethodAmount[]
+}
+
+export interface FinancePaymentMethodAmount {
+  method: string
+  methodLabel: string
+  amount: number
+}
+
+export interface FinanceRiskCard {
+  overdueElderCount: number
+  overdueAmount: number
+  lowBalanceCount: number
+  expiringContractCount: number
+}
+
+export interface FinancePendingCard {
+  pendingDiscountCount: number
+  pendingRefundCount: number
+  pendingDischargeSettlementCount: number
+}
+
+export interface FinanceRevenueStructureCard {
+  monthRevenueTotal: number
+  categories: FinanceRevenueCategory[]
+}
+
+export interface FinanceRevenueCategory {
+  code: string
+  name: string
+  amount: number
+  ratio: number
+}
+
+export interface FinanceRoomOpsCard {
+  floorTop: FinanceFloorRanking[]
+  floorBottom: FinanceFloorRanking[]
+  roomTop10: FinanceRoomRanking[]
+  emptyBedLossEstimate: number
+}
+
+export interface FinanceFloorRanking {
+  floorNo: string
+  income: number
+}
+
+export interface FinanceRoomRanking {
+  building: string
+  floorNo: string
+  roomNo: string
+  income: number
+  cost: number
+  netAmount: number
+  occupiedBeds: number
+  emptyBeds: number
+}
+
+export interface FinanceAutoDebitCard {
+  shouldDeductCount: number
+  successCount: number
+  failedCount: number
+  pendingHandleCount: number
+  failureReasons: FinanceReasonCount[]
+}
+
+export interface FinanceReasonCount {
+  reason: string
+  count: number
+}
+
+export interface FinanceMedicalFlowCard {
+  todayFlowCount: number
+  todayFlowAmount: number
+  pendingReviewCount: number
+  duplicateBillingCount: number
+  missingOrderLinkCount: number
+}
+
+export interface FinanceAllocationCard {
+  monthGeneratedCount: number
+  ungeneratedRoomCount: number
+  errorCount: number
+}
+
+export interface FinanceReconcileCard {
+  billPaidUnmatchedCount: number
+  duplicatedOrReversalPendingCount: number
+  invoiceUnlinkedCount: number
+}
+
+export interface FinanceQuickEntry {
+  key: string
+  label: string
+  path: string
+}
+
+export interface FinanceInvoiceReceiptItem {
+  paymentId: number
+  billId?: number
+  elderId?: number
+  elderName?: string
+  amount: number
+  payMethod: string
+  payMethodLabel: string
+  invoiceStatus: 'LINKED' | 'UNLINKED'
+  invoiceStatusLabel: string
+  receiptNo: string
+  remark?: string
+  paidAt: string
+}
+
+export interface FinanceAutoDebitExceptionItem {
+  billId: number
+  elderId?: number
+  elderName?: string
+  billMonth: string
+  outstandingAmount: number
+  balance: number
+  reasonCode: string
+  reasonLabel: string
+  suggestion: string
+}
+
+export interface FinanceRoomOpsDetailResponse {
+  period: string
+  building?: string
+  room?: string
+  totalIncome: number
+  totalCost: number
+  totalNetAmount: number
+  totalOccupiedBeds: number
+  totalEmptyBeds: number
+  rows: FinanceRoomOpsDetailRow[]
+}
+
+export interface FinanceRoomOpsDetailRow {
+  building: string
+  floorNo: string
+  roomNo: string
+  income: number
+  cost: number
+  netAmount: number
+  occupiedBeds: number
+  emptyBeds: number
+}
+
+export interface FinanceAllocationRuleItem {
+  id: number
+  ruleType: string
+  ruleTypeLabel: string
+  configKey: string
+  configValue: number
+  effectiveMonth: string
+  status: number
+  remark?: string
+}
+
+export interface FinanceReconcileExceptionItem {
+  exceptionType: string
+  exceptionTypeLabel: string
+  billId?: number
+  paymentId?: number
+  elderId?: number
+  elderName?: string
+  amount: number
+  detail: string
+  suggestion: string
+  occurredAt?: string
+}
+
+export interface FinanceMasterDataOverview {
+  month: string
+  feeSubjectCount: number
+  billingRuleCount: number
+  paymentChannelCount: number
+  pendingApprovalCount: number
+  paymentChannels: string[]
+  recentConfigs: FinanceMasterConfigEntry[]
+}
+
+export interface FinanceMasterConfigEntry {
+  configKey: string
+  effectiveMonth: string
+  valueText: string
+  remark?: string
+  status: number
+}
+
+export interface FinanceBillingConfigEntry {
+  id: number
+  orgId: number
+  configKey: string
+  configValue: number
+  effectiveMonth: string
+  status: number
+  remark?: string
+}
+
+export interface FinanceBillingConfigUpsertRequest {
+  configKey: string
+  configValue: number
+  effectiveMonth: string
+  status?: number
+  remark?: string
+}
+
+export interface FinanceBillingConfigBatchUpsertRequest {
+  items: FinanceBillingConfigUpsertRequest[]
+}
+
+export interface FinanceConfigChangeLogItem {
+  id: number
+  actorName?: string
+  actorId?: number
+  actionType: string
+  entityType: string
+  entityId?: number
+  detail?: string
+  createTime: string
+}
+
+export interface FinanceBillingConfigRollbackRequest {
+  logId: number
+}
+
+export interface FinanceBillingConfigSnapshotItem {
+  effectiveMonth: string
+  configCount: number
+  latestUpdateTime?: string
+}
+
+export interface FinanceModuleEntrySummary {
+  moduleKey: string
+  bizDate: string
+  todayAmount: number
+  monthAmount: number
+  totalCount: number
+  pendingCount: number
+  exceptionCount: number
+  warningMessage?: string
+  topItems: FinanceModuleEntryItem[]
+}
+
+export interface FinanceModuleEntryItem {
+  label: string
+  count: number
+  amount: number
+}

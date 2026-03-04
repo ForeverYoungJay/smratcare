@@ -30,7 +30,7 @@
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'averageScore'">
-            {{ record.averageScore.toFixed(2) }}
+            {{ Number(record.averageScore || 0).toFixed(2) }}
           </template>
         </template>
       </a-table>
@@ -49,7 +49,7 @@ const rows = ref<SurveyPerformanceItem[]>([])
 const loading = ref(false)
 
 const query = reactive({
-  templateId: undefined as number | undefined,
+  templateId: undefined as string | number | undefined,
   dateRange: [] as string[]
 })
 
@@ -61,7 +61,10 @@ const columns = [
 
 async function loadTemplates() {
   const res: PageResult<SurveyTemplate> = await getSurveyTemplatePage({ pageNo: 1, pageSize: 200 })
-  templates.value = res.list
+  templates.value = (res.list || []).map((item) => ({
+    ...item,
+    id: String(item.id)
+  }))
 }
 
 function getDateParams() {

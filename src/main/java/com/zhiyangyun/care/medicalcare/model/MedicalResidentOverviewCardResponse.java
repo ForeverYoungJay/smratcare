@@ -12,4 +12,7 @@ public class MedicalResidentOverviewCardResponse {
   private String description;
   private List<String> lines;
   private List<MedicalResidentOverviewActionResponse> actions;
+  private Integer dangerCount;
+  private Integer warningCount;
+  private Integer alertCount;
 }

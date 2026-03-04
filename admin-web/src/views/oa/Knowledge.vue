@@ -12,10 +12,15 @@
       </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openEdit()">新增文章</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" @click="batchPublish">批量发布</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" @click="batchArchive">批量归档</a-button>
+        <a-button :disabled="!selectedSingleRecord || !canEditSelected" @click="editSelected">编辑</a-button>
+        <a-button :disabled="!selectedSingleRecord || !canPublishSelected" @click="publishSelected">发布</a-button>
+        <a-button :disabled="!selectedSingleRecord || !canArchiveSelected" @click="archiveSelected">归档</a-button>
+        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+        <a-button :disabled="selectedPublishIds.length === 0" @click="batchPublish">批量发布</a-button>
+        <a-button :disabled="selectedArchiveIds.length === 0" @click="batchArchive">批量归档</a-button>
         <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
         <a-button @click="downloadExport">导出CSV</a-button>
+        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条，批量状态流转按当前状态自动过滤</span>
       </template>
     </SearchForm>
 
@@ -34,14 +39,6 @@
         </template>
         <template v-else-if="column.key === 'content'">
           <span>{{ (record.content || '').slice(0, 40) }}{{ (record.content || '').length > 40 ? '...' : '' }}</span>
-        </template>
-        <template v-else-if="column.key === 'action'">
-          <a-space>
-            <a :style="{ color: record.status === 'ARCHIVED' ? '#999' : '' }" @click="openEdit(record)">编辑</a>
-            <a :style="{ color: record.status !== 'DRAFT' ? '#999' : '' }" @click="publish(record)">发布</a>
-            <a :style="{ color: record.status === 'ARCHIVED' ? '#999' : '' }" @click="archive(record)">归档</a>
-            <a @click="remove(record)" style="color: #ff4d4f">删除</a>
-          </a-space>
         </template>
       </template>
     </DataTable>
@@ -111,7 +108,7 @@ const saving = ref(false)
 const rows = ref<OaKnowledge[]>([])
 const query = reactive({ keyword: '', category: '', status: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
-const selectedRowKeys = ref<number[]>([])
+const selectedRowKeys = ref<string[]>([])
 
 const columns = [
   { title: '标题', dataIndex: 'title', key: 'title', width: 220 },
@@ -120,8 +117,7 @@ const columns = [
   { title: '正文摘要', dataIndex: 'content', key: 'content', width: 260 },
   { title: '作者', dataIndex: 'authorName', key: 'authorName', width: 120 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
-  { title: '发布时间', dataIndex: 'publishedAt', key: 'publishedAt', width: 160 },
-  { title: '操作', key: 'action', width: 140 }
+  { title: '发布时间', dataIndex: 'publishedAt', key: 'publishedAt', width: 160 }
 ]
 
 const statusOptions = [
@@ -139,9 +135,20 @@ const form = reactive<Partial<OaKnowledge>>({ status: 'DRAFT' })
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: (string | number)[]) => {
-    selectedRowKeys.value = keys.map((item) => Number(item))
+    selectedRowKeys.value = keys.map((item) => String(item))
   }
 }))
+const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(String(item.id))))
+const selectedSingleRecord = computed(() => (selectedRecords.value.length === 1 ? selectedRecords.value[0] : null))
+const canEditSelected = computed(() => !!selectedSingleRecord.value && selectedSingleRecord.value.status !== 'ARCHIVED')
+const canPublishSelected = computed(() => selectedSingleRecord.value?.status === 'DRAFT')
+const canArchiveSelected = computed(() => !!selectedSingleRecord.value && selectedSingleRecord.value.status !== 'ARCHIVED')
+const selectedPublishIds = computed(() =>
+  selectedRecords.value.filter((item) => item.status === 'DRAFT').map((item) => String(item.id))
+)
+const selectedArchiveIds = computed(() =>
+  selectedRecords.value.filter((item) => item.status !== 'ARCHIVED').map((item) => String(item.id))
+)
 
 function statusText(status?: string) {
   if (status === 'PUBLISHED') return '已发布'
@@ -159,7 +166,10 @@ async function fetchData() {
   loading.value = true
   try {
     const res: PageResult<OaKnowledge> = await getKnowledgePage(query)
-    rows.value = res.list
+    rows.value = (res.list || []).map((item) => ({
+      ...item,
+      id: String(item.id)
+    }))
     pagination.total = res.total || res.list.length
     selectedRowKeys.value = []
   } finally {
@@ -206,32 +216,70 @@ async function submit() {
 }
 
 async function remove(record: OaKnowledge) {
-  await deleteKnowledge(record.id)
+  await deleteKnowledge(String(record.id))
   fetchData()
 }
 
 async function publish(record: OaKnowledge) {
   if (record.status !== 'DRAFT') return
-  await publishKnowledge(record.id)
+  await publishKnowledge(String(record.id))
   fetchData()
 }
 
 async function archive(record: OaKnowledge) {
   if (record.status === 'ARCHIVED') return
-  await archiveKnowledge(record.id)
+  await archiveKnowledge(String(record.id))
   fetchData()
 }
 
+function requireSingleSelection(action: string) {
+  if (!selectedSingleRecord.value) {
+    message.info(`请先勾选 1 条知识文章后再${action}`)
+    return null
+  }
+  return selectedSingleRecord.value
+}
+
+function editSelected() {
+  const record = requireSingleSelection('编辑')
+  if (!record) return
+  openEdit(record)
+}
+
+async function publishSelected() {
+  const record = requireSingleSelection('发布')
+  if (!record) return
+  await publish(record)
+}
+
+async function archiveSelected() {
+  const record = requireSingleSelection('归档')
+  if (!record) return
+  await archive(record)
+}
+
+async function removeSelected() {
+  const record = requireSingleSelection('删除')
+  if (!record) return
+  await remove(record)
+}
+
 async function batchPublish() {
-  if (selectedRowKeys.value.length === 0) return
-  const affected = await batchPublishKnowledge(selectedRowKeys.value)
+  if (selectedPublishIds.value.length === 0) {
+    message.info('勾选项中没有可发布文章')
+    return
+  }
+  const affected = await batchPublishKnowledge(selectedPublishIds.value)
   message.success(`批量发布，共处理 ${affected || 0} 条`)
   fetchData()
 }
 
 async function batchArchive() {
-  if (selectedRowKeys.value.length === 0) return
-  const affected = await batchArchiveKnowledge(selectedRowKeys.value)
+  if (selectedArchiveIds.value.length === 0) {
+    message.info('勾选项中没有可归档文章')
+    return
+  }
+  const affected = await batchArchiveKnowledge(selectedArchiveIds.value)
   message.success(`批量归档，共处理 ${affected || 0} 条`)
   fetchData()
 }
@@ -261,3 +309,10 @@ async function downloadExport() {
 
 fetchData()
 </script>
+
+<style scoped>
+.selection-tip {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+</style>

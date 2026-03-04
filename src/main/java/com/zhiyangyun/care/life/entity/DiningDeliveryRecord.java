@@ -33,6 +33,16 @@ public class DiningDeliveryRecord {
 
   private String status;
 
+  private String failureReason;
+
+  private String redispatchStatus;
+
+  private LocalDateTime redispatchAt;
+
+  private String redispatchByName;
+
+  private String redispatchRemark;
+
   private String remark;
 
   private Long createdBy;

@@ -22,6 +22,7 @@ export interface BedItem {
   bedQrCode?: string
   elderId?: Id
   elderName?: string
+  elderGender?: number
   careLevel?: string
   roomNo?: string
   building?: string

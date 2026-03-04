@@ -1,5 +1,6 @@
 <template>
   <PageContainer title="长者档案" sub-title="营销转化后的长者信息沉淀与跟踪">
+    <MarketingQuickNav />
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item label="姓名">
@@ -22,13 +23,22 @@
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px">
-      <a-table :data-source="rows" :columns="columns" :loading="loading" row-key="id" :pagination="false">
+      <MarketingListToolbar :tip="`已勾选 ${selectedRowKeys.length} 条`">
+        <a-space>
+          <a-button :disabled="!selectedSingleRecord" @click="viewSelected">查看档案</a-button>
+        </a-space>
+      </MarketingListToolbar>
+      <a-table
+        :data-source="rows"
+        :columns="columns"
+        :loading="loading"
+        row-key="id"
+        :row-selection="rowSelection"
+        :pagination="false"
+      >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
             <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <a-button type="link" @click="goDetail(record.id)">查看档案</a-button>
           </template>
         </template>
       </a-table>
@@ -46,9 +56,12 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
+import MarketingQuickNav from './components/MarketingQuickNav.vue'
+import MarketingListToolbar from './components/MarketingListToolbar.vue'
 import { getElderPage } from '../../api/elder'
 import type { ElderItem, PageResult } from '../../types'
 
@@ -56,6 +69,7 @@ const router = useRouter()
 const loading = ref(false)
 const rows = ref<ElderItem[]>([])
 const total = ref(0)
+const selectedRowKeys = ref<string[]>([])
 
 const query = reactive({
   keyword: '',
@@ -70,9 +84,16 @@ const columns = [
   { title: '入住日期', dataIndex: 'admissionDate', key: 'admissionDate', width: 140 },
   { title: '床位号', dataIndex: 'bedNo', key: 'bedNo', width: 120 },
   { title: '护理等级', dataIndex: 'careLevel', key: 'careLevel', width: 120 },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
-  { title: '操作', key: 'action', width: 140 }
+  { title: '状态', dataIndex: 'status', key: 'status', width: 100 }
 ]
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: (string | number)[]) => {
+    selectedRowKeys.value = keys.map((item) => String(item))
+  }
+}))
+const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(String(item.id))))
+const selectedSingleRecord = computed(() => (selectedRecords.value.length === 1 ? selectedRecords.value[0] : null))
 
 function statusLabel(status?: number) {
   if (status === 1) return '在院'
@@ -96,8 +117,11 @@ async function fetchData() {
       pageSize: query.pageSize,
       keyword: query.keyword || undefined
     })
-    rows.value = (page.list || []).filter((item) => query.status == null || item.status === query.status)
+    rows.value = (page.list || [])
+      .filter((item) => query.status == null || item.status === query.status)
+      .map((item) => ({ ...item, id: String(item.id) }))
     total.value = page.total || rows.value.length
+    selectedRowKeys.value = []
   } finally {
     loading.value = false
   }
@@ -121,8 +145,16 @@ function onPageSizeChange(_current: number, size: number) {
   fetchData()
 }
 
-function goDetail(id: number) {
+function goDetail(id: string | number) {
   router.push(`/elder/detail/${id}`)
+}
+
+function viewSelected() {
+  if (!selectedSingleRecord.value) {
+    message.info('请先勾选 1 条长者记录')
+    return
+  }
+  goDetail(String(selectedSingleRecord.value.id))
 }
 
 onMounted(fetchData)

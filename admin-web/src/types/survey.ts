@@ -1,5 +1,5 @@
 export interface SurveyQuestion {
-  id: number
+  id: string | number
   questionCode: string
   title: string
   questionType: string
@@ -12,7 +12,7 @@ export interface SurveyQuestion {
 }
 
 export interface SurveyTemplate {
-  id: number
+  id: string | number
   templateCode: string
   templateName: string
   description?: string
@@ -26,7 +26,7 @@ export interface SurveyTemplate {
 }
 
 export interface SurveyTemplateQuestionDetail {
-  questionId: number
+  questionId: string | number
   questionCode: string
   title: string
   questionType: string
@@ -44,30 +44,40 @@ export interface SurveyTemplateDetail extends SurveyTemplate {
 }
 
 export interface SurveyTemplateQuestionItem {
-  questionId: number
+  questionId: string | number
   sortNo?: number
   requiredFlag?: number
   weight?: number | null
 }
 
 export interface SurveySubmissionAnswerItem {
-  questionId: number
+  questionId: string | number
   answerJson?: string
   answerText?: string
   score?: number
 }
 
 export interface SurveySubmissionRequest {
-  templateId: number
+  templateId: string | number
   targetType: string
-  targetId?: number
-  relatedStaffId?: number
+  targetId?: string | number
+  relatedStaffId?: string | number
   anonymousFlag?: number
   answers: SurveySubmissionAnswerItem[]
 }
 
+export interface SurveySubmissionItem {
+  id: string | number
+  templateId?: string | number
+  targetType?: string
+  targetId?: string | number
+  submitterName?: string
+  scoreTotal?: number
+  createTime?: string
+}
+
 export interface SurveySubmissionResponse {
-  submissionId: number
+  submissionId: string | number
   scoreTotal?: number
 }
 
@@ -78,7 +88,7 @@ export interface SurveyStatsSummary {
 }
 
 export interface SurveyPerformanceItem {
-  staffId: number
+  staffId: string | number
   staffName?: string
   submissions: number
   averageScore: number

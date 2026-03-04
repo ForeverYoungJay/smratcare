@@ -5,7 +5,9 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
+import com.zhiyangyun.care.oa.entity.OaTask;
 import com.zhiyangyun.care.oa.entity.OaTodo;
+import com.zhiyangyun.care.oa.mapper.OaTaskMapper;
 import com.zhiyangyun.care.oa.mapper.OaTodoMapper;
 import com.zhiyangyun.care.oa.model.OaBatchIdsRequest;
 import com.zhiyangyun.care.oa.model.OaTodoSummaryResponse;
@@ -34,9 +36,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/oa/todo")
 public class OaTodoController {
   private final OaTodoMapper todoMapper;
+  private final OaTaskMapper taskMapper;
 
-  public OaTodoController(OaTodoMapper todoMapper) {
+  public OaTodoController(OaTodoMapper todoMapper, OaTaskMapper taskMapper) {
     this.todoMapper = todoMapper;
+    this.taskMapper = taskMapper;
   }
 
   @GetMapping("/page")
@@ -97,6 +101,7 @@ public class OaTodoController {
     todo.setAssigneeName(request.getAssigneeName());
     todo.setCreatedBy(AuthContext.getStaffId());
     todoMapper.insert(todo);
+    syncTodoTask(todo);
     return Result.ok(todo);
   }
 
@@ -120,6 +125,7 @@ public class OaTodoController {
     todo.setAssigneeId(request.getAssigneeId());
     todo.setAssigneeName(request.getAssigneeName());
     todoMapper.updateById(todo);
+    syncTodoTask(todo);
     return Result.ok(todo);
   }
 
@@ -134,6 +140,7 @@ public class OaTodoController {
     }
     todo.setStatus("DONE");
     todoMapper.updateById(todo);
+    syncTodoTask(todo);
     return Result.ok(todo);
   }
 
@@ -155,6 +162,7 @@ public class OaTodoController {
       }
       todo.setStatus("DONE");
       todoMapper.updateById(todo);
+      syncTodoTask(todo);
       count++;
     }
     return Result.ok(count);
@@ -174,6 +182,7 @@ public class OaTodoController {
     for (OaTodo todo : todos) {
       todo.setIsDeleted(1);
       todoMapper.updateById(todo);
+      deleteTodoTask(todo.getId(), orgId);
     }
     return Result.ok(todos.size());
   }
@@ -214,8 +223,62 @@ public class OaTodoController {
     if (todo != null) {
       todo.setIsDeleted(1);
       todoMapper.updateById(todo);
+      deleteTodoTask(todo.getId(), todo.getOrgId());
     }
     return Result.ok(null);
+  }
+
+  private void syncTodoTask(OaTodo todo) {
+    if (todo == null || todo.getId() == null) {
+      return;
+    }
+    Long orgId = todo.getOrgId();
+    OaTask task = taskMapper.selectOne(Wrappers.lambdaQuery(OaTask.class)
+        .eq(OaTask::getIsDeleted, 0)
+        .eq(orgId != null, OaTask::getOrgId, orgId)
+        .eq(OaTask::getSourceTodoId, todo.getId())
+        .last("LIMIT 1"));
+    if (task == null) {
+      task = new OaTask();
+      task.setTenantId(todo.getTenantId());
+      task.setOrgId(todo.getOrgId());
+      task.setCreatedBy(todo.getCreatedBy());
+      task.setSourceTodoId(todo.getId());
+    }
+    task.setTitle("【代办】" + safe(todo.getTitle()));
+    task.setDescription(todo.getContent());
+    task.setStartTime(todo.getDueTime());
+    task.setEndTime(todo.getDueTime());
+    task.setPriority("NORMAL");
+    task.setStatus("DONE".equalsIgnoreCase(todo.getStatus()) ? "DONE" : "OPEN");
+    task.setAssigneeId(todo.getAssigneeId());
+    task.setAssigneeName(todo.getAssigneeName());
+    task.setCalendarType("DAILY");
+    task.setPlanCategory("代办事项");
+    task.setUrgency("NORMAL");
+    task.setEventColor("#1677ff");
+    task.setIsRecurring(0);
+    if (task.getId() == null) {
+      taskMapper.insert(task);
+    } else {
+      taskMapper.updateById(task);
+    }
+  }
+
+  private void deleteTodoTask(Long todoId, Long orgId) {
+    if (todoId == null) {
+      return;
+    }
+    OaTask task = taskMapper.selectOne(Wrappers.lambdaQuery(OaTask.class)
+        .eq(OaTask::getIsDeleted, 0)
+        .eq(orgId != null, OaTask::getOrgId, orgId)
+        .eq(OaTask::getSourceTodoId, todoId)
+        .last("LIMIT 1"));
+    if (task == null) {
+      return;
+    }
+    task.setIsDeleted(1);
+    taskMapper.updateById(task);
   }
 
   private OaTodo findAccessibleTodo(Long id) {

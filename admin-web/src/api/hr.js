@@ -2,6 +2,90 @@ import request, { fetchPage } from '../utils/request';
 export function getHrStaffPage(params) {
     return fetchPage('/api/admin/hr/staff/page', params);
 }
+export function getHrWorkbenchSummary(params) {
+    return request.get('/api/admin/hr/workbench/summary', { params });
+}
+export function getHrContractReminderPage(params) {
+    return fetchPage('/api/admin/hr/contract/reminder/page', params);
+}
+export function getHrAttendanceAbnormalPage(params) {
+    return fetchPage('/api/admin/hr/attendance/abnormal/page', params);
+}
+export function getHrRecruitmentNeedPage(params) {
+    return fetchPage('/api/admin/hr/recruitment/need/page', params);
+}
+export function createHrRecruitmentNeed(data) {
+    return request.post('/api/admin/hr/recruitment/need', data);
+}
+export function getHrPolicyPage(params) {
+    return fetchPage('/api/admin/hr/policy/page', params);
+}
+export function getHrPolicyAlertPage(params) {
+    return fetchPage('/api/admin/hr/policy-alert/page', params);
+}
+export function getHrProfileContractPage(params) {
+    return fetchPage('/api/admin/hr/profile/contract/page', params);
+}
+export function getHrProfileTemplatePage(params) {
+    return fetchPage('/api/admin/hr/profile/template/page', params);
+}
+export function createHrProfileTemplate(data) {
+    return request.post('/api/admin/hr/profile/template', data);
+}
+export function getHrProfileAttachmentPage(params) {
+    return fetchPage('/api/admin/hr/profile/attachment/page', params);
+}
+export function createHrProfileAttachment(data) {
+    return request.post('/api/admin/hr/profile/attachment', data);
+}
+export function getHrProfileCertificatePage(params) {
+    return fetchPage('/api/admin/hr/profile/certificate/page', params);
+}
+export function createHrProfileCertificate(data) {
+    return request.post('/api/admin/hr/profile/certificate', data);
+}
+export function getHrProfileCertificateReminderPage(params) {
+    return fetchPage('/api/admin/hr/profile/certificate/reminder/page', params);
+}
+export function getHrAccessControlPage(params) {
+    return fetchPage('/api/admin/hr/integration/access-control/page', params);
+}
+export function getHrCardSyncPage(params) {
+    return fetchPage('/api/admin/hr/integration/card-sync/page', params);
+}
+export function getHrMealFeePage(params) {
+    return fetchPage('/api/admin/hr/expense/meal-fee/page', params);
+}
+export function getHrElectricityFeePage(params) {
+    return fetchPage('/api/admin/hr/expense/electricity-fee/page', params);
+}
+export function getHrTrainingReimbursePage(params) {
+    return fetchPage('/api/admin/hr/expense/training-reimburse/page', params);
+}
+export function getHrSubsidyPage(params) {
+    return fetchPage('/api/admin/hr/expense/subsidy/page', params);
+}
+export function getHrSalarySubsidyPage(params) {
+    return fetchPage('/api/admin/hr/expense/salary-subsidy/page', params);
+}
+export function getHrExpenseApprovalFlowPage(params) {
+    return fetchPage('/api/admin/hr/expense/approval-flow/page', params);
+}
+export function createHrExpenseApprovalFlow(data) {
+    return request.post('/api/admin/hr/expense/approval-flow', data);
+}
+export function getHrAttendanceLeavePage(params) {
+    return fetchPage('/api/admin/hr/attendance/leave/page', params);
+}
+export function getHrAttendanceShiftChangePage(params) {
+    return fetchPage('/api/admin/hr/attendance/shift-change/page', params);
+}
+export function getHrAttendanceOvertimePage(params) {
+    return fetchPage('/api/admin/hr/attendance/overtime/page', params);
+}
+export function getHrAttendanceRecordPage(params) {
+    return fetchPage('/api/admin/hr/attendance/record/page', params);
+}
 export function getHrProfile(staffId) {
     return request.get(`/api/admin/hr/profile/${staffId}`);
 }
