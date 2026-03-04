@@ -222,7 +222,7 @@
 
     <a-modal
       v-model:open="scheduleOpen"
-      title="新增行政日程"
+      :title="scheduleModalTitle"
       width="620px"
       :confirm-loading="scheduleSaving"
       @ok="submitSchedule"
@@ -342,13 +342,20 @@
       <a-card size="small" title="今天">
         <a-list :data-source="todayAgenda" :locale="{ emptyText: '今日暂无日程' }" size="small">
           <template #renderItem="{ item }">
-            <a-list-item>
-              <a-list-item-meta
-                :title="item.title"
-                :description="`${item.timeText} · ${item.typeText}${item.assigneeText ? ` · ${item.assigneeText}` : ''}`"
-              />
+            <a-list-item :class="{ 'agenda-item-done': item.status === 'DONE' }">
+              <a-list-item-meta :description="`${item.timeText} · ${item.typeText}${item.assigneeText ? ` · ${item.assigneeText}` : ''}`">
+                <template #title>
+                  <a-space size="small">
+                    <span :class="{ 'agenda-title-done': item.status === 'DONE' }">{{ item.title }}</span>
+                    <a-tag v-if="item.status === 'DONE'">已完成</a-tag>
+                  </a-space>
+                </template>
+              </a-list-item-meta>
               <template #actions>
                 <a-button type="link" size="small" @click="focusCalendarDate(item.dateText)">定位</a-button>
+                <a-button type="link" size="small" @click="openEditSchedule(item.id)">编辑</a-button>
+                <a-button type="link" size="small" @click="markScheduleDone(item.id)">完成</a-button>
+                <a-button type="link" danger size="small" @click="removeSchedule(item.id)">删除</a-button>
               </template>
             </a-list-item>
           </template>
@@ -357,13 +364,20 @@
       <a-card size="small" title="明天" style="margin-top: 12px;">
         <a-list :data-source="tomorrowAgenda" :locale="{ emptyText: '明日暂无日程' }" size="small">
           <template #renderItem="{ item }">
-            <a-list-item>
-              <a-list-item-meta
-                :title="item.title"
-                :description="`${item.timeText} · ${item.typeText}${item.assigneeText ? ` · ${item.assigneeText}` : ''}`"
-              />
+            <a-list-item :class="{ 'agenda-item-done': item.status === 'DONE' }">
+              <a-list-item-meta :description="`${item.timeText} · ${item.typeText}${item.assigneeText ? ` · ${item.assigneeText}` : ''}`">
+                <template #title>
+                  <a-space size="small">
+                    <span :class="{ 'agenda-title-done': item.status === 'DONE' }">{{ item.title }}</span>
+                    <a-tag v-if="item.status === 'DONE'">已完成</a-tag>
+                  </a-space>
+                </template>
+              </a-list-item-meta>
               <template #actions>
                 <a-button type="link" size="small" @click="focusCalendarDate(item.dateText)">定位</a-button>
+                <a-button type="link" size="small" @click="openEditSchedule(item.id)">编辑</a-button>
+                <a-button type="link" size="small" @click="markScheduleDone(item.id)">完成</a-button>
+                <a-button type="link" danger size="small" @click="removeSchedule(item.id)">删除</a-button>
               </template>
             </a-list-item>
           </template>
@@ -376,6 +390,39 @@
         </a-space>
       </div>
     </a-drawer>
+
+    <a-drawer
+      v-model:open="dayEventDrawerOpen"
+      :title="`${selectedCalendarDateText} 日程详情`"
+      width="520"
+      placement="right"
+    >
+      <a-list :data-source="selectedCalendarDateAgenda" :locale="{ emptyText: '当天暂无日程' }" size="small">
+        <template #renderItem="{ item }">
+          <a-list-item :class="{ 'agenda-item-done': item.status === 'DONE' }">
+            <a-list-item-meta :description="`${item.timeText} · ${item.typeText}${item.assigneeText ? ` · ${item.assigneeText}` : ''}`">
+              <template #title>
+                <a-space size="small">
+                  <span :class="{ 'agenda-title-done': item.status === 'DONE' }">{{ item.title }}</span>
+                  <a-tag v-if="item.status === 'DONE'">已完成</a-tag>
+                </a-space>
+              </template>
+            </a-list-item-meta>
+            <template #actions>
+              <a-button type="link" size="small" @click="openEditSchedule(item.id)">编辑</a-button>
+              <a-button type="link" size="small" @click="markScheduleDone(item.id)">完成</a-button>
+              <a-button type="link" danger size="small" @click="removeSchedule(item.id)">删除</a-button>
+            </template>
+          </a-list-item>
+        </template>
+      </a-list>
+      <div class="calendar-actions">
+        <a-space wrap>
+          <a-button type="primary" @click="go('/oa/work-execution/calendar')">打开完整协同日历</a-button>
+          <a-button @click="dayEventDrawerOpen = false">关闭</a-button>
+        </a-space>
+      </div>
+    </a-drawer>
   </PageContainer>
 </template>
 
@@ -383,7 +430,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
@@ -392,7 +439,7 @@ import VChart from 'vue-echarts'
 import PageContainer from '../components/PageContainer.vue'
 import StatefulBlock from '../components/StatefulBlock.vue'
 import { useUserStore } from '../stores/user'
-import { createOaTask, getOaTaskCalendar, getPortalSummary } from '../api/oa'
+import { createOaTask, getOaTaskCalendar, getPortalSummary, updateOaTask, completeOaTask, deleteOaTask } from '../api/oa'
 import type { OaPortalSummary, OaTask, PageResult, BedItem, CrmContractItem, CrmLeadItem } from '../types'
 import { useLiveSyncRefresh } from '../composables/useLiveSyncRefresh'
 import { getDashboardSummary, type DashboardSummary } from '../api/dashboard'
@@ -417,6 +464,9 @@ const scheduleSaving = ref(false)
 const calendarRows = ref<OaTask[]>([])
 const calendarRef = ref<any>(null)
 const agendaDrawerOpen = ref(false)
+const editingScheduleId = ref<string | number | null>(null)
+const dayEventDrawerOpen = ref(false)
+const selectedCalendarDateText = ref(dayjs().format('YYYY-MM-DD'))
 const departmentOptions = ref<Array<{ label: string; value: string }>>([])
 const staffOptions = ref<Array<{ label: string; value: string }>>([])
 const staffDeptMap = ref<Record<string, string | undefined>>({})
@@ -727,9 +777,14 @@ const calendarOptions = computed(() => ({
     openCreateSchedule(dayjs(arg.dateStr))
   },
   eventClick: (arg: any) => {
+    const start = arg?.event?.start
+    if (start) {
+      selectedCalendarDateText.value = dayjs(start).format('YYYY-MM-DD')
+      dayEventDrawerOpen.value = true
+      return
+    }
     const typeText = arg?.event?.extendedProps?.calendarType || 'WORK'
-    message.info(`已定位到「${calendarTypeText(typeText)}」日程，正在打开协同日历详情`)
-    go('/oa/work-execution/calendar')
+    message.info(`已定位到「${calendarTypeText(typeText)}」日程`)
   },
   events: calendarRows.value
     .filter((task) => visibleCalendarTypes.value.includes((task.calendarType || 'WORK') as any))
@@ -748,6 +803,8 @@ const calendarOptions = computed(() => ({
 
 const todayAgenda = computed(() => buildAgendaByDate(dayjs()))
 const tomorrowAgenda = computed(() => buildAgendaByDate(dayjs().add(1, 'day')))
+const scheduleModalTitle = computed(() => (editingScheduleId.value ? '编辑行政日程' : '新增行政日程'))
+const selectedCalendarDateAgenda = computed(() => buildAgendaByDate(dayjs(selectedCalendarDateText.value)))
 
 const filteredStaffOptions = computed(() => {
   if (!scheduleForm.collaboratorDeptId) return staffOptions.value
@@ -808,6 +865,7 @@ function buildAgendaByDate(target: Dayjs) {
     .map((task) => ({
       id: String(task.id),
       title: task.title || '未命名日程',
+      status: task.status || 'OPEN',
       timeText: agendaTimeText(task),
       typeText: calendarTypeText(task.calendarType),
       assigneeText: task.assigneeName || '',
@@ -824,6 +882,19 @@ function focusCalendarDate(dateText: string) {
   api.gotoDate(dateText)
   api.changeView('dayGridDay')
   agendaDrawerOpen.value = false
+}
+
+function upsertCalendarTask(task: OaTask) {
+  const index = calendarRows.value.findIndex((item) => String(item.id) === String(task.id))
+  if (index >= 0) {
+    calendarRows.value[index] = { ...calendarRows.value[index], ...task }
+    return
+  }
+  calendarRows.value = [...calendarRows.value, task]
+}
+
+function removeCalendarTaskById(id: string | number) {
+  calendarRows.value = calendarRows.value.filter((item) => String(item.id) !== String(id))
 }
 
 function onUrgencyChange(value: 'NORMAL' | 'EMERGENCY') {
@@ -851,13 +922,14 @@ function money(amount: number) {
 }
 
 function resolveTaskColor(task: OaTask) {
+  if (task.status === 'DONE') return '#94a3b8'
   if (task.eventColor) return task.eventColor
   if (task.urgency === 'EMERGENCY') return '#ff4d4f'
   if (task.calendarType === 'COLLAB') return '#722ed1'
   if (task.calendarType === 'WORK') return '#1677ff'
   if (task.calendarType === 'DAILY') return '#fa8c16'
   if (task.calendarType === 'PERSONAL') return '#52c41a'
-  return task.status === 'DONE' ? '#52c41a' : '#1677ff'
+  return '#1677ff'
 }
 
 function resolveBedStatus(bed: BedItem): '空闲' | '清洁中' | '其他' {
@@ -1045,6 +1117,7 @@ function submitSearch(value: string) {
 }
 
 function openCreateSchedule(date?: Dayjs) {
+  editingScheduleId.value = null
   scheduleForm.title = ''
   scheduleForm.startTime = date ? date.hour(9).minute(0).second(0) : undefined
   scheduleForm.endTime = date ? date.hour(10).minute(0).second(0) : undefined
@@ -1061,6 +1134,36 @@ function openCreateSchedule(date?: Dayjs) {
   scheduleForm.recurrenceRule = 'WEEKLY'
   scheduleForm.recurrenceInterval = 1
   scheduleForm.recurrenceCount = 4
+  scheduleOpen.value = true
+}
+
+function openEditSchedule(id: string | number) {
+  const matched = calendarRows.value.find((item) => String(item.id) === String(id))
+  if (!matched) {
+    message.warning('未找到对应日程')
+    return
+  }
+  editingScheduleId.value = matched.id
+  scheduleForm.title = matched.title || ''
+  scheduleForm.startTime = matched.startTime ? dayjs(matched.startTime) : undefined
+  scheduleForm.endTime = matched.endTime ? dayjs(matched.endTime) : undefined
+  scheduleForm.assigneeName = matched.assigneeName || ''
+  scheduleForm.priority = (matched.priority as any) || 'NORMAL'
+  scheduleForm.description = matched.description || ''
+  scheduleForm.calendarType = matched.calendarType || 'WORK'
+  scheduleForm.urgency = matched.urgency || 'NORMAL'
+  scheduleForm.planCategory = matched.planCategory || '基础办公'
+  scheduleForm.eventColor = matched.eventColor || resolveTaskColor(matched)
+  scheduleForm.collaboratorDeptId = undefined
+  scheduleForm.collaboratorIds = Array.isArray(matched.collaboratorIds)
+    ? matched.collaboratorIds.map((item) => String(item))
+    : typeof matched.collaboratorIds === 'string' && matched.collaboratorIds
+      ? matched.collaboratorIds.split(',').map((item) => item.trim()).filter(Boolean)
+      : []
+  scheduleForm.recurring = false
+  scheduleForm.recurrenceRule = 'WEEKLY'
+  scheduleForm.recurrenceInterval = 1
+  scheduleForm.recurrenceCount = 1
   scheduleOpen.value = true
 }
 
@@ -1085,6 +1188,27 @@ async function submitSchedule() {
   const repeatInterval = Math.max(1, Number(scheduleForm.recurrenceInterval || 1))
   scheduleSaving.value = true
   try {
+    if (editingScheduleId.value != null) {
+      const updated = await updateOaTask(editingScheduleId.value, {
+        title: scheduleForm.title.trim(),
+        description: scheduleForm.description || undefined,
+        startTime: dayjs(scheduleForm.startTime).format('YYYY-MM-DDTHH:mm:ss'),
+        endTime: scheduleForm.endTime ? dayjs(scheduleForm.endTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
+        priority: scheduleForm.priority,
+        assigneeName: scheduleForm.assigneeName || undefined,
+        calendarType: scheduleForm.calendarType,
+        planCategory: scheduleForm.planCategory || undefined,
+        urgency: scheduleForm.urgency,
+        eventColor: scheduleForm.eventColor,
+        collaboratorIds: scheduleForm.calendarType === 'COLLAB' ? scheduleForm.collaboratorIds : [],
+        collaboratorNames: scheduleForm.calendarType === 'COLLAB' ? collaboratorNames : []
+      })
+      upsertCalendarTask(updated)
+      scheduleOpen.value = false
+      editingScheduleId.value = null
+      message.success('日程已更新')
+      return
+    }
     const tasks: Promise<any>[] = []
     for (let i = 0; i < repeatCount; i += 1) {
       const startTime = i === 0 ? scheduleForm.startTime : addByRule(scheduleForm.startTime, repeatRule, repeatInterval * i)
@@ -1111,13 +1235,49 @@ async function submitSchedule() {
         })
       )
     }
-    await Promise.all(tasks)
+    const createdRows = await Promise.all(tasks)
+    createdRows.forEach((row) => {
+      if (row?.id != null) upsertCalendarTask(row)
+    })
     scheduleOpen.value = false
+    editingScheduleId.value = null
     message.success(scheduleForm.recurring ? `已生成 ${tasks.length} 条周期日程` : '日程已新增')
-    await loadCalendar()
   } finally {
     scheduleSaving.value = false
   }
+}
+
+function markScheduleDone(id: string | number) {
+  Modal.confirm({
+    title: '确认标记完成该日程？',
+    onOk: async () => {
+      const updated = await completeOaTask(id)
+      if (updated?.id != null) {
+        upsertCalendarTask(updated)
+      } else {
+        const target = calendarRows.value.find((item) => String(item.id) === String(id))
+        if (target) {
+          upsertCalendarTask({
+            ...target,
+            status: 'DONE'
+          })
+        }
+      }
+      message.success('已标记完成')
+    }
+  })
+}
+
+function removeSchedule(id: string | number) {
+  Modal.confirm({
+    title: '确认删除该日程？',
+    okButtonProps: { danger: true },
+    onOk: async () => {
+      await deleteOaTask(id)
+      removeCalendarTaskById(id)
+      message.success('已删除')
+    }
+  })
 }
 
 async function loadStaffOptions() {
@@ -1390,6 +1550,15 @@ onMounted(init)
 
 .repeat-card {
   margin-bottom: 12px;
+}
+
+.agenda-item-done {
+  opacity: 0.72;
+}
+
+.agenda-title-done {
+  color: #64748b;
+  text-decoration: line-through;
 }
 
 @media (max-width: 768px) {

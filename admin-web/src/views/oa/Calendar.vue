@@ -50,11 +50,12 @@
       </div>
       <a-list :data-source="selectedDayEvents" :locale="{ emptyText: '当天暂无计划，可点击上方快速创建' }" item-layout="vertical">
         <template #renderItem="{ item }">
-          <a-list-item>
+          <a-list-item :class="{ 'agenda-item-done': item.status === 'DONE' }">
             <a-list-item-meta>
               <template #title>
                 <a-space wrap>
-                  <span>{{ item.title }}</span>
+                  <span :class="{ 'agenda-title-done': item.status === 'DONE' }">{{ item.title }}</span>
+                  <a-tag v-if="item.status === 'DONE'">已完成</a-tag>
                   <a-tag>{{ calendarTypeText(item.calendarType) }}</a-tag>
                   <a-tag :color="item.urgency === 'EMERGENCY' ? 'red' : 'blue'">{{ item.urgency === 'EMERGENCY' ? '紧急' : '常规' }}</a-tag>
                   <a-tag v-if="item.planCategory" color="purple">{{ item.planCategory }}</a-tag>
@@ -67,6 +68,11 @@
                 </div>
               </template>
             </a-list-item-meta>
+            <template #actions>
+              <a-button type="link" size="small" @click="openEdit(item)">编辑</a-button>
+              <a-button type="link" size="small" @click="markDone(item)">完成</a-button>
+              <a-button type="link" size="small" danger @click="removeTask(item)">删除</a-button>
+            </template>
           </a-list-item>
         </template>
       </a-list>
@@ -74,7 +80,7 @@
 
     <a-modal
       v-model:open="editOpen"
-      :title="form.type === 'HOLIDAY' ? '新增节假日/重大节日' : '新增行政日程'"
+      :title="modalTitle"
       @ok="submit"
       :confirm-loading="saving"
       width="760px"
@@ -207,10 +213,10 @@ import type { Dayjs } from 'dayjs'
 import FullCalendar from '@fullcalendar/vue3'
 import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
-import { getOaTaskCalendar, createOaTask } from '../../api/oa'
+import { getOaTaskCalendar, createOaTask, updateOaTask, completeOaTask, deleteOaTask } from '../../api/oa'
 import { getElderPage } from '../../api/elder'
 import { getDepartmentPage, getStaffPage } from '../../api/rbac'
 import { useUserStore } from '../../stores/user'
@@ -231,6 +237,7 @@ const saving = ref(false)
 const editOpen = ref(false)
 const dayDrawerOpen = ref(false)
 const selectedDate = ref<Dayjs>()
+const editingTaskId = ref<string | number | null>(null)
 let syncTimer: number | undefined
 
 const query = reactive({
@@ -356,6 +363,11 @@ const filteredStaffOptions = computed(() => {
   return staffOptions.value.filter((item) => staffDeptMap.value[item.value] === form.collaboratorDeptId)
 })
 
+const modalTitle = computed(() => {
+  if (editingTaskId.value != null) return '编辑行政日程'
+  return form.type === 'HOLIDAY' ? '新增节假日/重大节日' : '新增行政日程'
+})
+
 watch(
   () => form.collaboratorDeptId,
   (deptId) => {
@@ -419,9 +431,9 @@ function calendarTypeText(value?: string) {
 
 function eventColor(task: OaTask, isHoliday: boolean) {
   if (isHoliday) return '#f5222d'
+  if (task.status === 'DONE') return '#94a3b8'
   if (task.eventColor) return task.eventColor
   if (task.urgency === 'EMERGENCY') return '#ff4d4f'
-  if (task.status === 'DONE') return '#52c41a'
   if (task.calendarType === 'COLLAB') return '#722ed1'
   return '#1677ff'
 }
@@ -435,6 +447,19 @@ function normalizeCollaboratorNames(input: string[] | string | undefined) {
     .split(',')
     .map((item) => item.trim())
     .filter((item) => !!item)
+}
+
+function upsertTaskRow(task: OaTask) {
+  const index = rows.value.findIndex((item) => String(item.id) === String(task.id))
+  if (index >= 0) {
+    rows.value[index] = { ...rows.value[index], ...task }
+    return
+  }
+  rows.value = [...rows.value, task]
+}
+
+function removeTaskRow(id: string | number) {
+  rows.value = rows.value.filter((item) => String(item.id) !== String(id))
 }
 
 function openDayDrawer(date: Dayjs) {
@@ -503,6 +528,7 @@ function onReset() {
 }
 
 function openCreate(type: EventKind, date?: Dayjs) {
+  editingTaskId.value = null
   form.type = type
   form.title = ''
   form.planCategory = '基础办公'
@@ -521,6 +547,63 @@ function openCreate(type: EventKind, date?: Dayjs) {
   form.recurrenceInterval = 1
   form.recurrenceCount = 4
   editOpen.value = true
+}
+
+function openEdit(item: OaTask) {
+  editingTaskId.value = item.id
+  form.type = (String(item.title || '').startsWith('【节假日】') || String(item.title || '').startsWith('【重大节日】')) ? 'HOLIDAY' : 'TASK'
+  form.title = form.type === 'HOLIDAY'
+    ? String(item.title || '').replace(/^【节假日】|^【重大节日】/g, '')
+    : (item.title || '')
+  form.planCategory = item.planCategory || '基础办公'
+  form.calendarType = (item.calendarType || 'WORK') as CalendarType
+  form.urgency = (item.urgency || 'NORMAL') as UrgencyType
+  form.eventColor = item.eventColor || eventColor(item, false)
+  form.startTime = item.startTime ? dayjs(item.startTime) : undefined
+  form.endTime = item.endTime ? dayjs(item.endTime) : undefined
+  form.assigneeName = item.assigneeName || ''
+  form.priority = item.priority || 'NORMAL'
+  form.description = item.description || ''
+  form.collaboratorDeptId = undefined
+  form.collaboratorIds = Array.isArray(item.collaboratorIds)
+    ? item.collaboratorIds.map((x) => String(x))
+    : typeof item.collaboratorIds === 'string' && item.collaboratorIds
+      ? item.collaboratorIds.split(',').map((x) => x.trim()).filter(Boolean)
+      : []
+  form.recurring = false
+  form.recurrenceRule = 'WEEKLY'
+  form.recurrenceInterval = 1
+  form.recurrenceCount = 1
+  editOpen.value = true
+}
+
+function markDone(item: OaTask) {
+  if (!item.id) return
+  Modal.confirm({
+    title: '确认将该日程标记为已完成？',
+    onOk: async () => {
+      const updated = await completeOaTask(item.id)
+      if (updated?.id != null) {
+        upsertTaskRow(updated)
+      } else {
+        upsertTaskRow({ ...item, status: 'DONE' })
+      }
+      message.success('已标记完成')
+    }
+  })
+}
+
+function removeTask(item: OaTask) {
+  if (!item.id) return
+  Modal.confirm({
+    title: '确认删除该日程？',
+    okButtonProps: { danger: true },
+    onOk: async () => {
+      await deleteOaTask(item.id)
+      removeTaskRow(item.id)
+      message.success('已删除')
+    }
+  })
 }
 
 function addByRule(base: Dayjs, rule: RecurrenceType, interval: number) {
@@ -551,6 +634,28 @@ async function submit() {
 
   saving.value = true
   try {
+    if (editingTaskId.value != null) {
+      const title = form.type === 'HOLIDAY' ? `【节假日】${form.title.trim()}` : form.title.trim()
+      const updated = await updateOaTask(editingTaskId.value, {
+        title,
+        description: form.description || undefined,
+        startTime: dayjs(form.startTime).format('YYYY-MM-DDTHH:mm:ss'),
+        endTime: form.endTime ? dayjs(form.endTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
+        priority: form.priority,
+        assigneeName: form.assigneeName || undefined,
+        calendarType: form.calendarType,
+        planCategory: form.planCategory || undefined,
+        urgency: form.urgency,
+        eventColor: form.eventColor,
+        collaboratorIds: form.calendarType === 'COLLAB' ? form.collaboratorIds : [],
+        collaboratorNames: form.calendarType === 'COLLAB' ? collaboratorNames : []
+      })
+      upsertTaskRow(updated)
+      message.success('日程已更新')
+      editOpen.value = false
+      editingTaskId.value = null
+      return
+    }
     const tasks: Promise<any>[] = []
     for (let i = 0; i < repeatCount; i++) {
       const startTime = i === 0 ? form.startTime : addByRule(form.startTime, repeatRule, repeatInterval * i)
@@ -579,10 +684,13 @@ async function submit() {
       )
     }
 
-    await Promise.all(tasks)
+    const createdRows = await Promise.all(tasks)
+    createdRows.forEach((row) => {
+      if (row?.id != null) upsertTaskRow(row)
+    })
     message.success(form.recurring ? `已按周期生成 ${tasks.length} 条行政计划` : form.type === 'HOLIDAY' ? '节假日/重大节日已记录' : '行政日程已记录')
     editOpen.value = false
-    await fetchAll()
+    editingTaskId.value = null
   } finally {
     saving.value = false
   }
@@ -644,5 +752,14 @@ onBeforeUnmount(() => {
   color: #64748b;
   font-size: 12px;
   line-height: 32px;
+}
+
+.agenda-item-done {
+  opacity: 0.72;
+}
+
+.agenda-title-done {
+  color: #64748b;
+  text-decoration: line-through;
 }
 </style>
