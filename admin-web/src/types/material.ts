@@ -28,6 +28,8 @@ export interface MaterialPurchaseOrderItem {
   id?: number
   productId: number
   productName?: string
+  businessDomain?: 'INTERNAL' | 'MALL' | 'BOTH' | string
+  itemType?: 'ASSET' | 'CONSUMABLE' | 'FOOD' | 'SERVICE' | string
   quantity: number
   unitPrice: number
   amount?: number
@@ -43,6 +45,12 @@ export interface MaterialPurchaseOrder {
   orderDate?: string
   status?: MaterialOrderStatus
   totalAmount?: number
+  source?: string
+  sourceRef?: string
+  assetAmount?: number
+  consumableAmount?: number
+  foodAmount?: number
+  serviceAmount?: number
   remark?: string
   createTime?: string
   items?: MaterialPurchaseOrderItem[]

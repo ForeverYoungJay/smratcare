@@ -1,19 +1,33 @@
 <template>
   <PageContainer title="后勤工作台" subTitle="资产、物资、餐饮、维修一体化后勤保障总览">
+    <template #extra>
+      <a-space>
+        <a-tag :color="dutyMode ? 'gold' : 'default'">{{ dutyMode ? '值班高密度模式' : '标准模式' }}</a-tag>
+        <a-switch v-model:checked="dutyMode" checked-children="值班" un-checked-children="标准" />
+      </a-space>
+    </template>
     <StatefulBlock :loading="loading" :error="errorMessage" :empty="!summary" empty-text="暂无后勤数据" @retry="loadSummary">
-      <a-row :gutter="12">
-        <a-col :xs="24" :md="12" :xl="8" v-for="card in cards" :key="card.key" style="margin-bottom: 12px">
-          <a-card class="card-elevated" :bordered="false" :title="card.title">
+      <a-row :gutter="dutyMode ? 8 : 12">
+        <a-col
+          :xs="24"
+          :md="dutyMode ? 8 : 12"
+          :xl="dutyMode ? 6 : 8"
+          v-for="card in cards"
+          :key="card.key"
+          :style="{ marginBottom: dutyMode ? '8px' : '12px' }"
+        >
+          <a-card class="card-elevated" :class="{ 'card-duty': dutyMode }" :bordered="false" :title="card.title">
             <template #extra>
               <a-tag :color="card.color">{{ card.tag }}</a-tag>
             </template>
-            <div class="line-item" v-for="line in card.lines" :key="line">{{ line }}</div>
-            <a-space wrap style="margin-top: 12px">
+            <div class="line-item" v-for="line in visibleLines(card.lines)" :key="line">{{ line }}</div>
+            <a-space wrap :style="{ marginTop: dutyMode ? '8px' : '12px' }">
               <a-button
-                v-for="action in card.actions"
+                v-for="action in visibleActions(card.actions)"
                 :key="action.label"
                 :type="action.primary ? 'primary' : 'default'"
                 :disabled="action.disabled"
+                :size="dutyMode ? 'small' : 'middle'"
                 @click="go(action.path)"
               >
                 {{ action.label }}
@@ -28,7 +42,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
@@ -40,9 +54,11 @@ import {
 import type { LogisticsWorkbenchSummary } from '../../types'
 
 const router = useRouter()
+const route = useRoute()
 const loading = ref(false)
 const errorMessage = ref('')
 const summary = ref<LogisticsWorkbenchSummary>()
+const dutyMode = ref(false)
 
 const cards = computed(() => {
   const data = summary.value
@@ -96,7 +112,7 @@ const cards = computed(() => {
       actions: [
         { label: '床态全景', path: '/elder/bed-panorama?filter=occupied', primary: true },
         { label: '清洁中床位', path: '/life/room-cleaning?status=PENDING' },
-        { label: '维修中床位', path: '/life/maintenance?status=PROCESSING' }
+        { label: '维修中床位', path: '/logistics/assets/maintenance-record?status=PROCESSING' }
       ]
     },
     {
@@ -110,8 +126,8 @@ const cards = computed(() => {
         `本月维修成本：${amount(data.monthMaintenanceCost)}`
       ],
       actions: [
-        { label: '待维修', path: '/life/maintenance?status=OPEN', primary: true },
-        { label: '超时维修', path: '/life/maintenance?filter=overdue' },
+        { label: '待维修', path: '/logistics/assets/maintenance-record?status=OPEN', primary: true },
+        { label: '超时维修', path: '/logistics/assets/maintenance-record?filter=overdue' },
         { label: '维修成本', path: '/logistics/maintenance/cost' },
         { label: '设备档案', path: '/logistics/maintenance/assets' },
         { label: '生成维保待办', path: 'action:generate-maintenance-todos' },
@@ -130,7 +146,7 @@ const cards = computed(() => {
         `今日餐饮成本估算：${amount(data.todayDiningCost)}`
       ],
       actions: [
-        { label: '订餐详情', path: '/dining/stats?date=today', primary: true },
+        { label: '订餐详情', path: '/logistics/dining/stats?date=today', primary: true },
         { label: '未送达', path: '/logistics/dining/delivery-plan?filter=undelivered' },
         { label: '餐饮成本', path: '/logistics/reports/dining-cost' }
       ]
@@ -146,8 +162,8 @@ const cards = computed(() => {
         `特殊营养餐：${data.specialNutritionMealCount}`
       ],
       actions: [
-        { label: '食谱管理', path: '/dining/recipe', primary: true },
-        { label: '禁忌设置', path: '/logistics/storage/risk-rule' }
+        { label: '食谱管理', path: '/logistics/dining/recipe', primary: true },
+        { label: '禁忌设置', path: '/logistics/commerce/risk' }
       ]
     },
     {
@@ -163,8 +179,26 @@ const cards = computed(() => {
       actions: [{ label: '物资消耗报表', path: '/logistics/reports/consume', primary: true }]
     },
     {
+      key: 'supply-chain',
+      title: '卡片8：仓储四链路聚合',
+      tag: '聚合',
+      color: 'magenta',
+      lines: [
+        `库存(资/耗/食/服)：${data.inventoryAssetQty}/${data.inventoryConsumableQty}/${data.inventoryFoodQty}/${data.inventoryServiceQty}`,
+        `低库存预警(资/耗/食/服)：${data.lowStockAssetCount}/${data.lowStockConsumableCount}/${data.lowStockFoodCount}/${data.lowStockServiceCount}`,
+        `本月采购金额(资/耗/食/服)：${amount(data.monthPurchaseAssetAmount)} / ${amount(data.monthPurchaseConsumableAmount)} / ${amount(data.monthPurchaseFoodAmount)} / ${amount(data.monthPurchaseServiceAmount)}`,
+        `今日出库(资/耗/食/服)：${data.todayOutboundAssetQty}/${data.todayOutboundConsumableQty}/${data.todayOutboundFoodQty}/${data.todayOutboundServiceQty}`
+      ],
+      actions: [
+        { label: '库存总览', path: '/logistics/storage/stock-query?businessDomain=INTERNAL&itemType=CONSUMABLE', primary: true },
+        { label: '库存预警', path: '/logistics/storage/alerts?focus=low&businessDomain=INTERNAL&itemType=CONSUMABLE' },
+        { label: '采购单', path: '/logistics/storage/purchase?status=DRAFT&source=inventory_alert_batch' },
+        { label: '出库记录', path: '/logistics/storage/outbound?outType=CONSUME&businessDomain=INTERNAL&itemType=CONSUMABLE' }
+      ]
+    },
+    {
       key: 'task-load',
-      title: '卡片8：后勤任务负载',
+      title: '卡片9：后勤任务负载',
       tag: '任务',
       color: 'cyan',
       lines: [
@@ -204,6 +238,16 @@ function go(path: string) {
     return
   }
   router.push(path)
+}
+
+function visibleLines(lines: string[]) {
+  if (!dutyMode.value) return lines
+  return lines.slice(0, 2)
+}
+
+function visibleActions(actions: Array<{ label: string; path: string; primary?: boolean; disabled?: boolean }>) {
+  if (!dutyMode.value) return actions
+  return actions.slice(0, 3)
 }
 
 async function triggerMaintenanceTodos() {
@@ -272,7 +316,10 @@ async function loadSummary() {
   }
 }
 
-onMounted(loadSummary)
+onMounted(() => {
+  dutyMode.value = String(Array.isArray(route.query.mode) ? route.query.mode[0] : route.query.mode || '').toLowerCase() === 'duty'
+  loadSummary()
+})
 </script>
 
 <style scoped>
@@ -281,5 +328,23 @@ onMounted(loadSummary)
   color: #434343;
   font-size: 13px;
   line-height: 1.65;
+}
+
+.card-duty :deep(.ant-card-head) {
+  min-height: 44px;
+}
+
+.card-duty :deep(.ant-card-head-title) {
+  font-size: 14px;
+}
+
+.card-duty :deep(.ant-card-body) {
+  padding: 12px;
+}
+
+.card-duty .line-item {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.45;
 }
 </style>

@@ -21,6 +21,18 @@
         <a-form-item label="分类">
           <a-select v-model:value="query.category" :options="categoryOptions" allow-clear style="width: 180px" />
         </a-form-item>
+        <a-form-item label="业务域">
+          <a-select v-model:value="query.businessDomain" allow-clear style="width: 140px" :options="businessDomainOptions" />
+        </a-form-item>
+        <a-form-item label="物资类型">
+          <a-select v-model:value="query.itemType" allow-clear style="width: 140px" :options="itemTypeOptions" />
+        </a-form-item>
+        <a-form-item label="商城可售">
+          <a-select v-model:value="query.mallEnabled" allow-clear style="width: 120px">
+            <a-select-option :value="1">是</a-select-option>
+            <a-select-option :value="0">否</a-select-option>
+          </a-select>
+        </a-form-item>
         <a-form-item label="临期天数<=">
           <a-input-number v-model:value="query.expiryDays" :min="0" style="width: 120px" />
         </a-form-item>
@@ -43,6 +55,17 @@
           <a-button type="primary" @click="openAdjust">盘点调整</a-button>
         </a-space>
       </div>
+      <a-row :gutter="12" style="margin-bottom: 12px">
+        <a-col :span="6"><a-statistic title="固定资产库存" :value="summaryStats.assetQty" /></a-col>
+        <a-col :span="6"><a-statistic title="耗材库存" :value="summaryStats.consumableQty" /></a-col>
+        <a-col :span="6"><a-statistic title="食材库存" :value="summaryStats.foodQty" /></a-col>
+        <a-col :span="6"><a-statistic title="服务库存" :value="summaryStats.serviceQty" /></a-col>
+      </a-row>
+      <a-row :gutter="12" style="margin-bottom: 12px">
+        <a-col :span="8"><a-statistic title="低库存条目" :value="summaryStats.lowStockCount" /></a-col>
+        <a-col :span="8"><a-statistic title="临期条目(<=30天)" :value="summaryStats.expiringCount" /></a-col>
+        <a-col :span="8"><a-statistic title="低库存缺口" :value="summaryStats.lowStockGap" /></a-col>
+      </a-row>
 
       <vxe-toolbar custom export></vxe-toolbar>
       <vxe-table
@@ -56,6 +79,14 @@
       >
         <vxe-column field="productName" title="商品名称" min-width="160" />
         <vxe-column field="productId" title="商品ID" width="120" />
+        <vxe-column field="businessDomain" title="业务域" width="110">
+          <template #default="{ row }">
+            <a-tag :color="domainColor(row.businessDomain)">{{ domainLabel(row.businessDomain) }}</a-tag>
+          </template>
+        </vxe-column>
+        <vxe-column field="itemType" title="类型" width="110">
+          <template #default="{ row }">{{ itemTypeLabel(row.itemType) }}</template>
+        </vxe-column>
         <vxe-column field="batchNo" title="批次号" min-width="160" />
         <vxe-column field="quantity" title="库存数量" width="120">
           <template #default="{ row }">
@@ -143,6 +174,9 @@ const query = reactive({
   productId: undefined as number | undefined,
   warehouseId: undefined as number | undefined,
   category: undefined as string | undefined,
+  businessDomain: undefined as string | undefined,
+  itemType: undefined as string | undefined,
+  mallEnabled: undefined as number | undefined,
   expiryDays: undefined as number | undefined,
   lowStockOnly: false,
   pageNo: 1,
@@ -150,12 +184,53 @@ const query = reactive({
 })
 const warehouseOptions = ref<Array<{ label: string; value: number }>>([])
 const categoryOptions = ref<Array<{ label: string; value: string }>>([])
+const businessDomainOptions = [
+  { label: '企业内部', value: 'INTERNAL' },
+  { label: '商城', value: 'MALL' },
+  { label: '双用途', value: 'BOTH' }
+]
+const itemTypeOptions = [
+  { label: '固定资产', value: 'ASSET' },
+  { label: '耗材', value: 'CONSUMABLE' },
+  { label: '食材', value: 'FOOD' },
+  { label: '服务', value: 'SERVICE' }
+]
 const productOptions = computed(() =>
   products.value.map((p) => ({
     label: `${p.productName} (ID:${p.idStr || p.id})`,
     value: p.id
   }))
 )
+const summaryStats = computed(() => {
+  const stats = {
+    assetQty: 0,
+    consumableQty: 0,
+    foodQty: 0,
+    serviceQty: 0,
+    lowStockCount: 0,
+    expiringCount: 0,
+    lowStockGap: 0
+  }
+  for (const row of rows.value) {
+    const qty = Number(row.quantity || 0)
+    const itemType = row.itemType || 'CONSUMABLE'
+    if (itemType === 'ASSET') stats.assetQty += qty
+    else if (itemType === 'FOOD') stats.foodQty += qty
+    else if (itemType === 'SERVICE') stats.serviceQty += qty
+    else stats.consumableQty += qty
+
+    if (lowStock(row)) {
+      stats.lowStockCount += 1
+      const safety = Number(row.safetyStock || 0)
+      const gap = Math.max(safety - qty, 0)
+      stats.lowStockGap += gap
+    }
+    if (expiring(row)) {
+      stats.expiringCount += 1
+    }
+  }
+  return stats
+})
 
 const adjustOpen = ref(false)
 const adjusting = ref(false)
@@ -203,6 +278,9 @@ async function fetchData() {
       productId: query.productId,
       warehouseId: query.warehouseId,
       category: query.category,
+      businessDomain: query.businessDomain,
+      itemType: query.itemType,
+      mallEnabled: query.mallEnabled,
       expiryDays: query.expiryDays,
       lowStockOnly: query.lowStockOnly,
       keyword: query.keyword || undefined
@@ -219,6 +297,9 @@ function reset() {
   query.productId = undefined
   query.warehouseId = undefined
   query.category = undefined
+  query.businessDomain = undefined
+  query.itemType = undefined
+  query.mallEnabled = undefined
   query.expiryDays = undefined
   query.lowStockOnly = false
   query.pageNo = 1
@@ -246,6 +327,9 @@ function exportCsvData() {
     rows.value.map((r) => ({
       商品名称: r.productName,
       商品ID: r.productId,
+      业务域: domainLabel(r.businessDomain),
+      类型: itemTypeLabel(r.itemType),
+      商城可售: r.mallEnabled === 1 ? '是' : '否',
       批次号: r.batchNo,
       库存数量: r.quantity,
       安全库存: r.safetyStock,
@@ -285,13 +369,18 @@ function applyRouteQuery() {
   const q = route.query || {}
   const queryKeyword = typeof q.keyword === 'string' ? q.keyword : ''
   const queryCategory = typeof q.category === 'string' ? q.category : undefined
+  const queryBusinessDomain = typeof q.businessDomain === 'string' ? q.businessDomain : undefined
+  const queryItemType = typeof q.itemType === 'string' ? q.itemType : undefined
   const productIdRaw = Array.isArray(q.productId) ? q.productId[0] : q.productId
   const expiryDaysRaw = Array.isArray(q.expiryDays) ? q.expiryDays[0] : q.expiryDays
   const lowStockRaw = Array.isArray(q.lowStockOnly) ? q.lowStockOnly[0] : q.lowStockOnly
+  const mallEnabledRaw = Array.isArray(q.mallEnabled) ? q.mallEnabled[0] : q.mallEnabled
   const filterRaw = Array.isArray(q.filter) ? q.filter[0] : q.filter
 
   if (queryKeyword) query.keyword = queryKeyword
   if (queryCategory) query.category = queryCategory
+  if (queryBusinessDomain) query.businessDomain = queryBusinessDomain
+  if (queryItemType) query.itemType = queryItemType
   if (productIdRaw !== undefined) {
     const parsed = Number(productIdRaw)
     query.productId = Number.isNaN(parsed) ? undefined : parsed
@@ -303,12 +392,38 @@ function applyRouteQuery() {
   if (lowStockRaw !== undefined) {
     query.lowStockOnly = String(lowStockRaw) === '1' || String(lowStockRaw).toLowerCase() === 'true'
   }
+  if (mallEnabledRaw !== undefined) {
+    const parsed = Number(mallEnabledRaw)
+    query.mallEnabled = Number.isNaN(parsed) ? undefined : parsed
+  }
   if (String(filterRaw || '') === 'low_stock') {
     query.lowStockOnly = true
   }
   if (String(filterRaw || '') === 'expiring' && query.expiryDays === undefined) {
     query.expiryDays = 30
   }
+}
+
+function domainLabel(value?: string) {
+  if (value === 'INTERNAL') return '企业内部'
+  if (value === 'MALL') return '商城'
+  if (value === 'BOTH') return '双用途'
+  return '未设置'
+}
+
+function domainColor(value?: string) {
+  if (value === 'INTERNAL') return 'default'
+  if (value === 'MALL') return 'blue'
+  if (value === 'BOTH') return 'purple'
+  return 'default'
+}
+
+function itemTypeLabel(value?: string) {
+  if (value === 'ASSET') return '固定资产'
+  if (value === 'FOOD') return '食材'
+  if (value === 'SERVICE') return '服务'
+  if (value === 'CONSUMABLE') return '耗材'
+  return '未设置'
 }
 
 onMounted(async () => {

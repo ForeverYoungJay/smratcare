@@ -97,6 +97,11 @@
         <a-descriptions-item label="积分">{{ detail?.pointsUsed }}</a-descriptions-item>
       </a-descriptions>
       <a-divider />
+      <div class="detail-actions">
+        <a-space>
+          <a-button type="primary" @click="createPurchaseByDetail" :disabled="!detail?.items?.length">整单发起采购</a-button>
+        </a-space>
+      </div>
       <a-tabs>
         <a-tab-pane key="items" tab="商品明细">
           <a-empty v-if="!detail?.items?.length" description="暂无明细" />
@@ -379,7 +384,39 @@ function createPurchaseByItem(item: any) {
       autoCreate: '1',
       productId: item.productId,
       quantity: Math.max(Number(item.quantity || 1), 1),
-      source: 'store_order_item'
+      source: 'store_order_item',
+      sourceRef: detail.value?.orderNo || ''
+    }
+  })
+}
+
+function createPurchaseByDetail() {
+  const items = detail.value?.items || []
+  if (!items.length) {
+    message.info('暂无可转采购商品')
+    return
+  }
+  const merged = new Map<number, number>()
+  for (const item of items as any[]) {
+    const productId = Number(item.productId || 0)
+    if (!productId) continue
+    const qty = Math.max(Number(item.quantity || 1), 1)
+    merged.set(productId, (merged.get(productId) || 0) + qty)
+  }
+  const productIds = Array.from(merged.keys())
+  if (!productIds.length) {
+    message.info('商品明细缺少有效商品ID，无法转采购')
+    return
+  }
+  const quantities = productIds.map((id) => merged.get(id) || 1)
+  router.push({
+    path: '/logistics/storage/purchase',
+    query: {
+      autoCreate: '1',
+      productIds: productIds.join(','),
+      quantities: quantities.join(','),
+      source: 'store_order_detail',
+      sourceRef: detail.value?.orderNo || ''
     }
   })
 }
@@ -405,5 +442,8 @@ onMounted(async () => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+.detail-actions {
+  margin-bottom: 8px;
 }
 </style>

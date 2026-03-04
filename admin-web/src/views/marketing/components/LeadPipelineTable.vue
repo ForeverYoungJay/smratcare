@@ -672,6 +672,11 @@ function applyScenarioFilters(list: CrmLeadItem[]) {
       if (!textContains(reservationStatus, '锁')) return false
       if (!nextFollow || nextFollow < todayText || dayjs(nextFollow).diff(dayjs(todayText), 'day') > 3) return false
     }
+    if (filter === 'missing_followup' && String(item.followupStatus || '').trim()) return false
+    if (filter === 'unsigned_lock') {
+      if (!textContains(reservationStatus, '锁')) return false
+      if (item.contractSignedFlag) return false
+    }
 
     if (scenario === 'blacklist') {
       if (!textContains(customerTag, '黑')) return false

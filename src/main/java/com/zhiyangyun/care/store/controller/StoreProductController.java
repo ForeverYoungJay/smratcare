@@ -47,13 +47,19 @@ public class StoreProductController {
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) String keyword,
       @RequestParam(required = false) Integer status,
-      @RequestParam(required = false) String category) {
+      @RequestParam(required = false) String category,
+      @RequestParam(required = false) String businessDomain,
+      @RequestParam(required = false) String itemType,
+      @RequestParam(required = false) Integer mallEnabled) {
     Long orgId = AuthContext.getOrgId();
     LambdaQueryWrapper<Product> wrapper = new LambdaQueryWrapper<>();
     wrapper.eq(orgId != null, Product::getOrgId, orgId)
         .eq(Product::getIsDeleted, 0)
         .eq(status != null, Product::getStatus, status)
-        .like(category != null && !category.isBlank(), Product::getCategory, category);
+        .like(category != null && !category.isBlank(), Product::getCategory, category)
+        .eq(businessDomain != null && !businessDomain.isBlank(), Product::getBusinessDomain, businessDomain)
+        .eq(itemType != null && !itemType.isBlank(), Product::getItemType, itemType)
+        .eq(mallEnabled != null, Product::getMallEnabled, mallEnabled);
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(Product::getProductName, keyword)
           .or().like(Product::getProductCode, keyword));
@@ -82,6 +88,9 @@ public class StoreProductController {
       item.setProductCode(product.getProductCode());
       item.setProductName(product.getProductName());
       item.setCategory(product.getCategory());
+      item.setBusinessDomain(product.getBusinessDomain());
+      item.setItemType(product.getItemType());
+      item.setMallEnabled(product.getMallEnabled());
       item.setPrice(product.getPrice());
       item.setPointsPrice(product.getPointsPrice());
       item.setSafetyStock(product.getSafetyStock());
@@ -152,6 +161,15 @@ public class StoreProductController {
     if (product.getStatus() == null) {
       product.setStatus(1);
     }
+    if (isBlank(product.getBusinessDomain())) {
+      product.setBusinessDomain("BOTH");
+    }
+    if (isBlank(product.getItemType())) {
+      product.setItemType("CONSUMABLE");
+    }
+    if (product.getMallEnabled() == null) {
+      product.setMallEnabled(1);
+    }
   }
 
   private void applyDefaultsForUpdate(Product product, Product existing) {
@@ -179,6 +197,15 @@ public class StoreProductController {
     }
     if (product.getCategory() == null) {
       product.setCategory(existing.getCategory());
+    }
+    if (product.getBusinessDomain() == null) {
+      product.setBusinessDomain(existing.getBusinessDomain());
+    }
+    if (product.getItemType() == null) {
+      product.setItemType(existing.getItemType());
+    }
+    if (product.getMallEnabled() == null) {
+      product.setMallEnabled(existing.getMallEnabled());
     }
     if (product.getUnit() == null) {
       product.setUnit(existing.getUnit());

@@ -334,6 +334,11 @@ public class MaterialController {
         ? Map.of()
         : supplierMapper.selectBatchIds(supplierIds).stream()
             .collect(Collectors.toMap(MaterialSupplier::getId, MaterialSupplier::getSupplierName));
+    List<Long> orderIds = page.getRecords().stream()
+        .map(MaterialPurchaseOrder::getId)
+        .filter(Objects::nonNull)
+        .toList();
+    Map<Long, PurchaseItemAggregation> aggregationByOrder = buildPurchaseItemAggregation(orderIds);
     resp.setRecords(page.getRecords().stream().map(order -> {
       MaterialPurchaseOrderDetailResponse item = new MaterialPurchaseOrderDetailResponse();
       item.setId(order.getId());
@@ -345,6 +350,20 @@ public class MaterialController {
       item.setOrderDate(order.getOrderDate());
       item.setStatus(order.getStatus());
       item.setTotalAmount(order.getTotalAmount());
+      item.setSource(extractSource(order.getRemark()));
+      item.setSourceRef(extractSourceRef(order.getRemark()));
+      PurchaseItemAggregation aggregation = aggregationByOrder.get(order.getId());
+      if (aggregation != null) {
+        item.setAssetAmount(aggregation.assetAmount());
+        item.setConsumableAmount(aggregation.consumableAmount());
+        item.setFoodAmount(aggregation.foodAmount());
+        item.setServiceAmount(aggregation.serviceAmount());
+      } else {
+        item.setAssetAmount(BigDecimal.ZERO);
+        item.setConsumableAmount(BigDecimal.ZERO);
+        item.setFoodAmount(BigDecimal.ZERO);
+        item.setServiceAmount(BigDecimal.ZERO);
+      }
       item.setRemark(order.getRemark());
       item.setCreateTime(order.getCreateTime());
       return item;
@@ -753,6 +772,8 @@ public class MaterialController {
     detail.setOrderDate(order.getOrderDate());
     detail.setStatus(order.getStatus());
     detail.setTotalAmount(order.getTotalAmount());
+    detail.setSource(extractSource(order.getRemark()));
+    detail.setSourceRef(extractSourceRef(order.getRemark()));
     detail.setRemark(order.getRemark());
     detail.setCreateTime(order.getCreateTime());
 
@@ -769,11 +790,29 @@ public class MaterialController {
         Wrappers.lambdaQuery(MaterialPurchaseOrderItem.class)
             .eq(MaterialPurchaseOrderItem::getOrderId, order.getId())
             .eq(MaterialPurchaseOrderItem::getIsDeleted, 0));
+    List<Long> productIds = rows.stream()
+        .map(MaterialPurchaseOrderItem::getProductId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList();
+    Map<Long, Product> productMap = productIds.isEmpty()
+        ? Map.of()
+        : productMapper.selectBatchIds(productIds).stream()
+            .collect(Collectors.toMap(Product::getId, p -> p));
+    PurchaseItemAggregation aggregation = aggregatePurchaseItems(rows, productMap);
+    detail.setAssetAmount(aggregation.assetAmount());
+    detail.setConsumableAmount(aggregation.consumableAmount());
+    detail.setFoodAmount(aggregation.foodAmount());
+    detail.setServiceAmount(aggregation.serviceAmount());
+
     List<MaterialPurchaseOrderItemResponse> itemResponses = rows.stream().map(row -> {
       MaterialPurchaseOrderItemResponse item = new MaterialPurchaseOrderItemResponse();
       item.setId(row.getId());
       item.setProductId(row.getProductId());
       item.setProductName(row.getProductNameSnapshot());
+      Product product = productMap.get(row.getProductId());
+      item.setBusinessDomain(product == null ? null : product.getBusinessDomain());
+      item.setItemType(product == null ? null : product.getItemType());
       item.setQuantity(row.getQuantity());
       item.setUnitPrice(row.getUnitPrice());
       item.setAmount(row.getAmount());
@@ -1111,6 +1150,94 @@ public class MaterialController {
       }
     }
   }
+
+  private Map<Long, PurchaseItemAggregation> buildPurchaseItemAggregation(List<Long> orderIds) {
+    if (orderIds == null || orderIds.isEmpty()) {
+      return Map.of();
+    }
+    List<MaterialPurchaseOrderItem> rows = purchaseOrderItemMapper.selectList(
+        Wrappers.lambdaQuery(MaterialPurchaseOrderItem.class)
+            .in(MaterialPurchaseOrderItem::getOrderId, orderIds)
+            .eq(MaterialPurchaseOrderItem::getIsDeleted, 0));
+    if (rows.isEmpty()) {
+      return Map.of();
+    }
+    List<Long> productIds = rows.stream()
+        .map(MaterialPurchaseOrderItem::getProductId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList();
+    Map<Long, Product> productMap = productIds.isEmpty()
+        ? Map.of()
+        : productMapper.selectBatchIds(productIds).stream()
+            .collect(Collectors.toMap(Product::getId, p -> p));
+
+    Map<Long, List<MaterialPurchaseOrderItem>> rowsByOrder = rows.stream()
+        .collect(Collectors.groupingBy(MaterialPurchaseOrderItem::getOrderId));
+    Map<Long, PurchaseItemAggregation> result = new HashMap<>();
+    for (Map.Entry<Long, List<MaterialPurchaseOrderItem>> entry : rowsByOrder.entrySet()) {
+      result.put(entry.getKey(), aggregatePurchaseItems(entry.getValue(), productMap));
+    }
+    return result;
+  }
+
+  private PurchaseItemAggregation aggregatePurchaseItems(
+      List<MaterialPurchaseOrderItem> rows,
+      Map<Long, Product> productMap) {
+    BigDecimal assetAmount = BigDecimal.ZERO;
+    BigDecimal consumableAmount = BigDecimal.ZERO;
+    BigDecimal foodAmount = BigDecimal.ZERO;
+    BigDecimal serviceAmount = BigDecimal.ZERO;
+    for (MaterialPurchaseOrderItem row : rows) {
+      if (row == null || row.getAmount() == null) {
+        continue;
+      }
+      Product product = productMap.get(row.getProductId());
+      String itemType = product == null ? null : product.getItemType();
+      if ("ASSET".equalsIgnoreCase(itemType)) {
+        assetAmount = assetAmount.add(row.getAmount());
+      } else if ("FOOD".equalsIgnoreCase(itemType)) {
+        foodAmount = foodAmount.add(row.getAmount());
+      } else if ("SERVICE".equalsIgnoreCase(itemType)) {
+        serviceAmount = serviceAmount.add(row.getAmount());
+      } else {
+        consumableAmount = consumableAmount.add(row.getAmount());
+      }
+    }
+    return new PurchaseItemAggregation(assetAmount, consumableAmount, foodAmount, serviceAmount);
+  }
+
+  private String extractSource(String remark) {
+    if (remark == null || remark.isBlank()) {
+      return null;
+    }
+    String[] parts = remark.split("；");
+    for (String part : parts) {
+      if (part.startsWith("来源=")) {
+        return normalizeNullableText(part.substring("来源=".length()));
+      }
+    }
+    return null;
+  }
+
+  private String extractSourceRef(String remark) {
+    if (remark == null || remark.isBlank()) {
+      return null;
+    }
+    String[] parts = remark.split("；");
+    for (String part : parts) {
+      if (part.startsWith("关联=")) {
+        return normalizeNullableText(part.substring("关联=".length()));
+      }
+    }
+    return null;
+  }
+
+  private record PurchaseItemAggregation(
+      BigDecimal assetAmount,
+      BigDecimal consumableAmount,
+      BigDecimal foodAmount,
+      BigDecimal serviceAmount) {}
 
   private void validateStatusFlag(Integer status, String fieldName) {
     if (status == null) {

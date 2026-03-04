@@ -3,6 +3,8 @@ import type {
   MedicalCareWorkbenchSummary,
   MedicalCvdAssessment,
   MedicalCvdAssessmentSummary,
+  MedicalAiGenerateTaskResponse,
+  MedicalAiReportItem,
   MedicalResidentOverview,
   MedicalResidentRiskCard,
   MedicalTcmAssessment,
@@ -81,4 +83,24 @@ export function getResidentRiskCard(residentId: number | string) {
 
 export function getResidentOverview(residentId: number | string) {
   return request.get<MedicalResidentOverview>('/api/medical-care/resident360/overview', { params: { residentId } })
+}
+
+export function getMedicalAiReportPage(params: any) {
+  return fetchPage<MedicalAiReportItem>('/api/medical-care/ai-reports/page', params)
+}
+
+export function generateMedicalAiReport(data: {
+  type?: string
+  dateFrom?: string
+  dateTo?: string
+}) {
+  return request.post<MedicalAiReportItem>('/api/medical-care/ai-reports/generate', data)
+}
+
+export function publishMedicalAiReport(id: number) {
+  return request.post<MedicalAiReportItem>(`/api/medical-care/ai-reports/${id}/publish`)
+}
+
+export function generateMedicalAiReportTasks(id: number) {
+  return request.post<MedicalAiGenerateTaskResponse>(`/api/medical-care/ai-reports/${id}/generate-tasks`)
 }

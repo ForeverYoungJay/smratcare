@@ -137,7 +137,8 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
     if (product == null
         || product.getStatus() == null
         || product.getStatus() != 1
-        || !elder.getOrgId().equals(product.getOrgId())) {
+        || !elder.getOrgId().equals(product.getOrgId())
+        || !isProductMallAvailable(product)) {
       response.setStatus(OrderStatus.PRODUCT_NOT_FOUND.name());
       response.setAllowed(false);
       response.setMessage("Product not found or disabled");
@@ -263,7 +264,7 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
     }
 
     Product product = productMapper.selectById(request.getProductId());
-    if (product == null || !elder.getOrgId().equals(product.getOrgId())) {
+    if (product == null || !elder.getOrgId().equals(product.getOrgId()) || !isProductMallAvailable(product)) {
       response.setStatus(OrderStatus.PRODUCT_NOT_FOUND.name());
       response.setAllowed(false);
       response.setMessage("Product not found");
@@ -646,6 +647,21 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
         .filter(s -> !s.isEmpty())
         .map(Long::valueOf)
         .collect(Collectors.toSet());
+  }
+
+  private boolean isProductMallAvailable(Product product) {
+    if (product == null) {
+      return false;
+    }
+    Integer mallEnabled = product.getMallEnabled();
+    if (mallEnabled != null && mallEnabled != 1) {
+      return false;
+    }
+    String businessDomain = product.getBusinessDomain();
+    return businessDomain == null
+        || businessDomain.isBlank()
+        || "MALL".equalsIgnoreCase(businessDomain)
+        || "BOTH".equalsIgnoreCase(businessDomain);
   }
 
   private String generateOrderNo() {

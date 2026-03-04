@@ -80,3 +80,6 @@ export function getFinanceBillingConfigSnapshots() {
 export function getFinanceModuleEntrySummary(params) {
     return request.get('/api/finance/workbench/module-entry', { params });
 }
+export function getFinanceReportEntrySummary(params) {
+    return request.get('/api/finance/report/entry-summary', { params });
+}

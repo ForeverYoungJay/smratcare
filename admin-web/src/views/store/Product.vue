@@ -32,6 +32,18 @@
         <a-form-item label="商品大类">
           <a-select v-model:value="query.category" allow-clear style="width: 180px" :options="categoryOptions" />
         </a-form-item>
+        <a-form-item label="业务域">
+          <a-select v-model:value="query.businessDomain" allow-clear style="width: 160px" :options="businessDomainOptions" />
+        </a-form-item>
+        <a-form-item label="物资类型">
+          <a-select v-model:value="query.itemType" allow-clear style="width: 160px" :options="itemTypeOptions" />
+        </a-form-item>
+        <a-form-item label="商城可售">
+          <a-select v-model:value="query.mallEnabled" allow-clear style="width: 120px">
+            <a-select-option :value="1">是</a-select-option>
+            <a-select-option :value="0">否</a-select-option>
+          </a-select>
+        </a-form-item>
         <a-form-item>
           <a-space>
             <a-button type="primary" @click="handleSearch">搜索</a-button>
@@ -64,6 +76,21 @@
         <vxe-column field="productCode" title="编码" width="140" />
         <vxe-column field="productName" title="商品名称" min-width="180" />
         <vxe-column field="category" title="商品大类" width="140" />
+        <vxe-column field="businessDomain" title="业务域" width="130">
+          <template #default="{ row }">
+            <a-tag :color="domainColor(row.businessDomain)">{{ domainLabel(row.businessDomain) }}</a-tag>
+          </template>
+        </vxe-column>
+        <vxe-column field="itemType" title="物资类型" width="130">
+          <template #default="{ row }">
+            <a-tag>{{ itemTypeLabel(row.itemType) }}</a-tag>
+          </template>
+        </vxe-column>
+        <vxe-column field="mallEnabled" title="商城可售" width="110">
+          <template #default="{ row }">
+            <a-tag :color="row.mallEnabled === 1 ? 'green' : 'default'">{{ row.mallEnabled === 1 ? '是' : '否' }}</a-tag>
+          </template>
+        </vxe-column>
         <vxe-column field="price" title="售价" width="120" />
         <vxe-column field="pointsPrice" title="积分价" width="120" />
         <vxe-column field="safetyStock" title="安全库存" width="120" />
@@ -132,6 +159,15 @@
         <a-form-item label="商品标签">
           <a-select v-model:value="form.tagIds" mode="multiple" :options="tagOptions" allow-clear />
         </a-form-item>
+        <a-form-item label="业务域">
+          <a-select v-model:value="form.businessDomain" :options="businessDomainOptions" />
+        </a-form-item>
+        <a-form-item label="物资类型">
+          <a-select v-model:value="form.itemType" :options="itemTypeOptions" />
+        </a-form-item>
+        <a-form-item label="商城可售">
+          <a-switch v-model:checked="form.mallEnabled" checked-children="是" un-checked-children="否" />
+        </a-form-item>
         <a-form-item label="状态">
           <a-switch v-model:checked="form.status" checked-children="上架" un-checked-children="下架" />
         </a-form-item>
@@ -182,6 +218,9 @@ const query = reactive({
   keyword: '',
   status: undefined as number | undefined,
   category: undefined as string | undefined,
+  businessDomain: undefined as string | undefined,
+  itemType: undefined as string | undefined,
+  mallEnabled: (props.mode === 'commerce' ? 1 : undefined) as number | undefined,
   pageNo: 1,
   pageSize: 10
 })
@@ -197,6 +236,9 @@ const form = reactive<any>({
   category: undefined as string | undefined,
   safetyStock: 0,
   tagIds: [] as number[],
+  businessDomain: 'BOTH',
+  itemType: 'CONSUMABLE',
+  mallEnabled: true,
   status: true
 })
 
@@ -204,6 +246,19 @@ const rules = {
   productName: [{ required: true, message: '请输入商品名称' }],
   pointsPrice: [{ required: true, message: '请输入积分价' }]
 }
+
+const businessDomainOptions = [
+  { label: '企业内部', value: 'INTERNAL' },
+  { label: '商城', value: 'MALL' },
+  { label: '双用途', value: 'BOTH' }
+]
+
+const itemTypeOptions = [
+  { label: '固定资产', value: 'ASSET' },
+  { label: '耗材', value: 'CONSUMABLE' },
+  { label: '食材', value: 'FOOD' },
+  { label: '服务', value: 'SERVICE' }
+]
 
 const tagOptions = computed(() => tags.value.map((t) => ({ label: t.tagName, value: t.id })))
 const categoryOptions = computed(() =>
@@ -236,7 +291,10 @@ async function fetchData() {
       pageSize: query.pageSize,
       keyword: query.keyword || undefined,
       status: query.status,
-      category: query.category
+      category: query.category,
+      businessDomain: query.businessDomain,
+      itemType: query.itemType,
+      mallEnabled: query.mallEnabled
     })
     rows.value = res.list
     total.value = res.total
@@ -249,6 +307,9 @@ function reset() {
   query.keyword = ''
   query.status = undefined
   query.category = undefined
+  query.businessDomain = undefined
+  query.itemType = undefined
+  query.mallEnabled = isStorageMode.value ? undefined : 1
   query.pageNo = 1
   fetchData()
 }
@@ -275,6 +336,9 @@ function exportCsvData() {
       编码: p.productCode,
       名称: p.productName,
       大类: p.category,
+      业务域: domainLabel(p.businessDomain),
+      物资类型: itemTypeLabel(p.itemType),
+      商城可售: p.mallEnabled === 1 ? '是' : '否',
       售价: p.price,
       积分价: p.pointsPrice,
       安全库存: p.safetyStock,
@@ -298,6 +362,9 @@ function openCreate() {
     category: undefined,
     safetyStock: 0,
     tagIds: [],
+    businessDomain: 'BOTH',
+    itemType: 'CONSUMABLE',
+    mallEnabled: true,
     status: true
   })
   editorOpen.value = true
@@ -320,6 +387,9 @@ function openEdit(row: ProductItem) {
       .split(',')
       .map((v) => Number(v))
       .filter(Boolean),
+    businessDomain: row.businessDomain || 'BOTH',
+    itemType: row.itemType || 'CONSUMABLE',
+    mallEnabled: row.mallEnabled !== 0,
     status: row.status === 1
   })
   editorOpen.value = true
@@ -334,6 +404,14 @@ async function submit() {
     goToCommerceProduct()
     return
   }
+  if (!form.mallEnabled) {
+    message.error('商城商品必须设置为“商城可售=是”')
+    return
+  }
+  if (form.businessDomain === 'INTERNAL') {
+    message.error('商城商品业务域不能为“企业内部”，请改为“商城”或“双用途”')
+    return
+  }
   try {
     await formRef.value?.validate()
     saving.value = true
@@ -344,6 +422,9 @@ async function submit() {
       pointsPrice: form.pointsPrice,
       category: form.category || undefined,
       safetyStock: form.safetyStock,
+      businessDomain: form.businessDomain || 'BOTH',
+      itemType: form.itemType || 'CONSUMABLE',
+      mallEnabled: form.mallEnabled ? 1 : 0,
       status: form.status ? 1 : 0,
       tagIds: (form.tagIds || []).join(',')
     }
@@ -398,6 +479,28 @@ function goToInbound() {
 
 function goToOutbound() {
   router.push('/logistics/storage/outbound')
+}
+
+function domainLabel(value?: string) {
+  if (value === 'INTERNAL') return '企业内部'
+  if (value === 'MALL') return '商城'
+  if (value === 'BOTH') return '双用途'
+  return '未设置'
+}
+
+function domainColor(value?: string) {
+  if (value === 'INTERNAL') return 'default'
+  if (value === 'MALL') return 'blue'
+  if (value === 'BOTH') return 'purple'
+  return 'default'
+}
+
+function itemTypeLabel(value?: string) {
+  if (value === 'ASSET') return '固定资产'
+  if (value === 'FOOD') return '食材'
+  if (value === 'SERVICE') return '服务'
+  if (value === 'CONSUMABLE') return '耗材'
+  return '未设置'
 }
 
 onMounted(() => {

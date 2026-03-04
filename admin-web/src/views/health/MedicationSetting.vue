@@ -5,11 +5,23 @@
         <a-input v-model:value="query.keyword" placeholder="老人/药品" allow-clear />
       </a-form-item>
       <template #extra>
-        <a-button type="primary" @click="openCreate">新增设置</a-button>
+        <a-space>
+          <a-button @click="exportCsvData" :loading="exporting">导出CSV</a-button>
+          <a-button @click="exportExcelData" :loading="exporting">导出Excel</a-button>
+          <a-button type="primary" @click="openCreate">新增设置</a-button>
+        </a-space>
       </template>
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      rowKey="id"
+      :columns="columns"
+      :data-source="rows"
+      :loading="loading"
+      :pagination="pagination"
+      :row-class-name="resolveRowClassName"
+      @change="handleTableChange"
+    >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'action'">
           <a-space>
@@ -62,13 +74,17 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
+import { mapHealthExportRows, medicationSettingExportColumns } from '../../constants/healthExport'
+import { exportCsv, exportExcel } from '../../utils/export'
+import { resolveHealthError } from './healthError'
 import {
   getHealthMedicationSettingPage,
   createHealthMedicationSetting,
@@ -78,6 +94,8 @@ import {
 import type { HealthMedicationSetting, PageResult } from '../../types'
 
 const loading = ref(false)
+const exporting = ref(false)
+const route = useRoute()
 const rows = ref<HealthMedicationSetting[]>([])
 const query = reactive({ keyword: '', pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
@@ -121,9 +139,19 @@ const frequencyOptions = [
 async function fetchData() {
   loading.value = true
   try {
-    const res: PageResult<HealthMedicationSetting> = await getHealthMedicationSettingPage(query)
+    const residentId = route.query.residentId ?? route.query.elderId
+    const res: PageResult<HealthMedicationSetting> = await getHealthMedicationSettingPage({
+      keyword: query.keyword || undefined,
+      pageNo: query.pageNo,
+      pageSize: query.pageSize,
+      elderId: residentId ? Number(residentId) : undefined
+    })
     rows.value = res.list
     pagination.total = res.total || res.list.length
+  } catch (error) {
+    message.error(resolveHealthError(error, '加载用药设置失败'))
+    rows.value = []
+    pagination.total = 0
   } finally {
     loading.value = false
   }
@@ -146,9 +174,12 @@ function onReset() {
 }
 
 function openCreate() {
+  const residentId = route.query.residentId ?? route.query.elderId
+  const residentName = typeof route.query.residentName === 'string' ? route.query.residentName : ''
   form.id = undefined
-  form.elderId = undefined
-  form.elderName = ''
+  form.elderId = residentId ? Number(residentId) : undefined
+  form.elderName = residentName
+  ensureSelectedElder(form.elderId, residentName)
   form.drugName = ''
   form.dosage = ''
   form.frequency = 'QD'
@@ -223,17 +254,97 @@ async function submit() {
     message.success('保存成功')
     editOpen.value = false
     fetchData()
+  } catch (error) {
+    message.error(resolveHealthError(error, '保存失败'))
   } finally {
     saving.value = false
   }
 }
 
 async function remove(record: HealthMedicationSetting) {
-  await deleteHealthMedicationSetting(record.id)
-  message.success('删除成功')
-  fetchData()
+  try {
+    await deleteHealthMedicationSetting(record.id)
+    message.success('删除成功')
+    fetchData()
+  } catch (error) {
+    message.error(resolveHealthError(error, '删除失败'))
+  }
+}
+
+function resolveRowClassName(record: HealthMedicationSetting) {
+  if (record.endDate && dayjs(record.endDate).isBefore(dayjs(), 'day')) return 'health-row-danger'
+  if (record.frequency === 'CUSTOM' && !record.medicationTime) return 'health-row-warning'
+  if (record.minRemainQty != null && Number(record.minRemainQty) <= 0) return 'health-row-warning'
+  return ''
+}
+
+async function exportCsvData() {
+  const records = await loadExportRecords()
+  if (!records.length) {
+    message.warning('暂无可导出数据')
+    return
+  }
+  exportCsv(records, `用药设置-${dayjs().format('YYYYMMDD-HHmmss')}.csv`)
+  message.success('CSV导出成功')
+}
+
+async function exportExcelData() {
+  const records = await loadExportRecords()
+  if (!records.length) {
+    message.warning('暂无可导出数据')
+    return
+  }
+  exportExcel(records, `用药设置-${dayjs().format('YYYYMMDD-HHmmss')}.xls`)
+  message.success('Excel导出成功')
+}
+
+async function loadExportRecords() {
+  exporting.value = true
+  try {
+    const pageSize = 500
+    let pageNo = 1
+    let total = 0
+    const list: HealthMedicationSetting[] = []
+    do {
+      const residentId = route.query.residentId ?? route.query.elderId
+      const page = await getHealthMedicationSettingPage({
+        keyword: query.keyword || undefined,
+        pageNo,
+        pageSize,
+        elderId: residentId ? Number(residentId) : undefined
+      }) as PageResult<HealthMedicationSetting>
+      total = page.total || 0
+      list.push(...(page.list || []))
+      pageNo += 1
+      if (!page.list || page.list.length < pageSize) break
+    } while (list.length < total && pageNo <= 20)
+    return mapHealthExportRows(list, medicationSettingExportColumns)
+  } catch (error) {
+    message.error(resolveHealthError(error, '加载导出数据失败'))
+    return []
+  } finally {
+    exporting.value = false
+  }
 }
 
 fetchData()
 searchElders('')
+
+watch(
+  () => [route.query.residentId, route.query.elderId],
+  () => {
+    query.pageNo = 1
+    pagination.current = 1
+    fetchData()
+  }
+)
 </script>
+
+<style scoped>
+:deep(.health-row-danger > td) {
+  background: #fff1f0 !important;
+}
+:deep(.health-row-warning > td) {
+  background: #fff7e6 !important;
+}
+</style>

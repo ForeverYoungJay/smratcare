@@ -12,6 +12,22 @@ public class LogisticsWorkbenchSummaryResponse {
   private long todayOutboundQty;
   private BigDecimal inventoryTotalAmount;
   private List<LogisticsNamedStatItem> weekTopConsumption;
+  private long inventoryAssetQty;
+  private long inventoryConsumableQty;
+  private long inventoryFoodQty;
+  private long inventoryServiceQty;
+  private long lowStockAssetCount;
+  private long lowStockConsumableCount;
+  private long lowStockFoodCount;
+  private long lowStockServiceCount;
+  private BigDecimal monthPurchaseAssetAmount;
+  private BigDecimal monthPurchaseConsumableAmount;
+  private BigDecimal monthPurchaseFoodAmount;
+  private BigDecimal monthPurchaseServiceAmount;
+  private long todayOutboundAssetQty;
+  private long todayOutboundConsumableQty;
+  private long todayOutboundFoodQty;
+  private long todayOutboundServiceQty;
 
   private long purchasePendingApprovalCount;
   private long purchaseApprovedNotArrivedCount;

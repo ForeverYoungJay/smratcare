@@ -387,3 +387,22 @@ export interface FinanceModuleEntryItem {
   count: number
   amount: number
 }
+
+export interface FinanceReportEntrySummary {
+  reportKey: string
+  periodFrom: string
+  periodTo: string
+  totalRevenue: number
+  totalStoreSales: number
+  arrearsTotal: number
+  arrearsElderCount: number
+  warningMessage?: string
+  topCategories: FinanceNameAmountItem[]
+  topRooms: FinanceNameAmountItem[]
+}
+
+export interface FinanceNameAmountItem {
+  label: string
+  amount: number
+  extra?: string
+}

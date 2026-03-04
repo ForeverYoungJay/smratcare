@@ -3,23 +3,13 @@
     <a-card class="card-elevated" :bordered="false" style="margin-bottom: 16px">
       <a-space wrap>
         <span class="quick-label">快速返回上次筛选视图：</span>
-        <a-button size="small" @click="goWithReportCache('/marketing/reports/conversion', 'conversion')">
-          {{ quickLabel('conversion', '转化率统计') }}
-        </a-button>
-        <a-button size="small" @click="goWithReportCache('/marketing/reports/followup', 'followup')">
-          {{ quickLabel('followup', '跟进统计') }}
-        </a-button>
-        <a-button size="small" @click="goWithReportCache('/marketing/reports/channel', 'channel')">
-          {{ quickLabel('channel', '渠道评估') }}
-        </a-button>
-        <a-button size="small" @click="goWithReportCache('/marketing/reports/consultation', 'consultation')">
-          {{ quickLabel('consultation', '咨询统计') }}
-        </a-button>
         <a-button
+          v-for="item in quickReportButtons"
+          :key="item.key"
           size="small"
-          @click="goWithReportCache('/marketing/reports/callback', hasCache('callback-checkin') ? 'callback-checkin' : 'callback-all')"
+          @click="goReport(item.entry)"
         >
-          {{ quickLabel(hasCache('callback-checkin') ? 'callback-checkin' : 'callback-all', '回访统计') }}
+          {{ quickLabel(item.entry, item.label) }}
         </a-button>
       </a-space>
     </a-card>
@@ -32,13 +22,13 @@
             <a-col :span="12"><div class="stat-link" @click="goContract('pending')"><a-statistic title="待签约人数" :value="funnel.pendingSignCount" /></div></a-col>
             <a-col :span="12"><div class="stat-link" @click="goFunnel('admission')"><a-statistic title="待入住人数" :value="funnel.pendingAdmissionCount" /></div></a-col>
             <a-col :span="12"><div class="stat-link" @click="goContract('signed')"><a-statistic title="本月成交数" :value="funnel.monthDealCount" /></div></a-col>
-            <a-col :span="12"><div class="stat-link" @click="goWithReportCache('/marketing/reports/conversion', 'conversion')"><a-statistic title="本月转化率" :value="funnel.monthConversionRate" suffix="%" /></div></a-col>
+            <a-col :span="12"><div class="stat-link" @click="goReport('conversion')"><a-statistic title="本月转化率" :value="funnel.monthConversionRate" suffix="%" /></div></a-col>
           </a-row>
           <v-chart :option="funnelOption" autoresize style="height: 240px; margin-top: 12px" />
           <a-space wrap>
             <a-button size="small" @click="goFunnel('evaluation')">待评估</a-button>
             <a-button size="small" @click="goContract('pending')">待签约</a-button>
-            <a-button size="small" @click="goWithReportCache('/marketing/reports/conversion', 'conversion')">转化率</a-button>
+            <a-button size="small" @click="goReport('conversion')">转化率</a-button>
           </a-space>
         </a-card>
       </a-col>
@@ -75,12 +65,12 @@
             </template>
           </a-table>
           <a-row :gutter="12" style="margin-top: 12px">
-            <a-col :span="12"><div class="stat-link" @click="goWithReportCache('/marketing/reports/unknown-channel', 'channel')"><a-statistic title="不明渠道数量" :value="channelUnknownCount" /></div></a-col>
-            <a-col :span="12"><div class="stat-link" @click="goWithReportCache('/marketing/reports/channel-rank', 'channel-rank')"><a-statistic title="本月渠道成交贡献" :value="channelMonthDeals" /></div></a-col>
+            <a-col :span="12"><div class="stat-link" @click="goReport('unknown-channel')"><a-statistic title="不明渠道数量" :value="channelUnknownCount" /></div></a-col>
+            <a-col :span="12"><div class="stat-link" @click="goReport('channel-rank')"><a-statistic title="本月渠道成交贡献" :value="channelMonthDeals" /></div></a-col>
           </a-row>
           <a-space wrap style="margin-top: 12px">
-            <a-button size="small" @click="goWithReportCache('/marketing/reports/channel', 'channel')">渠道评估</a-button>
-            <a-button size="small" @click="goWithReportCache('/marketing/reports/unknown-channel', 'channel')">不明渠道统计</a-button>
+            <a-button size="small" @click="goReport('channel')">渠道评估</a-button>
+            <a-button size="small" @click="goReport('unknown-channel')">不明渠道统计</a-button>
           </a-space>
         </a-card>
       </a-col>
@@ -106,7 +96,7 @@
             <a-col :span="12"><div class="stat-link" @click="goContract('pending')"><a-statistic title="待签合同" :value="contract.pendingSignCount" /></div></a-col>
             <a-col :span="12"><div class="stat-link" @click="goContract('renewal')"><a-statistic title="续签提醒" :value="contract.renewalDueCount" /></div></a-col>
             <a-col :span="12"><div class="stat-link" @click="goContract('change')"><a-statistic title="合同变更待审批" :value="contract.changePendingCount" /></div></a-col>
-            <a-col :span="12"><div class="stat-link" @click="goWithReportCache('/marketing/reports/sales-performance', 'sales-performance')"><a-statistic title="本月合同金额总计" :value="contract.monthAmount" precision="2" prefix="¥" /></div></a-col>
+            <a-col :span="12"><div class="stat-link" @click="goReport('sales-performance')"><a-statistic title="本月合同金额总计" :value="contract.monthAmount" precision="2" prefix="¥" /></div></a-col>
           </a-row>
           <a-space wrap style="margin-top: 12px">
             <a-button size="small" @click="goContract('pending')">待签合同</a-button>
@@ -137,13 +127,13 @@
       <a-col :xs="24" :lg="12">
         <a-card class="card-elevated" :bordered="false" title="卡片7：销售人员业绩">
           <a-row :gutter="[12, 12]">
-            <a-col :span="12"><div class="stat-link" @click="goWithReportCache('/marketing/reports/sales-performance', 'sales-performance')"><a-statistic title="本月个人成交数" :value="performance.monthDealCount" /></div></a-col>
-            <a-col :span="12"><div class="stat-link" @click="goWithReportCache('/marketing/reports/sales-performance', 'sales-performance')"><a-statistic title="本月签约金额" :value="performance.monthAmount" precision="2" prefix="¥" /></div></a-col>
-            <a-col :span="12"><div class="stat-link" @click="goWithReportCache('/marketing/reports/sales-performance', 'sales-performance')"><a-statistic title="转化率排名" :value="performance.rankNo" suffix="名" /></div></a-col>
-            <a-col :span="12"><div class="stat-link" @click="goWithReportCache('/marketing/reports/followup', 'followup')"><a-statistic title="跟进及时率" :value="performance.timelyRate" suffix="%" /></div></a-col>
+            <a-col :span="12"><div class="stat-link" @click="goReport('sales-performance')"><a-statistic title="本月个人成交数" :value="performance.monthDealCount" /></div></a-col>
+            <a-col :span="12"><div class="stat-link" @click="goReport('sales-performance')"><a-statistic title="本月签约金额" :value="performance.monthAmount" precision="2" prefix="¥" /></div></a-col>
+            <a-col :span="12"><div class="stat-link" @click="goReport('sales-performance')"><a-statistic title="转化率排名" :value="performance.rankNo" suffix="名" /></div></a-col>
+            <a-col :span="12"><div class="stat-link" @click="goReport('followup')"><a-statistic title="跟进及时率" :value="performance.timelyRate" suffix="%" /></div></a-col>
           </a-row>
           <a-space wrap style="margin-top: 12px">
-            <a-button size="small" @click="goWithReportCache('/marketing/reports/sales-performance', 'sales-performance')">销售人员业绩</a-button>
+            <a-button size="small" @click="goReport('sales-performance')">销售人员业绩</a-button>
           </a-space>
         </a-card>
       </a-col>
@@ -165,9 +155,9 @@
         <a-card class="card-elevated" :bordered="false" title="卡片9：销售风险预警">
           <a-row :gutter="[12, 12]">
             <a-col :xs="12" :lg="6"><div class="stat-link" @click="goFollowup('overdue')"><a-statistic title="逾期跟进客户" :value="risk.overdueFollowupCount" /></div></a-col>
-            <a-col :xs="12" :lg="6"><div class="stat-link" @click="goReservation('lock')"><a-statistic title="锁床未签约客户" :value="risk.lockUnsignedCount" /></div></a-col>
-            <a-col :xs="12" :lg="6"><div class="stat-link" @click="goFunnel('evaluation')"><a-statistic title="高意向未评估客户" :value="risk.highIntentNoEvalCount" /></div></a-col>
-            <a-col :xs="12" :lg="6"><div class="stat-link" @click="goWithReportCache('/marketing/reports/channel-rank', 'channel-rank')"><a-statistic title="渠道异常下降数" :value="risk.channelDropCount" /></div></a-col>
+            <a-col :xs="12" :lg="6"><div class="stat-link" @click="goReservation('lock', { filter: 'unsigned_lock' })"><a-statistic title="锁床未签约客户" :value="risk.lockUnsignedCount" /></div></a-col>
+            <a-col :xs="12" :lg="6"><div class="stat-link" @click="goLead('intent', { filter: 'missing_followup' })"><a-statistic title="高意向未评估客户" :value="risk.highIntentNoEvalCount" /></div></a-col>
+            <a-col :xs="12" :lg="6"><div class="stat-link" @click="goReport('channel-rank')"><a-statistic title="渠道异常下降数" :value="risk.channelDropCount" /></div></a-col>
           </a-row>
         </a-card>
       </a-col>
@@ -182,6 +172,7 @@ import dayjs from 'dayjs'
 import VChart from 'vue-echarts'
 import PageContainer from '../../components/PageContainer.vue'
 import { buildReportRoute, hasReportCache } from '../../utils/marketingReportNav'
+import { getMarketingReportRoute, type MarketingReportEntry } from '../../utils/marketingReportRegistry'
 import {
   buildCallbackRoute,
   buildContractRoute,
@@ -266,6 +257,16 @@ const channelColumns = [
   { title: '转化率', dataIndex: 'contractRate', key: 'contractRate', width: 120 }
 ]
 
+const quickReportButtons = computed(() => {
+  return [
+    { key: 'conversion', label: '转化率统计', entry: 'conversion' as MarketingReportEntry },
+    { key: 'followup', label: '跟进统计', entry: 'followup' as MarketingReportEntry },
+    { key: 'channel', label: '渠道评估', entry: 'channel' as MarketingReportEntry },
+    { key: 'consultation', label: '咨询统计', entry: 'consultation' as MarketingReportEntry },
+    { key: 'callback', label: '回访统计', entry: 'callback' as MarketingReportEntry }
+  ]
+})
+
 const funnelOption = computed(() => ({
   tooltip: { trigger: 'item' },
   series: [
@@ -285,6 +286,11 @@ const funnelOption = computed(() => ({
 
 function goWithReportCache(path: string, cacheKey: string) {
   router.push(buildReportRoute(path, cacheKey))
+}
+
+function goReport(entry: MarketingReportEntry) {
+  const config = getMarketingReportRoute(entry, hasCache)
+  goWithReportCache(config.path, config.cacheKey)
 }
 
 function goLead(entry: 'all' | 'intent' | 'invalid' | 'blacklist' | 'unknown-source' | 'medical-transfer', query?: Record<string, string>) {
@@ -319,8 +325,9 @@ function hasCache(cacheKey: string) {
   return hasReportCache(cacheKey)
 }
 
-function quickLabel(cacheKey: string, base: string) {
-  return hasCache(cacheKey) ? `${base}（上次筛选）` : base
+function quickLabel(entry: MarketingReportEntry, base: string) {
+  const config = getMarketingReportRoute(entry, hasCache)
+  return hasCache(config.cacheKey) ? `${base}（上次筛选）` : base
 }
 
 async function loadOverview() {

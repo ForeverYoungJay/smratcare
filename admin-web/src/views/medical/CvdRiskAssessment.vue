@@ -13,6 +13,8 @@
       <a-form-item label="日期"><a-range-picker v-model:value="query.dateRange" /></a-form-item>
       <template #extra>
         <a-space>
+          <a-button @click="exportCsvData">导出CSV</a-button>
+          <a-button @click="exportExcelData">导出Excel</a-button>
           <a-button type="primary" @click="openCreate">新建风险评估</a-button>
         </a-space>
       </template>
@@ -37,7 +39,7 @@
     </StatefulBlock>
 
     <StatefulBlock :loading="loading" :error="tableError" :empty="!loading && !tableError && rows.length === 0" empty-text="暂无心血管风险评估记录" @retry="fetchData">
-      <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="false" :pagination="pagination" @change="onTableChange">
+      <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="false" :pagination="pagination" :row-class-name="resolveRowClassName" @change="onTableChange">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'elderBed'">
             {{ record.elderName || '-' }} / {{ bedNoMap[record.elderId || 0] || '-' }}
@@ -55,7 +57,7 @@
             <a-space>
               <a-button type="link" @click="openEdit(record)">编辑</a-button>
               <a-button type="link" @click="openPublish(record)" :disabled="record.status === 'PUBLISHED'">发布</a-button>
-              <a-popconfirm title="确认删除该记录?" @confirm="remove(record)">
+              <a-popconfirm title="确认删除该记录吗？" ok-text="确认" cancel-text="取消" @confirm="remove(record)">
                 <a-button danger type="link">删除</a-button>
               </a-popconfirm>
             </a-space>
@@ -113,7 +115,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
@@ -123,6 +125,9 @@ import DataTable from '../../components/DataTable.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { getElderDetail } from '../../api/elder'
+import { exportCsv, exportExcel } from '../../utils/export'
+import { cvdAssessmentExportColumns, mapMedicalExportRows } from '../../constants/medicalExport'
+import { resolveMedicalError } from './medicalError'
 import {
   createCvdAssessment,
   deleteCvdAssessment,
@@ -302,7 +307,7 @@ async function fetchData() {
     pagination.total = res.total || 0
     Object.assign(summary, sum || {})
   } catch (error: any) {
-    const text = error?.message || '加载失败，请稍后重试'
+    const text = resolveMedicalError(error, '加载失败，请稍后重试')
     tableError.value = text
     summaryError.value = text
   } finally {
@@ -329,6 +334,45 @@ function onReset() {
   query.pageSize = pagination.pageSize
   pagination.current = 1
   fetchData()
+}
+
+function resolveRowClassName(record: MedicalCvdAssessment) {
+  if (record.riskLevel === 'VERY_HIGH' || record.riskLevel === 'HIGH') return 'medical-row-danger'
+  if (record.needFollowup === 1 && record.status !== 'PUBLISHED') return 'medical-row-warning'
+  return ''
+}
+
+function exportRows() {
+  return mapMedicalExportRows(
+    rows.value.map((item) => ({
+      ...item,
+      bedNo: bedNoMap[item.elderId || 0] || '-',
+      riskLevel: riskLabel(item.riskLevel),
+      needFollowup: item.needFollowup === 1 ? '需要' : '无需',
+      status: item.status === 'PUBLISHED' ? '已发布' : '草稿'
+    })),
+    cvdAssessmentExportColumns
+  )
+}
+
+function exportCsvData() {
+  const data = exportRows()
+  if (!data.length) {
+    message.warning('暂无可导出数据')
+    return
+  }
+  exportCsv(data, `心血管风险评估-${dayjs().format('YYYYMMDD-HHmmss')}.csv`)
+  message.success('CSV导出成功')
+}
+
+function exportExcelData() {
+  const data = exportRows()
+  if (!data.length) {
+    message.warning('暂无可导出数据')
+    return
+  }
+  exportExcel(data, `心血管风险评估-${dayjs().format('YYYYMMDD-HHmmss')}.xls`)
+  message.success('Excel导出成功')
 }
 
 async function submit() {
@@ -362,6 +406,8 @@ async function submit() {
     message.success('保存成功')
     editOpen.value = false
     fetchData()
+  } catch (error) {
+    message.error(resolveMedicalError(error, '保存失败'))
   } finally {
     saving.value = false
   }
@@ -398,15 +444,21 @@ async function confirmPublish() {
     if (publishActions.suggestMedicalOrder && result.medicalOrderRoute) {
       router.push(result.medicalOrderRoute)
     }
+  } catch (error) {
+    message.error(resolveMedicalError(error, '发布失败'))
   } finally {
     publishing.value = false
   }
 }
 
 async function remove(record: MedicalCvdAssessment) {
-  await deleteCvdAssessment(record.id)
-  message.success('删除成功')
-  fetchData()
+  try {
+    await deleteCvdAssessment(record.id)
+    message.success('删除成功')
+    fetchData()
+  } catch (error) {
+    message.error(resolveMedicalError(error, '删除失败'))
+  }
 }
 
 onMounted(() => {
@@ -417,4 +469,21 @@ onMounted(() => {
     openCreate()
   }
 })
+
+watch(
+  () => [route.query.residentId, route.query.elderId],
+  () => {
+    onReset()
+  }
+)
 </script>
+
+<style scoped>
+:deep(.medical-row-danger > td) {
+  background: #fff1f0 !important;
+}
+
+:deep(.medical-row-warning > td) {
+  background: #fffbe6 !important;
+}
+</style>

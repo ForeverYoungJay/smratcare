@@ -50,6 +50,7 @@ import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
 import { getMedicalCareWorkbenchSummary } from '../../api/medicalCare'
+import { resolveMedicalError } from './medicalError'
 import type { MedicalCareWorkbenchSummary } from '../../types'
 
 const router = useRouter()
@@ -255,7 +256,7 @@ async function load() {
     const data = await getMedicalCareWorkbenchSummary()
     Object.assign(summary, data || {})
   } catch (error: any) {
-    errorText.value = error?.message || '加载失败，请稍后重试'
+    errorText.value = resolveMedicalError(error, '加载失败，请稍后重试')
   } finally {
     loading.value = false
   }

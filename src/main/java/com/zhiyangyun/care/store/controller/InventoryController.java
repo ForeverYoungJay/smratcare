@@ -119,6 +119,9 @@ public class InventoryController {
       @RequestParam(required = false) Long productId,
       @RequestParam(required = false) Long warehouseId,
       @RequestParam(required = false) String category,
+      @RequestParam(required = false) String businessDomain,
+      @RequestParam(required = false) String itemType,
+      @RequestParam(required = false) Integer mallEnabled,
       @RequestParam(required = false) String keyword,
       @RequestParam(defaultValue = "false") boolean lowStockOnly,
       @RequestParam(required = false) Integer expiryDays) {
@@ -128,31 +131,46 @@ public class InventoryController {
         .eq(InventoryBatch::getIsDeleted, 0)
         .eq(productId != null, InventoryBatch::getProductId, productId)
         .eq(warehouseId != null, InventoryBatch::getWarehouseId, warehouseId);
-    if (category != null && !category.isBlank()) {
-      List<Long> categoryProductIds = productMapper.selectList(
-          Wrappers.lambdaQuery(Product.class)
-              .eq(Product::getIsDeleted, 0)
-              .eq(orgId != null, Product::getOrgId, orgId)
-              .like(Product::getCategory, category))
+    boolean hasProductAttrFilter = (category != null && !category.isBlank())
+        || (businessDomain != null && !businessDomain.isBlank())
+        || (itemType != null && !itemType.isBlank())
+        || mallEnabled != null;
+    if (hasProductAttrFilter) {
+      List<Long> filteredProductIds = productMapper.selectList(
+              Wrappers.lambdaQuery(Product.class)
+                  .eq(Product::getIsDeleted, 0)
+                  .eq(orgId != null, Product::getOrgId, orgId)
+                  .like(category != null && !category.isBlank(), Product::getCategory, category)
+                  .eq(businessDomain != null && !businessDomain.isBlank(), Product::getBusinessDomain, businessDomain)
+                  .eq(itemType != null && !itemType.isBlank(), Product::getItemType, itemType)
+                  .eq(mallEnabled != null, Product::getMallEnabled, mallEnabled))
           .stream()
           .map(Product::getId)
           .toList();
-      if (categoryProductIds.isEmpty()) {
+      if (filteredProductIds.isEmpty()) {
         return Result.ok(new Page<>(pageNo, pageSize, 0));
       }
-      wrapper.in(InventoryBatch::getProductId, categoryProductIds);
+      wrapper.in(InventoryBatch::getProductId, filteredProductIds);
     }
     if (keyword != null && !keyword.isBlank()) {
-      wrapper.and(w -> w.like(InventoryBatch::getBatchNo, keyword));
-      List<Product> products = productMapper.selectList(
+      List<Long> keywordProductIds = productMapper.selectList(
           Wrappers.lambdaQuery(Product.class)
               .eq(Product::getIsDeleted, 0)
               .eq(orgId != null, Product::getOrgId, orgId)
+              .like(category != null && !category.isBlank(), Product::getCategory, category)
+              .eq(businessDomain != null && !businessDomain.isBlank(), Product::getBusinessDomain, businessDomain)
+              .eq(itemType != null && !itemType.isBlank(), Product::getItemType, itemType)
+              .eq(mallEnabled != null, Product::getMallEnabled, mallEnabled)
               .and(p -> p.like(Product::getProductName, keyword)
-                  .or().like(Product::getProductCode, keyword)));
-      if (!products.isEmpty()) {
-        wrapper.or(w -> w.in(InventoryBatch::getProductId,
-            products.stream().map(Product::getId).toList()));
+                  .or().like(Product::getProductCode, keyword)))
+          .stream()
+          .map(Product::getId)
+          .toList();
+      if (keywordProductIds.isEmpty()) {
+        wrapper.and(w -> w.like(InventoryBatch::getBatchNo, keyword));
+      } else {
+        wrapper.and(w -> w.like(InventoryBatch::getBatchNo, keyword)
+            .or().in(InventoryBatch::getProductId, keywordProductIds));
       }
     }
     wrapper.orderByDesc(InventoryBatch::getCreateTime);
@@ -185,6 +203,9 @@ public class InventoryController {
       item.setProductId(batch.getProductId());
       item.setProductName(product == null ? null : product.getProductName());
       item.setCategory(product == null ? null : product.getCategory());
+      item.setBusinessDomain(product == null ? null : product.getBusinessDomain());
+      item.setItemType(product == null ? null : product.getItemType());
+      item.setMallEnabled(product == null ? null : product.getMallEnabled());
       item.setSafetyStock(product == null ? null : product.getSafetyStock());
       item.setWarehouseId(batch.getWarehouseId());
       item.setWarehouseName(warehouse == null ? null : warehouse.getWarehouseName());

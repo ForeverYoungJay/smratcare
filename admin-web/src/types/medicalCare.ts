@@ -175,3 +175,20 @@ export interface MedicalResidentOverview {
   alertTotalCount?: number
   cards: MedicalResidentOverviewCard[]
 }
+
+export interface MedicalAiReportItem {
+  id: number
+  type: 'WEEKLY' | 'MONTHLY' | 'CVD' | 'CHRONIC' | string
+  status: 'GENERATING' | 'GENERATED' | 'PUBLISHED' | string
+  dateFrom?: string
+  dateTo?: string
+  rangeText?: string
+  highRiskCount?: number
+  createdAt?: string
+}
+
+export interface MedicalAiGenerateTaskResponse {
+  inspectionRoute?: string
+  medicalTodoRoute?: string
+  nursingTaskRoute?: string
+}

@@ -3,6 +3,9 @@ export interface InventoryBatchItem {
   productId: number
   productName?: string
   category?: string
+  businessDomain?: 'INTERNAL' | 'MALL' | 'BOTH' | string
+  itemType?: 'ASSET' | 'CONSUMABLE' | 'FOOD' | 'SERVICE' | string
+  mallEnabled?: number
   safetyStock?: number
   warehouseId?: number
   warehouseName?: string

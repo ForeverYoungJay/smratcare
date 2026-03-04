@@ -633,6 +633,12 @@ import type {
   Id
 } from '../../types'
 
+const props = withDefaults(defineProps<{
+  initialTab?: 'buildings' | 'floors' | 'rooms' | 'beds'
+}>(), {
+  initialTab: 'buildings'
+})
+
 const router = useRouter()
 const rooms = ref<RoomItem[]>([])
 const beds = ref<BedItem[]>([])
@@ -654,7 +660,16 @@ const loadingRooms = ref(false)
 const loadingBeds = ref(false)
 const loadingBuildings = ref(false)
 const loadingFloors = ref(false)
-const activeTab = ref<'buildings' | 'floors' | 'rooms' | 'beds'>('buildings')
+const activeTab = ref<'buildings' | 'floors' | 'rooms' | 'beds'>(props.initialTab)
+
+watch(
+  () => props.initialTab,
+  (value) => {
+    if (value && activeTab.value !== value) {
+      activeTab.value = value
+    }
+  }
+)
 
 const roomOpen = ref(false)
 const bedOpen = ref(false)

@@ -5,11 +5,23 @@
         <a-input v-model:value="query.keyword" placeholder="输入老人姓名" allow-clear />
       </a-form-item>
       <template #extra>
-        <a-button type="primary" @click="openCreate">新增档案</a-button>
+        <a-space>
+          <a-button @click="exportCsvData" :loading="exporting">导出CSV</a-button>
+          <a-button @click="exportExcelData" :loading="exporting">导出Excel</a-button>
+          <a-button type="primary" @click="openCreate">新增档案</a-button>
+        </a-space>
       </template>
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      rowKey="id"
+      :columns="columns"
+      :data-source="rows"
+      :loading="loading"
+      :pagination="pagination"
+      :row-class-name="resolveRowClassName"
+      @change="handleTableChange"
+    >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'action'">
           <a-space>
@@ -53,16 +65,23 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
+import dayjs from 'dayjs'
+import { mapHealthExportRows, archiveExportColumns } from '../../constants/healthExport'
+import { exportCsv, exportExcel } from '../../utils/export'
+import { resolveHealthError } from './healthError'
 import { getHealthArchivePage, createHealthArchive, updateHealthArchive, deleteHealthArchive } from '../../api/health'
 import type { HealthArchive, PageResult } from '../../types'
 
 const loading = ref(false)
+const exporting = ref(false)
+const route = useRoute()
 const rows = ref<HealthArchive[]>([])
 const query = reactive({ keyword: '', pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
@@ -96,9 +115,19 @@ const form = reactive({
 async function fetchData() {
   loading.value = true
   try {
-    const res: PageResult<HealthArchive> = await getHealthArchivePage(query)
+    const residentId = route.query.residentId ?? route.query.elderId
+    const res: PageResult<HealthArchive> = await getHealthArchivePage({
+      keyword: query.keyword || undefined,
+      pageNo: query.pageNo,
+      pageSize: query.pageSize,
+      elderId: residentId ? Number(residentId) : undefined
+    })
     rows.value = res.list
     pagination.total = res.total || res.list.length
+  } catch (error) {
+    message.error(resolveHealthError(error, '加载健康档案失败'))
+    rows.value = []
+    pagination.total = 0
   } finally {
     loading.value = false
   }
@@ -121,9 +150,12 @@ function onReset() {
 }
 
 function openCreate() {
+  const residentId = route.query.residentId ?? route.query.elderId
+  const residentName = typeof route.query.residentName === 'string' ? route.query.residentName : ''
   form.id = undefined
-  form.elderId = undefined
-  form.elderName = ''
+  form.elderId = residentId ? Number(residentId) : undefined
+  form.elderName = residentName
+  ensureSelectedElder(form.elderId, residentName)
   form.bloodType = ''
   form.allergyHistory = ''
   form.chronicDisease = ''
@@ -183,17 +215,92 @@ async function submit() {
     message.success('保存成功')
     editOpen.value = false
     fetchData()
+  } catch (error) {
+    message.error(resolveHealthError(error, '保存失败'))
   } finally {
     saving.value = false
   }
 }
 
 async function remove(record: HealthArchive) {
-  await deleteHealthArchive(record.id)
-  message.success('删除成功')
-  fetchData()
+  try {
+    await deleteHealthArchive(record.id)
+    message.success('删除成功')
+    fetchData()
+  } catch (error) {
+    message.error(resolveHealthError(error, '删除失败'))
+  }
+}
+
+function resolveRowClassName(record: HealthArchive) {
+  if (!record.emergencyContact || !record.emergencyPhone) return 'health-row-warning'
+  return ''
+}
+
+async function exportCsvData() {
+  const records = await loadExportRecords()
+  if (!records.length) {
+    message.warning('暂无可导出数据')
+    return
+  }
+  exportCsv(records, `健康档案-${dayjs().format('YYYYMMDD-HHmmss')}.csv`)
+  message.success('CSV导出成功')
+}
+
+async function exportExcelData() {
+  const records = await loadExportRecords()
+  if (!records.length) {
+    message.warning('暂无可导出数据')
+    return
+  }
+  exportExcel(records, `健康档案-${dayjs().format('YYYYMMDD-HHmmss')}.xls`)
+  message.success('Excel导出成功')
+}
+
+async function loadExportRecords() {
+  exporting.value = true
+  try {
+    const pageSize = 500
+    let pageNo = 1
+    let total = 0
+    const list: HealthArchive[] = []
+    do {
+      const residentId = route.query.residentId ?? route.query.elderId
+      const page = await getHealthArchivePage({
+        keyword: query.keyword || undefined,
+        pageNo,
+        pageSize,
+        elderId: residentId ? Number(residentId) : undefined
+      }) as PageResult<HealthArchive>
+      total = page.total || 0
+      list.push(...(page.list || []))
+      pageNo += 1
+      if (!page.list || page.list.length < pageSize) break
+    } while (list.length < total && pageNo <= 20)
+    return mapHealthExportRows(list, archiveExportColumns)
+  } catch (error) {
+    message.error(resolveHealthError(error, '加载导出数据失败'))
+    return []
+  } finally {
+    exporting.value = false
+  }
 }
 
 fetchData()
 searchElders('')
+
+watch(
+  () => [route.query.residentId, route.query.elderId],
+  () => {
+    query.pageNo = 1
+    pagination.current = 1
+    fetchData()
+  }
+)
 </script>
+
+<style scoped>
+:deep(.health-row-warning > td) {
+  background: #fff7e6 !important;
+}
+</style>

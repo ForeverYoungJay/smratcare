@@ -11,6 +11,10 @@ public class MaterialPurchaseOrderItemResponse {
 
   private String productName;
 
+  private String businessDomain;
+
+  private String itemType;
+
   private Integer quantity;
 
   private BigDecimal unitPrice;

@@ -278,7 +278,7 @@ async function remove(record: LogisticsEquipmentArchive) {
 async function createMaintenance(record: LogisticsEquipmentArchive) {
   await generateEquipmentMaintenance(record.id)
   message.success('已发起维修单')
-  router.push('/life/maintenance?status=OPEN')
+  router.push('/logistics/assets/maintenance-record?status=OPEN')
 }
 
 function onReset() {

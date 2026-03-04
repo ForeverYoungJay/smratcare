@@ -22,6 +22,12 @@ public class Product {
 
   private String category;
 
+  private String businessDomain;
+
+  private String itemType;
+
+  private Integer mallEnabled;
+
   private String unit;
 
   private BigDecimal price;

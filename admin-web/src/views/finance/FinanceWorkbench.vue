@@ -201,8 +201,8 @@
               <a-col :span="8"><a-statistic title="发票未关联账单" :value="overview?.reconcile?.invoiceUnlinkedCount || 0" /></a-col>
             </a-row>
             <a-space wrap style="margin-top: 8px;">
-              <a-button type="link" @click="go('/finance/reconcile-center?filter=unmatched')">对账中心</a-button>
-              <a-button type="link" @click="go('/finance/reconcile-invoice?filter=unlinked')">发票对账</a-button>
+              <a-button type="link" @click="go('/finance/reconcile/center?filter=unmatched')">对账中心</a-button>
+              <a-button type="link" @click="go('/finance/reconcile/invoice?filter=unlinked')">发票对账</a-button>
             </a-space>
           </a-card>
         </a-col>

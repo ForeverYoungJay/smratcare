@@ -15,7 +15,7 @@
         <a-form-item>
           <a-space>
             <a-button type="primary" @click="loadData">查询</a-button>
-            <a-button @click="go('/finance/reconcile-center')">返回对账中心</a-button>
+            <a-button @click="go('/finance/reconcile/center')">返回对账中心</a-button>
           </a-space>
         </a-form-item>
       </a-form>

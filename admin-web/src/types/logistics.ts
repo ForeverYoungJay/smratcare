@@ -9,6 +9,22 @@ export interface LogisticsWorkbenchSummary {
   todayOutboundQty: number
   inventoryTotalAmount: number
   weekTopConsumption: LogisticsNamedStatItem[]
+  inventoryAssetQty: number
+  inventoryConsumableQty: number
+  inventoryFoodQty: number
+  inventoryServiceQty: number
+  lowStockAssetCount: number
+  lowStockConsumableCount: number
+  lowStockFoodCount: number
+  lowStockServiceCount: number
+  monthPurchaseAssetAmount: number
+  monthPurchaseConsumableAmount: number
+  monthPurchaseFoodAmount: number
+  monthPurchaseServiceAmount: number
+  todayOutboundAssetQty: number
+  todayOutboundConsumableQty: number
+  todayOutboundFoodQty: number
+  todayOutboundServiceQty: number
 
   purchasePendingApprovalCount: number
   purchaseApprovedNotArrivedCount: number

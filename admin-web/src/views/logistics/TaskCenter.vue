@@ -21,8 +21,8 @@
             <div class="metric-value">{{ summary?.todayMaintenanceTaskCount || 0 }}</div>
             <div class="metric-line">待处理：{{ pendingMaintenanceCount }}</div>
             <a-space style="margin-top: 8px">
-              <a-button type="primary" @click="go('/life/maintenance?status=OPEN')">待派单</a-button>
-              <a-button @click="go('/life/maintenance?status=PROCESSING')">处理中</a-button>
+              <a-button type="primary" @click="go('/logistics/assets/maintenance-record?status=OPEN')">待派单</a-button>
+              <a-button @click="go('/logistics/assets/maintenance-record?status=PROCESSING')">处理中</a-button>
             </a-space>
           </a-card>
         </a-col>

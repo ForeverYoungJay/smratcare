@@ -148,7 +148,7 @@
           <a-input v-model:value="boardForm.handleAction" placeholder="异常项必须填写处理方式" />
         </a-form-item>
         <a-form-item label="附件说明">
-          <a-input v-model:value="boardForm.attachmentNote" placeholder="照片/伤口/皮肤说明（占位）" />
+          <a-input v-model:value="boardForm.attachmentNote" placeholder="照片/伤口/皮肤说明" />
         </a-form-item>
         <a-form-item label="巡检结论">
           <a-radio-group v-model:value="boardForm.conclusion">
@@ -167,7 +167,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
@@ -177,6 +177,7 @@ import DataTable from '../../components/DataTable.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { inspectionExportColumns, mapHealthExportRows } from '../../constants/healthExport'
 import { exportCsv, exportExcel } from '../../utils/export'
+import { resolveHealthError } from './healthError'
 import {
   getHealthInspectionPage,
   getHealthInspectionSummary,
@@ -297,6 +298,16 @@ async function fetchData() {
     summary.closedCount = summaryRes.closedCount || 0
     summary.linkedLogCount = summaryRes.linkedLogCount || 0
     summary.statusStats = summaryRes.statusStats || []
+  } catch (error) {
+    message.error(resolveHealthError(error, '加载健康巡检失败'))
+    rows.value = []
+    pagination.total = 0
+    summary.totalCount = 0
+    summary.abnormalCount = 0
+    summary.followingCount = 0
+    summary.closedCount = 0
+    summary.linkedLogCount = 0
+    summary.statusStats = []
   } finally {
     loading.value = false
   }
@@ -477,15 +488,21 @@ async function submit() {
     message.success('保存成功')
     editOpen.value = false
     fetchData()
+  } catch (error) {
+    message.error(resolveHealthError(error, '保存失败'))
   } finally {
     saving.value = false
   }
 }
 
 async function remove(record: HealthInspection) {
-  await deleteHealthInspection(record.id)
-  message.success('删除成功')
-  fetchData()
+  try {
+    await deleteHealthInspection(record.id)
+    message.success('删除成功')
+    fetchData()
+  } catch (error) {
+    message.error(resolveHealthError(error, '删除失败'))
+  }
 }
 
 async function exportCsvData() {
@@ -574,6 +591,9 @@ async function loadExportRecords() {
       })),
       inspectionExportColumns
     )
+  } catch (error) {
+    message.error(resolveHealthError(error, '加载导出数据失败'))
+    return []
   } finally {
     exporting.value = false
   }
@@ -581,6 +601,15 @@ async function loadExportRecords() {
 
 fetchData()
 searchElders('')
+
+watch(
+  () => [route.query.residentId, route.query.elderId],
+  () => {
+    query.pageNo = 1
+    pagination.current = 1
+    fetchData()
+  }
+)
 </script>
 
 <style scoped>

@@ -84,6 +84,21 @@ Flyway 版本冲突检查：
 ./scripts/check_flyway_versions.sh
 ```
 
+Flyway 状态巡检（只检查，不修复）：
+```bash
+./scripts/flyway_status.sh
+```
+
+Flyway 一键自检+修复（检查失败迁移、清理 success=0、重启后端）：
+```bash
+./scripts/flyway_self_heal.sh
+```
+
+如使用自定义 env/compose 文件：
+```bash
+./scripts/flyway_self_heal.sh --env-file .env.local.prod -f docker-compose.prod.yml
+```
+
 ## 接口与鉴权
 登录接口：
 - `POST /api/auth/login`

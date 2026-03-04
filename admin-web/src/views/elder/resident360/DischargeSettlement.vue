@@ -12,7 +12,7 @@
             </a-descriptions>
             <a-space style="margin-top: 12px">
               <a-button type="primary" @click="go(`/finance/bill?period=this_month&residentId=${residentId}`)">查看账单</a-button>
-              <a-button @click="go(`/finance/account-log?residentId=${residentId}`)">费用明细</a-button>
+              <a-button @click="go(`/finance/accounts/ledger?residentId=${residentId}`)">费用明细</a-button>
               <a-button danger @click="go(`/elder/discharge?residentId=${residentId}`)">确认退院登记</a-button>
             </a-space>
           </StatefulBlock>

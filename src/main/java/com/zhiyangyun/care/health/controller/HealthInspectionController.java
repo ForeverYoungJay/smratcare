@@ -89,7 +89,7 @@ public class HealthInspectionController {
         .eq(elderId != null, HealthNursingLog::getElderId, elderId)
         .isNotNull(HealthNursingLog::getSourceInspectionId)
         .ge(fromStart != null, HealthNursingLog::getLogTime, fromStart)
-        .le(toEndExclusive != null, HealthNursingLog::getLogTime, toEndExclusive));
+        .lt(toEndExclusive != null, HealthNursingLog::getLogTime, toEndExclusive));
 
     var statusStatWrapper = Wrappers.query(HealthInspection.class)
         .select("status AS name", "COUNT(1) AS totalCount")

@@ -27,8 +27,8 @@
         <a-divider />
         <a-space wrap>
           <a-button v-for="item in props.links" :key="item.to" @click="go(item.to)">{{ item.label }}</a-button>
-          <a-button type="primary" @click="go('/finance/report')">进入财务报表</a-button>
-          <a-button @click="go('/finance/account')">进入账户管理</a-button>
+          <a-button type="primary" @click="go('/finance/reports/overall')">进入财务报表</a-button>
+          <a-button @click="go('/finance/accounts/list')">进入账户管理</a-button>
         </a-space>
       </StatefulBlock>
     </a-card>

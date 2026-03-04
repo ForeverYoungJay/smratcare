@@ -174,7 +174,7 @@ const coreCards = computed(() => {
       tag: '待回款',
       color: 'gold',
       trend: '财务关注',
-      route: '/finance/report'
+      route: '/finance/reports/overall'
     },
     {
       title: '在院老人',

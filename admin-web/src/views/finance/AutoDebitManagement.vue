@@ -5,7 +5,7 @@
         <a-date-picker v-model:value="query.date" />
         <a-button type="primary" @click="loadData">刷新</a-button>
         <a-button @click="go('/finance/accounts/list?filter=low_balance')">低余额账户</a-button>
-        <a-button @click="go('/finance/reconcile-center?filter=unmatched')">对账异常</a-button>
+        <a-button @click="go('/finance/reconcile/center?filter=unmatched')">对账异常</a-button>
       </a-space>
     </a-card>
 

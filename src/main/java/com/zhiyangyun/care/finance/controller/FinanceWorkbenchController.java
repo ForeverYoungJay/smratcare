@@ -1140,8 +1140,8 @@ public class FinanceWorkbenchController {
   private List<FinanceWorkbenchOverviewResponse.QuickEntry> buildQuickEntries() {
     List<FinanceWorkbenchOverviewResponse.QuickEntry> entries = new ArrayList<>();
     entries.add(quick("prepaid_recharge", "预存充值", "/finance/prepaid-recharge?from=finance_dashboard"));
-    entries.add(quick("payment_register", "收款登记", "/finance/resident-bill-payment?from=finance_dashboard"));
-    entries.add(quick("discharge_settlement", "退住结算", "/finance/discharge-settlement?from=finance_dashboard"));
+    entries.add(quick("payment_register", "收款登记", "/finance/payments/register?from=finance_dashboard"));
+    entries.add(quick("discharge_settlement", "退住结算", "/finance/discharge/settlement?from=finance_dashboard"));
     entries.add(quick("invoice_receipt", "开票/打印收据", "/finance/fees/payment-and-invoice?from=finance_dashboard"));
     entries.add(quick("fee_adjustment", "费用调整单", "/finance/flows/adjustments?from=finance_dashboard"));
     return entries;

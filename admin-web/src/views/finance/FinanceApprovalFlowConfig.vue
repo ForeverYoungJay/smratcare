@@ -68,7 +68,7 @@
           <a-card class="card-elevated" :bordered="false" title="审批联动">
             <a-space direction="vertical" style="width: 100%">
               <a-button @click="go('/oa/approval?module=finance&status=pending')">审批中心（财务）</a-button>
-              <a-button @click="go('/finance/reconcile-exception')">对账异常处理</a-button>
+              <a-button @click="go('/finance/reconcile/exception')">对账异常处理</a-button>
               <a-button @click="go('/finance/config/change-log')">查看配置变更记录</a-button>
               <a-button @click="go('/finance/workbench')">返回财务工作台</a-button>
             </a-space>

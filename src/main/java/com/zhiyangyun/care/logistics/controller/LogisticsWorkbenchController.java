@@ -27,10 +27,12 @@ import com.zhiyangyun.care.store.entity.InventoryAdjustment;
 import com.zhiyangyun.care.store.entity.InventoryBatch;
 import com.zhiyangyun.care.store.entity.InventoryLog;
 import com.zhiyangyun.care.store.entity.MaterialPurchaseOrder;
+import com.zhiyangyun.care.store.entity.MaterialPurchaseOrderItem;
 import com.zhiyangyun.care.store.entity.Product;
 import com.zhiyangyun.care.store.mapper.InventoryAdjustmentMapper;
 import com.zhiyangyun.care.store.mapper.InventoryBatchMapper;
 import com.zhiyangyun.care.store.mapper.InventoryLogMapper;
+import com.zhiyangyun.care.store.mapper.MaterialPurchaseOrderItemMapper;
 import com.zhiyangyun.care.store.mapper.MaterialPurchaseOrderMapper;
 import com.zhiyangyun.care.store.mapper.ProductMapper;
 import com.zhiyangyun.care.store.service.InventoryService;
@@ -55,6 +57,7 @@ public class LogisticsWorkbenchController {
   private final InventoryBatchMapper inventoryBatchMapper;
   private final ProductMapper productMapper;
   private final MaterialPurchaseOrderMapper materialPurchaseOrderMapper;
+  private final MaterialPurchaseOrderItemMapper materialPurchaseOrderItemMapper;
   private final BedMapper bedMapper;
   private final RoomCleaningTaskMapper roomCleaningTaskMapper;
   private final ElderAdmissionMapper elderAdmissionMapper;
@@ -72,6 +75,7 @@ public class LogisticsWorkbenchController {
       InventoryBatchMapper inventoryBatchMapper,
       ProductMapper productMapper,
       MaterialPurchaseOrderMapper materialPurchaseOrderMapper,
+      MaterialPurchaseOrderItemMapper materialPurchaseOrderItemMapper,
       BedMapper bedMapper,
       RoomCleaningTaskMapper roomCleaningTaskMapper,
       ElderAdmissionMapper elderAdmissionMapper,
@@ -87,6 +91,7 @@ public class LogisticsWorkbenchController {
     this.inventoryBatchMapper = inventoryBatchMapper;
     this.productMapper = productMapper;
     this.materialPurchaseOrderMapper = materialPurchaseOrderMapper;
+    this.materialPurchaseOrderItemMapper = materialPurchaseOrderItemMapper;
     this.bedMapper = bedMapper;
     this.roomCleaningTaskMapper = roomCleaningTaskMapper;
     this.elderAdmissionMapper = elderAdmissionMapper;
@@ -146,6 +151,51 @@ public class LogisticsWorkbenchController {
             .eq(orgId != null, Product::getOrgId, orgId))
         .stream().collect(java.util.stream.Collectors.toMap(Product::getId, item -> item));
 
+    long inventoryAssetQty = 0;
+    long inventoryConsumableQty = 0;
+    long inventoryFoodQty = 0;
+    long inventoryServiceQty = 0;
+    for (InventoryBatch batch : allBatches) {
+      int qty = batch.getQuantity() == null ? 0 : batch.getQuantity();
+      Product product = batch.getProductId() == null ? null : productMap.get(batch.getProductId());
+      String itemType = normalizeItemType(product == null ? null : product.getItemType());
+      if ("ASSET".equals(itemType)) {
+        inventoryAssetQty += qty;
+      } else if ("FOOD".equals(itemType)) {
+        inventoryFoodQty += qty;
+      } else if ("SERVICE".equals(itemType)) {
+        inventoryServiceQty += qty;
+      } else {
+        inventoryConsumableQty += qty;
+      }
+    }
+    response.setInventoryAssetQty(inventoryAssetQty);
+    response.setInventoryConsumableQty(inventoryConsumableQty);
+    response.setInventoryFoodQty(inventoryFoodQty);
+    response.setInventoryServiceQty(inventoryServiceQty);
+
+    long lowStockAssetCount = 0;
+    long lowStockConsumableCount = 0;
+    long lowStockFoodCount = 0;
+    long lowStockServiceCount = 0;
+    for (var alert : inventoryService.lowStockAlerts(orgId)) {
+      Product product = alert.getProductId() == null ? null : productMap.get(alert.getProductId());
+      String itemType = normalizeItemType(product == null ? null : product.getItemType());
+      if ("ASSET".equals(itemType)) {
+        lowStockAssetCount++;
+      } else if ("FOOD".equals(itemType)) {
+        lowStockFoodCount++;
+      } else if ("SERVICE".equals(itemType)) {
+        lowStockServiceCount++;
+      } else {
+        lowStockConsumableCount++;
+      }
+    }
+    response.setLowStockAssetCount(lowStockAssetCount);
+    response.setLowStockConsumableCount(lowStockConsumableCount);
+    response.setLowStockFoodCount(lowStockFoodCount);
+    response.setLowStockServiceCount(lowStockServiceCount);
+
     Map<Long, Long> weekConsumeMap = new HashMap<>();
     for (InventoryLog log : allOutLogs) {
       if (log.getCreateTime() == null || log.getCreateTime().isBefore(weekStartAt) || log.getProductId() == null) continue;
@@ -175,6 +225,45 @@ public class LogisticsWorkbenchController {
         .map(order -> order.getTotalAmount() == null ? BigDecimal.ZERO : order.getTotalAmount())
         .reduce(BigDecimal.ZERO, BigDecimal::add);
     response.setMonthPurchaseAmount(monthPurchaseAmount);
+
+    List<MaterialPurchaseOrder> monthPurchaseOrders = materialPurchaseOrderMapper.selectList(
+        Wrappers.lambdaQuery(MaterialPurchaseOrder.class)
+            .eq(MaterialPurchaseOrder::getIsDeleted, 0)
+            .eq(orgId != null, MaterialPurchaseOrder::getOrgId, orgId)
+            .between(MaterialPurchaseOrder::getOrderDate, monthStart, today)
+            .ne(MaterialPurchaseOrder::getStatus, "CANCELLED"));
+    BigDecimal monthPurchaseAssetAmount = BigDecimal.ZERO;
+    BigDecimal monthPurchaseConsumableAmount = BigDecimal.ZERO;
+    BigDecimal monthPurchaseFoodAmount = BigDecimal.ZERO;
+    BigDecimal monthPurchaseServiceAmount = BigDecimal.ZERO;
+    if (!monthPurchaseOrders.isEmpty()) {
+      List<Long> purchaseOrderIds = monthPurchaseOrders.stream()
+          .map(MaterialPurchaseOrder::getId)
+          .filter(java.util.Objects::nonNull)
+          .toList();
+      List<MaterialPurchaseOrderItem> purchaseItems = materialPurchaseOrderItemMapper.selectList(
+          Wrappers.lambdaQuery(MaterialPurchaseOrderItem.class)
+              .eq(MaterialPurchaseOrderItem::getIsDeleted, 0)
+              .in(MaterialPurchaseOrderItem::getOrderId, purchaseOrderIds));
+      for (MaterialPurchaseOrderItem item : purchaseItems) {
+        BigDecimal amount = item.getAmount() == null ? BigDecimal.ZERO : item.getAmount();
+        Product product = item.getProductId() == null ? null : productMap.get(item.getProductId());
+        String itemType = normalizeItemType(product == null ? null : product.getItemType());
+        if ("ASSET".equals(itemType)) {
+          monthPurchaseAssetAmount = monthPurchaseAssetAmount.add(amount);
+        } else if ("FOOD".equals(itemType)) {
+          monthPurchaseFoodAmount = monthPurchaseFoodAmount.add(amount);
+        } else if ("SERVICE".equals(itemType)) {
+          monthPurchaseServiceAmount = monthPurchaseServiceAmount.add(amount);
+        } else {
+          monthPurchaseConsumableAmount = monthPurchaseConsumableAmount.add(amount);
+        }
+      }
+    }
+    response.setMonthPurchaseAssetAmount(monthPurchaseAssetAmount);
+    response.setMonthPurchaseConsumableAmount(monthPurchaseConsumableAmount);
+    response.setMonthPurchaseFoodAmount(monthPurchaseFoodAmount);
+    response.setMonthPurchaseServiceAmount(monthPurchaseServiceAmount);
 
     response.setFreeBeds(bedMapper.selectCount(Wrappers.lambdaQuery(Bed.class)
         .eq(Bed::getIsDeleted, 0)
@@ -272,6 +361,10 @@ public class LogisticsWorkbenchController {
     BigDecimal monthConsumeAmount = BigDecimal.ZERO;
     BigDecimal nursingConsumeAmount = BigDecimal.ZERO;
     BigDecimal diningConsumeAmount = BigDecimal.ZERO;
+    long todayOutboundAssetQty = 0;
+    long todayOutboundConsumableQty = 0;
+    long todayOutboundFoodQty = 0;
+    long todayOutboundServiceQty = 0;
     Map<Long, Long> monthConsumeMap = new HashMap<>();
     for (InventoryLog log : allOutLogs) {
       int qty = log.getChangeQty() == null ? 0 : log.getChangeQty();
@@ -282,12 +375,29 @@ public class LogisticsWorkbenchController {
       if ("ORDER".equals(log.getBizType())) diningConsumeAmount = diningConsumeAmount.add(amount);
       if (log.getProductId() != null) {
         monthConsumeMap.merge(log.getProductId(), (long) qty, Long::sum);
+        if (log.getCreateTime() != null && !log.getCreateTime().isBefore(todayStart)) {
+          Product product = productMap.get(log.getProductId());
+          String itemType = normalizeItemType(product == null ? null : product.getItemType());
+          if ("ASSET".equals(itemType)) {
+            todayOutboundAssetQty += qty;
+          } else if ("FOOD".equals(itemType)) {
+            todayOutboundFoodQty += qty;
+          } else if ("SERVICE".equals(itemType)) {
+            todayOutboundServiceQty += qty;
+          } else {
+            todayOutboundConsumableQty += qty;
+          }
+        }
       }
     }
     response.setMonthConsumeAmount(monthConsumeAmount);
     response.setNursingConsumeAmount(nursingConsumeAmount);
     response.setDiningConsumeAmount(diningConsumeAmount);
     response.setMonthTopConsumption(toTopNamedItems(monthConsumeMap, productMap, 10));
+    response.setTodayOutboundAssetQty(todayOutboundAssetQty);
+    response.setTodayOutboundConsumableQty(todayOutboundConsumableQty);
+    response.setTodayOutboundFoodQty(todayOutboundFoodQty);
+    response.setTodayOutboundServiceQty(todayOutboundServiceQty);
 
     response.setTodayCleaningTaskCount(roomCleaningTaskMapper.selectCount(Wrappers.lambdaQuery(RoomCleaningTask.class)
         .eq(RoomCleaningTask::getIsDeleted, 0)
@@ -375,5 +485,12 @@ public class LogisticsWorkbenchController {
       }
     }
     return false;
+  }
+
+  private String normalizeItemType(String itemType) {
+    if (itemType == null || itemType.isBlank()) {
+      return "CONSUMABLE";
+    }
+    return itemType.trim().toUpperCase();
   }
 }

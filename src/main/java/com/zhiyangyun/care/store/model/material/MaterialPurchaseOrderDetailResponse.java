@@ -26,6 +26,18 @@ public class MaterialPurchaseOrderDetailResponse {
 
   private BigDecimal totalAmount;
 
+  private String source;
+
+  private String sourceRef;
+
+  private BigDecimal assetAmount;
+
+  private BigDecimal consumableAmount;
+
+  private BigDecimal foodAmount;
+
+  private BigDecimal serviceAmount;
+
   private String remark;
 
   private LocalDateTime createTime;

@@ -9,28 +9,39 @@
           <a-space>
             <a-button type="primary" @click="reconcile">生成对账</a-button>
             <a-button @click="reset">重置</a-button>
+            <a-button @click="go('/finance/reconcile/exception')">异常处理</a-button>
           </a-space>
         </a-form-item>
       </a-form>
     </a-card>
 
-    <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="对账结果">
-      <a-row :gutter="16">
-        <a-col :span="8">
-          <a-statistic title="日期" :value="result?.date || '-'" />
-        </a-col>
-        <a-col :span="8">
-          <a-statistic title="当日收款" :value="result?.totalReceived ?? 0" />
-        </a-col>
-        <a-col :span="8">
-          <a-statistic title="是否异常">
-            <template #value>
-              <a-tag :color="result?.mismatchFlag ? 'red' : 'green'">{{ result?.mismatchFlag ? '存在差异' : '正常' }}</a-tag>
-            </template>
-          </a-statistic>
-        </a-col>
+    <StatefulBlock style="margin-top: 16px;" :loading="loading" :error="errorMessage" @retry="loadSummary">
+      <a-row :gutter="[16, 16]">
+        <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="账单已收未核销" :value="summary.billPaidUnmatchedCount" /></a-card></a-col>
+        <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="重复/冲正异常" :value="summary.duplicatedOrReversalPendingCount" /></a-card></a-col>
+        <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="发票未关联" :value="summary.invoiceUnlinkedCount" /></a-card></a-col>
+        <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="当日异常数" :value="todayExceptionCount" /></a-card></a-col>
       </a-row>
-    </a-card>
+      <a-alert v-if="todayExceptionCount > 0 || result?.mismatchFlag" style="margin-top: 12px;" type="warning" show-icon message="存在对账异常，请尽快处理并核销" />
+
+      <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="对账结果">
+        <a-row :gutter="16">
+          <a-col :span="8">
+            <a-statistic title="日期" :value="result?.date || '-'" />
+          </a-col>
+          <a-col :span="8">
+            <a-statistic title="当日收款" :value="result?.totalReceived ?? 0" />
+          </a-col>
+          <a-col :span="8">
+            <a-statistic title="是否异常">
+              <template #value>
+                <a-tag :color="result?.mismatchFlag ? 'red' : 'green'">{{ result?.mismatchFlag ? '存在差异' : '正常' }}</a-tag>
+              </template>
+            </a-statistic>
+          </a-col>
+        </a-row>
+      </a-card>
+    </StatefulBlock>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="对账历史">
       <a-form layout="inline" :model="historyQuery" class="search-form">
@@ -79,18 +90,31 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
+import { message } from 'ant-design-vue'
+import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
-import { reconcileDaily, getReconcilePage } from '../../api/finance'
-import type { PageResult, ReconcileDailyItem } from '../../types'
+import StatefulBlock from '../../components/StatefulBlock.vue'
+import { reconcileDaily, getReconcilePage, getFinanceReconcileExceptions, getFinanceWorkbenchOverview } from '../../api/finance'
+import type { FinanceReconcileCard, FinanceReconcileExceptionItem, PageResult, ReconcileDailyItem } from '../../types'
 import { exportCsv } from '../../utils/export'
 
+const router = useRouter()
 const query = ref({
   date: dayjs()
 })
 
+const loading = ref(false)
+const errorMessage = ref('')
 const result = ref<ReconcileDailyItem | null>(null)
+const summary = ref<FinanceReconcileCard>({
+  billPaidUnmatchedCount: 0,
+  duplicatedOrReversalPendingCount: 0,
+  invoiceUnlinkedCount: 0
+})
+const todayExceptions = ref<FinanceReconcileExceptionItem[]>([])
+const todayExceptionCount = computed(() => todayExceptions.value.length)
 
 const historyQuery = ref({
   from: dayjs().subtract(14, 'day'),
@@ -103,14 +127,27 @@ const history = ref<ReconcileDailyItem[]>([])
 const historyTotal = ref(0)
 
 async function reconcile() {
-  result.value = await reconcileDaily({
-    date: dayjs(query.value.date).format('YYYY-MM-DD')
-  })
+  loading.value = true
+  errorMessage.value = ''
+  try {
+    result.value = await reconcileDaily({
+      date: dayjs(query.value.date).format('YYYY-MM-DD')
+    })
+    await loadSummary()
+    await fetchHistory()
+    message.success('对账已生成')
+  } catch (error: any) {
+    errorMessage.value = error?.message || '生成对账失败'
+    message.error(errorMessage.value)
+  } finally {
+    loading.value = false
+  }
 }
 
 function reset() {
   query.value.date = dayjs()
   result.value = null
+  loadSummary()
 }
 
 async function fetchHistory() {
@@ -126,6 +163,30 @@ async function fetchHistory() {
     historyTotal.value = res.total
   } finally {
     historyLoading.value = false
+  }
+}
+
+async function loadSummary() {
+  loading.value = true
+  errorMessage.value = ''
+  try {
+    const [overview, exceptions] = await Promise.all([
+      getFinanceWorkbenchOverview(),
+      getFinanceReconcileExceptions({
+        date: dayjs(query.value.date).format('YYYY-MM-DD')
+      })
+    ])
+    summary.value = overview.reconcile || {
+      billPaidUnmatchedCount: 0,
+      duplicatedOrReversalPendingCount: 0,
+      invoiceUnlinkedCount: 0
+    }
+    todayExceptions.value = exceptions || []
+  } catch (error: any) {
+    errorMessage.value = error?.message || '加载对账摘要失败'
+    message.error(errorMessage.value)
+  } finally {
+    loading.value = false
   }
 }
 
@@ -151,5 +212,11 @@ function onHistoryPageSizeChange(current: number, size: number) {
   fetchHistory()
 }
 
-onMounted(fetchHistory)
+function go(path: string) {
+  router.push(path)
+}
+
+onMounted(async () => {
+  await Promise.all([loadSummary(), fetchHistory()])
+})
 </script>

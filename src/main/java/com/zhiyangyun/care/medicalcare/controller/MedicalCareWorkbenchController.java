@@ -25,6 +25,8 @@ import com.zhiyangyun.care.medicalcare.mapper.MedicalTcmAssessmentMapper;
 import com.zhiyangyun.care.medicalcare.model.MedicalCareWorkbenchSummaryResponse;
 import com.zhiyangyun.care.nursing.entity.ShiftHandover;
 import com.zhiyangyun.care.nursing.mapper.ShiftHandoverMapper;
+import com.zhiyangyun.care.oa.entity.OaDocument;
+import com.zhiyangyun.care.oa.mapper.OaDocumentMapper;
 import com.zhiyangyun.care.oa.entity.OaTask;
 import com.zhiyangyun.care.oa.mapper.OaTaskMapper;
 import com.zhiyangyun.care.survey.entity.SurveySubmission;
@@ -59,6 +61,7 @@ public class MedicalCareWorkbenchController {
   private final ShiftHandoverMapper shiftHandoverMapper;
   private final IncidentReportMapper incidentReportMapper;
   private final SurveySubmissionMapper surveySubmissionMapper;
+  private final OaDocumentMapper oaDocumentMapper;
   private final OaTaskMapper oaTaskMapper;
   private final MedicalTcmAssessmentMapper tcmAssessmentMapper;
   private final MedicalCvdRiskAssessmentMapper cvdRiskAssessmentMapper;
@@ -74,6 +77,7 @@ public class MedicalCareWorkbenchController {
       ShiftHandoverMapper shiftHandoverMapper,
       IncidentReportMapper incidentReportMapper,
       SurveySubmissionMapper surveySubmissionMapper,
+      OaDocumentMapper oaDocumentMapper,
       OaTaskMapper oaTaskMapper,
       MedicalTcmAssessmentMapper tcmAssessmentMapper,
       MedicalCvdRiskAssessmentMapper cvdRiskAssessmentMapper) {
@@ -87,6 +91,7 @@ public class MedicalCareWorkbenchController {
     this.shiftHandoverMapper = shiftHandoverMapper;
     this.incidentReportMapper = incidentReportMapper;
     this.surveySubmissionMapper = surveySubmissionMapper;
+    this.oaDocumentMapper = oaDocumentMapper;
     this.oaTaskMapper = oaTaskMapper;
     this.tcmAssessmentMapper = tcmAssessmentMapper;
     this.cvdRiskAssessmentMapper = cvdRiskAssessmentMapper;
@@ -326,16 +331,17 @@ public class MedicalCareWorkbenchController {
     response.setRectifyOverdueCount(rectifyOverdue);
 
     // Card I
-    Long tcmMonthCount = tcmAssessmentMapper.selectCount(Wrappers.lambdaQuery(MedicalTcmAssessment.class)
-        .eq(MedicalTcmAssessment::getIsDeleted, 0)
-        .eq(orgId != null, MedicalTcmAssessment::getOrgId, orgId)
-        .ge(MedicalTcmAssessment::getAssessmentDate, today.withDayOfMonth(1)));
-    Long cvdMonthCount = cvdRiskAssessmentMapper.selectCount(Wrappers.lambdaQuery(MedicalCvdRiskAssessment.class)
-        .eq(MedicalCvdRiskAssessment::getIsDeleted, 0)
-        .eq(orgId != null, MedicalCvdRiskAssessment::getOrgId, orgId)
-        .ge(MedicalCvdRiskAssessment::getAssessmentDate, today.withDayOfMonth(1)));
-    response.setAiReportGeneratedCount(tcmMonthCount + cvdMonthCount);
-    response.setAiReportPublishedCount(response.getTcmPublishedCount() + response.getCvdHighRiskCount());
+    Long aiGeneratedCount = oaDocumentMapper.selectCount(Wrappers.lambdaQuery(OaDocument.class)
+        .eq(OaDocument::getIsDeleted, 0)
+        .eq(orgId != null, OaDocument::getOrgId, orgId)
+        .eq(OaDocument::getFolder, "AI_HEALTH_REPORT"));
+    Long aiPublishedCount = oaDocumentMapper.selectCount(Wrappers.lambdaQuery(OaDocument.class)
+        .eq(OaDocument::getIsDeleted, 0)
+        .eq(orgId != null, OaDocument::getOrgId, orgId)
+        .eq(OaDocument::getFolder, "AI_HEALTH_REPORT")
+        .like(OaDocument::getRemark, "\"status\":\"PUBLISHED\""));
+    response.setAiReportGeneratedCount(aiGeneratedCount);
+    response.setAiReportPublishedCount(aiPublishedCount);
 
     List<MedicalCvdRiskAssessment> topList = cvdRiskAssessmentMapper.selectList(Wrappers.lambdaQuery(MedicalCvdRiskAssessment.class)
         .eq(MedicalCvdRiskAssessment::getIsDeleted, 0)

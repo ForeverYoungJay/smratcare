@@ -102,7 +102,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
@@ -112,6 +112,7 @@ import DataTable from '../../components/DataTable.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { mapHealthExportRows, nursingLogExportColumns } from '../../constants/healthExport'
 import { exportCsv, exportExcel } from '../../utils/export'
+import { resolveHealthError } from './healthError'
 import {
   getHealthNursingLogPage,
   getHealthNursingLogSummary,
@@ -195,6 +196,16 @@ async function fetchData() {
     summary.closedCount = summaryRes.closedCount || 0
     summary.linkedInspectionCount = summaryRes.linkedInspectionCount || 0
     summary.logTypeStats = summaryRes.logTypeStats || []
+  } catch (error) {
+    message.error(resolveHealthError(error, '加载护理日志失败'))
+    rows.value = []
+    pagination.total = 0
+    summary.totalCount = 0
+    summary.pendingCount = 0
+    summary.doneCount = 0
+    summary.closedCount = 0
+    summary.linkedInspectionCount = 0
+    summary.logTypeStats = []
   } finally {
     loading.value = false
   }
@@ -289,15 +300,21 @@ async function submit() {
     message.success('保存成功')
     editOpen.value = false
     fetchData()
+  } catch (error) {
+    message.error(resolveHealthError(error, '保存失败'))
   } finally {
     saving.value = false
   }
 }
 
 async function remove(record: HealthNursingLog) {
-  await deleteHealthNursingLog(record.id)
-  message.success('删除成功')
-  fetchData()
+  try {
+    await deleteHealthNursingLog(record.id)
+    message.success('删除成功')
+    fetchData()
+  } catch (error) {
+    message.error(resolveHealthError(error, '删除失败'))
+  }
 }
 
 async function exportCsvData() {
@@ -394,6 +411,9 @@ async function loadExportRecords() {
       })),
       nursingLogExportColumns
     )
+  } catch (error) {
+    message.error(resolveHealthError(error, '加载导出数据失败'))
+    return []
   } finally {
     exporting.value = false
   }
@@ -401,6 +421,15 @@ async function loadExportRecords() {
 
 fetchData()
 searchElders('')
+
+watch(
+  () => [route.query.residentId, route.query.elderId],
+  () => {
+    query.pageNo = 1
+    pagination.current = 1
+    fetchData()
+  }
+)
 </script>
 
 <style scoped>

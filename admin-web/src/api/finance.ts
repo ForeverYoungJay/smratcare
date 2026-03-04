@@ -24,7 +24,8 @@ import type {
   FinanceConfigChangeLogItem,
   FinanceBillingConfigRollbackRequest,
   FinanceBillingConfigSnapshotItem,
-  FinanceModuleEntrySummary
+  FinanceModuleEntrySummary,
+  FinanceReportEntrySummary
 } from '../types'
 
 export function getPaymentRecordPage(params: any) {
@@ -133,4 +134,8 @@ export function getFinanceBillingConfigSnapshots() {
 
 export function getFinanceModuleEntrySummary(params: { moduleKey: string }) {
   return request.get<FinanceModuleEntrySummary>('/api/finance/workbench/module-entry', { params })
+}
+
+export function getFinanceReportEntrySummary(params: { reportKey: string; from?: string; to?: string; top?: number }) {
+  return request.get<FinanceReportEntrySummary>('/api/finance/report/entry-summary', { params })
 }

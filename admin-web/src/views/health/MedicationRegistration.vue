@@ -105,7 +105,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
@@ -115,6 +115,7 @@ import DataTable from '../../components/DataTable.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { mapHealthExportRows, medicationRegistrationExportColumns } from '../../constants/healthExport'
 import { exportCsv, exportExcel } from '../../utils/export'
+import { resolveHealthError } from './healthError'
 import {
   getHealthMedicationRegistrationPage,
   getHealthMedicationRegistrationSummary,
@@ -188,6 +189,16 @@ async function fetchData() {
     summary.doneTaskCount = summaryRes.doneTaskCount || 0
     summary.pendingTaskCount = summaryRes.pendingTaskCount || 0
     summary.nurseStats = summaryRes.nurseStats || []
+  } catch (error) {
+    message.error(resolveHealthError(error, '加载用药登记失败'))
+    rows.value = []
+    pagination.total = 0
+    summary.totalCount = 0
+    summary.todayCount = 0
+    summary.totalDosage = 0
+    summary.doneTaskCount = 0
+    summary.pendingTaskCount = 0
+    summary.nurseStats = []
   } finally {
     loading.value = false
   }
@@ -279,15 +290,21 @@ async function submit() {
     message.success('保存成功')
     editOpen.value = false
     fetchData()
+  } catch (error) {
+    message.error(resolveHealthError(error, '保存失败'))
   } finally {
     saving.value = false
   }
 }
 
 async function remove(record: HealthMedicationRegistration) {
-  await deleteHealthMedicationRegistration(record.id)
-  message.success('删除成功')
-  fetchData()
+  try {
+    await deleteHealthMedicationRegistration(record.id)
+    message.success('删除成功')
+    fetchData()
+  } catch (error) {
+    message.error(resolveHealthError(error, '删除失败'))
+  }
 }
 
 async function exportCsvData() {
@@ -366,6 +383,9 @@ async function loadExportRecords() {
       })),
       medicationRegistrationExportColumns
     )
+  } catch (error) {
+    message.error(resolveHealthError(error, '加载导出数据失败'))
+    return []
   } finally {
     exporting.value = false
   }
@@ -373,6 +393,15 @@ async function loadExportRecords() {
 
 fetchData()
 searchElders('')
+
+watch(
+  () => [route.query.residentId, route.query.elderId],
+  () => {
+    query.pageNo = 1
+    pagination.current = 1
+    fetchData()
+  }
+)
 </script>
 
 <style scoped>

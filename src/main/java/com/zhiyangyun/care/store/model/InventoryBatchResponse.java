@@ -11,6 +11,9 @@ public class InventoryBatchResponse {
   private Long productId;
   private String productName;
   private String category;
+  private String businessDomain;
+  private String itemType;
+  private Integer mallEnabled;
   private Integer safetyStock;
   private Long warehouseId;
   private String warehouseName;

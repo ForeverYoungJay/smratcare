@@ -12,6 +12,9 @@ public class ProductStockResponse {
   private String productCode;
   private String productName;
   private String category;
+  private String businessDomain;
+  private String itemType;
+  private Integer mallEnabled;
   private BigDecimal price;
   private Integer pointsPrice;
   private Integer safetyStock;

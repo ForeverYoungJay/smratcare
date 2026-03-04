@@ -47,3 +47,15 @@ export function getResidentRiskCard(residentId) {
 export function getResidentOverview(residentId) {
     return request.get('/api/medical-care/resident360/overview', { params: { residentId } });
 }
+export function getMedicalAiReportPage(params) {
+    return fetchPage('/api/medical-care/ai-reports/page', params);
+}
+export function generateMedicalAiReport(data) {
+    return request.post('/api/medical-care/ai-reports/generate', data);
+}
+export function publishMedicalAiReport(id) {
+    return request.post(`/api/medical-care/ai-reports/${id}/publish`);
+}
+export function generateMedicalAiReportTasks(id) {
+    return request.post(`/api/medical-care/ai-reports/${id}/generate-tasks`);
+}

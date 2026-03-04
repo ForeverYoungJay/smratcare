@@ -18,7 +18,7 @@
       <a-card title="账户预警与医护协同" style="margin-bottom: 16px">
         <template #extra>
           <a-space>
-            <a-button @click="go('/finance/account')">老人账户</a-button>
+            <a-button @click="go('/finance/accounts/list')">老人账户</a-button>
             <a-button @click="go('/health/medication/medication-registration?date=today')">用药登记</a-button>
             <a-button type="primary" @click="go('/care/workbench/task-board?date=today')">护理任务看板</a-button>
           </a-space>
@@ -46,6 +46,7 @@ import PageContainer from '../../components/PageContainer.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
 import { getElderAccountLogPage, getElderAccountWarnings } from '../../api/finance'
 import { getMedicalCareWorkbenchSummary } from '../../api/medicalCare'
+import { resolveMedicalError } from './medicalError'
 import type { ElderAccount, ElderAccountLog, MedicalCareWorkbenchSummary, PageResult } from '../../types'
 
 const router = useRouter()
@@ -142,7 +143,7 @@ async function load() {
     const page = logData as PageResult<ElderAccountLog>
     logRows.value = page?.list || []
   } catch (error: any) {
-    errorText.value = error?.message || '加载失败，请稍后重试'
+    errorText.value = resolveMedicalError(error, '加载失败，请稍后重试')
   } finally {
     loading.value = false
   }

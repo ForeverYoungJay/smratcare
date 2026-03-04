@@ -1,5 +1,14 @@
 <template>
   <PageContainer title="护理与质量中心" subTitle="用药 / 巡查 / 护理计划 / 执行闭环 / 交接 / 药库 / 质量报表">
+    <a-row :gutter="12" style="margin-bottom: 12px">
+      <a-col :xs="12" :lg="4"><a-card :bordered="false" class="card-elevated"><a-statistic title="用药待执行" :value="summary.todayMedicationPendingCount || 0" /></a-card></a-col>
+      <a-col :xs="12" :lg="4"><a-card :bordered="false" class="card-elevated"><a-statistic title="巡检待闭环" :value="summary.todayInspectionPendingCount || 0" /></a-card></a-col>
+      <a-col :xs="12" :lg="4"><a-card :bordered="false" class="card-elevated"><a-statistic title="日志待补录" :value="summary.nursingLogPendingCount || 0" /></a-card></a-col>
+      <a-col :xs="12" :lg="4"><a-card :bordered="false" class="card-elevated"><a-statistic title="交接待完成" :value="summary.handoverPendingCount || 0" /></a-card></a-col>
+      <a-col :xs="12" :lg="4"><a-card :bordered="false" class="card-elevated"><a-statistic title="整改逾期" :value="summary.rectifyOverdueCount || 0" /></a-card></a-col>
+      <a-col :xs="12" :lg="4"><a-card :bordered="false" class="card-elevated"><a-statistic title="异常事件未闭环" :value="summary.unclosedAbnormalCount || 0" /></a-card></a-col>
+    </a-row>
+
     <a-tabs v-model:activeKey="activeTab" type="card">
       <a-tab-pane key="medication" tab="用药管理">
         <a-space wrap>
@@ -66,12 +75,63 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, reactive, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
+import { getMedicalHealthCenterSummary } from '../../api/medicalCare'
+import type { MedicalCareWorkbenchSummary } from '../../types'
 
 const router = useRouter()
 const route = useRoute()
+const summary = reactive<MedicalCareWorkbenchSummary>({
+  pendingMedicalOrderCount: 0,
+  pendingReviewCount: 0,
+  pendingAuditCount: 0,
+  unclosedAbnormalCount: 0,
+  todayInspectionTodoCount: 0,
+  topRiskResidentCount: 0,
+  abnormalVital24hCount: 0,
+  abnormalEvent24hCount: 0,
+  medicalOrderShouldCount: 0,
+  medicalOrderDoneCount: 0,
+  medicalOrderPendingCount: 0,
+  medicalOrderAbnormalCount: 0,
+  orderCheckRate: 0,
+  medicationShouldCount: 0,
+  medicationDoneCount: 0,
+  medicationUndoneCount: 0,
+  medicationLowStockCount: 0,
+  medicationRequestPendingCount: 0,
+  careTaskShouldCount: 0,
+  careTaskDoneCount: 0,
+  careTaskOverdueCount: 0,
+  scanExecuteRate: 0,
+  todayInspectionPlanCount: 0,
+  nursingLogPendingCount: 0,
+  handoverPendingCount: 0,
+  handoverDoneCount: 0,
+  handoverRiskCount: 0,
+  handoverTodoCount: 0,
+  incidentOpenCount: 0,
+  incident30dCount: 0,
+  incident30dRate: 0,
+  lowScoreSurveyCount: 0,
+  rectifyInProgressCount: 0,
+  rectifyOverdueCount: 0,
+  aiReportGeneratedCount: 0,
+  aiReportPublishedCount: 0,
+  pendingCareTaskCount: 0,
+  overdueCareTaskCount: 0,
+  todayInspectionPendingCount: 0,
+  todayInspectionDoneCount: 0,
+  abnormalInspectionCount: 0,
+  todayMedicationPendingCount: 0,
+  todayMedicationDoneCount: 0,
+  tcmPublishedCount: 0,
+  cvdHighRiskCount: 0,
+  cvdNeedFollowupCount: 0,
+  keyResidents: []
+})
 const activeTab = computed({
   get: () => (typeof route.query.tab === 'string' ? route.query.tab : 'medication'),
   set: (tab: string) => {
@@ -80,6 +140,30 @@ const activeTab = computed({
 })
 
 function go(path: string) {
-  router.push(path)
+  const [pathname, search] = path.split('?')
+  const parsed = new URLSearchParams(search || '')
+  const query: Record<string, any> = {}
+  parsed.forEach((value, key) => {
+    query[key] = value
+  })
+  const residentId = route.query.residentId ?? route.query.elderId
+  if (residentId != null && query.residentId == null && query.elderId == null) {
+    query.residentId = residentId
+    query.elderId = residentId
+  }
+  router.push({
+    path: pathname,
+    query
+  })
 }
+
+async function loadSummary() {
+  const data = await getMedicalHealthCenterSummary({
+    elderId: route.query.elderId ? Number(route.query.elderId) : route.query.residentId ? Number(route.query.residentId) : undefined
+  })
+  Object.assign(summary, data || {})
+}
+
+onMounted(loadSummary)
+watch(() => route.query, loadSummary)
 </script>
