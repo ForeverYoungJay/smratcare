@@ -177,13 +177,35 @@
             <a-space>
               <a-button size="small" @click="openCreateSchedule()">创建日程</a-button>
               <a-button size="small" @click="go('/oa/work-execution/calendar')">查看日程</a-button>
+              <a-button size="small" @click="agendaDrawerOpen = true">今日/明日速览</a-button>
               <a-button size="small" @click="go('/oa/attendance-leave?type=LEAVE&quick=1')">发起请假</a-button>
               <a-button size="small" @click="go('/oa/approval?type=LEAVE')">请假审批流程</a-button>
             </a-space>
           </template>
+          <div class="calendar-toolbar">
+            <div class="calendar-title-tip">日历分层：个人、部门工作、日常计划、协同日历（类似 Apple Calendar 的多日历开关）。</div>
+            <a-space wrap>
+              <a-checkable-tag
+                v-for="item in calendarBuckets"
+                :key="item.type"
+                :checked="visibleCalendarTypes.includes(item.type)"
+                @change="toggleCalendarType(item.type)"
+              >
+                <span class="legend-dot" :style="{ background: item.color }"></span>
+                {{ item.label }} {{ item.count }}
+              </a-checkable-tag>
+            </a-space>
+          </div>
           <StatefulBlock :loading="calendarLoading" :error="''" :empty="!calendarRows.length" empty-text="暂无日程安排" @retry="loadCalendar">
-            <FullCalendar :options="calendarOptions" />
+            <FullCalendar ref="calendarRef" :options="calendarOptions" />
           </StatefulBlock>
+          <div class="calendar-actions">
+            <a-space wrap>
+              <a-button type="link" @click="go('/oa/work-execution/calendar')">进入协同日历完整视图</a-button>
+              <a-button type="link" @click="go('/oa/work-execution/task')">查看工作执行任务</a-button>
+              <a-button type="link" @click="go('/oa/approval?type=LEAVE')">请假审批看板</a-button>
+            </a-space>
+          </div>
         </a-card>
 
         <a-card :bordered="false" class="card-elevated" title="🔟 数据分析入口">
@@ -233,11 +255,127 @@
             </a-form-item>
           </a-col>
         </a-row>
+        <a-row :gutter="12">
+          <a-col :span="12">
+            <a-form-item label="日历类型">
+              <a-select v-model:value="scheduleForm.calendarType" :options="calendarTypeOptions" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="紧急程度">
+              <a-select v-model:value="scheduleForm.urgency" :options="urgencyOptions" @change="onUrgencyChange" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="12">
+          <a-col :span="12">
+            <a-form-item label="计划分类">
+              <a-select v-model:value="scheduleForm.planCategory" :options="planCategoryOptions" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="显示颜色">
+              <a-select v-model:value="scheduleForm.eventColor" :options="colorOptions" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="12" v-if="scheduleForm.calendarType === 'COLLAB'">
+          <a-col :span="12">
+            <a-form-item label="协同部门">
+              <a-select v-model:value="scheduleForm.collaboratorDeptId" allow-clear :options="departmentOptions" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="协同成员">
+              <a-select
+                v-model:value="scheduleForm.collaboratorIds"
+                mode="multiple"
+                allow-clear
+                :options="filteredStaffOptions"
+                option-filter-prop="label"
+                placeholder="邀请后自动进入对方协同日历"
+              />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-card size="small" class="repeat-card" title="周期计划">
+          <a-row :gutter="12">
+            <a-col :span="8">
+              <a-form-item label="开启周期">
+                <a-switch v-model:checked="scheduleForm.recurring" checked-children="开启" un-checked-children="关闭" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="频率">
+                <a-select v-model:value="scheduleForm.recurrenceRule" :options="recurrenceRuleOptions" :disabled="!scheduleForm.recurring" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="8">
+              <a-form-item label="间隔">
+                <a-input-number v-model:value="scheduleForm.recurrenceInterval" :min="1" :max="90" :disabled="!scheduleForm.recurring" style="width: 100%" />
+              </a-form-item>
+            </a-col>
+          </a-row>
+          <a-row :gutter="12">
+            <a-col :span="8">
+              <a-form-item label="生成次数">
+                <a-input-number v-model:value="scheduleForm.recurrenceCount" :min="1" :max="30" :disabled="!scheduleForm.recurring" style="width: 100%" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="16">
+              <div class="hint-text">支持个人、部门、协同等多日历周期排程。</div>
+            </a-col>
+          </a-row>
+        </a-card>
         <a-form-item label="备注">
           <a-textarea v-model:value="scheduleForm.description" :rows="3" />
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <a-drawer
+      v-model:open="agendaDrawerOpen"
+      title="今日 / 明日日程速览"
+      width="460"
+      placement="right"
+    >
+      <a-card size="small" title="今天">
+        <a-list :data-source="todayAgenda" :locale="{ emptyText: '今日暂无日程' }" size="small">
+          <template #renderItem="{ item }">
+            <a-list-item>
+              <a-list-item-meta
+                :title="item.title"
+                :description="`${item.timeText} · ${item.typeText}${item.assigneeText ? ` · ${item.assigneeText}` : ''}`"
+              />
+              <template #actions>
+                <a-button type="link" size="small" @click="focusCalendarDate(item.dateText)">定位</a-button>
+              </template>
+            </a-list-item>
+          </template>
+        </a-list>
+      </a-card>
+      <a-card size="small" title="明天" style="margin-top: 12px;">
+        <a-list :data-source="tomorrowAgenda" :locale="{ emptyText: '明日暂无日程' }" size="small">
+          <template #renderItem="{ item }">
+            <a-list-item>
+              <a-list-item-meta
+                :title="item.title"
+                :description="`${item.timeText} · ${item.typeText}${item.assigneeText ? ` · ${item.assigneeText}` : ''}`"
+              />
+              <template #actions>
+                <a-button type="link" size="small" @click="focusCalendarDate(item.dateText)">定位</a-button>
+              </template>
+            </a-list-item>
+          </template>
+        </a-list>
+      </a-card>
+      <div class="calendar-actions">
+        <a-space wrap>
+          <a-button type="primary" @click="go('/oa/work-execution/calendar')">打开完整协同日历</a-button>
+          <a-button @click="agendaDrawerOpen = false">关闭</a-button>
+        </a-space>
+      </div>
+    </a-drawer>
   </PageContainer>
 </template>
 
@@ -264,6 +402,8 @@ import { getMarketingConversionReport, getLeadPage, getContractPage } from '../a
 import { getResidenceStatusSummary } from '../api/elderResidence'
 import { getBedMap } from '../api/bed'
 import { getHrProfileCertificateReminderPage, getHrWorkbenchSummary } from '../api/hr'
+import { getDepartmentPage, getStaffPage } from '../api/rbac'
+import type { DepartmentItem, StaffItem } from '../types'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -275,6 +415,12 @@ const refreshedAt = ref('')
 const scheduleOpen = ref(false)
 const scheduleSaving = ref(false)
 const calendarRows = ref<OaTask[]>([])
+const calendarRef = ref<any>(null)
+const agendaDrawerOpen = ref(false)
+const departmentOptions = ref<Array<{ label: string; value: string }>>([])
+const staffOptions = ref<Array<{ label: string; value: string }>>([])
+const staffDeptMap = ref<Record<string, string | undefined>>({})
+const visibleCalendarTypes = ref<Array<'PERSONAL' | 'WORK' | 'DAILY' | 'COLLAB'>>(['PERSONAL', 'WORK', 'DAILY', 'COLLAB'])
 const searchKeyword = ref('')
 const searchOptions = ref<Array<{ value: string; label: string; route: string }>>([])
 const searchIndex = ref<Array<{ title: string; route: string; keywords: string }>>([])
@@ -341,13 +487,52 @@ const scheduleForm = reactive({
   endTime: undefined as Dayjs | undefined,
   assigneeName: '',
   priority: 'NORMAL',
-  description: ''
+  description: '',
+  calendarType: 'WORK' as 'PERSONAL' | 'WORK' | 'DAILY' | 'COLLAB',
+  urgency: 'NORMAL' as 'NORMAL' | 'EMERGENCY',
+  planCategory: '基础办公',
+  eventColor: '#1677ff',
+  collaboratorDeptId: undefined as string | undefined,
+  collaboratorIds: [] as string[],
+  recurring: false,
+  recurrenceRule: 'WEEKLY' as 'DAILY' | 'WEEKLY' | 'MONTHLY',
+  recurrenceInterval: 1,
+  recurrenceCount: 4
 })
 
 const priorityOptions = [
   { label: '低', value: 'LOW' },
   { label: '中', value: 'NORMAL' },
   { label: '高', value: 'HIGH' }
+]
+const calendarTypeOptions = [
+  { label: '个人', value: 'PERSONAL' },
+  { label: '部门工作', value: 'WORK' },
+  { label: '日常计划', value: 'DAILY' },
+  { label: '协同日历', value: 'COLLAB' }
+]
+const urgencyOptions = [
+  { label: '常规', value: 'NORMAL' },
+  { label: '紧急（红色）', value: 'EMERGENCY' }
+]
+const recurrenceRuleOptions = [
+  { label: '每天', value: 'DAILY' },
+  { label: '每周', value: 'WEEKLY' },
+  { label: '每月', value: 'MONTHLY' }
+]
+const planCategoryOptions = [
+  { label: '基础办公', value: '基础办公' },
+  { label: '行政日常', value: '行政日常' },
+  { label: '协同会议', value: '协同会议' },
+  { label: '后勤排班', value: '后勤排班' },
+  { label: '专项检查', value: '专项检查' }
+]
+const colorOptions = [
+  { label: '蓝色（工作）', value: '#1677ff' },
+  { label: '绿色（个人）', value: '#52c41a' },
+  { label: '橙色（日常）', value: '#fa8c16' },
+  { label: '紫色（协同）', value: '#722ed1' },
+  { label: '红色（紧急）', value: '#ff4d4f' }
 ]
 
 const SEARCH_RECENT_KEY = 'portal_search_recent_routes'
@@ -530,31 +715,135 @@ const calendarOptions = computed(() => ({
   headerToolbar: {
     left: 'prev,next today',
     center: 'title',
-    right: 'dayGridMonth'
+    right: 'dayGridMonth,dayGridWeek,dayGridDay'
   },
   buttonText: {
     today: '今天',
-    month: '月视图'
+    month: '月视图',
+    dayGridWeek: '周视图',
+    dayGridDay: '日视图'
   },
   dateClick: (arg: any) => {
     openCreateSchedule(dayjs(arg.dateStr))
   },
-  eventClick: () => {
+  eventClick: (arg: any) => {
+    const typeText = arg?.event?.extendedProps?.calendarType || 'WORK'
+    message.info(`已定位到「${calendarTypeText(typeText)}」日程，正在打开协同日历详情`)
     go('/oa/work-execution/calendar')
   },
-  events: calendarRows.value.map((task) => ({
-    id: String(task.id),
-    title: `${task.title}${task.assigneeName ? `（${task.assigneeName}）` : ''}`,
-    start: task.startTime || task.endTime,
-    end: task.endTime || task.startTime,
-    color: resolveTaskColor(task)
-  }))
+  events: calendarRows.value
+    .filter((task) => visibleCalendarTypes.value.includes((task.calendarType || 'WORK') as any))
+    .map((task) => ({
+      id: String(task.id),
+      title: `${task.title}${task.assigneeName ? `（${task.assigneeName}）` : ''}`,
+      start: task.startTime || task.endTime,
+      end: task.endTime || task.startTime,
+      color: resolveTaskColor(task),
+      extendedProps: {
+        calendarType: task.calendarType || 'WORK',
+        urgency: task.urgency || 'NORMAL'
+      }
+    }))
 }))
+
+const todayAgenda = computed(() => buildAgendaByDate(dayjs()))
+const tomorrowAgenda = computed(() => buildAgendaByDate(dayjs().add(1, 'day')))
+
+const filteredStaffOptions = computed(() => {
+  if (!scheduleForm.collaboratorDeptId) return staffOptions.value
+  return staffOptions.value.filter((item) => staffDeptMap.value[item.value] === scheduleForm.collaboratorDeptId)
+})
+
+const calendarBuckets = computed(() => {
+  const defs = [
+    { type: 'PERSONAL' as const, label: '个人', color: '#52c41a' },
+    { type: 'WORK' as const, label: '部门工作', color: '#1677ff' },
+    { type: 'DAILY' as const, label: '日常计划', color: '#fa8c16' },
+    { type: 'COLLAB' as const, label: '协同', color: '#722ed1' }
+  ]
+  return defs.map((item) => ({
+    ...item,
+    count: calendarRows.value.filter((task) => (task.calendarType || 'WORK') === item.type).length
+  }))
+})
 
 function severityColor(level: string) {
   if (level === '紧急') return 'red'
   if (level === '预警') return 'orange'
   return 'blue'
+}
+
+function toggleCalendarType(type: 'PERSONAL' | 'WORK' | 'DAILY' | 'COLLAB') {
+  if (visibleCalendarTypes.value.includes(type)) {
+    if (visibleCalendarTypes.value.length === 1) return
+    visibleCalendarTypes.value = visibleCalendarTypes.value.filter((item) => item !== type)
+    return
+  }
+  visibleCalendarTypes.value = [...visibleCalendarTypes.value, type]
+}
+
+function calendarTypeText(value?: string) {
+  if (value === 'PERSONAL') return '个人'
+  if (value === 'DAILY') return '日常计划'
+  if (value === 'COLLAB') return '协同日历'
+  return '部门工作'
+}
+
+function agendaTimeText(task: OaTask) {
+  const start = task.startTime ? dayjs(task.startTime) : undefined
+  const end = task.endTime ? dayjs(task.endTime) : undefined
+  if (!start) return '--'
+  if (!end || start.format('YYYY-MM-DD') !== end.format('YYYY-MM-DD')) return start.format('MM-DD HH:mm')
+  return `${start.format('HH:mm')} - ${end.format('HH:mm')}`
+}
+
+function buildAgendaByDate(target: Dayjs) {
+  const dateText = target.format('YYYY-MM-DD')
+  return calendarRows.value
+    .filter((task) => {
+      const start = task.startTime || task.endTime
+      return start ? dayjs(start).format('YYYY-MM-DD') === dateText : false
+    })
+    .sort((a, b) => dayjs(a.startTime || a.endTime).valueOf() - dayjs(b.startTime || b.endTime).valueOf())
+    .map((task) => ({
+      id: String(task.id),
+      title: task.title || '未命名日程',
+      timeText: agendaTimeText(task),
+      typeText: calendarTypeText(task.calendarType),
+      assigneeText: task.assigneeName || '',
+      dateText
+    }))
+}
+
+function focusCalendarDate(dateText: string) {
+  const api = calendarRef.value?.getApi?.()
+  if (!api) {
+    message.warning('日历未就绪，请稍后再试')
+    return
+  }
+  api.gotoDate(dateText)
+  api.changeView('dayGridDay')
+  agendaDrawerOpen.value = false
+}
+
+function onUrgencyChange(value: 'NORMAL' | 'EMERGENCY') {
+  if (value === 'EMERGENCY') {
+    scheduleForm.eventColor = '#ff4d4f'
+    return
+  }
+  scheduleForm.eventColor = scheduleForm.calendarType === 'PERSONAL'
+    ? '#52c41a'
+    : scheduleForm.calendarType === 'DAILY'
+      ? '#fa8c16'
+      : scheduleForm.calendarType === 'COLLAB'
+        ? '#722ed1'
+        : '#1677ff'
+}
+
+function addByRule(base: Dayjs, rule: 'DAILY' | 'WEEKLY' | 'MONTHLY', interval: number) {
+  if (rule === 'DAILY') return base.add(interval, 'day')
+  if (rule === 'MONTHLY') return base.add(interval, 'month')
+  return base.add(interval, 'week')
 }
 
 function money(amount: number) {
@@ -563,10 +852,11 @@ function money(amount: number) {
 
 function resolveTaskColor(task: OaTask) {
   if (task.eventColor) return task.eventColor
-  if (task.calendarType === 'COLLAB') return '#1677ff'
-  if (task.calendarType === 'WORK') return '#fa8c16'
-  if (task.calendarType === 'DAILY') return '#722ed1'
-  if (task.calendarType === 'PERSONAL') return '#13c2c2'
+  if (task.urgency === 'EMERGENCY') return '#ff4d4f'
+  if (task.calendarType === 'COLLAB') return '#722ed1'
+  if (task.calendarType === 'WORK') return '#1677ff'
+  if (task.calendarType === 'DAILY') return '#fa8c16'
+  if (task.calendarType === 'PERSONAL') return '#52c41a'
   return task.status === 'DONE' ? '#52c41a' : '#1677ff'
 }
 
@@ -758,9 +1048,19 @@ function openCreateSchedule(date?: Dayjs) {
   scheduleForm.title = ''
   scheduleForm.startTime = date ? date.hour(9).minute(0).second(0) : undefined
   scheduleForm.endTime = date ? date.hour(10).minute(0).second(0) : undefined
-  scheduleForm.assigneeName = ''
+  scheduleForm.assigneeName = (userStore.staffInfo?.realName || userStore.staffInfo?.username || '').trim()
   scheduleForm.priority = 'NORMAL'
   scheduleForm.description = ''
+  scheduleForm.calendarType = 'WORK'
+  scheduleForm.urgency = 'NORMAL'
+  scheduleForm.planCategory = '基础办公'
+  scheduleForm.eventColor = '#1677ff'
+  scheduleForm.collaboratorDeptId = undefined
+  scheduleForm.collaboratorIds = []
+  scheduleForm.recurring = false
+  scheduleForm.recurrenceRule = 'WEEKLY'
+  scheduleForm.recurrenceInterval = 1
+  scheduleForm.recurrenceCount = 4
   scheduleOpen.value = true
 }
 
@@ -773,23 +1073,75 @@ async function submitSchedule() {
     message.warning('请选择开始时间')
     return
   }
+  if (scheduleForm.startTime && scheduleForm.endTime && scheduleForm.startTime.isAfter(scheduleForm.endTime)) {
+    message.warning('开始时间不能晚于结束时间')
+    return
+  }
+  const collaboratorNames = staffOptions.value
+    .filter((item) => scheduleForm.collaboratorIds.includes(item.value))
+    .map((item) => item.label)
+  const repeatCount = scheduleForm.recurring ? Math.max(1, Number(scheduleForm.recurrenceCount || 1)) : 1
+  const repeatRule = scheduleForm.recurrenceRule
+  const repeatInterval = Math.max(1, Number(scheduleForm.recurrenceInterval || 1))
   scheduleSaving.value = true
   try {
-    await createOaTask({
-      title: scheduleForm.title.trim(),
-      description: scheduleForm.description || undefined,
-      startTime: dayjs(scheduleForm.startTime).format('YYYY-MM-DDTHH:mm:ss'),
-      endTime: scheduleForm.endTime ? dayjs(scheduleForm.endTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
-      priority: scheduleForm.priority,
-      status: 'OPEN',
-      assigneeName: scheduleForm.assigneeName || undefined
-    })
+    const tasks: Promise<any>[] = []
+    for (let i = 0; i < repeatCount; i += 1) {
+      const startTime = i === 0 ? scheduleForm.startTime : addByRule(scheduleForm.startTime, repeatRule, repeatInterval * i)
+      const endTime = scheduleForm.endTime ? (i === 0 ? scheduleForm.endTime : addByRule(scheduleForm.endTime, repeatRule, repeatInterval * i)) : undefined
+      tasks.push(
+        createOaTask({
+          title: scheduleForm.title.trim(),
+          description: scheduleForm.description || undefined,
+          startTime: dayjs(startTime).format('YYYY-MM-DDTHH:mm:ss'),
+          endTime: endTime ? dayjs(endTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
+          priority: scheduleForm.priority,
+          status: 'OPEN',
+          assigneeName: scheduleForm.assigneeName || undefined,
+          calendarType: scheduleForm.calendarType,
+          planCategory: scheduleForm.planCategory || undefined,
+          urgency: scheduleForm.urgency,
+          eventColor: scheduleForm.eventColor,
+          collaboratorIds: scheduleForm.calendarType === 'COLLAB' ? scheduleForm.collaboratorIds : [],
+          collaboratorNames: scheduleForm.calendarType === 'COLLAB' ? collaboratorNames : [],
+          recurring: scheduleForm.recurring,
+          recurrenceRule: scheduleForm.recurring ? repeatRule : undefined,
+          recurrenceInterval: scheduleForm.recurring ? repeatInterval : undefined,
+          recurrenceCount: scheduleForm.recurring ? repeatCount : undefined
+        })
+      )
+    }
+    await Promise.all(tasks)
     scheduleOpen.value = false
-    message.success('日程已新增')
+    message.success(scheduleForm.recurring ? `已生成 ${tasks.length} 条周期日程` : '日程已新增')
     await loadCalendar()
   } finally {
     scheduleSaving.value = false
   }
+}
+
+async function loadStaffOptions() {
+  try {
+    const page: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: 300 })
+    staffDeptMap.value = {}
+    ;(page.list || []).forEach((item) => {
+      staffDeptMap.value[String(item.id)] = item.departmentId == null ? undefined : String(item.departmentId)
+    })
+    staffOptions.value = (page.list || []).map((item) => ({
+      label: item.realName || item.username || `员工#${item.id}`,
+      value: String(item.id)
+    }))
+  } catch {}
+}
+
+async function loadDepartmentOptions() {
+  try {
+    const page: PageResult<DepartmentItem> = await getDepartmentPage({ pageNo: 1, pageSize: 200 })
+    departmentOptions.value = (page.list || []).map((item) => ({
+      label: item.deptName,
+      value: String(item.id)
+    }))
+  } catch {}
 }
 
 async function loadSummary() {
@@ -860,7 +1212,7 @@ async function init() {
       loadRecentSearchRoutes()
     }
     updateSearchOptions(searchKeyword.value)
-    await Promise.all([loadSummary(), loadCalendar()])
+    await Promise.all([loadSummary(), loadCalendar(), loadStaffOptions(), loadDepartmentOptions()])
     await Promise.allSettled([
       loadDashboard(),
       loadFinanceOverview(),
@@ -1012,6 +1364,32 @@ onMounted(init)
 .hint-text {
   color: #64748b;
   font-size: 12px;
+}
+
+.calendar-toolbar {
+  margin-bottom: 10px;
+}
+
+.calendar-title-tip {
+  color: #64748b;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  display: inline-block;
+  border-radius: 50%;
+  margin-right: 4px;
+}
+
+.calendar-actions {
+  margin-top: 8px;
+}
+
+.repeat-card {
+  margin-bottom: 12px;
 }
 
 @media (max-width: 768px) {
