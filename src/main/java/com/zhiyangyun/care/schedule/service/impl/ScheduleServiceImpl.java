@@ -51,7 +51,7 @@ public class ScheduleServiceImpl implements ScheduleService {
     List<Long> staffIds = page.getRecords().stream().map(StaffSchedule::getStaffId).distinct().toList();
     Map<Long, StaffAccount> staffMap = staffIds.isEmpty()
         ? Collections.emptyMap()
-        : staffMapper.selectBatchIds(staffIds).stream()
+        : staffMapper.selectBatchIdsSafe(staffIds).stream()
             .collect(Collectors.toMap(StaffAccount::getId, s -> s, (a, b) -> a));
 
     IPage<ScheduleResponse> resp = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());

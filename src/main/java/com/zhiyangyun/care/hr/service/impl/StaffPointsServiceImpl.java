@@ -150,7 +150,7 @@ public class StaffPointsServiceImpl implements StaffPointsService {
     wrapper.orderByDesc(StaffPointsLog::getCreateTime);
 
     IPage<StaffPointsLog> page = logMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
-    Map<Long, StaffAccount> staffMap = staffMapper.selectBatchIds(
+    Map<Long, StaffAccount> staffMap = staffMapper.selectBatchIdsSafe(
             page.getRecords().stream().map(StaffPointsLog::getStaffId).distinct().toList())
         .stream()
         .collect(Collectors.toMap(StaffAccount::getId, s -> s));

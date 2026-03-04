@@ -104,7 +104,7 @@ public class NursingRecordServiceImpl implements NursingRecordService {
     Map<Long, ElderProfile> elderMap = elderIds.isEmpty() ? Collections.emptyMap()
         : elderMapper.selectBatchIds(elderIds).stream().collect(Collectors.toMap(ElderProfile::getId, e -> e, (a, b) -> a));
     Map<Long, StaffAccount> staffMap = staffIds.isEmpty() ? Collections.emptyMap()
-        : staffMapper.selectBatchIds(staffIds).stream().collect(Collectors.toMap(StaffAccount::getId, s -> s, (a, b) -> a));
+        : staffMapper.selectBatchIdsSafe(staffIds).stream().collect(Collectors.toMap(StaffAccount::getId, s -> s, (a, b) -> a));
 
     List<NursingRecordItem> all = new ArrayList<>();
 

@@ -62,7 +62,7 @@ public class ShiftHandoverServiceImpl implements ShiftHandoverService {
       staffIds.add(handover.getToStaffId());
     }
     Map<Long, StaffAccount> staffMap = staffIds.isEmpty() ? Collections.emptyMap()
-        : staffMapper.selectBatchIds(staffIds).stream()
+        : staffMapper.selectBatchIdsSafe(staffIds).stream()
             .collect(Collectors.toMap(StaffAccount::getId, s -> s, (a, b) -> a));
     return toResponse(handover, staffMap);
   }
@@ -86,7 +86,7 @@ public class ShiftHandoverServiceImpl implements ShiftHandoverService {
         .filter(id -> id != null && id > 0)
         .collect(Collectors.toSet());
     Map<Long, StaffAccount> staffMap = staffIds.isEmpty() ? Collections.emptyMap()
-        : staffMapper.selectBatchIds(staffIds).stream()
+        : staffMapper.selectBatchIdsSafe(staffIds).stream()
             .collect(Collectors.toMap(StaffAccount::getId, s -> s, (a, b) -> a));
 
     IPage<ShiftHandoverResponse> resp = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());

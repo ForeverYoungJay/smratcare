@@ -392,7 +392,7 @@ public class AdminHrController {
     }
     wrapper.orderByDesc(AttendanceRecord::getCheckInTime);
     IPage<AttendanceRecord> page = attendanceRecordMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
-    Map<Long, StaffAccount> staffMap = staffMapper.selectBatchIds(
+    Map<Long, StaffAccount> staffMap = staffMapper.selectBatchIdsSafe(
             page.getRecords().stream().map(AttendanceRecord::getStaffId).distinct().toList())
         .stream()
         .collect(Collectors.toMap(StaffAccount::getId, s -> s, (a, b) -> a));
@@ -701,7 +701,7 @@ public class AdminHrController {
     }
     wrapper.orderByDesc(AttendanceRecord::getCheckInTime);
     IPage<AttendanceRecord> page = attendanceRecordMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
-    Map<Long, StaffAccount> staffMap = staffMapper.selectBatchIds(
+    Map<Long, StaffAccount> staffMap = staffMapper.selectBatchIdsSafe(
             page.getRecords().stream().map(AttendanceRecord::getStaffId).distinct().toList())
         .stream()
         .collect(Collectors.toMap(StaffAccount::getId, s -> s, (a, b) -> a));
@@ -969,7 +969,7 @@ public class AdminHrController {
     }
     wrapper.orderByDesc(AttendanceRecord::getCheckInTime);
     IPage<AttendanceRecord> page = attendanceRecordMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
-    Map<Long, StaffAccount> staffMap = staffMapper.selectBatchIds(
+    Map<Long, StaffAccount> staffMap = staffMapper.selectBatchIdsSafe(
             page.getRecords().stream().map(AttendanceRecord::getStaffId).distinct().toList())
         .stream()
         .collect(Collectors.toMap(StaffAccount::getId, s -> s, (a, b) -> a));
@@ -1178,7 +1178,7 @@ public class AdminHrController {
     wrapper.orderByDesc(StaffTrainingRecord::getCreateTime);
     IPage<StaffTrainingRecord> page = trainingRecordMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
 
-    Map<Long, StaffAccount> staffMap = staffMapper.selectBatchIds(
+    Map<Long, StaffAccount> staffMap = staffMapper.selectBatchIdsSafe(
             page.getRecords().stream().map(StaffTrainingRecord::getStaffId).distinct().toList())
         .stream()
         .collect(Collectors.toMap(StaffAccount::getId, s -> s));
@@ -1373,7 +1373,7 @@ public class AdminHrController {
 
   private IPage<HrStaffCertificateResponse> toCertificatePage(IPage<StaffTrainingRecord> source, LocalDate today) {
     List<Long> staffIds = source.getRecords().stream().map(StaffTrainingRecord::getStaffId).distinct().toList();
-    Map<Long, StaffAccount> staffMap = staffMapper.selectBatchIds(staffIds)
+    Map<Long, StaffAccount> staffMap = staffMapper.selectBatchIdsSafe(staffIds)
         .stream()
         .collect(Collectors.toMap(StaffAccount::getId, s -> s, (a, b) -> a));
     IPage<HrStaffCertificateResponse> resp = new Page<>(source.getCurrent(), source.getSize(), source.getTotal());

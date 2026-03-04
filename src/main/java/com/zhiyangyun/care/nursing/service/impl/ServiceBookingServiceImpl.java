@@ -106,7 +106,7 @@ public class ServiceBookingServiceImpl implements ServiceBookingService {
     Map<Long, ServiceItem> itemMap = itemIds.isEmpty() ? Collections.emptyMap()
         : serviceItemMapper.selectBatchIds(itemIds).stream().collect(Collectors.toMap(ServiceItem::getId, s -> s, (a, b) -> a));
     Map<Long, StaffAccount> staffMap = staffIds.isEmpty() ? Collections.emptyMap()
-        : staffMapper.selectBatchIds(staffIds).stream().collect(Collectors.toMap(StaffAccount::getId, s -> s, (a, b) -> a));
+        : staffMapper.selectBatchIdsSafe(staffIds).stream().collect(Collectors.toMap(StaffAccount::getId, s -> s, (a, b) -> a));
 
     IPage<ServiceBookingResponse> resp = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
     resp.setRecords(page.getRecords().stream()

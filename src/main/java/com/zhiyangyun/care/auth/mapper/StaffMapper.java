@@ -2,11 +2,21 @@ package com.zhiyangyun.care.auth.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.zhiyangyun.care.auth.entity.StaffAccount;
+import java.io.Serializable;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 public interface StaffMapper extends BaseMapper<StaffAccount> {
+  default List<StaffAccount> selectBatchIdsSafe(Collection<? extends Serializable> idList) {
+    if (idList == null || idList.isEmpty()) {
+      return Collections.emptyList();
+    }
+    return this.selectBatchIds(idList);
+  }
+
   @Select("SELECT s.* FROM staff s "
       + "JOIN staff_role sr ON s.id = sr.staff_id "
       + "JOIN role r ON r.id = sr.role_id "

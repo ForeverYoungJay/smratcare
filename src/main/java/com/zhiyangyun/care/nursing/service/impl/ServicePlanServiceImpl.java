@@ -104,7 +104,7 @@ public class ServicePlanServiceImpl implements ServicePlanService {
     Map<Long, ServiceItem> serviceItemMap = itemIds.isEmpty() ? Collections.emptyMap()
         : serviceItemMapper.selectBatchIds(itemIds).stream().collect(Collectors.toMap(ServiceItem::getId, s -> s, (a, b) -> a));
     Map<Long, StaffAccount> staffMap = staffIds.isEmpty() ? Collections.emptyMap()
-        : staffMapper.selectBatchIds(staffIds).stream().collect(Collectors.toMap(StaffAccount::getId, s -> s, (a, b) -> a));
+        : staffMapper.selectBatchIdsSafe(staffIds).stream().collect(Collectors.toMap(StaffAccount::getId, s -> s, (a, b) -> a));
 
     IPage<ServicePlanResponse> resp = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
     resp.setRecords(page.getRecords().stream()

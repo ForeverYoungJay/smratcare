@@ -111,7 +111,7 @@ public class NursingReportServiceImpl implements NursingReportService {
 
     Set<Long> staffIds = loadMap.keySet();
     Map<Long, StaffAccount> staffMap = staffIds.isEmpty() ? Collections.emptyMap()
-        : staffMapper.selectBatchIds(staffIds).stream()
+        : staffMapper.selectBatchIdsSafe(staffIds).stream()
             .collect(Collectors.toMap(StaffAccount::getId, s -> s, (a, b) -> a));
 
     List<NursingStaffWorkloadItem> workloads = new ArrayList<>(loadMap.values());

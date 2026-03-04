@@ -53,7 +53,7 @@ public class AttendanceServiceImpl implements AttendanceService {
     List<Long> staffIds = page.getRecords().stream().map(AttendanceRecord::getStaffId).distinct().toList();
     Map<Long, StaffAccount> staffMap = staffIds.isEmpty()
         ? Collections.emptyMap()
-        : staffMapper.selectBatchIds(staffIds).stream()
+        : staffMapper.selectBatchIdsSafe(staffIds).stream()
             .collect(Collectors.toMap(StaffAccount::getId, s -> s, (a, b) -> a));
 
     IPage<AttendanceResponse> resp = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
