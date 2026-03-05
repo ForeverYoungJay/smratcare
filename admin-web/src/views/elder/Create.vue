@@ -1,6 +1,13 @@
 <template>
-  <PageContainer title="新增老人" subTitle="录入老人档案">
+  <PageContainer :title="quickArchiveMode ? '档案一键生成' : '新增老人'" :subTitle="quickArchiveMode ? '上传现有资料并直接办理入住（跳过营销合同流程）' : '录入老人档案'">
     <a-card class="card-elevated" :bordered="false">
+      <a-alert
+        v-if="quickArchiveMode"
+        type="info"
+        show-icon
+        style="margin-bottom: 16px"
+        message="快捷建档模式：可直接上传医保/户口/病历资料并办理入住，不需要营销合同。"
+      />
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical" style="max-width: 760px">
         <a-form-item label="姓名" name="fullName">
           <a-input v-model:value="form.fullName" />
@@ -14,6 +21,33 @@
         <a-form-item label="家庭地址" name="homeAddress">
           <a-input v-model:value="form.homeAddress" />
         </a-form-item>
+        <a-form-item label="医保复印件">
+          <a-space>
+            <a-upload :show-upload-list="false" :before-upload="beforeUploadMedicalInsurance">
+              <a-button :loading="uploading.medicalInsurance">上传文件</a-button>
+            </a-upload>
+            <a-typography-text type="secondary">{{ fileLabel(form.medicalInsuranceCopyUrl, '未上传') }}</a-typography-text>
+            <a-button v-if="form.medicalInsuranceCopyUrl" type="link" @click="openFile(form.medicalInsuranceCopyUrl)">查看</a-button>
+          </a-space>
+        </a-form-item>
+        <a-form-item label="户口本复印件">
+          <a-space>
+            <a-upload :show-upload-list="false" :before-upload="beforeUploadHousehold">
+              <a-button :loading="uploading.household">上传文件</a-button>
+            </a-upload>
+            <a-typography-text type="secondary">{{ fileLabel(form.householdCopyUrl, '未上传') }}</a-typography-text>
+            <a-button v-if="form.householdCopyUrl" type="link" @click="openFile(form.householdCopyUrl)">查看</a-button>
+          </a-space>
+        </a-form-item>
+        <a-form-item label="既往病历资料">
+          <a-space>
+            <a-upload :show-upload-list="false" :before-upload="beforeUploadMedicalRecord">
+              <a-button :loading="uploading.medicalRecord">上传文件</a-button>
+            </a-upload>
+            <a-typography-text type="secondary">{{ fileLabel(form.medicalRecordFileUrl, '未上传') }}</a-typography-text>
+            <a-button v-if="form.medicalRecordFileUrl" type="link" @click="openFile(form.medicalRecordFileUrl)">查看</a-button>
+          </a-space>
+        </a-form-item>
         <a-form-item label="性别" name="gender">
           <a-select v-model:value="form.gender" placeholder="请选择">
             <a-select-option :value="1">男</a-select-option>
@@ -26,8 +60,8 @@
         <a-form-item label="入院日期" name="admissionDate">
           <a-date-picker v-model:value="form.admissionDate" value-format="YYYY-MM-DD" style="width: 100%" />
         </a-form-item>
-        <a-form-item label="合同号" name="contractNo">
-          <a-input v-model:value="form.contractNo" />
+        <a-form-item v-if="!quickArchiveMode" label="合同号" name="contractNo">
+          <a-input v-model:value="form.contractNo" placeholder="营销链路下可填写，触发生命周期入住记录" />
         </a-form-item>
         <a-form-item label="初始余额(押金)" name="depositAmount">
           <a-input-number v-model:value="form.depositAmount" :min="0" style="width: 100%" />
@@ -95,24 +129,29 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
-import { createElder } from '../../api/elder'
+import { createElder, uploadElderFile } from '../../api/elder'
 import { admitElder } from '../../api/elderLifecycle'
 import { getBedList, getBuildingList, getFloorList, getRoomList } from '../../api/bed'
 import type { AdmissionRequest, BedItem, BuildingItem, ElderCreateRequest, ElderItem, FloorItem, RoomItem } from '../../types/api'
 
+const route = useRoute()
 const router = useRouter()
 const formRef = ref<FormInstance>()
 const saving = ref(false)
+const quickArchiveMode = computed(() => String(route.query.quickArchive || '') === '1')
 
 const form = reactive<ElderCreateRequest & { contractNo?: string; depositAmount?: number }>({
   fullName: '',
   idCardNo: '',
   phone: '',
   homeAddress: '',
+  medicalInsuranceCopyUrl: '',
+  householdCopyUrl: '',
+  medicalRecordFileUrl: '',
   gender: undefined,
   birthDate: undefined,
   admissionDate: undefined,
@@ -124,6 +163,11 @@ const form = reactive<ElderCreateRequest & { contractNo?: string; depositAmount?
   remark: '',
   bedId: undefined,
   bedStartDate: undefined
+})
+const uploading = reactive({
+  medicalInsurance: false,
+  household: false,
+  medicalRecord: false
 })
 
 const buildings = ref<BuildingItem[]>([])
@@ -171,12 +215,16 @@ async function submit() {
   try {
     await formRef.value.validate()
     saving.value = true
-    const shouldAdmit = !!form.admissionDate
+    const normalizedContractNo = String(form.contractNo || '').trim()
+    const shouldAdmit = !quickArchiveMode.value && !!form.admissionDate && !!normalizedContractNo
     const payload: ElderCreateRequest = {
       fullName: form.fullName,
       idCardNo: form.idCardNo,
       phone: form.phone,
       homeAddress: form.homeAddress,
+      medicalInsuranceCopyUrl: form.medicalInsuranceCopyUrl,
+      householdCopyUrl: form.householdCopyUrl,
+      medicalRecordFileUrl: form.medicalRecordFileUrl,
       gender: form.gender,
       birthDate: form.birthDate,
       admissionDate: form.admissionDate,
@@ -195,7 +243,7 @@ async function submit() {
       const admission: AdmissionRequest = {
         elderId: created.id,
         admissionDate: form.admissionDate || new Date().toISOString().slice(0, 10),
-        contractNo: form.contractNo || undefined,
+        contractNo: normalizedContractNo || undefined,
         depositAmount: form.depositAmount,
         bedId: form.bedId,
         bedStartDate: form.bedStartDate
@@ -208,6 +256,8 @@ async function submit() {
       } catch (admitError: any) {
         message.warning(admitError?.message || '老人档案已创建，但自动办理入住失败，请到“入住办理”继续处理')
       }
+    } else if (form.admissionDate && form.bedId) {
+      message.success('已按直办入住完成建档与床位分配')
     }
     message.success('保存成功')
     router.push('/elder/list')
@@ -216,6 +266,48 @@ async function submit() {
   } finally {
     saving.value = false
   }
+}
+
+async function uploadArchiveFile(field: 'medicalInsuranceCopyUrl' | 'householdCopyUrl' | 'medicalRecordFileUrl', loadingKey: 'medicalInsurance' | 'household' | 'medicalRecord', file: File) {
+  uploading[loadingKey] = true
+  try {
+    const uploaded = await uploadElderFile(file, `elder-${field}`)
+    const url = uploaded?.fileUrl || ''
+    if (!url) {
+      message.error('上传失败：未返回文件地址')
+      return false
+    }
+    form[field] = url
+    message.success('上传成功')
+  } catch (error: any) {
+    message.error(error?.message || '上传失败')
+  } finally {
+    uploading[loadingKey] = false
+  }
+  return false
+}
+
+function beforeUploadMedicalInsurance(file: File) {
+  return uploadArchiveFile('medicalInsuranceCopyUrl', 'medicalInsurance', file)
+}
+
+function beforeUploadHousehold(file: File) {
+  return uploadArchiveFile('householdCopyUrl', 'household', file)
+}
+
+function beforeUploadMedicalRecord(file: File) {
+  return uploadArchiveFile('medicalRecordFileUrl', 'medicalRecord', file)
+}
+
+function fileLabel(url?: string, fallback = '') {
+  if (!url) return fallback
+  const text = String(url).split('/').pop() || url
+  return decodeURIComponent(text)
+}
+
+function openFile(url?: string) {
+  if (!url) return
+  window.open(url, '_blank')
 }
 
 async function loadBeds() {

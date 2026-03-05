@@ -60,6 +60,7 @@ import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { getServiceItemPage, createServiceItem, updateServiceItem, deleteServiceItem } from '../../api/standard'
 import type { ServiceItem, PageResult } from '../../types'
+import { resolveCareError } from './careError'
 
 const list = ref<ServiceItem[]>([])
 const loading = ref(false)
@@ -112,8 +113,8 @@ async function submit() {
     message.success('保存成功')
     modalOpen.value = false
     load()
-  } catch {
-    message.error('保存失败')
+  } catch (error) {
+    message.error(resolveCareError(error, '保存失败'))
   } finally {
     submitting.value = false
   }
@@ -123,9 +124,13 @@ async function remove(id: number) {
   Modal.confirm({
     title: '确认删除该服务项目？',
     onOk: async () => {
-      await deleteServiceItem(id)
-      message.success('已删除')
-      load()
+      try {
+        await deleteServiceItem(id)
+        message.success('已删除')
+        await load()
+      } catch (error) {
+        message.error(resolveCareError(error, '删除失败'))
+      }
     }
   })
 }
@@ -139,6 +144,10 @@ async function load() {
     })
     list.value = res.list
     page.total = res.total
+  } catch (error) {
+    message.error(resolveCareError(error, '加载服务项目失败'))
+    list.value = []
+    page.total = 0
   } finally {
     loading.value = false
   }

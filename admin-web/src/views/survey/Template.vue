@@ -36,6 +36,9 @@
           <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
           <a-button :disabled="!selectedSingleRecord" @click="configQuestionsSelected">配置题目</a-button>
           <a-button :disabled="!selectedSingleRecord" @click="openQrSelected">二维码</a-button>
+          <a-button :disabled="!selectedSingleRecord" @click="openFamilyPreviewSelected">家属端预览</a-button>
+          <a-button :disabled="!selectedSingleRecord" @click="openStatsSelected">行政统计</a-button>
+          <a-button :disabled="!selectedSingleRecord" @click="openPerformanceSelected">绩效榜</a-button>
           <a-button :disabled="!canPublishSingle" @click="publishSelected">发布</a-button>
           <a-button :disabled="!canDisableSingle" @click="disableSelected">停用</a-button>
           <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
@@ -45,6 +48,7 @@
           <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
         </a-space>
       </div>
+      <div class="publish-tip">发布后自动同步到家属端问卷列表与行政端问卷统计，可直接扫码填写。</div>
       <a-table
         :data-source="rows"
         :columns="columns"
@@ -59,7 +63,9 @@
             {{ targetLabel(record.targetType) }}
           </template>
           <template v-else-if="column.key === 'status'">
-            <a-tag :color="statusTag(record.status)">{{ statusLabel(record.status) }}</a-tag>
+            <a-tag :color="isExpiredTemplate(record) ? 'red' : statusTag(record.status)">
+              {{ isExpiredTemplate(record) ? '已过期' : statusLabel(record.status) }}
+            </a-tag>
           </template>
           <template v-else-if="column.key === 'scoreEnabled'">
             <a-tag :color="record.scoreEnabled === 1 ? 'green' : 'default'">
@@ -98,7 +104,7 @@
         <a-form-item label="状态">
           <a-select v-model:value="form.status">
             <a-select-option :value="0">草稿</a-select-option>
-            <a-select-option :value="1">发布</a-select-option>
+            <a-select-option :value="1" disabled>发布（请用列表“发布”按钮）</a-select-option>
             <a-select-option :value="2">停用</a-select-option>
           </a-select>
         </a-form-item>
@@ -112,13 +118,16 @@
           <a-switch v-model:checked="form.anonymousFlag" :checked-value="1" :un-checked-value="0" />
         </a-form-item>
         <a-form-item label="计分">
-          <a-switch v-model:checked="form.scoreEnabled" :checked-value="1" :un-checked-value="0" />
+          <a-switch v-model:checked="form.scoreEnabled" :checked-value="1" :un-checked-value="0" @change="onScoreEnabledChange" />
         </a-form-item>
-        <a-form-item label="总分">
+        <a-form-item v-if="form.scoreEnabled === 1" label="总分">
           <a-input-number v-model:value="form.totalScore" :min="0" :max="1000" style="width: 100%" />
         </a-form-item>
         <a-form-item label="描述">
           <a-textarea v-model:value="form.description" :rows="3" />
+        </a-form-item>
+        <a-form-item label="问卷内容">
+          <a-textarea v-model:value="form.content" :rows="4" placeholder="用于家属端/行政端展示的问卷说明内容" />
         </a-form-item>
       </a-form>
     </a-modal>
@@ -181,6 +190,8 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref, computed } from 'vue'
+import { useRoute } from 'vue-router'
+import dayjs from 'dayjs'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import QRCode from 'qrcode'
@@ -189,13 +200,17 @@ import {
   getSurveyTemplatePage,
   createSurveyTemplate,
   updateSurveyTemplate,
+  publishSurveyTemplate,
+  disableSurveyTemplate,
   deleteSurveyTemplate,
+  verifySurveyPublishedTemplate,
   getSurveyQuestionPage,
   getSurveyTemplateDetail,
   updateSurveyTemplateQuestions
 } from '../../api/survey'
 import type { SurveyTemplate, SurveyQuestion, SurveyTemplateQuestionItem, PageResult } from '../../types'
 
+const route = useRoute()
 const loading = ref(false)
 const rows = ref<SurveyTemplate[]>([])
 const total = ref(0)
@@ -214,6 +229,8 @@ const formRef = ref<FormInstance>()
 const form = reactive<Partial<SurveyTemplate>>({
   templateCode: '',
   templateName: '',
+  description: '',
+  content: '',
   targetType: 'ELDER',
   status: 0,
   anonymousFlag: 0,
@@ -278,8 +295,8 @@ const canDisableSingle = computed(() => !!selectedSingleRecord.value && selected
 
 function statusLabel(status?: number) {
   if (status === 0) return '草稿'
-  if (status === 1) return '发布'
   if (status === 2) return '停用'
+  if (status === 1) return '发布'
   return '-'
 }
 
@@ -287,6 +304,12 @@ function statusTag(status?: number) {
   if (status === 1) return 'green'
   if (status === 2) return 'default'
   return 'orange'
+}
+
+function isExpiredTemplate(row: Partial<SurveyTemplate>) {
+  if (row.status !== 1) return false
+  if (!row.endDate) return false
+  return dayjs(row.endDate).isBefore(dayjs(), 'day')
 }
 
 function targetLabel(type?: string) {
@@ -331,6 +354,22 @@ async function fetchData() {
   }
 }
 
+function initByQuery() {
+  const statusText = String(route.query.status || '').trim()
+  if (statusText) {
+    const statusValue = Number(statusText)
+    query.status = Number.isNaN(statusValue) ? undefined : statusValue
+  }
+  const targetType = String(route.query.targetType || '').trim().toUpperCase()
+  if (['ELDER', 'STAFF', 'FAMILY', 'OTHER'].includes(targetType)) {
+    query.targetType = targetType
+  }
+  const keyword = String(route.query.keyword || '').trim()
+  if (keyword) {
+    query.keyword = keyword
+  }
+}
+
 function reset() {
   query.keyword = ''
   query.status = undefined
@@ -354,9 +393,40 @@ function openForm(row?: SurveyTemplate) {
   if (row) {
     Object.assign(form, row)
   } else {
-    Object.assign(form, { id: undefined, templateCode: '', templateName: '', targetType: 'ELDER', status: 0, startDate: '', endDate: '', anonymousFlag: 0, scoreEnabled: 0, totalScore: undefined, description: '' })
+    Object.assign(form, {
+      id: undefined,
+      templateCode: '',
+      templateName: '',
+      targetType: 'ELDER',
+      status: 0,
+      startDate: undefined,
+      endDate: undefined,
+      anonymousFlag: 0,
+      scoreEnabled: 0,
+      totalScore: undefined,
+      description: '',
+      content: ''
+    })
   }
   open.value = true
+}
+
+function buildPayload() {
+  return {
+    ...form,
+    startDate: form.startDate || undefined,
+    endDate: form.endDate || undefined,
+    templateCode: String(form.templateCode || '').trim(),
+    templateName: String(form.templateName || '').trim(),
+    description: form.description ? String(form.description).trim() : undefined,
+    content: form.content ? String(form.content).trim() : undefined
+  }
+}
+
+function onScoreEnabledChange(enabled: boolean | string | number) {
+  if (Number(enabled) !== 1) {
+    form.totalScore = undefined
+  }
 }
 
 async function submit() {
@@ -364,10 +434,11 @@ async function submit() {
   try {
     await formRef.value.validate()
     submitting.value = true
+    const payload = buildPayload()
     if (form.id) {
-      await updateSurveyTemplate(form.id, form)
+      await updateSurveyTemplate(form.id, payload)
     } else {
-      await createSurveyTemplate(form)
+      await createSurveyTemplate(payload)
     }
     message.success('保存成功')
     open.value = false
@@ -393,15 +464,7 @@ async function remove(id: string | number) {
 
 async function quickPublish(row: SurveyTemplate) {
   try {
-    const detail = await getSurveyTemplateDetail(row.id)
-    if (!detail.questions?.length) {
-      message.warning('请先配置题目后再发布')
-      return
-    }
-    await updateSurveyTemplate(row.id, {
-      ...row,
-      status: 1
-    })
+    await publishSurveyTemplate(row.id)
     message.success('模板已发布')
     await fetchData()
   } catch (error: any) {
@@ -411,10 +474,7 @@ async function quickPublish(row: SurveyTemplate) {
 
 async function quickDisable(row: SurveyTemplate) {
   try {
-    await updateSurveyTemplate(row.id, {
-      ...row,
-      status: 2
-    })
+    await disableSurveyTemplate(row.id)
     message.success('模板已停用')
     await fetchData()
   } catch (error: any) {
@@ -446,6 +506,27 @@ async function openQrSelected() {
   const record = requireSingleSelection('查看二维码')
   if (!record) return
   await openQr(record)
+}
+
+function openFamilyPreviewSelected() {
+  const record = requireSingleSelection('家属端预览')
+  if (!record) return
+  const link = `${window.location.origin}/#/survey/submit?templateId=${encodeURIComponent(String(record.id))}&templateCode=${encodeURIComponent(String(record.templateCode || ''))}&targetType=${encodeURIComponent(String(record.targetType || 'FAMILY'))}&anonymous=${encodeURIComponent(String(record.anonymousFlag ?? 1))}&from=preview`
+  window.open(link, '_blank')
+}
+
+function openStatsSelected() {
+  const record = requireSingleSelection('查看统计')
+  if (!record) return
+  const link = `${window.location.origin}/#/survey/stats?templateId=${encodeURIComponent(String(record.id))}`
+  window.open(link, '_blank')
+}
+
+function openPerformanceSelected() {
+  const record = requireSingleSelection('查看绩效榜')
+  if (!record) return
+  const link = `${window.location.origin}/#/survey/performance?templateId=${encodeURIComponent(String(record.id))}`
+  window.open(link, '_blank')
 }
 
 async function publishSelected() {
@@ -482,23 +563,28 @@ async function batchPublish() {
     return
   }
   let successCount = 0
+  let failedCount = 0
+  let firstError = ''
   for (const record of validRecords) {
     try {
-      const detail = await getSurveyTemplateDetail(String(record.id))
-      if (!detail.questions?.length) {
-        continue
-      }
-      await updateSurveyTemplate(String(record.id), { ...record, status: 1 })
+      await publishSurveyTemplate(String(record.id))
       successCount += 1
-    } catch {
-      // ignore single failure
+    } catch (error: any) {
+      failedCount += 1
+      if (!firstError) {
+        firstError = error?.message || ''
+      }
     }
   }
   if (successCount === 0) {
-    message.warning('批量发布未成功：请确认模板已配置题目')
+    message.warning(firstError || '批量发布未成功：请确认模板已配置题目且日期有效')
     return
   }
-  message.success(`批量发布完成，共处理 ${successCount} 条`)
+  if (failedCount > 0) {
+    message.warning(`批量发布完成：成功 ${successCount} 条，失败 ${failedCount} 条${firstError ? `（${firstError}）` : ''}`)
+  } else {
+    message.success(`批量发布完成，共处理 ${successCount} 条`)
+  }
   await fetchData()
 }
 
@@ -509,8 +595,14 @@ async function batchDisable() {
     message.info('勾选项中没有可停用模板')
     return
   }
-  await Promise.all(validRecords.map((item) => updateSurveyTemplate(String(item.id), { ...item, status: 2 })))
-  message.success(`批量停用完成，共处理 ${validRecords.length} 条`)
+  const settled = await Promise.allSettled(validRecords.map((item) => disableSurveyTemplate(String(item.id))))
+  const successCount = settled.filter((item) => item.status === 'fulfilled').length
+  const failedCount = settled.length - successCount
+  if (failedCount > 0) {
+    message.warning(`批量停用完成：成功 ${successCount} 条，失败 ${failedCount} 条`)
+  } else {
+    message.success(`批量停用完成，共处理 ${successCount} 条`)
+  }
   await fetchData()
 }
 
@@ -520,16 +612,32 @@ async function batchRemove() {
     title: '提示',
     content: `确认删除选中的 ${selectedRecords.value.length} 条模板吗？`,
     async onOk() {
-      await Promise.all(selectedRecords.value.map((item) => deleteSurveyTemplate(String(item.id))))
-      message.success(`批量删除完成，共处理 ${selectedRecords.value.length} 条`)
+      const settled = await Promise.allSettled(selectedRecords.value.map((item) => deleteSurveyTemplate(String(item.id))))
+      const successCount = settled.filter((item) => item.status === 'fulfilled').length
+      const failedCount = settled.length - successCount
+      if (failedCount > 0) {
+        message.warning(`批量删除完成：成功 ${successCount} 条，失败 ${failedCount} 条`)
+      } else {
+        message.success(`批量删除完成，共处理 ${successCount} 条`)
+      }
       await fetchData()
     }
   })
 }
 
 async function openQr(row: SurveyTemplate) {
+  const verify = await verifySurveyPublishedTemplate(row.id)
+  if (!verify.valid) {
+    message.warning(verify.message || '当前模板不可生成二维码')
+    return
+  }
+  const detail = await getSurveyTemplateDetail(row.id)
+  if (!detail.questions?.length) {
+    message.warning('模板未配置题目，二维码暂不可用')
+    return
+  }
   const base = `${window.location.origin}/#/survey/submit`
-  const link = `${base}?templateId=${encodeURIComponent(String(row.id))}&targetType=FAMILY&anonymous=1`
+  const link = `${base}?templateId=${encodeURIComponent(String(row.id))}&templateCode=${encodeURIComponent(String(row.templateCode || ''))}&targetType=${encodeURIComponent(String(row.targetType || 'FAMILY'))}&anonymous=${encodeURIComponent(String(row.anonymousFlag ?? 1))}&from=qr`
   qrLink.value = link
   qrOpen.value = true
   try {
@@ -613,7 +721,10 @@ async function saveQuestions() {
   }
 }
 
-onMounted(fetchData)
+onMounted(async () => {
+  initByQuery()
+  await fetchData()
+})
 </script>
 
 <style scoped>
@@ -624,6 +735,11 @@ onMounted(fetchData)
   display: flex;
   justify-content: space-between;
   margin-bottom: 12px;
+}
+.publish-tip {
+  margin-bottom: 10px;
+  color: rgba(0, 0, 0, 0.65);
+  font-size: 12px;
 }
 .selection-tip {
   color: rgba(0, 0, 0, 0.45);

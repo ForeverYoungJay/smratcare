@@ -8,6 +8,7 @@ import type {
   ElderDiseaseUpdateRequest,
   ElderDiseaseItem,
   FamilyBindRequest,
+  UploadedFileResult,
   Id
 } from '../types'
 
@@ -48,4 +49,13 @@ export function updateElderDiseases(elderId: Id, diseaseIds: number[]) {
 
 export function bindFamily(data: FamilyBindRequest) {
   return request.post<void>('/api/family/bindElder', data)
+}
+
+export function uploadElderFile(file: File, bizType = 'elder-archive') {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('bizType', bizType)
+  return request.post<UploadedFileResult>('/api/files/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
 }

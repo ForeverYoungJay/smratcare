@@ -12,4 +12,5 @@ public class OaApprovalSummaryResponse {
   private long leavePendingCount;
   private long reimbursePendingCount;
   private long purchasePendingCount;
+  private long marketingPlanPendingCount;
 }

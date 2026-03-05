@@ -77,9 +77,11 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { getMedicalHealthCenterSummary } from '../../api/medicalCare'
 import type { MedicalCareWorkbenchSummary } from '../../types'
+import { resolveMedicalError } from './medicalError'
 
 const router = useRouter()
 const route = useRoute()
@@ -158,10 +160,14 @@ function go(path: string) {
 }
 
 async function loadSummary() {
-  const data = await getMedicalHealthCenterSummary({
-    elderId: route.query.elderId ? Number(route.query.elderId) : route.query.residentId ? Number(route.query.residentId) : undefined
-  })
-  Object.assign(summary, data || {})
+  try {
+    const data = await getMedicalHealthCenterSummary({
+      elderId: route.query.elderId ? Number(route.query.elderId) : route.query.residentId ? Number(route.query.residentId) : undefined
+    })
+    Object.assign(summary, data || {})
+  } catch (error) {
+    message.error(resolveMedicalError(error, '加载护理与质量中心失败'))
+  }
 }
 
 onMounted(loadSummary)

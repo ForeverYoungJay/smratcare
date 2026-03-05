@@ -39,13 +39,21 @@
         style="margin-top: 8px"
         message="当前通过家属端二维码进入，模板与对象已自动锁定。"
       />
+      <a-alert
+        v-if="verifyMessage"
+        :type="verifyValid ? 'success' : 'warning'"
+        show-icon
+        style="margin-top: 8px"
+        :message="verifyMessage"
+        :description="!verifyValid && fromQr ? '当前链接可能已过期或参数异常，请返回重新扫码进入。' : undefined"
+      />
     </a-card>
 
     <a-card v-if="detail" class="card-elevated" :bordered="false" style="margin-top: 16px;">
       <div class="template-header">
         <div>
           <div class="template-title">{{ detail.templateName }}</div>
-          <div class="template-desc">{{ detail.description || '暂无描述' }}</div>
+          <div class="template-desc">{{ detail.content || detail.description || '暂无描述' }}</div>
         </div>
         <a-tag :color="detail.scoreEnabled === 1 ? 'green' : 'default'">
           {{ detail.scoreEnabled === 1 ? '计分问卷' : '非计分问卷' }}
@@ -111,7 +119,7 @@
       </a-form>
 
       <div class="actions">
-        <a-button type="primary" :loading="submitting" @click="submit">提交问卷</a-button>
+        <a-button type="primary" :loading="submitting" :disabled="!verifyValid" @click="submit">提交问卷</a-button>
       </div>
     </a-card>
   </PageContainer>
@@ -125,6 +133,7 @@ import PageContainer from '../../components/PageContainer.vue'
 import {
   getSurveyPublishedTemplateDetail,
   getSurveyPublishedTemplatePage,
+  verifySurveyPublishedTemplate,
   submitSurvey
 } from '../../api/survey'
 import type { SurveyTemplate, SurveyTemplateDetail, SurveySubmissionRequest, SurveySubmissionAnswerItem, PageResult } from '../../types'
@@ -134,6 +143,9 @@ const templates = ref<SurveyTemplate[]>([])
 const detail = ref<SurveyTemplateDetail | null>(null)
 const submitting = ref(false)
 const fromQr = ref(false)
+const verifyValid = ref(true)
+const verifyMessage = ref('')
+const templateCodeFromQr = ref<string | undefined>()
 
 const form = reactive({
   templateId: undefined as string | undefined,
@@ -175,6 +187,7 @@ function normalizeTargetType(value: unknown) {
 
 async function initByQuery() {
   const templateId = normalizeId(route.query.templateId)
+  const templateCode = normalizeId(route.query.templateCode)
   const targetType = normalizeTargetType(route.query.targetType)
   const anonymous = String(route.query.anonymous || '').trim()
   const targetId = normalizeId(route.query.targetId)
@@ -198,19 +211,45 @@ async function initByQuery() {
   }
   if (templateId) {
     form.templateId = templateId
+    templateCodeFromQr.value = templateCode
     fromQr.value = true
     await onTemplateChange()
   }
 }
 
+async function verifyCurrentTemplate() {
+  if (!form.templateId) {
+    verifyValid.value = false
+    verifyMessage.value = '请选择模板'
+    return false
+  }
+  const verify = await verifySurveyPublishedTemplate(form.templateId, {
+    templateCode: templateCodeFromQr.value,
+    targetType: form.targetType
+  })
+  verifyValid.value = !!verify.valid
+  verifyMessage.value = verify.message || ''
+  return verifyValid.value
+}
+
 async function onTemplateChange() {
   if (!form.templateId) return
   try {
+    const valid = await verifyCurrentTemplate()
+    if (!valid) {
+      detail.value = null
+      return
+    }
     detail.value = await getSurveyPublishedTemplateDetail(form.templateId)
+    if (detail.value?.targetType) {
+      form.targetType = detail.value.targetType
+    }
     Object.keys(answers).forEach((key) => delete answers[key])
     Object.keys(scores).forEach((key) => delete scores[key])
   } catch (error: any) {
     detail.value = null
+    verifyValid.value = false
+    verifyMessage.value = ''
     message.error(error?.message || '模板加载失败')
   }
 }
@@ -279,11 +318,17 @@ function validateRequired(): boolean {
 
 async function submit() {
   if (!detail.value || !form.templateId) return
+  const valid = await verifyCurrentTemplate()
+  if (!valid) {
+    message.warning(verifyMessage.value || '问卷当前不可提交')
+    return
+  }
   if (!validateRequired()) return
   submitting.value = true
   try {
     const payload: SurveySubmissionRequest = {
       templateId: form.templateId,
+      templateCode: templateCodeFromQr.value || detail.value.templateCode,
       targetType: form.targetType,
       targetId: normalizeId(form.targetId),
       relatedStaffId: normalizeId(form.relatedStaffId),

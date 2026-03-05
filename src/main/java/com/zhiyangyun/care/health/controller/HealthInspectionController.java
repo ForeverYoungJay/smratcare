@@ -125,20 +125,27 @@ public class HealthInspectionController {
 
   @PostMapping
   public Result<HealthInspection> create(@Valid @RequestBody HealthInspectionRequest request) {
+    String resolvedStatus = resolveInspectionStatus(request.getStatus(), request.getResult());
+    String followUpAction = normalizeText(request.getFollowUpAction());
+    if ("ABNORMAL".equals(resolvedStatus) && (followUpAction == null || followUpAction.isBlank())) {
+      return Result.error(400, "异常巡检必须填写跟进措施");
+    }
     Long orgId = AuthContext.getOrgId();
     Long elderId = elderResolveSupport.resolveElderId(orgId, request.getElderId(), request.getElderName());
     HealthInspection item = new HealthInspection();
     item.setTenantId(orgId);
     item.setOrgId(orgId);
     item.setElderId(elderId);
-    item.setElderName(elderResolveSupport.resolveElderName(elderId, request.getElderName()));
+    item.setElderName(elderResolveSupport.resolveElderName(elderId, normalizeText(request.getElderName())));
     item.setInspectionDate(request.getInspectionDate());
-    item.setInspectionItem(request.getInspectionItem());
-    item.setResult(request.getResult());
-    item.setStatus(resolveInspectionStatus(request.getStatus(), request.getResult()));
-    item.setInspectorName(request.getInspectorName());
-    item.setFollowUpAction(request.getFollowUpAction());
-    item.setRemark(request.getRemark());
+    item.setInspectionItem(normalizeText(request.getInspectionItem()));
+    item.setResult(normalizeText(request.getResult()));
+    item.setStatus(resolvedStatus);
+    item.setInspectorName(normalizeText(request.getInspectorName()));
+    item.setFollowUpAction(followUpAction);
+    item.setAttachmentUrls(normalizeText(request.getAttachmentUrls()));
+    item.setOtherNote(normalizeText(request.getOtherNote()));
+    item.setRemark(normalizeText(request.getRemark()));
     item.setCreatedBy(AuthContext.getStaffId());
     mapper.insert(item);
     inspectionClosureService.syncFromInspection(item, AuthContext.getStaffId());
@@ -153,16 +160,23 @@ public class HealthInspectionController {
         || orgId != null && !orgId.equals(item.getOrgId())) {
       return Result.ok(null);
     }
+    String resolvedStatus = resolveInspectionStatus(request.getStatus(), request.getResult());
+    String followUpAction = normalizeText(request.getFollowUpAction());
+    if ("ABNORMAL".equals(resolvedStatus) && (followUpAction == null || followUpAction.isBlank())) {
+      return Result.error(400, "异常巡检必须填写跟进措施");
+    }
     Long elderId = elderResolveSupport.resolveElderId(orgId, request.getElderId(), request.getElderName());
     item.setElderId(elderId);
-    item.setElderName(elderResolveSupport.resolveElderName(elderId, request.getElderName()));
+    item.setElderName(elderResolveSupport.resolveElderName(elderId, normalizeText(request.getElderName())));
     item.setInspectionDate(request.getInspectionDate());
-    item.setInspectionItem(request.getInspectionItem());
-    item.setResult(request.getResult());
-    item.setStatus(resolveInspectionStatus(request.getStatus(), request.getResult()));
-    item.setInspectorName(request.getInspectorName());
-    item.setFollowUpAction(request.getFollowUpAction());
-    item.setRemark(request.getRemark());
+    item.setInspectionItem(normalizeText(request.getInspectionItem()));
+    item.setResult(normalizeText(request.getResult()));
+    item.setStatus(resolvedStatus);
+    item.setInspectorName(normalizeText(request.getInspectorName()));
+    item.setFollowUpAction(followUpAction);
+    item.setAttachmentUrls(normalizeText(request.getAttachmentUrls()));
+    item.setOtherNote(normalizeText(request.getOtherNote()));
+    item.setRemark(normalizeText(request.getRemark()));
     mapper.updateById(item);
     inspectionClosureService.syncFromInspection(item, AuthContext.getStaffId());
     return Result.ok(item);
@@ -199,7 +213,9 @@ public class HealthInspectionController {
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(HealthInspection::getElderName, keyword)
           .or().like(HealthInspection::getInspectionItem, keyword)
-          .or().like(HealthInspection::getInspectorName, keyword));
+          .or().like(HealthInspection::getInspectorName, keyword)
+          .or().like(HealthInspection::getOtherNote, keyword)
+          .or().like(HealthInspection::getFollowUpAction, keyword));
     }
     return wrapper;
   }
@@ -234,6 +250,14 @@ public class HealthInspectionController {
       return "UNKNOWN";
     }
     return status.toUpperCase(Locale.ROOT);
+  }
+
+  private String normalizeText(String value) {
+    if (value == null) {
+      return null;
+    }
+    String trimmed = value.trim();
+    return trimmed.isEmpty() ? null : trimmed;
   }
 
   private Long toLong(Object value) {

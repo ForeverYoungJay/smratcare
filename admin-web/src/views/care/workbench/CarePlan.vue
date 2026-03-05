@@ -48,6 +48,7 @@ import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
 import { getCareLevelList, getServicePlanPage } from '../../../api/nursing'
 import type { CareLevelItem, ServicePlanItem } from '../../../types'
+import { resolveCareError } from '../careError'
 
 const route = useRoute()
 const router = useRouter()
@@ -72,7 +73,18 @@ const columns = [
 ]
 
 function go(path: string) {
-  router.push(path)
+  const [pathname, search] = path.split('?')
+  const parsed = new URLSearchParams(search || '')
+  const query: Record<string, any> = {}
+  parsed.forEach((value, key) => {
+    query[key] = value
+  })
+  const resident = route.query.residentId ?? route.query.elderId
+  if (resident != null && query.residentId == null && query.elderId == null) {
+    query.residentId = resident
+    query.elderId = resident
+  }
+  router.push({ path: pathname, query })
 }
 
 async function loadPlans() {
@@ -81,8 +93,8 @@ async function loadPlans() {
   try {
     const page = await getServicePlanPage({ pageNo: 1, pageSize: 50, elderId: residentId.value })
     plans.value = page.list || []
-  } catch (error: any) {
-    planError.value = error?.message || '加载服务计划失败'
+  } catch (error) {
+    planError.value = resolveCareError(error, '加载服务计划失败')
     message.error(planError.value)
   } finally {
     loadingPlans.value = false
@@ -94,8 +106,8 @@ async function loadLevels() {
   levelError.value = ''
   try {
     careLevels.value = await getCareLevelList({ enabled: 1 })
-  } catch (error: any) {
-    levelError.value = error?.message || '加载护理等级失败'
+  } catch (error) {
+    levelError.value = resolveCareError(error, '加载护理等级失败')
     message.error(levelError.value)
   } finally {
     loadingLevels.value = false

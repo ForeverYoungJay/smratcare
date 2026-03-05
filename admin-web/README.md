@@ -21,7 +21,7 @@ docker build -t smartcare-admin:local ./admin-web
 
 单独运行（需可访问后端 `backend:8080`）：
 ```bash
-docker run --rm -p 5173:80 smartcare-admin:local
+docker run --rm -p 80:80 smartcare-admin:local
 ```
 
 说明：
@@ -34,3 +34,4 @@ docker run --rm -p 5173:80 smartcare-admin:local
 - 家属登录接口：`POST /api/auth/family/login`（后端字段：`orgId`、`phone`、`verifyCode`）
 - Token 保存在 localStorage，并由 Axios 请求拦截器自动携带
 - 401 自动跳转登录页
+- 企业首页配置文件：`src/constants/enterpriseProfile.ts`（机构名称、服务、联系方式等可直接修改）

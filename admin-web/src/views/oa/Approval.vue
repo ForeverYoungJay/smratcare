@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="审批流程" subTitle="请假/加班/报销/采购/收入证明/物资申请/用章审批">
+  <PageContainer title="审批流程" subTitle="请假/加班/报销/采购/收入证明/物资申请/用章审批/营销方案审批">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="标题/申请人/备注" allow-clear style="width: 240px" />
@@ -8,20 +8,37 @@
         <a-select v-model:value="query.type" :options="typeOptions" allow-clear style="width: 160px" />
       </a-form-item>
       <a-form-item label="状态">
-        <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 160px" />
+        <a-select
+          v-model:value="query.status"
+          :options="statusOptions"
+          :disabled="isStatusLocked"
+          :placeholder="statusSelectPlaceholder"
+          allow-clear
+          style="width: 160px"
+        />
+      </a-form-item>
+      <a-form-item label="视角">
+        <a-radio-group v-model:value="approvalScope" button-style="solid" size="small">
+          <a-radio-button value="MY">我的申请</a-radio-button>
+          <a-radio-button v-if="canApproveFlow" value="PENDING_REVIEW">待我审批</a-radio-button>
+          <a-radio-button v-if="canApproveFlow" value="ALL">全部审批</a-radio-button>
+        </a-radio-group>
+      </a-form-item>
+      <a-form-item label="自动刷新">
+        <a-switch v-model:checked="autoRefresh" />
       </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openCreate">新增审批</a-button>
         <a-button :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="editSelected">编辑</a-button>
-        <a-button :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="approveSelected">通过</a-button>
-        <a-button :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="rejectSelected">驳回</a-button>
+        <a-button v-if="canApproveFlow" :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="approveSelected">同意</a-button>
+        <a-button v-if="canApproveFlow" :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="rejectSelected">驳回</a-button>
         <a-button :disabled="!selectedSingleRecord || !isSelectedSingleRejected" @click="resubmitSelected">驳回后重提</a-button>
         <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
-        <a-button :disabled="selectedPendingCount === 0" @click="batchApprove">批量通过</a-button>
-        <a-button :disabled="selectedPendingCount === 0" @click="batchReject">批量驳回</a-button>
+        <a-button v-if="canApproveFlow" :disabled="selectedPendingCount === 0" @click="batchApprove">批量同意</a-button>
+        <a-button v-if="canApproveFlow" :disabled="selectedPendingCount === 0" @click="batchReject">批量驳回</a-button>
         <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
         <a-button @click="downloadExport">导出CSV</a-button>
-        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条，批量审批仅对“待审批”生效</span>
+        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条，{{ canApproveFlow ? '批量审批仅对“待审批”生效' : '当前账号仅可发起/编辑本人申请' }}</span>
       </template>
     </SearchForm>
 
@@ -35,6 +52,7 @@
         <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="请假待审" :value="summary.leavePendingCount || 0" /></a-card></a-col>
         <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="报销待审" :value="summary.reimbursePendingCount || 0" /></a-card></a-col>
         <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="采购待审" :value="summary.purchasePendingCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="营销待审" :value="summary.marketingPlanPendingCount || 0" /></a-card></a-col>
       </a-row>
       <a-alert
         v-if="(summary.timeoutPendingCount || 0) > 0"
@@ -56,10 +74,28 @@
         @change="handleTableChange"
       >
         <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'status'">
+          <template v-if="column.key === 'approvalType'">
+            {{ typeLabel(record.approvalType) }}
+          </template>
+          <template v-else-if="column.key === 'status'">
             <a-tag :color="record.status === 'APPROVED' ? 'green' : record.status === 'REJECTED' ? 'red' : 'orange'">
               {{ statusLabel(record.status) }}
             </a-tag>
+          </template>
+          <template v-else-if="column.key === 'approvalOpinion'">
+            {{ approvalOpinion(record) }}
+          </template>
+          <template v-else-if="column.key === 'annualLeaveCount'">
+            {{ record.approvalType === 'LEAVE' && record.status === 'APPROVED' ? annualLeaveCount(record) : '-' }}
+          </template>
+          <template v-else-if="column.key === 'actions'">
+            <a-space size="small">
+              <a v-if="canEditRecord(record)" @click="openEdit(record)">编辑</a>
+              <a v-if="canApproveRecord(record)" @click="approve(record)">同意</a>
+              <a v-if="canApproveRecord(record)" @click="reject(record)">驳回</a>
+              <a v-if="canResubmitRecord(record)" @click="resubmit(record)">重提</a>
+              <a v-if="canDeleteRecord(record)" @click="remove(record)">删除</a>
+            </a-space>
           </template>
         </template>
       </DataTable>
@@ -74,7 +110,7 @@
           <a-input v-model:value="form.title" />
         </a-form-item>
         <a-form-item label="申请人" required>
-          <a-input v-model:value="form.applicantName" />
+          <a-input v-model:value="form.applicantName" :disabled="!canApproveFlow" />
         </a-form-item>
         <a-row :gutter="16">
           <a-col :span="12">
@@ -328,7 +364,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
@@ -369,6 +405,10 @@ const query = reactive({
   pageNo: 1,
   pageSize: 10
 })
+const approvalScope = ref<'MY' | 'PENDING_REVIEW' | 'ALL'>('MY')
+const autoRefresh = ref(true)
+let autoRefreshTimer: number | undefined
+const AUTO_REFRESH_INTERVAL_MS = 60 * 1000
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const selectedRowKeys = ref<string[]>([])
 const summary = reactive<OaApprovalSummary>({
@@ -387,7 +427,10 @@ const columns = [
   { title: '标题', dataIndex: 'title', key: 'title', width: 200 },
   { title: '申请人', dataIndex: 'applicantName', key: 'applicantName', width: 120 },
   { title: '金额', dataIndex: 'amount', key: 'amount', width: 120 },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 100 }
+  { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
+  { title: '审批意见', key: 'approvalOpinion', width: 220 },
+  { title: '年度请假次数', key: 'annualLeaveCount', width: 130 },
+  { title: '操作', key: 'actions', width: 260 }
 ]
 
 const editOpen = ref(false)
@@ -437,13 +480,16 @@ const typeOptions = [
   { label: '银行卡申请', value: 'BANK_CARD' },
   { label: '积分兑现金', value: 'POINTS_CASH' },
   { label: '物资申领', value: 'MATERIAL_APPLY' },
-  { label: '用章申请', value: 'OFFICIAL_SEAL' }
+  { label: '用章申请', value: 'OFFICIAL_SEAL' },
+  { label: '营销方案审批', value: 'MARKETING_PLAN' }
 ]
 const statusOptions = [
   { label: '待审批', value: 'PENDING' },
   { label: '已通过', value: 'APPROVED' },
   { label: '已驳回', value: 'REJECTED' }
 ]
+const isStatusLocked = computed(() => approvalScope.value === 'PENDING_REVIEW')
+const statusSelectPlaceholder = computed(() => (isStatusLocked.value ? '待我审批视角固定为待审批' : '请选择状态'))
 const editableStatusOptions = [{ label: '待审批', value: 'PENDING' }]
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
@@ -459,6 +505,15 @@ const selectedPendingCount = computed(() => selectedRecords.value.filter((item) 
 const selectedPendingIds = computed(() =>
   selectedRecords.value.filter((item) => item.status === 'PENDING').map((item) => String(item.id))
 )
+const canApproveFlow = computed(() => {
+  const roles = (userStore.roles || []).map((item) => String(item || '').toUpperCase())
+  return roles.includes('ADMIN')
+    || roles.includes('DEPT_LEADER')
+    || roles.includes('LEADER')
+    || roles.includes('MANAGER')
+    || roles.includes('SUPERVISOR')
+    || roles.includes('DIRECTOR')
+})
 
 const workflowStepsMap: Record<string, string[]> = {
   LEAVE: ['员工发起申请', '部门主管审批', '人事确认', '必要时院长审批', '自动归档'],
@@ -469,7 +524,8 @@ const workflowStepsMap: Record<string, string[]> = {
   INCOME_PROOF: ['员工申请', '人事审核', '财务确认收入', '行政盖章', '归档'],
   BANK_CARD: ['员工申请', '人事审核', '财务确认收入', '行政盖章', '归档'],
   POINTS_CASH: ['员工申请', '院长审批', '自动扣减积分', '财务发放现金', '归档'],
-  OFFICIAL_SEAL: ['申请人提交', '行政审核', '院长审批', '盖章归档']
+  OFFICIAL_SEAL: ['申请人提交', '行政审核', '院长审批', '盖章归档'],
+  MARKETING_PLAN: ['营销经理提交方案', '院长审批', '审批意见回写方案', '发布执行']
 }
 const workflowHintMap: Record<string, string> = {
   LEAVE: '请假时间系统自动计算，超过3天会自动追加院长审批提醒。',
@@ -480,7 +536,8 @@ const workflowHintMap: Record<string, string> = {
   INCOME_PROOF: '系统应自动生成标准模板并记录证明编号，电子归档至人事档案。',
   BANK_CARD: '银行卡办理同收入证明流程，支持追加辅助证明材料。',
   POINTS_CASH: '按 300 积分 = 10 元自动换算，审批通过后自动扣减积分余额。',
-  OFFICIAL_SEAL: '请明确用途、对象、时间，避免跨用途盖章风险。'
+  OFFICIAL_SEAL: '请明确用途、对象、时间，避免跨用途盖章风险。',
+  MARKETING_PLAN: '营销方案提交后会同步到营销管理的审批状态，并支持发布/驳回意见联动。'
 }
 const workflowSteps = computed(() => workflowStepsMap[form.approvalType] || ['申请', '审批', '归档'])
 const workflowTitle = computed(() => {
@@ -502,17 +559,26 @@ function statusLabel(status?: string) {
   return '待审批'
 }
 
+function typeLabel(type?: string) {
+  const value = String(type || '').toUpperCase()
+  const option = typeOptions.find((item) => item.value === value)
+  return option?.label || type || '-'
+}
+
 async function fetchData() {
   loading.value = true
   summaryLoading.value = true
   tableError.value = ''
   summaryError.value = ''
   try {
+    const applicantId = resolveApplicantIdParam()
+    const effectiveStatus = approvalScope.value === 'PENDING_REVIEW' ? 'PENDING' : query.status
     const params = {
       pageNo: query.pageNo,
       pageSize: query.pageSize,
-      status: query.status,
+      status: effectiveStatus,
       type: query.type,
+      applicantId,
       keyword: query.keyword || undefined
     }
     const [res, sum] = await Promise.all([
@@ -550,7 +616,36 @@ function onReset() {
   query.type = undefined
   query.pageNo = 1
   pagination.current = 1
+  approvalScope.value = canApproveFlow.value ? 'ALL' : 'MY'
   fetchData()
+}
+
+function stopAutoRefreshTimer() {
+  if (autoRefreshTimer !== undefined) {
+    window.clearInterval(autoRefreshTimer)
+    autoRefreshTimer = undefined
+  }
+}
+
+function startAutoRefreshTimer() {
+  if (!autoRefresh.value || autoRefreshTimer !== undefined) {
+    return
+  }
+  autoRefreshTimer = window.setInterval(() => {
+    if (loading.value || summaryLoading.value) return
+    fetchData()
+  }, AUTO_REFRESH_INTERVAL_MS)
+}
+
+function resolveApplicantIdParam() {
+  const myId = userStore.staffInfo?.id
+  if (!canApproveFlow.value) {
+    return myId
+  }
+  if (approvalScope.value === 'MY') {
+    return myId
+  }
+  return undefined
 }
 
 function resetWorkflowForm() {
@@ -580,6 +675,38 @@ function parseFormData(raw?: string) {
   } catch {
     return {}
   }
+}
+
+function approvalOpinion(record: OaApproval) {
+  const parsed = parseFormData(record.formData)
+  return parsed?.lastApprovalRemark || record.remark || '-'
+}
+
+function annualLeaveCount(record: OaApproval) {
+  const parsed = parseFormData(record.formData)
+  const count = Number(parsed?.annualLeaveApprovedCount || 0)
+  return Number.isFinite(count) && count > 0 ? count : '-'
+}
+
+function canEditRecord(record: OaApproval) {
+  if (record.status !== 'PENDING') return false
+  if (canApproveFlow.value) return true
+  return String(record.applicantId || '') === String(userStore.staffInfo?.id || '')
+}
+
+function canDeleteRecord(record: OaApproval) {
+  if (canApproveFlow.value) return true
+  return String(record.applicantId || '') === String(userStore.staffInfo?.id || '')
+}
+
+function canApproveRecord(record: OaApproval) {
+  return canApproveFlow.value && record.status === 'PENDING'
+}
+
+function canResubmitRecord(record: OaApproval) {
+  if (record.status !== 'REJECTED') return false
+  if (canApproveFlow.value) return true
+  return String(record.applicantId || '') === String(userStore.staffInfo?.id || '')
 }
 
 function applyWorkflowData(parsed: Record<string, any>) {
@@ -710,8 +837,8 @@ async function submit() {
   const payload = {
     approvalType: form.approvalType,
     title: form.title,
-    applicantId: userStore.staffInfo?.id,
-    applicantName: form.applicantName,
+    applicantId: canApproveFlow.value ? undefined : userStore.staffInfo?.id,
+    applicantName: canApproveFlow.value ? form.applicantName : (userStore.staffInfo?.realName || form.applicantName),
     amount: form.approvalType === 'POINTS_CASH' ? redeemCash.value : form.amount,
     startTime: form.startTime ? dayjs(form.startTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
     endTime: form.endTime ? dayjs(form.endTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
@@ -788,8 +915,10 @@ function openPolicy(path: string) {
 
 async function approve(record: OaApproval) {
   if (record.status !== 'PENDING') return
+  const remark = window.prompt('请输入审批意见', '同意')
+  if (remark === null) return
   try {
-    await approveApproval(String(record.id))
+    await approveApproval(String(record.id), remark || undefined)
     message.success('审批已通过')
     await fetchData()
   } catch (error: any) {
@@ -835,6 +964,10 @@ function editSelected() {
     message.warning('仅待审批状态可编辑')
     return
   }
+  if (!canApproveFlow.value && String(record.applicantId || '') !== String(userStore.staffInfo?.id || '')) {
+    message.warning('仅可编辑本人申请')
+    return
+  }
   openEdit(record)
 }
 
@@ -863,10 +996,18 @@ function resubmitSelected() {
 async function removeSelected() {
   const record = requireSingleSelection('删除')
   if (!record) return
+  if (!canApproveFlow.value && String(record.applicantId || '') !== String(userStore.staffInfo?.id || '')) {
+    message.warning('仅可删除本人申请')
+    return
+  }
   await remove(record)
 }
 
 async function batchApprove() {
+  if (!canApproveFlow.value) {
+    message.warning('仅管理者可执行审批')
+    return
+  }
   if (selectedPendingIds.value.length === 0) {
     message.info('勾选项中没有“待审批”记录')
     return
@@ -877,6 +1018,10 @@ async function batchApprove() {
 }
 
 async function batchReject() {
+  if (!canApproveFlow.value) {
+    message.warning('仅管理者可执行审批')
+    return
+  }
   if (selectedPendingIds.value.length === 0) {
     message.info('勾选项中没有“待审批”记录')
     return
@@ -896,10 +1041,13 @@ async function batchRemove() {
 }
 
 async function downloadExport() {
+  const applicantId = resolveApplicantIdParam()
+  const effectiveStatus = approvalScope.value === 'PENDING_REVIEW' ? 'PENDING' : query.status
   const blob = await exportApproval({
     keyword: query.keyword || undefined,
     type: query.type,
-    status: query.status
+    status: effectiveStatus,
+    applicantId
   })
   const href = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -911,18 +1059,51 @@ async function downloadExport() {
   URL.revokeObjectURL(href)
 }
 
-fetchData()
+watch(approvalScope, () => {
+  query.pageNo = 1
+  pagination.current = 1
+  if (approvalScope.value === 'PENDING_REVIEW') {
+    query.status = 'PENDING'
+  }
+  fetchData()
+})
+
+watch(autoRefresh, (enabled) => {
+  if (enabled) {
+    startAutoRefreshTimer()
+    return
+  }
+  stopAutoRefreshTimer()
+})
 
 onMounted(() => {
   const type = String(route.query.type || '').toUpperCase()
+  const status = String(route.query.status || '').toUpperCase()
   const quick = String(route.query.quick || '')
+  approvalScope.value = canApproveFlow.value ? 'ALL' : 'MY'
   if (type && typeOptions.some((item) => item.value === type)) {
     query.type = type
     form.approvalType = type
   }
+  if (status && statusOptions.some((item) => item.value === status)) {
+    query.status = status
+  }
+  if (route.query.my === '1') {
+    approvalScope.value = 'MY'
+  }
+  if (route.query.pending === '1' && canApproveFlow.value) {
+    approvalScope.value = 'PENDING_REVIEW'
+    query.status = 'PENDING'
+  }
+  fetchData()
+  startAutoRefreshTimer()
   if (quick === '1') {
     openCreate()
   }
+})
+
+onUnmounted(() => {
+  stopAutoRefreshTimer()
 })
 </script>
 

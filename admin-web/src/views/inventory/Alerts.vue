@@ -3,9 +3,14 @@
     <a-card class="card-elevated" :bordered="false">
       <a-space>
         <a-button @click="exportSuggestions">导出采购建议</a-button>
+        <a-button @click="exportPhotoIndex" :disabled="photoAttachments.length === 0">导出附件清单</a-button>
+        <a-button danger @click="clearPhotos" :disabled="photoAttachments.length === 0">清空附件</a-button>
         <a-button type="primary" @click="toBatchPurchase" :disabled="!lowRowsFiltered.length">低库存批量建采购单</a-button>
-        <a-upload :show-upload-list="false" :before-upload="beforeUploadPhoto">
-          <a-button :loading="uploading">上传库存拍照单品/合计图</a-button>
+        <a-upload :show-upload-list="false" :before-upload="beforeUploadItemPhoto">
+          <a-button :loading="uploadingItem">上传单品盘点图</a-button>
+        </a-upload>
+        <a-upload :show-upload-list="false" :before-upload="beforeUploadTotalPhoto">
+          <a-button :loading="uploadingTotal">上传合计数量图</a-button>
         </a-upload>
         <a-button @click="fetchAll">刷新</a-button>
       </a-space>
@@ -23,10 +28,22 @@
           <a-select v-model:value="filters.itemType" allow-clear style="width: 140px" :options="itemTypeOptions" />
         </a-form-item>
       </a-form>
-      <div v-if="photoAttachments.length" class="attach-list">
-        <div v-for="(item, idx) in photoAttachments" :key="`${item.url}-${idx}`" class="attach-item">
-          <a :href="item.url" target="_blank" rel="noopener noreferrer">{{ item.name }}</a>
-          <a-button type="link" danger size="small" @click="removePhoto(idx)">删除</a-button>
+      <div v-if="itemPhotoAttachments.length || totalPhotoAttachments.length" class="attach-list">
+        <div class="attach-title">单品盘点图片（{{ itemPhotoAttachments.length }}）</div>
+        <div v-for="(item, idx) in itemPhotoAttachments" :key="`item-${item.url}-${idx}`" class="attach-item">
+          <div class="attach-item-main">
+            <a :href="item.url" target="_blank" rel="noopener noreferrer">{{ item.name }}</a>
+            <span class="attach-time">{{ displayUploadedAt(item.uploadedAt) }}</span>
+          </div>
+          <a-button type="link" danger size="small" @click="removePhoto(item)">删除</a-button>
+        </div>
+        <div class="attach-title" style="margin-top: 8px">合计数量图片（{{ totalPhotoAttachments.length }}）</div>
+        <div v-for="(item, idx) in totalPhotoAttachments" :key="`total-${item.url}-${idx}`" class="attach-item">
+          <div class="attach-item-main">
+            <a :href="item.url" target="_blank" rel="noopener noreferrer">{{ item.name }}</a>
+            <span class="attach-time">{{ displayUploadedAt(item.uploadedAt) }}</span>
+          </div>
+          <a-button type="link" danger size="small" @click="removePhoto(item)">删除</a-button>
         </div>
       </div>
     </a-card>
@@ -66,7 +83,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
@@ -74,18 +92,21 @@ import { exportCsv } from '../../utils/export'
 import { getInventoryAlerts, getInventoryExpiryAlerts } from '../../api/materialCenter'
 import { getProductPage } from '../../api/store'
 import { uploadOaFile } from '../../api/oa'
+import { useUserStore } from '../../stores/user'
 import type { InventoryAlertItem, InventoryExpiryAlertItem, PageResult, ProductItem } from '../../types'
 
 const activeKey = ref('low')
 const router = useRouter()
 const route = useRoute()
+const userStore = useUserStore()
 const loading = ref(false)
-const uploading = ref(false)
+const uploadingItem = ref(false)
+const uploadingTotal = ref(false)
 const lowRows = ref<InventoryAlertItem[]>([])
 const expiryRows = ref<InventoryExpiryAlertItem[]>([])
 const products = ref<ProductItem[]>([])
-const photoAttachments = ref<Array<{ name: string; url: string }>>([])
-const attachmentStorageKey = 'inventory-alert-photo-attachments'
+type AlertPhotoAttachment = { name: string; url: string; photoType: 'ITEM' | 'TOTAL'; uploadedAt?: string }
+const photoAttachments = ref<AlertPhotoAttachment[]>([])
 const filters = reactive({
   businessDomain: undefined as string | undefined,
   itemType: undefined as string | undefined
@@ -125,6 +146,8 @@ const summaryStats = computed(() => {
   }
   return stats
 })
+const itemPhotoAttachments = computed(() => photoAttachments.value.filter((item) => item.photoType === 'ITEM'))
+const totalPhotoAttachments = computed(() => photoAttachments.value.filter((item) => item.photoType === 'TOTAL'))
 
 const lowColumns = [
   { title: '商品名称', dataIndex: 'productName' },
@@ -169,8 +192,14 @@ async function fetchAll() {
 }
 
 function exportSuggestions() {
+  const latestItemPhoto = itemPhotoAttachments.value[0]
+  const latestTotalPhoto = totalPhotoAttachments.value[0]
+  const exportTime = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  const exportBy = userStore.staffInfo?.realName || userStore.staffInfo?.username || '未知用户'
+  const exportDomain = domainLabel(filters.businessDomain)
+  const exportItemType = itemTypeLabel(filters.itemType)
   const data = [
-    ...lowRows.value.map((r) => ({
+    ...lowRowsFiltered.value.map((r) => ({
       类型: '低库存',
       商品名称: r.productName,
       商品ID: r.productId,
@@ -178,37 +207,97 @@ function exportSuggestions() {
       物资类型: itemTypeLabel(productById.value.get(Number(r.productId))?.itemType),
       安全库存: r.safetyStock,
       当前库存: r.currentStock,
-      建议采购数量: Math.max(Number(r.safetyStock || 0) - Number(r.currentStock || 0), 0)
+      建议采购数量: Math.max(Number(r.safetyStock || 0) - Number(r.currentStock || 0), 0),
+      单品盘点图数: itemPhotoAttachments.value.length,
+      合计数量图数: totalPhotoAttachments.value.length,
+      最新单品图: latestItemPhoto?.url || '',
+      最新合计图: latestTotalPhoto?.url || '',
+      导出业务域: exportDomain,
+      导出物资类型: exportItemType,
+      导出人: exportBy,
+      导出时间: exportTime
     })),
-    ...expiryRows.value.map((r) => ({
+    ...expiryRowsFiltered.value.map((r) => ({
       类型: '临期',
       商品名称: r.productName,
       批次号: r.batchNo,
       库存数量: r.quantity,
       有效期: r.expireDate,
-      距离到期: r.daysToExpire
+      距离到期: r.daysToExpire,
+      单品盘点图数: itemPhotoAttachments.value.length,
+      合计数量图数: totalPhotoAttachments.value.length,
+      最新单品图: latestItemPhoto?.url || '',
+      最新合计图: latestTotalPhoto?.url || '',
+      导出业务域: exportDomain,
+      导出物资类型: exportItemType,
+      导出人: exportBy,
+      导出时间: exportTime
     }))
   ]
-  exportCsv(data, '库存预警清单')
+  if (!data.length) {
+    message.warning('当前筛选条件下暂无可导出的采购建议')
+    return
+  }
+  exportCsv(data, '库存预警采购建议')
+  message.success(`已导出 ${data.length} 条采购建议`)
+}
+
+function exportPhotoIndex() {
+  if (!photoAttachments.value.length) {
+    message.warning('暂无可导出的图片附件')
+    return
+  }
+  exportCsv(
+    photoAttachments.value.map((item, index) => ({
+      序号: index + 1,
+      类型: item.photoType === 'TOTAL' ? '合计数量图' : '单品盘点图',
+      文件名: item.name,
+      链接: item.url,
+      上传时间: item.uploadedAt ? dayjs(item.uploadedAt).format('YYYY-MM-DD HH:mm:ss') : ''
+    })),
+    '库存预警-图片附件清单'
+  )
+  message.success(`已导出 ${photoAttachments.value.length} 条附件记录`)
 }
 
 function loadAttachments() {
+  const attachmentStorageKey = resolveAttachmentStorageKey()
   try {
     const cached = JSON.parse(localStorage.getItem(attachmentStorageKey) || '[]')
-    photoAttachments.value = Array.isArray(cached) ? cached.filter((item) => item?.url) : []
+    photoAttachments.value = Array.isArray(cached)
+      ? cached.filter((item) => item?.url).map((item) => ({
+          name: item.name,
+          url: item.url,
+          photoType: item.photoType === 'TOTAL' ? 'TOTAL' : 'ITEM',
+          uploadedAt: item.uploadedAt
+        }))
+      : []
   } catch {
     photoAttachments.value = []
   }
 }
 
 function saveAttachments() {
+  const attachmentStorageKey = resolveAttachmentStorageKey()
   localStorage.setItem(attachmentStorageKey, JSON.stringify(photoAttachments.value))
 }
 
-async function beforeUploadPhoto(file: File) {
-  uploading.value = true
+function resolveAttachmentStorageKey() {
+  const orgId = String(userStore.staffInfo?.orgId || 'unknown-org')
+  const staffId = String(userStore.staffInfo?.id || 'unknown-staff')
+  return `inventory-alert-photo-attachments:${orgId}:${staffId}`
+}
+
+async function uploadPhotoByType(file: File, photoType: 'ITEM' | 'TOTAL') {
+  const targetLoading = photoType === 'ITEM' ? uploadingItem : uploadingTotal
+  targetLoading.value = true
   try {
-    const uploaded = await uploadOaFile(file, 'inventory-alert-photo')
+    const sameTypeCount = photoAttachments.value.filter((item) => item.photoType === photoType).length
+    if (sameTypeCount >= 50) {
+      message.warning(`${photoType === 'ITEM' ? '单品盘点图' : '合计数量图'}最多保留 50 张，请先删除旧附件`)
+      return false
+    }
+    const uploaded = await uploadOaFile(file, photoType === 'ITEM' ? 'inventory-alert-photo-item' : 'inventory-alert-photo-total')
     const url = uploaded?.fileUrl || ''
     if (!url) {
       message.error('上传失败：未返回文件地址')
@@ -216,21 +305,42 @@ async function beforeUploadPhoto(file: File) {
     }
     photoAttachments.value.unshift({
       name: uploaded.originalFileName || uploaded.fileName || file.name,
-      url
+      url,
+      photoType,
+      uploadedAt: new Date().toISOString()
     })
     saveAttachments()
-    message.success('库存图片已上传')
+    message.success(photoType === 'ITEM' ? '单品盘点图片已上传' : '合计数量图片已上传')
   } catch (error: any) {
     message.error(error?.message || '上传失败')
   } finally {
-    uploading.value = false
+    targetLoading.value = false
   }
   return false
 }
 
-function removePhoto(index: number) {
-  photoAttachments.value.splice(index, 1)
+async function beforeUploadItemPhoto(file: File) {
+  return uploadPhotoByType(file, 'ITEM')
+}
+
+async function beforeUploadTotalPhoto(file: File) {
+  return uploadPhotoByType(file, 'TOTAL')
+}
+
+function removePhoto(target: AlertPhotoAttachment) {
+  photoAttachments.value = photoAttachments.value.filter((item) => item.url !== target.url || item.photoType !== target.photoType)
   saveAttachments()
+}
+
+function clearPhotos() {
+  photoAttachments.value = []
+  saveAttachments()
+  message.success('附件已清空')
+}
+
+function displayUploadedAt(uploadedAt?: string) {
+  if (!uploadedAt) return ''
+  return dayjs(uploadedAt).format('YYYY-MM-DD HH:mm:ss')
 }
 
 function suggestQty(record: InventoryAlertItem) {
@@ -315,6 +425,13 @@ onMounted(() => {
   fetchAll()
 })
 
+watch(
+  () => [userStore.staffInfo?.orgId, userStore.staffInfo?.id],
+  () => {
+    loadAttachments()
+  }
+)
+
 function matchProductFilters(productId: number) {
   const product = productById.value.get(productId)
   if (!product) return true
@@ -328,6 +445,7 @@ function matchProductFilters(productId: number) {
 }
 
 function domainLabel(value?: string) {
+  if (!value) return '全部'
   if (value === 'INTERNAL') return '企业内部'
   if (value === 'MALL') return '商城'
   if (value === 'BOTH') return '双用途'
@@ -335,6 +453,7 @@ function domainLabel(value?: string) {
 }
 
 function itemTypeLabel(value?: string) {
+  if (!value) return '全部'
   if (value === 'ASSET') return '固定资产'
   if (value === 'FOOD') return '食材'
   if (value === 'SERVICE') return '服务'
@@ -349,6 +468,10 @@ function itemTypeLabel(value?: string) {
   display: grid;
   gap: 6px;
 }
+.attach-title {
+  font-size: 12px;
+  color: #595959;
+}
 .attach-item {
   display: flex;
   align-items: center;
@@ -356,5 +479,14 @@ function itemTypeLabel(value?: string) {
   padding: 4px 8px;
   border: 1px solid #f0f0f0;
   border-radius: 6px;
+}
+.attach-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.attach-time {
+  font-size: 12px;
+  color: #8c8c8c;
 }
 </style>

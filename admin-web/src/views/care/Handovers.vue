@@ -102,12 +102,12 @@
           </a-col>
           <a-col :span="8">
             <a-form-item label="交班时间" name="handoverTime">
-              <a-date-picker v-model:value="form.handoverTime" show-time value-format="YYYY-MM-DD HH:mm:ss" style="width: 100%" />
+              <a-date-picker v-model:value="form.handoverTime" show-time value-format="YYYY-MM-DDTHH:mm:ss" style="width: 100%" />
             </a-form-item>
           </a-col>
           <a-col :span="8">
             <a-form-item label="确认时间" name="confirmTime">
-              <a-date-picker v-model:value="form.confirmTime" show-time value-format="YYYY-MM-DD HH:mm:ss" style="width: 100%" />
+              <a-date-picker v-model:value="form.confirmTime" show-time value-format="YYYY-MM-DDTHH:mm:ss" style="width: 100%" />
             </a-form-item>
           </a-col>
         </a-row>
@@ -124,6 +124,7 @@ import PageContainer from '../../components/PageContainer.vue'
 import { getStaffPage } from '../../api/rbac'
 import { createShiftHandover, deleteShiftHandover, getShiftHandoverPage, updateShiftHandover } from '../../api/nursing'
 import type { PageResult, ShiftHandoverItem, StaffItem } from '../../types'
+import { resolveCareError } from './careError'
 
 const rows = ref<ShiftHandoverItem[]>([])
 const loading = ref(false)
@@ -225,7 +226,11 @@ function resetForm() {
 function openModal(record?: ShiftHandoverItem) {
   resetForm()
   if (record) {
-    Object.assign(form, record)
+    Object.assign(form, {
+      ...record,
+      handoverTime: toIsoDateTime(record.handoverTime),
+      confirmTime: toIsoDateTime(record.confirmTime)
+    })
   }
   modalOpen.value = true
 }
@@ -252,8 +257,8 @@ async function submit() {
       riskNote: form.attentionNote || form.riskNote,
       todoNote: form.todoNote,
       status: form.status,
-      handoverTime: form.handoverTime,
-      confirmTime: form.confirmTime
+      handoverTime: toIsoDateTime(form.handoverTime),
+      confirmTime: toIsoDateTime(form.confirmTime)
     }
     if (form.id) {
       await updateShiftHandover(form.id, payload)
@@ -263,6 +268,11 @@ async function submit() {
     message.success('保存成功')
     modalOpen.value = false
     await load()
+  } catch (error: any) {
+    if (error?.errorFields) {
+      return
+    }
+    message.error(resolveCareError(error, '保存失败'))
   } finally {
     submitting.value = false
   }
@@ -272,9 +282,13 @@ async function remove(id: number) {
   Modal.confirm({
     title: '确认删除该交接日志？',
     onOk: async () => {
-      await deleteShiftHandover(id)
-      message.success('删除成功')
-      await load()
+      try {
+        await deleteShiftHandover(id)
+        message.success('删除成功')
+        await load()
+      } catch (error) {
+        message.error(resolveCareError(error, '删除失败'))
+      }
     }
   })
 }
@@ -312,12 +326,23 @@ async function load() {
     rows.value = res.list.map((item) => ({
       ...item,
       onDutySummary: item.onDutySummary || item.summary,
-      attentionNote: item.attentionNote || item.riskNote
+      attentionNote: item.attentionNote || item.riskNote,
+      handoverTime: toIsoDateTime(item.handoverTime),
+      confirmTime: toIsoDateTime(item.confirmTime)
     }))
     query.total = res.total
+  } catch (error) {
+    message.error(resolveCareError(error, '加载交接日志失败'))
+    rows.value = []
+    query.total = 0
   } finally {
     loading.value = false
   }
+}
+
+function toIsoDateTime(value?: string) {
+  if (!value) return undefined
+  return value.replace(' ', 'T')
 }
 
 load()

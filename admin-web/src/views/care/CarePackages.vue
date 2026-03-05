@@ -57,6 +57,7 @@ import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { getCarePackagePage, createCarePackage, updateCarePackage, deleteCarePackage } from '../../api/standard'
 import type { CarePackage, PageResult } from '../../types'
+import { resolveCareError } from './careError'
 
 const list = ref<CarePackage[]>([])
 const loading = ref(false)
@@ -108,8 +109,8 @@ async function submit() {
     message.success('保存成功')
     modalOpen.value = false
     load()
-  } catch {
-    message.error('保存失败')
+  } catch (error) {
+    message.error(resolveCareError(error, '保存失败'))
   } finally {
     submitting.value = false
   }
@@ -119,9 +120,13 @@ async function remove(id: number) {
   Modal.confirm({
     title: '确认删除该套餐？',
     onOk: async () => {
-      await deleteCarePackage(id)
-      message.success('已删除')
-      load()
+      try {
+        await deleteCarePackage(id)
+        message.success('已删除')
+        await load()
+      } catch (error) {
+        message.error(resolveCareError(error, '删除失败'))
+      }
     }
   })
 }
@@ -135,6 +140,10 @@ async function load() {
     })
     list.value = res.list
     page.total = res.total
+  } catch (error) {
+    message.error(resolveCareError(error, '加载护理套餐失败'))
+    list.value = []
+    page.total = 0
   } finally {
     loading.value = false
   }

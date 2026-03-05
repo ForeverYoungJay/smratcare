@@ -63,3 +63,20 @@ export interface AssessmentRecordSummary {
   reassessOverdueCount: number
   highRiskCount: number
 }
+
+export interface AssessmentRecordReport {
+  recordId: number
+  reportNo: string
+  reportStatus: string
+  elderName?: string
+  assessmentType?: AssessmentType
+  assessmentTypeLabel?: string
+  assessorName?: string
+  assessmentDate?: string
+  completedTime?: string
+  score?: number
+  levelCode?: string
+  resultSummary?: string
+  suggestion?: string
+  detailJson?: string
+}

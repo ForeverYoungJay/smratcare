@@ -22,13 +22,15 @@
           </div>
           <a-space>
             <a-button @click="init">刷新首页</a-button>
+            <a-button @click="openModuleCustomize">自定义首页</a-button>
+            <a-button @click="openCustomCardEditor()">新增卡面</a-button>
             <a-button type="primary" @click="go('/oa/todo')">进入待办中心</a-button>
           </a-space>
         </a-card>
 
-        <a-row :gutter="[12, 12]">
-          <a-col :xs="24" :xl="14">
-            <a-card :bordered="false" class="card-elevated full-height" title="1️⃣ 我的待办（最重要）">
+        <a-row :gutter="[12, 12]" v-if="showRowTodoReminder" :style="{ order: sectionOrder(['todo', 'reminder']) }">
+          <a-col :xs="24" :xl="14" :style="{ order: moduleOrder('todo') }">
+            <a-card v-if="isModuleVisible('todo')" :bordered="false" class="card-elevated full-height" title="1️⃣ 我的待办（最重要）">
               <template #extra>
                 <a-tag color="processing">总待办 {{ totalTodoCount }}</a-tag>
               </template>
@@ -57,8 +59,8 @@
             </a-card>
           </a-col>
 
-          <a-col :xs="24" :xl="10">
-            <a-card :bordered="false" class="card-elevated full-height" title="2️⃣ 提醒中心（系统预警）">
+          <a-col :xs="24" :xl="10" :style="{ order: moduleOrder('reminder') }">
+            <a-card v-if="isModuleVisible('reminder')" :bordered="false" class="card-elevated full-height" title="2️⃣ 提醒中心（系统预警）">
               <a-list size="small" :data-source="riskReminders" :locale="{ emptyText: '暂无提醒' }">
                 <template #renderItem="{ item }">
                   <a-list-item>
@@ -82,7 +84,13 @@
           </a-col>
         </a-row>
 
-        <a-card :bordered="false" class="card-elevated" title="3️⃣ 快捷发起（操作入口）">
+        <a-card
+          v-if="isModuleVisible('quickLaunch')"
+          :bordered="false"
+          class="card-elevated"
+          :style="{ order: sectionOrder(['quickLaunch']) }"
+          title="3️⃣ 快捷发起（操作入口）"
+        >
           <a-row :gutter="[12, 12]">
             <a-col :xs="24" :md="12" :xl="6" v-for="group in quickLaunchGroups" :key="group.title">
               <div class="quick-group">
@@ -97,9 +105,50 @@
           </a-row>
         </a-card>
 
-        <a-row :gutter="[12, 12]">
-          <a-col :xs="24" :xl="8">
-            <a-card :bordered="false" class="card-elevated full-height" title="4️⃣ 今日运营概览（核心KPI）">
+        <a-card
+          v-if="isModuleVisible('customCards')"
+          :bordered="false"
+          class="card-elevated"
+          :style="{ order: sectionOrder(['customCards']) }"
+          title="🧩 我的自定义卡面"
+        >
+          <template #extra>
+            <a-space>
+              <a-select
+                v-model:value="customCardCategoryFilter"
+                size="small"
+                style="width: 120px;"
+                :options="customCardCategoryFilterOptions"
+              />
+              <a-button size="small" @click="openCustomCardEditor()">新增卡面</a-button>
+              <a-button size="small" @click="customCardManageOpen = true">管理卡面</a-button>
+            </a-space>
+          </template>
+          <a-row :gutter="[12, 12]">
+            <a-col :xs="24" :sm="12" :xl="6" v-for="item in filteredCustomCards" :key="item.id">
+              <div class="custom-card-item" :style="{ borderTopColor: item.themeColor || '#1677ff' }" @click="handleCustomCardClick(item)">
+                <div class="custom-card-title">{{ item.icon || '🧩' }} {{ item.title }}</div>
+                <div class="custom-card-route">{{ item.route }}</div>
+                <div class="custom-card-desc">{{ item.description || '点击快速进入' }}</div>
+                <a-tag class="custom-card-mode" size="small">{{ item.openMode === 'new' ? '新标签打开' : '当前页打开' }}</a-tag>
+                <a-tag class="custom-card-category" size="small" color="blue">{{ customCardCategoryText(item.category) }}</a-tag>
+                <a-tag class="custom-card-category" size="small" color="purple">{{ audienceText(item.audience) }}</a-tag>
+                <div class="custom-card-actions" @click.stop>
+                  <a-button type="link" size="small" @click="openCustomCardEditor(item.id)">编辑</a-button>
+                  <a-button type="link" size="small" @click="duplicateCustomCard(item.id)">复制</a-button>
+                  <a-button type="link" danger size="small" @click="removeCustomCard(item.id)">删除</a-button>
+                </div>
+              </div>
+            </a-col>
+            <a-col v-if="!filteredCustomCards.length" :span="24">
+              <a-empty description="暂无自定义卡面，可点击右上角“新增卡面”" />
+            </a-col>
+          </a-row>
+        </a-card>
+
+        <a-row :gutter="[12, 12]" v-if="showRowOperation" :style="{ order: sectionOrder(['operation', 'finance', 'salesFunnel']) }">
+          <a-col :xs="24" :xl="8" :style="{ order: moduleOrder('operation') }">
+            <a-card v-if="isModuleVisible('operation')" :bordered="false" class="card-elevated full-height" title="4️⃣ 今日运营概览（核心KPI）">
               <a-row :gutter="[10, 10]">
                 <a-col :span="12" v-for="item in operationOverview" :key="item.title">
                   <div class="metric-cell" @click="item.route ? go(item.route) : undefined">
@@ -111,8 +160,8 @@
             </a-card>
           </a-col>
 
-          <a-col :xs="24" :xl="8">
-            <a-card :bordered="false" class="card-elevated full-height" title="5️⃣ 财务运营概览">
+          <a-col :xs="24" :xl="8" :style="{ order: moduleOrder('finance') }">
+            <a-card v-if="isModuleVisible('finance')" :bordered="false" class="card-elevated full-height" title="5️⃣ 财务运营概览">
               <a-row :gutter="[10, 10]">
                 <a-col :span="12" v-for="item in financeOverviewItems" :key="item.title">
                   <div class="metric-cell" @click="item.route ? go(item.route) : undefined">
@@ -125,8 +174,8 @@
             </a-card>
           </a-col>
 
-          <a-col :xs="24" :xl="8">
-            <a-card :bordered="false" class="card-elevated full-height" title="6️⃣ 销售运营漏斗">
+          <a-col :xs="24" :xl="8" :style="{ order: moduleOrder('salesFunnel') }">
+            <a-card v-if="isModuleVisible('salesFunnel')" :bordered="false" class="card-elevated full-height" title="6️⃣ 销售运营漏斗">
               <a-row :gutter="[10, 10]">
                 <a-col :span="12" v-for="item in salesFunnelItems" :key="item.title">
                   <div class="metric-cell" @click="go(item.route)">
@@ -140,9 +189,9 @@
           </a-col>
         </a-row>
 
-        <a-row :gutter="[12, 12]">
-          <a-col :xs="24" :xl="10">
-            <a-card :bordered="false" class="card-elevated full-height" title="7️⃣ 床位与长者状态">
+        <a-row :gutter="[12, 12]" v-if="showRowStatusExpense" :style="{ order: sectionOrder(['bedStatus', 'expense']) }">
+          <a-col :xs="24" :xl="10" :style="{ order: moduleOrder('bedStatus') }">
+            <a-card v-if="isModuleVisible('bedStatus')" :bordered="false" class="card-elevated full-height" title="7️⃣ 床位与长者状态">
               <a-row :gutter="[10, 10]">
                 <a-col :span="8" v-for="item in bedAndElderStatusItems" :key="item.title">
                   <div class="metric-cell" @click="go(item.route)">
@@ -155,8 +204,8 @@
             </a-card>
           </a-col>
 
-          <a-col :xs="24" :xl="14">
-            <a-card :bordered="false" class="card-elevated full-height" title="8️⃣ 费用管理（我的费用 / 部门费用 / 发票夹）">
+          <a-col :xs="24" :xl="14" :style="{ order: moduleOrder('expense') }">
+            <a-card v-if="isModuleVisible('expense')" :bordered="false" class="card-elevated full-height" title="8️⃣ 费用管理（我的费用 / 部门费用 / 发票夹）">
               <a-row :gutter="[10, 10]">
                 <a-col :xs="24" :md="8" v-for="group in expenseSections" :key="group.title">
                   <div class="expense-block">
@@ -172,7 +221,13 @@
           </a-col>
         </a-row>
 
-        <a-card :bordered="false" class="card-elevated" title="9️⃣ 行政日历 / 协同日历">
+        <a-card
+          v-if="isModuleVisible('calendar')"
+          :bordered="false"
+          class="card-elevated"
+          :style="{ order: sectionOrder(['calendar']) }"
+          title="9️⃣ 行政日历 / 协同日历"
+        >
           <template #extra>
             <a-space>
               <a-button size="small" @click="openCreateSchedule()">创建日程</a-button>
@@ -208,7 +263,13 @@
           </div>
         </a-card>
 
-        <a-card :bordered="false" class="card-elevated" title="🔟 数据分析入口">
+        <a-card
+          v-if="isModuleVisible('dataEntry')"
+          :bordered="false"
+          class="card-elevated"
+          :style="{ order: sectionOrder(['dataEntry']) }"
+          title="🔟 数据分析入口"
+        >
           <div class="hint-text">首页不放复杂图表，仅提供分析入口。</div>
           <a-space wrap style="margin-top: 8px;">
             <a-button type="primary" ghost @click="go('/stats/org/monthly-operation')">运营分析</a-button>
@@ -423,6 +484,234 @@
         </a-space>
       </div>
     </a-drawer>
+
+    <a-drawer
+      v-model:open="moduleCustomizeOpen"
+      title="自定义养老首页"
+      width="420"
+      placement="right"
+    >
+      <div class="hint-text" style="margin-bottom: 10px;">
+        可自由隐藏/添加首页卡片，并支持上移/下移排序；配置按当前账号本地保存。
+      </div>
+      <a-space wrap style="margin-bottom: 10px;">
+        <a-button size="small" @click="applyModulePreset('director')">院长视图预设</a-button>
+        <a-button size="small" @click="applyModulePreset('nurse')">护士站预设</a-button>
+        <a-button size="small" @click="applyModulePreset('finance')">财务视图预设</a-button>
+        <a-button size="small" @click="customCardManageOpen = true">管理自定义卡面</a-button>
+      </a-space>
+      <div class="manage-card-list">
+        <div
+          v-for="(item, index) in moduleConfigDraft"
+          :key="item.key"
+          class="manage-card-item"
+          draggable="true"
+          @dragstart="onModuleDragStart(item.key)"
+          @dragover.prevent
+          @drop.prevent="onModuleDrop(item.key)"
+          @dragend="onModuleDragEnd"
+        >
+          <div class="manage-card-main">
+            <div class="manage-card-title">#{{ index + 1 }} {{ item.title }}</div>
+            <div class="manage-card-desc">{{ item.desc }} · {{ audienceText(item.audience) }}</div>
+          </div>
+          <a-space wrap>
+            <a-button size="small" :disabled="index === 0" @click="moveModule(index, -1)">上移</a-button>
+            <a-button
+              size="small"
+              :disabled="index === moduleConfigDraft.length - 1"
+              @click="moveModule(index, 1)"
+            >
+              下移
+            </a-button>
+            <a-select
+              v-model:value="item.audience"
+              mode="multiple"
+              style="min-width: 170px;"
+              :options="moduleAudienceOptions"
+              size="small"
+              placeholder="可见角色"
+            />
+            <a-switch v-model:checked="item.visible" checked-children="显示" un-checked-children="隐藏" />
+          </a-space>
+        </div>
+      </div>
+      <div class="calendar-actions">
+        <a-space wrap>
+          <a-button @click="resetModuleCustomize">恢复默认</a-button>
+          <a-button danger @click="resetAllHomepageCustomize">恢复全部默认</a-button>
+          <a-button @click="exportHomepageCustomize">导出配置</a-button>
+          <a-button @click="importPayloadOpen = true">导入配置</a-button>
+          <a-button type="primary" @click="applyModuleCustomize">保存配置</a-button>
+        </a-space>
+      </div>
+    </a-drawer>
+
+    <a-drawer
+      v-model:open="customCardManageOpen"
+      title="管理自定义卡面"
+      width="480"
+      placement="right"
+    >
+      <div class="hint-text" style="margin-bottom: 10px;">
+        可新增养老首页卡面入口，支持编辑、删除、排序（上移/下移）。
+      </div>
+      <a-space wrap style="margin-bottom: 10px;">
+        <a-button type="primary" @click="openCustomCardEditor()">新增卡面</a-button>
+        <a-button @click="resetCustomCards">恢复默认卡面</a-button>
+        <a-button @click="addRecentRouteAsCards">导入最近访问</a-button>
+        <a-switch v-model:checked="customCardGroupMode" checked-children="分组" un-checked-children="平铺" />
+      </a-space>
+      <a-space wrap style="margin-bottom: 10px;">
+        <a-input v-model:value="customCardManageKeyword" allow-clear style="width: 220px;" placeholder="搜索卡面标题/地址/说明" />
+        <a-button size="small" @click="setCustomCardVisibleByFilter(true)">当前结果全部显示</a-button>
+        <a-button size="small" @click="setCustomCardVisibleByFilter(false)">当前结果全部隐藏</a-button>
+        <a-button size="small" danger @click="removeHiddenCustomCards">清理已隐藏卡面</a-button>
+      </a-space>
+      <a-space wrap style="margin-bottom: 10px;">
+        <span class="hint-text">模板：</span>
+        <a-tag
+          v-for="template in customCardTemplateCatalog"
+          :key="template.key"
+          class="template-tag"
+          @click="addCustomCardFromTemplate(template.key)"
+        >
+          + {{ template.title }}
+        </a-tag>
+      </a-space>
+      <a-collapse v-if="customCardGroupMode" :bordered="false">
+        <a-collapse-panel v-for="group in groupedCustomCards" :key="group.category" :header="`${group.title}（${group.list.length}）`">
+          <div class="manage-card-list">
+            <div
+              v-for="item in group.list"
+              :key="item.id"
+              class="manage-card-item"
+              draggable="true"
+              @dragstart="onCustomCardDragStart(item.id)"
+              @dragover.prevent="onCustomCardDragOver(item.id)"
+              @drop.prevent="onCustomCardDrop(item.id)"
+              @dragend="onCustomCardDragEnd"
+            >
+              <div class="manage-card-main">
+                <div class="manage-card-title">{{ item.icon || '🧩' }} {{ item.title }}</div>
+                <div class="manage-card-desc">{{ item.route }} · {{ audienceText(item.audience) }}</div>
+              </div>
+              <a-space wrap>
+                <a-switch v-model:checked="item.visible" checked-children="显示" un-checked-children="隐藏" @change="persistCustomCards" />
+                <a-button type="link" size="small" @click="openCustomCardEditor(item.id)">编辑</a-button>
+                <a-button type="link" size="small" @click="duplicateCustomCard(item.id)">复制</a-button>
+                <a-button type="link" danger size="small" @click="removeCustomCard(item.id)">删除</a-button>
+              </a-space>
+            </div>
+          </div>
+        </a-collapse-panel>
+      </a-collapse>
+      <div v-else class="manage-card-list">
+        <div
+          v-for="item in manageFilteredCustomCards"
+          :key="item.id"
+          class="manage-card-item"
+          draggable="true"
+          @dragstart="onCustomCardDragStart(item.id)"
+          @dragover.prevent="onCustomCardDragOver(item.id)"
+          @drop.prevent="onCustomCardDrop(item.id)"
+          @dragend="onCustomCardDragEnd"
+        >
+          <div class="manage-card-main">
+            <div class="manage-card-title">{{ item.icon || '🧩' }} {{ item.title }}</div>
+            <div class="manage-card-desc">{{ item.route }} · {{ customCardCategoryText(item.category) }} · {{ audienceText(item.audience) }}</div>
+          </div>
+          <a-space wrap>
+            <a-switch v-model:checked="item.visible" checked-children="显示" un-checked-children="隐藏" @change="persistCustomCards" />
+            <a-button type="link" size="small" @click="openCustomCardEditor(item.id)">编辑</a-button>
+            <a-button type="link" size="small" @click="duplicateCustomCard(item.id)">复制</a-button>
+            <a-button type="link" danger size="small" @click="removeCustomCard(item.id)">删除</a-button>
+          </a-space>
+        </div>
+      </div>
+      <a-empty v-if="!manageFilteredCustomCards.length" description="暂无匹配卡面，可清空搜索或新增卡面" />
+    </a-drawer>
+
+    <a-modal
+      v-model:open="customCardEditorOpen"
+      :title="customCardEditingId ? '编辑自定义卡面' : '新增自定义卡面'"
+      width="560px"
+      @ok="saveCustomCard"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="卡面标题" required>
+          <a-input v-model:value="customCardForm.title" placeholder="例如：老人档案总览" />
+        </a-form-item>
+        <a-row :gutter="12">
+          <a-col :span="12">
+            <a-form-item label="图标">
+              <a-input v-model:value="customCardForm.icon" placeholder="例如：📊" maxlength="2" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="分类">
+              <a-select v-model:value="customCardForm.category" :options="customCardCategoryOptions" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-form-item label="可见范围（角色）">
+          <a-select
+            v-model:value="customCardForm.audience"
+            mode="multiple"
+            :options="customCardAudienceOptions"
+            placeholder="不选默认全员可见"
+          />
+        </a-form-item>
+        <a-form-item label="跳转地址" required>
+          <a-auto-complete
+            v-model:value="customCardForm.route"
+            :options="customCardRouteOptions"
+            :filter-option="false"
+            placeholder="例如：/elder/in-hospital-overview"
+            @search="onCustomCardRouteSearch"
+            @select="onCustomCardRouteSelect"
+          />
+        </a-form-item>
+        <a-form-item label="卡面说明">
+          <a-input v-model:value="customCardForm.description" placeholder="例如：快速查看在住长者与床位信息" />
+        </a-form-item>
+        <div class="hint-text" style="margin-bottom: 8px;">提示：内部地址建议以 `/` 开头；外部地址支持 `https://`。</div>
+        <a-row :gutter="12">
+          <a-col :span="12">
+            <a-form-item label="卡面主题色">
+              <a-select v-model:value="customCardForm.themeColor" :options="customCardThemeOptions" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="打开方式">
+              <a-radio-group v-model:value="customCardForm.openMode">
+                <a-radio-button value="current">当前页</a-radio-button>
+                <a-radio-button value="new">新标签</a-radio-button>
+              </a-radio-group>
+            </a-form-item>
+          </a-col>
+        </a-row>
+      </a-form>
+    </a-modal>
+
+    <a-modal v-model:open="exportPayloadOpen" title="导出首页配置" width="700px" :footer="null">
+      <a-space direction="vertical" style="width: 100%;">
+        <div class="hint-text">可复制下方 JSON，用于跨账号导入。</div>
+        <a-textarea v-model:value="exportPayloadText" :rows="14" readonly />
+        <a-space>
+          <a-button @click="copyExportPayload">复制到剪贴板</a-button>
+          <a-button @click="exportPayloadOpen = false">关闭</a-button>
+        </a-space>
+      </a-space>
+    </a-modal>
+
+    <a-modal v-model:open="importPayloadOpen" title="导入首页配置" width="700px" @ok="applyImportedHomepageCustomize">
+      <a-space direction="vertical" style="width: 100%;">
+        <div class="hint-text">请粘贴导出的 JSON 配置，导入后会覆盖当前账号首页设置。</div>
+        <a-textarea v-model:value="importPayloadText" :rows="14" placeholder="粘贴配置 JSON" />
+        <div class="hint-text">导入支持字段：`moduleConfig`、`customCards`，缺失字段将按默认补全。</div>
+      </a-space>
+    </a-modal>
   </PageContainer>
 </template>
 
@@ -475,6 +764,152 @@ const searchKeyword = ref('')
 const searchOptions = ref<Array<{ value: string; label: string; route: string }>>([])
 const searchIndex = ref<Array<{ title: string; route: string; keywords: string }>>([])
 const recentSearchRoutes = ref<string[]>([])
+const moduleCustomizeOpen = ref(false)
+const customCardManageOpen = ref(false)
+const customCardEditorOpen = ref(false)
+const customCardEditingId = ref('')
+const customCardCategoryFilter = ref<'ALL' | 'OPS' | 'CARE' | 'FINANCE' | 'OA' | 'CUSTOM'>('ALL')
+const customCardGroupMode = ref(true)
+const draggingCustomCardId = ref('')
+const draggingModuleKey = ref('')
+const exportPayloadOpen = ref(false)
+const importPayloadOpen = ref(false)
+const exportPayloadText = ref('')
+const importPayloadText = ref('')
+const customCardManageKeyword = ref('')
+
+type AudienceCode = 'ALL' | 'DIRECTOR' | 'NURSE' | 'FINANCE' | 'ADMIN' | 'HR' | 'OPS'
+
+type PortalModuleKey =
+  | 'todo'
+  | 'reminder'
+  | 'quickLaunch'
+  | 'operation'
+  | 'finance'
+  | 'salesFunnel'
+  | 'bedStatus'
+  | 'expense'
+  | 'customCards'
+  | 'calendar'
+  | 'dataEntry'
+
+interface PortalModuleConfigItem {
+  key: PortalModuleKey
+  title: string
+  desc: string
+  visible: boolean
+  order: number
+  audience: AudienceCode[]
+}
+
+const portalModuleCatalog: Array<Omit<PortalModuleConfigItem, 'visible' | 'order'>> = [
+  { key: 'todo', title: '我的待办', desc: '待审批、待处理、超时任务', audience: ['ALL'] },
+  { key: 'reminder', title: '提醒中心', desc: '风险预警与系统提醒', audience: ['ALL'] },
+  { key: 'quickLaunch', title: '快捷发起', desc: '员工/医护/运营/后勤入口', audience: ['ALL'] },
+  { key: 'operation', title: '今日运营概览', desc: '在住、空床、入住退住等KPI', audience: ['ALL'] },
+  { key: 'finance', title: '财务运营概览', desc: '收入、欠费人数、欠费金额', audience: ['FINANCE', 'DIRECTOR', 'ADMIN'] },
+  { key: 'salesFunnel', title: '销售运营漏斗', desc: '咨询-评估-签约转化', audience: ['OPS', 'DIRECTOR', 'ADMIN'] },
+  { key: 'bedStatus', title: '床位与长者状态', desc: '在住/外出/空床/清洁中', audience: ['ALL'] },
+  { key: 'expense', title: '费用管理', desc: '我的费用、部门费用、发票夹', audience: ['FINANCE', 'DIRECTOR', 'ADMIN', 'HR'] },
+  { key: 'customCards', title: '我的自定义卡面', desc: '可自由新增首页入口卡片', audience: ['ALL'] },
+  { key: 'calendar', title: '行政日历/协同日历', desc: '日程、请假、协同安排', audience: ['ALL'] },
+  { key: 'dataEntry', title: '数据分析入口', desc: '运营/财务/医护/销售分析入口', audience: ['ALL'] }
+]
+
+const moduleConfig = ref<PortalModuleConfigItem[]>(
+  portalModuleCatalog.map((item, index) => ({ ...item, visible: true, order: index }))
+)
+const moduleConfigDraft = ref<PortalModuleConfigItem[]>(
+  portalModuleCatalog.map((item, index) => ({ ...item, visible: true, order: index }))
+)
+
+interface PortalCustomCardItem {
+  id: string
+  title: string
+  route: string
+  description: string
+  themeColor: string
+  openMode: 'current' | 'new'
+  icon: string
+  category: 'OPS' | 'CARE' | 'FINANCE' | 'OA' | 'CUSTOM'
+  visible: boolean
+  audience: AudienceCode[]
+}
+
+interface PortalCustomCardTemplate {
+  key: string
+  title: string
+  route: string
+  description: string
+  themeColor: string
+  openMode: 'current' | 'new'
+  icon: string
+  category: 'OPS' | 'CARE' | 'FINANCE' | 'OA' | 'CUSTOM'
+  audience: AudienceCode[]
+}
+
+const defaultCustomCards: PortalCustomCardItem[] = [
+  { id: 'elder-overview', title: '长者总览', route: '/elder/in-hospital-overview', description: '快速查看在住长者信息', themeColor: '#1677ff', openMode: 'current', icon: '👴', category: 'OPS', visible: true, audience: ['ALL'] },
+  { id: 'bed-panorama', title: '床态全景', route: '/elder/bed-panorama', description: '查看空床、清洁中与占用床位', themeColor: '#13c2c2', openMode: 'current', icon: '🛏️', category: 'OPS', visible: true, audience: ['ALL'] },
+  { id: 'finance-risk', title: '欠费看板', route: '/finance/bills/in-resident?filter=overdue', description: '快速追踪欠费风险', themeColor: '#fa8c16', openMode: 'current', icon: '💰', category: 'FINANCE', visible: true, audience: ['FINANCE', 'DIRECTOR', 'ADMIN'] },
+  { id: 'oa-calendar', title: '协同日历', route: '/oa/work-execution/calendar', description: '查看个人/部门/协同计划', themeColor: '#722ed1', openMode: 'current', icon: '📅', category: 'OA', visible: true, audience: ['ALL'] }
+]
+
+const customCards = ref<PortalCustomCardItem[]>([])
+const customCardRouteOptions = ref<Array<{ value: string; label: string }>>([])
+const customCardForm = reactive({
+  title: '',
+  route: '',
+  description: '',
+  themeColor: '#1677ff',
+  openMode: 'current' as 'current' | 'new',
+  icon: '🧩',
+  category: 'CUSTOM' as 'OPS' | 'CARE' | 'FINANCE' | 'OA' | 'CUSTOM',
+  audience: ['ALL'] as AudienceCode[]
+})
+
+const customCardThemeOptions = [
+  { label: '蓝色', value: '#1677ff' },
+  { label: '青色', value: '#13c2c2' },
+  { label: '绿色', value: '#52c41a' },
+  { label: '橙色', value: '#fa8c16' },
+  { label: '紫色', value: '#722ed1' },
+  { label: '红色', value: '#ff4d4f' }
+]
+
+const customCardTemplateCatalog: PortalCustomCardTemplate[] = [
+  { key: 'elder-list', title: '长者档案', route: '/elder/list', description: '快速进入长者档案列表', themeColor: '#1677ff', openMode: 'current', icon: '🧾', category: 'OPS', audience: ['ALL'] },
+  { key: 'nursing-board', title: '护理任务看板', route: '/medical-care/care-task-board', description: '查看待执行护理任务', themeColor: '#52c41a', openMode: 'current', icon: '🩺', category: 'CARE', audience: ['NURSE', 'DIRECTOR', 'ADMIN'] },
+  { key: 'approval', title: '审批中心', route: '/oa/approval', description: '处理请假/报销/采购审批', themeColor: '#722ed1', openMode: 'current', icon: '✅', category: 'OA', audience: ['ALL'] },
+  { key: 'finance-overall', title: '财务分析', route: '/finance/reports/overall', description: '收入、欠费、成本总览', themeColor: '#fa8c16', openMode: 'current', icon: '📈', category: 'FINANCE', audience: ['FINANCE', 'DIRECTOR', 'ADMIN'] },
+  { key: 'marketing-funnel', title: '销售转化分析', route: '/marketing/reports/conversion', description: '线索转化漏斗分析', themeColor: '#13c2c2', openMode: 'current', icon: '🎯', category: 'OPS', audience: ['OPS', 'DIRECTOR', 'ADMIN'] },
+  { key: 'calendar-full', title: '协同日历全景', route: '/oa/work-execution/calendar', description: '统一查看个人/部门/协同日程', themeColor: '#2f54eb', openMode: 'current', icon: '🗓️', category: 'OA', audience: ['ALL'] }
+]
+
+const customCardCategoryOptions = [
+  { label: '运营', value: 'OPS' },
+  { label: '医护', value: 'CARE' },
+  { label: '财务', value: 'FINANCE' },
+  { label: '行政', value: 'OA' },
+  { label: '自定义', value: 'CUSTOM' }
+]
+
+const customCardCategoryFilterOptions = [
+  { label: '全部分类', value: 'ALL' },
+  ...customCardCategoryOptions
+]
+
+const customCardAudienceOptions = [
+  { label: '全员', value: 'ALL' },
+  { label: '院长', value: 'DIRECTOR' },
+  { label: '护士', value: 'NURSE' },
+  { label: '财务', value: 'FINANCE' },
+  { label: '管理员', value: 'ADMIN' },
+  { label: '人事', value: 'HR' },
+  { label: '运营', value: 'OPS' }
+]
+
+const moduleAudienceOptions = [...customCardAudienceOptions]
 
 const summary = reactive<OaPortalSummary>({
   notices: [],
@@ -587,8 +1022,16 @@ const colorOptions = [
 
 const SEARCH_RECENT_KEY = 'portal_search_recent_routes'
 const SEARCH_RECENT_MAX = 8
+const MODULE_CONFIG_KEY_PREFIX = 'portal_module_config_v1_'
+const CUSTOM_CARD_KEY_PREFIX = 'portal_custom_card_v1_'
 const PINYIN_INITIAL_LETTERS = 'ABCDEFGHJKLMNOPQRSTWXYZ'
 const PINYIN_INITIAL_BOUNDARY_CHARS = '阿芭擦搭蛾发噶哈讥咔垃妈拿哦啪期然撒塌挖昔压匝'
+
+const modulePresetMap: Record<'director' | 'nurse' | 'finance', PortalModuleKey[]> = {
+  director: ['todo', 'reminder', 'operation', 'finance', 'salesFunnel', 'bedStatus', 'calendar', 'customCards', 'dataEntry', 'quickLaunch', 'expense'],
+  nurse: ['todo', 'reminder', 'calendar', 'bedStatus', 'quickLaunch', 'operation', 'customCards', 'dataEntry', 'expense', 'finance', 'salesFunnel'],
+  finance: ['todo', 'reminder', 'finance', 'expense', 'operation', 'customCards', 'dataEntry', 'calendar', 'quickLaunch', 'salesFunnel', 'bedStatus']
+}
 
 const searchAliases: Record<string, string[]> = {
   '/oa/approval': ['审批', '待审批', '流程审批', '批量审批', '请假审批'],
@@ -615,6 +1058,68 @@ const searchPinnedRoutes = [
   '/hr/development/certificate-reminders',
   '/hr/profile/contract-reminders'
 ]
+
+function moduleStorageKey() {
+  return `${MODULE_CONFIG_KEY_PREFIX}${String(userStore.staffInfo?.id || 'default')}`
+}
+
+function customCardStorageKey() {
+  return `${CUSTOM_CARD_KEY_PREFIX}${String(userStore.staffInfo?.id || 'default')}`
+}
+
+function isModuleVisible(key: PortalModuleKey) {
+  const matched = moduleConfig.value.find((item) => item.key === key)
+  if (!matched) return true
+  if (!matched.visible) return false
+  return cardAudienceMatched(matched.audience, currentUserAudience.value)
+}
+
+const orderedModules = computed(() => [...moduleConfig.value].sort((a, b) => a.order - b.order))
+
+function moduleOrder(key: PortalModuleKey) {
+  const index = orderedModules.value.findIndex((item) => item.key === key)
+  return index >= 0 ? index : 999
+}
+
+function sectionOrder(keys: PortalModuleKey[]) {
+  const orders = keys
+    .map((key) => moduleOrder(key))
+    .filter((value) => Number.isFinite(value))
+  if (!orders.length) return 999
+  return Math.min(...orders)
+}
+
+const showRowTodoReminder = computed(() => isModuleVisible('todo') || isModuleVisible('reminder'))
+const showRowOperation = computed(() => isModuleVisible('operation') || isModuleVisible('finance') || isModuleVisible('salesFunnel'))
+const showRowStatusExpense = computed(() => isModuleVisible('bedStatus') || isModuleVisible('expense'))
+const currentUserAudience = computed(() => resolveCurrentUserAudience())
+const filteredCustomCards = computed(() => {
+  const visibleCards = customCards.value
+    .filter((item) => item.visible !== false)
+    .filter((item) => cardAudienceMatched(item.audience, currentUserAudience.value))
+  if (customCardCategoryFilter.value === 'ALL') return visibleCards
+  return visibleCards.filter((item) => item.category === customCardCategoryFilter.value)
+})
+
+const manageFilteredCustomCards = computed(() => {
+  const keyword = String(customCardManageKeyword.value || '').trim().toLowerCase()
+  if (!keyword) return customCards.value
+  return customCards.value.filter((item) => {
+    const text = `${item.title} ${item.route} ${item.description} ${customCardCategoryText(item.category)}`.toLowerCase()
+    return text.includes(keyword)
+  })
+})
+
+const groupedCustomCards = computed(() => {
+  const categories: Array<'OPS' | 'CARE' | 'FINANCE' | 'OA' | 'CUSTOM'> = ['OPS', 'CARE', 'FINANCE', 'OA', 'CUSTOM']
+  return categories
+    .map((category) => ({
+      category,
+      title: customCardCategoryText(category),
+      list: manageFilteredCustomCards.value.filter((item) => item.category === category)
+    }))
+    .filter((group) => group.list.length > 0)
+})
 
 const myTodoStats = computed(() => [
   { title: '待审批流程', value: summary.pendingApprovalCount || 0, route: '/oa/approval' },
@@ -939,8 +1444,73 @@ function resolveBedStatus(bed: BedItem): '空闲' | '清洁中' | '其他' {
   return '其他'
 }
 
-function go(path: string) {
+function go(path: string, forceNewTab = false) {
+  if (!path) return
+  if (forceNewTab || path.startsWith('http://') || path.startsWith('https://')) {
+    window.open(path, '_blank')
+    return
+  }
   router.push(path)
+}
+
+function handleCustomCardClick(item: PortalCustomCardItem) {
+  go(item.route, item.openMode === 'new')
+}
+
+function customCardCategoryText(category?: string) {
+  if (category === 'OPS') return '运营'
+  if (category === 'CARE') return '医护'
+  if (category === 'FINANCE') return '财务'
+  if (category === 'OA') return '行政'
+  return '自定义'
+}
+
+function normalizeCardAudience(values: unknown): AudienceCode[] {
+  const valid = new Set(['ALL', 'DIRECTOR', 'NURSE', 'FINANCE', 'ADMIN', 'HR', 'OPS'])
+  const list = Array.isArray(values) ? values : []
+  const normalized = list
+    .map((item) => String(item || '').toUpperCase())
+    .filter((item) => valid.has(item)) as AudienceCode[]
+  if (!normalized.length) return ['ALL']
+  if (normalized.includes('ALL')) return ['ALL']
+  return Array.from(new Set(normalized))
+}
+
+function audienceText(audience?: AudienceCode[]) {
+  const normalized = normalizeCardAudience(audience)
+  if (normalized.includes('ALL')) return '全员可见'
+  return normalized.map((item) => {
+    if (item === 'DIRECTOR') return '院长'
+    if (item === 'NURSE') return '护士'
+    if (item === 'FINANCE') return '财务'
+    if (item === 'ADMIN') return '管理员'
+    if (item === 'HR') return '人事'
+    if (item === 'OPS') return '运营'
+    return item
+  }).join(' / ')
+}
+
+function resolveCurrentUserAudience() {
+  const rawParts: string[] = []
+  const anyInfo = userStore.staffInfo as any
+  if (Array.isArray(anyInfo?.roleNames)) rawParts.push(...anyInfo.roleNames.map((item: any) => String(item)))
+  if (Array.isArray(anyInfo?.roles)) rawParts.push(...anyInfo.roles.map((item: any) => String(item?.name || item?.roleName || item)))
+  if (anyInfo?.roleName) rawParts.push(String(anyInfo.roleName))
+  const merged = rawParts.join(' ').toLowerCase()
+  const roleSet = new Set<AudienceCode>(['ALL'])
+  if (/院长|总监|director/.test(merged)) roleSet.add('DIRECTOR')
+  if (/护士|护理|nurse/.test(merged)) roleSet.add('NURSE')
+  if (/财务|finance|会计/.test(merged)) roleSet.add('FINANCE')
+  if (/管理员|admin|super/.test(merged)) roleSet.add('ADMIN')
+  if (/人事|hr/.test(merged)) roleSet.add('HR')
+  if (/运营|ops|operation/.test(merged)) roleSet.add('OPS')
+  return Array.from(roleSet)
+}
+
+function cardAudienceMatched(cardAudience: AudienceCode[] | undefined, userAudience: AudienceCode[]) {
+  const normalizedCard = normalizeCardAudience(cardAudience)
+  if (normalizedCard.includes('ALL')) return true
+  return normalizedCard.some((item) => userAudience.includes(item))
 }
 
 function normalizeText(text: string) {
@@ -995,6 +1565,34 @@ function fuzzyScore(text: string, keyword: string) {
     cursor = index + 1
   }
   return score
+}
+
+function updateCustomCardRouteOptions(keyword = '') {
+  const text = String(keyword || '').trim()
+  if (!text) {
+    customCardRouteOptions.value = searchIndex.value.slice(0, 20).map((item) => ({
+      value: item.route,
+      label: `${item.title} · ${item.route}`
+    }))
+    return
+  }
+  const scored = searchIndex.value
+    .map((item) => ({ item, score: fuzzyScore(`${item.title} ${item.keywords}`, text) }))
+    .filter((row) => row.score >= 0)
+    .sort((a, b) => b.score - a.score || a.item.route.length - b.item.route.length)
+    .slice(0, 20)
+  customCardRouteOptions.value = scored.map((row) => ({
+    value: row.item.route,
+    label: `${row.item.title} · ${row.item.route}`
+  }))
+}
+
+function onCustomCardRouteSearch(value: string) {
+  updateCustomCardRouteOptions(value)
+}
+
+function onCustomCardRouteSelect(value: string) {
+  customCardForm.route = value
 }
 
 function loadRecentSearchRoutes() {
@@ -1114,6 +1712,517 @@ function submitSearch(value: string) {
     return
   }
   message.warning('没有匹配到页面，请尝试更短关键词')
+}
+
+function loadModuleCustomize() {
+  try {
+    const raw = localStorage.getItem(moduleStorageKey())
+    if (!raw) return
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return
+    const visibilityMap = new Map<string, boolean>()
+    const orderMap = new Map<string, number>()
+    const audienceMap = new Map<string, AudienceCode[]>()
+    parsed.forEach((item: any) => {
+      visibilityMap.set(String(item.key), Boolean(item.visible))
+      orderMap.set(String(item.key), Number(item.order))
+      audienceMap.set(String(item.key), normalizeCardAudience(item.audience))
+    })
+    moduleConfig.value = portalModuleCatalog.map((item) => ({
+      ...item,
+      visible: visibilityMap.has(item.key) ? Boolean(visibilityMap.get(item.key)) : true,
+      order: Number.isFinite(orderMap.get(item.key)) ? Number(orderMap.get(item.key)) : portalModuleCatalog.findIndex((row) => row.key === item.key),
+      audience: audienceMap.get(item.key) || normalizeCardAudience(item.audience)
+    })).sort((a, b) => a.order - b.order).map((item, index) => ({ ...item, order: index }))
+  } catch {}
+}
+
+function persistModuleCustomize() {
+  try {
+    const simple = [...moduleConfig.value]
+      .sort((a, b) => a.order - b.order)
+      .map((item, index) => ({ key: item.key, visible: item.visible, order: index, audience: normalizeCardAudience(item.audience) }))
+    localStorage.setItem(moduleStorageKey(), JSON.stringify(simple))
+  } catch {}
+}
+
+function applyModulePreset(preset: 'director' | 'nurse' | 'finance') {
+  const keyOrder = modulePresetMap[preset]
+  const fallback = portalModuleCatalog.map((item) => item.key)
+  const fullOrder = [...keyOrder, ...fallback.filter((key) => !keyOrder.includes(key))]
+  moduleConfigDraft.value = fullOrder
+    .map((key, index) => {
+      const base = portalModuleCatalog.find((item) => item.key === key)
+      if (!base) return null
+      return {
+        ...base,
+        visible: true,
+        order: index,
+        audience: normalizeCardAudience(base.audience)
+      }
+    })
+    .filter((item): item is PortalModuleConfigItem => !!item)
+  message.success('已应用预设，可继续微调后保存')
+}
+
+function openModuleCustomize() {
+  moduleConfigDraft.value = [...moduleConfig.value]
+    .sort((a, b) => a.order - b.order)
+    .map((item, index) => ({ ...item, order: index }))
+  moduleCustomizeOpen.value = true
+}
+
+function resetModuleCustomize() {
+  moduleConfigDraft.value = portalModuleCatalog.map((item, index) => ({
+    ...item,
+    visible: true,
+    order: index,
+    audience: normalizeCardAudience(item.audience)
+  }))
+}
+
+function moveModule(index: number, delta: -1 | 1) {
+  const targetIndex = index + delta
+  if (targetIndex < 0 || targetIndex >= moduleConfigDraft.value.length) return
+  const next = [...moduleConfigDraft.value]
+  const [moved] = next.splice(index, 1)
+  next.splice(targetIndex, 0, moved)
+  moduleConfigDraft.value = next.map((item, itemIndex) => ({ ...item, order: itemIndex }))
+}
+
+function onModuleDragStart(key: PortalModuleKey) {
+  draggingModuleKey.value = key
+}
+
+function onModuleDrop(targetKey: PortalModuleKey) {
+  const sourceKey = draggingModuleKey.value
+  if (!sourceKey || sourceKey === targetKey) return
+  const sourceIndex = moduleConfigDraft.value.findIndex((item) => item.key === sourceKey)
+  const targetIndex = moduleConfigDraft.value.findIndex((item) => item.key === targetKey)
+  if (sourceIndex < 0 || targetIndex < 0) return
+  const next = [...moduleConfigDraft.value]
+  const [moved] = next.splice(sourceIndex, 1)
+  next.splice(targetIndex, 0, moved)
+  moduleConfigDraft.value = next.map((item, index) => ({ ...item, order: index }))
+  draggingModuleKey.value = ''
+}
+
+function onModuleDragEnd() {
+  draggingModuleKey.value = ''
+}
+
+function applyModuleCustomize() {
+  const visibleCount = moduleConfigDraft.value.filter((item) => item.visible).length
+  if (visibleCount === 0) {
+    message.warning('请至少保留一个首页卡片')
+    return
+  }
+  moduleConfig.value = [...moduleConfigDraft.value]
+    .sort((a, b) => a.order - b.order)
+    .map((item, index) => ({ ...item, order: index, audience: normalizeCardAudience(item.audience) }))
+  persistModuleCustomize()
+  moduleCustomizeOpen.value = false
+  message.success('首页卡片配置已保存')
+}
+
+function resetAllHomepageCustomize() {
+  Modal.confirm({
+    title: '确认恢复首页全部默认配置？',
+    content: '将重置模块显示顺序和自定义卡面。',
+    onOk: async () => {
+      moduleConfig.value = portalModuleCatalog.map((item, index) => ({
+        ...item,
+        visible: true,
+        order: index,
+        audience: normalizeCardAudience(item.audience)
+      }))
+      moduleConfigDraft.value = portalModuleCatalog.map((item, index) => ({
+        ...item,
+        visible: true,
+        order: index,
+        audience: normalizeCardAudience(item.audience)
+      }))
+      customCards.value = defaultCustomCards.map((item) => ({ ...item }))
+      persistModuleCustomize()
+      persistCustomCards()
+      moduleCustomizeOpen.value = false
+      message.success('首页已恢复默认')
+    }
+  })
+}
+
+function normalizeCustomRoute(route: string) {
+  const text = String(route || '').trim()
+  if (!text) return ''
+  if (text.startsWith('http://') || text.startsWith('https://')) return text
+  return text.startsWith('/') ? text : `/${text}`
+}
+
+function normalizeCustomCardCategory(value: unknown): 'OPS' | 'CARE' | 'FINANCE' | 'OA' | 'CUSTOM' {
+  const text = String(value || '')
+  if (text === 'OPS' || text === 'CARE' || text === 'FINANCE' || text === 'OA' || text === 'CUSTOM') return text
+  return 'CUSTOM'
+}
+
+function normalizeCustomCardPayload(item: any, fallbackId: string) {
+  return {
+    id: String(item?.id || fallbackId),
+    title: String(item?.title || ''),
+    route: normalizeCustomRoute(String(item?.route || '')),
+    description: String(item?.description || ''),
+    themeColor: String(item?.themeColor || '#1677ff'),
+    openMode: item?.openMode === 'new' ? 'new' as const : 'current' as const,
+    icon: String(item?.icon || '🧩').trim().slice(0, 2) || '🧩',
+    category: normalizeCustomCardCategory(item?.category),
+    visible: item?.visible !== false,
+    audience: normalizeCardAudience(item?.audience)
+  }
+}
+
+function loadCustomCards() {
+  try {
+    const raw = localStorage.getItem(customCardStorageKey())
+    if (!raw) {
+      customCards.value = defaultCustomCards.map((item) => ({ ...item }))
+      return
+    }
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) {
+      customCards.value = defaultCustomCards.map((item) => ({ ...item }))
+      return
+    }
+    customCards.value = parsed
+      .map((item: any, index: number) => normalizeCustomCardPayload(item, `card_auto_${index}`))
+      .filter((item: PortalCustomCardItem) => !!item.id && !!item.title && !!item.route)
+  } catch {
+    customCards.value = defaultCustomCards.map((item) => ({ ...item }))
+  }
+}
+
+function persistCustomCards() {
+  try {
+    localStorage.setItem(customCardStorageKey(), JSON.stringify(customCards.value))
+  } catch {}
+}
+
+function openCustomCardEditor(id?: string) {
+  if (!id) {
+    customCardEditingId.value = ''
+    customCardForm.title = ''
+    customCardForm.route = ''
+    customCardForm.description = ''
+    customCardForm.themeColor = '#1677ff'
+    customCardForm.openMode = 'current'
+    customCardForm.icon = '🧩'
+    customCardForm.category = 'CUSTOM'
+    customCardForm.audience = ['ALL']
+    updateCustomCardRouteOptions('')
+    customCardEditorOpen.value = true
+    return
+  }
+  const target = customCards.value.find((item) => item.id === id)
+  if (!target) {
+    message.warning('未找到卡面')
+    return
+  }
+  customCardEditingId.value = target.id
+  customCardForm.title = target.title
+  customCardForm.route = target.route
+  customCardForm.description = target.description
+  customCardForm.themeColor = target.themeColor || '#1677ff'
+  customCardForm.openMode = target.openMode || 'current'
+  customCardForm.icon = target.icon || '🧩'
+  customCardForm.category = target.category || 'CUSTOM'
+  customCardForm.audience = normalizeCardAudience(target.audience)
+  updateCustomCardRouteOptions(target.route)
+  customCardEditorOpen.value = true
+}
+
+function saveCustomCard() {
+  const title = String(customCardForm.title || '').trim()
+  const route = normalizeCustomRoute(customCardForm.route)
+  const description = String(customCardForm.description || '').trim()
+  const themeColor = String(customCardForm.themeColor || '#1677ff')
+  const openMode = customCardForm.openMode === 'new' ? 'new' : 'current'
+  const icon = String(customCardForm.icon || '🧩').trim().slice(0, 2) || '🧩'
+  const category = customCardForm.category || 'CUSTOM'
+  const audience = normalizeCardAudience(customCardForm.audience)
+  if (!title) {
+    message.warning('请填写卡面标题')
+    return
+  }
+  if (!route) {
+    message.warning('请填写跳转地址')
+    return
+  }
+  if (!/^https?:\/\//.test(route) && !route.startsWith('/')) {
+    message.warning('地址格式不正确，请填写系统路由或 http(s) 地址')
+    return
+  }
+  if (route.startsWith('/') && !searchIndex.value.some((item) => item.route === route)) {
+    message.warning('未识别到系统内路由，请确认地址是否正确')
+    return
+  }
+  const duplicate = customCards.value.find((item) => item.route === route && item.id !== customCardEditingId.value)
+  if (duplicate) {
+    message.warning(`该地址已存在卡面：${duplicate.title}`)
+    return
+  }
+  if (!customCardEditingId.value && customCards.value.length >= 60) {
+    message.warning('卡面数量最多 60 个，请先删除部分卡面')
+    return
+  }
+  if (customCardEditingId.value) {
+    customCards.value = customCards.value.map((item) => item.id === customCardEditingId.value ? {
+      ...item,
+      title,
+      route,
+      description,
+      themeColor,
+      openMode,
+      icon,
+      category,
+      audience
+    } : item)
+    persistCustomCards()
+    customCardEditorOpen.value = false
+    customCardEditingId.value = ''
+    message.success('卡面已更新')
+    return
+  }
+  const id = `card_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+  customCards.value = [...customCards.value, { id, title, route, description, themeColor, openMode, icon, category, visible: true, audience }]
+  persistCustomCards()
+  customCardEditorOpen.value = false
+  customCardEditingId.value = ''
+  message.success('卡面已新增')
+}
+
+function addCustomCardFromTemplate(templateKey: string) {
+  const template = customCardTemplateCatalog.find((item) => item.key === templateKey)
+  if (!template) return
+  const existed = customCards.value.some((item) => item.title === template.title && item.route === template.route)
+  if (existed) {
+    message.info('该模板卡面已存在')
+    return
+  }
+  const id = `tpl_${template.key}_${Date.now()}`
+  customCards.value = [...customCards.value, { ...template, id, visible: true, audience: normalizeCardAudience(template.audience) }]
+  persistCustomCards()
+  message.success(`已添加模板卡面：${template.title}`)
+}
+
+function duplicateCustomCard(id: string) {
+  const source = customCards.value.find((item) => item.id === id)
+  if (!source) {
+    message.warning('未找到可复制的卡面')
+    return
+  }
+  if (customCards.value.length >= 60) {
+    message.warning('卡面数量最多 60 个，请先删除部分卡面')
+    return
+  }
+  const duplicated: PortalCustomCardItem = {
+    ...source,
+    id: `dup_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    title: `${source.title}（副本）`
+  }
+  customCards.value = [...customCards.value, duplicated]
+  persistCustomCards()
+  message.success('已复制卡面')
+}
+
+function addRecentRouteAsCards() {
+  const candidates = recentSearchRoutes.value.slice(0, 6)
+  if (!candidates.length) {
+    message.info('最近暂无访问记录')
+    return
+  }
+  const toAdd = candidates
+    .map((route) => searchIndex.value.find((item) => item.route === route))
+    .filter((item): item is { title: string; route: string; keywords: string } => !!item)
+    .filter((item) => !customCards.value.some((card) => card.route === item.route))
+  if (!toAdd.length) {
+    message.info('最近访问页面已全部存在')
+    return
+  }
+  const next = toAdd.map((item, idx) => ({
+    id: `recent_${Date.now()}_${idx}`,
+    title: item.title,
+    route: item.route,
+    description: '从最近访问自动添加',
+    themeColor: '#1677ff',
+    openMode: 'current' as const,
+    icon: '🧩',
+    category: 'CUSTOM' as const,
+    visible: true,
+    audience: ['ALL'] as AudienceCode[]
+  }))
+  customCards.value = [...customCards.value, ...next]
+  persistCustomCards()
+  message.success(`已添加 ${next.length} 张最近访问卡面`)
+}
+
+function onCustomCardDragStart(id: string) {
+  draggingCustomCardId.value = id
+}
+
+function onCustomCardDragOver(_id: string) {}
+
+function onCustomCardDrop(targetId: string) {
+  const sourceId = draggingCustomCardId.value
+  if (!sourceId || sourceId === targetId) return
+  const sourceIndex = customCards.value.findIndex((item) => item.id === sourceId)
+  const targetIndex = customCards.value.findIndex((item) => item.id === targetId)
+  if (sourceIndex < 0 || targetIndex < 0) return
+  const next = [...customCards.value]
+  const [moved] = next.splice(sourceIndex, 1)
+  next.splice(targetIndex, 0, moved)
+  customCards.value = next
+  draggingCustomCardId.value = ''
+  persistCustomCards()
+}
+
+function onCustomCardDragEnd() {
+  draggingCustomCardId.value = ''
+}
+
+function removeCustomCard(id: string) {
+  Modal.confirm({
+    title: '确认删除该卡面？',
+    okButtonProps: { danger: true },
+    onOk: async () => {
+      customCards.value = customCards.value.filter((item) => item.id !== id)
+      persistCustomCards()
+      message.success('卡面已删除')
+    }
+  })
+}
+
+function setCustomCardVisibleByFilter(visible: boolean) {
+  if (!manageFilteredCustomCards.value.length) {
+    message.info('当前没有可操作的卡面')
+    return
+  }
+  const targetIds = new Set(manageFilteredCustomCards.value.map((item) => item.id))
+  customCards.value = customCards.value.map((item) => targetIds.has(item.id) ? { ...item, visible } : item)
+  persistCustomCards()
+  message.success(visible ? '已将当前结果全部设为显示' : '已将当前结果全部设为隐藏')
+}
+
+function removeHiddenCustomCards() {
+  const hiddenCount = customCards.value.filter((item) => item.visible === false).length
+  if (!hiddenCount) {
+    message.info('暂无已隐藏卡面')
+    return
+  }
+  Modal.confirm({
+    title: `确认清理 ${hiddenCount} 个已隐藏卡面？`,
+    okButtonProps: { danger: true },
+    onOk: async () => {
+      customCards.value = customCards.value.filter((item) => item.visible !== false)
+      persistCustomCards()
+      message.success('已清理隐藏卡面')
+    }
+  })
+}
+
+function moveCustomCard(index: number, delta: -1 | 1) {
+  const targetIndex = index + delta
+  if (targetIndex < 0 || targetIndex >= customCards.value.length) return
+  const next = [...customCards.value]
+  const [moved] = next.splice(index, 1)
+  next.splice(targetIndex, 0, moved)
+  customCards.value = next
+  persistCustomCards()
+}
+
+function resetCustomCards() {
+  Modal.confirm({
+    title: '确认恢复默认卡面？',
+    onOk: async () => {
+      customCards.value = defaultCustomCards.map((item) => ({ ...item }))
+      persistCustomCards()
+      message.success('已恢复默认卡面')
+    }
+  })
+}
+
+function exportHomepageCustomize() {
+  const payload = {
+    version: 1,
+    exportedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+    moduleConfig: [...moduleConfig.value]
+      .sort((a, b) => a.order - b.order)
+      .map((item, index) => ({ key: item.key, visible: item.visible, order: index, audience: normalizeCardAudience(item.audience) })),
+    customCards: customCards.value
+  }
+  exportPayloadText.value = JSON.stringify(payload, null, 2)
+  exportPayloadOpen.value = true
+}
+
+async function copyExportPayload() {
+  if (!exportPayloadText.value) return
+  try {
+    await navigator.clipboard.writeText(exportPayloadText.value)
+    message.success('已复制配置 JSON')
+  } catch {
+    message.warning('复制失败，请手动复制')
+  }
+}
+
+function applyImportedHomepageCustomize() {
+  let parsed: any
+  try {
+    parsed = JSON.parse(String(importPayloadText.value || '').trim())
+  } catch {
+    message.error('JSON 格式不正确')
+    return
+  }
+  if (!parsed || typeof parsed !== 'object') {
+    message.error('配置内容无效')
+    return
+  }
+  if (Array.isArray(parsed.moduleConfig)) {
+    const visibilityMap = new Map<string, boolean>()
+    const orderMap = new Map<string, number>()
+    const audienceMap = new Map<string, AudienceCode[]>()
+    parsed.moduleConfig.forEach((item: any, index: number) => {
+      const key = String(item?.key || '')
+      if (!key) return
+      visibilityMap.set(key, item?.visible !== false)
+      orderMap.set(key, Number.isFinite(Number(item?.order)) ? Number(item.order) : index)
+      audienceMap.set(key, normalizeCardAudience(item?.audience))
+    })
+    moduleConfig.value = portalModuleCatalog
+      .map((item, index) => ({
+        ...item,
+        visible: visibilityMap.has(item.key) ? Boolean(visibilityMap.get(item.key)) : true,
+        order: orderMap.has(item.key) ? Number(orderMap.get(item.key)) : index,
+        audience: audienceMap.get(item.key) || normalizeCardAudience(item.audience)
+      }))
+      .sort((a, b) => a.order - b.order)
+      .map((item, index) => ({ ...item, order: index }))
+    if (!moduleConfig.value.some((item) => item.visible)) {
+      message.error('导入失败：至少需要保留一个首页模块')
+      return
+    }
+  }
+  if (Array.isArray(parsed.customCards)) {
+    const nextCards = parsed.customCards
+      .map((item: any, index: number) => normalizeCustomCardPayload(item, `import_${Date.now()}_${index}`))
+      .filter((item: PortalCustomCardItem) => !!item.title && !!item.route)
+    customCards.value = nextCards
+  }
+  if (!Array.isArray(parsed.moduleConfig) && !Array.isArray(parsed.customCards)) {
+    message.error('导入失败：缺少 moduleConfig 或 customCards 字段')
+    return
+  }
+  persistModuleCustomize()
+  persistCustomCards()
+  importPayloadOpen.value = false
+  importPayloadText.value = ''
+  message.success('首页配置导入成功')
 }
 
 function openCreateSchedule(date?: Dayjs) {
@@ -1371,6 +2480,9 @@ async function init() {
       buildSearchIndex()
       loadRecentSearchRoutes()
     }
+    updateCustomCardRouteOptions('')
+    loadModuleCustomize()
+    loadCustomCards()
     updateSearchOptions(searchKeyword.value)
     await Promise.all([loadSummary(), loadCalendar(), loadStaffOptions(), loadDepartmentOptions()])
     await Promise.allSettled([
@@ -1519,6 +2631,93 @@ onMounted(init)
 
 .expense-row strong {
   color: #0f172a;
+}
+
+.custom-card-item {
+  border: 1px solid #dbeafe;
+  border-top: 3px solid #1677ff;
+  border-radius: 10px;
+  background: #f8fbff;
+  padding: 10px;
+  cursor: pointer;
+  height: 100%;
+}
+
+.custom-card-item:hover {
+  border-color: #91caff;
+  background: #eef6ff;
+}
+
+.custom-card-title {
+  font-weight: 700;
+  color: #1e3a8a;
+}
+
+.custom-card-route {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #475569;
+  word-break: break-all;
+}
+
+.custom-card-desc {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.custom-card-actions {
+  margin-top: 6px;
+}
+
+.custom-card-mode {
+  margin-top: 6px;
+}
+
+.custom-card-category {
+  margin-top: 6px;
+  margin-left: 6px;
+}
+
+.template-tag {
+  cursor: pointer;
+}
+
+.manage-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.manage-card-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px;
+  background: #fff;
+}
+
+.manage-card-item:hover {
+  border-color: #91caff;
+}
+
+.manage-card-main {
+  min-width: 0;
+  margin-right: 10px;
+}
+
+.manage-card-title {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.manage-card-desc {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #64748b;
+  word-break: break-all;
 }
 
 .hint-text {

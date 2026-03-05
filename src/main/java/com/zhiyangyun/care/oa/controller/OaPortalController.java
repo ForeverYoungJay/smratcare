@@ -34,6 +34,10 @@ import com.zhiyangyun.care.schedule.entity.AttendanceRecord;
 import com.zhiyangyun.care.schedule.mapper.AttendanceRecordMapper;
 import com.zhiyangyun.care.store.model.MaterialCenterOverviewResponse;
 import com.zhiyangyun.care.store.service.MaterialCenterOverviewService;
+import com.zhiyangyun.care.survey.entity.SurveySubmission;
+import com.zhiyangyun.care.survey.entity.SurveyTemplate;
+import com.zhiyangyun.care.survey.mapper.SurveySubmissionMapper;
+import com.zhiyangyun.care.survey.mapper.SurveyTemplateMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -61,6 +65,8 @@ public class OaPortalController {
   private final HealthInspectionMapper healthInspectionMapper;
   private final ElderMapper elderMapper;
   private final CrmLeadMapper crmLeadMapper;
+  private final SurveyTemplateMapper surveyTemplateMapper;
+  private final SurveySubmissionMapper surveySubmissionMapper;
 
   public OaPortalController(
       OaNoticeMapper noticeMapper,
@@ -77,7 +83,9 @@ public class OaPortalController {
       MaterialCenterOverviewService materialCenterOverviewService,
       HealthInspectionMapper healthInspectionMapper,
       ElderMapper elderMapper,
-      CrmLeadMapper crmLeadMapper) {
+      CrmLeadMapper crmLeadMapper,
+      SurveyTemplateMapper surveyTemplateMapper,
+      SurveySubmissionMapper surveySubmissionMapper) {
     this.noticeMapper = noticeMapper;
     this.todoMapper = todoMapper;
     this.approvalMapper = approvalMapper;
@@ -93,6 +101,8 @@ public class OaPortalController {
     this.healthInspectionMapper = healthInspectionMapper;
     this.elderMapper = elderMapper;
     this.crmLeadMapper = crmLeadMapper;
+    this.surveyTemplateMapper = surveyTemplateMapper;
+    this.surveySubmissionMapper = surveySubmissionMapper;
   }
 
   @GetMapping("/summary")
@@ -152,6 +162,7 @@ public class OaPortalController {
     Long leavePendingCount = countByApprovalType(orgId, "LEAVE");
     Long reimbursePendingCount = countByApprovalType(orgId, "REIMBURSE");
     Long purchasePendingCount = countByApprovalType(orgId, "PURCHASE");
+    Long marketingPlanPendingCount = countByApprovalType(orgId, "MARKETING_PLAN");
     Long contractPendingCount = count(crmLeadMapper.selectCount(Wrappers.lambdaQuery(CrmLead.class)
         .eq(CrmLead::getIsDeleted, 0)
         .eq(orgId != null, CrmLead::getOrgId, orgId)
@@ -197,11 +208,29 @@ public class OaPortalController {
         .eq(ElderProfile::getStatus, 1)));
 
     Long inventoryLowStockCount = materialOverview.getLowStockCount();
+    Long surveyDraftCount = count(surveyTemplateMapper.selectCount(Wrappers.lambdaQuery(SurveyTemplate.class)
+        .eq(SurveyTemplate::getIsDeleted, 0)
+        .eq(orgId != null, SurveyTemplate::getOrgId, orgId)
+        .eq(SurveyTemplate::getStatus, 0)));
+    Long surveyPublishedCount = count(surveyTemplateMapper.selectCount(Wrappers.lambdaQuery(SurveyTemplate.class)
+        .eq(SurveyTemplate::getIsDeleted, 0)
+        .eq(orgId != null, SurveyTemplate::getOrgId, orgId)
+        .eq(SurveyTemplate::getStatus, 1)));
+    Long surveyFamilyPublishedCount = count(surveyTemplateMapper.selectCount(Wrappers.lambdaQuery(SurveyTemplate.class)
+        .eq(SurveyTemplate::getIsDeleted, 0)
+        .eq(orgId != null, SurveyTemplate::getOrgId, orgId)
+        .eq(SurveyTemplate::getStatus, 1)
+        .eq(SurveyTemplate::getTargetType, "FAMILY")));
+    Long surveyTodaySubmissionCount = count(surveySubmissionMapper.selectCount(Wrappers.lambdaQuery(SurveySubmission.class)
+        .eq(SurveySubmission::getIsDeleted, 0)
+        .eq(orgId != null, SurveySubmission::getOrgId, orgId)
+        .ge(SurveySubmission::getCreateTime, today.atStartOfDay())
+        .lt(SurveySubmission::getCreateTime, today.plusDays(1).atStartOfDay())));
 
     List<OaPortalSummary.MarketingChannelItem> marketingChannels = queryMarketingChannels(orgId);
     List<OaPortalSummary.CollaborationGanttItem> collaborationGantt = queryCollaborationGantt(orgId);
     List<OaPortalSummary.WorkflowTodoItem> workflowTodos = buildWorkflowTodos(
-        leavePendingCount, reimbursePendingCount, purchasePendingCount, contractPendingCount);
+        leavePendingCount, reimbursePendingCount, purchasePendingCount, marketingPlanPendingCount, contractPendingCount);
     List<OaPortalSummary.SuggestionItem> latestSuggestions = queryLatestSuggestions(orgId);
     Long suggestionCount = count(suggestionMapper.selectCount(Wrappers.lambdaQuery(OaSuggestion.class)
         .eq(OaSuggestion::getIsDeleted, 0)
@@ -234,6 +263,10 @@ public class OaPortalController {
     summary.setMaterialPurchaseDraftCount(materialPurchaseDraftCount);
     summary.setInHospitalElderCount(inHospitalElderCount);
     summary.setSuggestionCount(suggestionCount);
+    summary.setSurveyDraftCount(surveyDraftCount);
+    summary.setSurveyPublishedCount(surveyPublishedCount);
+    summary.setSurveyTodaySubmissionCount(surveyTodaySubmissionCount);
+    summary.setSurveyFamilyPublishedCount(surveyFamilyPublishedCount);
     summary.setWorkflowTodos(workflowTodos);
     summary.setMarketingChannels(marketingChannels);
     summary.setCollaborationGantt(collaborationGantt);
@@ -253,12 +286,14 @@ public class OaPortalController {
       Long leavePendingCount,
       Long reimbursePendingCount,
       Long purchasePendingCount,
+      Long marketingPlanPendingCount,
       Long contractPendingCount) {
     List<OaPortalSummary.WorkflowTodoItem> items = new ArrayList<>();
     items.add(workflow("LEAVE", "请假审批", leavePendingCount, "/oa/approval"));
     items.add(workflow("OVERTIME", "加班申请", 0L, "/oa/approval"));
     items.add(workflow("REIMBURSE", "报销审批", reimbursePendingCount, "/oa/approval"));
     items.add(workflow("PURCHASE", "采购审批", purchasePendingCount, "/oa/approval"));
+    items.add(workflow("MARKETING_PLAN", "营销方案审批", marketingPlanPendingCount, "/oa/approval?type=MARKETING_PLAN&status=PENDING"));
     items.add(workflow("CONTRACT", "合同审批", contractPendingCount, "/marketing/contract-signing"));
     return items;
   }

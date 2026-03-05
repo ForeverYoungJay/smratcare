@@ -23,6 +23,8 @@ public class HealthInspection {
   private String status;
   private String inspectorName;
   private String followUpAction;
+  private String attachmentUrls;
+  private String otherNote;
   private String remark;
   private Long createdBy;
   @TableField("create_time")

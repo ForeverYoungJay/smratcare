@@ -9,6 +9,9 @@ export function createOuting(data) {
 export function returnOuting(id, data) {
     return request.put(`/api/elder/lifecycle/outing/${id}/return`, data);
 }
+export function deleteOuting(id) {
+    return request.delete(`/api/elder/lifecycle/outing/${id}`);
+}
 export function getMedicalOutingPage(params) {
     return fetchPage('/api/elder/lifecycle/medical-outing/page', params);
 }
@@ -17,6 +20,9 @@ export function createMedicalOuting(data) {
 }
 export function returnMedicalOuting(id, data) {
     return request.put(`/api/elder/lifecycle/medical-outing/${id}/return`, data);
+}
+export function deleteMedicalOuting(id) {
+    return request.delete(`/api/elder/lifecycle/medical-outing/${id}`);
 }
 export function getTrialStayPage(params) {
     return fetchPage('/api/elder/lifecycle/trial-stay/page', params);
@@ -27,6 +33,9 @@ export function createTrialStay(data) {
 export function updateTrialStay(id, data) {
     return request.put(`/api/elder/lifecycle/trial-stay/${id}`, data);
 }
+export function deleteTrialStay(id) {
+    return request.delete(`/api/elder/lifecycle/trial-stay/${id}`);
+}
 export function getDischargeApplyPage(params) {
     return fetchPage('/api/elder/lifecycle/discharge-apply/page', params);
 }
@@ -35,6 +44,9 @@ export function createDischargeApply(data) {
 }
 export function reviewDischargeApply(id, data) {
     return request.put(`/api/elder/lifecycle/discharge-apply/${id}/review`, data);
+}
+export function deleteDischargeApply(id) {
+    return request.delete(`/api/elder/lifecycle/discharge-apply/${id}`);
 }
 export function getDeathRegisterPage(params) {
     return fetchPage('/api/elder/lifecycle/death-register/page', params);
@@ -47,6 +59,9 @@ export function updateDeathRegister(id, data) {
 }
 export function cancelDeathRegister(id, data) {
     return request.put(`/api/elder/lifecycle/death-register/${id}/cancel`, data || {});
+}
+export function deleteDeathRegister(id) {
+    return request.delete(`/api/elder/lifecycle/death-register/${id}`);
 }
 export function exportMedicalOuting(params) {
     return exportCsvByRequest('/api/elder/lifecycle/medical-outing/export', params, '外出就医登记.csv');

@@ -91,6 +91,30 @@ public class AdminSurveyTemplateController {
   }
 
   @PreAuthorize("hasRole('ADMIN')")
+  @PostMapping("/{id}/publish")
+  public Result<SurveyTemplate> publish(@PathVariable Long id) {
+    SurveyTemplate updated = templateService.publish(AuthContext.getOrgId(), id);
+    if (updated == null) {
+      return Result.error(404, "Template not found");
+    }
+    auditLogService.record(AuthContext.getOrgId(), AuthContext.getOrgId(), AuthContext.getStaffId(), AuthContext.getUsername(),
+        "PUBLISH", "SURVEY_TEMPLATE", id, "发布问卷模板");
+    return Result.ok(updated);
+  }
+
+  @PreAuthorize("hasRole('ADMIN')")
+  @PostMapping("/{id}/disable")
+  public Result<SurveyTemplate> disable(@PathVariable Long id) {
+    SurveyTemplate updated = templateService.disable(AuthContext.getOrgId(), id);
+    if (updated == null) {
+      return Result.error(404, "Template not found");
+    }
+    auditLogService.record(AuthContext.getOrgId(), AuthContext.getOrgId(), AuthContext.getStaffId(), AuthContext.getUsername(),
+        "DISABLE", "SURVEY_TEMPLATE", id, "停用问卷模板");
+    return Result.ok(updated);
+  }
+
+  @PreAuthorize("hasRole('ADMIN')")
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
     SurveyTemplateDetailResponse detail = templateService.getDetail(AuthContext.getOrgId(), id);
@@ -108,6 +132,7 @@ public class AdminSurveyTemplateController {
     template.setTemplateCode(request.getTemplateCode());
     template.setTemplateName(request.getTemplateName());
     template.setDescription(request.getDescription());
+    template.setContent(request.getContent());
     template.setTargetType(request.getTargetType());
     template.setStatus(request.getStatus());
     template.setAnonymousFlag(request.getAnonymousFlag());

@@ -13,6 +13,8 @@ public class SurveyTemplateRequest {
 
   private String description;
 
+  private String content;
+
   @NotBlank
   private String targetType;
 

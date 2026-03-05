@@ -14,5 +14,6 @@ public class OutingCreateRequest {
   private LocalDateTime expectedReturnTime;
   private String companion;
   private String reason;
+  private String leaveNoteImageUrl;
   private String remark;
 }

@@ -45,6 +45,7 @@
       <div class="table-actions">
         <a-space>
           <a-button type="primary" @click="goCreate">新增老人</a-button>
+          <a-button type="primary" ghost @click="goQuickArchiveCreate">档案一键生成（直办入住）</a-button>
           <a-button @click="exportCsvData">导出CSV</a-button>
           <a-button :disabled="selectedCount !== 1" @click="goDetailSelected">详情</a-button>
           <a-button :disabled="selectedCount !== 1" @click="goEditSelected">编辑</a-button>
@@ -176,7 +177,7 @@ const columns = [
 ]
 const selectedCount = computed(() => selectedRowKeys.value.length)
 const selectedRows = computed(() => rows.value.filter((item) => selectedRowKeys.value.some((id) => String(id) === String(item.id))))
-const elderFlowSteps = ['合同最终签署', '长者入院', '在院管理']
+const elderFlowSteps = ['档案建档', '办理入住', '在院管理']
 const elderFlowCurrentIndex = computed(() => {
   if (!selectedRows.value.length) return 2
   const row = selectedRows.value[0]
@@ -195,7 +196,7 @@ const elderFlowStageColor = computed(() => {
   return 'default'
 })
 const elderFlowSubject = computed(() => {
-  if (!selectedRows.value.length) return `当前列表共 ${total.value} 位，均来源于已签署合同`
+  if (!selectedRows.value.length) return `当前列表共 ${total.value} 位，支持营销签约与直办入住双来源`
   const row = selectedRows.value[0]
   return `长者 ${row.fullName} / 床位 ${row.bedNo || '-'}`
 })
@@ -206,8 +207,8 @@ const elderFlowBlockers = computed(() => {
   return []
 })
 const elderFlowHint = computed(() => {
-  if (!selectedRows.value.length) return '系统仅展示最终签署成功合同对应长者'
-  return '可执行换床、退住、家属绑定等在院操作'
+  if (!selectedRows.value.length) return '支持档案一键生成并直办入住；可与营销合同流程并行'
+  return '可执行换床、退住、家属绑定与二维码打印等在院操作'
 })
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
@@ -273,7 +274,6 @@ async function fetchData() {
     const res: PageResult<ElderItem> = await getElderPage({
       pageNo: query.pageNo,
       pageSize: query.pageSize,
-      signedOnly: true,
       fullName: query.fullName,
       idCardNo: query.idCardNo,
       bedNo: query.bedNo,
@@ -376,6 +376,10 @@ function exportCsvData() {
 
 function goCreate() {
   router.push('/elder/create')
+}
+
+function goQuickArchiveCreate() {
+  router.push('/elder/create?quickArchive=1')
 }
 
 function goEdit(id: Id) {

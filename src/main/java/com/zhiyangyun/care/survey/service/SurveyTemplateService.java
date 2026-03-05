@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.zhiyangyun.care.survey.entity.SurveyTemplate;
 import com.zhiyangyun.care.survey.model.SurveyTemplateDetailResponse;
 import com.zhiyangyun.care.survey.model.SurveyTemplateQuestionItem;
+import java.time.LocalDate;
 import java.util.List;
 
 public interface SurveyTemplateService {
@@ -15,7 +16,14 @@ public interface SurveyTemplateService {
 
   IPage<SurveyTemplate> page(Long orgId, long pageNo, long pageSize, String keyword, Integer status, String targetType);
 
+  IPage<SurveyTemplate> pagePublishedAvailable(Long orgId, long pageNo, long pageSize, String keyword, String targetType,
+      LocalDate date);
+
   void setQuestions(Long orgId, Long templateId, List<SurveyTemplateQuestionItem> items);
+
+  SurveyTemplate publish(Long orgId, Long id);
+
+  SurveyTemplate disable(Long orgId, Long id);
 
   void delete(Long orgId, Long id);
 }

@@ -25,6 +25,8 @@ import com.zhiyangyun.care.crm.model.MarketingPlanRequest;
 import com.zhiyangyun.care.crm.model.MarketingPlanResponse;
 import com.zhiyangyun.care.crm.model.MarketingPlanWorkflowSummaryResponse;
 import com.zhiyangyun.care.crm.service.MarketingPlanService;
+import com.zhiyangyun.care.oa.entity.OaApproval;
+import com.zhiyangyun.care.oa.mapper.OaApprovalMapper;
 import com.zhiyangyun.care.oa.entity.OaTodo;
 import com.zhiyangyun.care.oa.mapper.OaTodoMapper;
 import java.math.BigDecimal;
@@ -50,6 +52,7 @@ public class MarketingPlanServiceImpl implements MarketingPlanService {
   private final DepartmentMapper departmentMapper;
   private final StaffMapper staffMapper;
   private final OaTodoMapper todoMapper;
+  private final OaApprovalMapper oaApprovalMapper;
 
   public MarketingPlanServiceImpl(
       CrmMarketingPlanMapper marketingPlanMapper,
@@ -59,7 +62,8 @@ public class MarketingPlanServiceImpl implements MarketingPlanService {
       CrmMarketingPlanPerformanceMapper performanceMapper,
       DepartmentMapper departmentMapper,
       StaffMapper staffMapper,
-      OaTodoMapper todoMapper) {
+      OaTodoMapper todoMapper,
+      OaApprovalMapper oaApprovalMapper) {
     this.marketingPlanMapper = marketingPlanMapper;
     this.planDepartmentMapper = planDepartmentMapper;
     this.approvalMapper = approvalMapper;
@@ -68,6 +72,7 @@ public class MarketingPlanServiceImpl implements MarketingPlanService {
     this.departmentMapper = departmentMapper;
     this.staffMapper = staffMapper;
     this.todoMapper = todoMapper;
+    this.oaApprovalMapper = oaApprovalMapper;
   }
 
   @Override
@@ -150,6 +155,7 @@ public class MarketingPlanServiceImpl implements MarketingPlanService {
     }
     entity.setStatus("PENDING_APPROVAL");
     marketingPlanMapper.updateById(entity);
+    syncApprovalTicketOnSubmit(orgId, staffId, entity);
     return toResponse(entity, staffId);
   }
 
@@ -164,6 +170,7 @@ public class MarketingPlanServiceImpl implements MarketingPlanService {
     approvalMapper.insert(approval);
     entity.setStatus("APPROVED");
     marketingPlanMapper.updateById(entity);
+    syncApprovalTicketStatus(orgId, id, "APPROVED", request == null ? null : request.getRemark());
     return toResponse(entity, staffId);
   }
 
@@ -178,6 +185,7 @@ public class MarketingPlanServiceImpl implements MarketingPlanService {
     approvalMapper.insert(approval);
     entity.setStatus("REJECTED");
     marketingPlanMapper.updateById(entity);
+    syncApprovalTicketStatus(orgId, id, "REJECTED", request == null ? null : request.getRemark());
     return toResponse(entity, staffId);
   }
 
@@ -296,6 +304,18 @@ public class MarketingPlanServiceImpl implements MarketingPlanService {
     CrmMarketingPlan entity = getById(orgId, id);
     entity.setIsDeleted(1);
     marketingPlanMapper.updateById(entity);
+    List<OaApproval> approvals = oaApprovalMapper.selectList(Wrappers.lambdaQuery(OaApproval.class)
+        .eq(OaApproval::getIsDeleted, 0)
+        .eq(orgId != null, OaApproval::getOrgId, orgId)
+        .eq(OaApproval::getApprovalType, "MARKETING_PLAN")
+        .orderByDesc(OaApproval::getCreateTime)
+        .last("LIMIT 300"));
+    approvals.stream()
+        .filter(item -> matchesPlanId(item.getFormData(), id))
+        .forEach(item -> {
+          item.setIsDeleted(1);
+          oaApprovalMapper.updateById(item);
+        });
   }
 
   private void syncPublishLinkages(Long orgId, Long staffId, CrmMarketingPlan plan) {
@@ -363,6 +383,86 @@ public class MarketingPlanServiceImpl implements MarketingPlanService {
         todoMapper.insert(todo);
       }
     }
+  }
+
+  private void syncApprovalTicketOnSubmit(Long orgId, Long staffId, CrmMarketingPlan plan) {
+    StaffAccount staff = staffMapper.selectById(staffId);
+    OaApproval approval = findLatestMarketingApprovalByPlanId(orgId, plan.getId());
+    if (approval != null && "PENDING".equals(approval.getStatus())) {
+      approval.setTitle("营销方案审批：" + safeText(plan.getTitle(), "未命名方案"));
+      approval.setApplicantId(staffId);
+      approval.setApplicantName(staff == null ? String.valueOf(staffId) : safeText(staff.getRealName(), String.valueOf(staffId)));
+      approval.setFormData(buildApprovalFormData(plan));
+      approval.setRemark("营销方案重新提交审批");
+      oaApprovalMapper.updateById(approval);
+      return;
+    }
+
+    OaApproval newApproval = new OaApproval();
+    newApproval.setTenantId(orgId);
+    newApproval.setOrgId(orgId);
+    newApproval.setApprovalType("MARKETING_PLAN");
+    newApproval.setTitle("营销方案审批：" + safeText(plan.getTitle(), "未命名方案"));
+    newApproval.setApplicantId(staffId);
+    newApproval.setApplicantName(staff == null ? String.valueOf(staffId) : safeText(staff.getRealName(), String.valueOf(staffId)));
+    newApproval.setFormData(buildApprovalFormData(plan));
+    newApproval.setStatus("PENDING");
+    newApproval.setRemark("营销方案提交审批");
+    newApproval.setCreatedBy(staffId);
+    oaApprovalMapper.insert(newApproval);
+  }
+
+  private void syncApprovalTicketStatus(Long orgId, Long planId, String status, String remark) {
+    OaApproval approval = findLatestMarketingApprovalByPlanId(orgId, planId);
+    if (approval == null) {
+      return;
+    }
+    if ("PENDING".equals(approval.getStatus()) || !StringUtils.hasText(approval.getStatus())) {
+      approval.setStatus(status);
+    }
+    if (StringUtils.hasText(remark)) {
+      approval.setRemark(remark.trim());
+    } else if (!StringUtils.hasText(approval.getRemark())) {
+      approval.setRemark("APPROVED".equals(status) ? "营销方案审批通过" : "营销方案审批驳回");
+    }
+    oaApprovalMapper.updateById(approval);
+  }
+
+  private OaApproval findLatestMarketingApprovalByPlanId(Long orgId, Long planId) {
+    if (planId == null) {
+      return null;
+    }
+    List<OaApproval> approvals = oaApprovalMapper.selectList(Wrappers.lambdaQuery(OaApproval.class)
+        .eq(OaApproval::getIsDeleted, 0)
+        .eq(orgId != null, OaApproval::getOrgId, orgId)
+        .eq(OaApproval::getApprovalType, "MARKETING_PLAN")
+        .orderByDesc(OaApproval::getCreateTime)
+        .last("LIMIT 300"));
+    return approvals.stream()
+        .filter(item -> matchesPlanId(item.getFormData(), planId))
+        .findFirst()
+        .orElse(null);
+  }
+
+  private boolean matchesPlanId(String formData, Long planId) {
+    String data = trimToNull(formData);
+    if (data == null || planId == null) {
+      return false;
+    }
+    String stringToken = "\"planId\":\"" + planId + "\"";
+    String numericToken = "\"planId\":" + planId;
+    return data.contains(stringToken) || data.contains(numericToken);
+  }
+
+  private String buildApprovalFormData(CrmMarketingPlan plan) {
+    String planId = String.valueOf(plan.getId());
+    String moduleType = safeJsonText(plan.getModuleType());
+    String title = safeJsonText(plan.getTitle());
+    return "{\"planId\":\"" + planId + "\",\"moduleType\":\"" + moduleType + "\",\"title\":\"" + title + "\"}";
+  }
+
+  private String safeJsonText(String value) {
+    return safeText(value, "").replace("\\", "\\\\").replace("\"", "\\\"");
   }
 
   private void syncPerformanceOnRead(Long orgId, Long planId, Long staffId, String staffName, String action) {

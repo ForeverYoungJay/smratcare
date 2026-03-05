@@ -11,7 +11,7 @@
               <a-input v-model:value="qrCode" placeholder="扫码后自动填充" />
             </a-form-item>
             <a-space>
-              <a-button type="primary" @click="go(`/care/workbench/task-board?residentId=${residentId}&date=${dateValue}`)">查看任务</a-button>
+              <a-button type="primary" @click="goTaskBoard">查看任务</a-button>
               <a-button @click="go('/elder/bed-panorama')">床态全景</a-button>
             </a-space>
           </a-form>
@@ -43,6 +43,7 @@ import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
 import { getTaskPage } from '../../../api/care'
 import type { CareTaskItem } from '../../../types'
+import { resolveCareError } from '../careError'
 
 const route = useRoute()
 const router = useRouter()
@@ -55,7 +56,27 @@ const errorMessage = ref('')
 const pendingRows = ref<CareTaskItem[]>([])
 
 function go(path: string) {
-  router.push(path)
+  const [pathname, search] = path.split('?')
+  const parsed = new URLSearchParams(search || '')
+  const query: Record<string, any> = {}
+  parsed.forEach((value, key) => {
+    query[key] = value
+  })
+  const resident = route.query.residentId ?? route.query.elderId
+  if (resident != null && query.residentId == null && query.elderId == null) {
+    query.residentId = resident
+    query.elderId = resident
+  }
+  router.push({ path: pathname, query })
+}
+
+function goTaskBoard() {
+  const query: Record<string, any> = { date: dateValue.value }
+  if (residentId.value != null) {
+    query.residentId = residentId.value
+    query.elderId = residentId.value
+  }
+  router.push({ path: '/care/workbench/task-board', query })
 }
 
 async function loadRows() {
@@ -70,8 +91,8 @@ async function loadRows() {
       status: 'PENDING'
     })
     pendingRows.value = page.list || []
-  } catch (error: any) {
-    errorMessage.value = error?.message || '加载待执行任务失败'
+  } catch (error) {
+    errorMessage.value = resolveCareError(error, '加载待执行任务失败')
     message.error(errorMessage.value)
   } finally {
     loading.value = false

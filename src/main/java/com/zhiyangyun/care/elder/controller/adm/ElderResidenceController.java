@@ -206,6 +206,7 @@ public class ElderResidenceController {
     record.setExpectedReturnTime(request.getExpectedReturnTime());
     record.setCompanion(request.getCompanion());
     record.setReason(request.getReason());
+    record.setLeaveNoteImageUrl(request.getLeaveNoteImageUrl());
     record.setStatus(ResidenceLifecycleConstants.OUTING_OUT);
     record.setRemark(request.getRemark());
     record.setCreatedBy(AuthContext.getStaffId());

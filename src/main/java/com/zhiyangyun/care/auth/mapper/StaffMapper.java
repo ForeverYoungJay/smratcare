@@ -1,6 +1,7 @@
 package com.zhiyangyun.care.auth.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zhiyangyun.care.auth.entity.StaffAccount;
 import java.io.Serializable;
 import java.util.Collection;
@@ -10,6 +11,14 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 public interface StaffMapper extends BaseMapper<StaffAccount> {
+  @Override
+  default List<StaffAccount> selectBatchIds(Collection<? extends Serializable> idList) {
+    if (idList == null || idList.isEmpty()) {
+      return Collections.emptyList();
+    }
+    return this.selectList(Wrappers.lambdaQuery(StaffAccount.class).in(StaffAccount::getId, idList));
+  }
+
   default List<StaffAccount> selectBatchIdsSafe(Collection<? extends Serializable> idList) {
     if (idList == null || idList.isEmpty()) {
       return Collections.emptyList();

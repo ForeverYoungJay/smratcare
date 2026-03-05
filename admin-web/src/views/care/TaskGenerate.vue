@@ -22,6 +22,7 @@ import { reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { generateTasksByPackage } from '../../api/standard'
+import { resolveCareError } from './careError'
 
 const loading = ref(false)
 const lastCount = ref<number | null>(null)
@@ -37,8 +38,8 @@ async function submit() {
     const count = await generateTasksByPackage({ date: form.date, force: form.force })
     lastCount.value = Number(count)
     message.success('任务已生成')
-  } catch {
-    message.error('生成失败')
+  } catch (error) {
+    message.error(resolveCareError(error, '生成失败'))
   } finally {
     loading.value = false
   }

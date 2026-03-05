@@ -55,7 +55,7 @@ export interface InventoryAdjustRequest {
   productId: number
   warehouseId?: number
   batchId?: number
-  inventoryType?: 'ASSET' | 'MATERIAL' | 'CONSUMABLE'
+  inventoryType?: string
   adjustType: 'GAIN' | 'LOSS'
   adjustQty: number
   reason?: string
@@ -89,7 +89,7 @@ export interface InventoryAdjustmentItem {
   batchId?: number
   warehouseId?: number
   warehouseName?: string
-  inventoryType?: 'ASSET' | 'MATERIAL' | 'CONSUMABLE'
+  inventoryType?: string
   adjustType: 'GAIN' | 'LOSS'
   adjustQty: number
   reason?: string
@@ -101,7 +101,7 @@ export interface InventoryAdjustmentDiffItem {
   productId: number
   productName?: string
   category?: string
-  inventoryType?: 'ASSET' | 'MATERIAL' | 'CONSUMABLE'
+  inventoryType?: string
   warehouseId?: number
   warehouseName?: string
   gainQty: number

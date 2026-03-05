@@ -11,6 +11,8 @@ public class SurveySubmissionRequest {
   @NotNull
   private Long templateId;
 
+  private String templateCode;
+
   @NotBlank
   private String targetType;
 

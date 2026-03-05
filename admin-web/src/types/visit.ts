@@ -8,7 +8,6 @@ export interface VisitBookingItem {
   visitTime: string
   visitorCount: number
   carPlate?: string
-  visitCode?: string
   status?: number
 }
 
@@ -24,5 +23,18 @@ export interface VisitBookRequest {
 
 export interface VisitCheckinRequest {
   bookingId?: number
-  visitCode?: string
+}
+
+export interface VisitPrintTicket {
+  bookingId: number
+  ticketNo: string
+  elderName?: string
+  familyName?: string
+  floorNo?: string
+  roomNo?: string
+  visitTime?: string
+  visitorCount?: number
+  carPlate?: string
+  statusText?: string
+  generatedAt?: string
 }

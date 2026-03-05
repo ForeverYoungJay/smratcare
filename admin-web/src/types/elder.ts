@@ -7,6 +7,9 @@ export interface ElderItem {
   idCardNo?: string
   phone?: string
   homeAddress?: string
+  medicalInsuranceCopyUrl?: string
+  householdCopyUrl?: string
+  medicalRecordFileUrl?: string
   elderCode?: string
   gender?: number
   birthDate?: string
@@ -29,6 +32,9 @@ export interface ElderCreateRequest {
   idCardNo?: string
   phone?: string
   homeAddress?: string
+  medicalInsuranceCopyUrl?: string
+  householdCopyUrl?: string
+  medicalRecordFileUrl?: string
   elderCode?: string
   gender?: number
   birthDate?: string
@@ -273,6 +279,7 @@ export interface OutingItem {
   actualReturnTime?: string
   companion?: string
   reason?: string
+  leaveNoteImageUrl?: string
   status?: OutingStatus
   remark?: string
   createTime?: string
@@ -284,6 +291,7 @@ export interface OutingCreateRequest {
   expectedReturnTime?: string
   companion?: string
   reason?: string
+  leaveNoteImageUrl?: string
   remark?: string
 }
 

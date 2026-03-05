@@ -60,6 +60,8 @@ import PageContainer from '../../components/PageContainer.vue'
 import { getTemplatePage, createTemplate, updateTemplate, deleteTemplate } from '../../api/care'
 import type { CareTaskTemplate, PageResult } from '../../types'
 import { exportCsv } from '../../utils/export'
+import { resolveCareError } from './careError'
+import { careTemplateExportColumns, mapCareExportRows } from '../../constants/careExport'
 
 const list = ref<CareTaskTemplate[]>([])
 const loading = ref(false)
@@ -112,8 +114,8 @@ async function submit() {
     message.success('保存成功')
     modalOpen.value = false
     load()
-  } catch {
-    message.error('保存失败')
+  } catch (error) {
+    message.error(resolveCareError(error, '保存失败'))
   } finally {
     submitting.value = false
   }
@@ -123,9 +125,13 @@ async function remove(id: number) {
   Modal.confirm({
     title: '确认删除该模板？',
     onOk: async () => {
-      await deleteTemplate(id)
-      message.success('已删除')
-      load()
+      try {
+        await deleteTemplate(id)
+        message.success('已删除')
+        await load()
+      } catch (error) {
+        message.error(resolveCareError(error, '删除失败'))
+      }
     }
   })
 }
@@ -135,8 +141,8 @@ async function toggle(record: CareTaskTemplate) {
     await updateTemplate(record.id, { enabled: !record.enabled })
     message.success('状态已更新')
     load()
-  } catch {
-    message.error('更新失败')
+  } catch (error) {
+    message.error(resolveCareError(error, '更新失败'))
   }
 }
 
@@ -149,22 +155,22 @@ async function load() {
     })
     list.value = res.list
     page.total = res.total
+  } catch (error) {
+    message.error(resolveCareError(error, '加载护理模板失败'))
+    list.value = []
+    page.total = 0
   } finally {
     loading.value = false
   }
 }
 
 function exportCsvData() {
-  exportCsv(
-    list.value.map((t) => ({
-      任务名称: t.taskName,
-      频次: t.frequencyPerDay,
-      护理等级: t.careLevelRequired || '',
-      收费: t.chargeAmount ?? 0,
-      状态: t.enabled ? '启用' : '停用'
-    })),
-    '护理模板'
-  )
+  if (!list.value.length) {
+    message.warning('暂无可导出数据')
+    return
+  }
+  exportCsv(mapCareExportRows(list.value, careTemplateExportColumns), '护理模板')
+  message.success('CSV导出成功')
 }
 
 load()

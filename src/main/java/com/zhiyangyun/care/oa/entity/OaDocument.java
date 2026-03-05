@@ -21,6 +21,8 @@ public class OaDocument {
 
   private String folder;
 
+  private Long folderId;
+
   private String url;
 
   private Long sizeBytes;

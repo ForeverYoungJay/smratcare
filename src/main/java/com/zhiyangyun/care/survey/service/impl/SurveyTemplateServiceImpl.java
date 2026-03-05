@@ -13,11 +13,13 @@ import com.zhiyangyun.care.survey.model.SurveyTemplateDetailResponse;
 import com.zhiyangyun.care.survey.model.SurveyTemplateQuestionDetail;
 import com.zhiyangyun.care.survey.model.SurveyTemplateQuestionItem;
 import com.zhiyangyun.care.survey.service.SurveyTemplateService;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 @Service
 public class SurveyTemplateServiceImpl implements SurveyTemplateService {
@@ -37,7 +39,10 @@ public class SurveyTemplateServiceImpl implements SurveyTemplateService {
   public SurveyTemplate create(Long orgId, SurveyTemplate template) {
     template.setTenantId(orgId);
     template.setOrgId(orgId);
-    if (template.getStatus() == null) {
+    if (!StringUtils.hasText(template.getContent())) {
+      template.setContent(template.getDescription());
+    }
+    if (template.getStatus() == null || Integer.valueOf(1).equals(template.getStatus())) {
       template.setStatus(0);
     }
     if (template.getAnonymousFlag() == null) {
@@ -64,8 +69,14 @@ public class SurveyTemplateServiceImpl implements SurveyTemplateService {
     existing.setTemplateCode(input.getTemplateCode());
     existing.setTemplateName(input.getTemplateName());
     existing.setDescription(input.getDescription());
+    existing.setContent(StringUtils.hasText(input.getContent()) ? input.getContent() : input.getDescription());
     existing.setTargetType(input.getTargetType());
-    existing.setStatus(input.getStatus() == null ? existing.getStatus() : input.getStatus());
+    if (input.getStatus() != null) {
+      if (Integer.valueOf(1).equals(input.getStatus()) && !Integer.valueOf(1).equals(existing.getStatus())) {
+        throw new IllegalArgumentException("请使用“发布”按钮发布问卷");
+      }
+      existing.setStatus(input.getStatus());
+    }
     existing.setStartDate(input.getStartDate());
     existing.setEndDate(input.getEndDate());
     existing.setAnonymousFlag(input.getAnonymousFlag() == null ? existing.getAnonymousFlag() : input.getAnonymousFlag());
@@ -90,6 +101,7 @@ public class SurveyTemplateServiceImpl implements SurveyTemplateService {
     response.setTemplateCode(template.getTemplateCode());
     response.setTemplateName(template.getTemplateName());
     response.setDescription(template.getDescription());
+    response.setContent(StringUtils.hasText(template.getContent()) ? template.getContent() : template.getDescription());
     response.setTargetType(template.getTargetType());
     response.setStatus(template.getStatus());
     response.setStartDate(template.getStartDate() == null ? null : template.getStartDate().toString());
@@ -164,6 +176,28 @@ public class SurveyTemplateServiceImpl implements SurveyTemplateService {
   }
 
   @Override
+  public IPage<SurveyTemplate> pagePublishedAvailable(Long orgId, long pageNo, long pageSize, String keyword, String targetType,
+      LocalDate date) {
+    LocalDate current = date == null ? LocalDate.now() : date;
+    var wrapper = Wrappers.lambdaQuery(SurveyTemplate.class)
+        .eq(SurveyTemplate::getTenantId, orgId)
+        .eq(SurveyTemplate::getOrgId, orgId)
+        .eq(SurveyTemplate::getIsDeleted, 0)
+        .eq(SurveyTemplate::getStatus, 1)
+        .and(w -> w.isNull(SurveyTemplate::getStartDate).or().le(SurveyTemplate::getStartDate, current))
+        .and(w -> w.isNull(SurveyTemplate::getEndDate).or().ge(SurveyTemplate::getEndDate, current));
+    if (keyword != null && !keyword.isBlank()) {
+      wrapper.and(w -> w.like(SurveyTemplate::getTemplateName, keyword)
+          .or().like(SurveyTemplate::getTemplateCode, keyword));
+    }
+    if (targetType != null && !targetType.isBlank()) {
+      wrapper.eq(SurveyTemplate::getTargetType, targetType);
+    }
+    wrapper.orderByDesc(SurveyTemplate::getUpdateTime);
+    return templateMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
+  }
+
+  @Override
   public void setQuestions(Long orgId, Long templateId, List<SurveyTemplateQuestionItem> items) {
     SurveyTemplate template = templateMapper.selectOne(Wrappers.lambdaQuery(SurveyTemplate.class)
         .eq(SurveyTemplate::getId, templateId)
@@ -192,6 +226,64 @@ public class SurveyTemplateServiceImpl implements SurveyTemplateService {
       relation.setIsDeleted(0);
       templateQuestionMapper.insert(relation);
     }
+  }
+
+  @Override
+  public SurveyTemplate publish(Long orgId, Long id) {
+    SurveyTemplate existing = templateMapper.selectOne(Wrappers.lambdaQuery(SurveyTemplate.class)
+        .eq(SurveyTemplate::getId, id)
+        .eq(SurveyTemplate::getTenantId, orgId)
+        .eq(SurveyTemplate::getOrgId, orgId)
+        .eq(SurveyTemplate::getIsDeleted, 0));
+    if (existing == null) {
+      return null;
+    }
+    List<SurveyTemplateQuestion> relations = templateQuestionMapper.selectList(
+        Wrappers.lambdaQuery(SurveyTemplateQuestion.class)
+            .eq(SurveyTemplateQuestion::getTenantId, orgId)
+            .eq(SurveyTemplateQuestion::getOrgId, orgId)
+            .eq(SurveyTemplateQuestion::getTemplateId, id)
+            .eq(SurveyTemplateQuestion::getIsDeleted, 0));
+    if (relations.isEmpty()) {
+      throw new IllegalArgumentException("请先配置问卷题目后再发布");
+    }
+    if (existing.getStartDate() != null && existing.getEndDate() != null
+        && existing.getEndDate().isBefore(existing.getStartDate())) {
+      throw new IllegalArgumentException("问卷结束日期不能早于开始日期");
+    }
+    if (existing.getEndDate() != null && existing.getEndDate().isBefore(LocalDate.now())) {
+      throw new IllegalArgumentException("问卷结束日期已过期，不能发布");
+    }
+    if (Integer.valueOf(1).equals(existing.getScoreEnabled())) {
+      if (existing.getTotalScore() == null || existing.getTotalScore() <= 0) {
+        throw new IllegalArgumentException("计分问卷请先设置总分");
+      }
+      List<Long> questionIds = relations.stream().map(SurveyTemplateQuestion::getQuestionId).toList();
+      List<SurveyQuestion> questions = questionMapper.selectBatchIds(questionIds);
+      boolean hasScoreQuestion = questions.stream()
+          .anyMatch(item -> item != null && Integer.valueOf(1).equals(item.getScoreEnabled()));
+      if (!hasScoreQuestion) {
+        throw new IllegalArgumentException("计分问卷至少需包含一个计分题目");
+      }
+    }
+    existing.setStatus(1);
+    templateMapper.updateById(existing);
+    return existing;
+  }
+
+  @Override
+  public SurveyTemplate disable(Long orgId, Long id) {
+    SurveyTemplate existing = templateMapper.selectOne(Wrappers.lambdaQuery(SurveyTemplate.class)
+        .eq(SurveyTemplate::getId, id)
+        .eq(SurveyTemplate::getTenantId, orgId)
+        .eq(SurveyTemplate::getOrgId, orgId)
+        .eq(SurveyTemplate::getIsDeleted, 0));
+    if (existing == null) {
+      return null;
+    }
+    existing.setStatus(2);
+    templateMapper.updateById(existing);
+    return existing;
   }
 
   @Override

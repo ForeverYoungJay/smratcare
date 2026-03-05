@@ -29,6 +29,7 @@ export interface OaApproval {
   id: string | number
   approvalType: string
   title: string
+  applicantId?: number
   applicantName: string
   amount?: number
   startTime?: string
@@ -47,11 +48,13 @@ export interface OaApprovalSummary {
   leavePendingCount: number
   reimbursePendingCount: number
   purchasePendingCount: number
+  marketingPlanPendingCount: number
 }
 
 export interface OaDocument {
   id: string | number
   name: string
+  folderId?: string | number
   folder?: string
   url?: string
   sizeBytes?: number
@@ -60,11 +63,24 @@ export interface OaDocument {
   remark?: string
 }
 
+export interface OaDocumentFolder {
+  id: string | number
+  name: string
+  parentId?: string | number
+  sortNo?: number
+  status?: string
+  remark?: string
+  documentCount?: number
+  children?: OaDocumentFolder[]
+}
+
 export interface OaAlbum {
   id: string | number
   title: string
   category?: string
+  folderName?: string
   coverUrl?: string
+  photosJson?: string
   photoCount?: number
   shootDate?: string
   status?: string
@@ -77,9 +93,14 @@ export interface OaKnowledge {
   category?: string
   tags?: string
   content?: string
+  attachmentName?: string
+  attachmentUrl?: string
+  attachmentType?: string
+  attachmentSize?: number
   authorName?: string
   status?: string
   publishedAt?: string
+  expiredAt?: string
   remark?: string
 }
 
@@ -166,6 +187,10 @@ export interface OaPortalSummary {
   materialPurchaseDraftCount?: number
   inHospitalElderCount?: number
   suggestionCount?: number
+  surveyDraftCount?: number
+  surveyPublishedCount?: number
+  surveyTodaySubmissionCount?: number
+  surveyFamilyPublishedCount?: number
   workflowTodos?: OaWorkflowTodoItem[]
   marketingChannels?: OaMarketingChannelItem[]
   collaborationGantt?: OaCollaborationGanttItem[]

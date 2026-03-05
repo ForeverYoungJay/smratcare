@@ -3,6 +3,7 @@ import type {
   SurveyQuestion,
   SurveyTemplate,
   SurveyTemplateDetail,
+  SurveyTemplateVerifyResult,
   SurveyTemplateQuestionItem,
   SurveySubmissionRequest,
   SurveySubmissionResponse,
@@ -47,12 +48,24 @@ export function getSurveyPublishedTemplateDetail(id: string | number) {
   return request.get<SurveyTemplateDetail>(`/api/survey/templates/${id}`)
 }
 
+export function verifySurveyPublishedTemplate(id: string | number, params?: { templateCode?: string; targetType?: string }) {
+  return request.get<SurveyTemplateVerifyResult>(`/api/survey/templates/${id}/verify`, { params })
+}
+
 export function createSurveyTemplate(data: Partial<SurveyTemplate>) {
   return request.post<SurveyTemplate>('/api/admin/survey/templates', data)
 }
 
 export function updateSurveyTemplate(id: string | number, data: Partial<SurveyTemplate>) {
   return request.put<SurveyTemplate>(`/api/admin/survey/templates/${id}`, data)
+}
+
+export function publishSurveyTemplate(id: string | number) {
+  return request.post<SurveyTemplate>(`/api/admin/survey/templates/${id}/publish`)
+}
+
+export function disableSurveyTemplate(id: string | number) {
+  return request.post<SurveyTemplate>(`/api/admin/survey/templates/${id}/disable`)
 }
 
 export function deleteSurveyTemplate(id: string | number) {

@@ -1,6 +1,8 @@
 package com.zhiyangyun.care.health.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zhiyangyun.care.health.entity.HealthInspection;
 import com.zhiyangyun.care.health.entity.HealthNursingLog;
 import com.zhiyangyun.care.health.mapper.HealthInspectionMapper;
@@ -13,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class HealthInspectionClosureServiceImpl implements HealthInspectionClosureService {
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private final HealthInspectionMapper inspectionMapper;
   private final HealthNursingLogMapper nursingLogMapper;
 
@@ -118,6 +121,32 @@ public class HealthInspectionClosureServiceImpl implements HealthInspectionClosu
   private static String buildFollowUpContent(HealthInspection inspection) {
     String result = inspection.getResult() == null ? "" : inspection.getResult();
     String action = inspection.getFollowUpAction() == null ? "" : inspection.getFollowUpAction();
-    return "巡检异常跟进: " + inspection.getInspectionItem() + "；结果: " + result + "；措施: " + action;
+    String otherNote = inspection.getOtherNote() == null ? "" : inspection.getOtherNote();
+    long photoCount = countAttachmentPhotos(inspection.getAttachmentUrls());
+    String photoText = photoCount > 0 ? ("；附件照片: " + photoCount + "张") : "";
+    String noteText = otherNote.isBlank() ? "" : ("；说明: " + otherNote);
+    return "巡检异常跟进: " + inspection.getInspectionItem() + "；结果: " + result + "；措施: " + action + photoText + noteText;
+  }
+
+  private static long countAttachmentPhotos(String value) {
+    if (value == null || value.isBlank()) {
+      return 0L;
+    }
+    String text = value.trim();
+    if (text.startsWith("[")) {
+      try {
+        JsonNode node = OBJECT_MAPPER.readTree(text);
+        if (node != null && node.isArray()) {
+          return node.size();
+        }
+      } catch (Exception ignore) {
+        long count = text.chars().filter(ch -> ch == '{').count();
+        if (count > 0) {
+          return count;
+        }
+        return text.chars().filter(ch -> ch == '"').count() / 2;
+      }
+    }
+    return text.chars().filter(ch -> ch == ',').count() + 1;
   }
 }

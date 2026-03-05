@@ -7,6 +7,7 @@ import com.zhiyangyun.care.assessment.entity.AssessmentRecord;
 import com.zhiyangyun.care.assessment.entity.AssessmentScaleTemplate;
 import com.zhiyangyun.care.assessment.mapper.AssessmentRecordMapper;
 import com.zhiyangyun.care.assessment.model.AssessmentRecordRequest;
+import com.zhiyangyun.care.assessment.model.AssessmentRecordReportResponse;
 import com.zhiyangyun.care.assessment.model.AssessmentRecordResponse;
 import com.zhiyangyun.care.assessment.model.AssessmentScoreResult;
 import com.zhiyangyun.care.assessment.model.AssessmentRecordSummaryResponse;
@@ -131,6 +132,19 @@ public class AssessmentRecordController {
       throw new IllegalArgumentException("无权限访问该评估记录");
     }
     return Result.ok(toResponse(record, selectElder(record.getElderId()), selectOrg(record.getOrgId())));
+  }
+
+  @GetMapping("/{id}/report")
+  public Result<AssessmentRecordReportResponse> report(@PathVariable Long id) {
+    AssessmentRecord record = recordMapper.selectById(id);
+    if (record == null || record.getIsDeleted() == 1) {
+      return Result.ok(null);
+    }
+    Long orgId = AuthContext.getOrgId();
+    if (orgId != null && !orgId.equals(record.getOrgId())) {
+      throw new IllegalArgumentException("无权限访问该评估记录");
+    }
+    return Result.ok(toReportResponse(record));
   }
 
   @PostMapping
@@ -568,6 +582,26 @@ public class AssessmentRecordController {
   private String csvValue(String value) {
     String normalized = value == null ? "" : value;
     return "\"" + normalized.replace("\"", "\"\"") + "\"";
+  }
+
+  private AssessmentRecordReportResponse toReportResponse(AssessmentRecord record) {
+    AssessmentRecordReportResponse response = new AssessmentRecordReportResponse();
+    response.setRecordId(record.getId());
+    response.setReportNo(
+        (record.getArchiveNo() != null && !record.getArchiveNo().isBlank()) ? record.getArchiveNo() : "ASSESS-" + record.getId());
+    response.setReportStatus(resolveStatusLabel(record.getStatus()));
+    response.setElderName(record.getElderName());
+    response.setAssessmentType(record.getAssessmentType());
+    response.setAssessmentTypeLabel(resolveAssessmentTypeLabel(record.getAssessmentType()));
+    response.setAssessorName(record.getAssessorName());
+    response.setAssessmentDate(record.getAssessmentDate());
+    response.setCompletedTime(record.getUpdateTime());
+    response.setScore(record.getScore());
+    response.setLevelCode(record.getLevelCode());
+    response.setResultSummary(record.getResultSummary());
+    response.setSuggestion(record.getSuggestion());
+    response.setDetailJson(record.getDetailJson());
+    return response;
   }
 
   private void syncLeadFlowAfterAssessment(AssessmentRecord record) {

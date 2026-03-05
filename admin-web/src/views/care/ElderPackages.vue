@@ -86,6 +86,7 @@ import {
   listCarePackages
 } from '../../api/standard'
 import type { ElderPackage, CarePackage, PageResult } from '../../types'
+import { resolveCareError } from './careError'
 
 interface ElderOption {
   id: number
@@ -149,8 +150,8 @@ async function submit() {
     message.success('保存成功')
     modalOpen.value = false
     load()
-  } catch {
-    message.error('保存失败')
+  } catch (error) {
+    message.error(resolveCareError(error, '保存失败'))
   } finally {
     submitting.value = false
   }
@@ -160,17 +161,27 @@ async function remove(id: number) {
   Modal.confirm({
     title: '确认删除该老人套餐？',
     onOk: async () => {
-      await deleteElderPackage(id)
-      message.success('已删除')
-      load()
+      try {
+        await deleteElderPackage(id)
+        message.success('已删除')
+        await load()
+      } catch (error) {
+        message.error(resolveCareError(error, '删除失败'))
+      }
     }
   })
 }
 
 async function loadOptions() {
-  const elders = await getElderPage({ pageNo: 1, pageSize: 200 })
-  elderOptions.value = (elders.list || []).map((item: any) => ({ id: item.id, fullName: item.fullName }))
-  packageOptions.value = await listCarePackages()
+  try {
+    const elders = await getElderPage({ pageNo: 1, pageSize: 200 })
+    elderOptions.value = (elders.list || []).map((item: any) => ({ id: item.id, fullName: item.fullName }))
+    packageOptions.value = await listCarePackages()
+  } catch (error) {
+    message.error(resolveCareError(error, '加载老人/套餐选项失败'))
+    elderOptions.value = []
+    packageOptions.value = []
+  }
 }
 
 async function load() {
@@ -183,6 +194,10 @@ async function load() {
     })
     list.value = res.list
     page.total = res.total
+  } catch (error) {
+    message.error(resolveCareError(error, '加载老人套餐失败'))
+    list.value = []
+    page.total = 0
   } finally {
     loading.value = false
   }

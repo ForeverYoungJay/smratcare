@@ -26,6 +26,14 @@ public class OaKnowledge {
 
   private String content;
 
+  private String attachmentName;
+
+  private String attachmentUrl;
+
+  private String attachmentType;
+
+  private Long attachmentSize;
+
   private Long authorId;
 
   private String authorName;
@@ -33,6 +41,8 @@ public class OaKnowledge {
   private String status;
 
   private LocalDateTime publishedAt;
+
+  private LocalDateTime expiredAt;
 
   private String remark;
 

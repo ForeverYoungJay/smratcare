@@ -14,55 +14,57 @@
         </template>
       </SearchForm>
 
-      <a-row :gutter="16" style="margin-bottom: 16px">
-        <a-col :span="6"><a-card><a-statistic title="记录总数" :value="summary.totalCount" /></a-card></a-col>
-        <a-col :span="6"><a-card><a-statistic title="处理中" :value="summary.openCount" /></a-card></a-col>
-        <a-col :span="6"><a-card><a-statistic title="已关闭" :value="summary.closedCount" /></a-card></a-col>
-        <a-col :span="6"><a-card><a-statistic title="逾期项" :value="summary.overdueCount" /></a-card></a-col>
-      </a-row>
+      <StatefulBlock :loading="loading" :error="errorMessage" :empty="!detail.records.length" empty-text="暂无消防统计数据" @retry="fetchAll">
+        <a-row :gutter="16" style="margin-bottom: 16px">
+          <a-col :span="6"><a-card><a-statistic title="记录总数" :value="summary.totalCount" /></a-card></a-col>
+          <a-col :span="6"><a-card><a-statistic title="处理中" :value="summary.openCount" /></a-card></a-col>
+          <a-col :span="6"><a-card><a-statistic title="已关闭" :value="summary.closedCount" /></a-card></a-col>
+          <a-col :span="6"><a-card><a-statistic title="逾期项" :value="summary.overdueCount" /></a-card></a-col>
+        </a-row>
 
-      <a-row :gutter="16" style="margin-bottom: 16px">
-        <a-col :span="4"><a-card><a-statistic title="日巡完成" :value="summary.dailyCompletedCount" /></a-card></a-col>
-        <a-col :span="4"><a-card><a-statistic title="月检完成" :value="summary.monthlyCompletedCount" /></a-card></a-col>
-        <a-col :span="4"><a-card><a-statistic title="值班记录" :value="summary.dutyRecordCount" /></a-card></a-col>
-        <a-col :span="4"><a-card><a-statistic title="交接班打卡" :value="summary.handoverPunchCount" /></a-card></a-col>
-        <a-col :span="4"><a-card><a-statistic title="设备批号更新" :value="summary.equipmentUpdateCount" /></a-card></a-col>
-        <a-col :span="4"><a-card><a-statistic title="设备老化处置" :value="summary.equipmentAgingDisposalCount" /></a-card></a-col>
-      </a-row>
+        <a-row :gutter="16" style="margin-bottom: 16px">
+          <a-col :span="4"><a-card><a-statistic title="日巡完成" :value="summary.dailyCompletedCount" /></a-card></a-col>
+          <a-col :span="4"><a-card><a-statistic title="月检完成" :value="summary.monthlyCompletedCount" /></a-card></a-col>
+          <a-col :span="4"><a-card><a-statistic title="值班记录" :value="summary.dutyRecordCount" /></a-card></a-col>
+          <a-col :span="4"><a-card><a-statistic title="交接班打卡" :value="summary.handoverPunchCount" /></a-card></a-col>
+          <a-col :span="4"><a-card><a-statistic title="设备批号更新" :value="summary.equipmentUpdateCount" /></a-card></a-col>
+          <a-col :span="4"><a-card><a-statistic title="设备老化处置" :value="summary.equipmentAgingDisposalCount" /></a-card></a-col>
+        </a-row>
 
-      <a-row :gutter="16">
-        <a-col :span="8">
-          <a-card title="分类统计" style="margin-bottom: 16px">
-            <a-table :columns="typeColumns" :data-source="summary.typeStats" :pagination="false" row-key="recordType" size="small">
-              <template #bodyCell="{ column, record }">
-                <template v-if="column.key === 'recordType'">{{ typeLabel(record.recordType) }}</template>
-              </template>
-            </a-table>
-          </a-card>
-        </a-col>
-        <a-col :span="16">
-          <a-card title="日报/月报分栏视图">
-            <a-tabs v-model:activeKey="activeTab">
-              <a-tab-pane key="daily" tab="日报">
-                <a-table :columns="dailyColumns" :data-source="dailyRows" row-key="date" size="small" :pagination="false" />
-              </a-tab-pane>
-              <a-tab-pane key="monthly" tab="月报">
-                <a-table :columns="monthlyColumns" :data-source="monthlyRows" row-key="month" size="small" :pagination="false" />
-              </a-tab-pane>
-              <a-tab-pane key="detail" tab="巡查明细">
-                <a-table :columns="detailColumns" :data-source="detail.records" :pagination="false" row-key="id" size="small" :scroll="{ x: 1320 }">
-                  <template #bodyCell="{ column, record }">
-                    <template v-if="column.key === 'recordType'">{{ typeLabel(record.recordType) }}</template>
-                    <template v-else-if="column.key === 'status'">
-                      <a-tag :color="record.status === 'CLOSED' ? 'green' : 'orange'">{{ record.status === 'CLOSED' ? '已关闭' : '处理中' }}</a-tag>
+        <a-row :gutter="16">
+          <a-col :span="8">
+            <a-card title="分类统计" style="margin-bottom: 16px">
+              <a-table :columns="typeColumns" :data-source="summary.typeStats" :pagination="false" row-key="recordType" size="small">
+                <template #bodyCell="{ column, record }">
+                  <template v-if="column.key === 'recordType'">{{ typeLabel(record.recordType) }}</template>
+                </template>
+              </a-table>
+            </a-card>
+          </a-col>
+          <a-col :span="16">
+            <a-card title="日报/月报分栏视图">
+              <a-tabs v-model:activeKey="activeTab">
+                <a-tab-pane key="daily" tab="日报">
+                  <a-table :columns="dailyColumns" :data-source="dailyRows" row-key="date" size="small" :pagination="false" />
+                </a-tab-pane>
+                <a-tab-pane key="monthly" tab="月报">
+                  <a-table :columns="monthlyColumns" :data-source="monthlyRows" row-key="month" size="small" :pagination="false" />
+                </a-tab-pane>
+                <a-tab-pane key="detail" tab="巡查明细">
+                  <a-table :columns="detailColumns" :data-source="detail.records" :pagination="false" row-key="id" size="small" :scroll="{ x: 1320 }">
+                    <template #bodyCell="{ column, record }">
+                      <template v-if="column.key === 'recordType'">{{ typeLabel(record.recordType) }}</template>
+                      <template v-else-if="column.key === 'status'">
+                        <a-tag :color="record.status === 'CLOSED' ? 'green' : 'orange'">{{ record.status === 'CLOSED' ? '已关闭' : '处理中' }}</a-tag>
+                      </template>
                     </template>
-                  </template>
-                </a-table>
-              </a-tab-pane>
-            </a-tabs>
-          </a-card>
-        </a-col>
-      </a-row>
+                  </a-table>
+                </a-tab-pane>
+              </a-tabs>
+            </a-card>
+          </a-col>
+        </a-row>
+      </StatefulBlock>
     </div>
 
     <div class="print-area" id="fire-print-area">
@@ -142,6 +144,7 @@ import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
+import StatefulBlock from '../../components/StatefulBlock.vue'
 import { exportFireSafetyReport, getFireSafetyReportDetail, getFireSafetySummary } from '../../api/fire'
 import type { FireSafetyRecordType, FireSafetyReportDetail, FireSafetyReportRecordItem, FireSafetyReportSummary } from '../../types'
 
@@ -152,6 +155,7 @@ const query = reactive({
 const activeTab = ref('daily')
 const loading = ref(false)
 const exporting = ref(false)
+const errorMessage = ref('')
 
 const summary = reactive<FireSafetyReportSummary>({
   totalCount: 0,
@@ -288,6 +292,7 @@ const generatedAt = computed(() => dayjs().format('YYYY-MM-DD HH:mm:ss'))
 async function fetchAll() {
   const [dateFrom, dateTo] = query.dateRange || []
   loading.value = true
+  errorMessage.value = ''
   try {
     const [summaryData, detailData] = await Promise.all([
       getFireSafetySummary({ dateFrom, dateTo }),
@@ -295,6 +300,8 @@ async function fetchAll() {
     ])
     Object.assign(summary, summaryData)
     Object.assign(detail, detailData)
+  } catch (error: any) {
+    errorMessage.value = error?.message || '加载消防统计失败'
   } finally {
     loading.value = false
   }
@@ -306,6 +313,8 @@ async function downloadReport() {
   try {
     await exportFireSafetyReport({ dateFrom, dateTo })
     message.success('报表下载成功')
+  } catch (error: any) {
+    message.error(error?.message || '报表下载失败')
   } finally {
     exporting.value = false
   }

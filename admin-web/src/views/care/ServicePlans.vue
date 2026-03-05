@@ -125,14 +125,17 @@
 import { computed, reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import type { FormInstance } from 'ant-design-vue'
+import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { getStaffPage } from '../../api/rbac'
 import { listServiceItems } from '../../api/standard'
 import { createServicePlan, deleteServicePlan, getCareLevelList, getServicePlanPage, updateServicePlan } from '../../api/nursing'
 import type { CareLevelItem, PageResult, ServiceItem, ServicePlanItem, StaffItem } from '../../types'
+import { resolveCareError } from './careError'
 
 const rows = ref<ServicePlanItem[]>([])
+const route = useRoute()
 const loading = ref(false)
 const modalOpen = ref(false)
 const submitting = ref(false)
@@ -224,14 +227,21 @@ function openModal(record?: ServicePlanItem) {
   if (record) {
     Object.assign(form, record)
     ensureSelectedElder(record.elderId, record.elderName)
+  } else {
+    const residentId = route.query.residentId ?? route.query.elderId
+    const residentName = typeof route.query.residentName === 'string' ? route.query.residentName : undefined
+    if (residentId) {
+      form.elderId = Number(residentId)
+      ensureSelectedElder(form.elderId, residentName)
+    }
   }
   modalOpen.value = true
 }
 
 async function submit() {
-  await formRef.value?.validate()
-  submitting.value = true
   try {
+    await formRef.value?.validate()
+    submitting.value = true
     const payload: Partial<ServicePlanItem> = {
       planName: form.planName,
       elderId: form.elderId,
@@ -253,6 +263,8 @@ async function submit() {
     message.success('保存成功')
     modalOpen.value = false
     await load()
+  } catch (error) {
+    message.error(resolveCareError(error, '保存失败'))
   } finally {
     submitting.value = false
   }
@@ -262,9 +274,13 @@ async function remove(id: number) {
   Modal.confirm({
     title: '确认删除该服务计划？',
     onOk: async () => {
-      await deleteServicePlan(id)
-      message.success('删除成功')
-      await load()
+      try {
+        await deleteServicePlan(id)
+        message.success('删除成功')
+        await load()
+      } catch (error) {
+        message.error(resolveCareError(error, '删除失败'))
+      }
     }
   })
 }
@@ -292,18 +308,31 @@ async function searchElder(keyword: string) {
 }
 
 async function searchStaff(keyword: string) {
-  const res: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: 50, keyword })
-  staffOptions.value = res.list.map((item) => ({ label: item.realName || item.username, value: item.id }))
+  try {
+    const res: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: 50, keyword })
+    staffOptions.value = res.list.map((item) => ({ label: item.realName || item.username, value: item.id }))
+  } catch (error) {
+    if (!keyword) {
+      staffOptions.value = []
+    }
+    message.error(resolveCareError(error, '加载护工列表失败'))
+  }
 }
 
 async function loadBaseOptions() {
-  const [careLevels, serviceItems] = await Promise.all([
-    getCareLevelList({ enabled: 1 }) as Promise<CareLevelItem[]>,
-    listServiceItems({ enabled: 1 }) as Promise<ServiceItem[]>
-  ])
-  careLevelOptions.value = careLevels.map((item) => ({ label: `${item.levelCode} - ${item.levelName}`, value: item.id }))
-  serviceItemOptions.value = serviceItems.map((item) => ({ label: item.name, value: item.id }))
-  await Promise.all([searchElders(''), searchStaff('')])
+  try {
+    const [careLevels, serviceItems] = await Promise.all([
+      getCareLevelList({ enabled: 1 }) as Promise<CareLevelItem[]>,
+      listServiceItems({ enabled: 1 }) as Promise<ServiceItem[]>
+    ])
+    careLevelOptions.value = careLevels.map((item) => ({ label: `${item.levelCode} - ${item.levelName}`, value: item.id }))
+    serviceItemOptions.value = serviceItems.map((item) => ({ label: item.name, value: item.id }))
+    await Promise.all([searchElders(''), searchStaff('')])
+  } catch (error) {
+    message.error(resolveCareError(error, '加载基础选项失败'))
+    careLevelOptions.value = []
+    serviceItemOptions.value = []
+  }
 }
 
 async function load() {
@@ -313,10 +342,15 @@ async function load() {
       pageNo: query.pageNo,
       pageSize: query.pageSize,
       status: query.status,
-      keyword: query.keyword
+      keyword: query.keyword,
+      elderId: route.query.residentId ? Number(route.query.residentId) : route.query.elderId ? Number(route.query.elderId) : undefined
     })
     rows.value = res.list
     query.total = res.total
+  } catch (error) {
+    message.error(resolveCareError(error, '加载服务计划失败'))
+    rows.value = []
+    query.total = 0
   } finally {
     loading.value = false
   }

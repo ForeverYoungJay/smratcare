@@ -23,6 +23,7 @@ public class ElderOutingRecord {
   private LocalDateTime actualReturnTime;
   private String companion;
   private String reason;
+  private String leaveNoteImageUrl;
   private String status;
   private String remark;
   private Long createdBy;

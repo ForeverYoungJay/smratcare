@@ -9,6 +9,7 @@ public class SurveyTemplateDetailResponse {
   private String templateCode;
   private String templateName;
   private String description;
+  private String content;
   private String targetType;
   private Integer status;
   private String startDate;

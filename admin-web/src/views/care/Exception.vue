@@ -49,15 +49,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { Modal, message } from 'ant-design-vue'
+import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { getTaskPage } from '../../api/care'
 import { getStaffPage } from '../../api/rbac'
 import type { CareTaskItem, PageResult } from '../../types'
 import { exportCsv } from '../../utils/export'
+import { resolveCareError } from './careError'
+import { careExceptionExportColumns, mapCareExportRows } from '../../constants/careExport'
 
 const list = ref<CareTaskItem[]>([])
+const route = useRoute()
 const loading = ref(false)
 const detailOpen = ref(false)
 const current = ref<CareTaskItem | null>(null)
@@ -66,9 +70,17 @@ const staffMap = ref<Record<number, string>>({})
 async function search() {
   loading.value = true
   try {
-    const res: PageResult<CareTaskItem> = await getTaskPage({ pageNo: 1, pageSize: 50, status: 'EXCEPTION' })
+    const res: PageResult<CareTaskItem> = await getTaskPage({
+      pageNo: 1,
+      pageSize: 50,
+      status: 'EXCEPTION',
+      elderId: route.query.residentId ? Number(route.query.residentId) : route.query.elderId ? Number(route.query.elderId) : undefined
+    })
     list.value = res.list
     await loadStaffOptions()
+  } catch (error) {
+    message.error(resolveCareError(error, '加载异常任务失败'))
+    list.value = []
   } finally {
     loading.value = false
   }
@@ -89,24 +101,29 @@ function confirmResolve(row: CareTaskItem) {
 }
 
 function exportCsvData() {
-  exportCsv(
-    list.value.map((t) => ({
-      老人: t.elderName,
-      房间: t.roomNo,
-      任务: t.taskName,
-      计划时间: t.planTime,
-      护工: staffName(t.staffId)
-    })),
-    '异常任务'
-  )
+  if (!list.value.length) {
+    message.warning('暂无可导出数据')
+    return
+  }
+  const rows = mapCareExportRows(list.value, careExceptionExportColumns).map((item, index) => ({
+    ...item,
+    护工: staffName(list.value[index]?.staffId)
+  }))
+  exportCsv(rows, '异常任务')
+  message.success('CSV导出成功')
 }
 
 async function loadStaffOptions() {
-  const res = await getStaffPage({ pageNo: 1, pageSize: 200 })
-  staffMap.value = res.list.reduce((acc: Record<number, string>, item: any) => {
-    acc[item.id] = item.realName || item.username || `员工#${item.id}`
-    return acc
-  }, {})
+  try {
+    const res = await getStaffPage({ pageNo: 1, pageSize: 200 })
+    staffMap.value = res.list.reduce((acc: Record<number, string>, item: any) => {
+      acc[item.id] = item.realName || item.username || `员工#${item.id}`
+      return acc
+    }, {})
+  } catch (error) {
+    message.error(resolveCareError(error, '加载护工信息失败'))
+    staffMap.value = {}
+  }
 }
 
 function staffName(staffId?: number) {
@@ -115,6 +132,7 @@ function staffName(staffId?: number) {
 }
 
 search()
+watch(() => route.query, search)
 </script>
 
 <style scoped>

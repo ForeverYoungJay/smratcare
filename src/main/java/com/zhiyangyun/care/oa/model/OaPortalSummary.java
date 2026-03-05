@@ -34,6 +34,10 @@ public class OaPortalSummary {
   private Long materialPurchaseDraftCount;
   private Long inHospitalElderCount;
   private Long suggestionCount;
+  private Long surveyDraftCount;
+  private Long surveyPublishedCount;
+  private Long surveyTodaySubmissionCount;
+  private Long surveyFamilyPublishedCount;
   private List<WorkflowTodoItem> workflowTodos;
   private List<MarketingChannelItem> marketingChannels;
   private List<CollaborationGanttItem> collaborationGantt;

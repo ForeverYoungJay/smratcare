@@ -24,6 +24,8 @@ public class SurveyTemplate {
 
   private String description;
 
+  private String content;
+
   private String targetType;
 
   private Integer status;

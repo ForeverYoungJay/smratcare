@@ -47,18 +47,23 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
+import { message } from 'ant-design-vue'
+import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { getNursingRecordPage } from '../../api/nursing'
 import type { NursingRecordItem, PageResult } from '../../types'
+import { resolveCareError } from './careError'
 
 const loading = ref(false)
 const rows = ref<NursingRecordItem[]>([])
+const route = useRoute()
+const routeResidentId = route.query.residentId ? Number(route.query.residentId) : route.query.elderId ? Number(route.query.elderId) : undefined
 const { elderOptions, searchElders } = useElderOptions({ pageSize: 50 })
 const query = reactive({
-  elderId: undefined as number | undefined,
+  elderId: routeResidentId as number | undefined,
   staffId: undefined as number | undefined,
   keyword: '',
   range: undefined as [Dayjs, Dayjs] | undefined,
@@ -88,11 +93,15 @@ async function fetchData() {
       elderId: query.elderId,
       staffId: query.staffId,
       keyword: query.keyword || undefined,
-      timeFrom: query.range?.[0] ? dayjs(query.range[0]).format('YYYY-MM-DD HH:mm:ss') : undefined,
-      timeTo: query.range?.[1] ? dayjs(query.range[1]).format('YYYY-MM-DD HH:mm:ss') : undefined
+      timeFrom: query.range?.[0] ? dayjs(query.range[0]).format('YYYY-MM-DDTHH:mm:ss') : undefined,
+      timeTo: query.range?.[1] ? dayjs(query.range[1]).format('YYYY-MM-DDTHH:mm:ss') : undefined
     })
     rows.value = res.list
     pagination.total = res.total || res.list.length
+  } catch (error) {
+    message.error(resolveCareError(error, '加载护理记录失败'))
+    rows.value = []
+    pagination.total = 0
   } finally {
     loading.value = false
   }
@@ -107,7 +116,7 @@ function handleTableChange(pag: any) {
 }
 
 function onReset() {
-  query.elderId = undefined
+  query.elderId = routeResidentId
   query.staffId = undefined
   query.keyword = ''
   query.range = undefined

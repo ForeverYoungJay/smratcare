@@ -6,6 +6,7 @@ import com.zhiyangyun.care.visit.model.VisitBookingResponse;
 import com.zhiyangyun.care.visit.model.VisitBookRequest;
 import com.zhiyangyun.care.visit.model.VisitCheckInRequest;
 import com.zhiyangyun.care.visit.model.VisitCheckInResponse;
+import com.zhiyangyun.care.visit.model.VisitPrintTicketResponse;
 import com.zhiyangyun.care.visit.service.VisitService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -38,6 +39,7 @@ public class GuardVisitController {
   @PostMapping("/checkin")
   public Result<VisitCheckInResponse> checkin(@Valid @RequestBody VisitCheckInRequest request) {
     Long staffId = AuthContext.getStaffId();
+    request.setOrgId(AuthContext.getOrgId());
     return Result.ok(visitService.checkIn(request, staffId));
   }
 
@@ -60,5 +62,11 @@ public class GuardVisitController {
   public Result<Boolean> delete(@PathVariable Long id) {
     visitService.deleteBooking(AuthContext.getOrgId(), id);
     return Result.ok(true);
+  }
+
+  @PreAuthorize("hasAnyRole('GUARD','STAFF','ADMIN')")
+  @GetMapping("/{id}/print-ticket")
+  public Result<VisitPrintTicketResponse> printTicket(@PathVariable Long id) {
+    return Result.ok(visitService.buildPrintTicket(AuthContext.getOrgId(), id));
   }
 }

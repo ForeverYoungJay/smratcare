@@ -8,6 +8,9 @@ export function getAssessmentRecordSummary(params) {
 export function getAssessmentRecord(id) {
     return request.get(`/api/assessment/records/${id}`);
 }
+export function getAssessmentRecordReport(id) {
+    return request.get(`/api/assessment/records/${id}/report`);
+}
 export function createAssessmentRecord(data) {
     return request.post('/api/assessment/records', data);
 }

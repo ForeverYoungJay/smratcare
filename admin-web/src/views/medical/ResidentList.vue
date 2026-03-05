@@ -46,11 +46,13 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { getElderPage } from '../../api/elder'
 import type { ElderItem, PageResult } from '../../types'
+import { resolveMedicalError } from './medicalError'
 
 const router = useRouter()
 const loading = ref(false)
@@ -92,6 +94,10 @@ async function fetchData() {
     const res = await getElderPage(buildParams()) as PageResult<ElderItem>
     rows.value = res.list || []
     pagination.total = res.total || 0
+  } catch (error) {
+    message.error(resolveMedicalError(error, '加载长者列表失败'))
+    rows.value = []
+    pagination.total = 0
   } finally {
     loading.value = false
   }

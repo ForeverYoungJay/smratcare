@@ -229,6 +229,7 @@ public class ElderServiceImpl implements ElderService {
     if (!elder.getOrgId().equals(bed.getOrgId())) {
       throw new IllegalStateException("Org mismatch");
     }
+    ensureNoDuplicateNameOccupied(elder);
 
     long occupied = bedMapper.selectCount(Wrappers.lambdaQuery(Bed.class)
         .eq(Bed::getRoomId, bed.getRoomId())
@@ -298,6 +299,25 @@ public class ElderServiceImpl implements ElderService {
     insertChangeLog(elder.getTenantId(), elder.getOrgId(), elder.getId(), request.getCreatedBy(),
         "BED_CHANGE", null, String.valueOf(bed.getId()), "床位分配");
     return toResponse(elder, bed);
+  }
+
+  private void ensureNoDuplicateNameOccupied(ElderProfile elder) {
+    String fullName = elder.getFullName();
+    if (fullName == null || fullName.isBlank()) {
+      return;
+    }
+    List<ElderProfile> duplicated = elderMapper.selectList(
+        Wrappers.lambdaQuery(ElderProfile.class)
+            .eq(ElderProfile::getIsDeleted, 0)
+            .eq(ElderProfile::getTenantId, elder.getTenantId())
+            .eq(ElderProfile::getOrgId, elder.getOrgId())
+            .eq(ElderProfile::getFullName, fullName.trim())
+            .in(ElderProfile::getStatus, List.of(1, 2))
+            .isNotNull(ElderProfile::getBedId)
+            .ne(ElderProfile::getId, elder.getId()));
+    if (!duplicated.isEmpty()) {
+      throw new IllegalStateException("同名长者已占用床位，请在姓名后备注如“" + fullName.trim() + "2”后再办理入住");
+    }
   }
 
   @Override

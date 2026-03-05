@@ -28,29 +28,31 @@
           <a-button :disabled="!selectedSingleRecord" @click="viewSelected">查看档案</a-button>
         </a-space>
       </MarketingListToolbar>
-      <a-table
-        :data-source="rows"
-        :columns="columns"
-        :loading="loading"
-        row-key="id"
-        :row-selection="rowSelection"
-        :pagination="false"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'status'">
-            <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
+      <StatefulBlock :loading="loading" :error="errorMessage" :empty="!rows.length" empty-text="暂无长者档案" @retry="fetchData">
+        <a-table
+          :data-source="rows"
+          :columns="columns"
+          :loading="loading"
+          row-key="id"
+          :row-selection="rowSelection"
+          :pagination="false"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'status'">
+              <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
+            </template>
           </template>
-        </template>
-      </a-table>
-      <a-pagination
-        style="margin-top: 16px; text-align: right;"
-        :current="query.pageNo"
-        :page-size="query.pageSize"
-        :total="total"
-        show-size-changer
-        @change="onPageChange"
-        @showSizeChange="onPageSizeChange"
-      />
+        </a-table>
+        <a-pagination
+          style="margin-top: 16px; text-align: right;"
+          :current="query.pageNo"
+          :page-size="query.pageSize"
+          :total="total"
+          show-size-changer
+          @change="onPageChange"
+          @showSizeChange="onPageSizeChange"
+        />
+      </StatefulBlock>
     </a-card>
   </PageContainer>
 </template>
@@ -60,6 +62,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
+import StatefulBlock from '../../components/StatefulBlock.vue'
 import MarketingQuickNav from './components/MarketingQuickNav.vue'
 import MarketingListToolbar from './components/MarketingListToolbar.vue'
 import { getElderPage } from '../../api/elder'
@@ -67,6 +70,7 @@ import type { ElderItem, PageResult } from '../../types'
 
 const router = useRouter()
 const loading = ref(false)
+const errorMessage = ref('')
 const rows = ref<ElderItem[]>([])
 const total = ref(0)
 const selectedRowKeys = ref<string[]>([])
@@ -111,17 +115,19 @@ function statusColor(status?: number) {
 
 async function fetchData() {
   loading.value = true
+  errorMessage.value = ''
   try {
     const page: PageResult<ElderItem> = await getElderPage({
       pageNo: query.pageNo,
       pageSize: query.pageSize,
-      keyword: query.keyword || undefined
+      keyword: query.keyword || undefined,
+      status: query.status
     })
-    rows.value = (page.list || [])
-      .filter((item) => query.status == null || item.status === query.status)
-      .map((item) => ({ ...item, id: String(item.id) }))
-    total.value = page.total || rows.value.length
+    rows.value = (page.list || []).map((item) => ({ ...item, id: String(item.id) }))
+    total.value = page.total || 0
     selectedRowKeys.value = []
+  } catch (error: any) {
+    errorMessage.value = error?.message || '加载长者档案失败'
   } finally {
     loading.value = false
   }

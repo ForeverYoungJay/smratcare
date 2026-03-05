@@ -29,6 +29,14 @@
         <div class="value">{{ summary.scoreTotal }}</div>
       </a-card>
       <a-card class="summary" :bordered="false">
+        <div class="label">已评分提交</div>
+        <div class="value">{{ summary.scoredSubmissions || 0 }}</div>
+      </a-card>
+      <a-card class="summary" :bordered="false">
+        <div class="label">未评分提交</div>
+        <div class="value">{{ summary.unscoredSubmissions || 0 }}</div>
+      </a-card>
+      <a-card class="summary" :bordered="false">
         <div class="label">平均分</div>
         <div class="value">{{ Number(summary.averageScore || 0).toFixed(2) }}</div>
       </a-card>
@@ -64,12 +72,20 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { getSurveyTemplatePage, getSurveyStatsSummary, getSurveySubmissionPage } from '../../api/survey'
 import type { SurveyTemplate, SurveyStatsSummary, SurveySubmissionItem, PageResult } from '../../types'
 
+const route = useRoute()
 const templates = ref<SurveyTemplate[]>([])
-const summary = reactive<SurveyStatsSummary>({ totalSubmissions: 0, averageScore: 0, scoreTotal: 0 })
+const summary = reactive<SurveyStatsSummary>({
+  totalSubmissions: 0,
+  scoredSubmissions: 0,
+  unscoredSubmissions: 0,
+  averageScore: 0,
+  scoreTotal: 0
+})
 
 const loading = ref(false)
 const rows = ref<SurveySubmissionItem[]>([])
@@ -113,10 +129,29 @@ function getDateParams() {
   return { dateFrom: from, dateTo: to }
 }
 
+function normalizeId(value: unknown) {
+  const text = String(value || '').trim()
+  return text ? text : undefined
+}
+
+function initByQuery() {
+  const templateId = normalizeId(route.query.templateId)
+  if (templateId) {
+    query.templateId = templateId
+  }
+  const dateFrom = normalizeId(route.query.dateFrom)
+  const dateTo = normalizeId(route.query.dateTo)
+  if (dateFrom && dateTo) {
+    query.dateRange = [dateFrom, dateTo]
+  }
+}
+
 async function fetchSummary() {
   const params = { templateId: query.templateId, ...getDateParams() }
   const res = await getSurveyStatsSummary(params)
   summary.totalSubmissions = res.totalSubmissions
+  summary.scoredSubmissions = res.scoredSubmissions || 0
+  summary.unscoredSubmissions = res.unscoredSubmissions || 0
   summary.averageScore = res.averageScore
   summary.scoreTotal = res.scoreTotal
 }
@@ -127,7 +162,8 @@ async function fetchPage() {
     const res = await getSurveySubmissionPage({
       pageNo: query.pageNo,
       pageSize: query.pageSize,
-      templateId: query.templateId
+      templateId: query.templateId,
+      ...getDateParams()
     })
     rows.value = (res.list || []).map((item) => ({
       ...item,
@@ -165,6 +201,7 @@ function onPageSizeChange(current: number, size: number) {
 
 onMounted(async () => {
   await loadTemplates()
+  initByQuery()
   await fetchAll()
 })
 </script>
@@ -175,7 +212,7 @@ onMounted(async () => {
 }
 .summary-cards {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   margin: 16px 0;
 }

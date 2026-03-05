@@ -64,6 +64,7 @@ import type { FormInstance } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { createCareLevel, deleteCareLevel, getCareLevelPage, updateCareLevel } from '../../api/nursing'
 import type { CareLevelItem, PageResult } from '../../types'
+import { resolveCareError } from './careError'
 
 const rows = ref<CareLevelItem[]>([])
 const loading = ref(false)
@@ -111,9 +112,9 @@ function openModal(record?: CareLevelItem) {
 }
 
 async function submit() {
-  await formRef.value?.validate()
-  submitting.value = true
   try {
+    await formRef.value?.validate()
+    submitting.value = true
     const payload: Partial<CareLevelItem> = {
       levelCode: form.levelCode,
       levelName: form.levelName,
@@ -130,6 +131,8 @@ async function submit() {
     message.success('保存成功')
     modalOpen.value = false
     await load()
+  } catch (error) {
+    message.error(resolveCareError(error, '保存失败'))
   } finally {
     submitting.value = false
   }
@@ -145,9 +148,13 @@ async function remove(id: number) {
   Modal.confirm({
     title: '确认删除该护理等级？',
     onOk: async () => {
-      await deleteCareLevel(id)
-      message.success('删除成功')
-      await load()
+      try {
+        await deleteCareLevel(id)
+        message.success('删除成功')
+        await load()
+      } catch (error) {
+        message.error(resolveCareError(error, '删除失败'))
+      }
     }
   })
 }
@@ -175,6 +182,10 @@ async function load() {
     })
     rows.value = res.list
     query.total = res.total
+  } catch (error) {
+    message.error(resolveCareError(error, '加载护理等级失败'))
+    rows.value = []
+    query.total = 0
   } finally {
     loading.value = false
   }

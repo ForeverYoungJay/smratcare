@@ -291,7 +291,7 @@ async function submit() {
   }
   saving.value = true
   try {
-    const measuredAt = dayjs(form.measuredAt).format('YYYY-MM-DD HH:mm:ss')
+    const measuredAt = dayjs(form.measuredAt).format('YYYY-MM-DDTHH:mm:ss')
     const recommendedAbnormal = recommendAbnormalFlag(form.dataType, form.dataValue)
     const payload = {
       elderId: form.elderId,
@@ -341,8 +341,8 @@ function buildQueryParams() {
     params.elderId = Number(residentId)
   }
   if (Array.isArray(query.measuredRange) && query.measuredRange.length === 2) {
-    params.measuredFrom = dayjs(query.measuredRange[0]).format('YYYY-MM-DD HH:mm:ss')
-    params.measuredTo = dayjs(query.measuredRange[1]).format('YYYY-MM-DD HH:mm:ss')
+    params.measuredFrom = dayjs(query.measuredRange[0]).format('YYYY-MM-DDTHH:mm:ss')
+    params.measuredTo = dayjs(query.measuredRange[1]).format('YYYY-MM-DDTHH:mm:ss')
   }
   return params
 }

@@ -11,7 +11,8 @@ public interface SurveySubmissionService {
   SurveySubmission submit(Long orgId, Long submitterId, String submitterName, String submitterRole,
                           SurveySubmission submission, List<com.zhiyangyun.care.survey.entity.SurveySubmissionItem> items);
 
-  IPage<SurveySubmission> page(Long orgId, long pageNo, long pageSize, Long templateId, String targetType, Long targetId);
+  IPage<SurveySubmission> page(Long orgId, long pageNo, long pageSize, Long templateId, String targetType, Long targetId,
+      LocalDate from, LocalDate to);
 
   SurveyStatsSummaryResponse summary(Long orgId, Long templateId, LocalDate from, LocalDate to);
 

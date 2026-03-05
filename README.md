@@ -29,7 +29,7 @@ docker compose up -d --build
 ```
 
 默认端口：
-- 前端：`http://localhost:5173`
+- 前端：`http://localhost`
 - 后端：`http://localhost:8080`
 - MySQL：`127.0.0.1:3307`
 - Redis：`127.0.0.1:6379`
@@ -51,6 +51,7 @@ cd admin-web
 npm install
 npm run dev
 ```
+本地 `npm run dev` 默认端口仍为 `5173`，仅 `docker compose` 映射为 `80`。
 
 ## 数据库说明
 - 后端运行时会执行 Flyway（`src/main/resources/db/migration`）。
@@ -82,6 +83,11 @@ npm run build
 Flyway 版本冲突检查：
 ```bash
 ./scripts/check_flyway_versions.sh
+```
+
+项目一键静态自检（Flyway 版本冲突 + 前端导航路由）：
+```bash
+./scripts/project_self_check.sh
 ```
 
 Flyway 状态巡检（只检查，不修复）：

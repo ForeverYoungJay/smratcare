@@ -42,10 +42,12 @@
 <script setup lang="ts">
 import { reactive } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
+import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import { getNursingReportSummary } from '../../api/nursing'
 import type { NursingReportSummary } from '../../types'
+import { resolveCareError } from './careError'
 
 const query = reactive({
   range: undefined as [Dayjs, Dayjs] | undefined
@@ -78,11 +80,26 @@ function pct(value?: number | null) {
 }
 
 async function fetchData() {
-  const res = await getNursingReportSummary({
-    timeFrom: query.range?.[0] ? dayjs(query.range[0]).format('YYYY-MM-DD 00:00:00') : undefined,
-    timeTo: query.range?.[1] ? dayjs(query.range[1]).format('YYYY-MM-DD 23:59:59') : undefined
-  })
-  Object.assign(summary, res || {})
+  try {
+    const res = await getNursingReportSummary({
+      timeFrom: query.range?.[0] ? dayjs(query.range[0]).format('YYYY-MM-DDT00:00:00') : undefined,
+      timeTo: query.range?.[1] ? dayjs(query.range[1]).format('YYYY-MM-DDT23:59:59') : undefined
+    })
+    Object.assign(summary, res || {})
+  } catch (error) {
+    message.error(resolveCareError(error, '加载护理报表失败'))
+    Object.assign(summary, {
+      totalServices: 0,
+      completedServices: 0,
+      completionRate: 0,
+      overdueCount: 0,
+      overdueRate: 0,
+      planBookingCount: 0,
+      planCompletedCount: 0,
+      planAchievementRate: 0,
+      staffWorkloads: []
+    })
+  }
 }
 
 function onReset() {

@@ -60,12 +60,24 @@ public class DiningDeliveryRecordController {
         .eq(orgId != null, DiningDeliveryRecord::getOrgId, orgId)
         .eq(status != null && !status.isBlank(), DiningDeliveryRecord::getStatus, status);
     if (dateFrom != null && dateTo != null) {
-      wrapper.between(DiningDeliveryRecord::getDeliveredAt,
-          dateFrom.atStartOfDay(), dateTo.plusDays(1).atStartOfDay());
+      LocalDateTime start = dateFrom.atStartOfDay();
+      LocalDateTime endExclusive = dateTo.plusDays(1).atStartOfDay();
+      wrapper.and(w -> w
+          .between(DiningDeliveryRecord::getDeliveredAt, start, endExclusive)
+          .or(inner -> inner.isNull(DiningDeliveryRecord::getDeliveredAt)
+              .between(DiningDeliveryRecord::getCreateTime, start, endExclusive)));
     } else if (dateFrom != null) {
-      wrapper.ge(DiningDeliveryRecord::getDeliveredAt, dateFrom.atStartOfDay());
+      LocalDateTime start = dateFrom.atStartOfDay();
+      wrapper.and(w -> w
+          .ge(DiningDeliveryRecord::getDeliveredAt, start)
+          .or(inner -> inner.isNull(DiningDeliveryRecord::getDeliveredAt)
+              .ge(DiningDeliveryRecord::getCreateTime, start)));
     } else if (dateTo != null) {
-      wrapper.le(DiningDeliveryRecord::getDeliveredAt, dateTo.plusDays(1).atStartOfDay());
+      LocalDateTime endExclusive = dateTo.plusDays(1).atStartOfDay();
+      wrapper.and(w -> w
+          .lt(DiningDeliveryRecord::getDeliveredAt, endExclusive)
+          .or(inner -> inner.isNull(DiningDeliveryRecord::getDeliveredAt)
+              .lt(DiningDeliveryRecord::getCreateTime, endExclusive)));
     }
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(DiningDeliveryRecord::getOrderNo, keyword)
@@ -133,7 +145,7 @@ public class DiningDeliveryRecordController {
   }
 
   private void fillRecordFields(DiningDeliveryRecord record, Long orgId, DiningDeliveryRecordRequest request, boolean create) {
-    DiningMealOrder order = resolveMealOrder(orgId, request.getMealOrderId());
+    DiningMealOrder order = resolveMealOrderForUpsert(orgId, request.getMealOrderId(), record.getMealOrderId(), create);
     record.setMealOrderId(order.getId());
     record.setOrderNo(order.getOrderNo());
     applyDeliveryArea(record, orgId, request.getDeliveryAreaId(), request.getDeliveryAreaName());
@@ -161,6 +173,21 @@ public class DiningDeliveryRecordController {
       }
     }
     record.setRemark(normalizeText(request.getRemark()));
+  }
+
+  private DiningMealOrder resolveMealOrderForUpsert(
+      Long orgId,
+      Long requestMealOrderId,
+      Long currentMealOrderId,
+      boolean create) {
+    Long targetMealOrderId = requestMealOrderId;
+    if (targetMealOrderId == null && !create) {
+      targetMealOrderId = currentMealOrderId;
+    }
+    if (targetMealOrderId == null) {
+      throw new IllegalArgumentException(DiningConstants.MSG_ORDER_NOT_FOUND_OR_FORBIDDEN);
+    }
+    return resolveMealOrder(orgId, targetMealOrderId);
   }
 
   private void syncOrderStatus(DiningDeliveryRecord record) {

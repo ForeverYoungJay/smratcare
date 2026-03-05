@@ -402,6 +402,8 @@ import type {
   CareTaskReviewRequest
 } from '../../types'
 import { exportCsv } from '../../utils/export'
+import { resolveCareError } from './careError'
+import { careTodayLogExportColumns, careTodayTaskExportColumns, mapCareExportRows } from '../../constants/careExport'
 
 const route = useRoute()
 const router = useRouter()
@@ -732,23 +734,25 @@ function metricLabel(metric: 'total' | 'pending' | 'done' | 'exception' | 'overd
 }
 
 function exportCsvData() {
-  exportCsv(
-    tasks.value.map((t) => ({
-      老人: t.elderName,
-      房间: t.roomNo,
-      任务: t.taskName,
-      计划时间: t.planTime,
-      护工: staffName(t.staffId),
-      状态: statusLabel(t.status),
-      是否逾期: t.overdueFlag ? '是' : '否',
-      是否可疑: t.suspiciousFlag ? '是' : '否'
-    })),
-    '护理任务_今日'
-  )
+  if (!tasks.value.length) {
+    message.warning('暂无可导出数据')
+    return
+  }
+  const rows = mapCareExportRows(tasks.value, careTodayTaskExportColumns).map((item, index) => ({
+    ...item,
+    护工: staffName(tasks.value[index]?.staffId),
+    状态: statusLabel(tasks.value[index]?.status)
+  }))
+  exportCsv(rows, '护理任务_今日')
+  message.success('CSV导出成功')
 }
 
 function exportLogCsvData() {
   if (!current.value) {
+    return
+  }
+  if (!filteredExecuteLogs.value.length) {
+    message.warning('暂无可导出数据')
     return
   }
   const filterLabel = logResultFilter.value === 'SUCCESS'
@@ -757,20 +761,15 @@ function exportLogCsvData() {
       ? '失败'
       : '全部'
   const timestamp = dayjs().format('YYYYMMDD_HHmmss')
-  exportCsv(
-    filteredExecuteLogs.value.map((item) => ({
-      任务ID: item.taskDailyId,
-      老人: current.value?.elderName || '-',
-      房间: current.value?.roomNo || '-',
-      执行时间: item.executeTime ? dayjs(item.executeTime).format('YYYY-MM-DD HH:mm:ss') : '-',
-      护工: item.staffName || staffName(item.staffId),
-      结果: Number(item.resultStatus) === 1 ? '成功' : '失败',
-      是否可疑: item.suspiciousFlag ? '是' : '否',
-      床位码: item.bedQrCode || '',
-      备注: item.remark || ''
-    })),
-    `护理执行日志_${current.value.taskDailyId}_${filterLabel}_${timestamp}`
-  )
+  const rows = mapCareExportRows(filteredExecuteLogs.value, careTodayLogExportColumns).map((item, index) => ({
+    ...item,
+    老人: current.value?.elderName || '-',
+    房间: current.value?.roomNo || '-',
+    执行时间: filteredExecuteLogs.value[index]?.executeTime ? dayjs(filteredExecuteLogs.value[index].executeTime).format('YYYY-MM-DD HH:mm:ss') : '-',
+    护工: filteredExecuteLogs.value[index]?.staffName || staffName(filteredExecuteLogs.value[index]?.staffId)
+  }))
+  exportCsv(rows, `护理执行日志_${current.value.taskDailyId}_${filterLabel}_${timestamp}`)
+  message.success('CSV导出成功')
 }
 
 function handlePageChange(current: number, pageSize?: number) {
@@ -879,9 +878,9 @@ async function submitAssign() {
     message.success('派发成功')
     assignOpen.value = false
     search()
-  } catch (err) {
-    if (!err) return
-    message.error('派发失败')
+  } catch (error) {
+    if (!error) return
+    message.error(resolveCareError(error, '派发失败'))
   } finally {
     assigning.value = false
   }
@@ -908,9 +907,9 @@ async function submitReview() {
     })
     message.success('评价已提交')
     reviewOpen.value = false
-  } catch (err) {
-    if (!err) return
-    message.error('评价提交失败')
+  } catch (error) {
+    if (!error) return
+    message.error(resolveCareError(error, '评价提交失败'))
   } finally {
     reviewing.value = false
   }
@@ -976,8 +975,8 @@ async function submitAction() {
     }
     actionOpen.value = false
     search()
-  } catch (err) {
-    message.error('操作失败')
+  } catch (error) {
+    message.error(resolveCareError(error, '操作失败'))
   } finally {
     actionLoading.value = false
   }
@@ -987,7 +986,8 @@ async function loadTemplates() {
   try {
     const res = await getTemplatePage({ pageNo: 1, pageSize: 200 })
     templateOptions.value = res.list.map((t) => ({ label: t.taskName, value: t.id }))
-  } catch {
+  } catch (error) {
+    message.error(resolveCareError(error, '加载模板失败'))
     templateOptions.value = []
   }
 }
@@ -1003,11 +1003,12 @@ async function loadStaffOptions(keyword = '') {
       acc[cur.value] = cur.label
       return acc
     }, {} as Record<number, string>)
-  } catch {
+  } catch (error) {
     if (!keyword) {
       staffOptions.value = []
       staffMap.value = {}
     }
+    message.error(resolveCareError(error, '加载员工失败'))
   }
 }
 
@@ -1030,7 +1031,8 @@ async function searchElders(keyword: string) {
       acc[cur.value] = cur.label
       return acc
     }, {} as Record<number, string>)
-  } catch {
+  } catch (error) {
+    message.error(resolveCareError(error, '加载老人失败'))
     elderOptions.value = []
   }
 }

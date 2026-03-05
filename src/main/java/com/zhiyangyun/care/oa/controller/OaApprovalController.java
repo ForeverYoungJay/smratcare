@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -59,11 +60,12 @@ public class OaApprovalController {
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String type,
+      @RequestParam(required = false) Long applicantId,
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
     String normalizedStatus = normalizeStatus(status);
     String normalizedType = normalizeType(type);
-    var wrapper = buildQuery(orgId, normalizedStatus, normalizedType, keyword).orderByDesc(OaApproval::getCreateTime);
+    var wrapper = buildQuery(orgId, normalizedStatus, normalizedType, applicantId, keyword).orderByDesc(OaApproval::getCreateTime);
     return Result.ok(approvalMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
   }
 
@@ -71,6 +73,7 @@ public class OaApprovalController {
   public Result<OaApprovalSummaryResponse> summary(
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String type,
+      @RequestParam(required = false) Long applicantId,
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
     String normalizedStatus = normalizeStatus(status);
@@ -78,28 +81,31 @@ public class OaApprovalController {
     LocalDateTime now = LocalDateTime.now();
 
     OaApprovalSummaryResponse response = new OaApprovalSummaryResponse();
-    response.setTotalCount(count(approvalMapper.selectCount(buildQuery(orgId, normalizedStatus, normalizedType, keyword))));
-    response.setPendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", normalizedType, keyword))));
-    response.setApprovedCount(count(approvalMapper.selectCount(buildQuery(orgId, "APPROVED", normalizedType, keyword))));
-    response.setRejectedCount(count(approvalMapper.selectCount(buildQuery(orgId, "REJECTED", normalizedType, keyword))));
-    response.setTimeoutPendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", normalizedType, keyword)
+    response.setTotalCount(count(approvalMapper.selectCount(buildQuery(orgId, normalizedStatus, normalizedType, applicantId, keyword))));
+    response.setPendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", normalizedType, applicantId, keyword))));
+    response.setApprovedCount(count(approvalMapper.selectCount(buildQuery(orgId, "APPROVED", normalizedType, applicantId, keyword))));
+    response.setRejectedCount(count(approvalMapper.selectCount(buildQuery(orgId, "REJECTED", normalizedType, applicantId, keyword))));
+    response.setTimeoutPendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", normalizedType, applicantId, keyword)
         .lt(OaApproval::getCreateTime, now.minusHours(48)))));
-    response.setLeavePendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", "LEAVE", keyword))));
-    response.setReimbursePendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", "REIMBURSE", keyword))));
-    response.setPurchasePendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", "PURCHASE", keyword))));
+    response.setLeavePendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", "LEAVE", applicantId, keyword))));
+    response.setReimbursePendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", "REIMBURSE", applicantId, keyword))));
+    response.setPurchasePendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", "PURCHASE", applicantId, keyword))));
+    response.setMarketingPlanPendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", "MARKETING_PLAN", applicantId, keyword))));
     return Result.ok(response);
   }
 
   @PostMapping
   public Result<OaApproval> create(@Valid @RequestBody OaApprovalRequest request) {
     Long orgId = AuthContext.getOrgId();
+    Long currentStaffId = AuthContext.getStaffId();
+    boolean canApprove = canCurrentUserApprove();
     OaApproval approval = new OaApproval();
     approval.setTenantId(orgId);
     approval.setOrgId(orgId);
     validateDateRange(request.getStartTime(), request.getEndTime());
     approval.setApprovalType(normalizeType(request.getApprovalType()));
     approval.setTitle(request.getTitle());
-    approval.setApplicantId(request.getApplicantId());
+    approval.setApplicantId(resolveApplicantId(canApprove, currentStaffId, request.getApplicantId()));
     approval.setApplicantName(request.getApplicantName());
     approval.setAmount(request.getAmount());
     approval.setStartTime(request.getStartTime());
@@ -111,7 +117,7 @@ public class OaApprovalController {
     }
     approval.setStatus(normalizedStatus == null ? "PENDING" : normalizedStatus);
     approval.setRemark(request.getRemark());
-    approval.setCreatedBy(AuthContext.getStaffId());
+    approval.setCreatedBy(currentStaffId);
     approvalMapper.insert(approval);
     return Result.ok(approval);
   }
@@ -128,7 +134,7 @@ public class OaApprovalController {
     validateDateRange(request.getStartTime(), request.getEndTime());
     approval.setApprovalType(normalizeType(request.getApprovalType()));
     approval.setTitle(request.getTitle());
-    approval.setApplicantId(request.getApplicantId());
+    approval.setApplicantId(resolveApplicantId(canCurrentUserApprove(), AuthContext.getStaffId(), request.getApplicantId()));
     approval.setApplicantName(request.getApplicantName());
     approval.setAmount(request.getAmount());
     approval.setStartTime(request.getStartTime());
@@ -145,13 +151,14 @@ public class OaApprovalController {
   }
 
   @PutMapping("/{id}/approve")
-  public Result<OaApproval> approve(@PathVariable Long id) {
+  public Result<OaApproval> approve(@PathVariable Long id, @RequestParam(required = false) String remark) {
+    ensureApprovePermission();
     OaApproval approval = findAccessibleApproval(id);
     if (approval == null) {
       return Result.ok(null);
     }
     ensurePending(approval);
-    approval.setStatus("APPROVED");
+    applyApprovalDecision(approval, "APPROVED", remark);
     approvalMapper.updateById(approval);
     handleAfterApproved(approval);
     return Result.ok(approval);
@@ -159,19 +166,20 @@ public class OaApprovalController {
 
   @PutMapping("/{id}/reject")
   public Result<OaApproval> reject(@PathVariable Long id, @RequestParam(required = false) String remark) {
+    ensureApprovePermission();
     OaApproval approval = findAccessibleApproval(id);
     if (approval == null) {
       return Result.ok(null);
     }
     ensurePending(approval);
-    approval.setStatus("REJECTED");
-    approval.setRemark(remark);
+    applyApprovalDecision(approval, "REJECTED", remark);
     approvalMapper.updateById(approval);
     return Result.ok(approval);
   }
 
   @PutMapping("/batch/approve")
   public Result<Integer> batchApprove(@RequestBody OaBatchIdsRequest request) {
+    ensureApprovePermission();
     List<Long> ids = sanitizeIds(request == null ? null : request.getIds());
     if (ids.isEmpty()) {
       return Result.ok(0);
@@ -186,7 +194,7 @@ public class OaApprovalController {
       if (!"PENDING".equals(approval.getStatus())) {
         continue;
       }
-      approval.setStatus("APPROVED");
+      applyApprovalDecision(approval, "APPROVED", "批量审批通过");
       approvalMapper.updateById(approval);
       handleAfterApproved(approval);
       count++;
@@ -196,6 +204,7 @@ public class OaApprovalController {
 
   @PutMapping("/batch/reject")
   public Result<Integer> batchReject(@RequestBody OaApprovalBatchRejectRequest request) {
+    ensureApprovePermission();
     List<Long> ids = sanitizeIds(request == null ? null : request.getIds());
     if (ids.isEmpty()) {
       return Result.ok(0);
@@ -211,8 +220,7 @@ public class OaApprovalController {
       if (!"PENDING".equals(approval.getStatus())) {
         continue;
       }
-      approval.setStatus("REJECTED");
-      approval.setRemark(remark);
+      applyApprovalDecision(approval, "REJECTED", remark);
       approvalMapper.updateById(approval);
       count++;
     }
@@ -241,23 +249,13 @@ public class OaApprovalController {
   public ResponseEntity<byte[]> export(
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String type,
+      @RequestParam(required = false) Long applicantId,
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
     String normalizedStatus = normalizeStatus(status);
     String normalizedType = normalizeType(type);
-    var wrapper = Wrappers.lambdaQuery(OaApproval.class)
-        .eq(OaApproval::getIsDeleted, 0)
-        .eq(orgId != null, OaApproval::getOrgId, orgId)
-        .eq(normalizedStatus != null, OaApproval::getStatus, normalizedStatus)
-        .eq(normalizedType != null, OaApproval::getApprovalType, normalizedType)
+    var wrapper = buildQuery(orgId, normalizedStatus, normalizedType, applicantId, keyword)
         .orderByDesc(OaApproval::getCreateTime);
-    if (keyword != null && !keyword.isBlank()) {
-      wrapper.and(w -> w.like(OaApproval::getTitle, keyword)
-          .or()
-          .like(OaApproval::getApplicantName, keyword)
-          .or()
-          .like(OaApproval::getRemark, keyword));
-    }
     List<OaApproval> approvals = approvalMapper.selectList(wrapper);
     List<String> headers = List.of("ID", "类型", "标题", "申请人", "金额", "状态", "开始时间", "结束时间", "备注");
     List<List<String>> rows = approvals.stream()
@@ -287,10 +285,13 @@ public class OaApprovalController {
 
   private OaApproval findAccessibleApproval(Long id) {
     Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
+    boolean canApprove = canCurrentUserApprove();
     return approvalMapper.selectOne(Wrappers.lambdaQuery(OaApproval.class)
         .eq(OaApproval::getId, id)
         .eq(OaApproval::getIsDeleted, 0)
         .eq(orgId != null, OaApproval::getOrgId, orgId)
+        .eq(!canApprove && staffId != null, OaApproval::getApplicantId, staffId)
         .last("LIMIT 1"));
   }
 
@@ -319,9 +320,10 @@ public class OaApprovalController {
         && !"BANK_CARD".equals(normalized)
         && !"POINTS_CASH".equals(normalized)
         && !"MATERIAL_APPLY".equals(normalized)
-        && !"OFFICIAL_SEAL".equals(normalized)) {
+        && !"OFFICIAL_SEAL".equals(normalized)
+        && !"MARKETING_PLAN".equals(normalized)) {
       throw new IllegalArgumentException(
-          "approvalType 仅支持 LEAVE/OVERTIME/REIMBURSE/PURCHASE/INCOME_PROOF/BANK_CARD/POINTS_CASH/MATERIAL_APPLY/OFFICIAL_SEAL");
+          "approvalType 仅支持 LEAVE/OVERTIME/REIMBURSE/PURCHASE/INCOME_PROOF/BANK_CARD/POINTS_CASH/MATERIAL_APPLY/OFFICIAL_SEAL/MARKETING_PLAN");
     }
     return normalized;
   }
@@ -385,12 +387,16 @@ public class OaApprovalController {
   }
 
   private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OaApproval> buildQuery(
-      Long orgId, String normalizedStatus, String normalizedType, String keyword) {
+      Long orgId, String normalizedStatus, String normalizedType, Long applicantId, String keyword) {
+    Long staffId = AuthContext.getStaffId();
+    boolean canApprove = canCurrentUserApprove();
+    Long queryApplicantId = canApprove ? applicantId : staffId;
     var wrapper = Wrappers.lambdaQuery(OaApproval.class)
         .eq(OaApproval::getIsDeleted, 0)
         .eq(orgId != null, OaApproval::getOrgId, orgId)
         .eq(normalizedStatus != null, OaApproval::getStatus, normalizedStatus)
-        .eq(normalizedType != null, OaApproval::getApprovalType, normalizedType);
+        .eq(normalizedType != null, OaApproval::getApprovalType, normalizedType)
+        .eq(queryApplicantId != null, OaApproval::getApplicantId, queryApplicantId);
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(OaApproval::getTitle, keyword)
           .or().like(OaApproval::getApplicantName, keyword)
@@ -508,9 +514,82 @@ public class OaApprovalController {
     if (approval == null || approval.getApprovalType() == null) {
       return;
     }
+    if ("LEAVE".equalsIgnoreCase(approval.getApprovalType())) {
+      updateLeaveAnnualStats(approval);
+    }
     if ("POINTS_CASH".equalsIgnoreCase(approval.getApprovalType())) {
       applyPointsCashRedeem(approval);
     }
+  }
+
+  private void updateLeaveAnnualStats(OaApproval approval) {
+    if (approval.getApplicantId() == null) {
+      return;
+    }
+    int targetYear = approval.getStartTime() == null ? LocalDateTime.now().getYear() : approval.getStartTime().getYear();
+    LocalDateTime yearStart = LocalDateTime.of(targetYear, 1, 1, 0, 0, 0);
+    LocalDateTime yearEnd = yearStart.plusYears(1);
+    long annualCount = count(approvalMapper.selectCount(Wrappers.lambdaQuery(OaApproval.class)
+        .eq(OaApproval::getIsDeleted, 0)
+        .eq(approval.getOrgId() != null, OaApproval::getOrgId, approval.getOrgId())
+        .eq(OaApproval::getApprovalType, "LEAVE")
+        .eq(OaApproval::getApplicantId, approval.getApplicantId())
+        .eq(OaApproval::getStatus, "APPROVED")
+        .ge(OaApproval::getStartTime, yearStart)
+        .lt(OaApproval::getStartTime, yearEnd)));
+    Map<String, Object> map = readFormMap(approval.getFormData());
+    map.put("annualLeaveApprovedYear", targetYear);
+    map.put("annualLeaveApprovedCount", annualCount);
+    approval.setFormData(writeFormMap(map));
+    approvalMapper.updateById(approval);
+  }
+
+  private void applyApprovalDecision(OaApproval approval, String status, String remark) {
+    Map<String, Object> map = readFormMap(approval.getFormData());
+    map.put("lastApprovalStatus", status);
+    map.put("lastApprovalRemark", normalizeOpinion(remark));
+    map.put("lastApprovalAt", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+    map.put("lastApproverId", AuthContext.getStaffId());
+    map.put("lastApproverRoles", AuthContext.getRoleCodes());
+    approval.setFormData(writeFormMap(map));
+    approval.setStatus(status);
+    approval.setRemark(normalizeOpinion(remark));
+  }
+
+  private String normalizeOpinion(String remark) {
+    if (remark == null) {
+      return null;
+    }
+    String trimmed = remark.trim();
+    return trimmed.isEmpty() ? null : trimmed;
+  }
+
+  private void ensureApprovePermission() {
+    if (!canCurrentUserApprove()) {
+      throw new AccessDeniedException("仅管理者或部门负责人可审批");
+    }
+  }
+
+  private boolean canCurrentUserApprove() {
+    if (AuthContext.isAdmin()) {
+      return true;
+    }
+    List<String> roleCodes = AuthContext.getRoleCodes();
+    return roleCodes.contains("DEPT_LEADER")
+        || roleCodes.contains("LEADER")
+        || roleCodes.contains("MANAGER")
+        || roleCodes.contains("SUPERVISOR")
+        || roleCodes.contains("DIRECTOR");
+  }
+
+  private Long resolveApplicantId(boolean canApprove, Long currentStaffId, Long requestApplicantId) {
+    if (!canApprove) {
+      return currentStaffId;
+    }
+    if (requestApplicantId != null) {
+      return requestApplicantId;
+    }
+    return currentStaffId;
   }
 
   private void applyPointsCashRedeem(OaApproval approval) {

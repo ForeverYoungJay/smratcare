@@ -125,6 +125,7 @@ import PageContainer from '../../components/PageContainer.vue'
 import { getStaffPage } from '../../api/rbac'
 import { applyShiftTemplate, createShiftTemplate, deleteShiftTemplate, getShiftTemplatePage, updateShiftTemplate } from '../../api/nursing'
 import type { PageResult, ShiftTemplateItem, StaffItem } from '../../types'
+import { resolveCareError } from './careError'
 
 const rows = ref<ShiftTemplateItem[]>([])
 const loading = ref(false)
@@ -244,6 +245,8 @@ async function submit() {
     message.success('保存成功')
     modalOpen.value = false
     await load()
+  } catch (error) {
+    message.error(resolveCareError(error, '保存失败'))
   } finally {
     submitting.value = false
   }
@@ -253,9 +256,13 @@ async function remove(id: number) {
   Modal.confirm({
     title: '确认删除该排班方案？',
     onOk: async () => {
-      await deleteShiftTemplate(id)
-      message.success('删除成功')
-      await load()
+      try {
+        await deleteShiftTemplate(id)
+        message.success('删除成功')
+        await load()
+      } catch (error) {
+        message.error(resolveCareError(error, '删除失败'))
+      }
     }
   })
 }
@@ -309,17 +316,26 @@ async function submitApply() {
     })
     message.success(`实施完成，已生成 ${count || 0} 条排班`)
     applyOpen.value = false
+  } catch (error) {
+    message.error(resolveCareError(error, '实施排班方案失败'))
   } finally {
     applying.value = false
   }
 }
 
 async function loadStaffOptions(keyword?: string) {
-  const res: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: 50, keyword })
-  staffOptions.value = (res.list || []).map((item) => ({
-    label: item.realName || item.username || `员工${item.id}`,
-    value: item.id
-  }))
+  try {
+    const res: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: 50, keyword })
+    staffOptions.value = (res.list || []).map((item) => ({
+      label: item.realName || item.username || `员工${item.id}`,
+      value: item.id
+    }))
+  } catch (error) {
+    if (!keyword) {
+      staffOptions.value = []
+    }
+    message.error(resolveCareError(error, '加载员工列表失败'))
+  }
 }
 
 async function searchStaff(keyword: string) {
@@ -337,6 +353,10 @@ async function load() {
     })
     rows.value = res.list
     query.total = res.total
+  } catch (error) {
+    message.error(resolveCareError(error, '加载排班方案失败'))
+    rows.value = []
+    query.total = 0
   } finally {
     loading.value = false
   }

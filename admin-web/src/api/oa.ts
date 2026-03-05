@@ -6,6 +6,7 @@ import type {
   OaApproval,
   OaApprovalSummary,
   OaDocument,
+  OaDocumentFolder,
   OaTask,
   OaTaskSummary,
   OaPortalSummary,
@@ -129,8 +130,8 @@ export function updateApproval(id: string | number, data: Partial<OaApproval>) {
   return request.put<OaApproval>(`/api/oa/approval/${id}`, data)
 }
 
-export function approveApproval(id: string | number) {
-  return request.put<OaApproval>(`/api/oa/approval/${id}/approve`)
+export function approveApproval(id: string | number, remark?: string) {
+  return request.put<OaApproval>(`/api/oa/approval/${id}/approve`, null, { params: { remark } })
 }
 
 export function batchApproveApproval(ids: Array<string | number>) {
@@ -165,6 +166,22 @@ export function createDocument(data: Partial<OaDocument>) {
   return request.post<OaDocument>('/api/oa/document', data)
 }
 
+export function getDocumentFolderTree() {
+  return request.get<OaDocumentFolder[]>('/api/oa/document/folder/tree')
+}
+
+export function createDocumentFolder(data: Partial<OaDocumentFolder>) {
+  return request.post<OaDocumentFolder>('/api/oa/document/folder', data)
+}
+
+export function updateDocumentFolder(id: string | number, data: Partial<OaDocumentFolder>) {
+  return request.put<OaDocumentFolder>(`/api/oa/document/folder/${id}`, data)
+}
+
+export function deleteDocumentFolder(id: string | number) {
+  return request.delete<void>(`/api/oa/document/folder/${id}`)
+}
+
 export function updateDocument(id: string | number, data: Partial<OaDocument>) {
   return request.put<OaDocument>(`/api/oa/document/${id}`, data)
 }
@@ -183,6 +200,10 @@ export function exportDocument(params: any) {
 
 export function getAlbumPage(params: any) {
   return fetchPage<OaAlbum>('/api/oa/album/page', params)
+}
+
+export function getAlbumFolders() {
+  return request.get<string[]>('/api/oa/album/folders')
 }
 
 export function createAlbum(data: Partial<OaAlbum>) {
@@ -217,12 +238,20 @@ export function archiveKnowledge(id: string | number) {
   return request.put<OaKnowledge>(`/api/oa/knowledge/${id}/archive`)
 }
 
+export function expireKnowledge(id: string | number) {
+  return request.put<OaKnowledge>(`/api/oa/knowledge/${id}/expire`)
+}
+
 export function batchPublishKnowledge(ids: Array<string | number>) {
   return request.put<number>('/api/oa/knowledge/batch/publish', { ids })
 }
 
 export function batchArchiveKnowledge(ids: Array<string | number>) {
   return request.put<number>('/api/oa/knowledge/batch/archive', { ids })
+}
+
+export function batchExpireKnowledge(ids: Array<string | number>) {
+  return request.put<number>('/api/oa/knowledge/batch/expire', { ids })
 }
 
 export function deleteKnowledge(id: string | number) {

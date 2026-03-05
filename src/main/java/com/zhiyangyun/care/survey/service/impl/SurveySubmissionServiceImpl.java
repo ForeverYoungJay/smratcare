@@ -67,6 +67,17 @@ public class SurveySubmissionServiceImpl implements SurveySubmissionService {
     if (template.getStatus() != null && template.getStatus() != 1) {
       throw new IllegalArgumentException("Template not published");
     }
+    LocalDate today = LocalDate.now();
+    if (template.getStartDate() != null && today.isBefore(template.getStartDate())) {
+      throw new IllegalArgumentException("问卷未到生效日期");
+    }
+    if (template.getEndDate() != null && today.isAfter(template.getEndDate())) {
+      throw new IllegalArgumentException("问卷已过期");
+    }
+    if (submission.getTargetType() != null && template.getTargetType() != null
+        && !submission.getTargetType().equalsIgnoreCase(template.getTargetType())) {
+      throw new IllegalArgumentException("问卷对象类型不匹配");
+    }
     List<SurveyTemplateQuestion> relations = templateQuestionMapper.selectList(
         Wrappers.lambdaQuery(SurveyTemplateQuestion.class)
             .eq(SurveyTemplateQuestion::getTenantId, orgId)
@@ -141,7 +152,10 @@ public class SurveySubmissionServiceImpl implements SurveySubmissionService {
   }
 
   @Override
-  public IPage<SurveySubmission> page(Long orgId, long pageNo, long pageSize, Long templateId, String targetType, Long targetId) {
+  public IPage<SurveySubmission> page(Long orgId, long pageNo, long pageSize, Long templateId, String targetType, Long targetId,
+      LocalDate from, LocalDate to) {
+    LocalDateTime start = from == null ? null : from.atStartOfDay();
+    LocalDateTime end = to == null ? null : to.plusDays(1).atStartOfDay().minusNanos(1);
     var wrapper = Wrappers.lambdaQuery(SurveySubmission.class)
         .eq(SurveySubmission::getTenantId, orgId)
         .eq(SurveySubmission::getOrgId, orgId)
@@ -154,6 +168,12 @@ public class SurveySubmissionServiceImpl implements SurveySubmissionService {
     }
     if (targetId != null) {
       wrapper.eq(SurveySubmission::getTargetId, targetId);
+    }
+    if (start != null) {
+      wrapper.ge(SurveySubmission::getCreateTime, start);
+    }
+    if (end != null) {
+      wrapper.le(SurveySubmission::getCreateTime, end);
     }
     wrapper.orderByDesc(SurveySubmission::getCreateTime);
     return submissionMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
@@ -173,6 +193,8 @@ public class SurveySubmissionServiceImpl implements SurveySubmissionService {
     }
     SurveyStatsSummaryResponse response = new SurveyStatsSummaryResponse();
     response.setTotalSubmissions(total);
+    response.setScoredSubmissions((long) scored);
+    response.setUnscoredSubmissions(total - scored);
     response.setScoreTotal(sum);
     response.setAverageScore(scored == 0 ? 0.0 : (double) sum / scored);
     return response;

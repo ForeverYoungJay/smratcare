@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="来访登记" subTitle="访客预约核销与到访记录">
+  <PageContainer title="来访登记" subTitle="访客预约与到访登记">
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item label="老人姓名">
@@ -27,25 +27,28 @@
       <a-space style="margin-bottom: 12px" wrap>
         <a-tag color="blue">已选 {{ selectedRowKeys.length }} 条</a-tag>
         <a-button :disabled="selectedRowKeys.length !== 1" @click="checkinSelected">登记到访</a-button>
+        <a-button :disabled="selectedRowKeys.length !== 1" @click="printSelectedTicket">打印词条</a-button>
         <a-button :disabled="selectedRowKeys.length !== 1" @click="openEditSelected">编辑</a-button>
         <a-button danger :disabled="selectedRowKeys.length === 0" @click="deleteSelected">删除</a-button>
       </a-space>
-      <a-table
-        :data-source="rows"
-        :columns="columns"
-        :loading="loading"
-        row-key="id"
-        :pagination="false"
-        :row-selection="rowSelection"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'status'">
-            <a-tag :color="record.status === 1 ? 'green' : 'orange'">
-              {{ record.status === 1 ? '已登记' : '待登记' }}
-            </a-tag>
+      <StatefulBlock :loading="loading" :error="errorMessage" :empty="!rows.length" empty-text="暂无来访记录" @retry="fetchData">
+        <a-table
+          :data-source="rows"
+          :columns="columns"
+          :loading="loading"
+          row-key="id"
+          :pagination="false"
+          :row-selection="rowSelection"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'status'">
+              <a-tag :color="record.status === 1 ? 'green' : 'orange'">
+                {{ record.status === 1 ? '已登记' : '待登记' }}
+              </a-tag>
+            </template>
           </template>
-        </template>
-      </a-table>
+        </a-table>
+      </StatefulBlock>
     </a-card>
 
     <a-modal v-model:open="editOpen" :title="editingId ? '编辑来访预约' : '新增来访预约'" @ok="submitEdit" :confirm-loading="submitting" width="520px">
@@ -79,8 +82,9 @@ import dayjs from 'dayjs'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
+import StatefulBlock from '../../components/StatefulBlock.vue'
 import { getElderPage } from '../../api/elder'
-import { guardBookVisit, guardCheckin, guardDeleteVisit, guardTodayVisits, guardUpdateVisit } from '../../api/visit'
+import { guardBookVisit, guardCheckin, guardDeleteVisit, guardGetPrintTicket, guardTodayVisits, guardUpdateVisit } from '../../api/visit'
 import type { ElderItem, PageResult, VisitBookRequest, VisitBookingItem } from '../../types'
 
 const loading = ref(false)
@@ -90,6 +94,7 @@ const selectedRowKeys = ref<number[]>([])
 const route = useRoute()
 const editOpen = ref(false)
 const submitting = ref(false)
+const errorMessage = ref('')
 const editingId = ref<number | undefined>(undefined)
 const formRef = ref<FormInstance>()
 const rowSelection = computed(() => ({
@@ -123,7 +128,6 @@ const columns = [
   { title: '来访时间', dataIndex: 'visitTime', key: 'visitTime', width: 180 },
   { title: '访客人数', dataIndex: 'visitorCount', key: 'visitorCount', width: 100 },
   { title: '车牌', dataIndex: 'carPlate', key: 'carPlate', width: 120 },
-  { title: '核销码', dataIndex: 'visitCode', key: 'visitCode', width: 160 },
   { title: '状态', key: 'status', width: 100 }
 ]
 
@@ -139,6 +143,7 @@ function resolveElderName(elderId?: number) {
 
 async function fetchData() {
   loading.value = true
+  errorMessage.value = ''
   try {
     const source = await guardTodayVisits()
     rows.value = source
@@ -149,6 +154,8 @@ async function fetchData() {
         elderName: item.elderName || resolveElderName(item.elderId)
       }))
     selectedRowKeys.value = selectedRowKeys.value.filter((id) => rows.value.some((item) => item.id === id))
+  } catch (error: any) {
+    errorMessage.value = error?.message || '加载来访记录失败'
   } finally {
     loading.value = false
   }
@@ -175,6 +182,95 @@ async function checkinSelected() {
     return
   }
   await checkin(record)
+}
+
+function buildPrintableTicket(record: {
+  ticketNo?: string
+  elderName?: string
+  familyName?: string
+  visitTime?: string
+  visitorCount?: number
+  floorNo?: string
+  roomNo?: string
+  carPlate?: string
+  statusText?: string
+  generatedAt?: string
+}) {
+  const lines = [
+    `词条编号：${record.ticketNo || '-'}`,
+    `老人：${record.elderName || '-'}`,
+    `访客：${record.familyName || '-'}`,
+    `来访时间：${record.visitTime || '-'}`,
+    `访客人数：${record.visitorCount || 1}`,
+    `楼层/房间：${record.floorNo || '-'} / ${record.roomNo || '-'}`,
+    `车牌：${record.carPlate || '-'}`,
+    `状态：${record.statusText || '-'}`,
+    `生成时间：${record.generatedAt || '-'}`
+  ]
+  return lines.map((line) => `<div>${line}</div>`).join('')
+}
+
+function printVisitTicket(record: {
+  ticketNo?: string
+  elderName?: string
+  familyName?: string
+  visitTime?: string
+  visitorCount?: number
+  floorNo?: string
+  roomNo?: string
+  carPlate?: string
+  statusText?: string
+  generatedAt?: string
+}) {
+  const popup = window.open('', '_blank', 'width=420,height=520')
+  if (!popup) {
+    message.warning('浏览器拦截了打印窗口，请允许弹窗后重试')
+    return
+  }
+  popup.document.write(`
+    <html>
+      <head>
+        <title>来访登记词条</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; padding: 20px; }
+          .ticket { border: 1px dashed #333; padding: 16px; line-height: 1.8; font-size: 14px; }
+          .title { font-weight: 700; margin-bottom: 8px; font-size: 16px; }
+        </style>
+      </head>
+      <body>
+        <div class="ticket">
+          <div class="title">来访登记词条</div>
+          ${buildPrintableTicket(record)}
+        </div>
+      </body>
+    </html>
+  `)
+  popup.document.close()
+  popup.focus()
+  popup.print()
+}
+
+async function printSelectedTicket() {
+  if (selectedRowKeys.value.length !== 1) return
+  const record = rows.value.find((item) => item.id === selectedRowKeys.value[0])
+  if (!record) return
+  try {
+    const ticket = await guardGetPrintTicket(record.id)
+    printVisitTicket({
+      ticketNo: ticket.ticketNo,
+      elderName: ticket.elderName,
+      familyName: ticket.familyName,
+      visitTime: ticket.visitTime,
+      visitorCount: ticket.visitorCount,
+      floorNo: ticket.floorNo,
+      roomNo: ticket.roomNo,
+      carPlate: ticket.carPlate,
+      statusText: ticket.statusText,
+      generatedAt: ticket.generatedAt
+    })
+  } catch (error: any) {
+    message.error(error?.message || '生成打印词条失败')
+  }
 }
 
 function openCreate() {

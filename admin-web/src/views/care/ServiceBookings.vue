@@ -3,7 +3,7 @@
     <a-card :bordered="false" class="card-elevated">
       <a-form layout="inline" @submit.prevent>
         <a-form-item label="预约时间">
-          <a-range-picker v-model:value="query.range" show-time value-format="YYYY-MM-DD HH:mm:ss" />
+          <a-range-picker v-model:value="query.range" show-time value-format="YYYY-MM-DDTHH:mm:ss" />
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 140px" />
@@ -61,7 +61,7 @@
           </a-col>
           <a-col :span="12">
             <a-form-item label="预约时间" name="bookingTime" required>
-              <a-date-picker v-model:value="form.bookingTime" show-time value-format="YYYY-MM-DD HH:mm:ss" style="width: 100%" />
+              <a-date-picker v-model:value="form.bookingTime" show-time value-format="YYYY-MM-DDTHH:mm:ss" style="width: 100%" />
             </a-form-item>
           </a-col>
         </a-row>
@@ -116,6 +116,7 @@
 import { computed, reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import type { FormInstance } from 'ant-design-vue'
+import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { getStaffPage } from '../../api/rbac'
@@ -128,8 +129,10 @@ import {
   updateServiceBooking
 } from '../../api/nursing'
 import type { PageResult, ServiceBookingItem, ServiceItem, ServicePlanItem, StaffItem } from '../../types'
+import { resolveCareError } from './careError'
 
 const rows = ref<ServiceBookingItem[]>([])
+const route = useRoute()
 const loading = ref(false)
 const modalOpen = ref(false)
 const submitting = ref(false)
@@ -225,14 +228,21 @@ function openModal(record?: ServiceBookingItem) {
   if (record) {
     Object.assign(form, record)
     ensureSelectedElder(record.elderId, record.elderName)
+  } else {
+    const residentId = route.query.residentId ?? route.query.elderId
+    const residentName = typeof route.query.residentName === 'string' ? route.query.residentName : undefined
+    if (residentId) {
+      form.elderId = Number(residentId)
+      ensureSelectedElder(form.elderId, residentName)
+    }
   }
   modalOpen.value = true
 }
 
 async function submit() {
-  await formRef.value?.validate()
-  submitting.value = true
   try {
+    await formRef.value?.validate()
+    submitting.value = true
     const payload: Partial<ServiceBookingItem> = {
       elderId: form.elderId,
       serviceItemId: form.serviceItemId,
@@ -253,6 +263,8 @@ async function submit() {
     message.success('保存成功')
     modalOpen.value = false
     await load()
+  } catch (error) {
+    message.error(resolveCareError(error, '保存失败'))
   } finally {
     submitting.value = false
   }
@@ -262,9 +274,13 @@ async function remove(id: number) {
   Modal.confirm({
     title: '确认删除该服务预定？',
     onOk: async () => {
-      await deleteServiceBooking(id)
-      message.success('删除成功')
-      await load()
+      try {
+        await deleteServiceBooking(id)
+        message.success('删除成功')
+        await load()
+      } catch (error) {
+        message.error(resolveCareError(error, '删除失败'))
+      }
     }
   })
 }
@@ -292,18 +308,31 @@ async function searchElder(keyword: string) {
 }
 
 async function searchStaff(keyword: string) {
-  const res: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: 50, keyword })
-  staffOptions.value = res.list.map((item) => ({ label: item.realName || item.username, value: item.id }))
+  try {
+    const res: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: 50, keyword })
+    staffOptions.value = res.list.map((item) => ({ label: item.realName || item.username, value: item.id }))
+  } catch (error) {
+    if (!keyword) {
+      staffOptions.value = []
+    }
+    message.error(resolveCareError(error, '加载护工列表失败'))
+  }
 }
 
 async function loadBaseOptions() {
-  const [serviceItems, plans] = await Promise.all([
-    listServiceItems({ enabled: 1 }) as Promise<ServiceItem[]>,
-    getServicePlanList({ status: 'ACTIVE' }) as Promise<ServicePlanItem[]>
-  ])
-  serviceItemOptions.value = serviceItems.map((item) => ({ label: item.name, value: item.id }))
-  planOptions.value = plans.map((item) => ({ label: item.planName, value: item.id }))
-  await Promise.all([searchElders(''), searchStaff('')])
+  try {
+    const [serviceItems, plans] = await Promise.all([
+      listServiceItems({ enabled: 1 }) as Promise<ServiceItem[]>,
+      getServicePlanList({ status: 'ACTIVE' }) as Promise<ServicePlanItem[]>
+    ])
+    serviceItemOptions.value = serviceItems.map((item) => ({ label: item.name, value: item.id }))
+    planOptions.value = plans.map((item) => ({ label: item.planName, value: item.id }))
+    await Promise.all([searchElders(''), searchStaff('')])
+  } catch (error) {
+    message.error(resolveCareError(error, '加载基础选项失败'))
+    serviceItemOptions.value = []
+    planOptions.value = []
+  }
 }
 
 async function load() {
@@ -312,12 +341,17 @@ async function load() {
     const res: PageResult<ServiceBookingItem> = await getServiceBookingPage({
       pageNo: query.pageNo,
       pageSize: query.pageSize,
-      timeFrom: query.range?.[0],
-      timeTo: query.range?.[1],
-      status: query.status
+      timeFrom: query.range?.[0] || undefined,
+      timeTo: query.range?.[1] || undefined,
+      status: query.status,
+      elderId: route.query.residentId ? Number(route.query.residentId) : route.query.elderId ? Number(route.query.elderId) : undefined
     })
     rows.value = res.list
     query.total = res.total
+  } catch (error) {
+    message.error(resolveCareError(error, '加载服务预定失败'))
+    rows.value = []
+    query.total = 0
   } finally {
     loading.value = false
   }

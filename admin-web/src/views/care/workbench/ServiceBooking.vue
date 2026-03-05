@@ -34,6 +34,7 @@ import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
 import { getServiceBookingPage } from '../../../api/nursing'
 import type { ServiceBookingItem } from '../../../types'
+import { resolveCareError } from '../careError'
 
 const route = useRoute()
 const router = useRouter()
@@ -55,7 +56,18 @@ const columns = [
 ]
 
 function go(path: string) {
-  router.push(path)
+  const [pathname, search] = path.split('?')
+  const parsed = new URLSearchParams(search || '')
+  const query: Record<string, any> = {}
+  parsed.forEach((value, key) => {
+    query[key] = value
+  })
+  const resident = route.query.residentId ?? route.query.elderId
+  if (resident != null && query.residentId == null && query.elderId == null) {
+    query.residentId = resident
+    query.elderId = resident
+  }
+  router.push({ path: pathname, query })
 }
 
 function statusColor(status?: string) {
@@ -74,12 +86,12 @@ async function loadBookings() {
       pageSize: 50,
       elderId: residentId.value,
       status: statusFilter.value,
-      timeFrom: dayjs().subtract(30, 'day').format('YYYY-MM-DD 00:00:00'),
-      timeTo: dayjs().add(30, 'day').format('YYYY-MM-DD 23:59:59')
+      timeFrom: dayjs().subtract(30, 'day').format('YYYY-MM-DDT00:00:00'),
+      timeTo: dayjs().add(30, 'day').format('YYYY-MM-DDT23:59:59')
     })
     rows.value = page.list || []
-  } catch (error: any) {
-    errorMessage.value = error?.message || '加载服务预约失败'
+  } catch (error) {
+    errorMessage.value = resolveCareError(error, '加载服务预约失败')
     message.error(errorMessage.value)
   } finally {
     loading.value = false

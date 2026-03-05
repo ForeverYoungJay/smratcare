@@ -552,7 +552,7 @@ export const routes = [
             path: 'plan',
             name: 'MarketingPlan',
             component: () => import('../views/marketing/MarketingPlan.vue'),
-            meta: { title: '营销方案', hidden: true }
+            meta: { title: '营销方案与审批' }
           },
           {
             path: 'sales',
@@ -2245,7 +2245,7 @@ export const routes = [
             path: 'album',
             name: 'OaAlbum',
             component: () => import('../views/oa/Album.vue'),
-            meta: { title: '相册管理' }
+            meta: { title: '相册管理', hidden: true }
           },
           {
             path: 'card',
@@ -2564,7 +2564,7 @@ export const routes = [
               { path: 'tasks', name: 'HrOaTasks', component: () => import('../views/oa/Task.vue'), meta: { title: '任务管理', roles: ['ADMIN'] } },
               { path: 'execution', name: 'HrOaExecution', component: () => import('../views/oa/Todo.vue'), meta: { title: '工作执行', roles: ['ADMIN'] } },
               { path: 'activity-plan', name: 'HrOaActivityPlan', component: () => import('../views/oa/ActivityPlan.vue'), meta: { title: '活动计划', roles: ['ADMIN'] } },
-              { path: 'albums', name: 'HrOaAlbums', component: () => import('../views/oa/Album.vue'), meta: { title: '相册管理', roles: ['ADMIN'] } },
+              { path: 'albums', name: 'HrOaAlbums', component: () => import('../views/oa/Album.vue'), meta: { title: '相册管理', hidden: true, roles: ['ADMIN'] } },
               { path: 'knowledge', name: 'HrOaKnowledge', component: () => import('../views/oa/Knowledge.vue'), meta: { title: '知识库', roles: ['ADMIN'] } },
               { path: 'policies', name: 'HrOaPolicies', component: () => import('../views/hr/HrPolicies.vue'), meta: { title: '规章制度库', roles: ['ADMIN'] } },
               { path: 'policy-alerts', name: 'HrOaPolicyAlerts', component: () => import('../views/hr/HrPolicyAlerts.vue'), meta: { title: '制度更新预警', roles: ['ADMIN'] } },

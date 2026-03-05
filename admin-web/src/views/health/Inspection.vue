@@ -70,6 +70,13 @@
         <template v-if="column.key === 'inspectionDate'">
           {{ formatDate(record.inspectionDate) }}
         </template>
+        <template v-else-if="column.key === 'attachmentCount'">
+          <a-space v-if="resolveAttachmentFiles(record.attachmentUrls).length">
+            <a-tag color="blue">{{ resolveAttachmentFiles(record.attachmentUrls).length }} 张</a-tag>
+            <a @click="previewPhotos(resolveAttachmentFiles(record.attachmentUrls))">查看</a>
+          </a-space>
+          <span v-else>-</span>
+        </template>
         <template v-else-if="column.key === 'status'">
           <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
         </template>
@@ -110,6 +117,17 @@
           <a-col :span="12"><a-form-item label="巡检人"><a-input v-model:value="form.inspectorName" /></a-form-item></a-col>
         </a-row>
         <a-form-item label="跟进措施"><a-input v-model:value="form.followUpAction" /></a-form-item>
+        <a-form-item label="巡检附件（照片）">
+          <a-upload :before-upload="beforeUploadFormPhoto" :show-upload-list="false" accept="image/*">
+            <a-button :loading="uploadingFormPhoto">上传照片</a-button>
+          </a-upload>
+          <a-space wrap style="margin-top: 8px" v-if="formPhotoFiles.length">
+            <a-tag v-for="(photo, index) in formPhotoFiles" :key="`${photo.url}-${index}`" closable @close="removeFormPhoto(index)">
+              <a @click="previewPhotos(formPhotoFiles, index)">{{ photo.name || `照片${index + 1}` }}</a>
+            </a-tag>
+          </a-space>
+        </a-form-item>
+        <a-form-item label="其他说明"><a-textarea v-model:value="form.otherNote" :rows="2" /></a-form-item>
         <a-form-item label="备注"><a-input v-model:value="form.remark" /></a-form-item>
       </a-form>
     </a-modal>
@@ -147,8 +165,18 @@
         <a-form-item label="处理方式" v-if="boardForm.abnormal">
           <a-input v-model:value="boardForm.handleAction" placeholder="异常项必须填写处理方式" />
         </a-form-item>
-        <a-form-item label="附件说明">
-          <a-input v-model:value="boardForm.attachmentNote" placeholder="照片/伤口/皮肤说明" />
+        <a-form-item label="巡检附件（照片）">
+          <a-upload :before-upload="beforeUploadBoardPhoto" :show-upload-list="false" accept="image/*">
+            <a-button :loading="uploadingBoardPhoto">上传照片</a-button>
+          </a-upload>
+          <a-space wrap style="margin-top: 8px" v-if="boardPhotoFiles.length">
+            <a-tag v-for="(photo, index) in boardPhotoFiles" :key="`${photo.url}-${index}`" closable @close="removeBoardPhoto(index)">
+              <a @click="previewPhotos(boardPhotoFiles, index)">{{ photo.name || `照片${index + 1}` }}</a>
+            </a-tag>
+          </a-space>
+        </a-form-item>
+        <a-form-item label="其他说明">
+          <a-textarea v-model:value="boardForm.otherNote" :rows="2" placeholder="可补充症状、处理过程、沟通情况等" />
         </a-form-item>
         <a-form-item label="巡检结论">
           <a-radio-group v-model:value="boardForm.conclusion">
@@ -163,6 +191,12 @@
         </a-space>
       </a-form>
     </a-drawer>
+    <a-image-preview-group
+      v-if="previewState.open && previewState.urls.length"
+      :preview="{ visible: previewState.open, current: previewState.current, onVisibleChange: handlePreviewVisibleChange }"
+    >
+      <a-image v-for="(url, index) in previewState.urls" :key="`${url}-${index}`" :src="url" style="display: none" />
+    </a-image-preview-group>
   </PageContainer>
 </template>
 
@@ -177,6 +211,7 @@ import DataTable from '../../components/DataTable.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { inspectionExportColumns, mapHealthExportRows } from '../../constants/healthExport'
 import { exportCsv, exportExcel } from '../../utils/export'
+import { uploadOaFile } from '../../api/oa'
 import { resolveHealthError } from './healthError'
 import {
   getHealthInspectionPage,
@@ -186,6 +221,11 @@ import {
   deleteHealthInspection
 } from '../../api/health'
 import type { HealthInspection, HealthInspectionSummary, PageResult } from '../../types'
+
+type InspectionPhotoFile = {
+  name: string
+  url: string
+}
 
 const loading = ref(false)
 const exporting = ref(false)
@@ -209,6 +249,8 @@ const columns = [
   { title: '结果', dataIndex: 'result', key: 'result', width: 200 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 120 },
   { title: '巡检人', dataIndex: 'inspectorName', key: 'inspectorName', width: 120 },
+  { title: '附件', key: 'attachmentCount', width: 100 },
+  { title: '其他说明', dataIndex: 'otherNote', key: 'otherNote', width: 180 },
   { title: '跟进措施', dataIndex: 'followUpAction', key: 'followUpAction' },
   { title: '操作', key: 'action', width: 120 }
 ]
@@ -226,7 +268,20 @@ const form = reactive({
   status: '',
   inspectorName: '',
   followUpAction: '',
+  attachmentUrls: '',
+  otherNote: '',
   remark: ''
+})
+const formPhotoFiles = ref<InspectionPhotoFile[]>([])
+const boardPhotoFiles = ref<InspectionPhotoFile[]>([])
+const uploadingFormPhoto = ref(false)
+const uploadingBoardPhoto = ref(false)
+const maxPhotoCount = 9
+const maxPhotoSizeMb = 10
+const previewState = reactive({
+  open: false,
+  current: 0,
+  urls: [] as string[]
 })
 const statusOptions = [
   { label: '正常', value: 'NORMAL' },
@@ -258,7 +313,7 @@ const boardForm = reactive({
   abnormal: false,
   needReport: false,
   handleAction: '',
-  attachmentNote: '',
+  otherNote: '',
   conclusion: 'NORMAL'
 })
 const boardRows = computed(() => {
@@ -344,7 +399,10 @@ function openCreate() {
   form.status = 'NORMAL'
   form.inspectorName = ''
   form.followUpAction = ''
+  form.attachmentUrls = ''
+  form.otherNote = ''
   form.remark = ''
+  formPhotoFiles.value = []
   editOpen.value = true
 }
 
@@ -359,7 +417,10 @@ function openEdit(record: HealthInspection) {
   form.status = record.status || 'NORMAL'
   form.inspectorName = record.inspectorName || ''
   form.followUpAction = record.followUpAction || ''
+  form.attachmentUrls = record.attachmentUrls || ''
+  form.otherNote = record.otherNote || ''
   form.remark = record.remark || ''
+  formPhotoFiles.value = resolveAttachmentFiles(record.attachmentUrls)
   editOpen.value = true
 }
 
@@ -386,8 +447,9 @@ function resetBoardForm() {
   boardForm.abnormal = false
   boardForm.needReport = false
   boardForm.handleAction = ''
-  boardForm.attachmentNote = ''
+  boardForm.otherNote = ''
   boardForm.conclusion = 'NORMAL'
+  boardPhotoFiles.value = []
 }
 
 function openBoardRecord(record?: HealthInspection) {
@@ -397,6 +459,8 @@ function openBoardRecord(record?: HealthInspection) {
     boardForm.elderName = record.elderName || ''
     boardForm.inspectionDate = record.inspectionDate ? dayjs(record.inspectionDate) : dayjs()
     boardForm.conclusion = (record.status as any) || 'NORMAL'
+    boardForm.otherNote = record.otherNote || ''
+    boardPhotoFiles.value = resolveAttachmentFiles(record.attachmentUrls)
   } else {
     const residentId = route.query.residentId ?? route.query.elderId
     if (residentId) {
@@ -413,6 +477,120 @@ function saveBoardDraft() {
   message.success('已保存草稿（页面暂存）')
 }
 
+function previewPhotos(files: InspectionPhotoFile[], current = 0) {
+  previewState.urls = files.map((item) => item.url).filter((item) => !!item)
+  previewState.current = current
+  previewState.open = previewState.urls.length > 0
+}
+
+function handlePreviewVisibleChange(visible: boolean) {
+  previewState.open = visible
+  if (!visible) {
+    previewState.urls = []
+    previewState.current = 0
+  }
+}
+
+function resolveAttachmentFiles(value?: string): InspectionPhotoFile[] {
+  if (!value) return []
+  const text = String(value).trim()
+  if (!text) return []
+  try {
+    const parsed = JSON.parse(text)
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .map((item: any) => {
+        if (typeof item === 'string') {
+          return { name: item.split('/').pop() || '照片', url: item }
+        }
+        const url = item?.url || item?.fileUrl || ''
+        if (!url) return null
+        return {
+          name: item?.name || item?.originalFileName || item?.fileName || url.split('/').pop() || '照片',
+          url
+        }
+      })
+      .filter((item): item is InspectionPhotoFile => !!item?.url)
+  } catch {
+    return text
+      .split(',')
+      .map((item) => item.trim())
+      .filter((item) => !!item)
+      .map((url) => ({ name: url.split('/').pop() || '照片', url }))
+  }
+}
+
+function serializeAttachmentFiles(files: InspectionPhotoFile[]) {
+  if (!files.length) return ''
+  return JSON.stringify(files.map((item) => ({ name: item.name, url: item.url })))
+}
+
+async function uploadInspectionPhoto(file: File, target: 'form' | 'board') {
+  const isImage = file.type.startsWith('image/')
+  if (!isImage) {
+    message.error('仅支持上传图片文件')
+    return false
+  }
+  const sizeMb = file.size / 1024 / 1024
+  if (sizeMb > maxPhotoSizeMb) {
+    message.error(`图片大小不能超过${maxPhotoSizeMb}MB`)
+    return false
+  }
+  const targetList = target === 'form' ? formPhotoFiles.value : boardPhotoFiles.value
+  if (targetList.length >= maxPhotoCount) {
+    message.warning(`最多上传${maxPhotoCount}张照片`)
+    return false
+  }
+  if (target === 'form') {
+    uploadingFormPhoto.value = true
+  } else {
+    uploadingBoardPhoto.value = true
+  }
+  try {
+    const uploaded = await uploadOaFile(file, 'health-inspection-photo')
+    const url = uploaded?.fileUrl || ''
+    if (!url) {
+      message.error('上传失败：未返回图片地址')
+      return false
+    }
+    const photo = {
+      name: uploaded.originalFileName || uploaded.fileName || file.name,
+      url
+    }
+    if (target === 'form') {
+      formPhotoFiles.value = [...formPhotoFiles.value, photo]
+    } else {
+      boardPhotoFiles.value = [...boardPhotoFiles.value, photo]
+    }
+    message.success('照片上传成功')
+  } catch (error) {
+    message.error(resolveHealthError(error, '照片上传失败'))
+  } finally {
+    if (target === 'form') {
+      uploadingFormPhoto.value = false
+    } else {
+      uploadingBoardPhoto.value = false
+    }
+  }
+  return false
+}
+
+async function beforeUploadFormPhoto(file: File) {
+  return uploadInspectionPhoto(file, 'form')
+}
+
+async function beforeUploadBoardPhoto(file: File) {
+  return uploadInspectionPhoto(file, 'board')
+}
+
+function removeFormPhoto(index: number) {
+  formPhotoFiles.value.splice(index, 1)
+}
+
+function removeBoardPhoto(index: number) {
+  boardPhotoFiles.value.splice(index, 1)
+}
+
 async function submitBoard() {
   if (!boardForm.elderName || !boardForm.inspectionDate) {
     message.error('请填写长者与巡检日期')
@@ -420,6 +598,10 @@ async function submitBoard() {
   }
   if (boardForm.abnormal && !boardForm.handleAction) {
     message.error('异常项必须填写处理方式')
+    return
+  }
+  if (boardForm.abnormal && !boardPhotoFiles.value.length) {
+    message.error('异常巡检请至少上传1张照片')
     return
   }
   const vitalText = [
@@ -447,12 +629,18 @@ async function submitBoard() {
     status: boardForm.conclusion,
     inspectorName: form.inspectorName || '系统记录',
     followUpAction: boardForm.abnormal ? boardForm.handleAction : '',
-    remark: `上报:${boardForm.needReport ? '是' : '否'}；附件:${boardForm.attachmentNote || '-'}`
+    attachmentUrls: serializeAttachmentFiles(boardPhotoFiles.value),
+    otherNote: boardForm.otherNote,
+    remark: `上报:${boardForm.needReport ? '是' : '否'}`
   }
-  await createHealthInspection(payload)
-  message.success('巡检已提交并完成联动')
-  boardOpen.value = false
-  fetchData()
+  try {
+    await createHealthInspection(payload)
+    message.success('巡检已提交并完成联动')
+    boardOpen.value = false
+    fetchData()
+  } catch (error) {
+    message.error(resolveHealthError(error, '巡检提交失败'))
+  }
 }
 
 async function submit() {
@@ -467,6 +655,10 @@ async function submit() {
     message.error('异常巡检请填写跟进措施')
     return
   }
+  if (form.status === 'ABNORMAL' && !formPhotoFiles.value.length && !form.id) {
+    message.error('异常巡检请至少上传1张照片')
+    return
+  }
   saving.value = true
   try {
     const payload = {
@@ -478,6 +670,8 @@ async function submit() {
       status: form.status,
       inspectorName: form.inspectorName,
       followUpAction: form.followUpAction,
+      attachmentUrls: serializeAttachmentFiles(formPhotoFiles.value),
+      otherNote: form.otherNote,
       remark: form.remark
     }
     if (form.id) {
@@ -560,6 +754,7 @@ function formatDate(value?: string) {
 }
 
 function resolveRowClassName(record: HealthInspection) {
+  if (record.status === 'ABNORMAL' && !resolveAttachmentFiles(record.attachmentUrls).length) return 'health-row-warning'
   if (record.status === 'ABNORMAL' || record.status === 'FOLLOWING') return 'health-row-danger'
   return ''
 }
@@ -587,7 +782,8 @@ async function loadExportRecords() {
       list.map((item) => ({
         ...item,
         inspectionDate: formatDate(item.inspectionDate),
-        status: statusLabel(item.status)
+        status: statusLabel(item.status),
+        attachmentUrls: resolveAttachmentFiles(item.attachmentUrls).map((file) => file.url).join('；')
       })),
       inspectionExportColumns
     )
@@ -618,5 +814,8 @@ watch(
 }
 :deep(.health-row-danger > td) {
   background: #fff1f0 !important;
+}
+:deep(.health-row-warning > td) {
+  background: #fff7e6 !important;
 }
 </style>

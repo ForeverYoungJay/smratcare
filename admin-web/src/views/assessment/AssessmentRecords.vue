@@ -49,6 +49,13 @@
       style="margin-top: 12px"
       :message="`风险提醒：复评逾期 ${summary.reassessOverdueCount || 0} 条，高风险等级 ${summary.highRiskCount || 0} 条。`"
     />
+    <a-card v-if="props.assessmentType === 'ARCHIVE'" class="card-elevated" :bordered="false" style="margin-top: 12px">
+      <a-tabs v-model:activeKey="archiveStatusTab" @change="onArchiveStatusTabChange">
+        <a-tab-pane key="ALL" :tab="`总记录 (${summary.totalCount || 0})`" />
+        <a-tab-pane key="DRAFT" :tab="`草稿 (${summary.draftCount || 0})`" />
+        <a-tab-pane key="COMPLETED" :tab="`已完成 (${summary.completedCount || 0})`" />
+      </a-tabs>
+    </a-card>
     <FlowGuardBar
       v-if="isAdmissionAssessment"
       title="入住评估守卫"
@@ -82,6 +89,7 @@
         :pagination="false"
         row-key="id"
         :row-selection="rowSelection"
+        :custom-row="tableCustomRow"
         :locale="{ emptyText: '暂无数据' }"
         :scroll="{ x: 1300, y: 520 }"
       >
@@ -124,6 +132,13 @@
               <a-button v-if="pageConfig.actions.includes('assign')" type="link" @click="assignRecord(record)">指派</a-button>
               <a-button v-if="pageConfig.actions.includes('edit')" type="link" @click="openForm(record)">编辑</a-button>
               <a-button v-if="pageConfig.actions.includes('view')" type="link" @click="openForm(record, true)">查看</a-button>
+              <a-button
+                v-if="record.status === 'COMPLETED' || record.status === 'ARCHIVED'"
+                type="link"
+                @click="printReport(record)"
+              >
+                打印报告
+              </a-button>
               <a-button v-if="pageConfig.actions.includes('delete')" type="link" danger @click="remove(record.id)">删除</a-button>
             </a-space>
           </template>
@@ -238,16 +253,21 @@
                 <a-card v-for="item in group.items" :key="item.id" size="small">
                   <div style="font-weight: 600; margin-bottom: 6px;">{{ item.id }}. {{ item.title }}</div>
                   <div style="color: rgba(0,0,0,0.65); margin-bottom: 8px;">指标说明：{{ item.description }}</div>
-                  <a-select
+                  <a-input-number
                     v-model:value="admissionScores[item.id]"
-                    placeholder="请选择评分"
+                    :min="admissionItemMin(item)"
+                    :max="admissionItemMax(item)"
+                    :precision="0"
                     :disabled="formReadonly"
                     style="width: 100%; margin-bottom: 8px;"
-                  >
-                    <a-select-option v-for="opt in item.options" :key="`${item.id}-${opt.score}`" :value="opt.score">
-                      {{ opt.score }}分：{{ opt.label }}
-                    </a-select-option>
-                  </a-select>
+                    :placeholder="`请输入分值(${admissionItemMin(item)}~${admissionItemMax(item)})`"
+                  />
+                  <div style="color: rgba(0,0,0,0.6); font-size: 12px;">
+                    可选分值：
+                    <span v-for="(opt, idx) in item.options" :key="`${item.id}-hint-${idx}`">
+                      {{ opt.score }}分{{ idx < item.options.length - 1 ? ' / ' : '' }}
+                    </span>
+                  </div>
                 </a-card>
               </a-space>
             </a-card>
@@ -350,6 +370,7 @@ import {
   deleteAssessmentRecord,
   batchDeleteAssessmentRecord,
   exportAssessmentRecord,
+  getAssessmentRecordReport,
   getAssessmentTemplateList,
   previewAssessmentScore
 } from '../../api/assessment'
@@ -772,6 +793,7 @@ const pageConfigMap: Record<AssessmentType, PageConfig> = {
     columns: [
       { title: '序号', key: 'index', width: 70, fixed: 'left' },
       { title: '老人姓名', key: 'elderName', dataIndex: 'elderName', width: 130 },
+      { title: '状态', key: 'status', dataIndex: 'status', width: 110 },
       { title: '性别', key: 'gender', dataIndex: 'gender', width: 90 },
       { title: '年龄', key: 'age', dataIndex: 'age', width: 90 },
       { title: '家庭地址', key: 'address', dataIndex: 'address', width: 260 },
@@ -885,7 +907,10 @@ const admissionLevelText = computed(() => {
   return resolveAbilityLevel(admissionTotalScore.value)
 })
 const admissionMissingItems = computed(() =>
-  admissionScoreItemList.filter((item) => admissionScores[item.id] === undefined && Math.max(...item.options.map((opt) => opt.score)) > 0)
+  admissionScoreItemList.filter((item) => {
+    const current = admissionScores[item.id]
+    return (current === undefined || current === null) && Math.max(...item.options.map((opt) => opt.score)) > 0
+  })
 )
 const admissionResidentIdFromRoute = computed(() => Number(route.query.residentId || route.query.elderId || 0))
 const admissionContractNoFromRoute = computed(() => String(route.query.contractNo || '').trim())
@@ -893,6 +918,11 @@ const admissionElderNameFromRoute = computed(() => String(route.query.elderName 
 const admissionAutoOpenMode = computed(() => String(route.query.mode || 'new'))
 const admissionShouldAutoOpen = computed(() => String(route.query.autoOpen || '') === '1')
 const admissionRouteHandled = ref(false)
+const routeElderId = computed(() => {
+  const raw = Number(route.query.residentId || route.query.elderId || 0)
+  return raw > 0 ? raw : undefined
+})
+const archiveStatusTab = ref<'ALL' | 'DRAFT' | 'COMPLETED'>('ALL')
 
 const query = reactive({
   keyword: '',
@@ -923,10 +953,10 @@ const form = reactive<Partial<AssessmentRecord>>({
   resultSummary: '',
   suggestion: '',
   detailJson: '',
-  scoreAuto: 1
+  scoreAuto: 0
 })
 const submitting = ref(false)
-const scoreAutoChecked = ref(true)
+const scoreAutoChecked = ref(false)
 
 const rules: FormRules = {
   assessmentDate: [{ required: true, message: '请选择评估日期' }],
@@ -1024,6 +1054,22 @@ const rowSelection = computed(() => {
   }
 })
 
+const tableCustomRow = (record: AssessmentRecord) => {
+  if (props.assessmentType !== 'ARCHIVE') {
+    return {}
+  }
+  return {
+    style: { cursor: 'pointer' },
+    onClick: (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null
+      if (target?.closest('button') || target?.closest('a')) {
+        return
+      }
+      openForm(record, true)
+    }
+  }
+}
+
 function statusLabel(status?: string) {
   if (status === 'DRAFT') return '草稿'
   if (status === 'ARCHIVED') return '已归档'
@@ -1034,6 +1080,23 @@ function statusColor(status?: string) {
   if (status === 'DRAFT') return 'orange'
   if (status === 'ARCHIVED') return 'blue'
   return 'green'
+}
+
+function normalizeArchiveStatusByTab() {
+  if (props.assessmentType !== 'ARCHIVE') {
+    return pageConfig.value.showStatusFilter ? query.status : undefined
+  }
+  if (archiveStatusTab.value === 'ALL') {
+    return undefined
+  }
+  return archiveStatusTab.value
+}
+
+function onArchiveStatusTabChange(tab: string) {
+  archiveStatusTab.value = (tab as 'ALL' | 'DRAFT' | 'COMPLETED') || 'ALL'
+  query.status = archiveStatusTab.value === 'ALL' ? undefined : archiveStatusTab.value
+  query.pageNo = 1
+  fetchData()
 }
 
 function assessmentTypeLabel(type?: AssessmentType | string) {
@@ -1069,7 +1132,8 @@ async function fetchData() {
       pageNo: query.pageNo,
       pageSize: query.pageSize,
       assessmentType: assessmentTypeForQuery,
-      status: pageConfig.value.showStatusFilter ? query.status : undefined,
+      status: normalizeArchiveStatusByTab(),
+      elderId: routeElderId.value,
       keyword,
       dateFrom: query.dateRange?.[0],
       dateTo: query.dateRange?.[1]
@@ -1099,11 +1163,20 @@ function reset() {
   query.keyword = ''
   query.contentKeyword = ''
   query.archiveType = undefined
+  archiveStatusTab.value = 'ALL'
   query.status = undefined
   query.dateRange = undefined
   query.pageNo = 1
   selectedRowKeys.value = []
   fetchData()
+}
+
+function admissionItemMin(item: AdmissionAbilityItem) {
+  return Math.min(...item.options.map((opt) => opt.score))
+}
+
+function admissionItemMax(item: AdmissionAbilityItem) {
+  return Math.max(...item.options.map((opt) => opt.score))
 }
 
 function onPageChange(page: number) {
@@ -1169,14 +1242,6 @@ function resetAdmissionScores() {
   })
 }
 
-function applyAdmissionDefaultTemplate() {
-  admissionScoreItemList.forEach((item) => {
-    const defaultOption = item.options[0]
-    if (!defaultOption) return
-    admissionScores[item.id] = defaultOption.score
-  })
-}
-
 function loadAdmissionScoresFromDetail(detailJson?: string) {
   resetAdmissionScores()
   if (!detailJson) return
@@ -1185,7 +1250,8 @@ function loadAdmissionScoresFromDetail(detailJson?: string) {
     const mapped = parsed?.admissionAbilityScores || {}
     admissionScoreItemList.forEach((item) => {
       if (mapped[item.id] !== undefined && mapped[item.id] !== null) {
-        admissionScores[item.id] = Number(mapped[item.id])
+        const parsedScore = Number(mapped[item.id])
+        admissionScores[item.id] = Number.isFinite(parsedScore) ? parsedScore : undefined
       }
     })
   } catch {
@@ -1220,15 +1286,16 @@ function openForm(record?: AssessmentRecord, readonly = false) {
   formReadonly.value = readonly
   if (record) {
     Object.assign(form, record)
-    form.scoreAuto = record.scoreAuto === 0 ? 0 : 1
+    form.scoreAuto = record.scoreAuto === 1 ? 1 : 0
     ensureSelectedElder(record.elderId, record.elderName)
-    scoreAutoChecked.value = record.scoreAuto !== 0
+    scoreAutoChecked.value = record.scoreAuto === 1
     if (isAdmissionAssessment.value) {
       loadAdmissionScoresFromDetail(record.detailJson)
       form.score = admissionTotalScore.value
       form.levelCode = resolveAbilityLevel(admissionTotalScore.value).split('：')[0]
     }
   } else {
+    const defaultStatus = isAdmissionAssessment.value ? 'DRAFT' : 'COMPLETED'
     Object.assign(form, {
       id: undefined,
       elderId: undefined,
@@ -1239,22 +1306,19 @@ function openForm(record?: AssessmentRecord, readonly = false) {
       score: undefined,
       assessmentDate: new Date().toISOString().slice(0, 10),
       nextAssessmentDate: undefined,
-      status: 'COMPLETED',
+      status: defaultStatus,
       assessorName: '',
       archiveNo: '',
       resultSummary: '',
       suggestion: '',
       detailJson: '',
-      scoreAuto: 1
+      scoreAuto: 0
     })
-    scoreAutoChecked.value = true
+    scoreAutoChecked.value = false
     if (isAdmissionAssessment.value) {
-      applyAdmissionDefaultTemplate()
+      resetAdmissionScores()
       form.score = admissionTotalScore.value
       form.levelCode = admissionLevelText.value === '待完成评分' ? '' : admissionLevelText.value.split('：')[0]
-      if (!form.status) {
-        form.status = 'DRAFT'
-      }
     }
   }
   open.value = true
@@ -1340,6 +1404,14 @@ async function submit() {
       message.warning(`请完成所有评分项，当前仍有 ${admissionMissingItems.value.length} 项未评分`)
       return
     }
+    const outOfRangeItem = admissionScoreItemList.find((item) => {
+      const val = Number(admissionScores[item.id])
+      return val < admissionItemMin(item) || val > admissionItemMax(item)
+    })
+    if (outOfRangeItem) {
+      message.warning(`第${outOfRangeItem.id}项分值超出范围，请按提示输入`)
+      return
+    }
     form.score = admissionTotalScore.value
     form.levelCode = resolveAbilityLevel(admissionTotalScore.value).split('：')[0]
     form.resultSummary = form.resultSummary || resolveAbilityLevel(admissionTotalScore.value)
@@ -1379,6 +1451,74 @@ async function submit() {
   } finally {
     submitting.value = false
   }
+}
+
+function safeHtml(value?: string | number | null) {
+  const text = value === null || value === undefined ? '' : String(value)
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+async function printReport(record: AssessmentRecord) {
+  const report = await getAssessmentRecordReport(Number(record.id))
+  if (!report) {
+    message.warning('未找到评估报告数据')
+    return
+  }
+  const popup = window.open('', '_blank', 'width=900,height=760')
+  if (!popup) {
+    message.warning('浏览器拦截了打印窗口，请允许弹窗后重试')
+    return
+  }
+  popup.document.write(`
+    <html>
+      <head>
+        <title>评估报告-${report.reportNo || report.recordId}</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; padding: 24px; color:#222; }
+          .title { font-size: 22px; font-weight: 700; margin-bottom: 14px; }
+          .meta { display:grid; grid-template-columns: 1fr 1fr; gap:8px 16px; margin-bottom:16px; font-size:14px; }
+          .block { border:1px solid #ddd; padding:12px; margin-bottom:12px; border-radius:6px; }
+          .label { font-weight:600; margin-bottom:8px; }
+          .pre { white-space: pre-wrap; word-break: break-word; line-height: 1.7; }
+        </style>
+      </head>
+      <body>
+        <div class="title">入住评估报告</div>
+        <div class="meta">
+          <div>报告编号：${safeHtml(report.reportNo || '-')}</div>
+          <div>记录ID：${safeHtml(report.recordId || '-')}</div>
+          <div>老人姓名：${safeHtml(report.elderName || '-')}</div>
+          <div>评估类型：${safeHtml(report.assessmentTypeLabel || report.assessmentType || '-')}</div>
+          <div>评估日期：${safeHtml(report.assessmentDate || '-')}</div>
+          <div>评估人：${safeHtml(report.assessorName || '-')}</div>
+          <div>评估状态：${safeHtml(report.reportStatus || '-')}</div>
+          <div>完成时间：${safeHtml(report.completedTime || '-')}</div>
+          <div>分值：${safeHtml(report.score ?? '-')}</div>
+          <div>等级：${safeHtml(report.levelCode || '-')}</div>
+        </div>
+        <div class="block">
+          <div class="label">评估结论</div>
+          <div class="pre">${safeHtml(report.resultSummary || '-')}</div>
+        </div>
+        <div class="block">
+          <div class="label">护理建议</div>
+          <div class="pre">${safeHtml(report.suggestion || '-')}</div>
+        </div>
+        <div class="block">
+          <div class="label">评分明细</div>
+          <div class="pre">${safeHtml(report.detailJson || '-')}</div>
+        </div>
+      </body>
+    </html>
+  `)
+  popup.document.close()
+  popup.focus()
+  popup.print()
 }
 
 async function autoOpenAdmissionFromRoute() {
@@ -1489,6 +1629,17 @@ async function exportCsv() {
 }
 
 onMounted(async () => {
+  const keywordFromRoute = String(route.query.keyword || route.query.elderName || '').trim()
+  if (keywordFromRoute) {
+    query.keyword = keywordFromRoute
+  }
+  if (props.assessmentType === 'ARCHIVE') {
+    const statusFromRoute = String(route.query.status || '').toUpperCase()
+    if (statusFromRoute === 'DRAFT' || statusFromRoute === 'COMPLETED') {
+      archiveStatusTab.value = statusFromRoute as 'DRAFT' | 'COMPLETED'
+      query.status = statusFromRoute as 'DRAFT' | 'COMPLETED'
+    }
+  }
   await Promise.all([fetchTemplates(), fetchData(), loadElderOptions()])
   await autoOpenAdmissionFromRoute()
 })

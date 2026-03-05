@@ -74,8 +74,8 @@ export function createApproval(data) {
 export function updateApproval(id, data) {
     return request.put(`/api/oa/approval/${id}`, data);
 }
-export function approveApproval(id) {
-    return request.put(`/api/oa/approval/${id}/approve`);
+export function approveApproval(id, remark) {
+    return request.put(`/api/oa/approval/${id}/approve`, null, { params: { remark } });
 }
 export function batchApproveApproval(ids) {
     return request.put('/api/oa/approval/batch/approve', { ids });

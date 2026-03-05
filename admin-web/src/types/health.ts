@@ -129,6 +129,8 @@ export interface HealthInspection {
   status?: string
   inspectorName?: string
   followUpAction?: string
+  attachmentUrls?: string
+  otherNote?: string
   remark?: string
 }
 

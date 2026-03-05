@@ -151,8 +151,24 @@
         </a-card>
       </a-col>
 
+      <a-col :xs="24" :lg="12">
+        <a-card class="card-elevated" :bordered="false" title="卡片9：营销方案与审批">
+          <a-row :gutter="[12, 12]">
+            <a-col :span="12"><div class="stat-link" @click="goPlan({ moduleType: 'SPEECH' })"><a-statistic title="话术库总数" :value="plan.speechCount" /></div></a-col>
+            <a-col :span="12"><div class="stat-link" @click="goPlan({ moduleType: 'POLICY' })"><a-statistic title="季度政策总数" :value="plan.policyCount" /></div></a-col>
+            <a-col :span="12"><div class="stat-link" @click="goPlan({ status: 'PENDING_APPROVAL' })"><a-statistic title="待审批方案" :value="plan.pendingApprovalCount" /></div></a-col>
+            <a-col :span="12"><div class="stat-link" @click="goPlan({ status: 'REJECTED' })"><a-statistic title="已驳回方案" :value="plan.rejectedCount" /></div></a-col>
+          </a-row>
+          <a-space wrap style="margin-top: 12px">
+            <a-button size="small" @click="goPlan({ status: 'PUBLISHED' })">已发布方案</a-button>
+            <a-button size="small" @click="goPlan({ status: 'INACTIVE' })">停用方案</a-button>
+            <a-button size="small" @click="goApproval('MARKETING_PLAN')">院长审批栏</a-button>
+          </a-space>
+        </a-card>
+      </a-col>
+
       <a-col :xs="24">
-        <a-card class="card-elevated" :bordered="false" title="卡片9：销售风险预警">
+        <a-card class="card-elevated" :bordered="false" title="卡片10：销售风险预警">
           <a-row :gutter="[12, 12]">
             <a-col :xs="12" :lg="6"><div class="stat-link" @click="goFollowup('overdue')"><a-statistic title="逾期跟进客户" :value="risk.overdueFollowupCount" /></div></a-col>
             <a-col :xs="12" :lg="6"><div class="stat-link" @click="goReservation('lock', { filter: 'unsigned_lock' })"><a-statistic title="锁床未签约客户" :value="risk.lockUnsignedCount" /></div></a-col>
@@ -189,7 +205,8 @@ import {
   getMarketingCallbackReport,
   getMarketingChannelReport,
   getMarketingConversionReport,
-  getMarketingFollowupReport
+  getMarketingFollowupReport,
+  getMarketingPlanPage
 } from '../../api/marketing'
 import type { BedItem, CrmContractItem, CrmLeadItem, MarketingChannelReportItem, MarketingConversionReport, MarketingFollowupReport, PageResult } from '../../types'
 
@@ -239,6 +256,12 @@ const medical = reactive({
   todayCount: 0,
   referCount: 0,
   unassignedCount: 0
+})
+const plan = reactive({
+  speechCount: 0,
+  policyCount: 0,
+  pendingApprovalCount: 0,
+  rejectedCount: 0
 })
 const risk = reactive({
   overdueFollowupCount: 0,
@@ -321,6 +344,20 @@ function goChannelSource(source: string) {
   router.push(routeToUnknownSourceOrAll(source))
 }
 
+function goPlan(query?: Record<string, string>) {
+  router.push({
+    path: '/marketing/plan',
+    query: query || {}
+  })
+}
+
+function goApproval(type: string) {
+  router.push({
+    path: '/oa/approval',
+    query: { type, status: 'PENDING' }
+  })
+}
+
 function hasCache(cacheKey: string) {
   return hasReportCache(cacheKey)
 }
@@ -338,7 +375,9 @@ async function loadOverview() {
     channelReport,
     leadPage,
     contractPage,
-    bedMap
+    bedMap,
+    speechPlanPage,
+    policyPlanPage
   ] = await Promise.all([
     getMarketingConversionReport({ dateFrom: monthStart, dateTo: today }),
     getMarketingFollowupReport({ dateFrom: monthStart, dateTo: today }) as Promise<MarketingFollowupReport>,
@@ -346,12 +385,16 @@ async function loadOverview() {
     getMarketingChannelReport({ dateFrom: monthStart, dateTo: today }) as Promise<MarketingChannelReportItem[]>,
     getLeadPage({ pageNo: 1, pageSize: 300 }),
     getContractPage({ pageNo: 1, pageSize: 300 }),
-    getBedMap()
+    getBedMap(),
+    getMarketingPlanPage({ pageNo: 1, pageSize: 500, moduleType: 'SPEECH' }),
+    getMarketingPlanPage({ pageNo: 1, pageSize: 500, moduleType: 'POLICY' })
   ])
 
   const leads = (leadPage as PageResult<CrmLeadItem>).list || []
   const contracts = (contractPage as PageResult<CrmContractItem>).list || []
   const beds = (bedMap || []) as BedItem[]
+  const speechPlans = speechPlanPage.list || []
+  const policyPlans = policyPlanPage.list || []
   const conv = conversion as MarketingConversionReport
 
   funnel.todayConsultCount = conv.consultCount || 0
@@ -406,6 +449,12 @@ async function loadOverview() {
   medical.todayCount = medicalLeads.filter((item) => String(item.createTime || '').slice(0, 10) === today).length
   medical.referCount = medicalLeads.length
   medical.unassignedCount = medicalLeads.filter((item) => !item.marketerName).length
+
+  const allPlans = [...speechPlans, ...policyPlans]
+  plan.speechCount = speechPlans.length
+  plan.policyCount = policyPlans.length
+  plan.pendingApprovalCount = allPlans.filter((item) => String(item.status || '') === 'PENDING_APPROVAL').length
+  plan.rejectedCount = allPlans.filter((item) => String(item.status || '') === 'REJECTED').length
 
   risk.overdueFollowupCount = callbackReport.overdue || 0
   risk.lockUnsignedCount = leads.filter((item) => String(item.reservationStatus || '').includes('锁') && !item.contractSignedFlag).length

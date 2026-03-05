@@ -54,11 +54,13 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { getTodayTasks } from '../../api/care'
 import { getStaffPage } from '../../api/rbac'
 import type { CareTaskItem } from '../../types'
 import { useECharts } from '../../plugins/echarts'
+import { resolveCareError } from './careError'
 
 const loading = ref(false)
 const tasks = ref<CareTaskItem[]>([])
@@ -136,17 +138,26 @@ async function load() {
     tasks.value = page.list || []
     await loadStaffOptions()
     buildCharts(tasks.value)
+  } catch (error) {
+    message.error(resolveCareError(error, '加载护理看板失败'))
+    tasks.value = []
+    buildCharts([])
   } finally {
     loading.value = false
   }
 }
 
 async function loadStaffOptions() {
-  const res = await getStaffPage({ pageNo: 1, pageSize: 200 })
-  staffMap.value = res.list.reduce((acc: Record<number, string>, item: any) => {
-    acc[item.id] = item.realName || item.username || `员工#${item.id}`
-    return acc
-  }, {})
+  try {
+    const res = await getStaffPage({ pageNo: 1, pageSize: 200 })
+    staffMap.value = res.list.reduce((acc: Record<number, string>, item: any) => {
+      acc[item.id] = item.realName || item.username || `员工#${item.id}`
+      return acc
+    }, {})
+  } catch (error) {
+    message.error(resolveCareError(error, '加载护工信息失败'))
+    staffMap.value = {}
+  }
 }
 
 onMounted(load)

@@ -30,6 +30,28 @@
           </a-card>
         </a-col>
       </a-row>
+      <a-row :gutter="16" class="overview-row">
+        <a-col :span="6">
+          <a-card :bordered="false" class="card-elevated stat-card clickable" @click="openPath('/survey/template')">
+            <a-statistic title="问卷草稿" :value="summary.surveyDraftCount || 0" />
+          </a-card>
+        </a-col>
+        <a-col :span="6">
+          <a-card :bordered="false" class="card-elevated stat-card clickable" @click="openPath('/survey/template?status=1')">
+            <a-statistic title="已发布问卷" :value="summary.surveyPublishedCount || 0" />
+          </a-card>
+        </a-col>
+        <a-col :span="6">
+          <a-card :bordered="false" class="card-elevated stat-card clickable" @click="openPath('/survey/stats')">
+            <a-statistic title="今日问卷回收" :value="summary.surveyTodaySubmissionCount || 0" />
+          </a-card>
+        </a-col>
+        <a-col :span="6">
+          <a-card :bordered="false" class="card-elevated stat-card clickable" @click="openPath('/survey/template?targetType=FAMILY&status=1')">
+            <a-statistic title="家属端问卷" :value="summary.surveyFamilyPublishedCount || 0" />
+          </a-card>
+        </a-col>
+      </a-row>
       <a-row :gutter="16">
         <a-col :span="14">
           <a-card title="最新公告" :bordered="false" class="card-elevated">
@@ -71,6 +93,10 @@ function renderTodo(item: OaTodo) {
   ])
 }
 
+function openPath(path: string) {
+  window.location.hash = `#${path}`
+}
+
 async function load() {
   loading.value = true
   errorText.value = ''
@@ -95,6 +121,9 @@ load()
 }
 .stat-card {
   min-height: 120px;
+}
+.clickable {
+  cursor: pointer;
 }
 .list-item {
   display: flex;

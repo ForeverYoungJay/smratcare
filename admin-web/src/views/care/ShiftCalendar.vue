@@ -90,11 +90,13 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
+import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { createSchedule, deleteSchedule, getSchedulePage, updateSchedule } from '../../api/schedule'
 import type { PageResult, ScheduleItem } from '../../types'
+import { resolveCareError } from './careError'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -136,6 +138,10 @@ async function fetchData() {
     })
     rows.value = res.list
     pagination.total = res.total || res.list.length
+  } catch (error) {
+    message.error(resolveCareError(error, '加载排班失败'))
+    rows.value = []
+    pagination.total = 0
   } finally {
     loading.value = false
   }
@@ -177,16 +183,29 @@ async function submit() {
     } else {
       await createSchedule(payload)
     }
+    message.success('保存成功')
     editOpen.value = false
-    fetchData()
+    await fetchData()
+  } catch (error) {
+    message.error(resolveCareError(error, '保存失败'))
   } finally {
     saving.value = false
   }
 }
 
 async function remove(record: ScheduleItem) {
-  await deleteSchedule(record.id)
-  fetchData()
+  Modal.confirm({
+    title: '确认删除该排班记录吗？',
+    onOk: async () => {
+      try {
+        await deleteSchedule(record.id)
+        message.success('删除成功')
+        await fetchData()
+      } catch (error) {
+        message.error(resolveCareError(error, '删除失败'))
+      }
+    }
+  })
 }
 
 fetchData()

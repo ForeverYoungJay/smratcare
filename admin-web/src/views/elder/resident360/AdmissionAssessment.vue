@@ -106,7 +106,7 @@
         <a-space direction="vertical" style="width: 100%">
           <a-button block type="primary" :disabled="!selectedContract" @click="go(primaryActionPath)">{{ primaryActionText }}</a-button>
           <a-button block @click="go(historyPath)">查看历史评估报告</a-button>
-          <a-button block :disabled="!selectedLatestRecord" @click="downloadLatestReport">下载最近评估报告</a-button>
+          <a-button block :loading="downloadingReport" :disabled="!selectedLatestRecord" @click="downloadLatestReport">下载最近评估报告</a-button>
           <a-button block :disabled="!selectedContract" @click="go(admissionPath)">进入入住办理</a-button>
         </a-space>
       </StatefulBlock>
@@ -121,7 +121,7 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
 import FlowGuardBar from '../../../components/FlowGuardBar.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
-import { getAssessmentRecordPage } from '../../../api/assessment'
+import { getAssessmentRecordPage, getAssessmentRecordReport } from '../../../api/assessment'
 import { getContractAssessmentOverview, getContractPage } from '../../../api/marketing'
 import type { AssessmentRecord, ContractAssessmentContractItem, ContractAssessmentOverview, CrmContractItem, PageResult } from '../../../types'
 
@@ -132,6 +132,7 @@ const leadId = computed(() => Number(route.query.leadId || 0))
 const latestRecord = ref<AssessmentRecord | null>(null)
 const overview = ref<ContractAssessmentOverview | null>(null)
 const loading = ref(false)
+const downloadingReport = ref(false)
 const errorMessage = ref('')
 const fallbackContracts = ref<ContractAssessmentContractItem[]>([])
 const contracts = computed<ContractAssessmentContractItem[]>(() =>
@@ -372,35 +373,48 @@ function flowStageColor(stage?: string) {
   return 'default'
 }
 
-function downloadLatestReport() {
+async function downloadLatestReport() {
   if (!selectedLatestRecord.value) {
     message.warning('暂无可下载评估记录')
     return
   }
-  const record = selectedLatestRecord.value
-  const elderName = latestRecord.value?.elderName || overview.value?.elderName || '长者'
-  const suggestion = 'suggestion' in record ? record.suggestion : latestRecord.value?.suggestion
-  const lines = [
-    '入住评估报告',
-    `老人姓名：${elderName || '-'}`,
-    `评估日期：${record.assessmentDate || '-'}`,
-    `评估状态：${record.status || '-'}`,
-    `评估分值：${record.score ?? '-'}`,
-    `评估等级：${record.levelCode || '-'}`,
-    `评估结论：${record.resultSummary || '-'}`,
-    `护理建议：${suggestion || '-'}`,
-    `下次评估日期：${record.nextAssessmentDate || '-'}`
-  ]
-  const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `入住评估报告_${elderName || '长者'}_${record.assessmentDate || new Date().toISOString().slice(0, 10)}.txt`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
-  message.success('最近评估报告已下载')
+  downloadingReport.value = true
+  try {
+    const record = selectedLatestRecord.value
+    const report = await getAssessmentRecordReport(Number(record.id))
+    if (!report) {
+      message.warning('评估报告数据不存在')
+      return
+    }
+    const elderName = report.elderName || latestRecord.value?.elderName || overview.value?.elderName || '长者'
+    const lines = [
+      '入住评估报告',
+      `报告编号：${report.reportNo || '-'}`,
+      `老人姓名：${elderName || '-'}`,
+      `评估类型：${report.assessmentTypeLabel || report.assessmentType || '-'}`,
+      `评估日期：${report.assessmentDate || '-'}`,
+      `评估状态：${report.reportStatus || '-'}`,
+      `评估分值：${report.score ?? '-'}`,
+      `评估等级：${report.levelCode || '-'}`,
+      `评估结论：${report.resultSummary || '-'}`,
+      `护理建议：${report.suggestion || '-'}`,
+      `评分明细：${report.detailJson || '-'}`
+    ]
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `入住评估报告_${elderName || '长者'}_${report.assessmentDate || new Date().toISOString().slice(0, 10)}.txt`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    message.success('最近评估报告已下载')
+  } catch (error: any) {
+    message.error(error?.message || '下载评估报告失败')
+  } finally {
+    downloadingReport.value = false
+  }
 }
 
 function contractCustomRow(record: ContractAssessmentContractItem) {

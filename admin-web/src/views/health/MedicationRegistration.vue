@@ -276,7 +276,7 @@ async function submit() {
       elderId: form.elderId,
       elderName: findElderName(form.elderId) || form.elderName,
       drugName: form.drugName,
-      registerTime: dayjs(form.registerTime).format('YYYY-MM-DD HH:mm:ss'),
+      registerTime: dayjs(form.registerTime).format('YYYY-MM-DDTHH:mm:ss'),
       dosageTaken: form.dosageTaken,
       unit: form.unit,
       nurseName: form.nurseName || '未填写',
@@ -340,8 +340,8 @@ function buildQueryParams() {
     params.elderId = Number(residentId)
   }
   if (Array.isArray(query.registerRange) && query.registerRange.length === 2) {
-    params.registerFrom = dayjs(query.registerRange[0]).format('YYYY-MM-DD HH:mm:ss')
-    params.registerTo = dayjs(query.registerRange[1]).format('YYYY-MM-DD HH:mm:ss')
+    params.registerFrom = dayjs(query.registerRange[0]).format('YYYY-MM-DDTHH:mm:ss')
+    params.registerTo = dayjs(query.registerRange[1]).format('YYYY-MM-DDTHH:mm:ss')
   }
   return params
 }

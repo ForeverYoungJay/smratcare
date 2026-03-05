@@ -91,6 +91,7 @@ import PageContainer from '../../components/PageContainer.vue'
 import { getStaffPage } from '../../api/rbac'
 import { createCaregiverGroup, deleteCaregiverGroup, getCaregiverGroupPage, updateCaregiverGroup } from '../../api/nursing'
 import type { CaregiverGroupItem, PageResult, StaffItem } from '../../types'
+import { resolveCareError } from './careError'
 
 const rows = ref<CaregiverGroupItem[]>([])
 const loading = ref(false)
@@ -165,8 +166,15 @@ function openModal(record?: CaregiverGroupItem) {
 }
 
 async function loadStaffOptions(keyword?: string) {
-  const res: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: 50, keyword })
-  staffOptions.value = res.list.map((item) => ({ label: item.realName || item.username, value: item.id }))
+  try {
+    const res: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: 50, keyword })
+    staffOptions.value = res.list.map((item) => ({ label: item.realName || item.username, value: item.id }))
+  } catch (error) {
+    if (!keyword) {
+      staffOptions.value = []
+    }
+    message.error(resolveCareError(error, '加载护工列表失败'))
+  }
 }
 
 async function searchStaff(keyword: string) {
@@ -192,6 +200,8 @@ async function submit() {
     message.success('保存成功')
     modalOpen.value = false
     await load()
+  } catch (error) {
+    message.error(resolveCareError(error, '保存失败'))
   } finally {
     submitting.value = false
   }
@@ -201,9 +211,13 @@ async function remove(id: number) {
   Modal.confirm({
     title: '确认删除该护工小组？',
     onOk: async () => {
-      await deleteCaregiverGroup(id)
-      message.success('删除成功')
-      await load()
+      try {
+        await deleteCaregiverGroup(id)
+        message.success('删除成功')
+        await load()
+      } catch (error) {
+        message.error(resolveCareError(error, '删除失败'))
+      }
     }
   })
 }
@@ -237,6 +251,10 @@ async function load() {
     })
     rows.value = res.list
     query.total = res.total
+  } catch (error) {
+    message.error(resolveCareError(error, '加载护工小组失败'))
+    rows.value = []
+    query.total = 0
   } finally {
     loading.value = false
   }

@@ -86,6 +86,7 @@ import {
   listServiceItems
 } from '../../api/standard'
 import type { CarePackage, CarePackageItem, ServiceItem, PageResult } from '../../types'
+import { resolveCareError } from './careError'
 
 const list = ref<CarePackageItem[]>([])
 const loading = ref(false)
@@ -142,8 +143,8 @@ async function submit() {
     message.success('保存成功')
     modalOpen.value = false
     load()
-  } catch {
-    message.error('保存失败')
+  } catch (error) {
+    message.error(resolveCareError(error, '保存失败'))
   } finally {
     submitting.value = false
   }
@@ -153,16 +154,26 @@ async function remove(id: number) {
   Modal.confirm({
     title: '确认删除该明细？',
     onOk: async () => {
-      await deletePackageItem(id)
-      message.success('已删除')
-      load()
+      try {
+        await deletePackageItem(id)
+        message.success('已删除')
+        await load()
+      } catch (error) {
+        message.error(resolveCareError(error, '删除失败'))
+      }
     }
   })
 }
 
 async function loadOptions() {
-  packageOptions.value = await listCarePackages()
-  itemOptions.value = await listServiceItems()
+  try {
+    packageOptions.value = await listCarePackages()
+    itemOptions.value = await listServiceItems()
+  } catch (error) {
+    message.error(resolveCareError(error, '加载套餐/服务项失败'))
+    packageOptions.value = []
+    itemOptions.value = []
+  }
 }
 
 async function load() {
@@ -175,6 +186,10 @@ async function load() {
     })
     list.value = res.list
     page.total = res.total
+  } catch (error) {
+    message.error(resolveCareError(error, '加载套餐明细失败'))
+    list.value = []
+    page.total = 0
   } finally {
     loading.value = false
   }

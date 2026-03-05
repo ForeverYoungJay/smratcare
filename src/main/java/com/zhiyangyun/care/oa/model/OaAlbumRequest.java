@@ -11,7 +11,11 @@ public class OaAlbumRequest {
 
   private String category;
 
+  private String folderName;
+
   private String coverUrl;
+
+  private String photosJson;
 
   private Integer photoCount;
 

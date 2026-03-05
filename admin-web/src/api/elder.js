@@ -29,3 +29,11 @@ export function updateElderDiseases(elderId, diseaseIds) {
 export function bindFamily(data) {
     return request.post('/api/family/bindElder', data);
 }
+export function uploadElderFile(file, bizType = 'elder-archive') {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('bizType', bizType);
+    return request.post('/api/files/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    });
+}

@@ -61,6 +61,7 @@
           <a-button @click="go('/oa/work-execution/task?department=logistics')">OA任务中心</a-button>
           <a-button @click="go('/logistics/reports/maintenance-todo-log')">维保执行日志</a-button>
           <a-button @click="exportCurrentTab">导出当前视图</a-button>
+          <a-button @click="exportActionLogs" :disabled="actionLogs.length === 0">导出操作日志</a-button>
           <a-button
             v-if="activeTab === 'cleaning'"
             :disabled="selectedCleaningKeys.length === 0"
@@ -86,6 +87,14 @@
         </a-space>
       </a-card>
 
+      <a-card v-if="actionLogs.length > 0" size="small" style="margin-bottom: 12px" title="本机操作日志（最近20条）">
+        <a-timeline>
+          <a-timeline-item v-for="item in latestActionLogs" :key="item.id" :color="item.success ? 'green' : 'red'">
+            {{ item.time }}｜{{ item.action }}｜{{ item.detail }}
+          </a-timeline-item>
+        </a-timeline>
+      </a-card>
+
       <a-alert
         v-if="overdueTotal > 0"
         style="margin-bottom: 12px"
@@ -109,7 +118,7 @@
                 <a-tag :color="cleaningStatusColor(record)">{{ cleaningStatusLabel(record) }}</a-tag>
               </template>
               <template v-if="column.key === 'action'">
-                <a-button type="link" :disabled="record.status === 'DONE'" @click="finishCleaning(record)">完成</a-button>
+                <a-button type="link" :disabled="isCleaningDone(record.status)" @click="finishCleaning(record)">完成</a-button>
               </template>
             </template>
           </a-table>
@@ -178,12 +187,22 @@ import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
 import { exportCsv } from '../../utils/export'
+import { useUserStore } from '../../stores/user'
 import { getLogisticsWorkbenchSummary } from '../../api/logistics'
 import { completeMaintenance, completeRoomCleaning, getMaintenancePage, getRoomCleaningPage } from '../../api/life'
 import { getDiningDeliveryRecordPage, redispatchDiningDeliveryRecord, updateDiningDeliveryRecord } from '../../api/dining'
 import { getInventoryAdjustmentPage } from '../../api/materialCenter'
 import type { DiningDeliveryRecord, InventoryAdjustmentItem, LogisticsWorkbenchSummary, MaintenanceRequest, RoomCleaningTask } from '../../types'
 
+type ActionLogEntry = {
+  id: string
+  time: string
+  action: string
+  detail: string
+  success: boolean
+}
+
+const userStore = useUserStore()
 const router = useRouter()
 const route = useRoute()
 const loading = ref(false)
@@ -201,33 +220,47 @@ const adjustmentRows = ref<InventoryAdjustmentItem[]>([])
 const selectedCleaningKeys = ref<Array<number | string>>([])
 const selectedMaintenanceKeys = ref<Array<number | string>>([])
 const selectedDeliveryKeys = ref<Array<number | string>>([])
+const actionLogs = ref<ActionLogEntry[]>([])
+const latestActionLogs = computed(() => actionLogs.value.slice(0, 20))
 
-const pendingCleaningCount = computed(() => cleaningRows.value.filter((item) => item.status !== 'DONE').length)
-const pendingMaintenanceCount = computed(() => maintenanceRows.value.filter((item) => item.status === 'OPEN' || item.status === 'PROCESSING').length)
-const pendingDeliveryCount = computed(() => deliveryRows.value.filter((item) => item.status !== 'DELIVERED').length)
+const pendingCleaningCount = computed(() => cleaningRows.value.filter((item) => !isCleaningDone(item.status)).length)
+const pendingMaintenanceCount = computed(() =>
+  maintenanceRows.value.filter((item) => {
+    const status = normalizeStatus(item.status)
+    return status === 'OPEN' || status === 'PROCESSING'
+  }).length
+)
+const pendingDeliveryCount = computed(() => deliveryRows.value.filter((item) => normalizeStatus(item.status) !== 'DELIVERED').length)
 const lossAdjustmentCount = computed(() => adjustmentRows.value.filter((item) => item.adjustType === 'LOSS').length)
 const overdueCleaningCount = computed(() =>
-  cleaningRows.value.filter((item) => item.status !== 'DONE' && item.planDate && dayjs(item.planDate).isBefore(dayjs(), 'day')).length
+  cleaningRows.value.filter((item) => !isCleaningDone(item.status) && item.planDate && dayjs(item.planDate).isBefore(dayjs(), 'day')).length
 )
 const overdueMaintenanceCount = computed(() =>
-  maintenanceRows.value.filter((item) => item.status !== 'COMPLETED' && item.reportedAt && dayjs(item.reportedAt).isBefore(dayjs().subtract(2, 'day'))).length
+  maintenanceRows.value.filter((item) => normalizeStatus(item.status) !== 'COMPLETED' && item.reportedAt && dayjs(item.reportedAt).isBefore(dayjs().subtract(2, 'day'))).length
 )
 const overdueDeliveryCount = computed(() =>
-  deliveryRows.value.filter((item) => item.status !== 'DELIVERED' && item.deliveredAt && dayjs(item.deliveredAt).isBefore(dayjs().subtract(2, 'hour'))).length
+  deliveryRows.value.filter((item) => {
+    if (normalizeStatus(item.status) === 'DELIVERED') return false
+    const refTime = item.deliveredAt || item.createTime
+    return Boolean(refTime && dayjs(refTime).isBefore(dayjs().subtract(2, 'hour')))
+  }).length
 )
 const overdueTotal = computed(() => overdueCleaningCount.value + overdueMaintenanceCount.value + overdueDeliveryCount.value)
 
 const displayCleaningRows = computed(() => {
   if (viewMode.value === 'ALL') return cleaningRows.value
-  return cleaningRows.value.filter((item) => item.status !== 'DONE')
+  return cleaningRows.value.filter((item) => !isCleaningDone(item.status))
 })
 const displayMaintenanceRows = computed(() => {
   if (viewMode.value === 'ALL') return maintenanceRows.value
-  return maintenanceRows.value.filter((item) => item.status === 'OPEN' || item.status === 'PROCESSING')
+  return maintenanceRows.value.filter((item) => {
+    const status = normalizeStatus(item.status)
+    return status === 'OPEN' || status === 'PROCESSING'
+  })
 })
 const displayDeliveryRows = computed(() => {
   if (viewMode.value === 'ALL') return deliveryRows.value
-  return deliveryRows.value.filter((item) => item.status !== 'DELIVERED')
+  return deliveryRows.value.filter((item) => normalizeStatus(item.status) !== 'DELIVERED')
 })
 const displayAdjustmentRows = computed(() => {
   if (viewMode.value === 'ALL') return adjustmentRows.value
@@ -294,28 +327,72 @@ function go(path: string) {
   router.push(path)
 }
 
+function normalizeStatus(status?: string) {
+  return String(status || '').trim().toUpperCase()
+}
+
+function actionLogStorageKey() {
+  const orgId = userStore.staffInfo?.orgId || 'unknown-org'
+  const staffId = userStore.staffInfo?.id || 'unknown-staff'
+  return `logistics-task-center-action-logs:${orgId}:${staffId}`
+}
+
+function loadActionLogs() {
+  try {
+    const raw = window.localStorage.getItem(actionLogStorageKey())
+    const parsed = raw ? JSON.parse(raw) : []
+    actionLogs.value = Array.isArray(parsed) ? parsed.slice(0, 20) : []
+  } catch {
+    actionLogs.value = []
+  }
+}
+
+function saveActionLogs() {
+  try {
+    window.localStorage.setItem(actionLogStorageKey(), JSON.stringify(actionLogs.value.slice(0, 20)))
+  } catch {}
+}
+
+function pushActionLog(action: string, detail: string, success: boolean) {
+  actionLogs.value = [
+    {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      time: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+      action,
+      detail,
+      success
+    },
+    ...actionLogs.value
+  ].slice(0, 20)
+  saveActionLogs()
+}
+
 async function finishCleaning(record: RoomCleaningTask) {
   try {
     await completeRoomCleaning(record.id)
+    pushActionLog('清洁任务完成', `房间 ${record.roomNo || '-'}，任务ID ${record.id}`, true)
     message.success('清洁任务已完成')
     await loadData()
   } catch (error: any) {
+    pushActionLog('清洁任务完成', `任务ID ${record.id}，失败：${error?.message || '未知错误'}`, false)
     message.error(error?.message || '清洁任务完成失败')
   }
 }
 
 async function batchFinishCleaning() {
-  const rows = displayCleaningRows.value.filter((item) => selectedCleaningKeys.value.includes(item.id) && item.status !== 'DONE')
+  const rows = displayCleaningRows.value.filter((item) => selectedCleaningKeys.value.includes(item.id) && !isCleaningDone(item.status))
   if (rows.length === 0) {
     message.info('没有可批量完成的清洁任务')
     return
   }
   try {
     await Promise.all(rows.map((item) => completeRoomCleaning(item.id)))
+    pushActionLog('批量完成清洁', `处理 ${rows.length} 条`, true)
     message.success(`已批量完成${rows.length}条清洁任务`)
     selectedCleaningKeys.value = []
     await loadData()
   } catch (error: any) {
+    pushActionLog('批量完成清洁', `失败：${error?.message || '未知错误'}`, false)
     message.error(error?.message || '批量完成清洁失败')
   }
 }
@@ -323,16 +400,18 @@ async function batchFinishCleaning() {
 async function finishMaintenance(record: MaintenanceRequest) {
   try {
     await completeMaintenance(record.id)
+    pushActionLog('维修任务完成', `房间 ${record.roomNo || '-'}，任务ID ${record.id}`, true)
     message.success('维修任务已完成')
     await loadData()
   } catch (error: any) {
+    pushActionLog('维修任务完成', `任务ID ${record.id}，失败：${error?.message || '未知错误'}`, false)
     message.error(error?.message || '维修任务完成失败')
   }
 }
 
 async function batchFinishMaintenance() {
   const rows = displayMaintenanceRows.value.filter((item) =>
-    selectedMaintenanceKeys.value.includes(item.id) && item.status !== 'COMPLETED'
+    selectedMaintenanceKeys.value.includes(item.id) && normalizeStatus(item.status) !== 'COMPLETED'
   )
   if (rows.length === 0) {
     message.info('没有可批量完成的维修任务')
@@ -340,52 +419,65 @@ async function batchFinishMaintenance() {
   }
   try {
     await Promise.all(rows.map((item) => completeMaintenance(item.id)))
+    pushActionLog('批量完成维修', `处理 ${rows.length} 条`, true)
     message.success(`已批量完成${rows.length}条维修任务`)
     selectedMaintenanceKeys.value = []
     await loadData()
   } catch (error: any) {
+    pushActionLog('批量完成维修', `失败：${error?.message || '未知错误'}`, false)
     message.error(error?.message || '批量完成维修失败')
   }
 }
 
 function cleaningStatusLabel(record: RoomCleaningTask) {
-  if (record.status === 'DONE') return '已完成'
+  if (isCleaningDone(record.status)) return '已完成'
   const overdue = record.planDate && dayjs(record.planDate).isBefore(dayjs(), 'day')
   return overdue ? '待清洁（超时）' : '待清洁'
 }
 
 function cleaningStatusColor(record: RoomCleaningTask) {
-  if (record.status === 'DONE') return 'green'
+  if (isCleaningDone(record.status)) return 'green'
   const overdue = record.planDate && dayjs(record.planDate).isBefore(dayjs(), 'day')
   return overdue ? 'red' : 'orange'
 }
 
+function isCleaningDone(status?: string) {
+  const normalized = normalizeStatus(status)
+  return normalized === 'DONE' || normalized === 'COMPLETED'
+}
+
 function maintenanceStatusLabel(record: MaintenanceRequest) {
-  if (record.status === 'COMPLETED') return '已完成'
+  const status = normalizeStatus(record.status)
+  if (status === 'COMPLETED') return '已完成'
   const overdue = record.reportedAt && dayjs(record.reportedAt).isBefore(dayjs().subtract(2, 'day'))
-  if (record.status === 'PROCESSING') {
+  if (status === 'PROCESSING') {
     return overdue ? '处理中（超时）' : '处理中'
   }
   return overdue ? '待处理（超时）' : '待处理'
 }
 
 function maintenanceStatusColor(record: MaintenanceRequest) {
-  if (record.status === 'COMPLETED') return 'green'
+  const status = normalizeStatus(record.status)
+  if (status === 'COMPLETED') return 'green'
   const overdue = record.reportedAt && dayjs(record.reportedAt).isBefore(dayjs().subtract(2, 'day'))
-  return overdue ? 'red' : (record.status === 'PROCESSING' ? 'blue' : 'orange')
+  return overdue ? 'red' : (status === 'PROCESSING' ? 'blue' : 'orange')
 }
 
 function deliveryStatusLabel(record: DiningDeliveryRecord) {
-  if (record.status === 'DELIVERED') return '已送达'
-  if (record.status === 'FAILED') return '送达失败'
-  const overdue = record.deliveredAt && dayjs(record.deliveredAt).isBefore(dayjs().subtract(2, 'hour'))
+  const status = normalizeStatus(record.status)
+  if (status === 'DELIVERED') return '已送达'
+  if (status === 'FAILED') return '送达失败'
+  const refTime = record.deliveredAt || record.createTime
+  const overdue = refTime && dayjs(refTime).isBefore(dayjs().subtract(2, 'hour'))
   return overdue ? '待送达（超时）' : '待送达'
 }
 
 function deliveryStatusColor(record: DiningDeliveryRecord) {
-  if (record.status === 'DELIVERED') return 'green'
-  if (record.status === 'FAILED') return 'red'
-  const overdue = record.deliveredAt && dayjs(record.deliveredAt).isBefore(dayjs().subtract(2, 'hour'))
+  const status = normalizeStatus(record.status)
+  if (status === 'DELIVERED') return 'green'
+  if (status === 'FAILED') return 'red'
+  const refTime = record.deliveredAt || record.createTime
+  const overdue = refTime && dayjs(refTime).isBefore(dayjs().subtract(2, 'hour'))
   return overdue ? 'volcano' : 'gold'
 }
 
@@ -398,11 +490,14 @@ async function finishDelivery(record: DiningDeliveryRecord) {
       deliveryAreaName: record.deliveryAreaName,
       deliveredByName: record.deliveredByName,
       status: 'DELIVERED',
+      failureReason: undefined,
       remark: record.remark
     })
+    pushActionLog('送餐标记送达', `订单 ${record.orderNo || '-'}，记录ID ${record.id}`, true)
     message.success('送餐任务已标记送达')
     await loadData()
   } catch (error: any) {
+    pushActionLog('送餐标记送达', `记录ID ${record.id}，失败：${error?.message || '未知错误'}`, false)
     message.error(error?.message || '标记送达失败')
   }
 }
@@ -428,9 +523,11 @@ async function markDeliveryFailed(record: DiningDeliveryRecord) {
       failureReason,
       remark: record.remark
     })
+    pushActionLog('送餐标记失败', `订单 ${record.orderNo || '-'}，原因：${failureReason}`, true)
     message.success('送餐任务已标记失败')
     await loadData()
   } catch (error: any) {
+    pushActionLog('送餐标记失败', `记录ID ${record.id}，失败：${error?.message || '未知错误'}`, false)
     message.error(error?.message || '标记失败失败')
   }
 }
@@ -438,16 +535,18 @@ async function markDeliveryFailed(record: DiningDeliveryRecord) {
 async function redispatchDelivery(record: DiningDeliveryRecord) {
   try {
     await redispatchDiningDeliveryRecord(record.id, {})
+    pushActionLog('送餐重派', `订单 ${record.orderNo || '-'}，记录ID ${record.id}`, true)
     message.success('送餐任务已重派')
     await loadData()
   } catch (error: any) {
+    pushActionLog('送餐重派', `记录ID ${record.id}，失败：${error?.message || '未知错误'}`, false)
     message.error(error?.message || '重派失败')
   }
 }
 
 async function batchRedispatchDelivery() {
   const rows = displayDeliveryRows.value.filter((item) =>
-    selectedDeliveryKeys.value.includes(item.id) && item.status !== 'DELIVERED'
+    selectedDeliveryKeys.value.includes(item.id) && normalizeStatus(item.status) !== 'DELIVERED'
   )
   if (rows.length === 0) {
     message.info('没有可批量重派的送餐任务')
@@ -455,10 +554,12 @@ async function batchRedispatchDelivery() {
   }
   try {
     await Promise.all(rows.map((item) => redispatchDiningDeliveryRecord(item.id, {})))
+    pushActionLog('批量重派送餐', `处理 ${rows.length} 条`, true)
     message.success(`已批量重派${rows.length}条送餐任务`)
     selectedDeliveryKeys.value = []
     await loadData()
   } catch (error: any) {
+    pushActionLog('批量重派送餐', `失败：${error?.message || '未知错误'}`, false)
     message.error(error?.message || '批量重派失败')
   }
 }
@@ -517,6 +618,18 @@ function exportCurrentTab() {
   )
 }
 
+function exportActionLogs() {
+  exportCsv(
+    actionLogs.value.map((item) => ({
+      时间: item.time,
+      动作: item.action,
+      详情: item.detail,
+      结果: item.success ? '成功' : '失败'
+    })),
+    `后勤任务-操作日志-${dayjs().format('YYYYMMDD-HHmm')}.csv`
+  )
+}
+
 async function loadData() {
   loading.value = true
   errorMessage.value = ''
@@ -524,10 +637,10 @@ async function loadData() {
   try {
     const [summaryData, cleaningPage, maintenancePage, deliveryPage, adjustmentPage] = await Promise.all([
       getLogisticsWorkbenchSummary(),
-      getRoomCleaningPage({ pageNo: 1, pageSize: 30, dateFrom: today, dateTo: today }),
-      getMaintenancePage({ pageNo: 1, pageSize: 30, dateFrom: today, dateTo: today }),
-      getDiningDeliveryRecordPage({ pageNo: 1, pageSize: 30, dateFrom: today, dateTo: today }),
-      getInventoryAdjustmentPage({ pageNo: 1, pageSize: 30, dateFrom: today, dateTo: today })
+      getRoomCleaningPage({ pageNo: 1, pageSize: 500 }),
+      getMaintenancePage({ pageNo: 1, pageSize: 500, dateFrom: today, dateTo: today }),
+      getDiningDeliveryRecordPage({ pageNo: 1, pageSize: 500, dateFrom: today, dateTo: today }),
+      getInventoryAdjustmentPage({ pageNo: 1, pageSize: 200, dateFrom: today, dateTo: today })
     ])
     summary.value = summaryData
     cleaningRows.value = cleaningPage?.list || []
@@ -551,6 +664,7 @@ onMounted(() => {
   if (['cleaning', 'maintenance', 'delivery', 'inventory'].includes(tab)) {
     activeTab.value = tab
   }
+  loadActionLogs()
   loadData()
   refreshTimer = window.setInterval(loadData, 60000)
 })

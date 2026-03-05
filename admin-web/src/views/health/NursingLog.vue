@@ -285,7 +285,7 @@ async function submit() {
       elderId: form.elderId,
       elderName: findElderName(form.elderId) || form.elderName,
       sourceInspectionId: form.sourceInspectionId,
-      logTime: dayjs(form.logTime).format('YYYY-MM-DD HH:mm:ss'),
+      logTime: dayjs(form.logTime).format('YYYY-MM-DDTHH:mm:ss'),
       logType: form.logType,
       content: form.content,
       staffName: form.staffName,
@@ -350,8 +350,8 @@ function buildQueryParams() {
     params.elderId = Number(residentId)
   }
   if (Array.isArray(query.logRange) && query.logRange.length === 2) {
-    params.logFrom = dayjs(query.logRange[0]).format('YYYY-MM-DD HH:mm:ss')
-    params.logTo = dayjs(query.logRange[1]).format('YYYY-MM-DD HH:mm:ss')
+    params.logFrom = dayjs(query.logRange[0]).format('YYYY-MM-DDTHH:mm:ss')
+    params.logTo = dayjs(query.logRange[1]).format('YYYY-MM-DDTHH:mm:ss')
   }
   return params
 }

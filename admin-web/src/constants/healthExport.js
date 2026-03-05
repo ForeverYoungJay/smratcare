@@ -24,6 +24,8 @@ export const inspectionExportColumns = [
     { key: 'status', title: '状态', value: (item) => item.status || '' },
     { key: 'inspectorName', title: '巡检人', value: (item) => item.inspectorName || '' },
     { key: 'followUpAction', title: '跟进措施', value: (item) => item.followUpAction || '' },
+    { key: 'attachmentUrls', title: '附件', value: (item) => item.attachmentUrls || '' },
+    { key: 'otherNote', title: '其他说明', value: (item) => item.otherNote || '' },
     { key: 'remark', title: '备注', value: (item) => item.remark || '' }
 ];
 export const nursingLogExportColumns = [
@@ -64,6 +66,15 @@ export const medicationSettingExportColumns = [
     { key: 'period', title: '起止日期', value: (item) => `${item.startDate || '-'} ~ ${item.endDate || '-'}` },
     { key: 'minRemainQty', title: '最小阈值', value: (item) => item.minRemainQty ?? '' },
     { key: 'remark', title: '备注', value: (item) => item.remark || '' }
+];
+export const medicationRemainingExportColumns = [
+    { key: 'elderName', title: '老人', value: (item) => item.elderName || '' },
+    { key: 'drugName', title: '药品', value: (item) => item.drugName || '' },
+    { key: 'depositQty', title: '缴存总量', value: (item) => item.depositQty ?? '' },
+    { key: 'usedQty', title: '已用总量', value: (item) => item.usedQty ?? '' },
+    { key: 'remainQty', title: '剩余用量', value: (item) => item.remainQty ?? '' },
+    { key: 'minRemainQty', title: '最小阈值', value: (item) => item.minRemainQty ?? '' },
+    { key: 'lowStock', title: '状态', value: (item) => Number(item.lowStock) === 1 ? '预警' : '正常' }
 ];
 export const archiveExportColumns = [
     { key: 'elderName', title: '老人', value: (item) => item.elderName || '' },

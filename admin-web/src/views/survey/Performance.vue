@@ -40,10 +40,12 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { getSurveyPerformance, getSurveyTemplatePage } from '../../api/survey'
 import type { SurveyPerformanceItem, SurveyTemplate, PageResult } from '../../types'
 
+const route = useRoute()
 const templates = ref<SurveyTemplate[]>([])
 const rows = ref<SurveyPerformanceItem[]>([])
 const loading = ref(false)
@@ -72,6 +74,23 @@ function getDateParams() {
   return { dateFrom: from, dateTo: to }
 }
 
+function normalizeId(value: unknown) {
+  const text = String(value || '').trim()
+  return text ? text : undefined
+}
+
+function initByQuery() {
+  const templateId = normalizeId(route.query.templateId)
+  if (templateId) {
+    query.templateId = templateId
+  }
+  const dateFrom = normalizeId(route.query.dateFrom)
+  const dateTo = normalizeId(route.query.dateTo)
+  if (dateFrom && dateTo) {
+    query.dateRange = [dateFrom, dateTo]
+  }
+}
+
 async function fetchData() {
   loading.value = true
   try {
@@ -90,6 +109,7 @@ function reset() {
 
 onMounted(async () => {
   await loadTemplates()
+  initByQuery()
   await fetchData()
 })
 </script>

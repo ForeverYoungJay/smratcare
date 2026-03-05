@@ -2,11 +2,13 @@ package com.zhiyangyun.care.visit.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
+import com.zhiyangyun.care.elder.entity.ElderFamily;
 import com.zhiyangyun.care.elder.entity.FamilyUser;
 import com.zhiyangyun.care.elder.entity.Room;
 import com.zhiyangyun.care.elder.entity.Bed;
 import com.zhiyangyun.care.elder.mapper.BedMapper;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
+import com.zhiyangyun.care.elder.mapper.ElderFamilyMapper;
 import com.zhiyangyun.care.elder.mapper.FamilyUserMapper;
 import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import com.zhiyangyun.care.visit.entity.VisitBooking;
@@ -17,6 +19,7 @@ import com.zhiyangyun.care.visit.model.VisitBookRequest;
 import com.zhiyangyun.care.visit.model.VisitBookingResponse;
 import com.zhiyangyun.care.visit.model.VisitCheckInRequest;
 import com.zhiyangyun.care.visit.model.VisitCheckInResponse;
+import com.zhiyangyun.care.visit.model.VisitPrintTicketResponse;
 import com.zhiyangyun.care.visit.service.VisitService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -32,6 +35,7 @@ public class VisitServiceImpl implements VisitService {
   private final VisitBookingMapper bookingMapper;
   private final VisitCheckLogMapper checkLogMapper;
   private final ElderMapper elderMapper;
+  private final ElderFamilyMapper elderFamilyMapper;
   private final FamilyUserMapper familyUserMapper;
   private final BedMapper bedMapper;
   private final RoomMapper roomMapper;
@@ -39,12 +43,14 @@ public class VisitServiceImpl implements VisitService {
   public VisitServiceImpl(VisitBookingMapper bookingMapper,
       VisitCheckLogMapper checkLogMapper,
       ElderMapper elderMapper,
+      ElderFamilyMapper elderFamilyMapper,
       FamilyUserMapper familyUserMapper,
       BedMapper bedMapper,
       RoomMapper roomMapper) {
     this.bookingMapper = bookingMapper;
     this.checkLogMapper = checkLogMapper;
     this.elderMapper = elderMapper;
+    this.elderFamilyMapper = elderFamilyMapper;
     this.familyUserMapper = familyUserMapper;
     this.bedMapper = bedMapper;
     this.roomMapper = roomMapper;
@@ -60,7 +66,7 @@ public class VisitServiceImpl implements VisitService {
     VisitBooking booking = new VisitBooking();
     booking.setOrgId(request.getOrgId());
     booking.setElderId(request.getElderId());
-    booking.setFamilyUserId(request.getFamilyUserId());
+    booking.setFamilyUserId(resolveFamilyUserId(request.getOrgId(), request.getElderId(), request.getFamilyUserId()));
     booking.setVisitTime(request.getVisitTime());
     booking.setVisitDate(request.getVisitTime().toLocalDate());
     booking.setVisitTimeSlot(request.getVisitTimeSlot());
@@ -121,14 +127,12 @@ public class VisitServiceImpl implements VisitService {
     VisitBooking booking = null;
     if (request.getBookingId() != null) {
       booking = bookingMapper.selectById(request.getBookingId());
-    } else if (request.getVisitCode() != null && !request.getVisitCode().isBlank()) {
-      booking = bookingMapper.selectOne(Wrappers.lambdaQuery(VisitBooking.class)
-          .eq(VisitBooking::getOrgId, request.getOrgId())
-          .eq(VisitBooking::getVisitCode, request.getVisitCode())
-          .eq(VisitBooking::getIsDeleted, 0));
     }
 
     if (booking == null) {
+      throw new IllegalArgumentException("Booking not found");
+    }
+    if (!Objects.equals(booking.getOrgId(), request.getOrgId()) || Integer.valueOf(1).equals(booking.getIsDeleted())) {
       throw new IllegalArgumentException("Booking not found");
     }
 
@@ -137,7 +141,7 @@ public class VisitServiceImpl implements VisitService {
     log.setBookingId(booking.getId());
     log.setCheckTime(LocalDateTime.now());
     log.setStaffId(guardStaffId);
-    log.setQrcodeToken(request.getVisitCode() == null ? booking.getVisitCode() : request.getVisitCode());
+    log.setQrcodeToken("DIRECT_CHECKIN");
     log.setResultStatus(1);
     log.setRemark(request.getRemark());
     checkLogMapper.insert(log);
@@ -167,7 +171,7 @@ public class VisitServiceImpl implements VisitService {
       throw new IllegalArgumentException("Elder not found");
     }
     booking.setElderId(request.getElderId());
-    booking.setFamilyUserId(request.getFamilyUserId());
+    booking.setFamilyUserId(resolveFamilyUserId(orgId, request.getElderId(), request.getFamilyUserId()));
     booking.setVisitTime(request.getVisitTime());
     booking.setVisitDate(request.getVisitTime().toLocalDate());
     booking.setVisitTimeSlot(request.getVisitTimeSlot());
@@ -192,6 +196,31 @@ public class VisitServiceImpl implements VisitService {
     bookingMapper.updateById(booking);
   }
 
+  @Override
+  public VisitPrintTicketResponse buildPrintTicket(Long orgId, Long bookingId) {
+    VisitBooking booking = bookingMapper.selectById(bookingId);
+    if (booking == null || !Objects.equals(booking.getOrgId(), orgId) || Integer.valueOf(1).equals(booking.getIsDeleted())) {
+      throw new IllegalArgumentException("Booking not found");
+    }
+    ElderProfile elder = elderMapper.selectById(booking.getElderId());
+    FamilyUser familyUser = familyUserMapper.selectById(booking.getFamilyUserId());
+    VisitBookingResponse source = toResponse(booking, elder, familyUser);
+
+    VisitPrintTicketResponse response = new VisitPrintTicketResponse();
+    response.setBookingId(booking.getId());
+    response.setTicketNo("VST-" + booking.getId());
+    response.setElderName(source.getElderName());
+    response.setFamilyName(source.getFamilyName());
+    response.setFloorNo(source.getFloorNo());
+    response.setRoomNo(source.getRoomNo());
+    response.setVisitTime(source.getVisitTime());
+    response.setVisitorCount(source.getVisitorCount());
+    response.setCarPlate(source.getCarPlate());
+    response.setStatusText((source.getStatus() != null && source.getStatus() == 1) ? "已登记" : "待登记");
+    response.setGeneratedAt(LocalDateTime.now());
+    return response;
+  }
+
   private String generateUniqueCode(Long orgId) {
     for (int i = 0; i < 5; i++) {
       String code = UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase();
@@ -205,6 +234,23 @@ public class VisitServiceImpl implements VisitService {
     return UUID.randomUUID().toString().replace("-", "").toUpperCase();
   }
 
+  private Long resolveFamilyUserId(Long orgId, Long elderId, Long requestFamilyUserId) {
+    if (requestFamilyUserId != null && requestFamilyUserId > 0) {
+      return requestFamilyUserId;
+    }
+    ElderFamily relation = elderFamilyMapper.selectOne(Wrappers.lambdaQuery(ElderFamily.class)
+        .eq(ElderFamily::getOrgId, orgId)
+        .eq(ElderFamily::getIsDeleted, 0)
+        .eq(ElderFamily::getElderId, elderId)
+        .orderByDesc(ElderFamily::getIsPrimary)
+        .orderByDesc(ElderFamily::getUpdateTime)
+        .last("LIMIT 1"));
+    if (relation != null && relation.getFamilyUserId() != null) {
+      return relation.getFamilyUserId();
+    }
+    return 0L;
+  }
+
   private VisitBookingResponse toResponse(VisitBooking booking, ElderProfile elder, FamilyUser familyUser) {
     VisitBookingResponse response = new VisitBookingResponse();
     response.setId(booking.getId());
@@ -213,6 +259,8 @@ public class VisitServiceImpl implements VisitService {
     response.setElderName(elder == null ? null : elder.getFullName());
     response.setFamilyUserId(booking.getFamilyUserId());
     response.setFamilyName(familyUser == null ? null : familyUser.getRealName());
+    response.setVisitCode(booking.getVisitCode());
+    response.setVerifyCode(booking.getVerifyCode());
     if (elder != null && elder.getBedId() != null) {
       Bed bed = bedMapper.selectById(elder.getBedId());
       if (bed != null && bed.getRoomId() != null) {
@@ -229,7 +277,6 @@ public class VisitServiceImpl implements VisitService {
     response.setVisitorCount(booking.getVisitorCount());
     response.setCarPlate(booking.getCarPlate());
     response.setStatus(booking.getStatus());
-    response.setVisitCode(booking.getVisitCode());
     response.setRemark(booking.getRemark());
     return response;
   }

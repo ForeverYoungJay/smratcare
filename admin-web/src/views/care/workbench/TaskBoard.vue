@@ -47,6 +47,7 @@ import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
 import { getTaskPage, getTaskSummary } from '../../../api/care'
 import type { CareTaskItem, CareTaskSummary } from '../../../types'
+import { resolveCareError } from '../careError'
 
 const route = useRoute()
 const router = useRouter()
@@ -85,7 +86,18 @@ function statusColor(status?: string) {
 }
 
 function go(path: string) {
-  router.push(path)
+  const [pathname, search] = path.split('?')
+  const parsed = new URLSearchParams(search || '')
+  const query: Record<string, any> = {}
+  parsed.forEach((value, key) => {
+    query[key] = value
+  })
+  const resident = route.query.residentId ?? route.query.elderId
+  if (resident != null && query.residentId == null && query.elderId == null) {
+    query.residentId = resident
+    query.elderId = resident
+  }
+  router.push({ path: pathname, query })
 }
 
 async function reload() {
@@ -100,8 +112,8 @@ async function reload() {
     ])
     rows.value = page.list || []
     summary.value = sum || {}
-  } catch (error: any) {
-    errorMessage.value = error?.message || '加载照护任务失败'
+  } catch (error) {
+    errorMessage.value = resolveCareError(error, '加载照护任务失败')
     message.error(errorMessage.value)
   } finally {
     loading.value = false

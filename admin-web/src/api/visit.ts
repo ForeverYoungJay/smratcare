@@ -1,5 +1,5 @@
 import request from '../utils/request'
-import type { VisitBookingItem, VisitBookRequest, VisitCheckinRequest } from '../types'
+import type { VisitBookingItem, VisitBookRequest, VisitCheckinRequest, VisitPrintTicket } from '../types'
 
 export function bookVisit(data: VisitBookRequest) {
   return request.post<void>('/api/family/visit/book', data)
@@ -27,4 +27,8 @@ export function guardUpdateVisit(id: number, data: VisitBookRequest) {
 
 export function guardDeleteVisit(id: number) {
   return request.delete<void>(`/api/guard/visit/${id}`)
+}
+
+export function guardGetPrintTicket(id: number) {
+  return request.get<VisitPrintTicket>(`/api/guard/visit/${id}/print-ticket`)
 }

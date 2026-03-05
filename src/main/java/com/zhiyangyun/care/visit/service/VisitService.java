@@ -4,6 +4,7 @@ import com.zhiyangyun.care.visit.model.VisitBookRequest;
 import com.zhiyangyun.care.visit.model.VisitBookingResponse;
 import com.zhiyangyun.care.visit.model.VisitCheckInRequest;
 import com.zhiyangyun.care.visit.model.VisitCheckInResponse;
+import com.zhiyangyun.care.visit.model.VisitPrintTicketResponse;
 import java.util.List;
 
 public interface VisitService {
@@ -18,4 +19,6 @@ public interface VisitService {
   VisitBookingResponse updateBooking(Long orgId, Long bookingId, VisitBookRequest request);
 
   void deleteBooking(Long orgId, Long bookingId);
+
+  VisitPrintTicketResponse buildPrintTicket(Long orgId, Long bookingId);
 }

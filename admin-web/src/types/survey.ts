@@ -16,6 +16,7 @@ export interface SurveyTemplate {
   templateCode: string
   templateName: string
   description?: string
+  content?: string
   targetType: string
   status?: number
   startDate?: string | null
@@ -43,6 +44,17 @@ export interface SurveyTemplateDetail extends SurveyTemplate {
   questions: SurveyTemplateQuestionDetail[]
 }
 
+export interface SurveyTemplateVerifyResult {
+  templateId: string | number
+  templateCode?: string
+  templateName?: string
+  targetType?: string
+  status?: number
+  valid: boolean
+  message?: string
+  hasQuestions?: boolean
+}
+
 export interface SurveyTemplateQuestionItem {
   questionId: string | number
   sortNo?: number
@@ -59,6 +71,7 @@ export interface SurveySubmissionAnswerItem {
 
 export interface SurveySubmissionRequest {
   templateId: string | number
+  templateCode?: string
   targetType: string
   targetId?: string | number
   relatedStaffId?: string | number
@@ -83,6 +96,8 @@ export interface SurveySubmissionResponse {
 
 export interface SurveyStatsSummary {
   totalSubmissions: number
+  scoredSubmissions?: number
+  unscoredSubmissions?: number
   averageScore: number
   scoreTotal: number
 }

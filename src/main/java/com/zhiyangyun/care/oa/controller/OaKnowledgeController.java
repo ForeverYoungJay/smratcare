@@ -64,6 +64,7 @@ public class OaKnowledgeController {
   @PostMapping
   public Result<OaKnowledge> create(@Valid @RequestBody OaKnowledgeRequest request) {
     Long orgId = AuthContext.getOrgId();
+    validatePayload(request);
     OaKnowledge knowledge = new OaKnowledge();
     knowledge.setTenantId(orgId);
     knowledge.setOrgId(orgId);
@@ -71,6 +72,10 @@ public class OaKnowledgeController {
     knowledge.setCategory(request.getCategory());
     knowledge.setTags(request.getTags());
     knowledge.setContent(request.getContent());
+    knowledge.setAttachmentName(request.getAttachmentName());
+    knowledge.setAttachmentUrl(request.getAttachmentUrl());
+    knowledge.setAttachmentType(request.getAttachmentType());
+    knowledge.setAttachmentSize(request.getAttachmentSize());
     knowledge.setAuthorId(request.getAuthorId() == null ? AuthContext.getStaffId() : request.getAuthorId());
     knowledge.setAuthorName(
         request.getAuthorName() == null || request.getAuthorName().isBlank()
@@ -83,6 +88,7 @@ public class OaKnowledgeController {
     knowledge.setStatus(normalizedStatus == null ? "DRAFT" : normalizedStatus);
     knowledge.setPublishedAt(
         "PUBLISHED".equalsIgnoreCase(knowledge.getStatus()) ? LocalDateTime.now() : null);
+    knowledge.setExpiredAt(resolveExpiredAt(request.getExpiredAt(), knowledge.getStatus()));
     knowledge.setRemark(request.getRemark());
     knowledge.setCreatedBy(AuthContext.getStaffId());
     knowledgeMapper.insert(knowledge);
@@ -98,10 +104,15 @@ public class OaKnowledgeController {
     if ("ARCHIVED".equals(knowledge.getStatus())) {
       throw new IllegalArgumentException("已归档知识不可编辑");
     }
+    validatePayload(request);
     knowledge.setTitle(request.getTitle());
     knowledge.setCategory(request.getCategory());
     knowledge.setTags(request.getTags());
     knowledge.setContent(request.getContent());
+    knowledge.setAttachmentName(request.getAttachmentName());
+    knowledge.setAttachmentUrl(request.getAttachmentUrl());
+    knowledge.setAttachmentType(request.getAttachmentType());
+    knowledge.setAttachmentSize(request.getAttachmentSize());
     knowledge.setAuthorId(request.getAuthorId());
     knowledge.setAuthorName(request.getAuthorName());
     String normalizedStatus = normalizeStatus(request.getStatus());
@@ -112,6 +123,7 @@ public class OaKnowledgeController {
     if ("PUBLISHED".equals(knowledge.getStatus()) && knowledge.getPublishedAt() == null) {
       knowledge.setPublishedAt(LocalDateTime.now());
     }
+    knowledge.setExpiredAt(resolveExpiredAt(request.getExpiredAt(), knowledge.getStatus()));
     knowledge.setRemark(request.getRemark());
     knowledgeMapper.updateById(knowledge);
     return Result.ok(knowledge);
@@ -144,6 +156,21 @@ public class OaKnowledgeController {
     return Result.ok(knowledge);
   }
 
+  @PutMapping("/{id}/expire")
+  public Result<OaKnowledge> expire(@PathVariable Long id) {
+    OaKnowledge knowledge = findAccessibleKnowledge(id);
+    if (knowledge == null) {
+      return Result.ok(null);
+    }
+    ensureStatusTransition(knowledge.getStatus(), "EXPIRED");
+    knowledge.setStatus("EXPIRED");
+    if (knowledge.getExpiredAt() == null) {
+      knowledge.setExpiredAt(LocalDateTime.now());
+    }
+    knowledgeMapper.updateById(knowledge);
+    return Result.ok(knowledge);
+  }
+
   @PutMapping("/batch/publish")
   public Result<Integer> batchPublish(@RequestBody OaBatchIdsRequest request) {
     List<Long> ids = sanitizeIds(request == null ? null : request.getIds());
@@ -157,12 +184,38 @@ public class OaKnowledgeController {
         .in(OaKnowledge::getId, ids));
     int count = 0;
     for (OaKnowledge item : list) {
-      if (!"DRAFT".equals(item.getStatus())) {
+      if (!"DRAFT".equals(item.getStatus()) && !"EXPIRED".equals(item.getStatus())) {
         continue;
       }
       item.setStatus("PUBLISHED");
       if (item.getPublishedAt() == null) {
         item.setPublishedAt(LocalDateTime.now());
+      }
+      knowledgeMapper.updateById(item);
+      count++;
+    }
+    return Result.ok(count);
+  }
+
+  @PutMapping("/batch/expire")
+  public Result<Integer> batchExpire(@RequestBody OaBatchIdsRequest request) {
+    List<Long> ids = sanitizeIds(request == null ? null : request.getIds());
+    if (ids.isEmpty()) {
+      return Result.ok(0);
+    }
+    Long orgId = AuthContext.getOrgId();
+    List<OaKnowledge> list = knowledgeMapper.selectList(Wrappers.lambdaQuery(OaKnowledge.class)
+        .eq(OaKnowledge::getIsDeleted, 0)
+        .eq(orgId != null, OaKnowledge::getOrgId, orgId)
+        .in(OaKnowledge::getId, ids));
+    int count = 0;
+    for (OaKnowledge item : list) {
+      if ("ARCHIVED".equals(item.getStatus()) || "EXPIRED".equals(item.getStatus())) {
+        continue;
+      }
+      item.setStatus("EXPIRED");
+      if (item.getExpiredAt() == null) {
+        item.setExpiredAt(LocalDateTime.now());
       }
       knowledgeMapper.updateById(item);
       count++;
@@ -269,10 +322,15 @@ public class OaKnowledgeController {
     if (toStatus == null || fromStatus == null || toStatus.equals(fromStatus)) {
       return;
     }
-    if ("DRAFT".equals(fromStatus) && ("PUBLISHED".equals(toStatus) || "ARCHIVED".equals(toStatus))) {
+    if ("DRAFT".equals(fromStatus) && ("PUBLISHED".equals(toStatus)
+        || "ARCHIVED".equals(toStatus)
+        || "EXPIRED".equals(toStatus))) {
       return;
     }
-    if ("PUBLISHED".equals(fromStatus) && "ARCHIVED".equals(toStatus)) {
+    if ("PUBLISHED".equals(fromStatus) && ("ARCHIVED".equals(toStatus) || "EXPIRED".equals(toStatus))) {
+      return;
+    }
+    if ("EXPIRED".equals(fromStatus) && ("PUBLISHED".equals(toStatus) || "ARCHIVED".equals(toStatus))) {
       return;
     }
     throw new IllegalArgumentException("知识状态不允许从 " + fromStatus + " 变更为 " + toStatus);
@@ -283,10 +341,33 @@ public class OaKnowledgeController {
       return null;
     }
     String normalized = status.trim().toUpperCase();
-    if (!"DRAFT".equals(normalized) && !"PUBLISHED".equals(normalized) && !"ARCHIVED".equals(normalized)) {
-      throw new IllegalArgumentException("status 仅支持 DRAFT/PUBLISHED/ARCHIVED");
+    if (!"DRAFT".equals(normalized)
+        && !"PUBLISHED".equals(normalized)
+        && !"ARCHIVED".equals(normalized)
+        && !"EXPIRED".equals(normalized)) {
+      throw new IllegalArgumentException("status 仅支持 DRAFT/PUBLISHED/EXPIRED/ARCHIVED");
     }
     return normalized;
+  }
+
+  private void validatePayload(OaKnowledgeRequest request) {
+    if (request == null || request.getTitle() == null || request.getTitle().isBlank()) {
+      throw new IllegalArgumentException("标题不能为空");
+    }
+    if ((request.getContent() == null || request.getContent().isBlank())
+        && (request.getAttachmentUrl() == null || request.getAttachmentUrl().isBlank())) {
+      throw new IllegalArgumentException("正文或附件至少填写一项");
+    }
+    if (request.getAttachmentSize() != null && request.getAttachmentSize() < 0) {
+      throw new IllegalArgumentException("附件大小不能小于0");
+    }
+  }
+
+  private LocalDateTime resolveExpiredAt(LocalDateTime requestedExpiredAt, String status) {
+    if ("EXPIRED".equals(status)) {
+      return requestedExpiredAt == null ? LocalDateTime.now() : requestedExpiredAt;
+    }
+    return requestedExpiredAt;
   }
 
   private List<Long> sanitizeIds(List<Long> ids) {

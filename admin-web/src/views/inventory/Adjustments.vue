@@ -20,9 +20,9 @@
         </a-form-item>
         <a-form-item label="盘点类型">
           <a-select v-model:value="query.inventoryType" allow-clear style="width: 180px">
-            <a-select-option value="ASSET">中心不动产盘点</a-select-option>
-            <a-select-option value="MATERIAL">物资盘点</a-select-option>
-            <a-select-option value="CONSUMABLE">损耗品盘点</a-select-option>
+            <a-select-option v-for="option in inventoryTypeOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="类型">
@@ -46,6 +46,7 @@
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
       <div class="table-actions">
         <a-space>
+          <a-button type="primary" @click="openCreateModal">新增盘点记录</a-button>
           <a-button @click="exportCsvData">导出CSV</a-button>
         </a-space>
       </div>
@@ -77,7 +78,11 @@
           </template>
         </vxe-column>
         <vxe-column field="adjustQty" title="数量" width="120" />
-        <vxe-column field="reason" title="原因" min-width="160" />
+        <vxe-column field="reason" title="原因" min-width="220">
+          <template #default="{ row }">
+            {{ adjustmentReasonText(row.reason) }}
+          </template>
+        </vxe-column>
       </vxe-table>
 
       <a-pagination
@@ -90,6 +95,126 @@
         @showSizeChange="onPageSizeChange"
       />
     </a-card>
+
+    <a-modal
+      v-model:open="createOpen"
+      title="新增盘点记录"
+      :confirm-loading="saving"
+      width="780px"
+      @ok="submitCreate"
+    >
+      <a-form layout="vertical">
+        <a-row :gutter="12">
+          <a-col :span="12">
+            <a-form-item label="商品" required>
+              <a-select
+                v-model:value="createForm.productId"
+                :options="productOptions"
+                show-search
+                option-filter-prop="label"
+                placeholder="请选择商品"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="仓库">
+              <a-select v-model:value="createForm.warehouseId" :options="warehouseOptions" allow-clear placeholder="请选择仓库" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="12">
+          <a-col :span="12">
+            <a-form-item label="盘点类型" required>
+              <a-select v-model:value="createForm.inventoryType" :options="inventoryTypeOptions" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="调整类型" required>
+              <a-select v-model:value="createForm.adjustType" :options="adjustTypeOptions" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="12">
+          <a-col :span="12">
+            <a-form-item label="调整数量" required>
+              <a-input-number v-model:value="createForm.adjustQty" :min="1" :precision="0" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="批次号">
+              <a-input v-model:value="createForm.batchNo" maxlength="64" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="12">
+          <a-col :span="12">
+            <a-form-item label="摆放位置">
+              <a-input v-model:value="createForm.warehouseLocation" maxlength="64" placeholder="如：库房A区/办公室" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="效期">
+              <a-space>
+                <a-switch v-model:checked="createForm.longTermValid" checked-children="长期有效" un-checked-children="填写效期" />
+                <a-date-picker
+                  v-if="!createForm.longTermValid"
+                  v-model:value="createForm.expireDate"
+                  value-format="YYYY-MM-DD"
+                  placeholder="请选择过期时间"
+                />
+              </a-space>
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="12">
+          <a-col :span="12">
+            <a-form-item label="盘点周期">
+              <a-select v-model:value="createForm.periodType" :options="periodTypeOptions" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="周期任务标题">
+              <a-input v-model:value="createForm.periodTitle" maxlength="120" placeholder="例如：2026年3-4月全院药品盘点" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="12">
+          <a-col :span="24">
+            <a-form-item label="盘亏处理意见（亏盘/临期盘点必填）">
+              <a-textarea v-model:value="createForm.handlingOpinion" :rows="2" maxlength="255" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="12">
+          <a-col :span="24">
+            <a-form-item label="盘点图片">
+              <a-upload
+                :show-upload-list="true"
+                list-type="text"
+                :before-upload="beforeUploadFile"
+                :max-count="3"
+              >
+                <a-button>上传图片</a-button>
+              </a-upload>
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="12">
+          <a-col :span="12">
+            <a-form-item>
+              <a-checkbox v-model:checked="createForm.expiryCheckAsLoss">
+                临期/效期盘点按盘亏处理
+              </a-checkbox>
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="备注">
+              <a-input v-model:value="createForm.remark" maxlength="255" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+      </a-form>
+    </a-modal>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
       <div class="table-actions">
@@ -122,14 +247,21 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import dayjs from 'dayjs'
+import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportCsv } from '../../utils/export'
-import { getInventoryAdjustmentDiffReport, getInventoryAdjustmentPage } from '../../api/materialCenter'
+import { adjustInventory, getInventoryAdjustmentDiffReport, getInventoryAdjustmentPage } from '../../api/materialCenter'
 import { getWarehousePage } from '../../api/materialCenter'
 import { getProductPage } from '../../api/store'
+import { createOaTask, uploadOaFile } from '../../api/oa'
+import { useUserStore } from '../../stores/user'
 import type { InventoryAdjustmentDiffItem, InventoryAdjustmentItem, PageResult, ProductItem } from '../../types'
 
+const userStore = useUserStore()
 const loading = ref(false)
+const saving = ref(false)
+const createOpen = ref(false)
 const rows = ref<InventoryAdjustmentItem[]>([])
 const total = ref(0)
 const products = ref<ProductItem[]>([])
@@ -137,6 +269,7 @@ const loadingReport = ref(false)
 const reportRows = ref<Array<InventoryAdjustmentDiffItem & { key: string }>>([])
 const warehouseOptions = ref<Array<{ label: string; value: number }>>([])
 const categoryOptions = ref<Array<{ label: string; value: string }>>([])
+const uploadedPhotoUrls = ref<string[]>([])
 const productOptions = computed(() =>
   products.value.map((p) => ({
     label: `${p.productName} (ID:${p.idStr || p.id})`,
@@ -144,15 +277,58 @@ const productOptions = computed(() =>
   }))
 )
 
+const inventoryTypeOptions = [
+  { label: '药品盘点', value: 'MEDICINE' },
+  { label: '耗材盘点', value: 'CONSUMABLE' },
+  { label: '食品与食材盘点', value: 'FOOD' },
+  { label: '清洁与消杀用品盘点', value: 'CLEANING' },
+  { label: '办公与生活物资盘点', value: 'OFFICE_LIFE' },
+  { label: '固定资产盘点', value: 'FIXED_ASSET' },
+  { label: '寄存物盘点', value: 'DEPOSIT' },
+  { label: '老人个人物品盘点', value: 'ELDER_PERSONAL' },
+  { label: '异常盘点', value: 'ABNORMAL' },
+  { label: '中心不动产盘点', value: 'ASSET' },
+  { label: '物资盘点', value: 'MATERIAL' }
+]
+
+const adjustTypeOptions = [
+  { label: '盘盈', value: 'GAIN' },
+  { label: '盘亏', value: 'LOSS' }
+]
+
+const periodTypeOptions = [
+  { label: '不创建周期任务', value: 'NONE' },
+  { label: '月末盘点', value: 'MONTH_END' },
+  { label: '季度盘点', value: 'QUARTER_END' },
+  { label: '年终盘点', value: 'YEAR_END' }
+]
+
 const query = reactive({
   productId: undefined as number | undefined,
   warehouseId: undefined as number | undefined,
   category: undefined as string | undefined,
-  inventoryType: undefined as 'ASSET' | 'MATERIAL' | 'CONSUMABLE' | undefined,
+  inventoryType: undefined as string | undefined,
   adjustType: undefined as 'GAIN' | 'LOSS' | undefined,
   range: undefined as any,
   pageNo: 1,
   pageSize: 10
+})
+
+const createForm = reactive({
+  productId: undefined as number | undefined,
+  warehouseId: undefined as number | undefined,
+  inventoryType: 'MEDICINE',
+  adjustType: 'GAIN' as 'GAIN' | 'LOSS',
+  adjustQty: 1,
+  batchNo: '',
+  warehouseLocation: '',
+  longTermValid: false,
+  expireDate: undefined as string | undefined,
+  periodType: 'NONE' as 'NONE' | 'MONTH_END' | 'QUARTER_END' | 'YEAR_END',
+  periodTitle: '',
+  handlingOpinion: '',
+  expiryCheckAsLoss: false,
+  remark: ''
 })
 
 const reportColumns = [
@@ -182,6 +358,10 @@ async function fetchData() {
     })
     rows.value = res.list
     total.value = res.total
+  } catch (error: any) {
+    message.error(error?.message || '加载盘点记录失败')
+    rows.value = []
+    total.value = 0
   } finally {
     loading.value = false
   }
@@ -201,6 +381,9 @@ async function fetchDiffReport() {
       ...it,
       key: `${it.productId || 0}-${it.warehouseId || 0}`
     }))
+  } catch (error: any) {
+    message.error(error?.message || '加载盘点差异报表失败')
+    reportRows.value = []
   } finally {
     loadingReport.value = false
   }
@@ -241,11 +424,18 @@ function exportCsvData() {
       调整时间: r.createTime,
       商品名称: r.productName,
       商品ID: r.productId,
-      批次ID: r.batchId,
+      批次ID: r.batchId || '',
       盘点类型: inventoryTypeLabel(r.inventoryType),
       类型: r.adjustType === 'GAIN' ? '盘盈' : '盘亏',
       数量: r.adjustQty,
-      原因: r.reason
+      批次号: parseAdjustmentReason(r.reason).batchNo,
+      摆放位置: parseAdjustmentReason(r.reason).warehouseLocation,
+      过期时间: parseAdjustmentReason(r.reason).expireDate,
+      长期有效: parseAdjustmentReason(r.reason).longTermValid ? '是' : '否',
+      临期盘亏: parseAdjustmentReason(r.reason).expiryCheckAsLoss ? '是' : '否',
+      处理意见: parseAdjustmentReason(r.reason).handlingOpinion,
+      图片: parseAdjustmentReason(r.reason).photoUrls?.join(' | ') || '',
+      原因: parseAdjustmentReason(r.reason).reasonText || r.reason || ''
     })),
     '盘点调整记录'
   )
@@ -268,25 +458,210 @@ function exportDiffCsvData() {
 }
 
 function inventoryTypeLabel(type?: string) {
-  if (type === 'ASSET') return '中心不动产盘点'
-  if (type === 'CONSUMABLE') return '损耗品盘点'
-  return type === 'MATERIAL' ? '物资盘点' : '-'
+  return inventoryTypeOptions.find((item) => item.value === type)?.label || type || '-'
+}
+
+function parseAdjustmentReason(raw?: string) {
+  if (!raw) return {} as any
+  try {
+    const parsed = JSON.parse(raw)
+    return typeof parsed === 'object' && parsed ? parsed : ({} as any)
+  } catch {
+    return { reasonText: raw } as any
+  }
+}
+
+function adjustmentReasonText(raw?: string) {
+  const parsed = parseAdjustmentReason(raw)
+  const parts = [
+    parsed.reasonText,
+    parsed.handlingOpinion ? `处理意见：${parsed.handlingOpinion}` : undefined,
+    parsed.batchNo ? `批次：${parsed.batchNo}` : undefined,
+    parsed.warehouseLocation ? `位置：${parsed.warehouseLocation}` : undefined
+  ].filter(Boolean)
+  return parts.join('；') || '-'
+}
+
+function resetCreateForm() {
+  createForm.productId = undefined
+  createForm.warehouseId = undefined
+  createForm.inventoryType = 'MEDICINE'
+  createForm.adjustType = 'GAIN'
+  createForm.adjustQty = 1
+  createForm.batchNo = ''
+  createForm.warehouseLocation = ''
+  createForm.longTermValid = false
+  createForm.expireDate = undefined
+  createForm.periodType = 'NONE'
+  createForm.periodTitle = ''
+  createForm.handlingOpinion = ''
+  createForm.expiryCheckAsLoss = false
+  createForm.remark = ''
+  uploadedPhotoUrls.value = []
+}
+
+function openCreateModal() {
+  resetCreateForm()
+  createOpen.value = true
+}
+
+async function beforeUploadFile(file: File) {
+  try {
+    const res = await uploadOaFile(file, 'inventory-adjustment')
+    if (res.fileUrl) {
+      uploadedPhotoUrls.value = [...uploadedPhotoUrls.value, res.fileUrl]
+      message.success(`已上传：${file.name}`)
+    }
+  } catch (error: any) {
+    message.error(error?.message || `上传失败：${file.name}`)
+  }
+  return false
+}
+
+function resolvePeriodicSchedule(periodType: 'MONTH_END' | 'QUARTER_END' | 'YEAR_END') {
+  const now = dayjs()
+  if (periodType === 'MONTH_END') {
+    const dueDate = now.endOf('month').startOf('day')
+    return {
+      dueDate,
+      titleRange: `${dueDate.format('YYYY年M月')}月末`,
+      periodDesc: `${dueDate.format('YYYY-MM-DD')} 月末盘点`
+    }
+  }
+  if (periodType === 'QUARTER_END') {
+    const quarter = Math.ceil((now.month() + 1) / 3)
+    const quarterEndMonth = quarter * 3
+    const dueDate = dayjs(`${now.year()}-${String(quarterEndMonth).padStart(2, '0')}-01`).endOf('month').startOf('day')
+    return {
+      dueDate,
+      titleRange: `${now.year()}年Q${quarter}季度末`,
+      periodDesc: `${dueDate.format('YYYY-MM-DD')} 季度末盘点`
+    }
+  }
+  const dueDate = dayjs(`${now.year()}-12-31`).startOf('day')
+  return {
+    dueDate,
+    titleRange: `${now.year()}年年末`,
+    periodDesc: `${dueDate.format('YYYY-MM-DD')} 年终盘点`
+  }
+}
+
+async function createPeriodicTaskIfNeeded(inventoryTypeLabelText: string) {
+  if (createForm.periodType === 'NONE') {
+    return null
+  }
+  const periodType = createForm.periodType as 'MONTH_END' | 'QUARTER_END' | 'YEAR_END'
+  const schedule = resolvePeriodicSchedule(periodType)
+  const startTime = schedule.dueDate
+  const endTime = schedule.dueDate.endOf('day')
+  const title = createForm.periodTitle.trim()
+    || `${schedule.titleRange}全院${inventoryTypeLabelText}`
+  const productName = products.value.find((item) => item.id === createForm.productId)?.productName || '-'
+  const trackingNo = `INV-${dayjs().format('YYYYMMDDHHmmss')}-${Math.floor(Math.random() * 900 + 100)}`
+  return createOaTask({
+    title,
+    description: [
+      '由盘点记录自动生成的周期盘点任务',
+      `追踪号：${trackingNo}`,
+      `周期类型：${schedule.periodDesc}`,
+      `盘点类型：${inventoryTypeLabelText}`,
+      `商品：${productName}`,
+      `来源页面：库存盘点调整`
+    ].join('\n'),
+    startTime: startTime.format('YYYY-MM-DD HH:mm:ss'),
+    endTime: endTime.format('YYYY-MM-DD HH:mm:ss'),
+    calendarType: 'COLLAB',
+    priority: 'HIGH',
+    planCategory: 'INVENTORY_CHECK',
+    urgency: 'NORMAL',
+    assigneeName: userStore.staffInfo?.realName || userStore.staffInfo?.username || undefined
+  })
+}
+
+async function submitCreate() {
+  if (!createForm.productId) {
+    message.warning('请选择商品')
+    return
+  }
+  if (!createForm.inventoryType) {
+    message.warning('请选择盘点类型')
+    return
+  }
+  if (!createForm.adjustQty || createForm.adjustQty <= 0) {
+    message.warning('调整数量必须大于0')
+    return
+  }
+  const forceLoss = createForm.expiryCheckAsLoss
+  const adjustType = forceLoss ? 'LOSS' : createForm.adjustType
+  if (adjustType === 'LOSS' && !createForm.handlingOpinion.trim()) {
+    message.warning('盘亏或临期盘亏需要填写处理意见')
+    return
+  }
+  const reasonPayload = {
+    reasonText: createForm.remark.trim() || undefined,
+    batchNo: createForm.batchNo.trim() || undefined,
+    warehouseLocation: createForm.warehouseLocation.trim() || undefined,
+    expireDate: createForm.longTermValid ? undefined : createForm.expireDate,
+    longTermValid: createForm.longTermValid,
+    handlingOpinion: createForm.handlingOpinion.trim() || undefined,
+    expiryCheckAsLoss: createForm.expiryCheckAsLoss,
+    periodType: createForm.periodType,
+    periodTitle: createForm.periodTitle.trim() || undefined,
+    periodAutoTaskEnabled: createForm.periodType !== 'NONE',
+    photoUrls: uploadedPhotoUrls.value
+  }
+  saving.value = true
+  try {
+    await adjustInventory({
+      productId: createForm.productId,
+      warehouseId: createForm.warehouseId,
+      inventoryType: createForm.inventoryType,
+      adjustType,
+      adjustQty: createForm.adjustQty,
+      reason: JSON.stringify(reasonPayload)
+    })
+    let periodicTask: any = null
+    if (createForm.periodType !== 'NONE') {
+      try {
+        periodicTask = await createPeriodicTaskIfNeeded(inventoryTypeLabel(createForm.inventoryType))
+      } catch (error: any) {
+        message.warning(error?.message || '盘点记录已创建，但周期任务创建失败，请手动在协同日历补建')
+      }
+    }
+    createOpen.value = false
+    message.success(periodicTask?.id ? `盘点记录已创建，已生成协同日历任务 #${periodicTask.id}` : '盘点记录已创建')
+    await fetchData()
+    await fetchDiffReport()
+  } catch (error: any) {
+    message.error(error?.message || '新增盘点记录失败')
+  } finally {
+    saving.value = false
+  }
 }
 
 onMounted(async () => {
-  const [warehouseRes, productRes] = await Promise.all([
-    getWarehousePage({ pageNo: 1, pageSize: 500 }),
-    getProductPage({ pageNo: 1, pageSize: 500 })
-  ])
-  warehouseOptions.value = warehouseRes.list.map((it: { id: number; warehouseName?: string }) => ({ label: it.warehouseName || `仓库${it.id}`, value: it.id }))
-  products.value = productRes.list || []
-  const categorySet = new Set<string>()
-  for (const row of products.value) {
-    if (row.category) categorySet.add(row.category)
+  try {
+    const [warehouseRes, productRes] = await Promise.all([
+      getWarehousePage({ pageNo: 1, pageSize: 500 }),
+      getProductPage({ pageNo: 1, pageSize: 500 })
+    ])
+    warehouseOptions.value = (warehouseRes?.list || [])
+      .map((it: { id: number; warehouseName?: string }) => ({ label: it.warehouseName || `仓库${it.id}`, value: it.id }))
+    products.value = productRes?.list || []
+    const categorySet = new Set<string>()
+    for (const row of products.value) {
+      if (row.category) categorySet.add(row.category)
+    }
+    categoryOptions.value = Array.from(categorySet).map((it) => ({ label: it, value: it }))
+  } catch (error: any) {
+    warehouseOptions.value = []
+    products.value = []
+    categoryOptions.value = []
+    message.error(error?.message || '盘点基础数据加载失败，请稍后刷新重试')
+  } finally {
+    await fetchData()
+    await fetchDiffReport()
   }
-  categoryOptions.value = Array.from(categorySet).map((it) => ({ label: it, value: it }))
-  await fetchData()
-  await fetchDiffReport()
 })
 </script>
 

@@ -36,31 +36,37 @@
         <a-button :disabled="selectedRowKeys.length !== 1" @click="markReturnSelected">返院登记</a-button>
         <a-button danger :disabled="selectedRowKeys.length === 0" @click="deleteSelected">删除</a-button>
       </a-space>
-      <a-table
-        :data-source="rows"
-        :columns="columns"
-        :loading="loading"
-        :pagination="false"
-        row-key="id"
-        :row-selection="rowSelection"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'status'">
-            <a-tag :color="record.status === 'RETURNED' ? 'green' : 'orange'">
-              {{ record.status === 'RETURNED' ? '已返院' : '外出中' }}
-            </a-tag>
+      <StatefulBlock :loading="loading" :error="errorMessage" :empty="!rows.length" empty-text="暂无外出记录" @retry="fetchData">
+        <a-table
+          :data-source="rows"
+          :columns="columns"
+          :loading="loading"
+          :pagination="false"
+          row-key="id"
+          :row-selection="rowSelection"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'status'">
+              <a-tag :color="record.status === 'RETURNED' ? 'green' : 'orange'">
+                {{ record.status === 'RETURNED' ? '已返院' : '外出中' }}
+              </a-tag>
+            </template>
+            <template v-else-if="column.key === 'leaveNoteImageUrl'">
+              <a v-if="record.leaveNoteImageUrl" :href="record.leaveNoteImageUrl" target="_blank" rel="noopener noreferrer">查看</a>
+              <span v-else>-</span>
+            </template>
           </template>
-        </template>
-      </a-table>
-      <a-pagination
-        style="margin-top: 16px; text-align: right;"
-        :current="query.pageNo"
-        :page-size="query.pageSize"
-        :total="total"
-        show-size-changer
-        @change="onPageChange"
-        @showSizeChange="onPageSizeChange"
-      />
+        </a-table>
+        <a-pagination
+          style="margin-top: 16px; text-align: right;"
+          :current="query.pageNo"
+          :page-size="query.pageSize"
+          :total="total"
+          show-size-changer
+          @change="onPageChange"
+          @showSizeChange="onPageSizeChange"
+        />
+      </StatefulBlock>
     </a-card>
 
     <a-modal v-model:open="createOpen" title="新增外出登记" @ok="submitCreate" :confirm-loading="submitting" width="520px">
@@ -87,6 +93,16 @@
         <a-form-item label="外出事由">
           <a-input v-model:value="form.reason" />
         </a-form-item>
+        <a-form-item label="请假条照片">
+          <a-space direction="vertical" style="width: 100%">
+            <a-upload :show-upload-list="false" :before-upload="beforeUploadLeaveNote" accept="image/*">
+              <a-button :loading="uploadingLeaveNote">拍照/上传请假条</a-button>
+            </a-upload>
+            <a v-if="form.leaveNoteImageUrl" :href="form.leaveNoteImageUrl" target="_blank" rel="noopener noreferrer">
+              查看已上传请假条
+            </a>
+          </a-space>
+        </a-form-item>
         <a-form-item label="备注">
           <a-input v-model:value="form.remark" />
         </a-form-item>
@@ -102,7 +118,8 @@ import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
-import { getElderPage } from '../../api/elder'
+import StatefulBlock from '../../components/StatefulBlock.vue'
+import { getElderPage, uploadElderFile } from '../../api/elder'
 import { createOuting, deleteOuting, getOutingPage, returnOuting } from '../../api/elderResidence'
 import type { ElderItem, OutingCreateRequest, OutingItem, PageResult } from '../../types'
 
@@ -112,6 +129,8 @@ const total = ref(0)
 const elders = ref<ElderItem[]>([])
 const createOpen = ref(false)
 const submitting = ref(false)
+const uploadingLeaveNote = ref(false)
+const errorMessage = ref('')
 const formRef = ref<FormInstance>()
 const selectedRowKeys = ref<number[]>([])
 const route = useRoute()
@@ -136,6 +155,7 @@ const form = reactive<OutingCreateRequest>({
   expectedReturnTime: undefined,
   companion: '',
   reason: '',
+  leaveNoteImageUrl: '',
   remark: ''
 })
 
@@ -150,6 +170,7 @@ const columns = [
   { title: '预计返院', dataIndex: 'expectedReturnTime', key: 'expectedReturnTime', width: 180 },
   { title: '实际返院', dataIndex: 'actualReturnTime', key: 'actualReturnTime', width: 180 },
   { title: '外出事由', dataIndex: 'reason', key: 'reason' },
+  { title: '请假条', dataIndex: 'leaveNoteImageUrl', key: 'leaveNoteImageUrl', width: 120 },
   { title: '状态', key: 'status', width: 100 }
 ]
 
@@ -160,6 +181,7 @@ async function loadElders() {
 
 async function fetchData() {
   loading.value = true
+  errorMessage.value = ''
   try {
     const res: PageResult<OutingItem> = await getOutingPage(query)
     rows.value = (res.list || []).filter((item) => {
@@ -171,6 +193,8 @@ async function fetchData() {
     })
     total.value = query.planTimeRange?.length ? rows.value.length : res.total
     selectedRowKeys.value = selectedRowKeys.value.filter((id) => rows.value.some((item) => item.id === id))
+  } catch (error: any) {
+    errorMessage.value = error?.message || '加载外出记录失败'
   } finally {
     loading.value = false
   }
@@ -191,7 +215,24 @@ function openCreate() {
   form.expectedReturnTime = undefined
   form.companion = ''
   form.reason = ''
+  form.leaveNoteImageUrl = ''
   form.remark = ''
+}
+
+async function uploadLeaveNote(file: File) {
+  uploadingLeaveNote.value = true
+  try {
+    const uploaded = await uploadElderFile(file, 'elder-outing-leave-note')
+    form.leaveNoteImageUrl = uploaded?.fileUrl || ''
+    message.success('请假条上传成功')
+  } finally {
+    uploadingLeaveNote.value = false
+  }
+}
+
+async function beforeUploadLeaveNote(file: File) {
+  await uploadLeaveNote(file)
+  return false
 }
 
 async function submitCreate() {

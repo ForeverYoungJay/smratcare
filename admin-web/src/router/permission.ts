@@ -4,8 +4,10 @@ import { getRoles, getToken } from '../utils/auth'
 export function setupPermission(router: Router) {
   router.beforeEach((to, _from, next) => {
     const token = getToken()
-    if (to.path !== '/login' && !token) {
-      next('/login')
+    const publicPages = ['/home', '/login']
+
+    if (!token && !publicPages.includes(to.path)) {
+      next('/home')
       return
     }
 
