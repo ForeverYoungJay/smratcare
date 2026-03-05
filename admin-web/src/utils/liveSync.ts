@@ -8,6 +8,8 @@ export type LiveSyncTopic =
   | 'dining'
   | 'marketing'
   | 'oa'
+  | 'hr'
+  | 'logistics'
   | 'system'
 
 export interface LiveSyncPayload {
@@ -31,7 +33,11 @@ const topicRules: Array<{ pattern: RegExp; topics: LiveSyncTopic[] }> = [
   { pattern: /^\/api\/health\//, topics: ['health', 'elder'] },
   { pattern: /^\/api\/dining\//, topics: ['dining', 'elder'] },
   { pattern: /^\/api\/marketing\//, topics: ['marketing', 'elder'] },
-  { pattern: /^\/api\/oa\//, topics: ['oa'] }
+  { pattern: /^\/api\/oa\//, topics: ['oa'] },
+  { pattern: /^\/api\/hr\//, topics: ['hr'] },
+  { pattern: /^\/api\/logistics\//, topics: ['logistics'] },
+  { pattern: /^\/api\/storage\//, topics: ['logistics'] },
+  { pattern: /^\/api\/inventory\//, topics: ['logistics'] }
 ]
 
 function isBrowser() {

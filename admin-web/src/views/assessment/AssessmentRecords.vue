@@ -253,6 +253,14 @@
                 <a-card v-for="item in group.items" :key="item.id" size="small">
                   <div style="font-weight: 600; margin-bottom: 6px;">{{ item.id }}. {{ item.title }}</div>
                   <div style="color: rgba(0,0,0,0.65); margin-bottom: 8px;">指标说明：{{ item.description }}</div>
+                  <a-select
+                    v-model:value="admissionScores[item.id]"
+                    :options="admissionOptionSelectOptions(item)"
+                    :disabled="formReadonly"
+                    allow-clear
+                    style="width: 100%; margin-bottom: 8px;"
+                    placeholder="请选择分值及对应能力描述"
+                  />
                   <a-input-number
                     v-model:value="admissionScores[item.id]"
                     :min="admissionItemMin(item)"
@@ -1177,6 +1185,13 @@ function admissionItemMin(item: AdmissionAbilityItem) {
 
 function admissionItemMax(item: AdmissionAbilityItem) {
   return Math.max(...item.options.map((opt) => opt.score))
+}
+
+function admissionOptionSelectOptions(item: AdmissionAbilityItem) {
+  return item.options.map((opt) => ({
+    value: opt.score,
+    label: `${opt.score}分 - ${opt.label}`
+  }))
 }
 
 function onPageChange(page: number) {

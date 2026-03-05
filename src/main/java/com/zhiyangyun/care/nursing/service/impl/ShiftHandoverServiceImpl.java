@@ -116,6 +116,7 @@ public class ShiftHandoverServiceImpl implements ShiftHandoverService {
     handover.setStatus(request.getStatus() == null ? "DRAFT" : request.getStatus());
     handover.setHandoverTime(request.getHandoverTime());
     handover.setConfirmTime(request.getConfirmTime());
+    handover.setAttachmentUrls(normalizeText(request.getAttachmentUrls()));
   }
 
   private ShiftHandoverResponse toResponse(ShiftHandover handover, Map<Long, StaffAccount> staffMap) {
@@ -133,6 +134,7 @@ public class ShiftHandoverServiceImpl implements ShiftHandoverService {
     response.setStatus(handover.getStatus());
     response.setHandoverTime(handover.getHandoverTime());
     response.setConfirmTime(handover.getConfirmTime());
+    response.setAttachmentUrls(handover.getAttachmentUrls());
 
     StaffAccount fromStaff = handover.getFromStaffId() == null ? null : staffMap.get(handover.getFromStaffId());
     if (fromStaff == null && handover.getFromStaffId() != null) {
@@ -146,5 +148,13 @@ public class ShiftHandoverServiceImpl implements ShiftHandoverService {
     }
     response.setToStaffName(toStaff == null ? null : toStaff.getRealName());
     return response;
+  }
+
+  private String normalizeText(String value) {
+    if (value == null) {
+      return null;
+    }
+    String trimmed = value.trim();
+    return trimmed.isEmpty() ? null : trimmed;
   }
 }

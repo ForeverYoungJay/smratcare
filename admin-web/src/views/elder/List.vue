@@ -45,7 +45,7 @@
       <div class="table-actions">
         <a-space>
           <a-button type="primary" @click="goCreate">新增老人</a-button>
-          <a-button type="primary" ghost @click="goQuickArchiveCreate">档案一键生成（直办入住）</a-button>
+          <a-button type="primary"  @click="goQuickArchiveCreate">档案一键生成（直办入住）</a-button>
           <a-button @click="exportCsvData">导出CSV</a-button>
           <a-button :disabled="selectedCount !== 1" @click="goDetailSelected">详情</a-button>
           <a-button :disabled="selectedCount !== 1" @click="goEditSelected">编辑</a-button>

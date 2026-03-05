@@ -112,7 +112,7 @@ public class DiningRiskServiceImpl implements DiningRiskService {
           .eq(ElderProfile::getId, elderId)
           .last("LIMIT 1"));
       if (elder == null) {
-        throw new IllegalArgumentException("老人不存在或不在当前机构");
+        throw new IllegalArgumentException("老人不存在或不在当前机构（elderId=" + elderId + "）");
       }
       return elder;
     }

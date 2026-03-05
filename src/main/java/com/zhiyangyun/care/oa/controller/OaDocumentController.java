@@ -53,11 +53,15 @@ public class OaDocumentController {
 
   @GetMapping("/page")
   public Result<IPage<OaDocument>> page(
-      @RequestParam(defaultValue = "1") long pageNo,
-      @RequestParam(defaultValue = "20") long pageSize,
+      @RequestParam(required = false) Long pageNo,
+      @RequestParam(required = false) Long pageSize,
+      @RequestParam(required = false) Long page,
+      @RequestParam(required = false) Long size,
       @RequestParam(required = false) Long folderId,
       @RequestParam(required = false) String folder,
       @RequestParam(required = false) String keyword) {
+    long resolvedPageNo = pageNo != null && pageNo > 0 ? pageNo : (page != null && page > 0 ? page : 1);
+    long resolvedPageSize = pageSize != null && pageSize > 0 ? pageSize : (size != null && size > 0 ? size : 20);
     Long orgId = AuthContext.getOrgId();
     var wrapper = Wrappers.lambdaQuery(OaDocument.class)
         .eq(OaDocument::getIsDeleted, 0)
@@ -69,7 +73,7 @@ public class OaDocumentController {
           .or().like(OaDocument::getUploaderName, keyword));
     }
     wrapper.orderByDesc(OaDocument::getUploadedAt).orderByDesc(OaDocument::getCreateTime);
-    return Result.ok(documentMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
+    return Result.ok(documentMapper.selectPage(new Page<>(resolvedPageNo, resolvedPageSize), wrapper));
   }
 
   @GetMapping("/folder/tree")

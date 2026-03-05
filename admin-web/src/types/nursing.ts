@@ -40,6 +40,7 @@ export interface ShiftHandoverItem {
   status?: string
   handoverTime?: string
   confirmTime?: string
+  attachmentUrls?: string
 }
 
 export interface CareLevelItem {

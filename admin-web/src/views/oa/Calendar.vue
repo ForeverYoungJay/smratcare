@@ -497,7 +497,7 @@ async function fetchAll() {
     startDate: query.range?.[0] ? dayjs(query.range[0]).format('YYYY-MM-DD') : undefined,
     endDate: query.range?.[1] ? dayjs(query.range[1]).format('YYYY-MM-DD') : undefined
   })
-  const elderPage: PageResult<ElderItem> = await getElderPage({ pageNo: 1, pageSize: 500 })
+  const elderPage: PageResult<ElderItem> = await getElderPage({ pageNo: 1, pageSize: 500, status: 1, elderStatus: 1 })
   elders.value = elderPage.list || []
 }
 

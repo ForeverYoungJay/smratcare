@@ -96,6 +96,10 @@ export function getDiningMealOrderPage(params: any) {
   return fetchPage<DiningMealOrder>('/api/life/dining/order/page', params)
 }
 
+export function getDiningMealOrderList(params: any) {
+  return request.get<DiningMealOrder[]>('/api/life/dining/order/list', { params })
+}
+
 export function createDiningMealOrder(data: Partial<DiningMealOrder>) {
   return request.post<DiningMealOrder>('/api/life/dining/order', data)
 }

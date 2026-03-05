@@ -51,9 +51,11 @@
               <a-select
                 v-model:value="form.elderId"
                 show-search
+                :filter-option="false"
                 :options="elderOptions"
-                option-filter-prop="label"
                 placeholder="请选择老人"
+                @search="loadElders"
+                @focus="() => !elderOptions.length && loadElders('')"
                 @change="onElderChange"
               />
             </a-form-item>
@@ -163,7 +165,7 @@ import {
   getDiningOrderStatusColor,
   getDiningOrderStatusLabel
 } from '../../constants/dining'
-import { getElderPage } from '../../api/elder'
+import { useElderOptions } from '../../composables/useElderOptions'
 import {
   getDiningMealOrderPage,
   createDiningMealOrder,
@@ -194,7 +196,11 @@ const query = reactive({
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const editOpen = ref(false)
 const saving = ref(false)
-const elderOptions = ref<{ label: string; value: number }[]>([])
+const { elderOptions, searchElders: loadElderOptions, ensureSelectedElder } = useElderOptions({
+  pageSize: 120,
+  preloadSize: 400,
+  inHospitalOnly: true
+})
 const dishOptions = ref<{ label: string; value: number; price: number }[]>([])
 const prepZoneOptions = ref<{ label: string; value: number; name: string }[]>([])
 const deliveryAreaOptions = ref<{ label: string; value: number; name: string }[]>([])
@@ -262,12 +268,8 @@ async function fetchData() {
   }
 }
 
-async function loadElders() {
-  const page = await getElderPage({ pageNo: 1, pageSize: 200 })
-  elderOptions.value = (page.list || []).map((item: any) => ({
-    label: `${item.fullName || item.elderName || item.name}(${item.id})`,
-    value: Number(item.id)
-  }))
+async function loadElders(keyword?: string) {
+  await loadElderOptions(String(keyword || ''))
 }
 
 async function loadDishOptions() {
@@ -299,7 +301,27 @@ async function loadDeliveryAreas() {
 
 function onElderChange(value: number) {
   const selected = elderOptions.value.find((item) => item.value === value)
-  form.elderName = selected?.label?.split('(')[0] || ''
+  form.elderName = selected?.name || selected?.label || ''
+}
+
+async function ensureValidElderSelection() {
+  if (!form.elderId) {
+    message.error('请选择老人')
+    return false
+  }
+  const elderId = Number(form.elderId)
+  if (elderOptions.value.some((item) => Number(item.value) === elderId)) {
+    return true
+  }
+  await loadElders(form.elderName || undefined)
+  ensureSelectedElder(elderId, form.elderName)
+  if (elderOptions.value.some((item) => Number(item.value) === elderId)) {
+    return true
+  }
+  form.elderId = undefined
+  form.elderName = ''
+  message.error('所选老人不存在或不在当前机构，请重新选择')
+  return false
 }
 
 function onMealTypeChange() {
@@ -395,6 +417,9 @@ async function runRiskCheck() {
     message.error(DINING_MESSAGES.requiredOrderMealDish)
     return
   }
+  if (!(await ensureValidElderSelection())) {
+    return
+  }
   riskResult.value = await checkDiningMealOrderRisk({
     elderId: form.elderId,
     elderName: form.elderName,
@@ -428,6 +453,9 @@ async function applyOverride() {
 async function submit() {
   if (!form.elderId || !form.orderDate || !form.mealType || form.dishIdList.length === 0) {
     message.error(DINING_MESSAGES.requiredOrderFields)
+    return
+  }
+  if (!(await ensureValidElderSelection())) {
     return
   }
   saving.value = true

@@ -26,6 +26,7 @@ public class ShiftHandover {
   private String status;
   private LocalDateTime handoverTime;
   private LocalDateTime confirmTime;
+  private String attachmentUrls;
   private Long createdBy;
   @TableField(value = "create_time", fill = FieldFill.INSERT)
   private LocalDateTime createTime;

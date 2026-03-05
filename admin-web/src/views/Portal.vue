@@ -6,6 +6,20 @@
           <div class="hero-left">
             <div class="hero-title">您好，{{ userStore.staffInfo?.realName || '管理员' }}</div>
             <div class="hero-subtitle">当前时间 {{ refreshedAt || '--' }}，优先处理“我的待办”可显著降低超时风险。</div>
+            <div class="hero-kpis">
+              <div class="hero-kpi-item">
+                <span class="hero-kpi-label">待办总量</span>
+                <strong class="hero-kpi-value">{{ totalTodoCount }}</strong>
+              </div>
+              <div class="hero-kpi-item">
+                <span class="hero-kpi-label">风险提醒</span>
+                <strong class="hero-kpi-value">{{ activeRiskCount }}</strong>
+              </div>
+              <div class="hero-kpi-item">
+                <span class="hero-kpi-label">今日日程</span>
+                <strong class="hero-kpi-value">{{ todayAgenda.length }}</strong>
+              </div>
+            </div>
             <div class="hero-search">
               <a-auto-complete
                 v-model:value="searchKeyword"
@@ -20,17 +34,20 @@
               </a-auto-complete>
             </div>
           </div>
-          <a-space>
-            <a-button @click="init">刷新首页</a-button>
-            <a-button @click="openModuleCustomize">自定义首页</a-button>
-            <a-button @click="openCustomCardEditor()">新增卡面</a-button>
-            <a-button type="primary" @click="go('/oa/todo')">进入待办中心</a-button>
-          </a-space>
+          <div class="hero-actions">
+            <a-space wrap>
+              <a-button @click="init">刷新首页</a-button>
+              <a-button @click="openModuleCustomize">自定义首页</a-button>
+              <a-button @click="openCustomCardEditor()">新增卡面</a-button>
+              <a-button type="primary" @click="go('/oa/todo')">进入待办中心</a-button>
+            </a-space>
+            <div class="hero-actions-tip">支持卡片拖拽排序、角色可见范围、导入导出配置</div>
+          </div>
         </a-card>
 
-        <a-row :gutter="[12, 12]" v-if="showRowTodoReminder" :style="{ order: sectionOrder(['todo', 'reminder']) }">
+        <a-row :gutter="[12, 12]" v-if="showRowTodoReminder" class="section-row" :style="{ order: sectionOrder(['todo', 'reminder']) }">
           <a-col :xs="24" :xl="14" :style="{ order: moduleOrder('todo') }">
-            <a-card v-if="isModuleVisible('todo')" :bordered="false" class="card-elevated full-height" title="1️⃣ 我的待办（最重要）">
+            <a-card v-if="isModuleVisible('todo')" :bordered="false" class="card-elevated full-height module-card" :style="moduleCardStyle('todo')" title="1️⃣ 我的待办（最重要）">
               <template #extra>
                 <a-tag color="processing">总待办 {{ totalTodoCount }}</a-tag>
               </template>
@@ -56,11 +73,14 @@
                 <a-button @click="go('/oa/approval')">批量审批</a-button>
                 <a-button @click="go('/logistics/task-center')">打开任务中心</a-button>
               </a-space>
+              <div class="module-resize-handle module-resize-right" @mousedown.stop.prevent="startResizeModuleCard('todo', 'right', $event)" />
+              <div class="module-resize-handle module-resize-bottom" @mousedown.stop.prevent="startResizeModuleCard('todo', 'bottom', $event)" />
+              <div class="module-resize-handle module-resize-corner" @mousedown.stop.prevent="startResizeModuleCard('todo', 'corner', $event)" />
             </a-card>
           </a-col>
 
           <a-col :xs="24" :xl="10" :style="{ order: moduleOrder('reminder') }">
-            <a-card v-if="isModuleVisible('reminder')" :bordered="false" class="card-elevated full-height" title="2️⃣ 提醒中心（系统预警）">
+            <a-card v-if="isModuleVisible('reminder')" :bordered="false" class="card-elevated full-height module-card" :style="moduleCardStyle('reminder')" title="2️⃣ 提醒中心（系统预警）">
               <a-list size="small" :data-source="riskReminders" :locale="{ emptyText: '暂无提醒' }">
                 <template #renderItem="{ item }">
                   <a-list-item>
@@ -80,6 +100,9 @@
                 <a-tag color="orange">橙色：预警</a-tag>
                 <a-tag color="blue">蓝色：普通通知</a-tag>
               </div>
+              <div class="module-resize-handle module-resize-right" @mousedown.stop.prevent="startResizeModuleCard('reminder', 'right', $event)" />
+              <div class="module-resize-handle module-resize-bottom" @mousedown.stop.prevent="startResizeModuleCard('reminder', 'bottom', $event)" />
+              <div class="module-resize-handle module-resize-corner" @mousedown.stop.prevent="startResizeModuleCard('reminder', 'corner', $event)" />
             </a-card>
           </a-col>
         </a-row>
@@ -87,8 +110,8 @@
         <a-card
           v-if="isModuleVisible('quickLaunch')"
           :bordered="false"
-          class="card-elevated"
-          :style="{ order: sectionOrder(['quickLaunch']) }"
+          class="card-elevated module-card"
+          :style="[moduleCardStyle('quickLaunch'), { order: sectionOrder(['quickLaunch']) }]"
           title="3️⃣ 快捷发起（操作入口）"
         >
           <a-row :gutter="[12, 12]">
@@ -103,13 +126,16 @@
               </div>
             </a-col>
           </a-row>
+          <div class="module-resize-handle module-resize-right" @mousedown.stop.prevent="startResizeModuleCard('quickLaunch', 'right', $event)" />
+          <div class="module-resize-handle module-resize-bottom" @mousedown.stop.prevent="startResizeModuleCard('quickLaunch', 'bottom', $event)" />
+          <div class="module-resize-handle module-resize-corner" @mousedown.stop.prevent="startResizeModuleCard('quickLaunch', 'corner', $event)" />
         </a-card>
 
         <a-card
           v-if="isModuleVisible('customCards')"
           :bordered="false"
-          class="card-elevated"
-          :style="{ order: sectionOrder(['customCards']) }"
+          class="card-elevated module-card"
+          :style="[moduleCardStyle('customCards'), { order: sectionOrder(['customCards']) }]"
           title="🧩 我的自定义卡面"
         >
           <template #extra>
@@ -126,7 +152,7 @@
           </template>
           <a-row :gutter="[12, 12]">
             <a-col :xs="24" :sm="12" :xl="6" v-for="item in filteredCustomCards" :key="item.id">
-              <div class="custom-card-item" :style="{ borderTopColor: item.themeColor || '#1677ff' }" @click="handleCustomCardClick(item)">
+              <div class="custom-card-item" :style="customCardItemStyle(item)" @click="handleCustomCardClick(item)">
                 <div class="custom-card-title">{{ item.icon || '🧩' }} {{ item.title }}</div>
                 <div class="custom-card-route">{{ item.route }}</div>
                 <div class="custom-card-desc">{{ item.description || '点击快速进入' }}</div>
@@ -138,17 +164,23 @@
                   <a-button type="link" size="small" @click="duplicateCustomCard(item.id)">复制</a-button>
                   <a-button type="link" danger size="small" @click="removeCustomCard(item.id)">删除</a-button>
                 </div>
+                <div class="resize-handle resize-right" @mousedown.stop.prevent="startResizeCustomCard(item.id, 'right', $event)" />
+                <div class="resize-handle resize-bottom" @mousedown.stop.prevent="startResizeCustomCard(item.id, 'bottom', $event)" />
+                <div class="resize-handle resize-corner" @mousedown.stop.prevent="startResizeCustomCard(item.id, 'corner', $event)" />
               </div>
             </a-col>
             <a-col v-if="!filteredCustomCards.length" :span="24">
               <a-empty description="暂无自定义卡面，可点击右上角“新增卡面”" />
             </a-col>
           </a-row>
+          <div class="module-resize-handle module-resize-right" @mousedown.stop.prevent="startResizeModuleCard('customCards', 'right', $event)" />
+          <div class="module-resize-handle module-resize-bottom" @mousedown.stop.prevent="startResizeModuleCard('customCards', 'bottom', $event)" />
+          <div class="module-resize-handle module-resize-corner" @mousedown.stop.prevent="startResizeModuleCard('customCards', 'corner', $event)" />
         </a-card>
 
-        <a-row :gutter="[12, 12]" v-if="showRowOperation" :style="{ order: sectionOrder(['operation', 'finance', 'salesFunnel']) }">
+        <a-row :gutter="[12, 12]" v-if="showRowOperation" class="section-row" :style="{ order: sectionOrder(['operation', 'finance', 'salesFunnel']) }">
           <a-col :xs="24" :xl="8" :style="{ order: moduleOrder('operation') }">
-            <a-card v-if="isModuleVisible('operation')" :bordered="false" class="card-elevated full-height" title="4️⃣ 今日运营概览（核心KPI）">
+            <a-card v-if="isModuleVisible('operation')" :bordered="false" class="card-elevated full-height module-card" :style="moduleCardStyle('operation')" title="4️⃣ 今日运营概览（核心KPI）">
               <a-row :gutter="[10, 10]">
                 <a-col :span="12" v-for="item in operationOverview" :key="item.title">
                   <div class="metric-cell" @click="item.route ? go(item.route) : undefined">
@@ -157,11 +189,14 @@
                   </div>
                 </a-col>
               </a-row>
+              <div class="module-resize-handle module-resize-right" @mousedown.stop.prevent="startResizeModuleCard('operation', 'right', $event)" />
+              <div class="module-resize-handle module-resize-bottom" @mousedown.stop.prevent="startResizeModuleCard('operation', 'bottom', $event)" />
+              <div class="module-resize-handle module-resize-corner" @mousedown.stop.prevent="startResizeModuleCard('operation', 'corner', $event)" />
             </a-card>
           </a-col>
 
           <a-col :xs="24" :xl="8" :style="{ order: moduleOrder('finance') }">
-            <a-card v-if="isModuleVisible('finance')" :bordered="false" class="card-elevated full-height" title="5️⃣ 财务运营概览">
+            <a-card v-if="isModuleVisible('finance')" :bordered="false" class="card-elevated full-height module-card" :style="moduleCardStyle('finance')" title="5️⃣ 财务运营概览">
               <a-row :gutter="[10, 10]">
                 <a-col :span="12" v-for="item in financeOverviewItems" :key="item.title">
                   <div class="metric-cell" @click="item.route ? go(item.route) : undefined">
@@ -171,11 +206,14 @@
                 </a-col>
               </a-row>
               <a-button type="link" style="padding-left: 0; margin-top: 8px;" @click="go('/finance/reports/overall')">点击 → 财务分析</a-button>
+              <div class="module-resize-handle module-resize-right" @mousedown.stop.prevent="startResizeModuleCard('finance', 'right', $event)" />
+              <div class="module-resize-handle module-resize-bottom" @mousedown.stop.prevent="startResizeModuleCard('finance', 'bottom', $event)" />
+              <div class="module-resize-handle module-resize-corner" @mousedown.stop.prevent="startResizeModuleCard('finance', 'corner', $event)" />
             </a-card>
           </a-col>
 
           <a-col :xs="24" :xl="8" :style="{ order: moduleOrder('salesFunnel') }">
-            <a-card v-if="isModuleVisible('salesFunnel')" :bordered="false" class="card-elevated full-height" title="6️⃣ 销售运营漏斗">
+            <a-card v-if="isModuleVisible('salesFunnel')" :bordered="false" class="card-elevated full-height module-card" :style="moduleCardStyle('salesFunnel')" title="6️⃣ 销售运营漏斗">
               <a-row :gutter="[10, 10]">
                 <a-col :span="12" v-for="item in salesFunnelItems" :key="item.title">
                   <div class="metric-cell" @click="go(item.route)">
@@ -185,13 +223,16 @@
                 </a-col>
               </a-row>
               <v-chart :option="funnelOption" autoresize class="funnel-chart" />
+              <div class="module-resize-handle module-resize-right" @mousedown.stop.prevent="startResizeModuleCard('salesFunnel', 'right', $event)" />
+              <div class="module-resize-handle module-resize-bottom" @mousedown.stop.prevent="startResizeModuleCard('salesFunnel', 'bottom', $event)" />
+              <div class="module-resize-handle module-resize-corner" @mousedown.stop.prevent="startResizeModuleCard('salesFunnel', 'corner', $event)" />
             </a-card>
           </a-col>
         </a-row>
 
-        <a-row :gutter="[12, 12]" v-if="showRowStatusExpense" :style="{ order: sectionOrder(['bedStatus', 'expense']) }">
+        <a-row :gutter="[12, 12]" v-if="showRowStatusExpense" class="section-row" :style="{ order: sectionOrder(['bedStatus', 'expense']) }">
           <a-col :xs="24" :xl="10" :style="{ order: moduleOrder('bedStatus') }">
-            <a-card v-if="isModuleVisible('bedStatus')" :bordered="false" class="card-elevated full-height" title="7️⃣ 床位与长者状态">
+            <a-card v-if="isModuleVisible('bedStatus')" :bordered="false" class="card-elevated full-height module-card" :style="moduleCardStyle('bedStatus')" title="7️⃣ 床位与长者状态">
               <a-row :gutter="[10, 10]">
                 <a-col :span="8" v-for="item in bedAndElderStatusItems" :key="item.title">
                   <div class="metric-cell" @click="go(item.route)">
@@ -201,11 +242,14 @@
                 </a-col>
               </a-row>
               <a-button type="link" style="padding-left: 0; margin-top: 8px;" @click="go('/elder/bed-panorama')">点击 → 床态全景</a-button>
+              <div class="module-resize-handle module-resize-right" @mousedown.stop.prevent="startResizeModuleCard('bedStatus', 'right', $event)" />
+              <div class="module-resize-handle module-resize-bottom" @mousedown.stop.prevent="startResizeModuleCard('bedStatus', 'bottom', $event)" />
+              <div class="module-resize-handle module-resize-corner" @mousedown.stop.prevent="startResizeModuleCard('bedStatus', 'corner', $event)" />
             </a-card>
           </a-col>
 
           <a-col :xs="24" :xl="14" :style="{ order: moduleOrder('expense') }">
-            <a-card v-if="isModuleVisible('expense')" :bordered="false" class="card-elevated full-height" title="8️⃣ 费用管理（我的费用 / 部门费用 / 发票夹）">
+            <a-card v-if="isModuleVisible('expense')" :bordered="false" class="card-elevated full-height module-card" :style="moduleCardStyle('expense')" title="8️⃣ 费用管理（我的费用 / 部门费用 / 发票夹）">
               <a-row :gutter="[10, 10]">
                 <a-col :xs="24" :md="8" v-for="group in expenseSections" :key="group.title">
                   <div class="expense-block">
@@ -217,6 +261,9 @@
                   </div>
                 </a-col>
               </a-row>
+              <div class="module-resize-handle module-resize-right" @mousedown.stop.prevent="startResizeModuleCard('expense', 'right', $event)" />
+              <div class="module-resize-handle module-resize-bottom" @mousedown.stop.prevent="startResizeModuleCard('expense', 'bottom', $event)" />
+              <div class="module-resize-handle module-resize-corner" @mousedown.stop.prevent="startResizeModuleCard('expense', 'corner', $event)" />
             </a-card>
           </a-col>
         </a-row>
@@ -224,8 +271,8 @@
         <a-card
           v-if="isModuleVisible('calendar')"
           :bordered="false"
-          class="card-elevated"
-          :style="{ order: sectionOrder(['calendar']) }"
+          class="card-elevated module-card"
+          :style="[moduleCardStyle('calendar'), { order: sectionOrder(['calendar']) }]"
           title="9️⃣ 行政日历 / 协同日历"
         >
           <template #extra>
@@ -261,22 +308,28 @@
               <a-button type="link" @click="go('/oa/approval?type=LEAVE')">请假审批看板</a-button>
             </a-space>
           </div>
+          <div class="module-resize-handle module-resize-right" @mousedown.stop.prevent="startResizeModuleCard('calendar', 'right', $event)" />
+          <div class="module-resize-handle module-resize-bottom" @mousedown.stop.prevent="startResizeModuleCard('calendar', 'bottom', $event)" />
+          <div class="module-resize-handle module-resize-corner" @mousedown.stop.prevent="startResizeModuleCard('calendar', 'corner', $event)" />
         </a-card>
 
         <a-card
           v-if="isModuleVisible('dataEntry')"
           :bordered="false"
-          class="card-elevated"
-          :style="{ order: sectionOrder(['dataEntry']) }"
+          class="card-elevated module-card"
+          :style="[moduleCardStyle('dataEntry'), { order: sectionOrder(['dataEntry']) }]"
           title="🔟 数据分析入口"
         >
           <div class="hint-text">首页不放复杂图表，仅提供分析入口。</div>
           <a-space wrap style="margin-top: 8px;">
-            <a-button type="primary" ghost @click="go('/stats/org/monthly-operation')">运营分析</a-button>
-            <a-button type="primary" ghost @click="go('/finance/reports/overall')">财务分析</a-button>
-            <a-button type="primary" ghost @click="go('/medical-care/nursing-quality')">医护质量</a-button>
-            <a-button type="primary" ghost @click="go('/marketing/reports/conversion')">销售分析</a-button>
+            <a-button type="primary"  @click="go('/stats/org/monthly-operation')">运营分析</a-button>
+            <a-button type="primary"  @click="go('/finance/reports/overall')">财务分析</a-button>
+            <a-button type="primary"  @click="go('/medical-care/nursing-quality')">医护质量</a-button>
+            <a-button type="primary"  @click="go('/marketing/reports/conversion')">销售分析</a-button>
           </a-space>
+          <div class="module-resize-handle module-resize-right" @mousedown.stop.prevent="startResizeModuleCard('dataEntry', 'right', $event)" />
+          <div class="module-resize-handle module-resize-bottom" @mousedown.stop.prevent="startResizeModuleCard('dataEntry', 'bottom', $event)" />
+          <div class="module-resize-handle module-resize-corner" @mousedown.stop.prevent="startResizeModuleCard('dataEntry', 'corner', $event)" />
         </a-card>
       </div>
     </StatefulBlock>
@@ -505,6 +558,7 @@
           v-for="(item, index) in moduleConfigDraft"
           :key="item.key"
           class="manage-card-item"
+          :class="{ 'is-dragging': draggingModuleKey === item.key }"
           draggable="true"
           @dragstart="onModuleDragStart(item.key)"
           @dragover.prevent
@@ -539,6 +593,7 @@
       <div class="calendar-actions">
         <a-space wrap>
           <a-button @click="resetModuleCustomize">恢复默认</a-button>
+          <a-button @click="resetAllModuleCardSizes">重置模块尺寸</a-button>
           <a-button danger @click="resetAllHomepageCustomize">恢复全部默认</a-button>
           <a-button @click="exportHomepageCustomize">导出配置</a-button>
           <a-button @click="importPayloadOpen = true">导入配置</a-button>
@@ -559,6 +614,7 @@
       <a-space wrap style="margin-bottom: 10px;">
         <a-button type="primary" @click="openCustomCardEditor()">新增卡面</a-button>
         <a-button @click="resetCustomCards">恢复默认卡面</a-button>
+        <a-button @click="resetAllCustomCardSizes">重置卡面尺寸</a-button>
         <a-button @click="addRecentRouteAsCards">导入最近访问</a-button>
         <a-switch v-model:checked="customCardGroupMode" checked-children="分组" un-checked-children="平铺" />
       </a-space>
@@ -586,6 +642,7 @@
               v-for="item in group.list"
               :key="item.id"
               class="manage-card-item"
+              :class="{ 'is-dragging': draggingCustomCardId === item.id }"
               draggable="true"
               @dragstart="onCustomCardDragStart(item.id)"
               @dragover.prevent="onCustomCardDragOver(item.id)"
@@ -611,6 +668,7 @@
           v-for="item in manageFilteredCustomCards"
           :key="item.id"
           class="manage-card-item"
+          :class="{ 'is-dragging': draggingCustomCardId === item.id }"
           draggable="true"
           @dragstart="onCustomCardDragStart(item.id)"
           @dragover.prevent="onCustomCardDragOver(item.id)"
@@ -712,11 +770,15 @@
         <div class="hint-text">导入支持字段：`moduleConfig`、`customCards`，缺失字段将按默认补全。</div>
       </a-space>
     </a-modal>
+
+    <div v-if="resizeIndicator.visible" class="resize-indicator" :style="{ left: `${resizeIndicator.x}px`, top: `${resizeIndicator.y}px` }">
+      {{ resizeIndicator.text }}
+    </div>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
 import { message, Modal } from 'ant-design-vue'
@@ -777,6 +839,15 @@ const importPayloadOpen = ref(false)
 const exportPayloadText = ref('')
 const importPayloadText = ref('')
 const customCardManageKeyword = ref('')
+const resizeIndicator = reactive({
+  visible: false,
+  text: '',
+  x: 0,
+  y: 0
+})
+let portalSyncTimer: number | undefined
+let portalVisibleHandler: (() => void) | null = null
+const suppressCardClickUntil = ref(0)
 
 type AudienceCode = 'ALL' | 'DIRECTOR' | 'NURSE' | 'FINANCE' | 'ADMIN' | 'HR' | 'OPS'
 
@@ -800,6 +871,8 @@ interface PortalModuleConfigItem {
   visible: boolean
   order: number
   audience: AudienceCode[]
+  width?: number
+  height?: number
 }
 
 const portalModuleCatalog: Array<Omit<PortalModuleConfigItem, 'visible' | 'order'>> = [
@@ -817,10 +890,10 @@ const portalModuleCatalog: Array<Omit<PortalModuleConfigItem, 'visible' | 'order
 ]
 
 const moduleConfig = ref<PortalModuleConfigItem[]>(
-  portalModuleCatalog.map((item, index) => ({ ...item, visible: true, order: index }))
+  portalModuleCatalog.map((item, index) => ({ ...item, visible: true, order: index, width: undefined, height: undefined }))
 )
 const moduleConfigDraft = ref<PortalModuleConfigItem[]>(
-  portalModuleCatalog.map((item, index) => ({ ...item, visible: true, order: index }))
+  portalModuleCatalog.map((item, index) => ({ ...item, visible: true, order: index, width: undefined, height: undefined }))
 )
 
 interface PortalCustomCardItem {
@@ -834,6 +907,8 @@ interface PortalCustomCardItem {
   category: 'OPS' | 'CARE' | 'FINANCE' | 'OA' | 'CUSTOM'
   visible: boolean
   audience: AudienceCode[]
+  width?: number
+  height?: number
 }
 
 interface PortalCustomCardTemplate {
@@ -849,10 +924,10 @@ interface PortalCustomCardTemplate {
 }
 
 const defaultCustomCards: PortalCustomCardItem[] = [
-  { id: 'elder-overview', title: '长者总览', route: '/elder/in-hospital-overview', description: '快速查看在住长者信息', themeColor: '#1677ff', openMode: 'current', icon: '👴', category: 'OPS', visible: true, audience: ['ALL'] },
-  { id: 'bed-panorama', title: '床态全景', route: '/elder/bed-panorama', description: '查看空床、清洁中与占用床位', themeColor: '#13c2c2', openMode: 'current', icon: '🛏️', category: 'OPS', visible: true, audience: ['ALL'] },
-  { id: 'finance-risk', title: '欠费看板', route: '/finance/bills/in-resident?filter=overdue', description: '快速追踪欠费风险', themeColor: '#fa8c16', openMode: 'current', icon: '💰', category: 'FINANCE', visible: true, audience: ['FINANCE', 'DIRECTOR', 'ADMIN'] },
-  { id: 'oa-calendar', title: '协同日历', route: '/oa/work-execution/calendar', description: '查看个人/部门/协同计划', themeColor: '#722ed1', openMode: 'current', icon: '📅', category: 'OA', visible: true, audience: ['ALL'] }
+  { id: 'elder-overview', title: '长者总览', route: '/elder/in-hospital-overview', description: '快速查看在住长者信息', themeColor: '#1677ff', openMode: 'current', icon: '👴', category: 'OPS', visible: true, audience: ['ALL'], height: 168 },
+  { id: 'bed-panorama', title: '床态全景', route: '/elder/bed-panorama', description: '查看空床、清洁中与占用床位', themeColor: '#13c2c2', openMode: 'current', icon: '🛏️', category: 'OPS', visible: true, audience: ['ALL'], height: 168 },
+  { id: 'finance-risk', title: '欠费看板', route: '/finance/bills/in-resident?filter=overdue', description: '快速追踪欠费风险', themeColor: '#fa8c16', openMode: 'current', icon: '💰', category: 'FINANCE', visible: true, audience: ['FINANCE', 'DIRECTOR', 'ADMIN'], height: 168 },
+  { id: 'oa-calendar', title: '协同日历', route: '/oa/work-execution/calendar', description: '查看个人/部门/协同计划', themeColor: '#722ed1', openMode: 'current', icon: '📅', category: 'OA', visible: true, audience: ['ALL'], height: 168 }
 ]
 
 const customCards = ref<PortalCustomCardItem[]>([])
@@ -910,6 +985,24 @@ const customCardAudienceOptions = [
 ]
 
 const moduleAudienceOptions = [...customCardAudienceOptions]
+const resizingCustomCard = reactive({
+  id: '',
+  direction: '' as '' | 'right' | 'bottom' | 'corner',
+  startX: 0,
+  startY: 0,
+  startWidth: 0,
+  startHeight: 0,
+  moved: false
+})
+const resizingModuleCard = reactive({
+  key: '' as '' | PortalModuleKey,
+  direction: '' as '' | 'right' | 'bottom' | 'corner',
+  startX: 0,
+  startY: 0,
+  startWidth: 0,
+  startHeight: 0,
+  moved: false
+})
 
 const summary = reactive<OaPortalSummary>({
   notices: [],
@@ -1148,6 +1241,7 @@ const riskReminders = computed(() => {
     { title: '合同到期', count: contractExpiringCount, route: '/hr/profile/contract-reminders', level: contractExpiringCount > 0 ? '预警' : '普通通知' }
   ]
 })
+const activeRiskCount = computed(() => riskReminders.value.reduce((sum, item) => sum + Number(item.count || 0), 0))
 
 const quickLaunchGroups = [
   {
@@ -1454,7 +1548,156 @@ function go(path: string, forceNewTab = false) {
 }
 
 function handleCustomCardClick(item: PortalCustomCardItem) {
+  if (Date.now() < suppressCardClickUntil.value) return
   go(item.route, item.openMode === 'new')
+}
+
+function clampCustomCardWidth(value: number) {
+  return Math.max(170, Math.min(360, snapResizeValue(value, 10)))
+}
+
+function clampCustomCardHeight(value: number) {
+  return Math.max(138, Math.min(320, snapResizeValue(value, 8)))
+}
+
+function clampModuleCardWidth(value: number) {
+  return Math.max(260, Math.min(1200, snapResizeValue(value, 12)))
+}
+
+function clampModuleCardHeight(value: number) {
+  return Math.max(180, Math.min(880, snapResizeValue(value, 10)))
+}
+
+function snapResizeValue(value: number, step: number) {
+  return Math.round(value / step) * step
+}
+
+function showResizeIndicator(event: MouseEvent, width?: number, height?: number) {
+  const parts = []
+  if (width != null) parts.push(`宽 ${width}px`)
+  if (height != null) parts.push(`高 ${height}px`)
+  resizeIndicator.text = parts.join(' · ')
+  resizeIndicator.x = event.clientX + 16
+  resizeIndicator.y = event.clientY + 12
+  resizeIndicator.visible = true
+}
+
+function hideResizeIndicator() {
+  resizeIndicator.visible = false
+  resizeIndicator.text = ''
+}
+
+function moduleCardStyle(key: PortalModuleKey) {
+  const matched = moduleConfig.value.find((item) => item.key === key)
+  const width = matched?.width ? clampModuleCardWidth(matched.width) : undefined
+  const height = matched?.height ? clampModuleCardHeight(matched.height) : undefined
+  return {
+    width: width ? `${width}px` : '100%',
+    maxWidth: '100%',
+    minHeight: height ? `${height}px` : undefined
+  }
+}
+
+function customCardItemStyle(item: PortalCustomCardItem) {
+  return {
+    borderTopColor: item.themeColor || '#1677ff',
+    width: item.width ? `${clampCustomCardWidth(item.width)}px` : '100%',
+    maxWidth: '100%',
+    height: item.height ? `${clampCustomCardHeight(item.height)}px` : '168px'
+  }
+}
+
+function startResizeModuleCard(key: PortalModuleKey, direction: 'right' | 'bottom' | 'corner', event: MouseEvent) {
+  const handleEl = event.currentTarget as HTMLElement | null
+  const cardEl = handleEl?.closest('.module-card') as HTMLElement | null
+  const target = moduleConfig.value.find((item) => item.key === key)
+  if (!cardEl || !target) return
+  resizingModuleCard.key = key
+  resizingModuleCard.direction = direction
+  resizingModuleCard.startX = event.clientX
+  resizingModuleCard.startY = event.clientY
+  resizingModuleCard.startWidth = target.width || cardEl.getBoundingClientRect().width
+  resizingModuleCard.startHeight = target.height || cardEl.getBoundingClientRect().height
+  resizingModuleCard.moved = false
+  document.body.classList.add('resizing-active')
+}
+
+function startResizeCustomCard(id: string, direction: 'right' | 'bottom' | 'corner', event: MouseEvent) {
+  const handleEl = event.currentTarget as HTMLElement | null
+  const cardEl = handleEl?.parentElement as HTMLElement | null
+  const target = customCards.value.find((item) => item.id === id)
+  if (!cardEl || !target) return
+  resizingCustomCard.id = id
+  resizingCustomCard.direction = direction
+  resizingCustomCard.startX = event.clientX
+  resizingCustomCard.startY = event.clientY
+  resizingCustomCard.startWidth = target.width || cardEl.getBoundingClientRect().width
+  resizingCustomCard.startHeight = target.height || cardEl.getBoundingClientRect().height
+  resizingCustomCard.moved = false
+  document.body.classList.add('resizing-active')
+}
+
+function onCustomCardResizeMove(event: MouseEvent) {
+  if (!resizingCustomCard.id || !resizingCustomCard.direction) return
+  const deltaX = event.clientX - resizingCustomCard.startX
+  const deltaY = event.clientY - resizingCustomCard.startY
+  const useWidth = resizingCustomCard.direction === 'right' || resizingCustomCard.direction === 'corner'
+  const useHeight = resizingCustomCard.direction === 'bottom' || resizingCustomCard.direction === 'corner'
+  if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) resizingCustomCard.moved = true
+  const nextWidth = useWidth ? clampCustomCardWidth(resizingCustomCard.startWidth + deltaX) : undefined
+  const nextHeight = useHeight ? clampCustomCardHeight(resizingCustomCard.startHeight + deltaY) : undefined
+  customCards.value = customCards.value.map((item) => {
+    if (item.id !== resizingCustomCard.id) return item
+    return {
+      ...item,
+      width: useWidth ? nextWidth : item.width,
+      height: useHeight ? nextHeight : item.height
+    }
+  })
+  showResizeIndicator(event, useWidth ? nextWidth : undefined, useHeight ? nextHeight : undefined)
+}
+
+function onCustomCardResizeEnd() {
+  if (!resizingCustomCard.id) return
+  if (resizingCustomCard.moved) {
+    suppressCardClickUntil.value = Date.now() + 220
+    persistCustomCards()
+  }
+  resizingCustomCard.id = ''
+  resizingCustomCard.direction = ''
+  if (!resizingModuleCard.key) document.body.classList.remove('resizing-active')
+  hideResizeIndicator()
+}
+
+function onModuleCardResizeMove(event: MouseEvent) {
+  if (!resizingModuleCard.key || !resizingModuleCard.direction) return
+  const deltaX = event.clientX - resizingModuleCard.startX
+  const deltaY = event.clientY - resizingModuleCard.startY
+  const useWidth = resizingModuleCard.direction === 'right' || resizingModuleCard.direction === 'corner'
+  const useHeight = resizingModuleCard.direction === 'bottom' || resizingModuleCard.direction === 'corner'
+  if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) resizingModuleCard.moved = true
+  const nextWidth = useWidth ? clampModuleCardWidth(resizingModuleCard.startWidth + deltaX) : undefined
+  const nextHeight = useHeight ? clampModuleCardHeight(resizingModuleCard.startHeight + deltaY) : undefined
+  moduleConfig.value = moduleConfig.value.map((item) => {
+    if (item.key !== resizingModuleCard.key) return item
+    return {
+      ...item,
+      width: useWidth ? nextWidth : item.width,
+      height: useHeight ? nextHeight : item.height
+    }
+  })
+  showResizeIndicator(event, useWidth ? nextWidth : undefined, useHeight ? nextHeight : undefined)
+}
+
+function onModuleCardResizeEnd() {
+  if (!resizingModuleCard.key) return
+  if (resizingModuleCard.moved) {
+    persistModuleCustomize()
+  }
+  resizingModuleCard.key = ''
+  resizingModuleCard.direction = ''
+  if (!resizingCustomCard.id) document.body.classList.remove('resizing-active')
+  hideResizeIndicator()
 }
 
 function customCardCategoryText(category?: string) {
@@ -1723,16 +1966,24 @@ function loadModuleCustomize() {
     const visibilityMap = new Map<string, boolean>()
     const orderMap = new Map<string, number>()
     const audienceMap = new Map<string, AudienceCode[]>()
+    const widthMap = new Map<string, number | undefined>()
+    const heightMap = new Map<string, number | undefined>()
     parsed.forEach((item: any) => {
       visibilityMap.set(String(item.key), Boolean(item.visible))
       orderMap.set(String(item.key), Number(item.order))
       audienceMap.set(String(item.key), normalizeCardAudience(item.audience))
+      const width = Number(item.width)
+      const height = Number(item.height)
+      widthMap.set(String(item.key), Number.isFinite(width) ? clampModuleCardWidth(width) : undefined)
+      heightMap.set(String(item.key), Number.isFinite(height) ? clampModuleCardHeight(height) : undefined)
     })
     moduleConfig.value = portalModuleCatalog.map((item) => ({
       ...item,
       visible: visibilityMap.has(item.key) ? Boolean(visibilityMap.get(item.key)) : true,
       order: Number.isFinite(orderMap.get(item.key)) ? Number(orderMap.get(item.key)) : portalModuleCatalog.findIndex((row) => row.key === item.key),
-      audience: audienceMap.get(item.key) || normalizeCardAudience(item.audience)
+      audience: audienceMap.get(item.key) || normalizeCardAudience(item.audience),
+      width: widthMap.get(item.key),
+      height: heightMap.get(item.key)
     })).sort((a, b) => a.order - b.order).map((item, index) => ({ ...item, order: index }))
   } catch {}
 }
@@ -1741,7 +1992,14 @@ function persistModuleCustomize() {
   try {
     const simple = [...moduleConfig.value]
       .sort((a, b) => a.order - b.order)
-      .map((item, index) => ({ key: item.key, visible: item.visible, order: index, audience: normalizeCardAudience(item.audience) }))
+      .map((item, index) => ({
+        key: item.key,
+        visible: item.visible,
+        order: index,
+        audience: normalizeCardAudience(item.audience),
+        width: item.width != null ? clampModuleCardWidth(item.width) : undefined,
+        height: item.height != null ? clampModuleCardHeight(item.height) : undefined
+      }))
     localStorage.setItem(moduleStorageKey(), JSON.stringify(simple))
   } catch {}
 }
@@ -1758,7 +2016,9 @@ function applyModulePreset(preset: 'director' | 'nurse' | 'finance') {
         ...base,
         visible: true,
         order: index,
-        audience: normalizeCardAudience(base.audience)
+        audience: normalizeCardAudience(base.audience),
+        width: undefined,
+        height: undefined
       }
     })
     .filter((item): item is PortalModuleConfigItem => !!item)
@@ -1777,8 +2037,17 @@ function resetModuleCustomize() {
     ...item,
     visible: true,
     order: index,
-    audience: normalizeCardAudience(item.audience)
+    audience: normalizeCardAudience(item.audience),
+    width: undefined,
+    height: undefined
   }))
+}
+
+function resetAllModuleCardSizes() {
+  moduleConfig.value = moduleConfig.value.map((item) => ({ ...item, width: undefined, height: undefined }))
+  moduleConfigDraft.value = moduleConfigDraft.value.map((item) => ({ ...item, width: undefined, height: undefined }))
+  persistModuleCustomize()
+  message.success('模块尺寸已重置')
 }
 
 function moveModule(index: number, delta: -1 | 1) {
@@ -1819,7 +2088,13 @@ function applyModuleCustomize() {
   }
   moduleConfig.value = [...moduleConfigDraft.value]
     .sort((a, b) => a.order - b.order)
-    .map((item, index) => ({ ...item, order: index, audience: normalizeCardAudience(item.audience) }))
+    .map((item, index) => ({
+      ...item,
+      order: index,
+      audience: normalizeCardAudience(item.audience),
+      width: item.width != null ? clampModuleCardWidth(item.width) : undefined,
+      height: item.height != null ? clampModuleCardHeight(item.height) : undefined
+    }))
   persistModuleCustomize()
   moduleCustomizeOpen.value = false
   message.success('首页卡片配置已保存')
@@ -1834,13 +2109,17 @@ function resetAllHomepageCustomize() {
         ...item,
         visible: true,
         order: index,
-        audience: normalizeCardAudience(item.audience)
+        audience: normalizeCardAudience(item.audience),
+        width: undefined,
+        height: undefined
       }))
       moduleConfigDraft.value = portalModuleCatalog.map((item, index) => ({
         ...item,
         visible: true,
         order: index,
-        audience: normalizeCardAudience(item.audience)
+        audience: normalizeCardAudience(item.audience),
+        width: undefined,
+        height: undefined
       }))
       customCards.value = defaultCustomCards.map((item) => ({ ...item }))
       persistModuleCustomize()
@@ -1865,6 +2144,8 @@ function normalizeCustomCardCategory(value: unknown): 'OPS' | 'CARE' | 'FINANCE'
 }
 
 function normalizeCustomCardPayload(item: any, fallbackId: string) {
+  const rawWidth = Number(item?.width)
+  const rawHeight = Number(item?.height)
   return {
     id: String(item?.id || fallbackId),
     title: String(item?.title || ''),
@@ -1875,7 +2156,9 @@ function normalizeCustomCardPayload(item: any, fallbackId: string) {
     icon: String(item?.icon || '🧩').trim().slice(0, 2) || '🧩',
     category: normalizeCustomCardCategory(item?.category),
     visible: item?.visible !== false,
-    audience: normalizeCardAudience(item?.audience)
+    audience: normalizeCardAudience(item?.audience),
+    width: Number.isFinite(rawWidth) ? clampCustomCardWidth(rawWidth) : undefined,
+    height: Number.isFinite(rawHeight) ? clampCustomCardHeight(rawHeight) : 168
   }
 }
 
@@ -1991,7 +2274,19 @@ function saveCustomCard() {
     return
   }
   const id = `card_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-  customCards.value = [...customCards.value, { id, title, route, description, themeColor, openMode, icon, category, visible: true, audience }]
+  customCards.value = [...customCards.value, {
+    id,
+    title,
+    route,
+    description,
+    themeColor,
+    openMode,
+    icon,
+    category,
+    visible: true,
+    audience,
+    height: 168
+  }]
   persistCustomCards()
   customCardEditorOpen.value = false
   customCardEditingId.value = ''
@@ -2025,7 +2320,9 @@ function duplicateCustomCard(id: string) {
   const duplicated: PortalCustomCardItem = {
     ...source,
     id: `dup_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    title: `${source.title}（副本）`
+    title: `${source.title}（副本）`,
+    width: source.width,
+    height: source.height
   }
   customCards.value = [...customCards.value, duplicated]
   persistCustomCards()
@@ -2056,7 +2353,8 @@ function addRecentRouteAsCards() {
     icon: '🧩',
     category: 'CUSTOM' as const,
     visible: true,
-    audience: ['ALL'] as AudienceCode[]
+    audience: ['ALL'] as AudienceCode[],
+    height: 168
   }))
   customCards.value = [...customCards.value, ...next]
   persistCustomCards()
@@ -2148,13 +2446,26 @@ function resetCustomCards() {
   })
 }
 
+function resetAllCustomCardSizes() {
+  customCards.value = customCards.value.map((item) => ({ ...item, width: undefined, height: 168 }))
+  persistCustomCards()
+  message.success('卡面尺寸已重置')
+}
+
 function exportHomepageCustomize() {
   const payload = {
     version: 1,
     exportedAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
     moduleConfig: [...moduleConfig.value]
       .sort((a, b) => a.order - b.order)
-      .map((item, index) => ({ key: item.key, visible: item.visible, order: index, audience: normalizeCardAudience(item.audience) })),
+      .map((item, index) => ({
+        key: item.key,
+        visible: item.visible,
+        order: index,
+        audience: normalizeCardAudience(item.audience),
+        width: item.width != null ? clampModuleCardWidth(item.width) : undefined,
+        height: item.height != null ? clampModuleCardHeight(item.height) : undefined
+      })),
     customCards: customCards.value
   }
   exportPayloadText.value = JSON.stringify(payload, null, 2)
@@ -2187,19 +2498,27 @@ function applyImportedHomepageCustomize() {
     const visibilityMap = new Map<string, boolean>()
     const orderMap = new Map<string, number>()
     const audienceMap = new Map<string, AudienceCode[]>()
+    const widthMap = new Map<string, number | undefined>()
+    const heightMap = new Map<string, number | undefined>()
     parsed.moduleConfig.forEach((item: any, index: number) => {
       const key = String(item?.key || '')
       if (!key) return
       visibilityMap.set(key, item?.visible !== false)
       orderMap.set(key, Number.isFinite(Number(item?.order)) ? Number(item.order) : index)
       audienceMap.set(key, normalizeCardAudience(item?.audience))
+      const width = Number(item?.width)
+      const height = Number(item?.height)
+      widthMap.set(key, Number.isFinite(width) ? clampModuleCardWidth(width) : undefined)
+      heightMap.set(key, Number.isFinite(height) ? clampModuleCardHeight(height) : undefined)
     })
     moduleConfig.value = portalModuleCatalog
       .map((item, index) => ({
         ...item,
         visible: visibilityMap.has(item.key) ? Boolean(visibilityMap.get(item.key)) : true,
         order: orderMap.has(item.key) ? Number(orderMap.get(item.key)) : index,
-        audience: audienceMap.get(item.key) || normalizeCardAudience(item.audience)
+        audience: audienceMap.get(item.key) || normalizeCardAudience(item.audience),
+        width: widthMap.get(item.key),
+        height: heightMap.get(item.key)
       }))
       .sort((a, b) => a.order - b.order)
       .map((item, index) => ({ ...item, order: index }))
@@ -2472,6 +2791,22 @@ async function loadHrReminder() {
   certificateReminderCount.value = Number(certPage.total || 0)
 }
 
+async function refreshPortalModules(withCalendar = true) {
+  await loadSummary()
+  const jobs: Array<Promise<any>> = [
+    loadDashboard(),
+    loadFinanceOverview(),
+    loadSalesFunnel(),
+    loadBedAndElderStatus(),
+    loadHrReminder()
+  ]
+  if (withCalendar) {
+    jobs.push(loadCalendar())
+  }
+  await Promise.allSettled(jobs)
+  refreshedAt.value = dayjs().format('YYYY-MM-DD HH:mm:ss')
+}
+
 async function init() {
   loading.value = true
   pageError.value = ''
@@ -2484,15 +2819,8 @@ async function init() {
     loadModuleCustomize()
     loadCustomCards()
     updateSearchOptions(searchKeyword.value)
-    await Promise.all([loadSummary(), loadCalendar(), loadStaffOptions(), loadDepartmentOptions()])
-    await Promise.allSettled([
-      loadDashboard(),
-      loadFinanceOverview(),
-      loadSalesFunnel(),
-      loadBedAndElderStatus(),
-      loadHrReminder()
-    ])
-    refreshedAt.value = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    await Promise.all([loadStaffOptions(), loadDepartmentOptions()])
+    await refreshPortalModules(true)
   } catch (error: any) {
     pageError.value = error?.message || '加载首页失败'
     message.error(pageError.value)
@@ -2502,44 +2830,172 @@ async function init() {
 }
 
 useLiveSyncRefresh({
-  topics: ['elder', 'bed', 'lifecycle', 'finance', 'care', 'health', 'dining', 'marketing', 'oa', 'hr'],
+  topics: ['elder', 'bed', 'lifecycle', 'finance', 'care', 'health', 'dining', 'marketing', 'oa', 'hr', 'logistics', 'system'],
   refresh: () => {
-    init()
+    refreshPortalModules(true).catch(() => {})
   },
   debounceMs: 800
 })
 
-onMounted(init)
+onMounted(() => {
+  init()
+  if (portalSyncTimer) window.clearInterval(portalSyncTimer)
+  portalSyncTimer = window.setInterval(() => {
+    if (document.hidden) return
+    refreshPortalModules(false).catch(() => {})
+  }, 45 * 1000)
+  portalVisibleHandler = () => {
+    if (!document.hidden) refreshPortalModules(false).catch(() => {})
+  }
+  document.addEventListener('visibilitychange', portalVisibleHandler)
+  window.addEventListener('mousemove', onCustomCardResizeMove)
+  window.addEventListener('mouseup', onCustomCardResizeEnd)
+  window.addEventListener('mousemove', onModuleCardResizeMove)
+  window.addEventListener('mouseup', onModuleCardResizeEnd)
+})
+
+onBeforeUnmount(() => {
+  if (portalSyncTimer) window.clearInterval(portalSyncTimer)
+  if (portalVisibleHandler) document.removeEventListener('visibilitychange', portalVisibleHandler)
+  portalVisibleHandler = null
+  window.removeEventListener('mousemove', onCustomCardResizeMove)
+  window.removeEventListener('mouseup', onCustomCardResizeEnd)
+  window.removeEventListener('mousemove', onModuleCardResizeMove)
+  window.removeEventListener('mouseup', onModuleCardResizeEnd)
+  document.body.classList.remove('resizing-active')
+  hideResizeIndicator()
+})
 </script>
 
 <style scoped>
 .portal-page {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
+  padding: 2px;
 }
 
 .hero-card {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #eef6ff 0%, #f8fbff 55%, #ffffff 100%);
+  border: 1px solid #dbeafe;
+}
+
+.hero-left {
+  flex: 1;
+  min-width: 0;
 }
 
 .hero-title {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
-  color: #1f2937;
+  color: #0f172a;
 }
 
 .hero-subtitle {
-  margin-top: 4px;
+  margin-top: 6px;
   font-size: 13px;
-  color: var(--muted);
+  color: #475569;
+}
+
+.hero-kpis {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.hero-kpi-item {
+  min-width: 92px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 6px 10px;
+}
+
+.hero-kpi-label {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.hero-kpi-value {
+  color: #0f172a;
+  font-size: 18px;
+}
+
+.hero-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.hero-actions-tip {
+  font-size: 12px;
+  color: #64748b;
 }
 
 .hero-search {
   margin-top: 10px;
+}
+
+.section-row {
+  margin-top: 2px;
+}
+
+.module-card {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.module-card:hover {
+  border-color: #bfdbfe;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.module-resize-handle {
+  position: absolute;
+  z-index: 3;
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+
+.module-card:hover .module-resize-handle {
+  opacity: 1;
+}
+
+.module-resize-right {
+  top: 14px;
+  right: 0;
+  width: 10px;
+  height: calc(100% - 26px);
+  cursor: ew-resize;
+}
+
+.module-resize-bottom {
+  left: 14px;
+  bottom: 0;
+  width: calc(100% - 26px);
+  height: 10px;
+  cursor: ns-resize;
+}
+
+.module-resize-corner {
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  background:
+    linear-gradient(135deg, transparent 0 46%, #93c5fd 46% 54%, transparent 54% 100%);
 }
 
 .full-height {
@@ -2547,15 +3003,15 @@ onMounted(init)
 }
 
 .metric-cell {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 10px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  padding: 12px;
   cursor: pointer;
 }
 
 .metric-cell:hover {
-  border-color: #91caff;
+  border-color: #60a5fa;
   background: #f0f7ff;
 }
 
@@ -2592,9 +3048,10 @@ onMounted(init)
 }
 
 .quick-group {
-  border: 1px dashed #dbeafe;
-  border-radius: 8px;
-  padding: 10px;
+  border: 1px dashed #bfdbfe;
+  border-radius: 10px;
+  background: #f8fbff;
+  padding: 12px;
   height: 100%;
 }
 
@@ -2611,9 +3068,10 @@ onMounted(init)
 }
 
 .expense-block {
-  border: 1px solid #f1f5f9;
-  border-radius: 8px;
-  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px;
+  background: #fcfdff;
 }
 
 .expense-row {
@@ -2636,11 +3094,13 @@ onMounted(init)
 .custom-card-item {
   border: 1px solid #dbeafe;
   border-top: 3px solid #1677ff;
-  border-radius: 10px;
+  border-radius: 12px;
   background: #f8fbff;
-  padding: 10px;
+  padding: 12px;
   cursor: pointer;
   height: 100%;
+  position: relative;
+  overflow: hidden;
 }
 
 .custom-card-item:hover {
@@ -2668,6 +3128,8 @@ onMounted(init)
 
 .custom-card-actions {
   margin-top: 6px;
+  position: relative;
+  z-index: 2;
 }
 
 .custom-card-mode {
@@ -2677,6 +3139,43 @@ onMounted(init)
 .custom-card-category {
   margin-top: 6px;
   margin-left: 6px;
+}
+
+.resize-handle {
+  position: absolute;
+  z-index: 3;
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+
+.custom-card-item:hover .resize-handle {
+  opacity: 1;
+}
+
+.resize-right {
+  top: 10px;
+  right: 0;
+  width: 10px;
+  height: calc(100% - 22px);
+  cursor: ew-resize;
+}
+
+.resize-bottom {
+  left: 10px;
+  bottom: 0;
+  width: calc(100% - 22px);
+  height: 10px;
+  cursor: ns-resize;
+}
+
+.resize-corner {
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  background:
+    linear-gradient(135deg, transparent 0 46%, #93c5fd 46% 54%, transparent 54% 100%);
 }
 
 .template-tag {
@@ -2694,13 +3193,20 @@ onMounted(init)
   justify-content: space-between;
   align-items: center;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 8px;
+  border-radius: 10px;
+  padding: 10px;
   background: #fff;
 }
 
 .manage-card-item:hover {
   border-color: #91caff;
+}
+
+.manage-card-item.is-dragging {
+  border-style: dashed;
+  border-color: #2563eb;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.16);
+  background: #eff6ff;
 }
 
 .manage-card-main {
@@ -2723,6 +3229,24 @@ onMounted(init)
 .hint-text {
   color: #64748b;
   font-size: 12px;
+}
+
+:global(body.resizing-active) {
+  user-select: none;
+  cursor: nwse-resize;
+}
+
+.resize-indicator {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  background: rgba(15, 23, 42, 0.9);
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.2;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.24);
 }
 
 .calendar-toolbar {
@@ -2764,6 +3288,15 @@ onMounted(init)
   .hero-card {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .hero-actions {
+    width: 100%;
+    align-items: flex-start;
+  }
+
+  .hero-kpi-item {
+    min-width: 84px;
   }
 }
 </style>

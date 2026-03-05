@@ -62,6 +62,9 @@ export function deleteDiningDeliveryArea(id) {
 export function getDiningMealOrderPage(params) {
     return fetchPage('/api/life/dining/order/page', params);
 }
+export function getDiningMealOrderList(params) {
+    return request.get('/api/life/dining/order/list', { params });
+}
 export function createDiningMealOrder(data) {
     return request.post('/api/life/dining/order', data);
 }

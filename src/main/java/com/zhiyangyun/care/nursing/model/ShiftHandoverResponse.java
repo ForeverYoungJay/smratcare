@@ -21,4 +21,5 @@ public class ShiftHandoverResponse {
   private String status;
   private LocalDateTime handoverTime;
   private LocalDateTime confirmTime;
+  private String attachmentUrls;
 }

@@ -13,7 +13,9 @@ import com.zhiyangyun.care.life.entity.DiningMealOrder;
 import com.zhiyangyun.care.life.entity.DiningPrepZone;
 import com.zhiyangyun.care.life.entity.DiningRiskInterceptLog;
 import com.zhiyangyun.care.life.entity.DiningRiskOverride;
+import com.zhiyangyun.care.life.entity.DiningDeliveryRecord;
 import com.zhiyangyun.care.life.mapper.DiningDeliveryAreaMapper;
+import com.zhiyangyun.care.life.mapper.DiningDeliveryRecordMapper;
 import com.zhiyangyun.care.life.mapper.DiningMealOrderMapper;
 import com.zhiyangyun.care.life.mapper.DiningPrepZoneMapper;
 import com.zhiyangyun.care.life.mapper.DiningRiskInterceptLogMapper;
@@ -26,9 +28,11 @@ import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -43,6 +47,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/life/dining/order")
 public class DiningMealOrderController {
   private final DiningMealOrderMapper mealOrderMapper;
+  private final DiningDeliveryRecordMapper deliveryRecordMapper;
   private final DiningPrepZoneMapper prepZoneMapper;
   private final DiningDeliveryAreaMapper deliveryAreaMapper;
   private final DiningRiskService diningRiskService;
@@ -53,6 +58,7 @@ public class DiningMealOrderController {
 
   public DiningMealOrderController(
       DiningMealOrderMapper mealOrderMapper,
+      DiningDeliveryRecordMapper deliveryRecordMapper,
       DiningPrepZoneMapper prepZoneMapper,
       DiningDeliveryAreaMapper deliveryAreaMapper,
       DiningRiskService diningRiskService,
@@ -61,6 +67,7 @@ public class DiningMealOrderController {
       AuditLogService auditLogService,
       ObjectMapper objectMapper) {
     this.mealOrderMapper = mealOrderMapper;
+    this.deliveryRecordMapper = deliveryRecordMapper;
     this.prepZoneMapper = prepZoneMapper;
     this.deliveryAreaMapper = deliveryAreaMapper;
     this.diningRiskService = diningRiskService;
@@ -68,6 +75,53 @@ public class DiningMealOrderController {
     this.riskOverrideMapper = riskOverrideMapper;
     this.auditLogService = auditLogService;
     this.objectMapper = objectMapper;
+  }
+
+  @GetMapping("/list")
+  public Result<List<DiningMealOrder>> list(
+      @RequestParam(required = false) LocalDate date,
+      @RequestParam(defaultValue = "true") boolean pendingOnly,
+      @RequestParam(required = false) String keyword,
+      @RequestParam(defaultValue = "200") int limit) {
+    Long orgId = AuthContext.getOrgId();
+    int safeLimit = Math.max(1, Math.min(limit, 500));
+    var wrapper = Wrappers.lambdaQuery(DiningMealOrder.class)
+        .eq(DiningMealOrder::getIsDeleted, 0)
+        .eq(orgId != null, DiningMealOrder::getOrgId, orgId)
+        .eq(date != null, DiningMealOrder::getOrderDate, date);
+    if (pendingOnly) {
+      wrapper.in(DiningMealOrder::getStatus,
+          DiningConstants.ORDER_STATUS_CREATED,
+          DiningConstants.ORDER_STATUS_PREPARING,
+          DiningConstants.ORDER_STATUS_DELIVERING);
+    }
+    if (keyword != null && !keyword.isBlank()) {
+      wrapper.and(w -> w.like(DiningMealOrder::getOrderNo, keyword)
+          .or().like(DiningMealOrder::getElderName, keyword)
+          .or().like(DiningMealOrder::getDishNames, keyword));
+    }
+    wrapper.orderByDesc(DiningMealOrder::getOrderDate).orderByDesc(DiningMealOrder::getCreateTime).last("LIMIT " + safeLimit);
+    List<DiningMealOrder> orders = mealOrderMapper.selectList(wrapper);
+    if (!pendingOnly || orders.isEmpty()) {
+      return Result.ok(orders);
+    }
+
+    List<Long> orderIds = orders.stream().map(DiningMealOrder::getId).toList();
+    if (orderIds.isEmpty()) {
+      return Result.ok(orders);
+    }
+    Set<Long> plannedOrderIds = deliveryRecordMapper.selectList(Wrappers.lambdaQuery(DiningDeliveryRecord.class)
+            .eq(DiningDeliveryRecord::getIsDeleted, 0)
+            .eq(orgId != null, DiningDeliveryRecord::getOrgId, orgId)
+            .in(DiningDeliveryRecord::getMealOrderId, orderIds)
+            .eq(DiningDeliveryRecord::getStatus, DiningConstants.DELIVERY_STATUS_PENDING))
+        .stream()
+        .map(DiningDeliveryRecord::getMealOrderId)
+        .collect(Collectors.toSet());
+    List<DiningMealOrder> available = orders.stream()
+        .filter(item -> !plannedOrderIds.contains(item.getId()))
+        .toList();
+    return Result.ok(available);
   }
 
   @GetMapping("/page")

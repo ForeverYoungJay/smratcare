@@ -267,6 +267,7 @@
               :filter-option="false"
               :options="elderOptions"
               @search="searchElders"
+              @focus="() => !elderOptions.length && searchElders('')"
             />
           </a-form-item>
           <a-form-item label="自定义任务">
@@ -391,7 +392,7 @@ import {
   createTask
 } from '../../api/care'
 import { getStaffPage } from '../../api/rbac'
-import { getElderPage } from '../../api/elder'
+import { useElderOptions } from '../../composables/useElderOptions'
 import type {
   CareTaskItem,
   CareExecuteLogItem,
@@ -429,9 +430,12 @@ const actionStep = ref(0)
 const actionMode = ref<'generate' | 'create' | 'batch'>('generate')
 const actionLoading = ref(false)
 const staffOptions = ref<{ label: string; value: number }[]>([])
-const elderOptions = ref<{ label: string; value: number }[]>([])
+const { elderOptions, searchElders: searchElderOptions, findElderName } = useElderOptions({
+  pageSize: 80,
+  preloadSize: 300,
+  inHospitalOnly: true
+})
 const staffMap = ref<Record<number, string>>({})
-const elderMap = ref<Record<number, string>>({})
 const summary = reactive<CareTaskSummary>({
   totalCount: 0,
   pendingCount: 0,
@@ -1017,23 +1021,10 @@ async function searchStaff(keyword: string) {
 }
 
 async function searchElders(keyword: string) {
-  if (!keyword) {
-    elderOptions.value = []
-    return
-  }
   try {
-    const res = await getElderPage({ pageNo: 1, pageSize: 50, keyword })
-    elderOptions.value = res.list.map((item: any) => ({
-      label: item.fullName || '未知老人',
-      value: item.id
-    }))
-    elderMap.value = elderOptions.value.reduce((acc, cur) => {
-      acc[cur.value] = cur.label
-      return acc
-    }, {} as Record<number, string>)
+    await searchElderOptions(keyword)
   } catch (error) {
     message.error(resolveCareError(error, '加载老人失败'))
-    elderOptions.value = []
   }
 }
 
@@ -1044,7 +1035,7 @@ function staffName(staffId?: number) {
 
 function elderName(elderId?: number) {
   if (!elderId) return '-'
-  return elderMap.value[elderId] || '未知老人'
+  return findElderName(elderId) || '未知老人'
 }
 
 function resolveRowClassName({ row }: { row: CareTaskItem }) {

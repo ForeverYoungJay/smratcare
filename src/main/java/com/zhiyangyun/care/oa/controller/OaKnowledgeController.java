@@ -65,22 +65,30 @@ public class OaKnowledgeController {
   public Result<OaKnowledge> create(@Valid @RequestBody OaKnowledgeRequest request) {
     Long orgId = AuthContext.getOrgId();
     validatePayload(request);
+    String normalizedTitle = trimToNull(request.getTitle());
+    String normalizedCategory = trimToNull(request.getCategory());
+    String normalizedTags = trimToNull(request.getTags());
+    String normalizedContent = resolveContentForStorage(request.getContent(), request.getAttachmentUrl());
+    String normalizedAttachmentName = trimToNull(request.getAttachmentName());
+    String normalizedAttachmentUrl = trimToNull(request.getAttachmentUrl());
+    String normalizedAttachmentType = trimToNull(request.getAttachmentType());
+    String normalizedRemark = trimToNull(request.getRemark());
     OaKnowledge knowledge = new OaKnowledge();
     knowledge.setTenantId(orgId);
     knowledge.setOrgId(orgId);
-    knowledge.setTitle(request.getTitle());
-    knowledge.setCategory(request.getCategory());
-    knowledge.setTags(request.getTags());
-    knowledge.setContent(request.getContent());
-    knowledge.setAttachmentName(request.getAttachmentName());
-    knowledge.setAttachmentUrl(request.getAttachmentUrl());
-    knowledge.setAttachmentType(request.getAttachmentType());
+    knowledge.setTitle(normalizedTitle);
+    knowledge.setCategory(normalizedCategory);
+    knowledge.setTags(normalizedTags);
+    knowledge.setContent(normalizedContent);
+    knowledge.setAttachmentName(normalizedAttachmentName);
+    knowledge.setAttachmentUrl(normalizedAttachmentUrl);
+    knowledge.setAttachmentType(normalizedAttachmentType);
     knowledge.setAttachmentSize(request.getAttachmentSize());
     knowledge.setAuthorId(request.getAuthorId() == null ? AuthContext.getStaffId() : request.getAuthorId());
     knowledge.setAuthorName(
         request.getAuthorName() == null || request.getAuthorName().isBlank()
             ? AuthContext.getUsername()
-            : request.getAuthorName());
+            : request.getAuthorName().trim());
     String normalizedStatus = normalizeStatus(request.getStatus());
     if (normalizedStatus != null && "ARCHIVED".equals(normalizedStatus)) {
       throw new IllegalArgumentException("创建知识库不支持 ARCHIVED 状态");
@@ -89,7 +97,7 @@ public class OaKnowledgeController {
     knowledge.setPublishedAt(
         "PUBLISHED".equalsIgnoreCase(knowledge.getStatus()) ? LocalDateTime.now() : null);
     knowledge.setExpiredAt(resolveExpiredAt(request.getExpiredAt(), knowledge.getStatus()));
-    knowledge.setRemark(request.getRemark());
+    knowledge.setRemark(normalizedRemark);
     knowledge.setCreatedBy(AuthContext.getStaffId());
     knowledgeMapper.insert(knowledge);
     return Result.ok(knowledge);
@@ -105,16 +113,25 @@ public class OaKnowledgeController {
       throw new IllegalArgumentException("已归档知识不可编辑");
     }
     validatePayload(request);
-    knowledge.setTitle(request.getTitle());
-    knowledge.setCategory(request.getCategory());
-    knowledge.setTags(request.getTags());
-    knowledge.setContent(request.getContent());
-    knowledge.setAttachmentName(request.getAttachmentName());
-    knowledge.setAttachmentUrl(request.getAttachmentUrl());
-    knowledge.setAttachmentType(request.getAttachmentType());
+    String normalizedTitle = trimToNull(request.getTitle());
+    String normalizedCategory = trimToNull(request.getCategory());
+    String normalizedTags = trimToNull(request.getTags());
+    String normalizedContent = resolveContentForStorage(request.getContent(), request.getAttachmentUrl());
+    String normalizedAttachmentName = trimToNull(request.getAttachmentName());
+    String normalizedAttachmentUrl = trimToNull(request.getAttachmentUrl());
+    String normalizedAttachmentType = trimToNull(request.getAttachmentType());
+    String normalizedAuthorName = trimToNull(request.getAuthorName());
+    String normalizedRemark = trimToNull(request.getRemark());
+    knowledge.setTitle(normalizedTitle);
+    knowledge.setCategory(normalizedCategory);
+    knowledge.setTags(normalizedTags);
+    knowledge.setContent(normalizedContent);
+    knowledge.setAttachmentName(normalizedAttachmentName);
+    knowledge.setAttachmentUrl(normalizedAttachmentUrl);
+    knowledge.setAttachmentType(normalizedAttachmentType);
     knowledge.setAttachmentSize(request.getAttachmentSize());
     knowledge.setAuthorId(request.getAuthorId());
-    knowledge.setAuthorName(request.getAuthorName());
+    knowledge.setAuthorName(normalizedAuthorName);
     String normalizedStatus = normalizeStatus(request.getStatus());
     if (normalizedStatus != null) {
       ensureStatusTransition(knowledge.getStatus(), normalizedStatus);
@@ -124,7 +141,7 @@ public class OaKnowledgeController {
       knowledge.setPublishedAt(LocalDateTime.now());
     }
     knowledge.setExpiredAt(resolveExpiredAt(request.getExpiredAt(), knowledge.getStatus()));
-    knowledge.setRemark(request.getRemark());
+    knowledge.setRemark(normalizedRemark);
     knowledgeMapper.updateById(knowledge);
     return Result.ok(knowledge);
   }
@@ -361,6 +378,25 @@ public class OaKnowledgeController {
     if (request.getAttachmentSize() != null && request.getAttachmentSize() < 0) {
       throw new IllegalArgumentException("附件大小不能小于0");
     }
+  }
+
+  private String resolveContentForStorage(String content, String attachmentUrl) {
+    String normalizedContent = trimToNull(content);
+    if (normalizedContent != null) {
+      return normalizedContent;
+    }
+    String normalizedAttachmentUrl = trimToNull(attachmentUrl);
+    if (normalizedAttachmentUrl != null) {
+      return "";
+    }
+    return null;
+  }
+
+  private String trimToNull(String text) {
+    if (text == null || text.isBlank()) {
+      return null;
+    }
+    return text.trim();
   }
 
   private LocalDateTime resolveExpiredAt(LocalDateTime requestedExpiredAt, String status) {

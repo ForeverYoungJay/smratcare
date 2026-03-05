@@ -2,6 +2,7 @@ package com.zhiyangyun.care.nursing.model;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.Data;
@@ -24,5 +25,7 @@ public class ShiftHandoverRequest {
   private String status = "DRAFT";
   private LocalDateTime handoverTime;
   private LocalDateTime confirmTime;
+  @Size(max = 2000, message = "attachmentUrls too long")
+  private String attachmentUrls;
   private Long createdBy;
 }

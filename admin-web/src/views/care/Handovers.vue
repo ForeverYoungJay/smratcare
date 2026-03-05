@@ -32,6 +32,12 @@
           <template v-if="column.key === 'status'">
             <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
           </template>
+          <template v-else-if="column.key === 'attachmentUrls'">
+            <a-button v-if="countAttachments(record.attachmentUrls) > 0" type="link" @click="openAttachments(record.attachmentUrls)">
+              {{ countAttachments(record.attachmentUrls) }}个附件
+            </a-button>
+            <span v-else>-</span>
+          </template>
           <template v-else-if="column.key === 'actions'">
             <a-space>
               <a @click="openModal(record)">编辑</a>
@@ -93,6 +99,17 @@
         <a-form-item label="待办事项" name="todoNote">
           <a-textarea v-model:value="form.todoNote" :rows="2" />
         </a-form-item>
+        <a-form-item label="交接附件">
+          <a-upload :show-upload-list="false" :before-upload="beforeUploadAttachment">
+            <a-button :loading="uploadingAttachment">上传附件</a-button>
+          </a-upload>
+          <div class="upload-tip">支持图片/文档，单个不超过20MB，最多10个附件</div>
+          <a-space wrap style="margin-top: 8px">
+            <a-tag v-for="(file, index) in attachmentFiles" :key="`${file.url}_${index}`" closable @close="removeAttachment(index)">
+              <a @click.prevent="openAttachment(file.url)">{{ file.name }}</a>
+            </a-tag>
+          </a-space>
+        </a-form-item>
 
         <a-row :gutter="16">
           <a-col :span="8">
@@ -123,6 +140,7 @@ import type { FormInstance } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { getStaffPage } from '../../api/rbac'
 import { createShiftHandover, deleteShiftHandover, getShiftHandoverPage, updateShiftHandover } from '../../api/nursing'
+import { uploadOaFile } from '../../api/oa'
 import type { PageResult, ShiftHandoverItem, StaffItem } from '../../types'
 import { resolveCareError } from './careError'
 
@@ -130,8 +148,10 @@ const rows = ref<ShiftHandoverItem[]>([])
 const loading = ref(false)
 const modalOpen = ref(false)
 const submitting = ref(false)
+const uploadingAttachment = ref(false)
 const formRef = ref<FormInstance>()
 const staffOptions = ref<Array<{ label: string; value: number }>>([])
+const attachmentFiles = ref<HandoverAttachmentFile[]>([])
 
 const query = reactive({
   pageNo: 1,
@@ -154,8 +174,14 @@ const form = reactive<Partial<ShiftHandoverItem>>({
   todoNote: '',
   status: 'DRAFT',
   handoverTime: undefined,
-  confirmTime: undefined
+  confirmTime: undefined,
+  attachmentUrls: ''
 })
+
+interface HandoverAttachmentFile {
+  name: string
+  url: string
+}
 
 const statusOptions = [
   { label: '草稿', value: 'DRAFT' },
@@ -176,6 +202,7 @@ const columns = [
   { title: '交班人', dataIndex: 'fromStaffName', key: 'fromStaffName', width: 120 },
   { title: '接班人', dataIndex: 'toStaffName', key: 'toStaffName', width: 120 },
   { title: '状态', key: 'status', width: 110 },
+  { title: '附件', key: 'attachmentUrls', width: 120 },
   { title: '注意事项', dataIndex: 'attentionNote', key: 'attentionNote' },
   { title: '操作', key: 'actions', width: 140 }
 ]
@@ -221,6 +248,8 @@ function resetForm() {
   form.status = 'DRAFT'
   form.handoverTime = undefined
   form.confirmTime = undefined
+  form.attachmentUrls = ''
+  attachmentFiles.value = []
 }
 
 function openModal(record?: ShiftHandoverItem) {
@@ -231,6 +260,7 @@ function openModal(record?: ShiftHandoverItem) {
       handoverTime: toIsoDateTime(record.handoverTime),
       confirmTime: toIsoDateTime(record.confirmTime)
     })
+    attachmentFiles.value = parseAttachments(record.attachmentUrls)
   }
   modalOpen.value = true
 }
@@ -258,7 +288,8 @@ async function submit() {
       todoNote: form.todoNote,
       status: form.status,
       handoverTime: toIsoDateTime(form.handoverTime),
-      confirmTime: toIsoDateTime(form.confirmTime)
+      confirmTime: toIsoDateTime(form.confirmTime),
+      attachmentUrls: serializeAttachments(attachmentFiles.value)
     }
     if (form.id) {
       await updateShiftHandover(form.id, payload)
@@ -345,6 +376,88 @@ function toIsoDateTime(value?: string) {
   return value.replace(' ', 'T')
 }
 
+function parseAttachments(value?: string) {
+  if (!value) return []
+  const text = String(value).trim()
+  if (!text) return []
+  try {
+    const parsed = JSON.parse(text)
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .map((item: any) => {
+        if (typeof item === 'string') {
+          return { name: item.split('/').pop() || '附件', url: item }
+        }
+        const url = item?.url || item?.fileUrl || ''
+        if (!url) return null
+        return {
+          name: item?.name || item?.originalFileName || item?.fileName || url.split('/').pop() || '附件',
+          url
+        }
+      })
+      .filter((item): item is HandoverAttachmentFile => !!item?.url)
+  } catch {
+    return text
+      .split(',')
+      .map((item) => item.trim())
+      .filter((item) => !!item)
+      .map((url) => ({ name: url.split('/').pop() || '附件', url }))
+  }
+}
+
+function serializeAttachments(list: HandoverAttachmentFile[]) {
+  if (!list.length) return ''
+  return JSON.stringify(list.map((item) => ({ name: item.name, url: item.url })))
+}
+
+function countAttachments(value?: string) {
+  return parseAttachments(value).length
+}
+
+function openAttachment(url: string) {
+  if (!url) return
+  window.open(url, '_blank')
+}
+
+function openAttachments(value?: string) {
+  parseAttachments(value).forEach((item) => openAttachment(item.url))
+}
+
+function removeAttachment(index: number) {
+  attachmentFiles.value.splice(index, 1)
+}
+
+async function beforeUploadAttachment(file: File) {
+  const maxSizeMb = 20
+  if (attachmentFiles.value.length >= 10) {
+    message.warning('最多上传10个附件')
+    return false
+  }
+  if (file.size / 1024 / 1024 > maxSizeMb) {
+    message.error(`附件大小不能超过${maxSizeMb}MB`)
+    return false
+  }
+  uploadingAttachment.value = true
+  try {
+    const uploaded = await uploadOaFile(file, 'nursing-handover-attachment')
+    const url = uploaded?.fileUrl || ''
+    if (!url) {
+      message.error('上传失败：未返回附件地址')
+      return false
+    }
+    attachmentFiles.value.push({
+      name: uploaded?.originalFileName || uploaded?.fileName || file.name,
+      url
+    })
+    message.success('附件上传成功')
+  } catch (error) {
+    message.error(resolveCareError(error, '附件上传失败'))
+  } finally {
+    uploadingAttachment.value = false
+  }
+  return false
+}
+
 load()
 loadStaffOptions()
 </script>
@@ -352,5 +465,10 @@ loadStaffOptions()
 <style scoped>
 .danger-text {
   color: #ef4444;
+}
+.upload-tip {
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 12px;
 }
 </style>

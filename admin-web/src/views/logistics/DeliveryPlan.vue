@@ -67,6 +67,18 @@
 
     <a-modal v-model:open="createOpen" title="新增送餐计划" :confirm-loading="creating" @ok="submitCreate">
       <a-form layout="vertical">
+        <a-alert
+          v-if="!optionsLoading && mealOrders.length === 0"
+          type="warning"
+          show-icon
+          message="暂无可用餐单"
+          description="请先在点餐管理创建餐单，再回来新增送餐计划。"
+          style="margin-bottom: 12px"
+        >
+          <template #action>
+            <a-button type="link" size="small" @click="router.push('/dining/order')">去点餐管理</a-button>
+          </template>
+        </a-alert>
         <a-form-item label="餐单" required>
           <a-select
             v-model:value="createForm.mealOrderId"
@@ -101,7 +113,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
@@ -110,13 +122,14 @@ import {
   createDiningDeliveryRecord,
   getDiningDeliveryAreaList,
   getDiningDeliveryRecordPage,
-  getDiningMealOrderPage,
+  getDiningMealOrderList,
   redispatchDiningDeliveryRecord,
   updateDiningDeliveryRecord
 } from '../../api/dining'
 import type { DiningDeliveryArea, DiningDeliveryRecord, DiningMealOrder, PageResult } from '../../types'
 
 const route = useRoute()
+const router = useRouter()
 const loading = ref(false)
 const saving = ref(false)
 const creating = ref(false)
@@ -145,7 +158,7 @@ const statusOptions = [
 
 const mealOrderOptions = computed(() =>
   mealOrders.value.map((item) => ({
-    label: `${item.orderNo}｜${item.elderName || '未知长者'}｜${item.deliveryAreaName || '未分区'}`,
+    label: `${item.orderNo}｜${item.elderName || '未知长者'}｜${item.orderDate || ''} ${item.mealType || ''}｜${item.deliveryAreaName || '未分区'}`,
     value: item.id
   }))
 )
@@ -217,14 +230,14 @@ async function fetchData() {
 async function loadCreateOptions() {
   optionsLoading.value = true
   try {
-    const [orderRes, areaList] = await Promise.all([
-      getDiningMealOrderPage({ pageNo: 1, pageSize: 200, dateFrom: query.date || undefined, dateTo: query.date || undefined }),
+    const [orderList, areaList] = await Promise.all([
+      getDiningMealOrderList({ pendingOnly: true, date: query.date || undefined, limit: 300 }),
       getDiningDeliveryAreaList({})
     ])
-    let orders = orderRes?.list || []
+    let orders = orderList || []
     if (orders.length === 0 && query.date) {
-      const fallback = await getDiningMealOrderPage({ pageNo: 1, pageSize: 200 })
-      orders = fallback?.list || []
+      const fallback = await getDiningMealOrderList({ pendingOnly: true, limit: 300 })
+      orders = fallback || []
       if (orders.length > 0) {
         message.info('当前日期暂无餐单，已自动展示全部可用餐单')
       }
