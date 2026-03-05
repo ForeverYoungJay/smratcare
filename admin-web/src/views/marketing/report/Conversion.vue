@@ -21,11 +21,17 @@
           </a-select>
         </a-form-item>
         <a-form-item label="跟进人">
-          <a-select v-model:value="query.staffId" allow-clear style="width: 180px" show-search option-filter-prop="label">
-            <a-select-option v-for="item in staffOptions" :key="item.value" :value="item.value" :label="item.label">
-              {{ item.label }}
-            </a-select-option>
-          </a-select>
+          <a-select
+            v-model:value="query.staffId"
+            allow-clear
+            style="width: 220px"
+            show-search
+            :filter-option="false"
+            :options="staffOptions"
+            placeholder="输入员工姓名/拼音首字母"
+            @search="searchStaff"
+            @focus="() => !staffOptions.length && searchStaff('')"
+          />
         </a-form-item>
         <a-form-item>
           <a-space>
@@ -67,11 +73,11 @@ import VChart from 'vue-echarts'
 import PageContainer from '../../../components/PageContainer.vue'
 import MarketingQuickNav from '../components/MarketingQuickNav.vue'
 import { getMarketingConversionReport } from '../../../api/marketing'
-import { getStaffPage } from '../../../api/staff'
+import { useStaffOptions } from '../../../composables/useStaffOptions'
 import { useReportQueryCache } from '../../../composables/useReportQueryCache'
 import { buildContractRoute, buildLeadRoute, buildReservationRoute } from '../../../utils/marketingNav'
 import { exportCsv } from '../../../utils/export'
-import type { MarketingConversionReport, MarketingReportQuery, PageResult, StaffItem } from '../../../types'
+import type { MarketingConversionReport, MarketingReportQuery } from '../../../types'
 
 const router = useRouter()
 const report = ref<MarketingConversionReport>({
@@ -88,6 +94,7 @@ const report = ref<MarketingConversionReport>({
 const query = reactive<MarketingReportQuery>({})
 const queryCache = useReportQueryCache<MarketingReportQuery>('conversion')
 const staffOptions = ref<Array<{ label: string; value: number }>>([])
+const { staffOptions: staffOptionPool, searchStaff: searchStaffPool } = useStaffOptions({ pageSize: 220, preloadSize: 500 })
 
 const cards = computed(() => [
   { title: '咨询总量', value: report.value.consultCount, stage: '咨询' },
@@ -171,21 +178,19 @@ async function loadData() {
   report.value = await getMarketingConversionReport(query)
 }
 
-async function loadStaff() {
-  try {
-    const page: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: 200 })
-    staffOptions.value = (page.list || []).map((item) => ({
-      label: item.realName || item.username || String(item.id),
-      value: item.id
+async function searchStaff(keyword = '') {
+  await searchStaffPool(keyword)
+  staffOptions.value = staffOptionPool.value
+    .map((item) => ({
+      label: item.label,
+      value: Number(item.value)
     }))
-  } catch {
-    staffOptions.value = []
-  }
+    .filter((item) => Number.isFinite(item.value))
 }
 
 onMounted(async () => {
   Object.assign(query, queryCache.restore())
-  await loadStaff()
+  await searchStaff('')
   await loadData()
 })
 

@@ -59,6 +59,7 @@
             placeholder="输入姓名搜索"
             :options="staffOptions"
             @search="searchStaff"
+            @focus="() => !staffOptions.length && searchStaff('')"
           />
         </a-form-item>
         <a-form-item label="成员" name="memberStaffIds">
@@ -70,6 +71,7 @@
             placeholder="选择小组成员"
             :options="staffOptions"
             @search="searchStaff"
+            @focus="() => !staffOptions.length && searchStaff('')"
           />
         </a-form-item>
         <a-form-item label="启用状态" name="enabled">
@@ -88,9 +90,9 @@ import { computed, reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import type { FormInstance } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
-import { getStaffPage } from '../../api/rbac'
+import { useStaffOptions } from '../../composables/useStaffOptions'
 import { createCaregiverGroup, deleteCaregiverGroup, getCaregiverGroupPage, updateCaregiverGroup } from '../../api/nursing'
-import type { CaregiverGroupItem, PageResult, StaffItem } from '../../types'
+import type { CaregiverGroupItem, PageResult } from '../../types'
 import { resolveCareError } from './careError'
 
 const rows = ref<CaregiverGroupItem[]>([])
@@ -98,7 +100,7 @@ const loading = ref(false)
 const modalOpen = ref(false)
 const submitting = ref(false)
 const formRef = ref<FormInstance>()
-const staffOptions = ref<Array<{ label: string; value: number }>>([])
+const { staffOptions, searchStaff, ensureSelectedStaff } = useStaffOptions({ pageSize: 120 })
 
 const query = reactive({
   pageNo: 1,
@@ -161,24 +163,10 @@ function openModal(record?: CaregiverGroupItem) {
       enabled: record.enabled ?? 1,
       remark: record.remark || ''
     })
+    ensureSelectedStaff(record.leaderStaffId, record.leaderStaffName)
+    ;(record.memberStaffIds || []).forEach((id) => ensureSelectedStaff(id))
   }
   modalOpen.value = true
-}
-
-async function loadStaffOptions(keyword?: string) {
-  try {
-    const res: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: 50, keyword })
-    staffOptions.value = res.list.map((item) => ({ label: item.realName || item.username, value: item.id }))
-  } catch (error) {
-    if (!keyword) {
-      staffOptions.value = []
-    }
-    message.error(resolveCareError(error, '加载护工列表失败'))
-  }
-}
-
-async function searchStaff(keyword: string) {
-  await loadStaffOptions(keyword)
 }
 
 async function submit() {
@@ -261,7 +249,7 @@ async function load() {
 }
 
 load()
-loadStaffOptions()
+searchStaff('')
 </script>
 
 <style scoped>

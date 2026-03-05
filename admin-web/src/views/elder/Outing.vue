@@ -3,9 +3,18 @@
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item label="老人">
-          <a-select v-model:value="query.elderId" allow-clear style="width: 180px" placeholder="请选择老人姓名">
-            <a-select-option v-for="item in elders" :key="item.id" :value="item.id">{{ item.fullName }}</a-select-option>
-          </a-select>
+          <a-select
+            v-model:value="query.elderId"
+            allow-clear
+            show-search
+            :filter-option="false"
+            :options="elderOptions"
+            :loading="elderLoading"
+            style="width: 220px"
+            placeholder="请输入老人姓名/拼音首字母"
+            @search="searchElders"
+            @focus="() => !elderOptions.length && searchElders('')"
+          />
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="query.status" allow-clear style="width: 140px" placeholder="请选择状态">
@@ -72,9 +81,16 @@
     <a-modal v-model:open="createOpen" title="新增外出登记" @ok="submitCreate" :confirm-loading="submitting" width="520px">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="老人" name="elderId">
-          <a-select v-model:value="form.elderId" placeholder="请选择老人">
-            <a-select-option v-for="item in elders" :key="item.id" :value="item.id">{{ item.fullName }}</a-select-option>
-          </a-select>
+          <a-select
+            v-model:value="form.elderId"
+            show-search
+            :filter-option="false"
+            :options="elderOptions"
+            :loading="elderLoading"
+            placeholder="请输入老人姓名/拼音首字母"
+            @search="searchElders"
+            @focus="() => !elderOptions.length && searchElders('')"
+          />
         </a-form-item>
         <a-form-item label="外出日期" name="outingDate">
           <a-date-picker v-model:value="form.outingDate" value-format="YYYY-MM-DD" style="width: 100%" />
@@ -119,14 +135,14 @@ import { message, Modal } from 'ant-design-vue'
 import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
-import { getElderPage, uploadElderFile } from '../../api/elder'
+import { uploadElderFile } from '../../api/elder'
+import { useElderOptions } from '../../composables/useElderOptions'
 import { createOuting, deleteOuting, getOutingPage, returnOuting } from '../../api/elderResidence'
-import type { ElderItem, OutingCreateRequest, OutingItem, PageResult } from '../../types'
+import type { OutingCreateRequest, OutingItem, PageResult } from '../../types'
 
 const loading = ref(false)
 const rows = ref<OutingItem[]>([])
 const total = ref(0)
-const elders = ref<ElderItem[]>([])
 const createOpen = ref(false)
 const submitting = ref(false)
 const uploadingLeaveNote = ref(false)
@@ -134,6 +150,7 @@ const errorMessage = ref('')
 const formRef = ref<FormInstance>()
 const selectedRowKeys = ref<number[]>([])
 const route = useRoute()
+const { elderOptions, elderLoading, searchElders, ensureSelectedElder } = useElderOptions({ pageSize: 80 })
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: (string | number)[]) => {
@@ -173,11 +190,6 @@ const columns = [
   { title: '请假条', dataIndex: 'leaveNoteImageUrl', key: 'leaveNoteImageUrl', width: 120 },
   { title: '状态', key: 'status', width: 100 }
 ]
-
-async function loadElders() {
-  const res: PageResult<ElderItem> = await getElderPage({ pageNo: 1, pageSize: 200 })
-  elders.value = res.list
-}
 
 async function fetchData() {
   loading.value = true
@@ -298,9 +310,10 @@ function onPageSizeChange(current: number, size: number) {
 }
 
 onMounted(async () => {
-  await loadElders()
+  await searchElders('')
   const elderId = Number(route.query.elderId || 0)
   if (elderId > 0) {
+    ensureSelectedElder(elderId)
     query.elderId = elderId
   }
   await fetchData()

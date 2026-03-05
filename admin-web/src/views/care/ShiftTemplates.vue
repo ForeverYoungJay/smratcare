@@ -81,6 +81,7 @@
             placeholder="输入姓名搜索"
             :options="staffOptions"
             @search="searchStaff"
+            @focus="() => !staffOptions.length && searchStaff('')"
           />
         </a-form-item>
         <a-form-item label="联动上班打卡" name="attendanceLinked">
@@ -122,9 +123,9 @@ import { computed, reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import type { FormInstance } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
-import { getStaffPage } from '../../api/rbac'
+import { useStaffOptions } from '../../composables/useStaffOptions'
 import { applyShiftTemplate, createShiftTemplate, deleteShiftTemplate, getShiftTemplatePage, updateShiftTemplate } from '../../api/nursing'
-import type { PageResult, ShiftTemplateItem, StaffItem } from '../../types'
+import type { PageResult, ShiftTemplateItem } from '../../types'
 import { resolveCareError } from './careError'
 
 const rows = ref<ShiftTemplateItem[]>([])
@@ -135,7 +136,7 @@ const applying = ref(false)
 const applyOpen = ref(false)
 const applyTarget = ref<ShiftTemplateItem>()
 const formRef = ref<FormInstance>()
-const staffOptions = ref<Array<{ label: string; value: number }>>([])
+const { staffOptions, searchStaff, ensureSelectedStaff } = useStaffOptions({ pageSize: 120 })
 
 const query = reactive({
   pageNo: 1,
@@ -216,6 +217,7 @@ function openModal(record?: ShiftTemplateItem) {
   resetForm()
   if (record) {
     Object.assign(form, record)
+    ensureSelectedStaff(record.executeStaffId, record.executeStaffName)
   }
   modalOpen.value = true
 }
@@ -323,25 +325,6 @@ async function submitApply() {
   }
 }
 
-async function loadStaffOptions(keyword?: string) {
-  try {
-    const res: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: 50, keyword })
-    staffOptions.value = (res.list || []).map((item) => ({
-      label: item.realName || item.username || `员工${item.id}`,
-      value: item.id
-    }))
-  } catch (error) {
-    if (!keyword) {
-      staffOptions.value = []
-    }
-    message.error(resolveCareError(error, '加载员工列表失败'))
-  }
-}
-
-async function searchStaff(keyword: string) {
-  await loadStaffOptions(keyword)
-}
-
 async function load() {
   loading.value = true
   try {
@@ -363,7 +346,7 @@ async function load() {
 }
 
 load()
-loadStaffOptions()
+searchStaff('')
 </script>
 
 <style scoped>

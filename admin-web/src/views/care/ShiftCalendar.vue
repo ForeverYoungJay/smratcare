@@ -1,8 +1,18 @@
 <template>
   <PageContainer title="排班" subTitle="护理人员班次排期管理">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
-      <a-form-item label="员工ID">
-        <a-input-number v-model:value="query.staffId" :min="1" style="width: 140px" />
+      <a-form-item label="员工">
+        <a-select
+          v-model:value="query.staffId"
+          allow-clear
+          show-search
+          :filter-option="false"
+          :options="staffOptions"
+          style="width: 220px"
+          placeholder="输入员工姓名/拼音首字母"
+          @search="searchStaff"
+          @focus="() => !staffOptions.length && searchStaff('')"
+        />
       </a-form-item>
       <a-form-item label="状态">
         <a-select v-model:value="query.status" allow-clear style="width: 140px">
@@ -41,8 +51,16 @@
       <a-form layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">
-            <a-form-item label="员工ID" required>
-              <a-input-number v-model:value="form.staffId" :min="1" style="width: 100%" />
+            <a-form-item label="员工" required>
+              <a-select
+                v-model:value="form.staffId"
+                show-search
+                :filter-option="false"
+                :options="staffOptions"
+                placeholder="输入员工姓名/拼音首字母"
+                @search="searchStaff"
+                @focus="() => !staffOptions.length && searchStaff('')"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="12">
@@ -94,6 +112,7 @@ import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import { useStaffOptions } from '../../composables/useStaffOptions'
 import { createSchedule, deleteSchedule, getSchedulePage, updateSchedule } from '../../api/schedule'
 import type { PageResult, ScheduleItem } from '../../types'
 import { resolveCareError } from './careError'
@@ -101,8 +120,9 @@ import { resolveCareError } from './careError'
 const loading = ref(false)
 const saving = ref(false)
 const rows = ref<ScheduleItem[]>([])
+const { staffOptions, searchStaff, ensureSelectedStaff } = useStaffOptions({ pageSize: 200, preloadSize: 500 })
 const query = reactive({
-  staffId: undefined as number | undefined,
+  staffId: undefined as string | undefined,
   status: undefined as number | undefined,
   range: undefined as [Dayjs, Dayjs] | undefined,
   pageNo: 1,
@@ -123,7 +143,7 @@ const columns = [
 
 const editOpen = ref(false)
 const dutyDate = ref<Dayjs | undefined>()
-const form = reactive<Partial<ScheduleItem>>({ status: 1 })
+const form = reactive<Partial<ScheduleItem> & { staffId?: string | number }>({ status: 1 })
 
 async function fetchData() {
   loading.value = true
@@ -131,7 +151,7 @@ async function fetchData() {
     const res: PageResult<ScheduleItem> = await getSchedulePage({
       pageNo: query.pageNo,
       pageSize: query.pageSize,
-      staffId: query.staffId,
+      staffId: query.staffId ? Number(query.staffId) : undefined,
       status: query.status,
       dateFrom: query.range?.[0] ? dayjs(query.range[0]).format('YYYY-MM-DD') : undefined,
       dateTo: query.range?.[1] ? dayjs(query.range[1]).format('YYYY-MM-DD') : undefined
@@ -165,15 +185,26 @@ function onReset() {
 }
 
 function openEdit(record?: ScheduleItem) {
-  Object.assign(form, record || { status: 1, staffId: undefined, staffName: '', shiftCode: '', startTime: '', endTime: '' })
+  if (record) {
+    Object.assign(form, {
+      ...record,
+      staffId: record.staffId == null ? undefined : String(record.staffId)
+    })
+  } else {
+    Object.assign(form, { status: 1, staffId: undefined, staffName: '', shiftCode: '', startTime: '', endTime: '' })
+  }
+  if (form.staffId) ensureSelectedStaff(form.staffId, form.staffName)
   dutyDate.value = form.dutyDate ? dayjs(form.dutyDate) : undefined
   editOpen.value = true
 }
 
 async function submit() {
   if (!form.staffId || !dutyDate.value) return
+  const selected = staffOptions.value.find((item) => String(item.value) === String(form.staffId))
   const payload = {
     ...form,
+    staffId: Number(form.staffId),
+    staffName: selected?.name || form.staffName,
     dutyDate: dutyDate.value.format('YYYY-MM-DD')
   }
   saving.value = true
@@ -208,5 +239,6 @@ async function remove(record: ScheduleItem) {
   })
 }
 
+searchStaff('')
 fetchData()
 </script>

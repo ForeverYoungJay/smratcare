@@ -60,7 +60,7 @@ import PageContainer from '../components/PageContainer.vue'
 import SearchForm from '../components/SearchForm.vue'
 import DataTable from '../components/DataTable.vue'
 import { getTaskPage, generateTasks } from '../api/care'
-import { getStaffPage } from '../api/rbac'
+import { useStaffOptions } from '../composables/useStaffOptions'
 import type { CareTaskItem, PageResult } from '../types/api'
 
 const query = reactive({
@@ -74,7 +74,8 @@ const query = reactive({
 const loading = ref(false)
 const rows = ref<CareTaskItem[]>([])
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
-const staffMap = ref<Record<number, string>>({})
+const staffLoaded = ref(false)
+const { searchStaff, findStaffName } = useStaffOptions({ pageSize: 220, preloadSize: 500 })
 
 const columns = [
   { title: '老人', dataIndex: 'elderName', key: 'elderName', width: 120 },
@@ -101,7 +102,7 @@ async function fetchData() {
     }
     rows.value = list
     pagination.total = res.total || list.length
-    await loadStaffOptions()
+    await ensureStaffLoaded()
   } catch {
     rows.value = []
     pagination.total = 0
@@ -110,17 +111,15 @@ async function fetchData() {
   }
 }
 
-async function loadStaffOptions() {
-  const res = await getStaffPage({ pageNo: 1, pageSize: 200 })
-  staffMap.value = res.list.reduce((acc: Record<number, string>, item: any) => {
-    acc[item.id] = item.realName || item.username || `员工#${item.id}`
-    return acc
-  }, {})
+async function ensureStaffLoaded() {
+  if (staffLoaded.value) return
+  await searchStaff('')
+  staffLoaded.value = true
 }
 
 function staffName(staffId?: number) {
   if (!staffId) return '-'
-  return staffMap.value[staffId] || '未知护理员'
+  return findStaffName(staffId) || `员工#${staffId}`
 }
 
 function handleTableChange(pag: any) {

@@ -54,7 +54,7 @@ import { Modal, message } from 'ant-design-vue'
 import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { getTaskPage } from '../../api/care'
-import { getStaffPage } from '../../api/rbac'
+import { useStaffOptions } from '../../composables/useStaffOptions'
 import type { CareTaskItem, PageResult } from '../../types'
 import { exportCsv } from '../../utils/export'
 import { resolveCareError } from './careError'
@@ -65,7 +65,8 @@ const route = useRoute()
 const loading = ref(false)
 const detailOpen = ref(false)
 const current = ref<CareTaskItem | null>(null)
-const staffMap = ref<Record<number, string>>({})
+const staffLoaded = ref(false)
+const { searchStaff, findStaffName } = useStaffOptions({ pageSize: 220, preloadSize: 500 })
 
 async function search() {
   loading.value = true
@@ -77,7 +78,7 @@ async function search() {
       elderId: route.query.residentId ? Number(route.query.residentId) : route.query.elderId ? Number(route.query.elderId) : undefined
     })
     list.value = res.list
-    await loadStaffOptions()
+    await ensureStaffLoaded()
   } catch (error) {
     message.error(resolveCareError(error, '加载异常任务失败'))
     list.value = []
@@ -113,22 +114,19 @@ function exportCsvData() {
   message.success('CSV导出成功')
 }
 
-async function loadStaffOptions() {
+async function ensureStaffLoaded() {
+  if (staffLoaded.value) return
   try {
-    const res = await getStaffPage({ pageNo: 1, pageSize: 200 })
-    staffMap.value = res.list.reduce((acc: Record<number, string>, item: any) => {
-      acc[item.id] = item.realName || item.username || `员工#${item.id}`
-      return acc
-    }, {})
+    await searchStaff('')
+    staffLoaded.value = true
   } catch (error) {
     message.error(resolveCareError(error, '加载护工信息失败'))
-    staffMap.value = {}
   }
 }
 
 function staffName(staffId?: number) {
   if (!staffId) return '未分配'
-  return staffMap.value[staffId] || '未知护理员'
+  return findStaffName(staffId) || `员工#${staffId}`
 }
 
 search()

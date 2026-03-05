@@ -73,6 +73,7 @@
                 placeholder="输入姓名搜索"
                 :options="staffOptions"
                 @search="searchStaff"
+                @focus="() => !staffOptions.length && searchStaff('')"
               />
             </a-form-item>
           </a-col>
@@ -85,6 +86,7 @@
                 placeholder="输入姓名搜索"
                 :options="staffOptions"
                 @search="searchStaff"
+                @focus="() => !staffOptions.length && searchStaff('')"
               />
             </a-form-item>
           </a-col>
@@ -138,10 +140,10 @@ import { computed, reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import type { FormInstance } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
-import { getStaffPage } from '../../api/rbac'
+import { useStaffOptions } from '../../composables/useStaffOptions'
 import { createShiftHandover, deleteShiftHandover, getShiftHandoverPage, updateShiftHandover } from '../../api/nursing'
 import { uploadOaFile } from '../../api/oa'
-import type { PageResult, ShiftHandoverItem, StaffItem } from '../../types'
+import type { PageResult, ShiftHandoverItem } from '../../types'
 import { resolveCareError } from './careError'
 
 const rows = ref<ShiftHandoverItem[]>([])
@@ -150,7 +152,7 @@ const modalOpen = ref(false)
 const submitting = ref(false)
 const uploadingAttachment = ref(false)
 const formRef = ref<FormInstance>()
-const staffOptions = ref<Array<{ label: string; value: number }>>([])
+const { staffOptions, searchStaff, ensureSelectedStaff } = useStaffOptions({ pageSize: 120 })
 const attachmentFiles = ref<HandoverAttachmentFile[]>([])
 
 const query = reactive({
@@ -260,18 +262,11 @@ function openModal(record?: ShiftHandoverItem) {
       handoverTime: toIsoDateTime(record.handoverTime),
       confirmTime: toIsoDateTime(record.confirmTime)
     })
+    ensureSelectedStaff(record.fromStaffId, record.fromStaffName)
+    ensureSelectedStaff(record.toStaffId, record.toStaffName)
     attachmentFiles.value = parseAttachments(record.attachmentUrls)
   }
   modalOpen.value = true
-}
-
-async function loadStaffOptions(keyword?: string) {
-  const res: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: 50, keyword })
-  staffOptions.value = res.list.map((item) => ({ label: item.realName || item.username, value: item.id }))
-}
-
-async function searchStaff(keyword: string) {
-  await loadStaffOptions(keyword)
 }
 
 async function submit() {
@@ -459,7 +454,7 @@ async function beforeUploadAttachment(file: File) {
 }
 
 load()
-loadStaffOptions()
+searchStaff('')
 </script>
 
 <style scoped>

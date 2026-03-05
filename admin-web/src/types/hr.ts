@@ -158,6 +158,36 @@ export interface HrRecruitmentNeedItem {
   remark?: string
   applicantName?: string
   createTime?: string
+  candidateName?: string
+  contactPhone?: string
+  resumeUrl?: string
+  intentionStatus?: string
+  followUpDate?: string
+  offerStatus?: string
+  onboardDate?: string
+  salary?: string
+  probationPeriod?: string
+  workLocation?: string
+  shiftType?: string
+  checklistJson?: string
+  signedFilesJson?: string
+  accountPermissionJson?: string
+  issuedItemsJson?: string
+  mentorName?: string
+  probationGoal?: string
+  regularizationStatus?: string
+  recommendationNote?: string
+  offboardingType?: string
+  lastWorkDate?: string
+  handoverDeadline?: string
+  resignationReason?: string
+  resignationReportUrl?: string
+  handoverItemsJson?: string
+  assetRecoveryJson?: string
+  permissionRecycleJson?: string
+  financeSettlementNote?: string
+  exitArchiveJson?: string
+  formData?: string
 }
 
 export interface HrPolicyAlertItem {

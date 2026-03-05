@@ -3,9 +3,18 @@
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item label="老人姓名">
-          <a-select v-model:value="query.elderId" allow-clear style="width: 180px" placeholder="请选择老人姓名">
-            <a-select-option v-for="item in elders" :key="item.id" :value="item.id">{{ item.fullName }}</a-select-option>
-          </a-select>
+          <a-select
+            v-model:value="query.elderId"
+            allow-clear
+            show-search
+            :filter-option="false"
+            :options="elderOptions"
+            :loading="elderLoading"
+            style="width: 220px"
+            placeholder="请输入老人姓名/拼音首字母"
+            @search="searchElders"
+            @focus="() => !elderOptions.length && searchElders('')"
+          />
         </a-form-item>
         <a-form-item label="关键词">
           <a-input v-model:value="query.keyword" allow-clear placeholder="请输入老人姓名/申请原因/审核备注" style="width: 280px" />
@@ -71,9 +80,16 @@
     <a-modal v-model:open="createOpen" title="新增退住申请" @ok="submitCreate" :confirm-loading="submitting" width="520px">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="老人" name="elderId">
-          <a-select v-model:value="form.elderId" placeholder="请选择老人">
-            <a-select-option v-for="item in elders" :key="item.id" :value="item.id">{{ item.fullName }}</a-select-option>
-          </a-select>
+          <a-select
+            v-model:value="form.elderId"
+            show-search
+            :filter-option="false"
+            :options="elderOptions"
+            :loading="elderLoading"
+            placeholder="请输入老人姓名/拼音首字母"
+            @search="searchElders"
+            @focus="() => !elderOptions.length && searchElders('')"
+          />
         </a-form-item>
         <a-form-item label="计划退住日期" name="plannedDischargeDate">
           <a-date-picker v-model:value="form.plannedDischargeDate" value-format="YYYY-MM-DD" style="width: 100%" />
@@ -106,7 +122,7 @@ import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { getBaseConfigItemList } from '../../api/baseConfig'
-import { getElderPage } from '../../api/elder'
+import { useElderOptions } from '../../composables/useElderOptions'
 import {
   createDischargeApply,
   deleteDischargeApply,
@@ -119,14 +135,12 @@ import type {
   DischargeApplyCreateRequest,
   DischargeApplyItem,
   DischargeApplyStatus,
-  ElderItem,
   PageResult
 } from '../../types'
 
 const loading = ref(false)
 const rows = ref<DischargeApplyItem[]>([])
 const total = ref(0)
-const elders = ref<ElderItem[]>([])
 const createOpen = ref(false)
 const submitting = ref(false)
 const formRef = ref<FormInstance>()
@@ -138,6 +152,7 @@ const reviewRemark = ref('')
 const route = useRoute()
 const router = useRouter()
 const dischargeFeeConfigOptions = ref<{ label: string; value: string }[]>([])
+const { elderOptions, elderLoading, searchElders, ensureSelectedElder } = useElderOptions({ pageSize: 80 })
 const selectedRowKeys = ref<number[]>([])
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
@@ -183,11 +198,6 @@ const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKe
 const canReviewSelected = computed(
   () => selectedRecords.value.length === 1 && selectedRecords.value[0]?.status === 'PENDING'
 )
-
-async function loadElders() {
-  const res: PageResult<ElderItem> = await getElderPage({ pageNo: 1, pageSize: 200 })
-  elders.value = res.list
-}
 
 async function loadDischargeFeeConfigOptions() {
   const options = await getBaseConfigItemList({ configGroup: 'DISCHARGE_FEE_CONFIG', status: 1 })
@@ -238,6 +248,7 @@ function tryOpenCreateFromRoute() {
   const elderId = Number(route.query.elderId || 0)
   const openCreateFlag = String(route.query.openCreate || '') === '1'
   if (!elderId) return
+  ensureSelectedElder(elderId)
   query.elderId = elderId
   if (!openCreateFlag) return
   createOpen.value = true
@@ -353,7 +364,7 @@ function onPageSizeChange(current: number, size: number) {
 
 onMounted(async () => {
   await loadDischargeFeeConfigOptions()
-  await loadElders()
+  await searchElders('')
   tryOpenCreateFromRoute()
   await fetchData()
 })

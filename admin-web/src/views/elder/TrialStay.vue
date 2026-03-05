@@ -3,9 +3,18 @@
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item label="老人姓名">
-          <a-select v-model:value="query.elderId" allow-clear style="width: 180px" placeholder="请选择老人姓名">
-            <a-select-option v-for="item in elders" :key="item.id" :value="item.id">{{ item.fullName }}</a-select-option>
-          </a-select>
+          <a-select
+            v-model:value="query.elderId"
+            allow-clear
+            show-search
+            :filter-option="false"
+            :options="elderOptions"
+            :loading="elderLoading"
+            style="width: 220px"
+            placeholder="请输入老人姓名/拼音首字母"
+            @search="searchElders"
+            @focus="() => !elderOptions.length && searchElders('')"
+          />
         </a-form-item>
         <a-form-item label="关键词">
           <a-input v-model:value="query.keyword" allow-clear placeholder="请输入老人姓名/护理等级/来源渠道" style="width: 260px" />
@@ -66,9 +75,16 @@
     <a-modal v-model:open="editOpen" :title="editId ? '编辑试住登记' : '新增试住登记'" @ok="submit" :confirm-loading="submitting" width="560px">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="老人" name="elderId">
-          <a-select v-model:value="form.elderId" placeholder="请选择老人">
-            <a-select-option v-for="item in elders" :key="item.id" :value="item.id">{{ item.fullName }}</a-select-option>
-          </a-select>
+          <a-select
+            v-model:value="form.elderId"
+            show-search
+            :filter-option="false"
+            :options="elderOptions"
+            :loading="elderLoading"
+            placeholder="请输入老人姓名/拼音首字母"
+            @search="searchElders"
+            @focus="() => !elderOptions.length && searchElders('')"
+          />
         </a-form-item>
         <a-form-item label="开始日期" name="trialStartDate">
           <a-date-picker v-model:value="form.trialStartDate" value-format="YYYY-MM-DD" style="width: 100%" />
@@ -119,20 +135,20 @@ import { message, Modal } from 'ant-design-vue'
 import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { getBaseConfigItemList } from '../../api/baseConfig'
-import { getElderPage } from '../../api/elder'
+import { useElderOptions } from '../../composables/useElderOptions'
 import { createTrialStay, deleteTrialStay, exportTrialStay, getTrialStayPage, updateTrialStay } from '../../api/elderResidence'
-import type { BaseConfigItem, ElderItem, PageResult, TrialStayItem, TrialStayRequest, TrialStayStatus } from '../../types'
+import type { BaseConfigItem, PageResult, TrialStayItem, TrialStayRequest, TrialStayStatus } from '../../types'
 
 const loading = ref(false)
 const rows = ref<TrialStayItem[]>([])
 const total = ref(0)
-const elders = ref<ElderItem[]>([])
 const editOpen = ref(false)
 const editId = ref<number | undefined>(undefined)
 const submitting = ref(false)
 const formRef = ref<FormInstance>()
 const selectedRowKeys = ref<number[]>([])
 const route = useRoute()
+const { elderOptions, elderLoading, searchElders, ensureSelectedElder } = useElderOptions({ pageSize: 80 })
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: (string | number)[]) => {
@@ -208,11 +224,6 @@ async function exportRows() {
   })
 }
 
-async function loadElders() {
-  const res: PageResult<ElderItem> = await getElderPage({ pageNo: 1, pageSize: 200 })
-  elders.value = res.list
-}
-
 async function loadDictOptions() {
   const [channelItems, packageItems] = await Promise.all([
     getBaseConfigItemList({ configGroup: 'MARKETING_SOURCE_CHANNEL', status: 1 }),
@@ -267,6 +278,7 @@ function openCreate() {
 }
 
 function openEdit(record: TrialStayItem) {
+  ensureSelectedElder(record.elderId, record.elderName)
   editOpen.value = true
   editId.value = record.id
   form.elderId = record.elderId
@@ -339,9 +351,10 @@ function onPageSizeChange(current: number, size: number) {
 
 onMounted(async () => {
   await loadDictOptions()
-  await loadElders()
+  await searchElders('')
   const elderId = Number(route.query.elderId || 0)
   if (elderId > 0) {
+    ensureSelectedElder(elderId)
     query.elderId = elderId
   }
   await fetchData()

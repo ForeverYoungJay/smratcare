@@ -10,9 +10,16 @@
     <a-card class="card-elevated" :bordered="false">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="老人" name="elderId">
-          <a-select v-model:value="form.elderId" placeholder="请选择老人">
-            <a-select-option v-for="item in elders" :key="item.id" :value="item.id">{{ item.fullName }}</a-select-option>
-          </a-select>
+          <a-select
+            v-model:value="form.elderId"
+            show-search
+            :filter-option="false"
+            :options="elderOptions"
+            :loading="elderLoading"
+            placeholder="请输入老人姓名/拼音首字母"
+            @search="searchElders"
+            @focus="() => !elderOptions.length && searchElders('')"
+          />
         </a-form-item>
         <a-form-item label="退院日期" name="dischargeDate">
           <a-date-picker v-model:value="form.dischargeDate" value-format="YYYY-MM-DD" style="width: 100%" />
@@ -45,26 +52,21 @@ import { message } from 'ant-design-vue'
 import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { getBaseConfigItemList } from '../../api/baseConfig'
-import { getElderPage } from '../../api/elder'
+import { useElderOptions } from '../../composables/useElderOptions'
 import { dischargeElder } from '../../api/elderLifecycle'
-import type { BaseConfigItem, DischargeRequest, ElderItem, PageResult } from '../../types'
+import type { BaseConfigItem, DischargeRequest } from '../../types'
 
 const formRef = ref<FormInstance>()
 const form = reactive<DischargeRequest>({ elderId: 0, dischargeDate: '' })
 const submitting = ref(false)
-const elders = ref<ElderItem[]>([])
 const route = useRoute()
 const highlightApplyId = ref('')
 const dischargeFeeConfigOptions = ref<{ label: string; value: string }[]>([])
+const { elderOptions, elderLoading, searchElders } = useElderOptions({ pageSize: 80 })
 
 const rules: FormRules = {
   elderId: [{ required: true, message: '请选择老人' }],
   dischargeDate: [{ required: true, message: '请选择退院日期' }]
-}
-
-async function loadElders() {
-  const res: PageResult<ElderItem> = await getElderPage({ pageNo: 1, pageSize: 200 })
-  elders.value = res.list
 }
 
 async function loadDischargeFeeConfigOptions() {
@@ -92,6 +94,6 @@ async function submit() {
 onMounted(() => {
   highlightApplyId.value = String(route.query.highlightApplyId || '')
   loadDischargeFeeConfigOptions()
-  loadElders()
+  searchElders('')
 })
 </script>

@@ -34,4 +34,4 @@ docker run --rm -p 80:80 smartcare-admin:local
 - 家属登录接口：`POST /api/auth/family/login`（后端字段：`orgId`、`phone`、`verifyCode`）
 - Token 保存在 localStorage，并由 Axios 请求拦截器自动携带
 - 401 自动跳转登录页
-- 企业首页配置文件：`src/constants/enterpriseProfile.ts`（机构名称、服务、联系方式等可直接修改）
+- 企业首页配置文件：`src/constants/enterpriseProfile.ts`（机构名称、服务体系、居民体系、新闻活动、招聘合作、联系方式等均可直接修改）

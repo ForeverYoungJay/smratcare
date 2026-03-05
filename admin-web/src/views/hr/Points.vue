@@ -7,14 +7,13 @@
           allow-clear
           show-search
           :filter-option="false"
+          :options="staffOptions"
+          :loading="staffLoading"
           placeholder="选择员工"
           style="width: 200px"
           @search="searchStaff"
-        >
-          <a-select-option v-for="item in staffOptions" :key="item.value" :value="item.value">
-            {{ item.label }}
-          </a-select-option>
-        </a-select>
+          @focus="() => !staffOptions.length && searchStaff('')"
+        />
       </a-form-item>
       <a-form-item label="日期范围">
         <a-range-picker v-model:value="query.range" />
@@ -49,13 +48,12 @@
             allow-clear
             show-search
             :filter-option="false"
+            :options="staffOptions"
+            :loading="staffLoading"
             placeholder="选择员工"
             @search="searchStaff"
-          >
-            <a-select-option v-for="item in staffOptions" :key="item.value" :value="item.value">
-              {{ item.label }}
-            </a-select-option>
-          </a-select>
+            @focus="() => !staffOptions.length && searchStaff('')"
+          />
         </a-form-item>
         <a-form-item label="调整类型" required>
           <a-select v-model:value="adjustForm.changeType" :options="changeTypeOptions" />
@@ -79,8 +77,8 @@ import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { adjustStaffPoints, getStaffPointsLog } from '../../api/hr'
-import { getStaffPage } from '../../api/rbac'
-import type { StaffPointsLog, PageResult, StaffItem } from '../../types'
+import { useStaffOptions } from '../../composables/useStaffOptions'
+import type { StaffPointsLog, PageResult } from '../../types'
 
 const query = reactive({
   staffId: undefined as number | undefined,
@@ -105,7 +103,7 @@ const columns = [
 const adjustOpen = ref(false)
 const adjusting = ref(false)
 const adjustForm = reactive({ staffId: undefined as number | undefined, changeType: 'EARN', changePoints: 1, remark: '' })
-const staffOptions = ref<Array<{ label: string; value: number }>>([])
+const { staffOptions, staffLoading, searchStaff } = useStaffOptions({ pageSize: 120 })
 const changeTypeOptions = [
   { label: '奖励', value: 'EARN' },
   { label: '扣减', value: 'DEDUCT' },
@@ -181,16 +179,7 @@ async function submitAdjust() {
   }
 }
 
-async function loadStaffOptions(keyword?: string) {
-  const res: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: 50, keyword })
-  staffOptions.value = res.list.map((item) => ({ label: item.realName || item.username, value: item.id }))
-}
-
-async function searchStaff(val: string) {
-  await loadStaffOptions(val)
-}
-
-loadStaffOptions()
+searchStaff('')
 fetchData()
 </script>
 

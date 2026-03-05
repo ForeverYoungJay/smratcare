@@ -43,14 +43,13 @@
             allow-clear
             show-search
             :filter-option="false"
+            :options="staffOptions"
+            :loading="staffLoading"
             placeholder="选择员工"
             @search="searchStaff"
+            @focus="() => !staffOptions.length && searchStaff('')"
             @change="onStaffChange"
-          >
-            <a-select-option v-for="item in staffOptions" :key="item.value" :value="item.value">
-              {{ item.label }}
-            </a-select-option>
-          </a-select>
+          />
           <a-input v-else v-model:value="form.realName" disabled />
         </a-form-item>
         <a-form-item label="岗位/职称">
@@ -119,8 +118,8 @@ import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { getHrStaffPage, getHrProfile, upsertHrProfile, terminateStaff, reinstateStaff } from '../../api/hr'
-import { getStaffPage } from '../../api/rbac'
-import type { HrStaffProfile, PageResult, StaffItem } from '../../types'
+import { useStaffOptions } from '../../composables/useStaffOptions'
+import type { HrStaffProfile, PageResult } from '../../types'
 
 const props = withDefaults(defineProps<{
   title?: string
@@ -138,7 +137,7 @@ const rows = ref<HrStaffProfile[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
-const staffOptions = ref<Array<{ label: string; value: string | number }>>([])
+const { staffOptions, staffLoading, searchStaff, ensureSelectedStaff } = useStaffOptions({ pageSize: 120 })
 const selectedRowKeys = ref<string[]>([])
 
 const columns = [
@@ -206,15 +205,6 @@ function onReset() {
   fetchData()
 }
 
-async function loadStaffOptions(keyword?: string) {
-  const res: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: 50, keyword })
-  staffOptions.value = res.list.map((item) => ({ label: item.realName || item.username, value: String(item.id) }))
-}
-
-async function searchStaff(val: string) {
-  await loadStaffOptions(val)
-}
-
 function onStaffChange(val: string | number) {
   const selected = staffOptions.value.find((item) => String(item.value) === String(val))
   if (selected) {
@@ -228,12 +218,10 @@ async function openDrawer(record?: HrStaffProfile) {
   })
   Object.assign(form, record || { status: 1 })
   if (!record) {
-    await loadStaffOptions()
+    await searchStaff('')
   }
   if (record?.staffId && record?.realName) {
-    if (!staffOptions.value.some((item) => String(item.value) === String(record.staffId))) {
-      staffOptions.value = [{ label: record.realName, value: String(record.staffId) }, ...staffOptions.value]
-    }
+    ensureSelectedStaff(record.staffId, record.realName)
   }
   if (record?.staffId) {
     try {
@@ -397,7 +385,7 @@ async function batchReinstate() {
   }
 }
 
-loadStaffOptions()
+searchStaff('')
 fetchData()
 </script>
 

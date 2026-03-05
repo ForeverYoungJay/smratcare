@@ -7,14 +7,13 @@
           allow-clear
           show-search
           :filter-option="false"
+          :options="staffOptions"
+          :loading="staffLoading"
           placeholder="选择员工"
           style="width: 200px"
           @search="searchStaff"
-        >
-          <a-select-option v-for="item in staffOptions" :key="item.value" :value="item.value">
-            {{ item.label }}
-          </a-select-option>
-        </a-select>
+          @focus="() => !staffOptions.length && searchStaff('')"
+        />
       </a-form-item>
       <a-form-item label="类型">
         <a-select v-model:value="query.type" allow-clear style="width: 140px" :options="typeOptions" />
@@ -65,14 +64,13 @@
                 allow-clear
                 show-search
                 :filter-option="false"
+                :options="staffOptions"
+                :loading="staffLoading"
                 placeholder="选择员工"
                 @search="searchStaff"
+                @focus="() => !staffOptions.length && searchStaff('')"
                 @change="onStaffChange"
-              >
-                <a-select-option v-for="item in staffOptions" :key="item.value" :value="item.value">
-                  {{ item.label }}
-                </a-select-option>
-              </a-select>
+              />
             </a-form-item>
           </a-col>
           <a-col :span="12">
@@ -132,8 +130,8 @@ import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { createRewardPunishment, deleteRewardPunishment, getRewardPunishmentPage, updateRewardPunishment } from '../../api/hr'
-import { getStaffPage } from '../../api/rbac'
-import type { PageResult, StaffItem, StaffRewardPunishment } from '../../types'
+import { useStaffOptions } from '../../composables/useStaffOptions'
+import type { PageResult, StaffRewardPunishment } from '../../types'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -148,7 +146,7 @@ const query = reactive({
   pageSize: 10
 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
-const staffOptions = ref<Array<{ label: string; value: string | number }>>([])
+const { staffOptions, staffLoading, searchStaff, ensureSelectedStaff } = useStaffOptions({ pageSize: 120 })
 
 const columns = [
   { title: '员工', dataIndex: 'staffName', key: 'staffName', width: 120 },
@@ -181,15 +179,6 @@ const rowSelection = computed(() => ({
 }))
 const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(String(item.id))))
 const selectedSingleRecord = computed(() => (selectedRecords.value.length === 1 ? selectedRecords.value[0] : null))
-
-async function loadStaffOptions(keyword?: string) {
-  const res: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: 50, keyword })
-  staffOptions.value = res.list.map((item) => ({ label: item.realName || item.username, value: String(item.id) }))
-}
-
-async function searchStaff(val: string) {
-  await loadStaffOptions(val)
-}
 
 function onStaffChange(staffId: string | number) {
   const staff = staffOptions.value.find((item) => String(item.value) === String(staffId))
@@ -234,8 +223,8 @@ function onReset() {
 
 function openEdit(record?: StaffRewardPunishment) {
   Object.assign(form, record || { type: 'REWARD', status: 'EFFECTIVE', title: '', reason: '', level: '' })
-  if (record?.staffId && record?.staffName && !staffOptions.value.some((item) => String(item.value) === String(record.staffId))) {
-    staffOptions.value.unshift({ label: record.staffName, value: String(record.staffId) })
+  if (record?.staffId && record?.staffName) {
+    ensureSelectedStaff(record.staffId, record.staffName)
   }
   occurredDate.value = form.occurredDate ? dayjs(form.occurredDate) : undefined
   editOpen.value = true
@@ -309,7 +298,7 @@ async function batchRemove() {
   }
 }
 
-loadStaffOptions()
+searchStaff('')
 fetchData()
 </script>
 

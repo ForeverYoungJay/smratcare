@@ -44,6 +44,18 @@
         <a-form-item label="营销人员">
           <a-input v-model:value="query.marketerName" placeholder="请输入 营销人员" allow-clear />
         </a-form-item>
+        <a-form-item label="优惠政策">
+          <a-select
+            v-model:value="query.orgName"
+            style="width: 220px"
+            allow-clear
+            show-search
+            :loading="policyLoading"
+            :options="policyOptions"
+            placeholder="筛选运营政策"
+            :filter-option="policyFilterOption"
+          />
+        </a-form-item>
         <a-form-item label="流程阶段">
           <a-select v-model:value="query.flowStage" style="width: 150px" allow-clear>
             <a-select-option value="PENDING_ASSESSMENT">待评估</a-select-option>
@@ -165,7 +177,19 @@
             </a-form-item>
           </a-col>
           <a-col :span="12"><a-form-item label="营销人员"><a-input v-model:value="form.marketerName" /></a-form-item></a-col>
-          <a-col :span="12"><a-form-item label="优惠政策"><a-input v-model:value="form.orgName" placeholder="请输入优惠政策" /></a-form-item></a-col>
+          <a-col :span="12">
+            <a-form-item label="优惠政策（联动运营政策）">
+              <a-select
+                v-model:value="form.orgName"
+                allow-clear
+                show-search
+                :loading="policyLoading"
+                :options="policyOptions"
+                placeholder="请选择营销方案中的季度运营政策"
+                :filter-option="policyFilterOption"
+              />
+            </a-form-item>
+          </a-col>
         </a-row>
       </a-form>
     </a-modal>
@@ -252,12 +276,13 @@ import {
   getContractAssessmentOverview,
   getContractAttachments,
   getContractPage,
+  getMarketingPlanList,
   updateCrmContract,
   uploadMarketingFile
 } from '../../api/marketing'
 import { createElder, getElderPage, updateElder } from '../../api/elder'
 import { getAdmissionRecords } from '../../api/elderLifecycle'
-import type { ContractAttachmentItem, CrmContractItem, ElderItem, PageResult } from '../../types'
+import type { ContractAttachmentItem, CrmContractItem, ElderItem, MarketingPlanItem, PageResult } from '../../types'
 
 const router = useRouter()
 const route = useRoute()
@@ -285,6 +310,8 @@ const onlyMineDept = ref(false)
 const mineDept = ref<'MARKETING' | 'ASSESSMENT'>('MARKETING')
 const onlyOverdue = ref(false)
 const sortByOverdue = ref(false)
+const policyOptions = ref<Array<{ label: string; value: string }>>([])
+const policyLoading = ref(false)
 
 const stageBoard = reactive({
   pendingAssessment: 0,
@@ -305,6 +332,7 @@ const query = reactive({
   elderName: '',
   elderPhone: '',
   marketerName: '',
+  orgName: undefined as string | undefined,
   flowStage: undefined as CrmContractItem['flowStage'] | undefined,
   pageNo: 1,
   pageSize: 10
@@ -440,6 +468,7 @@ const columns = [
   { title: '签约房号', dataIndex: 'reservationRoomNo', key: 'reservationRoomNo', width: 140 },
   { title: '联系电话', dataIndex: 'elderPhone', key: 'elderPhone', width: 140 },
   { title: '营销人员', dataIndex: 'marketerName', key: 'marketerName', width: 120 },
+  { title: '优惠政策', dataIndex: 'orgName', key: 'orgName', width: 220 },
   { title: '合同状态', dataIndex: 'contractStatus', key: 'contractStatus', width: 130 },
   { title: '超时预警', dataIndex: 'slaWarning', key: 'slaWarning', width: 150 }
 ]
@@ -677,6 +706,7 @@ async function fetchData() {
         elderName: query.elderName || undefined,
         elderPhone: query.elderPhone || undefined,
         marketerName: query.marketerName || undefined,
+        orgName: query.orgName || undefined,
         flowStage: query.flowStage || undefined,
         currentOwnerDept: onlyMineDept.value ? mineDept.value : undefined
       })
@@ -707,6 +737,7 @@ async function fetchAllLeadRows() {
       elderName: query.elderName || undefined,
       elderPhone: query.elderPhone || undefined,
       marketerName: query.marketerName || undefined,
+      orgName: query.orgName || undefined,
       flowStage: query.flowStage || undefined,
       currentOwnerDept: onlyMineDept.value ? mineDept.value : undefined
     })
@@ -745,6 +776,7 @@ function reset() {
   query.elderName = ''
   query.elderPhone = ''
   query.marketerName = ''
+  query.orgName = undefined
   query.flowStage = undefined
   onlyMineDept.value = false
   mineDept.value = 'MARKETING'
@@ -858,10 +890,46 @@ function openForm(record?: CrmContractItem) {
       flowStage: 'PENDING_ASSESSMENT',
       currentOwnerDept: 'ASSESSMENT',
       reservationRoomNo: undefined,
-      orgName: '弋阳龟峰颐养中心'
+      orgName: undefined
     } as Partial<CrmContractItem>)
   }
   open.value = true
+}
+
+async function fetchPolicyOptions() {
+  policyLoading.value = true
+  try {
+    const list = await getMarketingPlanList('POLICY')
+    const options = (list || [])
+      .filter((item: MarketingPlanItem) => ['PUBLISHED', 'ACTIVE'].includes(String(item.status || '')))
+      .map((item: MarketingPlanItem) => {
+        const quarter = item.quarterLabel ? `${item.quarterLabel} · ` : ''
+        return {
+          label: `${quarter}${item.title}`,
+          value: item.title
+        }
+      })
+    const dedup = new Map<string, { label: string; value: string }>()
+    options.forEach((item) => {
+      if (!dedup.has(item.value)) {
+        dedup.set(item.value, item)
+      }
+    })
+    policyOptions.value = Array.from(dedup.values())
+  } catch (error: any) {
+    message.warning(error?.message || '运营政策加载失败，请稍后重试')
+    policyOptions.value = []
+  } finally {
+    policyLoading.value = false
+  }
+}
+
+function policyFilterOption(input: string, option: any) {
+  const label = String(option?.label || '')
+  const value = String(option?.value || '')
+  const keyword = String(input || '').trim().toLowerCase()
+  if (!keyword) return true
+  return label.toLowerCase().includes(keyword) || value.toLowerCase().includes(keyword)
 }
 
 async function submit() {
@@ -1203,6 +1271,7 @@ async function ensureElderFromLead(lead: CrmContractItem): Promise<ElderItem> {
 
 onMounted(() => {
   applyStatusPreset()
+  fetchPolicyOptions()
   fetchData()
 })
 

@@ -130,6 +130,7 @@ public class CrmContractServiceImpl implements CrmContractService {
       String elderName,
       String elderPhone,
       String marketerName,
+      String orgName,
       String flowStage,
       String contractStatus,
       String status,
@@ -151,6 +152,9 @@ public class CrmContractServiceImpl implements CrmContractService {
     if (marketerName != null && !marketerName.isBlank()) {
       wrapper.like(CrmContract::getMarketerName, marketerName.trim());
     }
+    if (orgName != null && !orgName.isBlank()) {
+      wrapper.like(CrmContract::getOrgName, orgName.trim());
+    }
     if (flowStage != null && !flowStage.isBlank()) {
       wrapper.eq(CrmContract::getFlowStage, flowStage.trim());
     }
@@ -169,7 +173,8 @@ public class CrmContractServiceImpl implements CrmContractService {
           .or().like(CrmContract::getPhone, keyword)
           .or().like(CrmContract::getElderName, keyword)
           .or().like(CrmContract::getElderPhone, keyword)
-          .or().like(CrmContract::getMarketerName, keyword));
+          .or().like(CrmContract::getMarketerName, keyword)
+          .or().like(CrmContract::getOrgName, keyword));
     }
     if (Boolean.TRUE.equals(overdueOnly)) {
       wrapper.and(w -> w

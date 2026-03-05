@@ -148,7 +148,16 @@
           </a-col>
           <a-col :span="12">
             <a-form-item label="协同部门" v-if="form.calendarType === 'COLLAB'">
-              <a-select v-model:value="form.collaboratorDeptId" allow-clear :options="departmentOptions" placeholder="先选部门再选人" />
+              <a-select
+                v-model:value="form.collaboratorDeptId"
+                allow-clear
+                show-search
+                :filter-option="false"
+                :options="departmentOptions"
+                placeholder="输入部门名称/拼音首字母"
+                @search="searchDepartments"
+                @focus="() => !departmentOptions.length && searchDepartments('')"
+              />
             </a-form-item>
           </a-col>
         </a-row>
@@ -160,9 +169,12 @@
                 v-model:value="form.collaboratorIds"
                 mode="multiple"
                 allow-clear
+                show-search
+                :filter-option="false"
                 :options="filteredStaffOptions"
                 placeholder="邀请其他人后会自动在协同日历展示"
-                option-filter-prop="label"
+                @search="searchStaff"
+                @focus="() => !staffOptions.length && searchStaff('')"
               />
             </a-form-item>
           </a-col>
@@ -218,9 +230,10 @@ import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import { getOaTaskCalendar, createOaTask, updateOaTask, completeOaTask, deleteOaTask } from '../../api/oa'
 import { getElderPage } from '../../api/elder'
-import { getDepartmentPage, getStaffPage } from '../../api/rbac'
+import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
+import { useStaffOptions } from '../../composables/useStaffOptions'
 import { useUserStore } from '../../stores/user'
-import type { DepartmentItem, OaTask, ElderItem, PageResult, StaffItem } from '../../types'
+import type { OaTask, ElderItem, PageResult } from '../../types'
 
 type EventKind = 'TASK' | 'HOLIDAY' | 'BIRTHDAY'
 type CalendarType = 'PERSONAL' | 'WORK' | 'DAILY' | 'COLLAB'
@@ -230,8 +243,8 @@ type RecurrenceType = 'DAILY' | 'WEEKLY' | 'MONTHLY'
 const userStore = useUserStore()
 const rows = ref<OaTask[]>([])
 const elders = ref<ElderItem[]>([])
-const staffOptions = ref<{ label: string; value: string }[]>([])
-const departmentOptions = ref<{ label: string; value: string }[]>([])
+const { staffOptions, searchStaff } = useStaffOptions({ pageSize: 300, preloadSize: 500 })
+const { departmentOptions, searchDepartments } = useDepartmentOptions({ pageSize: 240, preloadSize: 500 })
 const staffDeptMap = ref<Record<string, string | undefined>>({})
 const saving = ref(false)
 const editOpen = ref(false)
@@ -502,20 +515,15 @@ async function fetchAll() {
 }
 
 async function fetchStaffOptions() {
-  const page: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: 300 })
+  await searchStaff('')
   staffDeptMap.value = {}
-  ;(page.list || []).forEach((item) => {
-    staffDeptMap.value[String(item.id)] = item.departmentId == null ? undefined : String(item.departmentId)
+  staffOptions.value.forEach((item: any) => {
+    staffDeptMap.value[String(item.value)] = item.departmentId == null ? undefined : String(item.departmentId)
   })
-  staffOptions.value = (page.list || []).map((item) => ({
-    label: item.realName || item.username || `员工#${item.id}`,
-    value: String(item.id)
-  }))
 }
 
 async function fetchDepartmentOptions() {
-  const page: PageResult<DepartmentItem> = await getDepartmentPage({ pageNo: 1, pageSize: 200 })
-  departmentOptions.value = (page.list || []).map((item) => ({ label: item.deptName, value: String(item.id) }))
+  await searchDepartments('')
 }
 
 function onReset() {

@@ -47,9 +47,33 @@
 
         <a-row :gutter="[12, 12]" v-if="showRowTodoReminder" class="section-row" :style="{ order: sectionOrder(['todo', 'reminder']) }">
           <a-col :xs="24" :xl="14" :style="{ order: moduleOrder('todo') }">
-            <a-card v-if="isModuleVisible('todo')" :bordered="false" class="card-elevated full-height module-card" :style="moduleCardStyle('todo')" title="1️⃣ 我的待办（最重要）">
+            <a-card
+              v-if="isModuleVisible('todo')"
+              :bordered="false"
+              class="card-elevated full-height module-card"
+              :class="portalModuleCardClass('todo')"
+              :style="moduleCardStyle('todo')"
+              title="1️⃣ 我的待办（最重要）"
+              @dragover="onPortalModuleDragOver('todo', $event)"
+              @drop.prevent="onPortalModuleDrop('todo')"
+            >
               <template #extra>
-                <a-tag color="processing">总待办 {{ totalTodoCount }}</a-tag>
+                <a-space>
+                  <a-tag color="processing">总待办 {{ totalTodoCount }}</a-tag>
+                  <div
+                    class="module-drag-handle"
+                    :class="{ 'is-ready': moduleDragReadyKey === 'todo' }"
+                    draggable="true"
+                    title="按住 120ms 拖动排序"
+                    @mousedown.left.stop="onPortalModuleHandleMouseDown('todo')"
+                    @mouseup.stop="onPortalModuleHandleRelease"
+                    @mouseleave="onPortalModuleHandleRelease"
+                    @dragstart="onPortalModuleCardDragStart('todo', $event)"
+                    @dragend="onPortalModuleCardDragEnd"
+                  >
+                    ⋮⋮
+                  </div>
+                </a-space>
               </template>
               <a-row :gutter="[10, 10]">
                 <a-col :xs="12" :sm="6" v-for="item in myTodoStats" :key="item.title">
@@ -80,7 +104,31 @@
           </a-col>
 
           <a-col :xs="24" :xl="10" :style="{ order: moduleOrder('reminder') }">
-            <a-card v-if="isModuleVisible('reminder')" :bordered="false" class="card-elevated full-height module-card" :style="moduleCardStyle('reminder')" title="2️⃣ 提醒中心（系统预警）">
+            <a-card
+              v-if="isModuleVisible('reminder')"
+              :bordered="false"
+              class="card-elevated full-height module-card"
+              :class="portalModuleCardClass('reminder')"
+              :style="moduleCardStyle('reminder')"
+              title="2️⃣ 提醒中心（系统预警）"
+              @dragover="onPortalModuleDragOver('reminder', $event)"
+              @drop.prevent="onPortalModuleDrop('reminder')"
+            >
+              <template #extra>
+                <div
+                  class="module-drag-handle"
+                  :class="{ 'is-ready': moduleDragReadyKey === 'reminder' }"
+                  draggable="true"
+                  title="按住 120ms 拖动排序"
+                  @mousedown.left.stop="onPortalModuleHandleMouseDown('reminder')"
+                  @mouseup.stop="onPortalModuleHandleRelease"
+                  @mouseleave="onPortalModuleHandleRelease"
+                  @dragstart="onPortalModuleCardDragStart('reminder', $event)"
+                  @dragend="onPortalModuleCardDragEnd"
+                >
+                  ⋮⋮
+                </div>
+              </template>
               <a-list size="small" :data-source="riskReminders" :locale="{ emptyText: '暂无提醒' }">
                 <template #renderItem="{ item }">
                   <a-list-item>
@@ -111,9 +159,27 @@
           v-if="isModuleVisible('quickLaunch')"
           :bordered="false"
           class="card-elevated module-card"
+          :class="portalModuleCardClass('quickLaunch')"
           :style="[moduleCardStyle('quickLaunch'), { order: sectionOrder(['quickLaunch']) }]"
           title="3️⃣ 快捷发起（操作入口）"
+          @dragover="onPortalModuleDragOver('quickLaunch', $event)"
+          @drop.prevent="onPortalModuleDrop('quickLaunch')"
         >
+          <template #extra>
+            <div
+              class="module-drag-handle"
+              :class="{ 'is-ready': moduleDragReadyKey === 'quickLaunch' }"
+              draggable="true"
+              title="按住 120ms 拖动排序"
+              @mousedown.left.stop="onPortalModuleHandleMouseDown('quickLaunch')"
+              @mouseup.stop="onPortalModuleHandleRelease"
+              @mouseleave="onPortalModuleHandleRelease"
+              @dragstart="onPortalModuleCardDragStart('quickLaunch', $event)"
+              @dragend="onPortalModuleCardDragEnd"
+            >
+              ⋮⋮
+            </div>
+          </template>
           <a-row :gutter="[12, 12]">
             <a-col :xs="24" :md="12" :xl="6" v-for="group in quickLaunchGroups" :key="group.title">
               <div class="quick-group">
@@ -135,8 +201,11 @@
           v-if="isModuleVisible('customCards')"
           :bordered="false"
           class="card-elevated module-card"
+          :class="portalModuleCardClass('customCards')"
           :style="[moduleCardStyle('customCards'), { order: sectionOrder(['customCards']) }]"
           title="🧩 我的自定义卡面"
+          @dragover="onPortalModuleDragOver('customCards', $event)"
+          @drop.prevent="onPortalModuleDrop('customCards')"
         >
           <template #extra>
             <a-space>
@@ -148,6 +217,19 @@
               />
               <a-button size="small" @click="openCustomCardEditor()">新增卡面</a-button>
               <a-button size="small" @click="customCardManageOpen = true">管理卡面</a-button>
+              <div
+                class="module-drag-handle"
+                :class="{ 'is-ready': moduleDragReadyKey === 'customCards' }"
+                draggable="true"
+                title="按住 120ms 拖动排序"
+                @mousedown.left.stop="onPortalModuleHandleMouseDown('customCards')"
+                @mouseup.stop="onPortalModuleHandleRelease"
+                @mouseleave="onPortalModuleHandleRelease"
+                @dragstart="onPortalModuleCardDragStart('customCards', $event)"
+                @dragend="onPortalModuleCardDragEnd"
+              >
+                ⋮⋮
+              </div>
             </a-space>
           </template>
           <a-row :gutter="[12, 12]">
@@ -180,7 +262,31 @@
 
         <a-row :gutter="[12, 12]" v-if="showRowOperation" class="section-row" :style="{ order: sectionOrder(['operation', 'finance', 'salesFunnel']) }">
           <a-col :xs="24" :xl="8" :style="{ order: moduleOrder('operation') }">
-            <a-card v-if="isModuleVisible('operation')" :bordered="false" class="card-elevated full-height module-card" :style="moduleCardStyle('operation')" title="4️⃣ 今日运营概览（核心KPI）">
+            <a-card
+              v-if="isModuleVisible('operation')"
+              :bordered="false"
+              class="card-elevated full-height module-card"
+              :class="portalModuleCardClass('operation')"
+              :style="moduleCardStyle('operation')"
+              title="4️⃣ 今日运营概览（核心KPI）"
+              @dragover="onPortalModuleDragOver('operation', $event)"
+              @drop.prevent="onPortalModuleDrop('operation')"
+            >
+              <template #extra>
+                <div
+                  class="module-drag-handle"
+                  :class="{ 'is-ready': moduleDragReadyKey === 'operation' }"
+                  draggable="true"
+                  title="按住 120ms 拖动排序"
+                  @mousedown.left.stop="onPortalModuleHandleMouseDown('operation')"
+                  @mouseup.stop="onPortalModuleHandleRelease"
+                  @mouseleave="onPortalModuleHandleRelease"
+                  @dragstart="onPortalModuleCardDragStart('operation', $event)"
+                  @dragend="onPortalModuleCardDragEnd"
+                >
+                  ⋮⋮
+                </div>
+              </template>
               <a-row :gutter="[10, 10]">
                 <a-col :span="12" v-for="item in operationOverview" :key="item.title">
                   <div class="metric-cell" @click="item.route ? go(item.route) : undefined">
@@ -196,7 +302,31 @@
           </a-col>
 
           <a-col :xs="24" :xl="8" :style="{ order: moduleOrder('finance') }">
-            <a-card v-if="isModuleVisible('finance')" :bordered="false" class="card-elevated full-height module-card" :style="moduleCardStyle('finance')" title="5️⃣ 财务运营概览">
+            <a-card
+              v-if="isModuleVisible('finance')"
+              :bordered="false"
+              class="card-elevated full-height module-card"
+              :class="portalModuleCardClass('finance')"
+              :style="moduleCardStyle('finance')"
+              title="5️⃣ 财务运营概览"
+              @dragover="onPortalModuleDragOver('finance', $event)"
+              @drop.prevent="onPortalModuleDrop('finance')"
+            >
+              <template #extra>
+                <div
+                  class="module-drag-handle"
+                  :class="{ 'is-ready': moduleDragReadyKey === 'finance' }"
+                  draggable="true"
+                  title="按住 120ms 拖动排序"
+                  @mousedown.left.stop="onPortalModuleHandleMouseDown('finance')"
+                  @mouseup.stop="onPortalModuleHandleRelease"
+                  @mouseleave="onPortalModuleHandleRelease"
+                  @dragstart="onPortalModuleCardDragStart('finance', $event)"
+                  @dragend="onPortalModuleCardDragEnd"
+                >
+                  ⋮⋮
+                </div>
+              </template>
               <a-row :gutter="[10, 10]">
                 <a-col :span="12" v-for="item in financeOverviewItems" :key="item.title">
                   <div class="metric-cell" @click="item.route ? go(item.route) : undefined">
@@ -213,7 +343,31 @@
           </a-col>
 
           <a-col :xs="24" :xl="8" :style="{ order: moduleOrder('salesFunnel') }">
-            <a-card v-if="isModuleVisible('salesFunnel')" :bordered="false" class="card-elevated full-height module-card" :style="moduleCardStyle('salesFunnel')" title="6️⃣ 销售运营漏斗">
+            <a-card
+              v-if="isModuleVisible('salesFunnel')"
+              :bordered="false"
+              class="card-elevated full-height module-card"
+              :class="portalModuleCardClass('salesFunnel')"
+              :style="moduleCardStyle('salesFunnel')"
+              title="6️⃣ 销售运营漏斗"
+              @dragover="onPortalModuleDragOver('salesFunnel', $event)"
+              @drop.prevent="onPortalModuleDrop('salesFunnel')"
+            >
+              <template #extra>
+                <div
+                  class="module-drag-handle"
+                  :class="{ 'is-ready': moduleDragReadyKey === 'salesFunnel' }"
+                  draggable="true"
+                  title="按住 120ms 拖动排序"
+                  @mousedown.left.stop="onPortalModuleHandleMouseDown('salesFunnel')"
+                  @mouseup.stop="onPortalModuleHandleRelease"
+                  @mouseleave="onPortalModuleHandleRelease"
+                  @dragstart="onPortalModuleCardDragStart('salesFunnel', $event)"
+                  @dragend="onPortalModuleCardDragEnd"
+                >
+                  ⋮⋮
+                </div>
+              </template>
               <a-row :gutter="[10, 10]">
                 <a-col :span="12" v-for="item in salesFunnelItems" :key="item.title">
                   <div class="metric-cell" @click="go(item.route)">
@@ -232,7 +386,31 @@
 
         <a-row :gutter="[12, 12]" v-if="showRowStatusExpense" class="section-row" :style="{ order: sectionOrder(['bedStatus', 'expense']) }">
           <a-col :xs="24" :xl="10" :style="{ order: moduleOrder('bedStatus') }">
-            <a-card v-if="isModuleVisible('bedStatus')" :bordered="false" class="card-elevated full-height module-card" :style="moduleCardStyle('bedStatus')" title="7️⃣ 床位与长者状态">
+            <a-card
+              v-if="isModuleVisible('bedStatus')"
+              :bordered="false"
+              class="card-elevated full-height module-card"
+              :class="portalModuleCardClass('bedStatus')"
+              :style="moduleCardStyle('bedStatus')"
+              title="7️⃣ 床位与长者状态"
+              @dragover="onPortalModuleDragOver('bedStatus', $event)"
+              @drop.prevent="onPortalModuleDrop('bedStatus')"
+            >
+              <template #extra>
+                <div
+                  class="module-drag-handle"
+                  :class="{ 'is-ready': moduleDragReadyKey === 'bedStatus' }"
+                  draggable="true"
+                  title="按住 120ms 拖动排序"
+                  @mousedown.left.stop="onPortalModuleHandleMouseDown('bedStatus')"
+                  @mouseup.stop="onPortalModuleHandleRelease"
+                  @mouseleave="onPortalModuleHandleRelease"
+                  @dragstart="onPortalModuleCardDragStart('bedStatus', $event)"
+                  @dragend="onPortalModuleCardDragEnd"
+                >
+                  ⋮⋮
+                </div>
+              </template>
               <a-row :gutter="[10, 10]">
                 <a-col :span="8" v-for="item in bedAndElderStatusItems" :key="item.title">
                   <div class="metric-cell" @click="go(item.route)">
@@ -249,7 +427,31 @@
           </a-col>
 
           <a-col :xs="24" :xl="14" :style="{ order: moduleOrder('expense') }">
-            <a-card v-if="isModuleVisible('expense')" :bordered="false" class="card-elevated full-height module-card" :style="moduleCardStyle('expense')" title="8️⃣ 费用管理（我的费用 / 部门费用 / 发票夹）">
+            <a-card
+              v-if="isModuleVisible('expense')"
+              :bordered="false"
+              class="card-elevated full-height module-card"
+              :class="portalModuleCardClass('expense')"
+              :style="moduleCardStyle('expense')"
+              title="8️⃣ 费用管理（我的费用 / 部门费用 / 发票夹）"
+              @dragover="onPortalModuleDragOver('expense', $event)"
+              @drop.prevent="onPortalModuleDrop('expense')"
+            >
+              <template #extra>
+                <div
+                  class="module-drag-handle"
+                  :class="{ 'is-ready': moduleDragReadyKey === 'expense' }"
+                  draggable="true"
+                  title="按住 120ms 拖动排序"
+                  @mousedown.left.stop="onPortalModuleHandleMouseDown('expense')"
+                  @mouseup.stop="onPortalModuleHandleRelease"
+                  @mouseleave="onPortalModuleHandleRelease"
+                  @dragstart="onPortalModuleCardDragStart('expense', $event)"
+                  @dragend="onPortalModuleCardDragEnd"
+                >
+                  ⋮⋮
+                </div>
+              </template>
               <a-row :gutter="[10, 10]">
                 <a-col :xs="24" :md="8" v-for="group in expenseSections" :key="group.title">
                   <div class="expense-block">
@@ -272,8 +474,11 @@
           v-if="isModuleVisible('calendar')"
           :bordered="false"
           class="card-elevated module-card"
+          :class="portalModuleCardClass('calendar')"
           :style="[moduleCardStyle('calendar'), { order: sectionOrder(['calendar']) }]"
           title="9️⃣ 行政日历 / 协同日历"
+          @dragover="onPortalModuleDragOver('calendar', $event)"
+          @drop.prevent="onPortalModuleDrop('calendar')"
         >
           <template #extra>
             <a-space>
@@ -282,6 +487,19 @@
               <a-button size="small" @click="agendaDrawerOpen = true">今日/明日速览</a-button>
               <a-button size="small" @click="go('/oa/attendance-leave?type=LEAVE&quick=1')">发起请假</a-button>
               <a-button size="small" @click="go('/oa/approval?type=LEAVE')">请假审批流程</a-button>
+              <div
+                class="module-drag-handle"
+                :class="{ 'is-ready': moduleDragReadyKey === 'calendar' }"
+                draggable="true"
+                title="按住 120ms 拖动排序"
+                @mousedown.left.stop="onPortalModuleHandleMouseDown('calendar')"
+                @mouseup.stop="onPortalModuleHandleRelease"
+                @mouseleave="onPortalModuleHandleRelease"
+                @dragstart="onPortalModuleCardDragStart('calendar', $event)"
+                @dragend="onPortalModuleCardDragEnd"
+              >
+                ⋮⋮
+              </div>
             </a-space>
           </template>
           <div class="calendar-toolbar">
@@ -317,9 +535,27 @@
           v-if="isModuleVisible('dataEntry')"
           :bordered="false"
           class="card-elevated module-card"
+          :class="portalModuleCardClass('dataEntry')"
           :style="[moduleCardStyle('dataEntry'), { order: sectionOrder(['dataEntry']) }]"
           title="🔟 数据分析入口"
+          @dragover="onPortalModuleDragOver('dataEntry', $event)"
+          @drop.prevent="onPortalModuleDrop('dataEntry')"
         >
+          <template #extra>
+            <div
+              class="module-drag-handle"
+              :class="{ 'is-ready': moduleDragReadyKey === 'dataEntry' }"
+              draggable="true"
+              title="按住 120ms 拖动排序"
+              @mousedown.left.stop="onPortalModuleHandleMouseDown('dataEntry')"
+              @mouseup.stop="onPortalModuleHandleRelease"
+              @mouseleave="onPortalModuleHandleRelease"
+              @dragstart="onPortalModuleCardDragStart('dataEntry', $event)"
+              @dragend="onPortalModuleCardDragEnd"
+            >
+              ⋮⋮
+            </div>
+          </template>
           <div class="hint-text">首页不放复杂图表，仅提供分析入口。</div>
           <a-space wrap style="margin-top: 8px;">
             <a-button type="primary"  @click="go('/stats/org/monthly-operation')">运营分析</a-button>
@@ -396,7 +632,16 @@
         <a-row :gutter="12" v-if="scheduleForm.calendarType === 'COLLAB'">
           <a-col :span="12">
             <a-form-item label="协同部门">
-              <a-select v-model:value="scheduleForm.collaboratorDeptId" allow-clear :options="departmentOptions" />
+              <a-select
+                v-model:value="scheduleForm.collaboratorDeptId"
+                allow-clear
+                show-search
+                :filter-option="false"
+                :options="departmentOptions"
+                placeholder="输入部门名称/拼音首字母"
+                @search="searchDepartments"
+                @focus="() => !departmentOptions.length && searchDepartments('')"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="12">
@@ -405,9 +650,12 @@
                 v-model:value="scheduleForm.collaboratorIds"
                 mode="multiple"
                 allow-clear
+                show-search
+                :filter-option="false"
                 :options="filteredStaffOptions"
-                option-filter-prop="label"
                 placeholder="邀请后自动进入对方协同日历"
+                @search="searchStaff"
+                @focus="() => !staffOptions.length && searchStaff('')"
               />
             </a-form-item>
           </a-col>
@@ -800,8 +1048,8 @@ import { getMarketingConversionReport, getLeadPage, getContractPage } from '../a
 import { getResidenceStatusSummary } from '../api/elderResidence'
 import { getBedMap } from '../api/bed'
 import { getHrProfileCertificateReminderPage, getHrWorkbenchSummary } from '../api/hr'
-import { getDepartmentPage, getStaffPage } from '../api/rbac'
-import type { DepartmentItem, StaffItem } from '../types'
+import { useDepartmentOptions } from '../composables/useDepartmentOptions'
+import { useStaffOptions } from '../composables/useStaffOptions'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -818,8 +1066,8 @@ const agendaDrawerOpen = ref(false)
 const editingScheduleId = ref<string | number | null>(null)
 const dayEventDrawerOpen = ref(false)
 const selectedCalendarDateText = ref(dayjs().format('YYYY-MM-DD'))
-const departmentOptions = ref<Array<{ label: string; value: string }>>([])
-const staffOptions = ref<Array<{ label: string; value: string }>>([])
+const { departmentOptions, searchDepartments } = useDepartmentOptions({ pageSize: 240, preloadSize: 500 })
+const { staffOptions, searchStaff } = useStaffOptions({ pageSize: 300, preloadSize: 500 })
 const staffDeptMap = ref<Record<string, string | undefined>>({})
 const visibleCalendarTypes = ref<Array<'PERSONAL' | 'WORK' | 'DAILY' | 'COLLAB'>>(['PERSONAL', 'WORK', 'DAILY', 'COLLAB'])
 const searchKeyword = ref('')
@@ -834,6 +1082,12 @@ const customCardCategoryFilter = ref<'ALL' | 'OPS' | 'CARE' | 'FINANCE' | 'OA' |
 const customCardGroupMode = ref(true)
 const draggingCustomCardId = ref('')
 const draggingModuleKey = ref('')
+const draggingPortalModuleKey = ref<PortalModuleKey | ''>('')
+const portalModuleDropTargetKey = ref<PortalModuleKey | ''>('')
+const moduleDragReadyKey = ref<PortalModuleKey | ''>('')
+const moduleDragCommitted = ref(false)
+const moduleDragInvalidKey = ref<PortalModuleKey | ''>('')
+const moduleDragSnapshot = ref<PortalModuleConfigItem[] | null>(null)
 const exportPayloadOpen = ref(false)
 const importPayloadOpen = ref(false)
 const exportPayloadText = ref('')
@@ -847,6 +1101,7 @@ const resizeIndicator = reactive({
 })
 let portalSyncTimer: number | undefined
 let portalVisibleHandler: (() => void) | null = null
+let moduleDragHoldTimer: number | undefined
 const suppressCardClickUntil = ref(0)
 
 type AudienceCode = 'ALL' | 'DIRECTOR' | 'NURSE' | 'FINANCE' | 'ADMIN' | 'HR' | 'OPS'
@@ -1598,6 +1853,15 @@ function moduleCardStyle(key: PortalModuleKey) {
   }
 }
 
+function portalModuleCardClass(key: PortalModuleKey) {
+  return {
+    'is-dragging-source': draggingPortalModuleKey.value === key,
+    'is-drop-zone': !!draggingPortalModuleKey.value && draggingPortalModuleKey.value !== key,
+    'is-drop-target': portalModuleDropTargetKey.value === key,
+    'is-invalid-bounce': moduleDragInvalidKey.value === key
+  }
+}
+
 function customCardItemStyle(item: PortalCustomCardItem) {
   return {
     borderTopColor: item.themeColor || '#1677ff',
@@ -1990,17 +2254,7 @@ function loadModuleCustomize() {
 
 function persistModuleCustomize() {
   try {
-    const simple = [...moduleConfig.value]
-      .sort((a, b) => a.order - b.order)
-      .map((item, index) => ({
-        key: item.key,
-        visible: item.visible,
-        order: index,
-        audience: normalizeCardAudience(item.audience),
-        width: item.width != null ? clampModuleCardWidth(item.width) : undefined,
-        height: item.height != null ? clampModuleCardHeight(item.height) : undefined
-      }))
-    localStorage.setItem(moduleStorageKey(), JSON.stringify(simple))
+    persistModuleCustomizeStrict()
   } catch {}
 }
 
@@ -2078,6 +2332,124 @@ function onModuleDrop(targetKey: PortalModuleKey) {
 
 function onModuleDragEnd() {
   draggingModuleKey.value = ''
+}
+
+function clearPortalModuleHoldTimer() {
+  if (moduleDragHoldTimer) {
+    window.clearTimeout(moduleDragHoldTimer)
+    moduleDragHoldTimer = undefined
+  }
+}
+
+function resetPortalModuleDragState() {
+  clearPortalModuleHoldTimer()
+  moduleDragReadyKey.value = ''
+  draggingPortalModuleKey.value = ''
+  portalModuleDropTargetKey.value = ''
+  moduleDragCommitted.value = false
+  moduleDragSnapshot.value = null
+}
+
+function onPortalModuleHandleMouseDown(key: PortalModuleKey) {
+  if (draggingPortalModuleKey.value) return
+  clearPortalModuleHoldTimer()
+  moduleDragReadyKey.value = ''
+  moduleDragHoldTimer = window.setTimeout(() => {
+    moduleDragReadyKey.value = key
+  }, 120)
+}
+
+function onPortalModuleHandleRelease(event?: MouseEvent) {
+  if (event?.type === 'mouseleave') {
+    return
+  }
+  if (!draggingPortalModuleKey.value) {
+    clearPortalModuleHoldTimer()
+    moduleDragReadyKey.value = ''
+  }
+}
+
+function onPortalModuleCardDragStart(key: PortalModuleKey, event: DragEvent) {
+  if (moduleDragReadyKey.value !== key) {
+    event.preventDefault()
+    return
+  }
+  const dataTransfer = event.dataTransfer
+  if (dataTransfer) {
+    dataTransfer.effectAllowed = 'move'
+    dataTransfer.dropEffect = 'move'
+    dataTransfer.setData('text/plain', key)
+  }
+  draggingPortalModuleKey.value = key
+  portalModuleDropTargetKey.value = ''
+  moduleDragCommitted.value = false
+  moduleDragSnapshot.value = moduleConfig.value.map((item) => ({ ...item }))
+}
+
+function onPortalModuleDragOver(targetKey: PortalModuleKey, event: DragEvent) {
+  if (!draggingPortalModuleKey.value || draggingPortalModuleKey.value === targetKey) return
+  event.preventDefault()
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move'
+  }
+  portalModuleDropTargetKey.value = targetKey
+}
+
+function reorderModuleConfig(sourceKey: PortalModuleKey, targetKey: PortalModuleKey, source: PortalModuleConfigItem[]) {
+  if (sourceKey === targetKey) return source
+  const sourceIndex = source.findIndex((item) => item.key === sourceKey)
+  const targetIndex = source.findIndex((item) => item.key === targetKey)
+  if (sourceIndex < 0 || targetIndex < 0) return source
+  const next = [...source]
+  const [moved] = next.splice(sourceIndex, 1)
+  next.splice(targetIndex, 0, moved)
+  return next.map((item, index) => ({ ...item, order: index }))
+}
+
+function persistModuleCustomizeStrict(source = moduleConfig.value) {
+  const simple = [...source]
+    .sort((a, b) => a.order - b.order)
+    .map((item, index) => ({
+      key: item.key,
+      visible: item.visible,
+      order: index,
+      audience: normalizeCardAudience(item.audience),
+      width: item.width != null ? clampModuleCardWidth(item.width) : undefined,
+      height: item.height != null ? clampModuleCardHeight(item.height) : undefined
+    }))
+  localStorage.setItem(moduleStorageKey(), JSON.stringify(simple))
+}
+
+async function onPortalModuleDrop(targetKey: PortalModuleKey) {
+  const sourceKey = draggingPortalModuleKey.value
+  if (!sourceKey || sourceKey === targetKey) return
+  const snapshot = moduleDragSnapshot.value?.map((item) => ({ ...item })) || moduleConfig.value.map((item) => ({ ...item }))
+  const next = reorderModuleConfig(sourceKey, targetKey, moduleConfig.value)
+  moduleConfig.value = next
+  moduleDragCommitted.value = true
+  try {
+    persistModuleCustomizeStrict(next)
+    message.success('首页卡片顺序已更新')
+  } catch (error: any) {
+    moduleConfig.value = snapshot
+    message.error(error?.message || '排序保存失败，已回滚')
+  } finally {
+    resetPortalModuleDragState()
+  }
+}
+
+function onPortalModuleCardDragEnd() {
+  const sourceKey = draggingPortalModuleKey.value
+  const committed = moduleDragCommitted.value
+  resetPortalModuleDragState()
+  if (!committed && sourceKey) {
+    moduleDragInvalidKey.value = sourceKey
+    window.setTimeout(() => {
+      if (moduleDragInvalidKey.value === sourceKey) {
+        moduleDragInvalidKey.value = ''
+      }
+    }, 240)
+  }
 }
 
 function applyModuleCustomize() {
@@ -2710,25 +3082,17 @@ function removeSchedule(id: string | number) {
 
 async function loadStaffOptions() {
   try {
-    const page: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: 300 })
+    await searchStaff('')
     staffDeptMap.value = {}
-    ;(page.list || []).forEach((item) => {
-      staffDeptMap.value[String(item.id)] = item.departmentId == null ? undefined : String(item.departmentId)
+    staffOptions.value.forEach((item: any) => {
+      staffDeptMap.value[String(item.value)] = item.departmentId == null ? undefined : String(item.departmentId)
     })
-    staffOptions.value = (page.list || []).map((item) => ({
-      label: item.realName || item.username || `员工#${item.id}`,
-      value: String(item.id)
-    }))
   } catch {}
 }
 
 async function loadDepartmentOptions() {
   try {
-    const page: PageResult<DepartmentItem> = await getDepartmentPage({ pageNo: 1, pageSize: 200 })
-    departmentOptions.value = (page.list || []).map((item) => ({
-      label: item.deptName,
-      value: String(item.id)
-    }))
+    await searchDepartments('')
   } catch {}
 }
 
@@ -2792,8 +3156,8 @@ async function loadHrReminder() {
 }
 
 async function refreshPortalModules(withCalendar = true) {
-  await loadSummary()
   const jobs: Array<Promise<any>> = [
+    loadSummary(),
     loadDashboard(),
     loadFinanceOverview(),
     loadSalesFunnel(),
@@ -2852,6 +3216,7 @@ onMounted(() => {
   window.addEventListener('mouseup', onCustomCardResizeEnd)
   window.addEventListener('mousemove', onModuleCardResizeMove)
   window.addEventListener('mouseup', onModuleCardResizeEnd)
+  window.addEventListener('mouseup', onPortalModuleHandleRelease)
 })
 
 onBeforeUnmount(() => {
@@ -2862,6 +3227,8 @@ onBeforeUnmount(() => {
   window.removeEventListener('mouseup', onCustomCardResizeEnd)
   window.removeEventListener('mousemove', onModuleCardResizeMove)
   window.removeEventListener('mouseup', onModuleCardResizeEnd)
+  window.removeEventListener('mouseup', onPortalModuleHandleRelease)
+  resetPortalModuleDragState()
   document.body.classList.remove('resizing-active')
   hideResizeIndicator()
 })
@@ -2959,6 +3326,68 @@ onBeforeUnmount(() => {
 .module-card:hover {
   border-color: #bfdbfe;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.module-card.is-drop-zone {
+  border-color: #93c5fd;
+}
+
+.module-card.is-dragging-source {
+  opacity: 0.6;
+  box-shadow: 0 16px 38px rgba(59, 130, 246, 0.28);
+}
+
+.module-card.is-drop-target::after {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border-radius: 10px;
+  border: 2px dashed #3b82f6;
+  background: rgba(59, 130, 246, 0.06);
+  pointer-events: none;
+}
+
+.module-card.is-invalid-bounce {
+  animation: module-invalid-bounce 0.24s ease;
+}
+
+@keyframes module-invalid-bounce {
+  0% { transform: translateX(0); }
+  35% { transform: translateX(-7px); }
+  70% { transform: translateX(5px); }
+  100% { transform: translateX(0); }
+}
+
+.module-drag-handle {
+  width: 26px;
+  min-width: 26px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px dashed #bfdbfe;
+  color: #64748b;
+  background: #f8fbff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  user-select: none;
+  transition: all 0.16s ease;
+}
+
+.module-drag-handle:hover {
+  border-color: #60a5fa;
+  color: #1d4ed8;
+}
+
+.module-drag-handle.is-ready {
+  border-style: solid;
+  border-color: #2563eb;
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+.module-drag-handle:active {
+  cursor: grabbing;
 }
 
 .module-resize-handle {

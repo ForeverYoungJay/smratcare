@@ -83,7 +83,17 @@
           </a-col>
           <a-col :span="8">
             <a-form-item label="供应商">
-              <a-select v-model:value="form.supplierId" :options="supplierOptions" allow-clear />
+              <a-select
+                v-model:value="form.supplierId"
+                show-search
+                :filter-option="false"
+                :options="supplierOptions"
+                :loading="supplierLoading"
+                allow-clear
+                placeholder="输入供应商名称/拼音首字母"
+                @search="searchSuppliers"
+                @focus="() => !supplierOptions.length && searchSuppliers('')"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="8">
@@ -169,14 +179,13 @@ import {
   createPurchase,
   getPurchaseDetail,
   getPurchasePage,
-  getSupplierPage,
   getWarehousePage,
   updatePurchase
 } from '../../api/materialCenter'
+import { useSupplierOptions } from '../../composables/useSupplierOptions'
 import type {
   MaterialPurchaseOrder,
   MaterialPurchaseOrderItem,
-  MaterialSupplierItem,
   MaterialWarehouseItem,
   PageResult,
   ProductItem
@@ -232,11 +241,10 @@ const itemColumns = [
 const statusOptions = MATERIAL_PURCHASE_STATUS_OPTIONS
 
 const warehouses = ref<MaterialWarehouseItem[]>([])
-const suppliers = ref<MaterialSupplierItem[]>([])
+const { supplierOptions, supplierLoading, searchSuppliers } = useSupplierOptions({ pageSize: 240, enabledOnly: true })
 const products = ref<ProductItem[]>([])
 
 const warehouseOptions = computed(() => warehouses.value.map((it) => ({ label: it.warehouseName, value: it.id })))
-const supplierOptions = computed(() => suppliers.value.map((it) => ({ label: it.supplierName, value: it.id })))
 const purchaseDomainOptions = [
   { label: '企业+双用途', value: 'INTERNAL_OR_BOTH' },
   { label: '企业内部', value: 'INTERNAL' },
@@ -308,14 +316,13 @@ async function fetchData() {
 }
 
 async function loadOptions() {
-  const [wRes, sRes, pRes] = await Promise.all([
+  const [wRes, pRes] = await Promise.all([
     getWarehousePage({ pageNo: 1, pageSize: 200, enabledOnly: true }),
-    getSupplierPage({ pageNo: 1, pageSize: 200, enabledOnly: true }),
     getProductPage({ pageNo: 1, pageSize: 500 })
   ])
   warehouses.value = wRes.list
-  suppliers.value = sRes.list
   products.value = pRes.list
+  await searchSuppliers('')
 }
 
 function reset() {
@@ -386,7 +393,7 @@ function sanitizeDisabledSelections() {
     form.warehouseId = undefined
     message.warning('原采购单仓库不可用，已自动清空，请重新选择（原因：仓库已停用或不存在）')
   }
-  const selectedSupplier = suppliers.value.find((it) => it.id === form.supplierId)
+  const selectedSupplier = supplierOptions.value.find((it) => it.value === form.supplierId)
   if (form.supplierId && !selectedSupplier) {
     form.supplierId = undefined
     message.warning('原采购单供应商不可用，已自动清空，请重新选择（原因：供应商已停用或不存在）')
@@ -448,7 +455,7 @@ async function submit() {
     form.warehouseId = undefined
     return
   }
-  const selectedSupplier = suppliers.value.find((it) => it.id === form.supplierId)
+  const selectedSupplier = supplierOptions.value.find((it) => it.value === form.supplierId)
   if (!selectedSupplier) {
     message.warning('当前供应商不可用，请选择启用中的供应商（原因：供应商已停用或不存在）')
     form.supplierId = undefined

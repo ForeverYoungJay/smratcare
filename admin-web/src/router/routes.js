@@ -2426,6 +2426,12 @@ export const routes = [
                 name: 'HrRecruitmentMaterials',
                 component: () => import('../views/hr/HrRecruitmentNeeds.vue'),
                 meta: { title: '入职资料收集', roles: ['ADMIN'] }
+              },
+              {
+                path: 'offboarding',
+                name: 'HrRecruitmentOffboarding',
+                component: () => import('../views/hr/HrRecruitmentNeeds.vue'),
+                meta: { title: '退职办理', roles: ['ADMIN'] }
               }
             ]
           },

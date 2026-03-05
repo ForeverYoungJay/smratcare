@@ -41,13 +41,13 @@
                 style="width: 220px"
                 show-search
                 allow-clear
-                placeholder="请选择长者"
-                :filter-option="filterElderOption"
-              >
-                <a-select-option v-for="item in elders" :key="item.id" :value="String(item.id)">
-                  {{ item.fullName }}（{{ item.id }}）
-                </a-select-option>
-              </a-select>
+                :filter-option="false"
+                :options="elderOptions"
+                :loading="elderLoading"
+                placeholder="请输入长者姓名/拼音首字母"
+                @search="searchElders"
+                @focus="() => !elderOptions.length && searchElders('')"
+              />
             </a-form-item>
             <a-form-item>
               <a-button type="primary" @click="loadBySelectedElder">加载资料</a-button>
@@ -138,7 +138,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
-import { getElderPage } from '../../../api/elder'
+import { useElderOptions } from '../../../composables/useElderOptions'
 import {
   getContractAssessmentOverview,
   getContractLinkageByContract,
@@ -149,9 +149,7 @@ import type {
   ContractAssessmentOverview,
   ContractAssessmentReportItem,
   ContractAttachmentItem,
-  ContractLinkageSummary,
-  ElderItem,
-  PageResult
+  ContractLinkageSummary
 } from '../../../types'
 
 type DocumentKind = 'ATTACHMENT' | 'ASSESSMENT'
@@ -173,9 +171,9 @@ const loading = ref(false)
 const errorMessage = ref('')
 const linkage = ref<ContractLinkageSummary>()
 const assessmentOverview = ref<ContractAssessmentOverview>()
-const elders = ref<ElderItem[]>([])
+const { elderOptions, elderLoading, searchElders, ensureSelectedElder } = useElderOptions({ pageSize: 120 })
 const selector = reactive({
-  elderId: ''
+  elderId: undefined as number | undefined
 })
 const filters = reactive({
   kind: 'ALL',
@@ -246,11 +244,6 @@ function resetFilters() {
 
 function go(path: string) {
   router.push(path)
-}
-
-function filterElderOption(input: string, option: any) {
-  const label = String(option?.children?.join?.('') || option?.children || '').toLowerCase()
-  return label.includes(input.toLowerCase())
 }
 
 function goContractSigning() {
@@ -375,7 +368,7 @@ async function safeLinkageByLead(leadId: string) {
 }
 
 async function resolveLinkage() {
-  const elderId = selector.elderId || String(route.query.elderId || '').trim()
+  const elderId = selector.elderId ? String(selector.elderId) : String(route.query.elderId || '').trim()
   const residentId = String(route.query.residentId || '').trim()
   const contractId = String(route.query.contractId || '').trim()
   const leadId = String(route.query.leadId || '').trim()
@@ -399,11 +392,6 @@ async function resolveLinkage() {
   }
 
   return undefined
-}
-
-async function loadElders() {
-  const page: PageResult<ElderItem> = await getElderPage({ pageNo: 1, pageSize: 200 })
-  elders.value = page.list || []
 }
 
 async function loadBySelectedElder() {
@@ -446,10 +434,15 @@ async function loadAll() {
 
 onMounted(async () => {
   applyFilters()
-  await loadElders()
+  await searchElders('')
   if (!selector.elderId) {
-    const fromRoute = String(route.query.elderId || route.query.residentId || '').trim()
-    selector.elderId = fromRoute || String(elders.value[0]?.id || '')
+    const fromRoute = Number(route.query.elderId || route.query.residentId || 0)
+    if (fromRoute > 0) {
+      ensureSelectedElder(fromRoute)
+      selector.elderId = fromRoute
+    } else {
+      selector.elderId = elderOptions.value[0]?.value
+    }
   }
   await loadAll()
 })

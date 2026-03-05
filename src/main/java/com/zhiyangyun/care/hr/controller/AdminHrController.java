@@ -52,13 +52,16 @@ import com.zhiyangyun.care.hr.model.StaffPointsRuleResponse;
 import com.zhiyangyun.care.hr.service.StaffPointsRuleService;
 import com.zhiyangyun.care.oa.entity.OaApproval;
 import com.zhiyangyun.care.oa.entity.OaDocument;
+import com.zhiyangyun.care.oa.entity.OaDocumentFolder;
 import com.zhiyangyun.care.oa.mapper.OaApprovalMapper;
 import com.zhiyangyun.care.oa.mapper.OaDocumentMapper;
+import com.zhiyangyun.care.oa.mapper.OaDocumentFolderMapper;
 import com.zhiyangyun.care.schedule.entity.AttendanceRecord;
 import com.zhiyangyun.care.schedule.mapper.AttendanceRecordMapper;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -86,6 +89,7 @@ public class AdminHrController {
   private final AuditLogService auditLogService;
   private final OaApprovalMapper oaApprovalMapper;
   private final OaDocumentMapper oaDocumentMapper;
+  private final OaDocumentFolderMapper oaDocumentFolderMapper;
   private final AttendanceRecordMapper attendanceRecordMapper;
   private final CrmContractMapper crmContractMapper;
   private final CardAccountMapper cardAccountMapper;
@@ -101,6 +105,7 @@ public class AdminHrController {
       AuditLogService auditLogService,
       OaApprovalMapper oaApprovalMapper,
       OaDocumentMapper oaDocumentMapper,
+      OaDocumentFolderMapper oaDocumentFolderMapper,
       AttendanceRecordMapper attendanceRecordMapper,
       CrmContractMapper crmContractMapper,
       CardAccountMapper cardAccountMapper,
@@ -115,6 +120,7 @@ public class AdminHrController {
     this.auditLogService = auditLogService;
     this.oaApprovalMapper = oaApprovalMapper;
     this.oaDocumentMapper = oaDocumentMapper;
+    this.oaDocumentFolderMapper = oaDocumentFolderMapper;
     this.attendanceRecordMapper = attendanceRecordMapper;
     this.crmContractMapper = crmContractMapper;
     this.cardAccountMapper = cardAccountMapper;
@@ -431,7 +437,8 @@ public class AdminHrController {
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(OaApproval::getTitle, keyword.trim())
           .or().like(OaApproval::getApplicantName, keyword.trim())
-          .or().like(OaApproval::getRemark, keyword.trim()));
+          .or().like(OaApproval::getRemark, keyword.trim())
+          .or().like(OaApproval::getFormData, keyword.trim()));
     }
     wrapper.orderByDesc(OaApproval::getCreateTime);
     IPage<OaApproval> page = oaApprovalMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
@@ -457,15 +464,112 @@ public class AdminHrController {
     entity.setStatus(request.getStatus() == null || request.getStatus().isBlank() ? "PENDING" : request.getStatus());
     entity.setRemark(request.getRemark());
     entity.setCreatedBy(AuthContext.getStaffId());
-    entity.setFormData(writeJson(Map.of(
-        "positionName", empty(request.getPositionName()),
-        "departmentName", empty(request.getDepartmentName()),
-        "requiredDate", request.getRequiredDate() == null ? "" : request.getRequiredDate().toString(),
-        "headcount", request.getHeadcount() == null ? 0 : request.getHeadcount(),
-        "scene", empty(request.getScene())
-    )));
+    entity.setFormData(writeJson(buildRecruitmentExtWithDefaults(request)));
     oaApprovalMapper.insert(entity);
     return Result.ok(toRecruitmentNeedResponse(entity));
+  }
+
+  @PreAuthorize("hasRole('ADMIN')")
+  @PutMapping("/recruitment/need/{id}")
+  public Result<HrRecruitmentNeedResponse> updateRecruitmentNeed(
+      @PathVariable Long id,
+      @RequestBody HrRecruitmentNeedRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    OaApproval entity = oaApprovalMapper.selectOne(Wrappers.lambdaQuery(OaApproval.class)
+        .eq(OaApproval::getId, id)
+        .eq(OaApproval::getIsDeleted, 0)
+        .eq(orgId != null, OaApproval::getOrgId, orgId)
+        .eq(OaApproval::getApprovalType, "HR_RECRUITMENT")
+        .last("LIMIT 1"));
+    if (entity == null) {
+      return Result.error(404, "招聘事项不存在");
+    }
+    if (request.getTitle() != null) {
+      entity.setTitle(request.getTitle());
+    }
+    if (request.getHeadcount() != null) {
+      entity.setAmount(java.math.BigDecimal.valueOf(request.getHeadcount()));
+    }
+    if (request.getRequiredDate() != null) {
+      entity.setStartTime(request.getRequiredDate().atStartOfDay());
+    }
+    if (request.getStatus() != null && !request.getStatus().isBlank()) {
+      entity.setStatus(request.getStatus());
+    }
+    if (request.getRemark() != null) {
+      entity.setRemark(request.getRemark());
+    }
+    Map<String, Object> merged = parseJson(entity.getFormData());
+    merged.putAll(buildRecruitmentExtWithDefaults(request));
+    entity.setFormData(writeJson(merged));
+    oaApprovalMapper.updateById(entity);
+    return Result.ok(toRecruitmentNeedResponse(entity));
+  }
+
+  @PreAuthorize("hasRole('ADMIN')")
+  @DeleteMapping("/recruitment/need/{id}")
+  public Result<Void> deleteRecruitmentNeed(@PathVariable Long id) {
+    Long orgId = AuthContext.getOrgId();
+    OaApproval entity = oaApprovalMapper.selectOne(Wrappers.lambdaQuery(OaApproval.class)
+        .eq(OaApproval::getId, id)
+        .eq(OaApproval::getIsDeleted, 0)
+        .eq(orgId != null, OaApproval::getOrgId, orgId)
+        .eq(OaApproval::getApprovalType, "HR_RECRUITMENT")
+        .last("LIMIT 1"));
+    if (entity == null) {
+      return Result.ok(null);
+    }
+    entity.setIsDeleted(1);
+    oaApprovalMapper.updateById(entity);
+    return Result.ok(null);
+  }
+
+  @PreAuthorize("hasRole('ADMIN')")
+  @PutMapping("/recruitment/need/batch/status")
+  public Result<Integer> batchUpdateRecruitmentNeedStatus(
+      @RequestBody OaBatchIdsRequest request,
+      @RequestParam String status) {
+    if (status == null || status.isBlank()) {
+      return Result.error(400, "status required");
+    }
+    Long orgId = AuthContext.getOrgId();
+    List<Long> ids = sanitizeIds(request == null ? null : request.getIds());
+    if (ids.isEmpty()) {
+      return Result.ok(0);
+    }
+    List<OaApproval> rows = oaApprovalMapper.selectList(Wrappers.lambdaQuery(OaApproval.class)
+        .eq(OaApproval::getIsDeleted, 0)
+        .eq(orgId != null, OaApproval::getOrgId, orgId)
+        .eq(OaApproval::getApprovalType, "HR_RECRUITMENT")
+        .in(OaApproval::getId, ids));
+    for (OaApproval row : rows) {
+      row.setStatus(status.trim());
+      oaApprovalMapper.updateById(row);
+    }
+    return Result.ok(rows.size());
+  }
+
+  @PreAuthorize("hasRole('ADMIN')")
+  @PostMapping("/recruitment/materials/folder/bootstrap")
+  public Result<Map<String, Object>> bootstrapRecruitmentMaterialFolders(
+      @RequestParam(required = false) Integer year,
+      @RequestParam(required = false) String departmentName) {
+    Long orgId = AuthContext.getOrgId();
+    int resolvedYear = year == null || year < 2000 ? LocalDate.now().getYear() : year;
+    String resolvedDepartment = departmentName == null || departmentName.isBlank() ? "综合部门" : departmentName.trim();
+    Long rootId = ensureFolder(orgId, 0L, "人事行政档案", "入职/离职资料总目录");
+    Long yearId = ensureFolder(orgId, rootId, String.valueOf(resolvedYear), "按年度归档");
+    Long deptId = ensureFolder(orgId, yearId, resolvedDepartment, "按部门归档");
+    Long onboardingId = ensureFolder(orgId, deptId, "入职资料收集", "入职资料");
+    Long offboardingId = ensureFolder(orgId, deptId, "退职资料归档", "离职资料");
+    Map<String, Object> result = new HashMap<>();
+    result.put("rootFolderId", rootId);
+    result.put("yearFolderId", yearId);
+    result.put("departmentFolderId", deptId);
+    result.put("onboardingFolderId", onboardingId);
+    result.put("offboardingFolderId", offboardingId);
+    result.put("folderPath", "人事行政档案/" + resolvedYear + "/" + resolvedDepartment);
+    return Result.ok(result);
   }
 
   @PreAuthorize("hasRole('ADMIN')")
@@ -1293,6 +1397,36 @@ public class AdminHrController {
     response.setPositionName(asString(ext.get("positionName")));
     response.setDepartmentName(asString(ext.get("departmentName")));
     response.setScene(asString(ext.get("scene")));
+    response.setCandidateName(asString(ext.get("candidateName")));
+    response.setContactPhone(asString(ext.get("contactPhone")));
+    response.setResumeUrl(asString(ext.get("resumeUrl")));
+    response.setIntentionStatus(asString(ext.get("intentionStatus")));
+    response.setFollowUpDate(parseDate(asString(ext.get("followUpDate"))));
+    response.setOfferStatus(asString(ext.get("offerStatus")));
+    response.setOnboardDate(parseDate(asString(ext.get("onboardDate"))));
+    response.setSalary(asString(ext.get("salary")));
+    response.setProbationPeriod(asString(ext.get("probationPeriod")));
+    response.setWorkLocation(asString(ext.get("workLocation")));
+    response.setShiftType(asString(ext.get("shiftType")));
+    response.setChecklistJson(asString(ext.get("checklistJson")));
+    response.setSignedFilesJson(asString(ext.get("signedFilesJson")));
+    response.setAccountPermissionJson(asString(ext.get("accountPermissionJson")));
+    response.setIssuedItemsJson(asString(ext.get("issuedItemsJson")));
+    response.setMentorName(asString(ext.get("mentorName")));
+    response.setProbationGoal(asString(ext.get("probationGoal")));
+    response.setRegularizationStatus(asString(ext.get("regularizationStatus")));
+    response.setRecommendationNote(asString(ext.get("recommendationNote")));
+    response.setOffboardingType(asString(ext.get("offboardingType")));
+    response.setLastWorkDate(parseDate(asString(ext.get("lastWorkDate"))));
+    response.setHandoverDeadline(parseDate(asString(ext.get("handoverDeadline"))));
+    response.setResignationReason(asString(ext.get("resignationReason")));
+    response.setResignationReportUrl(asString(ext.get("resignationReportUrl")));
+    response.setHandoverItemsJson(asString(ext.get("handoverItemsJson")));
+    response.setAssetRecoveryJson(asString(ext.get("assetRecoveryJson")));
+    response.setPermissionRecycleJson(asString(ext.get("permissionRecycleJson")));
+    response.setFinanceSettlementNote(asString(ext.get("financeSettlementNote")));
+    response.setExitArchiveJson(asString(ext.get("exitArchiveJson")));
+    response.setFormData(item == null ? null : item.getFormData());
     LocalDate requiredDate = parseDate(asString(ext.get("requiredDate")));
     if (requiredDate == null && item != null && item.getStartTime() != null) {
       requiredDate = item.getStartTime().toLocalDate();
@@ -1526,6 +1660,120 @@ public class AdminHrController {
     return "报销";
   }
 
+  private Map<String, Object> buildRecruitmentExt(HrRecruitmentNeedRequest request) {
+    Map<String, Object> ext = new HashMap<>();
+    if (request == null) {
+      return ext;
+    }
+    putIfPresent(ext, "positionName", request.getPositionName());
+    putIfPresent(ext, "departmentName", request.getDepartmentName());
+    putIfPresent(ext, "requiredDate", request.getRequiredDate() == null ? null : request.getRequiredDate().toString());
+    putIfPresent(ext, "headcount", request.getHeadcount());
+    putIfPresent(ext, "scene", request.getScene());
+    putIfPresent(ext, "candidateName", request.getCandidateName());
+    putIfPresent(ext, "contactPhone", request.getContactPhone());
+    putIfPresent(ext, "resumeUrl", request.getResumeUrl());
+    putIfPresent(ext, "intentionStatus", request.getIntentionStatus());
+    putIfPresent(ext, "followUpDate", request.getFollowUpDate() == null ? null : request.getFollowUpDate().toString());
+    putIfPresent(ext, "offerStatus", request.getOfferStatus());
+    putIfPresent(ext, "onboardDate", request.getOnboardDate() == null ? null : request.getOnboardDate().toString());
+    putIfPresent(ext, "salary", request.getSalary());
+    putIfPresent(ext, "probationPeriod", request.getProbationPeriod());
+    putIfPresent(ext, "workLocation", request.getWorkLocation());
+    putIfPresent(ext, "shiftType", request.getShiftType());
+    putIfPresent(ext, "checklistJson", request.getChecklistJson());
+    putIfPresent(ext, "signedFilesJson", request.getSignedFilesJson());
+    putIfPresent(ext, "accountPermissionJson", request.getAccountPermissionJson());
+    putIfPresent(ext, "issuedItemsJson", request.getIssuedItemsJson());
+    putIfPresent(ext, "mentorName", request.getMentorName());
+    putIfPresent(ext, "probationGoal", request.getProbationGoal());
+    putIfPresent(ext, "regularizationStatus", request.getRegularizationStatus());
+    putIfPresent(ext, "recommendationNote", request.getRecommendationNote());
+    putIfPresent(ext, "offboardingType", request.getOffboardingType());
+    putIfPresent(ext, "lastWorkDate", request.getLastWorkDate() == null ? null : request.getLastWorkDate().toString());
+    putIfPresent(ext, "handoverDeadline", request.getHandoverDeadline() == null ? null : request.getHandoverDeadline().toString());
+    putIfPresent(ext, "resignationReason", request.getResignationReason());
+    putIfPresent(ext, "resignationReportUrl", request.getResignationReportUrl());
+    putIfPresent(ext, "handoverItemsJson", request.getHandoverItemsJson());
+    putIfPresent(ext, "assetRecoveryJson", request.getAssetRecoveryJson());
+    putIfPresent(ext, "permissionRecycleJson", request.getPermissionRecycleJson());
+    putIfPresent(ext, "financeSettlementNote", request.getFinanceSettlementNote());
+    putIfPresent(ext, "exitArchiveJson", request.getExitArchiveJson());
+    return ext;
+  }
+
+  private Map<String, Object> buildRecruitmentExtWithDefaults(HrRecruitmentNeedRequest request) {
+    Map<String, Object> ext = buildRecruitmentExt(request);
+    String scene = request == null ? null : request.getScene();
+    if ("onboarding".equalsIgnoreCase(scene) || "materials".equalsIgnoreCase(scene)) {
+      if (!ext.containsKey("checklistJson")) {
+        List<String> defaults = List.of(
+            "身份证", "居住证明", "学历证明", "资格证", "体检/健康证", "无犯罪记录证明",
+            "银行卡信息", "紧急联系人", "背调核验", "劳动合同", "保密协议", "员工手册承诺");
+        ext.put("checklistJson", writeJsonArray(defaults));
+      }
+      if (!ext.containsKey("offerStatus")) {
+        ext.put("offerStatus", "PENDING");
+      }
+      if (!ext.containsKey("regularizationStatus")) {
+        ext.put("regularizationStatus", "PENDING");
+      }
+    }
+    if ("offboarding".equalsIgnoreCase(scene)) {
+      if (!ext.containsKey("offboardingType")) {
+        ext.put("offboardingType", "RESIGN");
+      }
+      if (!ext.containsKey("handoverItemsJson")) {
+        List<String> defaults = List.of("在办事项", "重点住养老人情况", "风险事项", "文件资料", "资产与库存");
+        ext.put("handoverItemsJson", writeJsonArray(defaults));
+      }
+      if (!ext.containsKey("assetRecoveryJson")) {
+        List<String> defaults = List.of("工牌门禁", "钥匙", "制服", "电脑/手机/对讲机");
+        ext.put("assetRecoveryJson", writeJsonArray(defaults));
+      }
+      if (!ext.containsKey("permissionRecycleJson")) {
+        ext.put("permissionRecycleJson", "最后工作日自动禁用账号；重要系统提前下线权限；保留审计日志");
+      }
+    }
+    if ("candidates".equalsIgnoreCase(scene) && !ext.containsKey("intentionStatus")) {
+      ext.put("intentionStatus", "CONSIDERING");
+    }
+    return ext;
+  }
+
+  private void putIfPresent(Map<String, Object> target, String key, Object value) {
+    if (value == null) {
+      return;
+    }
+    if (value instanceof String text && text.isBlank()) {
+      return;
+    }
+    target.put(key, value);
+  }
+
+  private Long ensureFolder(Long orgId, Long parentId, String name, String remark) {
+    OaDocumentFolder existed = oaDocumentFolderMapper.selectOne(Wrappers.lambdaQuery(OaDocumentFolder.class)
+        .eq(OaDocumentFolder::getIsDeleted, 0)
+        .eq(orgId != null, OaDocumentFolder::getOrgId, orgId)
+        .eq(OaDocumentFolder::getParentId, parentId == null ? 0L : parentId)
+        .eq(OaDocumentFolder::getName, name)
+        .last("LIMIT 1"));
+    if (existed != null) {
+      return existed.getId();
+    }
+    OaDocumentFolder folder = new OaDocumentFolder();
+    folder.setTenantId(orgId);
+    folder.setOrgId(orgId);
+    folder.setParentId(parentId == null ? 0L : parentId);
+    folder.setName(name);
+    folder.setSortNo(0);
+    folder.setStatus("ENABLED");
+    folder.setRemark(remark);
+    folder.setCreatedBy(AuthContext.getStaffId());
+    oaDocumentFolderMapper.insert(folder);
+    return folder.getId();
+  }
+
   private Map<String, Object> parseJson(String payload) {
     if (payload == null || payload.isBlank()) {
       return new HashMap<>();
@@ -1542,6 +1790,14 @@ public class AdminHrController {
       return objectMapper.writeValueAsString(payload);
     } catch (Exception ex) {
       return "{}";
+    }
+  }
+
+  private String writeJsonArray(List<String> payload) {
+    try {
+      return objectMapper.writeValueAsString(payload == null ? new ArrayList<>() : payload);
+    } catch (Exception ex) {
+      return "[]";
     }
   }
 
@@ -1576,6 +1832,13 @@ public class AdminHrController {
 
   private String empty(String value) {
     return value == null ? "" : value;
+  }
+
+  private List<Long> sanitizeIds(List<Long> ids) {
+    if (ids == null || ids.isEmpty()) {
+      return List.of();
+    }
+    return ids.stream().filter(x -> x != null && x > 0).distinct().toList();
   }
 
   private StaffProfileResponse toProfileResponse(StaffAccount staff, StaffProfile profile) {

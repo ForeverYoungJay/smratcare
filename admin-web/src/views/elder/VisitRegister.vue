@@ -3,9 +3,18 @@
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item label="老人姓名">
-          <a-select v-model:value="query.elderId" allow-clear style="width: 180px" placeholder="请选择老人姓名">
-            <a-select-option v-for="item in elders" :key="item.id" :value="item.id">{{ item.fullName }}</a-select-option>
-          </a-select>
+          <a-select
+            v-model:value="query.elderId"
+            allow-clear
+            show-search
+            :filter-option="false"
+            :options="elderOptions"
+            :loading="elderLoading"
+            style="width: 220px"
+            placeholder="请输入老人姓名/拼音首字母"
+            @search="searchElders"
+            @focus="() => !elderOptions.length && searchElders('')"
+          />
         </a-form-item>
         <a-form-item label="来访状态">
           <a-select v-model:value="query.status" allow-clear style="width: 160px" placeholder="请选择来访状态">
@@ -54,9 +63,16 @@
     <a-modal v-model:open="editOpen" :title="editingId ? '编辑来访预约' : '新增来访预约'" @ok="submitEdit" :confirm-loading="submitting" width="520px">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="老人" name="elderId">
-          <a-select v-model:value="form.elderId" placeholder="请选择老人">
-            <a-select-option v-for="item in elders" :key="item.id" :value="item.id">{{ item.fullName }}</a-select-option>
-          </a-select>
+          <a-select
+            v-model:value="form.elderId"
+            show-search
+            :filter-option="false"
+            :options="elderOptions"
+            :loading="elderLoading"
+            placeholder="请输入老人姓名/拼音首字母"
+            @search="searchElders"
+            @focus="() => !elderOptions.length && searchElders('')"
+          />
         </a-form-item>
         <a-form-item label="来访时间" name="visitTime">
           <a-date-picker v-model:value="form.visitTime" show-time value-format="YYYY-MM-DDTHH:mm:ss" style="width: 100%" />
@@ -83,13 +99,12 @@ import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
-import { getElderPage } from '../../api/elder'
+import { useElderOptions } from '../../composables/useElderOptions'
 import { guardBookVisit, guardCheckin, guardDeleteVisit, guardGetPrintTicket, guardTodayVisits, guardUpdateVisit } from '../../api/visit'
-import type { ElderItem, PageResult, VisitBookRequest, VisitBookingItem } from '../../types'
+import type { VisitBookRequest, VisitBookingItem } from '../../types'
 
 const loading = ref(false)
 const rows = ref<VisitBookingItem[]>([])
-const elders = ref<ElderItem[]>([])
 const selectedRowKeys = ref<number[]>([])
 const route = useRoute()
 const editOpen = ref(false)
@@ -97,6 +112,7 @@ const submitting = ref(false)
 const errorMessage = ref('')
 const editingId = ref<number | undefined>(undefined)
 const formRef = ref<FormInstance>()
+const { elderOptions, elderLoading, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 80 })
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: (string | number)[]) => {
@@ -131,14 +147,8 @@ const columns = [
   { title: '状态', key: 'status', width: 100 }
 ]
 
-async function loadElders() {
-  const res: PageResult<ElderItem> = await getElderPage({ pageNo: 1, pageSize: 200 })
-  elders.value = res.list
-}
-
 function resolveElderName(elderId?: number) {
-  const elder = elders.value.find((item) => item.id === elderId)
-  return elder?.fullName || `#${elderId || '-'}`
+  return findElderName(elderId) || `#${elderId || '-'}`
 }
 
 async function fetchData() {
@@ -292,6 +302,7 @@ function openEditSelected() {
     message.warning('已登记到访记录不可编辑')
     return
   }
+  ensureSelectedElder(record.elderId, record.elderName)
   editingId.value = record.id
   form.elderId = record.elderId
   form.visitTime = record.visitTime
@@ -354,9 +365,10 @@ function deleteSelected() {
 }
 
 onMounted(async () => {
-  await loadElders()
+  await searchElders('')
   const elderId = Number(route.query.elderId || 0)
   if (elderId > 0) {
+    ensureSelectedElder(elderId)
     query.elderId = elderId
   }
   await fetchData()

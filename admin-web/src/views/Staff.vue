@@ -41,7 +41,16 @@
           <a-input v-model:value="form.realName" />
         </a-form-item>
         <a-form-item label="部门">
-          <a-select v-model:value="form.departmentId" :options="departmentOptions" />
+          <a-select
+            v-model:value="form.departmentId"
+            allow-clear
+            show-search
+            :filter-option="false"
+            :options="departmentSelectOptions"
+            placeholder="输入部门名称/拼音首字母"
+            @search="searchDepartments"
+            @focus="() => !departmentOptions.length && searchDepartments('')"
+          />
         </a-form-item>
         <a-form-item label="手机号">
           <a-input v-model:value="form.phone" />
@@ -76,8 +85,8 @@ import SearchForm from '../components/SearchForm.vue'
 import DataTable from '../components/DataTable.vue'
 import { getStaffPage, createStaff, updateStaff, updateStaffRoles } from '../api/staff'
 import { getRolePage } from '../api/role'
-import { getDepartmentPage } from '../api/department'
-import type { StaffItem, RoleItem, DepartmentItem, PageResult } from '../types'
+import { useDepartmentOptions } from '../composables/useDepartmentOptions'
+import type { StaffItem, RoleItem, PageResult } from '../types'
 
 const query = reactive({ keyword: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const rows = ref<StaffItem[]>([])
@@ -103,12 +112,19 @@ const statusOptions = [
 
 const roleOpen = ref(false)
 const roleForm = reactive<{ staffId?: number; roleIds: number[] }>({ roleIds: [] })
+const { departmentOptions, searchDepartments, ensureSelectedDepartment } = useDepartmentOptions({ pageSize: 260, preloadSize: 600 })
 
 const roles = ref<RoleItem[]>([])
-const departments = ref<DepartmentItem[]>([])
 
 const roleOptions = computed(() => roles.value.map((r) => ({ label: r.roleName, value: r.id })))
-const departmentOptions = computed(() => departments.value.map((d) => ({ label: d.deptName, value: d.id })))
+const departmentSelectOptions = computed(() =>
+  departmentOptions.value
+    .map((item) => ({
+      label: item.label,
+      value: Number(item.value)
+    }))
+    .filter((item) => Number.isFinite(item.value))
+)
 const drawerTitle = computed(() => (form.id ? '编辑员工' : '新增员工'))
 
 async function fetchData() {
@@ -119,8 +135,7 @@ async function fetchData() {
     pagination.total = res.total || res.list.length
     const roleRes: PageResult<RoleItem> = await getRolePage({ pageNo: 1, pageSize: 200 })
     roles.value = roleRes.list
-    const deptRes: PageResult<DepartmentItem> = await getDepartmentPage({ pageNo: 1, pageSize: 200 })
-    departments.value = deptRes.list
+    if (!departmentOptions.value.length) await searchDepartments('')
   } catch {
     rows.value = []
   } finally {
@@ -144,6 +159,7 @@ function onReset() {
 
 function openDrawer(record?: StaffItem) {
   Object.assign(form, record || { status: 1 })
+  ensureSelectedDepartment(form.departmentId)
   drawerOpen.value = true
 }
 

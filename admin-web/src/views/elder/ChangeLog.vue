@@ -3,9 +3,18 @@
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item label="老人姓名">
-          <a-select v-model:value="query.elderId" allow-clear style="width: 180px" placeholder="请选择老人姓名">
-            <a-select-option v-for="item in elders" :key="item.id" :value="item.id">{{ item.fullName }}</a-select-option>
-          </a-select>
+          <a-select
+            v-model:value="query.elderId"
+            allow-clear
+            show-search
+            :filter-option="false"
+            :options="elderOptions"
+            :loading="elderLoading"
+            style="width: 220px"
+            placeholder="请输入老人姓名/拼音首字母"
+            @search="searchElders"
+            @focus="() => !elderOptions.length && searchElders('')"
+          />
         </a-form-item>
         <a-form-item label="变更类型">
           <a-select v-model:value="query.changeType" allow-clear style="width: 160px" placeholder="请选择变更类型">
@@ -59,14 +68,14 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
-import { getElderPage } from '../../api/elder'
+import { useElderOptions } from '../../composables/useElderOptions'
 import { exportChangeLogs, getChangeLogs } from '../../api/elderLifecycle'
-import type { ChangeLogItem, ElderItem, PageResult } from '../../types'
+import type { ChangeLogItem, PageResult } from '../../types'
 
 const loading = ref(false)
 const rows = ref<ChangeLogItem[]>([])
 const total = ref(0)
-const elders = ref<ElderItem[]>([])
+const { elderOptions, elderLoading, searchElders } = useElderOptions({ pageSize: 80 })
 
 const query = reactive({
   elderId: undefined as number | undefined,
@@ -106,11 +115,6 @@ async function fetchData() {
   }
 }
 
-async function loadElders() {
-  const res: PageResult<ElderItem> = await getElderPage({ pageNo: 1, pageSize: 200 })
-  elders.value = res.list
-}
-
 function reset() {
   query.elderId = undefined
   query.changeType = undefined
@@ -143,7 +147,7 @@ function onPageSizeChange(current: number, size: number) {
 }
 
 onMounted(async () => {
-  await loadElders()
+  await searchElders('')
   await fetchData()
 })
 </script>

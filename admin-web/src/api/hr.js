@@ -17,6 +17,18 @@ export function getHrRecruitmentNeedPage(params) {
 export function createHrRecruitmentNeed(data) {
     return request.post('/api/admin/hr/recruitment/need', data);
 }
+export function updateHrRecruitmentNeed(id, data) {
+    return request.put(`/api/admin/hr/recruitment/need/${id}`, data);
+}
+export function deleteHrRecruitmentNeed(id) {
+    return request.delete(`/api/admin/hr/recruitment/need/${id}`);
+}
+export function batchUpdateHrRecruitmentNeedStatus(ids, status) {
+    return request.put('/api/admin/hr/recruitment/need/batch/status', { ids }, { params: { status } });
+}
+export function bootstrapHrMaterialsFolders(params) {
+    return request.post('/api/admin/hr/recruitment/materials/folder/bootstrap', null, { params });
+}
 export function getHrPolicyPage(params) {
     return fetchPage('/api/admin/hr/policy/page', params);
 }

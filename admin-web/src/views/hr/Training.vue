@@ -7,14 +7,13 @@
           allow-clear
           show-search
           :filter-option="false"
+          :options="staffOptions"
+          :loading="staffLoading"
           placeholder="选择员工"
           style="width: 200px"
           @search="searchStaff"
-        >
-          <a-select-option v-for="item in staffOptions" :key="item.value" :value="item.value">
-            {{ item.label }}
-          </a-select-option>
-        </a-select>
+          @focus="() => !staffOptions.length && searchStaff('')"
+        />
       </a-form-item>
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="培训名称/机构" allow-clear />
@@ -57,13 +56,12 @@
             allow-clear
             show-search
             :filter-option="false"
+            :options="staffOptions"
+            :loading="staffLoading"
             placeholder="选择员工"
             @search="searchStaff"
-          >
-            <a-select-option v-for="item in staffOptions" :key="item.value" :value="item.value">
-              {{ item.label }}
-            </a-select-option>
-          </a-select>
+            @focus="() => !staffOptions.length && searchStaff('')"
+          />
         </a-form-item>
         <a-form-item label="培训名称" required>
           <a-input v-model:value="form.trainingName" />
@@ -112,8 +110,8 @@ import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { getHrTrainingPage, createHrTraining, updateHrTraining, deleteHrTraining } from '../../api/hr'
-import { getStaffPage } from '../../api/rbac'
-import type { StaffTrainingRecord, PageResult, StaffItem } from '../../types'
+import { useStaffOptions } from '../../composables/useStaffOptions'
+import type { StaffTrainingRecord, PageResult } from '../../types'
 
 const query = reactive({
   staffId: undefined as string | number | undefined,
@@ -143,7 +141,7 @@ const columns = [
 const drawerOpen = ref(false)
 const form = reactive<Partial<StaffTrainingRecord>>({ status: 1 })
 const formRange = ref<[Dayjs, Dayjs] | undefined>()
-const staffOptions = ref<Array<{ label: string; value: string | number }>>([])
+const { staffOptions, staffLoading, searchStaff, ensureSelectedStaff } = useStaffOptions({ pageSize: 120 })
 const statusOptions = [
   { label: '完成', value: 1 },
   { label: '未完成', value: 0 }
@@ -207,7 +205,7 @@ function onReset() {
 function openDrawer(record?: StaffTrainingRecord) {
   Object.assign(form, record || { status: 1 })
   if (record?.staffId && record?.staffName) {
-    ensureStaffOption(record.staffId, record.staffName)
+    ensureSelectedStaff(record.staffId, record.staffName)
   }
   if (record?.startDate && record?.endDate) {
     formRange.value = [dayjs(record.startDate as string), dayjs(record.endDate as string)]
@@ -215,21 +213,6 @@ function openDrawer(record?: StaffTrainingRecord) {
     formRange.value = undefined
   }
   drawerOpen.value = true
-}
-
-async function loadStaffOptions(keyword?: string) {
-  const res: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: 50, keyword })
-  staffOptions.value = res.list.map((item) => ({ label: item.realName || item.username, value: String(item.id) }))
-}
-
-function ensureStaffOption(id: string | number, name: string) {
-  if (!staffOptions.value.some((item) => String(item.value) === String(id))) {
-    staffOptions.value = [{ label: name, value: String(id) }, ...staffOptions.value]
-  }
-}
-
-async function searchStaff(val: string) {
-  await loadStaffOptions(val)
 }
 
 async function submit() {
@@ -318,7 +301,7 @@ async function batchRemove() {
   })
 }
 
-loadStaffOptions()
+searchStaff('')
 fetchData()
 </script>
 

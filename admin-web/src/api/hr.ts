@@ -48,6 +48,26 @@ export function createHrRecruitmentNeed(data: Partial<HrRecruitmentNeedItem>) {
   return request.post<HrRecruitmentNeedItem>('/api/admin/hr/recruitment/need', data)
 }
 
+export function updateHrRecruitmentNeed(id: string | number, data: Partial<HrRecruitmentNeedItem>) {
+  return request.put<HrRecruitmentNeedItem>(`/api/admin/hr/recruitment/need/${id}`, data)
+}
+
+export function deleteHrRecruitmentNeed(id: string | number) {
+  return request.delete<void>(`/api/admin/hr/recruitment/need/${id}`)
+}
+
+export function batchUpdateHrRecruitmentNeedStatus(ids: Array<string | number>, status: string) {
+  return request.put<number>('/api/admin/hr/recruitment/need/batch/status', { ids }, { params: { status } })
+}
+
+export function bootstrapHrMaterialsFolders(params: { year?: number; departmentName?: string }) {
+  return request.post<{ folderPath?: string; onboardingFolderId?: string | number; offboardingFolderId?: string | number }>(
+    '/api/admin/hr/recruitment/materials/folder/bootstrap',
+    null,
+    { params }
+  )
+}
+
 export function getHrPolicyPage(params: any) {
   return fetchPage<HrProfileDocumentItem>('/api/admin/hr/policy/page', params)
 }

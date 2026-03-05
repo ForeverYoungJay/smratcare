@@ -166,8 +166,12 @@
             v-model:value="form.linkedDepartmentIds"
             mode="multiple"
             allow-clear
+            show-search
+            :filter-option="false"
             placeholder="选择需要联动执行的部门"
             :options="departmentOptions"
+            @search="searchDepartments"
+            @focus="() => !departmentOptions.length && searchDepartments('')"
           />
         </a-form-item>
         <a-form-item v-if="form.moduleType === 'POLICY'" label="运营目标" name="target">
@@ -250,9 +254,8 @@ import {
   submitMarketingPlan,
   updateMarketingPlan
 } from '../../api/marketing'
-import { getDepartmentPage } from '../../api/department'
+import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
 import type {
-  DepartmentItem,
   MarketingPlanItem,
   MarketingPlanPayload,
   MarketingPlanQuery,
@@ -271,7 +274,7 @@ const previewRecord = ref<MarketingPlanItem>()
 const editingId = ref<number | string>()
 const formRef = ref<FormInstance>()
 const receipts = ref<MarketingPlanReceiptItem[]>([])
-const departmentOptions = ref<{ label: string; value: string }[]>([])
+const { departmentOptions, searchDepartments } = useDepartmentOptions({ pageSize: 500, preloadSize: 800 })
 
 const query = reactive<MarketingPlanQuery>({
   pageNo: 1,
@@ -420,19 +423,6 @@ async function fetchData() {
     message.error(error?.message || '加载营销方案失败')
   } finally {
     loading.value = false
-  }
-}
-
-async function fetchDepartments() {
-  try {
-    const page = await getDepartmentPage({ pageNo: 1, pageSize: 500, status: 1 })
-    const list = page.list || []
-    departmentOptions.value = list.map((item: DepartmentItem) => ({
-      label: item.deptName || `部门${item.id}`,
-      value: String(item.id)
-    }))
-  } catch {
-    departmentOptions.value = []
   }
 }
 
@@ -900,7 +890,7 @@ function initByQuery() {
 
 onMounted(() => {
   initByQuery()
-  fetchDepartments()
+  searchDepartments('')
   fetchData()
 })
 </script>

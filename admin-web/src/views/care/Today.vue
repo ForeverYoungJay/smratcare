@@ -391,8 +391,8 @@ import {
   getTemplatePage,
   createTask
 } from '../../api/care'
-import { getStaffPage } from '../../api/rbac'
 import { useElderOptions } from '../../composables/useElderOptions'
+import { useStaffOptions } from '../../composables/useStaffOptions'
 import type {
   CareTaskItem,
   CareExecuteLogItem,
@@ -430,6 +430,7 @@ const actionStep = ref(0)
 const actionMode = ref<'generate' | 'create' | 'batch'>('generate')
 const actionLoading = ref(false)
 const staffOptions = ref<{ label: string; value: number }[]>([])
+const { staffOptions: staffOptionPool, searchStaff: searchStaffPool } = useStaffOptions({ pageSize: 220, preloadSize: 500 })
 const { elderOptions, searchElders: searchElderOptions, findElderName } = useElderOptions({
   pageSize: 80,
   preloadSize: 300,
@@ -998,11 +999,11 @@ async function loadTemplates() {
 
 async function loadStaffOptions(keyword = '') {
   try {
-    const res = await getStaffPage({ pageNo: 1, pageSize: 200, keyword })
-    staffOptions.value = res.list.map((item: any) => ({
-      label: item.realName || item.username || `员工#${item.id}`,
-      value: item.id
-    }))
+    await searchStaffPool(keyword)
+    staffOptions.value = staffOptionPool.value.map((item) => ({
+      label: item.label,
+      value: Number(item.value)
+    })).filter((item) => Number.isFinite(item.value))
     staffMap.value = staffOptions.value.reduce((acc, cur) => {
       acc[cur.value] = cur.label
       return acc

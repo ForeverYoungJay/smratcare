@@ -2,13 +2,25 @@
   <div class="enterprise-home">
     <header class="topbar">
       <div class="container topbar-inner">
-        <div class="brand">
+        <div class="brand" @click="scrollTo('top')">
           <div class="brand-logo">{{ profile.shortName.slice(0, 1) }}</div>
           <div class="brand-text">
             <div class="name">{{ profile.name }}</div>
             <div class="desc">{{ profile.slogan }}</div>
           </div>
         </div>
+        <nav class="nav-list">
+          <a @click="scrollTo('service-system')">服务体系</a>
+          <a @click="scrollTo('resident-system')">龟峰居民</a>
+          <a @click="scrollTo('community')">社区动态</a>
+          <a @click="scrollTo('news')">新闻资讯</a>
+          <a @click="scrollTo('activities')">居民活动</a>
+          <a @click="scrollTo('about-us')">关于我们</a>
+          <a @click="scrollTo('join-us')">加入我们</a>
+          <a @click="scrollTo('cooperation')">业务合作</a>
+          <a @click="scrollTo('city-tier')">城市分档</a>
+          <a @click="scrollTo('contact')">联系我们</a>
+        </nav>
         <div class="top-actions">
           <a-button type="primary" @click="goAdmin">进入管理后台</a-button>
           <a-button @click="goLogin">员工登录</a-button>
@@ -16,7 +28,7 @@
       </div>
     </header>
 
-    <section class="hero">
+    <section id="top" class="hero">
       <div class="hero-mask" />
       <div class="container hero-content">
         <div class="hero-badge">企业首页</div>
@@ -24,8 +36,8 @@
         <p>{{ profile.heroDesc }}</p>
         <div class="hero-actions">
           <a-button type="primary" size="large" @click="goAdmin">进入管理后台</a-button>
-          <a-button size="large" @click="scrollTo('services')">服务项目</a-button>
-          <a-button size="large" @click="scrollTo('admission')">入住流程</a-button>
+          <a-button size="large" @click="scrollTo('service-system')">查看服务体系</a-button>
+          <a-button size="large" @click="openVrCommunity">VR看社区</a-button>
           <a-button size="large" @click="scrollTo('contact')">联系我们</a-button>
         </div>
       </div>
@@ -48,19 +60,19 @@
     <section class="section">
       <div class="container">
         <div class="section-title">
-          <h2>机构介绍</h2>
+          <h2>企业介绍</h2>
           <p>{{ profile.subtitle }}</p>
         </div>
         <a-row :gutter="[16, 16]">
           <a-col :xs="24" :md="12">
-            <a-card :bordered="false" class="intro-card">
-              <h3>我们的使命</h3>
+            <a-card :bordered="false" class="card intro">
+              <h3>使命</h3>
               <p>{{ profile.mission }}</p>
             </a-card>
           </a-col>
           <a-col :xs="24" :md="12">
-            <a-card :bordered="false" class="intro-card">
-              <h3>我们的愿景</h3>
+            <a-card :bordered="false" class="card intro">
+              <h3>愿景</h3>
               <p>{{ profile.vision }}</p>
             </a-card>
           </a-col>
@@ -68,14 +80,14 @@
       </div>
     </section>
 
-    <section id="services" class="section section-alt">
+    <section id="service-system" class="section section-alt">
       <div class="container">
         <div class="section-title">
-          <h2>核心服务</h2>
-          <p>围绕长者全周期照护需求，提供专业化、个性化、可持续服务。</p>
+          <h2>服务体系</h2>
+          <p>活力生活、专业护理、记忆照护、康复医院、生命关怀五大模块协同。</p>
         </div>
         <a-row :gutter="[16, 16]">
-          <a-col v-for="item in profile.serviceGroups" :key="item.title" :xs="24" :md="12" :lg="8">
+          <a-col v-for="item in profile.serviceSystem" :key="item.title" :xs="24" :md="12" :lg="8">
             <a-card :bordered="false" class="card">
               <h3>{{ item.title }}</h3>
               <p>{{ item.desc }}</p>
@@ -85,31 +97,24 @@
       </div>
     </section>
 
-    <section class="section">
+    <section id="resident-system" class="section">
       <div class="container">
         <div class="section-title">
-          <h2>服务优势</h2>
-          <p>让机构管理更稳，让照护服务更细，让家属沟通更顺畅。</p>
+          <h2>龟峰居民</h2>
+          <p>居民体系、价值再创造、风采与故事，形成“有归属感”的社区生活。</p>
         </div>
         <a-row :gutter="[16, 16]">
-          <a-col v-for="item in profile.strengths" :key="item.title" :xs="24" :md="12">
+          <a-col v-for="item in profile.residentSystem" :key="item.title" :xs="24" :md="12">
             <a-card :bordered="false" class="card">
               <h3>{{ item.title }}</h3>
               <p>{{ item.desc }}</p>
             </a-card>
           </a-col>
         </a-row>
-      </div>
-    </section>
 
-    <section class="section section-alt">
-      <div class="container">
-        <div class="section-title">
-          <h2>照护理念</h2>
-          <p>坚持“以长者为中心”，实现安全、尊严与品质并重。</p>
-        </div>
+        <div class="sub-title">居民专题</div>
         <a-row :gutter="[16, 16]">
-          <a-col v-for="item in profile.carePrinciples" :key="item.title" :xs="24" :md="12" :lg="6">
+          <a-col v-for="item in profile.residentHighlights" :key="item.title" :xs="24" :md="12" :lg="6">
             <a-card :bordered="false" class="card compact">
               <h3>{{ item.title }}</h3>
               <p>{{ item.desc }}</p>
@@ -119,28 +124,66 @@
       </div>
     </section>
 
-    <section class="section">
+    <section id="community" class="section section-alt">
       <div class="container">
         <div class="section-title">
-          <h2>院内环境</h2>
-          <p>营造安全、舒适、温馨的适老化生活空间。</p>
+          <h2>社区动态</h2>
+          <p>新闻资讯、居民活动、服务更新。</p>
+        </div>
+        <div class="news-list">
+          <a-card v-for="item in profile.communityUpdates" :key="item.title" :bordered="false" class="news-card">
+            <h3>{{ item.title }}</h3>
+            <p>{{ item.desc }}</p>
+          </a-card>
+        </div>
+      </div>
+    </section>
+
+    <section id="news" class="section">
+      <div class="container">
+        <div class="section-title">
+          <h2>新闻资讯</h2>
+          <p>关注机构公告、健康科普和养老服务最新动态。</p>
+        </div>
+        <div class="news-list">
+          <a-card v-for="item in profile.newsList" :key="item.title" :bordered="false" class="news-card">
+            <div class="news-meta">
+              <span class="news-tag">{{ item.tag }}</span>
+              <span class="news-date">{{ item.date }}</span>
+            </div>
+            <h3>{{ item.title }}</h3>
+            <p>{{ item.desc }}</p>
+          </a-card>
+        </div>
+      </div>
+    </section>
+
+    <section id="activities" class="section section-alt">
+      <div class="container">
+        <div class="section-title">
+          <h2>居民活动</h2>
+          <p>以活动促交流，以参与促健康，打造有温度的院内生活。</p>
         </div>
         <a-row :gutter="[16, 16]">
-          <a-col v-for="item in profile.environment" :key="item.title" :xs="24" :md="8">
+          <a-col v-for="item in profile.residentActivities" :key="item.title" :xs="24" :md="8">
             <a-card :bordered="false" class="card">
               <h3>{{ item.title }}</h3>
               <p>{{ item.desc }}</p>
+              <div class="activity-meta">
+                <span>{{ item.schedule }}</span>
+                <span>{{ item.location }}</span>
+              </div>
             </a-card>
           </a-col>
         </a-row>
       </div>
     </section>
 
-    <section id="admission" class="section section-alt">
+    <section class="section">
       <div class="container">
         <div class="section-title">
           <h2>入住流程</h2>
-          <p>流程透明、评估先行、方案清晰。</p>
+          <p>从预约咨询到周期复评，流程透明，方案清晰。</p>
         </div>
         <div class="flow-list">
           <div v-for="(item, index) in profile.admissionFlow" :key="item" class="flow-item">
@@ -151,11 +194,86 @@
       </div>
     </section>
 
+    <section id="about-us" class="section section-alt">
+      <div class="container">
+        <div class="section-title">
+          <h2>关于我们</h2>
+          <p>企业介绍、联系我们、加入我们。</p>
+        </div>
+        <a-row :gutter="[16, 16]">
+          <a-col v-for="item in profile.aboutUs" :key="item.title" :xs="24" :md="8">
+            <a-card :bordered="false" class="card">
+              <h3>{{ item.title }}</h3>
+              <p>{{ item.desc }}</p>
+            </a-card>
+          </a-col>
+        </a-row>
+      </div>
+    </section>
+
+    <section id="join-us" class="section">
+      <div class="container">
+        <div class="section-title">
+          <h2>加入我们</h2>
+          <p>欢迎认同“专业、耐心、尊重”的你，加入龟峰颐养团队。</p>
+        </div>
+        <a-row :gutter="[16, 16]">
+          <a-col v-for="item in profile.jobs" :key="item.title" :xs="24" :md="8">
+            <a-card :bordered="false" class="card">
+              <h3>{{ item.title }}</h3>
+              <p>{{ item.requirement }}</p>
+              <div class="job-dept">{{ item.department }}</div>
+            </a-card>
+          </a-col>
+        </a-row>
+        <div class="section-actions">
+          <a-button type="primary" @click="openJoinUs">投递简历</a-button>
+        </div>
+      </div>
+    </section>
+
+    <section id="cooperation" class="section">
+      <div class="container">
+        <div class="section-title">
+          <h2>业务合作</h2>
+          <p>面向医疗、康复、供应链、保险、公益组织开放生态合作。</p>
+        </div>
+        <a-row :gutter="[16, 16]">
+          <a-col v-for="item in profile.cooperation" :key="item.title" :xs="24" :md="12">
+            <a-card :bordered="false" class="card">
+              <h3>{{ item.title }}</h3>
+              <p>{{ item.desc }}</p>
+            </a-card>
+          </a-col>
+        </a-row>
+      </div>
+    </section>
+
+    <section id="city-tier" class="section section-alt">
+      <div class="container">
+        <div class="section-title">
+          <h2>城市分档</h2>
+          <p>按城市与区域特征，配置差异化养老服务供给。</p>
+        </div>
+        <a-table
+          :dataSource="profile.cityTiers"
+          :pagination="false"
+          rowKey="tier"
+          size="middle"
+          class="tier-table"
+        >
+          <a-table-column title="分档" data-index="tier" key="tier" />
+          <a-table-column title="城市/区域" data-index="cityGroup" key="cityGroup" />
+          <a-table-column title="服务模型" data-index="model" key="model" />
+        </a-table>
+      </div>
+    </section>
+
     <section id="contact" class="section">
       <div class="container">
         <div class="contact-card">
           <h2>联系我们</h2>
-          <p>欢迎预约到院参观，获取个性化养老照护方案建议。</p>
+          <p>欢迎预约到院参观，获取个性化养老照护方案。</p>
           <ul>
             <li><span>咨询电话：</span>{{ profile.contact.phone }} {{ profile.contact.hotlineTip }}</li>
             <li><span>联系邮箱：</span>{{ profile.contact.email }}</li>
@@ -203,6 +321,22 @@ function goAdmin() {
   router.push(hasToken.value ? '/portal' : '/login')
 }
 
+function openJoinUs() {
+  if (profile.joinUsUrl === '#') {
+    scrollTo('contact')
+    return
+  }
+  window.open(profile.joinUsUrl, '_blank', 'noopener,noreferrer')
+}
+
+function openVrCommunity() {
+  if (!profile.vrCommunityUrl || profile.vrCommunityUrl === '#') {
+    scrollTo('community')
+    return
+  }
+  window.open(profile.vrCommunityUrl, '_blank', 'noopener,noreferrer')
+}
+
 function scrollTo(id: string) {
   const target = document.getElementById(id)
   if (!target) return
@@ -218,7 +352,7 @@ function scrollTo(id: string) {
 }
 
 .container {
-  width: min(1180px, calc(100vw - 40px));
+  width: min(1200px, calc(100vw - 36px));
   margin: 0 auto;
 }
 
@@ -226,7 +360,7 @@ function scrollTo(id: string) {
   position: fixed;
   inset-inline: 0;
   top: 0;
-  z-index: 20;
+  z-index: 30;
   backdrop-filter: blur(8px);
   background: rgba(13, 44, 109, 0.58);
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
@@ -234,15 +368,17 @@ function scrollTo(id: string) {
 
 .topbar-inner {
   height: 72px;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 18px;
   align-items: center;
-  justify-content: space-between;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  cursor: pointer;
 }
 
 .brand-logo {
@@ -257,7 +393,7 @@ function scrollTo(id: string) {
 }
 
 .brand-text .name {
-  font-size: 18px;
+  font-size: 17px;
   line-height: 1.2;
   font-weight: 700;
   color: #ffffff;
@@ -269,6 +405,19 @@ function scrollTo(id: string) {
   color: rgba(255, 255, 255, 0.82);
 }
 
+.nav-list {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  font-size: 14px;
+}
+
+.nav-list a {
+  color: rgba(255, 255, 255, 0.94);
+  text-decoration: none;
+  cursor: pointer;
+}
+
 .top-actions {
   display: flex;
   gap: 10px;
@@ -276,8 +425,8 @@ function scrollTo(id: string) {
 
 .hero {
   position: relative;
-  min-height: 620px;
-  padding: 140px 0 90px;
+  min-height: 630px;
+  padding: 140px 0 95px;
   background: linear-gradient(120deg, #0b2f79 0%, #1c58bb 55%, #3b84f3 100%);
 }
 
@@ -313,8 +462,8 @@ function scrollTo(id: string) {
 }
 
 .hero p {
-  margin: 20px 0 0;
-  max-width: 860px;
+  margin: 18px 0 0;
+  max-width: 900px;
   font-size: 17px;
   line-height: 1.9;
   color: rgba(255, 255, 255, 0.92);
@@ -350,6 +499,12 @@ function scrollTo(id: string) {
   color: #5d6f8f;
 }
 
+.sub-title {
+  margin: 24px 0 12px;
+  color: #314e7c;
+  font-weight: 700;
+}
+
 .stats {
   margin-top: -72px;
   position: relative;
@@ -380,32 +535,69 @@ function scrollTo(id: string) {
   font-size: 12px;
 }
 
-.intro-card,
 .card {
   height: 100%;
   border-radius: 14px;
 }
 
 .card.compact p {
-  min-height: 84px;
+  min-height: 88px;
 }
 
-.intro-card h3,
 .card h3 {
   margin: 0;
   color: #24395e;
 }
 
-.intro-card p,
 .card p {
   margin: 10px 0 0;
   color: #667890;
-  line-height: 1.85;
+  line-height: 1.8;
+}
+
+.news-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.news-card {
+  border-radius: 14px;
+}
+
+.news-card h3 {
+  margin: 0;
+  color: #23447c;
+}
+
+.news-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.news-tag {
+  background: #e8f1ff;
+  color: #2b63bf;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+}
+
+.news-date {
+  color: #8496b4;
+  font-size: 12px;
+}
+
+.news-card p {
+  margin: 10px 0 0;
+  color: #6a7f9e;
+  line-height: 1.8;
 }
 
 .flow-list {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -431,6 +623,34 @@ function scrollTo(id: string) {
   margin-top: 10px;
   color: #385173;
   font-weight: 600;
+}
+
+.tier-table :deep(.ant-table) {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.section-actions {
+  margin-top: 14px;
+}
+
+.activity-meta {
+  margin-top: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: #6b7f9f;
+  font-size: 12px;
+}
+
+.job-dept {
+  margin-top: 12px;
+  display: inline-block;
+  color: #2d63bb;
+  background: #e7f0ff;
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
 }
 
 .contact-card {
@@ -487,50 +707,81 @@ function scrollTo(id: string) {
   flex-wrap: wrap;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1080px) {
   .topbar-inner {
-    height: 64px;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      'brand actions'
+      'nav nav';
+    height: auto;
+    padding: 10px 0;
   }
 
-  .brand-text .name {
-    font-size: 16px;
+  .brand {
+    grid-area: brand;
+  }
+
+  .top-actions {
+    grid-area: actions;
+  }
+
+  .nav-list {
+    grid-area: nav;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+    margin-top: 8px;
+  }
+
+  .hero {
+    padding-top: 170px;
+  }
+
+  .news-list {
+    grid-template-columns: 1fr;
+  }
+
+  .flow-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .container {
+    width: calc(100vw - 24px);
   }
 
   .brand-text .desc {
     display: none;
   }
 
+  .top-actions :deep(.ant-btn) {
+    padding-inline: 10px;
+  }
+
   .hero {
     min-height: 560px;
-    padding-top: 112px;
+    padding-top: 175px;
   }
 
   .stats {
     margin-top: -52px;
   }
 
-  .flow-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 680px) {
-  .container {
-    width: calc(100vw - 24px);
-  }
-
-  .top-actions :deep(.ant-btn) {
-    padding-inline: 11px;
-  }
-
   .section {
     padding: 50px 0;
+  }
+
+  .flow-list {
+    grid-template-columns: 1fr 1fr;
   }
 
   .contact-card {
     padding: 20px;
   }
+}
 
+@media (max-width: 520px) {
   .flow-list {
     grid-template-columns: 1fr;
   }

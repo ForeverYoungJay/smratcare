@@ -42,11 +42,12 @@
             allow-clear
             show-search
             :filter-option="false"
+            :options="staffOptions"
+            :loading="staffLoading"
             placeholder="选择员工"
             @search="searchStaff"
-          >
-            <a-select-option v-for="item in staffOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
-          </a-select>
+            @focus="() => !staffOptions.length && searchStaff('')"
+          />
         </a-form-item>
         <a-form-item label="证书名称" required>
           <a-input v-model:value="form.certificateName" />
@@ -85,8 +86,8 @@ import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { createHrProfileCertificate, getHrProfileCertificatePage } from '../../api/hr'
-import { getStaffPage } from '../../api/rbac'
-import type { HrStaffCertificateItem, PageResult, StaffItem } from '../../types'
+import { useStaffOptions } from '../../composables/useStaffOptions'
+import type { HrStaffCertificateItem, PageResult } from '../../types'
 import { resolveHrError } from './hrError'
 import { exportCsv, exportExcel } from '../../utils/export'
 import { mapByDict } from './hrExportFields'
@@ -115,7 +116,7 @@ const drawerOpen = ref(false)
 const issueDate = ref<Dayjs>()
 const expiryDate = ref<Dayjs>()
 const form = reactive<Partial<HrStaffCertificateItem>>({})
-const staffOptions = ref<Array<{ label: string; value: string | number }>>([])
+const { staffOptions, staffLoading, searchStaff } = useStaffOptions({ pageSize: 120 })
 
 async function fetchData() {
   loading.value = true
@@ -156,15 +157,6 @@ function onReset() {
   pagination.current = 1
   pagination.pageSize = 10
   fetchData()
-}
-
-async function loadStaffOptions(keyword?: string) {
-  const res: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: 50, keyword })
-  staffOptions.value = res.list.map((item) => ({ label: item.realName || item.username, value: String(item.id) }))
-}
-
-async function searchStaff(val: string) {
-  await loadStaffOptions(val)
 }
 
 function openDrawer() {
@@ -227,7 +219,7 @@ function onExportExcel() {
 
 onMounted(() => {
   fetchData()
-  loadStaffOptions()
+  searchStaff('')
 })
 </script>
 

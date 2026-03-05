@@ -46,7 +46,16 @@
           <a-input v-model:value="form.deptCode" />
         </a-form-item>
         <a-form-item label="上级部门">
-          <a-select v-model:value="form.parentId" allow-clear :options="parentOptions" />
+          <a-select
+            v-model:value="form.parentId"
+            allow-clear
+            show-search
+            :filter-option="false"
+            :options="parentOptions"
+            placeholder="输入部门名称/拼音首字母"
+            @search="searchDepartments"
+            @focus="() => !departmentOptions.length && searchDepartments('')"
+          />
         </a-form-item>
         <a-form-item label="排序">
           <a-input-number v-model:value="form.sortNo" :min="0" style="width: 100%" />
@@ -72,6 +81,7 @@ import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { getDepartmentPage, createDepartment, updateDepartment, deleteDepartment } from '../../api/rbac'
+import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
 import type { DepartmentItem, PageResult } from '../../types'
 
 const query = reactive({ keyword: undefined as string | undefined, pageNo: 1, pageSize: 10 })
@@ -82,6 +92,7 @@ const saving = ref(false)
 const drawerOpen = ref(false)
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const form = reactive<Partial<DepartmentItem>>({ status: 1, sortNo: 0 })
+const { departmentOptions, searchDepartments, ensureSelectedDepartment } = useDepartmentOptions({ pageSize: 400, preloadSize: 1000 })
 
 const statusOptions = [
   { label: '启用', value: 1 },
@@ -99,9 +110,9 @@ const columns = [
 
 const drawerTitle = computed(() => (form.id ? '编辑部门' : '新增部门'))
 const parentOptions = computed(() =>
-  allRows.value
-    .filter((item) => item.id !== form.id)
-    .map((item) => ({ label: item.deptName, value: item.id }))
+  departmentOptions.value
+    .map((item) => ({ label: item.label, value: Number(item.value) }))
+    .filter((item) => Number.isFinite(item.value) && item.value !== form.id)
 )
 
 function resolveParentName(parentId?: number) {
@@ -117,6 +128,7 @@ async function fetchData() {
     pagination.total = res.total || res.list.length
     const allRes: PageResult<DepartmentItem> = await getDepartmentPage({ pageNo: 1, pageSize: 1000 })
     allRows.value = allRes.list
+    if (!departmentOptions.value.length) await searchDepartments('')
   } finally {
     loading.value = false
   }
@@ -146,6 +158,7 @@ function openDrawer(record?: DepartmentItem) {
     sortNo: record?.sortNo ?? 0,
     status: record?.status ?? 1
   })
+  ensureSelectedDepartment(form.parentId)
   drawerOpen.value = true
 }
 

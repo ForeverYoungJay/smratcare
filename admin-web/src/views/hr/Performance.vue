@@ -7,14 +7,13 @@
           allow-clear
           show-search
           :filter-option="false"
+          :options="staffOptions"
+          :loading="staffLoading"
           placeholder="选择员工"
           style="width: 220px"
           @search="searchStaff"
-        >
-          <a-select-option v-for="item in staffOptions" :key="item.value" :value="item.value">
-            {{ item.label }}
-          </a-select-option>
-        </a-select>
+          @focus="() => !staffOptions.length && searchStaff('')"
+        />
       </a-form-item>
       <a-form-item label="员工类别">
         <a-select v-model:value="query.staffCategory" :options="staffCategoryOptions" allow-clear style="width: 180px" />
@@ -112,9 +111,16 @@
           message="规则：每 300 积分可兑换 10 元，提交后进入院长审批，审批通过后自动扣减积分余额。"
         />
         <a-form-item label="兑换员工" required>
-          <a-select v-model:value="redeemForm.staffId" show-search :filter-option="false" @search="searchStaff" placeholder="选择员工">
-            <a-select-option v-for="item in staffOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
-          </a-select>
+          <a-select
+            v-model:value="redeemForm.staffId"
+            show-search
+            :filter-option="false"
+            :options="staffOptions"
+            :loading="staffLoading"
+            @search="searchStaff"
+            @focus="() => !staffOptions.length && searchStaff('')"
+            placeholder="选择员工"
+          />
         </a-form-item>
         <a-form-item label="兑换积分" required>
           <a-input-number v-model:value="redeemForm.redeemPoints" :min="300" :step="300" style="width: 100%" />
@@ -139,9 +145,9 @@ import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { getPerformanceSummary, getPerformanceRanking } from '../../api/hr'
 import { createApproval, getApprovalPage } from '../../api/oa'
-import { getStaffPage } from '../../api/rbac'
+import { useStaffOptions } from '../../composables/useStaffOptions'
 import { useUserStore } from '../../stores/user'
-import type { StaffPerformanceRankItem, StaffPerformanceSummary, PageResult, StaffItem } from '../../types'
+import type { StaffPerformanceRankItem, StaffPerformanceSummary, PageResult } from '../../types'
 
 const userStore = useUserStore()
 
@@ -179,7 +185,7 @@ const summary = reactive<StaffPerformanceSummary>({
 
 const ranks = ref<StaffPerformanceRankItem[]>([])
 const loading = ref(false)
-const staffOptions = ref<Array<{ label: string; value: string }>>([])
+const { staffOptions, staffLoading, searchStaff } = useStaffOptions({ pageSize: 120 })
 const redeemRows = ref<Array<{
   id: string
   staffId?: string
@@ -355,15 +361,6 @@ function onReset() {
   fetchData()
 }
 
-async function loadStaffOptions(keyword?: string) {
-  const res: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: 80, keyword })
-  staffOptions.value = res.list.map((item) => ({ label: item.realName || item.username, value: String(item.id) }))
-}
-
-async function searchStaff(val: string) {
-  await loadStaffOptions(val)
-}
-
 function openRedeem() {
   redeemForm.staffId = query.staffId
   redeemForm.redeemPoints = 300
@@ -414,7 +411,7 @@ async function submitRedeem() {
   }
 }
 
-loadStaffOptions()
+searchStaff('')
 fetchData()
 </script>
 

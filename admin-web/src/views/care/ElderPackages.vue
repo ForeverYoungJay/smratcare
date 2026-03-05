@@ -6,14 +6,16 @@
           <a-select
             v-model:value="query.elderId"
             allow-clear
-            placeholder="选择老人"
+            show-search
+            :filter-option="false"
+            :options="elderSelectOptions"
+            :loading="elderLoading"
+            placeholder="输入老人姓名/拼音首字母"
             style="width: 220px"
+            @search="searchElders"
+            @focus="() => !elderSelectOptions.length && searchElders('')"
             @change="load"
-          >
-            <a-select-option v-for="elder in elderOptions" :key="elder.id" :value="elder.id">
-              {{ elder.fullName }}
-            </a-select-option>
-          </a-select>
+          />
           <a-button type="primary" @click="openModal()">新增老人套餐</a-button>
         </a-space>
       </div>
@@ -43,11 +45,16 @@
     <a-modal v-model:open="modalOpen" title="老人套餐" :confirm-loading="submitting" @ok="submit">
       <a-form ref="formRef" layout="vertical" :model="form" :rules="rules">
         <a-form-item name="elderId" label="老人" required>
-          <a-select v-model:value="form.elderId" placeholder="请选择老人">
-            <a-select-option v-for="elder in elderOptions" :key="elder.id" :value="elder.id">
-              {{ elder.fullName }}
-            </a-select-option>
-          </a-select>
+          <a-select
+            v-model:value="form.elderId"
+            show-search
+            :filter-option="false"
+            :options="elderSelectOptions"
+            :loading="elderLoading"
+            placeholder="请输入老人姓名/拼音首字母"
+            @search="searchElders"
+            @focus="() => !elderSelectOptions.length && searchElders('')"
+          />
         </a-form-item>
         <a-form-item name="packageId" label="套餐" required>
           <a-select v-model:value="form.packageId" placeholder="请选择套餐">
@@ -77,7 +84,7 @@
 import { reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
-import { getElderPage } from '../../api/elder'
+import { useElderOptions } from '../../composables/useElderOptions'
 import {
   getElderPackagePage,
   createElderPackage,
@@ -88,11 +95,6 @@ import {
 import type { ElderPackage, CarePackage, PageResult } from '../../types'
 import { resolveCareError } from './careError'
 
-interface ElderOption {
-  id: number
-  fullName: string
-}
-
 const list = ref<ElderPackage[]>([])
 const loading = ref(false)
 const modalOpen = ref(false)
@@ -102,7 +104,7 @@ const form = reactive<Partial<ElderPackage>>({ status: 1 })
 const page = reactive({ pageNo: 1, pageSize: 10, total: 0 })
 const query = reactive({ elderId: undefined as number | undefined })
 
-const elderOptions = ref<ElderOption[]>([])
+const { elderOptions: elderSelectOptions, elderLoading, searchElders } = useElderOptions({ pageSize: 120 })
 const packageOptions = ref<CarePackage[]>([])
 
 const rules = {
@@ -174,12 +176,10 @@ async function remove(id: number) {
 
 async function loadOptions() {
   try {
-    const elders = await getElderPage({ pageNo: 1, pageSize: 200 })
-    elderOptions.value = (elders.list || []).map((item: any) => ({ id: item.id, fullName: item.fullName }))
+    await searchElders('')
     packageOptions.value = await listCarePackages()
   } catch (error) {
     message.error(resolveCareError(error, '加载老人/套餐选项失败'))
-    elderOptions.value = []
     packageOptions.value = []
   }
 }

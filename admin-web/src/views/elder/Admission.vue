@@ -16,9 +16,16 @@
       />
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="老人姓名" name="elderId">
-          <a-select v-model:value="form.elderId" placeholder="请选择老人姓名">
-            <a-select-option v-for="item in elders" :key="item.id" :value="item.id">{{ item.fullName }}</a-select-option>
-          </a-select>
+          <a-select
+            v-model:value="form.elderId"
+            show-search
+            :filter-option="false"
+            :options="elderOptions"
+            :loading="elderLoading"
+            placeholder="请输入老人姓名/拼音首字母"
+            @search="searchElders"
+            @focus="() => !elderOptions.length && searchElders('')"
+          />
         </a-form-item>
         <a-form-item label="收费开始日期" name="admissionDate">
           <a-date-picker v-model:value="form.admissionDate" value-format="YYYY-MM-DD" style="width: 100%" />
@@ -126,7 +133,7 @@ import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import FlowGuardBar from '../../components/FlowGuardBar.vue'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
-import { getElderPage } from '../../api/elder'
+import { useElderOptions } from '../../composables/useElderOptions'
 import { getBedList, getBuildingList, getFloorList, getRoomList } from '../../api/bed'
 import { admitElder, exportAdmissionRecords, getAdmissionRecords } from '../../api/elderLifecycle'
 import { getContractPage } from '../../api/marketing'
@@ -137,7 +144,6 @@ import type {
   BedItem,
   BuildingItem,
   CrmContractItem,
-  ElderItem,
   FloorItem,
   PageResult,
   RoomItem
@@ -150,7 +156,7 @@ const form = reactive<AdmissionRequest>({ elderId: 0, admissionDate: '', bedId: 
 const submitting = ref(false)
 const linkedLeadId = ref<number>()
 const guardContract = ref<CrmContractItem | null>(null)
-const elders = ref<ElderItem[]>([])
+const { elderOptions, elderLoading, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 120 })
 const buildings = ref<BuildingItem[]>([])
 const floors = ref<FloorItem[]>([])
 const rooms = ref<RoomItem[]>([])
@@ -283,11 +289,6 @@ function statusText(status?: number) {
   return '-'
 }
 
-async function loadElders() {
-  const res: PageResult<ElderItem> = await getElderPage({ pageNo: 1, pageSize: 200 })
-  elders.value = res.list
-}
-
 async function submit() {
   if (!formRef.value) return
   try {
@@ -345,13 +346,7 @@ async function validateAdmissionGuard() {
     }
     if (contract.elderId) {
       form.elderId = contract.elderId as any
-      const hasOption = elders.value.some((item) => String(item.id) === String(contract.elderId))
-      if (!hasOption) {
-        elders.value.unshift({
-          id: contract.elderId as any,
-          fullName: contract.elderName || `长者${String(contract.elderId)}`
-        } as ElderItem)
-      }
+      ensureSelectedElder(Number(contract.elderId), contract.elderName || `长者${String(contract.elderId)}`)
     }
     if (contract.leadId && !linkedLeadId.value) {
       linkedLeadId.value = Number(contract.leadId)
@@ -379,13 +374,7 @@ async function loadContractGuardState() {
     guardContract.value = (page.list || []).find((item) => item.contractNo === contractNo) || null
     if (guardContract.value?.elderId) {
       form.elderId = guardContract.value.elderId as any
-      const hasOption = elders.value.some((item) => String(item.id) === String(guardContract.value?.elderId))
-      if (!hasOption) {
-        elders.value.unshift({
-          id: guardContract.value.elderId as any,
-          fullName: guardContract.value.elderName || `长者${String(guardContract.value.elderId)}`
-        } as ElderItem)
-      }
+      ensureSelectedElder(Number(guardContract.value.elderId), guardContract.value.elderName || `长者${String(guardContract.value.elderId)}`)
       if (!recordQuery.keyword && guardContract.value.elderName) {
         recordQuery.keyword = guardContract.value.elderName
       }
@@ -461,19 +450,14 @@ function applyRoutePrefill() {
   const contractNo = String(route.query.contractNo || '').trim()
   const elderName = String(route.query.elderName || '').trim()
   if (residentIdText) {
-    const matched = elders.value.find((item) => String(item.id) === residentIdText)
-    if (matched) {
-      form.elderId = matched.id
-      recordQuery.keyword = matched.fullName
+    const residentId = Number(residentIdText)
+    if (residentId > 0) {
+      ensureSelectedElder(residentId, elderName || `长者${residentId}`)
+      form.elderId = residentId as any
+      recordQuery.keyword = elderName || findElderName(residentId) || residentIdText
     } else {
       form.elderId = residentIdText as any
       recordQuery.keyword = elderName || residentIdText
-      if (elderName) {
-        elders.value.unshift({
-          id: residentIdText as any,
-          fullName: elderName
-        } as ElderItem)
-      }
     }
   }
   if (!recordQuery.keyword && elderName) {
@@ -552,7 +536,7 @@ watch(
 useLiveSyncRefresh({
   topics: ['elder', 'bed', 'lifecycle', 'finance', 'care'],
   refresh: () => {
-    loadElders()
+    searchElders('')
     loadAssets()
     fetchAdmissionRecords()
   },
@@ -560,7 +544,7 @@ useLiveSyncRefresh({
 })
 
 onMounted(async () => {
-  await loadElders()
+  await searchElders('')
   await loadAssets()
   applyRoutePrefill()
   await fetchAdmissionRecords()

@@ -86,6 +86,7 @@
                 :filter-option="false"
                 :options="staffOptions"
                 @search="searchStaff"
+                @focus="() => !staffOptions.length && searchStaff('')"
               />
             </a-form-item>
           </a-col>
@@ -128,10 +129,10 @@ import type { FormInstance } from 'ant-design-vue'
 import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
-import { getStaffPage } from '../../api/rbac'
+import { useStaffOptions } from '../../composables/useStaffOptions'
 import { listServiceItems } from '../../api/standard'
 import { createServicePlan, deleteServicePlan, getCareLevelList, getServicePlanPage, updateServicePlan } from '../../api/nursing'
-import type { CareLevelItem, PageResult, ServiceItem, ServicePlanItem, StaffItem } from '../../types'
+import type { CareLevelItem, PageResult, ServiceItem, ServicePlanItem } from '../../types'
 import { resolveCareError } from './careError'
 
 const rows = ref<ServicePlanItem[]>([])
@@ -142,7 +143,7 @@ const submitting = ref(false)
 const formRef = ref<FormInstance>()
 
 const { elderOptions, searchElders, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
-const staffOptions = ref<Array<{ label: string; value: number }>>([])
+const { staffOptions, searchStaff, ensureSelectedStaff } = useStaffOptions({ pageSize: 120 })
 const careLevelOptions = ref<Array<{ label: string; value: number }>>([])
 const serviceItemOptions = ref<Array<{ label: string; value: number }>>([])
 
@@ -227,6 +228,7 @@ function openModal(record?: ServicePlanItem) {
   if (record) {
     Object.assign(form, record)
     ensureSelectedElder(record.elderId, record.elderName)
+    ensureSelectedStaff(record.defaultStaffId, record.defaultStaffName)
   } else {
     const residentId = route.query.residentId ?? route.query.elderId
     const residentName = typeof route.query.residentName === 'string' ? route.query.residentName : undefined
@@ -305,18 +307,6 @@ function reset() {
 
 async function searchElder(keyword: string) {
   await searchElders(keyword)
-}
-
-async function searchStaff(keyword: string) {
-  try {
-    const res: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: 50, keyword })
-    staffOptions.value = res.list.map((item) => ({ label: item.realName || item.username, value: item.id }))
-  } catch (error) {
-    if (!keyword) {
-      staffOptions.value = []
-    }
-    message.error(resolveCareError(error, '加载护工列表失败'))
-  }
 }
 
 async function loadBaseOptions() {

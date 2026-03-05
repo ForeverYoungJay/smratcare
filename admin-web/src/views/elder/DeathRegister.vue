@@ -3,9 +3,18 @@
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item label="老人">
-          <a-select v-model:value="query.elderId" allow-clear style="width: 180px" placeholder="请选择老人姓名">
-            <a-select-option v-for="item in elders" :key="item.id" :value="item.id">{{ item.fullName }}</a-select-option>
-          </a-select>
+          <a-select
+            v-model:value="query.elderId"
+            allow-clear
+            show-search
+            :filter-option="false"
+            :options="elderOptions"
+            :loading="elderLoading"
+            style="width: 220px"
+            placeholder="请输入老人姓名/拼音首字母"
+            @search="searchElders"
+            @focus="() => !elderOptions.length && searchElders('')"
+          />
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="query.status" allow-clear style="width: 140px" placeholder="请选择状态">
@@ -64,9 +73,16 @@
     <a-modal v-model:open="createOpen" :title="editingId ? '更正死亡登记' : '新增死亡登记'" @ok="submitCreate" :confirm-loading="submitting" width="560px">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="老人" name="elderId">
-          <a-select v-model:value="form.elderId" placeholder="请选择老人">
-            <a-select-option v-for="item in elders" :key="item.id" :value="item.id">{{ item.fullName }}</a-select-option>
-          </a-select>
+          <a-select
+            v-model:value="form.elderId"
+            show-search
+            :filter-option="false"
+            :options="elderOptions"
+            :loading="elderLoading"
+            placeholder="请输入老人姓名/拼音首字母"
+            @search="searchElders"
+            @focus="() => !elderOptions.length && searchElders('')"
+          />
         </a-form-item>
         <a-form-item label="死亡日期" name="deathDate">
           <a-date-picker v-model:value="form.deathDate" value-format="YYYY-MM-DD" style="width: 100%" />
@@ -108,7 +124,7 @@ import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
-import { getElderPage } from '../../api/elder'
+import { useElderOptions } from '../../composables/useElderOptions'
 import {
   cancelDeathRegister,
   createDeathRegister,
@@ -118,18 +134,18 @@ import {
   updateDeathRegister
 } from '../../api/elderResidence'
 import { getRoles } from '../../utils/auth'
-import type { DeathRegisterCreateRequest, DeathRegisterItem, ElderItem, PageResult } from '../../types'
+import type { DeathRegisterCreateRequest, DeathRegisterItem, PageResult } from '../../types'
 
 const loading = ref(false)
 const rows = ref<DeathRegisterItem[]>([])
 const total = ref(0)
-const elders = ref<ElderItem[]>([])
 const createOpen = ref(false)
 const submitting = ref(false)
 const formRef = ref<FormInstance>()
 const editingId = ref<number | undefined>(undefined)
 const selectedRowKeys = ref<number[]>([])
 const route = useRoute()
+const { elderOptions, elderLoading, searchElders, ensureSelectedElder } = useElderOptions({ pageSize: 80 })
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: (string | number)[]) => {
@@ -185,11 +201,6 @@ const canCancelSelected = computed(
     selectedRecords.value[0]?.status !== 'CANCELLED'
 )
 
-async function loadElders() {
-  const res: PageResult<ElderItem> = await getElderPage({ pageNo: 1, pageSize: 200 })
-  elders.value = res.list
-}
-
 async function fetchData() {
   loading.value = true
   try {
@@ -225,6 +236,7 @@ function openCreate() {
 }
 
 function openEdit(record: DeathRegisterItem) {
+  ensureSelectedElder(record.elderId, record.elderName)
   createOpen.value = true
   editingId.value = record.id
   form.elderId = record.elderId
@@ -324,9 +336,10 @@ function onPageSizeChange(current: number, size: number) {
 }
 
 onMounted(async () => {
-  await loadElders()
+  await searchElders('')
   const elderId = Number(route.query.elderId || 0)
   if (elderId > 0) {
+    ensureSelectedElder(elderId)
     query.elderId = elderId
   }
   await fetchData()

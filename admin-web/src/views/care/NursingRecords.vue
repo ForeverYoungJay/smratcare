@@ -14,8 +14,18 @@
           @focus="() => !elderOptions.length && searchElders('')"
         />
       </a-form-item>
-      <a-form-item label="员工ID">
-        <a-input-number v-model:value="query.staffId" :min="1" style="width: 140px" />
+      <a-form-item label="员工">
+        <a-select
+          v-model:value="query.staffId"
+          style="width: 220px"
+          allow-clear
+          show-search
+          placeholder="输入员工姓名/拼音首字母"
+          :filter-option="false"
+          :options="staffOptions"
+          @search="searchStaff"
+          @focus="() => !staffOptions.length && searchStaff('')"
+        />
       </a-form-item>
       <a-form-item label="关键词">
         <a-input v-model:value="query.keyword" placeholder="服务名/计划名/备注" allow-clear />
@@ -53,6 +63,7 @@ import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
+import { useStaffOptions } from '../../composables/useStaffOptions'
 import { getNursingRecordPage } from '../../api/nursing'
 import type { NursingRecordItem, PageResult } from '../../types'
 import { resolveCareError } from './careError'
@@ -62,9 +73,10 @@ const rows = ref<NursingRecordItem[]>([])
 const route = useRoute()
 const routeResidentId = route.query.residentId ? Number(route.query.residentId) : route.query.elderId ? Number(route.query.elderId) : undefined
 const { elderOptions, searchElders } = useElderOptions({ pageSize: 50 })
+const { staffOptions, searchStaff } = useStaffOptions({ pageSize: 220, preloadSize: 500 })
 const query = reactive({
   elderId: routeResidentId as number | undefined,
-  staffId: undefined as number | undefined,
+  staffId: undefined as string | undefined,
   keyword: '',
   range: undefined as [Dayjs, Dayjs] | undefined,
   pageNo: 1,
@@ -91,7 +103,7 @@ async function fetchData() {
       pageNo: query.pageNo,
       pageSize: query.pageSize,
       elderId: query.elderId,
-      staffId: query.staffId,
+      staffId: query.staffId ? Number(query.staffId) : undefined,
       keyword: query.keyword || undefined,
       timeFrom: query.range?.[0] ? dayjs(query.range[0]).format('YYYY-MM-DDTHH:mm:ss') : undefined,
       timeTo: query.range?.[1] ? dayjs(query.range[1]).format('YYYY-MM-DDTHH:mm:ss') : undefined
@@ -126,7 +138,7 @@ function onReset() {
 }
 
 onMounted(async () => {
-  await searchElders('')
+  await Promise.all([searchElders(''), searchStaff('')])
   fetchData()
 })
 </script>

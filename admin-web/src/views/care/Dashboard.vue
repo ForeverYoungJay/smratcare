@@ -57,14 +57,15 @@ import { computed, onMounted, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { getTodayTasks } from '../../api/care'
-import { getStaffPage } from '../../api/rbac'
+import { useStaffOptions } from '../../composables/useStaffOptions'
 import type { CareTaskItem } from '../../types'
 import { useECharts } from '../../plugins/echarts'
 import { resolveCareError } from './careError'
 
 const loading = ref(false)
 const tasks = ref<CareTaskItem[]>([])
-const staffMap = ref<Record<number, string>>({})
+const staffLoaded = ref(false)
+const { searchStaff, findStaffName } = useStaffOptions({ pageSize: 260, preloadSize: 500 })
 
 const stats = computed(() => {
   const total = tasks.value.length
@@ -116,7 +117,7 @@ function buildCharts(list: CareTaskItem[]) {
 
   const staffCountMap = new Map<string, number>()
   list.filter((t) => t.status === 'DONE').forEach((task) => {
-    const key = task.staffId ? (staffMap.value[task.staffId] || '未知护理员') : '未分配'
+    const key = task.staffId ? (findStaffName(task.staffId) || `员工#${task.staffId}`) : '未分配'
     staffCountMap.set(key, (staffCountMap.get(key) || 0) + 1)
   })
   const rank = Array.from(staffCountMap.entries())
@@ -136,7 +137,7 @@ async function load() {
   try {
     const page = await getTodayTasks({ pageNo: 1, pageSize: 200 })
     tasks.value = page.list || []
-    await loadStaffOptions()
+    await ensureStaffLoaded()
     buildCharts(tasks.value)
   } catch (error) {
     message.error(resolveCareError(error, '加载护理看板失败'))
@@ -147,16 +148,13 @@ async function load() {
   }
 }
 
-async function loadStaffOptions() {
+async function ensureStaffLoaded() {
+  if (staffLoaded.value) return
   try {
-    const res = await getStaffPage({ pageNo: 1, pageSize: 200 })
-    staffMap.value = res.list.reduce((acc: Record<number, string>, item: any) => {
-      acc[item.id] = item.realName || item.username || `员工#${item.id}`
-      return acc
-    }, {})
+    await searchStaff('')
+    staffLoaded.value = true
   } catch (error) {
     message.error(resolveCareError(error, '加载护工信息失败'))
-    staffMap.value = {}
   }
 }
 
