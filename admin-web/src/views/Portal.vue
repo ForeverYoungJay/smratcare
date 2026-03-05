@@ -41,39 +41,21 @@
               <a-button @click="openCustomCardEditor()">新增卡面</a-button>
               <a-button type="primary" @click="go('/oa/todo')">进入待办中心</a-button>
             </a-space>
-            <div class="hero-actions-tip">支持卡片拖拽排序、角色可见范围、导入导出配置</div>
+            <div class="hero-actions-tip">支持角色可见范围、导入导出配置</div>
           </div>
         </a-card>
 
-        <a-row :gutter="[12, 12]" v-if="showRowTodoReminder" class="section-row" :style="{ order: sectionOrder(['todo', 'reminder']) }">
-          <a-col :xs="24" :xl="14" :style="{ order: moduleOrder('todo') }">
+        <a-row :gutter="[8, 8]" v-if="showRowTodoReminder" class="section-row" :style="{ order: sectionOrder(['todo', 'reminder']) }">
+          <a-col :xs="24" :xl="rowTodoReminderSpan('todo')" :style="{ order: moduleOrder('todo') }">
             <a-card
               v-if="isModuleVisible('todo')"
               :bordered="false"
               class="card-elevated full-height module-card"
-              :class="portalModuleCardClass('todo')"
               :style="moduleCardStyle('todo')"
               title="1️⃣ 我的待办（最重要）"
-              @dragover="onPortalModuleDragOver('todo', $event)"
-              @drop.prevent="onPortalModuleDrop('todo')"
             >
               <template #extra>
-                <a-space>
-                  <a-tag color="processing">总待办 {{ totalTodoCount }}</a-tag>
-                  <div
-                    class="module-drag-handle"
-                    :class="{ 'is-ready': moduleDragReadyKey === 'todo' }"
-                    draggable="true"
-                    title="按住 120ms 拖动排序"
-                    @mousedown.left.stop="onPortalModuleHandleMouseDown('todo')"
-                    @mouseup.stop="onPortalModuleHandleRelease"
-                    @mouseleave="onPortalModuleHandleRelease"
-                    @dragstart="onPortalModuleCardDragStart('todo', $event)"
-                    @dragend="onPortalModuleCardDragEnd"
-                  >
-                    ⋮⋮
-                  </div>
-                </a-space>
+                <a-tag color="processing">总待办 {{ totalTodoCount }}</a-tag>
               </template>
               <a-row :gutter="[10, 10]">
                 <a-col :xs="12" :sm="6" v-for="item in myTodoStats" :key="item.title">
@@ -97,38 +79,17 @@
                 <a-button @click="go('/oa/approval')">批量审批</a-button>
                 <a-button @click="go('/logistics/task-center')">打开任务中心</a-button>
               </a-space>
-              <div class="module-resize-handle module-resize-right" @mousedown.stop.prevent="startResizeModuleCard('todo', 'right', $event)" />
-              <div class="module-resize-handle module-resize-bottom" @mousedown.stop.prevent="startResizeModuleCard('todo', 'bottom', $event)" />
-              <div class="module-resize-handle module-resize-corner" @mousedown.stop.prevent="startResizeModuleCard('todo', 'corner', $event)" />
             </a-card>
           </a-col>
 
-          <a-col :xs="24" :xl="10" :style="{ order: moduleOrder('reminder') }">
+          <a-col :xs="24" :xl="rowTodoReminderSpan('reminder')" :style="{ order: moduleOrder('reminder') }">
             <a-card
               v-if="isModuleVisible('reminder')"
               :bordered="false"
               class="card-elevated full-height module-card"
-              :class="portalModuleCardClass('reminder')"
               :style="moduleCardStyle('reminder')"
               title="2️⃣ 提醒中心（系统预警）"
-              @dragover="onPortalModuleDragOver('reminder', $event)"
-              @drop.prevent="onPortalModuleDrop('reminder')"
             >
-              <template #extra>
-                <div
-                  class="module-drag-handle"
-                  :class="{ 'is-ready': moduleDragReadyKey === 'reminder' }"
-                  draggable="true"
-                  title="按住 120ms 拖动排序"
-                  @mousedown.left.stop="onPortalModuleHandleMouseDown('reminder')"
-                  @mouseup.stop="onPortalModuleHandleRelease"
-                  @mouseleave="onPortalModuleHandleRelease"
-                  @dragstart="onPortalModuleCardDragStart('reminder', $event)"
-                  @dragend="onPortalModuleCardDragEnd"
-                >
-                  ⋮⋮
-                </div>
-              </template>
               <a-list size="small" :data-source="riskReminders" :locale="{ emptyText: '暂无提醒' }">
                 <template #renderItem="{ item }">
                   <a-list-item>
@@ -148,9 +109,6 @@
                 <a-tag color="orange">橙色：预警</a-tag>
                 <a-tag color="blue">蓝色：普通通知</a-tag>
               </div>
-              <div class="module-resize-handle module-resize-right" @mousedown.stop.prevent="startResizeModuleCard('reminder', 'right', $event)" />
-              <div class="module-resize-handle module-resize-bottom" @mousedown.stop.prevent="startResizeModuleCard('reminder', 'bottom', $event)" />
-              <div class="module-resize-handle module-resize-corner" @mousedown.stop.prevent="startResizeModuleCard('reminder', 'corner', $event)" />
             </a-card>
           </a-col>
         </a-row>
@@ -159,28 +117,10 @@
           v-if="isModuleVisible('quickLaunch')"
           :bordered="false"
           class="card-elevated module-card"
-          :class="portalModuleCardClass('quickLaunch')"
           :style="[moduleCardStyle('quickLaunch'), { order: sectionOrder(['quickLaunch']) }]"
           title="3️⃣ 快捷发起（操作入口）"
-          @dragover="onPortalModuleDragOver('quickLaunch', $event)"
-          @drop.prevent="onPortalModuleDrop('quickLaunch')"
         >
-          <template #extra>
-            <div
-              class="module-drag-handle"
-              :class="{ 'is-ready': moduleDragReadyKey === 'quickLaunch' }"
-              draggable="true"
-              title="按住 120ms 拖动排序"
-              @mousedown.left.stop="onPortalModuleHandleMouseDown('quickLaunch')"
-              @mouseup.stop="onPortalModuleHandleRelease"
-              @mouseleave="onPortalModuleHandleRelease"
-              @dragstart="onPortalModuleCardDragStart('quickLaunch', $event)"
-              @dragend="onPortalModuleCardDragEnd"
-            >
-              ⋮⋮
-            </div>
-          </template>
-          <a-row :gutter="[12, 12]">
+          <a-row :gutter="[8, 8]">
             <a-col :xs="24" :md="12" :xl="6" v-for="group in quickLaunchGroups" :key="group.title">
               <div class="quick-group">
                 <div class="quick-title">{{ group.title }}</div>
@@ -192,20 +132,14 @@
               </div>
             </a-col>
           </a-row>
-          <div class="module-resize-handle module-resize-right" @mousedown.stop.prevent="startResizeModuleCard('quickLaunch', 'right', $event)" />
-          <div class="module-resize-handle module-resize-bottom" @mousedown.stop.prevent="startResizeModuleCard('quickLaunch', 'bottom', $event)" />
-          <div class="module-resize-handle module-resize-corner" @mousedown.stop.prevent="startResizeModuleCard('quickLaunch', 'corner', $event)" />
         </a-card>
 
         <a-card
           v-if="isModuleVisible('customCards')"
           :bordered="false"
           class="card-elevated module-card"
-          :class="portalModuleCardClass('customCards')"
           :style="[moduleCardStyle('customCards'), { order: sectionOrder(['customCards']) }]"
           title="🧩 我的自定义卡面"
-          @dragover="onPortalModuleDragOver('customCards', $event)"
-          @drop.prevent="onPortalModuleDrop('customCards')"
         >
           <template #extra>
             <a-space>
@@ -217,23 +151,10 @@
               />
               <a-button size="small" @click="openCustomCardEditor()">新增卡面</a-button>
               <a-button size="small" @click="customCardManageOpen = true">管理卡面</a-button>
-              <div
-                class="module-drag-handle"
-                :class="{ 'is-ready': moduleDragReadyKey === 'customCards' }"
-                draggable="true"
-                title="按住 120ms 拖动排序"
-                @mousedown.left.stop="onPortalModuleHandleMouseDown('customCards')"
-                @mouseup.stop="onPortalModuleHandleRelease"
-                @mouseleave="onPortalModuleHandleRelease"
-                @dragstart="onPortalModuleCardDragStart('customCards', $event)"
-                @dragend="onPortalModuleCardDragEnd"
-              >
-                ⋮⋮
-              </div>
             </a-space>
           </template>
-          <a-row :gutter="[12, 12]">
-            <a-col :xs="24" :sm="12" :xl="6" v-for="item in filteredCustomCards" :key="item.id">
+          <a-row :gutter="[8, 8]">
+            <a-col :xs="24" :sm="12" :xl="customCardColSpan" v-for="item in filteredCustomCards" :key="item.id">
               <div class="custom-card-item" :style="customCardItemStyle(item)" @click="handleCustomCardClick(item)">
                 <div class="custom-card-title">{{ item.icon || '🧩' }} {{ item.title }}</div>
                 <div class="custom-card-route">{{ item.route }}</div>
@@ -246,47 +167,23 @@
                   <a-button type="link" size="small" @click="duplicateCustomCard(item.id)">复制</a-button>
                   <a-button type="link" danger size="small" @click="removeCustomCard(item.id)">删除</a-button>
                 </div>
-                <div class="resize-handle resize-right" @mousedown.stop.prevent="startResizeCustomCard(item.id, 'right', $event)" />
-                <div class="resize-handle resize-bottom" @mousedown.stop.prevent="startResizeCustomCard(item.id, 'bottom', $event)" />
-                <div class="resize-handle resize-corner" @mousedown.stop.prevent="startResizeCustomCard(item.id, 'corner', $event)" />
               </div>
             </a-col>
             <a-col v-if="!filteredCustomCards.length" :span="24">
               <a-empty description="暂无自定义卡面，可点击右上角“新增卡面”" />
             </a-col>
           </a-row>
-          <div class="module-resize-handle module-resize-right" @mousedown.stop.prevent="startResizeModuleCard('customCards', 'right', $event)" />
-          <div class="module-resize-handle module-resize-bottom" @mousedown.stop.prevent="startResizeModuleCard('customCards', 'bottom', $event)" />
-          <div class="module-resize-handle module-resize-corner" @mousedown.stop.prevent="startResizeModuleCard('customCards', 'corner', $event)" />
         </a-card>
 
-        <a-row :gutter="[12, 12]" v-if="showRowOperation" class="section-row" :style="{ order: sectionOrder(['operation', 'finance', 'salesFunnel']) }">
-          <a-col :xs="24" :xl="8" :style="{ order: moduleOrder('operation') }">
+        <a-row :gutter="[8, 8]" v-if="showRowOperation" class="section-row" :style="{ order: sectionOrder(['operation', 'finance', 'salesFunnel']) }">
+          <a-col :xs="24" :xl="rowOperationSpan('operation')" :style="{ order: moduleOrder('operation') }">
             <a-card
               v-if="isModuleVisible('operation')"
               :bordered="false"
               class="card-elevated full-height module-card"
-              :class="portalModuleCardClass('operation')"
               :style="moduleCardStyle('operation')"
               title="4️⃣ 今日运营概览（核心KPI）"
-              @dragover="onPortalModuleDragOver('operation', $event)"
-              @drop.prevent="onPortalModuleDrop('operation')"
             >
-              <template #extra>
-                <div
-                  class="module-drag-handle"
-                  :class="{ 'is-ready': moduleDragReadyKey === 'operation' }"
-                  draggable="true"
-                  title="按住 120ms 拖动排序"
-                  @mousedown.left.stop="onPortalModuleHandleMouseDown('operation')"
-                  @mouseup.stop="onPortalModuleHandleRelease"
-                  @mouseleave="onPortalModuleHandleRelease"
-                  @dragstart="onPortalModuleCardDragStart('operation', $event)"
-                  @dragend="onPortalModuleCardDragEnd"
-                >
-                  ⋮⋮
-                </div>
-              </template>
               <a-row :gutter="[10, 10]">
                 <a-col :span="12" v-for="item in operationOverview" :key="item.title">
                   <div class="metric-cell" @click="item.route ? go(item.route) : undefined">
@@ -295,38 +192,17 @@
                   </div>
                 </a-col>
               </a-row>
-              <div class="module-resize-handle module-resize-right" @mousedown.stop.prevent="startResizeModuleCard('operation', 'right', $event)" />
-              <div class="module-resize-handle module-resize-bottom" @mousedown.stop.prevent="startResizeModuleCard('operation', 'bottom', $event)" />
-              <div class="module-resize-handle module-resize-corner" @mousedown.stop.prevent="startResizeModuleCard('operation', 'corner', $event)" />
             </a-card>
           </a-col>
 
-          <a-col :xs="24" :xl="8" :style="{ order: moduleOrder('finance') }">
+          <a-col :xs="24" :xl="rowOperationSpan('finance')" :style="{ order: moduleOrder('finance') }">
             <a-card
               v-if="isModuleVisible('finance')"
               :bordered="false"
               class="card-elevated full-height module-card"
-              :class="portalModuleCardClass('finance')"
               :style="moduleCardStyle('finance')"
               title="5️⃣ 财务运营概览"
-              @dragover="onPortalModuleDragOver('finance', $event)"
-              @drop.prevent="onPortalModuleDrop('finance')"
             >
-              <template #extra>
-                <div
-                  class="module-drag-handle"
-                  :class="{ 'is-ready': moduleDragReadyKey === 'finance' }"
-                  draggable="true"
-                  title="按住 120ms 拖动排序"
-                  @mousedown.left.stop="onPortalModuleHandleMouseDown('finance')"
-                  @mouseup.stop="onPortalModuleHandleRelease"
-                  @mouseleave="onPortalModuleHandleRelease"
-                  @dragstart="onPortalModuleCardDragStart('finance', $event)"
-                  @dragend="onPortalModuleCardDragEnd"
-                >
-                  ⋮⋮
-                </div>
-              </template>
               <a-row :gutter="[10, 10]">
                 <a-col :span="12" v-for="item in financeOverviewItems" :key="item.title">
                   <div class="metric-cell" @click="item.route ? go(item.route) : undefined">
@@ -336,38 +212,17 @@
                 </a-col>
               </a-row>
               <a-button type="link" style="padding-left: 0; margin-top: 8px;" @click="go('/finance/reports/overall')">点击 → 财务分析</a-button>
-              <div class="module-resize-handle module-resize-right" @mousedown.stop.prevent="startResizeModuleCard('finance', 'right', $event)" />
-              <div class="module-resize-handle module-resize-bottom" @mousedown.stop.prevent="startResizeModuleCard('finance', 'bottom', $event)" />
-              <div class="module-resize-handle module-resize-corner" @mousedown.stop.prevent="startResizeModuleCard('finance', 'corner', $event)" />
             </a-card>
           </a-col>
 
-          <a-col :xs="24" :xl="8" :style="{ order: moduleOrder('salesFunnel') }">
+          <a-col :xs="24" :xl="rowOperationSpan('salesFunnel')" :style="{ order: moduleOrder('salesFunnel') }">
             <a-card
               v-if="isModuleVisible('salesFunnel')"
               :bordered="false"
               class="card-elevated full-height module-card"
-              :class="portalModuleCardClass('salesFunnel')"
               :style="moduleCardStyle('salesFunnel')"
               title="6️⃣ 销售运营漏斗"
-              @dragover="onPortalModuleDragOver('salesFunnel', $event)"
-              @drop.prevent="onPortalModuleDrop('salesFunnel')"
             >
-              <template #extra>
-                <div
-                  class="module-drag-handle"
-                  :class="{ 'is-ready': moduleDragReadyKey === 'salesFunnel' }"
-                  draggable="true"
-                  title="按住 120ms 拖动排序"
-                  @mousedown.left.stop="onPortalModuleHandleMouseDown('salesFunnel')"
-                  @mouseup.stop="onPortalModuleHandleRelease"
-                  @mouseleave="onPortalModuleHandleRelease"
-                  @dragstart="onPortalModuleCardDragStart('salesFunnel', $event)"
-                  @dragend="onPortalModuleCardDragEnd"
-                >
-                  ⋮⋮
-                </div>
-              </template>
               <a-row :gutter="[10, 10]">
                 <a-col :span="12" v-for="item in salesFunnelItems" :key="item.title">
                   <div class="metric-cell" @click="go(item.route)">
@@ -377,40 +232,19 @@
                 </a-col>
               </a-row>
               <v-chart :option="funnelOption" autoresize class="funnel-chart" />
-              <div class="module-resize-handle module-resize-right" @mousedown.stop.prevent="startResizeModuleCard('salesFunnel', 'right', $event)" />
-              <div class="module-resize-handle module-resize-bottom" @mousedown.stop.prevent="startResizeModuleCard('salesFunnel', 'bottom', $event)" />
-              <div class="module-resize-handle module-resize-corner" @mousedown.stop.prevent="startResizeModuleCard('salesFunnel', 'corner', $event)" />
             </a-card>
           </a-col>
         </a-row>
 
-        <a-row :gutter="[12, 12]" v-if="showRowStatusExpense" class="section-row" :style="{ order: sectionOrder(['bedStatus', 'expense']) }">
-          <a-col :xs="24" :xl="10" :style="{ order: moduleOrder('bedStatus') }">
+        <a-row :gutter="[8, 8]" v-if="showRowStatusExpense" class="section-row" :style="{ order: sectionOrder(['bedStatus', 'expense']) }">
+          <a-col :xs="24" :xl="rowStatusExpenseSpan('bedStatus')" :style="{ order: moduleOrder('bedStatus') }">
             <a-card
               v-if="isModuleVisible('bedStatus')"
               :bordered="false"
               class="card-elevated full-height module-card"
-              :class="portalModuleCardClass('bedStatus')"
               :style="moduleCardStyle('bedStatus')"
               title="7️⃣ 床位与长者状态"
-              @dragover="onPortalModuleDragOver('bedStatus', $event)"
-              @drop.prevent="onPortalModuleDrop('bedStatus')"
             >
-              <template #extra>
-                <div
-                  class="module-drag-handle"
-                  :class="{ 'is-ready': moduleDragReadyKey === 'bedStatus' }"
-                  draggable="true"
-                  title="按住 120ms 拖动排序"
-                  @mousedown.left.stop="onPortalModuleHandleMouseDown('bedStatus')"
-                  @mouseup.stop="onPortalModuleHandleRelease"
-                  @mouseleave="onPortalModuleHandleRelease"
-                  @dragstart="onPortalModuleCardDragStart('bedStatus', $event)"
-                  @dragend="onPortalModuleCardDragEnd"
-                >
-                  ⋮⋮
-                </div>
-              </template>
               <a-row :gutter="[10, 10]">
                 <a-col :span="8" v-for="item in bedAndElderStatusItems" :key="item.title">
                   <div class="metric-cell" @click="go(item.route)">
@@ -420,38 +254,17 @@
                 </a-col>
               </a-row>
               <a-button type="link" style="padding-left: 0; margin-top: 8px;" @click="go('/elder/bed-panorama')">点击 → 床态全景</a-button>
-              <div class="module-resize-handle module-resize-right" @mousedown.stop.prevent="startResizeModuleCard('bedStatus', 'right', $event)" />
-              <div class="module-resize-handle module-resize-bottom" @mousedown.stop.prevent="startResizeModuleCard('bedStatus', 'bottom', $event)" />
-              <div class="module-resize-handle module-resize-corner" @mousedown.stop.prevent="startResizeModuleCard('bedStatus', 'corner', $event)" />
             </a-card>
           </a-col>
 
-          <a-col :xs="24" :xl="14" :style="{ order: moduleOrder('expense') }">
+          <a-col :xs="24" :xl="rowStatusExpenseSpan('expense')" :style="{ order: moduleOrder('expense') }">
             <a-card
               v-if="isModuleVisible('expense')"
               :bordered="false"
               class="card-elevated full-height module-card"
-              :class="portalModuleCardClass('expense')"
               :style="moduleCardStyle('expense')"
               title="8️⃣ 费用管理（我的费用 / 部门费用 / 发票夹）"
-              @dragover="onPortalModuleDragOver('expense', $event)"
-              @drop.prevent="onPortalModuleDrop('expense')"
             >
-              <template #extra>
-                <div
-                  class="module-drag-handle"
-                  :class="{ 'is-ready': moduleDragReadyKey === 'expense' }"
-                  draggable="true"
-                  title="按住 120ms 拖动排序"
-                  @mousedown.left.stop="onPortalModuleHandleMouseDown('expense')"
-                  @mouseup.stop="onPortalModuleHandleRelease"
-                  @mouseleave="onPortalModuleHandleRelease"
-                  @dragstart="onPortalModuleCardDragStart('expense', $event)"
-                  @dragend="onPortalModuleCardDragEnd"
-                >
-                  ⋮⋮
-                </div>
-              </template>
               <a-row :gutter="[10, 10]">
                 <a-col :xs="24" :md="8" v-for="group in expenseSections" :key="group.title">
                   <div class="expense-block">
@@ -463,9 +276,6 @@
                   </div>
                 </a-col>
               </a-row>
-              <div class="module-resize-handle module-resize-right" @mousedown.stop.prevent="startResizeModuleCard('expense', 'right', $event)" />
-              <div class="module-resize-handle module-resize-bottom" @mousedown.stop.prevent="startResizeModuleCard('expense', 'bottom', $event)" />
-              <div class="module-resize-handle module-resize-corner" @mousedown.stop.prevent="startResizeModuleCard('expense', 'corner', $event)" />
             </a-card>
           </a-col>
         </a-row>
@@ -474,11 +284,8 @@
           v-if="isModuleVisible('calendar')"
           :bordered="false"
           class="card-elevated module-card"
-          :class="portalModuleCardClass('calendar')"
           :style="[moduleCardStyle('calendar'), { order: sectionOrder(['calendar']) }]"
           title="9️⃣ 行政日历 / 协同日历"
-          @dragover="onPortalModuleDragOver('calendar', $event)"
-          @drop.prevent="onPortalModuleDrop('calendar')"
         >
           <template #extra>
             <a-space>
@@ -487,19 +294,6 @@
               <a-button size="small" @click="agendaDrawerOpen = true">今日/明日速览</a-button>
               <a-button size="small" @click="go('/oa/attendance-leave?type=LEAVE&quick=1')">发起请假</a-button>
               <a-button size="small" @click="go('/oa/approval?type=LEAVE')">请假审批流程</a-button>
-              <div
-                class="module-drag-handle"
-                :class="{ 'is-ready': moduleDragReadyKey === 'calendar' }"
-                draggable="true"
-                title="按住 120ms 拖动排序"
-                @mousedown.left.stop="onPortalModuleHandleMouseDown('calendar')"
-                @mouseup.stop="onPortalModuleHandleRelease"
-                @mouseleave="onPortalModuleHandleRelease"
-                @dragstart="onPortalModuleCardDragStart('calendar', $event)"
-                @dragend="onPortalModuleCardDragEnd"
-              >
-                ⋮⋮
-              </div>
             </a-space>
           </template>
           <div class="calendar-toolbar">
@@ -526,36 +320,15 @@
               <a-button type="link" @click="go('/oa/approval?type=LEAVE')">请假审批看板</a-button>
             </a-space>
           </div>
-          <div class="module-resize-handle module-resize-right" @mousedown.stop.prevent="startResizeModuleCard('calendar', 'right', $event)" />
-          <div class="module-resize-handle module-resize-bottom" @mousedown.stop.prevent="startResizeModuleCard('calendar', 'bottom', $event)" />
-          <div class="module-resize-handle module-resize-corner" @mousedown.stop.prevent="startResizeModuleCard('calendar', 'corner', $event)" />
         </a-card>
 
         <a-card
           v-if="isModuleVisible('dataEntry')"
           :bordered="false"
           class="card-elevated module-card"
-          :class="portalModuleCardClass('dataEntry')"
           :style="[moduleCardStyle('dataEntry'), { order: sectionOrder(['dataEntry']) }]"
           title="🔟 数据分析入口"
-          @dragover="onPortalModuleDragOver('dataEntry', $event)"
-          @drop.prevent="onPortalModuleDrop('dataEntry')"
         >
-          <template #extra>
-            <div
-              class="module-drag-handle"
-              :class="{ 'is-ready': moduleDragReadyKey === 'dataEntry' }"
-              draggable="true"
-              title="按住 120ms 拖动排序"
-              @mousedown.left.stop="onPortalModuleHandleMouseDown('dataEntry')"
-              @mouseup.stop="onPortalModuleHandleRelease"
-              @mouseleave="onPortalModuleHandleRelease"
-              @dragstart="onPortalModuleCardDragStart('dataEntry', $event)"
-              @dragend="onPortalModuleCardDragEnd"
-            >
-              ⋮⋮
-            </div>
-          </template>
           <div class="hint-text">首页不放复杂图表，仅提供分析入口。</div>
           <a-space wrap style="margin-top: 8px;">
             <a-button type="primary"  @click="go('/stats/org/monthly-operation')">运营分析</a-button>
@@ -563,9 +336,6 @@
             <a-button type="primary"  @click="go('/medical-care/nursing-quality')">医护质量</a-button>
             <a-button type="primary"  @click="go('/marketing/reports/conversion')">销售分析</a-button>
           </a-space>
-          <div class="module-resize-handle module-resize-right" @mousedown.stop.prevent="startResizeModuleCard('dataEntry', 'right', $event)" />
-          <div class="module-resize-handle module-resize-bottom" @mousedown.stop.prevent="startResizeModuleCard('dataEntry', 'bottom', $event)" />
-          <div class="module-resize-handle module-resize-corner" @mousedown.stop.prevent="startResizeModuleCard('dataEntry', 'corner', $event)" />
         </a-card>
       </div>
     </StatefulBlock>
@@ -806,12 +576,6 @@
           v-for="(item, index) in moduleConfigDraft"
           :key="item.key"
           class="manage-card-item"
-          :class="{ 'is-dragging': draggingModuleKey === item.key }"
-          draggable="true"
-          @dragstart="onModuleDragStart(item.key)"
-          @dragover.prevent
-          @drop.prevent="onModuleDrop(item.key)"
-          @dragend="onModuleDragEnd"
         >
           <div class="manage-card-main">
             <div class="manage-card-title">#{{ index + 1 }} {{ item.title }}</div>
@@ -890,12 +654,6 @@
               v-for="item in group.list"
               :key="item.id"
               class="manage-card-item"
-              :class="{ 'is-dragging': draggingCustomCardId === item.id }"
-              draggable="true"
-              @dragstart="onCustomCardDragStart(item.id)"
-              @dragover.prevent="onCustomCardDragOver(item.id)"
-              @drop.prevent="onCustomCardDrop(item.id)"
-              @dragend="onCustomCardDragEnd"
             >
               <div class="manage-card-main">
                 <div class="manage-card-title">{{ item.icon || '🧩' }} {{ item.title }}</div>
@@ -916,12 +674,6 @@
           v-for="item in manageFilteredCustomCards"
           :key="item.id"
           class="manage-card-item"
-          :class="{ 'is-dragging': draggingCustomCardId === item.id }"
-          draggable="true"
-          @dragstart="onCustomCardDragStart(item.id)"
-          @dragover.prevent="onCustomCardDragOver(item.id)"
-          @drop.prevent="onCustomCardDrop(item.id)"
-          @dragend="onCustomCardDragEnd"
         >
           <div class="manage-card-main">
             <div class="manage-card-title">{{ item.icon || '🧩' }} {{ item.title }}</div>
@@ -1019,9 +771,6 @@
       </a-space>
     </a-modal>
 
-    <div v-if="resizeIndicator.visible" class="resize-indicator" :style="{ left: `${resizeIndicator.x}px`, top: `${resizeIndicator.y}px` }">
-      {{ resizeIndicator.text }}
-    </div>
   </PageContainer>
 </template>
 
@@ -1080,29 +829,13 @@ const customCardEditorOpen = ref(false)
 const customCardEditingId = ref('')
 const customCardCategoryFilter = ref<'ALL' | 'OPS' | 'CARE' | 'FINANCE' | 'OA' | 'CUSTOM'>('ALL')
 const customCardGroupMode = ref(true)
-const draggingCustomCardId = ref('')
-const draggingModuleKey = ref('')
-const draggingPortalModuleKey = ref<PortalModuleKey | ''>('')
-const portalModuleDropTargetKey = ref<PortalModuleKey | ''>('')
-const moduleDragReadyKey = ref<PortalModuleKey | ''>('')
-const moduleDragCommitted = ref(false)
-const moduleDragInvalidKey = ref<PortalModuleKey | ''>('')
-const moduleDragSnapshot = ref<PortalModuleConfigItem[] | null>(null)
 const exportPayloadOpen = ref(false)
 const importPayloadOpen = ref(false)
 const exportPayloadText = ref('')
 const importPayloadText = ref('')
 const customCardManageKeyword = ref('')
-const resizeIndicator = reactive({
-  visible: false,
-  text: '',
-  x: 0,
-  y: 0
-})
 let portalSyncTimer: number | undefined
 let portalVisibleHandler: (() => void) | null = null
-let moduleDragHoldTimer: number | undefined
-const suppressCardClickUntil = ref(0)
 
 type AudienceCode = 'ALL' | 'DIRECTOR' | 'NURSE' | 'FINANCE' | 'ADMIN' | 'HR' | 'OPS'
 
@@ -1128,6 +861,8 @@ interface PortalModuleConfigItem {
   audience: AudienceCode[]
   width?: number
   height?: number
+  x?: number
+  y?: number
 }
 
 const portalModuleCatalog: Array<Omit<PortalModuleConfigItem, 'visible' | 'order'>> = [
@@ -1145,10 +880,10 @@ const portalModuleCatalog: Array<Omit<PortalModuleConfigItem, 'visible' | 'order
 ]
 
 const moduleConfig = ref<PortalModuleConfigItem[]>(
-  portalModuleCatalog.map((item, index) => ({ ...item, visible: true, order: index, width: undefined, height: undefined }))
+  portalModuleCatalog.map((item, index) => ({ ...item, visible: true, order: index, width: undefined, height: undefined, x: 0, y: 0 }))
 )
 const moduleConfigDraft = ref<PortalModuleConfigItem[]>(
-  portalModuleCatalog.map((item, index) => ({ ...item, visible: true, order: index, width: undefined, height: undefined }))
+  portalModuleCatalog.map((item, index) => ({ ...item, visible: true, order: index, width: undefined, height: undefined, x: 0, y: 0 }))
 )
 
 interface PortalCustomCardItem {
@@ -1240,24 +975,6 @@ const customCardAudienceOptions = [
 ]
 
 const moduleAudienceOptions = [...customCardAudienceOptions]
-const resizingCustomCard = reactive({
-  id: '',
-  direction: '' as '' | 'right' | 'bottom' | 'corner',
-  startX: 0,
-  startY: 0,
-  startWidth: 0,
-  startHeight: 0,
-  moved: false
-})
-const resizingModuleCard = reactive({
-  key: '' as '' | PortalModuleKey,
-  direction: '' as '' | 'right' | 'bottom' | 'corner',
-  startX: 0,
-  startY: 0,
-  startWidth: 0,
-  startHeight: 0,
-  moved: false
-})
 
 const summary = reactive<OaPortalSummary>({
   notices: [],
@@ -1441,6 +1158,37 @@ const showRowTodoReminder = computed(() => isModuleVisible('todo') || isModuleVi
 const showRowOperation = computed(() => isModuleVisible('operation') || isModuleVisible('finance') || isModuleVisible('salesFunnel'))
 const showRowStatusExpense = computed(() => isModuleVisible('bedStatus') || isModuleVisible('expense'))
 const currentUserAudience = computed(() => resolveCurrentUserAudience())
+
+function resolveAdaptiveSpan(rowKeys: PortalModuleKey[], target: PortalModuleKey) {
+  const visibleKeys = rowKeys.filter((key) => isModuleVisible(key))
+  if (!visibleKeys.includes(target)) return 24
+  const count = visibleKeys.length
+  if (count <= 1) return 24
+  if (count === 2) return 12
+  if (count === 3) return 8
+  return Math.max(6, Math.floor(24 / count))
+}
+
+function rowTodoReminderSpan(target: 'todo' | 'reminder') {
+  return resolveAdaptiveSpan(['todo', 'reminder'], target)
+}
+
+function rowOperationSpan(target: 'operation' | 'finance' | 'salesFunnel') {
+  return resolveAdaptiveSpan(['operation', 'finance', 'salesFunnel'], target)
+}
+
+function rowStatusExpenseSpan(target: 'bedStatus' | 'expense') {
+  return resolveAdaptiveSpan(['bedStatus', 'expense'], target)
+}
+
+const customCardColSpan = computed(() => {
+  const count = filteredCustomCards.value.length
+  if (count <= 1) return 24
+  if (count === 2) return 12
+  if (count === 3) return 8
+  return 6
+})
+
 const filteredCustomCards = computed(() => {
   const visibleCards = customCards.value
     .filter((item) => item.visible !== false)
@@ -1803,7 +1551,6 @@ function go(path: string, forceNewTab = false) {
 }
 
 function handleCustomCardClick(item: PortalCustomCardItem) {
-  if (Date.now() < suppressCardClickUntil.value) return
   go(item.route, item.openMode === 'new')
 }
 
@@ -1823,145 +1570,31 @@ function clampModuleCardHeight(value: number) {
   return Math.max(180, Math.min(880, snapResizeValue(value, 10)))
 }
 
+function clampModuleCardOffsetX(value: number) {
+  return Math.max(-2400, Math.min(2400, snapResizeValue(value, 4)))
+}
+
+function clampModuleCardOffsetY(value: number) {
+  return Math.max(-3200, Math.min(3200, snapResizeValue(value, 4)))
+}
+
 function snapResizeValue(value: number, step: number) {
   return Math.round(value / step) * step
 }
 
-function showResizeIndicator(event: MouseEvent, width?: number, height?: number) {
-  const parts = []
-  if (width != null) parts.push(`宽 ${width}px`)
-  if (height != null) parts.push(`高 ${height}px`)
-  resizeIndicator.text = parts.join(' · ')
-  resizeIndicator.x = event.clientX + 16
-  resizeIndicator.y = event.clientY + 12
-  resizeIndicator.visible = true
-}
-
-function hideResizeIndicator() {
-  resizeIndicator.visible = false
-  resizeIndicator.text = ''
-}
-
 function moduleCardStyle(key: PortalModuleKey) {
-  const matched = moduleConfig.value.find((item) => item.key === key)
-  const width = matched?.width ? clampModuleCardWidth(matched.width) : undefined
-  const height = matched?.height ? clampModuleCardHeight(matched.height) : undefined
+  void key
   return {
-    width: width ? `${width}px` : '100%',
-    maxWidth: '100%',
-    minHeight: height ? `${height}px` : undefined
-  }
-}
-
-function portalModuleCardClass(key: PortalModuleKey) {
-  return {
-    'is-dragging-source': draggingPortalModuleKey.value === key,
-    'is-drop-zone': !!draggingPortalModuleKey.value && draggingPortalModuleKey.value !== key,
-    'is-drop-target': portalModuleDropTargetKey.value === key,
-    'is-invalid-bounce': moduleDragInvalidKey.value === key
+    width: '100%'
   }
 }
 
 function customCardItemStyle(item: PortalCustomCardItem) {
   return {
     borderTopColor: item.themeColor || '#1677ff',
-    width: item.width ? `${clampCustomCardWidth(item.width)}px` : '100%',
-    maxWidth: '100%',
-    height: item.height ? `${clampCustomCardHeight(item.height)}px` : '168px'
+    width: '100%',
+    minHeight: '168px'
   }
-}
-
-function startResizeModuleCard(key: PortalModuleKey, direction: 'right' | 'bottom' | 'corner', event: MouseEvent) {
-  const handleEl = event.currentTarget as HTMLElement | null
-  const cardEl = handleEl?.closest('.module-card') as HTMLElement | null
-  const target = moduleConfig.value.find((item) => item.key === key)
-  if (!cardEl || !target) return
-  resizingModuleCard.key = key
-  resizingModuleCard.direction = direction
-  resizingModuleCard.startX = event.clientX
-  resizingModuleCard.startY = event.clientY
-  resizingModuleCard.startWidth = target.width || cardEl.getBoundingClientRect().width
-  resizingModuleCard.startHeight = target.height || cardEl.getBoundingClientRect().height
-  resizingModuleCard.moved = false
-  document.body.classList.add('resizing-active')
-}
-
-function startResizeCustomCard(id: string, direction: 'right' | 'bottom' | 'corner', event: MouseEvent) {
-  const handleEl = event.currentTarget as HTMLElement | null
-  const cardEl = handleEl?.parentElement as HTMLElement | null
-  const target = customCards.value.find((item) => item.id === id)
-  if (!cardEl || !target) return
-  resizingCustomCard.id = id
-  resizingCustomCard.direction = direction
-  resizingCustomCard.startX = event.clientX
-  resizingCustomCard.startY = event.clientY
-  resizingCustomCard.startWidth = target.width || cardEl.getBoundingClientRect().width
-  resizingCustomCard.startHeight = target.height || cardEl.getBoundingClientRect().height
-  resizingCustomCard.moved = false
-  document.body.classList.add('resizing-active')
-}
-
-function onCustomCardResizeMove(event: MouseEvent) {
-  if (!resizingCustomCard.id || !resizingCustomCard.direction) return
-  const deltaX = event.clientX - resizingCustomCard.startX
-  const deltaY = event.clientY - resizingCustomCard.startY
-  const useWidth = resizingCustomCard.direction === 'right' || resizingCustomCard.direction === 'corner'
-  const useHeight = resizingCustomCard.direction === 'bottom' || resizingCustomCard.direction === 'corner'
-  if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) resizingCustomCard.moved = true
-  const nextWidth = useWidth ? clampCustomCardWidth(resizingCustomCard.startWidth + deltaX) : undefined
-  const nextHeight = useHeight ? clampCustomCardHeight(resizingCustomCard.startHeight + deltaY) : undefined
-  customCards.value = customCards.value.map((item) => {
-    if (item.id !== resizingCustomCard.id) return item
-    return {
-      ...item,
-      width: useWidth ? nextWidth : item.width,
-      height: useHeight ? nextHeight : item.height
-    }
-  })
-  showResizeIndicator(event, useWidth ? nextWidth : undefined, useHeight ? nextHeight : undefined)
-}
-
-function onCustomCardResizeEnd() {
-  if (!resizingCustomCard.id) return
-  if (resizingCustomCard.moved) {
-    suppressCardClickUntil.value = Date.now() + 220
-    persistCustomCards()
-  }
-  resizingCustomCard.id = ''
-  resizingCustomCard.direction = ''
-  if (!resizingModuleCard.key) document.body.classList.remove('resizing-active')
-  hideResizeIndicator()
-}
-
-function onModuleCardResizeMove(event: MouseEvent) {
-  if (!resizingModuleCard.key || !resizingModuleCard.direction) return
-  const deltaX = event.clientX - resizingModuleCard.startX
-  const deltaY = event.clientY - resizingModuleCard.startY
-  const useWidth = resizingModuleCard.direction === 'right' || resizingModuleCard.direction === 'corner'
-  const useHeight = resizingModuleCard.direction === 'bottom' || resizingModuleCard.direction === 'corner'
-  if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) resizingModuleCard.moved = true
-  const nextWidth = useWidth ? clampModuleCardWidth(resizingModuleCard.startWidth + deltaX) : undefined
-  const nextHeight = useHeight ? clampModuleCardHeight(resizingModuleCard.startHeight + deltaY) : undefined
-  moduleConfig.value = moduleConfig.value.map((item) => {
-    if (item.key !== resizingModuleCard.key) return item
-    return {
-      ...item,
-      width: useWidth ? nextWidth : item.width,
-      height: useHeight ? nextHeight : item.height
-    }
-  })
-  showResizeIndicator(event, useWidth ? nextWidth : undefined, useHeight ? nextHeight : undefined)
-}
-
-function onModuleCardResizeEnd() {
-  if (!resizingModuleCard.key) return
-  if (resizingModuleCard.moved) {
-    persistModuleCustomize()
-  }
-  resizingModuleCard.key = ''
-  resizingModuleCard.direction = ''
-  if (!resizingCustomCard.id) document.body.classList.remove('resizing-active')
-  hideResizeIndicator()
 }
 
 function customCardCategoryText(category?: string) {
@@ -2232,14 +1865,20 @@ function loadModuleCustomize() {
     const audienceMap = new Map<string, AudienceCode[]>()
     const widthMap = new Map<string, number | undefined>()
     const heightMap = new Map<string, number | undefined>()
+    const xMap = new Map<string, number>()
+    const yMap = new Map<string, number>()
     parsed.forEach((item: any) => {
       visibilityMap.set(String(item.key), Boolean(item.visible))
       orderMap.set(String(item.key), Number(item.order))
       audienceMap.set(String(item.key), normalizeCardAudience(item.audience))
       const width = Number(item.width)
       const height = Number(item.height)
+      const x = Number(item.x)
+      const y = Number(item.y)
       widthMap.set(String(item.key), Number.isFinite(width) ? clampModuleCardWidth(width) : undefined)
       heightMap.set(String(item.key), Number.isFinite(height) ? clampModuleCardHeight(height) : undefined)
+      xMap.set(String(item.key), Number.isFinite(x) ? clampModuleCardOffsetX(x) : 0)
+      yMap.set(String(item.key), Number.isFinite(y) ? clampModuleCardOffsetY(y) : 0)
     })
     moduleConfig.value = portalModuleCatalog.map((item) => ({
       ...item,
@@ -2247,7 +1886,9 @@ function loadModuleCustomize() {
       order: Number.isFinite(orderMap.get(item.key)) ? Number(orderMap.get(item.key)) : portalModuleCatalog.findIndex((row) => row.key === item.key),
       audience: audienceMap.get(item.key) || normalizeCardAudience(item.audience),
       width: widthMap.get(item.key),
-      height: heightMap.get(item.key)
+      height: heightMap.get(item.key),
+      x: xMap.get(item.key) ?? 0,
+      y: yMap.get(item.key) ?? 0
     })).sort((a, b) => a.order - b.order).map((item, index) => ({ ...item, order: index }))
   } catch {}
 }
@@ -2272,7 +1913,9 @@ function applyModulePreset(preset: 'director' | 'nurse' | 'finance') {
         order: index,
         audience: normalizeCardAudience(base.audience),
         width: undefined,
-        height: undefined
+        height: undefined,
+        x: 0,
+        y: 0
       }
     })
     .filter((item): item is PortalModuleConfigItem => !!item)
@@ -2293,13 +1936,15 @@ function resetModuleCustomize() {
     order: index,
     audience: normalizeCardAudience(item.audience),
     width: undefined,
-    height: undefined
+    height: undefined,
+    x: 0,
+    y: 0
   }))
 }
 
 function resetAllModuleCardSizes() {
-  moduleConfig.value = moduleConfig.value.map((item) => ({ ...item, width: undefined, height: undefined }))
-  moduleConfigDraft.value = moduleConfigDraft.value.map((item) => ({ ...item, width: undefined, height: undefined }))
+  moduleConfig.value = moduleConfig.value.map((item) => ({ ...item, width: undefined, height: undefined, x: 0, y: 0 }))
+  moduleConfigDraft.value = moduleConfigDraft.value.map((item) => ({ ...item, width: undefined, height: undefined, x: 0, y: 0 }))
   persistModuleCustomize()
   message.success('模块尺寸已重置')
 }
@@ -2313,99 +1958,6 @@ function moveModule(index: number, delta: -1 | 1) {
   moduleConfigDraft.value = next.map((item, itemIndex) => ({ ...item, order: itemIndex }))
 }
 
-function onModuleDragStart(key: PortalModuleKey) {
-  draggingModuleKey.value = key
-}
-
-function onModuleDrop(targetKey: PortalModuleKey) {
-  const sourceKey = draggingModuleKey.value
-  if (!sourceKey || sourceKey === targetKey) return
-  const sourceIndex = moduleConfigDraft.value.findIndex((item) => item.key === sourceKey)
-  const targetIndex = moduleConfigDraft.value.findIndex((item) => item.key === targetKey)
-  if (sourceIndex < 0 || targetIndex < 0) return
-  const next = [...moduleConfigDraft.value]
-  const [moved] = next.splice(sourceIndex, 1)
-  next.splice(targetIndex, 0, moved)
-  moduleConfigDraft.value = next.map((item, index) => ({ ...item, order: index }))
-  draggingModuleKey.value = ''
-}
-
-function onModuleDragEnd() {
-  draggingModuleKey.value = ''
-}
-
-function clearPortalModuleHoldTimer() {
-  if (moduleDragHoldTimer) {
-    window.clearTimeout(moduleDragHoldTimer)
-    moduleDragHoldTimer = undefined
-  }
-}
-
-function resetPortalModuleDragState() {
-  clearPortalModuleHoldTimer()
-  moduleDragReadyKey.value = ''
-  draggingPortalModuleKey.value = ''
-  portalModuleDropTargetKey.value = ''
-  moduleDragCommitted.value = false
-  moduleDragSnapshot.value = null
-}
-
-function onPortalModuleHandleMouseDown(key: PortalModuleKey) {
-  if (draggingPortalModuleKey.value) return
-  clearPortalModuleHoldTimer()
-  moduleDragReadyKey.value = ''
-  moduleDragHoldTimer = window.setTimeout(() => {
-    moduleDragReadyKey.value = key
-  }, 120)
-}
-
-function onPortalModuleHandleRelease(event?: MouseEvent) {
-  if (event?.type === 'mouseleave') {
-    return
-  }
-  if (!draggingPortalModuleKey.value) {
-    clearPortalModuleHoldTimer()
-    moduleDragReadyKey.value = ''
-  }
-}
-
-function onPortalModuleCardDragStart(key: PortalModuleKey, event: DragEvent) {
-  if (moduleDragReadyKey.value !== key) {
-    event.preventDefault()
-    return
-  }
-  const dataTransfer = event.dataTransfer
-  if (dataTransfer) {
-    dataTransfer.effectAllowed = 'move'
-    dataTransfer.dropEffect = 'move'
-    dataTransfer.setData('text/plain', key)
-  }
-  draggingPortalModuleKey.value = key
-  portalModuleDropTargetKey.value = ''
-  moduleDragCommitted.value = false
-  moduleDragSnapshot.value = moduleConfig.value.map((item) => ({ ...item }))
-}
-
-function onPortalModuleDragOver(targetKey: PortalModuleKey, event: DragEvent) {
-  if (!draggingPortalModuleKey.value || draggingPortalModuleKey.value === targetKey) return
-  event.preventDefault()
-  if (event.dataTransfer) {
-    event.dataTransfer.dropEffect = 'move'
-  }
-  portalModuleDropTargetKey.value = targetKey
-}
-
-function reorderModuleConfig(sourceKey: PortalModuleKey, targetKey: PortalModuleKey, source: PortalModuleConfigItem[]) {
-  if (sourceKey === targetKey) return source
-  const sourceIndex = source.findIndex((item) => item.key === sourceKey)
-  const targetIndex = source.findIndex((item) => item.key === targetKey)
-  if (sourceIndex < 0 || targetIndex < 0) return source
-  const next = [...source]
-  const [moved] = next.splice(sourceIndex, 1)
-  next.splice(targetIndex, 0, moved)
-  return next.map((item, index) => ({ ...item, order: index }))
-}
-
 function persistModuleCustomizeStrict(source = moduleConfig.value) {
   const simple = [...source]
     .sort((a, b) => a.order - b.order)
@@ -2415,41 +1967,11 @@ function persistModuleCustomizeStrict(source = moduleConfig.value) {
       order: index,
       audience: normalizeCardAudience(item.audience),
       width: item.width != null ? clampModuleCardWidth(item.width) : undefined,
-      height: item.height != null ? clampModuleCardHeight(item.height) : undefined
+      height: item.height != null ? clampModuleCardHeight(item.height) : undefined,
+      x: item.x != null ? clampModuleCardOffsetX(item.x) : 0,
+      y: item.y != null ? clampModuleCardOffsetY(item.y) : 0
     }))
   localStorage.setItem(moduleStorageKey(), JSON.stringify(simple))
-}
-
-async function onPortalModuleDrop(targetKey: PortalModuleKey) {
-  const sourceKey = draggingPortalModuleKey.value
-  if (!sourceKey || sourceKey === targetKey) return
-  const snapshot = moduleDragSnapshot.value?.map((item) => ({ ...item })) || moduleConfig.value.map((item) => ({ ...item }))
-  const next = reorderModuleConfig(sourceKey, targetKey, moduleConfig.value)
-  moduleConfig.value = next
-  moduleDragCommitted.value = true
-  try {
-    persistModuleCustomizeStrict(next)
-    message.success('首页卡片顺序已更新')
-  } catch (error: any) {
-    moduleConfig.value = snapshot
-    message.error(error?.message || '排序保存失败，已回滚')
-  } finally {
-    resetPortalModuleDragState()
-  }
-}
-
-function onPortalModuleCardDragEnd() {
-  const sourceKey = draggingPortalModuleKey.value
-  const committed = moduleDragCommitted.value
-  resetPortalModuleDragState()
-  if (!committed && sourceKey) {
-    moduleDragInvalidKey.value = sourceKey
-    window.setTimeout(() => {
-      if (moduleDragInvalidKey.value === sourceKey) {
-        moduleDragInvalidKey.value = ''
-      }
-    }, 240)
-  }
 }
 
 function applyModuleCustomize() {
@@ -2465,7 +1987,9 @@ function applyModuleCustomize() {
       order: index,
       audience: normalizeCardAudience(item.audience),
       width: item.width != null ? clampModuleCardWidth(item.width) : undefined,
-      height: item.height != null ? clampModuleCardHeight(item.height) : undefined
+      height: item.height != null ? clampModuleCardHeight(item.height) : undefined,
+      x: item.x != null ? clampModuleCardOffsetX(item.x) : 0,
+      y: item.y != null ? clampModuleCardOffsetY(item.y) : 0
     }))
   persistModuleCustomize()
   moduleCustomizeOpen.value = false
@@ -2483,7 +2007,9 @@ function resetAllHomepageCustomize() {
         order: index,
         audience: normalizeCardAudience(item.audience),
         width: undefined,
-        height: undefined
+        height: undefined,
+        x: 0,
+        y: 0
       }))
       moduleConfigDraft.value = portalModuleCatalog.map((item, index) => ({
         ...item,
@@ -2491,7 +2017,9 @@ function resetAllHomepageCustomize() {
         order: index,
         audience: normalizeCardAudience(item.audience),
         width: undefined,
-        height: undefined
+        height: undefined,
+        x: 0,
+        y: 0
       }))
       customCards.value = defaultCustomCards.map((item) => ({ ...item }))
       persistModuleCustomize()
@@ -2733,30 +2261,6 @@ function addRecentRouteAsCards() {
   message.success(`已添加 ${next.length} 张最近访问卡面`)
 }
 
-function onCustomCardDragStart(id: string) {
-  draggingCustomCardId.value = id
-}
-
-function onCustomCardDragOver(_id: string) {}
-
-function onCustomCardDrop(targetId: string) {
-  const sourceId = draggingCustomCardId.value
-  if (!sourceId || sourceId === targetId) return
-  const sourceIndex = customCards.value.findIndex((item) => item.id === sourceId)
-  const targetIndex = customCards.value.findIndex((item) => item.id === targetId)
-  if (sourceIndex < 0 || targetIndex < 0) return
-  const next = [...customCards.value]
-  const [moved] = next.splice(sourceIndex, 1)
-  next.splice(targetIndex, 0, moved)
-  customCards.value = next
-  draggingCustomCardId.value = ''
-  persistCustomCards()
-}
-
-function onCustomCardDragEnd() {
-  draggingCustomCardId.value = ''
-}
-
 function removeCustomCard(id: string) {
   Modal.confirm({
     title: '确认删除该卡面？',
@@ -2836,7 +2340,9 @@ function exportHomepageCustomize() {
         order: index,
         audience: normalizeCardAudience(item.audience),
         width: item.width != null ? clampModuleCardWidth(item.width) : undefined,
-        height: item.height != null ? clampModuleCardHeight(item.height) : undefined
+        height: item.height != null ? clampModuleCardHeight(item.height) : undefined,
+        x: item.x != null ? clampModuleCardOffsetX(item.x) : 0,
+        y: item.y != null ? clampModuleCardOffsetY(item.y) : 0
       })),
     customCards: customCards.value
   }
@@ -2872,6 +2378,8 @@ function applyImportedHomepageCustomize() {
     const audienceMap = new Map<string, AudienceCode[]>()
     const widthMap = new Map<string, number | undefined>()
     const heightMap = new Map<string, number | undefined>()
+    const xMap = new Map<string, number>()
+    const yMap = new Map<string, number>()
     parsed.moduleConfig.forEach((item: any, index: number) => {
       const key = String(item?.key || '')
       if (!key) return
@@ -2880,8 +2388,12 @@ function applyImportedHomepageCustomize() {
       audienceMap.set(key, normalizeCardAudience(item?.audience))
       const width = Number(item?.width)
       const height = Number(item?.height)
+      const x = Number(item?.x)
+      const y = Number(item?.y)
       widthMap.set(key, Number.isFinite(width) ? clampModuleCardWidth(width) : undefined)
       heightMap.set(key, Number.isFinite(height) ? clampModuleCardHeight(height) : undefined)
+      xMap.set(key, Number.isFinite(x) ? clampModuleCardOffsetX(x) : 0)
+      yMap.set(key, Number.isFinite(y) ? clampModuleCardOffsetY(y) : 0)
     })
     moduleConfig.value = portalModuleCatalog
       .map((item, index) => ({
@@ -2890,7 +2402,9 @@ function applyImportedHomepageCustomize() {
         order: orderMap.has(item.key) ? Number(orderMap.get(item.key)) : index,
         audience: audienceMap.get(item.key) || normalizeCardAudience(item.audience),
         width: widthMap.get(item.key),
-        height: heightMap.get(item.key)
+        height: heightMap.get(item.key),
+        x: xMap.get(item.key) ?? 0,
+        y: yMap.get(item.key) ?? 0
       }))
       .sort((a, b) => a.order - b.order)
       .map((item, index) => ({ ...item, order: index }))
@@ -3212,25 +2726,12 @@ onMounted(() => {
     if (!document.hidden) refreshPortalModules(false).catch(() => {})
   }
   document.addEventListener('visibilitychange', portalVisibleHandler)
-  window.addEventListener('mousemove', onCustomCardResizeMove)
-  window.addEventListener('mouseup', onCustomCardResizeEnd)
-  window.addEventListener('mousemove', onModuleCardResizeMove)
-  window.addEventListener('mouseup', onModuleCardResizeEnd)
-  window.addEventListener('mouseup', onPortalModuleHandleRelease)
 })
 
 onBeforeUnmount(() => {
   if (portalSyncTimer) window.clearInterval(portalSyncTimer)
   if (portalVisibleHandler) document.removeEventListener('visibilitychange', portalVisibleHandler)
   portalVisibleHandler = null
-  window.removeEventListener('mousemove', onCustomCardResizeMove)
-  window.removeEventListener('mouseup', onCustomCardResizeEnd)
-  window.removeEventListener('mousemove', onModuleCardResizeMove)
-  window.removeEventListener('mouseup', onModuleCardResizeEnd)
-  window.removeEventListener('mouseup', onPortalModuleHandleRelease)
-  resetPortalModuleDragState()
-  document.body.classList.remove('resizing-active')
-  hideResizeIndicator()
 })
 </script>
 
@@ -3238,18 +2739,22 @@ onBeforeUnmount(() => {
 .portal-page {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 2px;
+  gap: 8px;
+  padding: 0;
 }
 
 .hero-card {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 16px;
-  border-radius: 14px;
+  gap: 10px;
+  border-radius: 10px;
   background: linear-gradient(135deg, #eef6ff 0%, #f8fbff 55%, #ffffff 100%);
   border: 1px solid #dbeafe;
+}
+
+.portal-page :deep(.ant-card .ant-card-body) {
+  padding: 12px 14px;
 }
 
 .hero-left {
@@ -3312,7 +2817,7 @@ onBeforeUnmount(() => {
 }
 
 .section-row {
-  margin-top: 2px;
+  margin-top: 0;
 }
 
 .module-card {
@@ -3325,106 +2830,7 @@ onBeforeUnmount(() => {
 
 .module-card:hover {
   border-color: #bfdbfe;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
-}
-
-.module-card.is-drop-zone {
-  border-color: #93c5fd;
-}
-
-.module-card.is-dragging-source {
-  opacity: 0.6;
-  box-shadow: 0 16px 38px rgba(59, 130, 246, 0.28);
-}
-
-.module-card.is-drop-target::after {
-  content: '';
-  position: absolute;
-  inset: 8px;
-  border-radius: 10px;
-  border: 2px dashed #3b82f6;
-  background: rgba(59, 130, 246, 0.06);
-  pointer-events: none;
-}
-
-.module-card.is-invalid-bounce {
-  animation: module-invalid-bounce 0.24s ease;
-}
-
-@keyframes module-invalid-bounce {
-  0% { transform: translateX(0); }
-  35% { transform: translateX(-7px); }
-  70% { transform: translateX(5px); }
-  100% { transform: translateX(0); }
-}
-
-.module-drag-handle {
-  width: 26px;
-  min-width: 26px;
-  height: 24px;
-  border-radius: 6px;
-  border: 1px dashed #bfdbfe;
-  color: #64748b;
-  background: #f8fbff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: grab;
-  user-select: none;
-  transition: all 0.16s ease;
-}
-
-.module-drag-handle:hover {
-  border-color: #60a5fa;
-  color: #1d4ed8;
-}
-
-.module-drag-handle.is-ready {
-  border-style: solid;
-  border-color: #2563eb;
-  background: #dbeafe;
-  color: #1e3a8a;
-}
-
-.module-drag-handle:active {
-  cursor: grabbing;
-}
-
-.module-resize-handle {
-  position: absolute;
-  z-index: 3;
-  opacity: 0;
-  transition: opacity 0.16s ease;
-}
-
-.module-card:hover .module-resize-handle {
-  opacity: 1;
-}
-
-.module-resize-right {
-  top: 14px;
-  right: 0;
-  width: 10px;
-  height: calc(100% - 26px);
-  cursor: ew-resize;
-}
-
-.module-resize-bottom {
-  left: 14px;
-  bottom: 0;
-  width: calc(100% - 26px);
-  height: 10px;
-  cursor: ns-resize;
-}
-
-.module-resize-corner {
-  right: 0;
-  bottom: 0;
-  width: 14px;
-  height: 14px;
-  cursor: nwse-resize;
-  background:
-    linear-gradient(135deg, transparent 0 46%, #93c5fd 46% 54%, transparent 54% 100%);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.07);
 }
 
 .full-height {
@@ -3480,7 +2886,7 @@ onBeforeUnmount(() => {
   border: 1px dashed #bfdbfe;
   border-radius: 10px;
   background: #f8fbff;
-  padding: 12px;
+  padding: 10px;
   height: 100%;
 }
 
@@ -3525,7 +2931,7 @@ onBeforeUnmount(() => {
   border-top: 3px solid #1677ff;
   border-radius: 12px;
   background: #f8fbff;
-  padding: 12px;
+  padding: 10px;
   cursor: pointer;
   height: 100%;
   position: relative;
@@ -3570,43 +2976,6 @@ onBeforeUnmount(() => {
   margin-left: 6px;
 }
 
-.resize-handle {
-  position: absolute;
-  z-index: 3;
-  opacity: 0;
-  transition: opacity 0.16s ease;
-}
-
-.custom-card-item:hover .resize-handle {
-  opacity: 1;
-}
-
-.resize-right {
-  top: 10px;
-  right: 0;
-  width: 10px;
-  height: calc(100% - 22px);
-  cursor: ew-resize;
-}
-
-.resize-bottom {
-  left: 10px;
-  bottom: 0;
-  width: calc(100% - 22px);
-  height: 10px;
-  cursor: ns-resize;
-}
-
-.resize-corner {
-  right: 0;
-  bottom: 0;
-  width: 14px;
-  height: 14px;
-  cursor: nwse-resize;
-  background:
-    linear-gradient(135deg, transparent 0 46%, #93c5fd 46% 54%, transparent 54% 100%);
-}
-
 .template-tag {
   cursor: pointer;
 }
@@ -3631,13 +3000,6 @@ onBeforeUnmount(() => {
   border-color: #91caff;
 }
 
-.manage-card-item.is-dragging {
-  border-style: dashed;
-  border-color: #2563eb;
-  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.16);
-  background: #eff6ff;
-}
-
 .manage-card-main {
   min-width: 0;
   margin-right: 10px;
@@ -3658,24 +3020,6 @@ onBeforeUnmount(() => {
 .hint-text {
   color: #64748b;
   font-size: 12px;
-}
-
-:global(body.resizing-active) {
-  user-select: none;
-  cursor: nwse-resize;
-}
-
-.resize-indicator {
-  position: fixed;
-  z-index: 9999;
-  pointer-events: none;
-  background: rgba(15, 23, 42, 0.9);
-  color: #fff;
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-size: 12px;
-  line-height: 1.2;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.24);
 }
 
 .calendar-toolbar {
