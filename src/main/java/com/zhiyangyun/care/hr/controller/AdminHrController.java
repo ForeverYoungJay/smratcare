@@ -56,6 +56,7 @@ import com.zhiyangyun.care.oa.entity.OaDocumentFolder;
 import com.zhiyangyun.care.oa.mapper.OaApprovalMapper;
 import com.zhiyangyun.care.oa.mapper.OaDocumentMapper;
 import com.zhiyangyun.care.oa.mapper.OaDocumentFolderMapper;
+import com.zhiyangyun.care.oa.model.OaBatchIdsRequest;
 import com.zhiyangyun.care.schedule.entity.AttendanceRecord;
 import com.zhiyangyun.care.schedule.mapper.AttendanceRecordMapper;
 import java.time.LocalDate;
