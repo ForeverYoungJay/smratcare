@@ -7,15 +7,15 @@
             <div class="hero-title">您好，{{ userStore.staffInfo?.realName || '管理员' }}</div>
             <div class="hero-subtitle">当前时间 {{ refreshedAt || '--' }}，优先处理“我的待办”可显著降低超时风险。</div>
             <div class="hero-kpis">
-              <div class="hero-kpi-item">
+              <div class="hero-kpi-item clickable" @click="go('/oa/todo')">
                 <span class="hero-kpi-label">待办总量</span>
                 <strong class="hero-kpi-value">{{ totalTodoCount }}</strong>
               </div>
-              <div class="hero-kpi-item">
+              <div class="hero-kpi-item clickable" @click="focusReminderCenter">
                 <span class="hero-kpi-label">风险提醒</span>
                 <strong class="hero-kpi-value">{{ activeRiskCount }}</strong>
               </div>
-              <div class="hero-kpi-item">
+              <div class="hero-kpi-item clickable" @click="agendaDrawerOpen = true">
                 <span class="hero-kpi-label">今日日程</span>
                 <strong class="hero-kpi-value">{{ todayAgenda.length }}</strong>
               </div>
@@ -41,7 +41,11 @@
               <a-button @click="openCustomCardEditor()">新增卡面</a-button>
               <a-button type="primary" @click="go('/oa/todo')">进入待办中心</a-button>
             </a-space>
-            <div class="hero-actions-tip">支持角色可见范围、导入导出配置</div>
+            <a-space size="small" class="hero-actions-tip-row">
+              <a-tag :color="syncingNow ? 'processing' : 'default'">{{ syncingNow ? '同步中' : '已同步' }}</a-tag>
+              <span class="hero-actions-tip">最近同步：{{ refreshedAt || '--' }} · {{ lastSyncSource }}</span>
+              <a-switch v-model:checked="autoSyncEnabled" checked-children="自动刷新开" un-checked-children="自动刷新关" />
+            </a-space>
           </div>
         </a-card>
 
@@ -55,7 +59,11 @@
               title="1️⃣ 我的待办（最重要）"
             >
               <template #extra>
-                <a-tag color="processing">总待办 {{ totalTodoCount }}</a-tag>
+                <a-space>
+                  <a-tag color="processing">总待办 {{ totalTodoCount }}</a-tag>
+                  <a-button type="link" size="small" @click="openApprovalOpinionPanel">审批意见</a-button>
+                  <a-button type="link" size="small" @click="urgeAllPendingApprovals">一键催办</a-button>
+                </a-space>
               </template>
               <a-row :gutter="[10, 10]">
                 <a-col :xs="12" :sm="6" v-for="item in myTodoStats" :key="item.title">
@@ -79,26 +87,65 @@
                 <a-button @click="go('/oa/approval')">批量审批</a-button>
                 <a-button @click="go('/logistics/task-center')">打开任务中心</a-button>
               </a-space>
+              <a-card size="small" class="approval-track-card" style="margin-top: 10px;">
+                <template #title>审批流程跟踪（含财务报销）</template>
+                <a-list size="small" :data-source="approvalTrackList" :locale="{ emptyText: '暂无审批流程' }">
+                  <template #renderItem="{ item }">
+                    <a-list-item>
+                      <a-list-item-meta :description="`当前：${item.currentStep} · 下一步：${item.nextStep}${item.currentApprover ? ` · 审批人：${item.currentApprover}` : ''} · 催办${item.urgeCount}次`">
+                        <template #title>
+                          <a-space size="small">
+                            <span>{{ item.title }}</span>
+                            <a-tag :color="item.statusColor">{{ item.statusText }}</a-tag>
+                          </a-space>
+                        </template>
+                      </a-list-item-meta>
+                      <template #actions>
+                        <a-button type="link" size="small" @click="go(`/oa/approval?keyword=${encodeURIComponent(item.title)}`)">查看流程</a-button>
+                        <a-button v-if="item.status === 'PENDING'" type="link" size="small" @click="urgeApproval(item)">催进下一步</a-button>
+                      </template>
+                    </a-list-item>
+                  </template>
+                </a-list>
+              </a-card>
             </a-card>
           </a-col>
 
           <a-col :xs="24" :xl="rowTodoReminderSpan('reminder')" :style="{ order: moduleOrder('reminder') }">
             <a-card
               v-if="isModuleVisible('reminder')"
+              ref="reminderCardRef"
               :bordered="false"
               class="card-elevated full-height module-card"
               :style="moduleCardStyle('reminder')"
               title="2️⃣ 提醒中心（系统预警）"
             >
-              <a-list size="small" :data-source="riskReminders" :locale="{ emptyText: '暂无提醒' }">
+              <template #extra>
+                <a-space size="small" wrap>
+                  <a-radio-group v-model:value="reminderViewMode" size="small" button-style="solid">
+                    <a-radio-button value="all">全部</a-radio-button>
+                    <a-radio-button value="unread">未读 {{ unreadReminderCount }}</a-radio-button>
+                    <a-radio-button value="pinned">置顶</a-radio-button>
+                    <a-radio-button value="urgent">紧急 {{ urgentReminderCount }}</a-radio-button>
+                  </a-radio-group>
+                  <a-button size="small" @click="markAllReminderRead">全部已读</a-button>
+                </a-space>
+              </template>
+              <a-list size="small" :data-source="displayRiskReminders" :locale="{ emptyText: '暂无提醒' }">
                 <template #renderItem="{ item }">
-                  <a-list-item>
+                  <a-list-item :class="{ 'reminder-unread': !isReminderRead(item) }">
                     <a-space>
                       <a-tag :color="severityColor(item.level)">{{ item.level }}</a-tag>
                       <span>{{ item.title }}</span>
                     </a-space>
                     <template #actions>
                       <span class="reminder-count">{{ item.count }}</span>
+                      <a-button type="link" size="small" @click="toggleReminderPinned(item)">
+                        {{ isReminderPinned(item) ? '取消置顶' : '置顶' }}
+                      </a-button>
+                      <a-button type="link" size="small" @click="toggleReminderRead(item)">
+                        {{ isReminderRead(item) ? '标未读' : '已读' }}
+                      </a-button>
                       <a-button type="link" size="small" @click="go(item.route)">处理</a-button>
                     </template>
                   </a-list-item>
@@ -112,6 +159,100 @@
             </a-card>
           </a-col>
         </a-row>
+
+        <a-card
+          v-if="isModuleVisible('birthdayPlan')"
+          :bordered="false"
+          class="card-elevated module-card"
+          :style="[moduleCardStyle('birthdayPlan'), { order: sectionOrder(['birthdayPlan']) }]"
+          title="🎂 老人院内生日计划"
+        >
+          <template #extra>
+            <a-space>
+              <a-button size="small" @click="go('/oa/life/birthday')">查看更多</a-button>
+              <a-button size="small" @click="exportBirthdayCsv">导出</a-button>
+              <a-button size="small" @click="printBirthdayYearPlan">打印年度表</a-button>
+              <a-button size="small" @click="syncBirthdayTasks">同步生日提醒到日历</a-button>
+            </a-space>
+          </template>
+          <a-row :gutter="[8, 8]">
+            <a-col :xs="24" :md="8">
+              <div class="metric-cell" @click="openBirthdayListByDays(0)">
+                <div class="metric-title">今日生日</div>
+                <div class="metric-value">{{ birthdayStats.today }}</div>
+              </div>
+            </a-col>
+            <a-col :xs="24" :md="8">
+              <div class="metric-cell" @click="openBirthdayListByDays(7)">
+                <div class="metric-title">未来7天</div>
+                <div class="metric-value">{{ birthdayStats.next7Days }}</div>
+              </div>
+            </a-col>
+            <a-col :xs="24" :md="8">
+              <div class="metric-cell" @click="openBirthdayListMonth">
+                <div class="metric-title">本月生日</div>
+                <div class="metric-value">{{ birthdayStats.thisMonth }}</div>
+              </div>
+            </a-col>
+          </a-row>
+          <a-alert
+            v-if="birthdayStats.today > 0"
+            style="margin-top: 10px;"
+            type="warning"
+            show-icon
+            :message="`今日生日：${birthdayStats.today} 人`"
+          />
+          <div class="birthday-remind-rules">
+            <a-tag color="blue">T-7 天：提醒活动负责人准备</a-tag>
+            <a-tag color="orange">T-1 天：提醒楼层/厨房/后勤</a-tag>
+            <a-tag color="red">当天：今日生日置顶</a-tag>
+          </div>
+          <div class="birthday-filter-bar">
+            <a-space wrap>
+              <span class="hint-text">楼层筛选：</span>
+              <a-select
+                v-model:value="birthdayFloorFilter"
+                size="small"
+                style="width: 130px;"
+                :options="birthdayFloorOptions"
+              />
+              <span class="hint-text">年龄分层：</span>
+              <a-radio-group v-model:value="birthdayAgeBand" size="small" button-style="solid">
+                <a-radio-button value="ALL">全部</a-radio-button>
+                <a-radio-button value="80_PLUS">80+</a-radio-button>
+                <a-radio-button value="90_PLUS">90+</a-radio-button>
+                <a-radio-button value="UNDER_80">&lt;80</a-radio-button>
+              </a-radio-group>
+              <a-tag color="blue">筛选总人数 {{ birthdaySliceStats.filteredTotal }}</a-tag>
+              <a-tag color="gold">今日 {{ birthdaySliceStats.filteredToday }}</a-tag>
+              <a-tag color="purple">未来31天 {{ birthdaySliceStats.filteredMonth }}</a-tag>
+            </a-space>
+          </div>
+          <a-list size="small" :data-source="birthdayUpcomingList" :locale="{ emptyText: '本月暂无生日' }" style="margin-top: 8px;">
+            <template #renderItem="{ item }">
+              <a-list-item>
+                <a-space>
+                  <a-tag color="purple">{{ item.nextBirthday || '--' }}</a-tag>
+                  <span>{{ item.elderName }}</span>
+                  <span class="hint-text">（{{ item.ageOnNextBirthday || '--' }}岁）</span>
+                </a-space>
+                <template #actions>
+                  <a-button type="link" size="small" @click="openBirthdayElderDetail(item)">老人档案</a-button>
+                  <a-button type="link" size="small" @click="openBirthdayActivityCreate(item)">创建生日活动</a-button>
+                  <a-button type="link" size="small" @click="openBirthdayActivityList">查看活动</a-button>
+                  <a-button type="link" size="small" @click="openBirthdayMaterialPrepare(item)">物资准备</a-button>
+                  <a-button type="link" size="small" @click="openBirthdayDoneRecord">完成</a-button>
+                </template>
+              </a-list-item>
+            </template>
+          </a-list>
+          <a-space wrap style="margin-top: 10px;">
+            <a-button size="small" @click="openAgeReport('80+')">一键统计80+</a-button>
+            <a-button size="small" @click="openAgeReport('90+')">一键统计90+</a-button>
+            <a-button size="small" @click="openAgeReport('CUSTOM')">自定义年龄统计</a-button>
+            <a-button size="small" @click="openBirthdayFrequencyCheck">高频生日筛查</a-button>
+          </a-space>
+        </a-card>
 
         <a-card
           v-if="isModuleVisible('quickLaunch')"
@@ -162,6 +303,9 @@
                 <a-tag class="custom-card-mode" size="small">{{ item.openMode === 'new' ? '新标签打开' : '当前页打开' }}</a-tag>
                 <a-tag class="custom-card-category" size="small" color="blue">{{ customCardCategoryText(item.category) }}</a-tag>
                 <a-tag class="custom-card-category" size="small" color="purple">{{ audienceText(item.audience) }}</a-tag>
+                <a-tag v-if="item.visibleStaffIds?.length" class="custom-card-category" size="small" color="gold">
+                  指定账号 {{ item.visibleStaffIds.length }} 人
+                </a-tag>
                 <div class="custom-card-actions" @click.stop>
                   <a-button type="link" size="small" @click="openCustomCardEditor(item.id)">编辑</a-button>
                   <a-button type="link" size="small" @click="duplicateCustomCard(item.id)">复制</a-button>
@@ -720,6 +864,19 @@
             placeholder="不选默认全员可见"
           />
         </a-form-item>
+        <a-form-item label="可见账号（可选）">
+          <a-select
+            v-model:value="customCardForm.visibleStaffIds"
+            mode="multiple"
+            allow-clear
+            show-search
+            :filter-option="false"
+            :options="staffOptions"
+            placeholder="不选则对可见角色全员开放；可按员工姓名筛选"
+            @search="searchStaff"
+            @focus="() => !staffOptions.length && searchStaff('')"
+          />
+        </a-form-item>
         <a-form-item label="跳转地址" required>
           <a-auto-complete
             v-model:value="customCardForm.route"
@@ -771,11 +928,43 @@
       </a-space>
     </a-modal>
 
+    <a-modal v-model:open="approvalOpinionOpen" title="审批意见窗口" width="760px" :footer="null">
+      <a-list :data-source="approvalOpinionList" :locale="{ emptyText: '暂无院长审批意见' }">
+        <template #renderItem="{ item }">
+          <a-list-item>
+            <a-list-item-meta :description="`${item.typeText} · ${item.timeText}`">
+              <template #title>
+                <a-space size="small">
+                  <span>{{ item.title }}</span>
+                  <a-tag color="green">已通过</a-tag>
+                </a-space>
+              </template>
+            </a-list-item-meta>
+            <template #actions>
+              <div class="approval-opinion-text">{{ item.remark || '（暂无审批意见）' }}</div>
+              <a-button type="link" size="small" @click="go(`/oa/approval?keyword=${encodeURIComponent(item.title)}`)">查看流程</a-button>
+            </template>
+          </a-list-item>
+        </template>
+      </a-list>
+    </a-modal>
+
+    <a-modal v-model:open="birthdayInsightOpen" :title="birthdayInsightTitle" width="640px" :footer="null">
+      <a-list size="small" :data-source="birthdayInsightRows" :locale="{ emptyText: '暂无统计数据' }">
+        <template #renderItem="{ item }">
+          <a-list-item>
+            <span>{{ item.label }}</span>
+            <strong>{{ item.value }}</strong>
+          </a-list-item>
+        </template>
+      </a-list>
+    </a-modal>
+
   </PageContainer>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
 import { message, Modal } from 'ant-design-vue'
@@ -787,8 +976,9 @@ import VChart from 'vue-echarts'
 import PageContainer from '../components/PageContainer.vue'
 import StatefulBlock from '../components/StatefulBlock.vue'
 import { useUserStore } from '../stores/user'
-import { createOaTask, getOaTaskCalendar, getPortalSummary, updateOaTask, completeOaTask, deleteOaTask } from '../api/oa'
-import type { OaPortalSummary, OaTask, PageResult, BedItem, CrmContractItem, CrmLeadItem } from '../types'
+import { createOaTask, getOaTaskCalendar, getPortalSummary, updateOaTask, completeOaTask, deleteOaTask, getApprovalPage, updateApproval } from '../api/oa'
+import { getBirthdayPage } from '../api/life'
+import type { OaPortalSummary, OaTask, PageResult, BedItem, CrmContractItem, CrmLeadItem, OaApproval, BirthdayReminder } from '../types'
 import { useLiveSyncRefresh } from '../composables/useLiveSyncRefresh'
 import { getDashboardSummary, type DashboardSummary } from '../api/dashboard'
 import { getFinanceWorkbenchOverview } from '../api/finance'
@@ -815,6 +1005,7 @@ const agendaDrawerOpen = ref(false)
 const editingScheduleId = ref<string | number | null>(null)
 const dayEventDrawerOpen = ref(false)
 const selectedCalendarDateText = ref(dayjs().format('YYYY-MM-DD'))
+const reminderCardRef = ref<any>(null)
 const { departmentOptions, searchDepartments } = useDepartmentOptions({ pageSize: 240, preloadSize: 500 })
 const { staffOptions, searchStaff } = useStaffOptions({ pageSize: 300, preloadSize: 500 })
 const staffDeptMap = ref<Record<string, string | undefined>>({})
@@ -834,6 +1025,19 @@ const importPayloadOpen = ref(false)
 const exportPayloadText = ref('')
 const importPayloadText = ref('')
 const customCardManageKeyword = ref('')
+const approvalOpinionOpen = ref(false)
+const approvalRows = ref<OaApproval[]>([])
+const birthdayRows = ref<BirthdayReminder[]>([])
+const birthdayInsightOpen = ref(false)
+const birthdayInsightTitle = ref('生日统计')
+const birthdayInsightRows = ref<Array<{ label: string; value: string }>>([])
+const reminderViewMode = ref<'all' | 'unread' | 'pinned' | 'urgent'>('all')
+const reminderState = ref<Record<string, { read?: boolean; pinned?: boolean; updatedAt?: string; lastCount?: number }>>({})
+const birthdayFloorFilter = ref<string>('ALL')
+const birthdayAgeBand = ref<'ALL' | '80_PLUS' | '90_PLUS' | 'UNDER_80'>('ALL')
+const autoSyncEnabled = ref(true)
+const syncingNow = ref(false)
+const lastSyncSource = ref('初始化')
 let portalSyncTimer: number | undefined
 let portalVisibleHandler: (() => void) | null = null
 
@@ -849,6 +1053,7 @@ type PortalModuleKey =
   | 'bedStatus'
   | 'expense'
   | 'customCards'
+  | 'birthdayPlan'
   | 'calendar'
   | 'dataEntry'
 
@@ -875,6 +1080,7 @@ const portalModuleCatalog: Array<Omit<PortalModuleConfigItem, 'visible' | 'order
   { key: 'bedStatus', title: '床位与长者状态', desc: '在住/外出/空床/清洁中', audience: ['ALL'] },
   { key: 'expense', title: '费用管理', desc: '我的费用、部门费用、发票夹', audience: ['FINANCE', 'DIRECTOR', 'ADMIN', 'HR'] },
   { key: 'customCards', title: '我的自定义卡面', desc: '可自由新增首页入口卡片', audience: ['ALL'] },
+  { key: 'birthdayPlan', title: '老人生日计划', desc: '生日提醒与活动安排', audience: ['ALL'] },
   { key: 'calendar', title: '行政日历/协同日历', desc: '日程、请假、协同安排', audience: ['ALL'] },
   { key: 'dataEntry', title: '数据分析入口', desc: '运营/财务/医护/销售分析入口', audience: ['ALL'] }
 ]
@@ -897,6 +1103,7 @@ interface PortalCustomCardItem {
   category: 'OPS' | 'CARE' | 'FINANCE' | 'OA' | 'CUSTOM'
   visible: boolean
   audience: AudienceCode[]
+  visibleStaffIds?: string[]
   width?: number
   height?: number
 }
@@ -930,7 +1137,8 @@ const customCardForm = reactive({
   openMode: 'current' as 'current' | 'new',
   icon: '🧩',
   category: 'CUSTOM' as 'OPS' | 'CARE' | 'FINANCE' | 'OA' | 'CUSTOM',
-  audience: ['ALL'] as AudienceCode[]
+  audience: ['ALL'] as AudienceCode[],
+  visibleStaffIds: [] as string[]
 })
 
 const customCardThemeOptions = [
@@ -1089,19 +1297,21 @@ const SEARCH_RECENT_KEY = 'portal_search_recent_routes'
 const SEARCH_RECENT_MAX = 8
 const MODULE_CONFIG_KEY_PREFIX = 'portal_module_config_v1_'
 const CUSTOM_CARD_KEY_PREFIX = 'portal_custom_card_v1_'
+const AUTO_SYNC_KEY_PREFIX = 'portal_auto_sync_v1_'
 const PINYIN_INITIAL_LETTERS = 'ABCDEFGHJKLMNOPQRSTWXYZ'
 const PINYIN_INITIAL_BOUNDARY_CHARS = '阿芭擦搭蛾发噶哈讥咔垃妈拿哦啪期然撒塌挖昔压匝'
 
 const modulePresetMap: Record<'director' | 'nurse' | 'finance', PortalModuleKey[]> = {
-  director: ['todo', 'reminder', 'operation', 'finance', 'salesFunnel', 'bedStatus', 'calendar', 'customCards', 'dataEntry', 'quickLaunch', 'expense'],
-  nurse: ['todo', 'reminder', 'calendar', 'bedStatus', 'quickLaunch', 'operation', 'customCards', 'dataEntry', 'expense', 'finance', 'salesFunnel'],
-  finance: ['todo', 'reminder', 'finance', 'expense', 'operation', 'customCards', 'dataEntry', 'calendar', 'quickLaunch', 'salesFunnel', 'bedStatus']
+  director: ['todo', 'reminder', 'operation', 'finance', 'salesFunnel', 'bedStatus', 'birthdayPlan', 'calendar', 'customCards', 'dataEntry', 'quickLaunch', 'expense'],
+  nurse: ['todo', 'reminder', 'calendar', 'birthdayPlan', 'bedStatus', 'quickLaunch', 'operation', 'customCards', 'dataEntry', 'expense', 'finance', 'salesFunnel'],
+  finance: ['todo', 'reminder', 'finance', 'expense', 'operation', 'customCards', 'birthdayPlan', 'dataEntry', 'calendar', 'quickLaunch', 'salesFunnel', 'bedStatus']
 }
 
 const searchAliases: Record<string, string[]> = {
   '/oa/approval': ['审批', '待审批', '流程审批', '批量审批', '请假审批'],
   '/oa/todo': ['待办', '任务', '待处理', '超时'],
   '/oa/work-execution/calendar': ['日历', '协同日历', '行政日历', '排班'],
+  '/oa/life/birthday': ['生日', '生日提醒', '生日计划', '老人生日'],
   '/oa/attendance-leave': ['请假', '考勤', '值班', '调班', '加班'],
   '/elder/bed-panorama': ['床态', '空床', '清洁中', '床位全景'],
   '/marketing/reports/conversion': ['漏斗', '销售分析', '签约', '转化'],
@@ -1115,6 +1325,7 @@ const searchPinnedRoutes = [
   '/oa/approval',
   '/oa/work-execution/calendar',
   '/oa/attendance-leave',
+  '/oa/life/birthday',
   '/elder/bed-panorama',
   '/marketing/reports/conversion',
   '/finance/reports/overall',
@@ -1130,6 +1341,24 @@ function moduleStorageKey() {
 
 function customCardStorageKey() {
   return `${CUSTOM_CARD_KEY_PREFIX}${String(userStore.staffInfo?.id || 'default')}`
+}
+
+function autoSyncStorageKey() {
+  return `${AUTO_SYNC_KEY_PREFIX}${String(userStore.staffInfo?.id || 'default')}`
+}
+
+function loadAutoSyncSetting() {
+  try {
+    const raw = localStorage.getItem(autoSyncStorageKey())
+    if (raw === '0') autoSyncEnabled.value = false
+    if (raw === '1') autoSyncEnabled.value = true
+  } catch {}
+}
+
+function persistAutoSyncSetting() {
+  try {
+    localStorage.setItem(autoSyncStorageKey(), autoSyncEnabled.value ? '1' : '0')
+  } catch {}
 }
 
 function isModuleVisible(key: PortalModuleKey) {
@@ -1190,9 +1419,15 @@ const customCardColSpan = computed(() => {
 })
 
 const filteredCustomCards = computed(() => {
+  const currentStaffId = String(userStore.staffInfo?.id || '')
   const visibleCards = customCards.value
     .filter((item) => item.visible !== false)
     .filter((item) => cardAudienceMatched(item.audience, currentUserAudience.value))
+    .filter((item) => {
+      const onlyStaff = Array.isArray(item.visibleStaffIds) ? item.visibleStaffIds.map((id) => String(id)) : []
+      if (!onlyStaff.length) return true
+      return currentStaffId ? onlyStaff.includes(currentStaffId) : false
+    })
   if (customCardCategoryFilter.value === 'ALL') return visibleCards
   return visibleCards.filter((item) => item.category === customCardCategoryFilter.value)
 })
@@ -1244,7 +1479,104 @@ const riskReminders = computed(() => {
     { title: '合同到期', count: contractExpiringCount, route: '/hr/profile/contract-reminders', level: contractExpiringCount > 0 ? '预警' : '普通通知' }
   ]
 })
+const displayRiskReminders = computed(() => {
+  const list = [...riskReminders.value]
+    .sort((a, b) => Number(isReminderPinned(b)) - Number(isReminderPinned(a)))
+  if (reminderViewMode.value === 'unread') {
+    return list.filter((item) => !isReminderRead(item))
+  }
+  if (reminderViewMode.value === 'pinned') {
+    return list.filter((item) => isReminderPinned(item))
+  }
+  if (reminderViewMode.value === 'urgent') {
+    return list.filter((item) => item.level === '紧急')
+  }
+  return list
+})
+const unreadReminderCount = computed(() => riskReminders.value.filter((item) => !isReminderRead(item)).length)
+const urgentReminderCount = computed(() => riskReminders.value.filter((item) => item.level === '紧急').length)
 const activeRiskCount = computed(() => riskReminders.value.reduce((sum, item) => sum + Number(item.count || 0), 0))
+
+const approvalOpinionList = computed(() => approvalRows.value
+  .filter((item) => item.status === 'APPROVED')
+  .slice(0, 12)
+  .map((item) => ({
+    id: String(item.id),
+    title: item.title || '未命名审批',
+    remark: String(item.remark || ''),
+    typeText: typeLabel(item.approvalType),
+    timeText: dayjs(item.endTime || item.startTime || new Date()).format('YYYY-MM-DD HH:mm')
+  })))
+
+const approvalTrackList = computed(() => approvalRows.value
+  .slice(0, 10)
+  .map((item) => {
+    const parsed = parseApprovalMeta(item.formData)
+    const steps = approvalStepNames(item.approvalType)
+    const statusText = item.status === 'APPROVED' ? '已通过' : item.status === 'REJECTED' ? '已驳回' : '审批中'
+    const statusColor = item.status === 'APPROVED' ? 'green' : item.status === 'REJECTED' ? 'red' : 'orange'
+    const currentStep = resolveApprovalCurrentStep(item.approvalType, item.status)
+    const nextStep = resolveApprovalNextStep(item.approvalType, item.status)
+    return {
+      id: String(item.id),
+      title: item.title || `${typeLabel(item.approvalType)}申请`,
+      status: String(item.status || 'PENDING'),
+      statusText,
+      statusColor,
+      currentStep,
+      nextStep,
+      stepCount: steps.length,
+      currentApprover: parsed.currentApproverName || parsed.nextApproverName || '',
+      urgeCount: Number(parsed.urgeCount || 0),
+      formData: item.formData || ''
+    }
+  }))
+
+const birthdayStats = computed(() => {
+  const now = dayjs()
+  const thisMonth = now.month() + 1
+  const monthCount = birthdayRows.value.filter((item) => {
+    if (!item.nextBirthday) return false
+    return dayjs(item.nextBirthday).month() + 1 === thisMonth
+  }).length
+  return {
+    today: birthdayRows.value.filter((item) => Number(item.daysUntil || 9999) === 0).length,
+    next7Days: birthdayRows.value.filter((item) => Number(item.daysUntil || 9999) >= 0 && Number(item.daysUntil || 9999) <= 7).length,
+    thisMonth: monthCount
+  }
+})
+
+const birthdayFloorOptions = computed(() => {
+  const set = new Set<string>()
+  birthdayRows.value.forEach((item) => {
+    const floor = extractFloorLabel(item.roomNo)
+    if (floor) set.add(floor)
+  })
+  return [{ label: '全部楼层', value: 'ALL' }, ...Array.from(set).sort().map((floor) => ({ label: floor, value: floor }))]
+})
+
+const birthdayFilteredRows = computed(() => birthdayRows.value.filter((item) => {
+  if (birthdayFloorFilter.value !== 'ALL') {
+    const floor = extractFloorLabel(item.roomNo)
+    if (floor !== birthdayFloorFilter.value) return false
+  }
+  const age = Number(item.ageOnNextBirthday || 0)
+  if (birthdayAgeBand.value === '80_PLUS') return age >= 80
+  if (birthdayAgeBand.value === '90_PLUS') return age >= 90
+  if (birthdayAgeBand.value === 'UNDER_80') return age > 0 && age < 80
+  return true
+}))
+
+const birthdaySliceStats = computed(() => ({
+  filteredTotal: birthdayFilteredRows.value.length,
+  filteredToday: birthdayFilteredRows.value.filter((item) => Number(item.daysUntil || 9999) === 0).length,
+  filteredMonth: birthdayFilteredRows.value.filter((item) => Number(item.daysUntil || 9999) >= 0 && Number(item.daysUntil || 9999) <= 31).length
+}))
+
+const birthdayUpcomingList = computed(() => birthdayFilteredRows.value
+  .filter((item) => Number(item.daysUntil || 9999) >= 0 && Number(item.daysUntil || 9999) <= 31)
+  .sort((a, b) => Number(a.daysUntil || 9999) - Number(b.daysUntil || 9999))
+  .slice(0, 12))
 
 const quickLaunchGroups = [
   {
@@ -1432,6 +1764,347 @@ function severityColor(level: string) {
   return 'blue'
 }
 
+function reminderStorageKey() {
+  return `portal_reminder_state_v1_${String(userStore.staffInfo?.id || 'default')}`
+}
+
+function reminderKey(item: { title: string }) {
+  return String(item.title || '')
+}
+
+function loadReminderState() {
+  try {
+    const raw = localStorage.getItem(reminderStorageKey())
+    if (!raw) {
+      reminderState.value = {}
+      return
+    }
+    const parsed = JSON.parse(raw)
+    reminderState.value = parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    reminderState.value = {}
+  }
+}
+
+function persistReminderState() {
+  try {
+    localStorage.setItem(reminderStorageKey(), JSON.stringify(reminderState.value))
+  } catch {}
+}
+
+function isReminderRead(item: { title: string }) {
+  const key = reminderKey(item)
+  return Boolean(reminderState.value[key]?.read)
+}
+
+function isReminderPinned(item: { title: string }) {
+  const key = reminderKey(item)
+  return Boolean(reminderState.value[key]?.pinned)
+}
+
+function toggleReminderRead(item: { title: string }) {
+  const key = reminderKey(item)
+  const current = reminderState.value[key] || {}
+  reminderState.value = {
+    ...reminderState.value,
+    [key]: {
+      ...current,
+      read: !current.read,
+      updatedAt: dayjs().format('YYYY-MM-DDTHH:mm:ss')
+    }
+  }
+  persistReminderState()
+}
+
+function toggleReminderPinned(item: { title: string }) {
+  const key = reminderKey(item)
+  const current = reminderState.value[key] || {}
+  reminderState.value = {
+    ...reminderState.value,
+    [key]: {
+      ...current,
+      pinned: !current.pinned,
+      updatedAt: dayjs().format('YYYY-MM-DDTHH:mm:ss')
+    }
+  }
+  persistReminderState()
+}
+
+function markAllReminderRead() {
+  const next: Record<string, { read?: boolean; pinned?: boolean; updatedAt?: string; lastCount?: number }> = { ...reminderState.value }
+  riskReminders.value.forEach((item) => {
+    const key = reminderKey(item)
+    next[key] = {
+      ...(next[key] || {}),
+      read: true,
+      updatedAt: dayjs().format('YYYY-MM-DDTHH:mm:ss')
+    }
+  })
+  reminderState.value = next
+  persistReminderState()
+  message.success('提醒已全部标记为已读')
+}
+
+function typeLabel(value?: string) {
+  if (value === 'LEAVE') return '请假'
+  if (value === 'OVERTIME') return '加班'
+  if (value === 'REIMBURSE') return '报销'
+  if (value === 'PURCHASE') return '采购'
+  if (value === 'MATERIAL_APPLY') return '物资申领'
+  if (value === 'MARKETING_PLAN') return '营销方案'
+  return value || '审批'
+}
+
+function parseApprovalMeta(raw?: string) {
+  if (!raw || !raw.trim()) return {} as Record<string, any>
+  try {
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function approvalStepNames(value?: string) {
+  if (value === 'LEAVE') return ['员工提交', '部门审批', '人事确认', '院长审批', '归档']
+  if (value === 'REIMBURSE') return ['申请提交', '财务初审', '院长审批', '出纳处理', '归档']
+  if (value === 'PURCHASE') return ['申请提交', '仓储核验', '财务审批', '院长审批', '采购执行']
+  if (value === 'MARKETING_PLAN') return ['方案提交', '运营评审', '院长审批', '执行落地']
+  return ['提交', '审批', '归档']
+}
+
+function resolveApprovalCurrentStep(type?: string, status?: string) {
+  if (status === 'APPROVED') return '流程完成'
+  if (status === 'REJECTED') return '已驳回'
+  const steps = approvalStepNames(type)
+  return steps[Math.min(1, steps.length - 1)] || '待审批'
+}
+
+function resolveApprovalNextStep(type?: string, status?: string) {
+  if (status === 'APPROVED') return '已归档'
+  if (status === 'REJECTED') return '申请人修改后重提'
+  const steps = approvalStepNames(type)
+  return steps[Math.min(2, steps.length - 1)] || '等待处理'
+}
+
+function openApprovalOpinionPanel() {
+  if (!approvalRows.value.length) {
+    loadApprovalTracks().catch(() => {})
+  }
+  approvalOpinionOpen.value = true
+}
+
+async function urgeApproval(item: { id: string; title: string; currentApprover?: string; formData?: string }, silent = false) {
+  try {
+    const parsed = parseApprovalMeta(item.formData)
+    const urgeCount = Number(parsed.urgeCount || 0) + 1
+    const nextFormData = JSON.stringify({
+      ...parsed,
+      urgeCount,
+      lastUrgedAt: dayjs().format('YYYY-MM-DDTHH:mm:ss'),
+      lastUrgedBy: userStore.staffInfo?.realName || userStore.staffInfo?.username || '系统用户'
+    })
+    await updateApproval(item.id, {
+      formData: nextFormData
+    })
+    await createOaTask({
+      title: `催办审批：${item.title}`,
+      description: '来自首页审批流程跟踪的催办提醒',
+      calendarType: 'WORK',
+      priority: 'HIGH',
+      urgency: 'EMERGENCY',
+      status: 'OPEN',
+      assigneeName: item.currentApprover || undefined
+    })
+    if (!silent) message.success(`已催办：${item.title}`)
+    await refreshPortalModules(true)
+    return true
+  } catch (error: any) {
+    if (!silent) message.error(error?.message || '催办失败，请稍后再试')
+    return false
+  }
+}
+
+async function urgeAllPendingApprovals() {
+  const pendingList = approvalTrackList.value.filter((item) => item.status === 'PENDING').slice(0, 20)
+  if (!pendingList.length) {
+    message.info('当前没有待催办审批')
+    return
+  }
+  let successCount = 0
+  for (const item of pendingList) {
+    // eslint-disable-next-line no-await-in-loop
+    const ok = await urgeApproval(item, true)
+    if (ok) successCount += 1
+  }
+  if (successCount > 0) {
+    message.success(`已批量催办 ${successCount} 条审批`)
+  }
+}
+
+function exportBirthdayCsv() {
+  if (!birthdayFilteredRows.value.length) {
+    message.info('暂无生日数据可导出')
+    return
+  }
+  const header = ['姓名', '出生日期', '下次生日', '剩余天数', '届时年龄', '房间号', '床位号']
+  const lines = birthdayFilteredRows.value.map((row) => ([
+    row.elderName || '',
+    row.birthDate || '',
+    row.nextBirthday || '',
+    String(row.daysUntil ?? ''),
+    String(row.ageOnNextBirthday ?? ''),
+    row.roomNo || '',
+    row.bedNo || ''
+  ]))
+  const csv = [header, ...lines]
+    .map((cols) => cols.map((cell) => `"${String(cell || '').replace(/"/g, '""')}"`).join(','))
+    .join('\n')
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `生日日程_${dayjs().format('YYYYMMDD')}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+async function syncBirthdayTasks() {
+  const candidates = birthdayFilteredRows.value.filter((item) => Number(item.daysUntil || 9999) >= 0 && Number(item.daysUntil || 9999) <= 7)
+  if (!candidates.length) {
+    message.info('未来7天暂无生日，无需同步')
+    return
+  }
+  const existedTitles = new Set(calendarRows.value.map((item) => String(item.title || '')))
+  let createdCount = 0
+  for (const item of candidates.slice(0, 20)) {
+    const dateText = item.nextBirthday ? dayjs(item.nextBirthday).format('YYYY-MM-DD') : ''
+    if (!dateText) continue
+    const plans = [
+      { offset: -7, title: `生日准备（T-7）：${item.elderName}`, desc: '提醒活动负责人准备', urgency: 'NORMAL' as const },
+      { offset: -1, title: `生日准备（T-1）：${item.elderName}`, desc: '提醒楼层/厨房/后勤准备', urgency: 'NORMAL' as const },
+      { offset: 0, title: `今日生日：${item.elderName}`, desc: '今日生日置顶提醒', urgency: 'EMERGENCY' as const }
+    ]
+    for (const plan of plans) {
+      const targetDate = dayjs(dateText).add(plan.offset, 'day')
+      if (targetDate.isBefore(dayjs().startOf('day'))) continue
+      if (existedTitles.has(plan.title)) continue
+      try {
+        const created = await createOaTask({
+          title: plan.title,
+          calendarType: 'DAILY',
+          planCategory: '生日卡片',
+          startTime: `${targetDate.format('YYYY-MM-DD')}T09:00:00`,
+          endTime: `${targetDate.format('YYYY-MM-DD')}T10:00:00`,
+          urgency: plan.urgency,
+          description: `${plan.desc}（${item.elderName}，${item.ageOnNextBirthday || '--'}岁）`
+        })
+        if (created?.id != null) {
+          upsertCalendarTask(created)
+          createdCount += 1
+        }
+      } catch {}
+    }
+  }
+  await refreshPortalModules(true)
+  message.success(createdCount > 0 ? `已同步 ${createdCount} 条生日提醒` : '生日提醒已是最新')
+}
+
+function printBirthdayYearPlan() {
+  const list = birthdayFilteredRows.value
+    .filter((item) => !!item.nextBirthday)
+    .sort((a, b) => String(a.nextBirthday).localeCompare(String(b.nextBirthday)))
+  if (!list.length) {
+    message.info('暂无生日数据可打印')
+    return
+  }
+  const rowsHtml = list
+    .map((item, index) => `<tr>
+      <td>${index + 1}</td>
+      <td>${item.elderName || '-'}</td>
+      <td>${item.nextBirthday || '-'}</td>
+      <td>${item.ageOnNextBirthday || '-'}</td>
+      <td>${item.roomNo || '-'}/${item.bedNo || '-'}</td>
+    </tr>`)
+    .join('')
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>年度生日计划</title>
+    <style>body{font-family:Arial,'PingFang SC';padding:20px;color:#111;} h2{margin:0 0 10px;} table{width:100%;border-collapse:collapse;} th,td{border:1px solid #ddd;padding:8px;font-size:12px;} th{background:#f5f7fa;}</style>
+    </head><body><h2>年度生日日程表（老人）</h2><div>生成时间：${dayjs().format('YYYY-MM-DD HH:mm:ss')}</div>
+    <table><thead><tr><th>#</th><th>姓名</th><th>生日日期</th><th>年龄</th><th>房间/床位</th></tr></thead><tbody>${rowsHtml}</tbody></table></body></html>`
+  const win = window.open('', '_blank')
+  if (!win) return
+  win.document.write(html)
+  win.document.close()
+  win.focus()
+  win.print()
+}
+
+async function refreshAfterCalendarChange() {
+  await refreshPortalModules(true, '日程更新')
+}
+
+function openBirthdayListMonth() {
+  go(`/oa/life/birthday?month=${dayjs().month() + 1}`)
+}
+
+function openBirthdayListByDays(days: number) {
+  go(`/oa/life/birthday?daysAhead=${days}`)
+}
+
+function openBirthdayElderDetail(item: BirthdayReminder) {
+  if (item.elderId != null) {
+    go(`/elder/detail/${item.elderId}`)
+    return
+  }
+  go(`/elder/list?keyword=${encodeURIComponent(item.elderName || '')}`)
+}
+
+function openBirthdayActivityCreate(item: BirthdayReminder) {
+  go(`/life/activity?quick=create&elderName=${encodeURIComponent(item.elderName || '')}`)
+}
+
+function openBirthdayActivityList() {
+  go('/life/activity')
+}
+
+function openBirthdayMaterialPrepare(item: BirthdayReminder) {
+  go(`/inventory/outbound?scene=birthday&elderName=${encodeURIComponent(item.elderName || '')}`)
+}
+
+function openBirthdayDoneRecord() {
+  go('/life/activity?status=DONE')
+}
+
+function openAgeReport(mode: '80+' | '90+' | 'CUSTOM') {
+  let threshold = 80
+  if (mode === '90+') threshold = 90
+  if (mode === 'CUSTOM') threshold = Number(window.prompt('请输入年龄阈值（例如 85）', '85') || 85)
+  const list = birthdayFilteredRows.value
+    .filter((item) => Number(item.ageOnNextBirthday || 0) >= threshold)
+    .sort((a, b) => Number(b.ageOnNextBirthday || 0) - Number(a.ageOnNextBirthday || 0))
+  birthdayInsightTitle.value = `年龄 ${threshold}+ 生日清单（${list.length} 人）`
+  birthdayInsightRows.value = list.map((item) => ({
+    label: `${item.elderName} · ${item.nextBirthday || '--'}`,
+    value: `${item.ageOnNextBirthday || '--'} 岁`
+  }))
+  birthdayInsightOpen.value = true
+}
+
+function openBirthdayFrequencyCheck() {
+  const bucket = new Map<string, number>()
+  birthdayFilteredRows.value.forEach((item) => {
+    if (!item.nextBirthday) return
+    const key = dayjs(item.nextBirthday).format('MM-DD')
+    bucket.set(key, Number(bucket.get(key) || 0) + 1)
+  })
+  const rows = Array.from(bucket.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 12)
+  birthdayInsightTitle.value = '同月同日生日高频分布'
+  birthdayInsightRows.value = rows.map(([day, count]) => ({ label: day, value: `${count} 人` }))
+  birthdayInsightOpen.value = true
+}
+
 function toggleCalendarType(type: 'PERSONAL' | 'WORK' | 'DAILY' | 'COLLAB') {
   if (visibleCalendarTypes.value.includes(type)) {
     if (visibleCalendarTypes.value.length === 1) return
@@ -1439,6 +2112,22 @@ function toggleCalendarType(type: 'PERSONAL' | 'WORK' | 'DAILY' | 'COLLAB') {
     return
   }
   visibleCalendarTypes.value = [...visibleCalendarTypes.value, type]
+}
+
+function focusReminderCenter() {
+  if (urgentReminderCount.value > 0) {
+    reminderViewMode.value = 'urgent'
+  } else if (unreadReminderCount.value > 0) {
+    reminderViewMode.value = 'unread'
+  } else {
+    reminderViewMode.value = 'all'
+  }
+  const card = reminderCardRef.value?.$el || reminderCardRef.value
+  if (card?.scrollIntoView) {
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    return
+  }
+  go('/oa/approval?status=PENDING')
 }
 
 function calendarTypeText(value?: string) {
@@ -1521,6 +2210,16 @@ function addByRule(base: Dayjs, rule: 'DAILY' | 'WEEKLY' | 'MONTHLY', interval: 
 
 function money(amount: number) {
   return `${Number(amount || 0).toFixed(2)}元`
+}
+
+function extractFloorLabel(roomNo?: string) {
+  const text = String(roomNo || '').trim()
+  if (!text) return ''
+  const prefixMatch = text.match(/^(\d{1,2})/)
+  if (prefixMatch) return `${prefixMatch[1]}楼`
+  const floorMatch = text.match(/([A-Za-z]|\d{1,2})\s*楼/)
+  if (floorMatch) return `${floorMatch[1].toUpperCase()}楼`
+  return ''
 }
 
 function resolveTaskColor(task: OaTask) {
@@ -2057,6 +2756,7 @@ function normalizeCustomCardPayload(item: any, fallbackId: string) {
     category: normalizeCustomCardCategory(item?.category),
     visible: item?.visible !== false,
     audience: normalizeCardAudience(item?.audience),
+    visibleStaffIds: Array.isArray(item?.visibleStaffIds) ? item.visibleStaffIds.map((row: any) => String(row)) : [],
     width: Number.isFinite(rawWidth) ? clampCustomCardWidth(rawWidth) : undefined,
     height: Number.isFinite(rawHeight) ? clampCustomCardHeight(rawHeight) : 168
   }
@@ -2099,6 +2799,7 @@ function openCustomCardEditor(id?: string) {
     customCardForm.icon = '🧩'
     customCardForm.category = 'CUSTOM'
     customCardForm.audience = ['ALL']
+    customCardForm.visibleStaffIds = []
     updateCustomCardRouteOptions('')
     customCardEditorOpen.value = true
     return
@@ -2117,6 +2818,7 @@ function openCustomCardEditor(id?: string) {
   customCardForm.icon = target.icon || '🧩'
   customCardForm.category = target.category || 'CUSTOM'
   customCardForm.audience = normalizeCardAudience(target.audience)
+  customCardForm.visibleStaffIds = Array.isArray(target.visibleStaffIds) ? target.visibleStaffIds.map((item) => String(item)) : []
   updateCustomCardRouteOptions(target.route)
   customCardEditorOpen.value = true
 }
@@ -2130,6 +2832,9 @@ function saveCustomCard() {
   const icon = String(customCardForm.icon || '🧩').trim().slice(0, 2) || '🧩'
   const category = customCardForm.category || 'CUSTOM'
   const audience = normalizeCardAudience(customCardForm.audience)
+  const visibleStaffIds = Array.isArray(customCardForm.visibleStaffIds)
+    ? customCardForm.visibleStaffIds.map((item) => String(item))
+    : []
   if (!title) {
     message.warning('请填写卡面标题')
     return
@@ -2165,7 +2870,8 @@ function saveCustomCard() {
       openMode,
       icon,
       category,
-      audience
+      audience,
+      visibleStaffIds
     } : item)
     persistCustomCards()
     customCardEditorOpen.value = false
@@ -2185,6 +2891,7 @@ function saveCustomCard() {
     category,
     visible: true,
     audience,
+    visibleStaffIds,
     height: 168
   }]
   persistCustomCards()
@@ -2520,6 +3227,7 @@ async function submitSchedule() {
       upsertCalendarTask(updated)
       scheduleOpen.value = false
       editingScheduleId.value = null
+      await refreshAfterCalendarChange()
       message.success('日程已更新')
       return
     }
@@ -2555,6 +3263,7 @@ async function submitSchedule() {
     })
     scheduleOpen.value = false
     editingScheduleId.value = null
+    await refreshAfterCalendarChange()
     message.success(scheduleForm.recurring ? `已生成 ${tasks.length} 条周期日程` : '日程已新增')
   } finally {
     scheduleSaving.value = false
@@ -2577,6 +3286,7 @@ function markScheduleDone(id: string | number) {
           })
         }
       }
+      await refreshAfterCalendarChange()
       message.success('已标记完成')
     }
   })
@@ -2589,6 +3299,7 @@ function removeSchedule(id: string | number) {
     onOk: async () => {
       await deleteOaTask(id)
       removeCalendarTaskById(id)
+      await refreshAfterCalendarChange()
       message.success('已删除')
     }
   })
@@ -2669,20 +3380,45 @@ async function loadHrReminder() {
   certificateReminderCount.value = Number(certPage.total || 0)
 }
 
-async function refreshPortalModules(withCalendar = true) {
+async function loadApprovalTracks() {
+  const approvalPage = await getApprovalPage({
+    pageNo: 1,
+    pageSize: 16,
+    status: undefined,
+    scope: 'MY'
+  })
+  approvalRows.value = approvalPage.list || []
+}
+
+async function loadBirthdayPlan() {
+  const birthdayPage = await getBirthdayPage({
+    pageNo: 1,
+    pageSize: 500,
+    daysAhead: 365
+  })
+  birthdayRows.value = birthdayPage.list || []
+}
+
+async function refreshPortalModules(withCalendar = true, source = '自动刷新') {
+  if (syncingNow.value) return
+  syncingNow.value = true
+  lastSyncSource.value = source
   const jobs: Array<Promise<any>> = [
     loadSummary(),
     loadDashboard(),
     loadFinanceOverview(),
     loadSalesFunnel(),
     loadBedAndElderStatus(),
-    loadHrReminder()
+    loadHrReminder(),
+    loadApprovalTracks(),
+    loadBirthdayPlan()
   ]
   if (withCalendar) {
     jobs.push(loadCalendar())
   }
   await Promise.allSettled(jobs)
   refreshedAt.value = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  syncingNow.value = false
 }
 
 async function init() {
@@ -2696,9 +3432,11 @@ async function init() {
     updateCustomCardRouteOptions('')
     loadModuleCustomize()
     loadCustomCards()
+    loadReminderState()
+    loadAutoSyncSetting()
     updateSearchOptions(searchKeyword.value)
     await Promise.all([loadStaffOptions(), loadDepartmentOptions()])
-    await refreshPortalModules(true)
+    await refreshPortalModules(true, '初始化加载')
   } catch (error: any) {
     pageError.value = error?.message || '加载首页失败'
     message.error(pageError.value)
@@ -2710,20 +3448,57 @@ async function init() {
 useLiveSyncRefresh({
   topics: ['elder', 'bed', 'lifecycle', 'finance', 'care', 'health', 'dining', 'marketing', 'oa', 'hr', 'logistics', 'system'],
   refresh: () => {
-    refreshPortalModules(true).catch(() => {})
+    if (!autoSyncEnabled.value) return
+    refreshPortalModules(true, '跨模块联动').catch(() => {})
   },
   debounceMs: 800
 })
+
+watch(autoSyncEnabled, (value) => {
+  persistAutoSyncSetting()
+  if (value) {
+    refreshPortalModules(true, '自动刷新开启').catch(() => {})
+  }
+})
+
+watch(riskReminders, (list) => {
+  let changed = false
+  const next = { ...reminderState.value }
+  list.forEach((item) => {
+    const key = reminderKey(item)
+    const currentCount = Number(item.count || 0)
+    const previous = next[key]
+    if (!previous) {
+      next[key] = { read: false, pinned: false, lastCount: currentCount }
+      changed = true
+      return
+    }
+    const previousCount = Number(previous.lastCount || 0)
+    if (currentCount > previousCount) {
+      next[key] = { ...previous, read: false, lastCount: currentCount, updatedAt: dayjs().format('YYYY-MM-DDTHH:mm:ss') }
+      changed = true
+      return
+    }
+    if (currentCount !== previousCount) {
+      next[key] = { ...previous, lastCount: currentCount }
+      changed = true
+    }
+  })
+  if (changed) {
+    reminderState.value = next
+    persistReminderState()
+  }
+}, { deep: true })
 
 onMounted(() => {
   init()
   if (portalSyncTimer) window.clearInterval(portalSyncTimer)
   portalSyncTimer = window.setInterval(() => {
-    if (document.hidden) return
-    refreshPortalModules(false).catch(() => {})
-  }, 45 * 1000)
+    if (document.hidden || !autoSyncEnabled.value) return
+    refreshPortalModules(true, '定时轮询').catch(() => {})
+  }, 20 * 1000)
   portalVisibleHandler = () => {
-    if (!document.hidden) refreshPortalModules(false).catch(() => {})
+    if (!document.hidden && autoSyncEnabled.value) refreshPortalModules(true, '回到页面').catch(() => {})
   }
   document.addEventListener('visibilitychange', portalVisibleHandler)
 })
@@ -2789,6 +3564,15 @@ onBeforeUnmount(() => {
   padding: 6px 10px;
 }
 
+.hero-kpi-item.clickable {
+  cursor: pointer;
+}
+
+.hero-kpi-item.clickable:hover {
+  border-color: #91caff;
+  background: #f0f7ff;
+}
+
 .hero-kpi-label {
   display: block;
   color: #64748b;
@@ -2810,6 +3594,10 @@ onBeforeUnmount(() => {
 .hero-actions-tip {
   font-size: 12px;
   color: #64748b;
+}
+
+.hero-actions-tip-row {
+  margin-top: 2px;
 }
 
 .hero-search {
@@ -2872,14 +3660,39 @@ onBeforeUnmount(() => {
   margin-top: 12px;
 }
 
+.approval-track-card :deep(.ant-card-head) {
+  min-height: 34px;
+}
+
+.approval-track-card :deep(.ant-card-head-title) {
+  padding: 8px 0;
+  font-size: 13px;
+}
+
 .legend-line {
   margin-top: 8px;
+}
+
+.birthday-remind-rules {
+  margin-top: 10px;
+}
+
+.birthday-filter-bar {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px dashed #bfdbfe;
+  border-radius: 10px;
+  background: #f8fbff;
 }
 
 .reminder-count {
   min-width: 42px;
   text-align: right;
   color: #475569;
+}
+
+.reminder-unread {
+  background: rgba(239, 246, 255, 0.78);
 }
 
 .quick-group {
@@ -3055,6 +3868,11 @@ onBeforeUnmount(() => {
 .agenda-title-done {
   color: #64748b;
   text-decoration: line-through;
+}
+
+.approval-opinion-text {
+  max-width: 280px;
+  color: #334155;
 }
 
 @media (max-width: 768px) {

@@ -33,7 +33,7 @@ public class AdminStaffController {
     this.passwordEncoder = passwordEncoder;
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping
   public Result<StaffAccount> create(@Valid @RequestBody StaffCreateRequest request) {
     StaffAccount staff = new StaffAccount();
@@ -51,7 +51,7 @@ public class AdminStaffController {
     return Result.ok(staff);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PutMapping
   public Result<StaffAccount> update(@Valid @RequestBody StaffUpdateRequest request) {
     StaffAccount staff = staffMapper.selectById(request.getId());
@@ -83,7 +83,7 @@ public class AdminStaffController {
     return Result.ok(staff);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
     StaffAccount staff = staffMapper.selectById(id);
@@ -95,13 +95,13 @@ public class AdminStaffController {
     return Result.ok(null);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/{id}")
   public Result<StaffAccount> get(@PathVariable Long id) {
     return Result.ok(staffMapper.selectById(id));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping
   public Result<IPage<StaffAccount>> list(
       @RequestParam(defaultValue = "1") long page,

@@ -29,7 +29,7 @@ public class AdminDiseaseController {
     this.diseaseMapper = diseaseMapper;
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping
   public Result<Disease> create(@Valid @RequestBody DiseaseRequest request) {
     Disease disease = new Disease();
@@ -41,7 +41,7 @@ public class AdminDiseaseController {
     return Result.ok(disease);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PutMapping("/{id}")
   public Result<Disease> update(@PathVariable Long id, @Valid @RequestBody DiseaseRequest request) {
     Disease disease = diseaseMapper.selectById(id);
@@ -56,7 +56,7 @@ public class AdminDiseaseController {
     return Result.ok(disease);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
     Disease disease = diseaseMapper.selectById(id);
@@ -68,13 +68,13 @@ public class AdminDiseaseController {
     return Result.ok(null);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/{id}")
   public Result<Disease> get(@PathVariable Long id) {
     return Result.ok(diseaseMapper.selectById(id));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping
   public Result<IPage<Disease>> page(
       @RequestParam(defaultValue = "1") long page,

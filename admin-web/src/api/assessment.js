@@ -5,6 +5,9 @@ export function getAssessmentRecordPage(params) {
 export function getAssessmentRecordSummary(params) {
     return request.get('/api/assessment/records/summary', { params });
 }
+export function getAssessmentRecordIds(params) {
+    return request.get('/api/assessment/records/ids', { params });
+}
 export function getAssessmentRecord(id) {
     return request.get(`/api/assessment/records/${id}`);
 }
@@ -22,6 +25,15 @@ export function deleteAssessmentRecord(id) {
 }
 export function batchDeleteAssessmentRecord(ids) {
     return request.post('/api/assessment/records/batch-delete', ids);
+}
+export function batchUpdateAssessmentRecordStatus(ids, status) {
+    return request.post('/api/assessment/records/batch-status', { ids, status });
+}
+export function batchAssignAssessmentRecord(ids, assessorName, assessorId) {
+    return request.post('/api/assessment/records/batch-assign', { ids, assessorName, assessorId });
+}
+export function batchUpdateAssessmentNextDate(ids, nextAssessmentDate) {
+    return request.post('/api/assessment/records/batch-next-date', { ids, nextAssessmentDate });
 }
 export function exportAssessmentRecord(params) {
     return request.get('/api/assessment/records/export', {

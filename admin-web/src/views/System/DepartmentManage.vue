@@ -82,6 +82,7 @@ import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { getDepartmentPage, createDepartment, updateDepartment, deleteDepartment } from '../../api/rbac'
 import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
+import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import type { DepartmentItem, PageResult } from '../../types'
 
 const query = reactive({ keyword: undefined as string | undefined, pageNo: 1, pageSize: 10 })
@@ -196,4 +197,13 @@ async function remove(record: DepartmentItem) {
 }
 
 fetchData()
+
+useLiveSyncRefresh({
+  topics: ['system', 'hr', 'oa'],
+  refresh: () => {
+    if (loading.value || saving.value) return
+    fetchData().catch(() => {})
+  },
+  debounceMs: 900
+})
 </script>

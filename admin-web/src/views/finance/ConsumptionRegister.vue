@@ -14,6 +14,8 @@
         <a-input v-model:value="query.keyword" placeholder="老人/类别/备注" allow-clear />
       </a-form-item>
       <template #extra>
+        <a-button @click="exportData">导出</a-button>
+        <a-button @click="printCurrent">打印当前结果</a-button>
         <a-button type="primary" @click="openCreate">新增消费</a-button>
       </template>
     </SearchForm>
@@ -49,16 +51,27 @@
 import { reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
+import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { createConsumption, getConsumptionPage } from '../../api/financeFee'
 import type { ConsumptionRecordItem, PageResult } from '../../types'
+import { exportCsv } from '../../utils/export'
 
 const loading = ref(false)
 const rows = ref<ConsumptionRecordItem[]>([])
-const query = reactive({ pageNo: 1, pageSize: 10, from: undefined as any, to: undefined as any, category: '', keyword: '' })
+const route = useRoute()
+const query = reactive({
+  pageNo: 1,
+  pageSize: 10,
+  from: undefined as any,
+  to: undefined as any,
+  category: '',
+  keyword: '',
+  elderId: route.query.elderId ? Number(route.query.elderId) : undefined as number | undefined
+})
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 
 const columns = [
@@ -77,7 +90,8 @@ const { elderOptions, searchElders: searchElderOptions } = useElderOptions({ pag
 const sourceTypeOptions = [
   { label: '手工', value: 'MANUAL' },
   { label: '商城', value: 'STORE' },
-  { label: '医护', value: 'MEDICAL' }
+  { label: '医护', value: 'MEDICAL' },
+  { label: '账单收款', value: 'BILL_PAYMENT' }
 ]
 const categoryOptions = [
   { label: '餐饮消费', value: 'DINING' },
@@ -85,6 +99,7 @@ const categoryOptions = [
   { label: '护理消费', value: 'NURSING' },
   { label: '押金消费', value: 'DEPOSIT' },
   { label: '药品消费', value: 'MEDICINE' },
+  { label: '账单收款', value: 'BILL_PAYMENT' },
   { label: '其他消费', value: 'OTHER' }
 ]
 const createForm = reactive({
@@ -106,6 +121,7 @@ async function fetchData() {
     const res: PageResult<ConsumptionRecordItem> = await getConsumptionPage({
       pageNo: query.pageNo,
       pageSize: query.pageSize,
+      elderId: query.elderId,
       from: query.from ? dayjs(query.from).format('YYYY-MM-DD') : undefined,
       to: query.to ? dayjs(query.to).format('YYYY-MM-DD') : undefined,
       category: query.category || undefined,
@@ -124,6 +140,7 @@ function onReset() {
   query.to = undefined
   query.category = ''
   query.keyword = ''
+  query.elderId = undefined
   pagination.current = 1
   fetchData()
 }
@@ -179,6 +196,55 @@ async function submitCreate() {
   } finally {
     creating.value = false
   }
+}
+
+function exportData() {
+  exportCsv(
+    rows.value.map(item => ({
+      老人: item.elderName || '',
+      消费日期: item.consumeDate || '',
+      金额: item.amount || 0,
+      类别: item.category || '',
+      来源类型: item.sourceType || '',
+      备注: item.remark || '',
+      创建时间: item.createTime || ''
+    })),
+    `消费明细-${dayjs().format('YYYYMMDD-HHmmss')}.csv`
+  )
+}
+
+function printCurrent() {
+  const table = rows.value.map(item => ({
+    老人: item.elderName || '',
+    消费日期: item.consumeDate || '',
+    金额: item.amount || 0,
+    类别: item.category || '',
+    来源类型: item.sourceType || '',
+    备注: item.remark || ''
+  }))
+  const html = `
+    <html>
+      <head><meta charset="utf-8"><title>消费明细打印</title></head>
+      <body>
+        <h3>消费明细（${dayjs().format('YYYY-MM-DD HH:mm')}）</h3>
+        <table border="1" cellspacing="0" cellpadding="6">
+          <thead><tr><th>老人</th><th>消费日期</th><th>金额</th><th>类别</th><th>来源类型</th><th>备注</th></tr></thead>
+          <tbody>
+            ${table.map(item => `<tr><td>${item.老人}</td><td>${item.消费日期}</td><td>${item.金额}</td><td>${item.类别}</td><td>${item.来源类型}</td><td>${item.备注}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `
+  const win = window.open('', '_blank')
+  if (!win) {
+    message.error('请允许弹窗后重试打印')
+    return
+  }
+  win.document.write(html)
+  win.document.close()
+  win.focus()
+  win.print()
 }
 
 fetchData()

@@ -4,6 +4,9 @@
       <a-space wrap>
         <a-date-picker v-model:value="query.month" picker="month" style="width: 150px" />
         <a-button type="primary" @click="loadData">刷新</a-button>
+        <a-input v-model:value="query.printRemark" allow-clear placeholder="打印备注" style="width: 180px" />
+        <a-button @click="exportCurrent">导出当前</a-button>
+        <a-button @click="printCurrent">打印当前</a-button>
         <a-button @click="go('/finance/bills/rules')">计费规则入口</a-button>
         <a-button @click="go('/finance/accounts/warning-rules')">余额预警规则</a-button>
         <a-button @click="go('/finance/config/fee-subjects')">费用科目字典</a-button>
@@ -85,15 +88,19 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
+import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { getFinanceBillingConfigSnapshots, getFinanceMasterDataOverview } from '../../api/finance'
 import type { FinanceBillingConfigSnapshotItem, FinanceMasterDataOverview } from '../../types'
+import { exportCsv } from '../../utils/export'
+import { printTableReport } from '../../utils/print'
 
 const router = useRouter()
 const loading = ref(false)
 const query = ref({
-  month: dayjs()
+  month: dayjs(),
+  printRemark: ''
 })
 const overview = ref<FinanceMasterDataOverview | null>(null)
 const snapshots = ref<FinanceBillingConfigSnapshotItem[]>([])
@@ -113,8 +120,48 @@ async function loadData() {
     ])
     overview.value = overviewData
     snapshots.value = snapshotData || []
+  } catch (error: any) {
+    message.error(error?.message || '加载主数据配置失败')
   } finally {
     loading.value = false
+  }
+}
+
+function exportCurrent() {
+  exportCsv(
+    (overview.value?.recentConfigs || []).map(item => ({
+      配置键: item.configKey || '',
+      配置值: item.valueText || '',
+      生效月份: item.effectiveMonth || '',
+      状态: Number(item.status) === 1 ? '启用' : '停用',
+      备注: item.remark || ''
+    })),
+    `财务主数据配置-${dayjs().format('YYYYMMDD-HHmmss')}.csv`
+  )
+}
+
+function printCurrent() {
+  try {
+    printTableReport({
+      title: '财务主数据配置中心',
+      subtitle: `月份：${dayjs(query.value.month).format('YYYY-MM')}；费用科目：${overview.value?.feeSubjectCount || 0}；计费规则：${overview.value?.billingRuleCount || 0}；支付渠道：${overview.value?.paymentChannelCount || 0}；备注：${query.value.printRemark || '-'}`,
+      columns: [
+        { key: 'configKey', title: '配置键' },
+        { key: 'valueText', title: '配置值' },
+        { key: 'effectiveMonth', title: '生效月份' },
+        { key: 'statusText', title: '状态' },
+        { key: 'remark', title: '备注' }
+      ],
+      rows: (overview.value?.recentConfigs || []).map(item => ({
+        configKey: item.configKey || '-',
+        valueText: item.valueText || '-',
+        effectiveMonth: item.effectiveMonth || '-',
+        statusText: Number(item.status) === 1 ? '启用' : '停用',
+        remark: item.remark || '-'
+      }))
+    })
+  } catch (error: any) {
+    message.error(error?.message || '打印失败')
   }
 }
 

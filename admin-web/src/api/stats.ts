@@ -1,5 +1,5 @@
 import request from '../utils/request'
-import { getToken } from '../utils/auth'
+import { exportCsvByRequest } from '../utils/export'
 import type {
   BedUsageStatsResponse,
   CheckInStatsResponse,
@@ -58,31 +58,7 @@ export async function exportElderFlowReportCsv(params?: {
   keyword?: string
   orgId?: number
 }) {
-  const url = new URL('/api/stats/elder-flow-report/export', window.location.origin)
-  Object.entries(params || {}).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      url.searchParams.set(key, String(value))
-    }
-  })
-  const response = await fetch(url.toString(), {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${getToken()}`
-    }
-  })
-  if (!response.ok) {
-    throw new Error('导出失败')
-  }
-  const blob = await response.blob()
-  const contentDisposition = response.headers.get('content-disposition') || ''
-  const filenameMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/)
-  const filename = filenameMatch?.[1] || `elder-flow-report-${new Date().toISOString().slice(0, 10)}.csv`
-  const link = document.createElement('a')
-  const objectUrl = URL.createObjectURL(blob)
-  link.href = objectUrl
-  link.download = filename
-  link.click()
-  URL.revokeObjectURL(objectUrl)
+  await exportCsvByRequest('/api/stats/elder-flow-report/export', params, `elder-flow-report-${new Date().toISOString().slice(0, 10)}.csv`)
 }
 
 export async function exportOrgMonthlyOperationCsv(params?: {
@@ -91,29 +67,38 @@ export async function exportOrgMonthlyOperationCsv(params?: {
   months?: number
   orgId?: number
 }) {
-  const url = new URL('/api/stats/org/monthly-operation/export', window.location.origin)
-  Object.entries(params || {}).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      url.searchParams.set(key, String(value))
-    }
-  })
-  const response = await fetch(url.toString(), {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${getToken()}`
-    }
-  })
-  if (!response.ok) {
-    throw new Error('导出失败')
-  }
-  const blob = await response.blob()
-  const contentDisposition = response.headers.get('content-disposition') || ''
-  const filenameMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/)
-  const filename = filenameMatch?.[1] || `org-monthly-operation-${new Date().toISOString().slice(0, 10)}.csv`
-  const link = document.createElement('a')
-  const objectUrl = URL.createObjectURL(blob)
-  link.href = objectUrl
-  link.download = filename
-  link.click()
-  URL.revokeObjectURL(objectUrl)
+  await exportCsvByRequest('/api/stats/org/monthly-operation/export', params, `org-monthly-operation-${new Date().toISOString().slice(0, 10)}.csv`)
+}
+
+export async function exportOrgElderFlowCsv(params?: {
+  from?: string
+  to?: string
+  months?: number
+  orgId?: number
+}) {
+  await exportCsvByRequest('/api/stats/org/elder-flow/export', params, `org-elder-flow-${new Date().toISOString().slice(0, 10)}.csv`)
+}
+
+async function exportStatsCsv(urlPath: string, fallbackFilename: string, params?: Record<string, any>) {
+  await exportCsvByRequest(urlPath, params, fallbackFilename)
+}
+
+export function exportCheckInStatsCsv(params?: { from?: string; to?: string; months?: number; orgId?: number }) {
+  return exportStatsCsv('/api/stats/check-in/export', `check-in-stats-${new Date().toISOString().slice(0, 10)}.csv`, params)
+}
+
+export function exportConsumptionStatsCsv(params?: { from?: string; to?: string; months?: number; orgId?: number }) {
+  return exportStatsCsv('/api/stats/consumption/export', `consumption-stats-${new Date().toISOString().slice(0, 10)}.csv`, params)
+}
+
+export function exportElderInfoStatsCsv(params?: { orgId?: number }) {
+  return exportStatsCsv('/api/stats/elder-info/export', `elder-info-stats-${new Date().toISOString().slice(0, 10)}.csv`, params)
+}
+
+export function exportOrgBedUsageCsv(params?: { orgId?: number }) {
+  return exportStatsCsv('/api/stats/org/bed-usage/export', `org-bed-usage-${new Date().toISOString().slice(0, 10)}.csv`, params)
+}
+
+export function exportMonthlyRevenueStatsCsv(params?: { from?: string; to?: string; months?: number; orgId?: number }) {
+  return exportStatsCsv('/api/stats/monthly-revenue/export', `monthly-revenue-stats-${new Date().toISOString().slice(0, 10)}.csv`, params)
 }

@@ -25,6 +25,10 @@ public class OaDocumentFolder {
 
   private String status;
 
+  private String visibility;
+
+  private String regionCode;
+
   private String remark;
 
   private Long createdBy;

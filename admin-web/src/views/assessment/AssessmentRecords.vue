@@ -5,6 +5,20 @@
         <a-form-item :label="pageConfig.keywordLabel">
           <a-input v-model:value="query.keyword" :placeholder="pageConfig.keywordPlaceholder" allow-clear />
         </a-form-item>
+        <a-form-item v-if="props.assessmentType === 'ARCHIVE'" label="老人">
+          <a-select
+            v-model:value="query.elderId"
+            allow-clear
+            show-search
+            :filter-option="false"
+            :options="elderOptions"
+            :loading="elderLoading"
+            style="width: 220px"
+            placeholder="请输入老人姓名/拼音首字母"
+            @search="searchElderOptions"
+            @focus="() => !elderOptions.length && loadElderOptions()"
+          />
+        </a-form-item>
         <a-form-item v-if="pageConfig.showStatusFilter" label="状态">
           <a-select v-model:value="query.status" allow-clear style="width: 140px">
             <a-select-option value="DRAFT">草稿</a-select-option>
@@ -54,6 +68,7 @@
         <a-tab-pane key="ALL" :tab="`总记录 (${summary.totalCount || 0})`" />
         <a-tab-pane key="DRAFT" :tab="`草稿 (${summary.draftCount || 0})`" />
         <a-tab-pane key="COMPLETED" :tab="`已完成 (${summary.completedCount || 0})`" />
+        <a-tab-pane key="ARCHIVED" :tab="`已归档 (${summary.archivedCount || 0})`" />
       </a-tabs>
     </a-card>
     <FlowGuardBar
@@ -76,12 +91,58 @@
           <a-button v-if="pageConfig.showCreateButton" type="primary" @click="openForm()">
             {{ pageConfig.createButtonText }}
           </a-button>
-          <a-button v-if="pageConfig.showBatchDelete" danger :disabled="selectedRowKeys.length === 0" @click="removeBatch">
+          <a-button
+            v-if="pageConfig.actions.includes('view')"
+            :disabled="selectedRowKeys.length !== 1"
+            @click="viewSelected"
+          >
+            查看勾选
+          </a-button>
+          <a-button
+            v-if="pageConfig.actions.includes('edit')"
+            :disabled="selectedRowKeys.length !== 1"
+            @click="editSelected"
+          >
+            编辑勾选
+          </a-button>
+          <a-button :disabled="selectedRowKeys.length === 0" @click="openBatchAssignModal">批量指派评估人</a-button>
+          <a-button :disabled="selectedRowKeys.length === 0" @click="openBatchNextDateModal">批量设置复评日期</a-button>
+          <a-button :disabled="selectedRowKeys.length === 0" @click="markSelectedStatus('COMPLETED')">
+            批量标记完成
+          </a-button>
+          <a-button :disabled="selectedRowKeys.length === 0" @click="markSelectedStatus('ARCHIVED')">
+            批量归档
+          </a-button>
+          <a-button
+            v-if="pageConfig.showBatchDelete && canDeleteAssessment"
+            danger
+            :disabled="selectedRowKeys.length === 0"
+            @click="removeBatch"
+          >
             删除
           </a-button>
+          <a-button :disabled="selectedRowKeys.length === 0" @click="exportSelectedCsv">导出勾选Excel</a-button>
+          <a-button @click="selectByFilter">按筛选全选(<=2000)</a-button>
+          <a-button :disabled="selectedRowKeys.length === 0" @click="clearSelection">清空勾选</a-button>
+          <a-button :disabled="rows.length === 0" @click="toggleSelectAll">
+            {{ selectedRowKeys.length === rows.length && rows.length > 0 ? '取消全选' : '全选当前页' }}
+          </a-button>
           <a-button v-if="pageConfig.showExportButton" @click="exportCsv">导出Excel</a-button>
+          <a-button :disabled="selectedRowKeys.length === 0" @click="exportSelectedPdf">下载勾选PDF</a-button>
+          <a-button v-if="props.assessmentType === 'ARCHIVE'" @click="exportCurrentPageCsv">下载本页Excel</a-button>
+          <a-button v-if="props.assessmentType === 'ARCHIVE'" @click="exportCurrentPagePdf">下载本页PDF</a-button>
         </a-space>
+        <span style="color: rgba(0,0,0,0.45);">
+          已勾选 {{ selectedRowKeys.length }} 条{{ selectedByFilter ? '（含跨页筛选）' : '' }}
+        </span>
       </div>
+      <a-alert
+        v-if="lastBatchAction"
+        style="margin-bottom: 12px"
+        type="success"
+        show-icon
+        :message="lastBatchAction"
+      />
       <a-table
         :data-source="rows"
         :columns="tableColumns"
@@ -89,6 +150,7 @@
         :pagination="false"
         row-key="id"
         :row-selection="rowSelection"
+        :row-class-name="tableRowClassName"
         :custom-row="tableCustomRow"
         :locale="{ emptyText: '暂无数据' }"
         :scroll="{ x: 1300, y: 520 }"
@@ -139,7 +201,14 @@
               >
                 打印报告
               </a-button>
-              <a-button v-if="pageConfig.actions.includes('delete')" type="link" danger @click="remove(record.id)">删除</a-button>
+              <a-button
+                v-if="pageConfig.actions.includes('delete') && canDeleteAssessment"
+                type="link"
+                danger
+                @click="remove(record.id)"
+              >
+                删除
+              </a-button>
             </a-space>
           </template>
           <template v-else>
@@ -180,15 +249,13 @@
                 allow-clear
                 show-search
                 :filter-option="false"
+                :options="elderOptions"
+                :loading="elderLoading"
                 placeholder="请选择老人"
                 @search="searchElderOptions"
-                @focus="() => loadElderOptions()"
+                @focus="() => !elderOptions.length && loadElderOptions()"
                 @change="onElderChange"
-              >
-                <a-select-option v-for="item in elderOptions" :key="item.value" :value="item.value">
-                  {{ item.label }}
-                </a-select-option>
-              </a-select>
+              />
               <a-input
                 v-else
                 v-model:value="form.elderName"
@@ -227,11 +294,14 @@
         <a-row :gutter="16">
           <a-col :span="16">
             <a-form-item v-if="!isAdmissionAssessment" label="量表模板">
-              <a-select v-model:value="form.templateId" allow-clear placeholder="可选，选择后可自动算分" :disabled="formReadonly">
-                <a-select-option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">
-                  {{ tpl.templateName }} ({{ tpl.templateCode }})
-                </a-select-option>
-              </a-select>
+              <a-space direction="vertical" style="width: 100%">
+                <a-select v-model:value="form.templateId" allow-clear placeholder="可选，选择后可自动算分" :disabled="formReadonly">
+                  <a-select-option v-for="tpl in templates" :key="tpl.id" :value="tpl.id">
+                    {{ tpl.templateName }} ({{ tpl.templateCode }})
+                  </a-select-option>
+                </a-select>
+                <a-button type="link" style="padding: 0;" @click="openTemplateManager">上传/自定义量表模板</a-button>
+              </a-space>
             </a-form-item>
           </a-col>
           <a-col :span="8">
@@ -350,11 +420,60 @@
           />
           <div style="margin-top: 8px;">
             <a-space>
+              <a-upload :before-upload="beforeDetailJsonUpload" :show-upload-list="false" accept=".json,.txt" :disabled="formReadonly">
+                <a-button size="small" :disabled="formReadonly">上传明细文件</a-button>
+              </a-upload>
               <a-button size="small" :disabled="formReadonly" @click="previewScore">试算分值</a-button>
               <span class="hint">选择模板并填写明细后，可自动计算分值和等级。</span>
             </a-space>
           </div>
         </a-form-item>
+      </a-form>
+    </a-modal>
+    <a-modal
+      v-model:open="batchAssignOpen"
+      title="批量指派评估人"
+      :confirm-loading="batchAssignSubmitting"
+      ok-text="确认指派"
+      cancel-text="取消"
+      @ok="submitBatchAssign"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="评估人姓名" required>
+          <a-input
+            v-model:value="batchAssignAssessorName"
+            placeholder="请输入评估人姓名"
+            :maxlength="32"
+          />
+        </a-form-item>
+        <a-alert
+          type="info"
+          show-icon
+          :message="`将更新 ${selectedRowKeys.length} 条勾选记录的评估人`"
+        />
+      </a-form>
+    </a-modal>
+    <a-modal
+      v-model:open="batchNextDateOpen"
+      title="批量设置复评日期"
+      :confirm-loading="batchNextDateSubmitting"
+      ok-text="确认设置"
+      cancel-text="取消"
+      @ok="submitBatchNextDate"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="下次评估日期" required>
+          <a-date-picker
+            v-model:value="batchNextAssessmentDate"
+            value-format="YYYY-MM-DD"
+            style="width: 100%"
+          />
+        </a-form-item>
+        <a-alert
+          type="info"
+          show-icon
+          :message="`将更新 ${selectedRowKeys.length} 条勾选记录的复评日期`"
+        />
       </a-form>
     </a-modal>
   </PageContainer>
@@ -364,25 +483,39 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { useUserStore } from '../../stores/user'
+import { hasMinisterOrHigher } from '../../utils/roleAccess'
 import PageContainer from '../../components/PageContainer.vue'
 import FlowGuardBar from '../../components/FlowGuardBar.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
-import { getElderPage } from '../../api/elder'
+import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { getContractPage } from '../../api/marketing'
 import {
   getAssessmentRecordPage,
   getAssessmentRecordSummary,
+  getAssessmentRecordIds,
   createAssessmentRecord,
   updateAssessmentRecord,
   deleteAssessmentRecord,
   batchDeleteAssessmentRecord,
+  batchAssignAssessmentRecord,
+  batchUpdateAssessmentNextDate,
+  batchUpdateAssessmentRecordStatus,
   exportAssessmentRecord,
   getAssessmentRecordReport,
   getAssessmentTemplateList,
   previewAssessmentScore
 } from '../../api/assessment'
-import type { AssessmentRecord, AssessmentRecordSummary, AssessmentType, AssessmentScaleTemplate, CrmContractItem, ElderItem, PageResult } from '../../types'
+import type {
+  AssessmentBatchOperationResult,
+  AssessmentRecord,
+  AssessmentRecordSummary,
+  AssessmentType,
+  AssessmentScaleTemplate,
+  CrmContractItem,
+  PageResult
+} from '../../types'
 
 const props = defineProps<{
   title: string
@@ -390,6 +523,8 @@ const props = defineProps<{
   assessmentType: AssessmentType
 }>()
 const route = useRoute()
+const router = useRouter()
+const userStore = useUserStore()
 
 const loading = ref(false)
 const rows = ref<AssessmentRecord[]>([])
@@ -405,6 +540,7 @@ const summary = reactive<AssessmentRecordSummary>({
 const templates = ref<AssessmentScaleTemplate[]>([])
 const {
   elderOptions,
+  elderLoading,
   searchElders: loadElderOptions,
   findElderName,
   ensureSelectedElder
@@ -795,7 +931,7 @@ const pageConfigMap: Record<AssessmentType, PageConfig> = {
     showContentKeyword: false,
     showCreateButton: false,
     showBatchDelete: false,
-    showExportButton: false,
+    showExportButton: true,
     createButtonText: '新增',
     actions: ['view'],
     columns: [
@@ -848,11 +984,11 @@ const pageConfigMap: Record<AssessmentType, PageConfig> = {
     showDateFilter: true,
     showArchiveTypeFilter: false,
     showContentKeyword: false,
-    showCreateButton: false,
+    showCreateButton: true,
     showBatchDelete: false,
     showExportButton: false,
     createButtonText: '新增',
-    actions: [],
+    actions: ['edit', 'view', 'delete'],
     columns: [
       { title: '序号', key: 'index', width: 70, fixed: 'left' },
       { title: '老人姓名', key: 'elderName', dataIndex: 'elderName', width: 130 },
@@ -873,11 +1009,11 @@ const pageConfigMap: Record<AssessmentType, PageConfig> = {
     showDateFilter: true,
     showArchiveTypeFilter: false,
     showContentKeyword: false,
-    showCreateButton: false,
+    showCreateButton: true,
     showBatchDelete: false,
     showExportButton: false,
     createButtonText: '新增',
-    actions: [],
+    actions: ['edit', 'view', 'delete'],
     columns: [
       { title: '序号', key: 'index', width: 70, fixed: 'left' },
       { title: '老人姓名', key: 'elderName', dataIndex: 'elderName', width: 130 },
@@ -930,10 +1066,11 @@ const routeElderId = computed(() => {
   const raw = Number(route.query.residentId || route.query.elderId || 0)
   return raw > 0 ? raw : undefined
 })
-const archiveStatusTab = ref<'ALL' | 'DRAFT' | 'COMPLETED'>('ALL')
+const archiveStatusTab = ref<'ALL' | 'DRAFT' | 'COMPLETED' | 'ARCHIVED'>('ALL')
 
 const query = reactive({
   keyword: '',
+  elderId: undefined as number | undefined,
   contentKeyword: '',
   archiveType: undefined as AssessmentType | undefined,
   status: undefined as string | undefined,
@@ -946,6 +1083,15 @@ const open = ref(false)
 const formReadonly = ref(false)
 const formRef = ref<FormInstance>()
 const selectedRowKeys = ref<number[]>([])
+const batchAssignOpen = ref(false)
+const batchAssignSubmitting = ref(false)
+const batchAssignAssessorName = ref('')
+const batchNextDateOpen = ref(false)
+const batchNextDateSubmitting = ref(false)
+const batchNextAssessmentDate = ref<string>('')
+const lastBatchAction = ref('')
+const changedRowIdSet = ref<Set<number>>(new Set())
+const selectedByFilter = ref(false)
 const form = reactive<Partial<AssessmentRecord>>({
   elderId: undefined,
   assessmentType: props.assessmentType,
@@ -972,6 +1118,10 @@ const rules: FormRules = {
 }
 
 const tableColumns = computed(() => pageConfig.value.columns)
+const canDeleteAssessment = computed(() => {
+  const roles = (userStore.roles || []).map((item) => String(item || '').toUpperCase())
+  return hasMinisterOrHigher(roles)
+})
 const admissionGuardSteps = ['合同待评估', '完成入住评估登记', '办理入住选床', '合同最终签署']
 const selectedAdmissionRecord = computed(() => {
   if (selectedRowKeys.value.length !== 1) return null
@@ -1051,13 +1201,13 @@ function handleAdmissionGuardAction(item: { actionKey?: string }) {
   }
 }
 const rowSelection = computed(() => {
-  if (!pageConfig.value.showBatchDelete) {
-    return undefined
-  }
   return {
     selectedRowKeys: selectedRowKeys.value,
-    onChange: (keys: number[]) => {
-      selectedRowKeys.value = keys
+    onChange: (keys: Array<number | string>) => {
+      selectedRowKeys.value = keys.map((item) => Number(item)).filter((item) => Number.isFinite(item))
+      if (selectedByFilter.value && selectedRowKeys.value.length <= rows.value.length) {
+        selectedByFilter.value = false
+      }
     }
   }
 })
@@ -1076,6 +1226,14 @@ const tableCustomRow = (record: AssessmentRecord) => {
       openForm(record, true)
     }
   }
+}
+
+const tableRowClassName = (record: AssessmentRecord) => {
+  const id = Number(record.id)
+  if (!Number.isFinite(id)) {
+    return ''
+  }
+  return changedRowIdSet.value.has(id) ? 'row-batch-updated' : ''
 }
 
 function statusLabel(status?: string) {
@@ -1101,9 +1259,10 @@ function normalizeArchiveStatusByTab() {
 }
 
 function onArchiveStatusTabChange(tab: string) {
-  archiveStatusTab.value = (tab as 'ALL' | 'DRAFT' | 'COMPLETED') || 'ALL'
+  archiveStatusTab.value = (tab as 'ALL' | 'DRAFT' | 'COMPLETED' | 'ARCHIVED') || 'ALL'
   query.status = archiveStatusTab.value === 'ALL' ? undefined : archiveStatusTab.value
   query.pageNo = 1
+  selectedByFilter.value = false
   fetchData()
 }
 
@@ -1129,22 +1288,28 @@ function orgDisplayName(record: AssessmentRecord & Record<string, any>) {
   return '-'
 }
 
+function buildQueryParams() {
+  const assessmentTypeForQuery = props.assessmentType === 'ARCHIVE'
+    ? query.archiveType
+    : props.assessmentType
+  const keyword = query.contentKeyword || query.keyword
+  return {
+    assessmentType: assessmentTypeForQuery,
+    status: normalizeArchiveStatusByTab(),
+    elderId: props.assessmentType === 'ARCHIVE' ? query.elderId : routeElderId.value,
+    keyword,
+    dateFrom: query.dateRange?.[0],
+    dateTo: query.dateRange?.[1]
+  }
+}
+
 async function fetchData() {
   loading.value = true
   try {
-    const assessmentTypeForQuery = props.assessmentType === 'ARCHIVE'
-      ? query.archiveType
-      : props.assessmentType
-    const keyword = query.contentKeyword || query.keyword
     const params = {
       pageNo: query.pageNo,
       pageSize: query.pageSize,
-      assessmentType: assessmentTypeForQuery,
-      status: normalizeArchiveStatusByTab(),
-      elderId: routeElderId.value,
-      keyword,
-      dateFrom: query.dateRange?.[0],
-      dateTo: query.dateRange?.[1]
+      ...buildQueryParams()
     }
     const [res, sum] = await Promise.all([
       getAssessmentRecordPage(params),
@@ -1164,11 +1329,13 @@ async function fetchTemplates() {
 
 function onSearch() {
   query.pageNo = 1
+  selectedByFilter.value = false
   fetchData()
 }
 
 function reset() {
   query.keyword = ''
+  query.elderId = undefined
   query.contentKeyword = ''
   query.archiveType = undefined
   archiveStatusTab.value = 'ALL'
@@ -1176,6 +1343,7 @@ function reset() {
   query.dateRange = undefined
   query.pageNo = 1
   selectedRowKeys.value = []
+  selectedByFilter.value = false
   fetchData()
 }
 
@@ -1335,6 +1503,14 @@ function openForm(record?: AssessmentRecord, readonly = false) {
       form.score = admissionTotalScore.value
       form.levelCode = admissionLevelText.value === '待完成评分' ? '' : admissionLevelText.value.split('：')[0]
     }
+    if (routeElderId.value) {
+      form.elderId = routeElderId.value
+      const routeElderName = findElderName(routeElderId.value)
+      if (routeElderName) {
+        form.elderName = routeElderName
+      }
+      ensureSelectedElder(routeElderId.value, routeElderName || `长者${routeElderId.value}`)
+    }
   }
   open.value = true
 }
@@ -1384,6 +1560,28 @@ async function previewScore() {
     form.levelCode = result.levelCode
   }
   message.success('试算完成')
+}
+
+function openTemplateManager() {
+  router.push('/assessment/template')
+}
+
+function beforeDetailJsonUpload(file: File) {
+  const reader = new FileReader()
+  reader.onload = () => {
+    const content = String(reader.result || '')
+    if (!content.trim()) {
+      message.warning('上传文件内容为空')
+      return
+    }
+    form.detailJson = content
+    message.success('量表明细已导入')
+  }
+  reader.onerror = () => {
+    message.error('读取文件失败，请重试')
+  }
+  reader.readAsText(file, 'utf-8')
+  return false
 }
 
 async function submit() {
@@ -1598,6 +1796,10 @@ async function autoOpenAdmissionFromRoute() {
 }
 
 function remove(id: number) {
+  if (!canDeleteAssessment.value) {
+    message.warning('仅主管及以上角色可删除评估记录')
+    return
+  }
   Modal.confirm({
     title: '确认删除该评估记录？',
     onOk: async () => {
@@ -1609,28 +1811,24 @@ function remove(id: number) {
 }
 
 function removeBatch() {
+  if (!canDeleteAssessment.value) {
+    message.warning('仅主管及以上角色可批量删除')
+    return
+  }
   if (!selectedRowKeys.value.length) return
   Modal.confirm({
     title: `确认删除选中的 ${selectedRowKeys.value.length} 条评估记录？`,
     onOk: async () => {
-      await batchDeleteAssessmentRecord(selectedRowKeys.value.map((item) => Number(item)))
-      message.success('批量删除成功')
-      selectedRowKeys.value = []
+      const result = await batchDeleteAssessmentRecord(selectedRowKeys.value.map((item) => Number(item)))
+      handleBatchResultFeedback(result, '批量删除评估记录')
       fetchData()
     }
   })
 }
 
 async function exportCsv() {
-  const assessmentTypeForQuery = props.assessmentType === 'ARCHIVE'
-    ? query.archiveType
-    : props.assessmentType
   const blob = await exportAssessmentRecord({
-    assessmentType: assessmentTypeForQuery,
-    status: pageConfig.value.showStatusFilter ? query.status : undefined,
-    keyword: query.contentKeyword || query.keyword,
-    dateFrom: query.dateRange?.[0],
-    dateTo: query.dateRange?.[1]
+    ...buildQueryParams()
   })
   const link = document.createElement('a')
   const url = URL.createObjectURL(new Blob([blob], { type: 'text/csv;charset=utf-8;' }))
@@ -1643,20 +1841,424 @@ async function exportCsv() {
   message.success('导出成功')
 }
 
+function getSelectedRows() {
+  const idSet = new Set(selectedRowKeys.value.map((item) => Number(item)))
+  return rows.value.filter((item) => idSet.has(Number(item.id)))
+}
+
+function toggleSelectAll() {
+  if (!rows.value.length) {
+    selectedRowKeys.value = []
+    selectedByFilter.value = false
+    return
+  }
+  if (selectedRowKeys.value.length === rows.value.length) {
+    selectedRowKeys.value = []
+    selectedByFilter.value = false
+    return
+  }
+  selectedRowKeys.value = rows.value
+    .map((item) => Number(item.id))
+    .filter((item) => Number.isFinite(item))
+  selectedByFilter.value = false
+}
+
+async function selectByFilter() {
+  const ids = await getAssessmentRecordIds({
+    ...buildQueryParams(),
+    limit: 2000
+  })
+  const selected = (ids || [])
+    .map((item) => Number(item))
+    .filter((item) => Number.isFinite(item))
+  selectedRowKeys.value = selected
+  selectedByFilter.value = selected.length > rows.value.length
+  if (!selected.length) {
+    message.warning('当前筛选条件下暂无可勾选记录')
+    return
+  }
+  message.success(`已按筛选条件勾选 ${selected.length} 条（最多2000条）`)
+}
+
+function clearSelection() {
+  selectedRowKeys.value = []
+  selectedByFilter.value = false
+}
+
+function markLastBatchAction(text: string) {
+  const timeText = new Date().toLocaleString()
+  lastBatchAction.value = `${timeText}：${text}`
+}
+
+function handleBatchResultFeedback(result: AssessmentBatchOperationResult, successText: string) {
+  const successCount = Number(result?.successCount || 0)
+  const failedCount = Number(result?.failedCount || 0)
+  const successIds = Array.isArray(result?.successIds) ? result.successIds : []
+  const failedIds = Array.from(new Set(
+    (result?.failures || [])
+      .map((item) => Number(item?.id))
+      .filter((item) => Number.isFinite(item))
+  ))
+  changedRowIdSet.value = new Set(
+    successIds
+      .map((item) => Number(item))
+      .filter((item) => Number.isFinite(item))
+  )
+  selectedRowKeys.value = failedIds
+  selectedByFilter.value = failedIds.length > rows.value.length
+  if (successCount > 0) {
+    markLastBatchAction(`${successText}，成功 ${successCount} 条`)
+  }
+  if (successCount > 0 && failedCount === 0) {
+    message.success(`批量处理成功，共 ${successCount} 条`)
+    return
+  }
+  if (successCount > 0 && failedCount > 0) {
+    message.warning(`部分成功：成功 ${successCount} 条，失败 ${failedCount} 条`)
+    showBatchFailureDetails(result)
+    return
+  }
+  message.error(`批量处理失败，共 ${failedCount} 条失败`)
+  showBatchFailureDetails(result)
+}
+
+function showBatchFailureDetails(result: AssessmentBatchOperationResult) {
+  const lines = (result?.failures || [])
+    .slice(0, 50)
+    .map((item) => {
+      const idText = item?.id ? `ID=${item.id}` : 'ID=未知'
+      const reason = String(item?.reason || '未知错误')
+      return `${idText}：${reason}`
+    })
+  if (!lines.length) {
+    return
+  }
+  const content = lines.join('\n')
+  Modal.info({
+    title: '批量处理失败明细',
+    width: 680,
+    content
+  })
+}
+
+function markSelectedStatus(status: 'COMPLETED' | 'ARCHIVED') {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先勾选要处理的评估记录')
+    return
+  }
+  const actionText = status === 'ARCHIVED' ? '归档' : '标记完成'
+  Modal.confirm({
+    title: `确认将勾选的 ${selectedRowKeys.value.length} 条记录${actionText}？`,
+    onOk: async () => {
+      const result = await batchUpdateAssessmentRecordStatus(
+        selectedRowKeys.value.map((item) => Number(item)),
+        status
+      )
+      handleBatchResultFeedback(
+        result,
+        `批量状态更新为${status === 'ARCHIVED' ? '已归档' : '已完成'}`
+      )
+      await fetchData()
+    }
+  })
+}
+
+function openBatchAssignModal() {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先勾选要指派的评估记录')
+    return
+  }
+  const selected = getSelectedRows()
+  const firstAssessor = selected.find((item) => String(item.assessorName || '').trim())?.assessorName || ''
+  batchAssignAssessorName.value = firstAssessor
+  batchAssignOpen.value = true
+}
+
+async function submitBatchAssign() {
+  const assessorName = String(batchAssignAssessorName.value || '').trim()
+  if (!assessorName) {
+    message.warning('请输入评估人姓名')
+    return
+  }
+  if (!selectedRowKeys.value.length) {
+    batchAssignOpen.value = false
+    return
+  }
+  batchAssignSubmitting.value = true
+  try {
+    const result = await batchAssignAssessmentRecord(
+      selectedRowKeys.value.map((item) => Number(item)),
+      assessorName
+    )
+    handleBatchResultFeedback(result, `批量指派评估人：${assessorName}`)
+    batchAssignOpen.value = false
+    await fetchData()
+  } finally {
+    batchAssignSubmitting.value = false
+  }
+}
+
+function openBatchNextDateModal() {
+  if (!selectedRowKeys.value.length) {
+    message.warning('请先勾选要设置复评日期的评估记录')
+    return
+  }
+  const selected = getSelectedRows()
+  batchNextAssessmentDate.value = String(selected.find((item) => item.nextAssessmentDate)?.nextAssessmentDate || '')
+  batchNextDateOpen.value = true
+}
+
+async function submitBatchNextDate() {
+  const nextDate = String(batchNextAssessmentDate.value || '').trim()
+  if (!nextDate) {
+    message.warning('请选择下次评估日期')
+    return
+  }
+  if (!selectedRowKeys.value.length) {
+    batchNextDateOpen.value = false
+    return
+  }
+  batchNextDateSubmitting.value = true
+  try {
+    const result = await batchUpdateAssessmentNextDate(
+      selectedRowKeys.value.map((item) => Number(item)),
+      nextDate
+    )
+    handleBatchResultFeedback(result, `批量设置复评日期：${nextDate}`)
+    batchNextDateOpen.value = false
+    await fetchData()
+  } finally {
+    batchNextDateSubmitting.value = false
+  }
+}
+
+function exportSelectedCsv() {
+  const selectedRows = getSelectedRows()
+  if (!selectedRows.length) {
+    message.warning('请先勾选要导出的评估记录')
+    return
+  }
+  const headers = ['评估编码', '老人姓名', '评估类型', '评估日期', '状态', '评估结果', '分值', '评估人', '所属机构']
+  const csvEscape = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`
+  const lines = selectedRows.map((item) => ([
+    item.archiveNo || item.id || '-',
+    item.elderName || '-',
+    assessmentTypeLabel(item.assessmentTypeLabel || item.assessmentType),
+    item.assessmentDate || '-',
+    item.statusLabel || statusLabel(item.status),
+    item.resultSummary || '-',
+    item.score ?? '-',
+    item.assessorName || '-',
+    orgDisplayName(item as any)
+  ].map(csvEscape).join(',')))
+  const content = ['\uFEFF' + headers.join(','), ...lines].join('\n')
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${title}_勾选_${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+  message.success(`已导出 ${selectedRows.length} 条记录`)
+}
+
+function exportSelectedPdf() {
+  const selectedRows = getSelectedRows()
+  if (!selectedRows.length) {
+    message.warning('请先勾选要导出的评估记录')
+    return
+  }
+  const popup = window.open('', '_blank', 'width=1220,height=820')
+  if (!popup) {
+    message.warning('浏览器拦截了弹窗，请允许后重试')
+    return
+  }
+  const rowsHtml = selectedRows.map((item, index) => `
+    <tr>
+      <td>${index + 1}</td>
+      <td>${safeHtml(item.archiveNo || item.id || '-')}</td>
+      <td>${safeHtml(item.elderName || '-')}</td>
+      <td>${safeHtml(assessmentTypeLabel(item.assessmentTypeLabel || item.assessmentType))}</td>
+      <td>${safeHtml(item.assessmentDate || '-')}</td>
+      <td>${safeHtml(item.statusLabel || statusLabel(item.status))}</td>
+      <td>${safeHtml(item.score ?? '-')}</td>
+      <td>${safeHtml(item.assessorName || '-')}</td>
+      <td>${safeHtml(item.resultSummary || '-')}</td>
+    </tr>
+  `).join('')
+  popup.document.write(`
+    <html>
+      <head>
+        <title>评估记录勾选导出</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; padding: 16px; color: #222; }
+          h2 { margin: 0 0 10px 0; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; vertical-align: top; }
+          th { background: #f5f5f5; }
+        </style>
+      </head>
+      <body>
+        <h2>评估记录（勾选导出）</h2>
+        <div style="margin-bottom:8px;">导出时间：${safeHtml(new Date().toLocaleString())}</div>
+        <table>
+          <thead>
+            <tr>
+              <th>序号</th><th>评估编码</th><th>老人姓名</th><th>评估类型</th><th>评估日期</th><th>状态</th><th>分值</th><th>评估人</th><th>评估结果</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </body>
+    </html>
+  `)
+  popup.document.close()
+  popup.focus()
+  popup.print()
+}
+
+function viewSelected() {
+  if (selectedRowKeys.value.length !== 1) {
+    message.warning('请勾选一条记录后查看')
+    return
+  }
+  const selected = getSelectedRows()[0]
+  if (!selected) {
+    message.warning('当前页未找到勾选记录，请刷新后重试')
+    return
+  }
+  openForm(selected, true)
+}
+
+function editSelected() {
+  if (selectedRowKeys.value.length !== 1) {
+    message.warning('请勾选一条记录后编辑')
+    return
+  }
+  const selected = getSelectedRows()[0]
+  if (!selected) {
+    message.warning('当前页未找到勾选记录，请刷新后重试')
+    return
+  }
+  openForm(selected)
+}
+
+function exportCurrentPageCsv() {
+  if (!rows.value.length) {
+    message.warning('当前页无可导出记录')
+    return
+  }
+  const headers = ['评估编码', '老人姓名', '评估类型', '评估日期', '状态', '评估结果', '分值', '评估人', '所属机构']
+  const csvEscape = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`
+  const lines = rows.value.map((item) => ([
+    item.archiveNo || item.id || '-',
+    item.elderName || '-',
+    assessmentTypeLabel(item.assessmentTypeLabel || item.assessmentType),
+    item.assessmentDate || '-',
+    item.statusLabel || statusLabel(item.status),
+    item.resultSummary || '-',
+    item.score ?? '-',
+    item.assessorName || '-',
+    orgDisplayName(item as any)
+  ].map(csvEscape).join(',')))
+  const content = ['\uFEFF' + headers.join(','), ...lines].join('\n')
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `评估档案_本页_${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+  message.success('本页Excel导出成功')
+}
+
+function exportCurrentPagePdf() {
+  if (!rows.value.length) {
+    message.warning('当前页无可导出记录')
+    return
+  }
+  const popup = window.open('', '_blank', 'width=1120,height=780')
+  if (!popup) {
+    message.warning('浏览器拦截了弹窗，请允许后重试')
+    return
+  }
+  const rowsHtml = rows.value.map((item, index) => `
+    <tr>
+      <td>${index + 1}</td>
+      <td>${safeHtml(item.archiveNo || item.id || '-')}</td>
+      <td>${safeHtml(item.elderName || '-')}</td>
+      <td>${safeHtml(assessmentTypeLabel(item.assessmentTypeLabel || item.assessmentType))}</td>
+      <td>${safeHtml(item.assessmentDate || '-')}</td>
+      <td>${safeHtml(item.statusLabel || statusLabel(item.status))}</td>
+      <td>${safeHtml(item.resultSummary || '-')}</td>
+      <td>${safeHtml(item.score ?? '-')}</td>
+      <td>${safeHtml(item.assessorName || '-')}</td>
+      <td>${safeHtml(orgDisplayName(item as any))}</td>
+    </tr>
+  `).join('')
+  popup.document.write(`
+    <html>
+      <head>
+        <title>评估档案本页导出</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; padding: 16px; color: #222; }
+          h2 { margin: 0 0 10px 0; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; }
+          th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; vertical-align: top; }
+          th { background: #f5f5f5; }
+        </style>
+      </head>
+      <body>
+        <h2>评估档案（本页）</h2>
+        <div style="margin-bottom:8px;">导出时间：${safeHtml(new Date().toLocaleString())}</div>
+        <table>
+          <thead>
+            <tr>
+              <th>序号</th><th>评估编码</th><th>老人姓名</th><th>评估类型</th><th>评估日期</th><th>状态</th><th>评估结果</th><th>分值</th><th>评估人</th><th>所属机构</th>
+            </tr>
+          </thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+      </body>
+    </html>
+  `)
+  popup.document.close()
+  popup.focus()
+  popup.print()
+}
+
 onMounted(async () => {
   const keywordFromRoute = String(route.query.keyword || route.query.elderName || '').trim()
   if (keywordFromRoute) {
     query.keyword = keywordFromRoute
   }
+  const elderIdFromRoute = Number(route.query.elderId || route.query.residentId || 0)
+  if (elderIdFromRoute > 0 && props.assessmentType === 'ARCHIVE') {
+    query.elderId = elderIdFromRoute
+    ensureSelectedElder(elderIdFromRoute)
+  }
   if (props.assessmentType === 'ARCHIVE') {
     const statusFromRoute = String(route.query.status || '').toUpperCase()
-    if (statusFromRoute === 'DRAFT' || statusFromRoute === 'COMPLETED') {
-      archiveStatusTab.value = statusFromRoute as 'DRAFT' | 'COMPLETED'
-      query.status = statusFromRoute as 'DRAFT' | 'COMPLETED'
+    if (statusFromRoute === 'DRAFT' || statusFromRoute === 'COMPLETED' || statusFromRoute === 'ARCHIVED') {
+      archiveStatusTab.value = statusFromRoute as 'DRAFT' | 'COMPLETED' | 'ARCHIVED'
+      query.status = statusFromRoute as 'DRAFT' | 'COMPLETED' | 'ARCHIVED'
     }
   }
   await Promise.all([fetchTemplates(), fetchData(), loadElderOptions()])
   await autoOpenAdmissionFromRoute()
+})
+
+useLiveSyncRefresh({
+  topics: ['elder', 'health', 'oa', 'hr'],
+  refresh: () => {
+    if (loading.value) return
+    fetchData().catch(() => {})
+  },
+  debounceMs: 900
 })
 </script>
 
@@ -1677,5 +2279,9 @@ onMounted(async () => {
 .hint {
   color: rgba(0, 0, 0, 0.45);
   font-size: 12px;
+}
+
+:deep(.row-batch-updated > td) {
+  background: #f6ffed !important;
 }
 </style>

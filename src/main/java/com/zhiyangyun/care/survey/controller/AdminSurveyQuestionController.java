@@ -32,7 +32,7 @@ public class AdminSurveyQuestionController {
     this.auditLogService = auditLogService;
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','MEDICAL_MINISTER','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping
   public Result<SurveyQuestion> create(@Valid @RequestBody SurveyQuestionRequest request) {
     SurveyQuestion question = new SurveyQuestion();
@@ -55,7 +55,7 @@ public class AdminSurveyQuestionController {
     return Result.ok(question);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','MEDICAL_MINISTER','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PutMapping("/{id}")
   public Result<SurveyQuestion> update(@PathVariable Long id, @Valid @RequestBody SurveyQuestionRequest request) {
     Long orgId = AuthContext.getOrgId();
@@ -82,7 +82,7 @@ public class AdminSurveyQuestionController {
     return Result.ok(question);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','MEDICAL_MINISTER','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
     Long orgId = AuthContext.getOrgId();
@@ -101,7 +101,7 @@ public class AdminSurveyQuestionController {
     return Result.ok(null);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','MEDICAL_MINISTER','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/{id}")
   public Result<SurveyQuestion> get(@PathVariable Long id) {
     Long orgId = AuthContext.getOrgId();
@@ -116,7 +116,7 @@ public class AdminSurveyQuestionController {
     return Result.ok(question);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','MEDICAL_MINISTER','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/page")
   public Result<IPage<SurveyQuestion>> page(
       @RequestParam(defaultValue = "1") long pageNo,

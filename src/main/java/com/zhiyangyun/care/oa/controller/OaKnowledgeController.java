@@ -68,10 +68,10 @@ public class OaKnowledgeController {
     String normalizedTitle = trimToNull(request.getTitle());
     String normalizedCategory = trimToNull(request.getCategory());
     String normalizedTags = trimToNull(request.getTags());
-    String normalizedContent = resolveContentForStorage(request.getContent(), request.getAttachmentUrl());
-    String normalizedAttachmentName = trimToNull(request.getAttachmentName());
-    String normalizedAttachmentUrl = trimToNull(request.getAttachmentUrl());
-    String normalizedAttachmentType = trimToNull(request.getAttachmentType());
+    String normalizedAttachmentUrl = normalizeWithMaxLength(request.getAttachmentUrl(), 1024);
+    String normalizedContent = resolveContentForStorage(request.getContent(), normalizedAttachmentUrl);
+    String normalizedAttachmentName = normalizeWithMaxLength(request.getAttachmentName(), 255);
+    String normalizedAttachmentType = normalizeWithMaxLength(request.getAttachmentType(), 128);
     String normalizedRemark = trimToNull(request.getRemark());
     OaKnowledge knowledge = new OaKnowledge();
     knowledge.setTenantId(orgId);
@@ -116,10 +116,10 @@ public class OaKnowledgeController {
     String normalizedTitle = trimToNull(request.getTitle());
     String normalizedCategory = trimToNull(request.getCategory());
     String normalizedTags = trimToNull(request.getTags());
-    String normalizedContent = resolveContentForStorage(request.getContent(), request.getAttachmentUrl());
-    String normalizedAttachmentName = trimToNull(request.getAttachmentName());
-    String normalizedAttachmentUrl = trimToNull(request.getAttachmentUrl());
-    String normalizedAttachmentType = trimToNull(request.getAttachmentType());
+    String normalizedAttachmentUrl = normalizeWithMaxLength(request.getAttachmentUrl(), 1024);
+    String normalizedContent = resolveContentForStorage(request.getContent(), normalizedAttachmentUrl);
+    String normalizedAttachmentName = normalizeWithMaxLength(request.getAttachmentName(), 255);
+    String normalizedAttachmentType = normalizeWithMaxLength(request.getAttachmentType(), 128);
     String normalizedAuthorName = trimToNull(request.getAuthorName());
     String normalizedRemark = trimToNull(request.getRemark());
     knowledge.setTitle(normalizedTitle);
@@ -397,6 +397,14 @@ public class OaKnowledgeController {
       return null;
     }
     return text.trim();
+  }
+
+  private String normalizeWithMaxLength(String text, int maxLength) {
+    String normalized = trimToNull(text);
+    if (normalized == null || maxLength <= 0 || normalized.length() <= maxLength) {
+      return normalized;
+    }
+    return normalized.substring(0, maxLength);
   }
 
   private LocalDateTime resolveExpiredAt(LocalDateTime requestedExpiredAt, String status) {

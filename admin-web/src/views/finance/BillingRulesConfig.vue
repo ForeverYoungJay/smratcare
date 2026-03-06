@@ -8,6 +8,9 @@
         <a-form-item label="关键字">
           <a-input v-model:value="query.keyword" allow-clear placeholder="配置键/备注" style="width: 220px" />
         </a-form-item>
+        <a-form-item label="打印备注">
+          <a-input v-model:value="query.printRemark" allow-clear placeholder="例如：规则评审版" style="width: 180px" />
+        </a-form-item>
         <a-form-item>
           <a-space>
             <a-button type="primary" @click="loadData">查询</a-button>
@@ -15,6 +18,7 @@
             <a-button @click="batchToggleStatus(1)">批量启用</a-button>
             <a-button @click="batchToggleStatus(0)">批量停用</a-button>
             <a-button @click="exportData">导出</a-button>
+            <a-button @click="printCurrent">打印当前</a-button>
             <a-button @click="triggerImport">导入CSV</a-button>
             <a-button @click="go('/finance/config/change-log')">查看变更记录</a-button>
           </a-space>
@@ -76,6 +80,7 @@ import PageContainer from '../../components/PageContainer.vue'
 import { batchUpsertFinanceBillingConfig, getFinanceBillingConfig, upsertFinanceBillingConfig } from '../../api/finance'
 import type { FinanceBillingConfigEntry } from '../../types'
 import { exportCsv } from '../../utils/export'
+import { printTableReport } from '../../utils/print'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -85,7 +90,8 @@ const tableRef = ref<any>()
 const importInputRef = ref<HTMLInputElement | null>(null)
 const query = ref({
   month: dayjs(),
-  keyword: ''
+  keyword: '',
+  printRemark: ''
 })
 
 const editOpen = ref(false)
@@ -221,6 +227,31 @@ function exportData() {
     })),
     `账单计费规则-${dayjs().format('YYYYMMDD-HHmmss')}.csv`
   )
+}
+
+function printCurrent() {
+  try {
+    printTableReport({
+      title: '账单模板/计费规则',
+      subtitle: `生效月份：${dayjs(query.value.month).format('YYYY-MM')}；关键字：${query.value.keyword || '-'}；备注：${query.value.printRemark || '-'}`,
+      columns: [
+        { key: 'configKey', title: '配置键' },
+        { key: 'configValue', title: '配置值' },
+        { key: 'effectiveMonth', title: '生效月份' },
+        { key: 'statusText', title: '状态' },
+        { key: 'remark', title: '备注' }
+      ],
+      rows: filteredRows.value.map(item => ({
+        configKey: item.configKey || '-',
+        configValue: item.configValue ?? 0,
+        effectiveMonth: item.effectiveMonth || '-',
+        statusText: Number(item.status) === 1 ? '启用' : '停用',
+        remark: item.remark || '-'
+      }))
+    })
+  } catch (error: any) {
+    message.error(error?.message || '打印失败')
+  }
 }
 
 function triggerImport() {

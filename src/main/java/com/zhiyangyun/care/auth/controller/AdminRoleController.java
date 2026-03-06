@@ -29,7 +29,7 @@ public class AdminRoleController {
     this.roleMapper = roleMapper;
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping
   public Result<Role> create(@Valid @RequestBody RoleRequest request) {
     Role role = new Role();
@@ -42,7 +42,7 @@ public class AdminRoleController {
     return Result.ok(role);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN')")
   @PutMapping("/{id}")
   public Result<Role> update(@PathVariable Long id, @Valid @RequestBody RoleRequest request) {
     Role role = roleMapper.selectById(id);
@@ -58,7 +58,7 @@ public class AdminRoleController {
     return Result.ok(role);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN')")
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
     Role role = roleMapper.selectById(id);
@@ -70,13 +70,13 @@ public class AdminRoleController {
     return Result.ok(null);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/{id}")
   public Result<Role> get(@PathVariable Long id) {
     return Result.ok(roleMapper.selectById(id));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping
   public Result<IPage<Role>> list(
       @RequestParam(defaultValue = "1") long page,

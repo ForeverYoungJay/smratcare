@@ -64,8 +64,11 @@ public class ElderController {
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) String keyword,
-      @RequestParam(defaultValue = "false") Boolean signedOnly) {
-    return Result.ok(elderService.page(AuthContext.getOrgId(), pageNo, pageSize, keyword, signedOnly));
+      @RequestParam(defaultValue = "false") Boolean signedOnly,
+      @RequestParam(required = false) Integer status,
+      @RequestParam(required = false) Integer elderStatus) {
+    Integer queryStatus = status == null ? elderStatus : status;
+    return Result.ok(elderService.page(AuthContext.getOrgId(), pageNo, pageSize, keyword, signedOnly, queryStatus));
   }
 
   @PostMapping("/{id}/assignBed")

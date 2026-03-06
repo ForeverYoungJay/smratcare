@@ -22,7 +22,7 @@ public class NursingReportController {
     this.nursingReportService = nursingReportService;
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/summary")
   public Result<NursingReportSummaryResponse> summary(
       @RequestParam(required = false) String timeFrom,

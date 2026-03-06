@@ -24,6 +24,7 @@ public class Room {
   private Integer capacity;
   private Integer status;
   private String roomQrCode;
+  private String remark;
   private Long createdBy;
   @TableField(value = "create_time", fill = FieldFill.INSERT)
   private LocalDateTime createTime;

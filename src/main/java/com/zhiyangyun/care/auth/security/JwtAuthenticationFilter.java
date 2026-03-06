@@ -6,7 +6,9 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -45,8 +47,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String staffId = claims.getSubject();
         Long orgId = claims.get("orgId", Long.class);
         @SuppressWarnings("unchecked")
-        List<String> roles = claims.get("roles", List.class);
-        List<SimpleGrantedAuthority> authorities = roles == null ? List.of() : roles.stream()
+        List<String> roles = RoleCodeHelper.normalizeRoles(claims.get("roles", List.class));
+        Set<String> authorityCodes = new LinkedHashSet<>(roles);
+        if (shouldElevateToAdmin(request.getRequestURI(), authorityCodes)) {
+          authorityCodes.add(RoleCodeHelper.ROLE_ADMIN);
+        }
+        List<SimpleGrantedAuthority> authorities = authorityCodes.stream()
             .map(r -> r.startsWith("ROLE_") ? r : "ROLE_" + r)
             .map(SimpleGrantedAuthority::new)
             .collect(Collectors.toList());
@@ -63,5 +69,79 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       }
     }
     filterChain.doFilter(request, response);
+  }
+
+  private boolean shouldElevateToAdmin(String requestUri, Set<String> roleCodes) {
+    if (requestUri == null || requestUri.isBlank()) {
+      return false;
+    }
+    if (roleCodes.contains(RoleCodeHelper.ROLE_ADMIN)
+        || roleCodes.contains(RoleCodeHelper.ROLE_SYS_ADMIN)
+        || roleCodes.contains(RoleCodeHelper.ROLE_DIRECTOR)) {
+      return true;
+    }
+    if ((requestUri.startsWith("/api/admin/hr")
+        || requestUri.startsWith("/api/hr")
+        || requestUri.startsWith("/api/schedule")
+        || requestUri.startsWith("/api/attendance"))
+        && hasAnyRole(roleCodes, "HR_MINISTER")) {
+      return true;
+    }
+    if ((requestUri.startsWith("/api/admin/staff")
+        || requestUri.startsWith("/api/admin/staff-roles")
+        || requestUri.startsWith("/api/admin/departments")
+        || requestUri.startsWith("/api/admin/family"))
+        && hasAnyRole(roleCodes, "HR_MINISTER")) {
+      return true;
+    }
+    if (requestUri.startsWith("/api/assessment")
+        && hasAnyRole(roleCodes, "MEDICAL_MINISTER", "NURSING_MINISTER")) {
+      return true;
+    }
+    if ((requestUri.startsWith("/api/elder/lifecycle/medical-outing")
+        || requestUri.startsWith("/api/elder/lifecycle/death-register"))
+        && hasAnyRole(roleCodes, "MEDICAL_MINISTER", "NURSING_MINISTER")) {
+      return true;
+    }
+    if ((requestUri.startsWith("/api/nursing") || requestUri.startsWith("/api/care"))
+        && hasAnyRole(roleCodes, "NURSING_MINISTER")) {
+      return true;
+    }
+    if (requestUri.startsWith("/api/finance")
+        && hasAnyRole(roleCodes, "FINANCE_MINISTER")) {
+      return true;
+    }
+    if ((requestUri.startsWith("/api/logistics")
+        || requestUri.startsWith("/api/store")
+        || requestUri.startsWith("/api/material")
+        || requestUri.startsWith("/api/inventory")
+        || requestUri.startsWith("/api/admin/product")
+        || requestUri.startsWith("/api/admin/disease"))
+        && hasAnyRole(roleCodes, "LOGISTICS_MINISTER")) {
+      return true;
+    }
+    if ((requestUri.startsWith("/api/marketing") || requestUri.startsWith("/api/crm"))
+        && hasAnyRole(roleCodes, "MARKETING_MINISTER")) {
+      return true;
+    }
+    if ((requestUri.startsWith("/api/medical-care")
+        || requestUri.startsWith("/api/health")
+        || requestUri.startsWith("/api/medical"))
+        && hasAnyRole(roleCodes, "MEDICAL_MINISTER")) {
+      return true;
+    }
+    return false;
+  }
+
+  private boolean hasAnyRole(Set<String> roles, String... candidates) {
+    if (roles == null || roles.isEmpty() || candidates == null) {
+      return false;
+    }
+    for (String code : candidates) {
+      if (code != null && roles.contains(code)) {
+        return true;
+      }
+    }
+    return false;
   }
 }

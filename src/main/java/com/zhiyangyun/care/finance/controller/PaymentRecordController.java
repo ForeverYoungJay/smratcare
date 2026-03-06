@@ -7,10 +7,17 @@ import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.finance.entity.PaymentRecord;
 import com.zhiyangyun.care.finance.mapper.PaymentRecordMapper;
+import com.zhiyangyun.care.finance.model.PaymentRequest;
+import com.zhiyangyun.care.finance.model.PaymentResponse;
+import com.zhiyangyun.care.finance.service.FinanceService;
+import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -18,9 +25,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/finance/payment")
 public class PaymentRecordController {
   private final PaymentRecordMapper paymentRecordMapper;
+  private final FinanceService financeService;
 
-  public PaymentRecordController(PaymentRecordMapper paymentRecordMapper) {
+  public PaymentRecordController(PaymentRecordMapper paymentRecordMapper, FinanceService financeService) {
     this.paymentRecordMapper = paymentRecordMapper;
+    this.financeService = financeService;
   }
 
   @GetMapping("/page")
@@ -45,5 +54,13 @@ public class PaymentRecordController {
       wrapper.lt(PaymentRecord::getPaidAt, end);
     }
     return Result.ok(paymentRecordMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
+  }
+
+  @PutMapping("/{paymentId}")
+  public Result<PaymentResponse> updatePayment(
+      @PathVariable Long paymentId,
+      @Valid @RequestBody PaymentRequest request) {
+    Long operatorId = AuthContext.getStaffId();
+    return Result.ok(financeService.updatePaymentRecord(paymentId, request, operatorId));
   }
 }

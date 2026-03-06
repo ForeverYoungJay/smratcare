@@ -32,6 +32,15 @@
           <a-form-item label="关键词">
             <a-input v-model:value="query.keyword" placeholder="文件名/上传人" allow-clear />
           </a-form-item>
+          <a-form-item label="文件夹可见性">
+            <a-select v-model:value="query.folderVisibility" allow-clear style="width: 140px">
+              <a-select-option value="PUBLIC">公开</a-select-option>
+              <a-select-option value="PRIVATE">私有</a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item label="区域">
+            <a-input v-model:value="query.regionCode" placeholder="如：A区/护理部" allow-clear style="width: 160px" />
+          </a-form-item>
           <a-form-item label="当前档案夹">
             <a-tag color="blue">{{ selectedFolderName }}</a-tag>
           </a-form-item>
@@ -169,6 +178,21 @@
             </a-form-item>
           </a-col>
         </a-row>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="可见性">
+              <a-select v-model:value="folderForm.visibility">
+                <a-select-option value="PUBLIC">公开</a-select-option>
+                <a-select-option value="PRIVATE">私有</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="区域编码">
+              <a-input v-model:value="folderForm.regionCode" placeholder="如：A区/护理部" />
+            </a-form-item>
+          </a-col>
+        </a-row>
         <a-form-item label="备注">
           <a-input v-model:value="folderForm.remark" />
         </a-form-item>
@@ -205,7 +229,14 @@ const rows = ref<OaDocument[]>([])
 const folders = ref<OaDocumentFolder[]>([])
 const selectedFolderKey = ref<string>(ROOT_KEY)
 
-const query = reactive({ keyword: '', pageNo: 1, pageSize: 10, folderId: '' })
+const query = reactive({
+  keyword: '',
+  folderVisibility: undefined as string | undefined,
+  regionCode: '',
+  pageNo: 1,
+  pageSize: 10,
+  folderId: ''
+})
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const selectedRowKeys = ref<string[]>([])
 
@@ -239,6 +270,8 @@ const folderForm = reactive({
   parentId: undefined as string | undefined,
   sortNo: 0,
   status: 'ENABLED',
+  visibility: 'PUBLIC',
+  regionCode: '',
   remark: ''
 })
 
@@ -284,9 +317,11 @@ const folderTreeData = computed(() => [
   {
     key: ROOT_KEY,
     title: '全部文档',
-    children: transformFolderTreeToUi(folders.value)
+    children: transformFolderTreeToUi(filteredFolders.value)
   }
 ])
+
+const filteredFolders = computed(() => applyFolderFilters(folders.value))
 
 const folderSelectData = computed(() => transformFolderTreeToSelect(folders.value))
 
@@ -311,6 +346,8 @@ async function fetchData() {
       pageNo: query.pageNo,
       pageSize: query.pageSize,
       folderId: query.folderId || undefined,
+      folderVisibility: query.folderVisibility || undefined,
+      regionCode: query.regionCode || undefined,
       keyword: query.keyword || undefined
     })
     rows.value = (res.list || []).map((item) => ({
@@ -318,7 +355,9 @@ async function fetchData() {
       id: String(item.id),
       folderId: item.folderId ? String(item.folderId) : undefined
     }))
-    pagination.total = res.total || res.list.length
+    pagination.total = Number(res.total || 0)
+    pagination.current = query.pageNo
+    pagination.pageSize = query.pageSize
     selectedRowKeys.value = []
   } finally {
     loading.value = false
@@ -335,8 +374,16 @@ function handleTableChange(pag: any) {
 
 function onReset() {
   query.keyword = ''
+  query.folderVisibility = undefined
+  query.regionCode = ''
   query.pageNo = 1
+  query.pageSize = 10
   pagination.current = 1
+  pagination.pageSize = 10
+  if (selectedFolderKey.value !== ROOT_KEY && !folderNodeMap.value.has(selectedFolderKey.value)) {
+    selectedFolderKey.value = ROOT_KEY
+    query.folderId = ''
+  }
   fetchData()
 }
 
@@ -379,7 +426,7 @@ async function submit() {
   const selectedFolder = form.folderId ? folderNodeMap.value.get(String(form.folderId)) : null
   const payload = {
     name: form.name,
-    folderId: form.folderId ? Number(form.folderId) : undefined,
+    folderId: normalizeTreeNodeId(form.folderId),
     folder: selectedFolder?.name,
     url: form.url,
     sizeBytes: form.sizeBytes,
@@ -458,6 +505,8 @@ async function batchRemove() {
 async function downloadExport() {
   const blob = await exportDocument({
     folderId: query.folderId || undefined,
+    folderVisibility: query.folderVisibility || undefined,
+    regionCode: query.regionCode || undefined,
     keyword: query.keyword || undefined
   })
   const href = URL.createObjectURL(blob)
@@ -484,6 +533,8 @@ function openFolderCreate() {
   folderForm.parentId = selectedFolderKey.value === ROOT_KEY ? undefined : selectedFolderKey.value
   folderForm.sortNo = 0
   folderForm.status = 'ENABLED'
+  folderForm.visibility = 'PUBLIC'
+  folderForm.regionCode = ''
   folderForm.remark = ''
   folderEditOpen.value = true
 }
@@ -499,6 +550,8 @@ function openFolderEdit() {
   folderForm.parentId = folder.parentId ? String(folder.parentId) : undefined
   folderForm.sortNo = folder.sortNo || 0
   folderForm.status = folder.status || 'ENABLED'
+  folderForm.visibility = folder.visibility || 'PUBLIC'
+  folderForm.regionCode = folder.regionCode || ''
   folderForm.remark = folder.remark || ''
   folderEditOpen.value = true
 }
@@ -510,9 +563,11 @@ async function submitFolder() {
   }
   const payload = {
     name: folderForm.name.trim(),
-    parentId: folderForm.parentId ? Number(folderForm.parentId) : undefined,
+    parentId: normalizeTreeNodeId(folderForm.parentId),
     sortNo: folderForm.sortNo,
     status: folderForm.status,
+    visibility: folderForm.visibility,
+    regionCode: folderForm.regionCode || undefined,
     remark: folderForm.remark
   }
   folderSaving.value = true
@@ -557,14 +612,23 @@ function normalizeFolderTree(nodes: OaDocumentFolder[]): OaDocumentFolder[] {
     ...item,
     id: String(item.id),
     parentId: item.parentId ? String(item.parentId) : undefined,
+    visibility: item.visibility || 'PUBLIC',
+    regionCode: item.regionCode || '',
     children: normalizeFolderTree(item.children || [])
   }))
+}
+
+function normalizeTreeNodeId(id?: string) {
+  if (!id) return undefined
+  const parsed = Number(id)
+  if (!Number.isFinite(parsed) || parsed <= 0) return undefined
+  return parsed
 }
 
 function transformFolderTreeToUi(nodes: OaDocumentFolder[]) {
   return (nodes || []).map((item) => ({
     key: String(item.id),
-    title: `${item.name}${item.documentCount ? ` (${item.documentCount})` : ''}`,
+    title: `${item.visibility === 'PRIVATE' ? '🔒' : '🌐'} ${item.name}${item.documentCount ? ` (${item.documentCount})` : ''}`,
     children: transformFolderTreeToUi(item.children || [])
   }))
 }
@@ -573,10 +637,27 @@ function transformFolderTreeToSelect(nodes: OaDocumentFolder[], excludeId?: stri
   return (nodes || [])
     .filter((item) => String(item.id) !== String(excludeId || ''))
     .map((item) => ({
-      title: item.name,
+      title: `${item.visibility === 'PRIVATE' ? '🔒' : '🌐'} ${item.name}`,
       value: String(item.id),
       children: transformFolderTreeToSelect(item.children || [], excludeId)
     }))
+}
+
+function applyFolderFilters(nodes: OaDocumentFolder[]): OaDocumentFolder[] {
+  const visibility = query.folderVisibility
+  const region = (query.regionCode || '').trim()
+  const walk = (items: OaDocumentFolder[]): OaDocumentFolder[] =>
+    (items || [])
+      .map((item) => {
+        const children = walk(item.children || [])
+        const passVisibility = !visibility || (item.visibility || 'PUBLIC') === visibility
+        const passRegion = !region || String(item.regionCode || '').includes(region)
+        const selfMatched = passVisibility && passRegion
+        if (!selfMatched && !children.length) return null
+        return { ...item, children }
+      })
+      .filter((item): item is OaDocumentFolder => !!item)
+  return walk(nodes)
 }
 
 function formatSize(size?: number) {

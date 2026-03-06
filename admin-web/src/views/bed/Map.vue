@@ -116,6 +116,7 @@
           >
             <div class="building-name">{{ building.name }}</div>
             <div class="building-kpi">{{ building.floors.length }} 层 · {{ building.roomCount }} 间 · {{ building.bedCount }} 床</div>
+            <div v-if="resolveVisibleRemark(building.remark)" class="building-remark">{{ resolveVisibleRemark(building.remark) }}</div>
           </button>
           <template v-for="floor in matrixFloors" :key="floor">
             <button
@@ -128,9 +129,10 @@
             </button>
             <div v-for="building in matrixBuildings" :key="`${building.key}-${floor}`" class="matrix-cell">
               <template v-if="roomsAt(building.name, floor).length">
-                <div v-for="room in roomsAt(building.name, floor)" :key="room.key" class="room-cube">
+                <div v-for="room in roomsAt(building.name, floor)" :key="room.key" class="room-cube" @dblclick="openRoomSceneDetail(room)">
                   <div class="room-title">{{ room.roomNo }}</div>
                   <div class="room-meta">{{ room.occupiedBeds }}/{{ room.totalBeds }} 床 · {{ room.elderCount }} 人</div>
+                  <div v-if="resolveVisibleRemark(room.remark)" class="room-remark">{{ resolveVisibleRemark(room.remark) }}</div>
                   <div class="bed-grid">
                     <button
                       v-for="bed in room.beds"
@@ -218,6 +220,27 @@
         <img :src="qrDataUrl" alt="qr" />
       </div>
     </a-modal>
+
+    <a-modal v-model:open="roomDetailOpen" :title="`房间详情 · ${roomCurrent?.roomNo || '-'}`" width="760px" :footer="null" destroy-on-close>
+      <a-descriptions bordered size="small" :column="2" style="margin-bottom: 12px">
+        <a-descriptions-item label="总床位">{{ roomCurrent?.totalBeds || 0 }}</a-descriptions-item>
+        <a-descriptions-item label="在住人数">{{ roomCurrent?.elderCount || 0 }}</a-descriptions-item>
+        <a-descriptions-item label="公开备注" :span="2">{{ resolveVisibleRemark(roomCurrent?.remark) || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="全部备注" :span="2">{{ resolveAllRemark(roomCurrent?.remark) || '-' }}</a-descriptions-item>
+      </a-descriptions>
+      <a-table :loading="roomResidentLoading" :data-source="roomResidents" :pagination="false" :row-key="(item:any)=>item.id" size="small">
+        <a-table-column title="头像" key="avatar" width="70">
+          <template #default="{ record }">
+            <a-avatar style="background-color: #1677ff">{{ String(record?.fullName || '?').slice(-1) }}</a-avatar>
+          </template>
+        </a-table-column>
+        <a-table-column title="姓名" data-index="fullName" key="fullName" width="120" />
+        <a-table-column title="生日" data-index="birthDate" key="birthDate" width="120" />
+        <a-table-column title="家庭住址" data-index="homeAddress" key="homeAddress" />
+        <a-table-column title="备注" data-index="remark" key="remark" />
+      </a-table>
+      <a-empty v-if="!roomResidentLoading && !roomResidents.length" description="当前房间暂无入住长者" />
+    </a-modal>
   </PageContainer>
 </template>
 
@@ -240,6 +263,7 @@ type RoomScene = {
   totalBeds: number
   occupiedBeds: number
   elderCount: number
+  remark?: string
 }
 
 type FloorScene = {
@@ -252,6 +276,7 @@ type FloorScene = {
 type BuildingScene = {
   key: string
   name: string
+  remark?: string
   floors: FloorScene[]
   roomCount: number
   bedCount: number
@@ -261,10 +286,14 @@ const router = useRouter()
 const route = useRoute()
 const beds = ref<BedItem[]>([])
 const detailOpen = ref(false)
+const roomDetailOpen = ref(false)
 const current = ref<BedItem | null>(null)
+const roomCurrent = ref<RoomScene | null>(null)
 const qrDataUrl = ref('')
 const elderLoading = ref(false)
 const elderDetail = ref<ElderItem | null>(null)
+const roomResidentLoading = ref(false)
+const roomResidents = ref<ElderItem[]>([])
 const roomTypeItems = ref<BaseConfigItem[]>([])
 const bedTypeItems = ref<BaseConfigItem[]>([])
 const areaItems = ref<BaseConfigItem[]>([])
@@ -355,7 +384,8 @@ const buildingScenes = computed<BuildingScene[]>(() => {
               beds: roomBeds.sort((a, b) => String(a.bedNo || '').localeCompare(String(b.bedNo || ''), 'zh-CN')),
               totalBeds: roomBeds.length,
               occupiedBeds,
-              elderCount: roomBeds.filter((bed) => !!bed.elderId).length
+              elderCount: roomBeds.filter((bed) => !!bed.elderId).length,
+              remark: roomBeds[0]?.roomRemark
             }
           })
           .sort((a, b) => a.roomNo.localeCompare(b.roomNo, 'zh-CN'))
@@ -372,6 +402,7 @@ const buildingScenes = computed<BuildingScene[]>(() => {
     return {
       key: buildingName,
       name: buildingName,
+      remark: floors.flatMap((item) => item.rooms).find((item) => !!item.beds[0]?.buildingRemark)?.beds[0]?.buildingRemark,
       floors,
       roomCount: floors.reduce((sum, floor) => sum + floor.rooms.length, 0),
       bedCount: floors.reduce((sum, floor) => sum + floor.rooms.reduce((acc, room) => acc + room.totalBeds, 0), 0)
@@ -617,6 +648,50 @@ function resolveBedTypeLabel(bedType?: string) {
   return bedTypeLabelMap.value[bedType] || bedType
 }
 
+function parseRemarkSlots(raw?: string) {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    const slots = Array.isArray(parsed?.slots) ? parsed.slots : [parsed?.remark1, parsed?.remark2, parsed?.remark3]
+    return slots
+      .map((slot: any) => {
+        if (!slot) return null
+        if (typeof slot === 'string') return { text: slot, visible: true }
+        return { text: String(slot.text || slot.value || '').trim(), visible: slot.visible !== false }
+      })
+      .filter((item: any) => item && item.text)
+  } catch {
+    return [{ text: raw, visible: true }]
+  }
+}
+
+function resolveVisibleRemark(raw?: string) {
+  return parseRemarkSlots(raw).filter((item: any) => item.visible).map((item: any) => item.text).join('；')
+}
+
+function resolveAllRemark(raw?: string) {
+  return parseRemarkSlots(raw).map((item: any) => item.text).join('；')
+}
+
+async function openRoomSceneDetail(room: RoomScene) {
+  roomCurrent.value = room
+  roomDetailOpen.value = true
+  const elderIds = Array.from(new Set(room.beds.map((item) => item.elderId).filter(Boolean))) as string[]
+  if (!elderIds.length) {
+    roomResidents.value = []
+    return
+  }
+  roomResidentLoading.value = true
+  try {
+    const results = await Promise.allSettled(elderIds.map((elderId) => getElderDetail(elderId)))
+    roomResidents.value = results
+      .filter((item): item is PromiseFulfilledResult<ElderItem> => item.status === 'fulfilled')
+      .map((item) => item.value)
+  } finally {
+    roomResidentLoading.value = false
+  }
+}
+
 async function openBed(bed: BedItem) {
   current.value = bed
   detailOpen.value = true
@@ -718,6 +793,12 @@ watch(filteredBeds, () => {
 .building-kpi {
   color: #5f6f8f;
   font-size: 12px;
+}
+
+.building-remark {
+  color: #64748b;
+  font-size: 12px;
+  margin-top: 2px;
 }
 
 .matrix-grid {
@@ -822,6 +903,12 @@ watch(filteredBeds, () => {
   font-size: 11px;
   color: #6b7ea5;
   margin-top: 2px;
+  margin-bottom: 4px;
+}
+
+.room-remark {
+  font-size: 11px;
+  color: #2563eb;
   margin-bottom: 4px;
 }
 

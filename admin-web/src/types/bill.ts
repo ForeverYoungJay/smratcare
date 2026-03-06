@@ -11,6 +11,10 @@ export interface BillItem {
   paidAmount?: number
   outstandingAmount?: number
   lastPayMethod?: string
+  lastPaymentId?: number
+  lastPaymentAmount?: number
+  lastPaidAt?: string
+  lastPaymentRemark?: string
   status?: number
 }
 

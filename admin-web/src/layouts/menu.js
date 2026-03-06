@@ -1,4 +1,5 @@
 import { routes } from '../router/routes';
+import { hasRouteAccess } from '../utils/roleAccess';
 function joinPath(base, path) {
     if (path.startsWith('/'))
         return path;
@@ -6,16 +7,14 @@ function joinPath(base, path) {
         return `/${path}`;
     return `${base}/${path}`.replace(/\/+/g, '/');
 }
-function hasAccess(route, roles) {
+function hasAccess(route, roles, fullPath) {
     const required = route.meta?.roles || [];
-    if (required.length === 0)
-        return true;
-    return required.some((r) => roles.includes(r));
+    return hasRouteAccess(roles, required, fullPath);
 }
 function buildMenu(routes, roles, basePath = '') {
     return routes
         .filter((r) => !r.meta?.hidden)
-        .filter((r) => hasAccess(r, roles))
+        .filter((r) => hasAccess(r, roles, joinPath(basePath, r.path || '')))
         .map((r) => {
         const fullPath = r.children ? undefined : joinPath(basePath, r.path || '');
         const node = {

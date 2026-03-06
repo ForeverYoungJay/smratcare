@@ -64,7 +64,7 @@ class ElderServiceTest {
 
   @Test
   void page_query() {
-    var page = elderService.page(null, 1, 10, "Elder", false);
+    var page = elderService.page(null, 1, 10, "Elder", false, null);
     assertNotNull(page);
     assertEquals(1, page.getCurrent());
   }

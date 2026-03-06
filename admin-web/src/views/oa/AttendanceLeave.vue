@@ -8,11 +8,14 @@
             style="width: 260px"
             show-search
             allow-clear
+            :filter-option="false"
+            :options="staffOptions"
+            :loading="staffLoading"
             :disabled="!canManageAttendance"
             placeholder="请选择员工"
-          >
-            <a-select-option v-for="staff in staffOptions" :key="staff.value" :value="staff.value">{{ staff.label }}</a-select-option>
-          </a-select>
+            @search="searchStaff"
+            @focus="() => !staffOptions.length && searchStaff('')"
+          />
         </a-form-item>
         <a-form-item label="月份">
           <a-date-picker v-model:value="query.month" picker="month" value-format="YYYY-MM" />
@@ -87,9 +90,11 @@ import PageContainer from '../../components/PageContainer.vue'
 import { exportCsv } from '../../utils/export'
 import { useUserStore } from '../../stores/user'
 import { getAttendancePage } from '../../api/schedule'
-import { getHrStaffPage } from '../../api/hr'
 import { getApprovalPage } from '../../api/oa'
-import type { AttendanceItem, HrStaffProfile, OaApproval, PageResult } from '../../types'
+import { hasMinisterOrHigher } from '../../utils/roleAccess'
+import { useStaffOptions } from '../../composables/useStaffOptions'
+import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
+import type { AttendanceItem, OaApproval } from '../../types'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -98,10 +103,10 @@ const autoRefresh = ref(true)
 let autoRefreshTimer: number | undefined
 const rows = ref<AttendanceItem[]>([])
 const approvals = ref<OaApproval[]>([])
-const staffList = ref<HrStaffProfile[]>([])
+const { staffOptions, staffLoading, searchStaff } = useStaffOptions({ pageSize: 260, preloadSize: 800 })
 
 const query = reactive({
-  staffId: undefined as number | undefined,
+  staffId: undefined as string | number | undefined,
   month: dayjs().format('YYYY-MM')
 })
 
@@ -119,17 +124,9 @@ const leaveColumns = [
   { title: '年度累计', dataIndex: 'annualLeaveCount', key: 'annualLeaveCount', width: 120 }
 ]
 
-const staffOptions = computed(() =>
-  staffList.value.map((item) => ({ label: `${item.realName || '-'}（${item.phone || '无手机号'}）`, value: item.staffId }))
-)
 const canManageAttendance = computed(() => {
   const roles = (userStore.roles || []).map((item) => String(item || '').toUpperCase())
-  return roles.includes('ADMIN')
-    || roles.includes('DEPT_LEADER')
-    || roles.includes('LEADER')
-    || roles.includes('MANAGER')
-    || roles.includes('SUPERVISOR')
-    || roles.includes('DIRECTOR')
+  return hasMinisterOrHigher(roles)
 })
 
 const summary = computed(() => {
@@ -209,8 +206,9 @@ async function fetchData() {
   try {
     const monthStart = dayjs(`${query.month}-01`).format('YYYY-MM-DD')
     const monthEnd = dayjs(`${query.month}-01`).endOf('month').format('YYYY-MM-DD')
-    const currentStaffId = userStore.staffInfo?.id
-    const effectiveStaffId = canManageAttendance.value ? query.staffId : currentStaffId
+    const currentStaffId = userStore.staffInfo?.id ? Number(userStore.staffInfo.id) : undefined
+    const selectedStaffId = query.staffId != null && query.staffId !== '' ? Number(query.staffId) : undefined
+    const effectiveStaffId = canManageAttendance.value ? selectedStaffId : currentStaffId
 
     const [attendancePage, approvalPage] = await Promise.all([
       getAttendancePage({
@@ -237,18 +235,8 @@ async function fetchData() {
   }
 }
 
-async function loadStaff() {
-  try {
-    const page: PageResult<HrStaffProfile> = await getHrStaffPage({ pageNo: 1, pageSize: 300 })
-    staffList.value = page.list || []
-  } catch (error: any) {
-    staffList.value = []
-    message.error(error?.message || '加载员工列表失败')
-  }
-}
-
 function reset() {
-  query.staffId = canManageAttendance.value ? undefined : userStore.staffInfo?.id
+  query.staffId = canManageAttendance.value ? undefined : userStore.staffInfo?.id ? String(userStore.staffInfo.id) : undefined
   query.month = dayjs().format('YYYY-MM')
   fetchData()
 }
@@ -309,14 +297,23 @@ watch(autoRefresh, (enabled) => {
 
 onMounted(async () => {
   if (!canManageAttendance.value) {
-    query.staffId = userStore.staffInfo?.id
+    query.staffId = userStore.staffInfo?.id ? String(userStore.staffInfo.id) : undefined
   }
-  await loadStaff()
+  await searchStaff('')
   await fetchData()
   startAutoRefresh()
 })
 
 onUnmounted(() => {
   stopAutoRefresh()
+})
+
+useLiveSyncRefresh({
+  topics: ['oa', 'hr', 'system'],
+  refresh: () => {
+    if (!autoRefresh.value) return
+    fetchData().catch(() => {})
+  },
+  debounceMs: 900
 })
 </script>

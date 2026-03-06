@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/admin/hr/reward-punishment")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
 public class AdminRewardPunishmentController {
   private final StaffRewardPunishmentMapper rewardPunishmentMapper;
 

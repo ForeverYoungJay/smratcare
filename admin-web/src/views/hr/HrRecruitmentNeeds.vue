@@ -55,6 +55,9 @@
           <a-button v-if="record.resumeUrl" type="link" @click="openLink(record.resumeUrl)">查看简历</a-button>
           <span v-else>-</span>
         </template>
+        <template v-else-if="column.key === 'followUpStatus'">
+          <a-tag :color="followUpTagColor(record)">{{ followUpStatusText(record) }}</a-tag>
+        </template>
         <template v-else-if="column.key === 'checklistJson'">
           {{ summarizeJsonList(record.checklistJson) }}
         </template>
@@ -292,6 +295,7 @@ const columns = computed(() => {
       { title: '联系方式', dataIndex: 'contactPhone', key: 'contactPhone', width: 140 },
       { title: '用人意向', dataIndex: 'intentionStatus', key: 'intentionStatus', width: 130 },
       { title: '提醒日期', dataIndex: 'followUpDate', key: 'followUpDate', width: 120 },
+      { title: '提醒状态', key: 'followUpStatus', width: 120 },
       { title: '简历', dataIndex: 'resumeUrl', key: 'resumeUrl', width: 120 },
       ...common
     ]
@@ -389,6 +393,28 @@ function intentionColor(v?: string) {
 }
 function intentionText(v?: string) {
   return intentionOptions.find((item) => item.value === v)?.label || v || '-'
+}
+
+function followUpStatusText(record: HrRecruitmentNeedItem) {
+  if (record.intentionStatus !== 'CONSIDERING') {
+    return '无需提醒'
+  }
+  const follow = record.followUpDate ? dayjs(record.followUpDate) : null
+  if (!follow || !follow.isValid()) {
+    return '未设提醒'
+  }
+  const diffDays = follow.startOf('day').diff(dayjs().startOf('day'), 'day')
+  if (diffDays < 0) return '已到期'
+  if (diffDays <= 3) return '即将到期'
+  return '计划中'
+}
+
+function followUpTagColor(record: HrRecruitmentNeedItem) {
+  const status = followUpStatusText(record)
+  if (status === '已到期') return 'red'
+  if (status === '即将到期') return 'orange'
+  if (status === '计划中') return 'blue'
+  return 'default'
 }
 
 async function fetchData() {

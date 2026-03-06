@@ -5,6 +5,9 @@
         <a-form-item label="日期">
           <a-date-picker v-model:value="query.date" />
         </a-form-item>
+        <a-form-item label="打印备注">
+          <a-input v-model:value="query.printRemark" allow-clear placeholder="例如：日结复核版" style="width: 200px" />
+        </a-form-item>
         <a-form-item>
           <a-space>
             <a-button type="primary" @click="reconcile">生成对账</a-button>
@@ -56,6 +59,7 @@
             <a-button type="primary" @click="fetchHistory">查询</a-button>
             <a-button @click="resetHistory">重置</a-button>
             <a-button @click="exportHistory">导出</a-button>
+            <a-button @click="printHistory">打印当前</a-button>
           </a-space>
         </a-form-item>
       </a-form>
@@ -96,13 +100,14 @@ import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
-import { reconcileDaily, getReconcilePage, getFinanceReconcileExceptions, getFinanceWorkbenchOverview } from '../../api/finance'
+import { exportFinanceReconcileHistoryCsv, reconcileDaily, getReconcilePage, getFinanceReconcileExceptions, getFinanceWorkbenchOverview } from '../../api/finance'
 import type { FinanceReconcileCard, FinanceReconcileExceptionItem, PageResult, ReconcileDailyItem } from '../../types'
-import { exportCsv } from '../../utils/export'
+import { printTableReport } from '../../utils/print'
 
 const router = useRouter()
 const query = ref({
-  date: dayjs()
+  date: dayjs(),
+  printRemark: ''
 })
 
 const loading = ref(false)
@@ -146,6 +151,7 @@ async function reconcile() {
 
 function reset() {
   query.value.date = dayjs()
+  query.value.printRemark = ''
   result.value = null
   loadSummary()
 }
@@ -197,8 +203,41 @@ function resetHistory() {
   fetchHistory()
 }
 
-function exportHistory() {
-  exportCsv(history.value, `reconcile-${dayjs().format('YYYYMMDD')}.csv`)
+async function exportHistory() {
+  try {
+    await exportFinanceReconcileHistoryCsv({
+      from: dayjs(historyQuery.value.from).format('YYYY-MM-DD'),
+      to: dayjs(historyQuery.value.to).format('YYYY-MM-DD')
+    })
+    message.success('导出成功')
+  } catch (error: any) {
+    message.error(error?.message || '导出失败')
+  }
+}
+
+function printHistory() {
+  try {
+    printTableReport({
+      title: '对账历史',
+      subtitle: `${dayjs(historyQuery.value.from).format('YYYY-MM-DD')} ~ ${dayjs(historyQuery.value.to).format('YYYY-MM-DD')}；备注：${query.value.printRemark || '-'}；当日异常数：${todayExceptionCount.value}`,
+      columns: [
+        { key: 'reconcileDate', title: '对账日期' },
+        { key: 'totalReceived', title: '收款总额' },
+        { key: 'mismatchText', title: '是否异常' },
+        { key: 'remark', title: '备注' },
+        { key: 'createTime', title: '生成时间' }
+      ],
+      rows: history.value.map(item => ({
+        reconcileDate: item.reconcileDate || item.date || '-',
+        totalReceived: item.totalReceived ?? 0,
+        mismatchText: item.mismatchFlag ? '异常' : '正常',
+        remark: item.remark || '-',
+        createTime: item.createTime || '-'
+      }))
+    })
+  } catch (error: any) {
+    message.error(error?.message || '打印失败')
+  }
 }
 
 function onHistoryPageChange(page: number) {

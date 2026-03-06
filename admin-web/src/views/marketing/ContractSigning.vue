@@ -126,6 +126,12 @@
           <template v-if="column.key === 'flowStage'">
             <a-tag :color="flowStageColor(normalizedFlowStage(record))">{{ flowStageText(normalizedFlowStage(record)) }}</a-tag>
           </template>
+          <template v-else-if="column.key === 'orgName'">
+            <a-space wrap>
+              <a-tag v-for="item in parsePolicyValues(record.orgName)" :key="item" color="blue">{{ item }}</a-tag>
+              <span v-if="!parsePolicyValues(record.orgName).length">-</span>
+            </a-space>
+          </template>
           <template v-else-if="column.key === 'slaWarning'">
             <a-tag v-if="getOverdueLevel(record) === 'high'" color="red">{{ overdueText(record) }}</a-tag>
             <span v-else>-</span>
@@ -180,13 +186,16 @@
           <a-col :span="12">
             <a-form-item label="优惠政策（联动运营政策）">
               <a-select
-                v-model:value="form.orgName"
+                v-model:value="selectedPolicyValues"
+                mode="multiple"
+                :max-tag-count="2"
                 allow-clear
                 show-search
                 :loading="policyLoading"
                 :options="policyOptions"
-                placeholder="请选择营销方案中的季度运营政策"
+                placeholder="请选择运营政策（最多2条）"
                 :filter-option="policyFilterOption"
+                @change="onPolicySelectionChange"
               />
             </a-form-item>
           </a-col>
@@ -360,6 +369,7 @@ function applyStatusPreset() {
 }
 
 const form = reactive<Partial<CrmContractItem>>({})
+const selectedPolicyValues = ref<string[]>([])
 const rules: FormRules = {
   elderName: [{ required: true, message: '请输入姓名' }]
 }
@@ -879,6 +889,7 @@ function openForm(record?: CrmContractItem) {
   if (record) {
     Object.assign(form, record)
     form.contractStatus = record.contractStatus || '待评估'
+    selectedPolicyValues.value = parsePolicyValues(record.orgName)
   } else {
     Object.assign(form, {
       id: undefined,
@@ -892,6 +903,7 @@ function openForm(record?: CrmContractItem) {
       reservationRoomNo: undefined,
       orgName: undefined
     } as Partial<CrmContractItem>)
+    selectedPolicyValues.value = []
   }
   open.value = true
 }
@@ -932,6 +944,24 @@ function policyFilterOption(input: string, option: any) {
   return label.toLowerCase().includes(keyword) || value.toLowerCase().includes(keyword)
 }
 
+function parsePolicyValues(raw?: string) {
+  if (!raw) return []
+  return String(raw)
+    .split(/[；;,，]/)
+    .map((item) => item.trim())
+    .filter((item) => !!item)
+}
+
+function onPolicySelectionChange(values: string[]) {
+  const normalized = Array.from(new Set((values || []).map((item) => String(item || '').trim()).filter((item) => !!item)))
+  if (normalized.length > 2) {
+    message.warning('每位老人最多享受 2 条营销优惠政策')
+    selectedPolicyValues.value = normalized.slice(0, 2)
+    return
+  }
+  selectedPolicyValues.value = normalized
+}
+
 async function submit() {
   if (!formRef.value) return
   try {
@@ -948,7 +978,8 @@ async function submit() {
       flowStage: isCreate ? 'PENDING_ASSESSMENT' : (form.flowStage || 'PENDING_ASSESSMENT'),
       currentOwnerDept: isCreate ? 'ASSESSMENT' : (form.currentOwnerDept || 'ASSESSMENT'),
       contractStatus: isCreate ? '待评估' : (form.contractStatus || '待评估'),
-      reservationRoomNo: isCreate ? undefined : form.reservationRoomNo
+      reservationRoomNo: isCreate ? undefined : form.reservationRoomNo,
+      orgName: selectedPolicyValues.value.length ? selectedPolicyValues.value.join('；') : undefined
     }
     let saved: CrmContractItem
     if (form.id) {

@@ -13,6 +13,7 @@ import com.zhiyangyun.care.auth.model.FamilyLoginResponse;
 import com.zhiyangyun.care.auth.security.TokenBlacklistService;
 import com.zhiyangyun.care.auth.security.TokenProvider;
 import com.zhiyangyun.care.auth.security.PermissionRegistry;
+import com.zhiyangyun.care.auth.security.RoleCodeHelper;
 import com.zhiyangyun.care.elder.entity.FamilyUser;
 import com.zhiyangyun.care.elder.mapper.FamilyUserMapper;
 import jakarta.validation.Valid;
@@ -66,7 +67,8 @@ public class AuthController {
         Wrappers.lambdaQuery(StaffAccount.class)
             .eq(StaffAccount::getUsername, request.getUsername())
             .eq(StaffAccount::getIsDeleted, 0));
-    List<String> roles = roleMapper.selectRoleCodesByStaff(staff.getId(), staff.getOrgId());
+    List<String> roles = RoleCodeHelper.normalizeRoles(
+        roleMapper.selectRoleCodesByStaff(staff.getId(), staff.getOrgId()));
 
     String token = tokenProvider.generateToken(staff.getId(), staff.getUsername(), staff.getOrgId(), roles);
     LoginResponse response = new LoginResponse();

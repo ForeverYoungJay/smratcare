@@ -34,7 +34,7 @@ public class AdminSurveyTemplateController {
     this.auditLogService = auditLogService;
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','MEDICAL_MINISTER','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping
   public Result<SurveyTemplate> create(@Valid @RequestBody SurveyTemplateRequest request) {
     SurveyTemplate template = toEntity(request);
@@ -46,7 +46,7 @@ public class AdminSurveyTemplateController {
     return Result.ok(created);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','MEDICAL_MINISTER','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PutMapping("/{id}")
   public Result<SurveyTemplate> update(@PathVariable Long id, @Valid @RequestBody SurveyTemplateRequest request) {
     SurveyTemplate template = toEntity(request);
@@ -60,7 +60,7 @@ public class AdminSurveyTemplateController {
     return Result.ok(updated);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','MEDICAL_MINISTER','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/{id}")
   public Result<SurveyTemplateDetailResponse> get(@PathVariable Long id) {
     SurveyTemplateDetailResponse detail = templateService.getDetail(AuthContext.getOrgId(), id);
@@ -70,7 +70,7 @@ public class AdminSurveyTemplateController {
     return Result.ok(detail);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','MEDICAL_MINISTER','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/page")
   public Result<IPage<SurveyTemplate>> page(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -81,7 +81,7 @@ public class AdminSurveyTemplateController {
     return Result.ok(templateService.page(AuthContext.getOrgId(), pageNo, pageSize, keyword, status, targetType));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','MEDICAL_MINISTER','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PutMapping("/{id}/questions")
   public Result<Void> setQuestions(@PathVariable Long id, @Valid @RequestBody SurveyTemplateQuestionUpdateRequest request) {
     templateService.setQuestions(AuthContext.getOrgId(), id, request.getQuestions());
@@ -90,7 +90,7 @@ public class AdminSurveyTemplateController {
     return Result.ok(null);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','MEDICAL_MINISTER','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping("/{id}/publish")
   public Result<SurveyTemplate> publish(@PathVariable Long id) {
     SurveyTemplate updated = templateService.publish(AuthContext.getOrgId(), id);
@@ -102,7 +102,7 @@ public class AdminSurveyTemplateController {
     return Result.ok(updated);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','MEDICAL_MINISTER','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping("/{id}/disable")
   public Result<SurveyTemplate> disable(@PathVariable Long id) {
     SurveyTemplate updated = templateService.disable(AuthContext.getOrgId(), id);
@@ -114,7 +114,7 @@ public class AdminSurveyTemplateController {
     return Result.ok(updated);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','MEDICAL_MINISTER','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
     SurveyTemplateDetailResponse detail = templateService.getDetail(AuthContext.getOrgId(), id);

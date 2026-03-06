@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { getPermissions, getRoles, getToken, setPermissions, setRoles, setToken, clearPermissions, clearRoles, clearToken } from '../utils/auth'
+import { getPermissions, getRoles, getToken, setPermissions, setRoles, setToken, clearPermissions, clearRoles, clearToken, normalizeRoles } from '../utils/auth'
 import type { LoginResponse } from '../types/api'
 
 export const useUserStore = defineStore('user', {
@@ -11,12 +11,13 @@ export const useUserStore = defineStore('user', {
   }),
   actions: {
     setAuth(payload: LoginResponse) {
+      const roles = normalizeRoles(payload.roles || [])
       this.token = payload.token
-      this.roles = payload.roles || []
+      this.roles = roles
       this.permissions = payload.permissions || []
       this.staffInfo = payload.staffInfo
       setToken(payload.token)
-      setRoles(payload.roles || [])
+      setRoles(roles)
       setPermissions(payload.permissions || [])
     },
     clear() {

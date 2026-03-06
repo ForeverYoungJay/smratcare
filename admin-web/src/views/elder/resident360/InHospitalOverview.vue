@@ -7,8 +7,11 @@
           style="width: 220px"
           placeholder="选择长者"
           show-search
-          option-filter-prop="label"
+          :filter-option="false"
           :options="residentOptions"
+          :loading="residentLoading"
+          @search="searchResidentOptions"
+          @focus="() => !residentOptions.length && searchResidentOptions('')"
           @change="onResidentChange"
         />
         <a-switch v-model:checked="dutyMode" checked-children="值班模式" un-checked-children="普通模式" />
@@ -67,7 +70,8 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
 import { getResidentOverview } from '../../../api/medicalCare'
-import { getElderPage } from '../../../api/elder'
+import { useElderOptions } from '../../../composables/useElderOptions'
+import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
 import type { MedicalResidentOverview } from '../../../types'
 
 const router = useRouter()
@@ -80,7 +84,17 @@ const expandedCardKeys = ref<string[]>([])
 const showWarningOnly = ref(false)
 const autoRefresh = ref(true)
 const dutyMode = ref(false)
-const residentOptions = ref<{ label: string; value: string }[]>([])
+const { elderOptions: residentOptionPool, elderLoading: residentLoading, searchElders, ensureSelectedElder } = useElderOptions({
+  pageSize: 200,
+  preloadSize: 600,
+  inHospitalOnly: true
+})
+const residentOptions = computed(() =>
+  residentOptionPool.value.map((item) => ({
+    label: item.label,
+    value: String(item.value)
+  }))
+)
 let refreshTimer: number | null = null
 
 const cardKeyOrder = [
@@ -141,8 +155,16 @@ const effectiveAutoRefresh = computed(() => dutyMode.value || autoRefresh.value)
 const refreshIntervalMs = computed(() => (dutyMode.value ? 30000 : 60000))
 
 function go(path: string) {
+  const targetPath = appendResidentId(path)
   forceScrollTop()
-  router.push(path)
+  router.push(targetPath)
+}
+
+function appendResidentId(path: string) {
+  const currentResidentId = String(residentId.value || '').trim()
+  if (!currentResidentId) return path
+  if (/([?&])residentId=/.test(path)) return path
+  return path.includes('?') ? `${path}&residentId=${encodeURIComponent(currentResidentId)}` : `${path}?residentId=${encodeURIComponent(currentResidentId)}`
 }
 
 function forceScrollTop() {
@@ -216,23 +238,19 @@ async function resolveResidentId() {
   const fromRoute = String(route.query.residentId || '').trim()
   if (fromRoute) {
     residentId.value = fromRoute
+    if (/^\d+$/.test(fromRoute)) ensureSelectedElder(Number(fromRoute))
     return
   }
   if (residentOptions.value.length > 0) {
     residentId.value = residentOptions.value[0].value
     return
   }
-  const page = await getElderPage({ pageNo: 1, pageSize: 1 })
-  const first = page.list?.[0]
-  residentId.value = String(first?.id || '')
+  await searchResidentOptions('')
+  residentId.value = residentOptions.value[0]?.value || ''
 }
 
-async function loadResidentOptions() {
-  const page = await getElderPage({ pageNo: 1, pageSize: 50 })
-  residentOptions.value = (page.list || []).map((item: any) => ({
-    label: `${item.fullName || item.elderName || item.name || '未命名'}（${item.id}）`,
-    value: String(item.id)
-  }))
+async function searchResidentOptions(keyword = '') {
+  await searchElders(keyword)
 }
 
 function syncResidentToRoute() {
@@ -303,7 +321,7 @@ onMounted(async () => {
   try {
     dutyMode.value = String(route.query.duty || '').trim() === '1'
     showWarningOnly.value = String(route.query.warning || '').trim() === '1'
-    await loadResidentOptions()
+    await searchResidentOptions('')
     if (!residentId.value && residentOptions.value.length > 0) {
       residentId.value = residentOptions.value[0].value
       syncResidentToRoute()
@@ -350,6 +368,15 @@ watch(
   }
 )
 onBeforeUnmount(() => clearAutoRefresh())
+
+useLiveSyncRefresh({
+  topics: ['elder', 'lifecycle', 'bed', 'care', 'health', 'dining', 'finance'],
+  refresh: () => {
+    if (!effectiveAutoRefresh.value || loading.value) return
+    loadModules().catch(() => {})
+  },
+  debounceMs: 1000
+})
 </script>
 
 <style scoped>

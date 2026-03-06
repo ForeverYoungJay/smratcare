@@ -70,7 +70,10 @@
               :class="{ active: selectedBuilding === building }"
               @click="toggleBuilding(building)"
             >
-              {{ building }}
+              <div>{{ building }}</div>
+              <div v-if="resolveVisibleRemark(buildingRemarkByName(building))" class="building-remark">
+                {{ resolveVisibleRemark(buildingRemarkByName(building)) }}
+              </div>
             </button>
             <template v-for="floor in matrixFloors" :key="floor">
               <button
@@ -88,6 +91,7 @@
                     :key="room.key"
                     class="room-block"
                     :style="{ gridColumn: `span ${room.autoSpan}` }"
+                    @dblclick="openRoomDetail(room)"
                   >
                     <div class="room-head">
                       <div class="room-title">{{ room.roomNo }}</div>
@@ -95,6 +99,9 @@
                     </div>
                     <div class="room-meta">
                       {{ room.occupiedBeds }}/{{ room.totalBeds }} 床 · {{ room.elderCount }} 人 · 空床 {{ room.emptyBeds }}
+                    </div>
+                    <div v-if="resolveVisibleRemark(room.remark)" class="room-remark">
+                      {{ resolveVisibleRemark(room.remark) }}
                     </div>
                     <div class="bed-matrix">
                       <button
@@ -141,6 +148,44 @@
         <a-button block @click="goScan">扫码执行（定位今日任务）</a-button>
       </a-space>
     </a-modal>
+
+    <a-modal v-model:open="roomDetailOpen" :title="`房间详情 · ${selectedRoom?.roomNo || '-'}`" width="760px" :footer="null" destroy-on-close>
+      <a-descriptions bordered size="small" :column="2" style="margin-bottom: 12px">
+        <a-descriptions-item label="房型">{{ selectedRoom?.roomType || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="容量">{{ selectedRoom?.capacity || 0 }} 床</a-descriptions-item>
+        <a-descriptions-item label="在住人数">{{ selectedRoom?.elderCount || 0 }} 人</a-descriptions-item>
+        <a-descriptions-item label="空床">{{ selectedRoom?.emptyBeds || 0 }} 床</a-descriptions-item>
+        <a-descriptions-item label="公开备注" :span="2">{{ resolveVisibleRemark(selectedRoom?.remark) || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="全部备注" :span="2">{{ resolveAllRemark(selectedRoom?.remark) || '-' }}</a-descriptions-item>
+      </a-descriptions>
+
+      <a-table
+        :loading="roomResidentLoading"
+        :data-source="roomResidents"
+        :pagination="false"
+        :row-key="(item:any) => item.id"
+        size="small"
+      >
+        <a-table-column title="头像" key="avatar" width="70">
+          <template #default="{ record }">
+            <a-avatar style="background-color: #1677ff">{{ String(record?.fullName || '?').slice(-1) }}</a-avatar>
+          </template>
+        </a-table-column>
+        <a-table-column title="姓名" data-index="fullName" key="fullName" width="110" />
+        <a-table-column title="生日" data-index="birthDate" key="birthDate" width="120" />
+        <a-table-column title="家庭住址" data-index="homeAddress" key="homeAddress" />
+        <a-table-column title="备注" data-index="remark" key="remark" />
+        <a-table-column title="操作" key="action" width="180">
+          <template #default="{ record }">
+            <a-space>
+              <a-button type="link" size="small" @click="openElderProfile(record.id)">详情</a-button>
+              <a-button type="link" size="small" @click="openResidentBills(record.id)">账单</a-button>
+            </a-space>
+          </template>
+        </a-table-column>
+      </a-table>
+      <a-empty v-if="!roomResidentLoading && !roomResidents.length" description="当前房间暂无入住长者" />
+    </a-modal>
   </PageContainer>
 </template>
 
@@ -151,8 +196,9 @@ import { useRouter } from 'vue-router'
 import PageContainer from '../../../components/PageContainer.vue'
 import FlowGuardBar from '../../../components/FlowGuardBar.vue'
 import { getBedMap, getRoomList } from '../../../api/bed'
+import { getElderDetail } from '../../../api/elder'
 import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
-import type { BedItem, RoomItem } from '../../../types'
+import type { BedItem, ElderItem, RoomItem } from '../../../types'
 
 type RoomScene = {
   key: string
@@ -165,6 +211,7 @@ type RoomScene = {
   occupiedBeds: number
   elderCount: number
   emptyBeds: number
+  remark?: string
 }
 
 const router = useRouter()
@@ -174,6 +221,10 @@ const roomCapacityMap = ref<Record<string, number>>({})
 const keyword = ref('')
 const selectedBed = ref<BedItem | null>(null)
 const detailOpen = ref(false)
+const roomDetailOpen = ref(false)
+const selectedRoom = ref<RoomScene | null>(null)
+const roomResidents = ref<ElderItem[]>([])
+const roomResidentLoading = ref(false)
 const quickFilter = ref<'ALL' | 'IDLE' | 'OCCUPIED'>('ALL')
 const riskFilterEnabled = ref(false)
 const riskFilterLevel = ref<'ALL' | 'HIGH' | 'MEDIUM' | 'LOW'>('ALL')
@@ -343,7 +394,8 @@ const roomSceneLookup = computed(() => {
       totalBeds,
       occupiedBeds,
       elderCount,
-      emptyBeds
+      emptyBeds,
+      remark: roomBeds[0]?.roomRemark
     })
   })
 
@@ -467,6 +519,75 @@ function formatLatestAssessment(bed: BedItem) {
 function selectBed(bed: BedItem) {
   selectedBed.value = bed
   detailOpen.value = true
+}
+
+function buildingRemarkByName(buildingName: string) {
+  const hit = scopedBeds.value.find((item) => String(item.building || '未分配楼栋') === buildingName)
+  return hit?.buildingRemark || ''
+}
+
+function parseRemarkSlots(raw?: string) {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    const slots = Array.isArray(parsed?.slots) ? parsed.slots : [parsed?.remark1, parsed?.remark2, parsed?.remark3]
+    return slots
+      .map((slot: any, index: number) => {
+        if (!slot) return null
+        if (typeof slot === 'string') {
+          return { text: slot, visible: true, index }
+        }
+        return {
+          text: String(slot.text || slot.value || '').trim(),
+          visible: slot.visible !== false,
+          index
+        }
+      })
+      .filter((slot: any) => slot && slot.text)
+  } catch {
+    return [{ text: raw, visible: true, index: 0 }]
+  }
+}
+
+function resolveVisibleRemark(raw?: string) {
+  return parseRemarkSlots(raw)
+    .filter((item: any) => item.visible)
+    .map((item: any) => item.text)
+    .join('；')
+}
+
+function resolveAllRemark(raw?: string) {
+  return parseRemarkSlots(raw)
+    .map((item: any) => item.text)
+    .join('；')
+}
+
+async function openRoomDetail(room: RoomScene) {
+  selectedRoom.value = room
+  roomDetailOpen.value = true
+  const elderIds = Array.from(new Set(room.beds.map((item) => item.elderId).filter(Boolean))) as string[]
+  if (!elderIds.length) {
+    roomResidents.value = []
+    return
+  }
+  roomResidentLoading.value = true
+  try {
+    const results = await Promise.allSettled(elderIds.map((elderId) => getElderDetail(elderId)))
+    roomResidents.value = results
+      .filter((item): item is PromiseFulfilledResult<ElderItem> => item.status === 'fulfilled')
+      .map((item) => item.value)
+  } finally {
+    roomResidentLoading.value = false
+  }
+}
+
+function openElderProfile(elderId: string) {
+  roomDetailOpen.value = false
+  router.push(`/elder/detail/${elderId}`)
+}
+
+function openResidentBills(elderId: string) {
+  router.push(`/finance/bills/in-resident?elderId=${elderId}`)
 }
 
 function openProfile() {
@@ -627,6 +748,13 @@ watch(sourceBeds, () => {
   box-shadow: inset 0 0 0 1px #60a5fa;
 }
 
+.building-remark {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 500;
+}
+
 .matrix-floor-axis {
   border: 0;
   appearance: none;
@@ -703,6 +831,12 @@ watch(sourceBeds, () => {
 .room-meta {
   margin: 6px 0 6px;
   color: #64748b;
+  font-size: 11px;
+}
+
+.room-remark {
+  margin: 0 0 6px;
+  color: #2563eb;
   font-size: 11px;
 }
 

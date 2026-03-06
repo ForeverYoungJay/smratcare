@@ -19,6 +19,10 @@ public class BillMonthlyView {
   private BigDecimal paidAmount;
   private BigDecimal outstandingAmount;
   private String lastPayMethod;
+  private Long lastPaymentId;
+  private BigDecimal lastPaymentAmount;
+  private LocalDateTime lastPaidAt;
+  private String lastPaymentRemark;
   private Integer status;
   private LocalDateTime createTime;
   private LocalDateTime updateTime;

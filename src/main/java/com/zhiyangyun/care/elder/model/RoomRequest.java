@@ -20,5 +20,6 @@ public class RoomRequest {
   private Integer capacity = 1;
   private Integer status = 1;
   private String roomQrCode;
+  private String remark;
   private Long createdBy;
 }

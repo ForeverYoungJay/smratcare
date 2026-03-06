@@ -2,6 +2,30 @@ const TOKEN_KEY = 'zhiyangyun_token'
 const ROLES_KEY = 'zhiyangyun_roles'
 const PERMISSIONS_KEY = 'zhiyangyun_permissions'
 
+export function normalizeRoles(roles: string[]): string[] {
+  const normalized = new Set<string>()
+  ;(roles || []).forEach((role) => {
+    const code = String(role || '').trim().toUpperCase()
+    if (code) normalized.add(code)
+  })
+  if (normalized.has('OPERATOR')) {
+    normalized.add('MARKETING_EMPLOYEE')
+  }
+  if (normalized.has('MANAGER')) {
+    normalized.add('MARKETING_MINISTER')
+  }
+  const hasDepartmentRole = Array.from(normalized).some(
+    (code) => code.endsWith('_EMPLOYEE') || code.endsWith('_MINISTER')
+  )
+  if (hasDepartmentRole) {
+    normalized.add('STAFF')
+  }
+  if (normalized.has('SYS_ADMIN') || normalized.has('DIRECTOR')) {
+    normalized.add('ADMIN')
+  }
+  return Array.from(normalized)
+}
+
 export function getToken(): string {
   return localStorage.getItem(TOKEN_KEY) || ''
 }
@@ -16,11 +40,12 @@ export function clearToken() {
 
 export function getRoles(): string[] {
   const raw = localStorage.getItem(ROLES_KEY)
-  return raw ? JSON.parse(raw) : []
+  const roles = raw ? JSON.parse(raw) : []
+  return normalizeRoles(roles)
 }
 
 export function setRoles(roles: string[]) {
-  localStorage.setItem(ROLES_KEY, JSON.stringify(roles || []))
+  localStorage.setItem(ROLES_KEY, JSON.stringify(normalizeRoles(roles || [])))
 }
 
 export function clearRoles() {

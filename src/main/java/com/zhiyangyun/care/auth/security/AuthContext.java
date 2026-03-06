@@ -1,6 +1,7 @@
 package com.zhiyangyun.care.auth.security;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -68,7 +69,7 @@ public class AuthContext {
   }
 
   public static boolean isAdmin() {
-    return hasRole("ADMIN");
+    return hasRole("ADMIN") || hasRole("SYS_ADMIN") || hasRole("DIRECTOR");
   }
 
   public static List<String> getRoleCodes() {
@@ -81,5 +82,26 @@ public class AuthContext {
         .map(auth -> auth != null && auth.startsWith("ROLE_") ? auth.substring(5) : auth)
         .filter(auth -> auth != null && !auth.isBlank())
         .collect(Collectors.toList());
+  }
+
+  public static boolean isMinisterOrHigher() {
+    if (isAdmin()) {
+      return true;
+    }
+    List<String> roleCodes = getRoleCodes();
+    return hasLegacyManagerRole(roleCodes)
+        || roleCodes.stream()
+        .map(item -> item == null ? "" : item.toUpperCase(Locale.ROOT))
+        .anyMatch(item -> item.endsWith("_MINISTER"));
+  }
+
+  private static boolean hasLegacyManagerRole(List<String> roleCodes) {
+    if (roleCodes == null || roleCodes.isEmpty()) {
+      return false;
+    }
+    return roleCodes.contains("DEPT_LEADER")
+        || roleCodes.contains("LEADER")
+        || roleCodes.contains("MANAGER")
+        || roleCodes.contains("SUPERVISOR");
   }
 }

@@ -87,6 +87,7 @@
                 show-search
                 :filter-option="false"
                 :options="elderOptions"
+                :loading="elderLoading"
                 placeholder="请输入姓名搜索"
                 @search="searchElders"
                 @focus="() => !elderOptions.length && searchElders('')"
@@ -143,6 +144,7 @@ import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
+import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { getElderDetail } from '../../api/elder'
 import { exportCsv, exportExcel } from '../../utils/export'
 import { mapMedicalExportRows, tcmAssessmentExportColumns } from '../../constants/medicalExport'
@@ -218,7 +220,7 @@ const sceneOptions = [
 const editOpen = ref(false)
 const saving = ref(false)
 const form = reactive<any>({})
-const { elderOptions, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
+const { elderOptions, elderLoading, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
 
 function constitutionLabel(value?: string) {
   return constitutionOptions.find((i) => i.value === value)?.label || value || '-'
@@ -501,6 +503,15 @@ watch(
     onReset()
   }
 )
+
+useLiveSyncRefresh({
+  topics: ['health', 'elder', 'care', 'oa'],
+  refresh: () => {
+    if (loading.value || summaryLoading.value) return
+    fetchData().catch(() => {})
+  },
+  debounceMs: 900
+})
 </script>
 
 <style scoped>

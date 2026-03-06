@@ -3,8 +3,10 @@
     <a-card class="card-elevated" :bordered="false">
       <a-space wrap>
         <a-date-picker v-model:value="query.month" picker="month" style="width: 150px" />
+        <a-input v-model:value="query.printRemark" allow-clear placeholder="打印备注" style="width: 180px" />
         <a-button type="primary" @click="loadData">刷新</a-button>
         <a-button @click="exportData">导出</a-button>
+        <a-button @click="printCurrent">打印当前</a-button>
         <a-button @click="triggerImport">导入CSV</a-button>
         <a-button @click="go('/finance/config/change-log')">查看变更记录</a-button>
       </a-space>
@@ -98,12 +100,13 @@ import StatefulBlock from '../../components/StatefulBlock.vue'
 import { batchUpsertFinanceBillingConfig, getFinanceBillingConfig, getFinanceModuleEntrySummary, upsertFinanceBillingConfig } from '../../api/finance'
 import type { FinanceBillingConfigEntry, FinanceModuleEntrySummary } from '../../types'
 import { exportCsv } from '../../utils/export'
+import { printTableReport } from '../../utils/print'
 
 const router = useRouter()
 const loading = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
-const query = ref({ month: dayjs() })
+const query = ref({ month: dayjs(), printRemark: '' })
 const rows = ref<FinanceBillingConfigEntry[]>([])
 const importInputRef = ref<HTMLInputElement | null>(null)
 const summary = ref<FinanceModuleEntrySummary>({
@@ -255,6 +258,29 @@ function exportData() {
     })),
     `审批流配置-${dayjs().format('YYYYMMDD-HHmmss')}.csv`
   )
+}
+
+function printCurrent() {
+  try {
+    printTableReport({
+      title: '权限与审批流配置',
+      subtitle: `月份：${monthText()}；备注：${query.value.printRemark || '-'}；待处理事项：${summary.value.pendingCount || 0}`,
+      columns: [
+        { key: 'configKey', title: '配置键' },
+        { key: 'configValue', title: '配置值' },
+        { key: 'effectiveMonth', title: '生效月份' },
+        { key: 'remark', title: '备注' }
+      ],
+      rows: rows.value.map(item => ({
+        configKey: item.configKey || '-',
+        configValue: item.configValue ?? 0,
+        effectiveMonth: item.effectiveMonth || '-',
+        remark: item.remark || '-'
+      }))
+    })
+  } catch (error: any) {
+    message.error(error?.message || '打印失败')
+  }
 }
 
 function triggerImport() {

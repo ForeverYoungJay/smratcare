@@ -11,11 +11,15 @@
         <a-form-item label="关键字">
           <a-input v-model:value="query.keyword" allow-clear placeholder="操作人/动作/详情" style="width: 220px" />
         </a-form-item>
+        <a-form-item label="打印备注">
+          <a-input v-model:value="query.printRemark" allow-clear placeholder="例如：配置审计版" style="width: 180px" />
+        </a-form-item>
         <a-form-item>
           <a-space>
             <a-button type="primary" @click="loadData">查询</a-button>
             <a-button @click="reset">重置</a-button>
             <a-button @click="exportData">导出</a-button>
+            <a-button @click="printCurrent">打印当前</a-button>
           </a-space>
         </a-form-item>
       </a-form>
@@ -65,6 +69,7 @@ import PageContainer from '../../components/PageContainer.vue'
 import { getFinanceConfigChangeLogPage, rollbackFinanceBillingConfig } from '../../api/finance'
 import type { FinanceConfigChangeLogItem, PageResult } from '../../types'
 import { exportCsv } from '../../utils/export'
+import { printTableReport } from '../../utils/print'
 
 const loading = ref(false)
 const rows = ref<FinanceConfigChangeLogItem[]>([])
@@ -74,6 +79,7 @@ const query = reactive({
   from: dayjs().subtract(30, 'day'),
   to: dayjs(),
   keyword: '',
+  printRemark: '',
   pageNo: 1,
   pageSize: 20
 })
@@ -99,6 +105,7 @@ function reset() {
   query.from = dayjs().subtract(30, 'day')
   query.to = dayjs()
   query.keyword = ''
+  query.printRemark = ''
   query.pageNo = 1
   loadData()
 }
@@ -139,5 +146,32 @@ function exportData() {
     })),
     `财务配置变更记录-${dayjs().format('YYYYMMDD-HHmmss')}.csv`
   )
+}
+
+function printCurrent() {
+  try {
+    printTableReport({
+      title: '财务配置变更记录',
+      subtitle: `${dayjs(query.from).format('YYYY-MM-DD')} ~ ${dayjs(query.to).format('YYYY-MM-DD')}；关键字：${query.keyword || '-'}；备注：${query.printRemark || '-'}`,
+      columns: [
+        { key: 'createTime', title: '时间' },
+        { key: 'actorName', title: '操作人' },
+        { key: 'actionType', title: '动作' },
+        { key: 'entityType', title: '实体类型' },
+        { key: 'entityId', title: '实体ID' },
+        { key: 'detail', title: '变更详情' }
+      ],
+      rows: rows.value.map(item => ({
+        createTime: item.createTime || '-',
+        actorName: item.actorName || '-',
+        actionType: item.actionType || '-',
+        entityType: item.entityType || '-',
+        entityId: item.entityId || '-',
+        detail: item.detail || '-'
+      }))
+    })
+  } catch (error: any) {
+    message.error(error?.message || '打印失败')
+  }
 }
 </script>

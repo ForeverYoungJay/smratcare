@@ -232,6 +232,7 @@ import { getOaTaskCalendar, createOaTask, updateOaTask, completeOaTask, deleteOa
 import { getElderPage } from '../../api/elder'
 import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
 import { useStaffOptions } from '../../composables/useStaffOptions'
+import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { useUserStore } from '../../stores/user'
 import type { OaTask, ElderItem, PageResult } from '../../types'
 
@@ -715,6 +716,15 @@ onBeforeUnmount(() => {
   if (syncTimer) {
     window.clearInterval(syncTimer)
   }
+})
+
+useLiveSyncRefresh({
+  topics: ['oa', 'hr', 'elder', 'system'],
+  refresh: () => {
+    if (saving.value) return
+    fetchAll().catch(() => {})
+  },
+  debounceMs: 900
 })
 </script>
 

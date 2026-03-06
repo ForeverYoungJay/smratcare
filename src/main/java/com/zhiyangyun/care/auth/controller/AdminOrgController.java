@@ -28,7 +28,7 @@ public class AdminOrgController {
     this.orgMapper = orgMapper;
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping
   public Result<Org> create(@Valid @RequestBody OrgRequest request) {
     Org org = new Org();
@@ -43,7 +43,7 @@ public class AdminOrgController {
     return Result.ok(org);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN')")
   @PutMapping("/{id}")
   public Result<Org> update(@PathVariable Long id, @Valid @RequestBody OrgRequest request) {
     Org org = orgMapper.selectById(id);
@@ -61,7 +61,7 @@ public class AdminOrgController {
     return Result.ok(org);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN')")
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
     Org org = orgMapper.selectById(id);
@@ -73,13 +73,13 @@ public class AdminOrgController {
     return Result.ok(null);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/{id}")
   public Result<Org> get(@PathVariable Long id) {
     return Result.ok(orgMapper.selectById(id));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping
   public Result<IPage<Org>> list(
       @RequestParam(defaultValue = "1") long page,

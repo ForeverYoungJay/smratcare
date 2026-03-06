@@ -1,4 +1,5 @@
 import { getRoles, getToken } from '../utils/auth';
+import { hasRouteAccess } from '../utils/roleAccess';
 export function setupPermission(router) {
     router.beforeEach((to, _from, next) => {
         const token = getToken();
@@ -12,7 +13,7 @@ export function setupPermission(router) {
         }
         const roles = getRoles();
         const required = to.meta?.roles || [];
-        if (required.length > 0 && !required.some((r) => roles.includes(r))) {
+        if (!hasRouteAccess(roles, required, to.path)) {
             next('/403');
             return;
         }

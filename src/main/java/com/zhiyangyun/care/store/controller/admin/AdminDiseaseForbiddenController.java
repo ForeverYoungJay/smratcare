@@ -25,7 +25,7 @@ public class AdminDiseaseForbiddenController {
     this.diseaseRuleService = diseaseRuleService;
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PutMapping("/{id}/forbidden-tags")
   public Result<Void> saveForbiddenTags(
       @PathVariable Long id,
@@ -35,7 +35,7 @@ public class AdminDiseaseForbiddenController {
     return Result.ok(null);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/{id}/forbidden-tags")
   public Result<ForbiddenTagsResponse> getForbiddenTags(
       @PathVariable Long id) {

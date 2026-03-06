@@ -30,7 +30,7 @@ public class MarketingReportController {
     this.auditLogService = auditLogService;
   }
 
-  @PreAuthorize("hasAnyRole('ADMIN','MANAGER','OPERATOR')")
+  @PreAuthorize("hasAnyRole('MARKETING_EMPLOYEE','MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/lead-entry-summary")
   public Result<MarketingLeadEntrySummaryResponse> leadEntrySummary(
       @RequestParam String mode,
@@ -54,7 +54,7 @@ public class MarketingReportController {
         consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName));
   }
 
-  @PreAuthorize("hasAnyRole('ADMIN','MANAGER','OPERATOR')")
+  @PreAuthorize("hasAnyRole('MARKETING_EMPLOYEE','MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/conversion")
   public Result<MarketingConversionReportResponse> conversion(
       @RequestParam(required = false) String dateFrom,
@@ -67,7 +67,7 @@ public class MarketingReportController {
     return Result.ok(marketingReportService.conversion(orgId, dateFrom, dateTo, source, staffId));
   }
 
-  @PreAuthorize("hasAnyRole('ADMIN','MANAGER','OPERATOR')")
+  @PreAuthorize("hasAnyRole('MARKETING_EMPLOYEE','MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/consultation")
   public Result<List<MarketingConsultationTrendItem>> consultation(
       @RequestParam(defaultValue = "14") int days,
@@ -81,7 +81,7 @@ public class MarketingReportController {
     return Result.ok(marketingReportService.consultationTrend(orgId, days, dateFrom, dateTo, source, staffId));
   }
 
-  @PreAuthorize("hasAnyRole('ADMIN','MANAGER','OPERATOR')")
+  @PreAuthorize("hasAnyRole('MARKETING_EMPLOYEE','MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/channel")
   public Result<List<MarketingChannelReportItem>> channel(
       @RequestParam(required = false) String dateFrom,
@@ -93,7 +93,7 @@ public class MarketingReportController {
     return Result.ok(marketingReportService.channel(orgId, dateFrom, dateTo, staffId));
   }
 
-  @PreAuthorize("hasAnyRole('ADMIN','MANAGER','OPERATOR')")
+  @PreAuthorize("hasAnyRole('MARKETING_EMPLOYEE','MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/followup")
   public Result<MarketingFollowupReportResponse> followup(
       @RequestParam(required = false) String dateFrom,
@@ -106,7 +106,7 @@ public class MarketingReportController {
     return Result.ok(marketingReportService.followup(orgId, dateFrom, dateTo, source, staffId));
   }
 
-  @PreAuthorize("hasAnyRole('ADMIN','MANAGER','OPERATOR')")
+  @PreAuthorize("hasAnyRole('MARKETING_EMPLOYEE','MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/callback")
   public Result<MarketingCallbackReportResponse> callback(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -121,7 +121,7 @@ public class MarketingReportController {
     return Result.ok(marketingReportService.callback(orgId, pageNo, pageSize, dateFrom, dateTo, source, staffId));
   }
 
-  @PreAuthorize("hasAnyRole('ADMIN','MANAGER','OPERATOR')")
+  @PreAuthorize("hasAnyRole('MARKETING_EMPLOYEE','MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/data-quality")
   public Result<MarketingDataQualityResponse> dataQuality() {
     Long orgId = AuthContext.getOrgId();
@@ -130,7 +130,7 @@ public class MarketingReportController {
     return Result.ok(marketingReportService.dataQuality(orgId));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping("/data-quality/normalize-source")
   public Result<Integer> normalizeSource() {
     Long orgId = AuthContext.getOrgId();

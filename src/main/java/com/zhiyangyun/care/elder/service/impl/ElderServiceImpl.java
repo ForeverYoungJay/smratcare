@@ -21,15 +21,25 @@ import com.zhiyangyun.care.elder.model.ElderUpdateRequest;
 import com.zhiyangyun.care.elder.service.ElderService;
 import com.zhiyangyun.care.elder.util.QrCodeUtil;
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
+import net.sourceforge.pinyin4j.PinyinHelper;
+import net.sourceforge.pinyin4j.format.exception.BadHanyuPinyinOutputFormatCombination;
+import net.sourceforge.pinyin4j.format.HanyuPinyinCaseType;
+import net.sourceforge.pinyin4j.format.HanyuPinyinOutputFormat;
+import net.sourceforge.pinyin4j.format.HanyuPinyinToneType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ElderServiceImpl implements ElderService {
+  private static final String ELDER_NAME_PINYIN_BOUNDARY = "阿芭擦搭蛾发噶哈讥咔垃妈拿哦啪期然撒塌挖昔压匝";
+  private static final String ELDER_NAME_PINYIN_INITIAL = "ABCDEFGHJKLMNOPQRSTWXYZ";
+
   private final ElderMapper elderMapper;
   private final BedMapper bedMapper;
   private final ElderBedRelationMapper relationMapper;
@@ -177,10 +187,11 @@ public class ElderServiceImpl implements ElderService {
   }
 
   @Override
-  public IPage<ElderResponse> page(Long tenantId, long pageNo, long pageSize, String keyword, Boolean signedOnly) {
-    var wrapper = Wrappers.lambdaQuery(ElderProfile.class)
+  public IPage<ElderResponse> page(Long tenantId, long pageNo, long pageSize, String keyword, Boolean signedOnly, Integer status) {
+    var baseWrapper = Wrappers.lambdaQuery(ElderProfile.class)
         .eq(ElderProfile::getIsDeleted, 0)
-        .eq(tenantId != null, ElderProfile::getTenantId, tenantId);
+        .eq(tenantId != null, ElderProfile::getTenantId, tenantId)
+        .eq(status != null, ElderProfile::getStatus, status);
     if (Boolean.TRUE.equals(signedOnly)) {
       List<CrmContract> signedContracts = crmContractMapper.selectList(Wrappers.lambdaQuery(CrmContract.class)
           .eq(CrmContract::getIsDeleted, 0)
@@ -194,19 +205,130 @@ public class ElderServiceImpl implements ElderService {
       if (signedElderIds.isEmpty()) {
         return new Page<>(pageNo, pageSize);
       }
-      wrapper.in(ElderProfile::getId, signedElderIds);
+      baseWrapper.in(ElderProfile::getId, signedElderIds);
     }
-    if (keyword != null && !keyword.isBlank()) {
-      wrapper.and(w -> w.like(ElderProfile::getFullName, keyword)
-          .or().like(ElderProfile::getElderCode, keyword)
-          .or().like(ElderProfile::getPhone, keyword));
+    String normalizedKeyword = keyword == null ? "" : keyword.trim();
+    if (!normalizedKeyword.isEmpty()) {
+      var wrapper = Wrappers.lambdaQuery(ElderProfile.class)
+          .eq(ElderProfile::getIsDeleted, 0)
+          .eq(tenantId != null, ElderProfile::getTenantId, tenantId)
+          .eq(status != null, ElderProfile::getStatus, status);
+      if (Boolean.TRUE.equals(signedOnly)) {
+        List<CrmContract> signedContracts = crmContractMapper.selectList(Wrappers.lambdaQuery(CrmContract.class)
+            .eq(CrmContract::getIsDeleted, 0)
+            .eq(tenantId != null, CrmContract::getTenantId, tenantId)
+            .isNotNull(CrmContract::getElderId)
+            .in(CrmContract::getStatus, List.of("SIGNED", "EFFECTIVE")));
+        Set<Long> signedElderIds = new HashSet<>(signedContracts.stream()
+            .map(CrmContract::getElderId)
+            .filter(Objects::nonNull)
+            .toList());
+        if (signedElderIds.isEmpty()) {
+          return new Page<>(pageNo, pageSize);
+        }
+        wrapper.in(ElderProfile::getId, signedElderIds);
+      }
+      wrapper.and(w -> w.like(ElderProfile::getFullName, normalizedKeyword)
+          .or().like(ElderProfile::getElderCode, normalizedKeyword)
+          .or().like(ElderProfile::getPhone, normalizedKeyword));
+      wrapper.orderByDesc(ElderProfile::getCreateTime);
+      IPage<ElderProfile> page = elderMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
+      if (page.getTotal() > 0 || !isAlphabeticKeyword(normalizedKeyword)) {
+        return page.convert(elder -> {
+          Bed bed = elder.getBedId() == null ? null : bedMapper.selectById(elder.getBedId());
+          return toResponse(elder, bed);
+        });
+      }
+      List<ElderProfile> allRows = elderMapper.selectList(baseWrapper.orderByDesc(ElderProfile::getCreateTime));
+      List<ElderProfile> filtered = allRows.stream()
+          .filter(elder -> matchByPinyinOrText(elder, normalizedKeyword))
+          .sorted(Comparator.comparing(ElderProfile::getCreateTime, Comparator.nullsLast(Comparator.reverseOrder())))
+          .collect(Collectors.toList());
+      Page<ElderProfile> manualPage = new Page<>(pageNo, pageSize, filtered.size());
+      int fromIndex = Math.max((int) ((pageNo - 1) * pageSize), 0);
+      int toIndex = Math.min(fromIndex + (int) pageSize, filtered.size());
+      if (fromIndex >= filtered.size()) {
+        manualPage.setRecords(List.of());
+      } else {
+        manualPage.setRecords(filtered.subList(fromIndex, toIndex));
+      }
+      return manualPage.convert(elder -> {
+        Bed bed = elder.getBedId() == null ? null : bedMapper.selectById(elder.getBedId());
+        return toResponse(elder, bed);
+      });
     }
-    wrapper.orderByDesc(ElderProfile::getCreateTime);
-    IPage<ElderProfile> page = elderMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
+    baseWrapper.orderByDesc(ElderProfile::getCreateTime);
+    IPage<ElderProfile> page = elderMapper.selectPage(new Page<>(pageNo, pageSize), baseWrapper);
     return page.convert(elder -> {
       Bed bed = elder.getBedId() == null ? null : bedMapper.selectById(elder.getBedId());
       return toResponse(elder, bed);
     });
+  }
+
+  private boolean isAlphabeticKeyword(String keyword) {
+    if (keyword == null || keyword.isBlank()) {
+      return false;
+    }
+    return keyword.matches("[A-Za-z]+");
+  }
+
+  private boolean matchByPinyinOrText(ElderProfile elder, String keyword) {
+    String fullName = elder.getFullName() == null ? "" : elder.getFullName();
+    String elderCode = elder.getElderCode() == null ? "" : elder.getElderCode();
+    String phone = elder.getPhone() == null ? "" : elder.getPhone();
+    String searchText = (fullName + " " + elderCode + " " + phone + " " + toPinyinInitials(fullName)).toLowerCase();
+    return searchText.contains(keyword.toLowerCase());
+  }
+
+  private String toPinyinInitials(String text) {
+    if (text == null || text.isBlank()) {
+      return "";
+    }
+    HanyuPinyinOutputFormat format = new HanyuPinyinOutputFormat();
+    format.setCaseType(HanyuPinyinCaseType.LOWERCASE);
+    format.setToneType(HanyuPinyinToneType.WITHOUT_TONE);
+    StringBuilder sb = new StringBuilder();
+    for (char c : text.toCharArray()) {
+      if (Character.isLetterOrDigit(c)) {
+        if (c <= 127) {
+          sb.append(Character.toLowerCase(c));
+          continue;
+        }
+        try {
+          String[] arr = PinyinHelper.toHanyuPinyinStringArray(c, format);
+          if (arr != null && arr.length > 0 && arr[0] != null && !arr[0].isBlank()) {
+            sb.append(arr[0].charAt(0));
+            continue;
+          }
+        } catch (BadHanyuPinyinOutputFormatCombination ignored) {
+        }
+      }
+      String initial = getChineseInitial(c);
+      if (!initial.isBlank()) {
+        sb.append(initial.toLowerCase());
+      }
+    }
+    return sb.toString();
+  }
+
+  private String getChineseInitial(char c) {
+    if (c < '\u4e00' || c > '\u9fa5') {
+      return "";
+    }
+    String ch = String.valueOf(c);
+    for (int i = 0; i < ELDER_NAME_PINYIN_BOUNDARY.length(); i += 1) {
+      String current = ELDER_NAME_PINYIN_BOUNDARY.substring(i, i + 1);
+      String next = i + 1 >= ELDER_NAME_PINYIN_BOUNDARY.length()
+          ? null
+          : ELDER_NAME_PINYIN_BOUNDARY.substring(i + 1, i + 2);
+      if (next == null) {
+        return ELDER_NAME_PINYIN_INITIAL.substring(i, i + 1);
+      }
+      if (ch.compareTo(current) >= 0 && ch.compareTo(next) < 0) {
+        return ELDER_NAME_PINYIN_INITIAL.substring(i, i + 1);
+      }
+    }
+    return "";
   }
 
   @Override
@@ -302,22 +424,7 @@ public class ElderServiceImpl implements ElderService {
   }
 
   private void ensureNoDuplicateNameOccupied(ElderProfile elder) {
-    String fullName = elder.getFullName();
-    if (fullName == null || fullName.isBlank()) {
-      return;
-    }
-    List<ElderProfile> duplicated = elderMapper.selectList(
-        Wrappers.lambdaQuery(ElderProfile.class)
-            .eq(ElderProfile::getIsDeleted, 0)
-            .eq(ElderProfile::getTenantId, elder.getTenantId())
-            .eq(ElderProfile::getOrgId, elder.getOrgId())
-            .eq(ElderProfile::getFullName, fullName.trim())
-            .in(ElderProfile::getStatus, List.of(1, 2))
-            .isNotNull(ElderProfile::getBedId)
-            .ne(ElderProfile::getId, elder.getId()));
-    if (!duplicated.isEmpty()) {
-      throw new IllegalStateException("同名长者已占用床位，请在姓名后备注如“" + fullName.trim() + "2”后再办理入住");
-    }
+    return;
   }
 
   @Override

@@ -90,6 +90,11 @@ Flyway 版本冲突检查：
 ./scripts/project_self_check.sh
 ```
 
+RBAC 权限模型审计（旧权限表达式回归检查）：
+```bash
+./scripts/rbac_audit.sh
+```
+
 Flyway 状态巡检（只检查，不修复）：
 ```bash
 ./scripts/flyway_status.sh
@@ -129,6 +134,12 @@ curl -s -X POST http://localhost:8080/api/auth/login \
 - `permissions`：`string[]`
 - `staffInfo`：对象（`id/orgId/departmentId/username/realName/phone/status`）
 
+角色模型（新增）：
+- 超级管理员：`SYS_ADMIN`（自动具备 `ADMIN` 能力）
+- 管理层：`DIRECTOR`（自动具备 `ADMIN` 能力）
+- 六部门角色模板：`MEDICAL_*`、`NURSING_*`、`FINANCE_*`、`LOGISTICS_*`、`MARKETING_*`、`HR_*`
+- 兼容规则：任一部门角色自动具备 `STAFF` 能力；模块内 `ADMIN` 兼容默认收敛为“对应部门部长及以上”
+
 家属登录请求字段（`FamilyLoginRequest`）：
 - `orgId`：`number`，必填
 - `phone`：`string`，必填
@@ -149,6 +160,8 @@ OpenAPI：
 - 部署检查清单：`DEPLOYMENT_CHECKLIST.md`
 - 测试执行说明：`TESTING.md`
 - 物资中心合并说明：`docs/MATERIAL_CENTER_MERGE.md`
+- RBAC 闭环矩阵：`docs/RBAC_CLOSURE_MATRIX.md`
+- RBAC 验收清单：`docs/RBAC_ACCEPTANCE_CHECKLIST.md`
 
 ## 备注
 - 上传文件默认映射目录：`output/uploads`（容器内 `/app/uploads`）

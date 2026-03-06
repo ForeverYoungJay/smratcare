@@ -134,6 +134,7 @@ import {
   updateDeathRegister
 } from '../../api/elderResidence'
 import { getRoles } from '../../utils/auth'
+import { hasMinisterOrHigher, hasStaffOrHigher } from '../../utils/roleAccess'
 import type { DeathRegisterCreateRequest, DeathRegisterItem, PageResult } from '../../types'
 
 const loading = ref(false)
@@ -153,8 +154,8 @@ const rowSelection = computed(() => ({
   }
 }))
 const roles = getRoles()
-const canManage = roles.includes('ADMIN') || roles.includes('STAFF')
-const canCancel = roles.includes('ADMIN')
+const canManage = hasStaffOrHigher(roles)
+const canCancel = hasMinisterOrHigher(roles)
 
 const query = reactive({
   elderId: undefined as number | undefined,

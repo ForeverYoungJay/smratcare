@@ -16,6 +16,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -402,7 +403,8 @@ public class CrmContractServiceImpl implements CrmContractService {
     target.setContractStatus(firstNonBlank(blankToNull(request.getContractStatus()), current == null ? null : current.getContractStatus()));
     target.setFlowStage(firstNonBlank(blankToNull(request.getFlowStage()), current == null ? null : current.getFlowStage()));
     target.setCurrentOwnerDept(firstNonBlank(blankToNull(request.getCurrentOwnerDept()), current == null ? null : current.getCurrentOwnerDept()));
-    target.setOrgName(firstNonBlank(blankToNull(request.getOrgName()), current == null ? null : current.getOrgName()));
+    String normalizedPolicy = normalizePolicySelection(request.getOrgName());
+    target.setOrgName(firstNonBlank(blankToNull(normalizedPolicy), current == null ? null : current.getOrgName()));
     target.setStatus(firstNonBlank(blankToNull(request.getStatus()), current == null ? null : current.getStatus()));
     target.setRemark(firstNonBlank(blankToNull(request.getRemark()), current == null ? null : current.getRemark()));
     if (request.getSmsSendCount() != null) {
@@ -476,6 +478,22 @@ public class CrmContractServiceImpl implements CrmContractService {
     } else {
       leadMapper.updateById(lead);
     }
+  }
+
+  private String normalizePolicySelection(String raw) {
+    if (raw == null || raw.isBlank()) {
+      return null;
+    }
+    List<String> policies = Arrays.stream(raw.split("[；;,，]"))
+        .map(String::trim)
+        .filter(item -> !item.isBlank())
+        .distinct()
+        .limit(2)
+        .toList();
+    if (policies.isEmpty()) {
+      return null;
+    }
+    return String.join("；", policies);
   }
 
   private void syncLeadDelete(CrmContract contract) {

@@ -93,7 +93,6 @@
                 v-model:value="form.expiredAt"
                 show-time
                 style="width: 100%"
-                value-format="YYYY-MM-DD HH:mm:ss"
                 placeholder="可选，状态为已过期时自动补当前时间"
               />
             </a-form-item>
@@ -119,6 +118,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
+import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
@@ -265,6 +265,9 @@ function openEdit(record?: OaKnowledge) {
       remark: ''
     }
   )
+  if (record?.expiredAt) {
+    ;(form as any).expiredAt = dayjs(record.expiredAt)
+  }
   editOpen.value = true
 }
 
@@ -283,7 +286,8 @@ async function submit() {
     attachmentUrl: form.attachmentUrl ? String(form.attachmentUrl).trim() : undefined,
     attachmentType: form.attachmentType ? String(form.attachmentType).trim() : undefined,
     authorName: form.authorName ? String(form.authorName).trim() : undefined,
-    remark: form.remark ? String(form.remark).trim() : undefined
+    remark: form.remark ? String(form.remark).trim() : undefined,
+    expiredAt: normalizeExpiredAt(form.expiredAt)
   }
   saving.value = true
   try {
@@ -294,6 +298,9 @@ async function submit() {
     }
     editOpen.value = false
     fetchData()
+    message.success('保存成功')
+  } catch (error: any) {
+    message.error(error?.message || error?.response?.data?.message || '保存失败')
   } finally {
     saving.value = false
   }
@@ -425,7 +432,7 @@ async function beforeUploadKnowledge(file: File) {
     const res = await uploadOaFile(file, 'oa-knowledge')
     form.attachmentUrl = res.fileUrl || ''
     form.attachmentName = res.originalFileName || res.fileName || file.name
-    form.attachmentType = res.fileType || file.type || undefined
+    form.attachmentType = limitText(res.fileType || file.type || undefined, 128)
     form.attachmentSize = Number(res.fileSize || file.size || 0)
     if (!form.title) {
       const baseName = String(form.attachmentName || '').replace(/\.[^/.]+$/, '')
@@ -436,6 +443,27 @@ async function beforeUploadKnowledge(file: File) {
     uploading.value = false
   }
   return false
+}
+
+function normalizeExpiredAt(raw: any) {
+  if (!raw) return undefined
+  if (typeof raw === 'string') {
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(raw)) {
+      return raw.replace(' ', 'T')
+    }
+    return raw
+  }
+  if (typeof raw?.format === 'function') {
+    return raw.format('YYYY-MM-DDTHH:mm:ss')
+  }
+  return raw
+}
+
+function limitText(text?: string, max = 128) {
+  if (!text) return undefined
+  const normalized = String(text).trim()
+  if (!normalized) return undefined
+  return normalized.length <= max ? normalized : normalized.slice(0, max)
 }
 
 fetchData()

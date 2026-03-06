@@ -571,15 +571,7 @@ public class OaApprovalController {
   }
 
   private boolean canCurrentUserApprove() {
-    if (AuthContext.isAdmin()) {
-      return true;
-    }
-    List<String> roleCodes = AuthContext.getRoleCodes();
-    return roleCodes.contains("DEPT_LEADER")
-        || roleCodes.contains("LEADER")
-        || roleCodes.contains("MANAGER")
-        || roleCodes.contains("SUPERVISOR")
-        || roleCodes.contains("DIRECTOR");
+    return AuthContext.isMinisterOrHigher();
   }
 
   private Long resolveApplicantId(boolean canApprove, Long currentStaffId, Long requestApplicantId) {

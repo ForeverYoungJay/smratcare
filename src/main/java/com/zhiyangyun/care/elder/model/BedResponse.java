@@ -16,8 +16,10 @@ public class BedResponse {
   private Long elderId;
   private String roomNo;
   private String building;
+  private String buildingRemark;
   private String floorNo;
   private String roomType;
+  private String roomRemark;
   private String areaCode;
   private String areaName;
   private String roomQrCode;

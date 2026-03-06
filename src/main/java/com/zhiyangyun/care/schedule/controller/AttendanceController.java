@@ -21,7 +21,7 @@ public class AttendanceController {
     this.attendanceService = attendanceService;
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/page")
   public Result<IPage<AttendanceResponse>> page(
       @RequestParam(defaultValue = "1") long pageNo,

@@ -35,7 +35,7 @@ public class AdminProductTagController {
     this.productTagMapper = productTagMapper;
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping
   public Result<ProductTag> create(@Valid @RequestBody ProductTagRequest request) {
     ProductTag tag = new ProductTag();
@@ -48,7 +48,7 @@ public class AdminProductTagController {
     return Result.ok(tag);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PutMapping("/{id}")
   public Result<ProductTag> update(@PathVariable Long id, @Valid @RequestBody ProductTagRequest request) {
     ProductTag tag = productTagMapper.selectById(id);
@@ -124,7 +124,7 @@ public class AdminProductTagController {
     return normalized.toUpperCase(Locale.ROOT);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
     ProductTag tag = productTagMapper.selectById(id);
@@ -136,13 +136,13 @@ public class AdminProductTagController {
     return Result.ok(null);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/{id}")
   public Result<ProductTag> get(@PathVariable Long id) {
     return Result.ok(productTagMapper.selectById(id));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping
   public Result<IPage<ProductTag>> page(
       @RequestParam(defaultValue = "1") long page,

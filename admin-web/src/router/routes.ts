@@ -126,13 +126,19 @@ export const routes: RouteRecordRaw[] = [
                 path: 'medical-outing',
                 name: 'ElderStatusChangeMedicalOuting',
                 component: () => import('../views/elder/MedicalOuting.vue'),
-                meta: { title: '外出就医登记', roles: ['ADMIN', 'STAFF'] }
+                meta: {
+                  title: '外出就医登记',
+                  roles: ['MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'NURSING_EMPLOYEE', 'NURSING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
+                }
               },
               {
                 path: 'death-register',
                 name: 'ElderStatusChangeDeathRegister',
                 component: () => import('../views/elder/DeathRegister.vue'),
-                meta: { title: '死亡登记', roles: ['ADMIN', 'STAFF'] }
+                meta: {
+                  title: '死亡登记',
+                  roles: ['MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'NURSING_EMPLOYEE', 'NURSING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
+                }
               },
               {
                 path: 'discharge-settlement',
@@ -237,7 +243,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'marketing',
         name: 'Marketing',
-        meta: { title: '营销管理', icon: 'FundProjectionScreenOutlined' },
+        meta: { title: '营销管理', icon: 'FundProjectionScreenOutlined', roles: ['MARKETING_EMPLOYEE', 'MARKETING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
         redirect: '/marketing/workbench',
         children: [
           {
@@ -600,7 +606,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'logistics',
         name: 'Logistics',
-        meta: { title: '后勤保障', icon: 'ToolOutlined' },
+        meta: { title: '后勤保障', icon: 'ToolOutlined', roles: ['LOGISTICS_EMPLOYEE', 'LOGISTICS_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
         redirect: '/logistics/workbench',
         children: [
           {
@@ -802,7 +808,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'care',
         name: 'Care',
-        meta: { title: '照护管理', icon: 'ScheduleOutlined', hidden: true },
+        meta: { title: '照护管理', icon: 'ScheduleOutlined', hidden: true, roles: ['NURSING_EMPLOYEE', 'NURSING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
         redirect: '/care/staff/caregiver-info',
         children: [
           {
@@ -1126,7 +1132,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'finance',
         name: 'Finance',
-        meta: { title: '财务收费与经营分析中心', icon: 'AccountBookOutlined' },
+        meta: { title: '财务收费与经营分析中心', icon: 'AccountBookOutlined', roles: ['FINANCE_EMPLOYEE', 'FINANCE_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
         redirect: '/finance/workbench',
         children: [
           {
@@ -1761,7 +1767,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'medical-care',
         name: 'MedicalCare',
-        meta: { title: '医护健康服务', icon: 'MedicineBoxOutlined' },
+        meta: { title: '医护健康服务', icon: 'MedicineBoxOutlined', roles: ['MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
         redirect: '/medical-care/center',
         children: [
           {
@@ -2099,7 +2105,11 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'assessment',
         name: 'Assessment',
-        meta: { title: '评估管理', icon: 'FileSearchOutlined', roles: ['ADMIN', 'STAFF'] },
+        meta: {
+          title: '评估管理',
+          icon: 'FileSearchOutlined',
+          roles: ['MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'NURSING_EMPLOYEE', 'NURSING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
+        },
         redirect: '/assessment/ability/admission',
         children: [
           {
@@ -2308,12 +2318,6 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: '员工管理' }
           },
           {
-            path: 'album',
-            name: 'OaAlbum',
-            component: () => import('../views/oa/Album.vue'),
-            meta: { title: '相册管理', hidden: true }
-          },
-          {
             path: 'card',
             name: 'OaCard',
             meta: { title: '一卡通管理' },
@@ -2442,7 +2446,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'hr',
         name: 'Hr',
-        meta: { title: '人事行政工作台', icon: 'SolutionOutlined', roles: ['ADMIN'] },
+        meta: { title: '人事行政工作台', icon: 'SolutionOutlined', roles: ['HR_EMPLOYEE', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
         redirect: '/hr/workbench',
         children: [
           {
@@ -2636,7 +2640,6 @@ export const routes: RouteRecordRaw[] = [
               { path: 'tasks', name: 'HrOaTasks', component: () => import('../views/oa/Task.vue'), meta: { title: '任务管理', roles: ['ADMIN'] } },
               { path: 'execution', name: 'HrOaExecution', component: () => import('../views/oa/Todo.vue'), meta: { title: '工作执行', roles: ['ADMIN'] } },
               { path: 'activity-plan', name: 'HrOaActivityPlan', component: () => import('../views/oa/ActivityPlan.vue'), meta: { title: '活动计划', roles: ['ADMIN'] } },
-              { path: 'albums', name: 'HrOaAlbums', component: () => import('../views/oa/Album.vue'), meta: { title: '相册管理', hidden: true, roles: ['ADMIN'] } },
               { path: 'knowledge', name: 'HrOaKnowledge', component: () => import('../views/oa/Knowledge.vue'), meta: { title: '知识库', roles: ['ADMIN'] } },
               { path: 'policies', name: 'HrOaPolicies', component: () => import('../views/hr/HrPolicies.vue'), meta: { title: '规章制度库', roles: ['ADMIN'] } },
               { path: 'policy-alerts', name: 'HrOaPolicyAlerts', component: () => import('../views/hr/HrPolicyAlerts.vue'), meta: { title: '制度更新预警', roles: ['ADMIN'] } },
@@ -2860,7 +2863,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'system',
         name: 'System',
-        meta: { title: '系统管理', icon: 'SettingOutlined', roles: ['ADMIN'] },
+        meta: { title: '系统管理', icon: 'SettingOutlined', roles: ['DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
         redirect: '/system/org-info',
         children: [
           {

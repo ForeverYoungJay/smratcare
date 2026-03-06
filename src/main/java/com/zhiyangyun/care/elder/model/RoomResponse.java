@@ -16,4 +16,5 @@ public class RoomResponse {
   private Integer capacity;
   private Integer status;
   private String roomQrCode;
+  private String remark;
 }

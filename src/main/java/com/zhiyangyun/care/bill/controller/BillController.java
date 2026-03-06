@@ -105,7 +105,7 @@ public class BillController {
             .stream()
             .collect(Collectors.toMap(ElderProfile::getId, Function.identity(), (a, b) -> a));
 
-    Map<Long, String> payMethodMap = new HashMap<>();
+    Map<Long, PaymentRecord> lastPaymentMap = new HashMap<>();
     if (!page.getRecords().isEmpty()) {
       List<Long> billIds = page.getRecords().stream().map(BillMonthly::getId).toList();
       List<PaymentRecord> payRecords = paymentRecordMapper.selectList(
@@ -115,10 +115,10 @@ public class BillController {
               .orderByDesc(PaymentRecord::getPaidAt)
               .orderByDesc(PaymentRecord::getCreateTime));
       for (PaymentRecord payRecord : payRecords) {
-        if (payMethodMap.containsKey(payRecord.getBillMonthlyId())) {
+        if (lastPaymentMap.containsKey(payRecord.getBillMonthlyId())) {
           continue;
         }
-        payMethodMap.put(payRecord.getBillMonthlyId(), payRecord.getPayMethod());
+        lastPaymentMap.put(payRecord.getBillMonthlyId(), payRecord);
       }
     }
 
@@ -140,7 +140,12 @@ public class BillController {
       view.setInsuranceFee(feeMap.getOrDefault("INSURANCE", BigDecimal.ZERO));
       view.setPaidAmount(record.getPaidAmount());
       view.setOutstandingAmount(record.getOutstandingAmount());
-      view.setLastPayMethod(payMethodMap.get(record.getId()));
+      PaymentRecord latestPayment = lastPaymentMap.get(record.getId());
+      view.setLastPayMethod(latestPayment == null ? null : latestPayment.getPayMethod());
+      view.setLastPaymentId(latestPayment == null ? null : latestPayment.getId());
+      view.setLastPaymentAmount(latestPayment == null ? null : latestPayment.getAmount());
+      view.setLastPaidAt(latestPayment == null ? null : latestPayment.getPaidAt());
+      view.setLastPaymentRemark(latestPayment == null ? null : latestPayment.getRemark());
       view.setStatus(record.getStatus());
       view.setCreateTime(record.getCreateTime());
       view.setUpdateTime(record.getUpdateTime());

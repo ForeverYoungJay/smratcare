@@ -49,6 +49,7 @@ public class RoomServiceImpl implements RoomService {
     room.setCapacity(normalizedCapacity);
     room.setStatus(request.getStatus());
     room.setRoomQrCode(request.getRoomQrCode());
+    room.setRemark(request.getRemark());
     room.setCreatedBy(request.getCreatedBy());
     applyBuildingFloor(room, request.getTenantId(), request.getBuildingId(), request.getFloorId(),
         request.getBuilding(), request.getFloorNo());
@@ -80,6 +81,7 @@ public class RoomServiceImpl implements RoomService {
     room.setCapacity(normalizedCapacity);
     room.setStatus(request.getStatus());
     room.setRoomQrCode(request.getRoomQrCode());
+    room.setRemark(request.getRemark());
     applyBuildingFloor(room, request.getTenantId(), request.getBuildingId(), request.getFloorId(),
         request.getBuilding(), request.getFloorNo());
     roomMapper.updateById(room);
@@ -174,6 +176,7 @@ public class RoomServiceImpl implements RoomService {
     response.setCapacity(room.getCapacity());
     response.setStatus(room.getStatus());
     response.setRoomQrCode(room.getRoomQrCode());
+    response.setRemark(room.getRemark());
     return response;
   }
 

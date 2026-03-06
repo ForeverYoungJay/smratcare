@@ -30,7 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/finance/fee")
-@PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+@PreAuthorize("hasAnyRole('FINANCE_EMPLOYEE','FINANCE_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
 public class FeeManagementController {
   private final FeeManagementService feeManagementService;
   private final AuditLogService auditLogService;
@@ -62,7 +62,7 @@ public class FeeManagementController {
   }
 
   @PutMapping("/admission-audit/{id}/review")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('FINANCE_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<AdmissionFeeAudit> reviewAdmissionAudit(@PathVariable Long id,
       @Valid @RequestBody FeeAuditReviewRequest request) {
     Long orgId = AuthContext.getOrgId();
@@ -95,7 +95,7 @@ public class FeeManagementController {
   }
 
   @PutMapping("/discharge-audit/{id}/review")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('FINANCE_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<DischargeFeeAudit> reviewDischargeAudit(@PathVariable Long id,
       @Valid @RequestBody FeeAuditReviewRequest request) {
     Long orgId = AuthContext.getOrgId();
@@ -129,7 +129,7 @@ public class FeeManagementController {
   }
 
   @PostMapping("/discharge-settlement/{id}/confirm")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('FINANCE_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<DischargeSettlement> confirmDischargeSettlement(@PathVariable Long id,
       @RequestBody(required = false) DischargeSettlementConfirmRequest request) {
     Long orgId = AuthContext.getOrgId();

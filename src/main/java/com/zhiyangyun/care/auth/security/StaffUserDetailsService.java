@@ -35,7 +35,8 @@ public class StaffUserDetailsService implements UserDetailsService {
       throw new UsernameNotFoundException("User not found");
     }
 
-    List<String> roleCodes = roleMapper.selectRoleCodesByStaff(staff.getId(), staff.getOrgId());
+    List<String> roleCodes = RoleCodeHelper.normalizeRoles(
+        roleMapper.selectRoleCodesByStaff(staff.getId(), staff.getOrgId()));
     List<GrantedAuthority> authorities = roleCodes.stream()
         .map(code -> code.startsWith("ROLE_") ? code : "ROLE_" + code)
         .map(SimpleGrantedAuthority::new)

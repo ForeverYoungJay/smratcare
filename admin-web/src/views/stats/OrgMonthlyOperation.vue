@@ -11,10 +11,19 @@
         <a-form-item label="机构ID">
           <a-input-number v-model:value="query.orgId" :min="1" placeholder="默认当前机构" style="width: 160px" />
         </a-form-item>
+        <a-form-item label="机构名称">
+          <a-input v-model:value="query.orgNameKeyword" allow-clear placeholder="打印筛选" style="width: 160px" />
+        </a-form-item>
+        <a-form-item label="打印备注">
+          <a-input v-model:value="query.printRemark" allow-clear placeholder="例如：运营周会版" style="width: 200px" />
+        </a-form-item>
         <a-form-item>
           <a-space>
             <a-button type="primary" @click="loadData">刷新</a-button>
             <a-button @click="exportCsvReport">导出报表</a-button>
+            <a-button @click="openColumnSetting">列设置</a-button>
+            <a-button @click="printCurrent">打印当前列</a-button>
+            <a-button @click="printSpecificOrg">打印指定机构</a-button>
             <a-button @click="reset">重置</a-button>
           </a-space>
         </a-form-item>
@@ -26,7 +35,8 @@
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="机构月运营明细">
-      <vxe-table border stripe show-overflow :data="rows" height="320">
+      <vxe-table border stripe show-overflow :data="displayRows" height="320">
+        <vxe-column field="orgName" title="机构" min-width="140" />
         <vxe-column field="month" title="月份" width="120" />
         <vxe-column field="admissions" title="入住" width="100" />
         <vxe-column field="discharges" title="离院" width="100" />
@@ -36,25 +46,59 @@
         <vxe-column field="occupancyRate" title="床位使用率(%)" width="120" />
       </vxe-table>
     </a-card>
+
+    <a-modal v-model:open="columnSettingOpen" title="打印列设置" @ok="columnSettingOpen = false" cancel-text="关闭" ok-text="确定">
+      <a-checkbox-group v-model:value="selectedPrintColumns" :options="printColumnOptions" />
+    </a-modal>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportOrgMonthlyOperationCsv, getOrgMonthlyOperation } from '../../api/stats'
 import type { OrgMonthlyOperationItem } from '../../types'
 import { useECharts } from '../../plugins/echarts'
 import { message } from 'ant-design-vue'
+import { printTableReport } from '../../utils/print'
 
 const query = ref({
   from: dayjs().subtract(5, 'month') as Dayjs,
   to: dayjs() as Dayjs,
-  orgId: undefined as number | undefined
+  orgId: undefined as number | undefined,
+  orgNameKeyword: '',
+  printRemark: ''
 })
 const rows = ref<OrgMonthlyOperationItem[]>([])
 const { chartRef: trendRef, setOption } = useECharts()
+const columnSettingOpen = ref(false)
+const printColumnOptions = [
+  { label: '机构', value: 'orgName' },
+  { label: '月份', value: 'month' },
+  { label: '入住', value: 'admissions' },
+  { label: '离院', value: 'discharges' },
+  { label: '营收', value: 'revenue' },
+  { label: '已使用床位', value: 'occupiedBeds' },
+  { label: '总床位', value: 'totalBeds' },
+  { label: '床位使用率(%)', value: 'occupancyRate' }
+]
+const selectedPrintColumns = ref<string[]>(['orgName', 'month', 'admissions', 'discharges', 'revenue', 'occupiedBeds', 'totalBeds', 'occupancyRate'])
+const printableRows = computed(() => (rows.value || []).map(item => ({
+  orgName: item.orgName || `机构#${item.orgId || '-'}`,
+  month: item.month,
+  admissions: item.admissions,
+  discharges: item.discharges,
+  revenue: item.revenue,
+  occupiedBeds: item.occupiedBeds,
+  totalBeds: item.totalBeds,
+  occupancyRate: item.occupancyRate
+})))
+const displayRows = computed(() => {
+  const keyword = String(query.value.orgNameKeyword || '').trim()
+  if (!keyword) return rows.value
+  return rows.value.filter(item => String(item.orgName || '').includes(keyword))
+})
 
 async function loadData() {
   if (query.value.from.isAfter(query.value.to, 'month')) {
@@ -104,7 +148,51 @@ function reset() {
   query.value.from = dayjs().subtract(5, 'month')
   query.value.to = dayjs()
   query.value.orgId = undefined
+  query.value.orgNameKeyword = ''
+  query.value.printRemark = ''
   loadData()
+}
+
+function openColumnSetting() {
+  columnSettingOpen.value = true
+}
+
+function printCurrent() {
+  renderPrint('机构月运营详情（当前结果）', printableRows.value.filter(item => {
+    const keyword = String(query.value.orgNameKeyword || '').trim()
+    return !keyword || item.orgName.includes(keyword)
+  }))
+}
+
+function printSpecificOrg() {
+  const keyword = String(query.value.orgNameKeyword || '').trim()
+  if (!keyword) {
+    message.warning('请输入机构名称关键字')
+    return
+  }
+  const filtered = printableRows.value.filter(item => item.orgName.includes(keyword))
+  if (!filtered.length) {
+    message.warning('未找到匹配机构记录')
+    return
+  }
+  renderPrint(`机构月运营详情（${keyword}）`, filtered)
+}
+
+function renderPrint(title: string, data: Array<Record<string, any>>) {
+  if (!selectedPrintColumns.value.length) {
+    message.warning('请至少选择一列打印')
+    return
+  }
+  try {
+    printTableReport({
+      title,
+      subtitle: `${dayjs(query.value.from).format('YYYY-MM')} ~ ${dayjs(query.value.to).format('YYYY-MM')}；备注：${query.value.printRemark || '-'}`,
+      columns: printColumnOptions.filter(item => selectedPrintColumns.value.includes(item.value)).map(item => ({ key: item.value, title: item.label })),
+      rows: data
+    })
+  } catch (error: any) {
+    message.error(error?.message || '打印失败')
+  }
 }
 
 onMounted(loadData)

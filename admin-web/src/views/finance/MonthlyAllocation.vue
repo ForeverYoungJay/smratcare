@@ -7,7 +7,12 @@
       <a-form-item label="状态">
         <a-select v-model:value="query.status" allow-clear style="width: 180px" :options="statusOptions" />
       </a-form-item>
+      <a-form-item label="打印备注">
+        <a-input v-model:value="query.printRemark" allow-clear placeholder="例如：月度电费分摊核对" style="width: 220px" />
+      </a-form-item>
       <template #extra>
+        <a-button @click="exportCurrent">导出当前</a-button>
+        <a-button @click="printCurrent">打印当前</a-button>
         <a-button type="primary" @click="openCreate">新建分摊</a-button>
       </template>
     </SearchForm>
@@ -51,10 +56,18 @@ import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { createMonthlyAllocation, getMonthlyAllocationPage } from '../../api/financeFee'
 import type { MonthlyAllocationItem, PageResult } from '../../types'
+import { exportCsv } from '../../utils/export'
+import { printTableReport } from '../../utils/print'
 
 const loading = ref(false)
 const rows = ref<MonthlyAllocationItem[]>([])
-const query = reactive({ pageNo: 1, pageSize: 10, month: undefined as any, status: undefined as string | undefined })
+const query = reactive({
+  pageNo: 1,
+  pageSize: 10,
+  month: undefined as any,
+  status: undefined as string | undefined,
+  printRemark: ''
+})
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 
 const statusOptions = [
@@ -104,6 +117,7 @@ function onReset() {
   query.pageNo = 1
   query.month = undefined
   query.status = undefined
+  query.printRemark = ''
   pagination.current = 1
   fetchData()
 }
@@ -163,6 +177,53 @@ async function submitCreate() {
     fetchData()
   } finally {
     creating.value = false
+  }
+}
+
+function exportCurrent() {
+  exportCsv(
+    rows.value.map(item => ({
+      月份: item.allocationMonth || '',
+      分摊项目: item.allocationName || '',
+      总金额: Number(item.totalAmount || 0).toFixed(2),
+      目标人数: item.targetCount || 0,
+      人均金额: calcAvgAmount(Number(item.totalAmount || 0), Number(item.targetCount || 0)),
+      状态: item.status || '',
+      备注: item.remark || '',
+      创建时间: item.createTime || ''
+    })),
+    `月分摊费-${dayjs().format('YYYYMMDD-HHmmss')}.csv`
+  )
+}
+
+function printCurrent() {
+  try {
+    printTableReport({
+      title: '月分摊费',
+      subtitle: `月份：${query.month ? dayjs(query.month).format('YYYY-MM') : '全部'}；状态：${query.status || '全部'}；备注：${query.printRemark || '-'}`,
+      columns: [
+        { key: 'allocationMonth', title: '月份' },
+        { key: 'allocationName', title: '分摊项目' },
+        { key: 'totalAmount', title: '总金额' },
+        { key: 'targetCount', title: '目标人数' },
+        { key: 'avgAmount', title: '人均金额' },
+        { key: 'status', title: '状态' },
+        { key: 'remark', title: '备注' },
+        { key: 'createTime', title: '创建时间' }
+      ],
+      rows: rows.value.map(item => ({
+        allocationMonth: item.allocationMonth || '-',
+        allocationName: item.allocationName || '-',
+        totalAmount: Number(item.totalAmount || 0).toFixed(2),
+        targetCount: item.targetCount || 0,
+        avgAmount: calcAvgAmount(Number(item.totalAmount || 0), Number(item.targetCount || 0)),
+        status: item.status || '-',
+        remark: item.remark || '-',
+        createTime: item.createTime || '-'
+      }))
+    })
+  } catch (error: any) {
+    message.error(error?.message || '打印失败')
   }
 }
 

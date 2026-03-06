@@ -14,12 +14,20 @@ import com.zhiyangyun.care.elder.mapper.BedMapper;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import com.zhiyangyun.care.finance.model.FinanceArrearsItem;
+import com.zhiyangyun.care.finance.model.FinanceCategoryConsumptionAnalysisResponse;
 import com.zhiyangyun.care.finance.model.FinanceReportEntrySummaryResponse;
 import com.zhiyangyun.care.finance.model.FinanceReportMonthlyItem;
 import com.zhiyangyun.care.finance.model.FinanceStoreSalesItem;
+import com.zhiyangyun.care.store.entity.InventoryBatch;
+import com.zhiyangyun.care.store.entity.OrderItem;
+import com.zhiyangyun.care.store.entity.Product;
 import com.zhiyangyun.care.store.entity.StoreOrder;
+import com.zhiyangyun.care.store.mapper.InventoryBatchMapper;
+import com.zhiyangyun.care.store.mapper.OrderItemMapper;
+import com.zhiyangyun.care.store.mapper.ProductMapper;
 import com.zhiyangyun.care.store.mapper.StoreOrderMapper;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
@@ -47,6 +55,9 @@ public class FinanceReportController {
   private final ElderMapper elderMapper;
   private final BedMapper bedMapper;
   private final RoomMapper roomMapper;
+  private final OrderItemMapper orderItemMapper;
+  private final ProductMapper productMapper;
+  private final InventoryBatchMapper inventoryBatchMapper;
 
   public FinanceReportController(
       BillMonthlyMapper billMonthlyMapper,
@@ -54,13 +65,19 @@ public class FinanceReportController {
       StoreOrderMapper storeOrderMapper,
       ElderMapper elderMapper,
       BedMapper bedMapper,
-      RoomMapper roomMapper) {
+      RoomMapper roomMapper,
+      OrderItemMapper orderItemMapper,
+      ProductMapper productMapper,
+      InventoryBatchMapper inventoryBatchMapper) {
     this.billMonthlyMapper = billMonthlyMapper;
     this.billItemMapper = billItemMapper;
     this.storeOrderMapper = storeOrderMapper;
     this.elderMapper = elderMapper;
     this.bedMapper = bedMapper;
     this.roomMapper = roomMapper;
+    this.orderItemMapper = orderItemMapper;
+    this.productMapper = productMapper;
+    this.inventoryBatchMapper = inventoryBatchMapper;
   }
 
   @GetMapping("/entry-summary")
@@ -246,6 +263,161 @@ public class FinanceReportController {
     return Result.ok(result);
   }
 
+  @GetMapping("/category-consumption-analysis")
+  public Result<FinanceCategoryConsumptionAnalysisResponse> categoryConsumptionAnalysis(
+      @RequestParam String from,
+      @RequestParam String to,
+      @RequestParam(required = false) String itemKeyword,
+      @RequestParam(required = false) String building,
+      @RequestParam(required = false) String floorNo) {
+    Long orgId = AuthContext.getOrgId();
+    LocalDate start = LocalDate.parse(from);
+    LocalDate end = LocalDate.parse(to);
+    if (start.isAfter(end)) {
+      throw new IllegalArgumentException("开始日期不能晚于结束日期");
+    }
+    LocalDateTime startTime = start.atStartOfDay();
+    LocalDateTime endTime = end.plusDays(1).atStartOfDay();
+
+    List<StoreOrder> orders = storeOrderMapper.selectList(
+        Wrappers.lambdaQuery(StoreOrder.class)
+            .eq(StoreOrder::getIsDeleted, 0)
+            .eq(StoreOrder::getPayStatus, 1)
+            .eq(orgId != null, StoreOrder::getOrgId, orgId)
+            .ge(StoreOrder::getCreateTime, startTime)
+            .lt(StoreOrder::getCreateTime, endTime));
+    String buildingFilter = normalizeText(building, "");
+    String floorFilter = normalizeText(floorNo, "");
+    if (!buildingFilter.isBlank() || !floorFilter.isBlank()) {
+      List<Bed> beds = bedMapper.selectList(
+          Wrappers.lambdaQuery(Bed.class)
+              .eq(Bed::getIsDeleted, 0)
+              .eq(orgId != null, Bed::getOrgId, orgId)
+              .isNotNull(Bed::getElderId)
+              .isNotNull(Bed::getRoomId));
+      Map<Long, Room> roomMap = roomMapper.selectList(
+              Wrappers.lambdaQuery(Room.class)
+                  .eq(Room::getIsDeleted, 0)
+                  .eq(orgId != null, Room::getOrgId, orgId))
+          .stream()
+          .collect(Collectors.toMap(Room::getId, Function.identity(), (a, b) -> a));
+      Map<Long, Room> elderRoomMap = new HashMap<>();
+      for (Bed bed : beds) {
+        if (bed.getElderId() == null || bed.getRoomId() == null || elderRoomMap.containsKey(bed.getElderId())) {
+          continue;
+        }
+        Room room = roomMap.get(bed.getRoomId());
+        if (room != null) {
+          elderRoomMap.put(bed.getElderId(), room);
+        }
+      }
+      orders = orders.stream()
+          .filter(order -> {
+            Room room = order.getElderId() == null ? null : elderRoomMap.get(order.getElderId());
+            if (room == null) return false;
+            boolean buildingMatched = buildingFilter.isBlank() || normalizeText(room.getBuilding(), "").contains(buildingFilter);
+            boolean floorMatched = floorFilter.isBlank() || normalizeText(room.getFloorNo(), "").contains(floorFilter);
+            return buildingMatched && floorMatched;
+          })
+          .toList();
+    }
+    FinanceCategoryConsumptionAnalysisResponse response = new FinanceCategoryConsumptionAnalysisResponse();
+    response.setFrom(from);
+    response.setTo(to);
+    response.setItemKeyword(normalizeText(itemKeyword, ""));
+    if (orders.isEmpty()) {
+      return Result.ok(response);
+    }
+
+    Map<Long, StoreOrder> orderMap = orders.stream()
+        .collect(Collectors.toMap(StoreOrder::getId, Function.identity(), (a, b) -> a));
+    List<Long> orderIds = new ArrayList<>(orderMap.keySet());
+    List<OrderItem> items = orderItemMapper.selectList(
+        Wrappers.lambdaQuery(OrderItem.class)
+            .eq(OrderItem::getIsDeleted, 0)
+            .eq(orgId != null, OrderItem::getOrgId, orgId)
+            .in(OrderItem::getOrderId, orderIds));
+    if (items.isEmpty()) {
+      return Result.ok(response);
+    }
+
+    List<Long> productIds = items.stream()
+        .map(OrderItem::getProductId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList();
+    Map<Long, Product> productMap = productIds.isEmpty()
+        ? Map.of()
+        : productMapper.selectBatchIds(productIds).stream()
+            .collect(Collectors.toMap(Product::getId, Function.identity(), (a, b) -> a));
+    Map<Long, BigDecimal> costMap = buildProductCostMap(orgId, productIds);
+    String keyword = normalizeText(itemKeyword, "").toLowerCase(Locale.ROOT);
+
+    Map<LocalDate, BigDecimal> dayTotalMap = new LinkedHashMap<>();
+    Map<LocalDate, BigDecimal> dayKeywordMap = new LinkedHashMap<>();
+    Map<String, FinanceCategoryConsumptionAnalysisResponse.CategoryProfitItem> categoryMap = new LinkedHashMap<>();
+    BigDecimal totalAmount = BigDecimal.ZERO;
+    BigDecimal keywordAmount = BigDecimal.ZERO;
+
+    for (OrderItem item : items) {
+      StoreOrder order = orderMap.get(item.getOrderId());
+      if (order == null || order.getCreateTime() == null) {
+        continue;
+      }
+      LocalDate day = order.getCreateTime().toLocalDate();
+      BigDecimal itemAmount = safe(item.getTotalAmount());
+      totalAmount = totalAmount.add(itemAmount);
+      dayTotalMap.merge(day, itemAmount, BigDecimal::add);
+
+      String productName = normalizeText(item.getProductNameSnapshot(),
+          normalizeText(item.getProductName(), ""));
+      boolean keywordMatched = keyword.isBlank() || productName.toLowerCase(Locale.ROOT).contains(keyword);
+      if (keywordMatched) {
+        keywordAmount = keywordAmount.add(itemAmount);
+        dayKeywordMap.merge(day, itemAmount, BigDecimal::add);
+      }
+
+      Product product = item.getProductId() == null ? null : productMap.get(item.getProductId());
+      String category = normalizeText(product == null ? null : product.getCategory(), "未分类");
+      FinanceCategoryConsumptionAnalysisResponse.CategoryProfitItem bucket = categoryMap.computeIfAbsent(
+          category,
+          key -> {
+            FinanceCategoryConsumptionAnalysisResponse.CategoryProfitItem row =
+                new FinanceCategoryConsumptionAnalysisResponse.CategoryProfitItem();
+            row.setCategory(key);
+            return row;
+          });
+      bucket.setTotalAmount(bucket.getTotalAmount().add(itemAmount));
+      BigDecimal unitCost = costMap.getOrDefault(item.getProductId(), BigDecimal.ZERO);
+      BigDecimal itemCost = unitCost.multiply(BigDecimal.valueOf(item.getQuantity() == null ? 0 : item.getQuantity()));
+      bucket.setTotalCost(bucket.getTotalCost().add(itemCost));
+    }
+
+    response.setTotalAmount(totalAmount);
+    response.setItemAmount(keywordAmount);
+    response.setItemRatio(ratio(keywordAmount, totalAmount));
+
+    LocalDate cursor = start;
+    while (!cursor.isAfter(end)) {
+      FinanceCategoryConsumptionAnalysisResponse.TrendItem trendItem =
+          new FinanceCategoryConsumptionAnalysisResponse.TrendItem();
+      trendItem.setPeriod(cursor.toString());
+      trendItem.setAmount(dayKeywordMap.getOrDefault(cursor, BigDecimal.ZERO));
+      trendItem.setRatio(ratio(dayKeywordMap.getOrDefault(cursor, BigDecimal.ZERO), dayTotalMap.getOrDefault(cursor, BigDecimal.ZERO)));
+      response.getTrend().add(trendItem);
+      cursor = cursor.plusDays(1);
+    }
+
+    response.setCategoryProfit(categoryMap.values().stream()
+        .peek(item -> {
+          item.setTotalProfit(item.getTotalAmount().subtract(item.getTotalCost()));
+          item.setProfitRate(ratio(item.getTotalProfit(), item.getTotalAmount()));
+        })
+        .sorted(Comparator.comparing(FinanceCategoryConsumptionAnalysisResponse.CategoryProfitItem::getTotalProfit).reversed())
+        .toList());
+    return Result.ok(response);
+  }
+
   private BigDecimal sumBillAmount(List<BillMonthly> bills, boolean outstanding) {
     return bills.stream()
         .map(item -> outstanding ? item.getOutstandingAmount() : item.getTotalAmount())
@@ -349,6 +521,35 @@ public class FinanceReportController {
 
   private BigDecimal safe(BigDecimal value) {
     return value == null ? BigDecimal.ZERO : value;
+  }
+
+  private Map<Long, BigDecimal> buildProductCostMap(Long orgId, List<Long> productIds) {
+    if (productIds == null || productIds.isEmpty()) {
+      return Map.of();
+    }
+    List<InventoryBatch> batches = inventoryBatchMapper.selectList(
+        Wrappers.lambdaQuery(InventoryBatch.class)
+            .eq(InventoryBatch::getIsDeleted, 0)
+            .eq(orgId != null, InventoryBatch::getOrgId, orgId)
+            .in(InventoryBatch::getProductId, productIds)
+            .isNotNull(InventoryBatch::getCostPrice)
+            .orderByDesc(InventoryBatch::getUpdateTime)
+            .orderByDesc(InventoryBatch::getCreateTime));
+    Map<Long, BigDecimal> costMap = new HashMap<>();
+    for (InventoryBatch batch : batches) {
+      if (batch.getProductId() == null || costMap.containsKey(batch.getProductId())) {
+        continue;
+      }
+      costMap.put(batch.getProductId(), safe(batch.getCostPrice()));
+    }
+    return costMap;
+  }
+
+  private BigDecimal ratio(BigDecimal value, BigDecimal total) {
+    if (total == null || total.compareTo(BigDecimal.ZERO) <= 0 || value == null) {
+      return BigDecimal.ZERO;
+    }
+    return value.divide(total, 4, RoundingMode.HALF_UP);
   }
 
   private String normalizeText(String value, String fallback) {

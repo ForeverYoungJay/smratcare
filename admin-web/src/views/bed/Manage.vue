@@ -107,6 +107,9 @@
                       {{ record.status === 1 ? '启用' : '停用' }}
                     </a-tag>
                   </template>
+                  <template v-else-if="column.key === 'remark'">
+                    {{ resolvePublicRemark(record.remark) || '-' }}
+                  </template>
                   <template v-else-if="column.key === 'action'">
                     <a-space>
                       <a-button type="link" @click="openBuilding(record)">编辑</a-button>
@@ -265,6 +268,9 @@
                   <template v-if="column.key === 'roomType'">
                     {{ resolveRoomTypeLabel(record.roomType) }}
                   </template>
+                  <template v-else-if="column.key === 'remark'">
+                    {{ resolvePublicRemark(record.remark) || '-' }}
+                  </template>
                   <template v-else-if="column.key === 'capacity'">
                     <a-tag v-if="resolveCapacityMismatch(record)" color="gold">
                       {{ resolveRoomCapacity(record) }}（已按房型修正）
@@ -418,6 +424,24 @@
         <a-form-item label="备注" name="remark">
           <a-input v-model:value="buildingForm.remark" placeholder="可选" />
         </a-form-item>
+        <a-form-item label="备注1（可公开）">
+          <a-space style="display: flex">
+            <a-switch v-model:checked="buildingRemarkSlots[0].visible" checked-children="显示" un-checked-children="隐藏" />
+            <a-input v-model:value="buildingRemarkSlots[0].text" placeholder="例如：自理老人楼" />
+          </a-space>
+        </a-form-item>
+        <a-form-item label="备注2（可公开）">
+          <a-space style="display: flex">
+            <a-switch v-model:checked="buildingRemarkSlots[1].visible" checked-children="显示" un-checked-children="隐藏" />
+            <a-input v-model:value="buildingRemarkSlots[1].text" placeholder="例如：靠近活动中心" />
+          </a-space>
+        </a-form-item>
+        <a-form-item label="备注3（可公开）">
+          <a-space style="display: flex">
+            <a-switch v-model:checked="buildingRemarkSlots[2].visible" checked-children="显示" un-checked-children="隐藏" />
+            <a-input v-model:value="buildingRemarkSlots[2].text" placeholder="例如：夜间安静区" />
+          </a-space>
+        </a-form-item>
       </a-form>
     </a-modal>
 
@@ -469,6 +493,27 @@
             <a-select-option :value="1">可用</a-select-option>
             <a-select-option :value="0">停用</a-select-option>
           </a-select>
+        </a-form-item>
+        <a-form-item label="备注" name="remark">
+          <a-input v-model:value="roomForm.remark" placeholder="如 重点照护区/近电梯口" />
+        </a-form-item>
+        <a-form-item label="备注1（可公开）">
+          <a-space style="display: flex">
+            <a-switch v-model:checked="roomRemarkSlots[0].visible" checked-children="显示" un-checked-children="隐藏" />
+            <a-input v-model:value="roomRemarkSlots[0].text" placeholder="例如：高风险重点巡视房" />
+          </a-space>
+        </a-form-item>
+        <a-form-item label="备注2（可公开）">
+          <a-space style="display: flex">
+            <a-switch v-model:checked="roomRemarkSlots[1].visible" checked-children="显示" un-checked-children="隐藏" />
+            <a-input v-model:value="roomRemarkSlots[1].text" placeholder="例如：近护士站" />
+          </a-space>
+        </a-form-item>
+        <a-form-item label="备注3（可公开）">
+          <a-space style="display: flex">
+            <a-switch v-model:checked="roomRemarkSlots[2].visible" checked-children="显示" un-checked-children="隐藏" />
+            <a-input v-model:value="roomRemarkSlots[2].text" placeholder="例如：家属探视优先房" />
+          </a-space>
         </a-form-item>
       </a-form>
     </a-modal>
@@ -679,6 +724,16 @@ const roomForm = reactive<Partial<RoomItem>>({ status: 1 })
 const bedForm = reactive<Partial<BedItem>>({ status: 1 })
 const buildingForm = reactive<Partial<BuildingItem>>({ status: 1, sortNo: 0 })
 const floorForm = reactive<Partial<FloorItem>>({ status: 1, sortNo: 0 })
+const buildingRemarkSlots = reactive([
+  { text: '', visible: true },
+  { text: '', visible: true },
+  { text: '', visible: false }
+])
+const roomRemarkSlots = reactive([
+  { text: '', visible: true },
+  { text: '', visible: true },
+  { text: '', visible: false }
+])
 const roomFormRef = ref<FormInstance>()
 const bedFormRef = ref<FormInstance>()
 const buildingFormRef = ref<FormInstance>()
@@ -865,6 +920,7 @@ const roomColumns = [
   { title: '楼层', dataIndex: 'floorNo', key: 'floorNo', width: 100, sorter: true },
   { title: '房型', dataIndex: 'roomType', key: 'roomType', width: 120 },
   { title: '容量', dataIndex: 'capacity', key: 'capacity', width: 100, sorter: true },
+  { title: '备注', dataIndex: 'remark', key: 'remark', width: 180 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 120, sorter: true },
   { title: '操作', key: 'action', width: 200, fixed: 'right' as const }
 ]
@@ -1245,8 +1301,10 @@ function onBedPageSizeChange(current: number, size: number) {
 function openBuilding(row?: BuildingItem) {
   if (row) {
     Object.assign(buildingForm, row)
+    hydrateRemarkSlots(buildingRemarkSlots, row.remark)
   } else {
     Object.assign(buildingForm, { id: undefined, name: '', code: '', areaCode: undefined, areaName: undefined, status: 1, sortNo: 0, remark: '' })
+    hydrateRemarkSlots(buildingRemarkSlots, '')
   }
   buildingOpen.value = true
 }
@@ -1258,7 +1316,8 @@ async function submitBuilding() {
     buildingSubmitting.value = true
     const payload = {
       ...buildingForm,
-      areaName: buildingForm.areaCode ? areaNameByCode.value[buildingForm.areaCode] : undefined
+      areaName: buildingForm.areaCode ? areaNameByCode.value[buildingForm.areaCode] : undefined,
+      remark: stringifyRemarkSlots(buildingRemarkSlots, buildingForm.remark)
     }
     if (buildingForm.id) {
       await updateBuilding(buildingForm.id, payload)
@@ -1309,12 +1368,14 @@ async function submitFloor() {
 function openRoom(row?: RoomItem) {
   if (row) {
     Object.assign(roomForm, row)
+    hydrateRemarkSlots(roomRemarkSlots, row.remark)
     const inferred = inferCapacityByRoomType(row.roomType)
     if (inferred && roomForm.capacity !== inferred) {
       roomForm.capacity = inferred
     }
   } else {
-    Object.assign(roomForm, { id: undefined, roomNo: '', buildingId: undefined, floorId: undefined, roomType: undefined, capacity: 1, status: 1 })
+    Object.assign(roomForm, { id: undefined, roomNo: '', buildingId: undefined, floorId: undefined, roomType: undefined, capacity: 1, status: 1, remark: '' })
+    hydrateRemarkSlots(roomRemarkSlots, '')
   }
   roomOpen.value = true
 }
@@ -1327,6 +1388,7 @@ async function submitRoom() {
     if (inferredRoomType) {
       roomForm.roomType = inferredRoomType
     }
+    roomForm.remark = stringifyRemarkSlots(roomRemarkSlots, roomForm.remark)
     roomSubmitting.value = true
     if (roomForm.id) {
       await updateRoom(roomForm.id, roomForm)
@@ -1409,6 +1471,61 @@ function confirmAction(content: string, title = '提示') {
 
 function errorMessage(error: any, fallback: string) {
   return error?.message || error?.msg || error?.response?.data?.message || fallback
+}
+
+function hydrateRemarkSlots(target: Array<{ text: string; visible: boolean }>, raw?: string) {
+  target.forEach((item, index) => {
+    item.text = ''
+    item.visible = index < 2
+  })
+  if (!raw) return
+  try {
+    const parsed = JSON.parse(raw)
+    const slots = Array.isArray(parsed?.slots) ? parsed.slots : [parsed?.remark1, parsed?.remark2, parsed?.remark3]
+    slots.forEach((slot: any, index: number) => {
+      if (index > 2 || !target[index]) return
+      if (typeof slot === 'string') {
+        target[index].text = slot
+        target[index].visible = true
+        return
+      }
+      target[index].text = String(slot?.text || slot?.value || '')
+      target[index].visible = slot?.visible !== false
+    })
+  } catch {
+    target[0].text = raw
+    target[0].visible = true
+  }
+}
+
+function stringifyRemarkSlots(target: Array<{ text: string; visible: boolean }>, fallback?: string) {
+  const slots = target.map((item) => ({
+    text: String(item.text || '').trim(),
+    visible: item.visible
+  }))
+  if (!slots.some((item) => item.text)) {
+    return fallback || ''
+  }
+  return JSON.stringify({ slots })
+}
+
+function resolvePublicRemark(raw?: string) {
+  if (!raw) return ''
+  try {
+    const parsed = JSON.parse(raw)
+    const slots = Array.isArray(parsed?.slots) ? parsed.slots : [parsed?.remark1, parsed?.remark2, parsed?.remark3]
+    return slots
+      .map((slot: any) => {
+        if (!slot) return ''
+        if (typeof slot === 'string') return slot
+        if (slot.visible === false) return ''
+        return String(slot.text || slot.value || '')
+      })
+      .filter((item: string) => item)
+      .join('；')
+  } catch {
+    return raw
+  }
 }
 
 function buildTreeKey(nodes: AssetTreeNode[], parentKey: string): TreeNode[] {

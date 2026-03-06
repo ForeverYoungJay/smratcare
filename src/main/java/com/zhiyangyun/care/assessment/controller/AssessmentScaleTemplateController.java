@@ -38,7 +38,7 @@ public class AssessmentScaleTemplateController {
   }
 
   @GetMapping("/page")
-  @PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+  @PreAuthorize("hasAnyRole('MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<IPage<AssessmentScaleTemplate>> page(
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
@@ -60,7 +60,7 @@ public class AssessmentScaleTemplateController {
   }
 
   @GetMapping("/list")
-  @PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+  @PreAuthorize("hasAnyRole('MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<List<AssessmentScaleTemplate>> list(
       @RequestParam(required = false) String assessmentType) {
     Long orgId = AuthContext.getOrgId();
@@ -74,7 +74,7 @@ public class AssessmentScaleTemplateController {
   }
 
   @GetMapping("/{id}")
-  @PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+  @PreAuthorize("hasAnyRole('MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<AssessmentScaleTemplate> get(@PathVariable Long id) {
     AssessmentScaleTemplate template = templateMapper.selectById(id);
     if (template == null || template.getIsDeleted() == 1) {
@@ -88,7 +88,7 @@ public class AssessmentScaleTemplateController {
   }
 
   @PostMapping
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('MEDICAL_MINISTER','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<AssessmentScaleTemplate> create(@Valid @RequestBody AssessmentScaleTemplateRequest request) {
     Long orgId = AuthContext.getOrgId();
     AssessmentScaleTemplate template = new AssessmentScaleTemplate();
@@ -103,7 +103,7 @@ public class AssessmentScaleTemplateController {
   }
 
   @PutMapping("/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('MEDICAL_MINISTER','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<AssessmentScaleTemplate> update(@PathVariable Long id, @Valid @RequestBody AssessmentScaleTemplateRequest request) {
     AssessmentScaleTemplate template = templateMapper.selectById(id);
     if (template == null || template.getIsDeleted() == 1) {
@@ -120,7 +120,7 @@ public class AssessmentScaleTemplateController {
   }
 
   @DeleteMapping("/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('MEDICAL_MINISTER','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<Void> delete(@PathVariable Long id) {
     AssessmentScaleTemplate template = templateMapper.selectById(id);
     if (template != null && template.getIsDeleted() != 1) {
@@ -135,7 +135,7 @@ public class AssessmentScaleTemplateController {
   }
 
   @PostMapping("/score-preview")
-  @PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+  @PreAuthorize("hasAnyRole('MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<AssessmentScorePreviewResponse> preview(@Valid @RequestBody AssessmentScorePreviewRequest request) {
     Long orgId = AuthContext.getOrgId();
     AssessmentScaleTemplate template = scoringService.getActiveTemplate(orgId, request.getTemplateId());

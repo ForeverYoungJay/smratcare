@@ -5,7 +5,7 @@ export function exportCsv(data: Record<string, any>[], filename: string) {
   const headers = Object.keys(data[0])
   const rows = data.map((row) => headers.map((h) => JSON.stringify(row[h] ?? '')).join(','))
   const csv = [headers.join(','), ...rows].join('\n')
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
   downloadBlob(blob, filename.endsWith('.csv') ? filename : `${filename}.csv`)
 }
 
@@ -46,7 +46,7 @@ export async function exportCsvByRequest(
   const contentDisposition = response.headers.get('content-disposition') || ''
   const filenameMatch = contentDisposition.match(/filename\*?=(?:UTF-8''|\"?)([^\";]+)/i)
   const filename = filenameMatch?.[1] ? decodeURIComponent(filenameMatch[1]) : (fallbackFilename || 'export.csv')
-  downloadBlob(blob, filename)
+  downloadBlob(ensureUtf8Bom(blob), filename)
 }
 
 function downloadBlob(blob: Blob, filename: string) {
@@ -65,4 +65,11 @@ function escapeHtml(value: string) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
+}
+
+function ensureUtf8Bom(blob: Blob) {
+  if (!/text\/csv|application\/csv|application\/octet-stream/i.test(blob.type || '')) {
+    return blob
+  }
+  return new Blob(['\uFEFF', blob], { type: blob.type || 'text/csv;charset=utf-8;' })
 }

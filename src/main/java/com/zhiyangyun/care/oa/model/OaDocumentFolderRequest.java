@@ -14,5 +14,9 @@ public class OaDocumentFolderRequest {
 
   private String status;
 
+  private String visibility;
+
+  private String regionCode;
+
   private String remark;
 }

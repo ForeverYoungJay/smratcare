@@ -1,6 +1,7 @@
-import { ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { getSupplierPage } from '../api/materialCenter'
 import type { MaterialSupplierItem, PageResult } from '../types'
+import { subscribeLiveSync } from '../utils/liveSync'
 import { fuzzyScore, toPinyinInitials } from './entitySearch'
 
 export interface SupplierOption {
@@ -48,9 +49,10 @@ export function useSupplierOptions(config: UseSupplierOptionsConfig = {}) {
   const enabledOnly = config.enabledOnly !== false
   const supplierOptions = ref<SupplierOption[]>([])
   const supplierLoading = ref(false)
+  const lastKeyword = ref('')
+  const cacheKey = `supplier:${enabledOnly ? 'enabled' : 'all'}`
 
   async function loadBasePool(force = false) {
-    const cacheKey = `supplier:${enabledOnly ? 'enabled' : 'all'}`
     const lastAt = supplierPoolFetchedAt.get(cacheKey) || 0
     const hasFresh = supplierPoolCache.has(cacheKey) && (Date.now() - lastAt < SUPPLIER_POOL_CACHE_TTL)
     if (!force && hasFresh) return supplierPoolCache.get(cacheKey) || []
@@ -64,6 +66,7 @@ export function useSupplierOptions(config: UseSupplierOptionsConfig = {}) {
   async function searchSuppliers(keyword = '') {
     supplierLoading.value = true
     try {
+      lastKeyword.value = String(keyword || '')
       const text = String(keyword || '').trim()
       const baseRows = await loadBasePool(false)
       let mergedRows = [...baseRows]
@@ -101,10 +104,30 @@ export function useSupplierOptions(config: UseSupplierOptionsConfig = {}) {
     })
   }
 
+  function invalidateSupplierCache() {
+    supplierPoolCache.delete(cacheKey)
+    supplierPoolFetchedAt.delete(cacheKey)
+  }
+
+  let unsubscribe = () => {}
+  onMounted(() => {
+    unsubscribe = subscribeLiveSync((payload) => {
+      if (!payload.topics.some((topic) => topic === 'logistics' || topic === 'finance' || topic === 'system')) return
+      invalidateSupplierCache()
+      if (!supplierOptions.value.length || supplierLoading.value) return
+      searchSuppliers(lastKeyword.value).catch(() => {})
+    })
+  })
+
+  onUnmounted(() => {
+    unsubscribe()
+  })
+
   return {
     supplierOptions,
     supplierLoading,
     searchSuppliers,
-    ensureSelectedSupplier
+    ensureSelectedSupplier,
+    invalidateSupplierCache
   }
 }

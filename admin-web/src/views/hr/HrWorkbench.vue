@@ -85,7 +85,7 @@
             <a-button @click="go('/hr/oa/tasks')">任务管理</a-button>
             <a-button @click="go('/hr/oa/execution')">工作执行</a-button>
             <a-button @click="go('/hr/oa/activity-plan')">活动计划</a-button>
-            <a-button @click="go('/hr/oa/albums')">相册管理</a-button>
+            <a-button @click="go('/oa/document')">文档管理</a-button>
             <a-button @click="go('/hr/oa/knowledge')">知识库</a-button>
             <a-button @click="go('/hr/oa/policies')">规章制度库</a-button>
             <a-button @click="go('/hr/oa/policy-alerts')">制度更新预警</a-button>

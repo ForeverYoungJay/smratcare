@@ -1,6 +1,7 @@
-import { ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { getStaffPage } from '../api/rbac'
 import type { PageResult, StaffItem } from '../types'
+import { subscribeLiveSync } from '../utils/liveSync'
 import { fuzzyScore, toPinyinInitials } from './entitySearch'
 
 export interface StaffOption {
@@ -49,6 +50,7 @@ export function useStaffOptions(config: UseStaffOptionsConfig = {}) {
   const preloadSize = config.preloadSize || Math.max(pageSize * 4, 300)
   const staffOptions = ref<StaffOption[]>([])
   const staffLoading = ref(false)
+  const lastKeyword = ref('')
 
   async function loadBasePool(force = false) {
     const cacheKey = 'staff-all'
@@ -65,6 +67,7 @@ export function useStaffOptions(config: UseStaffOptionsConfig = {}) {
   async function searchStaff(keyword = '') {
     staffLoading.value = true
     try {
+      lastKeyword.value = String(keyword || '')
       const text = String(keyword || '').trim()
       const baseRows = await loadBasePool(false)
       let mergedRows = [...baseRows]
@@ -103,11 +106,32 @@ export function useStaffOptions(config: UseStaffOptionsConfig = {}) {
     return staffOptions.value.find((item) => item.value === String(staffId))?.name || ''
   }
 
+  function invalidateStaffCache() {
+    const cacheKey = 'staff-all'
+    staffPoolCache.delete(cacheKey)
+    staffPoolFetchedAt.delete(cacheKey)
+  }
+
+  let unsubscribe = () => {}
+  onMounted(() => {
+    unsubscribe = subscribeLiveSync((payload) => {
+      if (!payload.topics.some((topic) => topic === 'hr' || topic === 'system' || topic === 'oa')) return
+      invalidateStaffCache()
+      if (!staffOptions.value.length || staffLoading.value) return
+      searchStaff(lastKeyword.value).catch(() => {})
+    })
+  })
+
+  onUnmounted(() => {
+    unsubscribe()
+  })
+
   return {
     staffOptions,
     staffLoading,
     searchStaff,
     ensureSelectedStaff,
-    findStaffName
+    findStaffName,
+    invalidateStaffCache
   }
 }

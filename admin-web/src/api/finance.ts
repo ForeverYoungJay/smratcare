@@ -1,4 +1,5 @@
 import request, { fetchPage } from '../utils/request'
+import { getToken } from '../utils/auth'
 import type {
   FinanceBillDetail,
   FinanceReportMonthlyItem,
@@ -25,11 +26,16 @@ import type {
   FinanceBillingConfigRollbackRequest,
   FinanceBillingConfigSnapshotItem,
   FinanceModuleEntrySummary,
-  FinanceReportEntrySummary
+  FinanceReportEntrySummary,
+  FinanceCategoryConsumptionAnalysis
 } from '../types'
 
 export function getPaymentRecordPage(params: any) {
   return fetchPage<PaymentRecordItem>('/api/finance/payment/page', params)
+}
+
+export function updatePaymentRecord(paymentId: number, data: { amount: number; method: string; paidAt: string; remark?: string }) {
+  return request.put(`/api/finance/payment/${paymentId}`, data)
 }
 
 export function reconcileDaily(params: ReconcileRequest) {
@@ -88,8 +94,67 @@ export function getFinanceInvoiceReceiptPage(params: any) {
   return fetchPage<FinanceInvoiceReceiptItem>('/api/finance/workbench/invoice/page', params)
 }
 
+export async function exportFinanceInvoiceReceiptCsv(params?: {
+  date?: string
+  method?: string
+  invoiceStatus?: string
+  keyword?: string
+}) {
+  const url = new URL('/api/finance/workbench/invoice/export', window.location.origin)
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      url.searchParams.set(key, String(value))
+    }
+  })
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${getToken()}`
+    }
+  })
+  if (!response.ok) {
+    throw new Error('导出失败')
+  }
+  const blob = await response.blob()
+  const contentDisposition = response.headers.get('content-disposition') || ''
+  const filenameMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/)
+  const filename = filenameMatch?.[1] || `finance-invoice-receipt-${new Date().toISOString().slice(0, 10)}.csv`
+  const link = document.createElement('a')
+  const objectUrl = URL.createObjectURL(blob)
+  link.href = objectUrl
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(objectUrl)
+}
+
 export function getFinanceAutoDebitExceptions(params?: { date?: string }) {
   return request.get<FinanceAutoDebitExceptionItem[]>('/api/finance/workbench/auto-deduct/exceptions', { params })
+}
+
+export async function exportFinanceAutoDebitExceptionsCsv(params?: { date?: string }) {
+  const url = new URL('/api/finance/workbench/auto-deduct/exceptions/export', window.location.origin)
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      url.searchParams.set(key, String(value))
+    }
+  })
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${getToken()}` }
+  })
+  if (!response.ok) {
+    throw new Error('导出失败')
+  }
+  const blob = await response.blob()
+  const contentDisposition = response.headers.get('content-disposition') || ''
+  const filenameMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/)
+  const filename = filenameMatch?.[1] || `finance-auto-deduct-exceptions-${new Date().toISOString().slice(0, 10)}.csv`
+  const link = document.createElement('a')
+  const objectUrl = URL.createObjectURL(blob)
+  link.href = objectUrl
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(objectUrl)
 }
 
 export function getFinanceRoomOpsDetail(params?: { period?: string; building?: string; room?: string }) {
@@ -102,6 +167,58 @@ export function getFinanceAllocationRules(params?: { month?: string }) {
 
 export function getFinanceReconcileExceptions(params?: { date?: string; type?: string }) {
   return request.get<FinanceReconcileExceptionItem[]>('/api/finance/workbench/reconcile/exceptions', { params })
+}
+
+export async function exportFinanceReconcileExceptionsCsv(params?: { date?: string; type?: string }) {
+  const url = new URL('/api/finance/workbench/reconcile/exceptions/export', window.location.origin)
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      url.searchParams.set(key, String(value))
+    }
+  })
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${getToken()}` }
+  })
+  if (!response.ok) {
+    throw new Error('导出失败')
+  }
+  const blob = await response.blob()
+  const contentDisposition = response.headers.get('content-disposition') || ''
+  const filenameMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/)
+  const filename = filenameMatch?.[1] || `finance-reconcile-exceptions-${new Date().toISOString().slice(0, 10)}.csv`
+  const link = document.createElement('a')
+  const objectUrl = URL.createObjectURL(blob)
+  link.href = objectUrl
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(objectUrl)
+}
+
+export async function exportFinanceReconcileHistoryCsv(params?: { from?: string; to?: string }) {
+  const url = new URL('/api/finance/reconcile/export', window.location.origin)
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      url.searchParams.set(key, String(value))
+    }
+  })
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${getToken()}` }
+  })
+  if (!response.ok) {
+    throw new Error('导出失败')
+  }
+  const blob = await response.blob()
+  const contentDisposition = response.headers.get('content-disposition') || ''
+  const filenameMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/)
+  const filename = filenameMatch?.[1] || `finance-reconcile-history-${new Date().toISOString().slice(0, 10)}.csv`
+  const link = document.createElement('a')
+  const objectUrl = URL.createObjectURL(blob)
+  link.href = objectUrl
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(objectUrl)
 }
 
 export function getFinanceMasterDataOverview(params?: { month?: string }) {
@@ -138,4 +255,14 @@ export function getFinanceModuleEntrySummary(params: { moduleKey: string }) {
 
 export function getFinanceReportEntrySummary(params: { reportKey: string; from?: string; to?: string; top?: number }) {
   return request.get<FinanceReportEntrySummary>('/api/finance/report/entry-summary', { params })
+}
+
+export function getFinanceCategoryConsumptionAnalysis(params: {
+  from: string
+  to: string
+  itemKeyword?: string
+  building?: string
+  floorNo?: string
+}) {
+  return request.get<FinanceCategoryConsumptionAnalysis>('/api/finance/report/category-consumption-analysis', { params })
 }

@@ -37,11 +37,11 @@
 
     <a-modal v-model:open="editOpen" title="费用科目" @ok="submitEdit" :confirm-loading="saving">
       <a-form layout="vertical" :model="form">
-        <a-form-item label="科目键（自动补前缀 FEE_SUBJECT_）">
-          <a-input v-model:value="form.keySuffix" placeholder="如 ROOM_FEE / ELECTRICITY_FEE" />
+        <a-form-item label="科目编码（可选，自动补前缀 FEE_SUBJECT_）">
+          <a-input v-model:value="form.keySuffix" placeholder="留空自动生成；或输入 ROOM_FEE / ELECTRICITY_FEE" />
         </a-form-item>
         <a-form-item label="科目名称">
-          <a-input v-model:value="form.subjectName" placeholder="如 房费/水费/电费/网络费" />
+          <a-input v-model:value="form.subjectName" placeholder="支持中文，如 房费/水费/电费/网络费" />
         </a-form-item>
         <a-form-item label="默认单价/比例">
           <a-input-number v-model:value="form.configValue" style="width: 100%" :min="0" />
@@ -137,17 +137,13 @@ function openEdit(row?: FinanceBillingConfigEntry) {
 }
 
 async function submitEdit() {
-  const keySuffix = form.value.keySuffix.trim().toUpperCase()
-  if (!keySuffix) {
-    message.warning('请输入科目键')
-    return
-  }
-  if (!/^[A-Z0-9_]{2,48}$/.test(keySuffix)) {
-    message.warning('科目键仅支持大写字母、数字、下划线，长度 2-48')
-    return
-  }
   if (!form.value.subjectName.trim()) {
     message.warning('请输入科目名称')
+    return
+  }
+  const keySuffix = normalizeKeySuffix(form.value.keySuffix, form.value.subjectName)
+  if (!/^[A-Z0-9_]{2,48}$/.test(keySuffix)) {
+    message.warning('科目编码格式非法，请使用字母/数字/下划线，长度 2-48')
     return
   }
   saving.value = true
@@ -165,6 +161,18 @@ async function submitEdit() {
   } finally {
     saving.value = false
   }
+}
+
+function normalizeKeySuffix(rawKey: string, subjectName: string) {
+  const direct = String(rawKey || '').trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_').replace(/_{2,}/g, '_').replace(/^_+|_+$/g, '')
+  if (direct.length >= 2 && direct.length <= 48) {
+    return direct
+  }
+  const fromName = String(subjectName || '').trim().toUpperCase().replace(/[^A-Z0-9_]/g, '_').replace(/_{2,}/g, '_').replace(/^_+|_+$/g, '')
+  if (fromName.length >= 2) {
+    return fromName.slice(0, 48)
+  }
+  return `SUBJECT_${dayjs().format('HHmmssSSS')}`
 }
 
 function selectedRows(): FinanceBillingConfigEntry[] {

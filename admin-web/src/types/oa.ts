@@ -69,6 +69,8 @@ export interface OaDocumentFolder {
   parentId?: string | number
   sortNo?: number
   status?: string
+  visibility?: 'PUBLIC' | 'PRIVATE' | string
+  regionCode?: string
   remark?: string
   documentCount?: number
   children?: OaDocumentFolder[]

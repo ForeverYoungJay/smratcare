@@ -8,6 +8,7 @@
         <a-form-item label="支付方式">
           <a-select v-model:value="query.method" allow-clear style="width: 140px">
             <a-select-option value="CASH">现金</a-select-option>
+            <a-select-option value="CARD">刷卡</a-select-option>
             <a-select-option value="BANK">转账</a-select-option>
             <a-select-option value="ALIPAY">支付宝</a-select-option>
             <a-select-option value="WECHAT">微信</a-select-option>
@@ -24,9 +25,14 @@
         <a-form-item label="关键字">
           <a-input v-model:value="query.keyword" allow-clear placeholder="长者/收据号/备注" style="width: 200px" />
         </a-form-item>
+        <a-form-item label="打印备注">
+          <a-input v-model:value="query.printRemark" allow-clear placeholder="例如：财务复核版" style="width: 180px" />
+        </a-form-item>
         <a-form-item>
           <a-space>
             <a-button type="primary" @click="fetchData">查询</a-button>
+            <a-button @click="exportCsvReport">导出CSV</a-button>
+            <a-button @click="printCurrent">打印当前结果</a-button>
             <a-button @click="reset">重置</a-button>
           </a-space>
         </a-form-item>
@@ -66,9 +72,11 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
+import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
-import { getFinanceInvoiceReceiptPage } from '../../api/finance'
+import { exportFinanceInvoiceReceiptCsv, getFinanceInvoiceReceiptPage } from '../../api/finance'
 import type { FinanceInvoiceReceiptItem, PageResult } from '../../types'
+import { printTableReport } from '../../utils/print'
 
 const loading = ref(false)
 const rows = ref<FinanceInvoiceReceiptItem[]>([])
@@ -79,6 +87,7 @@ const query = reactive({
   method: undefined as string | undefined,
   invoiceStatus: undefined as string | undefined,
   keyword: '',
+  printRemark: '',
   pageNo: 1,
   pageSize: 20
 })
@@ -106,6 +115,7 @@ function reset() {
   query.method = undefined
   query.invoiceStatus = undefined
   query.keyword = ''
+  query.printRemark = ''
   query.pageNo = 1
   fetchData()
 }
@@ -119,6 +129,49 @@ function onPageSizeChange(_: number, size: number) {
   query.pageNo = 1
   query.pageSize = size
   fetchData()
+}
+
+async function exportCsvReport() {
+  try {
+    await exportFinanceInvoiceReceiptCsv({
+      date: dayjs(query.date).format('YYYY-MM-DD'),
+      method: query.method,
+      invoiceStatus: query.invoiceStatus,
+      keyword: query.keyword || undefined
+    })
+    message.success('导出成功')
+  } catch (error: any) {
+    message.error(error?.message || '导出失败')
+  }
+}
+
+function printCurrent() {
+  try {
+    printTableReport({
+      title: '发票/收据管理',
+      subtitle: `日期：${dayjs(query.date).format('YYYY-MM-DD')}；支付方式：${query.method || '全部'}；关联状态：${query.invoiceStatus || '全部'}；关键字：${query.keyword || '-'}；备注：${query.printRemark || '-'}`,
+      columns: [
+        { key: 'paidAt', title: '收款时间' },
+        { key: 'elderName', title: '长者' },
+        { key: 'amount', title: '金额' },
+        { key: 'payMethodLabel', title: '支付方式' },
+        { key: 'receiptNo', title: '收据号' },
+        { key: 'invoiceStatusLabel', title: '发票关联' },
+        { key: 'remark', title: '备注' }
+      ],
+      rows: rows.value.map(item => ({
+        paidAt: item.paidAt || '-',
+        elderName: item.elderName || '-',
+        amount: item.amount || 0,
+        payMethodLabel: item.payMethodLabel || '-',
+        receiptNo: item.receiptNo || '-',
+        invoiceStatusLabel: item.invoiceStatusLabel || '-',
+        remark: item.remark || '-'
+      }))
+    })
+  } catch (error: any) {
+    message.error(error?.message || '打印失败')
+  }
 }
 
 onMounted(fetchData)

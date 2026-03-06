@@ -105,7 +105,7 @@
           <a-upload :show-upload-list="false" :before-upload="beforeUploadAttachment">
             <a-button :loading="uploadingAttachment">上传附件</a-button>
           </a-upload>
-          <div class="upload-tip">支持图片/文档，单个不超过20MB，最多10个附件</div>
+          <div class="upload-tip">支持图片/文档，单个不超过10MB，最多10个附件</div>
           <a-space wrap style="margin-top: 8px">
             <a-tag v-for="(file, index) in attachmentFiles" :key="`${file.url}_${index}`" closable @close="removeAttachment(index)">
               <a @click.prevent="openAttachment(file.url)">{{ file.name }}</a>
@@ -423,7 +423,7 @@ function removeAttachment(index: number) {
 }
 
 async function beforeUploadAttachment(file: File) {
-  const maxSizeMb = 20
+  const maxSizeMb = 10
   if (attachmentFiles.value.length >= 10) {
     message.warning('最多上传10个附件')
     return false

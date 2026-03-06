@@ -242,7 +242,7 @@ public class ElderResidenceController {
   }
 
   @DeleteMapping("/outing/{id}")
-  @PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+  @PreAuthorize("hasAnyRole('MEDICAL_MINISTER','NURSING_MINISTER','HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<Boolean> deleteOuting(@PathVariable Long id) {
     Long orgId = AuthContext.getOrgId();
     ElderOutingRecord record = outingMapper.selectById(id);
@@ -264,6 +264,7 @@ public class ElderResidenceController {
   }
 
   @GetMapping("/medical-outing/page")
+  @PreAuthorize("hasAnyRole('MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<IPage<ElderMedicalOutingRecord>> medicalOutingPage(
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
@@ -289,7 +290,7 @@ public class ElderResidenceController {
   }
 
   @PostMapping("/medical-outing")
-  @PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+  @PreAuthorize("hasAnyRole('MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<ElderMedicalOutingRecord> createMedicalOuting(@Valid @RequestBody MedicalOutingCreateRequest request) {
     Long orgId = AuthContext.getOrgId();
     ensureNoActiveOuting(request.getElderId(), orgId);
@@ -319,7 +320,7 @@ public class ElderResidenceController {
   }
 
   @PutMapping("/medical-outing/{id}/return")
-  @PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+  @PreAuthorize("hasAnyRole('MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<ElderMedicalOutingRecord> returnFromMedicalOuting(@PathVariable Long id,
                                                                    @RequestBody MedicalOutingReturnRequest request) {
     Long orgId = AuthContext.getOrgId();
@@ -346,7 +347,7 @@ public class ElderResidenceController {
   }
 
   @DeleteMapping("/medical-outing/{id}")
-  @PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+  @PreAuthorize("hasAnyRole('MEDICAL_MINISTER','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<Boolean> deleteMedicalOuting(@PathVariable Long id) {
     Long orgId = AuthContext.getOrgId();
     ElderMedicalOutingRecord record = medicalOutingMapper.selectById(id);
@@ -368,7 +369,7 @@ public class ElderResidenceController {
   }
 
   @GetMapping(value = "/medical-outing/export", produces = "text/csv;charset=UTF-8")
-  @PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+  @PreAuthorize("hasAnyRole('MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public ResponseEntity<byte[]> exportMedicalOuting(
       @RequestParam(required = false) Long elderId,
       @RequestParam(required = false) String status,
@@ -407,6 +408,7 @@ public class ElderResidenceController {
   }
 
   @GetMapping("/death-register/page")
+  @PreAuthorize("hasAnyRole('MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<IPage<ElderDeathRegister>> deathRegisterPage(
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
@@ -431,7 +433,7 @@ public class ElderResidenceController {
   }
 
   @PostMapping("/death-register")
-  @PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+  @PreAuthorize("hasAnyRole('MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<ElderDeathRegister> createDeathRegister(@Valid @RequestBody DeathRegisterCreateRequest request) {
     Long orgId = AuthContext.getOrgId();
     long activeCount = deathRegisterMapper.selectCount(Wrappers.lambdaQuery(ElderDeathRegister.class)
@@ -469,7 +471,7 @@ public class ElderResidenceController {
   }
 
   @PutMapping("/death-register/{id}")
-  @PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+  @PreAuthorize("hasAnyRole('MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<ElderDeathRegister> updateDeathRegister(@PathVariable Long id,
                                                         @Valid @RequestBody DeathRegisterUpdateRequest request) {
     Long orgId = AuthContext.getOrgId();
@@ -496,7 +498,7 @@ public class ElderResidenceController {
   }
 
   @PutMapping("/death-register/{id}/cancel")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('MEDICAL_MINISTER','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<ElderDeathRegister> cancelDeathRegister(@PathVariable Long id,
                                                         @RequestBody(required = false) DeathRegisterCancelRequest request) {
     Long orgId = AuthContext.getOrgId();
@@ -525,7 +527,7 @@ public class ElderResidenceController {
   }
 
   @DeleteMapping("/death-register/{id}")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('MEDICAL_MINISTER','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<Boolean> deleteDeathRegister(@PathVariable Long id) {
     Long orgId = AuthContext.getOrgId();
     ElderDeathRegister record = deathRegisterMapper.selectById(id);
@@ -543,7 +545,7 @@ public class ElderResidenceController {
   }
 
   @GetMapping(value = "/death-register/export", produces = "text/csv;charset=UTF-8")
-  @PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+  @PreAuthorize("hasAnyRole('MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public ResponseEntity<byte[]> exportDeathRegister(
       @RequestParam(required = false) Long elderId,
       @RequestParam(required = false) String status,
@@ -717,7 +719,7 @@ public class ElderResidenceController {
   }
 
   @DeleteMapping("/trial-stay/{id}")
-  @PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+  @PreAuthorize("hasAnyRole('MEDICAL_MINISTER','NURSING_MINISTER','MARKETING_MINISTER','HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<Boolean> deleteTrialStay(@PathVariable Long id) {
     Long orgId = AuthContext.getOrgId();
     ElderTrialStay record = trialStayMapper.selectById(id);
@@ -816,7 +818,7 @@ public class ElderResidenceController {
   }
 
   @PostMapping("/discharge-apply")
-  @PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+  @PreAuthorize("hasAnyRole('MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','HR_EMPLOYEE','HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<ElderDischargeApply> createDischargeApply(@Valid @RequestBody DischargeApplyCreateRequest request) {
     Long orgId = AuthContext.getOrgId();
     long pendingCount = dischargeApplyMapper.selectCount(Wrappers.lambdaQuery(ElderDischargeApply.class)
@@ -848,7 +850,7 @@ public class ElderResidenceController {
   }
 
   @PutMapping("/discharge-apply/{id}/review")
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('MEDICAL_MINISTER','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<ElderDischargeApply> reviewDischargeApply(@PathVariable Long id,
                                                           @Valid @RequestBody DischargeApplyReviewRequest request) {
     Long orgId = AuthContext.getOrgId();
@@ -943,7 +945,7 @@ public class ElderResidenceController {
   }
 
   @DeleteMapping("/discharge-apply/{id}")
-  @PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+  @PreAuthorize("hasAnyRole('MEDICAL_MINISTER','NURSING_MINISTER','HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<Boolean> deleteDischargeApply(@PathVariable Long id) {
     Long orgId = AuthContext.getOrgId();
     ElderDischargeApply record = dischargeApplyMapper.selectById(id);

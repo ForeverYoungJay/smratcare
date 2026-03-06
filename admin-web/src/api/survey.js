@@ -20,11 +20,26 @@ export function getSurveyTemplatePage(params) {
 export function getSurveyTemplateDetail(id) {
     return request.get(`/api/admin/survey/templates/${id}`);
 }
+export function getSurveyPublishedTemplatePage(params) {
+    return fetchPage('/api/survey/templates/page', params);
+}
+export function getSurveyPublishedTemplateDetail(id) {
+    return request.get(`/api/survey/templates/${id}`);
+}
+export function verifySurveyPublishedTemplate(id, params) {
+    return request.get(`/api/survey/templates/${id}/verify`, { params });
+}
 export function createSurveyTemplate(data) {
     return request.post('/api/admin/survey/templates', data);
 }
 export function updateSurveyTemplate(id, data) {
     return request.put(`/api/admin/survey/templates/${id}`, data);
+}
+export function publishSurveyTemplate(id) {
+    return request.post(`/api/admin/survey/templates/${id}/publish`);
+}
+export function disableSurveyTemplate(id) {
+    return request.post(`/api/admin/survey/templates/${id}/disable`);
 }
 export function deleteSurveyTemplate(id) {
     return request.delete(`/api/admin/survey/templates/${id}`);

@@ -132,6 +132,29 @@ public class StatisticsController {
     return Result.ok(response);
   }
 
+  @GetMapping(value = "/check-in/export", produces = "text/csv;charset=UTF-8")
+  public ResponseEntity<byte[]> exportCheckIn(
+      @RequestParam(required = false) @Pattern(regexp = MONTH_PATTERN, message = "from must be YYYY-MM") String from,
+      @RequestParam(required = false) @Pattern(regexp = MONTH_PATTERN, message = "to must be YYYY-MM") String to,
+      @RequestParam(defaultValue = "6") @Min(1) @Max(36) int months,
+      @RequestParam(required = false) Long orgId) {
+    CheckInStatsResponse stats = checkIn(from, to, months, orgId).getData();
+    List<String> headers = List.of("月份", "入住", "离院", "净增长", "期间入住总数", "期间离院总数", "净增长总数", "当前在院", "离院/入住比(%)");
+    List<List<String>> body = stats.getMonthlyNetIncrease().stream()
+        .map(item -> List.of(
+            stringOf(item.getMonth()),
+            stringOf(stats.getMonthlyAdmissions().stream().filter(m -> Objects.equals(m.getMonth(), item.getMonth())).map(MonthCountItem::getCount).findFirst().orElse(0L)),
+            stringOf(stats.getMonthlyDischarges().stream().filter(m -> Objects.equals(m.getMonth(), item.getMonth())).map(MonthCountItem::getCount).findFirst().orElse(0L)),
+            stringOf(item.getCount()),
+            stringOf(stats.getTotalAdmissions()),
+            stringOf(stats.getTotalDischarges()),
+            stringOf(stats.getNetIncrease()),
+            stringOf(stats.getCurrentResidents()),
+            stringOf(stats.getDischargeToAdmissionRate())))
+        .toList();
+    return csvResponse("check-in-stats", headers, body);
+  }
+
   @GetMapping("/consumption")
   public Result<ConsumptionStatsResponse> consumption(
       @RequestParam(required = false) @Pattern(regexp = MONTH_PATTERN, message = "from must be YYYY-MM") String from,
@@ -214,6 +237,39 @@ public class StatisticsController {
     return Result.ok(response);
   }
 
+  @GetMapping(value = "/consumption/export", produces = "text/csv;charset=UTF-8")
+  public ResponseEntity<byte[]> exportConsumption(
+      @RequestParam(required = false) @Pattern(regexp = MONTH_PATTERN, message = "from must be YYYY-MM") String from,
+      @RequestParam(required = false) @Pattern(regexp = MONTH_PATTERN, message = "to must be YYYY-MM") String to,
+      @RequestParam(defaultValue = "6") @Min(1) @Max(36) int months,
+      @RequestParam(required = false) Long orgId) {
+    ConsumptionStatsResponse stats = consumption(from, to, months, orgId).getData();
+    List<String> headers = List.of("月份", "账单消费", "商城消费", "总消费", "账单占比(%)", "商城占比(%)", "月均消费");
+    List<List<String>> body = stats.getMonthlyTotalConsumption().stream()
+        .map(item -> {
+          BigDecimal bill = stats.getMonthlyBillConsumption().stream()
+              .filter(m -> Objects.equals(m.getMonth(), item.getMonth()))
+              .map(MonthAmountItem::getAmount)
+              .findFirst()
+              .orElse(BigDecimal.ZERO);
+          BigDecimal store = stats.getMonthlyStoreConsumption().stream()
+              .filter(m -> Objects.equals(m.getMonth(), item.getMonth()))
+              .map(MonthAmountItem::getAmount)
+              .findFirst()
+              .orElse(BigDecimal.ZERO);
+          return List.of(
+              stringOf(item.getMonth()),
+              stringOf(bill),
+              stringOf(store),
+              stringOf(item.getAmount()),
+              stringOf(stats.getBillConsumptionRatio()),
+              stringOf(stats.getStoreConsumptionRatio()),
+              stringOf(stats.getAverageMonthlyConsumption()));
+        })
+        .toList();
+    return csvResponse("consumption-stats", headers, body);
+  }
+
   @GetMapping("/elder-info")
   public Result<ElderInfoStatsResponse> elderInfo(@RequestParam(required = false) Long orgId) {
     Long scopedOrgId = resolveAccessibleOrgId(orgId);
@@ -267,6 +323,18 @@ public class StatisticsController {
     response.setCareLevelDistribution(toNameCountList(careLevel));
     response.setStatusDistribution(toNameCountList(elderStatus));
     return Result.ok(response);
+  }
+
+  @GetMapping(value = "/elder-info/export", produces = "text/csv;charset=UTF-8")
+  public ResponseEntity<byte[]> exportElderInfo(@RequestParam(required = false) Long orgId) {
+    ElderInfoStatsResponse stats = elderInfo(orgId).getData();
+    List<String> headers = List.of("维度", "项", "人数", "老人总数", "在院人数", "离院人数");
+    List<List<String>> body = new ArrayList<>();
+    appendElderInfoRows(body, "性别", stats.getGenderDistribution(), stats);
+    appendElderInfoRows(body, "年龄", stats.getAgeDistribution(), stats);
+    appendElderInfoRows(body, "护理等级", stats.getCareLevelDistribution(), stats);
+    appendElderInfoRows(body, "状态", stats.getStatusDistribution(), stats);
+    return csvResponse("elder-info-stats", headers, body);
   }
 
   @GetMapping("/org/monthly-operation")
@@ -363,6 +431,27 @@ public class StatisticsController {
     return Result.ok(result);
   }
 
+  @GetMapping(value = "/org/elder-flow/export", produces = "text/csv;charset=UTF-8")
+  public ResponseEntity<byte[]> exportOrgElderFlow(
+      @RequestParam(required = false) @Pattern(regexp = MONTH_PATTERN, message = "from must be YYYY-MM") String from,
+      @RequestParam(required = false) @Pattern(regexp = MONTH_PATTERN, message = "to must be YYYY-MM") String to,
+      @RequestParam(defaultValue = "6") @Min(1) @Max(36) int months,
+      @RequestParam(required = false) Long orgId) {
+    Long scopedOrgId = resolveAccessibleOrgId(orgId);
+    YearMonth end = parseYearMonth(to, YearMonth.now());
+    YearMonth start = parseYearMonth(from, end.minusMonths(Math.max(months - 1L, 0L)));
+    validateMonthRange(start, end, 36);
+    List<MonthFlowItem> rows = orgElderFlow(start.toString(), end.toString(), months, scopedOrgId).getData();
+    List<String> headers = List.of("月份", "入住人数", "离院人数");
+    List<List<String>> body = rows.stream()
+        .map(item -> List.of(
+            stringOf(item.getMonth()),
+            stringOf(item.getAdmissions()),
+            stringOf(item.getDischarges())))
+        .toList();
+    return csvResponse("org-elder-flow", headers, body);
+  }
+
   @GetMapping("/org/bed-usage")
   public Result<BedUsageStatsResponse> orgBedUsage(@RequestParam(required = false) Long orgId) {
     Long scopedOrgId = resolveAccessibleOrgId(orgId);
@@ -388,6 +477,22 @@ public class StatisticsController {
     response.setMaintenanceRate(calculateRate(maintenance, total));
     response.setAvailableRate(calculateRate(available, total));
     return Result.ok(response);
+  }
+
+  @GetMapping(value = "/org/bed-usage/export", produces = "text/csv;charset=UTF-8")
+  public ResponseEntity<byte[]> exportOrgBedUsage(@RequestParam(required = false) Long orgId) {
+    BedUsageStatsResponse stats = orgBedUsage(orgId).getData();
+    List<String> headers = List.of("总床位", "已使用床位", "空闲床位", "维护床位", "使用率(%)", "维护率(%)", "空闲率(%)");
+    List<List<String>> body = List.of(
+        List.of(
+            stringOf(stats.getTotalBeds()),
+            stringOf(stats.getOccupiedBeds()),
+            stringOf(stats.getAvailableBeds()),
+            stringOf(stats.getMaintenanceBeds()),
+            stringOf(stats.getOccupancyRate()),
+            stringOf(stats.getMaintenanceRate()),
+            stringOf(stats.getAvailableRate())));
+    return csvResponse("org-bed-usage", headers, body);
   }
 
   @GetMapping("/monthly-revenue")
@@ -421,6 +526,25 @@ public class StatisticsController {
     response.setAverageMonthlyRevenue(calculateAverage(total, monthMap.size()));
     response.setRevenueGrowthRate(calculateMonthOverMonthGrowth(monthMap));
     return Result.ok(response);
+  }
+
+  @GetMapping(value = "/monthly-revenue/export", produces = "text/csv;charset=UTF-8")
+  public ResponseEntity<byte[]> exportMonthlyRevenue(
+      @RequestParam(required = false) @Pattern(regexp = MONTH_PATTERN, message = "from must be YYYY-MM") String from,
+      @RequestParam(required = false) @Pattern(regexp = MONTH_PATTERN, message = "to must be YYYY-MM") String to,
+      @RequestParam(defaultValue = "6") @Min(1) @Max(36) int months,
+      @RequestParam(required = false) Long orgId) {
+    MonthlyRevenueStatsResponse stats = monthlyRevenue(from, to, months, orgId).getData();
+    List<String> headers = List.of("月份", "收入金额", "期间总收入", "月均收入", "最近环比(%)");
+    List<List<String>> body = (stats.getMonthlyRevenue() == null ? List.<MonthAmountItem>of() : stats.getMonthlyRevenue()).stream()
+        .map(item -> List.of(
+            stringOf(item.getMonth()),
+            stringOf(item.getAmount()),
+            stringOf(stats.getTotalRevenue()),
+            stringOf(stats.getAverageMonthlyRevenue()),
+            stringOf(stats.getRevenueGrowthRate())))
+        .toList();
+    return csvResponse("monthly-revenue-stats", headers, body);
   }
 
   @GetMapping("/elder-flow-report")
@@ -874,6 +998,7 @@ public class StatisticsController {
 
   private ResponseEntity<byte[]> csvResponse(String filenameBase, List<String> headers, List<List<String>> rows) {
     StringBuilder sb = new StringBuilder();
+    sb.append('\uFEFF');
     sb.append(toCsvLine(headers)).append("\n");
     for (List<String> row : rows) {
       sb.append(toCsvLine(row)).append("\n");
@@ -901,6 +1026,32 @@ public class StatisticsController {
 
   private String stringOf(Object value) {
     return value == null ? "" : String.valueOf(value);
+  }
+
+  private void appendElderInfoRows(
+      List<List<String>> body,
+      String section,
+      List<NameCountItem> items,
+      ElderInfoStatsResponse stats) {
+    if (items == null || items.isEmpty()) {
+      body.add(List.of(
+          section,
+          "-",
+          "0",
+          stringOf(stats.getTotalElders()),
+          stringOf(stats.getInHospitalCount()),
+          stringOf(stats.getDischargedCount())));
+      return;
+    }
+    for (NameCountItem item : items) {
+      body.add(List.of(
+          section,
+          stringOf(item.getName()),
+          stringOf(item.getCount()),
+          stringOf(stats.getTotalElders()),
+          stringOf(stats.getInHospitalCount()),
+          stringOf(stats.getDischargedCount())));
+    }
   }
 
   @Data

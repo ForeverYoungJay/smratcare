@@ -200,8 +200,10 @@ public class BedServiceImpl implements BedService {
         Floor floor = room.getFloorId() == null ? null : floorMap.get(room.getFloorId());
         response.setRoomNo(room.getRoomNo());
         response.setBuilding(building != null ? building.getName() : room.getBuilding());
+        response.setBuildingRemark(building == null ? null : building.getRemark());
         response.setFloorNo(floor != null ? floor.getFloorNo() : room.getFloorNo());
         response.setRoomType(room.getRoomType());
+        response.setRoomRemark(room.getRemark());
         response.setAreaCode(building == null ? null : building.getAreaCode());
         response.setAreaName(building == null ? null : building.getAreaName());
         response.setRoomQrCode(room.getRoomQrCode());
@@ -282,8 +284,10 @@ public class BedServiceImpl implements BedService {
         Floor floor = room.getFloorId() == null ? null : floorMap.get(room.getFloorId());
         response.setRoomNo(room.getRoomNo());
         response.setBuilding(building != null ? building.getName() : room.getBuilding());
+        response.setBuildingRemark(building == null ? null : building.getRemark());
         response.setFloorNo(floor != null ? floor.getFloorNo() : room.getFloorNo());
         response.setRoomType(room.getRoomType());
+        response.setRoomRemark(room.getRemark());
         response.setAreaCode(building == null ? null : building.getAreaCode());
         response.setAreaName(building == null ? null : building.getAreaName());
         response.setRoomQrCode(room.getRoomQrCode());

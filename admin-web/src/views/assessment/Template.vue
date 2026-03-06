@@ -93,6 +93,14 @@
         <a-form-item label="模板描述">
           <a-textarea v-model:value="form.description" :rows="2" />
         </a-form-item>
+        <a-form-item label="模板导入">
+          <a-space>
+            <a-upload :before-upload="beforeTemplateUpload" :show-upload-list="false" accept=".json,.txt">
+              <a-button>上传模板JSON</a-button>
+            </a-upload>
+            <span style="color: rgba(0, 0, 0, 0.45);">可导入 templateCode/templateName/assessmentType/scoreRulesJson/levelRulesJson</span>
+          </a-space>
+        </a-form-item>
         <a-form-item label="评分规则JSON" name="scoreRulesJson">
           <a-textarea v-model:value="form.scoreRulesJson" :rows="4" placeholder='[{"key":"q1","weight":1}]' />
         </a-form-item>
@@ -202,6 +210,38 @@ function openForm(row?: AssessmentScaleTemplate) {
     })
   }
   open.value = true
+}
+
+function beforeTemplateUpload(file: File) {
+  const reader = new FileReader()
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(String(reader.result || '{}')) as Partial<AssessmentScaleTemplate> & Record<string, any>
+      if (parsed.templateCode) form.templateCode = String(parsed.templateCode)
+      if (parsed.templateName) form.templateName = String(parsed.templateName)
+      if (parsed.assessmentType) form.assessmentType = String(parsed.assessmentType)
+      if (parsed.description !== undefined) form.description = String(parsed.description || '')
+      if (parsed.status !== undefined && parsed.status !== null) form.status = Number(parsed.status) === 0 ? 0 : 1
+      if (parsed.scoreRulesJson) {
+        form.scoreRulesJson = typeof parsed.scoreRulesJson === 'string'
+          ? parsed.scoreRulesJson
+          : JSON.stringify(parsed.scoreRulesJson)
+      }
+      if (parsed.levelRulesJson) {
+        form.levelRulesJson = typeof parsed.levelRulesJson === 'string'
+          ? parsed.levelRulesJson
+          : JSON.stringify(parsed.levelRulesJson)
+      }
+      message.success('模板JSON已导入')
+    } catch {
+      message.error('模板文件格式错误，请检查JSON内容')
+    }
+  }
+  reader.onerror = () => {
+    message.error('读取模板文件失败')
+  }
+  reader.readAsText(file, 'utf-8')
+  return false
 }
 
 async function submit() {

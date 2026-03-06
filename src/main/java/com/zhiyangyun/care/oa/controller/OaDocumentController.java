@@ -42,6 +42,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class OaDocumentController {
   private static final String FOLDER_STATUS_ENABLED = "ENABLED";
   private static final String FOLDER_STATUS_DISABLED = "DISABLED";
+  private static final String FOLDER_VISIBILITY_PUBLIC = "PUBLIC";
+  private static final String FOLDER_VISIBILITY_PRIVATE = "PRIVATE";
+  private static final int MAX_NAME_LENGTH = 255;
+  private static final int MAX_FOLDER_LENGTH = 128;
+  private static final int MAX_URL_LENGTH = 1024;
+  private static final int MAX_UPLOADER_LENGTH = 64;
+  private static final int MAX_REMARK_LENGTH = 500;
 
   private final OaDocumentMapper documentMapper;
   private final OaDocumentFolderMapper folderMapper;
@@ -59,15 +66,30 @@ public class OaDocumentController {
       @RequestParam(required = false) Long size,
       @RequestParam(required = false) Long folderId,
       @RequestParam(required = false) String folder,
+      @RequestParam(required = false) String folderVisibility,
+      @RequestParam(required = false) String regionCode,
       @RequestParam(required = false) String keyword) {
     long resolvedPageNo = pageNo != null && pageNo > 0 ? pageNo : (page != null && page > 0 ? page : 1);
     long resolvedPageSize = pageSize != null && pageSize > 0 ? pageSize : (size != null && size > 0 ? size : 20);
     Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
+    String normalizedFolderVisibility = normalizeFolderVisibilityFilter(folderVisibility);
+    String normalizedRegionCode = normalizeOptionalText(regionCode);
+    List<Long> accessibleFolderIds = listAccessibleFolderIds(orgId, staffId, normalizedFolderVisibility, normalizedRegionCode);
     var wrapper = Wrappers.lambdaQuery(OaDocument.class)
         .eq(OaDocument::getIsDeleted, 0)
         .eq(orgId != null, OaDocument::getOrgId, orgId)
         .eq(folderId != null, OaDocument::getFolderId, folderId)
         .eq(folderId == null && folder != null && !folder.isBlank(), OaDocument::getFolder, folder.trim());
+    if (folderId == null && (folder == null || folder.isBlank())) {
+      if (accessibleFolderIds.isEmpty()) {
+        wrapper.isNull(OaDocument::getFolderId);
+      } else {
+        wrapper.and(w -> w.isNull(OaDocument::getFolderId).or().in(OaDocument::getFolderId, accessibleFolderIds));
+      }
+    } else if (folderId != null && !accessibleFolderIds.contains(folderId)) {
+      return Result.ok(new Page<>(resolvedPageNo, resolvedPageSize, 0));
+    }
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(OaDocument::getName, keyword)
           .or().like(OaDocument::getUploaderName, keyword));
@@ -79,9 +101,13 @@ public class OaDocumentController {
   @GetMapping("/folder/tree")
   public Result<List<OaDocumentFolderTreeNode>> folderTree() {
     Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
     List<OaDocumentFolder> folders = folderMapper.selectList(Wrappers.lambdaQuery(OaDocumentFolder.class)
         .eq(OaDocumentFolder::getIsDeleted, 0)
         .eq(orgId != null, OaDocumentFolder::getOrgId, orgId)
+        .and(w -> w.eq(OaDocumentFolder::getVisibility, FOLDER_VISIBILITY_PUBLIC)
+            .or().isNull(OaDocumentFolder::getVisibility)
+            .or().eq(staffId != null, OaDocumentFolder::getCreatedBy, staffId))
         .orderByAsc(OaDocumentFolder::getSortNo)
         .orderByAsc(OaDocumentFolder::getCreateTime));
     List<OaDocument> docs = documentMapper.selectList(Wrappers.lambdaQuery(OaDocument.class)
@@ -105,6 +131,8 @@ public class OaDocumentController {
       node.setParentId(normalizeParentId(folder.getParentId()));
       node.setSortNo(folder.getSortNo());
       node.setStatus(folder.getStatus());
+      node.setVisibility(folder.getVisibility());
+      node.setRegionCode(folder.getRegionCode());
       node.setRemark(folder.getRemark());
       node.setDocumentCount(folderDocCountMap.getOrDefault(folder.getId(), 0));
       nodeMap.put(node.getId(), node);
@@ -147,6 +175,8 @@ public class OaDocumentController {
     folder.setParentId(parentId == null ? 0L : parentId);
     folder.setSortNo(request.getSortNo() == null ? 0 : request.getSortNo());
     folder.setStatus(normalizeFolderStatus(request.getStatus(), FOLDER_STATUS_ENABLED));
+    folder.setVisibility(normalizeFolderVisibility(request.getVisibility(), FOLDER_VISIBILITY_PUBLIC));
+    folder.setRegionCode(normalizeOptionalText(request.getRegionCode()));
     folder.setRemark(request.getRemark());
     folder.setCreatedBy(AuthContext.getStaffId());
     folderMapper.insert(folder);
@@ -180,6 +210,8 @@ public class OaDocumentController {
     folder.setParentId(parentId == null ? 0L : parentId);
     folder.setSortNo(request.getSortNo() == null ? 0 : request.getSortNo());
     folder.setStatus(normalizeFolderStatus(request.getStatus(), folder.getStatus()));
+    folder.setVisibility(normalizeFolderVisibility(request.getVisibility(), folder.getVisibility()));
+    folder.setRegionCode(normalizeOptionalText(request.getRegionCode()));
     folder.setRemark(request.getRemark());
     folderMapper.updateById(folder);
     return Result.ok(folder);
@@ -219,16 +251,19 @@ public class OaDocumentController {
     OaDocument doc = new OaDocument();
     doc.setTenantId(orgId);
     doc.setOrgId(orgId);
-    doc.setName(resolveDocumentName(request.getName(), request.getUrl()));
-    Long resolvedFolderId = resolveFolderId(request.getFolderId(), request.getFolder());
+    String normalizedUrl = normalizeText(request.getUrl(), MAX_URL_LENGTH);
+    String normalizedFolder = normalizeText(request.getFolder(), MAX_FOLDER_LENGTH);
+    Long resolvedFolderId = resolveFolderId(request.getFolderId(), normalizedFolder);
+    doc.setName(normalizeText(resolveDocumentName(request.getName(), normalizedUrl), MAX_NAME_LENGTH));
     doc.setFolderId(resolvedFolderId);
-    doc.setFolder(resolveFolderName(resolvedFolderId, request.getFolder()));
-    doc.setUrl(request.getUrl());
+    doc.setFolder(resolveFolderName(resolvedFolderId, normalizedFolder));
+    doc.setUrl(normalizedUrl);
     doc.setSizeBytes(request.getSizeBytes());
     doc.setUploaderId(request.getUploaderId());
-    doc.setUploaderName(request.getUploaderName() == null ? AuthContext.getUsername() : request.getUploaderName());
+    String uploaderName = request.getUploaderName() == null ? AuthContext.getUsername() : request.getUploaderName();
+    doc.setUploaderName(normalizeText(uploaderName, MAX_UPLOADER_LENGTH));
     doc.setUploadedAt(request.getUploadedAt() == null ? LocalDateTime.now() : request.getUploadedAt());
-    doc.setRemark(request.getRemark());
+    doc.setRemark(normalizeText(request.getRemark(), MAX_REMARK_LENGTH));
     doc.setCreatedBy(AuthContext.getStaffId());
     documentMapper.insert(doc);
     return Result.ok(doc);
@@ -242,16 +277,23 @@ public class OaDocumentController {
     }
     validateSize(request.getSizeBytes());
     validatePayload(request);
-    doc.setName(resolveDocumentName(request.getName(), request.getUrl()));
-    Long resolvedFolderId = resolveFolderId(request.getFolderId(), request.getFolder());
+    String normalizedUrl = normalizeText(request.getUrl(), MAX_URL_LENGTH);
+    String normalizedFolder = normalizeText(request.getFolder(), MAX_FOLDER_LENGTH);
+    Long resolvedFolderId = resolveFolderId(request.getFolderId(), normalizedFolder);
+    doc.setName(normalizeText(resolveDocumentName(request.getName(), normalizedUrl), MAX_NAME_LENGTH));
     doc.setFolderId(resolvedFolderId);
-    doc.setFolder(resolveFolderName(resolvedFolderId, request.getFolder()));
-    doc.setUrl(request.getUrl());
+    doc.setFolder(resolveFolderName(resolvedFolderId, normalizedFolder));
+    doc.setUrl(normalizedUrl);
     doc.setSizeBytes(request.getSizeBytes());
     doc.setUploaderId(request.getUploaderId());
-    doc.setUploaderName(request.getUploaderName());
+    String updateUploaderName = normalizeText(request.getUploaderName(), MAX_UPLOADER_LENGTH);
+    if (updateUploaderName != null) {
+      doc.setUploaderName(updateUploaderName);
+    } else if (doc.getUploaderName() == null || doc.getUploaderName().isBlank()) {
+      doc.setUploaderName(normalizeText(AuthContext.getUsername(), MAX_UPLOADER_LENGTH));
+    }
     doc.setUploadedAt(request.getUploadedAt() == null ? doc.getUploadedAt() : request.getUploadedAt());
-    doc.setRemark(request.getRemark());
+    doc.setRemark(normalizeText(request.getRemark(), MAX_REMARK_LENGTH));
     documentMapper.updateById(doc);
     return Result.ok(doc);
   }
@@ -278,15 +320,32 @@ public class OaDocumentController {
   public ResponseEntity<byte[]> export(
       @RequestParam(required = false) Long folderId,
       @RequestParam(required = false) String folder,
+      @RequestParam(required = false) String folderVisibility,
+      @RequestParam(required = false) String regionCode,
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
+    String normalizedFolderVisibility = normalizeFolderVisibilityFilter(folderVisibility);
+    String normalizedRegionCode = normalizeOptionalText(regionCode);
+    List<Long> accessibleFolderIds = listAccessibleFolderIds(orgId, staffId, normalizedFolderVisibility, normalizedRegionCode);
+    if (folderId != null && !accessibleFolderIds.contains(folderId)) {
+      return csvResponse("oa-document",
+          List.of("ID", "文件名", "目录", "URL", "大小(B)", "上传人", "上传时间", "备注"),
+          List.of());
+    }
     var wrapper = Wrappers.lambdaQuery(OaDocument.class)
         .eq(OaDocument::getIsDeleted, 0)
         .eq(orgId != null, OaDocument::getOrgId, orgId)
         .eq(folderId != null, OaDocument::getFolderId, folderId)
-        .eq(folderId == null && folder != null && !folder.isBlank(), OaDocument::getFolder, folder.trim())
-        .orderByDesc(OaDocument::getUploadedAt)
-        .orderByDesc(OaDocument::getCreateTime);
+        .eq(folderId == null && folder != null && !folder.isBlank(), OaDocument::getFolder, folder.trim());
+    if (folderId == null && (folder == null || folder.isBlank())) {
+      if (accessibleFolderIds.isEmpty()) {
+        wrapper.isNull(OaDocument::getFolderId);
+      } else {
+        wrapper.and(w -> w.isNull(OaDocument::getFolderId).or().in(OaDocument::getFolderId, accessibleFolderIds));
+      }
+    }
+    wrapper.orderByDesc(OaDocument::getUploadedAt).orderByDesc(OaDocument::getCreateTime);
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(OaDocument::getName, keyword).or().like(OaDocument::getUploaderName, keyword));
     }
@@ -327,10 +386,14 @@ public class OaDocumentController {
 
   private OaDocumentFolder findAccessibleFolder(Long id) {
     Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
     return folderMapper.selectOne(Wrappers.lambdaQuery(OaDocumentFolder.class)
         .eq(OaDocumentFolder::getId, id)
         .eq(OaDocumentFolder::getIsDeleted, 0)
         .eq(orgId != null, OaDocumentFolder::getOrgId, orgId)
+        .and(w -> w.eq(OaDocumentFolder::getVisibility, FOLDER_VISIBILITY_PUBLIC)
+            .or().isNull(OaDocumentFolder::getVisibility)
+            .or().eq(staffId != null, OaDocumentFolder::getCreatedBy, staffId))
         .last("LIMIT 1"));
   }
 
@@ -358,8 +421,10 @@ public class OaDocumentController {
   }
 
   private void validatePayload(OaDocumentRequest request) {
-    if ((request.getName() == null || request.getName().isBlank())
-        && (request.getUrl() == null || request.getUrl().isBlank())) {
+    String normalizedName = normalizeText(request.getName(), MAX_NAME_LENGTH);
+    String normalizedUrl = normalizeText(request.getUrl(), MAX_URL_LENGTH);
+    if ((normalizedName == null || normalizedName.isBlank())
+        && (normalizedUrl == null || normalizedUrl.isBlank())) {
       throw new IllegalArgumentException("文件名或文件地址至少填写一项");
     }
   }
@@ -398,10 +463,14 @@ public class OaDocumentController {
       return null;
     }
     Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
     OaDocumentFolder sameName = folderMapper.selectOne(Wrappers.lambdaQuery(OaDocumentFolder.class)
         .eq(OaDocumentFolder::getIsDeleted, 0)
         .eq(orgId != null, OaDocumentFolder::getOrgId, orgId)
         .eq(OaDocumentFolder::getName, folderName.trim())
+        .and(w -> w.eq(OaDocumentFolder::getVisibility, FOLDER_VISIBILITY_PUBLIC)
+            .or().isNull(OaDocumentFolder::getVisibility)
+            .or().eq(staffId != null, OaDocumentFolder::getCreatedBy, staffId))
         .last("LIMIT 1"));
     if (sameName == null || FOLDER_STATUS_DISABLED.equals(sameName.getStatus())) {
       return null;
@@ -440,6 +509,28 @@ public class OaDocumentController {
     return normalized;
   }
 
+  private String normalizeFolderVisibility(String visibility, String defaultVisibility) {
+    if (visibility == null || visibility.isBlank()) {
+      return defaultVisibility == null ? FOLDER_VISIBILITY_PUBLIC : defaultVisibility;
+    }
+    String normalized = visibility.trim().toUpperCase();
+    if (!FOLDER_VISIBILITY_PUBLIC.equals(normalized) && !FOLDER_VISIBILITY_PRIVATE.equals(normalized)) {
+      throw new IllegalArgumentException("档案夹可见性仅支持 PUBLIC/PRIVATE");
+    }
+    return normalized;
+  }
+
+  private String normalizeFolderVisibilityFilter(String visibility) {
+    if (visibility == null || visibility.isBlank()) {
+      return null;
+    }
+    String normalized = visibility.trim().toUpperCase();
+    if (!FOLDER_VISIBILITY_PUBLIC.equals(normalized) && !FOLDER_VISIBILITY_PRIVATE.equals(normalized)) {
+      throw new IllegalArgumentException("档案夹可见性仅支持 PUBLIC/PRIVATE");
+    }
+    return normalized;
+  }
+
   private void ensureFolderNameUnique(Long selfId, Long parentId, String name) {
     Long orgId = AuthContext.getOrgId();
     OaDocumentFolder sameName = folderMapper.selectOne(Wrappers.lambdaQuery(OaDocumentFolder.class)
@@ -458,6 +549,27 @@ public class OaDocumentController {
       return 0L;
     }
     return parentId;
+  }
+
+  private String normalizeOptionalText(String value) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    return value.trim();
+  }
+
+  private String normalizeText(String value, int maxLength) {
+    if (value == null) {
+      return null;
+    }
+    String normalized = value.trim();
+    if (normalized.isEmpty()) {
+      return null;
+    }
+    if (maxLength > 0 && normalized.length() > maxLength) {
+      return normalized.substring(0, maxLength);
+    }
+    return normalized;
   }
 
   private void sortFolderNodes(List<OaDocumentFolderTreeNode> nodes) {
@@ -481,6 +593,21 @@ public class OaDocumentController {
       return List.of();
     }
     return ids.stream().filter(id -> id != null && id > 0).distinct().collect(Collectors.toList());
+  }
+
+  private List<Long> listAccessibleFolderIds(Long orgId, Long staffId, String visibility, String regionCode) {
+    return folderMapper.selectList(Wrappers.lambdaQuery(OaDocumentFolder.class)
+            .eq(OaDocumentFolder::getIsDeleted, 0)
+            .eq(orgId != null, OaDocumentFolder::getOrgId, orgId)
+            .eq(visibility != null, OaDocumentFolder::getVisibility, visibility)
+            .like(regionCode != null && !regionCode.isBlank(), OaDocumentFolder::getRegionCode, regionCode)
+            .and(w -> w.eq(OaDocumentFolder::getVisibility, FOLDER_VISIBILITY_PUBLIC)
+                .or().isNull(OaDocumentFolder::getVisibility)
+                .or().eq(staffId != null, OaDocumentFolder::getCreatedBy, staffId)))
+        .stream()
+        .map(OaDocumentFolder::getId)
+        .filter(Objects::nonNull)
+        .toList();
   }
 
   private String safe(Object value) {

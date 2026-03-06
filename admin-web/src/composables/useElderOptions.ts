@@ -1,5 +1,6 @@
-import { ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { getElderPage } from '../api/elder'
+import { subscribeLiveSync } from '../utils/liveSync'
 import type { ElderItem, PageResult } from '../types'
 
 export interface ElderOption {
@@ -116,6 +117,7 @@ export function useElderOptions(config: UseElderOptionsConfig = {}) {
   const preloadSize = config.preloadSize || Math.max(pageSize * 4, 300)
   const elderOptions = ref<ElderOption[]>([])
   const elderLoading = ref(false)
+  const lastKeyword = ref('')
   const cacheKey = buildCacheKey(config)
 
   async function loadBasePool(force = false) {
@@ -140,6 +142,7 @@ export function useElderOptions(config: UseElderOptionsConfig = {}) {
   async function searchElders(keyword = '') {
     elderLoading.value = true
     try {
+      lastKeyword.value = String(keyword || '')
       const status = normalizeElderStatus(config)
       const baseRows = await loadBasePool(false)
       let mergedRows = [...baseRows]
@@ -186,11 +189,31 @@ export function useElderOptions(config: UseElderOptionsConfig = {}) {
     })
   }
 
+  function invalidateElderCache() {
+    elderPoolCache.delete(cacheKey)
+    elderPoolFetchedAt.delete(cacheKey)
+  }
+
+  let unsubscribe = () => {}
+  onMounted(() => {
+    unsubscribe = subscribeLiveSync((payload) => {
+      if (!payload.topics.some((topic) => topic === 'elder' || topic === 'lifecycle' || topic === 'bed')) return
+      invalidateElderCache()
+      if (!elderOptions.value.length || elderLoading.value) return
+      searchElders(lastKeyword.value).catch(() => {})
+    })
+  })
+
+  onUnmounted(() => {
+    unsubscribe()
+  })
+
   return {
     elderOptions,
     elderLoading,
     searchElders,
     findElderName,
-    ensureSelectedElder
+    ensureSelectedElder,
+    invalidateElderCache
   }
 }

@@ -24,9 +24,12 @@
           <a-select
             v-model:value="form.cardAccountId"
             show-search
+            :filter-option="false"
             :options="cardOptions"
+            :loading="cardAccountLoading"
             placeholder="请选择卡"
-            option-filter-prop="label"
+            @search="searchCardAccounts"
+            @focus="() => !cardOptions.length && searchCardAccounts('')"
           />
         </a-form-item>
         <a-form-item label="消费金额" required>
@@ -45,12 +48,14 @@ import { reactive, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
-import { consumeCard, getCardAccountPage, getCardConsumePage } from '../../api/card'
+import { useCardAccountOptions } from '../../composables/useCardAccountOptions'
+import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
+import { consumeCard, getCardConsumePage } from '../../api/card'
 import type { CardTradeLog, PageResult } from '../../types'
 
 const loading = ref(false)
 const rows = ref<CardTradeLog[]>([])
-const cardOptions = ref<any[]>([])
+const { cardAccountOptions: cardOptions, cardAccountLoading, searchCardAccounts } = useCardAccountOptions({ pageSize: 200, status: 'ACTIVE' })
 const query = reactive({ keyword: '', pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const columns = [
@@ -69,14 +74,6 @@ const form = reactive({
   amount: undefined as number | undefined,
   remark: ''
 })
-
-async function loadCards() {
-  const res = await getCardAccountPage({ pageNo: 1, pageSize: 200, status: 'ACTIVE' })
-  cardOptions.value = res.list.map((item: any) => ({
-    label: `${item.cardNo} - ${item.elderName || item.elderId}`,
-    value: item.id
-  }))
-}
 
 async function fetchData() {
   loading.value = true
@@ -130,6 +127,15 @@ async function submit() {
   }
 }
 
-loadCards()
+searchCardAccounts('')
 fetchData()
+
+useLiveSyncRefresh({
+  topics: ['finance', 'elder'],
+  refresh: () => {
+    if (loading.value || saving.value) return
+    fetchData().catch(() => {})
+  },
+  debounceMs: 900
+})
 </script>

@@ -29,7 +29,7 @@ public class AdminDepartmentController {
     this.departmentMapper = departmentMapper;
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping
   public Result<Department> create(@Valid @RequestBody DepartmentRequest request) {
     Department department = new Department();
@@ -43,7 +43,7 @@ public class AdminDepartmentController {
     return Result.ok(department);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PutMapping("/{id}")
   public Result<Department> update(@PathVariable Long id, @Valid @RequestBody DepartmentRequest request) {
     Department department = departmentMapper.selectById(id);
@@ -60,7 +60,7 @@ public class AdminDepartmentController {
     return Result.ok(department);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
     Department department = departmentMapper.selectById(id);
@@ -72,13 +72,13 @@ public class AdminDepartmentController {
     return Result.ok(null);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/{id}")
   public Result<Department> get(@PathVariable Long id) {
     return Result.ok(departmentMapper.selectById(id));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping
   public Result<IPage<Department>> list(
       @RequestParam(defaultValue = "1") long page,

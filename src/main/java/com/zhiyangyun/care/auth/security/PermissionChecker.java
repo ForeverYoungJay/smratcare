@@ -15,8 +15,9 @@ public class PermissionChecker {
     if (permissionCode == null || permissionCode.isBlank()) {
       return false;
     }
-    List<String> roleCodes = AuthContext.getRoleCodes();
-    if (roleCodes.contains("ADMIN")) {
+    List<String> roleCodes = RoleCodeHelper.normalizeRoles(AuthContext.getRoleCodes());
+    if (roleCodes.contains(RoleCodeHelper.ROLE_ADMIN)
+        || roleCodes.contains(RoleCodeHelper.ROLE_SYS_ADMIN)) {
       return true;
     }
     return permissionRegistry.getPermissionsByRoles(roleCodes).contains(permissionCode);

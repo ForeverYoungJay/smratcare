@@ -26,4 +26,11 @@ public class BillPaymentController {
     Long staffId = AuthContext.getStaffId();
     return Result.ok(financeService.pay(billId, request, staffId));
   }
+
+  @PostMapping("/{billId}/invalidate")
+  public Result<Void> invalidate(@PathVariable Long billId) {
+    Long staffId = AuthContext.getStaffId();
+    financeService.invalidateBill(billId, staffId);
+    return Result.ok(null);
+  }
 }

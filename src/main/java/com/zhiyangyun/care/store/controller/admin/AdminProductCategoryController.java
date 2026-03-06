@@ -34,7 +34,7 @@ public class AdminProductCategoryController {
     this.productMapper = productMapper;
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping
   public Result<ProductCategory> create(@Valid @RequestBody ProductCategoryRequest request) {
     Long orgId = AuthContext.getOrgId();
@@ -51,7 +51,7 @@ public class AdminProductCategoryController {
     return Result.ok(category);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PutMapping("/{id}")
   public Result<ProductCategory> update(@PathVariable Long id,
       @Valid @RequestBody ProductCategoryRequest request) {
@@ -84,7 +84,7 @@ public class AdminProductCategoryController {
     return Result.ok(category);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
     Long orgId = AuthContext.getOrgId();
@@ -104,7 +104,7 @@ public class AdminProductCategoryController {
     return Result.ok(null);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/{id}")
   public Result<ProductCategory> get(@PathVariable Long id) {
     Long orgId = AuthContext.getOrgId();
@@ -115,7 +115,7 @@ public class AdminProductCategoryController {
     return Result.ok(category);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping
   public Result<IPage<ProductCategory>> page(
       @RequestParam(defaultValue = "1") long page,

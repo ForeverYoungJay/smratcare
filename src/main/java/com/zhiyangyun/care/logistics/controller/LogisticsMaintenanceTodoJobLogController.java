@@ -20,6 +20,7 @@ import java.util.Map;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -32,6 +33,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class LogisticsMaintenanceTodoJobLogController {
   private static final int RERUN_MAX_LOOKBACK_DAYS = 30;
   private static final int RERUN_COOLDOWN_SECONDS = 120;
+  @Value("${app.logistics.maintenance-todo.cron:0 0 8 * * ?}")
+  private String maintenanceTodoCron;
 
   private final LogisticsMaintenanceTodoJobLogMapper jobLogMapper;
   private final LogisticsEquipmentTodoService equipmentTodoService;
@@ -124,17 +127,20 @@ public class LogisticsMaintenanceTodoJobLogController {
         .orderByDesc(LogisticsMaintenanceTodoJobLog::getExecutedAt)
         .orderByDesc(LogisticsMaintenanceTodoJobLog::getCreateTime);
     List<LogisticsMaintenanceTodoJobLog> rows = jobLogMapper.selectList(wrapper);
-    List<String> headers = List.of("ID", "执行时间", "触发方式", "状态", "扫描天数", "命中设备", "新建待办", "跳过重复", "错误信息");
+    List<String> headers = List.of("ID", "执行时间", "触发方式", "计划触发", "状态", "扫描天数", "命中设备", "新建待办", "跳过重复", "记录创建时间", "记录更新时间", "错误信息");
     List<List<String>> csvRows = rows.stream()
         .map(item -> List.of(
             safe(item.getId()),
             formatDateTime(item.getExecutedAt()),
-            safe(item.getTriggerType()),
+            triggerTypeLabel(item.getTriggerType()),
+            triggerPlanLabel(item.getTriggerType()),
             safe(item.getStatus()),
             safe(item.getDays()),
             safe(item.getTotalMatched()),
             safe(item.getCreatedCount()),
             safe(item.getSkippedCount()),
+            formatDateTime(item.getCreateTime()),
+            formatDateTime(item.getUpdateTime()),
             safe(item.getErrorMessage())))
         .toList();
     return csvResponse("logistics-maintenance-todo-job-log", headers, csvRows);
@@ -274,5 +280,25 @@ public class LogisticsMaintenanceTodoJobLogController {
       return message;
     }
     return message.substring(0, 500);
+  }
+
+  private String triggerTypeLabel(String triggerType) {
+    if ("SCHEDULED".equalsIgnoreCase(triggerType)) {
+      return "自动";
+    }
+    if ("RETRY".equalsIgnoreCase(triggerType)) {
+      return "重跑";
+    }
+    return "手动";
+  }
+
+  private String triggerPlanLabel(String triggerType) {
+    if ("SCHEDULED".equalsIgnoreCase(triggerType)) {
+      return "定时触发(CRON=" + safe(maintenanceTodoCron) + ")";
+    }
+    if ("RETRY".equalsIgnoreCase(triggerType)) {
+      return "失败后手动触发重跑";
+    }
+    return "人工手动触发";
   }
 }

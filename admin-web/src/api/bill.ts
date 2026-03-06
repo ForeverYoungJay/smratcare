@@ -16,3 +16,7 @@ export function generateBill(month: string) {
 export function payBill(billId: number, data: PayRequest) {
   return request.post<void>(`/api/bill/${billId}/pay`, data)
 }
+
+export function invalidateBill(billId: number) {
+  return request.post<void>(`/api/bill/${billId}/invalidate`)
+}

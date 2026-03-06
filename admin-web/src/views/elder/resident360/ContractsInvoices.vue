@@ -139,6 +139,7 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
 import { useElderOptions } from '../../../composables/useElderOptions'
+import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
 import {
   getContractAssessmentOverview,
   getContractLinkageByContract,
@@ -379,13 +380,13 @@ async function resolveLinkage() {
     if (linked) return linked
   }
 
-  const byContract = contractId || residentId
+  const byContract = contractId
   if (byContract) {
     const linked = await safeLinkageByContract(byContract)
     if (linked) return linked
   }
 
-  const byLead = leadId || residentId
+  const byLead = leadId
   if (byLead) {
     const linked = await safeLinkageByLead(byLead)
     if (linked) return linked
@@ -445,6 +446,16 @@ onMounted(async () => {
     }
   }
   await loadAll()
+})
+
+useLiveSyncRefresh({
+  topics: ['elder', 'marketing', 'finance', 'health', 'oa'],
+  refresh: () => {
+    if (loading.value) return
+    if (!selector.elderId && !linkage.value?.elderId) return
+    loadAll().catch(() => {})
+  },
+  debounceMs: 900
 })
 </script>
 

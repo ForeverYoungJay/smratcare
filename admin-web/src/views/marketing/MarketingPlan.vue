@@ -40,7 +40,7 @@
               </div>
               <div class="plan-card-meta">
                 <span>阅读：{{ item.readCount || 0 }}/{{ item.totalStaffCount || 0 }}</span>
-                <span>同意：{{ item.agreeCount || 0 }}</span>
+                <span>同意：{{ item.agreeCount || 0 }} · 改进：{{ item.improveCount || 0 }}</span>
               </div>
               <div class="plan-card-actions">
                 <a-button type="link" size="small" @click="openPreview(item)">查看详情</a-button>
@@ -98,7 +98,11 @@
                 <a-tag :color="approvalStatusColor(record.latestApprovalStatus)">{{ approvalStatusLabel(record.latestApprovalStatus) }}</a-tag>
               </template>
               <template v-else-if="column.key === 'workflow'">
-                <span>阅读 {{ record.readCount || 0 }}/{{ record.totalStaffCount || 0 }}</span>
+                <span>
+                  已读 {{ record.readCount || 0 }}/{{ record.totalStaffCount || 0 }}
+                  · 同意 {{ record.agreeCount || 0 }}
+                  · 改进 {{ record.improveCount || 0 }}
+                </span>
               </template>
             </template>
           </a-table>

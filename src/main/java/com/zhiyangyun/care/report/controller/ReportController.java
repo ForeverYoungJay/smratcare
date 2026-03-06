@@ -20,7 +20,7 @@ public class ReportController {
     this.reportService = reportService;
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/page")
   public Result<IPage<ReportResponse>> page(
       @RequestParam(defaultValue = "1") long pageNo,

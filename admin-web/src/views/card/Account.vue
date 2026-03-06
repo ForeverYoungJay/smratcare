@@ -45,9 +45,12 @@
             v-model:value="form.elderId"
             show-search
             :disabled="!!form.id"
+            :filter-option="false"
             :options="elderOptions"
+            :loading="elderLoading"
             placeholder="请选择老人"
-            option-filter-prop="label"
+            @search="searchElders"
+            @focus="() => !elderOptions.length && searchElders('')"
           />
         </a-form-item>
         <a-form-item label="卡号">
@@ -79,12 +82,13 @@ import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
+import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { getCardAccountPage, createCardAccount, updateCardAccount, deleteCardAccount } from '../../api/card'
 import type { CardAccount, PageResult } from '../../types'
 
 const loading = ref(false)
 const rows = ref<CardAccount[]>([])
-const { elderOptions, searchElders, ensureSelectedElder } = useElderOptions({ pageSize: 200 })
+const { elderOptions, elderLoading, searchElders, ensureSelectedElder } = useElderOptions({ pageSize: 200 })
 const query = reactive({ status: undefined as string | undefined, keyword: '', pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 
@@ -207,4 +211,13 @@ async function remove(record: CardAccount) {
 
 searchElders('')
 fetchData()
+
+useLiveSyncRefresh({
+  topics: ['finance', 'elder', 'system'],
+  refresh: () => {
+    if (loading.value) return
+    fetchData().catch(() => {})
+  },
+  debounceMs: 900
+})
 </script>

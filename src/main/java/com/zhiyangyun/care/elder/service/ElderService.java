@@ -14,7 +14,7 @@ public interface ElderService {
 
   ElderResponse get(Long id, Long tenantId);
 
-  IPage<ElderResponse> page(Long tenantId, long pageNo, long pageSize, String keyword, Boolean signedOnly);
+  IPage<ElderResponse> page(Long tenantId, long pageNo, long pageSize, String keyword, Boolean signedOnly, Integer status);
 
   ElderResponse assignBed(Long elderId, AssignBedRequest request);
 

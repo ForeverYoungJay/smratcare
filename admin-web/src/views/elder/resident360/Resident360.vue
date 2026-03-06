@@ -50,6 +50,7 @@ import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
 import { getResidentOverview } from '../../../api/medicalCare'
 import { getElderPage } from '../../../api/elder'
+import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
 import type { MedicalResidentOverview } from '../../../types'
 
 const router = useRouter()
@@ -63,7 +64,13 @@ const overview = ref<MedicalResidentOverview>()
 const cards = computed(() => overview.value?.cards || [])
 
 function go(path: string) {
-  router.push(path)
+  const currentResidentId = String(residentId.value || '').trim()
+  if (!currentResidentId || /([?&])residentId=/.test(path)) {
+    router.push(path)
+    return
+  }
+  const targetPath = path.includes('?') ? `${path}&residentId=${encodeURIComponent(currentResidentId)}` : `${path}?residentId=${encodeURIComponent(currentResidentId)}`
+  router.push(targetPath)
 }
 
 async function resolveResidentId() {
@@ -97,6 +104,15 @@ async function loadOverview() {
 }
 
 onMounted(loadOverview)
+
+useLiveSyncRefresh({
+  topics: ['elder', 'lifecycle', 'bed', 'care', 'health', 'dining', 'finance', 'marketing'],
+  refresh: () => {
+    if (loading.value) return
+    loadOverview().catch(() => {})
+  },
+  debounceMs: 1000
+})
 </script>
 
 <style scoped>

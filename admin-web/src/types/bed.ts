@@ -11,6 +11,7 @@ export interface RoomItem {
   capacity?: number
   status?: number
   roomQrCode?: string
+  remark?: string
 }
 
 export interface BedItem {
@@ -26,8 +27,10 @@ export interface BedItem {
   careLevel?: string
   roomNo?: string
   building?: string
+  buildingRemark?: string
   floorNo?: string
   roomType?: string
+  roomRemark?: string
   areaCode?: string
   areaName?: string
   roomQrCode?: string

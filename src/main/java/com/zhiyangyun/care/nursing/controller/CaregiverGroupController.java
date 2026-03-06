@@ -31,7 +31,7 @@ public class CaregiverGroupController {
     this.auditLogService = auditLogService;
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping
   public Result<CaregiverGroupResponse> create(@Valid @RequestBody CaregiverGroupRequest request) {
     Long tenantId = AuthContext.getOrgId();
@@ -44,7 +44,7 @@ public class CaregiverGroupController {
     return Result.ok(response);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PutMapping("/{id}")
   public Result<CaregiverGroupResponse> update(@PathVariable Long id, @Valid @RequestBody CaregiverGroupRequest request) {
     Long tenantId = AuthContext.getOrgId();
@@ -57,13 +57,13 @@ public class CaregiverGroupController {
     return Result.ok(response);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/{id}")
   public Result<CaregiverGroupResponse> get(@PathVariable Long id) {
     return Result.ok(caregiverGroupService.get(id, AuthContext.getOrgId()));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/page")
   public Result<IPage<CaregiverGroupResponse>> page(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -73,13 +73,13 @@ public class CaregiverGroupController {
     return Result.ok(caregiverGroupService.page(AuthContext.getOrgId(), pageNo, pageSize, keyword, enabled));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/list")
   public Result<List<CaregiverGroupResponse>> list(@RequestParam(required = false) Integer enabled) {
     return Result.ok(caregiverGroupService.list(AuthContext.getOrgId(), enabled));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
     Long tenantId = AuthContext.getOrgId();

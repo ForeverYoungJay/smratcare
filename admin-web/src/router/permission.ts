@@ -1,5 +1,6 @@
 import type { Router } from 'vue-router'
 import { getRoles, getToken } from '../utils/auth'
+import { hasRouteAccess } from '../utils/roleAccess'
 
 export function setupPermission(router: Router) {
   router.beforeEach((to, _from, next) => {
@@ -18,7 +19,7 @@ export function setupPermission(router: Router) {
 
     const roles = getRoles()
     const required = (to.meta?.roles as string[] | undefined) || []
-    if (required.length > 0 && !required.some((r) => roles.includes(r))) {
+    if (!hasRouteAccess(roles, required, to.path)) {
       next('/403')
       return
     }

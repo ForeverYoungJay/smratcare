@@ -27,6 +27,12 @@
       <a-form-item label="自动刷新">
         <a-switch v-model:checked="autoRefresh" />
       </a-form-item>
+      <a-form-item label="高级筛选">
+        <a-space wrap>
+          <a-checkbox v-model:checked="query.urgedOnly">仅看已催办</a-checkbox>
+          <a-checkbox v-model:checked="query.overdueOnly">仅看超时</a-checkbox>
+        </a-space>
+      </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openCreate">新增审批</a-button>
         <a-button :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="editSelected">编辑</a-button>
@@ -36,7 +42,9 @@
         <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
         <a-button v-if="canApproveFlow" :disabled="selectedPendingCount === 0" @click="batchApprove">批量同意</a-button>
         <a-button v-if="canApproveFlow" :disabled="selectedPendingCount === 0" @click="batchReject">批量驳回</a-button>
+        <a-button v-if="canApproveFlow" :disabled="selectedPendingCount === 0" @click="batchUrge">批量催办</a-button>
         <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+        <a-button :disabled="!selectedSingleRecord" @click="openSelectedTimeline">查看时间线</a-button>
         <a-button @click="downloadExport">导出CSV</a-button>
         <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条，{{ canApproveFlow ? '批量审批仅对“待审批”生效' : '当前账号仅可发起/编辑本人申请' }}</span>
       </template>
@@ -53,6 +61,8 @@
         <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="报销待审" :value="summary.reimbursePendingCount || 0" /></a-card></a-col>
         <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="采购待审" :value="summary.purchasePendingCount || 0" /></a-card></a-col>
         <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="营销待审" :value="summary.marketingPlanPendingCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已催办" :value="urgedRecordCount" /></a-card></a-col>
+        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="在途超时" :value="overduePendingCount" /></a-card></a-col>
       </a-row>
       <a-alert
         v-if="(summary.timeoutPendingCount || 0) > 0"
@@ -82,6 +92,13 @@
               {{ statusLabel(record.status) }}
             </a-tag>
           </template>
+          <template v-else-if="column.key === 'currentNode'">
+            {{ currentNode(record) }}
+          </template>
+          <template v-else-if="column.key === 'currentApprover'">
+            <div>{{ currentApprover(record) }}</div>
+            <div class="urge-meta">{{ urgeMetaText(record) }}</div>
+          </template>
           <template v-else-if="column.key === 'approvalOpinion'">
             {{ approvalOpinion(record) }}
           </template>
@@ -93,6 +110,8 @@
               <a v-if="canEditRecord(record)" @click="openEdit(record)">编辑</a>
               <a v-if="canApproveRecord(record)" @click="approve(record)">同意</a>
               <a v-if="canApproveRecord(record)" @click="reject(record)">驳回</a>
+              <a v-if="record.status === 'PENDING'" @click="urge(record)">催办</a>
+              <a @click="openTimeline(record)">时间线</a>
               <a v-if="canResubmitRecord(record)" @click="resubmit(record)">重提</a>
               <a v-if="canDeleteRecord(record)" @click="remove(record)">删除</a>
             </a-space>
@@ -100,6 +119,21 @@
         </template>
       </DataTable>
     </StatefulBlock>
+
+    <a-drawer
+      v-model:open="timelineOpen"
+      :title="`审批时间线 · ${timelineRecord?.title || ''}`"
+      width="520"
+      placement="right"
+    >
+      <a-timeline>
+        <a-timeline-item v-for="item in timelineItems" :key="item.key" :color="item.color">
+          <div class="timeline-title">{{ item.title }}</div>
+          <div class="timeline-desc">{{ item.desc }}</div>
+          <div class="timeline-time">{{ item.timeText }}</div>
+        </a-timeline-item>
+      </a-timeline>
+    </a-drawer>
 
     <a-modal v-model:open="editOpen" title="审批" @ok="submit" :confirm-loading="saving" width="700px">
       <a-form layout="vertical">
@@ -373,6 +407,8 @@ import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
 import { useUserStore } from '../../stores/user'
+import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
+import { hasMinisterOrHigher } from '../../utils/roleAccess'
 import {
   getApprovalSummary,
   getApprovalPage,
@@ -385,7 +421,8 @@ import {
   batchRejectApproval,
   batchDeleteApproval,
   exportApproval,
-  uploadOaFile
+  uploadOaFile,
+  createOaTask
 } from '../../api/oa'
 import type { OaApproval, OaApprovalSummary } from '../../types'
 
@@ -402,6 +439,8 @@ const query = reactive({
   keyword: '',
   type: undefined as string | undefined,
   status: undefined as string | undefined,
+  urgedOnly: false,
+  overdueOnly: false,
   pageNo: 1,
   pageSize: 10
 })
@@ -426,14 +465,18 @@ const columns = [
   { title: '类型', dataIndex: 'approvalType', key: 'approvalType', width: 120 },
   { title: '标题', dataIndex: 'title', key: 'title', width: 200 },
   { title: '申请人', dataIndex: 'applicantName', key: 'applicantName', width: 120 },
+  { title: '当前环节', key: 'currentNode', width: 130 },
+  { title: '当前审批人', key: 'currentApprover', width: 130 },
   { title: '金额', dataIndex: 'amount', key: 'amount', width: 120 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
   { title: '审批意见', key: 'approvalOpinion', width: 220 },
   { title: '年度请假次数', key: 'annualLeaveCount', width: 130 },
-  { title: '操作', key: 'actions', width: 260 }
+  { title: '操作', key: 'actions', width: 320 }
 ]
 
 const editOpen = ref(false)
+const timelineOpen = ref(false)
+const timelineRecord = ref<OaApproval | null>(null)
 const saving = ref(false)
 const proofUploading = ref(false)
 const leaveProofs = ref<ProofFile[]>([])
@@ -505,14 +548,109 @@ const selectedPendingCount = computed(() => selectedRecords.value.filter((item) 
 const selectedPendingIds = computed(() =>
   selectedRecords.value.filter((item) => item.status === 'PENDING').map((item) => String(item.id))
 )
+const urgedRecordCount = computed(() => rows.value.filter((item) => Number(parseFormData(item.formData)?.urgeCount || 0) > 0).length)
+const overduePendingCount = computed(() => rows.value.filter((item) => isApprovalOverdue(item)).length)
+const timelineItems = computed(() => {
+  const record = timelineRecord.value
+  if (!record) return []
+  const parsed = parseFormData(record.formData)
+  const items: Array<{ key: string; title: string; desc: string; timeText: string; color: string }> = []
+  const start = record.startTime ? dayjs(record.startTime) : null
+  const end = record.endTime ? dayjs(record.endTime) : null
+  const now = dayjs()
+  items.push({
+    key: 'created',
+    title: '申请创建',
+    desc: `${record.applicantName || '-'} 提交 ${typeLabel(record.approvalType)} 申请`,
+    timeText: formatTimelineTime(record.startTime),
+    color: 'blue'
+  })
+  if (parsed?.lastApprovalRemark) {
+    items.push({
+      key: 'remark',
+      title: '审批意见更新',
+      desc: parsed.lastApprovalRemark,
+      timeText: formatTimelineTime(parsed.lastApprovalAt),
+      color: 'cyan'
+    })
+  }
+  const urgeCount = Number(parsed?.urgeCount || 0)
+  if (urgeCount > 0) {
+    items.push({
+      key: 'urge',
+      title: `催办记录（${urgeCount}次）`,
+      desc: parsed?.lastUrgedBy ? `最近催办人：${parsed.lastUrgedBy}` : '已发生催办',
+      timeText: formatTimelineTime(parsed?.lastUrgedAt),
+      color: 'orange'
+    })
+  }
+  const approverHistory = Array.isArray(parsed?.approverHistory) ? parsed.approverHistory : []
+  approverHistory.slice(-6).forEach((entry: any, index: number) => {
+    if (!entry) return
+    items.push({
+      key: `approver-${index}-${entry?.at || ''}`,
+      title: '责任人变更',
+      desc: `${entry?.from || '未分配'} → ${entry?.to || '未分配'}`,
+      timeText: formatTimelineTime(entry?.at),
+      color: 'gold'
+    })
+  })
+  const urgeHistory = Array.isArray(parsed?.urgeHistory) ? parsed.urgeHistory : []
+  urgeHistory.slice(-6).forEach((entry: any, index: number) => {
+    if (!entry) return
+    items.push({
+      key: `urge-history-${index}-${entry?.at || ''}`,
+      title: '催办动作',
+      desc: `${entry?.by || '-'} 催办${entry?.count ? `（第${entry.count}次）` : ''}`,
+      timeText: formatTimelineTime(entry?.at),
+      color: 'orange'
+    })
+  })
+  if (record.status === 'PENDING' && start && start.isValid()) {
+    const pendingHours = now.diff(start, 'hour')
+    const overdue = pendingHours > 48
+    items.push({
+      key: 'pending-duration',
+      title: overdue ? '审批超时预警' : '在途处理时长',
+      desc: overdue ? `已超时 ${pendingHours - 48} 小时（总 ${pendingHours} 小时）` : `当前已在途 ${pendingHours} 小时`,
+      timeText: `阈值：48小时`,
+      color: overdue ? 'red' : 'blue'
+    })
+  }
+  if (record.status === 'APPROVED') {
+    items.push({
+      key: 'approved',
+      title: '审批通过',
+      desc: record.remark || '流程结束',
+      timeText: formatTimelineTime(record.endTime),
+      color: 'green'
+    })
+  }
+  if (record.status === 'REJECTED') {
+    items.push({
+      key: 'rejected',
+      title: '审批驳回',
+      desc: record.remark || '已驳回，待重提',
+      timeText: formatTimelineTime(record.endTime),
+      color: 'red'
+    })
+  }
+  if (start && start.isValid()) {
+    const finishedAt = end && end.isValid() ? end : now
+    const durationHours = Math.max(0, finishedAt.diff(start, 'hour'))
+    items.push({
+      key: 'duration',
+      title: '流程总耗时',
+      desc: `${durationHours} 小时`,
+      timeText: end && end.isValid() ? `截至 ${formatTimelineTime(record.endTime)}` : '仍在处理中',
+      color: 'purple'
+    })
+  }
+  return items
+})
 const canApproveFlow = computed(() => {
   const roles = (userStore.roles || []).map((item) => String(item || '').toUpperCase())
-  return roles.includes('ADMIN')
-    || roles.includes('DEPT_LEADER')
-    || roles.includes('LEADER')
-    || roles.includes('MANAGER')
-    || roles.includes('SUPERVISOR')
-    || roles.includes('DIRECTOR')
+  return hasMinisterOrHigher(roles)
 })
 
 const workflowStepsMap: Record<string, string[]> = {
@@ -565,6 +703,13 @@ function typeLabel(type?: string) {
   return option?.label || type || '-'
 }
 
+function formatTimelineTime(value?: string) {
+  if (!value) return '时间未知'
+  const time = dayjs(value)
+  if (!time.isValid()) return '时间未知'
+  return time.format('YYYY-MM-DD HH:mm')
+}
+
 async function fetchData() {
   loading.value = true
   summaryLoading.value = true
@@ -585,10 +730,16 @@ async function fetchData() {
       getApprovalPage(params),
       getApprovalSummary(params)
     ])
-    rows.value = (res.list || []).map((item) => ({
+    const rawRows = (res.list || []).map((item) => ({
       ...item,
       id: String(item.id)
     }))
+    rows.value = rawRows.filter((item) => {
+      const parsed = parseFormData(item.formData)
+      if (query.urgedOnly && Number(parsed?.urgeCount || 0) <= 0) return false
+      if (query.overdueOnly && !isApprovalOverdue(item)) return false
+      return true
+    })
     pagination.total = res.total || res.list.length
     selectedRowKeys.value = []
     Object.assign(summary, sum || {})
@@ -600,6 +751,13 @@ async function fetchData() {
     loading.value = false
     summaryLoading.value = false
   }
+}
+
+function isApprovalOverdue(item: OaApproval) {
+  const start = item.startTime ? dayjs(item.startTime) : null
+  if (!start || !start.isValid()) return false
+  if (item.status !== 'PENDING') return false
+  return dayjs().diff(start, 'hour') > 48
 }
 
 function handleTableChange(pag: any) {
@@ -614,6 +772,8 @@ function onReset() {
   query.keyword = ''
   query.status = undefined
   query.type = undefined
+  query.urgedOnly = false
+  query.overdueOnly = false
   query.pageNo = 1
   pagination.current = 1
   approvalScope.value = canApproveFlow.value ? 'ALL' : 'MY'
@@ -686,6 +846,29 @@ function annualLeaveCount(record: OaApproval) {
   const parsed = parseFormData(record.formData)
   const count = Number(parsed?.annualLeaveApprovedCount || 0)
   return Number.isFinite(count) && count > 0 ? count : '-'
+}
+
+function currentNode(record: OaApproval) {
+  const parsed = parseFormData(record.formData)
+  if (record.status === 'APPROVED') return '流程完成'
+  if (record.status === 'REJECTED') return '已驳回'
+  return parsed?.currentNodeName || parsed?.currentStep || '待审批'
+}
+
+function currentApprover(record: OaApproval) {
+  const parsed = parseFormData(record.formData)
+  if (record.status === 'APPROVED') return '-'
+  if (record.status === 'REJECTED') return '-'
+  return parsed?.currentApproverName || parsed?.nextApproverName || '待分配'
+}
+
+function urgeMetaText(record: OaApproval) {
+  const parsed = parseFormData(record.formData)
+  const count = Number(parsed?.urgeCount || 0)
+  const timeText = parsed?.lastUrgedAt ? dayjs(parsed.lastUrgedAt).format('MM-DD HH:mm') : ''
+  const byText = parsed?.lastUrgedBy ? ` by ${parsed.lastUrgedBy}` : ''
+  if (count <= 0) return '未催办'
+  return `催办${count}次${timeText ? ` · 最近 ${timeText}${byText}` : ''}`
 }
 
 function canEditRecord(record: OaApproval) {
@@ -949,6 +1132,97 @@ async function remove(record: OaApproval) {
   }
 }
 
+async function urge(record: OaApproval, silent = false) {
+  if (record.status !== 'PENDING') {
+    message.info('仅待审批流程支持催办')
+    return
+  }
+  try {
+    const parsed = parseFormData(record.formData)
+    const urgeCount = Number(parsed?.urgeCount || 0) + 1
+    const lastUrgedAt = dayjs().format('YYYY-MM-DDTHH:mm:ss')
+    const lastUrgedBy = userStore.staffInfo?.realName || userStore.staffInfo?.username || '系统用户'
+    const currentApproverName = currentApprover(record)
+    const previousApprover = String(parsed?.currentApproverName || parsed?.nextApproverName || '')
+    const nextApprover = currentApproverName === '-' ? '' : currentApproverName
+    const approverHistory = Array.isArray(parsed?.approverHistory) ? parsed.approverHistory.slice(-20) : []
+    if (nextApprover && previousApprover !== nextApprover) {
+      approverHistory.push({
+        from: previousApprover || '未分配',
+        to: nextApprover,
+        at: lastUrgedAt
+      })
+    }
+    const urgeHistory = Array.isArray(parsed?.urgeHistory) ? parsed.urgeHistory.slice(-30) : []
+    urgeHistory.push({
+      by: lastUrgedBy,
+      at: lastUrgedAt,
+      count: urgeCount
+    })
+    const nextFormData = JSON.stringify({
+      ...parsed,
+      urgeCount,
+      lastUrgedAt,
+      lastUrgedBy,
+      currentApproverName: nextApprover || parsed?.currentApproverName,
+      approverHistory,
+      urgeHistory
+    })
+    await updateApproval(String(record.id), {
+      formData: nextFormData
+    })
+    await createOaTask({
+      title: `催办审批：${record.title || record.approvalType || ''}`,
+      description: `审批ID：${record.id}，申请人：${record.applicantName || '-'}，${urgeMetaText({
+        ...record,
+        formData: nextFormData
+      } as OaApproval)}`,
+      priority: 'HIGH',
+      calendarType: 'WORK',
+      urgency: 'EMERGENCY',
+      status: 'OPEN',
+      assigneeName: currentApprover(record) !== '-' ? currentApprover(record) : undefined
+    })
+    if (!silent) message.success('催办已发送')
+    await fetchData()
+  } catch (error: any) {
+    if (!silent) message.error(error?.message || '催办失败')
+    throw error
+  }
+}
+
+async function batchUrge() {
+  const list = selectedRecords.value.filter((item) => item.status === 'PENDING')
+  if (!list.length) {
+    message.info('请先勾选待审批记录')
+    return
+  }
+  let successCount = 0
+  for (const item of list) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await urge(item, true)
+      successCount += 1
+    } catch {}
+  }
+  if (successCount === 0) {
+    message.error('批量催办失败')
+    return
+  }
+  message.success(`批量催办完成，共处理 ${successCount} 条`)
+}
+
+function openTimeline(record: OaApproval) {
+  timelineRecord.value = record
+  timelineOpen.value = true
+}
+
+function openSelectedTimeline() {
+  const record = requireSingleSelection('查看时间线')
+  if (!record) return
+  openTimeline(record)
+}
+
 function requireSingleSelection(action: string) {
   if (!selectedSingleRecord.value) {
     message.info(`请先勾选 1 条审批后再${action}`)
@@ -1076,34 +1350,81 @@ watch(autoRefresh, (enabled) => {
   stopAutoRefreshTimer()
 })
 
+watch(
+  () => [query.urgedOnly, query.overdueOnly],
+  () => {
+    query.pageNo = 1
+    pagination.current = 1
+    fetchData()
+  }
+)
+
 onMounted(() => {
-  const type = String(route.query.type || '').toUpperCase()
-  const status = String(route.query.status || '').toUpperCase()
-  const quick = String(route.query.quick || '')
-  approvalScope.value = canApproveFlow.value ? 'ALL' : 'MY'
-  if (type && typeOptions.some((item) => item.value === type)) {
-    query.type = type
-    form.approvalType = type
-  }
-  if (status && statusOptions.some((item) => item.value === status)) {
-    query.status = status
-  }
-  if (route.query.my === '1') {
-    approvalScope.value = 'MY'
-  }
-  if (route.query.pending === '1' && canApproveFlow.value) {
-    approvalScope.value = 'PENDING_REVIEW'
-    query.status = 'PENDING'
-  }
+  applyRouteFilters()
   fetchData()
   startAutoRefreshTimer()
-  if (quick === '1') {
+  if (String(route.query.quick || '') === '1') {
     openCreate()
   }
 })
 
+watch(
+  () => route.query,
+  () => {
+    applyRouteFilters()
+    fetchData()
+    if (String(route.query.quick || '') === '1') {
+      openCreate()
+    }
+  }
+)
+
+function applyRouteFilters() {
+  const type = String(route.query.type || '').toUpperCase()
+  const status = String(route.query.status || '').toUpperCase()
+  const scope = String(route.query.scope || '').toUpperCase()
+  const keyword = String(route.query.keyword || '').trim()
+  const urged = String(route.query.urged || '').toLowerCase()
+  const overdue = String(route.query.overdue || '').toLowerCase()
+  approvalScope.value = canApproveFlow.value ? 'ALL' : 'MY'
+  if (type && typeOptions.some((item) => item.value === type)) {
+    query.type = type
+    form.approvalType = type
+  } else if (!type) {
+    query.type = undefined
+  }
+  if (status && statusOptions.some((item) => item.value === status)) {
+    query.status = status
+  } else if (!status) {
+    query.status = undefined
+  }
+  if (keyword) {
+    query.keyword = keyword
+  } else if (!keyword) {
+    query.keyword = ''
+  }
+  query.urgedOnly = urged === '1' || urged === 'true'
+  query.overdueOnly = overdue === '1' || overdue === 'true'
+  if (scope === 'MY' || route.query.my === '1') {
+    approvalScope.value = 'MY'
+  }
+  if ((scope === 'PENDING_REVIEW' || route.query.pending === '1') && canApproveFlow.value) {
+    approvalScope.value = 'PENDING_REVIEW'
+    query.status = 'PENDING'
+  }
+}
+
 onUnmounted(() => {
   stopAutoRefreshTimer()
+})
+
+useLiveSyncRefresh({
+  topics: ['oa'],
+  refresh: () => {
+    if (loading.value || summaryLoading.value) return
+    fetchData().catch(() => {})
+  },
+  debounceMs: 800
 })
 </script>
 
@@ -1132,5 +1453,27 @@ onUnmounted(() => {
   padding: 4px 8px;
   border: 1px solid #f0f0f0;
   border-radius: 6px;
+}
+
+.urge-meta {
+  margin-top: 2px;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+
+.timeline-title {
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.timeline-desc {
+  margin-top: 2px;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.timeline-time {
+  margin-top: 2px;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
 }
 </style>

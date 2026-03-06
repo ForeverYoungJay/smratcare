@@ -23,7 +23,7 @@ public class NursingRecordController {
     this.nursingRecordService = nursingRecordService;
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/page")
   public Result<IPage<NursingRecordItem>> page(
       @RequestParam(defaultValue = "1") long pageNo,

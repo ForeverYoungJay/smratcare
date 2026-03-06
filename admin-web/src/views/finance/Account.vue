@@ -54,7 +54,9 @@
             placeholder="输入姓名搜索"
             :filter-option="false"
             :options="elderOptions"
+            :loading="elderLoading"
             @search="searchElders"
+            @focus="() => !elderOptions.length && searchElders('')"
           />
         </a-form-item>
         <a-form-item label="方向" required>
@@ -102,6 +104,7 @@ import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
+import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { getElderAccountPage, adjustElderAccount, getElderAccountWarnings, updateElderAccount } from '../../api/finance'
 import type { ElderAccount, PageResult } from '../../types'
 import router from '../../router'
@@ -155,7 +158,7 @@ const adjustForm = reactive({
   amount: 0,
   remark: ''
 })
-const { elderOptions, searchElders: searchElderOptions, findElderName } = useElderOptions({ pageSize: 20 })
+const { elderOptions, elderLoading, searchElders: searchElderOptions, findElderName } = useElderOptions({ pageSize: 20 })
 const directionOptions = [
   { label: '充值', value: 'CREDIT' },
   { label: '扣费', value: 'DEBIT' }
@@ -277,6 +280,15 @@ async function searchElders(keyword: string) {
 }
 
 fetchData()
+
+useLiveSyncRefresh({
+  topics: ['finance', 'elder', 'oa'],
+  refresh: () => {
+    if (loading.value) return
+    fetchData().catch(() => {})
+  },
+  debounceMs: 900
+})
 </script>
 
 <style scoped>

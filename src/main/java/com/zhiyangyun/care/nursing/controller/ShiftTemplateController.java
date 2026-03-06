@@ -32,7 +32,7 @@ public class ShiftTemplateController {
     this.auditLogService = auditLogService;
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping
   public Result<ShiftTemplateResponse> create(@Valid @RequestBody ShiftTemplateRequest request) {
     Long tenantId = AuthContext.getOrgId();
@@ -45,7 +45,7 @@ public class ShiftTemplateController {
     return Result.ok(response);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PutMapping("/{id}")
   public Result<ShiftTemplateResponse> update(@PathVariable Long id, @Valid @RequestBody ShiftTemplateRequest request) {
     Long tenantId = AuthContext.getOrgId();
@@ -57,13 +57,13 @@ public class ShiftTemplateController {
     return Result.ok(response);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/{id}")
   public Result<ShiftTemplateResponse> get(@PathVariable Long id) {
     return Result.ok(shiftTemplateService.get(id, AuthContext.getOrgId()));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/page")
   public Result<IPage<ShiftTemplateResponse>> page(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -73,13 +73,13 @@ public class ShiftTemplateController {
     return Result.ok(shiftTemplateService.page(AuthContext.getOrgId(), pageNo, pageSize, keyword, enabled));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/list")
   public Result<List<ShiftTemplateResponse>> list(@RequestParam(required = false) Integer enabled) {
     return Result.ok(shiftTemplateService.list(AuthContext.getOrgId(), enabled));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping("/{id}/apply")
   public Result<Integer> apply(@PathVariable Long id, @Valid @RequestBody ShiftTemplateApplyRequest request) {
     Long tenantId = AuthContext.getOrgId();
@@ -89,7 +89,7 @@ public class ShiftTemplateController {
     return Result.ok(count);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
     Long tenantId = AuthContext.getOrgId();

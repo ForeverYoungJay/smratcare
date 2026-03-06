@@ -31,7 +31,7 @@ public class ShiftHandoverController {
     this.auditLogService = auditLogService;
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping
   public Result<ShiftHandoverResponse> create(@Valid @RequestBody ShiftHandoverRequest request) {
     Long tenantId = AuthContext.getOrgId();
@@ -44,7 +44,7 @@ public class ShiftHandoverController {
     return Result.ok(response);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PutMapping("/{id}")
   public Result<ShiftHandoverResponse> update(@PathVariable Long id, @Valid @RequestBody ShiftHandoverRequest request) {
     Long tenantId = AuthContext.getOrgId();
@@ -56,13 +56,13 @@ public class ShiftHandoverController {
     return Result.ok(response);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/{id}")
   public Result<ShiftHandoverResponse> get(@PathVariable Long id) {
     return Result.ok(shiftHandoverService.get(id, AuthContext.getOrgId()));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/page")
   public Result<IPage<ShiftHandoverResponse>> page(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -76,7 +76,7 @@ public class ShiftHandoverController {
     return Result.ok(shiftHandoverService.page(AuthContext.getOrgId(), pageNo, pageSize, from, to, shiftCode, status));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
     Long tenantId = AuthContext.getOrgId();

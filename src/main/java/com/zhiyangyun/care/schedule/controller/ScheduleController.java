@@ -28,7 +28,7 @@ public class ScheduleController {
     this.scheduleService = scheduleService;
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/page")
   public Result<IPage<ScheduleResponse>> page(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -44,13 +44,13 @@ public class ScheduleController {
     return Result.ok(scheduleService.page(AuthContext.getOrgId(), pageNo, pageSize, staffId, from, to, status, sortBy, sortOrder));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping
   public Result<ScheduleResponse> create(@Valid @RequestBody ScheduleRequest request) {
     return Result.ok(scheduleService.create(AuthContext.getOrgId(), AuthContext.getStaffId(), request));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PutMapping("/{id}")
   public Result<ScheduleResponse> update(@PathVariable Long id, @Valid @RequestBody ScheduleRequest request) {
     request.setId(id);
@@ -61,7 +61,7 @@ public class ScheduleController {
     return Result.ok(response);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
     scheduleService.delete(AuthContext.getOrgId(), id);

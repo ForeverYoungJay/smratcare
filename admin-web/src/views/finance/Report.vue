@@ -71,6 +71,64 @@
           <vxe-column field="outstandingAmount" title="欠费金额" width="140" />
         </vxe-table>
       </a-card>
+
+      <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="类目消费比例与盈利分析">
+        <a-form layout="inline" :model="categoryQuery" class="search-form">
+          <a-form-item label="开始日期">
+            <a-date-picker v-model:value="categoryQuery.from" />
+          </a-form-item>
+          <a-form-item label="结束日期">
+            <a-date-picker v-model:value="categoryQuery.to" />
+          </a-form-item>
+          <a-form-item label="物品关键字">
+            <a-input v-model:value="categoryQuery.itemKeyword" allow-clear placeholder="例如：鸡蛋" style="width: 180px" />
+          </a-form-item>
+          <a-form-item label="楼栋">
+            <a-input v-model:value="categoryQuery.building" allow-clear placeholder="例如：A栋" style="width: 140px" />
+          </a-form-item>
+          <a-form-item label="楼层">
+            <a-input v-model:value="categoryQuery.floorNo" allow-clear placeholder="例如：2F" style="width: 120px" />
+          </a-form-item>
+          <a-form-item>
+            <a-space>
+              <a-button type="primary" @click="loadCategoryAnalysis">查询</a-button>
+              <a-button @click="queryAllCategories">一键查全部类目</a-button>
+              <a-button @click="exportCategoryProfit">下载盈利报表</a-button>
+              <a-button @click="exportCategoryTrend">下载波动趋势</a-button>
+              <a-button @click="printCategoryAnalysis">打印</a-button>
+            </a-space>
+          </a-form-item>
+        </a-form>
+
+        <a-row :gutter="16" style="margin-top: 12px;">
+          <a-col :xs="24" :xl="8"><a-statistic title="区间总消费" :value="categoryAnalysis.totalAmount" suffix="元" :precision="2" /></a-col>
+          <a-col :xs="24" :xl="8"><a-statistic title="关键字消费额" :value="categoryAnalysis.itemAmount" suffix="元" :precision="2" /></a-col>
+          <a-col :xs="24" :xl="8"><a-statistic title="关键字消费占比" :value="Number(categoryAnalysis.itemRatio || 0) * 100" suffix="%" :precision="2" /></a-col>
+        </a-row>
+
+        <a-row :gutter="16" style="margin-top: 12px;">
+          <a-col :xs="24" :xl="12">
+            <a-card :bordered="false" title="关键字消费波动线">
+              <div ref="categoryTrendRef" style="height: 260px;"></div>
+            </a-card>
+          </a-col>
+          <a-col :xs="24" :xl="12">
+            <a-card :bordered="false" title="全类目消费盈利情况">
+              <vxe-table border stripe show-overflow :data="categoryAnalysis.categoryProfit || []" height="260">
+                <vxe-column field="category" title="类目" min-width="120" />
+                <vxe-column field="totalAmount" title="消费额" width="110" />
+                <vxe-column field="totalCost" title="成本" width="110" />
+                <vxe-column field="totalProfit" title="利润" width="110" />
+                <vxe-column field="profitRate" title="利润率" width="110">
+                  <template #default="{ row }">
+                    {{ (Number(row.profitRate || 0) * 100).toFixed(2) }}%
+                  </template>
+                </vxe-column>
+              </vxe-table>
+            </a-card>
+          </a-col>
+        </a-row>
+      </a-card>
     </StatefulBlock>
   </PageContainer>
 </template>
@@ -82,9 +140,17 @@ import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
-import { getFinanceArrearsTop, getFinanceMonthlyRevenue, getFinanceReportEntrySummary, getFinanceStoreSales } from '../../api/finance'
-import type { FinanceArrearsItem, FinanceNameAmountItem, FinanceReportEntrySummary, FinanceReportMonthlyItem, FinanceStoreSalesItem } from '../../types'
+import { getFinanceArrearsTop, getFinanceCategoryConsumptionAnalysis, getFinanceMonthlyRevenue, getFinanceReportEntrySummary, getFinanceStoreSales } from '../../api/finance'
+import type {
+  FinanceArrearsItem,
+  FinanceCategoryConsumptionAnalysis,
+  FinanceNameAmountItem,
+  FinanceReportEntrySummary,
+  FinanceReportMonthlyItem,
+  FinanceStoreSalesItem
+} from '../../types'
 import { useECharts } from '../../plugins/echarts'
+import { exportCsv } from '../../utils/export'
 
 const route = useRoute()
 const router = useRouter()
@@ -112,6 +178,24 @@ const summary = ref<FinanceReportEntrySummary>({
 
 const { chartRef: revenueRef, setOption: setRevenueOption } = useECharts()
 const { chartRef: storeRef, setOption: setStoreOption } = useECharts()
+const { chartRef: categoryTrendRef, setOption: setCategoryTrendOption } = useECharts()
+const categoryQuery = ref({
+  from: dayjs().subtract(30, 'day'),
+  to: dayjs(),
+  itemKeyword: '鸡蛋',
+  building: '',
+  floorNo: ''
+})
+const categoryAnalysis = ref<FinanceCategoryConsumptionAnalysis>({
+  itemKeyword: '',
+  from: '',
+  to: '',
+  totalAmount: 0,
+  itemAmount: 0,
+  itemRatio: 0,
+  trend: [],
+  categoryProfit: []
+})
 
 const pageMeta = computed(() => {
   const key = reportKey.value
@@ -246,12 +330,99 @@ async function loadCharts() {
       yAxis: { type: 'value' },
       series: [{ name: '销售额', type: 'bar', data: storeSales.map(item => item.amount) }]
     })
+    await loadCategoryAnalysis()
   } catch (error: any) {
     errorMessage.value = error?.message || '加载财务报表失败'
     message.error(errorMessage.value)
   } finally {
     loading.value = false
   }
+}
+
+async function loadCategoryAnalysis() {
+  if (dayjs(categoryQuery.value.from).isAfter(dayjs(categoryQuery.value.to), 'day')) {
+    message.warning('类目分析开始日期不能晚于结束日期')
+    return
+  }
+  const data = await getFinanceCategoryConsumptionAnalysis({
+    from: dayjs(categoryQuery.value.from).format('YYYY-MM-DD'),
+    to: dayjs(categoryQuery.value.to).format('YYYY-MM-DD'),
+    itemKeyword: categoryQuery.value.itemKeyword || undefined,
+    building: categoryQuery.value.building || undefined,
+    floorNo: categoryQuery.value.floorNo || undefined
+  })
+  categoryAnalysis.value = data
+  setCategoryTrendOption({
+    tooltip: { trigger: 'axis' },
+    xAxis: { type: 'category', data: (data.trend || []).map(item => item.period) },
+    yAxis: [
+      { type: 'value', name: '消费额' },
+      { type: 'value', name: '占比(%)' }
+    ],
+    series: [
+      { name: '关键字消费额', type: 'line', smooth: true, data: (data.trend || []).map(item => item.amount) },
+      { name: '关键字占比', type: 'line', smooth: true, yAxisIndex: 1, data: (data.trend || []).map(item => Number(item.ratio || 0) * 100) }
+    ]
+  })
+}
+
+function exportCategoryProfit() {
+  exportCsv(
+    (categoryAnalysis.value.categoryProfit || []).map(item => ({
+      类目: item.category,
+      消费额: item.totalAmount,
+      成本: item.totalCost,
+      利润: item.totalProfit,
+      利润率: `${(Number(item.profitRate || 0) * 100).toFixed(2)}%`
+    })),
+    `类目消费盈利-${dayjs().format('YYYYMMDD-HHmmss')}.csv`
+  )
+}
+
+function exportCategoryTrend() {
+  exportCsv(
+    (categoryAnalysis.value.trend || []).map(item => ({
+      日期: item.period,
+      关键字消费额: item.amount,
+      关键字占比: `${(Number(item.ratio || 0) * 100).toFixed(2)}%`
+    })),
+    `类目消费波动-${dayjs().format('YYYYMMDD-HHmmss')}.csv`
+  )
+}
+
+function queryAllCategories() {
+  categoryQuery.value.itemKeyword = ''
+  loadCategoryAnalysis()
+}
+
+function printCategoryAnalysis() {
+  const rows = categoryAnalysis.value.categoryProfit || []
+  const win = window.open('', '_blank')
+  if (!win) {
+    message.error('请允许弹窗后重试打印')
+    return
+  }
+  const html = `
+    <html>
+      <head><meta charset="utf-8"><title>类目消费盈利分析</title></head>
+      <body>
+        <h3>类目消费盈利分析（${categoryAnalysis.value.from} ~ ${categoryAnalysis.value.to}）</h3>
+        <p>关键字：${categoryAnalysis.value.itemKeyword || '-'}</p>
+        <p>楼栋/楼层筛选：${categoryQuery.value.building || '全部'} / ${categoryQuery.value.floorNo || '全部'}</p>
+        <p>总消费：${categoryAnalysis.value.totalAmount}；关键字消费：${categoryAnalysis.value.itemAmount}；占比：${(Number(categoryAnalysis.value.itemRatio || 0) * 100).toFixed(2)}%</p>
+        <table border="1" cellspacing="0" cellpadding="6">
+          <thead><tr><th>类目</th><th>消费额</th><th>成本</th><th>利润</th><th>利润率</th></tr></thead>
+          <tbody>
+            ${rows.map(item => `<tr><td>${item.category}</td><td>${item.totalAmount}</td><td>${item.totalCost}</td><td>${item.totalProfit}</td><td>${(Number(item.profitRate || 0) * 100).toFixed(2)}%</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </body>
+    </html>
+  `
+  win.document.write(html)
+  win.document.close()
+  win.focus()
+  win.print()
 }
 
 function reset() {

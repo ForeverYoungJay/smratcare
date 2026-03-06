@@ -86,6 +86,7 @@ import DataTable from '../components/DataTable.vue'
 import { getStaffPage, createStaff, updateStaff, updateStaffRoles } from '../api/staff'
 import { getRolePage } from '../api/role'
 import { useDepartmentOptions } from '../composables/useDepartmentOptions'
+import { useLiveSyncRefresh } from '../composables/useLiveSyncRefresh'
 import type { StaffItem, RoleItem, PageResult } from '../types'
 
 const query = reactive({ keyword: undefined as string | undefined, pageNo: 1, pageSize: 10 })
@@ -199,4 +200,13 @@ async function submitRole() {
 }
 
 fetchData()
+
+useLiveSyncRefresh({
+  topics: ['system', 'hr', 'oa'],
+  refresh: () => {
+    if (loading.value || saving.value) return
+    fetchData().catch(() => {})
+  },
+  debounceMs: 900
+})
 </script>

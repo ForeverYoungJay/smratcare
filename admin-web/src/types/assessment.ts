@@ -80,3 +80,15 @@ export interface AssessmentRecordReport {
   suggestion?: string
   detailJson?: string
 }
+
+export interface AssessmentBatchFailureItem {
+  id?: number
+  reason?: string
+}
+
+export interface AssessmentBatchOperationResult {
+  successCount: number
+  failedCount: number
+  successIds: number[]
+  failures: AssessmentBatchFailureItem[]
+}

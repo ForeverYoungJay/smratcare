@@ -1,6 +1,10 @@
 import request, { fetchPage } from '../utils/request';
+import { getToken } from '../utils/auth';
 export function getPaymentRecordPage(params) {
     return fetchPage('/api/finance/payment/page', params);
+}
+export function updatePaymentRecord(paymentId, data) {
+    return request.put(`/api/finance/payment/${paymentId}`, data);
 }
 export function reconcileDaily(params) {
     return request.post('/api/finance/reconcile', null, { params });
@@ -44,8 +48,60 @@ export function getFinanceWorkbenchOverview() {
 export function getFinanceInvoiceReceiptPage(params) {
     return fetchPage('/api/finance/workbench/invoice/page', params);
 }
+export async function exportFinanceInvoiceReceiptCsv(params) {
+    const url = new URL('/api/finance/workbench/invoice/export', window.location.origin);
+    Object.entries(params || {}).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            url.searchParams.set(key, String(value));
+        }
+    });
+    const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: {
+            Authorization: `Bearer ${getToken()}`
+        }
+    });
+    if (!response.ok) {
+        throw new Error('导出失败');
+    }
+    const blob = await response.blob();
+    const contentDisposition = response.headers.get('content-disposition') || '';
+    const filenameMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/);
+    const filename = filenameMatch?.[1] || `finance-invoice-receipt-${new Date().toISOString().slice(0, 10)}.csv`;
+    const link = document.createElement('a');
+    const objectUrl = URL.createObjectURL(blob);
+    link.href = objectUrl;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(objectUrl);
+}
 export function getFinanceAutoDebitExceptions(params) {
     return request.get('/api/finance/workbench/auto-deduct/exceptions', { params });
+}
+export async function exportFinanceAutoDebitExceptionsCsv(params) {
+    const url = new URL('/api/finance/workbench/auto-deduct/exceptions/export', window.location.origin);
+    Object.entries(params || {}).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            url.searchParams.set(key, String(value));
+        }
+    });
+    const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${getToken()}` }
+    });
+    if (!response.ok) {
+        throw new Error('导出失败');
+    }
+    const blob = await response.blob();
+    const contentDisposition = response.headers.get('content-disposition') || '';
+    const filenameMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/);
+    const filename = filenameMatch?.[1] || `finance-auto-deduct-exceptions-${new Date().toISOString().slice(0, 10)}.csv`;
+    const link = document.createElement('a');
+    const objectUrl = URL.createObjectURL(blob);
+    link.href = objectUrl;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(objectUrl);
 }
 export function getFinanceRoomOpsDetail(params) {
     return request.get('/api/finance/workbench/room-ops/detail', { params });
@@ -55,6 +111,56 @@ export function getFinanceAllocationRules(params) {
 }
 export function getFinanceReconcileExceptions(params) {
     return request.get('/api/finance/workbench/reconcile/exceptions', { params });
+}
+export async function exportFinanceReconcileExceptionsCsv(params) {
+    const url = new URL('/api/finance/workbench/reconcile/exceptions/export', window.location.origin);
+    Object.entries(params || {}).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            url.searchParams.set(key, String(value));
+        }
+    });
+    const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${getToken()}` }
+    });
+    if (!response.ok) {
+        throw new Error('导出失败');
+    }
+    const blob = await response.blob();
+    const contentDisposition = response.headers.get('content-disposition') || '';
+    const filenameMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/);
+    const filename = filenameMatch?.[1] || `finance-reconcile-exceptions-${new Date().toISOString().slice(0, 10)}.csv`;
+    const link = document.createElement('a');
+    const objectUrl = URL.createObjectURL(blob);
+    link.href = objectUrl;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(objectUrl);
+}
+export async function exportFinanceReconcileHistoryCsv(params) {
+    const url = new URL('/api/finance/reconcile/export', window.location.origin);
+    Object.entries(params || {}).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            url.searchParams.set(key, String(value));
+        }
+    });
+    const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${getToken()}` }
+    });
+    if (!response.ok) {
+        throw new Error('导出失败');
+    }
+    const blob = await response.blob();
+    const contentDisposition = response.headers.get('content-disposition') || '';
+    const filenameMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/);
+    const filename = filenameMatch?.[1] || `finance-reconcile-history-${new Date().toISOString().slice(0, 10)}.csv`;
+    const link = document.createElement('a');
+    const objectUrl = URL.createObjectURL(blob);
+    link.href = objectUrl;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(objectUrl);
 }
 export function getFinanceMasterDataOverview(params) {
     return request.get('/api/finance/workbench/config/overview', { params });
@@ -82,4 +188,7 @@ export function getFinanceModuleEntrySummary(params) {
 }
 export function getFinanceReportEntrySummary(params) {
     return request.get('/api/finance/report/entry-summary', { params });
+}
+export function getFinanceCategoryConsumptionAnalysis(params) {
+    return request.get('/api/finance/report/category-consumption-analysis', { params });
 }

@@ -39,7 +39,7 @@ public class AdminFamilyController {
     this.elderMapper = elderMapper;
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/users/page")
   public Result<IPage<FamilyUserPageItem>> page(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -122,7 +122,7 @@ public class AdminFamilyController {
     return Result.ok(resp);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/relations")
   public Result<List<FamilyRelationItem>> relations(@RequestParam Long elderId) {
     Long orgId = AuthContext.getOrgId();

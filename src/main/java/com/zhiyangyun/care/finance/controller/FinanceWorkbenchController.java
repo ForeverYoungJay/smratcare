@@ -74,8 +74,12 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import jakarta.validation.Valid;
+import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -242,40 +246,38 @@ public class FinanceWorkbenchController {
     LocalDate targetDate = (date == null || date.isBlank() || "today".equalsIgnoreCase(date))
         ? LocalDate.now()
         : LocalDate.parse(date);
-    LocalDateTime start = targetDate.atStartOfDay();
-    LocalDateTime end = targetDate.plusDays(1).atStartOfDay();
-
-    var wrapper = Wrappers.lambdaQuery(PaymentRecord.class)
-        .eq(PaymentRecord::getIsDeleted, 0)
-        .eq(orgId != null, PaymentRecord::getOrgId, orgId)
-        .ge(PaymentRecord::getPaidAt, start)
-        .lt(PaymentRecord::getPaidAt, end)
-        .eq(method != null && !method.isBlank(), PaymentRecord::getPayMethod, method)
-        .orderByDesc(PaymentRecord::getPaidAt);
-    IPage<PaymentRecord> paymentPage = paymentRecordMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
-
-    List<PaymentRecord> payments = paymentPage.getRecords();
-    List<Long> billIds = payments.stream().map(PaymentRecord::getBillMonthlyId).filter(Objects::nonNull).distinct().toList();
-    Map<Long, BillMonthly> billMap = billIds.isEmpty()
-        ? Map.of()
-        : billMonthlyMapper.selectBatchIds(billIds)
-            .stream()
-            .collect(Collectors.toMap(BillMonthly::getId, Function.identity(), (a, b) -> a));
-    List<Long> elderIds = billMap.values().stream().map(BillMonthly::getElderId).filter(Objects::nonNull).distinct().toList();
-    Map<Long, ElderProfile> elderMap = elderIds.isEmpty()
-        ? Map.of()
-        : elderMapper.selectBatchIds(elderIds)
-            .stream()
-            .collect(Collectors.toMap(ElderProfile::getId, Function.identity(), (a, b) -> a));
-
-    List<FinanceInvoiceReceiptItem> rows = payments.stream()
-        .map(payment -> toInvoiceItem(payment, billMap, elderMap))
-        .filter(item -> filterInvoiceItem(item, invoiceStatus, keyword))
-        .toList();
-
-    IPage<FinanceInvoiceReceiptItem> result = new Page<>(pageNo, pageSize, paymentPage.getTotal());
-    result.setRecords(rows);
+    List<FinanceInvoiceReceiptItem> allRows = queryInvoiceReceiptItems(orgId, targetDate, method, invoiceStatus, keyword);
+    int fromIndex = (int) Math.max((pageNo - 1) * pageSize, 0);
+    int toIndex = (int) Math.min(fromIndex + pageSize, allRows.size());
+    List<FinanceInvoiceReceiptItem> pageRows = fromIndex >= allRows.size() ? List.of() : allRows.subList(fromIndex, toIndex);
+    IPage<FinanceInvoiceReceiptItem> result = new Page<>(pageNo, pageSize, allRows.size());
+    result.setRecords(pageRows);
     return Result.ok(result);
+  }
+
+  @GetMapping(value = "/invoice/export", produces = "text/csv;charset=UTF-8")
+  public ResponseEntity<byte[]> exportInvoice(
+      @RequestParam(required = false) String date,
+      @RequestParam(required = false) String method,
+      @RequestParam(required = false) String invoiceStatus,
+      @RequestParam(required = false) String keyword) {
+    Long orgId = AuthContext.getOrgId();
+    LocalDate targetDate = (date == null || date.isBlank() || "today".equalsIgnoreCase(date))
+        ? LocalDate.now()
+        : LocalDate.parse(date);
+    List<FinanceInvoiceReceiptItem> rows = queryInvoiceReceiptItems(orgId, targetDate, method, invoiceStatus, keyword);
+    List<String> headers = List.of("收款时间", "长者", "金额", "支付方式", "收据号", "发票关联", "备注");
+    List<List<String>> body = rows.stream()
+        .map(item -> List.of(
+            stringOf(item.getPaidAt()),
+            stringOf(item.getElderName()),
+            stringOf(item.getAmount()),
+            stringOf(item.getPayMethodLabel()),
+            stringOf(item.getReceiptNo()),
+            stringOf(item.getInvoiceStatusLabel()),
+            stringOf(item.getRemark())))
+        .toList();
+    return csvResponse("finance-invoice-receipt", headers, body);
   }
 
   @GetMapping("/auto-deduct/exceptions")
@@ -342,6 +344,25 @@ public class FinanceWorkbenchController {
       rows.add(item);
     }
     return Result.ok(rows);
+  }
+
+  @GetMapping(value = "/auto-deduct/exceptions/export", produces = "text/csv;charset=UTF-8")
+  public ResponseEntity<byte[]> exportAutoDebitExceptions(
+      @RequestParam(required = false) String date) {
+    List<FinanceAutoDebitExceptionItem> rows = autoDebitExceptions(date).getData();
+    List<String> headers = List.of("账单月", "长者", "应扣金额", "账户余额", "失败原因", "处理建议", "账单ID", "长者ID");
+    List<List<String>> body = rows.stream()
+        .map(item -> List.of(
+            stringOf(item.getBillMonth()),
+            stringOf(item.getElderName()),
+            stringOf(item.getOutstandingAmount()),
+            stringOf(item.getBalance()),
+            stringOf(item.getReasonLabel()),
+            stringOf(item.getSuggestion()),
+            stringOf(item.getBillId()),
+            stringOf(item.getElderId())))
+        .toList();
+    return csvResponse("finance-auto-deduct-exceptions", headers, body);
   }
 
   @GetMapping("/room-ops/detail")
@@ -503,6 +524,26 @@ public class FinanceWorkbenchController {
     }
 
     return Result.ok(result);
+  }
+
+  @GetMapping(value = "/reconcile/exceptions/export", produces = "text/csv;charset=UTF-8")
+  public ResponseEntity<byte[]> exportReconcileExceptions(
+      @RequestParam(required = false) String date,
+      @RequestParam(required = false) String type) {
+    List<FinanceReconcileExceptionItem> rows = reconcileExceptions(date, type).getData();
+    List<String> headers = List.of("发生时间", "异常类型", "长者", "涉及金额", "异常描述", "处理建议", "账单ID", "收款ID");
+    List<List<String>> body = rows.stream()
+        .map(item -> List.of(
+            stringOf(item.getOccurredAt()),
+            stringOf(item.getExceptionTypeLabel()),
+            stringOf(item.getElderName()),
+            stringOf(item.getAmount()),
+            stringOf(item.getDetail()),
+            stringOf(item.getSuggestion()),
+            stringOf(item.getBillId()),
+            stringOf(item.getPaymentId())))
+        .toList();
+    return csvResponse("finance-reconcile-exceptions", headers, body);
   }
 
   @GetMapping("/config/overview")
@@ -1213,6 +1254,7 @@ public class FinanceWorkbenchController {
     if (method.equals("WECHAT")) return "WECHAT";
     if (method.equals("ALIPAY")) return "ALIPAY";
     if (method.equals("BANK") || method.equals("TRANSFER")) return "BANK";
+    if (method.equals("CARD") || method.equals("POS")) return "CARD";
     if (method.equals("CASH")) return "CASH";
     if (method.equals("QR_CODE")) return "QR_CODE";
     return method;
@@ -1221,6 +1263,7 @@ public class FinanceWorkbenchController {
   private String payMethodLabel(String method) {
     if ("CASH".equals(method)) return "现金";
     if ("BANK".equals(method)) return "转账";
+    if ("CARD".equals(method)) return "刷卡";
     if ("ALIPAY".equals(method)) return "支付宝";
     if ("WECHAT".equals(method)) return "微信";
     if ("WECHAT_OFFLINE".equals(method)) return "微信线下";
@@ -1695,5 +1738,69 @@ public class FinanceWorkbenchController {
     return containsAny(item.getElderName(), text)
         || containsAny(item.getReceiptNo(), text)
         || containsAny(item.getRemark(), text);
+  }
+
+  private List<FinanceInvoiceReceiptItem> queryInvoiceReceiptItems(
+      Long orgId,
+      LocalDate targetDate,
+      String method,
+      String invoiceStatus,
+      String keyword) {
+    LocalDateTime start = targetDate.atStartOfDay();
+    LocalDateTime end = targetDate.plusDays(1).atStartOfDay();
+    List<PaymentRecord> payments = paymentRecordMapper.selectList(
+        Wrappers.lambdaQuery(PaymentRecord.class)
+            .eq(PaymentRecord::getIsDeleted, 0)
+            .eq(orgId != null, PaymentRecord::getOrgId, orgId)
+            .ge(PaymentRecord::getPaidAt, start)
+            .lt(PaymentRecord::getPaidAt, end)
+            .eq(method != null && !method.isBlank(), PaymentRecord::getPayMethod, method)
+            .orderByDesc(PaymentRecord::getPaidAt));
+
+    List<Long> billIds = payments.stream().map(PaymentRecord::getBillMonthlyId).filter(Objects::nonNull).distinct().toList();
+    Map<Long, BillMonthly> billMap = billIds.isEmpty()
+        ? Map.of()
+        : billMonthlyMapper.selectBatchIds(billIds)
+            .stream()
+            .collect(Collectors.toMap(BillMonthly::getId, Function.identity(), (a, b) -> a));
+    List<Long> elderIds = billMap.values().stream().map(BillMonthly::getElderId).filter(Objects::nonNull).distinct().toList();
+    Map<Long, ElderProfile> elderMap = elderIds.isEmpty()
+        ? Map.of()
+        : elderMapper.selectBatchIds(elderIds)
+            .stream()
+            .collect(Collectors.toMap(ElderProfile::getId, Function.identity(), (a, b) -> a));
+
+    return payments.stream()
+        .map(payment -> toInvoiceItem(payment, billMap, elderMap))
+        .filter(item -> filterInvoiceItem(item, invoiceStatus, keyword))
+        .toList();
+  }
+
+  private ResponseEntity<byte[]> csvResponse(String filenamePrefix, List<String> headers, List<List<String>> rows) {
+    StringBuilder builder = new StringBuilder();
+    builder.append('\uFEFF');
+    builder.append(headers.stream().map(this::escapeCsv).collect(Collectors.joining(","))).append('\n');
+    for (List<String> row : rows) {
+      builder.append(row.stream().map(this::escapeCsv).collect(Collectors.joining(","))).append('\n');
+    }
+    byte[] bytes = builder.toString().getBytes(StandardCharsets.UTF_8);
+    String filename = filenamePrefix + "-" + LocalDate.now() + ".csv";
+    return ResponseEntity.ok()
+        .contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))
+        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+        .body(bytes);
+  }
+
+  private String escapeCsv(String value) {
+    String text = value == null ? "" : value;
+    boolean needQuote = text.contains(",") || text.contains("\"") || text.contains("\n") || text.contains("\r");
+    if (!needQuote) {
+      return text;
+    }
+    return "\"" + text.replace("\"", "\"\"") + "\"";
+  }
+
+  private String stringOf(Object value) {
+    return value == null ? "" : String.valueOf(value);
   }
 }

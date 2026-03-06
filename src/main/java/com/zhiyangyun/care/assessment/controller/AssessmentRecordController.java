@@ -10,6 +10,10 @@ import com.zhiyangyun.care.assessment.model.AssessmentRecordRequest;
 import com.zhiyangyun.care.assessment.model.AssessmentRecordReportResponse;
 import com.zhiyangyun.care.assessment.model.AssessmentRecordResponse;
 import com.zhiyangyun.care.assessment.model.AssessmentScoreResult;
+import com.zhiyangyun.care.assessment.model.AssessmentBatchStatusRequest;
+import com.zhiyangyun.care.assessment.model.AssessmentBatchAssignRequest;
+import com.zhiyangyun.care.assessment.model.AssessmentBatchNextDateRequest;
+import com.zhiyangyun.care.assessment.model.AssessmentBatchOperationResult;
 import com.zhiyangyun.care.assessment.model.AssessmentRecordSummaryResponse;
 import com.zhiyangyun.care.assessment.service.AssessmentScoringService;
 import com.zhiyangyun.care.crm.entity.CrmContract;
@@ -20,6 +24,7 @@ import com.zhiyangyun.care.auth.entity.Org;
 import com.zhiyangyun.care.auth.mapper.OrgMapper;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
+import com.zhiyangyun.care.audit.service.AuditLogService;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import jakarta.validation.Valid;
@@ -50,7 +55,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/assessment/records")
-@PreAuthorize("hasAnyRole('ADMIN','STAFF')")
+@PreAuthorize("hasAnyRole('MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
 public class AssessmentRecordController {
   private final AssessmentRecordMapper recordMapper;
   private final ElderMapper elderMapper;
@@ -58,15 +63,18 @@ public class AssessmentRecordController {
   private final AssessmentScoringService scoringService;
   private final CrmLeadMapper crmLeadMapper;
   private final CrmContractMapper crmContractMapper;
+  private final AuditLogService auditLogService;
 
   public AssessmentRecordController(AssessmentRecordMapper recordMapper, ElderMapper elderMapper, OrgMapper orgMapper,
-      AssessmentScoringService scoringService, CrmLeadMapper crmLeadMapper, CrmContractMapper crmContractMapper) {
+      AssessmentScoringService scoringService, CrmLeadMapper crmLeadMapper, CrmContractMapper crmContractMapper,
+      AuditLogService auditLogService) {
     this.recordMapper = recordMapper;
     this.elderMapper = elderMapper;
     this.orgMapper = orgMapper;
     this.scoringService = scoringService;
     this.crmLeadMapper = crmLeadMapper;
     this.crmContractMapper = crmContractMapper;
+    this.auditLogService = auditLogService;
   }
 
   @GetMapping("/page")
@@ -121,6 +129,30 @@ public class AssessmentRecordController {
     return Result.ok(response);
   }
 
+  @GetMapping("/ids")
+  public Result<List<Long>> ids(
+      @RequestParam(required = false) String assessmentType,
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) Long elderId,
+      @RequestParam(required = false) Long templateId,
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String dateFrom,
+      @RequestParam(required = false) String dateTo,
+      @RequestParam(defaultValue = "2000") Integer limit) {
+    Long orgId = AuthContext.getOrgId();
+    int safeLimit = limit == null ? 2000 : Math.min(Math.max(limit, 1), 5000);
+    var wrapper = buildPageQuery(orgId, assessmentType, status, elderId, templateId, keyword, dateFrom, dateTo)
+        .select(AssessmentRecord::getId)
+        .orderByDesc(AssessmentRecord::getAssessmentDate)
+        .orderByDesc(AssessmentRecord::getUpdateTime)
+        .last("LIMIT " + safeLimit);
+    List<Long> ids = recordMapper.selectList(wrapper).stream()
+        .map(AssessmentRecord::getId)
+        .filter(id -> id != null)
+        .toList();
+    return Result.ok(ids);
+  }
+
   @GetMapping("/{id}")
   public Result<AssessmentRecordResponse> get(@PathVariable Long id) {
     AssessmentRecord record = recordMapper.selectById(id);
@@ -165,7 +197,7 @@ public class AssessmentRecordController {
       record.setStatus("COMPLETED");
     }
     if (record.getScoreAuto() == null) {
-      record.setScoreAuto(1);
+      record.setScoreAuto(0);
     }
     if (record.getAssessorId() == null) {
       record.setAssessorId(AuthContext.getStaffId());
@@ -205,7 +237,7 @@ public class AssessmentRecordController {
       record.setAssessorId(AuthContext.getStaffId());
     }
     if (record.getScoreAuto() == null) {
-      record.setScoreAuto(1);
+      record.setScoreAuto(0);
     }
     if (record.getAssessorName() == null || record.getAssessorName().isBlank()) {
       record.setAssessorName(AuthContext.getUsername());
@@ -221,6 +253,7 @@ public class AssessmentRecordController {
 
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
+    ensureCanDeleteRecord();
     AssessmentRecord record = recordMapper.selectById(id);
     if (record != null && record.getIsDeleted() != 1) {
       Long orgId = AuthContext.getOrgId();
@@ -229,33 +262,183 @@ public class AssessmentRecordController {
       }
       record.setIsDeleted(1);
       recordMapper.updateById(record);
+      recordAudit("ASSESSMENT_DELETE", "ASSESSMENT_RECORD", record.getId(),
+          "删除评估记录：" + (record.getArchiveNo() == null ? record.getId() : record.getArchiveNo()));
     }
     return Result.ok(null);
   }
 
   @PostMapping("/batch-delete")
-  public Result<Integer> batchDelete(@RequestBody List<Long> ids) {
+  public Result<AssessmentBatchOperationResult> batchDelete(@RequestBody List<Long> ids) {
+    ensureCanDeleteRecord();
+    AssessmentBatchOperationResult result = new AssessmentBatchOperationResult();
     if (ids == null || ids.isEmpty()) {
-      return Result.ok(0);
+      return Result.ok(result);
     }
     Long orgId = AuthContext.getOrgId();
-    int deleted = 0;
     for (Long id : ids) {
       if (id == null) {
+        result.addFailure(null, "记录ID为空");
         continue;
       }
-      AssessmentRecord record = recordMapper.selectById(id);
-      if (record == null || record.getIsDeleted() == 1) {
-        continue;
+      try {
+        AssessmentRecord record = recordMapper.selectById(id);
+        if (record == null || record.getIsDeleted() == 1) {
+          result.addFailure(id, "记录不存在或已删除");
+          continue;
+        }
+        if (orgId != null && !orgId.equals(record.getOrgId())) {
+          result.addFailure(id, "无权限访问该评估记录");
+          continue;
+        }
+        record.setIsDeleted(1);
+        recordMapper.updateById(record);
+        result.addSuccess(id);
+      } catch (Exception ex) {
+        result.addFailure(id, ex.getMessage());
       }
-      if (orgId != null && !orgId.equals(record.getOrgId())) {
-        throw new IllegalArgumentException("无权限访问该评估记录");
-      }
-      record.setIsDeleted(1);
-      recordMapper.updateById(record);
-      deleted++;
     }
-    return Result.ok(deleted);
+    if (result.getSuccessCount() > 0) {
+      recordAudit("ASSESSMENT_BATCH_DELETE", "ASSESSMENT_RECORD", null,
+          "批量删除评估记录，数量=" + result.getSuccessCount());
+    }
+    return Result.ok(result);
+  }
+
+  @PostMapping("/batch-status")
+  public Result<AssessmentBatchOperationResult> batchUpdateStatus(@Valid @RequestBody AssessmentBatchStatusRequest request) {
+    AssessmentBatchOperationResult result = new AssessmentBatchOperationResult();
+    if (request.getIds() == null || request.getIds().isEmpty()) {
+      return Result.ok(result);
+    }
+    String normalizedStatus;
+    try {
+      normalizedStatus = normalizeStatus(request.getStatus());
+    } catch (Exception ex) {
+      request.getIds().forEach(id -> result.addFailure(id, ex.getMessage()));
+      return Result.ok(result);
+    }
+    Long orgId = AuthContext.getOrgId();
+    for (Long id : request.getIds()) {
+      if (id == null) {
+        result.addFailure(null, "记录ID为空");
+        continue;
+      }
+      try {
+        AssessmentRecord record = recordMapper.selectById(id);
+        if (record == null || record.getIsDeleted() == 1) {
+          result.addFailure(id, "记录不存在或已删除");
+          continue;
+        }
+        if (orgId != null && !orgId.equals(record.getOrgId())) {
+          result.addFailure(id, "无权限访问该评估记录");
+          continue;
+        }
+        if (normalizedStatus.equals(record.getStatus())) {
+          result.addFailure(id, "状态未变化");
+          continue;
+        }
+        record.setStatus(normalizedStatus);
+        recordMapper.updateById(record);
+        syncLeadFlowAfterAssessment(record);
+        result.addSuccess(id);
+      } catch (Exception ex) {
+        result.addFailure(id, ex.getMessage());
+      }
+    }
+    if (result.getSuccessCount() > 0) {
+      recordAudit("ASSESSMENT_BATCH_STATUS", "ASSESSMENT_RECORD", null,
+          "批量更新状态为" + normalizedStatus + "，数量=" + result.getSuccessCount());
+    }
+    return Result.ok(result);
+  }
+
+  @PostMapping("/batch-assign")
+  public Result<AssessmentBatchOperationResult> batchAssign(@Valid @RequestBody AssessmentBatchAssignRequest request) {
+    AssessmentBatchOperationResult result = new AssessmentBatchOperationResult();
+    if (request.getIds() == null || request.getIds().isEmpty()) {
+      return Result.ok(result);
+    }
+    Long orgId = AuthContext.getOrgId();
+    Long assessorId = request.getAssessorId() == null ? AuthContext.getStaffId() : request.getAssessorId();
+    String assessorName = request.getAssessorName();
+    if (assessorName == null || assessorName.isBlank()) {
+      assessorName = AuthContext.getUsername();
+    }
+    if (assessorName == null || assessorName.isBlank()) {
+      request.getIds().forEach(id -> result.addFailure(id, "评估人不能为空"));
+      return Result.ok(result);
+    }
+
+    for (Long id : request.getIds()) {
+      if (id == null) {
+        result.addFailure(null, "记录ID为空");
+        continue;
+      }
+      try {
+        AssessmentRecord record = recordMapper.selectById(id);
+        if (record == null || record.getIsDeleted() == 1) {
+          result.addFailure(id, "记录不存在或已删除");
+          continue;
+        }
+        if (orgId != null && !orgId.equals(record.getOrgId())) {
+          result.addFailure(id, "无权限访问该评估记录");
+          continue;
+        }
+        record.setAssessorId(assessorId);
+        record.setAssessorName(assessorName);
+        recordMapper.updateById(record);
+        result.addSuccess(id);
+      } catch (Exception ex) {
+        result.addFailure(id, ex.getMessage());
+      }
+    }
+    if (result.getSuccessCount() > 0) {
+      recordAudit("ASSESSMENT_BATCH_ASSIGN", "ASSESSMENT_RECORD", null,
+          "批量指派评估人：" + assessorName + "，数量=" + result.getSuccessCount());
+    }
+    return Result.ok(result);
+  }
+
+  @PostMapping("/batch-next-date")
+  public Result<AssessmentBatchOperationResult> batchUpdateNextDate(@Valid @RequestBody AssessmentBatchNextDateRequest request) {
+    AssessmentBatchOperationResult result = new AssessmentBatchOperationResult();
+    if (request.getIds() == null || request.getIds().isEmpty()) {
+      return Result.ok(result);
+    }
+    LocalDate nextDate = request.getNextAssessmentDate();
+    Long orgId = AuthContext.getOrgId();
+    for (Long id : request.getIds()) {
+      if (id == null) {
+        result.addFailure(null, "记录ID为空");
+        continue;
+      }
+      try {
+        AssessmentRecord record = recordMapper.selectById(id);
+        if (record == null || record.getIsDeleted() == 1) {
+          result.addFailure(id, "记录不存在或已删除");
+          continue;
+        }
+        if (orgId != null && !orgId.equals(record.getOrgId())) {
+          result.addFailure(id, "无权限访问该评估记录");
+          continue;
+        }
+        if (record.getAssessmentDate() != null && nextDate.isBefore(record.getAssessmentDate())) {
+          result.addFailure(id, "下次评估日期不能早于评估日期");
+          continue;
+        }
+        record.setNextAssessmentDate(nextDate);
+        recordMapper.updateById(record);
+        result.addSuccess(id);
+      } catch (Exception ex) {
+        result.addFailure(id, ex.getMessage());
+      }
+    }
+    if (result.getSuccessCount() > 0) {
+      recordAudit("ASSESSMENT_BATCH_NEXT_DATE", "ASSESSMENT_RECORD", null,
+          "批量设置复评日期：" + nextDate + "，数量=" + result.getSuccessCount());
+    }
+    return Result.ok(result);
   }
 
   @GetMapping(value = "/export", produces = "text/csv;charset=UTF-8")
@@ -328,7 +511,7 @@ public class AssessmentRecordController {
         && request.getNextAssessmentDate().isBefore(request.getAssessmentDate())) {
       throw new IllegalArgumentException("下次评估日期不能早于评估日期");
     }
-    boolean autoScore = request.getScoreAuto() == null || request.getScoreAuto() == 1;
+    boolean autoScore = request.getScoreAuto() != null && request.getScoreAuto() == 1;
     if (autoScore) {
       if (request.getTemplateId() == null) {
         throw new IllegalArgumentException("自动评分开启时必须选择量表模板");
@@ -375,18 +558,21 @@ public class AssessmentRecordController {
       }
       throw new IllegalArgumentException("elderName required");
     }
-    ElderProfile elder = elderMapper.selectOne(Wrappers.lambdaQuery(ElderProfile.class)
+    List<ElderProfile> elderList = elderMapper.selectList(Wrappers.lambdaQuery(ElderProfile.class)
         .eq(ElderProfile::getIsDeleted, 0)
         .eq(orgId != null, ElderProfile::getOrgId, orgId)
         .eq(ElderProfile::getFullName, elderName)
-        .last("LIMIT 1"));
-    if (elder == null) {
+        .last("LIMIT 2"));
+    if (elderList == null || elderList.isEmpty()) {
       if (admissionAssessment) {
         return null;
       }
       throw new IllegalArgumentException("elder not found");
     }
-    return elder.getId();
+    if (elderList.size() > 1) {
+      throw new IllegalArgumentException("存在同名老人，请先通过下拉选择具体老人");
+    }
+    return elderList.get(0).getId();
   }
 
   private String resolveElderName(Long elderId, String fallback) {
@@ -577,6 +763,41 @@ public class AssessmentRecordController {
       case "ARCHIVED" -> "已归档";
       default -> "已完成";
     };
+  }
+
+  private String normalizeStatus(String status) {
+    if (status == null) {
+      throw new IllegalArgumentException("状态不能为空");
+    }
+    String normalized = status.trim().toUpperCase();
+    if ("DRAFT".equals(normalized) || "COMPLETED".equals(normalized) || "ARCHIVED".equals(normalized)) {
+      return normalized;
+    }
+    throw new IllegalArgumentException("不支持的评估状态");
+  }
+
+  private void ensureCanDeleteRecord() {
+    if (AuthContext.isMinisterOrHigher()) {
+      return;
+    }
+    throw new IllegalArgumentException("仅主管及以上角色可删除评估记录");
+  }
+
+  private void recordAudit(String actionType, String entityType, Long entityId, String detail) {
+    Long orgId = AuthContext.getOrgId();
+    if (orgId == null) {
+      return;
+    }
+    auditLogService.record(
+        orgId,
+        orgId,
+        AuthContext.getStaffId(),
+        AuthContext.getUsername(),
+        actionType,
+        entityType,
+        entityId,
+        detail
+    );
   }
 
   private String csvValue(String value) {

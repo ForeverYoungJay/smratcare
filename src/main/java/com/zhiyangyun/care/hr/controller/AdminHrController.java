@@ -129,7 +129,7 @@ public class AdminHrController {
     this.objectMapper = objectMapper;
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping("/profile")
   public Result<StaffProfileResponse> upsertProfile(@RequestBody StaffProfileRequest request) {
     Long orgId = AuthContext.getOrgId();
@@ -198,7 +198,7 @@ public class AdminHrController {
     return Result.ok(toProfileResponse(staff, profile));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/profile/{staffId}")
   public Result<StaffProfileResponse> getProfile(@PathVariable Long staffId) {
     Long orgId = AuthContext.getOrgId();
@@ -211,7 +211,7 @@ public class AdminHrController {
     return Result.ok(toProfileResponse(staff, profile));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/staff/page")
   public Result<IPage<StaffProfileResponse>> staffPage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -245,7 +245,7 @@ public class AdminHrController {
     return Result.ok(resp);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/workbench/summary")
   public Result<HrWorkbenchSummaryResponse> workbenchSummary(
       @RequestParam(required = false, defaultValue = "30") Integer warningDays) {
@@ -306,7 +306,7 @@ public class AdminHrController {
     return Result.ok(summary);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/contract/reminder/page")
   public Result<IPage<HrContractReminderResponse>> contractReminderPage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -358,7 +358,7 @@ public class AdminHrController {
     return Result.ok(resp);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/attendance/abnormal/page")
   public Result<IPage<HrAttendanceAbnormalResponse>> attendanceAbnormalPage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -418,7 +418,7 @@ public class AdminHrController {
     return Result.ok(resp);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/recruitment/need/page")
   public Result<IPage<HrRecruitmentNeedResponse>> recruitmentNeedPage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -449,7 +449,7 @@ public class AdminHrController {
     return Result.ok(resp);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping("/recruitment/need")
   public Result<HrRecruitmentNeedResponse> createRecruitmentNeed(@RequestBody HrRecruitmentNeedRequest request) {
     Long orgId = AuthContext.getOrgId();
@@ -470,7 +470,7 @@ public class AdminHrController {
     return Result.ok(toRecruitmentNeedResponse(entity));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PutMapping("/recruitment/need/{id}")
   public Result<HrRecruitmentNeedResponse> updateRecruitmentNeed(
       @PathVariable Long id,
@@ -507,7 +507,7 @@ public class AdminHrController {
     return Result.ok(toRecruitmentNeedResponse(entity));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @DeleteMapping("/recruitment/need/{id}")
   public Result<Void> deleteRecruitmentNeed(@PathVariable Long id) {
     Long orgId = AuthContext.getOrgId();
@@ -525,7 +525,7 @@ public class AdminHrController {
     return Result.ok(null);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PutMapping("/recruitment/need/batch/status")
   public Result<Integer> batchUpdateRecruitmentNeedStatus(
       @RequestBody OaBatchIdsRequest request,
@@ -550,7 +550,7 @@ public class AdminHrController {
     return Result.ok(rows.size());
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping("/recruitment/materials/folder/bootstrap")
   public Result<Map<String, Object>> bootstrapRecruitmentMaterialFolders(
       @RequestParam(required = false) Integer year,
@@ -573,7 +573,7 @@ public class AdminHrController {
     return Result.ok(result);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/policy/page")
   public Result<IPage<OaDocument>> policyPage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -597,7 +597,7 @@ public class AdminHrController {
     return Result.ok(oaDocumentMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/policy-alert/page")
   public Result<IPage<HrPolicyAlertResponse>> policyAlertPage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -624,7 +624,7 @@ public class AdminHrController {
     return Result.ok(resp);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/profile/contract/page")
   public Result<IPage<HrProfileContractResponse>> profileContractPage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -656,7 +656,7 @@ public class AdminHrController {
     return Result.ok(resp);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/profile/template/page")
   public Result<IPage<OaDocument>> profileTemplatePage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -665,13 +665,13 @@ public class AdminHrController {
     return Result.ok(queryProfileDocuments("合同模板", pageNo, pageSize, keyword));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping("/profile/template")
   public Result<OaDocument> createProfileTemplate(@RequestBody HrProfileDocumentRequest request) {
     return Result.ok(createProfileDocument("合同模板", request));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/profile/attachment/page")
   public Result<IPage<OaDocument>> profileAttachmentPage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -680,13 +680,13 @@ public class AdminHrController {
     return Result.ok(queryProfileDocuments("档案附件", pageNo, pageSize, keyword));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping("/profile/attachment")
   public Result<OaDocument> createProfileAttachment(@RequestBody HrProfileDocumentRequest request) {
     return Result.ok(createProfileDocument("档案附件", request));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/profile/certificate/page")
   public Result<IPage<HrStaffCertificateResponse>> profileCertificatePage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -716,7 +716,7 @@ public class AdminHrController {
     return Result.ok(toCertificatePage(page, LocalDate.now()));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping("/profile/certificate")
   public Result<HrStaffCertificateResponse> createProfileCertificate(@RequestBody HrStaffCertificateRequest request) {
     Long orgId = AuthContext.getOrgId();
@@ -738,7 +738,7 @@ public class AdminHrController {
     return Result.ok(converted.getRecords().isEmpty() ? null : converted.getRecords().get(0));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/profile/certificate/reminder/page")
   public Result<IPage<HrStaffCertificateResponse>> profileCertificateReminderPage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -771,7 +771,7 @@ public class AdminHrController {
     return Result.ok(toCertificatePage(page, today));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/integration/access-control/page")
   public Result<IPage<HrAccessControlRecordResponse>> integrationAccessControlPage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -826,7 +826,7 @@ public class AdminHrController {
     return Result.ok(resp);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/integration/card-sync/page")
   public Result<IPage<HrCardSyncItemResponse>> integrationCardSyncPage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -878,7 +878,7 @@ public class AdminHrController {
     return Result.ok(resp);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/expense/meal-fee/page")
   public Result<IPage<HrExpenseItemResponse>> expenseMealFeePage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -888,7 +888,7 @@ public class AdminHrController {
     return Result.ok(pageExpenseByKeyword(pageNo, pageSize, keyword, status, "餐费", "meal"));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/expense/electricity-fee/page")
   public Result<IPage<HrExpenseItemResponse>> expenseElectricityFeePage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -898,7 +898,7 @@ public class AdminHrController {
     return Result.ok(pageExpenseByKeyword(pageNo, pageSize, keyword, status, "电费", "electricity"));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/expense/training-reimburse/page")
   public Result<IPage<HrExpenseItemResponse>> expenseTrainingReimbursePage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -908,7 +908,7 @@ public class AdminHrController {
     return Result.ok(pageExpenseByKeyword(pageNo, pageSize, keyword, status, "培训", "training"));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/expense/subsidy/page")
   public Result<IPage<HrExpenseItemResponse>> expenseSubsidyPage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -918,7 +918,7 @@ public class AdminHrController {
     return Result.ok(pageExpenseByKeyword(pageNo, pageSize, keyword, status, "补贴", "subsidy"));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/expense/salary-subsidy/page")
   public Result<IPage<HrExpenseItemResponse>> expenseSalarySubsidyPage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -928,7 +928,7 @@ public class AdminHrController {
     return Result.ok(pageExpenseByKeyword(pageNo, pageSize, keyword, status, "工资补贴", "salary"));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/expense/approval-flow/page")
   public Result<IPage<HrExpenseItemResponse>> expenseApprovalFlowPage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -966,7 +966,7 @@ public class AdminHrController {
     return Result.ok(resp);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping("/expense/approval-flow")
   public Result<HrExpenseItemResponse> createExpenseApprovalFlow(@RequestBody HrExpenseApprovalRequest request) {
     if (request == null || request.getAmount() == null || request.getAmount().signum() <= 0) {
@@ -1009,7 +1009,7 @@ public class AdminHrController {
     return Result.ok(row);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/attendance/leave/page")
   public Result<IPage<HrGenericApprovalResponse>> attendanceLeavePage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -1019,7 +1019,7 @@ public class AdminHrController {
     return Result.ok(pageGenericApprovals(pageNo, pageSize, keyword, status, "LEAVE", null));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/attendance/shift-change/page")
   public Result<IPage<HrGenericApprovalResponse>> attendanceShiftChangePage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -1029,7 +1029,7 @@ public class AdminHrController {
     return Result.ok(pageGenericApprovals(pageNo, pageSize, keyword, status, "LEAVE", "shift-change"));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/attendance/overtime/page")
   public Result<IPage<HrGenericApprovalResponse>> attendanceOvertimePage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -1039,7 +1039,7 @@ public class AdminHrController {
     return Result.ok(pageGenericApprovals(pageNo, pageSize, keyword, status, "OVERTIME", null));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/attendance/record/page")
   public Result<IPage<HrAttendanceRecordResponse>> attendanceRecordPage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -1094,7 +1094,7 @@ public class AdminHrController {
     return Result.ok(resp);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping("/terminate")
   public Result<Void> terminate(@RequestParam Long staffId,
       @RequestParam(required = false) String leaveDate,
@@ -1133,7 +1133,7 @@ public class AdminHrController {
     return Result.ok(null);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping("/reinstate")
   public Result<Void> reinstate(@RequestParam Long staffId) {
     Long orgId = AuthContext.getOrgId();
@@ -1165,7 +1165,7 @@ public class AdminHrController {
     return Result.ok(null);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping("/training")
   public Result<StaffTrainingRecord> createTraining(@RequestBody StaffTrainingRequest request) {
     Long orgId = AuthContext.getOrgId();
@@ -1191,7 +1191,7 @@ public class AdminHrController {
     return Result.ok(record);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PutMapping("/training/{id}")
   public Result<StaffTrainingRecord> updateTraining(@PathVariable Long id,
       @RequestBody StaffTrainingRequest request) {
@@ -1239,7 +1239,7 @@ public class AdminHrController {
     return Result.ok(record);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @DeleteMapping("/training/{id}")
   public Result<Void> deleteTraining(@PathVariable Long id) {
     StaffTrainingRecord record = trainingRecordMapper.selectById(id);
@@ -1254,7 +1254,7 @@ public class AdminHrController {
     return Result.ok(null);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/training/page")
   public Result<IPage<StaffTrainingResponse>> trainingPage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -1311,7 +1311,7 @@ public class AdminHrController {
     return Result.ok(resp);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping("/points/adjust")
   public Result<StaffPointsAccountResponse> adjustPoints(@RequestBody StaffPointsAdjustRequest request) {
     if (request.getStaffId() == null || request.getChangePoints() == null) {
@@ -1327,7 +1327,7 @@ public class AdminHrController {
     return Result.ok(response);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/points/rule/page")
   public Result<IPage<StaffPointsRuleResponse>> rulePage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -1335,20 +1335,20 @@ public class AdminHrController {
     return Result.ok(staffPointsRuleService.page(AuthContext.getOrgId(), pageNo, pageSize));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping("/points/rule")
   public Result<StaffPointsRuleResponse> upsertRule(@RequestBody StaffPointsRuleRequest request) {
     return Result.ok(staffPointsRuleService.upsert(AuthContext.getOrgId(), request));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @DeleteMapping("/points/rule/{id}")
   public Result<Void> deleteRule(@PathVariable Long id) {
     staffPointsRuleService.delete(AuthContext.getOrgId(), id);
     return Result.ok(null);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/points/log/page")
   public Result<IPage<StaffPointsLogResponse>> pointsLogPage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -1362,7 +1362,7 @@ public class AdminHrController {
             AuthContext.getOrgId(), pageNo, pageSize, staffId, dateFrom, dateTo, sourceType));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/performance/summary")
   public Result<StaffPerformanceSummaryResponse> performanceSummary(
       @RequestParam Long staffId,
@@ -1371,7 +1371,7 @@ public class AdminHrController {
     return Result.ok(performanceService.summary(AuthContext.getOrgId(), staffId, dateFrom, dateTo));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/performance/ranking")
   public Result<List<StaffPerformanceRankItem>> performanceRanking(
       @RequestParam(required = false) String dateFrom,

@@ -38,18 +38,34 @@
           :options="overviewDayOptions"
           @change="fetchOverview"
         />
+        <a-button :disabled="selectedRowKeys.length === 0" @click="exportSelectedRows">导出勾选项</a-button>
+        <a-button :disabled="selectedRowKeys.length === 0" @click="batchRerunSelected">批量重跑勾选</a-button>
+        <a-button :disabled="rows.length === 0" @click="toggleSelectAll">
+          {{ selectedRowKeys.length === rows.length && rows.length > 0 ? '取消全选' : '全选当前页' }}
+        </a-button>
         <a-button @click="rerunLatestFailed">重跑最近失败</a-button>
-        <a-button @click="exportData">导出CSV</a-button>
+        <a-button @click="exportData">下载执行时间表</a-button>
         <a-button type="primary" @click="fetchData">刷新</a-button>
       </template>
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <DataTable
+      rowKey="id"
+      :columns="columns"
+      :data-source="rows"
+      :loading="loading"
+      :pagination="pagination"
+      :row-selection="rowSelection"
+      @change="handleTableChange"
+    >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'triggerType'">
-          <a-tag :color="record.triggerType === 'SCHEDULED' ? 'blue' : 'gold'">
-            {{ record.triggerType === 'SCHEDULED' ? '自动' : '手动' }}
+          <a-tag :color="record.triggerType === 'SCHEDULED' ? 'blue' : record.triggerType === 'RETRY' ? 'purple' : 'gold'">
+            {{ record.triggerType === 'SCHEDULED' ? '自动' : record.triggerType === 'RETRY' ? '重跑' : '手动' }}
           </a-tag>
+        </template>
+        <template v-else-if="column.key === 'triggerPlan'">
+          {{ triggerPlanLabel(record.triggerType) }}
         </template>
         <template v-else-if="column.key === 'status'">
           <a-tag :color="record.status === 'SUCCESS' ? 'green' : 'red'">
@@ -68,7 +84,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
@@ -84,6 +100,7 @@ import type { LogisticsMaintenanceTodoJobLog, LogisticsMaintenanceTodoJobLogOver
 
 const loading = ref(false)
 const rows = ref<LogisticsMaintenanceTodoJobLog[]>([])
+const selectedRowKeys = ref<number[]>([])
 const overviewDays = ref(7)
 const overviewDayOptions = [
   { label: '近7天', value: 7 },
@@ -119,12 +136,20 @@ const statusOptions = [
 const columns = [
   { title: '执行时间', dataIndex: 'executedAt', key: 'executedAt', width: 180 },
   { title: '触发方式', dataIndex: 'triggerType', key: 'triggerType', width: 100 },
+  { title: '计划触发', key: 'triggerPlan', width: 220 },
   { title: '执行状态', dataIndex: 'status', key: 'status', width: 100 },
   { title: '扫描天数', dataIndex: 'days', key: 'days', width: 100 },
   { title: '执行结果', key: 'result', width: 280 },
-  { title: '错误信息', dataIndex: 'errorMessage', key: 'errorMessage' },
+  { title: '记录时间', dataIndex: 'createTime', key: 'createTime', width: 180 },
+  { title: '错误信息', dataIndex: 'errorMessage', key: 'errorMessage', width: 260 },
   { title: '操作', key: 'action', width: 140 }
 ]
+const rowSelection = computed(() => ({
+  selectedRowKeys: selectedRowKeys.value,
+  onChange: (keys: Array<number | string>) => {
+    selectedRowKeys.value = keys.map((item) => Number(item)).filter((item) => Number.isFinite(item))
+  }
+}))
 
 async function fetchData() {
   loading.value = true
@@ -138,6 +163,7 @@ async function fetchData() {
     })
     rows.value = res.list || []
     pagination.total = res.total || 0
+    selectedRowKeys.value = selectedRowKeys.value.filter((key) => rows.value.some((row) => Number(row.id) === Number(key)))
   } finally {
     loading.value = false
   }
@@ -148,6 +174,7 @@ function onReset() {
   query.status = undefined
   query.pageNo = 1
   pagination.current = 1
+  selectedRowKeys.value = []
   fetchData()
 }
 
@@ -203,6 +230,91 @@ async function fetchOverview() {
 function statusLabel(status?: string) {
   if (!status) return '-'
   return status === 'SUCCESS' ? '成功' : '失败'
+}
+
+function triggerPlanLabel(triggerType?: string) {
+  if (triggerType === 'SCHEDULED') return '定时触发（系统计划任务）'
+  if (triggerType === 'RETRY') return '失败后手动重跑'
+  return '人工手动触发'
+}
+
+function getSelectedRows() {
+  const selectedSet = new Set(selectedRowKeys.value.map((item) => Number(item)))
+  return rows.value.filter((row) => selectedSet.has(Number(row.id)))
+}
+
+function toggleSelectAll() {
+  if (selectedRowKeys.value.length === rows.value.length && rows.value.length > 0) {
+    selectedRowKeys.value = []
+    return
+  }
+  selectedRowKeys.value = rows.value.map((row) => Number(row.id))
+}
+
+function exportSelectedRows() {
+  const selected = getSelectedRows()
+  if (!selected.length) {
+    message.warning('请先勾选要导出的记录')
+    return
+  }
+  const headers = ['ID', '执行时间', '触发方式', '计划触发', '执行状态', '扫描天数', '命中设备', '新建待办', '跳过重复', '记录时间', '错误信息']
+  const escapeCsv = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`
+  const rowsText = selected.map((item) => ([
+    item.id,
+    item.executedAt || '',
+    item.triggerType === 'SCHEDULED' ? '自动' : item.triggerType === 'RETRY' ? '重跑' : '手动',
+    triggerPlanLabel(item.triggerType),
+    statusLabel(item.status),
+    item.days || 0,
+    item.totalMatched || 0,
+    item.createdCount || 0,
+    item.skippedCount || 0,
+    item.createTime || '',
+    item.errorMessage || ''
+  ].map(escapeCsv).join(',')))
+  const content = ['\uFEFF' + headers.join(','), ...rowsText].join('\n')
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `维保待办执行日志_勾选_${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+  message.success(`已导出 ${selected.length} 条勾选记录`)
+}
+
+async function batchRerunSelected() {
+  const selected = getSelectedRows()
+  if (!selected.length) {
+    message.warning('请先勾选要重跑的记录')
+    return
+  }
+  let success = 0
+  let blockedWindow = 0
+  let blockedCooldown = 0
+  let failed = 0
+  for (const row of selected) {
+    try {
+      const res: any = await rerunMaintenanceTodoJobLog(row.id)
+      if (Number(res?.blockedByWindow || 0)) {
+        blockedWindow += 1
+        continue
+      }
+      if (Number(res?.blockedByCooldown || 0)) {
+        blockedCooldown += 1
+        continue
+      }
+      if (Number(res?.rerunTriggered || 0)) {
+        success += 1
+      }
+    } catch {
+      failed += 1
+    }
+  }
+  message.info(`批量结果：成功${success}，超窗${blockedWindow}，冷却${blockedCooldown}，失败${failed}`)
+  await fetchData()
 }
 
 async function exportData() {

@@ -18,9 +18,14 @@
           <a-statistic title="欠费" :value="detail?.outstandingAmount ?? 0" />
         </a-col>
       </a-row>
+      <a-tag style="margin-top: 8px;" :color="statusColor(detail?.status)">{{ statusText(detail?.status) }}</a-tag>
       <div style="margin-top: 16px;">
         <a-space>
-          <a-button type="primary" @click="openPay">登记收款</a-button>
+          <a-button v-if="detail?.status !== 9" type="primary" @click="openPay">登记收款</a-button>
+          <a-popconfirm v-if="detail?.status !== 9" title="确认将该账单标记为无效？" @confirm="markInvalid">
+            <a-button danger>无效账单</a-button>
+          </a-popconfirm>
+          <a-button @click="goConsumption">消费明细</a-button>
           <a-button @click="refresh">刷新</a-button>
         </a-space>
       </div>
@@ -101,14 +106,23 @@
       </div>
       <vxe-table border stripe show-overflow :data="detail?.payments || []" height="220">
         <vxe-column field="amount" title="金额" width="120" />
-        <vxe-column field="payMethod" title="方式" width="140" />
+        <vxe-column field="payMethod" title="方式" width="140">
+          <template #default="{ row }">
+            {{ payMethodText(row.payMethod) }}
+          </template>
+        </vxe-column>
         <vxe-column field="paidAt" title="支付时间" width="180" />
         <vxe-column field="operatorStaffName" title="操作人" width="120" />
         <vxe-column field="remark" title="备注" min-width="200" />
+        <vxe-column title="操作" width="120" fixed="right">
+          <template #default="{ row }">
+            <a-button v-if="detail?.status !== 9" type="link" @click="openEditPayment(row)">修改</a-button>
+          </template>
+        </vxe-column>
       </vxe-table>
     </a-card>
 
-    <a-modal v-model:open="payOpen" title="登记收款" @ok="submitPay" :confirm-loading="paying">
+    <a-modal v-model:open="payOpen" :title="activePaymentId ? '修改收款' : '登记收款'" @ok="submitPay" :confirm-loading="paying">
       <a-form layout="vertical" :model="payForm" :rules="payRules" ref="payFormRef">
         <a-form-item label="金额" name="amount">
           <a-input-number v-model:value="payForm.amount" style="width: 100%" />
@@ -116,6 +130,7 @@
         <a-form-item label="方式" name="method">
           <a-select v-model:value="payForm.method">
             <a-select-option value="CASH">现金</a-select-option>
+            <a-select-option value="CARD">刷卡</a-select-option>
             <a-select-option value="BANK">转账</a-select-option>
             <a-select-option value="ALIPAY">支付宝</a-select-option>
             <a-select-option value="WECHAT">微信</a-select-option>
@@ -136,17 +151,18 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
-import { getFinanceBillDetail } from '../../api/finance'
-import { payBill } from '../../api/bill'
+import { getFinanceBillDetail, updatePaymentRecord } from '../../api/finance'
+import { invalidateBill, payBill } from '../../api/bill'
 import { getOrderDetail } from '../../api/store'
 import type { FinanceBillDetail } from '../../types'
 import { exportCsv } from '../../utils/export'
 
 const route = useRoute()
+const router = useRouter()
 const billId = Number(route.params.billId)
 const detail = ref<FinanceBillDetail | null>(null)
 const orderDetailMap = ref<Record<number, any>>({})
@@ -155,6 +171,7 @@ const orderLoading = ref<Record<number, boolean>>({})
 const payOpen = ref(false)
 const paying = ref(false)
 const payFormRef = ref()
+const activePaymentId = ref<number | null>(null)
 type PayForm = {
   amount: number
   method: string
@@ -182,6 +199,20 @@ function orderStatusText(status?: number) {
   return '待处理'
 }
 
+function statusText(status?: number) {
+  if (status === 9) return '无效'
+  if (status === 2) return '已付'
+  if (status === 1) return '部分已付'
+  return '未付'
+}
+
+function statusColor(status?: number) {
+  if (status === 9) return 'default'
+  if (status === 2) return 'green'
+  if (status === 1) return 'orange'
+  return 'red'
+}
+
 async function refresh() {
   detail.value = await getFinanceBillDetail(billId)
 }
@@ -199,6 +230,7 @@ async function onToggleOrderExpand({ row, expanded }: any) {
 }
 
 function openPay() {
+  activePaymentId.value = null
   payForm.value = {
     amount: Number(detail.value?.outstandingAmount || 0),
     method: 'CASH',
@@ -208,26 +240,72 @@ function openPay() {
   payOpen.value = true
 }
 
+function openEditPayment(row: any) {
+  activePaymentId.value = Number(row.id)
+  payForm.value = {
+    amount: Number(row.amount || 0),
+    method: String(row.payMethod || 'CASH').toUpperCase(),
+    paidAt: row.paidAt ? dayjs(row.paidAt) : dayjs(),
+    remark: row.remark || ''
+  }
+  payOpen.value = true
+}
+
+function payMethodText(method?: string) {
+  const text = String(method || '').toUpperCase()
+  if (!text) return '-'
+  if (text === 'ALIPAY') return '支付宝'
+  if (text === 'WECHAT') return '微信'
+  if (text === 'WECHAT_OFFLINE') return '微信线下'
+  if (text === 'QR_CODE') return '扫码'
+  if (text === 'BANK') return '转账'
+  if (text === 'CARD') return '刷卡'
+  if (text === 'CASH') return '现金'
+  return text
+}
+
 async function submitPay() {
   await payFormRef.value?.validate?.()
   paying.value = true
   try {
-    await payBill(billId, {
+    const payload = {
       amount: payForm.value.amount,
       method: payForm.value.method,
       paidAt: dayjs(payForm.value.paidAt).format('YYYY-MM-DD HH:mm:ss'),
       remark: payForm.value.remark
-    })
-    message.success('收款登记成功')
+    }
+    if (activePaymentId.value) {
+      await updatePaymentRecord(activePaymentId.value, payload)
+      message.success('收款已修改')
+    } else {
+      await payBill(billId, payload)
+      message.success('收款登记成功')
+    }
     payOpen.value = false
+    activePaymentId.value = null
     refresh()
   } finally {
     paying.value = false
   }
 }
 
+async function markInvalid() {
+  await invalidateBill(billId)
+  message.success('账单已标记为无效')
+  refresh()
+}
+
 function exportPayments() {
   exportCsv(detail.value?.payments || [], `payments-${billId}.csv`)
+}
+
+function goConsumption() {
+  const elderId = detail.value?.elderId
+  if (!elderId) {
+    message.warning('当前账单未关联老人')
+    return
+  }
+  router.push(`/finance/flows/consumption?elderId=${elderId}`)
 }
 
 onMounted(refresh)

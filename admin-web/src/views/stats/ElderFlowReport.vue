@@ -20,10 +20,16 @@
         <a-form-item label="机构ID">
           <a-input-number v-model:value="query.orgId" :min="1" placeholder="默认当前机构" style="width: 160px" />
         </a-form-item>
+        <a-form-item label="打印老人">
+          <a-input v-model:value="printElderKeyword" allow-clear placeholder="按姓名筛选打印" style="width: 160px" />
+        </a-form-item>
         <a-form-item>
           <a-space>
             <a-button type="primary" @click="search">查询</a-button>
             <a-button @click="exportCsvReport">导出报表</a-button>
+            <a-button @click="openColumnSetting">列设置</a-button>
+            <a-button @click="printCurrent">打印当前列</a-button>
+            <a-button @click="printSpecificElder">打印指定老人</a-button>
             <a-button @click="reset">重置</a-button>
           </a-space>
         </a-form-item>
@@ -59,16 +65,21 @@
         />
       </div>
     </a-card>
+
+    <a-modal v-model:open="columnSettingOpen" title="打印列设置" @ok="columnSettingOpen = false" cancel-text="关闭" ok-text="确定">
+      <a-checkbox-group v-model:value="selectedPrintColumns" :options="printColumnOptions" />
+    </a-modal>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportElderFlowReportCsv, getElderFlowReport } from '../../api/stats'
 import type { FlowReportItem } from '../../types'
 import { message } from 'ant-design-vue'
+import { printTableReport } from '../../utils/print'
 
 const query = ref({
   fromDate: dayjs().subtract(29, 'day') as Dayjs,
@@ -82,6 +93,21 @@ const query = ref({
 
 const rows = ref<FlowReportItem[]>([])
 const total = ref(0)
+const printElderKeyword = ref('')
+const columnSettingOpen = ref(false)
+const printColumnOptions = [
+  { label: '日期', value: 'eventDate' },
+  { label: '事件类型', value: 'eventTypeLabel' },
+  { label: '老人姓名', value: 'elderName' },
+  { label: '备注', value: 'remark' }
+]
+const selectedPrintColumns = ref<string[]>(['eventDate', 'eventTypeLabel', 'elderName', 'remark'])
+const printRows = computed(() => rows.value.map(item => ({
+  eventDate: item.eventDate || '',
+  eventTypeLabel: item.eventType === 'ADMISSION' ? '入院' : '离院',
+  elderName: item.elderName || '未知老人',
+  remark: item.remark || ''
+})))
 
 async function loadData() {
   if (query.value.fromDate.isAfter(query.value.toDate, 'day')) {
@@ -127,6 +153,10 @@ function onPageSizeChange(_: number, pageSize: number) {
   loadData()
 }
 
+function openColumnSetting() {
+  columnSettingOpen.value = true
+}
+
 async function exportCsvReport() {
   if (query.value.fromDate.isAfter(query.value.toDate, 'day')) {
     message.warning('开始日期不能晚于结束日期')
@@ -143,6 +173,42 @@ async function exportCsvReport() {
     message.success('报表导出成功')
   } catch (error: any) {
     message.error(error?.message || '报表导出失败')
+  }
+}
+
+function printCurrent() {
+  renderPrint('老人出入报表（当前结果）', printRows.value)
+}
+
+function printSpecificElder() {
+  const keyword = printElderKeyword.value.trim()
+  if (!keyword) {
+    message.warning('请输入打印老人姓名关键字')
+    return
+  }
+  const filtered = printRows.value.filter(item => item.elderName.includes(keyword))
+  if (!filtered.length) {
+    message.warning('未找到匹配老人记录')
+    return
+  }
+  renderPrint(`老人出入报表（${keyword}）`, filtered)
+}
+
+function renderPrint(title: string, data: Array<Record<string, any>>) {
+  if (!selectedPrintColumns.value.length) {
+    message.warning('请至少选择一列打印')
+    return
+  }
+  const headers = printColumnOptions.filter(item => selectedPrintColumns.value.includes(item.value))
+  try {
+    printTableReport({
+      title,
+      subtitle: `${dayjs(query.value.fromDate).format('YYYY-MM-DD')} ~ ${dayjs(query.value.toDate).format('YYYY-MM-DD')}`,
+      columns: headers.map(item => ({ key: item.value, title: item.label })),
+      rows: data
+    })
+  } catch (error: any) {
+    message.error(error?.message || '打印失败')
   }
 }
 

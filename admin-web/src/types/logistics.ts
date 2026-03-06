@@ -109,6 +109,8 @@ export interface LogisticsMaintenanceTodoJobLog {
   errorMessage?: string
   executedAt?: string
   createdBy?: number
+  createTime?: string
+  updateTime?: string
 }
 
 export interface LogisticsMaintenanceTodoJobLogOverview {

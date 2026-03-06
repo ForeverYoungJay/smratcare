@@ -81,6 +81,9 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
       response.setAdmissionDate(admission.getAdmissionDate());
       response.setDepositAmount(admission.getDepositAmount());
     }
+    if (response.getAdmissionDate() == null) {
+      response.setAdmissionDate(elder.getAdmissionDate());
+    }
     if (contract != null) {
       response.setContractId(contract.getId());
       response.setLeadId(contract.getLeadId());
@@ -93,12 +96,16 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
     }
     if (lead != null) {
       response.setLeadId(lead.getId());
-      response.setOrgName(lead.getOrgName());
-      response.setMarketerName(lead.getMarketerName());
+      response.setOrgName(firstNonBlank(response.getOrgName(), lead.getOrgName()));
+      response.setMarketerName(firstNonBlank(response.getMarketerName(), lead.getMarketerName()));
       response.setContractNo(firstNonBlank(response.getContractNo(), lead.getContractNo()));
-      response.setContractStatus(lead.getContractStatus());
-      response.setContractSignedAt(lead.getContractSignedAt());
-      response.setContractExpiryDate(lead.getContractExpiryDate());
+      response.setContractStatus(firstNonBlank(response.getContractStatus(), lead.getContractStatus()));
+      if (response.getContractSignedAt() == null) {
+        response.setContractSignedAt(lead.getContractSignedAt());
+      }
+      if (response.getContractExpiryDate() == null) {
+        response.setContractExpiryDate(lead.getContractExpiryDate());
+      }
     }
 
     fillBillingSummary(response, elderId, tenantId);

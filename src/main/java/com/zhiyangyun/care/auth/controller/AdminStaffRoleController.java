@@ -28,7 +28,7 @@ public class AdminStaffRoleController {
     this.staffRoleMapper = staffRoleMapper;
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping("/assign")
   @Transactional
   public Result<Void> assignRoles(@Valid @RequestBody StaffRoleAssignRequest request) {
@@ -47,7 +47,7 @@ public class AdminStaffRoleController {
     return Result.ok(null);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping
   public Result<List<StaffRole>> listByStaff(@RequestParam Long staffId, @RequestParam Long orgId) {
     orgId = AuthContext.getOrgId();
@@ -57,7 +57,7 @@ public class AdminStaffRoleController {
         .eq(StaffRole::getIsDeleted, 0)));
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping("/add")
   public Result<Void> addRole(@Valid @RequestBody StaffRoleChangeRequest request) {
     request.setOrgId(AuthContext.getOrgId());
@@ -69,7 +69,7 @@ public class AdminStaffRoleController {
     return Result.ok(null);
   }
 
-  @PreAuthorize("hasRole('ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @DeleteMapping("/remove")
   public Result<Void> removeRole(@Valid @RequestBody StaffRoleChangeRequest request) {
     request.setOrgId(AuthContext.getOrgId());

@@ -1,6 +1,7 @@
-import { ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { getDepartmentPage } from '../api/rbac'
 import type { DepartmentItem, PageResult } from '../types'
+import { subscribeLiveSync } from '../utils/liveSync'
 import { fuzzyScore, toPinyinInitials } from './entitySearch'
 
 export interface DepartmentOption {
@@ -47,6 +48,7 @@ export function useDepartmentOptions(config: UseDepartmentOptionsConfig = {}) {
   const preloadSize = config.preloadSize || 500
   const departmentOptions = ref<DepartmentOption[]>([])
   const departmentLoading = ref(false)
+  const lastKeyword = ref('')
 
   async function loadBasePool(force = false) {
     const cacheKey = 'department-all'
@@ -63,6 +65,7 @@ export function useDepartmentOptions(config: UseDepartmentOptionsConfig = {}) {
   async function searchDepartments(keyword = '') {
     departmentLoading.value = true
     try {
+      lastKeyword.value = String(keyword || '')
       const text = String(keyword || '').trim()
       const baseRows = await loadBasePool(false)
       let mergedRows = [...baseRows]
@@ -96,10 +99,31 @@ export function useDepartmentOptions(config: UseDepartmentOptionsConfig = {}) {
     })
   }
 
+  function invalidateDepartmentCache() {
+    const cacheKey = 'department-all'
+    departmentPoolCache.delete(cacheKey)
+    departmentPoolFetchedAt.delete(cacheKey)
+  }
+
+  let unsubscribe = () => {}
+  onMounted(() => {
+    unsubscribe = subscribeLiveSync((payload) => {
+      if (!payload.topics.some((topic) => topic === 'system' || topic === 'hr' || topic === 'oa')) return
+      invalidateDepartmentCache()
+      if (!departmentOptions.value.length || departmentLoading.value) return
+      searchDepartments(lastKeyword.value).catch(() => {})
+    })
+  })
+
+  onUnmounted(() => {
+    unsubscribe()
+  })
+
   return {
     departmentOptions,
     departmentLoading,
     searchDepartments,
-    ensureSelectedDepartment
+    ensureSelectedDepartment,
+    invalidateDepartmentCache
   }
 }

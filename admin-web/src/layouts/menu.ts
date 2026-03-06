@@ -1,5 +1,6 @@
 import type { RouteRecordRaw } from 'vue-router'
 import { routes } from '../router/routes'
+import { hasRouteAccess } from '../utils/roleAccess'
 
 export interface MenuItem {
   key: string
@@ -16,16 +17,15 @@ function joinPath(base: string, path: string) {
   return `${base}/${path}`.replace(/\/+/g, '/')
 }
 
-function hasAccess(route: RouteRecordRaw, roles: string[]) {
+function hasAccess(route: RouteRecordRaw, roles: string[], fullPath: string) {
   const required = (route.meta?.roles as string[] | undefined) || []
-  if (required.length === 0) return true
-  return required.some((r) => roles.includes(r))
+  return hasRouteAccess(roles, required, fullPath)
 }
 
 function buildMenu(routes: RouteRecordRaw[], roles: string[], basePath = ''): MenuItem[] {
   return routes
     .filter((r) => !r.meta?.hidden)
-    .filter((r) => hasAccess(r, roles))
+    .filter((r) => hasAccess(r, roles, joinPath(basePath, r.path || '')))
     .map((r) => {
       const fullPath = r.children ? undefined : joinPath(basePath, r.path || '')
       const node: MenuItem = {
@@ -49,4 +49,3 @@ export function getMenuTree(roles: string[]) {
   const layout = routes.find((r) => r.path === '/' && r.children)
   return buildMenu(layout?.children || [], roles, '')
 }
-

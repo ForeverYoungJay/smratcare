@@ -72,13 +72,12 @@
             allow-clear
             show-search
             :filter-option="false"
+            :options="elderOptions"
+            :loading="elderLoading"
             placeholder="选择老人"
             @search="searchElders"
-          >
-            <a-select-option v-for="item in elderOptions" :key="item.value" :value="item.value">
-              {{ item.label }}
-            </a-select-option>
-          </a-select>
+            @focus="() => !elderOptions.length && searchElders('')"
+          />
         </a-form-item>
         <a-form-item label="关系" name="relation">
           <a-input v-model:value="bindForm.relation" placeholder="如 子女/配偶" />
@@ -97,6 +96,7 @@ import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
+import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { getFamilyUserPage } from '../../api/family'
 import { bindFamily } from '../../api/elder'
 import type { FamilyBindRequest, FamilyUserItem, PageResult } from '../../types/api'
@@ -132,7 +132,7 @@ const bindRules: FormRules = {
   elderId: [{ required: true, message: '请选择老人' }],
   relation: [{ required: true, message: '请输入关系' }]
 }
-const { elderOptions, searchElders: searchElderOptions } = useElderOptions({ pageSize: 200 })
+const { elderOptions, elderLoading, searchElders: searchElderOptions } = useElderOptions({ pageSize: 200 })
 
 async function fetchData() {
   loading.value = true
@@ -213,6 +213,15 @@ async function submitBind() {
 onMounted(async () => {
   await searchElderOptions('')
   await fetchData()
+})
+
+useLiveSyncRefresh({
+  topics: ['elder', 'system', 'hr'],
+  refresh: () => {
+    if (loading.value) return
+    fetchData().catch(() => {})
+  },
+  debounceMs: 900
 })
 </script>
 

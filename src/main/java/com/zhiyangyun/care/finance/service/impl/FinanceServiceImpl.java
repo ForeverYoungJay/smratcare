@@ -3,8 +3,12 @@ package com.zhiyangyun.care.finance.service.impl;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zhiyangyun.care.bill.entity.BillMonthly;
 import com.zhiyangyun.care.bill.mapper.BillMonthlyMapper;
+import com.zhiyangyun.care.elder.entity.ElderProfile;
+import com.zhiyangyun.care.elder.mapper.ElderMapper;
+import com.zhiyangyun.care.finance.entity.ConsumptionRecord;
 import com.zhiyangyun.care.finance.entity.PaymentRecord;
 import com.zhiyangyun.care.finance.entity.ReconciliationDaily;
+import com.zhiyangyun.care.finance.mapper.ConsumptionRecordMapper;
 import com.zhiyangyun.care.finance.mapper.PaymentRecordMapper;
 import com.zhiyangyun.care.finance.mapper.ReconciliationDailyMapper;
 import com.zhiyangyun.care.finance.model.PaymentRequest;
@@ -23,13 +27,19 @@ public class FinanceServiceImpl implements FinanceService {
   private final BillMonthlyMapper billMonthlyMapper;
   private final PaymentRecordMapper paymentRecordMapper;
   private final ReconciliationDailyMapper reconciliationDailyMapper;
+  private final ConsumptionRecordMapper consumptionRecordMapper;
+  private final ElderMapper elderMapper;
 
   public FinanceServiceImpl(BillMonthlyMapper billMonthlyMapper,
       PaymentRecordMapper paymentRecordMapper,
-      ReconciliationDailyMapper reconciliationDailyMapper) {
+      ReconciliationDailyMapper reconciliationDailyMapper,
+      ConsumptionRecordMapper consumptionRecordMapper,
+      ElderMapper elderMapper) {
     this.billMonthlyMapper = billMonthlyMapper;
     this.paymentRecordMapper = paymentRecordMapper;
     this.reconciliationDailyMapper = reconciliationDailyMapper;
+    this.consumptionRecordMapper = consumptionRecordMapper;
+    this.elderMapper = elderMapper;
   }
 
   @Override
@@ -56,6 +66,9 @@ public class FinanceServiceImpl implements FinanceService {
     if (bill == null) {
       throw new IllegalArgumentException("Bill not found");
     }
+    if (Integer.valueOf(9).equals(bill.getStatus())) {
+      throw new IllegalStateException("Invalid bill can not be paid");
+    }
 
     BigDecimal paidAmount = bill.getPaidAmount() == null ? BigDecimal.ZERO : bill.getPaidAmount();
     BigDecimal totalAmount = bill.getTotalAmount() == null ? BigDecimal.ZERO : bill.getTotalAmount();
@@ -75,6 +88,7 @@ public class FinanceServiceImpl implements FinanceService {
     record.setOperatorStaffId(operatorStaffId);
     record.setRemark(request.getRemark());
     paymentRecordMapper.insert(record);
+    upsertPaymentConsumptionRecord(record, bill);
 
     BigDecimal newPaid = paidAmount.add(request.getAmount());
     BigDecimal newOutstanding = totalAmount.subtract(newPaid);
@@ -87,6 +101,54 @@ public class FinanceServiceImpl implements FinanceService {
     }
     billMonthlyMapper.updateById(bill);
 
+    return toResponse(bill);
+  }
+
+  @Override
+  @Transactional
+  public PaymentResponse updatePaymentRecord(Long paymentRecordId, PaymentRequest request, Long operatorStaffId) {
+    if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+      throw new IllegalArgumentException("Payment amount must be positive");
+    }
+    PaymentRecord paymentRecord = paymentRecordMapper.selectById(paymentRecordId);
+    if (paymentRecord == null || Integer.valueOf(1).equals(paymentRecord.getIsDeleted())) {
+      throw new IllegalArgumentException("Payment record not found");
+    }
+    BillMonthly bill = billMonthlyMapper.selectById(paymentRecord.getBillMonthlyId());
+    if (bill == null) {
+      throw new IllegalArgumentException("Bill not found");
+    }
+    if (Integer.valueOf(9).equals(bill.getStatus())) {
+      throw new IllegalStateException("Invalid bill can not edit payment");
+    }
+    BigDecimal totalAmount = bill.getTotalAmount() == null ? BigDecimal.ZERO : bill.getTotalAmount();
+    BigDecimal otherPaid = paymentRecordMapper.selectList(
+            Wrappers.lambdaQuery(PaymentRecord.class)
+                .eq(PaymentRecord::getIsDeleted, 0)
+                .eq(PaymentRecord::getBillMonthlyId, bill.getId())
+                .ne(PaymentRecord::getId, paymentRecordId))
+        .stream()
+        .map(PaymentRecord::getAmount)
+        .filter(amount -> amount != null && amount.compareTo(BigDecimal.ZERO) > 0)
+        .reduce(BigDecimal.ZERO, BigDecimal::add);
+    BigDecimal newPaid = otherPaid.add(request.getAmount());
+    if (newPaid.compareTo(totalAmount) > 0) {
+      throw new IllegalArgumentException("Payment exceeds outstanding amount");
+    }
+
+    paymentRecord.setAmount(request.getAmount());
+    paymentRecord.setPayMethod(request.getMethod());
+    paymentRecord.setPaidAt(request.getPaidAt());
+    paymentRecord.setRemark(request.getRemark());
+    paymentRecord.setOperatorStaffId(operatorStaffId);
+    paymentRecordMapper.updateById(paymentRecord);
+
+    BigDecimal newOutstanding = totalAmount.subtract(newPaid);
+    bill.setPaidAmount(newPaid);
+    bill.setOutstandingAmount(newOutstanding);
+    bill.setStatus(newOutstanding.compareTo(BigDecimal.ZERO) == 0 ? 2 : (newPaid.compareTo(BigDecimal.ZERO) > 0 ? 1 : 0));
+    billMonthlyMapper.updateById(bill);
+    upsertPaymentConsumptionRecord(paymentRecord, bill);
     return toResponse(bill);
   }
 
@@ -140,6 +202,21 @@ public class FinanceServiceImpl implements FinanceService {
     return response;
   }
 
+  @Override
+  @Transactional
+  public void invalidateBill(Long billId, Long operatorStaffId) {
+    BillMonthly bill = billMonthlyMapper.selectById(billId);
+    if (bill == null) {
+      throw new IllegalArgumentException("Bill not found");
+    }
+    if (Integer.valueOf(9).equals(bill.getStatus())) {
+      return;
+    }
+    bill.setStatus(9);
+    bill.setOutstandingAmount(BigDecimal.ZERO);
+    billMonthlyMapper.updateById(bill);
+  }
+
   private PaymentResponse toResponse(BillMonthly bill) {
     PaymentResponse response = new PaymentResponse();
     response.setBillId(bill.getId());
@@ -157,5 +234,55 @@ public class FinanceServiceImpl implements FinanceService {
       return "PARTIALLY_PAID";
     }
     return "PAID";
+  }
+
+  private void upsertPaymentConsumptionRecord(PaymentRecord paymentRecord, BillMonthly bill) {
+    if (paymentRecord == null || bill == null || paymentRecord.getId() == null) {
+      return;
+    }
+    ConsumptionRecord current = consumptionRecordMapper.selectOne(
+        Wrappers.lambdaQuery(ConsumptionRecord.class)
+            .eq(ConsumptionRecord::getIsDeleted, 0)
+            .eq(ConsumptionRecord::getOrgId, bill.getOrgId())
+            .eq(ConsumptionRecord::getSourceType, "BILL_PAYMENT")
+            .eq(ConsumptionRecord::getSourceId, paymentRecord.getId())
+            .last("LIMIT 1"));
+    ElderProfile elder = bill.getElderId() == null ? null : elderMapper.selectById(bill.getElderId());
+    if (current == null) {
+      current = new ConsumptionRecord();
+      current.setOrgId(bill.getOrgId());
+      current.setElderId(bill.getElderId());
+      current.setSourceType("BILL_PAYMENT");
+      current.setSourceId(paymentRecord.getId());
+      current.setCategory("BILL_PAYMENT");
+      current.setCreatedBy(paymentRecord.getOperatorStaffId());
+    }
+    current.setElderName(elder == null ? null : elder.getFullName());
+    current.setConsumeDate(paymentRecord.getPaidAt() == null ? LocalDate.now() : paymentRecord.getPaidAt().toLocalDate());
+    current.setAmount(paymentRecord.getAmount());
+    current.setRemark(buildPaymentConsumptionRemark(bill, paymentRecord));
+    if (current.getId() == null) {
+      consumptionRecordMapper.insert(current);
+      return;
+    }
+    consumptionRecordMapper.updateById(current);
+  }
+
+  private String buildPaymentConsumptionRemark(BillMonthly bill, PaymentRecord paymentRecord) {
+    String billMonth = bill.getBillMonth() == null ? "-" : bill.getBillMonth();
+    String contractNo = bill.getContractNoSnapshot() == null || bill.getContractNoSnapshot().isBlank()
+        ? ""
+        : (" 合同:" + bill.getContractNoSnapshot());
+    String operatorRemark = paymentRecord.getRemark() == null || paymentRecord.getRemark().isBlank()
+        ? ""
+        : (" 备注:" + paymentRecord.getRemark().trim());
+    return "账单收款 月份:" + billMonth + " 方式:" + safeMethod(paymentRecord.getPayMethod()) + contractNo + operatorRemark;
+  }
+
+  private String safeMethod(String method) {
+    if (method == null || method.isBlank()) {
+      return "UNKNOWN";
+    }
+    return method.trim().toUpperCase();
   }
 }

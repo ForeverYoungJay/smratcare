@@ -36,6 +36,7 @@
           <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑</a-button>
           <a-button :disabled="!selectedSingleRecord" @click="configQuestionsSelected">配置题目</a-button>
           <a-button :disabled="!selectedSingleRecord" @click="openQrSelected">二维码</a-button>
+          <a-button :disabled="!canVerifySingle" @click="verifySelected">发布校验</a-button>
           <a-button :disabled="!selectedSingleRecord" @click="openFamilyPreviewSelected">家属端预览</a-button>
           <a-button :disabled="!selectedSingleRecord" @click="openStatsSelected">行政统计</a-button>
           <a-button :disabled="!selectedSingleRecord" @click="openPerformanceSelected">绩效榜</a-button>
@@ -71,6 +72,12 @@
             <a-tag :color="record.scoreEnabled === 1 ? 'green' : 'default'">
               {{ record.scoreEnabled === 1 ? '是' : '否' }}
             </a-tag>
+          </template>
+          <template v-else-if="column.key === 'syncStatus'">
+            <a-space size="small">
+              <a-tag :color="syncTagColor(record)">{{ syncLabel(record) }}</a-tag>
+              <a-typography-text type="secondary" class="sync-msg">{{ syncMessage(record) }}</a-typography-text>
+            </a-space>
           </template>
         </template>
       </a-table>
@@ -250,6 +257,7 @@ let activeTemplateId: string | null = null
 const qrOpen = ref(false)
 const qrDataUrl = ref('')
 const qrLink = ref('')
+const verifyState = ref<Record<string, { valid: boolean; message: string; checkedAt: string }>>({})
 
 const rules: FormRules = {
   templateCode: [{ required: true, message: '请输入模板编码' }],
@@ -262,6 +270,7 @@ const columns = [
   { title: '模板名称', dataIndex: 'templateName', key: 'templateName' },
   { title: '对象', dataIndex: 'targetType', key: 'targetType', width: 120 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 120 },
+  { title: '发布联动校验', key: 'syncStatus', width: 260 },
   { title: '开始日期', dataIndex: 'startDate', key: 'startDate', width: 140 },
   { title: '结束日期', dataIndex: 'endDate', key: 'endDate', width: 140 },
   { title: '计分', dataIndex: 'scoreEnabled', key: 'scoreEnabled', width: 100 }
@@ -292,6 +301,7 @@ const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKe
 const selectedSingleRecord = computed(() => (selectedRecords.value.length === 1 ? selectedRecords.value[0] : null))
 const canPublishSingle = computed(() => !!selectedSingleRecord.value && selectedSingleRecord.value.status !== 1)
 const canDisableSingle = computed(() => !!selectedSingleRecord.value && selectedSingleRecord.value.status === 1)
+const canVerifySingle = computed(() => !!selectedSingleRecord.value && selectedSingleRecord.value.status === 1)
 
 function statusLabel(status?: number) {
   if (status === 0) return '草稿'
@@ -347,6 +357,10 @@ async function fetchData() {
       ...item,
       id: String(item.id)
     }))
+    const visibleIds = new Set(rows.value.map((item) => String(item.id)))
+    verifyState.value = Object.fromEntries(
+      Object.entries(verifyState.value).filter(([id]) => visibleIds.has(id))
+    )
     total.value = res.total
     selectedRowKeys.value = []
   } finally {
@@ -465,6 +479,7 @@ async function remove(id: string | number) {
 async function quickPublish(row: SurveyTemplate) {
   try {
     await publishSurveyTemplate(row.id)
+    await verifyTemplate(row, false)
     message.success('模板已发布')
     await fetchData()
   } catch (error: any) {
@@ -506,6 +521,16 @@ async function openQrSelected() {
   const record = requireSingleSelection('查看二维码')
   if (!record) return
   await openQr(record)
+}
+
+async function verifySelected() {
+  const record = requireSingleSelection('发布校验')
+  if (!record) return
+  if (record.status !== 1) {
+    message.info('仅发布状态模板支持校验')
+    return
+  }
+  await verifyTemplate(record, true)
 }
 
 function openFamilyPreviewSelected() {
@@ -626,7 +651,7 @@ async function batchRemove() {
 }
 
 async function openQr(row: SurveyTemplate) {
-  const verify = await verifySurveyPublishedTemplate(row.id)
+  const verify = await verifyTemplate(row, false)
   if (!verify.valid) {
     message.warning(verify.message || '当前模板不可生成二维码')
     return
@@ -649,6 +674,47 @@ async function openQr(row: SurveyTemplate) {
     qrDataUrl.value = ''
     message.error('二维码生成失败，请稍后重试')
   }
+}
+
+async function verifyTemplate(row: SurveyTemplate, showMessage: boolean) {
+  const verify = await verifySurveyPublishedTemplate(row.id, {
+    templateCode: row.templateCode || undefined,
+    targetType: row.targetType || undefined
+  })
+  verifyState.value[String(row.id)] = {
+    valid: !!verify.valid,
+    message: verify.message || (verify.valid ? '家属端与行政端均可访问' : '发布校验失败'),
+    checkedAt: dayjs().format('MM-DD HH:mm')
+  }
+  if (showMessage) {
+    if (verify.valid) {
+      message.success(verify.message || '校验通过：家属端与行政端已可访问')
+    } else {
+      message.warning(verify.message || '校验失败，请检查模板配置与发布时间')
+    }
+  }
+  return verify
+}
+
+function syncLabel(record: SurveyTemplate) {
+  const state = verifyState.value[String(record.id)]
+  if (record.status !== 1) return '未发布'
+  if (!state) return '待校验'
+  return state.valid ? '已同步' : '异常'
+}
+
+function syncMessage(record: SurveyTemplate) {
+  const state = verifyState.value[String(record.id)]
+  if (record.status !== 1) return '发布后可校验家属端/行政端联动'
+  if (!state) return '点击“发布校验”验证二维码与填写页'
+  return `${state.message}${state.checkedAt ? `（${state.checkedAt}）` : ''}`
+}
+
+function syncTagColor(record: SurveyTemplate) {
+  const state = verifyState.value[String(record.id)]
+  if (record.status !== 1) return 'default'
+  if (!state) return 'blue'
+  return state.valid ? 'green' : 'red'
 }
 
 async function copyQrLink() {
@@ -753,6 +819,9 @@ onMounted(async () => {
 }
 .hint {
   color: rgba(0, 0, 0, 0.6);
+}
+.sync-msg {
+  max-width: 180px;
 }
 .qr-img {
   width: 280px;

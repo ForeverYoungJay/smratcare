@@ -2,7 +2,7 @@ export interface PaymentRecordItem {
   id: number
   billMonthlyId: number
   amount: number
-  payMethod: 'CASH' | 'BANK' | 'WECHAT_OFFLINE' | 'ALIPAY' | 'WECHAT' | 'QR_CODE'
+  payMethod: 'CASH' | 'CARD' | 'BANK' | 'WECHAT_OFFLINE' | 'ALIPAY' | 'WECHAT' | 'QR_CODE'
   paidAt: string
   operatorStaffId?: number
   operatorStaffName?: string
@@ -73,6 +73,31 @@ export interface FinanceArrearsItem {
 export interface FinanceStoreSalesItem {
   month: string
   amount: number
+}
+
+export interface FinanceCategoryTrendItem {
+  period: string
+  amount: number
+  ratio: number
+}
+
+export interface FinanceCategoryProfitItem {
+  category: string
+  totalAmount: number
+  totalCost: number
+  totalProfit: number
+  profitRate: number
+}
+
+export interface FinanceCategoryConsumptionAnalysis {
+  itemKeyword: string
+  from: string
+  to: string
+  totalAmount: number
+  itemAmount: number
+  itemRatio: number
+  trend: FinanceCategoryTrendItem[]
+  categoryProfit: FinanceCategoryProfitItem[]
 }
 
 export interface ElderAccount {

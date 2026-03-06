@@ -4,7 +4,8 @@ import type {
   AssessmentRecordSummary,
   AssessmentScaleTemplate,
   AssessmentScorePreview,
-  AssessmentRecordReport
+  AssessmentRecordReport,
+  AssessmentBatchOperationResult
 } from '../types'
 
 export function getAssessmentRecordPage(params: any) {
@@ -13,6 +14,10 @@ export function getAssessmentRecordPage(params: any) {
 
 export function getAssessmentRecordSummary(params: any) {
   return request.get<AssessmentRecordSummary>('/api/assessment/records/summary', { params })
+}
+
+export function getAssessmentRecordIds(params: any) {
+  return request.get<number[]>('/api/assessment/records/ids', { params })
 }
 
 export function getAssessmentRecord(id: number) {
@@ -36,7 +41,19 @@ export function deleteAssessmentRecord(id: number) {
 }
 
 export function batchDeleteAssessmentRecord(ids: number[]) {
-  return request.post<number>('/api/assessment/records/batch-delete', ids)
+  return request.post<AssessmentBatchOperationResult>('/api/assessment/records/batch-delete', ids)
+}
+
+export function batchUpdateAssessmentRecordStatus(ids: number[], status: 'DRAFT' | 'COMPLETED' | 'ARCHIVED') {
+  return request.post<AssessmentBatchOperationResult>('/api/assessment/records/batch-status', { ids, status })
+}
+
+export function batchAssignAssessmentRecord(ids: number[], assessorName: string, assessorId?: number) {
+  return request.post<AssessmentBatchOperationResult>('/api/assessment/records/batch-assign', { ids, assessorName, assessorId })
+}
+
+export function batchUpdateAssessmentNextDate(ids: number[], nextAssessmentDate: string) {
+  return request.post<AssessmentBatchOperationResult>('/api/assessment/records/batch-next-date', { ids, nextAssessmentDate })
 }
 
 export function exportAssessmentRecord(params: any) {

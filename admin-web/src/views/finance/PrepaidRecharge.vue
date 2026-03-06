@@ -9,6 +9,7 @@
             placeholder="输入姓名搜索"
             :filter-option="false"
             :options="elderOptions"
+            :loading="elderLoading"
             @search="searchElders"
             @focus="() => !elderOptions.length && searchElders('')"
           />
@@ -41,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
@@ -58,7 +59,7 @@ const form = reactive({
   rechargeTime: dayjs(),
   remark: '预存充值'
 })
-const { elderOptions, searchElders: searchElderOptions, findElderName } = useElderOptions({ pageSize: 20 })
+const { elderOptions, elderLoading, searchElders: searchElderOptions, findElderName } = useElderOptions({ pageSize: 20 })
 const submitting = ref(false)
 
 async function searchElders(keyword: string) {
@@ -102,4 +103,8 @@ async function submit() {
 function goLogs() {
   router.push({ name: 'FinanceMedicalCareLedger' })
 }
+
+onMounted(() => {
+  searchElders('').catch(() => {})
+})
 </script>
