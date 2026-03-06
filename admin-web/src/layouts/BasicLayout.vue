@@ -160,7 +160,7 @@ const quickNotifyItems = computed(() => {
   return [
     { title: '我的待办', route: '/oa/todo' },
     { title: '待我审批', route: '/oa/approval?scope=PENDING_REVIEW' },
-    { title: '协同日历', route: '/oa/work-execution/calendar' },
+    { title: '行政日历/协同日历', route: '/oa/work-execution/calendar' },
     { title: '会员生日', route: '/oa/life/birthday' }
   ]
 })

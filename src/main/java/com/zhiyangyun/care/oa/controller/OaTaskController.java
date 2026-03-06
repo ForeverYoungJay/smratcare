@@ -117,7 +117,8 @@ public class OaTaskController {
         .like(assigneeName != null && !assigneeName.isBlank(), OaTask::getAssigneeName, assigneeName)
         .ge(startDate != null, OaTask::getStartTime, startDate == null ? null : startDate.atStartOfDay())
         .lt(endDate != null, OaTask::getStartTime, endDate == null ? null : endDate.plusDays(1).atStartOfDay())
-        .orderByAsc(OaTask::getStartTime)
+        .orderByDesc(OaTask::getStartTime)
+        .orderByDesc(OaTask::getId)
         .last("LIMIT 1000");
     if (!AuthContext.isAdmin() && staffId != null) {
       wrapper.and(w -> w.ne(OaTask::getCalendarType, "PERSONAL")

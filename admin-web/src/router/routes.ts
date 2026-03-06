@@ -2250,7 +2250,7 @@ export const routes: RouteRecordRaw[] = [
                 path: 'calendar',
                 name: 'OaCalendar',
                 component: () => import('../views/oa/Calendar.vue'),
-                meta: { title: '协同日历' }
+                meta: { title: '行政日历 / 协同日历' }
               },
               {
                 path: 'daily-report',

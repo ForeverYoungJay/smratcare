@@ -7,6 +7,9 @@
       <a-form-item label="关键词">
         <a-input v-model:value="query.keyword" placeholder="活动名称/组织者" allow-clear />
       </a-form-item>
+      <a-form-item label="状态">
+        <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 140px" />
+      </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openCreate">新增活动</a-button>
       </template>
@@ -79,17 +82,20 @@
 import { reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
+import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { getActivityPage, createActivity, updateActivity, deleteActivity } from '../../api/life'
 import type { ActivityEvent, PageResult } from '../../types'
 
+const route = useRoute()
 const loading = ref(false)
 const rows = ref<ActivityEvent[]>([])
 const query = reactive({
   range: undefined as [Dayjs, Dayjs] | undefined,
   keyword: '',
+  status: undefined as string | undefined,
   pageNo: 1,
   pageSize: 10
 })
@@ -136,7 +142,8 @@ async function fetchData() {
     const params: any = {
       pageNo: query.pageNo,
       pageSize: query.pageSize,
-      keyword: query.keyword
+      keyword: query.keyword,
+      status: query.status
     }
     if (query.range) {
       params.dateFrom = query.range[0].format('YYYY-MM-DD')
@@ -161,22 +168,33 @@ function handleTableChange(pag: any) {
 function onReset() {
   query.range = undefined
   query.keyword = ''
+  query.status = undefined
   query.pageNo = 1
   pagination.current = 1
   fetchData()
 }
 
-function openCreate() {
+function openCreate(preset?: { elderName?: string; eventDate?: Dayjs; scope?: string; month?: string; count?: number }) {
+  const elderName = String(preset?.elderName || '').trim()
+  const monthlyScope = String(preset?.scope || '').toLowerCase() === 'monthly-birthday'
+  const monthText = String(preset?.month || '').trim()
+  const monthDate = monthText && dayjs(`${monthText}-01`).isValid() ? dayjs(`${monthText}-01`) : undefined
+  const monthLabel = monthDate ? monthDate.format('YYYY年M月') : dayjs().format('YYYY年M月')
+  const monthlyCount = Number(preset?.count || 0)
   form.id = undefined
-  form.title = ''
-  form.eventDate = dayjs()
+  form.title = monthlyScope
+    ? `${monthLabel}长者集体生日会`
+    : (elderName ? `${elderName}生日活动` : '')
+  form.eventDate = preset?.eventDate || monthDate || dayjs()
   form.startTime = undefined
   form.endTime = undefined
-  form.location = ''
-  form.organizer = ''
-  form.content = ''
+  form.location = (elderName || monthlyScope) ? '活动室' : ''
+  form.organizer = (elderName || monthlyScope) ? '行政部' : ''
+  form.content = monthlyScope
+    ? `为${monthLabel}生日长者集中举办生日活动${monthlyCount > 0 ? `（预计${monthlyCount}人）` : ''}`
+    : (elderName ? `为 ${elderName} 准备生日活动` : '')
   form.status = 'PLANNED'
-  form.remark = ''
+  form.remark = monthlyScope ? '月度集体生日活动' : ''
   editOpen.value = true
 }
 
@@ -225,5 +243,34 @@ async function remove(record: ActivityEvent) {
   fetchData()
 }
 
+function applyRouteQuickActions() {
+  const quick = String(route.query.quick || '').toLowerCase()
+  const elderName = String(route.query.elderName || '').trim()
+  const status = String(route.query.status || '').trim().toUpperCase()
+  const day = String(route.query.day || '').trim()
+  const scope = String(route.query.scope || '').trim().toLowerCase()
+  const month = String(route.query.month || '').trim()
+  const count = Number(route.query.count || 0)
+
+  if (status && ['PLANNED', 'DONE', 'CANCELLED'].includes(status)) {
+    query.status = status
+  }
+  if (scope === 'monthly-birthday' && month && dayjs(`${month}-01`).isValid()) {
+    const monthStart = dayjs(`${month}-01`)
+    query.range = [monthStart.startOf('month'), monthStart.endOf('month')]
+    if (!elderName && !query.keyword) {
+      query.keyword = `${monthStart.format('YYYY年M月')}长者集体生日会`
+    }
+  }
+  if (elderName) {
+    query.keyword = elderName
+  }
+  if (quick === 'create') {
+    const eventDate = day && dayjs(day).isValid() ? dayjs(day) : dayjs()
+    openCreate({ elderName, eventDate, scope, month, count })
+  }
+}
+
+applyRouteQuickActions()
 fetchData()
 </script>

@@ -73,15 +73,6 @@
                   </div>
                 </a-col>
               </a-row>
-              <div class="source-wrap">
-                <span class="block-label">来源：</span>
-                <a-space wrap>
-                  <a-tag color="blue">OA审批</a-tag>
-                  <a-tag color="cyan">任务中心</a-tag>
-                  <a-tag color="purple">医护任务</a-tag>
-                  <a-tag color="orange">系统异常</a-tag>
-                </a-space>
-              </div>
               <a-space wrap style="margin-top: 12px;">
                 <a-button type="primary" @click="go('/oa/todo')">查看全部</a-button>
                 <a-button @click="go('/oa/approval')">批量审批</a-button>
@@ -202,20 +193,8 @@
             show-icon
             :message="`今日生日：${birthdayStats.today} 人`"
           />
-          <div class="birthday-remind-rules">
-            <a-tag color="blue">T-7 天：提醒活动负责人准备</a-tag>
-            <a-tag color="orange">T-1 天：提醒楼层/厨房/后勤</a-tag>
-            <a-tag color="red">当天：今日生日置顶</a-tag>
-          </div>
           <div class="birthday-filter-bar">
             <a-space wrap>
-              <span class="hint-text">楼层筛选：</span>
-              <a-select
-                v-model:value="birthdayFloorFilter"
-                size="small"
-                style="width: 130px;"
-                :options="birthdayFloorOptions"
-              />
               <span class="hint-text">年龄分层：</span>
               <a-radio-group v-model:value="birthdayAgeBand" size="small" button-style="solid">
                 <a-radio-button value="ALL">全部</a-radio-button>
@@ -238,10 +217,10 @@
                 </a-space>
                 <template #actions>
                   <a-button type="link" size="small" @click="openBirthdayElderDetail(item)">老人档案</a-button>
-                  <a-button type="link" size="small" @click="openBirthdayActivityCreate(item)">创建生日活动</a-button>
-                  <a-button type="link" size="small" @click="openBirthdayActivityList">查看活动</a-button>
-                  <a-button type="link" size="small" @click="openBirthdayMaterialPrepare(item)">物资准备</a-button>
-                  <a-button type="link" size="small" @click="openBirthdayDoneRecord">完成</a-button>
+                  <a-button type="link" size="small" @click="openBirthdayActivityCreate(item)">创建本月集体活动</a-button>
+                  <a-button type="link" size="small" @click="openBirthdayActivityList(item)">查看本月活动</a-button>
+                  <a-button type="link" size="small" @click="openBirthdayMaterialPrepare(item)">本月物资准备</a-button>
+                  <a-button type="link" size="small" @click="openBirthdayDoneRecord(item)">本月完成记录</a-button>
                 </template>
               </a-list-item>
             </template>
@@ -429,19 +408,18 @@
           :bordered="false"
           class="card-elevated module-card"
           :style="[moduleCardStyle('calendar'), { order: sectionOrder(['calendar']) }]"
-          title="9️⃣ 行政日历 / 协同日历"
+          title="9️⃣ 行政日历 / 协同日历（统一页面）"
         >
           <template #extra>
             <a-space>
               <a-button size="small" @click="openCreateSchedule()">创建日程</a-button>
-              <a-button size="small" @click="go('/oa/work-execution/calendar')">查看日程</a-button>
+              <a-button size="small" @click="go('/oa/work-execution/calendar')">打开统一日历页面</a-button>
               <a-button size="small" @click="agendaDrawerOpen = true">今日/明日速览</a-button>
               <a-button size="small" @click="go('/oa/attendance-leave?type=LEAVE&quick=1')">发起请假</a-button>
               <a-button size="small" @click="go('/oa/approval?type=LEAVE')">请假审批流程</a-button>
             </a-space>
           </template>
           <div class="calendar-toolbar">
-            <div class="calendar-title-tip">日历分层：个人、部门工作、日常计划、协同日历（类似 Apple Calendar 的多日历开关）。</div>
             <a-space wrap>
               <a-checkable-tag
                 v-for="item in calendarBuckets"
@@ -459,7 +437,7 @@
           </StatefulBlock>
           <div class="calendar-actions">
             <a-space wrap>
-              <a-button type="link" @click="go('/oa/work-execution/calendar')">进入协同日历完整视图</a-button>
+              <a-button type="link" @click="go('/oa/work-execution/calendar')">进入统一日历完整视图</a-button>
               <a-button type="link" @click="go('/oa/work-execution/task')">查看工作执行任务</a-button>
               <a-button type="link" @click="go('/oa/approval?type=LEAVE')">请假审批看板</a-button>
             </a-space>
@@ -473,7 +451,6 @@
           :style="[moduleCardStyle('dataEntry'), { order: sectionOrder(['dataEntry']) }]"
           title="🔟 数据分析入口"
         >
-          <div class="hint-text">首页不放复杂图表，仅提供分析入口。</div>
           <a-space wrap style="margin-top: 8px;">
             <a-button type="primary"  @click="go('/stats/org/monthly-operation')">运营分析</a-button>
             <a-button type="primary"  @click="go('/finance/reports/overall')">财务分析</a-button>
@@ -522,7 +499,7 @@
         <a-row :gutter="12">
           <a-col :span="12">
             <a-form-item label="日历类型">
-              <a-select v-model:value="scheduleForm.calendarType" :options="calendarTypeOptions" />
+              <a-select v-model:value="scheduleForm.calendarType" :options="calendarTypeOptions" @change="onScheduleCalendarTypeChange" />
             </a-form-item>
           </a-col>
           <a-col :span="12">
@@ -538,27 +515,28 @@
             </a-form-item>
           </a-col>
           <a-col :span="12">
-            <a-form-item label="显示颜色">
-              <a-select v-model:value="scheduleForm.eventColor" :options="colorOptions" />
+            <a-form-item label="颜色策略">
+              <a-input :value="calendarTypeText(scheduleForm.calendarType)" disabled />
             </a-form-item>
           </a-col>
         </a-row>
         <a-row :gutter="12" v-if="scheduleForm.calendarType === 'COLLAB'">
-          <a-col :span="12">
-            <a-form-item label="协同部门">
+          <a-col :span="24">
+            <a-form-item label="协同部门（可多选）">
               <a-select
-                v-model:value="scheduleForm.collaboratorDeptId"
+                v-model:value="scheduleForm.collaboratorDeptIds"
+                mode="multiple"
                 allow-clear
                 show-search
                 :filter-option="false"
                 :options="departmentOptions"
-                placeholder="输入部门名称/拼音首字母"
+                placeholder="可选择多个部门，系统会自动同步到这些部门成员的协同日历"
                 @search="searchDepartments"
                 @focus="() => !departmentOptions.length && searchDepartments('')"
               />
             </a-form-item>
           </a-col>
-          <a-col :span="12">
+          <a-col :span="24">
             <a-form-item label="协同成员">
               <a-select
                 v-model:value="scheduleForm.collaboratorIds"
@@ -566,8 +544,8 @@
                 allow-clear
                 show-search
                 :filter-option="false"
-                :options="filteredStaffOptions"
-                placeholder="邀请后自动进入对方协同日历"
+                :options="staffOptions"
+                placeholder="可直接选择某些员工；与协同部门可同时选择"
                 @search="searchStaff"
                 @focus="() => !staffOptions.length && searchStaff('')"
               />
@@ -661,7 +639,7 @@
       </a-card>
       <div class="calendar-actions">
         <a-space wrap>
-          <a-button type="primary" @click="go('/oa/work-execution/calendar')">打开完整协同日历</a-button>
+          <a-button type="primary" @click="go('/oa/work-execution/calendar')">打开统一日历页面</a-button>
           <a-button @click="agendaDrawerOpen = false">关闭</a-button>
         </a-space>
       </div>
@@ -694,7 +672,7 @@
       </a-list>
       <div class="calendar-actions">
         <a-space wrap>
-          <a-button type="primary" @click="go('/oa/work-execution/calendar')">打开完整协同日历</a-button>
+          <a-button type="primary" @click="go('/oa/work-execution/calendar')">打开统一日历页面</a-button>
           <a-button @click="dayEventDrawerOpen = false">关闭</a-button>
         </a-space>
       </div>
@@ -987,6 +965,7 @@ import { getMarketingConversionReport, getLeadPage, getContractPage } from '../a
 import { getResidenceStatusSummary } from '../api/elderResidence'
 import { getBedMap } from '../api/bed'
 import { getHrProfileCertificateReminderPage, getHrWorkbenchSummary } from '../api/hr'
+import { getStaffPage } from '../api/rbac'
 import { useDepartmentOptions } from '../composables/useDepartmentOptions'
 import { useStaffOptions } from '../composables/useStaffOptions'
 
@@ -1008,7 +987,6 @@ const selectedCalendarDateText = ref(dayjs().format('YYYY-MM-DD'))
 const reminderCardRef = ref<any>(null)
 const { departmentOptions, searchDepartments } = useDepartmentOptions({ pageSize: 240, preloadSize: 500 })
 const { staffOptions, searchStaff } = useStaffOptions({ pageSize: 300, preloadSize: 500 })
-const staffDeptMap = ref<Record<string, string | undefined>>({})
 const visibleCalendarTypes = ref<Array<'PERSONAL' | 'WORK' | 'DAILY' | 'COLLAB'>>(['PERSONAL', 'WORK', 'DAILY', 'COLLAB'])
 const searchKeyword = ref('')
 const searchOptions = ref<Array<{ value: string; label: string; route: string }>>([])
@@ -1033,7 +1011,6 @@ const birthdayInsightTitle = ref('生日统计')
 const birthdayInsightRows = ref<Array<{ label: string; value: string }>>([])
 const reminderViewMode = ref<'all' | 'unread' | 'pinned' | 'urgent'>('all')
 const reminderState = ref<Record<string, { read?: boolean; pinned?: boolean; updatedAt?: string; lastCount?: number }>>({})
-const birthdayFloorFilter = ref<string>('ALL')
 const birthdayAgeBand = ref<'ALL' | '80_PLUS' | '90_PLUS' | 'UNDER_80'>('ALL')
 const autoSyncEnabled = ref(true)
 const syncingNow = ref(false)
@@ -1124,7 +1101,7 @@ const defaultCustomCards: PortalCustomCardItem[] = [
   { id: 'elder-overview', title: '长者总览', route: '/elder/in-hospital-overview', description: '快速查看在住长者信息', themeColor: '#1677ff', openMode: 'current', icon: '👴', category: 'OPS', visible: true, audience: ['ALL'], height: 168 },
   { id: 'bed-panorama', title: '床态全景', route: '/elder/bed-panorama', description: '查看空床、清洁中与占用床位', themeColor: '#13c2c2', openMode: 'current', icon: '🛏️', category: 'OPS', visible: true, audience: ['ALL'], height: 168 },
   { id: 'finance-risk', title: '欠费看板', route: '/finance/bills/in-resident?filter=overdue', description: '快速追踪欠费风险', themeColor: '#fa8c16', openMode: 'current', icon: '💰', category: 'FINANCE', visible: true, audience: ['FINANCE', 'DIRECTOR', 'ADMIN'], height: 168 },
-  { id: 'oa-calendar', title: '协同日历', route: '/oa/work-execution/calendar', description: '查看个人/部门/协同计划', themeColor: '#722ed1', openMode: 'current', icon: '📅', category: 'OA', visible: true, audience: ['ALL'], height: 168 }
+  { id: 'oa-calendar', title: '行政日历/协同日历', route: '/oa/work-execution/calendar', description: '查看个人/部门工作/日常/协同计划', themeColor: '#722ed1', openMode: 'current', icon: '📅', category: 'OA', visible: true, audience: ['ALL'], height: 168 }
 ]
 
 const customCards = ref<PortalCustomCardItem[]>([])
@@ -1156,7 +1133,7 @@ const customCardTemplateCatalog: PortalCustomCardTemplate[] = [
   { key: 'approval', title: '审批中心', route: '/oa/approval', description: '处理请假/报销/采购审批', themeColor: '#722ed1', openMode: 'current', icon: '✅', category: 'OA', audience: ['ALL'] },
   { key: 'finance-overall', title: '财务分析', route: '/finance/reports/overall', description: '收入、欠费、成本总览', themeColor: '#fa8c16', openMode: 'current', icon: '📈', category: 'FINANCE', audience: ['FINANCE', 'DIRECTOR', 'ADMIN'] },
   { key: 'marketing-funnel', title: '销售转化分析', route: '/marketing/reports/conversion', description: '线索转化漏斗分析', themeColor: '#13c2c2', openMode: 'current', icon: '🎯', category: 'OPS', audience: ['OPS', 'DIRECTOR', 'ADMIN'] },
-  { key: 'calendar-full', title: '协同日历全景', route: '/oa/work-execution/calendar', description: '统一查看个人/部门/协同日程', themeColor: '#2f54eb', openMode: 'current', icon: '🗓️', category: 'OA', audience: ['ALL'] }
+  { key: 'calendar-full', title: '统一日历全景', route: '/oa/work-execution/calendar', description: '统一查看个人/部门工作/日常/协同日程', themeColor: '#2f54eb', openMode: 'current', icon: '🗓️', category: 'OA', audience: ['ALL'] }
 ]
 
 const customCardCategoryOptions = [
@@ -1250,7 +1227,7 @@ const scheduleForm = reactive({
   urgency: 'NORMAL' as 'NORMAL' | 'EMERGENCY',
   planCategory: '基础办公',
   eventColor: '#1677ff',
-  collaboratorDeptId: undefined as string | undefined,
+  collaboratorDeptIds: [] as string[],
   collaboratorIds: [] as string[],
   recurring: false,
   recurrenceRule: 'WEEKLY' as 'DAILY' | 'WEEKLY' | 'MONTHLY',
@@ -1285,14 +1262,6 @@ const planCategoryOptions = [
   { label: '后勤排班', value: '后勤排班' },
   { label: '专项检查', value: '专项检查' }
 ]
-const colorOptions = [
-  { label: '蓝色（工作）', value: '#1677ff' },
-  { label: '绿色（个人）', value: '#52c41a' },
-  { label: '橙色（日常）', value: '#fa8c16' },
-  { label: '紫色（协同）', value: '#722ed1' },
-  { label: '红色（紧急）', value: '#ff4d4f' }
-]
-
 const SEARCH_RECENT_KEY = 'portal_search_recent_routes'
 const SEARCH_RECENT_MAX = 8
 const MODULE_CONFIG_KEY_PREFIX = 'portal_module_config_v1_'
@@ -1468,9 +1437,12 @@ const riskReminders = computed(() => {
   const orderPendingCount = Number(dashboard.value.abnormalTasksToday || 0)
   const approvalTimeoutCount = Number(summary.approvalTimeoutCount || 0)
   const contractExpiringCount = Number(hrSummary.value?.contractExpiringCount || summary.contractPendingCount || 0)
+  const birthdayReminderCount = birthdayRows.value
+    .filter((item) => Number(item.daysUntil || 9999) >= 0 && Number(item.daysUntil || 9999) <= 7).length
 
   return [
     { title: '长者异常', count: elderAbnormal, route: '/health/inspection', level: elderAbnormal > 0 ? '紧急' : '普通通知' },
+    { title: '生日提醒', count: birthdayReminderCount, route: '/oa/life/birthday?daysAhead=7', level: birthdayReminderCount > 0 ? '预警' : '普通通知' },
     { title: '欠费提醒', count: arrearsCount, route: '/finance/bills/in-resident?filter=overdue', level: arrearsCount > 0 ? '紧急' : '普通通知' },
     { title: '库存不足', count: inventoryCount, route: '/logistics/storage/alerts', level: inventoryCount > 0 ? '预警' : '普通通知' },
     { title: '医嘱未执行', count: orderPendingCount, route: '/medical-care/orders', level: orderPendingCount > 0 ? '预警' : '普通通知' },
@@ -1546,20 +1518,7 @@ const birthdayStats = computed(() => {
   }
 })
 
-const birthdayFloorOptions = computed(() => {
-  const set = new Set<string>()
-  birthdayRows.value.forEach((item) => {
-    const floor = extractFloorLabel(item.roomNo)
-    if (floor) set.add(floor)
-  })
-  return [{ label: '全部楼层', value: 'ALL' }, ...Array.from(set).sort().map((floor) => ({ label: floor, value: floor }))]
-})
-
 const birthdayFilteredRows = computed(() => birthdayRows.value.filter((item) => {
-  if (birthdayFloorFilter.value !== 'ALL') {
-    const floor = extractFloorLabel(item.roomNo)
-    if (floor !== birthdayFloorFilter.value) return false
-  }
   const age = Number(item.ageOnNextBirthday || 0)
   if (birthdayAgeBand.value === '80_PLUS') return age >= 80
   if (birthdayAgeBand.value === '90_PLUS') return age >= 90
@@ -1691,6 +1650,28 @@ const expenseSections = computed(() => {
   ]
 })
 
+const portalFestivalEvents = computed(() => {
+  const year = dayjs().year()
+  const items = [
+    { date: `${year}-01-01`, title: '元旦' },
+    { date: `${year}-05-01`, title: '劳动节' },
+    { date: `${year}-10-01`, title: '国庆节' },
+    { date: `${year}-12-31`, title: '年终总结日' }
+  ]
+  return items.map((item) => ({
+    id: `portal-festival-${item.date}`,
+    title: `【重大节日】${item.title}`,
+    start: `${item.date}T00:00:00`,
+    end: `${item.date}T23:59:59`,
+    allDay: true,
+    color: '#f5222d',
+    extendedProps: {
+      calendarType: 'DAILY',
+      urgency: 'EMERGENCY'
+    }
+  }))
+})
+
 const calendarOptions = computed(() => ({
   plugins: [dayGridPlugin, interactionPlugin],
   initialView: 'dayGridMonth',
@@ -1720,19 +1701,22 @@ const calendarOptions = computed(() => ({
     const typeText = arg?.event?.extendedProps?.calendarType || 'WORK'
     message.info(`已定位到「${calendarTypeText(typeText)}」日程`)
   },
-  events: calendarRows.value
-    .filter((task) => visibleCalendarTypes.value.includes((task.calendarType || 'WORK') as any))
-    .map((task) => ({
-      id: String(task.id),
-      title: `${task.title}${task.assigneeName ? `（${task.assigneeName}）` : ''}`,
-      start: task.startTime || task.endTime,
-      end: task.endTime || task.startTime,
-      color: resolveTaskColor(task),
-      extendedProps: {
-        calendarType: task.calendarType || 'WORK',
-        urgency: task.urgency || 'NORMAL'
-      }
-    }))
+  events: [
+    ...calendarRows.value
+      .filter((task) => visibleCalendarTypes.value.includes((task.calendarType || 'WORK') as any))
+      .map((task) => ({
+        id: String(task.id),
+        title: `${task.title}${task.assigneeName ? `（${task.assigneeName}）` : ''}`,
+        start: normalizeDateTimeValue(task.startTime || task.endTime),
+        end: normalizeDateTimeValue(task.endTime || task.startTime),
+        color: resolveTaskColor(task),
+        extendedProps: {
+          calendarType: task.calendarType || 'WORK',
+          urgency: task.urgency || 'NORMAL'
+        }
+      })),
+    ...portalFestivalEvents.value
+  ]
 }))
 
 const todayAgenda = computed(() => buildAgendaByDate(dayjs()))
@@ -1740,17 +1724,12 @@ const tomorrowAgenda = computed(() => buildAgendaByDate(dayjs().add(1, 'day')))
 const scheduleModalTitle = computed(() => (editingScheduleId.value ? '编辑行政日程' : '新增行政日程'))
 const selectedCalendarDateAgenda = computed(() => buildAgendaByDate(dayjs(selectedCalendarDateText.value)))
 
-const filteredStaffOptions = computed(() => {
-  if (!scheduleForm.collaboratorDeptId) return staffOptions.value
-  return staffOptions.value.filter((item) => staffDeptMap.value[item.value] === scheduleForm.collaboratorDeptId)
-})
-
 const calendarBuckets = computed(() => {
   const defs = [
     { type: 'PERSONAL' as const, label: '个人', color: '#52c41a' },
     { type: 'WORK' as const, label: '部门工作', color: '#1677ff' },
     { type: 'DAILY' as const, label: '日常计划', color: '#fa8c16' },
-    { type: 'COLLAB' as const, label: '协同', color: '#722ed1' }
+    { type: 'COLLAB' as const, label: '协同日历', color: '#722ed1' }
   ]
   return defs.map((item) => ({
     ...item,
@@ -2059,20 +2038,34 @@ function openBirthdayElderDetail(item: BirthdayReminder) {
   go(`/elder/list?keyword=${encodeURIComponent(item.elderName || '')}`)
 }
 
-function openBirthdayActivityCreate(item: BirthdayReminder) {
-  go(`/life/activity?quick=create&elderName=${encodeURIComponent(item.elderName || '')}`)
+function resolveBirthdayMonth(item?: BirthdayReminder) {
+  const target = item?.nextBirthday && dayjs(item.nextBirthday).isValid() ? dayjs(item.nextBirthday) : dayjs()
+  return target.format('YYYY-MM')
 }
 
-function openBirthdayActivityList() {
-  go('/life/activity')
+function resolveBirthdayMonthCount(monthText: string) {
+  return birthdayFilteredRows.value.filter((row) => row.nextBirthday && dayjs(row.nextBirthday).format('YYYY-MM') === monthText).length
 }
 
-function openBirthdayMaterialPrepare(item: BirthdayReminder) {
-  go(`/inventory/outbound?scene=birthday&elderName=${encodeURIComponent(item.elderName || '')}`)
+function openBirthdayActivityCreate(item?: BirthdayReminder) {
+  const month = resolveBirthdayMonth(item)
+  const count = resolveBirthdayMonthCount(month)
+  go(`/oa/activity?quick=create&scope=monthly-birthday&month=${month}&count=${count}`)
 }
 
-function openBirthdayDoneRecord() {
-  go('/life/activity?status=DONE')
+function openBirthdayActivityList(item?: BirthdayReminder) {
+  const month = resolveBirthdayMonth(item)
+  go(`/oa/activity?scope=monthly-birthday&month=${month}`)
+}
+
+function openBirthdayMaterialPrepare(item?: BirthdayReminder) {
+  const month = resolveBirthdayMonth(item)
+  go(`/logistics/storage/outbound?scene=monthly-birthday&month=${month}`)
+}
+
+function openBirthdayDoneRecord(item?: BirthdayReminder) {
+  const month = resolveBirthdayMonth(item)
+  go(`/oa/activity?status=DONE&scope=monthly-birthday&month=${month}`)
 }
 
 function openAgeReport(mode: '80+' | '90+' | 'CUSTOM') {
@@ -2106,12 +2099,11 @@ function openBirthdayFrequencyCheck() {
 }
 
 function toggleCalendarType(type: 'PERSONAL' | 'WORK' | 'DAILY' | 'COLLAB') {
-  if (visibleCalendarTypes.value.includes(type)) {
-    if (visibleCalendarTypes.value.length === 1) return
-    visibleCalendarTypes.value = visibleCalendarTypes.value.filter((item) => item !== type)
+  if (visibleCalendarTypes.value.length === 1 && visibleCalendarTypes.value[0] === type) {
+    visibleCalendarTypes.value = ['PERSONAL', 'WORK', 'DAILY', 'COLLAB']
     return
   }
-  visibleCalendarTypes.value = [...visibleCalendarTypes.value, type]
+  visibleCalendarTypes.value = [type]
 }
 
 function focusReminderCenter() {
@@ -2137,9 +2129,19 @@ function calendarTypeText(value?: string) {
   return '部门工作'
 }
 
+function normalizeDateTimeValue(value?: string) {
+  if (!value) return undefined
+  const normalized = String(value).replace(/\s*T\s*/g, 'T').trim()
+  const parsed = dayjs(normalized)
+  if (!parsed.isValid()) return undefined
+  return parsed.format('YYYY-MM-DDTHH:mm:ss')
+}
+
 function agendaTimeText(task: OaTask) {
-  const start = task.startTime ? dayjs(task.startTime) : undefined
-  const end = task.endTime ? dayjs(task.endTime) : undefined
+  const startValue = normalizeDateTimeValue(task.startTime || task.endTime)
+  const endValue = normalizeDateTimeValue(task.endTime || task.startTime)
+  const start = startValue ? dayjs(startValue) : undefined
+  const end = endValue ? dayjs(endValue) : undefined
   if (!start) return '--'
   if (!end || start.format('YYYY-MM-DD') !== end.format('YYYY-MM-DD')) return start.format('MM-DD HH:mm')
   return `${start.format('HH:mm')} - ${end.format('HH:mm')}`
@@ -2149,10 +2151,16 @@ function buildAgendaByDate(target: Dayjs) {
   const dateText = target.format('YYYY-MM-DD')
   return calendarRows.value
     .filter((task) => {
-      const start = task.startTime || task.endTime
+      const start = normalizeDateTimeValue(task.startTime || task.endTime)
       return start ? dayjs(start).format('YYYY-MM-DD') === dateText : false
     })
-    .sort((a, b) => dayjs(a.startTime || a.endTime).valueOf() - dayjs(b.startTime || b.endTime).valueOf())
+    .sort((a, b) => {
+      const left = normalizeDateTimeValue(a.startTime || a.endTime)
+      const right = normalizeDateTimeValue(b.startTime || b.endTime)
+      const leftTime = left ? dayjs(left).valueOf() : 0
+      const rightTime = right ? dayjs(right).valueOf() : 0
+      return leftTime - rightTime
+    })
     .map((task) => ({
       id: String(task.id),
       title: task.title || '未命名日程',
@@ -2188,18 +2196,51 @@ function removeCalendarTaskById(id: string | number) {
   calendarRows.value = calendarRows.value.filter((item) => String(item.id) !== String(id))
 }
 
+function resolveCalendarTypeColor(calendarType: 'PERSONAL' | 'WORK' | 'DAILY' | 'COLLAB', urgency: 'NORMAL' | 'EMERGENCY') {
+  if (urgency === 'EMERGENCY') return '#ff4d4f'
+  if (calendarType === 'PERSONAL') return '#52c41a'
+  if (calendarType === 'DAILY') return '#fa8c16'
+  if (calendarType === 'COLLAB') return '#722ed1'
+  return '#1677ff'
+}
+
 function onUrgencyChange(value: 'NORMAL' | 'EMERGENCY') {
-  if (value === 'EMERGENCY') {
-    scheduleForm.eventColor = '#ff4d4f'
-    return
+  scheduleForm.eventColor = resolveCalendarTypeColor(scheduleForm.calendarType, value)
+}
+
+function onScheduleCalendarTypeChange(value: 'PERSONAL' | 'WORK' | 'DAILY' | 'COLLAB') {
+  scheduleForm.eventColor = resolveCalendarTypeColor(value, scheduleForm.urgency)
+}
+
+async function resolveCollaborators(departmentIds: string[], staffIds: string[]) {
+  const collaboratorMap = new Map<string, string>()
+  staffOptions.value
+    .filter((item) => staffIds.includes(item.value))
+    .forEach((item) => collaboratorMap.set(String(item.value), item.name || item.label))
+  for (const staffId of staffIds) {
+    if (!collaboratorMap.has(staffId)) collaboratorMap.set(staffId, `员工#${staffId}`)
   }
-  scheduleForm.eventColor = scheduleForm.calendarType === 'PERSONAL'
-    ? '#52c41a'
-    : scheduleForm.calendarType === 'DAILY'
-      ? '#fa8c16'
-      : scheduleForm.calendarType === 'COLLAB'
-        ? '#722ed1'
-        : '#1677ff'
+  if (departmentIds.length > 0) {
+    const pages = await Promise.all(
+      departmentIds.map((departmentId) => getStaffPage({
+        pageNo: 1,
+        pageSize: 500,
+        departmentId,
+        status: 1
+      }))
+    )
+    pages.forEach((page) => {
+      ;(page.list || []).forEach((item) => {
+        const id = String(item.id)
+        const name = (item.realName || item.username || `员工#${id}`).trim()
+        collaboratorMap.set(id, name)
+      })
+    })
+  }
+  return {
+    ids: Array.from(collaboratorMap.keys()),
+    names: Array.from(collaboratorMap.values())
+  }
 }
 
 function addByRule(base: Dayjs, rule: 'DAILY' | 'WEEKLY' | 'MONTHLY', interval: number) {
@@ -2212,19 +2253,8 @@ function money(amount: number) {
   return `${Number(amount || 0).toFixed(2)}元`
 }
 
-function extractFloorLabel(roomNo?: string) {
-  const text = String(roomNo || '').trim()
-  if (!text) return ''
-  const prefixMatch = text.match(/^(\d{1,2})/)
-  if (prefixMatch) return `${prefixMatch[1]}楼`
-  const floorMatch = text.match(/([A-Za-z]|\d{1,2})\s*楼/)
-  if (floorMatch) return `${floorMatch[1].toUpperCase()}楼`
-  return ''
-}
-
 function resolveTaskColor(task: OaTask) {
   if (task.status === 'DONE') return '#94a3b8'
-  if (task.eventColor) return task.eventColor
   if (task.urgency === 'EMERGENCY') return '#ff4d4f'
   if (task.calendarType === 'COLLAB') return '#722ed1'
   if (task.calendarType === 'WORK') return '#1677ff'
@@ -3148,8 +3178,8 @@ function openCreateSchedule(date?: Dayjs) {
   scheduleForm.calendarType = 'WORK'
   scheduleForm.urgency = 'NORMAL'
   scheduleForm.planCategory = '基础办公'
-  scheduleForm.eventColor = '#1677ff'
-  scheduleForm.collaboratorDeptId = undefined
+  scheduleForm.eventColor = resolveCalendarTypeColor(scheduleForm.calendarType, scheduleForm.urgency)
+  scheduleForm.collaboratorDeptIds = []
   scheduleForm.collaboratorIds = []
   scheduleForm.recurring = false
   scheduleForm.recurrenceRule = 'WEEKLY'
@@ -3174,8 +3204,8 @@ function openEditSchedule(id: string | number) {
   scheduleForm.calendarType = matched.calendarType || 'WORK'
   scheduleForm.urgency = matched.urgency || 'NORMAL'
   scheduleForm.planCategory = matched.planCategory || '基础办公'
-  scheduleForm.eventColor = matched.eventColor || resolveTaskColor(matched)
-  scheduleForm.collaboratorDeptId = undefined
+  scheduleForm.eventColor = resolveCalendarTypeColor(scheduleForm.calendarType, scheduleForm.urgency)
+  scheduleForm.collaboratorDeptIds = []
   scheduleForm.collaboratorIds = Array.isArray(matched.collaboratorIds)
     ? matched.collaboratorIds.map((item) => String(item))
     : typeof matched.collaboratorIds === 'string' && matched.collaboratorIds
@@ -3201,9 +3231,13 @@ async function submitSchedule() {
     message.warning('开始时间不能晚于结束时间')
     return
   }
-  const collaboratorNames = staffOptions.value
-    .filter((item) => scheduleForm.collaboratorIds.includes(item.value))
-    .map((item) => item.label)
+  if (scheduleForm.calendarType === 'COLLAB' && !scheduleForm.collaboratorDeptIds.length && !scheduleForm.collaboratorIds.length) {
+    message.warning('协同日历请至少选择部门或协同成员')
+    return
+  }
+  const collaboratorPayload = scheduleForm.calendarType === 'COLLAB'
+    ? await resolveCollaborators(scheduleForm.collaboratorDeptIds, scheduleForm.collaboratorIds)
+    : { ids: [] as string[], names: [] as string[] }
   const repeatCount = scheduleForm.recurring ? Math.max(1, Number(scheduleForm.recurrenceCount || 1)) : 1
   const repeatRule = scheduleForm.recurrenceRule
   const repeatInterval = Math.max(1, Number(scheduleForm.recurrenceInterval || 1))
@@ -3220,9 +3254,9 @@ async function submitSchedule() {
         calendarType: scheduleForm.calendarType,
         planCategory: scheduleForm.planCategory || undefined,
         urgency: scheduleForm.urgency,
-        eventColor: scheduleForm.eventColor,
-        collaboratorIds: scheduleForm.calendarType === 'COLLAB' ? scheduleForm.collaboratorIds : [],
-        collaboratorNames: scheduleForm.calendarType === 'COLLAB' ? collaboratorNames : []
+        eventColor: resolveCalendarTypeColor(scheduleForm.calendarType, scheduleForm.urgency),
+        collaboratorIds: collaboratorPayload.ids,
+        collaboratorNames: collaboratorPayload.names
       })
       upsertCalendarTask(updated)
       scheduleOpen.value = false
@@ -3247,9 +3281,9 @@ async function submitSchedule() {
           calendarType: scheduleForm.calendarType,
           planCategory: scheduleForm.planCategory || undefined,
           urgency: scheduleForm.urgency,
-          eventColor: scheduleForm.eventColor,
-          collaboratorIds: scheduleForm.calendarType === 'COLLAB' ? scheduleForm.collaboratorIds : [],
-          collaboratorNames: scheduleForm.calendarType === 'COLLAB' ? collaboratorNames : [],
+          eventColor: resolveCalendarTypeColor(scheduleForm.calendarType, scheduleForm.urgency),
+          collaboratorIds: collaboratorPayload.ids,
+          collaboratorNames: collaboratorPayload.names,
           recurring: scheduleForm.recurring,
           recurrenceRule: scheduleForm.recurring ? repeatRule : undefined,
           recurrenceInterval: scheduleForm.recurring ? repeatInterval : undefined,
@@ -3308,10 +3342,6 @@ function removeSchedule(id: string | number) {
 async function loadStaffOptions() {
   try {
     await searchStaff('')
-    staffDeptMap.value = {}
-    staffOptions.value.forEach((item: any) => {
-      staffDeptMap.value[String(item.value)] = item.departmentId == null ? undefined : String(item.departmentId)
-    })
   } catch {}
 }
 
@@ -3651,15 +3681,6 @@ onBeforeUnmount(() => {
   word-break: break-all;
 }
 
-.block-label {
-  font-size: 12px;
-  color: #64748b;
-}
-
-.source-wrap {
-  margin-top: 12px;
-}
-
 .approval-track-card :deep(.ant-card-head) {
   min-height: 34px;
 }
@@ -3671,10 +3692,6 @@ onBeforeUnmount(() => {
 
 .legend-line {
   margin-top: 8px;
-}
-
-.birthday-remind-rules {
-  margin-top: 10px;
 }
 
 .birthday-filter-bar {
