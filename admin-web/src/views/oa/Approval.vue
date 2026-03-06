@@ -1169,6 +1169,13 @@ async function urge(record: OaApproval, silent = false) {
       urgeHistory
     })
     await updateApproval(String(record.id), {
+      approvalType: String(record.approvalType || 'LEAVE'),
+      title: String(record.title || '审批催办'),
+      applicantId: record.applicantId,
+      applicantName: String(record.applicantName || userStore.staffInfo?.realName || userStore.staffInfo?.username || '系统用户'),
+      amount: record.amount,
+      startTime: record.startTime,
+      endTime: record.endTime,
       formData: nextFormData
     })
     await createOaTask({

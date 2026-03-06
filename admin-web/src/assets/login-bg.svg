@@ -1,0 +1,39 @@
+<svg width="1920" height="1080" viewBox="0 0 1920 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1920" y2="1080" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0D2F6E"/>
+      <stop offset="0.5" stop-color="#1E5EC8"/>
+      <stop offset="1" stop-color="#65A6FF"/>
+    </linearGradient>
+    <radialGradient id="light1" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(320 180) rotate(25) scale(620 340)">
+      <stop stop-color="#CDE4FF" stop-opacity="0.8"/>
+      <stop offset="1" stop-color="#CDE4FF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="light2" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1560 220) rotate(-22) scale(520 300)">
+      <stop stop-color="#E3F1FF" stop-opacity="0.72"/>
+      <stop offset="1" stop-color="#E3F1FF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="mountain1" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#8FC0FF" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#8FC0FF" stop-opacity="0.05"/>
+    </linearGradient>
+    <linearGradient id="mountain2" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#B6D6FF" stop-opacity="0.26"/>
+      <stop offset="1" stop-color="#B6D6FF" stop-opacity="0.04"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <ellipse cx="320" cy="180" rx="620" ry="340" fill="url(#light1)"/>
+  <ellipse cx="1560" cy="220" rx="520" ry="300" fill="url(#light2)"/>
+
+  <path d="M0 760L220 640L420 700L640 560L850 640L1080 520L1300 620L1540 520L1760 620L1920 560V1080H0V760Z" fill="url(#mountain1)"/>
+  <path d="M0 850L200 780L380 820L600 740L840 790L1100 700L1350 780L1600 720L1920 820V1080H0V850Z" fill="url(#mountain2)"/>
+
+  <g opacity="0.12">
+    <circle cx="180" cy="980" r="220" fill="#FFFFFF"/>
+    <circle cx="420" cy="1040" r="260" fill="#FFFFFF"/>
+    <circle cx="1640" cy="980" r="240" fill="#FFFFFF"/>
+    <circle cx="1860" cy="1030" r="280" fill="#FFFFFF"/>
+  </g>
+</svg>

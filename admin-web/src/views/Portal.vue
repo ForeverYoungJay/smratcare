@@ -35,17 +35,21 @@
             </div>
           </div>
           <div class="hero-actions">
-            <a-space wrap>
-              <a-button @click="init">刷新首页</a-button>
-              <a-button @click="openModuleCustomize">自定义首页</a-button>
-              <a-button @click="openCustomCardEditor()">新增卡面</a-button>
-              <a-button type="primary" @click="go('/oa/todo')">进入待办中心</a-button>
-            </a-space>
-            <a-space size="small" class="hero-actions-tip-row">
-              <a-tag :color="syncingNow ? 'processing' : 'default'">{{ syncingNow ? '同步中' : '已同步' }}</a-tag>
-              <span class="hero-actions-tip">最近同步：{{ refreshedAt || '--' }} · {{ lastSyncSource }}</span>
-              <a-switch v-model:checked="autoSyncEnabled" checked-children="自动刷新开" un-checked-children="自动刷新关" />
-            </a-space>
+            <div class="hero-actions-main">
+              <a-space wrap class="hero-action-btns">
+                <a-button type="primary" @click="go('/oa/todo')">进入待办中心</a-button>
+                <a-button @click="init">刷新首页</a-button>
+                <a-button @click="openModuleCustomize">自定义首页</a-button>
+                <a-button @click="openCustomCardEditor()">新增卡面</a-button>
+              </a-space>
+            </div>
+            <div class="hero-actions-meta">
+              <a-space size="small" class="hero-actions-tip-row">
+                <a-tag :color="syncingNow ? 'processing' : 'default'">{{ syncingNow ? '同步中' : '已同步' }}</a-tag>
+                <span class="hero-actions-tip">最近同步：{{ refreshedAt || '--' }} · {{ lastSyncSource }}</span>
+                <a-switch v-model:checked="autoSyncEnabled" checked-children="自动刷新开" un-checked-children="自动刷新关" />
+              </a-space>
+            </div>
           </div>
         </a-card>
 
@@ -54,7 +58,7 @@
             <a-card
               v-if="isModuleVisible('todo')"
               :bordered="false"
-              class="card-elevated full-height module-card"
+              class="card-elevated full-height module-card todo-focus-card"
               :style="moduleCardStyle('todo')"
               title="1️⃣ 我的待办（最重要）"
             >
@@ -1425,7 +1429,7 @@ const myTodoStats = computed(() => [
   { title: '待审批流程', value: summary.pendingApprovalCount || 0, route: '/oa/approval' },
   { title: '待处理任务', value: summary.openTodoCount || 0, route: '/oa/todo' },
   { title: '待确认事项', value: summary.ongoingTaskCount || 0, route: '/oa/work-execution/task' },
-  { title: '超时未处理', value: (summary.overdueTodoCount || 0) + (summary.approvalTimeoutCount || 0), route: '/oa/approval?status=pending' }
+  { title: '超时未处理', value: summary.approvalTimeoutCount || 0, route: '/oa/approval?status=PENDING&overdue=1' }
 ])
 
 const totalTodoCount = computed(() => myTodoStats.value.reduce((sum, item) => sum + Number(item.value || 0), 0))
@@ -1492,6 +1496,12 @@ const approvalTrackList = computed(() => approvalRows.value
     return {
       id: String(item.id),
       title: item.title || `${typeLabel(item.approvalType)}申请`,
+      approvalType: item.approvalType || 'LEAVE',
+      applicantId: item.applicantId,
+      applicantName: item.applicantName || '',
+      amount: item.amount,
+      startTime: item.startTime,
+      endTime: item.endTime,
       status: String(item.status || 'PENDING'),
       statusText,
       statusColor,
@@ -1873,10 +1883,26 @@ function openApprovalOpinionPanel() {
   approvalOpinionOpen.value = true
 }
 
-async function urgeApproval(item: { id: string; title: string; currentApprover?: string; formData?: string }, silent = false) {
+async function urgeApproval(item: {
+  id: string
+  title: string
+  approvalType?: string
+  applicantId?: number
+  applicantName?: string
+  amount?: number
+  startTime?: string
+  endTime?: string
+  currentApprover?: string
+  formData?: string
+}, silent = false) {
   try {
     const parsed = parseApprovalMeta(item.formData)
     const urgeCount = Number(parsed.urgeCount || 0) + 1
+    const fallbackApplicantName = (item.applicantName || userStore.staffInfo?.realName || userStore.staffInfo?.username || '').trim()
+    if (!fallbackApplicantName) {
+      if (!silent) message.error('催办失败：申请人信息缺失')
+      return false
+    }
     const nextFormData = JSON.stringify({
       ...parsed,
       urgeCount,
@@ -1884,6 +1910,13 @@ async function urgeApproval(item: { id: string; title: string; currentApprover?:
       lastUrgedBy: userStore.staffInfo?.realName || userStore.staffInfo?.username || '系统用户'
     })
     await updateApproval(item.id, {
+      approvalType: String(item.approvalType || 'LEAVE'),
+      title: String(item.title || '审批催办'),
+      applicantId: item.applicantId,
+      applicantName: fallbackApplicantName,
+      amount: item.amount,
+      startTime: item.startTime,
+      endTime: item.endTime,
       formData: nextFormData
     })
     await createOaTask({
@@ -3553,9 +3586,24 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   align-items: center;
   gap: 10px;
-  border-radius: 10px;
+  border-radius: 14px;
   background: linear-gradient(135deg, #eef6ff 0%, #f8fbff 55%, #ffffff 100%);
-  border: 1px solid #dbeafe;
+  border: 1px solid #cfe4ff;
+  box-shadow: 0 8px 24px rgba(30, 64, 175, 0.1), 0 2px 8px rgba(15, 23, 42, 0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-card::after {
+  content: '';
+  position: absolute;
+  right: -56px;
+  top: -48px;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.16) 0%, rgba(37, 99, 235, 0) 70%);
+  pointer-events: none;
 }
 
 .portal-page :deep(.ant-card .ant-card-body) {
@@ -3619,6 +3667,21 @@ onBeforeUnmount(() => {
   flex-direction: column;
   align-items: flex-end;
   gap: 8px;
+  position: relative;
+  z-index: 1;
+  min-width: 360px;
+}
+
+.hero-actions-main {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.hero-actions-meta {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .hero-actions-tip {
@@ -3628,6 +3691,18 @@ onBeforeUnmount(() => {
 
 .hero-actions-tip-row {
   margin-top: 2px;
+}
+
+.hero-action-btns :deep(.ant-btn) {
+  border-radius: 999px;
+  border-color: rgba(59, 130, 246, 0.32);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+  min-width: 96px;
+}
+
+.hero-action-btns :deep(.ant-btn-primary) {
+  box-shadow: 0 10px 22px rgba(27, 102, 214, 0.28);
+  min-width: 132px;
 }
 
 .hero-search {
@@ -3644,6 +3719,17 @@ onBeforeUnmount(() => {
   transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
   position: relative;
   overflow: hidden;
+}
+
+.todo-focus-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(248, 251, 255, 0.96)),
+    linear-gradient(130deg, rgba(59, 130, 246, 0.08), rgba(56, 189, 248, 0.03));
+  border-color: #cfe4ff;
+}
+
+.todo-focus-card :deep(.ant-card-head) {
+  border-bottom-color: #dbeafe;
 }
 
 .module-card:hover {
@@ -3900,7 +3986,14 @@ onBeforeUnmount(() => {
 
   .hero-actions {
     width: 100%;
+    min-width: 0;
     align-items: flex-start;
+  }
+
+  .hero-actions-main,
+  .hero-actions-meta {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .hero-kpi-item {

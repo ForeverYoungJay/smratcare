@@ -57,9 +57,12 @@ async function onSubmit() {
   min-height: 100vh;
   display: grid;
   place-items: center;
-  background: radial-gradient(900px 300px at 20% -10%, rgba(56, 189, 248, 0.25), transparent 60%),
-              radial-gradient(800px 280px at 90% 0%, rgba(34, 211, 238, 0.22), transparent 55%),
-              #f5f7fb;
+  background-image:
+    linear-gradient(135deg, rgba(13, 47, 110, 0.50), rgba(20, 84, 184, 0.38)),
+    url('../assets/home.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .login-card {

@@ -64,11 +64,73 @@
         </div>
       </a-layout-header>
 
+      <div ref="routeTabsWrapRef" class="route-tabs-wrap">
+        <a-tabs
+          v-model:activeKey="activeTabKey"
+          type="editable-card"
+          hide-add
+          size="small"
+          @change="onTabChange"
+          @edit="onTabEdit"
+        >
+          <a-tab-pane
+            v-for="tab in routeTabs"
+            :key="tab.key"
+            :closable="tab.closable"
+          >
+            <template #tab>
+              <span
+                class="route-tab-title"
+                :class="{
+                  'route-tab-dragging': tabDrag.dragKey === tab.key,
+                  'route-tab-over': tabDrag.overKey === tab.key && tabDrag.dragKey !== tab.key
+                }"
+                draggable="true"
+                @dragstart="onTabDragStart(tab.key)"
+                @dragover.prevent="onTabDragOver($event, tab.key)"
+                @drop.prevent="onTabDrop(tab.key)"
+                @dragend="onTabDragEnd"
+                @contextmenu.prevent="openTabContextMenu($event, tab.key)"
+              >
+                {{ tab.title }}
+              </span>
+            </template>
+          </a-tab-pane>
+        </a-tabs>
+        <a-dropdown trigger="click">
+          <a-button size="small" class="tab-tools-btn">标签操作</a-button>
+          <template #overlay>
+            <a-menu>
+              <a-menu-item @click="refreshCurrentTab">刷新当前</a-menu-item>
+              <a-menu-item @click="closeOtherTabs">关闭其他</a-menu-item>
+              <a-menu-item @click="closeAllTabs">关闭全部</a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
+      </div>
+
       <a-layout-content class="app-content">
-        <router-view />
+        <router-view v-slot="{ Component }">
+          <component :is="Component" :key="viewRenderKey" />
+        </router-view>
       </a-layout-content>
     </a-layout>
   </a-layout>
+
+  <div
+    v-if="tabContext.visible"
+    class="tab-context-menu"
+    :style="{ left: `${tabContext.x}px`, top: `${tabContext.y}px` }"
+    @click.stop
+  >
+    <a-menu>
+      <a-menu-item @click="closeContextCurrent">关闭当前</a-menu-item>
+      <a-menu-item @click="closeOtherTabs(tabContext.key)">关闭其他</a-menu-item>
+      <a-menu-item @click="closeLeftTabs">关闭左侧</a-menu-item>
+      <a-menu-item @click="closeRightTabs">关闭右侧</a-menu-item>
+      <a-menu-item @click="refreshCurrentTab">刷新当前</a-menu-item>
+    </a-menu>
+  </div>
 
   <a-drawer
     v-model:open="headerSettingsOpen"
@@ -121,7 +183,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import type { UploadProps } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -134,6 +196,20 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const openKeys = ref<string[]>([])
+const routeTabsWrapRef = ref<HTMLElement | null>(null)
+const routeTabs = ref<Array<{ key: string; path: string; title: string; closable: boolean }>>([])
+const activeTabKey = ref('')
+const refreshSeed = ref(0)
+const tabContext = reactive({
+  visible: false,
+  x: 0,
+  y: 0,
+  key: ''
+})
+const tabDrag = reactive({
+  dragKey: '',
+  overKey: ''
+})
 const headerSettingsOpen = ref(false)
 const savingHeaderSettings = ref(false)
 const headerSettings = reactive({
@@ -181,6 +257,7 @@ const menuItems = computed(() => {
 })
 
 const selectedKeys = computed(() => [route.path])
+const viewRenderKey = computed(() => `${route.fullPath}::${refreshSeed.value}`)
 
 const currentTitle = computed(() => {
   const title = route.meta?.title as string | undefined
@@ -200,8 +277,10 @@ const todayLabel = computed(() => {
 })
 
 watch(
-  () => route.path,
-  (path) => {
+  () => route.fullPath,
+  (fullPath) => {
+    syncRouteTab(route.path, fullPath)
+    const path = route.path
     const trail = findMenuTrail(path)
     if (trail.length > 1) {
       openKeys.value = trail.slice(0, trail.length - 1).map((t) => t.key)
@@ -212,21 +291,215 @@ watch(
   { immediate: true }
 )
 
+function currentTabTitle() {
+  return String(route.meta?.title || route.name || '未命名页面')
+}
+
+function normalizeTabKey(pathLike: string) {
+  const text = String(pathLike || '').trim()
+  if (!text) return ''
+  const [purePath] = text.split('?')
+  return purePath || text
+}
+
+function syncRouteTab(pathKey: string, fullPath: string) {
+  if (!fullPath || fullPath.startsWith('/login') || fullPath.startsWith('/403')) return
+  const key = normalizeTabKey(pathKey || fullPath)
+  const found = routeTabs.value.find((item) => item.key === key)
+  if (found) {
+    found.title = currentTabTitle()
+    found.path = fullPath
+    activeTabKey.value = key
+    persistRouteTabs()
+    return
+  }
+  const isHomeTab = key === '/portal'
+  routeTabs.value.push({
+    key,
+    path: fullPath,
+    title: currentTabTitle(),
+    closable: !isHomeTab
+  })
+  activeTabKey.value = key
+  persistRouteTabs()
+}
+
+function onTabChange(key: string) {
+  if (!key) return
+  const tab = routeTabs.value.find((item) => item.key === key)
+  const target = tab?.path || key
+  if (target === route.fullPath) return
+  router.push(target)
+}
+
+function onTabEdit(targetKey: string | MouseEvent, action: 'add' | 'remove') {
+  if (action !== 'remove') return
+  closeTab(String(targetKey || ''))
+}
+
+function closeTab(targetKey: string) {
+  const idx = routeTabs.value.findIndex((item) => item.key === targetKey)
+  if (idx < 0) return
+  const tab = routeTabs.value[idx]
+  if (!tab.closable) return
+  routeTabs.value.splice(idx, 1)
+  persistRouteTabs()
+  if (activeTabKey.value !== targetKey) return
+  const fallback = routeTabs.value[idx] || routeTabs.value[idx - 1]
+  router.push(fallback?.key || '/portal')
+}
+
+function onTabDragStart(key: string) {
+  tabDrag.dragKey = key
+  tabDrag.overKey = key
+}
+
+function onTabDragOver(event: DragEvent, key: string) {
+  if (!tabDrag.dragKey) return
+  tabDrag.overKey = key
+  autoScrollTabNav(event.clientX)
+}
+
+function onTabDrop(key: string) {
+  const from = routeTabs.value.findIndex((item) => item.key === tabDrag.dragKey)
+  const to = routeTabs.value.findIndex((item) => item.key === key)
+  if (from < 0 || to < 0 || from === to) {
+    onTabDragEnd()
+    return
+  }
+  const moved = routeTabs.value.splice(from, 1)[0]
+  routeTabs.value.splice(to, 0, moved)
+  persistRouteTabs()
+  onTabDragEnd()
+}
+
+function onTabDragEnd() {
+  tabDrag.dragKey = ''
+  tabDrag.overKey = ''
+}
+
+function tabNavWrapElement() {
+  return routeTabsWrapRef.value?.querySelector('.ant-tabs-nav-wrap') as HTMLElement | null
+}
+
+function autoScrollTabNav(clientX: number) {
+  const navWrap = tabNavWrapElement()
+  if (!navWrap) return
+  const rect = navWrap.getBoundingClientRect()
+  const edge = 56
+  const step = 28
+  if (clientX < rect.left + edge) {
+    navWrap.scrollLeft -= step
+  } else if (clientX > rect.right - edge) {
+    navWrap.scrollLeft += step
+  }
+}
+
+function closeOtherTabs(keepKey?: string) {
+  const keep = keepKey || activeTabKey.value || route.fullPath
+  routeTabs.value = routeTabs.value.filter((item) => !item.closable || item.key === keep)
+  persistRouteTabs()
+  closeTabContextMenu()
+}
+
+function closeAllTabs() {
+  routeTabs.value = routeTabs.value.filter((item) => !item.closable)
+  persistRouteTabs()
+  closeTabContextMenu()
+  router.push('/portal')
+}
+
+function refreshCurrentTab() {
+  refreshSeed.value += 1
+  closeTabContextMenu()
+}
+
+function openTabContextMenu(event: MouseEvent, key: string) {
+  tabContext.visible = true
+  tabContext.x = event.clientX
+  tabContext.y = event.clientY
+  tabContext.key = key
+}
+
+function closeTabContextMenu() {
+  tabContext.visible = false
+  tabContext.key = ''
+}
+
+function closeContextCurrent() {
+  closeTab(tabContext.key)
+  closeTabContextMenu()
+}
+
+function closeLeftTabs() {
+  const idx = routeTabs.value.findIndex((item) => item.key === tabContext.key)
+  if (idx <= 0) {
+    closeTabContextMenu()
+    return
+  }
+  routeTabs.value = routeTabs.value.filter((item, i) => i >= idx || !item.closable)
+  persistRouteTabs()
+  ensureActiveTabAvailable()
+  closeTabContextMenu()
+}
+
+function closeRightTabs() {
+  const idx = routeTabs.value.findIndex((item) => item.key === tabContext.key)
+  if (idx < 0 || idx >= routeTabs.value.length - 1) {
+    closeTabContextMenu()
+    return
+  }
+  routeTabs.value = routeTabs.value.filter((item, i) => i <= idx || !item.closable)
+  persistRouteTabs()
+  ensureActiveTabAvailable()
+  closeTabContextMenu()
+}
+
+function ensureActiveTabAvailable() {
+  const active = activeTabKey.value || route.fullPath
+  if (routeTabs.value.some((item) => item.key === active)) return
+  const fallback = routeTabs.value[routeTabs.value.length - 1]
+  router.push(fallback?.key || '/portal')
+}
+
+function routeTabsStorageKey() {
+  return `layout_route_tabs_v1_${String(userStore.staffInfo?.id || 'default')}`
+}
+
+function persistRouteTabs() {
+  try {
+    const payload = routeTabs.value
+      .slice(-20)
+      .map((item) => ({ key: item.key, path: item.path, title: item.title, closable: item.closable }))
+    localStorage.setItem(routeTabsStorageKey(), JSON.stringify(payload))
+  } catch {}
+}
+
+function restoreRouteTabs() {
+  try {
+    const raw = localStorage.getItem(routeTabsStorageKey())
+    if (!raw) return
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return
+    routeTabs.value = parsed
+      .map((item: any) => ({
+        key: normalizeTabKey(String(item?.path || item?.key || '')),
+        path: String(item?.path || item?.key || ''),
+        title: String(item?.title || '未命名页面'),
+        closable: normalizeTabKey(String(item?.path || item?.key || '')) !== '/portal'
+      }))
+      .filter((item: any) => !!item.key && !!item.path)
+      .reduce((acc: Array<{ key: string; path: string; title: string; closable: boolean }>, item: any) => {
+        if (acc.some((x) => x.key === item.key)) return acc
+        acc.push(item)
+        return acc
+      }, [])
+      .slice(-20)
+  } catch {}
+}
+
 function onOpenChange(keys: string[]) {
-  const previousKeys = [...openKeys.value]
   openKeys.value = keys
-  const addedKey = keys.find((key) => !previousKeys.includes(key))
-  if (!addedKey) {
-    return
-  }
-  const isTopLevel = filteredMenu.value.some((item) => item.key === addedKey)
-  if (!isTopLevel) {
-    return
-  }
-  const targetPath = resolveMenuPathByKey(addedKey, filteredMenu.value)
-  if (targetPath && route.path !== targetPath) {
-    router.push(targetPath)
-  }
 }
 
 function onMenuClick(info: any) {
@@ -405,7 +678,14 @@ function resetHeaderSettings() {
 }
 
 onMounted(() => {
+  restoreRouteTabs()
+  syncRouteTab(route.path, route.fullPath)
   loadHeaderSettings()
+  document.addEventListener('click', closeTabContextMenu)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', closeTabContextMenu)
 })
 </script>
 
@@ -539,14 +819,104 @@ onMounted(() => {
   font-size: 12px;
 }
 
+.route-tabs-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 24px 0;
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.route-tabs-wrap :deep(.ant-tabs) {
+  flex: 1;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.route-tabs-wrap :deep(.ant-tabs-nav) {
+  margin: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.route-tabs-wrap :deep(.ant-tabs-nav-wrap) {
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scrollbar-width: thin;
+}
+
+.route-tabs-wrap :deep(.ant-tabs-nav-wrap::-webkit-scrollbar) {
+  height: 6px;
+}
+
+.route-tabs-wrap :deep(.ant-tabs-nav-wrap::-webkit-scrollbar-thumb) {
+  background: rgba(148, 163, 184, 0.6);
+  border-radius: 999px;
+}
+
+.route-tabs-wrap :deep(.ant-tabs-nav-list) {
+  min-width: max-content;
+}
+
+.tab-tools-btn {
+  margin-bottom: 6px;
+}
+
+.route-tab-title {
+  display: inline-block;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+  user-select: none;
+  transition: background-color 0.18s ease, transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.route-tab-dragging {
+  opacity: 0.72;
+  transform: scale(0.98);
+}
+
+.route-tab-over {
+  background: rgba(27, 102, 214, 0.12);
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(27, 102, 214, 0.24);
+}
+
+.tab-context-menu {
+  position: fixed;
+  z-index: 1200;
+  min-width: 140px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+}
+
 .app-content {
   padding: 24px;
-  min-height: calc(100vh - 64px);
+  min-height: calc(100vh - 108px);
 }
 
 @media (max-width: 992px) {
   .app-header {
     padding: 0 14px;
+  }
+
+  .route-tabs-wrap {
+    padding: 6px 12px 0;
+    gap: 6px;
+  }
+
+  .route-tab-title {
+    max-width: 120px;
+  }
+
+  .tab-tools-btn {
+    padding-inline: 8px;
   }
 
   .today-label,
@@ -556,6 +926,7 @@ onMounted(() => {
 
   .app-content {
     padding: 14px;
+    min-height: calc(100vh - 108px);
   }
 }
 </style>
