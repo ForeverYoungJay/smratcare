@@ -73,7 +73,7 @@
     </a-card>
     <FlowGuardBar
       v-if="isAdmissionAssessment"
-      title="入住评估守卫"
+      :title="admissionCloseLoopEnabled ? '入住评估闭环守卫' : '入住评估守卫'"
       :subject="admissionGuardSubject"
       :stage-text="admissionGuardStageText"
       :stage-color="admissionGuardStageColor"
@@ -84,57 +84,119 @@
       @action="handleAdmissionGuardAction"
       style="margin-top: 12px"
     />
+    <a-alert
+      v-if="isAdmissionAssessment && admissionCloseLoopEnabled"
+      type="success"
+      show-icon
+      style="margin-top: 12px"
+      message="闭环模式已开启：点击“保存并回流入住办理”后，将自动跳转入住办理并带入合同号与长者。"
+    />
+    <a-card
+      v-if="isAdmissionAssessment"
+      class="card-elevated"
+      :bordered="false"
+      style="margin-top: 12px;"
+    >
+      <template #title>待评估合同（请先勾选合同再新增入住评估）</template>
+      <template #extra>
+        <a-button type="primary" :disabled="!selectedPendingContract" @click="openForm()">
+          {{ pageConfig.createButtonText }}
+        </a-button>
+      </template>
+      <a-table
+        size="small"
+        row-key="contractNo"
+        :loading="pendingAdmissionLoading"
+        :data-source="pendingAdmissionContracts"
+        :columns="pendingAdmissionColumns"
+        :pagination="false"
+        :row-selection="pendingAdmissionRowSelection"
+        :locale="{ emptyText: '暂无待评估合同' }"
+        :custom-row="pendingAdmissionCustomRow"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'flowStage'">
+            {{ pendingFlowStageText(record.flowStage) }}
+          </template>
+        </template>
+      </a-table>
+      <a-alert
+        style="margin-top: 10px;"
+        type="info"
+        show-icon
+        :message="selectedPendingContract ? `当前已选合同：${selectedPendingContract.contractNo || '-'} / 老人：${selectedPendingContract.elderName || '-'}` : '未勾选合同：请先勾选一条待评估合同后再新增入住评估'"
+      />
+    </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
       <div class="table-actions">
-        <a-space>
-          <a-button v-if="pageConfig.showCreateButton" type="primary" @click="openForm()">
+        <a-space wrap size="small">
+          <a-button v-if="pageConfig.showCreateButton && !isAdmissionAssessment" type="primary" @click="openForm()">
             {{ pageConfig.createButtonText }}
           </a-button>
-          <a-button
-            v-if="pageConfig.actions.includes('view')"
-            :disabled="selectedRowKeys.length !== 1"
-            @click="viewSelected"
+          <a-dropdown
+            v-if="pageConfig.actions.includes('view') || pageConfig.actions.includes('edit')"
+            trigger="click"
           >
-            查看勾选
-          </a-button>
-          <a-button
-            v-if="pageConfig.actions.includes('edit')"
-            :disabled="selectedRowKeys.length !== 1"
-            @click="editSelected"
-          >
-            编辑勾选
-          </a-button>
-          <a-button :disabled="selectedRowKeys.length === 0" @click="openBatchAssignModal">批量指派评估人</a-button>
-          <a-button :disabled="selectedRowKeys.length === 0" @click="openBatchNextDateModal">批量设置复评日期</a-button>
-          <a-button :disabled="selectedRowKeys.length === 0" @click="markSelectedStatus('COMPLETED')">
-            批量标记完成
-          </a-button>
-          <a-button :disabled="selectedRowKeys.length === 0" @click="markSelectedStatus('ARCHIVED')">
-            批量归档
-          </a-button>
-          <a-button
-            v-if="pageConfig.showBatchDelete && canDeleteAssessment"
-            danger
-            :disabled="selectedRowKeys.length === 0"
-            @click="removeBatch"
-          >
-            删除
-          </a-button>
-          <a-button :disabled="selectedRowKeys.length === 0" @click="exportSelectedCsv">导出勾选Excel</a-button>
-          <a-button @click="selectByFilter">按筛选全选(<=2000)</a-button>
-          <a-button :disabled="selectedRowKeys.length === 0" @click="clearSelection">清空勾选</a-button>
-          <a-button :disabled="rows.length === 0" @click="toggleSelectAll">
-            {{ selectedRowKeys.length === rows.length && rows.length > 0 ? '取消全选' : '全选当前页' }}
-          </a-button>
-          <a-button v-if="pageConfig.showExportButton" @click="exportCsv">导出Excel</a-button>
-          <a-button :disabled="selectedRowKeys.length === 0" @click="exportSelectedPdf">下载勾选PDF</a-button>
-          <a-button v-if="props.assessmentType === 'ARCHIVE'" @click="exportCurrentPageCsv">下载本页Excel</a-button>
-          <a-button v-if="props.assessmentType === 'ARCHIVE'" @click="exportCurrentPagePdf">下载本页PDF</a-button>
+            <a-button>单条操作</a-button>
+            <template #overlay>
+              <a-menu @click="onSingleActionMenuClick">
+                <a-menu-item key="view" :disabled="!pageConfig.actions.includes('view') || selectedRowKeys.length !== 1">
+                  查看勾选
+                </a-menu-item>
+                <a-menu-item key="edit" :disabled="!pageConfig.actions.includes('edit') || selectedRowKeys.length !== 1">
+                  编辑勾选
+                </a-menu-item>
+              </a-menu>
+            </template>
+          </a-dropdown>
+          <a-dropdown trigger="click">
+            <a-button :disabled="selectedRowKeys.length === 0">批量处理</a-button>
+            <template #overlay>
+              <a-menu @click="onBatchActionMenuClick">
+                <a-menu-item key="assign">指派评估人</a-menu-item>
+                <a-menu-item key="next-date">设置复评日期</a-menu-item>
+                <a-menu-divider />
+                <a-menu-item key="mark-completed">标记完成</a-menu-item>
+                <a-menu-item key="mark-archived">批量归档</a-menu-item>
+                <a-menu-item
+                  v-if="pageConfig.showBatchDelete && canDeleteAssessment"
+                  key="delete"
+                  danger
+                >
+                  删除勾选
+                </a-menu-item>
+              </a-menu>
+            </template>
+          </a-dropdown>
+          <a-dropdown trigger="click">
+            <a-button>勾选管理</a-button>
+            <template #overlay>
+              <a-menu @click="onSelectionActionMenuClick">
+                <a-menu-item key="select-filter">按筛选全选(<=2000)</a-menu-item>
+                <a-menu-item key="toggle-page" :disabled="rows.length === 0">
+                  {{ selectedRowKeys.length === rows.length && rows.length > 0 ? '取消全选当前页' : '全选当前页' }}
+                </a-menu-item>
+                <a-menu-item key="clear-selection" :disabled="selectedRowKeys.length === 0">清空勾选</a-menu-item>
+              </a-menu>
+            </template>
+          </a-dropdown>
+          <a-dropdown trigger="click">
+            <a-button>导出</a-button>
+            <template #overlay>
+              <a-menu @click="onExportActionMenuClick">
+                <a-menu-item key="selected-excel" :disabled="selectedRowKeys.length === 0">导出勾选Excel</a-menu-item>
+                <a-menu-item key="selected-pdf" :disabled="selectedRowKeys.length === 0">下载勾选PDF</a-menu-item>
+                <a-menu-item v-if="pageConfig.showExportButton" key="all-excel">导出Excel</a-menu-item>
+                <a-menu-item v-if="props.assessmentType === 'ARCHIVE'" key="page-excel">下载本页Excel</a-menu-item>
+                <a-menu-item v-if="props.assessmentType === 'ARCHIVE'" key="page-pdf">下载本页PDF</a-menu-item>
+              </a-menu>
+            </template>
+          </a-dropdown>
         </a-space>
-        <span style="color: rgba(0,0,0,0.45);">
+        <a-tag color="blue">
           已勾选 {{ selectedRowKeys.length }} 条{{ selectedByFilter ? '（含跨页筛选）' : '' }}
-        </span>
+        </a-tag>
       </div>
       <a-alert
         v-if="lastBatchAction"
@@ -233,7 +295,7 @@
       width="680px"
       :confirm-loading="submitting"
       :ok-button-props="{ disabled: formReadonly }"
-      :ok-text="formReadonly ? '已查看' : '保存'"
+      :ok-text="formReadonly ? '已查看' : admissionModalConfirmText"
       cancel-text="关闭"
       @ok="submit"
       @cancel="() => (open = false)"
@@ -324,22 +386,29 @@
                   <div style="font-weight: 600; margin-bottom: 6px;">{{ item.id }}. {{ item.title }}</div>
                   <div style="color: rgba(0,0,0,0.65); margin-bottom: 8px;">指标说明：{{ item.description }}</div>
                   <a-select
+                    :data-admission-item-id="item.id"
                     v-model:value="admissionScores[item.id]"
                     :options="admissionOptionSelectOptions(item)"
                     :disabled="formReadonly"
                     allow-clear
                     style="width: 100%; margin-bottom: 8px;"
                     placeholder="请选择分值及对应能力描述"
+                    @change="onAdmissionScoreFilled(item.id, $event)"
                   />
-                  <a-input-number
-                    v-model:value="admissionScores[item.id]"
-                    :min="admissionItemMin(item)"
-                    :max="admissionItemMax(item)"
-                    :precision="0"
-                    :disabled="formReadonly"
-                    style="width: 100%; margin-bottom: 8px;"
-                    :placeholder="`请输入分值(${admissionItemMin(item)}~${admissionItemMax(item)})`"
-                  />
+                  <div :id="`admission-score-input-wrap-${item.id}`">
+                    <a-input-number
+                      v-model:value="admissionScores[item.id]"
+                      :min="admissionItemMin(item)"
+                      :max="admissionItemMax(item)"
+                      :precision="0"
+                      :disabled="formReadonly"
+                      style="width: 100%; margin-bottom: 8px;"
+                      :placeholder="`请输入分值(${admissionItemMin(item)}~${admissionItemMax(item)})`"
+                      @change="onAdmissionScoreFilled(item.id, $event)"
+                      @update:value="onAdmissionScoreFilled(item.id, $event)"
+                      @pressEnter="onAdmissionScoreFilled(item.id, admissionScores[item.id])"
+                    />
+                  </div>
                   <div style="color: rgba(0,0,0,0.6); font-size: 12px;">
                     可选分值：
                     <span v-for="(opt, idx) in item.options" :key="`${item.id}-hint-${idx}`">
@@ -480,7 +549,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -856,7 +925,7 @@ const pageConfigMap: Record<AssessmentType, PageConfig> = {
     showCreateButton: true,
     showBatchDelete: false,
     showExportButton: false,
-    createButtonText: '新增',
+    createButtonText: '新建入住评估',
     actions: ['assign', 'edit', 'view', 'delete'],
     columns: [
       { title: '序号', key: 'index', width: 70, fixed: 'left' },
@@ -1061,6 +1130,7 @@ const admissionContractNoFromRoute = computed(() => String(route.query.contractN
 const admissionElderNameFromRoute = computed(() => String(route.query.elderName || '').trim())
 const admissionAutoOpenMode = computed(() => String(route.query.mode || 'new'))
 const admissionShouldAutoOpen = computed(() => String(route.query.autoOpen || '') === '1')
+const admissionCloseLoopEnabled = computed(() => String(route.query.closeLoop || route.query.returnToAdmission || '') === '1')
 const admissionRouteHandled = ref(false)
 const routeElderId = computed(() => {
   const raw = Number(route.query.residentId || route.query.elderId || 0)
@@ -1111,6 +1181,9 @@ const form = reactive<Partial<AssessmentRecord>>({
 })
 const submitting = ref(false)
 const scoreAutoChecked = ref(false)
+const pendingAdmissionLoading = ref(false)
+const pendingAdmissionContracts = ref<CrmContractItem[]>([])
+const selectedPendingContractNo = ref('')
 
 const rules: FormRules = {
   assessmentDate: [{ required: true, message: '请选择评估日期' }],
@@ -1122,6 +1195,25 @@ const canDeleteAssessment = computed(() => {
   const roles = (userStore.roles || []).map((item) => String(item || '').toUpperCase())
   return hasMinisterOrHigher(roles)
 })
+const selectedPendingContract = computed(() =>
+  pendingAdmissionContracts.value.find((item) => item.contractNo === selectedPendingContractNo.value)
+)
+const pendingAdmissionColumns = [
+  { title: '合同编号', dataIndex: 'contractNo', key: 'contractNo', width: 180 },
+  { title: '老人姓名', dataIndex: 'elderName', key: 'elderName', width: 140 },
+  { title: '流程阶段', dataIndex: 'flowStage', key: 'flowStage', width: 120 },
+  { title: '状态', dataIndex: 'contractStatus', key: 'contractStatus', width: 120 },
+  { title: '签约时间', dataIndex: 'contractSignedAt', key: 'contractSignedAt', width: 170 }
+]
+const pendingAdmissionRowSelection = computed(() => ({
+  type: 'radio' as const,
+  selectedRowKeys: selectedPendingContractNo.value ? [selectedPendingContractNo.value] : [],
+  onChange: (keys: Array<string | number>) => {
+    const picked = String(keys?.[0] || '').trim()
+    if (!picked) return
+    choosePendingContract(picked)
+  }
+}))
 const admissionGuardSteps = ['合同待评估', '完成入住评估登记', '办理入住选床', '合同最终签署']
 const selectedAdmissionRecord = computed(() => {
   if (selectedRowKeys.value.length !== 1) return null
@@ -1155,15 +1247,21 @@ const admissionGuardSubject = computed(() => {
   if (selected) {
     return `合同号 ${selected.archiveNo || admissionContractNoFromRoute.value || '-'} / 老人 ${selected.elderName || '-'}`
   }
+  if (selectedPendingContract.value) {
+    return `合同号 ${selectedPendingContract.value.contractNo || '-'} / 老人 ${selectedPendingContract.value.elderName || '-'}`
+  }
   if (admissionContractNoFromRoute.value || admissionElderNameFromRoute.value) {
     return `合同号 ${admissionContractNoFromRoute.value || '-'} / 老人 ${admissionElderNameFromRoute.value || '-'}`
   }
-  return '请先选择或新建入住评估登记'
+  return '请先勾选待评估合同，再新建入住评估'
 })
 const admissionGuardBlockers = computed(() => {
   if (!isAdmissionAssessment.value) return []
   const blockers: Array<{ code: string; text: string; actionLabel?: string; actionKey?: string }> = []
   const selected = selectedAdmissionRecord.value
+  if (!selectedPendingContract.value) {
+    blockers.push({ code: 'G000', text: '未勾选待评估合同，无法新建入住评估', actionLabel: '勾选合同', actionKey: 'pick-contract' })
+  }
   if (!selected && !admissionShouldAutoOpen.value) {
     blockers.push({ code: 'G001', text: '未选择评估记录', actionLabel: '新建评估', actionKey: 'new-assessment' })
   }
@@ -1179,21 +1277,25 @@ const admissionGuardHint = computed(() => {
   if (!isAdmissionAssessment.value) return ''
   const selected = selectedAdmissionRecord.value
   if (selected && selected.status !== 'DRAFT') {
-    return '评估已完成，可前往入住办理并选择床位'
+    return admissionCloseLoopEnabled.value ? '评估已完成，点击保存将自动回流入住办理' : '评估已完成，可前往入住办理并选择床位'
   }
-  return '完成评估保存后，系统会自动推进到待办理入住'
+  return admissionCloseLoopEnabled.value
+    ? '闭环模式：请完成评估后直接保存，系统将一键回流入住办理'
+    : '完成评估保存后，系统会自动推进到待办理入住'
+})
+const admissionModalConfirmText = computed(() => {
+  if (formReadonly.value) return '已查看'
+  if (isAdmissionAssessment.value && admissionCloseLoopEnabled.value) return '保存并回流入住办理'
+  return '保存'
 })
 
 function handleAdmissionGuardAction(item: { actionKey?: string }) {
+  if (item.actionKey === 'pick-contract') {
+    message.warning('请先在“待评估合同”中勾选一条合同')
+    return
+  }
   if (item.actionKey === 'new-assessment') {
     openForm()
-    if (admissionContractNoFromRoute.value) {
-      form.archiveNo = admissionContractNoFromRoute.value
-    }
-    if (admissionElderNameFromRoute.value) {
-      form.elderName = admissionElderNameFromRoute.value
-    }
-    form.status = 'DRAFT'
     return
   }
   if (item.actionKey === 'edit-draft' && selectedAdmissionRecord.value) {
@@ -1273,6 +1375,14 @@ function assessmentTypeLabel(type?: AssessmentType | string) {
   return matched?.label || '-'
 }
 
+function pendingFlowStageText(stage?: string) {
+  if (stage === 'PENDING_ASSESSMENT') return '待评估'
+  if (stage === 'PENDING_BED_SELECT') return '待办理入住'
+  if (stage === 'PENDING_SIGN') return '待签署'
+  if (stage === 'SIGNED') return '已签署'
+  return stage || '-'
+}
+
 function displayCell(record: Record<string, any>, key?: string) {
   if (!key) return '-'
   const value = record[key]
@@ -1303,6 +1413,52 @@ function buildQueryParams() {
   }
 }
 
+async function loadPendingAdmissionContracts() {
+  if (!isAdmissionAssessment.value) return
+  pendingAdmissionLoading.value = true
+  try {
+    const elderIdFromRoute = Number(route.query.residentId || route.query.elderId || 0)
+    const page: PageResult<CrmContractItem> = await getContractPage({
+      pageNo: 1,
+      pageSize: 200,
+      flowStage: 'PENDING_ASSESSMENT',
+      currentOwnerDept: 'ASSESSMENT',
+      elderId: elderIdFromRoute > 0 ? elderIdFromRoute : undefined
+    })
+    pendingAdmissionContracts.value = page.list || []
+    const routeContractNo = admissionContractNoFromRoute.value
+    if (routeContractNo && pendingAdmissionContracts.value.some((item) => item.contractNo === routeContractNo)) {
+      selectedPendingContractNo.value = routeContractNo
+      return
+    }
+    if (selectedPendingContractNo.value
+      && pendingAdmissionContracts.value.some((item) => item.contractNo === selectedPendingContractNo.value)) {
+      return
+    }
+    selectedPendingContractNo.value = ''
+  } finally {
+    pendingAdmissionLoading.value = false
+  }
+}
+
+function choosePendingContract(contractNo?: string) {
+  const normalized = String(contractNo || '').trim()
+  if (!normalized) return
+  const target = pendingAdmissionContracts.value.find((item) => item.contractNo === normalized)
+  if (!target) return
+  selectedPendingContractNo.value = normalized
+  const nextQuery: Record<string, any> = { ...route.query, contractNo: normalized }
+  if (target.elderId) nextQuery.residentId = target.elderId
+  if (target.elderName) nextQuery.elderName = target.elderName
+  router.replace({ path: route.path, query: nextQuery })
+}
+
+function pendingAdmissionCustomRow(record: CrmContractItem) {
+  return {
+    onClick: () => choosePendingContract(record.contractNo || '')
+  }
+}
+
 async function fetchData() {
   loading.value = true
   try {
@@ -1318,6 +1474,9 @@ async function fetchData() {
     rows.value = res.list
     total.value = res.total
     Object.assign(summary, sum || {})
+    if (isAdmissionAssessment.value) {
+      await loadPendingAdmissionContracts()
+    }
   } finally {
     loading.value = false
   }
@@ -1360,6 +1519,36 @@ function admissionOptionSelectOptions(item: AdmissionAbilityItem) {
     value: opt.score,
     label: `${opt.score}分 - ${opt.label}`
   }))
+}
+
+function nextAdmissionItemId(currentItemId: number) {
+  const index = admissionScoreItemList.findIndex((item) => item.id === currentItemId)
+  if (index < 0 || index >= admissionScoreItemList.length - 1) return undefined
+  return admissionScoreItemList[index + 1].id
+}
+
+async function focusAdmissionItemInput(itemId?: number) {
+  if (!itemId) return
+  await nextTick()
+  const root = document.getElementById(`admission-score-input-wrap-${itemId}`) as HTMLElement | null
+  if (!root) return
+  const input = root.querySelector('input') as HTMLInputElement | null
+  if (!input || input.disabled) return
+  input.focus()
+  input.select?.()
+}
+
+function onAdmissionScoreFilled(itemId: number, value: unknown) {
+  if (formReadonly.value || !isAdmissionAssessment.value) return
+  if (value === null || value === undefined || value === '') return
+  const currentItem = admissionScoreItemList.find((item) => item.id === itemId)
+  if (!currentItem) return
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) return
+  if (numericValue < admissionItemMin(currentItem) || numericValue > admissionItemMax(currentItem)) return
+  const nextId = nextAdmissionItemId(itemId)
+  if (!nextId) return
+  focusAdmissionItemInput(nextId)
 }
 
 function onPageChange(page: number) {
@@ -1466,6 +1655,10 @@ function assignRecord(record: AssessmentRecord) {
 }
 
 function openForm(record?: AssessmentRecord, readonly = false) {
+  if (!record && isAdmissionAssessment.value && !selectedPendingContract.value) {
+    message.warning('请先勾选一条待评估合同，再新增入住评估')
+    return
+  }
   formReadonly.value = readonly
   if (record) {
     Object.assign(form, record)
@@ -1510,6 +1703,19 @@ function openForm(record?: AssessmentRecord, readonly = false) {
         form.elderName = routeElderName
       }
       ensureSelectedElder(routeElderId.value, routeElderName || `长者${routeElderId.value}`)
+    }
+    if (isAdmissionAssessment.value && selectedPendingContract.value) {
+      const contract = selectedPendingContract.value
+      if (contract.contractNo) {
+        form.archiveNo = contract.contractNo
+      }
+      if (contract.elderName) {
+        form.elderName = contract.elderName
+      }
+      if (contract.elderId) {
+        form.elderId = Number(contract.elderId)
+        ensureSelectedElder(Number(contract.elderId), contract.elderName || undefined)
+      }
     }
   }
   open.value = true
@@ -1563,7 +1769,7 @@ async function previewScore() {
 }
 
 function openTemplateManager() {
-  router.push('/assessment/template')
+  router.push('/elder/assessment/template')
 }
 
 function beforeDetailJsonUpload(file: File) {
@@ -1631,6 +1837,19 @@ async function submit() {
     form.detailJson = buildAdmissionDetailJson()
     form.scoreAuto = 0
     form.templateId = undefined
+    const admissionContractNo = String(
+      selectedPendingContract.value?.contractNo
+      || admissionContractNoFromRoute.value
+      || form.archiveNo
+      || ''
+    ).trim()
+    if ((form.status === 'COMPLETED' || form.status === 'ARCHIVED') && admissionContractNo) {
+      form.archiveNo = admissionContractNo
+    }
+    if (admissionCloseLoopEnabled.value && form.status === 'DRAFT') {
+      form.status = 'COMPLETED'
+      message.info('闭环模式已自动将评估状态改为“已完成”')
+    }
   }
   submitting.value = true
   try {
@@ -1654,12 +1873,24 @@ async function submit() {
     }
     if (form.id) {
       await updateAssessmentRecord(form.id, payload)
-      message.success('更新成功')
+      message.success(isAdmissionAssessment.value ? '入住评估更新成功' : '更新成功')
     } else {
       await createAssessmentRecord(payload)
-      message.success('登记成功')
+      message.success(isAdmissionAssessment.value ? '入住评估登记成功' : '登记成功')
     }
     open.value = false
+    if (isAdmissionAssessment.value && admissionCloseLoopEnabled.value) {
+      const contractNo = String(payload.archiveNo || admissionContractNoFromRoute.value || '').trim()
+      const residentId = Number(payload.elderId || admissionResidentIdFromRoute.value || 0)
+      const params = new URLSearchParams()
+      if (contractNo) params.set('contractNo', contractNo)
+      if (residentId > 0) params.set('residentId', String(residentId))
+      message.success('评估完成，正在自动回流入住办理')
+      const queryString = params.toString()
+      const targetPath = queryString ? `/elder/admission-processing?${queryString}` : '/elder/admission-processing'
+      await router.push(targetPath)
+      return
+    }
     fetchData()
   } finally {
     submitting.value = false
@@ -2145,6 +2376,78 @@ function editSelected() {
   openForm(selected)
 }
 
+function onSingleActionMenuClick({ key }: { key: string }) {
+  if (key === 'view') {
+    viewSelected()
+    return
+  }
+  if (key === 'edit') {
+    editSelected()
+  }
+}
+
+function onBatchActionMenuClick({ key }: { key: string }) {
+  if (selectedRowKeys.value.length === 0) {
+    message.warning('请先勾选记录')
+    return
+  }
+  if (key === 'assign') {
+    openBatchAssignModal()
+    return
+  }
+  if (key === 'next-date') {
+    openBatchNextDateModal()
+    return
+  }
+  if (key === 'mark-completed') {
+    markSelectedStatus('COMPLETED')
+    return
+  }
+  if (key === 'mark-archived') {
+    markSelectedStatus('ARCHIVED')
+    return
+  }
+  if (key === 'delete' && pageConfig.value.showBatchDelete && canDeleteAssessment.value) {
+    removeBatch()
+  }
+}
+
+function onSelectionActionMenuClick({ key }: { key: string }) {
+  if (key === 'select-filter') {
+    selectByFilter()
+    return
+  }
+  if (key === 'toggle-page') {
+    toggleSelectAll()
+    return
+  }
+  if (key === 'clear-selection') {
+    clearSelection()
+  }
+}
+
+function onExportActionMenuClick({ key }: { key: string }) {
+  if (key === 'selected-excel') {
+    exportSelectedCsv()
+    return
+  }
+  if (key === 'selected-pdf') {
+    exportSelectedPdf()
+    return
+  }
+  if (key === 'all-excel') {
+    exportCsv()
+    return
+  }
+  if (key === 'page-excel') {
+    exportCurrentPageCsv()
+    return
+  }
+  if (key === 'page-pdf') {
+    exportCurrentPagePdf()
+  }
+}
+
 function exportCurrentPageCsv() {
   if (!rows.value.length) {
     message.warning('当前页无可导出记录')
@@ -2274,6 +2577,8 @@ useLiveSyncRefresh({
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .hint {
@@ -2283,5 +2588,19 @@ useLiveSyncRefresh({
 
 :deep(.row-batch-updated > td) {
   background: #f6ffed !important;
+}
+
+:deep(.ant-table-selection-column .ant-checkbox .ant-checkbox-inner) {
+  background: #fff;
+  border-color: #8c8c8c;
+}
+
+:deep(.ant-table-selection-column .ant-checkbox-checked .ant-checkbox-inner) {
+  background: #1677ff;
+  border-color: #1677ff;
+}
+
+:deep(.ant-table-selection-column .ant-checkbox-checked .ant-checkbox-inner::after) {
+  border-color: #fff;
 }
 </style>

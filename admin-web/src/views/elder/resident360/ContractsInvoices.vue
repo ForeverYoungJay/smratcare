@@ -211,7 +211,7 @@ const documents = computed<DocumentItem[]>(() => {
     type: mapAssessmentType(report.assessmentType),
     name: buildAssessmentReportName(report),
     url: '',
-    route: `/assessment/ability/archive?elderId=${encodeURIComponent(String(linkage.value?.elderId || ''))}`,
+    route: `/elder/assessment/ability/archive?elderId=${encodeURIComponent(String(linkage.value?.elderId || ''))}`,
     size: '-',
     time: report.assessmentDate || '-'
   }))
@@ -266,10 +266,10 @@ function goContractManagement() {
 function goAssessmentArchive() {
   const elderId = linkage.value?.elderId
   if (elderId) {
-    router.push(`/assessment/ability/archive?elderId=${elderId}`)
+    router.push(`/elder/assessment/ability/archive?elderId=${elderId}`)
     return
   }
-  router.push('/assessment/ability/archive')
+  router.push('/elder/assessment/ability/archive')
 }
 
 function flattenReports(source?: ContractAssessmentOverview) {

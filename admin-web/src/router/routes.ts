@@ -70,8 +70,75 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'admission-assessment',
             name: 'ElderAdmissionAssessment',
-            component: () => import('../views/elder/resident360/AdmissionAssessment.vue'),
-            meta: { title: '入住评估' }
+            redirect: '/elder/assessment/ability/admission',
+            meta: { title: '入住评估', hidden: true }
+          },
+          {
+            path: 'assessment',
+            name: 'ElderAssessment',
+            meta: {
+              title: '评估管理',
+              roles: ['MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'NURSING_EMPLOYEE', 'NURSING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
+            },
+            redirect: '/elder/assessment/ability/admission',
+            children: [
+              {
+                path: 'ability',
+                name: 'ElderAssessmentAbility',
+                meta: { title: '能力评估管理' },
+                redirect: '/elder/assessment/ability/admission',
+                children: [
+                  {
+                    path: 'admission',
+                    name: 'ElderAssessmentAdmission',
+                    component: () => import('../views/assessment/Admission.vue'),
+                    meta: { title: '入住评估' }
+                  },
+                  {
+                    path: 'registration',
+                    name: 'ElderAssessmentRegistration',
+                    component: () => import('../views/assessment/Registration.vue'),
+                    meta: { title: '评估登记' }
+                  },
+                  {
+                    path: 'continuous',
+                    name: 'ElderAssessmentContinuous',
+                    component: () => import('../views/assessment/Continuous.vue'),
+                    meta: { title: '持续评估' }
+                  },
+                  {
+                    path: 'archive',
+                    name: 'ElderAssessmentArchive',
+                    component: () => import('../views/assessment/Archive.vue'),
+                    meta: { title: '评估档案' }
+                  }
+                ]
+              },
+              {
+                path: 'other-scale',
+                name: 'ElderAssessmentOtherScale',
+                component: () => import('../views/assessment/OtherScale.vue'),
+                meta: { title: '其他量表评估' }
+              },
+              {
+                path: 'template',
+                name: 'ElderAssessmentTemplate',
+                component: () => import('../views/assessment/Template.vue'),
+                meta: { title: '量表模板', roles: ['ADMIN'], hidden: true }
+              },
+              {
+                path: 'cognitive',
+                name: 'ElderAssessmentCognitive',
+                component: () => import('../views/assessment/Cognitive.vue'),
+                meta: { title: '认知能力评估' }
+              },
+              {
+                path: 'self-care',
+                name: 'ElderAssessmentSelfCare',
+                component: () => import('../views/assessment/SelfCare.vue'),
+                meta: { title: '自理能力评估' }
+              }
+            ]
           },
           {
             path: 'contracts-invoices',
@@ -422,7 +489,7 @@ export const routes: RouteRecordRaw[] = [
                 path: 'pending',
                 name: 'MarketingContractsPending',
                 component: () => import('../views/marketing/ContractSigning.vue'),
-                props: { statusPreset: 'pending_sign', title: '待签约合同', subTitle: '待签署合同统一处理：查看、入住办理、最终签署' },
+                props: { statusPreset: 'pending_sign', title: '待签约合同', subTitle: '待签署合同统一处理：查看、入住办理、最终签署', disableDefaultFlowStagePreset: true },
                 meta: { title: '待签约合同' }
               },
               {
@@ -2104,88 +2171,89 @@ export const routes: RouteRecordRaw[] = [
       },
       {
         path: 'assessment',
-        name: 'Assessment',
+        name: 'AssessmentLegacy',
         meta: {
           title: '评估管理',
           icon: 'FileSearchOutlined',
+          hidden: true,
           roles: ['MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER', 'NURSING_EMPLOYEE', 'NURSING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
         },
-        redirect: '/assessment/ability/admission',
+        redirect: '/elder/assessment/ability/admission',
         children: [
           {
             path: 'ability',
-            name: 'AssessmentAbility',
-            meta: { title: '能力评估管理' },
-            redirect: '/assessment/ability/admission',
+            name: 'AssessmentAbilityLegacy',
+            meta: { title: '能力评估管理', hidden: true },
+            redirect: '/elder/assessment/ability/admission',
             children: [
               {
                 path: 'admission',
-                name: 'AssessmentAdmission',
-                component: () => import('../views/assessment/Admission.vue'),
-                meta: { title: '入住评估' }
+                name: 'AssessmentAdmissionLegacy',
+                redirect: '/elder/assessment/ability/admission',
+                meta: { hidden: true }
               },
               {
                 path: 'registration',
-                name: 'AssessmentRegistration',
-                component: () => import('../views/assessment/Registration.vue'),
-                meta: { title: '评估登记' }
+                name: 'AssessmentRegistrationLegacy',
+                redirect: '/elder/assessment/ability/registration',
+                meta: { hidden: true }
               },
               {
                 path: 'continuous',
-                name: 'AssessmentContinuous',
-                component: () => import('../views/assessment/Continuous.vue'),
-                meta: { title: '持续评估' }
+                name: 'AssessmentContinuousLegacy',
+                redirect: '/elder/assessment/ability/continuous',
+                meta: { hidden: true }
               },
               {
                 path: 'archive',
-                name: 'AssessmentArchive',
-                component: () => import('../views/assessment/Archive.vue'),
-                meta: { title: '评估档案' }
+                name: 'AssessmentArchiveLegacy',
+                redirect: '/elder/assessment/ability/archive',
+                meta: { hidden: true }
               }
             ]
           },
           {
             path: 'other-scale',
-            name: 'AssessmentOtherScale',
-            component: () => import('../views/assessment/OtherScale.vue'),
-            meta: { title: '其他量表评估' }
+            name: 'AssessmentOtherScaleLegacy',
+            redirect: '/elder/assessment/other-scale',
+            meta: { hidden: true }
           },
           {
             path: 'template',
-            name: 'AssessmentTemplate',
-            component: () => import('../views/assessment/Template.vue'),
-            meta: { title: '量表模板', roles: ['ADMIN'], hidden: true }
+            name: 'AssessmentTemplateLegacy',
+            redirect: '/elder/assessment/template',
+            meta: { hidden: true }
           },
           {
             path: 'cognitive',
-            name: 'AssessmentCognitive',
-            component: () => import('../views/assessment/Cognitive.vue'),
-            meta: { title: '认知能力评估' }
+            name: 'AssessmentCognitiveLegacy',
+            redirect: '/elder/assessment/cognitive',
+            meta: { hidden: true }
           },
           {
             path: 'self-care',
-            name: 'AssessmentSelfCare',
-            component: () => import('../views/assessment/SelfCare.vue'),
-            meta: { title: '自理能力评估' }
+            name: 'AssessmentSelfCareLegacy',
+            redirect: '/elder/assessment/self-care',
+            meta: { hidden: true }
           },
           {
             path: 'admission',
-            redirect: '/assessment/ability/admission',
+            redirect: '/elder/assessment/ability/admission',
             meta: { hidden: true }
           },
           {
             path: 'registration',
-            redirect: '/assessment/ability/registration',
+            redirect: '/elder/assessment/ability/registration',
             meta: { hidden: true }
           },
           {
             path: 'continuous',
-            redirect: '/assessment/ability/continuous',
+            redirect: '/elder/assessment/ability/continuous',
             meta: { hidden: true }
           },
           {
             path: 'archive',
-            redirect: '/assessment/ability/archive',
+            redirect: '/elder/assessment/ability/archive',
             meta: { hidden: true }
           }
         ]

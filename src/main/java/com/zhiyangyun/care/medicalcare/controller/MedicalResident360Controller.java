@@ -385,9 +385,9 @@ public class MedicalResident360Controller {
             "最新评估：" + (risk.getLatestCvdDate() == null ? "-" : risk.getLatestCvdDate()) + "，等级 " + riskLabel(risk.getLatestCvdRiskLevel()) + "，护理建议 " + empty(risk.getLatestTcmPrimary()),
             "风险处置：未完成任务 " + pendingCareTaskCount + "，复评提醒 " + abnormalInspectionCount + "，24h异常体征 " + abnormalVitalCount),
         List.of(
-            action("做评估", "/assessment/ability/admission?residentId=" + resolvedResidentId + "&template=GBT42195", true),
+            action("做评估", "/elder/assessment/ability/admission?residentId=" + resolvedResidentId + "&template=GBT42195", true),
             action("创建风险处置任务", "/oa/work-execution/task?residentId=" + resolvedResidentId + "&category=risk", false),
-            action("查看历史评估", "/assessment/ability/admission?residentId=" + resolvedResidentId + "&tab=reports", false)),
+            action("查看历史评估", "/elder/assessment/ability/admission?residentId=" + resolvedResidentId + "&tab=reports", false)),
         "评估完成自动回写风险标签、护理建议与计划"), abnormalVitalCount + abnormalInspectionCount, pendingCareTaskCount));
 
     cards.add(withAlert(card("care-execution", "卡片3：护理执行", "任务完成率=服务质量", "cyan",

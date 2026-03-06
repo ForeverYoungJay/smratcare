@@ -31,10 +31,10 @@
     <StatefulBlock :loading="loading" :error="errorMessage" :empty="!modules.length" empty-text="暂无在院服务数据" @retry="loadModules">
       <a-row :gutter="16">
         <a-col v-for="item in modules" :key="item.title" :xs="24" :sm="24" :lg="12" :xl="12" style="margin-bottom: 12px">
-          <a-card :title="item.title" class="card-elevated" :bordered="false">
+          <a-card :title="item.title" :class="['card-elevated', { 'alert-card': item.alertCount > 0 }]" :bordered="false">
             <template #extra>
               <a-space size="small">
-                <a-tag :color="item.tagColor">{{ item.tag }}</a-tag>
+                <a-tag :color="item.alertCount > 0 ? 'red' : item.tagColor">{{ item.tag }}</a-tag>
                 <a-badge v-if="item.dangerCount > 0" status="error" :text="`严重 ${item.dangerCount}`" />
                 <a-badge v-if="item.warningCount > 0" status="warning" :text="`一般 ${item.warningCount}`" />
               </a-space>
@@ -95,6 +95,14 @@ const residentOptions = computed(() =>
     value: String(item.value)
   }))
 )
+const selectedResidentOption = computed(() =>
+  residentOptions.value.find((item) => item.value === String(residentId.value || '').trim())
+)
+const selectedResidentName = computed(() => {
+  const option = selectedResidentOption.value
+  if (!option) return ''
+  return String(option.label || '').replace(/\s*\([^)]*\)\s*$/, '').trim()
+})
 let refreshTimer: number | null = null
 
 const cardKeyOrder = [
@@ -162,9 +170,19 @@ function go(path: string) {
 
 function appendResidentId(path: string) {
   const currentResidentId = String(residentId.value || '').trim()
-  if (!currentResidentId) return path
-  if (/([?&])residentId=/.test(path)) return path
-  return path.includes('?') ? `${path}&residentId=${encodeURIComponent(currentResidentId)}` : `${path}?residentId=${encodeURIComponent(currentResidentId)}`
+  const currentResidentName = selectedResidentName.value
+  let nextPath = path
+  if (currentResidentId && !/([?&])(residentId|elderId)=/.test(nextPath)) {
+    nextPath = nextPath.includes('?')
+      ? `${nextPath}&residentId=${encodeURIComponent(currentResidentId)}`
+      : `${nextPath}?residentId=${encodeURIComponent(currentResidentId)}`
+  }
+  if (currentResidentName && !/([?&])elderName=/.test(nextPath)) {
+    nextPath = nextPath.includes('?')
+      ? `${nextPath}&elderName=${encodeURIComponent(currentResidentName)}`
+      : `${nextPath}?elderName=${encodeURIComponent(currentResidentName)}`
+  }
+  return nextPath
 }
 
 function forceScrollTop() {
@@ -235,10 +253,11 @@ function onLineClick(cardKey: string, line: string) {
 }
 
 async function resolveResidentId() {
-  const fromRoute = String(route.query.residentId || '').trim()
+  const fromRoute = String(route.query.residentId || route.query.elderId || '').trim()
+  const fromRouteName = String(route.query.elderName || '').trim()
   if (fromRoute) {
     residentId.value = fromRoute
-    if (/^\d+$/.test(fromRoute)) ensureSelectedElder(Number(fromRoute))
+    if (/^\d+$/.test(fromRoute)) ensureSelectedElder(Number(fromRoute), fromRouteName || undefined)
     return
   }
   if (residentOptions.value.length > 0) {
@@ -255,18 +274,24 @@ async function searchResidentOptions(keyword = '') {
 
 function syncResidentToRoute() {
   const nextResident = residentId.value.trim()
+  const nextResidentName = selectedResidentName.value
   const nextWarning = showWarningOnly.value ? '1' : ''
   const nextDuty = dutyMode.value ? '1' : ''
-  const currentResident = String(route.query.residentId || '').trim()
+  const currentResident = String(route.query.residentId || route.query.elderId || '').trim()
+  const currentResidentName = String(route.query.elderName || '').trim()
   const currentWarning = String(route.query.warning || '').trim()
   const currentDuty = String(route.query.duty || '').trim()
   const residentUnchanged = currentResident === nextResident || (!nextResident && !currentResident)
+  const residentNameUnchanged = currentResidentName === nextResidentName || (!nextResidentName && !currentResidentName)
   const warningUnchanged = currentWarning === nextWarning
   const dutyUnchanged = currentDuty === nextDuty
-  if (residentUnchanged && warningUnchanged && dutyUnchanged) return
+  if (residentUnchanged && residentNameUnchanged && warningUnchanged && dutyUnchanged) return
   const nextQuery: Record<string, any> = { ...route.query }
   if (nextResident) nextQuery.residentId = nextResident
   else delete nextQuery.residentId
+  delete nextQuery.elderId
+  if (nextResidentName) nextQuery.elderName = nextResidentName
+  else delete nextQuery.elderName
   if (nextWarning) nextQuery.warning = nextWarning
   else delete nextQuery.warning
   if (nextDuty) nextQuery.duty = nextDuty
@@ -321,6 +346,14 @@ onMounted(async () => {
   try {
     dutyMode.value = String(route.query.duty || '').trim() === '1'
     showWarningOnly.value = String(route.query.warning || '').trim() === '1'
+    const routeResident = String(route.query.residentId || route.query.elderId || '').trim()
+    if (routeResident) {
+      residentId.value = routeResident
+      const routeResidentName = String(route.query.elderName || '').trim()
+      if (/^\d+$/.test(routeResident)) {
+        ensureSelectedElder(Number(routeResident), routeResidentName || undefined)
+      }
+    }
     await searchResidentOptions('')
     if (!residentId.value && residentOptions.value.length > 0) {
       residentId.value = residentOptions.value[0].value
@@ -344,10 +377,14 @@ watch(dutyMode, (enabled) => {
   setupAutoRefresh()
 })
 watch(
-  () => String(route.query.residentId || '').trim(),
+  () => String(route.query.residentId || route.query.elderId || '').trim(),
   (nextResident) => {
     if (!nextResident || nextResident === residentId.value) return
     residentId.value = nextResident
+    const nextResidentName = String(route.query.elderName || '').trim()
+    if (/^\d+$/.test(nextResident)) {
+      ensureSelectedElder(Number(nextResident), nextResidentName || undefined)
+    }
     loadModules()
   }
 )
@@ -419,5 +456,15 @@ useLiveSyncRefresh({
   color: #1677ff;
   font-size: 12px;
   cursor: pointer;
+}
+
+:deep(.alert-card .ant-card-head-title) {
+  color: #cf1322;
+}
+
+:deep(.alert-card .ant-card-body) {
+  border: 1px solid #ffa39e;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #fff2f0 0%, #fff 56%);
 }
 </style>

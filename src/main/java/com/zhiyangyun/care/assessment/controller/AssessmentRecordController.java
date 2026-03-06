@@ -189,7 +189,7 @@ public class AssessmentRecordController {
     record.setTenantId(orgId);
     record.setOrgId(orgId);
     record.setElderId(elderId);
-    record.setElderName(resolveElderName(elderId, request.getElderName()));
+    record.setElderName(resolveAssessmentElderName(orgId, elderId, request.getElderName(), request.getAssessmentType()));
     patchFromRequest(record, request);
     applyAutoScore(orgId, record);
 
@@ -229,7 +229,7 @@ public class AssessmentRecordController {
 
     Long elderId = resolveElderId(orgId, request.getElderId(), request.getElderName(), request.getAssessmentType());
     record.setElderId(elderId);
-    record.setElderName(resolveElderName(elderId, request.getElderName()));
+    record.setElderName(resolveAssessmentElderName(orgId, elderId, request.getElderName(), request.getAssessmentType()));
     patchFromRequest(record, request);
     applyAutoScore(orgId, record);
 
@@ -554,7 +554,7 @@ public class AssessmentRecordController {
     boolean admissionAssessment = "ADMISSION".equalsIgnoreCase(assessmentType);
     if (elderName == null || elderName.isBlank()) {
       if (admissionAssessment) {
-        return null;
+        throw new IllegalArgumentException("入住评估必须填写老人姓名");
       }
       throw new IllegalArgumentException("elderName required");
     }
@@ -570,9 +570,68 @@ public class AssessmentRecordController {
       throw new IllegalArgumentException("elder not found");
     }
     if (elderList.size() > 1) {
+      if (admissionAssessment) {
+        return null;
+      }
       throw new IllegalArgumentException("存在同名老人，请先通过下拉选择具体老人");
     }
     return elderList.get(0).getId();
+  }
+
+  private String resolveAssessmentElderName(Long orgId, Long elderId, String elderName, String assessmentType) {
+    String resolvedName = resolveElderName(elderId, elderName);
+    if (!"ADMISSION".equalsIgnoreCase(assessmentType) || elderId != null) {
+      return resolvedName;
+    }
+    if (resolvedName == null || resolvedName.isBlank()) {
+      throw new IllegalArgumentException("入住评估必须填写老人姓名");
+    }
+    if (hasDuplicateElderName(orgId, resolvedName)) {
+      return nextAutoAdmissionElderName(orgId, resolvedName);
+    }
+    return resolvedName;
+  }
+
+  private boolean hasDuplicateElderName(Long orgId, String elderName) {
+    if (elderName == null || elderName.isBlank()) {
+      return false;
+    }
+    Long count = elderMapper.selectCount(Wrappers.lambdaQuery(ElderProfile.class)
+        .eq(ElderProfile::getIsDeleted, 0)
+        .eq(orgId != null, ElderProfile::getOrgId, orgId)
+        .eq(ElderProfile::getFullName, elderName));
+    return count != null && count > 1;
+  }
+
+  private String nextAutoAdmissionElderName(Long orgId, String preferredBaseName) {
+    String base = preferredBaseName == null ? "" : preferredBaseName.trim();
+    if (base.isBlank()) {
+      base = "老人";
+    }
+    for (int index = 1; index < 10000; index++) {
+      String candidate = base + index;
+      if (!admissionNameOccupied(orgId, candidate)) {
+        return candidate;
+      }
+    }
+    throw new IllegalStateException("自动生成老人姓名失败，请联系管理员");
+  }
+
+  private boolean admissionNameOccupied(Long orgId, String elderName) {
+    Long elderCount = elderMapper.selectCount(Wrappers.lambdaQuery(ElderProfile.class)
+        .eq(ElderProfile::getIsDeleted, 0)
+        .eq(orgId != null, ElderProfile::getOrgId, orgId)
+        .eq(ElderProfile::getFullName, elderName));
+    if (elderCount != null && elderCount > 0) {
+      return true;
+    }
+    Long assessmentCount = recordMapper.selectCount(Wrappers.lambdaQuery(AssessmentRecord.class)
+        .eq(AssessmentRecord::getIsDeleted, 0)
+        .eq(orgId != null, AssessmentRecord::getOrgId, orgId)
+        .eq(AssessmentRecord::getAssessmentType, "ADMISSION")
+        .isNull(AssessmentRecord::getElderId)
+        .eq(AssessmentRecord::getElderName, elderName));
+    return assessmentCount != null && assessmentCount > 0;
   }
 
   private String resolveElderName(Long elderId, String fallback) {

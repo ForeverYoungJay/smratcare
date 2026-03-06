@@ -1,12 +1,6 @@
 <template>
   <PageContainer title="入住评估" subTitle="按 GB/T 42195-2022 执行入院能力与风险评估，评估完成后进入签约与入住办理流程">
     <a-card title="评估入口" class="card-elevated" :bordered="false">
-      <a-alert
-        type="info"
-        show-icon
-        message="评估结果实时联动签约、入住办理与护理规则，不再使用演示数据。"
-        style="margin-bottom: 12px"
-      />
       <StatefulBlock :loading="loading" :error="errorMessage" @retry="loadLatestRecord">
         <a-alert
           v-if="contracts.length === 0"
@@ -15,26 +9,6 @@
           message="当前未匹配到待评估合同，请先在合同签约中新增合同，系统会自动进入待评估列表。"
           style="margin-bottom: 12px"
         />
-        <a-row :gutter="12" style="margin-bottom: 12px">
-          <a-col :xs="24" :sm="8">
-            <a-card size="small"><a-statistic title="合同数" :value="overview?.totalContractCount || 0" /></a-card>
-          </a-col>
-          <a-col :xs="24" :sm="8">
-            <a-card size="small"><a-statistic title="评估报告数" :value="overview?.totalReportCount || 0" /></a-card>
-          </a-col>
-          <a-col :xs="24" :sm="8">
-            <a-card size="small"><a-statistic title="待评估合同" :value="pendingAssessmentCount" /></a-card>
-          </a-col>
-        </a-row>
-        <a-descriptions :column="1" size="small" bordered style="margin-bottom: 12px">
-          <a-descriptions-item label="最近评估日期">{{ latestRecord?.assessmentDate || '-' }}</a-descriptions-item>
-          <a-descriptions-item label="最近评估状态">{{ latestRecord?.status || '无记录' }}</a-descriptions-item>
-          <a-descriptions-item label="最近评估分值">{{ latestRecord?.score ?? '-' }}</a-descriptions-item>
-          <a-descriptions-item label="最近评估等级">{{ latestRecord?.levelCode || '-' }}</a-descriptions-item>
-          <a-descriptions-item label="复评状态">
-            {{ isReassessOverdue ? '已到复评日期' : latestRecord?.nextAssessmentDate ? `下次复评 ${latestRecord?.nextAssessmentDate}` : '未设置' }}
-          </a-descriptions-item>
-        </a-descriptions>
         <a-table
           :data-source="contracts"
           :columns="contractColumns"
@@ -48,9 +22,6 @@
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'flowStage'">
               <a-tag :color="flowStageColor(record.flowStage)">{{ flowStageText(record.flowStage) }}</a-tag>
-            </template>
-            <template v-else-if="column.key === 'reportCount'">
-              {{ (record.reports || []).length }}
             </template>
           </template>
           <template #expandedRowRender="{ record }">
@@ -76,7 +47,7 @@
           type="success"
           show-icon
           style="margin-bottom: 12px"
-          :message="`当前已选合同：${selectedContract.contractNo || '-'}，可执行开始评估、下载报告、入住办理。`"
+          :message="`当前已选合同：${selectedContract.contractNo || '-'}，可执行一键闭环评估并自动回流入住办理。`"
         />
         <a-alert
           v-else
@@ -106,8 +77,7 @@
         <a-space direction="vertical" style="width: 100%">
           <a-button block type="primary" :disabled="!selectedContract" @click="go(primaryActionPath)">{{ primaryActionText }}</a-button>
           <a-button block @click="go(historyPath)">查看历史评估报告</a-button>
-          <a-button block :loading="downloadingReport" :disabled="!selectedLatestRecord" @click="downloadLatestReport">下载最近评估报告</a-button>
-          <a-button block :disabled="!selectedContract" @click="go(admissionPath)">进入入住办理</a-button>
+          <a-button block :disabled="!selectedContract" @click="go(admissionPath)">回流入住办理（闭环）</a-button>
         </a-space>
       </StatefulBlock>
     </a-card>
@@ -121,7 +91,7 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
 import FlowGuardBar from '../../../components/FlowGuardBar.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
-import { getAssessmentRecordPage, getAssessmentRecordReport } from '../../../api/assessment'
+import { getAssessmentRecordPage } from '../../../api/assessment'
 import { getContractAssessmentOverview, getContractPage } from '../../../api/marketing'
 import type { AssessmentRecord, ContractAssessmentContractItem, ContractAssessmentOverview, CrmContractItem, PageResult } from '../../../types'
 
@@ -132,7 +102,6 @@ const leadId = computed(() => Number(route.query.leadId || 0))
 const latestRecord = ref<AssessmentRecord | null>(null)
 const overview = ref<ContractAssessmentOverview | null>(null)
 const loading = ref(false)
-const downloadingReport = ref(false)
 const errorMessage = ref('')
 const fallbackContracts = ref<ContractAssessmentContractItem[]>([])
 const contracts = computed<ContractAssessmentContractItem[]>(() =>
@@ -179,7 +148,7 @@ const flowBlockers = computed(() => {
   if (!contract) return [{ code: 'G001', text: '未选择合同', actionLabel: '选择合同', actionKey: 'pick-contract' }]
   const blockers: Array<{ code: string; text: string; actionLabel?: string; actionKey?: string }> = []
   if (contract.flowStage === 'PENDING_ASSESSMENT') {
-    blockers.push({ code: 'G201', text: '请先点击“开始入住评估”并完成保存', actionLabel: '开始评估', actionKey: 'start-assessment' })
+    blockers.push({ code: 'G201', text: '请先完成入住评估并保存，系统将自动回流入住办理', actionLabel: '一键闭环评估', actionKey: 'start-assessment' })
   }
   if (contract.flowStage === 'PENDING_BED_SELECT' && !selectedLatestRecord.value) {
     blockers.push({ code: 'G203', text: '缺少评估报告，请先补充评估结果', actionLabel: '补评估', actionKey: 'start-assessment' })
@@ -192,9 +161,9 @@ const flowBlockers = computed(() => {
 const flowHint = computed(() => {
   const contract = selectedContract.value
   if (!contract) return ''
-  if (contract.flowStage === 'PENDING_BED_SELECT') return '当前可进入入住办理并选择床位'
+  if (contract.flowStage === 'PENDING_BED_SELECT') return '评估已完成，可直接回流入住办理并选择床位'
   if (contract.flowStage === 'SIGNED') return '流程已完成闭环'
-  return '按提示完成当前节点后系统将自动推进下一阶段'
+  return '按提示完成当前节点后，系统将自动推进到下一阶段'
 })
 
 function handleFlowGuardAction(item: { actionKey?: string }) {
@@ -209,11 +178,10 @@ function handleFlowGuardAction(item: { actionKey?: string }) {
 
 const contractColumns = [
   { title: '合同编号', dataIndex: 'contractNo', key: 'contractNo', width: 170 },
+  { title: '老人姓名', dataIndex: 'elderName', key: 'elderName', width: 140 },
   { title: '合同状态', dataIndex: 'contractStatus', key: 'contractStatus', width: 120 },
   { title: '流程阶段', dataIndex: 'flowStage', key: 'flowStage', width: 120 },
-  { title: '签约时间', dataIndex: 'contractSignedAt', key: 'contractSignedAt', width: 170 },
-  { title: '到期日期', dataIndex: 'contractExpiryDate', key: 'contractExpiryDate', width: 120 },
-  { title: '报告数', dataIndex: 'reportCount', key: 'reportCount', width: 90 }
+  { title: '签约时间', dataIndex: 'contractSignedAt', key: 'contractSignedAt', width: 170 }
 ]
 
 const reportColumns = [
@@ -231,7 +199,7 @@ const admissionPath = computed(() =>
 )
 
 const historyPath = computed(() =>
-  residentId.value ? `/assessment/ability/archive?residentId=${residentId.value}` : '/assessment/ability/archive'
+  residentId.value ? `/elder/assessment/ability/archive?residentId=${residentId.value}` : '/elder/assessment/ability/archive'
 )
 
 const isReassessOverdue = computed(() => {
@@ -242,10 +210,10 @@ const isReassessOverdue = computed(() => {
 })
 
 const primaryActionText = computed(() => {
-  if (!selectedLatestRecord.value) return '开始入住评估'
-  if (selectedLatestRecord.value.status === 'DRAFT') return '继续填写入住评估'
-  if (isReassessOverdue.value) return '发起复评'
-  return '新建入住评估'
+  if (!selectedLatestRecord.value) return '一键闭环：开始入住评估'
+  if (selectedLatestRecord.value.status === 'DRAFT') return '一键闭环：继续填写入住评估'
+  if (isReassessOverdue.value) return '一键闭环：发起复评'
+  return '一键闭环：新建入住评估'
 })
 
 const primaryActionPath = computed(() => {
@@ -258,6 +226,7 @@ const primaryActionPath = computed(() => {
   const selectedElderId = contract?.elderId || overview.value?.elderId || residentId.value || undefined
   const params = new URLSearchParams()
   params.set('autoOpen', '1')
+  params.set('closeLoop', '1')
   params.set('mode', mode)
   if (residentId.value) params.set('residentId', String(residentId.value))
   if (selectedElderId != null && String(selectedElderId) !== '0') {
@@ -270,7 +239,7 @@ const primaryActionPath = computed(() => {
   if (contract?.elderPhone) params.set('elderPhone', contract.elderPhone)
   if (contract?.idCardNo) params.set('idCardNo', contract.idCardNo)
   if (contract?.homeAddress) params.set('homeAddress', contract.homeAddress)
-  return `/assessment/ability/admission?${params.toString()}`
+  return `/elder/assessment/ability/admission?${params.toString()}`
 })
 
 function go(path: string) {
@@ -371,50 +340,6 @@ function flowStageColor(stage?: string) {
   if (stage === 'PENDING_SIGN') return 'purple'
   if (stage === 'SIGNED') return 'green'
   return 'default'
-}
-
-async function downloadLatestReport() {
-  if (!selectedLatestRecord.value) {
-    message.warning('暂无可下载评估记录')
-    return
-  }
-  downloadingReport.value = true
-  try {
-    const record = selectedLatestRecord.value
-    const report = await getAssessmentRecordReport(Number(record.id))
-    if (!report) {
-      message.warning('评估报告数据不存在')
-      return
-    }
-    const elderName = report.elderName || latestRecord.value?.elderName || overview.value?.elderName || '长者'
-    const lines = [
-      '入住评估报告',
-      `报告编号：${report.reportNo || '-'}`,
-      `老人姓名：${elderName || '-'}`,
-      `评估类型：${report.assessmentTypeLabel || report.assessmentType || '-'}`,
-      `评估日期：${report.assessmentDate || '-'}`,
-      `评估状态：${report.reportStatus || '-'}`,
-      `评估分值：${report.score ?? '-'}`,
-      `评估等级：${report.levelCode || '-'}`,
-      `评估结论：${report.resultSummary || '-'}`,
-      `护理建议：${report.suggestion || '-'}`,
-      `评分明细：${report.detailJson || '-'}`
-    ]
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `入住评估报告_${elderName || '长者'}_${report.assessmentDate || new Date().toISOString().slice(0, 10)}.txt`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-    message.success('最近评估报告已下载')
-  } catch (error: any) {
-    message.error(error?.message || '下载评估报告失败')
-  } finally {
-    downloadingReport.value = false
-  }
 }
 
 function contractCustomRow(record: ContractAssessmentContractItem) {

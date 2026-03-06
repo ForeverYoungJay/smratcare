@@ -30,7 +30,7 @@ const moduleRoleMap: Array<{ prefixes: string[]; employeeRoles: string[]; minist
   { prefixes: ['/marketing'], employeeRoles: ['MARKETING_EMPLOYEE'], ministerRoles: ['MARKETING_MINISTER'] },
   { prefixes: ['/hr', '/oa', '/schedule', '/attendance'], employeeRoles: ['HR_EMPLOYEE'], ministerRoles: ['HR_MINISTER'] },
   {
-    prefixes: ['/assessment'],
+    prefixes: ['/elder/assessment', '/assessment'],
     employeeRoles: ['MEDICAL_EMPLOYEE', 'NURSING_EMPLOYEE'],
     ministerRoles: ['MEDICAL_MINISTER', 'NURSING_MINISTER']
   },

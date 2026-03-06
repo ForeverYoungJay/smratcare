@@ -251,7 +251,7 @@ const admissionFlowBlockers = computed(() => {
   const blockers: Array<{ code: string; text: string; actionLabel?: string; actionKey?: string }> = []
   if (guardContract.value.status === 'VOID') blockers.push({ code: 'G401', text: '合同已作废' })
   if (guardContract.value.flowStage === 'PENDING_ASSESSMENT') {
-    blockers.push({ code: 'G201', text: '尚未完成入住评估', actionLabel: '去评估', actionKey: 'go-assessment' })
+    blockers.push({ code: 'G201', text: '尚未完成入住评估', actionLabel: '去评估并闭环回流', actionKey: 'go-assessment' })
   }
   if (guardContract.value.flowStage === 'SIGNED' || guardContract.value.status === 'SIGNED' || guardContract.value.status === 'EFFECTIVE') {
     blockers.push({ code: 'G402', text: '合同已签署，不能重复办理入住' })
@@ -263,6 +263,7 @@ const admissionFlowHint = computed(() => {
   if (guardContract.value.flowStage === 'PENDING_BED_SELECT') return '当前可提交入住办理并同步推进到待签署'
   if (guardContract.value.flowStage === 'PENDING_SIGN') return '已满足入住环节，可回到合同签约执行最终签署'
   if (guardContract.value.flowStage === 'SIGNED') return '当前合同流程已完成'
+  if (guardContract.value.flowStage === 'PENDING_ASSESSMENT') return '请通过“去评估并闭环回流”完成评估后自动返回本页'
   return ''
 })
 
@@ -274,11 +275,12 @@ function handleAdmissionGuardAction(item: { actionKey?: string }) {
   if (item.actionKey === 'go-assessment') {
     const params = new URLSearchParams()
     params.set('autoOpen', '1')
+    params.set('closeLoop', '1')
     params.set('mode', 'new')
     if (form.contractNo) params.set('contractNo', String(form.contractNo))
     if (guardContract.value?.leadId) params.set('leadId', String(guardContract.value.leadId))
     if (guardContract.value?.elderName) params.set('elderName', String(guardContract.value.elderName))
-    router.push(`/assessment/ability/admission?${params.toString()}`)
+    router.push(`/elder/assessment/ability/admission?${params.toString()}`)
   }
 }
 

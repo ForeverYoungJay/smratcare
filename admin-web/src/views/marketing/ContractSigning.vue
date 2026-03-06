@@ -104,7 +104,7 @@
       />
       <MarketingListToolbar :tip="`已勾选 ${selectedCount} 条`">
         <a-space>
-          <a-button type="primary" @click="openForm()">新增合同</a-button>
+          <a-button v-if="!isSignedMode" type="primary" @click="openForm()">新增合同</a-button>
           <a-button :disabled="!hasSingleSelection" @click="viewSelected">查看</a-button>
           <a-button :disabled="!hasSingleSelection" @click="editSelected">编辑</a-button>
           <a-button :disabled="!hasSingleSelection" @click="openAttachmentSelected">附件</a-button>
@@ -299,13 +299,17 @@ const props = withDefaults(defineProps<{
   statusPreset?: 'pending_sign' | 'signed' | 'pending_assessment' | 'pending_bed_select' | ''
   title?: string
   subTitle?: string
+  disableDefaultFlowStagePreset?: boolean
 }>(), {
   statusPreset: '',
   title: '合同签约',
-  subTitle: '营销建合同 -> 长者管理入住评估 -> 入住办理 -> 最终签署'
+  subTitle: '营销建合同 -> 长者管理入住评估 -> 入住办理 -> 最终签署',
+  disableDefaultFlowStagePreset: false
 })
 const pageTitle = computed(() => props.title || '合同签约')
 const pageSubTitle = computed(() => props.subTitle || '营销建合同 -> 长者管理入住评估 -> 入住办理 -> 最终签署')
+const resolvedStatusPreset = computed(() => String(props.statusPreset || route.query.status || '').trim())
+const isSignedMode = computed(() => resolvedStatusPreset.value === 'signed')
 const loading = ref(false)
 const submitting = ref(false)
 const open = ref(false)
@@ -348,7 +352,11 @@ const query = reactive({
 })
 
 function applyStatusPreset() {
-  const statusPreset = String(props.statusPreset || route.query.status || '').trim()
+  const statusPreset = resolvedStatusPreset.value
+  if (props.disableDefaultFlowStagePreset && statusPreset === 'pending_sign') {
+    query.flowStage = undefined
+    return
+  }
   if (statusPreset === 'pending_sign') {
     query.flowStage = 'PENDING_SIGN'
     return
@@ -457,7 +465,7 @@ function handleFlowGuardAction(item: { actionKey?: string }) {
     if (record.leadId) query.leadId = String(record.leadId)
     if (record.contractNo) query.contractNo = record.contractNo
     if (record.elderName) query.elderName = record.elderName
-    router.push({ path: '/elder/admission-assessment', query })
+    router.push({ path: '/elder/assessment/ability/admission', query })
     return
   }
   if (item.actionKey === 'go-admission') {
