@@ -10,7 +10,7 @@ cd "$ROOT_DIR"
 COMPOSE_ARGS=()
 NO_BUILD=0
 LOG_TAIL=160
-WAIT_SECONDS=45
+WAIT_SECONDS=10
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -93,6 +93,36 @@ history_table_exists() {
   [[ "${exists}" == "1" ]]
 }
 
+has_rg() {
+  command -v rg >/dev/null 2>&1
+}
+
+log_match() {
+  local logs="$1"
+  local pattern="$2"
+  if has_rg; then
+    echo "${logs}" | rg -q "${pattern}"
+  else
+    echo "${logs}" | grep -Eq "${pattern}"
+  fi
+}
+
+log_extract_last() {
+  local logs="$1"
+  local pattern="$2"
+  if has_rg; then
+    echo "${logs}" | rg -o "${pattern}" | tail -n 1
+  else
+    echo "${logs}" | grep -Eo "${pattern}" | tail -n 1
+  fi
+}
+
+delete_failed_version_record() {
+  local version="$1"
+  [[ -z "${version}" ]] && return 0
+  mysql_exec "DELETE FROM flyway_schema_history WHERE version='${version}' AND success=0;"
+}
+
 echo "[STEP 1/5] 检查本地迁移版本冲突"
 ./scripts/check_flyway_versions.sh
 
@@ -139,28 +169,30 @@ BACKEND_LOGS=""
 for _ in $(seq 1 "${WAIT_SECONDS}"); do
   sleep 1
   BACKEND_LOGS="$(compose logs --tail="${LOG_TAIL}" backend || true)"
-  if echo "${BACKEND_LOGS}" | rg -q "${SUCCESS_PATTERN}"; then
+  if log_match "${BACKEND_LOGS}" "${SUCCESS_PATTERN}"; then
     echo "${BACKEND_LOGS}"
     echo
     echo "[OK] backend 启动成功，Flyway 自检+修复完成"
     exit 0
   fi
-  if echo "${BACKEND_LOGS}" | rg -q "${FAIL_PATTERN}"; then
+  if log_match "${BACKEND_LOGS}" "${FAIL_PATTERN}"; then
     break
   fi
 done
 
 echo "${BACKEND_LOGS}"
 
-if echo "${BACKEND_LOGS}" | rg -q "${FAIL_PATTERN}"; then
-  FAILED_SCRIPT="$(echo "${BACKEND_LOGS}" | rg -o "V[0-9]+__[^[:space:]]+\\.sql" | tail -n 1 || true)"
-  FAILED_VERSION="$(echo "${BACKEND_LOGS}" | rg -o "version [0-9]+" | tail -n 1 | awk '{print $2}' || true)"
+if log_match "${BACKEND_LOGS}" "${FAIL_PATTERN}"; then
+  FAILED_SCRIPT="$(log_extract_last "${BACKEND_LOGS}" "V[0-9]+__[^[:space:]]+\\.sql" || true)"
+  FAILED_VERSION="$(log_extract_last "${BACKEND_LOGS}" "version [0-9]+" | awk '{print $2}' || true)"
   echo
   echo "[FAIL] 仍存在 Flyway/启动错误"
   if [[ -n "${FAILED_SCRIPT}" ]]; then
     echo "[HINT] 失败迁移脚本: ${FAILED_SCRIPT}"
   fi
   if [[ -n "${FAILED_VERSION}" ]]; then
+    echo "[ACTION] 自动清理本轮失败记录: version=${FAILED_VERSION}"
+    delete_failed_version_record "${FAILED_VERSION}" || true
     echo "[HINT] 可在脚本修复后重试本命令；若仍卡校验，可清理该失败记录:"
     echo "       DELETE FROM flyway_schema_history WHERE version='${FAILED_VERSION}' AND success=0;"
   fi
