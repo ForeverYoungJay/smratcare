@@ -199,6 +199,13 @@
         </a-tag>
       </div>
       <a-alert
+        v-if="selectedRowKeys.length > 0"
+        style="margin-bottom: 12px"
+        type="info"
+        show-icon
+        :message="selectedSummaryText"
+      />
+      <a-alert
         v-if="lastBatchAction"
         style="margin-bottom: 12px"
         type="success"
@@ -210,7 +217,7 @@
         :columns="tableColumns"
         :loading="loading"
         :pagination="false"
-        row-key="id"
+        :row-key="assessmentRowKey"
         :row-selection="rowSelection"
         :row-class-name="tableRowClassName"
         :custom-row="tableCustomRow"
@@ -1152,7 +1159,7 @@ const query = reactive({
 const open = ref(false)
 const formReadonly = ref(false)
 const formRef = ref<FormInstance>()
-const selectedRowKeys = ref<number[]>([])
+const selectedRowKeys = ref<string[]>([])
 const batchAssignOpen = ref(false)
 const batchAssignSubmitting = ref(false)
 const batchAssignAssessorName = ref('')
@@ -1302,16 +1309,46 @@ function handleAdmissionGuardAction(item: { actionKey?: string }) {
     openForm(selectedAdmissionRecord.value)
   }
 }
+function assessmentRowKey(record: AssessmentRecord) {
+  return String(record?.id ?? '').trim()
+}
 const rowSelection = computed(() => {
   return {
+    preserveSelectedRowKeys: true,
     selectedRowKeys: selectedRowKeys.value,
     onChange: (keys: Array<number | string>) => {
-      selectedRowKeys.value = keys.map((item) => Number(item)).filter((item) => Number.isFinite(item))
+      selectedRowKeys.value = keys
+        .map((item) => String(item ?? '').trim())
+        .filter((item) => item.length > 0)
       if (selectedByFilter.value && selectedRowKeys.value.length <= rows.value.length) {
         selectedByFilter.value = false
       }
     }
   }
+})
+const selectedRowsInCurrentPage = computed(() => {
+  if (!selectedRowKeys.value.length || !rows.value.length) return []
+  const idSet = new Set(selectedRowKeys.value)
+  return rows.value.filter((item) => idSet.has(assessmentRowKey(item)))
+})
+const selectedSummaryText = computed(() => {
+  const selectedCount = selectedRowKeys.value.length
+  if (!selectedCount) {
+    return '未勾选评估记录'
+  }
+  const selectedLabels = selectedRowsInCurrentPage.value
+    .slice(0, 8)
+    .map((item) => `${item.elderName || '-'}（${item.archiveNo || item.id || '-'}）`)
+  const hiddenCount = selectedRowsInCurrentPage.value.length - selectedLabels.length
+  const outOfPageCount = selectedCount - selectedRowsInCurrentPage.value.length
+  let text = `当前页已勾选：${selectedLabels.join('、') || '当前页暂无已勾选项'}`
+  if (hiddenCount > 0) {
+    text += `；另有 ${hiddenCount} 条未展开`
+  }
+  if (outOfPageCount > 0) {
+    text += `；另有 ${outOfPageCount} 条在其他页`
+  }
+  return text
 })
 
 const tableCustomRow = (record: AssessmentRecord) => {
@@ -2073,8 +2110,8 @@ async function exportCsv() {
 }
 
 function getSelectedRows() {
-  const idSet = new Set(selectedRowKeys.value.map((item) => Number(item)))
-  return rows.value.filter((item) => idSet.has(Number(item.id)))
+  const idSet = new Set(selectedRowKeys.value)
+  return rows.value.filter((item) => idSet.has(assessmentRowKey(item)))
 }
 
 function toggleSelectAll() {
@@ -2089,8 +2126,8 @@ function toggleSelectAll() {
     return
   }
   selectedRowKeys.value = rows.value
-    .map((item) => Number(item.id))
-    .filter((item) => Number.isFinite(item))
+    .map((item) => assessmentRowKey(item))
+    .filter((item) => item.length > 0)
   selectedByFilter.value = false
 }
 
@@ -2100,8 +2137,8 @@ async function selectByFilter() {
     limit: 2000
   })
   const selected = (ids || [])
-    .map((item) => Number(item))
-    .filter((item) => Number.isFinite(item))
+    .map((item) => String(item ?? '').trim())
+    .filter((item) => item.length > 0)
   selectedRowKeys.value = selected
   selectedByFilter.value = selected.length > rows.value.length
   if (!selected.length) {
@@ -2127,8 +2164,8 @@ function handleBatchResultFeedback(result: AssessmentBatchOperationResult, succe
   const successIds = Array.isArray(result?.successIds) ? result.successIds : []
   const failedIds = Array.from(new Set(
     (result?.failures || [])
-      .map((item) => Number(item?.id))
-      .filter((item) => Number.isFinite(item))
+      .map((item) => String(item?.id ?? '').trim())
+      .filter((item) => item.length > 0)
   ))
   changedRowIdSet.value = new Set(
     successIds
