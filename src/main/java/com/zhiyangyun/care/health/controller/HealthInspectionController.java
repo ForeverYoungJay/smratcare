@@ -119,10 +119,11 @@ public class HealthInspectionController {
         .le(to != null, "inspection_date", to)
         .groupBy("status")
         .orderByDesc("totalCount");
-    if (keyword != null && !keyword.isBlank()) {
-      statusStatWrapper.and(w -> w.like("elder_name", keyword)
-          .or().like("inspection_item", keyword)
-          .or().like("inspector_name", keyword));
+    final String keywordFilter = keyword;
+    if (keywordFilter != null && !keywordFilter.isBlank()) {
+      statusStatWrapper.and(w -> w.like("elder_name", keywordFilter)
+          .or().like("inspection_item", keywordFilter)
+          .or().like("inspector_name", keywordFilter));
     }
     List<HealthNameCountStatItem> statusStats = mapper.selectMaps(statusStatWrapper).stream().map(map -> {
       HealthNameCountStatItem item = new HealthNameCountStatItem();
