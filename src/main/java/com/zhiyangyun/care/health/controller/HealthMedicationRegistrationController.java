@@ -130,10 +130,11 @@ public class HealthMedicationRegistrationController {
         .le(to != null, "register_time", to)
         .groupBy("nurse_name")
         .orderByDesc("totalCount");
-    if (keyword != null && !keyword.isBlank()) {
-      nurseStatWrapper.and(w -> w.like("elder_name", keyword)
-          .or().like("drug_name", keyword)
-          .or().like("nurse_name", keyword));
+    final String keywordFilter = keyword;
+    if (keywordFilter != null && !keywordFilter.isBlank()) {
+      nurseStatWrapper.and(w -> w.like("elder_name", keywordFilter)
+          .or().like("drug_name", keywordFilter)
+          .or().like("nurse_name", keywordFilter));
     }
     List<HealthNameCountStatItem> nurseStats = mapper.selectMaps(nurseStatWrapper).stream().map(map -> {
       HealthNameCountStatItem item = new HealthNameCountStatItem();
