@@ -152,6 +152,7 @@ public class OaTaskController {
       rangeStart = rangeEnd;
       rangeEnd = tmp;
     }
+    final LocalDateTime overlapRangeStart = rangeStart;
 
     String normalizedAssigneeName = trimToNull(request.getAssigneeName());
     List<Long> collaboratorIds = sanitizeIds(request.getCollaboratorIds());
@@ -167,7 +168,7 @@ public class OaTaskController {
         .ne(request.getTaskId() != null, OaTask::getId, request.getTaskId())
         .isNotNull(OaTask::getStartTime)
         .le(OaTask::getStartTime, rangeEnd)
-        .and(w -> w.isNull(OaTask::getEndTime).or().ge(OaTask::getEndTime, rangeStart))
+        .and(w -> w.isNull(OaTask::getEndTime).or().ge(OaTask::getEndTime, overlapRangeStart))
         .last("LIMIT 2000");
 
     if (normalizedAssigneeName != null || !collaboratorIds.isEmpty()) {
