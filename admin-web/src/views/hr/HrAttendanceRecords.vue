@@ -30,6 +30,9 @@
         <template v-if="column.key === 'abnormal'">
           {{ record.abnormal ? '是' : '否' }}
         </template>
+        <template v-else-if="column.key === 'reviewed'">
+          {{ Number(record.reviewed) === 1 ? '已核验' : '待核验' }}
+        </template>
       </template>
     </DataTable>
   </PageContainer>
@@ -59,7 +62,8 @@ const columns = [
   { title: '签到时间', dataIndex: 'checkInTime', key: 'checkInTime', width: 180 },
   { title: '签退时间', dataIndex: 'checkOutTime', key: 'checkOutTime', width: 180 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 120 },
-  { title: '异常', dataIndex: 'abnormal', key: 'abnormal', width: 100 }
+  { title: '异常', dataIndex: 'abnormal', key: 'abnormal', width: 100 },
+  { title: '核验', dataIndex: 'reviewed', key: 'reviewed', width: 100 }
 ]
 
 const dateRange = ref<string[]>()
@@ -110,12 +114,12 @@ function rowClassName(record: HrAttendanceRecordItem) {
 }
 
 function onExportCsv() {
-  const exportRows = rows.value.map((item) => ({ ...item, abnormal: item.abnormal ? '是' : '否' }))
+  const exportRows = rows.value.map((item) => ({ ...item, abnormal: item.abnormal ? '是' : '否', reviewed: Number(item.reviewed) === 1 ? '已核验' : '待核验' }))
   exportCsv(mapByDict(exportRows as Record<string, any>[], HR_ATTENDANCE_EXPORT_FIELDS), '考勤记录-当前筛选')
 }
 
 function onExportExcel() {
-  const exportRows = rows.value.map((item) => ({ ...item, abnormal: item.abnormal ? '是' : '否' }))
+  const exportRows = rows.value.map((item) => ({ ...item, abnormal: item.abnormal ? '是' : '否', reviewed: Number(item.reviewed) === 1 ? '已核验' : '待核验' }))
   exportExcel(mapByDict(exportRows as Record<string, any>[], HR_ATTENDANCE_EXPORT_FIELDS), '考勤记录-当前筛选')
 }
 

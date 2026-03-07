@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.Data;
 
 @Data
@@ -21,6 +22,8 @@ public class StaffAccount {
   private String realName;
   private String phone;
   private String email;
+  private Long directLeaderId;
+  private Long indirectLeaderId;
   private Integer gender;
   private Integer status;
   private LocalDateTime lastLoginTime;
@@ -30,4 +33,6 @@ public class StaffAccount {
   private LocalDateTime updateTime;
   @TableField(value = "is_deleted", fill = FieldFill.INSERT)
   private Integer isDeleted;
+  @TableField(exist = false)
+  private List<String> roleCodes;
 }

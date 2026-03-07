@@ -33,7 +33,8 @@ export const HR_ATTENDANCE_EXPORT_FIELDS: ExportFieldDict[] = [
   { key: 'checkInTime', label: '签到时间' },
   { key: 'checkOutTime', label: '签退时间' },
   { key: 'status', label: '考勤状态' },
-  { key: 'abnormal', label: '是否异常' }
+  { key: 'abnormal', label: '是否异常' },
+  { key: 'reviewed', label: '是否核验' }
 ]
 
 export function mapByDict<T extends Record<string, any>>(rows: T[], dict: ExportFieldDict[]) {

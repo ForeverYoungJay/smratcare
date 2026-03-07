@@ -33,6 +33,8 @@ public class StaffProfile {
 
   private String emergencyContactPhone;
 
+  private LocalDate birthday;
+
   private Integer status;
 
   private LocalDate leaveDate;

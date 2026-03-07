@@ -15,7 +15,6 @@ public class OaApprovalRequest {
 
   private Long applicantId;
 
-  @NotBlank
   private String applicantName;
 
   private BigDecimal amount;

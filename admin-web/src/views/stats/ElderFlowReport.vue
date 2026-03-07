@@ -14,22 +14,31 @@
             <a-select-option value="DISCHARGE">离院</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="老人姓名">
-          <a-input v-model:value="query.keyword" allow-clear placeholder="请输入老人姓名" style="width: 180px" />
-        </a-form-item>
         <a-form-item label="机构ID">
           <a-input-number v-model:value="query.orgId" :min="1" placeholder="默认当前机构" style="width: 160px" />
         </a-form-item>
-        <a-form-item label="打印老人">
-          <a-input v-model:value="printElderKeyword" allow-clear placeholder="按姓名筛选打印" style="width: 160px" />
+        <a-form-item label="打印老人(院内)">
+          <a-select
+            v-model:value="printElderId"
+            show-search
+            allow-clear
+            :filter-option="false"
+            :options="elderOptions"
+            :loading="elderLoading"
+            placeholder="请选择院内老人"
+            style="width: 180px"
+            @search="searchElders"
+            @focus="() => !elderOptions.length && searchElders('')"
+            @change="onPrintElderChange"
+          />
         </a-form-item>
         <a-form-item>
           <a-space>
             <a-button type="primary" @click="search">查询</a-button>
             <a-button @click="exportCsvReport">导出报表</a-button>
             <a-button @click="openColumnSetting">列设置</a-button>
-            <a-button @click="printCurrent">打印当前列</a-button>
-            <a-button @click="printSpecificElder">打印指定老人</a-button>
+            <a-button :disabled="!printRows.length" @click="printCurrent">打印当前列</a-button>
+            <a-button :disabled="!canPrintSpecific" @click="printSpecificElder">打印指定老人</a-button>
             <a-button @click="reset">重置</a-button>
           </a-space>
         </a-form-item>
@@ -78,14 +87,14 @@ import dayjs, { type Dayjs } from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportElderFlowReportCsv, getElderFlowReport } from '../../api/stats'
 import type { FlowReportItem } from '../../types'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import { printTableReport } from '../../utils/print'
+import { useElderOptions } from '../../composables/useElderOptions'
 
 const query = ref({
   fromDate: dayjs().subtract(29, 'day') as Dayjs,
   toDate: dayjs() as Dayjs,
   eventType: undefined as 'ADMISSION' | 'DISCHARGE' | undefined,
-  keyword: undefined as string | undefined,
   orgId: undefined as number | undefined,
   pageNo: 1,
   pageSize: 20
@@ -93,7 +102,7 @@ const query = ref({
 
 const rows = ref<FlowReportItem[]>([])
 const total = ref(0)
-const printElderKeyword = ref('')
+const printElderId = ref<number | undefined>(undefined)
 const columnSettingOpen = ref(false)
 const printColumnOptions = [
   { label: '日期', value: 'eventDate' },
@@ -102,12 +111,17 @@ const printColumnOptions = [
   { label: '备注', value: 'remark' }
 ]
 const selectedPrintColumns = ref<string[]>(['eventDate', 'eventTypeLabel', 'elderName', 'remark'])
+const { elderOptions, elderLoading, searchElders } = useElderOptions({ pageSize: 100, inHospitalOnly: true })
+const LARGE_PRINT_ROW_THRESHOLD = 200
 const printRows = computed(() => rows.value.map(item => ({
+  elderId: item.elderId,
   eventDate: item.eventDate || '',
   eventTypeLabel: item.eventType === 'ADMISSION' ? '入院' : '离院',
   elderName: item.elderName || '未知老人',
   remark: item.remark || ''
 })))
+const selectedPrintElder = computed(() => elderOptions.value.find(item => Number(item.value) === Number(printElderId.value)))
+const canPrintSpecific = computed(() => !!printRows.value.length && !!printElderId.value)
 
 async function loadData() {
   if (query.value.fromDate.isAfter(query.value.toDate, 'day')) {
@@ -119,7 +133,6 @@ async function loadData() {
       fromDate: dayjs(query.value.fromDate).format('YYYY-MM-DD'),
       toDate: dayjs(query.value.toDate).format('YYYY-MM-DD'),
       eventType: query.value.eventType,
-      keyword: query.value.keyword,
       pageNo: query.value.pageNo,
       pageSize: query.value.pageSize,
       orgId: query.value.orgId
@@ -140,10 +153,10 @@ function reset() {
   query.value.fromDate = dayjs().subtract(29, 'day')
   query.value.toDate = dayjs()
   query.value.eventType = undefined
-  query.value.keyword = undefined
   query.value.orgId = undefined
   query.value.pageNo = 1
   query.value.pageSize = 20
+  printElderId.value = undefined
   loadData()
 }
 
@@ -167,7 +180,6 @@ async function exportCsvReport() {
       fromDate: dayjs(query.value.fromDate).format('YYYY-MM-DD'),
       toDate: dayjs(query.value.toDate).format('YYYY-MM-DD'),
       eventType: query.value.eventType,
-      keyword: query.value.keyword,
       orgId: query.value.orgId
     })
     message.success('报表导出成功')
@@ -177,39 +189,70 @@ async function exportCsvReport() {
 }
 
 function printCurrent() {
-  renderPrint('老人出入报表（当前结果）', printRows.value)
+  renderPrint('老人出入报表（当前结果）', printRows.value, '当前查询结果')
 }
 
 function printSpecificElder() {
-  const keyword = printElderKeyword.value.trim()
-  if (!keyword) {
-    message.warning('请输入打印老人姓名关键字')
+  let filtered = printRows.value
+  let title = '老人出入报表（指定老人）'
+  let printScope = '当前查询结果'
+
+  if (printElderId.value) {
+    filtered = filtered.filter(item => Number(item.elderId) === Number(printElderId.value))
+    const selectedName = selectedPrintElder.value?.name || `老人ID:${printElderId.value}`
+    title = `老人出入报表（${selectedName} / ID:${printElderId.value}）`
+    printScope = `指定老人：${selectedName} / ID:${printElderId.value}`
+  } else {
+    message.warning('请选择院内老人')
     return
   }
-  const filtered = printRows.value.filter(item => item.elderName.includes(keyword))
+
   if (!filtered.length) {
     message.warning('未找到匹配老人记录')
     return
   }
-  renderPrint(`老人出入报表（${keyword}）`, filtered)
+  renderPrint(title, filtered, printScope)
 }
 
-function renderPrint(title: string, data: Array<Record<string, any>>) {
+function onPrintElderChange(value?: number) {
+  printElderId.value = value
+}
+
+async function renderPrint(title: string, data: Array<Record<string, any>>, printScope: string) {
   if (!selectedPrintColumns.value.length) {
     message.warning('请至少选择一列打印')
     return
+  }
+  if (data.length > LARGE_PRINT_ROW_THRESHOLD) {
+    const confirmed = await confirmLargePrint(data.length)
+    if (!confirmed) {
+      return
+    }
   }
   const headers = printColumnOptions.filter(item => selectedPrintColumns.value.includes(item.value))
   try {
     printTableReport({
       title,
-      subtitle: `${dayjs(query.value.fromDate).format('YYYY-MM-DD')} ~ ${dayjs(query.value.toDate).format('YYYY-MM-DD')}`,
+      subtitle: `${dayjs(query.value.fromDate).format('YYYY-MM-DD')} ~ ${dayjs(query.value.toDate).format('YYYY-MM-DD')}；打印范围：${printScope}；记录数：${data.length}`,
       columns: headers.map(item => ({ key: item.value, title: item.label })),
       rows: data
     })
   } catch (error: any) {
     message.error(error?.message || '打印失败')
   }
+}
+
+function confirmLargePrint(rowCount: number) {
+  return new Promise<boolean>((resolve) => {
+    Modal.confirm({
+      title: '打印确认',
+      content: `本次将打印 ${rowCount} 条记录，可能耗时较长，是否继续？`,
+      okText: '继续打印',
+      cancelText: '取消',
+      onOk: () => resolve(true),
+      onCancel: () => resolve(false)
+    })
+  })
 }
 
 onMounted(loadData)

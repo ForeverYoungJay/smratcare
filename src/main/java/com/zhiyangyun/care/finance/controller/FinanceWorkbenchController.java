@@ -46,6 +46,9 @@ import com.zhiyangyun.care.finance.model.FinanceBillingConfigRollbackRequest;
 import com.zhiyangyun.care.finance.model.FinanceBillingConfigSnapshotItem;
 import com.zhiyangyun.care.finance.model.FinanceBillingConfigUpsertRequest;
 import com.zhiyangyun.care.finance.model.FinanceAllocationRuleItem;
+import com.zhiyangyun.care.finance.model.FinanceAllocationMeterValidateRequest;
+import com.zhiyangyun.care.finance.model.FinanceAllocationMeterValidateResponse;
+import com.zhiyangyun.care.finance.model.FinanceAllocationTemplateInitResponse;
 import com.zhiyangyun.care.finance.model.FinanceAutoDebitExceptionItem;
 import com.zhiyangyun.care.finance.model.FinanceConfigChangeLogItem;
 import com.zhiyangyun.care.finance.model.FinanceInvoiceReceiptItem;
@@ -465,6 +468,109 @@ public class FinanceWorkbenchController {
         .map(this::toAllocationRuleItem)
         .toList();
     return Result.ok(rows);
+  }
+
+  @PostMapping("/allocation/rules/template/init")
+  public Result<FinanceAllocationTemplateInitResponse> initAllocationRuleTemplate(
+      @RequestParam(required = false) String month) {
+    String targetMonth = (month == null || month.isBlank())
+        ? YearMonth.now().toString()
+        : month;
+    FinanceAllocationTemplateInitResponse response = new FinanceAllocationTemplateInitResponse();
+    response.setMonth(targetMonth);
+    List<FinanceBillingConfigUpsertRequest> templates = defaultAllocationTemplates(targetMonth);
+    for (FinanceBillingConfigUpsertRequest item : templates) {
+      BillingConfigEntry existed = billingConfigMapper.selectOne(
+          Wrappers.lambdaQuery(BillingConfigEntry.class)
+              .eq(BillingConfigEntry::getIsDeleted, 0)
+              .eq(BillingConfigEntry::getOrgId, AuthContext.getOrgId())
+              .eq(BillingConfigEntry::getConfigKey, item.getConfigKey())
+              .eq(BillingConfigEntry::getEffectiveMonth, item.getEffectiveMonth())
+              .last("LIMIT 1"));
+      upsertBillingConfigInternal(item);
+      response.getConfigKeys().add(item.getConfigKey());
+      if (existed == null) {
+        response.setCreatedCount(response.getCreatedCount() + 1);
+      } else {
+        response.setUpdatedCount(response.getUpdatedCount() + 1);
+      }
+    }
+    return Result.ok(response);
+  }
+
+  @PostMapping("/allocation/meter/validate")
+  public Result<FinanceAllocationMeterValidateResponse> validateAllocationMeter(
+      @Valid @RequestBody FinanceAllocationMeterValidateRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    BigDecimal threshold = request.getAbnormalThreshold() == null
+        ? BigDecimal.valueOf(500)
+        : request.getAbnormalThreshold();
+    String targetMonth = normalizeText(request.getMonth(), YearMonth.now().toString());
+    List<FinanceAllocationMeterValidateRequest.Row> sourceRows = request.getRows() == null
+        ? List.of()
+        : request.getRows();
+    Map<String, List<Room>> roomMap = roomMapper.selectList(
+        Wrappers.lambdaQuery(Room.class)
+            .eq(Room::getIsDeleted, 0)
+            .eq(orgId != null, Room::getOrgId, orgId))
+        .stream()
+        .collect(Collectors.groupingBy(item -> normalizeText(item.getRoomNo(), "").toUpperCase(Locale.ROOT)));
+
+    FinanceAllocationMeterValidateResponse response = new FinanceAllocationMeterValidateResponse();
+    response.setMonth(targetMonth);
+    response.setAbnormalThreshold(threshold);
+    response.setTotalRows(sourceRows.size());
+    for (int index = 0; index < sourceRows.size(); index += 1) {
+      FinanceAllocationMeterValidateRequest.Row row = sourceRows.get(index);
+      FinanceAllocationMeterValidateResponse.RowResult result = new FinanceAllocationMeterValidateResponse.RowResult();
+      result.setRowNo(index + 1);
+      result.setBuilding(normalizeText(row.getBuilding(), ""));
+      result.setFloorNo(normalizeText(row.getFloorNo(), ""));
+      result.setRoomNo(normalizeText(row.getRoomNo(), ""));
+      result.setPreviousReading(row.getPreviousReading());
+      result.setCurrentReading(row.getCurrentReading());
+      result.setRemark(normalizeText(row.getRemark(), ""));
+      result.setLevel("OK");
+      result.setCode("OK");
+      result.setMessage("校验通过");
+      result.setValid(true);
+
+      String normalizedRoomNo = normalizeText(row.getRoomNo(), "").toUpperCase(Locale.ROOT);
+      if (normalizedRoomNo.isBlank()) {
+        markInvalidMeterRow(result, "ROOM_REQUIRED", "房间号不能为空");
+      } else if (roomMap.getOrDefault(normalizedRoomNo, List.of()).isEmpty()) {
+        markInvalidMeterRow(result, "ROOM_NOT_FOUND", "房间不存在");
+      }
+
+      BigDecimal previous = row.getPreviousReading();
+      BigDecimal current = row.getCurrentReading();
+      if (current == null || previous == null) {
+        markInvalidMeterRow(result, "READING_REQUIRED", "上期/本期读数不能为空");
+      } else {
+        BigDecimal usage = current.subtract(previous);
+        result.setUsage(usage);
+        if (previous.compareTo(BigDecimal.ZERO) < 0 || current.compareTo(BigDecimal.ZERO) < 0) {
+          markInvalidMeterRow(result, "READING_NEGATIVE", "读数不能为负数");
+        } else if (usage.compareTo(BigDecimal.ZERO) < 0) {
+          markInvalidMeterRow(result, "READING_ROLLBACK", "本期读数不能小于上期读数");
+        } else if (usage.compareTo(threshold) > 0 && result.isValid()) {
+          result.setLevel("WARN");
+          result.setCode("ABNORMAL_SPIKE");
+          result.setMessage("用电波动异常，请人工复核");
+        }
+      }
+
+      if (result.isValid()) {
+        response.setValidRows(response.getValidRows() + 1);
+      } else {
+        response.setInvalidRows(response.getInvalidRows() + 1);
+      }
+      if ("WARN".equals(result.getLevel())) {
+        response.setWarningRows(response.getWarningRows() + 1);
+      }
+      response.getRows().add(result);
+    }
+    return Result.ok(response);
   }
 
   @GetMapping("/reconcile/exceptions")
@@ -1602,6 +1708,16 @@ public class FinanceWorkbenchController {
     return false;
   }
 
+  private void markInvalidMeterRow(
+      FinanceAllocationMeterValidateResponse.RowResult result,
+      String code,
+      String message) {
+    result.setValid(false);
+    result.setLevel("ERROR");
+    result.setCode(code);
+    result.setMessage(message);
+  }
+
   private FinanceConfigChangeLogItem toConfigLogItem(AuditLog item) {
     FinanceConfigChangeLogItem row = new FinanceConfigChangeLogItem();
     row.setId(item.getId());
@@ -1677,6 +1793,39 @@ public class FinanceWorkbenchController {
         || key.contains("分摊")
         || key.contains("房")
         || key.contains("床");
+  }
+
+  private List<FinanceBillingConfigUpsertRequest> defaultAllocationTemplates(String effectiveMonth) {
+    List<FinanceBillingConfigUpsertRequest> templates = new ArrayList<>();
+    templates.add(rule("ALLOC_ELECTRIC_FREE_KWH_PER_PERSON", BigDecimal.TEN, effectiveMonth,
+        "每位老人每月赠送免费电量（度）"));
+    templates.add(rule("ALLOC_ELECTRIC_FREE_KWH_DOUBLE_ROOM", BigDecimal.valueOf(20), effectiveMonth,
+        "双人满住每月赠送免费电量（度）"));
+    templates.add(rule("ALLOC_ELECTRIC_BASE_PRICE", BigDecimal.ONE, effectiveMonth,
+        "基础电价（元/度）"));
+    templates.add(rule("ALLOC_ELECTRIC_SPLIT_MODE", BigDecimal.ONE, effectiveMonth,
+        "电费分摊模式：1=按在住人数均摊"));
+    templates.add(rule("ALLOC_WATER_BASE_PRICE", BigDecimal.ZERO, effectiveMonth,
+        "水费基础价格（默认0元）"));
+    templates.add(rule("ALLOC_TV_BASE_PRICE", BigDecimal.ZERO, effectiveMonth,
+        "电视费基础价格（默认0元）"));
+    templates.add(rule("ALLOC_NETWORK_BASE_PRICE", BigDecimal.ZERO, effectiveMonth,
+        "网络费基础价格（默认0元）"));
+    return templates;
+  }
+
+  private FinanceBillingConfigUpsertRequest rule(
+      String key,
+      BigDecimal value,
+      String effectiveMonth,
+      String remark) {
+    FinanceBillingConfigUpsertRequest request = new FinanceBillingConfigUpsertRequest();
+    request.setConfigKey(key);
+    request.setConfigValue(value);
+    request.setEffectiveMonth(effectiveMonth);
+    request.setStatus(1);
+    request.setRemark(remark);
+    return request;
   }
 
   private FinanceReconcileExceptionItem reconcileItem(

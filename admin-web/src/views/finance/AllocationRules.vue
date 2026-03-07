@@ -4,6 +4,7 @@
       <a-space wrap>
         <a-date-picker v-model:value="query.month" picker="month" style="width: 150px" />
         <a-button type="primary" @click="loadData">查询</a-button>
+        <a-button :loading="initLoading" @click="initTemplate">初始化默认电费模板</a-button>
         <a-button @click="go('/finance/allocation/public-cost?period=this_month')">分摊与公共费用</a-button>
       </a-space>
     </a-card>
@@ -29,12 +30,14 @@
 import { onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
 import { useRouter } from 'vue-router'
+import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
-import { getFinanceAllocationRules } from '../../api/finance'
+import { getFinanceAllocationRules, initFinanceAllocationRuleTemplate } from '../../api/finance'
 import type { FinanceAllocationRuleItem } from '../../types'
 
 const router = useRouter()
 const loading = ref(false)
+const initLoading = ref(false)
 const query = ref({
   month: dayjs()
 })
@@ -52,6 +55,18 @@ async function loadData() {
     })
   } finally {
     loading.value = false
+  }
+}
+
+async function initTemplate() {
+  initLoading.value = true
+  try {
+    const month = dayjs(query.value.month).format('YYYY-MM')
+    const res = await initFinanceAllocationRuleTemplate({ month })
+    message.success(`模板已同步：新增${res.createdCount}条，更新${res.updatedCount}条`)
+    await loadData()
+  } finally {
+    initLoading.value = false
   }
 }
 

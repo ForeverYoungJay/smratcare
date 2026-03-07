@@ -13,6 +13,9 @@ import com.zhiyangyun.care.finance.model.DischargeSettlementConfirmRequest;
 import com.zhiyangyun.care.finance.model.DischargeSettlementCreateRequest;
 import com.zhiyangyun.care.finance.model.FeeAuditReviewRequest;
 import com.zhiyangyun.care.finance.model.MonthlyAllocationCreateRequest;
+import com.zhiyangyun.care.finance.model.MonthlyAllocationPreviewRequest;
+import com.zhiyangyun.care.finance.model.MonthlyAllocationPreviewResponse;
+import com.zhiyangyun.care.finance.model.MonthlyAllocationRollbackRequest;
 
 public interface FeeManagementService {
   IPage<AdmissionFeeAudit> admissionAuditPage(Long orgId, long pageNo, long pageSize, Long elderId, String status,
@@ -42,7 +45,12 @@ public interface FeeManagementService {
 
   ConsumptionRecord createConsumption(Long orgId, Long operatorId, ConsumptionRecordCreateRequest request);
 
-  IPage<MonthlyAllocation> monthlyAllocationPage(Long orgId, long pageNo, long pageSize, String month, String status);
+  IPage<MonthlyAllocation> monthlyAllocationPage(
+      Long orgId, long pageNo, long pageSize, String month, String status, Long elderId);
+
+  MonthlyAllocationPreviewResponse previewMonthlyAllocation(Long orgId, MonthlyAllocationPreviewRequest request);
 
   MonthlyAllocation createMonthlyAllocation(Long orgId, Long operatorId, MonthlyAllocationCreateRequest request);
+
+  MonthlyAllocation rollbackMonthlyAllocation(Long orgId, Long operatorId, Long id, MonthlyAllocationRollbackRequest request);
 }

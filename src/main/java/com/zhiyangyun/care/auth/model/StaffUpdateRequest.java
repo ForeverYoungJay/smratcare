@@ -12,6 +12,8 @@ public class StaffUpdateRequest {
   private String realName;
   private String phone;
   private String email;
+  private Long directLeaderId;
+  private Long indirectLeaderId;
   private Integer gender;
   private Integer status;
 }

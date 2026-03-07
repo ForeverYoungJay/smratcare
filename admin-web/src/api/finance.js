@@ -109,6 +109,12 @@ export function getFinanceRoomOpsDetail(params) {
 export function getFinanceAllocationRules(params) {
     return request.get('/api/finance/workbench/allocation/rules', { params });
 }
+export function initFinanceAllocationRuleTemplate(params) {
+    return request.post('/api/finance/workbench/allocation/rules/template/init', null, { params });
+}
+export function validateFinanceAllocationMeter(data) {
+    return request.post('/api/finance/workbench/allocation/meter/validate', data);
+}
 export function getFinanceReconcileExceptions(params) {
     return request.get('/api/finance/workbench/reconcile/exceptions', { params });
 }
@@ -191,4 +197,7 @@ export function getFinanceReportEntrySummary(params) {
 }
 export function getFinanceCategoryConsumptionAnalysis(params) {
     return request.get('/api/finance/report/category-consumption-analysis', { params });
+}
+export function bindFinanceBillElder(billId, data) {
+    return request.post(`/api/finance/bill/${billId}/bind-elder`, data);
 }

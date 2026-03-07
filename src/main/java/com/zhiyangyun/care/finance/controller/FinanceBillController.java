@@ -1,5 +1,6 @@
 package com.zhiyangyun.care.finance.controller;
 
+import com.zhiyangyun.care.audit.service.AuditLogService;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
@@ -13,6 +14,7 @@ import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.finance.entity.PaymentRecord;
 import com.zhiyangyun.care.finance.mapper.PaymentRecordMapper;
+import com.zhiyangyun.care.finance.model.FinanceBillBindElderRequest;
 import com.zhiyangyun.care.finance.model.FinanceBillDetailResponse;
 import com.zhiyangyun.care.finance.model.PaymentRecordItem;
 import com.zhiyangyun.care.finance.model.StoreOrderSummary;
@@ -23,10 +25,14 @@ import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/finance/bill")
@@ -37,6 +43,7 @@ public class FinanceBillController {
   private final PaymentRecordMapper paymentRecordMapper;
   private final StoreOrderMapper storeOrderMapper;
   private final StaffMapper staffMapper;
+  private final AuditLogService auditLogService;
 
   public FinanceBillController(
       BillService billService,
@@ -44,13 +51,15 @@ public class FinanceBillController {
       ElderMapper elderMapper,
       PaymentRecordMapper paymentRecordMapper,
       StoreOrderMapper storeOrderMapper,
-      StaffMapper staffMapper) {
+      StaffMapper staffMapper,
+      AuditLogService auditLogService) {
     this.billService = billService;
     this.billMonthlyMapper = billMonthlyMapper;
     this.elderMapper = elderMapper;
     this.paymentRecordMapper = paymentRecordMapper;
     this.storeOrderMapper = storeOrderMapper;
     this.staffMapper = staffMapper;
+    this.auditLogService = auditLogService;
   }
 
   @GetMapping("/{billId}")
@@ -142,5 +151,42 @@ public class FinanceBillController {
     resp.setStoreOrders(summaries);
 
     return Result.ok(resp);
+  }
+
+  @PostMapping("/{billId}/bind-elder")
+  @PreAuthorize("hasAnyRole('FINANCE_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  public Result<FinanceBillDetailResponse> bindElder(
+      @PathVariable Long billId,
+      @Valid @RequestBody FinanceBillBindElderRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
+    String username = AuthContext.getUsername();
+    BillMonthly monthly = billMonthlyMapper.selectOne(
+        Wrappers.lambdaQuery(BillMonthly.class)
+            .eq(BillMonthly::getId, billId)
+            .eq(orgId != null, BillMonthly::getOrgId, orgId)
+            .eq(BillMonthly::getIsDeleted, 0)
+            .last("LIMIT 1"));
+    if (monthly == null) {
+      return Result.error(404, "账单不存在");
+    }
+    ElderProfile elder = elderMapper.selectOne(
+        Wrappers.lambdaQuery(ElderProfile.class)
+            .eq(ElderProfile::getId, request.getElderId())
+            .eq(ElderProfile::getIsDeleted, 0)
+            .eq(orgId != null, ElderProfile::getOrgId, orgId)
+            .last("LIMIT 1"));
+    if (elder == null) {
+      throw new IllegalArgumentException("老人不存在");
+    }
+    Long beforeElderId = monthly.getElderId();
+    monthly.setElderId(elder.getId());
+    billMonthlyMapper.updateById(monthly);
+    auditLogService.record(
+        orgId, orgId, staffId, username,
+        "FIN_BILL_BIND_ELDER", "FINANCE_BILL", monthly.getId(),
+        "修复账单老人: " + beforeElderId + "->" + elder.getId()
+            + (request.getRemark() == null || request.getRemark().isBlank() ? "" : ("；备注:" + request.getRemark().trim())));
+    return detail(billId);
   }
 }

@@ -74,8 +74,14 @@ export interface MonthlyAllocationItem {
   allocationName: string
   totalAmount: number
   targetCount: number
+  elderIds?: string
+  elderSnapshotJson?: string
+  avgAmount?: number
   status: string
   remark?: string
+  rollbackBy?: number
+  rollbackReason?: string
+  rollbackTime?: string
   createTime?: string
 }
 
@@ -131,5 +137,30 @@ export interface MonthlyAllocationCreateRequest {
   allocationName: string
   totalAmount: number
   targetCount: number
+  elderIds?: number[]
   remark?: string
+}
+
+export interface MonthlyAllocationPreviewRequest {
+  allocationMonth?: string
+  allocationName?: string
+  totalAmount: number
+  elderIds?: number[]
+  remark?: string
+}
+
+export interface MonthlyAllocationPreviewRow {
+  elderId: number
+  elderName?: string
+  amount: number
+}
+
+export interface MonthlyAllocationPreviewResponse {
+  allocationMonth?: string
+  allocationName?: string
+  totalAmount: number
+  targetCount: number
+  avgAmount: number
+  remark?: string
+  rows: MonthlyAllocationPreviewRow[]
 }

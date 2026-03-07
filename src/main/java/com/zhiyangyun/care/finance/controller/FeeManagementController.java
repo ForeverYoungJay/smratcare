@@ -16,6 +16,9 @@ import com.zhiyangyun.care.finance.model.DischargeSettlementConfirmRequest;
 import com.zhiyangyun.care.finance.model.DischargeSettlementCreateRequest;
 import com.zhiyangyun.care.finance.model.FeeAuditReviewRequest;
 import com.zhiyangyun.care.finance.model.MonthlyAllocationCreateRequest;
+import com.zhiyangyun.care.finance.model.MonthlyAllocationPreviewRequest;
+import com.zhiyangyun.care.finance.model.MonthlyAllocationPreviewResponse;
+import com.zhiyangyun.care.finance.model.MonthlyAllocationRollbackRequest;
 import com.zhiyangyun.care.finance.service.FeeManagementService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -168,9 +171,10 @@ public class FeeManagementController {
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) String month,
-      @RequestParam(required = false) String status) {
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) Long elderId) {
     Long orgId = AuthContext.getOrgId();
-    return Result.ok(feeManagementService.monthlyAllocationPage(orgId, pageNo, pageSize, month, status));
+    return Result.ok(feeManagementService.monthlyAllocationPage(orgId, pageNo, pageSize, month, status, elderId));
   }
 
   @PostMapping("/monthly-allocation")
@@ -180,6 +184,26 @@ public class FeeManagementController {
     MonthlyAllocation result = feeManagementService.createMonthlyAllocation(orgId, operatorId, request);
     auditLogService.record(orgId, orgId, operatorId, AuthContext.getUsername(),
         "FIN_MONTHLY_ALLOCATION_CREATE", "FINANCE_FEE", result.getId(), "月分摊费创建");
+    return Result.ok(result);
+  }
+
+  @PostMapping("/monthly-allocation/preview")
+  public Result<MonthlyAllocationPreviewResponse> previewMonthlyAllocation(
+      @Valid @RequestBody MonthlyAllocationPreviewRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    return Result.ok(feeManagementService.previewMonthlyAllocation(orgId, request));
+  }
+
+  @PostMapping("/monthly-allocation/{id}/rollback")
+  @PreAuthorize("hasAnyRole('FINANCE_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  public Result<MonthlyAllocation> rollbackMonthlyAllocation(
+      @PathVariable Long id,
+      @RequestBody(required = false) MonthlyAllocationRollbackRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    Long operatorId = AuthContext.getStaffId();
+    MonthlyAllocation result = feeManagementService.rollbackMonthlyAllocation(orgId, operatorId, id, request);
+    auditLogService.record(orgId, orgId, operatorId, AuthContext.getUsername(),
+        "FIN_MONTHLY_ALLOCATION_ROLLBACK", "FINANCE_FEE", result.getId(), "月分摊回滚");
     return Result.ok(result);
   }
 }

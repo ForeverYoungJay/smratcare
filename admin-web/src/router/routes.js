@@ -2951,6 +2951,12 @@ export const routes = [
             name: 'SystemMenuPreview',
             component: () => import('../views/System/MenuPreview.vue'),
             meta: { title: '菜单预览', roles: ['ADMIN'] }
+          },
+          {
+            path: 'permission-overview',
+            name: 'SystemPermissionOverview',
+            component: () => import('../views/System/PermissionOverview.vue'),
+            meta: { title: '权限总览', roles: ['DIRECTOR', 'SYS_ADMIN', 'ADMIN', 'HR_MINISTER'] }
           }
         ]
       },

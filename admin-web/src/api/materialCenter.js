@@ -92,6 +92,18 @@ export function adjustInventory(data) {
 export function createOutbound(data) {
     return request.post('/api/inventory/outbound', data);
 }
+export function createOutboundSheet(data) {
+    return request.post('/api/inventory/outbound/sheet', data);
+}
+export function getOutboundSheetPage(params) {
+    return fetchPage('/api/inventory/outbound/sheet/page', params);
+}
+export function getOutboundSheetDetail(id) {
+    return request.get('/api/inventory/outbound/sheet/detail', { params: { id } });
+}
+export function confirmOutboundSheet(id) {
+    return request.post('/api/inventory/outbound/sheet/confirm', null, { params: { id } });
+}
 export function getInventoryAlerts() {
     return request.get('/api/inventory/alerts');
 }

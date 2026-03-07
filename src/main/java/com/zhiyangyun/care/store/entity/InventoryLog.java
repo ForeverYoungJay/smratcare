@@ -35,6 +35,7 @@ public class InventoryLog {
 
   private String bizType;
   private String receiverName;
+  private String outboundNo;
 
   private String remark;
 

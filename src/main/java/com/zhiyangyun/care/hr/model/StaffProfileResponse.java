@@ -19,6 +19,7 @@ public class StaffProfileResponse {
   private String certificateNo;
   private String emergencyContactName;
   private String emergencyContactPhone;
+  private LocalDate birthday;
   private Integer status;
   private LocalDate leaveDate;
   private String leaveReason;

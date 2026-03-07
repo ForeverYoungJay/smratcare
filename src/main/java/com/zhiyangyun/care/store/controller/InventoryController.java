@@ -10,11 +10,15 @@ import com.zhiyangyun.care.audit.service.AuditLogService;
 import com.zhiyangyun.care.store.entity.InventoryBatch;
 import com.zhiyangyun.care.store.entity.InventoryLog;
 import com.zhiyangyun.care.store.entity.InventoryAdjustment;
+import com.zhiyangyun.care.store.entity.InventoryOutboundSheet;
+import com.zhiyangyun.care.store.entity.InventoryOutboundSheetItem;
 import com.zhiyangyun.care.store.entity.MaterialWarehouse;
 import com.zhiyangyun.care.store.entity.Product;
 import com.zhiyangyun.care.store.mapper.InventoryBatchMapper;
 import com.zhiyangyun.care.store.mapper.InventoryAdjustmentMapper;
 import com.zhiyangyun.care.store.mapper.InventoryLogMapper;
+import com.zhiyangyun.care.store.mapper.InventoryOutboundSheetItemMapper;
+import com.zhiyangyun.care.store.mapper.InventoryOutboundSheetMapper;
 import com.zhiyangyun.care.store.mapper.MaterialWarehouseMapper;
 import com.zhiyangyun.care.store.mapper.ProductMapper;
 import com.zhiyangyun.care.store.model.InventoryAdjustRequest;
@@ -23,6 +27,10 @@ import com.zhiyangyun.care.store.model.InventoryBatchResponse;
 import com.zhiyangyun.care.store.model.InventoryExpiryAlertItem;
 import com.zhiyangyun.care.store.model.InventoryInboundRequest;
 import com.zhiyangyun.care.store.model.InventoryOutboundRequest;
+import com.zhiyangyun.care.store.model.InventoryOutboundSheetCreateRequest;
+import com.zhiyangyun.care.store.model.InventoryOutboundSheetItemRequest;
+import com.zhiyangyun.care.store.model.InventoryOutboundSheetItemResponse;
+import com.zhiyangyun.care.store.model.InventoryOutboundSheetResponse;
 import com.zhiyangyun.care.store.model.InventoryAdjustmentResponse;
 import com.zhiyangyun.care.store.model.InventoryAdjustmentDiffItem;
 import com.zhiyangyun.care.store.model.InventoryLogResponse;
@@ -34,6 +42,7 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -41,6 +50,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.transaction.annotation.Transactional;
 
 @RestController
 @RequestMapping("/api/inventory")
@@ -49,6 +59,8 @@ public class InventoryController {
   private final InventoryBatchMapper inventoryBatchMapper;
   private final InventoryAdjustmentMapper inventoryAdjustmentMapper;
   private final InventoryLogMapper inventoryLogMapper;
+  private final InventoryOutboundSheetMapper inventoryOutboundSheetMapper;
+  private final InventoryOutboundSheetItemMapper inventoryOutboundSheetItemMapper;
   private final ProductMapper productMapper;
   private final MaterialWarehouseMapper materialWarehouseMapper;
   private final AuditLogService auditLogService;
@@ -57,6 +69,8 @@ public class InventoryController {
       InventoryBatchMapper inventoryBatchMapper,
       InventoryAdjustmentMapper inventoryAdjustmentMapper,
       InventoryLogMapper inventoryLogMapper,
+      InventoryOutboundSheetMapper inventoryOutboundSheetMapper,
+      InventoryOutboundSheetItemMapper inventoryOutboundSheetItemMapper,
       ProductMapper productMapper,
       MaterialWarehouseMapper materialWarehouseMapper,
       AuditLogService auditLogService) {
@@ -64,6 +78,8 @@ public class InventoryController {
     this.inventoryBatchMapper = inventoryBatchMapper;
     this.inventoryAdjustmentMapper = inventoryAdjustmentMapper;
     this.inventoryLogMapper = inventoryLogMapper;
+    this.inventoryOutboundSheetMapper = inventoryOutboundSheetMapper;
+    this.inventoryOutboundSheetItemMapper = inventoryOutboundSheetItemMapper;
     this.productMapper = productMapper;
     this.materialWarehouseMapper = materialWarehouseMapper;
     this.auditLogService = auditLogService;
@@ -99,6 +115,176 @@ public class InventoryController {
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "INVENTORY_OUT", "PRODUCT", request.getProductId(), request.getReason());
     return Result.ok(null);
+  }
+
+  @PostMapping("/outbound/sheet")
+  @Transactional
+  public Result<InventoryOutboundSheetResponse> createOutboundSheet(@Valid @RequestBody InventoryOutboundSheetCreateRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    InventoryOutboundSheet sheet = new InventoryOutboundSheet();
+    sheet.setOrgId(orgId);
+    sheet.setOutboundNo(resolveOutboundNo(orgId, request.getOutboundNo()));
+    sheet.setReceiverName(request.getReceiverName());
+    sheet.setElderId(request.getElderId());
+    sheet.setContractNo(request.getContractNo());
+    sheet.setApplyDept(request.getApplyDept());
+    sheet.setOperatorStaffId(AuthContext.getStaffId());
+    sheet.setOperatorName(AuthContext.getUsername());
+    sheet.setRemark(request.getRemark());
+    sheet.setStatus("DRAFT");
+    sheet.setIsDeleted(0);
+    inventoryOutboundSheetMapper.insert(sheet);
+
+    List<InventoryOutboundSheetItemRequest> itemRequests = request.getItems();
+    int sort = 1;
+    for (InventoryOutboundSheetItemRequest item : itemRequests) {
+      InventoryOutboundSheetItem row = new InventoryOutboundSheetItem();
+      row.setOrgId(orgId);
+      row.setSheetId(sheet.getId());
+      row.setProductId(item.getProductId());
+      row.setWarehouseId(item.getWarehouseId());
+      row.setBatchId(item.getBatchId());
+      row.setQuantity(item.getQuantity());
+      row.setReason(item.getReason());
+      row.setItemSort(sort++);
+      row.setIsDeleted(0);
+      inventoryOutboundSheetItemMapper.insert(row);
+    }
+    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "INVENTORY_OUTBOUND_SHEET_CREATE", "OUTBOUND_SHEET", sheet.getId(), "创建领用单:" + sheet.getOutboundNo());
+    return Result.ok(getOutboundSheetDetail(sheet.getId()).getData());
+  }
+
+  @GetMapping("/outbound/sheet/page")
+  public Result<IPage<InventoryOutboundSheetResponse>> outboundSheetPage(
+      @RequestParam(defaultValue = "1") long pageNo,
+      @RequestParam(defaultValue = "20") long pageSize,
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String dateFrom,
+      @RequestParam(required = false) String dateTo) {
+    Long orgId = AuthContext.getOrgId();
+    LambdaQueryWrapper<InventoryOutboundSheet> wrapper = Wrappers.lambdaQuery(InventoryOutboundSheet.class)
+        .eq(InventoryOutboundSheet::getIsDeleted, 0)
+        .eq(orgId != null, InventoryOutboundSheet::getOrgId, orgId)
+        .eq(status != null && !status.isBlank(), InventoryOutboundSheet::getStatus, status)
+        .and(keyword != null && !keyword.isBlank(), w -> w.like(InventoryOutboundSheet::getOutboundNo, keyword)
+            .or().like(InventoryOutboundSheet::getReceiverName, keyword));
+    if (dateFrom != null && !dateFrom.isBlank()) {
+      LocalDate start = LocalDate.parse(dateFrom);
+      wrapper.ge(InventoryOutboundSheet::getCreateTime, LocalDateTime.of(start, LocalTime.MIN));
+    }
+    if (dateTo != null && !dateTo.isBlank()) {
+      LocalDate end = LocalDate.parse(dateTo);
+      wrapper.le(InventoryOutboundSheet::getCreateTime, LocalDateTime.of(end, LocalTime.MAX));
+    }
+    wrapper.orderByDesc(InventoryOutboundSheet::getCreateTime);
+    IPage<InventoryOutboundSheet> page = inventoryOutboundSheetMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
+    List<Long> sheetIds = page.getRecords().stream().map(InventoryOutboundSheet::getId).toList();
+    Map<Long, List<InventoryOutboundSheetItem>> itemMap = sheetIds.isEmpty() ? Map.of() :
+        inventoryOutboundSheetItemMapper.selectList(
+                Wrappers.lambdaQuery(InventoryOutboundSheetItem.class)
+                    .eq(InventoryOutboundSheetItem::getIsDeleted, 0)
+                    .eq(orgId != null, InventoryOutboundSheetItem::getOrgId, orgId)
+                    .in(InventoryOutboundSheetItem::getSheetId, sheetIds)
+                    .orderByAsc(InventoryOutboundSheetItem::getItemSort)
+                    .orderByAsc(InventoryOutboundSheetItem::getId))
+            .stream().collect(Collectors.groupingBy(InventoryOutboundSheetItem::getSheetId));
+    Map<Long, Product> productMap = itemMap.values().stream()
+        .flatMap(List::stream)
+        .map(InventoryOutboundSheetItem::getProductId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .collect(Collectors.collectingAndThen(Collectors.toList(), ids ->
+            ids.isEmpty() ? Map.of() : productMapper.selectBatchIds(ids).stream().collect(Collectors.toMap(Product::getId, p -> p))));
+    Map<Long, InventoryBatch> batchMap = itemMap.values().stream()
+        .flatMap(List::stream)
+        .map(InventoryOutboundSheetItem::getBatchId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .collect(Collectors.collectingAndThen(Collectors.toList(), ids ->
+            ids.isEmpty() ? Map.of() : inventoryBatchMapper.selectBatchIds(ids).stream().collect(Collectors.toMap(InventoryBatch::getId, b -> b))));
+    IPage<InventoryOutboundSheetResponse> resp = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
+    resp.setRecords(page.getRecords().stream()
+        .map(sheet -> toOutboundSheetResponse(sheet, itemMap.get(sheet.getId()), productMap, batchMap))
+        .toList());
+    return Result.ok(resp);
+  }
+
+  @GetMapping("/outbound/sheet/detail")
+  public Result<InventoryOutboundSheetResponse> getOutboundSheetDetail(@RequestParam Long id) {
+    Long orgId = AuthContext.getOrgId();
+    InventoryOutboundSheet sheet = inventoryOutboundSheetMapper.selectById(id);
+    if (sheet == null || sheet.getIsDeleted() == 1) {
+      return Result.ok(null);
+    }
+    if (orgId != null && !orgId.equals(sheet.getOrgId())) {
+      throw new IllegalArgumentException("无权限访问该领用单");
+    }
+    List<InventoryOutboundSheetItem> itemList = inventoryOutboundSheetItemMapper.selectList(
+        Wrappers.lambdaQuery(InventoryOutboundSheetItem.class)
+            .eq(InventoryOutboundSheetItem::getIsDeleted, 0)
+            .eq(InventoryOutboundSheetItem::getSheetId, sheet.getId())
+            .orderByAsc(InventoryOutboundSheetItem::getItemSort)
+            .orderByAsc(InventoryOutboundSheetItem::getId));
+    Map<Long, Product> productMap = itemList.stream()
+        .map(InventoryOutboundSheetItem::getProductId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .collect(Collectors.collectingAndThen(Collectors.toList(), ids ->
+            ids.isEmpty() ? Map.of() : productMapper.selectBatchIds(ids).stream().collect(Collectors.toMap(Product::getId, p -> p))));
+    Map<Long, InventoryBatch> batchMap = itemList.stream()
+        .map(InventoryOutboundSheetItem::getBatchId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .collect(Collectors.collectingAndThen(Collectors.toList(), ids ->
+            ids.isEmpty() ? Map.of() : inventoryBatchMapper.selectBatchIds(ids).stream().collect(Collectors.toMap(InventoryBatch::getId, b -> b))));
+    return Result.ok(toOutboundSheetResponse(sheet, itemList, productMap, batchMap));
+  }
+
+  @PostMapping("/outbound/sheet/confirm")
+  @Transactional
+  public Result<InventoryOutboundSheetResponse> confirmOutboundSheet(@RequestParam Long id) {
+    Long orgId = AuthContext.getOrgId();
+    InventoryOutboundSheet sheet = inventoryOutboundSheetMapper.selectById(id);
+    if (sheet == null || sheet.getIsDeleted() == 1) {
+      throw new IllegalArgumentException("领用单不存在");
+    }
+    if (orgId != null && !orgId.equals(sheet.getOrgId())) {
+      throw new IllegalArgumentException("无权限访问该领用单");
+    }
+    if ("CONFIRMED".equalsIgnoreCase(sheet.getStatus())) {
+      return Result.ok(getOutboundSheetDetail(id).getData());
+    }
+    List<InventoryOutboundSheetItem> items = inventoryOutboundSheetItemMapper.selectList(
+        Wrappers.lambdaQuery(InventoryOutboundSheetItem.class)
+            .eq(InventoryOutboundSheetItem::getIsDeleted, 0)
+            .eq(InventoryOutboundSheetItem::getSheetId, id)
+            .orderByAsc(InventoryOutboundSheetItem::getItemSort)
+            .orderByAsc(InventoryOutboundSheetItem::getId));
+    if (items.isEmpty()) {
+      throw new IllegalArgumentException("领用单明细为空");
+    }
+    for (InventoryOutboundSheetItem item : items) {
+      InventoryOutboundRequest outbound = new InventoryOutboundRequest();
+      outbound.setOrgId(orgId);
+      outbound.setOperatorStaffId(AuthContext.getStaffId());
+      outbound.setProductId(item.getProductId());
+      outbound.setWarehouseId(item.getWarehouseId());
+      outbound.setBatchId(item.getBatchId());
+      outbound.setQuantity(item.getQuantity());
+      outbound.setReceiverName(sheet.getReceiverName());
+      outbound.setReason(item.getReason());
+      outbound.setOutboundNo(sheet.getOutboundNo());
+      inventoryService.outbound(outbound);
+    }
+    sheet.setStatus("CONFIRMED");
+    sheet.setConfirmStaffId(AuthContext.getStaffId());
+    sheet.setConfirmTime(LocalDateTime.now());
+    inventoryOutboundSheetMapper.updateById(sheet);
+    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "INVENTORY_OUTBOUND_SHEET_CONFIRM", "OUTBOUND_SHEET", sheet.getId(), "确认出库:" + sheet.getOutboundNo());
+    return Result.ok(getOutboundSheetDetail(id).getData());
   }
 
   @GetMapping("/alerts")
@@ -306,6 +492,7 @@ public class InventoryController {
         item.setOutType(log.getRefOrderId() != null ? "SALE" : "CONSUME");
       }
       item.setReceiverName(log.getReceiverName());
+      item.setOutboundNo(log.getOutboundNo());
       item.setRemark(log.getRemark());
       item.setCreateTime(log.getCreateTime());
       return item;
@@ -427,6 +614,64 @@ public class InventoryController {
     }
     resp.setRecords(records);
     return Result.ok(resp);
+  }
+
+  private String resolveOutboundNo(Long orgId, String requestNo) {
+    String base = requestNo == null ? "" : requestNo.trim();
+    if (!base.isBlank()) {
+      return base;
+    }
+    String date = LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
+    String generated = "LY-" + date;
+    int suffix = 1;
+    while (inventoryOutboundSheetMapper.selectCount(
+        Wrappers.lambdaQuery(InventoryOutboundSheet.class)
+            .eq(InventoryOutboundSheet::getIsDeleted, 0)
+            .eq(orgId != null, InventoryOutboundSheet::getOrgId, orgId)
+            .eq(InventoryOutboundSheet::getOutboundNo, generated)) > 0) {
+      generated = "LY-" + date + "-" + suffix++;
+    }
+    return generated;
+  }
+
+  private InventoryOutboundSheetResponse toOutboundSheetResponse(
+      InventoryOutboundSheet sheet,
+      List<InventoryOutboundSheetItem> items,
+      Map<Long, Product> productMap,
+      Map<Long, InventoryBatch> batchMap) {
+    InventoryOutboundSheetResponse response = new InventoryOutboundSheetResponse();
+    response.setId(sheet.getId());
+    response.setOutboundNo(sheet.getOutboundNo());
+    response.setReceiverName(sheet.getReceiverName());
+    response.setElderId(sheet.getElderId());
+    response.setContractNo(sheet.getContractNo());
+    response.setApplyDept(sheet.getApplyDept());
+    response.setOperatorStaffId(sheet.getOperatorStaffId());
+    response.setOperatorName(sheet.getOperatorName());
+    response.setStatus(sheet.getStatus());
+    response.setRemark(sheet.getRemark());
+    response.setConfirmStaffId(sheet.getConfirmStaffId());
+    response.setConfirmTime(sheet.getConfirmTime());
+    response.setCreateTime(sheet.getCreateTime());
+    List<InventoryOutboundSheetItemResponse> detail = (items == null ? List.<InventoryOutboundSheetItem>of() : items)
+        .stream().map(item -> {
+          InventoryOutboundSheetItemResponse row = new InventoryOutboundSheetItemResponse();
+          row.setId(item.getId());
+          row.setProductId(item.getProductId());
+          Product product = productMap.get(item.getProductId());
+          row.setProductName(product == null ? null : product.getProductName());
+          row.setProductCode(product == null ? null : product.getProductCode());
+          row.setUnit(product == null ? null : product.getUnit());
+          row.setWarehouseId(item.getWarehouseId());
+          row.setBatchId(item.getBatchId());
+          InventoryBatch batch = item.getBatchId() == null ? null : batchMap.get(item.getBatchId());
+          row.setBatchNo(batch == null ? null : batch.getBatchNo());
+          row.setQuantity(item.getQuantity());
+          row.setReason(item.getReason());
+          return row;
+        }).toList();
+    response.setItems(detail);
+    return response;
   }
 
   @GetMapping("/adjustment/diff-report")

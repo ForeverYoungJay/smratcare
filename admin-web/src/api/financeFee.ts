@@ -11,7 +11,9 @@ import type {
   DischargeSettlementCreateRequest,
   DischargeSettlementConfirmRequest,
   ConsumptionRecordCreateRequest,
-  MonthlyAllocationCreateRequest
+  MonthlyAllocationCreateRequest,
+  MonthlyAllocationPreviewRequest,
+  MonthlyAllocationPreviewResponse
 } from '../types/financeFee'
 
 export function getAdmissionFeeAuditPage(params: any) {
@@ -64,4 +66,12 @@ export function getMonthlyAllocationPage(params: any) {
 
 export function createMonthlyAllocation(data: MonthlyAllocationCreateRequest) {
   return request.post<MonthlyAllocationItem>('/api/finance/fee/monthly-allocation', data)
+}
+
+export function previewMonthlyAllocation(data: MonthlyAllocationPreviewRequest) {
+  return request.post<MonthlyAllocationPreviewResponse>('/api/finance/fee/monthly-allocation/preview', data)
+}
+
+export function rollbackMonthlyAllocation(id: number, reason?: string) {
+  return request.post<MonthlyAllocationItem>(`/api/finance/fee/monthly-allocation/${id}/rollback`, reason ? { reason } : {})
 }

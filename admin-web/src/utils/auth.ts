@@ -1,6 +1,7 @@
 const TOKEN_KEY = 'zhiyangyun_token'
 const ROLES_KEY = 'zhiyangyun_roles'
 const PERMISSIONS_KEY = 'zhiyangyun_permissions'
+const STAFF_INFO_KEY = 'zhiyangyun_staff_info'
 
 export function normalizeRoles(roles: string[]): string[] {
   const normalized = new Set<string>()
@@ -63,4 +64,22 @@ export function setPermissions(permissions: string[]) {
 
 export function clearPermissions() {
   localStorage.removeItem(PERMISSIONS_KEY)
+}
+
+export function getStaffInfo<T = any>(): T | null {
+  const raw = localStorage.getItem(STAFF_INFO_KEY)
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as T
+  } catch {
+    return null
+  }
+}
+
+export function setStaffInfo(staffInfo: any) {
+  localStorage.setItem(STAFF_INFO_KEY, JSON.stringify(staffInfo || null))
+}
+
+export function clearStaffInfo() {
+  localStorage.removeItem(STAFF_INFO_KEY)
 }

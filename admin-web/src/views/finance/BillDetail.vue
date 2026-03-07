@@ -1,9 +1,9 @@
 <template>
-  <PageContainer title="账单详情" :subTitle="`账单ID: ${billId}`">
+  <PageContainer title="账单详情" :subTitle="`账单ID: ${currentBillId}`">
     <a-card class="card-elevated" :bordered="false">
       <a-row :gutter="16">
         <a-col :span="6">
-          <a-statistic title="老人" :value="detail?.elderName || '未知老人'" />
+          <a-statistic title="老人" :value="resolvedElderName" />
         </a-col>
         <a-col :span="6">
           <a-statistic title="账单月份" :value="detail?.billMonth" />
@@ -19,6 +19,25 @@
         </a-col>
       </a-row>
       <a-tag style="margin-top: 8px;" :color="statusColor(detail?.status)">{{ statusText(detail?.status) }}</a-tag>
+
+      <a-alert v-if="!detail?.elderName" type="warning" show-icon style="margin-top: 12px;" message="该账单老人信息缺失，请按老人+月份重新定位" />
+      <a-space v-if="!detail?.elderName" style="margin-top: 12px;" wrap>
+        <a-select
+          v-model:value="fixQuery.elderId"
+          show-search
+          allow-clear
+          :filter-option="false"
+          :options="elderOptions"
+          :loading="elderLoading"
+          placeholder="选择老人"
+          style="width: 260px"
+          @search="searchElders"
+        />
+        <a-date-picker v-model:value="fixQuery.month" picker="month" style="width: 160px" />
+        <a-button type="primary" @click="locateBillByElder">按老人查询账单</a-button>
+        <a-button :loading="bindingElder" @click="bindCurrentBillElder">修复本账单老人</a-button>
+      </a-space>
+
       <div style="margin-top: 16px;">
         <a-space>
           <a-button v-if="detail?.status !== 9" type="primary" @click="openPay">登记收款</a-button>
@@ -150,23 +169,41 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
-import { getFinanceBillDetail, updatePaymentRecord } from '../../api/finance'
-import { invalidateBill, payBill } from '../../api/bill'
+import { bindFinanceBillElder, getFinanceBillDetail, updatePaymentRecord } from '../../api/finance'
+import { getBillDetail, invalidateBill, payBill } from '../../api/bill'
 import { getOrderDetail } from '../../api/store'
 import type { FinanceBillDetail } from '../../types'
 import { exportCsv } from '../../utils/export'
+import { useElderOptions } from '../../composables/useElderOptions'
 
 const route = useRoute()
 const router = useRouter()
-const billId = Number(route.params.billId)
+const currentBillId = computed(() => Number(route.params.billId))
 const detail = ref<FinanceBillDetail | null>(null)
 const orderDetailMap = ref<Record<number, any>>({})
 const orderLoading = ref<Record<number, boolean>>({})
+
+const { elderOptions, elderLoading, searchElders, ensureSelectedElder, findElderName } = useElderOptions({ pageSize: 80, inHospitalOnly: false })
+
+const fixQuery = reactive({
+  elderId: undefined as number | undefined,
+  month: dayjs().startOf('month') as any
+})
+const bindingElder = ref(false)
+
+const resolvedElderName = computed(() => {
+  const current = detail.value
+  if (!current) return '-'
+  if (current.elderName) return current.elderName
+  if (current.elderId) return findElderName(current.elderId) || `老人#${current.elderId}`
+  if (fixQuery.elderId) return findElderName(fixQuery.elderId) || `老人#${fixQuery.elderId}`
+  return '未知老人'
+})
 
 const payOpen = ref(false)
 const paying = ref(false)
@@ -214,7 +251,59 @@ function statusColor(status?: number) {
 }
 
 async function refresh() {
-  detail.value = await getFinanceBillDetail(billId)
+  detail.value = await getFinanceBillDetail(currentBillId.value)
+  const month = detail.value?.billMonth
+  if (month) {
+    fixQuery.month = dayjs(month, 'YYYY-MM')
+  }
+  if (detail.value?.elderId) {
+    ensureSelectedElder(detail.value.elderId, detail.value.elderName)
+    fixQuery.elderId = detail.value.elderId
+  }
+}
+
+async function locateBillByElder() {
+  if (!fixQuery.elderId) {
+    message.warning('请先选择老人')
+    return
+  }
+  const monthText = fixQuery.month ? dayjs(fixQuery.month).format('YYYY-MM') : ''
+  if (!monthText) {
+    message.warning('请选择账单月份')
+    return
+  }
+  try {
+    const bill = await getBillDetail(fixQuery.elderId, monthText)
+    if (!bill?.id) {
+      message.warning('未查询到该老人该月账单')
+      return
+    }
+    if (Number(bill.id) === currentBillId.value) {
+      refresh()
+      return
+    }
+    router.replace(`/finance/bill/${bill.id}`)
+  } catch (error: any) {
+    message.error(error?.message || '查询失败')
+  }
+}
+
+async function bindCurrentBillElder() {
+  if (!fixQuery.elderId) {
+    message.warning('请先选择老人')
+    return
+  }
+  bindingElder.value = true
+  try {
+    await bindFinanceBillElder(currentBillId.value, {
+      elderId: fixQuery.elderId,
+      remark: '账单详情页手工修复'
+    })
+    message.success('账单老人已修复')
+    await refresh()
+  } finally {
+    bindingElder.value = false
+  }
 }
 
 async function onToggleOrderExpand({ row, expanded }: any) {
@@ -278,7 +367,7 @@ async function submitPay() {
       await updatePaymentRecord(activePaymentId.value, payload)
       message.success('收款已修改')
     } else {
-      await payBill(billId, payload)
+      await payBill(currentBillId.value, payload)
       message.success('收款登记成功')
     }
     payOpen.value = false
@@ -290,17 +379,17 @@ async function submitPay() {
 }
 
 async function markInvalid() {
-  await invalidateBill(billId)
+  await invalidateBill(currentBillId.value)
   message.success('账单已标记为无效')
   refresh()
 }
 
 function exportPayments() {
-  exportCsv(detail.value?.payments || [], `payments-${billId}.csv`)
+  exportCsv(detail.value?.payments || [], `payments-${currentBillId.value}.csv`)
 }
 
 function goConsumption() {
-  const elderId = detail.value?.elderId
+  const elderId = detail.value?.elderId || fixQuery.elderId
   if (!elderId) {
     message.warning('当前账单未关联老人')
     return
@@ -308,5 +397,17 @@ function goConsumption() {
   router.push(`/finance/flows/consumption?elderId=${elderId}`)
 }
 
-onMounted(refresh)
+watch(
+  () => route.params.billId,
+  () => {
+    orderDetailMap.value = {}
+    orderLoading.value = {}
+    refresh()
+  }
+)
+
+onMounted(() => {
+  searchElders('').catch(() => {})
+  refresh()
+})
 </script>

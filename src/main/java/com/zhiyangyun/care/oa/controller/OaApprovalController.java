@@ -5,12 +5,16 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zhiyangyun.care.auth.entity.StaffAccount;
+import com.zhiyangyun.care.auth.mapper.StaffMapper;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.hr.model.StaffPointsAdjustRequest;
 import com.zhiyangyun.care.hr.service.StaffPointsService;
 import com.zhiyangyun.care.oa.entity.OaApproval;
+import com.zhiyangyun.care.oa.entity.OaTask;
 import com.zhiyangyun.care.oa.mapper.OaApprovalMapper;
+import com.zhiyangyun.care.oa.mapper.OaTaskMapper;
 import com.zhiyangyun.care.oa.model.OaApprovalBatchRejectRequest;
 import com.zhiyangyun.care.oa.model.OaBatchIdsRequest;
 import com.zhiyangyun.care.oa.model.OaApprovalSummaryResponse;
@@ -21,6 +25,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -42,14 +47,20 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/oa/approval")
 public class OaApprovalController {
   private final OaApprovalMapper approvalMapper;
+  private final OaTaskMapper taskMapper;
+  private final StaffMapper staffMapper;
   private final StaffPointsService staffPointsService;
   private final ObjectMapper objectMapper;
 
   public OaApprovalController(
       OaApprovalMapper approvalMapper,
+      OaTaskMapper taskMapper,
+      StaffMapper staffMapper,
       StaffPointsService staffPointsService,
       ObjectMapper objectMapper) {
     this.approvalMapper = approvalMapper;
+    this.taskMapper = taskMapper;
+    this.staffMapper = staffMapper;
     this.staffPointsService = staffPointsService;
     this.objectMapper = objectMapper;
   }
@@ -61,11 +72,13 @@ public class OaApprovalController {
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String type,
       @RequestParam(required = false) Long applicantId,
+      @RequestParam(required = false, defaultValue = "false") boolean pendingMine,
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
     String normalizedStatus = normalizeStatus(status);
     String normalizedType = normalizeType(type);
-    var wrapper = buildQuery(orgId, normalizedStatus, normalizedType, applicantId, keyword).orderByDesc(OaApproval::getCreateTime);
+    var wrapper = buildQuery(orgId, normalizedStatus, normalizedType, applicantId, keyword, pendingMine)
+        .orderByDesc(OaApproval::getCreateTime);
     return Result.ok(approvalMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
   }
 
@@ -74,6 +87,7 @@ public class OaApprovalController {
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String type,
       @RequestParam(required = false) Long applicantId,
+      @RequestParam(required = false, defaultValue = "false") boolean pendingMine,
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
     String normalizedStatus = normalizeStatus(status);
@@ -81,16 +95,16 @@ public class OaApprovalController {
     LocalDateTime now = LocalDateTime.now();
 
     OaApprovalSummaryResponse response = new OaApprovalSummaryResponse();
-    response.setTotalCount(count(approvalMapper.selectCount(buildQuery(orgId, normalizedStatus, normalizedType, applicantId, keyword))));
-    response.setPendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", normalizedType, applicantId, keyword))));
-    response.setApprovedCount(count(approvalMapper.selectCount(buildQuery(orgId, "APPROVED", normalizedType, applicantId, keyword))));
-    response.setRejectedCount(count(approvalMapper.selectCount(buildQuery(orgId, "REJECTED", normalizedType, applicantId, keyword))));
-    response.setTimeoutPendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", normalizedType, applicantId, keyword)
+    response.setTotalCount(count(approvalMapper.selectCount(buildQuery(orgId, normalizedStatus, normalizedType, applicantId, keyword, pendingMine))));
+    response.setPendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", normalizedType, applicantId, keyword, pendingMine))));
+    response.setApprovedCount(count(approvalMapper.selectCount(buildQuery(orgId, "APPROVED", normalizedType, applicantId, keyword, pendingMine))));
+    response.setRejectedCount(count(approvalMapper.selectCount(buildQuery(orgId, "REJECTED", normalizedType, applicantId, keyword, pendingMine))));
+    response.setTimeoutPendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", normalizedType, applicantId, keyword, pendingMine)
         .lt(OaApproval::getCreateTime, now.minusHours(48)))));
-    response.setLeavePendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", "LEAVE", applicantId, keyword))));
-    response.setReimbursePendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", "REIMBURSE", applicantId, keyword))));
-    response.setPurchasePendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", "PURCHASE", applicantId, keyword))));
-    response.setMarketingPlanPendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", "MARKETING_PLAN", applicantId, keyword))));
+    response.setLeavePendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", "LEAVE", applicantId, keyword, pendingMine))));
+    response.setReimbursePendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", "REIMBURSE", applicantId, keyword, pendingMine))));
+    response.setPurchasePendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", "PURCHASE", applicantId, keyword, pendingMine))));
+    response.setMarketingPlanPendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", "MARKETING_PLAN", applicantId, keyword, pendingMine))));
     return Result.ok(response);
   }
 
@@ -98,19 +112,18 @@ public class OaApprovalController {
   public Result<OaApproval> create(@Valid @RequestBody OaApprovalRequest request) {
     Long orgId = AuthContext.getOrgId();
     Long currentStaffId = AuthContext.getStaffId();
-    boolean canApprove = canCurrentUserApprove();
     OaApproval approval = new OaApproval();
     approval.setTenantId(orgId);
     approval.setOrgId(orgId);
     validateDateRange(request.getStartTime(), request.getEndTime());
     approval.setApprovalType(normalizeType(request.getApprovalType()));
     approval.setTitle(request.getTitle());
-    approval.setApplicantId(resolveApplicantId(canApprove, currentStaffId, request.getApplicantId()));
-    approval.setApplicantName(request.getApplicantName());
+    approval.setApplicantId(resolveApplicantId(currentStaffId, request.getApplicantId()));
+    approval.setApplicantName(resolveApplicantName(request.getApplicantName()));
     approval.setAmount(request.getAmount());
     approval.setStartTime(request.getStartTime());
     approval.setEndTime(request.getEndTime());
-    approval.setFormData(enrichWorkflowData(request));
+    approval.setFormData(enrichWorkflowData(request, approval.getApplicantId()));
     String normalizedStatus = normalizeStatus(request.getStatus());
     if (normalizedStatus != null && !"PENDING".equals(normalizedStatus)) {
       throw new IllegalArgumentException("创建审批单仅支持 PENDING 状态");
@@ -134,12 +147,10 @@ public class OaApprovalController {
     validateDateRange(request.getStartTime(), request.getEndTime());
     approval.setApprovalType(normalizeType(request.getApprovalType()));
     approval.setTitle(request.getTitle());
-    approval.setApplicantId(resolveApplicantId(canCurrentUserApprove(), AuthContext.getStaffId(), request.getApplicantId()));
-    approval.setApplicantName(request.getApplicantName());
     approval.setAmount(request.getAmount());
     approval.setStartTime(request.getStartTime());
     approval.setEndTime(request.getEndTime());
-    approval.setFormData(enrichWorkflowData(request));
+    approval.setFormData(enrichWorkflowData(request, approval.getApplicantId()));
     String normalizedStatus = normalizeStatus(request.getStatus());
     if (normalizedStatus != null && !"PENDING".equals(normalizedStatus)) {
       throw new IllegalArgumentException("编辑审批单仅支持保持 PENDING 状态");
@@ -158,9 +169,12 @@ public class OaApprovalController {
       return Result.ok(null);
     }
     ensurePending(approval);
+    ensureCurrentApproverPermission(approval);
     applyApprovalDecision(approval, "APPROVED", remark);
     approvalMapper.updateById(approval);
-    handleAfterApproved(approval);
+    if ("APPROVED".equals(approval.getStatus())) {
+      handleAfterApproved(approval);
+    }
     return Result.ok(approval);
   }
 
@@ -172,8 +186,12 @@ public class OaApprovalController {
       return Result.ok(null);
     }
     ensurePending(approval);
+    ensureCurrentApproverPermission(approval);
     applyApprovalDecision(approval, "REJECTED", remark);
     approvalMapper.updateById(approval);
+    if ("REJECTED".equals(approval.getStatus())) {
+      handleAfterRejected(approval);
+    }
     return Result.ok(approval);
   }
 
@@ -194,9 +212,14 @@ public class OaApprovalController {
       if (!"PENDING".equals(approval.getStatus())) {
         continue;
       }
+      if (!canCurrentUserApproveStep(approval)) {
+        continue;
+      }
       applyApprovalDecision(approval, "APPROVED", "批量审批通过");
       approvalMapper.updateById(approval);
-      handleAfterApproved(approval);
+      if ("APPROVED".equals(approval.getStatus())) {
+        handleAfterApproved(approval);
+      }
       count++;
     }
     return Result.ok(count);
@@ -220,8 +243,14 @@ public class OaApprovalController {
       if (!"PENDING".equals(approval.getStatus())) {
         continue;
       }
+      if (!canCurrentUserApproveStep(approval)) {
+        continue;
+      }
       applyApprovalDecision(approval, "REJECTED", remark);
       approvalMapper.updateById(approval);
+      if ("REJECTED".equals(approval.getStatus())) {
+        handleAfterRejected(approval);
+      }
       count++;
     }
     return Result.ok(count);
@@ -241,6 +270,7 @@ public class OaApprovalController {
     for (OaApproval approval : approvals) {
       approval.setIsDeleted(1);
       approvalMapper.updateById(approval);
+      handleAfterDeleted(approval);
     }
     return Result.ok(approvals.size());
   }
@@ -254,7 +284,7 @@ public class OaApprovalController {
     Long orgId = AuthContext.getOrgId();
     String normalizedStatus = normalizeStatus(status);
     String normalizedType = normalizeType(type);
-    var wrapper = buildQuery(orgId, normalizedStatus, normalizedType, applicantId, keyword)
+    var wrapper = buildQuery(orgId, normalizedStatus, normalizedType, applicantId, keyword, false)
         .orderByDesc(OaApproval::getCreateTime);
     List<OaApproval> approvals = approvalMapper.selectList(wrapper);
     List<String> headers = List.of("ID", "类型", "标题", "申请人", "金额", "状态", "开始时间", "结束时间", "备注");
@@ -279,6 +309,7 @@ public class OaApprovalController {
     if (approval != null) {
       approval.setIsDeleted(1);
       approvalMapper.updateById(approval);
+      handleAfterDeleted(approval);
     }
     return Result.ok(null);
   }
@@ -387,7 +418,7 @@ public class OaApprovalController {
   }
 
   private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OaApproval> buildQuery(
-      Long orgId, String normalizedStatus, String normalizedType, Long applicantId, String keyword) {
+      Long orgId, String normalizedStatus, String normalizedType, Long applicantId, String keyword, boolean pendingMine) {
     Long staffId = AuthContext.getStaffId();
     boolean canApprove = canCurrentUserApprove();
     Long queryApplicantId = canApprove ? applicantId : staffId;
@@ -402,6 +433,27 @@ public class OaApprovalController {
           .or().like(OaApproval::getApplicantName, keyword)
           .or().like(OaApproval::getRemark, keyword));
     }
+    if (pendingMine && canApprove && "PENDING".equals(normalizedStatus)) {
+      List<String> roles = AuthContext.getRoleCodes();
+      List<String> normalizedRoles = (roles == null ? List.<String>of() : roles).stream()
+          .map(item -> item == null ? null : item.trim().toUpperCase())
+          .filter(item -> item != null && !item.isBlank())
+          .toList();
+      if (!normalizedRoles.isEmpty()) {
+        wrapper.and(w -> {
+          boolean first = true;
+          for (String role : normalizedRoles) {
+            String token = "\"currentApproverRole\":\"" + role + "\"";
+            if (first) {
+              w.like(OaApproval::getFormData, token);
+              first = false;
+            } else {
+              w.or().like(OaApproval::getFormData, token);
+            }
+          }
+        });
+      }
+    }
     return wrapper;
   }
 
@@ -409,14 +461,17 @@ public class OaApprovalController {
     return value == null ? 0L : value;
   }
 
-  private String enrichWorkflowData(OaApprovalRequest request) {
+  private String enrichWorkflowData(OaApprovalRequest request, Long applicantId) {
     Map<String, Object> map = readFormMap(request.getFormData());
     String type = normalizeType(request.getApprovalType());
     validateWorkflowRequest(type, request, map);
     map.put("workflowType", type);
     map.put("workflowVersion", "2026-Q1");
     map.put("submittedAt", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-    map.put("approvalPath", approvalPath(type, request));
+    bindApplicantSupervisors(map, applicantId);
+    List<String> path = approvalPath(type, request);
+    map.put("approvalPath", path);
+    initializeWorkflowRuntime(map, path);
     if ("LEAVE".equals(type) && request.getStartTime() != null && request.getEndTime() != null) {
       long leaveHours = Duration.between(request.getStartTime(), request.getEndTime()).toHours();
       long leaveDays = (long) Math.ceil(Math.max(leaveHours, 0) / 24.0);
@@ -427,6 +482,39 @@ public class OaApprovalController {
       }
     }
     return writeFormMap(map);
+  }
+
+  private void bindApplicantSupervisors(Map<String, Object> map, Long applicantId) {
+    if (map == null || applicantId == null) {
+      return;
+    }
+    StaffAccount applicant = staffMapper.selectById(applicantId);
+    if (applicant == null) {
+      return;
+    }
+    map.put("applicantId", applicant.getId());
+    map.put("applicantName", applicant.getRealName());
+    map.put("applicantDepartmentId", applicant.getDepartmentId());
+    if (applicant.getDirectLeaderId() != null) {
+      map.put("directLeaderId", applicant.getDirectLeaderId());
+      StaffAccount direct = staffMapper.selectById(applicant.getDirectLeaderId());
+      if (direct != null) {
+        map.put("directLeaderName", direct.getRealName());
+      }
+    } else {
+      map.put("directLeaderId", null);
+      map.put("directLeaderName", null);
+    }
+    if (applicant.getIndirectLeaderId() != null) {
+      map.put("indirectLeaderId", applicant.getIndirectLeaderId());
+      StaffAccount indirect = staffMapper.selectById(applicant.getIndirectLeaderId());
+      if (indirect != null) {
+        map.put("indirectLeaderName", indirect.getRealName());
+      }
+    } else {
+      map.put("indirectLeaderId", null);
+      map.put("indirectLeaderName", null);
+    }
   }
 
   private void validateWorkflowRequest(String type, OaApprovalRequest request, Map<String, Object> map) {
@@ -444,7 +532,7 @@ public class OaApprovalController {
     if ("POINTS_CASH".equals(type)) {
       Long staffId = parseLong(map.get("staffId"));
       if (staffId == null) {
-        staffId = request.getApplicantId();
+        staffId = AuthContext.getStaffId();
       }
       Integer redeemPoints = parseInteger(map.get("redeemPoints"));
       if (staffId == null || redeemPoints == null || redeemPoints <= 0 || redeemPoints % 300 != 0) {
@@ -516,9 +604,28 @@ public class OaApprovalController {
     }
     if ("LEAVE".equalsIgnoreCase(approval.getApprovalType())) {
       updateLeaveAnnualStats(approval);
+      syncLeaveCalendarTask(approval);
     }
     if ("POINTS_CASH".equalsIgnoreCase(approval.getApprovalType())) {
       applyPointsCashRedeem(approval);
+    }
+  }
+
+  private void handleAfterRejected(OaApproval approval) {
+    if (approval == null || approval.getApprovalType() == null) {
+      return;
+    }
+    if ("LEAVE".equalsIgnoreCase(approval.getApprovalType())) {
+      removeLeaveCalendarTask(approval);
+    }
+  }
+
+  private void handleAfterDeleted(OaApproval approval) {
+    if (approval == null || approval.getApprovalType() == null) {
+      return;
+    }
+    if ("LEAVE".equalsIgnoreCase(approval.getApprovalType())) {
+      removeLeaveCalendarTask(approval);
     }
   }
 
@@ -544,13 +651,106 @@ public class OaApprovalController {
     approvalMapper.updateById(approval);
   }
 
+  private void syncLeaveCalendarTask(OaApproval approval) {
+    if (approval == null || approval.getId() == null || approval.getApplicantId() == null) {
+      return;
+    }
+    OaTask task = taskMapper.selectOne(Wrappers.lambdaQuery(OaTask.class)
+        .eq(OaTask::getIsDeleted, 0)
+        .eq(approval.getOrgId() != null, OaTask::getOrgId, approval.getOrgId())
+        .eq(OaTask::getSourceTodoId, approval.getId())
+        .eq(OaTask::getAssigneeId, approval.getApplicantId())
+        .last("LIMIT 1"));
+    if (task == null) {
+      task = new OaTask();
+      task.setTenantId(approval.getOrgId());
+      task.setOrgId(approval.getOrgId());
+      task.setSourceTodoId(approval.getId());
+      task.setCreatedBy(AuthContext.getStaffId());
+    }
+    task.setTitle("请假中：" + parseString(approval.getApplicantName()));
+    task.setDescription("来源审批单#" + approval.getId() + "，审批通过后自动同步。");
+    task.setStartTime(approval.getStartTime());
+    task.setEndTime(approval.getEndTime());
+    task.setPriority("NORMAL");
+    task.setStatus("OPEN");
+    task.setAssigneeId(approval.getApplicantId());
+    task.setAssigneeName(approval.getApplicantName());
+    task.setCalendarType("PERSONAL");
+    task.setPlanCategory("请假");
+    task.setUrgency("NORMAL");
+    task.setEventColor("#1890ff");
+    task.setCollaboratorIds(null);
+    task.setCollaboratorNames(null);
+    task.setIsRecurring(0);
+    task.setRecurrenceRule(null);
+    task.setRecurrenceInterval(null);
+    task.setRecurrenceCount(null);
+    if (task.getId() == null) {
+      taskMapper.insert(task);
+      return;
+    }
+    taskMapper.updateById(task);
+  }
+
+  private void removeLeaveCalendarTask(OaApproval approval) {
+    if (approval == null || approval.getId() == null || approval.getApplicantId() == null) {
+      return;
+    }
+    OaTask task = taskMapper.selectOne(Wrappers.lambdaQuery(OaTask.class)
+        .eq(OaTask::getIsDeleted, 0)
+        .eq(approval.getOrgId() != null, OaTask::getOrgId, approval.getOrgId())
+        .eq(OaTask::getSourceTodoId, approval.getId())
+        .eq(OaTask::getAssigneeId, approval.getApplicantId())
+        .last("LIMIT 1"));
+    if (task == null) {
+      return;
+    }
+    task.setIsDeleted(1);
+    taskMapper.updateById(task);
+  }
+
   private void applyApprovalDecision(OaApproval approval, String status, String remark) {
     Map<String, Object> map = readFormMap(approval.getFormData());
+    List<String> path = parseStringList(map.get("approvalPath"));
+    int currentNodeIndex = resolveCurrentNodeIndex(path, map);
+    String currentNodeName = currentNodeIndex >= 0 && currentNodeIndex < path.size() ? path.get(currentNodeIndex) : null;
+    appendApprovalRoundHistory(map, currentNodeIndex, currentNodeName, status, remark);
     map.put("lastApprovalStatus", status);
     map.put("lastApprovalRemark", normalizeOpinion(remark));
     map.put("lastApprovalAt", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
     map.put("lastApproverId", AuthContext.getStaffId());
     map.put("lastApproverRoles", AuthContext.getRoleCodes());
+    map.put("lastApproverName", resolveApplicantName(null));
+    if ("APPROVED".equals(status) && !path.isEmpty()) {
+      int lastApprovalNodeIndex = resolveLastApprovalNodeIndex(path);
+      if (currentNodeIndex < lastApprovalNodeIndex) {
+        int nextIndex = Math.max(currentNodeIndex + 1, 0);
+        syncCurrentNodeMeta(map, path, nextIndex);
+        map.put("workflowState", "IN_REVIEW");
+        map.put("nextApprovalRequired", true);
+        String toRole = parseString(map.get("currentApproverRole"));
+        String toName = parseString(map.get("currentApproverName"));
+        appendNotifyHistory(map, toRole, toName, "上一审批环节已通过，系统已自动同步到你审批");
+        approval.setStatus("PENDING");
+        approval.setRemark(normalizeOpinion(remark));
+        approval.setFormData(writeFormMap(map));
+        return;
+      }
+    }
+    if ("REJECTED".equals(status)) {
+      map.put("workflowState", "REJECTED");
+      map.put("nextApprovalRequired", false);
+      map.put("currentNodeName", "已驳回");
+      map.put("currentApproverRole", null);
+      map.put("currentApproverName", null);
+    } else if ("APPROVED".equals(status)) {
+      map.put("workflowState", "COMPLETED");
+      map.put("nextApprovalRequired", false);
+      map.put("currentNodeName", "流程完成");
+      map.put("currentApproverRole", null);
+      map.put("currentApproverName", null);
+    }
     approval.setFormData(writeFormMap(map));
     approval.setStatus(status);
     approval.setRemark(normalizeOpinion(remark));
@@ -570,18 +770,44 @@ public class OaApprovalController {
     }
   }
 
+  private void ensureCurrentApproverPermission(OaApproval approval) {
+    Map<String, Object> map = readFormMap(approval == null ? null : approval.getFormData());
+    String requiredRole = parseString(map.get("currentApproverRole"));
+    if (requiredRole == null) {
+      return;
+    }
+    if (!canApproveByRole(requiredRole)) {
+      throw new AccessDeniedException("当前审批环节要求角色：" + requiredRole);
+    }
+  }
+
+  private boolean canCurrentUserApproveStep(OaApproval approval) {
+    try {
+      ensureCurrentApproverPermission(approval);
+      return true;
+    } catch (Exception ignore) {
+      return false;
+    }
+  }
+
   private boolean canCurrentUserApprove() {
     return AuthContext.isMinisterOrHigher();
   }
 
-  private Long resolveApplicantId(boolean canApprove, Long currentStaffId, Long requestApplicantId) {
-    if (!canApprove) {
-      return currentStaffId;
-    }
-    if (requestApplicantId != null) {
-      return requestApplicantId;
+  private Long resolveApplicantId(Long currentStaffId, Long requestApplicantId) {
+    if (requestApplicantId != null && currentStaffId != null && !requestApplicantId.equals(currentStaffId)) {
+      throw new IllegalArgumentException("申请人只能是当前登录人");
     }
     return currentStaffId;
+  }
+
+  private String resolveApplicantName(String requestApplicantName) {
+    String currentName = parseString(AuthContext.getUsername());
+    if (currentName != null) {
+      return currentName;
+    }
+    String requested = parseString(requestApplicantName);
+    return requested == null ? "当前用户" : requested;
   }
 
   private void applyPointsCashRedeem(OaApproval approval) {
@@ -615,6 +841,200 @@ public class OaApprovalController {
       map.put("rawText", formData);
       return map;
     }
+  }
+
+  private void initializeWorkflowRuntime(Map<String, Object> map, List<String> path) {
+    if (map == null || path == null || path.isEmpty()) {
+      return;
+    }
+    int initialNodeIndex = path.size() > 1 ? 1 : 0;
+    syncCurrentNodeMeta(map, path, initialNodeIndex);
+    map.put("workflowState", "IN_REVIEW");
+    map.put("nextApprovalRequired", true);
+    String toRole = parseString(map.get("currentApproverRole"));
+    String toName = parseString(map.get("currentApproverName"));
+    appendNotifyHistory(map, toRole, toName, "审批单已进入你的待办，请尽快处理");
+  }
+
+  private int resolveCurrentNodeIndex(List<String> path, Map<String, Object> map) {
+    if (path == null || path.isEmpty()) {
+      return 0;
+    }
+    Integer index = parseInteger(map == null ? null : map.get("currentNodeIndex"));
+    if (index == null || index < 0 || index >= path.size()) {
+      return path.size() > 1 ? 1 : 0;
+    }
+    return index;
+  }
+
+  private int resolveLastApprovalNodeIndex(List<String> path) {
+    if (path == null || path.isEmpty()) {
+      return 0;
+    }
+    int lastIndex = path.size() - 1;
+    String lastNode = path.get(lastIndex);
+    if (lastNode != null && lastNode.contains("归档") && lastIndex > 0) {
+      return lastIndex - 1;
+    }
+    return lastIndex;
+  }
+
+  private void syncCurrentNodeMeta(Map<String, Object> map, List<String> path, int nodeIndex) {
+    if (map == null || path == null || path.isEmpty()) {
+      return;
+    }
+    int index = Math.max(0, Math.min(nodeIndex, path.size() - 1));
+    String node = path.get(index);
+    String role = resolveApproverRole(node);
+    map.put("currentNodeIndex", index);
+    map.put("currentNodeName", node);
+    map.put("currentStep", node);
+    map.put("currentApproverRole", role);
+    map.put("currentApproverName", resolveApproverName(role, map));
+  }
+
+  private void appendApprovalRoundHistory(
+      Map<String, Object> map,
+      int nodeIndex,
+      String nodeName,
+      String action,
+      String remark) {
+    if (map == null) {
+      return;
+    }
+    Object raw = map.get("approvalRounds");
+    List<Map<String, Object>> rounds = new ArrayList<>();
+    if (raw instanceof List<?> list) {
+      for (Object item : list) {
+        if (item instanceof Map<?, ?> oldMap) {
+          Map<String, Object> next = new LinkedHashMap<>();
+          oldMap.forEach((k, v) -> next.put(String.valueOf(k), v));
+          rounds.add(next);
+        }
+      }
+    }
+    Map<String, Object> round = new LinkedHashMap<>();
+    round.put("round", rounds.size() + 1);
+    round.put("nodeIndex", nodeIndex);
+    round.put("nodeName", nodeName);
+    round.put("action", action);
+    round.put("remark", normalizeOpinion(remark));
+    round.put("approverId", AuthContext.getStaffId());
+    round.put("approverName", resolveApplicantName(null));
+    round.put("at", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+    rounds.add(round);
+    map.put("approvalRounds", rounds);
+  }
+
+  private void appendNotifyHistory(Map<String, Object> map, String toRole, String toName, String message) {
+    if (map == null) {
+      return;
+    }
+    Object raw = map.get("notifyHistory");
+    List<Map<String, Object>> history = new ArrayList<>();
+    if (raw instanceof List<?> list) {
+      for (Object item : list) {
+        if (item instanceof Map<?, ?> oldMap) {
+          Map<String, Object> next = new LinkedHashMap<>();
+          oldMap.forEach((k, v) -> next.put(String.valueOf(k), v));
+          history.add(next);
+        }
+      }
+    }
+    Map<String, Object> row = new LinkedHashMap<>();
+    row.put("toRole", parseString(toRole));
+    row.put("toName", parseString(toName));
+    row.put("message", parseString(message));
+    row.put("at", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+    row.put("by", resolveApplicantName(null));
+    history.add(row);
+    map.put("notifyHistory", history);
+  }
+
+  private List<String> parseStringList(Object value) {
+    if (!(value instanceof List<?> list) || list.isEmpty()) {
+      return List.of();
+    }
+    return list.stream().map(this::parseString).filter(item -> item != null && !item.isBlank()).toList();
+  }
+
+  private String resolveApproverRole(String nodeName) {
+    String node = parseString(nodeName);
+    if (node == null) {
+      return "MANAGER";
+    }
+    if (node.contains("部门主管")) return "DEPT_MANAGER";
+    if (node.contains("人事")) return "HR";
+    if (node.contains("财务") || node.contains("出纳")) return "FINANCE";
+    if (node.contains("院长")) return "DEAN";
+    if (node.contains("仓库")) return "WAREHOUSE";
+    if (node.contains("行政")) return "ADMIN_OFFICE";
+    if (node.contains("采购")) return "PURCHASING";
+    if (node.contains("归档")) return "ARCHIVE";
+    return "MANAGER";
+  }
+
+  private String resolveApproverName(String roleCode, Map<String, Object> map) {
+    if (roleCode == null) return "待分配";
+    if ("DEPT_MANAGER".equals(roleCode)) {
+      String directLeaderName = parseString(map == null ? null : map.get("directLeaderName"));
+      return directLeaderName == null ? "部门主管" : directLeaderName;
+    }
+    if ("HR".equals(roleCode)) return "人事审批人";
+    if ("FINANCE".equals(roleCode)) return "财务审批人";
+    if ("DEAN".equals(roleCode)) {
+      String indirectLeaderName = parseString(map == null ? null : map.get("indirectLeaderName"));
+      return indirectLeaderName == null ? "院长" : indirectLeaderName;
+    }
+    if ("WAREHOUSE".equals(roleCode)) return "仓库管理员";
+    if ("ADMIN_OFFICE".equals(roleCode)) return "行政审批人";
+    if ("PURCHASING".equals(roleCode)) return "采购执行人";
+    if ("ARCHIVE".equals(roleCode)) return "系统归档";
+    return "审批负责人";
+  }
+
+  private boolean canApproveByRole(String roleCode) {
+    if (roleCode == null || roleCode.isBlank()) {
+      return canCurrentUserApprove();
+    }
+    if (AuthContext.isAdmin()) {
+      return true;
+    }
+    String normalized = roleCode.trim().toUpperCase();
+    if ("DEPT_MANAGER".equals(normalized) || "MANAGER".equals(normalized)) {
+      return AuthContext.isMinisterOrHigher();
+    }
+    if ("DEAN".equals(normalized)) {
+      return AuthContext.hasRole("DEAN") || AuthContext.hasRole("DIRECTOR") || AuthContext.isAdmin();
+    }
+    if ("HR".equals(normalized)) {
+      return AuthContext.hasRole("HR")
+          || AuthContext.hasRole("HR_MANAGER")
+          || AuthContext.hasRole("PERSONNEL")
+          || AuthContext.isMinisterOrHigher();
+    }
+    if ("FINANCE".equals(normalized)) {
+      return AuthContext.hasRole("FINANCE")
+          || AuthContext.hasRole("CASHIER")
+          || AuthContext.hasRole("ACCOUNTANT")
+          || AuthContext.isMinisterOrHigher();
+    }
+    if ("WAREHOUSE".equals(normalized)) {
+      return AuthContext.hasRole("WAREHOUSE")
+          || AuthContext.hasRole("STORE_KEEPER")
+          || AuthContext.isMinisterOrHigher();
+    }
+    if ("ADMIN_OFFICE".equals(normalized)) {
+      return AuthContext.hasRole("ADMIN")
+          || AuthContext.hasRole("OFFICE")
+          || AuthContext.isMinisterOrHigher();
+    }
+    if ("PURCHASING".equals(normalized)) {
+      return AuthContext.hasRole("PURCHASE")
+          || AuthContext.hasRole("PROCUREMENT")
+          || AuthContext.isMinisterOrHigher();
+    }
+    return canCurrentUserApprove();
   }
 
   private String writeFormMap(Map<String, Object> map) {

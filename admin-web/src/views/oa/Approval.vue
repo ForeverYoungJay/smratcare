@@ -144,7 +144,8 @@
           <a-input v-model:value="form.title" />
         </a-form-item>
         <a-form-item label="申请人" required>
-          <a-input v-model:value="form.applicantName" :disabled="!canApproveFlow" />
+          <a-input v-model:value="form.applicantName" disabled />
+          <div class="upload-hint">申请人固定为当前登录人，系统自动带入并锁定。</div>
         </a-form-item>
         <a-row :gutter="16">
           <a-col :span="12">
@@ -724,6 +725,7 @@ async function fetchData() {
       status: effectiveStatus,
       type: query.type,
       applicantId,
+      pendingMine: approvalScope.value === 'PENDING_REVIEW',
       keyword: query.keyword || undefined
     }
     const [res, sum] = await Promise.all([
@@ -735,6 +737,7 @@ async function fetchData() {
       id: String(item.id)
     }))
     rows.value = rawRows.filter((item) => {
+      if (approvalScope.value === 'PENDING_REVIEW' && !isCurrentUserApprover(item)) return false
       const parsed = parseFormData(item.formData)
       if (query.urgedOnly && Number(parsed?.urgeCount || 0) <= 0) return false
       if (query.overdueOnly && !isApprovalOverdue(item)) return false
@@ -883,7 +886,8 @@ function canDeleteRecord(record: OaApproval) {
 }
 
 function canApproveRecord(record: OaApproval) {
-  return canApproveFlow.value && record.status === 'PENDING'
+  if (!canApproveFlow.value || record.status !== 'PENDING') return false
+  return isCurrentUserApprover(record)
 }
 
 function canResubmitRecord(record: OaApproval) {
@@ -999,10 +1003,7 @@ async function submit() {
     message.warning('请填写标题')
     return
   }
-  if (!form.applicantName.trim()) {
-    message.warning('请填写申请人')
-    return
-  }
+  form.applicantName = userStore.staffInfo?.realName || userStore.staffInfo?.username || form.applicantName
   if (form.approvalType === 'LEAVE' && !leavePolicyAcknowledged.value) {
     message.warning('请先勾选“我已阅读并同意制度”')
     return
@@ -1020,8 +1021,8 @@ async function submit() {
   const payload = {
     approvalType: form.approvalType,
     title: form.title,
-    applicantId: canApproveFlow.value ? undefined : userStore.staffInfo?.id,
-    applicantName: canApproveFlow.value ? form.applicantName : (userStore.staffInfo?.realName || form.applicantName),
+    applicantId: userStore.staffInfo?.id,
+    applicantName: userStore.staffInfo?.realName || userStore.staffInfo?.username || form.applicantName,
     amount: form.approvalType === 'POINTS_CASH' ? redeemCash.value : form.amount,
     startTime: form.startTime ? dayjs(form.startTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
     endTime: form.endTime ? dayjs(form.endTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
@@ -1044,6 +1045,36 @@ async function submit() {
   } finally {
     saving.value = false
   }
+}
+
+function isCurrentUserApprover(record: OaApproval) {
+  const parsed = parseFormData(record.formData)
+  const approverRole = String(parsed?.currentApproverRole || '').toUpperCase()
+  if (!approverRole) return canApproveFlow.value
+  const roles = (userStore.roles || []).map((item) => String(item || '').toUpperCase())
+  if (roles.includes('ADMIN') || roles.includes('SYS_ADMIN') || roles.includes('DIRECTOR')) return true
+  if (approverRole === 'DEPT_MANAGER' || approverRole === 'MANAGER') {
+    return hasMinisterOrHigher(roles)
+  }
+  if (approverRole === 'DEAN') {
+    return roles.includes('DEAN') || roles.includes('DIRECTOR')
+  }
+  if (approverRole === 'HR') {
+    return roles.some((role) => role.includes('HR') || role.includes('PERSONNEL')) || hasMinisterOrHigher(roles)
+  }
+  if (approverRole === 'FINANCE') {
+    return roles.some((role) => role.includes('FINANCE') || role.includes('CASHIER') || role.includes('ACCOUNTANT')) || hasMinisterOrHigher(roles)
+  }
+  if (approverRole === 'WAREHOUSE') {
+    return roles.some((role) => role.includes('WAREHOUSE') || role.includes('STORE')) || hasMinisterOrHigher(roles)
+  }
+  if (approverRole === 'ADMIN_OFFICE') {
+    return roles.some((role) => role.includes('ADMIN') || role.includes('OFFICE')) || hasMinisterOrHigher(roles)
+  }
+  if (approverRole === 'PURCHASING') {
+    return roles.some((role) => role.includes('PURCHASE') || role.includes('PROCUREMENT')) || hasMinisterOrHigher(roles)
+  }
+  return canApproveFlow.value
 }
 
 async function uploadProof(target: { value: ProofFile[] }, file: File, bizType: string, successText: string) {
@@ -1328,7 +1359,8 @@ async function downloadExport() {
     keyword: query.keyword || undefined,
     type: query.type,
     status: effectiveStatus,
-    applicantId
+    applicantId,
+    pendingMine: approvalScope.value === 'PENDING_REVIEW'
   })
   const href = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -1444,6 +1476,12 @@ useLiveSyncRefresh({
 }
 
 .selection-tip {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+
+.upload-hint {
+  margin-top: 6px;
   color: rgba(0, 0, 0, 0.45);
   font-size: 12px;
 }

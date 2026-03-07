@@ -32,6 +32,21 @@
             <a-statistic title="合同到期预警" :value="summary.contractExpiringCount" />
           </div>
         </a-col>
+        <a-col :xs="12" :md="4">
+          <div class="stat-clickable" @click="openBirthdayModal('TODAY')">
+            <a-statistic title="今日生日" :value="summary.birthdayTodayCount" />
+          </div>
+        </a-col>
+        <a-col :xs="12" :md="4">
+          <div class="stat-clickable" @click="openBirthdayModal('NEXT7')">
+            <a-statistic title="7天内生日" :value="summary.birthdayUpcomingCount" />
+          </div>
+        </a-col>
+        <a-col :xs="12" :md="4">
+          <div class="stat-clickable" @click="go('/oa/todo?keyword=生日提醒')">
+            <a-statistic title="生日待办" :value="summary.birthdayTodoCount" :value-style="{ color: (summary.birthdayTodoCount || 0) > 0 ? '#cf1322' : undefined }" />
+          </div>
+        </a-col>
       </a-row>
     </a-card>
 
@@ -89,6 +104,7 @@
             <a-button @click="go('/hr/oa/knowledge')">知识库</a-button>
             <a-button @click="go('/hr/oa/policies')">规章制度库</a-button>
             <a-button @click="go('/hr/oa/policy-alerts')">制度更新预警</a-button>
+            <a-button @click="go('/oa/todo?keyword=生日提醒')">生日提醒待办</a-button>
             <a-button @click="go('/hr/oa/groups')">分组设置</a-button>
           </a-space>
         </a-card>
@@ -125,14 +141,43 @@
         </a-card>
       </a-col>
     </a-row>
+
+    <a-modal
+      v-model:open="birthdayModalOpen"
+      :title="birthdayModalTitle"
+      width="880px"
+      :footer="null"
+      destroy-on-close
+    >
+      <a-table
+        :columns="birthdayColumns"
+        :data-source="birthdayRows"
+        :loading="birthdayLoading"
+        row-key="staffId"
+        :pagination="false"
+        size="small"
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'status'">
+            <a-tag :color="Number(record.status) === 1 ? 'green' : 'default'">{{ Number(record.status) === 1 ? '在职' : '离职' }}</a-tag>
+          </template>
+        </template>
+      </a-table>
+      <div style="margin-top: 12px; display: flex; justify-content: flex-end">
+        <a-button @click="printBirthdayRows">打印名单</a-button>
+      </div>
+    </a-modal>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import dayjs from 'dayjs'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
-import { getHrWorkbenchSummary } from '../../api/hr'
+import { getHrStaffBirthdayPage, getHrWorkbenchSummary } from '../../api/hr'
+import { openPrintTableReport } from '../../utils/print'
+import type { HrStaffBirthdayItem } from '../../types'
 
 const router = useRouter()
 const summary = reactive({
@@ -141,8 +186,27 @@ const summary = reactive({
   todayTrainingCount: 0,
   pendingLeaveApprovalCount: 0,
   attendanceAbnormalCount: 0,
-  contractExpiringCount: 0
+  contractExpiringCount: 0,
+  birthdayTodayCount: 0,
+  birthdayUpcomingCount: 0,
+  birthdayTodoCount: 0
 })
+
+const birthdayModalOpen = ref(false)
+const birthdayScope = ref<'TODAY' | 'NEXT7'>('TODAY')
+const birthdayRows = ref<HrStaffBirthdayItem[]>([])
+const birthdayLoading = ref(false)
+const birthdayColumns = [
+  { title: '工号', dataIndex: 'staffNo', key: 'staffNo', width: 110 },
+  { title: '姓名', dataIndex: 'realName', key: 'realName', width: 120 },
+  { title: '生日', dataIndex: 'birthday', key: 'birthday', width: 120 },
+  { title: '下次生日', dataIndex: 'nextBirthday', key: 'nextBirthday', width: 120 },
+  { title: '剩余天数', dataIndex: 'daysUntil', key: 'daysUntil', width: 100 },
+  { title: '手机号', dataIndex: 'phone', key: 'phone', width: 150 },
+  { title: '岗位', dataIndex: 'jobTitle', key: 'jobTitle', width: 140 },
+  { title: '状态', dataIndex: 'status', key: 'status', width: 90 }
+]
+const birthdayModalTitle = computed(() => (birthdayScope.value === 'TODAY' ? '今日生日名单' : '近7天生日名单'))
 
 function go(path: string) {
   router.push(path)
@@ -157,6 +221,9 @@ async function loadSummary() {
     summary.pendingLeaveApprovalCount = res.pendingLeaveApprovalCount || 0
     summary.attendanceAbnormalCount = res.attendanceAbnormalCount || 0
     summary.contractExpiringCount = res.contractExpiringCount || 0
+    summary.birthdayTodayCount = res.birthdayTodayCount || 0
+    summary.birthdayUpcomingCount = res.birthdayUpcomingCount || 0
+    summary.birthdayTodoCount = res.birthdayTodoCount || 0
   } catch (_error) {
     summary.onJobCount = 0
     summary.leftCount = 0
@@ -164,7 +231,49 @@ async function loadSummary() {
     summary.pendingLeaveApprovalCount = 0
     summary.attendanceAbnormalCount = 0
     summary.contractExpiringCount = 0
+    summary.birthdayTodayCount = 0
+    summary.birthdayUpcomingCount = 0
+    summary.birthdayTodoCount = 0
   }
+}
+
+async function openBirthdayModal(scope: 'TODAY' | 'NEXT7') {
+  birthdayScope.value = scope
+  birthdayModalOpen.value = true
+  birthdayLoading.value = true
+  try {
+    const page = await getHrStaffBirthdayPage({
+      pageNo: 1,
+      pageSize: 200,
+      scope,
+      onJobOnly: true
+    })
+    birthdayRows.value = page.list || []
+  } catch {
+    birthdayRows.value = []
+  } finally {
+    birthdayLoading.value = false
+  }
+}
+
+function printBirthdayRows() {
+  if (!birthdayRows.value.length) {
+    return
+  }
+  openPrintTableReport({
+    title: birthdayModalTitle.value,
+    subtitle: `打印时间：${dayjs().format('YYYY-MM-DD HH:mm:ss')}`,
+    columns: [
+      { key: 'staffNo', title: '工号' },
+      { key: 'realName', title: '姓名' },
+      { key: 'birthday', title: '生日' },
+      { key: 'nextBirthday', title: '下次生日' },
+      { key: 'daysUntil', title: '剩余天数' },
+      { key: 'phone', title: '手机号' },
+      { key: 'jobTitle', title: '岗位' }
+    ],
+    rows: birthdayRows.value as any
+  })
 }
 
 onMounted(loadSummary)

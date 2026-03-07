@@ -9,6 +9,7 @@ export interface StaffOption {
   value: string
   name: string
   departmentId?: string
+  roleCodes?: string[]
 }
 
 interface UseStaffOptionsConfig {
@@ -27,7 +28,8 @@ function toStaffOption(item: StaffItem): StaffOption {
     label: `${name}${suffix}`,
     value: String(item.id),
     name,
-    departmentId: item.departmentId == null ? undefined : String(item.departmentId)
+    departmentId: item.departmentId == null ? undefined : String(item.departmentId),
+    roleCodes: Array.isArray(item.roleCodes) ? item.roleCodes.map((code) => String(code || '').trim().toUpperCase()).filter(Boolean) : []
   }
 }
 
@@ -97,7 +99,8 @@ export function useStaffOptions(config: UseStaffOptionsConfig = {}) {
     staffOptions.value.unshift({
       label: name,
       value,
-      name
+      name,
+      roleCodes: []
     })
   }
 

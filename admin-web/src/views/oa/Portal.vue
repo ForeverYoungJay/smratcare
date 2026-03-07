@@ -2,31 +2,41 @@
   <PageContainer title="OA 门户" subTitle="公告与待办一览">
     <StatefulBlock :loading="loading" :error="errorText" :empty="false" @retry="load">
       <a-alert
-        v-if="(summary.overdueTodoCount || 0) > 0 || (summary.approvalTimeoutCount || 0) > 0 || (summary.healthAbnormalCount || 0) > 0"
+        v-if="(summary.overdueTodoCount || 0) > 0 || (summary.approvalTimeoutCount || 0) > 0 || (summary.healthAbnormalCount || 0) > 0 || (summary.birthdayTodoCount || 0) > 0"
         type="warning"
         show-icon
         style="margin-bottom: 12px"
-        :message="`协同提醒：超期待办 ${summary.overdueTodoCount || 0} 条，审批超时 ${summary.approvalTimeoutCount || 0} 条，健康异常 ${summary.healthAbnormalCount || 0} 条。`"
+        :message="`协同提醒：超期待办 ${summary.overdueTodoCount || 0} 条，审批超时 ${summary.approvalTimeoutCount || 0} 条，健康异常 ${summary.healthAbnormalCount || 0} 条，生日待办 ${summary.birthdayTodoCount || 0} 条。`"
       />
       <a-row :gutter="16" class="overview-row">
-        <a-col :span="6">
+        <a-col :xs="12" :md="4">
           <a-card :bordered="false" class="card-elevated stat-card">
             <a-statistic title="待办总数" :value="summary.openTodoCount || 0" />
           </a-card>
         </a-col>
-        <a-col :span="6">
+        <a-col :xs="12" :md="4">
+          <a-card :bordered="false" class="card-elevated stat-card clickable" @click="openPath('/oa/todo?keyword=生日提醒')">
+            <a-statistic title="生日待办" :value="summary.birthdayTodoCount || 0" />
+          </a-card>
+        </a-col>
+        <a-col :xs="12" :md="4">
           <a-card :bordered="false" class="card-elevated stat-card">
             <a-statistic title="超期待办" :value="summary.overdueTodoCount || 0" :value-style="{ color: '#cf1322' }" />
           </a-card>
         </a-col>
-        <a-col :span="6">
+        <a-col :xs="12" :md="4">
           <a-card :bordered="false" class="card-elevated stat-card">
             <a-statistic title="待审批单" :value="summary.pendingApprovalCount || 0" />
           </a-card>
         </a-col>
-        <a-col :span="6">
+        <a-col :xs="12" :md="4">
           <a-card :bordered="false" class="card-elevated stat-card">
             <a-statistic title="进行中任务" :value="summary.ongoingTaskCount || 0" />
+          </a-card>
+        </a-col>
+        <a-col :xs="12" :md="4">
+          <a-card :bordered="false" class="card-elevated stat-card">
+            <a-statistic title="今日日程" :value="summary.todayScheduleCount || 0" />
           </a-card>
         </a-col>
       </a-row>

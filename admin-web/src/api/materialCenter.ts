@@ -9,6 +9,8 @@ import type {
   InventoryInboundRequest,
   InventoryLogItem,
   InventoryOutboundRequest,
+  InventoryOutboundSheet,
+  InventoryOutboundSheetCreateRequest,
   MaterialPurchaseOrder,
   MaterialPurchaseOrderItem,
   MaterialStockAmountItem,
@@ -195,6 +197,22 @@ export function adjustInventory(data: InventoryAdjustRequest) {
 
 export function createOutbound(data: InventoryOutboundRequest) {
   return request.post<void>('/api/inventory/outbound', data)
+}
+
+export function createOutboundSheet(data: InventoryOutboundSheetCreateRequest) {
+  return request.post<InventoryOutboundSheet>('/api/inventory/outbound/sheet', data)
+}
+
+export function getOutboundSheetPage(params: any) {
+  return fetchPage<InventoryOutboundSheet>('/api/inventory/outbound/sheet/page', params)
+}
+
+export function getOutboundSheetDetail(id: number) {
+  return request.get<InventoryOutboundSheet>('/api/inventory/outbound/sheet/detail', { params: { id } })
+}
+
+export function confirmOutboundSheet(id: number) {
+  return request.post<InventoryOutboundSheet>('/api/inventory/outbound/sheet/confirm', null, { params: { id } })
 }
 
 export function getInventoryAlerts() {

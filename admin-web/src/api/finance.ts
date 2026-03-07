@@ -17,6 +17,9 @@ import type {
   FinanceAutoDebitExceptionItem,
   FinanceRoomOpsDetailResponse,
   FinanceAllocationRuleItem,
+  FinanceAllocationMeterValidateRequest,
+  FinanceAllocationMeterValidateResponse,
+  FinanceAllocationTemplateInitResponse,
   FinanceReconcileExceptionItem,
   FinanceMasterDataOverview,
   FinanceBillingConfigEntry,
@@ -165,6 +168,14 @@ export function getFinanceAllocationRules(params?: { month?: string }) {
   return request.get<FinanceAllocationRuleItem[]>('/api/finance/workbench/allocation/rules', { params })
 }
 
+export function initFinanceAllocationRuleTemplate(params?: { month?: string }) {
+  return request.post<FinanceAllocationTemplateInitResponse>('/api/finance/workbench/allocation/rules/template/init', null, { params })
+}
+
+export function validateFinanceAllocationMeter(data: FinanceAllocationMeterValidateRequest) {
+  return request.post<FinanceAllocationMeterValidateResponse>('/api/finance/workbench/allocation/meter/validate', data)
+}
+
 export function getFinanceReconcileExceptions(params?: { date?: string; type?: string }) {
   return request.get<FinanceReconcileExceptionItem[]>('/api/finance/workbench/reconcile/exceptions', { params })
 }
@@ -265,4 +276,8 @@ export function getFinanceCategoryConsumptionAnalysis(params: {
   floorNo?: string
 }) {
   return request.get<FinanceCategoryConsumptionAnalysis>('/api/finance/report/category-consumption-analysis', { params })
+}
+
+export function bindFinanceBillElder(billId: number, data: { elderId: number; remark?: string }) {
+  return request.post(`/api/finance/bill/${billId}/bind-elder`, data)
 }

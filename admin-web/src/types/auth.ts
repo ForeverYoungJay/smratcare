@@ -9,9 +9,12 @@ export interface LoginResponse {
     id: number
     orgId: number
     departmentId: number
+    staffNo?: string
     username: string
     realName: string
     phone?: string
+    directLeaderId?: number
+    indirectLeaderId?: number
     status: number
   }
   roles: string[]

@@ -38,3 +38,9 @@ export function getMonthlyAllocationPage(params) {
 export function createMonthlyAllocation(data) {
     return request.post('/api/finance/fee/monthly-allocation', data);
 }
+export function previewMonthlyAllocation(data) {
+    return request.post('/api/finance/fee/monthly-allocation/preview', data);
+}
+export function rollbackMonthlyAllocation(id, reason) {
+    return request.post(`/api/finance/fee/monthly-allocation/${id}/rollback`, reason ? { reason } : {});
+}

@@ -1,5 +1,5 @@
 <template>
-  <div class="login-page">
+  <div class="login-page" :style="{ '--login-mask-opacity': String(maskOpacity) }">
     <div class="login-card">
       <div class="brand">
         <div class="logo">智</div>
@@ -20,12 +20,16 @@
       <div class="tips">
         推荐使用现代浏览器访问以获得最佳体验
       </div>
+      <div class="bg-control">
+        <span>背景遮罩</span>
+        <a-slider v-model:value="maskOpacity" :min="0.2" :max="0.75" :step="0.01" />
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { login } from '../api/auth'
 import { useUserStore } from '../stores/user'
@@ -39,6 +43,20 @@ const form = reactive({
 })
 
 const loading = ref(false)
+const MASK_OPACITY_KEY = 'zhiyangyun_login_mask_opacity'
+const maskOpacity = ref(0.5)
+
+onMounted(() => {
+  const raw = localStorage.getItem(MASK_OPACITY_KEY)
+  const val = Number(raw)
+  if (Number.isFinite(val) && val >= 0.2 && val <= 0.75) {
+    maskOpacity.value = val
+  }
+})
+
+watch(maskOpacity, (value) => {
+  localStorage.setItem(MASK_OPACITY_KEY, String(value))
+})
 
 async function onSubmit() {
   loading.value = true
@@ -58,8 +76,8 @@ async function onSubmit() {
   display: grid;
   place-items: center;
   background-image:
-    linear-gradient(135deg, rgba(13, 47, 110, 0.50), rgba(20, 84, 184, 0.38)),
-    url('../assets/home.jpg');
+    linear-gradient(135deg, rgba(13, 47, 110, var(--login-mask-opacity)), rgba(20, 84, 184, var(--login-mask-opacity))),
+    url('../assets/home-login.jpg');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -108,5 +126,11 @@ async function onSubmit() {
   font-size: 12px;
   color: var(--muted);
   text-align: center;
+}
+
+.bg-control {
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--muted);
 }
 </style>

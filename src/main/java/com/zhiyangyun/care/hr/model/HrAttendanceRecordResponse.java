@@ -12,4 +12,7 @@ public class HrAttendanceRecordResponse {
   private LocalDateTime checkOutTime;
   private String status;
   private Boolean abnormal;
+  private Integer reviewed;
+  private String reviewRemark;
+  private LocalDateTime reviewedAt;
 }

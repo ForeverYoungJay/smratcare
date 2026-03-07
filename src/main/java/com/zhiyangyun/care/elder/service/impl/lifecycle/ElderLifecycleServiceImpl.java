@@ -88,9 +88,10 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
   @Transactional
   public AdmissionResponse admit(AdmissionRequest request) {
     ElderProfile elder = elderMapper.selectById(request.getElderId());
-    if (elder == null || !request.getTenantId().equals(elder.getTenantId())) {
+    if (!hasElderAccess(elder, request.getTenantId(), request.getOrgId())) {
       throw new IllegalArgumentException("老人不存在或无权限");
     }
+    backfillElderTenantScope(elder, request.getTenantId(), request.getOrgId());
     String normalizedContractNo = request.getContractNo() == null ? null : request.getContractNo().trim();
     request.setContractNo(normalizedContractNo);
     CrmContract contract = validateAdmissionContractGuard(request, elder);
@@ -235,9 +236,10 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
   @Transactional
   public DischargeResponse discharge(DischargeRequest request) {
     ElderProfile elder = elderMapper.selectById(request.getElderId());
-    if (elder == null || !request.getTenantId().equals(elder.getTenantId())) {
+    if (!hasElderAccess(elder, request.getTenantId(), request.getOrgId())) {
       throw new IllegalArgumentException("老人不存在或无权限");
     }
+    backfillElderTenantScope(elder, request.getTenantId(), request.getOrgId());
     long unpaid = billMonthlyMapper.selectCount(Wrappers.lambdaQuery(BillMonthly.class)
         .eq(BillMonthly::getIsDeleted, 0)
         .eq(request.getOrgId() != null, BillMonthly::getOrgId, request.getOrgId())
@@ -456,5 +458,40 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
     created.setPointsBalance(0);
     created.setStatus(1);
     pointsAccountMapper.insert(created);
+    }
   }
-}
+
+  private boolean hasElderAccess(ElderProfile elder, Long tenantId, Long orgId) {
+    if (elder == null) {
+      return false;
+    }
+    Long elderTenantId = elder.getTenantId();
+    Long elderOrgId = elder.getOrgId();
+    if (tenantId != null
+        && (Objects.equals(tenantId, elderTenantId) || Objects.equals(tenantId, elderOrgId))) {
+      return true;
+    }
+    if (orgId != null
+        && (Objects.equals(orgId, elderOrgId) || Objects.equals(orgId, elderTenantId))) {
+      return true;
+    }
+    return false;
+  }
+
+  private void backfillElderTenantScope(ElderProfile elder, Long tenantId, Long orgId) {
+    if (elder == null) {
+      return;
+    }
+    boolean changed = false;
+    if (elder.getTenantId() == null && tenantId != null) {
+      elder.setTenantId(tenantId);
+      changed = true;
+    }
+    if (elder.getOrgId() == null && orgId != null) {
+      elder.setOrgId(orgId);
+      changed = true;
+    }
+    if (changed) {
+      elderMapper.updateById(elder);
+    }
+  }

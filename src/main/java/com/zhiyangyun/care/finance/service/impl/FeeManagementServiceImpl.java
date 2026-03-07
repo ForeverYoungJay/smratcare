@@ -3,6 +3,10 @@ package com.zhiyangyun.care.finance.service.impl;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.zhiyangyun.care.bill.entity.BillItem;
+import com.zhiyangyun.care.bill.entity.BillMonthly;
+import com.zhiyangyun.care.bill.mapper.BillItemMapper;
+import com.zhiyangyun.care.bill.mapper.BillMonthlyMapper;
 import com.zhiyangyun.care.elder.entity.Bed;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderDischargeApply;
@@ -31,6 +35,9 @@ import com.zhiyangyun.care.finance.model.ElderAccountAdjustRequest;
 import com.zhiyangyun.care.finance.model.FeeAuditReviewRequest;
 import com.zhiyangyun.care.finance.model.FeeWorkflowConstants;
 import com.zhiyangyun.care.finance.model.MonthlyAllocationCreateRequest;
+import com.zhiyangyun.care.finance.model.MonthlyAllocationPreviewRequest;
+import com.zhiyangyun.care.finance.model.MonthlyAllocationPreviewResponse;
+import com.zhiyangyun.care.finance.model.MonthlyAllocationRollbackRequest;
 import com.zhiyangyun.care.finance.model.ReconcileResponse;
 import com.zhiyangyun.care.finance.service.ElderAccountService;
 import com.zhiyangyun.care.finance.service.FeeManagementService;
@@ -39,10 +46,12 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,6 +62,8 @@ public class FeeManagementServiceImpl implements FeeManagementService {
   private final DischargeSettlementMapper dischargeSettlementMapper;
   private final ConsumptionRecordMapper consumptionRecordMapper;
   private final MonthlyAllocationMapper monthlyAllocationMapper;
+  private final BillMonthlyMapper billMonthlyMapper;
+  private final BillItemMapper billItemMapper;
   private final BedMapper bedMapper;
   private final ElderMapper elderMapper;
   private final ElderAccountMapper elderAccountMapper;
@@ -66,6 +77,8 @@ public class FeeManagementServiceImpl implements FeeManagementService {
       DischargeSettlementMapper dischargeSettlementMapper,
       ConsumptionRecordMapper consumptionRecordMapper,
       MonthlyAllocationMapper monthlyAllocationMapper,
+      BillMonthlyMapper billMonthlyMapper,
+      BillItemMapper billItemMapper,
       BedMapper bedMapper,
       ElderMapper elderMapper,
       ElderAccountMapper elderAccountMapper,
@@ -77,6 +90,8 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     this.dischargeSettlementMapper = dischargeSettlementMapper;
     this.consumptionRecordMapper = consumptionRecordMapper;
     this.monthlyAllocationMapper = monthlyAllocationMapper;
+    this.billMonthlyMapper = billMonthlyMapper;
+    this.billItemMapper = billItemMapper;
     this.bedMapper = bedMapper;
     this.elderMapper = elderMapper;
     this.elderAccountMapper = elderAccountMapper;
@@ -462,25 +477,40 @@ public class FeeManagementServiceImpl implements FeeManagementService {
 
   @Override
   public IPage<MonthlyAllocation> monthlyAllocationPage(Long orgId, long pageNo, long pageSize,
-      String month, String status) {
+      String month, String status, Long elderId) {
     var wrapper = Wrappers.lambdaQuery(MonthlyAllocation.class)
         .eq(MonthlyAllocation::getIsDeleted, 0)
         .eq(orgId != null, MonthlyAllocation::getOrgId, orgId)
         .eq(hasText(month), MonthlyAllocation::getAllocationMonth, month)
         .eq(hasText(status), MonthlyAllocation::getStatus, normalizeStatus(status))
+        .apply(elderId != null, "FIND_IN_SET({0}, elder_ids)", elderId)
         .orderByDesc(MonthlyAllocation::getCreateTime);
     return monthlyAllocationMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
+  }
+
+  @Override
+  public MonthlyAllocationPreviewResponse previewMonthlyAllocation(Long orgId, MonthlyAllocationPreviewRequest request) {
+    validateNonNegativeAmount(request.getTotalAmount(), "totalAmount");
+    List<ElderProfile> elders = listAllocationElders(orgId, request.getElderIds());
+    if (elders.isEmpty()) {
+      throw new IllegalArgumentException("请选择分摊老人");
+    }
+    return buildPreviewResponse(request.getAllocationMonth(), request.getAllocationName(), request.getTotalAmount(),
+        request.getRemark(), elders);
   }
 
   @Override
   @Transactional
   public MonthlyAllocation createMonthlyAllocation(Long orgId, Long operatorId, MonthlyAllocationCreateRequest request) {
     validateNonNegativeAmount(request.getTotalAmount(), "totalAmount");
-    if (request.getTargetCount() == null || request.getTargetCount() < 0) {
-      throw new IllegalArgumentException("targetCount must be >= 0");
+    List<Long> elderIds = normalizeElderIds(request.getElderIds());
+    List<ElderProfile> elders = listAllocationElders(orgId, elderIds);
+    if (elders.isEmpty()) {
+      throw new IllegalArgumentException("请选择分摊老人");
     }
-    if (request.getTotalAmount().compareTo(BigDecimal.ZERO) > 0 && request.getTargetCount() == 0) {
-      throw new IllegalArgumentException("totalAmount > 0 时 targetCount 不能为 0");
+    int targetCount = elderIds.size();
+    if (request.getTotalAmount().compareTo(BigDecimal.ZERO) > 0 && targetCount == 0) {
+      throw new IllegalArgumentException("totalAmount > 0 时目标人数不能为 0");
     }
 
     MonthlyAllocation allocation = new MonthlyAllocation();
@@ -489,12 +519,300 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     allocation.setAllocationMonth(request.getAllocationMonth());
     allocation.setAllocationName(normalizeOptionalText(request.getAllocationName()));
     allocation.setTotalAmount(request.getTotalAmount());
-    allocation.setTargetCount(request.getTargetCount());
-    allocation.setStatus("DRAFT");
+    allocation.setTargetCount(targetCount);
+    allocation.setElderIds(elderIds.stream().map(String::valueOf).collect(Collectors.joining(",")));
+    allocation.setElderSnapshotJson(buildElderSnapshotJson(elders));
+    allocation.setAvgAmount(
+        targetCount <= 0
+            ? BigDecimal.ZERO
+            : request.getTotalAmount().divide(BigDecimal.valueOf(targetCount), 2, RoundingMode.HALF_UP));
+    allocation.setStatus("CONFIRMED");
     allocation.setRemark(normalizeOptionalText(request.getRemark()));
+    allocation.setReviewedBy(operatorId);
+    allocation.setReviewedTime(LocalDateTime.now());
     allocation.setCreatedBy(operatorId);
     monthlyAllocationMapper.insert(allocation);
+    writeAllocationConsumptionRecords(orgId, operatorId, allocation, elders);
     return allocation;
+  }
+
+  @Override
+  @Transactional
+  public MonthlyAllocation rollbackMonthlyAllocation(
+      Long orgId,
+      Long operatorId,
+      Long id,
+      MonthlyAllocationRollbackRequest request) {
+    MonthlyAllocation allocation = monthlyAllocationMapper.selectOne(
+        Wrappers.lambdaQuery(MonthlyAllocation.class)
+            .eq(MonthlyAllocation::getIsDeleted, 0)
+            .eq(MonthlyAllocation::getId, id)
+            .eq(orgId != null, MonthlyAllocation::getOrgId, orgId)
+            .last("FOR UPDATE"));
+    if (allocation == null) {
+      throw new IllegalArgumentException("分摊记录不存在");
+    }
+    if ("CANCELLED".equalsIgnoreCase(allocation.getStatus())) {
+      return allocation;
+    }
+    consumptionRecordMapper.update(
+        null,
+        Wrappers.lambdaUpdate(ConsumptionRecord.class)
+            .set(ConsumptionRecord::getIsDeleted, 1)
+            .eq(ConsumptionRecord::getIsDeleted, 0)
+            .eq(orgId != null, ConsumptionRecord::getOrgId, orgId)
+            .eq(ConsumptionRecord::getSourceType, "MONTHLY_ALLOCATION")
+            .eq(ConsumptionRecord::getSourceId, allocation.getId()));
+    List<BillItem> allocationItems = billItemMapper.selectList(
+        Wrappers.lambdaQuery(BillItem.class)
+            .eq(BillItem::getIsDeleted, 0)
+            .eq(orgId != null, BillItem::getOrgId, orgId)
+            .eq(BillItem::getItemType, "ALLOCATION")
+            .eq(BillItem::getRefOrderId, allocation.getId()));
+    if (!allocationItems.isEmpty()) {
+      for (BillItem item : allocationItems) {
+        item.setIsDeleted(1);
+        billItemMapper.updateById(item);
+      }
+      adjustBillsByAllocationItems(orgId, allocationItems, true);
+    }
+    allocation.setStatus("CANCELLED");
+    allocation.setRollbackBy(operatorId);
+    allocation.setRollbackReason(normalizeOptionalText(request == null ? null : request.getReason()));
+    allocation.setRollbackTime(LocalDateTime.now());
+    monthlyAllocationMapper.updateById(allocation);
+    return allocation;
+  }
+
+  private void writeAllocationConsumptionRecords(
+      Long orgId,
+      Long operatorId,
+      MonthlyAllocation allocation,
+      List<ElderProfile> elders) {
+    if (allocation == null || elders == null || elders.isEmpty()) {
+      return;
+    }
+    BigDecimal total = allocation.getTotalAmount() == null ? BigDecimal.ZERO : allocation.getTotalAmount();
+    BigDecimal average = total.divide(BigDecimal.valueOf(elders.size()), 2, RoundingMode.DOWN);
+    BigDecimal allocated = average.multiply(BigDecimal.valueOf(elders.size()));
+    BigDecimal remainder = total.subtract(allocated);
+    LocalDate consumeDate;
+    try {
+      consumeDate = YearMonth.parse(allocation.getAllocationMonth()).atDay(1);
+    } catch (Exception ex) {
+      consumeDate = LocalDate.now();
+    }
+    for (int index = 0; index < elders.size(); index += 1) {
+      ElderProfile elder = elders.get(index);
+      BigDecimal amount = index == elders.size() - 1 ? average.add(remainder) : average;
+      ConsumptionRecord record = new ConsumptionRecord();
+      record.setTenantId(orgId);
+      record.setOrgId(orgId);
+      record.setElderId(elder.getId());
+      record.setElderName(elder.getFullName());
+      record.setConsumeDate(consumeDate);
+      record.setAmount(amount);
+      record.setCategory("ALLOCATION");
+      record.setSourceType("MONTHLY_ALLOCATION");
+      record.setSourceId(allocation.getId());
+      record.setRemark(buildAllocationRemark(allocation, amount));
+      record.setCreatedBy(operatorId);
+      consumptionRecordMapper.insert(record);
+      upsertAllocationBillItem(orgId, allocation, elder, amount);
+    }
+  }
+
+  private void upsertAllocationBillItem(
+      Long orgId,
+      MonthlyAllocation allocation,
+      ElderProfile elder,
+      BigDecimal amount) {
+    if (allocation == null || elder == null || elder.getId() == null) {
+      return;
+    }
+    String month = allocation.getAllocationMonth();
+    if (!hasText(month)) {
+      month = YearMonth.now().toString();
+    }
+    BillMonthly monthly = billMonthlyMapper.selectOne(
+        Wrappers.lambdaQuery(BillMonthly.class)
+            .eq(BillMonthly::getIsDeleted, 0)
+            .eq(orgId != null, BillMonthly::getOrgId, orgId)
+            .eq(BillMonthly::getElderId, elder.getId())
+            .eq(BillMonthly::getBillMonth, month)
+            .last("LIMIT 1"));
+    if (monthly == null) {
+      monthly = new BillMonthly();
+      monthly.setOrgId(orgId);
+      monthly.setElderId(elder.getId());
+      monthly.setBillMonth(month);
+      monthly.setTotalAmount(BigDecimal.ZERO);
+      monthly.setPaidAmount(BigDecimal.ZERO);
+      monthly.setOutstandingAmount(BigDecimal.ZERO);
+      monthly.setStatus(0);
+      billMonthlyMapper.insert(monthly);
+    }
+    BillItem item = new BillItem();
+    item.setOrgId(orgId);
+    item.setBillMonthlyId(monthly.getId());
+    item.setItemType("ALLOCATION");
+    item.setItemName(hasText(allocation.getAllocationName()) ? allocation.getAllocationName() : "月分摊费");
+    item.setAmount(amount);
+    item.setRefOrderId(allocation.getId());
+    item.setRemark(buildAllocationRemark(allocation, amount));
+    billItemMapper.insert(item);
+    syncBillMonthlyAmounts(monthly, amount, false);
+    billMonthlyMapper.updateById(monthly);
+  }
+
+  private void adjustBillsByAllocationItems(Long orgId, List<BillItem> items, boolean subtract) {
+    if (items == null || items.isEmpty()) {
+      return;
+    }
+    var billAmountMap = new java.util.HashMap<Long, BigDecimal>();
+    for (BillItem item : items) {
+      if (item.getBillMonthlyId() == null) continue;
+      billAmountMap.merge(item.getBillMonthlyId(), safe(item.getAmount()), BigDecimal::add);
+    }
+    for (var entry : billAmountMap.entrySet()) {
+      BillMonthly monthly = billMonthlyMapper.selectOne(
+          Wrappers.lambdaQuery(BillMonthly.class)
+              .eq(BillMonthly::getId, entry.getKey())
+              .eq(BillMonthly::getIsDeleted, 0)
+              .eq(orgId != null, BillMonthly::getOrgId, orgId)
+              .last("LIMIT 1"));
+      if (monthly == null) continue;
+      syncBillMonthlyAmounts(monthly, entry.getValue(), subtract);
+      billMonthlyMapper.updateById(monthly);
+    }
+  }
+
+  private void syncBillMonthlyAmounts(BillMonthly monthly, BigDecimal amount, boolean subtract) {
+    if (monthly == null || amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+      return;
+    }
+    BigDecimal total = safe(monthly.getTotalAmount());
+    BigDecimal paid = safe(monthly.getPaidAmount());
+    BigDecimal delta = subtract ? amount.negate() : amount;
+    BigDecimal newTotal = total.add(delta);
+    if (newTotal.compareTo(BigDecimal.ZERO) < 0) {
+      newTotal = BigDecimal.ZERO;
+    }
+    monthly.setTotalAmount(newTotal);
+    BigDecimal outstanding = newTotal.subtract(paid);
+    if (outstanding.compareTo(BigDecimal.ZERO) < 0) {
+      outstanding = BigDecimal.ZERO;
+    }
+    monthly.setOutstandingAmount(outstanding);
+    if (Integer.valueOf(9).equals(monthly.getStatus())) {
+      return;
+    }
+    if (newTotal.compareTo(BigDecimal.ZERO) <= 0) {
+      monthly.setStatus(0);
+      return;
+    }
+    if (paid.compareTo(BigDecimal.ZERO) <= 0) {
+      monthly.setStatus(0);
+      return;
+    }
+    monthly.setStatus(outstanding.compareTo(BigDecimal.ZERO) == 0 ? 2 : 1);
+  }
+
+  private String buildAllocationRemark(MonthlyAllocation allocation, BigDecimal amount) {
+    String month = allocation.getAllocationMonth() == null ? "-" : allocation.getAllocationMonth();
+    String name = allocation.getAllocationName() == null ? "分摊项目" : allocation.getAllocationName();
+    String extra = allocation.getRemark() == null || allocation.getRemark().isBlank()
+        ? ""
+        : ("；备注:" + allocation.getRemark().trim());
+    return "月分摊[" + name + "] 月份:" + month + " 分摊金额:" + amount + extra;
+  }
+
+  private MonthlyAllocationPreviewResponse buildPreviewResponse(
+      String allocationMonth,
+      String allocationName,
+      BigDecimal totalAmount,
+      String remark,
+      List<ElderProfile> elders) {
+    MonthlyAllocationPreviewResponse response = new MonthlyAllocationPreviewResponse();
+    response.setAllocationMonth(normalizeOptionalText(allocationMonth));
+    response.setAllocationName(normalizeOptionalText(allocationName));
+    response.setTotalAmount(totalAmount);
+    response.setTargetCount(elders.size());
+    response.setRemark(normalizeOptionalText(remark));
+    if (elders.isEmpty()) {
+      response.setAvgAmount(BigDecimal.ZERO);
+      return response;
+    }
+    BigDecimal average = totalAmount.divide(BigDecimal.valueOf(elders.size()), 2, RoundingMode.DOWN);
+    BigDecimal allocated = average.multiply(BigDecimal.valueOf(elders.size()));
+    BigDecimal remainder = totalAmount.subtract(allocated);
+    response.setAvgAmount(totalAmount.divide(BigDecimal.valueOf(elders.size()), 2, RoundingMode.HALF_UP));
+    for (int index = 0; index < elders.size(); index += 1) {
+      ElderProfile elder = elders.get(index);
+      BigDecimal amount = index == elders.size() - 1 ? average.add(remainder) : average;
+      MonthlyAllocationPreviewResponse.Row row = new MonthlyAllocationPreviewResponse.Row();
+      row.setElderId(elder.getId());
+      row.setElderName(elder.getFullName());
+      row.setAmount(amount);
+      response.getRows().add(row);
+    }
+    return response;
+  }
+
+  private List<Long> normalizeElderIds(List<Long> source) {
+    if (source == null || source.isEmpty()) {
+      return List.of();
+    }
+    return source.stream().filter(Objects::nonNull).distinct().toList();
+  }
+
+  private List<ElderProfile> listAllocationElders(Long orgId, List<Long> elderIds) {
+    List<Long> normalized = normalizeElderIds(elderIds);
+    if (normalized.isEmpty()) {
+      return List.of();
+    }
+    List<ElderProfile> elders = elderMapper.selectList(
+        Wrappers.lambdaQuery(ElderProfile.class)
+            .eq(ElderProfile::getIsDeleted, 0)
+            .eq(orgId != null, ElderProfile::getOrgId, orgId)
+            .in(ElderProfile::getId, normalized));
+    if (elders.size() != normalized.size()) {
+      throw new IllegalArgumentException("存在无效老人，无法分摊");
+    }
+    return elders;
+  }
+
+  private String buildElderSnapshotJson(List<ElderProfile> elders) {
+    if (elders == null || elders.isEmpty()) {
+      return "[]";
+    }
+    StringBuilder builder = new StringBuilder("[");
+    for (int index = 0; index < elders.size(); index += 1) {
+      ElderProfile elder = elders.get(index);
+      if (index > 0) {
+        builder.append(',');
+      }
+      builder.append("{\"elderId\":")
+          .append(elder.getId() == null ? "null" : elder.getId())
+          .append(",\"elderName\":\"")
+          .append(escapeJson(elder.getFullName()))
+          .append("\"}");
+    }
+    builder.append(']');
+    return builder.toString();
+  }
+
+  private String escapeJson(String text) {
+    String value = text == null ? "" : text;
+    return value
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+        .replace("\n", "\\n")
+        .replace("\r", "\\r");
+  }
+
+  private BigDecimal safe(BigDecimal value) {
+    return value == null ? BigDecimal.ZERO : value;
   }
 
   private void autoCreateSettlementFromApprovedAudit(Long orgId, Long operatorId, DischargeFeeAudit audit) {

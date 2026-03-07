@@ -33,6 +33,7 @@ import com.zhiyangyun.care.hr.model.HrProfileContractResponse;
 import com.zhiyangyun.care.hr.model.HrProfileDocumentRequest;
 import com.zhiyangyun.care.hr.model.HrRecruitmentNeedRequest;
 import com.zhiyangyun.care.hr.model.HrRecruitmentNeedResponse;
+import com.zhiyangyun.care.hr.model.HrStaffBirthdayResponse;
 import com.zhiyangyun.care.hr.model.HrStaffCertificateRequest;
 import com.zhiyangyun.care.hr.model.HrStaffCertificateResponse;
 import com.zhiyangyun.care.hr.model.HrWorkbenchSummaryResponse;
@@ -51,9 +52,13 @@ import com.zhiyangyun.care.hr.model.StaffPointsRuleRequest;
 import com.zhiyangyun.care.hr.model.StaffPointsRuleResponse;
 import com.zhiyangyun.care.hr.service.StaffPointsRuleService;
 import com.zhiyangyun.care.oa.entity.OaApproval;
+import com.zhiyangyun.care.oa.entity.OaTask;
+import com.zhiyangyun.care.oa.entity.OaTodo;
 import com.zhiyangyun.care.oa.entity.OaDocument;
 import com.zhiyangyun.care.oa.entity.OaDocumentFolder;
 import com.zhiyangyun.care.oa.mapper.OaApprovalMapper;
+import com.zhiyangyun.care.oa.mapper.OaTaskMapper;
+import com.zhiyangyun.care.oa.mapper.OaTodoMapper;
 import com.zhiyangyun.care.oa.mapper.OaDocumentMapper;
 import com.zhiyangyun.care.oa.mapper.OaDocumentFolderMapper;
 import com.zhiyangyun.care.oa.model.OaBatchIdsRequest;
@@ -61,11 +66,13 @@ import com.zhiyangyun.care.schedule.entity.AttendanceRecord;
 import com.zhiyangyun.care.schedule.mapper.AttendanceRecordMapper;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import java.util.stream.Collectors;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -89,6 +96,8 @@ public class AdminHrController {
   private final HrPerformanceService performanceService;
   private final AuditLogService auditLogService;
   private final OaApprovalMapper oaApprovalMapper;
+  private final OaTaskMapper oaTaskMapper;
+  private final OaTodoMapper oaTodoMapper;
   private final OaDocumentMapper oaDocumentMapper;
   private final OaDocumentFolderMapper oaDocumentFolderMapper;
   private final AttendanceRecordMapper attendanceRecordMapper;
@@ -105,6 +114,8 @@ public class AdminHrController {
       HrPerformanceService performanceService,
       AuditLogService auditLogService,
       OaApprovalMapper oaApprovalMapper,
+      OaTaskMapper oaTaskMapper,
+      OaTodoMapper oaTodoMapper,
       OaDocumentMapper oaDocumentMapper,
       OaDocumentFolderMapper oaDocumentFolderMapper,
       AttendanceRecordMapper attendanceRecordMapper,
@@ -120,6 +131,8 @@ public class AdminHrController {
     this.performanceService = performanceService;
     this.auditLogService = auditLogService;
     this.oaApprovalMapper = oaApprovalMapper;
+    this.oaTaskMapper = oaTaskMapper;
+    this.oaTodoMapper = oaTodoMapper;
     this.oaDocumentMapper = oaDocumentMapper;
     this.oaDocumentFolderMapper = oaDocumentFolderMapper;
     this.attendanceRecordMapper = attendanceRecordMapper;
@@ -171,6 +184,9 @@ public class AdminHrController {
     if (request.getEmergencyContactPhone() != null) {
       profile.setEmergencyContactPhone(request.getEmergencyContactPhone());
     }
+    if (request.getBirthday() != null) {
+      profile.setBirthday(request.getBirthday());
+    }
     if (request.getStatus() != null) {
       profile.setStatus(request.getStatus());
       staff.setStatus(request.getStatus());
@@ -194,6 +210,7 @@ public class AdminHrController {
     } else {
       staffProfileMapper.updateById(profile);
     }
+    syncBirthdayCalendarTask(orgId, staff, profile);
 
     return Result.ok(toProfileResponse(staff, profile));
   }
@@ -295,6 +312,38 @@ public class AdminHrController {
         .le(CrmContract::getEffectiveTo, warningDeadline)
         .ne(CrmContract::getStatus, "VOID")));
 
+    List<StaffProfile> birthdayProfiles = staffProfileMapper.selectList(Wrappers.lambdaQuery(StaffProfile.class)
+        .eq(StaffProfile::getIsDeleted, 0)
+        .eq(orgId != null, StaffProfile::getOrgId, orgId)
+        .isNotNull(StaffProfile::getBirthday));
+    Map<Long, StaffAccount> birthdayStaffMap = staffMapper.selectBatchIdsSafe(
+            birthdayProfiles.stream().map(StaffProfile::getStaffId).distinct().toList())
+        .stream()
+        .collect(Collectors.toMap(StaffAccount::getId, s -> s, (a, b) -> a));
+    long birthdayTodayCount = birthdayProfiles.stream()
+        .filter(item -> item.getBirthday() != null)
+        .filter(item -> {
+          StaffAccount staff = birthdayStaffMap.get(item.getStaffId());
+          return staff != null && Integer.valueOf(1).equals(staff.getStatus());
+        })
+        .filter(item -> item.getBirthday().getMonthValue() == today.getMonthValue()
+            && item.getBirthday().getDayOfMonth() == today.getDayOfMonth())
+        .count();
+    long birthdayUpcomingCount = birthdayProfiles.stream()
+        .filter(item -> item.getBirthday() != null)
+        .filter(item -> {
+          StaffAccount staff = birthdayStaffMap.get(item.getStaffId());
+          return staff != null && Integer.valueOf(1).equals(staff.getStatus());
+        })
+        .map(item -> daysUntilBirthday(item.getBirthday(), today))
+        .filter(days -> days != null && days >= 0 && days <= 7)
+        .count();
+    long birthdayTodoCount = count(oaTodoMapper.selectCount(Wrappers.lambdaQuery(OaTodo.class)
+        .eq(OaTodo::getIsDeleted, 0)
+        .eq(orgId != null, OaTodo::getOrgId, orgId)
+        .eq(OaTodo::getStatus, "OPEN")
+        .like(OaTodo::getContent, "[BIRTHDAY_REMINDER:")));
+
     HrWorkbenchSummaryResponse summary = new HrWorkbenchSummaryResponse();
     summary.setOnJobCount(onJobCount);
     summary.setLeftCount(leftCount);
@@ -302,8 +351,70 @@ public class AdminHrController {
     summary.setPendingLeaveApprovalCount(pendingLeaveApprovalCount);
     summary.setAttendanceAbnormalCount(attendanceAbnormalCount);
     summary.setContractExpiringCount(contractExpiringCount);
+    summary.setBirthdayTodayCount(birthdayTodayCount);
+    summary.setBirthdayUpcomingCount(birthdayUpcomingCount);
+    summary.setBirthdayTodoCount(birthdayTodoCount);
     summary.setWarningDays(resolvedWarningDays);
     return Result.ok(summary);
+  }
+
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @GetMapping("/staff/birthday/page")
+  public Result<IPage<HrStaffBirthdayResponse>> staffBirthdayPage(
+      @RequestParam(defaultValue = "1") long pageNo,
+      @RequestParam(defaultValue = "20") long pageSize,
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String scope,
+      @RequestParam(required = false) Integer month,
+      @RequestParam(required = false, defaultValue = "true") Boolean onJobOnly) {
+    Long orgId = AuthContext.getOrgId();
+    LocalDate today = LocalDate.now();
+    List<StaffProfile> profiles = staffProfileMapper.selectList(Wrappers.lambdaQuery(StaffProfile.class)
+        .eq(StaffProfile::getIsDeleted, 0)
+        .eq(orgId != null, StaffProfile::getOrgId, orgId)
+        .isNotNull(StaffProfile::getBirthday));
+    List<Long> staffIds = profiles.stream().map(StaffProfile::getStaffId).distinct().toList();
+    Map<Long, StaffAccount> staffMap = staffMapper.selectBatchIdsSafe(staffIds).stream()
+        .collect(Collectors.toMap(StaffAccount::getId, s -> s, (a, b) -> a));
+    String scopeCode = scope == null ? "ALL" : scope.trim().toUpperCase(Locale.ROOT);
+    int filterMonth = month == null ? 0 : month;
+    boolean onlyOnJob = onJobOnly == null || onJobOnly;
+
+    List<HrStaffBirthdayResponse> rows = profiles.stream()
+        .map(profile -> toBirthdayResponse(profile, staffMap.get(profile.getStaffId()), today))
+        .filter(item -> item.getStaffId() != null)
+        .filter(item -> !onlyOnJob || Integer.valueOf(1).equals(item.getStatus()))
+        .filter(item -> matchBirthdayScope(item, scopeCode, filterMonth))
+        .filter(item -> {
+          if (keyword == null || keyword.isBlank()) {
+            return true;
+          }
+          String key = keyword.trim();
+          return (item.getRealName() != null && item.getRealName().contains(key))
+              || (item.getStaffNo() != null && item.getStaffNo().contains(key))
+              || (item.getPhone() != null && item.getPhone().contains(key));
+        })
+        .sorted((a, b) -> {
+          int cmp = Integer.compare(a.getDaysUntil() == null ? 9999 : a.getDaysUntil(), b.getDaysUntil() == null ? 9999 : b.getDaysUntil());
+          if (cmp != 0) {
+            return cmp;
+          }
+          LocalDate ad = a.getNextBirthday();
+          LocalDate bd = b.getNextBirthday();
+          if (ad == null && bd == null) return 0;
+          if (ad == null) return 1;
+          if (bd == null) return -1;
+          return ad.compareTo(bd);
+        })
+        .toList();
+
+    long total = rows.size();
+    int fromIndex = (int) Math.max((pageNo - 1) * pageSize, 0);
+    int toIndex = Math.min(fromIndex + (int) pageSize, rows.size());
+    List<HrStaffBirthdayResponse> paged = fromIndex >= toIndex ? List.of() : rows.subList(fromIndex, toIndex);
+    IPage<HrStaffBirthdayResponse> page = new Page<>(pageNo, pageSize, total);
+    page.setRecords(paged);
+    return Result.ok(page);
   }
 
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
@@ -413,6 +524,9 @@ public class AdminHrController {
       item.setCheckInTime(record.getCheckInTime());
       item.setCheckOutTime(record.getCheckOutTime());
       item.setStatus(record.getStatus());
+      item.setReviewed(record.getReviewed());
+      item.setReviewRemark(record.getReviewRemark());
+      item.setReviewedAt(record.getReviewedAt());
       return item;
     }).toList());
     return Result.ok(resp);
@@ -1089,6 +1203,9 @@ public class AdminHrController {
       row.setCheckOutTime(item.getCheckOutTime());
       row.setStatus(item.getStatus());
       row.setAbnormal(!"NORMAL".equalsIgnoreCase(item.getStatus()) && !"ON_TIME".equalsIgnoreCase(item.getStatus()));
+      row.setReviewed(item.getReviewed());
+      row.setReviewRemark(item.getReviewRemark());
+      row.setReviewedAt(item.getReviewedAt());
       return row;
     }).toList());
     return Result.ok(resp);
@@ -1862,6 +1979,7 @@ public class AdminHrController {
       response.setCertificateNo(profile.getCertificateNo());
       response.setEmergencyContactName(profile.getEmergencyContactName());
       response.setEmergencyContactPhone(profile.getEmergencyContactPhone());
+      response.setBirthday(profile.getBirthday());
       response.setStatus(profile.getStatus());
       response.setLeaveDate(profile.getLeaveDate());
       response.setLeaveReason(profile.getLeaveReason());
@@ -1869,5 +1987,134 @@ public class AdminHrController {
       response.setUpdateTime(profile.getUpdateTime());
     }
     return response;
+  }
+
+  private HrStaffBirthdayResponse toBirthdayResponse(StaffProfile profile, StaffAccount staff, LocalDate today) {
+    HrStaffBirthdayResponse item = new HrStaffBirthdayResponse();
+    if (profile != null) {
+      item.setStaffId(profile.getStaffId());
+      item.setJobTitle(profile.getJobTitle());
+      item.setBirthday(profile.getBirthday());
+      item.setRemark(profile.getRemark());
+      item.setDaysUntil(daysUntilBirthday(profile.getBirthday(), today));
+      item.setNextBirthday(resolveNextBirthday(profile.getBirthday(), today));
+    }
+    if (staff != null) {
+      item.setStaffId(staff.getId());
+      item.setStaffNo(staff.getStaffNo());
+      item.setRealName(staff.getRealName());
+      item.setPhone(staff.getPhone());
+      item.setDepartmentId(staff.getDepartmentId());
+      item.setStatus(staff.getStatus());
+    }
+    return item;
+  }
+
+  private boolean matchBirthdayScope(HrStaffBirthdayResponse item, String scopeCode, int month) {
+    if (item == null || item.getBirthday() == null) {
+      return false;
+    }
+    int daysUntil = item.getDaysUntil() == null ? -1 : item.getDaysUntil();
+    if ("TODAY".equals(scopeCode)) {
+      return daysUntil == 0;
+    }
+    if ("NEXT7".equals(scopeCode)) {
+      return daysUntil >= 0 && daysUntil <= 7;
+    }
+    if ("NEXT30".equals(scopeCode)) {
+      return daysUntil >= 0 && daysUntil <= 30;
+    }
+    if ("THIS_MONTH".equals(scopeCode)) {
+      int currentMonth = LocalDate.now().getMonthValue();
+      return item.getBirthday().getMonthValue() == currentMonth;
+    }
+    if (month >= 1 && month <= 12) {
+      return item.getBirthday().getMonthValue() == month;
+    }
+    return true;
+  }
+
+  private Integer daysUntilBirthday(LocalDate birthday, LocalDate today) {
+    LocalDate next = resolveNextBirthday(birthday, today);
+    if (next == null) {
+      return null;
+    }
+    return (int) ChronoUnit.DAYS.between(today, next);
+  }
+
+  private LocalDate resolveNextBirthday(LocalDate birthday, LocalDate today) {
+    if (birthday == null || today == null) {
+      return null;
+    }
+    LocalDate next = birthdayForYear(birthday, today.getYear());
+    if (next.isBefore(today)) {
+      next = birthdayForYear(birthday, today.getYear() + 1);
+    }
+    return next;
+  }
+
+  private LocalDate birthdayForYear(LocalDate birthday, int year) {
+    int month = birthday.getMonthValue();
+    int maxDay = java.time.Month.of(month).length(java.time.Year.isLeap(year));
+    int day = Math.min(birthday.getDayOfMonth(), maxDay);
+    return LocalDate.of(year, month, day);
+  }
+
+  private void syncBirthdayCalendarTask(Long orgId, StaffAccount staff, StaffProfile profile) {
+    if (staff == null || staff.getId() == null) {
+      return;
+    }
+    OaTask task = oaTaskMapper.selectOne(Wrappers.lambdaQuery(OaTask.class)
+        .eq(OaTask::getIsDeleted, 0)
+        .eq(orgId != null, OaTask::getOrgId, orgId)
+        .eq(OaTask::getPlanCategory, "STAFF_BIRTHDAY")
+        .eq(OaTask::getSourceTodoId, staff.getId())
+        .last("LIMIT 1"));
+
+    LocalDate birthday = profile == null ? null : profile.getBirthday();
+    if (birthday == null) {
+      if (task != null) {
+        task.setIsDeleted(1);
+        oaTaskMapper.updateById(task);
+      }
+      return;
+    }
+
+    LocalDate today = LocalDate.now();
+    LocalDate nextBirthday = birthdayForYear(birthday, today.getYear());
+    if (nextBirthday.isBefore(today)) {
+      nextBirthday = birthdayForYear(birthday, today.getYear() + 1);
+    }
+
+    if (task == null) {
+      task = new OaTask();
+      task.setTenantId(orgId);
+      task.setOrgId(orgId);
+      task.setSourceTodoId(staff.getId());
+      task.setCreatedBy(AuthContext.getStaffId());
+      task.setPlanCategory("STAFF_BIRTHDAY");
+    }
+    task.setTitle("员工生日：" + empty(staff.getRealName()));
+    task.setDescription("员工生日提醒，员工工号：" + empty(staff.getStaffNo()) + "，联系电话：" + empty(staff.getPhone()));
+    task.setStartTime(LocalDateTime.of(nextBirthday, LocalTime.of(9, 0)));
+    task.setEndTime(LocalDateTime.of(nextBirthday, LocalTime.of(18, 0)));
+    task.setPriority("NORMAL");
+    task.setStatus("OPEN");
+    task.setAssigneeId(staff.getId());
+    task.setAssigneeName(staff.getRealName());
+    task.setCalendarType("WORK");
+    task.setUrgency("NORMAL");
+    task.setEventColor("#eb2f96");
+    task.setCollaboratorIds(null);
+    task.setCollaboratorNames(null);
+    task.setIsRecurring(0);
+    task.setRecurrenceRule(null);
+    task.setRecurrenceInterval(null);
+    task.setRecurrenceCount(null);
+    if (task.getId() == null) {
+      oaTaskMapper.insert(task);
+      return;
+    }
+    oaTaskMapper.updateById(task);
   }
 }

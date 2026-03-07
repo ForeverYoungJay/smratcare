@@ -8,8 +8,11 @@ export interface StaffItem {
   staffNo?: string
   phone?: string
   email?: string
+  directLeaderId?: number
+  indirectLeaderId?: number
   gender?: number
   password?: string
+  roleCodes?: string[]
   roles?: RoleItem[]
 }
 

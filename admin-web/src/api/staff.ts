@@ -16,3 +16,17 @@ export function updateStaff(id: number, data: Partial<StaffItem>) {
 export function updateStaffRoles(id: number, roleIds: number[]) {
   return request.post<void>('/api/admin/staff-roles/assign', { staffId: id, roleIds })
 }
+
+export interface StaffSupervisorAnomalyItem {
+  staffId: number
+  staffNo?: string
+  staffName?: string
+  departmentId?: number
+  directLeaderId?: number
+  indirectLeaderId?: number
+  issue: string
+}
+
+export function getStaffSupervisorAnomalies() {
+  return request.get<StaffSupervisorAnomalyItem[]>('/api/admin/staff/supervisor-anomalies')
+}

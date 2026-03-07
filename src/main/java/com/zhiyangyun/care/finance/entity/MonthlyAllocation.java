@@ -20,8 +20,14 @@ public class MonthlyAllocation {
   private String allocationName;
   private BigDecimal totalAmount;
   private Integer targetCount;
+  private String elderIds;
+  private String elderSnapshotJson;
+  private BigDecimal avgAmount;
   private String status;
   private String remark;
+  private Long rollbackBy;
+  private String rollbackReason;
+  private LocalDateTime rollbackTime;
   private Long reviewedBy;
   private LocalDateTime reviewedTime;
   private Long createdBy;

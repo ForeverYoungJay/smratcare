@@ -24,6 +24,7 @@ export interface InventoryLogItem {
   batchId?: number
   warehouseId?: number
   batchNo?: string
+  outboundNo?: string
   changeType: 'IN' | 'OUT' | 'ADJUST'
   changeQty: number
   refOrderId?: number
@@ -78,7 +79,56 @@ export interface InventoryOutboundRequest {
   batchId?: number
   quantity: number
   receiverName?: string
+  outboundNo?: string
   reason?: string
+}
+
+export interface InventoryOutboundSheetItemRequest {
+  productId: number | string
+  warehouseId?: number
+  batchId?: number
+  quantity: number
+  reason?: string
+}
+
+export interface InventoryOutboundSheetCreateRequest {
+  outboundNo?: string
+  receiverName: string
+  elderId?: number
+  contractNo?: string
+  applyDept?: string
+  remark?: string
+  items: InventoryOutboundSheetItemRequest[]
+}
+
+export interface InventoryOutboundSheetItem {
+  id: number
+  productId: number
+  productName?: string
+  productCode?: string
+  unit?: string
+  warehouseId?: number
+  batchId?: number
+  batchNo?: string
+  quantity: number
+  reason?: string
+}
+
+export interface InventoryOutboundSheet {
+  id: number
+  outboundNo: string
+  receiverName: string
+  elderId?: number
+  contractNo?: string
+  applyDept?: string
+  operatorStaffId?: number
+  operatorName?: string
+  status: 'DRAFT' | 'CONFIRMED' | string
+  remark?: string
+  confirmStaffId?: number
+  confirmTime?: string
+  createTime?: string
+  items: InventoryOutboundSheetItem[]
 }
 
 export interface InventoryAdjustmentItem {

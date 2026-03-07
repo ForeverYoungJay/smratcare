@@ -10,5 +10,8 @@ public class HrWorkbenchSummaryResponse {
   private Long pendingLeaveApprovalCount;
   private Long attendanceAbnormalCount;
   private Long contractExpiringCount;
+  private Long birthdayTodayCount;
+  private Long birthdayUpcomingCount;
+  private Long birthdayTodoCount;
   private Integer warningDays;
 }

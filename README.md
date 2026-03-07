@@ -139,6 +139,7 @@ curl -s -X POST http://localhost:8080/api/auth/login \
 - 管理层：`DIRECTOR`（自动具备 `ADMIN` 能力）
 - 六部门角色模板：`MEDICAL_*`、`NURSING_*`、`FINANCE_*`、`LOGISTICS_*`、`MARKETING_*`、`HR_*`
 - 兼容规则：任一部门角色自动具备 `STAFF` 能力；模块内 `ADMIN` 兼容默认收敛为“对应部门部长及以上”
+- 权限可视化入口：系统管理 → `权限总览`（路由：`/system/permission-overview`）
 
 家属登录请求字段（`FamilyLoginRequest`）：
 - `orgId`：`number`，必填

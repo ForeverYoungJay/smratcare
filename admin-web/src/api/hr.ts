@@ -12,6 +12,7 @@ import type {
   HrExpenseApprovalRequest,
   HrGenericApprovalItem,
   HrAttendanceRecordItem,
+  HrStaffBirthdayItem,
   HrStaffCertificateItem,
   HrWorkbenchSummary,
   HrStaffProfile,
@@ -26,6 +27,10 @@ import type {
 
 export function getHrStaffPage(params: any) {
   return fetchPage<HrStaffProfile>('/api/admin/hr/staff/page', params)
+}
+
+export function getHrStaffBirthdayPage(params: any) {
+  return fetchPage<HrStaffBirthdayItem>('/api/admin/hr/staff/birthday/page', params)
 }
 
 export function getHrWorkbenchSummary(params?: { warningDays?: number }) {

@@ -12,6 +12,7 @@
         <a-button :disabled="!canReinstateSingle" @click="reinstateSelected">复职</a-button>
         <a-button :disabled="selectedRowKeys.length === 0" @click="batchTerminate">批量离职</a-button>
         <a-button :disabled="selectedRowKeys.length === 0" @click="batchReinstate">批量复职</a-button>
+        <a-button @click="printBirthdayLedger">打印生日台账</a-button>
         <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
       </template>
     </SearchForm>
@@ -73,6 +74,9 @@
         <a-form-item label="紧急联系电话">
           <a-input v-model:value="form.emergencyContactPhone" />
         </a-form-item>
+        <a-form-item label="生日">
+          <a-date-picker v-model:value="form.birthday" style="width: 100%" />
+        </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="form.status" :options="statusOptions" />
         </a-form-item>
@@ -118,6 +122,7 @@ import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { getHrStaffPage, getHrProfile, upsertHrProfile, terminateStaff, reinstateStaff } from '../../api/hr'
+import { openPrintTableReport } from '../../utils/print'
 import { useStaffOptions } from '../../composables/useStaffOptions'
 import type { HrStaffProfile, PageResult } from '../../types'
 
@@ -143,6 +148,7 @@ const selectedRowKeys = ref<string[]>([])
 const columns = [
   { title: '工号', dataIndex: 'staffNo', key: 'staffNo', width: 120 },
   { title: '姓名', dataIndex: 'realName', key: 'realName', width: 120 },
+  { title: '生日', dataIndex: 'birthday', key: 'birthday', width: 120 },
   { title: '手机号', dataIndex: 'phone', key: 'phone', width: 140 },
   { title: '岗位', dataIndex: 'jobTitle', key: 'jobTitle', width: 140 },
   { title: '用工类型', dataIndex: 'employmentType', key: 'employmentType', width: 120 },
@@ -237,6 +243,9 @@ async function openDrawer(record?: HrStaffProfile) {
   if (form.leaveDate && typeof form.leaveDate === 'string') {
     form.leaveDate = dayjs(form.leaveDate)
   }
+  if (form.birthday && typeof form.birthday === 'string') {
+    form.birthday = dayjs(form.birthday)
+  }
   drawerOpen.value = true
 }
 
@@ -257,6 +266,9 @@ async function submit() {
     }
     if (payload.leaveDate && typeof payload.leaveDate === 'object' && payload.leaveDate.format) {
       payload.leaveDate = payload.leaveDate.format('YYYY-MM-DD')
+    }
+    if (payload.birthday && typeof payload.birthday === 'object' && payload.birthday.format) {
+      payload.birthday = payload.birthday.format('YYYY-MM-DD')
     }
     await upsertHrProfile(payload)
     message.success('保存成功')
@@ -383,6 +395,36 @@ async function batchReinstate() {
   } catch {
     message.error('批量复职失败')
   }
+}
+
+function printBirthdayLedger() {
+  const candidates = rows.value
+    .filter((item) => item.birthday)
+    .sort((a, b) => String(a.birthday || '').localeCompare(String(b.birthday || '')))
+  if (!candidates.length) {
+    message.info('当前列表暂无生日数据可打印')
+    return
+  }
+  openPrintTableReport({
+    title: '职工生日台账',
+    subtitle: `打印时间：${dayjs().format('YYYY-MM-DD HH:mm:ss')}`,
+    columns: [
+      { key: 'staffNo', title: '工号' },
+      { key: 'realName', title: '姓名' },
+      { key: 'birthday', title: '生日' },
+      { key: 'phone', title: '手机号' },
+      { key: 'jobTitle', title: '岗位' },
+      { key: 'statusText', title: '状态' }
+    ],
+    rows: candidates.map((item) => ({
+      staffNo: item.staffNo || '-',
+      realName: item.realName || '-',
+      birthday: item.birthday ? dayjs(item.birthday).format('YYYY-MM-DD') : '-',
+      phone: item.phone || '-',
+      jobTitle: item.jobTitle || '-',
+      statusText: Number(item.status) === 1 ? '在职' : '离职'
+    }))
+  })
 }
 
 searchStaff('')

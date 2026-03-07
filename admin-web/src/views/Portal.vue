@@ -1441,6 +1441,7 @@ const riskReminders = computed(() => {
   const orderPendingCount = Number(dashboard.value.abnormalTasksToday || 0)
   const approvalTimeoutCount = Number(summary.approvalTimeoutCount || 0)
   const contractExpiringCount = Number(hrSummary.value?.contractExpiringCount || summary.contractPendingCount || 0)
+  const supervisorAnomalyCount = Number(summary.supervisorAnomalyCount || 0)
   const birthdayReminderCount = birthdayRows.value
     .filter((item) => Number(item.daysUntil || 9999) >= 0 && Number(item.daysUntil || 9999) <= 7).length
 
@@ -1451,6 +1452,7 @@ const riskReminders = computed(() => {
     { title: '库存不足', count: inventoryCount, route: '/logistics/storage/alerts', level: inventoryCount > 0 ? '预警' : '普通通知' },
     { title: '医嘱未执行', count: orderPendingCount, route: '/medical-care/orders', level: orderPendingCount > 0 ? '预警' : '普通通知' },
     { title: '审批超时', count: approvalTimeoutCount, route: '/oa/approval', level: approvalTimeoutCount > 0 ? '紧急' : '普通通知' },
+    { title: '监管链异常', count: supervisorAnomalyCount, route: '/system/staff?view=supervisor-anomalies', level: supervisorAnomalyCount > 0 ? '紧急' : '普通通知' },
     { title: '证书到期', count: certificateReminderCount.value, route: '/hr/development/certificate-reminders', level: certificateReminderCount.value > 0 ? '预警' : '普通通知' },
     { title: '合同到期', count: contractExpiringCount, route: '/hr/profile/contract-reminders', level: contractExpiringCount > 0 ? '预警' : '普通通知' }
   ]

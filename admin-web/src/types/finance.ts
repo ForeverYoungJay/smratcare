@@ -321,6 +321,53 @@ export interface FinanceAllocationRuleItem {
   remark?: string
 }
 
+export interface FinanceAllocationTemplateInitResponse {
+  month: string
+  createdCount: number
+  updatedCount: number
+  configKeys: string[]
+}
+
+export interface FinanceAllocationMeterValidateRowRequest {
+  building?: string
+  floorNo?: string
+  roomNo: string
+  previousReading: number
+  currentReading: number
+  remark?: string
+}
+
+export interface FinanceAllocationMeterValidateRequest {
+  month?: string
+  abnormalThreshold?: number
+  rows: FinanceAllocationMeterValidateRowRequest[]
+}
+
+export interface FinanceAllocationMeterValidateRowResult {
+  rowNo: number
+  building?: string
+  floorNo?: string
+  roomNo?: string
+  previousReading?: number
+  currentReading?: number
+  usage?: number
+  valid: boolean
+  level: 'OK' | 'WARN' | 'ERROR'
+  code: string
+  message: string
+  remark?: string
+}
+
+export interface FinanceAllocationMeterValidateResponse {
+  month: string
+  abnormalThreshold: number
+  totalRows: number
+  validRows: number
+  invalidRows: number
+  warningRows: number
+  rows: FinanceAllocationMeterValidateRowResult[]
+}
+
 export interface FinanceReconcileExceptionItem {
   exceptionType: string
   exceptionTypeLabel: string

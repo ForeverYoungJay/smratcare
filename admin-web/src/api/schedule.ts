@@ -1,5 +1,11 @@
 import request, { fetchPage } from '../utils/request'
-import type { ScheduleItem, AttendanceItem } from '../types'
+import type {
+  ScheduleItem,
+  AttendanceItem,
+  AttendanceDashboardOverview,
+  AttendanceSeasonRule,
+  AttendanceStaffAvailability
+} from '../types'
 
 export function getSchedulePage(params: any) {
   return fetchPage<ScheduleItem>('/api/schedule/page', params)
@@ -46,4 +52,24 @@ export function getAttendancePage(params: any) {
       pageSize: Number(merged.pageSize || 10)
     }
   })
+}
+
+export function getAttendanceOverview(params: { staffId?: string | number; month?: string }) {
+  return request.get<AttendanceDashboardOverview>('/api/attendance/overview', { params })
+}
+
+export function getAttendanceSeasonRule() {
+  return request.get<AttendanceSeasonRule>('/api/attendance/season-rule')
+}
+
+export function saveAttendanceSeasonRule(data: AttendanceSeasonRule) {
+  return request.post<AttendanceSeasonRule>('/api/attendance/season-rule', data)
+}
+
+export function getAttendanceStaffAvailability(staffId: string | number) {
+  return request.get<AttendanceStaffAvailability>('/api/attendance/staff-availability', { params: { staffId } })
+}
+
+export function reviewAttendanceRecord(id: string | number, data?: { reviewed?: number; reviewRemark?: string }) {
+  return request.put<AttendanceItem>(`/api/attendance/${id}/review`, data || { reviewed: 1 })
 }

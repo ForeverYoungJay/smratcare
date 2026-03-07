@@ -11,6 +11,7 @@ public class OaPortalSummary {
   private List<OaNotice> notices;
   private List<OaTodo> todos;
   private Long openTodoCount;
+  private Long birthdayTodoCount;
   private Long overdueTodoCount;
   private Long pendingApprovalCount;
   private Long ongoingTaskCount;
@@ -38,6 +39,7 @@ public class OaPortalSummary {
   private Long surveyPublishedCount;
   private Long surveyTodaySubmissionCount;
   private Long surveyFamilyPublishedCount;
+  private Long supervisorAnomalyCount;
   private List<WorkflowTodoItem> workflowTodos;
   private List<MarketingChannelItem> marketingChannels;
   private List<CollaborationGanttItem> collaborationGantt;

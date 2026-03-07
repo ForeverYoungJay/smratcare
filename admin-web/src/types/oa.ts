@@ -166,6 +166,7 @@ export interface OaPortalSummary {
   notices: OaNotice[]
   todos: OaTodo[]
   openTodoCount?: number
+  birthdayTodoCount?: number
   overdueTodoCount?: number
   pendingApprovalCount?: number
   ongoingTaskCount?: number
@@ -193,6 +194,7 @@ export interface OaPortalSummary {
   surveyPublishedCount?: number
   surveyTodaySubmissionCount?: number
   surveyFamilyPublishedCount?: number
+  supervisorAnomalyCount?: number
   workflowTodos?: OaWorkflowTodoItem[]
   marketingChannels?: OaMarketingChannelItem[]
   collaborationGantt?: OaCollaborationGanttItem[]

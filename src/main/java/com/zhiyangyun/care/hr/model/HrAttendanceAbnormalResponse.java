@@ -11,4 +11,7 @@ public class HrAttendanceAbnormalResponse {
   private LocalDateTime checkInTime;
   private LocalDateTime checkOutTime;
   private String status;
+  private Integer reviewed;
+  private String reviewRemark;
+  private LocalDateTime reviewedAt;
 }

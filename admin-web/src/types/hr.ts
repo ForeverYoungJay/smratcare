@@ -11,6 +11,7 @@ export interface HrStaffProfile {
   certificateNo?: string
   emergencyContactName?: string
   emergencyContactPhone?: string
+  birthday?: string
   status?: number
   leaveDate?: string
   leaveReason?: string
@@ -121,7 +122,24 @@ export interface HrWorkbenchSummary {
   pendingLeaveApprovalCount?: number
   attendanceAbnormalCount?: number
   contractExpiringCount?: number
+  birthdayTodayCount?: number
+  birthdayUpcomingCount?: number
+  birthdayTodoCount?: number
   warningDays?: number
+}
+
+export interface HrStaffBirthdayItem {
+  staffId?: number | string
+  staffNo?: string
+  realName?: string
+  phone?: string
+  departmentId?: number
+  jobTitle?: string
+  status?: number
+  birthday?: string
+  nextBirthday?: string
+  daysUntil?: number
+  remark?: string
 }
 
 export interface HrContractReminderItem {
@@ -144,6 +162,9 @@ export interface HrAttendanceAbnormalItem {
   checkInTime?: string
   checkOutTime?: string
   status?: string
+  reviewed?: number
+  reviewRemark?: string
+  reviewedAt?: string
 }
 
 export interface HrRecruitmentNeedItem {
@@ -308,4 +329,7 @@ export interface HrAttendanceRecordItem {
   checkOutTime?: string
   status?: string
   abnormal?: boolean
+  reviewed?: number
+  reviewRemark?: string
+  reviewedAt?: string
 }

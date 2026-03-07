@@ -4,13 +4,19 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.audit.service.AuditLogService;
+import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.model.AssignBedRequest;
 import com.zhiyangyun.care.elder.model.ElderCreateRequest;
+import com.zhiyangyun.care.elder.model.ElderProfileChangeApprovalRequest;
 import com.zhiyangyun.care.elder.model.ElderResponse;
 import com.zhiyangyun.care.elder.model.ElderUpdateRequest;
+import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.service.ElderService;
+import com.zhiyangyun.care.oa.entity.OaApproval;
+import com.zhiyangyun.care.oa.mapper.OaApprovalMapper;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,10 +31,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class ElderController {
   private final ElderService elderService;
   private final AuditLogService auditLogService;
+  private final ElderMapper elderMapper;
+  private final OaApprovalMapper oaApprovalMapper;
 
-  public ElderController(ElderService elderService, AuditLogService auditLogService) {
+  public ElderController(
+      ElderService elderService,
+      AuditLogService auditLogService,
+      ElderMapper elderMapper,
+      OaApprovalMapper oaApprovalMapper) {
     this.elderService = elderService;
     this.auditLogService = auditLogService;
+    this.elderMapper = elderMapper;
+    this.oaApprovalMapper = oaApprovalMapper;
   }
 
   @PostMapping
@@ -52,6 +66,39 @@ public class ElderController {
     auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "UPDATE", "ELDER", id, "更新老人档案");
     return Result.ok(response);
+  }
+
+  @PostMapping("/{id}/profile-change-approval")
+  public Result<OaApproval> applyProfileChangeApproval(
+      @PathVariable Long id,
+      @Valid @RequestBody ElderProfileChangeApprovalRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    ElderProfile elder = elderMapper.selectById(id);
+    if (elder == null || Integer.valueOf(1).equals(elder.getIsDeleted()) || (orgId != null && !orgId.equals(elder.getOrgId()))) {
+      throw new IllegalArgumentException("老人档案不存在");
+    }
+    Long applicantId = AuthContext.getStaffId();
+    OaApproval approval = new OaApproval();
+    approval.setTenantId(orgId);
+    approval.setOrgId(orgId);
+    approval.setApprovalType("OFFICIAL_SEAL");
+    approval.setTitle("老人档案修改申请：" + (elder.getFullName() == null ? ("#" + id) : elder.getFullName()));
+    approval.setApplicantId(applicantId);
+    approval.setApplicantName(AuthContext.getUsername());
+    String module = request.getModule() == null || request.getModule().isBlank() ? "BASE_PROFILE" : request.getModule().trim().toUpperCase();
+    String summary = request.getChangeSummary() == null ? "" : request.getChangeSummary().trim();
+    approval.setFormData("{\"bizType\":\"ELDER_PROFILE_CHANGE\",\"elderId\":" + id
+        + ",\"module\":\"" + module + "\""
+        + ",\"reason\":\"" + escapeJson(request.getReason()) + "\""
+        + ",\"summary\":\"" + escapeJson(summary) + "\"}");
+    approval.setStatus("PENDING");
+    approval.setRemark(request.getReason());
+    approval.setCreatedBy(applicantId);
+    approval.setStartTime(LocalDateTime.now());
+    oaApprovalMapper.insert(approval);
+    auditLogService.record(orgId, orgId, applicantId, AuthContext.getUsername(),
+        "ELDER_PROFILE_CHANGE_APPLY", "ELDER", id, "提交老人档案修改审批申请");
+    return Result.ok(approval);
   }
 
   @GetMapping("/{id}")
@@ -91,5 +138,12 @@ public class ElderController {
     auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "BED_UNBIND", "ELDER", id, "床位解绑");
     return Result.ok(response);
+  }
+
+  private String escapeJson(String raw) {
+    if (raw == null || raw.isBlank()) {
+      return "";
+    }
+    return raw.replace("\\", "\\\\").replace("\"", "\\\"");
   }
 }

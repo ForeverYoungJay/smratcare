@@ -14,5 +14,6 @@ public class InventoryOutboundRequest {
   private Integer quantity;
   private String reason;
   private String receiverName;
+  private String outboundNo;
   private Long operatorStaffId;
 }

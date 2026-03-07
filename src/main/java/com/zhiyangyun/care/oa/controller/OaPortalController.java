@@ -1,7 +1,11 @@
 package com.zhiyangyun.care.oa.controller;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.zhiyangyun.care.auth.entity.StaffAccount;
+import com.zhiyangyun.care.auth.mapper.RoleMapper;
+import com.zhiyangyun.care.auth.mapper.StaffMapper;
 import com.zhiyangyun.care.auth.model.Result;
+import com.zhiyangyun.care.auth.security.SupervisorRuleHelper;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.crm.entity.CrmLead;
 import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
@@ -42,7 +46,9 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -67,6 +73,8 @@ public class OaPortalController {
   private final CrmLeadMapper crmLeadMapper;
   private final SurveyTemplateMapper surveyTemplateMapper;
   private final SurveySubmissionMapper surveySubmissionMapper;
+  private final StaffMapper staffMapper;
+  private final RoleMapper roleMapper;
 
   public OaPortalController(
       OaNoticeMapper noticeMapper,
@@ -85,7 +93,9 @@ public class OaPortalController {
       ElderMapper elderMapper,
       CrmLeadMapper crmLeadMapper,
       SurveyTemplateMapper surveyTemplateMapper,
-      SurveySubmissionMapper surveySubmissionMapper) {
+      SurveySubmissionMapper surveySubmissionMapper,
+      StaffMapper staffMapper,
+      RoleMapper roleMapper) {
     this.noticeMapper = noticeMapper;
     this.todoMapper = todoMapper;
     this.approvalMapper = approvalMapper;
@@ -103,6 +113,8 @@ public class OaPortalController {
     this.crmLeadMapper = crmLeadMapper;
     this.surveyTemplateMapper = surveyTemplateMapper;
     this.surveySubmissionMapper = surveySubmissionMapper;
+    this.staffMapper = staffMapper;
+    this.roleMapper = roleMapper;
   }
 
   @GetMapping("/summary")
@@ -127,6 +139,11 @@ public class OaPortalController {
         .eq(OaTodo::getIsDeleted, 0)
         .eq(orgId != null, OaTodo::getOrgId, orgId)
         .eq(OaTodo::getStatus, "OPEN")));
+    Long birthdayTodoCount = count(todoMapper.selectCount(Wrappers.lambdaQuery(OaTodo.class)
+        .eq(OaTodo::getIsDeleted, 0)
+        .eq(orgId != null, OaTodo::getOrgId, orgId)
+        .eq(OaTodo::getStatus, "OPEN")
+        .like(OaTodo::getContent, "[BIRTHDAY_REMINDER:")));
     Long overdueTodoCount = count(todoMapper.selectCount(Wrappers.lambdaQuery(OaTodo.class)
         .eq(OaTodo::getIsDeleted, 0)
         .eq(orgId != null, OaTodo::getOrgId, orgId)
@@ -226,6 +243,7 @@ public class OaPortalController {
         .eq(orgId != null, SurveySubmission::getOrgId, orgId)
         .ge(SurveySubmission::getCreateTime, today.atStartOfDay())
         .lt(SurveySubmission::getCreateTime, today.plusDays(1).atStartOfDay())));
+    Long supervisorAnomalyCount = countSupervisorAnomalies(orgId);
 
     List<OaPortalSummary.MarketingChannelItem> marketingChannels = queryMarketingChannels(orgId);
     List<OaPortalSummary.CollaborationGanttItem> collaborationGantt = queryCollaborationGantt(orgId);
@@ -240,6 +258,7 @@ public class OaPortalController {
     summary.setNotices(notices);
     summary.setTodos(todos);
     summary.setOpenTodoCount(openTodoCount);
+    summary.setBirthdayTodoCount(birthdayTodoCount);
     summary.setOverdueTodoCount(overdueTodoCount);
     summary.setPendingApprovalCount(pendingApprovalCount);
     summary.setOngoingTaskCount(ongoingTaskCount);
@@ -267,6 +286,7 @@ public class OaPortalController {
     summary.setSurveyPublishedCount(surveyPublishedCount);
     summary.setSurveyTodaySubmissionCount(surveyTodaySubmissionCount);
     summary.setSurveyFamilyPublishedCount(surveyFamilyPublishedCount);
+    summary.setSupervisorAnomalyCount(supervisorAnomalyCount);
     summary.setWorkflowTodos(workflowTodos);
     summary.setMarketingChannels(marketingChannels);
     summary.setCollaborationGantt(collaborationGantt);
@@ -399,5 +419,76 @@ public class OaPortalController {
     } catch (NumberFormatException e) {
       return 0L;
     }
+  }
+
+  private Long countSupervisorAnomalies(Long orgId) {
+    List<StaffAccount> staffs = staffMapper.selectList(Wrappers.lambdaQuery(StaffAccount.class)
+        .eq(StaffAccount::getIsDeleted, 0)
+        .eq(orgId != null, StaffAccount::getOrgId, orgId));
+    if (staffs.isEmpty()) {
+      return 0L;
+    }
+    Map<Long, StaffAccount> map = new LinkedHashMap<>();
+    Map<Long, List<String>> roleMap = new LinkedHashMap<>();
+    for (StaffAccount staff : staffs) {
+      if (staff == null || staff.getId() == null) {
+        continue;
+      }
+      map.put(staff.getId(), staff);
+      roleMap.put(staff.getId(), SupervisorRuleHelper.normalizeRoleCodes(
+          roleMapper.selectRoleCodesByStaff(staff.getId(), staff.getOrgId())));
+    }
+    long total = 0L;
+    for (StaffAccount staff : staffs) {
+      if (staff == null || staff.getId() == null) {
+        continue;
+      }
+      if (hasSupervisorAnomaly(staff, map, roleMap)) {
+        total++;
+      }
+    }
+    return total;
+  }
+
+  private boolean hasSupervisorAnomaly(
+      StaffAccount target,
+      Map<Long, StaffAccount> staffMap,
+      Map<Long, List<String>> roleMap) {
+    Long targetId = target.getId();
+    Long directLeaderId = target.getDirectLeaderId();
+    Long indirectLeaderId = target.getIndirectLeaderId();
+    if (targetId != null && targetId.equals(directLeaderId)) {
+      return true;
+    }
+    if (targetId != null && targetId.equals(indirectLeaderId)) {
+      return true;
+    }
+    if (directLeaderId != null && directLeaderId.equals(indirectLeaderId)) {
+      return true;
+    }
+    SupervisorRuleHelper.Level targetLevel = SupervisorRuleHelper.resolveLevel(roleMap.get(targetId));
+    if (directLeaderId != null) {
+      StaffAccount directLeader = staffMap.get(directLeaderId);
+      if (directLeader == null) {
+        return true;
+      }
+      if (!SupervisorRuleHelper.canBeDirectLeader(
+          targetLevel,
+          target.getDepartmentId(),
+          directLeader.getDepartmentId(),
+          roleMap.get(directLeaderId))) {
+        return true;
+      }
+    }
+    if (indirectLeaderId != null) {
+      StaffAccount indirectLeader = staffMap.get(indirectLeaderId);
+      if (indirectLeader == null) {
+        return true;
+      }
+      if (!SupervisorRuleHelper.canBeIndirectLeader(targetLevel, roleMap.get(indirectLeaderId))) {
+        return true;
+      }
+    }
+    return false;
   }
 }

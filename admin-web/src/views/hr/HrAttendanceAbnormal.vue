@@ -31,6 +31,19 @@
         <template v-if="column.key === 'status'">
           <a-tag color="red">{{ record.status || '-' }}</a-tag>
         </template>
+        <template v-else-if="column.key === 'reviewed'">
+          <a-tag :color="Number(record.reviewed) === 1 ? 'green' : 'orange'">{{ Number(record.reviewed) === 1 ? '已核验' : '待核验' }}</a-tag>
+        </template>
+        <template v-else-if="column.key === 'action'">
+          <a-button
+            type="link"
+            size="small"
+            :disabled="Number(record.reviewed) === 1 || !record.id"
+            @click="markReviewed(record)"
+          >
+            标记已核验
+          </a-button>
+        </template>
       </template>
     </DataTable>
   </PageContainer>
@@ -44,6 +57,7 @@ import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { exportCsv, exportExcel } from '../../utils/export'
 import { getHrAttendanceAbnormalPage } from '../../api/hr'
+import { reviewAttendanceRecord } from '../../api/schedule'
 import type { HrAttendanceAbnormalItem, PageResult } from '../../types'
 import { mapByDict } from './hrExportFields'
 
@@ -65,7 +79,10 @@ const columns = [
   { title: '员工', dataIndex: 'staffName', key: 'staffName', width: 140 },
   { title: '签到时间', dataIndex: 'checkInTime', key: 'checkInTime', width: 180 },
   { title: '签退时间', dataIndex: 'checkOutTime', key: 'checkOutTime', width: 180 },
-  { title: '异常状态', dataIndex: 'status', key: 'status', width: 120 }
+  { title: '异常状态', dataIndex: 'status', key: 'status', width: 120 },
+  { title: '核验状态', dataIndex: 'reviewed', key: 'reviewed', width: 120 },
+  { title: '核验备注', dataIndex: 'reviewRemark', key: 'reviewRemark', width: 180 },
+  { title: '操作', key: 'action', width: 120 }
 ]
 const rows = ref<HrAttendanceAbnormalItem[]>([])
 const loading = ref(false)
@@ -74,7 +91,9 @@ const abnormalExportFields = [
   { key: 'staffName', label: '员工姓名' },
   { key: 'checkInTime', label: '签到时间' },
   { key: 'checkOutTime', label: '签退时间' },
-  { key: 'status', label: '异常状态' }
+  { key: 'status', label: '异常状态' },
+  { key: 'reviewedText', label: '核验状态' },
+  { key: 'reviewRemark', label: '核验备注' }
 ]
 
 async function fetchData() {
@@ -125,11 +144,23 @@ function rowClassName() {
 }
 
 function onExportCsv() {
-  exportCsv(mapByDict(rows.value as Record<string, any>[], abnormalExportFields), '考勤异常-当前筛选')
+  const exportRows = rows.value.map((item) => ({ ...item, reviewedText: Number(item.reviewed) === 1 ? '已核验' : '待核验' }))
+  exportCsv(mapByDict(exportRows as Record<string, any>[], abnormalExportFields), '考勤异常-当前筛选')
 }
 
 function onExportExcel() {
-  exportExcel(mapByDict(rows.value as Record<string, any>[], abnormalExportFields), '考勤异常-当前筛选')
+  const exportRows = rows.value.map((item) => ({ ...item, reviewedText: Number(item.reviewed) === 1 ? '已核验' : '待核验' }))
+  exportExcel(mapByDict(exportRows as Record<string, any>[], abnormalExportFields), '考勤异常-当前筛选')
+}
+
+async function markReviewed(record: HrAttendanceAbnormalItem) {
+  if (!record.id) return
+  try {
+    await reviewAttendanceRecord(record.id, { reviewed: 1, reviewRemark: '已核验异常记录' })
+    fetchData()
+  } catch {
+    // ignore
+  }
 }
 
 onMounted(fetchData)

@@ -1,8 +1,8 @@
 <template>
-  <PageContainer title="考勤与请假" subTitle="查看员工每日上下班签到状态、本月病假次数与额外假期天数">
-    <a-card class="card-elevated" :bordered="false" style="margin-bottom: 16px">
+  <PageContainer title="考勤与行政日程一览" subTitle="我的考勤、请假联动日程、院长查看员工打卡明细">
+    <a-card class="attendance-hero" :bordered="false">
       <a-form layout="inline">
-        <a-form-item label="员工">
+        <a-form-item v-if="canManageAttendance" label="查看员工">
           <a-select
             v-model:value="query.staffId"
             style="width: 260px"
@@ -11,7 +11,6 @@
             :filter-option="false"
             :options="staffOptions"
             :loading="staffLoading"
-            :disabled="!canManageAttendance"
             placeholder="请选择员工"
             @search="searchStaff"
             @focus="() => !staffOptions.length && searchStaff('')"
@@ -27,57 +26,172 @@
           <a-space>
             <a-button type="primary" @click="fetchData">查询</a-button>
             <a-button @click="reset">重置</a-button>
-            <a-button @click="exportAttendance">导出考勤明细</a-button>
-            <a-button @click="exportLeaveApprovals">导出请假回写</a-button>
-            <a-button @click="goLeaveApproval">在线填写请假申请</a-button>
+            <a-button @click="printCurrentEmployee">打印当前员工考勤</a-button>
+            <a-button @click="exportCurrentEmployee">导出当前员工月报</a-button>
+            <a-button @click="goLeaveApproval">填写请假申请</a-button>
           </a-space>
         </a-form-item>
       </a-form>
+      <div class="hero-tip">
+        请假审批通过后会自动写入本页日程；午休中显示蓝色状态；院长可切换员工查看上下班/外出时长并打印。
+      </div>
     </a-card>
 
-    <a-row :gutter="16" style="margin-bottom: 16px">
-      <a-col :xs="24" :sm="6">
-        <a-card class="card-elevated" :bordered="false">
-          <a-statistic title="本月正常签到" :value="summary.normalCount" />
+    <a-row :gutter="16" style="margin-top: 16px; margin-bottom: 16px">
+      <a-col :xs="24" :sm="12" :lg="6">
+        <a-card class="metric-card" :bordered="false">
+          <a-statistic title="当月在岗天数" :value="overview.onDutyDays || 0" />
         </a-card>
       </a-col>
-      <a-col :xs="24" :sm="6">
-        <a-card class="card-elevated" :bordered="false">
-          <a-statistic title="本月病假次数" :value="summary.sickLeaveCount" />
+      <a-col :xs="24" :sm="12" :lg="6">
+        <a-card class="metric-card" :bordered="false">
+          <a-statistic title="当月请假天数" :value="overview.leaveDays || 0" />
         </a-card>
       </a-col>
-      <a-col :xs="24" :sm="6">
-        <a-card class="card-elevated" :bordered="false">
-          <a-statistic title="额外假期/节日天数" :value="summary.extraHolidayDays" />
+      <a-col :xs="24" :sm="12" :lg="6">
+        <a-card class="metric-card" :bordered="false">
+          <a-statistic title="迟到/早退" :value="`${overview.lateCount || 0}/${overview.earlyLeaveCount || 0}`" />
         </a-card>
       </a-col>
-      <a-col :xs="24" :sm="6">
-        <a-card class="card-elevated" :bordered="false">
-          <a-statistic title="年度请假次数" :value="summary.annualLeaveCount" />
+      <a-col :xs="24" :sm="12" :lg="6">
+        <a-card class="metric-card" :bordered="false">
+          <a-statistic title="外出总时长(分)" :value="overview.totalOutingMinutes || 0" />
         </a-card>
       </a-col>
     </a-row>
 
-    <a-card class="card-elevated" :bordered="false">
-      <a-table :columns="columns" :data-source="rows" row-key="id" :loading="loading" :pagination="false">
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'status'">
-            <a-tag :color="statusColor(record.status)">{{ record.status || '-' }}</a-tag>
-          </template>
-        </template>
-      </a-table>
-    </a-card>
+    <a-row :gutter="16">
+      <a-col :xs="24" :xl="16">
+        <a-card class="grid-card" :bordered="false" title="考勤与行政日程合并视图">
+          <a-table
+            :columns="dayColumns"
+            :data-source="overview.days || []"
+            row-key="date"
+            :loading="loading"
+            :pagination="{ pageSize: 31, hideOnSinglePage: true }"
+            size="small"
+            class="attendance-table"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'attendanceTime'">
+                <div>{{ formatDateTime(record.checkInTime) || '-' }} → {{ formatDateTime(record.checkOutTime) || '-' }}</div>
+                <small class="muted">{{ record.workMinutes || 0 }} 分钟</small>
+              </template>
+              <template v-else-if="column.key === 'status'">
+                <a-tag :color="statusColor(record)">
+                  {{ record.status || '未打卡' }}
+                </a-tag>
+                <a-tag v-if="record.hasLeave" color="blue">请假中</a-tag>
+              </template>
+              <template v-else-if="column.key === 'leaveInfo'">
+                <span v-if="record.hasLeave">{{ record.leaveType || '请假' }} {{ record.leaveTitle ? `· ${record.leaveTitle}` : '' }}</span>
+                <span v-else class="muted">-</span>
+              </template>
+              <template v-else-if="column.key === 'restAndOuting'">
+                <div>午休 {{ record.lunchBreakMinutes || 0 }} 分钟</div>
+                <div>外出 {{ record.outingMinutes || 0 }} 分钟</div>
+              </template>
+              <template v-else-if="column.key === 'anomalyText'">
+                <a-tag v-if="record.anomalyText" color="orange">{{ record.anomalyText }}</a-tag>
+                <span v-else class="muted">正常</span>
+              </template>
+            </template>
+          </a-table>
+        </a-card>
+      </a-col>
 
-    <a-card class="card-elevated" :bordered="false" style="margin-top: 16px">
-      <template #title>当月请假审批回写</template>
-      <a-table :columns="leaveColumns" :data-source="leaveApprovalRows" row-key="id" :loading="loading" :pagination="false">
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'status'">
-            <a-tag :color="record.status === 'APPROVED' ? 'green' : 'orange'">{{ record.status === 'APPROVED' ? '已通过' : '待审批' }}</a-tag>
-          </template>
-        </template>
-      </a-table>
-    </a-card>
+      <a-col :xs="24" :xl="8">
+        <a-card class="grid-card" :bordered="false" title="今日状态">
+          <a-space direction="vertical" style="width: 100%">
+            <div class="today-line">
+              <span>当前员工：</span>
+              <strong>{{ currentStaffName || '-' }}</strong>
+            </div>
+            <div class="today-line">
+              <span>当前状态：</span>
+              <a-tag :color="todayStatusColor">{{ overview.todayStatusLabel || '未打卡' }}</a-tag>
+            </div>
+            <div class="today-line">
+              <span>当季考勤时间：</span>
+              <span>{{ seasonLabel }} {{ overview.expectedWorkStart || '--:--' }} - {{ overview.expectedWorkEnd || '--:--' }}</span>
+            </div>
+          </a-space>
+        </a-card>
+
+        <a-card class="grid-card" :bordered="false" title="联系前状态检查" style="margin-top: 16px">
+          <a-space direction="vertical" style="width: 100%">
+            <a-select
+              v-model:value="contactTargetStaffId"
+              show-search
+              allow-clear
+              :filter-option="false"
+              :options="staffOptions"
+              :loading="staffLoading"
+              placeholder="选择要联系的员工"
+              @search="searchStaff"
+            />
+            <a-button type="primary" block @click="checkContactAvailability">检查状态</a-button>
+            <a-alert
+              v-if="availabilityMessage"
+              :type="availabilityAvailable ? 'success' : 'warning'"
+              :message="availabilityMessage"
+              show-icon
+            />
+          </a-space>
+        </a-card>
+
+        <a-card v-if="canManageAttendance" class="grid-card" :bordered="false" title="季节考勤规则" style="margin-top: 16px">
+          <a-form layout="vertical">
+            <a-row :gutter="10">
+              <a-col :span="12">
+                <a-form-item label="冬季上班">
+                  <a-time-picker v-model:value="ruleForm.winterWorkStart" format="HH:mm" value-format="HH:mm" style="width: 100%" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="12">
+                <a-form-item label="冬季下班">
+                  <a-time-picker v-model:value="ruleForm.winterWorkEnd" format="HH:mm" value-format="HH:mm" style="width: 100%" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="12">
+                <a-form-item label="夏季上班">
+                  <a-time-picker v-model:value="ruleForm.summerWorkStart" format="HH:mm" value-format="HH:mm" style="width: 100%" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="12">
+                <a-form-item label="夏季下班">
+                  <a-time-picker v-model:value="ruleForm.summerWorkEnd" format="HH:mm" value-format="HH:mm" style="width: 100%" />
+                </a-form-item>
+              </a-col>
+            </a-row>
+            <a-row :gutter="10">
+              <a-col :span="8">
+                <a-form-item label="迟到宽限">
+                  <a-input-number v-model:value="ruleForm.lateGraceMinutes" :min="0" :max="120" style="width: 100%" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="早退宽限">
+                  <a-input-number v-model:value="ruleForm.earlyLeaveGraceMinutes" :min="0" :max="120" style="width: 100%" />
+                </a-form-item>
+              </a-col>
+              <a-col :span="8">
+                <a-form-item label="外出超时阈值">
+                  <a-input-number v-model:value="ruleForm.outingMaxMinutes" :min="30" :max="600" style="width: 100%" />
+                </a-form-item>
+              </a-col>
+            </a-row>
+            <a-row :gutter="10">
+              <a-col :span="12"><a-form-item label="迟到判定"><a-switch v-model:checked="lateEnabledChecked" /></a-form-item></a-col>
+              <a-col :span="12"><a-form-item label="早退判定"><a-switch v-model:checked="earlyLeaveEnabledChecked" /></a-form-item></a-col>
+              <a-col :span="12"><a-form-item label="外出超时判定"><a-switch v-model:checked="outingOvertimeEnabledChecked" /></a-form-item></a-col>
+              <a-col :span="12"><a-form-item label="缺签退判定"><a-switch v-model:checked="missingCheckoutEnabledChecked" /></a-form-item></a-col>
+            </a-row>
+            <a-button type="primary" block @click="saveRule">保存规则</a-button>
+          </a-form>
+        </a-card>
+      </a-col>
+    </a-row>
   </PageContainer>
 </template>
 
@@ -88,21 +202,28 @@ import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportCsv } from '../../utils/export'
+import { openPrintTableReport } from '../../utils/print'
 import { useUserStore } from '../../stores/user'
-import { getAttendancePage } from '../../api/schedule'
-import { getApprovalPage } from '../../api/oa'
 import { hasMinisterOrHigher } from '../../utils/roleAccess'
 import { useStaffOptions } from '../../composables/useStaffOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
-import type { AttendanceItem, OaApproval } from '../../types'
+import {
+  getAttendanceOverview,
+  getAttendanceSeasonRule,
+  getAttendanceStaffAvailability,
+  saveAttendanceSeasonRule
+} from '../../api/schedule'
+import type { AttendanceDashboardOverview, AttendanceSeasonRule } from '../../types'
 
 const router = useRouter()
 const userStore = useUserStore()
 const loading = ref(false)
 const autoRefresh = ref(true)
 let autoRefreshTimer: number | undefined
-const rows = ref<AttendanceItem[]>([])
-const approvals = ref<OaApproval[]>([])
+const overview = ref<AttendanceDashboardOverview>({ days: [] })
+const availabilityMessage = ref('')
+const availabilityAvailable = ref(true)
+const contactTargetStaffId = ref<string | number>()
 const { staffOptions, staffLoading, searchStaff } = useStaffOptions({ pageSize: 260, preloadSize: 800 })
 
 const query = reactive({
@@ -110,18 +231,54 @@ const query = reactive({
   month: dayjs().format('YYYY-MM')
 })
 
-const columns = [
-  { title: '签到时间', dataIndex: 'checkInTime', key: 'checkInTime', width: 200 },
-  { title: '签退时间', dataIndex: 'checkOutTime', key: 'checkOutTime', width: 200 },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 140 }
-]
-const leaveColumns = [
-  { title: '标题', dataIndex: 'title', key: 'title', width: 220 },
-  { title: '请假开始', dataIndex: 'startTime', key: 'startTime', width: 180 },
-  { title: '请假结束', dataIndex: 'endTime', key: 'endTime', width: 180 },
-  { title: '审批状态', dataIndex: 'status', key: 'status', width: 120 },
-  { title: '审批意见', dataIndex: 'approvalOpinion', key: 'approvalOpinion', width: 220 },
-  { title: '年度累计', dataIndex: 'annualLeaveCount', key: 'annualLeaveCount', width: 120 }
+const ruleForm = reactive<AttendanceSeasonRule>({
+  winterWorkStart: '13:30',
+  winterWorkEnd: '17:00',
+  summerWorkStart: '14:30',
+  summerWorkEnd: '18:00',
+  lateGraceMinutes: 10,
+  earlyLeaveGraceMinutes: 10,
+  outingMaxMinutes: 180,
+  lateEnabled: 1,
+  earlyLeaveEnabled: 1,
+  outingOvertimeEnabled: 1,
+  missingCheckoutEnabled: 1
+})
+
+const lateEnabledChecked = computed({
+  get: () => Number(ruleForm.lateEnabled) === 1,
+  set: (value: boolean) => {
+    ruleForm.lateEnabled = value ? 1 : 0
+  }
+})
+const earlyLeaveEnabledChecked = computed({
+  get: () => Number(ruleForm.earlyLeaveEnabled) === 1,
+  set: (value: boolean) => {
+    ruleForm.earlyLeaveEnabled = value ? 1 : 0
+  }
+})
+const outingOvertimeEnabledChecked = computed({
+  get: () => Number(ruleForm.outingOvertimeEnabled) === 1,
+  set: (value: boolean) => {
+    ruleForm.outingOvertimeEnabled = value ? 1 : 0
+  }
+})
+const missingCheckoutEnabledChecked = computed({
+  get: () => Number(ruleForm.missingCheckoutEnabled) === 1,
+  set: (value: boolean) => {
+    ruleForm.missingCheckoutEnabled = value ? 1 : 0
+  }
+})
+
+const dayColumns = [
+  { title: '日期', dataIndex: 'date', key: 'date', width: 110 },
+  { title: '星期', dataIndex: 'weekLabel', key: 'weekLabel', width: 90 },
+  { title: '打卡时间', dataIndex: 'attendanceTime', key: 'attendanceTime', width: 230 },
+  { title: '状态', dataIndex: 'status', key: 'status', width: 150 },
+  { title: '请假信息', dataIndex: 'leaveInfo', key: 'leaveInfo', width: 220 },
+  { title: '午休/外出', dataIndex: 'restAndOuting', key: 'restAndOuting', width: 170 },
+  { title: '行政日程', dataIndex: 'scheduleTitles', key: 'scheduleTitles', ellipsis: true },
+  { title: '异常判定', dataIndex: 'anomalyText', key: 'anomalyText', width: 180 }
 ]
 
 const canManageAttendance = computed(() => {
@@ -129,115 +286,61 @@ const canManageAttendance = computed(() => {
   return hasMinisterOrHigher(roles)
 })
 
-const summary = computed(() => {
-  const normalCount = rows.value.filter((item) => ['NORMAL', 'ON_TIME'].includes(String(item.status || '').toUpperCase())).length
-  const monthStart = dayjs(`${query.month}-01`)
-  const monthEnd = monthStart.endOf('month')
-  const currentYear = monthStart.year()
-
-  const leaveApprovals = approvals.value.filter((item) => {
-    const inMonth = item.startTime ? dayjs(item.startTime).isBetween(monthStart, monthEnd, null, '[]') : false
-    return item.approvalType === 'LEAVE' && item.status === 'APPROVED' && inMonth
-  })
-
-  const sickLeaveCount = leaveApprovals.filter((item) => {
-    const text = `${item.title || ''} ${item.remark || ''} ${item.formData || ''}`
-    return text.includes('病假')
-  }).length
-
-  const extraHolidayDays = leaveApprovals.filter((item) => {
-    const text = `${item.title || ''} ${item.remark || ''} ${item.formData || ''}`
-    return text.includes('调休') || text.includes('节日') || text.includes('额外假')
-  }).length
-
-  const annualLeaveCount = approvals.value
-    .filter((item) => item.approvalType === 'LEAVE' && item.status === 'APPROVED')
-    .filter((item) => {
-      const startYear = item.startTime ? dayjs(item.startTime).year() : currentYear
-      return startYear === currentYear
-    })
-    .reduce((maxCount, item) => {
-      const parsed = parseApprovalFormData(item.formData)
-      const count = Number(parsed?.annualLeaveApprovedCount || 0)
-      return count > maxCount ? count : maxCount
-    }, 0)
-
-  return { normalCount, sickLeaveCount, extraHolidayDays, annualLeaveCount }
+const currentStaffName = computed(() => {
+  if (overview.value?.staffName) return overview.value.staffName
+  if (query.staffId == null) return userStore.staffInfo?.realName || userStore.staffInfo?.username || ''
+  const target = (staffOptions.value || []).find((item: any) => String(item.value) === String(query.staffId))
+  return target?.label || ''
 })
 
-const leaveApprovalRows = computed(() => {
-  const monthStart = dayjs(`${query.month}-01`)
-  const monthEnd = monthStart.endOf('month')
-  return approvals.value
-    .filter((item) => item.approvalType === 'LEAVE')
-    .filter((item) => {
-      const inMonth = item.startTime ? dayjs(item.startTime).isBetween(monthStart, monthEnd, null, '[]') : false
-      return inMonth
-    })
-    .map((item) => {
-      const parsed = parseApprovalFormData(item.formData)
-      return {
-        ...item,
-        approvalOpinion: parsed?.lastApprovalRemark || item.remark || '-',
-        annualLeaveCount: Number(parsed?.annualLeaveApprovedCount || 0) || '-'
-      }
-    })
+const seasonLabel = computed(() => (overview.value?.seasonType === 'WINTER' ? '冬季' : '夏季'))
+
+const todayStatusColor = computed(() => {
+  const status = String(overview.value?.todayStatus || '').toUpperCase()
+  if (status === 'LUNCH_BREAK') return 'blue'
+  if (status === 'ON_LEAVE') return 'cyan'
+  if (status === 'OUTING') return 'orange'
+  if (status === 'ON_DUTY') return 'green'
+  if (status === 'OFF_DUTY') return 'purple'
+  return 'default'
 })
 
-function parseApprovalFormData(formData?: string) {
-  if (!formData) return {}
-  try {
-    const parsed = JSON.parse(formData)
-    return parsed && typeof parsed === 'object' ? parsed : {}
-  } catch {
-    return {}
-  }
+function statusColor(record: any) {
+  if (record?.hasLeave) return 'blue'
+  if (record?.anomalyText) return 'orange'
+  if (String(record?.status || '').includes('未打卡')) return 'default'
+  return 'green'
 }
 
-function statusColor(status?: string) {
-  const val = String(status || '').toUpperCase()
-  if (val === 'NORMAL' || val === 'ON_TIME') return 'green'
-  if (val.includes('LATE') || val.includes('ABNORMAL')) return 'orange'
-  return 'default'
+function formatDateTime(value?: string) {
+  if (!value) return ''
+  const parsed = dayjs(value)
+  if (!parsed.isValid()) return value
+  return parsed.format('HH:mm')
 }
 
 async function fetchData() {
   loading.value = true
   try {
-    const monthStart = dayjs(`${query.month}-01`).format('YYYY-MM-DD')
-    const monthEnd = dayjs(`${query.month}-01`).endOf('month').format('YYYY-MM-DD')
-    const currentStaffId = userStore.staffInfo?.id ? Number(userStore.staffInfo.id) : undefined
-    const selectedStaffId = query.staffId != null && query.staffId !== '' ? Number(query.staffId) : undefined
-    const effectiveStaffId = canManageAttendance.value ? selectedStaffId : currentStaffId
-
-    const [attendancePage, approvalPage] = await Promise.all([
-      getAttendancePage({
-        pageNo: 1,
-        pageSize: 500,
-        staffId: effectiveStaffId,
-        dateFrom: monthStart,
-        dateTo: monthEnd
-      }),
-      getApprovalPage({
-        pageNo: 1,
-        pageSize: 500,
-        type: 'LEAVE',
-        applicantId: effectiveStaffId
-      })
+    const currentStaffId = userStore.staffInfo?.id ? String(userStore.staffInfo.id) : undefined
+    const targetStaffId = canManageAttendance.value ? query.staffId : currentStaffId
+    const [overviewResp, ruleResp] = await Promise.all([
+      getAttendanceOverview({ staffId: targetStaffId, month: query.month }),
+      getAttendanceSeasonRule()
     ])
-
-    rows.value = attendancePage.list || []
-    approvals.value = approvalPage.list || []
+    overview.value = overviewResp || { days: [] }
+    Object.assign(ruleForm, ruleResp || {})
   } catch (error: any) {
-    message.error(error?.message || '加载考勤与请假数据失败')
+    message.error(error?.message || '加载考勤一览失败')
   } finally {
     loading.value = false
   }
 }
 
 function reset() {
-  query.staffId = canManageAttendance.value ? undefined : userStore.staffInfo?.id ? String(userStore.staffInfo.id) : undefined
   query.month = dayjs().format('YYYY-MM')
+  query.staffId = canManageAttendance.value ? undefined : userStore.staffInfo?.id ? String(userStore.staffInfo.id) : undefined
+  availabilityMessage.value = ''
   fetchData()
 }
 
@@ -245,35 +348,88 @@ function goLeaveApproval() {
   router.push('/oa/approval?type=LEAVE&quick=1')
 }
 
-function exportAttendance() {
-  exportCsv(
-    rows.value.map((item) => ({
-      签到时间: item.checkInTime || '',
-      签退时间: item.checkOutTime || '',
-      状态: item.status || ''
-    })),
-    `考勤明细-${query.month}`
-  )
+function printCurrentEmployee() {
+  const rows = (overview.value.days || []).map((item: any) => ({
+    date: item.date || '',
+    weekLabel: item.weekLabel || '',
+    attendance: `${formatDateTime(item.checkInTime) || '-'} → ${formatDateTime(item.checkOutTime) || '-'}`,
+    leaveInfo: item.hasLeave ? `${item.leaveType || '请假'} ${item.leaveTitle || ''}` : '-',
+    restAndOuting: `午休${item.lunchBreakMinutes || 0}分 / 外出${item.outingMinutes || 0}分`,
+    status: item.status || '未打卡',
+    anomalyText: item.anomalyText || '正常'
+  }))
+  if (!rows.length) {
+    message.info('暂无可打印数据')
+    return
+  }
+  openPrintTableReport({
+    title: `${currentStaffName.value || '员工'}考勤月报`,
+    subtitle: `月份：${query.month}，打印时间：${dayjs().format('YYYY-MM-DD HH:mm:ss')}`,
+    columns: [
+      { key: 'date', title: '日期' },
+      { key: 'weekLabel', title: '星期' },
+      { key: 'attendance', title: '打卡时间' },
+      { key: 'leaveInfo', title: '请假信息' },
+      { key: 'restAndOuting', title: '午休/外出' },
+      { key: 'status', title: '状态' },
+      { key: 'anomalyText', title: '异常判定' }
+    ],
+    rows
+  })
 }
 
-function exportLeaveApprovals() {
-  exportCsv(
-    leaveApprovalRows.value.map((item: any) => ({
-      标题: item.title || '',
-      请假开始: item.startTime || '',
-      请假结束: item.endTime || '',
-      审批状态: item.status || '',
-      审批意见: item.approvalOpinion || '',
-      年度累计: item.annualLeaveCount || ''
-    })),
-    `请假审批回写-${query.month}`
-  )
+function exportCurrentEmployee() {
+  const rows = (overview.value.days || []).map((item: any) => ({
+    日期: item.date || '',
+    星期: item.weekLabel || '',
+    打卡时间: `${formatDateTime(item.checkInTime) || '-'} -> ${formatDateTime(item.checkOutTime) || '-'}`,
+    请假信息: item.hasLeave ? `${item.leaveType || '请假'} ${item.leaveTitle || ''}` : '-',
+    午休分钟: item.lunchBreakMinutes || 0,
+    外出分钟: item.outingMinutes || 0,
+    状态: item.status || '未打卡',
+    异常判定: item.anomalyText || '正常'
+  }))
+  exportCsv(rows, `${currentStaffName.value || '员工'}-考勤月报-${query.month}`)
+}
+
+async function checkContactAvailability() {
+  if (!contactTargetStaffId.value) {
+    message.warning('请先选择要联系的员工')
+    return
+  }
+  try {
+    const result = await getAttendanceStaffAvailability(contactTargetStaffId.value)
+    availabilityMessage.value = result?.message || '已完成状态检查'
+    availabilityAvailable.value = Boolean(result?.available)
+  } catch (error: any) {
+    message.error(error?.message || '检查联系状态失败')
+  }
+}
+
+async function saveRule() {
+  try {
+    await saveAttendanceSeasonRule({
+      winterWorkStart: ruleForm.winterWorkStart,
+      winterWorkEnd: ruleForm.winterWorkEnd,
+      summerWorkStart: ruleForm.summerWorkStart,
+      summerWorkEnd: ruleForm.summerWorkEnd,
+      lateGraceMinutes: Number(ruleForm.lateGraceMinutes || 0),
+      earlyLeaveGraceMinutes: Number(ruleForm.earlyLeaveGraceMinutes || 0),
+      outingMaxMinutes: Number(ruleForm.outingMaxMinutes || 0),
+      lateEnabled: Number(ruleForm.lateEnabled || 0),
+      earlyLeaveEnabled: Number(ruleForm.earlyLeaveEnabled || 0),
+      outingOvertimeEnabled: Number(ruleForm.outingOvertimeEnabled || 0),
+      missingCheckoutEnabled: Number(ruleForm.missingCheckoutEnabled || 0)
+    })
+    message.success('季节考勤规则已保存')
+    fetchData()
+  } catch (error: any) {
+    message.error(error?.message || '保存规则失败')
+  }
 }
 
 function startAutoRefresh() {
-  if (!autoRefresh.value || autoRefreshTimer !== undefined) {
-    return
-  }
+  if (!autoRefresh.value || autoRefreshTimer !== undefined) return
   autoRefreshTimer = window.setInterval(() => {
     if (loading.value) return
     fetchData()
@@ -317,3 +473,43 @@ useLiveSyncRefresh({
   debounceMs: 900
 })
 </script>
+
+<style scoped>
+.attendance-hero {
+  background: linear-gradient(135deg, #0f766e 0%, #1d4ed8 100%);
+  color: #fff;
+}
+
+.attendance-hero :deep(.ant-form-item-label > label),
+.attendance-hero :deep(.ant-form-item) {
+  color: #fff !important;
+}
+
+.hero-tip {
+  margin-top: 10px;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.metric-card {
+  border-radius: 12px;
+}
+
+.grid-card {
+  border-radius: 12px;
+}
+
+.muted {
+  color: #8c8c8c;
+}
+
+.today-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.attendance-table :deep(.ant-table-thead > tr > th) {
+  background: #f5f7ff;
+}
+</style>

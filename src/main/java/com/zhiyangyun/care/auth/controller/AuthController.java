@@ -136,13 +136,19 @@ public class AuthController {
   }
 
   private StaffInfo toStaffInfo(StaffAccount staff) {
+    if (staff == null) {
+      return null;
+    }
     StaffInfo info = new StaffInfo();
     info.setId(staff.getId());
     info.setOrgId(staff.getOrgId());
     info.setDepartmentId(staff.getDepartmentId());
+    info.setStaffNo(staff.getStaffNo());
     info.setUsername(staff.getUsername());
     info.setRealName(staff.getRealName());
     info.setPhone(staff.getPhone());
+    info.setDirectLeaderId(staff.getDirectLeaderId());
+    info.setIndirectLeaderId(staff.getIndirectLeaderId());
     info.setStatus(staff.getStatus());
     return info;
   }
