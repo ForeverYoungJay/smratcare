@@ -82,12 +82,12 @@ public class HealthMedicationRegistrationController {
       @RequestParam(required = false) String registerTo,
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
-    drugName = normalizeText(drugName);
-    nurseName = normalizeText(nurseName);
-    keyword = normalizeText(keyword);
+    String normalizedDrugName = normalizeText(drugName);
+    String normalizedNurseName = normalizeText(nurseName);
+    String normalizedKeyword = normalizeText(keyword);
     LocalDateTime from = parseDateTime(registerFrom);
     LocalDateTime to = parseDateTime(registerTo);
-    var wrapper = buildQuery(orgId, elderId, drugName, nurseName, registerFrom, registerTo, keyword);
+    var wrapper = buildQuery(orgId, elderId, normalizedDrugName, normalizedNurseName, registerFrom, registerTo, normalizedKeyword);
     long totalCount = mapper.selectCount(wrapper);
 
     BigDecimal totalDosage = mapper.selectList(wrapper).stream()
@@ -97,16 +97,16 @@ public class HealthMedicationRegistrationController {
     long todayCount = mapper.selectCount(buildQuery(
         orgId,
         elderId,
-        drugName,
-        nurseName,
+        normalizedDrugName,
+        normalizedNurseName,
         LocalDate.now().atStartOfDay().format(DATE_TIME_FORMATTER),
         LocalDate.now().plusDays(1).atStartOfDay().minusSeconds(1).format(DATE_TIME_FORMATTER),
-        keyword));
+        normalizedKeyword));
     long doneTaskCount = taskMapper.selectCount(Wrappers.lambdaQuery(HealthMedicationTask.class)
         .eq(HealthMedicationTask::getIsDeleted, 0)
         .eq(orgId != null, HealthMedicationTask::getOrgId, orgId)
         .eq(elderId != null, HealthMedicationTask::getElderId, elderId)
-        .eq(drugName != null && !drugName.isBlank(), HealthMedicationTask::getDrugName, drugName)
+        .eq(normalizedDrugName != null && !normalizedDrugName.isBlank(), HealthMedicationTask::getDrugName, normalizedDrugName)
         .eq(HealthMedicationTask::getStatus, "DONE")
         .ge(from != null, HealthMedicationTask::getPlannedTime, from)
         .le(to != null, HealthMedicationTask::getPlannedTime, to));
@@ -114,7 +114,7 @@ public class HealthMedicationRegistrationController {
         .eq(HealthMedicationTask::getIsDeleted, 0)
         .eq(orgId != null, HealthMedicationTask::getOrgId, orgId)
         .eq(elderId != null, HealthMedicationTask::getElderId, elderId)
-        .eq(drugName != null && !drugName.isBlank(), HealthMedicationTask::getDrugName, drugName)
+        .eq(normalizedDrugName != null && !normalizedDrugName.isBlank(), HealthMedicationTask::getDrugName, normalizedDrugName)
         .eq(HealthMedicationTask::getStatus, "PENDING")
         .ge(from != null, HealthMedicationTask::getPlannedTime, from)
         .le(to != null, HealthMedicationTask::getPlannedTime, to));
@@ -124,13 +124,13 @@ public class HealthMedicationRegistrationController {
         .eq("is_deleted", 0)
         .eq(orgId != null, "org_id", orgId)
         .eq(elderId != null, "elder_id", elderId)
-        .eq(drugName != null && !drugName.isBlank(), "drug_name", drugName)
-        .eq(nurseName != null && !nurseName.isBlank(), "nurse_name", nurseName)
+        .eq(normalizedDrugName != null && !normalizedDrugName.isBlank(), "drug_name", normalizedDrugName)
+        .eq(normalizedNurseName != null && !normalizedNurseName.isBlank(), "nurse_name", normalizedNurseName)
         .ge(from != null, "register_time", from)
         .le(to != null, "register_time", to)
         .groupBy("nurse_name")
         .orderByDesc("totalCount");
-    final String keywordFilter = keyword;
+    final String keywordFilter = normalizedKeyword;
     if (keywordFilter != null && !keywordFilter.isBlank()) {
       nurseStatWrapper.and(w -> w.like("elder_name", keywordFilter)
           .or().like("drug_name", keywordFilter)

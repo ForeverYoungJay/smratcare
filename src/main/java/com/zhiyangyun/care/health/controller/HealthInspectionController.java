@@ -87,17 +87,17 @@ public class HealthInspectionController {
       @RequestParam(required = false) String inspectionTo,
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
-    status = normalizeStatusFilter(status);
-    keyword = normalizeText(keyword);
+    String normalizedStatus = normalizeStatusFilter(status);
+    String normalizedKeyword = normalizeText(keyword);
     LocalDate from = parseDate(inspectionFrom);
     LocalDate to = parseDate(inspectionTo);
     LocalDateTime fromStart = from == null ? null : from.atStartOfDay();
     LocalDateTime toEndExclusive = to == null ? null : to.plusDays(1).atStartOfDay();
-    var wrapper = buildQuery(orgId, inspectionId, elderId, status, inspectionFrom, inspectionTo, keyword);
+    var wrapper = buildQuery(orgId, inspectionId, elderId, normalizedStatus, inspectionFrom, inspectionTo, normalizedKeyword);
     long totalCount = mapper.selectCount(wrapper);
-    long abnormalCount = mapper.selectCount(buildQuery(orgId, inspectionId, elderId, "ABNORMAL", inspectionFrom, inspectionTo, keyword));
-    long followingCount = mapper.selectCount(buildQuery(orgId, inspectionId, elderId, "FOLLOWING", inspectionFrom, inspectionTo, keyword));
-    long closedCount = mapper.selectCount(buildQuery(orgId, inspectionId, elderId, "CLOSED", inspectionFrom, inspectionTo, keyword));
+    long abnormalCount = mapper.selectCount(buildQuery(orgId, inspectionId, elderId, "ABNORMAL", inspectionFrom, inspectionTo, normalizedKeyword));
+    long followingCount = mapper.selectCount(buildQuery(orgId, inspectionId, elderId, "FOLLOWING", inspectionFrom, inspectionTo, normalizedKeyword));
+    long closedCount = mapper.selectCount(buildQuery(orgId, inspectionId, elderId, "CLOSED", inspectionFrom, inspectionTo, normalizedKeyword));
 
     long linkedLogCount = nursingLogMapper.selectCount(Wrappers.lambdaQuery(HealthNursingLog.class)
         .eq(HealthNursingLog::getIsDeleted, 0)
@@ -114,12 +114,12 @@ public class HealthInspectionController {
         .eq(orgId != null, "org_id", orgId)
         .eq(inspectionId != null, "id", inspectionId)
         .eq(elderId != null, "elder_id", elderId)
-        .eq(status != null && !status.isBlank(), "status", status)
+        .eq(normalizedStatus != null && !normalizedStatus.isBlank(), "status", normalizedStatus)
         .ge(from != null, "inspection_date", from)
         .le(to != null, "inspection_date", to)
         .groupBy("status")
         .orderByDesc("totalCount");
-    final String keywordFilter = keyword;
+    final String keywordFilter = normalizedKeyword;
     if (keywordFilter != null && !keywordFilter.isBlank()) {
       statusStatWrapper.and(w -> w.like("elder_name", keywordFilter)
           .or().like("inspection_item", keywordFilter)

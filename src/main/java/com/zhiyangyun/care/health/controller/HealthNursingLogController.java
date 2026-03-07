@@ -79,23 +79,23 @@ public class HealthNursingLogController {
       @RequestParam(required = false) String logTo,
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
-    logType = normalizeLogTypeFilter(logType);
-    status = normalizeStatus(status);
-    keyword = normalizeText(keyword);
-    var wrapper = buildQuery(orgId, elderId, sourceInspectionId, logType, status, logFrom, logTo, keyword);
+    String normalizedLogType = normalizeLogTypeFilter(logType);
+    String normalizedStatus = normalizeStatus(status);
+    String normalizedKeyword = normalizeText(keyword);
+    var wrapper = buildQuery(orgId, elderId, sourceInspectionId, normalizedLogType, normalizedStatus, logFrom, logTo, normalizedKeyword);
     LocalDateTime from = parseDateTime(logFrom);
     LocalDateTime to = parseDateTime(logTo);
     long totalCount = mapper.selectCount(wrapper);
-    long pendingCount = mapper.selectCount(buildQuery(orgId, elderId, sourceInspectionId, logType, "PENDING", logFrom, logTo, keyword));
-    long doneCount = mapper.selectCount(buildQuery(orgId, elderId, sourceInspectionId, logType, "DONE", logFrom, logTo, keyword));
-    long closedCount = mapper.selectCount(buildQuery(orgId, elderId, sourceInspectionId, logType, "CLOSED", logFrom, logTo, keyword));
+    long pendingCount = mapper.selectCount(buildQuery(orgId, elderId, sourceInspectionId, normalizedLogType, "PENDING", logFrom, logTo, normalizedKeyword));
+    long doneCount = mapper.selectCount(buildQuery(orgId, elderId, sourceInspectionId, normalizedLogType, "DONE", logFrom, logTo, normalizedKeyword));
+    long closedCount = mapper.selectCount(buildQuery(orgId, elderId, sourceInspectionId, normalizedLogType, "CLOSED", logFrom, logTo, normalizedKeyword));
     long linkedInspectionCount = mapper.selectCount(Wrappers.lambdaQuery(HealthNursingLog.class)
         .eq(HealthNursingLog::getIsDeleted, 0)
         .eq(orgId != null, HealthNursingLog::getOrgId, orgId)
         .eq(elderId != null, HealthNursingLog::getElderId, elderId)
         .eq(sourceInspectionId != null, HealthNursingLog::getSourceInspectionId, sourceInspectionId)
-        .eq(logType != null && !logType.isBlank(), HealthNursingLog::getLogType, logType)
-        .eq(status != null && !status.isBlank(), HealthNursingLog::getStatus, status)
+        .eq(normalizedLogType != null && !normalizedLogType.isBlank(), HealthNursingLog::getLogType, normalizedLogType)
+        .eq(normalizedStatus != null && !normalizedStatus.isBlank(), HealthNursingLog::getStatus, normalizedStatus)
         .isNotNull(HealthNursingLog::getSourceInspectionId)
         .ge(from != null, HealthNursingLog::getLogTime, from)
         .le(to != null, HealthNursingLog::getLogTime, to));
@@ -106,16 +106,17 @@ public class HealthNursingLogController {
         .eq(orgId != null, "org_id", orgId)
         .eq(elderId != null, "elder_id", elderId)
         .eq(sourceInspectionId != null, "source_inspection_id", sourceInspectionId)
-        .eq(logType != null && !logType.isBlank(), "log_type", logType)
-        .eq(status != null && !status.isBlank(), "status", status)
+        .eq(normalizedLogType != null && !normalizedLogType.isBlank(), "log_type", normalizedLogType)
+        .eq(normalizedStatus != null && !normalizedStatus.isBlank(), "status", normalizedStatus)
         .ge(from != null, "log_time", from)
         .le(to != null, "log_time", to)
         .groupBy("log_type")
         .orderByDesc("totalCount");
-    if (keyword != null && !keyword.isBlank()) {
-      logTypeStatWrapper.and(w -> w.like("elder_name", keyword)
-          .or().like("content", keyword)
-          .or().like("staff_name", keyword));
+    final String keywordFilter = normalizedKeyword;
+    if (keywordFilter != null && !keywordFilter.isBlank()) {
+      logTypeStatWrapper.and(w -> w.like("elder_name", keywordFilter)
+          .or().like("content", keywordFilter)
+          .or().like("staff_name", keywordFilter));
     }
     List<HealthNameCountStatItem> logTypeStats = mapper.selectMaps(logTypeStatWrapper).stream().map(map -> {
       HealthNameCountStatItem item = new HealthNameCountStatItem();
