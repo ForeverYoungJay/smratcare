@@ -1,5 +1,35 @@
 <template>
   <PageContainer title="销售运营工作台" sub-title="营销管理首页：漏斗、跟进、床态、合同、回访、业绩、风险一屏总览">
+    <a-card class="card-elevated dashboard-control" :bordered="false" style="margin-bottom: 12px">
+      <a-space wrap>
+        <a-tag color="blue">机会指数：{{ opportunityCount }}</a-tag>
+        <a-tag :color="riskCount > 0 ? 'red' : 'green'">风险指数：{{ riskCount }}</a-tag>
+        <span class="quick-label">统计区间：</span>
+        <a-radio-group v-model:value="quickRange" size="small" @change="onQuickRangeChange">
+          <a-radio-button value="TODAY">今日</a-radio-button>
+          <a-radio-button value="7D">近7天</a-radio-button>
+          <a-radio-button value="30D">近30天</a-radio-button>
+          <a-radio-button value="MONTH">本月</a-radio-button>
+        </a-radio-group>
+        <a-range-picker
+          v-model:value="dateRange"
+          value-format="YYYY-MM-DD"
+          :allow-clear="false"
+          @change="onRangeChange"
+        />
+        <a-switch v-model:checked="autoRefresh" />
+        <span class="quick-label">自动刷新</span>
+        <a-button size="small" :loading="dashboardLoading" @click="loadOverview">立即刷新</a-button>
+        <span class="quick-label">更新于：{{ lastUpdated || '-' }}</span>
+      </a-space>
+      <a-alert
+        v-if="dashboardError"
+        style="margin-top: 10px"
+        type="warning"
+        show-icon
+        :message="dashboardError"
+      />
+    </a-card>
     <a-card class="card-elevated" :bordered="false" style="margin-bottom: 16px">
       <a-space wrap>
         <span class="quick-label">快速返回上次筛选视图：</span>
@@ -10,6 +40,24 @@
           @click="goReport(item.entry)"
         >
           {{ quickLabel(item.entry, item.label) }}
+        </a-button>
+      </a-space>
+    </a-card>
+
+    <a-card class="card-elevated action-board" :bordered="false" style="margin-bottom: 16px">
+      <a-space wrap>
+        <span class="quick-label">今日建议动作：</span>
+        <a-button type="primary" ghost @click="goFollowup('overdue')">
+          处理逾期跟进（{{ followup.overdue }}）
+        </a-button>
+        <a-button type="primary" ghost @click="goContract('pending')">
+          推进待签署（{{ contract.pendingSignCount }}）
+        </a-button>
+        <a-button type="primary" ghost @click="goReservation('expiring')">
+          处理锁床到期（{{ followup.lockExpiringCount }}）
+        </a-button>
+        <a-button type="primary" ghost @click="goPlan({ status: 'PENDING_APPROVAL' })">
+          审批营销方案（{{ plan.pendingApprovalCount }}）
         </a-button>
       </a-space>
     </a-card>
@@ -182,7 +230,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import VChart from 'vue-echarts'
@@ -211,8 +259,14 @@ import {
 import type { BedItem, CrmContractItem, CrmLeadItem, MarketingChannelReportItem, MarketingConversionReport, MarketingFollowupReport, PageResult } from '../../types'
 
 const router = useRouter()
-const today = dayjs().format('YYYY-MM-DD')
-const monthStart = dayjs().startOf('month').format('YYYY-MM-DD')
+const dashboardLoading = ref(false)
+const dashboardError = ref('')
+const lastUpdated = ref('')
+const quickRange = ref<'TODAY' | '7D' | '30D' | 'MONTH'>('MONTH')
+const dateRange = ref<any[]>([dayjs().startOf('month').format('YYYY-MM-DD'), dayjs().format('YYYY-MM-DD')])
+const autoRefresh = ref(true)
+let refreshTimer: number | undefined
+const AUTO_REFRESH_INTERVAL_MS = 60 * 1000
 
 const funnel = reactive({
   todayConsultCount: 0,
@@ -279,6 +333,18 @@ const channelColumns = [
   { title: '线索数', dataIndex: 'leadCount', key: 'leadCount', width: 120 },
   { title: '转化率', dataIndex: 'contractRate', key: 'contractRate', width: 120 }
 ]
+const riskCount = computed(() =>
+  Number(risk.overdueFollowupCount || 0)
+  + Number(risk.lockUnsignedCount || 0)
+  + Number(risk.highIntentNoEvalCount || 0)
+  + Number(risk.channelDropCount || 0)
+)
+const opportunityCount = computed(() =>
+  Number(funnel.evaluationCount || 0)
+  + Number(funnel.pendingSignCount || 0)
+  + Number(funnel.pendingAdmissionCount || 0)
+  + Number(medical.unassignedCount || 0)
+)
 
 const quickReportButtons = computed(() => {
   return [
@@ -368,34 +434,40 @@ function quickLabel(entry: MarketingReportEntry, base: string) {
 }
 
 async function loadOverview() {
-  const [
-    conversion,
-    followupReport,
-    callbackReport,
-    channelReport,
-    leadPage,
-    contractPage,
-    bedMap,
-    speechPlanPage,
-    policyPlanPage
-  ] = await Promise.all([
-    getMarketingConversionReport({ dateFrom: monthStart, dateTo: today }),
-    getMarketingFollowupReport({ dateFrom: monthStart, dateTo: today }) as Promise<MarketingFollowupReport>,
-    getMarketingCallbackReport({ pageNo: 1, pageSize: 200 }),
-    getMarketingChannelReport({ dateFrom: monthStart, dateTo: today }) as Promise<MarketingChannelReportItem[]>,
-    getLeadPage({ pageNo: 1, pageSize: 300 }),
-    getContractPage({ pageNo: 1, pageSize: 300 }),
-    getBedMap(),
-    getMarketingPlanPage({ pageNo: 1, pageSize: 500, moduleType: 'SPEECH' }),
-    getMarketingPlanPage({ pageNo: 1, pageSize: 500, moduleType: 'POLICY' })
-  ])
+  const rangeStart = String(dateRange.value?.[0] || dayjs().startOf('month').format('YYYY-MM-DD'))
+  const rangeEnd = String(dateRange.value?.[1] || dayjs().format('YYYY-MM-DD'))
+  const today = dayjs().format('YYYY-MM-DD')
+  dashboardLoading.value = true
+  dashboardError.value = ''
+  try {
+    const [
+      conversion,
+      followupReport,
+      callbackReport,
+      channelReport,
+      leadPage,
+      contractPage,
+      bedMap,
+      speechPlanPage,
+      policyPlanPage
+    ] = await Promise.all([
+      getMarketingConversionReport({ dateFrom: rangeStart, dateTo: rangeEnd }),
+      getMarketingFollowupReport({ dateFrom: rangeStart, dateTo: rangeEnd }) as Promise<MarketingFollowupReport>,
+      getMarketingCallbackReport({ pageNo: 1, pageSize: 200, dateFrom: rangeStart, dateTo: rangeEnd }),
+      getMarketingChannelReport({ dateFrom: rangeStart, dateTo: rangeEnd }) as Promise<MarketingChannelReportItem[]>,
+      getLeadPage({ pageNo: 1, pageSize: 300 }),
+      getContractPage({ pageNo: 1, pageSize: 300 }),
+      getBedMap(),
+      getMarketingPlanPage({ pageNo: 1, pageSize: 500, moduleType: 'SPEECH' }),
+      getMarketingPlanPage({ pageNo: 1, pageSize: 500, moduleType: 'POLICY' })
+    ])
 
-  const leads = (leadPage as PageResult<CrmLeadItem>).list || []
-  const contracts = (contractPage as PageResult<CrmContractItem>).list || []
-  const beds = (bedMap || []) as BedItem[]
-  const speechPlans = speechPlanPage.list || []
-  const policyPlans = policyPlanPage.list || []
-  const conv = conversion as MarketingConversionReport
+    const leads = (leadPage as PageResult<CrmLeadItem>).list || []
+    const contracts = (contractPage as PageResult<CrmContractItem>).list || []
+    const beds = (bedMap || []) as BedItem[]
+    const speechPlans = speechPlanPage.list || []
+    const policyPlans = policyPlanPage.list || []
+    const conv = conversion as MarketingConversionReport
 
   funnel.todayConsultCount = conv.consultCount || 0
   funnel.evaluationCount = leads.filter((item) => Number(item.status) === 1).length
@@ -473,12 +545,80 @@ async function loadOverview() {
     .filter((item) => !String(item.source || '').trim() || String(item.source || '').includes('不明'))
     .reduce((acc, item) => acc + Number(item.leadCount || 0), 0)
   channelMonthDeals.value = channelReport.reduce((acc, item) => acc + Number(item.contractCount || 0), 0)
+  lastUpdated.value = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  } catch (error: any) {
+    dashboardError.value = error?.message || '营销工作台数据加载失败'
+  } finally {
+    dashboardLoading.value = false
+  }
 }
 
-onMounted(loadOverview)
+function applyQuickRange(range: 'TODAY' | '7D' | '30D' | 'MONTH') {
+  const end = dayjs()
+  if (range === 'TODAY') {
+    dateRange.value = [end.format('YYYY-MM-DD'), end.format('YYYY-MM-DD')]
+    return
+  }
+  if (range === '7D') {
+    dateRange.value = [end.subtract(6, 'day').format('YYYY-MM-DD'), end.format('YYYY-MM-DD')]
+    return
+  }
+  if (range === '30D') {
+    dateRange.value = [end.subtract(29, 'day').format('YYYY-MM-DD'), end.format('YYYY-MM-DD')]
+    return
+  }
+  dateRange.value = [end.startOf('month').format('YYYY-MM-DD'), end.format('YYYY-MM-DD')]
+}
+
+function onQuickRangeChange() {
+  applyQuickRange(quickRange.value)
+  loadOverview()
+}
+
+function onRangeChange() {
+  loadOverview()
+}
+
+function startAutoRefresh() {
+  stopAutoRefresh()
+  if (!autoRefresh.value) return
+  refreshTimer = window.setInterval(() => {
+    if (dashboardLoading.value) return
+    loadOverview()
+  }, AUTO_REFRESH_INTERVAL_MS)
+}
+
+function stopAutoRefresh() {
+  if (!refreshTimer) return
+  window.clearInterval(refreshTimer)
+  refreshTimer = undefined
+}
+
+watch(autoRefresh, () => {
+  startAutoRefresh()
+})
+
+onMounted(() => {
+  applyQuickRange(quickRange.value)
+  loadOverview()
+  startAutoRefresh()
+})
+
+onUnmounted(() => {
+  stopAutoRefresh()
+})
 </script>
 
 <style scoped>
+.dashboard-control {
+  border: 1px solid rgba(45, 108, 223, 0.16);
+  background: linear-gradient(135deg, rgba(45, 108, 223, 0.08), rgba(24, 144, 255, 0.02));
+}
+
+.action-board {
+  border: 1px dashed rgba(24, 144, 255, 0.3);
+}
+
 .quick-label {
   color: rgba(0, 0, 0, 0.65);
   font-size: 12px;

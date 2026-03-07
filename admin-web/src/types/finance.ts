@@ -260,6 +260,71 @@ export interface FinanceQuickEntry {
   path: string
 }
 
+export interface FinanceLedgerHealthIssueItem {
+  issueType: string
+  issueTypeLabel: string
+  billId?: number
+  paymentId?: number
+  elderId?: number
+  elderName?: string
+  expectedAmount: number
+  actualAmount: number
+  detail: string
+}
+
+export interface FinanceLedgerHealth {
+  checkedAt: string
+  billCount: number
+  paymentCount: number
+  consumptionCount: number
+  mismatchBillItemCount: number
+  mismatchPaidCount: number
+  missingPaymentFlowCount: number
+  totalIssueCount: number
+  issues: FinanceLedgerHealthIssueItem[]
+}
+
+export interface FinanceDischargeStatusSyncRow {
+  settlementId: number
+  elderId?: number
+  elderName?: string
+  settledTime?: string
+  settlementStatus?: string
+  elderStatus?: number
+  elderBedId?: number
+  occupiedBedId?: number
+  issueType: string
+  issueMessage: string
+}
+
+export interface FinanceDischargeStatusSync {
+  checkedAt: string
+  settledCount: number
+  issueCount: number
+  rows: FinanceDischargeStatusSyncRow[]
+}
+
+export interface FinanceDischargeStatusSyncExecuteRequest {
+  settlementId?: number
+  elderId?: number
+  processAll?: boolean
+  remark?: string
+}
+
+export interface FinanceDischargeStatusSyncExecuteResult {
+  settlementId?: number
+  elderId?: number
+  success: boolean
+  message: string
+}
+
+export interface FinanceDischargeStatusSyncExecuteResponse {
+  processedCount: number
+  successCount: number
+  failCount: number
+  results: FinanceDischargeStatusSyncExecuteResult[]
+}
+
 export interface FinanceInvoiceReceiptItem {
   paymentId: number
   billId?: number
@@ -319,6 +384,29 @@ export interface FinanceAllocationRuleItem {
   effectiveMonth: string
   status: number
   remark?: string
+}
+
+export interface FinanceAllocationResidentOption {
+  elderId: number
+  elderName: string
+  elderStatus?: number
+  bedId?: number
+  bedNo?: string
+  roomId?: number
+  roomNo?: string
+  building?: string
+  floorNo?: string
+}
+
+export interface FinanceAllocationResidentSyncResponse {
+  syncTime: string
+  selectedBuilding?: string
+  selectedFloorNo?: string
+  selectedRoomNo?: string
+  buildingOptions: string[]
+  floorOptions: string[]
+  roomOptions: string[]
+  residentOptions: FinanceAllocationResidentOption[]
 }
 
 export interface FinanceAllocationTemplateInitResponse {
@@ -397,6 +485,31 @@ export interface FinanceMasterConfigEntry {
   valueText: string
   remark?: string
   status: number
+}
+
+export interface FinanceConfigImpactPreviewItem {
+  configKey: string
+  moduleLabel: string
+  affectedCount: number
+  impactHint: string
+}
+
+export interface FinanceConfigImpactPreview {
+  month: string
+  activeBillCount: number
+  activeElderCount: number
+  highRiskBillCount: number
+  pendingApprovalCount: number
+  recentPaymentCount: number
+  allocationTaskCount: number
+  configKeyCount: number
+  impactedItems: FinanceConfigImpactPreviewItem[]
+  riskTips: string[]
+}
+
+export interface FinanceConfigImpactPreviewRequest {
+  month?: string
+  configKeys: string[]
 }
 
 export interface FinanceBillingConfigEntry {

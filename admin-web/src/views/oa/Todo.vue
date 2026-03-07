@@ -7,15 +7,27 @@
       <a-form-item label="状态">
         <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 160px" />
       </a-form-item>
+      <a-form-item label="来源">
+        <a-select v-model:value="query.sourceType" :options="sourceTypeOptions" allow-clear style="width: 180px" />
+      </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openCreate">新增待办</a-button>
         <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="editSelected">编辑</a-button>
         <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="doneSelected">完成</a-button>
+        <a-select v-model:value="snoozeDays" style="width: 110px">
+          <a-select-option :value="1">延后1天</a-select-option>
+          <a-select-option :value="3">延后3天</a-select-option>
+          <a-select-option :value="7">延后7天</a-select-option>
+        </a-select>
+        <a-button :disabled="!canSnoozeSelected" @click="snoozeSelected">单条延后</a-button>
+        <a-button :disabled="selectedOpenBirthdayCount === 0" @click="batchSnoozeSelected">批量延后</a-button>
+        <a-button :disabled="!canIgnoreSelected" @click="ignoreSelected">忽略生日提醒</a-button>
+        <a-button :disabled="selectedOpenBirthdayCount === 0" @click="batchIgnoreSelected">批量忽略生日</a-button>
         <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
         <a-button :disabled="selectedOpenCount === 0" @click="batchDone">批量完成</a-button>
         <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
         <a-button @click="downloadExport">导出CSV</a-button>
-        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条，批量完成仅对“待处理”生效</span>
+        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条，其中生日提醒 {{ selectedOpenBirthdayCount }} 条</span>
       </template>
     </SearchForm>
 
@@ -46,13 +58,30 @@
     </a-card>
 
     <StatefulBlock :loading="summaryLoading" :error="summaryError" :empty="false" @retry="fetchData">
+      <a-space wrap style="margin-bottom: 10px">
+        <a-tag :color="!query.sourceType ? 'blue' : 'default'" style="cursor: pointer" @click="setSourceType(undefined)">
+          全部来源
+        </a-tag>
+        <a-tag :color="query.sourceType === 'APPROVAL' ? 'blue' : 'default'" style="cursor: pointer" @click="setSourceType('APPROVAL')">
+          审批流待办
+        </a-tag>
+        <a-tag :color="query.sourceType === 'BIRTHDAY' ? 'magenta' : 'default'" style="cursor: pointer" @click="setSourceType('BIRTHDAY')">
+          生日提醒
+        </a-tag>
+        <a-tag :color="query.sourceType === 'NORMAL' ? 'green' : 'default'" style="cursor: pointer" @click="setSourceType('NORMAL')">
+          普通待办
+        </a-tag>
+      </a-space>
       <a-row :gutter="[12, 12]" style="margin-bottom: 12px">
-        <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="总待办" :value="summary.totalCount || 0" /></a-card></a-col>
-        <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="待处理" :value="summary.openCount || 0" /></a-card></a-col>
-        <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已完成" :value="summary.doneCount || 0" /></a-card></a-col>
-        <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="今日到期" :value="summary.dueTodayCount || 0" /></a-card></a-col>
-        <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已逾期" :value="summary.overdueCount || 0" /></a-card></a-col>
-        <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="未分配" :value="summary.unassignedCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="总待办" :value="summary.totalCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="待处理" :value="summary.openCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已完成" :value="summary.doneCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="审批待办" :value="summary.approvalOpenCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="生日提醒" :value="summary.birthdayOpenCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="普通待办" :value="summary.normalOpenCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="今日到期" :value="summary.dueTodayCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已逾期" :value="summary.overdueCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="未分配" :value="summary.unassignedCount || 0" /></a-card></a-col>
       </a-row>
       <a-alert
         v-if="(summary.overdueCount || 0) > 0"
@@ -78,6 +107,22 @@
             <a-tag :color="record.status === 'DONE' ? 'green' : 'orange'">
               {{ record.status === 'DONE' ? '已完成' : '待处理' }}
             </a-tag>
+          </template>
+          <template v-else-if="column.key === 'dueTime'">
+            <a-space size="small">
+              <span :style="{ color: isOverdueTodo(record) ? '#cf1322' : undefined }">
+                {{ record.dueTime ? dayjs(record.dueTime).format('YYYY-MM-DD HH:mm') : '-' }}
+              </span>
+              <a-tag v-if="isOverdueTodo(record)" color="red">逾期</a-tag>
+            </a-space>
+          </template>
+          <template v-else-if="column.key === 'sourceType'">
+            <a-space size="small">
+              <a-tag v-if="isApprovalTodo(record)" color="blue">审批流</a-tag>
+              <a-tag v-else-if="isBirthdayReminder(record)" color="magenta">生日提醒</a-tag>
+              <a-tag v-else color="default">普通待办</a-tag>
+              <a v-if="isApprovalTodo(record)" @click="openApprovalFromTodo(record)">查看审批</a>
+            </a-space>
           </template>
         </template>
       </DataTable>
@@ -109,6 +154,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
+import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
@@ -119,19 +165,31 @@ import {
   createTodo,
   updateTodo,
   completeTodo,
+  snoozeTodo,
+  ignoreBirthdayTodo,
+  batchSnoozeBirthdayTodo,
+  batchIgnoreBirthdayTodo,
   deleteTodo,
   batchCompleteTodo,
   batchDeleteTodo,
   exportTodo
 } from '../../api/oa'
+import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import type { OaTodo, OaTodoSummary, PageResult } from '../../types'
 
 const loading = ref(false)
+const router = useRouter()
 const tableError = ref('')
 const summaryLoading = ref(false)
 const summaryError = ref('')
 const rows = ref<OaTodo[]>([])
-const query = reactive({ keyword: '', status: undefined as string | undefined, pageNo: 1, pageSize: 10 })
+const query = reactive({
+  keyword: '',
+  status: undefined as string | undefined,
+  sourceType: undefined as string | undefined,
+  pageNo: 1,
+  pageSize: 10
+})
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const selectedRowKeys = ref<string[]>([])
 const summary = reactive<OaTodoSummary>({
@@ -145,6 +203,7 @@ const summary = reactive<OaTodoSummary>({
 
 const columns = [
   { title: '标题', dataIndex: 'title', key: 'title', width: 200 },
+  { title: '来源', key: 'sourceType', width: 170 },
   { title: '负责人', dataIndex: 'assigneeName', key: 'assigneeName', width: 120 },
   { title: '截止时间', dataIndex: 'dueTime', key: 'dueTime', width: 160 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 100 }
@@ -165,6 +224,11 @@ const statusOptions = [
   { label: '待处理', value: 'OPEN' },
   { label: '已完成', value: 'DONE' }
 ]
+const sourceTypeOptions = [
+  { label: '审批流待办', value: 'APPROVAL' },
+  { label: '生日提醒', value: 'BIRTHDAY' },
+  { label: '普通待办', value: 'NORMAL' }
+]
 const editableStatusOptions = [{ label: '待处理', value: 'OPEN' }]
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
@@ -175,8 +239,21 @@ const rowSelection = computed(() => ({
 const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(String(item.id))))
 const selectedSingleRecord = computed(() => (selectedRecords.value.length === 1 ? selectedRecords.value[0] : null))
 const isSelectedSingleOpen = computed(() => selectedSingleRecord.value?.status === 'OPEN')
+const isSelectedBirthdayReminder = computed(() => {
+  const content = String(selectedSingleRecord.value?.content || '')
+  return content.includes('[BIRTHDAY_REMINDER:')
+})
+const canSnoozeSelected = computed(() => Boolean(selectedSingleRecord.value && isSelectedSingleOpen.value && isSelectedBirthdayReminder.value))
+const canIgnoreSelected = computed(() => Boolean(selectedSingleRecord.value && isSelectedSingleOpen.value && isSelectedBirthdayReminder.value))
 const selectedOpenIds = computed(() => selectedRecords.value.filter((item) => item.status === 'OPEN').map((item) => String(item.id)))
 const selectedOpenCount = computed(() => selectedOpenIds.value.length)
+const selectedOpenBirthdayIds = computed(() =>
+  selectedRecords.value
+    .filter((item) => item.status === 'OPEN' && isBirthdayReminder(item))
+    .map((item) => String(item.id))
+)
+const selectedOpenBirthdayCount = computed(() => selectedOpenBirthdayIds.value.length)
+const snoozeDays = ref(1)
 const policyStorageKey = 'oa-todo-policy-v1'
 const policyForm = reactive({
   cycle: 'WEEKLY',
@@ -193,6 +270,7 @@ async function fetchData() {
       pageNo: query.pageNo,
       pageSize: query.pageSize,
       status: query.status,
+      sourceType: query.sourceType,
       keyword: query.keyword || undefined
     }
     const [res, sum] = await Promise.all([
@@ -227,6 +305,14 @@ function handleTableChange(pag: any) {
 function onReset() {
   query.keyword = ''
   query.status = undefined
+  query.sourceType = undefined
+  query.pageNo = 1
+  pagination.current = 1
+  fetchData()
+}
+
+function setSourceType(sourceType?: string) {
+  query.sourceType = sourceType
   query.pageNo = 1
   pagination.current = 1
   fetchData()
@@ -240,6 +326,37 @@ function openCreate() {
   form.assigneeName = ''
   form.status = 'OPEN'
   editOpen.value = true
+}
+
+function isBirthdayReminder(todo: OaTodo) {
+  return String(todo?.content || '').includes('[BIRTHDAY_REMINDER:')
+}
+
+function isApprovalTodo(todo: OaTodo) {
+  return String(todo?.content || '').includes('[APPROVAL_FLOW:')
+}
+
+function parseApprovalIdFromTodo(todo: OaTodo) {
+  const content = String(todo?.content || '')
+  const match = content.match(/\[APPROVAL_FLOW:([0-9]+)\]/)
+  return match ? match[1] : ''
+}
+
+function isOverdueTodo(todo: OaTodo) {
+  if (!todo || todo.status !== 'OPEN' || !todo.dueTime) {
+    return false
+  }
+  const due = dayjs(todo.dueTime)
+  return due.isValid() && due.isBefore(dayjs())
+}
+
+function openApprovalFromTodo(todo: OaTodo) {
+  const approvalId = parseApprovalIdFromTodo(todo)
+  if (!approvalId) {
+    message.warning('未识别审批单ID')
+    return
+  }
+  router.push({ path: '/oa/approval', query: { focusId: approvalId } })
 }
 
 function openEdit(record: OaTodo) {
@@ -309,6 +426,42 @@ async function doneSelected() {
   await done(record)
 }
 
+async function snoozeSelected() {
+  const record = requireSingleSelection('延后')
+  if (!record || !record.id) return
+  await snoozeTodo(String(record.id), snoozeDays.value)
+  message.success(`已延后${snoozeDays.value}天`)
+  fetchData()
+}
+
+async function ignoreSelected() {
+  const record = requireSingleSelection('忽略')
+  if (!record || !record.id) return
+  await ignoreBirthdayTodo(String(record.id))
+  message.success('已忽略该生日提醒')
+  fetchData()
+}
+
+async function batchSnoozeSelected() {
+  if (selectedOpenBirthdayIds.value.length === 0) {
+    message.info('请先勾选待处理的生日提醒')
+    return
+  }
+  const affected = await batchSnoozeBirthdayTodo(selectedOpenBirthdayIds.value, snoozeDays.value)
+  message.success(`批量延后完成，共处理 ${affected || 0} 条`)
+  fetchData()
+}
+
+async function batchIgnoreSelected() {
+  if (selectedOpenBirthdayIds.value.length === 0) {
+    message.info('请先勾选待处理的生日提醒')
+    return
+  }
+  const affected = await batchIgnoreBirthdayTodo(selectedOpenBirthdayIds.value)
+  message.success(`批量忽略完成，共处理 ${affected || 0} 条`)
+  fetchData()
+}
+
 async function removeSelected() {
   const record = requireSingleSelection('删除')
   if (!record) return
@@ -335,7 +488,8 @@ async function batchRemove() {
 async function downloadExport() {
   const blob = await exportTodo({
     keyword: query.keyword || undefined,
-    status: query.status
+    status: query.status,
+    sourceType: query.sourceType
   })
   const href = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -413,6 +567,14 @@ onMounted(async () => {
   if (policyForm.autoClearDone && policyShouldRun(policyForm.cycle)) {
     await clearDoneTodos()
   }
+})
+
+useLiveSyncRefresh({
+  topics: ['oa', 'hr', 'system'],
+  refresh: () => {
+    fetchData().catch(() => {})
+  },
+  debounceMs: 900
 })
 </script>
 

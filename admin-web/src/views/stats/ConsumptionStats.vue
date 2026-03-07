@@ -11,23 +11,48 @@
         <a-form-item label="机构ID">
           <a-input-number v-model:value="query.orgId" :min="1" placeholder="默认当前机构" style="width: 160px" />
         </a-form-item>
-        <a-form-item label="老人筛选">
-          <a-input v-model:value="query.elderKeyword" allow-clear placeholder="打印按老人筛选" style="width: 160px" />
+        <a-form-item label="院内老人">
+          <a-select
+            v-model:value="query.elderId"
+            show-search
+            allow-clear
+            :filter-option="false"
+            :options="elderOptions"
+            :loading="elderLoading"
+            placeholder="按院内老人筛选"
+            style="width: 180px"
+            @search="searchElders"
+            @focus="() => !elderOptions.length && searchElders('')"
+            @change="onElderChange"
+          />
         </a-form-item>
         <a-form-item label="打印备注">
           <a-input v-model:value="query.printRemark" allow-clear placeholder="例如：财务复核版" style="width: 200px" />
+        </a-form-item>
+        <a-form-item label="快捷区间">
+          <a-space>
+            <a-button size="small" @click="setMonthPreset(3)">近3月</a-button>
+            <a-button size="small" @click="setMonthPreset(6)">近6月</a-button>
+            <a-button size="small" @click="setThisMonth">本月</a-button>
+          </a-space>
         </a-form-item>
         <a-form-item>
           <a-space>
             <a-button type="primary" @click="loadData">刷新</a-button>
             <a-button @click="exportSummary">导出统计</a-button>
+            <a-button @click="copyFilterLink">复制筛选链接</a-button>
             <a-button @click="openColumnSetting">列设置</a-button>
-            <a-button @click="printCurrent">打印当前列</a-button>
-            <a-button @click="printSpecificElder">打印指定老人</a-button>
+            <a-button :disabled="!displayTopRows.length" @click="printCurrent">打印当前列</a-button>
+            <a-button :disabled="!query.elderId || !displayTopRows.length" @click="printSpecificElder">打印指定老人</a-button>
             <a-button @click="reset">重置</a-button>
           </a-space>
         </a-form-item>
       </a-form>
+      <StatsMetaHint
+        scope-text="消费统计（总消费=账单+商城；排行口径为Top10）"
+        :refreshed-at="refreshedAt"
+        :note-text="metricTraceText"
+      />
     </a-card>
 
     <a-row :gutter="16" style="margin-top: 16px;">
@@ -90,18 +115,27 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
+import StatsMetaHint from '../../components/stats/StatsMetaHint.vue'
 import { exportConsumptionStatsCsv, getConsumptionStats } from '../../api/stats'
 import type { ConsumptionStatsResponse } from '../../types'
 import { useECharts } from '../../plugins/echarts'
 import { message } from 'ant-design-vue'
 import { printTableReport } from '../../utils/print'
+import { useElderOptions } from '../../composables/useElderOptions'
+import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
+import { copyText } from '../../utils/clipboard'
+
+const route = useRoute()
+const router = useRouter()
+const refreshedAt = ref('')
 
 const query = reactive({
   from: dayjs().subtract(5, 'month') as Dayjs,
   to: dayjs() as Dayjs,
   orgId: undefined as number | undefined,
-  elderKeyword: '',
+  elderId: undefined as number | undefined,
   printRemark: ''
 })
 
@@ -125,12 +159,22 @@ const printColumnOptions = [
   { label: '消费金额', value: 'amount' }
 ]
 const selectedPrintColumns = ref<string[]>(['elderName', 'amount'])
-const displayTopRows = computed(() => {
-  const keyword = String(query.elderKeyword || '').trim()
-  const list = stats.topConsumerElders || []
-  if (!keyword) return list
-  return list.filter(item => String(item.elderName || '').includes(keyword))
+const metricTraceText = computed(() => {
+  const version = String(route.query.metricVersion || '').trim()
+  const source = String(route.query.fromSource || '').trim()
+  const notes: string[] = []
+  if (version) notes.push(`口径版本：${version}`)
+  if (source === 'dashboard') notes.push('来源：看板钻取')
+  return notes.join('；')
 })
+const { elderOptions, elderLoading, searchElders } = useElderOptions({ pageSize: 100, inHospitalOnly: true })
+const displayTopRows = computed(() => {
+  const elderId = Number(query.elderId || 0)
+  const list = stats.topConsumerElders || []
+  if (!elderId) return list
+  return list.filter(item => Number(item.elderId) === elderId)
+})
+const selectedElder = computed(() => elderOptions.value.find(item => Number(item.value) === Number(query.elderId)))
 
 async function loadData() {
   if (query.from.isAfter(query.to, 'month')) {
@@ -155,6 +199,8 @@ async function loadData() {
         { name: '总消费', type: 'line', smooth: true, data: data.monthlyTotalConsumption.map(item => item.amount) }
       ]
     })
+    refreshedAt.value = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    syncRouteQuery()
   } catch (error: any) {
     message.error(error?.message || '加载消费统计失败')
   }
@@ -164,13 +210,26 @@ function reset() {
   query.from = dayjs().subtract(5, 'month')
   query.to = dayjs()
   query.orgId = undefined
-  query.elderKeyword = ''
+  query.elderId = undefined
   query.printRemark = ''
+  syncRouteQuery()
   loadData()
 }
 
 function openColumnSetting() {
   columnSettingOpen.value = true
+}
+
+function setMonthPreset(months: number) {
+  query.to = dayjs()
+  query.from = dayjs().subtract(months - 1, 'month')
+  loadData()
+}
+
+function setThisMonth() {
+  query.from = dayjs().startOf('month')
+  query.to = dayjs()
+  loadData()
 }
 
 async function exportSummary() {
@@ -186,6 +245,24 @@ async function exportSummary() {
   }
 }
 
+async function copyFilterLink() {
+  const resolved = router.resolve({
+    path: route.path,
+    query: {
+      from: dayjs(query.from).format('YYYY-MM'),
+      to: dayjs(query.to).format('YYYY-MM'),
+      orgId: query.orgId ? String(query.orgId) : '',
+      elderId: query.elderId ? String(query.elderId) : ''
+    }
+  })
+  const ok = await copyText(`${window.location.origin}${resolved.fullPath}`)
+  if (ok) {
+    message.success('筛选链接已复制')
+  } else {
+    message.warning('复制失败，请手动复制地址栏链接')
+  }
+}
+
 function printCurrent() {
   renderPrint('消费统计（当前结果）', displayTopRows.value.map(item => ({
     elderName: item.elderName || '未知老人',
@@ -194,19 +271,19 @@ function printCurrent() {
 }
 
 function printSpecificElder() {
-  const keyword = String(query.elderKeyword || '').trim()
-  if (!keyword) {
-    message.warning('请输入老人关键字')
+  if (!query.elderId) {
+    message.warning('请选择院内老人')
     return
   }
   const filtered = (stats.topConsumerElders || [])
-    .filter(item => String(item.elderName || '').includes(keyword))
+    .filter(item => Number(item.elderId) === Number(query.elderId))
     .map(item => ({ elderName: item.elderName || '未知老人', amount: item.amount }))
   if (!filtered.length) {
     message.warning('未找到匹配老人')
     return
   }
-  renderPrint(`消费统计（${keyword}）`, filtered)
+  const elderText = selectedElder.value ? `${selectedElder.value.name} / ID:${query.elderId}` : `ID:${query.elderId}`
+  renderPrint(`消费统计（${elderText}）`, filtered)
 }
 
 function renderPrint(title: string, rows: Array<Record<string, any>>) {
@@ -216,10 +293,12 @@ function renderPrint(title: string, rows: Array<Record<string, any>>) {
   }
   try {
     const orgText = query.orgId ? `机构ID：${query.orgId}` : '机构：当前'
-    const elderText = query.elderKeyword ? `老人筛选：${query.elderKeyword}` : '老人筛选：全部'
+    const elderText = selectedElder.value
+      ? `院内老人：${selectedElder.value.name} / ID:${query.elderId}`
+      : '院内老人：全部'
     printTableReport({
       title,
-      subtitle: `${dayjs(query.from).format('YYYY-MM')} ~ ${dayjs(query.to).format('YYYY-MM')}；${orgText}；${elderText}；备注：${query.printRemark || '-'}`,
+      subtitle: `${dayjs(query.from).format('YYYY-MM')} ~ ${dayjs(query.to).format('YYYY-MM')}；${orgText}；打印范围：${elderText}；记录数：${rows.length}；备注：${query.printRemark || '-'}`,
       columns: printColumnOptions.filter(item => selectedPrintColumns.value.includes(item.value)).map(item => ({ key: item.value, title: item.label })),
       rows
     })
@@ -228,5 +307,42 @@ function renderPrint(title: string, rows: Array<Record<string, any>>) {
   }
 }
 
-onMounted(loadData)
+function onElderChange(value?: number) {
+  query.elderId = value
+  syncRouteQuery()
+}
+
+function syncRouteQuery() {
+  const nextQuery: Record<string, string> = {
+    from: dayjs(query.from).format('YYYY-MM'),
+    to: dayjs(query.to).format('YYYY-MM')
+  }
+  if (query.orgId) nextQuery.orgId = String(query.orgId)
+  if (query.elderId) nextQuery.elderId = String(query.elderId)
+  router.replace({ path: route.path, query: nextQuery }).catch(() => {})
+}
+
+function initFromRouteQuery() {
+  const from = String(route.query.from || '')
+  const to = String(route.query.to || '')
+  if (dayjs(from).isValid()) query.from = dayjs(from)
+  if (dayjs(to).isValid()) query.to = dayjs(to)
+  const orgId = Number(route.query.orgId)
+  if (Number.isFinite(orgId) && orgId > 0) query.orgId = orgId
+  const elderId = Number(route.query.elderId)
+  if (Number.isFinite(elderId) && elderId > 0) query.elderId = elderId
+}
+
+useLiveSyncRefresh({
+  topics: ['finance', 'elder', 'lifecycle'],
+  refresh: () => {
+    loadData()
+  },
+  debounceMs: 900
+})
+
+onMounted(() => {
+  initFromRouteQuery()
+  loadData()
+})
 </script>

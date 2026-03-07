@@ -11,6 +11,7 @@ import type {
   InventoryOutboundRequest,
   InventoryOutboundSheet,
   InventoryOutboundSheetCreateRequest,
+  InventoryOutboundSheetPrefill,
   MaterialPurchaseOrder,
   MaterialPurchaseOrderItem,
   MaterialStockAmountItem,
@@ -209,6 +210,10 @@ export function getOutboundSheetPage(params: any) {
 
 export function getOutboundSheetDetail(id: number) {
   return request.get<InventoryOutboundSheet>('/api/inventory/outbound/sheet/detail', { params: { id } })
+}
+
+export function getOutboundSheetPrefill(params?: { elderId?: number | string }) {
+  return request.get<InventoryOutboundSheetPrefill>('/api/inventory/outbound/sheet/prefill', { params })
 }
 
 export function confirmOutboundSheet(id: number) {

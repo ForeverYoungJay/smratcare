@@ -105,7 +105,10 @@
     </StatefulBlock>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <MarketingListToolbar :tip="selectedCount > 0 ? `已勾选 ${selectedCount} 条，批量状态操作仅处理状态不同项` : `已勾选 ${selectedCount} 条`">
+      <MarketingListToolbar
+        :selected-count="selectedCount"
+        :tip="selectedCount > 0 ? '批量状态操作仅处理状态不同项' : '可通过勾选后执行批量操作'"
+      >
         <a-space>
           <a-button
             v-for="item in actionButtons"
@@ -905,6 +908,15 @@ function onPipelineTabChange() {
   fetchData()
 }
 
+function consumeQuickQuery() {
+  if (String(route.query.quick || '').trim() !== '1') {
+    return
+  }
+  const nextQuery: Record<string, any> = { ...route.query }
+  delete nextQuery.quick
+  router.replace({ path: route.path, query: nextQuery })
+}
+
 function onPageChange(page: number) {
   query.pageNo = page
   fetchData()
@@ -1331,6 +1343,11 @@ watch(
     query.pageNo = 1
     selectedRowKeys.value = []
     fetchData()
+    const quick = String(route.query.quick || '').trim()
+    if (quick === '1') {
+      openForm()
+      consumeQuickQuery()
+    }
   }
 )
 
@@ -1338,6 +1355,11 @@ onMounted(() => {
   syncPipelineTabByRoute()
   syncQueryFiltersByRoute()
   fetchData()
+  const quick = String(route.query.quick || '').trim()
+  if (quick === '1') {
+    openForm()
+    consumeQuickQuery()
+  }
 })
 </script>
 

@@ -23,7 +23,7 @@ export const routes: RouteRecordRaw[] = [
     path: '/',
     name: 'Root',
     component: () => import('../layouts/BasicLayout.vue'),
-    redirect: '/home',
+    redirect: '/portal',
     children: [
       {
         path: 'portal',
@@ -1345,12 +1345,13 @@ export const routes: RouteRecordRaw[] = [
               {
                 path: 'medical-errors',
                 name: 'FinanceFlowsMedicalErrors',
-                component: () => import('../views/finance/FeeModulePlaceholder.vue'),
+                component: () => import('../views/finance/FlowCenter.vue'),
                 meta: { title: '医护费用异常' },
                 props: {
                   moduleKey: 'MEDICAL_ERRORS',
                   moduleName: '医护费用异常',
                   description: '重复计费、缺少医嘱关联、异常修正与重算',
+                  category: 'MEDICINE',
                   links: [
                     { label: '查看医护费用流水', to: '/finance/flows/medical' },
                     { label: '查看费用调整单', to: '/finance/flows/adjustments' }
@@ -1360,12 +1361,13 @@ export const routes: RouteRecordRaw[] = [
               {
                 path: 'dining',
                 name: 'FinanceFlowsDining',
-                component: () => import('../views/finance/FeeModulePlaceholder.vue'),
+                component: () => import('../views/finance/FlowCenter.vue'),
                 meta: { title: '餐饮扣费流水（积分点餐）' },
                 props: {
                   moduleKey: 'DINING_FLOW',
                   moduleName: '餐饮扣费流水',
                   description: '积分点餐扣费、餐饮补扣与异常追踪',
+                  category: 'DINING',
                   links: [
                     { label: '查看消费流水', to: '/finance/flows/consumption' },
                     { label: '查看在住账单', to: '/finance/bills/in-resident' }
@@ -1375,12 +1377,13 @@ export const routes: RouteRecordRaw[] = [
               {
                 path: 'logistics',
                 name: 'FinanceFlowsLogistics',
-                component: () => import('../views/finance/FeeModulePlaceholder.vue'),
+                component: () => import('../views/finance/FlowCenter.vue'),
                 meta: { title: '物资/后勤收费流水' },
                 props: {
                   moduleKey: 'LOGISTICS_FLOW',
                   moduleName: '物资/后勤收费流水',
                   description: '物资与后勤额外收费项目的自动入账视图',
+                  category: 'OTHER',
                   links: [
                     { label: '查看消费流水', to: '/finance/flows/consumption' },
                     { label: '查看经营报表', to: '/finance/reports/overall' }
@@ -1390,7 +1393,7 @@ export const routes: RouteRecordRaw[] = [
               {
                 path: 'adjustments',
                 name: 'FinanceFlowsAdjustments',
-                component: () => import('../views/finance/FeeModulePlaceholder.vue'),
+                component: () => import('../views/finance/FlowCenter.vue'),
                 meta: { title: '费用调整单（减免/补录/改价）' },
                 props: {
                   moduleKey: 'ADJUSTMENTS',
@@ -1463,17 +1466,8 @@ export const routes: RouteRecordRaw[] = [
               {
                 path: 'status-sync',
                 name: 'FinanceDischargeStatusSync',
-                component: () => import('../views/finance/FeeModulePlaceholder.vue'),
-                meta: { title: '结算完成回写床态/档案状态' },
-                props: {
-                  moduleKey: 'DISCHARGE_STATUS_SYNC',
-                  moduleName: '结算完成状态回写',
-                  description: '退住结算完成后回写床态、档案状态与收费逻辑',
-                  links: [
-                    { label: '查看退住结算', to: '/finance/discharge/settlement' },
-                    { label: '查看床态全景', to: '/elder/bed-panorama' }
-                  ]
-                }
+                component: () => import('../views/finance/DischargeStatusSync.vue'),
+                meta: { title: '结算完成回写床态/档案状态' }
               }
             ]
           },
@@ -1498,23 +1492,20 @@ export const routes: RouteRecordRaw[] = [
               {
                 path: 'invoice',
                 name: 'FinanceReconcileInvoice',
-                component: () => import('../views/finance/FeeModulePlaceholder.vue'),
-                meta: { title: '发票对账' },
-                props: {
-                  moduleKey: 'RECONCILE_INVOICE',
-                  moduleName: '发票对账',
-                  description: '发票与账单关联核验、发票异常处理',
-                  links: [
-                    { label: '查看对账中心', to: '/finance/reconcile/center' },
-                    { label: '查看收费登记', to: '/finance/payments/register' }
-                  ]
-                }
+                component: () => import('../views/finance/ReconcileInvoice.vue'),
+                meta: { title: '发票对账' }
               },
               {
                 path: 'exception',
                 name: 'FinanceReconcileException',
                 component: () => import('../views/finance/ReconcileException.vue'),
                 meta: { title: '异常处理（短款/多款/重复/跨期）' }
+              },
+              {
+                path: 'ledger-health',
+                name: 'FinanceReconcileLedgerHealth',
+                component: () => import('../views/finance/LedgerHealth.vue'),
+                meta: { title: '财务一致性巡检' }
               }
             ]
           },
@@ -1862,6 +1853,12 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: '护理任务看板' }
           },
           {
+            path: 'unified-task-center',
+            name: 'MedicalCareUnifiedTaskCenter',
+            component: () => import('../views/medical/UnifiedTaskCenter.vue'),
+            meta: { title: '统一任务中心' }
+          },
+          {
             path: 'inspection',
             name: 'MedicalCareInspection',
             component: () => import('../views/health/Inspection.vue'),
@@ -1914,6 +1911,12 @@ export const routes: RouteRecordRaw[] = [
             name: 'MedicalCareNursingQuality',
             component: () => import('../views/medical/NursingQualityCenter.vue'),
             meta: { title: '护理与质量中心' }
+          },
+          {
+            path: 'alert-rules',
+            name: 'MedicalCareAlertRules',
+            component: () => import('../views/medical/AlertRuleConfig.vue'),
+            meta: { title: '异常规则配置' }
           },
           {
             path: 'ai-reports',

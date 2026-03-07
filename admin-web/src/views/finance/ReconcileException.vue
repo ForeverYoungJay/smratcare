@@ -18,6 +18,7 @@
             <a-button @click="exportCsvReport">导出CSV</a-button>
             <a-button @click="printCurrent">打印当前</a-button>
             <a-input v-model:value="query.printRemark" allow-clear placeholder="打印备注" style="width: 180px" />
+            <a-button @click="go('/finance/reconcile/ledger-health')">财务一致性巡检</a-button>
             <a-button @click="go('/finance/reconcile/center')">返回对账中心</a-button>
           </a-space>
         </a-form-item>

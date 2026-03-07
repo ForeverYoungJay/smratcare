@@ -7,6 +7,9 @@
       <a-form-item label="类型">
         <a-select v-model:value="query.type" :options="typeOptions" allow-clear style="width: 160px" />
       </a-form-item>
+      <a-form-item v-if="canApproveFlow" label="审批角色">
+        <a-select v-model:value="query.currentApproverRole" :options="approverRoleOptions" allow-clear style="width: 180px" />
+      </a-form-item>
       <a-form-item label="状态">
         <a-select
           v-model:value="query.status"
@@ -51,6 +54,14 @@
     </SearchForm>
 
     <StatefulBlock :loading="summaryLoading" :error="summaryError" :empty="false" @retry="fetchData">
+      <a-space v-if="canApproveFlow" wrap style="margin-bottom: 10px">
+        <a-tag :color="!query.currentApproverRole ? 'blue' : 'default'" style="cursor: pointer" @click="setApproverRole(undefined)">
+          全部角色
+        </a-tag>
+        <a-tag v-for="item in approverRoleOptions" :key="item.value" :color="query.currentApproverRole === item.value ? 'blue' : 'default'" style="cursor: pointer" @click="setApproverRole(item.value)">
+          {{ item.label }}
+        </a-tag>
+      </a-space>
       <a-row :gutter="[12, 12]" style="margin-bottom: 12px">
         <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="总单数" :value="summary.totalCount || 0" /></a-card></a-col>
         <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="待审批" :value="summary.pendingCount || 0" /></a-card></a-col>
@@ -98,6 +109,9 @@
           <template v-else-if="column.key === 'currentApprover'">
             <div>{{ currentApprover(record) }}</div>
             <div class="urge-meta">{{ urgeMetaText(record) }}</div>
+          </template>
+          <template v-else-if="column.key === 'approvalRounds'">
+            {{ approvalRoundCount(record) }}
           </template>
           <template v-else-if="column.key === 'approvalOpinion'">
             {{ approvalOpinion(record) }}
@@ -439,6 +453,7 @@ const route = useRoute()
 const query = reactive({
   keyword: '',
   type: undefined as string | undefined,
+  currentApproverRole: undefined as string | undefined,
   status: undefined as string | undefined,
   urgedOnly: false,
   overdueOnly: false,
@@ -449,6 +464,8 @@ const approvalScope = ref<'MY' | 'PENDING_REVIEW' | 'ALL'>('MY')
 const autoRefresh = ref(true)
 let autoRefreshTimer: number | undefined
 const AUTO_REFRESH_INTERVAL_MS = 60 * 1000
+const focusApprovalId = ref('')
+const focusedOnce = ref(false)
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const selectedRowKeys = ref<string[]>([])
 const summary = reactive<OaApprovalSummary>({
@@ -468,6 +485,7 @@ const columns = [
   { title: '申请人', dataIndex: 'applicantName', key: 'applicantName', width: 120 },
   { title: '当前环节', key: 'currentNode', width: 130 },
   { title: '当前审批人', key: 'currentApprover', width: 130 },
+  { title: '审批轮次', key: 'approvalRounds', width: 96 },
   { title: '金额', dataIndex: 'amount', key: 'amount', width: 120 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
   { title: '审批意见', key: 'approvalOpinion', width: 220 },
@@ -526,6 +544,16 @@ const typeOptions = [
   { label: '物资申领', value: 'MATERIAL_APPLY' },
   { label: '用章申请', value: 'OFFICIAL_SEAL' },
   { label: '营销方案审批', value: 'MARKETING_PLAN' }
+]
+const approverRoleOptions = [
+  { label: '部门主管', value: 'DEPT_MANAGER' },
+  { label: '人事', value: 'HR' },
+  { label: '财务', value: 'FINANCE' },
+  { label: '院长', value: 'DEAN' },
+  { label: '仓库', value: 'WAREHOUSE' },
+  { label: '行政', value: 'ADMIN_OFFICE' },
+  { label: '采购', value: 'PURCHASING' },
+  { label: '归档', value: 'ARCHIVE' }
 ]
 const statusOptions = [
   { label: '待审批', value: 'PENDING' },
@@ -605,6 +633,30 @@ const timelineItems = computed(() => {
       desc: `${entry?.by || '-'} 催办${entry?.count ? `（第${entry.count}次）` : ''}`,
       timeText: formatTimelineTime(entry?.at),
       color: 'orange'
+    })
+  })
+  const approvalRounds = Array.isArray(parsed?.approvalRounds) ? parsed.approvalRounds : []
+  approvalRounds.slice(-8).forEach((entry: any, index: number) => {
+    if (!entry) return
+    const action = String(entry?.action || '').toUpperCase()
+    const actionText = action === 'APPROVED' ? '通过' : action === 'REJECTED' ? '驳回' : action || '处理'
+    items.push({
+      key: `round-${index}-${entry?.at || ''}`,
+      title: `第${Number(entry?.round || index + 1)}轮审批 · ${actionText}`,
+      desc: `${entry?.nodeName || '未知节点'} · ${entry?.approverName || '-'}${entry?.remark ? `：${entry.remark}` : ''}`,
+      timeText: formatTimelineTime(entry?.at),
+      color: action === 'REJECTED' ? 'red' : 'green'
+    })
+  })
+  const notifyHistory = Array.isArray(parsed?.notifyHistory) ? parsed.notifyHistory : []
+  notifyHistory.slice(-8).forEach((entry: any, index: number) => {
+    if (!entry) return
+    items.push({
+      key: `notify-${index}-${entry?.at || ''}`,
+      title: '自动同步审批人',
+      desc: `${entry?.toName || '待分配'}（${entry?.toRole || '未定义角色'}）${entry?.message ? `：${entry.message}` : ''}`,
+      timeText: formatTimelineTime(entry?.at),
+      color: 'blue'
     })
   })
   if (record.status === 'PENDING' && start && start.isValid()) {
@@ -724,6 +776,7 @@ async function fetchData() {
       pageSize: query.pageSize,
       status: effectiveStatus,
       type: query.type,
+      currentApproverRole: query.currentApproverRole,
       applicantId,
       pendingMine: approvalScope.value === 'PENDING_REVIEW',
       keyword: query.keyword || undefined
@@ -745,6 +798,15 @@ async function fetchData() {
     })
     pagination.total = res.total || res.list.length
     selectedRowKeys.value = []
+    if (focusApprovalId.value && !focusedOnce.value) {
+      const matched = rows.value.find((item) => String(item.id) === String(focusApprovalId.value))
+      if (matched) {
+        selectedRowKeys.value = [String(matched.id)]
+        timelineRecord.value = matched
+        timelineOpen.value = true
+        focusedOnce.value = true
+      }
+    }
     Object.assign(summary, sum || {})
   } catch (error: any) {
     const text = error?.message || '加载失败，请稍后重试'
@@ -775,11 +837,19 @@ function onReset() {
   query.keyword = ''
   query.status = undefined
   query.type = undefined
+  query.currentApproverRole = undefined
   query.urgedOnly = false
   query.overdueOnly = false
   query.pageNo = 1
   pagination.current = 1
   approvalScope.value = canApproveFlow.value ? 'ALL' : 'MY'
+  fetchData()
+}
+
+function setApproverRole(role?: string) {
+  query.currentApproverRole = role
+  query.pageNo = 1
+  pagination.current = 1
   fetchData()
 }
 
@@ -851,6 +921,13 @@ function annualLeaveCount(record: OaApproval) {
   return Number.isFinite(count) && count > 0 ? count : '-'
 }
 
+function approvalRoundCount(record: OaApproval) {
+  const parsed = parseFormData(record.formData)
+  const rounds = Array.isArray(parsed?.approvalRounds) ? parsed.approvalRounds : []
+  const count = rounds.length
+  return count > 0 ? `${count}轮` : '-'
+}
+
 function currentNode(record: OaApproval) {
   const parsed = parseFormData(record.formData)
   if (record.status === 'APPROVED') return '流程完成'
@@ -862,7 +939,12 @@ function currentApprover(record: OaApproval) {
   const parsed = parseFormData(record.formData)
   if (record.status === 'APPROVED') return '-'
   if (record.status === 'REJECTED') return '-'
-  return parsed?.currentApproverName || parsed?.nextApproverName || '待分配'
+  const approverName = parsed?.currentApproverName || parsed?.nextApproverName
+  const role = parsed?.currentApproverRole ? String(parsed.currentApproverRole).trim() : ''
+  if (approverName && role) {
+    return `${approverName}（${role}）`
+  }
+  return approverName || '待分配'
 }
 
 function urgeMetaText(record: OaApproval) {
@@ -1358,6 +1440,7 @@ async function downloadExport() {
   const blob = await exportApproval({
     keyword: query.keyword || undefined,
     type: query.type,
+    currentApproverRole: query.currentApproverRole,
     status: effectiveStatus,
     applicantId,
     pendingMine: approvalScope.value === 'PENDING_REVIEW'
@@ -1420,9 +1503,11 @@ watch(
 
 function applyRouteFilters() {
   const type = String(route.query.type || '').toUpperCase()
+  const approverRole = String(route.query.currentApproverRole || '').toUpperCase()
   const status = String(route.query.status || '').toUpperCase()
   const scope = String(route.query.scope || '').toUpperCase()
   const keyword = String(route.query.keyword || '').trim()
+  const focusId = String(route.query.focusId || '').trim()
   const urged = String(route.query.urged || '').toLowerCase()
   const overdue = String(route.query.overdue || '').toLowerCase()
   approvalScope.value = canApproveFlow.value ? 'ALL' : 'MY'
@@ -1432,12 +1517,21 @@ function applyRouteFilters() {
   } else if (!type) {
     query.type = undefined
   }
+  if (approverRole && approverRoleOptions.some((item) => item.value === approverRole)) {
+    query.currentApproverRole = approverRole
+  } else if (!approverRole) {
+    query.currentApproverRole = undefined
+  }
   if (status && statusOptions.some((item) => item.value === status)) {
     query.status = status
   } else if (!status) {
     query.status = undefined
   }
-  if (keyword) {
+  focusApprovalId.value = focusId
+  if (focusId) {
+    query.keyword = focusId
+    focusedOnce.value = false
+  } else if (keyword) {
     query.keyword = keyword
   } else if (!keyword) {
     query.keyword = ''

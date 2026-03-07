@@ -104,7 +104,9 @@
             <a-button @click="go('/hr/oa/knowledge')">知识库</a-button>
             <a-button @click="go('/hr/oa/policies')">规章制度库</a-button>
             <a-button @click="go('/hr/oa/policy-alerts')">制度更新预警</a-button>
-            <a-button @click="go('/oa/todo?keyword=生日提醒')">生日提醒待办</a-button>
+            <a-badge :count="summary.birthdayTodoCount || 0" :offset="[2, -2]">
+              <a-button @click="go('/oa/todo?keyword=生日提醒')">生日提醒待办</a-button>
+            </a-badge>
             <a-button @click="go('/hr/oa/groups')">分组设置</a-button>
           </a-space>
         </a-card>
@@ -177,6 +179,7 @@ import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { getHrStaffBirthdayPage, getHrWorkbenchSummary } from '../../api/hr'
 import { openPrintTableReport } from '../../utils/print'
+import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import type { HrStaffBirthdayItem } from '../../types'
 
 const router = useRouter()
@@ -277,6 +280,14 @@ function printBirthdayRows() {
 }
 
 onMounted(loadSummary)
+
+useLiveSyncRefresh({
+  topics: ['hr', 'oa', 'system'],
+  refresh: () => {
+    loadSummary().catch(() => {})
+  },
+  debounceMs: 900
+})
 </script>
 
 <style scoped>

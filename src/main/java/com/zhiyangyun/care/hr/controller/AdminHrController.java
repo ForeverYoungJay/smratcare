@@ -2077,6 +2077,7 @@ public class AdminHrController {
         task.setIsDeleted(1);
         oaTaskMapper.updateById(task);
       }
+      clearBirthdayReminderTodos(orgId, staff.getId());
       return;
     }
 
@@ -2113,8 +2114,61 @@ public class AdminHrController {
     task.setRecurrenceCount(null);
     if (task.getId() == null) {
       oaTaskMapper.insert(task);
+    } else {
+      oaTaskMapper.updateById(task);
+    }
+    syncBirthdayReminderTodo(orgId, staff, birthday, nextBirthday);
+  }
+
+  private void syncBirthdayReminderTodo(Long orgId, StaffAccount staff, LocalDate birthday, LocalDate nextBirthday) {
+    if (staff == null || staff.getId() == null) {
       return;
     }
-    oaTaskMapper.updateById(task);
+    LocalDate today = LocalDate.now();
+    if (!today.equals(nextBirthday)) {
+      clearBirthdayReminderTodos(orgId, staff.getId());
+      return;
+    }
+    String marker = birthdayReminderMarker(staff.getId(), today);
+    OaTodo existed = oaTodoMapper.selectOne(Wrappers.lambdaQuery(OaTodo.class)
+        .eq(OaTodo::getIsDeleted, 0)
+        .eq(orgId != null, OaTodo::getOrgId, orgId)
+        .eq(OaTodo::getStatus, "OPEN")
+        .like(OaTodo::getContent, marker)
+        .last("LIMIT 1"));
+    if (existed != null) {
+      return;
+    }
+    OaTodo todo = new OaTodo();
+    todo.setTenantId(orgId);
+    todo.setOrgId(orgId);
+    todo.setTitle("【生日提醒】" + empty(staff.getRealName()) + " 今日生日");
+    todo.setContent(marker + " 员工工号：" + empty(staff.getStaffNo()) + "，联系电话：" + empty(staff.getPhone()) + "，生日：" + birthday);
+    todo.setDueTime(today.atTime(9, 0));
+    todo.setStatus("OPEN");
+    todo.setAssigneeId(null);
+    todo.setAssigneeName("人事行政");
+    todo.setCreatedBy(AuthContext.getStaffId());
+    oaTodoMapper.insert(todo);
+  }
+
+  private void clearBirthdayReminderTodos(Long orgId, Long staffId) {
+    if (staffId == null) {
+      return;
+    }
+    String markerPrefix = "[BIRTHDAY_REMINDER:" + staffId + ":";
+    List<OaTodo> todos = oaTodoMapper.selectList(Wrappers.lambdaQuery(OaTodo.class)
+        .eq(OaTodo::getIsDeleted, 0)
+        .eq(orgId != null, OaTodo::getOrgId, orgId)
+        .eq(OaTodo::getStatus, "OPEN")
+        .like(OaTodo::getContent, markerPrefix));
+    for (OaTodo item : todos) {
+      item.setStatus("DONE");
+      oaTodoMapper.updateById(item);
+    }
+  }
+
+  private String birthdayReminderMarker(Long staffId, LocalDate date) {
+    return "[BIRTHDAY_REMINDER:" + staffId + ":" + date + "]";
   }
 }

@@ -17,17 +17,30 @@
         <a-form-item label="打印备注">
           <a-input v-model:value="query.printRemark" allow-clear placeholder="例如：运营例会版" style="width: 200px" />
         </a-form-item>
+        <a-form-item label="快捷区间">
+          <a-space>
+            <a-button size="small" @click="setMonthPreset(3)">近3月</a-button>
+            <a-button size="small" @click="setMonthPreset(6)">近6月</a-button>
+            <a-button size="small" @click="setThisMonth">本月</a-button>
+          </a-space>
+        </a-form-item>
         <a-form-item>
           <a-space>
             <a-button type="primary" @click="loadData">刷新</a-button>
             <a-button @click="exportSummary">导出汇总</a-button>
+            <a-button @click="copyFilterLink">复制筛选链接</a-button>
             <a-button @click="openColumnSetting">列设置</a-button>
-            <a-button @click="printCurrent">打印当前列</a-button>
-            <a-button @click="printSpecificMonth">打印指定月份</a-button>
+            <a-button :disabled="!displayRows.length" @click="printCurrent">打印当前列</a-button>
+            <a-button :disabled="!query.monthKeyword.trim() || !displayRows.length" @click="printSpecificMonth">打印指定月份</a-button>
             <a-button @click="reset">重置</a-button>
           </a-space>
         </a-form-item>
       </a-form>
+      <StatsMetaHint
+        scope-text="入住统计（按月，净增长=入住-离院）"
+        :refreshed-at="refreshedAt"
+        :note-text="metricTraceText"
+      />
     </a-card>
 
     <a-row :gutter="16" style="margin-top: 16px;">
@@ -83,12 +96,20 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
+import StatsMetaHint from '../../components/stats/StatsMetaHint.vue'
 import { exportCheckInStatsCsv, getCheckInStats } from '../../api/stats'
 import type { CheckInStatsResponse } from '../../types'
 import { useECharts } from '../../plugins/echarts'
 import { message } from 'ant-design-vue'
 import { printTableReport } from '../../utils/print'
+import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
+import { copyText } from '../../utils/clipboard'
+
+const route = useRoute()
+const router = useRouter()
+const refreshedAt = ref('')
 
 const query = reactive({
   from: dayjs().subtract(5, 'month') as Dayjs,
@@ -118,6 +139,14 @@ const printColumnOptions = [
   { label: '净增长', value: 'netIncrease' }
 ]
 const selectedPrintColumns = ref<string[]>(['month', 'admissions', 'discharges', 'netIncrease'])
+const metricTraceText = computed(() => {
+  const version = String(route.query.metricVersion || '').trim()
+  const source = String(route.query.fromSource || '').trim()
+  const notes: string[] = []
+  if (version) notes.push(`口径版本：${version}`)
+  if (source === 'dashboard') notes.push('来源：看板钻取')
+  return notes.join('；')
+})
 const printableRows = computed(() => {
   const admissionsMap = new Map((stats.monthlyAdmissions || []).map(item => [item.month, item.count]))
   const dischargeMap = new Map((stats.monthlyDischarges || []).map(item => [item.month, item.count]))
@@ -157,6 +186,8 @@ async function loadData() {
         { name: '净增长', type: 'bar', data: data.monthlyNetIncrease.map(item => item.count) }
       ]
     })
+    refreshedAt.value = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    syncRouteQuery()
   } catch (error: any) {
     message.error(error?.message || '加载入住统计失败')
   }
@@ -168,11 +199,24 @@ function reset() {
   query.orgId = undefined
   query.monthKeyword = ''
   query.printRemark = ''
+  syncRouteQuery()
   loadData()
 }
 
 function openColumnSetting() {
   columnSettingOpen.value = true
+}
+
+function setMonthPreset(months: number) {
+  query.to = dayjs()
+  query.from = dayjs().subtract(months - 1, 'month')
+  loadData()
+}
+
+function setThisMonth() {
+  query.from = dayjs().startOf('month')
+  query.to = dayjs()
+  loadData()
 }
 
 async function exportSummary() {
@@ -185,6 +229,24 @@ async function exportSummary() {
     message.success('导出成功')
   } catch (error: any) {
     message.error(error?.message || '导出失败')
+  }
+}
+
+async function copyFilterLink() {
+  const resolved = router.resolve({
+    path: route.path,
+    query: {
+      from: dayjs(query.from).format('YYYY-MM'),
+      to: dayjs(query.to).format('YYYY-MM'),
+      orgId: query.orgId ? String(query.orgId) : '',
+      monthKeyword: query.monthKeyword || ''
+    }
+  })
+  const ok = await copyText(`${window.location.origin}${resolved.fullPath}`)
+  if (ok) {
+    message.success('筛选链接已复制')
+  } else {
+    message.warning('复制失败，请手动复制地址栏链接')
   }
 }
 
@@ -216,7 +278,7 @@ function renderPrint(title: string, rows: Array<Record<string, any>>) {
     const monthKeywordText = query.monthKeyword ? `月份筛选：${query.monthKeyword}` : '月份筛选：全部'
     printTableReport({
       title,
-      subtitle: `${dayjs(query.from).format('YYYY-MM')} ~ ${dayjs(query.to).format('YYYY-MM')}；${orgText}；${monthKeywordText}；备注：${query.printRemark || '-'}`,
+      subtitle: `${dayjs(query.from).format('YYYY-MM')} ~ ${dayjs(query.to).format('YYYY-MM')}；${orgText}；打印范围：${monthKeywordText}；记录数：${rows.length}；备注：${query.printRemark || '-'}`,
       columns: printColumnOptions.filter(item => selectedPrintColumns.value.includes(item.value)).map(item => ({ key: item.value, title: item.label })),
       rows
     })
@@ -225,5 +287,37 @@ function renderPrint(title: string, rows: Array<Record<string, any>>) {
   }
 }
 
-onMounted(loadData)
+function syncRouteQuery() {
+  const nextQuery: Record<string, string> = {
+    from: dayjs(query.from).format('YYYY-MM'),
+    to: dayjs(query.to).format('YYYY-MM')
+  }
+  if (query.orgId) nextQuery.orgId = String(query.orgId)
+  if (query.monthKeyword) nextQuery.monthKeyword = query.monthKeyword
+  router.replace({ path: route.path, query: nextQuery }).catch(() => {})
+}
+
+function initFromRouteQuery() {
+  const from = String(route.query.from || '')
+  const to = String(route.query.to || '')
+  if (dayjs(from).isValid()) query.from = dayjs(from)
+  if (dayjs(to).isValid()) query.to = dayjs(to)
+  const orgId = Number(route.query.orgId)
+  if (Number.isFinite(orgId) && orgId > 0) query.orgId = orgId
+  const monthKeyword = String(route.query.monthKeyword || '')
+  if (monthKeyword) query.monthKeyword = monthKeyword
+}
+
+useLiveSyncRefresh({
+  topics: ['elder', 'lifecycle', 'bed'],
+  refresh: () => {
+    loadData()
+  },
+  debounceMs: 800
+})
+
+onMounted(() => {
+  initFromRouteQuery()
+  loadData()
+})
 </script>

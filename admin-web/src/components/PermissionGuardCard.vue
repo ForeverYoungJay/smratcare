@@ -1,5 +1,5 @@
 <template>
-  <a-tooltip :title="tooltipText" :disabled="canAccess">
+  <PermissionDeniedTooltip :can-access="canAccess" :required-roles="requiredRoles">
     <a-card
       :size="size"
       :bordered="bordered"
@@ -8,12 +8,12 @@
     >
       <slot />
     </a-card>
-  </a-tooltip>
+  </PermissionDeniedTooltip>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
 import type { PropType } from 'vue'
+import PermissionDeniedTooltip from './PermissionDeniedTooltip.vue'
 
 const props = defineProps({
   canAccess: {
@@ -41,16 +41,6 @@ const props = defineProps({
 const emit = defineEmits<{
   (e: 'click'): void
 }>()
-
-const tooltipText = computed(() => {
-  if (props.canAccess) {
-    return ''
-  }
-  if (props.requiredRoles.length > 0) {
-    return `当前账号暂无权限，需角色：${props.requiredRoles.join(' / ')}`
-  }
-  return '当前账号暂无权限'
-})
 
 function handleClick() {
   if (!props.canAccess) {

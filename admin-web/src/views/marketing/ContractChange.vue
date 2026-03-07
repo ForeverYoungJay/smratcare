@@ -26,7 +26,7 @@
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px">
-      <MarketingListToolbar :tip="`已勾选 ${selectedRowKeys.length} 条`">
+      <MarketingListToolbar :selected-count="selectedRowKeys.length" tip="支持批量删除与批量处理">
         <a-space>
           <a-button :disabled="!selectedSingleRecord" @click="openEditSelected">编辑变更</a-button>
           <a-button :disabled="!selectedSingleRecord" @click="startChangeSelected">发起变更</a-button>

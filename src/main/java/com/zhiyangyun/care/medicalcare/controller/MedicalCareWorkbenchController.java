@@ -1,6 +1,8 @@
 package com.zhiyangyun.care.medicalcare.controller;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.entity.CareTaskDaily;
@@ -20,9 +22,12 @@ import com.zhiyangyun.care.mapper.CareTaskDailyMapper;
 import com.zhiyangyun.care.mapper.CareTaskExecuteLogMapper;
 import com.zhiyangyun.care.medicalcare.entity.MedicalCvdRiskAssessment;
 import com.zhiyangyun.care.medicalcare.entity.MedicalTcmAssessment;
+import com.zhiyangyun.care.medicalcare.entity.MedicalAlertRuleConfig;
+import com.zhiyangyun.care.medicalcare.mapper.MedicalAlertRuleConfigMapper;
 import com.zhiyangyun.care.medicalcare.mapper.MedicalCvdRiskAssessmentMapper;
 import com.zhiyangyun.care.medicalcare.mapper.MedicalTcmAssessmentMapper;
 import com.zhiyangyun.care.medicalcare.model.MedicalCareWorkbenchSummaryResponse;
+import com.zhiyangyun.care.medicalcare.model.MedicalUnifiedTaskItemResponse;
 import com.zhiyangyun.care.nursing.entity.ShiftHandover;
 import com.zhiyangyun.care.nursing.mapper.ShiftHandoverMapper;
 import com.zhiyangyun.care.oa.entity.OaDocument;
@@ -36,9 +41,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -65,6 +73,7 @@ public class MedicalCareWorkbenchController {
   private final OaTaskMapper oaTaskMapper;
   private final MedicalTcmAssessmentMapper tcmAssessmentMapper;
   private final MedicalCvdRiskAssessmentMapper cvdRiskAssessmentMapper;
+  private final MedicalAlertRuleConfigMapper medicalAlertRuleConfigMapper;
 
   public MedicalCareWorkbenchController(
       CareTaskDailyMapper careTaskDailyMapper,
@@ -80,7 +89,8 @@ public class MedicalCareWorkbenchController {
       OaDocumentMapper oaDocumentMapper,
       OaTaskMapper oaTaskMapper,
       MedicalTcmAssessmentMapper tcmAssessmentMapper,
-      MedicalCvdRiskAssessmentMapper cvdRiskAssessmentMapper) {
+      MedicalCvdRiskAssessmentMapper cvdRiskAssessmentMapper,
+      MedicalAlertRuleConfigMapper medicalAlertRuleConfigMapper) {
     this.careTaskDailyMapper = careTaskDailyMapper;
     this.careTaskExecuteLogMapper = careTaskExecuteLogMapper;
     this.elderMapper = elderMapper;
@@ -95,6 +105,7 @@ public class MedicalCareWorkbenchController {
     this.oaTaskMapper = oaTaskMapper;
     this.tcmAssessmentMapper = tcmAssessmentMapper;
     this.cvdRiskAssessmentMapper = cvdRiskAssessmentMapper;
+    this.medicalAlertRuleConfigMapper = medicalAlertRuleConfigMapper;
   }
 
   @GetMapping("/summary")
@@ -378,6 +389,144 @@ public class MedicalCareWorkbenchController {
     return Result.ok(response);
   }
 
+  @GetMapping("/unified-tasks")
+  public Result<IPage<MedicalUnifiedTaskItemResponse>> unifiedTasks(
+      @RequestParam(defaultValue = "1") long pageNo,
+      @RequestParam(defaultValue = "20") long pageSize,
+      @RequestParam(required = false) Long elderId,
+      @RequestParam(required = false) String module,
+      @RequestParam(required = false) String priority,
+      @RequestParam(required = false) String keyword) {
+    Long orgId = AuthContext.getOrgId();
+    LocalDateTime now = LocalDateTime.now();
+    MedicalAlertRuleConfig ruleConfig = medicalAlertRuleConfigMapper.selectOne(Wrappers.lambdaQuery(MedicalAlertRuleConfig.class)
+        .eq(MedicalAlertRuleConfig::getIsDeleted, 0)
+        .eq(orgId != null, MedicalAlertRuleConfig::getOrgId, orgId)
+        .last("LIMIT 1"));
+    int overdueHoursThreshold = ruleConfig == null || ruleConfig.getOverdueHoursThreshold() == null
+        ? 12 : Math.max(ruleConfig.getOverdueHoursThreshold(), 1);
+    LocalDateTime overdueCutoff = now.minusHours(overdueHoursThreshold);
+    String moduleFilter = normalizeEnumFilter(module);
+    String priorityFilter = normalizeEnumFilter(priority);
+    String keywordFilter = normalizeText(keyword);
+    boolean raiseTaskFromAbnormal = ruleConfig == null || !Integer.valueOf(0).equals(ruleConfig.getAutoRaiseTaskFromAbnormal());
+    List<String> handoverRiskKeywords = parseKeywords(ruleConfig == null ? null : ruleConfig.getHandoverRiskKeywords());
+
+    List<MedicalUnifiedTaskItemResponse> rows = new ArrayList<>();
+
+    List<HealthMedicationTask> medicationTasks = healthMedicationTaskMapper.selectList(Wrappers.lambdaQuery(HealthMedicationTask.class)
+        .eq(HealthMedicationTask::getIsDeleted, 0)
+        .eq(orgId != null, HealthMedicationTask::getOrgId, orgId)
+        .eq(elderId != null, HealthMedicationTask::getElderId, elderId)
+        .eq(HealthMedicationTask::getStatus, "PENDING")
+        .orderByAsc(HealthMedicationTask::getPlannedTime)
+        .last("LIMIT 300"));
+    for (HealthMedicationTask item : medicationTasks) {
+      MedicalUnifiedTaskItemResponse row = new MedicalUnifiedTaskItemResponse();
+      row.setId("ORDER_" + item.getId());
+      row.setModule("ORDER");
+      row.setResidentId(item.getElderId());
+      row.setResidentName(item.getElderName());
+      row.setTaskTitle("执行医嘱：" + safeText(item.getDrugName(), "未命名药品"));
+      row.setAssignee(item.getNurseName());
+      row.setPlannedTime(item.getPlannedTime());
+      row.setPriority(item.getPlannedTime() != null && item.getPlannedTime().isBefore(overdueCutoff)
+          ? "HIGH"
+          : (raiseTaskFromAbnormal ? "MEDIUM" : "LOW"));
+      row.setStatus(item.getStatus());
+      row.setSourceId(item.getId());
+      rows.add(row);
+    }
+
+    List<HealthInspection> inspectionTasks = healthInspectionMapper.selectList(Wrappers.lambdaQuery(HealthInspection.class)
+        .eq(HealthInspection::getIsDeleted, 0)
+        .eq(orgId != null, HealthInspection::getOrgId, orgId)
+        .eq(elderId != null, HealthInspection::getElderId, elderId)
+        .in(HealthInspection::getStatus, "ABNORMAL", "FOLLOWING")
+        .orderByDesc(HealthInspection::getInspectionDate)
+        .last("LIMIT 300"));
+    for (HealthInspection item : inspectionTasks) {
+      MedicalUnifiedTaskItemResponse row = new MedicalUnifiedTaskItemResponse();
+      row.setId("INSPECTION_" + item.getId());
+      row.setModule("INSPECTION");
+      row.setResidentId(item.getElderId());
+      row.setResidentName(item.getElderName());
+      row.setTaskTitle("巡检跟进：" + safeText(item.getInspectionItem(), "异常巡检"));
+      row.setAssignee(item.getInspectorName());
+      row.setPlannedTime(item.getInspectionDate() == null ? null : item.getInspectionDate().atStartOfDay().plusHours(9));
+      row.setPriority("ABNORMAL".equals(item.getStatus()) && raiseTaskFromAbnormal ? "HIGH" : "MEDIUM");
+      row.setStatus(item.getStatus());
+      row.setSourceId(item.getId());
+      rows.add(row);
+    }
+
+    List<HealthNursingLog> nursingTasks = healthNursingLogMapper.selectList(Wrappers.lambdaQuery(HealthNursingLog.class)
+        .eq(HealthNursingLog::getIsDeleted, 0)
+        .eq(orgId != null, HealthNursingLog::getOrgId, orgId)
+        .eq(elderId != null, HealthNursingLog::getElderId, elderId)
+        .eq(HealthNursingLog::getStatus, "PENDING")
+        .orderByDesc(HealthNursingLog::getLogTime)
+        .last("LIMIT 300"));
+    for (HealthNursingLog item : nursingTasks) {
+      MedicalUnifiedTaskItemResponse row = new MedicalUnifiedTaskItemResponse();
+      row.setId("NURSING_LOG_" + item.getId());
+      row.setModule("NURSING_LOG");
+      row.setResidentId(item.getElderId());
+      row.setResidentName(item.getElderName());
+      row.setTaskTitle("日志待处理：" + safeText(item.getContent(), "护理日志"));
+      row.setAssignee(item.getStaffName());
+      row.setPlannedTime(item.getLogTime());
+      row.setPriority("INCIDENT".equals(item.getLogType()) && raiseTaskFromAbnormal ? "HIGH" : "MEDIUM");
+      row.setStatus(item.getStatus());
+      row.setSourceId(item.getSourceInspectionId());
+      rows.add(row);
+    }
+
+    List<ShiftHandover> handoverTasks = shiftHandoverMapper.selectList(Wrappers.lambdaQuery(ShiftHandover.class)
+        .eq(ShiftHandover::getIsDeleted, 0)
+        .eq(orgId != null, ShiftHandover::getOrgId, orgId)
+        .in(ShiftHandover::getStatus, "DRAFT", "HANDED_OVER")
+        .orderByDesc(ShiftHandover::getDutyDate)
+        .last("LIMIT 300"));
+    for (ShiftHandover item : handoverTasks) {
+      MedicalUnifiedTaskItemResponse row = new MedicalUnifiedTaskItemResponse();
+      row.setId("HANDOVER_" + item.getId());
+      row.setModule("HANDOVER");
+      row.setTaskTitle("交接待确认：" + safeText(item.getShiftCode(), "-"));
+      row.setAssignee(item.getToStaffId() == null ? null : ("人员#" + item.getToStaffId()));
+      String handoverRiskText = safeText(item.getRiskNote(), "") + " " + safeText(item.getTodoNote(), "");
+      boolean matchedHandoverRisk = handoverRiskKeywords.stream().anyMatch(handoverRiskText::contains);
+      row.setPlannedTime(item.getHandoverTime() != null
+          ? item.getHandoverTime()
+          : (item.getDutyDate() == null ? null : item.getDutyDate().atStartOfDay().plusHours(20)));
+      row.setPriority(matchedHandoverRisk && raiseTaskFromAbnormal
+          ? "HIGH"
+          : (row.getPlannedTime() != null && row.getPlannedTime().isBefore(overdueCutoff)
+          ? "HIGH"
+          : ("HANDED_OVER".equals(item.getStatus()) ? "MEDIUM" : "LOW")));
+      row.setStatus(item.getStatus());
+      row.setSourceId(item.getId());
+      rows.add(row);
+    }
+
+    List<MedicalUnifiedTaskItemResponse> filtered = rows.stream()
+        .filter(item -> moduleFilter == null || moduleFilter.equalsIgnoreCase(item.getModule()))
+        .filter(item -> priorityFilter == null || priorityFilter.equalsIgnoreCase(item.getPriority()))
+        .filter(item -> matchKeyword(item, keywordFilter))
+        .sorted(Comparator.comparing(MedicalUnifiedTaskItemResponse::getPlannedTime,
+            Comparator.nullsLast(Comparator.naturalOrder())))
+        .toList();
+
+    long safePageNo = Math.max(pageNo, 1);
+    long safePageSize = Math.max(pageSize, 1);
+    int from = (int) Math.min((safePageNo - 1) * safePageSize, filtered.size());
+    int to = (int) Math.min(from + safePageSize, filtered.size());
+    List<MedicalUnifiedTaskItemResponse> pageRecords = filtered.subList(from, to);
+    IPage<MedicalUnifiedTaskItemResponse> page = new Page<>(safePageNo, safePageSize, filtered.size());
+    page.setRecords(pageRecords);
+    return Result.ok(page);
+  }
+
   private LocalDate parseDateOrDefault(String date) {
     if (date == null || date.isBlank()) {
       return LocalDate.now();
@@ -387,5 +536,45 @@ public class MedicalCareWorkbenchController {
     } catch (DateTimeParseException ignore) {
       return LocalDate.now();
     }
+  }
+
+  private String normalizeText(String value) {
+    if (value == null) {
+      return null;
+    }
+    String trimmed = value.trim();
+    return trimmed.isEmpty() ? null : trimmed;
+  }
+
+  private String normalizeEnumFilter(String value) {
+    String normalized = normalizeText(value);
+    return normalized == null ? null : normalized.toUpperCase(Locale.ROOT);
+  }
+
+  private String safeText(String value, String fallback) {
+    String normalized = normalizeText(value);
+    return normalized == null ? fallback : normalized;
+  }
+
+  private boolean matchKeyword(MedicalUnifiedTaskItemResponse item, String keyword) {
+    if (keyword == null) {
+      return true;
+    }
+    String text = (safeText(item.getResidentName(), "") + " "
+        + safeText(item.getTaskTitle(), "") + " "
+        + safeText(item.getAssignee(), "")).toLowerCase();
+    return text.contains(keyword.toLowerCase());
+  }
+
+  private List<String> parseKeywords(String rawText) {
+    String text = normalizeText(rawText);
+    if (text == null) {
+      return List.of("异常", "风险", "事故", "上报");
+    }
+    List<String> list = List.of(text.split("[,，]")).stream()
+        .map(this::normalizeText)
+        .filter(value -> value != null && !value.isBlank())
+        .toList();
+    return list.isEmpty() ? List.of("异常", "风险", "事故", "上报") : list;
   }
 }

@@ -19,7 +19,7 @@
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px">
-      <MarketingListToolbar :tip="`已勾选 ${selectedCount} 条`">
+      <MarketingListToolbar :selected-count="selectedCount" tip="可批量删除附件">
         <a-space>
           <a-button :disabled="!hasSingleSelection" @click="openSelectedAttachments">查看附件</a-button>
           <a-button :disabled="selectedCount === 0" @click="exportSelectedAttachmentIndex">导出所选附件索引</a-button>

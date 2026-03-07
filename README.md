@@ -95,6 +95,36 @@ RBAC 权限模型审计（旧权限表达式回归检查）：
 ./scripts/rbac_audit.sh
 ```
 
+RBAC 初始化账号/部门/角色静态审计（6部门×3角色）：
+```bash
+./scripts/rbac_seed_audit.sh
+```
+
+RBAC 权限回归冒烟（菜单规则+接口403/越权）：
+```bash
+./scripts/rbac_regression_smoke.sh
+```
+
+RBAC 一级菜单矩阵导出（按角色查看可访问菜单）：
+```bash
+./scripts/rbac_menu_matrix.sh
+```
+
+企业首页发布前内容检查（占位信息/链接/联系方式）：
+```bash
+./scripts/enterprise_home_content_check.sh
+```
+
+企业首页运营待办导出（更新节奏/占位风险/本周任务）：
+```bash
+./scripts/enterprise_ops_todo.sh
+```
+
+企业首页内容时效巡检（更新时间/复核日期/新闻新鲜度）：
+```bash
+./scripts/enterprise_home_freshness_check.sh
+```
+
 Flyway 状态巡检（只检查，不修复）：
 ```bash
 ./scripts/flyway_status.sh
@@ -163,6 +193,10 @@ OpenAPI：
 - 物资中心合并说明：`docs/MATERIAL_CENTER_MERGE.md`
 - RBAC 闭环矩阵：`docs/RBAC_CLOSURE_MATRIX.md`
 - RBAC 验收清单：`docs/RBAC_ACCEPTANCE_CHECKLIST.md`
+- RBAC 自动化回归：`docs/RBAC_REGRESSION_AUTOMATION.md`
+- RBAC 菜单矩阵导出：`docs/RBAC_MENU_MATRIX.md`
+- 初始化账号矩阵：`docs/INIT_STAFF_MATRIX.md`
+- 企业首页内容治理：`docs/ENTERPRISE_HOME_CONTENT_GOVERNANCE.md`
 
 ## 备注
 - 上传文件默认映射目录：`output/uploads`（容器内 `/app/uploads`）

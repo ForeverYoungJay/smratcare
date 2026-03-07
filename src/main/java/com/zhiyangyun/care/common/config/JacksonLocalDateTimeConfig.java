@@ -12,10 +12,14 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class JacksonLocalDateTimeConfig {
-  private static final DateTimeFormatter LOCAL_DATE_TIME_FORMATTER = new DateTimeFormatterBuilder()
+  private static final DateTimeFormatter LOCAL_DATE_TIME_SERIALIZER_FORMATTER =
+      DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+
+  private static final DateTimeFormatter LOCAL_DATE_TIME_DESERIALIZER_FORMATTER = new DateTimeFormatterBuilder()
       .append(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
       .optionalStart().appendLiteral(' ').optionalEnd()
       .optionalStart().appendLiteral('T').optionalEnd()
+      .optionalStart().appendLiteral(' ').optionalEnd()
       .appendPattern("HH:mm:ss")
       .optionalStart().appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true).optionalEnd()
       .toFormatter();
@@ -23,8 +27,8 @@ public class JacksonLocalDateTimeConfig {
   @Bean
   public Jackson2ObjectMapperBuilderCustomizer localDateTimeCustomizer() {
     return builder -> {
-      builder.serializerByType(LocalDateTime.class, new LocalDateTimeSerializer(LOCAL_DATE_TIME_FORMATTER));
-      builder.deserializerByType(LocalDateTime.class, new LocalDateTimeDeserializer(LOCAL_DATE_TIME_FORMATTER));
+      builder.serializerByType(LocalDateTime.class, new LocalDateTimeSerializer(LOCAL_DATE_TIME_SERIALIZER_FORMATTER));
+      builder.deserializerByType(LocalDateTime.class, new LocalDateTimeDeserializer(LOCAL_DATE_TIME_DESERIALIZER_FORMATTER));
     };
   }
 }

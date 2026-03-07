@@ -29,4 +29,9 @@ public class DashboardSummary {
   private BigDecimal totalRevenue;
   private BigDecimal averageMonthlyRevenue;
   private BigDecimal revenueGrowthRate;
+  private String statsFromMonth;
+  private String statsToMonth;
+  private String metricVersion;
+  private String metricEffectiveDate;
+  private String dataRefreshedAt;
 }

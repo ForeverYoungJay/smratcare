@@ -116,10 +116,31 @@
           </a-space>
         </a-form-item>
       </a-form>
+      <BatchActionBar :actions="sheetBatchActions" />
+      <a-alert
+        v-if="sheetLastBatchReceipt"
+        type="info"
+        show-icon
+        style="margin-bottom: 8px"
+        :message="`最近回执：${sheetLastBatchReceipt.action}｜开始 ${sheetLastBatchReceipt.startAt}｜结束 ${sheetLastBatchReceipt.finishAt}｜成功 ${sheetLastBatchReceipt.success}/${sheetLastBatchReceipt.total}｜失败 ${sheetLastBatchReceipt.failed}`"
+      />
+      <a-row v-if="sheetBatchFailures.length > 0" :gutter="12" style="margin-bottom: 8px;">
+        <a-col :span="8"><a-statistic title="失败总数" :value="sheetBatchFailures.length" /></a-col>
+        <a-col :span="8"><a-statistic title="可重试失败" :value="retryableSheetFailures.length" /></a-col>
+        <a-col :span="8"><a-statistic title="错误码种类" :value="sheetFailureCodeSummary.length" /></a-col>
+      </a-row>
+      <a-alert
+        v-if="sheetFailureCodeSummary.length > 0"
+        type="warning"
+        show-icon
+        style="margin-bottom: 8px"
+        :message="`错误码聚合：${sheetFailureCodeSummary.map((item) => `${item.code}(${item.count})`).join('，')}`"
+      />
       <a-table
         row-key="id"
         :loading="sheetLoading"
         :data-source="sheets"
+        :row-selection="sheetRowSelection"
         :pagination="false"
         size="small"
       >
@@ -322,6 +343,47 @@
       <a-button style="margin-top: 10px;" @click="appendSheetItem">+ 增加物品</a-button>
       <a-alert style="margin-top: 10px;" type="info" show-icon message="保存后生成领用单；领取完成后请点击“确认出库”，并打印领取单给家属签字。" />
     </a-modal>
+
+    <a-modal v-model:open="batchProgress.open" :title="batchProgress.title" :footer="null" :mask-closable="false" :closable="!batchProgress.running" @cancel="closeBatchProgress">
+      <a-space direction="vertical" style="width: 100%">
+        <a-progress :percent="batchProgress.percent" :status="batchProgress.running ? 'active' : 'normal'" />
+        <a-statistic title="总数" :value="batchProgress.total" />
+        <a-statistic title="已处理" :value="batchProgress.current" />
+        <a-statistic title="成功" :value="batchProgress.success" />
+        <a-statistic title="失败" :value="batchProgress.failed" />
+      </a-space>
+    </a-modal>
+
+    <a-drawer v-model:open="sheetFailureDrawerOpen" title="批量失败明细" width="820">
+      <a-form layout="inline" style="margin-bottom: 8px">
+        <a-form-item label="关键字">
+          <a-input v-model:value="sheetFailureKeyword" allow-clear placeholder="动作/原因/错误码/路径/领用单ID" style="width: 280px" />
+        </a-form-item>
+        <a-form-item>
+          <a-checkbox v-model:checked="sheetFailureRetryableOnly">仅可重试</a-checkbox>
+        </a-form-item>
+      </a-form>
+      <a-alert
+        v-if="sheetFailureActionSummary.length > 0"
+        type="warning"
+        show-icon
+        style="margin-bottom: 8px"
+        :message="`动作聚合：${sheetFailureActionSummary.map((item) => `${item.action}(${item.count})`).join('，')}`"
+      />
+      <a-table :data-source="filteredSheetBatchFailures" :pagination="false" row-key="at" size="small">
+        <a-table-column title="时间" data-index="at" key="at" width="170" />
+        <a-table-column title="动作" data-index="action" key="action" width="140" />
+        <a-table-column title="领用单ID" data-index="sheetId" key="sheetId" width="120" />
+        <a-table-column title="错误码" data-index="code" key="code" width="120" />
+        <a-table-column title="接口路径" data-index="path" key="path" width="200" />
+        <a-table-column title="可重试" key="retryable" width="90">
+          <template #default="{ record }">
+            <a-tag :color="record.retryable ? 'green' : 'red'">{{ record.retryable ? '是' : '否' }}</a-tag>
+          </template>
+        </a-table-column>
+        <a-table-column title="失败原因" data-index="reason" key="reason" />
+      </a-table>
+    </a-drawer>
   </PageContainer>
 </template>
 
@@ -334,19 +396,20 @@ import autoTable from 'jspdf-autotable'
 import { useUserStore } from '../../stores/user'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
+import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import PageContainer from '../../components/PageContainer.vue'
+import BatchActionBar, { type BatchActionItem } from '../../components/BatchActionBar.vue'
 import { exportCsv } from '../../utils/export'
 import {
   confirmOutboundSheet,
   createOutboundSheet,
   getInventoryOutboundPage,
   getOutboundSheetDetail,
+  getOutboundSheetPrefill,
   getOutboundSheetPage
 } from '../../api/materialCenter'
-import { getContractPage } from '../../api/marketing'
 import { getProductPage } from '../../api/store'
 import type {
-  CrmContractItem,
   InventoryLogItem,
   InventoryOutboundSheet,
   InventoryOutboundSheetCreateRequest,
@@ -354,6 +417,25 @@ import type {
   PageResult,
   ProductItem
 } from '../../types'
+
+type SheetBatchFailure = {
+  at: string
+  action: string
+  sheetId: number
+  reason: string
+  code: string
+  path: string
+  retryable: boolean
+}
+
+type SheetBatchReceipt = {
+  action: string
+  startAt: string
+  finishAt: string
+  total: number
+  success: number
+  failed: number
+}
 
 const loading = ref(false)
 const route = useRoute()
@@ -371,6 +453,22 @@ const sheets = ref<InventoryOutboundSheet[]>([])
 const sheetTotal = ref(0)
 const sheetDetail = ref<InventoryOutboundSheet | null>(null)
 const sheetDetailOpen = ref(false)
+const selectedSheetRowKeys = ref<number[]>([])
+const sheetBatchFailures = ref<SheetBatchFailure[]>([])
+const sheetFailureDrawerOpen = ref(false)
+const sheetLastBatchReceipt = ref<SheetBatchReceipt | null>(null)
+const sheetFailureKeyword = ref('')
+const sheetFailureRetryableOnly = ref(false)
+const batchProgress = reactive({
+  open: false,
+  running: false,
+  title: '批量处理中',
+  total: 0,
+  current: 0,
+  success: 0,
+  failed: 0,
+  percent: 0
+})
 
 const outboundOpen = ref(false)
 const outboundSubmitting = ref(false)
@@ -476,9 +574,119 @@ const elderSelectOptions = computed(() => elderOptions.value.map((item) => ({
 const departmentSelectOptions = computed(() =>
   departmentOptions.value.map((item) => ({
     label: item.label,
-    value: item.value
+    value: item.name
   }))
 )
+const selectedDraftSheetIds = computed(() => {
+  if (!selectedSheetRowKeys.value.length) return []
+  const selected = new Set(selectedSheetRowKeys.value.map((item) => Number(item)))
+  return sheets.value
+    .filter((item) => selected.has(Number(item.id)) && item.status !== 'CONFIRMED')
+    .map((item) => Number(item.id))
+})
+
+const sheetRowSelection = computed(() => ({
+  selectedRowKeys: selectedSheetRowKeys.value,
+  onChange: (keys: Array<string | number>) => {
+    selectedSheetRowKeys.value = keys.map((item) => Number(item)).filter((item) => Number.isFinite(item))
+  }
+}))
+const retryableSheetFailures = computed(() => sheetBatchFailures.value.filter((item) => item.retryable))
+const filteredSheetBatchFailures = computed(() => {
+  const keyword = sheetFailureKeyword.value.trim().toLowerCase()
+  return sheetBatchFailures.value.filter((item) => {
+    if (sheetFailureRetryableOnly.value && !item.retryable) return false
+    if (!keyword) return true
+    const haystack = [item.action, item.reason, item.code, item.path, String(item.sheetId)].join(' ').toLowerCase()
+    return haystack.includes(keyword)
+  })
+})
+const sheetFailureActionSummary = computed(() => {
+  const map = new Map<string, number>()
+  for (const row of filteredSheetBatchFailures.value) {
+    const key = String(row.action || '-')
+    map.set(key, (map.get(key) || 0) + 1)
+  }
+  return Array.from(map.entries())
+    .map(([action, count]) => ({ action, count }))
+    .sort((a, b) => b.count - a.count)
+})
+const sheetFailureCodeSummary = computed(() => {
+  const map = new Map<string, number>()
+  for (const row of sheetBatchFailures.value) {
+    const key = String(row.code || '-')
+    map.set(key, (map.get(key) || 0) + 1)
+  }
+  return Array.from(map.entries())
+    .map(([code, count]) => ({ code, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6)
+})
+
+const sheetBatchActions = computed<BatchActionItem[]>(() => [
+  {
+    key: 'confirm',
+    type: 'primary',
+    label: `批量确认出库（${selectedDraftSheetIds.value.length}）`,
+    disabled: selectedDraftSheetIds.value.length === 0,
+    onClick: batchConfirmSelected
+  },
+  {
+    key: 'pdf',
+    label: `批量导出PDF（${selectedSheetRowKeys.value.length}）`,
+    disabled: selectedSheetRowKeys.value.length === 0,
+    onClick: batchExportSelectedPdf
+  },
+  {
+    key: 'clear',
+    label: '清空勾选',
+    disabled: selectedSheetRowKeys.value.length === 0,
+    onClick: clearSheetSelection
+  },
+  {
+    key: 'retry-retryable',
+    type: 'dashed',
+    label: `重试可重试项（${retryableSheetFailures.value.length}）`,
+    disabled: retryableSheetFailures.value.length === 0,
+    onClick: retrySheetRetryableFailures
+  },
+  {
+    key: 'retry-failures',
+    type: 'dashed',
+    label: `重试失败项（${sheetBatchFailures.value.length}）`,
+    disabled: sheetBatchFailures.value.length === 0,
+    onClick: retrySheetBatchFailures
+  },
+  {
+    key: 'view-failures',
+    label: '查看失败明细',
+    disabled: sheetBatchFailures.value.length === 0,
+    onClick: () => { sheetFailureDrawerOpen.value = true }
+  },
+  {
+    key: 'export-failures',
+    label: `导出失败明细（${sheetBatchFailures.value.length}）`,
+    disabled: sheetBatchFailures.value.length === 0,
+    onClick: exportSheetBatchFailures
+  },
+  {
+    key: 'export-receipt',
+    label: '导出执行回执',
+    disabled: !sheetLastBatchReceipt.value,
+    onClick: exportSheetBatchReceipt
+  },
+  {
+    key: 'copy-digest',
+    label: '复制排障摘要',
+    disabled: sheetBatchFailures.value.length === 0,
+    onClick: copySheetFailureDigest
+  },
+  {
+    key: 'refresh',
+    label: '刷新',
+    onClick: fetchSheetData
+  }
+])
 
 async function fetchProducts() {
   const res: PageResult<ProductItem> = await getProductPage({ pageNo: 1, pageSize: 300 })
@@ -514,6 +722,8 @@ async function fetchSheetData() {
     })
     sheets.value = res.list || []
     sheetTotal.value = res.total || 0
+    const availableIds = new Set((sheets.value || []).map((item) => Number(item.id)))
+    selectedSheetRowKeys.value = selectedSheetRowKeys.value.filter((id) => availableIds.has(Number(id)))
   } finally {
     sheetLoading.value = false
   }
@@ -563,6 +773,249 @@ function resetSheetQuery() {
   fetchSheetData()
 }
 
+function clearSheetSelection() {
+  selectedSheetRowKeys.value = []
+}
+
+function startBatchProgress(title: string, total: number) {
+  batchProgress.open = true
+  batchProgress.running = true
+  batchProgress.title = title
+  batchProgress.total = total
+  batchProgress.current = 0
+  batchProgress.success = 0
+  batchProgress.failed = 0
+  batchProgress.percent = total > 0 ? 0 : 100
+}
+
+function stepBatchProgress(success: boolean) {
+  batchProgress.current += 1
+  if (success) batchProgress.success += 1
+  else batchProgress.failed += 1
+  batchProgress.percent = batchProgress.total > 0
+    ? Math.min(100, Math.round((batchProgress.current / batchProgress.total) * 100))
+    : 100
+}
+
+function finishBatchProgress() {
+  batchProgress.running = false
+  window.setTimeout(() => {
+    if (!batchProgress.running) {
+      batchProgress.open = false
+    }
+  }, 800)
+}
+
+function closeBatchProgress() {
+  if (batchProgress.running) return
+  batchProgress.open = false
+}
+
+function normalizeErrorMessage(error: unknown) {
+  const fallback = '未知错误'
+  const maybe = error as any
+  return String(maybe?.msg || maybe?.message || maybe?.response?.data?.msg || fallback)
+}
+
+function parseErrorDetail(error: unknown) {
+  const maybe = error as any
+  const status = maybe?.response?.status
+  const codeRaw = maybe?.response?.data?.code ?? status ?? maybe?.code
+  const code = codeRaw == null ? '' : String(codeRaw)
+  const path = String(maybe?.config?.url || maybe?.response?.config?.url || '').split('?')[0]
+  const retryable = !status || status >= 500 || status === 429 || status === 408 || code === 'ECONNABORTED' || code === 'ERR_NETWORK'
+  return {
+    reason: normalizeErrorMessage(error),
+    code: code || '-',
+    path: path || '-',
+    retryable
+  }
+}
+
+function exportSheetBatchFailures() {
+  if (!sheetBatchFailures.value.length) {
+    message.info('暂无失败明细')
+    return
+  }
+  exportCsv(
+    sheetBatchFailures.value.map((item) => ({
+      时间: item.at,
+      动作: item.action,
+      领用单ID: item.sheetId,
+      错误码: item.code,
+      接口路径: item.path,
+      可重试: item.retryable ? '是' : '否',
+      失败原因: item.reason
+    })),
+    `领用单批量失败明细-${new Date().toISOString().slice(0, 10)}.csv`
+  )
+}
+
+function exportSheetBatchReceipt() {
+  const receipt = sheetLastBatchReceipt.value
+  if (!receipt) {
+    message.info('暂无可导出的执行回执')
+    return
+  }
+  exportCsv(
+    [{
+      动作: receipt.action,
+      开始时间: receipt.startAt,
+      结束时间: receipt.finishAt,
+      总数: receipt.total,
+      成功: receipt.success,
+      失败: receipt.failed,
+      失败率: receipt.total > 0 ? `${Math.round((receipt.failed / receipt.total) * 100)}%` : '0%'
+    }],
+    `领用单批量执行回执-${new Date().toISOString().slice(0, 10)}.csv`
+  )
+}
+
+async function copySheetFailureDigest() {
+  if (!sheetBatchFailures.value.length) {
+    message.info('暂无失败明细')
+    return
+  }
+  const lines = sheetBatchFailures.value.slice(0, 30).map((item) =>
+    `[${item.at}] action=${item.action} sheetId=${item.sheetId} code=${item.code} retryable=${item.retryable ? 'Y' : 'N'} path=${item.path} reason=${item.reason}`
+  )
+  const text = [`批量失败摘要 total=${sheetBatchFailures.value.length}`, ...lines].join('\n')
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      message.success('排障摘要已复制')
+      return
+    }
+  } catch {}
+  message.warning('当前环境不支持剪贴板自动复制，请手动导出失败明细')
+}
+
+function latestSheetBatchAction() {
+  return sheetBatchFailures.value[0]?.action || ''
+}
+
+function failedSheetIds(options?: { retryableOnly?: boolean }) {
+  const source = options?.retryableOnly ? retryableSheetFailures.value : sheetBatchFailures.value
+  return Array.from(new Set(source.map((item) => Number(item.sheetId)).filter((id) => Number.isFinite(id))))
+}
+
+async function runBatchConfirm(ids: number[], actionLabel = '批量确认出库') {
+  const startedAt = new Date().toISOString().replace('T', ' ').slice(0, 19)
+  sheetBatchFailures.value = []
+  const successIds: number[] = []
+  const failedIds: number[] = []
+  startBatchProgress(`${actionLabel}处理中`, ids.length)
+  for (const id of ids) {
+    try {
+      await confirmOutboundSheet(id)
+      successIds.push(id)
+      stepBatchProgress(true)
+    } catch (error) {
+      failedIds.push(id)
+      stepBatchProgress(false)
+      const detail = parseErrorDetail(error)
+      sheetBatchFailures.value.push({
+        at: new Date().toISOString().replace('T', ' ').slice(0, 19),
+        action: actionLabel,
+        sheetId: id,
+        reason: detail.reason,
+        code: detail.code,
+        path: detail.path,
+        retryable: detail.retryable
+      })
+    }
+  }
+  finishBatchProgress()
+  sheetLastBatchReceipt.value = {
+    action: actionLabel,
+    startAt: startedAt,
+    finishAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
+    total: ids.length,
+    success: successIds.length,
+    failed: failedIds.length
+  }
+  selectedSheetRowKeys.value = failedIds
+  if (sheetDetail.value?.id && successIds.includes(Number(sheetDetail.value.id))) {
+    sheetDetail.value = await getOutboundSheetDetail(Number(sheetDetail.value.id))
+  }
+  await Promise.all([fetchSheetData(), fetchData()])
+  if (failedIds.length) {
+    message.warning(`${actionLabel}完成：成功 ${successIds.length}，失败 ${failedIds.length}（失败项已保留勾选）`)
+  } else {
+    message.success(`${actionLabel}成功：${successIds.length} 条`)
+  }
+}
+
+async function runBatchExportPdf(ids: number[], actionLabel = '批量导出PDF') {
+  const startedAt = new Date().toISOString().replace('T', ' ').slice(0, 19)
+  sheetBatchFailures.value = []
+  let ok = 0
+  let fail = 0
+  startBatchProgress(`${actionLabel}处理中`, ids.length)
+  for (const id of ids) {
+    try {
+      await downloadSheetPdf(id, false)
+      ok += 1
+      stepBatchProgress(true)
+    } catch (error) {
+      fail += 1
+      stepBatchProgress(false)
+      const detail = parseErrorDetail(error)
+      sheetBatchFailures.value.push({
+        at: new Date().toISOString().replace('T', ' ').slice(0, 19),
+        action: actionLabel,
+        sheetId: id,
+        reason: detail.reason,
+        code: detail.code,
+        path: detail.path,
+        retryable: detail.retryable
+      })
+    }
+  }
+  finishBatchProgress()
+  sheetLastBatchReceipt.value = {
+    action: actionLabel,
+    startAt: startedAt,
+    finishAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
+    total: ids.length,
+    success: ok,
+    failed: fail
+  }
+  if (fail > 0) {
+    message.warning(`${actionLabel}完成：成功 ${ok}，失败 ${fail}`)
+    return
+  }
+  message.success(`${actionLabel}完成：共 ${ok} 份`)
+}
+
+async function retrySheetBatchFailures() {
+  const ids = failedSheetIds()
+  if (!ids.length) {
+    message.info('暂无可重试失败项')
+    return
+  }
+  const action = latestSheetBatchAction()
+  if (action.includes('确认')) {
+    await runBatchConfirm(ids, '重试确认出库')
+    return
+  }
+  await runBatchExportPdf(ids, '重试导出PDF')
+}
+
+async function retrySheetRetryableFailures() {
+  const ids = failedSheetIds({ retryableOnly: true })
+  if (!ids.length) {
+    message.info('暂无可重试失败项')
+    return
+  }
+  const action = latestSheetBatchAction()
+  if (action.includes('确认')) {
+    await runBatchConfirm(ids, '重试确认出库')
+    return
+  }
+  await runBatchExportPdf(ids, '重试导出PDF')
+}
+
 function exportCsvData() {
   exportCsv(
     filteredRows.value.map((r) => ({
@@ -598,23 +1051,25 @@ function openOutboundSheet() {
   sheetForm.items = []
   appendSheetItem()
   outboundOpen.value = true
+  prefillSheetForm().catch(() => {})
 }
 
-async function resolveContractNoByElder(elderId?: number | string) {
-  if (!elderId) return ''
-  const normalizedElderId = Number(elderId)
-  if (!normalizedElderId) return ''
-  try {
-    const page: PageResult<CrmContractItem> = await getContractPage({
-      pageNo: 1,
-      pageSize: 20,
-      elderId: normalizedElderId
-    })
-    const list = page.list || []
-    const active = list.find((item) => item.contractNo && item.status !== 'VOID')
-    return (active || list.find((item) => item.contractNo))?.contractNo || ''
-  } catch {
-    return ''
+function matchDeptOptionByName(name?: string) {
+  const normalized = String(name || '').trim()
+  if (!normalized) return undefined
+  return departmentOptions.value.find((item) => String(item.name || '').trim() === normalized)?.name || normalized
+}
+
+async function prefillSheetForm(elderId?: number) {
+  const prefill = await getOutboundSheetPrefill({ elderId: elderId || undefined })
+  if (prefill?.receiverName) {
+    sheetForm.receiverName = prefill.receiverName
+  }
+  if (prefill?.contractNo !== undefined) {
+    sheetForm.contractNo = String(prefill.contractNo || '')
+  }
+  if (prefill?.applyDept) {
+    sheetForm.applyDept = matchDeptOptionByName(prefill.applyDept)
   }
 }
 
@@ -625,8 +1080,7 @@ async function onSheetElderChange(elderId?: number) {
     sheetForm.contractNo = ''
     return
   }
-  const contractNo = await resolveContractNoByElder(elderId)
-  sheetForm.contractNo = contractNo || ''
+  await prefillSheetForm(elderId)
 }
 
 function appendSheetItem() {
@@ -657,16 +1111,13 @@ async function submitOutboundSheet() {
     return
   }
   outboundSubmitting.value = true
-  const applyDeptName = sheetForm.applyDept
-    ? (departmentOptions.value.find((item) => String(item.value) === String(sheetForm.applyDept))?.name || String(sheetForm.applyDept))
-    : ''
   try {
     const payload: InventoryOutboundSheetCreateRequest = {
       receiverName: sheetForm.receiverName.trim(),
       outboundNo: sheetForm.outboundNo.trim() || undefined,
       elderId: sheetForm.elderId || undefined,
       contractNo: sheetForm.contractNo.trim() || undefined,
-      applyDept: applyDeptName || undefined,
+      applyDept: sheetForm.applyDept ? String(sheetForm.applyDept).trim() || undefined : undefined,
       remark: sheetForm.remark.trim() || undefined,
       items: sheetForm.items.map((item): InventoryOutboundSheetItemRequest => ({
         productId: item.productId as number | string,
@@ -695,12 +1146,37 @@ async function confirmSheet(id: number) {
     onOk: async () => {
       await confirmOutboundSheet(id)
       message.success('确认出库成功')
+      selectedSheetRowKeys.value = selectedSheetRowKeys.value.filter((item) => Number(item) !== Number(id))
       if (sheetDetail.value?.id === id) {
         sheetDetail.value = await getOutboundSheetDetail(id)
       }
       await Promise.all([fetchSheetData(), fetchData()])
     }
   })
+}
+
+async function batchConfirmSelected() {
+  if (!selectedDraftSheetIds.value.length) {
+    message.info('请先勾选待确认领用单')
+    return
+  }
+  Modal.confirm({
+    title: `确认批量出库（${selectedDraftSheetIds.value.length}）？`,
+    content: '系统会逐单确认，成功项自动取消勾选，失败项会保留勾选便于重试。',
+    onOk: async () => {
+      const ids = [...selectedDraftSheetIds.value]
+      await runBatchConfirm(ids, '批量确认出库')
+    }
+  })
+}
+
+async function batchExportSelectedPdf() {
+  if (!selectedSheetRowKeys.value.length) {
+    message.info('请先勾选领用单')
+    return
+  }
+  const ids = [...selectedSheetRowKeys.value]
+  await runBatchExportPdf(ids, '批量导出PDF')
 }
 
 async function printSheet(id: number) {
@@ -732,7 +1208,7 @@ async function downloadSheetHtml(id: number) {
   message.success('领取单已下载')
 }
 
-async function downloadSheetPdf(id: number) {
+async function downloadSheetPdf(id: number, notify = true) {
   const sheet = await getOutboundSheetDetail(id)
   const doc = new jsPDF({
     orientation: 'p',
@@ -786,7 +1262,9 @@ async function downloadSheetPdf(id: number) {
   doc.text(`经办人：${sheet.operatorName || '__________________'}`, marginLeft + 190, signY)
   doc.text('仓库管理员：__________________', marginLeft + 370, signY)
   doc.save(`领用出库单_${sheet.outboundNo || id}.pdf`)
-  message.success('PDF 已导出')
+  if (notify) {
+    message.success('PDF 已导出')
+  }
 }
 
 function buildSheetHtml(sheet: InventoryOutboundSheet) {
@@ -906,6 +1384,14 @@ function applyRouteFilters() {
   if (typeof domainRaw === 'string' && domainRaw) query.businessDomain = domainRaw
   if (typeof itemTypeRaw === 'string' && itemTypeRaw) query.itemType = itemTypeRaw
 }
+
+useLiveSyncRefresh({
+  topics: ['logistics', 'elder', 'marketing', 'system'],
+  refresh: async () => {
+    await Promise.all([fetchData(), fetchSheetData()])
+  },
+  debounceMs: 600
+})
 
 onMounted(async () => {
   applyRouteFilters()

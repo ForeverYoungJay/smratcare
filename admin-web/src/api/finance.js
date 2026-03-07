@@ -45,6 +45,40 @@ export function getElderAccountWarnings() {
 export function getFinanceWorkbenchOverview() {
     return request.get('/api/finance/workbench/overview');
 }
+export function getFinanceLedgerHealth(params) {
+    return request.get('/api/finance/workbench/ledger/health', { params });
+}
+export function getFinanceDischargeStatusSync(params) {
+    return request.get('/api/finance/workbench/discharge/status-sync', { params });
+}
+export function executeFinanceDischargeStatusSync(data) {
+    return request.post('/api/finance/workbench/discharge/status-sync/execute', data);
+}
+export async function exportFinanceLedgerHealthCsv(params) {
+    const url = new URL('/api/finance/workbench/ledger/health/export', window.location.origin);
+    Object.entries(params || {}).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            url.searchParams.set(key, String(value));
+        }
+    });
+    const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${getToken()}` }
+    });
+    if (!response.ok) {
+        throw new Error('导出失败');
+    }
+    const blob = await response.blob();
+    const contentDisposition = response.headers.get('content-disposition') || '';
+    const filenameMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/);
+    const filename = filenameMatch?.[1] || `finance-ledger-health-${new Date().toISOString().slice(0, 10)}.csv`;
+    const link = document.createElement('a');
+    const objectUrl = URL.createObjectURL(blob);
+    link.href = objectUrl;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(objectUrl);
+}
 export function getFinanceInvoiceReceiptPage(params) {
     return fetchPage('/api/finance/workbench/invoice/page', params);
 }
@@ -109,6 +143,9 @@ export function getFinanceRoomOpsDetail(params) {
 export function getFinanceAllocationRules(params) {
     return request.get('/api/finance/workbench/allocation/rules', { params });
 }
+export function getFinanceAllocationResidentOptions(params) {
+    return request.get('/api/finance/workbench/allocation/resident-options', { params });
+}
 export function initFinanceAllocationRuleTemplate(params) {
     return request.post('/api/finance/workbench/allocation/rules/template/init', null, { params });
 }
@@ -170,6 +207,9 @@ export async function exportFinanceReconcileHistoryCsv(params) {
 }
 export function getFinanceMasterDataOverview(params) {
     return request.get('/api/finance/workbench/config/overview', { params });
+}
+export function getFinanceConfigImpactPreview(data) {
+    return request.post('/api/finance/workbench/config/impact-preview', data);
 }
 export function getFinanceBillingConfig(params) {
     return request.get('/api/finance/workbench/billing-config', { params });

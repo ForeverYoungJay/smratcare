@@ -14,6 +14,8 @@ import com.zhiyangyun.care.health.model.HealthInspectionSummaryResponse;
 import com.zhiyangyun.care.health.model.HealthNameCountStatItem;
 import com.zhiyangyun.care.health.service.HealthInspectionClosureService;
 import com.zhiyangyun.care.health.support.ElderResolveSupport;
+import com.zhiyangyun.care.medicalcare.entity.MedicalAlertRuleConfig;
+import com.zhiyangyun.care.medicalcare.mapper.MedicalAlertRuleConfigMapper;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -39,53 +41,68 @@ public class HealthInspectionController {
   private final HealthNursingLogMapper nursingLogMapper;
   private final ElderResolveSupport elderResolveSupport;
   private final HealthInspectionClosureService inspectionClosureService;
+  private final MedicalAlertRuleConfigMapper alertRuleConfigMapper;
 
   public HealthInspectionController(
       HealthInspectionMapper mapper,
       HealthNursingLogMapper nursingLogMapper,
       ElderResolveSupport elderResolveSupport,
-      HealthInspectionClosureService inspectionClosureService) {
+      HealthInspectionClosureService inspectionClosureService,
+      MedicalAlertRuleConfigMapper alertRuleConfigMapper) {
     this.mapper = mapper;
     this.nursingLogMapper = nursingLogMapper;
     this.elderResolveSupport = elderResolveSupport;
     this.inspectionClosureService = inspectionClosureService;
+    this.alertRuleConfigMapper = alertRuleConfigMapper;
   }
 
   @GetMapping("/page")
   public Result<IPage<HealthInspection>> page(
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
+      @RequestParam(required = false) Long inspectionId,
       @RequestParam(required = false) Long elderId,
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String inspectionFrom,
       @RequestParam(required = false) String inspectionTo,
       @RequestParam(required = false) String keyword) {
-    var wrapper = buildQuery(AuthContext.getOrgId(), elderId, status, inspectionFrom, inspectionTo, keyword);
+    var wrapper = buildQuery(
+        AuthContext.getOrgId(),
+        inspectionId,
+        elderId,
+        normalizeStatusFilter(status),
+        inspectionFrom,
+        inspectionTo,
+        normalizeText(keyword));
     wrapper.orderByDesc(HealthInspection::getInspectionDate);
     return Result.ok(mapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
   }
 
   @GetMapping("/summary")
   public Result<HealthInspectionSummaryResponse> summary(
+      @RequestParam(required = false) Long inspectionId,
       @RequestParam(required = false) Long elderId,
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String inspectionFrom,
       @RequestParam(required = false) String inspectionTo,
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
+    status = normalizeStatusFilter(status);
+    keyword = normalizeText(keyword);
     LocalDate from = parseDate(inspectionFrom);
     LocalDate to = parseDate(inspectionTo);
     LocalDateTime fromStart = from == null ? null : from.atStartOfDay();
     LocalDateTime toEndExclusive = to == null ? null : to.plusDays(1).atStartOfDay();
-    var wrapper = buildQuery(orgId, elderId, status, inspectionFrom, inspectionTo, keyword);
+    var wrapper = buildQuery(orgId, inspectionId, elderId, status, inspectionFrom, inspectionTo, keyword);
     long totalCount = mapper.selectCount(wrapper);
-    long abnormalCount = mapper.selectCount(buildQuery(orgId, elderId, "ABNORMAL", inspectionFrom, inspectionTo, keyword));
-    long followingCount = mapper.selectCount(buildQuery(orgId, elderId, "FOLLOWING", inspectionFrom, inspectionTo, keyword));
-    long closedCount = mapper.selectCount(buildQuery(orgId, elderId, "CLOSED", inspectionFrom, inspectionTo, keyword));
+    long abnormalCount = mapper.selectCount(buildQuery(orgId, inspectionId, elderId, "ABNORMAL", inspectionFrom, inspectionTo, keyword));
+    long followingCount = mapper.selectCount(buildQuery(orgId, inspectionId, elderId, "FOLLOWING", inspectionFrom, inspectionTo, keyword));
+    long closedCount = mapper.selectCount(buildQuery(orgId, inspectionId, elderId, "CLOSED", inspectionFrom, inspectionTo, keyword));
 
     long linkedLogCount = nursingLogMapper.selectCount(Wrappers.lambdaQuery(HealthNursingLog.class)
         .eq(HealthNursingLog::getIsDeleted, 0)
         .eq(orgId != null, HealthNursingLog::getOrgId, orgId)
+        .eq(inspectionId != null, HealthNursingLog::getSourceInspectionId, inspectionId)
         .eq(elderId != null, HealthNursingLog::getElderId, elderId)
         .isNotNull(HealthNursingLog::getSourceInspectionId)
         .ge(fromStart != null, HealthNursingLog::getLogTime, fromStart)
@@ -95,6 +112,7 @@ public class HealthInspectionController {
         .select("status AS name", "COUNT(1) AS totalCount")
         .eq("is_deleted", 0)
         .eq(orgId != null, "org_id", orgId)
+        .eq(inspectionId != null, "id", inspectionId)
         .eq(elderId != null, "elder_id", elderId)
         .eq(status != null && !status.isBlank(), "status", status)
         .ge(from != null, "inspection_date", from)
@@ -148,6 +166,7 @@ public class HealthInspectionController {
     item.setRemark(normalizeText(request.getRemark()));
     item.setCreatedBy(AuthContext.getStaffId());
     mapper.insert(item);
+    syncAbnormalInspectionLog(item);
     inspectionClosureService.syncFromInspection(item, AuthContext.getStaffId());
     return Result.ok(item);
   }
@@ -178,6 +197,7 @@ public class HealthInspectionController {
     item.setOtherNote(normalizeText(request.getOtherNote()));
     item.setRemark(normalizeText(request.getRemark()));
     mapper.updateById(item);
+    syncAbnormalInspectionLog(item);
     inspectionClosureService.syncFromInspection(item, AuthContext.getStaffId());
     return Result.ok(item);
   }
@@ -196,6 +216,7 @@ public class HealthInspectionController {
 
   private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<HealthInspection> buildQuery(
       Long orgId,
+      Long inspectionId,
       Long elderId,
       String status,
       String inspectionFrom,
@@ -206,6 +227,7 @@ public class HealthInspectionController {
     var wrapper = Wrappers.lambdaQuery(HealthInspection.class)
         .eq(HealthInspection::getIsDeleted, 0)
         .eq(orgId != null, HealthInspection::getOrgId, orgId)
+        .eq(inspectionId != null, HealthInspection::getId, inspectionId)
         .eq(elderId != null, HealthInspection::getElderId, elderId)
         .eq(status != null && !status.isBlank(), HealthInspection::getStatus, status)
         .ge(from != null, HealthInspection::getInspectionDate, from)
@@ -236,13 +258,26 @@ public class HealthInspectionController {
   }
 
   private String resolveInspectionStatus(String status, String result) {
-    if (status != null && !status.isBlank()) {
-      return status;
+    String normalizedStatus = normalizeStatusFilter(status);
+    if (normalizedStatus != null) {
+      return normalizedStatus;
     }
     if (result != null && result.contains("异常")) {
       return "ABNORMAL";
     }
     return "NORMAL";
+  }
+
+  private String normalizeStatusFilter(String status) {
+    String normalized = normalizeText(status);
+    if (normalized == null) {
+      return null;
+    }
+    String upper = normalized.toUpperCase(Locale.ROOT);
+    if ("NORMAL".equals(upper) || "ABNORMAL".equals(upper) || "FOLLOWING".equals(upper) || "CLOSED".equals(upper)) {
+      return upper;
+    }
+    return null;
   }
 
   private String normalizeStatus(String status) {
@@ -272,5 +307,62 @@ public class HealthInspectionController {
     } catch (NumberFormatException e) {
       return 0L;
     }
+  }
+
+  private void syncAbnormalInspectionLog(HealthInspection inspection) {
+    if (inspection == null || inspection.getId() == null || !"ABNORMAL".equals(inspection.getStatus())) {
+      return;
+    }
+    Long orgId = inspection.getOrgId();
+    MedicalAlertRuleConfig config = alertRuleConfigMapper.selectOne(Wrappers.lambdaQuery(MedicalAlertRuleConfig.class)
+        .eq(MedicalAlertRuleConfig::getIsDeleted, 0)
+        .eq(orgId != null, MedicalAlertRuleConfig::getOrgId, orgId)
+        .last("LIMIT 1"));
+    if (config != null && Number.valueOf(0).equals(config.getAutoCreateNursingLogFromInspection())) {
+      return;
+    }
+
+    long linkedCount = nursingLogMapper.selectCount(Wrappers.lambdaQuery(HealthNursingLog.class)
+        .eq(HealthNursingLog::getIsDeleted, 0)
+        .eq(orgId != null, HealthNursingLog::getOrgId, orgId)
+        .eq(HealthNursingLog::getSourceInspectionId, inspection.getId()));
+    if (linkedCount > 0) {
+      return;
+    }
+
+    HealthNursingLog nursingLog = new HealthNursingLog();
+    nursingLog.setTenantId(inspection.getTenantId());
+    nursingLog.setOrgId(inspection.getOrgId());
+    nursingLog.setElderId(inspection.getElderId());
+    nursingLog.setElderName(inspection.getElderName());
+    nursingLog.setSourceInspectionId(inspection.getId());
+    nursingLog.setLogTime(LocalDateTime.now());
+    boolean raiseTask = config == null || !Number.valueOf(0).equals(config.getAutoRaiseTaskFromAbnormal());
+    nursingLog.setLogType(raiseTask ? "INCIDENT" : "INSPECTION_FOLLOW_UP");
+    nursingLog.setContent(buildAutoNursingLogContent(inspection));
+    nursingLog.setStaffName(inspection.getInspectorName());
+    nursingLog.setStatus("PENDING");
+    nursingLog.setRemark("系统根据异常巡检自动生成");
+    nursingLog.setCreatedBy(AuthContext.getStaffId());
+    nursingLogMapper.insert(nursingLog);
+    inspectionClosureService.syncFromNursingLog(nursingLog);
+  }
+
+  private String buildAutoNursingLogContent(HealthInspection inspection) {
+    String inspectionItem = normalizeText(inspection.getInspectionItem());
+    String result = normalizeText(inspection.getResult());
+    String action = normalizeText(inspection.getFollowUpAction());
+    StringBuilder builder = new StringBuilder();
+    builder.append("异常巡检自动联动");
+    if (inspectionItem != null) {
+      builder.append("：").append(inspectionItem);
+    }
+    if (result != null) {
+      builder.append("；结果=").append(result);
+    }
+    if (action != null) {
+      builder.append("；处理=").append(action);
+    }
+    return builder.toString();
   }
 }

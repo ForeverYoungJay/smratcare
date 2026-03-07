@@ -64,11 +64,16 @@ request.interceptors.response.use(
   },
   (error) => {
     const status = error?.response?.status
+    const url = String(error?.config?.url || '')
+    const isLoginRequest = url.includes('/api/auth/login') || url.includes('/api/auth/family/login')
     if (status === 401) {
       clearToken()
       clearRoles()
       clearPermissions()
       router.push('/login')
+      return Promise.reject(error)
+    }
+    if (isLoginRequest) {
       return Promise.reject(error)
     }
     const payload = error?.response?.data

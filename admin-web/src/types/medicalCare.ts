@@ -128,6 +128,30 @@ export interface MedicalCareWorkbenchSummary {
   keyResidents: MedicalCareRiskResident[]
 }
 
+export interface MedicalUnifiedTaskItem {
+  id: string
+  module: 'ORDER' | 'INSPECTION' | 'NURSING_LOG' | 'HANDOVER' | string
+  residentId?: number
+  residentName?: string
+  taskTitle: string
+  assignee?: string
+  plannedTime?: string
+  priority: 'HIGH' | 'MEDIUM' | 'LOW' | string
+  status?: string
+  sourceId?: number
+}
+
+export interface MedicalAlertRuleConfig {
+  medicationHighDosageThreshold: number
+  overdueHoursThreshold: number
+  abnormalInspectionRequirePhoto: number
+  handoverAutoFillConfirmTime: number
+  autoCreateNursingLogFromInspection: number
+  autoRaiseTaskFromAbnormal: number
+  autoCarryResidentContext: number
+  handoverRiskKeywords: string
+}
+
 export interface MedicalResidentRiskCard {
   elderId?: number
   elderName?: string

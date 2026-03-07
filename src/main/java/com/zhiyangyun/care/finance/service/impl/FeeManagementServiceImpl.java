@@ -9,9 +9,11 @@ import com.zhiyangyun.care.bill.mapper.BillItemMapper;
 import com.zhiyangyun.care.bill.mapper.BillMonthlyMapper;
 import com.zhiyangyun.care.elder.entity.Bed;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
+import com.zhiyangyun.care.elder.entity.Room;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderDischargeApply;
 import com.zhiyangyun.care.elder.mapper.BedMapper;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
+import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeApplyMapper;
 import com.zhiyangyun.care.elder.model.lifecycle.ResidenceLifecycleConstants;
 import com.zhiyangyun.care.finance.entity.AdmissionFeeAudit;
@@ -66,6 +68,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
   private final BillItemMapper billItemMapper;
   private final BedMapper bedMapper;
   private final ElderMapper elderMapper;
+  private final RoomMapper roomMapper;
   private final ElderAccountMapper elderAccountMapper;
   private final ElderDischargeApplyMapper elderDischargeApplyMapper;
   private final ElderAccountService elderAccountService;
@@ -81,6 +84,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
       BillItemMapper billItemMapper,
       BedMapper bedMapper,
       ElderMapper elderMapper,
+      RoomMapper roomMapper,
       ElderAccountMapper elderAccountMapper,
       ElderDischargeApplyMapper elderDischargeApplyMapper,
       ElderAccountService elderAccountService,
@@ -94,6 +98,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     this.billItemMapper = billItemMapper;
     this.bedMapper = bedMapper;
     this.elderMapper = elderMapper;
+    this.roomMapper = roomMapper;
     this.elderAccountMapper = elderAccountMapper;
     this.elderDischargeApplyMapper = elderDischargeApplyMapper;
     this.elderAccountService = elderAccountService;
@@ -491,7 +496,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
   @Override
   public MonthlyAllocationPreviewResponse previewMonthlyAllocation(Long orgId, MonthlyAllocationPreviewRequest request) {
     validateNonNegativeAmount(request.getTotalAmount(), "totalAmount");
-    List<ElderProfile> elders = listAllocationElders(orgId, request.getElderIds());
+    List<ElderProfile> elders = listAllocationElders(orgId, request.getElderIds(), null);
     if (elders.isEmpty()) {
       throw new IllegalArgumentException("请选择分摊老人");
     }
@@ -504,7 +509,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
   public MonthlyAllocation createMonthlyAllocation(Long orgId, Long operatorId, MonthlyAllocationCreateRequest request) {
     validateNonNegativeAmount(request.getTotalAmount(), "totalAmount");
     List<Long> elderIds = normalizeElderIds(request.getElderIds());
-    List<ElderProfile> elders = listAllocationElders(orgId, elderIds);
+    List<ElderProfile> elders = listAllocationElders(orgId, elderIds, request.getRoomNo());
     if (elders.isEmpty()) {
       throw new IllegalArgumentException("请选择分摊老人");
     }
@@ -766,7 +771,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     return source.stream().filter(Objects::nonNull).distinct().toList();
   }
 
-  private List<ElderProfile> listAllocationElders(Long orgId, List<Long> elderIds) {
+  private List<ElderProfile> listAllocationElders(Long orgId, List<Long> elderIds, String roomNo) {
     List<Long> normalized = normalizeElderIds(elderIds);
     if (normalized.isEmpty()) {
       return List.of();
@@ -779,7 +784,51 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     if (elders.size() != normalized.size()) {
       throw new IllegalArgumentException("存在无效老人，无法分摊");
     }
+    String normalizedRoomNo = normalizeOptionalText(roomNo);
+    if (hasText(normalizedRoomNo)) {
+      List<Bed> beds = bedMapper.selectList(
+          Wrappers.lambdaQuery(Bed.class)
+              .eq(Bed::getIsDeleted, 0)
+              .eq(orgId != null, Bed::getOrgId, orgId)
+              .in(Bed::getElderId, normalized));
+      long uniqueElderCount = beds.stream()
+          .map(Bed::getElderId)
+          .filter(Objects::nonNull)
+          .distinct()
+          .count();
+      if (uniqueElderCount != normalized.size()) {
+        throw new IllegalStateException("所选老人存在未入住床位数据，请刷新后重试");
+      }
+      List<Long> roomIds = beds.stream().map(Bed::getRoomId).filter(Objects::nonNull).distinct().toList();
+      var roomMap = roomIds.isEmpty()
+          ? java.util.Map.<Long, String>of()
+          : roomMapperByIds(roomIds);
+      List<Long> invalidElderIds = beds.stream()
+          .filter(bed -> !normalizedRoomNo.equals(roomMap.getOrDefault(bed.getRoomId(), "")))
+          .map(Bed::getElderId)
+          .filter(Objects::nonNull)
+          .distinct()
+          .toList();
+      if (!invalidElderIds.isEmpty()) {
+        throw new IllegalStateException("所选老人已不在房间[" + normalizedRoomNo + "]，请刷新后重试");
+      }
+    }
     return elders;
+  }
+
+  private java.util.Map<Long, String> roomMapperByIds(List<Long> roomIds) {
+    if (roomIds == null || roomIds.isEmpty()) {
+      return java.util.Map.of();
+    }
+    return roomMapper.selectList(
+        Wrappers.lambdaQuery(Room.class)
+            .in(Room::getId, roomIds)
+            .eq(Room::getIsDeleted, 0))
+        .stream()
+        .collect(Collectors.toMap(Room::getId, room -> {
+          String roomNo = normalizeOptionalText(room.getRoomNo());
+          return roomNo == null ? "" : roomNo;
+        }, (a, b) -> a));
   }
 
   private String buildElderSnapshotJson(List<ElderProfile> elders) {

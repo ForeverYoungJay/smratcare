@@ -137,6 +137,7 @@ export interface MonthlyAllocationCreateRequest {
   allocationName: string
   totalAmount: number
   targetCount: number
+  roomNo?: string
   elderIds?: number[]
   remark?: string
 }

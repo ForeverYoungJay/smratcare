@@ -122,7 +122,8 @@ const cards = computed(() => [
       { label: '待执行医嘱', route: '/medical-care/orders?filter=to_execute&assignee=me&date=today' },
       { label: '超时任务', route: '/medical-care/care-task-board?date=today&filter=overdue&assignee=me' },
       { label: '巡查待完成', route: '/medical-care/inspection?filter=pending&assignee=me&date=today' },
-      { label: '账户联动', route: '/medical-care/integrated-account' }
+      { label: '账户联动', route: '/medical-care/integrated-account' },
+      { label: '统一任务中心', route: '/medical-care/unified-task-center' }
     ]
   },
   {
@@ -232,7 +233,8 @@ const cards = computed(() => [
     actions: [
       { label: '生成巡检任务', route: '/medical-care/inspection?filter=generated_from_ai' },
       { label: '医护待办', route: '/medical-care/care-task-board?filter=generated_from_ai' },
-      { label: '护理任务', route: '/care/workbench/task-board?filter=generated_from_ai' }
+      { label: '护理任务', route: '/care/workbench/task-board?filter=generated_from_ai' },
+      { label: '异常规则', route: '/medical-care/alert-rules' }
     ]
   }
 ])

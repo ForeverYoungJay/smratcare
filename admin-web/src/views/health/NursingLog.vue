@@ -16,6 +16,14 @@
         <a-tag v-if="!summary.logTypeStats.length" color="default">暂无类型统计</a-tag>
       </a-space>
     </a-card>
+    <a-card v-if="residentContext.active" :bordered="false" class="summary-row context-card">
+      <a-space wrap>
+        <a-tag color="processing">当前长者：{{ residentContext.name }}</a-tag>
+        <a-button size="small" @click="goWithResident('/medical-care/inspection')">查看巡检</a-button>
+        <a-button size="small" @click="goWithResident('/medical-care/medication-registration')">查看用药登记</a-button>
+        <a-button size="small" @click="clearResidentContext">清除长者上下文</a-button>
+      </a-space>
+    </a-card>
 
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词"><a-input v-model:value="query.keyword" placeholder="老人/内容/记录人" allow-clear /></a-form-item>
@@ -55,6 +63,10 @@
         </template>
         <template v-else-if="column.key === 'status'">
           <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
+        </template>
+        <template v-else-if="column.key === 'sourceInspectionId'">
+          <a v-if="record.sourceInspectionId" @click="goInspection(record.sourceInspectionId)">#{{ record.sourceInspectionId }}</a>
+          <span v-else>-</span>
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
@@ -102,8 +114,8 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
@@ -112,6 +124,7 @@ import DataTable from '../../components/DataTable.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { mapHealthExportRows, nursingLogExportColumns } from '../../constants/healthExport'
 import { exportCsv, exportExcel } from '../../utils/export'
+import { syncMedicalAlertRules } from '../../utils/medicalAlertRule'
 import { resolveHealthError } from './healthError'
 import {
   getHealthNursingLogPage,
@@ -125,6 +138,7 @@ import type { HealthNursingLog, HealthNursingLogSummary, PageResult } from '../.
 const loading = ref(false)
 const exporting = ref(false)
 const route = useRoute()
+const router = useRouter()
 const rows = ref<HealthNursingLog[]>([])
 const query = reactive({
   keyword: '',
@@ -148,6 +162,7 @@ const columns = [
   { title: '老人', dataIndex: 'elderName', key: 'elderName', width: 120 },
   { title: '时间', dataIndex: 'logTime', key: 'logTime', width: 180 },
   { title: '类型', dataIndex: 'logType', key: 'logType', width: 120 },
+  { title: '来源巡检', dataIndex: 'sourceInspectionId', key: 'sourceInspectionId', width: 120 },
   { title: '内容', dataIndex: 'content', key: 'content', width: 260 },
   { title: '记录人', dataIndex: 'staffName', key: 'staffName', width: 120 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
@@ -168,6 +183,15 @@ const form = reactive({
   staffName: '',
   status: 'PENDING',
   remark: ''
+})
+const residentContext = computed(() => {
+  const residentId = route.query.residentId ?? route.query.elderId
+  const residentName = typeof route.query.residentName === 'string' ? route.query.residentName : ''
+  return {
+    active: !!residentId,
+    residentId: residentId ? Number(residentId) : undefined,
+    name: residentName || (residentId ? `长者#${residentId}` : '')
+  }
 })
 const logTypeOptions = [
   { label: '日常护理', value: 'ROUTINE' },
@@ -339,6 +363,7 @@ async function exportExcelData() {
 
 function buildQueryParams() {
   const residentId = route.query.residentId ?? route.query.elderId
+  const sourceInspectionId = route.query.sourceInspectionId ?? route.query.inspectionId
   const params: Record<string, any> = {
     keyword: query.keyword || undefined,
     logType: query.logType || undefined,
@@ -348,6 +373,9 @@ function buildQueryParams() {
   }
   if (residentId) {
     params.elderId = Number(residentId)
+  }
+  if (sourceInspectionId) {
+    params.sourceInspectionId = Number(sourceInspectionId)
   }
   if (Array.isArray(query.logRange) && query.logRange.length === 2) {
     params.logFrom = dayjs(query.logRange[0]).format('YYYY-MM-DDTHH:mm:ss')
@@ -374,6 +402,39 @@ function statusColor(value?: string) {
   if (value === 'DONE') return 'green'
   if (value === 'CLOSED') return 'blue'
   return 'orange'
+}
+
+function goInspection(sourceInspectionId: number) {
+  router.push({
+    path: '/health/inspection',
+    query: {
+      inspectionId: String(sourceInspectionId),
+      residentId: route.query.residentId ? String(route.query.residentId) : undefined,
+      residentName: route.query.residentName ? String(route.query.residentName) : undefined
+    }
+  })
+}
+
+function goWithResident(path: string) {
+  if (!residentContext.value.active) {
+    router.push(path)
+    return
+  }
+  router.push({
+    path,
+    query: {
+      residentId: residentContext.value.residentId ? String(residentContext.value.residentId) : undefined,
+      residentName: residentContext.value.name
+    }
+  })
+}
+
+function clearResidentContext() {
+  const nextQuery: Record<string, any> = { ...route.query }
+  delete nextQuery.residentId
+  delete nextQuery.elderId
+  delete nextQuery.residentName
+  router.push({ path: route.path, query: nextQuery })
 }
 
 function resolveRowClassName(record: HealthNursingLog) {
@@ -421,9 +482,10 @@ async function loadExportRecords() {
 
 fetchData()
 searchElders('')
+syncMedicalAlertRules().catch(() => {})
 
 watch(
-  () => [route.query.residentId, route.query.elderId],
+  () => [route.query.residentId, route.query.elderId, route.query.sourceInspectionId, route.query.inspectionId],
   () => {
     query.pageNo = 1
     pagination.current = 1
@@ -438,5 +500,8 @@ watch(
 }
 :deep(.health-row-warning > td) {
   background: #fff7e6 !important;
+}
+.context-card {
+  background: #f0f9ff;
 }
 </style>

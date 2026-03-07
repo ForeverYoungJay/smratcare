@@ -25,7 +25,7 @@
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <MarketingListToolbar :tip="`已勾选 ${selectedCount} 条`">
+      <MarketingListToolbar :selected-count="selectedCount" tip="支持批量短信、批量删除">
         <a-space>
           <a-button @click="exportList">导出</a-button>
           <a-button :disabled="selectedCount !== 1" @click="sendSmsSelected">短信</a-button>

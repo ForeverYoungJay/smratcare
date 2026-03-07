@@ -13,6 +13,14 @@
         <a-button @click="go('/finance/config/change-log')">查看变更记录</a-button>
       </a-space>
     </a-card>
+    <a-card v-if="impactPreview" class="card-elevated" :bordered="false" style="margin-top: 12px;">
+      <a-alert
+        type="info"
+        show-icon
+        :message="`最近预览：${impactPreview.month}（${impactPreview.configKeyCount} 个科目键）`"
+        :description="`账单 ${impactPreview.activeBillCount} 条，长者 ${impactPreview.activeElderCount} 人，欠费 ${impactPreview.highRiskBillCount} 条`"
+      />
+    </a-card>
     <input ref="importInputRef" type="file" accept=".csv,text/csv" style="display: none" @change="onImportFileChange" />
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
@@ -63,9 +71,10 @@ import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
-import { batchUpsertFinanceBillingConfig, getFinanceBillingConfig, upsertFinanceBillingConfig } from '../../api/finance'
-import type { FinanceBillingConfigEntry } from '../../types'
+import { batchUpsertFinanceBillingConfig, getFinanceBillingConfig, getFinanceConfigImpactPreview, upsertFinanceBillingConfig } from '../../api/finance'
+import type { FinanceBillingConfigEntry, FinanceConfigImpactPreview } from '../../types'
 import { exportCsv } from '../../utils/export'
+import { confirmAction } from '../../utils/actionConfirm'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -73,6 +82,7 @@ const router = useRouter()
 const rows = ref<FinanceBillingConfigEntry[]>([])
 const tableRef = ref<any>()
 const importInputRef = ref<HTMLInputElement | null>(null)
+const impactPreview = ref<FinanceConfigImpactPreview | null>(null)
 const query = ref({
   month: dayjs(),
   keyword: ''
@@ -146,10 +156,53 @@ async function submitEdit() {
     message.warning('科目编码格式非法，请使用字母/数字/下划线，长度 2-48')
     return
   }
+  const configKey = `FEE_SUBJECT_${keySuffix}`
+  let preview: FinanceConfigImpactPreview
+  let fallbackConfirmed = false
+  try {
+    preview = await getFinanceConfigImpactPreview({
+      month: dayjs(form.value.effectiveMonth).format('YYYY-MM'),
+      configKeys: [configKey]
+    })
+    impactPreview.value = preview
+  } catch (error: any) {
+    message.warning(error?.message || '影响预览加载失败，已切换普通确认')
+    const confirmedFallback = await confirmAction({
+      title: '确认保存费用科目？',
+      content: `即将保存 ${form.value.subjectName.trim()}（${configKey}）`,
+      okText: '确认保存'
+    })
+    if (!confirmedFallback) return
+    fallbackConfirmed = true
+    preview = {
+      month: dayjs(form.value.effectiveMonth).format('YYYY-MM'),
+      activeBillCount: 0,
+      activeElderCount: 0,
+      highRiskBillCount: 0,
+      pendingApprovalCount: 0,
+      recentPaymentCount: 0,
+      allocationTaskCount: 0,
+      configKeyCount: 1,
+      impactedItems: [],
+      riskTips: []
+    }
+  }
+  if (!fallbackConfirmed) {
+    const confirmed = await confirmAction({
+      title: '确认保存费用科目？',
+      content: `即将保存 ${form.value.subjectName.trim()}（${configKey}）`,
+      impactItems: [
+        `影响账单 ${preview.activeBillCount} 条，涉及长者 ${preview.activeElderCount} 人`,
+        ...preview.riskTips.slice(0, 2)
+      ],
+      okText: '确认保存'
+    })
+    if (!confirmed) return
+  }
   saving.value = true
   try {
     await upsertFinanceBillingConfig({
-      configKey: `FEE_SUBJECT_${keySuffix}`,
+      configKey,
       configValue: Number(form.value.configValue || 0),
       effectiveMonth: dayjs(form.value.effectiveMonth).format('YYYY-MM'),
       status: Number(form.value.status || 1),
@@ -184,6 +237,48 @@ async function batchToggleStatus(status: 0 | 1) {
   if (!selected.length) {
     message.warning('请先勾选要操作的科目')
     return
+  }
+  let preview: FinanceConfigImpactPreview
+  let fallbackConfirmed = false
+  try {
+    preview = await getFinanceConfigImpactPreview({
+      month: dayjs(query.value.month).format('YYYY-MM'),
+      configKeys: selected.map(item => item.configKey)
+    })
+    impactPreview.value = preview
+  } catch (error: any) {
+    message.warning(error?.message || '影响预览加载失败，已切换普通确认')
+    const fallbackOk = await confirmAction({
+      title: `确认批量${status === 1 ? '启用' : '停用'}科目？`,
+      content: `共 ${selected.length} 条科目`,
+      okText: '确认执行'
+    })
+    if (!fallbackOk) return
+    fallbackConfirmed = true
+    preview = {
+      month: dayjs(query.value.month).format('YYYY-MM'),
+      activeBillCount: 0,
+      activeElderCount: 0,
+      highRiskBillCount: 0,
+      pendingApprovalCount: 0,
+      recentPaymentCount: 0,
+      allocationTaskCount: 0,
+      configKeyCount: selected.length,
+      impactedItems: [],
+      riskTips: []
+    }
+  }
+  if (!fallbackConfirmed) {
+    const confirmed = await confirmAction({
+      title: `确认批量${status === 1 ? '启用' : '停用'}科目？`,
+      content: `共 ${selected.length} 条科目`,
+      impactItems: [
+        `影响账单 ${preview.activeBillCount} 条，欠费账单 ${preview.highRiskBillCount} 条`,
+        ...preview.riskTips.slice(0, 2)
+      ],
+      okText: '确认执行'
+    })
+    if (!confirmed) return
   }
   saving.value = true
   try {

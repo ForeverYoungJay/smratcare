@@ -17,7 +17,7 @@
         <a-form-item label="机构ID">
           <a-input-number v-model:value="query.orgId" :min="1" placeholder="默认当前机构" style="width: 160px" />
         </a-form-item>
-        <a-form-item label="打印老人(院内)">
+        <a-form-item label="院内老人">
           <a-select
             v-model:value="printElderId"
             show-search
@@ -32,10 +32,18 @@
             @change="onPrintElderChange"
           />
         </a-form-item>
+        <a-form-item label="快捷区间">
+          <a-space>
+            <a-button size="small" @click="setDayPreset(7)">近7天</a-button>
+            <a-button size="small" @click="setDayPreset(30)">近30天</a-button>
+            <a-button size="small" @click="setDayPreset(90)">近90天</a-button>
+          </a-space>
+        </a-form-item>
         <a-form-item>
           <a-space>
             <a-button type="primary" @click="search">查询</a-button>
             <a-button @click="exportCsvReport">导出报表</a-button>
+            <a-button @click="copyFilterLink">复制筛选链接</a-button>
             <a-button @click="openColumnSetting">列设置</a-button>
             <a-button :disabled="!printRows.length" @click="printCurrent">打印当前列</a-button>
             <a-button :disabled="!canPrintSpecific" @click="printSpecificElder">打印指定老人</a-button>
@@ -43,7 +51,30 @@
           </a-space>
         </a-form-item>
       </a-form>
+      <StatsMetaHint
+        scope-text="老人出入报表（支持按院内老人过滤）"
+        :refreshed-at="refreshedAt"
+        :note-text="metricTraceText"
+      />
     </a-card>
+
+    <a-row :gutter="16" style="margin-top: 16px;">
+      <a-col :span="8">
+        <a-card class="card-elevated" :bordered="false">
+          <a-statistic title="匹配总记录" :value="summary.total" />
+        </a-card>
+      </a-col>
+      <a-col :span="8">
+        <a-card class="card-elevated" :bordered="false">
+          <a-statistic title="入院记录" :value="summary.admissionCount" />
+        </a-card>
+      </a-col>
+      <a-col :span="8">
+        <a-card class="card-elevated" :bordered="false">
+          <a-statistic title="离院记录" :value="summary.dischargeCount" />
+        </a-card>
+      </a-col>
+    </a-row>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
       <vxe-table border stripe show-overflow :data="rows" height="420">
@@ -84,13 +115,20 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
+import StatsMetaHint from '../../components/stats/StatsMetaHint.vue'
 import { exportElderFlowReportCsv, getElderFlowReport } from '../../api/stats'
 import type { FlowReportItem } from '../../types'
 import { message, Modal } from 'ant-design-vue'
 import { printTableReport } from '../../utils/print'
 import { useElderOptions } from '../../composables/useElderOptions'
+import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
+import { copyText } from '../../utils/clipboard'
 
+const route = useRoute()
+const router = useRouter()
+const refreshedAt = ref('')
 const query = ref({
   fromDate: dayjs().subtract(29, 'day') as Dayjs,
   toDate: dayjs() as Dayjs,
@@ -102,6 +140,11 @@ const query = ref({
 
 const rows = ref<FlowReportItem[]>([])
 const total = ref(0)
+const summary = ref({
+  total: 0,
+  admissionCount: 0,
+  dischargeCount: 0
+})
 const printElderId = ref<number | undefined>(undefined)
 const columnSettingOpen = ref(false)
 const printColumnOptions = [
@@ -113,6 +156,14 @@ const printColumnOptions = [
 const selectedPrintColumns = ref<string[]>(['eventDate', 'eventTypeLabel', 'elderName', 'remark'])
 const { elderOptions, elderLoading, searchElders } = useElderOptions({ pageSize: 100, inHospitalOnly: true })
 const LARGE_PRINT_ROW_THRESHOLD = 200
+const metricTraceText = computed(() => {
+  const version = String(route.query.metricVersion || '').trim()
+  const source = String(route.query.fromSource || '').trim()
+  const notes: string[] = []
+  if (version) notes.push(`口径版本：${version}`)
+  if (source === 'dashboard') notes.push('来源：看板钻取')
+  return notes.join('；')
+})
 const printRows = computed(() => rows.value.map(item => ({
   elderId: item.elderId,
   eventDate: item.eventDate || '',
@@ -133,12 +184,18 @@ async function loadData() {
       fromDate: dayjs(query.value.fromDate).format('YYYY-MM-DD'),
       toDate: dayjs(query.value.toDate).format('YYYY-MM-DD'),
       eventType: query.value.eventType,
+      elderId: printElderId.value,
       pageNo: query.value.pageNo,
       pageSize: query.value.pageSize,
       orgId: query.value.orgId
     })
     rows.value = res.list || []
     total.value = Number(res.total || 0)
+    summary.value.total = Number(res.total || 0)
+    summary.value.admissionCount = Number(res.admissionCount || 0)
+    summary.value.dischargeCount = Number(res.dischargeCount || 0)
+    refreshedAt.value = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    syncRouteQuery()
   } catch (error: any) {
     message.error(error?.message || '加载老人出入报表失败')
   }
@@ -180,6 +237,7 @@ async function exportCsvReport() {
       fromDate: dayjs(query.value.fromDate).format('YYYY-MM-DD'),
       toDate: dayjs(query.value.toDate).format('YYYY-MM-DD'),
       eventType: query.value.eventType,
+      elderId: printElderId.value,
       orgId: query.value.orgId
     })
     message.success('报表导出成功')
@@ -188,8 +246,29 @@ async function exportCsvReport() {
   }
 }
 
+async function copyFilterLink() {
+  const resolved = router.resolve({
+    path: route.path,
+    query: {
+      fromDate: dayjs(query.value.fromDate).format('YYYY-MM-DD'),
+      toDate: dayjs(query.value.toDate).format('YYYY-MM-DD'),
+      eventType: query.value.eventType || '',
+      orgId: query.value.orgId ? String(query.value.orgId) : '',
+      elderId: printElderId.value ? String(printElderId.value) : '',
+      pageNo: String(query.value.pageNo),
+      pageSize: String(query.value.pageSize)
+    }
+  })
+  const ok = await copyText(`${window.location.origin}${resolved.fullPath}`)
+  if (ok) {
+    message.success('筛选链接已复制')
+  } else {
+    message.warning('复制失败，请手动复制地址栏链接')
+  }
+}
+
 function printCurrent() {
-  renderPrint('老人出入报表（当前结果）', printRows.value, '当前查询结果')
+  renderPrint('老人出入报表（当前结果）', printRows.value, buildPrintScopeText('当前查询结果'))
 }
 
 function printSpecificElder() {
@@ -201,7 +280,7 @@ function printSpecificElder() {
     filtered = filtered.filter(item => Number(item.elderId) === Number(printElderId.value))
     const selectedName = selectedPrintElder.value?.name || `老人ID:${printElderId.value}`
     title = `老人出入报表（${selectedName} / ID:${printElderId.value}）`
-    printScope = `指定老人：${selectedName} / ID:${printElderId.value}`
+    printScope = buildPrintScopeText(`指定老人：${selectedName} / ID:${printElderId.value}`)
   } else {
     message.warning('请选择院内老人')
     return
@@ -216,6 +295,15 @@ function printSpecificElder() {
 
 function onPrintElderChange(value?: number) {
   printElderId.value = value
+  query.value.pageNo = 1
+  loadData()
+}
+
+function setDayPreset(days: number) {
+  query.value.toDate = dayjs()
+  query.value.fromDate = dayjs().subtract(days - 1, 'day')
+  query.value.pageNo = 1
+  loadData()
 }
 
 async function renderPrint(title: string, data: Array<Record<string, any>>, printScope: string) {
@@ -255,5 +343,70 @@ function confirmLargePrint(rowCount: number) {
   })
 }
 
-onMounted(loadData)
+function buildPrintScopeText(baseScope: string) {
+  const eventTypeText = query.value.eventType === 'ADMISSION'
+    ? '仅入院'
+    : query.value.eventType === 'DISCHARGE'
+      ? '仅离院'
+      : '全部事件'
+  return `${baseScope}；事件类型：${eventTypeText}`
+}
+
+function syncRouteQuery() {
+  const nextQuery: Record<string, string> = {
+    fromDate: dayjs(query.value.fromDate).format('YYYY-MM-DD'),
+    toDate: dayjs(query.value.toDate).format('YYYY-MM-DD'),
+    pageNo: String(query.value.pageNo),
+    pageSize: String(query.value.pageSize)
+  }
+  if (query.value.eventType) nextQuery.eventType = query.value.eventType
+  if (query.value.orgId) nextQuery.orgId = String(query.value.orgId)
+  if (printElderId.value) nextQuery.elderId = String(printElderId.value)
+
+  router.replace({ path: route.path, query: nextQuery }).catch(() => {})
+}
+
+function initFromRouteQuery() {
+  const fromDate = String(route.query.fromDate || '')
+  const toDate = String(route.query.toDate || '')
+  if (dayjs(fromDate).isValid()) {
+    query.value.fromDate = dayjs(fromDate)
+  }
+  if (dayjs(toDate).isValid()) {
+    query.value.toDate = dayjs(toDate)
+  }
+  const eventType = String(route.query.eventType || '')
+  if (eventType === 'ADMISSION' || eventType === 'DISCHARGE') {
+    query.value.eventType = eventType
+  }
+  const orgId = Number(route.query.orgId)
+  if (Number.isFinite(orgId) && orgId > 0) {
+    query.value.orgId = orgId
+  }
+  const elderId = Number(route.query.elderId)
+  if (Number.isFinite(elderId) && elderId > 0) {
+    printElderId.value = elderId
+  }
+  const pageNo = Number(route.query.pageNo)
+  if (Number.isFinite(pageNo) && pageNo > 0) {
+    query.value.pageNo = pageNo
+  }
+  const pageSize = Number(route.query.pageSize)
+  if (Number.isFinite(pageSize) && pageSize > 0) {
+    query.value.pageSize = pageSize
+  }
+}
+
+useLiveSyncRefresh({
+  topics: ['elder', 'lifecycle', 'bed'],
+  refresh: () => {
+    loadData()
+  },
+  debounceMs: 800
+})
+
+onMounted(() => {
+  initFromRouteQuery()
+  loadData()
+})
 </script>

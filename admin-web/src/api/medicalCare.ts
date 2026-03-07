@@ -1,6 +1,8 @@
 import request, { fetchPage } from '../utils/request'
 import type {
   MedicalCareWorkbenchSummary,
+  MedicalAlertRuleConfig,
+  MedicalUnifiedTaskItem,
   MedicalCvdAssessment,
   MedicalCvdAssessmentSummary,
   MedicalAiGenerateTaskResponse,
@@ -21,6 +23,18 @@ export function getMedicalHealthCenterSummary(params?: {
   status?: string
 }) {
   return request.get<MedicalCareWorkbenchSummary>('/api/medical-care/center/summary', { params })
+}
+
+export function getMedicalUnifiedTaskPage(params: any) {
+  return fetchPage<MedicalUnifiedTaskItem>('/api/medical-care/workbench/unified-tasks', params)
+}
+
+export function getMedicalAlertRuleConfig() {
+  return request.get<MedicalAlertRuleConfig>('/api/medical-care/alert-rules')
+}
+
+export function updateMedicalAlertRuleConfig(data: Partial<MedicalAlertRuleConfig>) {
+  return request.put<MedicalAlertRuleConfig>('/api/medical-care/alert-rules', data)
 }
 
 export function getTcmAssessmentPage(params: any) {

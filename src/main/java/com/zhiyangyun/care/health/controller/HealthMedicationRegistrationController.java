@@ -64,11 +64,11 @@ public class HealthMedicationRegistrationController {
     var wrapper = buildQuery(
         AuthContext.getOrgId(),
         elderId,
-        drugName,
-        nurseName,
+        normalizeText(drugName),
+        normalizeText(nurseName),
         registerFrom,
         registerTo,
-        keyword);
+        normalizeText(keyword));
     wrapper.orderByDesc(HealthMedicationRegistration::getRegisterTime);
     return Result.ok(mapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
   }
@@ -82,6 +82,9 @@ public class HealthMedicationRegistrationController {
       @RequestParam(required = false) String registerTo,
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
+    drugName = normalizeText(drugName);
+    nurseName = normalizeText(nurseName);
+    keyword = normalizeText(keyword);
     LocalDateTime from = parseDateTime(registerFrom);
     LocalDateTime to = parseDateTime(registerTo);
     var wrapper = buildQuery(orgId, elderId, drugName, nurseName, registerFrom, registerTo, keyword);
@@ -157,14 +160,14 @@ public class HealthMedicationRegistrationController {
     item.setTenantId(orgId);
     item.setOrgId(orgId);
     item.setElderId(elderId);
-    item.setElderName(elderResolveSupport.resolveElderName(elderId, request.getElderName()));
+    item.setElderName(elderResolveSupport.resolveElderName(elderId, normalizeText(request.getElderName())));
     item.setDrugId(request.getDrugId());
-    item.setDrugName(request.getDrugName());
+    item.setDrugName(normalizeText(request.getDrugName()));
     item.setRegisterTime(request.getRegisterTime());
     item.setDosageTaken(request.getDosageTaken());
-    item.setUnit(request.getUnit());
-    item.setNurseName(request.getNurseName());
-    item.setRemark(request.getRemark());
+    item.setUnit(normalizeText(request.getUnit()));
+    item.setNurseName(normalizeText(request.getNurseName()));
+    item.setRemark(normalizeText(request.getRemark()));
     item.setCreatedBy(AuthContext.getStaffId());
     mapper.insert(item);
     medicationTaskService.completeTaskByRegistration(item);
@@ -181,14 +184,14 @@ public class HealthMedicationRegistrationController {
     }
     Long elderId = elderResolveSupport.resolveElderId(orgId, request.getElderId(), request.getElderName());
     item.setElderId(elderId);
-    item.setElderName(elderResolveSupport.resolveElderName(elderId, request.getElderName()));
+    item.setElderName(elderResolveSupport.resolveElderName(elderId, normalizeText(request.getElderName())));
     item.setDrugId(request.getDrugId());
-    item.setDrugName(request.getDrugName());
+    item.setDrugName(normalizeText(request.getDrugName()));
     item.setRegisterTime(request.getRegisterTime());
     item.setDosageTaken(request.getDosageTaken());
-    item.setUnit(request.getUnit());
-    item.setNurseName(request.getNurseName());
-    item.setRemark(request.getRemark());
+    item.setUnit(normalizeText(request.getUnit()));
+    item.setNurseName(normalizeText(request.getNurseName()));
+    item.setRemark(normalizeText(request.getRemark()));
     mapper.updateById(item);
     medicationTaskService.completeTaskByRegistration(item);
     return Result.ok(item);
@@ -260,5 +263,13 @@ public class HealthMedicationRegistrationController {
     } catch (NumberFormatException e) {
       return 0L;
     }
+  }
+
+  private String normalizeText(String value) {
+    if (value == null) {
+      return null;
+    }
+    String trimmed = value.trim();
+    return trimmed.isEmpty() ? null : trimmed;
   }
 }

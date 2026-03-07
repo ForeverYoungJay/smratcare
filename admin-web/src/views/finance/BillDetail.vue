@@ -41,9 +41,7 @@
       <div style="margin-top: 16px;">
         <a-space>
           <a-button v-if="detail?.status !== 9" type="primary" @click="openPay">登记收款</a-button>
-          <a-popconfirm v-if="detail?.status !== 9" title="确认将该账单标记为无效？" @confirm="markInvalid">
-            <a-button danger>无效账单</a-button>
-          </a-popconfirm>
+          <a-button v-if="detail?.status !== 9" danger @click="markInvalid">无效账单</a-button>
           <a-button @click="goConsumption">消费明细</a-button>
           <a-button @click="refresh">刷新</a-button>
         </a-space>
@@ -179,6 +177,7 @@ import { getBillDetail, invalidateBill, payBill } from '../../api/bill'
 import { getOrderDetail } from '../../api/store'
 import type { FinanceBillDetail } from '../../types'
 import { exportCsv } from '../../utils/export'
+import { confirmAction } from '../../utils/actionConfirm'
 import { useElderOptions } from '../../composables/useElderOptions'
 
 const route = useRoute()
@@ -209,6 +208,7 @@ const payOpen = ref(false)
 const paying = ref(false)
 const payFormRef = ref()
 const activePaymentId = ref<number | null>(null)
+const originalPayMethod = ref<string>('CASH')
 type PayForm = {
   amount: number
   method: string
@@ -320,6 +320,7 @@ async function onToggleOrderExpand({ row, expanded }: any) {
 
 function openPay() {
   activePaymentId.value = null
+  originalPayMethod.value = 'CASH'
   payForm.value = {
     amount: Number(detail.value?.outstandingAmount || 0),
     method: 'CASH',
@@ -331,6 +332,7 @@ function openPay() {
 
 function openEditPayment(row: any) {
   activePaymentId.value = Number(row.id)
+  originalPayMethod.value = String(row.payMethod || 'CASH').toUpperCase()
   payForm.value = {
     amount: Number(row.amount || 0),
     method: String(row.payMethod || 'CASH').toUpperCase(),
@@ -365,7 +367,11 @@ async function submitPay() {
     }
     if (activePaymentId.value) {
       await updatePaymentRecord(activePaymentId.value, payload)
-      message.success('收款已修改')
+      if (originalPayMethod.value !== payForm.value.method) {
+        message.success(`收款已修改，支付方式 ${payMethodText(originalPayMethod.value)} → ${payMethodText(payForm.value.method)}`)
+      } else {
+        message.success('收款已修改')
+      }
     } else {
       await payBill(currentBillId.value, payload)
       message.success('收款登记成功')
@@ -379,6 +385,14 @@ async function submitPay() {
 }
 
 async function markInvalid() {
+  const confirmed = await confirmAction({
+    title: '确认标记为无效账单？',
+    content: `账单ID：${currentBillId.value}`,
+    impactItems: ['账单状态将变更为“无效”', '该账单后续不可直接收款', '如需恢复需走修复流程'],
+    okText: '确认作废',
+    danger: true
+  })
+  if (!confirmed) return
   await invalidateBill(currentBillId.value)
   message.success('账单已标记为无效')
   refresh()

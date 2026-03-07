@@ -227,6 +227,9 @@ export function getOaTaskPage(params) {
 export function getOaTaskCalendar(params) {
     return request.get('/api/oa/task/calendar', { params });
 }
+export function checkOaTaskConflicts(data) {
+    return request.post('/api/oa/task/conflicts/check', data);
+}
 export function createOaTask(data) {
     return request.post('/api/oa/task', data);
 }

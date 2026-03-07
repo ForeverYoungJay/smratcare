@@ -15,6 +15,7 @@ public class MonthlyAllocationCreateRequest {
   @NotNull
   private BigDecimal totalAmount;
   private Integer targetCount;
+  private String roomNo;
   private List<Long> elderIds;
   private String remark;
 }

@@ -23,7 +23,7 @@
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px">
-      <MarketingListToolbar :tip="`已勾选 ${selectedRowKeys.length} 条`">
+      <MarketingListToolbar :selected-count="selectedRowKeys.length" tip="支持批量删除与导出">
         <a-space>
           <a-button :disabled="!selectedSingleRecord" @click="viewSelected">查看档案</a-button>
         </a-space>

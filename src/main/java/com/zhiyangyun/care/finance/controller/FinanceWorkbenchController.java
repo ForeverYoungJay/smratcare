@@ -46,12 +46,19 @@ import com.zhiyangyun.care.finance.model.FinanceBillingConfigRollbackRequest;
 import com.zhiyangyun.care.finance.model.FinanceBillingConfigSnapshotItem;
 import com.zhiyangyun.care.finance.model.FinanceBillingConfigUpsertRequest;
 import com.zhiyangyun.care.finance.model.FinanceAllocationRuleItem;
+import com.zhiyangyun.care.finance.model.FinanceAllocationResidentSyncResponse;
 import com.zhiyangyun.care.finance.model.FinanceAllocationMeterValidateRequest;
 import com.zhiyangyun.care.finance.model.FinanceAllocationMeterValidateResponse;
 import com.zhiyangyun.care.finance.model.FinanceAllocationTemplateInitResponse;
 import com.zhiyangyun.care.finance.model.FinanceAutoDebitExceptionItem;
 import com.zhiyangyun.care.finance.model.FinanceConfigChangeLogItem;
+import com.zhiyangyun.care.finance.model.FinanceConfigImpactPreviewRequest;
+import com.zhiyangyun.care.finance.model.FinanceConfigImpactPreviewResponse;
+import com.zhiyangyun.care.finance.model.FinanceDischargeStatusSyncExecuteRequest;
+import com.zhiyangyun.care.finance.model.FinanceDischargeStatusSyncExecuteResponse;
+import com.zhiyangyun.care.finance.model.FinanceDischargeStatusSyncResponse;
 import com.zhiyangyun.care.finance.model.FinanceInvoiceReceiptItem;
+import com.zhiyangyun.care.finance.model.FinanceLedgerHealthResponse;
 import com.zhiyangyun.care.finance.model.FinanceModuleEntrySummaryResponse;
 import com.zhiyangyun.care.finance.model.FinanceMasterDataOverviewResponse;
 import com.zhiyangyun.care.finance.model.FinanceReconcileExceptionItem;
@@ -83,6 +90,7 @@ import java.util.regex.Pattern;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -470,6 +478,113 @@ public class FinanceWorkbenchController {
     return Result.ok(rows);
   }
 
+  @GetMapping("/allocation/resident-options")
+  public Result<FinanceAllocationResidentSyncResponse> allocationResidentOptions(
+      @RequestParam(required = false) String building,
+      @RequestParam(required = false) String floorNo,
+      @RequestParam(required = false) String roomNo) {
+    Long orgId = AuthContext.getOrgId();
+    String selectedBuilding = normalizeText(building, "");
+    String selectedFloorNo = normalizeText(floorNo, "");
+    String selectedRoomNo = normalizeText(roomNo, "");
+
+    List<Room> allRooms = roomMapper.selectList(
+        Wrappers.lambdaQuery(Room.class)
+            .eq(Room::getIsDeleted, 0)
+            .eq(orgId != null, Room::getOrgId, orgId));
+    FinanceAllocationResidentSyncResponse response = new FinanceAllocationResidentSyncResponse();
+    response.setSyncTime(LocalDateTime.now());
+    response.setSelectedBuilding(selectedBuilding);
+    response.setSelectedFloorNo(selectedFloorNo);
+    response.setSelectedRoomNo(selectedRoomNo);
+
+    response.setBuildingOptions(allRooms.stream()
+        .map(item -> normalizeText(item.getBuilding(), ""))
+        .filter(item -> !item.isBlank())
+        .distinct()
+        .sorted()
+        .toList());
+
+    List<Room> buildingRooms = allRooms.stream()
+        .filter(item -> selectedBuilding.isBlank() || selectedBuilding.equals(normalizeText(item.getBuilding(), "")))
+        .toList();
+    response.setFloorOptions(buildingRooms.stream()
+        .map(item -> normalizeText(item.getFloorNo(), ""))
+        .filter(item -> !item.isBlank())
+        .distinct()
+        .sorted()
+        .toList());
+
+    List<Room> matchedRooms = buildingRooms.stream()
+        .filter(item -> selectedFloorNo.isBlank() || selectedFloorNo.equals(normalizeText(item.getFloorNo(), "")))
+        .filter(item -> selectedRoomNo.isBlank() || selectedRoomNo.equals(normalizeText(item.getRoomNo(), "")))
+        .toList();
+    response.setRoomOptions(buildingRooms.stream()
+        .filter(item -> selectedFloorNo.isBlank() || selectedFloorNo.equals(normalizeText(item.getFloorNo(), "")))
+        .map(item -> normalizeText(item.getRoomNo(), ""))
+        .filter(item -> !item.isBlank())
+        .distinct()
+        .sorted()
+        .toList());
+
+    List<Long> roomIds = matchedRooms.stream().map(Room::getId).filter(Objects::nonNull).distinct().toList();
+    if (roomIds.isEmpty()) {
+      return Result.ok(response);
+    }
+
+    Map<Long, Room> roomMap = matchedRooms.stream()
+        .collect(Collectors.toMap(Room::getId, Function.identity(), (a, b) -> a));
+    List<Bed> beds = bedMapper.selectList(
+        Wrappers.lambdaQuery(Bed.class)
+            .eq(Bed::getIsDeleted, 0)
+            .eq(orgId != null, Bed::getOrgId, orgId)
+            .in(Bed::getRoomId, roomIds)
+            .isNotNull(Bed::getElderId));
+    List<Long> elderIds = beds.stream()
+        .map(Bed::getElderId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList();
+    if (elderIds.isEmpty()) {
+      return Result.ok(response);
+    }
+    Map<Long, ElderProfile> elderMap = elderMapper.selectList(
+        Wrappers.lambdaQuery(ElderProfile.class)
+            .eq(ElderProfile::getIsDeleted, 0)
+            .eq(orgId != null, ElderProfile::getOrgId, orgId)
+            .in(ElderProfile::getId, elderIds)
+            .in(ElderProfile::getStatus, List.of(1, 2)))
+        .stream()
+        .collect(Collectors.toMap(ElderProfile::getId, Function.identity(), (a, b) -> a));
+
+    for (Bed bedEntity : beds) {
+      ElderProfile elder = elderMap.get(bedEntity.getElderId());
+      if (elder == null) {
+        continue;
+      }
+      Room roomEntity = roomMap.get(bedEntity.getRoomId());
+      FinanceAllocationResidentSyncResponse.ResidentOption row = new FinanceAllocationResidentSyncResponse.ResidentOption();
+      row.setElderId(elder.getId());
+      row.setElderName(normalizeText(elder.getFullName(), "未知老人"));
+      row.setElderStatus(elder.getStatus());
+      row.setBedId(bedEntity.getId());
+      row.setBedNo(normalizeText(bedEntity.getBedNo(), ""));
+      if (roomEntity != null) {
+        row.setRoomId(roomEntity.getId());
+        row.setRoomNo(normalizeText(roomEntity.getRoomNo(), ""));
+        row.setBuilding(normalizeText(roomEntity.getBuilding(), ""));
+        row.setFloorNo(normalizeText(roomEntity.getFloorNo(), ""));
+      }
+      response.getResidentOptions().add(row);
+    }
+    response.getResidentOptions().sort(Comparator
+        .comparing(FinanceAllocationResidentSyncResponse.ResidentOption::getBuilding, Comparator.nullsLast(String::compareTo))
+        .thenComparing(FinanceAllocationResidentSyncResponse.ResidentOption::getFloorNo, Comparator.nullsLast(String::compareTo))
+        .thenComparing(FinanceAllocationResidentSyncResponse.ResidentOption::getRoomNo, Comparator.nullsLast(String::compareTo))
+        .thenComparing(FinanceAllocationResidentSyncResponse.ResidentOption::getBedNo, Comparator.nullsLast(String::compareTo)));
+    return Result.ok(response);
+  }
+
   @PostMapping("/allocation/rules/template/init")
   public Result<FinanceAllocationTemplateInitResponse> initAllocationRuleTemplate(
       @RequestParam(required = false) String month) {
@@ -632,6 +747,224 @@ public class FinanceWorkbenchController {
     return Result.ok(result);
   }
 
+  @GetMapping("/ledger/health")
+  public Result<FinanceLedgerHealthResponse> ledgerHealth(
+      @RequestParam(defaultValue = "20") int limit) {
+    Long orgId = AuthContext.getOrgId();
+    int cappedLimit = Math.min(Math.max(limit, 1), 100);
+    FinanceLedgerHealthResponse response = new FinanceLedgerHealthResponse();
+    response.setCheckedAt(LocalDateTime.now());
+
+    List<BillMonthly> bills = billMonthlyMapper.selectList(
+        Wrappers.lambdaQuery(BillMonthly.class)
+            .eq(BillMonthly::getIsDeleted, 0)
+            .eq(orgId != null, BillMonthly::getOrgId, orgId));
+    response.setBillCount((long) bills.size());
+    if (bills.isEmpty()) {
+      response.setPaymentCount(0L);
+      response.setConsumptionCount(0L);
+      response.setMismatchBillItemCount(0L);
+      response.setMismatchPaidCount(0L);
+      response.setMissingPaymentFlowCount(0L);
+      response.setTotalIssueCount(0L);
+      return Result.ok(response);
+    }
+
+    List<Long> billIds = bills.stream().map(BillMonthly::getId).filter(Objects::nonNull).toList();
+    List<BillItem> billItems = billItemMapper.selectList(
+        Wrappers.lambdaQuery(BillItem.class)
+            .eq(BillItem::getIsDeleted, 0)
+            .eq(orgId != null, BillItem::getOrgId, orgId)
+            .in(BillItem::getBillMonthlyId, billIds));
+    Map<Long, BigDecimal> itemAmountByBill = billItems.stream()
+        .filter(item -> item.getBillMonthlyId() != null)
+        .collect(Collectors.groupingBy(
+            BillItem::getBillMonthlyId,
+            Collectors.reducing(BigDecimal.ZERO, item -> safe(item.getAmount()), BigDecimal::add)));
+
+    List<PaymentRecord> payments = paymentRecordMapper.selectList(
+        Wrappers.lambdaQuery(PaymentRecord.class)
+            .eq(PaymentRecord::getIsDeleted, 0)
+            .eq(orgId != null, PaymentRecord::getOrgId, orgId)
+            .in(PaymentRecord::getBillMonthlyId, billIds));
+    response.setPaymentCount((long) payments.size());
+    Map<Long, BigDecimal> paymentAmountByBill = payments.stream()
+        .filter(item -> item.getBillMonthlyId() != null)
+        .collect(Collectors.groupingBy(
+            PaymentRecord::getBillMonthlyId,
+            Collectors.reducing(BigDecimal.ZERO, item -> safe(item.getAmount()), BigDecimal::add)));
+
+    List<Long> paymentIds = payments.stream().map(PaymentRecord::getId).filter(Objects::nonNull).toList();
+    List<ConsumptionRecord> paymentFlows = paymentIds.isEmpty()
+        ? List.of()
+        : consumptionRecordMapper.selectList(
+            Wrappers.lambdaQuery(ConsumptionRecord.class)
+                .eq(ConsumptionRecord::getIsDeleted, 0)
+                .eq(orgId != null, ConsumptionRecord::getOrgId, orgId)
+                .eq(ConsumptionRecord::getSourceType, "BILL_PAYMENT")
+                .in(ConsumptionRecord::getSourceId, paymentIds));
+    response.setConsumptionCount((long) paymentFlows.size());
+    Set<Long> flowPaymentIdSet = paymentFlows.stream()
+        .map(ConsumptionRecord::getSourceId)
+        .filter(Objects::nonNull)
+        .collect(Collectors.toSet());
+
+    List<FinanceLedgerHealthResponse.IssueItem> issues = new ArrayList<>();
+    for (BillMonthly bill : bills) {
+      BigDecimal expectedTotal = safe(bill.getTotalAmount());
+      BigDecimal itemTotal = itemAmountByBill.getOrDefault(bill.getId(), BigDecimal.ZERO);
+      if (expectedTotal.compareTo(itemTotal) != 0) {
+        issues.add(ledgerIssue(
+            "BILL_ITEM_MISMATCH",
+            "账单总额与明细不一致",
+            bill.getId(),
+            null,
+            bill.getElderId(),
+            null,
+            expectedTotal,
+            itemTotal,
+            "bill.totalAmount != sum(bill_item.amount)"));
+      }
+      BigDecimal expectedPaid = safe(bill.getPaidAmount());
+      BigDecimal paymentTotal = paymentAmountByBill.getOrDefault(bill.getId(), BigDecimal.ZERO);
+      if (expectedPaid.compareTo(paymentTotal) != 0) {
+        issues.add(ledgerIssue(
+            "PAID_AMOUNT_MISMATCH",
+            "账单已付与收款不一致",
+            bill.getId(),
+            null,
+            bill.getElderId(),
+            null,
+            expectedPaid,
+            paymentTotal,
+            "bill.paidAmount != sum(payment_record.amount)"));
+      }
+    }
+
+    for (PaymentRecord payment : payments) {
+      if (!flowPaymentIdSet.contains(payment.getId())) {
+        issues.add(ledgerIssue(
+            "MISSING_PAYMENT_FLOW",
+            "收款缺少消费流水回写",
+            payment.getBillMonthlyId(),
+            payment.getId(),
+            null,
+            null,
+            safe(payment.getAmount()),
+            BigDecimal.ZERO,
+            "consumption_record(sourceType=BILL_PAYMENT) not found"));
+      }
+    }
+
+    response.setMismatchBillItemCount(issues.stream().filter(item -> "BILL_ITEM_MISMATCH".equals(item.getIssueType())).count());
+    response.setMismatchPaidCount(issues.stream().filter(item -> "PAID_AMOUNT_MISMATCH".equals(item.getIssueType())).count());
+    response.setMissingPaymentFlowCount(issues.stream().filter(item -> "MISSING_PAYMENT_FLOW".equals(item.getIssueType())).count());
+    response.setTotalIssueCount((long) issues.size());
+    response.setIssues(issues.stream().limit(cappedLimit).toList());
+    return Result.ok(response);
+  }
+
+  @GetMapping(value = "/ledger/health/export", produces = "text/csv;charset=UTF-8")
+  public ResponseEntity<byte[]> exportLedgerHealth(
+      @RequestParam(defaultValue = "200") int limit) {
+    FinanceLedgerHealthResponse data = ledgerHealth(limit).getData();
+    List<String> headers = List.of("异常类型", "账单ID", "收款ID", "老人ID", "老人姓名", "期望金额", "实际金额", "异常描述");
+    List<List<String>> body = (data == null || data.getIssues() == null)
+        ? List.of()
+        : data.getIssues().stream()
+            .map(item -> List.of(
+                stringOf(item.getIssueTypeLabel()),
+                stringOf(item.getBillId()),
+                stringOf(item.getPaymentId()),
+                stringOf(item.getElderId()),
+                stringOf(item.getElderName()),
+                stringOf(item.getExpectedAmount()),
+                stringOf(item.getActualAmount()),
+                stringOf(item.getDetail())))
+            .toList();
+    return csvResponse("finance-ledger-health", headers, body);
+  }
+
+  @GetMapping("/discharge/status-sync")
+  public Result<FinanceDischargeStatusSyncResponse> dischargeStatusSync(
+      @RequestParam(defaultValue = "100") int limit) {
+    Long orgId = AuthContext.getOrgId();
+    int cappedLimit = Math.min(Math.max(limit, 10), 500);
+    return Result.ok(buildDischargeStatusSyncResponse(orgId, cappedLimit));
+  }
+
+  @PostMapping("/discharge/status-sync/execute")
+  @Transactional
+  public Result<FinanceDischargeStatusSyncExecuteResponse> executeDischargeStatusSync(
+      @RequestBody(required = false) FinanceDischargeStatusSyncExecuteRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    FinanceDischargeStatusSyncExecuteRequest payload = request == null
+        ? new FinanceDischargeStatusSyncExecuteRequest()
+        : request;
+    FinanceDischargeStatusSyncResponse summary = buildDischargeStatusSyncResponse(orgId, 500);
+    List<FinanceDischargeStatusSyncResponse.Row> targetRows = summary.getRows();
+    if (payload.getSettlementId() != null) {
+      targetRows = targetRows.stream()
+          .filter(row -> Objects.equals(row.getSettlementId(), payload.getSettlementId()))
+          .toList();
+    }
+    if (payload.getElderId() != null) {
+      targetRows = targetRows.stream()
+          .filter(row -> Objects.equals(row.getElderId(), payload.getElderId()))
+          .toList();
+    }
+    if (!Boolean.TRUE.equals(payload.getProcessAll()) && payload.getSettlementId() == null && payload.getElderId() == null) {
+      targetRows = targetRows.stream().limit(20).toList();
+    }
+
+    FinanceDischargeStatusSyncExecuteResponse response = new FinanceDischargeStatusSyncExecuteResponse();
+    response.setProcessedCount(targetRows.size());
+    for (FinanceDischargeStatusSyncResponse.Row row : targetRows) {
+      FinanceDischargeStatusSyncExecuteResponse.RowResult result = new FinanceDischargeStatusSyncExecuteResponse.RowResult();
+      result.setSettlementId(row.getSettlementId());
+      result.setElderId(row.getElderId());
+      if (row.getElderId() == null) {
+        result.setSuccess(false);
+        result.setMessage("缺少老人ID，无法回写");
+        response.setFailCount(response.getFailCount() + 1);
+        response.getResults().add(result);
+        continue;
+      }
+      ElderProfile elder = elderMapper.selectOne(
+          Wrappers.lambdaQuery(ElderProfile.class)
+              .eq(ElderProfile::getIsDeleted, 0)
+              .eq(orgId != null, ElderProfile::getOrgId, orgId)
+              .eq(ElderProfile::getId, row.getElderId())
+              .last("LIMIT 1"));
+      if (elder == null) {
+        result.setSuccess(false);
+        result.setMessage("老人不存在或不在本机构");
+        response.setFailCount(response.getFailCount() + 1);
+        response.getResults().add(result);
+        continue;
+      }
+      List<Bed> occupiedBeds = bedMapper.selectList(
+          Wrappers.lambdaQuery(Bed.class)
+              .eq(Bed::getIsDeleted, 0)
+              .eq(orgId != null, Bed::getOrgId, orgId)
+              .eq(Bed::getElderId, elder.getId()));
+      elder.setStatus(3);
+      elder.setBedId(null);
+      elderMapper.updateById(elder);
+      for (Bed bedEntity : occupiedBeds) {
+        bedEntity.setElderId(null);
+        bedEntity.setStatus(1);
+        bedMapper.updateById(bedEntity);
+      }
+      result.setSuccess(true);
+      result.setMessage("状态回写成功");
+      response.setSuccessCount(response.getSuccessCount() + 1);
+      response.getResults().add(result);
+    }
+    response.setFailCount(response.getProcessedCount() - response.getSuccessCount());
+    return Result.ok(response);
+  }
+
   @GetMapping(value = "/reconcile/exceptions/export", produces = "text/csv;charset=UTF-8")
   public ResponseEntity<byte[]> exportReconcileExceptions(
       @RequestParam(required = false) String date,
@@ -710,6 +1043,115 @@ public class FinanceWorkbenchController {
       entry.setStatus(item.getStatus());
       return entry;
     }).toList());
+    return Result.ok(response);
+  }
+
+  @PostMapping("/config/impact-preview")
+  public Result<FinanceConfigImpactPreviewResponse> configImpactPreview(
+      @RequestBody(required = false) FinanceConfigImpactPreviewRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    String targetMonth = request == null || request.getMonth() == null || request.getMonth().isBlank()
+        ? YearMonth.now().toString()
+        : request.getMonth();
+    List<String> configKeys = request == null || request.getConfigKeys() == null
+        ? List.of()
+        : request.getConfigKeys().stream()
+            .filter(Objects::nonNull)
+            .map(item -> normalizeText(item, "").trim().toUpperCase(Locale.ROOT))
+            .filter(item -> !item.isBlank())
+            .distinct()
+            .toList();
+    List<BillMonthly> monthBills = billMonthlyMapper.selectList(
+        Wrappers.lambdaQuery(BillMonthly.class)
+            .eq(BillMonthly::getIsDeleted, 0)
+            .eq(orgId != null, BillMonthly::getOrgId, orgId)
+            .eq(BillMonthly::getBillMonth, targetMonth));
+    Long activeBillCount = (long) monthBills.size();
+    Long activeElderCount = monthBills.stream()
+        .map(BillMonthly::getElderId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .count();
+    Long highRiskBillCount = monthBills.stream()
+        .filter(item -> safe(item.getOutstandingAmount()).compareTo(BigDecimal.ZERO) > 0)
+        .count();
+    Long recentPaymentCount = paymentRecordMapper.selectCount(
+        Wrappers.lambdaQuery(PaymentRecord.class)
+            .eq(PaymentRecord::getIsDeleted, 0)
+            .eq(orgId != null, PaymentRecord::getOrgId, orgId)
+            .ge(PaymentRecord::getPaidAt, LocalDate.now().minusDays(7).atStartOfDay()));
+    Long allocationTaskCount = monthlyAllocationMapper.selectCount(
+        Wrappers.lambdaQuery(MonthlyAllocation.class)
+            .eq(MonthlyAllocation::getIsDeleted, 0)
+            .eq(orgId != null, MonthlyAllocation::getOrgId, orgId)
+            .eq(MonthlyAllocation::getAllocationMonth, targetMonth));
+    Long pendingApprovalCount = oaApprovalMapper.selectCount(
+        Wrappers.lambdaQuery(OaApproval.class)
+            .eq(OaApproval::getIsDeleted, 0)
+            .eq(orgId != null, OaApproval::getOrgId, orgId)
+            .eq(OaApproval::getStatus, "PENDING")
+            .and(q -> q.like(OaApproval::getTitle, "费用")
+                .or().like(OaApproval::getTitle, "退款")
+                .or().like(OaApproval::getTitle, "冲正")
+                .or().like(OaApproval::getTitle, "减免")));
+    FinanceConfigImpactPreviewResponse response = new FinanceConfigImpactPreviewResponse();
+    response.setMonth(targetMonth);
+    response.setActiveBillCount(activeBillCount);
+    response.setActiveElderCount(activeElderCount);
+    response.setHighRiskBillCount(highRiskBillCount);
+    response.setPendingApprovalCount(pendingApprovalCount == null ? 0L : pendingApprovalCount);
+    response.setRecentPaymentCount(recentPaymentCount == null ? 0L : recentPaymentCount);
+    response.setAllocationTaskCount(allocationTaskCount == null ? 0L : allocationTaskCount);
+    response.setConfigKeyCount(configKeys.size());
+
+    List<FinanceConfigImpactPreviewResponse.Item> impactedItems = new ArrayList<>();
+    for (String configKey : configKeys) {
+      FinanceConfigImpactPreviewResponse.Item item = new FinanceConfigImpactPreviewResponse.Item();
+      item.setConfigKey(configKey);
+      if (configKey.startsWith("FEE_SUBJECT_")) {
+        item.setModuleLabel("消费与费用流水");
+        item.setAffectedCount(activeBillCount);
+        item.setImpactHint("影响消费科目记账与账单展示口径");
+      } else if (configKey.startsWith("PAYMENT_CHANNEL_")) {
+        item.setModuleLabel("收费登记与对账中心");
+        item.setAffectedCount(response.getRecentPaymentCount());
+        item.setImpactHint("影响收款登记渠道、对账与日结");
+      } else if (configKey.startsWith("ALLOC_")) {
+        item.setModuleLabel("分摊与公共费用");
+        item.setAffectedCount(response.getAllocationTaskCount());
+        item.setImpactHint("影响月分摊账单生成及人均费用");
+      } else if (configKey.startsWith("BILL_")) {
+        item.setModuleLabel("账单中心与自动扣费");
+        item.setAffectedCount(activeBillCount);
+        item.setImpactHint("影响在住账单应收口径与催缴策略");
+      } else {
+        item.setModuleLabel("财务配置中心");
+        item.setAffectedCount(activeElderCount);
+        item.setImpactHint("影响财务流程默认策略，请确认联动页面");
+      }
+      impactedItems.add(item);
+    }
+    response.setImpactedItems(impactedItems);
+
+    List<String> riskTips = new ArrayList<>();
+    if (highRiskBillCount > 0) {
+      riskTips.add("当前存在 " + highRiskBillCount + " 条欠费账单，调整规则后请复核催缴结果");
+    }
+    if (response.getPendingApprovalCount() > 0) {
+      riskTips.add("存在 " + response.getPendingApprovalCount() + " 条待审批单据，避免中途变更审批口径");
+    }
+    if (configKeys.stream().anyMatch(item -> item.startsWith("PAYMENT_CHANNEL_"))
+        && response.getRecentPaymentCount() > 0) {
+      riskTips.add("近7天收款记录 " + response.getRecentPaymentCount() + " 条，请确认渠道停启不会影响交班");
+    }
+    if (configKeys.stream().anyMatch(item -> item.startsWith("ALLOC_"))
+        && response.getAllocationTaskCount() == 0) {
+      riskTips.add("本月还未生成分摊任务，建议先做规则演练再正式生效");
+    }
+    if (riskTips.isEmpty()) {
+      riskTips.add("未发现高风险冲突，可按流程发布配置");
+    }
+    response.setRiskTips(riskTips);
     return Result.ok(response);
   }
 
@@ -1850,6 +2292,104 @@ public class FinanceWorkbenchController {
     item.setDetail(detail);
     item.setSuggestion(suggestion);
     item.setOccurredAt(occurredAt);
+    return item;
+  }
+
+  private FinanceDischargeStatusSyncResponse buildDischargeStatusSyncResponse(Long orgId, int limit) {
+    FinanceDischargeStatusSyncResponse response = new FinanceDischargeStatusSyncResponse();
+    response.setCheckedAt(LocalDateTime.now());
+    List<DischargeSettlement> settlements = dischargeSettlementMapper.selectList(
+        Wrappers.lambdaQuery(DischargeSettlement.class)
+            .eq(DischargeSettlement::getIsDeleted, 0)
+            .eq(orgId != null, DischargeSettlement::getOrgId, orgId)
+            .eq(DischargeSettlement::getStatus, FeeWorkflowConstants.SETTLEMENT_SETTLED)
+            .orderByDesc(DischargeSettlement::getSettledTime)
+            .last("LIMIT " + Math.max(limit, 1)));
+    response.setSettledCount((long) settlements.size());
+    if (settlements.isEmpty()) {
+      response.setIssueCount(0L);
+      return response;
+    }
+    List<Long> elderIds = settlements.stream()
+        .map(DischargeSettlement::getElderId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList();
+    Map<Long, ElderProfile> elderMap = elderIds.isEmpty()
+        ? Map.of()
+        : elderMapper.selectList(
+            Wrappers.lambdaQuery(ElderProfile.class)
+                .eq(ElderProfile::getIsDeleted, 0)
+                .eq(orgId != null, ElderProfile::getOrgId, orgId)
+                .in(ElderProfile::getId, elderIds))
+            .stream()
+            .collect(Collectors.toMap(ElderProfile::getId, Function.identity(), (a, b) -> a));
+    Map<Long, Bed> occupiedBedMap = elderIds.isEmpty()
+        ? Map.of()
+        : bedMapper.selectList(
+            Wrappers.lambdaQuery(Bed.class)
+                .eq(Bed::getIsDeleted, 0)
+                .eq(orgId != null, Bed::getOrgId, orgId)
+                .in(Bed::getElderId, elderIds))
+            .stream()
+            .filter(item -> item.getElderId() != null)
+            .collect(Collectors.toMap(Bed::getElderId, Function.identity(), (a, b) -> a));
+
+    for (DischargeSettlement settlement : settlements) {
+      ElderProfile elder = settlement.getElderId() == null ? null : elderMap.get(settlement.getElderId());
+      Bed occupiedBed = settlement.getElderId() == null ? null : occupiedBedMap.get(settlement.getElderId());
+      String issueType = null;
+      String issueMessage = null;
+      if (elder == null) {
+        issueType = "ELDER_MISSING";
+        issueMessage = "老人档案不存在，无法校验退住回写";
+      } else if (!Integer.valueOf(3).equals(elder.getStatus())) {
+        issueType = "ELDER_STATUS_NOT_DISCHARGED";
+        issueMessage = "老人状态未回写为“已退住”";
+      } else if (elder.getBedId() != null || occupiedBed != null) {
+        issueType = "BED_NOT_RELEASED";
+        issueMessage = "床位未释放，仍存在占用关系";
+      }
+      if (issueType == null) {
+        continue;
+      }
+      FinanceDischargeStatusSyncResponse.Row row = new FinanceDischargeStatusSyncResponse.Row();
+      row.setSettlementId(settlement.getId());
+      row.setElderId(settlement.getElderId());
+      row.setElderName(settlement.getElderName());
+      row.setSettledTime(settlement.getSettledTime());
+      row.setSettlementStatus(settlement.getStatus());
+      row.setElderStatus(elder == null ? null : elder.getStatus());
+      row.setElderBedId(elder == null ? null : elder.getBedId());
+      row.setOccupiedBedId(occupiedBed == null ? null : occupiedBed.getId());
+      row.setIssueType(issueType);
+      row.setIssueMessage(issueMessage);
+      response.getRows().add(row);
+    }
+    response.setIssueCount((long) response.getRows().size());
+    return response;
+  }
+
+  private FinanceLedgerHealthResponse.IssueItem ledgerIssue(
+      String issueType,
+      String issueTypeLabel,
+      Long billId,
+      Long paymentId,
+      Long elderId,
+      String elderName,
+      BigDecimal expectedAmount,
+      BigDecimal actualAmount,
+      String detail) {
+    FinanceLedgerHealthResponse.IssueItem item = new FinanceLedgerHealthResponse.IssueItem();
+    item.setIssueType(issueType);
+    item.setIssueTypeLabel(issueTypeLabel);
+    item.setBillId(billId);
+    item.setPaymentId(paymentId);
+    item.setElderId(elderId);
+    item.setElderName(elderName);
+    item.setExpectedAmount(expectedAmount == null ? BigDecimal.ZERO : expectedAmount);
+    item.setActualAmount(actualAmount == null ? BigDecimal.ZERO : actualAmount);
+    item.setDetail(detail);
     return item;
   }
 

@@ -101,6 +101,13 @@ export interface InventoryOutboundSheetCreateRequest {
   items: InventoryOutboundSheetItemRequest[]
 }
 
+export interface InventoryOutboundSheetPrefill {
+  elderId?: number
+  receiverName?: string
+  contractNo?: string
+  applyDept?: string
+}
+
 export interface InventoryOutboundSheetItem {
   id: number
   productId: number

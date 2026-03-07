@@ -43,6 +43,7 @@ export function getElderFlowReport(params?: {
   fromDate?: string
   toDate?: string
   eventType?: 'ADMISSION' | 'DISCHARGE'
+  elderId?: number
   keyword?: string
   pageNo?: number
   pageSize?: number
@@ -55,6 +56,7 @@ export async function exportElderFlowReportCsv(params?: {
   fromDate?: string
   toDate?: string
   eventType?: 'ADMISSION' | 'DISCHARGE'
+  elderId?: number
   keyword?: string
   orgId?: number
 }) {

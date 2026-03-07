@@ -101,4 +101,6 @@ export interface FlowReportPageResponse {
   total: number
   pageNo: number
   pageSize: number
+  admissionCount: number
+  dischargeCount: number
 }

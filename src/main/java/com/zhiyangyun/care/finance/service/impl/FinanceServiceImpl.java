@@ -82,7 +82,7 @@ public class FinanceServiceImpl implements FinanceService {
     record.setOrgId(bill.getOrgId());
     record.setBillMonthlyId(bill.getId());
     record.setAmount(request.getAmount());
-    record.setPayMethod(request.getMethod());
+    record.setPayMethod(safeMethod(request.getMethod()));
     record.setExternalTxnId(request.getExternalTxnId());
     record.setPaidAt(request.getPaidAt());
     record.setOperatorStaffId(operatorStaffId);
@@ -136,10 +136,12 @@ public class FinanceServiceImpl implements FinanceService {
       throw new IllegalArgumentException("Payment exceeds outstanding amount");
     }
 
+    String beforeMethod = safeMethod(paymentRecord.getPayMethod());
+    String nextMethod = safeMethod(request.getMethod());
     paymentRecord.setAmount(request.getAmount());
-    paymentRecord.setPayMethod(request.getMethod());
+    paymentRecord.setPayMethod(nextMethod);
     paymentRecord.setPaidAt(request.getPaidAt());
-    paymentRecord.setRemark(request.getRemark());
+    paymentRecord.setRemark(mergePaymentRemark(request.getRemark(), beforeMethod, nextMethod));
     paymentRecord.setOperatorStaffId(operatorStaffId);
     paymentRecordMapper.updateById(paymentRecord);
 
@@ -281,8 +283,20 @@ public class FinanceServiceImpl implements FinanceService {
 
   private String safeMethod(String method) {
     if (method == null || method.isBlank()) {
-      return "UNKNOWN";
+      return "CASH";
     }
     return method.trim().toUpperCase();
+  }
+
+  private String mergePaymentRemark(String requestRemark, String beforeMethod, String nextMethod) {
+    String base = requestRemark == null ? "" : requestRemark.trim();
+    if (beforeMethod == null || nextMethod == null || beforeMethod.equals(nextMethod)) {
+      return base.isBlank() ? null : base;
+    }
+    String changed = "支付方式变更:" + beforeMethod + "->" + nextMethod;
+    if (base.isBlank()) {
+      return changed;
+    }
+    return base + "；" + changed;
   }
 }

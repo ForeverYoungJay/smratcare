@@ -12,6 +12,14 @@
         <a-button @click="go('/finance/config/change-log')">查看变更记录</a-button>
       </a-space>
     </a-card>
+    <a-card v-if="impactPreview" class="card-elevated" :bordered="false" style="margin-top: 12px;">
+      <a-alert
+        type="info"
+        show-icon
+        :message="`最近预览：${impactPreview.month}（${impactPreview.configKeyCount} 个渠道配置）`"
+        :description="`近7天收款 ${impactPreview.recentPaymentCount} 条，待审批 ${impactPreview.pendingApprovalCount} 条，欠费 ${impactPreview.highRiskBillCount} 条`"
+      />
+    </a-card>
     <input ref="importInputRef" type="file" accept=".csv,text/csv" style="display: none" @change="onImportFileChange" />
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
@@ -62,9 +70,10 @@ import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
-import { batchUpsertFinanceBillingConfig, getFinanceBillingConfig, upsertFinanceBillingConfig } from '../../api/finance'
-import type { FinanceBillingConfigEntry } from '../../types'
+import { batchUpsertFinanceBillingConfig, getFinanceBillingConfig, getFinanceConfigImpactPreview, upsertFinanceBillingConfig } from '../../api/finance'
+import type { FinanceBillingConfigEntry, FinanceConfigImpactPreview } from '../../types'
 import { exportCsv } from '../../utils/export'
+import { confirmAction } from '../../utils/actionConfirm'
 
 type ChannelRow = {
   channelCode: string
@@ -82,6 +91,7 @@ const entries = ref<FinanceBillingConfigEntry[]>([])
 const rows = ref<ChannelRow[]>([])
 const tableRef = ref<any>()
 const importInputRef = ref<HTMLInputElement | null>(null)
+const impactPreview = ref<FinanceConfigImpactPreview | null>(null)
 
 const editOpen = ref(false)
 const form = ref({
@@ -183,6 +193,54 @@ async function submitEdit() {
     message.warning('收款账号格式不正确（4-64 位字母数字/中划线/下划线）')
     return
   }
+  const configKeys = [
+    `PAYMENT_CHANNEL_${code}_ENABLED`,
+    `PAYMENT_CHANNEL_${code}_NAME`,
+    `PAYMENT_CHANNEL_${code}_ACCOUNT_NAME`,
+    `PAYMENT_CHANNEL_${code}_ACCOUNT_NO`
+  ]
+  let preview: FinanceConfigImpactPreview
+  let fallbackConfirmed = false
+  try {
+    preview = await getFinanceConfigImpactPreview({
+      month: monthText(),
+      configKeys
+    })
+    impactPreview.value = preview
+  } catch (error: any) {
+    message.warning(error?.message || '影响预览加载失败，已切换普通确认')
+    const confirmedFallback = await confirmAction({
+      title: '确认保存缴费渠道？',
+      content: `渠道：${form.value.channelName.trim()}（${code}）`,
+      okText: '确认保存'
+    })
+    if (!confirmedFallback) return
+    fallbackConfirmed = true
+    preview = {
+      month: monthText(),
+      activeBillCount: 0,
+      activeElderCount: 0,
+      highRiskBillCount: 0,
+      pendingApprovalCount: 0,
+      recentPaymentCount: 0,
+      allocationTaskCount: 0,
+      configKeyCount: configKeys.length,
+      impactedItems: [],
+      riskTips: []
+    }
+  }
+  if (!fallbackConfirmed) {
+    const confirmed = await confirmAction({
+      title: '确认保存缴费渠道？',
+      content: `渠道：${form.value.channelName.trim()}（${code}）`,
+      impactItems: [
+        `近7天收款 ${preview.recentPaymentCount} 条，待审批 ${preview.pendingApprovalCount} 条`,
+        ...preview.riskTips.slice(0, 2)
+      ],
+      okText: '确认保存'
+    })
+    if (!confirmed) return
+  }
   saving.value = true
   try {
     await Promise.all([
@@ -232,6 +290,50 @@ async function batchToggleStatus(status: 0 | 1) {
   if (!selected.length) {
     message.warning('请先勾选要操作的渠道')
     return
+  }
+  let preview: FinanceConfigImpactPreview
+  let fallbackConfirmed = false
+  try {
+    preview = await getFinanceConfigImpactPreview({
+      month: monthText(),
+      configKeys: selected.map(item => `PAYMENT_CHANNEL_${item.channelCode}_ENABLED`)
+    })
+    impactPreview.value = preview
+  } catch (error: any) {
+    message.warning(error?.message || '影响预览加载失败，已切换普通确认')
+    const confirmedFallback = await confirmAction({
+      title: `确认批量${status === 1 ? '启用' : '停用'}渠道？`,
+      content: `本次共操作 ${selected.length} 条渠道`,
+      okText: '确认执行',
+      danger: status === 0
+    })
+    if (!confirmedFallback) return
+    fallbackConfirmed = true
+    preview = {
+      month: monthText(),
+      activeBillCount: 0,
+      activeElderCount: 0,
+      highRiskBillCount: 0,
+      pendingApprovalCount: 0,
+      recentPaymentCount: 0,
+      allocationTaskCount: 0,
+      configKeyCount: selected.length,
+      impactedItems: [],
+      riskTips: []
+    }
+  }
+  if (!fallbackConfirmed) {
+    const confirmed = await confirmAction({
+      title: `确认批量${status === 1 ? '启用' : '停用'}渠道？`,
+      content: `本次共操作 ${selected.length} 条渠道`,
+      impactItems: [
+        `近7天收款 ${preview.recentPaymentCount} 条，欠费账单 ${preview.highRiskBillCount} 条`,
+        ...preview.riskTips.slice(0, 2)
+      ],
+      okText: '确认执行',
+      danger: status === 0
+    })
+    if (!confirmed) return
   }
   saving.value = true
   try {

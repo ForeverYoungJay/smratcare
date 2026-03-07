@@ -62,30 +62,29 @@
           <a-button @click="go('/logistics/reports/maintenance-todo-log')">维保执行日志</a-button>
           <a-button @click="exportCurrentTab">导出当前视图</a-button>
           <a-button @click="exportActionLogs" :disabled="actionLogs.length === 0">导出操作日志</a-button>
-          <a-button
-            v-if="activeTab === 'cleaning'"
-            :disabled="selectedCleaningKeys.length === 0"
-            @click="batchFinishCleaning"
-          >
-            批量完成清洁（{{ selectedCleaningKeys.length }}）
-          </a-button>
-          <a-button
-            v-if="activeTab === 'maintenance'"
-            :disabled="selectedMaintenanceKeys.length === 0"
-            @click="batchFinishMaintenance"
-          >
-            批量完成维修（{{ selectedMaintenanceKeys.length }}）
-          </a-button>
-          <a-button
-            v-if="activeTab === 'delivery'"
-            :disabled="selectedDeliveryKeys.length === 0"
-            @click="batchRedispatchDelivery"
-          >
-            批量重派送餐（{{ selectedDeliveryKeys.length }}）
-          </a-button>
+          <BatchActionBar :actions="tabBatchActions" />
           <a-button type="primary" @click="loadData">刷新任务数据</a-button>
         </a-space>
       </a-card>
+      <a-alert
+        v-if="lastBatchReceipt"
+        type="info"
+        show-icon
+        style="margin-bottom: 8px"
+        :message="`最近回执：${lastBatchReceipt.action}｜开始 ${lastBatchReceipt.startAt}｜结束 ${lastBatchReceipt.finishAt}｜成功 ${lastBatchReceipt.success}/${lastBatchReceipt.total}｜失败 ${lastBatchReceipt.failed}`"
+      />
+      <a-row v-if="batchFailures.length > 0" :gutter="12" style="margin-bottom: 8px">
+        <a-col :span="8"><a-statistic title="失败总数" :value="batchFailures.length" /></a-col>
+        <a-col :span="8"><a-statistic title="可重试失败" :value="retryableBatchFailures.length" /></a-col>
+        <a-col :span="8"><a-statistic title="错误码种类" :value="batchFailureCodeSummary.length" /></a-col>
+      </a-row>
+      <a-alert
+        v-if="batchFailureCodeSummary.length > 0"
+        style="margin-bottom: 8px"
+        type="warning"
+        show-icon
+        :message="`错误码聚合：${batchFailureCodeSummary.map((item) => `${item.code}(${item.count})`).join('，')}`"
+      />
 
       <a-card v-if="actionLogs.length > 0" size="small" style="margin-bottom: 12px" title="本机操作日志（最近20条）">
         <a-timeline>
@@ -176,6 +175,47 @@
         </a-tab-pane>
       </a-tabs>
     </StatefulBlock>
+
+    <a-drawer v-model:open="batchFailureDrawerOpen" title="批量失败明细" width="760">
+      <a-form layout="inline" style="margin-bottom: 8px">
+        <a-form-item label="关键字">
+          <a-input v-model:value="batchFailureKeyword" allow-clear placeholder="动作/原因/错误码/路径/对象ID" style="width: 280px" />
+        </a-form-item>
+        <a-form-item>
+          <a-checkbox v-model:checked="batchFailureRetryableOnly">仅可重试</a-checkbox>
+        </a-form-item>
+      </a-form>
+      <a-alert
+        v-if="batchFailureActionSummary.length > 0"
+        type="warning"
+        show-icon
+        style="margin-bottom: 8px"
+        :message="`动作聚合：${batchFailureActionSummary.map((item) => `${item.action}(${item.count})`).join('，')}`"
+      />
+      <a-table :data-source="filteredBatchFailures" :pagination="false" row-key="at" size="small">
+        <a-table-column title="时间" data-index="at" key="at" width="170" />
+        <a-table-column title="动作" data-index="action" key="action" width="150" />
+        <a-table-column title="对象ID" data-index="itemId" key="itemId" width="120" />
+        <a-table-column title="错误码" data-index="code" key="code" width="120" />
+        <a-table-column title="接口路径" data-index="path" key="path" width="200" />
+        <a-table-column title="可重试" key="retryable" width="90">
+          <template #default="{ record }">
+            <a-tag :color="record.retryable ? 'green' : 'red'">{{ record.retryable ? '是' : '否' }}</a-tag>
+          </template>
+        </a-table-column>
+        <a-table-column title="失败原因" data-index="reason" key="reason" />
+      </a-table>
+    </a-drawer>
+
+    <a-modal v-model:open="batchProgress.open" :title="batchProgress.title" :footer="null" :mask-closable="false" :closable="!batchProgress.running" @cancel="closeBatchProgress">
+      <a-space direction="vertical" style="width: 100%">
+        <a-progress :percent="batchProgress.percent" :status="batchProgress.running ? 'active' : 'normal'" />
+        <a-statistic title="总数" :value="batchProgress.total" />
+        <a-statistic title="已处理" :value="batchProgress.current" />
+        <a-statistic title="成功" :value="batchProgress.success" />
+        <a-statistic title="失败" :value="batchProgress.failed" />
+      </a-space>
+    </a-modal>
   </PageContainer>
 </template>
 
@@ -186,6 +226,7 @@ import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
+import BatchActionBar, { type BatchActionItem } from '../../components/BatchActionBar.vue'
 import { exportCsv } from '../../utils/export'
 import { useUserStore } from '../../stores/user'
 import { getLogisticsWorkbenchSummary } from '../../api/logistics'
@@ -200,6 +241,25 @@ type ActionLogEntry = {
   action: string
   detail: string
   success: boolean
+}
+
+type TaskBatchFailure = {
+  at: string
+  action: string
+  itemId: string | number
+  reason: string
+  code: string
+  path: string
+  retryable: boolean
+}
+
+type TaskBatchReceipt = {
+  action: string
+  startAt: string
+  finishAt: string
+  total: number
+  success: number
+  failed: number
 }
 
 const userStore = useUserStore()
@@ -221,6 +281,21 @@ const selectedCleaningKeys = ref<Array<number | string>>([])
 const selectedMaintenanceKeys = ref<Array<number | string>>([])
 const selectedDeliveryKeys = ref<Array<number | string>>([])
 const actionLogs = ref<ActionLogEntry[]>([])
+const batchFailures = ref<TaskBatchFailure[]>([])
+const batchFailureDrawerOpen = ref(false)
+const lastBatchReceipt = ref<TaskBatchReceipt | null>(null)
+const batchFailureKeyword = ref('')
+const batchFailureRetryableOnly = ref(false)
+const batchProgress = ref({
+  open: false,
+  running: false,
+  title: '批量处理中',
+  total: 0,
+  current: 0,
+  success: 0,
+  failed: 0,
+  percent: 0
+})
 const latestActionLogs = computed(() => actionLogs.value.slice(0, 20))
 
 const pendingCleaningCount = computed(() => cleaningRows.value.filter((item) => !isCleaningDone(item.status)).length)
@@ -266,6 +341,37 @@ const displayAdjustmentRows = computed(() => {
   if (viewMode.value === 'ALL') return adjustmentRows.value
   return adjustmentRows.value.filter((item) => item.adjustType === 'LOSS')
 })
+const retryableBatchFailures = computed(() => batchFailures.value.filter((item) => item.retryable))
+const filteredBatchFailures = computed(() => {
+  const keyword = batchFailureKeyword.value.trim().toLowerCase()
+  return batchFailures.value.filter((item) => {
+    if (batchFailureRetryableOnly.value && !item.retryable) return false
+    if (!keyword) return true
+    const haystack = [item.action, item.reason, item.code, item.path, String(item.itemId)].join(' ').toLowerCase()
+    return haystack.includes(keyword)
+  })
+})
+const batchFailureActionSummary = computed(() => {
+  const map = new Map<string, number>()
+  for (const row of filteredBatchFailures.value) {
+    const key = String(row.action || '-')
+    map.set(key, (map.get(key) || 0) + 1)
+  }
+  return Array.from(map.entries())
+    .map(([action, count]) => ({ action, count }))
+    .sort((a, b) => b.count - a.count)
+})
+const batchFailureCodeSummary = computed(() => {
+  const map = new Map<string, number>()
+  for (const row of batchFailures.value) {
+    const key = String(row.code || '-')
+    map.set(key, (map.get(key) || 0) + 1)
+  }
+  return Array.from(map.entries())
+    .map(([code, count]) => ({ code, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6)
+})
 
 const cleaningRowSelection = computed(() => ({
   selectedRowKeys: selectedCleaningKeys.value,
@@ -285,6 +391,351 @@ const deliveryRowSelection = computed(() => ({
     selectedDeliveryKeys.value = keys
   }
 }))
+
+function clearActiveTabSelection() {
+  if (activeTab.value === 'cleaning') {
+    selectedCleaningKeys.value = []
+    return
+  }
+  if (activeTab.value === 'maintenance') {
+    selectedMaintenanceKeys.value = []
+    return
+  }
+  if (activeTab.value === 'delivery') {
+    selectedDeliveryKeys.value = []
+  }
+}
+
+function startBatchProgress(title: string, total: number) {
+  batchProgress.value = {
+    open: true,
+    running: true,
+    title,
+    total,
+    current: 0,
+    success: 0,
+    failed: 0,
+    percent: total > 0 ? 0 : 100
+  }
+}
+
+function stepBatchProgress(success: boolean) {
+  batchProgress.value.current += 1
+  if (success) batchProgress.value.success += 1
+  else batchProgress.value.failed += 1
+  batchProgress.value.percent = batchProgress.value.total > 0
+    ? Math.min(100, Math.round((batchProgress.value.current / batchProgress.value.total) * 100))
+    : 100
+}
+
+function finishBatchProgress() {
+  batchProgress.value.running = false
+  window.setTimeout(() => {
+    if (!batchProgress.value.running) batchProgress.value.open = false
+  }, 800)
+}
+
+function closeBatchProgress() {
+  if (batchProgress.value.running) return
+  batchProgress.value.open = false
+}
+
+function normalizeErrorMessage(error: unknown) {
+  const raw = error as any
+  return String(raw?.msg || raw?.message || raw?.response?.data?.msg || '未知错误')
+}
+
+function parseErrorDetail(error: unknown) {
+  const raw = error as any
+  const status = raw?.response?.status
+  const codeRaw = raw?.response?.data?.code ?? status ?? raw?.code
+  const code = codeRaw == null ? '' : String(codeRaw)
+  const path = String(raw?.config?.url || raw?.response?.config?.url || '').split('?')[0]
+  const retryable = !status || status >= 500 || status === 429 || status === 408 || code === 'ECONNABORTED' || code === 'ERR_NETWORK'
+  return {
+    reason: normalizeErrorMessage(error),
+    code: code || '-',
+    path: path || '-',
+    retryable
+  }
+}
+
+function exportBatchFailures() {
+  if (!batchFailures.value.length) {
+    message.info('暂无失败明细')
+    return
+  }
+  exportCsv(
+    batchFailures.value.map((item) => ({
+      时间: item.at,
+      动作: item.action,
+      对象ID: item.itemId,
+      错误码: item.code,
+      接口路径: item.path,
+      可重试: item.retryable ? '是' : '否',
+      失败原因: item.reason
+    })),
+    `后勤批量失败明细-${dayjs().format('YYYYMMDD-HHmm')}.csv`
+  )
+}
+
+function exportBatchReceipt() {
+  const receipt = lastBatchReceipt.value
+  if (!receipt) {
+    message.info('暂无可导出的执行回执')
+    return
+  }
+  exportCsv(
+    [{
+      动作: receipt.action,
+      开始时间: receipt.startAt,
+      结束时间: receipt.finishAt,
+      总数: receipt.total,
+      成功: receipt.success,
+      失败: receipt.failed,
+      失败率: receipt.total > 0 ? `${Math.round((receipt.failed / receipt.total) * 100)}%` : '0%'
+    }],
+    `后勤批量执行回执-${dayjs().format('YYYYMMDD-HHmm')}.csv`
+  )
+}
+
+async function copyBatchFailureDigest() {
+  if (!batchFailures.value.length) {
+    message.info('暂无失败明细')
+    return
+  }
+  const lines = batchFailures.value.slice(0, 40).map((item) =>
+    `[${item.at}] action=${item.action} itemId=${item.itemId} code=${item.code} retryable=${item.retryable ? 'Y' : 'N'} path=${item.path} reason=${item.reason}`
+  )
+  const text = [`后勤批量失败摘要 total=${batchFailures.value.length}`, ...lines].join('\n')
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      message.success('排障摘要已复制')
+      return
+    }
+  } catch {}
+  message.warning('当前环境不支持剪贴板自动复制，请导出失败明细')
+}
+
+function latestBatchFailureAction() {
+  return batchFailures.value[0]?.action || ''
+}
+
+function failedBatchIds() {
+  return Array.from(new Set(batchFailures.value.map((item) => item.itemId).filter((id) => id !== null && id !== undefined && String(id) !== '')))
+}
+
+async function retryBatchFailures() {
+  const ids = failedBatchIds()
+  if (!ids.length) {
+    message.info('暂无可重试失败项')
+    return
+  }
+  const action = latestBatchFailureAction()
+  if (action.includes('清洁')) {
+    selectedCleaningKeys.value = ids
+    await batchFinishCleaning()
+    return
+  }
+  if (action.includes('维修')) {
+    selectedMaintenanceKeys.value = ids
+    await batchFinishMaintenance()
+    return
+  }
+  selectedDeliveryKeys.value = ids
+  await batchRedispatchDelivery()
+}
+
+async function retryRetryableBatchFailures() {
+  const ids = Array.from(new Set(retryableBatchFailures.value.map((item) => item.itemId)))
+  if (!ids.length) {
+    message.info('暂无可重试失败项')
+    return
+  }
+  const action = latestBatchFailureAction()
+  if (action.includes('清洁')) {
+    selectedCleaningKeys.value = ids
+    await batchFinishCleaning()
+    return
+  }
+  if (action.includes('维修')) {
+    selectedMaintenanceKeys.value = ids
+    await batchFinishMaintenance()
+    return
+  }
+  selectedDeliveryKeys.value = ids
+  await batchRedispatchDelivery()
+}
+
+const tabBatchActions = computed<BatchActionItem[]>(() => {
+  if (activeTab.value === 'cleaning') {
+    return [
+      {
+        key: 'batch-cleaning',
+        type: 'primary',
+        label: `批量完成清洁（${selectedCleaningKeys.value.length}）`,
+        disabled: selectedCleaningKeys.value.length === 0,
+        onClick: batchFinishCleaning
+      },
+      {
+        key: 'clear',
+        label: '清空勾选',
+        disabled: selectedCleaningKeys.value.length === 0,
+        onClick: clearActiveTabSelection
+      },
+      {
+        key: 'retry-failures',
+        type: 'dashed',
+        label: `重试失败项（${batchFailures.value.length}）`,
+        disabled: batchFailures.value.length === 0,
+        onClick: retryBatchFailures
+      },
+      {
+        key: 'retry-retryable',
+        type: 'dashed',
+        label: `仅重试可重试（${retryableBatchFailures.value.length}）`,
+        disabled: retryableBatchFailures.value.length === 0,
+        onClick: retryRetryableBatchFailures
+      },
+      {
+        key: 'view-failures',
+        label: '查看失败明细',
+        disabled: batchFailures.value.length === 0,
+        onClick: () => { batchFailureDrawerOpen.value = true }
+      },
+      {
+        key: 'export-failures',
+        label: `导出失败明细（${batchFailures.value.length}）`,
+        disabled: batchFailures.value.length === 0,
+        onClick: exportBatchFailures
+      },
+      {
+        key: 'export-receipt',
+        label: '导出执行回执',
+        disabled: !lastBatchReceipt.value,
+        onClick: exportBatchReceipt
+      },
+      {
+        key: 'copy-digest',
+        label: '复制排障摘要',
+        disabled: batchFailures.value.length === 0,
+        onClick: copyBatchFailureDigest
+      }
+    ]
+  }
+  if (activeTab.value === 'maintenance') {
+    return [
+      {
+        key: 'batch-maintenance',
+        type: 'primary',
+        label: `批量完成维修（${selectedMaintenanceKeys.value.length}）`,
+        disabled: selectedMaintenanceKeys.value.length === 0,
+        onClick: batchFinishMaintenance
+      },
+      {
+        key: 'clear',
+        label: '清空勾选',
+        disabled: selectedMaintenanceKeys.value.length === 0,
+        onClick: clearActiveTabSelection
+      },
+      {
+        key: 'retry-failures',
+        type: 'dashed',
+        label: `重试失败项（${batchFailures.value.length}）`,
+        disabled: batchFailures.value.length === 0,
+        onClick: retryBatchFailures
+      },
+      {
+        key: 'retry-retryable',
+        type: 'dashed',
+        label: `仅重试可重试（${retryableBatchFailures.value.length}）`,
+        disabled: retryableBatchFailures.value.length === 0,
+        onClick: retryRetryableBatchFailures
+      },
+      {
+        key: 'view-failures',
+        label: '查看失败明细',
+        disabled: batchFailures.value.length === 0,
+        onClick: () => { batchFailureDrawerOpen.value = true }
+      },
+      {
+        key: 'export-failures',
+        label: `导出失败明细（${batchFailures.value.length}）`,
+        disabled: batchFailures.value.length === 0,
+        onClick: exportBatchFailures
+      },
+      {
+        key: 'export-receipt',
+        label: '导出执行回执',
+        disabled: !lastBatchReceipt.value,
+        onClick: exportBatchReceipt
+      },
+      {
+        key: 'copy-digest',
+        label: '复制排障摘要',
+        disabled: batchFailures.value.length === 0,
+        onClick: copyBatchFailureDigest
+      }
+    ]
+  }
+  if (activeTab.value === 'delivery') {
+    return [
+      {
+        key: 'batch-delivery',
+        type: 'primary',
+        label: `批量重派送餐（${selectedDeliveryKeys.value.length}）`,
+        disabled: selectedDeliveryKeys.value.length === 0,
+        onClick: batchRedispatchDelivery
+      },
+      {
+        key: 'clear',
+        label: '清空勾选',
+        disabled: selectedDeliveryKeys.value.length === 0,
+        onClick: clearActiveTabSelection
+      },
+      {
+        key: 'retry-failures',
+        type: 'dashed',
+        label: `重试失败项（${batchFailures.value.length}）`,
+        disabled: batchFailures.value.length === 0,
+        onClick: retryBatchFailures
+      },
+      {
+        key: 'retry-retryable',
+        type: 'dashed',
+        label: `仅重试可重试（${retryableBatchFailures.value.length}）`,
+        disabled: retryableBatchFailures.value.length === 0,
+        onClick: retryRetryableBatchFailures
+      },
+      {
+        key: 'view-failures',
+        label: '查看失败明细',
+        disabled: batchFailures.value.length === 0,
+        onClick: () => { batchFailureDrawerOpen.value = true }
+      },
+      {
+        key: 'export-failures',
+        label: `导出失败明细（${batchFailures.value.length}）`,
+        disabled: batchFailures.value.length === 0,
+        onClick: exportBatchFailures
+      },
+      {
+        key: 'export-receipt',
+        label: '导出执行回执',
+        disabled: !lastBatchReceipt.value,
+        onClick: exportBatchReceipt
+      },
+      {
+        key: 'copy-digest',
+        label: '复制排障摘要',
+        disabled: batchFailures.value.length === 0,
+        onClick: copyBatchFailureDigest
+      }
+    ]
+  }
+  return []
+})
 
 const cleaningColumns = [
   { title: '房间', dataIndex: 'roomNo', key: 'roomNo', width: 120 },
@@ -385,16 +836,49 @@ async function batchFinishCleaning() {
     message.info('没有可批量完成的清洁任务')
     return
   }
-  try {
-    await Promise.all(rows.map((item) => completeRoomCleaning(item.id)))
-    pushActionLog('批量完成清洁', `处理 ${rows.length} 条`, true)
-    message.success(`已批量完成${rows.length}条清洁任务`)
-    selectedCleaningKeys.value = []
-    await loadData()
-  } catch (error: any) {
-    pushActionLog('批量完成清洁', `失败：${error?.message || '未知错误'}`, false)
-    message.error(error?.message || '批量完成清洁失败')
+  const startedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  batchFailures.value = []
+  startBatchProgress('批量完成清洁处理中', rows.length)
+  const successIds: Array<number | string> = []
+  const failedIds: Array<number | string> = []
+  for (const row of rows) {
+    try {
+      await completeRoomCleaning(row.id)
+      successIds.push(row.id)
+      stepBatchProgress(true)
+    } catch (error) {
+      failedIds.push(row.id)
+      stepBatchProgress(false)
+      const detail = parseErrorDetail(error)
+      batchFailures.value.push({
+        at: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+        action: '批量完成清洁',
+        itemId: row.id,
+        reason: detail.reason,
+        code: detail.code,
+        path: detail.path,
+        retryable: detail.retryable
+      })
+    }
   }
+  finishBatchProgress()
+  lastBatchReceipt.value = {
+    action: '批量完成清洁',
+    startAt: startedAt,
+    finishAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+    total: rows.length,
+    success: successIds.length,
+    failed: failedIds.length
+  }
+  selectedCleaningKeys.value = failedIds
+  await loadData({ preserveSelection: true })
+  if (failedIds.length > 0) {
+    pushActionLog('批量完成清洁', `成功 ${successIds.length} 条，失败 ${failedIds.length} 条`, false)
+    message.warning(`批量完成清洁：成功 ${successIds.length}，失败 ${failedIds.length}（失败项已保留勾选）`)
+    return
+  }
+  pushActionLog('批量完成清洁', `处理 ${successIds.length} 条`, true)
+  message.success(`已批量完成${successIds.length}条清洁任务`)
 }
 
 async function finishMaintenance(record: MaintenanceRequest) {
@@ -417,16 +901,49 @@ async function batchFinishMaintenance() {
     message.info('没有可批量完成的维修任务')
     return
   }
-  try {
-    await Promise.all(rows.map((item) => completeMaintenance(item.id)))
-    pushActionLog('批量完成维修', `处理 ${rows.length} 条`, true)
-    message.success(`已批量完成${rows.length}条维修任务`)
-    selectedMaintenanceKeys.value = []
-    await loadData()
-  } catch (error: any) {
-    pushActionLog('批量完成维修', `失败：${error?.message || '未知错误'}`, false)
-    message.error(error?.message || '批量完成维修失败')
+  const startedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  batchFailures.value = []
+  startBatchProgress('批量完成维修处理中', rows.length)
+  const successIds: Array<number | string> = []
+  const failedIds: Array<number | string> = []
+  for (const row of rows) {
+    try {
+      await completeMaintenance(row.id)
+      successIds.push(row.id)
+      stepBatchProgress(true)
+    } catch (error) {
+      failedIds.push(row.id)
+      stepBatchProgress(false)
+      const detail = parseErrorDetail(error)
+      batchFailures.value.push({
+        at: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+        action: '批量完成维修',
+        itemId: row.id,
+        reason: detail.reason,
+        code: detail.code,
+        path: detail.path,
+        retryable: detail.retryable
+      })
+    }
   }
+  finishBatchProgress()
+  lastBatchReceipt.value = {
+    action: '批量完成维修',
+    startAt: startedAt,
+    finishAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+    total: rows.length,
+    success: successIds.length,
+    failed: failedIds.length
+  }
+  selectedMaintenanceKeys.value = failedIds
+  await loadData({ preserveSelection: true })
+  if (failedIds.length > 0) {
+    pushActionLog('批量完成维修', `成功 ${successIds.length} 条，失败 ${failedIds.length} 条`, false)
+    message.warning(`批量完成维修：成功 ${successIds.length}，失败 ${failedIds.length}（失败项已保留勾选）`)
+    return
+  }
+  pushActionLog('批量完成维修', `处理 ${successIds.length} 条`, true)
+  message.success(`已批量完成${successIds.length}条维修任务`)
 }
 
 function cleaningStatusLabel(record: RoomCleaningTask) {
@@ -552,16 +1069,49 @@ async function batchRedispatchDelivery() {
     message.info('没有可批量重派的送餐任务')
     return
   }
-  try {
-    await Promise.all(rows.map((item) => redispatchDiningDeliveryRecord(item.id, {})))
-    pushActionLog('批量重派送餐', `处理 ${rows.length} 条`, true)
-    message.success(`已批量重派${rows.length}条送餐任务`)
-    selectedDeliveryKeys.value = []
-    await loadData()
-  } catch (error: any) {
-    pushActionLog('批量重派送餐', `失败：${error?.message || '未知错误'}`, false)
-    message.error(error?.message || '批量重派失败')
+  const startedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
+  batchFailures.value = []
+  startBatchProgress('批量重派送餐处理中', rows.length)
+  const successIds: Array<number | string> = []
+  const failedIds: Array<number | string> = []
+  for (const row of rows) {
+    try {
+      await redispatchDiningDeliveryRecord(row.id, {})
+      successIds.push(row.id)
+      stepBatchProgress(true)
+    } catch (error) {
+      failedIds.push(row.id)
+      stepBatchProgress(false)
+      const detail = parseErrorDetail(error)
+      batchFailures.value.push({
+        at: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+        action: '批量重派送餐',
+        itemId: row.id,
+        reason: detail.reason,
+        code: detail.code,
+        path: detail.path,
+        retryable: detail.retryable
+      })
+    }
   }
+  finishBatchProgress()
+  lastBatchReceipt.value = {
+    action: '批量重派送餐',
+    startAt: startedAt,
+    finishAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+    total: rows.length,
+    success: successIds.length,
+    failed: failedIds.length
+  }
+  selectedDeliveryKeys.value = failedIds
+  await loadData({ preserveSelection: true })
+  if (failedIds.length > 0) {
+    pushActionLog('批量重派送餐', `成功 ${successIds.length} 条，失败 ${failedIds.length} 条`, false)
+    message.warning(`批量重派送餐：成功 ${successIds.length}，失败 ${failedIds.length}（失败项已保留勾选）`)
+    return
+  }
+  pushActionLog('批量重派送餐', `处理 ${successIds.length} 条`, true)
+  message.success(`已批量重派${successIds.length}条送餐任务`)
 }
 
 function exportCurrentTab() {
@@ -630,10 +1180,11 @@ function exportActionLogs() {
   )
 }
 
-async function loadData() {
+async function loadData(options?: { preserveSelection?: boolean }) {
   loading.value = true
   errorMessage.value = ''
   const today = dayjs().format('YYYY-MM-DD')
+  const preserveSelection = Boolean(options?.preserveSelection)
   try {
     const [summaryData, cleaningPage, maintenancePage, deliveryPage, adjustmentPage] = await Promise.all([
       getLogisticsWorkbenchSummary(),
@@ -647,9 +1198,18 @@ async function loadData() {
     maintenanceRows.value = maintenancePage?.list || []
     deliveryRows.value = deliveryPage?.list || []
     adjustmentRows.value = adjustmentPage?.list || []
-    selectedCleaningKeys.value = []
-    selectedMaintenanceKeys.value = []
-    selectedDeliveryKeys.value = []
+    if (preserveSelection) {
+      const cleaningSet = new Set(cleaningRows.value.map((item) => String(item.id)))
+      selectedCleaningKeys.value = selectedCleaningKeys.value.filter((id) => cleaningSet.has(String(id)))
+      const maintenanceSet = new Set(maintenanceRows.value.map((item) => String(item.id)))
+      selectedMaintenanceKeys.value = selectedMaintenanceKeys.value.filter((id) => maintenanceSet.has(String(id)))
+      const deliverySet = new Set(deliveryRows.value.map((item) => String(item.id)))
+      selectedDeliveryKeys.value = selectedDeliveryKeys.value.filter((id) => deliverySet.has(String(id)))
+    } else {
+      selectedCleaningKeys.value = []
+      selectedMaintenanceKeys.value = []
+      selectedDeliveryKeys.value = []
+    }
   } catch (error: any) {
     errorMessage.value = error?.message || '加载后勤任务中心失败'
     message.error(errorMessage.value)

@@ -16,6 +16,14 @@
         <a-tag v-if="!summary.statusStats.length" color="default">暂无状态统计</a-tag>
       </a-space>
     </a-card>
+    <a-card v-if="residentContext.active" :bordered="false" class="summary-row context-card">
+      <a-space wrap>
+        <a-tag color="processing">当前长者：{{ residentContext.name }}</a-tag>
+        <a-button size="small" @click="goWithResident('/medical-care/medication-registration')">查看用药登记</a-button>
+        <a-button size="small" @click="goWithResident('/medical-care/nursing-log')">查看护理日志</a-button>
+        <a-button size="small" @click="clearResidentContext">清除长者上下文</a-button>
+      </a-space>
+    </a-card>
 
     <a-card :bordered="false" class="summary-row" title="巡检任务看板（计划-执行）">
       <a-space wrap style="margin-bottom: 10px">
@@ -82,6 +90,7 @@
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
+            <a-button type="link" @click="goNursingLogs(record)">护理日志</a-button>
             <a-button type="link" @click="openEdit(record)">编辑</a-button>
             <a-popconfirm title="确认删除该记录吗？" ok-text="确认" cancel-text="取消" @confirm="remove(record)">
               <a-button type="link" danger>删除</a-button>
@@ -202,7 +211,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
@@ -211,6 +220,7 @@ import DataTable from '../../components/DataTable.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { inspectionExportColumns, mapHealthExportRows } from '../../constants/healthExport'
 import { exportCsv, exportExcel } from '../../utils/export'
+import { isAbnormalInspectionPhotoRequired, syncMedicalAlertRules } from '../../utils/medicalAlertRule'
 import { uploadOaFile } from '../../api/oa'
 import { resolveHealthError } from './healthError'
 import {
@@ -230,6 +240,7 @@ type InspectionPhotoFile = {
 const loading = ref(false)
 const exporting = ref(false)
 const route = useRoute()
+const router = useRouter()
 const rows = ref<HealthInspection[]>([])
 const query = reactive({ keyword: '', status: '', inspectionRange: [] as any[], pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
@@ -240,6 +251,15 @@ const summary = reactive<HealthInspectionSummary>({
   closedCount: 0,
   linkedLogCount: 0,
   statusStats: []
+})
+const residentContext = computed(() => {
+  const residentId = route.query.residentId ?? route.query.elderId
+  const residentName = typeof route.query.residentName === 'string' ? route.query.residentName : ''
+  return {
+    active: !!residentId,
+    residentId: residentId ? Number(residentId) : undefined,
+    name: residentName || (residentId ? `长者#${residentId}` : '')
+  }
 })
 
 const columns = [
@@ -600,7 +620,7 @@ async function submitBoard() {
     message.error('异常项必须填写处理方式')
     return
   }
-  if (boardForm.abnormal && !boardPhotoFiles.value.length) {
+  if (boardForm.abnormal && isAbnormalInspectionPhotoRequired() && !boardPhotoFiles.value.length) {
     message.error('异常巡检请至少上传1张照片')
     return
   }
@@ -655,7 +675,7 @@ async function submit() {
     message.error('异常巡检请填写跟进措施')
     return
   }
-  if (form.status === 'ABNORMAL' && !formPhotoFiles.value.length && !form.id) {
+  if (form.status === 'ABNORMAL' && isAbnormalInspectionPhotoRequired() && !formPhotoFiles.value.length && !form.id) {
     message.error('异常巡检请至少上传1张照片')
     return
   }
@@ -699,6 +719,39 @@ async function remove(record: HealthInspection) {
   }
 }
 
+function goNursingLogs(record: HealthInspection) {
+  router.push({
+    path: '/health/nursing-log',
+    query: {
+      inspectionId: record.id ? String(record.id) : undefined,
+      residentId: record.elderId ? String(record.elderId) : undefined,
+      residentName: record.elderName || undefined
+    }
+  })
+}
+
+function goWithResident(path: string) {
+  if (!residentContext.value.active) {
+    router.push(path)
+    return
+  }
+  router.push({
+    path,
+    query: {
+      residentId: residentContext.value.residentId ? String(residentContext.value.residentId) : undefined,
+      residentName: residentContext.value.name
+    }
+  })
+}
+
+function clearResidentContext() {
+  const nextQuery: Record<string, any> = { ...route.query }
+  delete nextQuery.residentId
+  delete nextQuery.elderId
+  delete nextQuery.residentName
+  router.push({ path: route.path, query: nextQuery })
+}
+
 async function exportCsvData() {
   const records = await loadExportRecords()
   if (!records.length) {
@@ -721,11 +774,15 @@ async function exportExcelData() {
 
 function buildQueryParams() {
   const residentId = route.query.residentId ?? route.query.elderId
+  const inspectionId = route.query.inspectionId
   const params: Record<string, any> = {
     keyword: query.keyword || undefined,
     status: query.status || undefined,
     pageNo: query.pageNo,
     pageSize: query.pageSize
+  }
+  if (inspectionId) {
+    params.inspectionId = Number(inspectionId)
   }
   if (residentId) {
     params.elderId = Number(residentId)
@@ -797,9 +854,10 @@ async function loadExportRecords() {
 
 fetchData()
 searchElders('')
+syncMedicalAlertRules().catch(() => {})
 
 watch(
-  () => [route.query.residentId, route.query.elderId],
+  () => [route.query.residentId, route.query.elderId, route.query.inspectionId],
   () => {
     query.pageNo = 1
     pagination.current = 1
@@ -817,5 +875,8 @@ watch(
 }
 :deep(.health-row-warning > td) {
   background: #fff7e6 !important;
+}
+.context-card {
+  background: #f0f9ff;
 }
 </style>

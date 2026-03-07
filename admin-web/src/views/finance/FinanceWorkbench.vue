@@ -8,6 +8,48 @@
       </a-space>
     </a-card>
 
+    <a-card class="card-elevated" :bordered="false" style="margin-bottom: 16px;">
+      <a-row :gutter="[12, 12]">
+        <a-col :xs="24" :lg="16">
+          <a-alert
+            :type="(ledgerHealth?.totalIssueCount || 0) > 0 ? 'warning' : 'success'"
+            show-icon
+            :message="(ledgerHealth?.totalIssueCount || 0) > 0 ? `财务一致性巡检发现 ${ledgerHealth?.totalIssueCount || 0} 个问题` : '财务一致性巡检正常'"
+            :description="ledgerHealthHint"
+          />
+        </a-col>
+        <a-col :xs="24" :lg="8">
+          <a-space wrap>
+            <a-tag color="blue">账单 {{ ledgerHealth?.billCount || 0 }}</a-tag>
+            <a-tag color="purple">收款 {{ ledgerHealth?.paymentCount || 0 }}</a-tag>
+            <a-tag color="cyan">流水 {{ ledgerHealth?.consumptionCount || 0 }}</a-tag>
+            <a-button @click="go('/finance/reconcile/ledger-health')">巡检明细</a-button>
+            <a-button type="primary" ghost @click="go('/finance/reconcile/center?filter=unmatched')">去处理异常</a-button>
+          </a-space>
+        </a-col>
+        <a-col :span="24" v-if="(ledgerHealth?.issues || []).length">
+          <a-list
+            size="small"
+            :data-source="(ledgerHealth?.issues || []).slice(0, 6)"
+            bordered
+            style="background: #fff"
+          >
+            <template #renderItem="{ item }">
+              <a-list-item>
+                <a-space wrap>
+                  <a-tag color="red">{{ item.issueTypeLabel }}</a-tag>
+                  <span>{{ item.detail }}</span>
+                  <span v-if="item.billId">账单#{{ item.billId }}</span>
+                  <span v-if="item.paymentId">收款#{{ item.paymentId }}</span>
+                  <a-button type="link" size="small" @click="openLedgerIssue(item)">处理</a-button>
+                </a-space>
+              </a-list-item>
+            </template>
+          </a-list>
+        </a-col>
+      </a-row>
+    </a-card>
+
     <StatefulBlock :loading="loading" :error="errorMessage" @retry="loadData">
       <a-row :gutter="[16, 16]">
         <a-col :xs="24" :xl="12">
@@ -244,8 +286,15 @@ import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
-import { getFinanceConfigChangeLogPage, getFinanceMasterDataOverview, getFinanceWorkbenchOverview } from '../../api/finance'
-import type { FinanceConfigChangeLogItem, FinanceMasterDataOverview, FinanceRoomRanking, FinanceWorkbenchOverview } from '../../types'
+import { getFinanceConfigChangeLogPage, getFinanceLedgerHealth, getFinanceMasterDataOverview, getFinanceWorkbenchOverview } from '../../api/finance'
+import type {
+  FinanceConfigChangeLogItem,
+  FinanceLedgerHealth,
+  FinanceLedgerHealthIssueItem,
+  FinanceMasterDataOverview,
+  FinanceRoomRanking,
+  FinanceWorkbenchOverview
+} from '../../types'
 import { useECharts } from '../../plugins/echarts'
 
 const router = useRouter()
@@ -254,6 +303,7 @@ const errorMessage = ref('')
 const overview = ref<FinanceWorkbenchOverview | null>(null)
 const masterOverview = ref<FinanceMasterDataOverview | null>(null)
 const latestConfigChange = ref<FinanceConfigChangeLogItem | null>(null)
+const ledgerHealth = ref<FinanceLedgerHealth | null>(null)
 
 const { chartRef: revenueChartRef, setOption: setRevenueOption } = useECharts()
 
@@ -277,6 +327,15 @@ const latestConfigChangeText = computed(() => {
   const when = latestConfigChange.value.createTime || '-'
   const detail = latestConfigChange.value.detail || latestConfigChange.value.actionType || ''
   return `${when} ${who} - ${detail}`
+})
+
+const ledgerHealthHint = computed(() => {
+  if (!ledgerHealth.value) return '巡检未完成'
+  const mismatchItem = ledgerHealth.value.mismatchBillItemCount || 0
+  const mismatchPaid = ledgerHealth.value.mismatchPaidCount || 0
+  const missingFlow = ledgerHealth.value.missingPaymentFlowCount || 0
+  const checkedAt = ledgerHealth.value.checkedAt || '-'
+  return `明细不一致 ${mismatchItem}，已付不一致 ${mismatchPaid}，缺少收款流水 ${missingFlow}（巡检时间：${checkedAt}）`
 })
 
 function money(value?: number) {
@@ -310,6 +369,14 @@ function openRevenueCategory(categoryCode: string) {
   go(`/finance/reports/revenue-structure?period=this_month&category=${encodeURIComponent(categoryCode)}`)
 }
 
+function openLedgerIssue(item: FinanceLedgerHealthIssueItem) {
+  if (item.billId) {
+    go(`/finance/bill/${item.billId}`)
+    return
+  }
+  go('/finance/reconcile/center?filter=unmatched')
+}
+
 function renderRevenueChart() {
   const categories = overview.value?.revenueStructure?.categories || []
   setRevenueOption({
@@ -330,12 +397,14 @@ async function loadData() {
   loading.value = true
   errorMessage.value = ''
   try {
-    const [workbenchData, configData] = await Promise.all([
+    const [workbenchData, configData, ledgerData] = await Promise.all([
       getFinanceWorkbenchOverview(),
-      getFinanceMasterDataOverview()
+      getFinanceMasterDataOverview(),
+      getFinanceLedgerHealth({ limit: 12 })
     ])
     overview.value = workbenchData
     masterOverview.value = configData
+    ledgerHealth.value = ledgerData
     const changeLogPage = await getFinanceConfigChangeLogPage({ pageNo: 1, pageSize: 1 })
     latestConfigChange.value = changeLogPage?.list?.[0] || null
     renderRevenueChart()

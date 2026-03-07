@@ -1,14 +1,21 @@
 <template>
-  <PageContainer title="自动扣费/催缴管理" subTitle="自动扣费运行态势与异常处理">
+  <PageContainer title="自动扣费/催缴管理" subTitle="自动扣费运行态势、筛选与异常处理">
     <a-card class="card-elevated" :bordered="false">
       <a-space wrap>
         <a-date-picker v-model:value="query.date" />
+        <a-select v-model:value="query.reasonCode" allow-clear placeholder="失败原因筛选" style="width: 180px">
+          <a-select-option value="INSUFFICIENT_BALANCE">余额不足</a-select-option>
+          <a-select-option value="ELDER_STATUS_OUT">外出暂停</a-select-option>
+          <a-select-option value="RULE_MISSING">规则缺失</a-select-option>
+        </a-select>
+        <a-input-number v-model:value="query.minOutstanding" :min="0" :precision="2" placeholder="最小应扣金额" style="width: 160px" />
+        <a-input v-model:value="query.printRemark" allow-clear placeholder="打印备注" style="width: 180px" />
         <a-button type="primary" @click="loadData">刷新</a-button>
         <a-button @click="exportCsvReport">导出CSV</a-button>
         <a-button @click="printCurrent">打印当前结果</a-button>
-        <a-input v-model:value="query.printRemark" allow-clear placeholder="打印备注" style="width: 180px" />
         <a-button @click="go('/finance/accounts/list?filter=low_balance')">低余额账户</a-button>
         <a-button @click="go('/finance/reconcile/center?filter=unmatched')">对账异常</a-button>
+        <a-button @click="go('/finance/reconcile/ledger-health')">一致性巡检</a-button>
       </a-space>
     </a-card>
 
@@ -21,10 +28,18 @@
       </a-row>
 
       <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="自动扣费异常列表">
+        <a-alert
+          v-if="filteredRows.length !== rows.length"
+          type="info"
+          show-icon
+          style="margin-bottom: 12px;"
+          :message="`筛选结果 ${filteredRows.length} / ${rows.length} 条`"
+        />
         <a-space wrap style="margin-bottom: 12px;">
           <a-tag v-for="reason in (summary?.failureReasons || [])" :key="reason.reason" color="red">{{ reason.reason }} {{ reason.count }}</a-tag>
+          <a-tag color="orange">高风险待处理 {{ highRiskCount }}</a-tag>
         </a-space>
-        <vxe-table border stripe show-overflow :loading="loading" :data="rows" height="520">
+        <vxe-table border stripe show-overflow :loading="loading" :data="filteredRows" height="520">
           <vxe-column field="billMonth" title="账单月" width="120" />
           <vxe-column field="elderName" title="长者" min-width="140" />
           <vxe-column field="outstandingAmount" title="应扣金额" width="120" />
@@ -50,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
@@ -65,10 +80,19 @@ const loading = ref(false)
 const errorMessage = ref('')
 const query = ref({
   date: dayjs(),
+  reasonCode: undefined as string | undefined,
+  minOutstanding: undefined as number | undefined,
   printRemark: ''
 })
 const summary = ref<FinanceAutoDebitCard | null>(null)
 const rows = ref<FinanceAutoDebitExceptionItem[]>([])
+
+const filteredRows = computed(() =>
+  (rows.value || [])
+    .filter(item => !query.value.reasonCode || String(item.reasonCode || '') === query.value.reasonCode)
+    .filter(item => query.value.minOutstanding == null || Number(item.outstandingAmount || 0) >= Number(query.value.minOutstanding || 0))
+)
+const highRiskCount = computed(() => filteredRows.value.filter(item => Number(item.outstandingAmount || 0) >= 1000).length)
 
 function go(path: string) {
   router.push(path)
@@ -109,7 +133,7 @@ function printCurrent() {
   try {
     printTableReport({
       title: '自动扣费异常列表',
-      subtitle: `日期：${dayjs(query.value.date).format('YYYY-MM-DD')}；备注：${query.value.printRemark || '-'}`,
+      subtitle: `日期：${dayjs(query.value.date).format('YYYY-MM-DD')}；原因：${query.value.reasonCode || '全部'}；最小应扣：${query.value.minOutstanding ?? '-'}；备注：${query.value.printRemark || '-'}`,
       columns: [
         { key: 'billMonth', title: '账单月' },
         { key: 'elderName', title: '长者' },
@@ -118,7 +142,7 @@ function printCurrent() {
         { key: 'reasonLabel', title: '失败原因' },
         { key: 'suggestion', title: '处理建议' }
       ],
-      rows: rows.value.map(item => ({
+      rows: filteredRows.value.map(item => ({
         billMonth: item.billMonth || '-',
         elderName: item.elderName || '-',
         outstandingAmount: item.outstandingAmount || 0,

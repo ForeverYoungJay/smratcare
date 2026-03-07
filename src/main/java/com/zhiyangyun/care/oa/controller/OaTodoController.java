@@ -14,7 +14,9 @@ import com.zhiyangyun.care.oa.model.OaTodoSummaryResponse;
 import com.zhiyangyun.care.oa.model.OaTodoRequest;
 import jakarta.validation.Valid;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -48,38 +50,45 @@ public class OaTodoController {
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) String status,
+      @RequestParam(required = false) String sourceType,
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
     String normalizedStatus = normalizeStatus(status);
-    var wrapper = buildQuery(orgId, normalizedStatus, keyword).orderByDesc(OaTodo::getCreateTime);
+    String normalizedSourceType = normalizeSourceType(sourceType);
+    var wrapper = buildQuery(orgId, normalizedStatus, normalizedSourceType, keyword).orderByDesc(OaTodo::getCreateTime);
     return Result.ok(todoMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
   }
 
   @GetMapping("/summary")
   public Result<OaTodoSummaryResponse> summary(
       @RequestParam(required = false) String status,
+      @RequestParam(required = false) String sourceType,
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
     String normalizedStatus = normalizeStatus(status);
+    String normalizedSourceType = normalizeSourceType(sourceType);
     LocalDateTime now = LocalDateTime.now();
     LocalDateTime startOfToday = now.toLocalDate().atStartOfDay();
     LocalDateTime endOfToday = startOfToday.plusDays(1);
 
     OaTodoSummaryResponse response = new OaTodoSummaryResponse();
-    response.setTotalCount(count(todoMapper.selectCount(buildQuery(orgId, normalizedStatus, keyword))));
-    response.setOpenCount(count(todoMapper.selectCount(buildQuery(orgId, "OPEN", keyword))));
-    response.setDoneCount(count(todoMapper.selectCount(buildQuery(orgId, "DONE", keyword))));
-    response.setDueTodayCount(count(todoMapper.selectCount(buildQuery(orgId, normalizedStatus, keyword)
+    response.setTotalCount(count(todoMapper.selectCount(buildQuery(orgId, normalizedStatus, normalizedSourceType, keyword))));
+    response.setOpenCount(count(todoMapper.selectCount(buildQuery(orgId, "OPEN", normalizedSourceType, keyword))));
+    response.setDoneCount(count(todoMapper.selectCount(buildQuery(orgId, "DONE", normalizedSourceType, keyword))));
+    response.setDueTodayCount(count(todoMapper.selectCount(buildQuery(orgId, normalizedStatus, normalizedSourceType, keyword)
         .eq(OaTodo::getStatus, "OPEN")
         .isNotNull(OaTodo::getDueTime)
         .ge(OaTodo::getDueTime, startOfToday)
         .lt(OaTodo::getDueTime, endOfToday))));
-    response.setOverdueCount(count(todoMapper.selectCount(buildQuery(orgId, normalizedStatus, keyword)
+    response.setOverdueCount(count(todoMapper.selectCount(buildQuery(orgId, normalizedStatus, normalizedSourceType, keyword)
         .eq(OaTodo::getStatus, "OPEN")
         .isNotNull(OaTodo::getDueTime)
         .lt(OaTodo::getDueTime, now))));
-    response.setUnassignedCount(count(todoMapper.selectCount(buildQuery(orgId, normalizedStatus, keyword)
+    response.setUnassignedCount(count(todoMapper.selectCount(buildQuery(orgId, normalizedStatus, normalizedSourceType, keyword)
         .and(w -> w.isNull(OaTodo::getAssigneeName).or().eq(OaTodo::getAssigneeName, "")))));
+    response.setBirthdayOpenCount(count(todoMapper.selectCount(buildQuery(orgId, "OPEN", "BIRTHDAY", keyword))));
+    response.setApprovalOpenCount(count(todoMapper.selectCount(buildQuery(orgId, "OPEN", "APPROVAL", keyword))));
+    response.setNormalOpenCount(count(todoMapper.selectCount(buildQuery(orgId, "OPEN", "NORMAL", keyword))));
     return Result.ok(response);
   }
 
@@ -144,6 +153,96 @@ public class OaTodoController {
     return Result.ok(todo);
   }
 
+  @PutMapping("/{id}/snooze")
+  public Result<OaTodo> snooze(
+      @PathVariable Long id,
+      @RequestParam(required = false, defaultValue = "1") Integer days) {
+    OaTodo todo = findAccessibleTodo(id);
+    if (todo == null) {
+      return Result.ok(null);
+    }
+    if (!"OPEN".equals(todo.getStatus())) {
+      throw new IllegalArgumentException("仅 OPEN 状态待办可延后");
+    }
+    if (!isBirthdayReminder(todo)) {
+      throw new IllegalArgumentException("仅生日提醒待办支持延后");
+    }
+    int shift = normalizeSnoozeDays(days);
+    shiftBirthdayReminder(todo, shift);
+    todoMapper.updateById(todo);
+    syncTodoTask(todo);
+    return Result.ok(todo);
+  }
+
+  @PutMapping("/{id}/ignore-birthday")
+  public Result<OaTodo> ignoreBirthday(@PathVariable Long id) {
+    OaTodo todo = findAccessibleTodo(id);
+    if (todo == null) {
+      return Result.ok(null);
+    }
+    if (!"OPEN".equals(todo.getStatus())) {
+      throw new IllegalArgumentException("仅 OPEN 状态待办可忽略");
+    }
+    if (!isBirthdayReminder(todo)) {
+      throw new IllegalArgumentException("仅生日提醒待办支持忽略");
+    }
+    ignoreBirthdayReminder(todo);
+    todoMapper.updateById(todo);
+    syncTodoTask(todo);
+    return Result.ok(todo);
+  }
+
+  @PutMapping("/batch/snooze")
+  public Result<Integer> batchSnooze(
+      @RequestBody OaBatchIdsRequest request,
+      @RequestParam(required = false, defaultValue = "1") Integer days) {
+    List<Long> ids = sanitizeIds(request == null ? null : request.getIds());
+    if (ids.isEmpty()) {
+      return Result.ok(0);
+    }
+    Long orgId = AuthContext.getOrgId();
+    int shift = normalizeSnoozeDays(days);
+    List<OaTodo> todos = todoMapper.selectList(Wrappers.lambdaQuery(OaTodo.class)
+        .eq(OaTodo::getIsDeleted, 0)
+        .eq(orgId != null, OaTodo::getOrgId, orgId)
+        .in(OaTodo::getId, ids));
+    int count = 0;
+    for (OaTodo todo : todos) {
+      if (!"OPEN".equals(todo.getStatus()) || !isBirthdayReminder(todo)) {
+        continue;
+      }
+      shiftBirthdayReminder(todo, shift);
+      todoMapper.updateById(todo);
+      syncTodoTask(todo);
+      count++;
+    }
+    return Result.ok(count);
+  }
+
+  @PutMapping("/batch/ignore-birthday")
+  public Result<Integer> batchIgnoreBirthday(@RequestBody OaBatchIdsRequest request) {
+    List<Long> ids = sanitizeIds(request == null ? null : request.getIds());
+    if (ids.isEmpty()) {
+      return Result.ok(0);
+    }
+    Long orgId = AuthContext.getOrgId();
+    List<OaTodo> todos = todoMapper.selectList(Wrappers.lambdaQuery(OaTodo.class)
+        .eq(OaTodo::getIsDeleted, 0)
+        .eq(orgId != null, OaTodo::getOrgId, orgId)
+        .in(OaTodo::getId, ids));
+    int count = 0;
+    for (OaTodo todo : todos) {
+      if (!"OPEN".equals(todo.getStatus()) || !isBirthdayReminder(todo)) {
+        continue;
+      }
+      ignoreBirthdayReminder(todo);
+      todoMapper.updateById(todo);
+      syncTodoTask(todo);
+      count++;
+    }
+    return Result.ok(count);
+  }
+
   @PutMapping("/batch/done")
   public Result<Integer> batchDone(@RequestBody OaBatchIdsRequest request) {
     List<Long> ids = sanitizeIds(request == null ? null : request.getIds());
@@ -190,24 +289,19 @@ public class OaTodoController {
   @GetMapping(value = "/export", produces = "text/csv;charset=UTF-8")
   public ResponseEntity<byte[]> export(
       @RequestParam(required = false) String status,
+      @RequestParam(required = false) String sourceType,
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
     String normalizedStatus = normalizeStatus(status);
-    var wrapper = Wrappers.lambdaQuery(OaTodo.class)
-        .eq(OaTodo::getIsDeleted, 0)
-        .eq(orgId != null, OaTodo::getOrgId, orgId)
-        .eq(normalizedStatus != null, OaTodo::getStatus, normalizedStatus)
+    String normalizedSourceType = normalizeSourceType(sourceType);
+    var wrapper = buildQuery(orgId, normalizedStatus, normalizedSourceType, keyword)
         .orderByDesc(OaTodo::getCreateTime);
-    if (keyword != null && !keyword.isBlank()) {
-      wrapper.and(w -> w.like(OaTodo::getTitle, keyword)
-          .or().like(OaTodo::getContent, keyword)
-          .or().like(OaTodo::getAssigneeName, keyword));
-    }
     List<OaTodo> todos = todoMapper.selectList(wrapper);
-    List<String> headers = List.of("ID", "标题", "内容", "负责人", "截止时间", "状态");
+    List<String> headers = List.of("ID", "来源", "标题", "内容", "负责人", "截止时间", "状态");
     List<List<String>> rows = todos.stream()
         .map(item -> List.of(
             safe(item.getId()),
+            resolveTodoSourceType(item),
             safe(item.getTitle()),
             safe(item.getContent()),
             safe(item.getAssigneeName()),
@@ -349,11 +443,20 @@ public class OaTodoController {
   }
 
   private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OaTodo> buildQuery(
-      Long orgId, String normalizedStatus, String keyword) {
+      Long orgId, String normalizedStatus, String normalizedSourceType, String keyword) {
     var wrapper = Wrappers.lambdaQuery(OaTodo.class)
         .eq(OaTodo::getIsDeleted, 0)
         .eq(orgId != null, OaTodo::getOrgId, orgId)
         .eq(normalizedStatus != null, OaTodo::getStatus, normalizedStatus);
+    if ("BIRTHDAY".equals(normalizedSourceType)) {
+      wrapper.like(OaTodo::getContent, "[BIRTHDAY_REMINDER:");
+    } else if ("APPROVAL".equals(normalizedSourceType)) {
+      wrapper.like(OaTodo::getContent, "[APPROVAL_FLOW:");
+    } else if ("NORMAL".equals(normalizedSourceType)) {
+      wrapper.and(w -> w.and(n -> n.notLike(OaTodo::getContent, "[BIRTHDAY_REMINDER:")
+              .and().notLike(OaTodo::getContent, "[APPROVAL_FLOW:"))
+          .or().isNull(OaTodo::getContent));
+    }
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(OaTodo::getTitle, keyword)
           .or().like(OaTodo::getContent, keyword)
@@ -364,5 +467,78 @@ public class OaTodoController {
 
   private long count(Long value) {
     return value == null ? 0L : value;
+  }
+
+  private boolean isBirthdayReminder(OaTodo todo) {
+    if (todo == null) {
+      return false;
+    }
+    String content = safe(todo.getContent());
+    return content.contains("[BIRTHDAY_REMINDER:");
+  }
+
+  private String normalizeSourceType(String sourceType) {
+    if (sourceType == null || sourceType.isBlank()) {
+      return null;
+    }
+    String normalized = sourceType.trim().toUpperCase();
+    if (!"BIRTHDAY".equals(normalized)
+        && !"APPROVAL".equals(normalized)
+        && !"NORMAL".equals(normalized)) {
+      throw new IllegalArgumentException("sourceType 仅支持 BIRTHDAY/APPROVAL/NORMAL");
+    }
+    return normalized;
+  }
+
+  private String resolveTodoSourceType(OaTodo todo) {
+    if (todo == null) {
+      return "普通待办";
+    }
+    String content = safe(todo.getContent());
+    if (content.contains("[APPROVAL_FLOW:")) {
+      return "审批流";
+    }
+    if (content.contains("[BIRTHDAY_REMINDER:")) {
+      return "生日提醒";
+    }
+    return "普通待办";
+  }
+
+  private int normalizeSnoozeDays(Integer days) {
+    return days == null ? 1 : Math.max(1, Math.min(days, 30));
+  }
+
+  private void shiftBirthdayReminder(OaTodo todo, int shiftDays) {
+    if (todo == null) {
+      return;
+    }
+    LocalDate baseDate = (todo.getDueTime() == null ? LocalDate.now() : todo.getDueTime().toLocalDate());
+    LocalDate nextDate = baseDate.plusDays(Math.max(1, shiftDays));
+    todo.setDueTime(LocalDateTime.of(nextDate, LocalTime.of(9, 0)));
+    String operator = safe(AuthContext.getUsername());
+    String content = safe(todo.getContent());
+    content = content + " [BIRTHDAY_SNOOZED:" + Math.max(1, shiftDays) + "d"
+        + ":" + (operator.isBlank() ? "system" : operator)
+        + ":" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+        + "]";
+    todo.setContent(content);
+  }
+
+  private void ignoreBirthdayReminder(OaTodo todo) {
+    if (todo == null) {
+      return;
+    }
+    String operator = safe(AuthContext.getUsername());
+    String content = safe(todo.getContent());
+    if (!content.contains("[BIRTHDAY_IGNORED]")) {
+      content = content + " [BIRTHDAY_IGNORED]";
+    }
+    content = content + " [BIRTHDAY_IGNORED_BY:"
+        + (operator.isBlank() ? "system" : operator)
+        + ":" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
+        + "]";
+    todo.setContent(content);
+    todo.setStatus("DONE");
+    todo.setDueTime(LocalDateTime.now());
   }
 }

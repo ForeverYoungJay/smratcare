@@ -6,7 +6,15 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
+import com.zhiyangyun.care.auth.entity.Department;
+import com.zhiyangyun.care.auth.entity.StaffAccount;
+import com.zhiyangyun.care.auth.mapper.DepartmentMapper;
+import com.zhiyangyun.care.auth.mapper.StaffMapper;
 import com.zhiyangyun.care.audit.service.AuditLogService;
+import com.zhiyangyun.care.crm.entity.CrmContract;
+import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
+import com.zhiyangyun.care.elder.entity.ElderProfile;
+import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.store.entity.InventoryBatch;
 import com.zhiyangyun.care.store.entity.InventoryLog;
 import com.zhiyangyun.care.store.entity.InventoryAdjustment;
@@ -30,6 +38,7 @@ import com.zhiyangyun.care.store.model.InventoryOutboundRequest;
 import com.zhiyangyun.care.store.model.InventoryOutboundSheetCreateRequest;
 import com.zhiyangyun.care.store.model.InventoryOutboundSheetItemRequest;
 import com.zhiyangyun.care.store.model.InventoryOutboundSheetItemResponse;
+import com.zhiyangyun.care.store.model.InventoryOutboundSheetPrefillResponse;
 import com.zhiyangyun.care.store.model.InventoryOutboundSheetResponse;
 import com.zhiyangyun.care.store.model.InventoryAdjustmentResponse;
 import com.zhiyangyun.care.store.model.InventoryAdjustmentDiffItem;
@@ -63,6 +72,10 @@ public class InventoryController {
   private final InventoryOutboundSheetItemMapper inventoryOutboundSheetItemMapper;
   private final ProductMapper productMapper;
   private final MaterialWarehouseMapper materialWarehouseMapper;
+  private final ElderMapper elderMapper;
+  private final CrmContractMapper crmContractMapper;
+  private final StaffMapper staffMapper;
+  private final DepartmentMapper departmentMapper;
   private final AuditLogService auditLogService;
 
   public InventoryController(InventoryService inventoryService,
@@ -73,6 +86,10 @@ public class InventoryController {
       InventoryOutboundSheetItemMapper inventoryOutboundSheetItemMapper,
       ProductMapper productMapper,
       MaterialWarehouseMapper materialWarehouseMapper,
+      ElderMapper elderMapper,
+      CrmContractMapper crmContractMapper,
+      StaffMapper staffMapper,
+      DepartmentMapper departmentMapper,
       AuditLogService auditLogService) {
     this.inventoryService = inventoryService;
     this.inventoryBatchMapper = inventoryBatchMapper;
@@ -82,6 +99,10 @@ public class InventoryController {
     this.inventoryOutboundSheetItemMapper = inventoryOutboundSheetItemMapper;
     this.productMapper = productMapper;
     this.materialWarehouseMapper = materialWarehouseMapper;
+    this.elderMapper = elderMapper;
+    this.crmContractMapper = crmContractMapper;
+    this.staffMapper = staffMapper;
+    this.departmentMapper = departmentMapper;
     this.auditLogService = auditLogService;
   }
 
@@ -121,16 +142,25 @@ public class InventoryController {
   @Transactional
   public Result<InventoryOutboundSheetResponse> createOutboundSheet(@Valid @RequestBody InventoryOutboundSheetCreateRequest request) {
     Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
+    LinkageContext linkage = buildLinkageContext(orgId, staffId, request.getElderId());
+    String receiverName = normalizeText(request.getReceiverName());
+    if (receiverName == null) {
+      receiverName = linkage.receiverName;
+    }
+    if (receiverName == null) {
+      throw new IllegalArgumentException("领取人不能为空");
+    }
     InventoryOutboundSheet sheet = new InventoryOutboundSheet();
     sheet.setOrgId(orgId);
     sheet.setOutboundNo(resolveOutboundNo(orgId, request.getOutboundNo()));
-    sheet.setReceiverName(request.getReceiverName());
+    sheet.setReceiverName(receiverName);
     sheet.setElderId(request.getElderId());
-    sheet.setContractNo(request.getContractNo());
-    sheet.setApplyDept(request.getApplyDept());
-    sheet.setOperatorStaffId(AuthContext.getStaffId());
-    sheet.setOperatorName(AuthContext.getUsername());
-    sheet.setRemark(request.getRemark());
+    sheet.setContractNo(firstNonBlank(request.getContractNo(), linkage.contractNo));
+    sheet.setApplyDept(firstNonBlank(request.getApplyDept(), linkage.applyDeptName));
+    sheet.setOperatorStaffId(staffId);
+    sheet.setOperatorName(firstNonBlank(linkage.operatorName, AuthContext.getUsername()));
+    sheet.setRemark(normalizeText(request.getRemark()));
     sheet.setStatus("DRAFT");
     sheet.setIsDeleted(0);
     inventoryOutboundSheetMapper.insert(sheet);
@@ -153,6 +183,20 @@ public class InventoryController {
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "INVENTORY_OUTBOUND_SHEET_CREATE", "OUTBOUND_SHEET", sheet.getId(), "创建领用单:" + sheet.getOutboundNo());
     return Result.ok(getOutboundSheetDetail(sheet.getId()).getData());
+  }
+
+  @GetMapping("/outbound/sheet/prefill")
+  public Result<InventoryOutboundSheetPrefillResponse> outboundSheetPrefill(
+      @RequestParam(required = false) Long elderId) {
+    Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
+    LinkageContext linkage = buildLinkageContext(orgId, staffId, elderId);
+    InventoryOutboundSheetPrefillResponse response = new InventoryOutboundSheetPrefillResponse();
+    response.setElderId(elderId);
+    response.setReceiverName(linkage.receiverName);
+    response.setContractNo(linkage.contractNo);
+    response.setApplyDept(linkage.applyDeptName);
+    return Result.ok(response);
   }
 
   @GetMapping("/outbound/sheet/page")
@@ -632,6 +676,116 @@ public class InventoryController {
       generated = "LY-" + date + "-" + suffix++;
     }
     return generated;
+  }
+
+  private LinkageContext buildLinkageContext(Long orgId, Long staffId, Long elderId) {
+    LinkageContext context = new LinkageContext();
+    context.operatorName = resolveOperatorName(orgId, staffId);
+    context.applyDeptName = resolveApplyDeptName(orgId, staffId);
+    if (elderId != null) {
+      ElderProfile elder = elderMapper.selectOne(
+          Wrappers.lambdaQuery(ElderProfile.class)
+              .eq(ElderProfile::getIsDeleted, 0)
+              .eq(ElderProfile::getId, elderId)
+              .eq(orgId != null, ElderProfile::getOrgId, orgId)
+              .last("LIMIT 1"));
+      if (elder != null) {
+        context.receiverName = normalizeText(elder.getFullName());
+      }
+      context.contractNo = resolveContractNoByElder(orgId, elderId);
+    }
+    return context;
+  }
+
+  private String resolveContractNoByElder(Long orgId, Long elderId) {
+    if (elderId == null) {
+      return null;
+    }
+    List<CrmContract> contracts = crmContractMapper.selectList(
+        Wrappers.lambdaQuery(CrmContract.class)
+            .eq(CrmContract::getIsDeleted, 0)
+            .eq(CrmContract::getElderId, elderId)
+            .eq(orgId != null, CrmContract::getOrgId, orgId)
+            .orderByDesc(CrmContract::getSignedAt)
+            .orderByDesc(CrmContract::getUpdateTime)
+            .orderByDesc(CrmContract::getId));
+    if (contracts == null || contracts.isEmpty()) {
+      return null;
+    }
+    CrmContract active = contracts.stream()
+        .filter(item -> {
+          String status = normalizeText(item.getStatus());
+          return status == null || !"VOID".equalsIgnoreCase(status);
+        })
+        .findFirst()
+        .orElse(contracts.get(0));
+    return normalizeText(active.getContractNo());
+  }
+
+  private String resolveOperatorName(Long orgId, Long staffId) {
+    if (staffId == null) {
+      return normalizeText(AuthContext.getUsername());
+    }
+    StaffAccount staff = staffMapper.selectOne(
+        Wrappers.lambdaQuery(StaffAccount.class)
+            .eq(StaffAccount::getIsDeleted, 0)
+            .eq(StaffAccount::getId, staffId)
+            .eq(orgId != null, StaffAccount::getOrgId, orgId)
+            .last("LIMIT 1"));
+    if (staff == null) {
+      return normalizeText(AuthContext.getUsername());
+    }
+    return firstNonBlank(staff.getRealName(), staff.getUsername(), AuthContext.getUsername());
+  }
+
+  private String resolveApplyDeptName(Long orgId, Long staffId) {
+    if (staffId == null) {
+      return null;
+    }
+    StaffAccount staff = staffMapper.selectOne(
+        Wrappers.lambdaQuery(StaffAccount.class)
+            .eq(StaffAccount::getIsDeleted, 0)
+            .eq(StaffAccount::getId, staffId)
+            .eq(orgId != null, StaffAccount::getOrgId, orgId)
+            .last("LIMIT 1"));
+    if (staff == null || staff.getDepartmentId() == null) {
+      return null;
+    }
+    Department department = departmentMapper.selectOne(
+        Wrappers.lambdaQuery(Department.class)
+            .eq(Department::getIsDeleted, 0)
+            .eq(Department::getId, staff.getDepartmentId())
+            .eq(orgId != null, Department::getOrgId, orgId)
+            .last("LIMIT 1"));
+    return department == null ? null : normalizeText(department.getDeptName());
+  }
+
+  private String normalizeText(String value) {
+    if (value == null) {
+      return null;
+    }
+    String text = value.trim();
+    return text.isEmpty() ? null : text;
+  }
+
+  private String firstNonBlank(String... values) {
+    if (values == null) {
+      return null;
+    }
+    for (String value : values) {
+      String text = normalizeText(value);
+      if (text != null) {
+        return text;
+      }
+    }
+    return null;
+  }
+
+  private static class LinkageContext {
+    private String receiverName;
+    private String contractNo;
+    private String applyDeptName;
+    private String operatorName;
   }
 
   private InventoryOutboundSheetResponse toOutboundSheetResponse(

@@ -10,4 +10,7 @@ public class OaTodoSummaryResponse {
   private long dueTodayCount;
   private long overdueCount;
   private long unassignedCount;
+  private long birthdayOpenCount;
+  private long approvalOpenCount;
+  private long normalOpenCount;
 }

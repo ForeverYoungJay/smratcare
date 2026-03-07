@@ -26,7 +26,28 @@
 
     <a-card class="card-elevated" :bordered="false">
       <div class="calendar-toolbar">
-        <div class="calendar-title-tip">日历分层：个人、部门工作、日常计划、协同日历（与首页一致）</div>
+        <div>
+          <div class="calendar-title-tip">日历分层：个人、部门工作、日常计划、协同日历（与首页一致）</div>
+          <a-space size="small" wrap class="calendar-insights">
+            <a-tag v-for="item in calendarInsights" :key="item.label" :color="item.color">{{ item.label }} {{ item.value }}</a-tag>
+          </a-space>
+          <a-space size="small" wrap class="calendar-loads" v-if="calendarLoadLeaders.length">
+            <a-tag color="geekblue">负责人负载</a-tag>
+            <a-tag v-for="item in calendarLoadLeaders" :key="item.name">{{ item.name }} {{ item.count }}条</a-tag>
+          </a-space>
+          <div class="calendar-week-trend" v-if="calendarWeeklyLoad.length">
+            <span class="repeat-tip">本周负载：</span>
+            <div
+              v-for="item in calendarWeeklyLoad"
+              :key="item.day"
+              class="calendar-week-bar"
+              :title="`${item.label} ${item.count}条`"
+              :style="{ height: `${Math.max(18, item.height)}px` }"
+            >
+              <span>{{ item.label }}</span>
+            </div>
+          </div>
+        </div>
         <a-space wrap>
           <a-checkable-tag
             v-for="item in calendarBuckets"
@@ -37,9 +58,10 @@
             <span class="legend-dot" :style="{ background: item.color }"></span>
             {{ item.label }} {{ item.count }}
           </a-checkable-tag>
+          <a-button size="small" type="link" @click="showAllCalendarTypes">显示全部</a-button>
         </a-space>
       </div>
-      <FullCalendar :options="calendarOptions" />
+      <FullCalendar ref="calendarRef" :options="calendarOptions" />
     </a-card>
 
     <a-drawer
@@ -63,6 +85,7 @@
                 <a-space wrap>
                   <span :class="{ 'agenda-title-done': item.status === 'DONE' }">{{ item.title }}</span>
                   <a-tag v-if="item.status === 'DONE'">已完成</a-tag>
+                  <a-tag v-if="item.readonly" color="default">系统提醒</a-tag>
                   <a-tag>{{ calendarTypeText(item.calendarType) }}</a-tag>
                   <a-tag :color="item.urgency === 'EMERGENCY' ? 'red' : 'blue'">{{ item.urgency === 'EMERGENCY' ? '紧急' : '常规' }}</a-tag>
                   <a-tag v-if="item.planCategory" color="purple">{{ item.planCategory }}</a-tag>
@@ -76,9 +99,10 @@
               </template>
             </a-list-item-meta>
             <template #actions>
-              <a-button type="link" size="small" @click="openEdit(item)">编辑</a-button>
-              <a-button type="link" size="small" @click="markDone(item)">完成</a-button>
-              <a-button type="link" size="small" danger @click="removeTask(item)">删除</a-button>
+              <a-button v-if="!item.readonly" type="link" size="small" @click="openEdit(item)">编辑</a-button>
+              <a-button v-if="!item.readonly" type="link" size="small" @click="markDone(item)">完成</a-button>
+              <a-button v-if="!item.readonly" type="link" size="small" danger @click="removeTask(item)">删除</a-button>
+              <span v-if="item.readonly" class="readonly-tip">{{ item.readonlyReason || '系统提醒' }}</span>
             </template>
           </a-list-item>
         </template>
@@ -144,6 +168,33 @@
             </a-form-item>
           </a-col>
         </a-row>
+        <a-row :gutter="12">
+          <a-col :span="24">
+            <a-form-item label="冲突策略">
+              <a-segmented v-model:value="conflictPolicy" :options="conflictPolicyOptions" block />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="12">
+          <a-col :span="24">
+            <a-space wrap>
+              <a-button :loading="conflictPreviewLoading" @click="previewScheduleConflicts">立即预检冲突</a-button>
+              <span class="repeat-tip">保存前可先预检，策略生效：{{ conflictPolicyOptions.find((item) => item.value === conflictPolicy)?.label }}</span>
+            </a-space>
+          </a-col>
+        </a-row>
+        <a-row :gutter="12" v-if="conflictPreviewItems.length">
+          <a-col :span="24">
+            <a-alert :message="`预检发现 ${conflictPreviewItems.length} 条冲突`" type="warning" show-icon>
+              <template #description>
+                <div v-for="(item, index) in conflictPreviewItems.slice(0, 5)" :key="`${item.title}_${index}`">
+                  {{ index + 1 }}. {{ item.title || '未命名日程' }}（{{ conflictItemTimeText(item) }}）{{ item.reason ? ` - ${item.reason}` : '' }}
+                  <a-button type="link" size="small" @click="focusConflictDate(item.startTime)">定位</a-button>
+                </div>
+              </template>
+            </a-alert>
+          </a-col>
+        </a-row>
 
         <a-row :gutter="12" v-if="form.calendarType === 'COLLAB'">
           <a-col :span="24">
@@ -175,6 +226,17 @@
                 @focus="() => !staffOptions.length && searchStaff('')"
               />
             </a-form-item>
+          </a-col>
+          <a-col :span="24" v-if="collaboratorTip">
+            <div class="repeat-tip">
+              {{ collaboratorTip }}
+              <a-button v-if="collaboratorPreviewAllNames.length > collaboratorPreviewNames.length" type="link" size="small" @click="showAllCollaboratorPreview">
+                查看全部
+              </a-button>
+            </div>
+          </a-col>
+          <a-col :span="24" v-if="collaboratorDeltaTip">
+            <div class="repeat-tip">{{ collaboratorDeltaTip }}</div>
           </a-col>
         </a-row>
 
@@ -217,7 +279,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
 import FullCalendar from '@fullcalendar/vue3'
@@ -226,13 +288,14 @@ import interactionPlugin from '@fullcalendar/interaction'
 import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
-import { getOaTaskCalendar, createOaTask, updateOaTask, completeOaTask, deleteOaTask } from '../../api/oa'
+import { getOaTaskCalendar, createOaTask, updateOaTask, completeOaTask, deleteOaTask, checkOaTaskConflicts } from '../../api/oa'
+import { getBirthdayPage } from '../../api/life'
 import { getStaffPage } from '../../api/rbac'
 import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
 import { useStaffOptions } from '../../composables/useStaffOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { useUserStore } from '../../stores/user'
-import type { OaTask } from '../../types'
+import type { BirthdayReminder, OaTask } from '../../types'
 
 type CalendarType = 'PERSONAL' | 'WORK' | 'DAILY' | 'COLLAB'
 type UrgencyType = 'NORMAL' | 'EMERGENCY'
@@ -240,17 +303,33 @@ type RecurrenceType = 'DAILY' | 'WEEKLY' | 'MONTHLY'
 
 const userStore = useUserStore()
 const rows = ref<OaTask[]>([])
+const birthdayRows = ref<BirthdayReminder[]>([])
 const saving = ref(false)
+const collaboratorPreviewTotal = ref(0)
+const collaboratorPreviewLoading = ref(false)
+const collaboratorPreviewNames = ref<string[]>([])
+const collaboratorPreviewAllNames = ref<string[]>([])
+const originalCollaboratorIds = ref<string[]>([])
+const conflictPreviewLoading = ref(false)
+const conflictPreviewItems = ref<Array<{ title?: string; assigneeName?: string; startTime?: string; endTime?: string; reason?: string }>>([])
 const editOpen = ref(false)
 const dayDrawerOpen = ref(false)
 const selectedDate = ref<Dayjs>()
 const editingTaskId = ref<string | number | null>(null)
+const calendarRef = ref<any>(null)
 let syncTimer: number | undefined
 
 const { departmentOptions, searchDepartments } = useDepartmentOptions({ pageSize: 240, preloadSize: 500 })
 const { staffOptions, searchStaff } = useStaffOptions({ pageSize: 300, preloadSize: 500 })
 
 const visibleCalendarTypes = ref<Array<CalendarType>>(['PERSONAL', 'WORK', 'DAILY', 'COLLAB'])
+const VISIBLE_TYPES_STORAGE_KEY = 'oa_calendar_visible_types_v1'
+const CALENDAR_VIEW_STORAGE_KEY = 'oa_calendar_view_mode_v1'
+const CALENDAR_SYNC_PULSE_KEY = 'oa_calendar_sync_pulse_v1'
+const CONFLICT_POLICY_STORAGE_KEY = 'oa_calendar_conflict_policy_v1'
+const currentCalendarView = ref<'dayGridMonth' | 'dayGridWeek' | 'dayGridDay'>('dayGridMonth')
+const conflictPolicy = ref<'WARN' | 'BLOCK' | 'ALLOW'>('WARN')
+let calendarStorageHandler: ((event: StorageEvent) => void) | null = null
 
 const query = reactive({
   status: undefined as string | undefined,
@@ -315,6 +394,11 @@ const planCategoryOptions = [
   { label: '后勤排班', value: '后勤排班' },
   { label: '专项检查', value: '专项检查' }
 ]
+const conflictPolicyOptions = [
+  { label: '提示后可继续', value: 'WARN' as const },
+  { label: '发现冲突即阻止', value: 'BLOCK' as const },
+  { label: '忽略冲突直接保存', value: 'ALLOW' as const }
+]
 
 const majorFestivalEvents = computed(() => {
   const year = dayjs().year()
@@ -338,6 +422,36 @@ const majorFestivalEvents = computed(() => {
   }))
 })
 
+const birthdayReminderEvents = computed(() => birthdayRows.value
+  .map((item) => {
+    const date = item.nextBirthday ? dayjs(item.nextBirthday) : null
+    if (!date || !date.isValid()) return null
+    const urgency = Number(item.daysUntil || 9999) <= 0 ? 'EMERGENCY' : 'NORMAL'
+    return {
+      id: `calendar-birthday-${item.elderId || item.elderName || item.nextBirthday}`,
+      title: `🎂 ${item.elderName || '老人生日'}`,
+      start: `${date.format('YYYY-MM-DD')}T09:00:00`,
+      end: `${date.format('YYYY-MM-DD')}T10:00:00`,
+      color: urgency === 'EMERGENCY' ? '#eb2f96' : '#f759ab',
+      extendedProps: {
+        calendarType: 'DAILY',
+        urgency,
+        assigneeName: '系统提醒',
+        collaboratorNames: '',
+        planCategory: '生日提醒',
+        readonly: true,
+        readonlyReason: '生日提醒'
+      }
+    }
+  })
+  .filter((item): item is NonNullable<typeof item> => !!item))
+
+type DayAgendaItem = OaTask & {
+  collaboratorNames: string[]
+  readonly?: boolean
+  readonlyReason?: string
+}
+
 const calendarBuckets = computed(() => {
   const defs = [
     { type: 'PERSONAL' as const, label: '个人', color: '#52c41a' },
@@ -351,31 +465,139 @@ const calendarBuckets = computed(() => {
   }))
 })
 
-const selectedDayEvents = computed(() => {
+const calendarInsights = computed(() => {
+  const todayText = dayjs().format('YYYY-MM-DD')
+  return [
+    { label: '今日', value: rows.value.filter((task) => normalizeDateTimeValue(task.startTime || task.endTime)?.startsWith(todayText)).length, color: 'blue' },
+    { label: '紧急', value: rows.value.filter((task) => task.urgency === 'EMERGENCY' && task.status !== 'DONE').length, color: 'red' },
+    { label: '已完成', value: rows.value.filter((task) => task.status === 'DONE').length, color: 'default' },
+    { label: '节假日', value: majorFestivalEvents.value.length, color: 'orange' },
+    { label: '生日提醒', value: birthdayReminderEvents.value.length, color: 'magenta' }
+  ]
+})
+
+const calendarLoadLeaders = computed(() => {
+  const bucket = new Map<string, number>()
+  rows.value
+    .filter((task) => task.status !== 'DONE')
+    .forEach((task) => {
+      const name = (task.assigneeName || '未分配').trim()
+      bucket.set(name, Number(bucket.get(name) || 0) + 1)
+    })
+  return Array.from(bucket.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([name, count]) => ({ name, count }))
+})
+
+const calendarWeeklyLoad = computed(() => {
+  const start = dayjs().startOf('week')
+  const list = Array.from({ length: 7 }).map((_, index) => {
+    const day = start.add(index, 'day')
+    const dayText = day.format('YYYY-MM-DD')
+    const count = rows.value.filter((task) => {
+      if (task.status === 'DONE') return false
+      const startTime = normalizeDateTimeValue(task.startTime || task.endTime)
+      return startTime ? dayjs(startTime).format('YYYY-MM-DD') === dayText : false
+    }).length
+    return {
+      day: dayText,
+      label: ['日', '一', '二', '三', '四', '五', '六'][day.day()],
+      count
+    }
+  })
+  const max = list.reduce((acc, item) => Math.max(acc, item.count), 1)
+  return list.map((item) => ({
+    ...item,
+    height: Math.round((item.count / max) * 48)
+  }))
+})
+
+const selectedDayEvents = computed<DayAgendaItem[]>(() => {
   if (!selectedDate.value) return []
   const selected = selectedDate.value.format('YYYY-MM-DD')
-  return rows.value
+  const taskItems: DayAgendaItem[] = rows.value
     .filter((task) => visibleCalendarTypes.value.includes((task.calendarType || 'WORK') as CalendarType))
     .filter((task) => {
       const start = normalizeDateTimeValue(task.startTime || task.endTime)
       return start ? dayjs(start).format('YYYY-MM-DD') === selected : false
     })
+    .map((task) => ({
+      ...task,
+      collaboratorNames: normalizeCollaboratorNames(task.collaboratorNames),
+      readonly: false
+    }))
+
+  const birthdayItems: DayAgendaItem[] = birthdayReminderEvents.value
+    .filter((event) => dayjs(event.start).format('YYYY-MM-DD') === selected)
+    .map((event) => ({
+      id: event.id,
+      title: event.title,
+      startTime: event.start,
+      endTime: event.end,
+      status: 'OPEN',
+      calendarType: 'DAILY',
+      urgency: (event.extendedProps?.urgency || 'NORMAL') as UrgencyType,
+      assigneeName: '系统提醒',
+      planCategory: '生日提醒',
+      collaboratorNames: [],
+      readonly: true,
+      readonlyReason: '生日提醒'
+    } as DayAgendaItem))
+
+  const festivalItems: DayAgendaItem[] = majorFestivalEvents.value
+    .filter((event) => dayjs(event.start).format('YYYY-MM-DD') === selected)
+    .map((event) => ({
+      id: event.id,
+      title: event.title,
+      startTime: event.start,
+      endTime: event.end,
+      status: 'OPEN',
+      calendarType: 'DAILY',
+      urgency: 'EMERGENCY',
+      assigneeName: '系统提醒',
+      planCategory: '节假日',
+      collaboratorNames: [],
+      readonly: true,
+      readonlyReason: '节假日'
+    } as DayAgendaItem))
+
+  return [...taskItems, ...birthdayItems, ...festivalItems]
     .sort((a, b) => {
       const left = normalizeDateTimeValue(a.startTime || a.endTime)
       const right = normalizeDateTimeValue(b.startTime || b.endTime)
       return (left ? dayjs(left).valueOf() : 0) - (right ? dayjs(right).valueOf() : 0)
     })
-    .map((task) => ({
-      ...task,
-      collaboratorNames: normalizeCollaboratorNames(task.collaboratorNames)
-    }))
 })
 
 const modalTitle = computed(() => (editingTaskId.value != null ? '编辑行政日程' : '新增行政日程'))
+const collaboratorTip = computed(() => {
+  if (form.calendarType !== 'COLLAB') return ''
+  const deptCount = form.collaboratorDeptIds.length
+  const staffCount = form.collaboratorIds.length
+  if (!deptCount && !staffCount) return '未选择协同对象'
+  const previewText = collaboratorPreviewLoading.value
+    ? '正在计算同步人数'
+    : `预计同步 ${collaboratorPreviewTotal.value} 人`
+  const namesText = collaboratorPreviewNames.value.length ? `（${collaboratorPreviewNames.value.join('、')}）` : ''
+  return `已选 ${deptCount} 个部门、${staffCount} 位员工；${previewText}${namesText}，保存后自动展开并同步到协同日历`
+})
+
+const collaboratorDeltaTip = computed(() => {
+  if (form.calendarType !== 'COLLAB' || editingTaskId.value == null) return ''
+  const currentSet = new Set(form.collaboratorIds)
+  const originalSet = new Set(originalCollaboratorIds.value)
+  const added = form.collaboratorIds.filter((id) => !originalSet.has(id))
+  const removed = originalCollaboratorIds.value.filter((id) => !currentSet.has(id))
+  if (!added.length && !removed.length) return '协同成员未发生变化'
+  const addedText = added.length ? `新增 ${added.length} 人` : '新增 0 人'
+  const removedText = removed.length ? `移除 ${removed.length} 人` : '移除 0 人'
+  return `协同成员变更：${addedText}，${removedText}`
+})
 
 const calendarOptions = computed(() => ({
   plugins: [dayGridPlugin, interactionPlugin],
-  initialView: 'dayGridMonth',
+  initialView: currentCalendarView.value,
   locale: 'zh-cn',
   height: 'auto',
   headerToolbar: {
@@ -388,6 +610,24 @@ const calendarOptions = computed(() => ({
     dayGridMonth: '月视图',
     dayGridWeek: '周视图',
     dayGridDay: '日视图'
+  },
+  datesSet: (arg: any) => {
+    const viewType = String(arg?.view?.type || '')
+    if (viewType === 'dayGridMonth' || viewType === 'dayGridWeek' || viewType === 'dayGridDay') {
+      currentCalendarView.value = viewType
+    }
+  },
+  eventDidMount: (arg: any) => {
+    const event = arg?.event
+    const taskType = calendarTypeText(event?.extendedProps?.calendarType)
+    const urgencyText = event?.extendedProps?.urgency === 'EMERGENCY' ? '紧急' : '常规'
+    const assigneeText = event?.extendedProps?.assigneeName || '-'
+    const collaboratorText = event?.extendedProps?.collaboratorNames || '-'
+    const planCategory = event?.extendedProps?.planCategory || '-'
+    arg?.el?.setAttribute?.(
+      'title',
+      `${event?.title || ''}\n类型：${taskType}\n紧急：${urgencyText}\n负责人：${assigneeText}\n协同：${collaboratorText}\n分类：${planCategory}`
+    )
   },
   dateClick: (arg: { dateStr: string }) => {
     openDayDrawer(dayjs(arg.dateStr))
@@ -407,9 +647,13 @@ const calendarOptions = computed(() => ({
         color: resolveTaskColor(task),
         extendedProps: {
           calendarType: task.calendarType || 'WORK',
-          urgency: task.urgency || 'NORMAL'
+          urgency: task.urgency || 'NORMAL',
+          assigneeName: task.assigneeName || '',
+          collaboratorNames: normalizeCollaboratorNames(task.collaboratorNames).join('、'),
+          planCategory: task.planCategory || ''
         }
       })),
+    ...birthdayReminderEvents.value,
     ...majorFestivalEvents.value
   ]
 }))
@@ -457,6 +701,75 @@ function toggleCalendarType(type: CalendarType) {
     return
   }
   visibleCalendarTypes.value = [type]
+}
+
+function showAllCalendarTypes() {
+  visibleCalendarTypes.value = ['PERSONAL', 'WORK', 'DAILY', 'COLLAB']
+}
+
+function normalizeVisibleTypes(input: unknown): CalendarType[] {
+  const valid: CalendarType[] = ['PERSONAL', 'WORK', 'DAILY', 'COLLAB']
+  if (!Array.isArray(input)) return [...valid]
+  const filtered = input.filter((item): item is CalendarType => valid.includes(item as CalendarType))
+  const deduped = Array.from(new Set(filtered))
+  return deduped.length ? deduped : [...valid]
+}
+
+function syncVisibleTypesFromStorage() {
+  try {
+    const raw = localStorage.getItem(VISIBLE_TYPES_STORAGE_KEY)
+    if (!raw) return
+    visibleCalendarTypes.value = normalizeVisibleTypes(JSON.parse(raw))
+  } catch {}
+}
+
+function syncCalendarViewFromStorage() {
+  try {
+    const raw = localStorage.getItem(CALENDAR_VIEW_STORAGE_KEY)
+    if (!raw) return
+    if (raw === 'dayGridMonth' || raw === 'dayGridWeek' || raw === 'dayGridDay') {
+      currentCalendarView.value = raw
+    }
+  } catch {}
+}
+
+function syncConflictPolicyFromStorage() {
+  try {
+    const raw = localStorage.getItem(CONFLICT_POLICY_STORAGE_KEY)
+    if (!raw) return
+    if (raw === 'WARN' || raw === 'BLOCK' || raw === 'ALLOW') {
+      conflictPolicy.value = raw
+    }
+  } catch {}
+}
+
+function emitCalendarSyncPulse(action: 'CREATE' | 'UPDATE' | 'DONE' | 'DELETE') {
+  try {
+    localStorage.setItem(CALENDAR_SYNC_PULSE_KEY, JSON.stringify({
+      action,
+      at: dayjs().format('YYYY-MM-DDTHH:mm:ss')
+    }))
+  } catch {}
+}
+
+async function fetchBirthdayReminders() {
+  const data = await getBirthdayPage({
+    pageNo: 1,
+    pageSize: 500,
+    daysAhead: 366
+  })
+  birthdayRows.value = data.list || []
+}
+
+function focusCalendarDate(dateText: string) {
+  const api = calendarRef.value?.getApi?.()
+  if (!api) {
+    message.warning('日历未就绪，请稍后再试')
+    return
+  }
+  api.gotoDate(dateText)
+  api.changeView('dayGridDay')
+  openDayDrawer(dayjs(dateText))
 }
 
 function openDayDrawer(date: Dayjs) {
@@ -524,15 +837,139 @@ async function resolveCollaborators(departmentIds: string[], staffIds: string[])
   }
 }
 
-async function fetchAll() {
-  rows.value = await getOaTaskCalendar({
-    status: query.status,
-    calendarType: query.calendarType,
-    urgency: query.urgency,
-    assigneeName: query.assigneeName || undefined,
-    startDate: query.range?.[0] ? dayjs(query.range[0]).format('YYYY-MM-DD') : undefined,
-    endDate: query.range?.[1] ? dayjs(query.range[1]).format('YYYY-MM-DD') : undefined
+function buildConflictMessage(items: Array<{ title?: string; assigneeName?: string; startTime?: string; endTime?: string; reason?: string }>) {
+  return items
+    .slice(0, 6)
+    .map((item, index) => {
+      const start = item.startTime ? dayjs(item.startTime).format('MM-DD HH:mm') : '--'
+      const end = item.endTime ? dayjs(item.endTime).format('MM-DD HH:mm') : '--'
+      return `${index + 1}. ${item.title || '未命名日程'}（${start} ~ ${end}）${item.assigneeName ? ` [${item.assigneeName}]` : ''} - ${item.reason || '时间冲突'}`
+    })
+    .join('\n')
+}
+
+function conflictItemTimeText(item: { startTime?: string; endTime?: string }) {
+  const start = item.startTime ? dayjs(item.startTime).format('MM-DD HH:mm') : '--'
+  const end = item.endTime ? dayjs(item.endTime).format('MM-DD HH:mm') : '--'
+  return `${start} ~ ${end}`
+}
+
+function focusConflictDate(startTime?: string) {
+  const normalized = normalizeDateTimeValue(startTime)
+  if (!normalized) return
+  focusCalendarDate(dayjs(normalized).format('YYYY-MM-DD'))
+}
+
+function showAllCollaboratorPreview() {
+  if (!collaboratorPreviewAllNames.value.length) {
+    message.info('暂无协同成员')
+    return
+  }
+  Modal.info({
+    title: `协同成员清单（${collaboratorPreviewAllNames.value.length} 人）`,
+    content: collaboratorPreviewAllNames.value.join('、'),
+    width: 680
   })
+}
+
+async function previewScheduleConflicts() {
+  if (!form.startTime) {
+    message.warning('请先选择开始时间')
+    return
+  }
+  const collaboratorPayload = form.calendarType === 'COLLAB'
+    ? await resolveCollaborators(form.collaboratorDeptIds, form.collaboratorIds)
+    : { ids: [] as string[], names: [] as string[] }
+  const payload = {
+    taskId: editingTaskId.value || undefined,
+    startTime: dayjs(form.startTime).format('YYYY-MM-DDTHH:mm:ss'),
+    endTime: form.endTime ? dayjs(form.endTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
+    assigneeName: form.assigneeName || undefined,
+    collaboratorIds: collaboratorPayload.ids
+  }
+  conflictPreviewLoading.value = true
+  try {
+    const conflicts = await checkOaTaskConflicts(payload)
+    conflictPreviewItems.value = conflicts || []
+    if (!conflicts?.length) {
+      message.success('预检通过，未发现冲突')
+    }
+  } catch {
+    message.warning('冲突预检失败，请稍后重试')
+  } finally {
+    conflictPreviewLoading.value = false
+  }
+}
+
+async function confirmByConflicts(payload: { taskId?: string | number; startTime: string; endTime?: string; assigneeName?: string; collaboratorIds: string[] }) {
+  if (conflictPolicy.value === 'ALLOW') return true
+  try {
+    const conflicts = await checkOaTaskConflicts({
+      taskId: payload.taskId,
+      startTime: payload.startTime,
+      endTime: payload.endTime,
+      assigneeName: payload.assigneeName,
+      collaboratorIds: payload.collaboratorIds
+    })
+    conflictPreviewItems.value = conflicts || []
+    if (!conflicts?.length) return true
+    if (conflictPolicy.value === 'BLOCK') {
+      message.error(`检测到 ${conflicts.length} 条冲突，当前策略不允许保存`)
+      return false
+    }
+    return await new Promise<boolean>((resolve) => {
+      Modal.confirm({
+        title: `检测到 ${conflicts.length} 条潜在冲突`,
+        content: buildConflictMessage(conflicts),
+        okText: '仍然保存',
+        cancelText: '取消',
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false)
+      })
+    })
+  } catch {
+    message.warning('冲突检测失败，已跳过冲突提示')
+    return true
+  }
+}
+
+let collaboratorPreviewSeq = 0
+async function refreshCollaboratorPreview() {
+  if (form.calendarType !== 'COLLAB') {
+    collaboratorPreviewTotal.value = 0
+    collaboratorPreviewNames.value = []
+    collaboratorPreviewAllNames.value = []
+    collaboratorPreviewLoading.value = false
+    return
+  }
+  const currentSeq = ++collaboratorPreviewSeq
+  collaboratorPreviewLoading.value = true
+  try {
+    const result = await resolveCollaborators(form.collaboratorDeptIds, form.collaboratorIds)
+    if (currentSeq !== collaboratorPreviewSeq) return
+    collaboratorPreviewTotal.value = result.ids.length
+    collaboratorPreviewAllNames.value = result.names
+    collaboratorPreviewNames.value = result.names.slice(0, 6)
+  } finally {
+    if (currentSeq === collaboratorPreviewSeq) {
+      collaboratorPreviewLoading.value = false
+    }
+  }
+}
+
+async function fetchAll() {
+  const [taskRows] = await Promise.all([
+    getOaTaskCalendar({
+      status: query.status,
+      calendarType: query.calendarType,
+      urgency: query.urgency,
+      assigneeName: query.assigneeName || undefined,
+      startDate: query.range?.[0] ? dayjs(query.range[0]).format('YYYY-MM-DD') : undefined,
+      endDate: query.range?.[1] ? dayjs(query.range[1]).format('YYYY-MM-DD') : undefined
+    }),
+    fetchBirthdayReminders()
+  ])
+  rows.value = taskRows
 }
 
 async function fetchStaffOptions() {
@@ -566,6 +1003,10 @@ function openCreate(date?: Dayjs) {
   form.eventColor = resolveCalendarTypeColor(form.calendarType, form.urgency)
   form.collaboratorDeptIds = []
   form.collaboratorIds = []
+  originalCollaboratorIds.value = []
+  collaboratorPreviewNames.value = []
+  collaboratorPreviewAllNames.value = []
+  conflictPreviewItems.value = []
   form.recurring = false
   form.recurrenceRule = 'WEEKLY'
   form.recurrenceInterval = 1
@@ -591,6 +1032,9 @@ function openEdit(item: OaTask) {
     : typeof item.collaboratorIds === 'string' && item.collaboratorIds
       ? item.collaboratorIds.split(',').map((x) => x.trim()).filter(Boolean)
       : []
+  originalCollaboratorIds.value = [...form.collaboratorIds]
+  collaboratorPreviewAllNames.value = []
+  conflictPreviewItems.value = []
   form.recurring = false
   form.recurrenceRule = 'WEEKLY'
   form.recurrenceInterval = 1
@@ -622,6 +1066,7 @@ function markDone(item: OaTask) {
       } else {
         upsertTaskRow({ ...item, status: 'DONE' })
       }
+      emitCalendarSyncPulse('DONE')
       message.success('已标记完成')
     }
   })
@@ -635,6 +1080,7 @@ function removeTask(item: OaTask) {
     onOk: async () => {
       await deleteOaTask(item.id)
       removeTaskRow(item.id)
+      emitCalendarSyncPulse('DELETE')
       message.success('已删除')
     }
   })
@@ -667,6 +1113,16 @@ async function submit() {
   const collaboratorPayload = form.calendarType === 'COLLAB'
     ? await resolveCollaborators(form.collaboratorDeptIds, form.collaboratorIds)
     : { ids: [] as string[], names: [] as string[] }
+  const firstStart = dayjs(form.startTime).format('YYYY-MM-DDTHH:mm:ss')
+  const firstEnd = form.endTime ? dayjs(form.endTime).format('YYYY-MM-DDTHH:mm:ss') : undefined
+  const canContinue = await confirmByConflicts({
+    taskId: editingTaskId.value || undefined,
+    startTime: firstStart,
+    endTime: firstEnd,
+    assigneeName: form.assigneeName || undefined,
+    collaboratorIds: collaboratorPayload.ids
+  })
+  if (!canContinue) return
 
   const repeatCount = form.recurring ? Math.max(1, Number(form.recurrenceCount || 1)) : 1
   const repeatRule = form.recurrenceRule
@@ -692,6 +1148,8 @@ async function submit() {
       upsertTaskRow(updated)
       editOpen.value = false
       editingTaskId.value = null
+      conflictPreviewItems.value = []
+      emitCalendarSyncPulse('UPDATE')
       message.success('日程已更新')
       return
     }
@@ -729,6 +1187,8 @@ async function submit() {
     })
     editOpen.value = false
     editingTaskId.value = null
+    conflictPreviewItems.value = []
+    emitCalendarSyncPulse('CREATE')
     message.success(form.recurring ? `已生成 ${tasks.length} 条周期日程` : '日程已新增')
   } finally {
     saving.value = false
@@ -736,15 +1196,91 @@ async function submit() {
 }
 
 onMounted(async () => {
+  syncVisibleTypesFromStorage()
+  syncCalendarViewFromStorage()
+  syncConflictPolicyFromStorage()
   await Promise.all([fetchAll(), fetchStaffOptions(), fetchDepartmentOptions()])
   syncTimer = window.setInterval(() => {
     fetchAll().catch(() => {})
   }, 15000)
+  calendarStorageHandler = (event: StorageEvent) => {
+    if (event.key === VISIBLE_TYPES_STORAGE_KEY) {
+      syncVisibleTypesFromStorage()
+      return
+    }
+    if (event.key === CALENDAR_VIEW_STORAGE_KEY) {
+      syncCalendarViewFromStorage()
+      return
+    }
+    if (event.key === CONFLICT_POLICY_STORAGE_KEY) {
+      syncConflictPolicyFromStorage()
+      return
+    }
+    if (event.key === CALENDAR_SYNC_PULSE_KEY) {
+      fetchAll().catch(() => {})
+    }
+  }
+  window.addEventListener('storage', calendarStorageHandler)
 })
 
 onBeforeUnmount(() => {
   if (syncTimer) window.clearInterval(syncTimer)
+  if (calendarStorageHandler) window.removeEventListener('storage', calendarStorageHandler)
+  calendarStorageHandler = null
 })
+
+watch(
+  () => visibleCalendarTypes.value,
+  (value) => {
+    try {
+      localStorage.setItem(VISIBLE_TYPES_STORAGE_KEY, JSON.stringify(value))
+    } catch {}
+  },
+  { deep: true }
+)
+
+watch(
+  () => currentCalendarView.value,
+  (value) => {
+    try {
+      localStorage.setItem(CALENDAR_VIEW_STORAGE_KEY, value)
+    } catch {}
+  }
+)
+
+watch(
+  () => conflictPolicy.value,
+  (value) => {
+    try {
+      localStorage.setItem(CONFLICT_POLICY_STORAGE_KEY, value)
+    } catch {}
+  }
+)
+
+watch(
+  () => [
+    form.calendarType,
+    form.collaboratorDeptIds.join(','),
+    form.collaboratorIds.join(',')
+  ],
+  () => {
+    refreshCollaboratorPreview().catch(() => {})
+  },
+  { immediate: true }
+)
+
+watch(
+  () => [
+    form.startTime ? dayjs(form.startTime).format('YYYY-MM-DDTHH:mm:ss') : '',
+    form.endTime ? dayjs(form.endTime).format('YYYY-MM-DDTHH:mm:ss') : '',
+    form.assigneeName,
+    form.collaboratorIds.join(','),
+    form.collaboratorDeptIds.join(',')
+  ],
+  () => {
+    conflictPreviewItems.value = []
+  }
+)
 
 useLiveSyncRefresh({
   topics: ['oa', 'hr', 'elder', 'system'],
@@ -769,6 +1305,32 @@ useLiveSyncRefresh({
 .calendar-title-tip {
   color: #64748b;
   font-size: 12px;
+}
+
+.calendar-insights {
+  margin-top: 6px;
+}
+
+.calendar-loads {
+  margin-top: 2px;
+}
+
+.calendar-week-trend {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.calendar-week-bar {
+  min-width: 16px;
+  padding: 2px 4px;
+  border-radius: 6px 6px 2px 2px;
+  background: linear-gradient(180deg, #91caff 0%, #1677ff 100%);
+  color: #fff;
+  font-size: 11px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
 }
 
 .legend-dot {
@@ -800,5 +1362,10 @@ useLiveSyncRefresh({
 .agenda-title-done {
   color: #64748b;
   text-decoration: line-through;
+}
+
+.readonly-tip {
+  color: #64748b;
+  font-size: 12px;
 }
 </style>

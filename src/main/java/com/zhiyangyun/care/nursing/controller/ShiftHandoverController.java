@@ -9,6 +9,7 @@ import com.zhiyangyun.care.nursing.model.ShiftHandoverResponse;
 import com.zhiyangyun.care.nursing.service.ShiftHandoverService;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,6 +35,10 @@ public class ShiftHandoverController {
   @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping
   public Result<ShiftHandoverResponse> create(@Valid @RequestBody ShiftHandoverRequest request) {
+    Result<ShiftHandoverResponse> validation = validateRequest(request);
+    if (validation != null) {
+      return validation;
+    }
     Long tenantId = AuthContext.getOrgId();
     request.setTenantId(tenantId);
     request.setOrgId(tenantId);
@@ -47,10 +52,17 @@ public class ShiftHandoverController {
   @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PutMapping("/{id}")
   public Result<ShiftHandoverResponse> update(@PathVariable Long id, @Valid @RequestBody ShiftHandoverRequest request) {
+    Result<ShiftHandoverResponse> validation = validateRequest(request);
+    if (validation != null) {
+      return validation;
+    }
     Long tenantId = AuthContext.getOrgId();
     request.setTenantId(tenantId);
     request.setOrgId(tenantId);
     ShiftHandoverResponse response = shiftHandoverService.update(id, request);
+    if (response == null) {
+      return Result.error(404, "交接班记录不存在或无权限访问");
+    }
     auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "UPDATE", "SHIFT_HANDOVER", id, "更新交接班");
     return Result.ok(response);
@@ -59,7 +71,11 @@ public class ShiftHandoverController {
   @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/{id}")
   public Result<ShiftHandoverResponse> get(@PathVariable Long id) {
-    return Result.ok(shiftHandoverService.get(id, AuthContext.getOrgId()));
+    ShiftHandoverResponse response = shiftHandoverService.get(id, AuthContext.getOrgId());
+    if (response == null) {
+      return Result.error(404, "交接班记录不存在或无权限访问");
+    }
+    return Result.ok(response);
   }
 
   @PreAuthorize("hasAnyRole('NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
@@ -71,8 +87,8 @@ public class ShiftHandoverController {
       @RequestParam(required = false) String dateTo,
       @RequestParam(required = false) String shiftCode,
       @RequestParam(required = false) String status) {
-    LocalDate from = dateFrom == null || dateFrom.isBlank() ? null : LocalDate.parse(dateFrom);
-    LocalDate to = dateTo == null || dateTo.isBlank() ? null : LocalDate.parse(dateTo);
+    LocalDate from = parseDate(dateFrom);
+    LocalDate to = parseDate(dateTo);
     return Result.ok(shiftHandoverService.page(AuthContext.getOrgId(), pageNo, pageSize, from, to, shiftCode, status));
   }
 
@@ -84,5 +100,28 @@ public class ShiftHandoverController {
     auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "DELETE", "SHIFT_HANDOVER", id, "删除交接班");
     return Result.ok(null);
+  }
+
+  private Result<ShiftHandoverResponse> validateRequest(ShiftHandoverRequest request) {
+    if (request == null) {
+      return Result.error(400, "请求体不能为空");
+    }
+    String status = request.getStatus() == null ? "DRAFT" : request.getStatus().trim().toUpperCase();
+    boolean needStaff = "HANDED_OVER".equals(status) || "CONFIRMED".equals(status);
+    if (needStaff && (request.getFromStaffId() == null || request.getToStaffId() == null)) {
+      return Result.error(400, "已交接/已确认状态必须选择交班人与接班人");
+    }
+    return null;
+  }
+
+  private LocalDate parseDate(String value) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    try {
+      return LocalDate.parse(value);
+    } catch (DateTimeParseException ignore) {
+      return null;
+    }
   }
 }

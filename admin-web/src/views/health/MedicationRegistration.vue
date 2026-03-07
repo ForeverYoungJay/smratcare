@@ -24,6 +24,14 @@
         <a-tag v-if="!summary.nurseStats.length" color="default">暂无护士统计</a-tag>
       </a-space>
     </a-card>
+    <a-card v-if="residentContext.active" :bordered="false" class="summary-row context-card">
+      <a-space wrap>
+        <a-tag color="processing">当前长者：{{ residentContext.name }}</a-tag>
+        <a-button size="small" @click="goWithResident('/medical-care/inspection')">查看巡检</a-button>
+        <a-button size="small" @click="goWithResident('/medical-care/nursing-log')">查看护理日志</a-button>
+        <a-button size="small" @click="clearResidentContext">清除长者上下文</a-button>
+      </a-space>
+    </a-card>
 
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
@@ -105,8 +113,8 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
@@ -115,6 +123,7 @@ import DataTable from '../../components/DataTable.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { mapHealthExportRows, medicationRegistrationExportColumns } from '../../constants/healthExport'
 import { exportCsv, exportExcel } from '../../utils/export'
+import { getMedicationHighDosageThreshold, syncMedicalAlertRules } from '../../utils/medicalAlertRule'
 import { resolveHealthError } from './healthError'
 import {
   getHealthMedicationRegistrationPage,
@@ -128,6 +137,7 @@ import type { HealthMedicationRegistration, HealthMedicationRegistrationSummary,
 const loading = ref(false)
 const exporting = ref(false)
 const route = useRoute()
+const router = useRouter()
 const rows = ref<HealthMedicationRegistration[]>([])
 const query = reactive({
   keyword: '',
@@ -171,6 +181,15 @@ const form = reactive({
   unit: '',
   nurseName: '',
   remark: ''
+})
+const residentContext = computed(() => {
+  const residentId = route.query.residentId ?? route.query.elderId
+  const residentName = typeof route.query.residentName === 'string' ? route.query.residentName : ''
+  return {
+    active: !!residentId,
+    residentId: residentId ? Number(residentId) : undefined,
+    name: residentName || (residentId ? `长者#${residentId}` : '')
+  }
 })
 
 async function fetchData() {
@@ -255,6 +274,28 @@ function openEdit(record: HealthMedicationRegistration) {
 
 function onElderChange(elderId?: number) {
   form.elderName = findElderName(elderId)
+}
+
+function goWithResident(path: string) {
+  if (!residentContext.value.active) {
+    router.push(path)
+    return
+  }
+  router.push({
+    path,
+    query: {
+      residentId: residentContext.value.residentId ? String(residentContext.value.residentId) : undefined,
+      residentName: residentContext.value.name
+    }
+  })
+}
+
+function clearResidentContext() {
+  const nextQuery: Record<string, any> = { ...route.query }
+  delete nextQuery.residentId
+  delete nextQuery.elderId
+  delete nextQuery.residentName
+  router.push({ path: route.path, query: nextQuery })
 }
 
 async function submit() {
@@ -351,8 +392,9 @@ function formatDateTime(value?: string) {
 }
 
 function resolveRowClassName(record: HealthMedicationRegistration) {
+  const threshold = getMedicationHighDosageThreshold()
   if (!record.nurseName) return 'health-row-warning'
-  if (Number(record.dosageTaken || 0) > 10) return 'health-row-warning'
+  if (Number(record.dosageTaken || 0) > threshold) return 'health-row-warning'
   if (record.registerTime && dayjs(record.registerTime).isAfter(dayjs())) return 'health-row-warning'
   return ''
 }
@@ -393,6 +435,7 @@ async function loadExportRecords() {
 
 fetchData()
 searchElders('')
+syncMedicalAlertRules().catch(() => {})
 
 watch(
   () => [route.query.residentId, route.query.elderId],
@@ -410,5 +453,8 @@ watch(
 }
 :deep(.health-row-warning > td) {
   background: #fff7e6 !important;
+}
+.context-card {
+  background: #f0f9ff;
 }
 </style>

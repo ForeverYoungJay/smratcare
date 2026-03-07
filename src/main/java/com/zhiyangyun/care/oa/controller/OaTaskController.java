@@ -8,6 +8,8 @@ import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.oa.entity.OaTask;
 import com.zhiyangyun.care.oa.mapper.OaTaskMapper;
 import com.zhiyangyun.care.oa.model.OaBatchIdsRequest;
+import com.zhiyangyun.care.oa.model.OaTaskConflictCheckRequest;
+import com.zhiyangyun.care.oa.model.OaTaskConflictItem;
 import com.zhiyangyun.care.oa.model.OaTaskRequest;
 import com.zhiyangyun.care.oa.model.OaTaskSummaryResponse;
 import com.zhiyangyun.care.oa.model.OaTaskTrendItem;
@@ -118,8 +120,12 @@ public class OaTaskController {
         .ge(startDate != null, OaTask::getStartTime, startDate == null ? null : startDate.atStartOfDay())
         .lt(endDate != null, OaTask::getStartTime, endDate == null ? null : endDate.plusDays(1).atStartOfDay())
         .orderByDesc(OaTask::getStartTime)
-        .orderByDesc(OaTask::getId)
-        .last("LIMIT 1000");
+        .orderByDesc(OaTask::getId);
+    if (startDate == null && endDate == null) {
+      wrapper.last("LIMIT 1000");
+    } else {
+      wrapper.last("LIMIT 5000");
+    }
     if (!AuthContext.isAdmin() && staffId != null) {
       wrapper.and(w -> w.ne(OaTask::getCalendarType, "PERSONAL")
           .or().eq(OaTask::getCreatedBy, staffId)
@@ -131,6 +137,82 @@ public class OaTaskController {
           .or().like(OaTask::getDescription, keyword));
     }
     return Result.ok(taskMapper.selectList(wrapper));
+  }
+
+  @PostMapping("/conflicts/check")
+  @PreAuthorize("@perm.has('oa.calendar.view')")
+  public Result<List<OaTaskConflictItem>> checkConflicts(@RequestBody OaTaskConflictCheckRequest request) {
+    if (request == null || request.getStartTime() == null) {
+      return Result.ok(List.of());
+    }
+    LocalDateTime rangeStart = request.getStartTime();
+    LocalDateTime rangeEnd = request.getEndTime() == null ? request.getStartTime() : request.getEndTime();
+    if (rangeStart.isAfter(rangeEnd)) {
+      LocalDateTime tmp = rangeStart;
+      rangeStart = rangeEnd;
+      rangeEnd = tmp;
+    }
+
+    String normalizedAssigneeName = trimToNull(request.getAssigneeName());
+    List<Long> collaboratorIds = sanitizeIds(request.getCollaboratorIds());
+    if (normalizedAssigneeName == null && collaboratorIds.isEmpty()) {
+      return Result.ok(List.of());
+    }
+
+    Long orgId = AuthContext.getOrgId();
+    var wrapper = Wrappers.lambdaQuery(OaTask.class)
+        .eq(OaTask::getIsDeleted, 0)
+        .eq(orgId != null, OaTask::getOrgId, orgId)
+        .eq(OaTask::getStatus, "OPEN")
+        .ne(request.getTaskId() != null, OaTask::getId, request.getTaskId())
+        .isNotNull(OaTask::getStartTime)
+        .le(OaTask::getStartTime, rangeEnd)
+        .and(w -> w.isNull(OaTask::getEndTime).or().ge(OaTask::getEndTime, rangeStart))
+        .last("LIMIT 2000");
+
+    if (normalizedAssigneeName != null || !collaboratorIds.isEmpty()) {
+      wrapper.and(w -> {
+        if (normalizedAssigneeName != null) {
+          w.eq(OaTask::getAssigneeName, normalizedAssigneeName);
+        }
+        if (!collaboratorIds.isEmpty()) {
+          if (normalizedAssigneeName != null) {
+            w.or();
+          }
+          for (int i = 0; i < collaboratorIds.size(); i++) {
+            Long collaboratorId = collaboratorIds.get(i);
+            if (i > 0) {
+              w.or();
+            }
+            w.apply("FIND_IN_SET({0}, collaborator_ids)", collaboratorId);
+          }
+        }
+      });
+    }
+
+    List<OaTask> tasks = taskMapper.selectList(wrapper);
+    List<OaTaskConflictItem> result = new ArrayList<>();
+    for (OaTask task : tasks) {
+      List<String> reasons = new ArrayList<>();
+      if (normalizedAssigneeName != null && normalizedAssigneeName.equals(trimToNull(task.getAssigneeName()))) {
+        reasons.add("负责人冲突");
+      }
+      if (!collaboratorIds.isEmpty() && hasCollaboratorOverlap(task.getCollaboratorIds(), collaboratorIds)) {
+        reasons.add("协同成员冲突");
+      }
+      if (reasons.isEmpty()) {
+        continue;
+      }
+      OaTaskConflictItem item = new OaTaskConflictItem();
+      item.setTaskId(task.getId());
+      item.setTitle(task.getTitle());
+      item.setAssigneeName(task.getAssigneeName());
+      item.setStartTime(task.getStartTime());
+      item.setEndTime(task.getEndTime());
+      item.setReason(String.join(" / ", reasons));
+      result.add(item);
+    }
+    return Result.ok(result);
   }
 
   @GetMapping("/stats/trend")
@@ -522,6 +604,22 @@ public class OaTaskController {
       return List.of();
     }
     return ids.stream().filter(id -> id != null && id > 0).distinct().collect(Collectors.toList());
+  }
+
+  private boolean hasCollaboratorOverlap(String collaboratorIdsText, List<Long> collaboratorIds) {
+    if (collaboratorIdsText == null || collaboratorIdsText.isBlank() || collaboratorIds == null || collaboratorIds.isEmpty()) {
+      return false;
+    }
+    List<String> existed = Arrays.stream(collaboratorIdsText.split(","))
+        .map(String::trim)
+        .filter(s -> !s.isBlank())
+        .toList();
+    for (Long collaboratorId : collaboratorIds) {
+      if (existed.contains(String.valueOf(collaboratorId))) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private String safe(Object value) {

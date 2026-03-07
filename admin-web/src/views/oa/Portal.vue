@@ -83,6 +83,7 @@ import { reactive, h, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
 import { getPortalSummary } from '../../api/oa'
+import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import type { OaPortalSummary, OaNotice, OaTodo } from '../../types'
 
 const summary = reactive<OaPortalSummary>({ notices: [], todos: [] })
@@ -123,6 +124,14 @@ async function load() {
 }
 
 load()
+
+useLiveSyncRefresh({
+  topics: ['oa', 'hr', 'system'],
+  refresh: () => {
+    load().catch(() => {})
+  },
+  debounceMs: 900
+})
 </script>
 
 <style scoped>

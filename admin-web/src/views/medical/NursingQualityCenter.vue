@@ -38,6 +38,7 @@
       <a-tab-pane key="task" tab="护理任务与扫码执行">
         <a-space wrap>
           <a-button type="primary" @click="go('/medical-care/care-task-board?date=today&filter=all')">今日任务清单</a-button>
+          <a-button type="primary" @click="go('/medical-care/unified-task-center')">统一任务中心</a-button>
           <a-button @click="go('/care/workbench/qr?mode=scan')">扫码执行</a-button>
           <a-button @click="go('/medical-care/care-task-board?date=today&filter=overdue')">超时与补录</a-button>
           <a-button @click="go('/medical-care/care-task-board?date=today&filter=overdue_or_missed')">任务异常与事故入口</a-button>
@@ -64,6 +65,7 @@
       <a-tab-pane key="quality" tab="质量与报表">
         <a-space wrap>
           <a-button type="primary" @click="go('/care/service/nursing-reports')">护理报表</a-button>
+          <a-button @click="go('/medical-care/alert-rules')">异常规则配置</a-button>
           <a-button @click="go('/stats/org/monthly-operation')">医嘱执行率/巡查覆盖率</a-button>
           <a-button @click="go('/survey/stats?filter=low_score_or_complaint')">投诉/问卷关联分析</a-button>
           <a-button @click="go('/oa/work-execution/task?filter=overdue_rectify')">整改任务闭环</a-button>
@@ -82,6 +84,7 @@ import PageContainer from '../../components/PageContainer.vue'
 import { getMedicalHealthCenterSummary } from '../../api/medicalCare'
 import type { MedicalCareWorkbenchSummary } from '../../types'
 import { resolveMedicalError } from './medicalError'
+import { isAutoCarryResidentContextEnabled, syncMedicalAlertRules } from '../../utils/medicalAlertRule'
 
 const router = useRouter()
 const route = useRoute()
@@ -149,7 +152,8 @@ function go(path: string) {
     query[key] = value
   })
   const residentId = route.query.residentId ?? route.query.elderId
-  if (residentId != null && query.residentId == null && query.elderId == null) {
+  const carryResident = isAutoCarryResidentContextEnabled()
+  if (carryResident && residentId != null && query.residentId == null && query.elderId == null) {
     query.residentId = residentId
     query.elderId = residentId
   }
@@ -171,5 +175,8 @@ async function loadSummary() {
 }
 
 onMounted(loadSummary)
+onMounted(() => {
+  syncMedicalAlertRules().catch(() => {})
+})
 watch(() => route.query, loadSummary)
 </script>

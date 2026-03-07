@@ -17,11 +17,14 @@ import type {
   FinanceAutoDebitExceptionItem,
   FinanceRoomOpsDetailResponse,
   FinanceAllocationRuleItem,
+  FinanceAllocationResidentSyncResponse,
   FinanceAllocationMeterValidateRequest,
   FinanceAllocationMeterValidateResponse,
   FinanceAllocationTemplateInitResponse,
   FinanceReconcileExceptionItem,
   FinanceMasterDataOverview,
+  FinanceConfigImpactPreview,
+  FinanceConfigImpactPreviewRequest,
   FinanceBillingConfigEntry,
   FinanceBillingConfigUpsertRequest,
   FinanceBillingConfigBatchUpsertRequest,
@@ -30,7 +33,11 @@ import type {
   FinanceBillingConfigSnapshotItem,
   FinanceModuleEntrySummary,
   FinanceReportEntrySummary,
-  FinanceCategoryConsumptionAnalysis
+  FinanceCategoryConsumptionAnalysis,
+  FinanceLedgerHealth,
+  FinanceDischargeStatusSync,
+  FinanceDischargeStatusSyncExecuteRequest,
+  FinanceDischargeStatusSyncExecuteResponse
 } from '../types'
 
 export function getPaymentRecordPage(params: any) {
@@ -91,6 +98,44 @@ export function getElderAccountWarnings() {
 
 export function getFinanceWorkbenchOverview() {
   return request.get<FinanceWorkbenchOverview>('/api/finance/workbench/overview')
+}
+
+export function getFinanceLedgerHealth(params?: { limit?: number }) {
+  return request.get<FinanceLedgerHealth>('/api/finance/workbench/ledger/health', { params })
+}
+
+export function getFinanceDischargeStatusSync(params?: { limit?: number }) {
+  return request.get<FinanceDischargeStatusSync>('/api/finance/workbench/discharge/status-sync', { params })
+}
+
+export function executeFinanceDischargeStatusSync(data: FinanceDischargeStatusSyncExecuteRequest) {
+  return request.post<FinanceDischargeStatusSyncExecuteResponse>('/api/finance/workbench/discharge/status-sync/execute', data)
+}
+
+export async function exportFinanceLedgerHealthCsv(params?: { limit?: number }) {
+  const url = new URL('/api/finance/workbench/ledger/health/export', window.location.origin)
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      url.searchParams.set(key, String(value))
+    }
+  })
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${getToken()}` }
+  })
+  if (!response.ok) {
+    throw new Error('导出失败')
+  }
+  const blob = await response.blob()
+  const contentDisposition = response.headers.get('content-disposition') || ''
+  const filenameMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/)
+  const filename = filenameMatch?.[1] || `finance-ledger-health-${new Date().toISOString().slice(0, 10)}.csv`
+  const link = document.createElement('a')
+  const objectUrl = URL.createObjectURL(blob)
+  link.href = objectUrl
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(objectUrl)
 }
 
 export function getFinanceInvoiceReceiptPage(params: any) {
@@ -168,6 +213,14 @@ export function getFinanceAllocationRules(params?: { month?: string }) {
   return request.get<FinanceAllocationRuleItem[]>('/api/finance/workbench/allocation/rules', { params })
 }
 
+export function getFinanceAllocationResidentOptions(params?: {
+  building?: string
+  floorNo?: string
+  roomNo?: string
+}) {
+  return request.get<FinanceAllocationResidentSyncResponse>('/api/finance/workbench/allocation/resident-options', { params })
+}
+
 export function initFinanceAllocationRuleTemplate(params?: { month?: string }) {
   return request.post<FinanceAllocationTemplateInitResponse>('/api/finance/workbench/allocation/rules/template/init', null, { params })
 }
@@ -234,6 +287,10 @@ export async function exportFinanceReconcileHistoryCsv(params?: { from?: string;
 
 export function getFinanceMasterDataOverview(params?: { month?: string }) {
   return request.get<FinanceMasterDataOverview>('/api/finance/workbench/config/overview', { params })
+}
+
+export function getFinanceConfigImpactPreview(data: FinanceConfigImpactPreviewRequest) {
+  return request.post<FinanceConfigImpactPreview>('/api/finance/workbench/config/impact-preview', data)
 }
 
 export function getFinanceBillingConfig(params?: { month?: string; keyPrefix?: string }) {

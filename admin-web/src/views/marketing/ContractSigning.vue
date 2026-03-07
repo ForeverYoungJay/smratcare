@@ -102,7 +102,7 @@
         :hint="flowGuardHint"
         @action="handleFlowGuardAction"
       />
-      <MarketingListToolbar :tip="`已勾选 ${selectedCount} 条`">
+      <MarketingListToolbar :selected-count="selectedCount" tip="支持批量删除与流程推进">
         <a-space>
           <a-button v-if="!isSignedMode" type="primary" @click="openForm()">新增合同</a-button>
           <a-button :disabled="!hasSingleSelection" @click="viewSelected">查看</a-button>
@@ -1308,18 +1308,37 @@ async function ensureElderFromLead(lead: CrmContractItem): Promise<ElderItem> {
   })
 }
 
+function consumeQuickQuery() {
+  if (String(route.query.quick || '').trim() !== '1') {
+    return
+  }
+  const nextQuery: Record<string, any> = { ...route.query }
+  delete nextQuery.quick
+  router.replace({ path: route.path, query: nextQuery })
+}
+
 onMounted(() => {
   applyStatusPreset()
   fetchPolicyOptions()
   fetchData()
+  const quick = String(route.query.quick || '').trim()
+  if (quick === '1' && !isSignedMode.value) {
+    openForm()
+    consumeQuickQuery()
+  }
 })
 
 watch(
-  () => route.query.status,
+  () => route.query,
   () => {
     applyStatusPreset()
     query.pageNo = 1
     fetchData()
+    const quick = String(route.query.quick || '').trim()
+    if (quick === '1' && !isSignedMode.value) {
+      openForm()
+      consumeQuickQuery()
+    }
   }
 )
 watch(

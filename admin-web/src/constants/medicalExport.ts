@@ -54,3 +54,13 @@ export const cvdAssessmentExportColumns: MedicalExportColumn<any>[] = [
   { key: 'assessorName', title: '评估人', value: (item) => item.assessorName || '-' },
   { key: 'status', title: '状态', value: (item) => item.status || '-' }
 ]
+
+export const unifiedTaskExportColumns: MedicalExportColumn<any>[] = [
+  { key: 'module', title: '模块', value: (item) => item.module || '-' },
+  { key: 'residentName', title: '长者', value: (item) => item.residentName || '-' },
+  { key: 'taskTitle', title: '事项', value: (item) => item.taskTitle || '-' },
+  { key: 'assignee', title: '责任人', value: (item) => item.assignee || '-' },
+  { key: 'plannedTime', title: '计划时间', value: (item) => item.plannedTime || '-' },
+  { key: 'priority', title: '优先级', value: (item) => item.priority || '-' },
+  { key: 'status', title: '状态', value: (item) => item.status || '-' }
+]

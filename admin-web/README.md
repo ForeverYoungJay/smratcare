@@ -35,3 +35,6 @@ docker run --rm -p 80:80 smartcare-admin:local
 - Token 保存在 localStorage，并由 Axios 请求拦截器自动携带
 - 401 自动跳转登录页
 - 企业首页配置文件：`src/constants/enterpriseProfile.ts`（机构名称、服务体系、居民体系、新闻活动、招聘合作、联系方式等均可直接修改）
+- 登录页支持“演示账号快捷填充面板”：
+  - 默认仅开发环境显示（`import.meta.env.DEV`）。
+  - 生产若需临时演示，可在前端环境变量中设置 `VITE_ENABLE_DEMO_LOGIN=true`。

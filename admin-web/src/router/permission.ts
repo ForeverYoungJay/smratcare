@@ -13,7 +13,8 @@ export function setupPermission(router: Router) {
     }
 
     if (to.path === '/login' && token) {
-      next('/portal')
+      const redirect = typeof to.query.redirect === 'string' ? to.query.redirect : ''
+      next(redirect || '/portal')
       return
     }
 

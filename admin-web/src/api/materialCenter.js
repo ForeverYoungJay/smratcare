@@ -101,6 +101,9 @@ export function getOutboundSheetPage(params) {
 export function getOutboundSheetDetail(id) {
     return request.get('/api/inventory/outbound/sheet/detail', { params: { id } });
 }
+export function getOutboundSheetPrefill(params) {
+    return request.get('/api/inventory/outbound/sheet/prefill', { params });
+}
 export function confirmOutboundSheet(id) {
     return request.post('/api/inventory/outbound/sheet/confirm', null, { params: { id } });
 }

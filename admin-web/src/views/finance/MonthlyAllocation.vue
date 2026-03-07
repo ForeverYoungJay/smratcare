@@ -47,13 +47,14 @@
           {{ formatElderLabels(record.elderIds, record.elderSnapshotJson) }}
         </template>
         <template v-else-if="column.key === 'action'">
-          <a-popconfirm
+          <a-button
             v-if="record.status === 'CONFIRMED'"
-            title="确认回滚该分摊？将删除该次自动入账流水"
-            @confirm="rollbackAllocation(record)"
+            type="link"
+            danger
+            @click="rollbackAllocation(record)"
           >
-            <a-button type="link" danger>回滚</a-button>
-          </a-popconfirm>
+            回滚
+          </a-button>
           <a-tag v-else>{{ record.status || '-' }}</a-tag>
         </template>
       </template>
@@ -78,6 +79,7 @@
                 allow-clear
                 show-search
                 :options="buildingOptions"
+                :loading="allocationSyncLoading"
                 placeholder="选择楼栋（如情感楼）"
                 @change="onBuildingChange"
               />
@@ -88,6 +90,7 @@
                 allow-clear
                 show-search
                 :options="floorOptions"
+                :loading="allocationSyncLoading"
                 placeholder="选择楼层"
                 @change="onFloorChange"
               />
@@ -98,24 +101,31 @@
                 allow-clear
                 show-search
                 :options="roomOptions"
+                :loading="allocationSyncLoading"
                 placeholder="选择房间"
                 @change="applyRoomSelection"
               />
             </a-col>
           </a-row>
-          <div class="form-tip">选择楼栋/楼层/房间后，自动带出该房间在住老人用于分摊</div>
+          <div class="form-tip">
+            选择楼栋/楼层/房间后，自动带出该房间在住老人用于分摊
+            <span v-if="allocationSyncTime">（同步时间：{{ dayjs(allocationSyncTime).format('YYYY-MM-DD HH:mm:ss') }}）</span>
+            <a-button type="link" size="small" :loading="allocationSyncLoading" @click="syncAllocationResidentOptions">
+              立即同步
+            </a-button>
+          </div>
         </a-form-item>
         <a-form-item label="分摊老人" required>
           <a-select
             v-model:value="createForm.elderIds"
             mode="multiple"
             show-search
-            :filter-option="false"
-            :options="elderOptions"
-            :loading="elderLoading"
-            placeholder="请选择参与分摊的老人（可多选）"
+            :filter-option="true"
+            :options="allocationResidentOptions"
+            :loading="allocationSyncLoading"
+            :disabled="!createForm.roomNo"
+            placeholder="请先选择房间，再确认分摊老人"
             style="width: 100%"
-            @search="searchElders"
           />
           <div class="form-tip">{{ selectedEldersText }}</div>
         </a-form-item>
@@ -223,12 +233,11 @@ import {
   previewMonthlyAllocation,
   rollbackMonthlyAllocation
 } from '../../api/financeFee'
-import { validateFinanceAllocationMeter } from '../../api/finance'
-import { getRoomList } from '../../api/bed'
-import { getElderPage } from '../../api/elder'
-import type { ElderItem, MonthlyAllocationItem, PageResult } from '../../types'
+import { getFinanceAllocationResidentOptions, validateFinanceAllocationMeter } from '../../api/finance'
+import type { FinanceAllocationResidentOption, MonthlyAllocationItem, PageResult } from '../../types'
 import { exportCsv } from '../../utils/export'
 import { printTableReport } from '../../utils/print'
+import { confirmAction } from '../../utils/actionConfirm'
 import { useElderOptions } from '../../composables/useElderOptions'
 
 const loading = ref(false)
@@ -276,8 +285,12 @@ const createForm = reactive({
   elderIds: [] as number[],
   remark: ''
 })
-const residentPool = ref<ElderItem[]>([])
-const roomPool = ref<Array<{ roomNo: string; building?: string; floorNo?: string }>>([])
+const allocationSyncLoading = ref(false)
+const allocationSyncTime = ref('')
+const allocationResidents = ref<FinanceAllocationResidentOption[]>([])
+const buildingRawOptions = ref<string[]>([])
+const floorRawOptions = ref<string[]>([])
+const roomRawOptions = ref<string[]>([])
 const meterOpen = ref(false)
 const meterLoading = ref(false)
 const meterForm = reactive({
@@ -300,44 +313,29 @@ const meterColumns = [
 
 const { elderOptions, elderLoading, searchElders, findElderName } = useElderOptions({ pageSize: 80 })
 const buildingOptions = computed(() => {
-  const set = new Set<string>()
-  roomPool.value.forEach(item => {
-    const value = String(item.building || '').trim()
-    if (value) set.add(value)
-  })
-  return Array.from(set)
-    .sort((a, b) => a.localeCompare(b, 'zh-CN'))
-    .map(value => ({ label: value, value }))
+  return buildingRawOptions.value.map(value => ({ label: value, value }))
 })
 const floorOptions = computed(() => {
-  const set = new Set<string>()
-  roomPool.value
-    .filter(item => !createForm.building || item.building === createForm.building)
-    .forEach(item => {
-      const value = String(item.floorNo || '').trim()
-      if (value) set.add(value)
-    })
-  return Array.from(set)
-    .sort((a, b) => a.localeCompare(b, 'zh-CN'))
-    .map(value => ({ label: value, value }))
+  return floorRawOptions.value.map(value => ({ label: value, value }))
 })
 const roomOptions = computed(() => {
-  return roomPool.value
-    .filter(item => !createForm.building || item.building === createForm.building)
-    .filter(item => !createForm.floorNo || item.floorNo === createForm.floorNo)
-    .map(item => String(item.roomNo || '').trim())
-    .filter(Boolean)
-    .sort((a, b) => a.localeCompare(b, 'zh-CN'))
+  return roomRawOptions.value
     .map(value => ({ label: value, value }))
+})
+const allocationResidentOptions = computed(() => {
+  return allocationResidents.value.map(item => ({
+    label: item.roomNo ? `${item.elderName}（${item.roomNo}${item.bedNo ? `-${item.bedNo}` : ''}）` : item.elderName,
+    value: Number(item.elderId)
+  }))
 })
 const selectedEldersText = computed(() => {
   if (!createForm.elderIds.length) return '请至少选择一位老人'
   const idSet = new Set(createForm.elderIds.map(id => Number(id)))
-  const labels = residentPool.value
-    .filter(item => idSet.has(Number(item.id)))
+  const labels = allocationResidents.value
+    .filter(item => idSet.has(Number(item.elderId)))
     .map(item => {
       const roomNo = String(item.roomNo || '').trim()
-      return roomNo ? `${item.fullName}（${roomNo}）` : item.fullName
+      return roomNo ? `${item.elderName}（${roomNo}${item.bedNo ? `-${item.bedNo}` : ''}）` : item.elderName
     })
   if (!labels.length) {
     return `已选 ${createForm.elderIds.length} 位老人`
@@ -379,7 +377,10 @@ function formatElderLabels(raw?: string, snapshotJson?: string) {
   if (!ids.length) {
     return '--'
   }
-  return ids.map(id => findElderName(id) || `#${id}`).join('、')
+  const residentNameMap = new Map<number, string>(
+    allocationResidents.value.map(item => [Number(item.elderId), String(item.elderName || '').trim()])
+  )
+  return ids.map(id => residentNameMap.get(id) || findElderName(id) || `#${id}`).join('、')
 }
 
 function resolveAvgAmount(record: MonthlyAllocationItem) {
@@ -392,44 +393,41 @@ function resolveAvgAmount(record: MonthlyAllocationItem) {
   return (Number(record.totalAmount || 0) / record.targetCount).toFixed(2)
 }
 
-async function ensureResidentPool() {
-  if (residentPool.value.length) return
-  const page = await getElderPage({
-    pageNo: 1,
-    pageSize: 500,
-    status: 1,
-    elderStatus: 1
-  })
-  residentPool.value = page.list || []
-}
-
-async function ensureRoomPool() {
-  if (roomPool.value.length) return
-  const rows = await getRoomList()
-  roomPool.value = (rows || []).map(item => ({
-    roomNo: String(item.roomNo || '').trim(),
-    building: String(item.building || '').trim() || undefined,
-    floorNo: String(item.floorNo || '').trim() || undefined
-  }))
+async function syncAllocationResidentOptions() {
+  allocationSyncLoading.value = true
+  try {
+    const res = await getFinanceAllocationResidentOptions({
+      building: createForm.building || undefined,
+      floorNo: createForm.floorNo || undefined,
+      roomNo: createForm.roomNo || undefined
+    })
+    allocationSyncTime.value = res.syncTime || ''
+    buildingRawOptions.value = res.buildingOptions || []
+    floorRawOptions.value = res.floorOptions || []
+    roomRawOptions.value = res.roomOptions || []
+    allocationResidents.value = res.residentOptions || []
+  } finally {
+    allocationSyncLoading.value = false
+  }
 }
 
 async function onBuildingChange() {
   createForm.floorNo = undefined
   createForm.roomNo = undefined
   createForm.elderIds = []
+  await syncAllocationResidentOptions()
 }
 
 async function onFloorChange() {
   createForm.roomNo = undefined
   createForm.elderIds = []
+  await syncAllocationResidentOptions()
 }
 
 async function applyRoomSelection() {
-  await ensureResidentPool()
-  if (!createForm.roomNo) return
-  const ids = residentPool.value
-    .filter(item => String(item.roomNo || '').trim() === String(createForm.roomNo || '').trim())
-    .map(item => Number(item.id))
+  await syncAllocationResidentOptions()
+  const ids = allocationResidents.value
+    .map(item => Number(item.elderId))
     .filter(id => Number.isFinite(id) && id > 0)
   createForm.elderIds = Array.from(new Set(ids))
   if (!createForm.elderIds.length) {
@@ -483,8 +481,7 @@ function openCreate() {
   createForm.remark = ''
   previewData.value = null
   createOpen.value = true
-  ensureResidentPool().catch(() => {})
-  ensureRoomPool().catch(() => {})
+  syncAllocationResidentOptions().catch(() => {})
   searchElders('').catch(() => {})
 }
 
@@ -536,6 +533,7 @@ async function submitCreate() {
       allocationName: createForm.allocationName,
       totalAmount: createForm.totalAmount,
       targetCount: createForm.elderIds.length,
+      roomNo: createForm.roomNo || undefined,
       elderIds: [...createForm.elderIds],
       remark: createForm.remark || undefined
     })
@@ -548,6 +546,14 @@ async function submitCreate() {
 }
 
 async function rollbackAllocation(record: MonthlyAllocationItem) {
+  const confirmed = await confirmAction({
+    title: '确认回滚该分摊记录？',
+    content: `分摊项目：${record.allocationName || '-'}（${record.allocationMonth || '-'})`,
+    impactItems: ['删除该次自动入账的消费流水', '删除该次自动入账的账单明细', '回算相关账单金额'],
+    okText: '确认回滚',
+    danger: true
+  })
+  if (!confirmed) return
   await rollbackMonthlyAllocation(Number(record.id), '运营手工回滚')
   message.success('已回滚该分摊记录')
   fetchData()

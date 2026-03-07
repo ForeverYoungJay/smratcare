@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Locale;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -55,7 +56,15 @@ public class HealthNursingLogController {
       @RequestParam(required = false) String logFrom,
       @RequestParam(required = false) String logTo,
       @RequestParam(required = false) String keyword) {
-    var wrapper = buildQuery(AuthContext.getOrgId(), elderId, sourceInspectionId, logType, status, logFrom, logTo, keyword);
+    var wrapper = buildQuery(
+        AuthContext.getOrgId(),
+        elderId,
+        sourceInspectionId,
+        normalizeLogTypeFilter(logType),
+        normalizeStatus(status),
+        logFrom,
+        logTo,
+        normalizeText(keyword));
     wrapper.orderByDesc(HealthNursingLog::getLogTime);
     return Result.ok(mapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
   }
@@ -70,6 +79,9 @@ public class HealthNursingLogController {
       @RequestParam(required = false) String logTo,
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
+    logType = normalizeLogTypeFilter(logType);
+    status = normalizeStatus(status);
+    keyword = normalizeText(keyword);
     var wrapper = buildQuery(orgId, elderId, sourceInspectionId, logType, status, logFrom, logTo, keyword);
     LocalDateTime from = parseDateTime(logFrom);
     LocalDateTime to = parseDateTime(logTo);
@@ -130,14 +142,14 @@ public class HealthNursingLogController {
     item.setTenantId(orgId);
     item.setOrgId(orgId);
     item.setElderId(elderId);
-    item.setElderName(elderResolveSupport.resolveElderName(elderId, request.getElderName()));
+    item.setElderName(elderResolveSupport.resolveElderName(elderId, normalizeText(request.getElderName())));
     item.setSourceInspectionId(request.getSourceInspectionId());
     item.setLogTime(request.getLogTime());
-    item.setLogType(request.getLogType());
-    item.setContent(request.getContent());
-    item.setStaffName(request.getStaffName());
-    item.setStatus(request.getStatus() == null || request.getStatus().isBlank() ? "PENDING" : request.getStatus());
-    item.setRemark(request.getRemark());
+    item.setLogType(normalizeLogType(request.getLogType()));
+    item.setContent(normalizeText(request.getContent()));
+    item.setStaffName(normalizeText(request.getStaffName()));
+    item.setStatus(normalizeStatus(request.getStatus()));
+    item.setRemark(normalizeText(request.getRemark()));
     item.setCreatedBy(AuthContext.getStaffId());
     mapper.insert(item);
     inspectionClosureService.syncFromNursingLog(item);
@@ -154,14 +166,14 @@ public class HealthNursingLogController {
     }
     Long elderId = elderResolveSupport.resolveElderId(orgId, request.getElderId(), request.getElderName());
     item.setElderId(elderId);
-    item.setElderName(elderResolveSupport.resolveElderName(elderId, request.getElderName()));
+    item.setElderName(elderResolveSupport.resolveElderName(elderId, normalizeText(request.getElderName())));
     item.setSourceInspectionId(request.getSourceInspectionId());
     item.setLogTime(request.getLogTime());
-    item.setLogType(request.getLogType());
-    item.setContent(request.getContent());
-    item.setStaffName(request.getStaffName());
-    item.setStatus(request.getStatus() == null || request.getStatus().isBlank() ? "PENDING" : request.getStatus());
-    item.setRemark(request.getRemark());
+    item.setLogType(normalizeLogType(request.getLogType()));
+    item.setContent(normalizeText(request.getContent()));
+    item.setStaffName(normalizeText(request.getStaffName()));
+    item.setStatus(normalizeStatus(request.getStatus()));
+    item.setRemark(normalizeText(request.getRemark()));
     mapper.updateById(item);
     inspectionClosureService.syncFromNursingLog(item);
     return Result.ok(item);
@@ -235,5 +247,49 @@ public class HealthNursingLogController {
     } catch (NumberFormatException e) {
       return 0L;
     }
+  }
+
+  private String normalizeText(String value) {
+    if (value == null) {
+      return null;
+    }
+    String trimmed = value.trim();
+    return trimmed.isEmpty() ? null : trimmed;
+  }
+
+  private String normalizeLogType(String value) {
+    String normalized = normalizeText(value);
+    if (normalized == null) {
+      return "ROUTINE";
+    }
+    String upper = normalized.toUpperCase(Locale.ROOT);
+    if ("ROUTINE".equals(upper) || "INSPECTION_FOLLOW_UP".equals(upper) || "INCIDENT".equals(upper)) {
+      return upper;
+    }
+    return "ROUTINE";
+  }
+
+  private String normalizeLogTypeFilter(String value) {
+    String normalized = normalizeText(value);
+    if (normalized == null) {
+      return null;
+    }
+    String upper = normalized.toUpperCase(Locale.ROOT);
+    if ("ROUTINE".equals(upper) || "INSPECTION_FOLLOW_UP".equals(upper) || "INCIDENT".equals(upper)) {
+      return upper;
+    }
+    return null;
+  }
+
+  private String normalizeStatus(String value) {
+    String normalized = normalizeText(value);
+    if (normalized == null) {
+      return "PENDING";
+    }
+    String upper = normalized.toUpperCase(Locale.ROOT);
+    if ("PENDING".equals(upper) || "DONE".equals(upper) || "CLOSED".equals(upper)) {
+      return upper;
+    }
+    return "PENDING";
   }
 }

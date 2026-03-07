@@ -11,6 +11,7 @@ import com.zhiyangyun.care.nursing.model.ShiftHandoverRequest;
 import com.zhiyangyun.care.nursing.model.ShiftHandoverResponse;
 import com.zhiyangyun.care.nursing.service.ShiftHandoverService;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
@@ -40,7 +41,7 @@ public class ShiftHandoverServiceImpl implements ShiftHandoverService {
   @Override
   public ShiftHandoverResponse update(Long id, ShiftHandoverRequest request) {
     ShiftHandover handover = handoverMapper.selectById(id);
-    if (handover == null || !request.getTenantId().equals(handover.getTenantId())) {
+    if (handover == null || request.getTenantId() == null || !request.getTenantId().equals(handover.getTenantId())) {
       return null;
     }
     fillEntity(handover, request);
@@ -107,15 +108,16 @@ public class ShiftHandoverServiceImpl implements ShiftHandoverService {
     handover.setTenantId(request.getTenantId());
     handover.setOrgId(request.getOrgId());
     handover.setDutyDate(request.getDutyDate());
-    handover.setShiftCode(request.getShiftCode());
+    handover.setShiftCode(normalizeText(request.getShiftCode()));
     handover.setFromStaffId(request.getFromStaffId());
     handover.setToStaffId(request.getToStaffId());
-    handover.setSummary(request.getSummary());
-    handover.setRiskNote(request.getRiskNote());
-    handover.setTodoNote(request.getTodoNote());
-    handover.setStatus(request.getStatus() == null ? "DRAFT" : request.getStatus());
-    handover.setHandoverTime(request.getHandoverTime());
-    handover.setConfirmTime(request.getConfirmTime());
+    handover.setSummary(normalizeText(request.getSummary()));
+    handover.setRiskNote(normalizeText(request.getRiskNote()));
+    handover.setTodoNote(normalizeText(request.getTodoNote()));
+    String status = normalizeStatus(request.getStatus());
+    handover.setStatus(status);
+    handover.setHandoverTime(resolveHandoverTime(status, request.getHandoverTime(), handover.getHandoverTime()));
+    handover.setConfirmTime(resolveConfirmTime(status, request.getConfirmTime(), handover.getConfirmTime()));
     handover.setAttachmentUrls(normalizeText(request.getAttachmentUrls()));
   }
 
@@ -156,5 +158,43 @@ public class ShiftHandoverServiceImpl implements ShiftHandoverService {
     }
     String trimmed = value.trim();
     return trimmed.isEmpty() ? null : trimmed;
+  }
+
+  private String normalizeStatus(String status) {
+    String normalized = normalizeText(status);
+    if (normalized == null) {
+      return "DRAFT";
+    }
+    String upper = normalized.toUpperCase();
+    if ("DRAFT".equals(upper) || "HANDED_OVER".equals(upper) || "CONFIRMED".equals(upper)) {
+      return upper;
+    }
+    return "DRAFT";
+  }
+
+  private LocalDateTime resolveHandoverTime(String status, LocalDateTime requestTime, LocalDateTime existingTime) {
+    if (requestTime != null) {
+      return requestTime;
+    }
+    if (existingTime != null) {
+      return existingTime;
+    }
+    if ("HANDED_OVER".equals(status) || "CONFIRMED".equals(status)) {
+      return LocalDateTime.now();
+    }
+    return null;
+  }
+
+  private LocalDateTime resolveConfirmTime(String status, LocalDateTime requestTime, LocalDateTime existingTime) {
+    if (requestTime != null) {
+      return requestTime;
+    }
+    if (existingTime != null) {
+      return existingTime;
+    }
+    if ("CONFIRMED".equals(status)) {
+      return LocalDateTime.now();
+    }
+    return null;
   }
 }

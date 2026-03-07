@@ -5,7 +5,10 @@ import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.bill.entity.BillMonthly;
 import com.zhiyangyun.care.bill.mapper.BillMonthlyMapper;
+import com.zhiyangyun.care.dashboard.model.DashboardMetricCatalog;
+import com.zhiyangyun.care.dashboard.model.DashboardMetricDefinition;
 import com.zhiyangyun.care.dashboard.model.DashboardSummary;
+import com.zhiyangyun.care.dashboard.model.DashboardThresholdDefaultsResponse;
 import com.zhiyangyun.care.elder.entity.Bed;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderAdmission;
@@ -38,6 +41,9 @@ import org.springframework.web.bind.annotation.RestController;
 public class DashboardController {
   private static final int SUMMARY_MONTH_SPAN = 6;
   private static final int INVENTORY_EXPIRY_DAYS = 30;
+  private static final String METRIC_VERSION = "2026.03";
+  private static final String METRIC_EFFECTIVE_DATE = "2026-03-01";
+  private static final String THRESHOLD_CONFIG_VERSION = "2026.03";
 
   private final CareTaskDailyMapper careTaskDailyMapper;
   private final BillMonthlyMapper billMonthlyMapper;
@@ -189,7 +195,89 @@ public class DashboardController {
     summary.setTotalRevenue(totalRevenue);
     summary.setAverageMonthlyRevenue(calculateAverage(totalRevenue, SUMMARY_MONTH_SPAN));
     summary.setRevenueGrowthRate(calculateMonthOverMonthGrowth(revenueByMonth));
+    summary.setStatsFromMonth(start.toString());
+    summary.setStatsToMonth(end.toString());
+    summary.setMetricVersion(METRIC_VERSION);
+    summary.setMetricEffectiveDate(METRIC_EFFECTIVE_DATE);
+    summary.setDataRefreshedAt(LocalDateTime.now().toString());
     return Result.ok(summary);
+  }
+
+  @GetMapping("/metric-catalog")
+  public Result<DashboardMetricCatalog> metricCatalog() {
+    DashboardMetricCatalog catalog = new DashboardMetricCatalog();
+    catalog.setMetricVersion(METRIC_VERSION);
+    catalog.setEffectiveDate(METRIC_EFFECTIVE_DATE);
+    catalog.setDefaultWindow("最近6个月");
+    catalog.setDefinitions(List.of(
+        definition(
+            "check_in_net_increase",
+            "入住净增长",
+            "入住口径",
+            "净增长 = 入住人数 - 离院人数",
+            "elder_admission, elder_discharge",
+            "实时 + 近6个月聚合",
+            "/stats/check-in",
+            List.of("SUPER_ADMIN", "ADMIN", "ORG_ADMIN", "ORG_MANAGER", "NURSE")),
+        definition(
+            "total_consumption",
+            "总消费",
+            "消费口径",
+            "总消费 = 账单消费 + 商城消费",
+            "bill_monthly, store_order",
+            "实时 + 近6个月聚合",
+            "/stats/consumption",
+            List.of("SUPER_ADMIN", "ADMIN", "ORG_ADMIN", "ORG_MANAGER", "FINANCE")),
+        definition(
+            "bed_occupancy_rate",
+            "床位使用率",
+            "床位口径",
+            "床位使用率 = 已占用床位 / 总床位 × 100%",
+            "bed",
+            "实时",
+            "/stats/org/bed-usage",
+            List.of("SUPER_ADMIN", "ADMIN", "ORG_ADMIN", "ORG_MANAGER", "NURSE")),
+        definition(
+            "total_revenue",
+            "总收入",
+            "收入口径",
+            "总收入 = 账单月度总额（近6个月）",
+            "bill_monthly",
+            "实时 + 近6个月聚合",
+            "/stats/monthly-revenue",
+            List.of("SUPER_ADMIN", "ADMIN", "ORG_ADMIN", "ORG_MANAGER", "FINANCE"))));
+    return Result.ok(catalog);
+  }
+
+  @GetMapping("/threshold-defaults")
+  public Result<DashboardThresholdDefaultsResponse> thresholdDefaults() {
+    DashboardThresholdDefaultsResponse response = new DashboardThresholdDefaultsResponse();
+    response.setAbnormalTaskThreshold(3L);
+    response.setInventoryAlertThreshold(10L);
+    response.setBedOccupancyThreshold(95L);
+    response.setRevenueDropThreshold(5L);
+    response.setConfigVersion(THRESHOLD_CONFIG_VERSION);
+    return Result.ok(response);
+  }
+
+  private DashboardMetricDefinition definition(String metricKey,
+      String metricName,
+      String metricGroup,
+      String formula,
+      String source,
+      String refreshPolicy,
+      String suggestedRoute,
+      List<String> requiredRoles) {
+    DashboardMetricDefinition definition = new DashboardMetricDefinition();
+    definition.setMetricKey(metricKey);
+    definition.setMetricName(metricName);
+    definition.setMetricGroup(metricGroup);
+    definition.setFormula(formula);
+    definition.setSource(source);
+    definition.setRefreshPolicy(refreshPolicy);
+    definition.setSuggestedRoute(suggestedRoute);
+    definition.setRequiredRoles(requiredRoles);
+    return definition;
   }
 
   private Map<String, BigDecimal> initMonthAmountMap(YearMonth start, YearMonth end) {

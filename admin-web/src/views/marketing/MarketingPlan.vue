@@ -69,7 +69,10 @@
 
       <a-tab-pane key="POLICY" tab="季度运营政策">
         <a-card class="card-elevated" :bordered="false">
-          <MarketingListToolbar :tip="`已勾选 ${selectedCount} 条，审批通过后可发布，停用后可重新发布`">
+          <MarketingListToolbar
+            :selected-count="selectedCount"
+            tip="审批通过后可发布，停用后可重新发布"
+          >
             <a-space>
               <a-button :disabled="!selectedPlan" @click="previewSelected">详情</a-button>
               <a-button :disabled="!canEditSelected" @click="editSelected">编辑</a-button>
@@ -237,8 +240,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, h, onMounted, reactive, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, h, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Input, message, Modal } from 'ant-design-vue'
 import type { FormInstance, TablePaginationConfig } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
@@ -268,6 +271,7 @@ import type {
 } from '../../types'
 
 const route = useRoute()
+const router = useRouter()
 const activeModule = ref<'SPEECH' | 'POLICY'>('SPEECH')
 const loading = ref(false)
 const submitLoading = ref(false)
@@ -892,11 +896,34 @@ function initByQuery() {
   }
 }
 
+function consumeQuickQuery() {
+  if (String(route.query.quick || '').trim() !== '1') {
+    return
+  }
+  const nextQuery: Record<string, any> = { ...route.query }
+  delete nextQuery.quick
+  router.replace({ path: route.path, query: nextQuery })
+}
+
 onMounted(() => {
   initByQuery()
   searchDepartments('')
   fetchData()
+  if (String(route.query.quick || '').trim() === '1') {
+    openCreate()
+    consumeQuickQuery()
+  }
 })
+
+watch(
+  () => route.query.quick,
+  () => {
+    if (String(route.query.quick || '').trim() === '1') {
+      openCreate()
+      consumeQuickQuery()
+    }
+  }
+)
 </script>
 
 <style scoped>

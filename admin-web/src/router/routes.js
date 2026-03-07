@@ -1279,12 +1279,13 @@ export const routes = [
               {
                 path: 'medical-errors',
                 name: 'FinanceFlowsMedicalErrors',
-                component: () => import('../views/finance/FeeModulePlaceholder.vue'),
+                component: () => import('../views/finance/FlowCenter.vue'),
                 meta: { title: '医护费用异常' },
                 props: {
                   moduleKey: 'MEDICAL_ERRORS',
                   moduleName: '医护费用异常',
                   description: '重复计费、缺少医嘱关联、异常修正与重算',
+                  category: 'MEDICINE',
                   links: [
                     { label: '查看医护费用流水', to: '/finance/flows/medical' },
                     { label: '查看费用调整单', to: '/finance/flows/adjustments' }
@@ -1294,12 +1295,13 @@ export const routes = [
               {
                 path: 'dining',
                 name: 'FinanceFlowsDining',
-                component: () => import('../views/finance/FeeModulePlaceholder.vue'),
+                component: () => import('../views/finance/FlowCenter.vue'),
                 meta: { title: '餐饮扣费流水（积分点餐）' },
                 props: {
                   moduleKey: 'DINING_FLOW',
                   moduleName: '餐饮扣费流水',
                   description: '积分点餐扣费、餐饮补扣与异常追踪',
+                  category: 'DINING',
                   links: [
                     { label: '查看消费流水', to: '/finance/flows/consumption' },
                     { label: '查看在住账单', to: '/finance/bills/in-resident' }
@@ -1309,12 +1311,13 @@ export const routes = [
               {
                 path: 'logistics',
                 name: 'FinanceFlowsLogistics',
-                component: () => import('../views/finance/FeeModulePlaceholder.vue'),
+                component: () => import('../views/finance/FlowCenter.vue'),
                 meta: { title: '物资/后勤收费流水' },
                 props: {
                   moduleKey: 'LOGISTICS_FLOW',
                   moduleName: '物资/后勤收费流水',
                   description: '物资与后勤额外收费项目的自动入账视图',
+                  category: 'OTHER',
                   links: [
                     { label: '查看消费流水', to: '/finance/flows/consumption' },
                     { label: '查看经营报表', to: '/finance/reports/overall' }
@@ -1324,7 +1327,7 @@ export const routes = [
               {
                 path: 'adjustments',
                 name: 'FinanceFlowsAdjustments',
-                component: () => import('../views/finance/FeeModulePlaceholder.vue'),
+                component: () => import('../views/finance/FlowCenter.vue'),
                 meta: { title: '费用调整单（减免/补录/改价）' },
                 props: {
                   moduleKey: 'ADJUSTMENTS',
@@ -1397,17 +1400,8 @@ export const routes = [
               {
                 path: 'status-sync',
                 name: 'FinanceDischargeStatusSync',
-                component: () => import('../views/finance/FeeModulePlaceholder.vue'),
-                meta: { title: '结算完成回写床态/档案状态' },
-                props: {
-                  moduleKey: 'DISCHARGE_STATUS_SYNC',
-                  moduleName: '结算完成状态回写',
-                  description: '退住结算完成后回写床态、档案状态与收费逻辑',
-                  links: [
-                    { label: '查看退住结算', to: '/finance/discharge/settlement' },
-                    { label: '查看床态全景', to: '/elder/bed-panorama' }
-                  ]
-                }
+                component: () => import('../views/finance/DischargeStatusSync.vue'),
+                meta: { title: '结算完成回写床态/档案状态' }
               }
             ]
           },
@@ -1432,23 +1426,20 @@ export const routes = [
               {
                 path: 'invoice',
                 name: 'FinanceReconcileInvoice',
-                component: () => import('../views/finance/FeeModulePlaceholder.vue'),
-                meta: { title: '发票对账' },
-                props: {
-                  moduleKey: 'RECONCILE_INVOICE',
-                  moduleName: '发票对账',
-                  description: '发票与账单关联核验、发票异常处理',
-                  links: [
-                    { label: '查看对账中心', to: '/finance/reconcile/center' },
-                    { label: '查看收费登记', to: '/finance/payments/register' }
-                  ]
-                }
+                component: () => import('../views/finance/ReconcileInvoice.vue'),
+                meta: { title: '发票对账' }
               },
               {
                 path: 'exception',
                 name: 'FinanceReconcileException',
                 component: () => import('../views/finance/ReconcileException.vue'),
                 meta: { title: '异常处理（短款/多款/重复/跨期）' }
+              },
+              {
+                path: 'ledger-health',
+                name: 'FinanceReconcileLedgerHealth',
+                component: () => import('../views/finance/LedgerHealth.vue'),
+                meta: { title: '财务一致性巡检' }
               }
             ]
           },

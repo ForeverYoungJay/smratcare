@@ -25,6 +25,34 @@
         </a-form-item>
       </a-form>
     </a-card>
+
+    <a-card class="card-elevated" :bordered="false" style="margin-top: 12px;">
+      <a-row :gutter="[12, 12]">
+        <a-col :xs="24" :xl="12">
+          <a-space wrap>
+            <a-button :loading="saving" @click="applyTemplate('STANDARD')">应用标准规则模板</a-button>
+            <a-button :loading="saving" @click="applyTemplate('NURSING')">应用护理分级模板</a-button>
+            <a-button :loading="saving" @click="applyTemplate('UTILITY')">应用水电分摊模板</a-button>
+          </a-space>
+        </a-col>
+        <a-col :xs="24" :xl="12">
+          <a-alert
+            :type="healthWarnings.length ? 'warning' : 'success'"
+            show-icon
+            :message="healthWarnings.length ? `规则健康检查发现 ${healthWarnings.length} 项风险` : '规则健康检查通过'"
+            :description="healthWarnings.length ? healthWarnings.join('；') : '配置键、启停状态、数值范围均正常'"
+          />
+        </a-col>
+      </a-row>
+    </a-card>
+    <a-card v-if="impactPreview" class="card-elevated" :bordered="false" style="margin-top: 12px;">
+      <a-alert
+        type="info"
+        show-icon
+        :message="`最近一次影响预览：${impactPreview.month}（${impactPreview.configKeyCount} 个配置键）`"
+        :description="`账单 ${impactPreview.activeBillCount} 条，欠费 ${impactPreview.highRiskBillCount} 条，待审批 ${impactPreview.pendingApprovalCount} 条`"
+      />
+    </a-card>
     <input ref="importInputRef" type="file" accept=".csv,text/csv" style="display: none" @change="onImportFileChange" />
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
@@ -77,10 +105,11 @@ import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
-import { batchUpsertFinanceBillingConfig, getFinanceBillingConfig, upsertFinanceBillingConfig } from '../../api/finance'
-import type { FinanceBillingConfigEntry } from '../../types'
+import { batchUpsertFinanceBillingConfig, getFinanceBillingConfig, getFinanceConfigImpactPreview, upsertFinanceBillingConfig } from '../../api/finance'
+import type { FinanceBillingConfigEntry, FinanceConfigImpactPreview } from '../../types'
 import { exportCsv } from '../../utils/export'
 import { printTableReport } from '../../utils/print'
+import { confirmAction } from '../../utils/actionConfirm'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -88,6 +117,7 @@ const router = useRouter()
 const rows = ref<FinanceBillingConfigEntry[]>([])
 const tableRef = ref<any>()
 const importInputRef = ref<HTMLInputElement | null>(null)
+const impactPreview = ref<FinanceConfigImpactPreview | null>(null)
 const query = ref({
   month: dayjs(),
   keyword: '',
@@ -115,6 +145,28 @@ const filteredRows = computed(() => {
   if (!keyword) return rows.value
   return rows.value.filter(item => (`${item.configKey || ''} ${item.remark || ''}`).toLowerCase().includes(keyword))
 })
+const healthWarnings = computed(() => {
+  const warnings: string[] = []
+  const enabled = rows.value.filter(item => Number(item.status || 0) === 1)
+  if (!enabled.length) {
+    warnings.push('当前月份无启用计费规则')
+  }
+  const negativeItems = enabled.filter(item => Number(item.configValue || 0) < 0)
+  if (negativeItems.length) {
+    warnings.push(`存在 ${negativeItems.length} 条规则值为负数`)
+  }
+  const duplicatedKey = new Set<string>()
+  const seen = new Set<string>()
+  rows.value.forEach(item => {
+    const key = `${item.configKey || ''}@${item.effectiveMonth || ''}`
+    if (seen.has(key)) duplicatedKey.add(key)
+    seen.add(key)
+  })
+  if (duplicatedKey.size) {
+    warnings.push(`存在 ${duplicatedKey.size} 组重复规则键`)
+  }
+  return warnings
+})
 
 function go(path: string) {
   router.push(path)
@@ -136,6 +188,36 @@ async function loadData() {
     })
   } finally {
     loading.value = false
+  }
+}
+
+async function confirmWithImpact(configKeys: string[], actionTitle: string, content: string) {
+  try {
+    const month = dayjs(query.value.month).format('YYYY-MM')
+    const preview = await getFinanceConfigImpactPreview({
+      month,
+      configKeys
+    })
+    impactPreview.value = preview
+    const impactItems = [
+      `账单数：${preview.activeBillCount}；长者数：${preview.activeElderCount}`,
+      `欠费账单：${preview.highRiskBillCount}；待审批：${preview.pendingApprovalCount}`,
+      ...preview.impactedItems.slice(0, 4).map(item => `${item.moduleLabel}：${item.affectedCount}（${item.impactHint}）`),
+      ...preview.riskTips.slice(0, 2)
+    ]
+    return confirmAction({
+      title: actionTitle,
+      content,
+      impactItems,
+      okText: '确认继续'
+    })
+  } catch (error: any) {
+    message.warning(error?.message || '影响预览加载失败，已切换普通确认')
+    return confirmAction({
+      title: actionTitle,
+      content,
+      okText: '确认继续'
+    })
   }
 }
 
@@ -171,6 +253,12 @@ async function submitEdit() {
     message.warning('配置键仅支持大写字母、数字、下划线，长度 3-64')
     return
   }
+  const confirmed = await confirmWithImpact(
+    [normalizedKey],
+    '确认保存计费规则？',
+    `即将保存规则 ${normalizedKey}@${dayjs(form.value.effectiveMonth).format('YYYY-MM')}`
+  )
+  if (!confirmed) return
   saving.value = true
   try {
     await upsertFinanceBillingConfig({
@@ -198,6 +286,12 @@ async function batchToggleStatus(status: 0 | 1) {
     message.warning('请先勾选要操作的规则')
     return
   }
+  const confirmed = await confirmWithImpact(
+    selected.map(item => item.configKey),
+    `确认批量${status === 1 ? '启用' : '停用'}？`,
+    `本次将操作 ${selected.length} 条规则`
+  )
+  if (!confirmed) return
   saving.value = true
   try {
     await batchUpsertFinanceBillingConfig({
@@ -210,6 +304,49 @@ async function batchToggleStatus(status: 0 | 1) {
       }))
     })
     message.success(`批量${status === 1 ? '启用' : '停用'}成功`)
+    loadData()
+  } finally {
+    saving.value = false
+  }
+}
+
+async function applyTemplate(type: 'STANDARD' | 'NURSING' | 'UTILITY') {
+  const month = dayjs(query.value.month).format('YYYY-MM')
+  const templates = {
+    STANDARD: [
+      { configKey: 'BILL_ROOM_BASE_PRICE', configValue: 1800, remark: '房费基础单价（月）' },
+      { configKey: 'BILL_NURSING_BASE_PRICE', configValue: 1600, remark: '护理费基础单价（月）' },
+      { configKey: 'BILL_DEPOSIT_MIN', configValue: 5000, remark: '入住押金下限' }
+    ],
+    NURSING: [
+      { configKey: 'BILL_NURSING_L1_PRICE', configValue: 1200, remark: '护理一级价格' },
+      { configKey: 'BILL_NURSING_L2_PRICE', configValue: 1800, remark: '护理二级价格' },
+      { configKey: 'BILL_NURSING_L3_PRICE', configValue: 2600, remark: '护理三级价格' }
+    ],
+    UTILITY: [
+      { configKey: 'ALLOC_ELECTRIC_BASE_PRICE', configValue: 1, remark: '电费基础单价（元/度）' },
+      { configKey: 'ALLOC_ELECTRIC_FREE_KWH_PER_PERSON', configValue: 10, remark: '每人每月免费电量（度）' },
+      { configKey: 'ALLOC_WATER_BASE_PRICE', configValue: 0, remark: '水费基础单价（默认0）' }
+    ]
+  }[type]
+  const confirmed = await confirmWithImpact(
+    templates.map(item => item.configKey),
+    '确认应用模板规则？',
+    `模板类型：${type}，共 ${templates.length} 条规则`
+  )
+  if (!confirmed) return
+  saving.value = true
+  try {
+    await batchUpsertFinanceBillingConfig({
+      items: templates.map(item => ({
+        configKey: item.configKey,
+        configValue: item.configValue,
+        effectiveMonth: month,
+        status: 1,
+        remark: item.remark
+      }))
+    })
+    message.success('模板已应用')
     loadData()
   } finally {
     saving.value = false

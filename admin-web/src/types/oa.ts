@@ -23,6 +23,9 @@ export interface OaTodoSummary {
   dueTodayCount: number
   overdueCount: number
   unassignedCount: number
+  birthdayOpenCount?: number
+  approvalOpenCount?: number
+  normalOpenCount?: number
 }
 
 export interface OaApproval {
@@ -150,6 +153,15 @@ export interface OaTask {
   recurrenceInterval?: number
   recurrenceCount?: number
   assigneeName?: string
+}
+
+export interface OaTaskConflictItem {
+  taskId: string | number
+  title: string
+  assigneeName?: string
+  startTime?: string
+  endTime?: string
+  reason?: string
 }
 
 export interface OaTaskSummary {

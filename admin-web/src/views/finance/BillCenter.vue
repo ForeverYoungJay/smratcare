@@ -80,9 +80,7 @@
               <a-button v-if="row.status !== 9" type="link" @click="openPay(row)">登记收款</a-button>
               <a-button v-if="row.status !== 9 && row.lastPaymentId" type="link" @click="openEditLatestPayment(row)">改最近收款</a-button>
               <a-button type="link" @click="openHistory(row)">收款历史</a-button>
-              <a-popconfirm v-if="row.status !== 9" title="确认将该账单标记为无效？" @confirm="markInvalid(row)">
-                <a-button type="link" danger>无效账单</a-button>
-              </a-popconfirm>
+              <a-button v-if="row.status !== 9" type="link" danger @click="markInvalid(row)">无效账单</a-button>
               <a-tag v-else color="default">已无效</a-tag>
               <a-button type="link" @click="goConsumption(row)">消费明细</a-button>
             </a-space>
@@ -172,6 +170,7 @@ import { getPaymentRecordPage, updatePaymentRecord } from '../../api/finance'
 import type { BillItem, PageResult, PaymentRecordItem } from '../../types'
 import router from '../../router'
 import { printTableReport } from '../../utils/print'
+import { confirmAction } from '../../utils/actionConfirm'
 
 const props = withDefaults(defineProps<{
   title?: string
@@ -206,6 +205,7 @@ const payOpen = ref(false)
 const paying = ref(false)
 const payFormRef = ref()
 const activePaymentId = ref<number | null>(null)
+const originalPayMethod = ref<string>('CASH')
 type PayForm = {
   amount: number
   method: string
@@ -339,6 +339,7 @@ function openPay(row: BillItem) {
   activePaymentId.value = null
   payForm.amount = Number(row.outstandingAmount || 0)
   payForm.method = 'CASH'
+  originalPayMethod.value = 'CASH'
   payForm.paidAt = dayjs()
   payForm.remark = ''
   payOpen.value = true
@@ -353,6 +354,7 @@ function openEditLatestPayment(row: BillItem) {
   activePaymentId.value = Number(row.lastPaymentId)
   payForm.amount = Number(row.lastPaymentAmount || 0)
   payForm.method = String(row.lastPayMethod || 'CASH').toUpperCase()
+  originalPayMethod.value = payForm.method
   payForm.paidAt = row.lastPaidAt ? dayjs(row.lastPaidAt) : dayjs()
   payForm.remark = row.lastPaymentRemark || ''
   payOpen.value = true
@@ -371,7 +373,11 @@ async function submitPay() {
     }
     if (activePaymentId.value) {
       await updatePaymentRecord(activePaymentId.value, payload)
-      message.success('收款已修改')
+      if (originalPayMethod.value !== payForm.method) {
+        message.success(`收款已修改，支付方式 ${payMethodText(originalPayMethod.value)} → ${payMethodText(payForm.method)}`)
+      } else {
+        message.success('收款已修改')
+      }
     } else {
       await payBill(activeBillId.value, payload)
       message.success('收款登记成功')
@@ -406,6 +412,14 @@ function goConsumption(row: BillItem) {
 
 async function markInvalid(row: BillItem) {
   if (!row?.id) return
+  const confirmed = await confirmAction({
+    title: '确认标记为无效账单？',
+    content: `账单：${row.billMonth || '-'} / ${row.elderName || '未知老人'}`,
+    impactItems: ['账单状态将变更为“无效”', '后续不可直接继续收款', '需通过修复流程恢复有效状态'],
+    okText: '确认作废',
+    danger: true
+  })
+  if (!confirmed) return
   await invalidateBill(row.id)
   message.success('账单已标记为无效')
   fetchData()
@@ -433,6 +447,7 @@ function openEditHistoryPayment(row: PaymentRecordItem) {
   activePaymentId.value = Number(row.id)
   payForm.amount = Number(row.amount || 0)
   payForm.method = String(row.payMethod || 'CASH').toUpperCase()
+  originalPayMethod.value = payForm.method
   payForm.paidAt = row.paidAt ? dayjs(row.paidAt) : dayjs()
   payForm.remark = row.remark || ''
   payOpen.value = true

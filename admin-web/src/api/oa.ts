@@ -8,6 +8,7 @@ import type {
   OaDocument,
   OaDocumentFolder,
   OaTask,
+  OaTaskConflictItem,
   OaTaskSummary,
   OaPortalSummary,
   OaWorkReport,
@@ -96,6 +97,22 @@ export function updateTodo(id: string | number, data: Partial<OaTodo>) {
 
 export function completeTodo(id: string | number) {
   return request.put<OaTodo>(`/api/oa/todo/${id}/done`)
+}
+
+export function snoozeTodo(id: string | number, days = 1) {
+  return request.put<OaTodo>(`/api/oa/todo/${id}/snooze`, null, { params: { days } })
+}
+
+export function ignoreBirthdayTodo(id: string | number) {
+  return request.put<OaTodo>(`/api/oa/todo/${id}/ignore-birthday`)
+}
+
+export function batchSnoozeBirthdayTodo(ids: Array<string | number>, days = 1) {
+  return request.put<number>('/api/oa/todo/batch/snooze', { ids }, { params: { days } })
+}
+
+export function batchIgnoreBirthdayTodo(ids: Array<string | number>) {
+  return request.put<number>('/api/oa/todo/batch/ignore-birthday', { ids })
 }
 
 export function batchCompleteTodo(ids: Array<string | number>) {
@@ -364,6 +381,16 @@ export function getOaTaskSummary(params: any) {
 
 export function getOaTaskCalendar(params: any) {
   return request.get<OaTask[]>('/api/oa/task/calendar', { params })
+}
+
+export function checkOaTaskConflicts(data: {
+  taskId?: string | number
+  startTime?: string
+  endTime?: string
+  assigneeName?: string
+  collaboratorIds?: Array<string | number>
+}) {
+  return request.post<OaTaskConflictItem[]>('/api/oa/task/conflicts/check', data)
 }
 
 export function createOaTask(data: Partial<OaTask>) {

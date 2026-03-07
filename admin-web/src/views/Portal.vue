@@ -123,6 +123,8 @@
                     <a-radio-button value="pinned">置顶</a-radio-button>
                     <a-radio-button value="urgent">紧急 {{ urgentReminderCount }}</a-radio-button>
                   </a-radio-group>
+                  <a-tag color="purple">阈值 {{ thresholdConfig.configVersion || '--' }}</a-tag>
+                  <a-button size="small" @click="thresholdConfigOpen = true">阈值设置</a-button>
                   <a-button size="small" @click="markAllReminderRead">全部已读</a-button>
                 </a-space>
               </template>
@@ -132,6 +134,7 @@
                     <a-space>
                       <a-tag :color="severityColor(item.level)">{{ item.level }}</a-tag>
                       <span>{{ item.title }}</span>
+                      <span v-if="item.desc" class="hint-text">({{ item.desc }})</span>
                     </a-space>
                     <template #actions>
                       <span class="reminder-count">{{ item.count }}</span>
@@ -141,7 +144,7 @@
                       <a-button type="link" size="small" @click="toggleReminderRead(item)">
                         {{ isReminderRead(item) ? '标未读' : '已读' }}
                       </a-button>
-                      <a-button type="link" size="small" @click="go(item.route)">处理</a-button>
+                      <a-button type="link" size="small" @click="goRiskItem(item)">处理</a-button>
                     </template>
                   </a-list-item>
                 </template>
@@ -150,6 +153,10 @@
                 <a-tag color="red">红色：紧急</a-tag>
                 <a-tag color="orange">橙色：预警</a-tag>
                 <a-tag color="blue">蓝色：普通通知</a-tag>
+              </div>
+              <div class="hint-text" style="margin-top: 6px;">
+                当前阈值：异常≥{{ thresholdConfig.abnormalTaskThreshold }}；库存≥{{ thresholdConfig.inventoryAlertThreshold }}；
+                床位≥{{ thresholdConfig.bedOccupancyThreshold }}%；收入环比≤-{{ thresholdConfig.revenueDropThreshold }}%
               </div>
             </a-card>
           </a-col>
@@ -424,6 +431,25 @@
             </a-space>
           </template>
           <div class="calendar-toolbar">
+            <a-space size="small" wrap class="calendar-insights">
+              <a-tag v-for="item in calendarInsights" :key="item.label" :color="item.color">{{ item.label }} {{ item.value }}</a-tag>
+            </a-space>
+            <a-space size="small" wrap class="calendar-loads" v-if="calendarLoadLeaders.length">
+              <a-tag color="geekblue">负责人负载</a-tag>
+              <a-tag v-for="item in calendarLoadLeaders" :key="item.name">{{ item.name }} {{ item.count }}条</a-tag>
+            </a-space>
+            <div class="calendar-week-trend" v-if="calendarWeeklyLoad.length">
+              <span class="hint-text">本周负载：</span>
+              <div
+                v-for="item in calendarWeeklyLoad"
+                :key="item.day"
+                class="calendar-week-bar"
+                :title="`${item.label} ${item.count}条`"
+                :style="{ height: `${Math.max(18, item.height)}px` }"
+              >
+                <span>{{ item.label }}</span>
+              </div>
+            </div>
             <a-space wrap>
               <a-checkable-tag
                 v-for="item in calendarBuckets"
@@ -434,6 +460,7 @@
                 <span class="legend-dot" :style="{ background: item.color }"></span>
                 {{ item.label }} {{ item.count }}
               </a-checkable-tag>
+              <a-button size="small" type="link" @click="showAllCalendarTypes">显示全部</a-button>
             </a-space>
           </div>
           <StatefulBlock :loading="calendarLoading" :error="''" :empty="!calendarRows.length" empty-text="暂无日程安排" @retry="loadCalendar">
@@ -524,6 +551,33 @@
             </a-form-item>
           </a-col>
         </a-row>
+        <a-row :gutter="12">
+          <a-col :span="24">
+            <a-form-item label="冲突策略">
+              <a-segmented v-model:value="conflictPolicy" :options="conflictPolicyOptions" block />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="12">
+          <a-col :span="24">
+            <a-space wrap>
+              <a-button :loading="conflictPreviewLoading" @click="previewScheduleConflicts">立即预检冲突</a-button>
+              <span class="hint-text">保存前可先预检，策略生效：{{ conflictPolicyOptions.find((item) => item.value === conflictPolicy)?.label }}</span>
+            </a-space>
+          </a-col>
+        </a-row>
+        <a-row :gutter="12" v-if="conflictPreviewItems.length">
+          <a-col :span="24">
+            <a-alert :message="`预检发现 ${conflictPreviewItems.length} 条冲突`" type="warning" show-icon>
+              <template #description>
+                <div v-for="(item, index) in conflictPreviewItems.slice(0, 5)" :key="`${item.title}_${index}`">
+                  {{ index + 1 }}. {{ item.title || '未命名日程' }}（{{ conflictItemTimeText(item) }}）{{ item.reason ? ` - ${item.reason}` : '' }}
+                  <a-button type="link" size="small" @click="focusConflictDate(item.startTime)">定位</a-button>
+                </div>
+              </template>
+            </a-alert>
+          </a-col>
+        </a-row>
         <a-row :gutter="12" v-if="scheduleForm.calendarType === 'COLLAB'">
           <a-col :span="24">
             <a-form-item label="协同部门（可多选）">
@@ -554,6 +608,17 @@
                 @focus="() => !staffOptions.length && searchStaff('')"
               />
             </a-form-item>
+          </a-col>
+          <a-col :span="24" v-if="collaboratorTip">
+            <div class="hint-text">
+              {{ collaboratorTip }}
+              <a-button v-if="collaboratorPreviewAllNames.length > collaboratorPreviewNames.length" type="link" size="small" @click="showAllCollaboratorPreview">
+                查看全部
+              </a-button>
+            </div>
+          </a-col>
+          <a-col :span="24" v-if="collaboratorDeltaTip">
+            <div class="hint-text">{{ collaboratorDeltaTip }}</div>
           </a-col>
         </a-row>
         <a-card size="small" class="repeat-card" title="周期计划">
@@ -606,14 +671,15 @@
                   <a-space size="small">
                     <span :class="{ 'agenda-title-done': item.status === 'DONE' }">{{ item.title }}</span>
                     <a-tag v-if="item.status === 'DONE'">已完成</a-tag>
+                    <a-tag v-if="item.readonly">系统提醒</a-tag>
                   </a-space>
                 </template>
               </a-list-item-meta>
               <template #actions>
                 <a-button type="link" size="small" @click="focusCalendarDate(item.dateText)">定位</a-button>
-                <a-button type="link" size="small" @click="openEditSchedule(item.id)">编辑</a-button>
-                <a-button type="link" size="small" @click="markScheduleDone(item.id)">完成</a-button>
-                <a-button type="link" danger size="small" @click="removeSchedule(item.id)">删除</a-button>
+                <a-button v-if="!item.readonly" type="link" size="small" @click="openEditSchedule(item.id)">编辑</a-button>
+                <a-button v-if="!item.readonly" type="link" size="small" @click="markScheduleDone(item.id)">完成</a-button>
+                <a-button v-if="!item.readonly" type="link" danger size="small" @click="removeSchedule(item.id)">删除</a-button>
               </template>
             </a-list-item>
           </template>
@@ -628,14 +694,15 @@
                   <a-space size="small">
                     <span :class="{ 'agenda-title-done': item.status === 'DONE' }">{{ item.title }}</span>
                     <a-tag v-if="item.status === 'DONE'">已完成</a-tag>
+                    <a-tag v-if="item.readonly">系统提醒</a-tag>
                   </a-space>
                 </template>
               </a-list-item-meta>
               <template #actions>
                 <a-button type="link" size="small" @click="focusCalendarDate(item.dateText)">定位</a-button>
-                <a-button type="link" size="small" @click="openEditSchedule(item.id)">编辑</a-button>
-                <a-button type="link" size="small" @click="markScheduleDone(item.id)">完成</a-button>
-                <a-button type="link" danger size="small" @click="removeSchedule(item.id)">删除</a-button>
+                <a-button v-if="!item.readonly" type="link" size="small" @click="openEditSchedule(item.id)">编辑</a-button>
+                <a-button v-if="!item.readonly" type="link" size="small" @click="markScheduleDone(item.id)">完成</a-button>
+                <a-button v-if="!item.readonly" type="link" danger size="small" @click="removeSchedule(item.id)">删除</a-button>
               </template>
             </a-list-item>
           </template>
@@ -663,13 +730,14 @@
                 <a-space size="small">
                   <span :class="{ 'agenda-title-done': item.status === 'DONE' }">{{ item.title }}</span>
                   <a-tag v-if="item.status === 'DONE'">已完成</a-tag>
+                  <a-tag v-if="item.readonly">系统提醒</a-tag>
                 </a-space>
               </template>
             </a-list-item-meta>
             <template #actions>
-              <a-button type="link" size="small" @click="openEditSchedule(item.id)">编辑</a-button>
-              <a-button type="link" size="small" @click="markScheduleDone(item.id)">完成</a-button>
-              <a-button type="link" danger size="small" @click="removeSchedule(item.id)">删除</a-button>
+              <a-button v-if="!item.readonly" type="link" size="small" @click="openEditSchedule(item.id)">编辑</a-button>
+              <a-button v-if="!item.readonly" type="link" size="small" @click="markScheduleDone(item.id)">完成</a-button>
+              <a-button v-if="!item.readonly" type="link" danger size="small" @click="removeSchedule(item.id)">删除</a-button>
             </template>
           </a-list-item>
         </template>
@@ -942,6 +1010,42 @@
       </a-list>
     </a-modal>
 
+    <a-modal
+      v-model:open="thresholdConfigOpen"
+      title="提醒中心阈值设置"
+      ok-text="保存配置"
+      cancel-text="恢复默认"
+      @ok="saveThresholdConfig"
+      @cancel="resetThresholdConfig"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="护理异常任务阈值（条）">
+          <a-input-number v-model:value="thresholdConfig.abnormalTaskThreshold" :min="1" :max="999" style="width: 100%;" />
+        </a-form-item>
+        <a-form-item label="库存不足阈值（项）">
+          <a-input-number v-model:value="thresholdConfig.inventoryAlertThreshold" :min="1" :max="9999" style="width: 100%;" />
+        </a-form-item>
+        <a-form-item label="床位高占用阈值（%）">
+          <a-input-number v-model:value="thresholdConfig.bedOccupancyThreshold" :min="1" :max="100" style="width: 100%;" />
+        </a-form-item>
+        <a-form-item label="收入环比下滑阈值（%）">
+          <a-input-number v-model:value="thresholdConfig.revenueDropThreshold" :min="1" :max="100" style="width: 100%;" />
+        </a-form-item>
+      </a-form>
+      <a-divider style="margin: 8px 0;" />
+      <div class="hint-text" style="margin-bottom: 6px;">最近阈值变更</div>
+      <a-list size="small" :data-source="thresholdLogs.slice(0, 4)" :locale="{ emptyText: '暂无变更记录' }">
+        <template #renderItem="{ item }">
+          <a-list-item>
+            <span class="hint-text">
+              {{ dayjs(item.changedAt).format('YYYY-MM-DD HH:mm:ss') }}
+              · {{ item.source === 'dashboard' ? '仪表盘' : '首页' }}
+            </span>
+          </a-list-item>
+        </template>
+      </a-list>
+    </a-modal>
+
   </PageContainer>
 </template>
 
@@ -958,11 +1062,16 @@ import VChart from 'vue-echarts'
 import PageContainer from '../components/PageContainer.vue'
 import StatefulBlock from '../components/StatefulBlock.vue'
 import { useUserStore } from '../stores/user'
-import { createOaTask, getOaTaskCalendar, getPortalSummary, updateOaTask, completeOaTask, deleteOaTask, getApprovalPage, updateApproval } from '../api/oa'
+import { createOaTask, getOaTaskCalendar, getPortalSummary, updateOaTask, completeOaTask, deleteOaTask, getApprovalPage, updateApproval, checkOaTaskConflicts } from '../api/oa'
 import { getBirthdayPage } from '../api/life'
 import type { OaPortalSummary, OaTask, PageResult, BedItem, CrmContractItem, CrmLeadItem, OaApproval, BirthdayReminder } from '../types'
 import { useLiveSyncRefresh } from '../composables/useLiveSyncRefresh'
-import { getDashboardSummary, type DashboardSummary } from '../api/dashboard'
+import {
+  getDashboardSummary,
+  getDashboardThresholdDefaults,
+  type DashboardSummary,
+  type DashboardThresholdDefaults
+} from '../api/dashboard'
 import { getFinanceWorkbenchOverview } from '../api/finance'
 import type { FinanceWorkbenchOverview, HrWorkbenchSummary } from '../types'
 import { getMarketingConversionReport, getLeadPage, getContractPage } from '../api/marketing'
@@ -972,6 +1081,14 @@ import { getHrProfileCertificateReminderPage, getHrWorkbenchSummary } from '../a
 import { getStaffPage } from '../api/rbac'
 import { useDepartmentOptions } from '../composables/useDepartmentOptions'
 import { useStaffOptions } from '../composables/useStaffOptions'
+import {
+  clearThresholdSnapshot,
+  loadThresholdLogs,
+  loadThresholdSnapshot,
+  saveThresholdSnapshot,
+  thresholdPulseKey,
+  type ThresholdChangeLog
+} from '../utils/dashboardThreshold'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -982,6 +1099,13 @@ const calendarLoading = ref(false)
 const refreshedAt = ref('')
 const scheduleOpen = ref(false)
 const scheduleSaving = ref(false)
+const collaboratorPreviewTotal = ref(0)
+const collaboratorPreviewLoading = ref(false)
+const collaboratorPreviewNames = ref<string[]>([])
+const collaboratorPreviewAllNames = ref<string[]>([])
+const originalCollaboratorIds = ref<string[]>([])
+const conflictPreviewLoading = ref(false)
+const conflictPreviewItems = ref<Array<{ title?: string; assigneeName?: string; startTime?: string; endTime?: string; reason?: string }>>([])
 const calendarRows = ref<OaTask[]>([])
 const calendarRef = ref<any>(null)
 const agendaDrawerOpen = ref(false)
@@ -1015,12 +1139,17 @@ const birthdayInsightTitle = ref('生日统计')
 const birthdayInsightRows = ref<Array<{ label: string; value: string }>>([])
 const reminderViewMode = ref<'all' | 'unread' | 'pinned' | 'urgent'>('all')
 const reminderState = ref<Record<string, { read?: boolean; pinned?: boolean; updatedAt?: string; lastCount?: number }>>({})
+const thresholdConfigOpen = ref(false)
+const thresholdLogs = ref<ThresholdChangeLog[]>([])
 const birthdayAgeBand = ref<'ALL' | '80_PLUS' | '90_PLUS' | 'UNDER_80'>('ALL')
 const autoSyncEnabled = ref(true)
 const syncingNow = ref(false)
 const lastSyncSource = ref('初始化')
 let portalSyncTimer: number | undefined
 let portalVisibleHandler: (() => void) | null = null
+let calendarStorageHandler: ((event: StorageEvent) => void) | null = null
+const currentCalendarView = ref<'dayGridMonth' | 'dayGridWeek' | 'dayGridDay'>('dayGridMonth')
+const conflictPolicy = ref<'WARN' | 'BLOCK' | 'ALLOW'>('WARN')
 
 type AudienceCode = 'ALL' | 'DIRECTOR' | 'NURSE' | 'FINANCE' | 'ADMIN' | 'HR' | 'OPS'
 
@@ -1200,6 +1329,13 @@ const dashboard = ref<DashboardSummary>({
   averageMonthlyRevenue: 0,
   revenueGrowthRate: 0
 })
+const thresholdConfig = ref<DashboardThresholdDefaults>({
+  abnormalTaskThreshold: 3,
+  inventoryAlertThreshold: 10,
+  bedOccupancyThreshold: 95,
+  revenueDropThreshold: 5,
+  configVersion: '--'
+})
 
 const financeOverview = ref<FinanceWorkbenchOverview | null>(null)
 const hrSummary = ref<HrWorkbenchSummary | null>(null)
@@ -1266,11 +1402,20 @@ const planCategoryOptions = [
   { label: '后勤排班', value: '后勤排班' },
   { label: '专项检查', value: '专项检查' }
 ]
+const conflictPolicyOptions = [
+  { label: '提示后可继续', value: 'WARN' as const },
+  { label: '发现冲突即阻止', value: 'BLOCK' as const },
+  { label: '忽略冲突直接保存', value: 'ALLOW' as const }
+]
 const SEARCH_RECENT_KEY = 'portal_search_recent_routes'
 const SEARCH_RECENT_MAX = 8
 const MODULE_CONFIG_KEY_PREFIX = 'portal_module_config_v1_'
 const CUSTOM_CARD_KEY_PREFIX = 'portal_custom_card_v1_'
 const AUTO_SYNC_KEY_PREFIX = 'portal_auto_sync_v1_'
+const VISIBLE_TYPES_STORAGE_KEY = 'oa_calendar_visible_types_v1'
+const CALENDAR_VIEW_STORAGE_KEY = 'oa_calendar_view_mode_v1'
+const CALENDAR_SYNC_PULSE_KEY = 'oa_calendar_sync_pulse_v1'
+const CONFLICT_POLICY_STORAGE_KEY = 'oa_calendar_conflict_policy_v1'
 const PINYIN_INITIAL_LETTERS = 'ABCDEFGHJKLMNOPQRSTWXYZ'
 const PINYIN_INITIAL_BOUNDARY_CHARS = '阿芭擦搭蛾发噶哈讥咔垃妈拿哦啪期然撒塌挖昔压匝'
 
@@ -1334,6 +1479,45 @@ function persistAutoSyncSetting() {
   } catch {}
 }
 
+async function loadThresholdConfig() {
+  try {
+    const defaults = await getDashboardThresholdDefaults()
+    thresholdConfig.value = { ...defaults }
+  } catch {}
+  const snapshot = loadThresholdSnapshot(userStore.staffInfo?.id)
+  if (snapshot) {
+    thresholdConfig.value = {
+      ...thresholdConfig.value,
+      ...snapshot,
+      configVersion: thresholdConfig.value.configVersion
+    }
+  }
+  thresholdLogs.value = loadThresholdLogs(userStore.staffInfo?.id)
+}
+
+function saveThresholdConfig() {
+  try {
+    const snapshot = {
+      abnormalTaskThreshold: Number(thresholdConfig.value.abnormalTaskThreshold || 0),
+      inventoryAlertThreshold: Number(thresholdConfig.value.inventoryAlertThreshold || 0),
+      bedOccupancyThreshold: Number(thresholdConfig.value.bedOccupancyThreshold || 0),
+      revenueDropThreshold: Number(thresholdConfig.value.revenueDropThreshold || 0)
+    }
+    thresholdLogs.value = saveThresholdSnapshot(userStore.staffInfo?.id, snapshot, 'portal')
+    message.success('阈值配置已保存')
+    thresholdConfigOpen.value = false
+  } catch {
+    message.warning('阈值保存失败')
+  }
+}
+
+async function resetThresholdConfig() {
+  clearThresholdSnapshot(userStore.staffInfo?.id)
+  await loadThresholdConfig()
+  message.success('阈值已恢复默认')
+  thresholdConfigOpen.value = false
+}
+
 function isModuleVisible(key: PortalModuleKey) {
   const matched = moduleConfig.value.find((item) => item.key === key)
   if (!matched) return true
@@ -1381,6 +1565,18 @@ function rowOperationSpan(target: 'operation' | 'finance' | 'salesFunnel') {
 
 function rowStatusExpenseSpan(target: 'bedStatus' | 'expense') {
   return resolveAdaptiveSpan(['bedStatus', 'expense'], target)
+}
+
+function goRiskItem(item: { route: string }) {
+  const hasQuery = item.route.includes('?')
+  const query = [
+    'fromSource=portal',
+    `abnormalTaskThreshold=${Number(thresholdConfig.value.abnormalTaskThreshold || 0)}`,
+    `inventoryAlertThreshold=${Number(thresholdConfig.value.inventoryAlertThreshold || 0)}`,
+    `bedOccupancyThreshold=${Number(thresholdConfig.value.bedOccupancyThreshold || 0)}`,
+    `revenueDropThreshold=${Number(thresholdConfig.value.revenueDropThreshold || 0)}`
+  ].join('&')
+  go(`${item.route}${hasQuery ? '&' : '?'}${query}`)
 }
 
 const customCardColSpan = computed(() => {
@@ -1434,23 +1630,64 @@ const myTodoStats = computed(() => [
 
 const totalTodoCount = computed(() => myTodoStats.value.reduce((sum, item) => sum + Number(item.value || 0), 0))
 
+function thresholdLevel(value: number, warningThreshold: number, urgentThreshold: number) {
+  if (value >= urgentThreshold) return '紧急'
+  if (value >= warningThreshold) return '预警'
+  return '普通通知'
+}
+
 const riskReminders = computed(() => {
   const elderAbnormal = Number(summary.elderAbnormalCount || 0) + Number(summary.healthAbnormalCount || 0)
   const arrearsCount = Number(financeOverview.value?.risk?.overdueElderCount || 0)
   const inventoryCount = Number(summary.inventoryLowStockCount || 0)
   const orderPendingCount = Number(dashboard.value.abnormalTasksToday || 0)
   const approvalTimeoutCount = Number(summary.approvalTimeoutCount || 0)
+  const bedOccupancyRate = Number(dashboard.value.bedOccupancyRate || 0)
+  const revenueGrowthRate = Number(dashboard.value.revenueGrowthRate || 0)
   const contractExpiringCount = Number(hrSummary.value?.contractExpiringCount || summary.contractPendingCount || 0)
   const supervisorAnomalyCount = Number(summary.supervisorAnomalyCount || 0)
   const birthdayReminderCount = birthdayRows.value
     .filter((item) => Number(item.daysUntil || 9999) >= 0 && Number(item.daysUntil || 9999) <= 7).length
 
+  const abnormalThreshold = Number(thresholdConfig.value.abnormalTaskThreshold || 1)
+  const inventoryThreshold = Number(thresholdConfig.value.inventoryAlertThreshold || 1)
+  const bedThreshold = Number(thresholdConfig.value.bedOccupancyThreshold || 1)
+  const revenueDropThreshold = Number(thresholdConfig.value.revenueDropThreshold || 1)
+
   return [
     { title: '长者异常', count: elderAbnormal, route: '/health/inspection', level: elderAbnormal > 0 ? '紧急' : '普通通知' },
     { title: '生日提醒', count: birthdayReminderCount, route: '/oa/life/birthday?daysAhead=7', level: birthdayReminderCount > 0 ? '预警' : '普通通知' },
     { title: '欠费提醒', count: arrearsCount, route: '/finance/bills/in-resident?filter=overdue', level: arrearsCount > 0 ? '紧急' : '普通通知' },
-    { title: '库存不足', count: inventoryCount, route: '/logistics/storage/alerts', level: inventoryCount > 0 ? '预警' : '普通通知' },
-    { title: '医嘱未执行', count: orderPendingCount, route: '/medical-care/orders', level: orderPendingCount > 0 ? '预警' : '普通通知' },
+    {
+      title: '库存不足',
+      count: inventoryCount,
+      route: '/logistics/storage/alerts',
+      level: thresholdLevel(inventoryCount, inventoryThreshold, inventoryThreshold * 2),
+      desc: `阈值 ${inventoryThreshold}`
+    },
+    {
+      title: '医嘱未执行',
+      count: orderPendingCount,
+      route: '/medical-care/orders',
+      level: thresholdLevel(orderPendingCount, abnormalThreshold, abnormalThreshold * 2),
+      desc: `阈值 ${abnormalThreshold}`
+    },
+    {
+      title: '床位高占用',
+      count: bedOccupancyRate >= bedThreshold ? Number(bedOccupancyRate.toFixed(2)) : 0,
+      route: '/stats/org/bed-usage',
+      level: thresholdLevel(bedOccupancyRate, bedThreshold, Math.min(100, bedThreshold + 3)),
+      desc: `阈值 ${bedThreshold}%`
+    },
+    {
+      title: '收入环比下滑',
+      count: revenueGrowthRate <= 0 - revenueDropThreshold ? Number(Math.abs(revenueGrowthRate).toFixed(2)) : 0,
+      route: '/stats/monthly-revenue',
+      level: revenueGrowthRate <= 0 - revenueDropThreshold
+        ? '预警'
+        : '普通通知',
+      desc: `阈值 -${revenueDropThreshold}%`
+    },
     { title: '审批超时', count: approvalTimeoutCount, route: '/oa/approval', level: approvalTimeoutCount > 0 ? '紧急' : '普通通知' },
     { title: '监管链异常', count: supervisorAnomalyCount, route: '/system/staff?view=supervisor-anomalies', level: supervisorAnomalyCount > 0 ? '紧急' : '普通通知' },
     { title: '证书到期', count: certificateReminderCount.value, route: '/hr/development/certificate-reminders', level: certificateReminderCount.value > 0 ? '预警' : '普通通知' },
@@ -1473,7 +1710,7 @@ const displayRiskReminders = computed(() => {
 })
 const unreadReminderCount = computed(() => riskReminders.value.filter((item) => !isReminderRead(item)).length)
 const urgentReminderCount = computed(() => riskReminders.value.filter((item) => item.level === '紧急').length)
-const activeRiskCount = computed(() => riskReminders.value.reduce((sum, item) => sum + Number(item.count || 0), 0))
+const activeRiskCount = computed(() => riskReminders.value.filter((item) => item.level !== '普通通知').length)
 
 const approvalOpinionList = computed(() => approvalRows.value
   .filter((item) => item.status === 'APPROVED')
@@ -1586,7 +1823,11 @@ const operationOverview = computed(() => [
   { title: '空床数量', value: dashboard.value.availableBeds || 0, route: '/elder/bed-panorama' },
   { title: '今日入住', value: dashboard.value.totalAdmissions || 0, route: '/elder/admission-processing' },
   { title: '今日退住', value: dashboard.value.totalDischarges || 0, route: '/elder/status-change/discharge-apply' },
-  { title: '床位利用率', value: `${Number(dashboard.value.bedOccupancyRate || 0).toFixed(1)}%`, route: '/stats/org/bed-usage' }
+  {
+    title: '床位利用率',
+    value: `${Number(dashboard.value.bedOccupancyRate || 0).toFixed(1)}%${Number(dashboard.value.bedOccupancyRate || 0) >= Number(thresholdConfig.value.bedOccupancyThreshold || 0) ? ' ⚠' : ''}`,
+    route: '/stats/org/bed-usage'
+  }
 ])
 
 const financeOverviewItems = computed(() => [
@@ -1684,9 +1925,32 @@ const portalFestivalEvents = computed(() => {
   }))
 })
 
+const portalBirthdayEvents = computed(() => birthdayRows.value
+  .slice(0, 300)
+  .map((item) => {
+    const date = item.nextBirthday ? dayjs(item.nextBirthday) : null
+    if (!date || !date.isValid()) return null
+    const urgency = Number(item.daysUntil || 9999) <= 0 ? 'EMERGENCY' : 'NORMAL'
+    return {
+      id: `portal-birthday-${item.elderId || item.elderName || item.nextBirthday}`,
+      title: `🎂 ${item.elderName || '老人生日'}`,
+      start: `${date.format('YYYY-MM-DD')}T09:00:00`,
+      end: `${date.format('YYYY-MM-DD')}T10:00:00`,
+      color: urgency === 'EMERGENCY' ? '#eb2f96' : '#f759ab',
+      extendedProps: {
+        calendarType: 'DAILY',
+        urgency,
+        assigneeName: '系统提醒',
+        collaboratorNames: '',
+        planCategory: '生日提醒'
+      }
+    }
+  })
+  .filter((item): item is NonNullable<typeof item> => !!item))
+
 const calendarOptions = computed(() => ({
   plugins: [dayGridPlugin, interactionPlugin],
-  initialView: 'dayGridMonth',
+  initialView: currentCalendarView.value,
   locale: 'zh-cn',
   height: 360,
   headerToolbar: {
@@ -1699,6 +1963,24 @@ const calendarOptions = computed(() => ({
     month: '月视图',
     dayGridWeek: '周视图',
     dayGridDay: '日视图'
+  },
+  datesSet: (arg: any) => {
+    const viewType = String(arg?.view?.type || '')
+    if (viewType === 'dayGridMonth' || viewType === 'dayGridWeek' || viewType === 'dayGridDay') {
+      currentCalendarView.value = viewType
+    }
+  },
+  eventDidMount: (arg: any) => {
+    const event = arg?.event
+    const taskType = calendarTypeText(event?.extendedProps?.calendarType)
+    const urgencyText = event?.extendedProps?.urgency === 'EMERGENCY' ? '紧急' : '常规'
+    const assigneeText = event?.extendedProps?.assigneeName || '-'
+    const collaboratorText = event?.extendedProps?.collaboratorNames || '-'
+    const planCategory = event?.extendedProps?.planCategory || '-'
+    arg?.el?.setAttribute?.(
+      'title',
+      `${event?.title || ''}\n类型：${taskType}\n紧急：${urgencyText}\n负责人：${assigneeText}\n协同：${collaboratorText}\n分类：${planCategory}`
+    )
   },
   dateClick: (arg: any) => {
     openCreateSchedule(dayjs(arg.dateStr))
@@ -1724,9 +2006,13 @@ const calendarOptions = computed(() => ({
         color: resolveTaskColor(task),
         extendedProps: {
           calendarType: task.calendarType || 'WORK',
-          urgency: task.urgency || 'NORMAL'
+          urgency: task.urgency || 'NORMAL',
+          assigneeName: task.assigneeName || '',
+          collaboratorNames: normalizeCollaboratorNames(task.collaboratorNames).join('、'),
+          planCategory: task.planCategory || ''
         }
       })),
+    ...portalBirthdayEvents.value,
     ...portalFestivalEvents.value
   ]
 }))
@@ -1735,6 +2021,29 @@ const todayAgenda = computed(() => buildAgendaByDate(dayjs()))
 const tomorrowAgenda = computed(() => buildAgendaByDate(dayjs().add(1, 'day')))
 const scheduleModalTitle = computed(() => (editingScheduleId.value ? '编辑行政日程' : '新增行政日程'))
 const selectedCalendarDateAgenda = computed(() => buildAgendaByDate(dayjs(selectedCalendarDateText.value)))
+const collaboratorTip = computed(() => {
+  if (scheduleForm.calendarType !== 'COLLAB') return ''
+  const deptCount = scheduleForm.collaboratorDeptIds.length
+  const staffCount = scheduleForm.collaboratorIds.length
+  if (!deptCount && !staffCount) return '未选择协同对象'
+  const previewText = collaboratorPreviewLoading.value
+    ? '正在计算同步人数'
+    : `预计同步 ${collaboratorPreviewTotal.value} 人`
+  const namesText = collaboratorPreviewNames.value.length ? `（${collaboratorPreviewNames.value.join('、')}）` : ''
+  return `已选 ${deptCount} 个部门、${staffCount} 位员工；${previewText}${namesText}，保存后自动展开并同步到协同日历`
+})
+
+const collaboratorDeltaTip = computed(() => {
+  if (scheduleForm.calendarType !== 'COLLAB' || editingScheduleId.value == null) return ''
+  const currentSet = new Set(scheduleForm.collaboratorIds)
+  const originalSet = new Set(originalCollaboratorIds.value)
+  const added = scheduleForm.collaboratorIds.filter((id) => !originalSet.has(id))
+  const removed = originalCollaboratorIds.value.filter((id) => !currentSet.has(id))
+  if (!added.length && !removed.length) return '协同成员未发生变化'
+  const addedText = added.length ? `新增 ${added.length} 人` : '新增 0 人'
+  const removedText = removed.length ? `移除 ${removed.length} 人` : '移除 0 人'
+  return `协同成员变更：${addedText}，${removedText}`
+})
 
 const calendarBuckets = computed(() => {
   const defs = [
@@ -1746,6 +2055,54 @@ const calendarBuckets = computed(() => {
   return defs.map((item) => ({
     ...item,
     count: calendarRows.value.filter((task) => (task.calendarType || 'WORK') === item.type).length
+  }))
+})
+
+const calendarInsights = computed(() => {
+  const todayText = dayjs().format('YYYY-MM-DD')
+  return [
+    { label: '今日', value: calendarRows.value.filter((task) => normalizeDateTimeValue(task.startTime || task.endTime)?.startsWith(todayText)).length, color: 'blue' },
+    { label: '紧急', value: calendarRows.value.filter((task) => task.urgency === 'EMERGENCY' && task.status !== 'DONE').length, color: 'red' },
+    { label: '已完成', value: calendarRows.value.filter((task) => task.status === 'DONE').length, color: 'default' },
+    { label: '节假日', value: portalFestivalEvents.value.length, color: 'orange' },
+    { label: '生日提醒', value: portalBirthdayEvents.value.length, color: 'magenta' }
+  ]
+})
+
+const calendarLoadLeaders = computed(() => {
+  const bucket = new Map<string, number>()
+  calendarRows.value
+    .filter((task) => task.status !== 'DONE')
+    .forEach((task) => {
+      const name = (task.assigneeName || '未分配').trim()
+      bucket.set(name, Number(bucket.get(name) || 0) + 1)
+    })
+  return Array.from(bucket.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([name, count]) => ({ name, count }))
+})
+
+const calendarWeeklyLoad = computed(() => {
+  const start = dayjs().startOf('week')
+  const list = Array.from({ length: 7 }).map((_, index) => {
+    const day = start.add(index, 'day')
+    const dayText = day.format('YYYY-MM-DD')
+    const count = calendarRows.value.filter((task) => {
+      if (task.status === 'DONE') return false
+      const startTime = normalizeDateTimeValue(task.startTime || task.endTime)
+      return startTime ? dayjs(startTime).format('YYYY-MM-DD') === dayText : false
+    }).length
+    return {
+      day: dayText,
+      label: ['日', '一', '二', '三', '四', '五', '六'][day.day()],
+      count
+    }
+  })
+  const max = list.reduce((acc, item) => Math.max(acc, item.count), 1)
+  return list.map((item) => ({
+    ...item,
+    height: Math.round((item.count / max) * 48)
   }))
 })
 
@@ -2021,6 +2378,7 @@ async function syncBirthdayTasks() {
     }
   }
   await refreshPortalModules(true)
+  if (createdCount > 0) emitCalendarSyncPulse('CREATE')
   message.success(createdCount > 0 ? `已同步 ${createdCount} 条生日提醒` : '生日提醒已是最新')
 }
 
@@ -2141,6 +2499,55 @@ function toggleCalendarType(type: 'PERSONAL' | 'WORK' | 'DAILY' | 'COLLAB') {
   visibleCalendarTypes.value = [type]
 }
 
+function showAllCalendarTypes() {
+  visibleCalendarTypes.value = ['PERSONAL', 'WORK', 'DAILY', 'COLLAB']
+}
+
+function normalizeVisibleTypes(input: unknown): Array<'PERSONAL' | 'WORK' | 'DAILY' | 'COLLAB'> {
+  const valid = ['PERSONAL', 'WORK', 'DAILY', 'COLLAB'] as const
+  if (!Array.isArray(input)) return [...valid]
+  const filtered = input.filter((item): item is typeof valid[number] => valid.includes(item as typeof valid[number]))
+  const deduped = Array.from(new Set(filtered))
+  return deduped.length ? deduped : [...valid]
+}
+
+function syncVisibleTypesFromStorage() {
+  try {
+    const raw = localStorage.getItem(VISIBLE_TYPES_STORAGE_KEY)
+    if (!raw) return
+    visibleCalendarTypes.value = normalizeVisibleTypes(JSON.parse(raw))
+  } catch {}
+}
+
+function syncCalendarViewFromStorage() {
+  try {
+    const raw = localStorage.getItem(CALENDAR_VIEW_STORAGE_KEY)
+    if (!raw) return
+    if (raw === 'dayGridMonth' || raw === 'dayGridWeek' || raw === 'dayGridDay') {
+      currentCalendarView.value = raw
+    }
+  } catch {}
+}
+
+function syncConflictPolicyFromStorage() {
+  try {
+    const raw = localStorage.getItem(CONFLICT_POLICY_STORAGE_KEY)
+    if (!raw) return
+    if (raw === 'WARN' || raw === 'BLOCK' || raw === 'ALLOW') {
+      conflictPolicy.value = raw
+    }
+  } catch {}
+}
+
+function emitCalendarSyncPulse(action: 'CREATE' | 'UPDATE' | 'DONE' | 'DELETE') {
+  try {
+    localStorage.setItem(CALENDAR_SYNC_PULSE_KEY, JSON.stringify({
+      action,
+      at: dayjs().format('YYYY-MM-DDTHH:mm:ss')
+    }))
+  } catch {}
+}
+
 function focusReminderCenter() {
   if (urgentReminderCount.value > 0) {
     reminderViewMode.value = 'urgent'
@@ -2164,6 +2571,15 @@ function calendarTypeText(value?: string) {
   return '部门工作'
 }
 
+function normalizeCollaboratorNames(input: string[] | string | undefined) {
+  if (!input) return [] as string[]
+  if (Array.isArray(input)) return input.filter((item) => !!item)
+  return String(input)
+    .split(',')
+    .map((item) => item.trim())
+    .filter((item) => !!item)
+}
+
 function normalizeDateTimeValue(value?: string) {
   if (!value) return undefined
   const normalized = String(value).replace(/\s*T\s*/g, 'T').trim()
@@ -2184,17 +2600,10 @@ function agendaTimeText(task: OaTask) {
 
 function buildAgendaByDate(target: Dayjs) {
   const dateText = target.format('YYYY-MM-DD')
-  return calendarRows.value
+  const taskItems = calendarRows.value
     .filter((task) => {
       const start = normalizeDateTimeValue(task.startTime || task.endTime)
       return start ? dayjs(start).format('YYYY-MM-DD') === dateText : false
-    })
-    .sort((a, b) => {
-      const left = normalizeDateTimeValue(a.startTime || a.endTime)
-      const right = normalizeDateTimeValue(b.startTime || b.endTime)
-      const leftTime = left ? dayjs(left).valueOf() : 0
-      const rightTime = right ? dayjs(right).valueOf() : 0
-      return leftTime - rightTime
     })
     .map((task) => ({
       id: String(task.id),
@@ -2203,8 +2612,50 @@ function buildAgendaByDate(target: Dayjs) {
       timeText: agendaTimeText(task),
       typeText: calendarTypeText(task.calendarType),
       assigneeText: task.assigneeName || '',
-      dateText
+      dateText,
+      readonly: false
     }))
+
+  const birthdayItems = visibleCalendarTypes.value.includes('DAILY')
+    ? portalBirthdayEvents.value
+    .filter((event) => dayjs(event.start).format('YYYY-MM-DD') === dateText)
+    .map((event) => ({
+      id: String(event.id),
+      title: String(event.title || '生日提醒'),
+      status: 'OPEN',
+      timeText: '09:00 - 10:00',
+      typeText: '日常计划',
+      assigneeText: '系统提醒',
+      dateText,
+      readonly: true
+    }))
+    : []
+
+  const festivalItems = visibleCalendarTypes.value.includes('DAILY')
+    ? portalFestivalEvents.value
+    .filter((event) => dayjs(event.start).format('YYYY-MM-DD') === dateText)
+    .map((event) => ({
+      id: String(event.id),
+      title: String(event.title || '节假日'),
+      status: 'OPEN',
+      timeText: '全天',
+      typeText: '日常计划',
+      assigneeText: '系统提醒',
+      dateText,
+      readonly: true
+    }))
+    : []
+
+  return [...taskItems, ...birthdayItems, ...festivalItems]
+    .sort((a, b) => {
+      const left = typeof a.timeText === 'string' && a.timeText.includes(':')
+        ? dayjs(`${a.dateText} ${a.timeText.slice(0, 5)}`).valueOf()
+        : dayjs(`${a.dateText} 00:00`).valueOf()
+      const right = typeof b.timeText === 'string' && b.timeText.includes(':')
+        ? dayjs(`${b.dateText} ${b.timeText.slice(0, 5)}`).valueOf()
+        : dayjs(`${b.dateText} 00:00`).valueOf()
+      return left - right
+    })
 }
 
 function focusCalendarDate(dateText: string) {
@@ -2275,6 +2726,126 @@ async function resolveCollaborators(departmentIds: string[], staffIds: string[])
   return {
     ids: Array.from(collaboratorMap.keys()),
     names: Array.from(collaboratorMap.values())
+  }
+}
+
+function buildConflictMessage(items: Array<{ title?: string; assigneeName?: string; startTime?: string; endTime?: string; reason?: string }>) {
+  return items
+    .slice(0, 6)
+    .map((item, index) => {
+      const start = item.startTime ? dayjs(item.startTime).format('MM-DD HH:mm') : '--'
+      const end = item.endTime ? dayjs(item.endTime).format('MM-DD HH:mm') : '--'
+      return `${index + 1}. ${item.title || '未命名日程'}（${start} ~ ${end}）${item.assigneeName ? ` [${item.assigneeName}]` : ''} - ${item.reason || '时间冲突'}`
+    })
+    .join('\n')
+}
+
+function conflictItemTimeText(item: { startTime?: string; endTime?: string }) {
+  const start = item.startTime ? dayjs(item.startTime).format('MM-DD HH:mm') : '--'
+  const end = item.endTime ? dayjs(item.endTime).format('MM-DD HH:mm') : '--'
+  return `${start} ~ ${end}`
+}
+
+function focusConflictDate(startTime?: string) {
+  const normalized = normalizeDateTimeValue(startTime)
+  if (!normalized) return
+  focusCalendarDate(dayjs(normalized).format('YYYY-MM-DD'))
+}
+
+function showAllCollaboratorPreview() {
+  if (!collaboratorPreviewAllNames.value.length) {
+    message.info('暂无协同成员')
+    return
+  }
+  Modal.info({
+    title: `协同成员清单（${collaboratorPreviewAllNames.value.length} 人）`,
+    content: collaboratorPreviewAllNames.value.join('、'),
+    width: 680
+  })
+}
+
+async function previewScheduleConflicts() {
+  if (!scheduleForm.startTime) {
+    message.warning('请先选择开始时间')
+    return
+  }
+  const collaboratorPayload = scheduleForm.calendarType === 'COLLAB'
+    ? await resolveCollaborators(scheduleForm.collaboratorDeptIds, scheduleForm.collaboratorIds)
+    : { ids: [] as string[], names: [] as string[] }
+  const payload = {
+    taskId: editingScheduleId.value || undefined,
+    startTime: dayjs(scheduleForm.startTime).format('YYYY-MM-DDTHH:mm:ss'),
+    endTime: scheduleForm.endTime ? dayjs(scheduleForm.endTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
+    assigneeName: scheduleForm.assigneeName || undefined,
+    collaboratorIds: collaboratorPayload.ids
+  }
+  conflictPreviewLoading.value = true
+  try {
+    const conflicts = await checkOaTaskConflicts(payload)
+    conflictPreviewItems.value = conflicts || []
+    if (!conflicts?.length) {
+      message.success('预检通过，未发现冲突')
+    }
+  } catch {
+    message.warning('冲突预检失败，请稍后重试')
+  } finally {
+    conflictPreviewLoading.value = false
+  }
+}
+
+async function confirmByConflicts(payload: { taskId?: string | number; startTime: string; endTime?: string; assigneeName?: string; collaboratorIds: string[] }) {
+  if (conflictPolicy.value === 'ALLOW') return true
+  try {
+    const conflicts = await checkOaTaskConflicts({
+      taskId: payload.taskId,
+      startTime: payload.startTime,
+      endTime: payload.endTime,
+      assigneeName: payload.assigneeName,
+      collaboratorIds: payload.collaboratorIds
+    })
+    conflictPreviewItems.value = conflicts || []
+    if (!conflicts?.length) return true
+    if (conflictPolicy.value === 'BLOCK') {
+      message.error(`检测到 ${conflicts.length} 条冲突，当前策略不允许保存`)
+      return false
+    }
+    return await new Promise<boolean>((resolve) => {
+      Modal.confirm({
+        title: `检测到 ${conflicts.length} 条潜在冲突`,
+        content: buildConflictMessage(conflicts),
+        okText: '仍然保存',
+        cancelText: '取消',
+        onOk: () => resolve(true),
+        onCancel: () => resolve(false)
+      })
+    })
+  } catch {
+    message.warning('冲突检测失败，已跳过冲突提示')
+    return true
+  }
+}
+
+let collaboratorPreviewSeq = 0
+async function refreshCollaboratorPreview() {
+  if (scheduleForm.calendarType !== 'COLLAB') {
+    collaboratorPreviewTotal.value = 0
+    collaboratorPreviewNames.value = []
+    collaboratorPreviewAllNames.value = []
+    collaboratorPreviewLoading.value = false
+    return
+  }
+  const currentSeq = ++collaboratorPreviewSeq
+  collaboratorPreviewLoading.value = true
+  try {
+    const result = await resolveCollaborators(scheduleForm.collaboratorDeptIds, scheduleForm.collaboratorIds)
+    if (currentSeq !== collaboratorPreviewSeq) return
+    collaboratorPreviewTotal.value = result.ids.length
+    collaboratorPreviewAllNames.value = result.names
+    collaboratorPreviewNames.value = result.names.slice(0, 6)
+  } finally {
+    if (currentSeq === collaboratorPreviewSeq) {
+      collaboratorPreviewLoading.value = false
+    }
   }
 }
 
@@ -3216,6 +3787,10 @@ function openCreateSchedule(date?: Dayjs) {
   scheduleForm.eventColor = resolveCalendarTypeColor(scheduleForm.calendarType, scheduleForm.urgency)
   scheduleForm.collaboratorDeptIds = []
   scheduleForm.collaboratorIds = []
+  originalCollaboratorIds.value = []
+  collaboratorPreviewNames.value = []
+  collaboratorPreviewAllNames.value = []
+  conflictPreviewItems.value = []
   scheduleForm.recurring = false
   scheduleForm.recurrenceRule = 'WEEKLY'
   scheduleForm.recurrenceInterval = 1
@@ -3246,6 +3821,9 @@ function openEditSchedule(id: string | number) {
     : typeof matched.collaboratorIds === 'string' && matched.collaboratorIds
       ? matched.collaboratorIds.split(',').map((item) => item.trim()).filter(Boolean)
       : []
+  originalCollaboratorIds.value = [...scheduleForm.collaboratorIds]
+  collaboratorPreviewAllNames.value = []
+  conflictPreviewItems.value = []
   scheduleForm.recurring = false
   scheduleForm.recurrenceRule = 'WEEKLY'
   scheduleForm.recurrenceInterval = 1
@@ -3273,6 +3851,16 @@ async function submitSchedule() {
   const collaboratorPayload = scheduleForm.calendarType === 'COLLAB'
     ? await resolveCollaborators(scheduleForm.collaboratorDeptIds, scheduleForm.collaboratorIds)
     : { ids: [] as string[], names: [] as string[] }
+  const firstStart = dayjs(scheduleForm.startTime).format('YYYY-MM-DDTHH:mm:ss')
+  const firstEnd = scheduleForm.endTime ? dayjs(scheduleForm.endTime).format('YYYY-MM-DDTHH:mm:ss') : undefined
+  const canContinue = await confirmByConflicts({
+    taskId: editingScheduleId.value || undefined,
+    startTime: firstStart,
+    endTime: firstEnd,
+    assigneeName: scheduleForm.assigneeName || undefined,
+    collaboratorIds: collaboratorPayload.ids
+  })
+  if (!canContinue) return
   const repeatCount = scheduleForm.recurring ? Math.max(1, Number(scheduleForm.recurrenceCount || 1)) : 1
   const repeatRule = scheduleForm.recurrenceRule
   const repeatInterval = Math.max(1, Number(scheduleForm.recurrenceInterval || 1))
@@ -3296,7 +3884,9 @@ async function submitSchedule() {
       upsertCalendarTask(updated)
       scheduleOpen.value = false
       editingScheduleId.value = null
+      conflictPreviewItems.value = []
       await refreshAfterCalendarChange()
+      emitCalendarSyncPulse('UPDATE')
       message.success('日程已更新')
       return
     }
@@ -3332,7 +3922,9 @@ async function submitSchedule() {
     })
     scheduleOpen.value = false
     editingScheduleId.value = null
+    conflictPreviewItems.value = []
     await refreshAfterCalendarChange()
+    emitCalendarSyncPulse('CREATE')
     message.success(scheduleForm.recurring ? `已生成 ${tasks.length} 条周期日程` : '日程已新增')
   } finally {
     scheduleSaving.value = false
@@ -3356,6 +3948,7 @@ function markScheduleDone(id: string | number) {
         }
       }
       await refreshAfterCalendarChange()
+      emitCalendarSyncPulse('DONE')
       message.success('已标记完成')
     }
   })
@@ -3369,6 +3962,7 @@ function removeSchedule(id: string | number) {
       await deleteOaTask(id)
       removeCalendarTaskById(id)
       await refreshAfterCalendarChange()
+      emitCalendarSyncPulse('DELETE')
       message.success('已删除')
     }
   })
@@ -3499,6 +4093,7 @@ async function init() {
     loadCustomCards()
     loadReminderState()
     loadAutoSyncSetting()
+    await loadThresholdConfig()
     updateSearchOptions(searchKeyword.value)
     await Promise.all([loadStaffOptions(), loadDepartmentOptions()])
     await refreshPortalModules(true, '初始化加载')
@@ -3525,6 +4120,59 @@ watch(autoSyncEnabled, (value) => {
     refreshPortalModules(true, '自动刷新开启').catch(() => {})
   }
 })
+
+watch(
+  () => visibleCalendarTypes.value,
+  (value) => {
+    try {
+      localStorage.setItem(VISIBLE_TYPES_STORAGE_KEY, JSON.stringify(value))
+    } catch {}
+  },
+  { deep: true }
+)
+
+watch(
+  () => currentCalendarView.value,
+  (value) => {
+    try {
+      localStorage.setItem(CALENDAR_VIEW_STORAGE_KEY, value)
+    } catch {}
+  }
+)
+
+watch(
+  () => conflictPolicy.value,
+  (value) => {
+    try {
+      localStorage.setItem(CONFLICT_POLICY_STORAGE_KEY, value)
+    } catch {}
+  }
+)
+
+watch(
+  () => [
+    scheduleForm.calendarType,
+    scheduleForm.collaboratorDeptIds.join(','),
+    scheduleForm.collaboratorIds.join(',')
+  ],
+  () => {
+    refreshCollaboratorPreview().catch(() => {})
+  },
+  { immediate: true }
+)
+
+watch(
+  () => [
+    scheduleForm.startTime ? dayjs(scheduleForm.startTime).format('YYYY-MM-DDTHH:mm:ss') : '',
+    scheduleForm.endTime ? dayjs(scheduleForm.endTime).format('YYYY-MM-DDTHH:mm:ss') : '',
+    scheduleForm.assigneeName,
+    scheduleForm.collaboratorIds.join(','),
+    scheduleForm.collaboratorDeptIds.join(',')
+  ],
+  () => {
+    conflictPreviewItems.value = []
+  }
+)
 
 watch(riskReminders, (list) => {
   let changed = false
@@ -3556,6 +4204,9 @@ watch(riskReminders, (list) => {
 }, { deep: true })
 
 onMounted(() => {
+  syncVisibleTypesFromStorage()
+  syncCalendarViewFromStorage()
+  syncConflictPolicyFromStorage()
   init()
   if (portalSyncTimer) window.clearInterval(portalSyncTimer)
   portalSyncTimer = window.setInterval(() => {
@@ -3566,12 +4217,37 @@ onMounted(() => {
     if (!document.hidden && autoSyncEnabled.value) refreshPortalModules(true, '回到页面').catch(() => {})
   }
   document.addEventListener('visibilitychange', portalVisibleHandler)
+  calendarStorageHandler = (event: StorageEvent) => {
+    if (event.key === thresholdPulseKey()) {
+      loadThresholdConfig().catch(() => {})
+      message.info('阈值配置已由其他页面更新')
+      return
+    }
+    if (event.key === VISIBLE_TYPES_STORAGE_KEY) {
+      syncVisibleTypesFromStorage()
+      return
+    }
+    if (event.key === CALENDAR_VIEW_STORAGE_KEY) {
+      syncCalendarViewFromStorage()
+      return
+    }
+    if (event.key === CONFLICT_POLICY_STORAGE_KEY) {
+      syncConflictPolicyFromStorage()
+      return
+    }
+    if (event.key === CALENDAR_SYNC_PULSE_KEY) {
+      refreshPortalModules(true, '跨页面同步').catch(() => {})
+    }
+  }
+  window.addEventListener('storage', calendarStorageHandler)
 })
 
 onBeforeUnmount(() => {
   if (portalSyncTimer) window.clearInterval(portalSyncTimer)
   if (portalVisibleHandler) document.removeEventListener('visibilitychange', portalVisibleHandler)
+  if (calendarStorageHandler) window.removeEventListener('storage', calendarStorageHandler)
   portalVisibleHandler = null
+  calendarStorageHandler = null
 })
 </script>
 
@@ -3941,7 +4617,36 @@ onBeforeUnmount(() => {
 }
 
 .calendar-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   margin-bottom: 10px;
+}
+
+.calendar-insights {
+  margin-bottom: 2px;
+}
+
+.calendar-loads {
+  margin-bottom: 2px;
+}
+
+.calendar-week-trend {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.calendar-week-bar {
+  min-width: 16px;
+  padding: 2px 4px;
+  border-radius: 6px 6px 2px 2px;
+  background: linear-gradient(180deg, #91caff 0%, #1677ff 100%);
+  color: #fff;
+  font-size: 11px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
 }
 
 .calendar-title-tip {

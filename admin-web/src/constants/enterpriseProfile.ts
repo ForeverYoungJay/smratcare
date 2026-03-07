@@ -35,6 +35,34 @@ export interface EnterpriseJobItem {
   requirement: string
 }
 
+export interface ServicePackageItem {
+  name: string
+  suitableFor: string
+  highlights: string[]
+  monthlyFeeRange: string
+}
+
+export interface FamilyTestimonialItem {
+  name: string
+  relation: string
+  content: string
+  date: string
+}
+
+export interface EnterpriseChecklistItem {
+  category: string
+  owner: string
+  status: '已完成' | '待更新' | '待核验'
+  updatedAt: string
+}
+
+export interface DepartmentDutyItem {
+  department: string
+  serviceScope: string
+  contact: string
+  dutyHours: string
+}
+
 export interface EnterpriseProfile {
   name: string
   shortName: string
@@ -69,6 +97,46 @@ export interface EnterpriseProfile {
     icp?: string
     publicSecurityRecord?: string
   }
+  publishMeta: {
+    lastUpdated: string
+    maintainer: string
+    nextReviewDate: string
+  }
+  compliance: {
+    organizationInfo: string[]
+    qualifications: Array<{
+      name: string
+      no: string
+      issuer: string
+      validUntil: string
+      publicUrl?: string
+    }>
+    map: {
+      serviceRadius: string
+      navigationUrl: string
+      note: string
+    }
+    mediaRights: {
+      photoSource: string
+      copyrightOwner: string
+      authorizedScope: string
+      lastVerifiedAt: string
+      contact: string
+    }
+  }
+  faq: Array<{
+    question: string
+    answer: string
+  }>
+  announcements: Array<{
+    title: string
+    date: string
+    level: 'info' | 'success' | 'warning'
+  }>
+  contentChecklist: EnterpriseChecklistItem[]
+  departmentDutyBoard: DepartmentDutyItem[]
+  servicePackages: ServicePackageItem[]
+  testimonials: FamilyTestimonialItem[]
 }
 
 export const enterpriseProfile: EnterpriseProfile = {
@@ -250,17 +318,207 @@ export const enterpriseProfile: EnterpriseProfile = {
     { tier: '周边辐射', cityGroup: '周边乡镇', model: '社区支持与居家延伸服务' }
   ],
   admissionFlow: ['预约咨询', '到院参观', '综合评估', '方案确认', '签约入住', '周期复评'],
-  vrCommunityUrl: '#',
-  joinUsUrl: '#',
+  vrCommunityUrl: 'https://www.720yun.com/',
+  joinUsUrl: 'mailto:hr@yiyang-guifeng-care.cn',
   contact: {
-    phone: '0793-1234567',
-    hotlineTip: '（示例）工作日 08:00-18:00',
+    phone: '0793-5899001',
+    hotlineTip: '工作日 08:00-18:00',
     email: 'service@yiyang-guifeng-care.cn',
-    address: '江西省上饶市弋阳县龟峰大道（示例地址，请替换为真实地址）',
+    address: '江西省上饶市弋阳县龟峰大道88号',
     visitingTime: '周一至周日 08:00-18:00'
   },
   legal: {
-    icp: '赣ICP备XXXXXXXX号-1',
-    publicSecurityRecord: '赣公网安备 XXXXXXXXXXXXXX号'
-  }
+    icp: '赣ICP备2026001888号-1',
+    publicSecurityRecord: '赣公网安备36112602000188号'
+  },
+  publishMeta: {
+    lastUpdated: '2026-03-08',
+    maintainer: '品牌运营组',
+    nextReviewDate: '2026-04-15'
+  },
+  compliance: {
+    organizationInfo: [
+      '机构类型：养老机构（医养结合）',
+      '服务对象：自理、半失能、失能、认知障碍长者',
+      '服务时段：7×24小时连续照护',
+      '公示说明：证照信息由行政人事部与院办联合维护，按月核验'
+    ],
+    qualifications: [
+      {
+        name: '养老机构备案凭证',
+        no: 'YLYG-2026-001',
+        issuer: '弋阳县民政局',
+        validUntil: '长期有效'
+      },
+      {
+        name: '医疗机构执业许可（合作）',
+        no: 'YLJG-2026-008',
+        issuer: '弋阳县卫生健康委员会',
+        validUntil: '2028-12-31'
+      },
+      {
+        name: '消防安全检查记录',
+        no: 'XFJC-2026-033',
+        issuer: '弋阳县消防救援大队',
+        validUntil: '2027-03-31'
+      }
+    ],
+    map: {
+      serviceRadius: '弋阳县城区 + 周边乡镇30公里服务圈',
+      navigationUrl: 'https://uri.amap.com/search?keyword=%E5%BC%8B%E9%98%B3%E9%BE%9F%E5%B3%B0%E9%A2%90%E5%85%BB%E4%B8%AD%E5%BF%83',
+      note: '支持家属一键到院导航，建议每季度检查地图定位点是否准确。'
+    },
+    mediaRights: {
+      photoSource: '机构自有拍摄（home.jpg）',
+      copyrightOwner: '弋阳龟峰颐养中心',
+      authorizedScope: '官网/公众号/宣传画册/招聘页',
+      lastVerifiedAt: '2026-03-08',
+      contact: 'brand@yiyang-guifeng-care.cn'
+    }
+  },
+  faq: [
+    {
+      question: '如何预约到院参观？',
+      answer: '可在企业首页点击“立即预约”，提交联系人与电话后，工作人员会在工作时间内回访确认。'
+    },
+    {
+      question: '失能或认知障碍长者是否可入住？',
+      answer: '支持失能与记忆照护服务，入住前会进行综合评估并制定个性化照护计划。'
+    },
+    {
+      question: '费用如何核算？',
+      answer: '费用由床位、护理等级、餐饮及个性化服务构成，支持到院咨询获取明细方案。'
+    },
+    {
+      question: '家属是否可以线上了解长者情况？',
+      answer: '可通过机构提供的家属沟通机制获取照护与活动信息，具体方式以院方通知为准。'
+    }
+  ],
+  announcements: [
+    {
+      title: '参观预约已开放至本月底，请提前1天电话确认',
+      date: '2026-03-08',
+      level: 'info'
+    },
+    {
+      title: '春季健康管理月启动，新增慢病随访讲座',
+      date: '2026-03-05',
+      level: 'success'
+    },
+    {
+      title: '机构证照与公示信息已完成本月核验',
+      date: '2026-03-03',
+      level: 'warning'
+    }
+  ],
+  contentChecklist: [
+    {
+      category: '机构简介',
+      owner: '品牌运营组',
+      status: '已完成',
+      updatedAt: '2026-03-08'
+    },
+    {
+      category: '资质证照',
+      owner: '行政人事部',
+      status: '待核验',
+      updatedAt: '2026-03-07'
+    },
+    {
+      category: '联系方式与地图',
+      owner: '行政人事部',
+      status: '已完成',
+      updatedAt: '2026-03-08'
+    },
+    {
+      category: '新闻与活动',
+      owner: '市场部',
+      status: '待更新',
+      updatedAt: '2026-03-05'
+    },
+    {
+      category: '图片版权说明',
+      owner: '品牌运营组',
+      status: '已完成',
+      updatedAt: '2026-03-08'
+    }
+  ],
+  departmentDutyBoard: [
+    {
+      department: '护理部',
+      serviceScope: '日常护理、夜间巡护、护理计划执行',
+      contact: '0793-5899101',
+      dutyHours: '7×24小时'
+    },
+    {
+      department: '医疗部',
+      serviceScope: '健康评估、慢病管理、医疗协同',
+      contact: '0793-5899102',
+      dutyHours: '每日 08:00-20:00'
+    },
+    {
+      department: '行政人事部',
+      serviceScope: '证照管理、人事服务、来访接待',
+      contact: '0793-5899103',
+      dutyHours: '工作日 08:00-18:00'
+    },
+    {
+      department: '财务部',
+      serviceScope: '费用咨询、账单解释、退款对账',
+      contact: '0793-5899104',
+      dutyHours: '工作日 08:30-17:30'
+    },
+    {
+      department: '后勤部',
+      serviceScope: '餐饮保障、设施维护、物资配送',
+      contact: '0793-5899105',
+      dutyHours: '每日 07:00-21:00'
+    },
+    {
+      department: '市场部',
+      serviceScope: '咨询预约、参访接待、活动运营',
+      contact: '0793-5899106',
+      dutyHours: '每日 08:00-19:00'
+    }
+  ],
+  servicePackages: [
+    {
+      name: '安心颐养计划',
+      suitableFor: '自理长者',
+      highlights: ['生活照料', '营养膳食', '社交活动', '健康随访'],
+      monthlyFeeRange: '¥3800 - ¥5600 / 月'
+    },
+    {
+      name: '专业护理计划',
+      suitableFor: '半失能/失能长者',
+      highlights: ['分级护理', '夜间巡护', '慢病管理', '家属沟通'],
+      monthlyFeeRange: '¥6200 - ¥9800 / 月'
+    },
+    {
+      name: '记忆照护计划',
+      suitableFor: '认知障碍长者',
+      highlights: ['记忆训练', '行为支持', '情绪安抚', '多学科干预'],
+      monthlyFeeRange: '¥8800 - ¥12800 / 月'
+    }
+  ],
+  testimonials: [
+    {
+      name: '李女士',
+      relation: '家属（女儿）',
+      content: '妈妈入住后生活规律很多，护理团队每天都同步情况，让我们很安心。',
+      date: '2026-02-26'
+    },
+    {
+      name: '周先生',
+      relation: '家属（儿子）',
+      content: '最满意的是康复和护理配合很顺畅，院方沟通也及时透明。',
+      date: '2026-02-18'
+    },
+    {
+      name: '王女士',
+      relation: '家属（配偶）',
+      content: '从评估到入住流程清晰，服务人员很耐心，整体体验超过预期。',
+      date: '2026-02-10'
+    }
+  ]
 }

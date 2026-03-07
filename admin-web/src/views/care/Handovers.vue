@@ -15,6 +15,8 @@
           <a-space>
             <a-button type="primary" @click="search">查询</a-button>
             <a-button @click="reset">重置</a-button>
+            <a-button @click="exportCsvData" :loading="exporting">导出CSV</a-button>
+            <a-button @click="exportExcelData" :loading="exporting">导出Excel</a-button>
             <a-button type="primary" @click="openModal()">新增交接日志</a-button>
           </a-space>
         </a-form-item>
@@ -26,6 +28,7 @@
         :data-source="rows"
         :loading="loading"
         :pagination="pagination"
+        :row-class-name="resolveRowClassName"
         @change="onTableChange"
       >
         <template #bodyCell="{ column, record }">
@@ -137,17 +140,22 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import dayjs from 'dayjs'
 import { message, Modal } from 'ant-design-vue'
 import type { FormInstance } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { useStaffOptions } from '../../composables/useStaffOptions'
 import { createShiftHandover, deleteShiftHandover, getShiftHandoverPage, updateShiftHandover } from '../../api/nursing'
+import { handoverExportColumns, mapCareExportRows } from '../../constants/careExport'
+import { exportCsv, exportExcel } from '../../utils/export'
+import { getHandoverRiskKeywords, syncMedicalAlertRules } from '../../utils/medicalAlertRule'
 import { uploadOaFile } from '../../api/oa'
 import type { PageResult, ShiftHandoverItem } from '../../types'
 import { resolveCareError } from './careError'
 
 const rows = ref<ShiftHandoverItem[]>([])
 const loading = ref(false)
+const exporting = ref(false)
 const modalOpen = ref(false)
 const submitting = ref(false)
 const uploadingAttachment = ref(false)
@@ -273,6 +281,10 @@ async function submit() {
   try {
     await formRef.value?.validate()
     submitting.value = true
+    const normalizedStatus = form.status || 'DRAFT'
+    const nowIso = dayjs().format('YYYY-MM-DDTHH:mm:ss')
+    const handoverTime = toIsoDateTime(form.handoverTime) || (normalizedStatus === 'HANDED_OVER' || normalizedStatus === 'CONFIRMED' ? nowIso : undefined)
+    const confirmTime = toIsoDateTime(form.confirmTime) || (normalizedStatus === 'CONFIRMED' ? nowIso : undefined)
     const payload: Partial<ShiftHandoverItem> = {
       dutyDate: form.dutyDate,
       shiftCode: form.shiftCode,
@@ -281,9 +293,9 @@ async function submit() {
       summary: form.onDutySummary || form.summary,
       riskNote: form.attentionNote || form.riskNote,
       todoNote: form.todoNote,
-      status: form.status,
-      handoverTime: toIsoDateTime(form.handoverTime),
-      confirmTime: toIsoDateTime(form.confirmTime),
+      status: normalizedStatus,
+      handoverTime,
+      confirmTime,
       attachmentUrls: serializeAttachments(attachmentFiles.value)
     }
     if (form.id) {
@@ -338,6 +350,26 @@ function reset() {
   load()
 }
 
+async function exportCsvData() {
+  const records = await loadExportRecords()
+  if (!records.length) {
+    message.warning('暂无可导出数据')
+    return
+  }
+  exportCsv(records, `交接日志-${dayjs().format('YYYYMMDD-HHmmss')}.csv`)
+  message.success('CSV导出成功')
+}
+
+async function exportExcelData() {
+  const records = await loadExportRecords()
+  if (!records.length) {
+    message.warning('暂无可导出数据')
+    return
+  }
+  exportExcel(records, `交接日志-${dayjs().format('YYYYMMDD-HHmmss')}.xls`)
+  message.success('Excel导出成功')
+}
+
 async function load() {
   loading.value = true
   try {
@@ -369,6 +401,11 @@ async function load() {
 function toIsoDateTime(value?: string) {
   if (!value) return undefined
   return value.replace(' ', 'T')
+}
+
+function formatDateTime(value?: string) {
+  if (!value) return '-'
+  return dayjs(toIsoDateTime(value)).format('YYYY-MM-DD HH:mm:ss')
 }
 
 function parseAttachments(value?: string) {
@@ -422,6 +459,57 @@ function removeAttachment(index: number) {
   attachmentFiles.value.splice(index, 1)
 }
 
+function resolveRowClassName(record: ShiftHandoverItem) {
+  const noteText = `${record.riskNote || record.attentionNote || ''} ${record.todoNote || ''}`
+  const riskKeywords = getHandoverRiskKeywords()
+  if (record.status === 'HANDED_OVER' && !record.confirmTime) {
+    return 'handover-row-warning'
+  }
+  if (riskKeywords.some((keyword) => noteText.includes(keyword))) {
+    return 'handover-row-danger'
+  }
+  return ''
+}
+
+async function loadExportRecords() {
+  exporting.value = true
+  try {
+    const pageSize = 500
+    let pageNo = 1
+    let total = 0
+    const list: ShiftHandoverItem[] = []
+    do {
+      const page = await getShiftHandoverPage({
+        pageNo,
+        pageSize,
+        dateFrom: query.range?.[0],
+        dateTo: query.range?.[1],
+        shiftCode: query.shiftCode,
+        status: query.status
+      }) as PageResult<ShiftHandoverItem>
+      total = page.total || 0
+      list.push(...(page.list || []))
+      pageNo += 1
+      if (!page.list || page.list.length < pageSize) break
+    } while (list.length < total && pageNo <= 20)
+    return mapCareExportRows(
+      list.map((item) => ({
+        ...item,
+        status: statusLabel(item.status),
+        handoverTime: formatDateTime(item.handoverTime),
+        confirmTime: formatDateTime(item.confirmTime),
+        attachmentUrls: parseAttachments(item.attachmentUrls).map((file) => file.url).join('；')
+      })),
+      handoverExportColumns
+    )
+  } catch (error) {
+    message.error(resolveCareError(error, '加载导出数据失败'))
+    return []
+  } finally {
+    exporting.value = false
+  }
+}
+
 async function beforeUploadAttachment(file: File) {
   const maxSizeMb = 10
   if (attachmentFiles.value.length >= 10) {
@@ -455,6 +543,7 @@ async function beforeUploadAttachment(file: File) {
 
 load()
 searchStaff('')
+syncMedicalAlertRules().catch(() => {})
 </script>
 
 <style scoped>
@@ -465,5 +554,11 @@ searchStaff('')
   margin-top: 6px;
   color: #64748b;
   font-size: 12px;
+}
+:deep(.handover-row-warning > td) {
+  background: #fff7e6 !important;
+}
+:deep(.handover-row-danger > td) {
+  background: #fff1f0 !important;
 }
 </style>

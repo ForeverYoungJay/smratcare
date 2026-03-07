@@ -552,6 +552,7 @@ public class StatisticsController {
       @RequestParam(required = false) @Pattern(regexp = DATE_PATTERN, message = "fromDate must be YYYY-MM-DD") String fromDate,
       @RequestParam(required = false) @Pattern(regexp = DATE_PATTERN, message = "toDate must be YYYY-MM-DD") String toDate,
       @RequestParam(required = false) String eventType,
+      @RequestParam(required = false) @Min(1) Long elderId,
       @RequestParam(required = false) String keyword,
       @RequestParam(defaultValue = "1") @Min(1) long pageNo,
       @RequestParam(defaultValue = "20") @Min(1) @Max(200) long pageSize,
@@ -561,7 +562,9 @@ public class StatisticsController {
     LocalDate start = parseDate(fromDate, end.minusDays(29));
     validateDateRange(start, end, 366);
 
-    List<FlowReportItem> filtered = buildFlowRows(scopedOrgId, start, end, eventType, keyword);
+    List<FlowReportItem> filtered = buildFlowRows(scopedOrgId, start, end, eventType, elderId, keyword);
+    long admissionCount = filtered.stream().filter(item -> "ADMISSION".equals(item.getEventType())).count();
+    long dischargeCount = filtered.stream().filter(item -> "DISCHARGE".equals(item.getEventType())).count();
     long total = filtered.size();
     int startIndex = (int) Math.max((pageNo - 1) * pageSize, 0);
     int endIndex = (int) Math.min(startIndex + pageSize, total);
@@ -572,6 +575,8 @@ public class StatisticsController {
     response.setTotal(total);
     response.setPageNo(pageNo);
     response.setPageSize(pageSize);
+    response.setAdmissionCount(admissionCount);
+    response.setDischargeCount(dischargeCount);
     return Result.ok(response);
   }
 
@@ -580,6 +585,7 @@ public class StatisticsController {
       @RequestParam(required = false) @Pattern(regexp = DATE_PATTERN, message = "fromDate must be YYYY-MM-DD") String fromDate,
       @RequestParam(required = false) @Pattern(regexp = DATE_PATTERN, message = "toDate must be YYYY-MM-DD") String toDate,
       @RequestParam(required = false) String eventType,
+      @RequestParam(required = false) @Min(1) Long elderId,
       @RequestParam(required = false) String keyword,
       @RequestParam(required = false) Long orgId) {
     Long scopedOrgId = resolveAccessibleOrgId(orgId);
@@ -587,7 +593,7 @@ public class StatisticsController {
     LocalDate start = parseDate(fromDate, end.minusDays(29));
     validateDateRange(start, end, 366);
 
-    List<FlowReportItem> rows = buildFlowRows(scopedOrgId, start, end, eventType, keyword);
+    List<FlowReportItem> rows = buildFlowRows(scopedOrgId, start, end, eventType, elderId, keyword);
     List<String> headers = List.of("日期", "事件类型", "老人ID", "老人姓名", "备注");
     List<List<String>> body = rows.stream()
         .map(item -> List.of(
@@ -690,7 +696,8 @@ public class StatisticsController {
     return result;
   }
 
-  private List<FlowReportItem> buildFlowRows(Long orgId, LocalDate start, LocalDate end, String eventType, String keyword) {
+  private List<FlowReportItem> buildFlowRows(
+      Long orgId, LocalDate start, LocalDate end, String eventType, Long elderId, String keyword) {
     String normalizedType = normalizeEventType(eventType);
     List<FlowReportItem> rows = new ArrayList<>();
 
@@ -699,6 +706,7 @@ public class StatisticsController {
           Wrappers.lambdaQuery(ElderAdmission.class)
               .eq(ElderAdmission::getIsDeleted, 0)
               .eq(orgId != null, ElderAdmission::getOrgId, orgId)
+              .eq(elderId != null, ElderAdmission::getElderId, elderId)
               .ge(ElderAdmission::getAdmissionDate, start)
               .le(ElderAdmission::getAdmissionDate, end));
       for (ElderAdmission item : admissions) {
@@ -715,6 +723,7 @@ public class StatisticsController {
           Wrappers.lambdaQuery(ElderDischarge.class)
               .eq(ElderDischarge::getIsDeleted, 0)
               .eq(orgId != null, ElderDischarge::getOrgId, orgId)
+              .eq(elderId != null, ElderDischarge::getElderId, elderId)
               .ge(ElderDischarge::getDischargeDate, start)
               .le(ElderDischarge::getDischargeDate, end));
       for (ElderDischarge item : discharges) {
@@ -1170,5 +1179,7 @@ public class StatisticsController {
     private Long total;
     private Long pageNo;
     private Long pageSize;
+    private Long admissionCount;
+    private Long dischargeCount;
   }
 }
