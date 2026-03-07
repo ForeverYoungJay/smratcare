@@ -24,7 +24,7 @@
       </template>
     </SearchForm>
 
-    <a-card class="card-elevated" :bordered="false">
+    <a-card class="card-elevated calendar-surface" :bordered="false">
       <div class="calendar-toolbar">
         <div>
           <div class="calendar-title-tip">日历分层：个人、部门工作、日常计划、协同日历（与首页一致）</div>
@@ -1299,7 +1299,11 @@ useLiveSyncRefresh({
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f7fbff 0%, #eef6ff 100%);
 }
 
 .calendar-title-tip {
@@ -1367,5 +1371,53 @@ useLiveSyncRefresh({
 .readonly-tip {
   color: #64748b;
   font-size: 12px;
+}
+
+.calendar-surface :deep(.fc) {
+  --fc-border-color: #e2e8f0;
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: #f8fafc;
+  --fc-event-border-color: transparent;
+}
+
+.calendar-surface :deep(.fc .fc-toolbar.fc-header-toolbar) {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  background: #f8fbff;
+}
+
+.calendar-surface :deep(.fc .fc-button) {
+  border-radius: 999px;
+  border: 1px solid #bfdbfe;
+  background: #ffffff;
+  color: #1e3a8a;
+  box-shadow: none;
+}
+
+.calendar-surface :deep(.fc .fc-button:hover) {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.calendar-surface :deep(.fc .fc-col-header-cell-cushion) {
+  color: #334155;
+  font-weight: 600;
+}
+
+.calendar-surface :deep(.fc .fc-daygrid-day-number) {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.calendar-surface :deep(.fc .fc-daygrid-day.fc-day-today) {
+  background: rgba(219, 234, 254, 0.56);
+}
+
+.calendar-surface :deep(.fc .fc-daygrid-event) {
+  border-radius: 8px;
+  padding: 1px 4px;
+  box-shadow: 0 2px 8px rgba(30, 64, 175, 0.14);
 }
 </style>

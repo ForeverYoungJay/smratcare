@@ -237,10 +237,11 @@
   <a-drawer
     v-model:open="quickChatOpen"
     title="快捷聊天"
-    width="860"
+    :width="quickChatDrawerWidth"
     placement="right"
+    class="quick-chat-drawer"
   >
-      <a-space style="margin-bottom: 10px;">
+      <a-space wrap class="quick-chat-top-actions">
         <a-button type="primary" @click="openCreateQuickChatRoom">发起群聊申请</a-button>
         <a-button :disabled="!activeQuickChatRoom" @click="openInviteQuickChat">邀请部门/成员</a-button>
         <a-button :disabled="!activeQuickChatRoom" @click="openRenameQuickChatRoom">重命名会话</a-button>
@@ -843,6 +844,7 @@ const quickChatOpen = ref(false)
 const quickChatRooms = ref<QuickChatRoom[]>([])
 const activeQuickChatRoomId = ref('')
 const quickChatDraft = ref('')
+const quickChatDrawerWidth = ref(860)
 const quickChatRoomEditorOpen = ref(false)
 const quickChatRoomEditorMode = ref<'create' | 'invite' | 'rename'>('create')
 const quickChatNoticeOpen = ref(false)
@@ -1763,6 +1765,15 @@ function onIndirectLeaderChange(value?: string) {
 
 function searchLeaderOptions(keyword: string) {
   searchStaff(keyword || '').catch(() => {})
+}
+
+function updateQuickChatDrawerWidth() {
+  const viewport = typeof window !== 'undefined' ? window.innerWidth : 1280
+  if (viewport <= 768) {
+    quickChatDrawerWidth.value = Math.max(320, viewport - 12)
+    return
+  }
+  quickChatDrawerWidth.value = Math.max(640, Math.min(980, viewport - 56))
 }
 
 function quickChatStorageKey() {
@@ -3142,6 +3153,7 @@ function setupQuickChatTodoEscalationTimer() {
 }
 
 onMounted(() => {
+  updateQuickChatDrawerWidth()
   hydrateCurrentStaffInfo()
     .then(() => Promise.allSettled([searchDepartments(''), searchStaff('')]))
     .then(() => {
@@ -3173,6 +3185,7 @@ onMounted(() => {
   })
   setupQuickChatTodoEscalationTimer()
   window.setTimeout(() => runAutoEscalationIfNeeded(), 800)
+  window.addEventListener('resize', updateQuickChatDrawerWidth)
   window.addEventListener('storage', onQuickChatStorageChange)
   document.addEventListener('click', closeTabContextMenu)
 })
@@ -3187,6 +3200,7 @@ onBeforeUnmount(() => {
     window.clearInterval(quickChatTodoEscalationTimer)
     quickChatTodoEscalationTimer = undefined
   }
+  window.removeEventListener('resize', updateQuickChatDrawerWidth)
   window.removeEventListener('storage', onQuickChatStorageChange)
   document.removeEventListener('click', closeTabContextMenu)
 })
@@ -3434,7 +3448,19 @@ function onQuickChatStorageChange(event: StorageEvent) {
   display: grid;
   grid-template-columns: 240px 1fr;
   gap: 12px;
-  min-height: 520px;
+  min-height: 0;
+  max-height: calc(100vh - 180px);
+}
+
+.quick-chat-top-actions {
+  width: 100%;
+  display: flex;
+}
+
+.quick-chat-drawer :deep(.ant-drawer-body) {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .quick-chat-room-list {
@@ -3442,6 +3468,7 @@ function onQuickChatStorageChange(event: StorageEvent) {
   border-radius: 12px;
   background: #fff;
   overflow: auto;
+  max-height: 100%;
 }
 
 .quick-chat-room-search {
@@ -3505,6 +3532,7 @@ function onQuickChatStorageChange(event: StorageEvent) {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
 }
 
 .quick-chat-notice {
@@ -3631,7 +3659,7 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
   .quick-chat-layout {
     grid-template-columns: 1fr;
-    min-height: unset;
+    max-height: calc(100vh - 210px);
   }
 
   .quick-chat-room-list {

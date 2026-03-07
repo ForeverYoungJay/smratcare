@@ -111,22 +111,24 @@
               v-if="isModuleVisible('reminder')"
               ref="reminderCardRef"
               :bordered="false"
-              class="card-elevated full-height module-card"
+              class="card-elevated full-height module-card reminder-card"
               :style="moduleCardStyle('reminder')"
               title="2️⃣ 提醒中心（系统预警）"
             >
               <template #extra>
-                <a-space size="small" wrap>
+                <div class="reminder-extra">
                   <a-radio-group v-model:value="reminderViewMode" size="small" button-style="solid">
                     <a-radio-button value="all">全部</a-radio-button>
                     <a-radio-button value="unread">未读 {{ unreadReminderCount }}</a-radio-button>
                     <a-radio-button value="pinned">置顶</a-radio-button>
                     <a-radio-button value="urgent">紧急 {{ urgentReminderCount }}</a-radio-button>
                   </a-radio-group>
-                  <a-tag color="purple">阈值 {{ thresholdConfig.configVersion || '--' }}</a-tag>
-                  <a-button size="small" @click="thresholdConfigOpen = true">阈值设置</a-button>
-                  <a-button size="small" @click="markAllReminderRead">全部已读</a-button>
-                </a-space>
+                  <a-space size="small" wrap>
+                    <a-tag color="purple">阈值 {{ thresholdConfig.configVersion || '--' }}</a-tag>
+                    <a-button size="small" @click="thresholdConfigOpen = true">阈值设置</a-button>
+                    <a-button size="small" @click="markAllReminderRead">全部已读</a-button>
+                  </a-space>
+                </div>
               </template>
               <a-list size="small" :data-source="displayRiskReminders" :locale="{ emptyText: '暂无提醒' }">
                 <template #renderItem="{ item }">
@@ -417,7 +419,7 @@
         <a-card
           v-if="isModuleVisible('calendar')"
           :bordered="false"
-          class="card-elevated module-card"
+          class="card-elevated module-card calendar-card"
           :style="[moduleCardStyle('calendar'), { order: sectionOrder(['calendar']) }]"
           title="9️⃣ 行政日历 / 协同日历（统一页面）"
         >
@@ -4255,7 +4257,7 @@ onBeforeUnmount(() => {
 .portal-page {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   padding: 0;
 }
 
@@ -4286,6 +4288,31 @@ onBeforeUnmount(() => {
 
 .portal-page :deep(.ant-card .ant-card-body) {
   padding: 12px 14px;
+}
+
+.portal-page :deep(.module-card .ant-card-head) {
+  min-height: 50px;
+  padding-inline: 14px;
+  border-bottom: 1px solid #e5edf8;
+  background: linear-gradient(180deg, rgba(248, 251, 255, 0.9) 0%, rgba(255, 255, 255, 0.98) 100%);
+}
+
+.portal-page :deep(.module-card .ant-card-head-wrapper) {
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.portal-page :deep(.module-card .ant-card-head-title) {
+  white-space: normal;
+  line-height: 1.25;
+  padding: 10px 0;
+  font-size: 15px;
+  color: #0f172a;
+}
+
+.portal-page :deep(.module-card .ant-card-extra) {
+  padding: 8px 0;
+  max-width: 100%;
 }
 
 .hero-left {
@@ -4397,6 +4424,7 @@ onBeforeUnmount(() => {
   transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
   position: relative;
   overflow: hidden;
+  background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
 }
 
 .todo-focus-card {
@@ -4412,7 +4440,8 @@ onBeforeUnmount(() => {
 
 .module-card:hover {
   border-color: #bfdbfe;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.07);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
 }
 
 .full-height {
@@ -4470,6 +4499,27 @@ onBeforeUnmount(() => {
   min-width: 42px;
   text-align: right;
   color: #475569;
+}
+
+.reminder-card :deep(.ant-card-head-wrapper) {
+  flex-wrap: wrap;
+}
+
+.reminder-extra {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  max-width: min(560px, 100%);
+}
+
+.reminder-extra :deep(.ant-radio-group) {
+  max-width: 100%;
+}
+
+.reminder-extra :deep(.ant-radio-group .ant-radio-button-wrapper) {
+  font-size: 12px;
+  padding-inline: 10px;
 }
 
 .reminder-unread {
@@ -4619,8 +4669,12 @@ onBeforeUnmount(() => {
 .calendar-toolbar {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid #deebff;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f7fbff 0%, #eef6ff 100%);
 }
 
 .calendar-insights {
@@ -4667,6 +4721,54 @@ onBeforeUnmount(() => {
   margin-top: 8px;
 }
 
+.calendar-card :deep(.fc) {
+  --fc-border-color: #e2e8f0;
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: #f8fafc;
+  --fc-event-border-color: transparent;
+}
+
+.calendar-card :deep(.fc .fc-toolbar.fc-header-toolbar) {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  background: #f8fbff;
+}
+
+.calendar-card :deep(.fc .fc-button) {
+  border-radius: 999px;
+  border: 1px solid #bfdbfe;
+  background: #ffffff;
+  color: #1e3a8a;
+  box-shadow: none;
+}
+
+.calendar-card :deep(.fc .fc-button:hover) {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.calendar-card :deep(.fc .fc-col-header-cell-cushion) {
+  color: #334155;
+  font-weight: 600;
+}
+
+.calendar-card :deep(.fc .fc-daygrid-day-number) {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.calendar-card :deep(.fc .fc-daygrid-day.fc-day-today) {
+  background: rgba(219, 234, 254, 0.56);
+}
+
+.calendar-card :deep(.fc .fc-daygrid-event) {
+  border-radius: 8px;
+  padding: 1px 4px;
+  box-shadow: 0 2px 8px rgba(30, 64, 175, 0.14);
+}
+
 .repeat-card {
   margin-bottom: 12px;
 }
@@ -4705,6 +4807,15 @@ onBeforeUnmount(() => {
 
   .hero-kpi-item {
     min-width: 84px;
+  }
+
+  .reminder-extra {
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .portal-page :deep(.module-card .ant-card-head-wrapper) {
+    flex-wrap: wrap;
   }
 }
 </style>
