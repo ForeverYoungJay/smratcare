@@ -454,7 +454,7 @@ public class OaTodoController {
       wrapper.like(OaTodo::getContent, "[APPROVAL_FLOW:");
     } else if ("NORMAL".equals(normalizedSourceType)) {
       wrapper.and(w -> w.and(n -> n.notLike(OaTodo::getContent, "[BIRTHDAY_REMINDER:")
-              .and().notLike(OaTodo::getContent, "[APPROVAL_FLOW:"))
+              .notLike(OaTodo::getContent, "[APPROVAL_FLOW:"))
           .or().isNull(OaTodo::getContent));
     }
     if (keyword != null && !keyword.isBlank()) {

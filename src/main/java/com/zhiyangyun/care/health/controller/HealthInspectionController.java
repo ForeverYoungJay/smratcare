@@ -318,7 +318,7 @@ public class HealthInspectionController {
         .eq(MedicalAlertRuleConfig::getIsDeleted, 0)
         .eq(orgId != null, MedicalAlertRuleConfig::getOrgId, orgId)
         .last("LIMIT 1"));
-    if (config != null && Number.valueOf(0).equals(config.getAutoCreateNursingLogFromInspection())) {
+    if (config != null && Integer.valueOf(0).equals(config.getAutoCreateNursingLogFromInspection())) {
       return;
     }
 
@@ -337,7 +337,7 @@ public class HealthInspectionController {
     nursingLog.setElderName(inspection.getElderName());
     nursingLog.setSourceInspectionId(inspection.getId());
     nursingLog.setLogTime(LocalDateTime.now());
-    boolean raiseTask = config == null || !Number.valueOf(0).equals(config.getAutoRaiseTaskFromAbnormal());
+    boolean raiseTask = config == null || !Integer.valueOf(0).equals(config.getAutoRaiseTaskFromAbnormal());
     nursingLog.setLogType(raiseTask ? "INCIDENT" : "INSPECTION_FOLLOW_UP");
     nursingLog.setContent(buildAutoNursingLogContent(inspection));
     nursingLog.setStaffName(inspection.getInspectorName());

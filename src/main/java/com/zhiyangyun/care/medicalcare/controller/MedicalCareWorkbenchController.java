@@ -428,7 +428,7 @@ public class MedicalCareWorkbenchController {
       row.setResidentId(item.getElderId());
       row.setResidentName(item.getElderName());
       row.setTaskTitle("执行医嘱：" + safeText(item.getDrugName(), "未命名药品"));
-      row.setAssignee(item.getNurseName());
+      row.setAssignee(null);
       row.setPlannedTime(item.getPlannedTime());
       row.setPriority(item.getPlannedTime() != null && item.getPlannedTime().isBefore(overdueCutoff)
           ? "HIGH"
