@@ -458,7 +458,6 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
     created.setPointsBalance(0);
     created.setStatus(1);
     pointsAccountMapper.insert(created);
-    }
   }
 
   private boolean hasElderAccess(ElderProfile elder, Long tenantId, Long orgId) {
