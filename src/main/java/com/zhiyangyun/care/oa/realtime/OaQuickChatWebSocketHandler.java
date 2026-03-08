@@ -168,7 +168,7 @@ public class OaQuickChatWebSocketHandler extends TextWebSocketHandler {
       if (tokenBlacklistService.isBlacklisted(jti)) {
         return null;
       }
-      Long orgId = claims.get("orgId", Long.class);
+      Long orgId = toLong(claims.get("orgId"));
       String staffId = claims.getSubject();
       if (orgId == null || staffId == null || staffId.isBlank()) {
         return null;
@@ -181,5 +181,25 @@ public class OaQuickChatWebSocketHandler extends TextWebSocketHandler {
 
   private String buildUserKey(Long orgId, Long staffId) {
     return orgId + ":" + staffId;
+  }
+
+  private Long toLong(Object value) {
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof Number number) {
+      long raw = number.longValue();
+      return raw > 0 ? raw : null;
+    }
+    String text = String.valueOf(value).trim();
+    if (text.isBlank()) {
+      return null;
+    }
+    try {
+      long raw = Long.parseLong(text);
+      return raw > 0 ? raw : null;
+    } catch (Exception ex) {
+      return null;
+    }
   }
 }

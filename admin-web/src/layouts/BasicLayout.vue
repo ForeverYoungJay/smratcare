@@ -923,11 +923,20 @@ const quickChatRoomForm = reactive({
   applyRemark: ''
 })
 const quickChatAliasIdMap = reactive<Record<string, string>>({})
-const currentQuickChatSenderId = computed(() => String(userStore.staffInfo?.id || userStore.staffInfo?.username || 'me'))
+const currentQuickChatSenderId = computed(() => String(userStore.staffInfo?.username || userStore.staffInfo?.id || 'me'))
 const currentQuickChatSenderNumericId = computed(() => {
-  const raw = Number(userStore.staffInfo?.id || 0)
-  if (!Number.isFinite(raw) || raw <= 0) return ''
-  return String(raw)
+  const rawId = userStore.staffInfo?.id
+  if (typeof rawId === 'number') {
+    if (!Number.isSafeInteger(rawId) || rawId <= 0) return ''
+    return String(rawId)
+  }
+  const text = String(rawId ?? '').trim()
+  if (!/^\d+$/.test(text)) return ''
+  try {
+    return BigInt(text) > 0n ? text : ''
+  } catch {
+    return ''
+  }
 })
 const currentQuickChatActorId = computed(() =>
   String(currentQuickChatSenderNumericId.value || currentQuickChatSenderId.value || 'me')
@@ -2213,7 +2222,7 @@ function cloneQuickChatRoomRow(room: QuickChatRoom): QuickChatRoom {
 }
 
 function mergeQuickChatRoomRows(localRooms: QuickChatRoom[], remoteRooms: QuickChatRoom[]) {
-  const currentId = currentQuickChatSenderId.value
+  const currentId = currentQuickChatKeyId()
   const merged = new Map<string, QuickChatRoom>()
   localRooms.forEach((room) => {
     merged.set(room.id, cloneQuickChatRoomRow(room))
@@ -3064,7 +3073,7 @@ function applyQuickChatRealtimeEvent(eventRow: any) {
             msg.readByUser[currentId] = true
           })
           room.unreadByUser[currentId] = 0
-        } else if (senderId && senderId !== currentId) {
+        } else if (senderId && !isCurrentQuickChatIdentity(senderId)) {
           room.unreadByUser[currentId] = Number(room.unreadByUser[currentId] || 0) + 1
         }
       }
@@ -3852,7 +3861,7 @@ function submitQuickChatRoomEditor() {
     selectedMembers.forEach((id) => {
       if (room.unreadByUser && room.unreadByUser[id] == null) room.unreadByUser[id] = 0
     })
-    const invited = selectedMembers.filter((id) => id !== selfId).map((id) => memberNameById(id))
+    const invited = selectedMembers.filter((id) => !isCurrentQuickChatIdentity(id)).map((id) => memberNameById(id))
     if (invited.length) {
       appendRoomSystemMessage(room, `${currentQuickChatSenderName.value} 更新了成员：${invited.join('、')}`)
     }
@@ -4024,7 +4033,7 @@ function exitActiveQuickChatRoom() {
   if (!room) return
   const selfId = currentQuickChatKeyId()
   const selfName = currentQuickChatSenderName.value
-  room.memberIds = room.memberIds.filter((id) => id !== selfId)
+  room.memberIds = room.memberIds.filter((id) => !isCurrentQuickChatIdentity(id))
   if (room.unreadByUser) {
     delete room.unreadByUser[selfId]
   }
@@ -4032,7 +4041,7 @@ function exitActiveQuickChatRoom() {
   if (!room.memberIds.length) {
     quickChatRooms.value = quickChatRooms.value.filter((item) => item.id !== room.id)
   }
-  activeQuickChatRoomId.value = sortedQuickChatRooms.value.find((item) => item.memberIds.includes(selfId))?.id || sortedQuickChatRooms.value[0]?.id || ''
+  activeQuickChatRoomId.value = sortedQuickChatRooms.value.find((item) => item.memberIds.some((id) => isCurrentQuickChatIdentity(id)))?.id || sortedQuickChatRooms.value[0]?.id || ''
   persistQuickChatState()
   message.success('已退出会话')
 }

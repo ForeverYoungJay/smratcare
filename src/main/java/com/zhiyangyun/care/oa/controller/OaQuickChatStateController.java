@@ -182,6 +182,7 @@ public class OaQuickChatStateController {
     }
     Set<Long> idSet = new LinkedHashSet<>();
     Set<String> usernameSet = new LinkedHashSet<>();
+    Set<String> staffNoSet = new LinkedHashSet<>();
     for (String raw : targetStaffIds) {
       String text = raw == null ? "" : raw.trim();
       if (text.isBlank()) continue;
@@ -194,8 +195,9 @@ public class OaQuickChatStateController {
       } catch (NumberFormatException ignore) {
       }
       usernameSet.add(text);
+      staffNoSet.add(text);
     }
-    if (idSet.isEmpty() && usernameSet.isEmpty()) {
+    if (idSet.isEmpty() && usernameSet.isEmpty() && staffNoSet.isEmpty()) {
       return List.of();
     }
     List<StaffAccount> staffs = staffMapper.selectList(Wrappers.lambdaQuery(StaffAccount.class)
@@ -211,7 +213,9 @@ public class OaQuickChatStateController {
       boolean matchedById = idSet.contains(row.getId());
       String username = row.getUsername() == null ? "" : row.getUsername().trim();
       boolean matchedByUsername = !username.isBlank() && usernameSet.contains(username);
-      if (!matchedById && !matchedByUsername) continue;
+      String staffNo = row.getStaffNo() == null ? "" : row.getStaffNo().trim();
+      boolean matchedByStaffNo = !staffNo.isBlank() && staffNoSet.contains(staffNo);
+      if (!matchedById && !matchedByUsername && !matchedByStaffNo) continue;
       if (!seen.add(row.getId())) continue;
       rows.add(row);
     }

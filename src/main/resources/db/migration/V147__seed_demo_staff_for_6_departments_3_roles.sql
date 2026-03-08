@@ -95,30 +95,33 @@ WHERE s.org_id = @demo_org_id
 
 -- 补齐 6 部门 × 3 角色示例人员（admin 保留现有）
 INSERT INTO staff (id, org_id, department_id, staff_no, username, password_hash, real_name, phone, email, gender, status, last_login_time, create_time, update_time, is_deleted)
-SELECT UUID_SHORT(), @demo_org_id, d.id, p.staff_no, p.username, '$2a$10$A1rIAhc8BXcMXR/imDcBMeabjSM2/2z4pIjpGYBnMJ8Z.C8Z1e/Ym',
+SELECT p.staff_id, @demo_org_id, d.id, p.staff_no, p.username, '$2a$10$A1rIAhc8BXcMXR/imDcBMeabjSM2/2z4pIjpGYBnMJ8Z.C8Z1e/Ym',
        p.real_name, p.phone, NULL, p.gender, 1, NULL, NOW(), NOW(), 0
 FROM (
-    SELECT 'CARE' AS dept_code, 'DEMO-1001' AS staff_no, 'nursing_emp' AS username, '护理员工王' AS real_name, '13000001001' AS phone, 2 AS gender
-    UNION ALL SELECT 'CARE', 'DEMO-1002', 'nursing_minister', '护理部长李', '13000001002', 1
-    UNION ALL SELECT 'CARE', 'DEMO-1003', 'nursing_director', '护理管理层赵', '13000001003', 1
-    UNION ALL SELECT 'MED', 'DEMO-1101', 'medical_emp', '医疗员工钱', '13000001101', 2
-    UNION ALL SELECT 'MED', 'DEMO-1102', 'medical_minister', '医疗部长孙', '13000001102', 1
-    UNION ALL SELECT 'MED', 'DEMO-1103', 'medical_director', '医疗管理层周', '13000001103', 1
-    UNION ALL SELECT 'FIN', 'DEMO-1201', 'finance_emp', '财务员工吴', '13000001201', 2
-    UNION ALL SELECT 'FIN', 'DEMO-1202', 'finance_minister', '财务部长郑', '13000001202', 1
-    UNION ALL SELECT 'FIN', 'DEMO-1203', 'finance_director', '财务管理层王', '13000001203', 1
-    UNION ALL SELECT 'LOGI', 'DEMO-1301', 'logistics_emp', '后勤员工冯', '13000001301', 1
-    UNION ALL SELECT 'LOGI', 'DEMO-1302', 'logistics_minister', '后勤部长陈', '13000001302', 2
-    UNION ALL SELECT 'LOGI', 'DEMO-1303', 'logistics_director', '后勤管理层褚', '13000001303', 1
-    UNION ALL SELECT 'HR', 'DEMO-1401', 'hr_emp', '人事员工卫', '13000001401', 2
-    UNION ALL SELECT 'HR', 'DEMO-1402', 'hr_minister', '人事部长蒋', '13000001402', 1
-    UNION ALL SELECT 'HR', 'DEMO-1403', 'hr_director', '人事管理层沈', '13000001403', 1
-    UNION ALL SELECT 'MKT', 'DEMO-1501', 'marketing_emp', '市场员工韩', '13000001501', 2
-    UNION ALL SELECT 'MKT', 'DEMO-1502', 'marketing_minister', '市场部长杨', '13000001502', 1
-    UNION ALL SELECT 'MKT', 'DEMO-1503', 'marketing_director', '市场管理层朱', '13000001503', 1
+    SELECT 15001 AS staff_id, 'CARE' AS dept_code, 'DEMO-1001' AS staff_no, 'nursing_emp' AS username, '护理员工王' AS real_name, '13000001001' AS phone, 2 AS gender
+    UNION ALL SELECT 15002, 'CARE', 'DEMO-1002', 'nursing_minister', '护理部长李', '13000001002', 1
+    UNION ALL SELECT 15003, 'CARE', 'DEMO-1003', 'nursing_director', '护理管理层赵', '13000001003', 1
+    UNION ALL SELECT 15101, 'MED', 'DEMO-1101', 'medical_emp', '医疗员工钱', '13000001101', 2
+    UNION ALL SELECT 15102, 'MED', 'DEMO-1102', 'medical_minister', '医疗部长孙', '13000001102', 1
+    UNION ALL SELECT 15103, 'MED', 'DEMO-1103', 'medical_director', '医疗管理层周', '13000001103', 1
+    UNION ALL SELECT 15201, 'FIN', 'DEMO-1201', 'finance_emp', '财务员工吴', '13000001201', 2
+    UNION ALL SELECT 15202, 'FIN', 'DEMO-1202', 'finance_minister', '财务部长郑', '13000001202', 1
+    UNION ALL SELECT 15203, 'FIN', 'DEMO-1203', 'finance_director', '财务管理层王', '13000001203', 1
+    UNION ALL SELECT 15301, 'LOGI', 'DEMO-1301', 'logistics_emp', '后勤员工冯', '13000001301', 1
+    UNION ALL SELECT 15302, 'LOGI', 'DEMO-1302', 'logistics_minister', '后勤部长陈', '13000001302', 2
+    UNION ALL SELECT 15303, 'LOGI', 'DEMO-1303', 'logistics_director', '后勤管理层褚', '13000001303', 1
+    UNION ALL SELECT 15401, 'HR', 'DEMO-1401', 'hr_emp', '人事员工卫', '13000001401', 2
+    UNION ALL SELECT 15402, 'HR', 'DEMO-1402', 'hr_minister', '人事部长蒋', '13000001402', 1
+    UNION ALL SELECT 15403, 'HR', 'DEMO-1403', 'hr_director', '人事管理层沈', '13000001403', 1
+    UNION ALL SELECT 15501, 'MKT', 'DEMO-1501', 'marketing_emp', '市场员工韩', '13000001501', 2
+    UNION ALL SELECT 15502, 'MKT', 'DEMO-1502', 'marketing_minister', '市场部长杨', '13000001502', 1
+    UNION ALL SELECT 15503, 'MKT', 'DEMO-1503', 'marketing_director', '市场管理层朱', '13000001503', 1
 ) p
 JOIN department d ON d.org_id = @demo_org_id AND d.dept_code = p.dept_code AND d.is_deleted = 0
 WHERE @demo_org_id IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM staff sx WHERE sx.id = p.staff_id AND sx.is_deleted = 0
+  )
   AND NOT EXISTS (
     SELECT 1 FROM staff s WHERE s.org_id = @demo_org_id AND s.username = p.username AND s.is_deleted = 0
   );
