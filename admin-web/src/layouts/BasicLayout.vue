@@ -2037,8 +2037,8 @@ function loadQuickChatTodoAutomation() {
   }
 }
 
-function buildQuickChatStatePayload() {
-  return quickChatRooms.value.slice(0, 50).map((room) => ({
+function buildQuickChatRoomPayload(room: QuickChatRoom) {
+  return {
     id: room.id,
     name: room.name,
     departmentIds: Array.isArray(room.departmentIds) ? room.departmentIds : [],
@@ -2066,7 +2066,11 @@ function buildQuickChatStatePayload() {
         readByUser: message.readByUser || {}
       }))
       : []
-  }))
+  }
+}
+
+function buildQuickChatStatePayload() {
+  return quickChatRooms.value.slice(0, 50).map((room) => buildQuickChatRoomPayload(room))
 }
 
 function normalizeQuickChatRooms(parsed: any[]) {
@@ -2250,10 +2254,26 @@ function setupQuickChatFanoutRetryTimer() {
 
 function roomMemberTargets(room: any) {
   const selfId = Number(currentQuickChatSenderId.value)
+  const hasSelfId = Number.isFinite(selfId) && selfId > 0
   const raw = Array.isArray(room?.memberIds) ? room.memberIds : []
   return raw
     .map((id: any) => Number(id))
-    .filter((id: number) => Number.isFinite(id) && id > 0 && id !== selfId)
+    .filter((id: number) => Number.isFinite(id) && id > 0 && (!hasSelfId || id !== selfId))
+}
+
+async function pushQuickChatRoomToMembers(room?: QuickChatRoom | null) {
+  if (!room) return
+  const targets = roomMemberTargets(room)
+  if (!targets.length) return
+  const stateJson = JSON.stringify([buildQuickChatRoomPayload(room)])
+  try {
+    const affected = await fanoutQuickChatState(stateJson, targets)
+    quickChatFanoutLastSuccessAt.value = Date.now()
+    quickChatFanoutLastAffected.value = Number(affected || 0)
+  } catch {
+    quickChatFanoutLastErrorAt.value = Date.now()
+    quickChatFanoutQueuedPayload.value = JSON.stringify(buildQuickChatStatePayload())
+  }
 }
 
 function normalizeQuickChatEventRoom(room: any) {
@@ -2734,6 +2754,11 @@ function onQuickChatCloudVisibilityChange() {
 function resolveQuickChatWebSocketUrl() {
   const token = getToken()
   if (!token || typeof window === 'undefined') return ''
+  const envBase = String((import.meta as any)?.env?.VITE_WS_BASE_URL || '').trim()
+  if (envBase) {
+    const normalized = envBase.replace(/\/+$/, '')
+    return `${normalized}/ws/quick-chat?token=${encodeURIComponent(token)}`
+  }
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   const host = window.location.host
   return `${protocol}//${host}/ws/quick-chat?token=${encodeURIComponent(token)}`
@@ -2888,9 +2913,15 @@ function connectQuickChatWebSocket() {
   quickChatWebSocket.onerror = () => {
     quickChatWsConnected.value = false
   }
-  quickChatWebSocket.onclose = () => {
+  quickChatWebSocket.onclose = (event) => {
     quickChatWsConnected.value = false
+    const reason = String((event as CloseEvent)?.reason || '')
+    const closeCode = Number((event as CloseEvent)?.code || 0)
     quickChatWebSocket = null
+    if (closeCode === 1008 || reason.includes('invalid token') || reason.includes('missing token')) {
+      quickChatWebSocketManualClose = true
+      return
+    }
     scheduleQuickChatWsReconnect()
   }
 }
@@ -3494,6 +3525,7 @@ function submitQuickChatRoomEditor() {
     room.name = name
     appendRoomSystemMessage(room, `${currentQuickChatSenderName.value} 将会话名从“${previousName}”更新为“${name}”`)
     persistQuickChatState()
+    void pushQuickChatRoomToMembers(room)
     message.success('会话名称已更新')
   } else if (quickChatRoomEditorMode.value === 'create') {
     const room: QuickChatRoom = {
@@ -3519,6 +3551,7 @@ function submitQuickChatRoomEditor() {
     quickChatRooms.value.unshift(room)
     activeQuickChatRoomId.value = room.id
     persistQuickChatState()
+    void pushQuickChatRoomToMembers(room)
     message.success('群聊申请已发起')
   } else {
     const room = activeQuickChatRoom.value
@@ -3544,6 +3577,7 @@ function submitQuickChatRoomEditor() {
       appendRoomSystemMessage(room, `附言：${quickChatRoomForm.applyRemark.trim()}`)
     }
     persistQuickChatState()
+    void pushQuickChatRoomToMembers(room)
     message.success('群聊已更新')
   }
   quickChatRoomEditorOpen.value = false
@@ -3582,6 +3616,7 @@ function sendQuickChatText() {
   }
   quickChatDraft.value = ''
   persistQuickChatState()
+  void pushQuickChatRoomToMembers(room)
   scrollQuickChatToBottom()
 }
 
@@ -3623,6 +3658,7 @@ const beforeQuickChatUpload: UploadProps['beforeUpload'] = async (file) => {
   room.updatedAt = dayjs().toISOString()
   incrementRoomUnread(room)
   persistQuickChatState()
+  void pushQuickChatRoomToMembers(room)
   scrollQuickChatToBottom()
   return false
 }
