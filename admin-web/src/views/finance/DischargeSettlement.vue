@@ -12,6 +12,16 @@
       </template>
     </SearchForm>
 
+    <a-row :gutter="[12, 12]" style="margin-bottom: 12px;">
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="结算单数" :value="rows.length" /></a-card></a-col>
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="待退款数" :value="pendingRefundCount" /></a-card></a-col>
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="应退款金额" :value="refundTotal" suffix="元" :precision="2" /></a-card></a-col>
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="流程阻塞单数" :value="blockedCount" /></a-card></a-col>
+      <a-col :span="24" v-if="blockedCount > 0">
+        <a-alert type="warning" show-icon :message="`存在 ${blockedCount} 条退住结算流程阻塞（签字/退款未完成）`" />
+      </a-col>
+    </a-row>
+
     <DataTable
       rowKey="id"
       :columns="columns"
@@ -38,6 +48,9 @@
           <a-tag :color="extractLinkage(record.remark, '床位释放:').includes('已释放') ? 'green' : 'default'">
             {{ extractLinkage(record.remark, '床位释放:') || (record.financeRefunded === 1 ? '已回写' : '待回写') }}
           </a-tag>
+        </template>
+        <template v-else-if="column.key === 'riskLevel'">
+          <a-tag :color="riskColor(record)">{{ riskText(record) }}</a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
@@ -115,6 +128,8 @@ import { useElderOptions } from '../../composables/useElderOptions'
 import { getBaseConfigItemList } from '../../api/baseConfig'
 import { createDischargeSettlement, getDischargeSettlementPage, confirmDischargeSettlement } from '../../api/financeFee'
 import type { BaseConfigItem, DischargeSettlementItem, PageResult } from '../../types'
+import { confirmAction } from '../../utils/actionConfirm'
+import { computed } from 'vue'
 
 const loading = ref(false)
 const rows = ref<DischargeSettlementItem[]>([])
@@ -146,6 +161,7 @@ const columns = [
   { title: '押金处理', key: 'depositProcess', width: 220 },
   { title: '自动对账', key: 'reconcileStatus', width: 220 },
   { title: '床位释放', key: 'bedRelease', width: 180 },
+  { title: '风险等级', key: 'riskLevel', width: 100 },
   { title: '前台签字', dataIndex: 'frontdeskSignedTime', key: 'frontdeskSignedTime', width: 170 },
   { title: '护理部签字', dataIndex: 'nursingSignedTime', key: 'nursingSignedTime', width: 170 },
   { title: '财务退款时间', dataIndex: 'financeRefundTime', key: 'financeRefundTime', width: 170 },
@@ -153,6 +169,11 @@ const columns = [
   { title: '创建时间', dataIndex: 'createTime', key: 'createTime', width: 180 },
   { title: '操作', key: 'action', width: 280 }
 ]
+const pendingRefundCount = computed(() => rows.value.filter(item => item.financeRefunded !== 1).length)
+const refundTotal = computed(() => rows.value.reduce((sum, item) => sum + Number(item.refundAmount || 0), 0))
+const blockedCount = computed(() => rows.value.filter(item =>
+  item.status !== 'SETTLED'
+  && (item.frontdeskApproved !== 1 || item.nursingApproved !== 1 || item.financeRefunded !== 1)).length)
 
 const createOpen = ref(false)
 const creating = ref(false)
@@ -262,6 +283,13 @@ async function submitCreate() {
 }
 
 async function confirmSettlement(record: DischargeSettlementItem) {
+  const confirmed = await confirmAction({
+    title: '确认执行财务退款？',
+    content: `结算单：${record.detailNo || '-'} / ${record.elderName || '-'}`,
+    impactItems: ['将写入退款完成时间', '触发床态与档案状态回写'],
+    okText: '确认退款'
+  })
+  if (!confirmed) return
   const signerName = window.prompt('请输入财务签字人', '') || undefined
   await confirmDischargeSettlement(record.id, {
     action: 'FINANCE_REFUND',
@@ -273,6 +301,12 @@ async function confirmSettlement(record: DischargeSettlementItem) {
 }
 
 async function approveFrontdesk(record: DischargeSettlementItem) {
+  const confirmed = await confirmAction({
+    title: '确认前台签字？',
+    content: `结算单：${record.detailNo || '-'} / ${record.elderName || '-'}`,
+    okText: '确认签字'
+  })
+  if (!confirmed) return
   const signerName = window.prompt('请输入前台签字人', '') || undefined
   await confirmDischargeSettlement(record.id, {
     action: 'FRONTDESK_APPROVE',
@@ -284,6 +318,12 @@ async function approveFrontdesk(record: DischargeSettlementItem) {
 }
 
 async function approveNursing(record: DischargeSettlementItem) {
+  const confirmed = await confirmAction({
+    title: '确认护理部签字？',
+    content: `结算单：${record.detailNo || '-'} / ${record.elderName || '-'}`,
+    okText: '确认签字'
+  })
+  if (!confirmed) return
   const signerName = window.prompt('请输入护理部签字人', '') || undefined
   await confirmDischargeSettlement(record.id, {
     action: 'NURSING_APPROVE',
@@ -301,6 +341,20 @@ function extractLinkage(remark: string | undefined, prefix: string) {
   const parts = remark.split('；')
   const matched = parts.find((item) => item.trim().startsWith(prefix))
   return matched ? matched.trim().slice(prefix.length).trim() : ''
+}
+
+function riskText(item: DischargeSettlementItem) {
+  if (item.status === 'SETTLED') return '低'
+  if (item.frontdeskApproved !== 1 || item.nursingApproved !== 1) return '高'
+  if (item.financeRefunded !== 1) return '中'
+  return '低'
+}
+
+function riskColor(item: DischargeSettlementItem) {
+  const level = riskText(item)
+  if (level === '高') return 'red'
+  if (level === '中') return 'orange'
+  return 'green'
 }
 
 onMounted(async () => {

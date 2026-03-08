@@ -10,17 +10,41 @@
       <a-form-item label="类别">
         <a-select v-model:value="query.category" :options="categoryOptions" style="width: 180px" allow-clear />
       </a-form-item>
+      <a-form-item label="风险等级">
+        <a-select v-model:value="query.riskLevel" allow-clear style="width: 140px">
+          <a-select-option value="HIGH">高风险</a-select-option>
+          <a-select-option value="MEDIUM">中风险</a-select-option>
+          <a-select-option value="LOW">低风险</a-select-option>
+        </a-select>
+      </a-form-item>
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="老人/类别/备注" allow-clear />
       </a-form-item>
       <template #extra>
+        <a-button @click="quickFilterHighRisk">仅看高风险</a-button>
         <a-button @click="exportData">导出</a-button>
         <a-button @click="printCurrent">打印当前结果</a-button>
         <a-button type="primary" @click="openCreate">新增消费</a-button>
       </template>
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange" />
+    <a-row :gutter="[12, 12]" style="margin-bottom: 12px;">
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="流水数" :value="filteredRows.length" /></a-card></a-col>
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="消费总额" :value="totalAmount" suffix="元" :precision="2" /></a-card></a-col>
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="高风险数" :value="highRiskCount" /></a-card></a-col>
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="来源缺失" :value="missingSourceCount" /></a-card></a-col>
+      <a-col :span="24" v-if="missingSourceCount > 0">
+        <a-alert type="warning" show-icon :message="`存在 ${missingSourceCount} 条来源缺失流水，建议补齐 sourceType / sourceId`" />
+      </a-col>
+    </a-row>
+
+    <DataTable rowKey="id" :columns="columns" :data-source="filteredRows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+      <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'riskLevel'">
+          <a-tag :color="riskColor(record)">{{ riskLevel(record) }}</a-tag>
+        </template>
+      </template>
+    </DataTable>
 
     <a-modal v-model:open="createOpen" title="新增消费登记" :confirm-loading="creating" @ok="submitCreate">
       <a-form layout="vertical">
@@ -48,7 +72,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { useRoute } from 'vue-router'
@@ -69,6 +93,7 @@ const query = reactive({
   from: undefined as any,
   to: undefined as any,
   category: '',
+  riskLevel: undefined as 'HIGH' | 'MEDIUM' | 'LOW' | undefined,
   keyword: '',
   elderId: route.query.elderId ? Number(route.query.elderId) : undefined as number | undefined
 })
@@ -80,9 +105,15 @@ const columns = [
   { title: '金额', dataIndex: 'amount', key: 'amount', width: 120 },
   { title: '类别', dataIndex: 'category', key: 'category', width: 120 },
   { title: '来源类型', dataIndex: 'sourceType', key: 'sourceType', width: 120 },
+  { title: '风险等级', key: 'riskLevel', width: 100 },
   { title: '备注', dataIndex: 'remark', key: 'remark' },
   { title: '创建时间', dataIndex: 'createTime', key: 'createTime', width: 180 }
 ]
+const filteredRows = computed(() => (rows.value || [])
+  .filter(item => !query.riskLevel || riskLevel(item) === (query.riskLevel === 'HIGH' ? '高' : query.riskLevel === 'MEDIUM' ? '中' : '低')))
+const totalAmount = computed(() => filteredRows.value.reduce((sum, item) => sum + Number(item.amount || 0), 0))
+const highRiskCount = computed(() => filteredRows.value.filter(item => riskLevel(item) === '高').length)
+const missingSourceCount = computed(() => filteredRows.value.filter(item => !item.sourceType).length)
 
 const createOpen = ref(false)
 const creating = ref(false)
@@ -139,10 +170,15 @@ function onReset() {
   query.from = undefined
   query.to = undefined
   query.category = ''
+  query.riskLevel = undefined
   query.keyword = ''
   query.elderId = undefined
   pagination.current = 1
   fetchData()
+}
+
+function quickFilterHighRisk() {
+  query.riskLevel = 'HIGH'
 }
 
 function handleTableChange(pag: any) {
@@ -200,12 +236,13 @@ async function submitCreate() {
 
 function exportData() {
   exportCsv(
-    rows.value.map(item => ({
+    filteredRows.value.map(item => ({
       老人: item.elderName || '',
       消费日期: item.consumeDate || '',
       金额: item.amount || 0,
       类别: item.category || '',
       来源类型: item.sourceType || '',
+      风险等级: riskLevel(item),
       备注: item.remark || '',
       创建时间: item.createTime || ''
     })),
@@ -214,12 +251,13 @@ function exportData() {
 }
 
 function printCurrent() {
-  const table = rows.value.map(item => ({
+  const table = filteredRows.value.map(item => ({
     老人: item.elderName || '',
     消费日期: item.consumeDate || '',
     金额: item.amount || 0,
     类别: item.category || '',
     来源类型: item.sourceType || '',
+    风险等级: riskLevel(item),
     备注: item.remark || ''
   }))
   const html = `
@@ -228,9 +266,9 @@ function printCurrent() {
       <body>
         <h3>消费明细（${dayjs().format('YYYY-MM-DD HH:mm')}）</h3>
         <table border="1" cellspacing="0" cellpadding="6">
-          <thead><tr><th>老人</th><th>消费日期</th><th>金额</th><th>类别</th><th>来源类型</th><th>备注</th></tr></thead>
+          <thead><tr><th>老人</th><th>消费日期</th><th>金额</th><th>类别</th><th>来源类型</th><th>风险等级</th><th>备注</th></tr></thead>
           <tbody>
-            ${table.map(item => `<tr><td>${item.老人}</td><td>${item.消费日期}</td><td>${item.金额}</td><td>${item.类别}</td><td>${item.来源类型}</td><td>${item.备注}</td></tr>`).join('')}
+            ${table.map(item => `<tr><td>${item.老人}</td><td>${item.消费日期}</td><td>${item.金额}</td><td>${item.类别}</td><td>${item.来源类型}</td><td>${item.风险等级}</td><td>${item.备注}</td></tr>`).join('')}
           </tbody>
         </table>
       </body>
@@ -248,4 +286,20 @@ function printCurrent() {
 }
 
 fetchData()
+
+function riskLevel(item: ConsumptionRecordItem) {
+  const amount = Number(item.amount || 0)
+  const sourceType = String(item.sourceType || '').toUpperCase()
+  if (!sourceType) return '高'
+  if (sourceType === 'MANUAL' && amount >= 1000) return '高'
+  if (amount >= 300) return '中'
+  return '低'
+}
+
+function riskColor(item: ConsumptionRecordItem) {
+  const level = riskLevel(item)
+  if (level === '高') return 'red'
+  if (level === '中') return 'orange'
+  return 'green'
+}
 </script>

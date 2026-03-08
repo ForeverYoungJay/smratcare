@@ -7,15 +7,33 @@
       <a-form-item label="状态">
         <a-select v-model:value="query.status" allow-clear style="width: 180px" :options="statusOptions" />
       </a-form-item>
+      <a-form-item label="风险等级">
+        <a-select v-model:value="query.riskLevel" allow-clear style="width: 140px">
+          <a-select-option value="HIGH">高风险</a-select-option>
+          <a-select-option value="MEDIUM">中风险</a-select-option>
+          <a-select-option value="LOW">低风险</a-select-option>
+        </a-select>
+      </a-form-item>
       <template #extra>
+        <a-button @click="quickHighRisk">仅看高风险</a-button>
         <a-button type="primary" @click="openCreate">新建审核单</a-button>
       </template>
     </SearchForm>
 
-    <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
+    <a-row :gutter="[12, 12]" style="margin-bottom: 12px;">
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="审核单数" :value="filteredRows.length" /></a-card></a-col>
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="待审核" :value="pendingCount" /></a-card></a-col>
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="高风险单" :value="highRiskCount" /></a-card></a-col>
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="涉及金额" :value="totalAmount" suffix="元" :precision="2" /></a-card></a-col>
+    </a-row>
+
+    <DataTable rowKey="id" :columns="columns" :data-source="filteredRows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
           <a-tag :color="record.status === 'APPROVED' ? 'green' : record.status === 'REJECTED' ? 'red' : 'orange'">{{ record.status }}</a-tag>
+        </template>
+        <template v-else-if="column.key === 'riskLevel'">
+          <a-tag :color="riskColor(record)">{{ riskText(record) }}</a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
@@ -69,10 +87,17 @@ import { useElderOptions } from '../../composables/useElderOptions'
 import { getBaseConfigItemList } from '../../api/baseConfig'
 import { createDischargeFeeAudit, getDischargeFeeAuditPage, reviewDischargeFeeAudit } from '../../api/financeFee'
 import type { BaseConfigItem, DischargeFeeAuditItem, PageResult } from '../../types'
+import { computed } from 'vue'
 
 const loading = ref(false)
 const rows = ref<DischargeFeeAuditItem[]>([])
-const query = reactive({ pageNo: 1, pageSize: 10, status: undefined as string | undefined, keyword: '' })
+const query = reactive({
+  pageNo: 1,
+  pageSize: 10,
+  status: undefined as string | undefined,
+  riskLevel: undefined as 'HIGH' | 'MEDIUM' | 'LOW' | undefined,
+  keyword: ''
+})
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const statusOptions = [
   { label: '待审核', value: 'PENDING' },
@@ -85,11 +110,17 @@ const columns = [
   { title: '费用项', dataIndex: 'feeItem', key: 'feeItem', width: 140 },
   { title: '退住费用设置', dataIndex: 'dischargeFeeConfig', key: 'dischargeFeeConfig', width: 160 },
   { title: '应收应付', dataIndex: 'payableAmount', key: 'payableAmount', width: 120 },
+  { title: '风险等级', key: 'riskLevel', width: 100 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 120 },
   { title: '审核备注', dataIndex: 'auditRemark', key: 'auditRemark' },
   { title: '创建时间', dataIndex: 'createTime', key: 'createTime', width: 180 },
   { title: '操作', key: 'action', width: 140 }
 ]
+const filteredRows = computed(() => (rows.value || [])
+  .filter(item => !query.riskLevel || riskText(item) === (query.riskLevel === 'HIGH' ? '高' : query.riskLevel === 'MEDIUM' ? '中' : '低')))
+const pendingCount = computed(() => filteredRows.value.filter(item => item.status === 'PENDING').length)
+const highRiskCount = computed(() => filteredRows.value.filter(item => riskText(item) === '高').length)
+const totalAmount = computed(() => filteredRows.value.reduce((sum, item) => sum + Number(item.payableAmount || 0), 0))
 
 const createOpen = ref(false)
 const creating = ref(false)
@@ -124,9 +155,14 @@ async function fetchData() {
 function onReset() {
   query.pageNo = 1
   query.status = undefined
+  query.riskLevel = undefined
   query.keyword = ''
   pagination.current = 1
   fetchData()
+}
+
+function quickHighRisk() {
+  query.riskLevel = 'HIGH'
 }
 
 function handleTableChange(pag: any) {
@@ -230,6 +266,20 @@ function review(record: DischargeFeeAuditItem, status: 'APPROVED' | 'REJECTED') 
       fetchData()
     }
   })
+}
+
+function riskText(item: DischargeFeeAuditItem) {
+  const amount = Number(item.payableAmount || 0)
+  if (item.status === 'PENDING' && amount >= 2000) return '高'
+  if (item.status === 'PENDING') return '中'
+  return '低'
+}
+
+function riskColor(item: DischargeFeeAuditItem) {
+  const level = riskText(item)
+  if (level === '高') return 'red'
+  if (level === '中') return 'orange'
+  return 'green'
 }
 
 onMounted(async () => {

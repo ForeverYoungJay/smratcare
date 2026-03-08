@@ -840,6 +840,13 @@ public class FinanceWorkbenchController {
     LocalDate targetDate = (date == null || date.isBlank() || "today".equalsIgnoreCase(date))
         ? LocalDate.now()
         : LocalDate.parse(date);
+    return Result.ok(buildReconcileExceptions(orgId, targetDate, type));
+  }
+
+  private List<FinanceReconcileExceptionItem> buildReconcileExceptions(
+      Long orgId,
+      LocalDate targetDate,
+      String type) {
     LocalDateTime start = targetDate.atStartOfDay();
     LocalDateTime end = targetDate.plusDays(1).atStartOfDay();
 
@@ -888,7 +895,7 @@ public class FinanceWorkbenchController {
               "补充账单关联关系", item.getPaidAt())));
     }
 
-    return Result.ok(result);
+    return result;
   }
 
   @GetMapping("/ledger/health")
