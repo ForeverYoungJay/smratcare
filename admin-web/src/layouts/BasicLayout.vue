@@ -922,9 +922,11 @@ const quickChatRoomForm = reactive({
   memberIds: [] as string[],
   applyRemark: ''
 })
-const currentQuickChatSenderId = computed(() => {
-  const raw = userStore.staffInfo?.id
-  if (raw == null) return ''
+const quickChatAliasIdMap = reactive<Record<string, string>>({})
+const currentQuickChatSenderId = computed(() => String(userStore.staffInfo?.id || userStore.staffInfo?.username || 'me'))
+const currentQuickChatSenderNumericId = computed(() => {
+  const raw = Number(userStore.staffInfo?.id || 0)
+  if (!Number.isFinite(raw) || raw <= 0) return ''
   return String(raw)
 })
 const currentQuickChatSenderName = computed(() => String(userStore.staffInfo?.realName || userStore.staffInfo?.username || '我'))
@@ -1159,6 +1161,7 @@ let quickChatFanoutTimer: number | undefined
 let quickChatFanoutRetryTimer: number | undefined
 let quickChatEventEmitTimer: number | undefined
 let quickChatWsReconnectTimer: number | undefined
+let quickChatPermissionWarned = false
 const quickChatWsReconnectAttempt = ref(0)
 let quickChatWebSocket: WebSocket | null = null
 let quickChatWebSocketManualClose = false
@@ -1328,6 +1331,7 @@ watch(
     quickChatCloudRemoteUpdatedAt.value = 0
     quickChatCloudReady.value = false
     quickChatCloudSyncing.value = false
+    quickChatPermissionWarned = false
     quickChatWsReconnectAttempt.value = 0
     quickChatSyncConflict.visible = false
     quickChatSyncConflict.direction = ''
@@ -1348,6 +1352,9 @@ watch(
     connectQuickChatWebSocket()
     loadQuickChatState()
     reconcileQuickChatSelfIdentity()
+    hydrateQuickChatAliasMap().then(() => {
+      reconcileQuickChatSelfIdentity()
+    })
     pullQuickChatStateFromCloud(true)
     rehydrateQuickChatUnread()
     ensureActiveQuickChatVisible()
@@ -1962,6 +1969,41 @@ function quickChatTodoAutomationStorageKey() {
   return `layout_quick_chat_todo_auto_v1_org_${orgId}_${currentQuickChatSenderId.value}`
 }
 
+function rememberQuickChatStaffAlias(row: any) {
+  const idText = String(row?.id || '').trim()
+  if (!idText) return
+  quickChatAliasIdMap[idText] = idText
+  const username = String(row?.username || '').trim()
+  if (username) quickChatAliasIdMap[username] = idText
+  const staffNo = String(row?.staffNo || '').trim()
+  if (staffNo) quickChatAliasIdMap[staffNo] = idText
+}
+
+async function hydrateQuickChatAliasMap() {
+  try {
+    const page = await getStaffPage({
+      pageNo: 1,
+      pageSize: 500,
+      keyword: ''
+    })
+    ;(page.list || []).forEach((row: any) => rememberQuickChatStaffAlias(row))
+  } catch {}
+}
+
+function normalizeQuickChatMemberId(rawId: unknown) {
+  const text = String(rawId || '').trim()
+  if (!text) return ''
+  if (quickChatAliasIdMap[text]) return quickChatAliasIdMap[text]
+  const selfId = currentQuickChatSenderId.value
+  const selfNumericId = currentQuickChatSenderNumericId.value
+  if (selfId && text === selfId) return selfNumericId || selfId
+  if (selfNumericId && text === selfNumericId) return selfNumericId
+  if (text === 'me') return selfNumericId || selfId || text
+  const username = String(userStore.staffInfo?.username || '').trim()
+  if (username && text === username) return selfNumericId || selfId || text
+  return text
+}
+
 function quickChatPresenceKey() {
   return `layout_quick_chat_presence_v1_${userStorageScope()}`
 }
@@ -2083,7 +2125,9 @@ function normalizeQuickChatRooms(parsed: any[]) {
     id: String(room?.id || `room_${Date.now()}`),
     name: String(room?.name || '未命名群聊'),
     departmentIds: Array.isArray(room?.departmentIds) ? room.departmentIds.map((id: any) => String(id)) : [],
-    memberIds: Array.isArray(room?.memberIds) ? room.memberIds.map((id: any) => String(id)) : [],
+    memberIds: Array.isArray(room?.memberIds)
+      ? Array.from(new Set(room.memberIds.map((id: any) => normalizeQuickChatMemberId(id)).filter(Boolean)))
+      : [],
     unreadCount: Number(room?.unreadByUser?.[currentQuickChatSenderId.value] ?? room?.unreadCount ?? 0),
     unreadByUser: typeof room?.unreadByUser === 'object' && room?.unreadByUser
       ? Object.fromEntries(Object.entries(room.unreadByUser).map(([key, value]) => [String(key), Number(value || 0)]))
@@ -2361,7 +2405,7 @@ function roomMemberTargets(room: any) {
   const hasSelfId = Number.isFinite(selfId) && selfId > 0
   const raw = Array.isArray(room?.memberIds) ? room.memberIds : []
   return raw
-    .map((id: any) => Number(id))
+    .map((id: any) => Number(normalizeQuickChatMemberId(id)))
     .filter((id: number) => Number.isFinite(id) && id > 0 && (!hasSelfId || id !== selfId))
 }
 
@@ -2816,8 +2860,13 @@ async function pullQuickChatStateFromCloud(force = false) {
     quickChatCloudRemoteUpdatedAt.value = remoteLatestMs || Date.now()
     quickChatCloudLastPayload = remoteJson
     clearQuickChatSyncConflict()
-  } catch {
+  } catch (error: any) {
     quickChatCloudReady.value = true
+    const statusCode = Number(error?.response?.status || error?.status || 0)
+    if (statusCode === 403 && !quickChatPermissionWarned) {
+      quickChatPermissionWarned = true
+      message.warning('当前账号暂无聊天权限，请联系管理员检查角色配置')
+    }
     status = 'error'
   } finally {
     quickChatCloudSyncing.value = false
@@ -2906,7 +2955,9 @@ function applyQuickChatRealtimeEvent(eventRow: any) {
           id: String(roomPayload.id || roomId || `room_${Date.now()}`),
           name: String(roomPayload.name || '未命名群聊'),
           departmentIds: Array.isArray(roomPayload.departmentIds) ? roomPayload.departmentIds.map((id: any) => String(id)) : [],
-          memberIds: Array.isArray(roomPayload.memberIds) ? roomPayload.memberIds.map((id: any) => String(id)) : [],
+          memberIds: Array.isArray(roomPayload.memberIds)
+            ? Array.from(new Set(roomPayload.memberIds.map((id: any) => normalizeQuickChatMemberId(id)).filter(Boolean)))
+            : [],
           messages: [],
           unreadCount: 0,
           unreadByUser: { [currentQuickChatSenderId.value]: 0 },
@@ -2920,7 +2971,9 @@ function applyQuickChatRealtimeEvent(eventRow: any) {
       } else {
         existed.name = String(roomPayload.name || existed.name || '未命名群聊')
         existed.departmentIds = Array.isArray(roomPayload.departmentIds) ? roomPayload.departmentIds.map((id: any) => String(id)) : existed.departmentIds
-        existed.memberIds = Array.isArray(roomPayload.memberIds) ? roomPayload.memberIds.map((id: any) => String(id)) : existed.memberIds
+        existed.memberIds = Array.isArray(roomPayload.memberIds)
+          ? Array.from(new Set(roomPayload.memberIds.map((id: any) => normalizeQuickChatMemberId(id)).filter(Boolean)))
+          : existed.memberIds
         existed.notice = String(roomPayload.notice || existed.notice || '')
         existed.notificationMode = (['ALL', 'MENTION', 'MUTE'].includes(String(roomPayload.notificationMode || existed.notificationMode || 'ALL'))
           ? String(roomPayload.notificationMode || existed.notificationMode || 'ALL')
@@ -3214,6 +3267,14 @@ function memberNameById(staffId: string) {
   return matched?.name || `员工#${staffId}`
 }
 
+function expandDepartmentMemberIds(departmentIds: string[]) {
+  if (!departmentIds.length) return [] as string[]
+  const set = new Set(departmentIds.map((id) => String(id)))
+  return staffOptions.value
+    .filter((item) => item.departmentId && set.has(String(item.departmentId)))
+    .map((item) => String(item.value))
+}
+
 function ensureQuickChatSenderReady() {
   if (currentQuickChatSenderId.value) return true
   message.warning('账号信息尚未同步完成，请稍后重试')
@@ -3221,13 +3282,17 @@ function ensureQuickChatSenderReady() {
 }
 
 function reconcileQuickChatSelfIdentity() {
-  const selfId = currentQuickChatSenderId.value
+  const selfId = currentQuickChatSenderNumericId.value || currentQuickChatSenderId.value
   if (!selfId) return
   const username = String(userStore.staffInfo?.username || '').trim()
-  const aliasSet = new Set<string>(['me'])
+  const aliasSet = new Set<string>(['me', currentQuickChatSenderId.value])
   if (username) aliasSet.add(username)
   aliasSet.delete(selfId)
   if (!aliasSet.size) return
+  if (username) {
+    quickChatAliasIdMap[username] = selfId
+  }
+  quickChatAliasIdMap[selfId] = selfId
   let changed = false
   quickChatRooms.value.forEach((room) => {
     let roomChanged = false
@@ -3704,8 +3769,9 @@ function submitQuickChatRoomEditor() {
     return
   }
   const selfId = currentQuickChatSenderId.value
-  const selectedMembers = Array.from(new Set([...(quickChatRoomForm.memberIds || []), selfId].map((id) => String(id))))
   const selectedDepartments = Array.from(new Set((quickChatRoomForm.departmentIds || []).map((id) => String(id))))
+  const departmentMemberIds = expandDepartmentMemberIds(selectedDepartments)
+  const selectedMembers = Array.from(new Set([...(quickChatRoomForm.memberIds || []), ...departmentMemberIds, selfId].map((id) => String(id))))
   if (quickChatRoomEditorMode.value === 'rename') {
     const room = activeQuickChatRoom.value
     if (!room) {
@@ -4213,6 +4279,7 @@ onMounted(() => {
   updateQuickChatDrawerWidth()
   hydrateCurrentStaffInfo()
     .then(() => Promise.allSettled([searchDepartments(''), searchStaff('')]))
+    .then(() => hydrateQuickChatAliasMap())
     .then(() => {
       syncDepartmentName()
       loadHeaderSettings()

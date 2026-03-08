@@ -1064,7 +1064,19 @@ import VChart from 'vue-echarts'
 import PageContainer from '../components/PageContainer.vue'
 import StatefulBlock from '../components/StatefulBlock.vue'
 import { useUserStore } from '../stores/user'
-import { createOaTask, getOaTaskCalendar, getPortalSummary, updateOaTask, completeOaTask, deleteOaTask, getApprovalPage, updateApproval, checkOaTaskConflicts } from '../api/oa'
+import {
+  createOaTask,
+  getOaTaskCalendar,
+  getPortalSummary,
+  getTodoSummary,
+  getApprovalSummary,
+  updateOaTask,
+  completeOaTask,
+  deleteOaTask,
+  getApprovalPage,
+  updateApproval,
+  checkOaTaskConflicts
+} from '../api/oa'
 import { getBirthdayPage } from '../api/life'
 import type { OaPortalSummary, OaTask, PageResult, BedItem, CrmContractItem, CrmLeadItem, OaApproval, BirthdayReminder } from '../types'
 import { useLiveSyncRefresh } from '../composables/useLiveSyncRefresh'
@@ -1303,6 +1315,11 @@ const summary = reactive<OaPortalSummary>({
   marketingChannels: [],
   collaborationGantt: [],
   latestSuggestions: []
+})
+const myTodoSummary = reactive({
+  pendingApprovalCount: 0,
+  openTodoCount: 0,
+  timeoutApprovalCount: 0
 })
 
 const dashboard = ref<DashboardSummary>({
@@ -1625,13 +1642,15 @@ const groupedCustomCards = computed(() => {
 })
 
 const myTodoStats = computed(() => [
-  { title: '待审批流程', value: summary.pendingApprovalCount || 0, route: '/oa/approval' },
-  { title: '待处理任务', value: summary.openTodoCount || 0, route: '/oa/todo' },
+  { title: '待审批流程', value: myTodoSummary.pendingApprovalCount || 0, route: '/oa/approval?scope=PENDING_REVIEW' },
+  { title: '待处理任务', value: myTodoSummary.openTodoCount || 0, route: '/oa/todo' },
   { title: '待确认事项', value: summary.ongoingTaskCount || 0, route: '/oa/work-execution/task' },
-  { title: '超时未处理', value: summary.approvalTimeoutCount || 0, route: '/oa/approval?status=PENDING&overdue=1' }
+  { title: '超时未处理', value: myTodoSummary.timeoutApprovalCount || 0, route: '/oa/approval?scope=PENDING_REVIEW&overdue=1' }
 ])
 
-const totalTodoCount = computed(() => myTodoStats.value.reduce((sum, item) => sum + Number(item.value || 0), 0))
+const totalTodoCount = computed(() =>
+  Number(myTodoSummary.pendingApprovalCount || 0) + Number(myTodoSummary.openTodoCount || 0)
+)
 
 function thresholdLevel(value: number, warningThreshold: number, urgentThreshold: number) {
   if (value >= urgentThreshold) return '紧急'
@@ -4005,6 +4024,16 @@ async function loadSummary() {
   Object.assign(summary, data)
 }
 
+async function loadMyTodoSummary() {
+  const [todo, approval] = await Promise.all([
+    getTodoSummary({ status: 'OPEN', mineOnly: true }),
+    getApprovalSummary({ pendingMine: true })
+  ])
+  myTodoSummary.openTodoCount = Number(todo?.openCount || 0)
+  myTodoSummary.pendingApprovalCount = Number(approval?.pendingCount || 0)
+  myTodoSummary.timeoutApprovalCount = Number(approval?.timeoutPendingCount || 0)
+}
+
 async function loadCalendar() {
   calendarLoading.value = true
   try {
@@ -4087,6 +4116,7 @@ async function refreshPortalModules(withCalendar = true, source = '自动刷新'
   lastSyncSource.value = source
   const jobs: Array<Promise<any>> = [
     loadSummary(),
+    loadMyTodoSummary(),
     loadDashboard(),
     loadApprovalTracks(),
     loadBirthdayPlan()

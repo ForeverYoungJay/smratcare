@@ -34,7 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/oa/quick-chat/state")
-@PreAuthorize("isAuthenticated() and !hasRole('FAMILY')")
+@PreAuthorize("isAuthenticated()")
 public class OaQuickChatStateController {
   private static final int MAX_STATE_BYTES = 2 * 1024 * 1024;
   private static final TypeReference<List<Map<String, Object>>> ROOM_LIST_TYPE = new TypeReference<>() {};

@@ -51,13 +51,14 @@ public class OaTodoController {
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String sourceType,
-      @RequestParam(required = false) String keyword) {
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false, defaultValue = "false") boolean mineOnly) {
     Long orgId = AuthContext.getOrgId();
     Long staffId = AuthContext.getStaffId();
     boolean adminView = AuthContext.isAdmin();
     String normalizedStatus = normalizeStatus(status);
     String normalizedSourceType = normalizeSourceType(sourceType);
-    var wrapper = buildQuery(orgId, staffId, adminView, normalizedStatus, normalizedSourceType, keyword)
+    var wrapper = buildQuery(orgId, staffId, adminView, mineOnly, normalizedStatus, normalizedSourceType, keyword)
         .orderByDesc(OaTodo::getCreateTime);
     return Result.ok(todoMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
   }
@@ -66,7 +67,8 @@ public class OaTodoController {
   public Result<OaTodoSummaryResponse> summary(
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String sourceType,
-      @RequestParam(required = false) String keyword) {
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false, defaultValue = "false") boolean mineOnly) {
     Long orgId = AuthContext.getOrgId();
     Long staffId = AuthContext.getStaffId();
     boolean adminView = AuthContext.isAdmin();
@@ -77,23 +79,23 @@ public class OaTodoController {
     LocalDateTime endOfToday = startOfToday.plusDays(1);
 
     OaTodoSummaryResponse response = new OaTodoSummaryResponse();
-    response.setTotalCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, normalizedStatus, normalizedSourceType, keyword))));
-    response.setOpenCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, "OPEN", normalizedSourceType, keyword))));
-    response.setDoneCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, "DONE", normalizedSourceType, keyword))));
-    response.setDueTodayCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, normalizedStatus, normalizedSourceType, keyword)
+    response.setTotalCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, mineOnly, normalizedStatus, normalizedSourceType, keyword))));
+    response.setOpenCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, mineOnly, "OPEN", normalizedSourceType, keyword))));
+    response.setDoneCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, mineOnly, "DONE", normalizedSourceType, keyword))));
+    response.setDueTodayCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, mineOnly, normalizedStatus, normalizedSourceType, keyword)
         .eq(OaTodo::getStatus, "OPEN")
         .isNotNull(OaTodo::getDueTime)
         .ge(OaTodo::getDueTime, startOfToday)
         .lt(OaTodo::getDueTime, endOfToday))));
-    response.setOverdueCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, normalizedStatus, normalizedSourceType, keyword)
+    response.setOverdueCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, mineOnly, normalizedStatus, normalizedSourceType, keyword)
         .eq(OaTodo::getStatus, "OPEN")
         .isNotNull(OaTodo::getDueTime)
         .lt(OaTodo::getDueTime, now))));
-    response.setUnassignedCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, normalizedStatus, normalizedSourceType, keyword)
+    response.setUnassignedCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, mineOnly, normalizedStatus, normalizedSourceType, keyword)
         .and(w -> w.isNull(OaTodo::getAssigneeName).or().eq(OaTodo::getAssigneeName, "")))));
-    response.setBirthdayOpenCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, "OPEN", "BIRTHDAY", keyword))));
-    response.setApprovalOpenCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, "OPEN", "APPROVAL", keyword))));
-    response.setNormalOpenCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, "OPEN", "NORMAL", keyword))));
+    response.setBirthdayOpenCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, mineOnly, "OPEN", "BIRTHDAY", keyword))));
+    response.setApprovalOpenCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, mineOnly, "OPEN", "APPROVAL", keyword))));
+    response.setNormalOpenCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, mineOnly, "OPEN", "NORMAL", keyword))));
     return Result.ok(response);
   }
 
@@ -332,13 +334,14 @@ public class OaTodoController {
   public ResponseEntity<byte[]> export(
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String sourceType,
-      @RequestParam(required = false) String keyword) {
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false, defaultValue = "false") boolean mineOnly) {
     Long orgId = AuthContext.getOrgId();
     Long staffId = AuthContext.getStaffId();
     boolean adminView = AuthContext.isAdmin();
     String normalizedStatus = normalizeStatus(status);
     String normalizedSourceType = normalizeSourceType(sourceType);
-    var wrapper = buildQuery(orgId, staffId, adminView, normalizedStatus, normalizedSourceType, keyword)
+    var wrapper = buildQuery(orgId, staffId, adminView, mineOnly, normalizedStatus, normalizedSourceType, keyword)
         .orderByDesc(OaTodo::getCreateTime);
     List<OaTodo> todos = todoMapper.selectList(wrapper);
     List<String> headers = List.of("ID", "来源", "标题", "内容", "负责人", "截止时间", "状态");
@@ -495,12 +498,12 @@ public class OaTodoController {
   }
 
   private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OaTodo> buildQuery(
-      Long orgId, Long staffId, boolean adminView, String normalizedStatus, String normalizedSourceType, String keyword) {
+      Long orgId, Long staffId, boolean adminView, boolean mineOnly, String normalizedStatus, String normalizedSourceType, String keyword) {
     var wrapper = Wrappers.lambdaQuery(OaTodo.class)
         .eq(OaTodo::getIsDeleted, 0)
         .eq(orgId != null, OaTodo::getOrgId, orgId)
         .eq(normalizedStatus != null, OaTodo::getStatus, normalizedStatus);
-    if (!adminView) {
+    if (mineOnly || !adminView) {
       if (staffId == null) {
         wrapper.eq(OaTodo::getId, -1L);
         return wrapper;
