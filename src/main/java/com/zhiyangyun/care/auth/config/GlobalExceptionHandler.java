@@ -28,7 +28,7 @@ public class GlobalExceptionHandler {
   @ResponseStatus(HttpStatus.FORBIDDEN)
   public Result<Void> handleAccessDenied(AccessDeniedException ex) {
     log.warn("Access denied: {}", ex.getMessage());
-    return Result.error(403, "Access denied");
+    return Result.error(403, "无权限访问该资源");
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)

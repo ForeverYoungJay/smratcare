@@ -224,6 +224,15 @@ export function exportActivityPlan(params) {
 export function getOaTaskPage(params) {
     return fetchPage('/api/oa/task/page', params);
 }
+export function getOaTaskSummary(params) {
+    return request.get('/api/oa/task/summary', { params });
+}
+export function getQuickChatState() {
+    return request.get('/api/oa/quick-chat/state');
+}
+export function saveQuickChatState(stateJson) {
+    return request.put('/api/oa/quick-chat/state', { stateJson });
+}
 export function getOaTaskCalendar(params) {
     return request.get('/api/oa/task/calendar', { params });
 }

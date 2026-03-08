@@ -4067,13 +4067,25 @@ async function refreshPortalModules(withCalendar = true, source = '自动刷新'
   const jobs: Array<Promise<any>> = [
     loadSummary(),
     loadDashboard(),
-    loadFinanceOverview(),
-    loadSalesFunnel(),
-    loadBedAndElderStatus(),
-    loadHrReminder(),
     loadApprovalTracks(),
     loadBirthdayPlan()
   ]
+  if (isModuleVisible('finance') || isModuleVisible('expense')) {
+    jobs.push(loadFinanceOverview())
+  }
+  if (isModuleVisible('salesFunnel')) {
+    jobs.push(loadSalesFunnel())
+  }
+  if (isModuleVisible('bedStatus') || isModuleVisible('operation')) {
+    jobs.push(loadBedAndElderStatus())
+  }
+  if (
+    currentUserAudience.value.includes('HR') ||
+    currentUserAudience.value.includes('ADMIN') ||
+    currentUserAudience.value.includes('DIRECTOR')
+  ) {
+    jobs.push(loadHrReminder())
+  }
   if (withCalendar) {
     jobs.push(loadCalendar())
   }

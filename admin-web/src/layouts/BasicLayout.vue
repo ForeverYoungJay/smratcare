@@ -332,7 +332,7 @@
             />
             <a-button size="small" :disabled="!activeQuickChatRoom" @click="openNoticeEditor">编辑公告</a-button>
             <a-button size="small" :disabled="!activeQuickChatRoom" @click="markActiveRoomRead">全部已读</a-button>
-            <a-button size="small" danger :disabled="!activeQuickChatRoom" @click="removeActiveQuickChatRoom">删除会话</a-button>
+            <a-button size="small" danger :disabled="!activeQuickChatRoom" @click="removeActiveQuickChatRoom">删除会话（可恢复）</a-button>
           </a-space>
         </div>
         <div ref="quickChatMessagesRef" class="quick-chat-messages">
@@ -687,6 +687,7 @@ import { getMenuTree } from './menu'
 import { getMe } from '../api/auth'
 import { getStaffPage } from '../api/rbac'
 import { updateStaff } from '../api/staff'
+import { getQuickChatState, saveQuickChatState } from '../api/oa'
 import { useDepartmentOptions } from '../composables/useDepartmentOptions'
 import { useStaffOptions } from '../composables/useStaffOptions'
 import { canBeDirectLeader, canBeIndirectLeader, ensureSupervisorOrder } from '../utils/supervisor'
@@ -1118,6 +1119,14 @@ const presenceStatus = computed(() => {
 const presenceTick = ref(Date.now())
 let presenceTimer: number | undefined
 let quickChatSyncUnsubscribe = () => {}
+let quickChatCloudPullTimer: number | undefined
+let quickChatCloudSaveTimer: number | undefined
+const QUICK_CHAT_CLOUD_PULL_INTERVAL_MS = 30000
+const QUICK_CHAT_CLOUD_SAVE_DEBOUNCE_MS = 900
+const quickChatCloudReady = ref(false)
+const quickChatCloudRemoteUpdatedAt = ref(0)
+const quickChatCloudSavePending = ref(false)
+let quickChatCloudLastPayload = ''
 
 const filteredMenu = computed(() => {
   const roles = userStore.roles || []
@@ -1178,6 +1187,11 @@ watch(
 watch(
   () => currentQuickChatSenderId.value,
   () => {
+    quickChatCloudLastPayload = ''
+    quickChatCloudRemoteUpdatedAt.value = 0
+    quickChatCloudReady.value = false
+    loadQuickChatState()
+    pullQuickChatStateFromCloud(true)
     rehydrateQuickChatUnread()
     ensureActiveQuickChatVisible()
     loadQuickChatTodo()
@@ -1871,39 +1885,141 @@ function loadQuickChatTodoAutomation() {
   }
 }
 
-function persistQuickChatState() {
+function buildQuickChatStatePayload() {
+  return quickChatRooms.value.slice(0, 50).map((room) => ({
+    id: room.id,
+    name: room.name,
+    departmentIds: Array.isArray(room.departmentIds) ? room.departmentIds : [],
+    memberIds: Array.isArray(room.memberIds) ? room.memberIds : [],
+    unreadCount: Number(room.unreadCount || 0),
+    unreadByUser: room.unreadByUser || {},
+    pinned: room.pinned === true,
+    notificationMode: room.notificationMode || 'ALL',
+    notice: String(room.notice || ''),
+    archivedByUser: room.archivedByUser || {},
+    createdAt: room.createdAt,
+    updatedAt: room.updatedAt || room.createdAt,
+    messages: Array.isArray(room.messages)
+      ? room.messages.slice(-200).map((message) => ({
+        id: message.id,
+        senderId: message.senderId,
+        senderName: message.senderName,
+        kind: message.kind,
+        content: message.content || '',
+        fileName: message.fileName || '',
+        fileUrl: message.fileUrl || '',
+        timeText: message.timeText || dayjs().format('MM-DD HH:mm'),
+        createdAt: message.createdAt || dayjs().toISOString(),
+        recalled: message.recalled === true,
+        readByUser: message.readByUser || {}
+      }))
+      : []
+  }))
+}
+
+function normalizeQuickChatRooms(parsed: any[]) {
+  return parsed.map((room: any) => ({
+    id: String(room?.id || `room_${Date.now()}`),
+    name: String(room?.name || '未命名群聊'),
+    departmentIds: Array.isArray(room?.departmentIds) ? room.departmentIds.map((id: any) => String(id)) : [],
+    memberIds: Array.isArray(room?.memberIds) ? room.memberIds.map((id: any) => String(id)) : [],
+    unreadCount: Number(room?.unreadByUser?.[currentQuickChatSenderId.value] ?? room?.unreadCount ?? 0),
+    unreadByUser: typeof room?.unreadByUser === 'object' && room?.unreadByUser
+      ? Object.fromEntries(Object.entries(room.unreadByUser).map(([key, value]) => [String(key), Number(value || 0)]))
+      : {
+        [currentQuickChatSenderId.value]: Number(room?.unreadCount || 0)
+      },
+    pinned: room?.pinned === true,
+    notificationMode: (['ALL', 'MENTION', 'MUTE'].includes(String(room?.notificationMode || 'ALL'))
+      ? String(room.notificationMode)
+      : 'ALL') as QuickChatRoom['notificationMode'],
+    notice: String(room?.notice || ''),
+    archivedByUser: typeof room?.archivedByUser === 'object' && room?.archivedByUser
+      ? Object.fromEntries(Object.entries(room.archivedByUser).map(([key, value]) => [String(key), value === true]))
+      : {},
+    createdAt: String(room?.createdAt || dayjs().toISOString()),
+    updatedAt: String(room?.updatedAt || room?.createdAt || dayjs().toISOString()),
+    messages: Array.isArray(room?.messages)
+      ? room.messages.map((message: any) => ({
+        id: String(message?.id || `m_${Date.now()}`),
+        senderId: String(message?.senderId || 'system'),
+        senderName: String(message?.senderName || '系统'),
+        kind: (['TEXT', 'IMAGE', 'FILE', 'SYSTEM'].includes(String(message?.kind || 'TEXT')) ? String(message?.kind || 'TEXT') : 'TEXT') as QuickChatMessage['kind'],
+        content: String(message?.content || ''),
+        fileName: message?.fileName ? String(message.fileName) : undefined,
+        fileUrl: message?.fileUrl ? String(message.fileUrl) : undefined,
+        timeText: String(message?.timeText || dayjs().format('MM-DD HH:mm')),
+        createdAt: String(message?.createdAt || dayjs().toISOString()),
+        recalled: message?.recalled === true,
+        readByUser: typeof message?.readByUser === 'object' && message?.readByUser
+          ? Object.fromEntries(Object.entries(message.readByUser).map(([key, value]) => [String(key), Boolean(value)]))
+          : {}
+      }))
+      : []
+  }))
+}
+
+function applyQuickChatRoomsFromPayload(parsed: any[], preferredActiveId = '') {
+  quickChatRooms.value = normalizeQuickChatRooms(parsed)
+  activeQuickChatRoomId.value = preferredActiveId || sortedQuickChatRooms.value[0]?.id || ''
+  rehydrateQuickChatUnread()
+  ensureActiveQuickChatVisible()
+}
+
+function quickChatLatestRoomUpdateMs(rooms: Array<Partial<QuickChatRoom>>) {
+  return rooms.reduce((maxTs, room) => {
+    const roomTs = dayjs(room.updatedAt || room.createdAt || dayjs().toISOString()).valueOf()
+    const messages = Array.isArray(room.messages) ? room.messages : []
+    const messageTs = messages.reduce((msgMax, msg: any) => {
+      const ts = dayjs(msg?.createdAt || dayjs().toISOString()).valueOf()
+      return ts > msgMax ? ts : msgMax
+    }, 0)
+    return Math.max(maxTs, roomTs, messageTs)
+  }, 0)
+}
+
+function localQuickChatLatestMs() {
+  return quickChatLatestRoomUpdateMs(quickChatRooms.value)
+}
+
+async function pushQuickChatStateToCloud(stateJson: string) {
+  if (!stateJson || !quickChatCloudReady.value) return
+  if (quickChatCloudSavePending.value) return
+  quickChatCloudSavePending.value = true
   try {
-    const payload = quickChatRooms.value.slice(0, 50).map((room) => ({
-      id: room.id,
-      name: room.name,
-      departmentIds: Array.isArray(room.departmentIds) ? room.departmentIds : [],
-      memberIds: Array.isArray(room.memberIds) ? room.memberIds : [],
-      unreadCount: Number(room.unreadCount || 0),
-      unreadByUser: room.unreadByUser || {},
-      pinned: room.pinned === true,
-      notificationMode: room.notificationMode || 'ALL',
-      notice: String(room.notice || ''),
-      archivedByUser: room.archivedByUser || {},
-      createdAt: room.createdAt,
-      updatedAt: room.updatedAt || room.createdAt,
-      messages: Array.isArray(room.messages)
-        ? room.messages.slice(-200).map((message) => ({
-          id: message.id,
-          senderId: message.senderId,
-          senderName: message.senderName,
-          kind: message.kind,
-          content: message.content || '',
-          fileName: message.fileName || '',
-          fileUrl: message.fileUrl || '',
-          timeText: message.timeText || dayjs().format('MM-DD HH:mm'),
-          createdAt: message.createdAt || dayjs().toISOString(),
-          recalled: message.recalled === true,
-          readByUser: message.readByUser || {}
-        }))
-        : []
-    }))
-    localStorage.setItem(quickChatStorageKey(), JSON.stringify(payload))
+    const saved = await saveQuickChatState(stateJson)
+    const serverMs = dayjs(saved?.updateTime || dayjs().toISOString()).valueOf()
+    quickChatCloudRemoteUpdatedAt.value = serverMs || Date.now()
+    quickChatCloudLastPayload = stateJson
+  } catch {
+    // 云端失败不阻塞本地，等待下一次自动重试。
+  } finally {
+    quickChatCloudSavePending.value = false
+  }
+}
+
+function scheduleQuickChatCloudSave(stateJson: string) {
+  if (!quickChatCloudReady.value || !stateJson) return
+  if (stateJson === quickChatCloudLastPayload) return
+  if (quickChatCloudSaveTimer) {
+    window.clearTimeout(quickChatCloudSaveTimer)
+    quickChatCloudSaveTimer = undefined
+  }
+  quickChatCloudSaveTimer = window.setTimeout(() => {
+    quickChatCloudSaveTimer = undefined
+    pushQuickChatStateToCloud(stateJson)
+  }, QUICK_CHAT_CLOUD_SAVE_DEBOUNCE_MS)
+}
+
+function persistQuickChatState(options?: { skipCloud?: boolean }) {
+  try {
+    const payload = buildQuickChatStatePayload()
+    const payloadJson = JSON.stringify(payload)
+    localStorage.setItem(quickChatStorageKey(), payloadJson)
     emitQuickChatSync()
+    if (!options?.skipCloud) {
+      scheduleQuickChatCloudSave(payloadJson)
+    }
   } catch {}
 }
 
@@ -2068,50 +2184,56 @@ function loadQuickChatState() {
       activeQuickChatRoomId.value = ''
       return
     }
-    quickChatRooms.value = parsed.map((room: any) => ({
-      id: String(room?.id || `room_${Date.now()}`),
-      name: String(room?.name || '未命名群聊'),
-      departmentIds: Array.isArray(room?.departmentIds) ? room.departmentIds.map((id: any) => String(id)) : [],
-      memberIds: Array.isArray(room?.memberIds) ? room.memberIds.map((id: any) => String(id)) : [],
-      unreadCount: Number(room?.unreadByUser?.[currentQuickChatSenderId.value] ?? room?.unreadCount ?? 0),
-      unreadByUser: typeof room?.unreadByUser === 'object' && room?.unreadByUser
-        ? Object.fromEntries(Object.entries(room.unreadByUser).map(([key, value]) => [String(key), Number(value || 0)]))
-        : {
-          [currentQuickChatSenderId.value]: Number(room?.unreadCount || 0)
-        },
-      pinned: room?.pinned === true,
-      notificationMode: (['ALL', 'MENTION', 'MUTE'].includes(String(room?.notificationMode || 'ALL'))
-        ? String(room.notificationMode)
-        : 'ALL') as QuickChatRoom['notificationMode'],
-      notice: String(room?.notice || ''),
-      archivedByUser: typeof room?.archivedByUser === 'object' && room?.archivedByUser
-        ? Object.fromEntries(Object.entries(room.archivedByUser).map(([key, value]) => [String(key), value === true]))
-        : {},
-      createdAt: String(room?.createdAt || dayjs().toISOString()),
-      updatedAt: String(room?.updatedAt || room?.createdAt || dayjs().toISOString()),
-      messages: Array.isArray(room?.messages)
-        ? room.messages.map((message: any) => ({
-          id: String(message?.id || `m_${Date.now()}`),
-          senderId: String(message?.senderId || 'system'),
-          senderName: String(message?.senderName || '系统'),
-          kind: (['TEXT', 'IMAGE', 'FILE', 'SYSTEM'].includes(String(message?.kind || 'TEXT')) ? String(message?.kind || 'TEXT') : 'TEXT') as QuickChatMessage['kind'],
-          content: String(message?.content || ''),
-          fileName: message?.fileName ? String(message.fileName) : undefined,
-          fileUrl: message?.fileUrl ? String(message.fileUrl) : undefined,
-          timeText: String(message?.timeText || dayjs().format('MM-DD HH:mm')),
-          createdAt: String(message?.createdAt || dayjs().toISOString()),
-          recalled: message?.recalled === true,
-          readByUser: typeof message?.readByUser === 'object' && message?.readByUser
-            ? Object.fromEntries(Object.entries(message.readByUser).map(([key, value]) => [String(key), Boolean(value)]))
-            : {}
-        }))
-        : []
-    }))
-    activeQuickChatRoomId.value = sortedQuickChatRooms.value[0]?.id || ''
+    applyQuickChatRoomsFromPayload(parsed)
   } catch {
     quickChatRooms.value = []
     activeQuickChatRoomId.value = ''
   }
+}
+
+async function pullQuickChatStateFromCloud(force = false) {
+  if (!userStore.staffInfo?.id) return
+  try {
+    const remote = await getQuickChatState()
+    quickChatCloudReady.value = true
+    const remoteJson = String(remote?.stateJson || '')
+    const serverMs = dayjs(remote?.updateTime || dayjs().toISOString()).valueOf()
+    if (!remoteJson) {
+      if (localQuickChatLatestMs() > 0) {
+        const localPayloadJson = JSON.stringify(buildQuickChatStatePayload())
+        scheduleQuickChatCloudSave(localPayloadJson)
+      }
+      return
+    }
+    const parsed = JSON.parse(remoteJson)
+    if (!Array.isArray(parsed)) return
+    const remotePayloadMs = quickChatLatestRoomUpdateMs(parsed as Array<Partial<QuickChatRoom>>)
+    const remoteLatestMs = Math.max(serverMs || 0, remotePayloadMs || 0)
+    if (!force && remoteLatestMs > 0 && remoteLatestMs <= quickChatCloudRemoteUpdatedAt.value) return
+    const localLatestMs = localQuickChatLatestMs()
+    if (!force && localLatestMs > remoteLatestMs + 1000) {
+      const localPayloadJson = JSON.stringify(buildQuickChatStatePayload())
+      scheduleQuickChatCloudSave(localPayloadJson)
+      return
+    }
+    const previousActive = activeQuickChatRoomId.value
+    applyQuickChatRoomsFromPayload(parsed, previousActive)
+    localStorage.setItem(quickChatStorageKey(), remoteJson)
+    quickChatCloudRemoteUpdatedAt.value = remoteLatestMs || Date.now()
+    quickChatCloudLastPayload = remoteJson
+  } catch {
+    quickChatCloudReady.value = true
+  }
+}
+
+function setupQuickChatCloudPullTimer() {
+  if (quickChatCloudPullTimer) {
+    window.clearInterval(quickChatCloudPullTimer)
+    quickChatCloudPullTimer = undefined
+  }
+  quickChatCloudPullTimer = window.setInterval(() => {
+    pullQuickChatStateFromCloud(false)
+  }, QUICK_CHAT_CLOUD_PULL_INTERVAL_MS)
 }
 
 function emitQuickChatSync() {
@@ -2172,6 +2294,7 @@ function loadPresenceState() {
 
 function openQuickChat() {
   quickChatOpen.value = true
+  pullQuickChatStateFromCloud(false)
   if (!activeQuickChatRoomId.value && sortedQuickChatRooms.value.length) {
     activeQuickChatRoomId.value = sortedQuickChatRooms.value[0].id
   }
@@ -2841,13 +2964,13 @@ function markActiveRoomRead() {
 function removeActiveQuickChatRoom() {
   const room = activeQuickChatRoom.value
   if (!room) return
-  const roomId = room.id
-  quickChatRooms.value = quickChatRooms.value.filter((item) => item.id !== roomId)
-  if (activeQuickChatRoomId.value === roomId) {
-    activeQuickChatRoomId.value = sortedQuickChatRooms.value[0]?.id || ''
-  }
+  room.archivedByUser = room.archivedByUser || {}
+  const userId = currentQuickChatSenderId.value
+  room.archivedByUser[userId] = true
+  room.updatedAt = dayjs().toISOString()
   persistQuickChatState()
-  message.success('会话已删除')
+  ensureActiveQuickChatVisible()
+  message.success('会话已移入归档，可在“已归档”中恢复')
 }
 
 function togglePinActiveQuickChatRoom() {
@@ -3160,6 +3283,7 @@ onMounted(() => {
       syncDepartmentName()
       loadHeaderSettings()
       loadQuickChatState()
+      pullQuickChatStateFromCloud(true)
       loadQuickChatTodo()
       loadQuickChatTodoAutomation()
       loadPresenceState()
@@ -3183,6 +3307,7 @@ onMounted(() => {
     if (payload.url !== '/local/quick-chat') return
     syncQuickChatFromStorage()
   })
+  setupQuickChatCloudPullTimer()
   setupQuickChatTodoEscalationTimer()
   window.setTimeout(() => runAutoEscalationIfNeeded(), 800)
   window.addEventListener('resize', updateQuickChatDrawerWidth)
@@ -3196,6 +3321,14 @@ onBeforeUnmount(() => {
     presenceTimer = undefined
   }
   quickChatSyncUnsubscribe()
+  if (quickChatCloudPullTimer) {
+    window.clearInterval(quickChatCloudPullTimer)
+    quickChatCloudPullTimer = undefined
+  }
+  if (quickChatCloudSaveTimer) {
+    window.clearTimeout(quickChatCloudSaveTimer)
+    quickChatCloudSaveTimer = undefined
+  }
   if (quickChatTodoEscalationTimer) {
     window.clearInterval(quickChatTodoEscalationTimer)
     quickChatTodoEscalationTimer = undefined

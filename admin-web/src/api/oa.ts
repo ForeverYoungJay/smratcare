@@ -379,6 +379,22 @@ export function getOaTaskSummary(params: any) {
   return request.get<OaTaskSummary>('/api/oa/task/summary', { params })
 }
 
+export interface OaQuickChatStatePayload {
+  id?: number
+  orgId?: number
+  staffId?: number
+  stateJson?: string
+  updateTime?: string
+}
+
+export function getQuickChatState() {
+  return request.get<OaQuickChatStatePayload>('/api/oa/quick-chat/state')
+}
+
+export function saveQuickChatState(stateJson: string) {
+  return request.put<OaQuickChatStatePayload>('/api/oa/quick-chat/state', { stateJson })
+}
+
 export function getOaTaskCalendar(params: any) {
   return request.get<OaTask[]>('/api/oa/task/calendar', { params })
 }

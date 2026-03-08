@@ -18,6 +18,6 @@ public class RestAccessDeniedHandler implements AccessDeniedHandler {
       AccessDeniedException accessDeniedException) throws IOException {
     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
     response.setContentType("application/json;charset=UTF-8");
-    response.getWriter().write(objectMapper.writeValueAsString(Result.error(403, "Access denied")));
+    response.getWriter().write(objectMapper.writeValueAsString(Result.error(403, "无权限访问该资源")));
   }
 }
