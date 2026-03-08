@@ -922,7 +922,11 @@ const quickChatRoomForm = reactive({
   memberIds: [] as string[],
   applyRemark: ''
 })
-const currentQuickChatSenderId = computed(() => String(userStore.staffInfo?.id || userStore.staffInfo?.username || 'me'))
+const currentQuickChatSenderId = computed(() => {
+  const raw = userStore.staffInfo?.id
+  if (raw == null) return ''
+  return String(raw)
+})
 const currentQuickChatSenderName = computed(() => String(userStore.staffInfo?.realName || userStore.staffInfo?.username || '我'))
 const quickChatNotifyModeOptions = [
   { label: '全部提醒', value: 'ALL' },
@@ -1343,6 +1347,7 @@ watch(
     quickChatWebSocketManualClose = false
     connectQuickChatWebSocket()
     loadQuickChatState()
+    reconcileQuickChatSelfIdentity()
     pullQuickChatStateFromCloud(true)
     rehydrateQuickChatUnread()
     ensureActiveQuickChatVisible()
@@ -2115,6 +2120,105 @@ function normalizeQuickChatRooms(parsed: any[]) {
   }))
 }
 
+function cloneQuickChatMessageRow(messageRow: QuickChatMessage): QuickChatMessage {
+  return {
+    ...messageRow,
+    readByUser: { ...(messageRow.readByUser || {}) }
+  }
+}
+
+function cloneQuickChatRoomRow(room: QuickChatRoom): QuickChatRoom {
+  return {
+    ...room,
+    departmentIds: [...(room.departmentIds || [])],
+    memberIds: [...(room.memberIds || [])],
+    unreadByUser: { ...(room.unreadByUser || {}) },
+    archivedByUser: { ...(room.archivedByUser || {}) },
+    messages: Array.isArray(room.messages) ? room.messages.map((msg) => cloneQuickChatMessageRow(msg)) : []
+  }
+}
+
+function mergeQuickChatRoomRows(localRooms: QuickChatRoom[], remoteRooms: QuickChatRoom[]) {
+  const currentId = currentQuickChatSenderId.value
+  const merged = new Map<string, QuickChatRoom>()
+  localRooms.forEach((room) => {
+    merged.set(room.id, cloneQuickChatRoomRow(room))
+  })
+  remoteRooms.forEach((remoteRoom) => {
+    const existed = merged.get(remoteRoom.id)
+    if (!existed) {
+      merged.set(remoteRoom.id, cloneQuickChatRoomRow(remoteRoom))
+      return
+    }
+    const localTs = dayjs(existed.updatedAt || existed.createdAt).valueOf()
+    const remoteTs = dayjs(remoteRoom.updatedAt || remoteRoom.createdAt).valueOf()
+    const preferRemote = remoteTs >= localTs
+    const localMsgMap = new Map<string, QuickChatMessage>(
+      (existed.messages || []).map((msg) => [msg.id, cloneQuickChatMessageRow(msg)])
+    )
+    ;(remoteRoom.messages || []).forEach((remoteMsg) => {
+      const msgId = String(remoteMsg.id || '')
+      if (!msgId) return
+      const localMsg = localMsgMap.get(msgId)
+      if (!localMsg) {
+        localMsgMap.set(msgId, cloneQuickChatMessageRow(remoteMsg))
+        return
+      }
+      const mergedReadByUser: Record<string, boolean> = { ...(localMsg.readByUser || {}) }
+      Object.entries(remoteMsg.readByUser || {}).forEach(([key, value]) => {
+        mergedReadByUser[String(key)] = Boolean(mergedReadByUser[String(key)] || value)
+      })
+      const remoteMsgTs = dayjs(remoteMsg.createdAt || dayjs().toISOString()).valueOf()
+      const localMsgTs = dayjs(localMsg.createdAt || dayjs().toISOString()).valueOf()
+      if (remoteMsg.recalled === true || remoteMsgTs >= localMsgTs) {
+        localMsgMap.set(msgId, {
+          ...localMsg,
+          ...cloneQuickChatMessageRow(remoteMsg),
+          readByUser: mergedReadByUser
+        })
+      } else {
+        localMsg.readByUser = mergedReadByUser
+        localMsgMap.set(msgId, localMsg)
+      }
+    })
+    const mergedMessages = Array.from(localMsgMap.values()).sort((a, b) => {
+      const aTs = dayjs(a.createdAt || dayjs().toISOString()).valueOf()
+      const bTs = dayjs(b.createdAt || dayjs().toISOString()).valueOf()
+      if (aTs !== bTs) return aTs - bTs
+      return String(a.id || '').localeCompare(String(b.id || ''))
+    })
+    const mergedUnreadByUser: Record<string, number> = { ...(remoteRoom.unreadByUser || {}) }
+    Object.entries(existed.unreadByUser || {}).forEach(([key, value]) => {
+      const raw = Number(value || 0)
+      if (!Number.isFinite(raw)) return
+      mergedUnreadByUser[String(key)] = Math.max(Number(mergedUnreadByUser[String(key)] || 0), raw)
+    })
+    const mergedRoom: QuickChatRoom = {
+      ...existed,
+      name: preferRemote ? remoteRoom.name : existed.name,
+      departmentIds: Array.from(new Set([...(existed.departmentIds || []), ...(remoteRoom.departmentIds || [])])),
+      memberIds: Array.from(new Set([...(existed.memberIds || []), ...(remoteRoom.memberIds || [])])),
+      notificationMode: (preferRemote ? remoteRoom.notificationMode : existed.notificationMode) || 'ALL',
+      notice: preferRemote ? String(remoteRoom.notice || '') : String(existed.notice || ''),
+      archivedByUser: {
+        ...(remoteRoom.archivedByUser || {}),
+        ...(existed.archivedByUser || {})
+      },
+      unreadByUser: mergedUnreadByUser,
+      messages: mergedMessages,
+      createdAt: existed.createdAt || remoteRoom.createdAt || dayjs().toISOString(),
+      updatedAt: dayjs(Math.max(localTs || 0, remoteTs || 0, Date.now())).toISOString()
+    }
+    mergedRoom.unreadCount = Number(mergedRoom.unreadByUser[currentId] || 0)
+    merged.set(mergedRoom.id, mergedRoom)
+  })
+  return Array.from(merged.values()).sort((a, b) => {
+    const aTs = dayjs(a.updatedAt || a.createdAt).valueOf()
+    const bTs = dayjs(b.updatedAt || b.createdAt).valueOf()
+    return bTs - aTs
+  })
+}
+
 function applyQuickChatRoomsFromPayload(parsed: any[], preferredActiveId = '') {
   quickChatRooms.value = normalizeQuickChatRooms(parsed)
   activeQuickChatRoomId.value = preferredActiveId || sortedQuickChatRooms.value[0]?.id || ''
@@ -2690,8 +2794,18 @@ async function pullQuickChatStateFromCloud(force = false) {
         status = 'conflict'
         return
       }
-      // 自动同步场景下，本地领先时静默保留本地并尝试回推云端，避免频繁冲突打断收消息。
-      scheduleQuickChatCloudSave(JSON.stringify(buildQuickChatStatePayload()))
+      // 自动同步场景下，本地领先也要合并云端增量，避免新会话/新消息被本地时间戳压制。
+      const mergedRooms = mergeQuickChatRoomRows(quickChatRooms.value, normalizeQuickChatRooms(parsed))
+      quickChatRooms.value = mergedRooms
+      rehydrateQuickChatUnread()
+      ensureActiveQuickChatVisible()
+      const mergedPayloadJson = JSON.stringify(mergedRooms.map((room) => buildQuickChatRoomPayload(room)))
+      localStorage.setItem(quickChatStorageKey(), mergedPayloadJson)
+      emitQuickChatSync()
+      quickChatLastEventSnapshot.value = mergedPayloadJson
+      quickChatCloudRemoteUpdatedAt.value = remoteLatestMs || Date.now()
+      clearQuickChatSyncConflict()
+      scheduleQuickChatCloudSave(mergedPayloadJson)
       return
     }
     // 云端更新默认自动吸收，避免接收方被冲突弹层拦住看不到新消息。
@@ -2769,7 +2883,7 @@ function applyQuickChatRealtimeEvent(eventRow: any) {
   if (!eventType) return
   if (eventType === 'WS_READY') return
   if (eventType === 'SYNC_HINT') {
-    pullQuickChatStateFromCloud(true)
+    pullQuickChatStateFromCloud(false)
     return
   }
   const roomId = String(eventRow?.roomId || eventRow?.room?.id || '')
@@ -2823,7 +2937,7 @@ function applyQuickChatRealtimeEvent(eventRow: any) {
       const room = quickChatRooms.value.find((item) => item.id === roomId)
       if (!room) {
         // 接收到消息但本地还没有房间时，直接强制吸收云端，避免因本地时间戳领先而漏消息。
-        pullQuickChatStateFromCloud(true)
+        pullQuickChatStateFromCloud(false)
         return
       }
       const messagePayload = eventRow?.message
@@ -2857,9 +2971,22 @@ function applyQuickChatRealtimeEvent(eventRow: any) {
           : existedMsg.readByUser
       }
       room.updatedAt = String(eventRow?.meta?.roomUpdatedAt || messagePayload.createdAt || dayjs().toISOString())
+      const currentId = currentQuickChatSenderId.value
       room.unreadByUser = room.unreadByUser || {}
-      room.unreadByUser[currentQuickChatSenderId.value] = Number(room.unreadByUser[currentQuickChatSenderId.value] || 0) + 1
-      room.unreadCount = Number(room.unreadByUser[currentQuickChatSenderId.value] || 0)
+      const viewingCurrentRoom = quickChatOpen.value && activeQuickChatRoomId.value === roomId
+      const senderId = String(messagePayload.senderId || '')
+      if (eventType === 'MESSAGE_APPEND') {
+        if (viewingCurrentRoom) {
+          room.messages.forEach((msg) => {
+            msg.readByUser = msg.readByUser || {}
+            msg.readByUser[currentId] = true
+          })
+          room.unreadByUser[currentId] = 0
+        } else if (senderId && senderId !== currentId) {
+          room.unreadByUser[currentId] = Number(room.unreadByUser[currentId] || 0) + 1
+        }
+      }
+      room.unreadCount = Number(room.unreadByUser[currentId] || 0)
       persistQuickChatState({ skipCloud: true, skipFanout: true, skipEvent: true })
       return
     }
@@ -2905,7 +3032,7 @@ function connectQuickChatWebSocket() {
   quickChatWebSocket.onopen = () => {
     quickChatWsConnected.value = true
     quickChatWsReconnectAttempt.value = 0
-    pullQuickChatStateFromCloud(true)
+    pullQuickChatStateFromCloud(false)
   }
   quickChatWebSocket.onmessage = (event) => {
     handleQuickChatWebSocketMessage(String(event?.data || ''))
@@ -3085,6 +3212,69 @@ function openRenameQuickChatRoom() {
 function memberNameById(staffId: string) {
   const matched = staffOptions.value.find((item) => item.value === staffId)
   return matched?.name || `员工#${staffId}`
+}
+
+function ensureQuickChatSenderReady() {
+  if (currentQuickChatSenderId.value) return true
+  message.warning('账号信息尚未同步完成，请稍后重试')
+  return false
+}
+
+function reconcileQuickChatSelfIdentity() {
+  const selfId = currentQuickChatSenderId.value
+  if (!selfId) return
+  const username = String(userStore.staffInfo?.username || '').trim()
+  const aliasSet = new Set<string>(['me'])
+  if (username) aliasSet.add(username)
+  aliasSet.delete(selfId)
+  if (!aliasSet.size) return
+  let changed = false
+  quickChatRooms.value.forEach((room) => {
+    let roomChanged = false
+    const normalizedMembers = room.memberIds.map((id) => (aliasSet.has(id) ? selfId : id))
+    room.memberIds = Array.from(new Set(normalizedMembers))
+    room.unreadByUser = room.unreadByUser || {}
+    room.archivedByUser = room.archivedByUser || {}
+    Array.from(aliasSet).forEach((alias) => {
+      if (room.unreadByUser && room.unreadByUser[alias] != null) {
+        room.unreadByUser[selfId] = Math.max(
+          Number(room.unreadByUser[selfId] || 0),
+          Number(room.unreadByUser[alias] || 0)
+        )
+        delete room.unreadByUser[alias]
+        roomChanged = true
+      }
+      if (room.archivedByUser && room.archivedByUser[alias] != null) {
+        if (room.archivedByUser[selfId] == null) {
+          room.archivedByUser[selfId] = room.archivedByUser[alias] === true
+        }
+        delete room.archivedByUser[alias]
+        roomChanged = true
+      }
+    })
+    room.messages.forEach((msg) => {
+      if (aliasSet.has(msg.senderId)) {
+        msg.senderId = selfId
+        roomChanged = true
+      }
+      if (!msg.readByUser) return
+      Array.from(aliasSet).forEach((alias) => {
+        if (msg.readByUser && msg.readByUser[alias] != null) {
+          msg.readByUser[selfId] = Boolean(msg.readByUser[selfId] || msg.readByUser[alias])
+          delete msg.readByUser[alias]
+          roomChanged = true
+        }
+      })
+    })
+    if (roomChanged) {
+      room.unreadCount = Number(room.unreadByUser[selfId] || 0)
+      room.updatedAt = dayjs().toISOString()
+      changed = true
+    }
+  })
+  if (changed) {
+    persistQuickChatState()
+  }
 }
 
 function escalationLeaderNames() {
@@ -3507,6 +3697,7 @@ function jumpToQuickChatTodo(todoId: string) {
 }
 
 function submitQuickChatRoomEditor() {
+  if (!ensureQuickChatSenderReady()) return
   const name = String(quickChatRoomForm.name || '').trim()
   if (!name) {
     message.warning('请填写群聊名称')
@@ -3585,6 +3776,7 @@ function submitQuickChatRoomEditor() {
 }
 
 function sendQuickChatText() {
+  if (!ensureQuickChatSenderReady()) return
   const room = activeQuickChatRoom.value
   if (!room) {
     message.info('请先选择会话')
@@ -3634,6 +3826,7 @@ function incrementRoomUnread(room: QuickChatRoom, targetMemberIds?: string[]) {
 }
 
 const beforeQuickChatUpload: UploadProps['beforeUpload'] = async (file) => {
+  if (!ensureQuickChatSenderReady()) return false
   const room = activeQuickChatRoom.value
   if (!room) {
     message.info('请先选择会话')
@@ -3804,6 +3997,7 @@ function openForwardMessage(messageId: string) {
 }
 
 function submitForwardMessage() {
+  if (!ensureQuickChatSenderReady()) return
   const sourceRoom = activeQuickChatRoom.value
   if (!sourceRoom) return
   if (!quickChatForwardMessageId.value) return
@@ -4023,6 +4217,7 @@ onMounted(() => {
       syncDepartmentName()
       loadHeaderSettings()
       loadQuickChatState()
+      reconcileQuickChatSelfIdentity()
       pullQuickChatStateFromCloud(true)
       loadQuickChatTodo()
       loadQuickChatTodoAutomation()
