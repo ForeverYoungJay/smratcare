@@ -395,6 +395,10 @@ export function saveQuickChatState(stateJson: string) {
   return request.put<OaQuickChatStatePayload>('/api/oa/quick-chat/state', { stateJson })
 }
 
+export function fanoutQuickChatState(stateJson: string, targetStaffIds: Array<string | number>) {
+  return request.post<number>('/api/oa/quick-chat/state/fanout', { stateJson, targetStaffIds })
+}
+
 export function getOaTaskCalendar(params: any) {
   return request.get<OaTask[]>('/api/oa/task/calendar', { params })
 }

@@ -6,13 +6,13 @@ import com.zhiyangyun.care.crm.model.CrmLeadResponse;
 
 public interface CrmLeadService {
   CrmLeadResponse create(CrmLeadRequest request);
-  CrmLeadResponse update(Long id, CrmLeadRequest request);
-  CrmLeadResponse get(Long id, Long tenantId);
-  IPage<CrmLeadResponse> page(Long tenantId, long pageNo, long pageSize, String keyword, Integer status, String source, String customerTag,
+  CrmLeadResponse update(Long id, CrmLeadRequest request, Long currentStaffId, boolean adminView);
+  CrmLeadResponse get(Long id, Long tenantId, Long currentStaffId, boolean adminView);
+  IPage<CrmLeadResponse> page(Long tenantId, Long currentStaffId, boolean adminView, long pageNo, long pageSize, String keyword, Integer status, String source, String customerTag,
                               String consultantName, String consultantPhone, String elderName, String elderPhone,
                               String consultDateFrom, String consultDateTo, String consultType, String mediaChannel,
                               String infoSource, String marketerName, String followupStatus, String reservationChannel,
                               String contractNo, String contractStatus, String flowStage, String currentOwnerDept,
                               String followupDateFrom, String followupDateTo, Boolean followupDueOnly);
-  void delete(Long id, Long tenantId);
+  void delete(Long id, Long tenantId, Long currentStaffId, boolean adminView);
 }

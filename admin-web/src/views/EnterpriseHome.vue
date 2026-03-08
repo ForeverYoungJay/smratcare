@@ -439,6 +439,11 @@
           <h2>运营治理看板</h2>
           <p>面向运营同事的内容发布清单与部门值班信息，支持按清单更新，无需开发介入。</p>
         </div>
+        <div class="section-actions governance-tools">
+          <a-button type="primary" @click="openProfileConfig">运营配置中心</a-button>
+          <a-button @click="exportProfileConfig">导出当前配置(JSON)</a-button>
+          <a-button @click="downloadProfileConfigTemplate">下载配置模板</a-button>
+        </div>
         <div class="governance-metrics">
           <div class="metric-box">
             <div class="metric-label">治理评分</div>
@@ -575,7 +580,7 @@
         <span>© {{ currentYear }} {{ profile.name }}</span>
         <span>{{ profile.slogan }}</span>
         <span>最近更新：{{ profile.publishMeta.lastUpdated }}</span>
-        <span>维护人：{{ profile.publishMeta.maintainer }}</span>
+        <span>维护人：{{ pageMaintainer }}</span>
         <span>下次复核：{{ profile.publishMeta.nextReviewDate }}</span>
         <span v-if="profile.legal.icp">{{ profile.legal.icp }}</span>
         <span v-if="profile.legal.publicSecurityRecord">{{ profile.legal.publicSecurityRecord }}</span>
@@ -639,6 +644,30 @@
         <a-table-column title="需求" data-index="need" key="need" />
       </a-table>
     </a-modal>
+
+    <a-modal
+      v-model:open="profileConfigOpen"
+      title="运营配置中心"
+      width="920px"
+      :confirmLoading="profileConfigSaving"
+      ok-text="保存并生效"
+      cancel-text="取消"
+      @ok="saveProfileConfig"
+    >
+      <a-alert
+        type="info"
+        show-icon
+        style="margin-bottom: 12px;"
+        message="用于运营同事更新机构简介、公示证照、联系方式、值班与发布清单；保存后立即生效并写入浏览器本地。"
+      />
+      <a-textarea v-model:value="profileConfigDraft" :rows="20" />
+      <div class="config-modal-actions">
+        <a-button size="small" @click="formatProfileConfigDraft">JSON格式化</a-button>
+        <a-button size="small" @click="reloadProfileConfigDraft">从当前页面重载</a-button>
+        <a-button size="small" @click="importProfileConfigFromFile">导入JSON文件</a-button>
+        <a-button size="small" danger @click="resetProfileConfig">恢复默认配置</a-button>
+      </div>
+    </a-modal>
   </div>
 </template>
 
@@ -646,13 +675,20 @@
 import { message } from 'ant-design-vue'
 import type { FormInstance } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { enterpriseProfile as profile } from '../constants/enterpriseProfile'
+import { enterpriseProfile, type EnterpriseProfile } from '../constants/enterpriseProfile'
+import { useUserStore } from '../stores/user'
 import { getToken } from '../utils/auth'
 
 const router = useRouter()
+const userStore = useUserStore()
+const PROFILE_OVERRIDE_STORAGE_KEY = 'enterprise_profile_override_v1'
 const hasToken = computed(() => Boolean(getToken()))
+const profileConfigOpen = ref(false)
+const profileConfigSaving = ref(false)
+const profileConfigDraft = ref('')
+const profile = reactive<EnterpriseProfile>(buildRuntimeProfile())
 const currentYear = new Date().getFullYear()
 const mobileMenuOpen = ref(false)
 const consultModalOpen = ref(false)
@@ -695,6 +731,72 @@ const navItems = [
   { id: 'family-voice', label: '家属评价' },
   { id: 'contact', label: '联系我们' }
 ] as const
+
+function deepClone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value))
+}
+
+function isPlainObject(value: unknown): value is Record<string, any> {
+  return Object.prototype.toString.call(value) === '[object Object]'
+}
+
+function mergeProfile(base: any, patch: any): any {
+  if (!isPlainObject(base) || !isPlainObject(patch)) {
+    return patch == null ? base : patch
+  }
+  const merged: Record<string, any> = { ...base }
+  Object.keys(patch).forEach((key) => {
+    const baseValue = merged[key]
+    const patchValue = patch[key]
+    if (Array.isArray(patchValue)) {
+      merged[key] = patchValue
+      return
+    }
+    if (isPlainObject(baseValue) && isPlainObject(patchValue)) {
+      merged[key] = mergeProfile(baseValue, patchValue)
+      return
+    }
+    merged[key] = patchValue
+  })
+  return merged
+}
+
+function loadProfileOverride(): Partial<EnterpriseProfile> {
+  const raw = localStorage.getItem(PROFILE_OVERRIDE_STORAGE_KEY)
+  if (!raw) return {}
+  try {
+    const parsed = JSON.parse(raw)
+    return isPlainObject(parsed) ? parsed : {}
+  } catch (_error) {
+    return {}
+  }
+}
+
+function buildRuntimeProfile(): EnterpriseProfile {
+  const base = deepClone(enterpriseProfile)
+  const override = loadProfileOverride()
+  return mergeProfile(base, override)
+}
+
+function replaceProfile(nextProfile: EnterpriseProfile) {
+  Object.keys(profile).forEach((key) => {
+    delete (profile as any)[key]
+  })
+  Object.assign(profile, nextProfile)
+}
+
+function buildOpsConfigPayload(source: EnterpriseProfile) {
+  return {
+    publishMeta: source.publishMeta,
+    contact: source.contact,
+    legal: source.legal,
+    compliance: source.compliance,
+    contentChecklist: source.contentChecklist,
+    departmentDutyBoard: source.departmentDutyBoard,
+    newsList: source.newsList,
+    announcements: source.announcements
+  }
+}
 
 const ageGroupOptions = [
   { label: '60-69岁', value: '60-69' },
@@ -809,6 +911,14 @@ const consultTopDepartment = computed(() => {
   return first ? `${first[0]}（${first[1]}）` : '暂无'
 })
 
+const pageMaintainer = computed(() => {
+  const realName = String(userStore.staffInfo?.realName || '').trim()
+  if (realName) return realName
+  const username = String(userStore.staffInfo?.username || '').trim()
+  if (username) return username
+  return profile.publishMeta.maintainer
+})
+
 const guideResults = computed(() => {
   const keyword = guideKeyword.value.trim()
   if (!keyword) return navItems.slice(0, 6)
@@ -826,10 +936,119 @@ const guideResults = computed(() => {
 })
 
 onMounted(() => {
+  reloadProfileConfigDraft()
   document.title = `${profile.name} - 企业首页`
   const cachedReadingMode = localStorage.getItem('enterprise_home_reading_mode')
   if (cachedReadingMode === '1') readingMode.value = true
 })
+
+function reloadProfileConfigDraft() {
+  profileConfigDraft.value = JSON.stringify(buildOpsConfigPayload(profile), null, 2)
+}
+
+function openProfileConfig() {
+  reloadProfileConfigDraft()
+  profileConfigOpen.value = true
+}
+
+function formatProfileConfigDraft() {
+  try {
+    profileConfigDraft.value = JSON.stringify(JSON.parse(profileConfigDraft.value || '{}'), null, 2)
+  } catch (_error) {
+    message.warning('JSON 格式不正确，无法格式化。')
+  }
+}
+
+function saveProfileConfig() {
+  profileConfigSaving.value = true
+  try {
+    const parsed = JSON.parse(profileConfigDraft.value || '{}')
+    if (!isPlainObject(parsed)) {
+      message.warning('配置内容必须是 JSON 对象。')
+      return
+    }
+    const merged = mergeProfile(deepClone(enterpriseProfile), parsed) as EnterpriseProfile
+    replaceProfile(merged)
+    localStorage.setItem(PROFILE_OVERRIDE_STORAGE_KEY, JSON.stringify(parsed))
+    profileConfigOpen.value = false
+    message.success('运营配置已保存并生效。')
+  } catch (_error) {
+    message.error('配置保存失败，请检查 JSON 结构。')
+  } finally {
+    profileConfigSaving.value = false
+  }
+}
+
+function exportProfileConfig() {
+  const payload = buildOpsConfigPayload(profile)
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `enterprise-ops-config-${dayjs().format('YYYYMMDD-HHmmss')}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function downloadProfileConfigTemplate() {
+  const template = {
+    publishMeta: {
+      lastUpdated: '2026-03-08',
+      maintainer: '品牌运营组',
+      nextReviewDate: '2026-04-15'
+    },
+    contact: {
+      phone: '0793-5899001',
+      hotlineTip: '工作日 08:00-18:00',
+      email: 'service@yiyang-guifeng-care.cn',
+      address: '江西省上饶市弋阳县龟峰大道88号',
+      visitingTime: '周一至周日 08:00-18:00'
+    },
+    contentChecklist: [
+      { category: '机构简介', owner: '品牌运营组', status: '已完成', updatedAt: '2026-03-08' },
+      { category: '资质证照', owner: '行政人事部', status: '待核验', updatedAt: '2026-03-08' }
+    ],
+    departmentDutyBoard: [
+      { department: '护理部', serviceScope: '24小时护理响应', contact: '0793-5899002', dutyHours: '7×24' }
+    ]
+  }
+  const blob = new Blob([JSON.stringify(template, null, 2)], { type: 'application/json;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'enterprise-ops-config-template.json'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function importProfileConfigFromFile() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'application/json,.json'
+  input.onchange = () => {
+    const file = input.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const text = String(reader.result || '')
+      try {
+        profileConfigDraft.value = JSON.stringify(JSON.parse(text), null, 2)
+        message.success('配置文件已导入，请确认后保存。')
+      } catch (_error) {
+        message.error('导入失败：文件不是有效 JSON。')
+      }
+    }
+    reader.readAsText(file, 'utf-8')
+  }
+  input.click()
+}
+
+function resetProfileConfig() {
+  localStorage.removeItem(PROFILE_OVERRIDE_STORAGE_KEY)
+  replaceProfile(deepClone(enterpriseProfile))
+  reloadProfileConfigDraft()
+  message.success('已恢复默认配置。')
+}
 
 function openMobileMenu() {
   mobileMenuOpen.value = true
@@ -900,11 +1119,11 @@ function resetCareMatcher() {
 }
 
 function goLogin() {
-  router.push('/login?redirect=/portal')
+  router.push('/admin')
 }
 
 function goAdmin() {
-  router.push(hasToken.value ? '/portal' : '/login?redirect=/portal')
+  router.push(hasToken.value ? '/portal' : '/admin')
 }
 
 function openMapNavigation() {
@@ -1014,7 +1233,7 @@ async function copyComplianceSummary() {
   const summary = [
     `机构：${profile.name}`,
     `最近更新：${profile.publishMeta.lastUpdated}`,
-    `维护人：${profile.publishMeta.maintainer}`,
+    `维护人：${pageMaintainer.value}`,
     `地址：${profile.contact.address}`,
     `电话：${profile.contact.phone}`,
     `资质：${profile.compliance.qualifications.map((item) => item.name).join('、')}`
@@ -1031,7 +1250,7 @@ function downloadComplianceSnapshot() {
   const payload = {
     name: profile.name,
     updatedAt: profile.publishMeta.lastUpdated,
-    maintainer: profile.publishMeta.maintainer,
+    maintainer: pageMaintainer.value,
     contact: profile.contact,
     legal: profile.legal,
     compliance: profile.compliance
@@ -1073,7 +1292,7 @@ async function copyOpsTodo() {
     `【${profile.name} 运营更新待办】`,
     `- 最近更新：${profile.publishMeta.lastUpdated}`,
     `- 下次复核：${profile.publishMeta.nextReviewDate}`,
-    `- 维护人：${profile.publishMeta.maintainer}`,
+    `- 维护人：${pageMaintainer.value}`,
     `- 风险项数量：${contentRiskCount.value}`,
     `- 待更新：新闻资讯、活动排期、资质有效期、地图导航链接、版权核验日期`
   ]
@@ -1592,6 +1811,10 @@ function scrollTo(id: string) {
   margin-top: 14px;
 }
 
+.governance-tools {
+  margin-bottom: 10px;
+}
+
 .compliance-actions,
 .consult-actions,
 .consult-record-actions,
@@ -1651,6 +1874,13 @@ function scrollTo(id: string) {
 
 .duty-actions {
   margin-top: 8px;
+}
+
+.config-modal-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .contact-card {

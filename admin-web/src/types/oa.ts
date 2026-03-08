@@ -140,6 +140,7 @@ export interface OaTask {
   description?: string
   startTime?: string
   endTime?: string
+  assigneeId?: string | number
   priority?: string
   status?: string
   calendarType?: 'PERSONAL' | 'WORK' | 'DAILY' | 'COLLAB'

@@ -16,6 +16,7 @@
           <a-input-password v-model:value="form.password" placeholder="******" />
         </a-form-item>
         <a-button type="primary" html-type="submit" block :loading="loading">登录</a-button>
+        <a-button block style="margin-top: 8px" @click="goEnterpriseHome">返回企业首页</a-button>
       </a-form>
       <div class="tips">
         推荐使用现代浏览器访问以获得最佳体验
@@ -131,12 +132,26 @@ async function onSubmit() {
     router.push(redirect || '/portal')
   } catch (error: any) {
     const status = Number(error?.response?.status || 0)
+    const backendMsg = String(error?.response?.data?.message || error?.response?.data?.msg || error?.message || '')
+    const normalized = backendMsg.toLowerCase()
+    if (normalized.includes('disable') || normalized.includes('禁用') || normalized.includes('停用')) {
+      message.error('账号已被禁用，请联系管理员处理。')
+      return
+    }
+    if (normalized.includes('password') || normalized.includes('密码') || normalized.includes('凭证') || normalized.includes('401')) {
+      message.error('账号或密码错误，请重新输入。')
+      return
+    }
     if (status === 401) {
       message.error('账号或密码错误，请重新输入。')
       return
     }
     if (status === 403) {
       message.error('账号已被禁用或无登录权限，请联系管理员。')
+      return
+    }
+    if (status >= 500) {
+      message.error('服务暂时不可用（服务器异常），请稍后重试。')
       return
     }
     if (!error?.response) {
@@ -148,6 +163,10 @@ async function onSubmit() {
     loading.value = false
   }
 }
+
+function goEnterpriseHome() {
+  router.push('/home')
+}
 </script>
 
 <style scoped>
@@ -155,9 +174,7 @@ async function onSubmit() {
   min-height: 100vh;
   display: grid;
   place-items: center;
-  background-image:
-    linear-gradient(135deg, rgba(13, 47, 110, 0.5), rgba(20, 84, 184, 0.38)),
-    url('../assets/home-login.jpg');
+  background-image: url('../assets/home-login.jpg');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

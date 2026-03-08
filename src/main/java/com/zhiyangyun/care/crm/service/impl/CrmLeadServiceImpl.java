@@ -101,9 +101,9 @@ public class CrmLeadServiceImpl implements CrmLeadService {
   }
 
   @Override
-  public CrmLeadResponse update(Long id, CrmLeadRequest request) {
-    CrmLead lead = leadMapper.selectById(id);
-    if (lead == null || !request.getTenantId().equals(lead.getTenantId())) {
+  public CrmLeadResponse update(Long id, CrmLeadRequest request, Long currentStaffId, boolean adminView) {
+    CrmLead lead = findAccessibleLead(id, request.getTenantId(), currentStaffId, adminView);
+    if (lead == null) {
       return null;
     }
     lead.setName(defaultLeadName(request));
@@ -153,16 +153,14 @@ public class CrmLeadServiceImpl implements CrmLeadService {
   }
 
   @Override
-  public CrmLeadResponse get(Long id, Long tenantId) {
-    CrmLead lead = leadMapper.selectById(id);
-    if (lead == null || (tenantId != null && !tenantId.equals(lead.getTenantId()))) {
-      return null;
-    }
+  public CrmLeadResponse get(Long id, Long tenantId, Long currentStaffId, boolean adminView) {
+    CrmLead lead = findAccessibleLead(id, tenantId, currentStaffId, adminView);
+    if (lead == null) return null;
     return toResponse(lead);
   }
 
   @Override
-  public IPage<CrmLeadResponse> page(Long tenantId, long pageNo, long pageSize, String keyword, Integer status, String source, String customerTag,
+  public IPage<CrmLeadResponse> page(Long tenantId, Long currentStaffId, boolean adminView, long pageNo, long pageSize, String keyword, Integer status, String source, String customerTag,
                                      String consultantName, String consultantPhone, String elderName, String elderPhone,
                                      String consultDateFrom, String consultDateTo, String consultType, String mediaChannel,
                                      String infoSource, String marketerName, String followupStatus, String reservationChannel,
@@ -171,6 +169,13 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     var wrapper = Wrappers.lambdaQuery(CrmLead.class)
         .eq(CrmLead::getIsDeleted, 0)
         .eq(tenantId != null, CrmLead::getTenantId, tenantId);
+    if (!adminView) {
+      if (currentStaffId == null) {
+        wrapper.eq(CrmLead::getId, -1L);
+      } else {
+        wrapper.eq(CrmLead::getCreatedBy, currentStaffId);
+      }
+    }
     if (status != null) {
       wrapper.eq(CrmLead::getStatus, status);
     }
@@ -257,13 +262,29 @@ public class CrmLeadServiceImpl implements CrmLeadService {
   }
 
   @Override
-  public void delete(Long id, Long tenantId) {
-    CrmLead lead = leadMapper.selectById(id);
-    if (lead != null && tenantId != null && tenantId.equals(lead.getTenantId())) {
+  public void delete(Long id, Long tenantId, Long currentStaffId, boolean adminView) {
+    CrmLead lead = findAccessibleLead(id, tenantId, currentStaffId, adminView);
+    if (lead != null) {
       lead.setIsDeleted(1);
       leadMapper.updateById(lead);
       syncLeadDeleteToContract(lead);
     }
+  }
+
+  private CrmLead findAccessibleLead(Long id, Long tenantId, Long currentStaffId, boolean adminView) {
+    CrmLead lead = leadMapper.selectById(id);
+    if (lead == null) {
+      return null;
+    }
+    if (tenantId != null && !tenantId.equals(lead.getTenantId())) {
+      return null;
+    }
+    if (!adminView) {
+      if (currentStaffId == null || !currentStaffId.equals(lead.getCreatedBy())) {
+        return null;
+      }
+    }
+    return lead;
   }
 
   private CrmLeadResponse toResponse(CrmLead lead) {

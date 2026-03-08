@@ -41,7 +41,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/oa/task")
-@PreAuthorize("hasAnyRole('HR_EMPLOYEE','HR_MINISTER','MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','FINANCE_EMPLOYEE','FINANCE_MINISTER','LOGISTICS_EMPLOYEE','LOGISTICS_MINISTER','MARKETING_EMPLOYEE','MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+@PreAuthorize("hasAnyRole('STAFF','HR_EMPLOYEE','HR_MINISTER','MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','FINANCE_EMPLOYEE','FINANCE_MINISTER','LOGISTICS_EMPLOYEE','LOGISTICS_MINISTER','MARKETING_EMPLOYEE','MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
 public class OaTaskController {
   private final OaTaskMapper taskMapper;
 
@@ -126,12 +126,7 @@ public class OaTaskController {
     } else {
       wrapper.last("LIMIT 5000");
     }
-    if (!AuthContext.isAdmin() && staffId != null) {
-      wrapper.and(w -> w.ne(OaTask::getCalendarType, "PERSONAL")
-          .or().eq(OaTask::getCreatedBy, staffId)
-          .or().eq(OaTask::getAssigneeId, staffId)
-          .or().apply("FIND_IN_SET({0}, collaborator_ids)", staffId));
-    }
+    applyMyCalendarScope(wrapper, staffId);
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(OaTask::getTitle, keyword)
           .or().like(OaTask::getDescription, keyword));
@@ -665,16 +660,37 @@ public class OaTaskController {
 
   private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OaTask> buildQuery(
       Long orgId, String normalizedStatus, String keyword) {
+    Long staffId = AuthContext.getStaffId();
     var wrapper = Wrappers.lambdaQuery(OaTask.class)
         .eq(OaTask::getIsDeleted, 0)
         .eq(orgId != null, OaTask::getOrgId, orgId)
         .eq(normalizedStatus != null, OaTask::getStatus, normalizedStatus);
+    applyMyCalendarScope(wrapper, staffId);
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(OaTask::getTitle, keyword)
           .or().like(OaTask::getDescription, keyword)
           .or().like(OaTask::getAssigneeName, keyword));
     }
     return wrapper;
+  }
+
+  private void applyMyCalendarScope(com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OaTask> wrapper, Long staffId) {
+    if (AuthContext.isAdmin()) {
+      return;
+    }
+    String username = trimToNull(AuthContext.getUsername());
+    if (staffId == null) {
+      if (username == null) {
+        wrapper.eq(OaTask::getId, -1L);
+      } else {
+        wrapper.eq(OaTask::getAssigneeName, username);
+      }
+      return;
+    }
+    wrapper.and(w -> w.eq(OaTask::getCreatedBy, staffId)
+        .or().eq(OaTask::getAssigneeId, staffId)
+        .or().eq(username != null, OaTask::getAssigneeName, username)
+        .or().apply("FIND_IN_SET({0}, collaborator_ids)", staffId));
   }
 
   private long count(Long value) {

@@ -343,6 +343,7 @@ const form = reactive({
   title: '',
   startTime: undefined as Dayjs | undefined,
   endTime: undefined as Dayjs | undefined,
+  assigneeId: undefined as string | number | undefined,
   assigneeName: '',
   priority: 'NORMAL',
   description: '',
@@ -837,6 +838,19 @@ async function resolveCollaborators(departmentIds: string[], staffIds: string[])
   }
 }
 
+function resolveAssigneeIdForSubmit() {
+  const currentId = userStore.staffInfo?.id != null ? String(userStore.staffInfo.id) : ''
+  if (!currentId) return undefined
+  const currentRealName = String(userStore.staffInfo?.realName || '').trim()
+  const currentUsername = String(userStore.staffInfo?.username || '').trim()
+  const input = String(form.assigneeName || '').trim()
+  if (!input) return Number(currentId)
+  if ((currentRealName && input === currentRealName) || (currentUsername && input === currentUsername)) {
+    return Number(currentId)
+  }
+  return form.assigneeId != null ? Number(form.assigneeId) : undefined
+}
+
 function buildConflictMessage(items: Array<{ title?: string; assigneeName?: string; startTime?: string; endTime?: string; reason?: string }>) {
   return items
     .slice(0, 6)
@@ -994,6 +1008,7 @@ function openCreate(date?: Dayjs) {
   form.title = ''
   form.startTime = date ? date.hour(9).minute(0).second(0) : undefined
   form.endTime = date ? date.hour(10).minute(0).second(0) : undefined
+  form.assigneeId = userStore.staffInfo?.id != null ? String(userStore.staffInfo.id) : undefined
   form.assigneeName = (userStore.staffInfo?.realName || userStore.staffInfo?.username || '').trim()
   form.priority = 'NORMAL'
   form.description = ''
@@ -1019,6 +1034,7 @@ function openEdit(item: OaTask) {
   form.title = item.title || ''
   form.startTime = item.startTime ? dayjs(item.startTime) : undefined
   form.endTime = item.endTime ? dayjs(item.endTime) : undefined
+  form.assigneeId = item.assigneeId != null ? String(item.assigneeId) : undefined
   form.assigneeName = item.assigneeName || ''
   form.priority = item.priority || 'NORMAL'
   form.description = item.description || ''
@@ -1137,6 +1153,7 @@ async function submit() {
         startTime: dayjs(form.startTime).format('YYYY-MM-DDTHH:mm:ss'),
         endTime: form.endTime ? dayjs(form.endTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
         priority: form.priority,
+        assigneeId: resolveAssigneeIdForSubmit(),
         assigneeName: form.assigneeName || undefined,
         calendarType: form.calendarType,
         planCategory: form.planCategory || undefined,
@@ -1166,6 +1183,7 @@ async function submit() {
           endTime: endTime ? dayjs(endTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
           priority: form.priority,
           status: 'OPEN',
+          assigneeId: resolveAssigneeIdForSubmit(),
           assigneeName: form.assigneeName || undefined,
           calendarType: form.calendarType,
           planCategory: form.planCategory || undefined,

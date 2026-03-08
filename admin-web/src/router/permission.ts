@@ -5,7 +5,7 @@ import { hasRouteAccess } from '../utils/roleAccess'
 export function setupPermission(router: Router) {
   router.beforeEach((to, _from, next) => {
     const token = getToken()
-    const publicPages = ['/home', '/login']
+    const publicPages = ['/home', '/enterprise', '/admin', '/login']
 
     if (!token && !publicPages.includes(to.path)) {
       next('/home')

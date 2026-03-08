@@ -46,7 +46,9 @@ public class CrmLeadController {
     Long tenantId = AuthContext.getOrgId();
     request.setTenantId(tenantId);
     request.setOrgId(tenantId);
-    CrmLeadResponse response = leadService.update(id, request);
+    Long currentStaffId = AuthContext.getStaffId();
+    boolean adminView = AuthContext.isMinisterOrHigher();
+    CrmLeadResponse response = leadService.update(id, request, currentStaffId, adminView);
     auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "UPDATE", "CRM_LEAD", id, "更新CRM线索");
     return Result.ok(response);
@@ -54,7 +56,9 @@ public class CrmLeadController {
 
   @GetMapping("/{id}")
   public Result<CrmLeadResponse> get(@PathVariable Long id) {
-    return Result.ok(leadService.get(id, AuthContext.getOrgId()));
+    Long currentStaffId = AuthContext.getStaffId();
+    boolean adminView = AuthContext.isMinisterOrHigher();
+    return Result.ok(leadService.get(id, AuthContext.getOrgId(), currentStaffId, adminView));
   }
 
   @GetMapping("/page")
@@ -85,8 +89,10 @@ public class CrmLeadController {
       @RequestParam(required = false) String followupDateTo,
       @RequestParam(required = false) Boolean followupDueOnly) {
     Long tenantId = AuthContext.getOrgId();
+    Long currentStaffId = AuthContext.getStaffId();
+    boolean adminView = AuthContext.isMinisterOrHigher();
     return Result.ok(leadService.page(
-        tenantId, pageNo, pageSize, keyword, status, source, customerTag,
+        tenantId, currentStaffId, adminView, pageNo, pageSize, keyword, status, source, customerTag,
         consultantName, consultantPhone, elderName, elderPhone,
         consultDateFrom, consultDateTo, consultType, mediaChannel,
         infoSource, marketerName, followupStatus, reservationChannel,
@@ -97,7 +103,9 @@ public class CrmLeadController {
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
     Long tenantId = AuthContext.getOrgId();
-    leadService.delete(id, tenantId);
+    Long currentStaffId = AuthContext.getStaffId();
+    boolean adminView = AuthContext.isMinisterOrHigher();
+    leadService.delete(id, tenantId, currentStaffId, adminView);
     auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "DELETE", "CRM_LEAD", id, "删除CRM线索");
     return Result.ok(null);

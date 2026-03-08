@@ -259,6 +259,14 @@
           {{ activeQuickChatRoom && isRoomArchivedByCurrentUser(activeQuickChatRoom) ? '恢复会话' : '归档会话' }}
         </a-button>
         <a-button size="small" :loading="quickChatCloudSyncing" @click="forceQuickChatCloudSync">立即同步</a-button>
+        <a-button
+          v-if="quickChatFanoutQueuedPayload"
+          size="small"
+          :loading="quickChatFanoutPending"
+          @click="retryQuickChatFanoutNow"
+        >
+          重试分发
+        </a-button>
         <a-button :disabled="!activeQuickChatRoom" @click="nudgeActiveQuickChatRoom">催办提醒</a-button>
         <a-button :disabled="!activeQuickChatRoom" @click="exportActiveQuickChatHistory">导出会话</a-button>
         <a-badge :count="quickChatTodoPendingCount" size="small">
@@ -267,6 +275,7 @@
         <a-button danger :disabled="!activeQuickChatRoom" @click="exitActiveQuickChatRoom">退出会话</a-button>
         <a-tag :color="presenceStatus.color">{{ presenceStatus.label }}</a-tag>
         <a-tag :color="quickChatCloudStatus.color">{{ quickChatCloudStatus.text }}</a-tag>
+        <a-tag :color="quickChatFanoutStatus.color">{{ quickChatFanoutStatus.text }}</a-tag>
         <a-tag v-if="quickChatDnd" color="red">免打扰已开启</a-tag>
         <a-tag v-if="quickChatPressureTag" :color="quickChatPressureTag.color">{{ quickChatPressureTag.text }}</a-tag>
         <a-button
@@ -706,7 +715,7 @@ import { getMenuTree } from './menu'
 import { getMe } from '../api/auth'
 import { getStaffPage } from '../api/rbac'
 import { updateStaff } from '../api/staff'
-import { getQuickChatState, saveQuickChatState } from '../api/oa'
+import { fanoutQuickChatState, getQuickChatState, saveQuickChatState } from '../api/oa'
 import { useDepartmentOptions } from '../composables/useDepartmentOptions'
 import { useStaffOptions } from '../composables/useStaffOptions'
 import { canBeDirectLeader, canBeIndirectLeader, ensureSupervisorOrder } from '../utils/supervisor'
@@ -1140,8 +1149,12 @@ let presenceTimer: number | undefined
 let quickChatSyncUnsubscribe = () => {}
 let quickChatCloudPullTimer: number | undefined
 let quickChatCloudSaveTimer: number | undefined
-const QUICK_CHAT_CLOUD_PULL_INTERVAL_MS = 30000
+let quickChatFanoutTimer: number | undefined
+let quickChatFanoutRetryTimer: number | undefined
+const QUICK_CHAT_CLOUD_PULL_INTERVAL_MS = 5000
 const QUICK_CHAT_CLOUD_SAVE_DEBOUNCE_MS = 900
+const QUICK_CHAT_FANOUT_DEBOUNCE_MS = 700
+const QUICK_CHAT_FANOUT_RETRY_INTERVAL_MS = 8000
 const QUICK_CHAT_ARCHIVE_UNDO_WINDOW_MS = 5 * 60 * 1000
 const quickChatCloudReady = ref(false)
 const quickChatCloudRemoteUpdatedAt = ref(0)
@@ -1149,6 +1162,11 @@ const quickChatCloudSavePending = ref(false)
 const quickChatCloudSyncing = ref(false)
 let quickChatCloudLastPayload = ''
 let quickChatCloudQueuedPayload = ''
+const quickChatFanoutQueuedPayload = ref('')
+const quickChatFanoutPending = ref(false)
+const quickChatFanoutLastSuccessAt = ref(0)
+const quickChatFanoutLastErrorAt = ref(0)
+const quickChatFanoutLastAffected = ref(0)
 const quickChatSyncConflict = reactive({
   visible: false,
   direction: '' as 'LOCAL_NEWER' | 'CLOUD_NEWER' | '',
@@ -1177,6 +1195,23 @@ const quickChatCloudStatus = computed(() => {
     text: `已同步 ${dayjs(quickChatCloudRemoteUpdatedAt.value).format('MM-DD HH:mm')}`,
     color: 'green'
   }
+})
+const quickChatFanoutStatus = computed(() => {
+  if (quickChatFanoutPending.value) {
+    return { text: '成员分发中', color: 'blue' }
+  }
+  if (quickChatFanoutQueuedPayload.value) {
+    const errTime = quickChatFanoutLastErrorAt.value
+      ? dayjs(quickChatFanoutLastErrorAt.value).format('HH:mm:ss')
+      : '-'
+    return { text: `分发待重试 ${errTime}`, color: 'red' }
+  }
+  if (quickChatFanoutLastSuccessAt.value) {
+    const timeText = dayjs(quickChatFanoutLastSuccessAt.value).format('HH:mm:ss')
+    const affected = Number(quickChatFanoutLastAffected.value || 0)
+    return { text: `已分发${affected > 0 ? `(${affected})` : ''} ${timeText}`, color: 'green' }
+  }
+  return { text: '分发待初始化', color: 'default' }
 })
 const quickChatSyncConflictTitle = computed(() => {
   if (!quickChatSyncConflict.visible) return ''
@@ -1258,6 +1293,11 @@ watch(
   () => {
     quickChatCloudLastPayload = ''
     quickChatCloudQueuedPayload = ''
+    quickChatFanoutQueuedPayload.value = ''
+    quickChatFanoutPending.value = false
+    quickChatFanoutLastSuccessAt.value = 0
+    quickChatFanoutLastErrorAt.value = 0
+    quickChatFanoutLastAffected.value = 0
     quickChatCloudRemoteUpdatedAt.value = 0
     quickChatCloudReady.value = false
     quickChatCloudSyncing.value = false
@@ -1268,6 +1308,10 @@ watch(
     quickChatSyncConflict.remoteJson = ''
     quickChatLastArchivedRoomId.value = ''
     quickChatLastArchivedAt.value = 0
+    if (quickChatFanoutTimer) {
+      window.clearTimeout(quickChatFanoutTimer)
+      quickChatFanoutTimer = undefined
+    }
     loadQuickChatState()
     pullQuickChatStateFromCloud(true)
     rehydrateQuickChatUnread()
@@ -2103,7 +2147,74 @@ function scheduleQuickChatCloudSave(stateJson: string) {
   }, QUICK_CHAT_CLOUD_SAVE_DEBOUNCE_MS)
 }
 
-function persistQuickChatState(options?: { skipCloud?: boolean }) {
+function collectQuickChatFanoutTargets() {
+  const selfId = Number(currentQuickChatSenderId.value)
+  const targetSet = new Set<number>()
+  quickChatRooms.value.forEach((room) => {
+    ;(room.memberIds || []).forEach((memberId) => {
+      const id = Number(memberId)
+      if (!Number.isFinite(id) || id <= 0) return
+      if (Number.isFinite(selfId) && id === selfId) return
+      targetSet.add(id)
+    })
+  })
+  return Array.from(targetSet)
+}
+
+async function pushQuickChatStateToMembers(stateJson: string) {
+  if (!stateJson) return
+  if (quickChatFanoutPending.value) {
+    quickChatFanoutQueuedPayload.value = stateJson
+    return
+  }
+  const targets = collectQuickChatFanoutTargets()
+  if (!targets.length) return
+  quickChatFanoutPending.value = true
+  try {
+    const affected = await fanoutQuickChatState(stateJson, targets)
+    quickChatFanoutLastSuccessAt.value = Date.now()
+    quickChatFanoutLastAffected.value = Number(affected || 0)
+    quickChatFanoutQueuedPayload.value = ''
+  } catch {
+    quickChatFanoutLastErrorAt.value = Date.now()
+    quickChatFanoutQueuedPayload.value = stateJson
+  } finally {
+    quickChatFanoutPending.value = false
+  }
+}
+
+function scheduleQuickChatFanout(stateJson: string) {
+  if (!stateJson) return
+  if (quickChatFanoutTimer) {
+    window.clearTimeout(quickChatFanoutTimer)
+    quickChatFanoutTimer = undefined
+  }
+  quickChatFanoutTimer = window.setTimeout(() => {
+    quickChatFanoutTimer = undefined
+    pushQuickChatStateToMembers(stateJson)
+  }, QUICK_CHAT_FANOUT_DEBOUNCE_MS)
+}
+
+function retryQuickChatFanoutNow() {
+  if (!quickChatFanoutQueuedPayload.value) {
+    message.info('暂无待重试分发内容')
+    return
+  }
+  pushQuickChatStateToMembers(quickChatFanoutQueuedPayload.value)
+}
+
+function setupQuickChatFanoutRetryTimer() {
+  if (quickChatFanoutRetryTimer) {
+    window.clearInterval(quickChatFanoutRetryTimer)
+    quickChatFanoutRetryTimer = undefined
+  }
+  quickChatFanoutRetryTimer = window.setInterval(() => {
+    if (!quickChatFanoutQueuedPayload.value || quickChatFanoutPending.value) return
+    pushQuickChatStateToMembers(quickChatFanoutQueuedPayload.value)
+  }, QUICK_CHAT_FANOUT_RETRY_INTERVAL_MS)
+}
+
+function persistQuickChatState(options?: { skipCloud?: boolean; skipFanout?: boolean }) {
   try {
     const payload = buildQuickChatStatePayload()
     const payloadJson = JSON.stringify(payload)
@@ -2111,6 +2222,9 @@ function persistQuickChatState(options?: { skipCloud?: boolean }) {
     emitQuickChatSync()
     if (!options?.skipCloud) {
       scheduleQuickChatCloudSave(payloadJson)
+    }
+    if (!options?.skipFanout) {
+      scheduleQuickChatFanout(payloadJson)
     }
   } catch {}
 }
@@ -2307,6 +2421,7 @@ function dismissQuickChatConflict() {
 function resolveQuickChatConflictUseLocal() {
   const localPayloadJson = JSON.stringify(buildQuickChatStatePayload())
   pushQuickChatStateToCloud(localPayloadJson)
+  pushQuickChatStateToMembers(localPayloadJson)
   clearQuickChatSyncConflict()
   message.success('已按本地版本覆盖云端')
 }
@@ -2405,12 +2520,18 @@ function setupQuickChatCloudPullTimer() {
     quickChatCloudPullTimer = undefined
   }
   quickChatCloudPullTimer = window.setInterval(() => {
+    if (quickChatFanoutQueuedPayload.value) {
+      pushQuickChatStateToMembers(quickChatFanoutQueuedPayload.value)
+    }
     pullQuickChatStateFromCloud(false)
   }, QUICK_CHAT_CLOUD_PULL_INTERVAL_MS)
 }
 
 function onQuickChatCloudVisibilityChange() {
   if (document.visibilityState !== 'visible') return
+  if (quickChatFanoutQueuedPayload.value) {
+    pushQuickChatStateToMembers(quickChatFanoutQueuedPayload.value)
+  }
   pullQuickChatStateFromCloud(false)
 }
 
@@ -3514,6 +3635,7 @@ onMounted(() => {
     syncQuickChatFromStorage()
   })
   setupQuickChatCloudPullTimer()
+  setupQuickChatFanoutRetryTimer()
   setupQuickChatTodoEscalationTimer()
   window.setTimeout(() => runAutoEscalationIfNeeded(), 800)
   window.addEventListener('resize', updateQuickChatDrawerWidth)
@@ -3536,6 +3658,14 @@ onBeforeUnmount(() => {
   if (quickChatCloudSaveTimer) {
     window.clearTimeout(quickChatCloudSaveTimer)
     quickChatCloudSaveTimer = undefined
+  }
+  if (quickChatFanoutTimer) {
+    window.clearTimeout(quickChatFanoutTimer)
+    quickChatFanoutTimer = undefined
+  }
+  if (quickChatFanoutRetryTimer) {
+    window.clearInterval(quickChatFanoutRetryTimer)
+    quickChatFanoutRetryTimer = undefined
   }
   if (quickChatTodoEscalationTimer) {
     window.clearInterval(quickChatTodoEscalationTimer)

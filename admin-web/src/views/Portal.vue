@@ -1362,6 +1362,7 @@ const scheduleForm = reactive({
   title: '',
   startTime: undefined as Dayjs | undefined,
   endTime: undefined as Dayjs | undefined,
+  assigneeId: undefined as string | number | undefined,
   assigneeName: '',
   priority: 'NORMAL',
   description: '',
@@ -2731,6 +2732,19 @@ async function resolveCollaborators(departmentIds: string[], staffIds: string[])
   }
 }
 
+function resolveAssigneeIdForSubmit() {
+  const currentId = userStore.staffInfo?.id != null ? String(userStore.staffInfo.id) : ''
+  if (!currentId) return undefined
+  const currentRealName = String(userStore.staffInfo?.realName || '').trim()
+  const currentUsername = String(userStore.staffInfo?.username || '').trim()
+  const input = String(scheduleForm.assigneeName || '').trim()
+  if (!input) return Number(currentId)
+  if ((currentRealName && input === currentRealName) || (currentUsername && input === currentUsername)) {
+    return Number(currentId)
+  }
+  return scheduleForm.assigneeId != null ? Number(scheduleForm.assigneeId) : undefined
+}
+
 function buildConflictMessage(items: Array<{ title?: string; assigneeName?: string; startTime?: string; endTime?: string; reason?: string }>) {
   return items
     .slice(0, 6)
@@ -3780,6 +3794,7 @@ function openCreateSchedule(date?: Dayjs) {
   scheduleForm.title = ''
   scheduleForm.startTime = date ? date.hour(9).minute(0).second(0) : undefined
   scheduleForm.endTime = date ? date.hour(10).minute(0).second(0) : undefined
+  scheduleForm.assigneeId = userStore.staffInfo?.id != null ? String(userStore.staffInfo.id) : undefined
   scheduleForm.assigneeName = (userStore.staffInfo?.realName || userStore.staffInfo?.username || '').trim()
   scheduleForm.priority = 'NORMAL'
   scheduleForm.description = ''
@@ -3810,6 +3825,7 @@ function openEditSchedule(id: string | number) {
   scheduleForm.title = matched.title || ''
   scheduleForm.startTime = matched.startTime ? dayjs(matched.startTime) : undefined
   scheduleForm.endTime = matched.endTime ? dayjs(matched.endTime) : undefined
+  scheduleForm.assigneeId = matched.assigneeId != null ? String(matched.assigneeId) : undefined
   scheduleForm.assigneeName = matched.assigneeName || ''
   scheduleForm.priority = (matched.priority as any) || 'NORMAL'
   scheduleForm.description = matched.description || ''
@@ -3875,6 +3891,7 @@ async function submitSchedule() {
         startTime: dayjs(scheduleForm.startTime).format('YYYY-MM-DDTHH:mm:ss'),
         endTime: scheduleForm.endTime ? dayjs(scheduleForm.endTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
         priority: scheduleForm.priority,
+        assigneeId: resolveAssigneeIdForSubmit(),
         assigneeName: scheduleForm.assigneeName || undefined,
         calendarType: scheduleForm.calendarType,
         planCategory: scheduleForm.planCategory || undefined,
@@ -3904,6 +3921,7 @@ async function submitSchedule() {
           endTime: endTime ? dayjs(endTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
           priority: scheduleForm.priority,
           status: 'OPEN',
+          assigneeId: resolveAssigneeIdForSubmit(),
           assigneeName: scheduleForm.assigneeName || undefined,
           calendarType: scheduleForm.calendarType,
           planCategory: scheduleForm.planCategory || undefined,
