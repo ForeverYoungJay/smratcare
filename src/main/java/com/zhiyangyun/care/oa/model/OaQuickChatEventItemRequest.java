@@ -18,5 +18,5 @@ public class OaQuickChatEventItemRequest {
 
   private Map<String, Object> meta;
 
-  private List<Long> targetStaffIds;
+  private List<String> targetStaffIds;
 }
