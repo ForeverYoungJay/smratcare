@@ -77,7 +77,31 @@
     </a-row>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <vxe-table border stripe show-overflow :data="rows" height="420">
+      <div class="batch-action-bar">
+        <a-space wrap>
+          <a-tag color="blue">已选 {{ selectedRows.length }} 条</a-tag>
+          <a-button size="small" :disabled="!rows.length" @click="selectAllCurrentPage">全选本页</a-button>
+          <a-button size="small" :disabled="!rows.length" @click="selectByEventType('ADMISSION')">勾选全部入院</a-button>
+          <a-button size="small" :disabled="!rows.length" @click="selectByEventType('DISCHARGE')">勾选全部离院</a-button>
+          <a-button size="small" :disabled="!selectedRows.length" @click="clearSelection">清空勾选</a-button>
+          <a-button size="small" type="primary" :disabled="!selectedRows.length" @click="printSelectedRows">批量打印勾选</a-button>
+          <a-button size="small" :disabled="!selectedRows.length" @click="exportSelectedRowsCsv">批量导出勾选</a-button>
+        </a-space>
+      </div>
+
+      <vxe-table
+        ref="tableRef"
+        border
+        stripe
+        show-overflow
+        :row-id="'rowKey'"
+        :data="rows"
+        height="420"
+        @checkbox-change="refreshSelectedRows"
+        @checkbox-all="refreshSelectedRows"
+      >
+        <vxe-column type="checkbox" width="56" />
+        <vxe-column type="seq" title="#" width="60" />
         <vxe-column field="eventDate" title="日期" width="140" />
         <vxe-column field="eventType" title="事件类型" width="120">
           <template #default="{ row }">
@@ -113,7 +137,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
@@ -138,7 +162,13 @@ const query = ref({
   pageSize: 20
 })
 
-const rows = ref<FlowReportItem[]>([])
+type FlowReportTableRow = FlowReportItem & {
+  rowKey: string
+}
+
+const tableRef = ref<any>(null)
+const rows = ref<FlowReportTableRow[]>([])
+const selectedRows = ref<FlowReportTableRow[]>([])
 const total = ref(0)
 const summary = ref({
   total: 0,
@@ -165,6 +195,7 @@ const metricTraceText = computed(() => {
   return notes.join('；')
 })
 const printRows = computed(() => rows.value.map(item => ({
+  rowKey: item.rowKey,
   elderId: item.elderId,
   eventDate: item.eventDate || '',
   eventTypeLabel: item.eventType === 'ADMISSION' ? '入院' : '离院',
@@ -189,12 +220,18 @@ async function loadData() {
       pageSize: query.value.pageSize,
       orgId: query.value.orgId
     })
-    rows.value = res.list || []
+    rows.value = (res.list || []).map((item, index) => ({
+      ...item,
+      rowKey: buildRowKey(item, index)
+    }))
     total.value = Number(res.total || 0)
     summary.value.total = Number(res.total || 0)
     summary.value.admissionCount = Number(res.admissionCount || 0)
     summary.value.dischargeCount = Number(res.dischargeCount || 0)
     refreshedAt.value = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    selectedRows.value = []
+    await nextTick()
+    tableRef.value?.clearCheckboxRow?.()
     syncRouteQuery()
   } catch (error: any) {
     message.error(error?.message || '加载老人出入报表失败')
@@ -204,6 +241,15 @@ async function loadData() {
 function search() {
   query.value.pageNo = 1
   loadData()
+}
+
+function buildRowKey(row: FlowReportItem, index: number) {
+  return [
+    row.eventDate || 'NA',
+    row.eventType || 'NA',
+    row.elderId || 0,
+    index
+  ].join('_')
 }
 
 function reset() {
@@ -265,6 +311,74 @@ async function copyFilterLink() {
   } else {
     message.warning('复制失败，请手动复制地址栏链接')
   }
+}
+
+function refreshSelectedRows() {
+  const records = tableRef.value?.getCheckboxRecords?.() || []
+  selectedRows.value = records
+}
+
+function selectAllCurrentPage() {
+  tableRef.value?.setAllCheckboxRow?.(true)
+  refreshSelectedRows()
+}
+
+function clearSelection() {
+  tableRef.value?.clearCheckboxRow?.()
+  selectedRows.value = []
+}
+
+function selectByEventType(eventType: 'ADMISSION' | 'DISCHARGE') {
+  tableRef.value?.clearCheckboxRow?.()
+  const targets = rows.value.filter(item => item.eventType === eventType)
+  tableRef.value?.setCheckboxRow?.(targets, true)
+  refreshSelectedRows()
+}
+
+function printSelectedRows() {
+  if (!selectedRows.value.length) {
+    message.warning('请先勾选需要操作的记录')
+    return
+  }
+  const data = selectedRows.value.map(item => ({
+    elderId: item.elderId,
+    eventDate: item.eventDate || '',
+    eventTypeLabel: item.eventType === 'ADMISSION' ? '入院' : '离院',
+    elderName: item.elderName || '未知老人',
+    remark: item.remark || ''
+  }))
+  renderPrint(
+    `老人出入报表（批量勾选 ${data.length} 条）`,
+    data,
+    buildPrintScopeText(`批量勾选 ${data.length} 条`)
+  )
+}
+
+function exportSelectedRowsCsv() {
+  if (!selectedRows.value.length) {
+    message.warning('请先勾选需要操作的记录')
+    return
+  }
+  const headers = ['日期', '事件类型', '老人姓名', '备注']
+  const lines = selectedRows.value.map(item => [
+    csvSafe(item.eventDate || ''),
+    csvSafe(item.eventType === 'ADMISSION' ? '入院' : '离院'),
+    csvSafe(item.elderName || '未知老人'),
+    csvSafe(item.remark || '')
+  ].join(','))
+  const csv = [headers.join(','), ...lines].join('\n')
+  const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = `elder-flow-selected-${dayjs().format('YYYYMMDD-HHmmss')}.csv`
+  link.click()
+  URL.revokeObjectURL(link.href)
+  message.success(`已导出 ${selectedRows.value.length} 条勾选记录`)
+}
+
+function csvSafe(value: string) {
+  const next = String(value || '')
+  return `"${next.replace(/"/g, '""')}"`
 }
 
 function printCurrent() {
@@ -410,3 +524,12 @@ onMounted(() => {
   loadData()
 })
 </script>
+
+<style scoped>
+.batch-action-bar {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  background: var(--ant-color-fill-tertiary, #fafafa);
+  border-radius: 8px;
+}
+</style>

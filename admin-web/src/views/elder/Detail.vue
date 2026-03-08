@@ -130,7 +130,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message } from 'ant-design-vue'
@@ -335,7 +335,22 @@ function onFamilyPageSizeChange(current: number, size: number) {
   familyQuery.pageSize = size
 }
 
+function applyTabFromRoute() {
+  const tab = String(route.query.tab || '').trim()
+  if (tab === 'base' || tab === 'family' || tab === 'disease') {
+    activeKey.value = tab
+  }
+}
+
+watch(
+  () => route.query.tab,
+  () => {
+    applyTabFromRoute()
+  }
+)
+
 onMounted(async () => {
+  applyTabFromRoute()
   await load()
   await loadFamilies()
   await loadDiseases()

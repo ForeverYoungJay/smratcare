@@ -1190,6 +1190,7 @@ const quickChatCloudSavePending = ref(false)
 const quickChatCloudSyncing = ref(false)
 let quickChatCloudLastPayload = ''
 let quickChatCloudQueuedPayload = ''
+let quickChatFanoutLastPayload = ''
 const quickChatFanoutQueuedPayload = ref('')
 const quickChatEventQueuedSnapshot = ref('')
 const quickChatLastEventSnapshot = ref('')
@@ -1334,6 +1335,7 @@ watch(
   () => {
     quickChatCloudLastPayload = ''
     quickChatCloudQueuedPayload = ''
+    quickChatFanoutLastPayload = ''
     quickChatFanoutQueuedPayload.value = ''
     quickChatFanoutPending.value = false
     quickChatFanoutLastSuccessAt.value = 0
@@ -2383,28 +2385,39 @@ function collectQuickChatFanoutTargets() {
 
 async function pushQuickChatStateToMembers(stateJson: string) {
   if (!stateJson) return
+  if (stateJson === quickChatFanoutLastPayload && !quickChatFanoutQueuedPayload.value) return
   if (quickChatFanoutPending.value) {
     quickChatFanoutQueuedPayload.value = stateJson
     return
   }
   const targets = collectQuickChatFanoutTargets()
   if (!targets.length) return
+  const payload = stateJson
+  if (quickChatFanoutQueuedPayload.value === payload) {
+    quickChatFanoutQueuedPayload.value = ''
+  }
   quickChatFanoutPending.value = true
   try {
-    const affected = await fanoutQuickChatState(stateJson, targets)
+    const affected = await fanoutQuickChatState(payload, targets)
     quickChatFanoutLastSuccessAt.value = Date.now()
     quickChatFanoutLastAffected.value = Number(affected || 0)
-    quickChatFanoutQueuedPayload.value = ''
+    quickChatFanoutLastPayload = payload
   } catch {
     quickChatFanoutLastErrorAt.value = Date.now()
-    quickChatFanoutQueuedPayload.value = stateJson
+    quickChatFanoutQueuedPayload.value = payload
   } finally {
     quickChatFanoutPending.value = false
+    const queued = quickChatFanoutQueuedPayload.value
+    if (queued && queued !== quickChatFanoutLastPayload) {
+      quickChatFanoutQueuedPayload.value = ''
+      pushQuickChatStateToMembers(queued)
+    }
   }
 }
 
 function scheduleQuickChatFanout(stateJson: string) {
   if (!stateJson) return
+  if (stateJson === quickChatFanoutLastPayload && !quickChatFanoutQueuedPayload.value && !quickChatFanoutPending.value) return
   if (quickChatFanoutTimer) {
     window.clearTimeout(quickChatFanoutTimer)
     quickChatFanoutTimer = undefined
@@ -2433,8 +2446,14 @@ function setupQuickChatFanoutRetryTimer() {
     quickChatEventEmitTimer = undefined
   }
   quickChatFanoutRetryTimer = window.setInterval(() => {
-    if (!quickChatFanoutQueuedPayload.value || quickChatFanoutPending.value) return
-    pushQuickChatStateToMembers(quickChatFanoutQueuedPayload.value)
+    if (quickChatFanoutQueuedPayload.value && !quickChatFanoutPending.value) {
+      pushQuickChatStateToMembers(quickChatFanoutQueuedPayload.value)
+    }
+    if (quickChatEventQueuedSnapshot.value) {
+      const queued = quickChatEventQueuedSnapshot.value
+      quickChatEventQueuedSnapshot.value = ''
+      emitQuickChatIncrementalEvents(queued)
+    }
   }, QUICK_CHAT_FANOUT_RETRY_INTERVAL_MS)
 }
 
@@ -2577,16 +2596,20 @@ function buildQuickChatIncrementalEvents(snapshotJson: string) {
 
 async function emitQuickChatIncrementalEvents(snapshotJson: string) {
   if (!snapshotJson) return
+  if (snapshotJson === quickChatLastEventSnapshot.value && !quickChatEventQueuedSnapshot.value) return
   const events = buildQuickChatIncrementalEvents(snapshotJson)
-  quickChatLastEventSnapshot.value = snapshotJson
   if (!events.length) return
   try {
     await publishQuickChatEventBatch(events)
-  } catch {}
+    quickChatLastEventSnapshot.value = snapshotJson
+  } catch {
+    quickChatEventQueuedSnapshot.value = snapshotJson
+  }
 }
 
 function scheduleQuickChatIncrementalEmit(snapshotJson: string) {
   if (!snapshotJson || quickChatApplyingRemoteEvent.value) return
+  if (snapshotJson === quickChatLastEventSnapshot.value && !quickChatEventQueuedSnapshot.value) return
   quickChatEventQueuedSnapshot.value = snapshotJson
   if (quickChatEventEmitTimer) {
     window.clearTimeout(quickChatEventEmitTimer)

@@ -267,6 +267,9 @@ export interface AdmissionRecordItem {
   depositAmount?: number
   remark?: string
   elderStatus?: number
+  operatorName?: string
+  createByName?: string
+  creatorName?: string
   createTime?: string
 }
 

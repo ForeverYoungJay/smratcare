@@ -1209,6 +1209,17 @@ export const routes = [
                 name: 'FinanceBillsAutoDeductErrors',
                 component: () => import('../views/finance/AutoDebitManagement.vue'),
                 meta: { title: '自动扣费异常列表' }
+              },
+              {
+                path: 'detail-query',
+                name: 'FinanceBillsDetailQuery',
+                component: () => import('../views/finance/BillCenter.vue'),
+                meta: { title: '账单详情查询（按老人/月份）' },
+                props: {
+                  title: '账单详情查询',
+                  subTitle: '按老人、月份检索账单后进入详情页',
+                  defaultCurrentMonth: true
+                }
               }
             ]
           },

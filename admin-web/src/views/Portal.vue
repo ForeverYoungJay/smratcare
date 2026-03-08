@@ -2026,6 +2026,7 @@ const calendarOptions = computed(() => ({
         start: normalizeDateTimeValue(task.startTime || task.endTime),
         end: normalizeDateTimeValue(task.endTime || task.startTime),
         color: resolveTaskColor(task),
+        classNames: task.status === 'DONE' ? ['calendar-event-done'] : [],
         extendedProps: {
           calendarType: task.calendarType || 'WORK',
           urgency: task.urgency || 'NORMAL',
@@ -4843,6 +4844,14 @@ onBeforeUnmount(() => {
 .agenda-title-done {
   color: #64748b;
   text-decoration: line-through;
+}
+
+.portal-page :deep(.calendar-event-done .fc-event-title) {
+  text-decoration: line-through;
+}
+
+.portal-page :deep(.calendar-event-done) {
+  opacity: 0.82;
 }
 
 .approval-opinion-text {

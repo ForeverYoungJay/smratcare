@@ -646,6 +646,7 @@ const calendarOptions = computed(() => ({
         start: normalizeDateTimeValue(task.startTime || task.endTime),
         end: normalizeDateTimeValue(task.endTime || task.startTime),
         color: resolveTaskColor(task),
+        classNames: task.status === 'DONE' ? ['calendar-event-done'] : [],
         extendedProps: {
           calendarType: task.calendarType || 'WORK',
           urgency: task.urgency || 'NORMAL',
@@ -1437,5 +1438,13 @@ useLiveSyncRefresh({
   border-radius: 8px;
   padding: 1px 4px;
   box-shadow: 0 2px 8px rgba(30, 64, 175, 0.14);
+}
+
+.calendar-surface :deep(.calendar-event-done .fc-event-title) {
+  text-decoration: line-through;
+}
+
+.calendar-surface :deep(.calendar-event-done) {
+  opacity: 0.82;
 }
 </style>

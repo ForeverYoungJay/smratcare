@@ -116,26 +116,14 @@
           </a-space>
         </a-form-item>
       </a-form>
-      <BatchActionBar :actions="sheetBatchActions" />
-      <a-alert
-        v-if="sheetLastBatchReceipt"
-        type="info"
-        show-icon
-        style="margin-bottom: 8px"
-        :message="`最近回执：${sheetLastBatchReceipt.action}｜开始 ${sheetLastBatchReceipt.startAt}｜结束 ${sheetLastBatchReceipt.finishAt}｜成功 ${sheetLastBatchReceipt.success}/${sheetLastBatchReceipt.total}｜失败 ${sheetLastBatchReceipt.failed}`"
-      />
-      <a-row v-if="sheetBatchFailures.length > 0" :gutter="12" style="margin-bottom: 8px;">
-        <a-col :span="8"><a-statistic title="失败总数" :value="sheetBatchFailures.length" /></a-col>
-        <a-col :span="8"><a-statistic title="可重试失败" :value="retryableSheetFailures.length" /></a-col>
-        <a-col :span="8"><a-statistic title="错误码种类" :value="sheetFailureCodeSummary.length" /></a-col>
-      </a-row>
-      <a-alert
-        v-if="sheetFailureCodeSummary.length > 0"
-        type="warning"
-        show-icon
-        style="margin-bottom: 8px"
-        :message="`错误码聚合：${sheetFailureCodeSummary.map((item) => `${item.code}(${item.count})`).join('，')}`"
-      />
+      <a-space style="margin-bottom: 8px" wrap>
+        <a-button :disabled="selectedSheetRowKeys.length !== 1" @click="openSelectedSheetDetail">详情</a-button>
+        <a-button :disabled="selectedSheetRowKeys.length === 0" @click="printSelectedSheets">打印领取单</a-button>
+        <a-button :disabled="selectedSheetRowKeys.length === 0" @click="downloadSelectedSheetsPdf">导出PDF</a-button>
+        <a-button :disabled="selectedSheetRowKeys.length === 0" @click="downloadSelectedSheetsHtml">下载领取单</a-button>
+        <a-button type="primary" :disabled="selectedDraftSheetIds.length === 0" @click="confirmSelectedSheets">确认出库</a-button>
+        <a-button :disabled="selectedSheetRowKeys.length === 0" @click="clearSheetSelection">清空勾选</a-button>
+      </a-space>
       <a-table
         row-key="id"
         :loading="sheetLoading"
@@ -160,17 +148,6 @@
         </a-table-column>
         <a-table-column title="创建时间" data-index="createTime" key="createTime" width="180" />
         <a-table-column title="确认时间" data-index="confirmTime" key="confirmTime" width="180" />
-        <a-table-column title="操作" key="action" width="280" fixed="right">
-          <template #default="{ record }">
-            <a-space>
-              <a-button type="link" @click="openSheetDetail(record.id)">详情</a-button>
-              <a-button type="link" @click="printSheet(record.id)">打印领取单</a-button>
-              <a-button type="link" @click="downloadSheetPdf(record.id)">导出PDF</a-button>
-              <a-button type="link" @click="downloadSheetHtml(record.id)">下载领取单</a-button>
-              <a-button v-if="record.status !== 'CONFIRMED'" type="link" @click="confirmSheet(record.id)">确认出库</a-button>
-            </a-space>
-          </template>
-        </a-table-column>
       </a-table>
       <a-pagination
         style="margin-top: 12px; text-align: right;"
@@ -267,8 +244,8 @@
             </a-form-item>
           </a-col>
           <a-col :span="8">
-            <a-form-item label="合同号">
-              <a-input v-model:value="sheetForm.contractNo" placeholder="自动补齐（可手改）" />
+            <a-form-item label="合同号（自动回填）">
+              <a-input :value="sheetForm.contractNo" disabled placeholder="选择老人后自动填入" />
             </a-form-item>
           </a-col>
         </a-row>
@@ -344,46 +321,6 @@
       <a-alert style="margin-top: 10px;" type="info" show-icon message="保存后生成领用单；领取完成后请点击“确认出库”，并打印领取单给家属签字。" />
     </a-modal>
 
-    <a-modal v-model:open="batchProgress.open" :title="batchProgress.title" :footer="null" :mask-closable="false" :closable="!batchProgress.running" @cancel="closeBatchProgress">
-      <a-space direction="vertical" style="width: 100%">
-        <a-progress :percent="batchProgress.percent" :status="batchProgress.running ? 'active' : 'normal'" />
-        <a-statistic title="总数" :value="batchProgress.total" />
-        <a-statistic title="已处理" :value="batchProgress.current" />
-        <a-statistic title="成功" :value="batchProgress.success" />
-        <a-statistic title="失败" :value="batchProgress.failed" />
-      </a-space>
-    </a-modal>
-
-    <a-drawer v-model:open="sheetFailureDrawerOpen" title="批量失败明细" width="820">
-      <a-form layout="inline" style="margin-bottom: 8px">
-        <a-form-item label="关键字">
-          <a-input v-model:value="sheetFailureKeyword" allow-clear placeholder="动作/原因/错误码/路径/领用单ID" style="width: 280px" />
-        </a-form-item>
-        <a-form-item>
-          <a-checkbox v-model:checked="sheetFailureRetryableOnly">仅可重试</a-checkbox>
-        </a-form-item>
-      </a-form>
-      <a-alert
-        v-if="sheetFailureActionSummary.length > 0"
-        type="warning"
-        show-icon
-        style="margin-bottom: 8px"
-        :message="`动作聚合：${sheetFailureActionSummary.map((item) => `${item.action}(${item.count})`).join('，')}`"
-      />
-      <a-table :data-source="filteredSheetBatchFailures" :pagination="false" row-key="at" size="small">
-        <a-table-column title="时间" data-index="at" key="at" width="170" />
-        <a-table-column title="动作" data-index="action" key="action" width="140" />
-        <a-table-column title="领用单ID" data-index="sheetId" key="sheetId" width="120" />
-        <a-table-column title="错误码" data-index="code" key="code" width="120" />
-        <a-table-column title="接口路径" data-index="path" key="path" width="200" />
-        <a-table-column title="可重试" key="retryable" width="90">
-          <template #default="{ record }">
-            <a-tag :color="record.retryable ? 'green' : 'red'">{{ record.retryable ? '是' : '否' }}</a-tag>
-          </template>
-        </a-table-column>
-        <a-table-column title="失败原因" data-index="reason" key="reason" />
-      </a-table>
-    </a-drawer>
   </PageContainer>
 </template>
 
@@ -398,7 +335,6 @@ import { useElderOptions } from '../../composables/useElderOptions'
 import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import PageContainer from '../../components/PageContainer.vue'
-import BatchActionBar, { type BatchActionItem } from '../../components/BatchActionBar.vue'
 import { exportCsv } from '../../utils/export'
 import {
   confirmOutboundSheet,
@@ -623,71 +559,6 @@ const sheetFailureCodeSummary = computed(() => {
     .slice(0, 6)
 })
 
-const sheetBatchActions = computed<BatchActionItem[]>(() => [
-  {
-    key: 'confirm',
-    type: 'primary',
-    label: `批量确认出库（${selectedDraftSheetIds.value.length}）`,
-    disabled: selectedDraftSheetIds.value.length === 0,
-    onClick: batchConfirmSelected
-  },
-  {
-    key: 'pdf',
-    label: `批量导出PDF（${selectedSheetRowKeys.value.length}）`,
-    disabled: selectedSheetRowKeys.value.length === 0,
-    onClick: batchExportSelectedPdf
-  },
-  {
-    key: 'clear',
-    label: '清空勾选',
-    disabled: selectedSheetRowKeys.value.length === 0,
-    onClick: clearSheetSelection
-  },
-  {
-    key: 'retry-retryable',
-    type: 'dashed',
-    label: `重试可重试项（${retryableSheetFailures.value.length}）`,
-    disabled: retryableSheetFailures.value.length === 0,
-    onClick: retrySheetRetryableFailures
-  },
-  {
-    key: 'retry-failures',
-    type: 'dashed',
-    label: `重试失败项（${sheetBatchFailures.value.length}）`,
-    disabled: sheetBatchFailures.value.length === 0,
-    onClick: retrySheetBatchFailures
-  },
-  {
-    key: 'view-failures',
-    label: '查看失败明细',
-    disabled: sheetBatchFailures.value.length === 0,
-    onClick: () => { sheetFailureDrawerOpen.value = true }
-  },
-  {
-    key: 'export-failures',
-    label: `导出失败明细（${sheetBatchFailures.value.length}）`,
-    disabled: sheetBatchFailures.value.length === 0,
-    onClick: exportSheetBatchFailures
-  },
-  {
-    key: 'export-receipt',
-    label: '导出执行回执',
-    disabled: !sheetLastBatchReceipt.value,
-    onClick: exportSheetBatchReceipt
-  },
-  {
-    key: 'copy-digest',
-    label: '复制排障摘要',
-    disabled: sheetBatchFailures.value.length === 0,
-    onClick: copySheetFailureDigest
-  },
-  {
-    key: 'refresh',
-    label: '刷新',
-    onClick: fetchSheetData
-  }
-])
-
 async function fetchProducts() {
   const res: PageResult<ProductItem> = await getProductPage({ pageNo: 1, pageSize: 300 })
   products.value = res.list || []
@@ -775,6 +646,91 @@ function resetSheetQuery() {
 
 function clearSheetSelection() {
   selectedSheetRowKeys.value = []
+}
+
+function selectedSheetIds() {
+  return selectedSheetRowKeys.value.map((item) => Number(item)).filter((item) => Number.isFinite(item))
+}
+
+function selectedSheetRecords() {
+  const selected = new Set(selectedSheetIds())
+  return sheets.value.filter((item) => selected.has(Number(item.id)))
+}
+
+function openSelectedSheetDetail() {
+  const ids = selectedSheetIds()
+  if (ids.length !== 1) {
+    message.info('请勾选一条领用单后查看详情')
+    return
+  }
+  openSheetDetail(ids[0])
+}
+
+async function printSelectedSheets() {
+  const ids = selectedSheetIds()
+  if (!ids.length) {
+    message.info('请先勾选领用单')
+    return
+  }
+  for (const id of ids) {
+    await printSheet(id)
+  }
+}
+
+async function downloadSelectedSheetsPdf() {
+  const ids = selectedSheetIds()
+  if (!ids.length) {
+    message.info('请先勾选领用单')
+    return
+  }
+  for (const id of ids) {
+    await downloadSheetPdf(id, false)
+  }
+  message.success(`已导出 ${ids.length} 份PDF`)
+}
+
+async function downloadSelectedSheetsHtml() {
+  const ids = selectedSheetIds()
+  if (!ids.length) {
+    message.info('请先勾选领用单')
+    return
+  }
+  for (const id of ids) {
+    await downloadSheetHtml(id)
+  }
+}
+
+async function confirmSelectedSheets() {
+  const selectedRecords = selectedSheetRecords()
+  const draftIds = selectedRecords
+    .filter((item) => item.status !== 'CONFIRMED')
+    .map((item) => Number(item.id))
+  if (!draftIds.length) {
+    message.info('勾选项中没有可确认出库的领用单')
+    return
+  }
+  Modal.confirm({
+    title: `确认出库（${draftIds.length}）？`,
+    content: '确认后会扣减库存并生成出库日志，操作不可撤销。',
+    onOk: async () => {
+      let success = 0
+      let failed = 0
+      for (const id of draftIds) {
+        try {
+          await confirmOutboundSheet(id)
+          success += 1
+        } catch {
+          failed += 1
+        }
+      }
+      await Promise.all([fetchSheetData(), fetchData()])
+      if (failed > 0) {
+        message.warning(`确认出库完成：成功 ${success}，失败 ${failed}`)
+      } else {
+        message.success(`确认出库完成：成功 ${success}`)
+      }
+    }
+  })
 }
 
 function startBatchProgress(title: string, total: number) {

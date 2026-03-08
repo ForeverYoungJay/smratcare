@@ -25,13 +25,14 @@
             placeholder="请输入老人姓名/拼音首字母"
             @search="searchElders"
             @focus="() => !elderOptions.length && searchElders('')"
+            @change="onElderChange"
           />
         </a-form-item>
         <a-form-item label="收费开始日期" name="admissionDate">
           <a-date-picker v-model:value="form.admissionDate" value-format="YYYY-MM-DD" style="width: 100%" />
         </a-form-item>
-        <a-form-item label="合同号" name="contractNo">
-          <a-input v-model:value="form.contractNo" placeholder="请输入合同号" />
+        <a-form-item label="合同号（自动回填）" name="contractNo">
+          <a-input :value="form.contractNo" disabled placeholder="选择老人后自动填入，不可修改" />
         </a-form-item>
         <a-form-item label="初始余额(押金)" name="depositAmount">
           <a-input-number v-model:value="form.depositAmount" :min="0" style="width: 100%" placeholder="请输入押金金额" />
@@ -69,7 +70,7 @@
         </a-form-item>
       </a-form>
       <div style="text-align: right; margin-top: 8px;">
-        <a-button type="primary" :loading="submitting" @click="submit">提交入住办理</a-button>
+        <a-button type="primary" :loading="submitting || submitChecklistLoading" @click="openSubmitConfirm">提交入住办理</a-button>
       </div>
     </a-card>
 
@@ -109,6 +110,9 @@
               {{ statusText(record.elderStatus) }}
             </a-tag>
           </template>
+          <template v-else-if="column.key === 'operatorName'">
+            {{ record.operatorName || record.createByName || record.creatorName || '-' }}
+          </template>
         </template>
       </a-table>
       <a-pagination
@@ -121,6 +125,42 @@
         @showSizeChange="onPageSizeChange"
       />
     </a-card>
+
+    <a-modal
+      v-model:open="submitConfirmOpen"
+      title="提交确认"
+      :confirm-loading="submitting"
+      :ok-button-props="{ disabled: submitBlockingCount > 0 }"
+      ok-text="确认提交"
+      cancel-text="返回检查"
+      @ok="confirmSubmit"
+    >
+      <a-space direction="vertical" style="width: 100%">
+        <div>请确认以下信息填写及上传资料是否正确：</div>
+        <a-list bordered size="small" :data-source="submitChecklist">
+          <template #renderItem="{ item }">
+            <a-list-item>
+              <a-space>
+                <a-button type="link" style="padding: 0" @click="jumpToChecklist(item.key)">• {{ item.label }}</a-button>
+                <a-tag :color="item.ready ? 'green' : 'red'">{{ item.ready ? '已完善' : '待完善' }}</a-tag>
+                <span style="color: #8c8c8c">{{ item.note }}</span>
+              </a-space>
+            </a-list-item>
+          </template>
+        </a-list>
+        <a-alert
+          type="warning"
+          show-icon
+          :message="`确认无误后将正式建立老人档案，后续资料修改需申请审批。当前待完善项：${submitChecklist.filter((item) => !item.ready).length}`"
+        />
+        <a-alert
+          v-if="submitChecklist.some((item) => !item.ready)"
+          type="error"
+          show-icon
+          message="存在待完善项，建议先点击条目跳转补全后再提交。"
+        />
+      </a-space>
+    </a-modal>
   </PageContainer>
 </template>
 
@@ -134,9 +174,11 @@ import PageContainer from '../../components/PageContainer.vue'
 import FlowGuardBar from '../../components/FlowGuardBar.vue'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { useElderOptions } from '../../composables/useElderOptions'
+import { getFamilyRelations } from '../../api/family'
 import { getBedList, getBuildingList, getFloorList, getRoomList } from '../../api/bed'
 import { admitElder, exportAdmissionRecords, getAdmissionRecords } from '../../api/elderLifecycle'
-import { getContractPage } from '../../api/marketing'
+import { getElderDetail, getElderDiseases } from '../../api/elder'
+import { getContractAttachments, getContractPage } from '../../api/marketing'
 import { getCrmLead, updateCrmLead } from '../../api/crm'
 import type {
   AdmissionRecordItem,
@@ -154,6 +196,8 @@ const router = useRouter()
 const formRef = ref<FormInstance>()
 const form = reactive<AdmissionRequest>({ elderId: 0, admissionDate: '', bedId: undefined, bedStartDate: undefined })
 const submitting = ref(false)
+const submitChecklistLoading = ref(false)
+const submitConfirmOpen = ref(false)
 const linkedLeadId = ref<number>()
 const guardContract = ref<CrmContractItem | null>(null)
 const { elderOptions, elderLoading, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 120 })
@@ -197,6 +241,18 @@ const rules: FormRules = {
 const recordLoading = ref(false)
 const admissionRows = ref<AdmissionRecordItem[]>([])
 const recordTotal = ref(0)
+type SubmitChecklistKey = 'elder-base' | 'family' | 'disease' | 'contract' | 'attachment'
+type SubmitChecklistItem = { key: SubmitChecklistKey; label: string; ready: boolean; note: string }
+const submitChecklist = ref<SubmitChecklistItem[]>([
+  { key: 'elder-base', label: '老人基础信息', ready: false, note: '待校验' },
+  { key: 'family', label: '家属信息', ready: false, note: '待校验' },
+  { key: 'disease', label: '基础疾病信息', ready: false, note: '待校验' },
+  { key: 'contract', label: '合同信息', ready: false, note: '待校验' },
+  { key: 'attachment', label: '身份证/资料附件', ready: false, note: '待校验' }
+])
+const submitBlockingCount = computed(() =>
+  submitChecklist.value.filter((item) => !item.ready && item.key !== 'disease').length
+)
 const recordQuery = reactive({
   keyword: undefined as string | undefined,
   contractNo: undefined as string | undefined,
@@ -213,6 +269,7 @@ const columns = [
   { title: '押金（元）', dataIndex: 'depositAmount', key: 'depositAmount', width: 120 },
   { title: '入住状态', key: 'elderStatus', width: 100 },
   { title: '备注', dataIndex: 'remark', key: 'remark' },
+  { title: '操作员姓名', key: 'operatorName', width: 140 },
   { title: '登记时间', dataIndex: 'createTime', key: 'createTime', width: 180 }
 ]
 const admissionFlowSteps = ['合同完成评估', '办理入住选床', '进入待签署', '最终签署']
@@ -241,12 +298,12 @@ const admissionFlowStageColor = computed(() => {
   return 'default'
 })
 const admissionFlowSubject = computed(() => {
-  if (!form.contractNo) return '请输入合同号后系统自动校验流程'
+  if (!form.contractNo) return '请先选择老人并自动回填合同号'
   if (!guardContract.value) return `合同号 ${form.contractNo} 未匹配`
   return `合同 ${guardContract.value.contractNo || '-'} / 长者 ${guardContract.value.elderName || '-'}`
 })
 const admissionFlowBlockers = computed(() => {
-  if (!form.contractNo) return [{ code: 'G100', text: '未输入合同号，请先输入合同号', actionLabel: '填写合同号', actionKey: 'focus-contract' }]
+  if (!form.contractNo) return [{ code: 'G100', text: '未匹配到合同号，请先选择老人', actionLabel: '选择老人', actionKey: 'focus-elder' }]
   if (!guardContract.value) return [{ code: 'G102', text: '合同不存在或已删除', actionLabel: '去合同签约', actionKey: 'go-contract' }]
   const blockers: Array<{ code: string; text: string; actionLabel?: string; actionKey?: string }> = []
   if (guardContract.value.status === 'VOID') blockers.push({ code: 'G401', text: '合同已作废' })
@@ -268,6 +325,10 @@ const admissionFlowHint = computed(() => {
 })
 
 function handleAdmissionGuardAction(item: { actionKey?: string }) {
+  if (item.actionKey === 'focus-elder') {
+    message.info('请先在“老人姓名”中选择长者，系统会自动回填合同号')
+    return
+  }
   if (item.actionKey === 'go-contract') {
     router.push('/marketing/contract-signing')
     return
@@ -312,10 +373,110 @@ async function submit() {
   }
 }
 
+function checklistRoute(key: SubmitChecklistKey) {
+  const elderId = Number(form.elderId || 0)
+  const contractNo = encodeURIComponent(String(form.contractNo || '').trim())
+  if (key === 'elder-base') return elderId ? `/elder/detail/${elderId}?tab=base` : '/elder/list'
+  if (key === 'family') return elderId ? `/elder/detail/${elderId}?tab=family` : '/elder/family'
+  if (key === 'disease') return elderId ? `/elder/detail/${elderId}?tab=disease` : '/elder/list'
+  if (key === 'contract') return contractNo ? `/marketing/contract-signing?contractNo=${contractNo}` : '/marketing/contract-signing'
+  if (key === 'attachment') {
+    if (elderId) return `/elder/contracts-invoices?residentId=${elderId}&tab=attachments`
+    return contractNo ? `/marketing/contract-signing?contractNo=${contractNo}` : '/marketing/contract-signing'
+  }
+  return '/elder/list'
+}
+
+function jumpToChecklist(key: SubmitChecklistKey) {
+  submitConfirmOpen.value = false
+  router.push(checklistRoute(key))
+}
+
+async function buildSubmitChecklist() {
+  const elderId = Number(form.elderId || 0)
+  const contractNo = String(form.contractNo || '').trim()
+  const [elderDetailRes, familyRes, diseaseRes, contractPageRes] = await Promise.all([
+    elderId ? getElderDetail(elderId).catch(() => null) : Promise.resolve(null),
+    elderId ? getFamilyRelations(elderId).catch(() => []) : Promise.resolve([]),
+    elderId ? getElderDiseases(elderId).catch(() => []) : Promise.resolve([]),
+    contractNo ? getContractPage({ pageNo: 1, pageSize: 20, contractNo }).catch(() => ({ list: [] })) : Promise.resolve({ list: [] as CrmContractItem[] })
+  ])
+  const contract = (contractPageRes.list || []).find((item) => String(item.contractNo || '').trim() === contractNo) || null
+  const attachments = contract?.id
+    ? await getContractAttachments(contract.id).catch(() => [])
+    : []
+  const hasIdDoc = attachments.some((item) => {
+    const type = String(item.attachmentType || '').toUpperCase()
+    const name = String(item.fileName || '').toUpperCase()
+    return type.includes('ID') || type.includes('IDENT') || name.includes('身份证')
+  })
+  return [
+    {
+      key: 'elder-base' as const,
+      label: '老人基础信息',
+      ready: Boolean(elderDetailRes?.fullName && elderDetailRes?.idCardNo),
+      note: elderDetailRes?.fullName && elderDetailRes?.idCardNo ? '姓名/身份证已填写' : '缺少姓名或身份证'
+    },
+    {
+      key: 'family' as const,
+      label: '家属信息',
+      ready: Array.isArray(familyRes) && familyRes.length > 0,
+      note: Array.isArray(familyRes) && familyRes.length > 0 ? `已绑定 ${familyRes.length} 位家属` : '未绑定家属'
+    },
+    {
+      key: 'disease' as const,
+      label: '基础疾病信息',
+      ready: Array.isArray(diseaseRes) && diseaseRes.length > 0,
+      note: Array.isArray(diseaseRes) && diseaseRes.length > 0 ? `已维护 ${diseaseRes.length} 项疾病信息` : '未维护疾病信息'
+    },
+    {
+      key: 'contract' as const,
+      label: '合同信息',
+      ready: Boolean(contract && contract.contractNo),
+      note: contract ? `合同号 ${contract.contractNo || '-'}（${contract.status || contract.flowStage || '待处理'}）` : '未找到合同'
+    },
+    {
+      key: 'attachment' as const,
+      label: '身份证/资料附件',
+      ready: attachments.length > 0 && hasIdDoc,
+      note: attachments.length
+        ? (hasIdDoc ? `已上传 ${attachments.length} 份附件（含身份证）` : `已上传 ${attachments.length} 份附件（缺身份证类）`)
+        : '未上传附件'
+    }
+  ]
+}
+
+async function openSubmitConfirm() {
+  if (!form.elderId) {
+    message.warning('请先选择老人')
+    return
+  }
+  if (!form.contractNo) {
+    message.warning('请先自动回填合同号')
+    return
+  }
+  submitChecklistLoading.value = true
+  try {
+    submitChecklist.value = await buildSubmitChecklist()
+    submitConfirmOpen.value = true
+  } finally {
+    submitChecklistLoading.value = false
+  }
+}
+
+async function confirmSubmit() {
+  if (submitBlockingCount.value > 0) {
+    message.warning('存在关键资料未完善，请先返回检查并补齐后再提交')
+    return
+  }
+  submitConfirmOpen.value = false
+  await submit()
+}
+
 async function validateAdmissionGuard() {
   const contractNo = String(form.contractNo || '').trim()
   if (!contractNo) {
-    message.warning('请先填写合同号，再办理入住')
+    message.warning('请先选择老人并自动回填合同号，再办理入住')
     return false
   }
   try {
@@ -384,6 +545,59 @@ async function loadContractGuardState() {
   } catch {
     guardContract.value = null
   }
+}
+
+function contractPriority(item: CrmContractItem) {
+  const status = String(item.status || '')
+  const stage = String(item.flowStage || '')
+  if (status === 'VOID') return -1
+  if (stage === 'PENDING_BED_SELECT') return 500
+  if (stage === 'PENDING_SIGN') return 450
+  if (stage === 'SIGNED') return 400
+  if (status === 'EFFECTIVE') return 350
+  if (stage === 'PENDING_ASSESSMENT') return 300
+  return 100
+}
+
+async function resolveContractNoByElder(elderIdRaw: string | number | undefined) {
+  const elderId = Number(elderIdRaw || 0)
+  if (!elderId) {
+    form.contractNo = ''
+    guardContract.value = null
+    return
+  }
+  const elderName = findElderName(elderId)
+  const page: PageResult<CrmContractItem> = await getContractPage({
+    pageNo: 1,
+    pageSize: 200,
+    elderId,
+    elderName: elderName || undefined
+  })
+  const list = (page.list || []).filter((item) => Number(item.elderId || 0) === elderId || !item.elderId)
+  if (!list.length) {
+    form.contractNo = ''
+    guardContract.value = null
+    message.warning('该老人暂无可用合同，请先在合同签约中创建/确认合同')
+    return
+  }
+  const picked = [...list]
+    .sort((a, b) => {
+      const diff = contractPriority(b) - contractPriority(a)
+      if (diff !== 0) return diff
+      const ta = new Date(a.updateTime || a.createTime || 0).getTime()
+      const tb = new Date(b.updateTime || b.createTime || 0).getTime()
+      return tb - ta
+    })[0]
+  form.contractNo = String(picked.contractNo || '').trim()
+  guardContract.value = picked || null
+  if (picked.leadId && !linkedLeadId.value) {
+    linkedLeadId.value = Number(picked.leadId)
+  }
+}
+
+async function onElderChange(value: string | number | undefined) {
+  form.elderId = (value as any) || 0
+  await resolveContractNoByElder(value)
 }
 
 async function fetchAdmissionRecords() {
@@ -549,6 +763,9 @@ onMounted(async () => {
   await searchElders('')
   await loadAssets()
   applyRoutePrefill()
+  if (!form.contractNo && form.elderId) {
+    await resolveContractNoByElder(form.elderId as any)
+  }
   await fetchAdmissionRecords()
 })
 </script>
