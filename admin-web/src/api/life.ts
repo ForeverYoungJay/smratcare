@@ -83,8 +83,8 @@ export function deleteHealthBasic(id: number) {
   return request.delete<void>(`/api/life/health-basic/${id}`)
 }
 
-export function getBirthdayPage(params: any) {
-  return fetchPage<BirthdayReminder>('/api/life/birthday/page', params)
+export function getBirthdayPage(params: any, config?: Record<string, any>) {
+  return fetchPage<BirthdayReminder>('/api/life/birthday/page', params, config)
 }
 
 export function getRoomCleaningPage(params: any) {

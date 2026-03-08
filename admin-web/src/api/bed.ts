@@ -26,8 +26,8 @@ export function getBedList() {
   return request.get<BedItem[]>('/api/bed/list')
 }
 
-export function getBedMap() {
-  return request.get<BedItem[]>('/api/bed/map')
+export function getBedMap(config?: Record<string, any>) {
+  return request.get<BedItem[]>('/api/bed/map', config)
 }
 
 export function getBuildingPage(params: any) {

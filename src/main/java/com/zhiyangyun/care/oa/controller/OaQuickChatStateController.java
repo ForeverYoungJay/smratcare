@@ -9,6 +9,7 @@ import com.zhiyangyun.care.oa.model.OaQuickChatStateRequest;
 import com.zhiyangyun.care.oa.model.OaQuickChatStateResponse;
 import jakarta.validation.Valid;
 import java.nio.charset.StandardCharsets;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/oa/quick-chat/state")
+@PreAuthorize("isAuthenticated() and !hasRole('FAMILY')")
 public class OaQuickChatStateController {
   private static final int MAX_STATE_BYTES = 2 * 1024 * 1024;
   private final OaQuickChatStateMapper quickChatStateMapper;

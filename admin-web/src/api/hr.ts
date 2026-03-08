@@ -33,8 +33,8 @@ export function getHrStaffBirthdayPage(params: any) {
   return fetchPage<HrStaffBirthdayItem>('/api/admin/hr/staff/birthday/page', params)
 }
 
-export function getHrWorkbenchSummary(params?: { warningDays?: number }) {
-  return request.get<HrWorkbenchSummary>('/api/admin/hr/workbench/summary', { params })
+export function getHrWorkbenchSummary(params?: { warningDays?: number }, config?: Record<string, any>) {
+  return request.get<HrWorkbenchSummary>('/api/admin/hr/workbench/summary', { params, ...(config || {}) })
 }
 
 export function getHrContractReminderPage(params: any) {
@@ -109,8 +109,8 @@ export function createHrProfileCertificate(data: Partial<HrStaffCertificateItem>
   return request.post<HrStaffCertificateItem>('/api/admin/hr/profile/certificate', data)
 }
 
-export function getHrProfileCertificateReminderPage(params: any) {
-  return fetchPage<HrStaffCertificateItem>('/api/admin/hr/profile/certificate/reminder/page', params)
+export function getHrProfileCertificateReminderPage(params: any, config?: Record<string, any>) {
+  return fetchPage<HrStaffCertificateItem>('/api/admin/hr/profile/certificate/reminder/page', params, config)
 }
 
 export function getHrAccessControlPage(params: any) {

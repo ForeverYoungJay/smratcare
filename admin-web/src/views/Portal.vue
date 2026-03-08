@@ -3983,7 +3983,7 @@ async function loadDepartmentOptions() {
 }
 
 async function loadSummary() {
-  const data = await getPortalSummary()
+  const data = await getPortalSummary({ silent403: true })
   Object.assign(summary, data)
 }
 
@@ -4000,15 +4000,18 @@ async function loadCalendar() {
 }
 
 async function loadDashboard() {
-  dashboard.value = await getDashboardSummary()
+  dashboard.value = await getDashboardSummary({ silent403: true })
 }
 
 async function loadFinanceOverview() {
-  financeOverview.value = await getFinanceWorkbenchOverview()
+  financeOverview.value = await getFinanceWorkbenchOverview({ silent403: true })
 }
 
 async function loadBedAndElderStatus() {
-  const [residence, beds] = await Promise.all([getResidenceStatusSummary(), getBedMap()])
+  const [residence, beds] = await Promise.all([
+    getResidenceStatusSummary({ silent403: true }),
+    getBedMap({ silent403: true })
+  ])
   bedAndElderStatus.inHospital = Number(residence.inHospitalCount || 0)
   bedAndElderStatus.outing = Number(residence.outingCount || 0)
   bedAndElderStatus.medicalObservation = Number(residence.medicalOutingCount || 0)
@@ -4021,9 +4024,9 @@ async function loadSalesFunnel() {
   const monthStart = dayjs().startOf('month').format('YYYY-MM-DD')
 
   const [conversion, evalPage, pendingSignPage] = await Promise.all([
-    getMarketingConversionReport({ dateFrom: monthStart, dateTo: today }),
-    getLeadPage({ pageNo: 1, pageSize: 1, status: 1 }) as Promise<PageResult<CrmLeadItem>>,
-    getContractPage({ pageNo: 1, pageSize: 1, flowStage: 'PENDING_SIGN' }) as Promise<PageResult<CrmContractItem>>
+    getMarketingConversionReport({ dateFrom: monthStart, dateTo: today }, { silent403: true }),
+    getLeadPage({ pageNo: 1, pageSize: 1, status: 1 }, { silent403: true }) as Promise<PageResult<CrmLeadItem>>,
+    getContractPage({ pageNo: 1, pageSize: 1, flowStage: 'PENDING_SIGN' }, { silent403: true }) as Promise<PageResult<CrmContractItem>>
   ])
 
   salesFunnel.todayConsultCount = Number(conversion.consultCount || 0)
@@ -4034,8 +4037,8 @@ async function loadSalesFunnel() {
 
 async function loadHrReminder() {
   const [hrData, certPage] = await Promise.all([
-    getHrWorkbenchSummary(),
-    getHrProfileCertificateReminderPage({ pageNo: 1, pageSize: 1 })
+    getHrWorkbenchSummary(undefined, { silent403: true }),
+    getHrProfileCertificateReminderPage({ pageNo: 1, pageSize: 1 }, { silent403: true })
   ])
   hrSummary.value = hrData
   certificateReminderCount.value = Number(certPage.total || 0)
@@ -4056,7 +4059,7 @@ async function loadBirthdayPlan() {
     pageNo: 1,
     pageSize: 500,
     daysAhead: 365
-  })
+  }, { silent403: true })
   birthdayRows.value = birthdayPage.list || []
 }
 

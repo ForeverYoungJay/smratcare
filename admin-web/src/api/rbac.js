@@ -5,11 +5,17 @@ export function getOrgPage(params) {
 export function getDepartmentPage(params) {
     return fetchPage('/api/admin/departments', params);
 }
+export function getDepartmentOptionPage(params) {
+    return fetchPage('/api/admin/departments/options', params);
+}
 export function getRolePage(params) {
     return fetchPage('/api/admin/roles', params);
 }
 export function getStaffPage(params) {
     return fetchPage('/api/admin/staff', params);
+}
+export function getStaffOptionPage(params) {
+    return fetchPage('/api/admin/staff/options', params);
 }
 export function createStaff(data) {
     return request.post('/api/admin/staff', data);

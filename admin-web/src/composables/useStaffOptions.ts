@@ -1,5 +1,5 @@
 import { onMounted, onUnmounted, ref } from 'vue'
-import { getStaffPage } from '../api/rbac'
+import { getStaffOptionPage } from '../api/rbac'
 import type { PageResult, StaffItem } from '../types'
 import { subscribeLiveSync } from '../utils/liveSync'
 import { fuzzyScore, toPinyinInitials } from './entitySearch'
@@ -59,7 +59,7 @@ export function useStaffOptions(config: UseStaffOptionsConfig = {}) {
     const lastAt = staffPoolFetchedAt.get(cacheKey) || 0
     const hasFresh = staffPoolCache.has(cacheKey) && (Date.now() - lastAt < STAFF_POOL_CACHE_TTL)
     if (!force && hasFresh) return staffPoolCache.get(cacheKey) || []
-    const page: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: preloadSize })
+    const page: PageResult<StaffItem> = await getStaffOptionPage({ pageNo: 1, pageSize: preloadSize, activeOnly: true })
     const rows = page.list || []
     staffPoolCache.set(cacheKey, rows)
     staffPoolFetchedAt.set(cacheKey, Date.now())
@@ -74,7 +74,12 @@ export function useStaffOptions(config: UseStaffOptionsConfig = {}) {
       const baseRows = await loadBasePool(false)
       let mergedRows = [...baseRows]
       if (text) {
-        const page: PageResult<StaffItem> = await getStaffPage({ pageNo: 1, pageSize: Math.max(pageSize * 2, 120), keyword: text })
+        const page: PageResult<StaffItem> = await getStaffOptionPage({
+          pageNo: 1,
+          pageSize: Math.max(pageSize * 2, 120),
+          keyword: text,
+          activeOnly: true
+        })
         mergedRows = dedupeStaff([...(page.list || []), ...baseRows])
       }
       const finalRows = text

@@ -140,7 +140,7 @@
           <a-date-picker v-model:value="form.dueTime" show-time style="width: 100%" />
         </a-form-item>
         <a-form-item label="负责人">
-          <a-input v-model:value="form.assigneeName" />
+          <a-input v-model:value="form.assigneeName" :disabled="!canAssignOthers" :placeholder="canAssignOthers ? '' : '非管理角色固定为本人'" />
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="form.status" :options="editableStatusOptions" disabled />
@@ -175,10 +175,12 @@ import {
   exportTodo
 } from '../../api/oa'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
+import { useUserStore } from '../../stores/user'
 import type { OaTodo, OaTodoSummary, PageResult } from '../../types'
 
 const loading = ref(false)
 const router = useRouter()
+const userStore = useUserStore()
 const tableError = ref('')
 const summaryLoading = ref(false)
 const summaryError = ref('')
@@ -230,6 +232,15 @@ const sourceTypeOptions = [
   { label: '普通待办', value: 'NORMAL' }
 ]
 const editableStatusOptions = [{ label: '待处理', value: 'OPEN' }]
+const canAssignOthers = computed(() => {
+  const roles = userStore.roles || []
+  return roles.includes('ADMIN') || roles.includes('SYS_ADMIN') || roles.includes('DIRECTOR')
+})
+const currentUserName = computed(() => {
+  const realName = String(userStore.staffInfo?.realName || '').trim()
+  if (realName) return realName
+  return String(userStore.staffInfo?.username || '').trim()
+})
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: (string | number)[]) => {
@@ -323,7 +334,7 @@ function openCreate() {
   form.title = ''
   form.content = ''
   form.dueTime = undefined
-  form.assigneeName = ''
+  form.assigneeName = canAssignOthers.value ? '' : currentUserName.value
   form.status = 'OPEN'
   editOpen.value = true
 }
@@ -364,17 +375,18 @@ function openEdit(record: OaTodo) {
   form.title = record.title
   form.content = record.content || ''
   form.dueTime = record.dueTime ? dayjs(record.dueTime) : undefined
-  form.assigneeName = record.assigneeName || ''
+  form.assigneeName = canAssignOthers.value ? (record.assigneeName || '') : currentUserName.value
   form.status = record.status || 'OPEN'
   editOpen.value = true
 }
 
 async function submit() {
+  const assigneeName = canAssignOthers.value ? String(form.assigneeName || '').trim() : currentUserName.value
   const payload = {
     title: form.title,
     content: form.content,
     dueTime: form.dueTime ? dayjs(form.dueTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
-    assigneeName: form.assigneeName,
+    assigneeName,
     status: 'OPEN'
   }
   saving.value = true

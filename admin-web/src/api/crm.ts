@@ -1,8 +1,8 @@
 import request, { fetchPage } from '../utils/request'
 import type { CrmLeadItem } from '../types'
 
-export function getCrmLeadPage(params: any) {
-  return fetchPage<CrmLeadItem>('/api/crm/leads/page', params)
+export function getCrmLeadPage(params: any, config?: Record<string, any>) {
+  return fetchPage<CrmLeadItem>('/api/crm/leads/page', params, config)
 }
 
 export function getCrmLead(id: number) {

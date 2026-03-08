@@ -258,6 +258,7 @@
         <a-button :disabled="!activeQuickChatRoom" @click="toggleArchiveActiveRoom">
           {{ activeQuickChatRoom && isRoomArchivedByCurrentUser(activeQuickChatRoom) ? '恢复会话' : '归档会话' }}
         </a-button>
+        <a-button size="small" :loading="quickChatCloudSyncing" @click="forceQuickChatCloudSync">立即同步</a-button>
         <a-button :disabled="!activeQuickChatRoom" @click="nudgeActiveQuickChatRoom">催办提醒</a-button>
         <a-button :disabled="!activeQuickChatRoom" @click="exportActiveQuickChatHistory">导出会话</a-button>
         <a-badge :count="quickChatTodoPendingCount" size="small">
@@ -265,8 +266,17 @@
         </a-badge>
         <a-button danger :disabled="!activeQuickChatRoom" @click="exitActiveQuickChatRoom">退出会话</a-button>
         <a-tag :color="presenceStatus.color">{{ presenceStatus.label }}</a-tag>
+        <a-tag :color="quickChatCloudStatus.color">{{ quickChatCloudStatus.text }}</a-tag>
         <a-tag v-if="quickChatDnd" color="red">免打扰已开启</a-tag>
         <a-tag v-if="quickChatPressureTag" :color="quickChatPressureTag.color">{{ quickChatPressureTag.text }}</a-tag>
+        <a-button
+          v-if="canUndoQuickChatArchive"
+          size="small"
+          type="link"
+          @click="undoLastArchivedQuickChatRoom"
+        >
+          撤销删除
+        </a-button>
       </a-space>
     <div class="quick-chat-layout">
       <div class="quick-chat-room-list">
@@ -317,6 +327,15 @@
       <div class="quick-chat-main">
         <div v-if="activeQuickChatRoom?.notice" class="quick-chat-notice">
           <strong>群公告：</strong>{{ activeQuickChatRoom.notice }}
+        </div>
+        <div v-if="quickChatSyncConflict.visible" class="quick-chat-sync-conflict">
+          <div class="quick-chat-sync-conflict-title">{{ quickChatSyncConflictTitle }}</div>
+          <div class="quick-chat-sync-conflict-desc">{{ quickChatSyncConflictDesc }}</div>
+          <a-space size="small">
+            <a-button size="small" type="primary" @click="resolveQuickChatConflictUseLocal">以本地覆盖云端</a-button>
+            <a-button size="small" @click="resolveQuickChatConflictUseCloud">使用云端覆盖本地</a-button>
+            <a-button size="small" type="link" @click="dismissQuickChatConflict">稍后处理</a-button>
+          </a-space>
         </div>
         <div class="quick-chat-header">
           <strong>{{ activeQuickChatRoom?.name || '请选择会话' }}</strong>
@@ -1123,10 +1142,60 @@ let quickChatCloudPullTimer: number | undefined
 let quickChatCloudSaveTimer: number | undefined
 const QUICK_CHAT_CLOUD_PULL_INTERVAL_MS = 30000
 const QUICK_CHAT_CLOUD_SAVE_DEBOUNCE_MS = 900
+const QUICK_CHAT_ARCHIVE_UNDO_WINDOW_MS = 5 * 60 * 1000
 const quickChatCloudReady = ref(false)
 const quickChatCloudRemoteUpdatedAt = ref(0)
 const quickChatCloudSavePending = ref(false)
+const quickChatCloudSyncing = ref(false)
 let quickChatCloudLastPayload = ''
+let quickChatCloudQueuedPayload = ''
+const quickChatSyncConflict = reactive({
+  visible: false,
+  direction: '' as 'LOCAL_NEWER' | 'CLOUD_NEWER' | '',
+  localMs: 0,
+  remoteMs: 0,
+  remoteJson: ''
+})
+const quickChatLastArchivedRoomId = ref('')
+const quickChatLastArchivedAt = ref(0)
+const canUndoQuickChatArchive = computed(() => {
+  void presenceTick.value
+  if (!quickChatLastArchivedRoomId.value || !quickChatLastArchivedAt.value) return false
+  return Date.now() - quickChatLastArchivedAt.value <= QUICK_CHAT_ARCHIVE_UNDO_WINDOW_MS
+})
+const quickChatCloudStatus = computed(() => {
+  if (quickChatCloudSyncing.value || quickChatCloudSavePending.value) {
+    return { text: '云端同步中', color: 'blue' }
+  }
+  if (!quickChatCloudReady.value) {
+    return { text: '云端未连接', color: 'default' }
+  }
+  if (!quickChatCloudRemoteUpdatedAt.value) {
+    return { text: '云端待初始化', color: 'orange' }
+  }
+  return {
+    text: `已同步 ${dayjs(quickChatCloudRemoteUpdatedAt.value).format('MM-DD HH:mm')}`,
+    color: 'green'
+  }
+})
+const quickChatSyncConflictTitle = computed(() => {
+  if (!quickChatSyncConflict.visible) return ''
+  if (quickChatSyncConflict.direction === 'LOCAL_NEWER') return '检测到同步冲突：本地版本更新'
+  if (quickChatSyncConflict.direction === 'CLOUD_NEWER') return '检测到同步冲突：云端版本更新'
+  return '检测到同步冲突'
+})
+const quickChatSyncConflictDesc = computed(() => {
+  if (!quickChatSyncConflict.visible) return ''
+  const localText = quickChatSyncConflict.localMs ? dayjs(quickChatSyncConflict.localMs).format('MM-DD HH:mm:ss') : '-'
+  const remoteText = quickChatSyncConflict.remoteMs ? dayjs(quickChatSyncConflict.remoteMs).format('MM-DD HH:mm:ss') : '-'
+  if (quickChatSyncConflict.direction === 'LOCAL_NEWER') {
+    return `本地更新时间 ${localText}，云端更新时间 ${remoteText}。请选择是否将本地会话覆盖到云端。`
+  }
+  if (quickChatSyncConflict.direction === 'CLOUD_NEWER') {
+    return `云端更新时间 ${remoteText}，本地更新时间 ${localText}。请选择是否使用云端会话覆盖本地。`
+  }
+  return `本地更新时间 ${localText}，云端更新时间 ${remoteText}。请先确认同步策略。`
+})
 
 const filteredMenu = computed(() => {
   const roles = userStore.roles || []
@@ -1188,8 +1257,17 @@ watch(
   () => currentQuickChatSenderId.value,
   () => {
     quickChatCloudLastPayload = ''
+    quickChatCloudQueuedPayload = ''
     quickChatCloudRemoteUpdatedAt.value = 0
     quickChatCloudReady.value = false
+    quickChatCloudSyncing.value = false
+    quickChatSyncConflict.visible = false
+    quickChatSyncConflict.direction = ''
+    quickChatSyncConflict.localMs = 0
+    quickChatSyncConflict.remoteMs = 0
+    quickChatSyncConflict.remoteJson = ''
+    quickChatLastArchivedRoomId.value = ''
+    quickChatLastArchivedAt.value = 0
     loadQuickChatState()
     pullQuickChatStateFromCloud(true)
     rehydrateQuickChatUnread()
@@ -1984,17 +2062,27 @@ function localQuickChatLatestMs() {
 
 async function pushQuickChatStateToCloud(stateJson: string) {
   if (!stateJson || !quickChatCloudReady.value) return
-  if (quickChatCloudSavePending.value) return
+  if (quickChatCloudSavePending.value) {
+    quickChatCloudQueuedPayload = stateJson
+    return
+  }
   quickChatCloudSavePending.value = true
   try {
     const saved = await saveQuickChatState(stateJson)
     const serverMs = dayjs(saved?.updateTime || dayjs().toISOString()).valueOf()
     quickChatCloudRemoteUpdatedAt.value = serverMs || Date.now()
     quickChatCloudLastPayload = stateJson
+    quickChatCloudQueuedPayload = ''
   } catch {
     // 云端失败不阻塞本地，等待下一次自动重试。
+    quickChatCloudQueuedPayload = stateJson
   } finally {
     quickChatCloudSavePending.value = false
+    if (quickChatCloudQueuedPayload && quickChatCloudQueuedPayload !== quickChatCloudLastPayload) {
+      const queued = quickChatCloudQueuedPayload
+      quickChatCloudQueuedPayload = ''
+      pushQuickChatStateToCloud(queued)
+    }
   }
 }
 
@@ -2004,6 +2092,10 @@ function scheduleQuickChatCloudSave(stateJson: string) {
   if (quickChatCloudSaveTimer) {
     window.clearTimeout(quickChatCloudSaveTimer)
     quickChatCloudSaveTimer = undefined
+  }
+  if (quickChatCloudSavePending.value) {
+    quickChatCloudQueuedPayload = stateJson
+    return
   }
   quickChatCloudSaveTimer = window.setTimeout(() => {
     quickChatCloudSaveTimer = undefined
@@ -2191,8 +2283,64 @@ function loadQuickChatState() {
   }
 }
 
+function clearQuickChatSyncConflict() {
+  quickChatSyncConflict.visible = false
+  quickChatSyncConflict.direction = ''
+  quickChatSyncConflict.localMs = 0
+  quickChatSyncConflict.remoteMs = 0
+  quickChatSyncConflict.remoteJson = ''
+}
+
+function markQuickChatSyncConflict(direction: 'LOCAL_NEWER' | 'CLOUD_NEWER', localMs: number, remoteMs: number, remoteJson: string) {
+  quickChatSyncConflict.visible = true
+  quickChatSyncConflict.direction = direction
+  quickChatSyncConflict.localMs = localMs
+  quickChatSyncConflict.remoteMs = remoteMs
+  quickChatSyncConflict.remoteJson = remoteJson
+}
+
+function dismissQuickChatConflict() {
+  quickChatSyncConflict.visible = false
+  message.info('已保留冲突状态，稍后可手动同步处理')
+}
+
+function resolveQuickChatConflictUseLocal() {
+  const localPayloadJson = JSON.stringify(buildQuickChatStatePayload())
+  pushQuickChatStateToCloud(localPayloadJson)
+  clearQuickChatSyncConflict()
+  message.success('已按本地版本覆盖云端')
+}
+
+function resolveQuickChatConflictUseCloud() {
+  const remoteJson = String(quickChatSyncConflict.remoteJson || '')
+  if (!remoteJson) {
+    message.warning('云端版本不存在，无法覆盖')
+    return
+  }
+  try {
+    const parsed = JSON.parse(remoteJson)
+    if (!Array.isArray(parsed)) {
+      message.warning('云端数据格式异常，无法覆盖')
+      return
+    }
+    const previousActive = activeQuickChatRoomId.value
+    applyQuickChatRoomsFromPayload(parsed, previousActive)
+    localStorage.setItem(quickChatStorageKey(), remoteJson)
+    emitQuickChatSync()
+    quickChatCloudLastPayload = remoteJson
+    quickChatCloudRemoteUpdatedAt.value = Math.max(quickChatCloudRemoteUpdatedAt.value, Number(quickChatSyncConflict.remoteMs || 0))
+    clearQuickChatSyncConflict()
+    message.success('已按云端版本覆盖本地')
+  } catch {
+    message.warning('云端数据解析失败，无法覆盖')
+  }
+}
+
 async function pullQuickChatStateFromCloud(force = false) {
   if (!userStore.staffInfo?.id) return
+  if (quickChatCloudSyncing.value && !force) return
+  let status: 'ok' | 'error' | 'conflict' = 'ok'
+  quickChatCloudSyncing.value = true
   try {
     const remote = await getQuickChatState()
     quickChatCloudReady.value = true
@@ -2212,8 +2360,13 @@ async function pullQuickChatStateFromCloud(force = false) {
     if (!force && remoteLatestMs > 0 && remoteLatestMs <= quickChatCloudRemoteUpdatedAt.value) return
     const localLatestMs = localQuickChatLatestMs()
     if (!force && localLatestMs > remoteLatestMs + 1000) {
-      const localPayloadJson = JSON.stringify(buildQuickChatStatePayload())
-      scheduleQuickChatCloudSave(localPayloadJson)
+      markQuickChatSyncConflict('LOCAL_NEWER', localLatestMs, remoteLatestMs, remoteJson)
+      status = 'conflict'
+      return
+    }
+    if (!force && remoteLatestMs > localLatestMs + 1000 && localLatestMs > 0) {
+      markQuickChatSyncConflict('CLOUD_NEWER', localLatestMs, remoteLatestMs, remoteJson)
+      status = 'conflict'
       return
     }
     const previousActive = activeQuickChatRoomId.value
@@ -2221,9 +2374,29 @@ async function pullQuickChatStateFromCloud(force = false) {
     localStorage.setItem(quickChatStorageKey(), remoteJson)
     quickChatCloudRemoteUpdatedAt.value = remoteLatestMs || Date.now()
     quickChatCloudLastPayload = remoteJson
+    clearQuickChatSyncConflict()
   } catch {
     quickChatCloudReady.value = true
+    status = 'error'
+  } finally {
+    quickChatCloudSyncing.value = false
   }
+  return status
+}
+
+function forceQuickChatCloudSync() {
+  pullQuickChatStateFromCloud(true)
+    .then((status) => {
+      if (status === 'error') {
+        message.warning('同步失败，已保留本地数据')
+        return
+      }
+      if (status === 'conflict') {
+        message.warning('检测到同步冲突，请先选择处理策略')
+        return
+      }
+      message.success('已完成云端同步')
+    })
 }
 
 function setupQuickChatCloudPullTimer() {
@@ -2234,6 +2407,11 @@ function setupQuickChatCloudPullTimer() {
   quickChatCloudPullTimer = window.setInterval(() => {
     pullQuickChatStateFromCloud(false)
   }, QUICK_CHAT_CLOUD_PULL_INTERVAL_MS)
+}
+
+function onQuickChatCloudVisibilityChange() {
+  if (document.visibilityState !== 'visible') return
+  pullQuickChatStateFromCloud(false)
 }
 
 function emitQuickChatSync() {
@@ -2968,9 +3146,37 @@ function removeActiveQuickChatRoom() {
   const userId = currentQuickChatSenderId.value
   room.archivedByUser[userId] = true
   room.updatedAt = dayjs().toISOString()
+  quickChatLastArchivedRoomId.value = room.id
+  quickChatLastArchivedAt.value = Date.now()
   persistQuickChatState()
   ensureActiveQuickChatVisible()
   message.success('会话已移入归档，可在“已归档”中恢复')
+}
+
+function undoLastArchivedQuickChatRoom() {
+  if (!canUndoQuickChatArchive.value) {
+    quickChatLastArchivedRoomId.value = ''
+    quickChatLastArchivedAt.value = 0
+    message.info('撤销窗口已过期')
+    return
+  }
+  const roomId = quickChatLastArchivedRoomId.value
+  const room = quickChatRooms.value.find((item) => item.id === roomId)
+  if (!room) {
+    quickChatLastArchivedRoomId.value = ''
+    quickChatLastArchivedAt.value = 0
+    message.warning('会话不存在，无法恢复')
+    return
+  }
+  room.archivedByUser = room.archivedByUser || {}
+  const userId = currentQuickChatSenderId.value
+  room.archivedByUser[userId] = false
+  room.updatedAt = dayjs().toISOString()
+  quickChatLastArchivedRoomId.value = ''
+  quickChatLastArchivedAt.value = 0
+  persistQuickChatState()
+  activeQuickChatRoomId.value = room.id
+  message.success('已恢复会话')
 }
 
 function togglePinActiveQuickChatRoom() {
@@ -3312,6 +3518,8 @@ onMounted(() => {
   window.setTimeout(() => runAutoEscalationIfNeeded(), 800)
   window.addEventListener('resize', updateQuickChatDrawerWidth)
   window.addEventListener('storage', onQuickChatStorageChange)
+  window.addEventListener('focus', onQuickChatCloudVisibilityChange)
+  document.addEventListener('visibilitychange', onQuickChatCloudVisibilityChange)
   document.addEventListener('click', closeTabContextMenu)
 })
 
@@ -3335,6 +3543,8 @@ onBeforeUnmount(() => {
   }
   window.removeEventListener('resize', updateQuickChatDrawerWidth)
   window.removeEventListener('storage', onQuickChatStorageChange)
+  window.removeEventListener('focus', onQuickChatCloudVisibilityChange)
+  document.removeEventListener('visibilitychange', onQuickChatCloudVisibilityChange)
   document.removeEventListener('click', closeTabContextMenu)
 })
 
@@ -3674,6 +3884,25 @@ function onQuickChatStorageChange(event: StorageEvent) {
   border-bottom: 1px solid rgba(245, 158, 11, 0.3);
   color: #92400e;
   font-size: 12px;
+}
+
+.quick-chat-sync-conflict {
+  padding: 10px 12px;
+  background: rgba(239, 68, 68, 0.08);
+  border-bottom: 1px solid rgba(239, 68, 68, 0.24);
+}
+
+.quick-chat-sync-conflict-title {
+  color: #991b1b;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.quick-chat-sync-conflict-desc {
+  margin: 4px 0 8px;
+  color: #7f1d1d;
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .quick-chat-header {

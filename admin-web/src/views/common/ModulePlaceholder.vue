@@ -64,11 +64,14 @@ async function loadSummary() {
   loading.value = true
   errorMessage.value = ''
   try {
-    const data = await getPortalSummary()
+    const data = await getPortalSummary({ silent403: true })
     Object.assign(summary, data || {})
   } catch (error: any) {
-    errorMessage.value = error?.message || '加载模块概览失败'
-    message.error(errorMessage.value)
+    const status = Number(error?.response?.status || 0)
+    errorMessage.value = status === 403 ? '当前账号暂无模块概览权限' : (error?.message || '加载模块概览失败')
+    if (status !== 403) {
+      message.error(errorMessage.value)
+    }
   } finally {
     loading.value = false
   }

@@ -53,9 +53,12 @@ public class OaTodoController {
       @RequestParam(required = false) String sourceType,
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
+    boolean adminView = AuthContext.isAdmin();
     String normalizedStatus = normalizeStatus(status);
     String normalizedSourceType = normalizeSourceType(sourceType);
-    var wrapper = buildQuery(orgId, normalizedStatus, normalizedSourceType, keyword).orderByDesc(OaTodo::getCreateTime);
+    var wrapper = buildQuery(orgId, staffId, adminView, normalizedStatus, normalizedSourceType, keyword)
+        .orderByDesc(OaTodo::getCreateTime);
     return Result.ok(todoMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
   }
 
@@ -65,6 +68,8 @@ public class OaTodoController {
       @RequestParam(required = false) String sourceType,
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
+    boolean adminView = AuthContext.isAdmin();
     String normalizedStatus = normalizeStatus(status);
     String normalizedSourceType = normalizeSourceType(sourceType);
     LocalDateTime now = LocalDateTime.now();
@@ -72,29 +77,31 @@ public class OaTodoController {
     LocalDateTime endOfToday = startOfToday.plusDays(1);
 
     OaTodoSummaryResponse response = new OaTodoSummaryResponse();
-    response.setTotalCount(count(todoMapper.selectCount(buildQuery(orgId, normalizedStatus, normalizedSourceType, keyword))));
-    response.setOpenCount(count(todoMapper.selectCount(buildQuery(orgId, "OPEN", normalizedSourceType, keyword))));
-    response.setDoneCount(count(todoMapper.selectCount(buildQuery(orgId, "DONE", normalizedSourceType, keyword))));
-    response.setDueTodayCount(count(todoMapper.selectCount(buildQuery(orgId, normalizedStatus, normalizedSourceType, keyword)
+    response.setTotalCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, normalizedStatus, normalizedSourceType, keyword))));
+    response.setOpenCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, "OPEN", normalizedSourceType, keyword))));
+    response.setDoneCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, "DONE", normalizedSourceType, keyword))));
+    response.setDueTodayCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, normalizedStatus, normalizedSourceType, keyword)
         .eq(OaTodo::getStatus, "OPEN")
         .isNotNull(OaTodo::getDueTime)
         .ge(OaTodo::getDueTime, startOfToday)
         .lt(OaTodo::getDueTime, endOfToday))));
-    response.setOverdueCount(count(todoMapper.selectCount(buildQuery(orgId, normalizedStatus, normalizedSourceType, keyword)
+    response.setOverdueCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, normalizedStatus, normalizedSourceType, keyword)
         .eq(OaTodo::getStatus, "OPEN")
         .isNotNull(OaTodo::getDueTime)
         .lt(OaTodo::getDueTime, now))));
-    response.setUnassignedCount(count(todoMapper.selectCount(buildQuery(orgId, normalizedStatus, normalizedSourceType, keyword)
+    response.setUnassignedCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, normalizedStatus, normalizedSourceType, keyword)
         .and(w -> w.isNull(OaTodo::getAssigneeName).or().eq(OaTodo::getAssigneeName, "")))));
-    response.setBirthdayOpenCount(count(todoMapper.selectCount(buildQuery(orgId, "OPEN", "BIRTHDAY", keyword))));
-    response.setApprovalOpenCount(count(todoMapper.selectCount(buildQuery(orgId, "OPEN", "APPROVAL", keyword))));
-    response.setNormalOpenCount(count(todoMapper.selectCount(buildQuery(orgId, "OPEN", "NORMAL", keyword))));
+    response.setBirthdayOpenCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, "OPEN", "BIRTHDAY", keyword))));
+    response.setApprovalOpenCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, "OPEN", "APPROVAL", keyword))));
+    response.setNormalOpenCount(count(todoMapper.selectCount(buildQuery(orgId, staffId, adminView, "OPEN", "NORMAL", keyword))));
     return Result.ok(response);
   }
 
   @PostMapping
   public Result<OaTodo> create(@Valid @RequestBody OaTodoRequest request) {
     Long orgId = AuthContext.getOrgId();
+    Long currentStaffId = AuthContext.getStaffId();
+    boolean adminView = AuthContext.isAdmin();
     OaTodo todo = new OaTodo();
     todo.setTenantId(orgId);
     todo.setOrgId(orgId);
@@ -106,9 +113,14 @@ public class OaTodoController {
       throw new IllegalArgumentException("创建待办仅支持 OPEN 状态");
     }
     todo.setStatus(normalizedStatus == null ? "OPEN" : normalizedStatus);
-    todo.setAssigneeId(request.getAssigneeId());
-    todo.setAssigneeName(request.getAssigneeName());
-    todo.setCreatedBy(AuthContext.getStaffId());
+    if (!adminView) {
+      todo.setAssigneeId(currentStaffId);
+      todo.setAssigneeName(AuthContext.getUsername());
+    } else {
+      todo.setAssigneeId(request.getAssigneeId());
+      todo.setAssigneeName(request.getAssigneeName());
+    }
+    todo.setCreatedBy(currentStaffId);
     todoMapper.insert(todo);
     syncTodoTask(todo);
     return Result.ok(todo);
@@ -117,6 +129,7 @@ public class OaTodoController {
   @PutMapping("/{id}")
   public Result<OaTodo> update(@PathVariable Long id, @Valid @RequestBody OaTodoRequest request) {
     OaTodo todo = findAccessibleTodo(id);
+    boolean adminView = AuthContext.isAdmin();
     if (todo == null) {
       return Result.ok(null);
     }
@@ -131,8 +144,13 @@ public class OaTodoController {
       throw new IllegalArgumentException("编辑待办仅支持保持 OPEN 状态");
     }
     todo.setStatus("OPEN");
-    todo.setAssigneeId(request.getAssigneeId());
-    todo.setAssigneeName(request.getAssigneeName());
+    if (adminView) {
+      todo.setAssigneeId(request.getAssigneeId());
+      todo.setAssigneeName(request.getAssigneeName());
+    } else {
+      todo.setAssigneeId(AuthContext.getStaffId());
+      todo.setAssigneeName(AuthContext.getUsername());
+    }
     todoMapper.updateById(todo);
     syncTodoTask(todo);
     return Result.ok(todo);
@@ -201,10 +219,16 @@ public class OaTodoController {
       return Result.ok(0);
     }
     Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
+    boolean adminView = AuthContext.isAdmin();
+    if (!adminView && staffId == null) {
+      return Result.ok(0);
+    }
     int shift = normalizeSnoozeDays(days);
     List<OaTodo> todos = todoMapper.selectList(Wrappers.lambdaQuery(OaTodo.class)
         .eq(OaTodo::getIsDeleted, 0)
         .eq(orgId != null, OaTodo::getOrgId, orgId)
+        .and(!adminView, w -> w.eq(OaTodo::getAssigneeId, staffId).or().eq(OaTodo::getCreatedBy, staffId))
         .in(OaTodo::getId, ids));
     int count = 0;
     for (OaTodo todo : todos) {
@@ -226,9 +250,15 @@ public class OaTodoController {
       return Result.ok(0);
     }
     Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
+    boolean adminView = AuthContext.isAdmin();
+    if (!adminView && staffId == null) {
+      return Result.ok(0);
+    }
     List<OaTodo> todos = todoMapper.selectList(Wrappers.lambdaQuery(OaTodo.class)
         .eq(OaTodo::getIsDeleted, 0)
         .eq(orgId != null, OaTodo::getOrgId, orgId)
+        .and(!adminView, w -> w.eq(OaTodo::getAssigneeId, staffId).or().eq(OaTodo::getCreatedBy, staffId))
         .in(OaTodo::getId, ids));
     int count = 0;
     for (OaTodo todo : todos) {
@@ -250,9 +280,15 @@ public class OaTodoController {
       return Result.ok(0);
     }
     Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
+    boolean adminView = AuthContext.isAdmin();
+    if (!adminView && staffId == null) {
+      return Result.ok(0);
+    }
     List<OaTodo> todos = todoMapper.selectList(Wrappers.lambdaQuery(OaTodo.class)
         .eq(OaTodo::getIsDeleted, 0)
         .eq(orgId != null, OaTodo::getOrgId, orgId)
+        .and(!adminView, w -> w.eq(OaTodo::getAssigneeId, staffId).or().eq(OaTodo::getCreatedBy, staffId))
         .in(OaTodo::getId, ids));
     int count = 0;
     for (OaTodo todo : todos) {
@@ -274,9 +310,15 @@ public class OaTodoController {
       return Result.ok(0);
     }
     Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
+    boolean adminView = AuthContext.isAdmin();
+    if (!adminView && staffId == null) {
+      return Result.ok(0);
+    }
     List<OaTodo> todos = todoMapper.selectList(Wrappers.lambdaQuery(OaTodo.class)
         .eq(OaTodo::getIsDeleted, 0)
         .eq(orgId != null, OaTodo::getOrgId, orgId)
+        .and(!adminView, w -> w.eq(OaTodo::getAssigneeId, staffId).or().eq(OaTodo::getCreatedBy, staffId))
         .in(OaTodo::getId, ids));
     for (OaTodo todo : todos) {
       todo.setIsDeleted(1);
@@ -292,9 +334,11 @@ public class OaTodoController {
       @RequestParam(required = false) String sourceType,
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
+    boolean adminView = AuthContext.isAdmin();
     String normalizedStatus = normalizeStatus(status);
     String normalizedSourceType = normalizeSourceType(sourceType);
-    var wrapper = buildQuery(orgId, normalizedStatus, normalizedSourceType, keyword)
+    var wrapper = buildQuery(orgId, staffId, adminView, normalizedStatus, normalizedSourceType, keyword)
         .orderByDesc(OaTodo::getCreateTime);
     List<OaTodo> todos = todoMapper.selectList(wrapper);
     List<String> headers = List.of("ID", "来源", "标题", "内容", "负责人", "截止时间", "状态");
@@ -377,10 +421,18 @@ public class OaTodoController {
 
   private OaTodo findAccessibleTodo(Long id) {
     Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
+    boolean adminView = AuthContext.isAdmin();
+    if (!adminView && staffId == null) {
+      return null;
+    }
     return todoMapper.selectOne(Wrappers.lambdaQuery(OaTodo.class)
         .eq(OaTodo::getId, id)
         .eq(OaTodo::getIsDeleted, 0)
         .eq(orgId != null, OaTodo::getOrgId, orgId)
+        .and(!adminView, w -> w.eq(OaTodo::getAssigneeId, staffId)
+            .or()
+            .eq(OaTodo::getCreatedBy, staffId))
         .last("LIMIT 1"));
   }
 
@@ -443,11 +495,20 @@ public class OaTodoController {
   }
 
   private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OaTodo> buildQuery(
-      Long orgId, String normalizedStatus, String normalizedSourceType, String keyword) {
+      Long orgId, Long staffId, boolean adminView, String normalizedStatus, String normalizedSourceType, String keyword) {
     var wrapper = Wrappers.lambdaQuery(OaTodo.class)
         .eq(OaTodo::getIsDeleted, 0)
         .eq(orgId != null, OaTodo::getOrgId, orgId)
         .eq(normalizedStatus != null, OaTodo::getStatus, normalizedStatus);
+    if (!adminView) {
+      if (staffId == null) {
+        wrapper.eq(OaTodo::getId, -1L);
+        return wrapper;
+      }
+      wrapper.and(w -> w.eq(staffId != null, OaTodo::getAssigneeId, staffId)
+          .or()
+          .eq(staffId != null, OaTodo::getCreatedBy, staffId));
+    }
     if ("BIRTHDAY".equals(normalizedSourceType)) {
       wrapper.like(OaTodo::getContent, "[BIRTHDAY_REMINDER:");
     } else if ("APPROVAL".equals(normalizedSourceType)) {

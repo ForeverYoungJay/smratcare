@@ -40,12 +40,12 @@ import type {
 
 export { createCrmLead, updateCrmLead, deleteCrmLead }
 
-export function getLeadPage(params: any) {
-  return getCrmLeadPage(params)
+export function getLeadPage(params: any, config?: Record<string, any>) {
+  return getCrmLeadPage(params, config)
 }
 
-export function getContractPage(params: any) {
-  return fetchPage<CrmContractItem>('/api/crm/contracts/page', params)
+export function getContractPage(params: any, config?: Record<string, any>) {
+  return fetchPage<CrmContractItem>('/api/crm/contracts/page', params, config)
 }
 
 export function getCrmContract(id: number | string) {
@@ -195,8 +195,8 @@ export async function getAllAdmissions(pageSize = 200): Promise<AdmissionRecordI
   return result
 }
 
-export function getMarketingConversionReport(params?: MarketingReportQuery) {
-  return request.get<MarketingConversionReport>('/api/marketing/report/conversion', { params })
+export function getMarketingConversionReport(params?: MarketingReportQuery, config?: Record<string, any>) {
+  return request.get<MarketingConversionReport>('/api/marketing/report/conversion', { params, ...(config || {}) })
 }
 
 export function getMarketingConsultationTrend(days = 14, params?: MarketingReportQuery) {

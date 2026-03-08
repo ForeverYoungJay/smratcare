@@ -1,5 +1,5 @@
 import { onMounted, onUnmounted, ref } from 'vue'
-import { getDepartmentPage } from '../api/rbac'
+import { getDepartmentOptionPage } from '../api/rbac'
 import type { DepartmentItem, PageResult } from '../types'
 import { subscribeLiveSync } from '../utils/liveSync'
 import { fuzzyScore, toPinyinInitials } from './entitySearch'
@@ -55,7 +55,7 @@ export function useDepartmentOptions(config: UseDepartmentOptionsConfig = {}) {
     const lastAt = departmentPoolFetchedAt.get(cacheKey) || 0
     const hasFresh = departmentPoolCache.has(cacheKey) && (Date.now() - lastAt < DEPARTMENT_POOL_CACHE_TTL)
     if (!force && hasFresh) return departmentPoolCache.get(cacheKey) || []
-    const page: PageResult<DepartmentItem> = await getDepartmentPage({ pageNo: 1, pageSize: preloadSize })
+    const page: PageResult<DepartmentItem> = await getDepartmentOptionPage({ pageNo: 1, pageSize: preloadSize, activeOnly: true })
     const rows = page.list || []
     departmentPoolCache.set(cacheKey, rows)
     departmentPoolFetchedAt.set(cacheKey, Date.now())
@@ -70,7 +70,12 @@ export function useDepartmentOptions(config: UseDepartmentOptionsConfig = {}) {
       const baseRows = await loadBasePool(false)
       let mergedRows = [...baseRows]
       if (text) {
-        const page: PageResult<DepartmentItem> = await getDepartmentPage({ pageNo: 1, pageSize: Math.max(pageSize * 2, 200), keyword: text })
+        const page: PageResult<DepartmentItem> = await getDepartmentOptionPage({
+          pageNo: 1,
+          pageSize: Math.max(pageSize * 2, 200),
+          keyword: text,
+          activeOnly: true
+        })
         mergedRows = dedupeDepartments([...(page.list || []), ...baseRows])
       }
       const finalRows = text

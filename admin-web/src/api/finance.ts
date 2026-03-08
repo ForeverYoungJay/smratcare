@@ -96,8 +96,8 @@ export function getElderAccountWarnings() {
   return request.get<ElderAccount[]>('/api/finance/account/warnings')
 }
 
-export function getFinanceWorkbenchOverview() {
-  return request.get<FinanceWorkbenchOverview>('/api/finance/workbench/overview')
+export function getFinanceWorkbenchOverview(config?: Record<string, any>) {
+  return request.get<FinanceWorkbenchOverview>('/api/finance/workbench/overview', config)
 }
 
 export function getFinanceLedgerHealth(params?: { limit?: number }) {

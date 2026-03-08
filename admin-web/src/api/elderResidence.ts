@@ -124,6 +124,6 @@ export function exportDischargeApply(params: DischargeApplyQuery) {
   return exportCsvByRequest('/api/elder/lifecycle/discharge-apply/export', params, '退住申请.csv')
 }
 
-export function getResidenceStatusSummary() {
-  return request.get<ResidenceStatusSummary>('/api/elder/lifecycle/status-summary')
+export function getResidenceStatusSummary(config?: Record<string, any>) {
+  return request.get<ResidenceStatusSummary>('/api/elder/lifecycle/status-summary', config)
 }

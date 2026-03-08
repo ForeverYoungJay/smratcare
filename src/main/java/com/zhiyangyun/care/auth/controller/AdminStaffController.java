@@ -8,6 +8,7 @@ import com.zhiyangyun.care.auth.entity.StaffAccount;
 import com.zhiyangyun.care.auth.mapper.RoleMapper;
 import com.zhiyangyun.care.auth.mapper.StaffMapper;
 import com.zhiyangyun.care.auth.model.Result;
+import com.zhiyangyun.care.auth.model.StaffOptionResponse;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.auth.security.SupervisorRuleHelper;
 import com.zhiyangyun.care.auth.model.StaffCreateRequest;
@@ -167,6 +168,32 @@ public class AdminStaffController {
     return Result.ok(result);
   }
 
+  @PreAuthorize("isAuthenticated() and !hasRole('FAMILY')")
+  @GetMapping("/options")
+  public Result<IPage<StaffOptionResponse>> listOptions(
+      @RequestParam(defaultValue = "1") long page,
+      @RequestParam(defaultValue = "200") long size,
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false, defaultValue = "true") boolean activeOnly) {
+    Long orgId = AuthContext.getOrgId();
+    var wrapper = Wrappers.lambdaQuery(StaffAccount.class)
+        .eq(StaffAccount::getIsDeleted, 0)
+        .eq(orgId != null, StaffAccount::getOrgId, orgId)
+        .eq(activeOnly, StaffAccount::getStatus, 1);
+    if (keyword != null && !keyword.isBlank()) {
+      wrapper.and(w -> w.like(StaffAccount::getUsername, keyword)
+          .or().like(StaffAccount::getRealName, keyword)
+          .or().like(StaffAccount::getPhone, keyword)
+          .or().like(StaffAccount::getStaffNo, keyword));
+    }
+    wrapper.orderByAsc(StaffAccount::getRealName).orderByAsc(StaffAccount::getId);
+    IPage<StaffAccount> sourcePage = staffMapper.selectPage(new Page<>(page, size), wrapper);
+    sourcePage.getRecords().forEach(this::fillRoleCodes);
+    Page<StaffOptionResponse> responsePage = new Page<>(sourcePage.getCurrent(), sourcePage.getSize(), sourcePage.getTotal());
+    responsePage.setRecords(sourcePage.getRecords().stream().map(this::toStaffOptionResponse).toList());
+    return Result.ok(responsePage);
+  }
+
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/supervisor-anomalies")
   public Result<List<Map<String, Object>>> supervisorAnomalies() {
@@ -189,6 +216,20 @@ public class AdminStaffController {
       return;
     }
     staff.setRoleCodes(roleMapper.selectRoleCodesByStaff(staff.getId(), staff.getOrgId()));
+  }
+
+  private StaffOptionResponse toStaffOptionResponse(StaffAccount staff) {
+    StaffOptionResponse row = new StaffOptionResponse();
+    row.setId(staff.getId());
+    row.setUsername(staff.getUsername());
+    row.setRealName(staff.getRealName());
+    row.setStatus(staff.getStatus());
+    row.setDepartmentId(staff.getDepartmentId());
+    row.setOrgId(staff.getOrgId());
+    row.setStaffNo(staff.getStaffNo());
+    row.setPhone(staff.getPhone());
+    row.setRoleCodes(staff.getRoleCodes());
+    return row;
   }
 
   private void validateSupervisorChain(

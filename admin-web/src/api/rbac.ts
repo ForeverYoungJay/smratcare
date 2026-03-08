@@ -9,12 +9,20 @@ export function getDepartmentPage(params: any) {
   return fetchPage<DepartmentItem>('/api/admin/departments', params)
 }
 
+export function getDepartmentOptionPage(params: any) {
+  return fetchPage<DepartmentItem>('/api/admin/departments/options', params)
+}
+
 export function getRolePage(params: any) {
   return fetchPage<RoleItem>('/api/admin/roles', params)
 }
 
 export function getStaffPage(params: any) {
   return fetchPage<StaffItem>('/api/admin/staff', params)
+}
+
+export function getStaffOptionPage(params: any) {
+  return fetchPage<StaffItem>('/api/admin/staff/options', params)
 }
 
 export function createStaff(data: Partial<StaffItem>) {

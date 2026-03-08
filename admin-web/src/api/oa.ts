@@ -20,8 +20,8 @@ import type {
   OaSuggestion
 } from '../types'
 
-export function getPortalSummary() {
-  return request.get<OaPortalSummary>('/api/oa/portal/summary')
+export function getPortalSummary(config?: Record<string, any>) {
+  return request.get<OaPortalSummary>('/api/oa/portal/summary', config)
 }
 
 export function uploadOaFile(file: File, bizType = 'oa-approval-proof') {

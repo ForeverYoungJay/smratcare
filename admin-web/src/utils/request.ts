@@ -5,6 +5,11 @@ import { getToken, clearToken, clearRoles, clearPermissions } from './auth'
 import type { PageResult } from '../types/common'
 import { emitLiveSync, inferLiveSyncTopics } from './liveSync'
 
+type RequestExtraConfig = {
+  silentError?: boolean
+  silent403?: boolean
+}
+
 const request = axios.create({
   baseURL: '/',
   timeout: 15000
@@ -43,7 +48,10 @@ request.interceptors.response.use(
     const data = response.data
     if (data && typeof data.code !== 'undefined') {
       if (data.code !== 0) {
-        message.error(resolveErrorMessage(data))
+        const cfg = (response.config || {}) as RequestExtraConfig
+        if (!cfg.silentError) {
+          message.error(resolveErrorMessage(data))
+        }
         return Promise.reject(data)
       }
       if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
@@ -69,6 +77,9 @@ request.interceptors.response.use(
   (error) => {
     const status = error?.response?.status
     const url = String(error?.config?.url || '')
+    const cfg = (error?.config || {}) as RequestExtraConfig
+    const silentError = Boolean(cfg.silentError)
+    const silent403 = Boolean(cfg.silent403 || cfg.silentError)
     const isLoginRequest = url.includes('/api/auth/login') || url.includes('/api/auth/family/login')
     if (status === 401) {
       clearToken()
@@ -81,6 +92,9 @@ request.interceptors.response.use(
       return Promise.reject(error)
     }
     if (status === 403) {
+      if (silent403) {
+        return Promise.reject(error)
+      }
       const payload = error?.response?.data
       const rawMessage = resolveErrorMessage(payload, '当前账号无该操作权限（403）')
       const displayMessage = /access denied/i.test(rawMessage)
@@ -95,6 +109,9 @@ request.interceptors.response.use(
       }
       return Promise.reject(error)
     }
+    if (silentError) {
+      return Promise.reject(error)
+    }
     const payload = error?.response?.data
     message.error(resolveErrorMessage(payload, error?.message || '请求失败'))
     return Promise.reject(error)
@@ -103,7 +120,11 @@ request.interceptors.response.use(
 
 export default request
 
-export function fetchPage<T>(url: string, params?: Record<string, any>) {
+export function fetchPage<T>(
+  url: string,
+  params?: Record<string, any>,
+  config?: Record<string, any>
+) {
   const merged = { ...(params || {}) }
   if (merged.pageNo != null && merged.page == null) {
     merged.page = merged.pageNo
@@ -114,7 +135,7 @@ export function fetchPage<T>(url: string, params?: Record<string, any>) {
   if (merged.sortOrder != null && merged.order == null) {
     merged.order = merged.sortOrder
   }
-  return request.get<any>(url, { params: merged }).then((res) => {
+  return request.get<any>(url, { params: merged, ...(config || {}) }).then((res) => {
     if (res && Array.isArray(res.list)) {
       return res as PageResult<T>
     }

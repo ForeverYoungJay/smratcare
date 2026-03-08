@@ -58,8 +58,8 @@ export interface DashboardThresholdDefaults {
   configVersion: string
 }
 
-export function getDashboardSummary() {
-  return request.get<DashboardSummary>('/api/dashboard/summary')
+export function getDashboardSummary(config?: Record<string, any>) {
+  return request.get<DashboardSummary>('/api/dashboard/summary', config)
 }
 
 export function getDashboardMetricCatalog() {
