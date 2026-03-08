@@ -8,6 +8,7 @@ export interface StaffOption {
   label: string
   value: string
   name: string
+  username?: string
   departmentId?: string
   roleCodes?: string[]
 }
@@ -28,6 +29,7 @@ function toStaffOption(item: StaffItem): StaffOption {
     label: `${name}${suffix}`,
     value: String(item.id),
     name,
+    username: String(item.username || '').trim() || undefined,
     departmentId: item.departmentId == null ? undefined : String(item.departmentId),
     roleCodes: Array.isArray(item.roleCodes) ? item.roleCodes.map((code) => String(code || '').trim().toUpperCase()).filter(Boolean) : []
   }
