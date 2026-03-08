@@ -274,6 +274,7 @@
         </a-badge>
         <a-button danger :disabled="!activeQuickChatRoom" @click="exitActiveQuickChatRoom">退出会话</a-button>
         <a-tag :color="presenceStatus.color">{{ presenceStatus.label }}</a-tag>
+        <a-tag :color="quickChatWsStatus.color">{{ quickChatWsStatus.text }}</a-tag>
         <a-tag :color="quickChatCloudStatus.color">{{ quickChatCloudStatus.text }}</a-tag>
         <a-tag :color="quickChatFanoutStatus.color">{{ quickChatFanoutStatus.text }}</a-tag>
         <a-tag v-if="quickChatDnd" color="red">免打扰已开启</a-tag>
@@ -715,11 +716,12 @@ import { getMenuTree } from './menu'
 import { getMe } from '../api/auth'
 import { getStaffPage } from '../api/rbac'
 import { updateStaff } from '../api/staff'
-import { fanoutQuickChatState, getQuickChatState, saveQuickChatState } from '../api/oa'
+import { fanoutQuickChatState, getQuickChatState, publishQuickChatEventBatch, saveQuickChatState } from '../api/oa'
 import { useDepartmentOptions } from '../composables/useDepartmentOptions'
 import { useStaffOptions } from '../composables/useStaffOptions'
 import { canBeDirectLeader, canBeIndirectLeader, ensureSupervisorOrder } from '../utils/supervisor'
 import { emitLiveSync, subscribeLiveSync, type LiveSyncPayload } from '../utils/liveSync'
+import { getToken } from '../utils/auth'
 
 const collapsed = ref(false)
 const route = useRoute()
@@ -1151,10 +1153,16 @@ let quickChatCloudPullTimer: number | undefined
 let quickChatCloudSaveTimer: number | undefined
 let quickChatFanoutTimer: number | undefined
 let quickChatFanoutRetryTimer: number | undefined
-const QUICK_CHAT_CLOUD_PULL_INTERVAL_MS = 5000
+let quickChatEventEmitTimer: number | undefined
+let quickChatWsReconnectTimer: number | undefined
+const quickChatWsReconnectAttempt = ref(0)
+let quickChatWebSocket: WebSocket | null = null
+let quickChatWebSocketManualClose = false
+const QUICK_CHAT_CLOUD_PULL_INTERVAL_MS = 10000
 const QUICK_CHAT_CLOUD_SAVE_DEBOUNCE_MS = 900
 const QUICK_CHAT_FANOUT_DEBOUNCE_MS = 700
 const QUICK_CHAT_FANOUT_RETRY_INTERVAL_MS = 8000
+const QUICK_CHAT_EVENT_EMIT_DEBOUNCE_MS = 400
 const QUICK_CHAT_ARCHIVE_UNDO_WINDOW_MS = 5 * 60 * 1000
 const quickChatCloudReady = ref(false)
 const quickChatCloudRemoteUpdatedAt = ref(0)
@@ -1163,6 +1171,10 @@ const quickChatCloudSyncing = ref(false)
 let quickChatCloudLastPayload = ''
 let quickChatCloudQueuedPayload = ''
 const quickChatFanoutQueuedPayload = ref('')
+const quickChatEventQueuedSnapshot = ref('')
+const quickChatLastEventSnapshot = ref('')
+const quickChatWsConnected = ref(false)
+const quickChatApplyingRemoteEvent = ref(false)
 const quickChatFanoutPending = ref(false)
 const quickChatFanoutLastSuccessAt = ref(0)
 const quickChatFanoutLastErrorAt = ref(0)
@@ -1212,6 +1224,15 @@ const quickChatFanoutStatus = computed(() => {
     return { text: `已分发${affected > 0 ? `(${affected})` : ''} ${timeText}`, color: 'green' }
   }
   return { text: '分发待初始化', color: 'default' }
+})
+const quickChatWsStatus = computed(() => {
+  if (quickChatWsConnected.value) {
+    return { text: '推送已连接', color: 'green' }
+  }
+  if (quickChatWsReconnectAttempt.value > 0) {
+    return { text: `推送重连中(${quickChatWsReconnectAttempt.value})`, color: 'orange' }
+  }
+  return { text: '推送未连接', color: 'default' }
 })
 const quickChatSyncConflictTitle = computed(() => {
   if (!quickChatSyncConflict.visible) return ''
@@ -1298,9 +1319,12 @@ watch(
     quickChatFanoutLastSuccessAt.value = 0
     quickChatFanoutLastErrorAt.value = 0
     quickChatFanoutLastAffected.value = 0
+    quickChatLastEventSnapshot.value = ''
+    quickChatEventQueuedSnapshot.value = ''
     quickChatCloudRemoteUpdatedAt.value = 0
     quickChatCloudReady.value = false
     quickChatCloudSyncing.value = false
+    quickChatWsReconnectAttempt.value = 0
     quickChatSyncConflict.visible = false
     quickChatSyncConflict.direction = ''
     quickChatSyncConflict.localMs = 0
@@ -1312,6 +1336,12 @@ watch(
       window.clearTimeout(quickChatFanoutTimer)
       quickChatFanoutTimer = undefined
     }
+    if (quickChatEventEmitTimer) {
+      window.clearTimeout(quickChatEventEmitTimer)
+      quickChatEventEmitTimer = undefined
+    }
+    quickChatWebSocketManualClose = false
+    connectQuickChatWebSocket()
     loadQuickChatState()
     pullQuickChatStateFromCloud(true)
     rehydrateQuickChatUnread()
@@ -2208,13 +2238,165 @@ function setupQuickChatFanoutRetryTimer() {
     window.clearInterval(quickChatFanoutRetryTimer)
     quickChatFanoutRetryTimer = undefined
   }
+  if (quickChatEventEmitTimer) {
+    window.clearTimeout(quickChatEventEmitTimer)
+    quickChatEventEmitTimer = undefined
+  }
   quickChatFanoutRetryTimer = window.setInterval(() => {
     if (!quickChatFanoutQueuedPayload.value || quickChatFanoutPending.value) return
     pushQuickChatStateToMembers(quickChatFanoutQueuedPayload.value)
   }, QUICK_CHAT_FANOUT_RETRY_INTERVAL_MS)
 }
 
-function persistQuickChatState(options?: { skipCloud?: boolean; skipFanout?: boolean }) {
+function roomMemberTargets(room: any) {
+  const selfId = Number(currentQuickChatSenderId.value)
+  const raw = Array.isArray(room?.memberIds) ? room.memberIds : []
+  return raw
+    .map((id: any) => Number(id))
+    .filter((id: number) => Number.isFinite(id) && id > 0 && id !== selfId)
+}
+
+function normalizeQuickChatEventRoom(room: any) {
+  if (!room || typeof room !== 'object') return null
+  return {
+    id: String(room.id || ''),
+    name: String(room.name || ''),
+    memberIds: Array.isArray(room.memberIds) ? room.memberIds.map((id: any) => String(id)) : [],
+    departmentIds: Array.isArray(room.departmentIds) ? room.departmentIds.map((id: any) => String(id)) : [],
+    notice: String(room.notice || ''),
+    notificationMode: String(room.notificationMode || 'ALL'),
+    pinned: room.pinned === true,
+    updatedAt: String(room.updatedAt || room.createdAt || dayjs().toISOString()),
+    createdAt: String(room.createdAt || dayjs().toISOString())
+  }
+}
+
+function normalizeQuickChatEventMessage(messageRow: any) {
+  if (!messageRow || typeof messageRow !== 'object') return null
+  return {
+    id: String(messageRow.id || ''),
+    senderId: String(messageRow.senderId || ''),
+    senderName: String(messageRow.senderName || ''),
+    kind: String(messageRow.kind || 'TEXT'),
+    content: String(messageRow.content || ''),
+    fileName: messageRow.fileName ? String(messageRow.fileName) : undefined,
+    fileUrl: messageRow.fileUrl ? String(messageRow.fileUrl) : undefined,
+    createdAt: String(messageRow.createdAt || dayjs().toISOString()),
+    timeText: String(messageRow.timeText || dayjs().format('MM-DD HH:mm')),
+    recalled: messageRow.recalled === true,
+    readByUser: messageRow.readByUser && typeof messageRow.readByUser === 'object'
+      ? { ...messageRow.readByUser }
+      : {}
+  }
+}
+
+function buildQuickChatIncrementalEvents(snapshotJson: string) {
+  const events: any[] = []
+  const currentRooms = (() => {
+    try {
+      const parsed = JSON.parse(snapshotJson || '[]')
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return [] as any[]
+    }
+  })()
+  const previousRooms = (() => {
+    try {
+      const parsed = JSON.parse(quickChatLastEventSnapshot.value || '[]')
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return [] as any[]
+    }
+  })()
+  const prevMap = new Map<string, any>(previousRooms.map((room: any) => [String(room?.id || ''), room]))
+  const currMap = new Map<string, any>(currentRooms.map((room: any) => [String(room?.id || ''), room]))
+
+  currMap.forEach((room, roomId) => {
+    if (!roomId) return
+    const targets = roomMemberTargets(room)
+    if (!targets.length) return
+    const prevRoom = prevMap.get(roomId)
+    if (!prevRoom) {
+      const roomPayload = normalizeQuickChatEventRoom(room)
+      if (roomPayload) {
+        events.push({ eventType: 'ROOM_UPSERT', roomId, room: roomPayload, targetStaffIds: targets })
+      }
+    } else {
+      const currUpdated = String(room?.updatedAt || '')
+      const prevUpdated = String(prevRoom?.updatedAt || '')
+      if (currUpdated !== prevUpdated || String(room?.name || '') !== String(prevRoom?.name || '') || String(room?.notice || '') !== String(prevRoom?.notice || '')) {
+        const roomPayload = normalizeQuickChatEventRoom(room)
+        if (roomPayload) {
+          events.push({ eventType: 'ROOM_UPSERT', roomId, room: roomPayload, targetStaffIds: targets })
+        }
+      }
+      const prevMessages = Array.isArray(prevRoom?.messages) ? prevRoom.messages : []
+      const currMessages = Array.isArray(room?.messages) ? room.messages : []
+      const prevMsgMap = new Map<string, any>(prevMessages.map((msg: any) => [String(msg?.id || ''), msg]))
+      currMessages.forEach((msg: any) => {
+        const msgId = String(msg?.id || '')
+        if (!msgId) return
+        const prevMsg = prevMsgMap.get(msgId)
+        const normalizedMsg = normalizeQuickChatEventMessage(msg)
+        if (!normalizedMsg) return
+        if (!prevMsg) {
+          events.push({
+            eventType: 'MESSAGE_APPEND',
+            roomId,
+            message: normalizedMsg,
+            meta: { roomUpdatedAt: String(room?.updatedAt || normalizedMsg.createdAt || dayjs().toISOString()) },
+            targetStaffIds: targets
+          })
+          return
+        }
+        if (Boolean(prevMsg?.recalled) !== Boolean(msg?.recalled) || String(prevMsg?.content || '') !== String(msg?.content || '')) {
+          events.push({
+            eventType: 'MESSAGE_UPDATE',
+            roomId,
+            message: normalizedMsg,
+            meta: { roomUpdatedAt: String(room?.updatedAt || normalizedMsg.createdAt || dayjs().toISOString()) },
+            targetStaffIds: targets
+          })
+        }
+      })
+    }
+  })
+
+  prevMap.forEach((room, roomId) => {
+    if (!roomId || currMap.has(roomId)) return
+    const targets = roomMemberTargets(room)
+    if (!targets.length) return
+    events.push({ eventType: 'ROOM_REMOVE', roomId, targetStaffIds: targets })
+  })
+  return events
+}
+
+async function emitQuickChatIncrementalEvents(snapshotJson: string) {
+  if (!snapshotJson) return
+  const events = buildQuickChatIncrementalEvents(snapshotJson)
+  quickChatLastEventSnapshot.value = snapshotJson
+  if (!events.length) return
+  try {
+    await publishQuickChatEventBatch(events)
+  } catch {}
+}
+
+function scheduleQuickChatIncrementalEmit(snapshotJson: string) {
+  if (!snapshotJson || quickChatApplyingRemoteEvent.value) return
+  quickChatEventQueuedSnapshot.value = snapshotJson
+  if (quickChatEventEmitTimer) {
+    window.clearTimeout(quickChatEventEmitTimer)
+    quickChatEventEmitTimer = undefined
+  }
+  quickChatEventEmitTimer = window.setTimeout(() => {
+    quickChatEventEmitTimer = undefined
+    const queued = quickChatEventQueuedSnapshot.value
+    quickChatEventQueuedSnapshot.value = ''
+    emitQuickChatIncrementalEvents(queued)
+  }, QUICK_CHAT_EVENT_EMIT_DEBOUNCE_MS)
+}
+
+function persistQuickChatState(options?: { skipCloud?: boolean; skipFanout?: boolean; skipEvent?: boolean }) {
   try {
     const payload = buildQuickChatStatePayload()
     const payloadJson = JSON.stringify(payload)
@@ -2225,6 +2407,9 @@ function persistQuickChatState(options?: { skipCloud?: boolean; skipFanout?: boo
     }
     if (!options?.skipFanout) {
       scheduleQuickChatFanout(payloadJson)
+    }
+    if (!options?.skipEvent) {
+      scheduleQuickChatIncrementalEmit(payloadJson)
     }
   } catch {}
 }
@@ -2382,18 +2567,22 @@ function loadQuickChatState() {
     if (!raw) {
       quickChatRooms.value = []
       activeQuickChatRoomId.value = ''
+      quickChatLastEventSnapshot.value = '[]'
       return
     }
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) {
       quickChatRooms.value = []
       activeQuickChatRoomId.value = ''
+      quickChatLastEventSnapshot.value = '[]'
       return
     }
     applyQuickChatRoomsFromPayload(parsed)
+    quickChatLastEventSnapshot.value = raw
   } catch {
     quickChatRooms.value = []
     activeQuickChatRoomId.value = ''
+    quickChatLastEventSnapshot.value = '[]'
   }
 }
 
@@ -2442,6 +2631,7 @@ function resolveQuickChatConflictUseCloud() {
     applyQuickChatRoomsFromPayload(parsed, previousActive)
     localStorage.setItem(quickChatStorageKey(), remoteJson)
     emitQuickChatSync()
+    quickChatLastEventSnapshot.value = remoteJson
     quickChatCloudLastPayload = remoteJson
     quickChatCloudRemoteUpdatedAt.value = Math.max(quickChatCloudRemoteUpdatedAt.value, Number(quickChatSyncConflict.remoteMs || 0))
     clearQuickChatSyncConflict()
@@ -2474,19 +2664,21 @@ async function pullQuickChatStateFromCloud(force = false) {
     const remoteLatestMs = Math.max(serverMs || 0, remotePayloadMs || 0)
     if (!force && remoteLatestMs > 0 && remoteLatestMs <= quickChatCloudRemoteUpdatedAt.value) return
     const localLatestMs = localQuickChatLatestMs()
-    if (!force && localLatestMs > remoteLatestMs + 1000) {
-      markQuickChatSyncConflict('LOCAL_NEWER', localLatestMs, remoteLatestMs, remoteJson)
-      status = 'conflict'
+    if (localLatestMs > remoteLatestMs + 1000) {
+      if (force) {
+        markQuickChatSyncConflict('LOCAL_NEWER', localLatestMs, remoteLatestMs, remoteJson)
+        status = 'conflict'
+        return
+      }
+      // 自动同步场景下，本地领先时静默保留本地并尝试回推云端，避免频繁冲突打断收消息。
+      scheduleQuickChatCloudSave(JSON.stringify(buildQuickChatStatePayload()))
       return
     }
-    if (!force && remoteLatestMs > localLatestMs + 1000 && localLatestMs > 0) {
-      markQuickChatSyncConflict('CLOUD_NEWER', localLatestMs, remoteLatestMs, remoteJson)
-      status = 'conflict'
-      return
-    }
+    // 云端更新默认自动吸收，避免接收方被冲突弹层拦住看不到新消息。
     const previousActive = activeQuickChatRoomId.value
     applyQuickChatRoomsFromPayload(parsed, previousActive)
     localStorage.setItem(quickChatStorageKey(), remoteJson)
+    quickChatLastEventSnapshot.value = remoteJson
     quickChatCloudRemoteUpdatedAt.value = remoteLatestMs || Date.now()
     quickChatCloudLastPayload = remoteJson
     clearQuickChatSyncConflict()
@@ -2529,10 +2721,193 @@ function setupQuickChatCloudPullTimer() {
 
 function onQuickChatCloudVisibilityChange() {
   if (document.visibilityState !== 'visible') return
+  if (!quickChatWsConnected.value) {
+    quickChatWebSocketManualClose = false
+    connectQuickChatWebSocket()
+  }
   if (quickChatFanoutQueuedPayload.value) {
     pushQuickChatStateToMembers(quickChatFanoutQueuedPayload.value)
   }
   pullQuickChatStateFromCloud(false)
+}
+
+function resolveQuickChatWebSocketUrl() {
+  const token = getToken()
+  if (!token || typeof window === 'undefined') return ''
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const host = window.location.host
+  return `${protocol}//${host}/ws/quick-chat?token=${encodeURIComponent(token)}`
+}
+
+function applyQuickChatRealtimeEvent(eventRow: any) {
+  const eventType = String(eventRow?.eventType || '').trim().toUpperCase()
+  if (!eventType) return
+  if (eventType === 'WS_READY') return
+  if (eventType === 'SYNC_HINT') {
+    pullQuickChatStateFromCloud(true)
+    return
+  }
+  const roomId = String(eventRow?.roomId || eventRow?.room?.id || '')
+  quickChatApplyingRemoteEvent.value = true
+  try {
+    if (eventType === 'ROOM_REMOVE') {
+      if (roomId) {
+        quickChatRooms.value = quickChatRooms.value.filter((item) => item.id !== roomId)
+      }
+      ensureActiveQuickChatVisible()
+      persistQuickChatState({ skipCloud: true, skipFanout: true, skipEvent: true })
+      return
+    }
+    if (eventType === 'ROOM_UPSERT') {
+      const roomPayload = eventRow?.room
+      if (!roomPayload || typeof roomPayload !== 'object') return
+      const existed = quickChatRooms.value.find((item) => item.id === String(roomPayload.id || roomId))
+      if (!existed) {
+        quickChatRooms.value.unshift({
+          id: String(roomPayload.id || roomId || `room_${Date.now()}`),
+          name: String(roomPayload.name || '未命名群聊'),
+          departmentIds: Array.isArray(roomPayload.departmentIds) ? roomPayload.departmentIds.map((id: any) => String(id)) : [],
+          memberIds: Array.isArray(roomPayload.memberIds) ? roomPayload.memberIds.map((id: any) => String(id)) : [],
+          messages: [],
+          unreadCount: 0,
+          unreadByUser: { [currentQuickChatSenderId.value]: 0 },
+          pinned: roomPayload.pinned === true,
+          notificationMode: (['ALL', 'MENTION', 'MUTE'].includes(String(roomPayload.notificationMode || 'ALL')) ? String(roomPayload.notificationMode) : 'ALL') as QuickChatRoom['notificationMode'],
+          notice: String(roomPayload.notice || ''),
+          archivedByUser: {},
+          createdAt: String(roomPayload.createdAt || dayjs().toISOString()),
+          updatedAt: String(roomPayload.updatedAt || roomPayload.createdAt || dayjs().toISOString())
+        })
+      } else {
+        existed.name = String(roomPayload.name || existed.name || '未命名群聊')
+        existed.departmentIds = Array.isArray(roomPayload.departmentIds) ? roomPayload.departmentIds.map((id: any) => String(id)) : existed.departmentIds
+        existed.memberIds = Array.isArray(roomPayload.memberIds) ? roomPayload.memberIds.map((id: any) => String(id)) : existed.memberIds
+        existed.notice = String(roomPayload.notice || existed.notice || '')
+        existed.notificationMode = (['ALL', 'MENTION', 'MUTE'].includes(String(roomPayload.notificationMode || existed.notificationMode || 'ALL'))
+          ? String(roomPayload.notificationMode || existed.notificationMode || 'ALL')
+          : 'ALL') as QuickChatRoom['notificationMode']
+        existed.pinned = roomPayload.pinned === true
+        existed.updatedAt = String(roomPayload.updatedAt || dayjs().toISOString())
+      }
+      ensureActiveQuickChatVisible()
+      persistQuickChatState({ skipCloud: true, skipFanout: true, skipEvent: true })
+      return
+    }
+    if (eventType === 'MESSAGE_APPEND' || eventType === 'MESSAGE_UPDATE') {
+      if (!roomId) return
+      const room = quickChatRooms.value.find((item) => item.id === roomId)
+      if (!room) {
+        // 接收到消息但本地还没有房间时，直接强制吸收云端，避免因本地时间戳领先而漏消息。
+        pullQuickChatStateFromCloud(true)
+        return
+      }
+      const messagePayload = eventRow?.message
+      if (!messagePayload || typeof messagePayload !== 'object') return
+      const msgId = String(messagePayload.id || '')
+      if (!msgId) return
+      const existedMsg = room.messages.find((msg) => msg.id === msgId)
+      if (!existedMsg) {
+        room.messages.push({
+          id: msgId,
+          senderId: String(messagePayload.senderId || 'system'),
+          senderName: String(messagePayload.senderName || '系统'),
+          kind: (['TEXT', 'IMAGE', 'FILE', 'SYSTEM'].includes(String(messagePayload.kind || 'TEXT')) ? String(messagePayload.kind || 'TEXT') : 'TEXT') as QuickChatMessage['kind'],
+          content: String(messagePayload.content || ''),
+          fileName: messagePayload.fileName ? String(messagePayload.fileName) : undefined,
+          fileUrl: messagePayload.fileUrl ? String(messagePayload.fileUrl) : undefined,
+          timeText: String(messagePayload.timeText || dayjs().format('MM-DD HH:mm')),
+          createdAt: String(messagePayload.createdAt || dayjs().toISOString()),
+          recalled: messagePayload.recalled === true,
+          readByUser: typeof messagePayload.readByUser === 'object' && messagePayload.readByUser
+            ? Object.fromEntries(Object.entries(messagePayload.readByUser).map(([k, v]) => [String(k), Boolean(v)]))
+            : {}
+        })
+      } else {
+        existedMsg.content = String(messagePayload.content || existedMsg.content || '')
+        existedMsg.fileName = messagePayload.fileName ? String(messagePayload.fileName) : existedMsg.fileName
+        existedMsg.fileUrl = messagePayload.fileUrl ? String(messagePayload.fileUrl) : existedMsg.fileUrl
+        existedMsg.recalled = messagePayload.recalled === true
+        existedMsg.readByUser = typeof messagePayload.readByUser === 'object' && messagePayload.readByUser
+          ? Object.fromEntries(Object.entries(messagePayload.readByUser).map(([k, v]) => [String(k), Boolean(v)]))
+          : existedMsg.readByUser
+      }
+      room.updatedAt = String(eventRow?.meta?.roomUpdatedAt || messagePayload.createdAt || dayjs().toISOString())
+      room.unreadByUser = room.unreadByUser || {}
+      room.unreadByUser[currentQuickChatSenderId.value] = Number(room.unreadByUser[currentQuickChatSenderId.value] || 0) + 1
+      room.unreadCount = Number(room.unreadByUser[currentQuickChatSenderId.value] || 0)
+      persistQuickChatState({ skipCloud: true, skipFanout: true, skipEvent: true })
+      return
+    }
+  } finally {
+    quickChatApplyingRemoteEvent.value = false
+  }
+}
+
+function handleQuickChatWebSocketMessage(raw: string) {
+  if (!raw) return
+  try {
+    const parsed = JSON.parse(raw)
+    applyQuickChatRealtimeEvent(parsed)
+  } catch {}
+}
+
+function scheduleQuickChatWsReconnect() {
+  if (quickChatWebSocketManualClose) return
+  if (quickChatWsReconnectTimer) {
+    window.clearTimeout(quickChatWsReconnectTimer)
+    quickChatWsReconnectTimer = undefined
+  }
+  quickChatWsReconnectAttempt.value += 1
+  const delay = Math.min(3000 + quickChatWsReconnectAttempt.value * 1000, 12000)
+  quickChatWsReconnectTimer = window.setTimeout(() => {
+    quickChatWsReconnectTimer = undefined
+    connectQuickChatWebSocket()
+  }, delay)
+}
+
+function connectQuickChatWebSocket() {
+  const url = resolveQuickChatWebSocketUrl()
+  if (!url) return
+  if (quickChatWebSocket && (quickChatWebSocket.readyState === WebSocket.OPEN || quickChatWebSocket.readyState === WebSocket.CONNECTING)) {
+    return
+  }
+  try {
+    quickChatWebSocket = new WebSocket(url)
+  } catch {
+    scheduleQuickChatWsReconnect()
+    return
+  }
+  quickChatWebSocket.onopen = () => {
+    quickChatWsConnected.value = true
+    quickChatWsReconnectAttempt.value = 0
+    pullQuickChatStateFromCloud(true)
+  }
+  quickChatWebSocket.onmessage = (event) => {
+    handleQuickChatWebSocketMessage(String(event?.data || ''))
+  }
+  quickChatWebSocket.onerror = () => {
+    quickChatWsConnected.value = false
+  }
+  quickChatWebSocket.onclose = () => {
+    quickChatWsConnected.value = false
+    quickChatWebSocket = null
+    scheduleQuickChatWsReconnect()
+  }
+}
+
+function closeQuickChatWebSocket() {
+  quickChatWebSocketManualClose = true
+  quickChatWsConnected.value = false
+  if (quickChatWsReconnectTimer) {
+    window.clearTimeout(quickChatWsReconnectTimer)
+    quickChatWsReconnectTimer = undefined
+  }
+  if (quickChatWebSocket) {
+    try {
+      quickChatWebSocket.close()
+    } catch {}
+    quickChatWebSocket = null
+  }
 }
 
 function emitQuickChatSync() {
@@ -3603,6 +3978,8 @@ function setupQuickChatTodoEscalationTimer() {
 }
 
 onMounted(() => {
+  quickChatWebSocketManualClose = false
+  connectQuickChatWebSocket()
   updateQuickChatDrawerWidth()
   hydrateCurrentStaffInfo()
     .then(() => Promise.allSettled([searchDepartments(''), searchStaff('')]))
@@ -3646,6 +4023,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  closeQuickChatWebSocket()
   if (presenceTimer) {
     window.clearInterval(presenceTimer)
     presenceTimer = undefined

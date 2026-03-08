@@ -399,6 +399,19 @@ export function fanoutQuickChatState(stateJson: string, targetStaffIds: Array<st
   return request.post<number>('/api/oa/quick-chat/state/fanout', { stateJson, targetStaffIds })
 }
 
+export interface OaQuickChatEventItemPayload {
+  eventType: string
+  roomId?: string
+  room?: Record<string, any>
+  message?: Record<string, any>
+  meta?: Record<string, any>
+  targetStaffIds?: Array<string | number>
+}
+
+export function publishQuickChatEventBatch(events: OaQuickChatEventItemPayload[]) {
+  return request.post<number>('/api/oa/quick-chat/state/event/batch', { events })
+}
+
 export function getOaTaskCalendar(params: any) {
   return request.get<OaTask[]>('/api/oa/task/calendar', { params })
 }

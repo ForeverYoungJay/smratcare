@@ -13,6 +13,7 @@ import type {
   ReconcileDailyItem,
   ReconcileRequest,
   FinanceWorkbenchOverview,
+  FinanceOpsInsight,
   FinanceInvoiceReceiptItem,
   FinanceAutoDebitExceptionItem,
   FinanceRoomOpsDetailResponse,
@@ -98,6 +99,10 @@ export function getElderAccountWarnings() {
 
 export function getFinanceWorkbenchOverview(config?: Record<string, any>) {
   return request.get<FinanceWorkbenchOverview>('/api/finance/workbench/overview', config)
+}
+
+export function getFinanceOpsInsights() {
+  return request.get<FinanceOpsInsight>('/api/finance/workbench/ops-insights')
 }
 
 export function getFinanceLedgerHealth(params?: { limit?: number }) {

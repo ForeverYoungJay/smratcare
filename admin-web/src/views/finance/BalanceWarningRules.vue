@@ -19,6 +19,13 @@
         <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="欠费金额" :value="summary.monthAmount" suffix="元" :precision="2" /></a-card></a-col>
       </a-row>
       <a-alert v-if="summary.warningMessage" style="margin-top: 12px;" type="warning" show-icon :message="summary.warningMessage" />
+      <a-alert
+        style="margin-top: 12px;"
+        :type="healthIssues.length ? 'warning' : 'success'"
+        show-icon
+        :message="healthIssues.length ? `规则健康检查发现 ${healthIssues.length} 项风险` : '规则健康检查通过'"
+        :description="healthIssues.length ? healthIssues.join('；') : '阈值、通知对象、催缴联动配置均正常'"
+      />
       <a-card class="card-elevated" :bordered="false" style="margin-top: 12px;" title="风险摘要明细">
         <vxe-table border stripe show-overflow :data="summary.topItems || []" height="220">
           <vxe-column field="label" title="维度" min-width="180" />
@@ -114,6 +121,7 @@ const thresholdValue = ref<number>(0)
 const notifyOps = ref<boolean>(true)
 const notifyFamily = ref<boolean>(false)
 const notifyCashier = ref<boolean>(true)
+const healthIssues = ref<string[]>([])
 
 function go(path: string) {
   router.push(path)
@@ -142,12 +150,27 @@ async function loadData() {
     notifyOps.value = Number(findValue('ACCOUNT_WARN_NOTIFY_OPS') || 0) === 1
     notifyFamily.value = Number(findValue('ACCOUNT_WARN_NOTIFY_FAMILY') || 0) === 1
     notifyCashier.value = Number(findValue('ACCOUNT_WARN_NOTIFY_CASHIER') || 0) === 1
+    healthIssues.value = buildHealthIssues()
   } catch (error: any) {
     errorMessage.value = error?.message || '加载余额预警配置失败'
     message.error(errorMessage.value)
   } finally {
     loading.value = false
   }
+}
+
+function buildHealthIssues() {
+  const issues: string[] = []
+  if (Number(thresholdValue.value || 0) <= 0) {
+    issues.push('余额预警阈值为 0，无法提前触发预警')
+  }
+  if (!notifyOps.value && !notifyFamily.value && !notifyCashier.value) {
+    issues.push('通知对象全部关闭，预警无法触达')
+  }
+  if (summary.value.pendingCount > 0 && !notifyCashier.value) {
+    issues.push('低余额预警较多但未通知收银，可能影响扣费成功率')
+  }
+  return issues
 }
 
 function findValue(key: string) {

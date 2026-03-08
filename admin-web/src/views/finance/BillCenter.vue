@@ -19,14 +19,35 @@
             <a-select-option value="QR_CODE">扫码</a-select-option>
           </a-select>
         </a-form-item>
+        <a-form-item v-if="!props.lockScene" label="账单场景">
+          <a-select v-model:value="query.scene" allow-clear style="width: 140px">
+            <a-select-option value="ADMISSION">入住首期</a-select-option>
+            <a-select-option value="RESIDENT">在住周期</a-select-option>
+          </a-select>
+        </a-form-item>
         <a-form-item>
           <a-space>
-            <a-button type="primary" @click="fetchData">查询</a-button>
+            <a-button type="primary" @click="runQuery">查询</a-button>
             <a-button @click="reset">重置</a-button>
           </a-space>
         </a-form-item>
       </a-form>
     </a-card>
+
+    <a-row :gutter="[12, 12]" style="margin-top: 16px;">
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="当前账单数" :value="displayRows.length" /></a-card></a-col>
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="当前欠费笔数" :value="overdueCount" /></a-card></a-col>
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="当前欠费金额" :value="overdueAmount" suffix="元" :precision="2" /></a-card></a-col>
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="当前已收金额" :value="paidAmount" suffix="元" :precision="2" /></a-card></a-col>
+      <a-col :span="24">
+        <a-alert
+          :type="summary.warningMessage ? 'warning' : 'info'"
+          show-icon
+          :message="summary.warningMessage || `全院风险摘要：欠费 ${summary.totalCount} 人，低余额 ${summary.pendingCount} 人，合同到期风险 ${summary.exceptionCount} 人`"
+          :description="`今日收款 ${Number(summary.todayAmount || 0).toFixed(2)} 元，累计欠费 ${Number(summary.monthAmount || 0).toFixed(2)} 元`"
+        />
+      </a-col>
+    </a-row>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
       <div class="table-actions">
@@ -166,8 +187,8 @@ import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportCsv } from '../../utils/export'
 import { getBillPage, generateBill, invalidateBill, payBill } from '../../api/bill'
-import { getPaymentRecordPage, updatePaymentRecord } from '../../api/finance'
-import type { BillItem, PageResult, PaymentRecordItem } from '../../types'
+import { getFinanceModuleEntrySummary, getPaymentRecordPage, updatePaymentRecord } from '../../api/finance'
+import type { BillItem, FinanceModuleEntrySummary, PageResult, PaymentRecordItem } from '../../types'
 import router from '../../router'
 import { printTableReport } from '../../utils/print'
 import { confirmAction } from '../../utils/actionConfirm'
@@ -175,9 +196,15 @@ import { confirmAction } from '../../utils/actionConfirm'
 const props = withDefaults(defineProps<{
   title?: string
   subTitle?: string
+  defaultScene?: 'ADMISSION' | 'RESIDENT' | undefined
+  lockScene?: boolean
+  defaultCurrentMonth?: boolean
 }>(), {
   title: '月账单中心',
-  subTitle: '按月查询、生成与收款登记'
+  subTitle: '按月查询、生成与收款登记',
+  defaultScene: undefined,
+  lockScene: false,
+  defaultCurrentMonth: false
 })
 
 const pageTitle = props.title
@@ -186,11 +213,23 @@ const pageSubTitle = props.subTitle
 const loading = ref(false)
 const rows = ref<BillItem[]>([])
 const total = ref(0)
+const summary = ref<FinanceModuleEntrySummary>({
+  moduleKey: 'BALANCE_WARN',
+  bizDate: '',
+  todayAmount: 0,
+  monthAmount: 0,
+  totalCount: 0,
+  pendingCount: 0,
+  exceptionCount: 0,
+  warningMessage: '',
+  topItems: []
+})
 
 const query = reactive({
-  month: undefined as any,
+  month: props.defaultCurrentMonth ? dayjs().startOf('month') : undefined as any,
   keyword: '',
   payMethod: undefined as string | undefined,
+  scene: props.defaultScene as ('ADMISSION' | 'RESIDENT' | undefined),
   pageNo: 1,
   pageSize: 10
 })
@@ -235,6 +274,9 @@ const displayRows = computed(() => {
   if (!query.payMethod) return rows.value
   return rows.value.filter(item => String(item.lastPayMethod || '').toUpperCase() === String(query.payMethod || '').toUpperCase())
 })
+const overdueCount = computed(() => displayRows.value.filter(item => Number(item.outstandingAmount || 0) > 0).length)
+const overdueAmount = computed(() => displayRows.value.reduce((sum, item) => sum + Number(item.outstandingAmount || 0), 0))
+const paidAmount = computed(() => displayRows.value.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0))
 
 function statusText(status?: number) {
   if (status === 9) return '无效'
@@ -270,7 +312,8 @@ async function fetchData() {
       pageNo: query.pageNo,
       pageSize: query.pageSize,
       month: query.month ? dayjs(query.month).format('YYYY-MM') : undefined,
-      keyword: query.keyword
+      keyword: query.keyword,
+      scene: query.scene
     })
     rows.value = res.list
     total.value = res.total
@@ -279,12 +322,25 @@ async function fetchData() {
   }
 }
 
+async function fetchSummary() {
+  try {
+    summary.value = await getFinanceModuleEntrySummary({ moduleKey: 'BALANCE_WARN' })
+  } catch {
+    // keep page usable even when summary API is unavailable
+  }
+}
+
+async function runQuery() {
+  await Promise.all([fetchData(), fetchSummary()])
+}
+
 function reset() {
-  query.month = undefined
+  query.month = props.defaultCurrentMonth ? dayjs().startOf('month') : undefined
   query.keyword = ''
   query.payMethod = undefined
+  query.scene = props.defaultScene
   query.pageNo = 1
-  fetchData()
+  runQuery()
 }
 
 function onPageChange(page: number) {
@@ -487,5 +543,7 @@ function printHistory() {
   }
 }
 
-onMounted(fetchData)
+onMounted(async () => {
+  await runQuery()
+})
 </script>

@@ -17,6 +17,8 @@ import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.finance.entity.PaymentRecord;
 import com.zhiyangyun.care.finance.mapper.PaymentRecordMapper;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.HashMap;
 import jakarta.validation.constraints.Pattern;
@@ -68,6 +70,7 @@ public class BillController {
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) String month,
       @RequestParam(required = false) Long elderId,
+      @RequestParam(required = false) String scene,
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
     var wrapper = Wrappers.lambdaQuery(BillMonthly.class)
@@ -90,6 +93,36 @@ public class BillController {
         return Result.ok(new Page<>(pageNo, pageSize, 0));
       }
       wrapper.in(BillMonthly::getElderId, elderIds);
+    }
+    String normalizedScene = scene == null ? "" : scene.trim().toUpperCase();
+    if ("ADMISSION".equals(normalizedScene) || "RESIDENT".equals(normalizedScene)) {
+      YearMonth targetMonth;
+      try {
+        targetMonth = (month == null || month.isBlank())
+            ? YearMonth.now()
+            : YearMonth.parse(month);
+      } catch (Exception ignored) {
+        targetMonth = YearMonth.now();
+      }
+      LocalDate monthStart = targetMonth.atDay(1);
+      LocalDate nextMonthStart = targetMonth.plusMonths(1).atDay(1);
+      var elderWrapper = Wrappers.lambdaQuery(ElderProfile.class)
+          .eq(ElderProfile::getIsDeleted, 0)
+          .eq(orgId != null, ElderProfile::getOrgId, orgId);
+      if ("ADMISSION".equals(normalizedScene)) {
+        elderWrapper.ge(ElderProfile::getAdmissionDate, monthStart)
+            .lt(ElderProfile::getAdmissionDate, nextMonthStart);
+      } else {
+        elderWrapper.lt(ElderProfile::getAdmissionDate, monthStart);
+      }
+      List<Long> sceneElderIds = elderMapper.selectList(elderWrapper).stream()
+          .map(ElderProfile::getId)
+          .filter(id -> id != null && id > 0)
+          .toList();
+      if (sceneElderIds.isEmpty()) {
+        return Result.ok(new Page<>(pageNo, pageSize, 0));
+      }
+      wrapper.in(BillMonthly::getElderId, sceneElderIds);
     }
     wrapper.orderByDesc(BillMonthly::getBillMonth);
     IPage<BillMonthly> page = billMonthlyMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);

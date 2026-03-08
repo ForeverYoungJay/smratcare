@@ -45,6 +45,9 @@ export function getElderAccountWarnings() {
 export function getFinanceWorkbenchOverview() {
     return request.get('/api/finance/workbench/overview');
 }
+export function getFinanceOpsInsights() {
+    return request.get('/api/finance/workbench/ops-insights');
+}
 export function getFinanceLedgerHealth(params) {
     return request.get('/api/finance/workbench/ledger/health', { params });
 }

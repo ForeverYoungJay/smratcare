@@ -12,6 +12,21 @@
       </template>
     </SearchForm>
 
+    <a-row :gutter="[12, 12]" style="margin-bottom: 12px;">
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="账户总数" :value="rows.length" /></a-card></a-col>
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="低余额账户" :value="lowBalanceCount" /></a-card></a-col>
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="账户总余额" :value="totalBalance" suffix="元" :precision="2" /></a-card></a-col>
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="停用账户" :value="disabledCount" /></a-card></a-col>
+      <a-col :span="24">
+        <a-alert
+          :type="moduleSummary.warningMessage ? 'warning' : 'info'"
+          show-icon
+          :message="moduleSummary.warningMessage || `欠费 ${moduleSummary.totalCount} 人，低余额 ${moduleSummary.pendingCount} 人，合同到期风险 ${moduleSummary.exceptionCount} 人`"
+          :description="`今日收款 ${Number(moduleSummary.todayAmount || 0).toFixed(2)} 元，本月欠费 ${Number(moduleSummary.monthAmount || 0).toFixed(2)} 元`"
+        />
+      </a-col>
+    </a-row>
+
     <DataTable
       rowKey="id"
       :columns="columns"
@@ -98,21 +113,32 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
-import { getElderAccountPage, adjustElderAccount, getElderAccountWarnings, updateElderAccount } from '../../api/finance'
-import type { ElderAccount, PageResult } from '../../types'
+import { getElderAccountPage, adjustElderAccount, getElderAccountWarnings, getFinanceModuleEntrySummary, updateElderAccount } from '../../api/finance'
+import type { ElderAccount, FinanceModuleEntrySummary, PageResult } from '../../types'
 import router from '../../router'
 
 const loading = ref(false)
 const rows = ref<ElderAccount[]>([])
 const warnings = ref<ElderAccount[]>([])
 const warningOpen = ref(false)
+const moduleSummary = ref<FinanceModuleEntrySummary>({
+  moduleKey: 'BALANCE_WARN',
+  bizDate: '',
+  todayAmount: 0,
+  monthAmount: 0,
+  totalCount: 0,
+  pendingCount: 0,
+  exceptionCount: 0,
+  warningMessage: '',
+  topItems: []
+})
 
 const query = reactive({
   keyword: '',
@@ -121,6 +147,9 @@ const query = reactive({
 })
 
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
+const lowBalanceCount = computed(() => rows.value.filter(item => Number(item.balance || 0) <= Number(item.warnThreshold || 0)).length)
+const disabledCount = computed(() => rows.value.filter(item => Number(item.status || 0) !== 1).length)
+const totalBalance = computed(() => rows.value.reduce((sum, item) => sum + Number(item.balance || 0), 0))
 
 const columns = [
   { title: '老人', dataIndex: 'elderName', key: 'elderName', width: 140 },
@@ -171,13 +200,17 @@ const statusOptions = [
 async function fetchData() {
   loading.value = true
   try {
-    const res: PageResult<ElderAccount> = await getElderAccountPage({
-      pageNo: query.pageNo,
-      pageSize: query.pageSize,
-      keyword: query.keyword
-    })
+    const [res, summary] = await Promise.all([
+      getElderAccountPage({
+        pageNo: query.pageNo,
+        pageSize: query.pageSize,
+        keyword: query.keyword
+      }) as Promise<PageResult<ElderAccount>>,
+      getFinanceModuleEntrySummary({ moduleKey: 'BALANCE_WARN' })
+    ])
     rows.value = res.list
     pagination.total = res.total || res.list.length
+    moduleSummary.value = summary
   } finally {
     loading.value = false
   }

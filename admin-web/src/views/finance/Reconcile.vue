@@ -12,6 +12,8 @@
           <a-space>
             <a-button type="primary" @click="reconcile">生成对账</a-button>
             <a-button @click="reset">重置</a-button>
+            <a-button @click="severityFilter = 'HIGH'">仅看高风险</a-button>
+            <a-button @click="severityFilter = 'ALL'">全部风险</a-button>
             <a-button @click="go('/finance/reconcile/exception')">异常处理</a-button>
           </a-space>
         </a-form-item>
@@ -26,6 +28,14 @@
         <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="当日异常数" :value="todayExceptionCount" /></a-card></a-col>
       </a-row>
       <a-alert v-if="todayExceptionCount > 0 || result?.mismatchFlag" style="margin-top: 12px;" type="warning" show-icon message="存在对账异常，请尽快处理并核销" />
+      <a-alert
+        v-if="moduleSummary?.warningMessage"
+        style="margin-top: 12px;"
+        type="warning"
+        show-icon
+        :message="moduleSummary.warningMessage"
+        :description="`当日收款 ${Number(moduleSummary.todayAmount || 0).toFixed(2)} 元；异常总数 ${moduleSummary.totalCount || 0}`"
+      />
 
       <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="对账结果">
         <a-row :gutter="16">
@@ -43,6 +53,28 @@
             </a-statistic>
           </a-col>
         </a-row>
+      </a-card>
+      <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="当日异常明细（分级）">
+        <vxe-table border stripe show-overflow :data="filteredExceptions" height="260">
+          <vxe-column field="occurredAt" title="发生时间" width="180" />
+          <vxe-column field="exceptionTypeLabel" title="异常类型" width="180" />
+          <vxe-column field="elderName" title="长者" width="130" />
+          <vxe-column field="amount" title="金额" width="120" />
+          <vxe-column title="等级" width="90">
+            <template #default="{ row }">
+              <a-tag :color="exceptionLevelColor(row)">{{ exceptionLevel(row) }}</a-tag>
+            </template>
+          </vxe-column>
+          <vxe-column field="detail" title="异常描述" min-width="220" />
+          <vxe-column title="操作" width="180" fixed="right">
+            <template #default="{ row }">
+              <a-space>
+                <a-button type="link" @click="go(`/finance/bill/${row.billId}`)" v-if="row.billId">查看账单</a-button>
+                <a-button type="link" @click="go('/finance/reconcile/exception')">去处理</a-button>
+              </a-space>
+            </template>
+          </vxe-column>
+        </vxe-table>
       </a-card>
     </StatefulBlock>
 
@@ -100,8 +132,8 @@ import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
-import { exportFinanceReconcileHistoryCsv, reconcileDaily, getReconcilePage, getFinanceReconcileExceptions, getFinanceWorkbenchOverview } from '../../api/finance'
-import type { FinanceReconcileCard, FinanceReconcileExceptionItem, PageResult, ReconcileDailyItem } from '../../types'
+import { exportFinanceReconcileHistoryCsv, reconcileDaily, getReconcilePage, getFinanceModuleEntrySummary, getFinanceReconcileExceptions, getFinanceWorkbenchOverview } from '../../api/finance'
+import type { FinanceModuleEntrySummary, FinanceReconcileCard, FinanceReconcileExceptionItem, PageResult, ReconcileDailyItem } from '../../types'
 import { printTableReport } from '../../utils/print'
 
 const router = useRouter()
@@ -120,6 +152,10 @@ const summary = ref<FinanceReconcileCard>({
 })
 const todayExceptions = ref<FinanceReconcileExceptionItem[]>([])
 const todayExceptionCount = computed(() => todayExceptions.value.length)
+const moduleSummary = ref<FinanceModuleEntrySummary | null>(null)
+const severityFilter = ref<'ALL' | 'HIGH'>('ALL')
+const filteredExceptions = computed(() => (todayExceptions.value || [])
+  .filter(item => severityFilter.value === 'ALL' || exceptionLevel(item) === '高'))
 
 const historyQuery = ref({
   from: dayjs().subtract(14, 'day'),
@@ -176,11 +212,12 @@ async function loadSummary() {
   loading.value = true
   errorMessage.value = ''
   try {
-    const [overview, exceptions] = await Promise.all([
+    const [overview, exceptions, summaryEntry] = await Promise.all([
       getFinanceWorkbenchOverview(),
       getFinanceReconcileExceptions({
         date: dayjs(query.value.date).format('YYYY-MM-DD')
-      })
+      }),
+      getFinanceModuleEntrySummary({ moduleKey: 'RECONCILE_CENTER' })
     ])
     summary.value = overview.reconcile || {
       billPaidUnmatchedCount: 0,
@@ -188,12 +225,26 @@ async function loadSummary() {
       invoiceUnlinkedCount: 0
     }
     todayExceptions.value = exceptions || []
+    moduleSummary.value = summaryEntry
   } catch (error: any) {
     errorMessage.value = error?.message || '加载对账摘要失败'
     message.error(errorMessage.value)
   } finally {
     loading.value = false
   }
+}
+
+function exceptionLevel(item: FinanceReconcileExceptionItem) {
+  const type = String(item.exceptionType || '').toUpperCase()
+  const amount = Number(item.amount || 0)
+  if (type === 'BILL_PAID_UNMATCHED' && amount >= 1000) return '高'
+  if (type === 'DUPLICATED_PAYMENT') return '高'
+  if (type === 'INVOICE_UNLINKED' && amount >= 2000) return '高'
+  return '中'
+}
+
+function exceptionLevelColor(item: FinanceReconcileExceptionItem) {
+  return exceptionLevel(item) === '高' ? 'red' : 'orange'
 }
 
 function resetHistory() {

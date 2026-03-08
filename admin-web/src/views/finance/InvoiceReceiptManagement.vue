@@ -31,6 +31,8 @@
         <a-form-item>
           <a-space>
             <a-button type="primary" @click="fetchData">查询</a-button>
+            <a-button @click="quickFilter('UNLINKED')">仅看未关联</a-button>
+            <a-button @click="quickFilter('LINKED')">仅看已关联</a-button>
             <a-button @click="exportCsvReport">导出CSV</a-button>
             <a-button @click="printCurrent">打印当前结果</a-button>
             <a-button @click="reset">重置</a-button>
@@ -38,6 +40,16 @@
         </a-form-item>
       </a-form>
     </a-card>
+
+    <a-row :gutter="[12, 12]" style="margin-top: 16px;">
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="流水笔数" :value="rows.length" /></a-card></a-col>
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="总金额" :value="totalAmount" suffix="元" :precision="2" /></a-card></a-col>
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="未关联笔数" :value="unlinkedCount" /></a-card></a-col>
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="未关联金额" :value="unlinkedAmount" suffix="元" :precision="2" /></a-card></a-col>
+      <a-col :span="24" v-if="unlinkedCount > 0">
+        <a-alert type="warning" show-icon :message="`当前未关联发票 ${unlinkedCount} 笔，金额 ${unlinkedAmount.toFixed(2)} 元`" />
+      </a-col>
+    </a-row>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
       <vxe-table border stripe show-overflow :loading="loading" :data="rows" height="520">
@@ -53,7 +65,20 @@
             <a-tag :color="row.invoiceStatus === 'LINKED' ? 'green' : 'orange'">{{ row.invoiceStatusLabel }}</a-tag>
           </template>
         </vxe-column>
+        <vxe-column title="风险级别" width="100">
+          <template #default="{ row }">
+            <a-tag :color="riskTagColor(row)">{{ riskTagText(row) }}</a-tag>
+          </template>
+        </vxe-column>
         <vxe-column field="remark" title="备注" min-width="180" />
+        <vxe-column title="操作" width="180" fixed="right">
+          <template #default="{ row }">
+            <a-space>
+              <a-button type="link" @click="go(`/finance/bill/${row.billId}`)" v-if="row.billId">查看账单</a-button>
+              <a-button type="link" @click="go('/finance/reconcile/invoice?filter=unlinked')" v-if="row.invoiceStatus === 'UNLINKED'">去关联</a-button>
+            </a-space>
+          </template>
+        </vxe-column>
       </vxe-table>
 
       <a-pagination
@@ -70,17 +95,23 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
+import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportFinanceInvoiceReceiptCsv, getFinanceInvoiceReceiptPage } from '../../api/finance'
 import type { FinanceInvoiceReceiptItem, PageResult } from '../../types'
 import { printTableReport } from '../../utils/print'
 
+const router = useRouter()
 const loading = ref(false)
 const rows = ref<FinanceInvoiceReceiptItem[]>([])
 const total = ref(0)
+const totalAmount = computed(() => rows.value.reduce((sum, item) => sum + Number(item.amount || 0), 0))
+const unlinkedRows = computed(() => rows.value.filter(item => item.invoiceStatus === 'UNLINKED'))
+const unlinkedCount = computed(() => unlinkedRows.value.length)
+const unlinkedAmount = computed(() => unlinkedRows.value.reduce((sum, item) => sum + Number(item.amount || 0), 0))
 
 const query = reactive({
   date: dayjs(),
@@ -108,6 +139,29 @@ async function fetchData() {
   } finally {
     loading.value = false
   }
+}
+
+function go(path: string) {
+  router.push(path)
+}
+
+function quickFilter(status: 'LINKED' | 'UNLINKED') {
+  query.invoiceStatus = status
+  query.pageNo = 1
+  fetchData()
+}
+
+function riskTagText(row: FinanceInvoiceReceiptItem) {
+  if (row.invoiceStatus === 'UNLINKED' && Number(row.amount || 0) >= 2000) return '高'
+  if (row.invoiceStatus === 'UNLINKED') return '中'
+  return '低'
+}
+
+function riskTagColor(row: FinanceInvoiceReceiptItem) {
+  const text = riskTagText(row)
+  if (text === '高') return 'red'
+  if (text === '中') return 'orange'
+  return 'green'
 }
 
 function reset() {

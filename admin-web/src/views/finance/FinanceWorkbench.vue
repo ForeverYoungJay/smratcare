@@ -49,6 +49,36 @@
         </a-col>
       </a-row>
     </a-card>
+    <a-card class="card-elevated" :bordered="false" style="margin-bottom: 16px;">
+      <a-row :gutter="[12, 12]">
+        <a-col :xs="24" :lg="8">
+          <a-statistic title="运营洞察总数" :value="opsInsight?.totalInsights || 0" />
+        </a-col>
+        <a-col :xs="24" :lg="8">
+          <a-statistic title="高优先级" :value="opsInsight?.highPriorityCount || 0" />
+        </a-col>
+        <a-col :xs="24" :lg="8">
+          <a-tag color="blue">生成时间 {{ opsInsight?.generatedAt || '-' }}</a-tag>
+        </a-col>
+        <a-col :span="24" v-if="(opsInsight?.items || []).length">
+          <a-list size="small" :data-source="(opsInsight?.items || []).slice(0, 5)" bordered style="background: #fff">
+            <template #renderItem="{ item }">
+              <a-list-item>
+                <a-space wrap>
+                  <a-tag :color="item.level === 'HIGH' ? 'red' : item.level === 'MEDIUM' ? 'orange' : 'blue'">
+                    {{ item.level }}
+                  </a-tag>
+                  <span>{{ item.title }}</span>
+                  <span>{{ item.detail }}</span>
+                  <span style="color: #64748b;">{{ item.suggestion }}</span>
+                  <a-button type="link" size="small" @click="go(item.actionPath)">{{ item.actionLabel }}</a-button>
+                </a-space>
+              </a-list-item>
+            </template>
+          </a-list>
+        </a-col>
+      </a-row>
+    </a-card>
 
     <StatefulBlock :loading="loading" :error="errorMessage" @retry="loadData">
       <a-row :gutter="[16, 16]">
@@ -286,12 +316,13 @@ import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
-import { getFinanceConfigChangeLogPage, getFinanceLedgerHealth, getFinanceMasterDataOverview, getFinanceWorkbenchOverview } from '../../api/finance'
+import { getFinanceConfigChangeLogPage, getFinanceLedgerHealth, getFinanceMasterDataOverview, getFinanceOpsInsights, getFinanceWorkbenchOverview } from '../../api/finance'
 import type {
   FinanceConfigChangeLogItem,
   FinanceLedgerHealth,
   FinanceLedgerHealthIssueItem,
   FinanceMasterDataOverview,
+  FinanceOpsInsight,
   FinanceRoomRanking,
   FinanceWorkbenchOverview
 } from '../../types'
@@ -304,6 +335,7 @@ const overview = ref<FinanceWorkbenchOverview | null>(null)
 const masterOverview = ref<FinanceMasterDataOverview | null>(null)
 const latestConfigChange = ref<FinanceConfigChangeLogItem | null>(null)
 const ledgerHealth = ref<FinanceLedgerHealth | null>(null)
+const opsInsight = ref<FinanceOpsInsight | null>(null)
 
 const { chartRef: revenueChartRef, setOption: setRevenueOption } = useECharts()
 
@@ -397,14 +429,16 @@ async function loadData() {
   loading.value = true
   errorMessage.value = ''
   try {
-    const [workbenchData, configData, ledgerData] = await Promise.all([
+    const [workbenchData, configData, ledgerData, opsInsightData] = await Promise.all([
       getFinanceWorkbenchOverview(),
       getFinanceMasterDataOverview(),
-      getFinanceLedgerHealth({ limit: 12 })
+      getFinanceLedgerHealth({ limit: 12 }),
+      getFinanceOpsInsights()
     ])
     overview.value = workbenchData
     masterOverview.value = configData
     ledgerHealth.value = ledgerData
+    opsInsight.value = opsInsightData
     const changeLogPage = await getFinanceConfigChangeLogPage({ pageNo: 1, pageSize: 1 })
     latestConfigChange.value = changeLogPage?.list?.[0] || null
     renderRevenueChart()

@@ -260,6 +260,23 @@ export interface FinanceQuickEntry {
   path: string
 }
 
+export interface FinanceOpsInsightItem {
+  level: 'HIGH' | 'MEDIUM' | 'LOW'
+  title: string
+  detail: string
+  suggestion: string
+  actionPath: string
+  actionLabel: string
+  affectedCount: number
+}
+
+export interface FinanceOpsInsight {
+  generatedAt: string
+  totalInsights: number
+  highPriorityCount: number
+  items: FinanceOpsInsightItem[]
+}
+
 export interface FinanceLedgerHealthIssueItem {
   issueType: string
   issueTypeLabel: string

@@ -967,11 +967,15 @@ function saveProfileConfig() {
       message.warning('配置内容必须是 JSON 对象。')
       return
     }
+    const updater = pageMaintainer.value
+    const publishMetaPatch = isPlainObject(parsed.publishMeta) ? parsed.publishMeta : {}
+    publishMetaPatch.maintainer = updater
+    parsed.publishMeta = publishMetaPatch
     const merged = mergeProfile(deepClone(enterpriseProfile), parsed) as EnterpriseProfile
     replaceProfile(merged)
     localStorage.setItem(PROFILE_OVERRIDE_STORAGE_KEY, JSON.stringify(parsed))
     profileConfigOpen.value = false
-    message.success('运营配置已保存并生效。')
+    message.success(`运营配置已保存并生效，维护人已更新为：${updater}`)
   } catch (_error) {
     message.error('配置保存失败，请检查 JSON 结构。')
   } finally {

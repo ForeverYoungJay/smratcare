@@ -31,6 +31,13 @@
       </template>
     </SearchForm>
 
+    <a-alert
+      :type="canAssignOthers ? 'info' : 'warning'"
+      show-icon
+      style="margin-bottom: 12px"
+      :message="canAssignOthers ? '当前账号可查看全院待办并可指定负责人。' : `当前账号仅可查看“我创建”或“我负责”的待办（${currentUserName || '当前用户'}）。`"
+    />
+
     <a-card class="card-elevated" :bordered="false" style="margin-bottom: 12px">
       <a-space wrap>
         <a-tag color="blue">代办新增/完成会自动同步到行政日历</a-tag>

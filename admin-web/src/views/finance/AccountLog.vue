@@ -9,6 +9,16 @@
       </template>
     </SearchForm>
 
+    <a-row :gutter="[12, 12]" style="margin-bottom: 12px;">
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="流水笔数" :value="rows.length" /></a-card></a-col>
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="收入合计" :value="creditAmount" suffix="元" :precision="2" /></a-card></a-col>
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="支出合计" :value="debitAmount" suffix="元" :precision="2" /></a-card></a-col>
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="未识别充值方式" :value="unknownMethodCount" /></a-card></a-col>
+      <a-col :span="24" v-if="unknownMethodCount > 0">
+        <a-alert type="warning" show-icon message="存在未识别充值方式备注，建议规范备注格式：充值方式:xxx|充值时间:yyyy-MM-dd HH:mm:ss" />
+      </a-col>
+    </a-row>
+
     <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'rechargeMethod'">
@@ -23,7 +33,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
@@ -44,6 +54,16 @@ const query = reactive({
 })
 
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
+const creditAmount = computed(() => rows.value
+  .filter(item => String(item.direction || '').toUpperCase() === 'CREDIT')
+  .reduce((sum, item) => sum + Number(item.amount || 0), 0))
+const debitAmount = computed(() => rows.value
+  .filter(item => String(item.direction || '').toUpperCase() === 'DEBIT')
+  .reduce((sum, item) => sum + Number(item.amount || 0), 0))
+const unknownMethodCount = computed(() => rows.value
+  .filter(item => String(item.direction || '').toUpperCase() === 'CREDIT')
+  .filter(item => !parseRechargeMethod(item.remark))
+  .length)
 
 const columns = [
   { title: '老人', dataIndex: 'elderName', key: 'elderName', width: 140 },

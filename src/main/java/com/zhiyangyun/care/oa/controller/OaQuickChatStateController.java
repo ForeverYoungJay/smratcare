@@ -9,9 +9,12 @@ import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.oa.entity.OaQuickChatState;
 import com.zhiyangyun.care.oa.mapper.OaQuickChatStateMapper;
+import com.zhiyangyun.care.oa.model.OaQuickChatEventBatchRequest;
+import com.zhiyangyun.care.oa.model.OaQuickChatEventItemRequest;
 import com.zhiyangyun.care.oa.model.OaQuickChatFanoutRequest;
 import com.zhiyangyun.care.oa.model.OaQuickChatStateRequest;
 import com.zhiyangyun.care.oa.model.OaQuickChatStateResponse;
+import com.zhiyangyun.care.oa.realtime.OaQuickChatWebSocketHandler;
 import jakarta.validation.Valid;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -38,14 +41,17 @@ public class OaQuickChatStateController {
   private final OaQuickChatStateMapper quickChatStateMapper;
   private final StaffMapper staffMapper;
   private final ObjectMapper objectMapper;
+  private final OaQuickChatWebSocketHandler webSocketHandler;
 
   public OaQuickChatStateController(
       OaQuickChatStateMapper quickChatStateMapper,
       StaffMapper staffMapper,
-      ObjectMapper objectMapper) {
+      ObjectMapper objectMapper,
+      OaQuickChatWebSocketHandler webSocketHandler) {
     this.quickChatStateMapper = quickChatStateMapper;
     this.staffMapper = staffMapper;
     this.objectMapper = objectMapper;
+    this.webSocketHandler = webSocketHandler;
   }
 
   @GetMapping
@@ -131,9 +137,29 @@ public class OaQuickChatStateController {
         row.setStateJson(finalJson);
         quickChatStateMapper.updateById(row);
       }
+      webSocketHandler.sendToStaff(orgId, targetStaffId, Map.of(
+          "eventType", "SYNC_HINT",
+          "reason", "fanout",
+          "at", System.currentTimeMillis()));
       affected++;
     }
     return Result.ok(affected);
+  }
+
+  @PostMapping("/event/batch")
+  public Result<Integer> publishBatchEvents(@Valid @RequestBody OaQuickChatEventBatchRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    int delivered = 0;
+    for (OaQuickChatEventItemRequest item : request.getEvents()) {
+      if (item == null) continue;
+      List<Long> targets = resolveTargetStaffIds(orgId, item.getTargetStaffIds());
+      if (targets.isEmpty()) continue;
+      Map<String, Object> payload = buildEventPayload(item);
+      for (Long staffId : targets) {
+        delivered += webSocketHandler.sendToStaff(orgId, staffId, payload);
+      }
+    }
+    return Result.ok(delivered);
   }
 
   private OaQuickChatState findCurrentState() {
@@ -168,6 +194,25 @@ public class OaQuickChatStateController {
         .filter(id -> id != null && id > 0)
         .distinct()
         .toList();
+  }
+
+  private Map<String, Object> buildEventPayload(OaQuickChatEventItemRequest item) {
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("eventType", asText(item.getEventType()));
+    if (item.getRoomId() != null && !item.getRoomId().isBlank()) {
+      payload.put("roomId", item.getRoomId());
+    }
+    if (item.getRoom() != null && !item.getRoom().isEmpty()) {
+      payload.put("room", item.getRoom());
+    }
+    if (item.getMessage() != null && !item.getMessage().isEmpty()) {
+      payload.put("message", item.getMessage());
+    }
+    if (item.getMeta() != null && !item.getMeta().isEmpty()) {
+      payload.put("meta", item.getMeta());
+    }
+    payload.put("at", System.currentTimeMillis());
+    return payload;
   }
 
   private List<Map<String, Object>> parseRooms(String stateJson) {

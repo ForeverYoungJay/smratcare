@@ -61,6 +61,7 @@ import com.zhiyangyun.care.finance.model.FinanceInvoiceReceiptItem;
 import com.zhiyangyun.care.finance.model.FinanceLedgerHealthResponse;
 import com.zhiyangyun.care.finance.model.FinanceModuleEntrySummaryResponse;
 import com.zhiyangyun.care.finance.model.FinanceMasterDataOverviewResponse;
+import com.zhiyangyun.care.finance.model.FinanceOpsInsightResponse;
 import com.zhiyangyun.care.finance.model.FinanceReconcileExceptionItem;
 import com.zhiyangyun.care.finance.model.FinanceRoomOpsDetailResponse;
 import com.zhiyangyun.care.finance.model.FinanceWorkbenchOverviewResponse;
@@ -242,6 +243,149 @@ public class FinanceWorkbenchController {
     FinanceModuleEntrySummaryResponse response = buildModuleEntrySummary(
         normalizedKey, orgId, today, startOfToday, endOfToday, thisMonth, monthConsumption, todayConsumption, thisMonthBills,
         todayPayments);
+    return Result.ok(response);
+  }
+
+  @GetMapping("/ops-insights")
+  public Result<FinanceOpsInsightResponse> opsInsights() {
+    Long orgId = AuthContext.getOrgId();
+    LocalDate today = LocalDate.now();
+    String thisMonth = YearMonth.from(today).toString();
+
+    List<BillMonthly> bills = billMonthlyMapper.selectList(
+        Wrappers.lambdaQuery(BillMonthly.class)
+            .eq(BillMonthly::getIsDeleted, 0)
+            .eq(orgId != null, BillMonthly::getOrgId, orgId)
+            .eq(BillMonthly::getBillMonth, thisMonth));
+    long overdueCount = bills.stream()
+        .filter(item -> safe(item.getOutstandingAmount()).compareTo(BigDecimal.ZERO) > 0)
+        .count();
+    BigDecimal overdueAmount = bills.stream()
+        .map(item -> safe(item.getOutstandingAmount()))
+        .filter(item -> item.compareTo(BigDecimal.ZERO) > 0)
+        .reduce(BigDecimal.ZERO, BigDecimal::add);
+    long highArrearsCount = bills.stream()
+        .filter(item -> safe(item.getOutstandingAmount()).compareTo(new BigDecimal("1000")) >= 0)
+        .count();
+
+    List<ElderAccount> accounts = elderAccountMapper.selectList(
+        Wrappers.lambdaQuery(ElderAccount.class)
+            .eq(ElderAccount::getIsDeleted, 0)
+            .eq(orgId != null, ElderAccount::getOrgId, orgId));
+    long lowBalanceCount = accounts.stream()
+        .filter(item -> safe(item.getBalance()).compareTo(safe(item.getWarnThreshold())) < 0)
+        .count();
+
+    Long pendingApprovalCountRaw = oaApprovalMapper.selectCount(
+        Wrappers.lambdaQuery(OaApproval.class)
+            .eq(OaApproval::getIsDeleted, 0)
+            .eq(orgId != null, OaApproval::getOrgId, orgId)
+            .eq(OaApproval::getStatus, "PENDING")
+            .and(q -> q.like(OaApproval::getTitle, "费用")
+                .or().like(OaApproval::getTitle, "退款")
+                .or().like(OaApproval::getTitle, "冲正")
+                .or().like(OaApproval::getTitle, "减免")));
+    long pendingApprovalCount = pendingApprovalCountRaw == null ? 0L : pendingApprovalCountRaw;
+
+    List<FinanceReconcileExceptionItem> reconcileIssues = buildReconcileExceptions(
+        orgId, today, null);
+    long reconcileIssueCount = reconcileIssues.size();
+
+    Long disabledBillingRulesRaw = billingConfigMapper.selectCount(
+        Wrappers.lambdaQuery(BillingConfigEntry.class)
+            .eq(BillingConfigEntry::getIsDeleted, 0)
+            .eq(orgId != null, BillingConfigEntry::getOrgId, orgId)
+            .eq(BillingConfigEntry::getEffectiveMonth, thisMonth)
+            .eq(BillingConfigEntry::getStatus, 0));
+    long disabledBillingRules = disabledBillingRulesRaw == null ? 0L : disabledBillingRulesRaw;
+
+    FinanceOpsInsightResponse response = new FinanceOpsInsightResponse();
+    response.setGeneratedAt(LocalDateTime.now());
+
+    List<FinanceOpsInsightResponse.Item> items = new ArrayList<>();
+    if (overdueCount > 0) {
+      FinanceOpsInsightResponse.Item item = new FinanceOpsInsightResponse.Item();
+      item.setLevel(overdueAmount.compareTo(new BigDecimal("10000")) >= 0 ? "HIGH" : "MEDIUM");
+      item.setTitle("欠费催缴优先处理");
+      item.setDetail("本月欠费 " + overdueCount + " 人，累计 " + overdueAmount.setScale(2, RoundingMode.HALF_UP) + " 元");
+      item.setSuggestion("先处理高欠费账单，再触发自动催缴和家属通知");
+      item.setActionPath("/finance/bills/in-resident?filter=overdue");
+      item.setActionLabel("查看欠费账单");
+      item.setAffectedCount(overdueCount);
+      items.add(item);
+    }
+    if (highArrearsCount > 0) {
+      FinanceOpsInsightResponse.Item item = new FinanceOpsInsightResponse.Item();
+      item.setLevel("HIGH");
+      item.setTitle("存在高风险欠费长者");
+      item.setDetail("应收超 1000 元的欠费账单 " + highArrearsCount + " 条");
+      item.setSuggestion("建议运营与财务联合复核缴费计划");
+      item.setActionPath("/finance/bills/auto-deduct-errors?date=today");
+      item.setActionLabel("查看高风险异常");
+      item.setAffectedCount(highArrearsCount);
+      items.add(item);
+    }
+    if (lowBalanceCount > 0) {
+      FinanceOpsInsightResponse.Item item = new FinanceOpsInsightResponse.Item();
+      item.setLevel(lowBalanceCount >= 20 ? "HIGH" : "MEDIUM");
+      item.setTitle("预存余额预警需触达");
+      item.setDetail("低余额长者 " + lowBalanceCount + " 人");
+      item.setSuggestion("建议批量发送充值提醒，避免自动扣费失败");
+      item.setActionPath("/finance/accounts/list?filter=low_balance");
+      item.setActionLabel("查看低余额账户");
+      item.setAffectedCount(lowBalanceCount);
+      items.add(item);
+    }
+    if (pendingApprovalCount > 0) {
+      FinanceOpsInsightResponse.Item item = new FinanceOpsInsightResponse.Item();
+      item.setLevel("MEDIUM");
+      item.setTitle("审批积压影响账务闭环");
+      item.setDetail("财务相关待审批 " + pendingApprovalCount + " 条");
+      item.setSuggestion("优先处理退款/冲正，避免跨期对账异常");
+      item.setActionPath("/oa/approval?module=finance&status=pending");
+      item.setActionLabel("前往审批中心");
+      item.setAffectedCount(pendingApprovalCount);
+      items.add(item);
+    }
+    if (reconcileIssueCount > 0) {
+      FinanceOpsInsightResponse.Item item = new FinanceOpsInsightResponse.Item();
+      item.setLevel("HIGH");
+      item.setTitle("对账异常待处理");
+      item.setDetail("今日对账异常 " + reconcileIssueCount + " 条");
+      item.setSuggestion("建议先核销收款和账单映射，再处理发票关联");
+      item.setActionPath("/finance/reconcile/exception");
+      item.setActionLabel("处理对账异常");
+      item.setAffectedCount(reconcileIssueCount);
+      items.add(item);
+    }
+    if (disabledBillingRules > 0) {
+      FinanceOpsInsightResponse.Item item = new FinanceOpsInsightResponse.Item();
+      item.setLevel("LOW");
+      item.setTitle("存在停用配置项");
+      item.setDetail("本月停用计费配置 " + disabledBillingRules + " 条");
+      item.setSuggestion("请确认是否为临时停用，避免影响自动计费");
+      item.setActionPath("/finance/bills/rules");
+      item.setActionLabel("查看计费规则");
+      item.setAffectedCount(disabledBillingRules);
+      items.add(item);
+    }
+    if (items.isEmpty()) {
+      FinanceOpsInsightResponse.Item item = new FinanceOpsInsightResponse.Item();
+      item.setLevel("LOW");
+      item.setTitle("当前财务运行平稳");
+      item.setDetail("未识别到高优先级风险");
+      item.setSuggestion("建议每日复核收款、对账、分摊三类任务");
+      item.setActionPath("/finance/reconcile/center");
+      item.setActionLabel("进入对账中心");
+      item.setAffectedCount(0L);
+      items.add(item);
+    }
+    items.sort((a, b) -> insightLevelWeight(b.getLevel()) - insightLevelWeight(a.getLevel()));
+    response.setItems(items);
+    response.setTotalInsights(items.size());
+    response.setHighPriorityCount((int) items.stream()
+        .filter(item -> "HIGH".equalsIgnoreCase(item.getLevel()))
+        .count());
     return Result.ok(response);
   }
 
@@ -1376,6 +1520,12 @@ public class FinanceWorkbenchController {
     return card;
   }
 
+  private int insightLevelWeight(String level) {
+    if ("HIGH".equalsIgnoreCase(level)) return 3;
+    if ("MEDIUM".equalsIgnoreCase(level)) return 2;
+    return 1;
+  }
+
   private FinanceWorkbenchOverviewResponse.RiskCard buildRiskCard(
       Long orgId,
       List<BillMonthly> outstandingBills,
@@ -1840,6 +1990,7 @@ public class FinanceWorkbenchController {
       case "ADJUSTMENTS" -> fillAdjustmentEntry(response, orgId);
       case "DISCHARGE_STATUS_SYNC" -> fillDischargeSyncEntry(response, orgId, thisMonth);
       case "RECONCILE_INVOICE" -> fillReconcileInvoiceEntry(response, orgId, thisMonth, thisMonthBills, todayPayments);
+      case "RECONCILE_CENTER" -> fillReconcileCenterEntry(response, orgId, today, thisMonth, thisMonthBills, todayPayments);
       case "BALANCE_WARN" -> fillBalanceWarnEntry(response, orgId, today, todayPayments);
       case "APPROVAL_FLOW" -> fillApprovalFlowEntry(response, orgId);
       default -> fillDefaultEntry(response, monthConsumption, todayConsumption, thisMonthBills);
@@ -2030,6 +2181,33 @@ public class FinanceWorkbenchController {
     response.getTopItems().add(entryItem("已结算", settledCount, BigDecimal.ZERO));
     response.getTopItems().add(entryItem("待处理", pendingCount, BigDecimal.ZERO));
     response.getTopItems().add(entryItem("待回写", unsynced, BigDecimal.ZERO));
+  }
+
+  private void fillReconcileCenterEntry(
+      FinanceModuleEntrySummaryResponse response,
+      Long orgId,
+      LocalDate today,
+      String thisMonth,
+      List<BillMonthly> thisMonthBills,
+      List<PaymentRecord> todayPayments) {
+    FinanceWorkbenchOverviewResponse.ReconcileCard card = buildReconcileCard(orgId, thisMonth, thisMonthBills, todayPayments);
+    List<FinanceReconcileExceptionItem> exceptions = buildReconcileExceptions(orgId, today, null);
+    response.setTodayAmount(todayPayments.stream()
+        .map(PaymentRecord::getAmount)
+        .filter(Objects::nonNull)
+        .reduce(BigDecimal.ZERO, BigDecimal::add));
+    response.setMonthAmount(BigDecimal.valueOf(card.getBillPaidUnmatchedCount() == null ? 0 : card.getBillPaidUnmatchedCount())
+        .add(BigDecimal.valueOf(card.getDuplicatedOrReversalPendingCount() == null ? 0 : card.getDuplicatedOrReversalPendingCount()))
+        .add(BigDecimal.valueOf(card.getInvoiceUnlinkedCount() == null ? 0 : card.getInvoiceUnlinkedCount())));
+    response.setTotalCount((long) exceptions.size());
+    response.setPendingCount((long) (card.getBillPaidUnmatchedCount() + card.getDuplicatedOrReversalPendingCount()));
+    response.setExceptionCount((long) card.getInvoiceUnlinkedCount());
+    if (!exceptions.isEmpty()) {
+      response.setWarningMessage("存在对账异常，请优先处理重复收款与账单未核销问题");
+    }
+    response.getTopItems().add(entryItem("账单已收未核销", card.getBillPaidUnmatchedCount(), BigDecimal.ZERO));
+    response.getTopItems().add(entryItem("重复/冲正未完成", card.getDuplicatedOrReversalPendingCount(), BigDecimal.ZERO));
+    response.getTopItems().add(entryItem("发票未关联", card.getInvoiceUnlinkedCount(), BigDecimal.ZERO));
   }
 
   private void fillReconcileInvoiceEntry(

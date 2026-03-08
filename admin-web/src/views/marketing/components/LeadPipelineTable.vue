@@ -1,6 +1,12 @@
 <template>
   <PageContainer :title="title" :sub-title="subTitle">
     <MarketingQuickNav />
+    <a-alert
+      :type="canViewAllLeads ? 'info' : 'warning'"
+      show-icon
+      style="margin-bottom: 12px"
+      :message="canViewAllLeads ? '当前账号可查看本机构营销线索。' : `当前账号仅查看本人创建线索（${currentUserDisplayName}）。`"
+    />
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item v-if="props.mode === 'pipeline'" label="线索视图">
@@ -331,6 +337,8 @@ import {
   getLeadPage,
   updateCrmLead
 } from '../../../api/marketing'
+import { useUserStore } from '../../../stores/user'
+import { hasMinisterOrHigher } from '../../../utils/roleAccess'
 import type { CrmLeadItem, MarketingLeadEntrySummary, MarketingLeadMode, PageResult } from '../../../types'
 
 const props = withDefaults(defineProps<{
@@ -344,6 +352,7 @@ const props = withDefaults(defineProps<{
 
 const router = useRouter()
 const route = useRoute()
+const userStore = useUserStore()
 const pipelineTab = ref<'consultation' | 'intent' | 'callback'>('consultation')
 const effectiveMode = computed<'consultation' | 'intent' | 'reservation' | 'invalid' | 'callback'>(() => {
   return props.mode === 'pipeline' ? pipelineTab.value : props.mode
@@ -644,6 +653,13 @@ const warningMessage = computed(() => {
     return `回访提醒：今日到期 ${summary.callbackDueTodayCount} 条，逾期 ${summary.callbackOverdueCount} 条。`
   }
   return ''
+})
+
+const canViewAllLeads = computed(() => hasMinisterOrHigher(userStore.roles || []))
+const currentUserDisplayName = computed(() => {
+  const realName = String(userStore.staffInfo?.realName || '').trim()
+  if (realName) return realName
+  return String(userStore.staffInfo?.username || '').trim() || '当前用户'
 })
 
 function textContains(value: unknown, keyword: string) {

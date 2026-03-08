@@ -12,9 +12,18 @@
             <a-select-option value="INVOICE_UNLINKED">发票未关联账单</a-select-option>
           </a-select>
         </a-form-item>
+        <a-form-item label="风险等级">
+          <a-select v-model:value="query.severity" allow-clear style="width: 140px">
+            <a-select-option value="HIGH">高风险</a-select-option>
+            <a-select-option value="MEDIUM">中风险</a-select-option>
+            <a-select-option value="LOW">低风险</a-select-option>
+          </a-select>
+        </a-form-item>
         <a-form-item>
           <a-space>
             <a-button type="primary" @click="loadData">查询</a-button>
+            <a-button @click="quickType('DUPLICATED_PAYMENT')">仅看重复收款</a-button>
+            <a-button @click="quickType('INVOICE_UNLINKED')">仅看发票未关联</a-button>
             <a-button @click="exportCsvReport">导出CSV</a-button>
             <a-button @click="printCurrent">打印当前</a-button>
             <a-input v-model:value="query.printRemark" allow-clear placeholder="打印备注" style="width: 180px" />
@@ -26,12 +35,23 @@
     </a-card>
 
     <StatefulBlock style="margin-top: 16px;" :loading="loading" :error="errorMessage" @retry="loadData">
+      <a-row :gutter="[12, 12]" style="margin-bottom: 12px;">
+        <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="异常总数" :value="filteredRows.length" /></a-card></a-col>
+        <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="高风险数" :value="highRiskCount" /></a-card></a-col>
+        <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="异常金额" :value="totalAmount" suffix="元" :precision="2" /></a-card></a-col>
+        <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="高风险金额" :value="highRiskAmount" suffix="元" :precision="2" /></a-card></a-col>
+      </a-row>
       <a-card class="card-elevated" :bordered="false">
-        <vxe-table border stripe show-overflow :loading="loading" :data="rows" height="560">
+        <vxe-table border stripe show-overflow :loading="loading" :data="filteredRows" height="560">
           <vxe-column field="occurredAt" title="发生时间" width="180" />
           <vxe-column field="exceptionTypeLabel" title="异常类型" width="180">
             <template #default="{ row }">
               <a-tag color="volcano">{{ row.exceptionTypeLabel }}</a-tag>
+            </template>
+          </vxe-column>
+          <vxe-column title="风险等级" width="100">
+            <template #default="{ row }">
+              <a-tag :color="severityColor(row)">{{ severityText(row) }}</a-tag>
             </template>
           </vxe-column>
           <vxe-column field="elderName" title="长者" width="140">
@@ -55,7 +75,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
@@ -72,8 +92,15 @@ const rows = ref<FinanceReconcileExceptionItem[]>([])
 const query = ref({
   date: dayjs(),
   type: undefined as string | undefined,
+  severity: undefined as 'HIGH' | 'MEDIUM' | 'LOW' | undefined,
   printRemark: ''
 })
+const filteredRows = computed(() => (rows.value || [])
+  .filter(item => !query.value.severity || severityText(item) === (query.value.severity === 'HIGH' ? '高' : query.value.severity === 'MEDIUM' ? '中' : '低')))
+const totalAmount = computed(() => filteredRows.value.reduce((sum, item) => sum + Number(item.amount || 0), 0))
+const highRiskRows = computed(() => filteredRows.value.filter(item => severityText(item) === '高'))
+const highRiskCount = computed(() => highRiskRows.value.length)
+const highRiskAmount = computed(() => highRiskRows.value.reduce((sum, item) => sum + Number(item.amount || 0), 0))
 
 function go(path: string) {
   router.push(path)
@@ -95,6 +122,29 @@ async function loadData() {
   }
 }
 
+function severityText(item: FinanceReconcileExceptionItem) {
+  const type = String(item.exceptionType || '').toUpperCase()
+  const amount = Number(item.amount || 0)
+  if (type === 'DUPLICATED_PAYMENT') return '高'
+  if (type === 'BILL_PAID_UNMATCHED' && amount >= 1000) return '高'
+  if (type === 'INVOICE_UNLINKED' && amount >= 2000) return '高'
+  if (amount >= 500) return '中'
+  return '低'
+}
+
+function severityColor(item: FinanceReconcileExceptionItem) {
+  const level = severityText(item)
+  if (level === '高') return 'red'
+  if (level === '中') return 'orange'
+  return 'green'
+}
+
+function quickType(type: string) {
+  query.value.type = type
+  query.value.severity = undefined
+  loadData()
+}
+
 async function exportCsvReport() {
   try {
     await exportFinanceReconcileExceptionsCsv({
@@ -111,18 +161,20 @@ function printCurrent() {
   try {
     printTableReport({
       title: '对账异常处理',
-      subtitle: `日期：${dayjs(query.value.date).format('YYYY-MM-DD')}；类型：${query.value.type || '全部'}；备注：${query.value.printRemark || '-'}`,
+      subtitle: `日期：${dayjs(query.value.date).format('YYYY-MM-DD')}；类型：${query.value.type || '全部'}；风险：${query.value.severity || '全部'}；备注：${query.value.printRemark || '-'}`,
       columns: [
         { key: 'occurredAt', title: '发生时间' },
         { key: 'exceptionTypeLabel', title: '异常类型' },
+        { key: 'severity', title: '风险等级' },
         { key: 'elderName', title: '长者' },
         { key: 'amount', title: '涉及金额' },
         { key: 'detail', title: '异常描述' },
         { key: 'suggestion', title: '处理建议' }
       ],
-      rows: rows.value.map(item => ({
+      rows: filteredRows.value.map(item => ({
         occurredAt: item.occurredAt || '-',
         exceptionTypeLabel: item.exceptionTypeLabel || '-',
+        severity: severityText(item),
         elderName: item.elderName || '-',
         amount: item.amount || 0,
         detail: item.detail || '-',
