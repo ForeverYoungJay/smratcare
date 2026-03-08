@@ -9,5 +9,5 @@ public class OaQuickChatFanoutRequest {
   @NotBlank
   private String stateJson;
 
-  private List<String> targetStaffIds;
+  private List<Long> targetStaffIds;
 }

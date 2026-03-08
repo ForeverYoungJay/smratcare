@@ -100,15 +100,13 @@ public class OaQuickChatStateController {
     }
     Long orgId = AuthContext.getOrgId();
     Long operatorId = AuthContext.getStaffId();
-    List<StaffAccount> targets = resolveTargetStaffs(orgId, request.getTargetStaffIds());
-    if (targets.isEmpty()) {
+    List<Long> targetIds = resolveTargetStaffIds(orgId, request.getTargetStaffIds());
+    if (targetIds.isEmpty()) {
       return Result.ok(0);
     }
     int affected = 0;
-    for (StaffAccount target : targets) {
-      Long targetStaffId = target == null ? null : target.getId();
-      if (targetStaffId == null || targetStaffId <= 0) continue;
-      List<Map<String, Object>> visibleRooms = filterRoomsByMember(sourceRooms, target);
+    for (Long targetStaffId : targetIds) {
+      List<Map<String, Object>> visibleRooms = filterRoomsByMember(sourceRooms, targetStaffId);
       if (visibleRooms.isEmpty()) {
         continue;
       }
@@ -154,12 +152,10 @@ public class OaQuickChatStateController {
     int delivered = 0;
     for (OaQuickChatEventItemRequest item : request.getEvents()) {
       if (item == null) continue;
-      List<StaffAccount> targets = resolveTargetStaffs(orgId, item.getTargetStaffIds());
+      List<Long> targets = resolveTargetStaffIds(orgId, item.getTargetStaffIds());
       if (targets.isEmpty()) continue;
       Map<String, Object> payload = buildEventPayload(item);
-      for (StaffAccount staff : targets) {
-        Long staffId = staff == null ? null : staff.getId();
-        if (staffId == null || staffId <= 0) continue;
+      for (Long staffId : targets) {
         delivered += webSocketHandler.sendToStaff(orgId, staffId, payload);
       }
     }
@@ -176,71 +172,28 @@ public class OaQuickChatStateController {
         .last("limit 1"));
   }
 
-  private List<StaffAccount> resolveTargetStaffs(Long orgId, List<String> targetStaffIds) {
+  private List<Long> resolveTargetStaffIds(Long orgId, List<Long> targetStaffIds) {
     if (targetStaffIds == null || targetStaffIds.isEmpty()) {
       return List.of();
     }
     Set<Long> idSet = new LinkedHashSet<>();
-    Set<String> usernameSet = new LinkedHashSet<>();
-    for (String raw : targetStaffIds) {
-      String text = raw == null ? "" : raw.trim();
-      if (text.isBlank()) continue;
-      try {
-        long parsed = Long.parseLong(text);
-        if (parsed > 0) {
-          idSet.add(parsed);
-          continue;
-        }
-      } catch (NumberFormatException ignore) {
+    for (Long id : targetStaffIds) {
+      if (id != null && id > 0) {
+        idSet.add(id);
       }
-      usernameSet.add(text);
     }
-    if (idSet.isEmpty() && usernameSet.isEmpty()) {
+    if (idSet.isEmpty()) {
       return List.of();
     }
     List<StaffAccount> staffs = staffMapper.selectList(Wrappers.lambdaQuery(StaffAccount.class)
         .eq(StaffAccount::getIsDeleted, 0)
-        .eq(orgId != null, StaffAccount::getOrgId, orgId));
-    if (staffs == null || staffs.isEmpty()) {
-      return List.of();
-    }
-    Set<Long> seen = new LinkedHashSet<>();
-    List<StaffAccount> rows = new ArrayList<>();
-    for (StaffAccount row : staffs) {
-      if (row == null || row.getId() == null || row.getId() <= 0) continue;
-      boolean matchedById = idSet.contains(row.getId());
-      String username = row.getUsername() == null ? "" : row.getUsername().trim();
-      boolean matchedByUsername = !username.isBlank() && usernameSet.contains(username);
-      if (!matchedById && !matchedByUsername) continue;
-      if (!seen.add(row.getId())) continue;
-      rows.add(row);
-    }
-    return rows;
-  }
-
-  private List<Map<String, Object>> filterRoomsByMember(List<Map<String, Object>> rooms, StaffAccount staff) {
-    if (rooms == null || rooms.isEmpty() || staff == null || staff.getId() == null) {
-      return List.of();
-    }
-    String staffIdText = String.valueOf(staff.getId());
-    String username = staff.getUsername() == null ? "" : staff.getUsername().trim();
-    String staffNo = staff.getStaffNo() == null ? "" : staff.getStaffNo().trim();
-    List<Map<String, Object>> visible = new ArrayList<>();
-    for (Map<String, Object> room : rooms) {
-      Object rawMembers = room.get("memberIds");
-      if (!(rawMembers instanceof List<?> memberList)) {
-        continue;
-      }
-      boolean hit = memberList.stream()
-          .map(item -> item == null ? "" : String.valueOf(item).trim())
-          .anyMatch(member -> member.equals(staffIdText)
-              || (!username.isBlank() && member.equals(username))
-              || (!staffNo.isBlank() && member.equals(staffNo)));
-      if (hit) {
-        visible.add(room);
-      }
-    }
-    return visible;
+        .eq(orgId != null, StaffAccount::getOrgId, orgId)
+        .in(StaffAccount::getId, idSet));
+    return staffs.stream()
+        .map(StaffAccount::getId)
+        .filter(id -> id != null && id > 0)
+        .distinct()
+        .toList();
   }
 
   private Map<String, Object> buildEventPayload(OaQuickChatEventItemRequest item) {
@@ -283,6 +236,27 @@ public class OaQuickChatStateController {
     } catch (Exception ex) {
       return "[]";
     }
+  }
+
+  private List<Map<String, Object>> filterRoomsByMember(List<Map<String, Object>> rooms, Long staffId) {
+    if (rooms == null || rooms.isEmpty() || staffId == null) {
+      return List.of();
+    }
+    String staffIdText = String.valueOf(staffId);
+    List<Map<String, Object>> visible = new ArrayList<>();
+    for (Map<String, Object> room : rooms) {
+      Object rawMembers = room.get("memberIds");
+      if (!(rawMembers instanceof List<?> memberList)) {
+        continue;
+      }
+      boolean hit = memberList.stream()
+          .map(String::valueOf)
+          .anyMatch(staffIdText::equals);
+      if (hit) {
+        visible.add(room);
+      }
+    }
+    return visible;
   }
 
   private List<Map<String, Object>> mergeRooms(
