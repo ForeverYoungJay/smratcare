@@ -4437,13 +4437,25 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 <style scoped>
 .app-layout {
-  min-height: 100vh;
+  height: 100vh;
   background: var(--bg);
+  overflow: hidden;
 }
 
 .app-sider {
   background: linear-gradient(180deg, #08316d 0%, #0e4a99 100%);
   border-right: 1px solid rgba(255, 255, 255, 0.08);
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  left: 0;
+}
+
+.app-sider :deep(.ant-layout-sider-children) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
 }
 
 .brand {
@@ -4478,6 +4490,11 @@ function onQuickChatStorageChange(event: StorageEvent) {
 .side-menu {
   background: transparent !important;
   border-inline-end: none !important;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 10px;
 }
 
 .side-menu .ant-menu-item,
@@ -4492,6 +4509,11 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 .app-main {
   background: var(--bg);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .app-header {
@@ -4655,7 +4677,9 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 .app-content {
   padding: 24px;
-  min-height: calc(100vh - 108px);
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 .quick-chat-layout {
@@ -4887,7 +4911,9 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
   .app-content {
     padding: 14px;
-    min-height: calc(100vh - 108px);
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
   }
 
   .quick-chat-layout {
