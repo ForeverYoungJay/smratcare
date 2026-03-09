@@ -16,6 +16,18 @@ Page({
     }
   },
   timer: null,
+  onShow() {
+    const app = getApp();
+    if (app.globalData.token) {
+      wx.reLaunch({ url: '/pages/home/index' });
+      return;
+    }
+    if (app.globalData.localDevBypassLogin && app.isLocalDevEnvironment()) {
+      app.enableLocalDevSession();
+      wx.showToast({ title: '已进入本地调试模式', icon: 'none' });
+      wx.reLaunch({ url: '/pages/home/index' });
+    }
+  },
   switchMode(e) {
     this.setData({ mode: e.currentTarget.dataset.mode });
   },

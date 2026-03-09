@@ -49,6 +49,22 @@
       </a-form>
     </a-card>
 
+    <a-alert
+      v-if="lifecycleContext.active"
+      type="info"
+      show-icon
+      style="margin-top: 12px"
+      :message="lifecycleContext.message"
+    >
+      <template #description>
+        <a-space wrap>
+          <a-tag color="blue">场景：入住状态变更联动</a-tag>
+          <a-button type="link" size="small" @click="router.push('/elder/status-change')">返回状态变更中心</a-button>
+          <a-button type="link" size="small" @click="router.push('/elder/admission-processing?source=lifecycle&scene=status-change')">去入住办理核验</a-button>
+        </a-space>
+      </template>
+    </a-alert>
+
     <a-row :gutter="[12, 12]" style="margin-top: 16px">
       <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="总记录" :value="summary.totalCount || 0" /></a-card></a-col>
       <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="草稿" :value="summary.draftCount || 0" /></a-card></a-col>
@@ -616,6 +632,15 @@ const props = defineProps<{
 }>()
 const route = useRoute()
 const router = useRouter()
+const lifecycleContext = computed(() => {
+  const source = String(route.query.source || '').trim().toLowerCase()
+  const scene = String(route.query.scene || '').trim().toLowerCase()
+  const active = source === 'lifecycle' || scene === 'status-change'
+  return {
+    active,
+    message: active ? '当前评估页面由状态变更联动进入，建议优先补齐高风险评估并回流入住办理。' : ''
+  }
+})
 const userStore = useUserStore()
 const assessmentRouteSignature = ref('')
 const skipNextAssessmentRouteWatch = ref(false)

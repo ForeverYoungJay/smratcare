@@ -22,6 +22,21 @@
         </a-card>
       </a-col>
     </a-row>
+    <a-alert
+      v-if="lifecycleContext.active"
+      type="info"
+      show-icon
+      style="margin-bottom: 12px"
+      :message="lifecycleContext.message"
+    >
+      <template #description>
+        <a-space wrap>
+          <a-tag color="blue">场景：入住状态变更联动</a-tag>
+          <a-button type="link" size="small" @click="go('/elder/status-change')">返回状态变更中心</a-button>
+          <a-button type="link" size="small" @click="go('/finance/bills/in-resident?source=lifecycle&scene=status-change')">联动核对账单</a-button>
+        </a-space>
+      </template>
+    </a-alert>
 
     <a-row :gutter="16">
       <a-col :xs="24" :lg="16">
@@ -234,6 +249,15 @@ const ARCHIVE_MISSING_LABEL_MAP: Record<string, string> = {
 
 const router = useRouter()
 const route = useRoute()
+const lifecycleContext = computed(() => {
+  const source = String(route.query.source || '').trim().toLowerCase()
+  const scene = String(route.query.scene || '').trim().toLowerCase()
+  const active = source === 'lifecycle' || scene === 'status-change'
+  return {
+    active,
+    message: active ? '当前由状态变更联动进入，建议优先核验合同资料完整度并同步账单。' : ''
+  }
+})
 const loading = ref(false)
 const errorMessage = ref('')
 const linkage = ref<ContractLinkageSummary>()

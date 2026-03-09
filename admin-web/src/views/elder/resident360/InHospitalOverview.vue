@@ -30,6 +30,21 @@
         <a-col :xs="8" :sm="8" :md="8"><a-statistic title="预警总量" :value="alertTotalCount" /></a-col>
       </a-row>
     </template>
+    <a-alert
+      v-if="lifecycleContext.active"
+      type="info"
+      show-icon
+      style="margin-bottom: 12px"
+      :message="lifecycleContext.message"
+    >
+      <template #description>
+        <a-space wrap>
+          <a-tag color="blue">场景：入住状态变更联动</a-tag>
+          <a-button size="small" type="link" @click="go('/elder/status-change')">返回状态变更中心</a-button>
+          <a-button size="small" type="link" @click="go('/oa/work-execution/task?source=lifecycle&scene=status-change&quick=overdue')">查看超时任务</a-button>
+        </a-space>
+      </template>
+    </a-alert>
     <a-card class="card-elevated linkage-card" :bordered="false">
       <div class="linkage-head">
         <div class="linkage-title">协同联动</div>
@@ -134,6 +149,15 @@ const selectedResidentName = computed(() => {
   const option = selectedResidentOption.value
   if (!option) return ''
   return String(option.label || '').replace(/\s*\([^)]*\)\s*$/, '').trim()
+})
+const lifecycleContext = computed(() => {
+  const source = String(route.query.source || '').trim().toLowerCase()
+  const scene = String(route.query.scene || '').trim().toLowerCase()
+  const active = source === 'lifecycle' || scene === 'status-change'
+  return {
+    active,
+    message: active ? '当前总览由状态变更中心联动进入，可优先处理跨部门预警事项。' : ''
+  }
 })
 let refreshTimer: number | null = null
 

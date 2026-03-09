@@ -22,6 +22,23 @@
         :hint="admissionLifecycleHint"
         style="margin-bottom: 12px"
       />
+      <a-alert
+        v-if="lifecycleContext.active"
+        type="info"
+        show-icon
+        style="margin-bottom: 12px"
+        :message="lifecycleContext.message"
+      >
+        <template #description>
+          <a-space wrap>
+            <a-tag color="blue">场景：入住状态变更联动</a-tag>
+            <a-button type="link" size="small" @click="router.push('/elder/status-change')">返回状态变更中心</a-button>
+            <a-button type="link" size="small" @click="router.push('/logistics/task-center?source=lifecycle&scene=status-change&tab=maintenance&overdueOnly=1')">
+              查看后勤交接任务
+            </a-button>
+          </a-space>
+        </template>
+      </a-alert>
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="老人姓名" name="elderId">
           <a-select
@@ -259,6 +276,15 @@ import type {
 
 const route = useRoute()
 const router = useRouter()
+const lifecycleContext = computed(() => {
+  const source = String(route.query.source || '').trim().toLowerCase()
+  const scene = String(route.query.scene || '').trim().toLowerCase()
+  const active = source === 'lifecycle' || scene === 'status-change'
+  return {
+    active,
+    message: active ? '当前由状态变更联动进入，建议优先核对床位交接与合同资料后再提交入住办理。' : ''
+  }
+})
 const formRef = ref<FormInstance>()
 const form = reactive<AdmissionRequest>({ elderId: 0, admissionDate: '', bedId: undefined, bedStartDate: undefined })
 const submitting = ref(false)
