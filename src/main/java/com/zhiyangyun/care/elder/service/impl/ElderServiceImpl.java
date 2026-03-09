@@ -259,7 +259,7 @@ public class ElderServiceImpl implements ElderService {
   }
 
   private IPage<ElderResponse> toPagedResponse(IPage<ElderProfile> page, Long tenantId) {
-    List<ElderProfile> records = page.getRecords();
+    List<ElderProfile> records = page.getRecords() == null ? List.of() : page.getRecords();
     Map<Long, Bed> bedMap = resolveBedMap(records);
     Map<Long, CrmContract> contractMap = resolveLatestContractMap(records, tenantId);
     List<ElderResponse> responseRecords = records.stream().map((elder) -> {

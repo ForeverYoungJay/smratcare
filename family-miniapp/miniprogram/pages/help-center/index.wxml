@@ -3,8 +3,8 @@
     <view class="section-title">常见问题</view>
 
     <view wx:if="{{loading}}" class="list-empty">FAQ 加载中...</view>
-    <view wx:elif="{{groups.length === 0}}" class="list-empty">暂无帮助内容</view>
-    <block wx:else wx:for="{{groups}}" wx:for-item="group" wx:key="category">
+    <view wx:if="{{!loading && groups.length === 0}}" class="list-empty">暂无帮助内容</view>
+    <block wx:if="{{!loading && groups.length > 0}}" wx:for="{{groups}}" wx:for-item="group" wx:key="category">
       <view class="group">
         <view class="group-title">{{group.category}}</view>
         <block wx:for="{{group.items}}" wx:for-item="faq" wx:key="question">

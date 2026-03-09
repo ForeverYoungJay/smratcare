@@ -11,6 +11,13 @@
         <a-tag color="#ff85c0">女性长者</a-tag>
         <a-tag color="#69b1ff">男性长者</a-tag>
       </a-space>
+      <a-alert
+        v-if="lifecycleContext.active"
+        type="info"
+        show-icon
+        style="margin-bottom: 12px"
+        :message="lifecycleContext.message"
+      />
 
       <div class="selector-strip">
         <div class="selector-group">
@@ -252,6 +259,15 @@ const bedGuardSteps = ['合同签署入院', '入住选床完成', '在住照护
 const BED_ROUTE_KEYS = ['bedBuilding', 'bedFloor', 'bedKeyword', 'bedQuick', 'bedRiskEnabled', 'bedRiskLevel'] as const
 const bedRouteSignature = ref('')
 const skipNextBedRouteWatch = ref(false)
+const lifecycleContext = computed(() => {
+  const source = String(route.query.source || '').trim().toLowerCase()
+  const scene = String(route.query.scene || '').trim().toLowerCase()
+  const active = source === 'lifecycle' || scene === 'status-change'
+  return {
+    active,
+    message: active ? '当前来自入住状态变更联动，可在床态视图快速确认清洁/维修与空床调配。' : ''
+  }
+})
 
 const filteredBeds = computed(() => beds.value.filter((b) => {
   if (keyword.value) {

@@ -88,8 +88,8 @@
       <view class="muted">{{messages.length}} 条</view>
     </view>
     <view wx:if="{{loading}}" class="list-empty">记录加载中...</view>
-    <view wx:elif="{{messages.length === 0}}" class="list-empty">暂无沟通记录</view>
-    <block wx:else wx:for="{{messages}}" wx:for-item="msg" wx:key="id">
+    <view wx:if="{{!loading && messages.length === 0}}" class="list-empty">暂无沟通记录</view>
+    <block wx:if="{{!loading && messages.length > 0}}" wx:for="{{messages}}" wx:for-item="msg" wx:key="id">
       <view class="message-item">
         <view class="message-head">
           <view class="msg-role">{{msg.targetRole}}</view>
