@@ -8,11 +8,12 @@ import { emitLiveSync, inferLiveSyncTopics } from './liveSync'
 type RequestExtraConfig = {
   silentError?: boolean
   silent403?: boolean
+  forceErrorToast?: boolean
 }
 
 const request = axios.create({
   baseURL: '/',
-  timeout: 15000
+  timeout: 45000
 })
 
 let lastForbiddenToastAt = 0
@@ -26,6 +27,18 @@ function resolveErrorMessage(payload: any, fallback = '请求失败') {
   if (typeof payload?.message === 'string' && payload.message) return payload.message
   if (typeof payload?.error === 'string' && payload.error) return payload.error
   return fallback
+}
+
+function resolveAxiosErrorMessage(error: any) {
+  const rawMessage = String(error?.message || '')
+  const isTimeout = error?.code === 'ECONNABORTED' || /timeout/i.test(rawMessage)
+  if (isTimeout) {
+    return '请求超时，系统正在处理中，请稍后重试'
+  }
+  if (/network error/i.test(rawMessage)) {
+    return '网络异常，请检查网络后重试'
+  }
+  return resolveErrorMessage(error?.response?.data, rawMessage || '请求失败')
 }
 
 request.interceptors.request.use((config) => {
@@ -78,8 +91,12 @@ request.interceptors.response.use(
     const status = error?.response?.status
     const url = String(error?.config?.url || '')
     const cfg = (error?.config || {}) as RequestExtraConfig
+    const method = String(error?.config?.method || 'GET').toUpperCase()
+    const rawMessage = String(error?.message || '')
+    const isTimeoutOrNetwork = error?.code === 'ECONNABORTED' || /timeout|network error/i.test(rawMessage)
     const silentError = Boolean(cfg.silentError)
     const silent403 = Boolean(cfg.silent403 || cfg.silentError)
+    const forceErrorToast = Boolean(cfg.forceErrorToast)
     const isLoginRequest = url.includes('/api/auth/login') || url.includes('/api/auth/family/login')
     if (status === 401) {
       clearToken()
@@ -112,8 +129,11 @@ request.interceptors.response.use(
     if (silentError) {
       return Promise.reject(error)
     }
-    const payload = error?.response?.data
-    message.error(resolveErrorMessage(payload, error?.message || '请求失败'))
+    // 自动刷新类 GET 请求在超时/弱网下容易形成提示风暴，默认静默处理
+    if (!forceErrorToast && method === 'GET' && isTimeoutOrNetwork) {
+      return Promise.reject(error)
+    }
+    message.error(resolveAxiosErrorMessage(error))
     return Promise.reject(error)
   }
 )

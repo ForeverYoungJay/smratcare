@@ -7,7 +7,7 @@ export function useLiveSyncRefresh(options) {
         if (timer)
             window.clearTimeout(timer);
         timer = window.setTimeout(() => {
-            options.refresh();
+            Promise.resolve(options.refresh()).catch(() => { });
         }, debounceMs);
     };
     let unsubscribe = () => { };

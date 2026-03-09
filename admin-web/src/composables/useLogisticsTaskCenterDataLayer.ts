@@ -67,10 +67,11 @@ export function useLogisticsTaskCenterDataLayer(params: TaskCenterDataLayerParam
     )
   }
 
-  async function loadData(options?: { preserveSelection?: boolean }) {
+  async function loadData(options?: { preserveSelection?: boolean; silentError?: boolean }) {
     params.loading.value = true
     params.errorMessage.value = ''
     const preserveSelection = Boolean(options?.preserveSelection)
+    const silentError = Boolean(options?.silentError)
     try {
       const snapshot = await params.requestData()
       applySnapshot(snapshot)
@@ -80,7 +81,9 @@ export function useLogisticsTaskCenterDataLayer(params: TaskCenterDataLayerParam
     } catch (error: any) {
       const normalizedMessage = String(error?.message || '加载后勤任务中心失败')
       params.errorMessage.value = normalizedMessage
-      params.onError?.(normalizedMessage, error)
+      if (!silentError) {
+        params.onError?.(normalizedMessage, error)
+      }
     } finally {
       params.loading.value = false
     }

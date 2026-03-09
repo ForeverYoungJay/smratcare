@@ -1297,7 +1297,7 @@ onMounted(() => {
     if (!autoRefresh.value || loading.value || batchProgress.value.running || document.visibilityState !== 'visible') {
       return
     }
-    loadData({ preserveSelection: true })
+    loadData({ preserveSelection: true, silentError: true })
   }, 60000)
 })
 onUnmounted(() => {

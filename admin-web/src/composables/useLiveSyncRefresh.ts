@@ -14,7 +14,7 @@ export function useLiveSyncRefresh(options: UseLiveSyncRefreshOptions) {
   const triggerRefresh = () => {
     if (timer) window.clearTimeout(timer)
     timer = window.setTimeout(() => {
-      options.refresh()
+      Promise.resolve(options.refresh()).catch(() => {})
     }, debounceMs)
   }
 
@@ -31,4 +31,3 @@ export function useLiveSyncRefresh(options: UseLiveSyncRefreshOptions) {
     if (timer) window.clearTimeout(timer)
   })
 }
-

@@ -183,7 +183,10 @@
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
       <a-table :data-source="admissionRows" :columns="columns" :loading="recordLoading" :pagination="false" row-key="id">
         <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'elderStatus'">
+          <template v-if="column.key === 'elderName'">
+            {{ displayElderName(record) }}
+          </template>
+          <template v-else-if="column.key === 'elderStatus'">
             <a-tag :color="record.elderStatus === 1 ? 'green' : record.elderStatus === 2 ? 'orange' : 'default'">
               {{ statusText(record.elderStatus) }}
             </a-tag>
@@ -636,6 +639,17 @@ function statusText(status?: number) {
   return '-'
 }
 
+function displayElderName(record: AdmissionRecordItem) {
+  const name = String(record.elderName || '').trim()
+  if (name) return name
+  const elderId = Number(record.elderId || 0)
+  if (elderId > 0) {
+    const fallback = String(findElderName(elderId) || '').trim()
+    if (fallback) return fallback
+  }
+  return '-'
+}
+
 async function submit() {
   if (!formRef.value) return
   try {
@@ -906,6 +920,12 @@ async function fetchAdmissionRecords() {
       ...buildAdmissionRecordFilterParams()
     })
     admissionRows.value = res.list || []
+    admissionRows.value.forEach((item) => {
+      const elderId = Number(item.elderId || 0)
+      if (elderId > 0) {
+        ensureSelectedElder(elderId, String(item.elderName || '').trim() || undefined)
+      }
+    })
     recordTotal.value = Number(res.total || 0)
   } finally {
     recordLoading.value = false

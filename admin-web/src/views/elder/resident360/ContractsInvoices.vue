@@ -267,7 +267,7 @@ const docRouteSignature = ref('')
 const skipNextDocRouteWatch = ref(false)
 const DOC_ROUTE_KEYS = ['docElderId', 'docKind', 'docKeyword'] as const
 const DOC_ROUTE_OBSERVE_KEYS = ['elderId', 'residentId', 'contractId', 'leadId'] as const
-const { elderOptions, elderLoading, searchElders, ensureSelectedElder } = useElderOptions({ pageSize: 120 })
+const { elderOptions, elderLoading, searchElders, ensureSelectedElder, findElderName } = useElderOptions({ pageSize: 120 })
 const selector = reactive({
   elderId: undefined as number | undefined
 })
@@ -328,9 +328,20 @@ const assessmentReportCount = computed(() => flattenReports(assessmentOverview.v
 const resolvedLifecycleStage = computed(() =>
   normalizeLifecycleStage(linkage.value?.flowStage, linkage.value?.contractStatus)
 )
+const resolvedLinkageElderName = computed(() => {
+  const rawName = String(linkage.value?.elderName || '').trim()
+  const elderId = Number(linkage.value?.elderId || 0)
+  const looksLikeId = /^\d+$/.test(rawName)
+  if (rawName && !looksLikeId) return rawName
+  if (elderId > 0) {
+    const fromCache = String(findElderName(elderId) || '').trim()
+    if (fromCache) return fromCache
+  }
+  return rawName || '-'
+})
 const lifecycleSubject = computed(() => {
   if (!linkage.value) return '未匹配到合同信息'
-  return `合同 ${linkage.value.contractNo || '-'} / 长者 ${linkage.value.elderName || '-'}`
+  return `合同 ${linkage.value.contractNo || '-'} / 长者 ${resolvedLinkageElderName.value}`
 })
 const lifecycleHint = computed(() => {
   if (missingArchiveItems.value.length > 0) {
@@ -705,6 +716,12 @@ async function loadAll() {
     if (!linkage.value) {
       assessmentOverview.value = undefined
       return
+    }
+    const linkageElderId = Number(linkage.value.elderId || 0)
+    const linkageElderName = String(linkage.value.elderName || '').trim()
+    const likelyName = linkageElderName && !/^\d+$/.test(linkageElderName) ? linkageElderName : undefined
+    if (linkageElderId > 0) {
+      ensureSelectedElder(linkageElderId, likelyName)
     }
 
     const elderId = linkage.value.elderId

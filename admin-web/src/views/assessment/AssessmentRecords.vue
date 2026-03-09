@@ -124,9 +124,12 @@
     >
       <template #title>待评估合同（请先勾选合同再新增入住评估）</template>
       <template #extra>
-        <a-button type="primary" :disabled="!selectedPendingContract" @click="openForm()">
-          {{ pageConfig.createButtonText }}
-        </a-button>
+        <a-space size="small">
+          <a-tag color="gold">仅用于新建入住评估</a-tag>
+          <a-button type="primary" :disabled="!selectedPendingContract" @click="openForm()">
+            {{ pageConfig.createButtonText }}
+          </a-button>
+        </a-space>
       </template>
       <a-table
         size="small"
@@ -153,7 +156,16 @@
       />
     </a-card>
 
-    <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
+    <a-card v-if="!isAdmissionAssessment" class="card-elevated" :bordered="false" style="margin-top: 16px;">
+      <a-alert
+        v-if="isAdmissionAssessment"
+        style="margin-bottom: 10px"
+        type="info"
+        show-icon
+        :message="selectedPendingContract
+          ? `当前新建评估将使用合同 ${selectedPendingContract.contractNo || '-'}；下方“入住评估记录表”勾选仅用于批量处理，不影响新建合同选择。`
+          : '提示：上方合同表用于“新建入住评估”，下方记录表用于“批量处理/导出/查看历史”。'"
+      />
       <div class="table-actions">
         <a-space wrap size="small">
           <a-button v-if="pageConfig.showCreateButton && !isAdmissionAssessment" type="primary" @click="openForm()">
@@ -323,6 +335,31 @@
         @change="onPageChange"
         @showSizeChange="onPageSizeChange"
       />
+    </a-card>
+
+    <a-card v-else class="card-elevated" :bordered="false" style="margin-top: 16px;">
+      <a-alert
+        style="margin-bottom: 12px"
+        type="info"
+        show-icon
+        :message="selectedPendingContract
+          ? `入住评估记录已迁移到“评估档案”统一管理。当前合同：${selectedPendingContract.contractNo || '-'} / ${selectedPendingContract.elderName || '-'}`
+          : '入住评估记录已迁移到“评估档案”统一管理。请先在上方选择合同后再查看摘要。'"
+      />
+      <a-descriptions bordered size="small" :column="2">
+        <a-descriptions-item label="最近评估日期">{{ selectedContractLatestRecord?.assessmentDate || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="最近状态">{{ selectedContractLatestRecord ? statusLabel(selectedContractLatestRecord.status) : '-' }}</a-descriptions-item>
+        <a-descriptions-item label="最近分值">{{ selectedContractLatestRecord?.score ?? '-' }}</a-descriptions-item>
+        <a-descriptions-item label="最近等级">{{ selectedContractLatestRecord?.levelCode || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="评估人">{{ selectedContractLatestRecord?.assessorName || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="合同号">{{ selectedPendingContract?.contractNo || selectedContractLatestRecord?.archiveNo || '-' }}</a-descriptions-item>
+      </a-descriptions>
+      <a-space style="margin-top: 12px" wrap>
+        <a-button type="primary" :disabled="!selectedPendingContract" @click="openForm()">{{ pageConfig.createButtonText }}</a-button>
+        <a-button :disabled="!selectedContractLatestRecord" @click="openLatestAdmissionRecord">查看最近记录</a-button>
+        <a-button :disabled="!selectedPendingContractNo" @click="goAdmissionArchiveByContract">去评估档案（本合同）</a-button>
+        <a-button @click="goAdmissionArchiveAll">去评估档案（全部入住评估）</a-button>
+      </a-space>
     </a-card>
 
     <a-modal
@@ -1578,6 +1615,17 @@ const selectedRowsInCurrentPage = computed(() => {
   const idSet = new Set(selectedRowKeys.value)
   return rows.value.filter((item) => idSet.has(assessmentRowKey(item)))
 })
+const selectedContractLatestRecord = computed(() => {
+  if (!isAdmissionAssessment.value || !selectedPendingContractNo.value) return null
+  const filtered = rows.value
+    .filter((item) => String(item.archiveNo || '').trim() === selectedPendingContractNo.value)
+    .sort((a, b) => {
+      const ta = new Date(String(a.updateTime || a.assessmentDate || a.createTime || '')).getTime()
+      const tb = new Date(String(b.updateTime || b.assessmentDate || b.createTime || '')).getTime()
+      return (Number.isFinite(tb) ? tb : 0) - (Number.isFinite(ta) ? ta : 0)
+    })
+  return filtered[0] || null
+})
 const selectedSingleRecord = computed(() => {
   if (selectedRowKeys.value.length !== 1) return null
   const targetKey = selectedRowKeys.value[0]
@@ -2801,6 +2849,33 @@ function goSelectedAdmissionProcessing() {
       contractNo: context.contractNo || undefined
     }
   })
+}
+
+function goAdmissionArchiveByContract() {
+  if (!selectedPendingContractNo.value) {
+    message.warning('请先选择待评估合同')
+    return
+  }
+  const query: Record<string, string> = {
+    archiveType: 'ADMISSION',
+    keyword: selectedPendingContractNo.value
+  }
+  if (selectedPendingContract.value?.elderId) {
+    query.elderId = String(selectedPendingContract.value.elderId)
+  }
+  router.push({ path: '/elder/assessment/ability/archive', query })
+}
+
+function goAdmissionArchiveAll() {
+  router.push({ path: '/elder/assessment/ability/archive', query: { archiveType: 'ADMISSION' } })
+}
+
+function openLatestAdmissionRecord() {
+  if (!selectedContractLatestRecord.value) {
+    message.warning('当前合同暂无评估记录')
+    return
+  }
+  openForm(selectedContractLatestRecord.value, true)
 }
 
 function exportCurrentPageCsv() {
