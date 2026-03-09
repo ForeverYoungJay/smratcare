@@ -4403,6 +4403,10 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
     return value.trim();
   }
 
+  private boolean hasText(String value) {
+    return value != null && !value.isBlank();
+  }
+
   private int safeInt(Integer value) {
     return value == null ? 0 : value;
   }
