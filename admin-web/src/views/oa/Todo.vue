@@ -43,6 +43,22 @@
     </SearchForm>
 
     <a-alert
+      v-if="lifecycleContext.active"
+      type="info"
+      show-icon
+      style="margin-bottom: 12px"
+      :message="lifecycleContext.message"
+    >
+      <template #description>
+        <a-space wrap>
+          <a-tag color="blue">场景：入住状态变更联动</a-tag>
+          <a-button type="link" size="small" @click="applySummaryFilter('overdue')">查看逾期待办</a-button>
+          <a-button type="link" size="small" @click="applySummaryFilter('approval')">查看审批待办</a-button>
+        </a-space>
+      </template>
+    </a-alert>
+
+    <a-alert
       :type="canAssignOthers ? 'info' : 'warning'"
       show-icon
       style="margin-bottom: 12px"
@@ -266,7 +282,7 @@
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
@@ -295,6 +311,7 @@ import type { SelectProps } from 'ant-design-vue'
 
 const loading = ref(false)
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 const tableError = ref('')
 const summaryLoading = ref(false)
@@ -314,6 +331,7 @@ const activeSummaryFilter = ref<'total' | 'open' | 'done' | 'approval' | 'birthd
 const quickOverdueOnly = ref(false)
 const quickDueTodayOnly = ref(false)
 const quickUnassignedOnly = ref(false)
+const routePresetSignature = ref('')
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const selectedRowKeys = ref<string[]>([])
 const summary = reactive<OaTodoSummary>({
@@ -393,6 +411,15 @@ const assigneeOptions = [
   { label: '赵运营', value: '赵运营' },
   { label: '陈财务', value: '陈财务' }
 ]
+const lifecycleContext = computed(() => {
+  const source = String(route.query.source || '').trim().toLowerCase()
+  const scene = String(route.query.scene || '').trim().toLowerCase()
+  const active = source === 'lifecycle' || scene === 'status-change'
+  return {
+    active,
+    message: active ? '已按入住状态变更联动场景自动筛选待办，优先处理超时与审批类事项。' : ''
+  }
+})
 
 function filterOptionByLabel(input: string, option: SelectProps['options'][number]) {
   const label = String((option as any)?.label || '')
@@ -507,6 +534,104 @@ function setSourceType(sourceType?: string) {
   query.pageNo = 1
   pagination.current = 1
   fetchData()
+}
+
+function firstRouteQueryText(value: unknown) {
+  if (Array.isArray(value)) return firstRouteQueryText(value[0])
+  if (value == null) return ''
+  return String(value).trim()
+}
+
+function buildRoutePresetSignature(source: Record<string, unknown>) {
+  const keys = ['source', 'scene', 'status', 'sourceType', 'keyword', 'quick', 'category', 'auto'] as const
+  return keys.map((key) => `${key}:${firstRouteQueryText(source[key])}`).join('|')
+}
+
+function resolveRouteQuickFilter(routeQuick: string, routeCategory: string) {
+  const quick = routeQuick.toLowerCase()
+  if (quick === 'approval') return 'approval'
+  if (quick === 'birthday') return 'birthday'
+  if (quick === 'normal') return 'normal'
+  if (quick === 'due-today' || quick === 'duetoday') return 'dueToday'
+  if (quick === 'overdue' || quick === 'risk' || quick === 'alert') return 'overdue'
+  if (quick === 'unassigned') return 'unassigned'
+  if (routeCategory.toLowerCase() === 'alert') return 'overdue'
+  return ''
+}
+
+function applyRoutePreset() {
+  const routeStatus = firstRouteQueryText(route.query.status).toUpperCase()
+  query.status = routeStatus === 'OPEN' || routeStatus === 'DONE' ? routeStatus : undefined
+  const routeSourceType = firstRouteQueryText(route.query.sourceType).toUpperCase()
+  query.sourceType = sourceTypeOptions.some((item) => item.value === routeSourceType) ? routeSourceType : undefined
+  query.keyword = firstRouteQueryText(route.query.keyword)
+
+  const auto = firstRouteQueryText(route.query.auto).toLowerCase()
+  if (auto === '0' || auto === 'false') autoRefresh.value = false
+  if (auto === '1' || auto === 'true') autoRefresh.value = true
+
+  activeSummaryFilter.value = 'total'
+  quickOverdueOnly.value = false
+  quickDueTodayOnly.value = false
+  quickUnassignedOnly.value = false
+
+  const isLifecycleScene =
+    firstRouteQueryText(route.query.source).toLowerCase() === 'lifecycle'
+    || firstRouteQueryText(route.query.scene).toLowerCase() === 'status-change'
+  if (isLifecycleScene && !query.status) {
+    query.status = 'OPEN'
+  }
+
+  const quickFilter = resolveRouteQuickFilter(
+    firstRouteQueryText(route.query.quick),
+    firstRouteQueryText(route.query.category)
+  )
+  if (quickFilter === 'approval') {
+    query.status = 'OPEN'
+    query.sourceType = 'APPROVAL'
+    activeSummaryFilter.value = 'approval'
+    return
+  }
+  if (quickFilter === 'birthday') {
+    query.status = 'OPEN'
+    query.sourceType = 'BIRTHDAY'
+    activeSummaryFilter.value = 'birthday'
+    return
+  }
+  if (quickFilter === 'normal') {
+    query.status = 'OPEN'
+    query.sourceType = 'NORMAL'
+    activeSummaryFilter.value = 'normal'
+    return
+  }
+  if (quickFilter === 'dueToday') {
+    query.status = 'OPEN'
+    query.sourceType = undefined
+    activeSummaryFilter.value = 'dueToday'
+    quickDueTodayOnly.value = true
+    return
+  }
+  if (quickFilter === 'overdue') {
+    query.status = 'OPEN'
+    query.sourceType = undefined
+    activeSummaryFilter.value = 'overdue'
+    quickOverdueOnly.value = true
+    return
+  }
+  if (quickFilter === 'unassigned') {
+    query.status = 'OPEN'
+    query.sourceType = undefined
+    activeSummaryFilter.value = 'unassigned'
+    quickUnassignedOnly.value = true
+    return
+  }
+  if (query.status === 'OPEN') {
+    activeSummaryFilter.value = 'open'
+    return
+  }
+  if (query.status === 'DONE') {
+    activeSummaryFilter.value = 'done'
+  }
 }
 
 function applySummaryFilter(filterKey: typeof activeSummaryFilter.value) {
@@ -946,6 +1071,10 @@ async function runPolicyNow() {
 
 onMounted(async () => {
   loadPolicy()
+  applyRoutePreset()
+  routePresetSignature.value = buildRoutePresetSignature(route.query as Record<string, unknown>)
+  query.pageNo = 1
+  pagination.current = 1
   await fetchData()
   startAutoRefreshTimer()
   if (policyForm.autoClearDone && policyShouldRun(policyForm.cycle)) {
@@ -960,6 +1089,20 @@ watch(autoRefresh, (enabled) => {
   }
   stopAutoRefreshTimer()
 })
+
+watch(
+  () => route.query,
+  async (queryMap) => {
+    const nextSignature = buildRoutePresetSignature(queryMap as Record<string, unknown>)
+    if (nextSignature === routePresetSignature.value) return
+    routePresetSignature.value = nextSignature
+    applyRoutePreset()
+    query.pageNo = 1
+    pagination.current = 1
+    await fetchData()
+  },
+  { deep: true }
+)
 
 onUnmounted(() => {
   stopAutoRefreshTimer()

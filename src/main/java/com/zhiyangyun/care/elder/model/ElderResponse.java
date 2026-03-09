@@ -25,5 +25,7 @@ public class ElderResponse {
   private String careLevel;
   private String riskPrecommit;
   private String remark;
+  private String lifecycleStage;
+  private String lifecycleContractStatus;
   private BedResponse currentBed;
 }

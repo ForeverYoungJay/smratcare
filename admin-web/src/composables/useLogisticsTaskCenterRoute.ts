@@ -10,6 +10,7 @@ import {
 export type TaskCenterTab = 'cleaning' | 'maintenance' | 'delivery' | 'inventory'
 export type TaskCenterViewMode = 'ALL' | 'DUTY'
 export type TaskCenterDensityMode = 'normal' | 'dense'
+export type TaskCenterLifecycleFocus = TaskCenterTab | ''
 
 export const TASK_CENTER_TAB_VALUES: TaskCenterTab[] = ['cleaning', 'maintenance', 'delivery', 'inventory']
 export const TASK_CENTER_VIEW_VALUES: TaskCenterViewMode[] = ['ALL', 'DUTY']
@@ -21,7 +22,9 @@ export const TASK_CENTER_MANAGED_ROUTE_KEYS = new Set([
   'maintenanceDueDays',
   'tab',
   'view',
-  'density'
+  'density',
+  'lifecycleFocus',
+  'overdueOnly'
 ])
 
 export function firstTaskCenterQueryValue(value: unknown): string {
@@ -59,6 +62,17 @@ export function normalizeTaskCenterDensityMode(value: unknown): TaskCenterDensit
   return TASK_CENTER_DENSITY_VALUES.includes(raw as TaskCenterDensityMode) ? (raw as TaskCenterDensityMode) : 'normal'
 }
 
+export function normalizeTaskCenterLifecycleFocus(value: unknown): TaskCenterLifecycleFocus {
+  const normalized = normalizeTaskCenterTab(value)
+  const raw = firstTaskCenterQueryValue(value)
+  return raw && TASK_CENTER_TAB_VALUES.includes(normalized) ? normalized : ''
+}
+
+export function normalizeTaskCenterOverdueOnly(value: unknown): boolean {
+  const raw = firstTaskCenterQueryValue(value).toLowerCase()
+  return raw === '1' || raw === 'true' || raw === 'yes'
+}
+
 export function summaryQuerySignature(query: LogisticsWorkbenchSummaryQuery) {
   if (Object.keys(query || {}).length === 0) {
     return ''
@@ -74,6 +88,8 @@ export function useLogisticsTaskCenterRouteLayer(params: {
   activeTab: Ref<TaskCenterTab>
   viewMode: Ref<TaskCenterViewMode>
   densityMode: Ref<TaskCenterDensityMode>
+  lifecycleFocus: Ref<TaskCenterLifecycleFocus>
+  overdueOnly: Ref<boolean>
   syncingRouteState: Ref<boolean>
 }) {
   function syncStateFromRoute(query: LocationQuery) {
@@ -83,6 +99,8 @@ export function useLogisticsTaskCenterRouteLayer(params: {
       params.activeTab.value = normalizeTaskCenterTab(query.tab)
       params.viewMode.value = normalizeTaskCenterViewMode(query.view)
       params.densityMode.value = normalizeTaskCenterDensityMode(query.density)
+      params.lifecycleFocus.value = normalizeTaskCenterLifecycleFocus(query.lifecycleFocus)
+      params.overdueOnly.value = normalizeTaskCenterOverdueOnly(query.overdueOnly)
     } finally {
       params.syncingRouteState.value = false
     }
@@ -99,6 +117,12 @@ export function useLogisticsTaskCenterRouteLayer(params: {
       tab: params.activeTab.value,
       view: params.viewMode.value,
       density: params.densityMode.value
+    }
+    if (params.lifecycleFocus.value) {
+      extraQuery.lifecycleFocus = params.lifecycleFocus.value
+    }
+    if (params.overdueOnly.value) {
+      extraQuery.overdueOnly = '1'
     }
     if (Object.keys(params.summaryQuery.value || {}).length === 0) {
       return extraQuery

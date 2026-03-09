@@ -18,14 +18,14 @@
         <view class="comment-panel" wx:if="{{activeAlbumId === item.id}}">
           <view class="comment-title">评论互动</view>
           <view class="comment-loading" wx:if="{{loadingComments}}">评论加载中...</view>
-          <view class="comment-empty" wx:elif="{{comments.length === 0}}">暂无评论，欢迎留言。</view>
-          <block wx:else wx:for="{{comments}}" wx:key="id">
+          <view class="comment-empty" wx:if="{{!loadingComments && comments.length === 0}}">暂无评论，欢迎留言。</view>
+          <block wx:if="{{!loadingComments && comments.length > 0}}" wx:for="{{comments}}" wx:for-item="comment" wx:key="id">
             <view class="comment-row">
               <view class="comment-head">
-                <text class="commenter">{{item.commenter}}</text>
-                <text class="comment-time">{{item.time}}</text>
+                <text class="commenter">{{comment.commenter}}</text>
+                <text class="comment-time">{{comment.time}}</text>
               </view>
-              <view class="comment-content">{{item.content}}</view>
+              <view class="comment-content">{{comment.content}}</view>
             </view>
           </block>
           <view class="comment-editor">

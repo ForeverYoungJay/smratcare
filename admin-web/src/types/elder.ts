@@ -17,6 +17,8 @@ export interface ElderItem {
   careLevel?: string
   riskPrecommit?: 'RESCUE_FIRST' | 'NOTIFY_FAMILY_FIRST'
   status?: number
+  lifecycleStage?: 'PENDING_ASSESSMENT' | 'PENDING_BED_SELECT' | 'PENDING_SIGN' | 'SIGNED' | string
+  lifecycleContractStatus?: string
   bedId?: Id
   bedStartDate?: string
   bedNo?: string

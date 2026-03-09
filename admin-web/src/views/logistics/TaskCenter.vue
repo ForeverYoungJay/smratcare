@@ -66,6 +66,18 @@
             <a-radio-button value="normal">标准密度</a-radio-button>
             <a-radio-button value="dense">值班大屏</a-radio-button>
           </a-radio-group>
+          <a-select
+            v-model:value="lifecycleFocus"
+            allow-clear
+            placeholder="联动聚焦"
+            style="width: 170px"
+            :options="[
+              { label: '聚焦清洁', value: 'cleaning' },
+              { label: '聚焦维修', value: 'maintenance' },
+              { label: '聚焦送餐', value: 'delivery' }
+            ]"
+          />
+          <a-switch v-model:checked="overdueOnly" checked-children="仅超时" un-checked-children="全部时效" />
           <a-button @click="go('/oa/work-execution/task?department=logistics')">OA任务中心</a-button>
           <a-button @click="go('/logistics/reports/maintenance-todo-log')">维保执行日志</a-button>
           <a-button @click="exportCurrentTab">导出当前视图</a-button>
@@ -80,6 +92,13 @@
         </div>
         <div class="refresh-hint">最近刷新：{{ lastLoadedAt || '-' }}</div>
       </a-card>
+      <a-alert
+        v-if="lifecycleContext.active"
+        type="info"
+        show-icon
+        style="margin-bottom: 8px"
+        :message="lifecycleContext.message"
+      />
       <a-alert
         v-if="lastBatchReceipt"
         type="info"
@@ -258,7 +277,9 @@ import {
 import { runTaskBatch } from '../../composables/useLogisticsTaskCenterBatch'
 import { useLogisticsTaskCenterDataLayer } from '../../composables/useLogisticsTaskCenterDataLayer'
 import {
+  firstTaskCenterQueryValue,
   summaryQuerySignature,
+  type TaskCenterLifecycleFocus,
   type TaskCenterTab,
   useLogisticsTaskCenterRouteLayer
 } from '../../composables/useLogisticsTaskCenterRoute'
@@ -296,6 +317,8 @@ const route = useRoute()
 const loading = ref(false)
 const errorMessage = ref('')
 const activeTab = ref<TaskCenterTab>('cleaning')
+const lifecycleFocus = ref<TaskCenterLifecycleFocus>('')
+const overdueOnly = ref(false)
 const viewMode = ref<'ALL' | 'DUTY'>('ALL')
 const densityMode = ref<'normal' | 'dense'>('normal')
 const tableSize = computed(() => (densityMode.value === 'dense' ? 'small' : 'middle'))
@@ -313,7 +336,18 @@ const { syncStateFromRoute, buildTaskCenterRouteQuery, syncRouteQueryFromState }
   activeTab,
   viewMode,
   densityMode,
+  lifecycleFocus,
+  overdueOnly,
   syncingRouteState
+})
+const lifecycleContext = computed(() => {
+  const source = firstTaskCenterQueryValue(route.query.source).toLowerCase()
+  const scene = firstTaskCenterQueryValue(route.query.scene).toLowerCase()
+  const active = source === 'lifecycle' || scene === 'status-change'
+  return {
+    active,
+    message: active ? '当前为入住状态变更联动场景，已优先聚焦后勤超时任务。' : ''
+  }
 })
 
 const cleaningRows = ref<RoomCleaningTask[]>([])
@@ -360,6 +394,22 @@ const batchProgress = ref({
 })
 const latestActionLogs = computed(() => actionLogs.value.slice(0, 20))
 
+function isCleaningOverdue(item: RoomCleaningTask) {
+  return Boolean(!isCleaningDone(item.status) && item.planDate && dayjs(item.planDate).isBefore(dayjs(), 'day'))
+}
+
+function isMaintenanceOverdue(item: MaintenanceRequest) {
+  return Boolean(normalizeStatus(item.status) !== 'COMPLETED'
+    && item.reportedAt
+    && dayjs(item.reportedAt).isBefore(dayjs().subtract(2, 'day')))
+}
+
+function isDeliveryOverdue(item: DiningDeliveryRecord) {
+  if (normalizeStatus(item.status) === 'DELIVERED') return false
+  const refTime = item.deliveredAt || item.createTime
+  return Boolean(refTime && dayjs(refTime).isBefore(dayjs().subtract(2, 'hour')))
+}
+
 const pendingCleaningCount = computed(() => cleaningRows.value.filter((item) => !isCleaningDone(item.status)).length)
 const pendingMaintenanceCount = computed(() =>
   maintenanceRows.value.filter((item) => {
@@ -369,35 +419,28 @@ const pendingMaintenanceCount = computed(() =>
 )
 const pendingDeliveryCount = computed(() => deliveryRows.value.filter((item) => normalizeStatus(item.status) !== 'DELIVERED').length)
 const lossAdjustmentCount = computed(() => adjustmentRows.value.filter((item) => item.adjustType === 'LOSS').length)
-const overdueCleaningCount = computed(() =>
-  cleaningRows.value.filter((item) => !isCleaningDone(item.status) && item.planDate && dayjs(item.planDate).isBefore(dayjs(), 'day')).length
-)
-const overdueMaintenanceCount = computed(() =>
-  maintenanceRows.value.filter((item) => normalizeStatus(item.status) !== 'COMPLETED' && item.reportedAt && dayjs(item.reportedAt).isBefore(dayjs().subtract(2, 'day'))).length
-)
-const overdueDeliveryCount = computed(() =>
-  deliveryRows.value.filter((item) => {
-    if (normalizeStatus(item.status) === 'DELIVERED') return false
-    const refTime = item.deliveredAt || item.createTime
-    return Boolean(refTime && dayjs(refTime).isBefore(dayjs().subtract(2, 'hour')))
-  }).length
-)
+const overdueCleaningCount = computed(() => cleaningRows.value.filter((item) => isCleaningOverdue(item)).length)
+const overdueMaintenanceCount = computed(() => maintenanceRows.value.filter((item) => isMaintenanceOverdue(item)).length)
+const overdueDeliveryCount = computed(() => deliveryRows.value.filter((item) => isDeliveryOverdue(item)).length)
 const overdueTotal = computed(() => overdueCleaningCount.value + overdueMaintenanceCount.value + overdueDeliveryCount.value)
 
 const displayCleaningRows = computed(() => {
-  if (viewMode.value === 'ALL') return cleaningRows.value
-  return cleaningRows.value.filter((item) => !isCleaningDone(item.status))
+  const dutyRows = viewMode.value === 'ALL' ? cleaningRows.value : cleaningRows.value.filter((item) => !isCleaningDone(item.status))
+  if (!overdueOnly.value) return dutyRows
+  return dutyRows.filter((item) => isCleaningOverdue(item))
 })
 const displayMaintenanceRows = computed(() => {
-  if (viewMode.value === 'ALL') return maintenanceRows.value
-  return maintenanceRows.value.filter((item) => {
+  const dutyRows = viewMode.value === 'ALL' ? maintenanceRows.value : maintenanceRows.value.filter((item) => {
     const status = normalizeStatus(item.status)
     return status === 'OPEN' || status === 'PROCESSING'
   })
+  if (!overdueOnly.value) return dutyRows
+  return dutyRows.filter((item) => isMaintenanceOverdue(item))
 })
 const displayDeliveryRows = computed(() => {
-  if (viewMode.value === 'ALL') return deliveryRows.value
-  return deliveryRows.value.filter((item) => normalizeStatus(item.status) !== 'DELIVERED')
+  const dutyRows = viewMode.value === 'ALL' ? deliveryRows.value : deliveryRows.value.filter((item) => normalizeStatus(item.status) !== 'DELIVERED')
+  if (!overdueOnly.value) return dutyRows
+  return dutyRows.filter((item) => isDeliveryOverdue(item))
 })
 const displayAdjustmentRows = computed(() => {
   if (viewMode.value === 'ALL') return adjustmentRows.value
@@ -1009,14 +1052,12 @@ async function batchFinishMaintenance() {
 
 function cleaningStatusLabel(record: RoomCleaningTask) {
   if (isCleaningDone(record.status)) return '已完成'
-  const overdue = record.planDate && dayjs(record.planDate).isBefore(dayjs(), 'day')
-  return overdue ? '待清洁（超时）' : '待清洁'
+  return isCleaningOverdue(record) ? '待清洁（超时）' : '待清洁'
 }
 
 function cleaningStatusColor(record: RoomCleaningTask) {
   if (isCleaningDone(record.status)) return 'green'
-  const overdue = record.planDate && dayjs(record.planDate).isBefore(dayjs(), 'day')
-  return overdue ? 'red' : 'orange'
+  return isCleaningOverdue(record) ? 'red' : 'orange'
 }
 
 function isCleaningDone(status?: string) {
@@ -1027,7 +1068,7 @@ function isCleaningDone(status?: string) {
 function maintenanceStatusLabel(record: MaintenanceRequest) {
   const status = normalizeStatus(record.status)
   if (status === 'COMPLETED') return '已完成'
-  const overdue = record.reportedAt && dayjs(record.reportedAt).isBefore(dayjs().subtract(2, 'day'))
+  const overdue = isMaintenanceOverdue(record)
   if (status === 'PROCESSING') {
     return overdue ? '处理中（超时）' : '处理中'
   }
@@ -1037,7 +1078,7 @@ function maintenanceStatusLabel(record: MaintenanceRequest) {
 function maintenanceStatusColor(record: MaintenanceRequest) {
   const status = normalizeStatus(record.status)
   if (status === 'COMPLETED') return 'green'
-  const overdue = record.reportedAt && dayjs(record.reportedAt).isBefore(dayjs().subtract(2, 'day'))
+  const overdue = isMaintenanceOverdue(record)
   return overdue ? 'red' : (status === 'PROCESSING' ? 'blue' : 'orange')
 }
 
@@ -1045,18 +1086,14 @@ function deliveryStatusLabel(record: DiningDeliveryRecord) {
   const status = normalizeStatus(record.status)
   if (status === 'DELIVERED') return '已送达'
   if (status === 'FAILED') return '送达失败'
-  const refTime = record.deliveredAt || record.createTime
-  const overdue = refTime && dayjs(refTime).isBefore(dayjs().subtract(2, 'hour'))
-  return overdue ? '待送达（超时）' : '待送达'
+  return isDeliveryOverdue(record) ? '待送达（超时）' : '待送达'
 }
 
 function deliveryStatusColor(record: DiningDeliveryRecord) {
   const status = normalizeStatus(record.status)
   if (status === 'DELIVERED') return 'green'
   if (status === 'FAILED') return 'red'
-  const refTime = record.deliveredAt || record.createTime
-  const overdue = refTime && dayjs(refTime).isBefore(dayjs().subtract(2, 'hour'))
-  return overdue ? 'volcano' : 'gold'
+  return isDeliveryOverdue(record) ? 'volcano' : 'gold'
 }
 
 async function finishDelivery(record: DiningDeliveryRecord) {
@@ -1223,9 +1260,35 @@ function exportActionLogs() {
   )
 }
 
+function applyLifecycleScenePreset() {
+  const source = firstTaskCenterQueryValue(route.query.source).toLowerCase()
+  const scene = firstTaskCenterQueryValue(route.query.scene).toLowerCase()
+  const lifecycleScene = source === 'lifecycle' || scene === 'status-change'
+  if (!lifecycleScene) {
+    return
+  }
+  const hasTab = Boolean(firstTaskCenterQueryValue(route.query.tab))
+  const hasView = Boolean(firstTaskCenterQueryValue(route.query.view))
+  const hasFocus = Boolean(firstTaskCenterQueryValue(route.query.lifecycleFocus))
+  const hasOverdue = Boolean(firstTaskCenterQueryValue(route.query.overdueOnly))
+  if (!hasFocus) {
+    lifecycleFocus.value = 'maintenance'
+  }
+  if (!hasTab) {
+    activeTab.value = (lifecycleFocus.value || 'maintenance') as TaskCenterTab
+  }
+  if (!hasView) {
+    viewMode.value = 'DUTY'
+  }
+  if (!hasOverdue) {
+    overdueOnly.value = true
+  }
+}
+
 let refreshTimer: number | undefined
 onMounted(() => {
   syncStateFromRoute(route.query)
+  applyLifecycleScenePreset()
   loadedSummarySignature.value = summaryQuerySignature(summaryQuery.value)
   loadActionLogs()
   loadRefreshPreference()
@@ -1248,6 +1311,7 @@ watch(
   async (query) => {
     const previousSummarySignature = summaryQuerySignature(summaryQuery.value)
     syncStateFromRoute(query)
+    applyLifecycleScenePreset()
     const nextSummarySignature = summaryQuerySignature(summaryQuery.value)
     if (nextSummarySignature === previousSummarySignature && nextSummarySignature === loadedSummarySignature.value) {
       return
@@ -1257,8 +1321,14 @@ watch(
   { deep: true }
 )
 
-watch([activeTab, viewMode, densityMode], () => {
+watch([activeTab, viewMode, densityMode, lifecycleFocus, overdueOnly], () => {
   syncRouteQueryFromState().catch(() => {})
+})
+
+watch(lifecycleFocus, (focus) => {
+  if (focus) {
+    activeTab.value = focus
+  }
 })
 
 watch(autoRefresh, () => {

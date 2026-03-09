@@ -17,6 +17,22 @@
       </a-space>
     </a-card>
 
+    <a-alert
+      v-if="lifecycleContext.active"
+      type="info"
+      show-icon
+      style="margin-bottom: 12px"
+      :message="lifecycleContext.message"
+    >
+      <template #description>
+        <a-space wrap>
+          <a-tag color="blue">场景：入住状态变更联动</a-tag>
+          <a-button type="link" size="small" @click="setLifecycleQuick('risk')">聚焦高风险任务</a-button>
+          <a-button type="link" size="small" @click="setLifecycleQuick('overdue')">仅看超时任务</a-button>
+        </a-space>
+      </template>
+    </a-alert>
+
     <a-card class="card-elevated task-hero" :bordered="false">
       <a-row :gutter="[12, 12]" align="middle">
         <a-col :xs="24" :xl="8">
@@ -180,6 +196,21 @@ const loading = ref(false)
 const exporting = ref(false)
 const rows = ref<MedicalUnifiedTaskItem[]>([])
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
+const MEDICAL_MANAGED_ROUTE_KEYS = new Set([
+  'residentId',
+  'residentName',
+  'elderId',
+  'module',
+  'priority',
+  'status',
+  'keyword',
+  'overdueHours',
+  'onlyOverdue',
+  'sortBy',
+  'sortDirection',
+  'pageNo',
+  'pageSize'
+])
 
 const query = reactive<Required<Pick<MedicalUnifiedTaskQuery, 'keyword' | 'sortBy' | 'sortDirection' | 'overdueHours'>> & {
   module?: string
@@ -206,6 +237,15 @@ const residentContext = computed(() => {
     active: !!residentIdRaw,
     residentId: residentIdRaw ? Number(residentIdRaw) : undefined,
     name: residentName || (residentIdRaw ? `长者#${residentIdRaw}` : '')
+  }
+})
+const lifecycleContext = computed(() => {
+  const source = String(route.query.source || '').trim().toLowerCase()
+  const scene = String(route.query.scene || '').trim().toLowerCase()
+  const active = source === 'lifecycle' || scene === 'status-change'
+  return {
+    active,
+    message: active ? '已自动按状态变更场景启用风险排序，可直接处理跨模块高风险任务。' : ''
   }
 })
 
@@ -432,6 +472,23 @@ function applyQuickModule(module: 'ALL' | 'ORDER' | 'INSPECTION' | 'NURSING_LOG'
   activeQuickModule.value = module
 }
 
+function firstRouteQueryText(value: unknown) {
+  if (Array.isArray(value)) return firstRouteQueryText(value[0])
+  if (value == null) return ''
+  return String(value).trim()
+}
+
+function unmanagedRouteQuery() {
+  const unmanaged: Record<string, string> = {}
+  Object.entries(route.query).forEach(([key, value]) => {
+    if (MEDICAL_MANAGED_ROUTE_KEYS.has(key)) return
+    const text = firstRouteQueryText(value)
+    if (!text) return
+    unmanaged[key] = text
+  })
+  return unmanaged
+}
+
 function syncStateFromRoute() {
   const routeQuery = parseMedicalUnifiedTaskRouteQuery(route.query)
   query.keyword = routeQuery.keyword || ''
@@ -444,6 +501,51 @@ function syncStateFromRoute() {
   query.sortDirection = String(routeQuery.sortDirection || MEDICAL_UNIFIED_TASK_QUERY_DEFAULTS.sortDirection)
   pagination.current = Number(routeQuery.pageNo || 1)
   pagination.pageSize = Number(routeQuery.pageSize || 10)
+  const source = firstRouteQueryText(route.query.source).toLowerCase()
+  const scene = firstRouteQueryText(route.query.scene).toLowerCase()
+  const category = firstRouteQueryText(route.query.category).toLowerCase()
+  const quick = firstRouteQueryText(route.query.quick).toLowerCase()
+  const focus = firstRouteQueryText(route.query.lifecycleFocus).toLowerCase()
+  const lifecycleScene = source === 'lifecycle' || scene === 'status-change'
+  if (!lifecycleScene) {
+    return
+  }
+
+  const hasExplicitModule = Boolean(firstRouteQueryText(route.query.module))
+  if (!hasExplicitModule) {
+    if (focus === 'order') query.module = 'ORDER'
+    if (focus === 'inspection' || focus === 'medical') query.module = 'INSPECTION'
+    if (focus === 'nursing' || focus === 'nursing_log') query.module = 'NURSING_LOG'
+    if (focus === 'handover') query.module = 'HANDOVER'
+  }
+
+  const hasExplicitStatus = Boolean(firstRouteQueryText(route.query.status))
+  const riskyQuick = quick === 'overdue' || quick === 'risk' || quick === 'alert' || category === 'alert'
+  if (riskyQuick) {
+    query.onlyOverdue = true
+    if (!hasExplicitStatus) {
+      query.status = 'ABNORMAL'
+    }
+  }
+  if (!firstRouteQueryText(route.query.sortBy)) {
+    query.sortBy = 'RISK_SCORE'
+  }
+  if (!firstRouteQueryText(route.query.sortDirection)) {
+    query.sortDirection = 'DESC'
+  }
+}
+
+function setLifecycleQuick(mode: 'risk' | 'overdue') {
+  if (mode === 'risk') {
+    query.onlyOverdue = false
+    query.sortBy = 'RISK_SCORE'
+    query.sortDirection = 'DESC'
+    query.status = undefined
+  } else {
+    query.onlyOverdue = true
+    query.status = query.status || 'ABNORMAL'
+  }
+  applyRouteQuery(true)
 }
 
 function applyRouteQuery(resetPage = true) {
@@ -460,7 +562,9 @@ function applyRouteQuery(resetPage = true) {
     pageSize: pagination.pageSize,
     elderId: residentContext.value.residentId
   })
+  const unmanaged = unmanagedRouteQuery()
   const routeQuery = buildMedicalUnifiedTaskRouteQuery(normalized, {
+    ...unmanaged,
     residentName: typeof route.query.residentName === 'string' ? route.query.residentName : undefined
   })
   router.replace({

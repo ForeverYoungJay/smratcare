@@ -9,7 +9,9 @@ export const TASK_CENTER_MANAGED_ROUTE_KEYS = new Set([
     'maintenanceDueDays',
     'tab',
     'view',
-    'density'
+    'density',
+    'lifecycleFocus',
+    'overdueOnly'
 ]);
 export function firstTaskCenterQueryValue(value) {
     if (Array.isArray(value)) {
@@ -42,6 +44,15 @@ export function normalizeTaskCenterDensityMode(value) {
     const raw = firstTaskCenterQueryValue(value).toLowerCase();
     return TASK_CENTER_DENSITY_VALUES.includes(raw) ? raw : 'normal';
 }
+export function normalizeTaskCenterLifecycleFocus(value) {
+    const normalized = normalizeTaskCenterTab(value);
+    const raw = firstTaskCenterQueryValue(value);
+    return raw && TASK_CENTER_TAB_VALUES.includes(normalized) ? normalized : '';
+}
+export function normalizeTaskCenterOverdueOnly(value) {
+    const raw = firstTaskCenterQueryValue(value).toLowerCase();
+    return raw === '1' || raw === 'true' || raw === 'yes';
+}
 export function summaryQuerySignature(query) {
     if (Object.keys(query || {}).length === 0) {
         return '';
@@ -57,6 +68,8 @@ export function useLogisticsTaskCenterRouteLayer(params) {
             params.activeTab.value = normalizeTaskCenterTab(query.tab);
             params.viewMode.value = normalizeTaskCenterViewMode(query.view);
             params.densityMode.value = normalizeTaskCenterDensityMode(query.density);
+            params.lifecycleFocus.value = normalizeTaskCenterLifecycleFocus(query.lifecycleFocus);
+            params.overdueOnly.value = normalizeTaskCenterOverdueOnly(query.overdueOnly);
         }
         finally {
             params.syncingRouteState.value = false;
@@ -75,6 +88,12 @@ export function useLogisticsTaskCenterRouteLayer(params) {
             view: params.viewMode.value,
             density: params.densityMode.value
         };
+        if (params.lifecycleFocus.value) {
+            extraQuery.lifecycleFocus = params.lifecycleFocus.value;
+        }
+        if (params.overdueOnly.value) {
+            extraQuery.overdueOnly = '1';
+        }
         if (Object.keys(params.summaryQuery.value || {}).length === 0) {
             return extraQuery;
         }

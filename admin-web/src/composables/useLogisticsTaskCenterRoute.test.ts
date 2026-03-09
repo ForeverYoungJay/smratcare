@@ -3,6 +3,8 @@ import {
   firstTaskCenterQueryValue,
   flattenTaskCenterRouteQuery,
   normalizeTaskCenterDensityMode,
+  normalizeTaskCenterLifecycleFocus,
+  normalizeTaskCenterOverdueOnly,
   normalizeTaskCenterTab,
   normalizeTaskCenterViewMode,
   summaryQuerySignature
@@ -35,6 +37,11 @@ describe('useLogisticsTaskCenterRoute helpers', () => {
     expect(normalizeTaskCenterViewMode('x')).toBe('ALL')
     expect(normalizeTaskCenterDensityMode('dense')).toBe('dense')
     expect(normalizeTaskCenterDensityMode('x')).toBe('normal')
+    expect(normalizeTaskCenterLifecycleFocus('maintenance')).toBe('maintenance')
+    expect(normalizeTaskCenterLifecycleFocus('abc')).toBe('')
+    expect(normalizeTaskCenterOverdueOnly('1')).toBe(true)
+    expect(normalizeTaskCenterOverdueOnly('true')).toBe(true)
+    expect(normalizeTaskCenterOverdueOnly('0')).toBe(false)
   })
 
   it('builds stable signature for summary query', () => {

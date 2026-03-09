@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { firstTaskCenterQueryValue, flattenTaskCenterRouteQuery, normalizeTaskCenterDensityMode, normalizeTaskCenterTab, normalizeTaskCenterViewMode, summaryQuerySignature } from './useLogisticsTaskCenterRoute';
+import { firstTaskCenterQueryValue, flattenTaskCenterRouteQuery, normalizeTaskCenterDensityMode, normalizeTaskCenterLifecycleFocus, normalizeTaskCenterOverdueOnly, normalizeTaskCenterTab, normalizeTaskCenterViewMode, summaryQuerySignature } from './useLogisticsTaskCenterRoute';
 describe('useLogisticsTaskCenterRoute helpers', () => {
     it('parses first query value safely', () => {
         expect(firstTaskCenterQueryValue(['maintenance', 'delivery'])).toBe('maintenance');
@@ -25,6 +25,11 @@ describe('useLogisticsTaskCenterRoute helpers', () => {
         expect(normalizeTaskCenterViewMode('x')).toBe('ALL');
         expect(normalizeTaskCenterDensityMode('dense')).toBe('dense');
         expect(normalizeTaskCenterDensityMode('x')).toBe('normal');
+        expect(normalizeTaskCenterLifecycleFocus('maintenance')).toBe('maintenance');
+        expect(normalizeTaskCenterLifecycleFocus('abc')).toBe('');
+        expect(normalizeTaskCenterOverdueOnly('1')).toBe(true);
+        expect(normalizeTaskCenterOverdueOnly('true')).toBe(true);
+        expect(normalizeTaskCenterOverdueOnly('0')).toBe(false);
     });
     it('builds stable signature for summary query', () => {
         expect(summaryQuerySignature({})).toBe('');

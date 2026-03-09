@@ -60,6 +60,22 @@
       </template>
     </SearchForm>
 
+    <a-alert
+      v-if="lifecycleContext.active"
+      type="info"
+      show-icon
+      style="margin-bottom: 12px"
+      :message="lifecycleContext.message"
+    >
+      <template #description>
+        <a-space wrap>
+          <a-tag color="blue">场景：入住状态变更联动</a-tag>
+          <a-button type="link" size="small" @click="applySummaryFilter('timeoutPending')">查看超时待审</a-button>
+          <a-button type="link" size="small" @click="applySummaryFilter('pending')">查看待我审批</a-button>
+        </a-space>
+      </template>
+    </a-alert>
+
     <StatefulBlock :loading="summaryLoading" :error="summaryError" :empty="false" @retry="fetchData">
       <a-space v-if="canApproveFlow" wrap style="margin-bottom: 10px">
         <a-tag :color="!query.currentApproverRole ? 'blue' : 'default'" style="cursor: pointer" @click="setApproverRole(undefined)">
@@ -615,6 +631,15 @@ const statusOptions = [
 const isStatusLocked = computed(() => approvalScope.value === 'PENDING_REVIEW')
 const statusSelectPlaceholder = computed(() => (isStatusLocked.value ? '待我审批视角固定为待审批' : '请选择状态'))
 const editableStatusOptions = [{ label: '待审批', value: 'PENDING' }]
+const lifecycleContext = computed(() => {
+  const source = String(route.query.source || '').trim().toLowerCase()
+  const scene = String(route.query.scene || '').trim().toLowerCase()
+  const active = source === 'lifecycle' || scene === 'status-change'
+  return {
+    active,
+    message: active ? '已按状态变更联动场景应用审批筛选，优先处理超时待审单。' : ''
+  }
+})
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: (string | number)[]) => {
@@ -1639,6 +1664,11 @@ function applyRouteFilters() {
   const focusId = String(route.query.focusId || '').trim()
   const urged = String(route.query.urged || '').toLowerCase()
   const overdue = String(route.query.overdue || '').toLowerCase()
+  const source = String(route.query.source || '').toLowerCase()
+  const scene = String(route.query.scene || '').toLowerCase()
+  const category = String(route.query.category || '').toLowerCase()
+  const quick = String(route.query.quick || '').toLowerCase()
+  const lifecycleScene = source === 'lifecycle' || scene === 'status-change'
   activeSummaryFilter.value = 'total'
   approvalScope.value = canApproveFlow.value ? 'ALL' : 'MY'
   if (type && typeOptions.some((item) => item.value === type)) {
@@ -1666,14 +1696,26 @@ function applyRouteFilters() {
   } else if (!keyword) {
     query.keyword = ''
   }
-  query.urgedOnly = urged === '1' || urged === 'true'
+  query.urgedOnly = urged === '1' || urged === 'true' || quick === 'urged'
   query.overdueOnly = overdue === '1' || overdue === 'true'
-  if (scope === 'MY' || route.query.my === '1') {
+  if (quick === 'overdue' || quick === 'risk' || quick === 'alert' || category === 'alert') {
+    query.overdueOnly = true
+  }
+
+  const explicitMyScope = scope === 'MY' || route.query.my === '1'
+  const explicitPendingScope = (scope === 'PENDING_REVIEW' || route.query.pending === '1') && canApproveFlow.value
+  if (explicitMyScope) {
     approvalScope.value = 'MY'
   }
-  if ((scope === 'PENDING_REVIEW' || route.query.pending === '1') && canApproveFlow.value) {
+  if (explicitPendingScope) {
     approvalScope.value = 'PENDING_REVIEW'
     query.status = 'PENDING'
+  }
+  if (lifecycleScene && !explicitMyScope && !explicitPendingScope) {
+    approvalScope.value = canApproveFlow.value ? 'PENDING_REVIEW' : 'MY'
+    if (!status) {
+      query.status = 'PENDING'
+    }
   }
 }
 

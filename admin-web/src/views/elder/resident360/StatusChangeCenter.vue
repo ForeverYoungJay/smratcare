@@ -82,19 +82,31 @@
     <a-card title="跨部门联动入口" class="card-elevated" :bordered="false" style="margin-top: 16px">
       <a-row :gutter="[12, 12]">
         <a-col :xs="24" :md="8">
-          <a-card size="small" class="linkage-tile" @click="go('/oa/work-execution/task?category=alert')">
+          <a-card
+            size="small"
+            class="linkage-tile"
+            @click="go('/oa/work-execution/task?source=lifecycle&scene=status-change&category=alert&quick=overdue&status=OPEN')"
+          >
             <div class="linkage-title">综合任务中心</div>
             <div class="linkage-desc">查看状态变更触发的待办与告警任务</div>
           </a-card>
         </a-col>
         <a-col :xs="24" :md="8">
-          <a-card size="small" class="linkage-tile" @click="go('/medical-care/unified-task-center?source=lifecycle')">
+          <a-card
+            size="small"
+            class="linkage-tile"
+            @click="go('/medical-care/unified-task-center?source=lifecycle&scene=status-change&onlyOverdue=1&sortBy=RISK_SCORE&sortDirection=DESC')"
+          >
             <div class="linkage-title">医护任务中心</div>
             <div class="linkage-desc">就医外出、死亡登记后自动联动医护处置</div>
           </a-card>
         </a-col>
         <a-col :xs="24" :md="8">
-          <a-card size="small" class="linkage-tile" @click="go('/logistics/task-center?source=lifecycle')">
+          <a-card
+            size="small"
+            class="linkage-tile"
+            @click="go('/logistics/task-center?source=lifecycle&scene=status-change&view=DUTY&tab=maintenance&lifecycleFocus=maintenance&overdueOnly=1')"
+          >
             <div class="linkage-title">后勤任务中心</div>
             <div class="linkage-desc">退住交接、床位清洁与维修任务自动同步</div>
           </a-card>
@@ -357,22 +369,40 @@ const activeReceiptDetailMetrics = computed(() => {
 const activeReceiptActions = computed(() => {
   if (activeReceiptKey.value === 'oa') {
     return [
-      { label: '打开OA任务中心', path: '/oa/work-execution/task?status=OPEN&category=alert' },
-      { label: '打开OA审批中心', path: '/oa/approval?status=PENDING' },
-      { label: '打开OA待办中心', path: '/oa/todo?status=OPEN' }
+      {
+        label: '打开OA任务中心',
+        path: '/oa/work-execution/task?source=lifecycle&scene=status-change&status=OPEN&category=alert&quick=overdue'
+      },
+      {
+        label: '打开OA审批中心',
+        path: '/oa/approval?source=lifecycle&scene=status-change&scope=PENDING_REVIEW&status=PENDING&overdue=1'
+      },
+      {
+        label: '打开OA待办中心',
+        path: '/oa/todo?source=lifecycle&scene=status-change&status=OPEN&quick=overdue'
+      }
     ]
   }
   if (activeReceiptKey.value === 'medical') {
     return [
-      { label: '打开医护统一任务', path: '/medical-care/unified-task-center?source=lifecycle&status=OPEN' },
-      { label: '打开医护工作台', path: '/medical-care/workbench' },
-      { label: '打开医护服务中心', path: '/medical-care/center?source=lifecycle' }
+      {
+        label: '打开医护统一任务',
+        path: '/medical-care/unified-task-center?source=lifecycle&scene=status-change&module=INSPECTION&onlyOverdue=1&sortBy=RISK_SCORE&sortDirection=DESC'
+      },
+      { label: '打开医护工作台', path: '/medical-care/workbench?source=lifecycle&scene=status-change' },
+      { label: '打开医护服务中心', path: '/medical-care/center?source=lifecycle&scene=status-change' }
     ]
   }
   return [
-    { label: '打开后勤任务中心', path: '/logistics/task-center?source=lifecycle' },
-    { label: '打开后勤工作台', path: '/logistics/workbench?source=lifecycle' },
-    { label: '打开床态全景', path: '/elder/bed-panorama?source=lifecycle' }
+    {
+      label: '打开后勤任务中心',
+      path: '/logistics/task-center?source=lifecycle&scene=status-change&view=DUTY&tab=maintenance&lifecycleFocus=maintenance&overdueOnly=1'
+    },
+    {
+      label: '打开后勤工作台',
+      path: '/logistics/workbench?source=lifecycle&scene=status-change&focus=maintenance'
+    },
+    { label: '打开床态全景', path: '/elder/bed-panorama?source=lifecycle&scene=status-change' }
   ]
 })
 let refreshTimer: number | null = null

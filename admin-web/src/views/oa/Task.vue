@@ -32,6 +32,22 @@
           </template>
         </SearchForm>
 
+        <a-alert
+          v-if="lifecycleContext.active"
+          type="info"
+          show-icon
+          style="margin-bottom: 12px"
+          :message="lifecycleContext.message"
+        >
+          <template #description>
+            <a-space wrap>
+              <a-tag color="blue">场景：入住状态变更联动</a-tag>
+              <a-button type="link" size="small" @click="applySummaryFilter('overdue')">查看逾期任务</a-button>
+              <a-button type="link" size="small" @click="applySummaryFilter('highPriority')">查看高优任务</a-button>
+            </a-space>
+          </template>
+        </a-alert>
+
         <StatefulBlock :loading="summaryLoading" :error="summaryError" :empty="false" @retry="fetchData">
           <a-row :gutter="[12, 12]" style="margin-bottom: 12px">
             <a-col :xs="12" :lg="4">
@@ -243,6 +259,7 @@ import { reactive, ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import type { SelectProps } from 'ant-design-vue'
+import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
@@ -265,6 +282,7 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import interactionPlugin from '@fullcalendar/interaction'
 
 const activeKey = ref('list')
+const route = useRoute()
 const loading = ref(false)
 const tableError = ref('')
 const summaryLoading = ref(false)
@@ -281,6 +299,7 @@ const quickHighPriorityOnly = ref(false)
 const quickDueTodayOnly = ref(false)
 const quickOverdueOnly = ref(false)
 const quickUnassignedOnly = ref(false)
+const routePresetSignature = ref('')
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const selectedRowKeys = ref<string[]>([])
 const summary = reactive<OaTaskSummary>({
@@ -370,6 +389,15 @@ const collaboratorOptions = [
   { label: '后勤部-周主管', value: '后勤部-周主管' },
   { label: '市场部-吴经理', value: '市场部-吴经理' }
 ]
+const lifecycleContext = computed(() => {
+  const source = String(route.query.source || '').trim().toLowerCase()
+  const scene = String(route.query.scene || '').trim().toLowerCase()
+  const active = source === 'lifecycle' || scene === 'status-change'
+  return {
+    active,
+    message: active ? '已自动应用“入住状态变更”联动筛选，优先展示高风险/超时任务。' : ''
+  }
+})
 
 function filterOptionByLabel(input: string, option: SelectProps['options'][number]) {
   const label = String((option as any)?.label || '')
@@ -512,6 +540,74 @@ function resetQuickFilters() {
   quickDueTodayOnly.value = false
   quickOverdueOnly.value = false
   quickUnassignedOnly.value = false
+}
+
+function firstRouteQueryText(value: unknown) {
+  if (Array.isArray(value)) return firstRouteQueryText(value[0])
+  if (value == null) return ''
+  return String(value).trim()
+}
+
+function buildRoutePresetSignature(source: Record<string, unknown>) {
+  const keys = ['source', 'scene', 'status', 'keyword', 'quick', 'category', 'auto'] as const
+  return keys.map((key) => `${key}:${firstRouteQueryText(source[key])}`).join('|')
+}
+
+function resolveRouteQuickFilter(routeQuick: string, routeCategory: string) {
+  const quick = routeQuick.toLowerCase()
+  if (quick === 'high-priority' || quick === 'high_priority' || quick === 'highpriority') return 'highPriority'
+  if (quick === 'due-today' || quick === 'duetoday') return 'dueToday'
+  if (quick === 'overdue' || quick === 'risk' || quick === 'alert') return 'overdue'
+  if (quick === 'unassigned') return 'unassigned'
+  if (routeCategory.toLowerCase() === 'alert') return 'overdue'
+  return ''
+}
+
+function applyRoutePreset() {
+  const status = firstRouteQueryText(route.query.status).toUpperCase()
+  query.status = status === 'OPEN' || status === 'DONE' ? status : undefined
+  query.keyword = firstRouteQueryText(route.query.keyword)
+  const auto = firstRouteQueryText(route.query.auto).toLowerCase()
+  if (auto === '0' || auto === 'false') autoRefresh.value = false
+  if (auto === '1' || auto === 'true') autoRefresh.value = true
+
+  activeSummaryFilter.value = 'total'
+  resetQuickFilters()
+  const quickFilter = resolveRouteQuickFilter(
+    firstRouteQueryText(route.query.quick),
+    firstRouteQueryText(route.query.category)
+  )
+  if (quickFilter === 'highPriority') {
+    query.status = 'OPEN'
+    activeSummaryFilter.value = 'highPriority'
+    quickHighPriorityOnly.value = true
+    return
+  }
+  if (quickFilter === 'dueToday') {
+    query.status = 'OPEN'
+    activeSummaryFilter.value = 'dueToday'
+    quickDueTodayOnly.value = true
+    return
+  }
+  if (quickFilter === 'overdue') {
+    query.status = 'OPEN'
+    activeSummaryFilter.value = 'overdue'
+    quickOverdueOnly.value = true
+    return
+  }
+  if (quickFilter === 'unassigned') {
+    query.status = 'OPEN'
+    activeSummaryFilter.value = 'unassigned'
+    quickUnassignedOnly.value = true
+    return
+  }
+  if (query.status === 'OPEN') {
+    activeSummaryFilter.value = 'open'
+    return
+  }
+  if (query.status === 'DONE') {
+    activeSummaryFilter.value = 'done'
+  }
 }
 
 function applySummaryFilter(filterKey: typeof activeSummaryFilter.value) {
@@ -775,9 +871,30 @@ watch(activeKey, (value) => {
 })
 
 onMounted(async () => {
+  applyRoutePreset()
+  routePresetSignature.value = buildRoutePresetSignature(route.query as Record<string, unknown>)
+  query.pageNo = 1
+  pagination.current = 1
   await fetchData()
   startAutoRefreshTimer()
 })
+
+watch(
+  () => route.query,
+  async (queryMap) => {
+    const nextSignature = buildRoutePresetSignature(queryMap as Record<string, unknown>)
+    if (nextSignature === routePresetSignature.value) return
+    routePresetSignature.value = nextSignature
+    applyRoutePreset()
+    query.pageNo = 1
+    pagination.current = 1
+    await fetchData()
+    if (activeKey.value === 'calendar') {
+      await loadCalendarData()
+    }
+  },
+  { deep: true }
+)
 
 onUnmounted(() => {
   stopAutoRefreshTimer()

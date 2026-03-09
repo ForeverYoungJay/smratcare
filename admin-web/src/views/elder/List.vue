@@ -43,6 +43,12 @@
         :hint="elderFlowHint"
         style="margin-bottom: 12px"
       />
+      <a-space wrap style="margin-bottom: 10px">
+        <a-tag color="gold">待评估 {{ lifecycleStageCounters.pendingAssessment }}</a-tag>
+        <a-tag color="blue">待办理入住 {{ lifecycleStageCounters.pendingBedSelect }}</a-tag>
+        <a-tag color="purple">待签署 {{ lifecycleStageCounters.pendingSign }}</a-tag>
+        <a-tag color="green">已签署 {{ lifecycleStageCounters.signed }}</a-tag>
+      </a-space>
       <div class="table-actions">
         <a-space>
           <a-button type="primary" @click="goCreate">新增老人</a-button>
@@ -65,12 +71,17 @@
         :pagination="false"
         row-key="id"
         :row-selection="rowSelection"
-        :scroll="{ x: 1320, y: 520 }"
+        :scroll="{ x: 1450, y: 520 }"
         @change="onTableChange"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
             <a-tag :color="statusTag(record.status)">{{ statusText(record.status) }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'lifecycleStage'">
+            <a-tag :color="lifecycleStageColor(resolveLifecycleStage(record))">
+              {{ lifecycleStageLabel(resolveLifecycleStage(record)) }}
+            </a-tag>
           </template>
           <template v-else-if="column.key === 'action'">
             <a-space size="small">
@@ -152,6 +163,7 @@ import FlowGuardBar from '../../components/FlowGuardBar.vue'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { exportCsv } from '../../utils/export'
 import { copyText } from '../../utils/clipboard'
+import { lifecycleStageColor, lifecycleStageLabel, normalizeLifecycleStage } from '../../utils/lifecycleStage'
 import { getElderPage, assignBed, bindFamily } from '../../api/elder'
 import { getBedList } from '../../api/bed'
 import { getFamilyUserPage } from '../../api/family'
@@ -186,11 +198,28 @@ const columns = [
   { title: '家庭地址', dataIndex: 'homeAddress', key: 'homeAddress', width: 220 },
   { title: '床位号', dataIndex: 'bedNo', key: 'bedNo', width: 120, sorter: true },
   { title: '护理等级', dataIndex: 'careLevel', key: 'careLevel', width: 120, sorter: true },
+  { title: '履约阶段', dataIndex: 'lifecycleStage', key: 'lifecycleStage', width: 120 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 100, sorter: true },
   { title: '联动操作', key: 'action', width: 220 }
 ]
 const selectedCount = computed(() => selectedRowKeys.value.length)
 const selectedRows = computed(() => rows.value.filter((item) => selectedRowKeys.value.some((id) => String(id) === String(item.id))))
+const lifecycleStageCounters = computed(() => {
+  const counters = {
+    pendingAssessment: 0,
+    pendingBedSelect: 0,
+    pendingSign: 0,
+    signed: 0
+  }
+  rows.value.forEach((item) => {
+    const stage = resolveLifecycleStage(item)
+    if (stage === 'PENDING_ASSESSMENT') counters.pendingAssessment += 1
+    if (stage === 'PENDING_BED_SELECT') counters.pendingBedSelect += 1
+    if (stage === 'PENDING_SIGN') counters.pendingSign += 1
+    if (stage === 'SIGNED') counters.signed += 1
+  })
+  return counters
+})
 const elderFlowSteps = ['档案建档', '办理入住', '在院管理']
 const elderFlowCurrentIndex = computed(() => {
   if (!selectedRows.value.length) return 2
@@ -273,6 +302,11 @@ function statusTag(status?: number) {
   return 'default'
 }
 
+function resolveLifecycleStage(item: ElderItem) {
+  const fallback = item.status === 1 || item.status === 2 || item.status === 3 ? 'SIGNED' : 'PENDING_ASSESSMENT'
+  return normalizeLifecycleStage(item.lifecycleStage, item.lifecycleContractStatus || fallback)
+}
+
 function requireSingleSelection(actionLabel: string) {
   if (selectedRows.value.length !== 1) {
     message.info(`请先勾选 1 位长者后再${actionLabel}`)
@@ -299,7 +333,11 @@ async function fetchData() {
     rows.value = res.list.map((r: any) => ({
       ...r,
       bedNo: r.bedNo ?? r.currentBed?.bedNo,
-      roomNo: r.roomNo ?? r.currentBed?.roomNo
+      roomNo: r.roomNo ?? r.currentBed?.roomNo,
+      lifecycleStage: normalizeLifecycleStage(
+        r.lifecycleStage,
+        r.lifecycleContractStatus || (r.status === 1 || r.status === 2 || r.status === 3 ? 'SIGNED' : undefined)
+      )
     }))
     total.value = res.total || res.list.length
   } catch {
