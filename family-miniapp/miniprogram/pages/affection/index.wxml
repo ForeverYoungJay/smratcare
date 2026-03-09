@@ -1,0 +1,39 @@
+<view class="container">
+  <view class="surface card">
+    <view class="section-title">亲情互动</view>
+    <view class="section-subtitle">家庭照片、语音留言、节日祝福</view>
+
+    <button class="primary-btn action" bindtap="sendVoice">发送语音留言</button>
+
+    <view class="template-title">亲情相册上传</view>
+    <view class="media-panel">
+      <view class="media-info" wx:if="{{selectedMediaUrl}}">
+        <text class="media-name">{{selectedMediaName}}</text>
+        <text class="media-type">{{selectedMediaType === 'video' ? '视频' : '图片'}}</text>
+      </view>
+      <view class="media-empty" wx:else>尚未上传家庭照片/视频</view>
+      <view class="media-action-row">
+        <button class="ghost-btn media-btn" loading="{{mediaUploading}}" bindtap="chooseMedia">选择媒体</button>
+        <button class="ghost-btn media-btn" wx:if="{{selectedMediaUrl}}" bindtap="clearSelectedMedia">清空</button>
+        <button class="primary-btn media-btn" loading="{{uploadingMedia}}" bindtap="sendMediaMoment">发送素材</button>
+      </view>
+    </view>
+
+    <view class="template-title">节日模板</view>
+    <view class="template-row">
+      <block wx:for="{{templates}}" wx:key="*this">
+        <view class="template" data-template="{{item}}" bindtap="sendGreeting">{{item}}</view>
+      </block>
+    </view>
+
+    <view class="template-title">互动记录</view>
+    <block wx:for="{{moments}}" wx:key="id">
+      <view class="moment">
+        <view class="name">{{item.title}}</view>
+        <view class="time">{{item.time}} · {{item.type}}</view>
+        <view class="desc">{{item.desc}}</view>
+        <view class="desc" wx:if="{{item.mediaName}}">附件：{{item.mediaName}}</view>
+      </view>
+    </block>
+  </view>
+</view>

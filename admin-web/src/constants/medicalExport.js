@@ -11,6 +11,8 @@ export const medicalOrderTaskExportColumns = [
     { key: 'elderName', title: '长者', value: (item) => item.elderName || '-' },
     { key: 'drugName', title: '药品', value: (item) => item.drugName || '-' },
     { key: 'plannedTime', title: '计划时间', value: (item) => item.plannedTime || '-' },
+    { key: 'riskLevel', title: '风险等级', value: (item) => item.riskLevel || '-' },
+    { key: 'riskScore', title: '风险评分', value: (item) => item.riskScore || 0 },
     { key: 'status', title: '状态', value: (item) => item.status || '-' },
     { key: 'doneTime', title: '完成时间', value: (item) => item.doneTime || '-' },
     { key: 'registrationId', title: '登记ID', value: (item) => item.registrationId || '' }
@@ -42,5 +44,17 @@ export const cvdAssessmentExportColumns = [
     { key: 'medicalAdvice', title: '建议', value: (item) => item.medicalAdvice || '-' },
     { key: 'needFollowup', title: '随访', value: (item) => item.needFollowup || '-' },
     { key: 'assessorName', title: '评估人', value: (item) => item.assessorName || '-' },
+    { key: 'status', title: '状态', value: (item) => item.status || '-' }
+];
+export const unifiedTaskExportColumns = [
+    { key: 'module', title: '模块', value: (item) => item.module || '-' },
+    { key: 'residentName', title: '长者', value: (item) => item.residentName || '-' },
+    { key: 'taskTitle', title: '事项', value: (item) => item.taskTitle || '-' },
+    { key: 'assignee', title: '责任人', value: (item) => item.assignee || '-' },
+    { key: 'plannedTime', title: '计划时间', value: (item) => item.plannedTime || '-' },
+    { key: 'overdueMinutes', title: '超时状态', value: (item) => item.overdueMinutes || '-' },
+    { key: 'riskScore', title: '风险分', value: (item) => item.riskScore || 0 },
+    { key: 'riskReason', title: '风险说明', value: (item) => item.riskReason || '-' },
+    { key: 'priority', title: '优先级', value: (item) => item.priority || '-' },
     { key: 'status', title: '状态', value: (item) => item.status || '-' }
 ];

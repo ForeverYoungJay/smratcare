@@ -1,0 +1,89 @@
+<view class="container" wx:if="{{summary}}">
+  <view class="surface card">
+    <view class="section-title">在线缴费</view>
+    <view class="section-subtitle">支持微信充值，到账后可用于服务消费与商品购买</view>
+
+    <view class="guard-brief" wx:if="{{guard}}">
+      <view class="guard-main">
+        <text class="guard-title">支付保障中心</text>
+        <text class="guard-sub">待支付 {{guard.pendingOrderCount}} · 异常 {{guard.closedOrderCount + guard.failedOrderCount}}</text>
+      </view>
+      <button class="ghost-btn mini-guard-btn" bindtap="goPaymentGuard">查看详情</button>
+    </view>
+
+    <view class="line"><text>老人</text><text>{{summary.elderName}}</text></view>
+    <view class="line"><text>账单月份</text><text>{{summary.month}}</text></view>
+    <view class="line"><text>本月账单</text><text>¥{{summary.total}}</text></view>
+    <view class="line"><text>已缴金额</text><text>¥{{summary.paid}}</text></view>
+    <view class="line"><text>待缴金额</text><text class="warn">¥{{summary.outstanding}}</text></view>
+    <view class="line"><text>账户余额</text><text>¥{{summary.accountBalance}}</text></view>
+
+    <view class="divider"></view>
+    <view class="detail-title">费用明细</view>
+    <block wx:for="{{summary.details}}" wx:key="item">
+      <view class="line"><text>{{item.item}}</text><text>¥{{item.amount}}</text></view>
+    </block>
+
+    <view class="line switch-line">
+      <text>自动扣费设置</text>
+      <switch checked="{{summary.autoPayEnabled}}" bindchange="onAutoPaySwitch" color="#2c7a84" />
+    </view>
+
+    <view class="line"><text>充值金额</text><input class="amount-input" type="digit" value="{{rechargeAmount}}" bindinput="onRechargeInput" /></view>
+    <view class="preset-row">
+      <text class="preset-label">快捷金额</text>
+      <view class="preset-list">
+        <block wx:for="{{presetAmounts}}" wx:key="*this">
+          <view
+            class="preset-chip {{selectedPreset === item ? 'preset-chip-active' : ''}}"
+            data-amount="{{item}}"
+            bindtap="pickPreset">¥{{item}}</view>
+        </block>
+      </view>
+    </view>
+    <view class="preview-line">充值后预计余额：¥{{previewBalance}}</view>
+    <button class="primary-btn action" loading="{{paying}}" bindtap="rechargeNow">微信充值</button>
+    <view class="tip-text" wx:if="{{allowManualFallback}}">当前环境允许支付失败后回退为记账充值（仅测试/演练使用）。</view>
+    <view class="tip-text" wx:else>若支付失败将提示重试，不自动执行人工记账回退。</view>
+
+    <view class="warn-box" wx:if="{{abnormalOrders.length > 0}}">
+      <view class="warn-title">有 {{abnormalOrders.length}} 笔充值订单待处理</view>
+      <view class="warn-sub">包含待支付、已关闭或失败订单，建议尽快确认状态。</view>
+      <button class="ghost-btn warn-action" bindtap="toFirstAbnormalOrder">查看首笔待处理</button>
+    </view>
+
+    <view class="divider"></view>
+    <view class="detail-title">历史账单</view>
+    <block wx:for="{{history}}" wx:key="month">
+      <view class="line"><text>{{item.month}}</text><text>{{item.status}} · ¥{{item.total}}</text></view>
+    </block>
+
+    <view class="divider"></view>
+    <view class="detail-title">最近充值订单</view>
+    <scroll-view class="filter-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+      <view class="filter-row">
+        <block wx:for="{{orderFilters}}" wx:key="key">
+          <view
+            class="filter-chip {{orderFilter === item.key ? 'filter-chip-active' : ''}}"
+            data-filter="{{item.key}}"
+            bindtap="switchOrderFilter">{{item.label}}</view>
+        </block>
+      </view>
+    </scroll-view>
+    <view wx:if="{{filteredOrders.length === 0}}" class="list-empty">当前筛选下暂无充值记录</view>
+    <block wx:for="{{filteredOrders}}" wx:key="outTradeNo">
+      <view class="order-item" data-trade-no="{{item.outTradeNo}}" bindtap="toOrderDetail">
+        <view class="order-top">
+          <text class="order-no">{{item.outTradeNo}}</text>
+          <view class="order-side">
+            <text class="order-status">{{item.statusText}}</text>
+            <text class="order-arrow">></text>
+          </view>
+        </view>
+        <view class="order-sub">金额：¥{{item.amount}} · 渠道：{{item.channel}}</view>
+        <view class="order-sub">创建：{{item.createTime}}</view>
+        <view class="order-sub" wx:if="{{item.paidTime}}">到账：{{item.paidTime}}</view>
+      </view>
+    </block>
+  </view>
+</view>

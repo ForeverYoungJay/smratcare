@@ -14,6 +14,14 @@
         @action="handleAdmissionGuardAction"
         style="margin-bottom: 12px"
       />
+      <LifecycleStageBar
+        title="入住办理阶段"
+        :subject="admissionFlowSubject"
+        :stage="admissionLifecycleStage"
+        :generated-at="guardContract?.updateTime"
+        :hint="admissionLifecycleHint"
+        style="margin-bottom: 12px"
+      />
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="老人姓名" name="elderId">
           <a-select
@@ -94,12 +102,65 @@
         </a-form-item>
         <a-form-item>
           <a-space>
-            <a-button type="primary" @click="fetchAdmissionRecords">搜索</a-button>
+            <a-button type="primary" @click="runRecordSearch">搜索</a-button>
             <a-button @click="resetRecordQuery">清空</a-button>
             <a-button @click="exportRecords">导出</a-button>
+            <a-button @click="copyRecordSearchLink">复制检索链接</a-button>
           </a-space>
         </a-form-item>
       </a-form>
+    </a-card>
+
+    <a-card class="card-elevated admission-summary-card" :bordered="false" style="margin-top: 16px;">
+      <a-spin :spinning="recordSummaryLoading">
+        <div class="admission-summary-head">
+          <span class="admission-summary-title">入住记录筛选统计</span>
+          <span class="admission-summary-meta">更新时间：{{ recordSummaryGeneratedAtText }}</span>
+        </div>
+        <a-row :gutter="[12, 12]">
+          <a-col v-for="item in recordSummaryCards" :key="item.key" :xs="12" :md="8" :xl="4">
+            <div class="admission-summary-tile">
+              <div class="admission-summary-label">{{ item.label }}</div>
+              <div class="admission-summary-value">{{ item.value }}</div>
+              <div class="admission-summary-hint">{{ item.hint }}</div>
+            </div>
+          </a-col>
+        </a-row>
+        <div class="admission-distribution-panel">
+          <div class="admission-distribution-head">
+            <span class="admission-distribution-title">入住空间分布占比</span>
+            <a-space :size="8">
+              <a-segmented
+                v-model:value="recordDimension"
+                :options="[
+                  { label: '楼栋维度', value: 'BUILDING' },
+                  { label: '楼层维度', value: 'FLOOR' }
+                ]"
+              />
+              <a-tag color="blue">样本 {{ Number(recordSummary.totalCount || 0) }} 人</a-tag>
+            </a-space>
+          </div>
+          <div v-if="activeDistributionRows.length > 0" class="admission-distribution-list">
+            <div
+              v-for="item in activeDistributionRows"
+              :key="`${recordDimension}-${item.dimensionKey}`"
+              class="admission-distribution-item"
+            >
+              <div class="admission-distribution-row">
+                <span class="admission-distribution-label">{{ item.dimensionLabel }}</span>
+                <span class="admission-distribution-meta">{{ item.count }} 人 · {{ formatDistributionRatio(item.ratio) }}</span>
+              </div>
+              <div class="admission-distribution-track">
+                <div
+                  class="admission-distribution-fill"
+                  :style="{ width: `${Math.max(4, Math.round(Number(item.ratio || 0) * 100))}%` }"
+                />
+              </div>
+            </div>
+          </div>
+          <a-empty v-else :image="null" description="当前筛选条件下暂无楼栋/楼层分布数据" />
+        </div>
+      </a-spin>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
@@ -172,16 +233,21 @@ import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import FlowGuardBar from '../../components/FlowGuardBar.vue'
+import LifecycleStageBar from '../../components/LifecycleStageBar.vue'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { useElderOptions } from '../../composables/useElderOptions'
+import { copyText } from '../../utils/clipboard'
+import { lifecycleStageHint, normalizeLifecycleStage } from '../../utils/lifecycleStage'
 import { getFamilyRelations } from '../../api/family'
 import { getBedList, getBuildingList, getFloorList, getRoomList } from '../../api/bed'
-import { admitElder, exportAdmissionRecords, getAdmissionRecords } from '../../api/elderLifecycle'
+import { admitElder, exportAdmissionRecords, getAdmissionRecordSummary, getAdmissionRecords } from '../../api/elderLifecycle'
 import { getElderDetail, getElderDiseases } from '../../api/elder'
 import { getContractAttachments, getContractPage } from '../../api/marketing'
 import { getCrmLead, updateCrmLead } from '../../api/crm'
 import type {
+  AdmissionRecordDimensionItem,
   AdmissionRecordItem,
+  AdmissionRecordSummary,
   AdmissionRequest,
   BedItem,
   BuildingItem,
@@ -239,8 +305,24 @@ const rules: FormRules = {
 }
 
 const recordLoading = ref(false)
+const recordSummaryLoading = ref(false)
 const admissionRows = ref<AdmissionRecordItem[]>([])
 const recordTotal = ref(0)
+const recordSummary = reactive<AdmissionRecordSummary>({
+  totalCount: 0,
+  inHospitalCount: 0,
+  leaveCount: 0,
+  dischargedCount: 0,
+  otherStatusCount: 0,
+  withContractCount: 0,
+  withoutContractCount: 0,
+  todayAdmissionCount: 0,
+  buildingDistribution: [],
+  floorDistribution: []
+})
+const recordDimension = ref<'BUILDING' | 'FLOOR'>('BUILDING')
+const skipNextRecordRouteWatch = ref(false)
+const recordRouteSignature = ref('')
 type SubmitChecklistKey = 'elder-base' | 'family' | 'disease' | 'contract' | 'attachment'
 type SubmitChecklistItem = { key: SubmitChecklistKey; label: string; ready: boolean; note: string }
 const submitChecklist = ref<SubmitChecklistItem[]>([
@@ -261,6 +343,169 @@ const recordQuery = reactive({
   pageNo: 1,
   pageSize: 10
 })
+const RECORD_ROUTE_KEYS = new Set([
+  'recordKeyword',
+  'recordContractNo',
+  'recordElderStatus',
+  'recordAdmissionDateStart',
+  'recordAdmissionDateEnd',
+  'recordDimension',
+  'recordPageNo',
+  'recordPageSize'
+])
+const SORTED_RECORD_ROUTE_KEYS = [...RECORD_ROUTE_KEYS].sort()
+
+const recordSummaryGeneratedAtText = computed(() =>
+  recordSummary.generatedAt ? dayjs(recordSummary.generatedAt).format('MM-DD HH:mm:ss') : '-'
+)
+const recordSummaryCards = computed(() => {
+  const cards = [
+    {
+      key: 'total',
+      label: '筛选结果',
+      value: Number(recordSummary.totalCount || 0),
+      hint: `今日办理 ${Number(recordSummary.todayAdmissionCount || 0)}`
+    },
+    {
+      key: 'inHospital',
+      label: '在院',
+      value: Number(recordSummary.inHospitalCount || 0),
+      hint: '当前状态 = 在院'
+    },
+    {
+      key: 'leave',
+      label: '请假',
+      value: Number(recordSummary.leaveCount || 0),
+      hint: '当前状态 = 请假'
+    },
+    {
+      key: 'discharged',
+      label: '离院',
+      value: Number(recordSummary.dischargedCount || 0),
+      hint: '当前状态 = 离院'
+    },
+    {
+      key: 'withContract',
+      label: '有合同号',
+      value: Number(recordSummary.withContractCount || 0),
+      hint: `缺合同 ${Number(recordSummary.withoutContractCount || 0)}`
+    },
+    {
+      key: 'other',
+      label: '其他状态',
+      value: Number(recordSummary.otherStatusCount || 0),
+      hint: '异常状态核查'
+    }
+  ]
+  return cards
+})
+
+const activeDistributionRows = computed<AdmissionRecordDimensionItem[]>(() => {
+  const source = recordDimension.value === 'BUILDING'
+    ? recordSummary.buildingDistribution
+    : recordSummary.floorDistribution
+  if (!Array.isArray(source)) {
+    return []
+  }
+  return source
+    .filter((item) => Number(item?.count || 0) > 0)
+    .slice(0, 12)
+})
+
+function formatDistributionRatio(value: number) {
+  const ratio = Number(value || 0)
+  if (!Number.isFinite(ratio) || ratio <= 0) {
+    return '0.0%'
+  }
+  return `${(ratio * 100).toFixed(1)}%`
+}
+
+function firstQueryText(value: unknown) {
+  if (Array.isArray(value)) {
+    return firstQueryText(value[0])
+  }
+  if (value == null) return ''
+  return String(value).trim()
+}
+
+function normalizeRouteQueryMap(source: Record<string, unknown>) {
+  return Object.entries(source || {}).reduce<Record<string, string>>((acc, [key, value]) => {
+    const text = firstQueryText(value)
+    if (!text) return acc
+    acc[key] = text
+    return acc
+  }, {})
+}
+
+function buildRecordRouteSignature(source: Record<string, unknown>) {
+  return SORTED_RECORD_ROUTE_KEYS.map((key) => `${key}:${firstQueryText(source[key])}`).join('|')
+}
+
+function resetRecordQueryState() {
+  recordQuery.keyword = undefined
+  recordQuery.contractNo = undefined
+  recordQuery.elderStatus = undefined
+  recordQuery.admissionDateRange = undefined
+  recordDimension.value = 'BUILDING'
+  recordQuery.pageNo = 1
+  recordQuery.pageSize = 10
+}
+
+function applyRecordQueryFromRoute() {
+  resetRecordQueryState()
+  const keyword = firstQueryText(route.query.recordKeyword)
+  const contractNo = firstQueryText(route.query.recordContractNo)
+  const elderStatus = Number(firstQueryText(route.query.recordElderStatus))
+  const admissionDateStart = firstQueryText(route.query.recordAdmissionDateStart)
+  const admissionDateEnd = firstQueryText(route.query.recordAdmissionDateEnd)
+  const dimension = firstQueryText(route.query.recordDimension).toUpperCase()
+  const pageNo = Number(firstQueryText(route.query.recordPageNo))
+  const pageSize = Number(firstQueryText(route.query.recordPageSize))
+
+  if (keyword) recordQuery.keyword = keyword
+  if (contractNo) recordQuery.contractNo = contractNo
+  if (Number.isFinite(elderStatus) && elderStatus > 0) recordQuery.elderStatus = elderStatus
+  if (admissionDateStart && admissionDateEnd) {
+    recordQuery.admissionDateRange = [admissionDateStart, admissionDateEnd]
+  }
+  if (dimension === 'BUILDING' || dimension === 'FLOOR') {
+    recordDimension.value = dimension
+  }
+  if (Number.isFinite(pageNo) && pageNo > 0) recordQuery.pageNo = pageNo
+  if (Number.isFinite(pageSize) && pageSize > 0) recordQuery.pageSize = pageSize
+}
+
+function buildRecordRouteQuery() {
+  const query: Record<string, string> = {}
+  Object.entries(route.query || {}).forEach(([key, value]) => {
+    if (RECORD_ROUTE_KEYS.has(key)) return
+    const text = firstQueryText(value)
+    if (!text) return
+    query[key] = text
+  })
+  if (recordQuery.keyword) query.recordKeyword = recordQuery.keyword
+  if (recordQuery.contractNo) query.recordContractNo = recordQuery.contractNo
+  if (recordQuery.elderStatus) query.recordElderStatus = String(recordQuery.elderStatus)
+  if (recordQuery.admissionDateRange?.[0]) query.recordAdmissionDateStart = recordQuery.admissionDateRange[0]
+  if (recordQuery.admissionDateRange?.[1]) query.recordAdmissionDateEnd = recordQuery.admissionDateRange[1]
+  query.recordDimension = recordDimension.value
+  query.recordPageNo = String(recordQuery.pageNo)
+  query.recordPageSize = String(recordQuery.pageSize)
+  return query
+}
+
+async function syncRecordQueryToRoute() {
+  const nextQuery = buildRecordRouteQuery()
+  const currentQuery = normalizeRouteQueryMap(route.query as Record<string, unknown>)
+  const currentKeys = Object.keys(currentQuery)
+  const nextKeys = Object.keys(nextQuery)
+  if (currentKeys.length === nextKeys.length && nextKeys.every((key) => currentQuery[key] === nextQuery[key])) {
+    return
+  }
+  skipNextRecordRouteWatch.value = true
+  recordRouteSignature.value = buildRecordRouteSignature(nextQuery)
+  await router.replace({ path: route.path, query: nextQuery })
+}
 
 const columns = [
   { title: '老人姓名', dataIndex: 'elderName', key: 'elderName', width: 140 },
@@ -323,6 +568,19 @@ const admissionFlowHint = computed(() => {
   if (guardContract.value.flowStage === 'PENDING_ASSESSMENT') return '请通过“去评估并闭环回流”完成评估后自动返回本页'
   return ''
 })
+const admissionLifecycleStage = computed(() =>
+  normalizeLifecycleStage(guardContract.value?.flowStage, guardContract.value?.contractStatus || guardContract.value?.status)
+)
+const admissionLifecycleHint = computed(() => {
+  if (!form.contractNo) return '请先选择长者，系统会自动匹配合同号并同步流程阶段。'
+  if (admissionFlowBlockers.value.length) {
+    return admissionFlowBlockers.value
+      .slice(0, 2)
+      .map((item) => item.text)
+      .join('；')
+  }
+  return lifecycleStageHint(admissionLifecycleStage.value)
+})
 
 function handleAdmissionGuardAction(item: { actionKey?: string }) {
   if (item.actionKey === 'focus-elder') {
@@ -365,7 +623,7 @@ async function submit() {
     await admitElder(form)
     await syncLeadStageAfterAdmission()
     message.success('入住办理成功')
-    await fetchAdmissionRecords()
+    await refreshAdmissionRecordPanel()
   } catch (error: any) {
     message.error(error?.message || '提交失败')
   } finally {
@@ -381,8 +639,10 @@ function checklistRoute(key: SubmitChecklistKey) {
   if (key === 'disease') return elderId ? `/elder/detail/${elderId}?tab=disease` : '/elder/list'
   if (key === 'contract') return contractNo ? `/marketing/contract-signing?contractNo=${contractNo}` : '/marketing/contract-signing'
   if (key === 'attachment') {
-    if (elderId) return `/elder/contracts-invoices?residentId=${elderId}&tab=attachments`
-    return contractNo ? `/marketing/contract-signing?contractNo=${contractNo}` : '/marketing/contract-signing'
+    if (contractNo) {
+      return `/marketing/contract-signing?contractNo=${contractNo}&openAttachment=1&attachmentType=CONTRACT&from=admission_checklist`
+    }
+    return elderId ? `/marketing/contract-signing?elderId=${elderId}&openAttachment=1&from=admission_checklist` : '/marketing/contract-signing'
   }
   return '/elder/list'
 }
@@ -600,44 +860,113 @@ async function onElderChange(value: string | number | undefined) {
   await resolveContractNoByElder(value)
 }
 
-async function fetchAdmissionRecords() {
-  recordLoading.value = true
-  try {
-    const [admissionDateStart, admissionDateEnd] = recordQuery.admissionDateRange || []
-    const res: PageResult<AdmissionRecordItem> = await getAdmissionRecords({
-      pageNo: recordQuery.pageNo,
-      pageSize: recordQuery.pageSize,
-      keyword: recordQuery.keyword,
-      contractNo: recordQuery.contractNo,
-      elderStatus: recordQuery.elderStatus,
-      admissionDateStart,
-      admissionDateEnd
-    })
-    admissionRows.value = res.list
-    recordTotal.value = res.total
-  } finally {
-    recordLoading.value = false
-  }
-}
-
-function resetRecordQuery() {
-  recordQuery.keyword = undefined
-  recordQuery.contractNo = undefined
-  recordQuery.elderStatus = undefined
-  recordQuery.admissionDateRange = undefined
-  recordQuery.pageNo = 1
-  fetchAdmissionRecords()
-}
-
-async function exportRecords() {
+function buildAdmissionRecordFilterParams() {
   const [admissionDateStart, admissionDateEnd] = recordQuery.admissionDateRange || []
-  await exportAdmissionRecords({
+  return {
     keyword: recordQuery.keyword,
     contractNo: recordQuery.contractNo,
     elderStatus: recordQuery.elderStatus,
     admissionDateStart,
     admissionDateEnd
+  }
+}
+
+async function fetchAdmissionRecords() {
+  recordLoading.value = true
+  try {
+    const res: PageResult<AdmissionRecordItem> = await getAdmissionRecords({
+      pageNo: recordQuery.pageNo,
+      pageSize: recordQuery.pageSize,
+      ...buildAdmissionRecordFilterParams()
+    })
+    admissionRows.value = res.list || []
+    recordTotal.value = Number(res.total || 0)
+  } finally {
+    recordLoading.value = false
+  }
+}
+
+async function fetchAdmissionRecordSummary() {
+  recordSummaryLoading.value = true
+  try {
+    const data = await getAdmissionRecordSummary(buildAdmissionRecordFilterParams())
+    Object.assign(recordSummary, {
+      totalCount: Number(data?.totalCount || 0),
+      inHospitalCount: Number(data?.inHospitalCount || 0),
+      leaveCount: Number(data?.leaveCount || 0),
+      dischargedCount: Number(data?.dischargedCount || 0),
+      otherStatusCount: Number(data?.otherStatusCount || 0),
+      withContractCount: Number(data?.withContractCount || 0),
+      withoutContractCount: Number(data?.withoutContractCount || 0),
+      todayAdmissionCount: Number(data?.todayAdmissionCount || 0),
+      buildingDistribution: Array.isArray(data?.buildingDistribution)
+        ? data.buildingDistribution.map((item) => ({
+            dimensionKey: String(item?.dimensionKey || ''),
+            dimensionLabel: String(item?.dimensionLabel || item?.dimensionKey || '-'),
+            count: Number(item?.count || 0),
+            ratio: Number(item?.ratio || 0)
+          }))
+        : [],
+      floorDistribution: Array.isArray(data?.floorDistribution)
+        ? data.floorDistribution.map((item) => ({
+            dimensionKey: String(item?.dimensionKey || ''),
+            dimensionLabel: String(item?.dimensionLabel || item?.dimensionKey || '-'),
+            count: Number(item?.count || 0),
+            ratio: Number(item?.ratio || 0)
+          }))
+        : [],
+      generatedAt: data?.generatedAt
+    })
+  } catch {
+    Object.assign(recordSummary, {
+      totalCount: 0,
+      inHospitalCount: 0,
+      leaveCount: 0,
+      dischargedCount: 0,
+      otherStatusCount: 0,
+      withContractCount: 0,
+      withoutContractCount: 0,
+      todayAdmissionCount: 0,
+      buildingDistribution: [],
+      floorDistribution: [],
+      generatedAt: undefined
+    })
+  } finally {
+    recordSummaryLoading.value = false
+  }
+}
+
+async function refreshAdmissionRecordPanel() {
+  await Promise.all([fetchAdmissionRecords(), fetchAdmissionRecordSummary()])
+}
+
+function runRecordSearch() {
+  recordQuery.pageNo = 1
+  refreshAdmissionRecordPanel()
+  syncRecordQueryToRoute().catch(() => {})
+}
+
+function resetRecordQuery() {
+  resetRecordQueryState()
+  refreshAdmissionRecordPanel()
+  syncRecordQueryToRoute().catch(() => {})
+}
+
+async function exportRecords() {
+  await exportAdmissionRecords({
+    ...buildAdmissionRecordFilterParams()
   })
+}
+
+async function copyRecordSearchLink() {
+  const href = router.resolve({ path: route.path, query: buildRecordRouteQuery() }).href
+  const fullUrl = /^https?:\/\//i.test(href) ? href : `${window.location.origin}${href}`
+  const copied = await copyText(fullUrl)
+  if (copied) {
+    message.success('检索链接已复制')
+    return
+  }
+  message.warning('当前环境不支持自动复制，请手动复制地址栏链接')
 }
 
 async function loadAssets() {
@@ -661,11 +990,12 @@ async function loadAssets() {
 }
 
 function applyRoutePrefill() {
+  applyRecordQueryFromRoute()
   const residentIdText = String(route.query.residentId || '').trim()
   const leadId = Number(route.query.leadId || 0)
   const contractNo = String(route.query.contractNo || '').trim()
   const elderName = String(route.query.elderName || '').trim()
-  if (residentIdText) {
+  if (residentIdText && !recordQuery.keyword) {
     const residentId = Number(residentIdText)
     if (residentId > 0) {
       ensureSelectedElder(residentId, elderName || `长者${residentId}`)
@@ -684,7 +1014,9 @@ function applyRoutePrefill() {
   }
   if (contractNo) {
     form.contractNo = contractNo
-    recordQuery.contractNo = contractNo
+    if (!recordQuery.contractNo) {
+      recordQuery.contractNo = contractNo
+    }
   }
   if (!form.admissionDate) {
     form.admissionDate = dayjs().format('YYYY-MM-DD')
@@ -712,13 +1044,15 @@ async function syncLeadStageAfterAdmission() {
 
 function onPageChange(page: number) {
   recordQuery.pageNo = page
-  fetchAdmissionRecords()
+  refreshAdmissionRecordPanel()
+  syncRecordQueryToRoute().catch(() => {})
 }
 
 function onPageSizeChange(current: number, size: number) {
   recordQuery.pageNo = 1
   recordQuery.pageSize = size
-  fetchAdmissionRecords()
+  refreshAdmissionRecordPanel()
+  syncRecordQueryToRoute().catch(() => {})
 }
 
 watch(
@@ -748,13 +1082,34 @@ watch(
     loadContractGuardState()
   }
 )
+watch(
+  () => route.query,
+  () => {
+    const nextSignature = buildRecordRouteSignature(route.query as Record<string, unknown>)
+    if (skipNextRecordRouteWatch.value) {
+      skipNextRecordRouteWatch.value = false
+      recordRouteSignature.value = nextSignature
+      return
+    }
+    if (nextSignature === recordRouteSignature.value) {
+      return
+    }
+    recordRouteSignature.value = nextSignature
+    applyRecordQueryFromRoute()
+    refreshAdmissionRecordPanel()
+  },
+  { deep: true }
+)
+watch(recordDimension, () => {
+  syncRecordQueryToRoute().catch(() => {})
+})
 
 useLiveSyncRefresh({
   topics: ['elder', 'bed', 'lifecycle', 'finance', 'care'],
   refresh: () => {
     searchElders('')
     loadAssets()
-    fetchAdmissionRecords()
+    refreshAdmissionRecordPanel()
   },
   debounceMs: 700
 })
@@ -766,12 +1121,137 @@ onMounted(async () => {
   if (!form.contractNo && form.elderId) {
     await resolveContractNoByElder(form.elderId as any)
   }
-  await fetchAdmissionRecords()
+  await refreshAdmissionRecordPanel()
+  recordRouteSignature.value = buildRecordRouteSignature(route.query as Record<string, unknown>)
+  await syncRecordQueryToRoute().catch(() => {})
 })
 </script>
 
 <style scoped>
 .search-bar {
   margin-bottom: 12px;
+}
+
+.admission-summary-card {
+  border: 1px solid #e6f4ff;
+  background: linear-gradient(118deg, #f8fbff 0%, #f2f8ff 45%, #f9fcff 100%);
+}
+
+.admission-summary-head {
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admission-summary-title {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.admission-summary-meta {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.admission-summary-tile {
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(255, 255, 255, 0.8);
+  padding: 10px;
+  min-height: 88px;
+}
+
+.admission-summary-label {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.admission-summary-value {
+  margin-top: 6px;
+  color: #0f172a;
+  font-size: 24px;
+  line-height: 1.1;
+  font-weight: 700;
+}
+
+.admission-summary-hint {
+  margin-top: 6px;
+  color: #475569;
+  font-size: 12px;
+}
+
+.admission-distribution-panel {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: linear-gradient(130deg, rgba(255, 255, 255, 0.95) 0%, rgba(241, 245, 249, 0.84) 100%);
+}
+
+.admission-distribution-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.admission-distribution-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.admission-distribution-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admission-distribution-item {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.admission-distribution-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.admission-distribution-label {
+  color: #334155;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.admission-distribution-meta {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.admission-distribution-track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.2);
+  overflow: hidden;
+}
+
+.admission-distribution-fill {
+  height: 100%;
+  min-width: 4px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #1677ff 0%, #36cfc9 100%);
+  transition: width 0.35s ease;
 }
 </style>

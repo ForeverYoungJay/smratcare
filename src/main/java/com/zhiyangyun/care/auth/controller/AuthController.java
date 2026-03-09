@@ -10,12 +10,17 @@ import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.model.StaffInfo;
 import com.zhiyangyun.care.auth.model.FamilyLoginRequest;
 import com.zhiyangyun.care.auth.model.FamilyLoginResponse;
+import com.zhiyangyun.care.auth.model.FamilySmsCodeSendRequest;
+import com.zhiyangyun.care.auth.model.FamilySmsCodeSendResponse;
+import com.zhiyangyun.care.auth.model.FamilySmsCodeVerifyRequest;
+import com.zhiyangyun.care.auth.model.FamilySmsCodeVerifyResponse;
 import com.zhiyangyun.care.auth.security.TokenBlacklistService;
 import com.zhiyangyun.care.auth.security.TokenProvider;
 import com.zhiyangyun.care.auth.security.PermissionRegistry;
 import com.zhiyangyun.care.auth.security.RoleCodeHelper;
 import com.zhiyangyun.care.elder.entity.FamilyUser;
 import com.zhiyangyun.care.elder.mapper.FamilyUserMapper;
+import com.zhiyangyun.care.family.service.FamilySmsCodeService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -40,6 +45,7 @@ public class AuthController {
   private final TokenBlacklistService tokenBlacklistService;
   private final FamilyUserMapper familyUserMapper;
   private final PermissionRegistry permissionRegistry;
+  private final FamilySmsCodeService familySmsCodeService;
 
   public AuthController(AuthenticationManager authenticationManager,
       TokenProvider tokenProvider,
@@ -47,7 +53,8 @@ public class AuthController {
       RoleMapper roleMapper,
       TokenBlacklistService tokenBlacklistService,
       FamilyUserMapper familyUserMapper,
-      PermissionRegistry permissionRegistry) {
+      PermissionRegistry permissionRegistry,
+      FamilySmsCodeService familySmsCodeService) {
     this.authenticationManager = authenticationManager;
     this.tokenProvider = tokenProvider;
     this.staffMapper = staffMapper;
@@ -55,6 +62,23 @@ public class AuthController {
     this.tokenBlacklistService = tokenBlacklistService;
     this.familyUserMapper = familyUserMapper;
     this.permissionRegistry = permissionRegistry;
+    this.familySmsCodeService = familySmsCodeService;
+  }
+
+  @PostMapping("/family/sms-code/send")
+  public Result<FamilySmsCodeSendResponse> sendFamilySmsCode(@Valid @RequestBody FamilySmsCodeSendRequest request,
+      HttpServletRequest httpServletRequest) {
+    return Result.ok(familySmsCodeService.sendCode(
+        request.getOrgId(), null, request.getPhone(), request.getScene(), resolveClientIp(httpServletRequest)));
+  }
+
+  @PostMapping("/family/sms-code/verify")
+  public Result<FamilySmsCodeVerifyResponse> verifyFamilySmsCode(@Valid @RequestBody FamilySmsCodeVerifyRequest request,
+      HttpServletRequest httpServletRequest) {
+    boolean consume = request.getConsume() == null || request.getConsume();
+    return Result.ok(familySmsCodeService.verifyCode(
+        request.getOrgId(), request.getPhone(), request.getScene(), request.getVerifyCode(), consume,
+        resolveClientIp(httpServletRequest)));
   }
 
   @PostMapping("/login")
@@ -97,8 +121,15 @@ public class AuthController {
   }
 
   @PostMapping("/family/login")
-  public Result<FamilyLoginResponse> familyLogin(@Valid @RequestBody FamilyLoginRequest request) {
-    // 验证码校验占位
+  public Result<FamilyLoginResponse> familyLogin(@Valid @RequestBody FamilyLoginRequest request,
+      HttpServletRequest httpServletRequest) {
+    FamilySmsCodeVerifyResponse verifyResult = familySmsCodeService.verifyCode(
+        request.getOrgId(), request.getPhone(), "LOGIN", request.getVerifyCode(), true,
+        resolveClientIp(httpServletRequest));
+    if (!Boolean.TRUE.equals(verifyResult.getPassed())) {
+      throw new IllegalArgumentException(verifyResult.getMessage() == null ? "验证码校验失败" : verifyResult.getMessage());
+    }
+
     FamilyUser user = familyUserMapper.selectOne(
         Wrappers.lambdaQuery(FamilyUser.class)
             .eq(FamilyUser::getOrgId, request.getOrgId())
@@ -117,9 +148,32 @@ public class AuthController {
     FamilyLoginResponse response = new FamilyLoginResponse();
     response.setToken(token);
     response.setFamilyUserId(user.getId());
+    response.setOrgId(user.getOrgId());
     response.setPhone(user.getPhone());
     response.setRealName(user.getRealName());
     return Result.ok(response);
+  }
+
+  private String resolveClientIp(HttpServletRequest request) {
+    if (request == null) {
+      return "";
+    }
+    String[] candidateHeaders = {
+        "X-Forwarded-For",
+        "X-Real-IP",
+        "Proxy-Client-IP",
+        "WL-Proxy-Client-IP",
+        "HTTP_CLIENT_IP",
+        "HTTP_X_FORWARDED_FOR"
+    };
+    for (String header : candidateHeaders) {
+      String value = request.getHeader(header);
+      if (value != null && !value.isBlank() && !"unknown".equalsIgnoreCase(value.trim())) {
+        return value.trim();
+      }
+    }
+    String remoteAddr = request.getRemoteAddr();
+    return remoteAddr == null ? "" : remoteAddr.trim();
   }
 
   @GetMapping("/me")

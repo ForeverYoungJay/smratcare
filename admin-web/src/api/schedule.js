@@ -41,3 +41,18 @@ export function getAttendancePage(params) {
         };
     });
 }
+export function getAttendanceOverview(params) {
+    return request.get('/api/attendance/overview', { params });
+}
+export function getAttendanceSeasonRule() {
+    return request.get('/api/attendance/season-rule');
+}
+export function saveAttendanceSeasonRule(data) {
+    return request.post('/api/attendance/season-rule', data);
+}
+export function getAttendanceStaffAvailability(staffId) {
+    return request.get('/api/attendance/staff-availability', { params: { staffId } });
+}
+export function reviewAttendanceRecord(id, data) {
+    return request.put(`/api/attendance/${id}/review`, data || { reviewed: 1 });
+}

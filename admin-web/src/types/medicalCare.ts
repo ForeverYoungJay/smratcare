@@ -78,6 +78,37 @@ export interface MedicalCareRiskResident {
   assessmentDate?: string
 }
 
+export interface MedicalCareFocusAction {
+  key?: string
+  title?: string
+  description?: string
+  route?: string
+  severity?: 'HIGH' | 'MEDIUM' | 'LOW' | string
+  count?: number
+}
+
+export interface MedicalCareWorkbenchSummaryQuery {
+  elderId?: number | string
+  date?: string
+  status?: string
+  incidentWindowDays?: number
+  overdueHours?: number
+  topResidentLimit?: number
+  riskResidentLookbackDays?: number
+}
+
+export interface MedicalRiskTimelinePoint {
+  date?: string
+  riskScore?: number
+  riskLevel?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | string
+  medicationPendingCount?: number
+  inspectionOpenCount?: number
+  careOverdueCount?: number
+  incidentCount?: number
+  rectifyOverdueCount?: number
+  overdueHours?: number
+}
+
 export interface MedicalCareWorkbenchSummary {
   pendingMedicalOrderCount: number
   pendingReviewCount: number
@@ -120,12 +151,36 @@ export interface MedicalCareWorkbenchSummary {
   todayInspectionPendingCount: number
   todayInspectionDoneCount: number
   abnormalInspectionCount: number
+  abnormalInspectionOpenCount?: number
   todayMedicationPendingCount: number
   todayMedicationDoneCount: number
   tcmPublishedCount: number
   cvdHighRiskCount: number
   cvdNeedFollowupCount: number
   keyResidents: MedicalCareRiskResident[]
+
+  configuredIncidentWindowDays?: number
+  configuredOverdueHours?: number
+  configuredTopResidentLimit?: number
+  configuredRiskResidentLookbackDays?: number
+  snapshotDate?: string
+  incidentWindowStartDate?: string
+  incidentWindowEndDate?: string
+  generatedAt?: string
+
+  medicalOrderExecutionRate?: number
+  careTaskCompletionRate?: number
+  inspectionCompletionRate?: number
+  careTaskOverdueRate?: number
+  medicationPendingRate?: number
+  inspectionAbnormalRate?: number
+
+  riskIndex?: number
+  riskLevel?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+  riskTriggeredCount?: number
+  riskSignals?: string[]
+  focusActionCount?: number
+  focusActions?: MedicalCareFocusAction[]
 }
 
 export interface MedicalUnifiedTaskItem {
@@ -139,6 +194,25 @@ export interface MedicalUnifiedTaskItem {
   priority: 'HIGH' | 'MEDIUM' | 'LOW' | string
   status?: string
   sourceId?: number
+  overdue?: boolean
+  overdueMinutes?: number
+  riskScore?: number
+  riskReason?: string
+  suggestedRoute?: string
+}
+
+export interface MedicalUnifiedTaskQuery {
+  pageNo?: number
+  pageSize?: number
+  elderId?: number | string
+  module?: string
+  priority?: string
+  status?: string
+  keyword?: string
+  overdueHours?: number
+  onlyOverdue?: boolean | number | string
+  sortBy?: 'PLANNED_TIME' | 'PRIORITY' | 'RISK_SCORE' | string
+  sortDirection?: 'ASC' | 'DESC' | string
 }
 
 export interface MedicalAlertRuleConfig {
@@ -197,6 +271,7 @@ export interface MedicalResidentOverview {
   hasUnclosedIncident?: boolean
   alertCardCount?: number
   alertTotalCount?: number
+  generatedAt?: string
   cards: MedicalResidentOverviewCard[]
 }
 

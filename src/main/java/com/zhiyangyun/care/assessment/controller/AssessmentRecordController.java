@@ -25,6 +25,8 @@ import com.zhiyangyun.care.auth.mapper.OrgMapper;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.audit.service.AuditLogService;
+import com.zhiyangyun.care.common.file.model.UploadFileResponse;
+import com.zhiyangyun.care.common.file.service.FileStorageService;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import jakarta.validation.Valid;
@@ -52,6 +54,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/assessment/records")
@@ -64,10 +67,11 @@ public class AssessmentRecordController {
   private final CrmLeadMapper crmLeadMapper;
   private final CrmContractMapper crmContractMapper;
   private final AuditLogService auditLogService;
+  private final FileStorageService fileStorageService;
 
   public AssessmentRecordController(AssessmentRecordMapper recordMapper, ElderMapper elderMapper, OrgMapper orgMapper,
       AssessmentScoringService scoringService, CrmLeadMapper crmLeadMapper, CrmContractMapper crmContractMapper,
-      AuditLogService auditLogService) {
+      AuditLogService auditLogService, FileStorageService fileStorageService) {
     this.recordMapper = recordMapper;
     this.elderMapper = elderMapper;
     this.orgMapper = orgMapper;
@@ -75,6 +79,7 @@ public class AssessmentRecordController {
     this.crmLeadMapper = crmLeadMapper;
     this.crmContractMapper = crmContractMapper;
     this.auditLogService = auditLogService;
+    this.fileStorageService = fileStorageService;
   }
 
   @GetMapping("/page")
@@ -177,6 +182,24 @@ public class AssessmentRecordController {
       throw new IllegalArgumentException("无权限访问该评估记录");
     }
     return Result.ok(toReportResponse(record));
+  }
+
+  @PostMapping("/{id}/report-file")
+  public Result<AssessmentRecordResponse> uploadReportFile(@PathVariable Long id,
+      @RequestParam("file") MultipartFile file) {
+    AssessmentRecord record = recordMapper.selectById(id);
+    if (record == null || record.getIsDeleted() == 1) {
+      return Result.ok(null);
+    }
+    Long orgId = AuthContext.getOrgId();
+    if (orgId != null && !orgId.equals(record.getOrgId())) {
+      throw new IllegalArgumentException("无权限访问该评估记录");
+    }
+    UploadFileResponse upload = fileStorageService.upload(file, "assessment-report");
+    record.setReportFileUrl(upload.getFileUrl());
+    record.setReportFileName(upload.getOriginalFileName() == null ? upload.getFileName() : upload.getOriginalFileName());
+    recordMapper.updateById(record);
+    return Result.ok(toResponse(record, selectElder(record.getElderId()), selectOrg(record.getOrgId())));
   }
 
   @PostMapping
@@ -504,6 +527,8 @@ public class AssessmentRecordController {
     record.setScoreAuto(request.getScoreAuto());
     record.setArchiveNo(request.getArchiveNo());
     record.setSource(request.getSource());
+    record.setReportFileUrl(request.getReportFileUrl());
+    record.setReportFileName(request.getReportFileName());
   }
 
   private void validateRequest(AssessmentRecordRequest request) {
@@ -740,6 +765,8 @@ public class AssessmentRecordController {
     response.setScoreAuto(record.getScoreAuto());
     response.setArchiveNo(record.getArchiveNo());
     response.setSource(record.getSource());
+    response.setReportFileUrl(record.getReportFileUrl());
+    response.setReportFileName(record.getReportFileName());
     response.setCreatedBy(record.getCreatedBy());
     response.setCreateTime(record.getCreateTime());
     response.setUpdateTime(record.getUpdateTime());
@@ -881,6 +908,8 @@ public class AssessmentRecordController {
     response.setResultSummary(record.getResultSummary());
     response.setSuggestion(record.getSuggestion());
     response.setDetailJson(record.getDetailJson());
+    response.setReportFileUrl(record.getReportFileUrl());
+    response.setReportFileName(record.getReportFileName());
     return response;
   }
 

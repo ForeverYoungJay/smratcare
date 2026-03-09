@@ -1,5 +1,6 @@
-import { ref } from 'vue';
+import { onMounted, onUnmounted, ref } from 'vue';
 import { getElderPage } from '../api/elder';
+import { subscribeLiveSync } from '../utils/liveSync';
 function toElderOption(item) {
     const name = item.fullName || `Elder#${item.id}`;
     const suffix = item.elderCode ? ` (${item.elderCode})` : '';
@@ -9,19 +10,145 @@ function toElderOption(item) {
         name
     };
 }
+const PINYIN_INITIAL_LETTERS = 'ABCDEFGHJKLMNOPQRSTWXYZ';
+const PINYIN_INITIAL_BOUNDARY_CHARS = '阿芭擦搭蛾发噶哈讥咔垃妈拿哦啪期然撒塌挖昔压匝';
+const elderPoolCache = new Map();
+const elderPoolFetchedAt = new Map();
+const ELDER_POOL_CACHE_TTL = 90 * 1000;
+function normalizeText(text) {
+    return String(text || '')
+        .toLowerCase()
+        .replace(/[\s\-_/|（）()]+/g, '');
+}
+function getChineseInitial(char) {
+    const first = char.slice(0, 1);
+    if (!/[\u4e00-\u9fa5]/.test(first))
+        return '';
+    for (let i = 0; i < PINYIN_INITIAL_BOUNDARY_CHARS.length; i += 1) {
+        const current = PINYIN_INITIAL_BOUNDARY_CHARS[i];
+        const next = PINYIN_INITIAL_BOUNDARY_CHARS[i + 1];
+        if (!next)
+            return PINYIN_INITIAL_LETTERS[i] || '';
+        if (first.localeCompare(current, 'zh-CN') >= 0 && first.localeCompare(next, 'zh-CN') < 0) {
+            return PINYIN_INITIAL_LETTERS[i] || '';
+        }
+    }
+    return '';
+}
+function toPinyinInitials(text) {
+    let result = '';
+    const raw = String(text || '');
+    for (const char of raw) {
+        if (/[a-zA-Z0-9]/.test(char)) {
+            result += char.toLowerCase();
+            continue;
+        }
+        const initial = getChineseInitial(char);
+        if (initial)
+            result += initial.toLowerCase();
+    }
+    return result;
+}
+function fuzzyScore(text, keyword) {
+    const target = normalizeText(text);
+    const query = normalizeText(keyword);
+    if (!query)
+        return 0;
+    if (!target)
+        return -1;
+    if (target.includes(query)) {
+        const start = target.indexOf(query);
+        return 200 - start;
+    }
+    let score = 0;
+    let cursor = 0;
+    for (const char of query) {
+        const index = target.indexOf(char, cursor);
+        if (index < 0)
+            return -1;
+        score += Math.max(8 - (index - cursor), 1);
+        cursor = index + 1;
+    }
+    return score;
+}
+function normalizeElderStatus(config) {
+    if (typeof config.status === 'number')
+        return config.status;
+    if (config.inHospitalOnly === false)
+        return undefined;
+    return 1;
+}
+function buildCacheKey(config) {
+    const status = normalizeElderStatus(config);
+    return `status:${status == null ? 'all' : status}`;
+}
+function elderSearchText(item) {
+    const full = `${item.fullName || ''} ${item.elderCode || ''} ${item.phone || ''} ${item.bedNo || ''} ${item.roomNo || ''}`.trim();
+    return `${full} ${toPinyinInitials(full)}`;
+}
+function dedupeElders(rows) {
+    const map = new Map();
+    rows.forEach((row) => {
+        const id = Number(row.id);
+        if (!Number.isFinite(id))
+            return;
+        if (!map.has(id))
+            map.set(id, row);
+    });
+    return Array.from(map.values());
+}
 export function useElderOptions(config = {}) {
-    const pageSize = config.pageSize || 50;
+    const pageSize = config.pageSize || 80;
+    const preloadSize = config.preloadSize || Math.max(pageSize * 4, 300);
     const elderOptions = ref([]);
     const elderLoading = ref(false);
+    const lastKeyword = ref('');
+    const cacheKey = buildCacheKey(config);
+    async function loadBasePool(force = false) {
+        const lastAt = elderPoolFetchedAt.get(cacheKey) || 0;
+        const hasFresh = elderPoolCache.has(cacheKey) && (Date.now() - lastAt < ELDER_POOL_CACHE_TTL);
+        if (!force && hasFresh) {
+            return elderPoolCache.get(cacheKey) || [];
+        }
+        const status = normalizeElderStatus(config);
+        const page = await getElderPage({
+            pageNo: 1,
+            pageSize: preloadSize,
+            status,
+            elderStatus: status
+        });
+        const rows = page.list || [];
+        elderPoolCache.set(cacheKey, rows);
+        elderPoolFetchedAt.set(cacheKey, Date.now());
+        return rows;
+    }
     async function searchElders(keyword = '') {
         elderLoading.value = true;
         try {
-            const res = await getElderPage({
-                pageNo: 1,
-                pageSize,
-                keyword: keyword || undefined
-            });
-            elderOptions.value = (res.list || []).map(toElderOption);
+            lastKeyword.value = String(keyword || '');
+            const status = normalizeElderStatus(config);
+            const baseRows = await loadBasePool(false);
+            let mergedRows = [...baseRows];
+            const text = String(keyword || '').trim();
+            if (text) {
+                const remotePage = await getElderPage({
+                    pageNo: 1,
+                    pageSize: Math.max(pageSize * 2, 120),
+                    status,
+                    elderStatus: status,
+                    keyword: text
+                });
+                mergedRows = dedupeElders([...(remotePage.list || []), ...baseRows]);
+            }
+            const finalRows = text
+                ? mergedRows
+                    .map((item) => ({ item, score: fuzzyScore(elderSearchText(item), text) }))
+                    .filter((row) => row.score >= 0)
+                    .sort((a, b) => b.score - a.score || String(a.item.fullName || '').localeCompare(String(b.item.fullName || ''), 'zh-CN'))
+                    .slice(0, pageSize)
+                    .map((row) => row.item)
+                : mergedRows.slice(0, pageSize);
+            elderOptions.value = finalRows.map(toElderOption);
         }
         finally {
             elderLoading.value = false;
@@ -44,11 +171,30 @@ export function useElderOptions(config = {}) {
             name
         });
     }
+    function invalidateElderCache() {
+        elderPoolCache.delete(cacheKey);
+        elderPoolFetchedAt.delete(cacheKey);
+    }
+    let unsubscribe = () => { };
+    onMounted(() => {
+        unsubscribe = subscribeLiveSync((payload) => {
+            if (!payload.topics.some((topic) => topic === 'elder' || topic === 'lifecycle' || topic === 'bed'))
+                return;
+            invalidateElderCache();
+            if (!elderOptions.value.length || elderLoading.value)
+                return;
+            searchElders(lastKeyword.value).catch(() => { });
+        });
+    });
+    onUnmounted(() => {
+        unsubscribe();
+    });
     return {
         elderOptions,
         elderLoading,
         searchElders,
         findElderName,
-        ensureSelectedElder
+        ensureSelectedElder,
+        invalidateElderCache
     };
 }

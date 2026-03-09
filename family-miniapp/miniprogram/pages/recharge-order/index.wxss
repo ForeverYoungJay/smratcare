@@ -1,0 +1,150 @@
+.hero {
+  padding: 24rpx;
+  background: linear-gradient(140deg, rgba(25, 79, 94, 0.96), rgba(22, 124, 119, 0.96));
+  color: #f8fafc;
+}
+
+.hero-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.hero-title {
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.hero-no {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: rgba(248, 250, 252, 0.86);
+}
+
+.hero-amount {
+  margin-top: 22rpx;
+  font-size: 54rpx;
+  font-weight: 700;
+}
+
+.hero-elder {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: rgba(248, 250, 252, 0.9);
+}
+
+.status-tag {
+  padding: 8rpx 16rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+  border: 1rpx solid rgba(255, 255, 255, 0.36);
+}
+
+.status-paid {
+  background: rgba(187, 247, 208, 0.18);
+  color: #dcfce7;
+}
+
+.status-pending {
+  background: rgba(254, 243, 199, 0.18);
+  color: #fef3c7;
+}
+
+.status-closed {
+  background: rgba(226, 232, 240, 0.2);
+  color: #e2e8f0;
+}
+
+.status-failed {
+  background: rgba(254, 202, 202, 0.2);
+  color: #fecaca;
+}
+
+.status-default {
+  background: rgba(226, 232, 240, 0.2);
+  color: #e2e8f0;
+}
+
+.detail-card {
+  margin-top: 18rpx;
+  padding: 22rpx;
+}
+
+.line {
+  margin-top: 12rpx;
+  display: flex;
+  justify-content: space-between;
+  font-size: 24rpx;
+  color: #334155;
+  column-gap: 16rpx;
+}
+
+.multiline text:last-child {
+  flex: 1;
+  text-align: right;
+}
+
+.timeline-item {
+  margin-top: 16rpx;
+  display: flex;
+}
+
+.timeline-axis {
+  width: 34rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.timeline-dot {
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  background: #2c7a84;
+  margin-top: 6rpx;
+}
+
+.timeline-line {
+  flex: 1;
+  width: 2rpx;
+  margin-top: 4rpx;
+  background: linear-gradient(to bottom, #9cc5cd, #e2e8f0);
+}
+
+.timeline-content {
+  flex: 1;
+  padding-bottom: 14rpx;
+}
+
+.timeline-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.timeline-title {
+  font-size: 26rpx;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.timeline-time {
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.timeline-desc {
+  margin-top: 8rpx;
+  font-size: 23rpx;
+  color: #475569;
+  line-height: 1.6;
+}
+
+.action-card .action {
+  margin-top: 12rpx;
+}
+
+.empty-card {
+  text-align: center;
+}

@@ -1,0 +1,115 @@
+<view class="container">
+  <view class="surface card composer">
+    <view class="section-title">在线沟通</view>
+    <view class="section-subtitle">图文沟通、语音留言与探视预约统一入口</view>
+
+    <view class="row">
+      <view class="field">
+        <view class="field-label">沟通对象</view>
+        <picker mode="selector" range="{{roleOptions}}" value="{{roleIndex}}" bindchange="onRoleChange">
+          <view class="picker">{{roleOptions[roleIndex]}}</view>
+        </picker>
+      </view>
+      <view class="field">
+        <view class="field-label">消息类型</view>
+        <picker mode="selector" range="{{typeOptions}}" range-key="label" value="{{typeIndex}}" bindchange="onTypeChange">
+          <view class="picker">{{typeOptions[typeIndex].label}}</view>
+        </picker>
+      </view>
+    </view>
+
+    <view class="field">
+      <view class="field-label">快捷模板</view>
+      <view class="template-wrap">
+        <block wx:for="{{filteredTemplates}}" wx:key="id">
+          <view class="template-chip" data-index="{{index}}" bindtap="useTemplate">
+            <text class="template-title">{{item.title}}</text>
+            <text class="template-scene">{{item.scene}}</text>
+          </view>
+        </block>
+      </view>
+    </view>
+
+    <view class="field">
+      <view class="field-head">
+        <view class="field-label">发送内容</view>
+        <view class="draft-hint" wx:if="{{draftRestored}}">已恢复草稿</view>
+      </view>
+      <textarea
+        class="textarea"
+        placeholder="输入需要沟通的事项，例如：请反馈午后血压复测结果"
+        maxlength="200"
+        value="{{content}}"
+        bindinput="onContentInput" />
+      <view class="content-count">{{content.length}} / 200</view>
+    </view>
+
+    <view class="field" wx:if="{{typeOptions[typeIndex].value === 'voice'}}">
+      <view class="field-label">语音文件</view>
+      <view class="voice-file" wx:if="{{voiceFileUrl}}">
+        <text class="voice-name">{{voiceFileName}}</text>
+        <text class="voice-duration" wx:if="{{voiceDurationSec}}">{{voiceDurationSec}}秒</text>
+      </view>
+      <view class="voice-empty" wx:else>尚未上传语音文件</view>
+      <view class="action-row compact">
+        <button class="ghost-btn action-btn" loading="{{uploadingVoice}}" bindtap="chooseVoiceFile">选择语音</button>
+        <button class="ghost-btn action-btn" wx:if="{{voiceFileUrl}}" bindtap="clearVoiceFile">清空文件</button>
+      </view>
+    </view>
+
+    <view class="field" wx:if="{{typeOptions[typeIndex].value === 'voice'}}">
+      <view class="field-label">语音文字备注（可选）</view>
+      <textarea
+        class="textarea transcript"
+        placeholder="可填写语音内容摘要，便于护工快速理解"
+        maxlength="200"
+        value="{{voiceTranscript}}"
+        bindinput="onTranscriptInput" />
+    </view>
+
+    <view class="action-row">
+      <button class="primary-btn action-btn" loading="{{sending}}" bindtap="sendMessage">
+        {{typeOptions[typeIndex].value === 'voice' ? '发送语音留言' : '发送消息'}}
+      </button>
+      <button class="ghost-btn action-btn" loading="{{uploadingVoice}}" bindtap="chooseVoiceFile" wx:if="{{typeOptions[typeIndex].value === 'voice'}}">上传语音</button>
+    </view>
+  </view>
+
+  <view class="surface card booking">
+    <view class="card-title">探视预约（非实时）</view>
+    <view class="section-subtitle">用于预约护工协助的探视时段，格式建议：YYYY-MM-DD HH:mm</view>
+    <input class="input" value="{{videoTime}}" bindinput="onTimeInput" />
+    <button class="ghost-btn booking-btn" loading="{{sending}}" bindtap="submitVideoBooking">提交探视预约</button>
+  </view>
+
+  <view class="surface card history">
+    <view class="history-head">
+      <view class="card-title">沟通记录</view>
+      <view class="muted">{{messages.length}} 条</view>
+    </view>
+    <view wx:if="{{loading}}" class="list-empty">记录加载中...</view>
+    <view wx:elif="{{messages.length === 0}}" class="list-empty">暂无沟通记录</view>
+    <block wx:else wx:for="{{messages}}" wx:for-item="msg" wx:key="id">
+      <view class="message-item">
+        <view class="message-head">
+          <view class="msg-role">{{msg.targetRole}}</view>
+          <view class="msg-time">{{msg.time}}</view>
+        </view>
+        <view class="meta-row">
+          <view class="msg-type">{{msg.msgTypeText}}</view>
+          <view class="msg-status">{{msg.status}}</view>
+        </view>
+        <view class="voice-card" wx:if="{{msg.isVoice}}">
+          <view class="voice-row">
+            <text class="voice-name">{{msg.mediaName || '语音留言'}}</text>
+            <text class="voice-duration" wx:if="{{msg.voiceDurationText}}">{{msg.voiceDurationText}}</text>
+          </view>
+          <view class="voice-url">{{msg.mediaUrl ? '语音文件已上传，可在后台播放' : '语音文件待补充'}}</view>
+          <view class="voice-transcript" wx:if="{{msg.transcript}}">备注：{{msg.transcript}}</view>
+        </view>
+        <view class="msg-content">{{msg.content}}</view>
+        <view class="msg-sender">发送人：{{msg.sender}}</view>
+      </view>
+    </block>
+  </view>
+</view>

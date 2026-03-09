@@ -53,6 +53,10 @@ public class AssessmentRecord {
 
   private String source;
 
+  private String reportFileUrl;
+
+  private String reportFileName;
+
   private Long createdBy;
 
   @TableField("create_time")

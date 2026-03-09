@@ -1,0 +1,19 @@
+<view class="container">
+  <view class="surface card" wx:if="{{report}}">
+    <view class="section-title">{{report.reportName}}</view>
+    <view class="line"><text class="label">评估日期</text><text>{{report.date}}</text></view>
+    <view class="line"><text class="label">评估机构</text><text>{{report.orgName}}</text></view>
+    <view class="line multiline"><text class="label">结论摘要</text><text>{{report.summary}}</text></view>
+    <view class="line"><text class="label">风险等级</text><text>{{report.risk}}</text></view>
+    <view class="line"><text class="label">评分</text><text>{{report.score}}</text></view>
+    <view class="line multiline"><text class="label">文件名称</text><text>{{report.fileName}}</text></view>
+    <button class="primary-btn action" loading="{{opening}}" bindtap="openReport">在线查看PDF</button>
+    <button class="ghost-btn action" bindtap="copyLink">复制文件链接</button>
+  </view>
+
+  <view class="surface card empty-card" wx:else>
+    <view class="section-title">未找到评估报告</view>
+    <view class="section-subtitle">请返回评估报告列表后重新选择。</view>
+    <button class="ghost-btn action" bindtap="navigateBack">返回上一页</button>
+  </view>
+</view>

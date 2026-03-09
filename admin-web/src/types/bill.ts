@@ -18,6 +18,16 @@ export interface BillItem {
   status?: number
 }
 
+export interface BillPageQuery {
+  pageNo: number
+  pageSize: number
+  month?: string
+  elderId?: number
+  scene?: 'ADMISSION' | 'RESIDENT'
+  keyword?: string
+  payMethod?: string
+}
+
 export interface PayRequest {
   amount: number
   method: string

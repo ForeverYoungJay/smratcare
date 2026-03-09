@@ -1,0 +1,11 @@
+.card { padding: 24rpx; }
+.day-block { margin-top: 14rpx; }
+.day { font-size: 26rpx; color: #194f5e; font-weight: 700; }
+.row { margin-top: 10rpx; display: flex; gap: 12rpx; background: #f8fafc; border-radius: 10rpx; padding: 12rpx; }
+.time { width: 84rpx; font-size: 22rpx; color: #6b7280; }
+.main { flex: 1; }
+.project { display: block; font-size: 25rpx; color: #111827; font-weight: 600; }
+.staff { display: block; margin-top: 4rpx; font-size: 22rpx; color: #6b7280; }
+.note { display: block; margin-top: 4rpx; font-size: 22rpx; color: #374151; }
+.photo-row { margin-top: 8rpx; display: flex; gap: 8rpx; flex-wrap: wrap; }
+.photo { width: 140rpx; height: 100rpx; border-radius: 8rpx; background: #dbeafe; }

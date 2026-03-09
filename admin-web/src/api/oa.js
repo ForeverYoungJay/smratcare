@@ -1,6 +1,6 @@
 import request, { fetchPage } from '../utils/request';
-export function getPortalSummary() {
-    return request.get('/api/oa/portal/summary');
+export function getPortalSummary(config) {
+    return request.get('/api/oa/portal/summary', config);
 }
 export function uploadOaFile(file, bizType = 'oa-approval-proof') {
     const formData = new FormData();
@@ -44,6 +44,9 @@ export function exportNotice(params) {
 export function getTodoPage(params) {
     return fetchPage('/api/oa/todo/page', params);
 }
+export function getTodoSummary(params) {
+    return request.get('/api/oa/todo/summary', { params });
+}
 export function createTodo(data) {
     return request.post('/api/oa/todo', data);
 }
@@ -52,6 +55,18 @@ export function updateTodo(id, data) {
 }
 export function completeTodo(id) {
     return request.put(`/api/oa/todo/${id}/done`);
+}
+export function snoozeTodo(id, days = 1) {
+    return request.put(`/api/oa/todo/${id}/snooze`, null, { params: { days } });
+}
+export function ignoreBirthdayTodo(id) {
+    return request.put(`/api/oa/todo/${id}/ignore-birthday`);
+}
+export function batchSnoozeBirthdayTodo(ids, days = 1) {
+    return request.put('/api/oa/todo/batch/snooze', { ids }, { params: { days } });
+}
+export function batchIgnoreBirthdayTodo(ids) {
+    return request.put('/api/oa/todo/batch/ignore-birthday', { ids });
 }
 export function batchCompleteTodo(ids) {
     return request.put('/api/oa/todo/batch/done', { ids });
@@ -67,6 +82,9 @@ export function exportTodo(params) {
 }
 export function getApprovalPage(params) {
     return fetchPage('/api/oa/approval/page', params);
+}
+export function getApprovalSummary(params) {
+    return request.get('/api/oa/approval/summary', { params });
 }
 export function createApproval(data) {
     return request.post('/api/oa/approval', data);
@@ -101,6 +119,18 @@ export function getDocumentPage(params) {
 export function createDocument(data) {
     return request.post('/api/oa/document', data);
 }
+export function getDocumentFolderTree() {
+    return request.get('/api/oa/document/folder/tree');
+}
+export function createDocumentFolder(data) {
+    return request.post('/api/oa/document/folder', data);
+}
+export function updateDocumentFolder(id, data) {
+    return request.put(`/api/oa/document/folder/${id}`, data);
+}
+export function deleteDocumentFolder(id) {
+    return request.delete(`/api/oa/document/folder/${id}`);
+}
 export function updateDocument(id, data) {
     return request.put(`/api/oa/document/${id}`, data);
 }
@@ -115,6 +145,9 @@ export function exportDocument(params) {
 }
 export function getAlbumPage(params) {
     return fetchPage('/api/oa/album/page', params);
+}
+export function getAlbumFolders() {
+    return request.get('/api/oa/album/folders');
 }
 export function createAlbum(data) {
     return request.post('/api/oa/album', data);
@@ -140,11 +173,17 @@ export function publishKnowledge(id) {
 export function archiveKnowledge(id) {
     return request.put(`/api/oa/knowledge/${id}/archive`);
 }
+export function expireKnowledge(id) {
+    return request.put(`/api/oa/knowledge/${id}/expire`);
+}
 export function batchPublishKnowledge(ids) {
     return request.put('/api/oa/knowledge/batch/publish', { ids });
 }
 export function batchArchiveKnowledge(ids) {
     return request.put('/api/oa/knowledge/batch/archive', { ids });
+}
+export function batchExpireKnowledge(ids) {
+    return request.put('/api/oa/knowledge/batch/expire', { ids });
 }
 export function deleteKnowledge(id) {
     return request.delete(`/api/oa/knowledge/${id}`);
@@ -268,6 +307,9 @@ export function exportOaTask(params) {
 }
 export function getOaWorkReportPage(params) {
     return fetchPage('/api/oa/report/page', params);
+}
+export function getOaWorkReportSummary(params) {
+    return request.get('/api/oa/report/summary', { params });
 }
 export function getDailyWorkReportPage(params) {
     return fetchPage('/api/oa/report/daily/page', params);

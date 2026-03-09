@@ -57,8 +57,8 @@ export function getReconcilePage(params: any) {
   return fetchPage<ReconcileDailyItem>('/api/finance/reconcile/page', params)
 }
 
-export function getFinanceBillDetail(billId: number) {
-  return request.get<FinanceBillDetail>(`/api/finance/bill/${billId}`)
+export function getFinanceBillDetail(billId: number, config?: Record<string, any>) {
+  return request.get<FinanceBillDetail>(`/api/finance/bill/${billId}`, config)
 }
 
 export function getFinanceMonthlyRevenue(params?: { from?: string; to?: string; months?: number }) {

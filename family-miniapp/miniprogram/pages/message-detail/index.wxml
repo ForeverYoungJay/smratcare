@@ -1,0 +1,19 @@
+<view class="container" wx:if="{{detail}}">
+  <view class="surface card">
+    <view class="top-row">
+      <text class="tag {{detail.level}}">{{detail.levelText}}</text>
+      <text class="time">{{detail.time}}</text>
+    </view>
+    <view class="title">{{detail.title}}</view>
+    <view class="meta">涉及老人：{{detail.elderName}} · 类型：{{detail.type}}</view>
+    <view class="content">{{detail.content}}</view>
+
+    <view class="section">事件进展</view>
+    <block wx:for="{{detail.timeline}}" wx:key="*this">
+      <view class="timeline-row">{{item}}</view>
+    </block>
+
+    <button class="primary-btn action" bindtap="callNurse">联系责任护士</button>
+    <button class="ghost-btn action" bindtap="markRead">确认已读</button>
+  </view>
+</view>

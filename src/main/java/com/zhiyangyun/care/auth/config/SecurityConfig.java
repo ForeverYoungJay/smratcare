@@ -42,7 +42,8 @@ public class SecurityConfig {
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
             .requestMatchers("/uploads/**").permitAll()
-            .requestMatchers("/api/auth/login", "/api/auth/family/login").permitAll()
+            .requestMatchers("/api/auth/login", "/api/auth/family/login", "/api/auth/family/sms-code/**", "/api/family/register").permitAll()
+            .requestMatchers("/api/family/payment/wechat/notify").permitAll()
             .requestMatchers("/ws/**").permitAll()
             .requestMatchers("/api/admin/**").authenticated()
             .requestMatchers("/api/guard/**").hasAnyRole("GUARD", "ADMIN")

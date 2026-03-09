@@ -23,23 +23,27 @@ import com.zhiyangyun.care.elder.mapper.lifecycle.ElderAdmissionMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderChangeLogMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeMapper;
 import com.zhiyangyun.care.elder.model.lifecycle.AdmissionRequest;
+import com.zhiyangyun.care.elder.model.lifecycle.AdmissionRecordDimensionItem;
 import com.zhiyangyun.care.elder.model.lifecycle.AdmissionRecordResponse;
+import com.zhiyangyun.care.elder.model.lifecycle.AdmissionRecordSummaryResponse;
 import com.zhiyangyun.care.elder.model.lifecycle.AdmissionResponse;
 import com.zhiyangyun.care.elder.model.lifecycle.ChangeLogResponse;
 import com.zhiyangyun.care.elder.model.lifecycle.DischargeRequest;
 import com.zhiyangyun.care.elder.model.lifecycle.DischargeResponse;
+import com.zhiyangyun.care.elder.service.lifecycle.ElderLifecycleService;
 import com.zhiyangyun.care.elder.service.ElderService;
 import com.zhiyangyun.care.finance.model.ElderAccountAdjustRequest;
 import com.zhiyangyun.care.finance.service.ElderAccountService;
-import com.zhiyangyun.care.elder.service.lifecycle.ElderLifecycleService;
 import com.zhiyangyun.care.store.entity.ElderPointsAccount;
 import com.zhiyangyun.care.store.mapper.ElderPointsAccountMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -367,34 +371,18 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
   @Override
   public IPage<AdmissionRecordResponse> admissionPage(Long tenantId, long pageNo, long pageSize,
       String keyword, String contractNo, Integer elderStatus, LocalDate admissionDateStart, LocalDate admissionDateEnd) {
-    LocalDate actualStartDate = admissionDateStart;
-    LocalDate actualEndDate = admissionDateEnd;
-    if (actualStartDate != null && actualEndDate != null && actualStartDate.isAfter(actualEndDate)) {
-      LocalDate temp = actualStartDate;
-      actualStartDate = actualEndDate;
-      actualEndDate = temp;
+    LocalDate[] dateRange = normalizeAdmissionDateRange(admissionDateStart, admissionDateEnd);
+    List<Long> matchedElderIds = resolveMatchedElderIds(tenantId, keyword, elderStatus);
+    if (matchedElderIds != null && matchedElderIds.isEmpty()) {
+      return new Page<>(pageNo, pageSize, 0);
     }
-    var wrapper = Wrappers.lambdaQuery(ElderAdmission.class)
-        .eq(ElderAdmission::getIsDeleted, 0)
-        .eq(tenantId != null, ElderAdmission::getTenantId, tenantId)
-        .like(contractNo != null && !contractNo.isBlank(), ElderAdmission::getContractNo, contractNo)
-        .ge(actualStartDate != null, ElderAdmission::getAdmissionDate, actualStartDate)
-        .le(actualEndDate != null, ElderAdmission::getAdmissionDate, actualEndDate)
-        .orderByDesc(ElderAdmission::getAdmissionDate)
-        .orderByDesc(ElderAdmission::getCreateTime);
-
-    if ((keyword != null && !keyword.isBlank()) || elderStatus != null) {
-      var elderWrapper = Wrappers.lambdaQuery(ElderProfile.class)
-          .eq(ElderProfile::getIsDeleted, 0)
-          .eq(tenantId != null, ElderProfile::getTenantId, tenantId)
-          .like(keyword != null && !keyword.isBlank(), ElderProfile::getFullName, keyword)
-          .eq(elderStatus != null, ElderProfile::getStatus, elderStatus);
-      List<Long> elderIds = elderMapper.selectList(elderWrapper).stream().map(ElderProfile::getId).toList();
-      if (elderIds.isEmpty()) {
-        return new Page<>(pageNo, pageSize, 0);
-      }
-      wrapper.in(ElderAdmission::getElderId, elderIds);
-    }
+    var wrapper = buildAdmissionWrapper(
+        tenantId,
+        contractNo,
+        dateRange[0],
+        dateRange[1],
+        matchedElderIds);
+    wrapper.orderByDesc(ElderAdmission::getAdmissionDate).orderByDesc(ElderAdmission::getCreateTime);
 
     IPage<ElderAdmission> page = admissionMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
     List<Long> elderIds = page.getRecords().stream()
@@ -402,13 +390,7 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
         .filter(Objects::nonNull)
         .distinct()
         .toList();
-    Map<Long, ElderProfile> elderMap = elderIds.isEmpty()
-        ? Map.of()
-        : elderMapper.selectList(Wrappers.lambdaQuery(ElderProfile.class)
-            .in(ElderProfile::getId, elderIds)
-            .eq(ElderProfile::getIsDeleted, 0))
-            .stream()
-            .collect(java.util.stream.Collectors.toMap(ElderProfile::getId, item -> item, (a, b) -> a));
+    Map<Long, ElderProfile> elderMap = loadElderProfileMap(tenantId, elderIds);
 
     List<AdmissionRecordResponse> records = page.getRecords().stream().map(item -> {
       AdmissionRecordResponse response = new AdmissionRecordResponse();
@@ -428,6 +410,227 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
     IPage<AdmissionRecordResponse> resp = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
     resp.setRecords(records);
     return resp;
+  }
+
+  @Override
+  public AdmissionRecordSummaryResponse admissionSummary(
+      Long tenantId,
+      String keyword,
+      String contractNo,
+      Integer elderStatus,
+      LocalDate admissionDateStart,
+      LocalDate admissionDateEnd) {
+    LocalDate[] dateRange = normalizeAdmissionDateRange(admissionDateStart, admissionDateEnd);
+    List<Long> matchedElderIds = resolveMatchedElderIds(tenantId, keyword, elderStatus);
+    AdmissionRecordSummaryResponse response = new AdmissionRecordSummaryResponse();
+    response.setGeneratedAt(LocalDateTime.now());
+    if (matchedElderIds != null && matchedElderIds.isEmpty()) {
+      return response;
+    }
+
+    List<ElderAdmission> admissions = admissionMapper.selectList(buildAdmissionWrapper(
+        tenantId,
+        contractNo,
+        dateRange[0],
+        dateRange[1],
+        matchedElderIds));
+    if (admissions.isEmpty()) {
+      return response;
+    }
+    response.setTotalCount(admissions.size());
+
+    List<Long> elderIds = admissions.stream()
+        .map(ElderAdmission::getElderId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList();
+    Map<Long, ElderProfile> elderMap = loadElderProfileMap(tenantId, elderIds);
+    Map<Long, Bed> bedMap = loadBedMap(tenantId, elderMap.values().stream()
+        .map(ElderProfile::getBedId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList());
+    Map<Long, Room> roomMap = loadRoomMap(tenantId, bedMap.values().stream()
+        .map(Bed::getRoomId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList());
+    Map<String, Long> buildingDimensionCount = new java.util.HashMap<>();
+    Map<String, Long> floorDimensionCount = new java.util.HashMap<>();
+    LocalDate today = LocalDate.now();
+
+    for (ElderAdmission admission : admissions) {
+      String admissionContractNo = admission.getContractNo() == null ? "" : admission.getContractNo().trim();
+      if (admissionContractNo.isBlank()) {
+        response.setWithoutContractCount(response.getWithoutContractCount() + 1);
+      } else {
+        response.setWithContractCount(response.getWithContractCount() + 1);
+      }
+      if (Objects.equals(admission.getAdmissionDate(), today)) {
+        response.setTodayAdmissionCount(response.getTodayAdmissionCount() + 1);
+      }
+
+      ElderProfile elder = elderMap.get(admission.getElderId());
+      Integer status = elder == null ? null : elder.getStatus();
+      if (status == null) {
+        response.setOtherStatusCount(response.getOtherStatusCount() + 1);
+      } else if (status == 1) {
+        response.setInHospitalCount(response.getInHospitalCount() + 1);
+      } else if (status == 2) {
+        response.setLeaveCount(response.getLeaveCount() + 1);
+      } else if (status == 3) {
+        response.setDischargedCount(response.getDischargedCount() + 1);
+      } else {
+        response.setOtherStatusCount(response.getOtherStatusCount() + 1);
+      }
+
+      Bed bed = elder == null || elder.getBedId() == null ? null : bedMap.get(elder.getBedId());
+      Room room = bed == null || bed.getRoomId() == null ? null : roomMap.get(bed.getRoomId());
+      increaseDimensionCount(buildingDimensionCount, resolveBuildingDimension(room));
+      increaseDimensionCount(floorDimensionCount, resolveFloorDimension(room));
+    }
+    response.setBuildingDistribution(toDimensionItems(buildingDimensionCount, response.getTotalCount()));
+    response.setFloorDistribution(toDimensionItems(floorDimensionCount, response.getTotalCount()));
+    return response;
+  }
+
+  private LocalDate[] normalizeAdmissionDateRange(LocalDate admissionDateStart, LocalDate admissionDateEnd) {
+    LocalDate actualStartDate = admissionDateStart;
+    LocalDate actualEndDate = admissionDateEnd;
+    if (actualStartDate != null && actualEndDate != null && actualStartDate.isAfter(actualEndDate)) {
+      LocalDate temp = actualStartDate;
+      actualStartDate = actualEndDate;
+      actualEndDate = temp;
+    }
+    return new LocalDate[] {actualStartDate, actualEndDate};
+  }
+
+  private List<Long> resolveMatchedElderIds(Long tenantId, String keyword, Integer elderStatus) {
+    boolean hasKeyword = keyword != null && !keyword.isBlank();
+    boolean hasStatus = elderStatus != null;
+    if (!hasKeyword && !hasStatus) {
+      return null;
+    }
+    return elderMapper.selectList(Wrappers.lambdaQuery(ElderProfile.class)
+            .eq(ElderProfile::getIsDeleted, 0)
+            .eq(tenantId != null, ElderProfile::getTenantId, tenantId)
+            .like(hasKeyword, ElderProfile::getFullName, keyword)
+            .eq(hasStatus, ElderProfile::getStatus, elderStatus))
+        .stream()
+        .map(ElderProfile::getId)
+        .filter(Objects::nonNull)
+        .toList();
+  }
+
+  private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ElderAdmission> buildAdmissionWrapper(
+      Long tenantId,
+      String contractNo,
+      LocalDate admissionDateStart,
+      LocalDate admissionDateEnd,
+      List<Long> elderIds) {
+    var wrapper = Wrappers.lambdaQuery(ElderAdmission.class)
+        .eq(ElderAdmission::getIsDeleted, 0)
+        .eq(tenantId != null, ElderAdmission::getTenantId, tenantId)
+        .like(contractNo != null && !contractNo.isBlank(), ElderAdmission::getContractNo, contractNo)
+        .ge(admissionDateStart != null, ElderAdmission::getAdmissionDate, admissionDateStart)
+        .le(admissionDateEnd != null, ElderAdmission::getAdmissionDate, admissionDateEnd);
+    if (elderIds != null) {
+      wrapper.in(ElderAdmission::getElderId, elderIds);
+    }
+    return wrapper;
+  }
+
+  private Map<Long, ElderProfile> loadElderProfileMap(Long tenantId, List<Long> elderIds) {
+    if (elderIds == null || elderIds.isEmpty()) {
+      return Map.of();
+    }
+    return elderMapper.selectList(Wrappers.lambdaQuery(ElderProfile.class)
+            .eq(ElderProfile::getIsDeleted, 0)
+            .eq(tenantId != null, ElderProfile::getTenantId, tenantId)
+            .in(ElderProfile::getId, elderIds))
+        .stream()
+        .collect(Collectors.toMap(ElderProfile::getId, item -> item, (left, right) -> left));
+  }
+
+  private Map<Long, Bed> loadBedMap(Long tenantId, List<Long> bedIds) {
+    if (bedIds == null || bedIds.isEmpty()) {
+      return Map.of();
+    }
+    return bedMapper.selectList(Wrappers.lambdaQuery(Bed.class)
+            .eq(Bed::getIsDeleted, 0)
+            .eq(tenantId != null, Bed::getTenantId, tenantId)
+            .in(Bed::getId, bedIds))
+        .stream()
+        .collect(Collectors.toMap(Bed::getId, item -> item, (left, right) -> left));
+  }
+
+  private Map<Long, Room> loadRoomMap(Long tenantId, List<Long> roomIds) {
+    if (roomIds == null || roomIds.isEmpty()) {
+      return Map.of();
+    }
+    return roomMapper.selectList(Wrappers.lambdaQuery(Room.class)
+            .eq(Room::getIsDeleted, 0)
+            .eq(tenantId != null, Room::getTenantId, tenantId)
+            .in(Room::getId, roomIds))
+        .stream()
+        .collect(Collectors.toMap(Room::getId, item -> item, (left, right) -> left));
+  }
+
+  private void increaseDimensionCount(Map<String, Long> counter, String key) {
+    String normalized = key == null || key.isBlank() ? "-" : key;
+    counter.put(normalized, counter.getOrDefault(normalized, 0L) + 1L);
+  }
+
+  private String resolveBuildingDimension(Room room) {
+    if (room == null) {
+      return "未分配楼栋";
+    }
+    if (room.getBuilding() != null && !room.getBuilding().isBlank()) {
+      return room.getBuilding().trim();
+    }
+    if (room.getBuildingId() != null) {
+      return "楼栋#" + room.getBuildingId();
+    }
+    return "未分配楼栋";
+  }
+
+  private String resolveFloorDimension(Room room) {
+    if (room == null) {
+      return "未分配楼层";
+    }
+    String floorNo = room.getFloorNo() == null ? "" : room.getFloorNo().trim();
+    String building = room.getBuilding() == null ? "" : room.getBuilding().trim();
+    if (!floorNo.isBlank() && !building.isBlank()) {
+      return building + " / " + floorNo;
+    }
+    if (!floorNo.isBlank()) {
+      return floorNo;
+    }
+    if (room.getFloorId() != null) {
+      return "楼层#" + room.getFloorId();
+    }
+    return "未分配楼层";
+  }
+
+  private List<AdmissionRecordDimensionItem> toDimensionItems(Map<String, Long> counter, long totalCount) {
+    if (counter == null || counter.isEmpty() || totalCount <= 0) {
+      return List.of();
+    }
+    return counter.entrySet().stream()
+        .sorted(Comparator
+            .<Map.Entry<String, Long>>comparingLong(Map.Entry::getValue)
+            .reversed()
+            .thenComparing(Map.Entry::getKey))
+        .map(entry -> {
+          AdmissionRecordDimensionItem item = new AdmissionRecordDimensionItem();
+          item.setDimensionKey(entry.getKey());
+          item.setDimensionLabel(entry.getKey());
+          item.setCount(entry.getValue());
+          double ratioRaw = ((double) entry.getValue()) / ((double) totalCount);
+          item.setRatio(Math.round(ratioRaw * 10000d) / 10000d);
+          return item;
+        })
+        .toList();
   }
 
   private void insertChangeLog(Long tenantId, Long orgId, Long elderId, Long createdBy, String changeType,

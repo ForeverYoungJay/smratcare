@@ -1,0 +1,53 @@
+<view class="container">
+  <view class="surface panel" wx:if="{{status}}">
+    <view class="section-title">链路能力状态</view>
+    <view class="section-subtitle">短信验证码、微信通知、微信支付、安全设置与旧接口下线进度</view>
+    <view class="checked">最近检查：{{status.checkedAt}}</view>
+
+    <view class="summary-grid">
+      <view class="summary-item">
+        <text class="label">短信</text>
+        <text class="value">{{status.smsEnabled ? status.smsProvider : 'OFF'}}</text>
+      </view>
+      <view class="summary-item">
+        <text class="label">通知</text>
+        <text class="value">{{status.wechatNotifyEnabled ? (status.wechatNotifyBound ? '已绑定' : '待绑定') : 'OFF'}}</text>
+      </view>
+      <view class="summary-item">
+        <text class="label">微信支付</text>
+        <text class="value">{{status.wechatPayEnabled ? '已开启' : '未开启'}}</text>
+      </view>
+      <view class="summary-item">
+        <text class="label">旧接口</text>
+        <text class="value">{{status.legacyApiEnabled ? '兼容中' : '已下线'}}</text>
+      </view>
+    </view>
+
+    <view class="ops-row">
+      <button class="ghost-btn op" bindtap="bindNotifyOpenId">一键绑定通知</button>
+      <button class="ghost-btn op" bindtap="refreshStatus">刷新状态</button>
+    </view>
+  </view>
+
+  <view class="surface panel">
+    <view class="card-title">能力明细</view>
+    <view wx:if="{{loading}}" class="list-empty">正在刷新能力状态...</view>
+    <block wx:for="{{items}}" wx:key="code">
+      <view class="item">
+        <view class="item-head">
+          <text class="title">{{item.title}}</text>
+          <text class="badge {{item.badgeClass}}">{{item.statusText}}</text>
+        </view>
+        <view class="hint">{{item.hint}}</view>
+        <view
+          class="action"
+          wx:if="{{item.actionText}}"
+          data-path="{{item.actionPath}}"
+          data-code="{{item.code}}"
+          data-status="{{item.status}}"
+          data-action-type="{{item.actionType}}"
+          bindtap="openAction">{{item.actionText}}</view>
+      </view>
+    </block>
+  </view>
+</view>

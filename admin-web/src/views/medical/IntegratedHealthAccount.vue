@@ -1,6 +1,33 @@
 <template>
   <PageContainer title="健康服务与医护账户一体化" subTitle="医护执行 + 老人账户联动总览">
     <StatefulBlock :loading="loading" :error="errorText" :empty="false" @retry="load">
+      <a-card class="card-elevated risk-hero" :bordered="false" style="margin-bottom: 12px">
+        <a-row :gutter="[12, 12]" align="middle">
+          <a-col :xs="24" :xl="9">
+            <div class="risk-title">医护-账户联动风险指数</div>
+            <div class="risk-score-row">
+              <span class="risk-score">{{ riskIndex }}</span>
+              <a-tag :color="riskTagColor">{{ riskLevelLabel }}</a-tag>
+            </div>
+            <a-progress :percent="riskIndex" :status="riskIndex >= 75 ? 'exception' : riskIndex >= 55 ? 'active' : 'normal'" />
+            <div class="risk-subline">触发信号 {{ riskSignals.length }} 项 · 业务日期 {{ medicalSummary.snapshotDate || '-' }}</div>
+          </a-col>
+          <a-col :xs="24" :xl="15">
+            <a-space wrap>
+              <a-tag color="orange">护理超时率 {{ Number(medicalSummary.careTaskOverdueRate || 0).toFixed(2) }}%</a-tag>
+              <a-tag color="blue">医嘱待执行率 {{ Number(medicalSummary.medicationPendingRate || 0).toFixed(2) }}%</a-tag>
+              <a-tag color="volcano">整改逾期 {{ medicalSummary.rectifyOverdueCount || 0 }} 条</a-tag>
+              <a-tag color="purple">账户预警 {{ warningCount }} 人</a-tag>
+            </a-space>
+            <a-list size="small" style="margin-top: 8px" :data-source="riskSignals" :pagination="false" :locale="{ emptyText: '暂无协同风险信号' }">
+              <template #renderItem="{ item }">
+                <a-list-item>{{ item }}</a-list-item>
+              </template>
+            </a-list>
+          </a-col>
+        </a-row>
+      </a-card>
+
       <a-alert
         v-if="warningCount > 0 || medicalSummary.overdueCareTaskCount > 0 || medicalSummary.todayMedicationPendingCount > 0"
         type="warning"
@@ -47,66 +74,44 @@ import StatefulBlock from '../../components/StatefulBlock.vue'
 import { getElderAccountLogPage, getElderAccountWarnings } from '../../api/finance'
 import { getMedicalCareWorkbenchSummary } from '../../api/medicalCare'
 import { resolveMedicalError } from './medicalError'
+import {
+  createMedicalWorkbenchSummaryDefaults,
+  normalizeRiskIndex,
+  resolveMedicalRiskColor,
+  resolveMedicalRiskLabel
+} from '../../utils/medicalSummary'
 import type { ElderAccount, ElderAccountLog, MedicalCareWorkbenchSummary, PageResult } from '../../types'
 
 const router = useRouter()
 const loading = ref(false)
 const errorText = ref('')
 
-const medicalSummary = ref<MedicalCareWorkbenchSummary>({
-  pendingMedicalOrderCount: 0,
-  pendingReviewCount: 0,
-  pendingAuditCount: 0,
-  unclosedAbnormalCount: 0,
-  todayInspectionTodoCount: 0,
-  topRiskResidentCount: 0,
-  abnormalVital24hCount: 0,
-  abnormalEvent24hCount: 0,
-  medicalOrderShouldCount: 0,
-  medicalOrderDoneCount: 0,
-  medicalOrderPendingCount: 0,
-  medicalOrderAbnormalCount: 0,
-  orderCheckRate: 0,
-  medicationShouldCount: 0,
-  medicationDoneCount: 0,
-  medicationUndoneCount: 0,
-  medicationLowStockCount: 0,
-  medicationRequestPendingCount: 0,
-  careTaskShouldCount: 0,
-  careTaskDoneCount: 0,
-  careTaskOverdueCount: 0,
-  scanExecuteRate: 0,
-  todayInspectionPlanCount: 0,
-  nursingLogPendingCount: 0,
-  handoverPendingCount: 0,
-  handoverDoneCount: 0,
-  handoverRiskCount: 0,
-  handoverTodoCount: 0,
-  incidentOpenCount: 0,
-  incident30dCount: 0,
-  incident30dRate: 0,
-  lowScoreSurveyCount: 0,
-  rectifyInProgressCount: 0,
-  rectifyOverdueCount: 0,
-  aiReportGeneratedCount: 0,
-  aiReportPublishedCount: 0,
-  pendingCareTaskCount: 0,
-  overdueCareTaskCount: 0,
-  todayInspectionPendingCount: 0,
-  todayInspectionDoneCount: 0,
-  abnormalInspectionCount: 0,
-  todayMedicationPendingCount: 0,
-  todayMedicationDoneCount: 0,
-  tcmPublishedCount: 0,
-  cvdHighRiskCount: 0,
-  cvdNeedFollowupCount: 0,
-  keyResidents: []
-})
+const medicalSummary = ref<MedicalCareWorkbenchSummary>(createMedicalWorkbenchSummaryDefaults())
 
 const warningRows = ref<ElderAccount[]>([])
 const logRows = ref<ElderAccountLog[]>([])
 
 const warningCount = computed(() => warningRows.value.length)
+const riskIndex = computed(() => normalizeRiskIndex(medicalSummary.value.riskIndex))
+const riskTagColor = computed(() => resolveMedicalRiskColor(medicalSummary.value.riskLevel))
+const riskLevelLabel = computed(() => resolveMedicalRiskLabel(medicalSummary.value.riskLevel))
+const riskSignals = computed(() => {
+  const source = medicalSummary.value.riskSignals || []
+  if (source.length > 0) {
+    return source
+  }
+  const rows: string[] = []
+  if (Number(medicalSummary.value.overdueCareTaskCount || 0) > 0) {
+    rows.push(`护理超时 ${medicalSummary.value.overdueCareTaskCount} 条`)
+  }
+  if (Number(medicalSummary.value.todayMedicationPendingCount || 0) > 0) {
+    rows.push(`用药待执行 ${medicalSummary.value.todayMedicationPendingCount} 条`)
+  }
+  if (warningCount.value > 0) {
+    rows.push(`账户余额预警 ${warningCount.value} 人`)
+  }
+  return rows
+})
 
 const warningColumns = [
   { title: '老人', dataIndex: 'elderName', key: 'elderName', width: 140 },
@@ -138,7 +143,10 @@ async function load() {
       getElderAccountWarnings(),
       getElderAccountLogPage({ pageNo: 1, pageSize: 10 })
     ])
-    medicalSummary.value = medicalData
+    medicalSummary.value = {
+      ...createMedicalWorkbenchSummaryDefaults(),
+      ...(medicalData || {})
+    }
     warningRows.value = warningData || []
     const page = logData as PageResult<ElderAccountLog>
     logRows.value = page?.list || []
@@ -151,3 +159,39 @@ async function load() {
 
 onMounted(load)
 </script>
+
+<style scoped>
+.risk-hero {
+  border: 1px solid #dcecff;
+  background:
+    radial-gradient(140% 120% at 0% 0%, rgba(22, 119, 255, 0.1) 0%, rgba(22, 119, 255, 0) 56%),
+    linear-gradient(135deg, #f7fbff 0%, #eef6ff 42%, #f8fcff 100%);
+}
+
+.risk-title {
+  font-size: 14px;
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.risk-score-row {
+  margin-top: 8px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.risk-score {
+  font-size: 38px;
+  line-height: 1;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.risk-subline {
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 12px;
+}
+</style>

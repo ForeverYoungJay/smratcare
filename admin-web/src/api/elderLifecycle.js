@@ -12,6 +12,9 @@ export function getChangeLogs(params) {
 export function getAdmissionRecords(params) {
     return fetchPage('/api/elder/lifecycle/admissions/page', params);
 }
+export function getAdmissionRecordSummary(params) {
+    return request.get('/api/elder/lifecycle/admissions/summary', { params });
+}
 export function exportChangeLogs(params) {
     return exportCsvByRequest('/api/elder/lifecycle/changes/export', params, '变更记录.csv');
 }

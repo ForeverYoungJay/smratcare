@@ -5,9 +5,11 @@ import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.crm.model.CrmContractRequest;
 import com.zhiyangyun.care.crm.model.CrmContractResponse;
+import com.zhiyangyun.care.crm.model.CrmContractStageSummaryResponse;
 import com.zhiyangyun.care.crm.model.action.CrmContractBatchDeleteRequest;
 import com.zhiyangyun.care.crm.model.action.CrmContractFinalizeRequest;
 import com.zhiyangyun.care.crm.service.CrmContractService;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -76,6 +78,45 @@ public class CrmContractController {
         overdueOnly,
         sortByOverdue,
         currentOwnerDept));
+  }
+
+  @GetMapping("/stage-summary")
+  public Result<CrmContractStageSummaryResponse> stageSummary(
+      @RequestParam(required = false) String currentOwnerDept) {
+    Long orgId = AuthContext.getOrgId();
+    CrmContractStageSummaryResponse response = new CrmContractStageSummaryResponse();
+    response.setPendingAssessment(resolveStageTotal(orgId, "PENDING_ASSESSMENT", false, currentOwnerDept));
+    response.setPendingBedSelect(resolveStageTotal(orgId, "PENDING_BED_SELECT", false, currentOwnerDept));
+    response.setPendingSign(resolveStageTotal(orgId, "PENDING_SIGN", false, currentOwnerDept));
+    response.setSigned(resolveStageTotal(orgId, "SIGNED", false, currentOwnerDept));
+    response.setPendingAssessmentOverdue(resolveStageTotal(orgId, "PENDING_ASSESSMENT", true, currentOwnerDept));
+    response.setPendingSignOverdue(resolveStageTotal(orgId, "PENDING_SIGN", true, currentOwnerDept));
+    response.setGeneratedAt(LocalDateTime.now());
+    return Result.ok(response);
+  }
+
+  private long resolveStageTotal(
+      Long orgId,
+      String flowStage,
+      boolean overdueOnly,
+      String currentOwnerDept) {
+    return contractService.page(
+            orgId,
+            1,
+            1,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            flowStage,
+            null,
+            null,
+            overdueOnly,
+            false,
+            currentOwnerDept)
+        .getTotal();
   }
 
   @PostMapping("/batch/delete")

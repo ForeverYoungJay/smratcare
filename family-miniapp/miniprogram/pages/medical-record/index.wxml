@@ -1,0 +1,16 @@
+<view class="container">
+  <view class="surface card">
+    <view class="section-title">就医记录</view>
+    <view class="list-empty" wx:if="{{records.length === 0}}">暂无就医记录或未完成访问验证</view>
+    <block wx:for="{{records}}" wx:key="id">
+      <view class="item">
+        <view class="line"><text class="label">就诊时间</text><text class="value">{{item.date}}</text></view>
+        <view class="line"><text class="label">医院/科室</text><text class="value">{{item.hospital}}</text></view>
+        <view class="line"><text class="label">就诊原因</text><text class="value">{{item.reason}}</text></view>
+        <view class="line"><text class="label">诊断结果</text><text class="value">{{item.diagnosis}}</text></view>
+        <view class="line"><text class="label">医生建议</text><text class="value">{{item.advice}}</text></view>
+        <view class="line"><text class="label">用药记录</text><text class="value">{{item.meds}}</text></view>
+      </view>
+    </block>
+  </view>
+</view>

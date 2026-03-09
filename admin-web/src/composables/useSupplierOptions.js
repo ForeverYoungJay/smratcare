@@ -1,0 +1,115 @@
+import { onMounted, onUnmounted, ref } from 'vue';
+import { getSupplierPage } from '../api/materialCenter';
+import { subscribeLiveSync } from '../utils/liveSync';
+import { fuzzyScore, toPinyinInitials } from './entitySearch';
+const supplierPoolCache = new Map();
+const supplierPoolFetchedAt = new Map();
+const SUPPLIER_POOL_CACHE_TTL = 120 * 1000;
+function toSupplierOption(item) {
+    const name = item.supplierName || `供应商#${item.id}`;
+    const suffix = item.supplierCode ? ` (${item.supplierCode})` : '';
+    return {
+        label: `${name}${suffix}`,
+        value: item.id,
+        name
+    };
+}
+function supplierSearchText(item) {
+    const text = `${item.supplierName || ''} ${item.supplierCode || ''} ${item.contactName || ''} ${item.contactPhone || ''}`.trim();
+    return `${text} ${toPinyinInitials(text)}`;
+}
+function dedupeSuppliers(rows) {
+    const map = new Map();
+    rows.forEach((item) => {
+        if (!map.has(item.id))
+            map.set(item.id, item);
+    });
+    return Array.from(map.values());
+}
+export function useSupplierOptions(config = {}) {
+    const pageSize = config.pageSize || 120;
+    const preloadSize = config.preloadSize || 300;
+    const enabledOnly = config.enabledOnly !== false;
+    const supplierOptions = ref([]);
+    const supplierLoading = ref(false);
+    const lastKeyword = ref('');
+    const cacheKey = `supplier:${enabledOnly ? 'enabled' : 'all'}`;
+    async function loadBasePool(force = false) {
+        const lastAt = supplierPoolFetchedAt.get(cacheKey) || 0;
+        const hasFresh = supplierPoolCache.has(cacheKey) && (Date.now() - lastAt < SUPPLIER_POOL_CACHE_TTL);
+        if (!force && hasFresh)
+            return supplierPoolCache.get(cacheKey) || [];
+        const page = await getSupplierPage({ pageNo: 1, pageSize: preloadSize, enabledOnly });
+        const rows = page.list || [];
+        supplierPoolCache.set(cacheKey, rows);
+        supplierPoolFetchedAt.set(cacheKey, Date.now());
+        return rows;
+    }
+    async function searchSuppliers(keyword = '') {
+        supplierLoading.value = true;
+        try {
+            lastKeyword.value = String(keyword || '');
+            const text = String(keyword || '').trim();
+            const baseRows = await loadBasePool(false);
+            let mergedRows = [...baseRows];
+            if (text) {
+                const page = await getSupplierPage({
+                    pageNo: 1,
+                    pageSize: Math.max(pageSize * 2, 180),
+                    enabledOnly,
+                    keyword: text
+                });
+                mergedRows = dedupeSuppliers([...(page.list || []), ...baseRows]);
+            }
+            const finalRows = text
+                ? mergedRows
+                    .map((item) => ({ item, score: fuzzyScore(supplierSearchText(item), text) }))
+                    .filter((row) => row.score >= 0)
+                    .sort((a, b) => b.score - a.score || String(a.item.supplierName || '').localeCompare(String(b.item.supplierName || ''), 'zh-CN'))
+                    .slice(0, pageSize)
+                    .map((row) => row.item)
+                : mergedRows.slice(0, pageSize);
+            supplierOptions.value = finalRows.map(toSupplierOption);
+        }
+        finally {
+            supplierLoading.value = false;
+        }
+    }
+    function ensureSelectedSupplier(supplierId, supplierName) {
+        if (!supplierId)
+            return;
+        if (supplierOptions.value.some((item) => item.value === supplierId))
+            return;
+        const name = supplierName || `供应商#${supplierId}`;
+        supplierOptions.value.unshift({
+            label: name,
+            value: supplierId,
+            name
+        });
+    }
+    function invalidateSupplierCache() {
+        supplierPoolCache.delete(cacheKey);
+        supplierPoolFetchedAt.delete(cacheKey);
+    }
+    let unsubscribe = () => { };
+    onMounted(() => {
+        unsubscribe = subscribeLiveSync((payload) => {
+            if (!payload.topics.some((topic) => topic === 'logistics' || topic === 'finance' || topic === 'system'))
+                return;
+            invalidateSupplierCache();
+            if (!supplierOptions.value.length || supplierLoading.value)
+                return;
+            searchSuppliers(lastKeyword.value).catch(() => { });
+        });
+    });
+    onUnmounted(() => {
+        unsubscribe();
+    });
+    return {
+        supplierOptions,
+        supplierLoading,
+        searchSuppliers,
+        ensureSelectedSupplier,
+        invalidateSupplierCache
+    };
+}

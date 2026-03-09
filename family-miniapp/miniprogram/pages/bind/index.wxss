@@ -1,0 +1,42 @@
+.bind-card {
+  padding: 30rpx;
+}
+
+.ghost-btn {
+  margin-top: 16rpx;
+}
+
+.field {
+  margin-top: 20rpx;
+}
+
+.label {
+  display: block;
+  font-size: 24rpx;
+  color: #6b7280;
+  margin-bottom: 10rpx;
+}
+
+.input,
+.picker,
+.textarea {
+  background: #f8fafc;
+  border: 1rpx solid #dbe3ea;
+  border-radius: 14rpx;
+  padding: 20rpx;
+  font-size: 30rpx;
+}
+
+.picker {
+  color: #1f2937;
+}
+
+.textarea {
+  min-height: 140rpx;
+}
+
+.switch-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}

@@ -27,7 +27,7 @@ export function updateElderDiseases(elderId, diseaseIds) {
     return request.put(`/api/elder/${elderId}/diseases`, body);
 }
 export function bindFamily(data) {
-    return request.post('/api/family/bindElder', data);
+    return request.post('/api/admin/family/relations/bind', data);
 }
 export function uploadElderFile(file, bizType = 'elder-archive') {
     const formData = new FormData();

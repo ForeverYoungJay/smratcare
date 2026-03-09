@@ -1,0 +1,15 @@
+<view class="container">
+  <view class="surface card">
+    <view class="section-title">家庭成员绑定</view>
+    <block wx:for="{{list}}" wx:key="elderId">
+      <view class="item">
+        <view class="main">
+          <text class="name">{{item.elderName}}</text>
+          <text class="sub">关系：{{item.relation}} {{item.isPrimary ? '· 主要联系人' : ''}}</text>
+        </view>
+        <button class="ghost-btn small" data-id="{{item.elderId}}" bindtap="removeBinding">解除</button>
+      </view>
+    </block>
+    <button class="primary-btn action" bindtap="addBinding">添加绑定老人</button>
+  </view>
+</view>

@@ -1,0 +1,9 @@
+.card { padding: 24rpx; }
+.item { display: flex; justify-content: space-between; align-items: center; padding: 18rpx 0; border-bottom: 1rpx solid #e5e7eb; font-size: 26rpx; color: #1f2937; }
+.item:last-child { border-bottom: none; }
+.subscribe-item { align-items: flex-start; gap: 14rpx; }
+.subscribe-main { display: flex; flex-direction: column; gap: 6rpx; }
+.subscribe-status { font-size: 22rpx; color: #64748b; }
+.subscribe-btn { height: 56rpx; line-height: 56rpx; font-size: 22rpx; padding: 0 18rpx; }
+.template-list { margin-top: 10rpx; display: flex; flex-wrap: wrap; gap: 8rpx; }
+.template-item { padding: 6rpx 10rpx; border-radius: 999rpx; background: #eef7f8; color: #1f4f57; font-size: 20rpx; }

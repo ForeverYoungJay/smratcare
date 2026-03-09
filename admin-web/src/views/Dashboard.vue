@@ -24,6 +24,7 @@
             <span class="hint-text">更新时间：{{ refreshedAt || '--' }}</span>
             <a-tag color="blue">口径版本 {{ summary.metricVersion || metricCatalog.metricVersion || '--' }}</a-tag>
             <a-tag color="purple">阈值配置 {{ thresholdConfig.configVersion || '--' }}</a-tag>
+            <a-tag v-if="thresholdDirty" color="orange">未保存修改</a-tag>
             <a-button size="small" @click="metricDrawerOpen = true">口径详情</a-button>
             <a-button size="small" @click="thresholdDrawerOpen = true">阈值设置</a-button>
             <a-button size="small" @click="copyDashboardShareLink">复制筛选链接</a-button>
@@ -31,6 +32,24 @@
         </template>
         <div class="hint-text" style="margin-bottom: 12px;">
           口径说明：{{ metricCatalog.defaultWindow || '最近6个月' }}；总消费=账单消费+商城消费；总收入=账单总额。
+        </div>
+        <div class="window-toolbar">
+          <a-space size="small" wrap>
+            <span class="hint-text">统计窗口</span>
+            <a-button size="small" :type="activeWindowPreset === 3 ? 'primary' : 'default'" @click="applyWindowPreset(3)">
+              近3个月
+            </a-button>
+            <a-button size="small" :type="activeWindowPreset === 6 ? 'primary' : 'default'" @click="applyWindowPreset(6)">
+              近6个月
+            </a-button>
+            <a-button size="small" :type="activeWindowPreset === 12 ? 'primary' : 'default'" @click="applyWindowPreset(12)">
+              近12个月
+            </a-button>
+            <a-button size="small" :type="activeWindowPreset === 0 ? 'primary' : 'default'" @click="clearWindowPreset">
+              全部口径
+            </a-button>
+            <a-tag color="cyan">{{ activeWindowText }}</a-tag>
+          </a-space>
         </div>
         <a-row :gutter="[16, 16]">
           <a-col :xs="24" :sm="12" :lg="8" v-for="item in unifiedCards" :key="item.title">
@@ -139,6 +158,13 @@
         :destroy-on-close="false"
       >
         <a-alert type="info" show-icon :message="thresholdHintText" style="margin-bottom: 12px;" />
+        <a-alert
+          v-if="thresholdDirty"
+          type="warning"
+          show-icon
+          message="当前阈值有未保存修改，关闭抽屉不会自动保存。"
+          style="margin-bottom: 12px;"
+        />
         <a-form layout="vertical">
           <a-form-item label="护理异常任务阈值（条）">
             <a-input-number v-model:value="thresholdConfig.abnormalTaskThreshold" :min="1" :max="999" style="width: 100%;" />
@@ -153,8 +179,25 @@
             <a-input-number v-model:value="thresholdConfig.revenueDropThreshold" :min="1" :max="100" style="width: 100%;" />
           </a-form-item>
         </a-form>
+        <div class="hint-text" style="margin-bottom: 6px;">当前阈值命中预览</div>
+        <ThresholdPreviewList :rows="thresholdPreviewRows" />
+        <a-divider style="margin: 10px 0;" />
+        <div class="threshold-preset-row">
+          <span class="hint-text">快捷预设</span>
+          <a-space wrap>
+            <a-button
+              v-for="preset in thresholdPresets"
+              :key="preset.label"
+              size="small"
+              @click="applyThresholdPreset(preset.snapshot)"
+            >
+              {{ preset.label }}
+            </a-button>
+          </a-space>
+        </div>
         <a-space>
-          <a-button type="primary" @click="saveThresholdConfig">保存配置</a-button>
+          <a-button type="primary" :disabled="!thresholdDirty" @click="saveThresholdConfig">保存配置</a-button>
+          <a-button :disabled="!thresholdDirty" @click="rollbackThresholdDraft">撤销修改</a-button>
           <a-button @click="resetThresholdConfig">恢复默认</a-button>
         </a-space>
         <a-divider />
@@ -179,7 +222,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import VChart from 'vue-echarts'
 import PageContainer from '../components/PageContainer.vue'
 import {
@@ -197,6 +240,7 @@ import { useUserStore } from '../stores/user'
 import PermissionGuardCard from '../components/PermissionGuardCard.vue'
 import { resolveRouteAccess } from '../utils/routeAccess'
 import StatefulBlock from '../components/StatefulBlock.vue'
+import ThresholdPreviewList from '../components/ThresholdPreviewList.vue'
 import { copyText } from '../utils/clipboard'
 import {
   clearThresholdSnapshot,
@@ -204,8 +248,19 @@ import {
   loadThresholdSnapshot,
   saveThresholdSnapshot,
   thresholdPulseKey,
-  type ThresholdChangeLog
+  type ThresholdChangeLog,
+  type ThresholdSnapshot
 } from '../utils/dashboardThreshold'
+import {
+  DASHBOARD_THRESHOLD_PRESETS,
+  buildDashboardShareQuery,
+  mergeThresholdConfig,
+  parseDashboardRouteFilters,
+  parseThresholdQuery,
+  thresholdSnapshotsEqual,
+  toThresholdSnapshot
+} from '../utils/dashboardQuery'
+import { buildThresholdPreviewRows } from '../utils/dashboardThresholdPreview'
 
 const loading = ref(true)
 const errorMessage = ref('')
@@ -254,19 +309,56 @@ const metricCatalog = ref<DashboardMetricCatalog>({
   defaultWindow: '最近6个月',
   definitions: []
 })
-const thresholdConfig = ref<DashboardThresholdDefaults>({
+const defaultThresholdConfig: DashboardThresholdDefaults = {
   abnormalTaskThreshold: 3,
   inventoryAlertThreshold: 10,
   bedOccupancyThreshold: 95,
   revenueDropThreshold: 5,
   configVersion: '--'
+}
+const thresholdConfig = ref<DashboardThresholdDefaults>({ ...defaultThresholdConfig })
+const thresholdSavedSnapshot = ref<ThresholdSnapshot>(toThresholdSnapshot(defaultThresholdConfig))
+const thresholdPresets = DASHBOARD_THRESHOLD_PRESETS
+const thresholdDirty = computed(() =>
+  !thresholdSnapshotsEqual(toThresholdSnapshot(thresholdConfig.value), thresholdSavedSnapshot.value)
+)
+const routeFilters = computed(() => parseDashboardRouteFilters(route.query))
+const activeWindowText = computed(() => {
+  const from = routeFilters.value.from || summary.value.statsFromMonth
+  const to = routeFilters.value.to || summary.value.statsToMonth
+  if (from && to) {
+    return `${from} ~ ${to}`
+  }
+  return metricCatalog.value.defaultWindow || '最近6个月'
 })
+const activeWindowPreset = computed(() => {
+  const from = routeFilters.value.from
+  const to = routeFilters.value.to
+  if (!from || !to) return 0
+  const start = dayjs(`${from}-01`)
+  const end = dayjs(`${to}-01`)
+  if (!start.isValid() || !end.isValid() || end.isBefore(start)) return -1
+  const months = end.diff(start, 'month') + 1
+  return [3, 6, 12].includes(months) ? months : -1
+})
+const thresholdPreviewRows = computed(() =>
+  buildThresholdPreviewRows(
+    {
+      abnormalCount: Number(summary.value.abnormalTasksToday || 0),
+      inventoryCount: Number(summary.value.inventoryAlerts || 0),
+      bedOccupancyRate: Number(summary.value.bedOccupancyRate || 0),
+      revenueGrowthRate: Number(summary.value.revenueGrowthRate || 0)
+    },
+    toThresholdSnapshot(thresholdConfig.value)
+  )
+)
 
 async function loadSummary() {
   loading.value = true
   errorMessage.value = ''
   try {
-    summary.value = await getDashboardSummary()
+    const params = routeFilters.value
+    summary.value = await getDashboardSummary({ params })
     refreshedAt.value = summary.value.dataRefreshedAt
       ? dayjs(summary.value.dataRefreshedAt).format('YYYY-MM-DD HH:mm:ss')
       : dayjs().format('YYYY-MM-DD HH:mm:ss')
@@ -283,53 +375,81 @@ async function loadSummary() {
   }
 }
 
+function patchRouteQuery(patch: Record<string, string | undefined>) {
+  const nextQuery: Record<string, any> = { ...route.query }
+  Object.entries(patch).forEach(([key, value]) => {
+    if (!value) {
+      delete nextQuery[key]
+      return
+    }
+    nextQuery[key] = value
+  })
+  const nextFullPath = router.resolve({ path: route.path, query: nextQuery }).fullPath
+  if (nextFullPath === route.fullPath) {
+    return
+  }
+  router.replace({ path: route.path, query: nextQuery }).catch(() => {})
+}
+
+function applyWindowPreset(months: number) {
+  const safeMonths = [3, 6, 12].includes(months) ? months : 6
+  const to = dayjs().format('YYYY-MM')
+  const from = dayjs().subtract(safeMonths - 1, 'month').format('YYYY-MM')
+  patchRouteQuery({
+    window: `${from}_${to}`,
+    from: undefined,
+    to: undefined
+  })
+}
+
+function clearWindowPreset() {
+  patchRouteQuery({
+    window: undefined,
+    from: undefined,
+    to: undefined
+  })
+}
+
 async function loadThresholdDefaults() {
   try {
     const defaults = await getDashboardThresholdDefaults()
-    thresholdConfig.value = { ...defaults }
+    thresholdConfig.value = mergeThresholdConfig(defaults)
     const cache = loadThresholdSnapshot(userStore.staffInfo?.id)
     if (cache) {
-      thresholdConfig.value = {
-        ...thresholdConfig.value,
-        ...cache,
-        configVersion: thresholdConfig.value.configVersion
-      }
+      thresholdConfig.value = mergeThresholdConfig(thresholdConfig.value, cache)
+    }
+    const routeThresholdPatch = parseThresholdQuery(route.query)
+    if (Object.keys(routeThresholdPatch).length > 0) {
+      thresholdConfig.value = mergeThresholdConfig(thresholdConfig.value, routeThresholdPatch)
     }
     thresholdLogs.value = loadThresholdLogs(userStore.staffInfo?.id)
-    applyThresholdsFromRouteQuery()
   } catch (error: any) {
     message.warning(error?.message || '阈值默认配置加载失败，已使用内置默认值')
+    const routeThresholdPatch = parseThresholdQuery(route.query)
+    if (Object.keys(routeThresholdPatch).length > 0) {
+      thresholdConfig.value = mergeThresholdConfig(thresholdConfig.value, routeThresholdPatch)
+    }
   }
-}
-
-function applyThresholdsFromRouteQuery() {
-  const abnormalTaskThreshold = Number(route.query.abnormalTaskThreshold)
-  const inventoryAlertThreshold = Number(route.query.inventoryAlertThreshold)
-  const bedOccupancyThreshold = Number(route.query.bedOccupancyThreshold)
-  const revenueDropThreshold = Number(route.query.revenueDropThreshold)
-  if (Number.isFinite(abnormalTaskThreshold) && abnormalTaskThreshold > 0) {
-    thresholdConfig.value.abnormalTaskThreshold = abnormalTaskThreshold
-  }
-  if (Number.isFinite(inventoryAlertThreshold) && inventoryAlertThreshold > 0) {
-    thresholdConfig.value.inventoryAlertThreshold = inventoryAlertThreshold
-  }
-  if (Number.isFinite(bedOccupancyThreshold) && bedOccupancyThreshold > 0) {
-    thresholdConfig.value.bedOccupancyThreshold = bedOccupancyThreshold
-  }
-  if (Number.isFinite(revenueDropThreshold) && revenueDropThreshold > 0) {
-    thresholdConfig.value.revenueDropThreshold = revenueDropThreshold
-  }
+  thresholdSavedSnapshot.value = toThresholdSnapshot(thresholdConfig.value)
 }
 
 function saveThresholdConfig() {
-  const snapshot = {
-    abnormalTaskThreshold: Number(thresholdConfig.value.abnormalTaskThreshold || 0),
-    inventoryAlertThreshold: Number(thresholdConfig.value.inventoryAlertThreshold || 0),
-    bedOccupancyThreshold: Number(thresholdConfig.value.bedOccupancyThreshold || 0),
-    revenueDropThreshold: Number(thresholdConfig.value.revenueDropThreshold || 0)
+  const snapshot = toThresholdSnapshot(thresholdConfig.value)
+  if (!thresholdDirty.value) {
+    message.info('阈值未变化，无需保存')
+    return
   }
   thresholdLogs.value = saveThresholdSnapshot(userStore.staffInfo?.id, snapshot, 'dashboard')
+  thresholdSavedSnapshot.value = snapshot
   message.success('阈值配置已保存')
+}
+
+function applyThresholdPreset(snapshot: ThresholdSnapshot) {
+  thresholdConfig.value = mergeThresholdConfig(thresholdConfig.value, snapshot)
+}
+
+function rollbackThresholdDraft() {
+  thresholdConfig.value = mergeThresholdConfig(thresholdConfig.value, thresholdSavedSnapshot.value)
 }
 
 async function resetThresholdConfig() {
@@ -621,18 +741,15 @@ function goUnifiedCard(card: { route: string; metricKey: string }) {
 }
 
 async function copyDashboardShareLink() {
+  const query = buildDashboardShareQuery({
+    metricVersion: summary.value.metricVersion || metricCatalog.value.metricVersion || '',
+    threshold: toThresholdSnapshot(thresholdConfig.value),
+    from: summary.value.statsFromMonth,
+    to: summary.value.statsToMonth
+  })
   const resolved = router.resolve({
     path: route.path,
-    query: {
-      metricVersion: summary.value.metricVersion || metricCatalog.value.metricVersion || '',
-      abnormalTaskThreshold: String(thresholdConfig.value.abnormalTaskThreshold || ''),
-      inventoryAlertThreshold: String(thresholdConfig.value.inventoryAlertThreshold || ''),
-      bedOccupancyThreshold: String(thresholdConfig.value.bedOccupancyThreshold || ''),
-      revenueDropThreshold: String(thresholdConfig.value.revenueDropThreshold || ''),
-      window: summary.value.statsFromMonth && summary.value.statsToMonth
-        ? `${summary.value.statsFromMonth}_${summary.value.statsToMonth}`
-        : ''
-    }
+    query
   })
   const ok = await copyText(`${window.location.origin}${resolved.fullPath}`)
   if (ok) {
@@ -649,6 +766,28 @@ function fmtAmount(value?: number) {
 function fmtPercent(value?: number) {
   return Number(value || 0).toFixed(2)
 }
+
+watch(
+  () => [route.query.metricVersion, route.query.window, route.query.from, route.query.to],
+  () => {
+    loadSummary().catch(() => {})
+  }
+)
+
+watch(
+  () => [
+    route.query.abnormalTaskThreshold,
+    route.query.inventoryAlertThreshold,
+    route.query.bedOccupancyThreshold,
+    route.query.revenueDropThreshold
+  ],
+  () => {
+    const patch = parseThresholdQuery(route.query)
+    if (!Object.keys(patch).length) return
+    thresholdConfig.value = mergeThresholdConfig(thresholdConfig.value, patch)
+    thresholdSavedSnapshot.value = toThresholdSnapshot(thresholdConfig.value)
+  }
+)
 
 onMounted(async () => {
   await Promise.all([loadSummary(), loadThresholdDefaults()])
@@ -689,5 +828,17 @@ onBeforeUnmount(() => {
 .metric-def-line {
   margin-top: 2px;
   color: var(--muted);
+}
+
+.threshold-preset-row {
+  margin-bottom: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.window-toolbar {
+  margin-bottom: 12px;
 }
 </style>

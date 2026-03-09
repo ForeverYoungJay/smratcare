@@ -173,6 +173,7 @@ public class ElderResidenceController {
     response.setDeathCount(death);
     response.setOpenIncidentCount(openIncident);
     response.setOverdueOutingCount(overdueOuting);
+    response.setGeneratedAt(now);
     return Result.ok(response);
   }
 

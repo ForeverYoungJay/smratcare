@@ -1,0 +1,178 @@
+.hero {
+  padding: 24rpx;
+  background: linear-gradient(145deg, #fff7ef, #ffffff);
+}
+
+.hero-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12rpx;
+}
+
+.mini-btn {
+  height: 56rpx;
+  line-height: 56rpx;
+  font-size: 22rpx;
+  border-radius: 999rpx;
+  padding: 0 16rpx;
+}
+
+.count-grid {
+  margin-top: 16rpx;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10rpx;
+}
+
+.count-card {
+  background: #f8fafc;
+  border: 1rpx solid #e5e7eb;
+  border-radius: 12rpx;
+  padding: 12rpx;
+}
+
+.count-card .num {
+  display: block;
+  font-size: 34rpx;
+  color: #1f2937;
+  font-weight: 700;
+}
+
+.count-card .label {
+  display: block;
+  margin-top: 4rpx;
+  font-size: 21rpx;
+  color: #64748b;
+}
+
+.count-card.urgent {
+  background: #fff1f1;
+  border-color: #f8cccc;
+}
+
+.count-card.warning {
+  background: #fff7ed;
+  border-color: #f2d2a1;
+}
+
+.count-card.normal {
+  background: #eef7f8;
+  border-color: #cde1e4;
+}
+
+.panel {
+  margin-top: 18rpx;
+  padding: 22rpx;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panel-title {
+  font-size: 28rpx;
+  color: #1f2937;
+  font-weight: 700;
+}
+
+.link {
+  font-size: 22rpx;
+  color: #1f4f57;
+}
+
+.type-row {
+  margin-top: 10rpx;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 23rpx;
+  color: #374151;
+  background: #f8fafc;
+  border-radius: 10rpx;
+  padding: 10rpx 12rpx;
+}
+
+.type-name {
+  font-weight: 700;
+}
+
+.type-count {
+  color: #64748b;
+}
+
+.urgent-item {
+  margin-top: 12rpx;
+  border-radius: 12rpx;
+  border: 1rpx solid #f3d1d1;
+  background: #fffafa;
+  padding: 12rpx;
+}
+
+.urgent-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tag {
+  display: inline-block;
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+  font-size: 20rpx;
+}
+
+.tag.lv-urgent {
+  background: #ffefef;
+  color: #b91c1c;
+}
+
+.tag.lv-warning {
+  background: #fff4e8;
+  color: #b45309;
+}
+
+.tag.lv-normal {
+  background: #eef7f8;
+  color: #1f4f57;
+}
+
+.urgent-time {
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.urgent-title {
+  margin-top: 8rpx;
+  font-size: 27rpx;
+  color: #111827;
+  font-weight: 700;
+}
+
+.urgent-content {
+  margin-top: 8rpx;
+  font-size: 23rpx;
+  color: #475569;
+  line-height: 1.55;
+}
+
+.urgent-bottom {
+  margin-top: 10rpx;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.elder {
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.call-btn {
+  width: 90rpx;
+  height: 52rpx;
+  line-height: 52rpx;
+  font-size: 21rpx;
+}

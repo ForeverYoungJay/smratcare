@@ -1,0 +1,211 @@
+.hero {
+  padding: 24rpx;
+  background: linear-gradient(140deg, #eef7fb, #ffffff);
+}
+
+.hero-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16rpx;
+}
+
+.mini-btn {
+  height: 58rpx;
+  line-height: 58rpx;
+  font-size: 22rpx;
+  border-radius: 999rpx;
+  padding: 0 20rpx;
+}
+
+.hero-balance {
+  margin-top: 20rpx;
+  padding: 16rpx;
+  border-radius: 14rpx;
+  background: #f8fcff;
+  border: 1rpx solid #d4e6f1;
+  display: flex;
+  align-items: center;
+}
+
+.balance-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.label {
+  font-size: 22rpx;
+  color: #64748b;
+}
+
+.value {
+  font-size: 34rpx;
+  color: #0f4a5d;
+  font-weight: 700;
+}
+
+.warn {
+  color: #b45309;
+}
+
+.divider-v {
+  width: 1rpx;
+  height: 72rpx;
+  background: #dbe9f2;
+}
+
+.panel {
+  margin-top: 18rpx;
+  padding: 22rpx;
+}
+
+.panel-title {
+  font-size: 28rpx;
+  color: #1f2937;
+  font-weight: 700;
+}
+
+.stat-panel {
+  background: linear-gradient(145deg, #ffffff, #f7fbff);
+}
+
+.stat-grid {
+  margin-top: 14rpx;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12rpx;
+}
+
+.stat-item {
+  border-radius: 12rpx;
+  padding: 14rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.stat-item .num {
+  font-size: 36rpx;
+  font-weight: 700;
+}
+
+.stat-item .txt {
+  font-size: 22rpx;
+}
+
+.stat-item.paid {
+  background: #e9f9ef;
+  color: #0f766e;
+}
+
+.stat-item.pending {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.stat-item.closed {
+  background: #fff4e8;
+  color: #b45309;
+}
+
+.stat-item.failed {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.tip-item {
+  margin-top: 12rpx;
+  display: flex;
+  align-items: flex-start;
+  gap: 10rpx;
+  background: #f8fafc;
+  border-radius: 10rpx;
+  padding: 10rpx 12rpx;
+}
+
+.tip-index {
+  width: 34rpx;
+  height: 34rpx;
+  border-radius: 50%;
+  background: #194f5e;
+  color: #fff;
+  font-size: 21rpx;
+  text-align: center;
+  line-height: 34rpx;
+}
+
+.tip-text {
+  flex: 1;
+  font-size: 23rpx;
+  color: #334155;
+  line-height: 1.5;
+}
+
+.order-item {
+  margin-top: 12rpx;
+  border-radius: 12rpx;
+  border: 1rpx solid #deebf2;
+  background: #fbfeff;
+  padding: 12rpx;
+}
+
+.order-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 14rpx;
+  margin-top: 6rpx;
+  font-size: 22rpx;
+  color: #4b5563;
+}
+
+.order-head {
+  margin-top: 0;
+  align-items: center;
+}
+
+.trade-no {
+  font-size: 22rpx;
+  color: #1f2937;
+}
+
+.status {
+  font-size: 22rpx;
+  font-weight: 700;
+  padding: 4rpx 14rpx;
+  border-radius: 999rpx;
+}
+
+.status-paid {
+  color: #0f766e;
+  background: #e9f9ef;
+}
+
+.status-pending {
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.status-closed {
+  color: #b45309;
+  background: #fff4e8;
+}
+
+.status-failed {
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
+.order-actions {
+  margin-top: 12rpx;
+  display: flex;
+  gap: 10rpx;
+}
+
+.small-btn {
+  flex: 1;
+  height: 54rpx;
+  line-height: 54rpx;
+  font-size: 22rpx;
+}

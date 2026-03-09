@@ -1,0 +1,80 @@
+<view class="container" wx:if="{{guard}}">
+  <view class="surface hero">
+    <view class="hero-head">
+      <view>
+        <view class="section-title">支付保障中心</view>
+        <view class="section-subtitle">{{guard.elderName || '当前老人'}} · 最近到账 {{guard.lastPaidTime || '暂无记录'}}</view>
+      </view>
+      <button class="ghost-btn mini-btn" bindtap="toPayment">去充值</button>
+    </view>
+    <view class="hero-balance">
+      <view class="balance-item">
+        <text class="label">账户余额</text>
+        <text class="value">¥{{guard.accountBalance}}</text>
+      </view>
+      <view class="divider-v"></view>
+      <view class="balance-item">
+        <text class="label">待缴金额</text>
+        <text class="value warn">¥{{guard.outstanding}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="surface panel stat-panel">
+    <view class="panel-title">充值状态分布</view>
+    <view class="stat-grid">
+      <view class="stat-item paid">
+        <text class="num">{{guard.paidOrderCount}}</text>
+        <text class="txt">已支付</text>
+      </view>
+      <view class="stat-item pending">
+        <text class="num">{{guard.pendingOrderCount}}</text>
+        <text class="txt">待支付</text>
+      </view>
+      <view class="stat-item closed">
+        <text class="num">{{guard.closedOrderCount}}</text>
+        <text class="txt">已关闭</text>
+      </view>
+      <view class="stat-item failed">
+        <text class="num">{{guard.failedOrderCount}}</text>
+        <text class="txt">失败</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="surface panel">
+    <view class="panel-title">保障建议</view>
+    <block wx:for="{{guard.tips}}" wx:key="*this">
+      <view class="tip-item">
+        <text class="tip-index">{{index + 1}}</text>
+        <text class="tip-text">{{item}}</text>
+      </view>
+    </block>
+  </view>
+
+  <view class="surface panel">
+    <view class="panel-title">最近充值订单</view>
+    <view class="list-empty" wx:if="{{guard.recentOrders.length === 0}}">暂无充值订单</view>
+    <block wx:for="{{guard.recentOrders}}" wx:key="outTradeNo">
+      <view class="order-item" data-trade-no="{{item.outTradeNo}}" bindtap="goOrderDetail">
+        <view class="order-line order-head">
+          <text class="trade-no">{{item.outTradeNo}}</text>
+          <text class="status {{item.statusClass}}">{{item.statusText}}</text>
+        </view>
+        <view class="order-line">
+          <text>金额 ¥{{item.amount}}</text>
+          <text>{{item.channel}}</text>
+        </view>
+        <view class="order-line">
+          <text>创建 {{item.createTime}}</text>
+          <text wx:if="{{item.paidTime}}">到账 {{item.paidTime}}</text>
+          <text wx:elif="{{item.remark}}">{{item.remark}}</text>
+        </view>
+        <view class="order-actions">
+          <button class="ghost-btn small-btn" size="mini" data-trade-no="{{item.outTradeNo}}" catchtap="copyTradeNo">复制单号</button>
+          <button class="ghost-btn small-btn" size="mini" data-trade-no="{{item.outTradeNo}}" catchtap="goOrderDetail">查看详情</button>
+        </view>
+      </view>
+    </block>
+  </view>
+</view>

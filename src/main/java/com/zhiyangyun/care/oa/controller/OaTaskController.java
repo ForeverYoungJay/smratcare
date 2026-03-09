@@ -55,10 +55,11 @@ public class OaTaskController {
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) String status,
-      @RequestParam(required = false) String keyword) {
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false, defaultValue = "false") boolean mineOnly) {
     Long orgId = AuthContext.getOrgId();
     String normalizedStatus = normalizeStatus(status);
-    var wrapper = buildQuery(orgId, normalizedStatus, keyword).orderByDesc(OaTask::getStartTime);
+    var wrapper = buildQuery(orgId, normalizedStatus, keyword, mineOnly).orderByDesc(OaTask::getStartTime);
     return Result.ok(taskMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
   }
 
@@ -66,7 +67,8 @@ public class OaTaskController {
   @PreAuthorize("@perm.has('oa.calendar.view')")
   public Result<OaTaskSummaryResponse> summary(
       @RequestParam(required = false) String status,
-      @RequestParam(required = false) String keyword) {
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false, defaultValue = "false") boolean mineOnly) {
     Long orgId = AuthContext.getOrgId();
     String normalizedStatus = normalizeStatus(status);
     LocalDateTime now = LocalDateTime.now();
@@ -74,21 +76,21 @@ public class OaTaskController {
     LocalDateTime endOfToday = startOfToday.plusDays(1);
 
     OaTaskSummaryResponse response = new OaTaskSummaryResponse();
-    response.setTotalCount(count(taskMapper.selectCount(buildQuery(orgId, normalizedStatus, keyword))));
-    response.setOpenCount(count(taskMapper.selectCount(buildQuery(orgId, "OPEN", keyword))));
-    response.setDoneCount(count(taskMapper.selectCount(buildQuery(orgId, "DONE", keyword))));
-    response.setHighPriorityCount(count(taskMapper.selectCount(buildQuery(orgId, normalizedStatus, keyword)
+    response.setTotalCount(count(taskMapper.selectCount(buildQuery(orgId, normalizedStatus, keyword, mineOnly))));
+    response.setOpenCount(count(taskMapper.selectCount(buildQuery(orgId, "OPEN", keyword, mineOnly))));
+    response.setDoneCount(count(taskMapper.selectCount(buildQuery(orgId, "DONE", keyword, mineOnly))));
+    response.setHighPriorityCount(count(taskMapper.selectCount(buildQuery(orgId, normalizedStatus, keyword, mineOnly)
         .eq(OaTask::getPriority, "HIGH"))));
-    response.setDueTodayCount(count(taskMapper.selectCount(buildQuery(orgId, normalizedStatus, keyword)
+    response.setDueTodayCount(count(taskMapper.selectCount(buildQuery(orgId, normalizedStatus, keyword, mineOnly)
         .eq(OaTask::getStatus, "OPEN")
         .isNotNull(OaTask::getEndTime)
         .ge(OaTask::getEndTime, startOfToday)
         .lt(OaTask::getEndTime, endOfToday))));
-    response.setOverdueCount(count(taskMapper.selectCount(buildQuery(orgId, normalizedStatus, keyword)
+    response.setOverdueCount(count(taskMapper.selectCount(buildQuery(orgId, normalizedStatus, keyword, mineOnly)
         .eq(OaTask::getStatus, "OPEN")
         .isNotNull(OaTask::getEndTime)
         .lt(OaTask::getEndTime, now))));
-    response.setUnassignedCount(count(taskMapper.selectCount(buildQuery(orgId, normalizedStatus, keyword)
+    response.setUnassignedCount(count(taskMapper.selectCount(buildQuery(orgId, normalizedStatus, keyword, mineOnly)
         .and(w -> w.isNull(OaTask::getAssigneeName).or().eq(OaTask::getAssigneeName, "")))));
     return Result.ok(response);
   }
@@ -126,7 +128,7 @@ public class OaTaskController {
     } else {
       wrapper.last("LIMIT 5000");
     }
-    applyMyCalendarScope(wrapper, staffId);
+    applyMyCalendarScope(wrapper, staffId, false);
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(OaTask::getTitle, keyword)
           .or().like(OaTask::getDescription, keyword));
@@ -393,19 +395,12 @@ public class OaTaskController {
   @PreAuthorize("@perm.has('oa.calendar.view')")
   public ResponseEntity<byte[]> export(
       @RequestParam(required = false) String status,
-      @RequestParam(required = false) String keyword) {
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false, defaultValue = "false") boolean mineOnly) {
     Long orgId = AuthContext.getOrgId();
     String normalizedStatus = normalizeStatus(status);
-    var wrapper = Wrappers.lambdaQuery(OaTask.class)
-        .eq(OaTask::getIsDeleted, 0)
-        .eq(orgId != null, OaTask::getOrgId, orgId)
-        .eq(normalizedStatus != null, OaTask::getStatus, normalizedStatus)
+    var wrapper = buildQuery(orgId, normalizedStatus, keyword, mineOnly)
         .orderByDesc(OaTask::getStartTime);
-    if (keyword != null && !keyword.isBlank()) {
-      wrapper.and(w -> w.like(OaTask::getTitle, keyword)
-          .or().like(OaTask::getDescription, keyword)
-          .or().like(OaTask::getAssigneeName, keyword));
-    }
     List<OaTask> tasks = taskMapper.selectList(wrapper);
     List<String> headers = List.of("ID", "标题", "负责人", "日历种类", "计划分类", "紧急程度", "协同成员", "开始时间", "结束时间", "优先级", "状态", "描述");
     List<List<String>> rows = tasks.stream()
@@ -659,13 +654,13 @@ public class OaTaskController {
   }
 
   private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OaTask> buildQuery(
-      Long orgId, String normalizedStatus, String keyword) {
+      Long orgId, String normalizedStatus, String keyword, boolean mineOnly) {
     Long staffId = AuthContext.getStaffId();
     var wrapper = Wrappers.lambdaQuery(OaTask.class)
         .eq(OaTask::getIsDeleted, 0)
         .eq(orgId != null, OaTask::getOrgId, orgId)
         .eq(normalizedStatus != null, OaTask::getStatus, normalizedStatus);
-    applyMyCalendarScope(wrapper, staffId);
+    applyMyCalendarScope(wrapper, staffId, mineOnly);
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(OaTask::getTitle, keyword)
           .or().like(OaTask::getDescription, keyword)
@@ -674,8 +669,11 @@ public class OaTaskController {
     return wrapper;
   }
 
-  private void applyMyCalendarScope(com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OaTask> wrapper, Long staffId) {
-    if (AuthContext.isAdmin()) {
+  private void applyMyCalendarScope(
+      com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OaTask> wrapper,
+      Long staffId,
+      boolean mineOnly) {
+    if (AuthContext.isAdmin() && !mineOnly) {
       return;
     }
     String username = trimToNull(AuthContext.getUsername());

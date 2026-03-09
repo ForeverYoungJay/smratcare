@@ -54,8 +54,8 @@ export function updateHealthBasic(id, data) {
 export function deleteHealthBasic(id) {
     return request.delete(`/api/life/health-basic/${id}`);
 }
-export function getBirthdayPage(params) {
-    return fetchPage('/api/life/birthday/page', params);
+export function getBirthdayPage(params, config) {
+    return fetchPage('/api/life/birthday/page', params, config);
 }
 export function getRoomCleaningPage(params) {
     return fetchPage('/api/life/room-cleaning/page', params);

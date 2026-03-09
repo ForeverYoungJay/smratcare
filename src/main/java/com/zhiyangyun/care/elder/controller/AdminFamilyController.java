@@ -11,15 +11,22 @@ import com.zhiyangyun.care.elder.entity.FamilyUser;
 import com.zhiyangyun.care.elder.mapper.ElderFamilyMapper;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.FamilyUserMapper;
+import com.zhiyangyun.care.elder.model.FamilyBindRequest;
 import com.zhiyangyun.care.elder.model.FamilyRelationItem;
 import com.zhiyangyun.care.elder.model.FamilyUserPageItem;
+import com.zhiyangyun.care.elder.service.FamilyService;
+import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,13 +37,16 @@ public class AdminFamilyController {
   private final FamilyUserMapper familyUserMapper;
   private final ElderFamilyMapper elderFamilyMapper;
   private final ElderMapper elderMapper;
+  private final FamilyService familyService;
 
   public AdminFamilyController(FamilyUserMapper familyUserMapper,
       ElderFamilyMapper elderFamilyMapper,
-      ElderMapper elderMapper) {
+      ElderMapper elderMapper,
+      FamilyService familyService) {
     this.familyUserMapper = familyUserMapper;
     this.elderFamilyMapper = elderFamilyMapper;
     this.elderMapper = elderMapper;
+    this.familyService = familyService;
   }
 
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
@@ -154,5 +164,48 @@ public class AdminFamilyController {
       items.add(item);
     }
     return Result.ok(items);
+  }
+
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PostMapping("/relations/bind")
+  public Result<FamilyRelationItem> bindRelation(@Valid @RequestBody FamilyBindRequest request) {
+    if (request.getFamilyUserId() == null || request.getFamilyUserId() <= 0) {
+      throw new IllegalArgumentException("家属ID不能为空");
+    }
+    Long orgId = AuthContext.getOrgId();
+    FamilyUser familyUser = familyUserMapper.selectOne(
+        Wrappers.lambdaQuery(FamilyUser.class)
+            .eq(FamilyUser::getIsDeleted, 0)
+            .eq(FamilyUser::getOrgId, orgId)
+            .eq(FamilyUser::getId, request.getFamilyUserId())
+            .last("LIMIT 1"));
+    if (familyUser == null) {
+      throw new IllegalArgumentException("家属信息不存在或已失效");
+    }
+    request.setOrgId(orgId);
+    ElderFamily relation = familyService.bindElder(request);
+    FamilyRelationItem item = new FamilyRelationItem();
+    item.setId(relation.getId());
+    item.setFamilyUserId(relation.getFamilyUserId());
+    item.setRealName(familyUser.getRealName());
+    item.setPhone(familyUser.getPhone());
+    item.setRelation(relation.getRelation());
+    item.setIsPrimary(relation.getIsPrimary());
+    return Result.ok(item);
+  }
+
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @DeleteMapping("/relations/{relationId}")
+  public Result<Void> removeRelation(@PathVariable Long relationId) {
+    Long orgId = AuthContext.getOrgId();
+    ElderFamily relation = elderFamilyMapper.selectById(relationId);
+    if (relation != null
+        && relation.getIsDeleted() != null
+        && relation.getIsDeleted() == 0
+        && (orgId == null || orgId.equals(relation.getOrgId()))) {
+      relation.setIsDeleted(1);
+      elderFamilyMapper.updateById(relation);
+    }
+    return Result.ok(null);
   }
 }

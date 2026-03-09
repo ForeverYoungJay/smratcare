@@ -64,9 +64,15 @@ public class FinanceBillController {
 
   @GetMapping("/{billId}")
   public Result<FinanceBillDetailResponse> detail(@PathVariable Long billId) {
-    BillMonthly monthly = billMonthlyMapper.selectById(billId);
+    Long orgId = AuthContext.getOrgId();
+    BillMonthly monthly = billMonthlyMapper.selectOne(
+        Wrappers.lambdaQuery(BillMonthly.class)
+            .eq(BillMonthly::getId, billId)
+            .eq(orgId != null, BillMonthly::getOrgId, orgId)
+            .eq(BillMonthly::getIsDeleted, 0)
+            .last("LIMIT 1"));
     if (monthly == null) {
-      return Result.error(404, "Bill not found");
+      return Result.error(404, "账单不存在、已删除或无权限访问（ID: " + billId + "）");
     }
 
     FinanceBillDetailResponse resp = new FinanceBillDetailResponse();
@@ -119,7 +125,6 @@ public class FinanceBillController {
     }
     resp.setPayments(paymentItems);
 
-    Long orgId = AuthContext.getOrgId();
     YearMonth ym = YearMonth.parse(monthly.getBillMonth());
     LocalDate startDate = ym.atDay(1);
     LocalDate endDate = ym.atEndOfMonth();

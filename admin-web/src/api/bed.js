@@ -11,8 +11,8 @@ export function getRoomList() {
 export function getBedList() {
     return request.get('/api/bed/list');
 }
-export function getBedMap() {
-    return request.get('/api/bed/map');
+export function getBedMap(config) {
+    return request.get('/api/bed/map', config);
 }
 export function getBuildingPage(params) {
     return fetchPage('/api/asset/buildings/page', params);

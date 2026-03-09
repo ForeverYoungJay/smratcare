@@ -1,0 +1,45 @@
+<view class="container">
+  <view class="surface card">
+    <view class="section-title">健康数据看板</view>
+    <view wx:if="{{!accessGranted}}" class="verify-tip">
+      <view class="tip-title">访问受限</view>
+      <view class="tip-text">当前已开启健康档案二次验证，请完成验证后查看数据。</view>
+      <button class="ghost-btn verify-btn" bindtap="retryVerify">立即验证</button>
+    </view>
+    <block wx:else>
+    <view class="range-row">
+      <block wx:for="{{ranges}}" wx:key="key">
+        <view class="range {{item.key === range ? 'active' : ''}}" data-range="{{item.key}}" bindtap="switchRange">{{item.label}}</view>
+      </block>
+    </view>
+
+    <view class="summary-grid">
+      <view class="summary-item"><text class="k">血压</text><text class="v">{{board.latest.sbp}}/{{board.latest.dbp}}</text></view>
+      <view class="summary-item"><text class="k">心率</text><text class="v">{{board.latest.hr}}</text></view>
+      <view class="summary-item"><text class="k">体温</text><text class="v">{{board.latest.temp}}</text></view>
+      <view class="summary-item"><text class="k">血糖</text><text class="v">{{board.latest.sugar}}</text></view>
+    </view>
+
+    <view class="trend-box">
+      <block wx:for="{{board.trend}}" wx:key="date">
+        <view class="trend-row">
+          <text class="date">{{item.date}}</text>
+          <view class="bar-wrap"><view class="bar" style="width: {{item.sbp}}rpx;"></view></view>
+          <text class="value">{{item.sbp}}/{{item.dbp}}</text>
+        </view>
+      </block>
+    </view>
+
+    <view class="tips-title">健康建议</view>
+    <block wx:for="{{board.riskTips}}" wx:key="*this">
+      <view class="tip">{{item}}</view>
+    </block>
+
+    <view class="action-row">
+      <button class="ghost-btn action" data-path="/pages/medical-record/index" bindtap="go">就医记录</button>
+      <button class="ghost-btn action" data-path="/pages/assessment-report/index" bindtap="go">评估报告</button>
+      <button class="primary-btn action" data-path="/pages/emergency-contacts/index" bindtap="go">紧急联系人</button>
+    </view>
+    </block>
+  </view>
+</view>

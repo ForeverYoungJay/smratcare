@@ -1,60 +1,77 @@
 <template>
   <PageContainer title="考勤与行政日程一览" subTitle="我的考勤、请假联动日程、院长查看员工打卡明细">
     <a-card class="attendance-hero" :bordered="false">
-      <a-form layout="inline">
-        <a-form-item v-if="canManageAttendance" label="查看员工">
-          <a-select
-            v-model:value="query.staffId"
-            style="width: 260px"
-            show-search
-            allow-clear
-            :filter-option="false"
-            :options="staffOptions"
-            :loading="staffLoading"
-            placeholder="请选择员工"
-            @search="searchStaff"
-            @focus="() => !staffOptions.length && searchStaff('')"
-          />
-        </a-form-item>
-        <a-form-item label="月份">
-          <a-date-picker v-model:value="query.month" picker="month" value-format="YYYY-MM" />
-        </a-form-item>
-        <a-form-item label="自动刷新">
-          <a-switch v-model:checked="autoRefresh" />
-        </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="fetchData">查询</a-button>
-            <a-button @click="reset">重置</a-button>
-            <a-button @click="printCurrentEmployee">打印当前员工考勤</a-button>
-            <a-button @click="exportCurrentEmployee">导出当前员工月报</a-button>
-            <a-button @click="goLeaveApproval">填写请假申请</a-button>
-          </a-space>
-        </a-form-item>
+      <div class="hero-head">
+        <div>
+          <div class="hero-title">考勤与请假联动中心</div>
+          <div class="hero-sub">支持院长按员工查看打卡、外出、午休、请假联动日程并打印月报</div>
+        </div>
+        <a-tag color="processing">{{ query.month }} 月</a-tag>
+      </div>
+      <a-form layout="vertical" class="hero-form">
+        <a-row :gutter="[12, 6]">
+          <a-col v-if="canManageAttendance" :xs="24" :sm="12" :lg="8">
+            <a-form-item label="查看员工">
+              <a-select
+                v-model:value="query.staffId"
+                style="width: 100%"
+                show-search
+                allow-clear
+                :filter-option="false"
+                :options="staffOptions"
+                :loading="staffLoading"
+                placeholder="请选择员工"
+                @search="searchStaff"
+                @focus="() => !staffOptions.length && searchStaff('')"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="12" :sm="8" :lg="4">
+            <a-form-item label="月份">
+              <a-date-picker v-model:value="query.month" picker="month" value-format="YYYY-MM" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="12" :sm="4" :lg="3">
+            <a-form-item label="自动刷新">
+              <a-switch v-model:checked="autoRefresh" />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :lg="9">
+            <a-form-item label="快捷操作">
+              <a-space wrap>
+                <a-button type="primary" @click="fetchData">查询</a-button>
+                <a-button @click="reset">重置</a-button>
+                <a-button @click="printCurrentEmployee">打印当前员工</a-button>
+                <a-button @click="exportCurrentEmployee">导出月报</a-button>
+                <a-button @click="goLeaveApproval">填写请假</a-button>
+              </a-space>
+            </a-form-item>
+          </a-col>
+        </a-row>
       </a-form>
       <div class="hero-tip">
         请假审批通过后会自动写入本页日程；午休中显示蓝色状态；院长可切换员工查看上下班/外出时长并打印。
       </div>
     </a-card>
 
-    <a-row :gutter="16" style="margin-top: 16px; margin-bottom: 16px">
+    <a-row :gutter="16" class="metrics-row">
       <a-col :xs="24" :sm="12" :lg="6">
-        <a-card class="metric-card" :bordered="false">
+        <a-card class="metric-card metric-card-teal" :bordered="false">
           <a-statistic title="当月在岗天数" :value="overview.onDutyDays || 0" />
         </a-card>
       </a-col>
       <a-col :xs="24" :sm="12" :lg="6">
-        <a-card class="metric-card" :bordered="false">
+        <a-card class="metric-card metric-card-blue" :bordered="false">
           <a-statistic title="当月请假天数" :value="overview.leaveDays || 0" />
         </a-card>
       </a-col>
       <a-col :xs="24" :sm="12" :lg="6">
-        <a-card class="metric-card" :bordered="false">
+        <a-card class="metric-card metric-card-amber" :bordered="false">
           <a-statistic title="迟到/早退" :value="`${overview.lateCount || 0}/${overview.earlyLeaveCount || 0}`" />
         </a-card>
       </a-col>
       <a-col :xs="24" :sm="12" :lg="6">
-        <a-card class="metric-card" :bordered="false">
+        <a-card class="metric-card metric-card-violet" :bordered="false">
           <a-statistic title="外出总时长(分)" :value="overview.totalOutingMinutes || 0" />
         </a-card>
       </a-col>
@@ -101,7 +118,7 @@
       </a-col>
 
       <a-col :xs="24" :xl="8">
-        <a-card class="grid-card" :bordered="false" title="今日状态">
+        <a-card class="grid-card today-panel" :bordered="false" title="今日状态">
           <a-space direction="vertical" style="width: 100%">
             <div class="today-line">
               <span>当前员工：</span>
@@ -476,8 +493,10 @@ useLiveSyncRefresh({
 
 <style scoped>
 .attendance-hero {
-  background: linear-gradient(135deg, #0f766e 0%, #1d4ed8 100%);
+  background: linear-gradient(135deg, #0f766e 0%, #0ea5e9 52%, #1d4ed8 100%);
   color: #fff;
+  border-radius: 16px;
+  box-shadow: 0 14px 30px rgba(2, 12, 27, 0.18);
 }
 
 .attendance-hero :deep(.ant-form-item-label > label),
@@ -485,18 +504,77 @@ useLiveSyncRefresh({
   color: #fff !important;
 }
 
-.hero-tip {
-  margin-top: 10px;
+.hero-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.hero-title {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.hero-sub {
+  margin-top: 4px;
   font-size: 12px;
   opacity: 0.9;
 }
 
+.hero-form {
+  margin-top: 6px;
+}
+
+.hero-tip {
+  margin-top: 2px;
+  font-size: 12px;
+  opacity: 0.92;
+}
+
+.metrics-row {
+  margin-top: 16px;
+  margin-bottom: 16px;
+}
+
 .metric-card {
-  border-radius: 12px;
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+}
+
+.metric-card :deep(.ant-statistic-title) {
+  color: rgba(15, 23, 42, 0.72);
+}
+
+.metric-card :deep(.ant-statistic-content) {
+  font-weight: 600;
+}
+
+.metric-card-teal {
+  background: linear-gradient(180deg, #f0fdfa 0%, #ccfbf1 100%);
+}
+
+.metric-card-blue {
+  background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
+}
+
+.metric-card-amber {
+  background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%);
+}
+
+.metric-card-violet {
+  background: linear-gradient(180deg, #f5f3ff 0%, #ede9fe 100%);
 }
 
 .grid-card {
-  border-radius: 12px;
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+}
+
+.today-panel {
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
 }
 
 .muted {
@@ -511,5 +589,9 @@ useLiveSyncRefresh({
 
 .attendance-table :deep(.ant-table-thead > tr > th) {
   background: #f5f7ff;
+}
+
+.attendance-table :deep(.ant-table-tbody > tr:hover > td) {
+  background: #f8fafc;
 }
 </style>

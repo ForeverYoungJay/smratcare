@@ -37,19 +37,26 @@
         </a-space>
       </a-form-item>
       <template #extra>
-        <a-button type="primary" @click="openCreate">新增审批</a-button>
-        <a-button :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="editSelected">编辑</a-button>
-        <a-button v-if="canApproveFlow" :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="approveSelected">同意</a-button>
-        <a-button v-if="canApproveFlow" :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="rejectSelected">驳回</a-button>
-        <a-button :disabled="!selectedSingleRecord || !isSelectedSingleRejected" @click="resubmitSelected">驳回后重提</a-button>
-        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
-        <a-button v-if="canApproveFlow" :disabled="selectedPendingCount === 0" @click="batchApprove">批量同意</a-button>
-        <a-button v-if="canApproveFlow" :disabled="selectedPendingCount === 0" @click="batchReject">批量驳回</a-button>
-        <a-button v-if="canApproveFlow" :disabled="selectedPendingCount === 0" @click="batchUrge">批量催办</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
-        <a-button :disabled="!selectedSingleRecord" @click="openSelectedTimeline">查看时间线</a-button>
-        <a-button @click="downloadExport">导出CSV</a-button>
-        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条，{{ canApproveFlow ? '批量审批仅对“待审批”生效' : '当前账号仅可发起/编辑本人申请' }}</span>
+        <a-space wrap>
+          <a-button type="primary" @click="openCreate">新增审批</a-button>
+          <a-button @click="downloadExport">导出CSV</a-button>
+          <a-divider type="vertical" />
+          <span class="action-group-title">单条操作</span>
+          <a-button :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="editSelected">编辑</a-button>
+          <a-button v-if="canApproveFlow" :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="approveSelected">同意</a-button>
+          <a-button v-if="canApproveFlow" :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="rejectSelected">驳回</a-button>
+          <a-button :disabled="!selectedSingleRecord || !isSelectedSingleRejected" @click="resubmitSelected">驳回后重提</a-button>
+          <a-button :disabled="!selectedSingleRecord" @click="openSelectedTimeline">查看时间线</a-button>
+          <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+          <a-divider type="vertical" />
+          <span class="action-group-title">批量操作</span>
+          <a-button v-if="canApproveFlow" :disabled="selectedPendingCount === 0" @click="batchApprove">批量同意</a-button>
+          <a-button v-if="canApproveFlow" :disabled="selectedPendingCount === 0" @click="batchReject">批量驳回</a-button>
+          <a-button v-if="canApproveFlow" :disabled="selectedPendingCount === 0" @click="batchUrge">批量催办</a-button>
+          <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+          <a-tag color="blue">已勾选 {{ selectedRowKeys.length }} 条</a-tag>
+          <span class="selection-tip">{{ canApproveFlow ? '批量审批仅对待审批生效' : '当前账号仅可发起/编辑本人申请' }}</span>
+        </a-space>
       </template>
     </SearchForm>
 
@@ -63,17 +70,61 @@
         </a-tag>
       </a-space>
       <a-row :gutter="[12, 12]" style="margin-bottom: 12px">
-        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="总单数" :value="summary.totalCount || 0" /></a-card></a-col>
-        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="待审批" :value="summary.pendingCount || 0" /></a-card></a-col>
-        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已通过" :value="summary.approvedCount || 0" /></a-card></a-col>
-        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已驳回" :value="summary.rejectedCount || 0" /></a-card></a-col>
-        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="超时待审" :value="summary.timeoutPendingCount || 0" /></a-card></a-col>
-        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="请假待审" :value="summary.leavePendingCount || 0" /></a-card></a-col>
-        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="报销待审" :value="summary.reimbursePendingCount || 0" /></a-card></a-col>
-        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="采购待审" :value="summary.purchasePendingCount || 0" /></a-card></a-col>
-        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="营销待审" :value="summary.marketingPlanPendingCount || 0" /></a-card></a-col>
-        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已催办" :value="urgedRecordCount" /></a-card></a-col>
-        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="在途超时" :value="overduePendingCount" /></a-card></a-col>
+        <a-col :xs="12" :lg="3">
+          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'total' }" :bordered="false" size="small" @click="applySummaryFilter('total')">
+            <a-statistic title="总单数" :value="summary.totalCount || 0" />
+          </a-card>
+        </a-col>
+        <a-col :xs="12" :lg="3">
+          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'pending' }" :bordered="false" size="small" @click="applySummaryFilter('pending')">
+            <a-statistic title="待审批" :value="summary.pendingCount || 0" />
+          </a-card>
+        </a-col>
+        <a-col :xs="12" :lg="3">
+          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'approved' }" :bordered="false" size="small" @click="applySummaryFilter('approved')">
+            <a-statistic title="已通过" :value="summary.approvedCount || 0" />
+          </a-card>
+        </a-col>
+        <a-col :xs="12" :lg="3">
+          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'rejected' }" :bordered="false" size="small" @click="applySummaryFilter('rejected')">
+            <a-statistic title="已驳回" :value="summary.rejectedCount || 0" />
+          </a-card>
+        </a-col>
+        <a-col :xs="12" :lg="3">
+          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'timeoutPending' }" :bordered="false" size="small" @click="applySummaryFilter('timeoutPending')">
+            <a-statistic title="超时待审" :value="summary.timeoutPendingCount || 0" />
+          </a-card>
+        </a-col>
+        <a-col :xs="12" :lg="3">
+          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'leavePending' }" :bordered="false" size="small" @click="applySummaryFilter('leavePending')">
+            <a-statistic title="请假待审" :value="summary.leavePendingCount || 0" />
+          </a-card>
+        </a-col>
+        <a-col :xs="12" :lg="3">
+          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'reimbursePending' }" :bordered="false" size="small" @click="applySummaryFilter('reimbursePending')">
+            <a-statistic title="报销待审" :value="summary.reimbursePendingCount || 0" />
+          </a-card>
+        </a-col>
+        <a-col :xs="12" :lg="3">
+          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'purchasePending' }" :bordered="false" size="small" @click="applySummaryFilter('purchasePending')">
+            <a-statistic title="采购待审" :value="summary.purchasePendingCount || 0" />
+          </a-card>
+        </a-col>
+        <a-col :xs="12" :lg="3">
+          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'marketingPlanPending' }" :bordered="false" size="small" @click="applySummaryFilter('marketingPlanPending')">
+            <a-statistic title="营销待审" :value="summary.marketingPlanPendingCount || 0" />
+          </a-card>
+        </a-col>
+        <a-col :xs="12" :lg="3">
+          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'urged' }" :bordered="false" size="small" @click="applySummaryFilter('urged')">
+            <a-statistic title="已催办" :value="urgedRecordCount" />
+          </a-card>
+        </a-col>
+        <a-col :xs="12" :lg="3">
+          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'overdue' }" :bordered="false" size="small" @click="applySummaryFilter('overdue')">
+            <a-statistic title="在途超时" :value="overduePendingCount" />
+          </a-card>
+        </a-col>
       </a-row>
       <a-alert
         v-if="(summary.timeoutPendingCount || 0) > 0"
@@ -118,17 +169,6 @@
           </template>
           <template v-else-if="column.key === 'annualLeaveCount'">
             {{ record.approvalType === 'LEAVE' && record.status === 'APPROVED' ? annualLeaveCount(record) : '-' }}
-          </template>
-          <template v-else-if="column.key === 'actions'">
-            <a-space size="small">
-              <a v-if="canEditRecord(record)" @click="openEdit(record)">编辑</a>
-              <a v-if="canApproveRecord(record)" @click="approve(record)">同意</a>
-              <a v-if="canApproveRecord(record)" @click="reject(record)">驳回</a>
-              <a v-if="record.status === 'PENDING'" @click="urge(record)">催办</a>
-              <a @click="openTimeline(record)">时间线</a>
-              <a v-if="canResubmitRecord(record)" @click="resubmit(record)">重提</a>
-              <a v-if="canDeleteRecord(record)" @click="remove(record)">删除</a>
-            </a-space>
           </template>
         </template>
       </DataTable>
@@ -461,6 +501,19 @@ const query = reactive({
   pageSize: 10
 })
 const approvalScope = ref<'MY' | 'PENDING_REVIEW' | 'ALL'>('MY')
+const activeSummaryFilter = ref<
+  | 'total'
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'timeoutPending'
+  | 'leavePending'
+  | 'reimbursePending'
+  | 'purchasePending'
+  | 'marketingPlanPending'
+  | 'urged'
+  | 'overdue'
+>('total')
 const autoRefresh = ref(true)
 let autoRefreshTimer: number | undefined
 const AUTO_REFRESH_INTERVAL_MS = 60 * 1000
@@ -489,8 +542,7 @@ const columns = [
   { title: '金额', dataIndex: 'amount', key: 'amount', width: 120 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
   { title: '审批意见', key: 'approvalOpinion', width: 220 },
-  { title: '年度请假次数', key: 'annualLeaveCount', width: 130 },
-  { title: '操作', key: 'actions', width: 320 }
+  { title: '年度请假次数', key: 'annualLeaveCount', width: 130 }
 ]
 
 const editOpen = ref(false)
@@ -654,7 +706,7 @@ const timelineItems = computed(() => {
     items.push({
       key: `notify-${index}-${entry?.at || ''}`,
       title: '自动同步审批人',
-      desc: `${entry?.toName || '待分配'}（${entry?.toRole || '未定义角色'}）${entry?.message ? `：${entry.message}` : ''}`,
+      desc: `${entry?.toName || approverRoleLabel(entry?.toRole) || '待分配'}${entry?.message ? `：${entry.message}` : ''}`,
       timeText: formatTimelineTime(entry?.at),
       color: 'blue'
     })
@@ -840,6 +892,7 @@ function onReset() {
   query.currentApproverRole = undefined
   query.urgedOnly = false
   query.overdueOnly = false
+  activeSummaryFilter.value = 'total'
   query.pageNo = 1
   pagination.current = 1
   approvalScope.value = canApproveFlow.value ? 'ALL' : 'MY'
@@ -848,9 +901,93 @@ function onReset() {
 
 function setApproverRole(role?: string) {
   query.currentApproverRole = role
+  activeSummaryFilter.value = 'total'
   query.pageNo = 1
   pagination.current = 1
   fetchData()
+}
+
+function applySummaryFilter(filterKey: typeof activeSummaryFilter.value) {
+  activeSummaryFilter.value = filterKey
+  query.pageNo = 1
+  pagination.current = 1
+  if (filterKey === 'total') {
+    query.type = undefined
+    query.status = approvalScope.value === 'PENDING_REVIEW' ? 'PENDING' : undefined
+    query.urgedOnly = false
+    query.overdueOnly = false
+    fetchData()
+    return
+  }
+  if (filterKey === 'pending') {
+    query.status = 'PENDING'
+    query.type = undefined
+    query.urgedOnly = false
+    query.overdueOnly = false
+    fetchData()
+    return
+  }
+  if (filterKey === 'approved') {
+    query.status = 'APPROVED'
+    query.type = undefined
+    query.urgedOnly = false
+    query.overdueOnly = false
+    fetchData()
+    return
+  }
+  if (filterKey === 'rejected') {
+    query.status = 'REJECTED'
+    query.type = undefined
+    query.urgedOnly = false
+    query.overdueOnly = false
+    fetchData()
+    return
+  }
+  if (filterKey === 'timeoutPending' || filterKey === 'overdue') {
+    query.status = 'PENDING'
+    query.type = undefined
+    query.urgedOnly = false
+    query.overdueOnly = true
+    fetchData()
+    return
+  }
+  if (filterKey === 'leavePending') {
+    query.status = 'PENDING'
+    query.type = 'LEAVE'
+    query.urgedOnly = false
+    query.overdueOnly = false
+    fetchData()
+    return
+  }
+  if (filterKey === 'reimbursePending') {
+    query.status = 'PENDING'
+    query.type = 'REIMBURSE'
+    query.urgedOnly = false
+    query.overdueOnly = false
+    fetchData()
+    return
+  }
+  if (filterKey === 'purchasePending') {
+    query.status = 'PENDING'
+    query.type = 'PURCHASE'
+    query.urgedOnly = false
+    query.overdueOnly = false
+    fetchData()
+    return
+  }
+  if (filterKey === 'marketingPlanPending') {
+    query.status = 'PENDING'
+    query.type = 'MARKETING_PLAN'
+    query.urgedOnly = false
+    query.overdueOnly = false
+    fetchData()
+    return
+  }
+  if (filterKey === 'urged') {
+    query.urgedOnly = true
+    query.overdueOnly = false
+    fetchData()
+  }
 }
 
 function stopAutoRefreshTimer() {
@@ -941,10 +1078,17 @@ function currentApprover(record: OaApproval) {
   if (record.status === 'REJECTED') return '-'
   const approverName = parsed?.currentApproverName || parsed?.nextApproverName
   const role = parsed?.currentApproverRole ? String(parsed.currentApproverRole).trim() : ''
-  if (approverName && role) {
-    return `${approverName}（${role}）`
+  if (approverName) {
+    return approverName
   }
-  return approverName || '待分配'
+  return approverRoleLabel(role)
+}
+
+function approverRoleLabel(role?: string) {
+  const value = String(role || '').toUpperCase()
+  if (!value) return '待分配'
+  const matched = approverRoleOptions.find((item) => String(item.value || '').toUpperCase() === value)
+  return matched?.label || '待分配'
 }
 
 function urgeMetaText(record: OaApproval) {
@@ -954,28 +1098,6 @@ function urgeMetaText(record: OaApproval) {
   const byText = parsed?.lastUrgedBy ? ` by ${parsed.lastUrgedBy}` : ''
   if (count <= 0) return '未催办'
   return `催办${count}次${timeText ? ` · 最近 ${timeText}${byText}` : ''}`
-}
-
-function canEditRecord(record: OaApproval) {
-  if (record.status !== 'PENDING') return false
-  if (canApproveFlow.value) return true
-  return String(record.applicantId || '') === String(userStore.staffInfo?.id || '')
-}
-
-function canDeleteRecord(record: OaApproval) {
-  if (canApproveFlow.value) return true
-  return String(record.applicantId || '') === String(userStore.staffInfo?.id || '')
-}
-
-function canApproveRecord(record: OaApproval) {
-  if (!canApproveFlow.value || record.status !== 'PENDING') return false
-  return isCurrentUserApprover(record)
-}
-
-function canResubmitRecord(record: OaApproval) {
-  if (record.status !== 'REJECTED') return false
-  if (canApproveFlow.value) return true
-  return String(record.applicantId || '') === String(userStore.staffInfo?.id || '')
 }
 
 function applyWorkflowData(parsed: Record<string, any>) {
@@ -1211,10 +1333,8 @@ function openPolicy(path: string) {
 
 async function approve(record: OaApproval) {
   if (record.status !== 'PENDING') return
-  const remark = window.prompt('请输入审批意见', '同意')
-  if (remark === null) return
   try {
-    await approveApproval(String(record.id), remark || undefined)
+    await approveApproval(String(record.id), '同意')
     message.success('审批已通过')
     await fetchData()
   } catch (error: any) {
@@ -1226,8 +1346,12 @@ async function reject(record: OaApproval) {
   if (record.status !== 'PENDING') return
   const remark = window.prompt('请输入驳回原因', '请补充材料后重提')
   if (remark === null) return
+  if (!remark.trim()) {
+    message.warning('驳回原因不能为空')
+    return
+  }
   try {
-    await rejectApproval(String(record.id), remark)
+    await rejectApproval(String(record.id), remark.trim())
     message.success('已驳回')
     await fetchData()
   } catch (error: any) {
@@ -1422,7 +1546,11 @@ async function batchReject() {
   }
   const remark = window.prompt('请输入批量驳回原因', '批量未通过，请补充材料后重提')
   if (remark === null) return
-  const affected = await batchRejectApproval(selectedPendingIds.value, remark)
+  if (!remark.trim()) {
+    message.warning('批量驳回原因不能为空')
+    return
+  }
+  const affected = await batchRejectApproval(selectedPendingIds.value, remark.trim())
   message.success(`批量驳回完成，共处理 ${affected || 0} 条`)
   fetchData()
 }
@@ -1458,6 +1586,7 @@ async function downloadExport() {
 watch(approvalScope, () => {
   query.pageNo = 1
   pagination.current = 1
+  activeSummaryFilter.value = 'total'
   if (approvalScope.value === 'PENDING_REVIEW') {
     query.status = 'PENDING'
   }
@@ -1510,6 +1639,7 @@ function applyRouteFilters() {
   const focusId = String(route.query.focusId || '').trim()
   const urged = String(route.query.urged || '').toLowerCase()
   const overdue = String(route.query.overdue || '').toLowerCase()
+  activeSummaryFilter.value = 'total'
   approvalScope.value = canApproveFlow.value ? 'ALL' : 'MY'
   if (type && typeOptions.some((item) => item.value === type)) {
     query.type = type
@@ -1572,6 +1702,25 @@ useLiveSyncRefresh({
 .selection-tip {
   color: rgba(0, 0, 0, 0.45);
   font-size: 12px;
+}
+
+.action-group-title {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.summary-filter-card {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.summary-filter-card:hover {
+  transform: translateY(-1px);
+}
+
+.summary-filter-card.active {
+  box-shadow: 0 0 0 1px #1677ff inset;
+  background: #e6f4ff;
 }
 
 .upload-hint {

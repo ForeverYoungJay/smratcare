@@ -1,0 +1,32 @@
+<view class="container">
+  <view class="surface card">
+    <view class="section-title">护理日志</view>
+    <block wx:for="{{days}}" wx:key="date" wx:for-item="day">
+      <view class="day-block">
+        <view class="day">{{day.date}}</view>
+        <block wx:for="{{day.items}}" wx:key="time" wx:for-item="log" wx:for-index="logIndex">
+          <view class="row">
+            <text class="time">{{log.time}}</text>
+            <view class="main">
+              <text class="project">{{log.project}}</text>
+              <text class="staff">{{log.staff}} · {{log.status}}</text>
+              <text class="note">{{log.note}}</text>
+              <view class="photo-row" wx:if="{{log.photos && log.photos.length > 0}}">
+                <block wx:for="{{log.photos}}" wx:key="*this" wx:for-item="photo">
+                  <image
+                    class="photo"
+                    src="{{photo}}"
+                    mode="aspectFill"
+                    data-day="{{day.date}}"
+                    data-index="{{logIndex}}"
+                    data-url="{{photo}}"
+                    bindtap="previewPhoto" />
+                </block>
+              </view>
+            </view>
+          </view>
+        </block>
+      </view>
+    </block>
+  </view>
+</view>

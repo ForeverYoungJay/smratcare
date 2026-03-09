@@ -1,7 +1,7 @@
 import request, { fetchPage } from '../utils/request'
-import type { BillItem, PayRequest } from '../types'
+import type { BillItem, BillPageQuery, PayRequest } from '../types'
 
-export function getBillPage(params: any) {
+export function getBillPage(params: BillPageQuery) {
   return fetchPage<BillItem>('/api/bill/page', params)
 }
 

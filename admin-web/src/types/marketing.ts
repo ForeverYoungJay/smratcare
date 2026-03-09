@@ -233,6 +233,16 @@ export interface CrmContractPayload {
   remark?: string
 }
 
+export interface CrmContractStageSummary {
+  pendingAssessment: number
+  pendingBedSelect: number
+  pendingSign: number
+  signed: number
+  pendingAssessmentOverdue: number
+  pendingSignOverdue: number
+  generatedAt?: string
+}
+
 export interface ContractBatchDeleteRequest {
   ids?: number[]
   contractNos?: string[]
@@ -256,6 +266,8 @@ export interface ContractLinkageSummary {
   marketerName?: string
   contractNo?: string
   contractStatus?: string
+  flowStage?: 'PENDING_ASSESSMENT' | 'PENDING_BED_SELECT' | 'PENDING_SIGN' | 'SIGNED' | string
+  currentOwnerDept?: 'MARKETING' | 'ASSESSMENT' | string
   contractSignedAt?: string
   contractExpiryDate?: string
   admissionDate?: string
@@ -266,6 +278,25 @@ export interface ContractLinkageSummary {
   billOutstandingAmount?: number
   attachmentCount?: number
   attachments?: ContractAttachmentItem[]
+  archiveScore?: number
+  archiveLevel?: 'COMPLETE' | 'HIGH' | 'MEDIUM' | 'LOW' | string
+  missingRequiredAttachmentTypes?: string[]
+  hasContractAttachment?: boolean
+  hasInvoiceAttachment?: boolean
+  hasIdAttachment?: boolean
+  hasAssessmentReport?: boolean
+  archiveRuleVersion?: string
+  archiveRuleTips?: string[]
+  generatedAt?: string
+}
+
+export interface ContractArchiveRuleInfo {
+  ruleVersion?: string
+  title?: string
+  description?: string
+  requiredItems?: string[]
+  stageNotes?: string[]
+  generatedAt?: string
 }
 
 export interface ContractAssessmentReportItem {

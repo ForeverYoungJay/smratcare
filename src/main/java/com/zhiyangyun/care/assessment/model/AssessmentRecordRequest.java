@@ -43,4 +43,8 @@ public class AssessmentRecordRequest {
   private String archiveNo;
 
   private String source;
+
+  private String reportFileUrl;
+
+  private String reportFileName;
 }

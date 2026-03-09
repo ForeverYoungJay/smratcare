@@ -1,0 +1,181 @@
+.hero {
+  padding: 24rpx;
+  background: linear-gradient(150deg, #fff9ef, #ffffff);
+}
+
+.hero-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16rpx;
+}
+
+.mini-btn {
+  height: 58rpx;
+  line-height: 58rpx;
+  font-size: 22rpx;
+  border-radius: 999rpx;
+  padding: 0 20rpx;
+}
+
+.summary-grid {
+  margin-top: 18rpx;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10rpx;
+}
+
+.summary-item {
+  border-radius: 12rpx;
+  padding: 12rpx 10rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4rpx;
+}
+
+.summary-item .num {
+  font-size: 36rpx;
+  font-weight: 700;
+}
+
+.summary-item .txt {
+  font-size: 21rpx;
+}
+
+.summary-item.urgent {
+  background: #feeff2;
+  color: #be123c;
+}
+
+.summary-item.due {
+  background: #eef6ff;
+  color: #1d4ed8;
+}
+
+.summary-item.done {
+  background: #ecfdf3;
+  color: #0f766e;
+}
+
+.panel {
+  margin-top: 18rpx;
+  padding: 22rpx;
+}
+
+.panel-title {
+  font-size: 28rpx;
+  color: #1f2937;
+  font-weight: 700;
+}
+
+.todo-item {
+  margin-top: 12rpx;
+  border-radius: 12rpx;
+  border: 1rpx solid #e7edf3;
+  background: #fbfdff;
+  padding: 14rpx;
+}
+
+.todo-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.left-meta {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.type {
+  font-size: 20rpx;
+  color: #4b5563;
+  background: #eef2f7;
+  border-radius: 999rpx;
+  padding: 4rpx 10rpx;
+}
+
+.status {
+  font-size: 21rpx;
+  color: #64748b;
+}
+
+.priority {
+  font-size: 22rpx;
+  font-weight: 700;
+  border-radius: 999rpx;
+  padding: 4rpx 14rpx;
+}
+
+.priority-urgent {
+  color: #be123c;
+  background: #feeff2;
+}
+
+.priority-high {
+  color: #b45309;
+  background: #fff4e8;
+}
+
+.priority-normal {
+  color: #0f766e;
+  background: #ecfdf3;
+}
+
+.title {
+  margin-top: 10rpx;
+  font-size: 28rpx;
+  color: #111827;
+  font-weight: 700;
+}
+
+.desc {
+  margin-top: 8rpx;
+  font-size: 23rpx;
+  color: #475569;
+  line-height: 1.55;
+}
+
+.todo-bottom {
+  margin-top: 10rpx;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.due {
+  font-size: 22rpx;
+  color: #b45309;
+}
+
+.action {
+  font-size: 22rpx;
+  color: #0f4a5d;
+  font-weight: 700;
+}
+
+.action.done {
+  color: #0f766e;
+}
+
+.action.snoozed {
+  color: #b45309;
+}
+
+.op-row {
+  margin-top: 12rpx;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10rpx;
+}
+
+.op-btn {
+  min-width: 130rpx;
+  height: 56rpx;
+  line-height: 56rpx;
+  font-size: 21rpx;
+  border-radius: 999rpx;
+  padding: 0 16rpx;
+}

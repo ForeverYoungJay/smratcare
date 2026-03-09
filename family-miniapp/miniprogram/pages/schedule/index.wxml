@@ -1,0 +1,15 @@
+<view class="container">
+  <view class="surface card">
+    <view class="section-title">今日日程时间轴</view>
+    <block wx:for="{{list}}" wx:key="id">
+      <view class="row" data-index="{{index}}" bindtap="showDetail">
+        <text class="time">{{item.time}}</text>
+        <view class="main">
+          <text class="name">{{item.name}}</text>
+          <text class="desc">{{item.type}} · 执行人：{{item.owner}}</text>
+        </view>
+        <text class="state {{item.status === '已完成' ? 'done' : item.status === '进行中' ? 'doing' : 'todo'}}">{{item.status}}</text>
+      </view>
+    </block>
+  </view>
+</view>

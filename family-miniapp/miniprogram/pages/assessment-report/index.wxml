@@ -1,0 +1,19 @@
+<view class="container">
+  <view class="surface card">
+    <view class="section-title">评估报告中心</view>
+    <view class="ai-row">
+      <button class="ghost-btn ai-btn" loading="{{generating}}" data-type="TCM" bindtap="generateAi">生成中医评估</button>
+      <button class="ghost-btn ai-btn" loading="{{generating}}" data-type="CARDIO" bindtap="generateAi">生成心血管评估</button>
+      <button class="primary-btn ai-btn" loading="{{generating}}" data-type="ALL" bindtap="generateAi">一键生成AI评估</button>
+    </view>
+    <block wx:for="{{list}}" wx:key="id">
+      <view class="item">
+        <view class="name">{{item.reportName}}</view>
+        <view class="meta">{{item.type}} · {{item.date}} · {{item.orgName}}</view>
+        <view class="summary">{{item.summary}}</view>
+        <view class="score">评分：{{item.score}} · 风险：{{item.risk}}</view>
+        <button class="ghost-btn action" data-id="{{item.id}}" bindtap="viewReport">查看PDF</button>
+      </view>
+    </block>
+  </view>
+</view>

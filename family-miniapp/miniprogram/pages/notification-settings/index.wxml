@@ -1,0 +1,21 @@
+<view class="container">
+  <view class="surface card">
+    <view class="item"><text>健康提醒</text><switch checked="{{setting.healthAlert}}" data-field="healthAlert" bindchange="onSwitch" color="#2c7a84" /></view>
+    <view class="item"><text>费用提醒</text><switch checked="{{setting.paymentAlert}}" data-field="paymentAlert" bindchange="onSwitch" color="#2c7a84" /></view>
+    <view class="item"><text>活动提醒</text><switch checked="{{setting.activityAlert}}" data-field="activityAlert" bindchange="onSwitch" color="#2c7a84" /></view>
+    <view class="item"><text>紧急通知</text><switch checked="{{setting.urgentAlert}}" data-field="urgentAlert" bindchange="onSwitch" color="#2c7a84" /></view>
+    <view class="item"><text>短信兜底提醒</text><switch checked="{{setting.smsFallback}}" data-field="smsFallback" bindchange="onSwitch" color="#2c7a84" /></view>
+    <view class="item subscribe-item">
+      <view class="subscribe-main">
+        <text>微信服务通知订阅</text>
+        <text class="subscribe-status">{{setting.subscribeAuthorized ? '已授权' : '未授权'}}</text>
+      </view>
+      <button class="ghost-btn subscribe-btn" bindtap="requestSubscribe">申请授权</button>
+    </view>
+    <view class="template-list" wx:if="{{setting.subscribeTemplateIds && setting.subscribeTemplateIds.length > 0}}">
+      <block wx:for="{{setting.subscribeTemplateIds}}" wx:key="*this">
+        <text class="template-item">{{item}}</text>
+      </block>
+    </view>
+  </view>
+</view>

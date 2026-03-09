@@ -1,0 +1,41 @@
+<view class="container">
+  <view class="surface card">
+    <view class="section-title">满意度评价</view>
+    <view class="line">即时评价</view>
+
+    <view class="field">
+      <text class="label">反馈类型</text>
+      <picker mode="selector" range="{{feedbackTypes}}" range-key="label" value="{{feedbackTypeIndex}}" bindchange="onFeedbackTypeChange">
+        <view class="input">{{feedbackTypes[feedbackTypeIndex].label}}</view>
+      </picker>
+    </view>
+
+    <view class="field">
+      <text class="label">服务类型</text>
+      <picker mode="selector" range="{{serviceTypes}}" value="{{serviceTypeIndex}}" bindchange="onServiceTypeChange">
+        <view class="input">{{serviceType}}</view>
+      </picker>
+    </view>
+
+    <view class="field" wx:if="{{feedbackTypes[feedbackTypeIndex].value !== 'COMPLAINT'}}">
+      <text class="label">星级评分</text>
+      <slider min="1" max="5" step="1" show-value value="{{score}}" bindchange="onScoreChange" />
+    </view>
+
+    <textarea class="textarea" placeholder="{{feedbackTypes[feedbackTypeIndex].value === 'COMPLAINT' ? '请输入投诉建议内容' : '请输入本次服务评价'}}" maxlength="200" value="{{content}}" bindinput="onContentInput" />
+    <button class="primary-btn action" bindtap="submit">{{feedbackTypes[feedbackTypeIndex].value === 'COMPLAINT' ? '提交投诉' : '提交评价'}}</button>
+
+    <view class="line">定期问卷：月度满意度调查将于每月 25 日自动推送。</view>
+
+    <view class="line">历史反馈记录</view>
+    <view class="record-empty" wx:if="{{records.length === 0}}">暂无历史反馈记录</view>
+    <block wx:for="{{records}}" wx:key="id">
+      <view class="record">
+        <view class="record-title">{{item.feedbackType === 'COMPLAINT' ? '投诉建议' : '服务评价'}} · {{item.serviceType}}</view>
+        <view class="record-meta">{{item.status}} · {{item.createTime}}</view>
+        <view class="record-content">{{item.content}}</view>
+        <view class="record-reply">处理反馈：{{item.reply}}</view>
+      </view>
+    </block>
+  </view>
+</view>

@@ -7,6 +7,9 @@ const request = axios.create({
     baseURL: '/',
     timeout: 15000
 });
+let lastForbiddenToastAt = 0;
+let lastForbiddenToastKey = '';
+const FORBIDDEN_TOAST_COOLDOWN_MS = 2500;
 function resolveErrorMessage(payload, fallback = '请求失败') {
     if (!payload)
         return fallback;
@@ -38,7 +41,10 @@ request.interceptors.response.use((response) => {
     const data = response.data;
     if (data && typeof data.code !== 'undefined') {
         if (data.code !== 0) {
-            message.error(resolveErrorMessage(data));
+            const cfg = (response.config || {});
+            if (!cfg.silentError) {
+                message.error(resolveErrorMessage(data));
+            }
             return Promise.reject(data);
         }
         if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
@@ -62,6 +68,11 @@ request.interceptors.response.use((response) => {
     return data;
 }, (error) => {
     const status = error?.response?.status;
+    const url = String(error?.config?.url || '');
+    const cfg = (error?.config || {});
+    const silentError = Boolean(cfg.silentError);
+    const silent403 = Boolean(cfg.silent403 || cfg.silentError);
+    const isLoginRequest = url.includes('/api/auth/login') || url.includes('/api/auth/family/login');
     if (status === 401) {
         clearToken();
         clearRoles();
@@ -69,12 +80,36 @@ request.interceptors.response.use((response) => {
         router.push('/login');
         return Promise.reject(error);
     }
+    if (isLoginRequest) {
+        return Promise.reject(error);
+    }
+    if (status === 403) {
+        if (silent403) {
+            return Promise.reject(error);
+        }
+        const payload = error?.response?.data;
+        const rawMessage = resolveErrorMessage(payload, '当前账号无该操作权限（403）');
+        const displayMessage = /access denied/i.test(rawMessage)
+            ? '当前账号无该操作权限（403），请联系管理员开通。'
+            : rawMessage;
+        const now = Date.now();
+        const key = `${url}|${displayMessage}`;
+        if (key !== lastForbiddenToastKey || now - lastForbiddenToastAt > FORBIDDEN_TOAST_COOLDOWN_MS) {
+            message.warning(displayMessage);
+            lastForbiddenToastAt = now;
+            lastForbiddenToastKey = key;
+        }
+        return Promise.reject(error);
+    }
+    if (silentError) {
+        return Promise.reject(error);
+    }
     const payload = error?.response?.data;
     message.error(resolveErrorMessage(payload, error?.message || '请求失败'));
     return Promise.reject(error);
 });
 export default request;
-export function fetchPage(url, params) {
+export function fetchPage(url, params, config) {
     const merged = { ...(params || {}) };
     if (merged.pageNo != null && merged.page == null) {
         merged.page = merged.pageNo;
@@ -85,7 +120,7 @@ export function fetchPage(url, params) {
     if (merged.sortOrder != null && merged.order == null) {
         merged.order = merged.sortOrder;
     }
-    return request.get(url, { params: merged }).then((res) => {
+    return request.get(url, { params: merged, ...(config || {}) }).then((res) => {
         if (res && Array.isArray(res.list)) {
             return res;
         }

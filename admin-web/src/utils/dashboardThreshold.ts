@@ -1,3 +1,5 @@
+import { toThresholdSnapshot } from './dashboardQuery'
+
 export interface ThresholdSnapshot {
   abnormalTaskThreshold: number
   inventoryAlertThreshold: number
@@ -33,12 +35,7 @@ export function loadThresholdSnapshot(staffId: string | number | undefined) {
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<ThresholdSnapshot>
     if (!parsed || typeof parsed !== 'object') return null
-    return {
-      abnormalTaskThreshold: Number(parsed.abnormalTaskThreshold || 0),
-      inventoryAlertThreshold: Number(parsed.inventoryAlertThreshold || 0),
-      bedOccupancyThreshold: Number(parsed.bedOccupancyThreshold || 0),
-      revenueDropThreshold: Number(parsed.revenueDropThreshold || 0)
-    } as ThresholdSnapshot
+    return toThresholdSnapshot(parsed)
   } catch {
     return null
   }
@@ -68,12 +65,7 @@ export function saveThresholdSnapshot(
   snapshot: ThresholdSnapshot,
   source: 'dashboard' | 'portal'
 ) {
-  const safeSnapshot: ThresholdSnapshot = {
-    abnormalTaskThreshold: Number(snapshot.abnormalTaskThreshold || 0),
-    inventoryAlertThreshold: Number(snapshot.inventoryAlertThreshold || 0),
-    bedOccupancyThreshold: Number(snapshot.bedOccupancyThreshold || 0),
-    revenueDropThreshold: Number(snapshot.revenueDropThreshold || 0)
-  }
+  const safeSnapshot: ThresholdSnapshot = toThresholdSnapshot(snapshot)
 
   try {
     localStorage.setItem(thresholdStorageKey(staffId), JSON.stringify(safeSnapshot))

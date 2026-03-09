@@ -18,7 +18,9 @@
         <a-switch v-model:checked="showWarningOnly" checked-children="仅预警" un-checked-children="全部" />
         <a-switch v-model:checked="autoRefresh" checked-children="自动刷新" un-checked-children="手动刷新" />
         <a-tag v-if="dutyMode" color="red">值班中：30秒自动刷新 + 仅预警</a-tag>
+        <a-tag v-if="lastLoadedAt" color="blue">更新于 {{ lastLoadedAt }}</a-tag>
         <a-button @click="loadModules">立即刷新</a-button>
+        <a-button @click="copyShareLink">复制分享链接</a-button>
       </a-space>
     </template>
     <template #stats>
@@ -28,6 +30,30 @@
         <a-col :xs="8" :sm="8" :md="8"><a-statistic title="预警总量" :value="alertTotalCount" /></a-col>
       </a-row>
     </template>
+    <a-card class="card-elevated linkage-card" :bordered="false">
+      <div class="linkage-head">
+        <div class="linkage-title">协同联动</div>
+        <div class="linkage-sub-title">
+          {{ selectedResidentName ? `已选择：${selectedResidentName}` : '未选择长者，默认展示在院首位长者' }}
+        </div>
+      </div>
+      <a-space wrap>
+        <a-button type="primary" @click="openResidentProfile">长者档案</a-button>
+        <a-button @click="go('/elder/assessment/ability/archive')">评估档案</a-button>
+        <a-button @click="go('/elder/contracts-invoices')">合同与票据</a-button>
+        <a-button @click="go('/elder/admission-processing')">入住办理</a-button>
+        <a-button @click="go('/elder/status-change')">入住状态变更</a-button>
+        <a-button @click="go('/finance/bills/in-resident')">账单中心</a-button>
+      </a-space>
+    </a-card>
+    <LifecycleStageBar
+      title="长者履约阶段"
+      :subject="residentLifecycleSubject"
+      :stage="residentLifecycleStage"
+      :generated-at="residentLifecycleGeneratedAt"
+      :hint="residentLifecycleHint"
+      style="margin-bottom: 12px"
+    />
     <StatefulBlock :loading="loading" :error="errorMessage" :empty="!modules.length" empty-text="暂无在院服务数据" @retry="loadModules">
       <a-row :gutter="16">
         <a-col v-for="item in modules" :key="item.title" :xs="24" :sm="24" :lg="12" :xl="12" style="margin-bottom: 12px">
@@ -69,10 +95,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
+import LifecycleStageBar from '../../../components/LifecycleStageBar.vue'
 import { getResidentOverview } from '../../../api/medicalCare'
+import { getContractLinkageByElder } from '../../../api/marketing'
 import { useElderOptions } from '../../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
-import type { MedicalResidentOverview } from '../../../types'
+import { copyText } from '../../../utils/clipboard'
+import { lifecycleStageHint, normalizeLifecycleStage } from '../../../utils/lifecycleStage'
+import type { ContractLinkageSummary, MedicalResidentOverview } from '../../../types'
 
 const router = useRouter()
 const route = useRoute()
@@ -80,10 +110,12 @@ const residentId = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
 const overview = ref<MedicalResidentOverview>()
+const contractLinkage = ref<ContractLinkageSummary>()
 const expandedCardKeys = ref<string[]>([])
 const showWarningOnly = ref(false)
 const autoRefresh = ref(true)
 const dutyMode = ref(false)
+const lastLoadedAt = ref('')
 const { elderOptions: residentOptionPool, elderLoading: residentLoading, searchElders, ensureSelectedElder } = useElderOptions({
   pageSize: 200,
   preloadSize: 600,
@@ -161,6 +193,28 @@ const alertTotalCount = computed(() => baseModules.value.reduce((sum, item) => s
 const effectiveShowWarningOnly = computed(() => dutyMode.value || showWarningOnly.value)
 const effectiveAutoRefresh = computed(() => dutyMode.value || autoRefresh.value)
 const refreshIntervalMs = computed(() => (dutyMode.value ? 30000 : 60000))
+const residentLifecycleStage = computed(() =>
+  normalizeLifecycleStage(contractLinkage.value?.flowStage, contractLinkage.value?.contractStatus)
+)
+const residentLifecycleSubject = computed(() => {
+  if (!residentId.value) return '未选择长者'
+  const residentLabel = selectedResidentName.value || `长者ID ${residentId.value}`
+  const contractNo = contractLinkage.value?.contractNo || '-'
+  return `${residentLabel} / 合同 ${contractNo}`
+})
+const residentLifecycleHint = computed(() => {
+  if (!contractLinkage.value) {
+    return '未检索到合同联动信息，建议先在合同与票据确认签约状态。'
+  }
+  const tips = contractLinkage.value.archiveRuleTips || []
+  if (tips.length > 0) {
+    return tips[0]
+  }
+  return lifecycleStageHint(residentLifecycleStage.value)
+})
+const residentLifecycleGeneratedAt = computed(() =>
+  String(contractLinkage.value?.generatedAt || overview.value?.generatedAt || '').trim()
+)
 
 function go(path: string) {
   const targetPath = appendResidentId(path)
@@ -183,6 +237,16 @@ function appendResidentId(path: string) {
       : `${nextPath}?elderName=${encodeURIComponent(currentResidentName)}`
   }
   return nextPath
+}
+
+function openResidentProfile() {
+  const currentResidentId = String(residentId.value || '').trim()
+  if (!currentResidentId) {
+    message.warning('请先选择长者')
+    return
+  }
+  forceScrollTop()
+  router.push(`/elder/detail/${encodeURIComponent(currentResidentId)}`)
 }
 
 function forceScrollTop() {
@@ -273,19 +337,20 @@ async function searchResidentOptions(keyword = '') {
 }
 
 function syncResidentToRoute() {
+  const nextQuery = buildResidentRouteQuery()
+  if (hasSameRouteQuery(nextQuery)) return
+  router.replace({
+    path: route.path,
+    query: nextQuery
+  })
+}
+
+function buildResidentRouteQuery() {
   const nextResident = residentId.value.trim()
   const nextResidentName = selectedResidentName.value
   const nextWarning = showWarningOnly.value ? '1' : ''
   const nextDuty = dutyMode.value ? '1' : ''
-  const currentResident = String(route.query.residentId || route.query.elderId || '').trim()
-  const currentResidentName = String(route.query.elderName || '').trim()
-  const currentWarning = String(route.query.warning || '').trim()
-  const currentDuty = String(route.query.duty || '').trim()
-  const residentUnchanged = currentResident === nextResident || (!nextResident && !currentResident)
-  const residentNameUnchanged = currentResidentName === nextResidentName || (!nextResidentName && !currentResidentName)
-  const warningUnchanged = currentWarning === nextWarning
-  const dutyUnchanged = currentDuty === nextDuty
-  if (residentUnchanged && residentNameUnchanged && warningUnchanged && dutyUnchanged) return
+  const nextAuto = autoRefresh.value ? '1' : '0'
   const nextQuery: Record<string, any> = { ...route.query }
   if (nextResident) nextQuery.residentId = nextResident
   else delete nextQuery.residentId
@@ -296,10 +361,37 @@ function syncResidentToRoute() {
   else delete nextQuery.warning
   if (nextDuty) nextQuery.duty = nextDuty
   else delete nextQuery.duty
-  router.replace({
-    path: route.path,
-    query: nextQuery
-  })
+  nextQuery.auto = nextAuto
+  return nextQuery
+}
+
+function flattenRouteQuery(source: Record<string, unknown>) {
+  return Object.entries(source || {}).reduce<Record<string, string>>((acc, [key, value]) => {
+    const text = Array.isArray(value) ? String(value[0] || '').trim() : String(value || '').trim()
+    if (!text) return acc
+    acc[key] = text
+    return acc
+  }, {})
+}
+
+function hasSameRouteQuery(nextQuery: Record<string, any>) {
+  const currentQuery = flattenRouteQuery(route.query as Record<string, unknown>)
+  const nextFlatten = flattenRouteQuery(nextQuery)
+  const currentKeys = Object.keys(currentQuery)
+  const nextKeys = Object.keys(nextFlatten)
+  if (currentKeys.length !== nextKeys.length) return false
+  return nextKeys.every((key) => currentQuery[key] === nextFlatten[key])
+}
+
+async function copyShareLink() {
+  const href = router.resolve({ path: route.path, query: buildResidentRouteQuery() }).href
+  const fullUrl = /^https?:\/\//i.test(href) ? href : `${window.location.origin}${href}`
+  const copied = await copyText(fullUrl)
+  if (copied) {
+    message.success('分享链接已复制')
+    return
+  }
+  message.warning('复制失败，请手动复制地址栏链接')
 }
 
 function onResidentChange() {
@@ -329,10 +421,18 @@ async function loadModules() {
     await resolveResidentId()
     if (!residentId.value.trim()) {
       overview.value = undefined
+      contractLinkage.value = undefined
       errorMessage.value = "暂无可用长者，请先创建长者档案"
       return
     }
-    overview.value = await getResidentOverview(residentId.value)
+    const [overviewData, contractData] = await Promise.all([
+      getResidentOverview(residentId.value),
+      safeContractLinkageByElder(residentId.value)
+    ])
+    overview.value = overviewData
+    contractLinkage.value = contractData
+    const generatedAt = String(overview.value?.generatedAt || '').trim()
+    lastLoadedAt.value = generatedAt ? new Date(generatedAt).toLocaleString() : new Date().toLocaleString()
     expandedCardKeys.value = []
   } catch (error: any) {
     errorMessage.value = error?.message || '加载在院服务总览失败'
@@ -342,10 +442,19 @@ async function loadModules() {
   }
 }
 
+async function safeContractLinkageByElder(elderId: string) {
+  try {
+    return await getContractLinkageByElder(elderId)
+  } catch {
+    return undefined
+  }
+}
+
 onMounted(async () => {
   try {
     dutyMode.value = String(route.query.duty || '').trim() === '1'
     showWarningOnly.value = String(route.query.warning || '').trim() === '1'
+    autoRefresh.value = String(route.query.auto || '').trim() !== '0'
     const routeResident = String(route.query.residentId || route.query.elderId || '').trim()
     if (routeResident) {
       residentId.value = routeResident
@@ -363,10 +472,14 @@ onMounted(async () => {
     // ignore resident option init error
   }
   await loadModules()
+  syncResidentToRoute()
   setupAutoRefresh()
 })
 
-watch(autoRefresh, () => setupAutoRefresh())
+watch(autoRefresh, () => {
+  syncResidentToRoute()
+  setupAutoRefresh()
+})
 watch(showWarningOnly, () => syncResidentToRoute())
 watch(dutyMode, (enabled) => {
   if (enabled) {
@@ -404,6 +517,14 @@ watch(
     dutyMode.value = enabled
   }
 )
+watch(
+  () => String(route.query.auto || '').trim(),
+  (nextAuto) => {
+    const enabled = nextAuto === '0' ? false : true
+    if (enabled === autoRefresh.value) return
+    autoRefresh.value = enabled
+  }
+)
 onBeforeUnmount(() => clearAutoRefresh())
 
 useLiveSyncRefresh({
@@ -422,6 +543,28 @@ useLiveSyncRefresh({
   line-height: 1.65;
   min-height: 30px;
   font-size: 13px;
+}
+
+.linkage-card {
+  margin-bottom: 12px;
+  border: 1px solid #e6f4ff;
+  background: linear-gradient(132deg, #f6fbff 0%, #f0f7ff 45%, #ffffff 100%);
+}
+
+.linkage-head {
+  margin-bottom: 10px;
+}
+
+.linkage-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.linkage-sub-title {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #64748b;
 }
 
 .line-item {

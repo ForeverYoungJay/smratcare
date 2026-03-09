@@ -47,11 +47,24 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/logistics/workbench")
 public class LogisticsWorkbenchController {
+  private static final int MIN_WINDOW_DAYS = 1;
+  private static final int MAX_WINDOW_DAYS = 180;
+  private static final int DEFAULT_EXPIRY_DAYS = 30;
+  private static final int MIN_EXPIRY_DAYS = 1;
+  private static final int MAX_EXPIRY_DAYS = 365;
+  private static final int DEFAULT_OVERDUE_DAYS = 2;
+  private static final int MIN_OVERDUE_DAYS = 1;
+  private static final int MAX_OVERDUE_DAYS = 30;
+  private static final int DEFAULT_MAINTENANCE_DUE_DAYS = 30;
+  private static final int MIN_MAINTENANCE_DUE_DAYS = 1;
+  private static final int MAX_MAINTENANCE_DUE_DAYS = 180;
+
   private final InventoryService inventoryService;
   private final InventoryLogMapper inventoryLogMapper;
   private final InventoryBatchMapper inventoryBatchMapper;
@@ -105,25 +118,52 @@ public class LogisticsWorkbenchController {
   }
 
   @GetMapping("/summary")
-  public Result<LogisticsWorkbenchSummaryResponse> summary() {
+  public Result<LogisticsWorkbenchSummaryResponse> summary(
+      @RequestParam(required = false) Integer windowDays,
+      @RequestParam(required = false) Integer expiryDays,
+      @RequestParam(required = false) Integer overdueDays,
+      @RequestParam(required = false) Integer maintenanceDueDays,
+      @RequestParam(defaultValue = "false") boolean lite) {
     Long orgId = AuthContext.getOrgId();
     LocalDate today = LocalDate.now();
-    LocalDate monthStart = today.withDayOfMonth(1);
+    int defaultWindowDays = today.getDayOfMonth();
+    int resolvedWindowDays = resolveDays(windowDays, defaultWindowDays, MIN_WINDOW_DAYS, MAX_WINDOW_DAYS);
+    int resolvedExpiryDays = resolveDays(expiryDays, DEFAULT_EXPIRY_DAYS, MIN_EXPIRY_DAYS, MAX_EXPIRY_DAYS);
+    int resolvedOverdueDays = resolveDays(overdueDays, DEFAULT_OVERDUE_DAYS, MIN_OVERDUE_DAYS, MAX_OVERDUE_DAYS);
+    int resolvedMaintenanceDueDays = resolveDays(
+        maintenanceDueDays,
+        DEFAULT_MAINTENANCE_DUE_DAYS,
+        MIN_MAINTENANCE_DUE_DAYS,
+        MAX_MAINTENANCE_DUE_DAYS);
+
+    LocalDate windowStartDate = today.minusDays(Math.max(0, resolvedWindowDays - 1L));
     LocalDateTime todayStart = today.atStartOfDay();
     LocalDateTime now = LocalDateTime.now();
-    LocalDateTime monthStartAt = monthStart.atStartOfDay();
-    LocalDateTime weekStartAt = today.minusDays(6).atStartOfDay();
+    LocalDateTime windowStartAt = windowStartDate.atStartOfDay();
+    LocalDateTime weekStartAt = today.minusDays(Math.max(0, Math.min(resolvedWindowDays, 7) - 1L)).atStartOfDay();
 
     LogisticsWorkbenchSummaryResponse response = new LogisticsWorkbenchSummaryResponse();
+    response.setConfiguredWindowDays(resolvedWindowDays);
+    response.setConfiguredExpiryDays(resolvedExpiryDays);
+    response.setConfiguredOverdueDays(resolvedOverdueDays);
+    response.setConfiguredMaintenanceDueDays(resolvedMaintenanceDueDays);
+    response.setSnapshotStartDate(windowStartDate);
+    response.setSnapshotEndDate(today);
+    response.setGeneratedAt(now);
+    fillTodayTaskCounts(response, orgId, today, todayStart);
+    if (lite) {
+      return Result.ok(response);
+    }
 
-    response.setLowStockCount(inventoryService.lowStockAlerts(orgId).size());
-    response.setExpiringCount(inventoryService.expiryAlerts(orgId, 30).size());
+    var lowStockAlerts = inventoryService.lowStockAlerts(orgId);
+    response.setLowStockCount(lowStockAlerts.size());
+    response.setExpiringCount(inventoryService.expiryAlerts(orgId, resolvedExpiryDays).size());
 
     List<InventoryLog> allOutLogs = inventoryLogMapper.selectList(Wrappers.lambdaQuery(InventoryLog.class)
         .eq(InventoryLog::getIsDeleted, 0)
         .eq(orgId != null, InventoryLog::getOrgId, orgId)
         .eq(InventoryLog::getChangeType, "OUT")
-        .ge(InventoryLog::getCreateTime, monthStartAt));
+        .ge(InventoryLog::getCreateTime, windowStartAt));
 
     response.setTodayOutboundQty(allOutLogs.stream()
         .filter(log -> log.getCreateTime() != null && !log.getCreateTime().isBefore(todayStart))
@@ -149,7 +189,9 @@ public class LogisticsWorkbenchController {
     Map<Long, Product> productMap = productMapper.selectList(Wrappers.lambdaQuery(Product.class)
             .eq(Product::getIsDeleted, 0)
             .eq(orgId != null, Product::getOrgId, orgId))
-        .stream().collect(java.util.stream.Collectors.toMap(Product::getId, item -> item));
+        .stream()
+        .filter(item -> item.getId() != null)
+        .collect(java.util.stream.Collectors.toMap(Product::getId, item -> item, (left, right) -> left));
 
     long inventoryAssetQty = 0;
     long inventoryConsumableQty = 0;
@@ -178,7 +220,7 @@ public class LogisticsWorkbenchController {
     long lowStockConsumableCount = 0;
     long lowStockFoodCount = 0;
     long lowStockServiceCount = 0;
-    for (var alert : inventoryService.lowStockAlerts(orgId)) {
+    for (var alert : lowStockAlerts) {
       Product product = alert.getProductId() == null ? null : productMap.get(alert.getProductId());
       String itemType = normalizeItemType(product == null ? null : product.getItemType());
       if ("ASSET".equals(itemType)) {
@@ -219,7 +261,7 @@ public class LogisticsWorkbenchController {
     BigDecimal monthPurchaseAmount = materialPurchaseOrderMapper.selectList(Wrappers.lambdaQuery(MaterialPurchaseOrder.class)
             .eq(MaterialPurchaseOrder::getIsDeleted, 0)
             .eq(orgId != null, MaterialPurchaseOrder::getOrgId, orgId)
-            .between(MaterialPurchaseOrder::getOrderDate, monthStart, today)
+            .between(MaterialPurchaseOrder::getOrderDate, windowStartDate, today)
             .ne(MaterialPurchaseOrder::getStatus, "CANCELLED"))
         .stream()
         .map(order -> order.getTotalAmount() == null ? BigDecimal.ZERO : order.getTotalAmount())
@@ -230,7 +272,7 @@ public class LogisticsWorkbenchController {
         Wrappers.lambdaQuery(MaterialPurchaseOrder.class)
             .eq(MaterialPurchaseOrder::getIsDeleted, 0)
             .eq(orgId != null, MaterialPurchaseOrder::getOrgId, orgId)
-            .between(MaterialPurchaseOrder::getOrderDate, monthStart, today)
+            .between(MaterialPurchaseOrder::getOrderDate, windowStartDate, today)
             .ne(MaterialPurchaseOrder::getStatus, "CANCELLED"));
     BigDecimal monthPurchaseAssetAmount = BigDecimal.ZERO;
     BigDecimal monthPurchaseConsumableAmount = BigDecimal.ZERO;
@@ -241,22 +283,25 @@ public class LogisticsWorkbenchController {
           .map(MaterialPurchaseOrder::getId)
           .filter(java.util.Objects::nonNull)
           .toList();
-      List<MaterialPurchaseOrderItem> purchaseItems = materialPurchaseOrderItemMapper.selectList(
-          Wrappers.lambdaQuery(MaterialPurchaseOrderItem.class)
-              .eq(MaterialPurchaseOrderItem::getIsDeleted, 0)
-              .in(MaterialPurchaseOrderItem::getOrderId, purchaseOrderIds));
-      for (MaterialPurchaseOrderItem item : purchaseItems) {
-        BigDecimal amount = item.getAmount() == null ? BigDecimal.ZERO : item.getAmount();
-        Product product = item.getProductId() == null ? null : productMap.get(item.getProductId());
-        String itemType = normalizeItemType(product == null ? null : product.getItemType());
-        if ("ASSET".equals(itemType)) {
-          monthPurchaseAssetAmount = monthPurchaseAssetAmount.add(amount);
-        } else if ("FOOD".equals(itemType)) {
-          monthPurchaseFoodAmount = monthPurchaseFoodAmount.add(amount);
-        } else if ("SERVICE".equals(itemType)) {
-          monthPurchaseServiceAmount = monthPurchaseServiceAmount.add(amount);
-        } else {
-          monthPurchaseConsumableAmount = monthPurchaseConsumableAmount.add(amount);
+      if (!purchaseOrderIds.isEmpty()) {
+        List<MaterialPurchaseOrderItem> purchaseItems = materialPurchaseOrderItemMapper.selectList(
+            Wrappers.lambdaQuery(MaterialPurchaseOrderItem.class)
+                .eq(MaterialPurchaseOrderItem::getIsDeleted, 0)
+                .eq(orgId != null, MaterialPurchaseOrderItem::getOrgId, orgId)
+                .in(MaterialPurchaseOrderItem::getOrderId, purchaseOrderIds));
+        for (MaterialPurchaseOrderItem item : purchaseItems) {
+          BigDecimal amount = item.getAmount() == null ? BigDecimal.ZERO : item.getAmount();
+          Product product = item.getProductId() == null ? null : productMap.get(item.getProductId());
+          String itemType = normalizeItemType(product == null ? null : product.getItemType());
+          if ("ASSET".equals(itemType)) {
+            monthPurchaseAssetAmount = monthPurchaseAssetAmount.add(amount);
+          } else if ("FOOD".equals(itemType)) {
+            monthPurchaseFoodAmount = monthPurchaseFoodAmount.add(amount);
+          } else if ("SERVICE".equals(itemType)) {
+            monthPurchaseServiceAmount = monthPurchaseServiceAmount.add(amount);
+          } else {
+            monthPurchaseConsumableAmount = monthPurchaseConsumableAmount.add(amount);
+          }
         }
       }
     }
@@ -315,11 +360,11 @@ public class LogisticsWorkbenchController {
         .eq(MaintenanceRequest::getIsDeleted, 0)
         .eq(orgId != null, MaintenanceRequest::getOrgId, orgId)
         .in(MaintenanceRequest::getStatus, List.of("OPEN", "PROCESSING"))
-        .lt(MaintenanceRequest::getReportedAt, now.minusDays(2))));
+        .lt(MaintenanceRequest::getReportedAt, now.minusDays(resolvedOverdueDays))));
     BigDecimal monthMaintenanceCost = maintenanceRequestMapper.selectList(Wrappers.lambdaQuery(MaintenanceRequest.class)
             .eq(MaintenanceRequest::getIsDeleted, 0)
             .eq(orgId != null, MaintenanceRequest::getOrgId, orgId)
-            .ge(MaintenanceRequest::getReportedAt, monthStartAt))
+            .ge(MaintenanceRequest::getReportedAt, windowStartAt))
         .stream()
         .map(item -> item.getTotalCost() == null ? BigDecimal.ZERO : item.getTotalCost())
         .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -399,23 +444,6 @@ public class LogisticsWorkbenchController {
     response.setTodayOutboundFoodQty(todayOutboundFoodQty);
     response.setTodayOutboundServiceQty(todayOutboundServiceQty);
 
-    response.setTodayCleaningTaskCount(roomCleaningTaskMapper.selectCount(Wrappers.lambdaQuery(RoomCleaningTask.class)
-        .eq(RoomCleaningTask::getIsDeleted, 0)
-        .eq(orgId != null, RoomCleaningTask::getOrgId, orgId)
-        .eq(RoomCleaningTask::getPlanDate, today)));
-    response.setTodayMaintenanceTaskCount(maintenanceRequestMapper.selectCount(Wrappers.lambdaQuery(MaintenanceRequest.class)
-        .eq(MaintenanceRequest::getIsDeleted, 0)
-        .eq(orgId != null, MaintenanceRequest::getOrgId, orgId)
-        .ge(MaintenanceRequest::getReportedAt, todayStart)));
-    response.setTodayDeliveryTaskCount(diningDeliveryRecordMapper.selectCount(Wrappers.lambdaQuery(DiningDeliveryRecord.class)
-        .eq(DiningDeliveryRecord::getIsDeleted, 0)
-        .eq(orgId != null, DiningDeliveryRecord::getOrgId, orgId)
-        .ge(DiningDeliveryRecord::getCreateTime, todayStart)));
-    response.setTodayInventoryCheckTaskCount(inventoryAdjustmentMapper.selectCount(Wrappers.lambdaQuery(InventoryAdjustment.class)
-        .eq(InventoryAdjustment::getIsDeleted, 0)
-        .eq(orgId != null, InventoryAdjustment::getOrgId, orgId)
-        .ge(InventoryAdjustment::getCreateTime, todayStart)));
-
     response.setEquipmentTotalCount(logisticsEquipmentArchiveMapper.selectCount(Wrappers.lambdaQuery(LogisticsEquipmentArchive.class)
         .eq(LogisticsEquipmentArchive::getIsDeleted, 0)
         .eq(orgId != null, LogisticsEquipmentArchive::getOrgId, orgId)));
@@ -427,7 +455,7 @@ public class LogisticsWorkbenchController {
         .eq(LogisticsEquipmentArchive::getIsDeleted, 0)
         .eq(orgId != null, LogisticsEquipmentArchive::getOrgId, orgId)
         .isNotNull(LogisticsEquipmentArchive::getNextMaintainedAt)
-        .between(LogisticsEquipmentArchive::getNextMaintainedAt, now, now.plusDays(30))));
+        .between(LogisticsEquipmentArchive::getNextMaintainedAt, now, now.plusDays(resolvedMaintenanceDueDays))));
 
     LogisticsMaintenanceTodoJobLog latestJobLog = logisticsMaintenanceTodoJobLogMapper.selectOne(
         Wrappers.lambdaQuery(LogisticsMaintenanceTodoJobLog.class)
@@ -451,7 +479,77 @@ public class LogisticsWorkbenchController {
             .eq(LogisticsMaintenanceTodoJobLog::getStatus, "FAILED")
             .ge(LogisticsMaintenanceTodoJobLog::getExecutedAt, now.minusDays(7))));
 
+    long bedTotal = response.getOccupiedBeds() + response.getFreeBeds() + response.getMaintenanceBeds();
+    response.setBedOccupancyRate(toRatePercent(response.getOccupiedBeds(), bedTotal));
+    long maintenanceOpenTotal = response.getMaintenancePendingCount() + response.getMaintenanceProcessingCount();
+    response.setMaintenanceOverdueRate(toRatePercent(response.getMaintenanceOverdueCount(), maintenanceOpenTotal));
+    response.setDeliveryUndeliveredRate(toRatePercent(response.getUndeliveredCount(), response.getTodayMealOrderCount()));
+    response.setEquipmentDueSoonRate(toRatePercent(response.getEquipmentDueSoonCount(), response.getEquipmentTotalCount()));
+
+    List<String> riskSignals = new ArrayList<>();
+    int riskIndex = 0;
+
+    long inventoryRiskCount = response.getLowStockCount() + response.getExpiringCount();
+    int inventoryRiskScore = scoreByCount(inventoryRiskCount, 6, 12, 20, 30, 8, 16, 24, 32);
+    riskIndex += inventoryRiskScore;
+    if (inventoryRiskScore > 0) {
+      riskSignals.add(String.format("库存风险 %d 项（低库存 %d，临期 %d）", inventoryRiskCount, response.getLowStockCount(), response.getExpiringCount()));
+    }
+
+    int maintenanceRiskScore = scoreByRate(response.getMaintenanceOverdueRate(), 10, 20, 35, 50, 8, 16, 24, 32);
+    riskIndex += maintenanceRiskScore;
+    if (maintenanceRiskScore > 0) {
+      riskSignals.add(String.format("维修超时率 %.2f%%（阈值 %d 天）", response.getMaintenanceOverdueRate().doubleValue(), resolvedOverdueDays));
+    }
+
+    int deliveryRiskScore = scoreByRate(response.getDeliveryUndeliveredRate(), 5, 10, 20, 35, 6, 12, 18, 24);
+    riskIndex += deliveryRiskScore;
+    if (deliveryRiskScore > 0) {
+      riskSignals.add(String.format("送餐未送达率 %.2f%%（未送达 %d）", response.getDeliveryUndeliveredRate().doubleValue(), response.getUndeliveredCount()));
+    }
+
+    int equipmentRiskScore = scoreByRate(response.getEquipmentDueSoonRate(), 10, 20, 35, 50, 4, 8, 12, 16);
+    riskIndex += equipmentRiskScore;
+    if (equipmentRiskScore > 0) {
+      riskSignals.add(String.format("维保临近率 %.2f%%（%d 天内 %d 台）", response.getEquipmentDueSoonRate().doubleValue(), resolvedMaintenanceDueDays, response.getEquipmentDueSoonCount()));
+    }
+
+    if (response.getMaintenanceTodoFailedCount7d() > 0) {
+      int failedJobScore = (int) Math.min(12, response.getMaintenanceTodoFailedCount7d() * 3);
+      riskIndex += failedJobScore;
+      riskSignals.add(String.format("维保待办任务近7天失败 %d 次", response.getMaintenanceTodoFailedCount7d()));
+    }
+
+    int safeRiskIndex = Math.max(0, Math.min(100, riskIndex));
+    response.setRiskIndex(safeRiskIndex);
+    response.setRiskLevel(resolveRiskLevel(safeRiskIndex));
+    response.setRiskTriggeredCount(riskSignals.size());
+    response.setRiskSignals(riskSignals);
+
     return Result.ok(response);
+  }
+
+  private void fillTodayTaskCounts(
+      LogisticsWorkbenchSummaryResponse response,
+      Long orgId,
+      LocalDate today,
+      LocalDateTime todayStart) {
+    response.setTodayCleaningTaskCount(roomCleaningTaskMapper.selectCount(Wrappers.lambdaQuery(RoomCleaningTask.class)
+        .eq(RoomCleaningTask::getIsDeleted, 0)
+        .eq(orgId != null, RoomCleaningTask::getOrgId, orgId)
+        .eq(RoomCleaningTask::getPlanDate, today)));
+    response.setTodayMaintenanceTaskCount(maintenanceRequestMapper.selectCount(Wrappers.lambdaQuery(MaintenanceRequest.class)
+        .eq(MaintenanceRequest::getIsDeleted, 0)
+        .eq(orgId != null, MaintenanceRequest::getOrgId, orgId)
+        .ge(MaintenanceRequest::getReportedAt, todayStart)));
+    response.setTodayDeliveryTaskCount(diningDeliveryRecordMapper.selectCount(Wrappers.lambdaQuery(DiningDeliveryRecord.class)
+        .eq(DiningDeliveryRecord::getIsDeleted, 0)
+        .eq(orgId != null, DiningDeliveryRecord::getOrgId, orgId)
+        .ge(DiningDeliveryRecord::getCreateTime, todayStart)));
+    response.setTodayInventoryCheckTaskCount(inventoryAdjustmentMapper.selectCount(Wrappers.lambdaQuery(InventoryAdjustment.class)
+        .eq(InventoryAdjustment::getIsDeleted, 0)
+        .eq(orgId != null, InventoryAdjustment::getOrgId, orgId)
+        .ge(InventoryAdjustment::getCreateTime, todayStart)));
   }
 
   private List<LogisticsNamedStatItem> toTopNamedItems(
@@ -473,6 +571,90 @@ public class LogisticsWorkbenchController {
           items.add(item);
         });
     return items;
+  }
+
+  private int resolveDays(Integer input, int defaultValue, int min, int max) {
+    int raw = input == null ? defaultValue : input;
+    if (raw < min) {
+      return min;
+    }
+    if (raw > max) {
+      return max;
+    }
+    return raw;
+  }
+
+  private BigDecimal toRatePercent(long numerator, long denominator) {
+    if (denominator <= 0 || numerator <= 0) {
+      return BigDecimal.ZERO;
+    }
+    return BigDecimal.valueOf(numerator)
+        .multiply(BigDecimal.valueOf(100))
+        .divide(BigDecimal.valueOf(denominator), 2, RoundingMode.HALF_UP);
+  }
+
+  private int scoreByRate(
+      BigDecimal ratePercent,
+      double l1,
+      double l2,
+      double l3,
+      double l4,
+      int s1,
+      int s2,
+      int s3,
+      int s4) {
+    return scoreByValue(ratePercent == null ? 0D : ratePercent.doubleValue(), l1, l2, l3, l4, s1, s2, s3, s4);
+  }
+
+  private int scoreByCount(
+      long value,
+      long l1,
+      long l2,
+      long l3,
+      long l4,
+      int s1,
+      int s2,
+      int s3,
+      int s4) {
+    return scoreByValue(value, l1, l2, l3, l4, s1, s2, s3, s4);
+  }
+
+  private int scoreByValue(
+      double value,
+      double l1,
+      double l2,
+      double l3,
+      double l4,
+      int s1,
+      int s2,
+      int s3,
+      int s4) {
+    if (value >= l4) {
+      return s4;
+    }
+    if (value >= l3) {
+      return s3;
+    }
+    if (value >= l2) {
+      return s2;
+    }
+    if (value >= l1) {
+      return s1;
+    }
+    return 0;
+  }
+
+  private String resolveRiskLevel(int riskIndex) {
+    if (riskIndex >= 75) {
+      return "CRITICAL";
+    }
+    if (riskIndex >= 55) {
+      return "HIGH";
+    }
+    if (riskIndex >= 30) {
+      return "MEDIUM";
+    }
+    return "LOW";
   }
 
   private boolean containsAny(String text, String... keywords) {

@@ -1,0 +1,147 @@
+.board {
+  padding: 26rpx;
+}
+
+.top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14rpx;
+}
+
+.op-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.mini-read-btn {
+  height: 56rpx;
+  line-height: 56rpx;
+  font-size: 22rpx;
+  border-radius: 999rpx;
+  padding: 0 18rpx;
+}
+
+.unread-summary {
+  margin-top: 12rpx;
+  padding: 10rpx 12rpx;
+  border-radius: 10rpx;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 22rpx;
+}
+
+.filter-scroll {
+  margin-top: 12rpx;
+  width: 100%;
+  white-space: nowrap;
+}
+
+.filter-row {
+  display: inline-flex;
+  gap: 10rpx;
+  padding-bottom: 4rpx;
+}
+
+.filter-item {
+  border-radius: 999rpx;
+  border: 1rpx solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  padding: 10rpx 18rpx;
+  font-size: 22rpx;
+  line-height: 1;
+}
+
+.filter-item-active {
+  color: #0f4a5d;
+  background: #e8f4f6;
+  border-color: #9ec9d1;
+  font-weight: 700;
+}
+
+.msg-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12rpx;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #e5e7eb;
+}
+
+.msg-item:last-child {
+  border-bottom: none;
+}
+
+.left {
+  flex: 1;
+}
+
+.badge-row {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.tag {
+  display: inline-block;
+  padding: 4rpx 12rpx;
+  border-radius: 999rpx;
+  font-size: 20rpx;
+}
+
+.tag.urgent {
+  background: #ffefef;
+  color: #b91c1c;
+}
+
+.tag.warning {
+  background: #fff4e8;
+  color: #b45309;
+}
+
+.tag.normal {
+  background: #eef7f8;
+  color: #1f4f57;
+}
+
+.type {
+  font-size: 20rpx;
+  color: #6b7280;
+}
+
+.title {
+  margin-top: 8rpx;
+  font-size: 28rpx;
+  color: #111827;
+  font-weight: 700;
+}
+
+.content,
+.meta {
+  margin-top: 6rpx;
+  font-size: 23rpx;
+  color: #4b5563;
+}
+
+.right {
+  width: 110rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.contact {
+  width: 100rpx;
+  height: 60rpx;
+  line-height: 60rpx;
+  font-size: 22rpx;
+}
+
+.unread {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  background: #ef4444;
+}

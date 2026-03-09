@@ -1,0 +1,5 @@
+.card { padding: 24rpx; }
+.item { margin-top: 14rpx; padding: 14rpx; background: #f8fafc; border-radius: 12rpx; border: 1rpx solid #e5edf2; }
+.line { margin-top: 8rpx; display: flex; justify-content: space-between; gap: 20rpx; }
+.label { width: 140rpx; font-size: 22rpx; color: #6b7280; }
+.value { flex: 1; font-size: 23rpx; color: #1f2937; text-align: right; }

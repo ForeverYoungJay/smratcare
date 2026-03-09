@@ -1,0 +1,51 @@
+<view class="container">
+  <view class="surface card" wx:if="{{profile}}">
+    <view class="user-name">{{profile.realName}}</view>
+    <view class="user-sub">{{profile.phone}} · {{profile.preferredContact}}</view>
+    <view class="user-sub">已绑定 {{elderCount}} 位老人</view>
+
+    <view class="menu-list">
+      <view class="menu-item" data-path="/pages/weekly-brief/index" bindtap="go">
+        <text>家属周报</text>
+        <text class="arrow">></text>
+      </view>
+      <view class="menu-item" data-path="/pages/alert-center/index" bindtap="go">
+        <text>预警中心</text>
+        <text class="arrow">></text>
+      </view>
+      <view class="menu-item" data-path="/pages/todo-center/index" bindtap="go">
+        <text>待办中心</text>
+        <text class="arrow">></text>
+      </view>
+      <view class="menu-item" data-path="/pages/family-management/index" bindtap="go">
+        <text>我的家庭</text>
+        <text class="arrow">></text>
+      </view>
+      <view class="menu-item" data-path="/pages/profile-edit/index" bindtap="go">
+        <text>我的信息</text>
+        <text class="arrow">></text>
+      </view>
+      <view class="menu-item" data-path="/pages/notification-settings/index" bindtap="go">
+        <text>通知设置</text>
+        <text class="arrow">></text>
+      </view>
+      <view class="menu-item" data-path="/pages/capability-status/index" bindtap="go">
+        <text>能力状态</text>
+        <view class="menu-right">
+          <text class="menu-badge" wx:if="{{capabilityAlertCount > 0}}">{{capabilityAlertCount > 99 ? '99+' : capabilityAlertCount}}</text>
+          <text class="arrow">></text>
+        </view>
+      </view>
+      <view class="menu-item" data-path="/pages/settings-security/index" bindtap="go">
+        <text>隐私与安全</text>
+        <text class="arrow">></text>
+      </view>
+      <view class="menu-item" data-path="/pages/help-center/index" bindtap="go">
+        <text>帮助与反馈</text>
+        <text class="arrow">></text>
+      </view>
+    </view>
+
+    <button class="danger-btn action" bindtap="logout">退出登录</button>
+  </view>
+</view>

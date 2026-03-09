@@ -1,0 +1,49 @@
+<view class="container">
+  <view class="surface block">
+    <view class="section-title">我的服务</view>
+    <view class="section-subtitle">在线办理与互动，核心流程三步完成</view>
+
+    <view class="entry-grid">
+      <view class="entry" data-path="/pages/weekly-brief/index" bindtap="go">
+        <text class="title">家属周报</text>
+        <text class="desc">一周健康、护理、活动与沟通总结</text>
+      </view>
+      <view class="entry" data-path="/pages/alert-center/index" bindtap="go">
+        <text class="title">预警中心</text>
+        <text class="desc">紧急提醒、未读分类、快速处理入口</text>
+      </view>
+      <view class="entry" data-path="/pages/todo-center/index" bindtap="go">
+        <text class="title">待办中心</text>
+        <text class="desc">消息、缴费、日程待办统一聚合</text>
+      </view>
+      <view class="entry" data-path="/pages/payment/index" bindtap="go">
+        <text class="title">在线缴费</text>
+        <text class="desc">账单查询 / 在线充值 / 自动扣费设置</text>
+      </view>
+      <view class="entry" data-path="/pages/payment-guard/index" bindtap="go">
+        <text class="title">支付保障</text>
+        <text class="desc">充值状态、异常订单、到账保障建议</text>
+      </view>
+      <view class="entry" data-path="/pages/service-mall/index" bindtap="go">
+        <text class="title">服务增购</text>
+        <text class="desc">护理/生活服务商城，支持下单与记录追踪</text>
+      </view>
+      <view class="entry" data-path="/pages/communication/index" bindtap="go">
+        <text class="title">在线沟通</text>
+        <text class="desc">图文沟通 + 语音留言 + 探视预约（非实时）</text>
+      </view>
+      <view class="entry" data-path="/pages/feedback/index" bindtap="go">
+        <text class="title">满意度评价</text>
+        <text class="desc">服务评分、文字反馈、定期问卷</text>
+      </view>
+      <view class="entry" data-path="/pages/service-orders/index" bindtap="go">
+        <text class="title">服务订单</text>
+        <text class="desc">已购服务、消费明细、完成状态</text>
+      </view>
+      <view class="entry" data-path="/pages/affection/index" bindtap="go">
+        <text class="title">亲情互动</text>
+        <text class="desc">家庭相册、语音留言、节日祝福</text>
+      </view>
+    </view>
+  </view>
+</view>

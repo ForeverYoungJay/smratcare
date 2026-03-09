@@ -1,0 +1,4 @@
+.card { padding: 24rpx; }
+.item { margin-top: 14rpx; padding: 14rpx; border: 1rpx solid #e5edf2; border-radius: 12rpx; background: #f8fafc; }
+.name { font-size: 27rpx; color: #111827; font-weight: 700; }
+.desc { margin-top: 6rpx; font-size: 23rpx; color: #4b5563; }

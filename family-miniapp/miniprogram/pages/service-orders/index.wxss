@@ -1,0 +1,6 @@
+.card { padding: 24rpx; }
+.item { margin-top: 14rpx; background: #f8fafc; border-radius: 14rpx; border: 1rpx solid #e5edf2; padding: 16rpx; }
+.row { display: flex; justify-content: space-between; margin-top: 8rpx; }
+.label { font-size: 22rpx; color: #6b7280; }
+.value { font-size: 24rpx; color: #111827; }
+.state { font-size: 24rpx; color: #0f766e; }

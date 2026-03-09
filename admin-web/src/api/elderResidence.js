@@ -75,6 +75,6 @@ export function exportTrialStay(params) {
 export function exportDischargeApply(params) {
     return exportCsvByRequest('/api/elder/lifecycle/discharge-apply/export', params, '退住申请.csv');
 }
-export function getResidenceStatusSummary() {
-    return request.get('/api/elder/lifecycle/status-summary');
+export function getResidenceStatusSummary(config) {
+    return request.get('/api/elder/lifecycle/status-summary', config);
 }

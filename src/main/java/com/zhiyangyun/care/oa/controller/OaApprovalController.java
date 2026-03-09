@@ -962,6 +962,10 @@ public class OaApprovalController {
   }
 
   private String resolveApplicantName(String requestApplicantName) {
+    String staffName = resolveCurrentStaffName();
+    if (staffName != null && !staffName.isBlank()) {
+      return staffName;
+    }
     String currentName = parseString(AuthContext.getUsername());
     if (currentName != null) {
       return currentName;
@@ -1080,7 +1084,7 @@ public class OaApprovalController {
     round.put("action", action);
     round.put("remark", normalizeOpinion(remark));
     round.put("approverId", AuthContext.getStaffId());
-    round.put("approverName", resolveApplicantName(null));
+    round.put("approverName", resolveCurrentStaffName());
     round.put("at", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
     rounds.add(round);
     map.put("approvalRounds", rounds);
@@ -1106,9 +1110,25 @@ public class OaApprovalController {
     row.put("toName", parseString(toName));
     row.put("message", parseString(message));
     row.put("at", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
-    row.put("by", resolveApplicantName(null));
+    row.put("by", resolveCurrentStaffName());
     history.add(row);
     map.put("notifyHistory", history);
+  }
+
+  private String resolveCurrentStaffName() {
+    Long staffId = AuthContext.getStaffId();
+    if (staffId != null) {
+      StaffAccount account = staffMapper.selectById(staffId);
+      String realName = parseString(account == null ? null : account.getRealName());
+      if (realName != null && !realName.isBlank()) {
+        return realName;
+      }
+    }
+    String username = parseString(AuthContext.getUsername());
+    if (username != null && !username.isBlank()) {
+      return username;
+    }
+    return "当前用户";
   }
 
   private List<String> parseStringList(Object value) {

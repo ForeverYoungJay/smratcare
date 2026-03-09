@@ -3,6 +3,7 @@ package com.zhiyangyun.care.crm.controller;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.crm.model.CrmContractAssessmentOverviewResponse;
+import com.zhiyangyun.care.crm.model.CrmContractArchiveRuleResponse;
 import com.zhiyangyun.care.crm.model.CrmContractLinkageResponse;
 import com.zhiyangyun.care.crm.service.CrmContractLinkageService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -40,5 +41,10 @@ public class CrmContractLinkageController {
       @RequestParam(required = false) Long elderId,
       @RequestParam(required = false) Long leadId) {
     return Result.ok(linkageService.getAssessmentOverview(AuthContext.getOrgId(), elderId, leadId));
+  }
+
+  @GetMapping("/linkage-archive-rule")
+  public Result<CrmContractArchiveRuleResponse> linkageArchiveRule() {
+    return Result.ok(linkageService.getArchiveRule(AuthContext.getOrgId()));
   }
 }

@@ -1,0 +1,11 @@
+.card { padding: 24rpx; }
+.row { display: flex; align-items: center; padding: 14rpx 0; border-bottom: 1rpx dashed #e5e7eb; }
+.row:last-child { border-bottom: none; }
+.time { width: 96rpx; font-size: 23rpx; color: #6b7280; }
+.main { flex: 1; }
+.name { display: block; font-size: 27rpx; color: #111827; }
+.desc { display: block; margin-top: 4rpx; font-size: 22rpx; color: #6b7280; }
+.state { font-size: 22rpx; padding: 4rpx 12rpx; border-radius: 999rpx; }
+.todo { background: #f1f5f9; color: #6b7280; }
+.doing { background: #eaf1ff; color: #1d4ed8; }
+.done { background: #e7f8ef; color: #0f766e; }

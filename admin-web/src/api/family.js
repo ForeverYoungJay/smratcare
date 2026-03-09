@@ -5,3 +5,6 @@ export function getFamilyUserPage(params) {
 export function getFamilyRelations(elderId) {
     return request.get('/api/admin/family/relations', { params: { elderId } });
 }
+export function removeFamilyRelation(relationId) {
+    return request.delete(`/api/admin/family/relations/${relationId}`);
+}

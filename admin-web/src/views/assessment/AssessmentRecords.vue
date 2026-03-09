@@ -43,6 +43,7 @@
           <a-space>
             <a-button type="primary" @click="onSearch">搜索</a-button>
             <a-button @click="reset">清空</a-button>
+            <a-button @click="copyQueryLink">复制查询链接</a-button>
           </a-space>
         </a-form-item>
       </a-form>
@@ -82,6 +83,14 @@
       :blockers="admissionGuardBlockers"
       :hint="admissionGuardHint"
       @action="handleAdmissionGuardAction"
+      style="margin-top: 12px"
+    />
+    <LifecycleStageBar
+      v-if="isAdmissionAssessment"
+      title="评估-入住联动阶段"
+      :subject="admissionLifecycleSubject"
+      :stage="admissionLifecycleStage"
+      :hint="admissionLifecycleHint"
       style="margin-top: 12px"
     />
     <a-alert
@@ -193,6 +202,10 @@
               </a-menu>
             </template>
           </a-dropdown>
+          <a-divider type="vertical" />
+          <a-button :disabled="!selectedSingleRecord" @click="goSelectedInHospitalOverview">在院总览</a-button>
+          <a-button :disabled="!selectedSingleRecord" @click="goSelectedContractsInvoices">合同票据</a-button>
+          <a-button :disabled="!selectedSingleRecord" @click="goSelectedAdmissionProcessing">入住办理</a-button>
         </a-space>
         <a-tag color="blue">
           已勾选 {{ selectedRowKeys.length }} 条{{ selectedByFilter ? '（含跨页筛选）' : '' }}
@@ -564,8 +577,11 @@ import { useUserStore } from '../../stores/user'
 import { hasMinisterOrHigher } from '../../utils/roleAccess'
 import PageContainer from '../../components/PageContainer.vue'
 import FlowGuardBar from '../../components/FlowGuardBar.vue'
+import LifecycleStageBar from '../../components/LifecycleStageBar.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
+import { copyText } from '../../utils/clipboard'
+import { lifecycleStageHint, normalizeLifecycleStage } from '../../utils/lifecycleStage'
 import { getContractPage } from '../../api/marketing'
 import {
   getAssessmentRecordPage,
@@ -601,6 +617,21 @@ const props = defineProps<{
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const assessmentRouteSignature = ref('')
+const skipNextAssessmentRouteWatch = ref(false)
+const ASSESSMENT_ROUTE_KEYS = [
+  'assessArchiveType',
+  'assessContentKeyword',
+  'assessDateEnd',
+  'assessDateStart',
+  'assessElderId',
+  'assessKeyword',
+  'assessPageNo',
+  'assessPageSize',
+  'assessStatus'
+] as const
+const ASSESSMENT_ROUTE_LEGACY_KEYS = ['archiveType', 'contentKeyword', 'dateFrom', 'dateTo', 'keyword', 'pageNo', 'pageSize', 'status'] as const
+const ASSESSMENT_ROUTE_OBSERVE_KEYS = ['residentId', 'elderId', 'elderName'] as const
 
 const loading = ref(false)
 const rows = ref<AssessmentRecord[]>([])
@@ -1156,6 +1187,154 @@ const query = reactive({
   pageSize: 10
 })
 
+function firstRouteQueryText(value: unknown) {
+  if (Array.isArray(value)) return firstRouteQueryText(value[0])
+  if (value == null) return ''
+  return String(value).trim()
+}
+
+function parsePositiveInt(value: unknown, fallback: number) {
+  const parsed = Number(firstRouteQueryText(value))
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback
+  return Math.round(parsed)
+}
+
+function normalizeAssessmentStatus(value: unknown): 'DRAFT' | 'COMPLETED' | 'ARCHIVED' | undefined {
+  const text = firstRouteQueryText(value).toUpperCase()
+  if (text === 'DRAFT' || text === 'COMPLETED' || text === 'ARCHIVED') {
+    return text
+  }
+  return undefined
+}
+
+function normalizeAssessmentArchiveType(value: unknown): AssessmentType | undefined {
+  const text = firstRouteQueryText(value).toUpperCase()
+  if (!text) return undefined
+  if (assessmentTypeOptions.some((item) => item.value === text)) {
+    return text as AssessmentType
+  }
+  return undefined
+}
+
+function flattenAssessmentRouteQuery(source: Record<string, unknown>) {
+  return Object.entries(source || {}).reduce<Record<string, string>>((acc, [key, value]) => {
+    const text = firstRouteQueryText(value)
+    if (!text) return acc
+    acc[key] = text
+    return acc
+  }, {})
+}
+
+function buildAssessmentRouteSignature(source: Record<string, unknown>) {
+  const keys = [...ASSESSMENT_ROUTE_KEYS, ...ASSESSMENT_ROUTE_LEGACY_KEYS, ...ASSESSMENT_ROUTE_OBSERVE_KEYS]
+  return keys
+    .sort()
+    .map((key) => `${key}:${firstRouteQueryText(source[key])}`)
+    .join('|')
+}
+
+function resetAssessmentQueryState() {
+  query.keyword = ''
+  query.elderId = undefined
+  query.contentKeyword = ''
+  query.archiveType = undefined
+  query.status = undefined
+  query.dateRange = undefined
+  query.pageNo = 1
+  query.pageSize = 10
+  archiveStatusTab.value = 'ALL'
+}
+
+function applyAssessmentQueryFromRoute() {
+  resetAssessmentQueryState()
+
+  const legacyKeyword = firstRouteQueryText(route.query.keyword || route.query.elderName)
+  const keyword = firstRouteQueryText(route.query.assessKeyword) || legacyKeyword
+  if (keyword) query.keyword = keyword
+
+  const elderId = Number(firstRouteQueryText(route.query.assessElderId || route.query.elderId || route.query.residentId))
+  if (Number.isFinite(elderId) && elderId > 0 && props.assessmentType === 'ARCHIVE') {
+    query.elderId = elderId
+    ensureSelectedElder(elderId)
+  }
+
+  const contentKeyword = firstRouteQueryText(route.query.assessContentKeyword || route.query.contentKeyword)
+  if (contentKeyword) query.contentKeyword = contentKeyword
+
+  const archiveType = normalizeAssessmentArchiveType(route.query.assessArchiveType || route.query.archiveType)
+  if (archiveType && props.assessmentType === 'ARCHIVE') {
+    query.archiveType = archiveType
+  }
+
+  const status = normalizeAssessmentStatus(route.query.assessStatus || route.query.status)
+  if (status) {
+    query.status = status
+    if (props.assessmentType === 'ARCHIVE') {
+      archiveStatusTab.value = status
+    }
+  }
+
+  const dateStart = firstRouteQueryText(route.query.assessDateStart || route.query.dateFrom)
+  const dateEnd = firstRouteQueryText(route.query.assessDateEnd || route.query.dateTo)
+  if (dateStart && dateEnd) {
+    query.dateRange = [dateStart, dateEnd]
+  }
+
+  query.pageNo = parsePositiveInt(route.query.assessPageNo || route.query.pageNo, 1)
+  query.pageSize = parsePositiveInt(route.query.assessPageSize || route.query.pageSize, 10)
+}
+
+function buildAssessmentRouteQuery() {
+  const nextQuery: Record<string, string> = {}
+  Object.entries(flattenAssessmentRouteQuery(route.query as Record<string, unknown>)).forEach(([key, value]) => {
+    if ((ASSESSMENT_ROUTE_KEYS as readonly string[]).includes(key)) return
+    if ((ASSESSMENT_ROUTE_LEGACY_KEYS as readonly string[]).includes(key)) return
+    nextQuery[key] = value
+  })
+
+  if (query.keyword) nextQuery.assessKeyword = query.keyword
+  if (props.assessmentType === 'ARCHIVE' && query.elderId) nextQuery.assessElderId = String(query.elderId)
+  if (query.contentKeyword) nextQuery.assessContentKeyword = query.contentKeyword
+  if (props.assessmentType === 'ARCHIVE' && query.archiveType) nextQuery.assessArchiveType = String(query.archiveType)
+
+  const normalizedStatus = normalizeAssessmentStatus(query.status)
+  if (pageConfig.value.showStatusFilter && normalizedStatus) {
+    nextQuery.assessStatus = normalizedStatus
+  }
+  if (query.dateRange?.[0]) nextQuery.assessDateStart = query.dateRange[0]
+  if (query.dateRange?.[1]) nextQuery.assessDateEnd = query.dateRange[1]
+  nextQuery.assessPageNo = String(parsePositiveInt(query.pageNo, 1))
+  nextQuery.assessPageSize = String(parsePositiveInt(query.pageSize, 10))
+  return nextQuery
+}
+
+function hasSameAssessmentRouteQuery(nextQuery: Record<string, string>) {
+  const currentQuery = flattenAssessmentRouteQuery(route.query as Record<string, unknown>)
+  const currentKeys = Object.keys(currentQuery)
+  const nextKeys = Object.keys(nextQuery)
+  if (currentKeys.length !== nextKeys.length) return false
+  return nextKeys.every((key) => currentQuery[key] === nextQuery[key])
+}
+
+async function syncAssessmentQueryToRoute() {
+  const nextQuery = buildAssessmentRouteQuery()
+  if (hasSameAssessmentRouteQuery(nextQuery)) return
+  skipNextAssessmentRouteWatch.value = true
+  assessmentRouteSignature.value = buildAssessmentRouteSignature(nextQuery)
+  await router.replace({ path: route.path, query: nextQuery })
+}
+
+async function copyQueryLink() {
+  const href = router.resolve({ path: route.path, query: buildAssessmentRouteQuery() }).href
+  const fullUrl = /^https?:\/\//i.test(href) ? href : `${window.location.origin}${href}`
+  const copied = await copyText(fullUrl)
+  if (copied) {
+    message.success('查询链接已复制')
+    return
+  }
+  message.warning('复制失败，请手动复制地址栏链接')
+}
+
 const open = ref(false)
 const formReadonly = ref(false)
 const formRef = ref<FormInstance>()
@@ -1290,6 +1469,42 @@ const admissionGuardHint = computed(() => {
     ? '闭环模式：请完成评估后直接保存，系统将一键回流入住办理'
     : '完成评估保存后，系统会自动推进到待办理入住'
 })
+const admissionLifecycleStage = computed(() => {
+  if (!isAdmissionAssessment.value) return 'PENDING_ASSESSMENT'
+  if (selectedPendingContract.value?.flowStage) {
+    return normalizeLifecycleStage(selectedPendingContract.value.flowStage, selectedPendingContract.value.contractStatus)
+  }
+  const selected = selectedAdmissionRecord.value
+  if (selected) {
+    return selected.status === 'DRAFT'
+      ? 'PENDING_ASSESSMENT'
+      : 'PENDING_BED_SELECT'
+  }
+  return 'PENDING_ASSESSMENT'
+})
+const admissionLifecycleSubject = computed(() => {
+  if (!isAdmissionAssessment.value) return ''
+  if (selectedPendingContract.value) {
+    return `合同 ${selectedPendingContract.value.contractNo || '-'} / 长者 ${selectedPendingContract.value.elderName || '-'}`
+  }
+  if (selectedAdmissionRecord.value) {
+    return `评估记录 ${selectedAdmissionRecord.value.archiveNo || selectedAdmissionRecord.value.id || '-'} / 长者 ${selectedAdmissionRecord.value.elderName || '-'}`
+  }
+  return '未勾选待评估合同，建议先在待评估合同列表中选择一条。'
+})
+const admissionLifecycleHint = computed(() => {
+  if (!isAdmissionAssessment.value) return ''
+  if (admissionGuardBlockers.value.length > 0) {
+    return admissionGuardBlockers.value
+      .slice(0, 2)
+      .map((item) => item.text)
+      .join('；')
+  }
+  if (selectedAdmissionRecord.value?.status === 'DRAFT') {
+    return '评估仍是草稿，建议先补全评分与建议后再推进。'
+  }
+  return lifecycleStageHint(admissionLifecycleStage.value)
+})
 const admissionModalConfirmText = computed(() => {
   if (formReadonly.value) return '已查看'
   if (isAdmissionAssessment.value && admissionCloseLoopEnabled.value) return '保存并回流入住办理'
@@ -1323,6 +1538,13 @@ const rowSelection = computed(() => {
       if (selectedByFilter.value && selectedRowKeys.value.length <= rows.value.length) {
         selectedByFilter.value = false
       }
+      if (isAdmissionAssessment.value && selectedRowKeys.value.length === 1) {
+        const selected = rows.value.find((item) => assessmentRowKey(item) === selectedRowKeys.value[0])
+        const contractNo = String(selected?.archiveNo || '').trim()
+        if (contractNo && pendingAdmissionContracts.value.some((item) => item.contractNo === contractNo)) {
+          selectedPendingContractNo.value = contractNo
+        }
+      }
     }
   }
 })
@@ -1330,6 +1552,11 @@ const selectedRowsInCurrentPage = computed(() => {
   if (!selectedRowKeys.value.length || !rows.value.length) return []
   const idSet = new Set(selectedRowKeys.value)
   return rows.value.filter((item) => idSet.has(assessmentRowKey(item)))
+})
+const selectedSingleRecord = computed(() => {
+  if (selectedRowKeys.value.length !== 1) return null
+  const targetKey = selectedRowKeys.value[0]
+  return rows.value.find((item) => assessmentRowKey(item) === targetKey) || null
 })
 const selectedSummaryText = computed(() => {
   const selectedCount = selectedRowKeys.value.length
@@ -1402,7 +1629,9 @@ function onArchiveStatusTabChange(tab: string) {
   query.status = archiveStatusTab.value === 'ALL' ? undefined : archiveStatusTab.value
   query.pageNo = 1
   selectedByFilter.value = false
-  fetchData()
+  syncAssessmentQueryToRoute()
+    .then(() => fetchData())
+    .catch(() => {})
 }
 
 function assessmentTypeLabel(type?: AssessmentType | string) {
@@ -1483,6 +1712,8 @@ function choosePendingContract(contractNo?: string) {
   if (!normalized) return
   const target = pendingAdmissionContracts.value.find((item) => item.contractNo === normalized)
   if (!target) return
+  selectedRowKeys.value = []
+  selectedByFilter.value = false
   selectedPendingContractNo.value = normalized
   const nextQuery: Record<string, any> = { ...route.query, contractNo: normalized }
   if (target.elderId) nextQuery.residentId = target.elderId
@@ -1526,21 +1757,18 @@ async function fetchTemplates() {
 function onSearch() {
   query.pageNo = 1
   selectedByFilter.value = false
-  fetchData()
+  syncAssessmentQueryToRoute()
+    .then(() => fetchData())
+    .catch(() => {})
 }
 
 function reset() {
-  query.keyword = ''
-  query.elderId = undefined
-  query.contentKeyword = ''
-  query.archiveType = undefined
-  archiveStatusTab.value = 'ALL'
-  query.status = undefined
-  query.dateRange = undefined
-  query.pageNo = 1
+  resetAssessmentQueryState()
   selectedRowKeys.value = []
   selectedByFilter.value = false
-  fetchData()
+  syncAssessmentQueryToRoute()
+    .then(() => fetchData())
+    .catch(() => {})
 }
 
 function admissionItemMin(item: AdmissionAbilityItem) {
@@ -1590,13 +1818,17 @@ function onAdmissionScoreFilled(itemId: number, value: unknown) {
 
 function onPageChange(page: number) {
   query.pageNo = page
-  fetchData()
+  syncAssessmentQueryToRoute()
+    .then(() => fetchData())
+    .catch(() => {})
 }
 
 function onPageSizeChange(current: number, size: number) {
   query.pageNo = 1
   query.pageSize = size
-  fetchData()
+  syncAssessmentQueryToRoute()
+    .then(() => fetchData())
+    .catch(() => {})
 }
 
 async function searchElderOptions(keyword: string) {
@@ -1703,6 +1935,10 @@ function openForm(record?: AssessmentRecord, readonly = false) {
     ensureSelectedElder(record.elderId, record.elderName)
     scoreAutoChecked.value = record.scoreAuto === 1
     if (isAdmissionAssessment.value) {
+      const recordContractNo = String(record.archiveNo || '').trim()
+      if (recordContractNo && pendingAdmissionContracts.value.some((item) => item.contractNo === recordContractNo)) {
+        selectedPendingContractNo.value = recordContractNo
+      }
       loadAdmissionScoresFromDetail(record.detailJson)
       form.score = admissionTotalScore.value
       form.levelCode = resolveAbilityLevel(admissionTotalScore.value).split('：')[0]
@@ -2485,6 +2721,63 @@ function onExportActionMenuClick({ key }: { key: string }) {
   }
 }
 
+function selectedRecordElderContext() {
+  const selected = selectedSingleRecord.value
+  if (!selected) {
+    message.warning('请先勾选当前页 1 条记录')
+    return null
+  }
+  const elderId = Number(selected.elderId || 0)
+  const elderName = String(selected.elderName || '').trim()
+  if (!elderId) {
+    message.warning('该评估记录未关联长者ID')
+    return null
+  }
+  return {
+    elderId,
+    elderName,
+    contractNo: String(selected.archiveNo || '').trim()
+  }
+}
+
+function goSelectedInHospitalOverview() {
+  const context = selectedRecordElderContext()
+  if (!context) return
+  router.push({
+    path: '/elder/in-hospital-overview',
+    query: {
+      residentId: String(context.elderId),
+      elderName: context.elderName || undefined
+    }
+  })
+}
+
+function goSelectedContractsInvoices() {
+  const context = selectedRecordElderContext()
+  if (!context) return
+  router.push({
+    path: '/elder/contracts-invoices',
+    query: {
+      elderId: String(context.elderId),
+      elderName: context.elderName || undefined,
+      contractNo: context.contractNo || undefined
+    }
+  })
+}
+
+function goSelectedAdmissionProcessing() {
+  const context = selectedRecordElderContext()
+  if (!context) return
+  router.push({
+    path: '/elder/admission-processing',
+    query: {
+      residentId: String(context.elderId),
+      elderName: context.elderName || undefined,
+      contractNo: context.contractNo || undefined
+    }
+  })
+}
+
 function exportCurrentPageCsv() {
   if (!rows.value.length) {
     message.warning('当前页无可导出记录')
@@ -2572,25 +2865,31 @@ function exportCurrentPagePdf() {
 }
 
 onMounted(async () => {
-  const keywordFromRoute = String(route.query.keyword || route.query.elderName || '').trim()
-  if (keywordFromRoute) {
-    query.keyword = keywordFromRoute
-  }
-  const elderIdFromRoute = Number(route.query.elderId || route.query.residentId || 0)
-  if (elderIdFromRoute > 0 && props.assessmentType === 'ARCHIVE') {
-    query.elderId = elderIdFromRoute
-    ensureSelectedElder(elderIdFromRoute)
-  }
-  if (props.assessmentType === 'ARCHIVE') {
-    const statusFromRoute = String(route.query.status || '').toUpperCase()
-    if (statusFromRoute === 'DRAFT' || statusFromRoute === 'COMPLETED' || statusFromRoute === 'ARCHIVED') {
-      archiveStatusTab.value = statusFromRoute as 'DRAFT' | 'COMPLETED' | 'ARCHIVED'
-      query.status = statusFromRoute as 'DRAFT' | 'COMPLETED' | 'ARCHIVED'
-    }
-  }
+  applyAssessmentQueryFromRoute()
+  assessmentRouteSignature.value = buildAssessmentRouteSignature(route.query as Record<string, unknown>)
   await Promise.all([fetchTemplates(), fetchData(), loadElderOptions()])
   await autoOpenAdmissionFromRoute()
+  await syncAssessmentQueryToRoute().catch(() => {})
 })
+
+watch(
+  () => route.query,
+  (queryMap) => {
+    const nextSignature = buildAssessmentRouteSignature(queryMap as Record<string, unknown>)
+    if (skipNextAssessmentRouteWatch.value) {
+      skipNextAssessmentRouteWatch.value = false
+      assessmentRouteSignature.value = nextSignature
+      return
+    }
+    if (nextSignature === assessmentRouteSignature.value) {
+      return
+    }
+    assessmentRouteSignature.value = nextSignature
+    applyAssessmentQueryFromRoute()
+    fetchData().catch(() => {})
+  },
+  { deep: true }
+)
 
 useLiveSyncRefresh({
   topics: ['elder', 'health', 'oa', 'hr'],

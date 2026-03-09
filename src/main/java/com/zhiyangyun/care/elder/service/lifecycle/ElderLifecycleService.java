@@ -3,6 +3,7 @@ package com.zhiyangyun.care.elder.service.lifecycle;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.zhiyangyun.care.elder.model.lifecycle.AdmissionRequest;
 import com.zhiyangyun.care.elder.model.lifecycle.AdmissionRecordResponse;
+import com.zhiyangyun.care.elder.model.lifecycle.AdmissionRecordSummaryResponse;
 import com.zhiyangyun.care.elder.model.lifecycle.AdmissionResponse;
 import com.zhiyangyun.care.elder.model.lifecycle.ChangeLogResponse;
 import com.zhiyangyun.care.elder.model.lifecycle.DischargeRequest;
@@ -27,6 +28,14 @@ public interface ElderLifecycleService {
       Long tenantId,
       long pageNo,
       long pageSize,
+      String keyword,
+      String contractNo,
+      Integer elderStatus,
+      LocalDate admissionDateStart,
+      LocalDate admissionDateEnd);
+
+  AdmissionRecordSummaryResponse admissionSummary(
+      Long tenantId,
       String keyword,
       String contractNo,
       Integer elderStatus,

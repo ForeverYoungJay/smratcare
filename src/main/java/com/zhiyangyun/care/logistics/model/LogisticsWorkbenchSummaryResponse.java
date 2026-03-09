@@ -1,6 +1,7 @@
 package com.zhiyangyun.care.logistics.model;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.Data;
@@ -78,4 +79,22 @@ public class LogisticsWorkbenchSummaryResponse {
   private Long maintenanceTodoLastSkippedCount;
   private String maintenanceTodoLastErrorMessage;
   private long maintenanceTodoFailedCount7d;
+
+  private Integer configuredWindowDays;
+  private Integer configuredExpiryDays;
+  private Integer configuredOverdueDays;
+  private Integer configuredMaintenanceDueDays;
+  private LocalDate snapshotStartDate;
+  private LocalDate snapshotEndDate;
+  private LocalDateTime generatedAt;
+
+  private BigDecimal bedOccupancyRate;
+  private BigDecimal maintenanceOverdueRate;
+  private BigDecimal deliveryUndeliveredRate;
+  private BigDecimal equipmentDueSoonRate;
+
+  private Integer riskIndex;
+  private String riskLevel;
+  private long riskTriggeredCount;
+  private List<String> riskSignals;
 }

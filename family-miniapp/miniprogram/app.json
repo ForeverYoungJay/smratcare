@@ -1,0 +1,74 @@
+{
+  "pages": [
+    "pages/login/index",
+    "pages/home/index",
+    "pages/weekly-brief/index",
+    "pages/alert-center/index",
+    "pages/todo-center/index",
+    "pages/bind/index",
+    "pages/messages/index",
+    "pages/message-detail/index",
+    "pages/services/index",
+    "pages/service-mall/index",
+    "pages/service-orders/index",
+    "pages/profile/index",
+    "pages/capability-status/index",
+    "pages/family-management/index",
+    "pages/profile-edit/index",
+    "pages/notification-settings/index",
+    "pages/help-center/index",
+    "pages/settings-security/index",
+    "pages/security-verify/index",
+    "pages/health/index",
+    "pages/medical-record/index",
+    "pages/assessment-report/index",
+    "pages/report-viewer/index",
+    "pages/emergency-contacts/index",
+    "pages/schedule/index",
+    "pages/meal/index",
+    "pages/diet-calendar/index",
+    "pages/payment/index",
+    "pages/payment-guard/index",
+    "pages/recharge-order/index",
+    "pages/communication/index",
+    "pages/feedback/index",
+    "pages/dynamic/index",
+    "pages/care-log/index",
+    "pages/activity-album/index",
+    "pages/outing-record/index",
+    "pages/affection/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "智养云家属端",
+    "navigationBarBackgroundColor": "#f7efe3",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f6f7fb",
+    "backgroundTextStyle": "light"
+  },
+  "tabBar": {
+    "color": "#6b7280",
+    "selectedColor": "#194f5e",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/home/index",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/messages/index",
+        "text": "消息"
+      },
+      {
+        "pagePath": "pages/services/index",
+        "text": "服务"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "我的"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

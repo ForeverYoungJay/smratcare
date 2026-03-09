@@ -11,3 +11,6 @@ export function updateStaff(id, data) {
 export function updateStaffRoles(id, roleIds) {
     return request.post('/api/admin/staff-roles/assign', { staffId: id, roleIds });
 }
+export function getStaffSupervisorAnomalies() {
+    return request.get('/api/admin/staff/supervisor-anomalies');
+}

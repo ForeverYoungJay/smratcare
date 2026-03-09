@@ -1,0 +1,1501 @@
+{
+  "info": {
+    "name": "Family 聚合接口回归测试",
+    "_postman_id": "31f55f7f-34ad-4f3d-8a6b-0de6f8f8c101",
+    "description": "覆盖家属端关键能力：短信验证码、充值、安全设置、沟通消息（语音）、FAQ、微信预下单、回调模拟与订单查询。",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Family Auth",
+      "item": [
+        {
+          "name": "Send Family Login SMS Code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orgId\": {{familyOrgId}},\n  \"phone\": \"{{familyPhone}}\",\n  \"scene\": \"LOGIN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/family/sms-code/send",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "family",
+                "sms-code",
+                "send"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('send login sms code success', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(body.data.expireSeconds).to.not.equal(undefined);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "if (body.data && body.data.debugCode) {",
+                  "  pm.environment.set('familyVerifyCode', body.data.debugCode);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Family Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orgId\": {{familyOrgId}},\n  \"phone\": \"{{familyPhone}}\",\n  \"verifyCode\": \"{{familyVerifyCode}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/family/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "family",
+                "login"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('family login success', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(body.data.token).to.be.a('string');",
+                  "});",
+                  "pm.environment.set('familyToken', pm.response.json().data.token);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Family Portal Core",
+      "item": [
+        {
+          "name": "Recharge (Manual)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"elderId\": {{familyElderId}},\n  \"amount\": 100,\n  \"method\": \"MANUAL_REGRESSION\",\n  \"remark\": \"postman回归充值\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/family/payment/recharge",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "payment",
+                "recharge"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('recharge success', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(body.data.outTradeNo).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Security Settings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/family/security-settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "security-settings"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('security settings fetched', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(body.data.verifyHealthData).to.not.equal(undefined);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Security Settings",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"verifyReports\": true,\n  \"maskSensitiveData\": true,\n  \"visibleScope\": \"仅子女可查看完整健康数据\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/family/security-settings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "security-settings"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('security settings updated', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(body.data.visibleScope).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Send Security SMS Code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scene\": \"SECURITY\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/family/security/sms-code/send",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "security",
+                "sms-code",
+                "send"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('send security sms code success', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(body.data.expireSeconds).to.not.equal(undefined);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "if (body.data && body.data.debugCode) {",
+                  "  pm.environment.set('familySecurityVerifyCode', body.data.debugCode);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Security SMS Code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scene\": \"SECURITY\",\n  \"verifyCode\": \"{{familySecurityVerifyCode}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/family/security/sms-code/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "security",
+                "sms-code",
+                "verify"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('verify security sms code success', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(body.data.passed).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Communication Messages",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/family/communication/messages?pageNo=1&pageSize=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "communication",
+                "messages"
+              ],
+              "query": [
+                {
+                  "key": "pageNo",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('communication list ok', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(Array.isArray(body.data)).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Send Communication Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"targetRole\": \"责任护工\",\n  \"msgType\": \"voice\",\n  \"content\": \"Postman回归：请协助播放语音留言\",\n  \"mediaUrl\": \"https://example.com/family/voice/postman-demo.m4a\",\n  \"mediaName\": \"postman-demo.m4a\",\n  \"mediaDurationSec\": 23,\n  \"transcript\": \"妈妈我想你了，周末来看你。\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/family/communication/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "communication",
+                "messages"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('communication send ok', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(body.data.id).to.not.equal(undefined);",
+                  "  pm.expect(body.data.msgType).to.eql('voice');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Recharge Orders",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/family/payment/recharge-orders?pageNo=1&pageSize=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "payment",
+                "recharge-orders"
+              ],
+              "query": [
+                {
+                  "key": "pageNo",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('recharge order list ok', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(Array.isArray(body.data)).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Help FAQ",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/family/help/faqs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "help",
+                "faqs"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('faq list ok', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(Array.isArray(body.data)).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Payment Guard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/family/payment/guard?elderId={{familyElderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "payment",
+                "guard"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('payment guard ok', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(body.data).to.have.property('pendingOrderCount');",
+                  "  pm.expect(body.data.tips).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Todo Center",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/family/todo-center?elderId={{familyElderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "todo-center"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var body = pm.response.json();",
+                  "pm.test('todo center ok', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(body.data).to.have.property('summary');",
+                  "  pm.expect(body.data.items).to.be.an('array');",
+                  "});",
+                  "var actionable = (body.data.items || []).find(function (item) { return item && item.todoKey && item.actionable === true; });",
+                  "if (actionable) {",
+                  "  pm.collectionVariables.set('familyTodoKey', actionable.todoKey);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Weekly Brief",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/family/dashboard/weekly-brief?elderId={{familyElderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "dashboard",
+                "weekly-brief"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('weekly brief ok', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(body.data).to.have.property('weekRange');",
+                  "  pm.expect(body.data.vitalBadges).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Communication Templates",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/family/communication/templates",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "communication",
+                "templates"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('communication templates ok', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(body.data).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark All Messages Read",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/family/messages/read-all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "messages",
+                "read-all"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('mark all messages read ok', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(body.data).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Weekly Brief History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/family/dashboard/weekly-brief/history?elderId={{familyElderId}}&weeks=6",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "dashboard",
+                "weekly-brief",
+                "history"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('weekly brief history ok', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(body.data).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Message Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/family/messages/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "messages",
+                "summary"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('message summary ok', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(body.data).to.have.property('unreadCount');",
+                  "  pm.expect(body.data.typeSummary).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Filter Messages (Urgent Unread)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/family/messages/page?pageNo=1&pageSize=10&level=urgent&unreadOnly=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "messages",
+                "page"
+              ],
+              "query": [
+                {
+                  "key": "pageNo",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "10"
+                },
+                {
+                  "key": "level",
+                  "value": "urgent"
+                },
+                {
+                  "key": "unreadOnly",
+                  "value": "true"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('filter messages ok', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(body.data).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Todo Action Done",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"todoKey\": \"{{familyTodoKey}}\",\n  \"action\": \"DONE\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/family/todo-center/action",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "todo-center",
+                "action"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('todo action done ok', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(body.data.status).to.eql('DONE');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Todo Action Snooze",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"todoKey\": \"{{familyTodoKey}}\",\n  \"action\": \"SNOOZE\",\n  \"snoozeMinutes\": 120\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/family/todo-center/action",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "todo-center",
+                "action"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('todo action snooze ok', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(body.data.status).to.eql('SNOOZED');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Activity Album Comments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/family/activity-albums/{{familyAlbumId}}/comments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "activity-albums",
+                "{{familyAlbumId}}",
+                "comments"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('list activity album comments success', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(Array.isArray(body.data)).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Add Activity Album Comment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"postman回归：家属评论互动\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/family/activity-albums/{{familyAlbumId}}/comments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "activity-albums",
+                "{{familyAlbumId}}",
+                "comments"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('add activity album comment success', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(!!body.data.id).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Set Security Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"Family#2026\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/family/security/password/set",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "security",
+                "password",
+                "set"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('set security password success', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(body.data).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Security Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"scene\": \"SECURITY\",\n  \"password\": \"Family#2026\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/family/security/password/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "security",
+                "password",
+                "verify"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('verify security password success', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(body.data.passed).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Feedback Records",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/family/feedback/records?pageNo=1&pageSize=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "feedback",
+                "records"
+              ],
+              "query": [
+                {
+                  "key": "pageNo",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('list feedback records success', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(Array.isArray(body.data)).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Generate AI Assessment Reports",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"elderId\": {{familyElderId}},\n  \"reportType\": \"ALL\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/family/assessment-reports/generate-ai",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "assessment-reports",
+                "generate-ai"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('generate ai assessment reports success', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(body.data.generatedCount).to.not.equal(undefined);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Capability Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/family/capabilities/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "capabilities",
+                "status"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Family Wechat Recharge",
+      "item": [
+        {
+          "name": "Create Wechat Prepay",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"elderId\": {{familyElderId}},\n  \"amount\": 99,\n  \"description\": \"家属端充值-回归\",\n  \"remark\": \"postman预下单\",\n  \"payerOpenId\": \"{{familyPayerOpenId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/family/payment/wechat/prepay",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "payment",
+                "wechat",
+                "prepay"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('wechat prepay response valid', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(body.data.outTradeNo).to.be.a('string');",
+                  "});",
+                  "var data = pm.response.json().data;",
+                  "if (data && data.outTradeNo) { pm.environment.set('familyOutTradeNo', data.outTradeNo); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Query Recharge Order",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/family/payment/recharge-orders/{{familyOutTradeNo}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "payment",
+                "recharge-orders",
+                "{{familyOutTradeNo}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('recharge order query ok', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(body.data.outTradeNo).to.eql(pm.environment.get('familyOutTradeNo'));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Wechat Notify (Dev Simulation)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Wechatpay-Serial",
+                "value": "MOCK_SERIAL"
+              },
+              {
+                "key": "Wechatpay-Signature",
+                "value": "MOCK_SIGNATURE"
+              },
+              {
+                "key": "Wechatpay-Timestamp",
+                "value": "1719892800"
+              },
+              {
+                "key": "Wechatpay-Nonce",
+                "value": "nonce123"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"EVT_202603080001\",\n  \"event_type\": \"TRANSACTION.SUCCESS\",\n  \"resource_type\": \"encrypt-resource\",\n  \"summary\": \"支付成功\",\n  \"out_trade_no\": \"{{familyOutTradeNo}}\",\n  \"trade_state\": \"SUCCESS\",\n  \"transaction_id\": \"4200000000000000001\",\n  \"amount\": {\n    \"total\": 9900\n  },\n  \"success_time\": \"2026-03-08T16:40:00+08:00\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/family/payment/wechat/notify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "payment",
+                "wechat",
+                "notify"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('wechat notify accepted', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code === 'SUCCESS' || body.code === 'FAIL').to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Legacy my-elders (Deprecated/Gone)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/family/my-elders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "my-elders"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('legacy endpoint is deprecated or gone', function () {",
+                  "  pm.expect(pm.response.code === 200 || pm.response.code === 410).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "familyOrgId",
+      "value": "1"
+    },
+    {
+      "key": "familyPhone",
+      "value": "13800138000"
+    },
+    {
+      "key": "familyVerifyCode",
+      "value": "123456"
+    },
+    {
+      "key": "familySecurityVerifyCode",
+      "value": "123456"
+    },
+    {
+      "key": "familyElderId",
+      "value": "1"
+    },
+    {
+      "key": "familyPayerOpenId",
+      "value": "oMockOpenId123"
+    },
+    {
+      "key": "familyToken",
+      "value": ""
+    },
+    {
+      "key": "familyOutTradeNo",
+      "value": ""
+    },
+    {
+      "key": "familyTodoKey",
+      "value": ""
+    },
+    {
+      "key": "familyAlbumId",
+      "value": "1"
+    }
+  ]
+}

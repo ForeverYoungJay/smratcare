@@ -2,6 +2,8 @@ package com.zhiyangyun.care.medicalcare.model;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import lombok.Data;
 
 @Data
@@ -45,6 +47,7 @@ public class MedicalCareWorkbenchSummaryResponse {
   private Long todayInspectionDoneCount = 0L;
   private Long todayInspectionPlanCount = 0L;
   private Long abnormalInspectionCount = 0L;
+  private Long abnormalInspectionOpenCount = 0L;
   private Long nursingLogPendingCount = 0L;
 
   // Card G
@@ -72,6 +75,39 @@ public class MedicalCareWorkbenchSummaryResponse {
   private Long cvdHighRiskCount = 0L;
   private Long cvdNeedFollowupCount = 0L;
   private List<ResidentRiskItem> keyResidents = new ArrayList<>();
+
+  private Integer configuredIncidentWindowDays;
+  private Integer configuredOverdueHours;
+  private Integer configuredTopResidentLimit;
+  private Integer configuredRiskResidentLookbackDays;
+  private LocalDate snapshotDate;
+  private LocalDate incidentWindowStartDate;
+  private LocalDate incidentWindowEndDate;
+  private LocalDateTime generatedAt;
+
+  private Double medicalOrderExecutionRate = 0D;
+  private Double careTaskCompletionRate = 0D;
+  private Double inspectionCompletionRate = 0D;
+  private Double careTaskOverdueRate = 0D;
+  private Double medicationPendingRate = 0D;
+  private Double inspectionAbnormalRate = 0D;
+
+  private Integer riskIndex;
+  private String riskLevel;
+  private Long riskTriggeredCount = 0L;
+  private List<String> riskSignals = new ArrayList<>();
+  private Integer focusActionCount = 0;
+  private List<FocusActionItem> focusActions = new ArrayList<>();
+
+  @Data
+  public static class FocusActionItem {
+    private String key;
+    private String title;
+    private String description;
+    private String route;
+    private String severity;
+    private Long count;
+  }
 
   @Data
   public static class ResidentRiskItem {

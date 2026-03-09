@@ -1,6 +1,6 @@
 import request, { fetchPage } from '../utils/request';
-export function getCrmLeadPage(params) {
-    return fetchPage('/api/crm/leads/page', params);
+export function getCrmLeadPage(params, config) {
+    return fetchPage('/api/crm/leads/page', params, config);
 }
 export function getCrmLead(id) {
     return request.get(`/api/crm/leads/${id}`);

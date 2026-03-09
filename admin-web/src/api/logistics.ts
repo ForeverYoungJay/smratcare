@@ -5,11 +5,14 @@ import type {
   LogisticsEquipmentArchive,
   LogisticsMaintenanceTodoJobLog,
   LogisticsMaintenanceTodoJobLogOverview,
-  LogisticsWorkbenchSummary
+  LogisticsWorkbenchSummary,
+  LogisticsWorkbenchSummaryQuery
 } from '../types'
 
-export function getLogisticsWorkbenchSummary() {
-  return request.get<LogisticsWorkbenchSummary>('/api/logistics/workbench/summary')
+type LogisticsWorkbenchSummaryRequest = LogisticsWorkbenchSummaryQuery & { lite?: boolean }
+
+export function getLogisticsWorkbenchSummary(params?: LogisticsWorkbenchSummaryRequest, config?: Record<string, any>) {
+  return request.get<LogisticsWorkbenchSummary>('/api/logistics/workbench/summary', { params, ...(config || {}) })
 }
 
 export function getLogisticsEquipmentPage(params: any) {

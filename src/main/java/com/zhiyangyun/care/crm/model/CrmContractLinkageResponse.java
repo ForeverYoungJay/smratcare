@@ -20,6 +20,8 @@ public class CrmContractLinkageResponse {
 
   private String contractNo;
   private String contractStatus;
+  private String flowStage;
+  private String currentOwnerDept;
   private LocalDateTime contractSignedAt;
   private LocalDate contractExpiryDate;
 
@@ -33,4 +35,15 @@ public class CrmContractLinkageResponse {
 
   private Integer attachmentCount;
   private List<CrmContractAttachmentResponse> attachments = new ArrayList<>();
+
+  private Integer archiveScore;
+  private String archiveLevel;
+  private List<String> missingRequiredAttachmentTypes = new ArrayList<>();
+  private Boolean hasContractAttachment;
+  private Boolean hasInvoiceAttachment;
+  private Boolean hasIdAttachment;
+  private Boolean hasAssessmentReport;
+  private String archiveRuleVersion;
+  private List<String> archiveRuleTips = new ArrayList<>();
+  private LocalDateTime generatedAt;
 }

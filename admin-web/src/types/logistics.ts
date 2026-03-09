@@ -3,6 +3,15 @@ export interface LogisticsNamedStatItem {
   quantity: number
 }
 
+export interface LogisticsWorkbenchSummaryQuery {
+  windowDays?: number
+  expiryDays?: number
+  overdueDays?: number
+  maintenanceDueDays?: number
+}
+
+export type LogisticsWorkbenchRiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+
 export interface LogisticsWorkbenchSummary {
   lowStockCount: number
   expiringCount: number
@@ -75,6 +84,24 @@ export interface LogisticsWorkbenchSummary {
   maintenanceTodoLastSkippedCount?: number
   maintenanceTodoLastErrorMessage?: string
   maintenanceTodoFailedCount7d: number
+
+  configuredWindowDays?: number
+  configuredExpiryDays?: number
+  configuredOverdueDays?: number
+  configuredMaintenanceDueDays?: number
+  snapshotStartDate?: string
+  snapshotEndDate?: string
+  generatedAt?: string
+
+  bedOccupancyRate?: number
+  maintenanceOverdueRate?: number
+  deliveryUndeliveredRate?: number
+  equipmentDueSoonRate?: number
+
+  riskIndex?: number
+  riskLevel?: LogisticsWorkbenchRiskLevel
+  riskTriggeredCount?: number
+  riskSignals?: string[]
 }
 
 export type LogisticsEquipmentStatus = 'ENABLED' | 'DISABLED' | 'MAINTENANCE' | 'SCRAPPED'

@@ -1,0 +1,63 @@
+<view class="container">
+  <view class="surface hero">
+    <view class="hero-head">
+      <view>
+        <view class="section-title">预警中心</view>
+        <view class="section-subtitle">统一查看未读分层与紧急事件</view>
+      </view>
+      <button class="ghost-btn mini-btn" loading="{{processing}}" bindtap="markAllRead">全部已读</button>
+    </view>
+
+    <view class="count-grid">
+      <view class="count-card">
+        <text class="num">{{summary.unreadCount}}</text>
+        <text class="label">未读总数</text>
+      </view>
+      <view class="count-card urgent">
+        <text class="num">{{summary.urgentUnreadCount}}</text>
+        <text class="label">紧急未读</text>
+      </view>
+      <view class="count-card warning">
+        <text class="num">{{summary.warningUnreadCount}}</text>
+        <text class="label">二级未读</text>
+      </view>
+      <view class="count-card normal">
+        <text class="num">{{summary.normalUnreadCount}}</text>
+        <text class="label">三级未读</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="surface panel">
+    <view class="panel-title">消息类型分布</view>
+    <view class="list-empty" wx:if="{{summary.typeSummary.length === 0}}">暂无消息统计</view>
+    <block wx:for="{{summary.typeSummary}}" wx:key="type">
+      <view class="type-row">
+        <text class="type-name">{{item.type}}</text>
+        <text class="type-count">总计 {{item.count}} · 未读 {{item.unreadCount}}</text>
+      </view>
+    </block>
+  </view>
+
+  <view class="surface panel">
+    <view class="panel-head">
+      <text class="panel-title">紧急事件</text>
+      <text class="link" bindtap="goMessageList">查看全部</text>
+    </view>
+    <view class="list-empty" wx:if="{{summary.urgentItems.length === 0}}">当前暂无紧急事件</view>
+    <block wx:for="{{summary.urgentItems}}" wx:key="id">
+      <view class="urgent-item" data-id="{{item.id}}" bindtap="goMessageDetail">
+        <view class="urgent-top">
+          <text class="tag {{item.levelClass}}">{{item.levelText}}</text>
+          <text class="urgent-time">{{item.time}}</text>
+        </view>
+        <view class="urgent-title">{{item.title}}</view>
+        <view class="urgent-content">{{item.content}}</view>
+        <view class="urgent-bottom">
+          <text class="elder">{{item.elderName}}</text>
+          <button class="ghost-btn call-btn" size="mini" data-phone="{{item.phone}}" catchtap="callNow">联系</button>
+        </view>
+      </view>
+    </block>
+  </view>
+</view>

@@ -1,7 +1,8 @@
-import request, { fetchPage } from '../utils/request';
+import request from '../utils/request';
+import { fetchPage } from '../utils/request';
 import { exportCsvByRequest } from '../utils/export';
-export function getLogisticsWorkbenchSummary() {
-    return request.get('/api/logistics/workbench/summary');
+export function getLogisticsWorkbenchSummary(params, config) {
+    return request.get('/api/logistics/workbench/summary', { params, ...(config || {}) });
 }
 export function getLogisticsEquipmentPage(params) {
     return fetchPage('/api/logistics/equipment/page', params);

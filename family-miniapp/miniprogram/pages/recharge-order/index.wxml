@@ -1,0 +1,56 @@
+<view class="container">
+  <view class="surface hero" wx:if="{{order}}">
+    <view class="hero-top">
+      <view>
+        <view class="hero-title">充值订单详情</view>
+        <view class="hero-no">{{order.outTradeNo}}</view>
+      </view>
+      <text class="status-tag {{statusClass}}">{{order.statusText}}</text>
+    </view>
+    <view class="hero-amount">¥{{order.amount}}</view>
+    <view class="hero-elder">到账对象：{{order.elderName}}</view>
+  </view>
+
+  <view class="surface detail-card" wx:if="{{order}}">
+    <view class="card-title">订单信息</view>
+    <view class="line"><text>支付渠道</text><text>{{order.channel}}</text></view>
+    <view class="line"><text>创建时间</text><text>{{order.createTime}}</text></view>
+    <view class="line" wx:if="{{order.paidTime}}"><text>到账时间</text><text>{{order.paidTime}}</text></view>
+    <view class="line multiline" wx:if="{{order.remark}}">
+      <text>备注</text>
+      <text>{{order.remark}}</text>
+    </view>
+  </view>
+
+  <view class="surface detail-card" wx:if="{{timeline.length > 0}}">
+    <view class="card-title">处理进展</view>
+    <block wx:for="{{timeline}}" wx:key="id">
+      <view class="timeline-item">
+        <view class="timeline-axis">
+          <view class="timeline-dot"></view>
+          <view class="timeline-line" wx:if="{{index !== timeline.length - 1}}"></view>
+        </view>
+        <view class="timeline-content">
+          <view class="timeline-head">
+            <text class="timeline-title">{{item.title}}</text>
+            <text class="timeline-time">{{item.time}}</text>
+          </view>
+          <view class="timeline-desc">{{item.desc}}</view>
+        </view>
+      </view>
+    </block>
+  </view>
+
+  <view class="surface detail-card action-card" wx:if="{{order}}">
+    <button class="primary-btn action" bindtap="refreshOrder">刷新状态</button>
+    <button class="ghost-btn action" bindtap="copyOrderNo">复制订单号</button>
+    <button class="danger-btn action" wx:if="{{contactPhone}}" bindtap="contactNurse">联系{{contactName}}</button>
+    <button class="ghost-btn action" bindtap="backToPayment">返回缴费页</button>
+  </view>
+
+  <view class="surface detail-card empty-card" wx:if="{{!order && !loading}}">
+    <view class="card-title">未找到充值订单</view>
+    <view class="section-subtitle">订单可能不存在，或当前家属账号无权限查看该订单。</view>
+    <button class="ghost-btn action" bindtap="backToPayment">返回缴费页</button>
+  </view>
+</view>

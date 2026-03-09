@@ -1,0 +1,67 @@
+<view class="container">
+  <view class="surface card">
+    <view class="section-title">安全与隐私策略</view>
+    <view class="section-subtitle">重要档案访问建议开启双重验证，减少信息泄露风险</view>
+
+    <view class="item">
+      <view>
+        <view class="item-title">健康档案二次校验</view>
+        <view class="item-desc">查看健康指标和趋势前要求验证</view>
+      </view>
+      <switch checked="{{setting.verifyHealthData}}" data-field="verifyHealthData" bindchange="onSwitch" color="#2c7a84" />
+    </view>
+
+    <view class="item">
+      <view>
+        <view class="item-title">就医记录二次校验</view>
+        <view class="item-desc">门诊诊断与用药记录访问验证</view>
+      </view>
+      <switch checked="{{setting.verifyMedicalRecords}}" data-field="verifyMedicalRecords" bindchange="onSwitch" color="#2c7a84" />
+    </view>
+
+    <view class="item">
+      <view>
+        <view class="item-title">评估报告二次校验</view>
+        <view class="item-desc">PDF 报告查看前二次确认</view>
+      </view>
+      <switch checked="{{setting.verifyReports}}" data-field="verifyReports" bindchange="onSwitch" color="#2c7a84" />
+    </view>
+
+    <view class="item">
+      <view>
+        <view class="item-title">短信验证码校验</view>
+        <view class="item-desc">敏感信息访问启用短信验证码</view>
+      </view>
+      <switch checked="{{setting.verifyWithSmsCode}}" data-field="verifyWithSmsCode" bindchange="onSwitch" color="#2c7a84" />
+    </view>
+
+    <view class="item">
+      <view>
+        <view class="item-title">独立密码校验</view>
+        <view class="item-desc">可使用独立密码进行敏感信息访问验证</view>
+      </view>
+      <switch checked="{{setting.verifyWithPassword}}" data-field="verifyWithPassword" bindchange="onSwitch" color="#2c7a84" />
+    </view>
+
+    <view class="password-panel">
+      <view class="item-title">独立密码状态</view>
+      <view class="item-desc">{{setting.hasIndependentPassword ? '已设置独立密码' : '尚未设置独立密码'}}</view>
+      <button class="ghost-btn password-btn" bindtap="onSetPassword">{{setting.hasIndependentPassword ? '重置密码' : '设置密码'}}</button>
+    </view>
+
+    <view class="item">
+      <view>
+        <view class="item-title">敏感字段脱敏</view>
+        <view class="item-desc">手机号、身份证号等默认隐藏</view>
+      </view>
+      <switch checked="{{setting.maskSensitiveData}}" data-field="maskSensitiveData" bindchange="onSwitch" color="#2c7a84" />
+    </view>
+
+    <view class="scope-panel">
+      <view class="item-title">数据可见范围</view>
+      <picker mode="selector" range="{{scopeOptions}}" value="{{scopeIndex}}" bindchange="onScopeChange">
+        <view class="scope-picker">{{scopeOptions[scopeIndex]}}</view>
+      </picker>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,16 @@
+<view class="container">
+  <view class="surface card">
+    <view class="section-title">外出记录</view>
+    <block wx:for="{{list}}" wx:key="id">
+      <view class="item">
+        <view class="line"><text class="label">老人</text><text class="value">{{item.elderName}}</text></view>
+        <view class="line"><text class="label">外出时间</text><text class="value">{{item.startTime}}</text></view>
+        <view class="line"><text class="label">外出原因</text><text class="value">{{item.reason}}</text></view>
+        <view class="line"><text class="label">陪同人员</text><text class="value">{{item.companion}}</text></view>
+        <view class="line"><text class="label">外出地点</text><text class="value">{{item.destination}}</text></view>
+        <view class="line"><text class="label">返回时间</text><text class="value">{{item.returnTime}}</text></view>
+        <view class="line"><text class="label">状态</text><text class="status">{{item.status}}</text></view>
+      </view>
+    </block>
+  </view>
+</view>

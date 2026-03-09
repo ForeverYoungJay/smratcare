@@ -1,6 +1,7 @@
 package com.zhiyangyun.care.elder.model.lifecycle;
 
 import lombok.Data;
+import java.time.LocalDateTime;
 
 @Data
 public class ResidenceStatusSummaryResponse {
@@ -15,4 +16,5 @@ public class ResidenceStatusSummaryResponse {
 
   private long openIncidentCount;
   private long overdueOutingCount;
+  private LocalDateTime generatedAt;
 }

@@ -3,12 +3,14 @@ import { hasRouteAccess } from '../utils/roleAccess';
 export function setupPermission(router) {
     router.beforeEach((to, _from, next) => {
         const token = getToken();
-        if (to.path !== '/login' && !token) {
-            next('/login');
+        const publicPages = ['/home', '/enterprise', '/admin', '/login'];
+        if (!token && !publicPages.includes(to.path)) {
+            next('/home');
             return;
         }
         if (to.path === '/login' && token) {
-            next('/portal');
+            const redirect = typeof to.query.redirect === 'string' ? to.query.redirect : '';
+            next(redirect || '/portal');
             return;
         }
         const roles = getRoles();

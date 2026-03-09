@@ -2,26 +2,33 @@
   <PageContainer :title="pageTitle" :sub-title="pageSubTitle">
     <MarketingQuickNav />
     <a-card class="card-elevated" :bordered="false">
+      <div class="board-head">
+        <span class="board-head-title">流程阶段看板</span>
+        <a-space size="small">
+          <span class="board-head-meta">更新时间：{{ stageBoardGeneratedAtText }}</span>
+          <a-button size="small" @click="fetchBoardSummary">刷新看板</a-button>
+        </a-space>
+      </div>
       <a-row :gutter="12">
-        <a-col :span="6">
+        <a-col :xs="12" :md="6">
           <div class="board-item">
             <div class="board-title">待评估 <a-badge :count="stageBoard.pendingAssessmentOverdue" color="#ff4d4f" /></div>
             <div class="board-value">{{ stageBoard.pendingAssessment }}</div>
           </div>
         </a-col>
-        <a-col :span="6">
+        <a-col :xs="12" :md="6">
           <div class="board-item">
             <div class="board-title">待办理入住</div>
             <div class="board-value">{{ stageBoard.pendingBedSelect }}</div>
           </div>
         </a-col>
-        <a-col :span="6">
+        <a-col :xs="12" :md="6">
           <div class="board-item">
             <div class="board-title">待签署 <a-badge :count="stageBoard.pendingSignOverdue" color="#ff4d4f" /></div>
             <div class="board-value">{{ stageBoard.pendingSign }}</div>
           </div>
         </a-col>
-        <a-col :span="6">
+        <a-col :xs="12" :md="6">
           <div class="board-item">
             <div class="board-title">已签署</div>
             <div class="board-value">{{ stageBoard.signed }}</div>
@@ -83,8 +90,9 @@
         </a-form-item>
         <a-form-item>
           <a-space>
-            <a-button type="primary" @click="fetchData">搜 索</a-button>
+            <a-button type="primary" @click="runSearch">搜 索</a-button>
             <a-button @click="reset">清 空</a-button>
+            <a-button @click="copySearchLink">复制筛选链接</a-button>
           </a-space>
         </a-form-item>
       </a-form>
@@ -285,6 +293,7 @@ import {
   getContractAssessmentOverview,
   getContractAttachments,
   getContractPage,
+  getContractStageSummary,
   getMarketingPlanList,
   updateCrmContract,
   uploadMarketingFile
@@ -315,7 +324,6 @@ const submitting = ref(false)
 const open = ref(false)
 const formRef = ref<FormInstance>()
 const rows = ref<CrmContractItem[]>([])
-const localRows = ref<CrmContractItem[]>([])
 const total = ref(0)
 const selectedRowKeys = ref<Array<number | string>>([])
 const selectedRows = ref<CrmContractItem[]>([])
@@ -334,6 +342,26 @@ const stageBoard = reactive({
   pendingAssessmentOverdue: 0,
   pendingSignOverdue: 0
 })
+const stageBoardGeneratedAt = ref('')
+const skipNextSearchRouteWatch = ref(false)
+const searchRouteSignature = ref('')
+const SEARCH_ROUTE_KEYS = [
+  'contractNo',
+  'elderName',
+  'elderPhone',
+  'marketerName',
+  'orgName',
+  'flowStage',
+  'pageNo',
+  'pageSize',
+  'onlyMine',
+  'mineDept',
+  'onlyOverdue',
+  'sortByOverdue'
+]
+const stageBoardGeneratedAtText = computed(() =>
+  stageBoardGeneratedAt.value ? dayjs(stageBoardGeneratedAt.value).format('MM-DD HH:mm:ss') : '-'
+)
 
 const mineDeptOptions = [
   { label: '营销部', value: 'MARKETING' },
@@ -376,6 +404,89 @@ function applyStatusPreset() {
   query.flowStage = undefined
 }
 
+function applyAttachmentRouteFilter() {
+  const openAttachmentFlag = String(route.query.openAttachment || '').trim() === '1'
+  if (!openAttachmentFlag) return
+  const contractNo = String(route.query.contractNo || '').trim()
+  const elderName = String(route.query.elderName || '').trim()
+  if (contractNo) {
+    query.contractNo = contractNo
+  } else if (elderName) {
+    query.elderName = elderName
+  }
+}
+
+function parseFlag(value: unknown) {
+  const text = firstQueryText(value).toLowerCase()
+  return text === '1' || text === 'true' || text === 'yes'
+}
+
+function firstQueryText(value: unknown) {
+  if (Array.isArray(value)) {
+    return firstQueryText(value[0])
+  }
+  if (value == null) {
+    return ''
+  }
+  return String(value).trim()
+}
+
+function normalizeRouteQueryMap(source: Record<string, unknown>) {
+  return Object.entries(source || {}).reduce<Record<string, string>>((acc, [key, value]) => {
+    const text = firstQueryText(value)
+    if (!text) return acc
+    acc[key] = text
+    return acc
+  }, {})
+}
+
+function buildSearchRouteSignature(source: Record<string, unknown>) {
+  return SEARCH_ROUTE_KEYS.map((key) => `${key}:${firstQueryText(source[key])}`).join('|')
+}
+
+function resetSearchFilters() {
+  query.contractNo = ''
+  query.elderName = ''
+  query.elderPhone = ''
+  query.marketerName = ''
+  query.orgName = undefined
+  query.pageNo = 1
+  query.pageSize = 10
+  onlyMineDept.value = false
+  mineDept.value = 'MARKETING'
+  onlyOverdue.value = false
+  sortByOverdue.value = false
+}
+
+function applyQueryRouteFilter() {
+  resetSearchFilters()
+  const contractNo = firstQueryText(route.query.contractNo)
+  const elderName = firstQueryText(route.query.elderName)
+  const elderPhone = firstQueryText(route.query.elderPhone)
+  const marketerName = firstQueryText(route.query.marketerName)
+  const orgName = firstQueryText(route.query.orgName)
+  const flowStage = firstQueryText(route.query.flowStage) as CrmContractItem['flowStage']
+  const pageNo = Number(firstQueryText(route.query.pageNo))
+  const pageSize = Number(firstQueryText(route.query.pageSize))
+  if (contractNo) query.contractNo = contractNo
+  if (elderName) query.elderName = elderName
+  if (elderPhone) query.elderPhone = elderPhone
+  if (marketerName) query.marketerName = marketerName
+  if (orgName) query.orgName = orgName
+  if (flowStage === 'PENDING_ASSESSMENT' || flowStage === 'PENDING_BED_SELECT' || flowStage === 'PENDING_SIGN' || flowStage === 'SIGNED') {
+    query.flowStage = flowStage
+  }
+  if (Number.isFinite(pageNo) && pageNo > 0) query.pageNo = pageNo
+  if (Number.isFinite(pageSize) && pageSize > 0) query.pageSize = pageSize
+  onlyMineDept.value = parseFlag(route.query.onlyMine)
+  onlyOverdue.value = parseFlag(route.query.onlyOverdue)
+  sortByOverdue.value = parseFlag(route.query.sortByOverdue)
+  const dept = firstQueryText(route.query.mineDept).toUpperCase()
+  if (dept === 'ASSESSMENT' || dept === 'MARKETING') {
+    mineDept.value = dept
+  }
+}
+
 const form = reactive<Partial<CrmContractItem>>({})
 const selectedPolicyValues = ref<string[]>([])
 const rules: FormRules = {
@@ -399,7 +510,6 @@ const selectedContractForFlow = computed(() => {
     selectedRows.value.find((item) => sameId(item.id, key)) ||
     tableRows.value.find((item) => sameId(item.id, key)) ||
     rows.value.find((item) => sameId(item.id, key)) ||
-    localRows.value.find((item) => sameId(item.id, key)) ||
     null
   )
 })
@@ -496,6 +606,7 @@ const attachmentSubmitting = ref(false)
 const attachmentType = ref<'MEDICAL_RECORD' | 'MEDICAL_INSURANCE' | 'HOUSEHOLD' | 'CONTRACT' | 'OTHER'>('CONTRACT')
 const currentAttachmentLead = ref<CrmContractItem>()
 const attachments = ref<ContractAttachmentItem[]>([])
+const autoAttachmentHandledKey = ref('')
 const uploadAccept = '.jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip'
 const attachmentColumns = [
   { title: '预览', dataIndex: 'preview', key: 'preview', width: 80 },
@@ -522,30 +633,8 @@ const finalizeForm = reactive({
   remark: ''
 })
 
-const processedRows = computed(() => {
-  let list = onlyOverdue.value
-    ? localRows.value.filter((item) => getOverdueLevel(item) === 'high')
-    : [...localRows.value]
-  if (sortByOverdue.value) {
-    list = list.sort((a, b) => overdueHours(b) - overdueHours(a))
-  }
-  return list
-})
-
-const tableRows = computed(() => {
-  if (!onlyOverdue.value && !sortByOverdue.value) {
-    return rows.value
-  }
-  const start = (query.pageNo - 1) * query.pageSize
-  return processedRows.value.slice(start, start + query.pageSize)
-})
-
-const displayTotal = computed(() => {
-  if (!onlyOverdue.value && !sortByOverdue.value) {
-    return total.value
-  }
-  return processedRows.value.length
-})
+const tableRows = computed(() => rows.value)
+const displayTotal = computed(() => total.value)
 
 function normalizedFlowStage(record: CrmContractItem): CrmContractItem['flowStage'] {
   return (record.flowStage || 'PENDING_ASSESSMENT') as CrmContractItem['flowStage']
@@ -591,7 +680,7 @@ function overdueHours(record: CrmContractItem) {
     return hoursFrom(record.createTime)
   }
   if (stage === 'PENDING_SIGN') {
-    return hoursFrom(record.updateTime || record.createTime)
+    return record.updateTime ? hoursFrom(record.updateTime) : 0
   }
   return 0
 }
@@ -600,10 +689,10 @@ function getOverdueLevel(record: CrmContractItem): 'none' | 'high' {
   const stage = normalizedFlowStage(record)
   const hours = overdueHours(record)
   if (stage === 'PENDING_ASSESSMENT') {
-    return hours >= 24 ? 'high' : 'none'
+    return hours >= 48 ? 'high' : 'none'
   }
   if (stage === 'PENDING_SIGN') {
-    return hours >= 48 ? 'high' : 'none'
+    return hours >= 24 ? 'high' : 'none'
   }
   return 'none'
 }
@@ -690,48 +779,40 @@ async function refreshAssessmentReady(rowsForCheck: CrmContractItem[]) {
 }
 
 async function fetchBoardSummary() {
-  const stages: CrmContractItem['flowStage'][] = ['PENDING_ASSESSMENT', 'PENDING_BED_SELECT', 'PENDING_SIGN', 'SIGNED']
-  const [a, b, c, d] = await Promise.all(stages.map((flowStage) => getContractPage({
-    pageNo: 1,
-    pageSize: 1,
-    flowStage,
+  const summary = await getContractStageSummary({
     currentOwnerDept: onlyMineDept.value ? mineDept.value : undefined
-  })))
-  stageBoard.pendingAssessment = a.total || 0
-  stageBoard.pendingBedSelect = b.total || 0
-  stageBoard.pendingSign = c.total || 0
-  stageBoard.signed = d.total || 0
-  const [assessmentOverdue, signOverdue] = await Promise.all([
-    fetchOverdueCount('PENDING_ASSESSMENT'),
-    fetchOverdueCount('PENDING_SIGN')
-  ])
-  stageBoard.pendingAssessmentOverdue = assessmentOverdue
-  stageBoard.pendingSignOverdue = signOverdue
+  })
+  stageBoard.pendingAssessment = Number(summary?.pendingAssessment || 0)
+  stageBoard.pendingBedSelect = Number(summary?.pendingBedSelect || 0)
+  stageBoard.pendingSign = Number(summary?.pendingSign || 0)
+  stageBoard.signed = Number(summary?.signed || 0)
+  stageBoard.pendingAssessmentOverdue = Number(summary?.pendingAssessmentOverdue || 0)
+  stageBoard.pendingSignOverdue = Number(summary?.pendingSignOverdue || 0)
+  stageBoardGeneratedAt.value = String(summary?.generatedAt || '')
+}
+
+function buildContractPageParams() {
+  return {
+    pageNo: query.pageNo,
+    pageSize: query.pageSize,
+    contractNo: query.contractNo || undefined,
+    elderName: query.elderName || undefined,
+    elderPhone: query.elderPhone || undefined,
+    marketerName: query.marketerName || undefined,
+    orgName: query.orgName || undefined,
+    flowStage: query.flowStage || undefined,
+    currentOwnerDept: onlyMineDept.value ? mineDept.value : undefined,
+    overdueOnly: onlyOverdue.value || undefined,
+    sortByOverdue: sortByOverdue.value || undefined
+  }
 }
 
 async function fetchData() {
   loading.value = true
   try {
-    if (onlyOverdue.value || sortByOverdue.value) {
-      localRows.value = await fetchAllLeadRows()
-      rows.value = []
-      total.value = 0
-    } else {
-      const page: PageResult<CrmContractItem> = await getContractPage({
-        pageNo: query.pageNo,
-        pageSize: query.pageSize,
-        contractNo: query.contractNo || undefined,
-        elderName: query.elderName || undefined,
-        elderPhone: query.elderPhone || undefined,
-        marketerName: query.marketerName || undefined,
-        orgName: query.orgName || undefined,
-        flowStage: query.flowStage || undefined,
-        currentOwnerDept: onlyMineDept.value ? mineDept.value : undefined
-      })
-      rows.value = page.list || []
-      total.value = page.total || 0
-      localRows.value = []
-    }
+    const page: PageResult<CrmContractItem> = await getContractPage(buildContractPageParams())
+    rows.value = page.list || []
+    total.value = page.total || 0
     await Promise.all([
       refreshFinalizeReady(tableRows.value),
       refreshAssessmentReady(tableRows.value)
@@ -742,104 +823,112 @@ async function fetchData() {
   }
 }
 
-async function fetchAllLeadRows() {
-  const pageSize = 200
-  let pageNo = 1
-  let all: CrmContractItem[] = []
-  let totalRows = 0
-  do {
-    const page: PageResult<CrmContractItem> = await getContractPage({
-      pageNo,
-      pageSize,
-      contractNo: query.contractNo || undefined,
-      elderName: query.elderName || undefined,
-      elderPhone: query.elderPhone || undefined,
-      marketerName: query.marketerName || undefined,
-      orgName: query.orgName || undefined,
-      flowStage: query.flowStage || undefined,
-      currentOwnerDept: onlyMineDept.value ? mineDept.value : undefined
-    })
-    const list = page.list || []
-    all = all.concat(list)
-    totalRows = page.total || 0
-    pageNo += 1
-    if (pageNo > 50) break
-  } while (all.length < totalRows)
-  return all
-}
-
-async function fetchOverdueCount(flowStage: 'PENDING_ASSESSMENT' | 'PENDING_SIGN') {
-  const pageSize = 200
-  let pageNo = 1
-  let totalRows = 0
-  let count = 0
-  do {
-    const page: PageResult<CrmContractItem> = await getContractPage({
-      pageNo,
-      pageSize,
-      flowStage,
-      currentOwnerDept: onlyMineDept.value ? mineDept.value : undefined
-    })
-    const list = page.list || []
-    count += list.filter((item) => getOverdueLevel(item) === 'high').length
-    totalRows = page.total || 0
-    pageNo += 1
-    if (pageNo > 50) break
-  } while ((pageNo - 1) * pageSize < totalRows)
-  return count
-}
-
 function reset() {
-  query.contractNo = ''
-  query.elderName = ''
-  query.elderPhone = ''
-  query.marketerName = ''
-  query.orgName = undefined
+  resetSearchFilters()
   query.flowStage = undefined
-  onlyMineDept.value = false
-  mineDept.value = 'MARKETING'
-  query.pageNo = 1
-  onlyOverdue.value = false
-  sortByOverdue.value = false
+  applyStatusPreset()
   selectedRowKeys.value = []
   selectedRows.value = []
-  fetchData()
+  triggerSearchRefresh()
+}
+
+function runSearch() {
+  query.pageNo = 1
+  triggerSearchRefresh()
 }
 
 function onPageChange(page: number) {
   query.pageNo = page
-  if (!onlyOverdue.value && !sortByOverdue.value) {
-    fetchData()
-  }
+  triggerSearchRefresh()
 }
 
 function onPageSizeChange(_current: number, size: number) {
   query.pageNo = 1
   query.pageSize = size
-  if (!onlyOverdue.value && !sortByOverdue.value) {
-    fetchData()
-  }
+  triggerSearchRefresh()
 }
 
 function onOverdueSwitchChange() {
   query.pageNo = 1
-  fetchData()
+  triggerSearchRefresh()
 }
 
 function onSortSwitchChange() {
   query.pageNo = 1
-  fetchData()
+  triggerSearchRefresh()
 }
 
 function onMineSwitchChange() {
   query.pageNo = 1
-  fetchData()
+  triggerSearchRefresh()
 }
 
 function onMineDeptChange() {
   if (!onlyMineDept.value) return
   query.pageNo = 1
+  triggerSearchRefresh()
+}
+
+function buildSearchRouteQuery() {
+  const routeQuery: Record<string, string> = {}
+  Object.entries(route.query || {}).forEach(([key, value]) => {
+    if (key === 'quick' || key === 'openAttachment' || key === 'attachmentType') return
+    const text = firstQueryText(value)
+    if (!text) return
+    routeQuery[key] = text
+  })
+  if (query.contractNo) routeQuery.contractNo = query.contractNo
+  else delete routeQuery.contractNo
+  if (query.elderName) routeQuery.elderName = query.elderName
+  else delete routeQuery.elderName
+  if (query.elderPhone) routeQuery.elderPhone = query.elderPhone
+  else delete routeQuery.elderPhone
+  if (query.marketerName) routeQuery.marketerName = query.marketerName
+  else delete routeQuery.marketerName
+  if (query.orgName) routeQuery.orgName = query.orgName
+  else delete routeQuery.orgName
+  if (query.flowStage) routeQuery.flowStage = query.flowStage
+  else delete routeQuery.flowStage
+  routeQuery.pageNo = String(query.pageNo)
+  routeQuery.pageSize = String(query.pageSize)
+  if (onlyMineDept.value) routeQuery.onlyMine = '1'
+  else delete routeQuery.onlyMine
+  if (onlyMineDept.value) routeQuery.mineDept = mineDept.value
+  else delete routeQuery.mineDept
+  if (onlyOverdue.value) routeQuery.onlyOverdue = '1'
+  else delete routeQuery.onlyOverdue
+  if (sortByOverdue.value) routeQuery.sortByOverdue = '1'
+  else delete routeQuery.sortByOverdue
+  return routeQuery
+}
+
+async function syncSearchQueryToRoute() {
+  const nextQuery = buildSearchRouteQuery()
+  const currentQuery = normalizeRouteQueryMap(route.query as Record<string, unknown>)
+  const currentKeys = Object.keys(currentQuery)
+  const nextKeys = Object.keys(nextQuery)
+  if (currentKeys.length === nextKeys.length && nextKeys.every((key) => currentQuery[key] === nextQuery[key])) {
+    return
+  }
+  skipNextSearchRouteWatch.value = true
+  searchRouteSignature.value = buildSearchRouteSignature(nextQuery)
+  await router.replace({ path: route.path, query: nextQuery })
+}
+
+function triggerSearchRefresh() {
   fetchData()
+  syncSearchQueryToRoute().catch(() => {})
+}
+
+async function copySearchLink() {
+  const href = router.resolve({ path: route.path, query: buildSearchRouteQuery() }).href
+  const fullUrl = /^https?:\/\//i.test(href) ? href : `${window.location.origin}${href}`
+  try {
+    await navigator.clipboard.writeText(fullUrl)
+    message.success('筛选链接已复制')
+  } catch {
+    message.warning('当前环境不支持自动复制，请手动复制地址栏链接')
+  }
 }
 
 function requireSingleSelection(actionLabel: string) {
@@ -851,8 +940,7 @@ function requireSingleSelection(actionLabel: string) {
   const row =
     selectedRows.value.find((item) => sameId(item.id, key)) ||
     tableRows.value.find((item) => sameId(item.id, key)) ||
-    rows.value.find((item) => sameId(item.id, key)) ||
-    localRows.value.find((item) => sameId(item.id, key))
+    rows.value.find((item) => sameId(item.id, key))
   if (!row) {
     message.warning('未找到选中的合同，请刷新后重试')
     return null
@@ -1182,6 +1270,47 @@ async function openAttachment(record: CrmContractItem) {
   attachmentOpen.value = true
 }
 
+function resolveAttachmentTypeFromRoute() {
+  const raw = String(route.query.attachmentType || '').trim().toUpperCase()
+  if (raw === 'MEDICAL_RECORD' || raw === 'MEDICAL_INSURANCE' || raw === 'HOUSEHOLD' || raw === 'CONTRACT' || raw === 'OTHER') {
+    attachmentType.value = raw
+    return
+  }
+  attachmentType.value = 'CONTRACT'
+}
+
+async function autoOpenAttachmentFromRoute() {
+  const openAttachmentFlag = String(route.query.openAttachment || '').trim() === '1'
+  if (!openAttachmentFlag) return
+  const contractNo = String(route.query.contractNo || '').trim()
+  const elderName = String(route.query.elderName || '').trim()
+  const elderId = Number(route.query.elderId || route.query.residentId || 0)
+  const handledKey = `${contractNo}|${elderName}|${elderId}|${String(route.query.attachmentType || '')}`
+  if (autoAttachmentHandledKey.value === handledKey) return
+  const target = tableRows.value.find((item) => {
+    if (contractNo && String(item.contractNo || '').trim() === contractNo) return true
+    if (!contractNo && elderName && String(item.elderName || '').trim() === elderName) return true
+    if (!contractNo && !elderName && elderId > 0 && Number(item.elderId || 0) === elderId) return true
+    return false
+  }) || rows.value.find((item) => {
+    if (contractNo && String(item.contractNo || '').trim() === contractNo) return true
+    if (!contractNo && elderName && String(item.elderName || '').trim() === elderName) return true
+    if (!contractNo && !elderName && elderId > 0 && Number(item.elderId || 0) === elderId) return true
+    return false
+  })
+  if (!target) {
+    if (contractNo || elderName) {
+      message.warning('未找到目标合同，请先检查筛选条件后重试')
+    }
+    return
+  }
+  selectedRowKeys.value = [target.id]
+  selectedRows.value = [target]
+  resolveAttachmentTypeFromRoute()
+  await openAttachment(target)
+  autoAttachmentHandledKey.value = handledKey
+}
+
 function beforeUpload(file: File) {
   const allowExt = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt', 'zip']
   const ext = file.name?.split('.').pop()?.toLowerCase() || ''
@@ -1319,8 +1448,13 @@ function consumeQuickQuery() {
 
 onMounted(() => {
   applyStatusPreset()
+  applyAttachmentRouteFilter()
+  applyQueryRouteFilter()
+  searchRouteSignature.value = buildSearchRouteSignature(route.query as Record<string, unknown>)
   fetchPolicyOptions()
   fetchData()
+    .then(() => autoOpenAttachmentFromRoute())
+    .then(() => syncSearchQueryToRoute().catch(() => {}))
   const quick = String(route.query.quick || '').trim()
   if (quick === '1' && !isSignedMode.value) {
     openForm()
@@ -1330,23 +1464,44 @@ onMounted(() => {
 
 watch(
   () => route.query,
-  () => {
+  async () => {
+    const nextSignature = buildSearchRouteSignature(route.query as Record<string, unknown>)
+    if (skipNextSearchRouteWatch.value) {
+      skipNextSearchRouteWatch.value = false
+      searchRouteSignature.value = nextSignature
+      const quick = String(route.query.quick || '').trim()
+      if (quick === '1' && !isSignedMode.value) {
+        openForm()
+        consumeQuickQuery()
+      }
+      if (String(route.query.openAttachment || '').trim() === '1') {
+        await autoOpenAttachmentFromRoute()
+      }
+      return
+    }
+    const signatureChanged = nextSignature !== searchRouteSignature.value
+    searchRouteSignature.value = nextSignature
     applyStatusPreset()
-    query.pageNo = 1
-    fetchData()
+    applyAttachmentRouteFilter()
+    applyQueryRouteFilter()
+    if (signatureChanged) {
+      await fetchData()
+    }
+    await autoOpenAttachmentFromRoute()
     const quick = String(route.query.quick || '').trim()
     if (quick === '1' && !isSignedMode.value) {
       openForm()
       consumeQuickQuery()
     }
-  }
+  },
+  { deep: true }
 )
 watch(
   () => props.statusPreset,
   () => {
     applyStatusPreset()
     query.pageNo = 1
-    fetchData()
+    triggerSearchRefresh()
   }
 )
 
@@ -1363,10 +1518,31 @@ watch(
   margin-bottom: 12px;
 }
 
+.board-head {
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.board-head-title {
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.board-head-meta {
+  color: #64748b;
+  font-size: 12px;
+}
+
 .board-item {
   padding: 10px 12px;
-  border: 1px solid #f0f0f0;
+  border: 1px solid #e6f4ff;
   border-radius: 8px;
+  background: linear-gradient(122deg, rgba(248, 251, 255, 0.95) 0%, rgba(240, 247, 255, 0.95) 100%);
 }
 
 .board-title {

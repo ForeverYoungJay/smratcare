@@ -10,24 +10,35 @@
       <a-form-item label="来源">
         <a-select v-model:value="query.sourceType" :options="sourceTypeOptions" allow-clear style="width: 180px" />
       </a-form-item>
+      <a-form-item label="自动刷新">
+        <a-switch v-model:checked="autoRefresh" />
+      </a-form-item>
       <template #extra>
-        <a-button type="primary" @click="openCreate">新增待办</a-button>
-        <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="editSelected">编辑</a-button>
-        <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="doneSelected">完成</a-button>
-        <a-select v-model:value="snoozeDays" style="width: 110px">
-          <a-select-option :value="1">延后1天</a-select-option>
-          <a-select-option :value="3">延后3天</a-select-option>
-          <a-select-option :value="7">延后7天</a-select-option>
-        </a-select>
-        <a-button :disabled="!canSnoozeSelected" @click="snoozeSelected">单条延后</a-button>
-        <a-button :disabled="selectedOpenBirthdayCount === 0" @click="batchSnoozeSelected">批量延后</a-button>
-        <a-button :disabled="!canIgnoreSelected" @click="ignoreSelected">忽略生日提醒</a-button>
-        <a-button :disabled="selectedOpenBirthdayCount === 0" @click="batchIgnoreSelected">批量忽略生日</a-button>
-        <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
-        <a-button :disabled="selectedOpenCount === 0" @click="batchDone">批量完成</a-button>
-        <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
-        <a-button @click="downloadExport">导出CSV</a-button>
-        <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条，其中生日提醒 {{ selectedOpenBirthdayCount }} 条</span>
+        <a-space wrap>
+          <a-button type="primary" @click="openCreate">新增待办</a-button>
+          <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="syncSelectedTodoToTaskCalendar">转任务日历</a-button>
+          <a-button @click="downloadExport">导出CSV</a-button>
+          <a-divider type="vertical" />
+          <span class="action-group-title">单条操作</span>
+          <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="editSelected">编辑</a-button>
+          <a-button :disabled="!selectedSingleRecord || !isSelectedSingleOpen" @click="doneSelected">完成</a-button>
+          <a-select v-model:value="snoozeDays" style="width: 110px">
+            <a-select-option :value="1">延后1天</a-select-option>
+            <a-select-option :value="3">延后3天</a-select-option>
+            <a-select-option :value="7">延后7天</a-select-option>
+          </a-select>
+          <a-button :disabled="!canSnoozeSelected" @click="snoozeSelected">延后</a-button>
+          <a-button :disabled="!canIgnoreSelected" @click="ignoreSelected">忽略生日</a-button>
+          <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+          <a-divider type="vertical" />
+          <span class="action-group-title">批量操作</span>
+          <a-button :disabled="selectedOpenCount === 0" @click="batchDone">批量完成</a-button>
+          <a-button :disabled="selectedOpenBirthdayCount === 0" @click="batchSnoozeSelected">批量延后</a-button>
+          <a-button :disabled="selectedOpenBirthdayCount === 0" @click="batchIgnoreSelected">批量忽略生日</a-button>
+          <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
+          <a-tag color="blue">已勾选 {{ selectedRowKeys.length }} 条</a-tag>
+          <span class="selection-tip">其中生日提醒 {{ selectedOpenBirthdayCount }} 条</span>
+        </a-space>
       </template>
     </SearchForm>
 
@@ -80,15 +91,51 @@
         </a-tag>
       </a-space>
       <a-row :gutter="[12, 12]" style="margin-bottom: 12px">
-        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="总待办" :value="summary.totalCount || 0" /></a-card></a-col>
-        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="待处理" :value="summary.openCount || 0" /></a-card></a-col>
-        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已完成" :value="summary.doneCount || 0" /></a-card></a-col>
-        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="审批待办" :value="summary.approvalOpenCount || 0" /></a-card></a-col>
-        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="生日提醒" :value="summary.birthdayOpenCount || 0" /></a-card></a-col>
-        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="普通待办" :value="summary.normalOpenCount || 0" /></a-card></a-col>
-        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="今日到期" :value="summary.dueTodayCount || 0" /></a-card></a-col>
-        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已逾期" :value="summary.overdueCount || 0" /></a-card></a-col>
-        <a-col :xs="12" :lg="3"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="未分配" :value="summary.unassignedCount || 0" /></a-card></a-col>
+        <a-col :xs="12" :lg="3">
+          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'total' }" :bordered="false" size="small" @click="applySummaryFilter('total')">
+            <a-statistic title="总待办" :value="summary.totalCount || 0" />
+          </a-card>
+        </a-col>
+        <a-col :xs="12" :lg="3">
+          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'open' }" :bordered="false" size="small" @click="applySummaryFilter('open')">
+            <a-statistic title="待处理" :value="summary.openCount || 0" />
+          </a-card>
+        </a-col>
+        <a-col :xs="12" :lg="3">
+          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'done' }" :bordered="false" size="small" @click="applySummaryFilter('done')">
+            <a-statistic title="已完成" :value="summary.doneCount || 0" />
+          </a-card>
+        </a-col>
+        <a-col :xs="12" :lg="3">
+          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'approval' }" :bordered="false" size="small" @click="applySummaryFilter('approval')">
+            <a-statistic title="审批待办" :value="summary.approvalOpenCount || 0" />
+          </a-card>
+        </a-col>
+        <a-col :xs="12" :lg="3">
+          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'birthday' }" :bordered="false" size="small" @click="applySummaryFilter('birthday')">
+            <a-statistic title="生日提醒" :value="summary.birthdayOpenCount || 0" />
+          </a-card>
+        </a-col>
+        <a-col :xs="12" :lg="3">
+          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'normal' }" :bordered="false" size="small" @click="applySummaryFilter('normal')">
+            <a-statistic title="普通待办" :value="summary.normalOpenCount || 0" />
+          </a-card>
+        </a-col>
+        <a-col :xs="12" :lg="3">
+          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'dueToday' }" :bordered="false" size="small" @click="applySummaryFilter('dueToday')">
+            <a-statistic title="今日到期" :value="summary.dueTodayCount || 0" />
+          </a-card>
+        </a-col>
+        <a-col :xs="12" :lg="3">
+          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'overdue' }" :bordered="false" size="small" @click="applySummaryFilter('overdue')">
+            <a-statistic title="已逾期" :value="summary.overdueCount || 0" />
+          </a-card>
+        </a-col>
+        <a-col :xs="12" :lg="3">
+          <a-card class="card-elevated summary-filter-card" :class="{ active: activeSummaryFilter === 'unassigned' }" :bordered="false" size="small" @click="applySummaryFilter('unassigned')">
+            <a-statistic title="未分配" :value="summary.unassignedCount || 0" />
+          </a-card>
+        </a-col>
       </a-row>
       <a-alert
         v-if="(summary.overdueCount || 0) > 0"
@@ -135,19 +182,77 @@
       </DataTable>
     </StatefulBlock>
 
-    <a-modal v-model:open="editOpen" title="待办" @ok="submit" :confirm-loading="saving" width="600px">
+    <a-modal v-model:open="editOpen" title="待办" @ok="submit" :confirm-loading="saving" width="760px">
       <a-form layout="vertical">
         <a-form-item label="标题" required>
-          <a-input v-model:value="form.title" />
+          <a-input v-model:value="form.title" placeholder="例如：跟进张阿姨家属签约资料" />
         </a-form-item>
+        <a-row :gutter="12">
+          <a-col :span="12">
+            <a-form-item label="待办类型">
+              <a-select v-model:value="form.todoCategory" :options="todoCategoryOptions" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="关联模块（可搜索）">
+              <a-select
+                v-model:value="form.relatedModule"
+                show-search
+                allow-clear
+                :options="relatedModuleOptions"
+                :filter-option="filterOptionByLabel"
+                placeholder="输入模块名搜索"
+              />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="12">
+          <a-col :span="12">
+            <a-form-item label="关联对象（可搜索）">
+              <a-select
+                v-model:value="form.relatedTarget"
+                show-search
+                allow-clear
+                :options="relatedTargetOptions"
+                :filter-option="filterOptionByLabel"
+                placeholder="例如：合同/老人/审批单"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="提醒方式">
+              <a-select v-model:value="form.remindMode" :options="remindModeOptions" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="12">
+          <a-col :span="12">
+            <a-form-item label="截止时间">
+              <a-date-picker v-model:value="form.dueTime" show-time style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="负责人（可搜索）">
+              <a-select
+                v-model:value="form.assigneeName"
+                :disabled="!canAssignOthers"
+                show-search
+                allow-clear
+                :options="assigneeOptions"
+                :filter-option="filterOptionByLabel"
+                :placeholder="canAssignOthers ? '输入姓名搜索' : '非管理角色固定为本人'"
+              />
+            </a-form-item>
+          </a-col>
+        </a-row>
         <a-form-item label="内容">
-          <a-textarea v-model:value="form.content" :rows="3" />
+          <a-textarea v-model:value="form.content" :rows="3" placeholder="可填写办理说明、回访要点、执行备注" />
         </a-form-item>
-        <a-form-item label="截止时间">
-          <a-date-picker v-model:value="form.dueTime" show-time style="width: 100%" />
-        </a-form-item>
-        <a-form-item label="负责人">
-          <a-input v-model:value="form.assigneeName" :disabled="!canAssignOthers" :placeholder="canAssignOthers ? '' : '非管理角色固定为本人'" />
+        <a-form-item label="联动设置">
+          <a-space>
+            <a-switch v-model:checked="form.syncToTaskCalendar" />
+            <span class="selection-tip">保存后同步到任务日历（自动去重）</span>
+          </a-space>
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="form.status" :options="editableStatusOptions" disabled />
@@ -158,7 +263,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
@@ -171,6 +276,8 @@ import {
   getTodoPage,
   createTodo,
   updateTodo,
+  getOaTaskPage,
+  createOaTask,
   completeTodo,
   snoozeTodo,
   ignoreBirthdayTodo,
@@ -184,6 +291,7 @@ import {
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { useUserStore } from '../../stores/user'
 import type { OaTodo, OaTodoSummary, PageResult } from '../../types'
+import type { SelectProps } from 'ant-design-vue'
 
 const loading = ref(false)
 const router = useRouter()
@@ -199,6 +307,13 @@ const query = reactive({
   pageNo: 1,
   pageSize: 10
 })
+const autoRefresh = ref(true)
+const AUTO_REFRESH_INTERVAL_MS = 60 * 1000
+let autoRefreshTimer: number | undefined
+const activeSummaryFilter = ref<'total' | 'open' | 'done' | 'approval' | 'birthday' | 'normal' | 'dueToday' | 'overdue' | 'unassigned'>('total')
+const quickOverdueOnly = ref(false)
+const quickDueTodayOnly = ref(false)
+const quickUnassignedOnly = ref(false)
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const selectedRowKeys = ref<string[]>([])
 const summary = reactive<OaTodoSummary>({
@@ -226,7 +341,12 @@ const form = reactive({
   content: '',
   dueTime: undefined as any,
   assigneeName: '',
-  status: 'OPEN'
+  status: 'OPEN',
+  todoCategory: '行政事务',
+  relatedModule: undefined as string | undefined,
+  relatedTarget: undefined as string | undefined,
+  remindMode: '系统站内',
+  syncToTaskCalendar: false
 })
 
 const statusOptions = [
@@ -239,6 +359,45 @@ const sourceTypeOptions = [
   { label: '普通待办', value: 'NORMAL' }
 ]
 const editableStatusOptions = [{ label: '待处理', value: 'OPEN' }]
+const todoCategoryOptions = [
+  { label: '行政事务', value: '行政事务' },
+  { label: '审批跟进', value: '审批跟进' },
+  { label: '营销跟进', value: '营销跟进' },
+  { label: '长者服务', value: '长者服务' },
+  { label: '后勤维护', value: '后勤维护' }
+]
+const relatedModuleOptions = [
+  { label: '合同签约', value: '合同签约' },
+  { label: '入住评估', value: '入住评估' },
+  { label: '入住办理', value: '入住办理' },
+  { label: '审批流程', value: '审批流程' },
+  { label: '营销线索', value: '营销线索' },
+  { label: '文档管理', value: '文档管理' }
+]
+const relatedTargetOptions = [
+  { label: '合同 gfyy20260303002', value: '合同 gfyy20260303002' },
+  { label: '长者 王桂英', value: '长者 王桂英' },
+  { label: '审批单 #2026-0310', value: '审批单 #2026-0310' },
+  { label: '线索 L-202603-088', value: '线索 L-202603-088' },
+  { label: '文档夹 入住资料-2026', value: '文档夹 入住资料-2026' }
+]
+const remindModeOptions = [
+  { label: '系统站内', value: '系统站内' },
+  { label: '短信提醒', value: '短信提醒' },
+  { label: '站内 + 短信', value: '站内 + 短信' }
+]
+const assigneeOptions = [
+  { label: '张院长', value: '张院长' },
+  { label: '李护士长', value: '李护士长' },
+  { label: '王行政', value: '王行政' },
+  { label: '赵运营', value: '赵运营' },
+  { label: '陈财务', value: '陈财务' }
+]
+
+function filterOptionByLabel(input: string, option: SelectProps['options'][number]) {
+  const label = String((option as any)?.label || '')
+  return label.toLowerCase().includes(input.toLowerCase())
+}
 const canAssignOthers = computed(() => {
   const roles = userStore.roles || []
   return roles.includes('ADMIN') || roles.includes('SYS_ADMIN') || roles.includes('DIRECTOR')
@@ -295,11 +454,17 @@ async function fetchData() {
       getTodoPage(params),
       getTodoSummary(params)
     ])
-    rows.value = (res.list || []).map((item) => ({
+    const rawRows = (res.list || []).map((item) => ({
       ...item,
       id: String(item.id)
     }))
-    pagination.total = res.total || res.list.length
+    rows.value = rawRows.filter((item) => {
+      if (quickOverdueOnly.value && !isOverdueTodo(item)) return false
+      if (quickDueTodayOnly.value && !isDueTodayTodo(item)) return false
+      if (quickUnassignedOnly.value && String(item.assigneeName || '').trim()) return false
+      return true
+    })
+    pagination.total = quickOverdueOnly.value || quickDueTodayOnly.value || quickUnassignedOnly.value ? rows.value.length : (res.total || res.list.length)
     selectedRowKeys.value = []
     Object.assign(summary, sum || {})
   } catch (error: any) {
@@ -324,6 +489,10 @@ function onReset() {
   query.keyword = ''
   query.status = undefined
   query.sourceType = undefined
+  activeSummaryFilter.value = 'total'
+  quickOverdueOnly.value = false
+  quickDueTodayOnly.value = false
+  quickUnassignedOnly.value = false
   query.pageNo = 1
   pagination.current = 1
   fetchData()
@@ -331,9 +500,95 @@ function onReset() {
 
 function setSourceType(sourceType?: string) {
   query.sourceType = sourceType
+  activeSummaryFilter.value = 'total'
+  quickOverdueOnly.value = false
+  quickDueTodayOnly.value = false
+  quickUnassignedOnly.value = false
   query.pageNo = 1
   pagination.current = 1
   fetchData()
+}
+
+function applySummaryFilter(filterKey: typeof activeSummaryFilter.value) {
+  activeSummaryFilter.value = filterKey
+  query.pageNo = 1
+  pagination.current = 1
+  quickOverdueOnly.value = false
+  quickDueTodayOnly.value = false
+  quickUnassignedOnly.value = false
+  if (filterKey === 'total') {
+    query.status = undefined
+    query.sourceType = undefined
+    fetchData()
+    return
+  }
+  if (filterKey === 'open') {
+    query.status = 'OPEN'
+    query.sourceType = undefined
+    fetchData()
+    return
+  }
+  if (filterKey === 'done') {
+    query.status = 'DONE'
+    query.sourceType = undefined
+    fetchData()
+    return
+  }
+  if (filterKey === 'approval') {
+    query.status = 'OPEN'
+    query.sourceType = 'APPROVAL'
+    fetchData()
+    return
+  }
+  if (filterKey === 'birthday') {
+    query.status = 'OPEN'
+    query.sourceType = 'BIRTHDAY'
+    fetchData()
+    return
+  }
+  if (filterKey === 'normal') {
+    query.status = 'OPEN'
+    query.sourceType = 'NORMAL'
+    fetchData()
+    return
+  }
+  if (filterKey === 'dueToday') {
+    query.status = 'OPEN'
+    query.sourceType = undefined
+    quickDueTodayOnly.value = true
+    fetchData()
+    return
+  }
+  if (filterKey === 'overdue') {
+    query.status = 'OPEN'
+    query.sourceType = undefined
+    quickOverdueOnly.value = true
+    fetchData()
+    return
+  }
+  if (filterKey === 'unassigned') {
+    query.status = 'OPEN'
+    query.sourceType = undefined
+    quickUnassignedOnly.value = true
+    fetchData()
+  }
+}
+
+function stopAutoRefreshTimer() {
+  if (autoRefreshTimer !== undefined) {
+    window.clearInterval(autoRefreshTimer)
+    autoRefreshTimer = undefined
+  }
+}
+
+function startAutoRefreshTimer() {
+  if (!autoRefresh.value || autoRefreshTimer !== undefined) {
+    return
+  }
+  autoRefreshTimer = window.setInterval(() => {
+    if (loading.value || summaryLoading.value) return
+    fetchData()
+  }, AUTO_REFRESH_INTERVAL_MS)
 }
 
 function openCreate() {
@@ -343,6 +598,11 @@ function openCreate() {
   form.dueTime = undefined
   form.assigneeName = canAssignOthers.value ? '' : currentUserName.value
   form.status = 'OPEN'
+  form.todoCategory = '行政事务'
+  form.relatedModule = undefined
+  form.relatedTarget = undefined
+  form.remindMode = '系统站内'
+  form.syncToTaskCalendar = false
   editOpen.value = true
 }
 
@@ -368,6 +628,66 @@ function isOverdueTodo(todo: OaTodo) {
   return due.isValid() && due.isBefore(dayjs())
 }
 
+function isDueTodayTodo(todo: OaTodo) {
+  if (!todo || todo.status !== 'OPEN' || !todo.dueTime) return false
+  const due = dayjs(todo.dueTime)
+  return due.isValid() && due.isSame(dayjs(), 'day')
+}
+
+function encodeTodoMeta() {
+  const meta = {
+    todoCategory: form.todoCategory || '行政事务',
+    relatedModule: form.relatedModule || '',
+    relatedTarget: form.relatedTarget || '',
+    remindMode: form.remindMode || '系统站内'
+  }
+  try {
+    const encoded = window.btoa(encodeURIComponent(JSON.stringify(meta)))
+    return `[TODO_META:${encoded}]`
+  } catch {
+    return ''
+  }
+}
+
+function decodeTodoMeta(rawContent: string) {
+  const content = String(rawContent || '')
+  const match = content.match(/^\[TODO_META:([A-Za-z0-9+/=]+)\]\n?/)
+  if (!match) {
+    return {
+      meta: {
+        todoCategory: '行政事务',
+        relatedModule: '',
+        relatedTarget: '',
+        remindMode: '系统站内'
+      },
+      plainContent: content
+    }
+  }
+  try {
+    const decoded = decodeURIComponent(window.atob(match[1]))
+    const meta = JSON.parse(decoded || '{}')
+    return {
+      meta: {
+        todoCategory: String(meta?.todoCategory || '行政事务'),
+        relatedModule: String(meta?.relatedModule || ''),
+        relatedTarget: String(meta?.relatedTarget || ''),
+        remindMode: String(meta?.remindMode || '系统站内')
+      },
+      plainContent: content.replace(match[0], '')
+    }
+  } catch {
+    return {
+      meta: {
+        todoCategory: '行政事务',
+        relatedModule: '',
+        relatedTarget: '',
+        remindMode: '系统站内'
+      },
+      plainContent: content.replace(match[0], '')
+    }
+  }
+}
+
 function openApprovalFromTodo(todo: OaTodo) {
   const approvalId = parseApprovalIdFromTodo(todo)
   if (!approvalId) {
@@ -378,33 +698,45 @@ function openApprovalFromTodo(todo: OaTodo) {
 }
 
 function openEdit(record: OaTodo) {
+  const parsedMeta = decodeTodoMeta(record.content || '')
   form.id = String(record.id)
   form.title = record.title
-  form.content = record.content || ''
+  form.content = parsedMeta.plainContent
   form.dueTime = record.dueTime ? dayjs(record.dueTime) : undefined
   form.assigneeName = canAssignOthers.value ? (record.assigneeName || '') : currentUserName.value
   form.status = record.status || 'OPEN'
+  form.todoCategory = parsedMeta.meta.todoCategory || '行政事务'
+  form.relatedModule = parsedMeta.meta.relatedModule || undefined
+  form.relatedTarget = parsedMeta.meta.relatedTarget || undefined
+  form.remindMode = parsedMeta.meta.remindMode || '系统站内'
+  form.syncToTaskCalendar = false
   editOpen.value = true
 }
 
 async function submit() {
   const assigneeName = canAssignOthers.value ? String(form.assigneeName || '').trim() : currentUserName.value
+  const metaPrefix = encodeTodoMeta()
+  const mergedContent = `${metaPrefix}${metaPrefix ? '\n' : ''}${form.content || ''}`.trim()
   const payload = {
     title: form.title,
-    content: form.content,
+    content: mergedContent,
     dueTime: form.dueTime ? dayjs(form.dueTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
     assigneeName,
     status: 'OPEN'
   }
   saving.value = true
   try {
+    let saved: OaTodo | null = null
     if (form.id) {
-      await updateTodo(form.id, payload)
+      saved = await updateTodo(form.id, payload)
     } else {
-      await createTodo(payload)
+      saved = await createTodo(payload)
+    }
+    if (form.syncToTaskCalendar && saved?.id) {
+      await ensureTodoLinkedTask(saved)
     }
     editOpen.value = false
-    fetchData()
+    await fetchData()
   } finally {
     saving.value = false
   }
@@ -414,6 +746,38 @@ async function done(record: OaTodo) {
   if (record.status !== 'OPEN') return
   await completeTodo(String(record.id))
   fetchData()
+}
+
+async function ensureTodoLinkedTask(todo: OaTodo) {
+  const todoId = String(todo.id || '').trim()
+  if (!todoId) return
+  const marker = `[TODO_LINK:${todoId}]`
+  const exist = await getOaTaskPage({ pageNo: 1, pageSize: 1, keyword: marker })
+  if ((exist.list || []).length > 0) {
+    return
+  }
+  const due = todo.dueTime ? dayjs(todo.dueTime) : dayjs().add(4, 'hour')
+  const start = due.subtract(1, 'hour')
+  await createOaTask({
+    title: `[待办转任务] ${todo.title || ''}`.trim(),
+    description: `${todo.content || ''}\n${marker}`.trim(),
+    startTime: start.format('YYYY-MM-DDTHH:mm:ss'),
+    endTime: due.format('YYYY-MM-DDTHH:mm:ss'),
+    assigneeName: todo.assigneeName || currentUserName.value,
+    priority: 'NORMAL',
+    status: 'OPEN',
+    calendarType: 'WORK',
+    planCategory: '待办联动',
+    urgency: 'NORMAL'
+  })
+}
+
+async function syncSelectedTodoToTaskCalendar() {
+  const record = requireSingleSelection('转任务日历')
+  if (!record) return
+  await ensureTodoLinkedTask(record)
+  message.success('已同步到任务日历（若已存在则自动去重）')
+  router.push({ path: '/oa/task' })
 }
 
 async function remove(record: OaTodo) {
@@ -583,9 +947,22 @@ async function runPolicyNow() {
 onMounted(async () => {
   loadPolicy()
   await fetchData()
+  startAutoRefreshTimer()
   if (policyForm.autoClearDone && policyShouldRun(policyForm.cycle)) {
     await clearDoneTodos()
   }
+})
+
+watch(autoRefresh, (enabled) => {
+  if (enabled) {
+    startAutoRefreshTimer()
+    return
+  }
+  stopAutoRefreshTimer()
+})
+
+onUnmounted(() => {
+  stopAutoRefreshTimer()
 })
 
 useLiveSyncRefresh({
@@ -601,5 +978,24 @@ useLiveSyncRefresh({
 .selection-tip {
   color: rgba(0, 0, 0, 0.45);
   font-size: 12px;
+}
+
+.action-group-title {
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.summary-filter-card {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.summary-filter-card:hover {
+  transform: translateY(-1px);
+}
+
+.summary-filter-card.active {
+  box-shadow: 0 0 0 1px #1677ff inset;
+  background: #e6f4ff;
 }
 </style>

@@ -63,6 +63,10 @@ public class AssessmentRecordResponse {
 
   private String source;
 
+  private String reportFileUrl;
+
+  private String reportFileName;
+
   private Long createdBy;
 
   private LocalDateTime createTime;

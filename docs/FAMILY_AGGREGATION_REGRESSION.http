@@ -1,0 +1,608 @@
+### Family 聚合接口 HTTP 回归脚本
+### 使用方式（JetBrains / VSCode REST Client）：
+### 1) 先执行短信验证码发送，再执行 Family Login 获取 token
+### 2) 再按顺序执行充值、安全设置、沟通消息（含语音）、FAQ、微信预下单与订单查询
+### 3) 如需验证微信回调，先确认 app.family.wechat-pay.skip-notify-signature-verify=true（仅测试环境）
+
+@baseUrl = http://localhost:8080
+@orgId = 1
+@familyPhone = 13800138000
+@familyVerifyCode = 123456
+@familySecurityVerifyCode = 123456
+@familyElderId = 1
+@familyAlbumId = 1
+@familyPayerOpenId = oMockOpenId123
+@familyTodoKey = TODO-PLACEHOLDER
+
+### 1) 发送登录验证码（本地 mock 默认会返回 debugCode）
+POST {{baseUrl}}/api/auth/family/sms-code/send
+Content-Type: application/json
+
+{
+  "orgId": {{orgId}},
+  "phone": "{{familyPhone}}",
+  "scene": "LOGIN"
+}
+
+> {% 
+  client.test("send family login sms code success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(response.body.data.expireSeconds !== undefined, "expireSeconds should exist");
+  });
+  if (response.body && response.body.data && response.body.data.debugCode) {
+    client.global.set("familyVerifyCode", response.body.data.debugCode);
+  }
+%}
+
+### 2) 家属登录（提取 token）
+POST {{baseUrl}}/api/auth/family/login
+Content-Type: application/json
+
+{
+  "orgId": {{orgId}},
+  "phone": "{{familyPhone}}",
+  "verifyCode": "{{familyVerifyCode}}"
+}
+
+> {% 
+  client.test("family login success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(!!response.body.data.token, "token should exist");
+  });
+  client.global.set("familyToken", response.body.data.token);
+%}
+
+### 2.1) 绑定微信通知 openId（真实投递前置）
+POST {{baseUrl}}/api/family/wechat/notify/bind-openid
+Authorization: Bearer {{familyToken}}
+Content-Type: application/json
+
+{
+  "openId": "{{familyPayerOpenId}}"
+}
+
+> {% 
+  client.test("bind wechat notify openid success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(response.body.data.bound === true, "bound should be true");
+  });
+%}
+
+### 2.2) 能力状态总览（短信/通知/支付/安全/旧接口）
+GET {{baseUrl}}/api/family/capabilities/status
+Authorization: Bearer {{familyToken}}
+
+> {% 
+  client.test("get capability status success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(response.body.data.smsEnabled !== undefined, "smsEnabled should exist");
+    client.assert(Array.isArray(response.body.data.items), "items should be array");
+  });
+%}
+
+### 3) 充值（业务记账路径）
+POST {{baseUrl}}/api/family/payment/recharge
+Authorization: Bearer {{familyToken}}
+Content-Type: application/json
+
+{
+  "elderId": {{familyElderId}},
+  "amount": 88,
+  "method": "HTTP_REGRESSION",
+  "remark": "http回归充值"
+}
+
+> {% 
+  client.test("manual recharge success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(!!response.body.data.outTradeNo, "outTradeNo should exist");
+  });
+%}
+
+### 4) 安全设置 - 查询
+GET {{baseUrl}}/api/family/security-settings
+Authorization: Bearer {{familyToken}}
+
+> {% 
+  client.test("get security settings success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(response.body.data.verifyHealthData !== undefined, "verifyHealthData should exist");
+  });
+%}
+
+### 5) 安全设置 - 更新
+PUT {{baseUrl}}/api/family/security-settings
+Authorization: Bearer {{familyToken}}
+Content-Type: application/json
+
+{
+  "verifyHealthData": true,
+  "verifyMedicalRecords": true,
+  "verifyReports": true,
+  "verifyWithSmsCode": true,
+  "maskSensitiveData": true,
+  "visibleScope": "仅子女可查看完整健康数据"
+}
+
+> {% 
+  client.test("update security settings success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(response.body.data.visibleScope === "仅子女可查看完整健康数据", "visibleScope should match");
+  });
+%}
+
+### 6) 安全验证码 - 发送（登录后敏感信息校验场景）
+POST {{baseUrl}}/api/family/security/sms-code/send
+Authorization: Bearer {{familyToken}}
+Content-Type: application/json
+
+{
+  "scene": "SECURITY"
+}
+
+> {% 
+  client.test("send security sms code success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(response.body.data.expireSeconds !== undefined, "expireSeconds should exist");
+  });
+  if (response.body && response.body.data && response.body.data.debugCode) {
+    client.global.set("familySecurityVerifyCode", response.body.data.debugCode);
+  }
+%}
+
+### 7) 安全验证码 - 校验
+POST {{baseUrl}}/api/family/security/sms-code/verify
+Authorization: Bearer {{familyToken}}
+Content-Type: application/json
+
+{
+  "scene": "SECURITY",
+  "verifyCode": "{{familySecurityVerifyCode}}"
+}
+
+> {% 
+  client.test("verify security sms code success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(response.body.data.passed === true, "sms code should pass");
+  });
+%}
+
+### 8) 沟通消息 - 列表
+GET {{baseUrl}}/api/family/communication/messages?pageNo=1&pageSize=10
+Authorization: Bearer {{familyToken}}
+
+> {% 
+  client.test("list communication messages success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(Array.isArray(response.body.data), "data should be array");
+  });
+%}
+
+### 9) 沟通消息 - 发送语音留言
+POST {{baseUrl}}/api/family/communication/messages
+Authorization: Bearer {{familyToken}}
+Content-Type: application/json
+
+{
+  "targetRole": "责任护工",
+  "msgType": "voice",
+  "content": "HTTP回归：请协助播放语音留言",
+  "mediaUrl": "https://example.com/family/voice/regression-demo.m4a",
+  "mediaName": "regression-demo.m4a",
+  "mediaDurationSec": 23,
+  "transcript": "妈妈我想你了，周末来看你。"
+}
+
+> {% 
+  client.test("send communication message success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(!!response.body.data.id, "message id should exist");
+    client.assert(response.body.data.msgType === "voice", "msgType should be voice");
+  });
+%}
+
+### 10) FAQ 列表
+GET {{baseUrl}}/api/family/help/faqs
+Authorization: Bearer {{familyToken}}
+
+> {% 
+  client.test("list help faqs success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(Array.isArray(response.body.data), "data should be array");
+  });
+%}
+
+### 11) 微信预下单（真实微信支付链路入口）
+POST {{baseUrl}}/api/family/payment/wechat/prepay
+Authorization: Bearer {{familyToken}}
+Content-Type: application/json
+
+{
+  "elderId": {{familyElderId}},
+  "amount": 99,
+  "description": "家属端充值-HTTP回归",
+  "remark": "http预下单",
+  "payerOpenId": "{{familyPayerOpenId}}"
+}
+
+> {% 
+  client.test("wechat prepay success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(!!response.body.data.outTradeNo, "outTradeNo should exist");
+  });
+  client.global.set("familyOutTradeNo", response.body.data.outTradeNo);
+%}
+
+### 12) 微信充值订单查询
+GET {{baseUrl}}/api/family/payment/recharge-orders/{{familyOutTradeNo}}
+Authorization: Bearer {{familyToken}}
+
+> {% 
+  client.test("query recharge order success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(response.body.data.outTradeNo === client.global.get("familyOutTradeNo"), "outTradeNo should match");
+  });
+%}
+
+### 13) 微信回调模拟（仅测试环境，且建议保持 skip-notify-signature-verify=true）
+POST {{baseUrl}}/api/family/payment/wechat/notify
+Content-Type: application/json
+Wechatpay-Serial: MOCK_SERIAL
+Wechatpay-Signature: MOCK_SIGNATURE
+Wechatpay-Timestamp: 1719892800
+Wechatpay-Nonce: nonce123
+
+{
+  "id": "EVT_202603080001",
+  "event_type": "TRANSACTION.SUCCESS",
+  "resource_type": "encrypt-resource",
+  "summary": "支付成功",
+  "resource": {
+    "algorithm": "AEAD_AES_256_GCM",
+    "ciphertext": "",
+    "nonce": "",
+    "associated_data": ""
+  },
+  "out_trade_no": "{{familyOutTradeNo}}",
+  "trade_state": "SUCCESS",
+  "transaction_id": "4200000000000000001",
+  "amount": {
+    "total": 9900
+  },
+  "success_time": "2026-03-08T16:40:00+08:00"
+}
+
+> {% 
+  client.test("wechat notify handled", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === "SUCCESS" || response.body.code === "FAIL", "notify result should be returned");
+  });
+%}
+
+### 14) 充值订单列表（补充回归）
+GET {{baseUrl}}/api/family/payment/recharge-orders?pageNo=1&pageSize=10
+Authorization: Bearer {{familyToken}}
+
+> {% 
+  client.test("list recharge orders success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(Array.isArray(response.body.data), "data should be array");
+  });
+%}
+
+### 15) 旧接口兼容性检查（已废弃，可能返回200+Deprecation 或 410）
+GET {{baseUrl}}/api/family/my-elders
+Authorization: Bearer {{familyToken}}
+
+> {% 
+  client.test("legacy endpoint is either deprecated or gone", function() {
+    client.assert(response.status === 200 || response.status === 410, "status should be 200 or 410");
+  });
+%}
+
+### 16) 支付保障中心（新增）
+GET {{baseUrl}}/api/family/payment/guard?elderId={{familyElderId}}
+Authorization: Bearer {{familyToken}}
+
+> {% 
+  client.test("get payment guard success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(response.body.data.pendingOrderCount !== undefined, "pendingOrderCount should exist");
+    client.assert(Array.isArray(response.body.data.tips), "tips should be array");
+  });
+%}
+
+### 17) 待办中心（新增）
+GET {{baseUrl}}/api/family/todo-center?elderId={{familyElderId}}
+Authorization: Bearer {{familyToken}}
+
+> {% 
+  client.test("get todo center success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(response.body.data.summary !== undefined, "summary should exist");
+    client.assert(Array.isArray(response.body.data.items), "items should be array");
+  });
+  if (response.body && response.body.data && Array.isArray(response.body.data.items)) {
+    const actionable = response.body.data.items.find(item => item && item.todoKey && item.actionable === true);
+    if (actionable) {
+      client.global.set("familyTodoKey", actionable.todoKey);
+    }
+  }
+%}
+
+### 18) 家属周报（新增）
+GET {{baseUrl}}/api/family/dashboard/weekly-brief?elderId={{familyElderId}}
+Authorization: Bearer {{familyToken}}
+
+> {% 
+  client.test("get weekly brief success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(response.body.data.weekRange !== undefined, "weekRange should exist");
+    client.assert(Array.isArray(response.body.data.vitalBadges), "vitalBadges should be array");
+  });
+%}
+
+### 19) 沟通模板列表（新增）
+GET {{baseUrl}}/api/family/communication/templates
+Authorization: Bearer {{familyToken}}
+
+> {% 
+  client.test("list communication templates success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(Array.isArray(response.body.data), "data should be array");
+  });
+%}
+
+### 20) 消息全部已读（新增）
+POST {{baseUrl}}/api/family/messages/read-all
+Authorization: Bearer {{familyToken}}
+
+> {% 
+  client.test("mark all messages read success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(response.body.data === true, "data should be true");
+  });
+%}
+
+### 21) 周报历史（新增）
+GET {{baseUrl}}/api/family/dashboard/weekly-brief/history?elderId={{familyElderId}}&weeks=6
+Authorization: Bearer {{familyToken}}
+
+> {% 
+  client.test("get weekly brief history success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(Array.isArray(response.body.data), "data should be array");
+  });
+%}
+
+### 22) 消息统计摘要（新增）
+GET {{baseUrl}}/api/family/messages/summary
+Authorization: Bearer {{familyToken}}
+
+> {% 
+  client.test("get message summary success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(response.body.data.unreadCount !== undefined, "unreadCount should exist");
+    client.assert(Array.isArray(response.body.data.typeSummary), "typeSummary should be array");
+  });
+%}
+
+### 23) 消息筛选（新增：仅未读+紧急）
+GET {{baseUrl}}/api/family/messages/page?pageNo=1&pageSize=10&level=urgent&unreadOnly=true
+Authorization: Bearer {{familyToken}}
+
+> {% 
+  client.test("filter messages success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(Array.isArray(response.body.data), "data should be array");
+  });
+%}
+
+### 24) 待办动作（新增：完成）
+POST {{baseUrl}}/api/family/todo-center/action
+Authorization: Bearer {{familyToken}}
+Content-Type: application/json
+
+{
+  "todoKey": "{{familyTodoKey}}",
+  "action": "DONE"
+}
+
+> {% 
+  client.test("todo done action success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(response.body.data.status === "DONE", "todo action status should be DONE");
+  });
+%}
+
+### 25) 待办动作（新增：稍后提醒）
+POST {{baseUrl}}/api/family/todo-center/action
+Authorization: Bearer {{familyToken}}
+Content-Type: application/json
+
+{
+  "todoKey": "{{familyTodoKey}}",
+  "action": "SNOOZE",
+  "snoozeMinutes": 120
+}
+
+> {% 
+  client.test("todo snooze action success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(response.body.data.status === "SNOOZED", "todo action status should be SNOOZED");
+  });
+%}
+
+### 26) 活动相册评论列表（新增）
+GET {{baseUrl}}/api/family/activity-albums/{{familyAlbumId}}/comments
+Authorization: Bearer {{familyToken}}
+
+> {% 
+  client.test("list activity album comments success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(Array.isArray(response.body.data), "data should be array");
+  });
+%}
+
+### 27) 活动相册评论提交（新增）
+POST {{baseUrl}}/api/family/activity-albums/{{familyAlbumId}}/comments
+Authorization: Bearer {{familyToken}}
+Content-Type: application/json
+
+{
+  "content": "HTTP回归：家属端评论互动验证"
+}
+
+> {% 
+  client.test("add activity album comment success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(!!response.body.data.id, "comment id should exist");
+  });
+%}
+
+### 28) 安全密码设置（新增）
+POST {{baseUrl}}/api/family/security/password/set
+Authorization: Bearer {{familyToken}}
+Content-Type: application/json
+
+{
+  "password": "Family#2026"
+}
+
+> {% 
+  client.test("set security password success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(response.body.data === true, "data should be true");
+  });
+%}
+
+### 29) 安全密码校验（新增）
+POST {{baseUrl}}/api/family/security/password/verify
+Authorization: Bearer {{familyToken}}
+Content-Type: application/json
+
+{
+  "scene": "SECURITY",
+  "password": "Family#2026"
+}
+
+> {% 
+  client.test("verify security password success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(response.body.data.passed === true, "password should pass");
+  });
+%}
+
+### 30) 订阅授权状态更新（新增）
+PUT {{baseUrl}}/api/family/notification-settings
+Authorization: Bearer {{familyToken}}
+Content-Type: application/json
+
+{
+  "subscribeAuthorized": true
+}
+
+> {% 
+  client.test("update notification subscribe authorized success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(response.body.data.subscribeAuthorized === true, "subscribe authorized should be true");
+  });
+%}
+
+### 31) 开启自动扣费（新增：授权确认）
+PUT {{baseUrl}}/api/family/payment/auto-pay
+Authorization: Bearer {{familyToken}}
+Content-Type: application/json
+
+{
+  "elderId": {{familyElderId}},
+  "enabled": true,
+  "authorizeConfirmed": true
+}
+
+> {% 
+  client.test("enable auto pay with authorization success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(response.body.data === true, "auto pay should be enabled");
+  });
+%}
+
+### 32) 提交投诉反馈（新增）
+POST {{baseUrl}}/api/family/feedback
+Authorization: Bearer {{familyToken}}
+Content-Type: application/json
+
+{
+  "feedbackType": "COMPLAINT",
+  "serviceType": "投诉建议",
+  "content": "HTTP回归：投诉记录流程验证",
+  "contact": "{{familyPhone}}"
+}
+
+> {% 
+  client.test("submit complaint feedback success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+  });
+%}
+
+### 33) 反馈记录列表（新增）
+GET {{baseUrl}}/api/family/feedback/records?pageNo=1&pageSize=10
+Authorization: Bearer {{familyToken}}
+
+> {% 
+  client.test("list feedback records success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(Array.isArray(response.body.data), "data should be array");
+  });
+%}
+
+### 34) 生成AI评估（新增）
+POST {{baseUrl}}/api/family/assessment-reports/generate-ai
+Authorization: Bearer {{familyToken}}
+Content-Type: application/json
+
+{
+  "elderId": {{familyElderId}},
+  "reportType": "ALL"
+}
+
+> {% 
+  client.test("generate ai assessment reports success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(response.body.data.generatedCount !== undefined, "generated count should exist");
+  });
+%}

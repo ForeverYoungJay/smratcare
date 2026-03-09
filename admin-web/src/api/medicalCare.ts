@@ -1,8 +1,11 @@
 import request, { fetchPage } from '../utils/request'
 import type {
   MedicalCareWorkbenchSummary,
+  MedicalCareWorkbenchSummaryQuery,
+  MedicalRiskTimelinePoint,
   MedicalAlertRuleConfig,
   MedicalUnifiedTaskItem,
+  MedicalUnifiedTaskQuery,
   MedicalCvdAssessment,
   MedicalCvdAssessmentSummary,
   MedicalAiGenerateTaskResponse,
@@ -13,19 +16,22 @@ import type {
   MedicalTcmAssessmentSummary
 } from '../types'
 
-export function getMedicalCareWorkbenchSummary() {
-  return request.get<MedicalCareWorkbenchSummary>('/api/medical-care/workbench/summary')
+export function getMedicalCareWorkbenchSummary(params?: MedicalCareWorkbenchSummaryQuery, config?: Record<string, any>) {
+  return request.get<MedicalCareWorkbenchSummary>('/api/medical-care/workbench/summary', { params, ...(config || {}) })
 }
 
-export function getMedicalHealthCenterSummary(params?: {
-  elderId?: number | string
-  date?: string
-  status?: string
-}) {
-  return request.get<MedicalCareWorkbenchSummary>('/api/medical-care/center/summary', { params })
+export function getMedicalHealthCenterSummary(params?: MedicalCareWorkbenchSummaryQuery, config?: Record<string, any>) {
+  return request.get<MedicalCareWorkbenchSummary>('/api/medical-care/center/summary', { params, ...(config || {}) })
 }
 
-export function getMedicalUnifiedTaskPage(params: any) {
+export function getMedicalRiskTimeline(
+  params?: Pick<MedicalCareWorkbenchSummaryQuery, 'elderId' | 'date' | 'overdueHours'> & { windowDays?: number },
+  config?: Record<string, any>
+) {
+  return request.get<MedicalRiskTimelinePoint[]>('/api/medical-care/workbench/risk-timeline', { params, ...(config || {}) })
+}
+
+export function getMedicalUnifiedTaskPage(params: MedicalUnifiedTaskQuery) {
   return fetchPage<MedicalUnifiedTaskItem>('/api/medical-care/workbench/unified-tasks', params)
 }
 

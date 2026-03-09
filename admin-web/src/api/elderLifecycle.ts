@@ -5,6 +5,7 @@ import type {
   DischargeRequest,
   ChangeLogItem,
   AdmissionRecordItem,
+  AdmissionRecordSummary,
   ChangeLogQuery,
   AdmissionRecordQuery
 } from '../types'
@@ -23,6 +24,10 @@ export function getChangeLogs(params: ChangeLogQuery) {
 
 export function getAdmissionRecords(params: AdmissionRecordQuery) {
   return fetchPage<AdmissionRecordItem>('/api/elder/lifecycle/admissions/page', params)
+}
+
+export function getAdmissionRecordSummary(params: Omit<AdmissionRecordQuery, 'pageNo' | 'pageSize'>) {
+  return request.get<AdmissionRecordSummary>('/api/elder/lifecycle/admissions/summary', { params })
 }
 
 export function exportChangeLogs(params: ChangeLogQuery) {

@@ -32,8 +32,10 @@ import type {
   SmsTaskItem,
   UploadedFileResult,
   ContractLinkageSummary,
+  ContractArchiveRuleInfo,
   ContractAssessmentOverview,
   CrmContractItem,
+  CrmContractStageSummary,
   CrmContractPayload,
   ContractBatchDeleteRequest
 } from '../types'
@@ -46,6 +48,10 @@ export function getLeadPage(params: any, config?: Record<string, any>) {
 
 export function getContractPage(params: any, config?: Record<string, any>) {
   return fetchPage<CrmContractItem>('/api/crm/contracts/page', params, config)
+}
+
+export function getContractStageSummary(params?: { currentOwnerDept?: string }) {
+  return request.get<CrmContractStageSummary>('/api/crm/contracts/stage-summary', { params })
 }
 
 export function getCrmContract(id: number | string) {
@@ -253,6 +259,10 @@ export function getContractLinkageByLead(leadId: number | string) {
 
 export function getContractLinkageByContract(contractId: number | string) {
   return request.get<ContractLinkageSummary>(`/api/crm/contracts/${contractId}/linkage-by-contract`)
+}
+
+export function getContractArchiveRule() {
+  return request.get<ContractArchiveRuleInfo>('/api/crm/contracts/linkage-archive-rule')
 }
 
 export function getContractAssessmentOverview(params: { elderId?: number | string; leadId?: number | string }) {

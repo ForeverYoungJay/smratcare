@@ -1,0 +1,14 @@
+<view class="container">
+  <view class="surface card">
+    <view class="section-title">院内重要联系人</view>
+    <block wx:for="{{contacts}}" wx:key="id">
+      <view class="item">
+        <view>
+          <view class="name">{{item.role}} · {{item.name}}</view>
+          <view class="duty">值班：{{item.duty}}</view>
+        </view>
+        <button class="primary-btn small" data-phone="{{item.phone}}" bindtap="call">拨号</button>
+      </view>
+    </block>
+  </view>
+</view>

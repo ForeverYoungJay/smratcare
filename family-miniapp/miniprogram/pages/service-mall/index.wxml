@@ -1,0 +1,18 @@
+<view class="container">
+  <view class="surface card">
+    <view class="section-title">服务商城</view>
+    <view class="section-subtitle">可为老人购买护理、生活和特色餐饮服务</view>
+
+    <block wx:for="{{catalog}}" wx:key="id">
+      <view class="item">
+        <view class="row-top">
+          <text class="name">{{item.name}}</text>
+          <text class="price">¥{{item.price}}/{{item.unit}}</text>
+        </view>
+        <view class="meta">{{item.category}}</view>
+        <view class="desc">{{item.desc}}</view>
+        <button class="primary-btn action" data-id="{{item.id}}" bindtap="orderNow">立即购买</button>
+      </view>
+    </block>
+  </view>
+</view>

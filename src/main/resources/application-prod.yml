@@ -48,11 +48,86 @@ logging:
     com.zhiyangyun.care: INFO
 
 app:
+  family:
+    legacy-api-enabled: true
+    legacy-api-sunset-date: ${FAMILY_LEGACY_API_SUNSET_DATE:2026-09-30}
+    recharge:
+      auto-close-enabled: ${FAMILY_RECHARGE_AUTO_CLOSE_ENABLED:true}
+      auto-close-cron: "${FAMILY_RECHARGE_AUTO_CLOSE_CRON:0 */5 * * * ?}"
+      prepay-timeout-minutes: ${FAMILY_RECHARGE_PREPAY_TIMEOUT_MINUTES:30}
+      auto-close-batch-size: ${FAMILY_RECHARGE_AUTO_CLOSE_BATCH_SIZE:200}
+      create-abnormal-todo: ${FAMILY_RECHARGE_CREATE_ABNORMAL_TODO:true}
+      auto-pay-settle-enabled: ${FAMILY_RECHARGE_AUTO_PAY_SETTLE_ENABLED:true}
+      auto-pay-settle-cron: "${FAMILY_RECHARGE_AUTO_PAY_SETTLE_CRON:0 */30 * * * ?}"
+      auto-pay-settle-batch-size: ${FAMILY_RECHARGE_AUTO_PAY_SETTLE_BATCH_SIZE:200}
+    wechat-pay:
+      enabled: ${FAMILY_WECHAT_PAY_ENABLED:false}
+      app-id: ${FAMILY_WECHAT_APP_ID:}
+      app-secret: ${FAMILY_WECHAT_APP_SECRET:}
+      merchant-id: ${FAMILY_WECHAT_MERCHANT_ID:}
+      merchant-serial-no: ${FAMILY_WECHAT_MERCHANT_SERIAL_NO:}
+      private-key-pem: ${FAMILY_WECHAT_PRIVATE_KEY_PEM:}
+      api-v3-key: ${FAMILY_WECHAT_API_V3_KEY:}
+      notify-url: ${FAMILY_WECHAT_NOTIFY_URL:https://your-domain.example.com/api/family/payment/wechat/notify}
+      prepay-url: ${FAMILY_WECHAT_PREPAY_URL:https://api.mch.weixin.qq.com/v3/pay/transactions/jsapi}
+      query-url-template: ${FAMILY_WECHAT_QUERY_URL_TEMPLATE:https://api.mch.weixin.qq.com/v3/pay/transactions/out-trade-no/{outTradeNo}?mchid={mchId}}
+      certificates-url: ${FAMILY_WECHAT_CERTIFICATES_URL:https://api.mch.weixin.qq.com/v3/certificates}
+      platform-serial-no: ${FAMILY_WECHAT_PLATFORM_SERIAL_NO:}
+      platform-certificate-pem: ${FAMILY_WECHAT_PLATFORM_CERTIFICATE_PEM:}
+      notify-allowed-skew-seconds: ${FAMILY_WECHAT_NOTIFY_ALLOWED_SKEW_SECONDS:300}
+      skip-notify-signature-verify: ${FAMILY_WECHAT_SKIP_NOTIFY_SIGNATURE_VERIFY:false}
+    wechat-notify:
+      enabled: ${FAMILY_WECHAT_NOTIFY_ENABLED:false}
+      app-id: ${FAMILY_WECHAT_NOTIFY_APP_ID:}
+      app-secret: ${FAMILY_WECHAT_NOTIFY_APP_SECRET:}
+      template-id: ${FAMILY_WECHAT_NOTIFY_TEMPLATE_ID:}
+      page: ${FAMILY_WECHAT_NOTIFY_PAGE:pages/messages/index}
+      mini-program-state: ${FAMILY_WECHAT_NOTIFY_MINI_PROGRAM_STATE:formal}
+      language: ${FAMILY_WECHAT_NOTIFY_LANGUAGE:zh_CN}
+      access-token-url: ${FAMILY_WECHAT_NOTIFY_ACCESS_TOKEN_URL:https://api.weixin.qq.com/cgi-bin/token}
+      subscribe-send-url: ${FAMILY_WECHAT_NOTIFY_SUBSCRIBE_SEND_URL:https://api.weixin.qq.com/cgi-bin/message/subscribe/send}
+      access-token-expire-buffer-seconds: ${FAMILY_WECHAT_NOTIFY_ACCESS_TOKEN_EXPIRE_BUFFER_SECONDS:120}
+      max-retry: ${FAMILY_WECHAT_NOTIFY_MAX_RETRY:3}
+      retry-interval-minutes: ${FAMILY_WECHAT_NOTIFY_RETRY_INTERVAL_MINUTES:5}
+      retry-batch-size: ${FAMILY_WECHAT_NOTIFY_RETRY_BATCH_SIZE:100}
+      retry-cron: "${FAMILY_WECHAT_NOTIFY_RETRY_CRON:0 */5 * * * ?}"
+    sms-code:
+      enabled: ${FAMILY_SMS_CODE_ENABLED:true}
+      provider: ${FAMILY_SMS_CODE_PROVIDER:mock}
+      code-length: ${FAMILY_SMS_CODE_LENGTH:6}
+      expire-seconds: ${FAMILY_SMS_CODE_EXPIRE_SECONDS:300}
+      cooldown-seconds: ${FAMILY_SMS_CODE_COOLDOWN_SECONDS:60}
+      daily-limit: ${FAMILY_SMS_CODE_DAILY_LIMIT:20}
+      max-attempts: ${FAMILY_SMS_CODE_MAX_ATTEMPTS:5}
+      ip-guard-enabled: ${FAMILY_SMS_CODE_IP_GUARD_ENABLED:true}
+      ip-cooldown-seconds: ${FAMILY_SMS_CODE_IP_COOLDOWN_SECONDS:10}
+      ip-daily-limit: ${FAMILY_SMS_CODE_IP_DAILY_LIMIT:120}
+      ip-ban-threshold: ${FAMILY_SMS_CODE_IP_BAN_THRESHOLD:12}
+      ip-ban-minutes: ${FAMILY_SMS_CODE_IP_BAN_MINUTES:30}
+      debug-return-code: ${FAMILY_SMS_CODE_DEBUG_RETURN_CODE:false}
+      code-salt: ${FAMILY_SMS_CODE_SALT:smartcare-family-sms}
+      sign-name: ${FAMILY_SMS_SIGN_NAME:}
+      login-template-code: ${FAMILY_SMS_LOGIN_TEMPLATE_CODE:}
+      security-template-code: ${FAMILY_SMS_SECURITY_TEMPLATE_CODE:}
+      default-template-code: ${FAMILY_SMS_DEFAULT_TEMPLATE_CODE:}
+      aliyun:
+        region-id: ${FAMILY_SMS_ALIYUN_REGION_ID:cn-hangzhou}
+        endpoint: ${FAMILY_SMS_ALIYUN_ENDPOINT:dysmsapi.aliyuncs.com}
+        access-key-id: ${FAMILY_SMS_ALIYUN_ACCESS_KEY_ID:}
+        access-key-secret: ${FAMILY_SMS_ALIYUN_ACCESS_KEY_SECRET:}
   file-storage:
+    provider: ${APP_FILE_STORAGE_PROVIDER:local}
     base-dir: /app/uploads
     url-prefix: /uploads
+    public-base-url: ${APP_FILE_STORAGE_PUBLIC_BASE_URL:}
     max-size-bytes: 10485760
-    allowed-extensions: jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,txt,zip
+    allowed-extensions: jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,txt,zip,mp3,m4a,wav,aac,amr
+    oss:
+      endpoint: ${OSS_ENDPOINT:}
+      bucket: ${OSS_BUCKET:}
+      access-key-id: ${OSS_ACCESS_KEY_ID:}
+      access-key-secret: ${OSS_ACCESS_KEY_SECRET:}
+      base-path: ${OSS_BASE_PATH:smartcare}
   logistics:
     maintenance-todo:
       enabled: true

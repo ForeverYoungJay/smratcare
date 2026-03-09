@@ -1,0 +1,14 @@
+<view class="container">
+  <view class="surface card">
+    <view class="section-title">服务订单</view>
+    <block wx:for="{{orders}}" wx:key="id">
+      <view class="item">
+        <view class="row"><text class="label">服务</text><text class="value">{{item.name}}</text></view>
+        <view class="row"><text class="label">金额</text><text class="value">¥{{item.amount}}</text></view>
+        <view class="row"><text class="label">日期</text><text class="value">{{item.date}}</text></view>
+        <view class="row"><text class="label">状态</text><text class="state">{{item.status}}</text></view>
+      </view>
+    </block>
+    <view class="list-empty" wx:if="{{!orders.length}}">暂无服务订单</view>
+  </view>
+</view>

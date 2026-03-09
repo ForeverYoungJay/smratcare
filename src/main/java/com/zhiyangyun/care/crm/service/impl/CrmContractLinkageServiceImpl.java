@@ -14,6 +14,7 @@ import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
 import com.zhiyangyun.care.crm.model.CrmContractAssessmentContractItem;
 import com.zhiyangyun.care.crm.model.CrmContractAssessmentOverviewResponse;
 import com.zhiyangyun.care.crm.model.CrmContractAssessmentReportItem;
+import com.zhiyangyun.care.crm.model.CrmContractArchiveRuleResponse;
 import com.zhiyangyun.care.crm.model.CrmContractLinkageResponse;
 import com.zhiyangyun.care.crm.model.action.CrmContractAttachmentResponse;
 import com.zhiyangyun.care.crm.service.CrmContractLinkageService;
@@ -23,14 +24,26 @@ import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderAdmissionMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 
 @Service
 public class CrmContractLinkageServiceImpl implements CrmContractLinkageService {
+  private static final String ARCHIVE_ITEM_CONTRACT_ATTACHMENT = "CONTRACT_ATTACHMENT";
+  private static final String ARCHIVE_ITEM_INVOICE_ATTACHMENT = "INVOICE_ATTACHMENT";
+  private static final String ARCHIVE_ITEM_ID_ATTACHMENT = "ID_ATTACHMENT";
+  private static final String ARCHIVE_ITEM_ASSESSMENT_REPORT = "ASSESSMENT_REPORT";
+  private static final String ARCHIVE_RULE_VERSION = "ARCHIVE_RULESET_V2026.03";
+  private static final String ARCHIVE_RULE_TITLE = "合同与票据归档规则";
+
   private final CrmLeadMapper leadMapper;
   private final CrmContractMapper contractMapper;
   private final CrmContractAttachmentMapper attachmentMapper;
@@ -91,6 +104,8 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
       response.setMarketerName(contract.getMarketerName());
       response.setContractNo(firstNonBlank(response.getContractNo(), contract.getContractNo()));
       response.setContractStatus(contract.getContractStatus());
+      response.setFlowStage(contract.getFlowStage());
+      response.setCurrentOwnerDept(contract.getCurrentOwnerDept());
       response.setContractSignedAt(contract.getSignedAt());
       response.setContractExpiryDate(contract.getEffectiveTo());
     }
@@ -100,6 +115,8 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
       response.setMarketerName(firstNonBlank(response.getMarketerName(), lead.getMarketerName()));
       response.setContractNo(firstNonBlank(response.getContractNo(), lead.getContractNo()));
       response.setContractStatus(firstNonBlank(response.getContractStatus(), lead.getContractStatus()));
+      response.setFlowStage(firstNonBlank(response.getFlowStage(), lead.getFlowStage()));
+      response.setCurrentOwnerDept(firstNonBlank(response.getCurrentOwnerDept(), lead.getCurrentOwnerDept()));
       if (response.getContractSignedAt() == null) {
         response.setContractSignedAt(lead.getContractSignedAt());
       }
@@ -110,6 +127,7 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
 
     fillBillingSummary(response, elderId, tenantId);
     fillAttachments(response, tenantId, contract == null ? null : contract.getId(), lead == null ? null : lead.getId(), response.getContractNo());
+    fillArchiveCompleteness(response, tenantId);
     return response;
   }
 
@@ -134,6 +152,9 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
     }
     response.setContractNo(contract == null ? lead.getContractNo() : contract.getContractNo());
     response.setContractStatus(contract == null ? lead.getContractStatus() : contract.getContractStatus());
+    response.setFlowStage(contract == null ? lead.getFlowStage() : firstNonBlank(contract.getFlowStage(), lead.getFlowStage()));
+    response.setCurrentOwnerDept(
+        contract == null ? lead.getCurrentOwnerDept() : firstNonBlank(contract.getCurrentOwnerDept(), lead.getCurrentOwnerDept()));
     response.setContractSignedAt(contract == null ? lead.getContractSignedAt() : contract.getSignedAt());
     response.setContractExpiryDate(contract == null ? lead.getContractExpiryDate() : contract.getEffectiveTo());
     response.setOrgName(contract == null ? lead.getOrgName() : firstNonBlank(contract.getOrgName(), lead.getOrgName()));
@@ -154,6 +175,7 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
     }
 
     fillAttachments(response, tenantId, contract == null ? null : contract.getId(), leadId, response.getContractNo());
+    fillArchiveCompleteness(response, tenantId);
     return response;
   }
 
@@ -166,11 +188,9 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
     if (contract == null || Integer.valueOf(1).equals(contract.getIsDeleted()) || !tenantId.equals(contract.getTenantId())) {
       return null;
     }
+    CrmContractLinkageResponse leadLinkage = null;
     if (contract.getLeadId() != null) {
-      CrmContractLinkageResponse byLead = getByLeadId(tenantId, contract.getLeadId());
-      if (byLead != null) {
-        return byLead;
-      }
+      leadLinkage = getByLeadId(tenantId, contract.getLeadId());
     }
     CrmContractLinkageResponse response = new CrmContractLinkageResponse();
     response.setLeadId(contract.getLeadId());
@@ -182,12 +202,28 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
     response.setMarketerName(contract.getMarketerName());
     response.setContractNo(contract.getContractNo());
     response.setContractStatus(contract.getContractStatus());
+    response.setFlowStage(contract.getFlowStage());
+    response.setCurrentOwnerDept(contract.getCurrentOwnerDept());
     response.setContractSignedAt(contract.getSignedAt());
     response.setContractExpiryDate(contract.getEffectiveTo());
-    if (contract.getElderId() != null) {
-      fillBillingSummary(response, contract.getElderId(), tenantId);
+    if (leadLinkage != null) {
+      response.setElderId(response.getElderId() == null ? leadLinkage.getElderId() : response.getElderId());
+      response.setElderName(firstNonBlank(response.getElderName(), leadLinkage.getElderName()));
+      response.setElderPhone(firstNonBlank(response.getElderPhone(), leadLinkage.getElderPhone()));
+      response.setOrgName(firstNonBlank(response.getOrgName(), leadLinkage.getOrgName()));
+      response.setMarketerName(firstNonBlank(response.getMarketerName(), leadLinkage.getMarketerName()));
+      if (response.getAdmissionDate() == null) {
+        response.setAdmissionDate(leadLinkage.getAdmissionDate());
+      }
+      if (response.getDepositAmount() == null) {
+        response.setDepositAmount(leadLinkage.getDepositAmount());
+      }
+    }
+    if (response.getElderId() != null) {
+      fillBillingSummary(response, response.getElderId(), tenantId);
     }
     fillAttachments(response, tenantId, contractId, contract.getLeadId(), contract.getContractNo());
+    fillArchiveCompleteness(response, tenantId);
     return response;
   }
 
@@ -218,6 +254,26 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
         .orderByDesc(AssessmentRecord::getUpdateTime));
     response.setTotalReportCount(records.size());
     attachReportsByContract(contractItems, records, response);
+    return response;
+  }
+
+  @Override
+  public CrmContractArchiveRuleResponse getArchiveRule(Long tenantId) {
+    CrmContractArchiveRuleResponse response = new CrmContractArchiveRuleResponse();
+    response.setRuleVersion(ARCHIVE_RULE_VERSION);
+    response.setTitle(ARCHIVE_RULE_TITLE);
+    response.setDescription("规则会根据合同阶段、账单与押金情况自动评估归档完整度，并生成缺失项。");
+    response.setRequiredItems(List.of(
+        archiveItemLabel(ARCHIVE_ITEM_CONTRACT_ATTACHMENT),
+        archiveItemLabel(ARCHIVE_ITEM_INVOICE_ATTACHMENT),
+        archiveItemLabel(ARCHIVE_ITEM_ID_ATTACHMENT),
+        archiveItemLabel(ARCHIVE_ITEM_ASSESSMENT_REPORT)));
+    response.setStageNotes(List.of(
+        "待评估阶段可暂不要求评估报告归档。",
+        "存在押金或账单记录时，必须归档发票/收据。",
+        "身份证/医保/户口等证件类附件至少需归档一项。",
+        "已签署或已办理入住阶段要求合同附件与证件类附件齐备。"));
+    response.setGeneratedAt(LocalDateTime.now());
     return response;
   }
 
@@ -639,6 +695,225 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
     }).toList();
     response.setAttachments(records);
     response.setAttachmentCount(records.size());
+  }
+
+  private void fillArchiveCompleteness(CrmContractLinkageResponse response, Long tenantId) {
+    if (response == null) {
+      return;
+    }
+    List<CrmContractAttachmentResponse> attachments = response.getAttachments() == null
+        ? Collections.emptyList()
+        : response.getAttachments();
+
+    boolean hasContractAttachment = hasContractAttachment(attachments);
+    boolean hasInvoiceAttachment = hasInvoiceAttachment(attachments);
+    boolean hasIdAttachment = hasIdAttachment(attachments);
+    boolean hasAssessmentReport = hasAssessmentReport(tenantId, response.getElderId());
+
+    Set<String> requiredItems = resolveRequiredArchiveItems(response);
+    Set<String> missingItems = new LinkedHashSet<>();
+    if (requiredItems.contains(ARCHIVE_ITEM_CONTRACT_ATTACHMENT) && !hasContractAttachment) {
+      missingItems.add(ARCHIVE_ITEM_CONTRACT_ATTACHMENT);
+    }
+    if (requiredItems.contains(ARCHIVE_ITEM_INVOICE_ATTACHMENT) && !hasInvoiceAttachment) {
+      missingItems.add(ARCHIVE_ITEM_INVOICE_ATTACHMENT);
+    }
+    if (requiredItems.contains(ARCHIVE_ITEM_ID_ATTACHMENT) && !hasIdAttachment) {
+      missingItems.add(ARCHIVE_ITEM_ID_ATTACHMENT);
+    }
+    if (requiredItems.contains(ARCHIVE_ITEM_ASSESSMENT_REPORT) && !hasAssessmentReport) {
+      missingItems.add(ARCHIVE_ITEM_ASSESSMENT_REPORT);
+    }
+
+    int requiredSize = requiredItems.size();
+    int completedSize = requiredSize - missingItems.size();
+    int archiveScore = requiredSize <= 0
+        ? 100
+        : Math.max(0, Math.min(100, Math.round((completedSize * 100f) / requiredSize)));
+
+    response.setHasContractAttachment(hasContractAttachment);
+    response.setHasInvoiceAttachment(hasInvoiceAttachment);
+    response.setHasIdAttachment(hasIdAttachment);
+    response.setHasAssessmentReport(hasAssessmentReport);
+    response.setArchiveScore(archiveScore);
+    response.setArchiveLevel(resolveArchiveLevel(archiveScore, missingItems.isEmpty()));
+    response.setMissingRequiredAttachmentTypes(new ArrayList<>(missingItems));
+    response.setArchiveRuleVersion(ARCHIVE_RULE_VERSION);
+    response.setArchiveRuleTips(buildArchiveRuleTips(requiredItems, missingItems));
+    response.setGeneratedAt(LocalDateTime.now());
+  }
+
+  private List<String> buildArchiveRuleTips(Set<String> requiredItems, Set<String> missingItems) {
+    List<String> tips = new ArrayList<>();
+    if (requiredItems != null && !requiredItems.isEmpty()) {
+      String requiredText = requiredItems.stream().map(this::archiveItemLabel).reduce((a, b) -> a + "、" + b).orElse("-");
+      tips.add("当前要求项：" + requiredText);
+    }
+    if (missingItems != null && !missingItems.isEmpty()) {
+      String missingText = missingItems.stream().map(this::archiveItemLabel).reduce((a, b) -> a + "、" + b).orElse("-");
+      tips.add("待补齐：" + missingText);
+    } else {
+      tips.add("当前要求项均已满足。");
+    }
+    tips.add("评估规则版本：" + ARCHIVE_RULE_VERSION);
+    return tips;
+  }
+
+  private String archiveItemLabel(String code) {
+    if (ARCHIVE_ITEM_CONTRACT_ATTACHMENT.equals(code)) {
+      return "合同附件";
+    }
+    if (ARCHIVE_ITEM_INVOICE_ATTACHMENT.equals(code)) {
+      return "发票/收据";
+    }
+    if (ARCHIVE_ITEM_ID_ATTACHMENT.equals(code)) {
+      return "身份证/证件";
+    }
+    if (ARCHIVE_ITEM_ASSESSMENT_REPORT.equals(code)) {
+      return "评估报告";
+    }
+    return code;
+  }
+
+  private Set<String> resolveRequiredArchiveItems(CrmContractLinkageResponse response) {
+    Set<String> requiredItems = new LinkedHashSet<>();
+    requiredItems.add(ARCHIVE_ITEM_CONTRACT_ATTACHMENT);
+    requiredItems.add(ARCHIVE_ITEM_ID_ATTACHMENT);
+    if (shouldRequireInvoiceAttachment(response)) {
+      requiredItems.add(ARCHIVE_ITEM_INVOICE_ATTACHMENT);
+    }
+    if (shouldRequireAssessmentReport(response)) {
+      requiredItems.add(ARCHIVE_ITEM_ASSESSMENT_REPORT);
+    }
+    return requiredItems;
+  }
+
+  private boolean shouldRequireInvoiceAttachment(CrmContractLinkageResponse response) {
+    if (response == null) {
+      return false;
+    }
+    if (response.getBillCount() != null && response.getBillCount() > 0) {
+      return true;
+    }
+    BigDecimal depositAmount = defaultAmount(response.getDepositAmount());
+    return depositAmount.compareTo(BigDecimal.ZERO) > 0;
+  }
+
+  private boolean shouldRequireAssessmentReport(CrmContractLinkageResponse response) {
+    if (response == null || response.getElderId() == null) {
+      return false;
+    }
+    String flowStage = normalizeUpper(response.getFlowStage());
+    return !"PENDING_ASSESSMENT".equals(flowStage);
+  }
+
+  private boolean hasContractAttachment(List<CrmContractAttachmentResponse> attachments) {
+    return attachments.stream().anyMatch(item -> {
+      String attachmentType = normalizeUpper(item.getAttachmentType());
+      if ("CONTRACT".equals(attachmentType)) {
+        return true;
+      }
+      String fileName = normalizeLower(item.getFileName());
+      return fileName.contains("合同") || fileName.contains("contract");
+    });
+  }
+
+  private boolean hasInvoiceAttachment(List<CrmContractAttachmentResponse> attachments) {
+    return attachments.stream().anyMatch(item -> {
+      String attachmentType = normalizeUpper(item.getAttachmentType());
+      if ("INVOICE".equals(attachmentType)) {
+        return true;
+      }
+      String fileName = normalizeLower(item.getFileName());
+      return fileName.contains("发票")
+          || fileName.contains("收据")
+          || fileName.contains("invoice")
+          || fileName.contains("receipt");
+    });
+  }
+
+  private boolean hasIdAttachment(List<CrmContractAttachmentResponse> attachments) {
+    return attachments.stream().anyMatch(item -> {
+      String attachmentType = normalizeUpper(item.getAttachmentType());
+      if ("ID_CARD".equals(attachmentType)
+          || "IDENTITY".equals(attachmentType)
+          || "HOUSEHOLD".equals(attachmentType)
+          || "MEDICAL_INSURANCE".equals(attachmentType)) {
+        return true;
+      }
+      if (attachmentType.contains("ID") || attachmentType.contains("IDENT")) {
+        return true;
+      }
+      String fileName = normalizeLower(item.getFileName());
+      return fileName.contains("身份证")
+          || fileName.contains("户口")
+          || fileName.contains("医保")
+          || fileName.contains("idcard")
+          || fileName.contains("identity");
+    });
+  }
+
+  private boolean hasAssessmentReport(Long tenantId, Long elderId) {
+    if (tenantId == null || elderId == null) {
+      return false;
+    }
+    List<AssessmentRecord> records = assessmentRecordMapper.selectList(Wrappers.lambdaQuery(AssessmentRecord.class)
+        .eq(AssessmentRecord::getIsDeleted, 0)
+        .eq(AssessmentRecord::getOrgId, tenantId)
+        .eq(AssessmentRecord::getElderId, elderId)
+        .eq(AssessmentRecord::getAssessmentType, "ADMISSION")
+        .in(AssessmentRecord::getStatus, List.of("COMPLETED", "ARCHIVED"))
+        .select(
+            AssessmentRecord::getStatus,
+            AssessmentRecord::getReportFileUrl,
+            AssessmentRecord::getReportFileName,
+            AssessmentRecord::getAssessmentDate)
+        .orderByDesc(AssessmentRecord::getAssessmentDate)
+        .last("LIMIT 30"));
+    return records.stream().anyMatch(this::isAssessmentReportReady);
+  }
+
+  private boolean isAssessmentReportReady(AssessmentRecord record) {
+    if (record == null) {
+      return false;
+    }
+    if (hasText(record.getReportFileUrl()) || hasText(record.getReportFileName())) {
+      return true;
+    }
+    return record.getAssessmentDate() != null
+        && ("ARCHIVED".equals(normalizeUpper(record.getStatus()))
+            || "COMPLETED".equals(normalizeUpper(record.getStatus())));
+  }
+
+  private String resolveArchiveLevel(int archiveScore, boolean noMissingRequiredItems) {
+    if (archiveScore >= 100 && noMissingRequiredItems) {
+      return "COMPLETE";
+    }
+    if (archiveScore >= 80) {
+      return "HIGH";
+    }
+    if (archiveScore >= 50) {
+      return "MEDIUM";
+    }
+    return "LOW";
+  }
+
+  private String normalizeUpper(String text) {
+    if (text == null) {
+      return "";
+    }
+    return text.trim().toUpperCase(Locale.ROOT);
+  }
+
+  private String normalizeLower(String text) {
+    if (text == null) {
+      return "";
+    }
+    return text.trim().toLowerCase(Locale.ROOT);
+  }
+
+  private boolean hasText(String value) {
+    return value != null && !value.isBlank();
   }
 
   private BigDecimal defaultAmount(BigDecimal value) {

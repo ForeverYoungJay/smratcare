@@ -2,8 +2,11 @@ import request, { fetchPage } from '../utils/request';
 export function getHrStaffPage(params) {
     return fetchPage('/api/admin/hr/staff/page', params);
 }
-export function getHrWorkbenchSummary(params) {
-    return request.get('/api/admin/hr/workbench/summary', { params });
+export function getHrStaffBirthdayPage(params) {
+    return fetchPage('/api/admin/hr/staff/birthday/page', params);
+}
+export function getHrWorkbenchSummary(params, config) {
+    return request.get('/api/admin/hr/workbench/summary', { params, ...(config || {}) });
 }
 export function getHrContractReminderPage(params) {
     return fetchPage('/api/admin/hr/contract/reminder/page', params);
@@ -56,8 +59,8 @@ export function getHrProfileCertificatePage(params) {
 export function createHrProfileCertificate(data) {
     return request.post('/api/admin/hr/profile/certificate', data);
 }
-export function getHrProfileCertificateReminderPage(params) {
-    return fetchPage('/api/admin/hr/profile/certificate/reminder/page', params);
+export function getHrProfileCertificateReminderPage(params, config) {
+    return fetchPage('/api/admin/hr/profile/certificate/reminder/page', params, config);
 }
 export function getHrAccessControlPage(params) {
     return fetchPage('/api/admin/hr/integration/access-control/page', params);

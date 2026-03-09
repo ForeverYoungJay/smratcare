@@ -22,6 +22,7 @@
             </div>
             <div class="hero-search">
               <a-auto-complete
+                ref="globalSearchRef"
                 v-model:value="searchKeyword"
                 :options="searchOptions"
                 :filter-option="false"
@@ -32,6 +33,7 @@
               >
                 <a-input-search enter-button="搜索" @search="submitSearch" />
               </a-auto-complete>
+              <div class="hero-search-hint">快捷键：/ 或 Ctrl+K 聚焦搜索，Esc 清空关键词</div>
             </div>
           </div>
           <div class="hero-actions">
@@ -125,7 +127,7 @@
                   </a-radio-group>
                   <a-space size="small" wrap>
                     <a-tag color="purple">阈值 {{ thresholdConfig.configVersion || '--' }}</a-tag>
-                    <a-button size="small" @click="thresholdConfigOpen = true">阈值设置</a-button>
+                    <a-button size="small" @click="openThresholdConfigModal">阈值设置</a-button>
                     <a-button size="small" @click="markAllReminderRead">全部已读</a-button>
                   </a-space>
                 </div>
@@ -1015,25 +1017,44 @@
     <a-modal
       v-model:open="thresholdConfigOpen"
       title="提醒中心阈值设置"
-      ok-text="保存配置"
-      cancel-text="恢复默认"
-      @ok="saveThresholdConfig"
-      @cancel="resetThresholdConfig"
+      @cancel="closeThresholdConfigModal"
     >
       <a-form layout="vertical">
         <a-form-item label="护理异常任务阈值（条）">
-          <a-input-number v-model:value="thresholdConfig.abnormalTaskThreshold" :min="1" :max="999" style="width: 100%;" />
+          <a-input-number v-model:value="thresholdDraft.abnormalTaskThreshold" :min="1" :max="999" style="width: 100%;" />
         </a-form-item>
         <a-form-item label="库存不足阈值（项）">
-          <a-input-number v-model:value="thresholdConfig.inventoryAlertThreshold" :min="1" :max="9999" style="width: 100%;" />
+          <a-input-number v-model:value="thresholdDraft.inventoryAlertThreshold" :min="1" :max="9999" style="width: 100%;" />
         </a-form-item>
         <a-form-item label="床位高占用阈值（%）">
-          <a-input-number v-model:value="thresholdConfig.bedOccupancyThreshold" :min="1" :max="100" style="width: 100%;" />
+          <a-input-number v-model:value="thresholdDraft.bedOccupancyThreshold" :min="1" :max="100" style="width: 100%;" />
         </a-form-item>
         <a-form-item label="收入环比下滑阈值（%）">
-          <a-input-number v-model:value="thresholdConfig.revenueDropThreshold" :min="1" :max="100" style="width: 100%;" />
+          <a-input-number v-model:value="thresholdDraft.revenueDropThreshold" :min="1" :max="100" style="width: 100%;" />
         </a-form-item>
       </a-form>
+      <div class="threshold-modal-preset">
+        <span class="hint-text">快捷预设</span>
+        <a-space wrap>
+          <a-button
+            v-for="preset in thresholdPresets"
+            :key="preset.label"
+            size="small"
+            @click="applyThresholdPreset(preset.snapshot)"
+          >
+            {{ preset.label }}
+          </a-button>
+        </a-space>
+      </div>
+      <a-alert
+        v-if="thresholdDraftDirty"
+        type="warning"
+        show-icon
+        message="当前有未保存阈值修改，关闭弹窗将自动撤销。"
+        style="margin: 8px 0;"
+      />
+      <div class="hint-text" style="margin-bottom: 6px;">草稿阈值命中预览</div>
+      <ThresholdPreviewList :rows="thresholdDraftPreviewRows" />
       <a-divider style="margin: 8px 0;" />
       <div class="hint-text" style="margin-bottom: 6px;">最近阈值变更</div>
       <a-list size="small" :data-source="thresholdLogs.slice(0, 4)" :locale="{ emptyText: '暂无变更记录' }">
@@ -1042,10 +1063,22 @@
             <span class="hint-text">
               {{ dayjs(item.changedAt).format('YYYY-MM-DD HH:mm:ss') }}
               · {{ item.source === 'dashboard' ? '仪表盘' : '首页' }}
+              · 异常≥{{ item.abnormalTaskThreshold }}
+              · 库存≥{{ item.inventoryAlertThreshold }}
+              · 床位≥{{ item.bedOccupancyThreshold }}%
+              · 收入≤-{{ item.revenueDropThreshold }}%
             </span>
           </a-list-item>
         </template>
       </a-list>
+      <template #footer>
+        <a-space>
+          <a-button @click="closeThresholdConfigModal">关闭</a-button>
+          <a-button :disabled="!thresholdDraftDirty" @click="rollbackThresholdDraft">撤销草稿</a-button>
+          <a-button @click="resetThresholdConfig">恢复默认</a-button>
+          <a-button type="primary" :disabled="!thresholdDraftDirty" @click="saveThresholdConfig">保存配置</a-button>
+        </a-space>
+      </template>
     </a-modal>
 
   </PageContainer>
@@ -1063,12 +1096,14 @@ import interactionPlugin from '@fullcalendar/interaction'
 import VChart from 'vue-echarts'
 import PageContainer from '../components/PageContainer.vue'
 import StatefulBlock from '../components/StatefulBlock.vue'
+import ThresholdPreviewList from '../components/ThresholdPreviewList.vue'
 import { useUserStore } from '../stores/user'
 import {
   createOaTask,
   getOaTaskCalendar,
   getPortalSummary,
   getTodoSummary,
+  getOaTaskSummary,
   getApprovalSummary,
   updateOaTask,
   completeOaTask,
@@ -1101,8 +1136,17 @@ import {
   loadThresholdSnapshot,
   saveThresholdSnapshot,
   thresholdPulseKey,
-  type ThresholdChangeLog
+  type ThresholdChangeLog,
+  type ThresholdSnapshot
 } from '../utils/dashboardThreshold'
+import {
+  buildThresholdQuery,
+  DASHBOARD_THRESHOLD_PRESETS,
+  mergeThresholdConfig,
+  thresholdSnapshotsEqual,
+  toThresholdSnapshot
+} from '../utils/dashboardQuery'
+import { buildThresholdPreviewRows } from '../utils/dashboardThresholdPreview'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -1127,6 +1171,7 @@ const editingScheduleId = ref<string | number | null>(null)
 const dayEventDrawerOpen = ref(false)
 const selectedCalendarDateText = ref(dayjs().format('YYYY-MM-DD'))
 const reminderCardRef = ref<any>(null)
+const globalSearchRef = ref<any>(null)
 const { departmentOptions, searchDepartments } = useDepartmentOptions({ pageSize: 240, preloadSize: 500 })
 const { staffOptions, searchStaff } = useStaffOptions({ pageSize: 300, preloadSize: 500 })
 const visibleCalendarTypes = ref<Array<'PERSONAL' | 'WORK' | 'DAILY' | 'COLLAB'>>(['PERSONAL', 'WORK', 'DAILY', 'COLLAB'])
@@ -1162,6 +1207,7 @@ const lastSyncSource = ref('初始化')
 let portalSyncTimer: number | undefined
 let portalVisibleHandler: (() => void) | null = null
 let calendarStorageHandler: ((event: StorageEvent) => void) | null = null
+let portalHotkeyHandler: ((event: KeyboardEvent) => void) | null = null
 const currentCalendarView = ref<'dayGridMonth' | 'dayGridWeek' | 'dayGridDay'>('dayGridMonth')
 const conflictPolicy = ref<'WARN' | 'BLOCK' | 'ALLOW'>('WARN')
 
@@ -1319,7 +1365,8 @@ const summary = reactive<OaPortalSummary>({
 const myTodoSummary = reactive({
   pendingApprovalCount: 0,
   openTodoCount: 0,
-  timeoutApprovalCount: 0
+  timeoutApprovalCount: 0,
+  ongoingTaskCount: 0
 })
 
 const dashboard = ref<DashboardSummary>({
@@ -1348,13 +1395,31 @@ const dashboard = ref<DashboardSummary>({
   averageMonthlyRevenue: 0,
   revenueGrowthRate: 0
 })
-const thresholdConfig = ref<DashboardThresholdDefaults>({
+const defaultThresholdConfig: DashboardThresholdDefaults = {
   abnormalTaskThreshold: 3,
   inventoryAlertThreshold: 10,
   bedOccupancyThreshold: 95,
   revenueDropThreshold: 5,
   configVersion: '--'
-})
+}
+const thresholdConfig = ref<DashboardThresholdDefaults>({ ...defaultThresholdConfig })
+const thresholdDraft = ref<ThresholdSnapshot>(toThresholdSnapshot(defaultThresholdConfig))
+const thresholdSavedSnapshot = ref<ThresholdSnapshot>(toThresholdSnapshot(defaultThresholdConfig))
+const thresholdPresets = DASHBOARD_THRESHOLD_PRESETS
+const thresholdDraftDirty = computed(() =>
+  !thresholdSnapshotsEqual(thresholdDraft.value, thresholdSavedSnapshot.value)
+)
+const thresholdDraftPreviewRows = computed(() =>
+  buildThresholdPreviewRows(
+    {
+      abnormalCount: Number(dashboard.value.abnormalTasksToday || 0),
+      inventoryCount: Number(summary.inventoryLowStockCount || 0),
+      bedOccupancyRate: Number(dashboard.value.bedOccupancyRate || 0),
+      revenueGrowthRate: Number(dashboard.value.revenueGrowthRate || 0)
+    },
+    thresholdDraft.value
+  )
+)
 
 const financeOverview = ref<FinanceWorkbenchOverview | null>(null)
 const hrSummary = ref<HrWorkbenchSummary | null>(null)
@@ -1502,28 +1567,46 @@ function persistAutoSyncSetting() {
 async function loadThresholdConfig() {
   try {
     const defaults = await getDashboardThresholdDefaults()
-    thresholdConfig.value = { ...defaults }
+    thresholdConfig.value = mergeThresholdConfig(defaults)
   } catch {}
   const snapshot = loadThresholdSnapshot(userStore.staffInfo?.id)
   if (snapshot) {
-    thresholdConfig.value = {
-      ...thresholdConfig.value,
-      ...snapshot,
-      configVersion: thresholdConfig.value.configVersion
-    }
+    thresholdConfig.value = mergeThresholdConfig(thresholdConfig.value, snapshot)
   }
   thresholdLogs.value = loadThresholdLogs(userStore.staffInfo?.id)
+  thresholdSavedSnapshot.value = toThresholdSnapshot(thresholdConfig.value)
+  thresholdDraft.value = toThresholdSnapshot(thresholdConfig.value)
+}
+
+function openThresholdConfigModal() {
+  thresholdDraft.value = toThresholdSnapshot(thresholdConfig.value)
+  thresholdConfigOpen.value = true
+}
+
+function closeThresholdConfigModal() {
+  thresholdDraft.value = toThresholdSnapshot(thresholdConfig.value)
+  thresholdConfigOpen.value = false
+}
+
+function rollbackThresholdDraft() {
+  thresholdDraft.value = toThresholdSnapshot(thresholdSavedSnapshot.value)
+}
+
+function applyThresholdPreset(snapshot: ThresholdSnapshot) {
+  thresholdDraft.value = toThresholdSnapshot(snapshot)
 }
 
 function saveThresholdConfig() {
   try {
-    const snapshot = {
-      abnormalTaskThreshold: Number(thresholdConfig.value.abnormalTaskThreshold || 0),
-      inventoryAlertThreshold: Number(thresholdConfig.value.inventoryAlertThreshold || 0),
-      bedOccupancyThreshold: Number(thresholdConfig.value.bedOccupancyThreshold || 0),
-      revenueDropThreshold: Number(thresholdConfig.value.revenueDropThreshold || 0)
+    const snapshot = toThresholdSnapshot(thresholdDraft.value)
+    if (!thresholdDraftDirty.value) {
+      message.info('阈值未变化，无需保存')
+      thresholdConfigOpen.value = false
+      return
     }
     thresholdLogs.value = saveThresholdSnapshot(userStore.staffInfo?.id, snapshot, 'portal')
+    thresholdConfig.value = mergeThresholdConfig(thresholdConfig.value, snapshot)
+    thresholdSavedSnapshot.value = snapshot
     message.success('阈值配置已保存')
     thresholdConfigOpen.value = false
   } catch {
@@ -1588,15 +1671,15 @@ function rowStatusExpenseSpan(target: 'bedStatus' | 'expense') {
 }
 
 function goRiskItem(item: { route: string }) {
-  const hasQuery = item.route.includes('?')
-  const query = [
-    'fromSource=portal',
-    `abnormalTaskThreshold=${Number(thresholdConfig.value.abnormalTaskThreshold || 0)}`,
-    `inventoryAlertThreshold=${Number(thresholdConfig.value.inventoryAlertThreshold || 0)}`,
-    `bedOccupancyThreshold=${Number(thresholdConfig.value.bedOccupancyThreshold || 0)}`,
-    `revenueDropThreshold=${Number(thresholdConfig.value.revenueDropThreshold || 0)}`
-  ].join('&')
-  go(`${item.route}${hasQuery ? '&' : '?'}${query}`)
+  const resolved = router.resolve(item.route)
+  router.push({
+    path: resolved.path,
+    query: {
+      ...resolved.query,
+      fromSource: 'portal',
+      ...buildThresholdQuery(thresholdConfig.value)
+    }
+  })
 }
 
 const customCardColSpan = computed(() => {
@@ -1644,7 +1727,7 @@ const groupedCustomCards = computed(() => {
 const myTodoStats = computed(() => [
   { title: '待审批流程', value: myTodoSummary.pendingApprovalCount || 0, route: '/oa/approval?scope=PENDING_REVIEW' },
   { title: '待处理任务', value: myTodoSummary.openTodoCount || 0, route: '/oa/todo' },
-  { title: '待确认事项', value: summary.ongoingTaskCount || 0, route: '/oa/work-execution/task' },
+  { title: '待确认事项', value: myTodoSummary.ongoingTaskCount || 0, route: '/oa/work-execution/task' },
   { title: '超时未处理', value: myTodoSummary.timeoutApprovalCount || 0, route: '/oa/approval?scope=PENDING_REVIEW&overdue=1' }
 ])
 
@@ -1903,7 +1986,7 @@ const expenseSections = computed(() => {
       rows: [
         { label: '本月报销金额', value: money(monthExpenseCount), route: '/hr/expense/approval-flow' },
         { label: '待报销金额', value: money(monthExpenseCount), route: '/hr/expense/training-reimburse' },
-        { label: '待审批报销', value: `${summary.pendingApprovalCount || 0} 条`, route: '/hr/expense/approval-flow' }
+        { label: '待审批报销', value: `${myTodoSummary.pendingApprovalCount || 0} 条`, route: '/hr/expense/approval-flow' }
       ]
     },
     {
@@ -1918,7 +2001,7 @@ const expenseSections = computed(() => {
       title: '发票夹',
       rows: [
         { label: '已录入发票数量', value: `${invoiceCount} 张`, route: '/finance/fees/payment-and-invoice' },
-        { label: '待报销发票', value: `${summary.openTodoCount || 0} 张`, route: '/finance/fees/payment-and-invoice' },
+        { label: '待报销发票', value: `${myTodoSummary.openTodoCount || 0} 张`, route: '/finance/fees/payment-and-invoice' },
         { label: '本月发票金额', value: money(financeOverview.value?.cashier?.todayInvoiceAmount || 0), route: '/finance/reconcile/invoice' }
       ]
     }
@@ -3163,6 +3246,22 @@ function buildOptionLabel(entry: { title: string; route: string }, score?: numbe
     : `${entry.title} · ${entry.route}`
 }
 
+function isEditableTarget(target: EventTarget | null) {
+  const element = target as HTMLElement | null
+  if (!element) return false
+  if (element.isContentEditable) return true
+  const tagName = String(element.tagName || '').toLowerCase()
+  return tagName === 'input' || tagName === 'textarea' || tagName === 'select'
+}
+
+function focusGlobalSearch() {
+  const root = globalSearchRef.value?.$el as HTMLElement | undefined
+  const input = root?.querySelector('input') as HTMLInputElement | null
+  if (!input) return
+  input.focus()
+  input.select()
+}
+
 function updateSearchOptions(keyword?: string) {
   const text = String(keyword || searchKeyword.value || '').trim()
   if (!text) {
@@ -4026,13 +4125,15 @@ async function loadSummary() {
 }
 
 async function loadMyTodoSummary() {
-  const [todo, approval] = await Promise.all([
+  const [todo, approval, task] = await Promise.all([
     getTodoSummary({ status: 'OPEN', mineOnly: true }),
-    getApprovalSummary({ pendingMine: true })
+    getApprovalSummary({ pendingMine: true }),
+    getOaTaskSummary({ status: 'OPEN', mineOnly: true })
   ])
   myTodoSummary.openTodoCount = Number(todo?.openCount || 0)
   myTodoSummary.pendingApprovalCount = Number(approval?.pendingCount || 0)
   myTodoSummary.timeoutApprovalCount = Number(approval?.timeoutPendingCount || 0)
+  myTodoSummary.ongoingTaskCount = Number(task?.openCount || 0)
 }
 
 async function loadCalendar() {
@@ -4306,14 +4407,34 @@ onMounted(() => {
     }
   }
   window.addEventListener('storage', calendarStorageHandler)
+  portalHotkeyHandler = (event: KeyboardEvent) => {
+    const key = String(event.key || '').toLowerCase()
+    if ((event.ctrlKey || event.metaKey) && key === 'k') {
+      event.preventDefault()
+      focusGlobalSearch()
+      return
+    }
+    if (event.key === '/' && !isEditableTarget(event.target)) {
+      event.preventDefault()
+      focusGlobalSearch()
+      return
+    }
+    if (event.key === 'Escape' && !isEditableTarget(event.target) && searchKeyword.value) {
+      searchKeyword.value = ''
+      updateSearchOptions('')
+    }
+  }
+  window.addEventListener('keydown', portalHotkeyHandler)
 })
 
 onBeforeUnmount(() => {
   if (portalSyncTimer) window.clearInterval(portalSyncTimer)
   if (portalVisibleHandler) document.removeEventListener('visibilitychange', portalVisibleHandler)
   if (calendarStorageHandler) window.removeEventListener('storage', calendarStorageHandler)
+  if (portalHotkeyHandler) window.removeEventListener('keydown', portalHotkeyHandler)
   portalVisibleHandler = null
   calendarStorageHandler = null
+  portalHotkeyHandler = null
 })
 </script>
 
@@ -4476,6 +4597,12 @@ onBeforeUnmount(() => {
 
 .hero-search {
   margin-top: 10px;
+}
+
+.hero-search-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #64748b;
 }
 
 .section-row {
@@ -4857,6 +4984,15 @@ onBeforeUnmount(() => {
 .approval-opinion-text {
   max-width: 280px;
   color: #334155;
+}
+
+.threshold-modal-preset {
+  margin-top: 2px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 @media (max-width: 768px) {

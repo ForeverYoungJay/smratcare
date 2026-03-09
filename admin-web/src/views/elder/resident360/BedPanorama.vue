@@ -32,7 +32,9 @@
         </div>
         <div class="selector-group">
           <a-button @click="openBedMap">查看床位全景</a-button>
-          <a-button type="primary" @click="openBedManage">床位管理管理</a-button>
+          <a-button type="primary" @click="openBedManage">床位管理</a-button>
+          <a-button @click="resetFilters">重置筛选</a-button>
+          <a-button @click="copyShareLink">复制分享链接</a-button>
         </div>
       </div>
 
@@ -144,6 +146,9 @@
       <a-space direction="vertical" style="margin-top: 12px; width: 100%">
         <a-button block type="primary" @click="openProfile">打开长者档案</a-button>
         <a-button block @click="allocateBed">一键分配床位</a-button>
+        <a-button block @click="openAssessmentArchive">查看评估档案</a-button>
+        <a-button block @click="openContractsInvoices">合同与票据</a-button>
+        <a-button block @click="openStatusChangeCenter">状态变更中心</a-button>
         <a-button block danger @click="createAlert">生成提醒并进入任务中心</a-button>
         <a-button block @click="goScan">扫码执行（定位今日任务）</a-button>
       </a-space>
@@ -192,12 +197,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../../components/PageContainer.vue'
 import FlowGuardBar from '../../../components/FlowGuardBar.vue'
 import { getBedMap, getRoomList } from '../../../api/bed'
 import { getElderDetail } from '../../../api/elder'
 import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
+import { copyText } from '../../../utils/clipboard'
 import type { BedItem, ElderItem, RoomItem } from '../../../types'
 
 type RoomScene = {
@@ -215,6 +221,7 @@ type RoomScene = {
 }
 
 const router = useRouter()
+const route = useRoute()
 const beds = ref<BedItem[]>([])
 const roomTypeMap = ref<Record<string, string>>({})
 const roomCapacityMap = ref<Record<string, number>>({})
@@ -242,11 +249,15 @@ const riskLevelOptions = [
   { label: '低风险', value: 'LOW' }
 ]
 const bedGuardSteps = ['合同签署入院', '入住选床完成', '在住照护执行', '风险干预闭环']
+const BED_ROUTE_KEYS = ['bedBuilding', 'bedFloor', 'bedKeyword', 'bedQuick', 'bedRiskEnabled', 'bedRiskLevel'] as const
+const bedRouteSignature = ref('')
+const skipNextBedRouteWatch = ref(false)
 
 const filteredBeds = computed(() => beds.value.filter((b) => {
   if (keyword.value) {
-    const text = `${b.roomNo || ''} ${b.elderName || ''}`
-    if (!text.includes(keyword.value)) return false
+    const text = `${b.roomNo || ''} ${b.elderName || ''}`.toLowerCase()
+    const searchText = keyword.value.toLowerCase()
+    if (!text.includes(searchText)) return false
   }
   return true
 }))
@@ -426,6 +437,92 @@ function clearMatrixSelection() {
   selectedFloor.value = ''
 }
 
+function resetFilters() {
+  keyword.value = ''
+  quickFilter.value = 'ALL'
+  riskFilterEnabled.value = false
+  riskFilterLevel.value = 'ALL'
+  clearMatrixSelection()
+}
+
+function firstRouteQueryText(value: unknown) {
+  if (Array.isArray(value)) return firstRouteQueryText(value[0])
+  if (value == null) return ''
+  return String(value).trim()
+}
+
+function flattenRouteQuery(source: Record<string, unknown>) {
+  return Object.entries(source || {}).reduce<Record<string, string>>((acc, [key, value]) => {
+    const text = firstRouteQueryText(value)
+    if (!text) return acc
+    acc[key] = text
+    return acc
+  }, {})
+}
+
+function buildBedRouteSignature(source: Record<string, unknown>) {
+  return [...BED_ROUTE_KEYS]
+    .sort()
+    .map((key) => `${key}:${firstRouteQueryText(source[key])}`)
+    .join('|')
+}
+
+function applyFiltersFromRoute() {
+  keyword.value = firstRouteQueryText(route.query.bedKeyword)
+
+  const nextQuick = firstRouteQueryText(route.query.bedQuick).toUpperCase()
+  quickFilter.value = nextQuick === 'IDLE' || nextQuick === 'OCCUPIED' ? nextQuick : 'ALL'
+
+  riskFilterEnabled.value = firstRouteQueryText(route.query.bedRiskEnabled) === '1'
+  const nextRisk = firstRouteQueryText(route.query.bedRiskLevel).toUpperCase()
+  riskFilterLevel.value = nextRisk === 'HIGH' || nextRisk === 'MEDIUM' || nextRisk === 'LOW' ? nextRisk : 'ALL'
+
+  selectedBuilding.value = firstRouteQueryText(route.query.bedBuilding)
+  selectedFloor.value = firstRouteQueryText(route.query.bedFloor)
+}
+
+function buildFiltersRouteQuery() {
+  const nextQuery: Record<string, string> = {}
+  Object.entries(flattenRouteQuery(route.query as Record<string, unknown>)).forEach(([key, value]) => {
+    if ((BED_ROUTE_KEYS as readonly string[]).includes(key)) return
+    nextQuery[key] = value
+  })
+  if (keyword.value.trim()) nextQuery.bedKeyword = keyword.value.trim()
+  nextQuery.bedQuick = quickFilter.value
+  if (riskFilterEnabled.value) nextQuery.bedRiskEnabled = '1'
+  if (riskFilterEnabled.value && riskFilterLevel.value !== 'ALL') nextQuery.bedRiskLevel = riskFilterLevel.value
+  if (selectedBuilding.value) nextQuery.bedBuilding = selectedBuilding.value
+  if (selectedFloor.value) nextQuery.bedFloor = selectedFloor.value
+  return nextQuery
+}
+
+function hasSameRouteQuery(nextQuery: Record<string, string>) {
+  const currentQuery = flattenRouteQuery(route.query as Record<string, unknown>)
+  const currentKeys = Object.keys(currentQuery)
+  const nextKeys = Object.keys(nextQuery)
+  if (currentKeys.length !== nextKeys.length) return false
+  return nextKeys.every((key) => currentQuery[key] === nextQuery[key])
+}
+
+async function syncFiltersToRoute() {
+  const nextQuery = buildFiltersRouteQuery()
+  if (hasSameRouteQuery(nextQuery)) return
+  skipNextBedRouteWatch.value = true
+  bedRouteSignature.value = buildBedRouteSignature(nextQuery)
+  await router.replace({ path: route.path, query: nextQuery })
+}
+
+async function copyShareLink() {
+  const href = router.resolve({ path: route.path, query: buildFiltersRouteQuery() }).href
+  const fullUrl = /^https?:\/\//i.test(href) ? href : `${window.location.origin}${href}`
+  const copied = await copyText(fullUrl)
+  if (copied) {
+    message.success('分享链接已复制')
+    return
+  }
+  message.warning('复制失败，请手动复制地址栏链接')
+}
+
 function floorSortValue(text: string) {
   const raw = String(text || '').trim()
   if (!raw) return -999
@@ -590,6 +687,38 @@ function openResidentBills(elderId: string) {
   router.push(`/finance/bills/in-resident?elderId=${elderId}`)
 }
 
+function activeElderId() {
+  const elderId = String(selectedBed.value?.elderId || '').trim()
+  if (!elderId) {
+    message.warning('当前床位未关联长者')
+    return ''
+  }
+  return elderId
+}
+
+function openAssessmentArchive() {
+  const elderId = activeElderId()
+  if (!elderId) return
+  detailOpen.value = false
+  router.push(`/elder/assessment/ability/archive?elderId=${encodeURIComponent(elderId)}`)
+}
+
+function openContractsInvoices() {
+  const elderId = activeElderId()
+  if (!elderId) return
+  detailOpen.value = false
+  router.push(`/elder/contracts-invoices?elderId=${encodeURIComponent(elderId)}`)
+}
+
+function openStatusChangeCenter() {
+  detailOpen.value = false
+  const elderId = String(selectedBed.value?.elderId || '').trim()
+  router.push({
+    path: '/elder/status-change',
+    query: elderId ? { residentId: elderId } : undefined
+  })
+}
+
 function openProfile() {
   if (!selectedBed.value?.elderId) {
     message.warning('当前是空床位，请先分配床位')
@@ -650,7 +779,10 @@ useLiveSyncRefresh({
 })
 
 onMounted(async () => {
+  applyFiltersFromRoute()
+  bedRouteSignature.value = buildBedRouteSignature(route.query as Record<string, unknown>)
   await Promise.all([loadBeds(), loadRooms()])
+  await syncFiltersToRoute().catch(() => {})
 })
 
 watch(sourceBeds, () => {
@@ -661,6 +793,31 @@ watch(sourceBeds, () => {
     selectedFloor.value = ''
   }
 })
+
+watch(
+  [keyword, quickFilter, riskFilterEnabled, riskFilterLevel, selectedBuilding, selectedFloor],
+  () => {
+    syncFiltersToRoute().catch(() => {})
+  }
+)
+
+watch(
+  () => route.query,
+  (queryMap) => {
+    const nextSignature = buildBedRouteSignature(queryMap as Record<string, unknown>)
+    if (skipNextBedRouteWatch.value) {
+      skipNextBedRouteWatch.value = false
+      bedRouteSignature.value = nextSignature
+      return
+    }
+    if (nextSignature === bedRouteSignature.value) {
+      return
+    }
+    bedRouteSignature.value = nextSignature
+    applyFiltersFromRoute()
+  },
+  { deep: true }
+)
 </script>
 
 <style scoped>

@@ -21,4 +21,6 @@ public class AssessmentRecordReportResponse {
   private String resultSummary;
   private String suggestion;
   private String detailJson;
+  private String reportFileUrl;
+  private String reportFileName;
 }

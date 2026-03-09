@@ -1,0 +1,31 @@
+<view class="container">
+  <view class="surface bind-card">
+    <view class="section-title">绑定入住老人</view>
+    <view class="section-subtitle">支持扫码二维码或手动填写老人ID</view>
+    <button class="ghost-btn" bindtap="scanCode">扫码绑定（推荐）</button>
+
+    <view class="field">
+      <text class="label">老人ID</text>
+      <input class="input" type="number" value="{{form.elderId}}" bindinput="onElderIdInput" placeholder="请输入老人ID" />
+    </view>
+
+    <view class="field">
+      <text class="label">关系</text>
+      <picker mode="selector" range="{{relations}}" value="{{relationIndex}}" bindchange="onRelationChange">
+        <view class="picker">{{relations[relationIndex]}}</view>
+      </picker>
+    </view>
+
+    <view class="field switch-field">
+      <text class="label">设为主要联系人</text>
+      <switch checked="{{form.isPrimary === 1}}" bindchange="onPrimaryChange" color="#2c7a84" />
+    </view>
+
+    <view class="field">
+      <text class="label">备注</text>
+      <textarea class="textarea" value="{{form.remark}}" bindinput="onRemarkInput" maxlength="120" placeholder="例如：仅子女可查看完整健康档案" />
+    </view>
+
+    <button class="primary-btn" bindtap="onBind" loading="{{loading}}">完成绑定</button>
+  </view>
+</view>

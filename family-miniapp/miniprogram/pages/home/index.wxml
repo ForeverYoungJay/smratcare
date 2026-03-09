@@ -1,0 +1,183 @@
+<view class="container">
+  <view class="home-head">
+    <view>
+      <view class="section-title">家属看护中心</view>
+      <view class="section-subtitle">今日关键动态 · {{currentTime}}</view>
+    </view>
+    <button class="mini-btn" bindtap="goBind">绑定老人</button>
+  </view>
+
+  <view class="surface switch-panel" wx:if="{{elderOptions.length > 0}}">
+    <view class="switch-label">当前关注</view>
+    <picker mode="selector" range="{{elderOptions}}" value="{{elderIndex}}" bindchange="onElderPick">
+      <view class="switch-pick">{{elderOptions[elderIndex]}}</view>
+    </picker>
+  </view>
+
+  <swiper class="elder-swiper" indicator-dots="false" circular="{{elders.length > 1}}" current="{{elderIndex}}" bindchange="onElderChange">
+    <block wx:for="{{elders}}" wx:key="elderId">
+      <swiper-item>
+        <view class="surface elder-card">
+          <view class="card-top">
+            <view class="avatar">{{item.avatarText}}</view>
+            <view class="basic">
+              <view class="name-row">
+                <text class="elder-name">{{item.elderName}}</text>
+                <text class="pill {{item.statusClass}}">{{item.status}}</text>
+              </view>
+              <view class="meta">{{item.gender}} · {{item.age}}岁 · {{item.relation || '家属'}}</view>
+              <view class="meta">{{item.roomNo}}</view>
+              <view class="meta">护理等级：{{item.careLevel}} · 已入住 {{item.checkinDays}} 天</view>
+              <view class="meta">当前位置：{{item.locationText}}</view>
+            </view>
+          </view>
+          <view class="special-row">
+            <text class="special-tag">{{item.specialTag}}</text>
+            <text class="update">最后更新 {{item.latestUpdateTime}}</text>
+          </view>
+          <view class="dynamic">最近动态：{{item.dynamicPreview}}</view>
+          <view class="quick-actions">
+            <button class="primary-btn quick-action" data-path="/pages/communication/index" bindtap="goPage">在线沟通</button>
+            <button class="ghost-btn quick-action" data-path="/pages/health/index" bindtap="goPage">健康档案</button>
+            <button class="ghost-btn quick-action" data-path="/pages/communication/index?mode=video" bindtap="goPage">探视预约</button>
+          </view>
+        </view>
+      </swiper-item>
+    </block>
+  </swiper>
+
+  <view class="switch-strip" wx:if="{{elders.length > 1}}">
+    <block wx:for="{{elders}}" wx:key="elderId">
+      <view class="dot {{index === elderIndex ? 'dot-active' : ''}}"></view>
+    </block>
+  </view>
+
+  <view class="surface panel focus-panel" wx:if="{{dashboard.focusEvents.length > 0}}">
+    <view class="panel-head">
+      <text class="panel-title">今日重点安排</text>
+      <text class="hint">机构主动提醒</text>
+    </view>
+    <block wx:for="{{dashboard.focusEvents}}" wx:key="*this">
+      <view class="focus-item">{{item}}</view>
+    </block>
+  </view>
+
+  <view class="surface panel weekly-panel" wx:if="{{weeklyBrief}}">
+    <view class="panel-head">
+      <text class="panel-title">本周简报</text>
+      <text class="link" data-path="/pages/weekly-brief/index" bindtap="goPage">查看周报</text>
+    </view>
+    <view class="weekly-range">{{weeklyBrief.weekRange}}</view>
+    <view class="weekly-text">{{weeklyBrief.overallText}}</view>
+    <view class="weekly-grid">
+      <view class="weekly-item">
+        <text class="n">{{weeklyBrief.healthCheckCount}}</text>
+        <text class="l">健康检测</text>
+      </view>
+      <view class="weekly-item">
+        <text class="n">{{weeklyBrief.abnormalCount}}</text>
+        <text class="l">异常指标</text>
+      </view>
+      <view class="weekly-item">
+        <text class="n">{{weeklyBrief.activityCount}}</text>
+        <text class="l">活动次数</text>
+      </view>
+      <view class="weekly-item">
+        <text class="n">{{weeklyBrief.unreadMessageCount}}</text>
+        <text class="l">未读提醒</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="surface panel">
+    <view class="panel-head">
+      <text class="panel-title">今日健康摘要</text>
+      <view class="panel-right">
+        <text class="hint">更新 {{dashboard.healthSummary.updateTime}}</text>
+        <text class="link" data-path="/pages/health/index" bindtap="goPage">查看趋势</text>
+      </view>
+    </view>
+    <view class="summary-line {{dashboard.healthSummary.level === 'warning' ? 'txt-warning' : dashboard.healthSummary.level === 'danger' ? 'txt-danger' : 'txt-normal'}}">{{dashboard.healthSummary.stateText}}</view>
+    <view class="metric-grid">
+      <block wx:for="{{dashboard.healthSummary.metrics}}" wx:key="name">
+        <view class="metric-item">
+          <text class="metric-name">{{item.name}}</text>
+          <text class="metric-value">{{item.value}} <text class="metric-unit">{{item.unit}}</text></text>
+          <text class="metric-status">{{item.status}}</text>
+          <text class="metric-trend">{{item.trend}}</text>
+        </view>
+      </block>
+    </view>
+    <view class="advice">{{dashboard.healthSummary.suggestion}}</view>
+  </view>
+
+  <view class="surface panel">
+    <view class="panel-head">
+      <text class="panel-title">今日日程</text>
+      <text class="link" data-path="/pages/schedule/index" bindtap="goPage">查看全部</text>
+    </view>
+    <block wx:for="{{dashboard.schedules}}" wx:key="id">
+      <view class="timeline-item">
+        <text class="time">{{item.time}}</text>
+        <view class="timeline-main">
+          <text class="name">{{item.name}}</text>
+          <text class="type">{{item.type}} · {{item.owner}}</text>
+        </view>
+        <text class="state {{item.status === '已完成' ? 'done' : item.status === '进行中' ? 'doing' : 'todo'}}">{{item.status}}</text>
+      </view>
+    </block>
+  </view>
+
+  <view class="surface panel">
+    <view class="panel-head">
+      <text class="panel-title">今日膳食</text>
+      <text class="link" data-path="/pages/diet-calendar/index" bindtap="goPage">本周食谱</text>
+    </view>
+    <view class="meal-review">{{dashboard.meal.review}}</view>
+    <view class="tag-row">
+      <block wx:for="{{dashboard.meal.tags}}" wx:key="*this">
+        <text class="meal-tag">{{item}}</text>
+      </block>
+    </view>
+    <view class="meal-list">
+      <text class="meal-label">早餐：{{dashboard.meal.breakfastText}}</text>
+      <text class="meal-label">午餐：{{dashboard.meal.lunchText}}</text>
+      <text class="meal-label">晚餐：{{dashboard.meal.dinnerText}}</text>
+    </view>
+    <view class="advice">{{dashboard.meal.eatingStatus}}</view>
+  </view>
+
+  <view class="surface panel">
+    <view class="panel-head">
+      <text class="panel-title">消息提醒</text>
+      <text class="link" data-path="/pages/messages/index" bindtap="goPage">查看全部</text>
+    </view>
+    <block wx:for="{{dashboard.notices}}" wx:key="id">
+      <view class="notice-item" data-id="{{item.id}}" bindtap="goMessageDetail">
+        <view class="notice-main">
+          <text class="notice-title {{item.level}}">{{item.title}}</text>
+          <text class="notice-content">{{item.content}}</text>
+        </view>
+        <view class="notice-side">
+          <text class="notice-time">{{item.time}}</text>
+          <view class="unread" wx:if="{{item.unread}}"></view>
+        </view>
+      </view>
+    </block>
+  </view>
+
+  <view class="surface panel">
+    <view class="panel-head">
+      <text class="panel-title">常用功能</text>
+    </view>
+    <view class="entry-grid">
+      <block wx:for="{{entries}}" wx:key="path">
+        <view class="entry-item" data-path="{{item.path}}" bindtap="goPage">
+          <text class="entry-badge" wx:if="{{item.badge}}">{{item.badge}}</text>
+          <text class="entry-title">{{item.title}}</text>
+          <text class="entry-sub">{{item.sub}}</text>
+        </view>
+      </block>
+    </view>
+  </view>
+</view>

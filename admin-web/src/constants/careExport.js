@@ -48,3 +48,16 @@ export const careTodayLogExportColumns = [
     { key: 'bedQrCode', title: '床位码', value: (item) => item.bedQrCode || '' },
     { key: 'remark', title: '备注', value: (item) => item.remark || '' }
 ];
+export const handoverExportColumns = [
+    { key: 'dutyDate', title: '班次日期', value: (item) => item.dutyDate || '' },
+    { key: 'shiftCode', title: '班次编码', value: (item) => item.shiftCode || '' },
+    { key: 'fromStaffName', title: '交班人', value: (item) => item.fromStaffName || '' },
+    { key: 'toStaffName', title: '接班人', value: (item) => item.toStaffName || '' },
+    { key: 'summary', title: '在岗情况', value: (item) => item.summary || item.onDutySummary || '' },
+    { key: 'riskNote', title: '注意事项', value: (item) => item.riskNote || item.attentionNote || '' },
+    { key: 'todoNote', title: '待办事项', value: (item) => item.todoNote || '' },
+    { key: 'status', title: '状态', value: (item) => item.status || '' },
+    { key: 'handoverTime', title: '交班时间', value: (item) => item.handoverTime || '' },
+    { key: 'confirmTime', title: '确认时间', value: (item) => item.confirmTime || '' },
+    { key: 'attachmentUrls', title: '附件地址', value: (item) => item.attachmentUrls || '' }
+];

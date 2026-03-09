@@ -23,8 +23,9 @@
         </a-form-item>
         <a-form-item>
           <a-space>
-            <a-button type="primary" @click="fetchData">搜索</a-button>
+            <a-button type="primary" @click="runSearch">搜索</a-button>
             <a-button @click="reset">重置</a-button>
+            <a-button @click="copySearchLink">复制查询链接</a-button>
           </a-space>
         </a-form-item>
       </a-form>
@@ -64,12 +65,19 @@
         :pagination="false"
         row-key="id"
         :row-selection="rowSelection"
-        :scroll="{ y: 520 }"
+        :scroll="{ x: 1320, y: 520 }"
         @change="onTableChange"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
             <a-tag :color="statusTag(record.status)">{{ statusText(record.status) }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'action'">
+            <a-space size="small">
+              <a-button type="link" size="small" @click="goInHospitalOverview(record)">总览</a-button>
+              <a-button type="link" size="small" @click="goAssessmentArchive(record)">评估</a-button>
+              <a-button type="link" size="small" @click="goContractsInvoices(record)">合同票据</a-button>
+            </a-space>
           </template>
         </template>
       </a-table>
@@ -134,8 +142,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import QRCode from 'qrcode'
@@ -143,16 +151,21 @@ import PageContainer from '../../components/PageContainer.vue'
 import FlowGuardBar from '../../components/FlowGuardBar.vue'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { exportCsv } from '../../utils/export'
+import { copyText } from '../../utils/clipboard'
 import { getElderPage, assignBed, bindFamily } from '../../api/elder'
 import { getBedList } from '../../api/bed'
 import { getFamilyUserPage } from '../../api/family'
 import type { BedItem, ElderItem, FamilyBindRequest, PageResult, FamilyUserItem, Id } from '../../types/api'
 
 const router = useRouter()
+const route = useRoute()
 const loading = ref(false)
 const rows = ref<ElderItem[]>([])
 const total = ref(0)
 const selectedRowKeys = ref<Id[]>([])
+const skipNextRouteWatch = ref(false)
+const routeSignature = ref('')
+const ELDER_LIST_ROUTE_KEYS = ['fullName', 'idCardNo', 'bedNo', 'careLevel', 'status', 'sortBy', 'sortOrder', 'pageNo', 'pageSize'] as const
 
 const query = reactive({
   fullName: undefined as string | undefined,
@@ -173,7 +186,8 @@ const columns = [
   { title: '家庭地址', dataIndex: 'homeAddress', key: 'homeAddress', width: 220 },
   { title: '床位号', dataIndex: 'bedNo', key: 'bedNo', width: 120, sorter: true },
   { title: '护理等级', dataIndex: 'careLevel', key: 'careLevel', width: 120, sorter: true },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 100, sorter: true }
+  { title: '状态', dataIndex: 'status', key: 'status', width: 100, sorter: true },
+  { title: '联动操作', key: 'action', width: 220 }
 ]
 const selectedCount = computed(() => selectedRowKeys.value.length)
 const selectedRows = computed(() => rows.value.filter((item) => selectedRowKeys.value.some((id) => String(id) === String(item.id))))
@@ -326,6 +340,99 @@ async function searchFamilyUsers(val: string) {
   await loadFamilyUsers(val)
 }
 
+function firstRouteQueryText(value: unknown) {
+  if (Array.isArray(value)) return firstRouteQueryText(value[0])
+  if (value == null) return ''
+  return String(value).trim()
+}
+
+function parsePositiveInt(value: unknown, fallback: number) {
+  const parsed = Number(firstRouteQueryText(value))
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback
+  return Math.round(parsed)
+}
+
+function flattenRouteQuery(source: Record<string, unknown>) {
+  return Object.entries(source || {}).reduce<Record<string, string>>((acc, [key, value]) => {
+    const text = firstRouteQueryText(value)
+    if (!text) return acc
+    acc[key] = text
+    return acc
+  }, {})
+}
+
+function buildRouteSignature(source: Record<string, unknown>) {
+  return [...ELDER_LIST_ROUTE_KEYS]
+    .sort()
+    .map((key) => `${key}:${firstRouteQueryText(source[key])}`)
+    .join('|')
+}
+
+function applyQueryFromRoute() {
+  query.fullName = firstRouteQueryText(route.query.fullName) || undefined
+  query.idCardNo = firstRouteQueryText(route.query.idCardNo) || undefined
+  query.bedNo = firstRouteQueryText(route.query.bedNo) || undefined
+  query.careLevel = firstRouteQueryText(route.query.careLevel) || undefined
+  const status = Number(firstRouteQueryText(route.query.status))
+  query.status = Number.isFinite(status) && status > 0 ? status : undefined
+  query.sortBy = firstRouteQueryText(route.query.sortBy) || undefined
+  const order = firstRouteQueryText(route.query.sortOrder).toLowerCase()
+  query.sortOrder = order === 'asc' || order === 'desc' ? order : undefined
+  query.pageNo = parsePositiveInt(route.query.pageNo, 1)
+  query.pageSize = parsePositiveInt(route.query.pageSize, 10)
+}
+
+function buildQueryRouteQuery() {
+  const nextQuery: Record<string, string> = {}
+  Object.entries(flattenRouteQuery(route.query as Record<string, unknown>)).forEach(([key, value]) => {
+    if ((ELDER_LIST_ROUTE_KEYS as readonly string[]).includes(key)) return
+    nextQuery[key] = value
+  })
+  if (query.fullName) nextQuery.fullName = query.fullName
+  if (query.idCardNo) nextQuery.idCardNo = query.idCardNo
+  if (query.bedNo) nextQuery.bedNo = query.bedNo
+  if (query.careLevel) nextQuery.careLevel = query.careLevel
+  if (query.status) nextQuery.status = String(query.status)
+  if (query.sortBy) nextQuery.sortBy = query.sortBy
+  if (query.sortOrder) nextQuery.sortOrder = query.sortOrder
+  nextQuery.pageNo = String(parsePositiveInt(query.pageNo, 1))
+  nextQuery.pageSize = String(parsePositiveInt(query.pageSize, 10))
+  return nextQuery
+}
+
+function hasSameRouteQuery(nextQuery: Record<string, string>) {
+  const currentQuery = flattenRouteQuery(route.query as Record<string, unknown>)
+  const currentKeys = Object.keys(currentQuery)
+  const nextKeys = Object.keys(nextQuery)
+  if (currentKeys.length !== nextKeys.length) return false
+  return nextKeys.every((key) => currentQuery[key] === nextQuery[key])
+}
+
+async function syncQueryToRoute() {
+  const nextQuery = buildQueryRouteQuery()
+  if (hasSameRouteQuery(nextQuery)) return
+  skipNextRouteWatch.value = true
+  routeSignature.value = buildRouteSignature(nextQuery)
+  await router.replace({ path: route.path, query: nextQuery })
+}
+
+async function runSearch() {
+  query.pageNo = 1
+  await syncQueryToRoute()
+  await fetchData()
+}
+
+async function copySearchLink() {
+  const href = router.resolve({ path: route.path, query: buildQueryRouteQuery() }).href
+  const fullUrl = /^https?:\/\//i.test(href) ? href : `${window.location.origin}${href}`
+  const copied = await copyText(fullUrl)
+  if (copied) {
+    message.success('查询链接已复制')
+    return
+  }
+  message.warning('复制失败，请手动复制地址栏链接')
+}
+
 function reset() {
   query.pageNo = 1
   query.pageSize = 10
@@ -337,26 +444,35 @@ function reset() {
   query.sortBy = undefined
   query.sortOrder = undefined
   selectedRowKeys.value = []
-  fetchData()
+  syncQueryToRoute()
+    .then(() => fetchData())
+    .catch(() => {})
 }
 
 function onPageChange(page: number) {
   query.pageNo = page
-  fetchData()
+  syncQueryToRoute()
+    .then(() => fetchData())
+    .catch(() => {})
 }
 
 function onPageSizeChange(current: number, size: number) {
   query.pageNo = 1
   query.pageSize = size
   selectedRowKeys.value = []
-  fetchData()
+  syncQueryToRoute()
+    .then(() => fetchData())
+    .catch(() => {})
 }
 
 function onTableChange(_: any, __: any, sorter: any) {
   if (Array.isArray(sorter)) sorter = sorter[0]
   query.sortBy = sorter?.field || undefined
   query.sortOrder = sorter?.order === 'ascend' ? 'asc' : sorter?.order === 'descend' ? 'desc' : undefined
-  fetchData()
+  query.pageNo = 1
+  syncQueryToRoute()
+    .then(() => fetchData())
+    .catch(() => {})
 }
 
 function exportCsvData() {
@@ -388,6 +504,36 @@ function goEdit(id: Id) {
 
 function goDetail(id: Id) {
   router.push(`/elder/detail/${id}`)
+}
+
+function goInHospitalOverview(row: ElderItem) {
+  router.push({
+    path: '/elder/in-hospital-overview',
+    query: {
+      residentId: String(row.id),
+      elderName: row.fullName || ''
+    }
+  })
+}
+
+function goAssessmentArchive(row: ElderItem) {
+  router.push({
+    path: '/elder/assessment/ability/archive',
+    query: {
+      elderId: String(row.id),
+      elderName: row.fullName || ''
+    }
+  })
+}
+
+function goContractsInvoices(row: ElderItem) {
+  router.push({
+    path: '/elder/contracts-invoices',
+    query: {
+      elderId: String(row.id),
+      elderName: row.fullName || ''
+    }
+  })
 }
 
 function goEditSelected() {
@@ -505,9 +651,29 @@ useLiveSyncRefresh({
 })
 
 onMounted(() => {
+  applyQueryFromRoute()
+  routeSignature.value = buildRouteSignature(route.query as Record<string, unknown>)
   fetchData()
   loadBeds()
+  syncQueryToRoute().catch(() => {})
 })
+
+watch(
+  () => route.query,
+  (queryMap) => {
+    const nextSignature = buildRouteSignature(queryMap as Record<string, unknown>)
+    if (skipNextRouteWatch.value) {
+      skipNextRouteWatch.value = false
+      routeSignature.value = nextSignature
+      return
+    }
+    if (nextSignature === routeSignature.value) return
+    routeSignature.value = nextSignature
+    applyQueryFromRoute()
+    fetchData()
+  },
+  { deep: true }
+)
 </script>
 
 <style scoped>

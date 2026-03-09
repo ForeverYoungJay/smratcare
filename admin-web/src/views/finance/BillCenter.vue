@@ -29,13 +29,14 @@
           <a-space>
             <a-button type="primary" @click="runQuery">查询</a-button>
             <a-button @click="reset">重置</a-button>
+            <a-button @click="copyQueryLink">复制查询链接</a-button>
           </a-space>
         </a-form-item>
       </a-form>
     </a-card>
 
     <a-row :gutter="[12, 12]" style="margin-top: 16px;">
-      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="当前账单数" :value="displayRows.length" /></a-card></a-col>
+      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="当前账单数" :value="total" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="当前欠费笔数" :value="overdueCount" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="当前欠费金额" :value="overdueAmount" suffix="元" :precision="2" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="当前已收金额" :value="paidAmount" suffix="元" :precision="2" /></a-card></a-col>
@@ -181,17 +182,24 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportCsv } from '../../utils/export'
 import { getBillPage, generateBill, invalidateBill, payBill } from '../../api/bill'
 import { getFinanceModuleEntrySummary, getPaymentRecordPage, updatePaymentRecord } from '../../api/finance'
 import type { BillItem, FinanceModuleEntrySummary, PageResult, PaymentRecordItem } from '../../types'
-import router from '../../router'
 import { printTableReport } from '../../utils/print'
 import { confirmAction } from '../../utils/actionConfirm'
+import {
+  buildBillCenterRouteQuery,
+  buildBillCenterRouteSignature,
+  flattenBillCenterRouteQuery,
+  parseBillCenterRouteState,
+  type BillCenterScene
+} from '../../utils/billCenterQuery'
 
 const props = withDefaults(defineProps<{
   title?: string
@@ -209,6 +217,10 @@ const props = withDefaults(defineProps<{
 
 const pageTitle = props.title
 const pageSubTitle = props.subTitle
+const route = useRoute()
+const router = useRouter()
+const billRouteSignature = ref('')
+const skipNextBillRouteWatch = ref(false)
 
 const loading = ref(false)
 const rows = ref<BillItem[]>([])
@@ -226,10 +238,10 @@ const summary = ref<FinanceModuleEntrySummary>({
 })
 
 const query = reactive({
-  month: props.defaultCurrentMonth ? dayjs().startOf('month') : undefined as any,
+  month: undefined as any,
   keyword: '',
   payMethod: undefined as string | undefined,
-  scene: props.defaultScene as ('ADMISSION' | 'RESIDENT' | undefined),
+  scene: undefined as ('ADMISSION' | 'RESIDENT' | undefined),
   pageNo: 1,
   pageSize: 10
 })
@@ -270,10 +282,7 @@ const historyLoading = ref(false)
 const historyRows = ref<PaymentRecordItem[]>([])
 const historyReadonly = ref(false)
 
-const displayRows = computed(() => {
-  if (!query.payMethod) return rows.value
-  return rows.value.filter(item => String(item.lastPayMethod || '').toUpperCase() === String(query.payMethod || '').toUpperCase())
-})
+const displayRows = computed(() => rows.value)
 const overdueCount = computed(() => displayRows.value.filter(item => Number(item.outstandingAmount || 0) > 0).length)
 const overdueAmount = computed(() => displayRows.value.reduce((sum, item) => sum + Number(item.outstandingAmount || 0), 0))
 const paidAmount = computed(() => displayRows.value.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0))
@@ -305,6 +314,71 @@ function payMethodText(method?: string) {
   return text
 }
 
+function routeOptions() {
+  return {
+    lockScene: props.lockScene,
+    defaultScene: props.defaultScene as BillCenterScene | undefined,
+    defaultMonth: props.defaultCurrentMonth ? dayjs().format('YYYY-MM') : undefined,
+    defaultPageNo: 1,
+    defaultPageSize: 10
+  }
+}
+
+function applyBillRouteState() {
+  const state = parseBillCenterRouteState(route.query, routeOptions())
+  query.month = state.month ? dayjs(state.month, 'YYYY-MM') : undefined
+  query.keyword = state.keyword || ''
+  query.payMethod = state.payMethod
+  query.scene = state.scene
+  query.pageNo = state.pageNo
+  query.pageSize = state.pageSize
+}
+
+function currentRouteState() {
+  return {
+    month: query.month ? dayjs(query.month).format('YYYY-MM') : undefined,
+    keyword: query.keyword,
+    payMethod: query.payMethod ? String(query.payMethod).toUpperCase() : undefined,
+    scene: query.scene,
+    pageNo: query.pageNo,
+    pageSize: query.pageSize
+  }
+}
+
+function buildQueryRouteQuery() {
+  return buildBillCenterRouteQuery(currentRouteState(), route.query, routeOptions())
+}
+
+function hasSameQueryPayload(nextQuery: Record<string, string>) {
+  const currentQuery = flattenBillCenterRouteQuery(route.query)
+  const currentKeys = Object.keys(currentQuery)
+  const nextKeys = Object.keys(nextQuery)
+  if (currentKeys.length !== nextKeys.length) {
+    return false
+  }
+  return nextKeys.every((key) => currentQuery[key] === nextQuery[key])
+}
+
+async function syncQueryToRoute() {
+  const nextQuery = buildQueryRouteQuery()
+  if (hasSameQueryPayload(nextQuery)) {
+    return
+  }
+  skipNextBillRouteWatch.value = true
+  billRouteSignature.value = buildBillCenterRouteSignature(nextQuery)
+  await router.replace({ path: route.path, query: nextQuery })
+}
+
+function toAbsoluteUrl(resolvedHref: string) {
+  if (/^https?:\/\//i.test(resolvedHref)) {
+    return resolvedHref
+  }
+  if (resolvedHref.startsWith('#')) {
+    return `${window.location.origin}${window.location.pathname}${resolvedHref}`
+  }
+  return `${window.location.origin}${resolvedHref}`
+}
+
 async function fetchData() {
   loading.value = true
   try {
@@ -313,7 +387,8 @@ async function fetchData() {
       pageSize: query.pageSize,
       month: query.month ? dayjs(query.month).format('YYYY-MM') : undefined,
       keyword: query.keyword,
-      scene: query.scene
+      scene: query.scene,
+      payMethod: query.payMethod ? String(query.payMethod).toUpperCase() : undefined
     })
     rows.value = res.list
     total.value = res.total
@@ -330,28 +405,49 @@ async function fetchSummary() {
   }
 }
 
-async function runQuery() {
+async function runQuery(resetPage = true) {
+  if (resetPage) {
+    query.pageNo = 1
+  }
+  await syncQueryToRoute()
   await Promise.all([fetchData(), fetchSummary()])
 }
 
 function reset() {
-  query.month = props.defaultCurrentMonth ? dayjs().startOf('month') : undefined
-  query.keyword = ''
-  query.payMethod = undefined
-  query.scene = props.defaultScene
-  query.pageNo = 1
-  runQuery()
+  const state = parseBillCenterRouteState({}, routeOptions())
+  query.month = state.month ? dayjs(state.month, 'YYYY-MM') : undefined
+  query.keyword = state.keyword || ''
+  query.payMethod = state.payMethod
+  query.scene = state.scene
+  query.pageNo = state.pageNo
+  query.pageSize = state.pageSize
+  runQuery(false).catch(() => {})
 }
 
-function onPageChange(page: number) {
+async function onPageChange(page: number) {
   query.pageNo = page
-  fetchData()
+  await syncQueryToRoute()
+  await fetchData()
 }
 
-function onPageSizeChange(current: number, size: number) {
+async function onPageSizeChange(current: number, size: number) {
   query.pageNo = 1
   query.pageSize = size
-  fetchData()
+  await syncQueryToRoute()
+  await fetchData()
+}
+
+async function copyQueryLink() {
+  const href = router.resolve({ path: route.path, query: buildQueryRouteQuery() }).href
+  const fullUrl = toAbsoluteUrl(href)
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(fullUrl)
+      message.success('查询链接已复制')
+      return
+    }
+  } catch {}
+  message.warning('当前环境不支持自动复制，请手动复制地址栏链接')
 }
 
 function exportCsvData() {
@@ -455,6 +551,10 @@ async function submitPay() {
 }
 
 function openDetail(row: BillItem) {
+  if (!row?.id) {
+    message.warning('该行账单缺少ID，无法查看详情')
+    return
+  }
   router.push(`/finance/bill/${row.id}`)
 }
 
@@ -543,7 +643,28 @@ function printHistory() {
   }
 }
 
+watch(
+  () => route.query,
+  (queryMap) => {
+    const nextSignature = buildBillCenterRouteSignature(queryMap)
+    if (skipNextBillRouteWatch.value) {
+      skipNextBillRouteWatch.value = false
+      billRouteSignature.value = nextSignature
+      return
+    }
+    if (nextSignature === billRouteSignature.value) {
+      return
+    }
+    billRouteSignature.value = nextSignature
+    applyBillRouteState()
+    runQuery(false).catch(() => {})
+  },
+  { deep: true }
+)
+
 onMounted(async () => {
-  await runQuery()
+  applyBillRouteState()
+  billRouteSignature.value = buildBillCenterRouteSignature(route.query)
+  await runQuery(false)
 })
 </script>

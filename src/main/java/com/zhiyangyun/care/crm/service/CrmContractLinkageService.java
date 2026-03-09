@@ -2,6 +2,7 @@ package com.zhiyangyun.care.crm.service;
 
 import com.zhiyangyun.care.crm.model.CrmContractLinkageResponse;
 import com.zhiyangyun.care.crm.model.CrmContractAssessmentOverviewResponse;
+import com.zhiyangyun.care.crm.model.CrmContractArchiveRuleResponse;
 
 public interface CrmContractLinkageService {
   CrmContractLinkageResponse getByElderId(Long tenantId, Long elderId);
@@ -10,4 +11,6 @@ public interface CrmContractLinkageService {
   CrmContractLinkageResponse getByContractId(Long tenantId, Long contractId);
 
   CrmContractAssessmentOverviewResponse getAssessmentOverview(Long tenantId, Long elderId, Long leadId);
+
+  CrmContractArchiveRuleResponse getArchiveRule(Long tenantId);
 }

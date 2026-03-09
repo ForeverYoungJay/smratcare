@@ -1,0 +1,55 @@
+.card {
+  padding: 28rpx;
+}
+
+.user-name {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #111827;
+}
+
+.user-sub {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #6b7280;
+}
+
+.menu-list {
+  margin-top: 22rpx;
+  border-top: 1rpx solid #e5e7eb;
+}
+
+.menu-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #eef2f7;
+  font-size: 27rpx;
+  color: #1f2937;
+}
+
+.menu-right {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+}
+
+.menu-badge {
+  min-width: 30rpx;
+  padding: 2rpx 8rpx;
+  border-radius: 999rpx;
+  background: #dc2626;
+  color: #fff;
+  font-size: 18rpx;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.arrow {
+  color: #9ca3af;
+}
+
+.action {
+  margin-top: 24rpx;
+}

@@ -525,6 +525,7 @@ public class MedicalResident360Controller {
     response.setHasUnclosedIncident(openIncidentCount > 0);
     response.setAlertCardCount(alertCardCount);
     response.setAlertTotalCount(alertTotalCount);
+    response.setGeneratedAt(LocalDateTime.now());
     response.setCards(cards);
     return Result.ok(response);
   }

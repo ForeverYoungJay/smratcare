@@ -1,0 +1,99 @@
+page {
+  background: radial-gradient(circle at 0 0, #f7efe3 0%, #f3f6fb 44%, #eef2f7 100%);
+  color: #1f2937;
+  min-height: 100%;
+  font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+}
+
+.container {
+  padding: 24rpx;
+}
+
+.surface {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1rpx solid rgba(25, 79, 94, 0.1);
+  border-radius: 24rpx;
+  box-shadow: 0 14rpx 48rpx rgba(31, 41, 55, 0.08);
+}
+
+.section-title {
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #194f5e;
+}
+
+.section-subtitle {
+  font-size: 24rpx;
+  color: #6b7280;
+}
+
+.card-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.muted {
+  color: #6b7280;
+}
+
+.divider {
+  height: 1rpx;
+  background: #e5e7eb;
+  margin: 16rpx 0;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6rpx 18rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  line-height: 1;
+}
+
+.pill-normal {
+  background: #e6f6ed;
+  color: #0f766e;
+}
+
+.pill-warning {
+  background: #fff4e8;
+  color: #b45309;
+}
+
+.pill-danger {
+  background: #ffefef;
+  color: #b91c1c;
+}
+
+.primary-btn {
+  background: linear-gradient(120deg, #194f5e, #2c7a84);
+  color: #fff;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  border: none;
+}
+
+.ghost-btn {
+  background: #f2f7f8;
+  border: 1rpx solid #b8d3d9;
+  color: #194f5e;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+}
+
+.danger-btn {
+  background: linear-gradient(120deg, #b91c1c, #dc2626);
+  color: #fff;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  border: none;
+}
+
+.list-empty {
+  padding: 40rpx 20rpx;
+  text-align: center;
+  color: #6b7280;
+  font-size: 24rpx;
+}

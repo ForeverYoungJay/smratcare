@@ -24,6 +24,7 @@ import java.util.HashMap;
 import jakarta.validation.constraints.Pattern;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,6 +37,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/bill")
 public class BillController {
+  private static final Set<String> SUPPORTED_PAY_METHODS = Set.of(
+      "CASH",
+      "CARD",
+      "BANK",
+      "ALIPAY",
+      "WECHAT",
+      "WECHAT_OFFLINE",
+      "QR_CODE");
+
   private final BillService billService;
   private final BillMonthlyMapper billMonthlyMapper;
   private final ElderMapper elderMapper;
@@ -71,7 +81,8 @@ public class BillController {
       @RequestParam(required = false) String month,
       @RequestParam(required = false) Long elderId,
       @RequestParam(required = false) String scene,
-      @RequestParam(required = false) String keyword) {
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String payMethod) {
     Long orgId = AuthContext.getOrgId();
     var wrapper = Wrappers.lambdaQuery(BillMonthly.class)
         .eq(BillMonthly::getIsDeleted, 0)
@@ -124,7 +135,18 @@ public class BillController {
       }
       wrapper.in(BillMonthly::getElderId, sceneElderIds);
     }
-    wrapper.orderByDesc(BillMonthly::getBillMonth);
+    String normalizedPayMethod = payMethod == null ? "" : payMethod.trim().toUpperCase();
+    if (!normalizedPayMethod.isEmpty() && !SUPPORTED_PAY_METHODS.contains(normalizedPayMethod)) {
+      return Result.ok(new Page<>(pageNo, pageSize, 0));
+    }
+    if (!normalizedPayMethod.isEmpty()) {
+      wrapper.apply(
+          "UPPER(COALESCE((SELECT p.pay_method FROM payment_record p "
+              + "WHERE p.bill_monthly_id = bill_monthly.id AND p.is_deleted = 0 "
+              + "ORDER BY p.paid_at DESC, p.create_time DESC LIMIT 1), '')) = {0}",
+          normalizedPayMethod);
+    }
+    wrapper.orderByDesc(BillMonthly::getBillMonth).orderByDesc(BillMonthly::getId);
     IPage<BillMonthly> page = billMonthlyMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
     List<Long> elderIds = page.getRecords().stream()
         .map(BillMonthly::getElderId)

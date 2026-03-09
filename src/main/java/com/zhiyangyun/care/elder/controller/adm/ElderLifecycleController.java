@@ -6,6 +6,7 @@ import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.audit.service.AuditLogService;
 import com.zhiyangyun.care.elder.model.lifecycle.AdmissionRequest;
 import com.zhiyangyun.care.elder.model.lifecycle.AdmissionRecordResponse;
+import com.zhiyangyun.care.elder.model.lifecycle.AdmissionRecordSummaryResponse;
 import com.zhiyangyun.care.elder.model.lifecycle.AdmissionResponse;
 import com.zhiyangyun.care.elder.model.lifecycle.ChangeLogResponse;
 import com.zhiyangyun.care.elder.model.lifecycle.DischargeRequest;
@@ -94,6 +95,20 @@ public class ElderLifecycleController {
     Long tenantId = AuthContext.getOrgId();
     return Result.ok(lifecycleService.admissionPage(
         tenantId, pageNo, pageSize, keyword, contractNo, elderStatus, admissionDateStart, admissionDateEnd));
+  }
+
+  @GetMapping("/admissions/summary")
+  public Result<AdmissionRecordSummaryResponse> admissionsSummary(
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String contractNo,
+      @RequestParam(required = false) Integer elderStatus,
+      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+      @RequestParam(required = false) LocalDate admissionDateStart,
+      @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+      @RequestParam(required = false) LocalDate admissionDateEnd) {
+    Long tenantId = AuthContext.getOrgId();
+    return Result.ok(lifecycleService.admissionSummary(
+        tenantId, keyword, contractNo, elderStatus, admissionDateStart, admissionDateEnd));
   }
 
   @GetMapping(value = "/changes/export", produces = "text/csv;charset=UTF-8")

@@ -1,0 +1,16 @@
+.card { padding: 24rpx; }
+.action { margin-top: 14rpx; }
+.template-title { margin-top: 18rpx; font-size: 25rpx; font-weight: 700; color: #1f2937; }
+.template-row { margin-top: 10rpx; display: flex; gap: 10rpx; flex-wrap: wrap; }
+.template { padding: 8rpx 14rpx; border-radius: 999rpx; background: #eef7f8; color: #1f4f57; font-size: 22rpx; }
+.media-panel { margin-top: 10rpx; padding: 12rpx; border: 1rpx solid #e2e8f0; border-radius: 10rpx; background: #f8fafc; }
+.media-info { display: flex; align-items: center; justify-content: space-between; gap: 10rpx; }
+.media-name { font-size: 23rpx; color: #1f2937; }
+.media-type { font-size: 21rpx; color: #64748b; }
+.media-empty { font-size: 22rpx; color: #64748b; }
+.media-action-row { margin-top: 10rpx; display: flex; gap: 10rpx; flex-wrap: wrap; }
+.media-btn { height: 60rpx; line-height: 60rpx; font-size: 22rpx; padding: 0 18rpx; }
+.moment { margin-top: 12rpx; padding: 12rpx; border-radius: 10rpx; background: #f8fafc; border: 1rpx solid #e5edf2; }
+.name { font-size: 25rpx; color: #111827; font-weight: 700; }
+.time { margin-top: 4rpx; font-size: 22rpx; color: #6b7280; }
+.desc { margin-top: 6rpx; font-size: 23rpx; color: #374151; }

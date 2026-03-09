@@ -1,0 +1,8 @@
+.card { padding: 24rpx; }
+.item { display: flex; justify-content: space-between; align-items: center; padding: 14rpx 0; border-bottom: 1rpx solid #e5e7eb; }
+.item:last-child { border-bottom: none; }
+.main { display: flex; flex-direction: column; }
+.name { font-size: 28rpx; color: #111827; font-weight: 700; }
+.sub { margin-top: 6rpx; font-size: 23rpx; color: #6b7280; }
+.small { width: 120rpx; height: 58rpx; line-height: 58rpx; font-size: 22rpx; }
+.action { margin-top: 18rpx; }

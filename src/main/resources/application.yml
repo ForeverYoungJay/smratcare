@@ -43,11 +43,87 @@ security:
     blacklist-enabled: true
 
 app:
+  family:
+    legacy-api-enabled: true
+    legacy-api-sunset-date: "2026-09-30"
+    recharge:
+      auto-close-enabled: true
+      auto-close-cron: "0 */5 * * * ?"
+      prepay-timeout-minutes: 30
+      auto-close-batch-size: 200
+      create-abnormal-todo: true
+      auto-pay-settle-enabled: true
+      auto-pay-settle-cron: "0 */30 * * * ?"
+      auto-pay-settle-batch-size: 200
+    wechat-pay:
+      enabled: false
+      app-id: ""
+      app-secret: ""
+      merchant-id: ""
+      merchant-serial-no: ""
+      private-key-pem: ""
+      api-v3-key: ""
+      notify-url: "http://localhost:8080/api/family/payment/wechat/notify"
+      prepay-url: "https://api.mch.weixin.qq.com/v3/pay/transactions/jsapi"
+      query-url-template: "https://api.mch.weixin.qq.com/v3/pay/transactions/out-trade-no/{outTradeNo}?mchid={mchId}"
+      certificates-url: "https://api.mch.weixin.qq.com/v3/certificates"
+      platform-serial-no: ""
+      platform-certificate-pem: ""
+      notify-allowed-skew-seconds: 300
+      skip-notify-signature-verify: true
+    wechat-notify:
+      enabled: false
+      app-id: ""
+      app-secret: ""
+      template-id: ""
+      page: "pages/messages/index"
+      mini-program-state: "formal"
+      language: "zh_CN"
+      access-token-url: "https://api.weixin.qq.com/cgi-bin/token"
+      subscribe-send-url: "https://api.weixin.qq.com/cgi-bin/message/subscribe/send"
+      data-template-json: "{\"thing1\":{\"value\":\"{title}\"},\"thing2\":{\"value\":\"{content}\"},\"time3\":{\"value\":\"{time}\"}}"
+      access-token-expire-buffer-seconds: 120
+      max-retry: 3
+      retry-interval-minutes: 5
+      retry-batch-size: 100
+      retry-cron: "0 */5 * * * ?"
+    sms-code:
+      enabled: true
+      provider: "mock"
+      code-length: 6
+      expire-seconds: 300
+      cooldown-seconds: 60
+      daily-limit: 20
+      max-attempts: 5
+      ip-guard-enabled: true
+      ip-cooldown-seconds: 10
+      ip-daily-limit: 120
+      ip-ban-threshold: 12
+      ip-ban-minutes: 30
+      debug-return-code: true
+      code-salt: "smartcare-family-sms"
+      sign-name: ""
+      login-template-code: ""
+      security-template-code: ""
+      default-template-code: ""
+      aliyun:
+        region-id: "cn-hangzhou"
+        endpoint: "dysmsapi.aliyuncs.com"
+        access-key-id: ""
+        access-key-secret: ""
   file-storage:
+    provider: local
     base-dir: ${user.home}/smartcare-uploads
     url-prefix: /uploads
+    public-base-url: ""
     max-size-bytes: 10485760
-    allowed-extensions: jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,txt,zip
+    allowed-extensions: jpg,jpeg,png,gif,webp,pdf,doc,docx,xls,xlsx,txt,zip,mp3,m4a,wav,aac,amr
+    oss:
+      endpoint: ""
+      bucket: ""
+      access-key-id: ""
+      access-key-secret: ""
+      base-path: smartcare
   logistics:
     maintenance-todo:
       enabled: true

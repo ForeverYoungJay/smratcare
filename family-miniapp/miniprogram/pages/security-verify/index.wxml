@@ -1,0 +1,40 @@
+<view class="container">
+  <view class="surface card">
+    <view class="section-title">{{title}}</view>
+    <view class="section-subtitle">为保护老人隐私，请完成二次验证。验证通过后 10 分钟内免重复验证。</view>
+
+    <view class="code-box" wx:if="{{mode === 'sms'}}">
+      <view class="label">短信验证码</view>
+      <input
+        class="code-input"
+        type="number"
+        maxlength="6"
+        placeholder="请输入6位验证码"
+        value="{{verifyCode}}"
+        bindinput="onCodeInput" />
+      <view class="hint">验证码有效期 5 分钟，验证通过后当前页面 10 分钟内免重复验证。</view>
+      <view class="hint" wx:if="{{debugCodeHint}}">{{debugCodeHint}}</view>
+    </view>
+
+    <view class="code-box" wx:if="{{mode === 'password'}}">
+      <view class="label">独立密码</view>
+      <input
+        class="code-input"
+        type="password"
+        maxlength="32"
+        placeholder="请输入独立密码"
+        value="{{password}}"
+        bindinput="onPasswordInput" />
+      <view class="hint">若未设置独立密码，请前往“安全设置”先完成设置。</view>
+    </view>
+
+    <button class="ghost-btn action-btn switch-btn" bindtap="switchMode">
+      {{mode === 'sms' ? '改用独立密码' : '改用短信验证码'}}
+    </button>
+
+    <view class="action-row">
+      <button class="ghost-btn action-btn" wx:if="{{mode === 'sms'}}" loading="{{sending}}" bindtap="sendCode">{{countdown > 0 ? countdown + 's后重发' : '发送验证码'}}</button>
+      <button class="primary-btn action-btn" loading="{{submitting}}" bindtap="submitVerify">验证并继续</button>
+    </view>
+  </view>
+</view>

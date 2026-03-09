@@ -12,8 +12,8 @@ export function reconcileDaily(params) {
 export function getReconcilePage(params) {
     return fetchPage('/api/finance/reconcile/page', params);
 }
-export function getFinanceBillDetail(billId) {
-    return request.get(`/api/finance/bill/${billId}`);
+export function getFinanceBillDetail(billId, config) {
+    return request.get(`/api/finance/bill/${billId}`, config);
 }
 export function getFinanceMonthlyRevenue(params) {
     return request.get('/api/finance/report/monthly-revenue', { params });
@@ -42,8 +42,8 @@ export function updateElderAccount(data) {
 export function getElderAccountWarnings() {
     return request.get('/api/finance/account/warnings');
 }
-export function getFinanceWorkbenchOverview() {
-    return request.get('/api/finance/workbench/overview');
+export function getFinanceWorkbenchOverview(config) {
+    return request.get('/api/finance/workbench/overview', config);
 }
 export function getFinanceOpsInsights() {
     return request.get('/api/finance/workbench/ops-insights');

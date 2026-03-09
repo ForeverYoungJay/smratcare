@@ -1,0 +1,66 @@
+<view class="container">
+  <view class="surface hero">
+    <view class="hero-head">
+      <view>
+        <view class="section-title">今日待办中心</view>
+        <view class="section-subtitle">刷新于 {{todo.refreshTime || '--'}}</view>
+      </view>
+      <button class="ghost-btn mini-btn" bindtap="toPaymentGuard">支付保障</button>
+    </view>
+
+    <view class="summary-grid">
+      <view class="summary-item urgent">
+        <text class="num">{{todo.summary.urgentCount || 0}}</text>
+        <text class="txt">紧急提醒</text>
+      </view>
+      <view class="summary-item due">
+        <text class="num">{{todo.summary.dueTodayCount || 0}}</text>
+        <text class="txt">今日待办</text>
+      </view>
+      <view class="summary-item done">
+        <text class="num">{{todo.summary.completedHintCount || 0}}</text>
+        <text class="txt">已完成日程</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="surface panel">
+    <view class="panel-title">待办事项</view>
+    <view class="list-empty" wx:if="{{todo.items.length === 0}}">当前暂无待办事项</view>
+    <block wx:for="{{todo.items}}" wx:key="index">
+      <view class="todo-item" data-path="{{item.actionPath}}" bindtap="openAction">
+        <view class="todo-top">
+          <view class="left-meta">
+            <text class="type">{{item.typeText}}</text>
+            <text class="status">{{item.status}}</text>
+          </view>
+          <text class="priority {{item.priorityClass}}">{{item.priorityText}}</text>
+        </view>
+        <view class="title">{{item.title}}</view>
+        <view class="desc">{{item.description}}</view>
+        <view class="todo-bottom">
+          <text class="due" wx:if="{{item.dueTime}}">截止 {{item.dueTime}}</text>
+          <text class="action" wx:if="{{item.actionable}}">去处理 ></text>
+          <text class="action done" wx:if="{{item.done}}">已处理</text>
+          <text class="action snoozed" wx:if="{{item.snoozed}}">稍后提醒</text>
+        </view>
+        <view class="op-row" wx:if="{{item.actionable}}">
+          <button
+            class="ghost-btn op-btn"
+            size="mini"
+            loading="{{actionLoading}}"
+            data-key="{{item.todoKey}}"
+            data-actionable="{{item.actionable}}"
+            catchtap="snoozeTodo">稍后2h</button>
+          <button
+            class="primary-btn op-btn"
+            size="mini"
+            loading="{{actionLoading}}"
+            data-key="{{item.todoKey}}"
+            data-actionable="{{item.actionable}}"
+            catchtap="markDone">完成</button>
+        </view>
+      </view>
+    </block>
+  </view>
+</view>

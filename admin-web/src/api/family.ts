@@ -8,3 +8,7 @@ export function getFamilyUserPage(params: any) {
 export function getFamilyRelations(elderId: number) {
   return request.get<FamilyRelationItem[]>('/api/admin/family/relations', { params: { elderId } })
 }
+
+export function removeFamilyRelation(relationId: number | string) {
+  return request.delete<void>(`/api/admin/family/relations/${relationId}`)
+}

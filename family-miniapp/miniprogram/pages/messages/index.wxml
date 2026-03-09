@@ -1,0 +1,47 @@
+<view class="container">
+  <view class="surface board">
+    <view class="top-row">
+      <view>
+        <view class="section-title">通知中心</view>
+        <view class="section-subtitle">高优先级事件双通道提醒（服务通知 + 小程序内消息）</view>
+      </view>
+      <view class="op-col">
+        <button class="ghost-btn mini-read-btn" bindtap="goAlertCenter">预警中心</button>
+        <button class="ghost-btn mini-read-btn" loading="{{processing}}" bindtap="readAll">全部已读</button>
+      </view>
+    </view>
+
+    <view class="unread-summary" wx:if="{{unreadCount > 0}}">当前有 {{unreadCount}} 条未读消息，建议优先处理紧急提醒</view>
+
+    <scroll-view class="filter-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+      <view class="filter-row">
+        <block wx:for="{{filters}}" wx:key="id">
+          <view
+            class="filter-item {{activeFilter === item.id ? 'filter-item-active' : ''}}"
+            data-filter="{{item.id}}"
+            bindtap="switchFilter">{{item.label}}</view>
+        </block>
+      </view>
+    </scroll-view>
+
+    <block wx:for="{{list}}" wx:key="id">
+      <view class="msg-item" data-id="{{item.id}}" bindtap="goDetail">
+        <view class="left">
+          <view class="badge-row">
+            <text class="tag {{item.level}}">{{item.levelText}}</text>
+            <text class="type">{{item.type}}</text>
+          </view>
+          <view class="title">{{item.title}}</view>
+          <view class="content">{{item.content}}</view>
+          <view class="meta">{{item.elderName}} · {{item.time}}</view>
+        </view>
+        <view class="right">
+          <button class="ghost-btn contact" data-phone="{{item.phone}}" catchtap="contactNurse">联系</button>
+          <view class="unread" wx:if="{{item.unread}}"></view>
+        </view>
+      </view>
+    </block>
+
+    <view class="list-empty" wx:if="{{!list.length}}">{{emptyText}}</view>
+  </view>
+</view>

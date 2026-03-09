@@ -1,0 +1,21 @@
+<view class="container">
+  <view class="surface card">
+    <view class="section-title">老人动态中心</view>
+    <view class="item" data-path="/pages/care-log/index" bindtap="go">
+      <view class="name">护理日志</view>
+      <view class="desc">查看每日护理项目、执行人员和备注</view>
+    </view>
+    <view class="item" data-path="/pages/activity-album/index" bindtap="go">
+      <view class="name">活动相册/视频</view>
+      <view class="desc">查看文娱活动纪实并可点赞评论</view>
+    </view>
+    <view class="item" data-path="/pages/diet-calendar/index" bindtap="go">
+      <view class="name">膳食日历</view>
+      <view class="desc">查看每日三餐、膳食标签和进食情况</view>
+    </view>
+    <view class="item" data-path="/pages/outing-record/index" bindtap="go">
+      <view class="name">外出记录</view>
+      <view class="desc">掌握外出时间、原因、陪同人员和返院状态</view>
+    </view>
+  </view>
+</view>

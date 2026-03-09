@@ -1,19 +1,28 @@
 import { defineStore } from 'pinia';
-import { getPermissions, getRoles, getToken, setPermissions, setRoles, setToken, clearPermissions, clearRoles, clearToken, normalizeRoles } from '../utils/auth';
+import { getPermissions, getRoles, getStaffInfo, getToken, setPermissions, setRoles, setStaffInfo, setToken, clearPermissions, clearRoles, clearStaffInfo, clearToken, normalizeRoles } from '../utils/auth';
 export const useUserStore = defineStore('user', {
     state: () => ({
         token: getToken(),
         roles: getRoles(),
         permissions: getPermissions(),
-        staffInfo: null
+        staffInfo: getStaffInfo()
     }),
     actions: {
+        setStaffProfile(staffInfo) {
+            this.staffInfo = staffInfo;
+            if (staffInfo) {
+                setStaffInfo(staffInfo);
+            }
+            else {
+                clearStaffInfo();
+            }
+        },
         setAuth(payload) {
             const roles = normalizeRoles(payload.roles || []);
             this.token = payload.token;
             this.roles = roles;
             this.permissions = payload.permissions || [];
-            this.staffInfo = payload.staffInfo;
+            this.setStaffProfile(payload.staffInfo);
             setToken(payload.token);
             setRoles(roles);
             setPermissions(payload.permissions || []);
@@ -22,7 +31,7 @@ export const useUserStore = defineStore('user', {
             this.token = '';
             this.roles = [];
             this.permissions = [];
-            this.staffInfo = null;
+            this.setStaffProfile(null);
             clearToken();
             clearRoles();
             clearPermissions();

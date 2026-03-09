@@ -1,9 +1,21 @@
 import request, { fetchPage } from '../utils/request';
-export function getMedicalCareWorkbenchSummary() {
-    return request.get('/api/medical-care/workbench/summary');
+export function getMedicalCareWorkbenchSummary(params, config) {
+    return request.get('/api/medical-care/workbench/summary', { params, ...(config || {}) });
 }
-export function getMedicalHealthCenterSummary(params) {
-    return request.get('/api/medical-care/center/summary', { params });
+export function getMedicalHealthCenterSummary(params, config) {
+    return request.get('/api/medical-care/center/summary', { params, ...(config || {}) });
+}
+export function getMedicalRiskTimeline(params, config) {
+    return request.get('/api/medical-care/workbench/risk-timeline', { params, ...(config || {}) });
+}
+export function getMedicalUnifiedTaskPage(params) {
+    return fetchPage('/api/medical-care/workbench/unified-tasks', params);
+}
+export function getMedicalAlertRuleConfig() {
+    return request.get('/api/medical-care/alert-rules');
+}
+export function updateMedicalAlertRuleConfig(data) {
+    return request.put('/api/medical-care/alert-rules', data);
 }
 export function getTcmAssessmentPage(params) {
     return fetchPage('/api/medical-care/tcm-assessments/page', params);

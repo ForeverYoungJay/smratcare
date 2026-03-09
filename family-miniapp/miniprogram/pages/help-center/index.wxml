@@ -1,0 +1,22 @@
+<view class="container">
+  <view class="surface card">
+    <view class="section-title">常见问题</view>
+
+    <view wx:if="{{loading}}" class="list-empty">FAQ 加载中...</view>
+    <view wx:elif="{{groups.length === 0}}" class="list-empty">暂无帮助内容</view>
+    <block wx:else wx:for="{{groups}}" wx:for-item="group" wx:key="category">
+      <view class="group">
+        <view class="group-title">{{group.category}}</view>
+        <block wx:for="{{group.items}}" wx:for-item="faq" wx:key="question">
+          <view class="qa-card">
+            <view class="qa">Q: {{faq.question}}</view>
+            <view class="ans">A: {{faq.answer}}</view>
+          </view>
+        </block>
+      </view>
+    </block>
+
+    <button class="primary-btn action" bindtap="callService">联系在线客服</button>
+    <button class="ghost-btn action" bindtap="goFeedback">提交建议反馈</button>
+  </view>
+</view>

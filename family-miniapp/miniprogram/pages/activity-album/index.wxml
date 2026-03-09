@@ -1,0 +1,44 @@
+<view class="container">
+  <view class="surface card">
+    <view class="section-title">活动相册 / 视频</view>
+    <block wx:for="{{list}}" wx:key="id">
+      <view class="item">
+        <image wx:if="{{item.coverUrl}}" class="cover-image" src="{{item.coverUrl}}" mode="aspectFill" />
+        <view wx:else class="cover">{{item.coverText}}</view>
+        <view class="name">{{item.title}}</view>
+        <view class="meta">{{item.elderName}} · {{item.date}} · {{item.mediaType}}</view>
+        <view class="desc">{{item.description}}</view>
+        <view class="actions">
+          <button class="ghost-btn small" data-id="{{item.id}}" bindtap="like">{{item.liked ? '取消赞' : '点赞'}} {{item.likes}}</button>
+          <button class="ghost-btn small" data-id="{{item.id}}" bindtap="openComments">
+            {{activeAlbumId === item.id ? '收起评论' : '评论 ' + item.comments}}
+          </button>
+        </view>
+
+        <view class="comment-panel" wx:if="{{activeAlbumId === item.id}}">
+          <view class="comment-title">评论互动</view>
+          <view class="comment-loading" wx:if="{{loadingComments}}">评论加载中...</view>
+          <view class="comment-empty" wx:elif="{{comments.length === 0}}">暂无评论，欢迎留言。</view>
+          <block wx:else wx:for="{{comments}}" wx:key="id">
+            <view class="comment-row">
+              <view class="comment-head">
+                <text class="commenter">{{item.commenter}}</text>
+                <text class="comment-time">{{item.time}}</text>
+              </view>
+              <view class="comment-content">{{item.content}}</view>
+            </view>
+          </block>
+          <view class="comment-editor">
+            <input
+              class="comment-input"
+              placeholder="写下你的互动留言"
+              value="{{commentInput}}"
+              maxlength="200"
+              bindinput="onCommentInput" />
+            <button class="primary-btn comment-btn" loading="{{commenting}}" bindtap="submitComment">发送</button>
+          </view>
+        </view>
+      </view>
+    </block>
+  </view>
+</view>

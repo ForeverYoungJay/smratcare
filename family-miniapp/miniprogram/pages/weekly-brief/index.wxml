@@ -1,0 +1,90 @@
+<view class="container" wx:if="{{brief}}">
+  <view class="surface hero {{brief.overallClass}}">
+    <view class="hero-head">
+      <view>
+        <view class="section-title">家属周报</view>
+        <view class="section-subtitle">{{brief.elderName}} · {{brief.weekRange}}</view>
+      </view>
+      <view class="status-pill">{{brief.overallLevel === 'warning' ? '需关注' : '平稳'}}</view>
+    </view>
+    <view class="overall-text">{{brief.overallText}}</view>
+
+    <view class="stat-grid">
+      <view class="stat-item">
+        <text class="num">{{brief.healthCheckCount}}</text>
+        <text class="txt">健康检测</text>
+      </view>
+      <view class="stat-item">
+        <text class="num">{{brief.abnormalCount}}</text>
+        <text class="txt">异常指标</text>
+      </view>
+      <view class="stat-item">
+        <text class="num">{{brief.nursingLogCount}}</text>
+        <text class="txt">护理日志</text>
+      </view>
+      <view class="stat-item">
+        <text class="num">{{brief.activityCount}}</text>
+        <text class="txt">活动次数</text>
+      </view>
+      <view class="stat-item">
+        <text class="num">{{brief.communicationCount}}</text>
+        <text class="txt">沟通次数</text>
+      </view>
+      <view class="stat-item">
+        <text class="num">{{brief.unreadMessageCount}}</text>
+        <text class="txt">未读提醒</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="surface panel">
+    <view class="panel-title">生命体征快照</view>
+    <view class="vital-grid">
+      <block wx:for="{{brief.vitalBadges}}" wx:key="name">
+        <view class="vital-item">
+          <view class="vital-name">{{item.name}}</view>
+          <view class="vital-value">{{item.value}}</view>
+          <view class="vital-status {{item.statusClass}}">{{item.status}}</view>
+        </view>
+      </block>
+    </view>
+  </view>
+
+  <view class="surface panel">
+    <view class="panel-title">本周亮点</view>
+    <block wx:for="{{brief.highlights}}" wx:key="*this">
+      <view class="line-item">
+        <text class="dot">•</text>
+        <text class="line-text">{{item}}</text>
+      </view>
+    </block>
+  </view>
+
+  <view class="surface panel">
+    <view class="panel-title">跟进建议</view>
+    <block wx:for="{{brief.suggestions}}" wx:key="*this">
+      <view class="suggest-item">{{index + 1}}. {{item}}</view>
+    </block>
+  </view>
+
+  <view class="surface panel">
+    <view class="panel-title">历史周报</view>
+    <view class="list-empty" wx:if="{{history.length === 0}}">暂无历史周报</view>
+    <block wx:for="{{history}}" wx:key="weekRange">
+      <view class="history-item {{item.overallClass}}" data-index="{{index}}" bindtap="onHistoryTap">
+        <view class="history-top">
+          <text class="history-range">{{item.weekRange}}</text>
+          <text class="history-level">{{item.overallLevel === 'warning' ? '需关注' : '平稳'}}</text>
+        </view>
+        <view class="history-quick">{{item.quickText}}</view>
+      </view>
+    </block>
+  </view>
+
+  <view class="quick-actions">
+    <button class="ghost-btn action-btn" bindtap="shareBriefText">复制摘要</button>
+    <button class="ghost-btn action-btn" bindtap="toHealth">查看趋势</button>
+    <button class="ghost-btn action-btn" bindtap="toTodoCenter">处理待办</button>
+    <button class="primary-btn action-btn" bindtap="toCommunication">发起沟通</button>
+  </view>
+</view>

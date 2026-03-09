@@ -4,10 +4,18 @@
     subTitle="按清洁、维修、送餐、盘点进行任务分流与执行跟踪"
     :class="{ 'duty-dense': densityMode === 'dense' }"
   >
+    <template #extra>
+      <a-space>
+        <a-tag :color="viewMode === 'DUTY' ? 'gold' : 'blue'">{{ viewMode === 'DUTY' ? '值班视图' : '全量视图' }}</a-tag>
+        <a-tag :color="densityMode === 'dense' ? 'orange' : 'default'">{{ densityMode === 'dense' ? '大屏密度' : '标准密度' }}</a-tag>
+        <a-button @click="copyShareLink">复制分享链接</a-button>
+        <a-button type="primary" ghost @click="loadData({ preserveSelection: true })">刷新数据</a-button>
+      </a-space>
+    </template>
     <StatefulBlock :loading="loading" :error="errorMessage" :empty="false" @retry="loadData">
-      <a-row :gutter="12" style="margin-bottom: 12px">
+      <a-row :gutter="12" class="task-summary-row">
         <a-col :xs="24" :md="12" :xl="6">
-          <a-card size="small" title="清洁任务">
+          <a-card size="small" title="清洁任务" class="task-summary-card">
             <div class="metric-value">{{ summary?.todayCleaningTaskCount || 0 }}</div>
             <div class="metric-line">待完成：{{ pendingCleaningCount }}</div>
             <a-space style="margin-top: 8px">
@@ -17,7 +25,7 @@
           </a-card>
         </a-col>
         <a-col :xs="24" :md="12" :xl="6">
-          <a-card size="small" title="维修任务">
+          <a-card size="small" title="维修任务" class="task-summary-card">
             <div class="metric-value">{{ summary?.todayMaintenanceTaskCount || 0 }}</div>
             <div class="metric-line">待处理：{{ pendingMaintenanceCount }}</div>
             <a-space style="margin-top: 8px">
@@ -27,7 +35,7 @@
           </a-card>
         </a-col>
         <a-col :xs="24" :md="12" :xl="6">
-          <a-card size="small" title="送餐任务">
+          <a-card size="small" title="送餐任务" class="task-summary-card">
             <div class="metric-value">{{ summary?.todayDeliveryTaskCount || 0 }}</div>
             <div class="metric-line">未完成：{{ pendingDeliveryCount }}</div>
             <a-space style="margin-top: 8px">
@@ -37,7 +45,7 @@
           </a-card>
         </a-col>
         <a-col :xs="24" :md="12" :xl="6">
-          <a-card size="small" title="库存盘点">
+          <a-card size="small" title="库存盘点" class="task-summary-card">
             <div class="metric-value">{{ summary?.todayInventoryCheckTaskCount || 0 }}</div>
             <div class="metric-line">盘亏记录：{{ lossAdjustmentCount }}</div>
             <a-space style="margin-top: 8px">
@@ -48,7 +56,7 @@
         </a-col>
       </a-row>
 
-      <a-card size="small" style="margin-bottom: 12px">
+      <a-card size="small" class="task-control-card">
         <a-space wrap>
           <a-radio-group v-model:value="viewMode" button-style="solid">
             <a-radio-button value="ALL">全量视图</a-radio-button>
@@ -63,8 +71,14 @@
           <a-button @click="exportCurrentTab">导出当前视图</a-button>
           <a-button @click="exportActionLogs" :disabled="actionLogs.length === 0">导出操作日志</a-button>
           <BatchActionBar :actions="tabBatchActions" />
-          <a-button type="primary" @click="loadData">刷新任务数据</a-button>
+          <a-button type="primary" @click="loadData({ preserveSelection: true })">刷新任务数据</a-button>
+          <a-switch v-model:checked="autoRefresh" checked-children="自动刷新" un-checked-children="手动刷新" />
         </a-space>
+        <div style="margin-top: 8px">
+          <a-tag color="blue">任务视角参数</a-tag>
+          <span style="color: #64748b">{{ summaryWindowHint }}</span>
+        </div>
+        <div class="refresh-hint">最近刷新：{{ lastLoadedAt || '-' }}</div>
       </a-card>
       <a-alert
         v-if="lastBatchReceipt"
@@ -220,7 +234,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -229,11 +243,25 @@ import StatefulBlock from '../../components/StatefulBlock.vue'
 import BatchActionBar, { type BatchActionItem } from '../../components/BatchActionBar.vue'
 import { exportCsv } from '../../utils/export'
 import { useUserStore } from '../../stores/user'
-import { getLogisticsWorkbenchSummary } from '../../api/logistics'
-import { completeMaintenance, completeRoomCleaning, getMaintenancePage, getRoomCleaningPage } from '../../api/life'
-import { getDiningDeliveryRecordPage, redispatchDiningDeliveryRecord, updateDiningDeliveryRecord } from '../../api/dining'
-import { getInventoryAdjustmentPage } from '../../api/materialCenter'
-import type { DiningDeliveryRecord, InventoryAdjustmentItem, LogisticsWorkbenchSummary, MaintenanceRequest, RoomCleaningTask } from '../../types'
+import type {
+  DiningDeliveryRecord,
+  InventoryAdjustmentItem,
+  LogisticsWorkbenchSummary,
+  LogisticsWorkbenchSummaryQuery,
+  MaintenanceRequest,
+  RoomCleaningTask
+} from '../../types'
+import {
+  useLogisticsTaskCenterRequestLayer,
+  taskCenterRequestActions
+} from '../../composables/useLogisticsTaskCenterRequestLayer'
+import { runTaskBatch } from '../../composables/useLogisticsTaskCenterBatch'
+import { useLogisticsTaskCenterDataLayer } from '../../composables/useLogisticsTaskCenterDataLayer'
+import {
+  summaryQuerySignature,
+  type TaskCenterTab,
+  useLogisticsTaskCenterRouteLayer
+} from '../../composables/useLogisticsTaskCenterRoute'
 
 type ActionLogEntry = {
   id: string
@@ -267,12 +295,27 @@ const router = useRouter()
 const route = useRoute()
 const loading = ref(false)
 const errorMessage = ref('')
-const activeTab = ref('cleaning')
+const activeTab = ref<TaskCenterTab>('cleaning')
 const viewMode = ref<'ALL' | 'DUTY'>('ALL')
 const densityMode = ref<'normal' | 'dense'>('normal')
 const tableSize = computed(() => (densityMode.value === 'dense' ? 'small' : 'middle'))
-
 const summary = ref<LogisticsWorkbenchSummary>()
+const summaryQuery = ref<LogisticsWorkbenchSummaryQuery>({})
+const syncingRouteState = ref(false)
+const loadedSummarySignature = ref('')
+const autoRefresh = ref(true)
+const lastLoadedAt = ref('')
+const { resolvedSummaryQuery, summaryWindowHint, requestData } = useLogisticsTaskCenterRequestLayer(summaryQuery)
+const { syncStateFromRoute, buildTaskCenterRouteQuery, syncRouteQueryFromState } = useLogisticsTaskCenterRouteLayer({
+  route,
+  router,
+  summaryQuery,
+  activeTab,
+  viewMode,
+  densityMode,
+  syncingRouteState
+})
+
 const cleaningRows = ref<RoomCleaningTask[]>([])
 const maintenanceRows = ref<MaintenanceRequest[]>([])
 const deliveryRows = ref<DiningDeliveryRecord[]>([])
@@ -281,6 +324,25 @@ const selectedCleaningKeys = ref<Array<number | string>>([])
 const selectedMaintenanceKeys = ref<Array<number | string>>([])
 const selectedDeliveryKeys = ref<Array<number | string>>([])
 const actionLogs = ref<ActionLogEntry[]>([])
+const { loadData } = useLogisticsTaskCenterDataLayer({
+  requestData,
+  summaryQuery,
+  loading,
+  errorMessage,
+  loadedSummarySignature,
+  lastLoadedAt,
+  summary,
+  cleaningRows,
+  maintenanceRows,
+  deliveryRows,
+  adjustmentRows,
+  selectedCleaningKeys,
+  selectedMaintenanceKeys,
+  selectedDeliveryKeys,
+  onError: (errorText) => {
+    message.error(errorText)
+  }
+})
 const batchFailures = ref<TaskBatchFailure[]>([])
 const batchFailureDrawerOpen = ref(false)
 const lastBatchReceipt = ref<TaskBatchReceipt | null>(null)
@@ -778,6 +840,18 @@ function go(path: string) {
   router.push(path)
 }
 
+async function copyShareLink() {
+  const query = buildTaskCenterRouteQuery()
+  const resolved = router.resolve({ path: route.path, query })
+  const shareLink = `${window.location.origin}${resolved.fullPath}`
+  try {
+    await navigator.clipboard.writeText(shareLink)
+    message.success('分享链接已复制')
+  } catch {
+    message.warning('当前环境不支持自动复制，请手动复制地址栏链接')
+  }
+}
+
 function normalizeStatus(status?: string) {
   return String(status || '').trim().toUpperCase()
 }
@@ -786,6 +860,29 @@ function actionLogStorageKey() {
   const orgId = userStore.staffInfo?.orgId || 'unknown-org'
   const staffId = userStore.staffInfo?.id || 'unknown-staff'
   return `logistics-task-center-action-logs:${orgId}:${staffId}`
+}
+
+function refreshPreferenceStorageKey() {
+  const orgId = userStore.staffInfo?.orgId || 'unknown-org'
+  const staffId = userStore.staffInfo?.id || 'unknown-staff'
+  return `logistics-task-center-auto-refresh:${orgId}:${staffId}`
+}
+
+function loadRefreshPreference() {
+  try {
+    const raw = window.localStorage.getItem(refreshPreferenceStorageKey())
+    if (raw === '0') {
+      autoRefresh.value = false
+      return
+    }
+  } catch {}
+  autoRefresh.value = true
+}
+
+function saveRefreshPreference() {
+  try {
+    window.localStorage.setItem(refreshPreferenceStorageKey(), autoRefresh.value ? '1' : '0')
+  } catch {}
 }
 
 function loadActionLogs() {
@@ -820,7 +917,7 @@ function pushActionLog(action: string, detail: string, success: boolean) {
 
 async function finishCleaning(record: RoomCleaningTask) {
   try {
-    await completeRoomCleaning(record.id)
+    await taskCenterRequestActions.completeRoomCleaning(record.id)
     pushActionLog('清洁任务完成', `房间 ${record.roomNo || '-'}，任务ID ${record.id}`, true)
     message.success('清洁任务已完成')
     await loadData()
@@ -836,54 +933,36 @@ async function batchFinishCleaning() {
     message.info('没有可批量完成的清洁任务')
     return
   }
-  const startedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
-  batchFailures.value = []
   startBatchProgress('批量完成清洁处理中', rows.length)
-  const successIds: Array<number | string> = []
-  const failedIds: Array<number | string> = []
-  for (const row of rows) {
-    try {
-      await completeRoomCleaning(row.id)
-      successIds.push(row.id)
-      stepBatchProgress(true)
-    } catch (error) {
-      failedIds.push(row.id)
-      stepBatchProgress(false)
-      const detail = parseErrorDetail(error)
-      batchFailures.value.push({
-        at: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-        action: '批量完成清洁',
-        itemId: row.id,
-        reason: detail.reason,
-        code: detail.code,
-        path: detail.path,
-        retryable: detail.retryable
-      })
-    }
-  }
-  finishBatchProgress()
-  lastBatchReceipt.value = {
+  const result = await runTaskBatch({
     action: '批量完成清洁',
-    startAt: startedAt,
-    finishAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-    total: rows.length,
-    success: successIds.length,
-    failed: failedIds.length
-  }
-  selectedCleaningKeys.value = failedIds
+    rows,
+    getItemId: (row) => row.id,
+    execute: async (row) => {
+      await taskCenterRequestActions.completeRoomCleaning(row.id)
+    },
+    parseErrorDetail,
+    onStep: (ok) => {
+      stepBatchProgress(ok)
+    }
+  })
+  batchFailures.value = result.failures
+  finishBatchProgress()
+  lastBatchReceipt.value = result.receipt
+  selectedCleaningKeys.value = result.failedIds
   await loadData({ preserveSelection: true })
-  if (failedIds.length > 0) {
-    pushActionLog('批量完成清洁', `成功 ${successIds.length} 条，失败 ${failedIds.length} 条`, false)
-    message.warning(`批量完成清洁：成功 ${successIds.length}，失败 ${failedIds.length}（失败项已保留勾选）`)
+  if (result.failedIds.length > 0) {
+    pushActionLog('批量完成清洁', `成功 ${result.successIds.length} 条，失败 ${result.failedIds.length} 条`, false)
+    message.warning(`批量完成清洁：成功 ${result.successIds.length}，失败 ${result.failedIds.length}（失败项已保留勾选）`)
     return
   }
-  pushActionLog('批量完成清洁', `处理 ${successIds.length} 条`, true)
-  message.success(`已批量完成${successIds.length}条清洁任务`)
+  pushActionLog('批量完成清洁', `处理 ${result.successIds.length} 条`, true)
+  message.success(`已批量完成${result.successIds.length}条清洁任务`)
 }
 
 async function finishMaintenance(record: MaintenanceRequest) {
   try {
-    await completeMaintenance(record.id)
+    await taskCenterRequestActions.completeMaintenance(record.id)
     pushActionLog('维修任务完成', `房间 ${record.roomNo || '-'}，任务ID ${record.id}`, true)
     message.success('维修任务已完成')
     await loadData()
@@ -901,49 +980,31 @@ async function batchFinishMaintenance() {
     message.info('没有可批量完成的维修任务')
     return
   }
-  const startedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
-  batchFailures.value = []
   startBatchProgress('批量完成维修处理中', rows.length)
-  const successIds: Array<number | string> = []
-  const failedIds: Array<number | string> = []
-  for (const row of rows) {
-    try {
-      await completeMaintenance(row.id)
-      successIds.push(row.id)
-      stepBatchProgress(true)
-    } catch (error) {
-      failedIds.push(row.id)
-      stepBatchProgress(false)
-      const detail = parseErrorDetail(error)
-      batchFailures.value.push({
-        at: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-        action: '批量完成维修',
-        itemId: row.id,
-        reason: detail.reason,
-        code: detail.code,
-        path: detail.path,
-        retryable: detail.retryable
-      })
-    }
-  }
-  finishBatchProgress()
-  lastBatchReceipt.value = {
+  const result = await runTaskBatch({
     action: '批量完成维修',
-    startAt: startedAt,
-    finishAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-    total: rows.length,
-    success: successIds.length,
-    failed: failedIds.length
-  }
-  selectedMaintenanceKeys.value = failedIds
+    rows,
+    getItemId: (row) => row.id,
+    execute: async (row) => {
+      await taskCenterRequestActions.completeMaintenance(row.id)
+    },
+    parseErrorDetail,
+    onStep: (ok) => {
+      stepBatchProgress(ok)
+    }
+  })
+  batchFailures.value = result.failures
+  finishBatchProgress()
+  lastBatchReceipt.value = result.receipt
+  selectedMaintenanceKeys.value = result.failedIds
   await loadData({ preserveSelection: true })
-  if (failedIds.length > 0) {
-    pushActionLog('批量完成维修', `成功 ${successIds.length} 条，失败 ${failedIds.length} 条`, false)
-    message.warning(`批量完成维修：成功 ${successIds.length}，失败 ${failedIds.length}（失败项已保留勾选）`)
+  if (result.failedIds.length > 0) {
+    pushActionLog('批量完成维修', `成功 ${result.successIds.length} 条，失败 ${result.failedIds.length} 条`, false)
+    message.warning(`批量完成维修：成功 ${result.successIds.length}，失败 ${result.failedIds.length}（失败项已保留勾选）`)
     return
   }
-  pushActionLog('批量完成维修', `处理 ${successIds.length} 条`, true)
-  message.success(`已批量完成${successIds.length}条维修任务`)
+  pushActionLog('批量完成维修', `处理 ${result.successIds.length} 条`, true)
+  message.success(`已批量完成${result.successIds.length}条维修任务`)
 }
 
 function cleaningStatusLabel(record: RoomCleaningTask) {
@@ -1000,7 +1061,7 @@ function deliveryStatusColor(record: DiningDeliveryRecord) {
 
 async function finishDelivery(record: DiningDeliveryRecord) {
   try {
-    await updateDiningDeliveryRecord(record.id, {
+    await taskCenterRequestActions.updateDiningDeliveryRecord(record.id, {
       mealOrderId: record.mealOrderId,
       orderNo: record.orderNo,
       deliveryAreaId: record.deliveryAreaId,
@@ -1030,7 +1091,7 @@ async function markDeliveryFailed(record: DiningDeliveryRecord) {
       message.warning('失败原因不能为空')
       return
     }
-    await updateDiningDeliveryRecord(record.id, {
+    await taskCenterRequestActions.updateDiningDeliveryRecord(record.id, {
       mealOrderId: record.mealOrderId,
       orderNo: record.orderNo,
       deliveryAreaId: record.deliveryAreaId,
@@ -1051,7 +1112,7 @@ async function markDeliveryFailed(record: DiningDeliveryRecord) {
 
 async function redispatchDelivery(record: DiningDeliveryRecord) {
   try {
-    await redispatchDiningDeliveryRecord(record.id, {})
+    await taskCenterRequestActions.redispatchDiningDeliveryRecord(record.id, {})
     pushActionLog('送餐重派', `订单 ${record.orderNo || '-'}，记录ID ${record.id}`, true)
     message.success('送餐任务已重派')
     await loadData()
@@ -1069,49 +1130,31 @@ async function batchRedispatchDelivery() {
     message.info('没有可批量重派的送餐任务')
     return
   }
-  const startedAt = dayjs().format('YYYY-MM-DD HH:mm:ss')
-  batchFailures.value = []
   startBatchProgress('批量重派送餐处理中', rows.length)
-  const successIds: Array<number | string> = []
-  const failedIds: Array<number | string> = []
-  for (const row of rows) {
-    try {
-      await redispatchDiningDeliveryRecord(row.id, {})
-      successIds.push(row.id)
-      stepBatchProgress(true)
-    } catch (error) {
-      failedIds.push(row.id)
-      stepBatchProgress(false)
-      const detail = parseErrorDetail(error)
-      batchFailures.value.push({
-        at: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-        action: '批量重派送餐',
-        itemId: row.id,
-        reason: detail.reason,
-        code: detail.code,
-        path: detail.path,
-        retryable: detail.retryable
-      })
-    }
-  }
-  finishBatchProgress()
-  lastBatchReceipt.value = {
+  const result = await runTaskBatch({
     action: '批量重派送餐',
-    startAt: startedAt,
-    finishAt: dayjs().format('YYYY-MM-DD HH:mm:ss'),
-    total: rows.length,
-    success: successIds.length,
-    failed: failedIds.length
-  }
-  selectedDeliveryKeys.value = failedIds
+    rows,
+    getItemId: (row) => row.id,
+    execute: async (row) => {
+      await taskCenterRequestActions.redispatchDiningDeliveryRecord(row.id, {})
+    },
+    parseErrorDetail,
+    onStep: (ok) => {
+      stepBatchProgress(ok)
+    }
+  })
+  batchFailures.value = result.failures
+  finishBatchProgress()
+  lastBatchReceipt.value = result.receipt
+  selectedDeliveryKeys.value = result.failedIds
   await loadData({ preserveSelection: true })
-  if (failedIds.length > 0) {
-    pushActionLog('批量重派送餐', `成功 ${successIds.length} 条，失败 ${failedIds.length} 条`, false)
-    message.warning(`批量重派送餐：成功 ${successIds.length}，失败 ${failedIds.length}（失败项已保留勾选）`)
+  if (result.failedIds.length > 0) {
+    pushActionLog('批量重派送餐', `成功 ${result.successIds.length} 条，失败 ${result.failedIds.length} 条`, false)
+    message.warning(`批量重派送餐：成功 ${result.successIds.length}，失败 ${result.failedIds.length}（失败项已保留勾选）`)
     return
   }
-  pushActionLog('批量重派送餐', `处理 ${successIds.length} 条`, true)
-  message.success(`已批量重派${successIds.length}条送餐任务`)
+  pushActionLog('批量重派送餐', `处理 ${result.successIds.length} 条`, true)
+  message.success(`已批量重派${result.successIds.length}条送餐任务`)
 }
 
 function exportCurrentTab() {
@@ -1180,72 +1223,83 @@ function exportActionLogs() {
   )
 }
 
-async function loadData(options?: { preserveSelection?: boolean }) {
-  loading.value = true
-  errorMessage.value = ''
-  const today = dayjs().format('YYYY-MM-DD')
-  const preserveSelection = Boolean(options?.preserveSelection)
-  try {
-    const [summaryData, cleaningPage, maintenancePage, deliveryPage, adjustmentPage] = await Promise.all([
-      getLogisticsWorkbenchSummary(),
-      getRoomCleaningPage({ pageNo: 1, pageSize: 500 }),
-      getMaintenancePage({ pageNo: 1, pageSize: 500, dateFrom: today, dateTo: today }),
-      getDiningDeliveryRecordPage({ pageNo: 1, pageSize: 500, dateFrom: today, dateTo: today }),
-      getInventoryAdjustmentPage({ pageNo: 1, pageSize: 200, dateFrom: today, dateTo: today })
-    ])
-    summary.value = summaryData
-    cleaningRows.value = cleaningPage?.list || []
-    maintenanceRows.value = maintenancePage?.list || []
-    deliveryRows.value = deliveryPage?.list || []
-    adjustmentRows.value = adjustmentPage?.list || []
-    if (preserveSelection) {
-      const cleaningSet = new Set(cleaningRows.value.map((item) => String(item.id)))
-      selectedCleaningKeys.value = selectedCleaningKeys.value.filter((id) => cleaningSet.has(String(id)))
-      const maintenanceSet = new Set(maintenanceRows.value.map((item) => String(item.id)))
-      selectedMaintenanceKeys.value = selectedMaintenanceKeys.value.filter((id) => maintenanceSet.has(String(id)))
-      const deliverySet = new Set(deliveryRows.value.map((item) => String(item.id)))
-      selectedDeliveryKeys.value = selectedDeliveryKeys.value.filter((id) => deliverySet.has(String(id)))
-    } else {
-      selectedCleaningKeys.value = []
-      selectedMaintenanceKeys.value = []
-      selectedDeliveryKeys.value = []
-    }
-  } catch (error: any) {
-    errorMessage.value = error?.message || '加载后勤任务中心失败'
-    message.error(errorMessage.value)
-  } finally {
-    loading.value = false
-  }
-}
-
 let refreshTimer: number | undefined
 onMounted(() => {
-  const tab = String(route.query.tab || '')
-  if (['cleaning', 'maintenance', 'delivery', 'inventory'].includes(tab)) {
-    activeTab.value = tab
-  }
+  syncStateFromRoute(route.query)
+  loadedSummarySignature.value = summaryQuerySignature(summaryQuery.value)
   loadActionLogs()
+  loadRefreshPreference()
   loadData()
-  refreshTimer = window.setInterval(loadData, 60000)
+  refreshTimer = window.setInterval(() => {
+    if (!autoRefresh.value || loading.value || batchProgress.value.running || document.visibilityState !== 'visible') {
+      return
+    }
+    loadData({ preserveSelection: true })
+  }, 60000)
 })
 onUnmounted(() => {
   if (refreshTimer) {
     window.clearInterval(refreshTimer)
   }
 })
+
+watch(
+  () => route.query,
+  async (query) => {
+    const previousSummarySignature = summaryQuerySignature(summaryQuery.value)
+    syncStateFromRoute(query)
+    const nextSummarySignature = summaryQuerySignature(summaryQuery.value)
+    if (nextSummarySignature === previousSummarySignature && nextSummarySignature === loadedSummarySignature.value) {
+      return
+    }
+    await loadData({ preserveSelection: true })
+  },
+  { deep: true }
+)
+
+watch([activeTab, viewMode, densityMode], () => {
+  syncRouteQueryFromState().catch(() => {})
+})
+
+watch(autoRefresh, () => {
+  saveRefreshPreference()
+})
 </script>
 
 <style scoped>
+.task-summary-row {
+  margin-bottom: 12px;
+}
+
+.task-summary-card {
+  border: 1px solid #e9edf5;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+}
+
+.task-control-card {
+  margin-bottom: 12px;
+  border: 1px solid #e6f0ff;
+  border-radius: 12px;
+  background: linear-gradient(90deg, #f8fcff 0%, #ffffff 45%, #fffaf5 100%);
+}
+
+.refresh-hint {
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 12px;
+}
+
 .metric-value {
   font-size: 24px;
   font-weight: 600;
-  color: #262626;
+  color: #1d2939;
   line-height: 1.4;
 }
 
 .metric-line {
   margin-top: 4px;
-  color: #595959;
+  color: #475467;
 }
 
 .duty-dense :deep(.ant-card-body) {

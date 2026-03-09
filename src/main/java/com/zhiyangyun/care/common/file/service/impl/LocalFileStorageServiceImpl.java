@@ -10,10 +10,12 @@ import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
+@ConditionalOnProperty(prefix = "app.file-storage", name = "provider", havingValue = "local", matchIfMissing = true)
 public class LocalFileStorageServiceImpl implements FileStorageService {
   private final FileStorageProperties properties;
 
@@ -52,7 +54,7 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
     UploadFileResponse response = new UploadFileResponse();
     response.setFileName(storageName);
     response.setOriginalFileName(originalName);
-    response.setFileUrl(normalizePrefix(properties.getUrlPrefix()) + relativePath);
+    response.setFileUrl(buildFileUrl(relativePath));
     response.setFileType(file.getContentType());
     response.setFileSize(file.getSize());
     return response;
@@ -102,6 +104,9 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
 
   private String normalizePrefix(String prefix) {
     String value = (prefix == null || prefix.isBlank()) ? "/uploads" : prefix.trim();
+    if (value.startsWith("http://") || value.startsWith("https://")) {
+      return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
+    }
     if (!value.startsWith("/")) {
       value = "/" + value;
     }
@@ -109,5 +114,15 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
       value = value.substring(0, value.length() - 1);
     }
     return value;
+  }
+
+  private String buildFileUrl(String relativePath) {
+    String publicBase = properties.getPublicBaseUrl();
+    if (publicBase != null && !publicBase.isBlank()) {
+      String base = publicBase.trim().endsWith("/") ? publicBase.trim().substring(0, publicBase.trim().length() - 1)
+          : publicBase.trim();
+      return base + relativePath;
+    }
+    return normalizePrefix(properties.getUrlPrefix()) + relativePath;
   }
 }

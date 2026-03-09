@@ -256,6 +256,7 @@ export interface ResidenceStatusSummary {
   deathCount: number
   openIncidentCount: number
   overdueOutingCount: number
+  generatedAt?: string
 }
 
 export interface AdmissionRecordItem {
@@ -271,6 +272,27 @@ export interface AdmissionRecordItem {
   createByName?: string
   creatorName?: string
   createTime?: string
+}
+
+export interface AdmissionRecordSummary {
+  totalCount: number
+  inHospitalCount: number
+  leaveCount: number
+  dischargedCount: number
+  otherStatusCount: number
+  withContractCount: number
+  withoutContractCount: number
+  todayAdmissionCount: number
+  buildingDistribution?: AdmissionRecordDimensionItem[]
+  floorDistribution?: AdmissionRecordDimensionItem[]
+  generatedAt?: string
+}
+
+export interface AdmissionRecordDimensionItem {
+  dimensionKey: string
+  dimensionLabel: string
+  count: number
+  ratio: number
 }
 
 export interface OutingItem {

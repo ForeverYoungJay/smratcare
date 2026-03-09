@@ -1,5 +1,38 @@
 <template>
   <PageContainer title="账单详情" :subTitle="`账单ID: ${currentBillId}`">
+    <a-card v-if="loadError" class="card-elevated" :bordered="false">
+      <a-result
+        status="warning"
+        title="未找到可访问的账单"
+        :sub-title="loadError"
+      >
+        <template #extra>
+          <a-space wrap>
+            <a-button type="primary" @click="router.push('/finance/bills/detail-query')">返回账单详情查询</a-button>
+            <a-button @click="router.push('/finance/bills/in-resident')">前往在住账单</a-button>
+            <a-button v-if="lastValidBillId" @click="router.push(`/finance/bill/${lastValidBillId}`)">返回最近账单</a-button>
+          </a-space>
+        </template>
+      </a-result>
+      <a-divider />
+      <a-space wrap>
+        <a-select
+          v-model:value="fixQuery.elderId"
+          show-search
+          allow-clear
+          :filter-option="false"
+          :options="elderOptions"
+          :loading="elderLoading"
+          placeholder="选择老人后定位账单"
+          style="width: 280px"
+          @search="searchElders"
+        />
+        <a-date-picker v-model:value="fixQuery.month" picker="month" style="width: 160px" />
+        <a-button type="primary" @click="locateBillByElder">按老人+月份定位账单</a-button>
+      </a-space>
+    </a-card>
+
+    <template v-else>
     <a-card class="card-elevated" :bordered="false">
       <a-row :gutter="16">
         <a-col :span="6">
@@ -163,6 +196,7 @@
         </a-form-item>
       </a-form>
     </a-modal>
+    </template>
   </PageContainer>
 </template>
 
@@ -184,6 +218,8 @@ const route = useRoute()
 const router = useRouter()
 const currentBillId = computed(() => Number(route.params.billId))
 const detail = ref<FinanceBillDetail | null>(null)
+const loadError = ref('')
+const lastValidBillId = ref<number | null>(null)
 const orderDetailMap = ref<Record<number, any>>({})
 const orderLoading = ref<Record<number, boolean>>({})
 
@@ -251,14 +287,35 @@ function statusColor(status?: number) {
 }
 
 async function refresh() {
-  detail.value = await getFinanceBillDetail(currentBillId.value)
-  const month = detail.value?.billMonth
-  if (month) {
-    fixQuery.month = dayjs(month, 'YYYY-MM')
+  const billId = Number(currentBillId.value)
+  if (!Number.isFinite(billId) || billId <= 0) {
+    detail.value = null
+    loadError.value = '账单ID无效，请返回账单中心重新选择。'
+    return
   }
-  if (detail.value?.elderId) {
-    ensureSelectedElder(detail.value.elderId, detail.value.elderName)
-    fixQuery.elderId = detail.value.elderId
+  try {
+    const data = await getFinanceBillDetail(billId, { silentError: true })
+    detail.value = data
+    lastValidBillId.value = billId
+    loadError.value = ''
+    const month = detail.value?.billMonth
+    if (month) {
+      fixQuery.month = dayjs(month, 'YYYY-MM')
+    }
+    if (detail.value?.elderId) {
+      ensureSelectedElder(detail.value.elderId, detail.value.elderName)
+      fixQuery.elderId = detail.value.elderId
+    }
+  } catch (error: any) {
+    detail.value = null
+    const raw = String(error?.message || error?.msg || '').trim()
+    if (raw) {
+      loadError.value = /bill not found/i.test(raw)
+        ? `账单不存在、已删除或无权限访问（ID: ${billId}）`
+        : raw
+    } else {
+      loadError.value = `账单不存在、已删除或无权限访问（ID: ${billId}）`
+    }
   }
 }
 
@@ -356,6 +413,7 @@ function payMethodText(method?: string) {
 }
 
 async function submitPay() {
+  if (!detail.value) return
   await payFormRef.value?.validate?.()
   paying.value = true
   try {
@@ -385,6 +443,7 @@ async function submitPay() {
 }
 
 async function markInvalid() {
+  if (!detail.value) return
   const confirmed = await confirmAction({
     title: '确认标记为无效账单？',
     content: `账单ID：${currentBillId.value}`,
@@ -399,6 +458,7 @@ async function markInvalid() {
 }
 
 function exportPayments() {
+  if (!detail.value) return
   exportCsv(detail.value?.payments || [], `payments-${currentBillId.value}.csv`)
 }
 

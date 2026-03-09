@@ -1,0 +1,26 @@
+<view class="container">
+  <view class="surface card">
+    <view class="section-title">按日期查看膳食</view>
+    <block wx:for="{{list}}" wx:key="date">
+      <view class="item">
+        <view class="date">{{item.date}}</view>
+        <view class="review">{{item.review}}</view>
+        <view class="meal">早餐：{{item.breakfastText}}</view>
+        <view class="meal">午餐：{{item.lunchText}}</view>
+        <view class="meal">晚餐：{{item.dinnerText}}</view>
+        <view class="photo-empty" wx:if="{{!item.photos || item.photos.length === 0}}">餐食实拍：稍后补充</view>
+        <view class="photo-row" wx:else>
+          <block wx:for="{{item.photos}}" wx:for-item="photo" wx:key="*this">
+            <image
+              class="photo"
+              src="{{photo}}"
+              mode="aspectFill"
+              data-date="{{item.date}}"
+              data-url="{{photo}}"
+              bindtap="previewPhoto" />
+          </block>
+        </view>
+      </view>
+    </block>
+  </view>
+</view>
