@@ -38,7 +38,6 @@
         :column-config="{ resizable: true }"
       >
         <vxe-column field="elderName" title="老人" min-width="160" />
-        <vxe-column field="elderId" title="老人ID" width="120" />
         <vxe-column field="pointsBalance" title="积分余额" width="120" />
         <vxe-column field="status" title="状态" width="120">
           <template #default="{ row }">

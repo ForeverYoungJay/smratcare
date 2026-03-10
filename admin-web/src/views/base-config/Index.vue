@@ -15,8 +15,8 @@
             <a-select-option :value="0">停用</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item>
-          <a-space>
+        <a-form-item class="search-actions-item">
+          <a-space class="search-actions" wrap>
             <a-button type="primary" @click="fetchData">查询</a-button>
             <a-button @click="reset">重置</a-button>
             <a-button type="primary" @click="openCreate" :disabled="!activeGroup">新增配置项</a-button>
@@ -44,6 +44,7 @@
         :pagination="false"
         row-key="id"
         :row-selection="rowSelection"
+        :scroll="{ x: 980 }"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'configGroup'">
@@ -803,5 +804,46 @@ watch(
 <style scoped>
 .search-bar {
   margin-bottom: 12px;
+}
+
+.search-actions {
+  max-width: 100%;
+}
+
+@media (max-width: 768px) {
+  .search-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 0;
+  }
+
+  .search-bar :deep(.ant-form-item) {
+    width: 100%;
+    margin-right: 0;
+    margin-bottom: 8px;
+  }
+
+  .search-bar :deep(.ant-form-item-control-input),
+  .search-bar :deep(.ant-form-item-control-input-content),
+  .search-bar :deep(.ant-input),
+  .search-bar :deep(.ant-select) {
+    width: 100% !important;
+  }
+
+  .search-actions-item :deep(.ant-form-item-control-input-content) {
+    width: 100%;
+  }
+
+  .search-actions {
+    width: 100%;
+  }
+
+  .search-actions :deep(.ant-space-item) {
+    margin-bottom: 6px;
+  }
+
+  .search-actions :deep(.ant-btn) {
+    width: 100%;
+  }
 }
 </style>

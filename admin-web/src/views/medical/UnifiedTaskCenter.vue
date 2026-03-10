@@ -236,7 +236,7 @@ const residentContext = computed(() => {
   return {
     active: !!residentIdRaw,
     residentId: residentIdRaw ? Number(residentIdRaw) : undefined,
-    name: residentName || (residentIdRaw ? `长者#${residentIdRaw}` : '')
+    name: residentName || ''
   }
 })
 const lifecycleContext = computed(() => {

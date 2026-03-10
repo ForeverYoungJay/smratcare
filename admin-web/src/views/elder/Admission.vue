@@ -98,6 +98,7 @@
         <a-form-item label="入住状态">
           <a-select v-model:value="recordQuery.elderStatus" allow-clear style="width: 140px" placeholder="请选择入住状态">
             <a-select-option :value="1">在院</a-select-option>
+            <a-select-option :value="0">不在院</a-select-option>
             <a-select-option :value="2">请假</a-select-option>
             <a-select-option :value="3">离院</a-select-option>
           </a-select>
@@ -175,7 +176,7 @@
             {{ displayElderName(record) }}
           </template>
           <template v-else-if="column.key === 'elderStatus'">
-            <a-tag :color="record.elderStatus === 1 ? 'green' : record.elderStatus === 2 ? 'orange' : 'default'">
+            <a-tag :color="statusColor(record.elderStatus)">
               {{ statusText(record.elderStatus) }}
             </a-tag>
           </template>
@@ -282,7 +283,10 @@ const submitChecklistLoading = ref(false)
 const submitConfirmOpen = ref(false)
 const linkedLeadId = ref<number>()
 const guardContract = ref<CrmContractItem | null>(null)
-const { elderOptions, elderLoading, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 120 })
+const { elderOptions, elderLoading, searchElders, findElderName, ensureSelectedElder } = useElderOptions({
+  pageSize: 120,
+  inHospitalOnly: false
+})
 const buildings = ref<BuildingItem[]>([])
 const floors = ref<FloorItem[]>([])
 const rooms = ref<RoomItem[]>([])
@@ -386,7 +390,7 @@ const recordSummaryCards = computed(() => {
       key: 'inHospital',
       label: '在院',
       value: Number(recordSummary.inHospitalCount || 0),
-      hint: '当前状态 = 在院'
+      hint: '合同已签署/生效'
     },
     {
       key: 'leave',
@@ -471,7 +475,8 @@ function applyRecordQueryFromRoute() {
   resetRecordQueryState()
   const keyword = firstQueryText(route.query.recordKeyword)
   const contractNo = firstQueryText(route.query.recordContractNo)
-  const elderStatus = Number(firstQueryText(route.query.recordElderStatus))
+  const elderStatusTextRaw = firstQueryText(route.query.recordElderStatus)
+  const elderStatus = Number(elderStatusTextRaw)
   const admissionDateStart = firstQueryText(route.query.recordAdmissionDateStart)
   const admissionDateEnd = firstQueryText(route.query.recordAdmissionDateEnd)
   const dimension = firstQueryText(route.query.recordDimension).toUpperCase()
@@ -480,7 +485,7 @@ function applyRecordQueryFromRoute() {
 
   if (keyword) recordQuery.keyword = keyword
   if (contractNo) recordQuery.contractNo = contractNo
-  if (Number.isFinite(elderStatus) && elderStatus > 0) recordQuery.elderStatus = elderStatus
+  if (elderStatusTextRaw !== '' && Number.isFinite(elderStatus) && elderStatus >= 0) recordQuery.elderStatus = elderStatus
   if (admissionDateStart && admissionDateEnd) {
     recordQuery.admissionDateRange = [admissionDateStart, admissionDateEnd]
   }
@@ -501,7 +506,7 @@ function buildRecordRouteQuery() {
   })
   if (recordQuery.keyword) query.recordKeyword = recordQuery.keyword
   if (recordQuery.contractNo) query.recordContractNo = recordQuery.contractNo
-  if (recordQuery.elderStatus) query.recordElderStatus = String(recordQuery.elderStatus)
+  if (recordQuery.elderStatus != null) query.recordElderStatus = String(recordQuery.elderStatus)
   if (recordQuery.admissionDateRange?.[0]) query.recordAdmissionDateStart = recordQuery.admissionDateRange[0]
   if (recordQuery.admissionDateRange?.[1]) query.recordAdmissionDateEnd = recordQuery.admissionDateRange[1]
   query.recordDimension = recordDimension.value
@@ -554,9 +559,17 @@ const admissionLifecycleHint = computed(() => {
 
 function statusText(status?: number) {
   if (status === 1) return '在院'
+  if (status === 0) return '不在院'
   if (status === 2) return '请假'
   if (status === 3) return '离院'
   return '-'
+}
+
+function statusColor(status?: number) {
+  if (status === 1) return 'green'
+  if (status === 2) return 'orange'
+  if (status === 3) return 'red'
+  return 'default'
 }
 
 function displayElderName(record: AdmissionRecordItem) {
@@ -717,7 +730,7 @@ async function loadContractGuardState() {
     guardContract.value = (page.list || []).find((item) => item.contractNo === contractNo) || null
     if (guardContract.value?.elderId) {
       form.elderId = guardContract.value.elderId as any
-      ensureSelectedElder(String(guardContract.value.elderId), guardContract.value.elderName || `长者${String(guardContract.value.elderId)}`)
+      ensureSelectedElder(String(guardContract.value.elderId), guardContract.value.elderName || '未命名长者')
       if (!recordQuery.keyword && guardContract.value.elderName) {
         recordQuery.keyword = guardContract.value.elderName
       }
@@ -926,12 +939,12 @@ function applyRoutePrefill() {
   if (residentIdText && !recordQuery.keyword) {
     const residentId = Number(residentIdText)
     if (residentId > 0) {
-      ensureSelectedElder(residentId, elderName || `长者${residentId}`)
+      ensureSelectedElder(residentId, elderName || findElderName(residentId) || undefined)
       form.elderId = residentId as any
-      recordQuery.keyword = elderName || findElderName(residentId) || residentIdText
+      recordQuery.keyword = elderName || findElderName(residentId) || ''
     } else {
       form.elderId = residentIdText as any
-      recordQuery.keyword = elderName || residentIdText
+      recordQuery.keyword = elderName || ''
     }
   }
   if (!recordQuery.keyword && elderName) {

@@ -155,7 +155,6 @@
         <a-descriptions-item label="人均">{{ Number(previewData?.avgAmount || 0).toFixed(2) }}</a-descriptions-item>
       </a-descriptions>
       <vxe-table border stripe show-overflow :data="previewData?.rows || []" height="360" style="margin-top: 12px;">
-        <vxe-column field="elderId" title="老人ID" width="140" />
         <vxe-column field="elderName" title="老人姓名" min-width="220" />
         <vxe-column field="amount" title="分摊金额" width="160" />
       </vxe-table>
@@ -380,7 +379,7 @@ function formatElderLabels(raw?: string, snapshotJson?: string) {
   const residentNameMap = new Map<number, string>(
     allocationResidents.value.map(item => [Number(item.elderId), String(item.elderName || '').trim()])
   )
-  return ids.map(id => residentNameMap.get(id) || findElderName(id) || `#${id}`).join('、')
+  return ids.map(id => residentNameMap.get(id) || findElderName(id) || '未命名长者').join('、')
 }
 
 function resolveAvgAmount(record: MonthlyAllocationItem) {
@@ -640,7 +639,7 @@ function printCurrent() {
   try {
     printTableReport({
       title: '月分摊费',
-      subtitle: `月份：${query.month ? dayjs(query.month).format('YYYY-MM') : '全部'}；状态：${query.status || '全部'}；老人：${query.elderId ? (findElderName(query.elderId) || `#${query.elderId}`) : '全部'}；备注：${query.printRemark || '-'}`,
+      subtitle: `月份：${query.month ? dayjs(query.month).format('YYYY-MM') : '全部'}；状态：${query.status || '全部'}；老人：${query.elderId ? (findElderName(query.elderId) || '未命名长者') : '全部'}；备注：${query.printRemark || '-'}`,
       columns: [
         { key: 'allocationMonth', title: '月份' },
         { key: 'allocationName', title: '分摊项目' },

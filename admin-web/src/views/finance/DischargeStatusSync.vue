@@ -105,7 +105,7 @@ async function loadData() {
 async function executeOne(row: FinanceDischargeStatusSyncRow) {
   const confirmed = await confirmAction({
     title: '确认执行该条状态回写？',
-    content: `结算单#${row.settlementId || '-'} / 老人#${row.elderId || '-'}`,
+    content: `结算单#${row.settlementId || '-'} / 老人：${row.elderName || '未命名长者'}`,
     impactItems: ['老人状态将回写为已退住', '老人档案床位将清空', '床位状态将释放为空床'],
     okText: '确认回写',
     danger: true
@@ -153,7 +153,6 @@ function exportCurrent() {
   exportCsv(
     (data.value?.rows || []).map(item => ({
       结算单ID: item.settlementId || '',
-      老人ID: item.elderId || '',
       老人姓名: item.elderName || '',
       结算时间: item.settledTime || '',
       异常类型: issueTypeText(item.issueType),
@@ -173,7 +172,6 @@ function printCurrent() {
       subtitle: `巡检上限：${query.value.limit}；备注：${query.value.printRemark || '-'}`,
       columns: [
         { key: 'settlementId', title: '结算单ID' },
-        { key: 'elderId', title: '老人ID' },
         { key: 'elderName', title: '老人姓名' },
         { key: 'settledTime', title: '结算时间' },
         { key: 'issueTypeText', title: '异常类型' },
@@ -184,7 +182,6 @@ function printCurrent() {
       ],
       rows: (data.value?.rows || []).map(item => ({
         settlementId: item.settlementId || '-',
-        elderId: item.elderId || '-',
         elderName: item.elderName || '-',
         settledTime: item.settledTime || '-',
         issueTypeText: issueTypeText(item.issueType),

@@ -134,7 +134,7 @@
       >
         <a-table-column title="领用单号" data-index="outboundNo" key="outboundNo" width="180" />
         <a-table-column title="领取人" data-index="receiverName" key="receiverName" width="120" />
-        <a-table-column title="老人院内ID" data-index="elderId" key="elderId" width="120" />
+        <a-table-column title="老人姓名" data-index="elderName" key="elderName" width="120" />
         <a-table-column title="合同号" data-index="contractNo" key="contractNo" width="140" />
         <a-table-column title="申请部门" data-index="applyDept" key="applyDept" width="120" />
         <a-table-column title="经办人" data-index="operatorName" key="operatorName" width="120" />
@@ -181,7 +181,7 @@
       <a-descriptions v-if="sheetDetail" :column="2" bordered size="small" style="margin-bottom: 12px;">
         <a-descriptions-item label="领用单号">{{ sheetDetail.outboundNo }}</a-descriptions-item>
         <a-descriptions-item label="领取人">{{ sheetDetail.receiverName }}</a-descriptions-item>
-        <a-descriptions-item label="老人院内ID">{{ sheetDetail.elderId || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="老人姓名">{{ resolveSheetElderName(sheetDetail) }}</a-descriptions-item>
         <a-descriptions-item label="合同号">{{ sheetDetail.contractNo || '-' }}</a-descriptions-item>
         <a-descriptions-item label="申请部门">{{ sheetDetail.applyDept || '-' }}</a-descriptions-item>
         <a-descriptions-item label="经办人">{{ sheetDetail.operatorName || '-' }}</a-descriptions-item>
@@ -1181,7 +1181,7 @@ async function downloadSheetPdf(id: number, notify = true) {
   doc.setFontSize(10)
   const metaLines = [
     `领用人：${sheet.receiverName || '-'}`,
-    `老人院内ID：${sheet.elderId || '-'}`,
+    `老人姓名：${resolveSheetElderName(sheet)}`,
     `合同号：${sheet.contractNo || '-'}`,
     `领用单号：${sheet.outboundNo || '-'}`,
     `申请部门：${sheet.applyDept || '-'}`,
@@ -1265,7 +1265,7 @@ function buildSheetHtml(sheet: InventoryOutboundSheet) {
         <h2>领用出库单</h2>
         <div class="meta">
           领用人：${safeHtml(sheet.receiverName)}<br/>
-          老人院内ID：${safeHtml(sheet.elderId || '-')}<br/>
+          老人姓名：${safeHtml(resolveSheetElderName(sheet))}<br/>
           合同号：${safeHtml(sheet.contractNo || '-')}<br/>
           出库单号：${safeHtml(sheet.outboundNo)}<br/>
           申请部门：${safeHtml(sheet.applyDept || '-')}<br/>
@@ -1299,6 +1299,10 @@ function productSpecById(productId?: number | string) {
 
 function itemSpec(item: { unit?: string; productCode?: string }) {
   return item.unit || item.productCode || '-'
+}
+
+function resolveSheetElderName(sheet?: Pick<InventoryOutboundSheet, 'elderName'> | null) {
+  return String(sheet?.elderName || '').trim() || '未命名长者'
 }
 
 function safeHtml(value: unknown) {

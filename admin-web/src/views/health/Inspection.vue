@@ -258,7 +258,7 @@ const residentContext = computed(() => {
   return {
     active: !!residentId,
     residentId: residentId ? Number(residentId) : undefined,
-    name: residentName || (residentId ? `长者#${residentId}` : '')
+    name: residentName || ''
   }
 })
 

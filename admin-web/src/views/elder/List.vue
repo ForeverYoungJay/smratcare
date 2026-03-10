@@ -17,6 +17,7 @@
         <a-form-item label="状态">
           <a-select v-model:value="query.status" allow-clear style="width: 120px">
             <a-select-option :value="1">在院</a-select-option>
+            <a-select-option :value="0">不在院</a-select-option>
             <a-select-option :value="2">请假</a-select-option>
             <a-select-option :value="3">离院</a-select-option>
           </a-select>
@@ -76,7 +77,7 @@
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
-            <a-tag :color="statusTag(record.status)">{{ statusText(record.status) }}</a-tag>
+            <a-tag :color="statusTag(record)">{{ statusText(record) }}</a-tag>
           </template>
           <template v-else-if="column.key === 'lifecycleStage'">
             <a-tag :color="lifecycleStageColor(resolveLifecycleStage(record))">
@@ -164,6 +165,7 @@ import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { exportCsv } from '../../utils/export'
 import { copyText } from '../../utils/clipboard'
 import { lifecycleStageColor, lifecycleStageLabel, normalizeLifecycleStage } from '../../utils/lifecycleStage'
+import { elderResidenceStatusColor, elderResidenceStatusText, resolveElderResidenceStatus } from '../../utils/elderResidenceStatus'
 import { getElderPage, assignBed, bindFamily } from '../../api/elder'
 import { getBedList } from '../../api/bed'
 import { getFamilyUserPage } from '../../api/family'
@@ -224,19 +226,16 @@ const elderFlowSteps = ['档案建档', '办理入住', '在院管理']
 const elderFlowCurrentIndex = computed(() => {
   if (!selectedRows.value.length) return 2
   const row = selectedRows.value[0]
-  if (row.status === 1 || row.status === 2) return 2
+  if (resolveDisplayStatus(row) === 1 || resolveDisplayStatus(row) === 2) return 2
   return 1
 })
 const elderFlowStageText = computed(() => {
   if (!selectedRows.value.length) return '已过滤为签署后长者'
-  return statusText(selectedRows.value[0].status)
+  return statusText(selectedRows.value[0])
 })
 const elderFlowStageColor = computed(() => {
   if (!selectedRows.value.length) return 'blue'
-  const status = selectedRows.value[0].status
-  if (status === 1) return 'green'
-  if (status === 2) return 'orange'
-  return 'default'
+  return statusTag(selectedRows.value[0])
 })
 const elderFlowSubject = computed(() => {
   if (!selectedRows.value.length) return `当前列表共 ${total.value} 位，支持营销签约与直办入住双来源`
@@ -288,23 +287,32 @@ const qrOpen = ref(false)
 const qrDataUrl = ref('')
 const qrText = ref('')
 
-function statusText(status?: number) {
-  if (status === 1) return '在院'
-  if (status === 2) return '请假'
-  if (status === 3) return '离院'
-  return '未知'
+function resolveDisplayStatus(item: ElderItem) {
+  return resolveElderResidenceStatus({
+    status: item.status,
+    lifecycleStage: item.lifecycleStage,
+    lifecycleContractStatus: item.lifecycleContractStatus
+  })
 }
 
-function statusTag(status?: number) {
-  if (status === 1) return 'green'
-  if (status === 2) return 'orange'
-  if (status === 3) return 'red'
-  return 'default'
+function statusText(item: ElderItem) {
+  return elderResidenceStatusText({
+    status: item.status,
+    lifecycleStage: item.lifecycleStage,
+    lifecycleContractStatus: item.lifecycleContractStatus
+  })
+}
+
+function statusTag(item: ElderItem) {
+  return elderResidenceStatusColor({
+    status: item.status,
+    lifecycleStage: item.lifecycleStage,
+    lifecycleContractStatus: item.lifecycleContractStatus
+  })
 }
 
 function resolveLifecycleStage(item: ElderItem) {
-  const fallback = item.status === 1 || item.status === 2 || item.status === 3 ? 'SIGNED' : 'PENDING_ASSESSMENT'
-  return normalizeLifecycleStage(item.lifecycleStage, item.lifecycleContractStatus || fallback)
+  return normalizeLifecycleStage(item.lifecycleStage, item.lifecycleContractStatus)
 }
 
 function requireSingleSelection(actionLabel: string) {
@@ -337,7 +345,7 @@ async function fetchData() {
       roomNo: r.roomNo ?? r.currentBed?.roomNo,
       lifecycleStage: normalizeLifecycleStage(
         r.lifecycleStage,
-        r.lifecycleContractStatus || (r.status === 1 || r.status === 2 || r.status === 3 ? 'SIGNED' : undefined)
+        r.lifecycleContractStatus
       )
     }))
     total.value = res.total || res.list.length
@@ -412,8 +420,9 @@ function applyQueryFromRoute() {
   query.idCardNo = firstRouteQueryText(route.query.idCardNo) || undefined
   query.bedNo = firstRouteQueryText(route.query.bedNo) || undefined
   query.careLevel = firstRouteQueryText(route.query.careLevel) || undefined
-  const status = Number(firstRouteQueryText(route.query.status))
-  query.status = Number.isFinite(status) && status > 0 ? status : undefined
+  const statusTextRaw = firstRouteQueryText(route.query.status)
+  const status = Number(statusTextRaw)
+  query.status = statusTextRaw !== '' && Number.isFinite(status) && status >= 0 ? status : undefined
   query.sortBy = firstRouteQueryText(route.query.sortBy) || undefined
   const order = firstRouteQueryText(route.query.sortOrder).toLowerCase()
   query.sortOrder = order === 'asc' || order === 'desc' ? order : undefined
@@ -431,7 +440,7 @@ function buildQueryRouteQuery() {
   if (query.idCardNo) nextQuery.idCardNo = query.idCardNo
   if (query.bedNo) nextQuery.bedNo = query.bedNo
   if (query.careLevel) nextQuery.careLevel = query.careLevel
-  if (query.status) nextQuery.status = String(query.status)
+  if (query.status != null) nextQuery.status = String(query.status)
   if (query.sortBy) nextQuery.sortBy = query.sortBy
   if (query.sortOrder) nextQuery.sortOrder = query.sortOrder
   nextQuery.pageNo = String(parsePositiveInt(query.pageNo, 1))
@@ -523,7 +532,7 @@ function exportCsvData() {
       家庭地址: r.homeAddress || '',
       床位号: r.bedNo || '',
       护理等级: r.careLevel || '',
-      状态: statusText(r.status)
+      状态: statusText(r)
     })),
     'elder-list.csv'
   )

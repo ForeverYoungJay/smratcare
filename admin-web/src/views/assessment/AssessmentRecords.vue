@@ -1175,7 +1175,7 @@ const admissionMissingItems = computed(() =>
     return (current === undefined || current === null) && Math.max(...item.options.map((opt) => opt.score)) > 0
   })
 )
-const admissionResidentIdFromRoute = computed(() => Number(route.query.residentId || route.query.elderId || 0))
+const admissionResidentIdFromRoute = computed(() => firstRouteQueryText(route.query.residentId || route.query.elderId))
 const admissionContractNoFromRoute = computed(() => String(route.query.contractNo || '').trim())
 const admissionElderNameFromRoute = computed(() => String(route.query.elderName || '').trim())
 const admissionAutoOpenMode = computed(() => String(route.query.mode || 'new'))
@@ -1183,14 +1183,14 @@ const admissionShouldAutoOpen = computed(() => String(route.query.autoOpen || ''
 const admissionCloseLoopEnabled = computed(() => String(route.query.closeLoop || route.query.returnToAdmission || '') === '1')
 const admissionRouteHandled = ref(false)
 const routeElderId = computed(() => {
-  const raw = Number(route.query.residentId || route.query.elderId || 0)
-  return raw > 0 ? raw : undefined
+  const raw = firstRouteQueryText(route.query.residentId || route.query.elderId)
+  return raw || undefined
 })
 const archiveStatusTab = ref<'ALL' | 'DRAFT' | 'COMPLETED' | 'ARCHIVED'>('ALL')
 
 const query = reactive({
   keyword: '',
-  elderId: undefined as number | undefined,
+  elderId: undefined as string | number | undefined,
   contentKeyword: '',
   archiveType: undefined as AssessmentType | undefined,
   status: undefined as string | undefined,
@@ -1264,8 +1264,8 @@ function applyAssessmentQueryFromRoute() {
   const keyword = firstRouteQueryText(route.query.assessKeyword) || legacyKeyword
   if (keyword) query.keyword = keyword
 
-  const elderId = Number(firstRouteQueryText(route.query.assessElderId || route.query.elderId || route.query.residentId))
-  if (Number.isFinite(elderId) && elderId > 0 && props.assessmentType === 'ARCHIVE') {
+  const elderId = firstRouteQueryText(route.query.assessElderId || route.query.elderId || route.query.residentId)
+  if (elderId && props.assessmentType === 'ARCHIVE') {
     query.elderId = elderId
     ensureSelectedElder(elderId)
   }
@@ -1630,13 +1630,13 @@ async function loadPendingAdmissionContracts() {
   if (!isAdmissionAssessment.value) return
   pendingAdmissionLoading.value = true
   try {
-    const elderIdFromRoute = Number(route.query.residentId || route.query.elderId || 0)
+    const elderIdFromRoute = firstRouteQueryText(route.query.residentId || route.query.elderId)
     const page: PageResult<CrmContractItem> = await getContractPage({
       pageNo: 1,
       pageSize: 200,
       flowStage: 'PENDING_ASSESSMENT',
       currentOwnerDept: 'ASSESSMENT',
-      elderId: elderIdFromRoute > 0 ? elderIdFromRoute : undefined
+      elderId: elderIdFromRoute || undefined
     })
     pendingAdmissionContracts.value = page.list || []
     const routeContractNo = admissionContractNoFromRoute.value
@@ -1784,7 +1784,7 @@ async function searchElderOptions(keyword: string) {
 
 async function resolveContractNoByElder(elderId?: number | string) {
   if (!elderId) return ''
-  const normalizedElderId = Number(elderId)
+  const normalizedElderId = String(elderId).trim()
   if (!normalizedElderId) return ''
   try {
     const page: PageResult<CrmContractItem> = await getContractPage({
@@ -1801,7 +1801,7 @@ async function resolveContractNoByElder(elderId?: number | string) {
 }
 
 async function onElderChange(elderId?: number | string) {
-  form.elderName = findElderName(Number(elderId) || undefined)
+  form.elderName = findElderName(elderId as any)
   if (!elderId || formReadonly.value) return
   if (admissionContractNoFromRoute.value) {
     form.archiveNo = admissionContractNoFromRoute.value
@@ -1917,8 +1917,8 @@ function openForm(record?: AssessmentRecord, readonly = false) {
       form.levelCode = admissionLevelText.value === '待完成评分' ? '' : admissionLevelText.value.split('：')[0]
     }
     if (routeElderId.value) {
-      form.elderId = routeElderId.value
-      const routeElderName = findElderName(routeElderId.value)
+      form.elderId = routeElderId.value as any
+      const routeElderName = findElderName(routeElderId.value as any)
       if (routeElderName) {
         form.elderName = routeElderName
       }
@@ -1933,8 +1933,8 @@ function openForm(record?: AssessmentRecord, readonly = false) {
         form.elderName = contract.elderName
       }
       if (contract.elderId) {
-        form.elderId = Number(contract.elderId)
-        ensureSelectedElder(Number(contract.elderId), contract.elderName || undefined)
+        form.elderId = contract.elderId as any
+        ensureSelectedElder(contract.elderId as any, contract.elderName || undefined)
       }
     }
   }
@@ -2097,10 +2097,10 @@ async function submit() {
     open.value = false
     if (isAdmissionAssessment.value && admissionCloseLoopEnabled.value) {
       const contractNo = String(payload.archiveNo || admissionContractNoFromRoute.value || '').trim()
-      const residentId = Number(payload.elderId || admissionResidentIdFromRoute.value || 0)
+      const residentId = String(payload.elderId || admissionResidentIdFromRoute.value || '').trim()
       const params = new URLSearchParams()
       if (contractNo) params.set('contractNo', contractNo)
-      if (residentId > 0) params.set('residentId', String(residentId))
+      if (residentId) params.set('residentId', residentId)
       message.success('评估完成，正在自动回流入住办理')
       const queryString = params.toString()
       const targetPath = queryString ? `/elder/admission-processing?${queryString}` : '/elder/admission-processing'

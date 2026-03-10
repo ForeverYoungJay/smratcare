@@ -124,7 +124,7 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
     }
 
     elder.setAdmissionDate(request.getAdmissionDate());
-    elder.setStatus(1);
+    elder.setStatus(isSignedContract(contract) ? 1 : 0);
     elderMapper.updateById(elder);
 
     if (request.getBedId() != null
@@ -390,6 +390,7 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
         .filter(Objects::nonNull)
         .distinct()
         .toList();
+    List<Long> signedElderIds = resolveSignedContractElderIds(tenantId, elderIds);
     Map<Long, ElderProfile> elderMap = loadElderProfileMap(tenantId, elderIds);
 
     List<AdmissionRecordResponse> records = page.getRecords().stream().map(item -> {
@@ -403,7 +404,11 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
       response.setCreateTime(item.getCreateTime());
       ElderProfile elder = elderMap.get(item.getElderId());
       response.setElderName(elder == null ? null : elder.getFullName());
-      response.setElderStatus(elder == null ? null : elder.getStatus());
+      Integer elderStatus = elder == null ? null : elder.getStatus();
+      if (!signedElderIds.contains(item.getElderId()) && (elderStatus == null || elderStatus == 1)) {
+        elderStatus = 0;
+      }
+      response.setElderStatus(elderStatus);
       return response;
     }).toList();
 
@@ -445,6 +450,7 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
         .filter(Objects::nonNull)
         .distinct()
         .toList();
+    List<Long> signedElderIds = resolveSignedContractElderIds(tenantId, elderIds);
     Map<Long, ElderProfile> elderMap = loadElderProfileMap(tenantId, elderIds);
     Map<Long, Bed> bedMap = loadBedMap(tenantId, elderMap.values().stream()
         .map(ElderProfile::getBedId)
@@ -473,16 +479,15 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
 
       ElderProfile elder = elderMap.get(admission.getElderId());
       Integer status = elder == null ? null : elder.getStatus();
-      if (status == null) {
+      boolean signed = admission.getElderId() != null && signedElderIds.contains(admission.getElderId());
+      if (!signed) {
         response.setOtherStatusCount(response.getOtherStatusCount() + 1);
-      } else if (status == 1) {
-        response.setInHospitalCount(response.getInHospitalCount() + 1);
-      } else if (status == 2) {
+      } else if (Objects.equals(status, 2)) {
         response.setLeaveCount(response.getLeaveCount() + 1);
-      } else if (status == 3) {
+      } else if (Objects.equals(status, 3)) {
         response.setDischargedCount(response.getDischargedCount() + 1);
       } else {
-        response.setOtherStatusCount(response.getOtherStatusCount() + 1);
+        response.setInHospitalCount(response.getInHospitalCount() + 1);
       }
 
       Bed bed = elder == null || elder.getBedId() == null ? null : bedMap.get(elder.getBedId());
@@ -513,16 +518,49 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
     if (!hasKeyword && !hasStatus && !hasElderId) {
       return null;
     }
-    return elderMapper.selectList(Wrappers.lambdaQuery(ElderProfile.class)
+    List<Long> candidateIds = elderMapper.selectList(Wrappers.lambdaQuery(ElderProfile.class)
             .eq(ElderProfile::getIsDeleted, 0)
             .eq(tenantId != null, ElderProfile::getTenantId, tenantId)
             .eq(hasElderId, ElderProfile::getId, elderId)
             .like(hasKeyword, ElderProfile::getFullName, keyword)
-            .eq(hasStatus, ElderProfile::getStatus, elderStatus))
+            .eq(hasStatus && !Objects.equals(elderStatus, 1), ElderProfile::getStatus, elderStatus))
         .stream()
         .map(ElderProfile::getId)
         .filter(Objects::nonNull)
         .toList();
+    if (!Objects.equals(elderStatus, 1)) {
+      return candidateIds;
+    }
+    List<Long> signedElderIds = resolveSignedContractElderIds(tenantId, candidateIds);
+    if (signedElderIds.isEmpty()) {
+      return List.of();
+    }
+    return candidateIds.stream().filter(signedElderIds::contains).toList();
+  }
+
+  private List<Long> resolveSignedContractElderIds(Long tenantId, List<Long> elderIds) {
+    if (elderIds == null || elderIds.isEmpty()) {
+      return List.of();
+    }
+    return crmContractMapper.selectList(Wrappers.lambdaQuery(CrmContract.class)
+            .eq(CrmContract::getIsDeleted, 0)
+            .eq(tenantId != null, CrmContract::getTenantId, tenantId)
+            .in(CrmContract::getStatus, List.of("SIGNED", "EFFECTIVE"))
+            .in(CrmContract::getElderId, elderIds))
+        .stream()
+        .map(CrmContract::getElderId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList();
+  }
+
+  private boolean isSignedContract(CrmContract contract) {
+    if (contract == null) {
+      return false;
+    }
+    String status = String.valueOf(contract.getStatus() == null ? "" : contract.getStatus()).trim().toUpperCase();
+    String flowStage = String.valueOf(contract.getFlowStage() == null ? "" : contract.getFlowStage()).trim().toUpperCase();
+    return "SIGNED".equals(status) || "EFFECTIVE".equals(status) || "SIGNED".equals(flowStage);
   }
 
   private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ElderAdmission> buildAdmissionWrapper(

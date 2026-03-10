@@ -108,9 +108,10 @@
             </a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="状态" name="status">
+        <a-form-item label="状态（合同签署后自动在院）" name="status">
           <a-select v-model:value="form.status" placeholder="请选择">
-            <a-select-option :value="1">在院</a-select-option>
+            <a-select-option :value="1" disabled>在院（自动）</a-select-option>
+            <a-select-option :value="0">不在院</a-select-option>
             <a-select-option :value="2">请假</a-select-option>
             <a-select-option :value="3">离院</a-select-option>
           </a-select>
@@ -159,7 +160,7 @@ const form = reactive<ElderCreateRequest & { contractNo?: string; depositAmount?
   depositAmount: undefined,
   careLevel: '',
   riskPrecommit: undefined,
-  status: 1,
+  status: 0,
   remark: '',
   bedId: undefined,
   bedStartDate: undefined
@@ -202,8 +203,7 @@ const bedOptions = computed(() =>
 )
 
 const rules: FormRules = {
-  fullName: [{ required: true, message: '请输入姓名' }],
-  status: [{ required: true, message: '请选择状态' }]
+  fullName: [{ required: true, message: '请输入姓名' }]
 }
 
 function back() {
