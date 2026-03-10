@@ -998,12 +998,6 @@ watch(
   }
 )
 watch(
-  () => form.contractNo,
-  () => {
-    loadContractGuardState()
-  }
-)
-watch(
   () => route.query,
   () => {
     const nextSignature = buildRecordRouteSignature(route.query as Record<string, unknown>)
@@ -1041,6 +1035,8 @@ onMounted(async () => {
   applyRoutePrefill()
   if (!form.contractNo && form.elderId) {
     await resolveContractNoByElder(form.elderId as any)
+  } else if (form.contractNo) {
+    await loadContractGuardState()
   }
   await refreshAdmissionRecordPanel()
   recordRouteSignature.value = buildRecordRouteSignature(route.query as Record<string, unknown>)

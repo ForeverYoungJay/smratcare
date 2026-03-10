@@ -136,12 +136,32 @@ const { elderOptions: residentOptionPool, elderLoading: residentLoading, searchE
   preloadSize: 600,
   inHospitalOnly: true
 })
-const residentOptions = computed(() =>
-  residentOptionPool.value.map((item) => ({
-    label: item.label,
-    value: String(item.value)
-  }))
-)
+const residentOptions = computed(() => {
+  const map = new Map<string, { label: string; value: string }>()
+  residentOptionPool.value.forEach((item) => {
+    const value = String(item.value || '').trim()
+    if (!value) return
+    const nextOption = {
+      label: String(item.label || '').trim(),
+      value
+    }
+    const current = map.get(value)
+    if (!current) {
+      map.set(value, nextOption)
+      return
+    }
+    const currentHasCode = /\([^)]*\)/.test(current.label)
+    const nextHasCode = /\([^)]*\)/.test(nextOption.label)
+    if (!currentHasCode && nextHasCode) {
+      map.set(value, nextOption)
+      return
+    }
+    if (nextOption.label.length > current.label.length) {
+      map.set(value, nextOption)
+    }
+  })
+  return Array.from(map.values())
+})
 const selectedResidentOption = computed(() =>
   residentOptions.value.find((item) => item.value === String(residentId.value || '').trim())
 )

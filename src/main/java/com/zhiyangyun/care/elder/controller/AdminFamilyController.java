@@ -14,6 +14,7 @@ import com.zhiyangyun.care.elder.mapper.FamilyUserMapper;
 import com.zhiyangyun.care.elder.model.FamilyBindRequest;
 import com.zhiyangyun.care.elder.model.FamilyRelationItem;
 import com.zhiyangyun.care.elder.model.FamilyUserPageItem;
+import com.zhiyangyun.care.elder.model.AdminFamilyUserUpsertRequest;
 import com.zhiyangyun.care.elder.service.FamilyService;
 import jakarta.validation.Valid;
 import java.util.ArrayList;
@@ -159,11 +160,65 @@ public class AdminFamilyController {
       item.setFamilyUserId(relation.getFamilyUserId());
       item.setRealName(user == null ? null : user.getRealName());
       item.setPhone(user == null ? null : user.getPhone());
+      item.setIdCardNo(user == null ? null : user.getIdCardNo());
       item.setRelation(relation.getRelation());
       item.setIsPrimary(relation.getIsPrimary());
       items.add(item);
     }
     return Result.ok(items);
+  }
+
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PostMapping("/users/upsert")
+  public Result<FamilyUserPageItem> upsertUser(@Valid @RequestBody AdminFamilyUserUpsertRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    String phone = request.getPhone() == null ? "" : request.getPhone().trim();
+    String idCardNo = request.getIdCardNo() == null ? "" : request.getIdCardNo().trim();
+    String realName = request.getRealName() == null ? "" : request.getRealName().trim();
+    if (phone.isEmpty()) {
+      throw new IllegalArgumentException("家属手机号不能为空");
+    }
+    if (idCardNo.isEmpty()) {
+      throw new IllegalArgumentException("家属身份证号不能为空");
+    }
+    if (realName.isEmpty()) {
+      throw new IllegalArgumentException("家属姓名不能为空");
+    }
+
+    FamilyUser user = familyUserMapper.selectOne(
+        Wrappers.lambdaQuery(FamilyUser.class)
+            .eq(FamilyUser::getIsDeleted, 0)
+            .eq(FamilyUser::getOrgId, orgId)
+            .eq(FamilyUser::getPhone, phone)
+            .last("LIMIT 1"));
+    if (user == null) {
+      user = new FamilyUser();
+      user.setOrgId(orgId);
+      user.setPhone(phone);
+      user.setRealName(realName);
+      user.setIdCardNo(idCardNo);
+      user.setStatus(request.getStatus() == null ? 1 : request.getStatus());
+      familyUserMapper.insert(user);
+    } else {
+      user.setRealName(realName);
+      user.setIdCardNo(idCardNo);
+      if (request.getStatus() != null) {
+        user.setStatus(request.getStatus());
+      } else if (user.getStatus() == null) {
+        user.setStatus(1);
+      }
+      familyUserMapper.updateById(user);
+    }
+
+    FamilyUserPageItem item = new FamilyUserPageItem();
+    item.setId(user.getId());
+    item.setRealName(user.getRealName());
+    item.setPhone(user.getPhone());
+    item.setIdCardNo(user.getIdCardNo());
+    item.setStatus(user.getStatus());
+    item.setElderCount(0L);
+    item.setCreateTime(user.getCreateTime());
+    return Result.ok(item);
   }
 
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
@@ -189,6 +244,7 @@ public class AdminFamilyController {
     item.setFamilyUserId(relation.getFamilyUserId());
     item.setRealName(familyUser.getRealName());
     item.setPhone(familyUser.getPhone());
+    item.setIdCardNo(familyUser.getIdCardNo());
     item.setRelation(relation.getRelation());
     item.setIsPrimary(relation.getIsPrimary());
     return Result.ok(item);

@@ -92,6 +92,7 @@ export interface FamilyRelationItem {
   familyUserId: Id
   realName?: string
   phone?: string
+  idCardNo?: string
   relation?: string
   isPrimary?: boolean
 }

@@ -8,6 +8,7 @@ public class FamilyRelationItem {
   private Long familyUserId;
   private String realName;
   private String phone;
+  private String idCardNo;
   private String relation;
   private Integer isPrimary;
 }

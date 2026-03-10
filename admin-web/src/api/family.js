@@ -2,6 +2,9 @@ import request, { fetchPage } from '../utils/request';
 export function getFamilyUserPage(params) {
     return fetchPage('/api/admin/family/users/page', params);
 }
+export function upsertFamilyUser(data) {
+    return request.post('/api/admin/family/users/upsert', data);
+}
 export function getFamilyRelations(elderId) {
     return request.get('/api/admin/family/relations', { params: { elderId } });
 }

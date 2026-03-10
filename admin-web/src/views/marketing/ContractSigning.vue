@@ -160,7 +160,7 @@
       />
     </a-card>
 
-    <a-modal v-model:open="open" :title="form.id ? '编辑合同' : '新增合同'" width="760px" :confirm-loading="submitting" @ok="submit">
+    <a-modal v-model:open="open" :title="form.id ? '编辑合同' : '新增合同'" width="920px" :confirm-loading="submitting" @ok="submit">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">
@@ -185,6 +185,19 @@
           <a-col :span="6"><a-form-item label="年龄"><a-input-number v-model:value="form.age" :min="0" :max="120" style="width: 100%" /></a-form-item></a-col>
           <a-col :span="6"><a-form-item label="生日"><a-input :value="formDerivedBirthDate || '-'" readonly /></a-form-item></a-col>
           <a-col :span="6"><a-form-item label="签约日期"><a-date-picker v-model:value="form.contractSignedAt" value-format="YYYY-MM-DD HH:mm:ss" show-time style="width: 100%" /></a-form-item></a-col>
+          <a-col :span="12">
+            <a-form-item label="护理等级">
+              <a-input v-model:value="elderFormExtra.careLevel" placeholder="如：一级护理/二级护理" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="风险预担">
+              <a-select v-model:value="elderFormExtra.riskPrecommit" allow-clear placeholder="请选择风险处置策略">
+                <a-select-option value="RESCUE_FIRST">第一时间抢救</a-select-option>
+                <a-select-option value="NOTIFY_FAMILY_FIRST">第一时间通知家属</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
           <a-col :span="12"><a-form-item label="合同有效期止"><a-date-picker v-model:value="form.contractExpiryDate" value-format="YYYY-MM-DD" style="width: 100%" /></a-form-item></a-col>
           <a-col :span="12">
             <a-form-item label="合同状态">
@@ -210,6 +223,92 @@
           </a-col>
         </a-row>
       </a-form>
+      <a-divider style="margin: 8px 0 14px">长者信息快照（与长者详情一致）</a-divider>
+      <a-spin :spinning="elderSnapshotLoading">
+        <a-row :gutter="12">
+          <a-col :xs="24" :lg="12">
+            <a-card size="small" title="老人基础信息" class="snapshot-card" :bordered="false">
+              <a-descriptions :column="1" size="small" bordered>
+                <a-descriptions-item label="姓名">{{ elderSnapshot.base.fullName || '-' }}</a-descriptions-item>
+                <a-descriptions-item label="身份证">{{ elderSnapshot.base.idCardNo || '-' }}</a-descriptions-item>
+                <a-descriptions-item label="床位">{{ elderSnapshot.base.bedNo || '-' }}</a-descriptions-item>
+                <a-descriptions-item label="护理等级">{{ elderSnapshot.base.careLevel || '-' }}</a-descriptions-item>
+                <a-descriptions-item label="状态">{{ elderStatusText(elderSnapshot.base.status) }}</a-descriptions-item>
+                <a-descriptions-item label="生日">{{ elderSnapshot.base.birthDate || '-' }}</a-descriptions-item>
+                <a-descriptions-item label="风险预担">{{ riskPrecommitText(elderSnapshot.base.riskPrecommit) }}</a-descriptions-item>
+                <a-descriptions-item label="入院日期">{{ elderSnapshot.base.admissionDate || '-' }}</a-descriptions-item>
+                <a-descriptions-item label="家庭地址">{{ elderSnapshot.base.homeAddress || '-' }}</a-descriptions-item>
+              </a-descriptions>
+            </a-card>
+          </a-col>
+          <a-col :xs="24" :lg="12">
+            <a-space direction="vertical" style="width: 100%" :size="12">
+              <a-card size="small" title="家属信息" class="snapshot-card" :bordered="false">
+                <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center">
+                  <span style="color: #595959">可绑定多人家属（每人手机号、身份证必填）</span>
+                  <a-button size="small" type="dashed" @click="addFamilyDraftRow">新增家属</a-button>
+                </div>
+                <a-table
+                  :data-source="familyDraftRows"
+                  :columns="familyDraftColumns"
+                  size="small"
+                  :pagination="false"
+                  row-key="key"
+                  :locale="{ emptyText: '请点击“新增家属”录入' }"
+                  style="margin-bottom: 10px"
+                >
+                  <template #bodyCell="{ column, record }">
+                    <template v-if="column.key === 'realName'">
+                      <a-input v-model:value="record.realName" placeholder="姓名" />
+                    </template>
+                    <template v-else-if="column.key === 'relation'">
+                      <a-input v-model:value="record.relation" placeholder="关系（如子女）" />
+                    </template>
+                    <template v-else-if="column.key === 'phone'">
+                      <a-input v-model:value="record.phone" placeholder="手机号" />
+                    </template>
+                    <template v-else-if="column.key === 'idCardNo'">
+                      <a-input v-model:value="record.idCardNo" placeholder="身份证号" />
+                    </template>
+                    <template v-else-if="column.key === 'isPrimary'">
+                      <a-switch v-model:checked="record.isPrimary" @change="() => setPrimaryFamilyDraftRow(record.key)" />
+                    </template>
+                    <template v-else-if="column.key === 'operation'">
+                      <a-button type="link" danger @click="removeFamilyDraftRow(record.key)">删除</a-button>
+                    </template>
+                  </template>
+                </a-table>
+                <a-table
+                  :data-source="elderSnapshot.families"
+                  :columns="snapshotFamilyColumns"
+                  size="small"
+                  :pagination="false"
+                  row-key="id"
+                  :locale="{ emptyText: '暂无家属信息' }"
+                />
+              </a-card>
+              <a-card size="small" title="基础疾病信息" class="snapshot-card" :bordered="false">
+                <a-form-item label="新建/编辑时录入疾病" style="margin-bottom: 10px">
+                  <a-select
+                    v-model:value="selectedDiseaseIds"
+                    mode="multiple"
+                    allow-clear
+                    show-search
+                    :options="diseaseOptions"
+                    placeholder="请选择基础疾病"
+                  />
+                </a-form-item>
+                <a-space wrap>
+                  <a-tag v-for="item in elderSnapshot.diseases" :key="item.id || item.diseaseId" color="blue">
+                    {{ item.diseaseName || `疾病#${item.diseaseId}` }}
+                  </a-tag>
+                  <span v-if="!elderSnapshot.diseases.length" style="color: #8c8c8c">暂无疾病信息</span>
+                </a-space>
+              </a-card>
+            </a-space>
+          </a-col>
+        </a-row>
+      </a-spin>
     </a-modal>
 
     <a-modal v-model:open="attachmentOpen" title="合同附件（病历/医保/户口等）" width="860px" :footer="null">
@@ -299,9 +398,11 @@ import {
   updateCrmContract,
   uploadMarketingFile
 } from '../../api/marketing'
-import { createElder, getElderPage, updateElder } from '../../api/elder'
+import { bindFamily, createElder, getElderDetail, getElderDiseases, getElderPage, updateElder, updateElderDiseases } from '../../api/elder'
 import { getAdmissionRecords } from '../../api/elderLifecycle'
-import type { ContractAttachmentItem, CrmContractItem, ElderItem, MarketingPlanItem, PageResult } from '../../types'
+import { getFamilyRelations, upsertFamilyUser } from '../../api/family'
+import { getDiseaseList } from '../../api/store'
+import type { ContractAttachmentItem, CrmContractItem, ElderDiseaseItem, ElderItem, FamilyRelationItem, MarketingPlanItem, PageResult } from '../../types'
 
 const router = useRouter()
 const route = useRoute()
@@ -495,6 +596,10 @@ const selectedPolicyValues = ref<string[]>([])
 const rules: FormRules = {
   elderName: [{ required: true, message: '请输入姓名' }]
 }
+const elderFormExtra = reactive({
+  careLevel: '',
+  riskPrecommit: undefined as 'RESCUE_FIRST' | 'NOTIFY_FAMILY_FIRST' | undefined
+})
 
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
@@ -622,6 +727,39 @@ const attachmentColumns = [
   { title: '上传时间', dataIndex: 'createTime', key: 'createTime', width: 160 },
   { title: '操作', key: 'operation', width: 80 }
 ]
+const snapshotFamilyColumns = [
+  { title: '姓名', dataIndex: 'realName', key: 'realName', width: 110 },
+  { title: '关系', dataIndex: 'relation', key: 'relation', width: 90 },
+  { title: '电话', dataIndex: 'phone', key: 'phone', width: 130 },
+  { title: '身份证', dataIndex: 'idCardNo', key: 'idCardNo', width: 170 },
+  { title: '主联系人', dataIndex: 'isPrimary', key: 'isPrimary', width: 90 }
+]
+const familyDraftColumns = [
+  { title: '姓名', key: 'realName', width: 110 },
+  { title: '关系', key: 'relation', width: 100 },
+  { title: '手机号', key: 'phone', width: 130 },
+  { title: '身份证号', key: 'idCardNo', width: 190 },
+  { title: '主联系人', key: 'isPrimary', width: 90 },
+  { title: '操作', key: 'operation', width: 80 }
+]
+const elderSnapshotLoading = ref(false)
+const elderSnapshot = reactive({
+  elderId: '' as string,
+  base: {} as Partial<ElderItem>,
+  families: [] as FamilyRelationItem[],
+  diseases: [] as ElderDiseaseItem[]
+})
+const familyDraftRows = ref<Array<{
+  key: string
+  realName: string
+  relation: string
+  phone: string
+  idCardNo: string
+  isPrimary: boolean
+  familyUserId?: string
+}>>([])
+const selectedDiseaseIds = ref<number[]>([])
+const diseaseOptions = ref<Array<{ label: string; value: number }>>([])
 
 const finalizeOpen = ref(false)
 const finalizing = ref(false)
@@ -991,6 +1129,8 @@ function openForm(record?: CrmContractItem) {
     form.contractStatus = record.contractStatus || '待评估'
     selectedPolicyValues.value = parsePolicyValues(record.orgName)
     syncIdCardDerivedFields(record.idCardNo, false)
+    elderFormExtra.careLevel = String(record.careLevel || '')
+    elderFormExtra.riskPrecommit = (record.riskPrecommit as any) || undefined
   } else {
     Object.assign(form, {
       id: undefined,
@@ -1006,8 +1146,18 @@ function openForm(record?: CrmContractItem) {
     } as Partial<CrmContractItem>)
     selectedPolicyValues.value = []
     formDerivedBirthDate.value = ''
+    elderFormExtra.careLevel = ''
+    elderFormExtra.riskPrecommit = undefined
+    familyDraftRows.value = []
+    selectedDiseaseIds.value = []
+    elderSnapshot.elderId = ''
+    elderSnapshot.base = {}
+    elderSnapshot.families = []
+    elderSnapshot.diseases = []
   }
   open.value = true
+  loadDiseaseOptions().catch(() => {})
+  loadElderSnapshotByForm().catch(() => {})
 }
 
 async function fetchPolicyOptions() {
@@ -1090,6 +1240,7 @@ async function submit() {
     } else {
       saved = await createCrmContract(payload)
     }
+    await syncContractElderData(saved)
     message.success(`保存成功，合同号：${saved?.contractNo || '生成中'}`)
     open.value = false
     await fetchData()
@@ -1476,6 +1627,212 @@ function syncIdCardDerivedFields(idCardNo?: string, overrideAge = true) {
   if (overrideAge || form.age == null) {
     form.age = age
   }
+}
+
+function elderStatusText(status?: number) {
+  if (status === 1) return '在院'
+  if (status === 2) return '请假'
+  if (status === 3) return '离院'
+  return '-'
+}
+
+function riskPrecommitText(value?: string) {
+  if (value === 'RESCUE_FIRST') return '第一时间抢救'
+  if (value === 'NOTIFY_FAMILY_FIRST') return '第一时间通知家属'
+  return '-'
+}
+
+function addFamilyDraftRow() {
+  familyDraftRows.value.push({
+    key: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    realName: '',
+    relation: '',
+    phone: '',
+    idCardNo: '',
+    isPrimary: familyDraftRows.value.length === 0
+  })
+}
+
+function removeFamilyDraftRow(key: string) {
+  familyDraftRows.value = familyDraftRows.value.filter((item) => item.key !== key)
+  if (!familyDraftRows.value.some((item) => item.isPrimary) && familyDraftRows.value.length) {
+    familyDraftRows.value[0].isPrimary = true
+  }
+}
+
+function setPrimaryFamilyDraftRow(key: string) {
+  familyDraftRows.value.forEach((item) => {
+    item.isPrimary = item.key === key
+  })
+}
+
+async function loadDiseaseOptions() {
+  try {
+    const list = await getDiseaseList()
+    diseaseOptions.value = (list || []).map((item: any) => ({
+      label: String(item.diseaseName || item.name || `疾病#${item.id}`),
+      value: Number(item.id)
+    }))
+  } catch {
+    diseaseOptions.value = []
+  }
+}
+
+async function findElderByContractForm() {
+  if (form.elderId) {
+    try {
+      return await getElderDetail(String(form.elderId))
+    } catch {
+      // ignore
+    }
+  }
+  const keywordCandidates = [
+    String(form.idCardNo || '').trim(),
+    String(form.elderName || '').trim(),
+    String(form.elderPhone || form.phone || '').trim()
+  ].filter(Boolean)
+  for (const keyword of keywordCandidates) {
+    const page = await getElderPage({ pageNo: 1, pageSize: 120, keyword })
+    const list = page.list || []
+    const byIdCard = String(form.idCardNo || '').trim()
+      ? list.find((item) => String(item.idCardNo || '').trim() === String(form.idCardNo || '').trim())
+      : undefined
+    if (byIdCard) return byIdCard
+    const byNamePhone = list.find((item) =>
+      String(item.fullName || '').trim() === String(form.elderName || '').trim()
+      && String(item.phone || '').trim() === String(form.elderPhone || form.phone || '').trim())
+    if (byNamePhone) return byNamePhone
+    const byName = list.find((item) => String(item.fullName || '').trim() === String(form.elderName || '').trim())
+    if (byName) return byName
+  }
+  return undefined
+}
+
+async function loadElderSnapshotByForm() {
+  elderSnapshotLoading.value = true
+  try {
+    const elder = await findElderByContractForm()
+    if (!elder?.id) {
+      elderSnapshot.elderId = ''
+      elderSnapshot.base = {
+        fullName: String(form.elderName || '').trim() || undefined,
+        idCardNo: String(form.idCardNo || '').trim() || undefined,
+        homeAddress: String(form.homeAddress || '').trim() || undefined,
+        phone: String(form.elderPhone || form.phone || '').trim() || undefined,
+        careLevel: elderFormExtra.careLevel || undefined,
+        riskPrecommit: elderFormExtra.riskPrecommit
+      }
+      elderSnapshot.families = []
+      elderSnapshot.diseases = []
+      familyDraftRows.value = []
+      selectedDiseaseIds.value = []
+      return
+    }
+    elderSnapshot.elderId = String(elder.id)
+    elderSnapshot.base = elder
+    elderFormExtra.careLevel = String(elder.careLevel || elderFormExtra.careLevel || '')
+    elderFormExtra.riskPrecommit = elder.riskPrecommit as any
+    const [families, diseases] = await Promise.all([
+      getFamilyRelations(String(elder.id)).catch(() => []),
+      getElderDiseases(String(elder.id)).catch(() => [])
+    ])
+    elderSnapshot.families = families || []
+    elderSnapshot.diseases = diseases || []
+    familyDraftRows.value = elderSnapshot.families.map((item, index) => ({
+      key: `existing-${String(item.id || item.familyUserId || index)}`,
+      familyUserId: String(item.familyUserId || ''),
+      realName: String(item.realName || ''),
+      relation: String(item.relation || ''),
+      phone: String(item.phone || ''),
+      idCardNo: String((item as any).idCardNo || ''),
+      isPrimary: Number(item.isPrimary || 0) === 1
+    }))
+    if (!familyDraftRows.value.some((item) => item.isPrimary) && familyDraftRows.value.length) {
+      familyDraftRows.value[0].isPrimary = true
+    }
+    selectedDiseaseIds.value = elderSnapshot.diseases
+      .map((item) => Number(item.diseaseId))
+      .filter((item) => Number.isFinite(item) && item > 0)
+  } finally {
+    elderSnapshotLoading.value = false
+  }
+}
+
+async function syncContractElderData(savedContract: CrmContractItem) {
+  const { birthDate } = resolveBirthDateAndAgeFromIdCard(String(form.idCardNo || '').trim())
+  const payload = {
+    fullName: String(form.elderName || '').trim() || '未命名长者',
+    idCardNo: String(form.idCardNo || '').trim() || undefined,
+    gender: form.gender,
+    birthDate: birthDate || undefined,
+    phone: String(form.elderPhone || form.phone || '').trim() || undefined,
+    homeAddress: String(form.homeAddress || '').trim() || undefined,
+    careLevel: elderFormExtra.careLevel || undefined,
+    riskPrecommit: elderFormExtra.riskPrecommit,
+    remark: String(form.remark || '').trim() || undefined
+  } as Partial<ElderItem>
+
+  const existed = await findElderByContractForm()
+  let elderId = String(existed?.id || '').trim()
+  if (elderId) {
+    await updateElder(elderId, payload)
+  } else {
+    const created = await createElder({
+      ...payload,
+      status: 3
+    })
+    elderId = String(created?.id || '').trim()
+  }
+  if (!elderId) return
+
+  if (!savedContract.elderId || String(savedContract.elderId) !== elderId) {
+    await updateCrmContract(savedContract.id, {
+      ...savedContract,
+      elderId
+    })
+  }
+
+  if (selectedDiseaseIds.value.length > 0) {
+    await updateElderDiseases(elderId, selectedDiseaseIds.value)
+  }
+
+  if (familyDraftRows.value.length > 0) {
+    const invalidRow = familyDraftRows.value.find((item) =>
+      !String(item.realName || '').trim()
+      || !String(item.phone || '').trim()
+      || !String(item.idCardNo || '').trim())
+    if (invalidRow) {
+      throw new Error('家属信息需填写姓名、手机号和身份证号')
+    }
+    const invalidPhoneRow = familyDraftRows.value.find((item) => !/^1\d{10}$/.test(String(item.phone || '').trim()))
+    if (invalidPhoneRow) {
+      throw new Error(`家属手机号格式不正确：${String(invalidPhoneRow.realName || '未命名家属')}`)
+    }
+    const invalidIdCardRow = familyDraftRows.value.find((item) => !/^(\d{15}|\d{17}[\dXx])$/.test(String(item.idCardNo || '').trim()))
+    if (invalidIdCardRow) {
+      throw new Error(`家属身份证号格式不正确：${String(invalidIdCardRow.realName || '未命名家属')}`)
+    }
+    await getFamilyRelations(elderId).catch(() => [])
+    for (let i = 0; i < familyDraftRows.value.length; i += 1) {
+      const familyRow = familyDraftRows.value[i]
+      const user = await upsertFamilyUser({
+        realName: String(familyRow.realName || '').trim(),
+        phone: String(familyRow.phone || '').trim(),
+        idCardNo: String(familyRow.idCardNo || '').trim(),
+        status: 1
+      })
+      const familyUserId = String(user?.id || familyRow.familyUserId || '').trim()
+      if (!familyUserId) continue
+      await bindFamily({
+        elderId,
+        familyUserId,
+        relation: String(familyRow.relation || '').trim() || '家属',
+        isPrimary: familyRow.isPrimary || (!familyDraftRows.value.some((item) => item.isPrimary) && i === 0)
+      })
+    }
+  }
+
+  await loadElderSnapshotByForm()
 }
 
 async function ensureContractNo(record: CrmContractItem) {
