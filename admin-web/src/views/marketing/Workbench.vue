@@ -433,6 +433,12 @@ function quickLabel(entry: MarketingReportEntry, base: string) {
   return hasCache(config.cacheKey) ? `${base}（上次筛选）` : base
 }
 
+function isSignedContract(item: CrmContractItem) {
+  const flowStage = String(item.flowStage || '').toUpperCase()
+  const status = String(item.status || '').toUpperCase()
+  return flowStage === 'SIGNED' || status === 'SIGNED' || status === 'EFFECTIVE'
+}
+
 async function loadOverview() {
   const rangeStart = String(dateRange.value?.[0] || dayjs().startOf('month').format('YYYY-MM-DD'))
   const rangeEnd = String(dateRange.value?.[1] || dayjs().format('YYYY-MM-DD'))
@@ -489,6 +495,7 @@ async function loadOverview() {
 
   contract.pendingSignCount = contracts.filter((item) => String(item.flowStage || '') === 'PENDING_SIGN').length
   contract.renewalDueCount = contracts.filter((item) => {
+    if (!isSignedContract(item)) return false
     if (!item.contractExpiryDate) return false
     const diff = dayjs(item.contractExpiryDate).diff(dayjs(today), 'day')
     return diff >= 0 && diff <= 30

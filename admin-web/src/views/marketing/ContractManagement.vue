@@ -190,7 +190,9 @@ async function fetchData() {
       contractNo: query.contractNo || undefined,
       elderName: query.elderName || undefined,
       elderPhone: query.elderPhone || undefined,
-      marketerName: query.marketerName || undefined
+      marketerName: query.marketerName || undefined,
+      // 续签提醒仅针对已签约合同
+      flowStage: 'SIGNED'
     })
     rows.value = page.list || []
     total.value = page.total || 0

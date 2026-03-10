@@ -101,7 +101,7 @@ export interface FamilyBindRequest {
   familyUserId: Id
   elderId: Id
   relation: string
-  isPrimary?: boolean
+  isPrimary?: boolean | number
 }
 
 export interface CrmLeadItem {

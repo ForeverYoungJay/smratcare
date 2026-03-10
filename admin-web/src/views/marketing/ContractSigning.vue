@@ -160,8 +160,15 @@
       />
     </a-card>
 
-    <a-modal v-model:open="open" :title="form.id ? '编辑合同' : '新增合同'" width="920px" :confirm-loading="submitting" @ok="submit">
-      <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
+    <a-modal
+      v-model:open="open"
+      :title="contractModalTitle"
+      width="920px"
+      :confirm-loading="submitting"
+      :footer="contractViewMode ? null : undefined"
+      @ok="onContractModalOk"
+    >
+      <a-form ref="formRef" :model="form" :rules="rules" layout="vertical" :disabled="contractViewMode">
         <a-row :gutter="16">
           <a-col :span="12">
             <a-form-item label="合同编号" name="contractNo">
@@ -252,7 +259,7 @@
         <a-card v-show="contractInfoPage === 2" size="small" title="家属信息" class="snapshot-card" :bordered="false">
                 <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center">
                   <span style="color: #595959">可绑定多人家属（每人手机号、身份证必填）</span>
-                  <a-button size="small" type="dashed" @click="addFamilyDraftRow">新增家属</a-button>
+                  <a-button v-if="!contractViewMode" size="small" type="dashed" @click="addFamilyDraftRow">新增家属</a-button>
                 </div>
                 <a-table
                   :data-source="familyDraftRows"
@@ -265,22 +272,32 @@
                 >
                   <template #bodyCell="{ column, record }">
                     <template v-if="column.key === 'realName'">
-                      <a-input v-model:value="record.realName" placeholder="姓名" />
+                      <a-input v-if="!contractViewMode" v-model:value="record.realName" placeholder="姓名" />
+                      <span v-else>{{ record.realName || '-' }}</span>
                     </template>
                     <template v-else-if="column.key === 'relation'">
-                      <a-input v-model:value="record.relation" placeholder="关系（如子女）" />
+                      <a-input v-if="!contractViewMode" v-model:value="record.relation" placeholder="关系（如子女）" />
+                      <span v-else>{{ record.relation || '-' }}</span>
                     </template>
                     <template v-else-if="column.key === 'phone'">
-                      <a-input v-model:value="record.phone" placeholder="手机号" />
+                      <a-input v-if="!contractViewMode" v-model:value="record.phone" placeholder="手机号" />
+                      <span v-else>{{ record.phone || '-' }}</span>
                     </template>
                     <template v-else-if="column.key === 'idCardNo'">
-                      <a-input v-model:value="record.idCardNo" placeholder="身份证号" />
+                      <a-input v-if="!contractViewMode" v-model:value="record.idCardNo" placeholder="身份证号" />
+                      <span v-else>{{ record.idCardNo || '-' }}</span>
                     </template>
                     <template v-else-if="column.key === 'isPrimary'">
-                      <a-switch v-model:checked="record.isPrimary" @change="() => setPrimaryFamilyDraftRow(record.key)" />
+                      <a-switch
+                        v-if="!contractViewMode"
+                        v-model:checked="record.isPrimary"
+                        @change="() => setPrimaryFamilyDraftRow(record.key)"
+                      />
+                      <span v-else>{{ record.isPrimary ? '是' : '否' }}</span>
                     </template>
                     <template v-else-if="column.key === 'operation'">
-                      <a-button type="link" danger @click="removeFamilyDraftRow(record.key)">删除</a-button>
+                      <a-button v-if="!contractViewMode" type="link" danger @click="removeFamilyDraftRow(record.key)">删除</a-button>
+                      <span v-else>-</span>
                     </template>
                   </template>
                 </a-table>
@@ -302,6 +319,7 @@
                     show-search
                     :options="diseaseOptions"
                     placeholder="请选择基础疾病"
+                    :disabled="contractViewMode"
                   />
                 </a-form-item>
                 <a-space wrap>
@@ -427,6 +445,7 @@ const isSignedMode = computed(() => resolvedStatusPreset.value === 'signed')
 const loading = ref(false)
 const submitting = ref(false)
 const open = ref(false)
+const contractViewMode = ref(false)
 const formRef = ref<FormInstance>()
 const elderNameInputRef = ref<any>()
 const rows = ref<CrmContractItem[]>([])
@@ -594,6 +613,10 @@ function applyQueryRouteFilter() {
 }
 
 const form = reactive<Partial<CrmContractItem>>({})
+const contractModalTitle = computed(() => {
+  if (contractViewMode.value) return '查看合同'
+  return form.id ? '编辑合同' : '新增合同'
+})
 const formDerivedBirthDate = ref('')
 const selectedPolicyValues = ref<string[]>([])
 const rules: FormRules = {
@@ -1124,7 +1147,16 @@ async function finalizeSelected() {
   await openFinalize(row)
 }
 
-function openForm(record?: CrmContractItem) {
+function onContractModalOk() {
+  if (contractViewMode.value) {
+    open.value = false
+    return
+  }
+  submit()
+}
+
+function openForm(record?: CrmContractItem, readonly = false) {
+  contractViewMode.value = readonly
   Object.keys(form).forEach((key) => {
     delete (form as Record<string, any>)[key]
   })
@@ -1310,10 +1342,7 @@ function removeContract(record: CrmContractItem) {
 }
 
 function view(record: CrmContractItem) {
-  Modal.info({
-    title: '合同详情',
-    content: `${record.contractNo || '-'} / ${record.elderName || '-'} / ${flowStageText(normalizedFlowStage(record))} / ${ownerDeptText(normalizedOwnerDept(record))}`
-  })
+  openForm(record, true)
 }
 
 async function goAdmissionProcessing(record: CrmContractItem) {
@@ -1832,7 +1861,7 @@ async function syncContractElderData(savedContract: CrmContractItem) {
         elderId,
         familyUserId,
         relation: String(familyRow.relation || '').trim() || '家属',
-        isPrimary: familyRow.isPrimary || (!familyDraftRows.value.some((item) => item.isPrimary) && i === 0)
+        isPrimary: (familyRow.isPrimary || (!familyDraftRows.value.some((item) => item.isPrimary) && i === 0)) ? 1 : 0
       })
     }
   }

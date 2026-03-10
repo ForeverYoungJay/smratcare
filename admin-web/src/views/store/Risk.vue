@@ -5,6 +5,11 @@
         <a-col :span="6">
           <a-space direction="vertical" style="width: 100%">
             <a-input v-model:value="keyword" placeholder="搜索疾病" allow-clear />
+            <a-space wrap>
+              <a-button type="primary" @click="openDiseaseModal()">新增疾病</a-button>
+              <a-button :disabled="!currentDisease" @click="openDiseaseModal(currentDisease || undefined)">编辑疾病</a-button>
+              <a-button danger :disabled="!currentDisease" @click="removeCurrentDisease">删除疾病</a-button>
+            </a-space>
             <a-list
               bordered
               :data-source="filteredDiseases"
@@ -47,15 +52,28 @@
         </a-col>
       </a-row>
     </a-card>
+
+    <a-modal
+      v-model:open="diseaseModalOpen"
+      :title="editingDiseaseId ? '编辑疾病' : '新增疾病'"
+      :confirm-loading="diseaseSaving"
+      @ok="submitDisease"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="疾病名称" required>
+          <a-input v-model:value="diseaseForm.diseaseName" placeholder="请输入疾病名称" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportCsv } from '../../utils/export'
-import { getDiseaseList, getForbiddenTags, updateForbiddenTags } from '../../api/store'
+import { createDisease, deleteDisease, getDiseaseList, getForbiddenTags, updateDisease, updateForbiddenTags } from '../../api/store'
 import type { DiseaseItem } from '../../types'
 
 const loading = ref(false)
@@ -64,6 +82,12 @@ const diseases = ref<DiseaseItem[]>([])
 const keyword = ref('')
 const currentDisease = ref<DiseaseItem | null>(null)
 const tagGroups = ref<{ selectedIds: number[]; options: { label: string; value: number }[] }[]>([])
+const diseaseModalOpen = ref(false)
+const diseaseSaving = ref(false)
+const editingDiseaseId = ref<number | null>(null)
+const diseaseForm = ref({
+  diseaseName: ''
+})
 
 const filteredDiseases = computed(() => {
   if (!keyword.value) return diseases.value
@@ -154,6 +178,53 @@ async function init() {
 }
 
 onMounted(init)
+
+function openDiseaseModal(item?: DiseaseItem) {
+  editingDiseaseId.value = item ? Number(item.id) : null
+  diseaseForm.value.diseaseName = String(item?.diseaseName || '')
+  diseaseModalOpen.value = true
+}
+
+async function submitDisease() {
+  const diseaseName = String(diseaseForm.value.diseaseName || '').trim()
+  if (!diseaseName) {
+    message.warning('请填写疾病名称')
+    return
+  }
+  diseaseSaving.value = true
+  try {
+    if (editingDiseaseId.value) {
+      await updateDisease(editingDiseaseId.value, { diseaseName })
+      message.success('疾病已更新')
+    } else {
+      await createDisease({ diseaseName })
+      message.success('疾病已新增')
+    }
+    diseaseModalOpen.value = false
+    await init()
+    const found = diseases.value.find((item) => String(item.diseaseName || '').trim() === diseaseName)
+    if (found) {
+      await selectDisease(found)
+    }
+  } finally {
+    diseaseSaving.value = false
+  }
+}
+
+function removeCurrentDisease() {
+  if (!currentDisease.value) return
+  const target = currentDisease.value
+  Modal.confirm({
+    title: `确认删除疾病“${target.diseaseName || '-'}”吗？`,
+    content: '删除后将从基础疾病下拉中移除，请谨慎操作。',
+    okButtonProps: { danger: true },
+    onOk: async () => {
+      await deleteDisease(Number(target.id))
+      message.success('疾病已删除')
+      await init()
+    }
+  })
+}
 </script>
 
 <style scoped>
