@@ -22,8 +22,8 @@
             <a-select-option value="UNLINKED">未关联</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="关键字">
-          <a-input v-model:value="query.keyword" allow-clear placeholder="长者/收据号/备注" style="width: 220px" />
+        <a-form-item label="长者">
+          <ElderNameAutocomplete v-model:value="query.keyword" allow-clear placeholder="姓名(编号)" width="220px" />
         </a-form-item>
         <a-form-item>
           <a-space>
@@ -100,6 +100,7 @@ import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { exportFinanceInvoiceReceiptCsv, getFinanceInvoiceReceiptPage } from '../../api/finance'
 import type { FinanceInvoiceReceiptItem, PageResult } from '../../types'
 import { printTableReport } from '../../utils/print'

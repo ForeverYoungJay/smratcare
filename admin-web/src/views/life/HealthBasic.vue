@@ -2,7 +2,7 @@
   <PageContainer title="基础健康记录" subTitle="身高体重、血压等基础指标">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="老人姓名">
-        <a-input v-model:value="query.keyword" placeholder="输入姓名" allow-clear />
+        <ElderNameAutocomplete v-model:value="query.keyword" placeholder="姓名(编号)" width="220px" />
       </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openCreate">新增记录</a-button>
@@ -86,6 +86,7 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { getHealthBasicPage, createHealthBasic, updateHealthBasic, deleteHealthBasic } from '../../api/life'
 import type { HealthBasicRecord, PageResult } from '../../types'

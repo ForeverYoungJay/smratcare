@@ -6,7 +6,7 @@
           <a-date-picker v-model:value="query.month" picker="month" allow-clear style="width: 160px" />
         </a-form-item>
         <a-form-item label="老人姓名">
-          <a-input v-model:value="query.keyword" style="width: 160px" allow-clear />
+          <ElderNameAutocomplete v-model:value="query.keyword" width="180px" placeholder="老人姓名(编号)" />
         </a-form-item>
         <a-form-item label="收款方式">
           <a-select v-model:value="query.payMethod" allow-clear style="width: 140px">
@@ -187,6 +187,7 @@ import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { exportCsv } from '../../utils/export'
 import { getBillPage, generateBill, invalidateBill, payBill } from '../../api/bill'
 import { getFinanceModuleEntrySummary, getPaymentRecordPage, updatePaymentRecord } from '../../api/finance'

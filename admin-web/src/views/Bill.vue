@@ -5,7 +5,7 @@
         <a-date-picker v-model:value="query.month" value-format="YYYY-MM" picker="month" />
       </a-form-item>
       <a-form-item label="老人">
-        <a-input v-model:value="query.keyword" placeholder="输入老人姓名" allow-clear />
+        <ElderNameAutocomplete v-model:value="query.keyword" placeholder="老人姓名(编号)" width="220px" />
       </a-form-item>
     </SearchForm>
 
@@ -54,6 +54,7 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../components/PageContainer.vue'
 import SearchForm from '../components/SearchForm.vue'
 import DataTable from '../components/DataTable.vue'
+import ElderNameAutocomplete from '../components/ElderNameAutocomplete.vue'
 import { getBillPage, payBill } from '../api/bill'
 import type { BillItem, PageResult } from '../types/api'
 

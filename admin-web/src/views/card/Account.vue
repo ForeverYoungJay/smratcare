@@ -5,7 +5,7 @@
         <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 160px" />
       </a-form-item>
       <a-form-item label="关键词">
-        <a-input v-model:value="query.keyword" placeholder="卡号/老人姓名" allow-clear />
+        <ElderNameAutocomplete v-model:value="query.keyword" placeholder="卡号/老人姓名(编号)" width="220px" />
       </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openCreate">开卡</a-button>
@@ -81,6 +81,7 @@ import { reactive, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { getCardAccountPage, createCardAccount, updateCardAccount, deleteCardAccount } from '../../api/card'

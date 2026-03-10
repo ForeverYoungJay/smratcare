@@ -1,8 +1,8 @@
 <template>
   <PageContainer title="退住费用审核" subTitle="审核通过后自动生成退住结算单">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
-      <a-form-item label="关键字">
-        <a-input v-model:value="query.keyword" allow-clear placeholder="老人/费用项/备注" style="width: 220px" />
+      <a-form-item label="老人">
+        <ElderNameAutocomplete v-model:value="query.keyword" allow-clear placeholder="老人姓名(编号)" width="220px" />
       </a-form-item>
       <a-form-item label="状态">
         <a-select v-model:value="query.status" allow-clear style="width: 180px" :options="statusOptions" />
@@ -83,6 +83,7 @@ import { Input, message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { getBaseConfigItemList } from '../../api/baseConfig'
 import { createDischargeFeeAudit, getDischargeFeeAuditPage, reviewDischargeFeeAudit } from '../../api/financeFee'

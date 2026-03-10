@@ -2,7 +2,7 @@
   <PageContainer title="一卡通数据对接" subTitle="排班与考勤管理 / 一卡通数据对接">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
-        <a-input v-model:value="query.keyword" placeholder="卡号/长者姓名" allow-clear />
+        <ElderNameAutocomplete v-model:value="query.keyword" placeholder="长者姓名(编号)" width="220px" />
       </a-form-item>
       <a-form-item label="卡状态">
         <a-input v-model:value="query.status" placeholder="如 ACTIVE/INACTIVE" allow-clear />
@@ -32,6 +32,7 @@ import { onMounted, reactive, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { getHrCardSyncPage } from '../../api/hr'
 import type { HrCardSyncItem, PageResult } from '../../types'
 import { exportCsv, exportExcel } from '../../utils/export'

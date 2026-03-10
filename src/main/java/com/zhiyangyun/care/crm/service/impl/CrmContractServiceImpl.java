@@ -3,6 +3,8 @@ package com.zhiyangyun.care.crm.service.impl;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.zhiyangyun.care.assessment.entity.AssessmentRecord;
+import com.zhiyangyun.care.assessment.mapper.AssessmentRecordMapper;
 import com.zhiyangyun.care.crm.entity.CrmContract;
 import com.zhiyangyun.care.crm.entity.CrmLead;
 import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
@@ -43,14 +45,17 @@ public class CrmContractServiceImpl implements CrmContractService {
   private final CrmContractMapper contractMapper;
   private final CrmLeadMapper leadMapper;
   private final ElderAdmissionMapper admissionMapper;
+  private final AssessmentRecordMapper assessmentRecordMapper;
 
   public CrmContractServiceImpl(
       CrmContractMapper contractMapper,
       CrmLeadMapper leadMapper,
-      ElderAdmissionMapper admissionMapper) {
+      ElderAdmissionMapper admissionMapper,
+      AssessmentRecordMapper assessmentRecordMapper) {
     this.contractMapper = contractMapper;
     this.leadMapper = leadMapper;
     this.admissionMapper = admissionMapper;
+    this.assessmentRecordMapper = assessmentRecordMapper;
   }
 
   @Override
@@ -251,8 +256,43 @@ public class CrmContractServiceImpl implements CrmContractService {
     contract.setStatus("PENDING_APPROVAL");
     validateStatusTransition(before, contract);
     contractMapper.updateById(contract);
+    archiveAdmissionAssessmentsAfterSign(contract);
     syncLeadProjection(contract, false);
     return toResponse(contract);
+  }
+
+  private void archiveAdmissionAssessmentsAfterSign(CrmContract contract) {
+    if (contract == null || contract.getTenantId() == null) {
+      return;
+    }
+    String contractNo = blankToNull(contract.getContractNo());
+    List<AssessmentRecord> records = List.of();
+    if (contractNo != null) {
+      records = assessmentRecordMapper.selectList(Wrappers.lambdaQuery(AssessmentRecord.class)
+          .eq(AssessmentRecord::getTenantId, contract.getTenantId())
+          .eq(AssessmentRecord::getIsDeleted, 0)
+          .eq(AssessmentRecord::getAssessmentType, "ADMISSION")
+          .eq(AssessmentRecord::getArchiveNo, contractNo)
+          .ne(AssessmentRecord::getStatus, "ARCHIVED")
+          .orderByDesc(AssessmentRecord::getAssessmentDate)
+          .orderByDesc(AssessmentRecord::getUpdateTime));
+    }
+    if (records.isEmpty() && contract.getElderId() != null) {
+      records = assessmentRecordMapper.selectList(Wrappers.lambdaQuery(AssessmentRecord.class)
+          .eq(AssessmentRecord::getTenantId, contract.getTenantId())
+          .eq(AssessmentRecord::getIsDeleted, 0)
+          .eq(AssessmentRecord::getAssessmentType, "ADMISSION")
+          .eq(AssessmentRecord::getElderId, contract.getElderId())
+          .and(w -> w.isNull(AssessmentRecord::getArchiveNo).or().eq(AssessmentRecord::getArchiveNo, ""))
+          .ne(AssessmentRecord::getStatus, "ARCHIVED")
+          .orderByDesc(AssessmentRecord::getAssessmentDate)
+          .orderByDesc(AssessmentRecord::getUpdateTime)
+          .last("LIMIT 1"));
+    }
+    for (AssessmentRecord record : records) {
+      record.setStatus("ARCHIVED");
+      assessmentRecordMapper.updateById(record);
+    }
   }
 
   @Override

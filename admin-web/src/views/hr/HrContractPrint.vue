@@ -2,7 +2,7 @@
   <PageContainer title="合同打印" subTitle="员工档案中心 / 合同打印">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
-        <a-input v-model:value="query.keyword" placeholder="合同号/长者/联系人" allow-clear />
+        <ElderNameAutocomplete v-model:value="query.keyword" placeholder="长者姓名(编号)" width="220px" />
       </a-form-item>
       <a-form-item label="状态">
         <a-select v-model:value="query.status" allow-clear style="width: 180px" :options="statusOptions" />
@@ -38,6 +38,7 @@ import { onMounted, reactive, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { getHrProfileContractPage } from '../../api/hr'
 import type { HrProfileContractItem, PageResult } from '../../types'
 import { exportCsv, exportExcel } from '../../utils/export'

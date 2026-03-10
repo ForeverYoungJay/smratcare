@@ -63,8 +63,8 @@
     <a-row :gutter="16" style="margin-top: 12px; margin-bottom: 12px">
       <a-col :xs="24" :xl="16">
         <SearchForm :model="query" @search="applyFilters" @reset="resetFilters">
-          <a-form-item label="关键词">
-            <a-input v-model:value="query.keyword" placeholder="长者/事项/责任人" allow-clear />
+          <a-form-item label="长者">
+            <ElderNameAutocomplete v-model:value="query.keyword" placeholder="姓名(编号)" width="220px" />
           </a-form-item>
           <a-form-item label="模块">
             <a-select v-model:value="query.module" :options="moduleOptions" allow-clear style="width: 150px" />
@@ -178,6 +178,7 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { mapMedicalExportRows, unifiedTaskExportColumns } from '../../constants/medicalExport'
 import { exportCsv, exportExcel } from '../../utils/export'
 import { resolveMedicalError } from './medicalError'

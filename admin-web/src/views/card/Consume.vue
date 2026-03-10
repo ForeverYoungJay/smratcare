@@ -2,7 +2,7 @@
   <PageContainer title="消费记录" subTitle="一卡通消费扣费记录">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
-        <a-input v-model:value="query.keyword" placeholder="老人姓名" allow-clear />
+        <ElderNameAutocomplete v-model:value="query.keyword" placeholder="老人姓名(编号)" width="220px" />
       </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openConsume">登记消费</a-button>
@@ -48,6 +48,7 @@ import { reactive, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useCardAccountOptions } from '../../composables/useCardAccountOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { consumeCard, getCardConsumePage } from '../../api/card'

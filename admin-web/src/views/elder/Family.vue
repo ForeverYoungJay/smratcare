@@ -9,7 +9,7 @@
           <a-input v-model:value="query.phone" placeholder="手机号" allow-clear />
         </a-form-item>
         <a-form-item label="关联老人">
-          <a-input v-model:value="query.elderName" placeholder="老人姓名" allow-clear />
+          <ElderNameAutocomplete v-model:value="query.elderName" placeholder="老人姓名(编号)" width="220px" />
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="query.status" allow-clear style="width: 120px">
@@ -95,6 +95,7 @@ import { onMounted, reactive, ref } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { getFamilyUserPage } from '../../api/family'

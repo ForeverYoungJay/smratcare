@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="中医体质评估" subTitle="评估中心 > 中医体质评估">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
-      <a-form-item label="长者"><a-input v-model:value="query.keyword" placeholder="姓名/建议要点/评估人" allow-clear /></a-form-item>
+      <a-form-item label="长者"><ElderNameAutocomplete v-model:value="query.keyword" placeholder="姓名(编号)" width="220px" /></a-form-item>
       <a-form-item label="评估人"><a-input v-model:value="query.assessorName" placeholder="评估人姓名" allow-clear style="width: 140px" /></a-form-item>
       <a-form-item label="体质类型">
         <a-select v-model:value="query.constitutionType" allow-clear style="width: 180px" :options="constitutionOptions" />
@@ -143,6 +143,7 @@ import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { getElderDetail } from '../../api/elder'

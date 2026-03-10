@@ -35,7 +35,7 @@
 
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
-        <a-input v-model:value="query.keyword" placeholder="老人/药品/护士" allow-clear />
+        <ElderNameAutocomplete v-model:value="query.keyword" placeholder="老人姓名(编号)" width="220px" />
       </a-form-item>
       <a-form-item label="药品">
         <a-input v-model:value="query.drugName" placeholder="药品名" allow-clear style="width: 160px" />
@@ -120,6 +120,7 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { mapHealthExportRows, medicationRegistrationExportColumns } from '../../constants/healthExport'
 import { exportCsv, exportExcel } from '../../utils/export'

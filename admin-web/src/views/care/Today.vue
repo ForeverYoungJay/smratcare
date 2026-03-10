@@ -434,7 +434,8 @@ const { staffOptions: staffOptionPool, searchStaff: searchStaffPool } = useStaff
 const { elderOptions, searchElders: searchElderOptions, findElderName } = useElderOptions({
   pageSize: 80,
   preloadSize: 300,
-  inHospitalOnly: true
+  inHospitalOnly: true,
+  signedOnly: true
 })
 const staffMap = ref<Record<number, string>>({})
 const summary = reactive<CareTaskSummary>({

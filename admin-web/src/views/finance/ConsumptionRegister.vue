@@ -17,8 +17,8 @@
           <a-select-option value="LOW">低风险</a-select-option>
         </a-select>
       </a-form-item>
-      <a-form-item label="关键字">
-        <a-input v-model:value="query.keyword" placeholder="老人/类别/备注" allow-clear />
+      <a-form-item label="老人">
+        <ElderNameAutocomplete v-model:value="query.keyword" placeholder="老人姓名(编号)" width="220px" />
       </a-form-item>
       <template #extra>
         <a-button @click="quickFilterHighRisk">仅看高风险</a-button>
@@ -79,6 +79,7 @@ import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { createConsumption, getConsumptionPage } from '../../api/financeFee'
 import type { ConsumptionRecordItem, PageResult } from '../../types'

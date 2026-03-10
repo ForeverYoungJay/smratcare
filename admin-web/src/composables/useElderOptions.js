@@ -2,7 +2,8 @@ import { onMounted, onUnmounted, ref } from 'vue';
 import { getElderPage } from '../api/elder';
 import { subscribeLiveSync } from '../utils/liveSync';
 function toElderOption(item) {
-    const name = item.fullName || '未命名长者';
+    const fullName = String(item.fullName || '').trim();
+    const name = fullName || (item.elderCode ? `长者${item.elderCode}` : '姓名待完善');
     const suffix = item.elderCode ? ` (${item.elderCode})` : '';
     return {
         label: `${name}${suffix}`,
@@ -78,9 +79,17 @@ function normalizeElderStatus(config) {
         return undefined;
     return 1;
 }
+function normalizeSignedOnly(config) {
+    if (typeof config.signedOnly === 'boolean')
+        return config.signedOnly;
+    if (config.inHospitalOnly === false)
+        return false;
+    return true;
+}
 function buildCacheKey(config) {
     const status = normalizeElderStatus(config);
-    return `status:${status == null ? 'all' : status}`;
+    const signedOnly = normalizeSignedOnly(config);
+    return `status:${status == null ? 'all' : status}|signedOnly:${signedOnly ? 1 : 0}`;
 }
 function elderSearchText(item) {
     const full = `${item.fullName || ''} ${item.elderCode || ''} ${item.phone || ''} ${item.bedNo || ''} ${item.roomNo || ''}`.trim();
@@ -97,6 +106,20 @@ function dedupeElders(rows) {
     });
     return Array.from(map.values());
 }
+function upgradeOptionWithName(option, elderName) {
+    const nextName = String(elderName || '').trim();
+    if (!nextName)
+        return option;
+    const currentName = String(option?.name || '').trim();
+    const shouldUpgrade = !currentName || currentName === '姓名待完善' || /^\d+$/.test(currentName) || currentName.startsWith('长者E');
+    if (!shouldUpgrade || currentName === nextName)
+        return option;
+    return {
+        ...option,
+        name: nextName,
+        label: nextName
+    };
+}
 export function useElderOptions(config = {}) {
     const pageSize = config.pageSize || 80;
     const preloadSize = config.preloadSize || Math.max(pageSize * 4, 300);
@@ -104,6 +127,25 @@ export function useElderOptions(config = {}) {
     const elderLoading = ref(false);
     const lastKeyword = ref('');
     const cacheKey = buildCacheKey(config);
+    function upgradeExistingOptionsWithRows(rows) {
+        if (!rows?.length || !elderOptions.value.length)
+            return;
+        const nameMap = new Map();
+        rows.forEach((row) => {
+            const id = String(row.id || '').trim();
+            const name = String(row.fullName || '').trim();
+            if (!id || !name)
+                return;
+            if (!nameMap.has(id))
+                nameMap.set(id, name);
+        });
+        if (!nameMap.size)
+            return;
+        elderOptions.value = elderOptions.value.map((item) => {
+            const id = String(item.value || '').trim();
+            return upgradeOptionWithName(item, nameMap.get(id));
+        });
+    }
     async function loadBasePool(force = false) {
         const lastAt = elderPoolFetchedAt.get(cacheKey) || 0;
         const hasFresh = elderPoolCache.has(cacheKey) && (Date.now() - lastAt < ELDER_POOL_CACHE_TTL);
@@ -111,13 +153,16 @@ export function useElderOptions(config = {}) {
             return elderPoolCache.get(cacheKey) || [];
         }
         const status = normalizeElderStatus(config);
+        const signedOnly = normalizeSignedOnly(config);
         const page = await getElderPage({
             pageNo: 1,
             pageSize: preloadSize,
             status,
-            elderStatus: status
+            elderStatus: status,
+            signedOnly
         });
         const rows = page.list || [];
+        upgradeExistingOptionsWithRows(rows);
         elderPoolCache.set(cacheKey, rows);
         elderPoolFetchedAt.set(cacheKey, Date.now());
         return rows;
@@ -127,6 +172,7 @@ export function useElderOptions(config = {}) {
         try {
             lastKeyword.value = String(keyword || '');
             const status = normalizeElderStatus(config);
+            const signedOnly = normalizeSignedOnly(config);
             const baseRows = await loadBasePool(false);
             let mergedRows = [...baseRows];
             const text = String(keyword || '').trim();
@@ -136,6 +182,7 @@ export function useElderOptions(config = {}) {
                     pageSize: Math.max(pageSize * 2, 120),
                     status,
                     elderStatus: status,
+                    signedOnly,
                     keyword: text
                 });
                 mergedRows = dedupeElders([...(remotePage.list || []), ...baseRows]);
@@ -163,15 +210,23 @@ export function useElderOptions(config = {}) {
     }
     function ensureSelectedElder(elderId, elderName) {
         const targetId = String(elderId || '').trim();
-        if (!targetId || elderOptions.value.some((item) => String(item.value) === targetId)) {
+        if (!targetId) {
             return;
         }
-        const name = (elderName && String(elderName).trim()) || '未命名长者';
-        elderOptions.value.unshift({
-            label: name,
-            value: targetId,
-            name
-        });
+        const resolvedName = String(elderName || '').trim();
+        const existingIndex = elderOptions.value.findIndex((item) => String(item.value) === targetId);
+        if (existingIndex >= 0) {
+            if (!resolvedName)
+                return;
+            const current = elderOptions.value[existingIndex];
+            const next = upgradeOptionWithName(current, resolvedName);
+            if (next === current)
+                return;
+            elderOptions.value.splice(existingIndex, 1, next);
+            return;
+        }
+        const name = resolvedName || '姓名待完善';
+        elderOptions.value.unshift({ label: name, value: targetId, name });
     }
     function invalidateElderCache() {
         elderPoolCache.delete(cacheKey);

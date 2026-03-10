@@ -184,7 +184,7 @@ const printColumnOptions = [
   { label: '备注', value: 'remark' }
 ]
 const selectedPrintColumns = ref<string[]>(['eventDate', 'eventTypeLabel', 'elderName', 'remark'])
-const { elderOptions, elderLoading, searchElders } = useElderOptions({ pageSize: 100, inHospitalOnly: true })
+const { elderOptions, elderLoading, searchElders } = useElderOptions({ pageSize: 100, inHospitalOnly: true, signedOnly: true })
 const LARGE_PRINT_ROW_THRESHOLD = 200
 const metricTraceText = computed(() => {
   const version = String(route.query.metricVersion || '').trim()

@@ -2,7 +2,7 @@
   <PageContainer title="用药设置" subTitle="维护老人用药方案与阈值">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
-        <a-input v-model:value="query.keyword" placeholder="老人/药品" allow-clear />
+        <ElderNameAutocomplete v-model:value="query.keyword" placeholder="老人姓名(编号)" width="220px" />
       </a-form-item>
       <template #extra>
         <a-space>
@@ -81,6 +81,7 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { mapHealthExportRows, medicationSettingExportColumns } from '../../constants/healthExport'
 import { exportCsv, exportExcel } from '../../utils/export'

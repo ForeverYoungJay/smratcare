@@ -11,7 +11,7 @@
         <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 140px" />
       </a-form-item>
       <a-form-item label="关键词">
-        <a-input v-model:value="query.keyword" placeholder="订单号/老人/菜品" allow-clear />
+        <ElderNameAutocomplete v-model:value="query.keyword" placeholder="老人姓名(编号)" width="220px" />
       </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openCreate">新增点餐</a-button>
@@ -155,6 +155,7 @@ import type { Dayjs } from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import {
   DINING_MEAL_TYPES,
   DINING_MEAL_TYPE_OPTIONS,
@@ -199,7 +200,8 @@ const saving = ref(false)
 const { elderOptions, searchElders: loadElderOptions, ensureSelectedElder } = useElderOptions({
   pageSize: 120,
   preloadSize: 400,
-  inHospitalOnly: true
+  inHospitalOnly: true,
+  signedOnly: true
 })
 const dishOptions = ref<{ label: string; value: number; price: number }[]>([])
 const prepZoneOptions = ref<{ label: string; value: number; name: string }[]>([])

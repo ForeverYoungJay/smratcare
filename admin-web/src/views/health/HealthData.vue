@@ -33,7 +33,7 @@
     </a-card>
 
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
-      <a-form-item label="关键词"><a-input v-model:value="query.keyword" placeholder="老人/数值" allow-clear /></a-form-item>
+      <a-form-item label="长者"><ElderNameAutocomplete v-model:value="query.keyword" placeholder="姓名(编号)" width="220px" /></a-form-item>
       <a-form-item label="类型">
         <a-select v-model:value="query.dataType" :options="dataTypeOptions" allow-clear placeholder="选择类型" style="width: 180px" />
       </a-form-item>
@@ -123,6 +123,7 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { healthDataExportColumns, mapHealthExportRows } from '../../constants/healthExport'
 import { exportCsv, exportExcel } from '../../utils/export'

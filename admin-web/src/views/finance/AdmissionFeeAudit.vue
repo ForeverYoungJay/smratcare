@@ -2,7 +2,7 @@
   <PageContainer title="入住费用审核" subTitle="登记并审核入住费用与押金信息">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
-        <a-input v-model:value="query.keyword" allow-clear placeholder="老人姓名/备注" style="width: 220px" />
+        <ElderNameAutocomplete v-model:value="query.keyword" allow-clear placeholder="老人姓名(编号)" width="220px" />
       </a-form-item>
       <a-form-item label="状态">
         <a-select v-model:value="query.status" allow-clear style="width: 180px" :options="statusOptions" />
@@ -54,6 +54,7 @@ import { Input, message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { createAdmissionFeeAudit, getAdmissionFeeAuditPage, reviewAdmissionFeeAudit } from '../../api/financeFee'
 import type { AdmissionFeeAuditItem, PageResult } from '../../types'

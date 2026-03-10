@@ -17,7 +17,7 @@
           />
         </a-form-item>
         <a-form-item label="关键词">
-          <a-input v-model:value="query.keyword" allow-clear placeholder="请输入老人姓名/护理等级/来源渠道" style="width: 260px" />
+          <ElderNameAutocomplete v-model:value="query.keyword" allow-clear placeholder="请输入老人姓名(编号)/护理等级/来源渠道" width="280px" />
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="query.status" allow-clear style="width: 180px" placeholder="请选择状态">
@@ -134,6 +134,7 @@ import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { getBaseConfigItemList } from '../../api/baseConfig'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { createTrialStay, deleteTrialStay, exportTrialStay, getTrialStayPage, updateTrialStay } from '../../api/elderResidence'

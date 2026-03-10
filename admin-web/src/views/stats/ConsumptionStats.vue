@@ -167,7 +167,7 @@ const metricTraceText = computed(() => {
   if (source === 'dashboard') notes.push('来源：看板钻取')
   return notes.join('；')
 })
-const { elderOptions, elderLoading, searchElders } = useElderOptions({ pageSize: 100, inHospitalOnly: true })
+const { elderOptions, elderLoading, searchElders } = useElderOptions({ pageSize: 100, inHospitalOnly: true, signedOnly: true })
 const displayTopRows = computed(() => {
   const elderId = Number(query.elderId || 0)
   const list = stats.topConsumerElders || []

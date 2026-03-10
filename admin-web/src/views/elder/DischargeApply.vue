@@ -17,7 +17,7 @@
           />
         </a-form-item>
         <a-form-item label="关键词">
-          <a-input v-model:value="query.keyword" allow-clear placeholder="请输入老人姓名/申请原因/审核备注" style="width: 280px" />
+          <a-input v-model:value="query.keyword" allow-clear placeholder="请输入申请原因/审核备注" style="width: 280px" />
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="query.status" allow-clear style="width: 160px" placeholder="请选择状态">

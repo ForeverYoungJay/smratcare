@@ -2,7 +2,7 @@
   <PageContainer title="订单管理" subTitle="订单与积分结算">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="订单号">
-        <a-input v-model:value="query.keyword" placeholder="订单号/老人姓名" />
+        <ElderNameAutocomplete v-model:value="query.keyword" placeholder="订单号/老人姓名(编号)" width="240px" />
       </a-form-item>
     </SearchForm>
 
@@ -40,6 +40,7 @@ import { reactive, ref } from 'vue'
 import PageContainer from '../components/PageContainer.vue'
 import SearchForm from '../components/SearchForm.vue'
 import DataTable from '../components/DataTable.vue'
+import ElderNameAutocomplete from '../components/ElderNameAutocomplete.vue'
 import { getOrderPage } from '../api/store'
 import type { OrderItem, PageResult } from '../types/api'
 

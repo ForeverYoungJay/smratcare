@@ -9,7 +9,7 @@
           <a-input v-model:value="query.roomNo" placeholder="请输入房间号" allow-clear />
         </a-form-item>
         <a-form-item label="老人">
-          <a-input v-model:value="query.elderName" placeholder="请输入老人姓名" allow-clear />
+          <ElderNameAutocomplete v-model:value="query.elderName" placeholder="请输入老人姓名(编号)" width="220px" />
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="query.status" allow-clear style="width: 120px">
@@ -250,6 +250,7 @@ import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 import QRCode from 'qrcode'
 import PageContainer from '../../components/PageContainer.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { getBaseConfigItemList } from '../../api/baseConfig'
 import { getBedMap } from '../../api/bed'
 import { getElderDetail } from '../../api/elder'

@@ -2,7 +2,7 @@
   <PageContainer title="长者患者列表" subTitle="护理/医护共同入口">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="长者">
-        <a-input v-model:value="query.fullName" allow-clear placeholder="姓名/手机号/身份证" />
+        <ElderNameAutocomplete v-model:value="query.fullName" allow-clear placeholder="姓名(编号)" width="220px" />
       </a-form-item>
       <a-form-item label="床位">
         <a-input v-model:value="query.bedNo" allow-clear placeholder="床位号" />
@@ -50,6 +50,7 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { getElderPage } from '../../api/elder'
 import type { ElderItem, PageResult } from '../../types'
 import { resolveMedicalError } from './medicalError'

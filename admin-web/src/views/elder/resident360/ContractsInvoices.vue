@@ -496,9 +496,10 @@ function buildDocRouteSignature(source: Record<string, unknown>) {
 
 function applyDocumentQueryFromRoute() {
   const elderId = firstRouteQueryText(route.query.docElderId || route.query.elderId || route.query.residentId)
+  const routeElderName = firstRouteQueryText(route.query.elderName)
   if (elderId) {
     selector.elderId = elderId
-    ensureSelectedElder(elderId)
+    ensureSelectedElder(elderId, routeElderName || undefined)
   } else {
     selector.elderId = undefined
   }
@@ -783,8 +784,9 @@ onMounted(async () => {
   await searchElders('')
   if (!selector.elderId) {
     const fromRoute = firstRouteQueryText(route.query.docElderId || route.query.elderId || route.query.residentId)
+    const routeElderName = firstRouteQueryText(route.query.elderName)
     if (fromRoute) {
-      ensureSelectedElder(fromRoute)
+      ensureSelectedElder(fromRoute, routeElderName || undefined)
       selector.elderId = fromRoute
     } else {
       selector.elderId = elderOptions.value[0]?.value

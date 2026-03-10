@@ -2,7 +2,7 @@
   <PageContainer title="事故登记" subTitle="事故/意外记录与追踪">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="老人姓名">
-        <a-input v-model:value="query.elderName" placeholder="请输入老人姓名" allow-clear />
+        <ElderNameAutocomplete v-model:value="query.elderName" placeholder="请输入老人姓名(编号)" width="240px" />
       </a-form-item>
       <a-form-item label="事故类型">
         <a-input v-model:value="query.incidentType" placeholder="请输入事故类型" allow-clear />
@@ -113,6 +113,7 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { getIncidentPage, createIncident, updateIncident, deleteIncident, closeIncident, exportIncidentPage } from '../../api/life'
 import type { IncidentLevel, IncidentReport, IncidentStatus, PageResult } from '../../types'

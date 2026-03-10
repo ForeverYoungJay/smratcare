@@ -3,7 +3,13 @@
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item :label="pageConfig.keywordLabel">
-          <a-input v-model:value="query.keyword" :placeholder="pageConfig.keywordPlaceholder" allow-clear />
+          <ElderNameAutocomplete
+            v-if="useElderKeywordSelect"
+            v-model:value="query.keyword"
+            :placeholder="`${pageConfig.keywordLabel}(编号)`"
+            width="220px"
+          />
+          <a-input v-else v-model:value="query.keyword" :placeholder="pageConfig.keywordPlaceholder" allow-clear />
         </a-form-item>
         <a-form-item v-if="props.assessmentType === 'ARCHIVE'" label="老人">
           <a-select
@@ -65,7 +71,7 @@
       </template>
     </a-alert>
 
-    <a-row :gutter="[12, 12]" style="margin-top: 16px">
+    <a-row v-if="!isAdmissionAssessment" :gutter="[12, 12]" style="margin-top: 16px">
       <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="总记录" :value="summary.totalCount || 0" /></a-card></a-col>
       <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="草稿" :value="summary.draftCount || 0" /></a-card></a-col>
       <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已完成" :value="summary.completedCount || 0" /></a-card></a-col>
@@ -74,7 +80,7 @@
       <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="高风险等级" :value="summary.highRiskCount || 0" /></a-card></a-col>
     </a-row>
     <a-alert
-      v-if="(summary.reassessOverdueCount || 0) > 0 || (summary.highRiskCount || 0) > 0"
+      v-if="!isAdmissionAssessment && ((summary.reassessOverdueCount || 0) > 0 || (summary.highRiskCount || 0) > 0)"
       type="warning"
       show-icon
       style="margin-top: 12px"
@@ -585,6 +591,7 @@ import { useUserStore } from '../../stores/user'
 import { hasMinisterOrHigher } from '../../utils/roleAccess'
 import PageContainer from '../../components/PageContainer.vue'
 import LifecycleStageBar from '../../components/LifecycleStageBar.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { copyText } from '../../utils/clipboard'
@@ -1152,6 +1159,10 @@ const pageConfigMap: Record<AssessmentType, PageConfig> = {
 }
 
 const pageConfig = computed(() => pageConfigMap[props.assessmentType])
+const useElderKeywordSelect = computed(() => {
+  const label = String(pageConfig.value.keywordLabel || '')
+  return label.includes('老人') || label.includes('长者')
+})
 const isAdmissionAssessment = computed(() => props.assessmentType === 'ADMISSION')
 const admissionScoreItemList = admissionAbilityGroups.flatMap((group) => group.items)
 const admissionMaxRawScore = admissionScoreItemList.reduce((sum, item) => sum + Math.max(...item.options.map((opt) => opt.score)), 0)
@@ -1414,7 +1425,7 @@ const pendingAdmissionRowSelection = computed(() => ({
   onChange: (keys: Array<string | number>) => {
     const picked = String(keys?.[0] || '').trim()
     if (!picked) return
-    choosePendingContract(picked)
+    choosePendingContract(picked).catch(() => {})
   }
 }))
 const selectedAdmissionRecord = computed(() => {
@@ -1658,7 +1669,7 @@ async function loadPendingAdmissionContracts() {
   }
 }
 
-function choosePendingContract(contractNo?: string) {
+async function choosePendingContract(contractNo?: string) {
   const normalized = String(contractNo || '').trim()
   if (!normalized) return
   const target = pendingAdmissionContracts.value.find((item) => item.contractNo === normalized)
@@ -1669,12 +1680,18 @@ function choosePendingContract(contractNo?: string) {
   const nextQuery: Record<string, any> = { ...route.query, contractNo: normalized }
   if (target.elderId) nextQuery.residentId = target.elderId
   if (target.elderName) nextQuery.elderName = target.elderName
-  router.replace({ path: route.path, query: nextQuery })
+  const nextSignature = buildAssessmentRouteSignature(nextQuery)
+  if (nextSignature === buildAssessmentRouteSignature(route.query as Record<string, unknown>)) {
+    return
+  }
+  skipNextAssessmentRouteWatch.value = true
+  assessmentRouteSignature.value = nextSignature
+  await router.replace({ path: route.path, query: nextQuery })
 }
 
 function pendingAdmissionCustomRow(record: CrmContractItem) {
   return {
-    onClick: () => choosePendingContract(record.contractNo || '')
+    onClick: () => choosePendingContract(record.contractNo || '').catch(() => {})
   }
 }
 

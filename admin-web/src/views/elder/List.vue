@@ -3,7 +3,7 @@
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-form">
         <a-form-item label="姓名">
-          <a-input v-model:value="query.fullName" placeholder="姓名" allow-clear />
+          <ElderNameAutocomplete v-model:value="query.fullName" placeholder="姓名(编号)" width="180px" />
         </a-form-item>
         <a-form-item label="身份证">
           <a-input v-model:value="query.idCardNo" placeholder="身份证号" allow-clear />
@@ -160,6 +160,7 @@ import type { FormInstance, FormRules } from 'ant-design-vue'
 import QRCode from 'qrcode'
 import PageContainer from '../../components/PageContainer.vue'
 import FlowGuardBar from '../../components/FlowGuardBar.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { exportCsv } from '../../utils/export'
 import { copyText } from '../../utils/clipboard'

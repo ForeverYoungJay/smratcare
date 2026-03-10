@@ -3,8 +3,14 @@
     <MarketingQuickNav parent-path="/marketing/callback" />
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline">
-        <a-form-item label="关键词">
-          <a-input v-model:value="query.keyword" allow-clear placeholder="姓名/电话/备注" />
+        <a-form-item label="长者">
+          <ElderNameAutocomplete v-model:value="query.keyword" allow-clear placeholder="姓名(编号)" width="220px" />
+        </a-form-item>
+        <a-form-item label="电话">
+          <a-input v-model:value="query.phone" allow-clear placeholder="请输入电话" />
+        </a-form-item>
+        <a-form-item label="备注">
+          <a-input v-model:value="query.remarkKeyword" allow-clear placeholder="备注关键词" />
         </a-form-item>
         <a-form-item label="来源">
           <a-input v-model:value="query.source" allow-clear placeholder="渠道/来源" />
@@ -81,6 +87,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import MarketingQuickNav from './components/MarketingQuickNav.vue'
 import MarketingListToolbar from './components/MarketingListToolbar.vue'
 import { getMarketingCallbackReport } from '../../api/marketing'
@@ -112,6 +119,8 @@ const query = reactive({
   pageNo: 1,
   pageSize: 10,
   keyword: '',
+  phone: '',
+  remarkKeyword: '',
   source: '',
   dateFrom: undefined as string | undefined,
   dateTo: undefined as string | undefined,
@@ -130,10 +139,17 @@ const columns = [
 
 const filteredRows = computed(() => {
   const keyword = query.keyword.trim()
+  const phone = query.phone.trim()
+  const remarkKeyword = query.remarkKeyword.trim()
   return allRows.value.filter((item) => {
     if (keyword) {
-      const haystack = `${item.name || ''} ${item.phone || ''} ${item.remark || ''}`
-      if (!haystack.includes(keyword)) return false
+      if (!String(item.name || '').includes(keyword)) return false
+    }
+    if (phone && !String(item.phone || '').includes(phone)) {
+      return false
+    }
+    if (remarkKeyword && !String(item.remark || '').includes(remarkKeyword)) {
+      return false
     }
     if (query.source && !String(item.source || '').includes(query.source)) return false
     if (query.dateFrom && item.nextFollowDate && item.nextFollowDate < query.dateFrom) return false
@@ -204,6 +220,8 @@ function onReset() {
   query.pageNo = 1
   query.pageSize = 10
   query.keyword = ''
+  query.phone = ''
+  query.remarkKeyword = ''
   query.source = ''
   query.dateFrom = undefined
   query.dateTo = undefined

@@ -1,7 +1,7 @@
 <template>
   <PageContainer title="心血管风险评估" subTitle="评估中心 > 缺血性心血管病风险评估">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
-      <a-form-item label="长者"><a-input v-model:value="query.keyword" placeholder="姓名/风险因子/评估人" allow-clear /></a-form-item>
+      <a-form-item label="长者"><ElderNameAutocomplete v-model:value="query.keyword" placeholder="姓名(编号)" width="220px" /></a-form-item>
       <a-form-item label="评估人"><a-input v-model:value="query.assessorName" placeholder="评估人姓名" allow-clear style="width: 140px" /></a-form-item>
       <a-form-item label="风险等级"><a-select v-model:value="query.riskLevel" allow-clear style="width: 140px" :options="riskOptions" /></a-form-item>
       <a-form-item label="需要随访">
@@ -124,6 +124,7 @@ import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { getElderDetail } from '../../api/elder'

@@ -5,8 +5,8 @@
         <a-form-item label="日期范围">
           <a-range-picker v-model:value="query.range" style="width: 260px" />
         </a-form-item>
-        <a-form-item label="关键字">
-          <a-input v-model:value="query.keyword" allow-clear placeholder="老人/来源/备注" style="width: 200px" />
+        <a-form-item label="长者">
+          <ElderNameAutocomplete v-model:value="query.keyword" allow-clear placeholder="姓名(编号)" width="200px" />
         </a-form-item>
         <a-form-item label="打印备注">
           <a-input v-model:value="query.printRemark" allow-clear style="width: 180px" />
@@ -69,6 +69,7 @@ import dayjs from 'dayjs'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { getFinanceModuleEntrySummary } from '../../api/finance'
 import { getConsumptionPage } from '../../api/financeFee'
 import type { ConsumptionRecordItem, FinanceModuleEntrySummary, PageResult } from '../../types'

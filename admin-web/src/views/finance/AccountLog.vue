@@ -2,7 +2,7 @@
   <PageContainer title="账户流水" subTitle="按老人查询流水记录">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="老人姓名">
-        <a-input v-model:value="query.keyword" placeholder="输入姓名" allow-clear />
+        <ElderNameAutocomplete v-model:value="query.keyword" placeholder="姓名(编号)" width="220px" />
       </a-form-item>
       <template #extra>
         <a-button @click="printCurrentElderLogs">打印当前流水</a-button>
@@ -37,6 +37,7 @@ import { computed, reactive, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { getElderAccountLogPage, printElderAccountLogPdf } from '../../api/finance'
 import type { ElderAccountLog, PageResult } from '../../types'
 import { useRoute } from 'vue-router'

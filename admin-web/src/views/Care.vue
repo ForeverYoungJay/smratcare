@@ -12,7 +12,7 @@
         </a-select>
       </a-form-item>
       <a-form-item label="关键字">
-        <a-input v-model:value="query.keyword" placeholder="老人/房间" />
+        <ElderNameAutocomplete v-model:value="query.keyword" placeholder="老人姓名(编号)" width="220px" />
       </a-form-item>
       <template #extra>
         <a-space>
@@ -59,6 +59,7 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../components/PageContainer.vue'
 import SearchForm from '../components/SearchForm.vue'
 import DataTable from '../components/DataTable.vue'
+import ElderNameAutocomplete from '../components/ElderNameAutocomplete.vue'
 import { getTaskPage, generateTasks } from '../api/care'
 import { useStaffOptions } from '../composables/useStaffOptions'
 import type { CareTaskItem, PageResult } from '../types/api'

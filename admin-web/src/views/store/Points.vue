@@ -3,7 +3,7 @@
     <a-card class="card-elevated" :bordered="false">
       <a-form layout="inline" :model="query" class="search-form">
         <a-form-item label="关键词">
-          <a-input v-model:value="query.keyword" placeholder="老人姓名" allow-clear />
+          <ElderNameAutocomplete v-model:value="query.keyword" placeholder="老人姓名(编号)" width="220px" />
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="query.status" allow-clear style="width: 120px">
@@ -119,6 +119,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { adjustPoints, getPointsAccountPage, getPointsLogPage } from '../../api/store'
 import type { PageResult, PointsAccountItem, PointsLogItem } from '../../types'

@@ -7,7 +7,7 @@
           <a-input v-model:value="query.contractNo" placeholder="请输入 合同编号" allow-clear />
         </a-form-item>
         <a-form-item label="姓名">
-          <a-input v-model:value="query.elderName" placeholder="请输入 姓名" allow-clear />
+          <ElderNameAutocomplete v-model:value="query.elderName" placeholder="姓名(编号)" width="220px" />
         </a-form-item>
         <a-form-item label="联系电话">
           <a-input v-model:value="query.elderPhone" placeholder="请输入 联系电话" allow-clear />
@@ -82,6 +82,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
+import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import MarketingQuickNav from './components/MarketingQuickNav.vue'
 import MarketingListToolbar from './components/MarketingListToolbar.vue'
 import {

@@ -134,7 +134,8 @@ const lastLoadedAt = ref('')
 const { elderOptions: residentOptionPool, elderLoading: residentLoading, searchElders, ensureSelectedElder } = useElderOptions({
   pageSize: 200,
   preloadSize: 600,
-  inHospitalOnly: true
+  inHospitalOnly: true,
+  signedOnly: true
 })
 const signedResidentIdSet = ref<Set<string>>(new Set())
 const signedResidentSetReady = ref(false)
@@ -519,6 +520,11 @@ async function loadModules() {
   errorMessage.value = ''
   try {
     await resolveResidentId()
+    const availableResidentIds = new Set((residentOptions.value || []).map((item) => String(item.value || '').trim()).filter(Boolean))
+    if (residentId.value.trim() && availableResidentIds.size > 0 && !availableResidentIds.has(residentId.value.trim())) {
+      residentId.value = residentOptions.value[0]?.value || ''
+      syncResidentToRoute()
+    }
     if (!residentId.value.trim()) {
       overview.value = undefined
       contractLinkage.value = undefined
