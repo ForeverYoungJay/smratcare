@@ -177,13 +177,14 @@
               />
             </a-form-item>
           </a-col>
-          <a-col :span="12"><a-form-item label="姓名" name="elderName"><a-input v-model:value="form.elderName" /></a-form-item></a-col>
+          <a-col :span="12"><a-form-item label="姓名" name="elderName"><a-input ref="elderNameInputRef" v-model:value="form.elderName" /></a-form-item></a-col>
           <a-col :span="12"><a-form-item label="联系电话"><a-input v-model:value="form.elderPhone" /></a-form-item></a-col>
           <a-col :span="12"><a-form-item label="身份证号"><a-input v-model:value="form.idCardNo" /></a-form-item></a-col>
           <a-col :span="12"><a-form-item label="家庭地址"><a-input v-model:value="form.homeAddress" /></a-form-item></a-col>
-          <a-col :span="8"><a-form-item label="性别"><a-select v-model:value="form.gender" allow-clear><a-select-option :value="1">男</a-select-option><a-select-option :value="2">女</a-select-option></a-select></a-form-item></a-col>
-          <a-col :span="8"><a-form-item label="年龄"><a-input-number v-model:value="form.age" :min="0" :max="120" style="width: 100%" /></a-form-item></a-col>
-          <a-col :span="8"><a-form-item label="签约日期"><a-date-picker v-model:value="form.contractSignedAt" value-format="YYYY-MM-DD HH:mm:ss" show-time style="width: 100%" /></a-form-item></a-col>
+          <a-col :span="6"><a-form-item label="性别"><a-select v-model:value="form.gender" allow-clear><a-select-option :value="1">男</a-select-option><a-select-option :value="2">女</a-select-option></a-select></a-form-item></a-col>
+          <a-col :span="6"><a-form-item label="年龄"><a-input-number v-model:value="form.age" :min="0" :max="120" style="width: 100%" /></a-form-item></a-col>
+          <a-col :span="6"><a-form-item label="生日"><a-input :value="formDerivedBirthDate || '-'" readonly /></a-form-item></a-col>
+          <a-col :span="6"><a-form-item label="签约日期"><a-date-picker v-model:value="form.contractSignedAt" value-format="YYYY-MM-DD HH:mm:ss" show-time style="width: 100%" /></a-form-item></a-col>
           <a-col :span="12"><a-form-item label="合同有效期止"><a-date-picker v-model:value="form.contractExpiryDate" value-format="YYYY-MM-DD" style="width: 100%" /></a-form-item></a-col>
           <a-col :span="12">
             <a-form-item label="合同状态">
@@ -274,7 +275,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
@@ -323,6 +324,7 @@ const loading = ref(false)
 const submitting = ref(false)
 const open = ref(false)
 const formRef = ref<FormInstance>()
+const elderNameInputRef = ref<any>()
 const rows = ref<CrmContractItem[]>([])
 const total = ref(0)
 const selectedRowKeys = ref<Array<number | string>>([])
@@ -488,6 +490,7 @@ function applyQueryRouteFilter() {
 }
 
 const form = reactive<Partial<CrmContractItem>>({})
+const formDerivedBirthDate = ref('')
 const selectedPolicyValues = ref<string[]>([])
 const rules: FormRules = {
   elderName: [{ required: true, message: '请输入姓名' }]
@@ -607,6 +610,7 @@ const attachmentType = ref<'MEDICAL_RECORD' | 'MEDICAL_INSURANCE' | 'HOUSEHOLD' 
 const currentAttachmentLead = ref<CrmContractItem>()
 const attachments = ref<ContractAttachmentItem[]>([])
 const autoAttachmentHandledKey = ref('')
+const autoEditHandledKey = ref('')
 const uploadAccept = '.jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip'
 const attachmentColumns = [
   { title: '预览', dataIndex: 'preview', key: 'preview', width: 80 },
@@ -986,6 +990,7 @@ function openForm(record?: CrmContractItem) {
     Object.assign(form, record)
     form.contractStatus = record.contractStatus || '待评估'
     selectedPolicyValues.value = parsePolicyValues(record.orgName)
+    syncIdCardDerivedFields(record.idCardNo, false)
   } else {
     Object.assign(form, {
       id: undefined,
@@ -1000,6 +1005,7 @@ function openForm(record?: CrmContractItem) {
       orgName: undefined
     } as Partial<CrmContractItem>)
     selectedPolicyValues.value = []
+    formDerivedBirthDate.value = ''
   }
   open.value = true
 }
@@ -1075,7 +1081,8 @@ async function submit() {
       currentOwnerDept: isCreate ? 'ASSESSMENT' : (form.currentOwnerDept || 'ASSESSMENT'),
       contractStatus: isCreate ? '待评估' : (form.contractStatus || '待评估'),
       reservationRoomNo: isCreate ? undefined : form.reservationRoomNo,
-      orgName: selectedPolicyValues.value.length ? selectedPolicyValues.value.join('；') : undefined
+      orgName: selectedPolicyValues.value.length ? selectedPolicyValues.value.join('；') : undefined,
+      age: Number.isFinite(Number(form.age)) ? Number(form.age) : undefined
     }
     let saved: CrmContractItem
     if (form.id) {
@@ -1284,18 +1291,18 @@ async function autoOpenAttachmentFromRoute() {
   if (!openAttachmentFlag) return
   const contractNo = String(route.query.contractNo || '').trim()
   const elderName = String(route.query.elderName || '').trim()
-  const elderId = Number(route.query.elderId || route.query.residentId || 0)
+  const elderId = String(route.query.elderId || route.query.residentId || '').trim()
   const handledKey = `${contractNo}|${elderName}|${elderId}|${String(route.query.attachmentType || '')}`
   if (autoAttachmentHandledKey.value === handledKey) return
   const target = tableRows.value.find((item) => {
     if (contractNo && String(item.contractNo || '').trim() === contractNo) return true
     if (!contractNo && elderName && String(item.elderName || '').trim() === elderName) return true
-    if (!contractNo && !elderName && elderId > 0 && Number(item.elderId || 0) === elderId) return true
+    if (!contractNo && !elderName && elderId && String(item.elderId || '').trim() === elderId) return true
     return false
   }) || rows.value.find((item) => {
     if (contractNo && String(item.contractNo || '').trim() === contractNo) return true
     if (!contractNo && elderName && String(item.elderName || '').trim() === elderName) return true
-    if (!contractNo && !elderName && elderId > 0 && Number(item.elderId || 0) === elderId) return true
+    if (!contractNo && !elderName && elderId && String(item.elderId || '').trim() === elderId) return true
     return false
   })
   if (!target) {
@@ -1309,6 +1316,45 @@ async function autoOpenAttachmentFromRoute() {
   resolveAttachmentTypeFromRoute()
   await openAttachment(target)
   autoAttachmentHandledKey.value = handledKey
+}
+
+function focusEditTargetFromRoute() {
+  if (String(route.query.focus || '').trim() !== 'elder-info') return
+  nextTick(() => {
+    elderNameInputRef.value?.focus?.()
+  })
+}
+
+async function autoOpenEditFromRoute() {
+  const openEditFlag = String(route.query.openEdit || '').trim() === '1'
+  if (!openEditFlag) return
+  const contractNo = String(route.query.contractNo || '').trim()
+  const elderName = String(route.query.elderName || '').trim()
+  const elderId = String(route.query.elderId || route.query.residentId || '').trim()
+  const handledKey = `${contractNo}|${elderName}|${elderId}`
+  if (autoEditHandledKey.value === handledKey) return
+  const target = tableRows.value.find((item) => {
+    if (contractNo && String(item.contractNo || '').trim() === contractNo) return true
+    if (!contractNo && elderName && String(item.elderName || '').trim() === elderName) return true
+    if (!contractNo && !elderName && elderId && String(item.elderId || '').trim() === elderId) return true
+    return false
+  }) || rows.value.find((item) => {
+    if (contractNo && String(item.contractNo || '').trim() === contractNo) return true
+    if (!contractNo && elderName && String(item.elderName || '').trim() === elderName) return true
+    if (!contractNo && !elderName && elderId && String(item.elderId || '').trim() === elderId) return true
+    return false
+  })
+  if (!target) {
+    if (contractNo || elderName) {
+      message.warning('未找到目标合同，请先检查筛选条件后重试')
+    }
+    return
+  }
+  selectedRowKeys.value = [target.id]
+  selectedRows.value = [target]
+  openForm(target)
+  focusEditTargetFromRoute()
+  autoEditHandledKey.value = handledKey
 }
 
 function beforeUpload(file: File) {
@@ -1389,6 +1435,49 @@ function normalizeLeadName(lead: CrmContractItem) {
   return (lead.elderName || lead.name || '').trim() || '未命名长者'
 }
 
+function resolveBirthDateAndAgeFromIdCard(idCardNo?: string) {
+  const normalized = String(idCardNo || '').trim()
+  const now = dayjs()
+  const toValidBirthDate = (value: string) => {
+    const d = dayjs(value)
+    if (!d.isValid()) return null
+    if (d.format('YYYY-MM-DD') !== value) return null
+    if (d.isAfter(now)) return null
+    return d
+  }
+  if (/^\d{17}[\dXx]$/.test(normalized)) {
+    const yyyy = normalized.slice(6, 10)
+    const mm = normalized.slice(10, 12)
+    const dd = normalized.slice(12, 14)
+    const birthDate = toValidBirthDate(`${yyyy}-${mm}-${dd}`)
+    if (!birthDate) return { birthDate: '', age: undefined as number | undefined }
+    return { birthDate: birthDate.format('YYYY-MM-DD'), age: now.diff(birthDate, 'year') }
+  }
+  if (/^\d{15}$/.test(normalized)) {
+    const yy = normalized.slice(6, 8)
+    const mm = normalized.slice(8, 10)
+    const dd = normalized.slice(10, 12)
+    const birthDate = toValidBirthDate(`19${yy}-${mm}-${dd}`)
+    if (!birthDate) return { birthDate: '', age: undefined as number | undefined }
+    return { birthDate: birthDate.format('YYYY-MM-DD'), age: now.diff(birthDate, 'year') }
+  }
+  return { birthDate: '', age: undefined as number | undefined }
+}
+
+function syncIdCardDerivedFields(idCardNo?: string, overrideAge = true) {
+  const { birthDate, age } = resolveBirthDateAndAgeFromIdCard(idCardNo)
+  formDerivedBirthDate.value = birthDate || ''
+  if (!birthDate) {
+    if (overrideAge) {
+      form.age = undefined
+    }
+    return
+  }
+  if (overrideAge || form.age == null) {
+    form.age = age
+  }
+}
+
 async function ensureContractNo(record: CrmContractItem) {
   if (record.contractNo) return record
   return updateCrmContract(record.id, {
@@ -1415,10 +1504,12 @@ async function findExistingElderByLead(lead: CrmContractItem): Promise<ElderItem
 async function ensureElderFromLead(lead: CrmContractItem): Promise<ElderItem> {
   const leadAttachments = await getContractAttachments(lead.id)
   const existing = await findExistingElderByLead(lead)
+  const { birthDate } = resolveBirthDateAndAgeFromIdCard(lead.idCardNo)
   const elderPayload = {
     fullName: normalizeLeadName(lead),
     idCardNo: lead.idCardNo,
     gender: lead.gender,
+    birthDate: birthDate || undefined,
     phone: lead.elderPhone || lead.phone,
     homeAddress: lead.homeAddress,
     medicalRecordFileUrl: pickLatestAttachment(leadAttachments, 'MEDICAL_RECORD')?.fileUrl,
@@ -1454,6 +1545,7 @@ onMounted(() => {
   fetchPolicyOptions()
   fetchData()
     .then(() => autoOpenAttachmentFromRoute())
+    .then(() => autoOpenEditFromRoute())
     .then(() => syncSearchQueryToRoute().catch(() => {}))
   const quick = String(route.query.quick || '').trim()
   if (quick === '1' && !isSignedMode.value) {
@@ -1477,6 +1569,9 @@ watch(
       if (String(route.query.openAttachment || '').trim() === '1') {
         await autoOpenAttachmentFromRoute()
       }
+      if (String(route.query.openEdit || '').trim() === '1') {
+        await autoOpenEditFromRoute()
+      }
       return
     }
     const signatureChanged = nextSignature !== searchRouteSignature.value
@@ -1488,6 +1583,7 @@ watch(
       await fetchData()
     }
     await autoOpenAttachmentFromRoute()
+    await autoOpenEditFromRoute()
     const quick = String(route.query.quick || '').trim()
     if (quick === '1' && !isSignedMode.value) {
       openForm()
@@ -1509,6 +1605,12 @@ watch(
   () => tableRows.value.map((item) => `${item.id}-${item.contractNo || ''}`).join(','),
   () => {
     refreshFinalizeReady(tableRows.value)
+  }
+)
+watch(
+  () => form.idCardNo,
+  (value) => {
+    syncIdCardDerivedFields(value, true)
   }
 )
 </script>

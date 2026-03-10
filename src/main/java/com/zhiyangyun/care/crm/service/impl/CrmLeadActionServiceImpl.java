@@ -27,11 +27,13 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CrmLeadActionServiceImpl implements CrmLeadActionService {
+  private static final int FILE_TYPE_MAX_LEN = 32;
   private final CrmLeadMapper leadMapper;
   private final CrmCallbackPlanMapper callbackPlanMapper;
   private final CrmContractAttachmentMapper attachmentMapper;
@@ -246,7 +248,7 @@ public class CrmLeadActionServiceImpl implements CrmLeadActionService {
     attachment.setContractNo(blankToDefault(request == null ? null : request.getContractNo(), lead.getContractNo()));
     attachment.setFileName(fileName);
     attachment.setFileUrl(blankToNull(request == null ? null : request.getFileUrl()));
-    attachment.setFileType(blankToNull(request == null ? null : request.getFileType()));
+    attachment.setFileType(normalizeFileType(request == null ? null : request.getFileType(), fileName));
     attachment.setFileSize(request == null ? null : request.getFileSize());
     attachment.setRemark(blankToNull(request == null ? null : request.getRemark()));
     attachment.setCreatedBy(staffId);
@@ -429,6 +431,49 @@ public class CrmLeadActionServiceImpl implements CrmLeadActionService {
       return null;
     }
     return value.trim();
+  }
+
+  private String normalizeFileType(String fileType, String fileName) {
+    String ext = extractFileExt(fileName);
+    if (ext != null) {
+      return ext;
+    }
+    String normalized = blankToNull(fileType);
+    if (normalized == null) {
+      return null;
+    }
+    int semicolonIndex = normalized.indexOf(';');
+    if (semicolonIndex >= 0) {
+      normalized = normalized.substring(0, semicolonIndex).trim();
+    }
+    int slashIndex = normalized.indexOf('/');
+    if (slashIndex >= 0 && slashIndex < normalized.length() - 1) {
+      normalized = normalized.substring(slashIndex + 1);
+    }
+    normalized = normalized.replaceAll("[^A-Za-z0-9._+-]", "_").toLowerCase(Locale.ROOT);
+    if (normalized.length() > FILE_TYPE_MAX_LEN) {
+      normalized = normalized.substring(0, FILE_TYPE_MAX_LEN);
+    }
+    return normalized.isBlank() ? null : normalized;
+  }
+
+  private String extractFileExt(String fileName) {
+    String normalizedName = blankToNull(fileName);
+    if (normalizedName == null) {
+      return null;
+    }
+    int dotIndex = normalizedName.lastIndexOf('.');
+    if (dotIndex < 0 || dotIndex == normalizedName.length() - 1) {
+      return null;
+    }
+    String ext = normalizedName.substring(dotIndex + 1).trim().toLowerCase(Locale.ROOT);
+    if (ext.isBlank()) {
+      return null;
+    }
+    if (ext.length() > FILE_TYPE_MAX_LEN) {
+      ext = ext.substring(0, FILE_TYPE_MAX_LEN);
+    }
+    return ext;
   }
 
   private LocalDate parseDate(String value) {

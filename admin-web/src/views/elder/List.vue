@@ -322,6 +322,7 @@ async function fetchData() {
     const res: PageResult<ElderItem> = await getElderPage({
       pageNo: query.pageNo,
       pageSize: query.pageSize,
+      signedOnly: true,
       fullName: query.fullName,
       idCardNo: query.idCardNo,
       bedNo: query.bedNo,

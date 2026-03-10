@@ -308,6 +308,8 @@ export interface ContractAssessmentReportItem {
   levelCode?: string
   resultSummary?: string
   nextAssessmentDate?: string
+  reportFileUrl?: string
+  reportFileName?: string
 }
 
 export interface ContractAssessmentContractItem {

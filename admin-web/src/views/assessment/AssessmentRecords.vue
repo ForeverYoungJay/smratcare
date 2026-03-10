@@ -88,19 +88,6 @@
         <a-tab-pane key="ARCHIVED" :tab="`已归档 (${summary.archivedCount || 0})`" />
       </a-tabs>
     </a-card>
-    <FlowGuardBar
-      v-if="isAdmissionAssessment"
-      :title="admissionCloseLoopEnabled ? '入住评估闭环守卫' : '入住评估守卫'"
-      :subject="admissionGuardSubject"
-      :stage-text="admissionGuardStageText"
-      :stage-color="admissionGuardStageColor"
-      :steps="admissionGuardSteps"
-      :current-index="admissionGuardCurrentIndex"
-      :blockers="admissionGuardBlockers"
-      :hint="admissionGuardHint"
-      @action="handleAdmissionGuardAction"
-      style="margin-top: 12px"
-    />
     <LifecycleStageBar
       v-if="isAdmissionAssessment"
       title="评估-入住联动阶段"
@@ -108,13 +95,6 @@
       :stage="admissionLifecycleStage"
       :hint="admissionLifecycleHint"
       style="margin-top: 12px"
-    />
-    <a-alert
-      v-if="isAdmissionAssessment && admissionCloseLoopEnabled"
-      type="success"
-      show-icon
-      style="margin-top: 12px"
-      message="闭环模式已开启：点击“保存并回流入住办理”后，将自动跳转入住办理并带入合同号与长者。"
     />
     <a-card
       v-if="isAdmissionAssessment"
@@ -335,31 +315,6 @@
         @change="onPageChange"
         @showSizeChange="onPageSizeChange"
       />
-    </a-card>
-
-    <a-card v-else class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <a-alert
-        style="margin-bottom: 12px"
-        type="info"
-        show-icon
-        :message="selectedPendingContract
-          ? `入住评估记录已迁移到“评估档案”统一管理。当前合同：${selectedPendingContract.contractNo || '-'} / ${selectedPendingContract.elderName || '-'}`
-          : '入住评估记录已迁移到“评估档案”统一管理。请先在上方选择合同后再查看摘要。'"
-      />
-      <a-descriptions bordered size="small" :column="2">
-        <a-descriptions-item label="最近评估日期">{{ selectedContractLatestRecord?.assessmentDate || '-' }}</a-descriptions-item>
-        <a-descriptions-item label="最近状态">{{ selectedContractLatestRecord ? statusLabel(selectedContractLatestRecord.status) : '-' }}</a-descriptions-item>
-        <a-descriptions-item label="最近分值">{{ selectedContractLatestRecord?.score ?? '-' }}</a-descriptions-item>
-        <a-descriptions-item label="最近等级">{{ selectedContractLatestRecord?.levelCode || '-' }}</a-descriptions-item>
-        <a-descriptions-item label="评估人">{{ selectedContractLatestRecord?.assessorName || '-' }}</a-descriptions-item>
-        <a-descriptions-item label="合同号">{{ selectedPendingContract?.contractNo || selectedContractLatestRecord?.archiveNo || '-' }}</a-descriptions-item>
-      </a-descriptions>
-      <a-space style="margin-top: 12px" wrap>
-        <a-button type="primary" :disabled="!selectedPendingContract" @click="openForm()">{{ pageConfig.createButtonText }}</a-button>
-        <a-button :disabled="!selectedContractLatestRecord" @click="openLatestAdmissionRecord">查看最近记录</a-button>
-        <a-button :disabled="!selectedPendingContractNo" @click="goAdmissionArchiveByContract">去评估档案（本合同）</a-button>
-        <a-button @click="goAdmissionArchiveAll">去评估档案（全部入住评估）</a-button>
-      </a-space>
     </a-card>
 
     <a-modal
@@ -629,7 +584,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../../stores/user'
 import { hasMinisterOrHigher } from '../../utils/roleAccess'
 import PageContainer from '../../components/PageContainer.vue'
-import FlowGuardBar from '../../components/FlowGuardBar.vue'
 import LifecycleStageBar from '../../components/LifecycleStageBar.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
@@ -1462,74 +1416,10 @@ const pendingAdmissionRowSelection = computed(() => ({
     choosePendingContract(picked)
   }
 }))
-const admissionGuardSteps = ['合同待评估', '完成入住评估登记', '办理入住选床', '合同最终签署']
 const selectedAdmissionRecord = computed(() => {
   if (selectedRowKeys.value.length !== 1) return null
   const key = Number(selectedRowKeys.value[0])
   return rows.value.find((item) => Number(item.id) === key) || null
-})
-const admissionGuardCurrentIndex = computed(() => {
-  if (!isAdmissionAssessment.value) return 0
-  const selected = selectedAdmissionRecord.value
-  if (!selected) return 0
-  if (selected.status === 'DRAFT') return 0
-  return 1
-})
-const admissionGuardStageText = computed(() => {
-  if (!isAdmissionAssessment.value) return ''
-  const selected = selectedAdmissionRecord.value
-  if (selected) {
-    return selected.status === 'DRAFT' ? '评估草稿中' : '评估已完成'
-  }
-  return admissionShouldAutoOpen.value ? '待创建评估草稿' : '未选择评估记录'
-})
-const admissionGuardStageColor = computed(() => {
-  if (!isAdmissionAssessment.value) return 'default'
-  const selected = selectedAdmissionRecord.value
-  if (!selected) return 'default'
-  return selected.status === 'DRAFT' ? 'gold' : 'green'
-})
-const admissionGuardSubject = computed(() => {
-  if (!isAdmissionAssessment.value) return ''
-  const selected = selectedAdmissionRecord.value
-  if (selected) {
-    return `合同号 ${selected.archiveNo || admissionContractNoFromRoute.value || '-'} / 老人 ${selected.elderName || '-'}`
-  }
-  if (selectedPendingContract.value) {
-    return `合同号 ${selectedPendingContract.value.contractNo || '-'} / 老人 ${selectedPendingContract.value.elderName || '-'}`
-  }
-  if (admissionContractNoFromRoute.value || admissionElderNameFromRoute.value) {
-    return `合同号 ${admissionContractNoFromRoute.value || '-'} / 老人 ${admissionElderNameFromRoute.value || '-'}`
-  }
-  return '请先勾选待评估合同，再新建入住评估'
-})
-const admissionGuardBlockers = computed(() => {
-  if (!isAdmissionAssessment.value) return []
-  const blockers: Array<{ code: string; text: string; actionLabel?: string; actionKey?: string }> = []
-  const selected = selectedAdmissionRecord.value
-  if (!selectedPendingContract.value) {
-    blockers.push({ code: 'G000', text: '未勾选待评估合同，无法新建入住评估', actionLabel: '勾选合同', actionKey: 'pick-contract' })
-  }
-  if (!selected && !admissionShouldAutoOpen.value) {
-    blockers.push({ code: 'G001', text: '未选择评估记录', actionLabel: '新建评估', actionKey: 'new-assessment' })
-  }
-  if (selected?.status === 'DRAFT') {
-    blockers.push({ code: 'G204', text: '评估仍是草稿，需完成并保存', actionLabel: '继续填写', actionKey: 'edit-draft' })
-  }
-  if (selected && !selected.archiveNo) {
-    blockers.push({ code: 'G205', text: '缺少合同编号，请补齐档案编号' })
-  }
-  return blockers
-})
-const admissionGuardHint = computed(() => {
-  if (!isAdmissionAssessment.value) return ''
-  const selected = selectedAdmissionRecord.value
-  if (selected && selected.status !== 'DRAFT') {
-    return admissionCloseLoopEnabled.value ? '评估已完成，点击保存将自动回流入住办理' : '评估已完成，可前往入住办理并选择床位'
-  }
-  return admissionCloseLoopEnabled.value
-    ? '闭环模式：请完成评估后直接保存，系统将一键回流入住办理'
-    : '完成评估保存后，系统会自动推进到待办理入住'
 })
 const admissionLifecycleStage = computed(() => {
   if (!isAdmissionAssessment.value) return 'PENDING_ASSESSMENT'
@@ -1556,11 +1446,8 @@ const admissionLifecycleSubject = computed(() => {
 })
 const admissionLifecycleHint = computed(() => {
   if (!isAdmissionAssessment.value) return ''
-  if (admissionGuardBlockers.value.length > 0) {
-    return admissionGuardBlockers.value
-      .slice(0, 2)
-      .map((item) => item.text)
-      .join('；')
+  if (!selectedPendingContract.value) {
+    return '请先在待评估合同列表中勾选合同，再新建入住评估。'
   }
   if (selectedAdmissionRecord.value?.status === 'DRAFT') {
     return '评估仍是草稿，建议先补全评分与建议后再推进。'
@@ -1573,19 +1460,6 @@ const admissionModalConfirmText = computed(() => {
   return '保存'
 })
 
-function handleAdmissionGuardAction(item: { actionKey?: string }) {
-  if (item.actionKey === 'pick-contract') {
-    message.warning('请先在“待评估合同”中勾选一条合同')
-    return
-  }
-  if (item.actionKey === 'new-assessment') {
-    openForm()
-    return
-  }
-  if (item.actionKey === 'edit-draft' && selectedAdmissionRecord.value) {
-    openForm(selectedAdmissionRecord.value)
-  }
-}
 function assessmentRowKey(record: AssessmentRecord) {
   return String(record?.id ?? '').trim()
 }
@@ -1614,17 +1488,6 @@ const selectedRowsInCurrentPage = computed(() => {
   if (!selectedRowKeys.value.length || !rows.value.length) return []
   const idSet = new Set(selectedRowKeys.value)
   return rows.value.filter((item) => idSet.has(assessmentRowKey(item)))
-})
-const selectedContractLatestRecord = computed(() => {
-  if (!isAdmissionAssessment.value || !selectedPendingContractNo.value) return null
-  const filtered = rows.value
-    .filter((item) => String(item.archiveNo || '').trim() === selectedPendingContractNo.value)
-    .sort((a, b) => {
-      const ta = new Date(String(a.updateTime || a.assessmentDate || a.createTime || '')).getTime()
-      const tb = new Date(String(b.updateTime || b.assessmentDate || b.createTime || '')).getTime()
-      return (Number.isFinite(tb) ? tb : 0) - (Number.isFinite(ta) ? ta : 0)
-    })
-  return filtered[0] || null
 })
 const selectedSingleRecord = computed(() => {
   if (selectedRowKeys.value.length !== 1) return null
@@ -2849,33 +2712,6 @@ function goSelectedAdmissionProcessing() {
       contractNo: context.contractNo || undefined
     }
   })
-}
-
-function goAdmissionArchiveByContract() {
-  if (!selectedPendingContractNo.value) {
-    message.warning('请先选择待评估合同')
-    return
-  }
-  const query: Record<string, string> = {
-    archiveType: 'ADMISSION',
-    keyword: selectedPendingContractNo.value
-  }
-  if (selectedPendingContract.value?.elderId) {
-    query.elderId = String(selectedPendingContract.value.elderId)
-  }
-  router.push({ path: '/elder/assessment/ability/archive', query })
-}
-
-function goAdmissionArchiveAll() {
-  router.push({ path: '/elder/assessment/ability/archive', query: { archiveType: 'ADMISSION' } })
-}
-
-function openLatestAdmissionRecord() {
-  if (!selectedContractLatestRecord.value) {
-    message.warning('当前合同暂无评估记录')
-    return
-  }
-  openForm(selectedContractLatestRecord.value, true)
 }
 
 function exportCurrentPageCsv() {

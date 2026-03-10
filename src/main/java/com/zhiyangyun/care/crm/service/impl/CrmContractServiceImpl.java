@@ -14,6 +14,7 @@ import com.zhiyangyun.care.elder.entity.lifecycle.ElderAdmission;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderAdmissionMapper;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Period;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Arrays;
@@ -31,6 +32,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class CrmContractServiceImpl implements CrmContractService {
   private static final Pattern CONTRACT_SEQ_PATTERN = Pattern.compile("^(gfyy\\d{8})(\\d{3,})$");
+  private static final Pattern ID_CARD_18_PATTERN = Pattern.compile("^\\d{17}[\\dXx]$");
+  private static final Pattern ID_CARD_15_PATTERN = Pattern.compile("^\\d{15}$");
   private static final String FLOW_PENDING_ASSESSMENT = "PENDING_ASSESSMENT";
   private static final String FLOW_PENDING_BED_SELECT = "PENDING_BED_SELECT";
   private static final String FLOW_PENDING_SIGN = "PENDING_SIGN";
@@ -392,7 +395,12 @@ public class CrmContractServiceImpl implements CrmContractService {
     target.setElderName(firstNonBlank(blankToNull(request.getElderName()), current == null ? null : current.getElderName()));
     target.setElderPhone(firstNonBlank(blankToNull(request.getElderPhone()), current == null ? null : current.getElderPhone()));
     target.setGender(request.getGender() == null ? (current == null ? null : current.getGender()) : request.getGender());
-    target.setAge(request.getAge() == null ? (current == null ? null : current.getAge()) : request.getAge());
+    if (request.getAge() != null) {
+      target.setAge(request.getAge());
+    } else {
+      Integer derivedAge = resolveAgeFromIdCard(target.getIdCardNo());
+      target.setAge(derivedAge == null ? (current == null ? null : current.getAge()) : derivedAge);
+    }
     target.setMarketerName(firstNonBlank(blankToNull(request.getMarketerName()), current == null ? null : current.getMarketerName()));
     LocalDateTime signedAt = parseDateTime(request.getContractSignedAt());
     target.setSignedAt(signedAt == null ? (current == null ? null : current.getSignedAt()) : signedAt);
@@ -721,6 +729,38 @@ public class CrmContractServiceImpl implements CrmContractService {
       return second;
     }
     return null;
+  }
+
+  private Integer resolveAgeFromIdCard(String idCardNo) {
+    LocalDate birthDate = resolveBirthDateFromIdCard(idCardNo);
+    if (birthDate == null) {
+      return null;
+    }
+    int age = Period.between(birthDate, LocalDate.now()).getYears();
+    return Math.max(0, age);
+  }
+
+  private LocalDate resolveBirthDateFromIdCard(String idCardNo) {
+    String normalized = blankToNull(idCardNo);
+    if (normalized == null) {
+      return null;
+    }
+    if (ID_CARD_18_PATTERN.matcher(normalized).matches()) {
+      return parseBirthDateSection(normalized.substring(6, 14));
+    }
+    if (ID_CARD_15_PATTERN.matcher(normalized).matches()) {
+      return parseBirthDateSection("19" + normalized.substring(6, 12));
+    }
+    return null;
+  }
+
+  private LocalDate parseBirthDateSection(String value) {
+    try {
+      LocalDate date = LocalDate.parse(value, DateTimeFormatter.ofPattern("yyyyMMdd"));
+      return date.isAfter(LocalDate.now()) ? null : date;
+    } catch (DateTimeParseException ex) {
+      return null;
+    }
   }
 
   private LocalDate parseDate(String text) {

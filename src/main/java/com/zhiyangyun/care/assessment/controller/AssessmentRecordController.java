@@ -17,7 +17,9 @@ import com.zhiyangyun.care.assessment.model.AssessmentBatchOperationResult;
 import com.zhiyangyun.care.assessment.model.AssessmentRecordSummaryResponse;
 import com.zhiyangyun.care.assessment.service.AssessmentScoringService;
 import com.zhiyangyun.care.crm.entity.CrmContract;
+import com.zhiyangyun.care.crm.entity.CrmContractAttachment;
 import com.zhiyangyun.care.crm.entity.CrmLead;
+import com.zhiyangyun.care.crm.mapper.CrmContractAttachmentMapper;
 import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
 import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
 import com.zhiyangyun.care.auth.entity.Org;
@@ -66,11 +68,13 @@ public class AssessmentRecordController {
   private final AssessmentScoringService scoringService;
   private final CrmLeadMapper crmLeadMapper;
   private final CrmContractMapper crmContractMapper;
+  private final CrmContractAttachmentMapper crmContractAttachmentMapper;
   private final AuditLogService auditLogService;
   private final FileStorageService fileStorageService;
 
   public AssessmentRecordController(AssessmentRecordMapper recordMapper, ElderMapper elderMapper, OrgMapper orgMapper,
       AssessmentScoringService scoringService, CrmLeadMapper crmLeadMapper, CrmContractMapper crmContractMapper,
+      CrmContractAttachmentMapper crmContractAttachmentMapper,
       AuditLogService auditLogService, FileStorageService fileStorageService) {
     this.recordMapper = recordMapper;
     this.elderMapper = elderMapper;
@@ -78,6 +82,7 @@ public class AssessmentRecordController {
     this.scoringService = scoringService;
     this.crmLeadMapper = crmLeadMapper;
     this.crmContractMapper = crmContractMapper;
+    this.crmContractAttachmentMapper = crmContractAttachmentMapper;
     this.auditLogService = auditLogService;
     this.fileStorageService = fileStorageService;
   }
@@ -199,6 +204,7 @@ public class AssessmentRecordController {
     record.setReportFileUrl(upload.getFileUrl());
     record.setReportFileName(upload.getOriginalFileName() == null ? upload.getFileName() : upload.getOriginalFileName());
     recordMapper.updateById(record);
+    syncAssessmentReportAttachment(record);
     return Result.ok(toResponse(record, selectElder(record.getElderId()), selectOrg(record.getOrgId())));
   }
 
@@ -235,6 +241,7 @@ public class AssessmentRecordController {
     record.setIsDeleted(0);
     recordMapper.insert(record);
     syncLeadFlowAfterAssessment(record);
+    syncAssessmentReportAttachment(record);
     return Result.ok(toResponse(record, selectElder(record.getElderId()), selectOrg(record.getOrgId())));
   }
 
@@ -271,6 +278,7 @@ public class AssessmentRecordController {
 
     recordMapper.updateById(record);
     syncLeadFlowAfterAssessment(record);
+    syncAssessmentReportAttachment(record);
     return Result.ok(toResponse(record, selectElder(record.getElderId()), selectOrg(record.getOrgId())));
   }
 
@@ -1029,5 +1037,72 @@ public class AssessmentRecordController {
       }
     }
     return null;
+  }
+
+  private void syncAssessmentReportAttachment(AssessmentRecord record) {
+    if (record == null || record.getId() == null) {
+      return;
+    }
+    String reportUrl = blankToNull(record.getReportFileUrl());
+    if (reportUrl == null) {
+      return;
+    }
+    Long tenantId = record.getTenantId();
+    if (tenantId == null) {
+      return;
+    }
+    ElderProfile elder = selectElder(record.getElderId());
+    CrmContract contract = resolveContractForAssessment(record, elder, tenantId);
+    if (contract == null || contract.getId() == null) {
+      return;
+    }
+    String marker = "ASSESSMENT_RECORD:" + record.getId();
+    CrmContractAttachment existed = crmContractAttachmentMapper.selectOne(Wrappers.lambdaQuery(CrmContractAttachment.class)
+        .eq(CrmContractAttachment::getTenantId, tenantId)
+        .eq(CrmContractAttachment::getContractId, contract.getId())
+        .eq(CrmContractAttachment::getIsDeleted, 0)
+        .and(w -> w.eq(CrmContractAttachment::getFileUrl, reportUrl)
+            .or().eq(CrmContractAttachment::getRemark, marker))
+        .last("LIMIT 1"));
+    if (existed != null) {
+      return;
+    }
+    CrmContractAttachment attachment = new CrmContractAttachment();
+    attachment.setTenantId(tenantId);
+    attachment.setOrgId(contract.getOrgId() == null ? record.getOrgId() : contract.getOrgId());
+    attachment.setLeadId(contract.getLeadId());
+    attachment.setContractId(contract.getId());
+    attachment.setContractNo(contract.getContractNo());
+    attachment.setAttachmentType("ASSESSMENT_REPORT");
+    attachment.setFileName(blankToNull(record.getReportFileName()) == null ? ("入住评估报告-" + record.getId() + ".pdf") : record.getReportFileName());
+    attachment.setFileUrl(reportUrl);
+    attachment.setFileType(resolveFileTypeByName(record.getReportFileName()));
+    attachment.setFileSize(null);
+    attachment.setRemark(marker);
+    attachment.setCreatedBy(AuthContext.getStaffId());
+    crmContractAttachmentMapper.insert(attachment);
+  }
+
+  private String resolveFileTypeByName(String fileName) {
+    String normalized = blankToNull(fileName);
+    if (normalized == null) {
+      return "pdf";
+    }
+    int dotIndex = normalized.lastIndexOf('.');
+    if (dotIndex < 0 || dotIndex >= normalized.length() - 1) {
+      return "pdf";
+    }
+    String ext = normalized.substring(dotIndex + 1).trim().toLowerCase();
+    if (ext.isBlank()) {
+      return "pdf";
+    }
+    return ext.length() > 32 ? ext.substring(0, 32) : ext;
+  }
+
+  private String blankToNull(String value) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    return value.trim();
   }
 }

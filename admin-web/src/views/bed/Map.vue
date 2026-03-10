@@ -639,13 +639,44 @@ function matchMatrixFilter(bed: BedItem) {
 }
 
 function resolveRoomTypeLabel(roomType?: string) {
-  if (!roomType) return '-'
-  return roomTypeLabelMap.value[roomType] || roomType
+  const raw = String(roomType || '').trim()
+  if (!raw) return '-'
+  const normalized = raw.toUpperCase()
+  const fallbackMap: Record<string, string> = {
+    '1': '单人间',
+    '2': '双人间',
+    '3': '三人间',
+    SINGLE: '单人间',
+    DOUBLE: '双人间',
+    TRIPLE: '三人间',
+    ONE: '单人间',
+    TWO: '双人间',
+    THREE: '三人间',
+    STANDARD: '标准间',
+    STANDARD_ROOM: '标准间',
+    DELUXE: '豪华间',
+    VIP: 'VIP房',
+    SUITE: '套间'
+  }
+  return roomTypeLabelMap.value[raw] || roomTypeLabelMap.value[normalized] || fallbackMap[normalized] || raw
 }
 
 function resolveBedTypeLabel(bedType?: string) {
-  if (!bedType) return '-'
-  return bedTypeLabelMap.value[bedType] || bedType
+  const raw = String(bedType || '').trim()
+  if (!raw) return '-'
+  const normalized = raw.toUpperCase()
+  const fallbackMap: Record<string, string> = {
+    STANDARD: '标准床',
+    NORMAL: '标准床',
+    CARE: '护理床',
+    NURSING: '护理床',
+    ELECTRIC: '电动护理床',
+    MEDICAL: '医疗床',
+    VIP: 'VIP床',
+    SINGLE: '单人床',
+    DOUBLE: '双人床'
+  }
+  return bedTypeLabelMap.value[raw] || bedTypeLabelMap.value[normalized] || fallbackMap[normalized] || raw
 }
 
 function parseRemarkSlots(raw?: string) {

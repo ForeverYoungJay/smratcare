@@ -14,4 +14,6 @@ public class CrmContractAssessmentReportItem {
   private String levelCode;
   private String resultSummary;
   private LocalDate nextAssessmentDate;
+  private String reportFileUrl;
+  private String reportFileName;
 }

@@ -2,11 +2,11 @@ import { onMounted, onUnmounted, ref } from 'vue';
 import { getElderPage } from '../api/elder';
 import { subscribeLiveSync } from '../utils/liveSync';
 function toElderOption(item) {
-    const name = item.fullName || `Elder#${item.id}`;
+    const name = item.fullName || '未命名长者';
     const suffix = item.elderCode ? ` (${item.elderCode})` : '';
     return {
         label: `${name}${suffix}`,
-        value: item.id,
+        value: String(item.id),
         name
     };
 }
@@ -89,8 +89,8 @@ function elderSearchText(item) {
 function dedupeElders(rows) {
     const map = new Map();
     rows.forEach((row) => {
-        const id = Number(row.id);
-        if (!Number.isFinite(id))
+        const id = String(row.id || '').trim();
+        if (!id)
             return;
         if (!map.has(id))
             map.set(id, row);
@@ -157,17 +157,19 @@ export function useElderOptions(config = {}) {
     function findElderName(elderId) {
         if (!elderId)
             return '';
-        const selected = elderOptions.value.find((item) => item.value === elderId);
+        const target = String(elderId);
+        const selected = elderOptions.value.find((item) => String(item.value) === target);
         return selected?.name || '';
     }
     function ensureSelectedElder(elderId, elderName) {
-        if (!elderId || elderOptions.value.some((item) => item.value === elderId)) {
+        const targetId = String(elderId || '').trim();
+        if (!targetId || elderOptions.value.some((item) => String(item.value) === targetId)) {
             return;
         }
-        const name = elderName || `Elder#${elderId}`;
+        const name = (elderName && String(elderName).trim()) || '未命名长者';
         elderOptions.value.unshift({
             label: name,
-            value: elderId,
+            value: targetId,
             name
         });
     }

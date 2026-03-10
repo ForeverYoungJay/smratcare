@@ -1,11 +1,11 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import { getElderPage } from '../api/elder'
 import { subscribeLiveSync } from '../utils/liveSync'
-import type { ElderItem, PageResult } from '../types'
+import type { ElderItem, Id, PageResult } from '../types'
 
 export interface ElderOption {
   label: string
-  value: number
+  value: Id
   name: string
 }
 
@@ -17,11 +17,11 @@ interface UseElderOptionsConfig {
 }
 
 function toElderOption(item: ElderItem): ElderOption {
-  const name = item.fullName || `Elder#${item.id}`
+  const name = item.fullName || '未命名长者'
   const suffix = item.elderCode ? ` (${item.elderCode})` : ''
   return {
     label: `${name}${suffix}`,
-    value: item.id,
+    value: String(item.id),
     name
   }
 }
@@ -103,10 +103,10 @@ function elderSearchText(item: ElderItem) {
 }
 
 function dedupeElders(rows: ElderItem[]) {
-  const map = new Map<number, ElderItem>()
+  const map = new Map<string, ElderItem>()
   rows.forEach((row) => {
-    const id = Number(row.id)
-    if (!Number.isFinite(id)) return
+    const id = String(row.id || '').trim()
+    if (!id) return
     if (!map.has(id)) map.set(id, row)
   })
   return Array.from(map.values())
@@ -171,20 +171,22 @@ export function useElderOptions(config: UseElderOptionsConfig = {}) {
     }
   }
 
-  function findElderName(elderId?: number) {
+  function findElderName(elderId?: Id) {
     if (!elderId) return ''
-    const selected = elderOptions.value.find((item) => item.value === elderId)
+    const target = String(elderId)
+    const selected = elderOptions.value.find((item) => String(item.value) === target)
     return selected?.name || ''
   }
 
-  function ensureSelectedElder(elderId?: number, elderName?: string) {
-    if (!elderId || elderOptions.value.some((item) => item.value === elderId)) {
+  function ensureSelectedElder(elderId?: Id, elderName?: string) {
+    const targetId = String(elderId || '').trim()
+    if (!targetId || elderOptions.value.some((item) => String(item.value) === targetId)) {
       return
     }
-    const name = elderName || `Elder#${elderId}`
+    const name = (elderName && String(elderName).trim()) || '未命名长者'
     elderOptions.value.unshift({
       label: name,
-      value: elderId,
+      value: targetId,
       name
     })
   }

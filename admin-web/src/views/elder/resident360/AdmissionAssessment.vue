@@ -56,24 +56,13 @@
           style="margin-bottom: 12px"
           message="请先在上方合同列表选择一个合同，再进行评估或入住办理。"
         />
-        <FlowGuardBar
-          :title="'入住链路状态'"
+        <LifecycleStageBar
+          title="评估-入住联动阶段"
           :subject="flowSubject"
-          :stage-text="flowStageLabel"
-          :stage-color="flowStageTagColor"
-          :steps="flowSteps"
-          :current-index="flowCurrentIndex"
-          :blockers="flowBlockers"
-          :hint="flowHint"
-          @action="handleFlowGuardAction"
+          :stage="admissionLifecycleStage"
+          :hint="admissionLifecycleHint"
           style="margin-bottom: 12px"
         />
-        <a-typography-paragraph>
-          输出：评估等级、建议护理套餐/服务频次、人力配置建议、评估报告下载并归档到长者档案。
-        </a-typography-paragraph>
-        <a-typography-paragraph>
-          联动：评估完成后自动创建“待签约/待入院办理”任务，并同步护理端生成个性化任务规则。
-        </a-typography-paragraph>
         <a-space direction="vertical" style="width: 100%">
           <a-button block type="primary" :disabled="!selectedContract" @click="go(primaryActionPath)">{{ primaryActionText }}</a-button>
           <a-button block @click="go(historyPath)">查看历史评估报告</a-button>
@@ -89,7 +78,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
-import FlowGuardBar from '../../../components/FlowGuardBar.vue'
+import LifecycleStageBar from '../../../components/LifecycleStageBar.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
 import { getAssessmentRecordPage } from '../../../api/assessment'
 import { getContractAssessmentOverview, getContractPage } from '../../../api/marketing'
@@ -119,62 +108,23 @@ const selectedLatestRecord = computed(() => {
   const draft = contractReports.find((item) => item.status === 'DRAFT')
   return draft || contractReports[0] || latestRecord.value || null
 })
-const flowSteps = ['合同待评估', '完成入住评估', '办理入住选床', '最终签署']
-const flowCurrentIndex = computed(() => {
-  const contract = selectedContract.value
-  if (!contract) return 0
-  if (contract.flowStage === 'PENDING_ASSESSMENT') return 0
-  if (contract.flowStage === 'PENDING_BED_SELECT') return 1
-  if (contract.flowStage === 'PENDING_SIGN') return 2
-  return 3
-})
-const flowStageLabel = computed(() => {
-  const contract = selectedContract.value
-  if (!contract) return '未选择合同'
-  return flowStageText(contract.flowStage)
-})
-const flowStageTagColor = computed(() => {
-  const contract = selectedContract.value
-  if (!contract) return 'default'
-  return flowStageColor(contract.flowStage)
-})
 const flowSubject = computed(() => {
   const contract = selectedContract.value
   if (!contract) return '请先在上方表格选择合同'
   return `合同 ${contract.contractNo || '-'} / 长者 ${contract.elderName || '-'}`
 })
-const flowBlockers = computed(() => {
+const admissionLifecycleStage = computed(() => {
   const contract = selectedContract.value
-  if (!contract) return [{ code: 'G001', text: '未选择合同', actionLabel: '选择合同', actionKey: 'pick-contract' }]
-  const blockers: Array<{ code: string; text: string; actionLabel?: string; actionKey?: string }> = []
-  if (contract.flowStage === 'PENDING_ASSESSMENT') {
-    blockers.push({ code: 'G201', text: '请先完成入住评估并保存，系统将自动回流入住办理', actionLabel: '一键闭环评估', actionKey: 'start-assessment' })
-  }
-  if (contract.flowStage === 'PENDING_BED_SELECT' && !selectedLatestRecord.value) {
-    blockers.push({ code: 'G203', text: '缺少评估报告，请先补充评估结果', actionLabel: '补评估', actionKey: 'start-assessment' })
-  }
-  if (contract.flowStage === 'PENDING_SIGN') {
-    blockers.push({ code: 'G301', text: '请前往入住办理完成选床后最终签署', actionLabel: '去入住办理', actionKey: 'go-admission' })
-  }
-  return blockers
+  if (!contract) return 'PENDING_ASSESSMENT'
+  return contract.flowStage || 'PENDING_ASSESSMENT'
 })
-const flowHint = computed(() => {
+const admissionLifecycleHint = computed(() => {
   const contract = selectedContract.value
   if (!contract) return ''
   if (contract.flowStage === 'PENDING_BED_SELECT') return '评估已完成，可直接回流入住办理并选择床位'
   if (contract.flowStage === 'SIGNED') return '流程已完成闭环'
   return '按提示完成当前节点后，系统将自动推进到下一阶段'
 })
-
-function handleFlowGuardAction(item: { actionKey?: string }) {
-  if (item.actionKey === 'start-assessment') {
-    go(primaryActionPath.value)
-    return
-  }
-  if (item.actionKey === 'go-admission') {
-    go(admissionPath.value)
-  }
-}
 
 const contractColumns = [
   { title: '合同编号', dataIndex: 'contractNo', key: 'contractNo', width: 170 },

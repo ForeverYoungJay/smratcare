@@ -2,18 +2,6 @@
   <PageContainer title="入住办理" subTitle="分床、押金账户、合同信息与二维码配置">
     <a-card class="card-elevated" :bordered="false">
       <h3>办理入住流程</h3>
-      <FlowGuardBar
-        :title="'入住办理守卫'"
-        :subject="admissionFlowSubject"
-        :stage-text="admissionFlowStageText"
-        :stage-color="admissionFlowStageColor"
-        :steps="admissionFlowSteps"
-        :current-index="admissionFlowIndex"
-        :blockers="admissionFlowBlockers"
-        :hint="admissionFlowHint"
-        @action="handleAdmissionGuardAction"
-        style="margin-bottom: 12px"
-      />
       <LifecycleStageBar
         title="入住办理阶段"
         :subject="admissionFlowSubject"
@@ -252,7 +240,6 @@ import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
-import FlowGuardBar from '../../components/FlowGuardBar.vue'
 import LifecycleStageBar from '../../components/LifecycleStageBar.vue'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { useElderOptions } from '../../composables/useElderOptions'
@@ -546,91 +533,24 @@ const columns = [
   { title: '操作员姓名', key: 'operatorName', width: 140 },
   { title: '登记时间', dataIndex: 'createTime', key: 'createTime', width: 180 }
 ]
-const admissionFlowSteps = ['合同完成评估', '办理入住选床', '进入待签署', '最终签署']
-const admissionFlowIndex = computed(() => {
-  if (!guardContract.value) return 0
-  if (guardContract.value.flowStage === 'PENDING_ASSESSMENT') return 0
-  if (guardContract.value.flowStage === 'PENDING_BED_SELECT') return 1
-  if (guardContract.value.flowStage === 'PENDING_SIGN') return 2
-  return 3
-})
-const admissionFlowStageText = computed(() => {
-  if (!form.contractNo) return '待输入合同号'
-  if (!guardContract.value) return '合同未找到'
-  if (guardContract.value.flowStage === 'PENDING_ASSESSMENT') return '待评估'
-  if (guardContract.value.flowStage === 'PENDING_BED_SELECT') return '待办理入住'
-  if (guardContract.value.flowStage === 'PENDING_SIGN') return '待签署'
-  if (guardContract.value.flowStage === 'SIGNED') return '已签署'
-  return guardContract.value.flowStage || '-'
-})
-const admissionFlowStageColor = computed(() => {
-  if (!guardContract.value) return 'default'
-  if (guardContract.value.flowStage === 'PENDING_ASSESSMENT') return 'gold'
-  if (guardContract.value.flowStage === 'PENDING_BED_SELECT') return 'blue'
-  if (guardContract.value.flowStage === 'PENDING_SIGN') return 'purple'
-  if (guardContract.value.flowStage === 'SIGNED') return 'green'
-  return 'default'
-})
 const admissionFlowSubject = computed(() => {
   if (!form.contractNo) return '请先选择老人并自动回填合同号'
   if (!guardContract.value) return `合同号 ${form.contractNo} 未匹配`
   return `合同 ${guardContract.value.contractNo || '-'} / 长者 ${guardContract.value.elderName || '-'}`
-})
-const admissionFlowBlockers = computed(() => {
-  if (!form.contractNo) return [{ code: 'G100', text: '未匹配到合同号，请先选择老人', actionLabel: '选择老人', actionKey: 'focus-elder' }]
-  if (!guardContract.value) return [{ code: 'G102', text: '合同不存在或已删除', actionLabel: '去合同签约', actionKey: 'go-contract' }]
-  const blockers: Array<{ code: string; text: string; actionLabel?: string; actionKey?: string }> = []
-  if (guardContract.value.status === 'VOID') blockers.push({ code: 'G401', text: '合同已作废' })
-  if (guardContract.value.flowStage === 'PENDING_ASSESSMENT') {
-    blockers.push({ code: 'G201', text: '尚未完成入住评估', actionLabel: '去评估并闭环回流', actionKey: 'go-assessment' })
-  }
-  if (guardContract.value.flowStage === 'SIGNED' || guardContract.value.status === 'SIGNED' || guardContract.value.status === 'EFFECTIVE') {
-    blockers.push({ code: 'G402', text: '合同已签署，不能重复办理入住' })
-  }
-  return blockers
-})
-const admissionFlowHint = computed(() => {
-  if (!guardContract.value) return ''
-  if (guardContract.value.flowStage === 'PENDING_BED_SELECT') return '当前可提交入住办理并同步推进到待签署'
-  if (guardContract.value.flowStage === 'PENDING_SIGN') return '已满足入住环节，可回到合同签约执行最终签署'
-  if (guardContract.value.flowStage === 'SIGNED') return '当前合同流程已完成'
-  if (guardContract.value.flowStage === 'PENDING_ASSESSMENT') return '请通过“去评估并闭环回流”完成评估后自动返回本页'
-  return ''
 })
 const admissionLifecycleStage = computed(() =>
   normalizeLifecycleStage(guardContract.value?.flowStage, guardContract.value?.contractStatus || guardContract.value?.status)
 )
 const admissionLifecycleHint = computed(() => {
   if (!form.contractNo) return '请先选择长者，系统会自动匹配合同号并同步流程阶段。'
-  if (admissionFlowBlockers.value.length) {
-    return admissionFlowBlockers.value
-      .slice(0, 2)
-      .map((item) => item.text)
-      .join('；')
+  if (!guardContract.value) {
+    return '未找到合同，请到合同签约核对合同号。'
+  }
+  if (guardContract.value.status === 'VOID') {
+    return '合同已作废，不能继续办理入住。'
   }
   return lifecycleStageHint(admissionLifecycleStage.value)
 })
-
-function handleAdmissionGuardAction(item: { actionKey?: string }) {
-  if (item.actionKey === 'focus-elder') {
-    message.info('请先在“老人姓名”中选择长者，系统会自动回填合同号')
-    return
-  }
-  if (item.actionKey === 'go-contract') {
-    router.push('/marketing/contract-signing')
-    return
-  }
-  if (item.actionKey === 'go-assessment') {
-    const params = new URLSearchParams()
-    params.set('autoOpen', '1')
-    params.set('closeLoop', '1')
-    params.set('mode', 'new')
-    if (form.contractNo) params.set('contractNo', String(form.contractNo))
-    if (guardContract.value?.leadId) params.set('leadId', String(guardContract.value.leadId))
-    if (guardContract.value?.elderName) params.set('elderName', String(guardContract.value.elderName))
-    router.push(`/elder/assessment/ability/admission?${params.toString()}`)
-  }
-}
 
 function statusText(status?: number) {
   if (status === 1) return '在院'
@@ -654,8 +574,6 @@ async function submit() {
   if (!formRef.value) return
   try {
     await formRef.value.validate()
-    const canContinue = await validateAdmissionGuard()
-    if (!canContinue) return
     submitting.value = true
     if (form.bedId && !form.bedStartDate) {
       form.bedStartDate = form.admissionDate || new Date().toISOString().slice(0, 10)
@@ -674,10 +592,16 @@ async function submit() {
 function checklistRoute(key: SubmitChecklistKey) {
   const elderId = Number(form.elderId || 0)
   const contractNo = encodeURIComponent(String(form.contractNo || '').trim())
-  if (key === 'elder-base') return elderId ? `/elder/detail/${elderId}?tab=base` : '/elder/list'
-  if (key === 'family') return elderId ? `/elder/detail/${elderId}?tab=family` : '/elder/family'
-  if (key === 'disease') return elderId ? `/elder/detail/${elderId}?tab=disease` : '/elder/list'
-  if (key === 'contract') return contractNo ? `/marketing/contract-signing?contractNo=${contractNo}` : '/marketing/contract-signing'
+  const toContractElderInfo = () => {
+    if (contractNo) {
+      return `/marketing/contract-signing?contractNo=${contractNo}&openEdit=1&focus=elder-info`
+    }
+    return '/marketing/contract-signing?quick=1'
+  }
+  if (key === 'elder-base') return toContractElderInfo()
+  if (key === 'family') return toContractElderInfo()
+  if (key === 'disease') return toContractElderInfo()
+  if (key === 'contract') return contractNo ? `/marketing/contract-signing?contractNo=${contractNo}&openEdit=1` : '/marketing/contract-signing'
   if (key === 'attachment') {
     if (contractNo) {
       return `/marketing/contract-signing?contractNo=${contractNo}&openAttachment=1&attachmentType=CONTRACT&from=admission_checklist`
@@ -771,55 +695,6 @@ async function confirmSubmit() {
   }
   submitConfirmOpen.value = false
   await submit()
-}
-
-async function validateAdmissionGuard() {
-  const contractNo = String(form.contractNo || '').trim()
-  if (!contractNo) {
-    message.warning('请先选择老人并自动回填合同号，再办理入住')
-    return false
-  }
-  try {
-    const page: PageResult<CrmContractItem> = await getContractPage({
-      pageNo: 1,
-      pageSize: 20,
-      contractNo
-    })
-    const contract = (page.list || []).find((item) => item.contractNo === contractNo)
-    guardContract.value = contract || null
-    if (!contract) {
-      message.warning('未找到该合同号，请先在合同签约中确认')
-      return false
-    }
-    if (contract.flowStage === 'PENDING_ASSESSMENT') {
-      message.warning('合同尚未完成入住评估，请先完成评估后再办理入住')
-      return false
-    }
-    if (contract.flowStage === 'SIGNED' || contract.status === 'SIGNED' || contract.status === 'EFFECTIVE') {
-      message.warning('该合同已完成签署，无法重复办理入住')
-      return false
-    }
-    if (contract.status === 'VOID') {
-      message.warning('作废合同不可办理入住')
-      return false
-    }
-    if (contract.elderId && String(form.elderId) !== String(contract.elderId)) {
-      message.warning('当前选择的老人和合同绑定老人不一致，请检查后重试')
-      return false
-    }
-    if (contract.elderId) {
-      form.elderId = contract.elderId as any
-      ensureSelectedElder(Number(contract.elderId), contract.elderName || `长者${String(contract.elderId)}`)
-    }
-    if (contract.leadId && !linkedLeadId.value) {
-      linkedLeadId.value = Number(contract.leadId)
-    }
-    return true
-  } catch {
-    guardContract.value = null
-    message.warning('合同流程校验失败，请稍后重试')
-    return false
-  }
 }
 
 async function loadContractGuardState() {

@@ -212,6 +212,7 @@ import { useElderOptions } from '../../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
 import { copyText } from '../../../utils/clipboard'
 import { lifecycleStageHint, normalizeLifecycleStage } from '../../../utils/lifecycleStage'
+import { getElderDetail } from '../../../api/elder'
 import {
   getContractArchiveRule,
   getContractAssessmentOverview,
@@ -267,9 +268,12 @@ const docRouteSignature = ref('')
 const skipNextDocRouteWatch = ref(false)
 const DOC_ROUTE_KEYS = ['docElderId', 'docKind', 'docKeyword'] as const
 const DOC_ROUTE_OBSERVE_KEYS = ['elderId', 'residentId', 'contractId', 'leadId'] as const
-const { elderOptions, elderLoading, searchElders, ensureSelectedElder, findElderName } = useElderOptions({ pageSize: 120 })
+const { elderOptions, elderLoading, searchElders, ensureSelectedElder, findElderName } = useElderOptions({
+  pageSize: 120,
+  inHospitalOnly: false
+})
 const selector = reactive({
-  elderId: undefined as number | undefined
+  elderId: undefined as string | undefined
 })
 const filters = reactive({
   kind: 'ALL',
@@ -303,9 +307,11 @@ const documents = computed<DocumentItem[]>(() => {
     id: `report-${report.recordId}`,
     kind: 'ASSESSMENT' as DocumentKind,
     type: mapAssessmentType(report.assessmentType),
-    name: buildAssessmentReportName(report),
-    url: '',
-    route: `/elder/assessment/ability/archive?elderId=${encodeURIComponent(String(linkage.value?.elderId || ''))}`,
+    name: report.reportFileName || buildAssessmentReportName(report),
+    url: report.reportFileUrl || '',
+    route: report.reportFileUrl
+      ? ''
+      : `/elder/assessment/ability/archive?elderId=${encodeURIComponent(String(linkage.value?.elderId || ''))}`,
     size: '-',
     time: report.assessmentDate || '-'
   }))
@@ -330,10 +336,10 @@ const resolvedLifecycleStage = computed(() =>
 )
 const resolvedLinkageElderName = computed(() => {
   const rawName = String(linkage.value?.elderName || '').trim()
-  const elderId = Number(linkage.value?.elderId || 0)
+  const elderId = String(linkage.value?.elderId || '').trim()
   const looksLikeId = /^\d+$/.test(rawName)
   if (rawName && !looksLikeId) return rawName
-  if (elderId > 0) {
+  if (elderId) {
     const fromCache = String(findElderName(elderId) || '').trim()
     if (fromCache) return fromCache
   }
@@ -473,8 +479,8 @@ function buildDocRouteSignature(source: Record<string, unknown>) {
 }
 
 function applyDocumentQueryFromRoute() {
-  const elderId = Number(firstRouteQueryText(route.query.docElderId || route.query.elderId || route.query.residentId))
-  if (Number.isFinite(elderId) && elderId > 0) {
+  const elderId = firstRouteQueryText(route.query.docElderId || route.query.elderId || route.query.residentId)
+  if (elderId) {
     selector.elderId = elderId
     ensureSelectedElder(elderId)
   } else {
@@ -572,6 +578,7 @@ function flattenReports(source?: ContractAssessmentOverview) {
 
 function normalizeAttachmentType(item: ContractAttachmentItem) {
   const type = (item.attachmentType || '').toUpperCase()
+  if (type === 'ASSESSMENT_REPORT') return '评估报告'
   if (type === 'INVOICE') return '收据/发票'
   if (type === 'CONTRACT') return '合同'
   if (type === 'MEDICAL_RECORD') return '病历资料'
@@ -665,7 +672,7 @@ async function safeLinkageByLead(leadId: string) {
 }
 
 async function resolveLinkage() {
-  const elderId = selector.elderId ? String(selector.elderId) : String(route.query.elderId || '').trim()
+  const elderId = selector.elderId ? String(selector.elderId).trim() : String(route.query.elderId || '').trim()
   const residentId = String(route.query.residentId || '').trim()
   const contractId = String(route.query.contractId || '').trim()
   const leadId = String(route.query.leadId || '').trim()
@@ -717,11 +724,20 @@ async function loadAll() {
       assessmentOverview.value = undefined
       return
     }
-    const linkageElderId = Number(linkage.value.elderId || 0)
+    const linkageElderId = String(linkage.value.elderId || '').trim()
     const linkageElderName = String(linkage.value.elderName || '').trim()
     const likelyName = linkageElderName && !/^\d+$/.test(linkageElderName) ? linkageElderName : undefined
-    if (linkageElderId > 0) {
-      ensureSelectedElder(linkageElderId, likelyName)
+    if (linkageElderId) {
+      if (likelyName) {
+        ensureSelectedElder(linkageElderId, likelyName)
+      } else {
+        try {
+          const elder = await getElderDetail(linkageElderId)
+          ensureSelectedElder(linkageElderId, String(elder?.fullName || '').trim() || undefined)
+        } catch {
+          ensureSelectedElder(linkageElderId)
+        }
+      }
     }
 
     const elderId = linkage.value.elderId
@@ -750,8 +766,8 @@ onMounted(async () => {
   await loadArchiveRuleInfo()
   await searchElders('')
   if (!selector.elderId) {
-    const fromRoute = Number(route.query.docElderId || route.query.elderId || route.query.residentId || 0)
-    if (fromRoute > 0) {
+    const fromRoute = firstRouteQueryText(route.query.docElderId || route.query.elderId || route.query.residentId)
+    if (fromRoute) {
       ensureSelectedElder(fromRoute)
       selector.elderId = fromRoute
     } else {

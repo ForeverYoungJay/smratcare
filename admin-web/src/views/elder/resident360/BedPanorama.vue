@@ -104,7 +104,7 @@
                   >
                     <div class="room-head">
                       <div class="room-title">{{ room.roomNo }}</div>
-                      <div class="room-type">{{ room.roomType }} · {{ room.capacity }}床</div>
+                      <div class="room-type">{{ resolveRoomTypeLabel(room.roomType) }} · {{ room.capacity }}床</div>
                     </div>
                     <div class="room-meta">
                       {{ room.occupiedBeds }}/{{ room.totalBeds }} 床 · {{ room.elderCount }} 人 · 空床 {{ room.emptyBeds }}
@@ -163,7 +163,7 @@
 
     <a-modal v-model:open="roomDetailOpen" :title="`房间详情 · ${selectedRoom?.roomNo || '-'}`" width="760px" :footer="null" destroy-on-close>
       <a-descriptions bordered size="small" :column="2" style="margin-bottom: 12px">
-        <a-descriptions-item label="房型">{{ selectedRoom?.roomType || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="房型">{{ resolveRoomTypeLabel(selectedRoom?.roomType) }}</a-descriptions-item>
         <a-descriptions-item label="容量">{{ selectedRoom?.capacity || 0 }} 床</a-descriptions-item>
         <a-descriptions-item label="在住人数">{{ selectedRoom?.elderCount || 0 }} 人</a-descriptions-item>
         <a-descriptions-item label="空床">{{ selectedRoom?.emptyBeds || 0 }} 床</a-descriptions-item>
@@ -414,7 +414,7 @@ const roomSceneLookup = computed(() => {
     lookup.get(lookupKey)!.push({
       key,
       roomNo,
-      roomType: roomTypeMap.value[roomId] || '标准间',
+      roomType: resolveRoomTypeLabel(roomTypeMap.value[roomId] || '标准间'),
       capacity,
       autoSpan,
       beds: sortedBeds,
@@ -589,6 +589,29 @@ function resolveStatus(bed: BedItem): '空闲' | '预定' | '在住' | '维修' 
   if (bed.status === 3) return '清洁中'
   if (String(bed.bedNo || '').endsWith('R')) return '预定'
   return '空闲'
+}
+
+function resolveRoomTypeLabel(roomType?: string) {
+  const raw = String(roomType || '').trim()
+  if (!raw) return '-'
+  const normalized = raw.toUpperCase()
+  const map: Record<string, string> = {
+    '1': '单人间',
+    '2': '双人间',
+    '3': '三人间',
+    SINGLE: '单人间',
+    DOUBLE: '双人间',
+    TRIPLE: '三人间',
+    ONE: '单人间',
+    TWO: '双人间',
+    THREE: '三人间',
+    STANDARD: '标准间',
+    STANDARD_ROOM: '标准间',
+    DELUXE: '豪华间',
+    VIP: 'VIP房',
+    SUITE: '套间'
+  }
+  return map[normalized] || raw
 }
 
 function statusClass(status: string) {

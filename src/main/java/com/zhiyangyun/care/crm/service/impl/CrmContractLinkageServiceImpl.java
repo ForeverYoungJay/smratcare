@@ -631,6 +631,8 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
     item.setLevelCode(record.getLevelCode());
     item.setResultSummary(record.getResultSummary());
     item.setNextAssessmentDate(record.getNextAssessmentDate());
+    item.setReportFileUrl(record.getReportFileUrl());
+    item.setReportFileName(record.getReportFileName());
     return item;
   }
 
