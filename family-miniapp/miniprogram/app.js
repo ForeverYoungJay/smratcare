@@ -17,7 +17,8 @@ App({
     familyUser: null,
     selectedElderId: null,
     pendingMessageFilter: '',
-    capabilityAlertCount: 0
+    capabilityAlertCount: 0,
+    mallOrdersDirty: false
   },
   onLaunch() {
     this.globalData.token = getToken();
@@ -63,6 +64,7 @@ App({
     this.globalData.selectedElderId = null;
     this.globalData.pendingMessageFilter = '';
     this.updateCapabilityAlerts(0);
+    this.globalData.mallOrdersDirty = false;
     wx.reLaunch({ url: '/pages/login/index' });
   },
   updateCapabilityAlerts(count) {

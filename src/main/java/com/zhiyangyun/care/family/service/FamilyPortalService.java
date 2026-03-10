@@ -95,6 +95,14 @@ public interface FamilyPortalService {
 
   List<FamilyPortalModels.MallOrderItem> listMallOrders(Long orgId, Long familyUserId, Long elderId, int pageNo, int pageSize);
 
+  FamilyPortalModels.MallOrderDetailResponse getMallOrderDetail(Long orgId, Long familyUserId, Long orderId);
+
+  FamilyPortalModels.MallOrderActionResponse cancelMallOrder(Long orgId, Long familyUserId, Long orderId,
+      FamilyPortalModels.MallOrderActionRequest request);
+
+  FamilyPortalModels.MallOrderActionResponse refundMallOrder(Long orgId, Long familyUserId, Long orderId,
+      FamilyPortalModels.MallOrderActionRequest request);
+
   void submitFeedback(Long orgId, Long familyUserId, FamilyPortalModels.FeedbackRequest request);
 
   List<FamilyPortalModels.FeedbackRecordItem> listFeedbackRecords(Long orgId, Long familyUserId, int pageNo, int pageSize);

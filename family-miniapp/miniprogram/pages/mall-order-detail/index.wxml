@@ -1,0 +1,81 @@
+<view class="container">
+  <view wx:if="{{loading}}" class="surface card loading">订单详情加载中...</view>
+
+  <view wx:if="{{!loading && !detail}}" class="surface card loading">订单不存在或无权限访问</view>
+
+  <block wx:if="{{!loading && detail}}">
+    <view class="surface card">
+      <view class="section-title">订单概览</view>
+      <view class="summary-grid">
+        <view class="summary-row"><text class="k">订单号</text><text class="v">{{detail.summary.orderNo}}</text></view>
+        <view class="summary-row"><text class="k">老人</text><text class="v">{{detail.summary.elderName}}</text></view>
+        <view class="summary-row"><text class="k">状态</text><text class="v">{{detail.summary.orderStatusText}}</text></view>
+        <view class="summary-row"><text class="k">支付</text><text class="v">{{detail.summary.payStatusText}}</text></view>
+        <view class="summary-row"><text class="k">金额</text><text class="v">¥{{detail.summary.totalAmount}}</text></view>
+        <view class="summary-row"><text class="k">创建时间</text><text class="v">{{detail.summary.createTime}}</text></view>
+      </view>
+    </view>
+
+    <view class="surface card">
+      <view class="section-title">商品明细</view>
+      <block wx:for="{{detail.items}}" wx:key="productId">
+        <view class="line-item">
+          <view class="line-top">
+            <text class="name">{{item.productName}}</text>
+            <text class="amount">¥{{item.amount}}</text>
+          </view>
+          <view class="line-sub">数量：{{item.quantity}} · 单价：¥{{item.unitPrice}}</view>
+        </view>
+      </block>
+      <view wx:if="{{detail.items.length === 0}}" class="empty">暂无商品明细</view>
+    </view>
+
+    <view class="surface card" wx:if="{{detail.fifoLogs.length > 0}}">
+      <view class="section-title">出库批次</view>
+      <block wx:for="{{detail.fifoLogs}}" wx:key="batchNo">
+        <view class="line-item">
+          <view class="line-top">
+            <text class="name">批次：{{item.batchNo}}</text>
+            <text class="amount">{{item.quantity}} 件</text>
+          </view>
+          <view class="line-sub">有效期：{{item.expireDate}}</view>
+        </view>
+      </block>
+    </view>
+
+    <view class="surface card" wx:if="{{detail.riskReasons.length > 0}}">
+      <view class="section-title">风险规则命中</view>
+      <block wx:for="{{detail.riskReasons}}" wx:key="tagCode">
+        <view class="risk-row">{{item.diseaseName}} · {{item.tagName}} ({{item.tagCode}})</view>
+      </block>
+    </view>
+
+    <view class="surface card">
+      <view class="section-title">售后操作</view>
+      <textarea
+        class="reason-input"
+        maxlength="120"
+        value="{{actionReason}}"
+        bindinput="onReasonInput"
+        placeholder="可填写操作说明（可选）" />
+      <view class="action-row">
+        <button
+          class="ghost-btn action-btn"
+          bindtap="onCancelOrder"
+          loading="{{acting}}"
+          disabled="{{!detail.summary.canCancel}}">取消订单</button>
+        <button
+          class="primary-btn action-btn"
+          bindtap="onRefundOrder"
+          loading="{{acting}}"
+          disabled="{{!detail.summary.canRefund}}">申请退款</button>
+      </view>
+      <view class="action-hint" wx:if="{{!detail.summary.canCancel}}">
+        取消提示：{{detail.summary.cancelHint || '当前订单不可取消'}}
+      </view>
+      <view class="action-hint" wx:if="{{!detail.summary.canRefund}}">
+        退款提示：{{detail.summary.refundHint || '当前订单不可退款'}}
+      </view>
+    </view>
+  </block>
+</view>

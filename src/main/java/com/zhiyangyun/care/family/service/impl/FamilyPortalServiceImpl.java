@@ -69,8 +69,11 @@ import com.zhiyangyun.care.store.mapper.OrderItemMapper;
 import com.zhiyangyun.care.store.mapper.ProductMapper;
 import com.zhiyangyun.care.store.mapper.StoreOrderMapper;
 import com.zhiyangyun.care.store.model.ForbiddenReason;
+import com.zhiyangyun.care.store.model.OrderCancelRequest;
+import com.zhiyangyun.care.store.model.OrderDetailResponse;
 import com.zhiyangyun.care.store.model.OrderPreviewRequest;
 import com.zhiyangyun.care.store.model.OrderPreviewResponse;
+import com.zhiyangyun.care.store.model.OrderRefundRequest;
 import com.zhiyangyun.care.store.model.OrderSubmitResponse;
 import com.zhiyangyun.care.store.service.StoreOrderService;
 import com.zhiyangyun.care.service.CareTaskService;
@@ -1813,8 +1816,106 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
       item.setPayStatusText(resolveMallPayStatusText(order.getPayStatus()));
       item.setCreateTime(order.getCreateTime() == null ? "" : order.getCreateTime().format(DATETIME_FMT));
       item.setPayTime(order.getPayTime() == null ? "" : order.getPayTime().format(DATETIME_FMT));
+      item.setCanCancel(canCancelMallOrder(order));
+      item.setCancelHint(resolveCancelMallOrderHint(order));
+      item.setCanRefund(canRefundMallOrder(order));
+      item.setRefundHint(resolveRefundMallOrderHint(order));
       return item;
     }).toList();
+  }
+
+  @Override
+  public FamilyPortalModels.MallOrderDetailResponse getMallOrderDetail(Long orgId, Long familyUserId, Long orderId) {
+    StoreOrder order = loadAuthorizedMallOrder(orgId, familyUserId, orderId);
+    OrderDetailResponse detail = storeOrderService.getOrderDetail(order.getId());
+
+    FamilyPortalModels.MallOrderDetailResponse response = new FamilyPortalModels.MallOrderDetailResponse();
+    FamilyPortalModels.MallOrderItem summary = toMallOrderSummary(order);
+    if (detail != null && hasText(detail.getElderName())) {
+      summary.setElderName(detail.getElderName().trim());
+    }
+
+    if (detail != null && detail.getItems() != null) {
+      List<FamilyPortalModels.MallOrderLineItem> items = detail.getItems().stream().map(line -> {
+        FamilyPortalModels.MallOrderLineItem item = new FamilyPortalModels.MallOrderLineItem();
+        item.setProductId(line.getProductId());
+        item.setProductName(defaultText(line.getProductName(), "商城商品"));
+        item.setQuantity(line.getQuantity());
+        item.setUnitPrice(safeDecimal(line.getUnitPrice()));
+        item.setAmount(safeDecimal(line.getAmount()));
+        return item;
+      }).toList());
+      response.setItems(items);
+      if (!items.isEmpty()) {
+        FamilyPortalModels.MallOrderLineItem first = items.get(0);
+        int qty = items.stream()
+            .map(FamilyPortalModels.MallOrderLineItem::getQuantity)
+            .filter(Objects::nonNull)
+            .mapToInt(Integer::intValue)
+            .sum();
+        summary.setProductId(first.getProductId());
+        summary.setQuantity(qty > 0 ? qty : 1);
+        summary.setUnitPrice(safeDecimal(first.getUnitPrice()));
+        String productName = defaultText(first.getProductName(), "商城商品");
+        if (items.size() > 1) {
+          productName = productName + " 等" + items.size() + "件";
+        }
+        summary.setProductName(productName);
+      }
+    }
+    response.setSummary(summary);
+
+    if (detail != null && detail.getRiskReasons() != null) {
+      response.setRiskReasons(detail.getRiskReasons().stream().map(reason -> {
+        FamilyPortalModels.MallOrderRiskItem item = new FamilyPortalModels.MallOrderRiskItem();
+        item.setDiseaseName(defaultText(reason.getDiseaseName(), ""));
+        item.setTagCode(defaultText(reason.getTagCode(), ""));
+        item.setTagName(defaultText(reason.getTagName(), ""));
+        return item;
+      }).toList());
+    }
+
+    if (detail != null && detail.getFifoLogs() != null) {
+      response.setFifoLogs(detail.getFifoLogs().stream().map(log -> {
+        FamilyPortalModels.MallOrderFifoItem item = new FamilyPortalModels.MallOrderFifoItem();
+        item.setBatchNo(defaultText(log.getBatchNo(), ""));
+        item.setQuantity(log.getQuantity());
+        item.setExpireDate(defaultText(log.getExpireDate(), ""));
+        return item;
+      }).toList());
+    }
+    return response;
+  }
+
+  @Override
+  @Transactional
+  public FamilyPortalModels.MallOrderActionResponse cancelMallOrder(Long orgId, Long familyUserId, Long orderId,
+      FamilyPortalModels.MallOrderActionRequest request) {
+    StoreOrder order = loadAuthorizedMallOrder(orgId, familyUserId, orderId);
+    if (!canCancelMallOrder(order)) {
+      throw new IllegalArgumentException(resolveCancelMallOrderHint(order));
+    }
+    OrderCancelRequest payload = new OrderCancelRequest();
+    payload.setOrderId(order.getId());
+    storeOrderService.cancel(payload);
+    StoreOrder latest = storeOrderMapper.selectById(order.getId());
+    return toMallOrderActionResponse(latest == null ? order : latest, "CANCEL", "订单已取消");
+  }
+
+  @Override
+  @Transactional
+  public FamilyPortalModels.MallOrderActionResponse refundMallOrder(Long orgId, Long familyUserId, Long orderId,
+      FamilyPortalModels.MallOrderActionRequest request) {
+    StoreOrder order = loadAuthorizedMallOrder(orgId, familyUserId, orderId);
+    if (!canRefundMallOrder(order)) {
+      throw new IllegalArgumentException(resolveRefundMallOrderHint(order));
+    }
+    OrderRefundRequest payload = new OrderRefundRequest();
+    payload.setOrderId(order.getId());
+    payload.setReason(defaultText(request == null ? null : request.getReason(), "家属端申请退款"));
+    storeOrderService.refund(payload);
+    StoreOrder latest = storeOrderMapper.selectById(order.getId());
+    return toMallOrderActionResponse(latest == null ? order : latest, "REFUND", "退款申请已处理");
   }
 
   @Override
@@ -1872,8 +1973,11 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
   @Transactional
   public FamilyPortalModels.BindRelationItem bindElder(Long orgId, Long familyUserId,
       FamilyPortalModels.BindCreateRequest request) {
-    Long requestedElderId = request == null ? null : request.getElderId();
-    String idCardNo = normalizeIdCardNo(request == null ? null : request.getElderIdCardNo());
+    if (request == null) {
+      throw new IllegalArgumentException("绑定请求不能为空");
+    }
+    Long requestedElderId = request.getElderId();
+    String idCardNo = normalizeIdCardNo(request.getElderIdCardNo());
     if (requestedElderId == null && !hasText(idCardNo)) {
       throw new IllegalArgumentException("请填写老人身份证号");
     }
@@ -1906,7 +2010,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
           .set(ElderFamily::getIsPrimary, 0)
           .eq(ElderFamily::getIsDeleted, 0)
           .eq(ElderFamily::getOrgId, orgId)
-          .eq(ElderFamily::getElderId, targetElderId));
+          .eq(ElderFamily::getFamilyUserId, familyUserId));
     }
 
     ElderFamily relation = elderFamilyMapper.selectOne(
@@ -3556,6 +3660,133 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
       case 2 -> "已退款";
       default -> "待支付";
     };
+  }
+
+  private FamilyPortalModels.MallOrderItem toMallOrderSummary(StoreOrder order) {
+    FamilyPortalModels.MallOrderItem item = new FamilyPortalModels.MallOrderItem();
+    if (order == null) {
+      item.setCanCancel(false);
+      item.setCancelHint(resolveCancelMallOrderHint(null));
+      item.setCanRefund(false);
+      item.setRefundHint(resolveRefundMallOrderHint(null));
+      return item;
+    }
+    item.setOrderId(order.getId());
+    item.setOrderNo(defaultText(order.getOrderNo(), ""));
+    item.setElderId(order.getElderId());
+    ElderProfile elder = order.getElderId() == null ? null : elderMapper.selectOne(
+        Wrappers.lambdaQuery(ElderProfile.class)
+            .eq(ElderProfile::getIsDeleted, 0)
+            .eq(ElderProfile::getOrgId, order.getOrgId())
+            .eq(ElderProfile::getId, order.getElderId())
+            .last("LIMIT 1"));
+    item.setElderName(elder == null ? "老人" : defaultText(elder.getFullName(), "老人"));
+    item.setProductName("商城商品");
+    item.setQuantity(1);
+    item.setUnitPrice(safeDecimal(order.getTotalAmount()));
+    item.setTotalAmount(safeDecimal(order.getTotalAmount()));
+    item.setPointsUsed(safeInt(order.getPointsUsed()));
+    item.setOrderStatus(order.getOrderStatus());
+    item.setOrderStatusText(resolveMallOrderStatusText(order.getOrderStatus()));
+    item.setPayStatus(order.getPayStatus());
+    item.setPayStatusText(resolveMallPayStatusText(order.getPayStatus()));
+    item.setCreateTime(order.getCreateTime() == null ? "" : order.getCreateTime().format(DATETIME_FMT));
+    item.setPayTime(order.getPayTime() == null ? "" : order.getPayTime().format(DATETIME_FMT));
+    item.setCanCancel(canCancelMallOrder(order));
+    item.setCancelHint(resolveCancelMallOrderHint(order));
+    item.setCanRefund(canRefundMallOrder(order));
+    item.setRefundHint(resolveRefundMallOrderHint(order));
+    return item;
+  }
+
+  private FamilyPortalModels.MallOrderActionResponse toMallOrderActionResponse(StoreOrder order, String action, String message) {
+    FamilyPortalModels.MallOrderActionResponse response = new FamilyPortalModels.MallOrderActionResponse();
+    response.setOrderId(order == null ? null : order.getId());
+    response.setAction(defaultText(action, ""));
+    response.setSuccess(Boolean.TRUE);
+    response.setMessage(defaultText(message, "操作成功"));
+    response.setOrderStatus(order == null ? null : order.getOrderStatus());
+    response.setOrderStatusText(resolveMallOrderStatusText(order == null ? null : order.getOrderStatus()));
+    response.setPayStatus(order == null ? null : order.getPayStatus());
+    response.setPayStatusText(resolveMallPayStatusText(order == null ? null : order.getPayStatus()));
+    response.setCanCancel(canCancelMallOrder(order));
+    response.setCancelHint(resolveCancelMallOrderHint(order));
+    response.setCanRefund(canRefundMallOrder(order));
+    response.setRefundHint(resolveRefundMallOrderHint(order));
+    return response;
+  }
+
+  private String resolveCancelMallOrderHint(StoreOrder order) {
+    if (order == null || order.getIsDeleted() != null && order.getIsDeleted() == 1) {
+      return "订单不存在或已失效";
+    }
+    int status = safeInt(order.getOrderStatus());
+    return switch (status) {
+      case 1, 2 -> "可取消";
+      case 3 -> "订单已完成，请改为申请退款";
+      case 4 -> "订单已取消，无法重复取消";
+      case 5 -> "订单已退款，无法取消";
+      default -> "当前订单状态不可取消";
+    };
+  }
+
+  private String resolveRefundMallOrderHint(StoreOrder order) {
+    if (order == null || order.getIsDeleted() != null && order.getIsDeleted() == 1) {
+      return "订单不存在或已失效";
+    }
+    int status = safeInt(order.getOrderStatus());
+    if (status == 4) {
+      return "订单已取消，无需退款";
+    }
+    if (status == 5) {
+      return "订单已退款，无需重复提交";
+    }
+    int payStatus = safeInt(order.getPayStatus());
+    if (payStatus == 1 || status == 3) {
+      return "可申请退款";
+    }
+    if (status == 1 && payStatus == 0) {
+      return "订单尚未支付，建议先取消订单";
+    }
+    return "当前订单状态不可退款";
+  }
+
+  private boolean canCancelMallOrder(StoreOrder order) {
+    if (order == null || order.getIsDeleted() != null && order.getIsDeleted() == 1) {
+      return false;
+    }
+    int status = safeInt(order.getOrderStatus());
+    return status == 1 || status == 2;
+  }
+
+  private boolean canRefundMallOrder(StoreOrder order) {
+    if (order == null || order.getIsDeleted() != null && order.getIsDeleted() == 1) {
+      return false;
+    }
+    int status = safeInt(order.getOrderStatus());
+    if (status == 4 || status == 5) {
+      return false;
+    }
+    int payStatus = safeInt(order.getPayStatus());
+    return payStatus == 1 || status == 3;
+  }
+
+  private StoreOrder loadAuthorizedMallOrder(Long orgId, Long familyUserId, Long orderId) {
+    if (orderId == null || orderId <= 0) {
+      throw new IllegalArgumentException("订单ID不能为空");
+    }
+    List<Long> elderIds = ensureBoundElderIds(extractElderIds(listBoundRelations(orgId, familyUserId)));
+    StoreOrder order = storeOrderMapper.selectOne(
+        Wrappers.lambdaQuery(StoreOrder.class)
+            .eq(StoreOrder::getIsDeleted, 0)
+            .eq(StoreOrder::getOrgId, orgId)
+            .eq(StoreOrder::getId, orderId)
+            .in(StoreOrder::getElderId, elderIds)
+            .last("LIMIT 1"));
+    if (order == null) {
+      throw new IllegalArgumentException("订单不存在或无权限访问");
+    }
+    return order;
   }
 
   private List<ElderFamily> listBoundRelations(Long orgId, Long familyUserId) {

@@ -265,6 +265,34 @@ public class FamilyPortalController {
         AuthContext.getOrgId(), AuthContext.getStaffId(), elderId, pageNo, pageSize));
   }
 
+  @GetMapping("/mall/orders/{orderId}")
+  public Result<FamilyPortalModels.MallOrderDetailResponse> mallOrderDetail(@PathVariable Long orderId) {
+    return Result.ok(familyPortalService.getMallOrderDetail(
+        AuthContext.getOrgId(), AuthContext.getStaffId(), orderId));
+  }
+
+  @PostMapping("/mall/orders/{orderId}/cancel")
+  public Result<FamilyPortalModels.MallOrderActionResponse> cancelMallOrder(
+      @PathVariable Long orderId,
+      @RequestBody(required = false) FamilyPortalModels.MallOrderActionRequest request) {
+    FamilyPortalModels.MallOrderActionRequest payload = request == null
+        ? new FamilyPortalModels.MallOrderActionRequest()
+        : request;
+    return Result.ok(familyPortalService.cancelMallOrder(
+        AuthContext.getOrgId(), AuthContext.getStaffId(), orderId, payload));
+  }
+
+  @PostMapping("/mall/orders/{orderId}/refund")
+  public Result<FamilyPortalModels.MallOrderActionResponse> refundMallOrder(
+      @PathVariable Long orderId,
+      @RequestBody(required = false) FamilyPortalModels.MallOrderActionRequest request) {
+    FamilyPortalModels.MallOrderActionRequest payload = request == null
+        ? new FamilyPortalModels.MallOrderActionRequest()
+        : request;
+    return Result.ok(familyPortalService.refundMallOrder(
+        AuthContext.getOrgId(), AuthContext.getStaffId(), orderId, payload));
+  }
+
   @PostMapping("/feedback")
   public Result<Void> submitFeedback(@Valid @RequestBody FamilyPortalModels.FeedbackRequest request) {
     familyPortalService.submitFeedback(AuthContext.getOrgId(), AuthContext.getStaffId(), request);

@@ -1,52 +1,75 @@
 ### Family 聚合接口 HTTP 回归脚本
 ### 使用方式（JetBrains / VSCode REST Client）：
-### 1) 先执行短信验证码发送，再执行 Family Login 获取 token
+### 1) 先执行注册验证码发送 + 首次注册，再执行账号密码登录获取 token
 ### 2) 再按顺序执行充值、安全设置、沟通消息（含语音）、FAQ、微信预下单与订单查询
 ### 3) 如需验证微信回调，先确认 app.family.wechat-pay.skip-notify-signature-verify=true（仅测试环境）
 
 @baseUrl = http://localhost:8080
 @orgId = 1
 @familyPhone = 13800138000
-@familyVerifyCode = 123456
+@familyPassword = Family@123
+@familyRegisterCode = 123456
 @familySecurityVerifyCode = 123456
 @familyElderId = 1
+@familyMallProductId = 0
+@familyMallOrderId = 0
 @familyAlbumId = 1
 @familyPayerOpenId = oMockOpenId123
 @familyTodoKey = TODO-PLACEHOLDER
 
-### 1) 发送登录验证码（本地 mock 默认会返回 debugCode）
+### 1) 发送注册验证码（本地 mock 默认会返回 debugCode）
 POST {{baseUrl}}/api/auth/family/sms-code/send
 Content-Type: application/json
 
 {
   "orgId": {{orgId}},
   "phone": "{{familyPhone}}",
-  "scene": "LOGIN"
+  "scene": "REGISTER"
 }
 
 > {% 
-  client.test("send family login sms code success", function() {
+  client.test("send family register sms code success", function() {
     client.assert(response.status === 200, "http status should be 200");
     client.assert(response.body.code === 0, "biz code should be 0");
     client.assert(response.body.data.expireSeconds !== undefined, "expireSeconds should exist");
   });
   if (response.body && response.body.data && response.body.data.debugCode) {
-    client.global.set("familyVerifyCode", response.body.data.debugCode);
+    client.global.set("familyRegisterCode", response.body.data.debugCode);
   }
 %}
 
-### 2) 家属登录（提取 token）
+### 2) 首次注册（手机号 + 验证码 + 密码）
+POST {{baseUrl}}/api/auth/family/register
+Content-Type: application/json
+
+{
+  "orgId": {{orgId}},
+  "phone": "{{familyPhone}}",
+  "verifyCode": "{{familyRegisterCode}}",
+  "password": "{{familyPassword}}",
+  "realName": "HTTP回归家属"
+}
+
+> {% 
+  client.test("family register success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(!!response.body.data.token, "token should exist");
+  });
+%}
+
+### 3) 家属登录（账号密码，提取 token）
 POST {{baseUrl}}/api/auth/family/login
 Content-Type: application/json
 
 {
   "orgId": {{orgId}},
   "phone": "{{familyPhone}}",
-  "verifyCode": "{{familyVerifyCode}}"
+  "password": "{{familyPassword}}"
 }
 
 > {% 
-  client.test("family login success", function() {
+  client.test("family password login success", function() {
     client.assert(response.status === 200, "http status should be 200");
     client.assert(response.body.code === 0, "biz code should be 0");
     client.assert(!!response.body.data.token, "token should exist");
@@ -54,7 +77,7 @@ Content-Type: application/json
   client.global.set("familyToken", response.body.data.token);
 %}
 
-### 2.1) 绑定微信通知 openId（真实投递前置）
+### 3.1) 绑定微信通知 openId（真实投递前置）
 POST {{baseUrl}}/api/family/wechat/notify/bind-openid
 Authorization: Bearer {{familyToken}}
 Content-Type: application/json
@@ -71,7 +94,7 @@ Content-Type: application/json
   });
 %}
 
-### 2.2) 能力状态总览（短信/通知/支付/安全/旧接口）
+### 3.2) 能力状态总览（短信/通知/支付/安全/旧接口）
 GET {{baseUrl}}/api/family/capabilities/status
 Authorization: Bearer {{familyToken}}
 
@@ -221,6 +244,123 @@ Authorization: Bearer {{familyToken}}
     client.assert(response.status === 200, "http status should be 200");
     client.assert(response.body.code === 0, "biz code should be 0");
     client.assert(Array.isArray(response.body.data), "data should be array");
+  });
+%}
+
+### 10.1) 商城商品列表
+GET {{baseUrl}}/api/family/mall/products?pageNo=1&pageSize=10
+Authorization: Bearer {{familyToken}}
+
+> {% 
+  client.test("list mall products success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(Array.isArray(response.body.data), "data should be array");
+  });
+  if (response.body && Array.isArray(response.body.data) && response.body.data.length > 0) {
+    client.global.set("familyMallProductId", response.body.data[0].id);
+  }
+%}
+
+### 10.2) 商城下单预检
+POST {{baseUrl}}/api/family/mall/orders/preview
+Authorization: Bearer {{familyToken}}
+Content-Type: application/json
+
+{
+  "elderId": {{familyElderId}},
+  "productId": {{familyMallProductId}},
+  "qty": 1
+}
+
+> {% 
+  client.test("mall preview success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(response.body.data.allowed !== undefined, "allowed should exist");
+  });
+%}
+
+### 10.3) 商城提交下单
+POST {{baseUrl}}/api/family/mall/orders/submit
+Authorization: Bearer {{familyToken}}
+Content-Type: application/json
+
+{
+  "elderId": {{familyElderId}},
+  "productId": {{familyMallProductId}},
+  "qty": 1
+}
+
+> {% 
+  client.test("mall submit success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(response.body.data.allowed !== undefined, "allowed should exist");
+  });
+  if (response.body && response.body.data && response.body.data.orderId) {
+    client.global.set("familyMallOrderId", response.body.data.orderId);
+  }
+%}
+
+### 10.4) 商城订单列表
+GET {{baseUrl}}/api/family/mall/orders?pageNo=1&pageSize=10&elderId={{familyElderId}}
+Authorization: Bearer {{familyToken}}
+
+> {% 
+  client.test("list mall orders success", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0, "biz code should be 0");
+    client.assert(Array.isArray(response.body.data), "data should be array");
+  });
+  if (response.body && Array.isArray(response.body.data) && response.body.data.length > 0 && !client.global.get("familyMallOrderId")) {
+    client.global.set("familyMallOrderId", response.body.data[0].orderId);
+  }
+%}
+
+### 10.5) 商城订单详情
+GET {{baseUrl}}/api/family/mall/orders/{{familyMallOrderId}}
+Authorization: Bearer {{familyToken}}
+
+> {% 
+  client.test("mall order detail returns expected payload", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0 || response.body.code === 400, "biz code should be 0 or 400");
+    if (response.body.code === 0) {
+      client.assert(response.body.data.summary !== undefined, "summary should exist");
+    }
+  });
+%}
+
+### 10.6) 商城订单取消（可能因状态不满足返回业务错误）
+POST {{baseUrl}}/api/family/mall/orders/{{familyMallOrderId}}/cancel
+Authorization: Bearer {{familyToken}}
+Content-Type: application/json
+
+{
+  "reason": "HTTP回归：订单取消测试"
+}
+
+> {% 
+  client.test("mall cancel api responded", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0 || response.body.code === 400, "biz code should be 0 or 400");
+  });
+%}
+
+### 10.7) 商城订单退款（可能因状态不满足返回业务错误）
+POST {{baseUrl}}/api/family/mall/orders/{{familyMallOrderId}}/refund
+Authorization: Bearer {{familyToken}}
+Content-Type: application/json
+
+{
+  "reason": "HTTP回归：订单退款测试"
+}
+
+> {% 
+  client.test("mall refund api responded", function() {
+    client.assert(response.status === 200, "http status should be 200");
+    client.assert(response.body.code === 0 || response.body.code === 400, "biz code should be 0 or 400");
   });
 %}
 

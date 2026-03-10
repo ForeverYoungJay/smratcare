@@ -1,3 +1,4 @@
 {
-  "navigationBarTitleText": "商城下单"
+  "navigationBarTitleText": "商城下单",
+  "enablePullDownRefresh": true
 }

@@ -2,9 +2,30 @@
   <view class="surface card">
     <view class="section-title">商城商品</view>
     <view class="section-subtitle">商品来自后台商品中心，可预检后直接下单</view>
+
+    <view class="bind-alert" wx:if="{{!hasBindings}}">
+      <view class="bind-title">尚未绑定老人，暂无法下单</view>
+      <view class="bind-desc">请先在“绑定入住老人”中完成身份证绑定</view>
+      <button class="primary-btn bind-btn" bindtap="goBindElder">去绑定老人</button>
+    </view>
+
+    <view class="elder-row" wx:if="{{hasBindings}}">
+      <view class="field-label">下单老人</view>
+      <picker mode="selector" range="{{bindings}}" range-key="displayName" value="{{selectedElderIndex}}" bindchange="onElderChange">
+        <view class="elder-picker">{{bindings[selectedElderIndex].displayName}}</view>
+      </picker>
+    </view>
+
     <view class="search-row">
       <input class="search-input" value="{{keyword}}" bindinput="onKeywordInput" placeholder="搜索商品名称或编码" />
       <button class="ghost-btn search-btn" bindtap="onSearch" loading="{{loadingProducts}}">查询</button>
+    </view>
+
+    <view class="category-row" wx:if="{{categoryOptions.length > 1}}">
+      <view class="field-label">商品分类</view>
+      <picker mode="selector" range="{{categoryOptions}}" value="{{categoryIndex}}" bindchange="onCategoryChange">
+        <view class="category-picker">{{categoryOptions[categoryIndex]}}</view>
+      </picker>
     </view>
 
     <view wx:if="{{loadingProducts}}" class="empty">商品加载中...</view>
@@ -28,7 +49,7 @@
 
         <view class="action-row">
           <button class="ghost-btn action-btn" data-id="{{item.id}}" bindtap="onPreview" loading="{{previewingId == item.id}}">预检</button>
-          <button class="primary-btn action-btn" data-id="{{item.id}}" bindtap="onSubmit" loading="{{submittingId == item.id}}">立即下单</button>
+          <button class="primary-btn action-btn" data-id="{{item.id}}" bindtap="onSubmit" loading="{{submittingId == item.id}}" disabled="{{!hasBindings || !item.canSubmit}}">立即下单</button>
         </view>
       </view>
     </block>
@@ -36,11 +57,19 @@
 
   <view class="surface card order-card">
     <view class="section-title">我的商城订单</view>
-    <view class="section-subtitle">仅展示当前家属已绑定老人的订单</view>
+    <view class="section-subtitle">可按状态筛选，查看订单处理进展</view>
+    <view class="tab-row">
+      <view
+        wx:for="{{orderStatusTabs}}"
+        wx:key="key"
+        class="tab {{activeOrderTab === item.key ? 'tab-active' : ''}}"
+        data-key="{{item.key}}"
+        bindtap="onOrderTabTap">{{item.label}}</view>
+    </view>
     <view wx:if="{{loadingOrders}}" class="empty">订单加载中...</view>
-    <view wx:if="{{!loadingOrders && orders.length === 0}}" class="empty">暂无订单记录</view>
-    <block wx:for="{{orders}}" wx:key="orderId">
-      <view class="order-item">
+    <view wx:if="{{!loadingOrders && filteredOrders.length === 0}}" class="empty">暂无订单记录</view>
+    <block wx:for="{{filteredOrders}}" wx:key="orderId">
+      <view class="order-item" data-id="{{item.orderId}}" bindtap="goOrderDetail">
         <view class="order-head">
           <text class="order-no">{{item.orderNo}}</text>
           <text class="order-status">{{item.orderStatusText}}</text>
@@ -51,6 +80,7 @@
           <text>{{item.createTime}}</text>
           <text>{{item.payStatusText}}</text>
         </view>
+        <view class="order-more">查看详情与操作</view>
       </view>
     </block>
   </view>

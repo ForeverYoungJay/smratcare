@@ -529,6 +529,7 @@ const affectionMoments = [
 const festivalTemplates = ['生日祝福', '春节问候', '中秋团圆', '母亲节祝福'];
 
 const appState = {
+  loginPassword: 'Family@123',
   wechatNotifyOpenId: '',
   notificationSettings: {
     healthAlert: true,
@@ -1027,13 +1028,91 @@ function createServiceOrder(serviceId) {
   return clone(order);
 }
 
+function canCancelMallOrder(order) {
+  if (!order) {
+    return false;
+  }
+  const status = Number(order.orderStatus || 0);
+  return status === 1 || status === 2;
+}
+
+function cancelMallOrderHint(order) {
+  if (!order) {
+    return '订单不存在或已失效';
+  }
+  const status = Number(order.orderStatus || 0);
+  if (status === 1 || status === 2) {
+    return '可取消';
+  }
+  if (status === 3) {
+    return '订单已完成，请改为申请退款';
+  }
+  if (status === 4) {
+    return '订单已取消，无法重复取消';
+  }
+  if (status === 5) {
+    return '订单已退款，无法取消';
+  }
+  return '当前订单状态不可取消';
+}
+
+function canRefundMallOrder(order) {
+  if (!order) {
+    return false;
+  }
+  const status = Number(order.orderStatus || 0);
+  const payStatus = Number(order.payStatus || 0);
+  if (status === 4 || status === 5) {
+    return false;
+  }
+  return payStatus === 1 || status === 3;
+}
+
+function refundMallOrderHint(order) {
+  if (!order) {
+    return '订单不存在或已失效';
+  }
+  const status = Number(order.orderStatus || 0);
+  const payStatus = Number(order.payStatus || 0);
+  if (status === 4) {
+    return '订单已取消，无需退款';
+  }
+  if (status === 5) {
+    return '订单已退款，无需重复提交';
+  }
+  if (payStatus === 1 || status === 3) {
+    return '可申请退款';
+  }
+  if (status === 1 && payStatus === 0) {
+    return '订单尚未支付，建议先取消订单';
+  }
+  return '当前订单状态不可退款';
+}
+
+function withMallOrderActions(order) {
+  const canCancel = canCancelMallOrder(order);
+  const canRefund = canRefundMallOrder(order);
+  return {
+    ...order,
+    canCancel,
+    cancelHint: cancelMallOrderHint(order),
+    canRefund,
+    refundHint: refundMallOrderHint(order)
+  };
+}
+
 function getMallProducts(options = {}) {
   const keyword = String(options.keyword || '').trim();
-  if (!keyword) {
-    return clone(mallProducts);
+  const category = String(options.category || '').trim();
+  let list = mallProducts.slice();
+  if (category) {
+    list = list.filter((item) => String(item.category || '').trim() === category);
   }
-  return clone(mallProducts.filter((item) =>
-    String(item.productName || '').includes(keyword) || String(item.productCode || '').includes(keyword)));
+  if (keyword) {
+    list = list.filter((item) =>
+      String(item.productName || '').includes(keyword) || String(item.productCode || '').includes(keyword));
+  }
+  return clone(list);
 }
 
 function previewMallOrder(payload = {}) {
@@ -1138,10 +1217,140 @@ function submitMallOrder(payload = {}) {
 
 function getMallOrders(options = {}) {
   const elderId = Number(options.elderId || 0);
-  if (!elderId) {
-    return clone(mallOrders);
+  const list = !elderId
+    ? mallOrders
+    : mallOrders.filter((item) => Number(item.elderId) === elderId);
+  return clone(list.map((item) => withMallOrderActions(item)));
+}
+
+function getMallOrderDetail(orderId) {
+  const order = mallOrders.find((item) => Number(item.orderId) === Number(orderId));
+  if (!order) {
+    return null;
   }
-  return clone(mallOrders.filter((item) => Number(item.elderId) === elderId));
+  return clone({
+    summary: withMallOrderActions(order),
+    items: [
+      {
+        productId: order.productId,
+        productName: order.productName,
+        quantity: order.quantity,
+        unitPrice: order.unitPrice,
+        amount: order.totalAmount
+      }
+    ],
+    riskReasons: [],
+    fifoLogs: [
+      {
+        batchNo: `MOCK-${String(order.productId).slice(-4)}`,
+        quantity: order.quantity,
+        expireDate: '2027-12-31'
+      }
+    ]
+  });
+}
+
+function cancelMallOrder(orderId) {
+  const order = mallOrders.find((item) => Number(item.orderId) === Number(orderId));
+  if (!order) {
+    return {
+      success: false,
+      action: 'CANCEL',
+      message: '订单不存在',
+      canCancel: false,
+      cancelHint: cancelMallOrderHint(null),
+      canRefund: false,
+      refundHint: refundMallOrderHint(null)
+    };
+  }
+  if (!canCancelMallOrder(order)) {
+    return {
+      orderId: order.orderId,
+      action: 'CANCEL',
+      success: false,
+      message: cancelMallOrderHint(order),
+      orderStatus: order.orderStatus,
+      orderStatusText: order.orderStatusText,
+      payStatus: order.payStatus,
+      payStatusText: order.payStatusText,
+      canCancel: false,
+      cancelHint: cancelMallOrderHint(order),
+      canRefund: canRefundMallOrder(order),
+      refundHint: refundMallOrderHint(order)
+    };
+  }
+  order.orderStatus = 4;
+  order.orderStatusText = '已取消';
+  if (Number(order.payStatus || 0) === 1) {
+    order.payStatus = 2;
+    order.payStatusText = '已退款';
+  } else {
+    order.payStatus = 0;
+    order.payStatusText = '待支付';
+  }
+  return {
+    orderId: order.orderId,
+    action: 'CANCEL',
+    success: true,
+    message: '订单已取消',
+    orderStatus: order.orderStatus,
+    orderStatusText: order.orderStatusText,
+    payStatus: order.payStatus,
+    payStatusText: order.payStatusText,
+    canCancel: false,
+    cancelHint: cancelMallOrderHint(order),
+    canRefund: false,
+    refundHint: refundMallOrderHint(order)
+  };
+}
+
+function refundMallOrder(orderId) {
+  const order = mallOrders.find((item) => Number(item.orderId) === Number(orderId));
+  if (!order) {
+    return {
+      success: false,
+      action: 'REFUND',
+      message: '订单不存在',
+      canCancel: false,
+      cancelHint: cancelMallOrderHint(null),
+      canRefund: false,
+      refundHint: refundMallOrderHint(null)
+    };
+  }
+  if (!canRefundMallOrder(order)) {
+    return {
+      orderId: order.orderId,
+      action: 'REFUND',
+      success: false,
+      message: refundMallOrderHint(order),
+      orderStatus: order.orderStatus,
+      orderStatusText: order.orderStatusText,
+      payStatus: order.payStatus,
+      payStatusText: order.payStatusText,
+      canCancel: canCancelMallOrder(order),
+      cancelHint: cancelMallOrderHint(order),
+      canRefund: false,
+      refundHint: refundMallOrderHint(order)
+    };
+  }
+  order.orderStatus = 5;
+  order.orderStatusText = '已退款';
+  order.payStatus = 2;
+  order.payStatusText = '已退款';
+  return {
+    orderId: order.orderId,
+    action: 'REFUND',
+    success: true,
+    message: '退款申请已处理',
+    orderStatus: order.orderStatus,
+    orderStatusText: order.orderStatusText,
+    payStatus: order.payStatus,
+    payStatusText: order.payStatusText,
+    canCancel: false,
+    cancelHint: cancelMallOrderHint(order),
+    canRefund: false,
+    refundHint: refundMallOrderHint(order)
+  };
 }
 
 function submitFeedback(payload = {}) {
@@ -1308,7 +1517,9 @@ function setSecurityPassword(password = '') {
 
 function verifySecurityPassword(payload = {}) {
   const password = String(payload.password || '').trim();
-  const passed = !!appState.securityPassword && appState.securityPassword === password;
+  const passed = appState.securityPassword
+    ? appState.securityPassword === password
+    : appState.loginPassword === password;
   return {
     passed,
     message: passed ? '密码验证通过' : '密码错误，请重试'
@@ -1690,6 +1901,9 @@ module.exports = {
   previewMallOrder,
   submitMallOrder,
   getMallOrders,
+  getMallOrderDetail,
+  cancelMallOrder,
+  refundMallOrder,
   submitFeedback,
   getFeedbackRecords,
   getAffectionMoments,

@@ -478,6 +478,35 @@ async function getMallOrders(options = {}) {
   );
 }
 
+async function getMallOrderDetail(orderId) {
+  return withFallback(
+    async () => request({ url: `/api/family/mall/orders/${orderId}` }),
+    () => mock.getMallOrderDetail(orderId)
+  );
+}
+
+async function cancelMallOrder(orderId, payload = {}) {
+  return withFallback(
+    async () => request({
+      url: `/api/family/mall/orders/${orderId}/cancel`,
+      method: 'POST',
+      data: payload
+    }),
+    () => mock.cancelMallOrder(orderId, payload)
+  );
+}
+
+async function refundMallOrder(orderId, payload = {}) {
+  return withFallback(
+    async () => request({
+      url: `/api/family/mall/orders/${orderId}/refund`,
+      method: 'POST',
+      data: payload
+    }),
+    () => mock.refundMallOrder(orderId, payload)
+  );
+}
+
 async function submitFeedback(payload) {
   return withFallback(
     async () => request({
@@ -591,19 +620,25 @@ async function verifySecuritySmsCode(verifyCode, scene = 'SECURITY') {
 }
 
 async function setSecurityPassword(password) {
-  return request({
-    url: '/api/family/security/password/set',
-    method: 'POST',
-    data: { password }
-  });
+  return withFallback(
+    async () => request({
+      url: '/api/family/security/password/set',
+      method: 'POST',
+      data: { password }
+    }),
+    () => mock.setSecurityPassword(password)
+  );
 }
 
 async function verifySecurityPassword(password, scene = 'SECURITY') {
-  return request({
-    url: '/api/family/security/password/verify',
-    method: 'POST',
-    data: { password, scene }
-  });
+  return withFallback(
+    async () => request({
+      url: '/api/family/security/password/verify',
+      method: 'POST',
+      data: { password, scene }
+    }),
+    () => mock.verifySecurityPassword({ password, scene })
+  );
 }
 
 async function uploadVoiceMessage(filePath, options = {}) {
@@ -783,6 +818,9 @@ module.exports = {
   previewMallOrder,
   submitMallOrder,
   getMallOrders,
+  getMallOrderDetail,
+  cancelMallOrder,
+  refundMallOrder,
   submitFeedback,
   getFeedbackRecords,
   bookVideoVisit,

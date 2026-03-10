@@ -2,7 +2,7 @@
   "info": {
     "name": "Family 聚合接口回归测试",
     "_postman_id": "31f55f7f-34ad-4f3d-8a6b-0de6f8f8c101",
-    "description": "覆盖家属端关键能力：短信验证码、充值、安全设置、沟通消息（语音）、FAQ、微信预下单、回调模拟与订单查询。",
+    "description": "覆盖家属端关键能力：注册验证码+账号密码登录、充值、安全设置、沟通消息（语音）、FAQ、商城下单/详情/取消退款、微信预下单、回调模拟与订单查询。",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -10,7 +10,7 @@
       "name": "Family Auth",
       "item": [
         {
-          "name": "Send Family Login SMS Code",
+          "name": "Send Family Register SMS Code",
           "request": {
             "method": "POST",
             "header": [
@@ -19,10 +19,6 @@
                 "value": "application/json"
               }
             ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"orgId\": {{familyOrgId}},\n  \"phone\": \"{{familyPhone}}\",\n  \"scene\": \"LOGIN\"\n}"
-            },
             "url": {
               "raw": "{{baseUrl}}/api/auth/family/sms-code/send",
               "host": [
@@ -35,6 +31,10 @@
                 "sms-code",
                 "send"
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orgId\": {{familyOrgId}},\n  \"phone\": \"{{familyPhone}}\",\n  \"scene\": \"REGISTER\"\n}"
             }
           },
           "event": [
@@ -42,7 +42,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('send login sms code success', function () {",
+                  "pm.test('send register sms code success', function () {",
                   "  pm.response.to.have.status(200);",
                   "  var body = pm.response.json();",
                   "  pm.expect(body.code).to.eql(0);",
@@ -50,7 +50,7 @@
                   "});",
                   "var body = pm.response.json();",
                   "if (body.data && body.data.debugCode) {",
-                  "  pm.environment.set('familyVerifyCode', body.data.debugCode);",
+                  "  pm.environment.set('familyRegisterCode', body.data.debugCode);",
                   "}"
                 ]
               }
@@ -58,7 +58,7 @@
           ]
         },
         {
-          "name": "Family Login",
+          "name": "Register Family Account",
           "request": {
             "method": "POST",
             "header": [
@@ -67,10 +67,51 @@
                 "value": "application/json"
               }
             ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/family/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "family",
+                "register"
+              ]
+            },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"orgId\": {{familyOrgId}},\n  \"phone\": \"{{familyPhone}}\",\n  \"verifyCode\": \"{{familyVerifyCode}}\"\n}"
-            },
+              "raw": "{\n  \"orgId\": {{familyOrgId}},\n  \"phone\": \"{{familyPhone}}\",\n  \"verifyCode\": \"{{familyRegisterCode}}\",\n  \"password\": \"{{familyPassword}}\",\n  \"realName\": \"Postman回归家属\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('family register handled', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect([0, 400]).to.include(body.code);",
+                  "  if (body.code === 0) {",
+                  "    pm.expect(body.data.token).to.be.a('string');",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Family Login (Password)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/auth/family/login",
               "host": [
@@ -82,6 +123,10 @@
                 "family",
                 "login"
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orgId\": {{familyOrgId}},\n  \"phone\": \"{{familyPhone}}\",\n  \"password\": \"{{familyPassword}}\"\n}"
             }
           },
           "event": [
@@ -89,7 +134,7 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('family login success', function () {",
+                  "pm.test('family password login success', function () {",
                   "  pm.response.to.have.status(200);",
                   "  var body = pm.response.json();",
                   "  pm.expect(body.code).to.eql(0);",
@@ -516,6 +561,354 @@
                   "  var body = pm.response.json();",
                   "  pm.expect(body.code).to.eql(0);",
                   "  pm.expect(Array.isArray(body.data)).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Mall Products",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/family/mall/products?pageNo=1&pageSize=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "mall",
+                "products"
+              ],
+              "query": [
+                {
+                  "key": "pageNo",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('list mall products success', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(Array.isArray(body.data)).to.eql(true);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "if (body.data && body.data.length > 0) {",
+                  "  pm.environment.set('familyMallProductId', body.data[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Preview Mall Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/family/mall/orders/preview",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "mall",
+                "orders",
+                "preview"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"elderId\": {{familyElderId}},\n  \"productId\": {{familyMallProductId}},\n  \"qty\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('preview mall order success', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(body.data.allowed).to.not.equal(undefined);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit Mall Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/family/mall/orders/submit",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "mall",
+                "orders",
+                "submit"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"elderId\": {{familyElderId}},\n  \"productId\": {{familyMallProductId}},\n  \"qty\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('submit mall order success', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(body.data.allowed).to.not.equal(undefined);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "if (body.data && body.data.orderId) {",
+                  "  pm.environment.set('familyMallOrderId', body.data.orderId);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Mall Orders",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/family/mall/orders?pageNo=1&pageSize=10&elderId={{familyElderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "mall",
+                "orders"
+              ],
+              "query": [
+                {
+                  "key": "pageNo",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "10"
+                },
+                {
+                  "key": "elderId",
+                  "value": "{{familyElderId}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('list mall orders success', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql(0);",
+                  "  pm.expect(Array.isArray(body.data)).to.eql(true);",
+                  "});",
+                  "var body = pm.response.json();",
+                  "if (body.data && body.data.length > 0 && !pm.environment.get(\"familyMallOrderId\")) {",
+                  "  pm.environment.set('familyMallOrderId', body.data[0].orderId);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Mall Order Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/family/mall/orders/{{familyMallOrderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "mall",
+                "orders",
+                "{{familyMallOrderId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('mall order detail responded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect([0, 400]).to.include(body.code);",
+                  "  if (body.code === 0) {",
+                  "    pm.expect(body.data.summary).to.not.equal(undefined);",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancel Mall Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/family/mall/orders/{{familyMallOrderId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "mall",
+                "orders",
+                "{{familyMallOrderId}}",
+                "cancel"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Postman回归取消测试\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('cancel mall order responded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect([0, 400]).to.include(body.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refund Mall Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{familyToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/family/mall/orders/{{familyMallOrderId}}/refund",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "family",
+                "mall",
+                "orders",
+                "{{familyMallOrderId}}",
+                "refund"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Postman回归退款测试\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('refund mall order responded', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "  var body = pm.response.json();",
+                  "  pm.expect([0, 400]).to.include(body.code);",
                   "});"
                 ]
               }
@@ -1466,10 +1859,6 @@
       "value": "13800138000"
     },
     {
-      "key": "familyVerifyCode",
-      "value": "123456"
-    },
-    {
       "key": "familySecurityVerifyCode",
       "value": "123456"
     },
@@ -1495,6 +1884,22 @@
     },
     {
       "key": "familyAlbumId",
+      "value": "1"
+    },
+    {
+      "key": "familyPassword",
+      "value": "Family@123"
+    },
+    {
+      "key": "familyRegisterCode",
+      "value": "123456"
+    },
+    {
+      "key": "familyMallProductId",
+      "value": "1"
+    },
+    {
+      "key": "familyMallOrderId",
       "value": "1"
     }
   ]

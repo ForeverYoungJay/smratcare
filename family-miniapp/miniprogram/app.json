@@ -10,6 +10,7 @@
     "pages/message-detail/index",
     "pages/services/index",
     "pages/service-mall/index",
+    "pages/mall-order-detail/index",
     "pages/service-orders/index",
     "pages/profile/index",
     "pages/capability-status/index",

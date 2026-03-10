@@ -432,6 +432,63 @@ public final class FamilyPortalModels {
     private String payStatusText;
     private String createTime;
     private String payTime;
+    private Boolean canCancel;
+    private String cancelHint;
+    private Boolean canRefund;
+    private String refundHint;
+  }
+
+  @Data
+  public static class MallOrderLineItem {
+    private Long productId;
+    private String productName;
+    private Integer quantity;
+    private BigDecimal unitPrice;
+    private BigDecimal amount;
+  }
+
+  @Data
+  public static class MallOrderRiskItem {
+    private String diseaseName;
+    private String tagCode;
+    private String tagName;
+  }
+
+  @Data
+  public static class MallOrderFifoItem {
+    private String batchNo;
+    private Integer quantity;
+    private String expireDate;
+  }
+
+  @Data
+  public static class MallOrderDetailResponse {
+    private MallOrderItem summary;
+    private List<MallOrderLineItem> items = new ArrayList<>();
+    private List<MallOrderRiskItem> riskReasons = new ArrayList<>();
+    private List<MallOrderFifoItem> fifoLogs = new ArrayList<>();
+  }
+
+  @Data
+  public static class MallOrderActionRequest {
+    @Size(max = 120)
+    private String reason;
+  }
+
+  @Data
+  public static class MallOrderActionResponse {
+    private Long orderId;
+    private String action;
+    private Boolean success;
+    private String message;
+    private Integer orderStatus;
+    private String orderStatusText;
+    private Integer payStatus;
+    private String payStatusText;
+    private Boolean canCancel;
+    private String cancelHint;
+    private Boolean canRefund;
+    private String refundHint;
   }
 
   @Data

@@ -2,10 +2,57 @@
   padding: 24rpx;
 }
 
+.bind-alert {
+  margin-bottom: 16rpx;
+  padding: 18rpx;
+  border: 1rpx solid #fcd34d;
+  background: #fffbeb;
+  border-radius: 12rpx;
+}
+
+.bind-title {
+  font-size: 26rpx;
+  color: #92400e;
+  font-weight: 700;
+}
+
+.bind-desc {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: #a16207;
+}
+
+.bind-btn {
+  margin-top: 12rpx;
+  height: 64rpx;
+  line-height: 64rpx;
+  font-size: 24rpx;
+}
+
+.field-label {
+  font-size: 23rpx;
+  color: #6b7280;
+  margin-bottom: 8rpx;
+}
+
+.elder-row {
+  margin-bottom: 14rpx;
+}
+
+.elder-picker,
+.category-picker {
+  background: #f8fafc;
+  border: 1rpx solid #dbe3ea;
+  border-radius: 12rpx;
+  padding: 16rpx 18rpx;
+  font-size: 24rpx;
+  color: #1f2937;
+}
+
 .search-row {
   display: flex;
   gap: 12rpx;
-  margin-bottom: 16rpx;
+  margin-bottom: 12rpx;
 }
 
 .search-input {
@@ -22,6 +69,10 @@
   height: 76rpx;
   line-height: 76rpx;
   font-size: 24rpx;
+}
+
+.category-row {
+  margin-bottom: 16rpx;
 }
 
 .item {
@@ -131,6 +182,28 @@
   margin-top: 20rpx;
 }
 
+.tab-row {
+  display: flex;
+  gap: 10rpx;
+  margin-top: 12rpx;
+  margin-bottom: 10rpx;
+}
+
+.tab {
+  flex: 1;
+  text-align: center;
+  font-size: 23rpx;
+  color: #4b5563;
+  padding: 10rpx 0;
+  border-radius: 999rpx;
+  background: #f1f5f9;
+}
+
+.tab-active {
+  color: #fff;
+  background: #194f5e;
+}
+
 .order-item {
   margin-top: 12rpx;
   padding: 14rpx;
@@ -168,4 +241,11 @@
   justify-content: space-between;
   font-size: 21rpx;
   color: #6b7280;
+}
+
+.order-more {
+  margin-top: 8rpx;
+  text-align: right;
+  font-size: 21rpx;
+  color: #2c7a84;
 }

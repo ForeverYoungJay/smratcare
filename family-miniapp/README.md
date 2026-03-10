@@ -5,8 +5,9 @@
 ## 一、已完成能力（完整版）
 
 ### 1) 登录与绑定
-- 家属注册/登录（手机号 + 真实短信验证码）
-- 绑定老人（支持扫码占位入口 + 手工绑定）
+- 家属首次注册（手机号 + 真实短信验证码 + 设置密码）
+- 家属登录（手机号 + 密码），找回密码走短信验证码
+- 绑定老人（支持扫码占位入口 + 手工身份证绑定）
 - 多老人切换（首页滑卡 + 顶部选择器）
 
 ### 2) 首页（完整信息架构）
@@ -90,10 +91,12 @@
 ## 三、接口策略（真实 API + Mock 兜底）
 
 已直接对接：
+- `GET /api/auth/family/bootstrap`
 - `POST /api/auth/family/sms-code/send`
 - `POST /api/auth/family/sms-code/verify`
+- `POST /api/auth/family/register`
+- `POST /api/auth/family/password/reset`
 - `POST /api/auth/family/login`
-- `POST /api/family/register`
 
 家属端聚合接口（本次补齐）：
 - `GET /api/family/dashboard/home`
@@ -129,6 +132,13 @@
 - `GET /api/family/service/catalog`
 - `GET /api/family/service/orders`
 - `POST /api/family/service/orders`
+- `GET /api/family/mall/products`
+- `POST /api/family/mall/orders/preview`
+- `POST /api/family/mall/orders/submit`
+- `GET /api/family/mall/orders`
+- `GET /api/family/mall/orders/{orderId}`
+- `POST /api/family/mall/orders/{orderId}/cancel`
+- `POST /api/family/mall/orders/{orderId}/refund`
 - `POST /api/family/feedback`
 - `GET /api/family/feedback/records`
 - `POST /api/family/visit/video/book`
@@ -163,6 +173,8 @@
 - `POST /api/assessment/records/{id}/report-file`（管理端上传评估报告 PDF，家属端通过 `assessment-reports` 获取真实 URL）
 
 说明：
+- 登录模式已调整为“密码登录”，短信验证码仅用于“首次注册/找回密码/安全短信场景”。
+- 敏感操作默认走“登录密码二次验证”，设置独立安全密码后优先使用独立密码。
 - `payment/auto-pay` 已升级为“按老人维度”配置，入参包含 `elderId`，避免多位老人场景下误开/误关自动扣费。
 - `payment/recharge` 作为机构内部补账/人工充值通道保留，家属微信支付主链路使用 `wechat/prepay + notify + recharge-orders`。
 - 沟通消息 `POST /api/family/communication/messages` 已支持语音附件字段：
@@ -180,4 +192,5 @@
 
 - 修改 `miniprogram/app.js` 中 `globalData.baseUrl`
 - 默认值：`http://localhost:8080`
+- 本地调试默认开启 `globalData.localDevBypassLogin=true`（localhost 环境自动跳过登录）
 - `globalData.allowManualRechargeFallback` 默认 `false`（建议仅测试环境临时开启）
