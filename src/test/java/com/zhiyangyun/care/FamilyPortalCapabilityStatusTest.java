@@ -39,6 +39,11 @@ import com.zhiyangyun.care.oa.mapper.OaSuggestionMapper;
 import com.zhiyangyun.care.oa.mapper.OaTodoMapper;
 import com.zhiyangyun.care.service.CareTaskService;
 import com.zhiyangyun.care.standard.mapper.ServiceItemMapper;
+import com.zhiyangyun.care.store.mapper.InventoryBatchMapper;
+import com.zhiyangyun.care.store.mapper.OrderItemMapper;
+import com.zhiyangyun.care.store.mapper.ProductMapper;
+import com.zhiyangyun.care.store.mapper.StoreOrderMapper;
+import com.zhiyangyun.care.store.service.StoreOrderService;
 import com.zhiyangyun.care.visit.service.VisitService;
 import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,6 +51,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
 class FamilyPortalCapabilityStatusTest {
@@ -95,6 +101,11 @@ class FamilyPortalCapabilityStatusTest {
         mock(ElderAccountLogMapper.class),
         mock(ServiceItemMapper.class),
         mock(ServiceBookingMapper.class),
+        mock(ProductMapper.class),
+        mock(InventoryBatchMapper.class),
+        mock(StoreOrderMapper.class),
+        mock(OrderItemMapper.class),
+        mock(StoreOrderService.class),
         mock(VisitService.class),
         mock(CareTaskService.class),
         mock(OrgMapper.class),
@@ -102,6 +113,7 @@ class FamilyPortalCapabilityStatusTest {
         mock(FamilyRechargeOrderMapper.class),
         properties,
         familyWechatNotifyService,
+        mock(PasswordEncoder.class),
         new ObjectMapper());
   }
 
