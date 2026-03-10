@@ -282,7 +282,7 @@ function printSpecificElder() {
     message.warning('未找到匹配老人')
     return
   }
-  const elderText = selectedElder.value ? `${selectedElder.value.name} / ID:${query.elderId}` : `ID:${query.elderId}`
+  const elderText = selectedElder.value ? `${selectedElder.value.name}` : '未命名长者'
   renderPrint(`消费统计（${elderText}）`, filtered)
 }
 
@@ -293,8 +293,8 @@ function renderPrint(title: string, rows: Array<Record<string, any>>) {
   }
   try {
     const orgText = query.orgId ? `机构ID：${query.orgId}` : '机构：当前'
-    const elderText = selectedElder.value
-      ? `院内老人：${selectedElder.value.name} / ID:${query.elderId}`
+  const elderText = selectedElder.value
+      ? `院内老人：${selectedElder.value.name}`
       : '院内老人：全部'
     printTableReport({
       title,

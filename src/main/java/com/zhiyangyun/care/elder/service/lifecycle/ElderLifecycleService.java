@@ -28,6 +28,7 @@ public interface ElderLifecycleService {
       Long tenantId,
       long pageNo,
       long pageSize,
+      Long elderId,
       String keyword,
       String contractNo,
       Integer elderStatus,
@@ -36,6 +37,7 @@ public interface ElderLifecycleService {
 
   AdmissionRecordSummaryResponse admissionSummary(
       Long tenantId,
+      Long elderId,
       String keyword,
       String contractNo,
       Integer elderStatus,

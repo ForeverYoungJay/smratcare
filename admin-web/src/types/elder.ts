@@ -188,6 +188,7 @@ export type DeathRegisterStatus = 'REGISTERED' | 'CANCELLED'
 export interface AdmissionRecordQuery {
   pageNo?: number
   pageSize?: number
+  elderId?: Id
   keyword?: string
   contractNo?: string
   elderStatus?: number

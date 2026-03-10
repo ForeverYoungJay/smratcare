@@ -6,7 +6,7 @@ const cardAccountPoolCache = new Map();
 const cardAccountPoolFetchedAt = new Map();
 const CARD_ACCOUNT_POOL_CACHE_TTL = 90 * 1000;
 function toCardAccountOption(item) {
-    const elderName = item.elderName || `长者#${item.elderId || '-'}`;
+    const elderName = item.elderName || '未命名长者';
     const cardNo = item.cardNo || `CARD#${item.id}`;
     return {
         label: `${cardNo} - ${elderName}`,
@@ -16,7 +16,7 @@ function toCardAccountOption(item) {
     };
 }
 function cardAccountSearchText(item) {
-    const text = `${item.cardNo || ''} ${item.elderName || ''} ${item.elderId || ''}`.trim();
+    const text = `${item.cardNo || ''} ${item.elderName || ''}`.trim();
     return `${text} ${toPinyinInitials(text)}`;
 }
 function dedupeCardAccounts(rows) {

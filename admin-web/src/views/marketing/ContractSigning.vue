@@ -225,25 +225,31 @@
       </a-form>
       <a-divider style="margin: 8px 0 14px">长者信息快照（与长者详情一致）</a-divider>
       <a-spin :spinning="elderSnapshotLoading">
-        <a-row :gutter="12">
-          <a-col :xs="24" :lg="12">
-            <a-card size="small" title="老人基础信息" class="snapshot-card" :bordered="false">
-              <a-descriptions :column="1" size="small" bordered>
-                <a-descriptions-item label="姓名">{{ elderSnapshot.base.fullName || '-' }}</a-descriptions-item>
-                <a-descriptions-item label="身份证">{{ elderSnapshot.base.idCardNo || '-' }}</a-descriptions-item>
-                <a-descriptions-item label="床位">{{ elderSnapshot.base.bedNo || '-' }}</a-descriptions-item>
-                <a-descriptions-item label="护理等级">{{ elderSnapshot.base.careLevel || '-' }}</a-descriptions-item>
-                <a-descriptions-item label="状态">{{ elderStatusText(elderSnapshot.base.status) }}</a-descriptions-item>
-                <a-descriptions-item label="生日">{{ elderSnapshot.base.birthDate || '-' }}</a-descriptions-item>
-                <a-descriptions-item label="风险预担">{{ riskPrecommitText(elderSnapshot.base.riskPrecommit) }}</a-descriptions-item>
-                <a-descriptions-item label="入院日期">{{ elderSnapshot.base.admissionDate || '-' }}</a-descriptions-item>
-                <a-descriptions-item label="家庭地址">{{ elderSnapshot.base.homeAddress || '-' }}</a-descriptions-item>
-              </a-descriptions>
-            </a-card>
-          </a-col>
-          <a-col :xs="24" :lg="12">
-            <a-space direction="vertical" style="width: 100%" :size="12">
-              <a-card size="small" title="家属信息" class="snapshot-card" :bordered="false">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px">
+          <span style="color: #595959">分页填写：{{ contractInfoPage === 1 ? '老人基础信息' : contractInfoPage === 2 ? '家属信息' : '基础疾病信息' }}</span>
+          <a-pagination
+            :current="contractInfoPage"
+            :total="3"
+            :page-size="1"
+            size="small"
+            simple
+            @change="(page) => (contractInfoPage = page)"
+          />
+        </div>
+        <a-card v-show="contractInfoPage === 1" size="small" title="老人基础信息" class="snapshot-card" :bordered="false">
+          <a-descriptions :column="1" size="small" bordered>
+            <a-descriptions-item label="姓名">{{ elderSnapshot.base.fullName || '-' }}</a-descriptions-item>
+            <a-descriptions-item label="身份证">{{ elderSnapshot.base.idCardNo || '-' }}</a-descriptions-item>
+            <a-descriptions-item label="床位">{{ elderSnapshot.base.bedNo || '-' }}</a-descriptions-item>
+            <a-descriptions-item label="护理等级">{{ elderSnapshot.base.careLevel || '-' }}</a-descriptions-item>
+            <a-descriptions-item label="状态">{{ elderStatusText(elderSnapshot.base.status) }}</a-descriptions-item>
+            <a-descriptions-item label="生日">{{ elderSnapshot.base.birthDate || '-' }}</a-descriptions-item>
+            <a-descriptions-item label="风险预担">{{ riskPrecommitText(elderSnapshot.base.riskPrecommit) }}</a-descriptions-item>
+            <a-descriptions-item label="入院日期">{{ elderSnapshot.base.admissionDate || '-' }}</a-descriptions-item>
+            <a-descriptions-item label="家庭地址">{{ elderSnapshot.base.homeAddress || '-' }}</a-descriptions-item>
+          </a-descriptions>
+        </a-card>
+        <a-card v-show="contractInfoPage === 2" size="small" title="家属信息" class="snapshot-card" :bordered="false">
                 <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center">
                   <span style="color: #595959">可绑定多人家属（每人手机号、身份证必填）</span>
                   <a-button size="small" type="dashed" @click="addFamilyDraftRow">新增家属</a-button>
@@ -286,8 +292,8 @@
                   row-key="id"
                   :locale="{ emptyText: '暂无家属信息' }"
                 />
-              </a-card>
-              <a-card size="small" title="基础疾病信息" class="snapshot-card" :bordered="false">
+        </a-card>
+        <a-card v-show="contractInfoPage === 3" size="small" title="基础疾病信息" class="snapshot-card" :bordered="false">
                 <a-form-item label="新建/编辑时录入疾病" style="margin-bottom: 10px">
                   <a-select
                     v-model:value="selectedDiseaseIds"
@@ -304,10 +310,7 @@
                   </a-tag>
                   <span v-if="!elderSnapshot.diseases.length" style="color: #8c8c8c">暂无疾病信息</span>
                 </a-space>
-              </a-card>
-            </a-space>
-          </a-col>
-        </a-row>
+        </a-card>
       </a-spin>
     </a-modal>
 
@@ -743,6 +746,7 @@ const familyDraftColumns = [
   { title: '操作', key: 'operation', width: 80 }
 ]
 const elderSnapshotLoading = ref(false)
+const contractInfoPage = ref(1)
 const elderSnapshot = reactive({
   elderId: '' as string,
   base: {} as Partial<ElderItem>,
@@ -1155,6 +1159,7 @@ function openForm(record?: CrmContractItem) {
     elderSnapshot.families = []
     elderSnapshot.diseases = []
   }
+  contractInfoPage.value = 1
   open.value = true
   loadDiseaseOptions().catch(() => {})
   loadElderSnapshotByForm().catch(() => {})

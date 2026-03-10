@@ -85,6 +85,7 @@ public class ElderLifecycleController {
   public Result<IPage<AdmissionRecordResponse>> admissions(
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
+      @RequestParam(required = false) Long elderId,
       @RequestParam(required = false) String keyword,
       @RequestParam(required = false) String contractNo,
       @RequestParam(required = false) Integer elderStatus,
@@ -94,11 +95,12 @@ public class ElderLifecycleController {
       @RequestParam(required = false) LocalDate admissionDateEnd) {
     Long tenantId = AuthContext.getOrgId();
     return Result.ok(lifecycleService.admissionPage(
-        tenantId, pageNo, pageSize, keyword, contractNo, elderStatus, admissionDateStart, admissionDateEnd));
+        tenantId, pageNo, pageSize, elderId, keyword, contractNo, elderStatus, admissionDateStart, admissionDateEnd));
   }
 
   @GetMapping("/admissions/summary")
   public Result<AdmissionRecordSummaryResponse> admissionsSummary(
+      @RequestParam(required = false) Long elderId,
       @RequestParam(required = false) String keyword,
       @RequestParam(required = false) String contractNo,
       @RequestParam(required = false) Integer elderStatus,
@@ -108,7 +110,7 @@ public class ElderLifecycleController {
       @RequestParam(required = false) LocalDate admissionDateEnd) {
     Long tenantId = AuthContext.getOrgId();
     return Result.ok(lifecycleService.admissionSummary(
-        tenantId, keyword, contractNo, elderStatus, admissionDateStart, admissionDateEnd));
+        tenantId, elderId, keyword, contractNo, elderStatus, admissionDateStart, admissionDateEnd));
   }
 
   @GetMapping(value = "/changes/export", produces = "text/csv;charset=UTF-8")
@@ -137,6 +139,7 @@ public class ElderLifecycleController {
 
   @GetMapping(value = "/admissions/export", produces = "text/csv;charset=UTF-8")
   public ResponseEntity<byte[]> exportAdmissions(
+      @RequestParam(required = false) Long elderId,
       @RequestParam(required = false) String keyword,
       @RequestParam(required = false) String contractNo,
       @RequestParam(required = false) Integer elderStatus,
@@ -146,7 +149,7 @@ public class ElderLifecycleController {
       @RequestParam(required = false) LocalDate admissionDateEnd) {
     Long tenantId = AuthContext.getOrgId();
     List<AdmissionRecordResponse> records = loadAllAdmissions(
-        tenantId, keyword, contractNo, elderStatus, admissionDateStart, admissionDateEnd);
+        tenantId, elderId, keyword, contractNo, elderStatus, admissionDateStart, admissionDateEnd);
     List<String> headers = List.of("老人姓名", "合同号", "收费开始日期", "押金（元）", "入住状态", "备注", "登记时间");
     List<List<String>> rows = records.stream()
         .map(item -> List.of(
@@ -184,6 +187,7 @@ public class ElderLifecycleController {
 
   private List<AdmissionRecordResponse> loadAllAdmissions(
       Long tenantId,
+      Long elderId,
       String keyword,
       String contractNo,
       Integer elderStatus,
@@ -194,7 +198,7 @@ public class ElderLifecycleController {
     List<AdmissionRecordResponse> all = new ArrayList<>();
     while (true) {
       IPage<AdmissionRecordResponse> page = lifecycleService.admissionPage(
-          tenantId, pageNo, pageSize, keyword, contractNo, elderStatus, admissionDateStart, admissionDateEnd);
+          tenantId, pageNo, pageSize, elderId, keyword, contractNo, elderStatus, admissionDateStart, admissionDateEnd);
       List<AdmissionRecordResponse> records = page.getRecords();
       if (records == null || records.isEmpty()) {
         break;

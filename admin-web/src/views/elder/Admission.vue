@@ -562,8 +562,8 @@ function statusText(status?: number) {
 function displayElderName(record: AdmissionRecordItem) {
   const name = String(record.elderName || '').trim()
   if (name) return name
-  const elderId = Number(record.elderId || 0)
-  if (elderId > 0) {
+  const elderId = String(record.elderId || '').trim()
+  if (elderId) {
     const fallback = String(findElderName(elderId) || '').trim()
     if (fallback) return fallback
   }
@@ -590,7 +590,7 @@ async function submit() {
 }
 
 function checklistRoute(key: SubmitChecklistKey) {
-  const elderId = Number(form.elderId || 0)
+  const elderId = String(form.elderId || '').trim()
   const contractNo = encodeURIComponent(String(form.contractNo || '').trim())
   const toContractElderInfo = () => {
     if (contractNo) {
@@ -606,7 +606,7 @@ function checklistRoute(key: SubmitChecklistKey) {
     if (contractNo) {
       return `/marketing/contract-signing?contractNo=${contractNo}&openAttachment=1&attachmentType=CONTRACT&from=admission_checklist`
     }
-    return elderId ? `/marketing/contract-signing?elderId=${elderId}&openAttachment=1&from=admission_checklist` : '/marketing/contract-signing'
+    return elderId ? `/marketing/contract-signing?elderId=${encodeURIComponent(elderId)}&openAttachment=1&from=admission_checklist` : '/marketing/contract-signing'
   }
   return '/elder/list'
 }
@@ -617,15 +617,20 @@ function jumpToChecklist(key: SubmitChecklistKey) {
 }
 
 async function buildSubmitChecklist() {
-  const elderId = Number(form.elderId || 0)
+  let elderId = String(form.elderId || '').trim()
   const contractNo = String(form.contractNo || '').trim()
-  const [elderDetailRes, familyRes, diseaseRes, contractPageRes] = await Promise.all([
+  const contractPageRes = contractNo
+    ? await getContractPage({ pageNo: 1, pageSize: 20, contractNo }).catch(() => ({ list: [] as CrmContractItem[] }))
+    : ({ list: [] as CrmContractItem[] })
+  const contract = (contractPageRes.list || []).find((item) => String(item.contractNo || '').trim() === contractNo) || null
+  if (!elderId && contract?.elderId != null) {
+    elderId = String(contract.elderId).trim()
+  }
+  const [elderDetailRes, familyRes, diseaseRes] = await Promise.all([
     elderId ? getElderDetail(elderId).catch(() => null) : Promise.resolve(null),
     elderId ? getFamilyRelations(elderId).catch(() => []) : Promise.resolve([]),
-    elderId ? getElderDiseases(elderId).catch(() => []) : Promise.resolve([]),
-    contractNo ? getContractPage({ pageNo: 1, pageSize: 20, contractNo }).catch(() => ({ list: [] })) : Promise.resolve({ list: [] as CrmContractItem[] })
+    elderId ? getElderDiseases(elderId).catch(() => []) : Promise.resolve([])
   ])
-  const contract = (contractPageRes.list || []).find((item) => String(item.contractNo || '').trim() === contractNo) || null
   const attachments = contract?.id
     ? await getContractAttachments(contract.id).catch(() => [])
     : []
@@ -712,7 +717,7 @@ async function loadContractGuardState() {
     guardContract.value = (page.list || []).find((item) => item.contractNo === contractNo) || null
     if (guardContract.value?.elderId) {
       form.elderId = guardContract.value.elderId as any
-      ensureSelectedElder(Number(guardContract.value.elderId), guardContract.value.elderName || `长者${String(guardContract.value.elderId)}`)
+      ensureSelectedElder(String(guardContract.value.elderId), guardContract.value.elderName || `长者${String(guardContract.value.elderId)}`)
       if (!recordQuery.keyword && guardContract.value.elderName) {
         recordQuery.keyword = guardContract.value.elderName
       }
@@ -735,7 +740,7 @@ function contractPriority(item: CrmContractItem) {
 }
 
 async function resolveContractNoByElder(elderIdRaw: string | number | undefined) {
-  const elderId = Number(elderIdRaw || 0)
+  const elderId = String(elderIdRaw || '').trim()
   if (!elderId) {
     form.contractNo = ''
     guardContract.value = null
@@ -748,7 +753,7 @@ async function resolveContractNoByElder(elderIdRaw: string | number | undefined)
     elderId,
     elderName: elderName || undefined
   })
-  const list = (page.list || []).filter((item) => Number(item.elderId || 0) === elderId || !item.elderId)
+  const list = (page.list || []).filter((item) => String(item.elderId || '').trim() === elderId || !item.elderId)
   if (!list.length) {
     form.contractNo = ''
     guardContract.value = null
@@ -776,8 +781,10 @@ async function onElderChange(value: string | number | undefined) {
 }
 
 function buildAdmissionRecordFilterParams() {
+  const routeElderId = Number(route.query.residentId || route.query.elderId || 0)
   const [admissionDateStart, admissionDateEnd] = recordQuery.admissionDateRange || []
   return {
+    elderId: Number.isFinite(routeElderId) && routeElderId > 0 ? routeElderId : undefined,
     keyword: recordQuery.keyword,
     contractNo: recordQuery.contractNo,
     elderStatus: recordQuery.elderStatus,
@@ -796,8 +803,8 @@ async function fetchAdmissionRecords() {
     })
     admissionRows.value = res.list || []
     admissionRows.value.forEach((item) => {
-      const elderId = Number(item.elderId || 0)
-      if (elderId > 0) {
+      const elderId = String(item.elderId || '').trim()
+      if (elderId) {
         ensureSelectedElder(elderId, String(item.elderName || '').trim() || undefined)
       }
     })

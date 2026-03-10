@@ -392,9 +392,9 @@ function printSpecificElder() {
 
   if (printElderId.value) {
     filtered = filtered.filter(item => Number(item.elderId) === Number(printElderId.value))
-    const selectedName = selectedPrintElder.value?.name || `老人ID:${printElderId.value}`
-    title = `老人出入报表（${selectedName} / ID:${printElderId.value}）`
-    printScope = buildPrintScopeText(`指定老人：${selectedName} / ID:${printElderId.value}`)
+    const selectedName = selectedPrintElder.value?.name || '未命名长者'
+    title = `老人出入报表（${selectedName}）`
+    printScope = buildPrintScopeText(`指定老人：${selectedName}`)
   } else {
     message.warning('请选择院内老人')
     return

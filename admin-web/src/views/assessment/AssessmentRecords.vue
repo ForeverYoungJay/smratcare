@@ -252,6 +252,9 @@
           <template v-else-if="column.key === 'assessmentType'">
             {{ assessmentTypeLabel(record.assessmentTypeLabel || record.assessmentType) }}
           </template>
+          <template v-else-if="column.key === 'elderName'">
+            {{ resolveAssessmentElderName(record) }}
+          </template>
           <template v-else-if="column.key === 'gender'">
             {{ record.genderLabel || (record.gender === 1 ? '男' : record.gender === 2 ? '女' : '-') }}
           </template>
@@ -331,9 +334,8 @@
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-row :gutter="16">
           <a-col :span="12">
-            <a-form-item label="老人姓名" :name="isAdmissionAssessment ? 'elderName' : 'elderId'">
+            <a-form-item label="老人" name="elderId">
               <a-select
-                v-if="!isAdmissionAssessment"
                 v-model:value="form.elderId"
                 :disabled="formReadonly"
                 allow-clear
@@ -341,16 +343,10 @@
                 :filter-option="false"
                 :options="elderOptions"
                 :loading="elderLoading"
-                placeholder="请选择老人"
+                placeholder="请输入老人姓名/拼音首字母"
                 @search="searchElderOptions"
                 @focus="() => !elderOptions.length && loadElderOptions()"
                 @change="onElderChange"
-              />
-              <a-input
-                v-else
-                v-model:value="form.elderName"
-                :disabled="formReadonly"
-                placeholder="请输入合同中的老人姓名"
               />
             </a-form-item>
           </a-col>
@@ -1388,6 +1384,7 @@ const pendingAdmissionContracts = ref<CrmContractItem[]>([])
 const selectedPendingContractNo = ref('')
 
 const rules: FormRules = {
+  elderId: [{ required: true, message: '请选择老人' }],
   assessmentDate: [{ required: true, message: '请选择评估日期' }],
   status: [{ required: true, message: '请选择状态' }]
 }
@@ -1437,10 +1434,10 @@ const admissionLifecycleStage = computed(() => {
 const admissionLifecycleSubject = computed(() => {
   if (!isAdmissionAssessment.value) return ''
   if (selectedPendingContract.value) {
-    return `合同 ${selectedPendingContract.value.contractNo || '-'} / 长者 ${selectedPendingContract.value.elderName || '-'}`
+    return `合同 ${selectedPendingContract.value.contractNo || '-'} / 长者 ${resolveAssessmentElderName(selectedPendingContract.value as any)}`
   }
   if (selectedAdmissionRecord.value) {
-    return `评估记录 ${selectedAdmissionRecord.value.archiveNo || selectedAdmissionRecord.value.id || '-'} / 长者 ${selectedAdmissionRecord.value.elderName || '-'}`
+    return `评估记录 ${selectedAdmissionRecord.value.archiveNo || selectedAdmissionRecord.value.id || '-'} / 长者 ${resolveAssessmentElderName(selectedAdmissionRecord.value as any)}`
   }
   return '未勾选待评估合同，建议先在待评估合同列表中选择一条。'
 })
@@ -1501,7 +1498,7 @@ const selectedSummaryText = computed(() => {
   }
   const selectedLabels = selectedRowsInCurrentPage.value
     .slice(0, 8)
-    .map((item) => `${item.elderName || '-'}（${item.archiveNo || item.id || '-'}）`)
+    .map((item) => `${resolveAssessmentElderName(item as any)}（${item.archiveNo || item.id || '-'}）`)
   const hiddenCount = selectedRowsInCurrentPage.value.length - selectedLabels.length
   const outOfPageCount = selectedCount - selectedRowsInCurrentPage.value.length
   let text = `当前页已勾选：${selectedLabels.join('、') || '当前页暂无已勾选项'}`
@@ -1587,11 +1584,25 @@ function pendingFlowStageText(stage?: string) {
 
 function displayCell(record: Record<string, any>, key?: string) {
   if (!key) return '-'
+  if (key === 'elderName') {
+    return resolveAssessmentElderName(record)
+  }
   const value = record[key]
   if (value === null || value === undefined || value === '') {
     return '-'
   }
   return value
+}
+
+function resolveAssessmentElderName(record: Record<string, any>) {
+  const rawName = String(record?.elderName || '').trim()
+  if (rawName && !/^\d+$/.test(rawName)) return rawName
+  const elderId = String(record?.elderId || '').trim()
+  if (elderId) {
+    const fromCache = String(findElderName(elderId as any) || '').trim()
+    if (fromCache) return fromCache
+  }
+  return '未命名长者'
 }
 
 function orgDisplayName(record: AssessmentRecord & Record<string, any>) {
@@ -1911,7 +1922,7 @@ function openForm(record?: AssessmentRecord, readonly = false) {
       if (routeElderName) {
         form.elderName = routeElderName
       }
-      ensureSelectedElder(routeElderId.value, routeElderName || `长者${routeElderId.value}`)
+      ensureSelectedElder(routeElderId.value, routeElderName || '未命名长者')
     }
     if (isAdmissionAssessment.value && selectedPendingContract.value) {
       const contract = selectedPendingContract.value
@@ -2020,10 +2031,6 @@ async function submit() {
   }
   if (!isAdmissionAssessment.value && !form.elderId) {
     message.warning('请选择老人')
-    return
-  }
-  if (isAdmissionAssessment.value && !String(form.elderName || '').trim() && !form.elderId) {
-    message.warning('请填写合同中的老人姓名')
     return
   }
   await formRef.value?.validate()
@@ -2221,7 +2228,7 @@ async function autoOpenAdmissionFromRoute() {
     form.elderId = residentId
     const elderName = findElderName(residentId) || elderNameFromRoute || ''
     form.elderName = elderName
-    ensureSelectedElder(residentId, elderName || `长者${residentId}`)
+    ensureSelectedElder(residentId, elderName || '未命名长者')
   } else if (elderNameFromRoute) {
     form.elderName = elderNameFromRoute
   }
@@ -2482,7 +2489,7 @@ function exportSelectedCsv() {
   const csvEscape = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`
   const lines = selectedRows.map((item) => ([
     item.archiveNo || item.id || '-',
-    item.elderName || '-',
+    resolveAssessmentElderName(item as any),
     assessmentTypeLabel(item.assessmentTypeLabel || item.assessmentType),
     item.assessmentDate || '-',
     item.statusLabel || statusLabel(item.status),
@@ -2519,7 +2526,7 @@ function exportSelectedPdf() {
     <tr>
       <td>${index + 1}</td>
       <td>${safeHtml(item.archiveNo || item.id || '-')}</td>
-      <td>${safeHtml(item.elderName || '-')}</td>
+      <td>${safeHtml(resolveAssessmentElderName(item as any))}</td>
       <td>${safeHtml(assessmentTypeLabel(item.assessmentTypeLabel || item.assessmentType))}</td>
       <td>${safeHtml(item.assessmentDate || '-')}</td>
       <td>${safeHtml(item.statusLabel || statusLabel(item.status))}</td>
@@ -2723,7 +2730,7 @@ function exportCurrentPageCsv() {
   const csvEscape = (value: unknown) => `"${String(value ?? '').replace(/"/g, '""')}"`
   const lines = rows.value.map((item) => ([
     item.archiveNo || item.id || '-',
-    item.elderName || '-',
+    resolveAssessmentElderName(item as any),
     assessmentTypeLabel(item.assessmentTypeLabel || item.assessmentType),
     item.assessmentDate || '-',
     item.statusLabel || statusLabel(item.status),
@@ -2759,7 +2766,7 @@ function exportCurrentPagePdf() {
     <tr>
       <td>${index + 1}</td>
       <td>${safeHtml(item.archiveNo || item.id || '-')}</td>
-      <td>${safeHtml(item.elderName || '-')}</td>
+      <td>${safeHtml(resolveAssessmentElderName(item as any))}</td>
       <td>${safeHtml(assessmentTypeLabel(item.assessmentTypeLabel || item.assessmentType))}</td>
       <td>${safeHtml(item.assessmentDate || '-')}</td>
       <td>${safeHtml(item.statusLabel || statusLabel(item.status))}</td>

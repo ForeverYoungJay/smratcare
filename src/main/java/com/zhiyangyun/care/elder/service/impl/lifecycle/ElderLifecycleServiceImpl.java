@@ -370,9 +370,9 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
 
   @Override
   public IPage<AdmissionRecordResponse> admissionPage(Long tenantId, long pageNo, long pageSize,
-      String keyword, String contractNo, Integer elderStatus, LocalDate admissionDateStart, LocalDate admissionDateEnd) {
+      Long elderId, String keyword, String contractNo, Integer elderStatus, LocalDate admissionDateStart, LocalDate admissionDateEnd) {
     LocalDate[] dateRange = normalizeAdmissionDateRange(admissionDateStart, admissionDateEnd);
-    List<Long> matchedElderIds = resolveMatchedElderIds(tenantId, keyword, elderStatus);
+    List<Long> matchedElderIds = resolveMatchedElderIds(tenantId, elderId, keyword, elderStatus);
     if (matchedElderIds != null && matchedElderIds.isEmpty()) {
       return new Page<>(pageNo, pageSize, 0);
     }
@@ -415,13 +415,14 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
   @Override
   public AdmissionRecordSummaryResponse admissionSummary(
       Long tenantId,
+      Long elderId,
       String keyword,
       String contractNo,
       Integer elderStatus,
       LocalDate admissionDateStart,
       LocalDate admissionDateEnd) {
     LocalDate[] dateRange = normalizeAdmissionDateRange(admissionDateStart, admissionDateEnd);
-    List<Long> matchedElderIds = resolveMatchedElderIds(tenantId, keyword, elderStatus);
+    List<Long> matchedElderIds = resolveMatchedElderIds(tenantId, elderId, keyword, elderStatus);
     AdmissionRecordSummaryResponse response = new AdmissionRecordSummaryResponse();
     response.setGeneratedAt(LocalDateTime.now());
     if (matchedElderIds != null && matchedElderIds.isEmpty()) {
@@ -505,15 +506,17 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
     return new LocalDate[] {actualStartDate, actualEndDate};
   }
 
-  private List<Long> resolveMatchedElderIds(Long tenantId, String keyword, Integer elderStatus) {
+  private List<Long> resolveMatchedElderIds(Long tenantId, Long elderId, String keyword, Integer elderStatus) {
     boolean hasKeyword = keyword != null && !keyword.isBlank();
+    boolean hasElderId = elderId != null && elderId > 0;
     boolean hasStatus = elderStatus != null;
-    if (!hasKeyword && !hasStatus) {
+    if (!hasKeyword && !hasStatus && !hasElderId) {
       return null;
     }
     return elderMapper.selectList(Wrappers.lambdaQuery(ElderProfile.class)
             .eq(ElderProfile::getIsDeleted, 0)
             .eq(tenantId != null, ElderProfile::getTenantId, tenantId)
+            .eq(hasElderId, ElderProfile::getId, elderId)
             .like(hasKeyword, ElderProfile::getFullName, keyword)
             .eq(hasStatus, ElderProfile::getStatus, elderStatus))
         .stream()

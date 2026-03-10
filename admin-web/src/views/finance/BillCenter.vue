@@ -240,6 +240,7 @@ const summary = ref<FinanceModuleEntrySummary>({
 const query = reactive({
   month: undefined as any,
   keyword: '',
+  elderId: undefined as number | undefined,
   payMethod: undefined as string | undefined,
   scene: undefined as ('ADMISSION' | 'RESIDENT' | undefined),
   pageNo: 1,
@@ -326,8 +327,10 @@ function routeOptions() {
 
 function applyBillRouteState() {
   const state = parseBillCenterRouteState(route.query, routeOptions())
+  const routeElderId = Number(route.query.elderId || route.query.residentId || 0)
   query.month = state.month ? dayjs(state.month, 'YYYY-MM') : undefined
   query.keyword = state.keyword || ''
+  query.elderId = Number.isFinite(routeElderId) && routeElderId > 0 ? routeElderId : undefined
   query.payMethod = state.payMethod
   query.scene = state.scene
   query.pageNo = state.pageNo
@@ -386,6 +389,7 @@ async function fetchData() {
       pageNo: query.pageNo,
       pageSize: query.pageSize,
       month: query.month ? dayjs(query.month).format('YYYY-MM') : undefined,
+      elderId: query.elderId,
       keyword: query.keyword,
       scene: query.scene,
       payMethod: query.payMethod ? String(query.payMethod).toUpperCase() : undefined

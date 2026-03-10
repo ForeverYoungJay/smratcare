@@ -275,6 +275,16 @@ function appendResidentId(path: string) {
       ? `${nextPath}&residentId=${encodeURIComponent(currentResidentId)}`
       : `${nextPath}?residentId=${encodeURIComponent(currentResidentId)}`
   }
+  if (currentResidentId && !/([?&])elderId=/.test(nextPath)) {
+    nextPath = nextPath.includes('?')
+      ? `${nextPath}&elderId=${encodeURIComponent(currentResidentId)}`
+      : `${nextPath}?elderId=${encodeURIComponent(currentResidentId)}`
+  }
+  if (currentResidentId && !/([?&])assessElderId=/.test(nextPath)) {
+    nextPath = nextPath.includes('?')
+      ? `${nextPath}&assessElderId=${encodeURIComponent(currentResidentId)}`
+      : `${nextPath}?assessElderId=${encodeURIComponent(currentResidentId)}`
+  }
   if (currentResidentName && !/([?&])elderName=/.test(nextPath)) {
     nextPath = nextPath.includes('?')
       ? `${nextPath}&elderName=${encodeURIComponent(currentResidentName)}`

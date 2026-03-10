@@ -148,7 +148,7 @@ const columns = [
 ]
 
 function resolveElderName(elderId?: number) {
-  return findElderName(elderId) || `#${elderId || '-'}`
+  return findElderName(elderId) || '未命名长者'
 }
 
 async function fetchData() {
