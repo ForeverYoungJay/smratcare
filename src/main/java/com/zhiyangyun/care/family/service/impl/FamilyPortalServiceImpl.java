@@ -1844,7 +1844,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
         item.setUnitPrice(safeDecimal(line.getUnitPrice()));
         item.setAmount(safeDecimal(line.getAmount()));
         return item;
-      }).toList());
+      }).toList();
       response.setItems(items);
       if (!items.isEmpty()) {
         FamilyPortalModels.MallOrderLineItem first = items.get(0);
