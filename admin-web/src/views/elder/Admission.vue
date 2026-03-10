@@ -637,10 +637,18 @@ async function buildSubmitChecklist() {
   const attachments = contract?.id
     ? await getContractAttachments(contract.id).catch(() => [])
     : []
-  const hasIdDoc = attachments.some((item) => {
+  const hasIdentityOrHouseholdDoc = attachments.some((item) => {
     const type = String(item.attachmentType || '').toUpperCase()
     const name = String(item.fileName || '').toUpperCase()
-    return type.includes('ID') || type.includes('IDENT') || name.includes('身份证')
+    return (
+      type.includes('ID')
+      || type.includes('IDENT')
+      || type.includes('HOUSEHOLD')
+      || type.includes('HUKOU')
+      || name.includes('身份证')
+      || name.includes('户口')
+      || name.includes('户籍')
+    )
   })
   return [
     {
@@ -670,9 +678,11 @@ async function buildSubmitChecklist() {
     {
       key: 'attachment' as const,
       label: '身份证/资料附件',
-      ready: attachments.length > 0 && hasIdDoc,
+      ready: attachments.length > 0 && hasIdentityOrHouseholdDoc,
       note: attachments.length
-        ? (hasIdDoc ? `已上传 ${attachments.length} 份附件（含身份证）` : `已上传 ${attachments.length} 份附件（缺身份证类）`)
+        ? (hasIdentityOrHouseholdDoc
+          ? `已上传 ${attachments.length} 份附件（含身份证或户口本）`
+          : `已上传 ${attachments.length} 份附件（缺身份证/户口本）`)
         : '未上传附件'
     }
   ]
