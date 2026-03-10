@@ -242,7 +242,7 @@
             <a-descriptions-item label="身份证">{{ elderSnapshot.base.idCardNo || '-' }}</a-descriptions-item>
             <a-descriptions-item label="床位">{{ elderSnapshot.base.bedNo || '-' }}</a-descriptions-item>
             <a-descriptions-item label="护理等级">{{ elderSnapshot.base.careLevel || '-' }}</a-descriptions-item>
-            <a-descriptions-item label="状态">{{ elderStatusText(elderSnapshot.base.status, form.flowStage, form.contractStatus) }}</a-descriptions-item>
+            <a-descriptions-item label="状态">{{ elderStatusText(elderSnapshot.base.status) }}</a-descriptions-item>
             <a-descriptions-item label="生日">{{ elderSnapshot.base.birthDate || '-' }}</a-descriptions-item>
             <a-descriptions-item label="风险预担">{{ riskPrecommitText(elderSnapshot.base.riskPrecommit) }}</a-descriptions-item>
             <a-descriptions-item label="入院日期">{{ elderSnapshot.base.admissionDate || '-' }}</a-descriptions-item>
@@ -405,7 +405,6 @@ import { bindFamily, createElder, getElderDetail, getElderDiseases, getElderPage
 import { getAdmissionRecords } from '../../api/elderLifecycle'
 import { getFamilyRelations, upsertFamilyUser } from '../../api/family'
 import { getDiseaseList } from '../../api/store'
-import { elderResidenceStatusText } from '../../utils/elderResidenceStatus'
 import type { ContractAttachmentItem, CrmContractItem, ElderDiseaseItem, ElderItem, FamilyRelationItem, MarketingPlanItem, PageResult } from '../../types'
 
 const router = useRouter()
@@ -1635,12 +1634,11 @@ function syncIdCardDerivedFields(idCardNo?: string, overrideAge = true) {
   }
 }
 
-function elderStatusText(status?: number, flowStage?: string, contractStatus?: string) {
-  return elderResidenceStatusText({
-    status,
-    flowStage,
-    contractStatus
-  })
+function elderStatusText(status?: number) {
+  if (status === 1) return '在院'
+  if (status === 2) return '请假'
+  if (status === 3) return '离院'
+  return '-'
 }
 
 function riskPrecommitText(value?: string) {

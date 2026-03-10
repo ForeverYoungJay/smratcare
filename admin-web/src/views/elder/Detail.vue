@@ -49,8 +49,7 @@
             </a-form-item>
             <a-form-item label="状态" name="status">
               <a-select v-model:value="baseForm.status" placeholder="请选择">
-                <a-select-option :value="1" disabled>在院（合同签署后自动）</a-select-option>
-                <a-select-option :value="0">不在院</a-select-option>
+                <a-select-option :value="1">在院</a-select-option>
                 <a-select-option :value="2">请假</a-select-option>
                 <a-select-option :value="3">离院</a-select-option>
               </a-select>
@@ -153,7 +152,6 @@ import { getContractLinkageByElder } from '../../api/marketing'
 import { getDiseaseList } from '../../api/store'
 import { getFamilyRelations, getFamilyUserPage, removeFamilyRelation } from '../../api/family'
 import { lifecycleStageHint, normalizeLifecycleStage } from '../../utils/lifecycleStage'
-import { elderResidenceStatusText } from '../../utils/elderResidenceStatus'
 import type { DiseaseItem, ElderItem, FamilyRelationItem, FamilyBindRequest, FamilyUserItem, PageResult, Id } from '../../types/api'
 import type { ContractLinkageSummary } from '../../types'
 
@@ -247,11 +245,10 @@ const detailLifecycleGeneratedAt = computed(() =>
 )
 
 function statusText(status?: number) {
-  return elderResidenceStatusText({
-    status,
-    lifecycleStage: detailLifecycleStage.value,
-    lifecycleContractStatus: contractLinkage.value?.contractStatus
-  })
+  if (status === 1) return '在院'
+  if (status === 2) return '请假'
+  if (status === 3) return '离院'
+  return '-'
 }
 
 function riskPrecommitText(value?: string) {

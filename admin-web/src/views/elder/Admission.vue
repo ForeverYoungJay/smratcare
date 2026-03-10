@@ -98,7 +98,6 @@
         <a-form-item label="入住状态">
           <a-select v-model:value="recordQuery.elderStatus" allow-clear style="width: 140px" placeholder="请选择入住状态">
             <a-select-option :value="1">在院</a-select-option>
-            <a-select-option :value="0">不在院</a-select-option>
             <a-select-option :value="2">请假</a-select-option>
             <a-select-option :value="3">离院</a-select-option>
           </a-select>
@@ -176,7 +175,7 @@
             {{ displayElderName(record) }}
           </template>
           <template v-else-if="column.key === 'elderStatus'">
-            <a-tag :color="statusColor(record.elderStatus)">
+            <a-tag :color="record.elderStatus === 1 ? 'green' : record.elderStatus === 2 ? 'orange' : 'default'">
               {{ statusText(record.elderStatus) }}
             </a-tag>
           </template>
@@ -390,7 +389,7 @@ const recordSummaryCards = computed(() => {
       key: 'inHospital',
       label: '在院',
       value: Number(recordSummary.inHospitalCount || 0),
-      hint: '合同已签署/生效'
+      hint: '当前状态 = 在院'
     },
     {
       key: 'leave',
@@ -475,8 +474,7 @@ function applyRecordQueryFromRoute() {
   resetRecordQueryState()
   const keyword = firstQueryText(route.query.recordKeyword)
   const contractNo = firstQueryText(route.query.recordContractNo)
-  const elderStatusTextRaw = firstQueryText(route.query.recordElderStatus)
-  const elderStatus = Number(elderStatusTextRaw)
+  const elderStatus = Number(firstQueryText(route.query.recordElderStatus))
   const admissionDateStart = firstQueryText(route.query.recordAdmissionDateStart)
   const admissionDateEnd = firstQueryText(route.query.recordAdmissionDateEnd)
   const dimension = firstQueryText(route.query.recordDimension).toUpperCase()
@@ -485,7 +483,7 @@ function applyRecordQueryFromRoute() {
 
   if (keyword) recordQuery.keyword = keyword
   if (contractNo) recordQuery.contractNo = contractNo
-  if (elderStatusTextRaw !== '' && Number.isFinite(elderStatus) && elderStatus >= 0) recordQuery.elderStatus = elderStatus
+  if (Number.isFinite(elderStatus) && elderStatus > 0) recordQuery.elderStatus = elderStatus
   if (admissionDateStart && admissionDateEnd) {
     recordQuery.admissionDateRange = [admissionDateStart, admissionDateEnd]
   }
@@ -506,7 +504,7 @@ function buildRecordRouteQuery() {
   })
   if (recordQuery.keyword) query.recordKeyword = recordQuery.keyword
   if (recordQuery.contractNo) query.recordContractNo = recordQuery.contractNo
-  if (recordQuery.elderStatus != null) query.recordElderStatus = String(recordQuery.elderStatus)
+  if (recordQuery.elderStatus) query.recordElderStatus = String(recordQuery.elderStatus)
   if (recordQuery.admissionDateRange?.[0]) query.recordAdmissionDateStart = recordQuery.admissionDateRange[0]
   if (recordQuery.admissionDateRange?.[1]) query.recordAdmissionDateEnd = recordQuery.admissionDateRange[1]
   query.recordDimension = recordDimension.value
@@ -559,17 +557,9 @@ const admissionLifecycleHint = computed(() => {
 
 function statusText(status?: number) {
   if (status === 1) return '在院'
-  if (status === 0) return '不在院'
   if (status === 2) return '请假'
   if (status === 3) return '离院'
   return '-'
-}
-
-function statusColor(status?: number) {
-  if (status === 1) return 'green'
-  if (status === 2) return 'orange'
-  if (status === 3) return 'red'
-  return 'default'
 }
 
 function displayElderName(record: AdmissionRecordItem) {

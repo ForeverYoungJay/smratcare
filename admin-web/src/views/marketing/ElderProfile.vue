@@ -9,7 +9,6 @@
         <a-form-item label="状态">
           <a-select v-model:value="query.status" allow-clear style="width: 130px">
             <a-select-option :value="1">在院</a-select-option>
-            <a-select-option :value="0">不在院</a-select-option>
             <a-select-option :value="2">请假</a-select-option>
             <a-select-option :value="3">离院</a-select-option>
           </a-select>
@@ -40,7 +39,7 @@
         >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'status'">
-              <a-tag :color="statusColor(record)">{{ statusLabel(record) }}</a-tag>
+              <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
             </template>
           </template>
         </a-table>
@@ -67,7 +66,6 @@ import StatefulBlock from '../../components/StatefulBlock.vue'
 import MarketingQuickNav from './components/MarketingQuickNav.vue'
 import MarketingListToolbar from './components/MarketingListToolbar.vue'
 import { getElderPage } from '../../api/elder'
-import { elderResidenceStatusColor, elderResidenceStatusText } from '../../utils/elderResidenceStatus'
 import type { ElderItem, PageResult } from '../../types'
 
 const router = useRouter()
@@ -101,20 +99,18 @@ const rowSelection = computed(() => ({
 const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(String(item.id))))
 const selectedSingleRecord = computed(() => (selectedRecords.value.length === 1 ? selectedRecords.value[0] : null))
 
-function statusLabel(item: ElderItem) {
-  return elderResidenceStatusText({
-    status: item.status,
-    lifecycleStage: item.lifecycleStage,
-    lifecycleContractStatus: item.lifecycleContractStatus
-  })
+function statusLabel(status?: number) {
+  if (status === 1) return '在院'
+  if (status === 2) return '请假'
+  if (status === 3) return '离院'
+  return '-'
 }
 
-function statusColor(item: ElderItem) {
-  return elderResidenceStatusColor({
-    status: item.status,
-    lifecycleStage: item.lifecycleStage,
-    lifecycleContractStatus: item.lifecycleContractStatus
-  })
+function statusColor(status?: number) {
+  if (status === 1) return 'green'
+  if (status === 2) return 'orange'
+  if (status === 3) return 'red'
+  return 'default'
 }
 
 async function fetchData() {

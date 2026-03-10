@@ -98,9 +98,9 @@ public class ElderServiceImpl implements ElderService {
       }
       assign.setStartDate(startDate);
       ElderResponse assigned = assignBed(elder.getId(), assign);
-      return assigned == null ? enrichResponseWithContract(toResponse(elder, null), elder.getTenantId()) : assigned;
+      return assigned == null ? toResponse(elder, null) : assigned;
     }
-    return enrichResponseWithContract(toResponse(elder, null), elder.getTenantId());
+    return toResponse(elder, null);
   }
 
   @Override
@@ -169,10 +169,10 @@ public class ElderServiceImpl implements ElderService {
       }
       assign.setStartDate(startDate);
       ElderResponse assigned = assignBed(elder.getId(), assign);
-      return assigned == null ? enrichResponseWithContract(toResponse(elder, null), elder.getTenantId()) : assigned;
+      return assigned == null ? toResponse(elder, null) : assigned;
     }
     Bed bed = elder.getBedId() == null ? null : bedMapper.selectById(elder.getBedId());
-    return enrichResponseWithContract(toResponse(elder, bed), elder.getTenantId());
+    return toResponse(elder, bed);
   }
 
   @Override
@@ -185,24 +185,28 @@ public class ElderServiceImpl implements ElderService {
       return null;
     }
     Bed bed = elder.getBedId() == null ? null : bedMapper.selectById(elder.getBedId());
-    return enrichResponseWithContract(toResponse(elder, bed), tenantId);
+    return toResponse(elder, bed);
   }
 
   @Override
   public IPage<ElderResponse> page(Long tenantId, long pageNo, long pageSize, String keyword, Boolean signedOnly, Integer status) {
-    Set<Long> signedElderIds = null;
-    boolean filterSignedByContract = Boolean.TRUE.equals(signedOnly) || Objects.equals(status, 1);
-    if (filterSignedByContract) {
-      signedElderIds = resolveSignedContractElderIds(tenantId);
-      if (signedElderIds.isEmpty()) {
-        return new Page<>(pageNo, pageSize);
-      }
-    }
     var baseWrapper = Wrappers.lambdaQuery(ElderProfile.class)
         .eq(ElderProfile::getIsDeleted, 0)
         .eq(tenantId != null, ElderProfile::getTenantId, tenantId)
-        .eq(status != null && !Objects.equals(status, 1), ElderProfile::getStatus, status);
-    if (filterSignedByContract) {
+        .eq(status != null, ElderProfile::getStatus, status);
+    if (Boolean.TRUE.equals(signedOnly)) {
+      List<CrmContract> signedContracts = crmContractMapper.selectList(Wrappers.lambdaQuery(CrmContract.class)
+          .eq(CrmContract::getIsDeleted, 0)
+          .eq(tenantId != null, CrmContract::getTenantId, tenantId)
+          .isNotNull(CrmContract::getElderId)
+          .in(CrmContract::getStatus, List.of("SIGNED", "EFFECTIVE")));
+      Set<Long> signedElderIds = new HashSet<>(signedContracts.stream()
+          .map(CrmContract::getElderId)
+          .filter(Objects::nonNull)
+          .toList());
+      if (signedElderIds.isEmpty()) {
+        return new Page<>(pageNo, pageSize);
+      }
       baseWrapper.in(ElderProfile::getId, signedElderIds);
     }
     String normalizedKeyword = keyword == null ? "" : keyword.trim();
@@ -210,8 +214,20 @@ public class ElderServiceImpl implements ElderService {
       var wrapper = Wrappers.lambdaQuery(ElderProfile.class)
           .eq(ElderProfile::getIsDeleted, 0)
           .eq(tenantId != null, ElderProfile::getTenantId, tenantId)
-          .eq(status != null && !Objects.equals(status, 1), ElderProfile::getStatus, status);
-      if (filterSignedByContract) {
+          .eq(status != null, ElderProfile::getStatus, status);
+      if (Boolean.TRUE.equals(signedOnly)) {
+        List<CrmContract> signedContracts = crmContractMapper.selectList(Wrappers.lambdaQuery(CrmContract.class)
+            .eq(CrmContract::getIsDeleted, 0)
+            .eq(tenantId != null, CrmContract::getTenantId, tenantId)
+            .isNotNull(CrmContract::getElderId)
+            .in(CrmContract::getStatus, List.of("SIGNED", "EFFECTIVE")));
+        Set<Long> signedElderIds = new HashSet<>(signedContracts.stream()
+            .map(CrmContract::getElderId)
+            .filter(Objects::nonNull)
+            .toList());
+        if (signedElderIds.isEmpty()) {
+          return new Page<>(pageNo, pageSize);
+        }
         wrapper.in(ElderProfile::getId, signedElderIds);
       }
       wrapper.and(w -> w.like(ElderProfile::getFullName, normalizedKeyword)
@@ -257,14 +273,6 @@ public class ElderServiceImpl implements ElderService {
     return responsePage;
   }
 
-  private ElderResponse enrichResponseWithContract(ElderResponse response, Long tenantId) {
-    if (response == null) {
-      return null;
-    }
-    applyLifecycleFromContract(response, resolveLatestContract(response.getId(), tenantId));
-    return response;
-  }
-
   private Map<Long, Bed> resolveBedMap(List<ElderProfile> elders) {
     Set<Long> bedIds = elders.stream()
         .map(ElderProfile::getBedId)
@@ -304,38 +312,11 @@ public class ElderServiceImpl implements ElderService {
     return map;
   }
 
-  private CrmContract resolveLatestContract(Long elderId, Long tenantId) {
-    if (elderId == null) {
-      return null;
-    }
-    return crmContractMapper.selectOne(Wrappers.lambdaQuery(CrmContract.class)
-        .eq(CrmContract::getIsDeleted, 0)
-        .eq(tenantId != null, CrmContract::getTenantId, tenantId)
-        .eq(CrmContract::getElderId, elderId)
-        .orderByDesc(CrmContract::getUpdateTime)
-        .orderByDesc(CrmContract::getCreateTime)
-        .orderByDesc(CrmContract::getId)
-        .last("LIMIT 1"));
-  }
-
-  private Set<Long> resolveSignedContractElderIds(Long tenantId) {
-    List<CrmContract> signedContracts = crmContractMapper.selectList(Wrappers.lambdaQuery(CrmContract.class)
-        .eq(CrmContract::getIsDeleted, 0)
-        .eq(tenantId != null, CrmContract::getTenantId, tenantId)
-        .isNotNull(CrmContract::getElderId)
-        .in(CrmContract::getStatus, List.of("SIGNED", "EFFECTIVE")));
-    return new HashSet<>(signedContracts.stream()
-        .map(CrmContract::getElderId)
-        .filter(Objects::nonNull)
-        .toList());
-  }
-
   private void applyLifecycleFromContract(ElderResponse response, CrmContract contract) {
     if (response == null) {
       return;
     }
     if (contract == null) {
-      applyDerivedResidenceStatus(response);
       return;
     }
     String flowStage = normalizeLifecycleStage(contract.getFlowStage());
@@ -349,37 +330,6 @@ public class ElderServiceImpl implements ElderService {
     if (contractStatus != null) {
       response.setLifecycleContractStatus(contractStatus);
     }
-    applyDerivedResidenceStatus(response);
-  }
-
-  private void applyDerivedResidenceStatus(ElderResponse response) {
-    if (response == null) {
-      return;
-    }
-    boolean signed = isSignedContractStage(response.getLifecycleStage(), response.getLifecycleContractStatus());
-    Integer rawStatus = response.getStatus();
-    if (!signed) {
-      if (rawStatus == null || rawStatus == 1) {
-        response.setStatus(0);
-      }
-      return;
-    }
-    if (rawStatus == null || rawStatus <= 0) {
-      response.setStatus(1);
-    }
-  }
-
-  private boolean isSignedContractStage(String lifecycleStage, String lifecycleContractStatus) {
-    String normalizedStage = normalizeLifecycleStage(lifecycleStage);
-    if ("SIGNED".equals(normalizedStage)) {
-      return true;
-    }
-    String status = lifecycleContractStatus == null ? "" : lifecycleContractStatus.trim().toUpperCase();
-    return status.contains("SIGNED")
-        || status.contains("EFFECTIVE")
-        || status.contains("APPROVED")
-        || status.contains("签署")
-        || status.contains("生效");
   }
 
   private boolean isAlphabeticKeyword(String keyword) {
@@ -531,16 +481,13 @@ public class ElderServiceImpl implements ElderService {
 
     elder.setBedId(bed.getId());
     if (elder.getStatus() == null || elder.getStatus() == 3) {
-      CrmContract latestContract = resolveLatestContract(elder.getId(), elder.getTenantId());
-      elder.setStatus(isSignedContractStage(null, firstNonBlank(
-          latestContract == null ? null : latestContract.getContractStatus(),
-          latestContract == null ? null : latestContract.getStatus())) ? 1 : 0);
+      elder.setStatus(1);
     }
     elderMapper.updateById(elder);
 
     insertChangeLog(elder.getTenantId(), elder.getOrgId(), elder.getId(), request.getCreatedBy(),
         "BED_CHANGE", null, String.valueOf(bed.getId()), "床位分配");
-    return enrichResponseWithContract(toResponse(elder, bed), elder.getTenantId());
+    return toResponse(elder, bed);
   }
 
   private void ensureNoDuplicateNameOccupied(ElderProfile elder) {
@@ -585,7 +532,7 @@ public class ElderServiceImpl implements ElderService {
     elderMapper.updateById(elder);
     insertChangeLog(elder.getTenantId(), elder.getOrgId(), elder.getId(), createdBy,
         "BED_CHANGE", previousBedId == null ? null : String.valueOf(previousBedId), null, reason);
-    return enrichResponseWithContract(toResponse(elder, null), elder.getTenantId());
+    return toResponse(elder, null);
   }
 
   private void insertChangeLog(Long tenantId, Long orgId, Long elderId, Long createdBy, String changeType,
@@ -648,7 +595,7 @@ public class ElderServiceImpl implements ElderService {
     if (status == null) {
       return "PENDING_ASSESSMENT";
     }
-    if (status == 2 || status == 3) {
+    if (status == 1 || status == 2 || status == 3) {
       return "SIGNED";
     }
     return "PENDING_ASSESSMENT";
