@@ -114,7 +114,7 @@ Page({
   },
   async onPreview(e) {
     const productId = e.currentTarget.dataset.id;
-    const loadingId = `preview_${productId}`;
+    const loadingId = String(productId);
     if (this.data.previewingId) {
       return;
     }
@@ -141,7 +141,7 @@ Page({
   },
   async onSubmit(e) {
     const productId = e.currentTarget.dataset.id;
-    const loadingId = `submit_${productId}`;
+    const loadingId = String(productId);
     if (this.data.submittingId) {
       return;
     }

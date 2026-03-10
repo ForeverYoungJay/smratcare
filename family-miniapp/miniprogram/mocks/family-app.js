@@ -454,6 +454,72 @@ const serviceOrders = [
   { id: 702, name: '理发服务', amount: 38, status: '待服务', date: '2026-03-10' }
 ];
 
+const mallProducts = [
+  {
+    id: 1101,
+    productCode: 'P-NUTRI-001',
+    productName: '高蛋白营养粉',
+    category: '营养品',
+    unit: '罐',
+    price: 128,
+    pointsPrice: 128,
+    currentStock: 18,
+    stockStatus: 'OK',
+    statusText: '可下单',
+    businessDomain: 'ELDER',
+    itemType: 'CONSUMABLE'
+  },
+  {
+    id: 1102,
+    productCode: 'P-CARE-012',
+    productName: '防压疮护理垫',
+    category: '护理用品',
+    unit: '件',
+    price: 86,
+    pointsPrice: 86,
+    currentStock: 6,
+    stockStatus: 'LOW',
+    statusText: '库存紧张',
+    businessDomain: 'ELDER',
+    itemType: 'CONSUMABLE'
+  },
+  {
+    id: 1103,
+    productCode: 'P-DAILY-088',
+    productName: '长者保暖披肩',
+    category: '生活用品',
+    unit: '件',
+    price: 59,
+    pointsPrice: 59,
+    currentStock: 0,
+    stockStatus: 'OUT',
+    statusText: '库存不足',
+    businessDomain: 'ELDER',
+    itemType: 'ASSET'
+  }
+];
+
+const mallOrders = [
+  {
+    orderId: 99001,
+    orderNo: 'SO202603090001',
+    elderId: 101,
+    elderName: '王秀兰',
+    productId: 1101,
+    productName: '高蛋白营养粉',
+    quantity: 1,
+    unitPrice: 128,
+    totalAmount: 128,
+    pointsUsed: 128,
+    orderStatus: 1,
+    orderStatusText: '待处理',
+    payStatus: 0,
+    payStatusText: '待支付',
+    createTime: '2026-03-09 10:12',
+    payTime: ''
+  }
+];
+
 const affectionMoments = [
   { id: 1, type: 'photo', title: '家庭合照上传', time: '2026-03-08 09:30', desc: '已由护工协助老人查看照片。' },
   { id: 2, type: 'voice', title: '语音留言', time: '2026-03-08 12:00', desc: '“妈妈我想你了，周末来看你。”' },
@@ -484,8 +550,8 @@ const appState = {
     verifyHealthData: true,
     verifyMedicalRecords: true,
     verifyReports: true,
-    verifyWithSmsCode: true,
-    verifyWithPassword: false,
+    verifyWithSmsCode: false,
+    verifyWithPassword: true,
     hasIndependentPassword: false,
     maskSensitiveData: true,
     visibleScope: '仅子女可查看完整健康数据'
@@ -529,6 +595,7 @@ const appState = {
       updateTime: '2026-03-07 09:30'
     }
   ],
+  idCardBindingMap: {},
   todoActionState: {}
 };
 
@@ -960,6 +1027,123 @@ function createServiceOrder(serviceId) {
   return clone(order);
 }
 
+function getMallProducts(options = {}) {
+  const keyword = String(options.keyword || '').trim();
+  if (!keyword) {
+    return clone(mallProducts);
+  }
+  return clone(mallProducts.filter((item) =>
+    String(item.productName || '').includes(keyword) || String(item.productCode || '').includes(keyword)));
+}
+
+function previewMallOrder(payload = {}) {
+  const product = mallProducts.find((item) => item.id === Number(payload.productId));
+  const qty = Math.max(1, Number(payload.qty || 1));
+  if (!product) {
+    return {
+      allowed: false,
+      status: 'PRODUCT_NOT_FOUND',
+      message: '商品不存在',
+      elderId: Number(payload.elderId || 101),
+      productId: Number(payload.productId || 0),
+      productName: '',
+      qty,
+      pointsRequired: 0,
+      reasons: ['商品不存在或已下架']
+    };
+  }
+  if (Number(product.currentStock || 0) < qty) {
+    return {
+      allowed: false,
+      status: 'INSUFFICIENT_STOCK',
+      message: '库存不足',
+      elderId: Number(payload.elderId || 101),
+      productId: product.id,
+      productName: product.productName,
+      qty,
+      pointsRequired: qty * Number(product.pointsPrice || 0),
+      reasons: ['库存不足，请调整购买数量']
+    };
+  }
+  return {
+    allowed: true,
+    status: 'ALLOWED',
+    message: '可下单',
+    elderId: Number(payload.elderId || 101),
+    productId: product.id,
+    productName: product.productName,
+    qty,
+    pointsRequired: qty * Number(product.pointsPrice || 0),
+    reasons: []
+  };
+}
+
+function submitMallOrder(payload = {}) {
+  const preview = previewMallOrder(payload);
+  if (!preview.allowed) {
+    return {
+      allowed: false,
+      status: preview.status,
+      message: preview.message,
+      preview
+    };
+  }
+  const product = mallProducts.find((item) => item.id === preview.productId);
+  if (product) {
+    product.currentStock = Math.max(0, Number(product.currentStock || 0) - preview.qty);
+    if (product.currentStock <= 0) {
+      product.stockStatus = 'OUT';
+      product.statusText = '库存不足';
+    } else if (product.currentStock <= 5) {
+      product.stockStatus = 'LOW';
+      product.statusText = '库存紧张';
+    } else {
+      product.stockStatus = 'OK';
+      product.statusText = '可下单';
+    }
+  }
+  const orderId = Date.now();
+  const unitPrice = Number(product && product.price ? product.price : 0);
+  const totalAmount = Number((unitPrice * preview.qty).toFixed(2));
+  const item = {
+    orderId,
+    orderNo: `SO${orderId}`,
+    elderId: preview.elderId,
+    elderName: (baseElders.find((elder) => elder.elderId === preview.elderId) || {}).elderName || '老人',
+    productId: preview.productId,
+    productName: preview.productName,
+    quantity: preview.qty,
+    unitPrice,
+    totalAmount,
+    pointsUsed: preview.pointsRequired,
+    orderStatus: 1,
+    orderStatusText: '待处理',
+    payStatus: 0,
+    payStatusText: '待支付',
+    createTime: formatDateTime(new Date()),
+    payTime: ''
+  };
+  mallOrders.unshift(item);
+  return {
+    allowed: true,
+    status: 'ALLOWED',
+    message: '下单成功',
+    orderId,
+    orderNo: item.orderNo,
+    pointsDeducted: preview.pointsRequired,
+    balanceAfter: Math.max(0, 1000 - preview.pointsRequired),
+    preview
+  };
+}
+
+function getMallOrders(options = {}) {
+  const elderId = Number(options.elderId || 0);
+  if (!elderId) {
+    return clone(mallOrders);
+  }
+  return clone(mallOrders.filter((item) => Number(item.elderId) === elderId));
+}
+
 function submitFeedback(payload = {}) {
   const type = String(payload.feedbackType || 'EVALUATION').toUpperCase() === 'COMPLAINT'
     ? 'COMPLAINT'
@@ -1039,8 +1223,7 @@ function getCapabilityStatus() {
   const wechatPayEnabled = false;
   const wechatNotifyEnabled = true;
   const wechatNotifyBound = !!appState.wechatNotifyOpenId;
-  const securityPasswordEnabled = !!appState.securitySettings.hasIndependentPassword
-    && !!appState.securitySettings.verifyWithPassword;
+  const securityPasswordEnabled = true;
   const legacyApiEnabled = false;
   const legacyApiSunsetDate = '2026-09-30';
   const legacyApiSunsetReached = false;
@@ -1080,9 +1263,9 @@ function getCapabilityStatus() {
       },
       {
         code: 'SECURITY_PASSWORD',
-        title: '独立密码校验',
+        title: '密码二次校验',
         status: securityPasswordEnabled ? 'READY' : 'OPTIONAL',
-        hint: securityPasswordEnabled ? '已启用独立密码验证。' : '可在隐私设置中开启独立密码验证。',
+        hint: securityPasswordEnabled ? '默认使用登录密码验证，已支持独立密码。' : '可在隐私设置中开启密码验证。',
         actionPath: '/pages/settings-security/index'
       },
       {
@@ -1097,13 +1280,17 @@ function getCapabilityStatus() {
 }
 
 function getSecuritySettings() {
+  appState.securitySettings.verifyWithSmsCode = false;
+  appState.securitySettings.verifyWithPassword = true;
   return clone(appState.securitySettings);
 }
 
 function updateSecuritySettings(nextState) {
   appState.securitySettings = {
     ...appState.securitySettings,
-    ...nextState
+    ...nextState,
+    verifyWithSmsCode: false,
+    verifyWithPassword: true
   };
   return getSecuritySettings();
 }
@@ -1330,7 +1517,15 @@ function getFamilyBindings() {
 }
 
 function bindFamilyElder(payload = {}) {
-  const elderId = Number(payload.elderId);
+  const idCardNo = String(payload.elderIdCardNo || '').trim().toUpperCase();
+  let elderId = Number(payload.elderId);
+  if (!elderId && idCardNo) {
+    if (!appState.idCardBindingMap[idCardNo]) {
+      const seed = idCardNo.slice(-6).replace(/\D/g, '');
+      appState.idCardBindingMap[idCardNo] = Number(seed || Date.now().toString().slice(-6));
+    }
+    elderId = Number(appState.idCardBindingMap[idCardNo]);
+  }
   if (!elderId) {
     return null;
   }
@@ -1340,14 +1535,17 @@ function bindFamilyElder(payload = {}) {
     appState.familyBindings = appState.familyBindings.map((item) => ({ ...item, isPrimary: false }));
   }
   const existing = appState.familyBindings.find((item) => item.elderId === elderId);
+  const baseElder = baseElders.find((item) => item.elderId === elderId);
+  const elderName = baseElder ? baseElder.elderName : `老人${elderId}`;
   if (existing) {
     existing.relation = relation;
     existing.isPrimary = isPrimary;
+    existing.elderName = elderName;
     return clone(existing);
   }
   const appended = {
     elderId,
-    elderName: `老人${elderId}`,
+    elderName,
     relation,
     isPrimary
   };
@@ -1488,6 +1686,10 @@ module.exports = {
   getServiceCatalog,
   getServiceOrders,
   createServiceOrder,
+  getMallProducts,
+  previewMallOrder,
+  submitMallOrder,
+  getMallOrders,
   submitFeedback,
   getFeedbackRecords,
   getAffectionMoments,

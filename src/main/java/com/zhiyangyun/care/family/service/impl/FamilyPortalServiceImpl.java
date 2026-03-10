@@ -3539,7 +3539,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
     }
     return switch (status) {
       case 1 -> "待处理";
-      case 2 -> "待出库";
+      case 2 -> "已支付";
       case 3 -> "已完成";
       case 4 -> "已取消";
       case 5 -> "已退款";

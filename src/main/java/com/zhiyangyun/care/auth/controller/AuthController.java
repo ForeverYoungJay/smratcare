@@ -112,8 +112,12 @@ public class AuthController {
   public Result<FamilyLoginResponse> registerFamily(@Valid @RequestBody FamilyAccountRegisterRequest request,
       HttpServletRequest httpServletRequest) {
     Long orgId = resolveFamilyOrgId(request.getOrgId());
+    String phone = defaultText(request.getPhone(), null);
+    if (!hasText(phone)) {
+      throw new IllegalArgumentException("手机号不能为空");
+    }
     FamilySmsCodeVerifyResponse verifyResult = familySmsCodeService.verifyCode(
-        orgId, request.getPhone(), "REGISTER", request.getVerifyCode(), true,
+        orgId, phone, "REGISTER", request.getVerifyCode(), true,
         resolveClientIp(httpServletRequest));
     if (!Boolean.TRUE.equals(verifyResult.getPassed())) {
       throw new IllegalArgumentException(defaultText(verifyResult.getMessage(), "验证码校验失败"));
@@ -122,15 +126,15 @@ public class AuthController {
     FamilyUser user = familyUserMapper.selectOne(
         Wrappers.lambdaQuery(FamilyUser.class)
             .eq(FamilyUser::getOrgId, orgId)
-            .eq(FamilyUser::getPhone, request.getPhone())
+            .eq(FamilyUser::getPhone, phone)
             .eq(FamilyUser::getIsDeleted, 0)
             .last("LIMIT 1"));
     if (user == null) {
       user = new FamilyUser();
       user.setOrgId(orgId);
-      user.setPhone(request.getPhone().trim());
-      user.setUsername(request.getPhone().trim());
-      user.setRealName(defaultText(request.getRealName(), request.getPhone().trim()));
+      user.setPhone(phone);
+      user.setUsername(phone);
+      user.setRealName(defaultText(request.getRealName(), phone));
       user.setPasswordHash(passwordEncoder.encode(request.getPassword().trim()));
       user.setStatus(1);
       familyUserMapper.insert(user);
@@ -138,8 +142,8 @@ public class AuthController {
       if (hasText(user.getPasswordHash())) {
         throw new IllegalArgumentException("该手机号已注册，请直接登录");
       }
-      user.setUsername(defaultText(user.getUsername(), request.getPhone().trim()));
-      user.setRealName(defaultText(request.getRealName(), defaultText(user.getRealName(), request.getPhone().trim())));
+      user.setUsername(defaultText(user.getUsername(), phone));
+      user.setRealName(defaultText(request.getRealName(), defaultText(user.getRealName(), phone)));
       user.setPasswordHash(passwordEncoder.encode(request.getPassword().trim()));
       user.setStatus(1);
       familyUserMapper.updateById(user);
@@ -151,8 +155,12 @@ public class AuthController {
   public Result<Boolean> resetFamilyPassword(@Valid @RequestBody FamilyPasswordResetRequest request,
       HttpServletRequest httpServletRequest) {
     Long orgId = resolveFamilyOrgId(request.getOrgId());
+    String phone = defaultText(request.getPhone(), null);
+    if (!hasText(phone)) {
+      throw new IllegalArgumentException("手机号不能为空");
+    }
     FamilySmsCodeVerifyResponse verifyResult = familySmsCodeService.verifyCode(
-        orgId, request.getPhone(), "RESET_PASSWORD", request.getVerifyCode(), true,
+        orgId, phone, "RESET_PASSWORD", request.getVerifyCode(), true,
         resolveClientIp(httpServletRequest));
     if (!Boolean.TRUE.equals(verifyResult.getPassed())) {
       throw new IllegalArgumentException(defaultText(verifyResult.getMessage(), "验证码校验失败"));
@@ -161,7 +169,7 @@ public class AuthController {
     FamilyUser user = familyUserMapper.selectOne(
         Wrappers.lambdaQuery(FamilyUser.class)
             .eq(FamilyUser::getOrgId, orgId)
-            .eq(FamilyUser::getPhone, request.getPhone())
+            .eq(FamilyUser::getPhone, phone)
             .eq(FamilyUser::getIsDeleted, 0)
             .last("LIMIT 1"));
     if (user == null) {
@@ -216,10 +224,14 @@ public class AuthController {
   public Result<FamilyLoginResponse> familyLogin(@Valid @RequestBody FamilyLoginRequest request,
       HttpServletRequest httpServletRequest) {
     Long orgId = resolveFamilyOrgId(request.getOrgId());
+    String phone = defaultText(request.getPhone(), null);
+    if (!hasText(phone)) {
+      throw new IllegalArgumentException("手机号不能为空");
+    }
     FamilyUser user = familyUserMapper.selectOne(
         Wrappers.lambdaQuery(FamilyUser.class)
             .eq(FamilyUser::getOrgId, orgId)
-            .eq(FamilyUser::getPhone, request.getPhone())
+            .eq(FamilyUser::getPhone, phone)
             .eq(FamilyUser::getIsDeleted, 0));
     if (user == null || !hasText(user.getPasswordHash())
         || !passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {

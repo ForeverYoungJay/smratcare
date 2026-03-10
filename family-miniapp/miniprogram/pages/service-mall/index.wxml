@@ -27,8 +27,8 @@
         </view>
 
         <view class="action-row">
-          <button class="ghost-btn action-btn" data-id="{{item.id}}" bindtap="onPreview" loading="{{previewingId === ('preview_' + item.id)}}">预检</button>
-          <button class="primary-btn action-btn" data-id="{{item.id}}" bindtap="onSubmit" loading="{{submittingId === ('submit_' + item.id)}}">立即下单</button>
+          <button class="ghost-btn action-btn" data-id="{{item.id}}" bindtap="onPreview" loading="{{previewingId == item.id}}">预检</button>
+          <button class="primary-btn action-btn" data-id="{{item.id}}" bindtap="onSubmit" loading="{{submittingId == item.id}}">立即下单</button>
         </view>
       </view>
     </block>

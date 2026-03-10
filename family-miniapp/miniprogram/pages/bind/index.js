@@ -32,9 +32,15 @@ Page({
 
     const idCardParam = text.match(/[?&](idCardNo|elderIdCardNo)=([^&#]+)/i);
     if (idCardParam && idCardParam[2]) {
+      let rawIdCard = idCardParam[2];
+      try {
+        rawIdCard = decodeURIComponent(rawIdCard);
+      } catch (error) {
+        rawIdCard = idCardParam[2];
+      }
       return {
         elderId: null,
-        elderIdCardNo: normalizeIdCard(decodeURIComponent(idCardParam[2]))
+        elderIdCardNo: normalizeIdCard(rawIdCard)
       };
     }
 
