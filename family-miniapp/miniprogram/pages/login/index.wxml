@@ -2,28 +2,29 @@
   <view class="brand surface">
     <view class="brand-title">智养云家属端</view>
     <view class="brand-subtitle">连接照护现场，第一时间掌握长者状态</view>
+    <view class="org-line">
+      <text>所属机构：{{orgName}}</text>
+      <text wx:if="{{loadingBootstrap}}" class="org-loading">加载中...</text>
+    </view>
     <view class="mode-row">
-      <view class="mode {{mode === 'login' ? 'active' : ''}}" data-mode="login" bindtap="switchMode">快捷登录</view>
+      <view class="mode {{mode === 'login' ? 'active' : ''}}" data-mode="login" bindtap="switchMode">密码登录</view>
       <view class="mode {{mode === 'register' ? 'active' : ''}}" data-mode="register" bindtap="switchMode">首次注册</view>
+      <view class="mode {{mode === 'reset' ? 'active' : ''}}" data-mode="reset" bindtap="switchMode">找回密码</view>
     </view>
   </view>
 
   <view class="form surface">
-    <view class="field">
-      <text class="label">机构 ID</text>
-      <input class="input" type="number" value="{{form.orgId}}" bindinput="onOrgInput" placeholder="请输入机构ID" />
-    </view>
-
     <view class="field" wx:if="{{mode === 'register'}}">
       <text class="label">家属姓名</text>
-      <input class="input" value="{{form.realName}}" bindinput="onNameInput" placeholder="请输入姓名" />
+      <input class="input" value="{{form.realName}}" bindinput="onNameInput" placeholder="请输入姓名（选填）" />
     </view>
 
     <view class="field">
-      <text class="label">手机号</text>
+      <text class="label">手机号（登录账号）</text>
       <input class="input" type="number" maxlength="11" value="{{form.phone}}" bindinput="onPhoneInput" placeholder="请输入手机号" />
     </view>
-    <view class="field code-row">
+
+    <view class="field code-row" wx:if="{{mode !== 'login'}}">
       <view class="code-main">
         <text class="label">验证码</text>
         <input class="input" maxlength="6" value="{{form.verifyCode}}" bindinput="onCodeInput" placeholder="请输入验证码" />
@@ -33,8 +34,15 @@
       </button>
     </view>
 
-    <button class="primary-btn login-btn" loading="{{loading}}" bindtap="onSubmit">{{mode === 'register' ? '注册并登录' : '登录并进入首页'}}</button>
-    <view class="tips">验证码有效期 5 分钟，连续输错将触发保护限制。</view>
+    <view class="field">
+      <text class="label">{{mode === 'reset' ? '新密码' : '密码'}}</text>
+      <input class="input" type="password" maxlength="32" value="{{form.password}}" bindinput="onPasswordInput" placeholder="请输入6-32位密码" />
+    </view>
+
+    <button class="primary-btn login-btn" loading="{{loading}}" bindtap="onSubmit">
+      {{mode === 'login' ? '登录并进入首页' : (mode === 'register' ? '注册并登录' : '重置密码并登录')}}
+    </button>
+    <view class="tips" wx:if="{{mode !== 'login'}}">验证码有效期 5 分钟，连续输错将触发保护限制。</view>
     <view class="tips" wx:if="{{debugCodeHint}}">{{debugCodeHint}}</view>
   </view>
 </view>

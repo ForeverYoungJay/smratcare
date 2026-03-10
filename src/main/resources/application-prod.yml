@@ -26,6 +26,8 @@ spring:
     baseline-on-migrate: true
     baseline-version: 11
     out-of-order: true
+    placeholders:
+      demo_seed_enabled: ${DEMO_SEED_ENABLED:false}
 
 mybatis-plus:
   configuration:

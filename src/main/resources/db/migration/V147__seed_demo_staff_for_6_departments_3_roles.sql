@@ -1,12 +1,24 @@
--- 为示例机构（ZYY-001）补齐 6 部门 × 3 角色人员初始化数据
+-- 为示例机构补齐 6 部门 × 3 角色人员初始化数据
 -- 角色体系：员工 / 部长 / 院长(管理层) + ADMIN + SYS_ADMIN
 
+SET @demo_seed_enabled := LOWER('${demo_seed_enabled}');
+SET @demo_seed_on := IF(@demo_seed_enabled IN ('1', 'true', 'yes', 'on'), 1, 0);
+
 SET @demo_org_id := (
-    SELECT o.id
-    FROM org o
-    WHERE o.org_code = 'ZYY-001' AND o.is_deleted = 0
-    ORDER BY o.id
-    LIMIT 1
+    IF(@demo_seed_on = 1,
+      (
+        SELECT o.id
+        FROM org o
+        WHERE o.is_deleted = 0
+          AND (
+            o.org_code = 'YY-GF-001'
+            OR o.org_name = '弋阳龟峰颐养中心'
+          )
+        ORDER BY o.id
+        LIMIT 1
+      ),
+      NULL
+    )
 );
 
 -- 部门兜底（兼容旧示例库）

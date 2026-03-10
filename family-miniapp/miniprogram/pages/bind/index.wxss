@@ -35,6 +35,12 @@
   min-height: 140rpx;
 }
 
+.hint {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: #6b7280;
+}
+
 .switch-field {
   display: flex;
   justify-content: space-between;

@@ -74,7 +74,7 @@
             <template #overlay>
               <a-menu>
                 <a-menu-item @click="openHeaderSettings">个人设置</a-menu-item>
-                <a-menu-item @click="router.push('/oa/staff')">账号与赋权</a-menu-item>
+                <a-menu-item @click="router.push('/hr/profile/account-access')">账号与赋权</a-menu-item>
                 <a-menu-item @click="logout">退出</a-menu-item>
               </a-menu>
             </template>
@@ -229,7 +229,7 @@
         <a-button @click="resetHeaderSettings">恢复默认</a-button>
       </a-space>
       <div class="settings-tip">
-        院长赋权注册账号：请前往“账号与赋权”页面进行员工账号开通、角色分配与权限管理。
+        人事新建账号与监管关系：请前往“账号与赋权”页面完成员工账号、初始密码与领导设置。
       </div>
     </a-form>
   </a-drawer>

@@ -5,7 +5,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
-public class FamilyLoginRequest {
+public class FamilyAccountRegisterRequest {
   private Long orgId;
 
   @NotBlank
@@ -13,6 +13,13 @@ public class FamilyLoginRequest {
   private String phone;
 
   @NotBlank
+  @Size(max = 10)
+  private String verifyCode;
+
+  @NotBlank
   @Size(min = 6, max = 32)
   private String password;
+
+  @Size(max = 60)
+  private String realName;
 }

@@ -60,6 +60,19 @@ import com.zhiyangyun.care.assessment.entity.AssessmentRecord;
 import com.zhiyangyun.care.assessment.mapper.AssessmentRecordMapper;
 import com.zhiyangyun.care.standard.entity.ServiceItem;
 import com.zhiyangyun.care.standard.mapper.ServiceItemMapper;
+import com.zhiyangyun.care.store.entity.InventoryBatch;
+import com.zhiyangyun.care.store.entity.OrderItem;
+import com.zhiyangyun.care.store.entity.Product;
+import com.zhiyangyun.care.store.entity.StoreOrder;
+import com.zhiyangyun.care.store.mapper.InventoryBatchMapper;
+import com.zhiyangyun.care.store.mapper.OrderItemMapper;
+import com.zhiyangyun.care.store.mapper.ProductMapper;
+import com.zhiyangyun.care.store.mapper.StoreOrderMapper;
+import com.zhiyangyun.care.store.model.ForbiddenReason;
+import com.zhiyangyun.care.store.model.OrderPreviewRequest;
+import com.zhiyangyun.care.store.model.OrderPreviewResponse;
+import com.zhiyangyun.care.store.model.OrderSubmitResponse;
+import com.zhiyangyun.care.store.service.StoreOrderService;
 import com.zhiyangyun.care.service.CareTaskService;
 import com.zhiyangyun.care.visit.model.VisitBookRequest;
 import com.zhiyangyun.care.visit.model.VisitBookingResponse;
@@ -109,6 +122,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
@@ -168,6 +182,11 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
   private final ElderAccountLogMapper elderAccountLogMapper;
   private final ServiceItemMapper serviceItemMapper;
   private final ServiceBookingMapper serviceBookingMapper;
+  private final ProductMapper productMapper;
+  private final InventoryBatchMapper inventoryBatchMapper;
+  private final StoreOrderMapper storeOrderMapper;
+  private final OrderItemMapper orderItemMapper;
+  private final StoreOrderService storeOrderService;
   private final VisitService visitService;
   private final CareTaskService careTaskService;
   private final OrgMapper orgMapper;
@@ -175,6 +194,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
   private final FamilyRechargeOrderMapper familyRechargeOrderMapper;
   private final FamilyPortalProperties familyPortalProperties;
   private final FamilyWechatNotifyService familyWechatNotifyService;
+  private final PasswordEncoder passwordEncoder;
   private final ObjectMapper objectMapper;
   private final RestTemplate restTemplate;
   private final Map<String, PlatformCertificateHolder> wechatPlatformCertCache = new ConcurrentHashMap<>();
@@ -202,6 +222,11 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
       ElderAccountLogMapper elderAccountLogMapper,
       ServiceItemMapper serviceItemMapper,
       ServiceBookingMapper serviceBookingMapper,
+      ProductMapper productMapper,
+      InventoryBatchMapper inventoryBatchMapper,
+      StoreOrderMapper storeOrderMapper,
+      OrderItemMapper orderItemMapper,
+      StoreOrderService storeOrderService,
       VisitService visitService,
       CareTaskService careTaskService,
       OrgMapper orgMapper,
@@ -209,6 +234,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
       FamilyRechargeOrderMapper familyRechargeOrderMapper,
       FamilyPortalProperties familyPortalProperties,
       FamilyWechatNotifyService familyWechatNotifyService,
+      PasswordEncoder passwordEncoder,
       ObjectMapper objectMapper) {
     this.elderFamilyMapper = elderFamilyMapper;
     this.elderMapper = elderMapper;
@@ -231,6 +257,11 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
     this.elderAccountLogMapper = elderAccountLogMapper;
     this.serviceItemMapper = serviceItemMapper;
     this.serviceBookingMapper = serviceBookingMapper;
+    this.productMapper = productMapper;
+    this.inventoryBatchMapper = inventoryBatchMapper;
+    this.storeOrderMapper = storeOrderMapper;
+    this.orderItemMapper = orderItemMapper;
+    this.storeOrderService = storeOrderService;
     this.visitService = visitService;
     this.careTaskService = careTaskService;
     this.orgMapper = orgMapper;
@@ -238,6 +269,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
     this.familyRechargeOrderMapper = familyRechargeOrderMapper;
     this.familyPortalProperties = familyPortalProperties;
     this.familyWechatNotifyService = familyWechatNotifyService;
+    this.passwordEncoder = passwordEncoder;
     this.objectMapper = objectMapper;
     this.restTemplate = new RestTemplate();
   }
@@ -1617,6 +1649,175 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
   }
 
   @Override
+  public List<FamilyPortalModels.MallProductItem> listMallProducts(Long orgId, Long familyUserId, String keyword,
+      String category, int pageNo, int pageSize) {
+    ensureBoundElderIds(extractElderIds(listBoundRelations(orgId, familyUserId)));
+    int safePageNo = Math.max(pageNo, 1);
+    int safePageSize = Math.min(Math.max(pageSize, 1), 100);
+
+    var wrapper = Wrappers.lambdaQuery(Product.class)
+        .eq(Product::getIsDeleted, 0)
+        .eq(Product::getOrgId, orgId)
+        .eq(Product::getStatus, 1)
+        .eq(Product::getMallEnabled, 1);
+    if (hasText(category)) {
+      wrapper.eq(Product::getCategory, category.trim());
+    }
+    if (hasText(keyword)) {
+      String kw = keyword.trim();
+      wrapper.and(w -> w.like(Product::getProductName, kw)
+          .or().like(Product::getProductCode, kw));
+    }
+    wrapper.orderByDesc(Product::getUpdateTime).orderByDesc(Product::getCreateTime);
+
+    Page<Product> page = productMapper.selectPage(new Page<>(safePageNo, safePageSize), wrapper);
+    List<Long> productIds = page.getRecords().stream()
+        .map(Product::getId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList();
+    Map<Long, Integer> stockMap = new HashMap<>();
+    if (!productIds.isEmpty()) {
+      List<InventoryBatch> batches = inventoryBatchMapper.selectList(
+          Wrappers.lambdaQuery(InventoryBatch.class)
+              .eq(InventoryBatch::getIsDeleted, 0)
+              .eq(InventoryBatch::getOrgId, orgId)
+              .in(InventoryBatch::getProductId, productIds));
+      for (InventoryBatch batch : batches) {
+        if (batch == null || batch.getProductId() == null) {
+          continue;
+        }
+        stockMap.merge(batch.getProductId(), safeInt(batch.getQuantity()), Integer::sum);
+      }
+    }
+
+    return page.getRecords().stream().map(product -> {
+      FamilyPortalModels.MallProductItem item = new FamilyPortalModels.MallProductItem();
+      item.setId(product.getId());
+      item.setProductCode(defaultText(product.getProductCode(), ""));
+      item.setProductName(defaultText(product.getProductName(), "未命名商品"));
+      item.setCategory(defaultText(product.getCategory(), "未分类"));
+      item.setUnit(defaultText(product.getUnit(), "件"));
+      item.setPrice(safeDecimal(product.getPrice()));
+      item.setPointsPrice(safeInt(product.getPointsPrice()));
+      int stock = stockMap.getOrDefault(product.getId(), 0);
+      item.setCurrentStock(stock);
+      int safetyStock = safeInt(product.getSafetyStock());
+      if (stock <= 0) {
+        item.setStockStatus("OUT");
+        item.setStatusText("库存不足");
+      } else if (safetyStock > 0 && stock <= safetyStock) {
+        item.setStockStatus("LOW");
+        item.setStatusText("库存紧张");
+      } else {
+        item.setStockStatus("OK");
+        item.setStatusText("可下单");
+      }
+      item.setBusinessDomain(defaultText(product.getBusinessDomain(), "BOTH"));
+      item.setItemType(defaultText(product.getItemType(), "CONSUMABLE"));
+      return item;
+    }).toList();
+  }
+
+  @Override
+  public FamilyPortalModels.MallOrderPreviewResponse previewMallOrder(Long orgId, Long familyUserId,
+      FamilyPortalModels.MallOrderPreviewRequest request) {
+    Long targetElderId = resolveTargetElderId(
+        ensureBoundElderIds(extractElderIds(listBoundRelations(orgId, familyUserId))),
+        request.getElderId());
+    OrderPreviewRequest payload = new OrderPreviewRequest();
+    payload.setElderId(targetElderId);
+    payload.setProductId(request.getProductId());
+    payload.setQty(request.getQty());
+    OrderPreviewResponse preview = storeOrderService.preview(payload);
+    return toMallOrderPreview(preview);
+  }
+
+  @Override
+  @Transactional
+  public FamilyPortalModels.MallOrderSubmitResponse submitMallOrder(Long orgId, Long familyUserId,
+      FamilyPortalModels.MallOrderSubmitRequest request) {
+    Long targetElderId = resolveTargetElderId(
+        ensureBoundElderIds(extractElderIds(listBoundRelations(orgId, familyUserId))),
+        request.getElderId());
+    OrderPreviewRequest payload = new OrderPreviewRequest();
+    payload.setElderId(targetElderId);
+    payload.setProductId(request.getProductId());
+    payload.setQty(request.getQty());
+    OrderSubmitResponse submit = storeOrderService.submit(payload);
+    return toMallOrderSubmit(submit);
+  }
+
+  @Override
+  public List<FamilyPortalModels.MallOrderItem> listMallOrders(Long orgId, Long familyUserId, Long elderId, int pageNo,
+      int pageSize) {
+    List<Long> elderIds = ensureBoundElderIds(extractElderIds(listBoundRelations(orgId, familyUserId)));
+    Long targetElderId = elderId == null ? null : resolveTargetElderId(elderIds, elderId);
+    int safePageNo = Math.max(pageNo, 1);
+    int safePageSize = Math.min(Math.max(pageSize, 1), 100);
+
+    Page<StoreOrder> page = storeOrderMapper.selectPage(new Page<>(safePageNo, safePageSize),
+        Wrappers.lambdaQuery(StoreOrder.class)
+            .eq(StoreOrder::getIsDeleted, 0)
+            .eq(StoreOrder::getOrgId, orgId)
+            .in(StoreOrder::getElderId, elderIds)
+            .eq(targetElderId != null, StoreOrder::getElderId, targetElderId)
+            .orderByDesc(StoreOrder::getCreateTime));
+
+    List<StoreOrder> orders = page.getRecords();
+    if (orders.isEmpty()) {
+      return List.of();
+    }
+    List<Long> orderIds = orders.stream()
+        .map(StoreOrder::getId)
+        .filter(Objects::nonNull)
+        .toList();
+    Map<Long, ElderProfile> elderMap = loadElderMap(orgId, elderIds);
+    Map<Long, List<OrderItem>> orderItemMap = orderItemMapper.selectList(
+            Wrappers.lambdaQuery(OrderItem.class)
+                .eq(OrderItem::getIsDeleted, 0)
+                .eq(OrderItem::getOrgId, orgId)
+                .in(OrderItem::getOrderId, orderIds)
+                .orderByAsc(OrderItem::getCreateTime))
+        .stream()
+        .collect(Collectors.groupingBy(OrderItem::getOrderId));
+
+    return orders.stream().map(order -> {
+      List<OrderItem> lines = orderItemMap.getOrDefault(order.getId(), List.of());
+      OrderItem first = lines.isEmpty() ? null : lines.get(0);
+      int quantity = lines.stream()
+          .map(OrderItem::getQuantity)
+          .filter(Objects::nonNull)
+          .mapToInt(Integer::intValue)
+          .sum();
+      String productName = first == null ? "商城商品"
+          : defaultText(defaultText(first.getProductNameSnapshot(), first.getProductName()), "商城商品");
+      if (lines.size() > 1) {
+        productName = productName + " 等" + lines.size() + "件";
+      }
+      FamilyPortalModels.MallOrderItem item = new FamilyPortalModels.MallOrderItem();
+      item.setOrderId(order.getId());
+      item.setOrderNo(defaultText(order.getOrderNo(), ""));
+      item.setElderId(order.getElderId());
+      ElderProfile elder = elderMap.get(order.getElderId());
+      item.setElderName(elder == null ? "老人" : defaultText(elder.getFullName(), "老人"));
+      item.setProductId(first == null ? null : first.getProductId());
+      item.setProductName(productName);
+      item.setQuantity(quantity > 0 ? quantity : 1);
+      item.setUnitPrice(first == null ? safeDecimal(order.getTotalAmount()) : safeDecimal(first.getUnitPrice()));
+      item.setTotalAmount(safeDecimal(order.getTotalAmount()));
+      item.setPointsUsed(safeInt(order.getPointsUsed()));
+      item.setOrderStatus(order.getOrderStatus());
+      item.setOrderStatusText(resolveMallOrderStatusText(order.getOrderStatus()));
+      item.setPayStatus(order.getPayStatus());
+      item.setPayStatusText(resolveMallPayStatusText(order.getPayStatus()));
+      item.setCreateTime(order.getCreateTime() == null ? "" : order.getCreateTime().format(DATETIME_FMT));
+      item.setPayTime(order.getPayTime() == null ? "" : order.getPayTime().format(DATETIME_FMT));
+      return item;
+    }).toList();
+  }
+
+  @Override
   @Transactional
   public void submitFeedback(Long orgId, Long familyUserId, FamilyPortalModels.FeedbackRequest request) {
     FamilyUser familyUser = familyUserMapper.selectById(familyUserId);
@@ -1671,15 +1872,33 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
   @Transactional
   public FamilyPortalModels.BindRelationItem bindElder(Long orgId, Long familyUserId,
       FamilyPortalModels.BindCreateRequest request) {
-    ElderProfile elder = elderMapper.selectOne(
-        Wrappers.lambdaQuery(ElderProfile.class)
-            .eq(ElderProfile::getIsDeleted, 0)
-            .eq(ElderProfile::getOrgId, orgId)
-            .eq(ElderProfile::getId, request.getElderId())
-            .last("LIMIT 1"));
+    Long requestedElderId = request == null ? null : request.getElderId();
+    String idCardNo = normalizeIdCardNo(request == null ? null : request.getElderIdCardNo());
+    if (requestedElderId == null && !hasText(idCardNo)) {
+      throw new IllegalArgumentException("请填写老人身份证号");
+    }
+
+    ElderProfile elder = null;
+    if (requestedElderId != null) {
+      elder = elderMapper.selectOne(
+          Wrappers.lambdaQuery(ElderProfile.class)
+              .eq(ElderProfile::getIsDeleted, 0)
+              .eq(ElderProfile::getOrgId, orgId)
+              .eq(ElderProfile::getId, requestedElderId)
+              .last("LIMIT 1"));
+    }
+    if (elder == null && hasText(idCardNo)) {
+      elder = elderMapper.selectOne(
+          Wrappers.lambdaQuery(ElderProfile.class)
+              .eq(ElderProfile::getIsDeleted, 0)
+              .eq(ElderProfile::getOrgId, orgId)
+              .apply("UPPER(id_card_no) = {0}", idCardNo)
+              .last("LIMIT 1"));
+    }
     if (elder == null) {
       throw new IllegalArgumentException("老人不存在或不属于当前机构");
     }
+    Long targetElderId = elder.getId();
 
     boolean switchToPrimary = Integer.valueOf(1).equals(request.getIsPrimary());
     if (switchToPrimary) {
@@ -1687,7 +1906,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
           .set(ElderFamily::getIsPrimary, 0)
           .eq(ElderFamily::getIsDeleted, 0)
           .eq(ElderFamily::getOrgId, orgId)
-          .eq(ElderFamily::getElderId, request.getElderId()));
+          .eq(ElderFamily::getElderId, targetElderId));
     }
 
     ElderFamily relation = elderFamilyMapper.selectOne(
@@ -1695,7 +1914,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
             .eq(ElderFamily::getIsDeleted, 0)
             .eq(ElderFamily::getOrgId, orgId)
             .eq(ElderFamily::getFamilyUserId, familyUserId)
-            .eq(ElderFamily::getElderId, request.getElderId())
+            .eq(ElderFamily::getElderId, targetElderId)
             .last("LIMIT 1"));
 
     String relationText = request.getRelation() == null ? null : defaultText(request.getRelation(), "家属");
@@ -1704,7 +1923,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
       relation = new ElderFamily();
       relation.setOrgId(orgId);
       relation.setFamilyUserId(familyUserId);
-      relation.setElderId(request.getElderId());
+      relation.setElderId(targetElderId);
       relation.setRelation(defaultText(relationText, "家属"));
       relation.setIsPrimary(switchToPrimary ? 1 : 0);
       relation.setRemark(remark);
@@ -1855,8 +2074,7 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
     boolean wechatPayEnabled = wechatPay != null && wechatPay.isEnabled();
     boolean wechatNotifyEnabled = wechatNotify != null && wechatNotify.isEnabled();
     boolean wechatNotifyBound = familyUser != null && hasText(defaultText(familyUser.getOpenId(), null));
-    boolean securityPasswordEnabled = hasSecurityPasswordConfigured(security)
-        && readBoolean(security, "verifyWithPassword", false);
+    boolean securityPasswordEnabled = true;
     boolean legacyApiEnabled = familyPortalProperties.isLegacyApiEnabled();
     String legacyApiSunsetDate = defaultText(familyPortalProperties.getLegacyApiSunsetDate(), "");
     boolean legacyApiSunsetReached = isLegacySunsetReached(legacyApiSunsetDate);
@@ -1904,11 +2122,11 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
         "/pages/payment/index"));
     response.getItems().add(buildCapabilityItem(
         "SECURITY_PASSWORD",
-        "独立密码校验",
+        "密码二次校验",
         securityPasswordEnabled ? "READY" : "OPTIONAL",
         securityPasswordEnabled
-            ? "敏感数据可通过独立密码进行二次验证"
-            : "尚未开启独立密码，当前使用短信验证码二次校验",
+            ? "敏感数据默认需二次输入密码，未设独立密码时将校验登录密码"
+            : "尚未开启密码二次校验，请尽快开启",
         "/pages/settings-security/index"));
     response.getItems().add(buildCapabilityItem(
         "LEGACY_API",
@@ -1928,8 +2146,8 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
     response.setVerifyHealthData(readBoolean(map, "verifyHealthData", true));
     response.setVerifyMedicalRecords(readBoolean(map, "verifyMedicalRecords", true));
     response.setVerifyReports(readBoolean(map, "verifyReports", true));
-    response.setVerifyWithSmsCode(readBoolean(map, "verifyWithSmsCode", true));
-    response.setVerifyWithPassword(readBoolean(map, "verifyWithPassword", false));
+    response.setVerifyWithSmsCode(false);
+    response.setVerifyWithPassword(true);
     response.setHasIndependentPassword(hasSecurityPasswordConfigured(map));
     response.setMaskSensitiveData(readBoolean(map, "maskSensitiveData", true));
     response.setVisibleScope(defaultText(readText(map, "visibleScope"), "仅子女可查看完整健康数据"));
@@ -1943,16 +2161,16 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
     if (request.getVerifyHealthData() != null) current.setVerifyHealthData(request.getVerifyHealthData());
     if (request.getVerifyMedicalRecords() != null) current.setVerifyMedicalRecords(request.getVerifyMedicalRecords());
     if (request.getVerifyReports() != null) current.setVerifyReports(request.getVerifyReports());
-    if (request.getVerifyWithSmsCode() != null) current.setVerifyWithSmsCode(request.getVerifyWithSmsCode());
-    if (request.getVerifyWithPassword() != null) current.setVerifyWithPassword(request.getVerifyWithPassword());
     if (request.getMaskSensitiveData() != null) current.setMaskSensitiveData(request.getMaskSensitiveData());
     if (request.getVisibleScope() != null) current.setVisibleScope(request.getVisibleScope().trim());
+    current.setVerifyWithSmsCode(false);
+    current.setVerifyWithPassword(true);
     Map<String, Object> existing = new LinkedHashMap<>(readStateMap(orgId, familyUserId, STATE_SECURITY, "default"));
     existing.put("verifyHealthData", current.getVerifyHealthData());
     existing.put("verifyMedicalRecords", current.getVerifyMedicalRecords());
     existing.put("verifyReports", current.getVerifyReports());
-    existing.put("verifyWithSmsCode", current.getVerifyWithSmsCode());
-    existing.put("verifyWithPassword", current.getVerifyWithPassword());
+    existing.put("verifyWithSmsCode", false);
+    existing.put("verifyWithPassword", true);
     existing.put("maskSensitiveData", current.getMaskSensitiveData());
     existing.put("visibleScope", defaultText(current.getVisibleScope(), "仅子女可查看完整健康数据"));
     upsertState(orgId, familyUserId, STATE_SECURITY, "default", existing);
@@ -1993,18 +2211,32 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
   public FamilyPortalModels.SecurityPasswordVerifyResponse verifySecurityPassword(
       Long orgId, Long familyUserId, FamilyPortalModels.SecurityPasswordVerifyRequest request) {
     FamilyPortalModels.SecurityPasswordVerifyResponse response = new FamilyPortalModels.SecurityPasswordVerifyResponse();
+    String password = defaultText(request == null ? null : request.getPassword(), "");
     Map<String, Object> current = readStateMap(orgId, familyUserId, STATE_SECURITY, "default");
     String salt = defaultText(readText(current, "passwordSalt"), null);
     String expected = defaultText(readText(current, "passwordHash"), null);
-    if (salt == null || expected == null) {
-      response.setPassed(false);
-      response.setMessage("尚未设置独立密码");
+    if (salt != null && expected != null) {
+      String candidate = hashSecurityPassword(password, salt);
+      boolean passed = Objects.equals(expected, candidate);
+      response.setPassed(passed);
+      response.setMessage(passed ? "密码验证通过" : "密码错误，请重试");
       return response;
     }
-    String candidate = hashSecurityPassword(defaultText(request == null ? null : request.getPassword(), ""), salt);
-    boolean passed = Objects.equals(expected, candidate);
+
+    FamilyUser familyUser = familyUserMapper.selectOne(
+        Wrappers.lambdaQuery(FamilyUser.class)
+            .eq(FamilyUser::getIsDeleted, 0)
+            .eq(FamilyUser::getOrgId, orgId)
+            .eq(FamilyUser::getId, familyUserId)
+            .last("LIMIT 1"));
+    if (familyUser == null || !hasText(familyUser.getPasswordHash())) {
+      response.setPassed(false);
+      response.setMessage("账号密码未设置，请联系管理员");
+      return response;
+    }
+    boolean passed = passwordEncoder.matches(password, familyUser.getPasswordHash());
     response.setPassed(passed);
-    response.setMessage(passed ? "密码验证通过" : "密码错误，请重试");
+    response.setMessage(passed ? "登录密码验证通过" : "登录密码错误，请重试");
     return response;
   }
 
@@ -3240,6 +3472,92 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
     }
   }
 
+  private FamilyPortalModels.MallOrderPreviewResponse toMallOrderPreview(OrderPreviewResponse preview) {
+    FamilyPortalModels.MallOrderPreviewResponse response = new FamilyPortalModels.MallOrderPreviewResponse();
+    if (preview == null) {
+      response.setAllowed(false);
+      response.setStatus("ERROR");
+      response.setMessage("预检失败，请稍后重试");
+      return response;
+    }
+    response.setAllowed(preview.isAllowed());
+    response.setStatus(defaultText(preview.getStatus(), ""));
+    response.setMessage(defaultText(preview.getMessage(), preview.isAllowed() ? "可下单" : "当前不可下单"));
+    response.setElderId(preview.getElderId());
+    response.setProductId(preview.getProductId());
+    response.setProductName(defaultText(preview.getProductName(), ""));
+    response.setQty(preview.getQty());
+    response.setPointsRequired(preview.getPointsRequired());
+    List<String> reasons = preview.getReasons() == null ? List.of() : preview.getReasons().stream()
+        .map(this::toMallForbiddenReasonText)
+        .filter(this::hasText)
+        .toList();
+    response.setReasons(reasons);
+    return response;
+  }
+
+  private FamilyPortalModels.MallOrderSubmitResponse toMallOrderSubmit(OrderSubmitResponse submit) {
+    FamilyPortalModels.MallOrderSubmitResponse response = new FamilyPortalModels.MallOrderSubmitResponse();
+    if (submit == null) {
+      response.setAllowed(false);
+      response.setStatus("ERROR");
+      response.setMessage("下单失败，请稍后重试");
+      return response;
+    }
+    response.setAllowed(submit.isAllowed());
+    response.setStatus(defaultText(submit.getStatus(), ""));
+    response.setMessage(defaultText(submit.getMessage(), submit.isAllowed() ? "下单成功" : "下单失败"));
+    response.setOrderId(submit.getOrderId());
+    response.setOrderNo(defaultText(submit.getOrderNo(), ""));
+    response.setPointsDeducted(submit.getPointsDeducted());
+    response.setBalanceAfter(submit.getBalanceAfter());
+    response.setPreview(toMallOrderPreview(submit.getPreview()));
+    return response;
+  }
+
+  private String toMallForbiddenReasonText(ForbiddenReason reason) {
+    if (reason == null) {
+      return "";
+    }
+    String disease = defaultText(reason.getDiseaseName(), "");
+    String tag = defaultText(reason.getTagName(), "");
+    if (!hasText(disease) && !hasText(tag)) {
+      return "";
+    }
+    if (!hasText(disease)) {
+      return "命中禁忌标签：" + tag;
+    }
+    if (!hasText(tag)) {
+      return "慢病限制：" + disease;
+    }
+    return disease + "（禁忌：" + tag + "）";
+  }
+
+  private String resolveMallOrderStatusText(Integer status) {
+    if (status == null) {
+      return "状态未知";
+    }
+    return switch (status) {
+      case 1 -> "待处理";
+      case 2 -> "待出库";
+      case 3 -> "已完成";
+      case 4 -> "已取消";
+      case 5 -> "已退款";
+      default -> "处理中";
+    };
+  }
+
+  private String resolveMallPayStatusText(Integer status) {
+    if (status == null) {
+      return "待支付";
+    }
+    return switch (status) {
+      case 1 -> "已支付";
+      case 2 -> "已退款";
+      default -> "待支付";
+    };
+  }
+
   private List<ElderFamily> listBoundRelations(Long orgId, Long familyUserId) {
     return elderFamilyMapper.selectList(
         Wrappers.lambdaQuery(ElderFamily.class)
@@ -4401,6 +4719,17 @@ public class FamilyPortalServiceImpl implements FamilyPortalService {
       return fallback;
     }
     return value.trim();
+  }
+
+  private String normalizeIdCardNo(String value) {
+    if (!hasText(value)) {
+      return null;
+    }
+    String normalized = value.trim().replaceAll("\\s+", "").toUpperCase(Locale.ROOT);
+    if (!normalized.matches("(^\\d{15}$)|(^\\d{17}[0-9X]$)")) {
+      throw new IllegalArgumentException("身份证号格式不正确");
+    }
+    return normalized;
   }
 
   private boolean hasText(String value) {

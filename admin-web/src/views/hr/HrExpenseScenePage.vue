@@ -39,6 +39,41 @@ import { HR_EXPENSE_EXPORT_FIELDS, mapByDict } from './hrExportFields'
 
 const route = useRoute()
 
+type ExpenseScene = 'training-reimburse' | 'subsidy' | 'salary-subsidy'
+
+const sceneTitleMap: Record<ExpenseScene, string> = {
+  'training-reimburse': '外出培训费用报销',
+  subsidy: '补贴申请',
+  'salary-subsidy': '工资补贴记录'
+}
+
+const sceneFetcherMap: Record<ExpenseScene, typeof getHrTrainingReimbursePage> = {
+  'training-reimburse': getHrTrainingReimbursePage,
+  subsidy: getHrSubsidyPage,
+  'salary-subsidy': getHrSalarySubsidyPage
+}
+
+const legacyNameSceneMap: Record<string, ExpenseScene> = {
+  HrExpenseTrainingReimburse: 'training-reimburse',
+  HrExpenseSubsidy: 'subsidy',
+  HrExpenseSalarySubsidy: 'salary-subsidy'
+}
+
+function toExpenseScene(raw: string | undefined): ExpenseScene | null {
+  if (!raw) return null
+  if (raw === 'training-reimburse') return 'training-reimburse'
+  if (raw === 'subsidy') return 'subsidy'
+  if (raw === 'salary-subsidy') return 'salary-subsidy'
+  return null
+}
+
+const activeScene = computed<ExpenseScene>(() => {
+  const fromQuery = toExpenseScene(typeof route.query.scene === 'string' ? route.query.scene : undefined)
+  if (fromQuery) return fromQuery
+  const fromLegacyName = toExpenseScene(legacyNameSceneMap[String(route.name || '')])
+  return fromLegacyName || 'training-reimburse'
+})
+
 const query = reactive({
   keyword: undefined as string | undefined,
   status: undefined as string | undefined,
@@ -67,18 +102,9 @@ const rows = ref<HrExpenseItem[]>([])
 const loading = ref(false)
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 
-const pageTitle = computed(() => {
-  if (route.name === 'HrExpenseTrainingReimburse') return '外出培训费用报销'
-  if (route.name === 'HrExpenseSubsidy') return '补贴申请'
-  if (route.name === 'HrExpenseSalarySubsidy') return '工资补贴记录'
-  return '费用记录'
-})
+const pageTitle = computed(() => sceneTitleMap[activeScene.value] || '费用记录')
 
-const fetcher = computed(() => {
-  if (route.name === 'HrExpenseTrainingReimburse') return getHrTrainingReimbursePage
-  if (route.name === 'HrExpenseSalarySubsidy') return getHrSalarySubsidyPage
-  return getHrSubsidyPage
-})
+const fetcher = computed(() => sceneFetcherMap[activeScene.value] || getHrSubsidyPage)
 
 async function fetchData() {
   loading.value = true
@@ -129,7 +155,7 @@ function rowClassName(record: HrExpenseItem) {
 onMounted(fetchData)
 
 watch(
-  () => route.name,
+  () => route.fullPath,
   () => {
     onReset()
   }

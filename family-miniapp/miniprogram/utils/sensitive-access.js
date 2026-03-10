@@ -15,10 +15,10 @@ function markVerified(scene) {
   wx.setStorageSync(cacheKey(scene), Date.now() + VERIFY_TTL_MS);
 }
 
-function openVerifyPage(scene, title, mode) {
+function openVerifyPage(scene, title) {
   return new Promise((resolve) => {
     wx.navigateTo({
-      url: `/pages/security-verify/index?scene=${encodeURIComponent(scene)}&title=${encodeURIComponent(title || '敏感信息验证')}&mode=${encodeURIComponent(mode || 'sms')}`,
+      url: `/pages/security-verify/index?scene=${encodeURIComponent(scene)}&title=${encodeURIComponent(title || '敏感信息验证')}`,
       events: {
         verified() {
           markVerified(scene);
@@ -39,7 +39,6 @@ async function ensureSensitiveAccess(options = {}) {
   const scene = options.scene || 'default';
   const title = options.title || '敏感信息验证';
   const settingKey = options.settingKey || '';
-  const preferredMode = options.mode || '';
 
   const settings = await getSecuritySettings();
   const needVerify = settingKey ? !!settings[settingKey] : true;
@@ -49,13 +48,7 @@ async function ensureSensitiveAccess(options = {}) {
   if (isVerified(scene)) {
     return true;
   }
-  let mode = 'sms';
-  if (preferredMode === 'password') {
-    mode = 'password';
-  } else if (settings.verifyWithPassword && settings.hasIndependentPassword) {
-    mode = 'password';
-  }
-  return openVerifyPage(scene, title, mode);
+  return openVerifyPage(scene, title);
 }
 
 module.exports = {

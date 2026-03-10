@@ -118,31 +118,4 @@ WHERE NOT EXISTS (
   SELECT 1 FROM assessment_scale_template WHERE org_id = 1 AND template_code = 'COG_MMSE' AND is_deleted = 0
 );
 
-INSERT INTO assessment_record (
-  id, tenant_id, org_id, elder_id, elder_name, assessment_type, template_id,
-  level_code, score, assessment_date, next_assessment_date, assessor_id, assessor_name,
-  status, result_summary, suggestion, detail_json, score_auto, archive_no, source, created_by, is_deleted
-)
-SELECT
-  8100000000001, 1, 1, 1, '演示老人A', 'ADMISSION', NULL,
-  'B', 78.00, CURRENT_DATE, DATE_ADD(CURRENT_DATE, INTERVAL 30 DAY), 1, '系统管理员',
-  'COMPLETED', '入住风险中等，建议重点关注夜间巡视。', '每周一次综合复评。',
-  NULL, 0, 'ARC-ADM-0001', 'MANUAL', 1, 0
-WHERE NOT EXISTS (
-  SELECT 1 FROM assessment_record WHERE org_id = 1 AND archive_no = 'ARC-ADM-0001' AND is_deleted = 0
-);
-
-INSERT INTO assessment_record (
-  id, tenant_id, org_id, elder_id, elder_name, assessment_type, template_id,
-  level_code, score, assessment_date, next_assessment_date, assessor_id, assessor_name,
-  status, result_summary, suggestion, detail_json, score_auto, archive_no, source, created_by, is_deleted
-)
-SELECT
-  8100000000002, 1, 1, 1, '演示老人A', 'SELF_CARE', 8000000000001,
-  '轻度依赖', 68.00, CURRENT_DATE, DATE_ADD(CURRENT_DATE, INTERVAL 14 DAY), 1, '系统管理员',
-  'COMPLETED', '具备基础活动能力，部分动作需辅助。', '维持步行训练与上下楼练习。',
-  '{"feeding":10,"bathing":5,"grooming":5,"dressing":10,"toilet":10,"transfer":10,"mobility":10,"stairs":8}',
-  1, 'ARC-SEL-0001', 'MANUAL', 1, 0
-WHERE NOT EXISTS (
-  SELECT 1 FROM assessment_record WHERE org_id = 1 AND archive_no = 'ARC-SEL-0001' AND is_deleted = 0
-);
+-- 不再插入“演示老人A”相关评估记录，避免初始化产生演示个体数据。

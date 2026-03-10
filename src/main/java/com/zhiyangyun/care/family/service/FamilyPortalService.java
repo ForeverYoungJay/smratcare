@@ -84,6 +84,17 @@ public interface FamilyPortalService {
   FamilyPortalModels.ServiceOrderItem createServiceOrder(Long orgId, Long familyUserId,
       FamilyPortalModels.ServiceOrderCreateRequest request);
 
+  List<FamilyPortalModels.MallProductItem> listMallProducts(Long orgId, Long familyUserId, String keyword, String category,
+      int pageNo, int pageSize);
+
+  FamilyPortalModels.MallOrderPreviewResponse previewMallOrder(Long orgId, Long familyUserId,
+      FamilyPortalModels.MallOrderPreviewRequest request);
+
+  FamilyPortalModels.MallOrderSubmitResponse submitMallOrder(Long orgId, Long familyUserId,
+      FamilyPortalModels.MallOrderSubmitRequest request);
+
+  List<FamilyPortalModels.MallOrderItem> listMallOrders(Long orgId, Long familyUserId, Long elderId, int pageNo, int pageSize);
+
   void submitFeedback(Long orgId, Long familyUserId, FamilyPortalModels.FeedbackRequest request);
 
   List<FamilyPortalModels.FeedbackRecordItem> listFeedbackRecords(Long orgId, Long familyUserId, int pageNo, int pageSize);

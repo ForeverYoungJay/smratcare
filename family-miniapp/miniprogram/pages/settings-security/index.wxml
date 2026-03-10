@@ -29,24 +29,15 @@
 
     <view class="item">
       <view>
-        <view class="item-title">短信验证码校验</view>
-        <view class="item-desc">敏感信息访问启用短信验证码</view>
+        <view class="item-title">敏感操作校验方式</view>
+        <view class="item-desc">默认使用登录密码二次验证，不再使用短信验证码</view>
       </view>
-      <switch checked="{{setting.verifyWithSmsCode}}" data-field="verifyWithSmsCode" bindchange="onSwitch" color="#2c7a84" />
-    </view>
-
-    <view class="item">
-      <view>
-        <view class="item-title">独立密码校验</view>
-        <view class="item-desc">可使用独立密码进行敏感信息访问验证</view>
-      </view>
-      <switch checked="{{setting.verifyWithPassword}}" data-field="verifyWithPassword" bindchange="onSwitch" color="#2c7a84" />
     </view>
 
     <view class="password-panel">
-      <view class="item-title">独立密码状态</view>
-      <view class="item-desc">{{setting.hasIndependentPassword ? '已设置独立密码' : '尚未设置独立密码'}}</view>
-      <button class="ghost-btn password-btn" bindtap="onSetPassword">{{setting.hasIndependentPassword ? '重置密码' : '设置密码'}}</button>
+      <view class="item-title">独立安全密码（可选）</view>
+      <view class="item-desc">{{setting.hasIndependentPassword ? '已设置独立密码，优先用于敏感校验' : '未设置时将使用登录密码进行敏感校验'}}</view>
+      <button class="ghost-btn password-btn" bindtap="onSetPassword">{{setting.hasIndependentPassword ? '重置独立密码' : '设置独立密码'}}</button>
     </view>
 
     <view class="item">

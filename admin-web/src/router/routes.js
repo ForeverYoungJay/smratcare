@@ -2403,9 +2403,8 @@ export const routes = [
                     {
                         path: 'staff',
                         name: 'OaStaff',
-                        component: () => import('../views/hr/Staff.vue'),
-                        props: { title: '员工管理', subTitle: '行政员工档案与在离职状态管理' },
-                        meta: { title: '员工管理' }
+                        redirect: '/hr/profile/basic',
+                        meta: { title: '员工档案（兼容）', hidden: true }
                     },
                     {
                         path: 'card',
@@ -2486,14 +2485,14 @@ export const routes = [
                     {
                         path: 'reward-punishment',
                         name: 'OaRewardPunishment',
-                        component: () => import('../views/oa/RewardPunishment.vue'),
-                        meta: { title: '奖惩管理' }
+                        redirect: '/hr/performance/reward-punishment',
+                        meta: { title: '奖惩管理（兼容）', hidden: true }
                     },
                     {
                         path: 'training',
                         name: 'OaTraining',
-                        component: () => import('../views/hr/Training.vue'),
-                        meta: { title: '培训管理' }
+                        redirect: '/hr/development/records',
+                        meta: { title: '培训管理（兼容）', hidden: true }
                     },
                     {
                         path: 'portal',
@@ -2555,43 +2554,43 @@ export const routes = [
                                 path: 'needs',
                                 name: 'HrRecruitmentNeeds',
                                 component: () => import('../views/hr/HrRecruitmentNeeds.vue'),
-                                meta: { title: '招聘需求申请', roles: ['ADMIN'] }
+                                meta: { title: '招聘办理台', roles: ['ADMIN'] }
                             },
                             {
                                 path: 'job-posting',
                                 name: 'HrRecruitmentJobPosting',
-                                component: () => import('../views/hr/HrRecruitmentNeeds.vue'),
-                                meta: { title: '岗位发布', roles: ['ADMIN'] }
+                                redirect: '/hr/recruitment/needs?scene=job-posting',
+                                meta: { title: '岗位发布（兼容）', roles: ['ADMIN'], hidden: true }
                             },
                             {
                                 path: 'candidates',
                                 name: 'HrRecruitmentCandidates',
-                                component: () => import('../views/hr/HrRecruitmentNeeds.vue'),
-                                meta: { title: '候选人库', roles: ['ADMIN'] }
+                                redirect: '/hr/recruitment/needs?scene=candidates',
+                                meta: { title: '候选人库（兼容）', roles: ['ADMIN'], hidden: true }
                             },
                             {
                                 path: 'interviews',
                                 name: 'HrRecruitmentInterviews',
-                                component: () => import('../views/hr/HrRecruitmentNeeds.vue'),
-                                meta: { title: '面试管理', roles: ['ADMIN'] }
+                                redirect: '/hr/recruitment/needs?scene=interviews',
+                                meta: { title: '面试管理（兼容）', roles: ['ADMIN'], hidden: true }
                             },
                             {
                                 path: 'onboarding',
                                 name: 'HrRecruitmentOnboarding',
-                                component: () => import('../views/hr/HrRecruitmentNeeds.vue'),
-                                meta: { title: '入职办理', roles: ['ADMIN'] }
+                                redirect: '/hr/recruitment/needs?scene=onboarding',
+                                meta: { title: '入职办理（兼容）', roles: ['ADMIN'], hidden: true }
                             },
                             {
                                 path: 'materials',
                                 name: 'HrRecruitmentMaterials',
-                                component: () => import('../views/hr/HrRecruitmentNeeds.vue'),
-                                meta: { title: '入职资料收集', roles: ['ADMIN'] }
+                                redirect: '/hr/recruitment/needs?scene=materials',
+                                meta: { title: '入职资料收集（兼容）', roles: ['ADMIN'], hidden: true }
                             },
                             {
                                 path: 'offboarding',
                                 name: 'HrRecruitmentOffboarding',
-                                component: () => import('../views/hr/HrRecruitmentNeeds.vue'),
-                                meta: { title: '退职办理', roles: ['ADMIN'] }
+                                redirect: '/hr/recruitment/needs?scene=offboarding',
+                                meta: { title: '退职办理（兼容）', roles: ['ADMIN'], hidden: true }
                             }
                         ]
                     },
@@ -2615,6 +2614,13 @@ export const routes = [
                                 meta: { title: '劳动合同管理', roles: ['ADMIN'] }
                             },
                             {
+                                path: 'account-access',
+                                name: 'HrProfileAccountAccess',
+                                component: () => import('../views/Staff.vue'),
+                                props: { title: '账号与领导设置', subTitle: '人事创建账号、初始化密码与上下级监管关系' },
+                                meta: { title: '账号与领导设置', roles: ['HR_EMPLOYEE', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
+                            },
+                            {
                                 path: 'contract-templates',
                                 name: 'HrProfileContractTemplates',
                                 component: () => import('../views/hr/HrProfileTemplates.vue'),
@@ -2635,8 +2641,8 @@ export const routes = [
                             {
                                 path: 'training-records',
                                 name: 'HrProfileTrainingRecords',
-                                component: () => import('../views/hr/Training.vue'),
-                                meta: { title: '培训记录', roles: ['ADMIN'] }
+                                redirect: '/hr/development/records?scene=records',
+                                meta: { title: '培训记录（兼容）', roles: ['ADMIN'], hidden: true }
                             },
                             {
                                 path: 'attachments',
@@ -2685,14 +2691,14 @@ export const routes = [
                             {
                                 path: 'shift-change',
                                 name: 'HrAttendanceShiftChange',
-                                component: () => import('../views/hr/HrAttendanceApprovalPage.vue'),
-                                meta: { title: '调班申请', roles: ['ADMIN'] }
+                                redirect: '/hr/attendance/leave-approval?scene=shift-change',
+                                meta: { title: '调班申请（兼容）', roles: ['ADMIN'], hidden: true }
                             },
                             {
                                 path: 'overtime',
                                 name: 'HrAttendanceOvertime',
-                                component: () => import('../views/hr/HrAttendanceApprovalPage.vue'),
-                                meta: { title: '加班申请', roles: ['ADMIN'] }
+                                redirect: '/hr/attendance/leave-approval?scene=overtime',
+                                meta: { title: '加班申请（兼容）', roles: ['ADMIN'], hidden: true }
                             },
                             {
                                 path: 'records',
@@ -2721,32 +2727,43 @@ export const routes = [
                         ]
                     },
                     {
-                        path: 'oa',
-                        name: 'HrOa',
-                        meta: { title: '行政协同（OA）', roles: ['ADMIN'] },
-                        redirect: '/hr/oa/notices',
+                        path: 'compliance',
+                        name: 'HrCompliance',
+                        meta: { title: '制度与合规', roles: ['ADMIN'] },
+                        redirect: '/hr/compliance/policies',
                         children: [
-                            { path: 'notices', name: 'HrOaNotices', component: () => import('../views/oa/Notice.vue'), meta: { title: '通知管理', roles: ['ADMIN'] } },
-                            { path: 'tasks', name: 'HrOaTasks', component: () => import('../views/oa/Task.vue'), meta: { title: '任务管理', roles: ['ADMIN'] } },
-                            { path: 'execution', name: 'HrOaExecution', component: () => import('../views/oa/Todo.vue'), meta: { title: '工作执行', roles: ['ADMIN'] } },
-                            { path: 'activity-plan', name: 'HrOaActivityPlan', component: () => import('../views/oa/ActivityPlan.vue'), meta: { title: '活动计划', roles: ['ADMIN'] } },
-                            { path: 'knowledge', name: 'HrOaKnowledge', component: () => import('../views/oa/Knowledge.vue'), meta: { title: '知识库', roles: ['ADMIN'] } },
-                            { path: 'policies', name: 'HrOaPolicies', component: () => import('../views/hr/HrPolicies.vue'), meta: { title: '规章制度库', roles: ['ADMIN'] } },
-                            { path: 'policy-alerts', name: 'HrOaPolicyAlerts', component: () => import('../views/hr/HrPolicyAlerts.vue'), meta: { title: '制度更新预警', roles: ['ADMIN'] } },
-                            { path: 'groups', name: 'HrOaGroups', component: () => import('../views/oa/GroupSettings.vue'), meta: { title: '分组设置', roles: ['ADMIN'] } }
+                            { path: 'policies', name: 'HrCompliancePolicies', component: () => import('../views/hr/HrPolicies.vue'), meta: { title: '规章制度库', roles: ['ADMIN'] } },
+                            { path: 'policy-alerts', name: 'HrCompliancePolicyAlerts', component: () => import('../views/hr/HrPolicyAlerts.vue'), meta: { title: '制度更新预警', roles: ['ADMIN'] } }
+                        ]
+                    },
+                    {
+                        path: 'oa',
+                        name: 'HrOaCompat',
+                        meta: { title: '行政协同（兼容）', roles: ['ADMIN'], hidden: true },
+                        redirect: '/oa/notice',
+                        children: [
+                            { path: 'notices', name: 'HrOaNotices', redirect: '/oa/notice', meta: { title: '通知管理（兼容）', roles: ['ADMIN'], hidden: true } },
+                            { path: 'tasks', name: 'HrOaTasks', redirect: '/oa/work-execution/task', meta: { title: '任务管理（兼容）', roles: ['ADMIN'], hidden: true } },
+                            { path: 'execution', name: 'HrOaExecution', redirect: '/oa/todo', meta: { title: '工作执行（兼容）', roles: ['ADMIN'], hidden: true } },
+                            { path: 'activity-plan', name: 'HrOaActivityPlan', redirect: '/oa/activity-plan', meta: { title: '活动计划（兼容）', roles: ['ADMIN'], hidden: true } },
+                            { path: 'knowledge', name: 'HrOaKnowledge', redirect: '/oa/knowledge', meta: { title: '知识库（兼容）', roles: ['ADMIN'], hidden: true } },
+                            { path: 'groups', name: 'HrOaGroups', redirect: '/oa/group-settings', meta: { title: '分组设置（兼容）', roles: ['ADMIN'], hidden: true } },
+                            { path: 'policies', name: 'HrOaPolicies', redirect: '/hr/compliance/policies', meta: { title: '规章制度库（兼容）', roles: ['ADMIN'], hidden: true } },
+                            { path: 'policy-alerts', name: 'HrOaPolicyAlerts', redirect: '/hr/compliance/policy-alerts', meta: { title: '制度更新预警（兼容）', roles: ['ADMIN'], hidden: true } }
                         ]
                     },
                     {
                         path: 'expense',
                         name: 'HrExpense',
                         meta: { title: '费用与报销', roles: ['ADMIN'] },
-                        redirect: '/hr/expense/training-reimburse',
+                        redirect: '/hr/expense/records?scene=training-reimburse',
                         children: [
-                            { path: 'training-reimburse', name: 'HrExpenseTrainingReimburse', component: () => import('../views/hr/HrExpenseScenePage.vue'), meta: { title: '外出培训费用报销', roles: ['ADMIN'] } },
-                            { path: 'subsidy', name: 'HrExpenseSubsidy', component: () => import('../views/hr/HrExpenseScenePage.vue'), meta: { title: '补贴申请', roles: ['ADMIN'] } },
+                            { path: 'records', name: 'HrExpenseRecords', component: () => import('../views/hr/HrExpenseScenePage.vue'), meta: { title: '费用报销台', roles: ['ADMIN'] } },
+                            { path: 'training-reimburse', name: 'HrExpenseTrainingReimburse', redirect: '/hr/expense/records?scene=training-reimburse', meta: { title: '外出培训费用报销（兼容）', roles: ['ADMIN'], hidden: true } },
+                            { path: 'subsidy', name: 'HrExpenseSubsidy', redirect: '/hr/expense/records?scene=subsidy', meta: { title: '补贴申请（兼容）', roles: ['ADMIN'], hidden: true } },
                             { path: 'meal-fee', name: 'HrExpenseMealFee', component: () => import('../views/hr/HrExpenseMealFee.vue'), meta: { title: '员工餐费', roles: ['ADMIN'] } },
                             { path: 'electricity-fee', name: 'HrExpenseElectricityFee', component: () => import('../views/hr/HrExpenseElectricityFee.vue'), meta: { title: '员工电费', roles: ['ADMIN'] } },
-                            { path: 'salary-subsidy', name: 'HrExpenseSalarySubsidy', component: () => import('../views/hr/HrExpenseScenePage.vue'), meta: { title: '工资补贴记录', roles: ['ADMIN'] } },
+                            { path: 'salary-subsidy', name: 'HrExpenseSalarySubsidy', redirect: '/hr/expense/records?scene=salary-subsidy', meta: { title: '工资补贴记录（兼容）', roles: ['ADMIN'], hidden: true } },
                             { path: 'approval-flow', name: 'HrExpenseApprovalFlow', component: () => import('../views/hr/HrExpenseApprovalFlow.vue'), meta: { title: '报销审批流', roles: ['ADMIN'] } }
                         ]
                     },
@@ -2754,11 +2771,11 @@ export const routes = [
                         path: 'development',
                         name: 'HrDevelopment',
                         meta: { title: '培训与发展', roles: ['ADMIN'] },
-                        redirect: '/hr/development/plans',
+                        redirect: '/hr/development/records',
                         children: [
-                            { path: 'plans', name: 'HrDevelopmentPlans', component: () => import('../views/hr/Training.vue'), meta: { title: '培训计划', roles: ['ADMIN'] } },
-                            { path: 'enrollments', name: 'HrDevelopmentEnrollments', component: () => import('../views/hr/Training.vue'), meta: { title: '培训报名', roles: ['ADMIN'] } },
-                            { path: 'signin', name: 'HrDevelopmentSignin', component: () => import('../views/hr/Training.vue'), meta: { title: '培训签到', roles: ['ADMIN'] } },
+                            { path: 'plans', name: 'HrDevelopmentPlans', redirect: '/hr/development/records?scene=plans', meta: { title: '培训计划（兼容）', roles: ['ADMIN'], hidden: true } },
+                            { path: 'enrollments', name: 'HrDevelopmentEnrollments', redirect: '/hr/development/records?scene=enrollments', meta: { title: '培训报名（兼容）', roles: ['ADMIN'], hidden: true } },
+                            { path: 'signin', name: 'HrDevelopmentSignin', redirect: '/hr/development/records?scene=signin', meta: { title: '培训签到（兼容）', roles: ['ADMIN'], hidden: true } },
                             { path: 'records', name: 'HrDevelopmentRecords', component: () => import('../views/hr/Training.vue'), meta: { title: '培训记录', roles: ['ADMIN'] } },
                             { path: 'certificates', name: 'HrDevelopmentCertificates', component: () => import('../views/hr/HrProfileCertificates.vue'), meta: { title: '证书管理', roles: ['ADMIN'] } },
                             { path: 'certificate-reminders', name: 'HrDevelopmentCertificateReminders', component: () => import('../views/hr/HrCertificateReminders.vue'), meta: { title: '证书到期提醒', roles: ['ADMIN'] } }
@@ -2768,13 +2785,13 @@ export const routes = [
                         path: 'performance',
                         name: 'HrPerformanceCenter',
                         meta: { title: '绩效考核', roles: ['ADMIN'] },
-                        redirect: '/hr/performance/nursing',
+                        redirect: '/hr/performance/reports',
                         children: [
-                            { path: 'nursing', name: 'HrPerformanceNursing', component: () => import('../views/hr/Performance.vue'), meta: { title: '护理绩效', roles: ['ADMIN'] } },
-                            { path: 'sales', name: 'HrPerformanceSales', component: () => import('../views/hr/Performance.vue'), meta: { title: '销售绩效', roles: ['ADMIN'] } },
-                            { path: 'admin', name: 'HrPerformanceAdmin', component: () => import('../views/hr/Performance.vue'), meta: { title: '行政绩效', roles: ['ADMIN'] } },
+                            { path: 'nursing', name: 'HrPerformanceNursing', redirect: '/hr/performance/reports?scene=nursing', meta: { title: '护理绩效（兼容）', roles: ['ADMIN'], hidden: true } },
+                            { path: 'sales', name: 'HrPerformanceSales', redirect: '/hr/performance/reports?scene=sales', meta: { title: '销售绩效（兼容）', roles: ['ADMIN'], hidden: true } },
+                            { path: 'admin', name: 'HrPerformanceAdmin', redirect: '/hr/performance/reports?scene=admin', meta: { title: '行政绩效（兼容）', roles: ['ADMIN'], hidden: true } },
                             { path: 'scoring-rules', name: 'HrPerformanceScoringRules', component: () => import('../views/hr/PointsRule.vue'), meta: { title: '评分规则配置', roles: ['ADMIN'] } },
-                            { path: 'generation', name: 'HrPerformanceGeneration', component: () => import('../views/hr/Performance.vue'), meta: { title: '绩效生成', roles: ['ADMIN'] } },
+                            { path: 'generation', name: 'HrPerformanceGeneration', redirect: '/hr/performance/reports?scene=generation', meta: { title: '绩效生成（兼容）', roles: ['ADMIN'], hidden: true } },
                             { path: 'reports', name: 'HrPerformanceReports', component: () => import('../views/hr/Performance.vue'), meta: { title: '绩效报表', roles: ['ADMIN'] } },
                             { path: 'reward-punishment', name: 'HrPerformanceRewardPunishment', component: () => import('../views/oa/RewardPunishment.vue'), meta: { title: '奖惩记录', roles: ['ADMIN'] } }
                         ]
@@ -2782,15 +2799,14 @@ export const routes = [
                     {
                         path: 'staff',
                         name: 'HrStaff',
-                        component: () => import('../views/hr/Staff.vue'),
-                        props: { title: '员工档案', subTitle: '人力资源档案、岗位与资质信息' },
-                        meta: { title: '员工档案', roles: ['ADMIN'] }
+                        redirect: '/hr/profile/basic',
+                        meta: { title: '员工档案（兼容）', roles: ['ADMIN'], hidden: true }
                     },
                     {
                         path: 'training',
                         name: 'HrTraining',
-                        component: () => import('../views/hr/Training.vue'),
-                        meta: { title: '培训管理', roles: ['ADMIN'] }
+                        redirect: '/hr/development/records',
+                        meta: { title: '培训管理（兼容）', roles: ['ADMIN'], hidden: true }
                     },
                     {
                         path: 'points',
@@ -3027,8 +3043,8 @@ export const routes = [
                     {
                         path: 'staff',
                         name: 'SystemStaff',
-                        component: () => import('../views/Staff.vue'),
-                        meta: { title: '员工管理', roles: ['ADMIN'] }
+                        redirect: '/hr/profile/account-access',
+                        meta: { title: '员工管理（兼容）', roles: ['ADMIN'], hidden: true }
                     },
                     {
                         path: 'menu-preview',

@@ -232,6 +232,39 @@ public class FamilyPortalController {
     return Result.ok(familyPortalService.createServiceOrder(AuthContext.getOrgId(), AuthContext.getStaffId(), request));
   }
 
+  @GetMapping("/mall/products")
+  public Result<List<FamilyPortalModels.MallProductItem>> mallProducts(
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String category,
+      @RequestParam(defaultValue = "1") int pageNo,
+      @RequestParam(defaultValue = "20") int pageSize) {
+    return Result.ok(familyPortalService.listMallProducts(
+        AuthContext.getOrgId(), AuthContext.getStaffId(), keyword, category, pageNo, pageSize));
+  }
+
+  @PostMapping("/mall/orders/preview")
+  public Result<FamilyPortalModels.MallOrderPreviewResponse> previewMallOrder(
+      @Valid @RequestBody FamilyPortalModels.MallOrderPreviewRequest request) {
+    return Result.ok(familyPortalService.previewMallOrder(
+        AuthContext.getOrgId(), AuthContext.getStaffId(), request));
+  }
+
+  @PostMapping("/mall/orders/submit")
+  public Result<FamilyPortalModels.MallOrderSubmitResponse> submitMallOrder(
+      @Valid @RequestBody FamilyPortalModels.MallOrderSubmitRequest request) {
+    return Result.ok(familyPortalService.submitMallOrder(
+        AuthContext.getOrgId(), AuthContext.getStaffId(), request));
+  }
+
+  @GetMapping("/mall/orders")
+  public Result<List<FamilyPortalModels.MallOrderItem>> mallOrders(
+      @RequestParam(required = false) Long elderId,
+      @RequestParam(defaultValue = "1") int pageNo,
+      @RequestParam(defaultValue = "20") int pageSize) {
+    return Result.ok(familyPortalService.listMallOrders(
+        AuthContext.getOrgId(), AuthContext.getStaffId(), elderId, pageNo, pageSize));
+  }
+
   @PostMapping("/feedback")
   public Result<Void> submitFeedback(@Valid @RequestBody FamilyPortalModels.FeedbackRequest request) {
     familyPortalService.submitFeedback(AuthContext.getOrgId(), AuthContext.getStaffId(), request);

@@ -250,7 +250,16 @@ const onboardingChecklistOptions = [
   '银行卡信息', '紧急联系人', '背调核验', '劳动合同', '保密协议', '员工手册承诺'
 ]
 
-const sceneMode = computed<'needs' | 'job-posting' | 'candidates' | 'interviews' | 'onboarding' | 'materials' | 'offboarding'>(() => {
+type RecruitmentScene = 'needs' | 'job-posting' | 'candidates' | 'interviews' | 'onboarding' | 'materials' | 'offboarding'
+
+const sceneMode = computed<RecruitmentScene>(() => {
+  const queryScene = String(route.query.scene || '').trim()
+  if (queryScene === 'job-posting') return 'job-posting'
+  if (queryScene === 'candidates') return 'candidates'
+  if (queryScene === 'interviews') return 'interviews'
+  if (queryScene === 'onboarding') return 'onboarding'
+  if (queryScene === 'materials') return 'materials'
+  if (queryScene === 'offboarding') return 'offboarding'
   if (route.name === 'HrRecruitmentJobPosting') return 'job-posting'
   if (route.name === 'HrRecruitmentCandidates') return 'candidates'
   if (route.name === 'HrRecruitmentInterviews') return 'interviews'
@@ -774,7 +783,7 @@ function onExportExcel() {
 
 onMounted(fetchData)
 watch(
-  () => route.name,
+  () => route.fullPath,
   () => onReset()
 )
 </script>

@@ -1,11 +1,11 @@
 <template>
-  <PageContainer title="员工管理" subTitle="账号与角色配置">
+  <PageContainer :title="pageTitle" :subTitle="pageSubTitle">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="姓名/账号" />
       </a-form-item>
       <template #extra>
-        <a-button type="primary" v-permission="['ADMIN']" @click="openDrawer()">新增员工</a-button>
+        <a-button type="primary" v-permission="accountManagerRoles" @click="openDrawer()">新增员工</a-button>
         <a-button :type="showSupervisorAnomaliesOnly ? 'primary' : 'default'" @click="toggleSupervisorAnomalyView">
           监管异常 {{ supervisorAnomalies.length }}
         </a-button>
@@ -53,15 +53,15 @@
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
-            <a v-permission="['ADMIN']" @click="openDrawer(record)">编辑</a>
+            <a v-permission="accountManagerRoles" @click="openDrawer(record)">编辑</a>
             <a
               v-if="supervisorAnomalyMap.get(String(record.id))"
-              v-permission="['ADMIN']"
+              v-permission="accountManagerRoles"
               @click="openDrawerWithRecommendation(record)"
             >
               推荐修复
             </a>
-            <a v-permission="['ADMIN']" @click="openRole(record)">分配角色</a>
+            <a v-permission="accountManagerRoles" @click="openRole(record)">分配角色</a>
           </a-space>
         </template>
       </template>
@@ -167,6 +167,13 @@ import { useLiveSyncRefresh } from '../composables/useLiveSyncRefresh'
 import { canBeDirectLeader, canBeIndirectLeader, ensureSupervisorOrder, mergeRoleCodes } from '../utils/supervisor'
 import type { StaffItem, RoleItem, PageResult } from '../types'
 
+const props = withDefaults(defineProps<{ title?: string; subTitle?: string }>(), {
+  title: '员工管理',
+  subTitle: '账号与角色配置'
+})
+
+const accountManagerRoles = ['HR_EMPLOYEE', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
+
 const query = reactive({ keyword: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const rows = ref<StaffItem[]>([])
 const route = useRoute()
@@ -211,6 +218,8 @@ const { departmentOptions, searchDepartments, ensureSelectedDepartment } = useDe
 const { staffOptions, staffLoading, searchStaff, ensureSelectedStaff } = useStaffOptions({ pageSize: 220, preloadSize: 600 })
 
 const roles = ref<RoleItem[]>([])
+const pageTitle = computed(() => props.title || '员工管理')
+const pageSubTitle = computed(() => props.subTitle || '账号与角色配置')
 
 const roleOptions = computed(() => roles.value.map((r) => ({ label: r.roleName, value: r.id })))
 const departmentNameMap = computed(() => new Map(departmentOptions.value.map((item) => [String(item.value), item.name])))

@@ -1,17 +1,56 @@
 <view class="container">
   <view class="surface card">
-    <view class="section-title">服务商城</view>
-    <view class="section-subtitle">可为老人购买护理、生活和特色餐饮服务</view>
+    <view class="section-title">商城商品</view>
+    <view class="section-subtitle">商品来自后台商品中心，可预检后直接下单</view>
+    <view class="search-row">
+      <input class="search-input" value="{{keyword}}" bindinput="onKeywordInput" placeholder="搜索商品名称或编码" />
+      <button class="ghost-btn search-btn" bindtap="onSearch" loading="{{loadingProducts}}">查询</button>
+    </view>
 
-    <block wx:for="{{catalog}}" wx:key="id">
+    <view wx:if="{{loadingProducts}}" class="empty">商品加载中...</view>
+    <view wx:if="{{!loadingProducts && products.length === 0}}" class="empty">暂无可售商品</view>
+
+    <block wx:for="{{products}}" wx:key="id">
       <view class="item">
         <view class="row-top">
-          <text class="name">{{item.name}}</text>
-          <text class="price">¥{{item.price}}/{{item.unit}}</text>
+          <text class="name">{{item.productName}}</text>
+          <text class="price">¥{{item.priceText}} / {{item.unit || '件'}}</text>
         </view>
-        <view class="meta">{{item.category}}</view>
-        <view class="desc">{{item.desc}}</view>
-        <button class="primary-btn action" data-id="{{item.id}}" bindtap="orderNow">立即购买</button>
+        <view class="meta">{{item.category}} · {{item.productCode}}</view>
+        <view class="stock stock-{{item.stockStatus}}">{{item.statusText}}（库存 {{item.stockText}}）</view>
+
+        <view class="qty-row">
+          <text class="qty-label">数量</text>
+          <button class="qty-btn" data-id="{{item.id}}" bindtap="decQty">-</button>
+          <input class="qty-input" type="number" value="{{qtyMap[item.id]}}" data-id="{{item.id}}" bindinput="onQtyInput" />
+          <button class="qty-btn" data-id="{{item.id}}" bindtap="incQty">+</button>
+        </view>
+
+        <view class="action-row">
+          <button class="ghost-btn action-btn" data-id="{{item.id}}" bindtap="onPreview" loading="{{previewingId === ('preview_' + item.id)}}">预检</button>
+          <button class="primary-btn action-btn" data-id="{{item.id}}" bindtap="onSubmit" loading="{{submittingId === ('submit_' + item.id)}}">立即下单</button>
+        </view>
+      </view>
+    </block>
+  </view>
+
+  <view class="surface card order-card">
+    <view class="section-title">我的商城订单</view>
+    <view class="section-subtitle">仅展示当前家属已绑定老人的订单</view>
+    <view wx:if="{{loadingOrders}}" class="empty">订单加载中...</view>
+    <view wx:if="{{!loadingOrders && orders.length === 0}}" class="empty">暂无订单记录</view>
+    <block wx:for="{{orders}}" wx:key="orderId">
+      <view class="order-item">
+        <view class="order-head">
+          <text class="order-no">{{item.orderNo}}</text>
+          <text class="order-status">{{item.orderStatusText}}</text>
+        </view>
+        <view class="order-line">{{item.elderName}} · {{item.productName}}</view>
+        <view class="order-line">{{item.qtyText}} · {{item.amountText}}</view>
+        <view class="order-foot">
+          <text>{{item.createTime}}</text>
+          <text>{{item.payStatusText}}</text>
+        </view>
       </view>
     </block>
   </view>

@@ -11,8 +11,8 @@ function normalizeSetting(raw = {}) {
     verifyHealthData: raw.verifyHealthData !== false,
     verifyMedicalRecords: raw.verifyMedicalRecords !== false,
     verifyReports: raw.verifyReports !== false,
-    verifyWithSmsCode: raw.verifyWithSmsCode !== false,
-    verifyWithPassword: !!raw.verifyWithPassword,
+    verifyWithSmsCode: false,
+    verifyWithPassword: true,
     hasIndependentPassword: !!raw.hasIndependentPassword,
     maskSensitiveData: raw.maskSensitiveData !== false,
     visibleScope: raw.visibleScope || SCOPE_OPTIONS[0]

@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="绩效看板" subTitle="区分护理/行政/运营绩效，支持积分兑现金审批">
+  <PageContainer :title="pageTitle" :subTitle="pageSubTitle">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="员工">
         <a-select
@@ -137,9 +137,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import type { Dayjs } from 'dayjs'
 import { message } from 'ant-design-vue'
+import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
@@ -150,6 +151,37 @@ import { useUserStore } from '../../stores/user'
 import type { StaffPerformanceRankItem, StaffPerformanceSummary, PageResult } from '../../types'
 
 const userStore = useUserStore()
+const route = useRoute()
+
+const performanceScene = computed<'nursing' | 'sales' | 'admin' | 'generation' | 'reports'>(() => {
+  const queryScene = String(route.query.scene || '').trim()
+  if (queryScene === 'nursing') return 'nursing'
+  if (queryScene === 'sales') return 'sales'
+  if (queryScene === 'admin') return 'admin'
+  if (queryScene === 'generation') return 'generation'
+  if (queryScene === 'reports') return 'reports'
+  if (route.name === 'HrPerformanceNursing') return 'nursing'
+  if (route.name === 'HrPerformanceSales') return 'sales'
+  if (route.name === 'HrPerformanceAdmin') return 'admin'
+  if (route.name === 'HrPerformanceGeneration') return 'generation'
+  return 'reports'
+})
+
+const pageTitle = computed(() => {
+  if (performanceScene.value === 'nursing') return '护理绩效'
+  if (performanceScene.value === 'sales') return '销售绩效'
+  if (performanceScene.value === 'admin') return '行政绩效'
+  if (performanceScene.value === 'generation') return '绩效生成'
+  return '绩效报表'
+})
+
+const pageSubTitle = computed(() => {
+  if (performanceScene.value === 'nursing') return '绩效考核 / 护理序列积分与质量排名'
+  if (performanceScene.value === 'sales') return '绩效考核 / 销售与运营转化绩效排名'
+  if (performanceScene.value === 'admin') return '绩效考核 / 行政执行与协同效率排名'
+  if (performanceScene.value === 'generation') return '绩效考核 / 绩效生成与审批联动'
+  return '绩效考核 / 全员积分看板与兑现金审批'
+})
 
 const query = reactive({
   staffId: undefined as string | undefined,
@@ -413,6 +445,14 @@ async function submitRedeem() {
 
 searchStaff('')
 fetchData()
+
+watch(
+  () => route.fullPath,
+  () => {
+    if (loading.value) return
+    fetchData()
+  }
+)
 </script>
 
 <style scoped>

@@ -1794,7 +1794,7 @@ const riskReminders = computed(() => {
       desc: `阈值 -${revenueDropThreshold}%`
     },
     { title: '审批超时', count: approvalTimeoutCount, route: '/oa/approval', level: approvalTimeoutCount > 0 ? '紧急' : '普通通知' },
-    { title: '监管链异常', count: supervisorAnomalyCount, route: '/system/staff?view=supervisor-anomalies', level: supervisorAnomalyCount > 0 ? '紧急' : '普通通知' },
+    { title: '监管链异常', count: supervisorAnomalyCount, route: '/hr/profile/account-access?view=supervisor-anomalies', level: supervisorAnomalyCount > 0 ? '紧急' : '普通通知' },
     { title: '证书到期', count: certificateReminderCount.value, route: '/hr/development/certificate-reminders', level: certificateReminderCount.value > 0 ? '预警' : '普通通知' },
     { title: '合同到期', count: contractExpiringCount, route: '/hr/profile/contract-reminders', level: contractExpiringCount > 0 ? '预警' : '普通通知' }
   ]
@@ -1985,7 +1985,7 @@ const expenseSections = computed(() => {
       title: '我的费用',
       rows: [
         { label: '本月报销金额', value: money(monthExpenseCount), route: '/hr/expense/approval-flow' },
-        { label: '待报销金额', value: money(monthExpenseCount), route: '/hr/expense/training-reimburse' },
+        { label: '待报销金额', value: money(monthExpenseCount), route: '/hr/expense/records?scene=training-reimburse' },
         { label: '待审批报销', value: `${myTodoSummary.pendingApprovalCount || 0} 条`, route: '/hr/expense/approval-flow' }
       ]
     },

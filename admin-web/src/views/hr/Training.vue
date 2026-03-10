@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="培训管理" subTitle="护理员培训与考核记录">
+  <PageContainer :title="pageTitle" :subTitle="pageSubTitle">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="员工">
         <a-select
@@ -102,16 +102,45 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
+import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { getHrTrainingPage, createHrTraining, updateHrTraining, deleteHrTraining } from '../../api/hr'
 import { useStaffOptions } from '../../composables/useStaffOptions'
 import type { StaffTrainingRecord, PageResult } from '../../types'
+
+const route = useRoute()
+
+const trainingScene = computed<'plans' | 'enrollments' | 'signin' | 'records'>(() => {
+  const queryScene = String(route.query.scene || '').trim()
+  if (queryScene === 'plans') return 'plans'
+  if (queryScene === 'enrollments') return 'enrollments'
+  if (queryScene === 'signin') return 'signin'
+  if (queryScene === 'records') return 'records'
+  if (route.name === 'HrDevelopmentPlans') return 'plans'
+  if (route.name === 'HrDevelopmentEnrollments') return 'enrollments'
+  if (route.name === 'HrDevelopmentSignin') return 'signin'
+  return 'records'
+})
+
+const pageTitle = computed(() => {
+  if (trainingScene.value === 'plans') return '培训计划'
+  if (trainingScene.value === 'enrollments') return '培训报名'
+  if (trainingScene.value === 'signin') return '培训签到'
+  return '培训记录'
+})
+
+const pageSubTitle = computed(() => {
+  if (trainingScene.value === 'plans') return '培训与发展 / 课程排期与计划执行'
+  if (trainingScene.value === 'enrollments') return '培训与发展 / 报名与参训名单管理'
+  if (trainingScene.value === 'signin') return '培训与发展 / 培训签到与出勤追踪'
+  return '培训与发展 / 培训记录与结果归档'
+})
 
 const query = reactive({
   staffId: undefined as string | number | undefined,
@@ -303,6 +332,14 @@ async function batchRemove() {
 
 searchStaff('')
 fetchData()
+
+watch(
+  () => route.fullPath,
+  () => {
+    if (loading.value || saving.value) return
+    fetchData()
+  }
+)
 </script>
 
 <style scoped>

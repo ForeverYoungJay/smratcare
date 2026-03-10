@@ -68,15 +68,25 @@ const rows = ref<HrGenericApprovalItem[]>([])
 const loading = ref(false)
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 
+const approvalScene = computed<'leave' | 'shift-change' | 'overtime'>(() => {
+  const scene = String(route.query.scene || '').trim()
+  if (scene === 'shift-change') return 'shift-change'
+  if (scene === 'overtime') return 'overtime'
+  if (scene === 'leave') return 'leave'
+  if (route.name === 'HrAttendanceShiftChange') return 'shift-change'
+  if (route.name === 'HrAttendanceOvertime') return 'overtime'
+  return 'leave'
+})
+
 const pageTitle = computed(() => {
-  if (route.name === 'HrAttendanceShiftChange') return '调班申请'
-  if (route.name === 'HrAttendanceOvertime') return '加班申请'
+  if (approvalScene.value === 'shift-change') return '调班申请'
+  if (approvalScene.value === 'overtime') return '加班申请'
   return '请假审批'
 })
 
 const fetcher = computed(() => {
-  if (route.name === 'HrAttendanceShiftChange') return getHrAttendanceShiftChangePage
-  if (route.name === 'HrAttendanceOvertime') return getHrAttendanceOvertimePage
+  if (approvalScene.value === 'shift-change') return getHrAttendanceShiftChangePage
+  if (approvalScene.value === 'overtime') return getHrAttendanceOvertimePage
   return getHrAttendanceLeavePage
 })
 
@@ -129,7 +139,7 @@ function onExportExcel() {
 onMounted(fetchData)
 
 watch(
-  () => route.name,
+  () => route.fullPath,
   () => {
     onReset()
   }

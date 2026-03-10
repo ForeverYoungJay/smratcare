@@ -1,21 +1,42 @@
-const { familyLogin, registerFamily, sendFamilySmsCode, bindWechatNotifyOpenId } = require('../../services/family');
+const {
+  familyLogin,
+  registerFamily,
+  resetFamilyPassword,
+  sendFamilySmsCode,
+  getFamilyAuthBootstrap,
+  bindWechatNotifyOpenId
+} = require('../../services/family');
 const { setAuth } = require('../../utils/auth');
+
+const MODE_LOGIN = 'login';
+const MODE_REGISTER = 'register';
+const MODE_RESET = 'reset';
+
+function trimText(value) {
+  return String(value || '').trim();
+}
 
 Page({
   data: {
+    loadingBootstrap: false,
     loading: false,
     sendingCode: false,
     countdown: 0,
     debugCodeHint: '',
-    mode: 'login',
+    mode: MODE_LOGIN,
+    orgId: 1,
+    orgName: '默认机构',
     form: {
-      orgId: '1',
       phone: '',
       verifyCode: '',
+      password: '',
       realName: ''
     }
   },
   timer: null,
+  onLoad() {
+    this.loadBootstrap();
+  },
   onShow() {
     const app = getApp();
     if (app.globalData.token) {
@@ -28,23 +49,25 @@ Page({
       wx.reLaunch({ url: '/pages/home/index' });
     }
   },
-  switchMode(e) {
-    this.setData({ mode: e.currentTarget.dataset.mode });
-  },
-  onOrgInput(e) {
-    this.setData({ 'form.orgId': e.detail.value });
-  },
-  onPhoneInput(e) {
-    this.setData({ 'form.phone': e.detail.value });
-  },
-  onCodeInput(e) {
-    this.setData({ 'form.verifyCode': e.detail.value });
-  },
-  onNameInput(e) {
-    this.setData({ 'form.realName': e.detail.value });
-  },
   onUnload() {
     this.clearTimer();
+  },
+  async loadBootstrap() {
+    this.setData({ loadingBootstrap: true });
+    try {
+      const resp = await getFamilyAuthBootstrap();
+      this.setData({
+        orgId: Number(resp && resp.orgId) || 1,
+        orgName: (resp && resp.orgName) || '默认机构'
+      });
+    } catch (error) {
+      this.setData({
+        orgId: 1,
+        orgName: '默认机构'
+      });
+    } finally {
+      this.setData({ loadingBootstrap: false });
+    }
   },
   clearTimer() {
     if (this.timer) {
@@ -66,21 +89,53 @@ Page({
       this.setData({ countdown: next });
     }, 1000);
   },
+  switchMode(e) {
+    const mode = e.currentTarget.dataset.mode || MODE_LOGIN;
+    if (mode === this.data.mode) {
+      return;
+    }
+    this.clearTimer();
+    this.setData({
+      mode,
+      countdown: 0,
+      debugCodeHint: '',
+      'form.verifyCode': '',
+      'form.password': ''
+    });
+  },
+  onPhoneInput(e) {
+    this.setData({ 'form.phone': e.detail.value });
+  },
+  onCodeInput(e) {
+    this.setData({ 'form.verifyCode': e.detail.value });
+  },
+  onPasswordInput(e) {
+    this.setData({ 'form.password': e.detail.value });
+  },
+  onNameInput(e) {
+    this.setData({ 'form.realName': e.detail.value });
+  },
+  currentCodeScene() {
+    return this.data.mode === MODE_REGISTER ? 'REGISTER' : 'RESET_PASSWORD';
+  },
   async sendCode() {
+    if (this.data.mode === MODE_LOGIN) {
+      return;
+    }
     if (this.data.sendingCode || this.data.countdown > 0) {
       return;
     }
-    const { orgId, phone } = this.data.form;
-    if (!orgId || !phone) {
-      wx.showToast({ title: '请先填写机构ID和手机号', icon: 'none' });
+    const phone = trimText(this.data.form.phone);
+    if (!phone) {
+      wx.showToast({ title: '请先填写手机号', icon: 'none' });
       return;
     }
     this.setData({ sendingCode: true });
     try {
       const resp = await sendFamilySmsCode({
-        orgId: Number(orgId),
-        phone: String(phone).trim(),
-        scene: 'LOGIN'
+        orgId: Number(this.data.orgId) || 1,
+        phone,
+        scene: this.currentCodeScene()
       });
       const retryAfterSeconds = Number(resp && resp.retryAfterSeconds) || 60;
       this.startCountdown(retryAfterSeconds);
@@ -93,38 +148,76 @@ Page({
     }
   },
   async onSubmit() {
-    const { orgId, phone, verifyCode, realName } = this.data.form;
-    if (!orgId || !phone || !verifyCode) {
-      wx.showToast({ title: '请完整填写信息', icon: 'none' });
+    if (this.data.loading) {
       return;
     }
+    const phone = trimText(this.data.form.phone);
+    const verifyCode = trimText(this.data.form.verifyCode);
+    const password = trimText(this.data.form.password);
+    const realName = trimText(this.data.form.realName);
+    const orgId = Number(this.data.orgId) || 1;
+
+    if (!phone) {
+      wx.showToast({ title: '请输入手机号', icon: 'none' });
+      return;
+    }
+    if (!password) {
+      wx.showToast({ title: this.data.mode === MODE_RESET ? '请输入新密码' : '请输入密码', icon: 'none' });
+      return;
+    }
+    if (password.length < 6) {
+      wx.showToast({ title: '密码长度至少6位', icon: 'none' });
+      return;
+    }
+    if (this.data.mode !== MODE_LOGIN && !verifyCode) {
+      wx.showToast({ title: '请输入验证码', icon: 'none' });
+      return;
+    }
+
     this.setData({ loading: true });
     try {
-      if (this.data.mode === 'register') {
-        await registerFamily({
-          orgId: Number(orgId),
+      let loginResp = null;
+      if (this.data.mode === MODE_REGISTER) {
+        loginResp = await registerFamily({
+          orgId,
           phone,
+          verifyCode,
+          password,
           realName: realName || phone
         });
+      } else if (this.data.mode === MODE_RESET) {
+        await resetFamilyPassword({
+          orgId,
+          phone,
+          verifyCode,
+          newPassword: password
+        });
+        loginResp = await familyLogin({
+          orgId,
+          phone,
+          password
+        });
+      } else {
+        loginResp = await familyLogin({
+          orgId,
+          phone,
+          password
+        });
       }
-      const res = await familyLogin({
-        orgId: Number(orgId),
-        phone,
-        verifyCode
-      });
+
       const app = getApp();
-      app.globalData.token = res.token;
+      app.globalData.token = loginResp.token;
       app.globalData.familyUser = {
-        familyUserId: res.familyUserId,
-        orgId: res.orgId || Number(orgId),
-        realName: res.realName,
-        phone: res.phone
+        familyUserId: loginResp.familyUserId,
+        orgId: loginResp.orgId || orgId,
+        realName: loginResp.realName,
+        phone: loginResp.phone
       };
-      setAuth(res.token, app.globalData.familyUser);
+      setAuth(loginResp.token, app.globalData.familyUser);
       this.bindWechatNotifyOpenId();
       wx.reLaunch({ url: '/pages/home/index' });
     } catch (error) {
-      wx.showToast({ title: error.message || '登录失败，请稍后重试', icon: 'none' });
+      wx.showToast({ title: error.message || '操作失败，请稍后重试', icon: 'none' });
     } finally {
       this.setData({ loading: false });
     }
@@ -143,7 +236,7 @@ Page({
         }
       },
       fail: () => {
-        // 忽略微信登录失败，避免影响主登录流程
+        // 忽略微信登录失败，避免影响主流程
       }
     });
   }

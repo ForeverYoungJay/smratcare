@@ -52,9 +52,25 @@ async function verifyFamilySmsCode(payload) {
 
 async function registerFamily(payload) {
   return request({
-    url: '/api/family/register',
+    url: '/api/auth/family/register',
     method: 'POST',
     data: payload,
+    auth: false
+  });
+}
+
+async function resetFamilyPassword(payload) {
+  return request({
+    url: '/api/auth/family/password/reset',
+    method: 'POST',
+    data: payload,
+    auth: false
+  });
+}
+
+async function getFamilyAuthBootstrap() {
+  return request({
+    url: '/api/auth/family/bootstrap',
     auth: false
   });
 }
@@ -402,6 +418,66 @@ async function createServiceOrder(serviceId, elderId, remark = '') {
   );
 }
 
+async function getMallProducts(options = {}) {
+  const data = {
+    keyword: options.keyword,
+    category: options.category,
+    pageNo: options.pageNo || 1,
+    pageSize: options.pageSize || 20
+  };
+  return withFallback(
+    async () => request({ url: '/api/family/mall/products', data }),
+    () => mock.getMallProducts(options)
+  );
+}
+
+async function previewMallOrder(payload = {}) {
+  const targetElderId = resolveCurrentElderId(payload.elderId);
+  return withFallback(
+    async () => request({
+      url: '/api/family/mall/orders/preview',
+      method: 'POST',
+      data: {
+        productId: payload.productId,
+        qty: payload.qty || 1,
+        elderId: targetElderId
+      }
+    }),
+    () => mock.previewMallOrder({ ...payload, elderId: targetElderId })
+  );
+}
+
+async function submitMallOrder(payload = {}) {
+  const targetElderId = resolveCurrentElderId(payload.elderId);
+  return withFallback(
+    async () => request({
+      url: '/api/family/mall/orders/submit',
+      method: 'POST',
+      data: {
+        productId: payload.productId,
+        qty: payload.qty || 1,
+        elderId: targetElderId
+      }
+    }),
+    () => mock.submitMallOrder({ ...payload, elderId: targetElderId })
+  );
+}
+
+async function getMallOrders(options = {}) {
+  const targetElderId = resolveCurrentElderId(options.elderId);
+  return withFallback(
+    async () => request({
+      url: '/api/family/mall/orders',
+      data: {
+        elderId: targetElderId,
+        pageNo: options.pageNo || 1,
+        pageSize: options.pageSize || 20
+      }
+    }),
+    () => mock.getMallOrders({ ...options, elderId: targetElderId })
+  );
+}
+
 async function submitFeedback(payload) {
   return withFallback(
     async () => request({
@@ -666,6 +742,8 @@ module.exports = {
   sendFamilySmsCode,
   verifyFamilySmsCode,
   registerFamily,
+  resetFamilyPassword,
+  getFamilyAuthBootstrap,
   bindElder,
   getMyElders,
   getHomeDashboard,
@@ -701,6 +779,10 @@ module.exports = {
   getServiceCatalog,
   getServiceOrders,
   createServiceOrder,
+  getMallProducts,
+  previewMallOrder,
+  submitMallOrder,
+  getMallOrders,
   submitFeedback,
   getFeedbackRecords,
   bookVideoVisit,

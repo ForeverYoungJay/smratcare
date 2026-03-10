@@ -399,6 +399,87 @@ public final class FamilyPortalModels {
   }
 
   @Data
+  public static class MallProductItem {
+    private Long id;
+    private String productCode;
+    private String productName;
+    private String category;
+    private String unit;
+    private BigDecimal price;
+    private Integer pointsPrice;
+    private Integer currentStock;
+    private String stockStatus;
+    private String statusText;
+    private String businessDomain;
+    private String itemType;
+  }
+
+  @Data
+  public static class MallOrderItem {
+    private Long orderId;
+    private String orderNo;
+    private Long elderId;
+    private String elderName;
+    private Long productId;
+    private String productName;
+    private Integer quantity;
+    private BigDecimal unitPrice;
+    private BigDecimal totalAmount;
+    private Integer pointsUsed;
+    private Integer orderStatus;
+    private String orderStatusText;
+    private Integer payStatus;
+    private String payStatusText;
+    private String createTime;
+    private String payTime;
+  }
+
+  @Data
+  public static class MallOrderPreviewRequest {
+    @NotNull
+    private Long productId;
+    @Min(1)
+    @NotNull
+    private Integer qty;
+    private Long elderId;
+  }
+
+  @Data
+  public static class MallOrderSubmitRequest {
+    @NotNull
+    private Long productId;
+    @Min(1)
+    @NotNull
+    private Integer qty;
+    private Long elderId;
+  }
+
+  @Data
+  public static class MallOrderPreviewResponse {
+    private Boolean allowed;
+    private String status;
+    private String message;
+    private Long elderId;
+    private Long productId;
+    private String productName;
+    private Integer qty;
+    private Integer pointsRequired;
+    private List<String> reasons = new ArrayList<>();
+  }
+
+  @Data
+  public static class MallOrderSubmitResponse {
+    private Boolean allowed;
+    private String status;
+    private String message;
+    private Long orderId;
+    private String orderNo;
+    private Integer pointsDeducted;
+    private Integer balanceAfter;
+    private MallOrderPreviewResponse preview;
+  }
+
+  @Data
   public static class BindRelationItem {
     private Long elderId;
     private String elderName;
@@ -408,8 +489,9 @@ public final class FamilyPortalModels {
 
   @Data
   public static class BindCreateRequest {
-    @NotNull
     private Long elderId;
+    @Size(max = 32)
+    private String elderIdCardNo;
     private String relation;
     @Min(0)
     @Max(1)

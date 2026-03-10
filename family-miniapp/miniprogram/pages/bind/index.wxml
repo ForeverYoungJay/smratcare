@@ -1,12 +1,13 @@
 <view class="container">
   <view class="surface bind-card">
     <view class="section-title">绑定入住老人</view>
-    <view class="section-subtitle">支持扫码二维码或手动填写老人ID</view>
+    <view class="section-subtitle">支持扫码院内二维码或手动填写老人身份证号</view>
     <button class="ghost-btn" bindtap="scanCode">扫码绑定（推荐）</button>
 
     <view class="field">
-      <text class="label">老人ID</text>
-      <input class="input" type="number" value="{{form.elderId}}" bindinput="onElderIdInput" placeholder="请输入老人ID" />
+      <text class="label">老人身份证号</text>
+      <input class="input" maxlength="18" value="{{form.elderIdCardNo}}" bindinput="onIdCardInput" placeholder="请输入15位或18位身份证号" />
+      <view class="hint">优先使用身份证匹配，兼容旧版二维码中的老人ID</view>
     </view>
 
     <view class="field">
