@@ -133,7 +133,7 @@
           <StatefulBlock :loading="loading" :error="errorMessage" @retry="loadAll">
             <a-descriptions :column="1" size="small" bordered>
               <a-descriptions-item label="合同号">{{ linkage?.contractNo || '-' }}</a-descriptions-item>
-              <a-descriptions-item label="签约状态">{{ linkage?.contractStatus || '-' }}</a-descriptions-item>
+              <a-descriptions-item label="签约状态">{{ contractStatusText(linkage?.contractStatus) }}</a-descriptions-item>
               <a-descriptions-item label="签约时间">{{ linkage?.contractSignedAt || '-' }}</a-descriptions-item>
               <a-descriptions-item label="合同有效期止">{{ linkage?.contractExpiryDate || '-' }}</a-descriptions-item>
               <a-descriptions-item label="入住日期">{{ linkage?.admissionDate || '-' }}</a-descriptions-item>
@@ -355,6 +355,22 @@ const lifecycleHint = computed(() => {
   }
   return lifecycleStageHint(resolvedLifecycleStage.value)
 })
+
+function contractStatusText(status?: string) {
+  const value = String(status || '').trim().toUpperCase()
+  if (!value) return '-'
+  if (value === 'DRAFT') return '草稿'
+  if (value === 'PENDING_APPROVAL') return '待审批'
+  if (value === 'APPROVED') return '已审批'
+  if (value === 'REJECTED') return '已驳回'
+  if (value === 'PENDING_ASSESSMENT') return '待评估'
+  if (value === 'PENDING_BED_SELECT') return '待办理入住'
+  if (value === 'PENDING_SIGN') return '待签署'
+  if (value === 'SIGNED') return '已签署'
+  if (value === 'EFFECTIVE') return '已生效'
+  if (value === 'VOID') return '已作废'
+  return status || '-'
+}
 const hasContractAttachment = computed(() =>
   linkage.value?.hasContractAttachment ?? contractAttachmentCount.value > 0
 )

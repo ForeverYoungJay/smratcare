@@ -45,14 +45,22 @@ public class MemberBirthdayController {
       @RequestParam(required = false) Integer month,
       @RequestParam(required = false) Integer daysAhead,
       @RequestParam(required = false) String keyword) {
+    long safePageNo = normalizePageNo(pageNo);
+    long safePageSize = normalizePageSize(pageSize);
+    Integer normalizedMonth = normalizeMonth(month);
+    Integer normalizedDaysAhead = normalizeDaysAhead(daysAhead);
     Long orgId = AuthContext.getOrgId();
     LocalDate today = LocalDate.now();
+    LocalDate minBirthDate = LocalDate.of(1900, 1, 1);
 
     List<ElderProfile> elders = elderMapper.selectList(Wrappers.lambdaQuery(ElderProfile.class)
         .eq(ElderProfile::getIsDeleted, 0)
         .eq(orgId != null, ElderProfile::getOrgId, orgId)
         .eq(ElderProfile::getStatus, 1)
         .isNotNull(ElderProfile::getBirthDate)
+        // 屏蔽异常生日值（如 0000-00-00 / 极端日期）导致的映射与计算异常。
+        .ge(ElderProfile::getBirthDate, minBirthDate)
+        .le(ElderProfile::getBirthDate, today)
         .like(keyword != null && !keyword.isBlank(), ElderProfile::getFullName, keyword));
 
     List<Long> bedIds = elders.stream()
@@ -78,20 +86,49 @@ public class MemberBirthdayController {
     List<BirthdayReminderResponse> list = elders.stream()
         .map(elder -> toResponse(elder, bedMap.get(elder.getBedId()), roomMap, today))
         .filter(item -> item.getNextBirthday() != null)
-        .filter(item -> month == null || item.getNextBirthday().getMonthValue() == month)
-        .filter(item -> daysAhead == null || item.getDaysUntil() <= daysAhead)
-        .sorted(Comparator.comparing(BirthdayReminderResponse::getDaysUntil)
-            .thenComparing(BirthdayReminderResponse::getElderId))
+        .filter(item -> normalizedMonth == null || item.getNextBirthday().getMonthValue() == normalizedMonth)
+        .filter(item -> normalizedDaysAhead == null || item.getDaysUntil() <= normalizedDaysAhead)
+        .sorted(Comparator.comparing(
+                BirthdayReminderResponse::getDaysUntil,
+                Comparator.nullsLast(Comparator.naturalOrder()))
+            .thenComparing(
+                BirthdayReminderResponse::getElderId,
+                Comparator.nullsLast(Comparator.naturalOrder())))
         .toList();
 
     long total = list.size();
-    int from = (int) Math.max((pageNo - 1) * pageSize, 0);
-    int to = (int) Math.min(from + pageSize, total);
+    int from = (int) Math.max((safePageNo - 1) * safePageSize, 0);
+    int to = (int) Math.min(from + safePageSize, total);
     List<BirthdayReminderResponse> records = from >= to ? List.of() : list.subList(from, to);
 
-    IPage<BirthdayReminderResponse> page = new Page<>(pageNo, pageSize, total);
+    IPage<BirthdayReminderResponse> page = new Page<>(safePageNo, safePageSize, total);
     page.setRecords(records);
     return Result.ok(page);
+  }
+
+  private long normalizePageNo(long pageNo) {
+    return pageNo <= 0 ? 1 : pageNo;
+  }
+
+  private long normalizePageSize(long pageSize) {
+    if (pageSize <= 0) return 20;
+    return Math.min(pageSize, 500);
+  }
+
+  private Integer normalizeMonth(Integer month) {
+    if (month == null) return null;
+    if (month < 1 || month > 12) {
+      throw new IllegalArgumentException("month 仅支持 1-12");
+    }
+    return month;
+  }
+
+  private Integer normalizeDaysAhead(Integer daysAhead) {
+    if (daysAhead == null) return null;
+    if (daysAhead < 0) {
+      throw new IllegalArgumentException("daysAhead 不能小于 0");
+    }
+    return Math.min(daysAhead, 3660);
   }
 
   private BirthdayReminderResponse toResponse(

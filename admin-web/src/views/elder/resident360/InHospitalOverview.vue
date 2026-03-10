@@ -112,12 +112,12 @@ import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
 import LifecycleStageBar from '../../../components/LifecycleStageBar.vue'
 import { getResidentOverview } from '../../../api/medicalCare'
-import { getContractLinkageByElder } from '../../../api/marketing'
+import { getContractLinkageByElder, getContractPage } from '../../../api/marketing'
 import { useElderOptions } from '../../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
 import { copyText } from '../../../utils/clipboard'
 import { lifecycleStageHint, normalizeLifecycleStage } from '../../../utils/lifecycleStage'
-import type { ContractLinkageSummary, MedicalResidentOverview } from '../../../types'
+import type { ContractLinkageSummary, CrmContractItem, MedicalResidentOverview, PageResult } from '../../../types'
 
 const router = useRouter()
 const route = useRoute()
@@ -136,6 +136,8 @@ const { elderOptions: residentOptionPool, elderLoading: residentLoading, searchE
   preloadSize: 600,
   inHospitalOnly: true
 })
+const signedResidentIdSet = ref<Set<string>>(new Set())
+const signedResidentSetReady = ref(false)
 const residentOptions = computed(() => {
   const map = new Map<string, { label: string; value: string }>()
   residentOptionPool.value.forEach((item) => {
@@ -160,7 +162,25 @@ const residentOptions = computed(() => {
       map.set(value, nextOption)
     }
   })
-  return Array.from(map.values())
+  let options = Array.from(map.values())
+  if (signedResidentSetReady.value) {
+    options = options.filter((item) => signedResidentIdSet.value.has(String(item.value || '').trim()))
+  }
+  const codedNameSet = new Set<string>()
+  options.forEach((option) => {
+    const nameKey = String(option.label || '').replace(/\s*\([^)]*\)\s*$/, '').trim()
+    if (!nameKey) return
+    if (/\([^)]*\)/.test(option.label)) {
+      codedNameSet.add(nameKey)
+    }
+  })
+  return options.filter((option) => {
+    const hasCode = /\([^)]*\)/.test(option.label)
+    if (hasCode) return true
+    const nameKey = String(option.label || '').replace(/\s*\([^)]*\)\s*$/, '').trim()
+    if (!nameKey) return true
+    return !codedNameSet.has(nameKey)
+  })
 })
 const selectedResidentOption = computed(() =>
   residentOptions.value.find((item) => item.value === String(residentId.value || '').trim())
@@ -387,7 +407,33 @@ async function resolveResidentId() {
 }
 
 async function searchResidentOptions(keyword = '') {
-  await searchElders(keyword)
+  await Promise.all([searchElders(keyword), loadSignedResidentSet()])
+}
+
+async function loadSignedResidentSet() {
+  try {
+    const idSet = new Set<string>()
+    let pageNo = 1
+    let total = 0
+    do {
+      const page: PageResult<CrmContractItem> = await getContractPage({
+        pageNo,
+        pageSize: 200,
+        flowStage: 'SIGNED'
+      })
+      const list = page.list || []
+      list.forEach((item) => {
+        const elderId = String(item.elderId || '').trim()
+        if (elderId) idSet.add(elderId)
+      })
+      total = Number(page.total || 0)
+      pageNo += 1
+      if (pageNo > 20) break
+    } while ((pageNo - 1) * 200 < total)
+    signedResidentIdSet.value = idSet
+  } finally {
+    signedResidentSetReady.value = true
+  }
 }
 
 function syncResidentToRoute() {

@@ -136,10 +136,13 @@ const editOpen = ref(false)
 const editForm = reactive<Partial<CrmContractItem>>({})
 
 function statusText(status?: string) {
+  if (status === 'DRAFT') return '草稿'
   if (status === 'PENDING_APPROVAL') return '待审批'
   if (status === 'APPROVED') return '已通过'
   if (status === 'REJECTED') return '已驳回'
   if (status === 'SIGNED') return '已签署'
+  if (status === 'EFFECTIVE') return '已生效'
+  if (status === 'VOID') return '已作废'
   return status || '-'
 }
 
