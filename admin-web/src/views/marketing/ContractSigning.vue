@@ -276,7 +276,14 @@
                       <span v-else>{{ record.realName || '-' }}</span>
                     </template>
                     <template v-else-if="column.key === 'relation'">
-                      <a-input v-if="!contractViewMode" v-model:value="record.relation" placeholder="关系（如子女）" />
+                      <a-select
+                        v-if="!contractViewMode"
+                        v-model:value="record.relation"
+                        :options="familyRelationOptions"
+                        allow-clear
+                        placeholder="请选择关系"
+                        style="width: 100%"
+                      />
                       <span v-else>{{ record.relation || '-' }}</span>
                     </template>
                     <template v-else-if="column.key === 'phone'">
@@ -767,6 +774,16 @@ const familyDraftColumns = [
   { title: '身份证号', key: 'idCardNo', width: 190 },
   { title: '主联系人', key: 'isPrimary', width: 90 },
   { title: '操作', key: 'operation', width: 80 }
+]
+const familyRelationOptions = [
+  { label: '配偶', value: '配偶' },
+  { label: '子女', value: '子女' },
+  { label: '孙辈', value: '孙辈' },
+  { label: '兄弟姐妹', value: '兄弟姐妹' },
+  { label: '监护人', value: '监护人' },
+  { label: '亲属', value: '亲属' },
+  { label: '朋友', value: '朋友' },
+  { label: '其他', value: '其他' }
 ]
 const elderSnapshotLoading = ref(false)
 const contractInfoPage = ref(1)

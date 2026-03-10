@@ -63,6 +63,9 @@
         <a-form-item label="疾病名称" required>
           <a-input v-model:value="diseaseForm.diseaseName" placeholder="请输入疾病名称" />
         </a-form-item>
+        <a-form-item label="备注">
+          <a-input v-model:value="diseaseForm.remark" placeholder="可选" />
+        </a-form-item>
       </a-form>
     </a-modal>
   </PageContainer>
@@ -86,7 +89,8 @@ const diseaseModalOpen = ref(false)
 const diseaseSaving = ref(false)
 const editingDiseaseId = ref<number | null>(null)
 const diseaseForm = ref({
-  diseaseName: ''
+  diseaseName: '',
+  remark: ''
 })
 
 const filteredDiseases = computed(() => {
@@ -182,6 +186,7 @@ onMounted(init)
 function openDiseaseModal(item?: DiseaseItem) {
   editingDiseaseId.value = item ? Number(item.id) : null
   diseaseForm.value.diseaseName = String(item?.diseaseName || '')
+  diseaseForm.value.remark = String((item as any)?.remark || '')
   diseaseModalOpen.value = true
 }
 
@@ -194,10 +199,16 @@ async function submitDisease() {
   diseaseSaving.value = true
   try {
     if (editingDiseaseId.value) {
-      await updateDisease(editingDiseaseId.value, { diseaseName })
+      await updateDisease(editingDiseaseId.value, {
+        diseaseName,
+        remark: String(diseaseForm.value.remark || '').trim() || undefined
+      })
       message.success('疾病已更新')
     } else {
-      await createDisease({ diseaseName })
+      await createDisease({
+        diseaseName,
+        remark: String(diseaseForm.value.remark || '').trim() || undefined
+      })
       message.success('疾病已新增')
     }
     diseaseModalOpen.value = false

@@ -494,7 +494,11 @@
           </a-col>
           <a-col :span="12">
             <a-form-item label="档案编号">
-              <a-input v-model:value="form.archiveNo" :disabled="formReadonly" />
+              <a-input
+                v-model:value="form.archiveNo"
+                :disabled="formReadonly || isAdmissionAssessment"
+                :placeholder="isAdmissionAssessment ? '系统自动回填合同编号' : ''"
+              />
             </a-form-item>
           </a-col>
         </a-row>

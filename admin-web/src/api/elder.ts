@@ -48,7 +48,11 @@ export function updateElderDiseases(elderId: Id, diseaseIds: number[]) {
 }
 
 export function bindFamily(data: FamilyBindRequest) {
-  return request.post<void>('/api/admin/family/relations/bind', data)
+  const payload = {
+    ...data,
+    isPrimary: data.isPrimary === true || Number(data.isPrimary) === 1 ? 1 : 0
+  }
+  return request.post<void>('/api/admin/family/relations/bind', payload)
 }
 
 export function uploadElderFile(file: File, bizType = 'elder-archive') {

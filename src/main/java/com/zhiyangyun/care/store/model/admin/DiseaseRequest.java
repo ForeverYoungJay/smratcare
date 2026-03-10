@@ -6,7 +6,6 @@ import lombok.Data;
 @Data
 public class DiseaseRequest {
   private Long orgId;
-  @NotBlank
   private String diseaseCode;
   @NotBlank
   private String diseaseName;

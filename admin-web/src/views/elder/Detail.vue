@@ -130,7 +130,7 @@
           </a-select>
         </a-form-item>
         <a-form-item label="关系" name="relation">
-          <a-input v-model:value="familyBind.relation" />
+          <a-select v-model:value="familyBind.relation" :options="familyRelationOptions" placeholder="请选择关系" />
         </a-form-item>
         <a-form-item label="主联系人">
           <a-switch v-model:checked="familyBind.isPrimary" />
@@ -192,9 +192,19 @@ const familyColumns = [
 const familyBindOpen = ref(false)
 const familyBindRef = ref<FormInstance>()
 const familyBind = reactive<FamilyBindRequest>({ familyUserId: '', elderId: '', relation: '', isPrimary: false })
+const familyRelationOptions = [
+  { label: '配偶', value: '配偶' },
+  { label: '子女', value: '子女' },
+  { label: '孙辈', value: '孙辈' },
+  { label: '兄弟姐妹', value: '兄弟姐妹' },
+  { label: '监护人', value: '监护人' },
+  { label: '亲属', value: '亲属' },
+  { label: '朋友', value: '朋友' },
+  { label: '其他', value: '其他' }
+]
 const familyBindRules: FormRules = {
   familyUserId: [{ required: true, message: '请选择家属' }],
-  relation: [{ required: true, message: '请输入关系' }]
+  relation: [{ required: true, message: '请选择关系' }]
 }
 const familyOptions = ref<Array<{ label: string; value: Id }>>([])
 

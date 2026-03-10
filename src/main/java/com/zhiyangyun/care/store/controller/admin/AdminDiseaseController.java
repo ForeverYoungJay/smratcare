@@ -9,6 +9,8 @@ import com.zhiyangyun.care.store.entity.Disease;
 import com.zhiyangyun.care.store.mapper.DiseaseMapper;
 import com.zhiyangyun.care.store.model.admin.DiseaseRequest;
 import jakarta.validation.Valid;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -34,7 +36,7 @@ public class AdminDiseaseController {
   public Result<Disease> create(@Valid @RequestBody DiseaseRequest request) {
     Disease disease = new Disease();
     disease.setOrgId(AuthContext.getOrgId());
-    disease.setDiseaseCode(request.getDiseaseCode());
+    disease.setDiseaseCode(resolveDiseaseCode(request.getDiseaseCode(), null));
     disease.setDiseaseName(request.getDiseaseName());
     disease.setRemark(request.getRemark());
     diseaseMapper.insert(disease);
@@ -49,7 +51,7 @@ public class AdminDiseaseController {
       return Result.error(404, "Disease not found");
     }
     disease.setOrgId(AuthContext.getOrgId());
-    disease.setDiseaseCode(request.getDiseaseCode());
+    disease.setDiseaseCode(resolveDiseaseCode(request.getDiseaseCode(), disease.getDiseaseCode()));
     disease.setDiseaseName(request.getDiseaseName());
     disease.setRemark(request.getRemark());
     diseaseMapper.updateById(disease);
@@ -101,5 +103,17 @@ public class AdminDiseaseController {
       }
     }
     return Result.ok(diseaseMapper.selectPage(new Page<>(page, size), wrapper));
+  }
+
+  private String resolveDiseaseCode(String incoming, String fallback) {
+    String normalized = incoming == null ? "" : incoming.trim();
+    if (!normalized.isEmpty()) {
+      return normalized.toUpperCase();
+    }
+    String fallbackCode = fallback == null ? "" : fallback.trim();
+    if (!fallbackCode.isEmpty()) {
+      return fallbackCode;
+    }
+    return "DIS-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
   }
 }
