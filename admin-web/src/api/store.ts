@@ -1,4 +1,5 @@
 import request, { fetchPage } from '../utils/request'
+import type { Id } from '../types/common'
 import type {
   ProductItem,
   OrderItem,
@@ -31,7 +32,7 @@ export function getOrderPage(params: any) {
   return fetchPage<OrderItem>('/api/store/order/page', params)
 }
 
-export function getOrderDetail(id: number) {
+export function getOrderDetail(id: Id) {
   return request.get<OrderItem>(`/api/store/order/${id}`)
 }
 

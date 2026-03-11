@@ -42,7 +42,7 @@
       <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="false" :pagination="pagination" :row-class-name="resolveRowClassName" @change="onTableChange">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'elderBed'">
-            {{ record.elderName || '-' }} / {{ bedNoMap[record.elderId || 0] || '-' }}
+            {{ record.elderName || '-' }} / {{ (record.elderId && bedNoMap[record.elderId]) || '-' }}
           </template>
           <template v-else-if="column.key === 'riskLevel'">
             <a-tag :color="riskColor(record.riskLevel)">{{ riskLabel(record.riskLevel) }}</a-tag>
@@ -129,6 +129,7 @@ import { useElderOptions } from '../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { getElderDetail } from '../../api/elder'
 import { exportCsv, exportExcel } from '../../utils/export'
+import { normalizeResidentId } from '../../utils/id'
 import { cvdAssessmentExportColumns, mapMedicalExportRows } from '../../constants/medicalExport'
 import { resolveMedicalError } from './medicalError'
 import {
@@ -139,7 +140,7 @@ import {
   publishCvdAssessment,
   updateCvdAssessment
 } from '../../api/medicalCare'
-import type { MedicalCvdAssessment, MedicalCvdAssessmentSummary } from '../../types'
+import type { Id, MedicalCvdAssessment, MedicalCvdAssessmentSummary } from '../../types'
 
 const route = useRoute()
 const router = useRouter()
@@ -147,7 +148,7 @@ const loading = ref(false)
 const tableError = ref('')
 const summaryLoading = ref(false)
 const summaryError = ref('')
-const bedNoMap = reactive<Record<number, string>>({})
+const bedNoMap = reactive<Record<string, string>>({})
 const rows = ref<MedicalCvdAssessment[]>([])
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const query = reactive({
@@ -195,7 +196,7 @@ const { elderOptions, elderLoading, searchElders, findElderName, ensureSelectedE
 
 const publishOpen = ref(false)
 const publishing = ref(false)
-const publishTargetId = ref<number>()
+const publishTargetId = ref<Id>()
 const publishActions = reactive({
   generateInspectionPlan: true,
   generateFollowupTask: true,
@@ -233,9 +234,9 @@ function resetForm() {
 
 function openCreate() {
   resetForm()
-  const residentId = route.query.residentId ?? route.query.elderId
+  const residentId = normalizeResidentId(route.query as Record<string, unknown>)
   if (residentId) {
-    form.elderId = Number(residentId)
+    form.elderId = residentId
     ensureSelectedElder(form.elderId, route.query.residentName ? String(route.query.residentName) : undefined)
   }
   if (route.query.residentName) {
@@ -255,12 +256,12 @@ function openEdit(record: MedicalCvdAssessment) {
   editOpen.value = true
 }
 
-function onElderChange(elderId?: number) {
+function onElderChange(elderId?: Id) {
   form.elderName = findElderName(elderId)
 }
 
 function buildParams() {
-  const residentId = route.query.residentId ?? route.query.elderId
+  const residentId = normalizeResidentId(route.query as Record<string, unknown>)
   const params: any = {
     pageNo: query.pageNo,
     pageSize: query.pageSize,
@@ -274,13 +275,13 @@ function buildParams() {
     params.dateTo = dayjs(query.dateRange[1]).format('YYYY-MM-DD')
   }
   if (residentId) {
-    params.elderId = Number(residentId)
+    params.elderId = residentId
   }
   return params
 }
 
 async function loadBedNos(records: MedicalCvdAssessment[]) {
-  const elderIds = Array.from(new Set(records.map((item) => Number(item.elderId)).filter((id) => Number.isFinite(id) && id > 0)))
+  const elderIds = Array.from(new Set(records.map((item) => item.elderId).filter((id): id is Id => !!id)))
   await Promise.all(
     elderIds.map(async (elderId) => {
       if (bedNoMap[elderId]) return
@@ -349,7 +350,7 @@ function exportRows() {
   return mapMedicalExportRows(
     rows.value.map((item) => ({
       ...item,
-      bedNo: bedNoMap[item.elderId || 0] || '-',
+      bedNo: item.elderId ? bedNoMap[item.elderId] || '-' : '-',
       riskLevel: riskLabel(item.riskLevel),
       needFollowup: item.needFollowup === 1 ? '需要' : '无需',
       status: item.status === 'PUBLISHED' ? '已发布' : '草稿'

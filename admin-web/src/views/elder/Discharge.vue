@@ -54,10 +54,10 @@ import PageContainer from '../../components/PageContainer.vue'
 import { getBaseConfigItemList } from '../../api/baseConfig'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { dischargeElder } from '../../api/elderLifecycle'
-import type { BaseConfigItem, DischargeRequest } from '../../types'
+import type { BaseConfigItem, DischargeRequest, Id } from '../../types'
 
 const formRef = ref<FormInstance>()
-const form = reactive<DischargeRequest>({ elderId: 0, dischargeDate: '' })
+const form = reactive<DischargeRequest>({ elderId: '' as Id, dischargeDate: '' })
 const submitting = ref(false)
 const route = useRoute()
 const highlightApplyId = ref('')

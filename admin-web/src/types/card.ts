@@ -1,6 +1,8 @@
+import type { Id } from './common'
+
 export interface CardAccount {
-  id: number
-  elderId: number
+  id: Id
+  elderId: Id
   elderName?: string
   cardNo: string
   status?: string
@@ -13,10 +15,10 @@ export interface CardAccount {
 }
 
 export interface CardTradeLog {
-  id: number
-  cardAccountId?: number
+  id: Id
+  cardAccountId?: Id
   cardNo?: string
-  elderId: number
+  elderId: Id
   elderName?: string
   amount: number
   balanceAfter?: number

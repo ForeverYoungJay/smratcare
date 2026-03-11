@@ -1,5 +1,7 @@
+import type { Id } from './common'
+
 export interface VitalRecordRequest {
-  elderId: number
+  elderId: Id
   type: string
   valueJson: any
   measuredAt: string
@@ -7,8 +9,8 @@ export interface VitalRecordRequest {
 }
 
 export interface VitalRecordItem {
-  id: number
-  elderId: number
+  id: Id
+  elderId: Id
   elderName?: string
   type: string
   valueJson: any

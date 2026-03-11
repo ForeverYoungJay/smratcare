@@ -65,17 +65,18 @@ import DataTable from '../../components/DataTable.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { useStaffOptions } from '../../composables/useStaffOptions'
 import { getNursingRecordPage } from '../../api/nursing'
-import type { NursingRecordItem, PageResult } from '../../types'
+import { normalizeResidentId } from '../../utils/id'
+import type { Id, NursingRecordItem, PageResult } from '../../types'
 import { resolveCareError } from './careError'
 
 const loading = ref(false)
 const rows = ref<NursingRecordItem[]>([])
 const route = useRoute()
-const routeResidentId = route.query.residentId ? Number(route.query.residentId) : route.query.elderId ? Number(route.query.elderId) : undefined
+const routeResidentId = normalizeResidentId(route.query as Record<string, unknown>)
 const { elderOptions, searchElders } = useElderOptions({ pageSize: 50 })
 const { staffOptions, searchStaff } = useStaffOptions({ pageSize: 220, preloadSize: 500 })
 const query = reactive({
-  elderId: routeResidentId as number | undefined,
+  elderId: routeResidentId as Id | undefined,
   staffId: undefined as string | undefined,
   keyword: '',
   range: undefined as [Dayjs, Dayjs] | undefined,

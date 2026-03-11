@@ -15,8 +15,9 @@ import jakarta.validation.Valid;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.Map;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -123,19 +124,20 @@ public class HealthDataRecordController {
 
   @PostMapping
   public Result<HealthDataRecord> create(@Valid @RequestBody HealthDataRecordRequest request) {
+    validateRequest(request);
     Long orgId = AuthContext.getOrgId();
     Long elderId = elderResolveSupport.resolveElderId(orgId, request.getElderId(), request.getElderName());
     HealthDataRecord item = new HealthDataRecord();
     item.setTenantId(orgId);
     item.setOrgId(orgId);
     item.setElderId(elderId);
-    item.setElderName(elderResolveSupport.resolveElderName(elderId, request.getElderName()));
-    item.setDataType(request.getDataType());
-    item.setDataValue(request.getDataValue());
+    item.setElderName(elderResolveSupport.resolveElderName(elderId, normalizeText(request.getElderName())));
+    item.setDataType(normalizeDataType(request.getDataType()));
+    item.setDataValue(normalizeText(request.getDataValue()));
     item.setMeasuredAt(request.getMeasuredAt());
-    item.setSource(request.getSource());
+    item.setSource(normalizeText(request.getSource()));
     item.setAbnormalFlag(request.getAbnormalFlag() == null ? 0 : request.getAbnormalFlag());
-    item.setRemark(request.getRemark());
+    item.setRemark(normalizeText(request.getRemark()));
     item.setCreatedBy(AuthContext.getStaffId());
     mapper.insert(item);
     return Result.ok(item);
@@ -143,6 +145,7 @@ public class HealthDataRecordController {
 
   @PutMapping("/{id}")
   public Result<HealthDataRecord> update(@PathVariable Long id, @Valid @RequestBody HealthDataRecordRequest request) {
+    validateRequest(request);
     HealthDataRecord item = mapper.selectById(id);
     Long orgId = AuthContext.getOrgId();
     if (item == null || item.getIsDeleted() != null && item.getIsDeleted() == 1
@@ -151,13 +154,13 @@ public class HealthDataRecordController {
     }
     Long elderId = elderResolveSupport.resolveElderId(orgId, request.getElderId(), request.getElderName());
     item.setElderId(elderId);
-    item.setElderName(elderResolveSupport.resolveElderName(elderId, request.getElderName()));
-    item.setDataType(request.getDataType());
-    item.setDataValue(request.getDataValue());
+    item.setElderName(elderResolveSupport.resolveElderName(elderId, normalizeText(request.getElderName())));
+    item.setDataType(normalizeDataType(request.getDataType()));
+    item.setDataValue(normalizeText(request.getDataValue()));
     item.setMeasuredAt(request.getMeasuredAt());
-    item.setSource(request.getSource());
+    item.setSource(normalizeText(request.getSource()));
     item.setAbnormalFlag(request.getAbnormalFlag() == null ? 0 : request.getAbnormalFlag());
-    item.setRemark(request.getRemark());
+    item.setRemark(normalizeText(request.getRemark()));
     mapper.updateById(item);
     return Result.ok(item);
   }
@@ -236,5 +239,64 @@ public class HealthDataRecordController {
       }
     }
     return "";
+  }
+
+  private void validateRequest(HealthDataRecordRequest request) {
+    if (request.getMeasuredAt() != null && request.getMeasuredAt().isAfter(LocalDateTime.now())) {
+      throw new IllegalArgumentException("采集时间不能晚于当前时间");
+    }
+    String dataType = normalizeDataType(request.getDataType());
+    String dataValue = normalizeText(request.getDataValue());
+    if (dataValue == null) {
+      throw new IllegalArgumentException("dataValue required");
+    }
+    if ("BP".equals(dataType)) {
+      if (!dataValue.matches("^\\d{2,3}/\\d{2,3}$")) {
+        throw new IllegalArgumentException("血压请使用“收缩压/舒张压”格式");
+      }
+      String[] parts = dataValue.split("/");
+      double systolic = Double.parseDouble(parts[0]);
+      double diastolic = Double.parseDouble(parts[1]);
+      if (systolic < 50 || systolic > 260 || diastolic < 30 || diastolic > 180 || systolic <= diastolic) {
+        throw new IllegalArgumentException("血压值超出合理范围");
+      }
+      return;
+    }
+    if ("OTHER".equals(dataType)) {
+      return;
+    }
+    double numericValue;
+    try {
+      numericValue = Double.parseDouble(dataValue);
+    } catch (NumberFormatException ex) {
+      throw new IllegalArgumentException("该类型数据值需为数字");
+    }
+    if ("HR".equals(dataType) && (numericValue < 20 || numericValue > 240)) {
+      throw new IllegalArgumentException("心率超出合理范围");
+    }
+    if ("TEMP".equals(dataType) && (numericValue < 30 || numericValue > 45)) {
+      throw new IllegalArgumentException("体温超出合理范围");
+    }
+    if ("SPO2".equals(dataType) && (numericValue < 0 || numericValue > 100)) {
+      throw new IllegalArgumentException("血氧超出合理范围");
+    }
+    if ("GLUCOSE".equals(dataType) && (numericValue < 0 || numericValue > 40)) {
+      throw new IllegalArgumentException("血糖超出合理范围");
+    }
+    if ("WEIGHT".equals(dataType) && (numericValue <= 0 || numericValue > 300)) {
+      throw new IllegalArgumentException("体重超出合理范围");
+    }
+  }
+
+  private String normalizeDataType(String value) {
+    return String.valueOf(value == null ? "" : value).trim().toUpperCase(Locale.ROOT);
+  }
+
+  private String normalizeText(String value) {
+    if (value == null) {
+      return null;
+    }
+    String trimmed = value.trim();
+    return trimmed.isEmpty() ? null : trimmed;
   }
 }

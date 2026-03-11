@@ -397,6 +397,7 @@ import type {
   CareTaskItem,
   CareExecuteLogItem,
   CareTaskSummary,
+  Id,
   PageResult,
   CareTaskAssignRequest,
   CareTaskBatchAssignRequest,
@@ -507,7 +508,7 @@ const reviewForm = reactive<CareTaskReviewRequest>({
 })
 const generateForm = reactive({ date: dayjs(), force: false })
 const createForm = reactive<any>({
-  elderId: 0,
+  elderId: '',
   templateId: 0,
   taskName: '',
   custom: false,
@@ -1035,7 +1036,7 @@ function staffName(staffId?: number) {
   return staffMap.value[staffId] || '未知护理员'
 }
 
-function elderName(elderId?: number) {
+function elderName(elderId?: Id) {
   if (!elderId) return '-'
   return findElderName(elderId) || '未知老人'
 }

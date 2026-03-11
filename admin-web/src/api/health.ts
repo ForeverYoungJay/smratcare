@@ -1,5 +1,6 @@
 import request, { fetchPage } from '../utils/request'
 import type {
+  Id,
   HealthDrugDictionary,
   HealthMedicationDeposit,
   HealthMedicationSetting,
@@ -24,11 +25,11 @@ export function createHealthDrugDictionary(data: Partial<HealthDrugDictionary>) 
   return request.post<HealthDrugDictionary>('/api/health/drug-dictionary', data)
 }
 
-export function updateHealthDrugDictionary(id: number, data: Partial<HealthDrugDictionary>) {
+export function updateHealthDrugDictionary(id: Id, data: Partial<HealthDrugDictionary>) {
   return request.put<HealthDrugDictionary>(`/api/health/drug-dictionary/${id}`, data)
 }
 
-export function deleteHealthDrugDictionary(id: number) {
+export function deleteHealthDrugDictionary(id: Id) {
   return request.delete<void>(`/api/health/drug-dictionary/${id}`)
 }
 
@@ -40,11 +41,11 @@ export function createHealthMedicationDeposit(data: Partial<HealthMedicationDepo
   return request.post<HealthMedicationDeposit>('/api/health/medication/deposit', data)
 }
 
-export function updateHealthMedicationDeposit(id: number, data: Partial<HealthMedicationDeposit>) {
+export function updateHealthMedicationDeposit(id: Id, data: Partial<HealthMedicationDeposit>) {
   return request.put<HealthMedicationDeposit>(`/api/health/medication/deposit/${id}`, data)
 }
 
-export function deleteHealthMedicationDeposit(id: number) {
+export function deleteHealthMedicationDeposit(id: Id) {
   return request.delete<void>(`/api/health/medication/deposit/${id}`)
 }
 
@@ -56,11 +57,11 @@ export function createHealthMedicationSetting(data: Partial<HealthMedicationSett
   return request.post<HealthMedicationSetting>('/api/health/medication/setting', data)
 }
 
-export function updateHealthMedicationSetting(id: number, data: Partial<HealthMedicationSetting>) {
+export function updateHealthMedicationSetting(id: Id, data: Partial<HealthMedicationSetting>) {
   return request.put<HealthMedicationSetting>(`/api/health/medication/setting/${id}`, data)
 }
 
-export function deleteHealthMedicationSetting(id: number) {
+export function deleteHealthMedicationSetting(id: Id) {
   return request.delete<void>(`/api/health/medication/setting/${id}`)
 }
 
@@ -76,11 +77,11 @@ export function createHealthMedicationRegistration(data: Partial<HealthMedicatio
   return request.post<HealthMedicationRegistration>('/api/health/medication/registration', data)
 }
 
-export function updateHealthMedicationRegistration(id: number, data: Partial<HealthMedicationRegistration>) {
+export function updateHealthMedicationRegistration(id: Id, data: Partial<HealthMedicationRegistration>) {
   return request.put<HealthMedicationRegistration>(`/api/health/medication/registration/${id}`, data)
 }
 
-export function deleteHealthMedicationRegistration(id: number) {
+export function deleteHealthMedicationRegistration(id: Id) {
   return request.delete<void>(`/api/health/medication/registration/${id}`)
 }
 
@@ -100,11 +101,11 @@ export function createHealthArchive(data: Partial<HealthArchive>) {
   return request.post<HealthArchive>('/api/health/archive', data)
 }
 
-export function updateHealthArchive(id: number, data: Partial<HealthArchive>) {
+export function updateHealthArchive(id: Id, data: Partial<HealthArchive>) {
   return request.put<HealthArchive>(`/api/health/archive/${id}`, data)
 }
 
-export function deleteHealthArchive(id: number) {
+export function deleteHealthArchive(id: Id) {
   return request.delete<void>(`/api/health/archive/${id}`)
 }
 
@@ -120,11 +121,11 @@ export function createHealthDataRecord(data: Partial<HealthDataRecord>) {
   return request.post<HealthDataRecord>('/api/health/data', data)
 }
 
-export function updateHealthDataRecord(id: number, data: Partial<HealthDataRecord>) {
+export function updateHealthDataRecord(id: Id, data: Partial<HealthDataRecord>) {
   return request.put<HealthDataRecord>(`/api/health/data/${id}`, data)
 }
 
-export function deleteHealthDataRecord(id: number) {
+export function deleteHealthDataRecord(id: Id) {
   return request.delete<void>(`/api/health/data/${id}`)
 }
 
@@ -140,11 +141,11 @@ export function createHealthInspection(data: Partial<HealthInspection>) {
   return request.post<HealthInspection>('/api/health/inspection', data)
 }
 
-export function updateHealthInspection(id: number, data: Partial<HealthInspection>) {
+export function updateHealthInspection(id: Id, data: Partial<HealthInspection>) {
   return request.put<HealthInspection>(`/api/health/inspection/${id}`, data)
 }
 
-export function deleteHealthInspection(id: number) {
+export function deleteHealthInspection(id: Id) {
   return request.delete<void>(`/api/health/inspection/${id}`)
 }
 
@@ -160,10 +161,10 @@ export function createHealthNursingLog(data: Partial<HealthNursingLog>) {
   return request.post<HealthNursingLog>('/api/health/nursing-log', data)
 }
 
-export function updateHealthNursingLog(id: number, data: Partial<HealthNursingLog>) {
+export function updateHealthNursingLog(id: Id, data: Partial<HealthNursingLog>) {
   return request.put<HealthNursingLog>(`/api/health/nursing-log/${id}`, data)
 }
 
-export function deleteHealthNursingLog(id: number) {
+export function deleteHealthNursingLog(id: Id) {
   return request.delete<void>(`/api/health/nursing-log/${id}`)
 }

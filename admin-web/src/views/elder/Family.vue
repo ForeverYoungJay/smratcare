@@ -100,7 +100,7 @@ import { useElderOptions } from '../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { getFamilyUserPage } from '../../api/family'
 import { bindFamily } from '../../api/elder'
-import type { FamilyBindRequest, FamilyUserItem, PageResult } from '../../types/api'
+import type { FamilyBindRequest, FamilyUserItem, Id, PageResult } from '../../types/api'
 
 const loading = ref(false)
 const rows = ref<FamilyUserItem[]>([])
@@ -128,7 +128,7 @@ const columns = [
 
 const bindOpen = ref(false)
 const bindFormRef = ref<FormInstance>()
-const bindForm = reactive<FamilyBindRequest>({ familyUserId: 0, elderId: 0, relation: '', isPrimary: false })
+const bindForm = reactive<FamilyBindRequest>({ familyUserId: '' as Id, elderId: '' as Id, relation: '', isPrimary: false })
 const bindRules: FormRules = {
   elderId: [{ required: true, message: '请选择老人' }],
   relation: [{ required: true, message: '请输入关系' }]
@@ -193,7 +193,7 @@ function onTableChange(_: any, __: any, sorter: any) {
 
 function openBind(row: FamilyUserItem) {
   bindForm.familyUserId = row.id
-  bindForm.elderId = 0
+  bindForm.elderId = '' as Id
   bindForm.relation = ''
   bindForm.isPrimary = false
   bindOpen.value = true

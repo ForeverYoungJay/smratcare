@@ -70,7 +70,7 @@ import { onMounted, reactive, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { exportChangeLogs, getChangeLogs } from '../../api/elderLifecycle'
-import type { ChangeLogItem, PageResult } from '../../types'
+import type { ChangeLogItem, Id, PageResult } from '../../types'
 
 const loading = ref(false)
 const rows = ref<ChangeLogItem[]>([])
@@ -78,7 +78,7 @@ const total = ref(0)
 const { elderOptions, elderLoading, searchElders } = useElderOptions({ pageSize: 80 })
 
 const query = reactive({
-  elderId: undefined as number | undefined,
+  elderId: undefined as Id | undefined,
   changeType: undefined as string | undefined,
   reason: undefined as string | undefined,
   timeRange: undefined as [string, string] | undefined,

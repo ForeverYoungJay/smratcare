@@ -32,7 +32,7 @@
           <a-select v-model:value="createForm.elderId" show-search :filter-option="false" :options="elderOptions" @search="searchElders" @focus="() => !elderOptions.length && searchElders('')" />
         </a-form-item>
         <a-form-item label="入院记录ID">
-          <a-input-number v-model:value="createForm.admissionId" :min="1" style="width: 100%" />
+          <a-input v-model:value="createForm.admissionId" placeholder="请输入入院记录ID" />
         </a-form-item>
         <a-form-item label="费用总额" required>
           <a-input-number v-model:value="createForm.totalAmount" :min="0.01" :precision="2" style="width: 100%" />
@@ -57,7 +57,7 @@ import DataTable from '../../components/DataTable.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { createAdmissionFeeAudit, getAdmissionFeeAuditPage, reviewAdmissionFeeAudit } from '../../api/financeFee'
-import type { AdmissionFeeAuditItem, PageResult } from '../../types'
+import type { AdmissionFeeAuditItem, Id, PageResult } from '../../types'
 
 const loading = ref(false)
 const rows = ref<AdmissionFeeAuditItem[]>([])
@@ -82,8 +82,8 @@ const createOpen = ref(false)
 const creating = ref(false)
 const { elderOptions, searchElders: searchElderOptions } = useElderOptions({ pageSize: 20 })
 const createForm = reactive({
-  elderId: undefined as number | undefined,
-  admissionId: undefined as number | undefined,
+  elderId: undefined as Id | undefined,
+  admissionId: undefined as Id | undefined,
   totalAmount: 0,
   depositAmount: 0,
   remark: ''
@@ -145,7 +145,11 @@ async function submitCreate() {
   }
   creating.value = true
   try {
-    await createAdmissionFeeAudit({ ...createForm, elderId: createForm.elderId })
+    await createAdmissionFeeAudit({
+      ...createForm,
+      elderId: createForm.elderId,
+      admissionId: createForm.admissionId || undefined
+    })
     message.success('创建成功')
     createOpen.value = false
     fetchData()

@@ -85,7 +85,7 @@ import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { getCardAccountPage, createCardAccount, updateCardAccount, deleteCardAccount } from '../../api/card'
-import type { CardAccount, PageResult } from '../../types'
+import type { CardAccount, Id, PageResult } from '../../types'
 
 const loading = ref(false)
 const rows = ref<CardAccount[]>([])
@@ -116,8 +116,8 @@ const lossOptions = [
 const editOpen = ref(false)
 const saving = ref(false)
 const form = reactive({
-  id: undefined as number | undefined,
-  elderId: undefined as number | undefined,
+  id: undefined as Id | undefined,
+  elderId: undefined as Id | undefined,
   cardNo: '',
   status: 'ACTIVE',
   lossFlag: 0,

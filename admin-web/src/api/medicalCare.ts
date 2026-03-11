@@ -1,5 +1,6 @@
 import request, { fetchPage } from '../utils/request'
 import type {
+  Id,
   MedicalCareWorkbenchSummary,
   MedicalCareWorkbenchSummaryQuery,
   MedicalRiskTimelinePoint,
@@ -55,15 +56,15 @@ export function createTcmAssessment(data: Partial<MedicalTcmAssessment>) {
   return request.post<MedicalTcmAssessment>('/api/medical-care/tcm-assessments', data)
 }
 
-export function updateTcmAssessment(id: number, data: Partial<MedicalTcmAssessment>) {
+export function updateTcmAssessment(id: Id, data: Partial<MedicalTcmAssessment>) {
   return request.put<MedicalTcmAssessment>(`/api/medical-care/tcm-assessments/${id}`, data)
 }
 
-export function publishTcmAssessment(id: number) {
+export function publishTcmAssessment(id: Id) {
   return request.post<MedicalTcmAssessment>(`/api/medical-care/tcm-assessments/${id}/publish`)
 }
 
-export function deleteTcmAssessment(id: number) {
+export function deleteTcmAssessment(id: Id) {
   return request.delete<void>(`/api/medical-care/tcm-assessments/${id}`)
 }
 
@@ -79,12 +80,12 @@ export function createCvdAssessment(data: Partial<MedicalCvdAssessment>) {
   return request.post<MedicalCvdAssessment>('/api/medical-care/cvd-assessments', data)
 }
 
-export function updateCvdAssessment(id: number, data: Partial<MedicalCvdAssessment>) {
+export function updateCvdAssessment(id: Id, data: Partial<MedicalCvdAssessment>) {
   return request.put<MedicalCvdAssessment>(`/api/medical-care/cvd-assessments/${id}`, data)
 }
 
 export function publishCvdAssessment(
-  id: number,
+  id: Id,
   actions: { generateInspectionPlan?: number; generateFollowupTask?: number; suggestMedicalOrder?: number }
 ) {
   return request.post<{ inspectionRoute?: string; medicalOrderRoute?: string; careTaskRoute?: string }>(
@@ -93,15 +94,15 @@ export function publishCvdAssessment(
   )
 }
 
-export function deleteCvdAssessment(id: number) {
+export function deleteCvdAssessment(id: Id) {
   return request.delete<void>(`/api/medical-care/cvd-assessments/${id}`)
 }
 
-export function getResidentRiskCard(residentId: number | string) {
+export function getResidentRiskCard(residentId: Id) {
   return request.get<MedicalResidentRiskCard>('/api/medical-care/resident360/risk-card', { params: { residentId } })
 }
 
-export function getResidentOverview(residentId: number | string) {
+export function getResidentOverview(residentId: Id) {
   return request.get<MedicalResidentOverview>('/api/medical-care/resident360/overview', { params: { residentId } })
 }
 
@@ -117,10 +118,10 @@ export function generateMedicalAiReport(data: {
   return request.post<MedicalAiReportItem>('/api/medical-care/ai-reports/generate', data)
 }
 
-export function publishMedicalAiReport(id: number) {
+export function publishMedicalAiReport(id: Id) {
   return request.post<MedicalAiReportItem>(`/api/medical-care/ai-reports/${id}/publish`)
 }
 
-export function generateMedicalAiReportTasks(id: number) {
+export function generateMedicalAiReportTasks(id: Id) {
   return request.post<MedicalAiGenerateTaskResponse>(`/api/medical-care/ai-reports/${id}/generate-tasks`)
 }

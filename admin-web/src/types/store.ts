@@ -1,3 +1,5 @@
+import type { Id } from './common'
+
 export interface ProductItem {
   id: number
   idStr?: string
@@ -16,9 +18,9 @@ export interface ProductItem {
 }
 
 export interface OrderItem {
-  id: number
+  id: Id
   orderNo?: string
-  elderId: number
+  elderId: Id
   elderName?: string
   totalAmount?: number
   payableAmount?: number
@@ -52,13 +54,13 @@ export interface FifoLogItem {
 }
 
 export interface StoreOrderPreviewRequest {
-  elderId: number
+  elderId: Id
   productId: number
   qty: number
 }
 
 export interface StoreOrderSubmitRequest {
-  elderId: number
+  elderId: Id
   productId: number
   qty: number
 }
@@ -102,9 +104,9 @@ export interface ForbiddenTagGroup {
 }
 
 export interface PointsAccountItem {
-  id: number
+  id: Id
   orgId?: number
-  elderId: number
+  elderId: Id
   elderName?: string
   pointsBalance?: number
   status?: number
@@ -112,19 +114,19 @@ export interface PointsAccountItem {
 }
 
 export interface PointsLogItem {
-  id: number
-  elderId: number
+  id: Id
+  elderId: Id
   elderName?: string
   changeType?: string
   changePoints?: number
   balanceAfter?: number
-  refOrderId?: number
+  refOrderId?: Id
   remark?: string
   createTime?: string
 }
 
 export interface PointsAdjustRequest {
-  elderId: number
+  elderId: Id
   points: number
   direction: 'CREDIT' | 'DEBIT'
   remark?: string

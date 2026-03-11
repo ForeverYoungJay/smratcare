@@ -82,8 +82,9 @@ import DataTable from '../../components/DataTable.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { createConsumption, getConsumptionPage } from '../../api/financeFee'
-import type { ConsumptionRecordItem, PageResult } from '../../types'
+import type { ConsumptionRecordItem, Id, PageResult } from '../../types'
 import { exportCsv } from '../../utils/export'
+import { normalizeResidentId } from '../../utils/id'
 
 const loading = ref(false)
 const rows = ref<ConsumptionRecordItem[]>([])
@@ -96,7 +97,7 @@ const query = reactive({
   category: '',
   riskLevel: undefined as 'HIGH' | 'MEDIUM' | 'LOW' | undefined,
   keyword: '',
-  elderId: route.query.elderId ? Number(route.query.elderId) : undefined as number | undefined
+  elderId: normalizeResidentId(route.query as Record<string, unknown>) as Id | undefined
 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 
@@ -135,7 +136,7 @@ const categoryOptions = [
   { label: '其他消费', value: 'OTHER' }
 ]
 const createForm = reactive({
-  elderId: undefined as number | undefined,
+  elderId: undefined as Id | undefined,
   consumeDate: undefined as any,
   amount: 0,
   category: '',
@@ -191,7 +192,7 @@ function handleTableChange(pag: any) {
 }
 
 function openCreate() {
-  createForm.elderId = undefined
+  createForm.elderId = query.elderId
   createForm.consumeDate = dayjs()
   createForm.amount = 0
   createForm.category = 'OTHER'

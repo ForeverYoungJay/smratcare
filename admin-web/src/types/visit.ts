@@ -1,6 +1,8 @@
+import type { Id } from './common'
+
 export interface VisitBookingItem {
-  id: number
-  elderId: number
+  id: Id
+  elderId: Id
   elderName?: string
   familyName?: string
   floorNo?: string
@@ -12,8 +14,8 @@ export interface VisitBookingItem {
 }
 
 export interface VisitBookRequest {
-  elderId: number
-  familyUserId?: number
+  elderId: Id
+  familyUserId?: Id
   visitTime: string
   visitTimeSlot: string
   visitorCount: number
@@ -22,11 +24,11 @@ export interface VisitBookRequest {
 }
 
 export interface VisitCheckinRequest {
-  bookingId?: number
+  bookingId?: Id
 }
 
 export interface VisitPrintTicket {
-  bookingId: number
+  bookingId: Id
   ticketNo: string
   elderName?: string
   familyName?: string

@@ -7,7 +7,7 @@ import lombok.Data;
 @Data
 public class AssessmentBatchAssignRequest {
   @NotEmpty
-  private List<Long> ids;
+  private List<String> ids;
 
   private Long assessorId;
 

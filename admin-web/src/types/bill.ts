@@ -1,6 +1,8 @@
+import type { Id } from './common'
+
 export interface BillItem {
-  id: number
-  elderId: number
+  id: Id
+  elderId: Id
   elderName?: string
   careLevel?: string
   billMonth?: string
@@ -11,7 +13,7 @@ export interface BillItem {
   paidAmount?: number
   outstandingAmount?: number
   lastPayMethod?: string
-  lastPaymentId?: number
+  lastPaymentId?: Id
   lastPaymentAmount?: number
   lastPaidAt?: string
   lastPaymentRemark?: string
@@ -22,7 +24,7 @@ export interface BillPageQuery {
   pageNo: number
   pageSize: number
   month?: string
-  elderId?: number
+  elderId?: Id
   scene?: 'ADMISSION' | 'RESIDENT'
   keyword?: string
   payMethod?: string

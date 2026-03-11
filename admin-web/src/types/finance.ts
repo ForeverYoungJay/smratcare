@@ -1,6 +1,8 @@
+import type { Id } from './common'
+
 export interface PaymentRecordItem {
-  id: number
-  billMonthlyId: number
+  id: Id
+  billMonthlyId: Id
   amount: number
   payMethod: 'CASH' | 'CARD' | 'BANK' | 'WECHAT_OFFLINE' | 'ALIPAY' | 'WECHAT' | 'QR_CODE'
   paidAt: string
@@ -12,7 +14,7 @@ export interface PaymentRecordItem {
 }
 
 export interface ReconcileDailyItem {
-  id?: number
+  id?: Id
   date?: string
   reconcileDate?: string
   totalReceived: number
@@ -26,8 +28,8 @@ export interface ReconcileRequest {
 }
 
 export interface FinanceBillDetail {
-  billId: number
-  elderId: number
+  billId: Id
+  elderId: Id
   elderName?: string
   billMonth: string
   totalAmount: number
@@ -47,9 +49,9 @@ export interface FinanceBillItem {
 }
 
 export interface StoreOrderSummary {
-  id: number
+  id: Id
   orderNo: string
-  elderId: number
+  elderId: Id
   elderName?: string
   totalAmount: number
   payableAmount: number
@@ -65,7 +67,7 @@ export interface FinanceReportMonthlyItem {
 }
 
 export interface FinanceArrearsItem {
-  elderId: number
+  elderId: Id
   elderName?: string
   outstandingAmount: number
 }
@@ -101,8 +103,8 @@ export interface FinanceCategoryConsumptionAnalysis {
 }
 
 export interface ElderAccount {
-  id: number
-  elderId: number
+  id: Id
+  elderId: Id
   elderName?: string
   balance: number
   creditLimit: number
@@ -116,21 +118,21 @@ export interface ElderAccount {
 }
 
 export interface ElderAccountLog {
-  id: number
-  accountId: number
-  elderId: number
+  id: Id
+  accountId: Id
+  elderId: Id
   elderName?: string
   amount: number
   balanceAfter: number
   direction: 'DEBIT' | 'CREDIT'
   sourceType: string
-  sourceId?: number
+  sourceId?: Id
   remark?: string
   createTime?: string
 }
 
 export interface ElderAccountAdjustRequest {
-  elderId: number
+  elderId: Id
   elderName?: string
   amount: number
   direction: 'DEBIT' | 'CREDIT'
@@ -138,7 +140,7 @@ export interface ElderAccountAdjustRequest {
 }
 
 export interface ElderAccountUpdateRequest {
-  elderId: number
+  elderId: Id
   elderName?: string
   creditLimit?: number
   warnThreshold?: number
@@ -280,9 +282,9 @@ export interface FinanceOpsInsight {
 export interface FinanceLedgerHealthIssueItem {
   issueType: string
   issueTypeLabel: string
-  billId?: number
-  paymentId?: number
-  elderId?: number
+  billId?: Id
+  paymentId?: Id
+  elderId?: Id
   elderName?: string
   expectedAmount: number
   actualAmount: number
@@ -302,14 +304,14 @@ export interface FinanceLedgerHealth {
 }
 
 export interface FinanceDischargeStatusSyncRow {
-  settlementId: number
-  elderId?: number
+  settlementId: Id
+  elderId?: Id
   elderName?: string
   settledTime?: string
   settlementStatus?: string
   elderStatus?: number
-  elderBedId?: number
-  occupiedBedId?: number
+  elderBedId?: Id
+  occupiedBedId?: Id
   issueType: string
   issueMessage: string
 }
@@ -322,15 +324,15 @@ export interface FinanceDischargeStatusSync {
 }
 
 export interface FinanceDischargeStatusSyncExecuteRequest {
-  settlementId?: number
-  elderId?: number
+  settlementId?: Id
+  elderId?: Id
   processAll?: boolean
   remark?: string
 }
 
 export interface FinanceDischargeStatusSyncExecuteResult {
-  settlementId?: number
-  elderId?: number
+  settlementId?: Id
+  elderId?: Id
   success: boolean
   message: string
 }
@@ -343,9 +345,9 @@ export interface FinanceDischargeStatusSyncExecuteResponse {
 }
 
 export interface FinanceInvoiceReceiptItem {
-  paymentId: number
-  billId?: number
-  elderId?: number
+  paymentId: Id
+  billId?: Id
+  elderId?: Id
   elderName?: string
   amount: number
   payMethod: string
@@ -358,8 +360,8 @@ export interface FinanceInvoiceReceiptItem {
 }
 
 export interface FinanceAutoDebitExceptionItem {
-  billId: number
-  elderId?: number
+  billId: Id
+  elderId?: Id
   elderName?: string
   billMonth: string
   outstandingAmount: number
@@ -393,7 +395,7 @@ export interface FinanceRoomOpsDetailRow {
 }
 
 export interface FinanceAllocationRuleItem {
-  id: number
+  id: Id
   ruleType: string
   ruleTypeLabel: string
   configKey: string
@@ -404,12 +406,12 @@ export interface FinanceAllocationRuleItem {
 }
 
 export interface FinanceAllocationResidentOption {
-  elderId: number
+  elderId: Id
   elderName: string
   elderStatus?: number
-  bedId?: number
+  bedId?: Id
   bedNo?: string
-  roomId?: number
+  roomId?: Id
   roomNo?: string
   building?: string
   floorNo?: string
@@ -476,9 +478,9 @@ export interface FinanceAllocationMeterValidateResponse {
 export interface FinanceReconcileExceptionItem {
   exceptionType: string
   exceptionTypeLabel: string
-  billId?: number
-  paymentId?: number
-  elderId?: number
+  billId?: Id
+  paymentId?: Id
+  elderId?: Id
   elderName?: string
   amount: number
   detail: string
@@ -530,8 +532,8 @@ export interface FinanceConfigImpactPreviewRequest {
 }
 
 export interface FinanceBillingConfigEntry {
-  id: number
-  orgId: number
+  id: Id
+  orgId: Id
   configKey: string
   configValue: number
   effectiveMonth: string
@@ -552,12 +554,12 @@ export interface FinanceBillingConfigBatchUpsertRequest {
 }
 
 export interface FinanceConfigChangeLogItem {
-  id: number
+  id: Id
   actorName?: string
-  actorId?: number
+  actorId?: Id
   actionType: string
   entityType: string
-  entityId?: number
+  entityId?: Id
   detail?: string
   createTime: string
 }

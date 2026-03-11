@@ -143,12 +143,13 @@ import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import StatsMetaHint from '../../components/stats/StatsMetaHint.vue'
 import { exportElderFlowReportCsv, getElderFlowReport } from '../../api/stats'
-import type { FlowReportItem } from '../../types'
+import type { FlowReportItem, Id } from '../../types'
 import { message, Modal } from 'ant-design-vue'
 import { printTableReport } from '../../utils/print'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { copyText } from '../../utils/clipboard'
+import { normalizeId } from '../../utils/id'
 
 const route = useRoute()
 const router = useRouter()
@@ -175,7 +176,7 @@ const summary = ref({
   admissionCount: 0,
   dischargeCount: 0
 })
-const printElderId = ref<number | undefined>(undefined)
+const printElderId = ref<Id | undefined>(undefined)
 const columnSettingOpen = ref(false)
 const printColumnOptions = [
   { label: '日期', value: 'eventDate' },
@@ -202,7 +203,7 @@ const printRows = computed(() => rows.value.map(item => ({
   elderName: item.elderName || '未知老人',
   remark: item.remark || ''
 })))
-const selectedPrintElder = computed(() => elderOptions.value.find(item => Number(item.value) === Number(printElderId.value)))
+const selectedPrintElder = computed(() => elderOptions.value.find((item) => String(item.value || '').trim() === String(printElderId.value || '').trim()))
 const canPrintSpecific = computed(() => !!printRows.value.length && !!printElderId.value)
 
 async function loadData() {
@@ -247,7 +248,7 @@ function buildRowKey(row: FlowReportItem, index: number) {
   return [
     row.eventDate || 'NA',
     row.eventType || 'NA',
-    row.elderId || 0,
+    row.elderId || 'NA',
     index
   ].join('_')
 }
@@ -391,7 +392,7 @@ function printSpecificElder() {
   let printScope = '当前查询结果'
 
   if (printElderId.value) {
-    filtered = filtered.filter(item => Number(item.elderId) === Number(printElderId.value))
+    filtered = filtered.filter((item) => String(item.elderId || '').trim() === String(printElderId.value || '').trim())
     const selectedName = selectedPrintElder.value?.name || '未命名长者'
     title = `老人出入报表（${selectedName}）`
     printScope = buildPrintScopeText(`指定老人：${selectedName}`)
@@ -407,7 +408,7 @@ function printSpecificElder() {
   renderPrint(title, filtered, printScope)
 }
 
-function onPrintElderChange(value?: number) {
+function onPrintElderChange(value?: Id) {
   printElderId.value = value
   query.value.pageNo = 1
   loadData()
@@ -497,10 +498,7 @@ function initFromRouteQuery() {
   if (Number.isFinite(orgId) && orgId > 0) {
     query.value.orgId = orgId
   }
-  const elderId = Number(route.query.elderId)
-  if (Number.isFinite(elderId) && elderId > 0) {
-    printElderId.value = elderId
-  }
+  printElderId.value = normalizeId(route.query.elderId)
   const pageNo = Number(route.query.pageNo)
   if (Number.isFinite(pageNo) && pageNo > 0) {
     query.value.pageNo = pageNo

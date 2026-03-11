@@ -7,6 +7,8 @@ import lombok.Data;
 @Data
 public class MedicalAiHealthReportResponse {
   private Long id;
+  private Long elderId;
+  private String elderName;
   private String type;
   private String status;
   private LocalDate dateFrom;

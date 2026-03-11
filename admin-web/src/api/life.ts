@@ -1,5 +1,6 @@
 import request, { fetchPage } from '../utils/request'
 import { exportCsvByRequest } from '../utils/export'
+import type { Id } from '../types/common'
 import type {
   MealPlan,
   ActivityEvent,
@@ -51,15 +52,15 @@ export function createIncident(data: Partial<IncidentReport>) {
   return request.post<IncidentReport>('/api/life/incident', data)
 }
 
-export function updateIncident(id: number, data: Partial<IncidentReport>) {
+export function updateIncident(id: Id, data: Partial<IncidentReport>) {
   return request.put<IncidentReport>(`/api/life/incident/${id}`, data)
 }
 
-export function closeIncident(id: number) {
+export function closeIncident(id: Id) {
   return request.put<IncidentReport>(`/api/life/incident/${id}/close`)
 }
 
-export function deleteIncident(id: number) {
+export function deleteIncident(id: Id) {
   return request.delete<void>(`/api/life/incident/${id}`)
 }
 
@@ -75,11 +76,11 @@ export function createHealthBasic(data: Partial<HealthBasicRecord>) {
   return request.post<HealthBasicRecord>('/api/life/health-basic', data)
 }
 
-export function updateHealthBasic(id: number, data: Partial<HealthBasicRecord>) {
+export function updateHealthBasic(id: Id, data: Partial<HealthBasicRecord>) {
   return request.put<HealthBasicRecord>(`/api/life/health-basic/${id}`, data)
 }
 
-export function deleteHealthBasic(id: number) {
+export function deleteHealthBasic(id: Id) {
   return request.delete<void>(`/api/life/health-basic/${id}`)
 }
 

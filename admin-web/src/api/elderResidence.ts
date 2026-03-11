@@ -1,5 +1,6 @@
 import request, { fetchPage } from '../utils/request'
 import { exportCsvByRequest } from '../utils/export'
+import type { Id } from '../types/common'
 import type {
   DeathRegisterCancelRequest,
   DeathRegisterCreateRequest,
@@ -32,11 +33,11 @@ export function createOuting(data: OutingCreateRequest) {
   return request.post<OutingItem>('/api/elder/lifecycle/outing', data)
 }
 
-export function returnOuting(id: number, data: OutingReturnRequest) {
+export function returnOuting(id: Id, data: OutingReturnRequest) {
   return request.put<OutingItem>(`/api/elder/lifecycle/outing/${id}/return`, data)
 }
 
-export function deleteOuting(id: number) {
+export function deleteOuting(id: Id) {
   return request.delete<boolean>(`/api/elder/lifecycle/outing/${id}`)
 }
 
@@ -48,11 +49,11 @@ export function createMedicalOuting(data: MedicalOutingCreateRequest) {
   return request.post<MedicalOutingItem>('/api/elder/lifecycle/medical-outing', data)
 }
 
-export function returnMedicalOuting(id: number, data: MedicalOutingReturnRequest) {
+export function returnMedicalOuting(id: Id, data: MedicalOutingReturnRequest) {
   return request.put<MedicalOutingItem>(`/api/elder/lifecycle/medical-outing/${id}/return`, data)
 }
 
-export function deleteMedicalOuting(id: number) {
+export function deleteMedicalOuting(id: Id) {
   return request.delete<boolean>(`/api/elder/lifecycle/medical-outing/${id}`)
 }
 
@@ -64,11 +65,11 @@ export function createTrialStay(data: TrialStayRequest) {
   return request.post<TrialStayItem>('/api/elder/lifecycle/trial-stay', data)
 }
 
-export function updateTrialStay(id: number, data: TrialStayRequest) {
+export function updateTrialStay(id: Id, data: TrialStayRequest) {
   return request.put<TrialStayItem>(`/api/elder/lifecycle/trial-stay/${id}`, data)
 }
 
-export function deleteTrialStay(id: number) {
+export function deleteTrialStay(id: Id) {
   return request.delete<boolean>(`/api/elder/lifecycle/trial-stay/${id}`)
 }
 
@@ -80,11 +81,11 @@ export function createDischargeApply(data: DischargeApplyCreateRequest) {
   return request.post<DischargeApplyItem>('/api/elder/lifecycle/discharge-apply', data)
 }
 
-export function reviewDischargeApply(id: number, data: DischargeApplyReviewRequest) {
+export function reviewDischargeApply(id: Id, data: DischargeApplyReviewRequest) {
   return request.put<DischargeApplyItem>(`/api/elder/lifecycle/discharge-apply/${id}/review`, data)
 }
 
-export function deleteDischargeApply(id: number) {
+export function deleteDischargeApply(id: Id) {
   return request.delete<boolean>(`/api/elder/lifecycle/discharge-apply/${id}`)
 }
 
@@ -96,15 +97,15 @@ export function createDeathRegister(data: DeathRegisterCreateRequest) {
   return request.post<DeathRegisterItem>('/api/elder/lifecycle/death-register', data)
 }
 
-export function updateDeathRegister(id: number, data: DeathRegisterUpdateRequest) {
+export function updateDeathRegister(id: Id, data: DeathRegisterUpdateRequest) {
   return request.put<DeathRegisterItem>(`/api/elder/lifecycle/death-register/${id}`, data)
 }
 
-export function cancelDeathRegister(id: number, data?: DeathRegisterCancelRequest) {
+export function cancelDeathRegister(id: Id, data?: DeathRegisterCancelRequest) {
   return request.put<DeathRegisterItem>(`/api/elder/lifecycle/death-register/${id}/cancel`, data || {})
 }
 
-export function deleteDeathRegister(id: number) {
+export function deleteDeathRegister(id: Id) {
   return request.delete<boolean>(`/api/elder/lifecycle/death-register/${id}`)
 }
 

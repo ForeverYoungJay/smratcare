@@ -233,7 +233,7 @@ import {
   rollbackMonthlyAllocation
 } from '../../api/financeFee'
 import { getFinanceAllocationResidentOptions, validateFinanceAllocationMeter } from '../../api/finance'
-import type { FinanceAllocationResidentOption, MonthlyAllocationItem, PageResult } from '../../types'
+import type { FinanceAllocationResidentOption, Id, MonthlyAllocationItem, PageResult } from '../../types'
 import { exportCsv } from '../../utils/export'
 import { printTableReport } from '../../utils/print'
 import { confirmAction } from '../../utils/actionConfirm'
@@ -246,7 +246,7 @@ const query = reactive({
   pageSize: 10,
   month: undefined as any,
   status: undefined as string | undefined,
-  elderId: undefined as number | undefined,
+  elderId: undefined as Id | undefined,
   printRemark: ''
 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
@@ -281,7 +281,7 @@ const createForm = reactive({
   building: undefined as string | undefined,
   floorNo: undefined as string | undefined,
   roomNo: undefined as string | undefined,
-  elderIds: [] as number[],
+  elderIds: [] as Id[],
   remark: ''
 })
 const allocationSyncLoading = ref(false)
@@ -324,14 +324,14 @@ const roomOptions = computed(() => {
 const allocationResidentOptions = computed(() => {
   return allocationResidents.value.map(item => ({
     label: item.roomNo ? `${item.elderName}（${item.roomNo}${item.bedNo ? `-${item.bedNo}` : ''}）` : item.elderName,
-    value: Number(item.elderId)
+    value: item.elderId
   }))
 })
 const selectedEldersText = computed(() => {
   if (!createForm.elderIds.length) return '请至少选择一位老人'
-  const idSet = new Set(createForm.elderIds.map(id => Number(id)))
+  const idSet = new Set(createForm.elderIds.map((id) => String(id)))
   const labels = allocationResidents.value
-    .filter(item => idSet.has(Number(item.elderId)))
+    .filter((item) => idSet.has(String(item.elderId || '')))
     .map(item => {
       const roomNo = String(item.roomNo || '').trim()
       return roomNo ? `${item.elderName}（${roomNo}${item.bedNo ? `-${item.bedNo}` : ''}）` : item.elderName
@@ -351,11 +351,11 @@ const createPreviewAvg = computed(() => {
 })
 
 function parseElderIds(raw?: string) {
-  if (!raw) return [] as number[]
+  if (!raw) return [] as Id[]
   return String(raw)
     .split(',')
-    .map(part => Number(part.trim()))
-    .filter(id => Number.isFinite(id) && id > 0)
+    .map((part) => part.trim())
+    .filter(Boolean) as Id[]
 }
 
 function formatElderLabels(raw?: string, snapshotJson?: string) {
@@ -376,10 +376,10 @@ function formatElderLabels(raw?: string, snapshotJson?: string) {
   if (!ids.length) {
     return '--'
   }
-  const residentNameMap = new Map<number, string>(
-    allocationResidents.value.map(item => [Number(item.elderId), String(item.elderName || '').trim()])
+  const residentNameMap = new Map<string, string>(
+    allocationResidents.value.map((item) => [String(item.elderId || ''), String(item.elderName || '').trim()])
   )
-  return ids.map(id => residentNameMap.get(id) || findElderName(id) || '未命名长者').join('、')
+  return ids.map((id) => residentNameMap.get(String(id)) || findElderName(id) || '未命名长者').join('、')
 }
 
 function resolveAvgAmount(record: MonthlyAllocationItem) {
@@ -426,8 +426,8 @@ async function onFloorChange() {
 async function applyRoomSelection() {
   await syncAllocationResidentOptions()
   const ids = allocationResidents.value
-    .map(item => Number(item.elderId))
-    .filter(id => Number.isFinite(id) && id > 0)
+    .map((item) => String(item.elderId || '').trim())
+    .filter(Boolean) as Id[]
   createForm.elderIds = Array.from(new Set(ids))
   if (!createForm.elderIds.length) {
     message.warning('该房间暂无可分摊老人，请重新选择')
@@ -553,7 +553,7 @@ async function rollbackAllocation(record: MonthlyAllocationItem) {
     danger: true
   })
   if (!confirmed) return
-  await rollbackMonthlyAllocation(Number(record.id), '运营手工回滚')
+  await rollbackMonthlyAllocation(record.id, '运营手工回滚')
   message.success('已回滚该分摊记录')
   fetchData()
 }

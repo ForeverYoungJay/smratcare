@@ -56,7 +56,7 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'resident-360',
             name: 'ElderResident360',
-            redirect: '/elder/in-hospital-overview',
+            component: () => import('../views/elder/resident360/InHospitalOverview.vue'),
             meta: { title: '长者总览', hidden: true }
           },
           {

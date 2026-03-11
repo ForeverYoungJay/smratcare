@@ -158,6 +158,8 @@ public class MedicalAiHealthReportController {
     Map<String, Object> ext = parseJson(doc == null ? null : doc.getRemark());
     MedicalAiHealthReportResponse response = new MedicalAiHealthReportResponse();
     response.setId(doc == null ? null : doc.getId());
+    response.setElderId(toLongOrNull(ext.get("elderId")));
+    response.setElderName(asString(ext.get("elderName")));
     String type = asString(ext.get("type"));
     response.setType(type == null || type.isBlank() ? "WEEKLY" : type.toUpperCase(Locale.ROOT));
     String status = asString(ext.get("status"));
@@ -218,6 +220,20 @@ public class MedicalAiHealthReportController {
       return Long.parseLong(String.valueOf(value));
     } catch (Exception ex) {
       return 0L;
+    }
+  }
+
+  private Long toLongOrNull(Object value) {
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof Number number) {
+      return number.longValue();
+    }
+    try {
+      return Long.parseLong(String.valueOf(value));
+    } catch (Exception ex) {
+      return null;
     }
   }
 }

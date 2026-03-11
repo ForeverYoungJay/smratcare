@@ -542,21 +542,21 @@ function isIdleBed(bed: BedItem) {
   return !isOccupiedBed(bed) && (bed.status === 1 || bed.status === undefined)
 }
 
-function statusText(status?: number, elderId?: number) {
+function statusText(status?: number, elderId?: string | number) {
   if (status === 2) return '占用'
   if (status === 3) return '维修'
   if (elderId) return '入住'
   return '空床'
 }
 
-function statusTag(status?: number, elderId?: number) {
+function statusTag(status?: number, elderId?: string | number) {
   if (status === 2) return 'orange'
   if (status === 3) return 'red'
   if (elderId) return 'blue'
   return 'green'
 }
 
-function statusClass(status?: number, elderId?: number) {
+function statusClass(status?: number, elderId?: string | number) {
   if (status === 3) return 'is-maintain'
   if (status === 2 || elderId) return 'is-occupied'
   return 'is-idle'

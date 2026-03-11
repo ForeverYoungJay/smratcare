@@ -17,14 +17,14 @@ export function getAssessmentRecordSummary(params: any) {
 }
 
 export function getAssessmentRecordIds(params: any) {
-  return request.get<number[]>('/api/assessment/records/ids', { params })
+  return request.get<string[]>('/api/assessment/records/ids', { params })
 }
 
-export function getAssessmentRecord(id: number) {
+export function getAssessmentRecord(id: number | string) {
   return request.get<AssessmentRecord>(`/api/assessment/records/${id}`)
 }
 
-export function getAssessmentRecordReport(id: number) {
+export function getAssessmentRecordReport(id: number | string) {
   return request.get<AssessmentRecordReport>(`/api/assessment/records/${id}/report`)
 }
 
@@ -32,27 +32,27 @@ export function createAssessmentRecord(data: Partial<AssessmentRecord>) {
   return request.post<AssessmentRecord>('/api/assessment/records', data)
 }
 
-export function updateAssessmentRecord(id: number, data: Partial<AssessmentRecord>) {
+export function updateAssessmentRecord(id: number | string, data: Partial<AssessmentRecord>) {
   return request.put<AssessmentRecord>(`/api/assessment/records/${id}`, data)
 }
 
-export function deleteAssessmentRecord(id: number) {
+export function deleteAssessmentRecord(id: number | string) {
   return request.delete<void>(`/api/assessment/records/${id}`)
 }
 
-export function batchDeleteAssessmentRecord(ids: number[]) {
+export function batchDeleteAssessmentRecord(ids: Array<number | string>) {
   return request.post<AssessmentBatchOperationResult>('/api/assessment/records/batch-delete', ids)
 }
 
-export function batchUpdateAssessmentRecordStatus(ids: number[], status: 'DRAFT' | 'COMPLETED' | 'ARCHIVED') {
+export function batchUpdateAssessmentRecordStatus(ids: Array<number | string>, status: 'DRAFT' | 'COMPLETED' | 'ARCHIVED') {
   return request.post<AssessmentBatchOperationResult>('/api/assessment/records/batch-status', { ids, status })
 }
 
-export function batchAssignAssessmentRecord(ids: number[], assessorName: string, assessorId?: number) {
+export function batchAssignAssessmentRecord(ids: Array<number | string>, assessorName: string, assessorId?: number) {
   return request.post<AssessmentBatchOperationResult>('/api/assessment/records/batch-assign', { ids, assessorName, assessorId })
 }
 
-export function batchUpdateAssessmentNextDate(ids: number[], nextAssessmentDate: string) {
+export function batchUpdateAssessmentNextDate(ids: Array<number | string>, nextAssessmentDate: string) {
   return request.post<AssessmentBatchOperationResult>('/api/assessment/records/batch-next-date', { ids, nextAssessmentDate })
 }
 

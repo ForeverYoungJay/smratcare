@@ -119,13 +119,14 @@ import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import StatsMetaHint from '../../components/stats/StatsMetaHint.vue'
 import { exportConsumptionStatsCsv, getConsumptionStats } from '../../api/stats'
-import type { ConsumptionStatsResponse } from '../../types'
+import type { ConsumptionStatsResponse, Id } from '../../types'
 import { useECharts } from '../../plugins/echarts'
 import { message } from 'ant-design-vue'
 import { printTableReport } from '../../utils/print'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { copyText } from '../../utils/clipboard'
+import { normalizeId } from '../../utils/id'
 
 const route = useRoute()
 const router = useRouter()
@@ -135,7 +136,7 @@ const query = reactive({
   from: dayjs().subtract(5, 'month') as Dayjs,
   to: dayjs() as Dayjs,
   orgId: undefined as number | undefined,
-  elderId: undefined as number | undefined,
+  elderId: undefined as Id | undefined,
   printRemark: ''
 })
 
@@ -169,12 +170,12 @@ const metricTraceText = computed(() => {
 })
 const { elderOptions, elderLoading, searchElders } = useElderOptions({ pageSize: 100, inHospitalOnly: true, signedOnly: true })
 const displayTopRows = computed(() => {
-  const elderId = Number(query.elderId || 0)
+  const elderId = String(query.elderId || '').trim()
   const list = stats.topConsumerElders || []
   if (!elderId) return list
-  return list.filter(item => Number(item.elderId) === elderId)
+  return list.filter((item) => String(item.elderId || '').trim() === elderId)
 })
-const selectedElder = computed(() => elderOptions.value.find(item => Number(item.value) === Number(query.elderId)))
+const selectedElder = computed(() => elderOptions.value.find((item) => String(item.value || '').trim() === String(query.elderId || '').trim()))
 
 async function loadData() {
   if (query.from.isAfter(query.to, 'month')) {
@@ -276,7 +277,7 @@ function printSpecificElder() {
     return
   }
   const filtered = (stats.topConsumerElders || [])
-    .filter(item => Number(item.elderId) === Number(query.elderId))
+    .filter((item) => String(item.elderId || '').trim() === String(query.elderId || '').trim())
     .map(item => ({ elderName: item.elderName || '未知老人', amount: item.amount }))
   if (!filtered.length) {
     message.warning('未找到匹配老人')
@@ -307,7 +308,7 @@ function renderPrint(title: string, rows: Array<Record<string, any>>) {
   }
 }
 
-function onElderChange(value?: number) {
+function onElderChange(value?: Id) {
   query.elderId = value
   syncRouteQuery()
 }
@@ -329,8 +330,7 @@ function initFromRouteQuery() {
   if (dayjs(to).isValid()) query.to = dayjs(to)
   const orgId = Number(route.query.orgId)
   if (Number.isFinite(orgId) && orgId > 0) query.orgId = orgId
-  const elderId = Number(route.query.elderId)
-  if (Number.isFinite(elderId) && elderId > 0) query.elderId = elderId
+  query.elderId = normalizeId(route.query.elderId)
 }
 
 useLiveSyncRefresh({

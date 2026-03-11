@@ -1,4 +1,5 @@
 import request, { fetchPage } from '../utils/request'
+import type { Id } from '../types/common'
 import type {
   AdmissionFeeAuditItem,
   DischargeFeeAuditItem,
@@ -24,7 +25,7 @@ export function createAdmissionFeeAudit(data: AdmissionFeeAuditCreateRequest) {
   return request.post<AdmissionFeeAuditItem>('/api/finance/fee/admission-audit', data)
 }
 
-export function reviewAdmissionFeeAudit(id: number, data: FeeAuditReviewRequest) {
+export function reviewAdmissionFeeAudit(id: Id, data: FeeAuditReviewRequest) {
   return request.put<AdmissionFeeAuditItem>(`/api/finance/fee/admission-audit/${id}/review`, data)
 }
 
@@ -36,7 +37,7 @@ export function createDischargeFeeAudit(data: DischargeFeeAuditCreateRequest) {
   return request.post<DischargeFeeAuditItem>('/api/finance/fee/discharge-audit', data)
 }
 
-export function reviewDischargeFeeAudit(id: number, data: FeeAuditReviewRequest) {
+export function reviewDischargeFeeAudit(id: Id, data: FeeAuditReviewRequest) {
   return request.put<DischargeFeeAuditItem>(`/api/finance/fee/discharge-audit/${id}/review`, data)
 }
 
@@ -48,7 +49,7 @@ export function createDischargeSettlement(data: DischargeSettlementCreateRequest
   return request.post<DischargeSettlementItem>('/api/finance/fee/discharge-settlement', data)
 }
 
-export function confirmDischargeSettlement(id: number, data?: DischargeSettlementConfirmRequest) {
+export function confirmDischargeSettlement(id: Id, data?: DischargeSettlementConfirmRequest) {
   return request.post<DischargeSettlementItem>(`/api/finance/fee/discharge-settlement/${id}/confirm`, data || {})
 }
 
@@ -72,6 +73,6 @@ export function previewMonthlyAllocation(data: MonthlyAllocationPreviewRequest) 
   return request.post<MonthlyAllocationPreviewResponse>('/api/finance/fee/monthly-allocation/preview', data)
 }
 
-export function rollbackMonthlyAllocation(id: number, reason?: string) {
+export function rollbackMonthlyAllocation(id: Id, reason?: string) {
   return request.post<MonthlyAllocationItem>(`/api/finance/fee/monthly-allocation/${id}/rollback`, reason ? { reason } : {})
 }

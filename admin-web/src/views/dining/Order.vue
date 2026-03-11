@@ -179,7 +179,7 @@ import {
   checkDiningMealOrderRisk,
   applyDiningRiskOverride
 } from '../../api/dining'
-import type { DiningMealOrder, DiningRiskCheckResponse, PageResult } from '../../types'
+import type { DiningMealOrder, DiningRiskCheckResponse, Id, PageResult } from '../../types'
 
 const mealOptions = DINING_MEAL_TYPE_OPTIONS
 const statusOptions = DINING_ORDER_STATUS_OPTIONS
@@ -210,7 +210,7 @@ const riskResult = ref<DiningRiskCheckResponse | null>(null)
 
 const form = reactive({
   id: undefined as number | undefined,
-  elderId: undefined as number | undefined,
+  elderId: undefined as Id | undefined,
   elderName: '',
   orderDate: dayjs(),
   mealType: DINING_MEAL_TYPES.lunch,
@@ -301,8 +301,8 @@ async function loadDeliveryAreas() {
   }))
 }
 
-function onElderChange(value: number) {
-  const selected = elderOptions.value.find((item) => item.value === value)
+function onElderChange(value?: Id) {
+  const selected = elderOptions.value.find((item) => String(item.value || '').trim() === String(value || '').trim())
   form.elderName = selected?.name || selected?.label || ''
 }
 
@@ -311,13 +311,13 @@ async function ensureValidElderSelection() {
     message.error('请选择老人')
     return false
   }
-  const elderId = Number(form.elderId)
-  if (elderOptions.value.some((item) => Number(item.value) === elderId)) {
+  const elderId = String(form.elderId || '').trim()
+  if (elderOptions.value.some((item) => String(item.value || '').trim() === elderId)) {
     return true
   }
   await loadElders(form.elderName || undefined)
   ensureSelectedElder(elderId, form.elderName)
-  if (elderOptions.value.some((item) => Number(item.value) === elderId)) {
+  if (elderOptions.value.some((item) => String(item.value || '').trim() === elderId)) {
     return true
   }
   form.elderId = undefined

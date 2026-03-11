@@ -144,13 +144,21 @@
               </div>
               <a-progress :percent="archiveCompleteScore" size="small" :show-info="false" :stroke-color="archiveProgressColor" />
               <a-space direction="vertical" size="small" style="width: 100%; margin-top: 8px">
-                <a-tag :color="archiveItemStateTagColor(hasContractAttachment)">
+                <a-tag
+                  :color="archiveItemStateTagColor(hasContractAttachment)"
+                  class="archive-item-action"
+                  @click="goAttachmentUpload('CONTRACT')"
+                >
                   合同附件 {{ hasContractAttachment ? '已上传' : '缺失' }}
                 </a-tag>
                 <a-tag :color="archiveItemStateTagColor(hasInvoiceAttachment)">
                   发票/收据 {{ hasInvoiceAttachment ? '已归档' : '缺失' }}
                 </a-tag>
-                <a-tag :color="archiveItemStateTagColor(hasIdAttachment)">
+                <a-tag
+                  :color="archiveItemStateTagColor(hasIdAttachment)"
+                  class="archive-item-action"
+                  @click="goAttachmentUpload('HOUSEHOLD')"
+                >
                   身份证/证件 {{ hasIdAttachment ? '已归档' : '缺失' }}
                 </a-tag>
                 <a-tag :color="archiveItemStateTagColor(hasAssessmentReport)">
@@ -497,7 +505,6 @@ function applyDocumentQueryFromRoute() {
   const routeElderName = firstRouteQueryText(route.query.elderName)
   if (elderId) {
     selector.elderId = elderId
-    ensureSelectedElder(elderId, routeElderName || undefined)
     selectorInput.value = routeElderName || String(findElderName(elderId) || '').trim()
   } else {
     selector.elderId = undefined
@@ -521,6 +528,16 @@ function onSelectorPick(payload: { elderId: string; elderName: string }) {
   }
   ensureSelectedElder(elderId, elderName || undefined)
   loadBySelectedElder().catch(() => {})
+}
+
+function isSignedLinkage(linked?: ContractLinkageSummary) {
+  if (!linked) return false
+  const status = String(linked.contractStatus || '').trim().toUpperCase()
+  const flowStage = String(linked.flowStage || '').trim().toUpperCase()
+  if (status.includes('SIGNED') || status.includes('EFFECTIVE')) return true
+  if (flowStage === 'SIGNED') return true
+  if (status.includes('已签') || status.includes('生效')) return true
+  return false
 }
 
 function buildDocumentRouteQuery() {
@@ -572,6 +589,20 @@ function goContractSigning() {
     return
   }
   router.push('/marketing/contract-signing')
+}
+
+function goAttachmentUpload(attachmentType: 'CONTRACT' | 'HOUSEHOLD' | 'MEDICAL_INSURANCE' | 'MEDICAL_RECORD' | 'OTHER') {
+  const contractNo = String(linkage.value?.contractNo || '').trim()
+  const elderName = String(resolvedLinkageElderName.value || '').trim()
+  const elderId = String(linkage.value?.elderId || '').trim()
+  const query: Record<string, string> = {
+    openAttachment: '1',
+    attachmentType
+  }
+  if (contractNo) query.contractNo = contractNo
+  if (!contractNo && elderName) query.elderName = elderName
+  if (!contractNo && !elderName && elderId) query.elderId = elderId
+  router.push({ path: '/marketing/contract-signing', query })
 }
 
 function goContractManagement() {
@@ -709,19 +740,19 @@ async function resolveLinkage() {
   const byElder = elderId || residentId
   if (byElder) {
     const linked = await safeLinkageByElder(byElder)
-    if (linked) return linked
+    if (isSignedLinkage(linked)) return linked
   }
 
   const byContract = contractId
   if (byContract) {
     const linked = await safeLinkageByContract(byContract)
-    if (linked) return linked
+    if (isSignedLinkage(linked)) return linked
   }
 
   const byLead = leadId
   if (byLead) {
     const linked = await safeLinkageByLead(byLead)
-    if (linked) return linked
+    if (isSignedLinkage(linked)) return linked
   }
 
   return undefined
@@ -805,9 +836,15 @@ onMounted(async () => {
     const fromRoute = firstRouteQueryText(route.query.docElderId || route.query.elderId || route.query.residentId)
     const routeElderName = firstRouteQueryText(route.query.elderName)
     if (fromRoute) {
-      ensureSelectedElder(fromRoute, routeElderName || undefined)
-      selector.elderId = fromRoute
-      selectorInput.value = routeElderName || String(findElderName(fromRoute) || '').trim()
+      const inSignedPool = elderOptions.value.some((item) => String(item.value || '').trim() === fromRoute)
+      if (inSignedPool) {
+        ensureSelectedElder(fromRoute, routeElderName || undefined)
+        selector.elderId = fromRoute
+        selectorInput.value = routeElderName || String(findElderName(fromRoute) || '').trim()
+      } else {
+        selector.elderId = undefined
+        selectorInput.value = ''
+      }
     } else {
       selector.elderId = elderOptions.value[0]?.value
       if (selector.elderId) {
@@ -913,5 +950,9 @@ useLiveSyncRefresh({
   margin-top: 6px;
   color: #334155;
   font-size: 12px;
+}
+
+.archive-item-action {
+  cursor: pointer;
 }
 </style>

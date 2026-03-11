@@ -41,6 +41,7 @@
       <a-descriptions bordered :column="2" size="small">
         <a-descriptions-item label="报告类型">{{ typeLabel(current?.type) }}</a-descriptions-item>
         <a-descriptions-item label="状态">{{ statusLabel(current?.status) }}</a-descriptions-item>
+        <a-descriptions-item label="关联长者">{{ current?.elderName || '机构级报告' }}</a-descriptions-item>
         <a-descriptions-item label="数据范围">{{ current?.rangeText }}</a-descriptions-item>
         <a-descriptions-item label="高风险提示">{{ current?.highRiskCount }}</a-descriptions-item>
       </a-descriptions>
@@ -49,7 +50,7 @@
           <a-button type="primary" @click="go(generatedRoutes.inspectionRoute || '/medical-care/inspection?filter=generated_from_ai')">生成巡检计划</a-button>
           <a-button @click="go(generatedRoutes.medicalTodoRoute || '/medical-care/center?filter=generated_from_ai')">生成医护随访任务</a-button>
           <a-button @click="go(generatedRoutes.nursingTaskRoute || '/medical-care/care-task-board?filter=generated_from_ai')">生成护理干预任务</a-button>
-          <a-button @click="go('/elder/resident-360?from=ai_report')">发起家属沟通记录</a-button>
+          <a-button :disabled="!current?.elderId" @click="goFamilyCommunication">发起家属沟通记录</a-button>
         </a-space>
       </a-card>
     </a-drawer>
@@ -273,6 +274,21 @@ function exportExcelData() {
 
 function go(path: string) {
   router.push(path)
+}
+
+function goFamilyCommunication() {
+  if (!current.value?.elderId) {
+    message.warning('当前报告为机构级汇总报告，暂不支持直接发起家属沟通记录')
+    return
+  }
+  router.push({
+    path: '/elder/resident-360',
+    query: {
+      residentId: current.value.elderId,
+      residentName: current.value.elderName || undefined,
+      from: 'ai_report'
+    }
+  })
 }
 
 loadReports()

@@ -57,11 +57,8 @@ function normalizeStatus(value: unknown) {
 }
 
 function normalizeElderId(value: unknown) {
-  const parsed = Number(value)
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return undefined
-  }
-  return Math.round(parsed)
+  const text = firstQueryValue(value)
+  return text || undefined
 }
 
 export function normalizeMedicalWorkbenchQuery(

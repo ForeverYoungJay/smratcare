@@ -9,7 +9,7 @@ import lombok.Data;
 @Data
 public class AssessmentBatchNextDateRequest {
   @NotEmpty
-  private List<Long> ids;
+  private List<String> ids;
 
   @NotNull
   private LocalDate nextAssessmentDate;

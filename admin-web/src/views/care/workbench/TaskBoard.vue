@@ -46,12 +46,13 @@ import dayjs from 'dayjs'
 import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
 import { getTaskPage, getTaskSummary } from '../../../api/care'
-import type { CareTaskItem, CareTaskSummary } from '../../../types'
+import { normalizeResidentId } from '../../../utils/id'
+import type { CareTaskItem, CareTaskSummary, Id } from '../../../types'
 import { resolveCareError } from '../careError'
 
 const route = useRoute()
 const router = useRouter()
-const residentId = computed(() => Number(route.query.residentId || 0) || undefined)
+const residentId = computed<Id | undefined>(() => normalizeResidentId(route.query as Record<string, unknown>))
 const filter = computed(() => String(route.query.filter || 'all'))
 const initialDate = String(route.query.date || '')
 const dateValue = ref(initialDate === 'today' || !initialDate ? dayjs().format('YYYY-MM-DD') : initialDate)

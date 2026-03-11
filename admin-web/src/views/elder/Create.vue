@@ -81,32 +81,35 @@
           </a-select>
         </a-form-item>
         <a-form-item label="楼栋" name="buildingId">
-          <a-select v-model:value="assetSelect.buildingId" allow-clear placeholder="选择楼栋">
+          <a-select v-model:value="assetSelect.buildingId" allow-clear placeholder="选择楼栋" :disabled="form.status !== 1">
             <a-select-option v-for="item in buildingOptions" :key="item.value" :value="item.value">
               {{ item.label }}
             </a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="楼层" name="floorId">
-          <a-select v-model:value="assetSelect.floorId" allow-clear placeholder="选择楼层">
+          <a-select v-model:value="assetSelect.floorId" allow-clear placeholder="选择楼层" :disabled="form.status !== 1">
             <a-select-option v-for="item in floorOptions" :key="item.value" :value="item.value">
               {{ item.label }}
             </a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="房间" name="roomId">
-          <a-select v-model:value="assetSelect.roomId" allow-clear placeholder="选择房间">
+          <a-select v-model:value="assetSelect.roomId" allow-clear placeholder="选择房间" :disabled="form.status !== 1">
             <a-select-option v-for="item in roomOptions" :key="item.value" :value="item.value">
               {{ item.label }}
             </a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="床位" name="bedId">
-          <a-select v-model:value="form.bedId" allow-clear placeholder="选择床位">
+          <a-select v-model:value="form.bedId" allow-clear placeholder="选择床位" :disabled="form.status !== 1">
             <a-select-option v-for="item in bedOptions" :key="item.value" :value="item.value">
               {{ item.label }}
             </a-select-option>
           </a-select>
+        </a-form-item>
+        <a-form-item label="床位开始日期" name="bedStartDate">
+          <a-date-picker v-model:value="form.bedStartDate" value-format="YYYY-MM-DD" style="width: 100%" :disabled="form.status !== 1" />
         </a-form-item>
         <a-form-item label="状态" name="status">
           <a-select v-model:value="form.status" placeholder="请选择">
@@ -130,13 +133,14 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import dayjs from 'dayjs'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { createElder, uploadElderFile } from '../../api/elder'
 import { admitElder } from '../../api/elderLifecycle'
 import { getBedList, getBuildingList, getFloorList, getRoomList } from '../../api/bed'
-import type { AdmissionRequest, BedItem, BuildingItem, ElderCreateRequest, ElderItem, FloorItem, RoomItem } from '../../types/api'
+import type { AdmissionRequest, BedItem, BuildingItem, ElderCreateRequest, ElderItem, FloorItem, Id, RoomItem } from '../../types'
 
 const route = useRoute()
 const router = useRouter()
@@ -176,10 +180,79 @@ const rooms = ref<RoomItem[]>([])
 const beds = ref<BedItem[]>([])
 
 const assetSelect = reactive({
-  buildingId: undefined as number | undefined,
-  floorId: undefined as number | undefined,
-  roomId: undefined as number | undefined
+  buildingId: undefined as Id | undefined,
+  floorId: undefined as Id | undefined,
+  roomId: undefined as Id | undefined
 })
+
+function trimText(value?: string) {
+  return String(value || '').trim()
+}
+
+async function validateIdCardNo(_rule: unknown, value?: string) {
+  const text = trimText(value)
+  if (!text) {
+    return Promise.resolve()
+  }
+  if (!/^(?:\d{15}|\d{17}[\dXx])$/.test(text)) {
+    return Promise.reject(new Error('身份证号格式不正确'))
+  }
+  return Promise.resolve()
+}
+
+async function validatePhone(_rule: unknown, value?: string) {
+  const text = trimText(value)
+  if (!text) {
+    return Promise.resolve()
+  }
+  if (!/^1\d{10}$/.test(text)) {
+    return Promise.reject(new Error('手机号格式不正确'))
+  }
+  return Promise.resolve()
+}
+
+async function validateBirthDate(_rule: unknown, value?: string) {
+  if (!value) {
+    return Promise.resolve()
+  }
+  if (dayjs(value).isAfter(dayjs(), 'day')) {
+    return Promise.reject(new Error('出生日期不能晚于今天'))
+  }
+  return Promise.resolve()
+}
+
+async function validateAdmissionDate(_rule: unknown, value?: string) {
+  if (form.bedId && !value) {
+    return Promise.reject(new Error('选择床位时必须填写入院日期'))
+  }
+  if (value && form.birthDate && dayjs(value).isBefore(dayjs(form.birthDate), 'day')) {
+    return Promise.reject(new Error('入院日期不能早于出生日期'))
+  }
+  return Promise.resolve()
+}
+
+async function validateBedId(_rule: unknown, value?: Id) {
+  if (!value) {
+    return Promise.resolve()
+  }
+  if (form.status !== 1) {
+    return Promise.reject(new Error('仅在院状态可分配床位'))
+  }
+  return Promise.resolve()
+}
+
+async function validateBedStartDate(_rule: unknown, value?: string) {
+  if (!form.bedId) {
+    return Promise.resolve()
+  }
+  if (!value) {
+    return Promise.reject(new Error('选择床位时必须填写床位开始日期'))
+  }
+  if (form.admissionDate && dayjs(value).isBefore(dayjs(form.admissionDate), 'day')) {
+    return Promise.reject(new Error('床位开始日期不能早于入院日期'))
+  }
+  return Promise.resolve()
+}
 
 const buildingOptions = computed(() =>
   buildings.value.map((b) => ({ label: b.name, value: b.id }))
@@ -203,6 +276,12 @@ const bedOptions = computed(() =>
 
 const rules: FormRules = {
   fullName: [{ required: true, message: '请输入姓名' }],
+  idCardNo: [{ validator: validateIdCardNo, trigger: 'blur' }],
+  phone: [{ validator: validatePhone, trigger: 'blur' }],
+  birthDate: [{ validator: validateBirthDate, trigger: 'change' }],
+  admissionDate: [{ validator: validateAdmissionDate, trigger: 'change' }],
+  bedId: [{ validator: validateBedId, trigger: 'change' }],
+  bedStartDate: [{ validator: validateBedStartDate, trigger: 'change' }],
   status: [{ required: true, message: '请选择状态' }]
 }
 
@@ -218,10 +297,10 @@ async function submit() {
     const normalizedContractNo = String(form.contractNo || '').trim()
     const shouldAdmit = !quickArchiveMode.value && !!form.admissionDate && !!normalizedContractNo
     const payload: ElderCreateRequest = {
-      fullName: form.fullName,
-      idCardNo: form.idCardNo,
-      phone: form.phone,
-      homeAddress: form.homeAddress,
+      fullName: trimText(form.fullName),
+      idCardNo: trimText(form.idCardNo) || undefined,
+      phone: trimText(form.phone) || undefined,
+      homeAddress: trimText(form.homeAddress) || undefined,
       medicalInsuranceCopyUrl: form.medicalInsuranceCopyUrl,
       householdCopyUrl: form.householdCopyUrl,
       medicalRecordFileUrl: form.medicalRecordFileUrl,
@@ -231,13 +310,10 @@ async function submit() {
       careLevel: form.careLevel,
       riskPrecommit: form.riskPrecommit,
       status: form.status,
-      remark: form.remark
+      remark: trimText(form.remark) || undefined
     }
     payload.bedId = form.bedId
     payload.bedStartDate = form.bedStartDate
-    if (payload.bedId && !payload.bedStartDate) {
-      payload.bedStartDate = form.admissionDate || new Date().toISOString().slice(0, 10)
-    }
     const created: ElderItem = await createElder(payload)
     if (shouldAdmit && created?.id) {
       const admission: AdmissionRequest = {
@@ -247,9 +323,6 @@ async function submit() {
         depositAmount: form.depositAmount,
         bedId: form.bedId,
         bedStartDate: form.bedStartDate
-      }
-      if (admission.bedId && !admission.bedStartDate) {
-        admission.bedStartDate = admission.admissionDate
       }
       try {
         await admitElder(admission)
@@ -357,6 +430,27 @@ watch(
   () => assetSelect.roomId,
   () => {
     form.bedId = undefined
+  }
+)
+watch(
+  () => form.bedId,
+  () => {
+    if (!form.bedId) {
+      form.bedStartDate = undefined
+    }
+  }
+)
+watch(
+  () => form.status,
+  (status) => {
+    if (status === 1) {
+      return
+    }
+    assetSelect.buildingId = undefined
+    assetSelect.floorId = undefined
+    assetSelect.roomId = undefined
+    form.bedId = undefined
+    form.bedStartDate = undefined
   }
 )
 

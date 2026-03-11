@@ -107,7 +107,16 @@
           <a-col :span="12"><a-form-item label="状态"><a-select v-model:value="form.status" :options="statusOptions" /></a-form-item></a-col>
           <a-col :span="12"><a-form-item label="备注"><a-input v-model:value="form.remark" /></a-form-item></a-col>
         </a-row>
-        <a-form-item label="来源巡检ID"><a-input-number v-model:value="form.sourceInspectionId" :min="1" style="width: 100%" /></a-form-item>
+        <a-form-item v-if="form.logType === 'INSPECTION_FOLLOW_UP'" label="来源巡检" required>
+          <a-select
+            v-model:value="form.sourceInspectionId"
+            :options="inspectionOptions"
+            show-search
+            option-filter-prop="label"
+            allow-clear
+            placeholder="请选择当前长者关联的巡检记录"
+          />
+        </a-form-item>
       </a-form>
     </a-modal>
   </PageContainer>
@@ -125,21 +134,25 @@ import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { mapHealthExportRows, nursingLogExportColumns } from '../../constants/healthExport'
 import { exportCsv, exportExcel } from '../../utils/export'
+import { normalizeId, normalizeResidentId } from '../../utils/id'
 import { syncMedicalAlertRules } from '../../utils/medicalAlertRule'
 import { resolveHealthError } from './healthError'
 import {
+  getHealthInspectionPage,
   getHealthNursingLogPage,
   getHealthNursingLogSummary,
   createHealthNursingLog,
   updateHealthNursingLog,
   deleteHealthNursingLog
 } from '../../api/health'
-import type { HealthNursingLog, HealthNursingLogSummary, PageResult } from '../../types'
+import { useUserStore } from '../../stores/user'
+import type { HealthInspection, HealthNursingLog, HealthNursingLogSummary, Id, PageResult } from '../../types'
 
 const loading = ref(false)
 const exporting = ref(false)
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const rows = ref<HealthNursingLog[]>([])
 const query = reactive({
   keyword: '',
@@ -173,24 +186,28 @@ const columns = [
 const editOpen = ref(false)
 const saving = ref(false)
 const { elderOptions, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
+const inspectionOptions = ref<{ label: string; value: Id }[]>([])
+const currentStaffName = computed(() => {
+  return String(userStore.staffInfo?.realName || userStore.staffInfo?.username || '').trim() || '当前登录用户'
+})
 const form = reactive({
-  id: undefined as number | undefined,
-  elderId: undefined as number | undefined,
+  id: undefined as Id | undefined,
+  elderId: undefined as Id | undefined,
   elderName: '',
-  sourceInspectionId: undefined as number | undefined,
+  sourceInspectionId: undefined as Id | undefined,
   logTime: dayjs(),
   logType: 'ROUTINE',
   content: '',
-  staffName: '',
+  staffName: currentStaffName.value,
   status: 'PENDING',
   remark: ''
 })
 const residentContext = computed(() => {
-  const residentId = route.query.residentId ?? route.query.elderId
+  const residentId = normalizeResidentId(route.query as Record<string, unknown>)
   const residentName = typeof route.query.residentName === 'string' ? route.query.residentName : ''
   return {
     active: !!residentId,
-    residentId: residentId ? Number(residentId) : undefined,
+    residentId,
     name: residentName || ''
   }
 })
@@ -256,19 +273,20 @@ function onReset() {
 }
 
 function openCreate() {
-  const residentId = route.query.residentId ?? route.query.elderId
+  const residentId = normalizeResidentId(route.query as Record<string, unknown>)
   const residentName = typeof route.query.residentName === 'string' ? route.query.residentName : ''
   form.id = undefined
-  form.elderId = residentId ? Number(residentId) : undefined
+  form.elderId = residentId
   form.elderName = residentName
   ensureSelectedElder(form.elderId, residentName)
   form.sourceInspectionId = undefined
   form.logTime = dayjs()
   form.logType = 'ROUTINE'
   form.content = ''
-  form.staffName = ''
+  form.staffName = currentStaffName.value
   form.status = 'PENDING'
   form.remark = ''
+  void loadInspectionOptions(form.elderId)
   editOpen.value = true
 }
 
@@ -281,14 +299,41 @@ function openEdit(record: HealthNursingLog) {
   form.logTime = record.logTime ? dayjs(record.logTime) : dayjs()
   form.logType = record.logType
   form.content = record.content
-  form.staffName = record.staffName || ''
+  form.staffName = record.staffName || currentStaffName.value
   form.status = record.status || 'PENDING'
   form.remark = record.remark || ''
+  void loadInspectionOptions(record.elderId, record.sourceInspectionId)
   editOpen.value = true
 }
 
-function onElderChange(elderId?: number) {
+function onElderChange(elderId?: Id) {
   form.elderName = findElderName(elderId)
+  form.sourceInspectionId = undefined
+  void loadInspectionOptions(elderId)
+}
+
+async function loadInspectionOptions(elderId?: Id, selectedInspectionId?: Id) {
+  if (!elderId) {
+    inspectionOptions.value = []
+    return
+  }
+  try {
+    const page = await getHealthInspectionPage({
+      elderId,
+      pageNo: 1,
+      pageSize: 50
+    }) as PageResult<HealthInspection>
+    const options = (page.list || []).map((item) => ({
+      value: item.id,
+      label: `${dayjs(item.inspectionDate).format('MM-DD')}｜${item.inspectionItem || '未命名巡检'}｜${item.status || '-'}`
+    }))
+    if (selectedInspectionId && !options.some((item) => item.value === selectedInspectionId)) {
+      options.unshift({ value: selectedInspectionId, label: `已关联巡检 #${selectedInspectionId}` })
+    }
+    inspectionOptions.value = options
+  } catch {
+    inspectionOptions.value = selectedInspectionId ? [{ value: selectedInspectionId, label: `已关联巡检 #${selectedInspectionId}` }] : []
+  }
 }
 
 async function submit() {
@@ -298,6 +343,10 @@ async function submit() {
   }
   if (form.logType === 'INSPECTION_FOLLOW_UP' && !form.sourceInspectionId) {
     message.error('巡检跟进日志需关联来源巡检ID')
+    return
+  }
+  if (!form.staffName.trim()) {
+    message.error('请填写记录人')
     return
   }
   if (dayjs(form.logTime).isAfter(dayjs())) {
@@ -313,7 +362,7 @@ async function submit() {
       logTime: dayjs(form.logTime).format('YYYY-MM-DDTHH:mm:ss'),
       logType: form.logType,
       content: form.content,
-      staffName: form.staffName,
+      staffName: form.staffName.trim(),
       status: form.status,
       remark: form.remark
     }
@@ -363,8 +412,8 @@ async function exportExcelData() {
 }
 
 function buildQueryParams() {
-  const residentId = route.query.residentId ?? route.query.elderId
-  const sourceInspectionId = route.query.sourceInspectionId ?? route.query.inspectionId
+  const residentId = normalizeResidentId(route.query as Record<string, unknown>)
+  const sourceInspectionId = normalizeId(route.query.sourceInspectionId ?? route.query.inspectionId)
   const params: Record<string, any> = {
     keyword: query.keyword || undefined,
     logType: query.logType || undefined,
@@ -373,10 +422,10 @@ function buildQueryParams() {
     pageSize: query.pageSize
   }
   if (residentId) {
-    params.elderId = Number(residentId)
+    params.elderId = residentId
   }
   if (sourceInspectionId) {
-    params.sourceInspectionId = Number(sourceInspectionId)
+    params.sourceInspectionId = sourceInspectionId
   }
   if (Array.isArray(query.logRange) && query.logRange.length === 2) {
     params.logFrom = dayjs(query.logRange[0]).format('YYYY-MM-DDTHH:mm:ss')
@@ -405,12 +454,12 @@ function statusColor(value?: string) {
   return 'orange'
 }
 
-function goInspection(sourceInspectionId: number) {
+function goInspection(sourceInspectionId: Id) {
   router.push({
-    path: '/health/inspection',
+    path: '/medical-care/inspection',
     query: {
       inspectionId: String(sourceInspectionId),
-      residentId: route.query.residentId ? String(route.query.residentId) : undefined,
+      residentId: normalizeResidentId(route.query as Record<string, unknown>) || undefined,
       residentName: route.query.residentName ? String(route.query.residentName) : undefined
     }
   })
@@ -491,6 +540,17 @@ watch(
     query.pageNo = 1
     pagination.current = 1
     fetchData()
+  }
+)
+
+watch(
+  () => [form.elderId, form.logType],
+  ([elderId, logType]) => {
+    if (logType !== 'INSPECTION_FOLLOW_UP') {
+      form.sourceInspectionId = undefined
+      return
+    }
+    void loadInspectionOptions(elderId as Id | undefined, form.sourceInspectionId)
   }
 )
 </script>

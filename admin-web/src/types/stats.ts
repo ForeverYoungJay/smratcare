@@ -1,3 +1,5 @@
+import type { Id } from './common'
+
 export interface MonthCountItem {
   month: string
   count: number
@@ -14,7 +16,7 @@ export interface NameCountItem {
 }
 
 export interface ElderAmountItem {
-  elderId?: number
+  elderId?: Id
   elderName?: string
   amount: number
 }
@@ -91,7 +93,7 @@ export interface MonthlyRevenueStatsResponse {
 export interface FlowReportItem {
   eventType: 'ADMISSION' | 'DISCHARGE'
   eventDate: string
-  elderId?: number
+  elderId?: Id
   elderName?: string
   remark?: string
 }

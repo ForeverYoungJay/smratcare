@@ -191,9 +191,10 @@ import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { exportCsv } from '../../utils/export'
 import { getBillPage, generateBill, invalidateBill, payBill } from '../../api/bill'
 import { getFinanceModuleEntrySummary, getPaymentRecordPage, updatePaymentRecord } from '../../api/finance'
-import type { BillItem, FinanceModuleEntrySummary, PageResult, PaymentRecordItem } from '../../types'
+import type { BillItem, FinanceModuleEntrySummary, Id, PageResult, PaymentRecordItem } from '../../types'
 import { printTableReport } from '../../utils/print'
 import { confirmAction } from '../../utils/actionConfirm'
+import { normalizeResidentId } from '../../utils/id'
 import {
   buildBillCenterRouteQuery,
   buildBillCenterRouteSignature,
@@ -241,7 +242,7 @@ const summary = ref<FinanceModuleEntrySummary>({
 const query = reactive({
   month: undefined as any,
   keyword: '',
-  elderId: undefined as number | undefined,
+  elderId: undefined as Id | undefined,
   payMethod: undefined as string | undefined,
   scene: undefined as ('ADMISSION' | 'RESIDENT' | undefined),
   pageNo: 1,
@@ -257,7 +258,7 @@ const generateForm = reactive({
 const payOpen = ref(false)
 const paying = ref(false)
 const payFormRef = ref()
-const activePaymentId = ref<number | null>(null)
+const activePaymentId = ref<Id | null>(null)
 const originalPayMethod = ref<string>('CASH')
 type PayForm = {
   amount: number
@@ -278,7 +279,7 @@ const payRules = {
   paidAt: [{ required: true, message: '请选择时间' }]
 }
 
-const activeBillId = ref<number | null>(null)
+const activeBillId = ref<Id | null>(null)
 const historyOpen = ref(false)
 const historyLoading = ref(false)
 const historyRows = ref<PaymentRecordItem[]>([])
@@ -328,10 +329,9 @@ function routeOptions() {
 
 function applyBillRouteState() {
   const state = parseBillCenterRouteState(route.query, routeOptions())
-  const routeElderId = Number(route.query.elderId || route.query.residentId || 0)
   query.month = state.month ? dayjs(state.month, 'YYYY-MM') : undefined
   query.keyword = state.keyword || ''
-  query.elderId = Number.isFinite(routeElderId) && routeElderId > 0 ? routeElderId : undefined
+  query.elderId = normalizeResidentId(route.query as Record<string, unknown>)
   query.payMethod = state.payMethod
   query.scene = state.scene
   query.pageNo = state.pageNo
@@ -508,7 +508,7 @@ function openEditLatestPayment(row: BillItem) {
     return
   }
   activeBillId.value = row.id
-  activePaymentId.value = Number(row.lastPaymentId)
+  activePaymentId.value = row.lastPaymentId || null
   payForm.amount = Number(row.lastPaymentAmount || 0)
   payForm.method = String(row.lastPayMethod || 'CASH').toUpperCase()
   originalPayMethod.value = payForm.method
@@ -604,8 +604,8 @@ async function openHistory(row: BillItem) {
 }
 
 function openEditHistoryPayment(row: PaymentRecordItem) {
-  activeBillId.value = Number(row.billMonthlyId)
-  activePaymentId.value = Number(row.id)
+  activeBillId.value = row.billMonthlyId
+  activePaymentId.value = row.id
   payForm.amount = Number(row.amount || 0)
   payForm.method = String(row.payMethod || 'CASH').toUpperCase()
   originalPayMethod.value = payForm.method

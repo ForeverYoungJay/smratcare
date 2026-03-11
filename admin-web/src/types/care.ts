@@ -1,8 +1,10 @@
+import type { Id } from './common'
+
 export interface CareTaskItem {
   taskDailyId: number
-  elderId: number
+  elderId: Id
   elderName: string
-  bedId: number
+  bedId: Id
   roomNo: string
   staffId?: number
   staffName?: string
@@ -67,7 +69,7 @@ export interface CareTaskReviewRequest {
 }
 
 export interface CareTaskCreateRequest {
-  elderId: number
+  elderId: Id
   templateId?: number
   taskName?: string
   planTime: string

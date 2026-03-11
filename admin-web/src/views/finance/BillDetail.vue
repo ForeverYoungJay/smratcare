@@ -209,24 +209,25 @@ import PageContainer from '../../components/PageContainer.vue'
 import { bindFinanceBillElder, getFinanceBillDetail, updatePaymentRecord } from '../../api/finance'
 import { getBillDetail, invalidateBill, payBill } from '../../api/bill'
 import { getOrderDetail } from '../../api/store'
-import type { FinanceBillDetail } from '../../types'
+import type { FinanceBillDetail, Id } from '../../types'
 import { exportCsv } from '../../utils/export'
 import { confirmAction } from '../../utils/actionConfirm'
 import { useElderOptions } from '../../composables/useElderOptions'
+import { normalizeId } from '../../utils/id'
 
 const route = useRoute()
 const router = useRouter()
-const currentBillId = computed(() => Number(route.params.billId))
+const currentBillId = computed<Id | undefined>(() => normalizeId(route.params.billId))
 const detail = ref<FinanceBillDetail | null>(null)
 const loadError = ref('')
-const lastValidBillId = ref<number | null>(null)
-const orderDetailMap = ref<Record<number, any>>({})
-const orderLoading = ref<Record<number, boolean>>({})
+const lastValidBillId = ref<Id | null>(null)
+const orderDetailMap = ref<Record<string, any>>({})
+const orderLoading = ref<Record<string, boolean>>({})
 
 const { elderOptions, elderLoading, searchElders, ensureSelectedElder, findElderName } = useElderOptions({ pageSize: 80, inHospitalOnly: false })
 
 const fixQuery = reactive({
-  elderId: undefined as number | undefined,
+  elderId: undefined as Id | undefined,
   month: dayjs().startOf('month') as any
 })
 const bindingElder = ref(false)
@@ -243,7 +244,7 @@ const resolvedElderName = computed(() => {
 const payOpen = ref(false)
 const paying = ref(false)
 const payFormRef = ref()
-const activePaymentId = ref<number | null>(null)
+const activePaymentId = ref<Id | null>(null)
 const originalPayMethod = ref<string>('CASH')
 type PayForm = {
   amount: number
@@ -287,8 +288,8 @@ function statusColor(status?: number) {
 }
 
 async function refresh() {
-  const billId = Number(currentBillId.value)
-  if (!Number.isFinite(billId) || billId <= 0) {
+  const billId = currentBillId.value
+  if (!billId) {
     detail.value = null
     loadError.value = '账单ID无效，请返回账单中心重新选择。'
     return
@@ -335,7 +336,7 @@ async function locateBillByElder() {
       message.warning('未查询到该老人该月账单')
       return
     }
-    if (Number(bill.id) === currentBillId.value) {
+    if (String(bill.id) === String(currentBillId.value || '')) {
       refresh()
       return
     }
@@ -346,13 +347,18 @@ async function locateBillByElder() {
 }
 
 async function bindCurrentBillElder() {
+  const billId = currentBillId.value
+  if (!billId) {
+    message.warning('当前账单ID无效')
+    return
+  }
   if (!fixQuery.elderId) {
     message.warning('请先选择老人')
     return
   }
   bindingElder.value = true
   try {
-    await bindFinanceBillElder(currentBillId.value, {
+    await bindFinanceBillElder(billId, {
       elderId: fixQuery.elderId,
       remark: '账单详情页手工修复'
     })
@@ -364,14 +370,15 @@ async function bindCurrentBillElder() {
 }
 
 async function onToggleOrderExpand({ row, expanded }: any) {
-  if (!expanded || !row?.id) return
-  if (orderDetailMap.value[row.id]) return
-  orderLoading.value[row.id] = true
+  const rowId = normalizeId(row?.id)
+  if (!expanded || !rowId) return
+  if (orderDetailMap.value[rowId]) return
+  orderLoading.value[rowId] = true
   try {
-    const data = await getOrderDetail(row.id)
-    orderDetailMap.value[row.id] = data
+    const data = await getOrderDetail(rowId)
+    orderDetailMap.value[rowId] = data
   } finally {
-    orderLoading.value[row.id] = false
+    orderLoading.value[rowId] = false
   }
 }
 
@@ -388,7 +395,7 @@ function openPay() {
 }
 
 function openEditPayment(row: any) {
-  activePaymentId.value = Number(row.id)
+  activePaymentId.value = normalizeId(row.id) || null
   originalPayMethod.value = String(row.payMethod || 'CASH').toUpperCase()
   payForm.value = {
     amount: Number(row.amount || 0),
@@ -413,7 +420,8 @@ function payMethodText(method?: string) {
 }
 
 async function submitPay() {
-  if (!detail.value) return
+  const billId = currentBillId.value
+  if (!detail.value || !billId) return
   await payFormRef.value?.validate?.()
   paying.value = true
   try {
@@ -431,7 +439,7 @@ async function submitPay() {
         message.success('收款已修改')
       }
     } else {
-      await payBill(currentBillId.value, payload)
+      await payBill(billId, payload)
       message.success('收款登记成功')
     }
     payOpen.value = false
@@ -443,16 +451,17 @@ async function submitPay() {
 }
 
 async function markInvalid() {
-  if (!detail.value) return
+  const billId = currentBillId.value
+  if (!detail.value || !billId) return
   const confirmed = await confirmAction({
     title: '确认标记为无效账单？',
-    content: `账单ID：${currentBillId.value}`,
+    content: `账单ID：${billId}`,
     impactItems: ['账单状态将变更为“无效”', '该账单后续不可直接收款', '如需恢复需走修复流程'],
     okText: '确认作废',
     danger: true
   })
   if (!confirmed) return
-  await invalidateBill(currentBillId.value)
+  await invalidateBill(billId)
   message.success('账单已标记为无效')
   refresh()
 }

@@ -56,7 +56,7 @@
       <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="false" :pagination="pagination" :row-class-name="resolveRowClassName" @change="onTableChange">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'elderBed'">
-            {{ record.elderName || '-' }} / {{ bedNoMap[record.elderId || 0] || '-' }}
+            {{ record.elderName || '-' }} / {{ (record.elderId && bedNoMap[record.elderId]) || '-' }}
           </template>
           <template v-else-if="column.key === 'constitution'">
             {{ constitutionLabel(record.constitutionPrimary) }} / {{ constitutionLabel(record.constitutionSecondary) }}
@@ -148,6 +148,7 @@ import { useElderOptions } from '../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { getElderDetail } from '../../api/elder'
 import { exportCsv, exportExcel } from '../../utils/export'
+import { normalizeResidentId } from '../../utils/id'
 import { mapMedicalExportRows, tcmAssessmentExportColumns } from '../../constants/medicalExport'
 import { resolveMedicalError } from './medicalError'
 import {
@@ -158,14 +159,14 @@ import {
   publishTcmAssessment,
   updateTcmAssessment
 } from '../../api/medicalCare'
-import type { MedicalTcmAssessment, MedicalTcmAssessmentSummary } from '../../types'
+import type { Id, MedicalTcmAssessment, MedicalTcmAssessmentSummary } from '../../types'
 
 const route = useRoute()
 const loading = ref(false)
 const tableError = ref('')
 const summaryLoading = ref(false)
 const summaryError = ref('')
-const bedNoMap = reactive<Record<number, string>>({})
+const bedNoMap = reactive<Record<string, string>>({})
 const rows = ref<MedicalTcmAssessment[]>([])
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const query = reactive({
@@ -253,9 +254,9 @@ function resetForm() {
 
 function openCreate() {
   resetForm()
-  const residentId = route.query.residentId ?? route.query.elderId
+  const residentId = normalizeResidentId(route.query as Record<string, unknown>)
   if (residentId) {
-    form.elderId = Number(residentId)
+    form.elderId = residentId
     ensureSelectedElder(form.elderId, route.query.residentName ? String(route.query.residentName) : undefined)
   }
   if (route.query.residentName) {
@@ -277,7 +278,7 @@ function openEdit(record: MedicalTcmAssessment) {
   editOpen.value = true
 }
 
-function onElderChange(elderId?: number) {
+function onElderChange(elderId?: Id) {
   form.elderName = findElderName(elderId)
 }
 
@@ -302,7 +303,7 @@ function autoCompute() {
 }
 
 function buildParams() {
-  const residentId = route.query.residentId ?? route.query.elderId
+  const residentId = normalizeResidentId(route.query as Record<string, unknown>)
   const params: any = {
     pageNo: query.pageNo,
     pageSize: query.pageSize,
@@ -318,13 +319,13 @@ function buildParams() {
     params.dateTo = dayjs(query.dateRange[1]).format('YYYY-MM-DD')
   }
   if (residentId) {
-    params.elderId = Number(residentId)
+    params.elderId = residentId
   }
   return params
 }
 
 async function loadBedNos(records: MedicalTcmAssessment[]) {
-  const elderIds = Array.from(new Set(records.map((item) => Number(item.elderId)).filter((id) => Number.isFinite(id) && id > 0)))
+  const elderIds = Array.from(new Set(records.map((item) => item.elderId).filter((id): id is Id => !!id)))
   await Promise.all(
     elderIds.map(async (elderId) => {
       if (bedNoMap[elderId]) return
@@ -395,7 +396,7 @@ function exportRows() {
   return mapMedicalExportRows(
     rows.value.map((item) => ({
       ...item,
-      bedNo: bedNoMap[item.elderId || 0] || '-',
+      bedNo: item.elderId ? bedNoMap[item.elderId] || '-' : '-',
       constitutionPrimary: constitutionLabel(item.constitutionPrimary),
       constitutionSecondary: constitutionLabel(item.constitutionSecondary),
       status: item.status === 'PUBLISHED' ? '已发布' : '草稿'

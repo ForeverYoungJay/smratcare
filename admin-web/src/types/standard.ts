@@ -1,3 +1,5 @@
+import type { Id } from './common'
+
 export interface ServiceItem {
   id: number
   name: string
@@ -29,10 +31,10 @@ export interface CarePackageItem {
 }
 
 export interface ElderPackage {
-  id: number
-  elderId: number
+  id: Id
+  elderId: Id
   elderName?: string
-  packageId: number
+  packageId: Id
   packageName?: string
   startDate: string
   endDate?: string

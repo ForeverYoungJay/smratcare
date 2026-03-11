@@ -1,4 +1,5 @@
 import request, { fetchPage } from '../utils/request'
+import type { Id } from '../types/common'
 import type { CardAccount, CardTradeLog } from '../types'
 
 export function getCardAccountPage(params: any) {
@@ -9,19 +10,19 @@ export function createCardAccount(data: Partial<CardAccount>) {
   return request.post<CardAccount>('/api/card/account', data)
 }
 
-export function updateCardAccount(id: number, data: Partial<CardAccount>) {
+export function updateCardAccount(id: Id, data: Partial<CardAccount>) {
   return request.put<CardAccount>(`/api/card/account/${id}`, data)
 }
 
-export function deleteCardAccount(id: number) {
+export function deleteCardAccount(id: Id) {
   return request.delete<void>(`/api/card/account/${id}`)
 }
 
-export function rechargeCard(data: { cardAccountId: number; amount: number; remark?: string }) {
+export function rechargeCard(data: { cardAccountId: Id; amount: number; remark?: string }) {
   return request.post('/api/card/account/recharge', data)
 }
 
-export function consumeCard(data: { cardAccountId: number; amount: number; remark?: string }) {
+export function consumeCard(data: { cardAccountId: Id; amount: number; remark?: string }) {
   return request.post('/api/card/account/consume', data)
 }
 

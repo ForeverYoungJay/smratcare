@@ -252,6 +252,7 @@ import { admitElder, exportAdmissionRecords, getAdmissionRecordSummary, getAdmis
 import { getElderDetail, getElderDiseases } from '../../api/elder'
 import { getContractAttachments, getContractPage } from '../../api/marketing'
 import { getCrmLead, updateCrmLead } from '../../api/crm'
+import { normalizeId, normalizeResidentId } from '../../utils/id'
 import type {
   AdmissionRecordDimensionItem,
   AdmissionRecordItem,
@@ -261,6 +262,7 @@ import type {
   BuildingItem,
   CrmContractItem,
   FloorItem,
+  Id,
   PageResult,
   RoomItem
 } from '../../types'
@@ -277,11 +279,11 @@ const lifecycleContext = computed(() => {
   }
 })
 const formRef = ref<FormInstance>()
-const form = reactive<AdmissionRequest>({ elderId: 0, admissionDate: '', bedId: undefined, bedStartDate: undefined })
+const form = reactive<AdmissionRequest>({ elderId: '' as Id, admissionDate: '', bedId: undefined, bedStartDate: undefined })
 const submitting = ref(false)
 const submitChecklistLoading = ref(false)
 const submitConfirmOpen = ref(false)
-const linkedLeadId = ref<number>()
+const linkedLeadId = ref<Id>()
 const guardContract = ref<CrmContractItem | null>(null)
 const { elderOptions, elderLoading, searchElders, findElderName, ensureSelectedElder } = useElderOptions({
   pageSize: 120,
@@ -785,20 +787,20 @@ async function resolveContractNoByElder(elderIdRaw: string | number | undefined)
   form.contractNo = String(picked.contractNo || '').trim()
   guardContract.value = picked || null
   if (picked.leadId && !linkedLeadId.value) {
-    linkedLeadId.value = Number(picked.leadId)
+    linkedLeadId.value = normalizeId(picked.leadId)
   }
 }
 
 async function onElderChange(value: string | number | undefined) {
-  form.elderId = (value as any) || 0
+  form.elderId = (normalizeId(value) || ('' as Id)) as Id
   await resolveContractNoByElder(value)
 }
 
 function buildAdmissionRecordFilterParams() {
-  const routeElderId = Number(route.query.residentId || route.query.elderId || 0)
+  const routeElderId = normalizeResidentId(route.query as Record<string, unknown>)
   const [admissionDateStart, admissionDateEnd] = recordQuery.admissionDateRange || []
   return {
-    elderId: Number.isFinite(routeElderId) && routeElderId > 0 ? routeElderId : undefined,
+    elderId: routeElderId,
     keyword: recordQuery.keyword,
     contractNo: recordQuery.contractNo,
     elderStatus: recordQuery.elderStatus,
@@ -933,25 +935,19 @@ async function loadAssets() {
 
 function applyRoutePrefill() {
   applyRecordQueryFromRoute()
-  const residentIdText = String(route.query.residentId || '').trim()
-  const leadId = Number(route.query.leadId || 0)
+  const residentIdText = normalizeResidentId(route.query as Record<string, unknown>)
+  const leadId = normalizeId(route.query.leadId)
   const contractNo = String(route.query.contractNo || '').trim()
   const elderName = String(route.query.elderName || '').trim()
   if (residentIdText && !recordQuery.keyword) {
-    const residentId = Number(residentIdText)
-    if (residentId > 0) {
-      ensureSelectedElder(residentId, elderName || findElderName(residentId) || undefined)
-      form.elderId = residentId as any
-      recordQuery.keyword = elderName || findElderName(residentId) || ''
-    } else {
-      form.elderId = residentIdText as any
-      recordQuery.keyword = elderName || ''
-    }
+    ensureSelectedElder(residentIdText, elderName || findElderName(residentIdText) || undefined)
+    form.elderId = residentIdText as Id
+    recordQuery.keyword = elderName || findElderName(residentIdText) || ''
   }
   if (!recordQuery.keyword && elderName) {
     recordQuery.keyword = elderName
   }
-  if (leadId > 0) {
+  if (leadId) {
     linkedLeadId.value = leadId
   }
   if (contractNo) {

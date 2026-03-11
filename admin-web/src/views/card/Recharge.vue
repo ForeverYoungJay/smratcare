@@ -52,7 +52,7 @@ import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useCardAccountOptions } from '../../composables/useCardAccountOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { getCardRechargePage, rechargeCard } from '../../api/card'
-import type { CardTradeLog, PageResult } from '../../types'
+import type { CardTradeLog, Id, PageResult } from '../../types'
 
 const loading = ref(false)
 const rows = ref<CardTradeLog[]>([])
@@ -71,7 +71,7 @@ const columns = [
 const open = ref(false)
 const saving = ref(false)
 const form = reactive({
-  cardAccountId: undefined as number | undefined,
+  cardAccountId: undefined as Id | undefined,
   amount: undefined as number | undefined,
   remark: ''
 })
@@ -117,7 +117,7 @@ async function submit() {
   saving.value = true
   try {
     await rechargeCard({
-      cardAccountId: Number(form.cardAccountId),
+      cardAccountId: form.cardAccountId as Id,
       amount: Number(form.amount),
       remark: form.remark
     })

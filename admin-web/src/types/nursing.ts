@@ -1,3 +1,5 @@
+import type { Id } from './common'
+
 export interface CaregiverGroupItem {
   id: number
   name: string
@@ -55,7 +57,7 @@ export interface CareLevelItem {
 
 export interface ServicePlanItem {
   id: number
-  elderId: number
+  elderId: Id
   elderName?: string
   careLevelId?: number
   careLevelName?: string
@@ -75,7 +77,7 @@ export interface ServicePlanItem {
 
 export interface ServiceBookingItem {
   id: number
-  elderId: number
+  elderId: Id
   elderName?: string
   planId?: number
   planName?: string
@@ -95,7 +97,7 @@ export interface NursingRecordItem {
   recordType: string
   sourceId: number
   recordTime?: string
-  elderId?: number
+  elderId?: Id
   elderName?: string
   staffId?: number
   staffName?: string

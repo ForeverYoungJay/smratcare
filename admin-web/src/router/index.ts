@@ -5,7 +5,13 @@ import { setupPermission } from './permission'
 const router = createRouter({
   history: createWebHistory(),
   routes,
-  scrollBehavior() {
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) {
+      return savedPosition
+    }
+    if (to.path === from.path) {
+      return false
+    }
     return { left: 0, top: 0 }
   }
 })

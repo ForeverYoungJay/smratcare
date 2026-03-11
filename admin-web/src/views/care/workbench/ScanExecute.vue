@@ -42,13 +42,14 @@ import dayjs from 'dayjs'
 import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
 import { getTaskPage } from '../../../api/care'
-import type { CareTaskItem } from '../../../types'
+import { normalizeResidentId } from '../../../utils/id'
+import type { CareTaskItem, Id } from '../../../types'
 import { resolveCareError } from '../careError'
 
 const route = useRoute()
 const router = useRouter()
 
-const residentId = computed(() => Number(route.query.residentId || 0) || undefined)
+const residentId = computed<Id | undefined>(() => normalizeResidentId(route.query as Record<string, unknown>))
 const dateValue = ref(dayjs().format('YYYY-MM-DD'))
 const qrCode = ref(String(route.query.bedQrCode || ''))
 const loading = ref(false)

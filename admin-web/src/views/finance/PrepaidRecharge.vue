@@ -71,13 +71,13 @@ import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { adjustElderAccount, getFinanceModuleEntrySummary, getFinanceWorkbenchOverview } from '../../api/finance'
-import type { FinanceModuleEntrySummary, FinancePaymentMethodAmount } from '../../types'
+import type { FinanceModuleEntrySummary, FinancePaymentMethodAmount, Id } from '../../types'
 import { confirmAction } from '../../utils/actionConfirm'
 
 const router = useRouter()
 
 const form = reactive({
-  elderId: undefined as number | undefined,
+  elderId: undefined as Id | undefined,
   amount: 0,
   rechargeMethod: 'ALIPAY',
   rechargeTime: dayjs(),

@@ -59,6 +59,7 @@ import { getTaskPage } from '../../api/care'
 import { useStaffOptions } from '../../composables/useStaffOptions'
 import type { CareTaskItem, PageResult } from '../../types'
 import { exportCsv } from '../../utils/export'
+import { normalizeResidentId } from '../../utils/id'
 import { resolveCareError } from './careError'
 import { careAuditExportColumns, mapCareExportRows } from '../../constants/careExport'
 
@@ -76,7 +77,7 @@ async function search() {
     const res: PageResult<CareTaskItem> = await getTaskPage({
       pageNo: 1,
       pageSize: 50,
-      elderId: route.query.residentId ? Number(route.query.residentId) : route.query.elderId ? Number(route.query.elderId) : undefined
+      elderId: normalizeResidentId(route.query as Record<string, unknown>)
     })
     list.value = res.list.filter((t) => t.suspiciousFlag)
     await ensureStaffLoaded()

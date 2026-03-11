@@ -272,7 +272,7 @@ export interface HrAccessControlRecordItem {
 
 export interface HrCardSyncItem {
   cardAccountId?: number | string
-  elderId?: number | string
+  elderId?: string
   elderName?: string
   cardNo?: string
   cardStatus?: string

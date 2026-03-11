@@ -181,6 +181,7 @@ import DataTable from '../../components/DataTable.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { mapMedicalExportRows, unifiedTaskExportColumns } from '../../constants/medicalExport'
 import { exportCsv, exportExcel } from '../../utils/export'
+import { normalizeResidentId } from '../../utils/id'
 import { resolveMedicalError } from './medicalError'
 import { getMedicalUnifiedTaskPage } from '../../api/medicalCare'
 import {
@@ -232,11 +233,11 @@ const query = reactive<Required<Pick<MedicalUnifiedTaskQuery, 'keyword' | 'sortB
 const activeQuickModule = ref<'ALL' | 'ORDER' | 'INSPECTION' | 'NURSING_LOG' | 'HANDOVER'>('ALL')
 
 const residentContext = computed(() => {
-  const residentIdRaw = route.query.residentId ?? route.query.elderId
+  const residentIdRaw = normalizeResidentId(route.query as Record<string, unknown>)
   const residentName = typeof route.query.residentName === 'string' ? route.query.residentName : ''
   return {
     active: !!residentIdRaw,
-    residentId: residentIdRaw ? Number(residentIdRaw) : undefined,
+    residentId: residentIdRaw,
     name: residentName || ''
   }
 })

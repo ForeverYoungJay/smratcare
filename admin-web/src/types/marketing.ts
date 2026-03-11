@@ -1,3 +1,5 @@
+import type { Id } from './common'
+
 export interface MarketingConversionReport {
   totalLeads: number
   consultCount: number
@@ -182,7 +184,7 @@ export interface CrmContractItem {
   name?: string
   phone?: string
   leadId?: number
-  elderId?: number
+  elderId?: Id
   idCardNo?: string
   homeAddress?: string
   contractNo?: string
@@ -211,7 +213,7 @@ export interface CrmContractPayload {
   name?: string
   phone?: string
   leadId?: number
-  elderId?: number
+  elderId?: Id
   idCardNo?: string
   homeAddress?: string
   contractNo?: string
@@ -259,7 +261,7 @@ export interface UploadedFileResult {
 export interface ContractLinkageSummary {
   contractId?: number
   leadId?: number
-  elderId?: number
+  elderId?: Id
   elderName?: string
   elderPhone?: string
   orgName?: string
@@ -315,7 +317,7 @@ export interface ContractAssessmentReportItem {
 export interface ContractAssessmentContractItem {
   contractId?: number
   leadId?: number
-  elderId?: number | string
+  elderId?: Id
   elderName?: string
   elderPhone?: string
   idCardNo?: string
@@ -332,7 +334,7 @@ export interface ContractAssessmentContractItem {
 }
 
 export interface ContractAssessmentOverview {
-  elderId?: number
+  elderId?: Id
   elderName?: string
   elderPhone?: string
   totalContractCount?: number

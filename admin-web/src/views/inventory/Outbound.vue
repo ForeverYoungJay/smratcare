@@ -346,6 +346,7 @@ import {
 } from '../../api/materialCenter'
 import { getProductPage } from '../../api/store'
 import type {
+  Id,
   InventoryLogItem,
   InventoryOutboundSheet,
   InventoryOutboundSheetCreateRequest,
@@ -412,7 +413,7 @@ let sheetRowSeq = 1
 const sheetForm = reactive<{
   receiverName: string
   outboundNo: string
-  elderId?: number
+  elderId?: Id
   elderName: string
   contractNo: string
   applyDept?: string
@@ -1016,7 +1017,7 @@ function matchDeptOptionByName(name?: string) {
   return departmentOptions.value.find((item) => String(item.name || '').trim() === normalized)?.name || normalized
 }
 
-async function prefillSheetForm(elderId?: number) {
+async function prefillSheetForm(elderId?: Id) {
   const prefill = await getOutboundSheetPrefill({ elderId: elderId || undefined })
   if (prefill?.receiverName) {
     sheetForm.receiverName = prefill.receiverName
@@ -1029,8 +1030,8 @@ async function prefillSheetForm(elderId?: number) {
   }
 }
 
-async function onSheetElderChange(elderId?: number) {
-  const selected = elderOptions.value.find((item) => Number(item.value) === Number(elderId || 0))
+async function onSheetElderChange(elderId?: Id) {
+  const selected = elderOptions.value.find((item) => String(item.value || '').trim() === String(elderId || '').trim())
   sheetForm.elderName = selected?.name || ''
   if (!elderId) {
     sheetForm.contractNo = ''

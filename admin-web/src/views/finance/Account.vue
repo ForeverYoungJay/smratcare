@@ -122,7 +122,7 @@ import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { getElderAccountPage, adjustElderAccount, getElderAccountWarnings, getFinanceModuleEntrySummary, updateElderAccount } from '../../api/finance'
-import type { ElderAccount, FinanceModuleEntrySummary, PageResult } from '../../types'
+import type { ElderAccount, FinanceModuleEntrySummary, Id, PageResult } from '../../types'
 import router from '../../router'
 
 const loading = ref(false)
@@ -175,7 +175,7 @@ const adjusting = ref(false)
 const configOpen = ref(false)
 const configSaving = ref(false)
 const configForm = reactive({
-  elderId: undefined as number | undefined,
+  elderId: undefined as Id | undefined,
   elderName: '',
   creditLimit: undefined as number | undefined,
   warnThreshold: undefined as number | undefined,
@@ -183,7 +183,7 @@ const configForm = reactive({
   remark: ''
 })
 const adjustForm = reactive({
-  elderId: undefined as number | undefined,
+  elderId: undefined as Id | undefined,
   direction: 'CREDIT',
   amount: 0,
   remark: ''

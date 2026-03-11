@@ -80,14 +80,15 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
 import LifecycleStageBar from '../../../components/LifecycleStageBar.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
+import { normalizeId } from '../../../utils/id'
 import { getAssessmentRecordPage } from '../../../api/assessment'
 import { getContractAssessmentOverview, getContractPage } from '../../../api/marketing'
 import type { AssessmentRecord, ContractAssessmentContractItem, ContractAssessmentOverview, CrmContractItem, PageResult } from '../../../types'
 
 const router = useRouter()
 const route = useRoute()
-const residentId = computed(() => Number(route.query.residentId || 0))
-const leadId = computed(() => Number(route.query.leadId || 0))
+const residentId = computed(() => normalizeId(route.query.residentId))
+const leadId = computed(() => normalizeId(route.query.leadId))
 const latestRecord = ref<AssessmentRecord | null>(null)
 const overview = ref<ContractAssessmentOverview | null>(null)
 const loading = ref(false)

@@ -1,6 +1,7 @@
 import { getCrmLeadPage, createCrmLead, updateCrmLead, deleteCrmLead } from './crm'
 import { getAdmissionRecords } from './elderLifecycle'
 import request, { fetchPage } from '../utils/request'
+import type { Id } from '../types/common'
 import type {
   AdmissionRecordItem,
   CallbackExecuteRequest,
@@ -249,7 +250,7 @@ export function normalizeMarketingSources() {
   return request.post<number>('/api/marketing/report/data-quality/normalize-source')
 }
 
-export function getContractLinkageByElder(elderId: number | string) {
+export function getContractLinkageByElder(elderId: Id) {
   return request.get<ContractLinkageSummary>('/api/crm/contracts/linkage', { params: { elderId } })
 }
 
@@ -265,7 +266,7 @@ export function getContractArchiveRule() {
   return request.get<ContractArchiveRuleInfo>('/api/crm/contracts/linkage-archive-rule')
 }
 
-export function getContractAssessmentOverview(params: { elderId?: number | string; leadId?: number | string }) {
+export function getContractAssessmentOverview(params: { elderId?: Id; leadId?: Id }) {
   return request.get<ContractAssessmentOverview>('/api/crm/contracts/assessment-overview', { params })
 }
 

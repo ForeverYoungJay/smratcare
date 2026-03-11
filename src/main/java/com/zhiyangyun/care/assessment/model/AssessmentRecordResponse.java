@@ -9,6 +9,8 @@ import lombok.Data;
 public class AssessmentRecordResponse {
   private Long id;
 
+  private String idText;
+
   private Long tenantId;
 
   private Long orgId;

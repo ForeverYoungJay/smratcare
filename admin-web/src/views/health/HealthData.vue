@@ -127,6 +127,7 @@ import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { healthDataExportColumns, mapHealthExportRows } from '../../constants/healthExport'
 import { exportCsv, exportExcel } from '../../utils/export'
+import { normalizeResidentId } from '../../utils/id'
 import { resolveHealthError } from './healthError'
 import {
   getHealthDataRecordPage,
@@ -135,7 +136,7 @@ import {
   updateHealthDataRecord,
   deleteHealthDataRecord
 } from '../../api/health'
-import type { HealthDataRecord, HealthDataSummary, PageResult } from '../../types'
+import type { HealthDataRecord, HealthDataSummary, Id, PageResult } from '../../types'
 
 const loading = ref(false)
 const exporting = ref(false)
@@ -173,8 +174,8 @@ const editOpen = ref(false)
 const saving = ref(false)
 const { elderOptions, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
 const form = reactive({
-  id: undefined as number | undefined,
-  elderId: undefined as number | undefined,
+  id: undefined as Id | undefined,
+  elderId: undefined as Id | undefined,
   elderName: '',
   dataType: '',
   dataValue: '',
@@ -247,10 +248,10 @@ function onReset() {
 }
 
 function openCreate() {
-  const residentId = route.query.residentId ?? route.query.elderId
+  const residentId = normalizeResidentId(route.query as Record<string, unknown>)
   const residentName = typeof route.query.residentName === 'string' ? route.query.residentName : ''
   form.id = undefined
-  form.elderId = residentId ? Number(residentId) : undefined
+  form.elderId = residentId
   form.elderName = residentName
   ensureSelectedElder(form.elderId, residentName)
   form.dataType = ''
@@ -276,7 +277,7 @@ function openEdit(record: HealthDataRecord) {
   editOpen.value = true
 }
 
-function onElderChange(elderId?: number) {
+function onElderChange(elderId?: Id) {
   form.elderName = findElderName(elderId)
 }
 
@@ -288,6 +289,10 @@ async function submit() {
   const validateMessage = validateDataValue(form.dataType, form.dataValue)
   if (validateMessage) {
     message.error(validateMessage)
+    return
+  }
+  if (dayjs(form.measuredAt).isAfter(dayjs())) {
+    message.error('采集时间不能晚于当前时间')
     return
   }
   saving.value = true
@@ -330,7 +335,7 @@ async function remove(record: HealthDataRecord) {
 }
 
 function buildQueryParams() {
-  const residentId = route.query.residentId ?? route.query.elderId
+  const residentId = normalizeResidentId(route.query as Record<string, unknown>)
   const params: Record<string, any> = {
     keyword: query.keyword || undefined,
     dataType: query.dataType || undefined,
@@ -339,7 +344,7 @@ function buildQueryParams() {
     pageSize: query.pageSize
   }
   if (residentId) {
-    params.elderId = Number(residentId)
+    params.elderId = residentId
   }
   if (Array.isArray(query.measuredRange) && query.measuredRange.length === 2) {
     params.measuredFrom = dayjs(query.measuredRange[0]).format('YYYY-MM-DDTHH:mm:ss')
@@ -363,6 +368,10 @@ function validateDataValue(dataType: string, value: string) {
     if (!/^\d{2,3}\/\d{2,3}$/.test(value)) {
       return '血压请使用“收缩压/舒张压”格式，例如 120/80'
     }
+    const [systolic, diastolic] = value.split('/').map((item) => Number(item))
+    if (systolic < 50 || systolic > 260 || diastolic < 30 || diastolic > 180 || systolic <= diastolic) {
+      return '血压值超出合理范围，请检查后重试'
+    }
     return ''
   }
   if (dataType === 'OTHER') {
@@ -372,6 +381,11 @@ function validateDataValue(dataType: string, value: string) {
   if (Number.isNaN(numeric)) {
     return '该类型数据值需为数字'
   }
+  if (dataType === 'HR' && (numeric < 20 || numeric > 240)) return '心率超出合理范围'
+  if (dataType === 'TEMP' && (numeric < 30 || numeric > 45)) return '体温超出合理范围'
+  if (dataType === 'SPO2' && (numeric < 0 || numeric > 100)) return '血氧超出合理范围'
+  if (dataType === 'GLUCOSE' && (numeric < 0 || numeric > 40)) return '血糖超出合理范围'
+  if (dataType === 'WEIGHT' && (numeric <= 0 || numeric > 300)) return '体重超出合理范围'
   return ''
 }
 

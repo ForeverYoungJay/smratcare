@@ -1,3 +1,5 @@
+import type { Id } from './common'
+
 export interface InventoryBatchItem {
   id: number
   productId: number
@@ -94,7 +96,7 @@ export interface InventoryOutboundSheetItemRequest {
 export interface InventoryOutboundSheetCreateRequest {
   outboundNo?: string
   receiverName: string
-  elderId?: number
+  elderId?: Id
   contractNo?: string
   applyDept?: string
   remark?: string
@@ -102,7 +104,7 @@ export interface InventoryOutboundSheetCreateRequest {
 }
 
 export interface InventoryOutboundSheetPrefill {
-  elderId?: number
+  elderId?: Id
   receiverName?: string
   contractNo?: string
   applyDept?: string
@@ -125,7 +127,7 @@ export interface InventoryOutboundSheet {
   id: number
   outboundNo: string
   receiverName: string
-  elderId?: number
+  elderId?: Id
   contractNo?: string
   applyDept?: string
   operatorStaffId?: number

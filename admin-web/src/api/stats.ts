@@ -1,5 +1,6 @@
 import request from '../utils/request'
 import { exportCsvByRequest } from '../utils/export'
+import type { Id } from '../types/common'
 import type {
   BedUsageStatsResponse,
   CheckInStatsResponse,
@@ -43,7 +44,7 @@ export function getElderFlowReport(params?: {
   fromDate?: string
   toDate?: string
   eventType?: 'ADMISSION' | 'DISCHARGE'
-  elderId?: number
+  elderId?: Id
   keyword?: string
   pageNo?: number
   pageSize?: number
@@ -56,7 +57,7 @@ export async function exportElderFlowReportCsv(params?: {
   fromDate?: string
   toDate?: string
   eventType?: 'ADMISSION' | 'DISCHARGE'
-  elderId?: number
+  elderId?: Id
   keyword?: string
   orgId?: number
 }) {

@@ -116,7 +116,7 @@ import DataTable from '../../components/DataTable.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { getIncidentPage, createIncident, updateIncident, deleteIncident, closeIncident, exportIncidentPage } from '../../api/life'
-import type { IncidentLevel, IncidentReport, IncidentStatus, PageResult } from '../../types'
+import type { Id, IncidentLevel, IncidentReport, IncidentStatus, PageResult } from '../../types'
 
 const loading = ref(false)
 const rows = ref<IncidentReport[]>([])
@@ -147,8 +147,8 @@ const editOpen = ref(false)
 const saving = ref(false)
 const { elderOptions, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
 const form = reactive({
-  id: undefined as number | undefined,
-  elderId: undefined as number | undefined,
+  id: undefined as Id | undefined,
+  elderId: undefined as Id | undefined,
   elderName: '',
   reporterName: '',
   incidentTime: dayjs(),
@@ -241,7 +241,7 @@ function openEdit(record: IncidentReport) {
   editOpen.value = true
 }
 
-function onElderChange(elderId?: number) {
+function onElderChange(elderId?: Id) {
   form.elderName = findElderName(elderId)
 }
 

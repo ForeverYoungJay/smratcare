@@ -31,7 +31,7 @@ describe('medicalWorkbenchQuery utils', () => {
             incidentWindowDays: 14,
             topResidentLimit: 8,
             riskResidentLookbackDays: 365,
-            elderId: 12
+            elderId: '12'
         });
     });
     it('builds route query payload with extras', () => {

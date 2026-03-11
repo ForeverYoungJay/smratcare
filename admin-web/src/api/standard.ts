@@ -1,4 +1,5 @@
 import request, { fetchPage } from '../utils/request'
+import type { Id } from '../types/common'
 import type { ServiceItem, CarePackage, CarePackageItem, ElderPackage, GenerateTaskRequest } from '../types'
 
 export function getServiceItemPage(params: any) {
@@ -65,7 +66,7 @@ export function getElderPackagePage(params: any) {
   return fetchPage<ElderPackage>('/api/standard/elder-packages/page', params)
 }
 
-export function listElderPackages(params?: { elderId?: number }) {
+export function listElderPackages(params?: { elderId?: Id }) {
   return request.get<ElderPackage[]>('/api/standard/elder-packages/list', { params })
 }
 
@@ -73,11 +74,11 @@ export function createElderPackage(data: Partial<ElderPackage>) {
   return request.post<void>('/api/standard/elder-packages', data)
 }
 
-export function updateElderPackage(id: number, data: Partial<ElderPackage>) {
+export function updateElderPackage(id: Id, data: Partial<ElderPackage>) {
   return request.put<void>(`/api/standard/elder-packages/${id}`, data)
 }
 
-export function deleteElderPackage(id: number) {
+export function deleteElderPackage(id: Id) {
   return request.delete<void>(`/api/standard/elder-packages/${id}`)
 }
 

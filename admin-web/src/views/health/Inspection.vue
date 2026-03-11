@@ -30,8 +30,8 @@
         <a-tag color="blue">今日待巡检：{{ boardStats.todayPending }}</a-tag>
         <a-tag color="green">今日已巡检：{{ boardStats.todayDone }}</a-tag>
         <a-tag color="red">今日超时：{{ boardStats.todayOverdue }}</a-tag>
-        <a-input v-model:value="board.floor" allow-clear placeholder="楼层筛选（如 3F）" style="width: 160px" />
-        <a-input v-model:value="board.group" allow-clear placeholder="护理组筛选（如 A组）" style="width: 170px" />
+        <a-input v-model:value="board.floor" allow-clear placeholder="楼层关键字（如 3F）" style="width: 160px" />
+        <a-input v-model:value="board.group" allow-clear placeholder="护理组关键字（如 A组）" style="width: 170px" />
         <a-button type="primary" @click="openBoardRecord()">巡检录入（抽屉）</a-button>
       </a-space>
       <a-list :data-source="boardStats.pendingRows.slice(0, 8)" size="small" bordered>
@@ -144,18 +144,43 @@
     <a-drawer v-model:open="boardOpen" title="巡检录入（不离开页面）" width="700" @close="resetBoardForm">
       <a-form layout="vertical">
         <a-row :gutter="12">
-          <a-col :span="12"><a-form-item label="长者"><a-input v-model:value="boardForm.elderName" /></a-form-item></a-col>
+          <a-col :span="12">
+            <a-form-item label="长者" required>
+              <a-select
+                v-model:value="boardForm.elderId"
+                show-search
+                :filter-option="false"
+                :options="elderOptions"
+                placeholder="请输入姓名搜索"
+                @search="searchElders"
+                @focus="() => !elderOptions.length && searchElders('')"
+                @change="onBoardElderChange"
+              />
+            </a-form-item>
+          </a-col>
           <a-col :span="12"><a-form-item label="巡检日期"><a-date-picker v-model:value="boardForm.inspectionDate" style="width: 100%" /></a-form-item></a-col>
         </a-row>
         <a-row :gutter="12">
-          <a-col :span="8"><a-form-item label="体温(℃)"><a-input v-model:value="boardForm.temp" /></a-form-item></a-col>
-          <a-col :span="8"><a-form-item label="血压(mmHg)"><a-input v-model:value="boardForm.bp" /></a-form-item></a-col>
-          <a-col :span="8"><a-form-item label="脉搏(次/分)"><a-input v-model:value="boardForm.pulse" /></a-form-item></a-col>
+          <a-col :span="8"><a-form-item label="体温(℃)"><a-input-number v-model:value="boardForm.temp" :min="30" :max="45" :precision="1" style="width: 100%" /></a-form-item></a-col>
+          <a-col :span="8">
+            <a-form-item label="收缩压(mmHg)">
+              <a-input-number v-model:value="boardForm.bpSystolic" :min="50" :max="260" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item label="舒张压(mmHg)">
+              <a-input-number v-model:value="boardForm.bpDiastolic" :min="30" :max="180" style="width: 100%" />
+            </a-form-item>
+          </a-col>
         </a-row>
         <a-row :gutter="12">
-          <a-col :span="8"><a-form-item label="呼吸"><a-input v-model:value="boardForm.respiration" /></a-form-item></a-col>
-          <a-col :span="8"><a-form-item label="血氧(%)"><a-input v-model:value="boardForm.spo2" /></a-form-item></a-col>
-          <a-col :span="8"><a-form-item label="血糖(mmol/L)"><a-input v-model:value="boardForm.glucose" /></a-form-item></a-col>
+          <a-col :span="8"><a-form-item label="脉搏(次/分)"><a-input-number v-model:value="boardForm.pulse" :min="20" :max="240" style="width: 100%" /></a-form-item></a-col>
+          <a-col :span="8"><a-form-item label="呼吸(次/分)"><a-input-number v-model:value="boardForm.respiration" :min="5" :max="80" style="width: 100%" /></a-form-item></a-col>
+          <a-col :span="8"><a-form-item label="血氧(%)"><a-input-number v-model:value="boardForm.spo2" :min="0" :max="100" style="width: 100%" /></a-form-item></a-col>
+        </a-row>
+        <a-row :gutter="12">
+          <a-col :span="8"><a-form-item label="血糖(mmol/L)"><a-input-number v-model:value="boardForm.glucose" :min="0" :max="40" :precision="1" style="width: 100%" /></a-form-item></a-col>
+          <a-col :span="8"><a-form-item label="巡检人"><a-input v-model:value="boardForm.inspectorName" /></a-form-item></a-col>
         </a-row>
         <a-row :gutter="12">
           <a-col :span="8"><a-form-item label="食欲"><a-input v-model:value="boardForm.appetite" /></a-form-item></a-col>
@@ -221,6 +246,7 @@ import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { inspectionExportColumns, mapHealthExportRows } from '../../constants/healthExport'
 import { exportCsv, exportExcel } from '../../utils/export'
+import { normalizeId, normalizeResidentId } from '../../utils/id'
 import { isAbnormalInspectionPhotoRequired, syncMedicalAlertRules } from '../../utils/medicalAlertRule'
 import { uploadOaFile } from '../../api/oa'
 import { resolveHealthError } from './healthError'
@@ -231,7 +257,8 @@ import {
   updateHealthInspection,
   deleteHealthInspection
 } from '../../api/health'
-import type { HealthInspection, HealthInspectionSummary, PageResult } from '../../types'
+import { useUserStore } from '../../stores/user'
+import type { HealthInspection, HealthInspectionSummary, Id, PageResult } from '../../types'
 
 type InspectionPhotoFile = {
   name: string
@@ -242,6 +269,7 @@ const loading = ref(false)
 const exporting = ref(false)
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const rows = ref<HealthInspection[]>([])
 const query = reactive({ keyword: '', status: '', inspectionRange: [] as any[], pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
@@ -254,13 +282,16 @@ const summary = reactive<HealthInspectionSummary>({
   statusStats: []
 })
 const residentContext = computed(() => {
-  const residentId = route.query.residentId ?? route.query.elderId
+  const residentId = normalizeResidentId(route.query as Record<string, unknown>)
   const residentName = typeof route.query.residentName === 'string' ? route.query.residentName : ''
   return {
     active: !!residentId,
-    residentId: residentId ? Number(residentId) : undefined,
+    residentId,
     name: residentName || ''
   }
+})
+const currentStaffName = computed(() => {
+  return String(userStore.staffInfo?.realName || userStore.staffInfo?.username || '').trim() || '当前登录用户'
 })
 
 const columns = [
@@ -280,8 +311,8 @@ const editOpen = ref(false)
 const saving = ref(false)
 const { elderOptions, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
 const form = reactive({
-  id: undefined as number | undefined,
-  elderId: undefined as number | undefined,
+  id: undefined as Id | undefined,
+  elderId: undefined as Id | undefined,
   elderName: '',
   inspectionDate: dayjs(),
   inspectionItem: '',
@@ -316,15 +347,17 @@ const board = reactive({
 })
 const boardOpen = ref(false)
 const boardForm = reactive({
-  elderId: undefined as number | undefined,
+  elderId: undefined as Id | undefined,
   elderName: '',
   inspectionDate: dayjs(),
-  temp: '',
-  bp: '',
-  pulse: '',
-  respiration: '',
-  spo2: '',
-  glucose: '',
+  inspectorName: currentStaffName.value,
+  temp: undefined as number | undefined,
+  bpSystolic: undefined as number | undefined,
+  bpDiastolic: undefined as number | undefined,
+  pulse: undefined as number | undefined,
+  respiration: undefined as number | undefined,
+  spo2: undefined as number | undefined,
+  glucose: undefined as number | undefined,
   appetite: '',
   sleep: '',
   bowel: '',
@@ -408,17 +441,17 @@ function onReset() {
 }
 
 function openCreate() {
-  const residentId = route.query.residentId ?? route.query.elderId
+  const residentId = normalizeResidentId(route.query as Record<string, unknown>)
   const residentName = typeof route.query.residentName === 'string' ? route.query.residentName : ''
   form.id = undefined
-  form.elderId = residentId ? Number(residentId) : undefined
+  form.elderId = residentId
   form.elderName = residentName
   ensureSelectedElder(form.elderId, residentName)
   form.inspectionDate = dayjs()
   form.inspectionItem = ''
   form.result = ''
   form.status = 'NORMAL'
-  form.inspectorName = ''
+  form.inspectorName = currentStaffName.value
   form.followUpAction = ''
   form.attachmentUrls = ''
   form.otherNote = ''
@@ -445,20 +478,26 @@ function openEdit(record: HealthInspection) {
   editOpen.value = true
 }
 
-function onElderChange(elderId?: number) {
+function onElderChange(elderId?: Id) {
   form.elderName = findElderName(elderId)
+}
+
+function onBoardElderChange(elderId?: Id) {
+  boardForm.elderName = findElderName(elderId)
 }
 
 function resetBoardForm() {
   boardForm.elderId = undefined
   boardForm.elderName = ''
   boardForm.inspectionDate = dayjs()
-  boardForm.temp = ''
-  boardForm.bp = ''
-  boardForm.pulse = ''
-  boardForm.respiration = ''
-  boardForm.spo2 = ''
-  boardForm.glucose = ''
+  boardForm.inspectorName = currentStaffName.value
+  boardForm.temp = undefined
+  boardForm.bpSystolic = undefined
+  boardForm.bpDiastolic = undefined
+  boardForm.pulse = undefined
+  boardForm.respiration = undefined
+  boardForm.spo2 = undefined
+  boardForm.glucose = undefined
   boardForm.appetite = ''
   boardForm.sleep = ''
   boardForm.bowel = ''
@@ -478,18 +517,19 @@ function openBoardRecord(record?: HealthInspection) {
   if (record) {
     boardForm.elderId = record.elderId
     boardForm.elderName = record.elderName || ''
+    ensureSelectedElder(record.elderId, record.elderName)
     boardForm.inspectionDate = record.inspectionDate ? dayjs(record.inspectionDate) : dayjs()
     boardForm.conclusion = (record.status as any) || 'NORMAL'
+    boardForm.inspectorName = record.inspectorName || currentStaffName.value
     boardForm.otherNote = record.otherNote || ''
     boardPhotoFiles.value = resolveAttachmentFiles(record.attachmentUrls)
   } else {
-    const residentId = route.query.residentId ?? route.query.elderId
-    if (residentId) {
-      boardForm.elderId = Number(residentId)
-    }
+    const residentId = normalizeResidentId(route.query as Record<string, unknown>)
+    if (residentId) boardForm.elderId = residentId
     if (route.query.residentName) {
       boardForm.elderName = String(route.query.residentName)
     }
+    ensureSelectedElder(boardForm.elderId, boardForm.elderName)
   }
   boardOpen.value = true
 }
@@ -613,8 +653,12 @@ function removeBoardPhoto(index: number) {
 }
 
 async function submitBoard() {
-  if (!boardForm.elderName || !boardForm.inspectionDate) {
+  if (!boardForm.elderId || !boardForm.inspectionDate) {
     message.error('请填写长者与巡检日期')
+    return
+  }
+  if (!boardForm.inspectorName.trim()) {
+    message.error('请填写巡检人')
     return
   }
   if (boardForm.abnormal && !boardForm.handleAction) {
@@ -625,13 +669,20 @@ async function submitBoard() {
     message.error('异常巡检请至少上传1张照片')
     return
   }
+  if (boardForm.bpSystolic != null && boardForm.bpDiastolic != null && boardForm.bpSystolic <= boardForm.bpDiastolic) {
+    message.error('血压填写有误，请检查收缩压和舒张压')
+    return
+  }
+  const bloodPressure = boardForm.bpSystolic != null && boardForm.bpDiastolic != null
+    ? `${boardForm.bpSystolic}/${boardForm.bpDiastolic}`
+    : '-'
   const vitalText = [
-    `体温:${boardForm.temp || '-'}`,
-    `血压:${boardForm.bp || '-'}`,
-    `脉搏:${boardForm.pulse || '-'}`,
-    `呼吸:${boardForm.respiration || '-'}`,
-    `血氧:${boardForm.spo2 || '-'}`,
-    `血糖:${boardForm.glucose || '-'}`
+    `体温:${formatBoardNumber(boardForm.temp)}`,
+    `血压:${bloodPressure}`,
+    `脉搏:${formatBoardNumber(boardForm.pulse)}`,
+    `呼吸:${formatBoardNumber(boardForm.respiration)}`,
+    `血氧:${formatBoardNumber(boardForm.spo2)}`,
+    `血糖:${formatBoardNumber(boardForm.glucose)}`
   ].join('，')
   const bodyText = [
     `食欲:${boardForm.appetite || '-'}`,
@@ -643,12 +694,12 @@ async function submitBoard() {
   ].join('，')
   const payload = {
     elderId: boardForm.elderId,
-    elderName: boardForm.elderName,
+    elderName: findElderName(boardForm.elderId) || boardForm.elderName,
     inspectionDate: dayjs(boardForm.inspectionDate).format('YYYY-MM-DD'),
     inspectionItem: '基础体征与身体状况巡检',
     result: `${vitalText}；${bodyText}`,
     status: boardForm.conclusion,
-    inspectorName: form.inspectorName || '系统记录',
+    inspectorName: boardForm.inspectorName.trim(),
     followUpAction: boardForm.abnormal ? boardForm.handleAction : '',
     attachmentUrls: serializeAttachmentFiles(boardPhotoFiles.value),
     otherNote: boardForm.otherNote,
@@ -667,6 +718,10 @@ async function submitBoard() {
 async function submit() {
   if (!form.elderId || !form.inspectionItem) {
     message.error('请补全必填项')
+    return
+  }
+  if (!form.inspectorName.trim()) {
+    message.error('请填写巡检人')
     return
   }
   if ((!form.status || form.status === 'NORMAL') && form.result && form.result.includes('异常')) {
@@ -689,7 +744,7 @@ async function submit() {
       inspectionItem: form.inspectionItem,
       result: form.result,
       status: form.status,
-      inspectorName: form.inspectorName,
+      inspectorName: form.inspectorName.trim(),
       followUpAction: form.followUpAction,
       attachmentUrls: serializeAttachmentFiles(formPhotoFiles.value),
       otherNote: form.otherNote,
@@ -722,7 +777,7 @@ async function remove(record: HealthInspection) {
 
 function goNursingLogs(record: HealthInspection) {
   router.push({
-    path: '/health/nursing-log',
+    path: '/medical-care/nursing-log',
     query: {
       inspectionId: record.id ? String(record.id) : undefined,
       residentId: record.elderId ? String(record.elderId) : undefined,
@@ -774,8 +829,8 @@ async function exportExcelData() {
 }
 
 function buildQueryParams() {
-  const residentId = route.query.residentId ?? route.query.elderId
-  const inspectionId = route.query.inspectionId
+  const residentId = normalizeResidentId(route.query as Record<string, unknown>)
+  const inspectionId = normalizeId(route.query.inspectionId)
   const params: Record<string, any> = {
     keyword: query.keyword || undefined,
     status: query.status || undefined,
@@ -783,10 +838,10 @@ function buildQueryParams() {
     pageSize: query.pageSize
   }
   if (inspectionId) {
-    params.inspectionId = Number(inspectionId)
+    params.inspectionId = inspectionId
   }
   if (residentId) {
-    params.elderId = Number(residentId)
+    params.elderId = residentId
   }
   if (Array.isArray(query.inspectionRange) && query.inspectionRange.length === 2) {
     params.inspectionFrom = dayjs(query.inspectionRange[0]).format('YYYY-MM-DD')
@@ -809,6 +864,10 @@ function statusColor(status?: string) {
 
 function formatDate(value?: string) {
   return value ? dayjs(value).format('YYYY-MM-DD') : '-'
+}
+
+function formatBoardNumber(value?: number) {
+  return typeof value === 'number' ? String(value) : '-'
 }
 
 function resolveRowClassName(record: HealthInspection) {

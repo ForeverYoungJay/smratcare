@@ -1,5 +1,7 @@
+import type { Id } from './common'
+
 export interface HealthDrugDictionary {
-  id: number
+  id: Id
   drugCode?: string
   drugName: string
   specification?: string
@@ -10,10 +12,10 @@ export interface HealthDrugDictionary {
 }
 
 export interface HealthMedicationDeposit {
-  id: number
-  elderId?: number
+  id: Id
+  elderId?: Id
   elderName?: string
-  drugId?: number
+  drugId?: Id
   drugName: string
   depositDate: string
   quantity: number
@@ -24,10 +26,10 @@ export interface HealthMedicationDeposit {
 }
 
 export interface HealthMedicationSetting {
-  id: number
-  elderId?: number
+  id: Id
+  elderId?: Id
   elderName?: string
-  drugId?: number
+  drugId?: Id
   drugName: string
   dosage?: string
   frequency?: string
@@ -39,10 +41,10 @@ export interface HealthMedicationSetting {
 }
 
 export interface HealthMedicationRegistration {
-  id: number
-  elderId?: number
+  id: Id
+  elderId?: Id
   elderName?: string
-  drugId?: number
+  drugId?: Id
   drugName: string
   registerTime: string
   dosageTaken: number
@@ -66,9 +68,9 @@ export interface HealthMedicationRegistrationSummary {
 }
 
 export interface HealthMedicationRemainingItem {
-  elderId?: number
+  elderId?: Id
   elderName?: string
-  drugId?: number
+  drugId?: Id
   drugName: string
   unit?: string
   depositQty: number
@@ -79,8 +81,8 @@ export interface HealthMedicationRemainingItem {
 }
 
 export interface HealthArchive {
-  id: number
-  elderId?: number
+  id: Id
+  elderId?: Id
   elderName?: string
   bloodType?: string
   allergyHistory?: string
@@ -92,8 +94,8 @@ export interface HealthArchive {
 }
 
 export interface HealthDataRecord {
-  id: number
-  elderId?: number
+  id: Id
+  elderId?: Id
   elderName?: string
   dataType: string
   dataValue: string
@@ -120,8 +122,8 @@ export interface HealthDataSummary {
 }
 
 export interface HealthInspection {
-  id: number
-  elderId?: number
+  id: Id
+  elderId?: Id
   elderName?: string
   inspectionDate: string
   inspectionItem: string
@@ -144,10 +146,10 @@ export interface HealthInspectionSummary {
 }
 
 export interface HealthNursingLog {
-  id: number
-  elderId?: number
+  id: Id
+  elderId?: Id
   elderName?: string
-  sourceInspectionId?: number
+  sourceInspectionId?: Id
   logTime: string
   logType: string
   content: string
@@ -166,15 +168,15 @@ export interface HealthNursingLogSummary {
 }
 
 export interface HealthMedicationTask {
-  id: number
-  settingId: number
-  elderId?: number
+  id: Id
+  settingId: Id
+  elderId?: Id
   elderName?: string
-  drugId?: number
+  drugId?: Id
   drugName: string
   plannedTime: string
   taskDate: string
   status: string
-  registrationId?: number
+  registrationId?: Id
   doneTime?: string
 }

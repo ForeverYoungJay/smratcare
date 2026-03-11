@@ -180,6 +180,7 @@ import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { exportCsv, exportExcel } from '../../utils/export'
+import { normalizeId } from '../../utils/id'
 import { mapMedicalExportRows, medicalOrderTaskExportColumns } from '../../constants/medicalExport'
 import { resolveMedicalError } from './medicalError'
 import { getMedicalHealthCenterSummary } from '../../api/medicalCare'
@@ -355,14 +356,6 @@ const heroTiles = computed(() => [
     hint: `${riskLabel.value} · 信号 ${summary.value.riskTriggeredCount || 0}`
   }
 ])
-
-function parsePositiveNumber(value: unknown) {
-  const parsed = Number(value)
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return undefined
-  }
-  return Math.round(parsed)
-}
 
 function parseFilterToStatus(filter?: string) {
   if (!filter) return undefined
@@ -581,7 +574,7 @@ function syncQueryFromRoute() {
     ...parseMedicalWorkbenchQueryPatch(route.query),
     date: typeof route.query.date === 'string' ? route.query.date : undefined,
     status: typeof route.query.status === 'string' ? route.query.status : undefined,
-    elderId: parsePositiveNumber(route.query.elderId)
+    elderId: normalizeId(route.query.elderId ?? route.query.residentId)
   })
   draftSummaryQuery.value = { ...summaryQuery.value }
 }
@@ -599,7 +592,7 @@ async function loadSummary() {
 }
 
 function buildTaskRequestParams(pageNo: number, pageSize: number) {
-  const elderId = parsePositiveNumber(summaryQuery.value.elderId)
+  const elderId = summaryQuery.value.elderId ? String(summaryQuery.value.elderId).trim() || undefined : undefined
   return {
     pageNo,
     pageSize,

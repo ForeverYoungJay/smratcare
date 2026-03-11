@@ -396,7 +396,7 @@ async function resolveResidentId() {
   const fromRouteName = String(route.query.elderName || '').trim()
   if (fromRoute) {
     residentId.value = fromRoute
-    if (/^\d+$/.test(fromRoute)) ensureSelectedElder(Number(fromRoute), fromRouteName || undefined)
+    ensureSelectedElder(fromRoute, fromRouteName || undefined)
     return
   }
   if (residentOptions.value.length > 0) {
@@ -565,9 +565,7 @@ onMounted(async () => {
     if (routeResident) {
       residentId.value = routeResident
       const routeResidentName = String(route.query.elderName || '').trim()
-      if (/^\d+$/.test(routeResident)) {
-        ensureSelectedElder(Number(routeResident), routeResidentName || undefined)
-      }
+      ensureSelectedElder(routeResident, routeResidentName || undefined)
     }
     await searchResidentOptions('')
     if (!residentId.value && residentOptions.value.length > 0) {
@@ -601,9 +599,7 @@ watch(
     if (!nextResident || nextResident === residentId.value) return
     residentId.value = nextResident
     const nextResidentName = String(route.query.elderName || '').trim()
-    if (/^\d+$/.test(nextResident)) {
-      ensureSelectedElder(Number(nextResident), nextResidentName || undefined)
-    }
+    ensureSelectedElder(nextResident, nextResidentName || undefined)
     loadModules()
   }
 )

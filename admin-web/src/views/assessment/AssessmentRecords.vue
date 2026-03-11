@@ -168,8 +168,19 @@
                 <a-menu-item key="view" :disabled="!pageConfig.actions.includes('view') || selectedRowKeys.length !== 1">
                   查看勾选
                 </a-menu-item>
-                <a-menu-item key="edit" :disabled="!pageConfig.actions.includes('edit') || selectedRowKeys.length !== 1">
+                <a-menu-item
+                  v-if="props.assessmentType !== 'ARCHIVE'"
+                  key="edit"
+                  :disabled="!pageConfig.actions.includes('edit') || selectedRowKeys.length !== 1"
+                >
                   编辑勾选
+                </a-menu-item>
+                <a-menu-item
+                  v-if="props.assessmentType === 'ARCHIVE'"
+                  key="print"
+                  :disabled="selectedRowKeys.length !== 1"
+                >
+                  打印报告
                 </a-menu-item>
               </a-menu>
             </template>
@@ -178,13 +189,13 @@
             <a-button :disabled="selectedRowKeys.length === 0">批量处理</a-button>
             <template #overlay>
               <a-menu @click="onBatchActionMenuClick">
-                <a-menu-item key="assign">指派评估人</a-menu-item>
-                <a-menu-item key="next-date">设置复评日期</a-menu-item>
-                <a-menu-divider />
+                <a-menu-item v-if="props.assessmentType !== 'ARCHIVE'" key="assign">指派评估人</a-menu-item>
+                <a-menu-item v-if="props.assessmentType !== 'ARCHIVE'" key="next-date">设置复评日期</a-menu-item>
+                <a-menu-divider v-if="props.assessmentType !== 'ARCHIVE'" />
                 <a-menu-item key="mark-completed">标记完成</a-menu-item>
                 <a-menu-item key="mark-archived">批量归档</a-menu-item>
                 <a-menu-item
-                  v-if="pageConfig.showBatchDelete && canDeleteAssessment"
+                  v-if="props.assessmentType !== 'ARCHIVE' && pageConfig.showBatchDelete && canDeleteAssessment"
                   key="delete"
                   danger
                 >
@@ -621,6 +632,7 @@ import type {
   AssessmentType,
   AssessmentScaleTemplate,
   CrmContractItem,
+  Id,
   PageResult
 } from '../../types'
 
@@ -1206,7 +1218,7 @@ const archiveStatusTab = ref<'ALL' | 'DRAFT' | 'COMPLETED' | 'ARCHIVED'>('ALL')
 
 const query = reactive({
   keyword: '',
-  elderId: undefined as string | number | undefined,
+  elderId: undefined as Id | undefined,
   contentKeyword: '',
   archiveType: undefined as AssessmentType | undefined,
   status: undefined as string | undefined,
@@ -1374,7 +1386,7 @@ const batchNextDateOpen = ref(false)
 const batchNextDateSubmitting = ref(false)
 const batchNextAssessmentDate = ref<string>('')
 const lastBatchAction = ref('')
-const changedRowIdSet = ref<Set<number>>(new Set())
+const changedRowIdSet = ref<Set<string>>(new Set())
 const selectedByFilter = ref(false)
 const form = reactive<Partial<AssessmentRecord>>({
   elderId: undefined,
@@ -1431,8 +1443,8 @@ const pendingAdmissionRowSelection = computed(() => ({
 }))
 const selectedAdmissionRecord = computed(() => {
   if (selectedRowKeys.value.length !== 1) return null
-  const key = Number(selectedRowKeys.value[0])
-  return rows.value.find((item) => Number(item.id) === key) || null
+  const key = selectedRowKeys.value[0]
+  return rows.value.find((item) => assessmentRowKey(item) === key) || null
 })
 const admissionLifecycleStage = computed(() => {
   if (!isAdmissionAssessment.value) return 'PENDING_ASSESSMENT'
@@ -1474,7 +1486,7 @@ const admissionModalConfirmText = computed(() => {
 })
 
 function assessmentRowKey(record: AssessmentRecord) {
-  return String(record?.id ?? '').trim()
+  return String((record as any)?.idText || record?.id || '').trim()
 }
 const rowSelection = computed(() => {
   return {
@@ -1544,8 +1556,8 @@ const tableCustomRow = (record: AssessmentRecord) => {
 }
 
 const tableRowClassName = (record: AssessmentRecord) => {
-  const id = Number(record.id)
-  if (!Number.isFinite(id)) {
+  const id = assessmentRowKey(record)
+  if (!id) {
     return ''
   }
   return changedRowIdSet.value.has(id) ? 'row-batch-updated' : ''
@@ -1804,7 +1816,7 @@ async function searchElderOptions(keyword: string) {
   await loadElderOptions(keyword)
 }
 
-async function resolveContractNoByElder(elderId?: number | string) {
+async function resolveContractNoByElder(elderId?: Id) {
   if (!elderId) return ''
   const normalizedElderId = String(elderId).trim()
   if (!normalizedElderId) return ''
@@ -1822,8 +1834,8 @@ async function resolveContractNoByElder(elderId?: number | string) {
   }
 }
 
-async function onElderChange(elderId?: number | string) {
-  form.elderName = findElderName(elderId as any)
+async function onElderChange(elderId?: Id) {
+  form.elderName = findElderName(elderId)
   if (!elderId || formReadonly.value) return
   if (admissionContractNoFromRoute.value) {
     form.archiveNo = admissionContractNoFromRoute.value
@@ -2146,7 +2158,12 @@ function safeHtml(value?: string | number | null) {
 }
 
 async function printReport(record: AssessmentRecord) {
-  const report = await getAssessmentRecordReport(Number(record.id))
+  const recordId = assessmentRowKey(record)
+  if (!recordId) {
+    message.warning('评估记录ID无效，请刷新后重试')
+    return
+  }
+  const report = await getAssessmentRecordReport(recordId)
   if (!report) {
     message.warning('未找到评估报告数据')
     return
@@ -2264,7 +2281,7 @@ async function autoOpenAdmissionFromRoute() {
   }
 }
 
-function remove(id: number) {
+function remove(id: number | string) {
   if (!canDeleteAssessment.value) {
     message.warning('仅主管及以上角色可删除评估记录')
     return
@@ -2288,7 +2305,12 @@ function removeBatch() {
   Modal.confirm({
     title: `确认删除选中的 ${selectedRowKeys.value.length} 条评估记录？`,
     onOk: async () => {
-      const result = await batchDeleteAssessmentRecord(selectedRowKeys.value.map((item) => Number(item)))
+      const ids = getSelectedBatchIds()
+      if (!ids.length) {
+        message.warning('勾选记录ID无效，请刷新后重试')
+        return
+      }
+      const result = await batchDeleteAssessmentRecord(ids)
       handleBatchResultFeedback(result, '批量删除评估记录')
       fetchData()
     }
@@ -2313,6 +2335,16 @@ async function exportCsv() {
 function getSelectedRows() {
   const idSet = new Set(selectedRowKeys.value)
   return rows.value.filter((item) => idSet.has(assessmentRowKey(item)))
+}
+
+function getSelectedBatchIds() {
+  return Array.from(
+    new Set(
+      selectedRowKeys.value
+        .map((item) => String(item || '').trim())
+        .filter((item) => /^\d+$/.test(item))
+    )
+  )
 }
 
 function toggleSelectAll() {
@@ -2370,8 +2402,8 @@ function handleBatchResultFeedback(result: AssessmentBatchOperationResult, succe
   ))
   changedRowIdSet.value = new Set(
     successIds
-      .map((item) => Number(item))
-      .filter((item) => Number.isFinite(item))
+      .map((item) => String(item ?? '').trim())
+      .filter((item) => item.length > 0)
   )
   selectedRowKeys.value = failedIds
   selectedByFilter.value = failedIds.length > rows.value.length
@@ -2419,8 +2451,13 @@ function markSelectedStatus(status: 'COMPLETED' | 'ARCHIVED') {
   Modal.confirm({
     title: `确认将勾选的 ${selectedRowKeys.value.length} 条记录${actionText}？`,
     onOk: async () => {
+      const ids = getSelectedBatchIds()
+      if (!ids.length) {
+        message.warning('勾选记录ID无效，请刷新后重试')
+        return
+      }
       const result = await batchUpdateAssessmentRecordStatus(
-        selectedRowKeys.value.map((item) => Number(item)),
+        ids,
         status
       )
       handleBatchResultFeedback(
@@ -2455,8 +2492,13 @@ async function submitBatchAssign() {
   }
   batchAssignSubmitting.value = true
   try {
+    const ids = getSelectedBatchIds()
+    if (!ids.length) {
+      message.warning('勾选记录ID无效，请刷新后重试')
+      return
+    }
     const result = await batchAssignAssessmentRecord(
-      selectedRowKeys.value.map((item) => Number(item)),
+      ids,
       assessorName
     )
     handleBatchResultFeedback(result, `批量指派评估人：${assessorName}`)
@@ -2489,8 +2531,13 @@ async function submitBatchNextDate() {
   }
   batchNextDateSubmitting.value = true
   try {
+    const ids = getSelectedBatchIds()
+    if (!ids.length) {
+      message.warning('勾选记录ID无效，请刷新后重试')
+      return
+    }
     const result = await batchUpdateAssessmentNextDate(
-      selectedRowKeys.value.map((item) => Number(item)),
+      ids,
       nextDate
     )
     handleBatchResultFeedback(result, `批量设置复评日期：${nextDate}`)
@@ -2617,6 +2664,15 @@ function editSelected() {
 function onSingleActionMenuClick({ key }: { key: string }) {
   if (key === 'view') {
     viewSelected()
+    return
+  }
+  if (key === 'print') {
+    const selected = getSelectedRows()[0]
+    if (!selected) {
+      message.warning('当前页未找到勾选记录，请刷新后重试')
+      return
+    }
+    printReport(selected)
     return
   }
   if (key === 'edit') {

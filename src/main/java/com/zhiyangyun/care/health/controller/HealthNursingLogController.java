@@ -5,7 +5,9 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
+import com.zhiyangyun.care.health.entity.HealthInspection;
 import com.zhiyangyun.care.health.entity.HealthNursingLog;
+import com.zhiyangyun.care.health.mapper.HealthInspectionMapper;
 import com.zhiyangyun.care.health.mapper.HealthNursingLogMapper;
 import com.zhiyangyun.care.health.model.HealthNursingLogRequest;
 import com.zhiyangyun.care.health.model.HealthNursingLogSummaryResponse;
@@ -33,14 +35,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class HealthNursingLogController {
   private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
   private final HealthNursingLogMapper mapper;
+  private final HealthInspectionMapper inspectionMapper;
   private final ElderResolveSupport elderResolveSupport;
   private final HealthInspectionClosureService inspectionClosureService;
 
   public HealthNursingLogController(
       HealthNursingLogMapper mapper,
+      HealthInspectionMapper inspectionMapper,
       ElderResolveSupport elderResolveSupport,
       HealthInspectionClosureService inspectionClosureService) {
     this.mapper = mapper;
+    this.inspectionMapper = inspectionMapper;
     this.elderResolveSupport = elderResolveSupport;
     this.inspectionClosureService = inspectionClosureService;
   }
@@ -139,6 +144,8 @@ public class HealthNursingLogController {
   public Result<HealthNursingLog> create(@Valid @RequestBody HealthNursingLogRequest request) {
     Long orgId = AuthContext.getOrgId();
     Long elderId = elderResolveSupport.resolveElderId(orgId, request.getElderId(), request.getElderName());
+    String logType = normalizeLogType(request.getLogType());
+    validateSourceInspection(orgId, elderId, logType, request.getSourceInspectionId());
     HealthNursingLog item = new HealthNursingLog();
     item.setTenantId(orgId);
     item.setOrgId(orgId);
@@ -146,7 +153,7 @@ public class HealthNursingLogController {
     item.setElderName(elderResolveSupport.resolveElderName(elderId, normalizeText(request.getElderName())));
     item.setSourceInspectionId(request.getSourceInspectionId());
     item.setLogTime(request.getLogTime());
-    item.setLogType(normalizeLogType(request.getLogType()));
+    item.setLogType(logType);
     item.setContent(normalizeText(request.getContent()));
     item.setStaffName(normalizeText(request.getStaffName()));
     item.setStatus(normalizeStatus(request.getStatus()));
@@ -166,11 +173,13 @@ public class HealthNursingLogController {
       return Result.ok(null);
     }
     Long elderId = elderResolveSupport.resolveElderId(orgId, request.getElderId(), request.getElderName());
+    String logType = normalizeLogType(request.getLogType());
+    validateSourceInspection(orgId, elderId, logType, request.getSourceInspectionId());
     item.setElderId(elderId);
     item.setElderName(elderResolveSupport.resolveElderName(elderId, normalizeText(request.getElderName())));
     item.setSourceInspectionId(request.getSourceInspectionId());
     item.setLogTime(request.getLogTime());
-    item.setLogType(normalizeLogType(request.getLogType()));
+    item.setLogType(logType);
     item.setContent(normalizeText(request.getContent()));
     item.setStaffName(normalizeText(request.getStaffName()));
     item.setStatus(normalizeStatus(request.getStatus()));
@@ -292,5 +301,24 @@ public class HealthNursingLogController {
       return upper;
     }
     return "PENDING";
+  }
+
+  private void validateSourceInspection(Long orgId, Long elderId, String logType, Long sourceInspectionId) {
+    if ("INSPECTION_FOLLOW_UP".equals(logType) && sourceInspectionId == null) {
+      throw new IllegalArgumentException("巡检跟进日志必须关联来源巡检");
+    }
+    if (sourceInspectionId == null) {
+      return;
+    }
+    HealthInspection inspection = inspectionMapper.selectById(sourceInspectionId);
+    if (inspection == null || inspection.getIsDeleted() != null && inspection.getIsDeleted() == 1) {
+      throw new IllegalArgumentException("来源巡检不存在");
+    }
+    if (orgId != null && !orgId.equals(inspection.getOrgId())) {
+      throw new IllegalArgumentException("来源巡检不属于当前机构");
+    }
+    if (elderId != null && !elderId.equals(inspection.getElderId())) {
+      throw new IllegalArgumentException("来源巡检与当前长者不一致");
+    }
   }
 }

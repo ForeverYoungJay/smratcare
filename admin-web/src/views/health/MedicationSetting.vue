@@ -85,6 +85,7 @@ import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { mapHealthExportRows, medicationSettingExportColumns } from '../../constants/healthExport'
 import { exportCsv, exportExcel } from '../../utils/export'
+import { normalizeResidentId } from '../../utils/id'
 import { resolveHealthError } from './healthError'
 import {
   getHealthMedicationSettingPage,
@@ -92,7 +93,7 @@ import {
   updateHealthMedicationSetting,
   deleteHealthMedicationSetting
 } from '../../api/health'
-import type { HealthMedicationSetting, PageResult } from '../../types'
+import type { HealthMedicationSetting, Id, PageResult } from '../../types'
 
 const loading = ref(false)
 const exporting = ref(false)
@@ -116,8 +117,8 @@ const editOpen = ref(false)
 const saving = ref(false)
 const { elderOptions, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
 const form = reactive({
-  id: undefined as number | undefined,
-  elderId: undefined as number | undefined,
+  id: undefined as Id | undefined,
+  elderId: undefined as Id | undefined,
   elderName: '',
   drugName: '',
   dosage: '',
@@ -140,12 +141,12 @@ const frequencyOptions = [
 async function fetchData() {
   loading.value = true
   try {
-    const residentId = route.query.residentId ?? route.query.elderId
+    const residentId = normalizeResidentId(route.query as Record<string, unknown>)
     const res: PageResult<HealthMedicationSetting> = await getHealthMedicationSettingPage({
       keyword: query.keyword || undefined,
       pageNo: query.pageNo,
       pageSize: query.pageSize,
-      elderId: residentId ? Number(residentId) : undefined
+      elderId: residentId
     })
     rows.value = res.list
     pagination.total = res.total || res.list.length
@@ -175,10 +176,10 @@ function onReset() {
 }
 
 function openCreate() {
-  const residentId = route.query.residentId ?? route.query.elderId
+  const residentId = normalizeResidentId(route.query as Record<string, unknown>)
   const residentName = typeof route.query.residentName === 'string' ? route.query.residentName : ''
   form.id = undefined
-  form.elderId = residentId ? Number(residentId) : undefined
+  form.elderId = residentId
   form.elderName = residentName
   ensureSelectedElder(form.elderId, residentName)
   form.drugName = ''
@@ -208,7 +209,7 @@ function openEdit(record: HealthMedicationSetting) {
   editOpen.value = true
 }
 
-function onElderChange(elderId?: number) {
+function onElderChange(elderId?: Id) {
   form.elderName = findElderName(elderId)
 }
 
@@ -307,12 +308,12 @@ async function loadExportRecords() {
     let total = 0
     const list: HealthMedicationSetting[] = []
     do {
-      const residentId = route.query.residentId ?? route.query.elderId
+      const residentId = normalizeResidentId(route.query as Record<string, unknown>)
       const page = await getHealthMedicationSettingPage({
         keyword: query.keyword || undefined,
         pageNo,
         pageSize,
-        elderId: residentId ? Number(residentId) : undefined
+        elderId: residentId
       }) as PageResult<HealthMedicationSetting>
       total = page.total || 0
       list.push(...(page.list || []))

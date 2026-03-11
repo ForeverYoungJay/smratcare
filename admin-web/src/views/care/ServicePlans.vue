@@ -132,7 +132,8 @@ import { useElderOptions } from '../../composables/useElderOptions'
 import { useStaffOptions } from '../../composables/useStaffOptions'
 import { listServiceItems } from '../../api/standard'
 import { createServicePlan, deleteServicePlan, getCareLevelList, getServicePlanPage, updateServicePlan } from '../../api/nursing'
-import type { CareLevelItem, PageResult, ServiceItem, ServicePlanItem } from '../../types'
+import { normalizeResidentId } from '../../utils/id'
+import type { CareLevelItem, Id, PageResult, ServiceItem, ServicePlanItem } from '../../types'
 import { resolveCareError } from './careError'
 
 const rows = ref<ServicePlanItem[]>([])
@@ -230,10 +231,10 @@ function openModal(record?: ServicePlanItem) {
     ensureSelectedElder(record.elderId, record.elderName)
     ensureSelectedStaff(record.defaultStaffId, record.defaultStaffName)
   } else {
-    const residentId = route.query.residentId ?? route.query.elderId
+    const residentId = normalizeResidentId(route.query as Record<string, unknown>)
     const residentName = typeof route.query.residentName === 'string' ? route.query.residentName : undefined
     if (residentId) {
-      form.elderId = Number(residentId)
+      form.elderId = residentId
       ensureSelectedElder(form.elderId, residentName)
     }
   }
@@ -333,7 +334,7 @@ async function load() {
       pageSize: query.pageSize,
       status: query.status,
       keyword: query.keyword,
-      elderId: route.query.residentId ? Number(route.query.residentId) : route.query.elderId ? Number(route.query.elderId) : undefined
+      elderId: normalizeResidentId(route.query as Record<string, unknown>)
     })
     rows.value = res.list
     query.total = res.total

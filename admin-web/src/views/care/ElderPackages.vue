@@ -92,7 +92,7 @@ import {
   deleteElderPackage,
   listCarePackages
 } from '../../api/standard'
-import type { ElderPackage, CarePackage, PageResult } from '../../types'
+import type { ElderPackage, CarePackage, Id, PageResult } from '../../types'
 import { resolveCareError } from './careError'
 
 const list = ref<ElderPackage[]>([])
@@ -102,7 +102,7 @@ const submitting = ref(false)
 const formRef = ref()
 const form = reactive<Partial<ElderPackage>>({ status: 1 })
 const page = reactive({ pageNo: 1, pageSize: 10, total: 0 })
-const query = reactive({ elderId: undefined as number | undefined })
+const query = reactive({ elderId: undefined as Id | undefined })
 
 const { elderOptions: elderSelectOptions, elderLoading, searchElders } = useElderOptions({ pageSize: 120 })
 const packageOptions = ref<CarePackage[]>([])
@@ -159,7 +159,7 @@ async function submit() {
   }
 }
 
-async function remove(id: number) {
+async function remove(id: Id) {
   Modal.confirm({
     title: '确认删除该老人套餐？',
     onOk: async () => {

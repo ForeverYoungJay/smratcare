@@ -91,7 +91,7 @@
           />
         </a-form-item>
         <a-form-item label="退住申请ID">
-          <a-input-number v-model:value="createForm.dischargeApplyId" :min="1" style="width: 100%" />
+          <a-input v-model:value="createForm.dischargeApplyId" placeholder="请输入退住申请ID" />
         </a-form-item>
         <a-form-item label="应收金额" required>
           <a-input-number v-model:value="createForm.payableAmount" :min="0" :precision="2" style="width: 100%" />
@@ -128,7 +128,7 @@ import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { getBaseConfigItemList } from '../../api/baseConfig'
 import { createDischargeSettlement, getDischargeSettlementPage, confirmDischargeSettlement } from '../../api/financeFee'
-import type { BaseConfigItem, DischargeSettlementItem, PageResult } from '../../types'
+import type { BaseConfigItem, DischargeSettlementItem, Id, PageResult } from '../../types'
 import { confirmAction } from '../../utils/actionConfirm'
 import { computed } from 'vue'
 
@@ -179,8 +179,8 @@ const blockedCount = computed(() => rows.value.filter(item =>
 const createOpen = ref(false)
 const creating = ref(false)
 const createForm = reactive({
-  elderId: undefined as number | undefined,
-  dischargeApplyId: undefined as number | undefined,
+  elderId: undefined as Id | undefined,
+  dischargeApplyId: undefined as Id | undefined,
   payableAmount: 0,
   feeItem: '',
   dischargeFeeConfig: '',
@@ -269,7 +269,7 @@ async function submitCreate() {
   try {
     await createDischargeSettlement({
       elderId: createForm.elderId,
-      dischargeApplyId: createForm.dischargeApplyId,
+      dischargeApplyId: createForm.dischargeApplyId || undefined,
       payableAmount: createForm.payableAmount,
       feeItem: createForm.feeItem,
       dischargeFeeConfig: createForm.dischargeFeeConfig,

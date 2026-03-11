@@ -129,7 +129,8 @@ import {
   getServicePlanList,
   updateServiceBooking
 } from '../../api/nursing'
-import type { PageResult, ServiceBookingItem, ServiceItem, ServicePlanItem } from '../../types'
+import { normalizeResidentId } from '../../utils/id'
+import type { Id, PageResult, ServiceBookingItem, ServiceItem, ServicePlanItem } from '../../types'
 import { resolveCareError } from './careError'
 
 const rows = ref<ServiceBookingItem[]>([])
@@ -231,10 +232,10 @@ function openModal(record?: ServiceBookingItem) {
     ensureSelectedElder(record.elderId, record.elderName)
     ensureSelectedStaff(record.assignedStaffId, record.assignedStaffName)
   } else {
-    const residentId = route.query.residentId ?? route.query.elderId
+    const residentId = normalizeResidentId(route.query as Record<string, unknown>)
     const residentName = typeof route.query.residentName === 'string' ? route.query.residentName : undefined
     if (residentId) {
-      form.elderId = Number(residentId)
+      form.elderId = residentId
       ensureSelectedElder(form.elderId, residentName)
     }
   }
@@ -334,7 +335,7 @@ async function load() {
       timeFrom: query.range?.[0] || undefined,
       timeTo: query.range?.[1] || undefined,
       status: query.status,
-      elderId: route.query.residentId ? Number(route.query.residentId) : route.query.elderId ? Number(route.query.elderId) : undefined
+      elderId: normalizeResidentId(route.query as Record<string, unknown>)
     })
     rows.value = res.list
     query.total = res.total

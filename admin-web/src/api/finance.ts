@@ -1,5 +1,6 @@
 import request, { fetchPage } from '../utils/request'
 import { getToken } from '../utils/auth'
+import type { Id } from '../types'
 import type {
   FinanceBillDetail,
   FinanceReportMonthlyItem,
@@ -45,7 +46,7 @@ export function getPaymentRecordPage(params: any) {
   return fetchPage<PaymentRecordItem>('/api/finance/payment/page', params)
 }
 
-export function updatePaymentRecord(paymentId: number, data: { amount: number; method: string; paidAt: string; remark?: string }) {
+export function updatePaymentRecord(paymentId: Id, data: { amount: number; method: string; paidAt: string; remark?: string }) {
   return request.put(`/api/finance/payment/${paymentId}`, data)
 }
 
@@ -57,7 +58,7 @@ export function getReconcilePage(params: any) {
   return fetchPage<ReconcileDailyItem>('/api/finance/reconcile/page', params)
 }
 
-export function getFinanceBillDetail(billId: number, config?: Record<string, any>) {
+export function getFinanceBillDetail(billId: Id, config?: Record<string, any>) {
   return request.get<FinanceBillDetail>(`/api/finance/bill/${billId}`, config)
 }
 
@@ -81,7 +82,7 @@ export function getElderAccountLogPage(params: any) {
   return fetchPage<ElderAccountLog>('/api/finance/account/log/page', params)
 }
 
-export function printElderAccountLogPdf(params: { elderId: number; accountId?: number; keyword?: string }) {
+export function printElderAccountLogPdf(params: { elderId: Id; accountId?: Id; keyword?: string }) {
   return request.get<Blob>('/api/finance/account/log/print', { params, responseType: 'blob' as any })
 }
 
@@ -340,6 +341,6 @@ export function getFinanceCategoryConsumptionAnalysis(params: {
   return request.get<FinanceCategoryConsumptionAnalysis>('/api/finance/report/category-consumption-analysis', { params })
 }
 
-export function bindFinanceBillElder(billId: number, data: { elderId: number; remark?: string }) {
+export function bindFinanceBillElder(billId: Id, data: { elderId: Id; remark?: string }) {
   return request.post(`/api/finance/bill/${billId}/bind-elder`, data)
 }

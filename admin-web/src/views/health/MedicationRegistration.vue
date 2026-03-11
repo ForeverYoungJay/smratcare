@@ -124,6 +124,7 @@ import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { mapHealthExportRows, medicationRegistrationExportColumns } from '../../constants/healthExport'
 import { exportCsv, exportExcel } from '../../utils/export'
+import { normalizeResidentId } from '../../utils/id'
 import { getMedicationHighDosageThreshold, syncMedicalAlertRules } from '../../utils/medicalAlertRule'
 import { resolveHealthError } from './healthError'
 import {
@@ -133,12 +134,14 @@ import {
   updateHealthMedicationRegistration,
   deleteHealthMedicationRegistration
 } from '../../api/health'
-import type { HealthMedicationRegistration, HealthMedicationRegistrationSummary, PageResult } from '../../types'
+import { useUserStore } from '../../stores/user'
+import type { HealthMedicationRegistration, HealthMedicationRegistrationSummary, Id, PageResult } from '../../types'
 
 const loading = ref(false)
 const exporting = ref(false)
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const rows = ref<HealthMedicationRegistration[]>([])
 const query = reactive({
   keyword: '',
@@ -172,23 +175,26 @@ const columns = [
 const editOpen = ref(false)
 const saving = ref(false)
 const { elderOptions, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
+const currentNurseName = computed(() => {
+  return String(userStore.staffInfo?.realName || userStore.staffInfo?.username || '').trim()
+})
 const form = reactive({
-  id: undefined as number | undefined,
-  elderId: undefined as number | undefined,
+  id: undefined as Id | undefined,
+  elderId: undefined as Id | undefined,
   elderName: '',
   drugName: '',
   registerTime: dayjs(),
   dosageTaken: 0 as number | undefined,
   unit: '',
-  nurseName: '',
+  nurseName: currentNurseName.value,
   remark: ''
 })
 const residentContext = computed(() => {
-  const residentId = route.query.residentId ?? route.query.elderId
+  const residentId = normalizeResidentId(route.query as Record<string, unknown>)
   const residentName = typeof route.query.residentName === 'string' ? route.query.residentName : ''
   return {
     active: !!residentId,
-    residentId: residentId ? Number(residentId) : undefined,
+    residentId,
     name: residentName || ''
   }
 })
@@ -244,17 +250,17 @@ function onReset() {
 }
 
 function openCreate() {
-  const residentId = route.query.residentId ?? route.query.elderId
+  const residentId = normalizeResidentId(route.query as Record<string, unknown>)
   const residentName = typeof route.query.residentName === 'string' ? route.query.residentName : ''
   form.id = undefined
-  form.elderId = residentId ? Number(residentId) : undefined
+  form.elderId = residentId
   form.elderName = residentName
   ensureSelectedElder(form.elderId, residentName)
   form.drugName = ''
   form.registerTime = dayjs()
   form.dosageTaken = 0
   form.unit = ''
-  form.nurseName = ''
+  form.nurseName = currentNurseName.value
   form.remark = ''
   editOpen.value = true
 }
@@ -273,7 +279,7 @@ function openEdit(record: HealthMedicationRegistration) {
   editOpen.value = true
 }
 
-function onElderChange(elderId?: number) {
+function onElderChange(elderId?: Id) {
   form.elderName = findElderName(elderId)
 }
 
@@ -370,7 +376,7 @@ async function exportExcelData() {
 }
 
 function buildQueryParams() {
-  const residentId = route.query.residentId ?? route.query.elderId
+  const residentId = normalizeResidentId(route.query as Record<string, unknown>)
   const params: Record<string, any> = {
     keyword: query.keyword || undefined,
     drugName: query.drugName || undefined,
@@ -379,7 +385,7 @@ function buildQueryParams() {
     pageSize: query.pageSize
   }
   if (residentId) {
-    params.elderId = Number(residentId)
+    params.elderId = residentId
   }
   if (Array.isArray(query.registerRange) && query.registerRange.length === 2) {
     params.registerFrom = dayjs(query.registerRange[0]).format('YYYY-MM-DDTHH:mm:ss')

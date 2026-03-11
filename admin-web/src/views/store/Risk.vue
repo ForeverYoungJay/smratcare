@@ -29,12 +29,17 @@
         </a-col>
         <a-col :span="18">
           <a-space style="margin-bottom: 12px">
+            <a-button @click="goToTagCreate">去新增标签</a-button>
+            <a-button @click="goToProductTagging">去商品打标</a-button>
             <a-button type="primary" :loading="saving" @click="save">保存配置</a-button>
             <a-button @click="exportAll">导出CSV</a-button>
             <a-upload :before-upload="beforeImport" :show-upload-list="false" accept=".csv">
               <a-button>导入CSV</a-button>
             </a-upload>
           </a-space>
+          <a-typography-text type="secondary" style="display: block; margin-bottom: 12px">
+            建议流程：先新增标签，再到商品信息打标，最后回本页做禁忌规则绑定。
+          </a-typography-text>
 
           <a-empty v-if="!currentDisease" description="请选择左侧疾病" />
           <div v-else>
@@ -73,6 +78,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportCsv } from '../../utils/export'
@@ -81,6 +87,7 @@ import type { DiseaseItem } from '../../types'
 
 const loading = ref(false)
 const saving = ref(false)
+const router = useRouter()
 const diseases = ref<DiseaseItem[]>([])
 const keyword = ref('')
 const currentDisease = ref<DiseaseItem | null>(null)
@@ -97,6 +104,14 @@ const filteredDiseases = computed(() => {
   if (!keyword.value) return diseases.value
   return diseases.value.filter((d) => (d.diseaseName || '').includes(keyword.value))
 })
+
+function goToTagCreate() {
+  router.push('/logistics/commerce/tag')
+}
+
+function goToProductTagging() {
+  router.push('/logistics/commerce/product')
+}
 
 function toFlatGroup(groups: any[], selectedIds: number[]) {
   const allTags = groups.flatMap((g) => g.tags || [])

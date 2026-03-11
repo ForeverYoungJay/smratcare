@@ -21,7 +21,10 @@ export function setupPermission(router) {
         }
         next();
     });
-    router.afterEach(() => {
+    router.afterEach((to, from) => {
+        if (to.path === from.path) {
+            return;
+        }
         window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
         const content = document.querySelector('.app-content');
         if (content) {

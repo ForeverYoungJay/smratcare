@@ -1,9 +1,11 @@
+import type { Id } from './common'
+
 export interface MedicalTcmAssessment {
-  id: number
-  elderId?: number
+  id: Id
+  elderId?: Id
   elderName: string
   assessmentDate: string
-  assessorId?: number
+  assessorId?: Id
   assessorName?: string
   assessmentScene?: 'ADMISSION' | 'REASSESSMENT' | 'SPECIAL'
   constitutionPrimary?: string
@@ -26,11 +28,11 @@ export interface MedicalTcmAssessment {
 }
 
 export interface MedicalCvdAssessment {
-  id: number
-  elderId?: number
+  id: Id
+  elderId?: Id
   elderName: string
   assessmentDate: string
-  assessorId?: number
+  assessorId?: Id
   assessorName?: string
   riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'VERY_HIGH'
   keyRiskFactors?: string
@@ -71,7 +73,7 @@ export interface MedicalTcmAssessmentSummary {
 }
 
 export interface MedicalCareRiskResident {
-  elderId?: number
+  elderId?: Id
   elderName?: string
   riskLevel?: string
   keyRiskFactors?: string
@@ -88,7 +90,7 @@ export interface MedicalCareFocusAction {
 }
 
 export interface MedicalCareWorkbenchSummaryQuery {
-  elderId?: number | string
+  elderId?: Id
   date?: string
   status?: string
   incidentWindowDays?: number
@@ -184,16 +186,16 @@ export interface MedicalCareWorkbenchSummary {
 }
 
 export interface MedicalUnifiedTaskItem {
-  id: string
+  id: Id
   module: 'ORDER' | 'INSPECTION' | 'NURSING_LOG' | 'HANDOVER' | string
-  residentId?: number
+  residentId?: Id
   residentName?: string
   taskTitle: string
   assignee?: string
   plannedTime?: string
   priority: 'HIGH' | 'MEDIUM' | 'LOW' | string
   status?: string
-  sourceId?: number
+  sourceId?: Id
   overdue?: boolean
   overdueMinutes?: number
   riskScore?: number
@@ -204,7 +206,7 @@ export interface MedicalUnifiedTaskItem {
 export interface MedicalUnifiedTaskQuery {
   pageNo?: number
   pageSize?: number
-  elderId?: number | string
+  elderId?: Id
   module?: string
   priority?: string
   status?: string
@@ -227,7 +229,7 @@ export interface MedicalAlertRuleConfig {
 }
 
 export interface MedicalResidentRiskCard {
-  elderId?: number
+  elderId?: Id
   elderName?: string
   latestTcmPrimary?: string
   latestTcmSecondary?: string
@@ -265,7 +267,7 @@ export interface MedicalResidentOverviewCard {
 }
 
 export interface MedicalResidentOverview {
-  elderId?: number
+  elderId?: Id
   elderName?: string
   currentStatus?: string
   hasUnclosedIncident?: boolean
@@ -276,9 +278,11 @@ export interface MedicalResidentOverview {
 }
 
 export interface MedicalAiReportItem {
-  id: number
+  id: Id
   type: 'WEEKLY' | 'MONTHLY' | 'CVD' | 'CHRONIC' | string
   status: 'GENERATING' | 'GENERATED' | 'PUBLISHED' | string
+  elderId?: Id
+  elderName?: string
   dateFrom?: string
   dateTo?: string
   rangeText?: string

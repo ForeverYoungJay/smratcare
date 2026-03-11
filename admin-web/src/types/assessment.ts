@@ -1,3 +1,5 @@
+import type { Id } from './common'
+
 export type AssessmentType =
   | 'ADMISSION'
   | 'REGISTRATION'
@@ -8,8 +10,9 @@ export type AssessmentType =
   | 'SELF_CARE'
 
 export interface AssessmentRecord {
-  id: number
-  elderId?: number
+  id: number | string
+  idText?: string
+  elderId?: Id
   elderName: string
   gender?: number
   genderLabel?: string

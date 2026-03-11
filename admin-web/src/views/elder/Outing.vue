@@ -138,7 +138,8 @@ import StatefulBlock from '../../components/StatefulBlock.vue'
 import { uploadElderFile } from '../../api/elder'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { createOuting, deleteOuting, getOutingPage, returnOuting } from '../../api/elderResidence'
-import type { OutingCreateRequest, OutingItem, PageResult } from '../../types'
+import type { Id, OutingCreateRequest, OutingItem, PageResult } from '../../types'
+import { normalizeResidentId } from '../../utils/id'
 
 const loading = ref(false)
 const rows = ref<OutingItem[]>([])
@@ -148,18 +149,18 @@ const submitting = ref(false)
 const uploadingLeaveNote = ref(false)
 const errorMessage = ref('')
 const formRef = ref<FormInstance>()
-const selectedRowKeys = ref<number[]>([])
+const selectedRowKeys = ref<Id[]>([])
 const route = useRoute()
 const { elderOptions, elderLoading, searchElders, ensureSelectedElder } = useElderOptions({ pageSize: 80 })
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: (string | number)[]) => {
-    selectedRowKeys.value = keys as number[]
+    selectedRowKeys.value = keys.map((key) => String(key)) as Id[]
   }
 }))
 
 const query = reactive({
-  elderId: undefined as number | undefined,
+  elderId: undefined as Id | undefined,
   status: undefined as string | undefined,
   planTimeRange: undefined as [string, string] | undefined,
   pageNo: 1,
@@ -167,7 +168,7 @@ const query = reactive({
 })
 
 const form = reactive<OutingCreateRequest>({
-  elderId: 0,
+  elderId: '' as Id,
   outingDate: '',
   expectedReturnTime: undefined,
   companion: '',
@@ -222,7 +223,7 @@ function reset() {
 
 function openCreate() {
   createOpen.value = true
-  form.elderId = 0
+  form.elderId = '' as Id
   form.outingDate = ''
   form.expectedReturnTime = undefined
   form.companion = ''
@@ -311,8 +312,8 @@ function onPageSizeChange(current: number, size: number) {
 
 onMounted(async () => {
   await searchElders('')
-  const elderId = Number(route.query.elderId || 0)
-  if (elderId > 0) {
+  const elderId = normalizeResidentId(route.query as Record<string, unknown>)
+  if (elderId) {
     ensureSelectedElder(elderId)
     query.elderId = elderId
   }

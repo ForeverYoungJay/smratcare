@@ -101,30 +101,31 @@ import PageContainer from '../../components/PageContainer.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { guardBookVisit, guardCheckin, guardDeleteVisit, guardGetPrintTicket, guardTodayVisits, guardUpdateVisit } from '../../api/visit'
-import type { VisitBookRequest, VisitBookingItem } from '../../types'
+import type { Id, VisitBookRequest, VisitBookingItem } from '../../types'
+import { normalizeResidentId } from '../../utils/id'
 
 const loading = ref(false)
 const rows = ref<VisitBookingItem[]>([])
-const selectedRowKeys = ref<number[]>([])
+const selectedRowKeys = ref<Id[]>([])
 const route = useRoute()
 const editOpen = ref(false)
 const submitting = ref(false)
 const errorMessage = ref('')
-const editingId = ref<number | undefined>(undefined)
+const editingId = ref<Id | undefined>(undefined)
 const formRef = ref<FormInstance>()
 const { elderOptions, elderLoading, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 80 })
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: (string | number)[]) => {
-    selectedRowKeys.value = keys as number[]
+    selectedRowKeys.value = keys.map((key) => String(key)) as Id[]
   }
 }))
 const query = reactive({
-  elderId: undefined as number | undefined,
+  elderId: undefined as Id | undefined,
   status: undefined as number | undefined
 })
 const form = reactive<VisitBookRequest>({
-  elderId: 0,
+  elderId: '' as Id,
   visitTime: '',
   visitTimeSlot: '',
   visitorCount: 1,
@@ -147,7 +148,7 @@ const columns = [
   { title: '状态', key: 'status', width: 100 }
 ]
 
-function resolveElderName(elderId?: number) {
+function resolveElderName(elderId?: Id) {
   return findElderName(elderId) || '未命名长者'
 }
 
@@ -285,7 +286,7 @@ async function printSelectedTicket() {
 
 function openCreate() {
   editingId.value = undefined
-  form.elderId = 0
+  form.elderId = '' as Id
   form.visitTime = ''
   form.visitTimeSlot = ''
   form.visitorCount = 1
@@ -366,8 +367,8 @@ function deleteSelected() {
 
 onMounted(async () => {
   await searchElders('')
-  const elderId = Number(route.query.elderId || 0)
-  if (elderId > 0) {
+  const elderId = normalizeResidentId(route.query as Record<string, unknown>)
+  if (elderId) {
     ensureSelectedElder(elderId)
     query.elderId = elderId
   }

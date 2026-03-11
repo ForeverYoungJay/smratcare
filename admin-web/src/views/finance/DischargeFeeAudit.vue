@@ -50,7 +50,7 @@
           <a-select v-model:value="createForm.elderId" show-search :filter-option="false" :options="elderOptions" @search="searchElders" @focus="() => !elderOptions.length && searchElders('')" />
         </a-form-item>
         <a-form-item label="退住申请ID">
-          <a-input-number v-model:value="createForm.dischargeApplyId" :min="1" style="width: 100%" />
+          <a-input v-model:value="createForm.dischargeApplyId" placeholder="请输入退住申请ID" />
         </a-form-item>
         <a-form-item label="应收应付金额" required>
           <a-input-number v-model:value="createForm.payableAmount" :min="0" :precision="2" style="width: 100%" />
@@ -87,7 +87,7 @@ import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { getBaseConfigItemList } from '../../api/baseConfig'
 import { createDischargeFeeAudit, getDischargeFeeAuditPage, reviewDischargeFeeAudit } from '../../api/financeFee'
-import type { BaseConfigItem, DischargeFeeAuditItem, PageResult } from '../../types'
+import type { BaseConfigItem, DischargeFeeAuditItem, Id, PageResult } from '../../types'
 import { computed } from 'vue'
 
 const loading = ref(false)
@@ -129,8 +129,8 @@ const { elderOptions, searchElders: searchElderOptions } = useElderOptions({ pag
 const feeItemOptions = ref<{ label: string; value: string }[]>([])
 const dischargeFeeConfigOptions = ref<{ label: string; value: string }[]>([])
 const createForm = reactive({
-  elderId: undefined as number | undefined,
-  dischargeApplyId: undefined as number | undefined,
+  elderId: undefined as Id | undefined,
+  dischargeApplyId: undefined as Id | undefined,
   payableAmount: 0,
   feeItem: '',
   dischargeFeeConfig: '',
@@ -222,6 +222,7 @@ async function submitCreate() {
     await createDischargeFeeAudit({
       ...createForm,
       elderId: createForm.elderId,
+      dischargeApplyId: createForm.dischargeApplyId || undefined,
       feeItem: createForm.feeItem,
       dischargeFeeConfig: createForm.dischargeFeeConfig
     })

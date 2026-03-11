@@ -169,51 +169,44 @@
       @ok="onContractModalOk"
     >
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical" :disabled="contractViewMode">
+        <a-alert
+          type="info"
+          show-icon
+          style="margin-bottom: 12px"
+          :message="contractFormGuideText"
+        />
+        <a-segmented
+          v-model:value="contractFormSection"
+          :options="contractFormSectionOptions"
+          style="margin-bottom: 12px"
+        />
         <a-row :gutter="16">
-          <a-col :span="12">
+          <a-col v-if="contractFormSection === 'BASIC'" :span="12">
             <a-form-item label="合同编号" name="contractNo">
               <a-input :value="form.contractNo" disabled placeholder="保存后后端自动生成（gfyy+年月日+编号）" />
             </a-form-item>
           </a-col>
-          <a-col :span="12">
-            <a-form-item label="签约房号">
-              <a-input
-                v-model:value="form.reservationRoomNo"
-                :disabled="!form.id"
-                :placeholder="form.id ? '入住办理后自动回填，可手动修正' : '新增合同无需填写，入住办理时自动选择'"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12"><a-form-item label="姓名" name="elderName"><a-input ref="elderNameInputRef" v-model:value="form.elderName" /></a-form-item></a-col>
-          <a-col :span="12"><a-form-item label="联系电话"><a-input v-model:value="form.elderPhone" /></a-form-item></a-col>
-          <a-col :span="12"><a-form-item label="身份证号"><a-input v-model:value="form.idCardNo" /></a-form-item></a-col>
-          <a-col :span="12"><a-form-item label="家庭地址"><a-input v-model:value="form.homeAddress" /></a-form-item></a-col>
-          <a-col :span="6"><a-form-item label="性别"><a-select v-model:value="form.gender" allow-clear><a-select-option :value="1">男</a-select-option><a-select-option :value="2">女</a-select-option></a-select></a-form-item></a-col>
-          <a-col :span="6"><a-form-item label="年龄"><a-input-number v-model:value="form.age" :min="0" :max="120" style="width: 100%" /></a-form-item></a-col>
-          <a-col :span="6"><a-form-item label="生日"><a-input :value="formDerivedBirthDate || '-'" readonly /></a-form-item></a-col>
-          <a-col :span="6"><a-form-item label="签约日期"><a-date-picker v-model:value="form.contractSignedAt" value-format="YYYY-MM-DD HH:mm:ss" show-time style="width: 100%" /></a-form-item></a-col>
-          <a-col :span="12">
-            <a-form-item label="护理等级">
-              <a-input v-model:value="elderFormExtra.careLevel" placeholder="如：一级护理/二级护理" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="风险预担">
-              <a-select v-model:value="elderFormExtra.riskPrecommit" allow-clear placeholder="请选择风险处置策略">
-                <a-select-option value="RESCUE_FIRST">第一时间抢救</a-select-option>
-                <a-select-option value="NOTIFY_FAMILY_FIRST">第一时间通知家属</a-select-option>
-              </a-select>
-            </a-form-item>
-          </a-col>
-          <a-col :span="12"><a-form-item label="合同有效期止"><a-date-picker v-model:value="form.contractExpiryDate" value-format="YYYY-MM-DD" style="width: 100%" /></a-form-item></a-col>
-          <a-col :span="12">
+          <a-col v-if="contractFormSection === 'BASIC'" :span="12">
             <a-form-item label="合同状态">
               <a-input v-model:value="form.contractStatus" disabled />
             </a-form-item>
           </a-col>
-          <a-col :span="12"><a-form-item label="营销人员"><a-input v-model:value="form.marketerName" /></a-form-item></a-col>
-          <a-col :span="12">
-            <a-form-item label="优惠政策（联动运营政策）">
+          <a-col v-if="contractFormSection === 'BASIC'" :span="12">
+            <a-form-item label="流程阶段">
+              <a-input :value="flowStageText((form.flowStage as any) || 'PENDING_ASSESSMENT')" disabled />
+            </a-form-item>
+          </a-col>
+          <a-col v-if="contractFormSection === 'BASIC'" :span="12">
+            <a-form-item label="签约日期">
+              <a-date-picker v-model:value="form.contractSignedAt" value-format="YYYY-MM-DD HH:mm:ss" show-time style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col v-if="contractFormSection === 'BASIC'" :span="12">
+            <a-form-item label="合同有效期止"><a-date-picker v-model:value="form.contractExpiryDate" value-format="YYYY-MM-DD" style="width: 100%" /></a-form-item>
+          </a-col>
+          <a-col v-if="contractFormSection === 'BASIC'" :span="12"><a-form-item label="营销人员"><a-input v-model:value="form.marketerName" placeholder="请输入负责营销人员姓名" /></a-form-item></a-col>
+          <a-col v-if="contractFormSection === 'BASIC'" :span="12">
+            <a-form-item label="优惠政策（联动运营政策，最多2条）">
               <a-select
                 v-model:value="selectedPolicyValues"
                 mode="multiple"
@@ -228,10 +221,49 @@
               />
             </a-form-item>
           </a-col>
+          <a-col v-if="contractFormSection === 'ELDER'" :span="12">
+            <a-form-item label="签约房号">
+              <a-input
+                v-model:value="form.reservationRoomNo"
+                :disabled="!form.id"
+                :placeholder="form.id ? '入住办理后自动回填，可手动修正' : '新增合同无需填写，入住办理时自动选择'"
+              />
+            </a-form-item>
+          </a-col>
+          <a-col v-if="contractFormSection === 'ELDER'" :span="12"><a-form-item label="姓名" name="elderName"><a-input ref="elderNameInputRef" v-model:value="form.elderName" placeholder="请输入长者姓名" /></a-form-item></a-col>
+          <a-col v-if="contractFormSection === 'ELDER'" :span="12"><a-form-item label="联系电话"><a-input v-model:value="form.elderPhone" placeholder="请输入长者联系电话" /></a-form-item></a-col>
+          <a-col v-if="contractFormSection === 'ELDER'" :span="12"><a-form-item label="身份证号"><a-input v-model:value="form.idCardNo" placeholder="自动识别生日/年龄" /></a-form-item></a-col>
+          <a-col v-if="contractFormSection === 'ELDER'" :span="12"><a-form-item label="家庭地址"><a-input v-model:value="form.homeAddress" placeholder="请输入长者家庭住址" /></a-form-item></a-col>
+          <a-col v-if="contractFormSection === 'ELDER'" :span="6"><a-form-item label="性别"><a-select v-model:value="form.gender" allow-clear><a-select-option :value="1">男</a-select-option><a-select-option :value="2">女</a-select-option></a-select></a-form-item></a-col>
+          <a-col v-if="contractFormSection === 'ELDER'" :span="6"><a-form-item label="年龄"><a-input-number v-model:value="form.age" :min="0" :max="120" style="width: 100%" /></a-form-item></a-col>
+          <a-col v-if="contractFormSection === 'ELDER'" :span="6"><a-form-item label="生日"><a-input :value="formDerivedBirthDate || '-'" readonly /></a-form-item></a-col>
+          <a-col v-if="contractFormSection === 'ELDER'" :span="6"><a-form-item label="身份证识别"><a-input :value="formDerivedBirthDate ? '已识别' : '未识别'" readonly /></a-form-item></a-col>
+          <a-col v-if="contractFormSection === 'ELDER'" :span="12">
+            <a-form-item label="护理等级">
+              <a-input v-model:value="elderFormExtra.careLevel" placeholder="如：一级护理/二级护理" />
+            </a-form-item>
+          </a-col>
+          <a-col v-if="contractFormSection === 'ELDER'" :span="12">
+            <a-form-item label="风险预担">
+              <a-select v-model:value="elderFormExtra.riskPrecommit" allow-clear placeholder="请选择风险处置策略">
+                <a-select-option value="RESCUE_FIRST">第一时间抢救</a-select-option>
+                <a-select-option value="NOTIFY_FAMILY_FIRST">第一时间通知家属</a-select-option>
+              </a-select>
+            </a-form-item>
+          </a-col>
+          <a-col v-if="contractFormSection === 'EXTRA'" :span="24">
+            <a-form-item label="补充备注">
+              <a-input-text-area
+                v-model:value="form.remark"
+                :rows="4"
+                placeholder="可填写签约背景、特殊照护提示、补充说明等"
+              />
+            </a-form-item>
+          </a-col>
         </a-row>
       </a-form>
-      <a-divider style="margin: 8px 0 14px">长者信息快照（与长者详情一致）</a-divider>
-      <a-spin :spinning="elderSnapshotLoading">
+      <a-divider v-if="contractFormSection !== 'BASIC' || contractViewMode" style="margin: 8px 0 14px">长者信息快照（与长者详情一致）</a-divider>
+      <a-spin v-if="contractFormSection !== 'BASIC' || contractViewMode" :spinning="elderSnapshotLoading">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px">
           <span style="color: #595959">分页填写：{{ contractInfoPage === 1 ? '老人基础信息' : contractInfoPage === 2 ? '家属信息' : '基础疾病信息' }}</span>
           <a-pagination
@@ -620,9 +652,25 @@ function applyQueryRouteFilter() {
 }
 
 const form = reactive<Partial<CrmContractItem>>({})
+const contractFormSection = ref<'BASIC' | 'ELDER' | 'EXTRA'>('BASIC')
+const contractFormSectionOptions = [
+  { label: '1 基础信息', value: 'BASIC' },
+  { label: '2 长者信息', value: 'ELDER' },
+  { label: '3 补充信息', value: 'EXTRA' }
+]
+const isCreateContractMode = computed(() => !form.id)
 const contractModalTitle = computed(() => {
   if (contractViewMode.value) return '查看合同'
   return form.id ? '编辑合同' : '新增合同'
+})
+const contractFormGuideText = computed(() => {
+  if (contractViewMode.value) {
+    return '当前为只读查看模式，可切换分区查看合同详情。'
+  }
+  if (isCreateContractMode.value) {
+    return '新建合同默认进入“待评估”阶段；仅“最终签署”后，该长者才会进入已签约列表。'
+  }
+  return '编辑合同建议按分区逐步检查，避免遗漏长者身份与家属信息。'
 })
 const formDerivedBirthDate = ref('')
 const selectedPolicyValues = ref<string[]>([])
@@ -1174,6 +1222,7 @@ function onContractModalOk() {
 
 function openForm(record?: CrmContractItem, readonly = false) {
   contractViewMode.value = readonly
+  contractFormSection.value = 'BASIC'
   Object.keys(form).forEach((key) => {
     delete (form as Record<string, any>)[key]
   })
@@ -1402,8 +1451,8 @@ async function checkAssessmentReady(record: CrmContractItem) {
   const elderId = record.elderId
   if (!leadId && !elderId) return false
   const overview = await getContractAssessmentOverview({
-    leadId: leadId ? Number(leadId) : undefined,
-    elderId: elderId ? Number(elderId) : undefined
+    leadId: leadId || undefined,
+    elderId: elderId || undefined
   })
   const contract = (overview?.contracts || []).find((item) => {
     if (record.id && item.contractId && String(item.contractId) === String(record.id)) return true
@@ -1849,7 +1898,7 @@ async function syncContractElderData(savedContract: CrmContractItem) {
   } else {
     const created = await createElder({
       ...payload,
-      status: 3
+      status: 0
     })
     elderId = String(created?.id || '').trim()
   }

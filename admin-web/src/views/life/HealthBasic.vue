@@ -89,7 +89,7 @@ import DataTable from '../../components/DataTable.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { getHealthBasicPage, createHealthBasic, updateHealthBasic, deleteHealthBasic } from '../../api/life'
-import type { HealthBasicRecord, PageResult } from '../../types'
+import type { HealthBasicRecord, Id, PageResult } from '../../types'
 
 const loading = ref(false)
 const rows = ref<HealthBasicRecord[]>([])
@@ -112,8 +112,8 @@ const editOpen = ref(false)
 const saving = ref(false)
 const { elderOptions, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
 const form = reactive({
-  id: undefined as number | undefined,
-  elderId: undefined as number | undefined,
+  id: undefined as Id | undefined,
+  elderId: undefined as Id | undefined,
   elderName: '',
   recordDate: dayjs(),
   heightCm: undefined as number | undefined,
@@ -183,7 +183,7 @@ function openEdit(record: HealthBasicRecord) {
   editOpen.value = true
 }
 
-function onElderChange(elderId?: number) {
+function onElderChange(elderId?: Id) {
   form.elderName = findElderName(elderId)
 }
 

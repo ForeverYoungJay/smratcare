@@ -122,7 +122,7 @@ import PageContainer from '../../components/PageContainer.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { adjustPoints, getPointsAccountPage, getPointsLogPage } from '../../api/store'
-import type { PageResult, PointsAccountItem, PointsLogItem } from '../../types'
+import type { Id, PageResult, PointsAccountItem, PointsLogItem } from '../../types'
 
 const loading = ref(false)
 const rows = ref<PointsAccountItem[]>([])
@@ -139,7 +139,7 @@ const adjusting = ref(false)
 const adjustFormRef = ref()
 const { elderOptions, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
 const adjustForm = reactive<{
-  elderId: number | undefined
+  elderId: Id | undefined
   points: number
   direction: 'CREDIT' | 'DEBIT'
   remark: string
@@ -159,7 +159,7 @@ const logOpen = ref(false)
 const logRows = ref<PointsLogItem[]>([])
 const logTotal = ref(0)
 const logQuery = reactive({
-  elderId: undefined as number | undefined,
+  elderId: undefined as Id | undefined,
   pageNo: 1,
   pageSize: 10
 })

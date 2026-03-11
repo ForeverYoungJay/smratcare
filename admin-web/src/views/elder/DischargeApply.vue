@@ -135,8 +135,10 @@ import type {
   DischargeApplyCreateRequest,
   DischargeApplyItem,
   DischargeApplyStatus,
+  Id,
   PageResult
 } from '../../types'
+import { normalizeResidentId } from '../../utils/id'
 
 const loading = ref(false)
 const rows = ref<DischargeApplyItem[]>([])
@@ -146,23 +148,23 @@ const submitting = ref(false)
 const formRef = ref<FormInstance>()
 const reviewOpen = ref(false)
 const reviewSubmitting = ref(false)
-const reviewId = ref<number | undefined>(undefined)
+const reviewId = ref<Id | undefined>(undefined)
 const reviewStatus = ref<'APPROVED' | 'REJECTED'>('APPROVED')
 const reviewRemark = ref('')
 const route = useRoute()
 const router = useRouter()
 const dischargeFeeConfigOptions = ref<{ label: string; value: string }[]>([])
 const { elderOptions, elderLoading, searchElders, ensureSelectedElder } = useElderOptions({ pageSize: 80 })
-const selectedRowKeys = ref<number[]>([])
+const selectedRowKeys = ref<Id[]>([])
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: (string | number)[]) => {
-    selectedRowKeys.value = keys as number[]
+    selectedRowKeys.value = keys.map((key) => String(key)) as Id[]
   }
 }))
 
 const query = reactive({
-  elderId: undefined as number | undefined,
+  elderId: undefined as Id | undefined,
   keyword: undefined as string | undefined,
   status: undefined as DischargeApplyStatus | undefined,
   plannedDateRange: undefined as [string, string] | undefined,
@@ -171,7 +173,7 @@ const query = reactive({
 })
 
 const form = reactive<DischargeApplyCreateRequest>({
-  elderId: 0,
+  elderId: '' as Id,
   plannedDischargeDate: '',
   reason: ''
 })
@@ -239,13 +241,13 @@ function reset() {
 
 function openCreate() {
   createOpen.value = true
-  form.elderId = 0
+  form.elderId = '' as Id
   form.plannedDischargeDate = ''
   form.reason = ''
 }
 
 function tryOpenCreateFromRoute() {
-  const elderId = Number(route.query.elderId || 0)
+  const elderId = normalizeResidentId(route.query as Record<string, unknown>)
   const openCreateFlag = String(route.query.openCreate || '') === '1'
   if (!elderId) return
   ensureSelectedElder(elderId)

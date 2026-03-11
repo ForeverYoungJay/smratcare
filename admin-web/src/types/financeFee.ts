@@ -1,38 +1,40 @@
+import type { Id } from './common'
+
 export interface AdmissionFeeAuditItem {
-  id: number
-  elderId: number
+  id: Id
+  elderId: Id
   elderName?: string
-  admissionId?: number
+  admissionId?: Id
   totalAmount: number
   depositAmount: number
   status: string
   auditRemark?: string
-  reviewedBy?: number
+  reviewedBy?: Id
   reviewedTime?: string
   createTime?: string
 }
 
 export interface DischargeFeeAuditItem {
-  id: number
-  elderId: number
+  id: Id
+  elderId: Id
   elderName?: string
-  dischargeApplyId?: number
+  dischargeApplyId?: Id
   payableAmount: number
   feeItem?: string
   dischargeFeeConfig?: string
   status: string
   auditRemark?: string
-  reviewedBy?: number
+  reviewedBy?: Id
   reviewedTime?: string
   createTime?: string
 }
 
 export interface DischargeSettlementItem {
-  id: number
+  id: Id
   detailNo?: string
-  elderId: number
+  elderId: Id
   elderName?: string
-  dischargeApplyId?: number
+  dischargeApplyId?: Id
   payableAmount: number
   feeItem?: string
   dischargeFeeConfig?: string
@@ -50,26 +52,26 @@ export interface DischargeSettlementItem {
   financeRefundOperatorName?: string
   financeRefundTime?: string
   remark?: string
-  settledBy?: number
+  settledBy?: Id
   settledTime?: string
   createTime?: string
 }
 
 export interface ConsumptionRecordItem {
-  id: number
-  elderId: number
+  id: Id
+  elderId: Id
   elderName?: string
   consumeDate: string
   amount: number
   category?: string
   sourceType?: string
-  sourceId?: number
+  sourceId?: Id
   remark?: string
   createTime?: string
 }
 
 export interface MonthlyAllocationItem {
-  id: number
+  id: Id
   allocationMonth: string
   allocationName: string
   totalAmount: number
@@ -79,23 +81,23 @@ export interface MonthlyAllocationItem {
   avgAmount?: number
   status: string
   remark?: string
-  rollbackBy?: number
+  rollbackBy?: Id
   rollbackReason?: string
   rollbackTime?: string
   createTime?: string
 }
 
 export interface AdmissionFeeAuditCreateRequest {
-  elderId: number
-  admissionId?: number
+  elderId: Id
+  admissionId?: Id
   totalAmount: number
   depositAmount: number
   remark?: string
 }
 
 export interface DischargeFeeAuditCreateRequest {
-  elderId: number
-  dischargeApplyId?: number
+  elderId: Id
+  dischargeApplyId?: Id
   payableAmount: number
   feeItem?: string
   dischargeFeeConfig?: string
@@ -108,8 +110,8 @@ export interface FeeAuditReviewRequest {
 }
 
 export interface DischargeSettlementCreateRequest {
-  elderId: number
-  dischargeApplyId?: number
+  elderId: Id
+  dischargeApplyId?: Id
   payableAmount: number
   feeItem?: string
   dischargeFeeConfig?: string
@@ -123,12 +125,12 @@ export interface DischargeSettlementConfirmRequest {
 }
 
 export interface ConsumptionRecordCreateRequest {
-  elderId: number
+  elderId: Id
   consumeDate: string
   amount: number
   category?: string
   sourceType?: string
-  sourceId?: number
+  sourceId?: Id
   remark?: string
 }
 
@@ -138,7 +140,7 @@ export interface MonthlyAllocationCreateRequest {
   totalAmount: number
   targetCount: number
   roomNo?: string
-  elderIds?: number[]
+  elderIds?: Id[]
   remark?: string
 }
 
@@ -146,12 +148,12 @@ export interface MonthlyAllocationPreviewRequest {
   allocationMonth?: string
   allocationName?: string
   totalAmount: number
-  elderIds?: number[]
+  elderIds?: Id[]
   remark?: string
 }
 
 export interface MonthlyAllocationPreviewRow {
-  elderId: number
+  elderId: Id
   elderName?: string
   amount: number
 }

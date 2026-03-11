@@ -34,14 +34,15 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
+import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { getElderAccountLogPage, printElderAccountLogPdf } from '../../api/finance'
 import type { ElderAccountLog, PageResult } from '../../types'
-import { useRoute } from 'vue-router'
-import { message } from 'ant-design-vue'
+import { normalizeResidentId } from '../../utils/id'
 
 const route = useRoute()
 const loading = ref(false)
@@ -49,7 +50,7 @@ const rows = ref<ElderAccountLog[]>([])
 
 const query = reactive({
   keyword: '',
-  elderId: route.query.elderId ? Number(route.query.elderId) : undefined,
+  elderId: normalizeResidentId(route.query as Record<string, unknown>),
   pageNo: 1,
   pageSize: 10
 })

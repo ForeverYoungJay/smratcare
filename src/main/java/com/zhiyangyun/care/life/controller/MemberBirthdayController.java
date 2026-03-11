@@ -1,7 +1,6 @@
 package com.zhiyangyun.care.life.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
@@ -9,7 +8,6 @@ import com.zhiyangyun.care.elder.entity.Bed;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.entity.Room;
 import com.zhiyangyun.care.elder.mapper.BedMapper;
-import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import com.zhiyangyun.care.life.model.BirthdayReminderResponse;
 import java.time.DateTimeException;
@@ -20,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -28,12 +27,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/life/birthday")
 public class MemberBirthdayController {
-  private final ElderMapper elderMapper;
+  private final JdbcTemplate jdbcTemplate;
   private final BedMapper bedMapper;
   private final RoomMapper roomMapper;
 
-  public MemberBirthdayController(ElderMapper elderMapper, BedMapper bedMapper, RoomMapper roomMapper) {
-    this.elderMapper = elderMapper;
+  public MemberBirthdayController(JdbcTemplate jdbcTemplate, BedMapper bedMapper, RoomMapper roomMapper) {
+    this.jdbcTemplate = jdbcTemplate;
     this.bedMapper = bedMapper;
     this.roomMapper = roomMapper;
   }
@@ -53,15 +52,12 @@ public class MemberBirthdayController {
     LocalDate today = LocalDate.now();
     LocalDate minBirthDate = LocalDate.of(1900, 1, 1);
 
-    List<ElderProfile> elders = elderMapper.selectList(Wrappers.lambdaQuery(ElderProfile.class)
-        .eq(ElderProfile::getIsDeleted, 0)
-        .eq(orgId != null, ElderProfile::getOrgId, orgId)
-        .eq(ElderProfile::getStatus, 1)
-        .isNotNull(ElderProfile::getBirthDate)
-        // 屏蔽异常生日值（如 0000-00-00 / 极端日期）导致的映射与计算异常。
-        .ge(ElderProfile::getBirthDate, minBirthDate)
-        .le(ElderProfile::getBirthDate, today)
-        .like(keyword != null && !keyword.isBlank(), ElderProfile::getFullName, keyword));
+    List<ElderProfile> elders = loadBirthdayElders(orgId, keyword).stream()
+        .filter(Objects::nonNull)
+        .filter(elder -> elder.getBirthDate() != null)
+        .filter(elder -> !elder.getBirthDate().isBefore(minBirthDate))
+        .filter(elder -> !elder.getBirthDate().isAfter(today))
+        .toList();
 
     List<Long> bedIds = elders.stream()
         .map(ElderProfile::getBedId)
@@ -71,6 +67,8 @@ public class MemberBirthdayController {
     Map<Long, Bed> bedMap = bedIds.isEmpty()
         ? Map.of()
         : bedMapper.selectBatchIds(bedIds).stream()
+            .filter(Objects::nonNull)
+            .filter(bed -> bed.getId() != null)
             .collect(Collectors.toMap(Bed::getId, b -> b, (a, b) -> a));
 
     List<Long> roomIds = bedMap.values().stream()
@@ -81,6 +79,8 @@ public class MemberBirthdayController {
     Map<Long, Room> roomMap = roomIds.isEmpty()
         ? Map.of()
         : roomMapper.selectBatchIds(roomIds).stream()
+            .filter(Objects::nonNull)
+            .filter(room -> room.getId() != null)
             .collect(Collectors.toMap(Room::getId, r -> r, (a, b) -> a));
 
     List<BirthdayReminderResponse> list = elders.stream()
@@ -106,6 +106,22 @@ public class MemberBirthdayController {
     return Result.ok(page);
   }
 
+  private List<ElderProfile> loadBirthdayElders(Long orgId, String keyword) {
+    String normalizedKeyword = keyword == null ? "" : keyword.trim();
+    return jdbcTemplate.query("""
+        SELECT id, full_name, bed_id, CAST(birth_date AS CHAR) AS birth_date_text
+        FROM elder
+        WHERE is_deleted = 0
+          AND status = 1
+          AND birth_date IS NOT NULL
+          AND CAST(birth_date AS CHAR) <> '0000-00-00'
+          AND (? IS NULL OR org_id = ?)
+          AND (? = '' OR full_name LIKE CONCAT('%', ?, '%'))
+        """,
+        (rs, rowNum) -> toElderProfile(rs.getLong("id"), rs.getString("full_name"), rs.getObject("bed_id"), rs.getString("birth_date_text")),
+        orgId, orgId, normalizedKeyword, normalizedKeyword);
+  }
+
   private long normalizePageNo(long pageNo) {
     return pageNo <= 0 ? 1 : pageNo;
   }
@@ -129,6 +145,41 @@ public class MemberBirthdayController {
       throw new IllegalArgumentException("daysAhead 不能小于 0");
     }
     return Math.min(daysAhead, 3660);
+  }
+
+  private ElderProfile toElderProfile(Long id, String fullName, Object bedIdValue, String birthDateText) {
+    LocalDate birthDate = parseBirthDate(birthDateText);
+    if (birthDate == null) {
+      return null;
+    }
+    ElderProfile elder = new ElderProfile();
+    elder.setId(id);
+    elder.setFullName(fullName);
+    if (bedIdValue instanceof Number number) {
+      elder.setBedId(number.longValue());
+    }
+    elder.setBirthDate(birthDate);
+    return elder;
+  }
+
+  private LocalDate parseBirthDate(String birthDateText) {
+    if (birthDateText == null) {
+      return null;
+    }
+    String normalized = birthDateText.trim();
+    if (normalized.isEmpty() || !normalized.matches("\\d{4}-\\d{2}-\\d{2}")) {
+      return null;
+    }
+    String month = normalized.substring(5, 7);
+    String day = normalized.substring(8, 10);
+    if ("00".equals(month) || "00".equals(day)) {
+      return null;
+    }
+    try {
+      return LocalDate.parse(normalized);
+    } catch (DateTimeException ignored) {
+      return null;
+    }
   }
 
   private BirthdayReminderResponse toResponse(

@@ -1,3 +1,5 @@
+import type { Id } from './common'
+
 export type DiningMealType = 'BREAKFAST' | 'LUNCH' | 'DINNER' | 'SNACK' | 'UNKNOWN'
 export type DiningEnableStatus = 'ENABLED' | 'DISABLED'
 export type DiningOrderStatus = 'CREATED' | 'PREPARING' | 'DELIVERING' | 'DELIVERED' | 'CANCELLED'
@@ -55,7 +57,7 @@ export interface DiningDeliveryArea {
 export interface DiningMealOrder {
   id: number
   orderNo: string
-  elderId?: number
+  elderId?: Id
   elderName?: string
   orderDate: string
   mealType: DiningMealType
@@ -111,7 +113,7 @@ export interface DiningRiskReasonItem {
 export interface DiningRiskCheckResponse {
   allowed: boolean
   canOverride: boolean
-  elderId: number
+  elderId: Id
   elderName: string
   dishNames: string
   blockedDishNames: string[]
@@ -121,7 +123,7 @@ export interface DiningRiskCheckResponse {
 
 export interface DiningRiskOverride {
   id: number
-  elderId: number
+  elderId: Id
   elderName?: string
   dishNames: string
   applyReason: string

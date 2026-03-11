@@ -62,6 +62,7 @@ public class ElderServiceImpl implements ElderService {
 
   @Override
   public ElderResponse create(ElderCreateRequest request) {
+    validateCreateRequest(request);
     ElderProfile elder = new ElderProfile();
     elder.setTenantId(request.getTenantId());
     elder.setOrgId(request.getOrgId());
@@ -71,20 +72,20 @@ public class ElderServiceImpl implements ElderService {
     }
     elder.setElderCode(elderCode);
     elder.setElderQrCode(QrCodeUtil.generate());
-    elder.setFullName(request.getFullName());
-    elder.setIdCardNo(request.getIdCardNo());
+    elder.setFullName(normalizeText(request.getFullName()));
+    elder.setIdCardNo(normalizeText(request.getIdCardNo()));
     elder.setGender(request.getGender());
     elder.setBirthDate(request.getBirthDate());
-    elder.setPhone(request.getPhone());
-    elder.setHomeAddress(request.getHomeAddress());
-    elder.setMedicalInsuranceCopyUrl(request.getMedicalInsuranceCopyUrl());
-    elder.setHouseholdCopyUrl(request.getHouseholdCopyUrl());
-    elder.setMedicalRecordFileUrl(request.getMedicalRecordFileUrl());
+    elder.setPhone(normalizeText(request.getPhone()));
+    elder.setHomeAddress(normalizeText(request.getHomeAddress()));
+    elder.setMedicalInsuranceCopyUrl(normalizeText(request.getMedicalInsuranceCopyUrl()));
+    elder.setHouseholdCopyUrl(normalizeText(request.getHouseholdCopyUrl()));
+    elder.setMedicalRecordFileUrl(normalizeText(request.getMedicalRecordFileUrl()));
     elder.setAdmissionDate(request.getAdmissionDate());
     elder.setStatus(request.getStatus());
-    elder.setCareLevel(request.getCareLevel());
-    elder.setRiskPrecommit(request.getRiskPrecommit());
-    elder.setRemark(request.getRemark());
+    elder.setCareLevel(normalizeText(request.getCareLevel()));
+    elder.setRiskPrecommit(normalizeText(request.getRiskPrecommit()));
+    elder.setRemark(normalizeText(request.getRemark()));
     elder.setCreatedBy(request.getCreatedBy());
     elderMapper.insert(elder);
     if (request.getBedId() != null) {
@@ -92,11 +93,7 @@ public class ElderServiceImpl implements ElderService {
       assign.setTenantId(request.getTenantId());
       assign.setCreatedBy(request.getCreatedBy());
       assign.setBedId(request.getBedId());
-      LocalDate startDate = request.getBedStartDate();
-      if (startDate == null) {
-        startDate = request.getAdmissionDate() == null ? LocalDate.now() : request.getAdmissionDate();
-      }
-      assign.setStartDate(startDate);
+      assign.setStartDate(request.getBedStartDate());
       ElderResponse assigned = assignBed(elder.getId(), assign);
       return assigned == null ? toResponse(elder, null) : assigned;
     }
@@ -113,10 +110,10 @@ public class ElderServiceImpl implements ElderService {
       throw new IllegalArgumentException("无权限访问该老人");
     }
     if (request.getFullName() != null) {
-      elder.setFullName(request.getFullName());
+      elder.setFullName(normalizeText(request.getFullName()));
     }
     if (request.getIdCardNo() != null) {
-      elder.setIdCardNo(request.getIdCardNo());
+      elder.setIdCardNo(normalizeText(request.getIdCardNo()));
     }
     if (request.getGender() != null) {
       elder.setGender(request.getGender());
@@ -125,19 +122,19 @@ public class ElderServiceImpl implements ElderService {
       elder.setBirthDate(request.getBirthDate());
     }
     if (request.getPhone() != null) {
-      elder.setPhone(request.getPhone());
+      elder.setPhone(normalizeText(request.getPhone()));
     }
     if (request.getHomeAddress() != null) {
-      elder.setHomeAddress(request.getHomeAddress());
+      elder.setHomeAddress(normalizeText(request.getHomeAddress()));
     }
     if (request.getMedicalInsuranceCopyUrl() != null) {
-      elder.setMedicalInsuranceCopyUrl(request.getMedicalInsuranceCopyUrl());
+      elder.setMedicalInsuranceCopyUrl(normalizeText(request.getMedicalInsuranceCopyUrl()));
     }
     if (request.getHouseholdCopyUrl() != null) {
-      elder.setHouseholdCopyUrl(request.getHouseholdCopyUrl());
+      elder.setHouseholdCopyUrl(normalizeText(request.getHouseholdCopyUrl()));
     }
     if (request.getMedicalRecordFileUrl() != null) {
-      elder.setMedicalRecordFileUrl(request.getMedicalRecordFileUrl());
+      elder.setMedicalRecordFileUrl(normalizeText(request.getMedicalRecordFileUrl()));
     }
     if (request.getAdmissionDate() != null) {
       elder.setAdmissionDate(request.getAdmissionDate());
@@ -146,28 +143,38 @@ public class ElderServiceImpl implements ElderService {
       elder.setStatus(request.getStatus());
     }
     if (request.getCareLevel() != null) {
-      elder.setCareLevel(request.getCareLevel());
+      elder.setCareLevel(normalizeText(request.getCareLevel()));
     }
     if (request.getRiskPrecommit() != null) {
-      elder.setRiskPrecommit(request.getRiskPrecommit());
+      elder.setRiskPrecommit(normalizeText(request.getRiskPrecommit()));
     }
     if (request.getRemark() != null) {
-      elder.setRemark(request.getRemark());
+      elder.setRemark(normalizeText(request.getRemark()));
     }
     elderMapper.updateById(elder);
     if (request.getStatus() != null && request.getStatus() == 3 && elder.getBedId() != null) {
       return unbindBed(elder.getId(), LocalDate.now(), "状态变更退住", request.getTenantId(), request.getUpdatedBy());
     }
     if (request.getBedId() != null && !request.getBedId().equals(elder.getBedId())) {
+      Integer nextStatus = request.getStatus() != null ? request.getStatus() : elder.getStatus();
+      LocalDate nextAdmissionDate = request.getAdmissionDate() != null ? request.getAdmissionDate() : elder.getAdmissionDate();
+      if (!Objects.equals(nextStatus, 1)) {
+        throw new IllegalArgumentException("仅在院状态可分配床位");
+      }
+      if (nextAdmissionDate == null) {
+        throw new IllegalArgumentException("选择床位时必须填写入院日期");
+      }
+      if (request.getBedStartDate() == null) {
+        throw new IllegalArgumentException("选择床位时必须填写床位开始日期");
+      }
+      if (request.getBedStartDate().isBefore(nextAdmissionDate)) {
+        throw new IllegalArgumentException("床位开始日期不能早于入院日期");
+      }
       AssignBedRequest assign = new AssignBedRequest();
       assign.setTenantId(request.getTenantId());
       assign.setCreatedBy(request.getUpdatedBy());
       assign.setBedId(request.getBedId());
-      LocalDate startDate = request.getBedStartDate();
-      if (startDate == null) {
-        startDate = LocalDate.now();
-      }
-      assign.setStartDate(startDate);
+      assign.setStartDate(request.getBedStartDate());
       ElderResponse assigned = assignBed(elder.getId(), assign);
       return assigned == null ? toResponse(elder, null) : assigned;
     }
@@ -190,24 +197,19 @@ public class ElderServiceImpl implements ElderService {
 
   @Override
   public IPage<ElderResponse> page(Long tenantId, long pageNo, long pageSize, String keyword, Boolean signedOnly, Integer status) {
+    Set<Long> latestSignedElderIds = null;
+    if (Boolean.TRUE.equals(signedOnly)) {
+      latestSignedElderIds = resolveLatestSignedElderIds(tenantId);
+      if (latestSignedElderIds.isEmpty()) {
+        return new Page<>(pageNo, pageSize);
+      }
+    }
     var baseWrapper = Wrappers.lambdaQuery(ElderProfile.class)
         .eq(ElderProfile::getIsDeleted, 0)
         .eq(tenantId != null, ElderProfile::getTenantId, tenantId)
         .eq(status != null, ElderProfile::getStatus, status);
-    if (Boolean.TRUE.equals(signedOnly)) {
-      List<CrmContract> signedContracts = crmContractMapper.selectList(Wrappers.lambdaQuery(CrmContract.class)
-          .eq(CrmContract::getIsDeleted, 0)
-          .eq(tenantId != null, CrmContract::getTenantId, tenantId)
-          .isNotNull(CrmContract::getElderId)
-          .in(CrmContract::getStatus, List.of("SIGNED", "EFFECTIVE")));
-      Set<Long> signedElderIds = new HashSet<>(signedContracts.stream()
-          .map(CrmContract::getElderId)
-          .filter(Objects::nonNull)
-          .toList());
-      if (signedElderIds.isEmpty()) {
-        return new Page<>(pageNo, pageSize);
-      }
-      baseWrapper.in(ElderProfile::getId, signedElderIds);
+    if (latestSignedElderIds != null) {
+      baseWrapper.in(ElderProfile::getId, latestSignedElderIds);
     }
     String normalizedKeyword = keyword == null ? "" : keyword.trim();
     if (!normalizedKeyword.isEmpty()) {
@@ -215,20 +217,8 @@ public class ElderServiceImpl implements ElderService {
           .eq(ElderProfile::getIsDeleted, 0)
           .eq(tenantId != null, ElderProfile::getTenantId, tenantId)
           .eq(status != null, ElderProfile::getStatus, status);
-      if (Boolean.TRUE.equals(signedOnly)) {
-        List<CrmContract> signedContracts = crmContractMapper.selectList(Wrappers.lambdaQuery(CrmContract.class)
-            .eq(CrmContract::getIsDeleted, 0)
-            .eq(tenantId != null, CrmContract::getTenantId, tenantId)
-            .isNotNull(CrmContract::getElderId)
-            .in(CrmContract::getStatus, List.of("SIGNED", "EFFECTIVE")));
-        Set<Long> signedElderIds = new HashSet<>(signedContracts.stream()
-            .map(CrmContract::getElderId)
-            .filter(Objects::nonNull)
-            .toList());
-        if (signedElderIds.isEmpty()) {
-          return new Page<>(pageNo, pageSize);
-        }
-        wrapper.in(ElderProfile::getId, signedElderIds);
+      if (latestSignedElderIds != null) {
+        wrapper.in(ElderProfile::getId, latestSignedElderIds);
       }
       wrapper.and(w -> w.like(ElderProfile::getFullName, normalizedKeyword)
           .or().like(ElderProfile::getElderCode, normalizedKeyword)
@@ -256,6 +246,76 @@ public class ElderServiceImpl implements ElderService {
     baseWrapper.orderByDesc(ElderProfile::getCreateTime);
     IPage<ElderProfile> page = elderMapper.selectPage(new Page<>(pageNo, pageSize), baseWrapper);
     return toPagedResponse(page, tenantId);
+  }
+
+  private void validateCreateRequest(ElderCreateRequest request) {
+    String fullName = normalizeText(request.getFullName());
+    if (fullName == null) {
+      throw new IllegalArgumentException("姓名不能为空");
+    }
+    if (request.getBirthDate() != null && request.getBirthDate().isAfter(LocalDate.now())) {
+      throw new IllegalArgumentException("出生日期不能晚于今天");
+    }
+    if (request.getAdmissionDate() != null && request.getBirthDate() != null
+        && request.getAdmissionDate().isBefore(request.getBirthDate())) {
+      throw new IllegalArgumentException("入院日期不能早于出生日期");
+    }
+    if (request.getBedStartDate() != null && request.getBedId() == null) {
+      throw new IllegalArgumentException("未选择床位时不能填写床位开始日期");
+    }
+    if (request.getBedId() != null) {
+      if (!Objects.equals(request.getStatus(), 1)) {
+        throw new IllegalArgumentException("仅在院状态可分配床位");
+      }
+      if (request.getAdmissionDate() == null) {
+        throw new IllegalArgumentException("选择床位时必须填写入院日期");
+      }
+      if (request.getBedStartDate() == null) {
+        throw new IllegalArgumentException("选择床位时必须填写床位开始日期");
+      }
+      if (request.getBedStartDate().isBefore(request.getAdmissionDate())) {
+        throw new IllegalArgumentException("床位开始日期不能早于入院日期");
+      }
+    }
+  }
+
+  private String normalizeText(String value) {
+    if (value == null) {
+      return null;
+    }
+    String trimmed = value.trim();
+    return trimmed.isEmpty() ? null : trimmed;
+  }
+
+  private Set<Long> resolveLatestSignedElderIds(Long tenantId) {
+    List<CrmContract> contracts = crmContractMapper.selectList(Wrappers.lambdaQuery(CrmContract.class)
+        .eq(CrmContract::getIsDeleted, 0)
+        .eq(tenantId != null, CrmContract::getTenantId, tenantId)
+        .isNotNull(CrmContract::getElderId)
+        .orderByDesc(CrmContract::getUpdateTime)
+        .orderByDesc(CrmContract::getCreateTime)
+        .orderByDesc(CrmContract::getId));
+    if (contracts == null || contracts.isEmpty()) {
+      return Set.of();
+    }
+    Map<Long, CrmContract> latestByElder = new HashMap<>();
+    for (CrmContract contract : contracts) {
+      Long elderId = contract.getElderId();
+      if (elderId == null || latestByElder.containsKey(elderId)) {
+        continue;
+      }
+      latestByElder.put(elderId, contract);
+    }
+    return latestByElder.values().stream()
+        .filter(contract -> {
+          String status = contract.getStatus();
+          if (status == null) return false;
+          String normalized = status.trim().toUpperCase();
+          return "SIGNED".equals(normalized) || "EFFECTIVE".equals(normalized);
+        })
+        .map(CrmContract::getElderId)
+        .filter(Objects::nonNull)
+        .collect(Collectors.toSet());
   }
 
   private IPage<ElderResponse> toPagedResponse(IPage<ElderProfile> page, Long tenantId) {

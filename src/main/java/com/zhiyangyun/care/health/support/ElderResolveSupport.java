@@ -3,6 +3,7 @@ package com.zhiyangyun.care.health.support;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
+import java.util.List;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -20,15 +21,18 @@ public class ElderResolveSupport {
     if (elderName == null || elderName.isBlank()) {
       throw new IllegalArgumentException("elderName required");
     }
-    ElderProfile elder = elderMapper.selectOne(Wrappers.lambdaQuery(ElderProfile.class)
+    List<ElderProfile> elders = elderMapper.selectList(Wrappers.lambdaQuery(ElderProfile.class)
         .eq(ElderProfile::getIsDeleted, 0)
         .eq(orgId != null, ElderProfile::getOrgId, orgId)
         .eq(ElderProfile::getFullName, elderName)
-        .last("LIMIT 1"));
-    if (elder == null) {
+        .last("LIMIT 2"));
+    if (elders.isEmpty()) {
       throw new IllegalArgumentException("elder not found");
     }
-    return elder.getId();
+    if (elders.size() > 1) {
+      throw new IllegalArgumentException("multiple elders matched, elderId required");
+    }
+    return elders.get(0).getId();
   }
 
   public String resolveElderName(Long elderId, String fallback) {

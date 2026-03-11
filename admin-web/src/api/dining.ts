@@ -1,4 +1,5 @@
 import request, { fetchPage } from '../utils/request'
+import type { Id } from '../types/common'
 import type {
   DiningDish,
   DiningRecipe,
@@ -112,7 +113,7 @@ export function applyDiningRiskOverride(data: any) {
   return request.post<DiningRiskOverride>('/api/life/dining/order/risk-override/apply', data)
 }
 
-export function reviewDiningRiskOverride(id: number, data: any) {
+export function reviewDiningRiskOverride(id: Id, data: any) {
   return request.put<DiningRiskOverride>(`/api/life/dining/order/risk-override/${id}/review`, data)
 }
 
@@ -120,15 +121,15 @@ export function getDiningRiskOverridePage(params: any) {
   return fetchPage<DiningRiskOverride>('/api/life/dining/order/risk-override/page', params)
 }
 
-export function updateDiningMealOrder(id: number, data: Partial<DiningMealOrder>) {
+export function updateDiningMealOrder(id: Id, data: Partial<DiningMealOrder>) {
   return request.put<DiningMealOrder>(`/api/life/dining/order/${id}`, data)
 }
 
-export function updateDiningMealOrderStatus(id: number, status: string) {
+export function updateDiningMealOrderStatus(id: Id, status: string) {
   return request.put<DiningMealOrder>(`/api/life/dining/order/${id}/status`, null, { params: { status } })
 }
 
-export function deleteDiningMealOrder(id: number) {
+export function deleteDiningMealOrder(id: Id) {
   return request.delete<void>(`/api/life/dining/order/${id}`)
 }
 

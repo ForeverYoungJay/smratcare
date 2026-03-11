@@ -372,11 +372,11 @@ function routeFilters() {
   const routePatch = parseMedicalWorkbenchQueryPatch(route.query)
   const carryResident = isAutoCarryResidentContextEnabled()
   const elderIdRaw = route.query.elderId ?? route.query.residentId
-  const elderId = elderIdRaw == null ? undefined : Number(elderIdRaw)
+  const elderId = elderIdRaw == null ? undefined : String(Array.isArray(elderIdRaw) ? elderIdRaw[0] || '' : elderIdRaw).trim() || undefined
   return normalizeMedicalWorkbenchQuery({
     ...MEDICAL_WORKBENCH_QUERY_DEFAULTS,
     ...routePatch,
-    elderId: carryResident && Number.isFinite(elderId) ? elderId : routePatch.elderId,
+    elderId: carryResident ? elderId : routePatch.elderId,
     date: typeof route.query.date === 'string' ? route.query.date : routePatch.date,
     status: typeof route.query.status === 'string' ? route.query.status : routePatch.status
   })

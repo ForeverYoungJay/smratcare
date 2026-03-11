@@ -42,6 +42,7 @@ import { getHealthMedicationRemainingPage } from '../../api/health'
 import type { HealthMedicationRemainingItem, PageResult } from '../../types'
 import { mapHealthExportRows, medicationRemainingExportColumns } from '../../constants/healthExport'
 import { exportCsv, exportExcel } from '../../utils/export'
+import { normalizeResidentId } from '../../utils/id'
 import { resolveHealthError } from './healthError'
 
 const loading = ref(false)
@@ -64,10 +65,10 @@ const columns = [
 async function fetchData() {
   loading.value = true
   try {
-    const residentId = route.query.residentId ?? route.query.elderId
+    const residentId = normalizeResidentId(route.query as Record<string, unknown>)
     const res: PageResult<HealthMedicationRemainingItem> = await getHealthMedicationRemainingPage({
       ...query,
-      elderId: residentId ? Number(residentId) : undefined
+      elderId: residentId
     })
     rows.value = res.list
     pagination.total = res.total || res.list.length
@@ -109,12 +110,12 @@ function resolveRowKey(record: HealthMedicationRemainingItem) {
 async function exportData(type: 'csv' | 'excel') {
   exporting.value = true
   try {
-    const residentId = route.query.residentId ?? route.query.elderId
+    const residentId = normalizeResidentId(route.query as Record<string, unknown>)
     const res: PageResult<HealthMedicationRemainingItem> = await getHealthMedicationRemainingPage({
       keyword: query.keyword || undefined,
       pageNo: 1,
       pageSize: 1000,
-      elderId: residentId ? Number(residentId) : undefined
+      elderId: residentId
     })
     const list = res.list || []
     if (!list.length) {

@@ -47,12 +47,13 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
 import { getCareLevelList, getServicePlanPage } from '../../../api/nursing'
-import type { CareLevelItem, ServicePlanItem } from '../../../types'
+import { normalizeResidentId } from '../../../utils/id'
+import type { CareLevelItem, Id, ServicePlanItem } from '../../../types'
 import { resolveCareError } from '../careError'
 
 const route = useRoute()
 const router = useRouter()
-const residentId = computed(() => Number(route.query.residentId || 0) || undefined)
+const residentId = computed<Id | undefined>(() => normalizeResidentId(route.query as Record<string, unknown>))
 
 const loadingPlans = ref(false)
 const loadingLevels = ref(false)

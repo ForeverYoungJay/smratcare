@@ -133,7 +133,8 @@ import {
 } from '../../api/elderResidence'
 import { getRoles } from '../../utils/auth'
 import { hasStaffOrHigher } from '../../utils/roleAccess'
-import type { MedicalOutingCreateRequest, MedicalOutingItem, PageResult } from '../../types'
+import type { Id, MedicalOutingCreateRequest, MedicalOutingItem, PageResult } from '../../types'
+import { normalizeResidentId } from '../../utils/id'
 
 const loading = ref(false)
 const rows = ref<MedicalOutingItem[]>([])
@@ -141,20 +142,20 @@ const total = ref(0)
 const createOpen = ref(false)
 const submitting = ref(false)
 const formRef = ref<FormInstance>()
-const selectedRowKeys = ref<number[]>([])
+const selectedRowKeys = ref<Id[]>([])
 const route = useRoute()
 const { elderOptions, elderLoading, searchElders, ensureSelectedElder } = useElderOptions({ pageSize: 80 })
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: (string | number)[]) => {
-    selectedRowKeys.value = keys as number[]
+    selectedRowKeys.value = keys.map((key) => String(key)) as Id[]
   }
 }))
 const roles = getRoles()
 const canManage = hasStaffOrHigher(roles)
 
 const query = reactive({
-  elderId: undefined as number | undefined,
+  elderId: undefined as Id | undefined,
   status: undefined as 'OUT' | 'RETURNED' | undefined,
   keyword: undefined as string | undefined,
   pageNo: 1,
@@ -162,7 +163,7 @@ const query = reactive({
 })
 
 const form = reactive<MedicalOutingCreateRequest>({
-  elderId: 0,
+  elderId: '' as Id,
   outingDate: '',
   expectedReturnTime: undefined,
   hospitalName: '',
@@ -212,7 +213,7 @@ function reset() {
 
 function openCreate() {
   createOpen.value = true
-  form.elderId = 0
+  form.elderId = '' as Id
   form.outingDate = ''
   form.expectedReturnTime = undefined
   form.hospitalName = ''
@@ -295,8 +296,8 @@ function onPageSizeChange(current: number, size: number) {
 
 onMounted(async () => {
   await searchElders('')
-  const elderId = Number(route.query.elderId || 0)
-  if (elderId > 0) {
+  const elderId = normalizeResidentId(route.query as Record<string, unknown>)
+  if (elderId) {
     ensureSelectedElder(elderId)
     query.elderId = elderId
   }

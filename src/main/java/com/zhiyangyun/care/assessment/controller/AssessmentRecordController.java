@@ -140,7 +140,7 @@ public class AssessmentRecordController {
   }
 
   @GetMapping("/ids")
-  public Result<List<Long>> ids(
+  public Result<List<String>> ids(
       @RequestParam(required = false) String assessmentType,
       @RequestParam(required = false) String status,
       @RequestParam(required = false) Long elderId,
@@ -156,9 +156,10 @@ public class AssessmentRecordController {
         .orderByDesc(AssessmentRecord::getAssessmentDate)
         .orderByDesc(AssessmentRecord::getUpdateTime)
         .last("LIMIT " + safeLimit);
-    List<Long> ids = recordMapper.selectList(wrapper).stream()
+    List<String> ids = recordMapper.selectList(wrapper).stream()
         .map(AssessmentRecord::getId)
         .filter(id -> id != null)
+        .map(String::valueOf)
         .toList();
     return Result.ok(ids);
   }
@@ -300,16 +301,17 @@ public class AssessmentRecordController {
   }
 
   @PostMapping("/batch-delete")
-  public Result<AssessmentBatchOperationResult> batchDelete(@RequestBody List<Long> ids) {
+  public Result<AssessmentBatchOperationResult> batchDelete(@RequestBody List<String> ids) {
     ensureCanDeleteRecord();
     AssessmentBatchOperationResult result = new AssessmentBatchOperationResult();
     if (ids == null || ids.isEmpty()) {
       return Result.ok(result);
     }
     Long orgId = AuthContext.getOrgId();
-    for (Long id : ids) {
+    for (String rawId : ids) {
+      Long id = parseBatchId(rawId);
       if (id == null) {
-        result.addFailure(null, "记录ID为空");
+        result.addFailure(null, "记录ID无效：" + rawId);
         continue;
       }
       try {
@@ -346,13 +348,14 @@ public class AssessmentRecordController {
     try {
       normalizedStatus = normalizeStatus(request.getStatus());
     } catch (Exception ex) {
-      request.getIds().forEach(id -> result.addFailure(id, ex.getMessage()));
+      request.getIds().forEach(id -> result.addFailure(parseBatchId(id), ex.getMessage()));
       return Result.ok(result);
     }
     Long orgId = AuthContext.getOrgId();
-    for (Long id : request.getIds()) {
+    for (String rawId : request.getIds()) {
+      Long id = parseBatchId(rawId);
       if (id == null) {
-        result.addFailure(null, "记录ID为空");
+        result.addFailure(null, "记录ID无效：" + rawId);
         continue;
       }
       try {
@@ -397,13 +400,14 @@ public class AssessmentRecordController {
       assessorName = AuthContext.getUsername();
     }
     if (assessorName == null || assessorName.isBlank()) {
-      request.getIds().forEach(id -> result.addFailure(id, "评估人不能为空"));
+      request.getIds().forEach(id -> result.addFailure(parseBatchId(id), "评估人不能为空"));
       return Result.ok(result);
     }
 
-    for (Long id : request.getIds()) {
+    for (String rawId : request.getIds()) {
+      Long id = parseBatchId(rawId);
       if (id == null) {
-        result.addFailure(null, "记录ID为空");
+        result.addFailure(null, "记录ID无效：" + rawId);
         continue;
       }
       try {
@@ -439,9 +443,10 @@ public class AssessmentRecordController {
     }
     LocalDate nextDate = request.getNextAssessmentDate();
     Long orgId = AuthContext.getOrgId();
-    for (Long id : request.getIds()) {
+    for (String rawId : request.getIds()) {
+      Long id = parseBatchId(rawId);
       if (id == null) {
-        result.addFailure(null, "记录ID为空");
+        result.addFailure(null, "记录ID无效：" + rawId);
         continue;
       }
       try {
@@ -746,6 +751,7 @@ public class AssessmentRecordController {
     }
     AssessmentRecordResponse response = new AssessmentRecordResponse();
     response.setId(record.getId());
+    response.setIdText(record.getId() == null ? null : String.valueOf(record.getId()));
     response.setTenantId(record.getTenantId());
     response.setOrgId(record.getOrgId());
     response.setOrgName(org == null ? null : org.getOrgName());
@@ -897,6 +903,21 @@ public class AssessmentRecordController {
   private String csvValue(String value) {
     String normalized = value == null ? "" : value;
     return "\"" + normalized.replace("\"", "\"\"") + "\"";
+  }
+
+  private Long parseBatchId(String rawId) {
+    if (rawId == null) {
+      return null;
+    }
+    String normalized = rawId.trim();
+    if (normalized.isEmpty()) {
+      return null;
+    }
+    try {
+      return Long.parseLong(normalized);
+    } catch (NumberFormatException ex) {
+      return null;
+    }
   }
 
   private AssessmentRecordReportResponse toReportResponse(AssessmentRecord record) {

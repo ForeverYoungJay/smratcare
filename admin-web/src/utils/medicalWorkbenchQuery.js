@@ -41,11 +41,8 @@ function normalizeStatus(value) {
     return text ? text.toUpperCase() : '';
 }
 function normalizeElderId(value) {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-        return undefined;
-    }
-    return Math.round(parsed);
+    const text = firstQueryValue(value);
+    return text || undefined;
 }
 export function normalizeMedicalWorkbenchQuery(query, fallback = MEDICAL_WORKBENCH_QUERY_DEFAULTS) {
     const normalized = {

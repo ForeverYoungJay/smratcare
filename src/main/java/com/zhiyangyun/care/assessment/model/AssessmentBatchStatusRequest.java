@@ -8,7 +8,7 @@ import lombok.Data;
 @Data
 public class AssessmentBatchStatusRequest {
   @NotEmpty
-  private List<Long> ids;
+  private List<String> ids;
 
   @NotBlank
   private String status;

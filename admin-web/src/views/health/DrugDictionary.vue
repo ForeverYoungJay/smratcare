@@ -78,7 +78,7 @@ import {
   updateHealthDrugDictionary,
   deleteHealthDrugDictionary
 } from '../../api/health'
-import type { HealthDrugDictionary, PageResult } from '../../types'
+import type { HealthDrugDictionary, Id, PageResult } from '../../types'
 
 const loading = ref(false)
 const exporting = ref(false)
@@ -100,7 +100,7 @@ const columns = [
 const editOpen = ref(false)
 const saving = ref(false)
 const form = reactive({
-  id: undefined as number | undefined,
+  id: undefined as Id | undefined,
   drugCode: '',
   drugName: '',
   specification: '',

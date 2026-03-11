@@ -1,4 +1,5 @@
 import request, { fetchPage } from '../utils/request'
+import type { Id } from '../types/common'
 import type {
   InventoryAdjustRequest,
   InventoryAdjustmentDiffItem,
@@ -212,7 +213,7 @@ export function getOutboundSheetDetail(id: number) {
   return request.get<InventoryOutboundSheet>('/api/inventory/outbound/sheet/detail', { params: { id } })
 }
 
-export function getOutboundSheetPrefill(params?: { elderId?: number | string }) {
+export function getOutboundSheetPrefill(params?: { elderId?: Id }) {
   return request.get<InventoryOutboundSheetPrefill>('/api/inventory/outbound/sheet/prefill', { params })
 }
 

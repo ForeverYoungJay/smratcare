@@ -1,3 +1,5 @@
+import type { Id } from './common'
+
 export interface MealPlan {
   id: number
   planDate: string
@@ -22,7 +24,7 @@ export interface ActivityEvent {
 
 export interface IncidentReport {
   id: number
-  elderId?: number
+  elderId?: Id
   elderName?: string
   reporterName: string
   incidentTime: string
@@ -51,7 +53,7 @@ export interface IncidentQuery {
 
 export interface HealthBasicRecord {
   id: number
-  elderId: number
+  elderId: Id
   elderName?: string
   recordDate: string
   heightCm?: number
@@ -63,7 +65,7 @@ export interface HealthBasicRecord {
 }
 
 export interface BirthdayReminder {
-  elderId: number
+  elderId: Id
   elderName: string
   birthDate?: string
   nextBirthday?: string
