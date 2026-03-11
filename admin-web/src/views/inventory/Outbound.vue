@@ -64,10 +64,10 @@
         <vxe-column field="productName" title="商品名称" min-width="160" />
         <vxe-column field="productId" title="商品ID" width="120" />
         <vxe-column field="itemType" title="物资类型" width="110">
-          <template #default="{ row }">{{ itemTypeLabel(productById.get(Number(row.productId))?.itemType) }}</template>
+          <template #default="{ row }">{{ itemTypeLabel(productById.get(String(row.productId))?.itemType) }}</template>
         </vxe-column>
         <vxe-column field="businessDomain" title="业务域" width="110">
-          <template #default="{ row }">{{ domainLabel(productById.get(Number(row.productId))?.businessDomain) }}</template>
+          <template #default="{ row }">{{ domainLabel(productById.get(String(row.productId))?.businessDomain) }}</template>
         </vxe-column>
         <vxe-column field="changeQty" title="出库数量" width="120" />
         <vxe-column field="receiverName" title="领取人" width="120" />
@@ -336,6 +336,7 @@ import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportCsv } from '../../utils/export'
+import { normalizeId } from '../../utils/id'
 import {
   confirmOutboundSheet,
   createOutboundSheet,
@@ -358,7 +359,7 @@ import type {
 type SheetBatchFailure = {
   at: string
   action: string
-  sheetId: number
+  sheetId: Id
   reason: string
   code: string
   path: string
@@ -390,7 +391,7 @@ const sheets = ref<InventoryOutboundSheet[]>([])
 const sheetTotal = ref(0)
 const sheetDetail = ref<InventoryOutboundSheet | null>(null)
 const sheetDetailOpen = ref(false)
-const selectedSheetRowKeys = ref<number[]>([])
+const selectedSheetRowKeys = ref<Id[]>([])
 const sheetBatchFailures = ref<SheetBatchFailure[]>([])
 const sheetFailureDrawerOpen = ref(false)
 const sheetLastBatchReceipt = ref<SheetBatchReceipt | null>(null)
@@ -418,7 +419,7 @@ const sheetForm = reactive<{
   contractNo: string
   applyDept?: string
   remark: string
-  items: Array<{ rowKey: string; productId?: number | string; quantity: number; reason?: string }>
+  items: Array<{ rowKey: string; productId?: Id; quantity: number; reason?: string }>
 }>({
   receiverName: '',
   outboundNo: '',
@@ -432,7 +433,7 @@ const sheetForm = reactive<{
 
 const query = reactive({
   outType: undefined as 'SALE' | 'CONSUME' | undefined,
-  productId: undefined as number | undefined,
+  productId: undefined as Id | undefined,
   businessDomain: undefined as string | undefined,
   itemType: undefined as string | undefined,
   range: undefined as any,
@@ -460,9 +461,9 @@ const itemTypeOptions = [
 ]
 
 const productById = computed(() => {
-  const map = new Map<number, ProductItem>()
+  const map = new Map<Id, ProductItem>()
   for (const product of products.value) {
-    map.set(Number(product.idStr || product.id), product)
+    map.set(String(product.idStr || product.id), product)
   }
   return map
 })
@@ -472,13 +473,13 @@ const productOptions = computed(() =>
     .filter((product) => !query.itemType || (product.itemType || '') === query.itemType)
     .map((p) => ({
       label: `${p.productName} (ID:${p.idStr || p.id})`,
-      value: p.id
+      value: String(p.id)
     }))
 )
 const filteredRows = computed(() =>
   rows.value.filter((row) => {
-    if (query.productId && Number(row.productId) !== Number(query.productId)) return false
-    const product = productById.value.get(Number(row.productId))
+    if (query.productId && String(row.productId) !== String(query.productId)) return false
+    const product = productById.value.get(String(row.productId))
     if (query.businessDomain && (product?.businessDomain || 'BOTH') !== query.businessDomain) return false
     if (query.itemType && (product?.itemType || '') !== query.itemType) return false
     return true
@@ -488,7 +489,7 @@ const summaryStats = computed(() => {
   const result = { assetQty: 0, consumableQty: 0, foodQty: 0, serviceQty: 0 }
   for (const row of filteredRows.value) {
     const qty = Number(row.changeQty || 0)
-    const itemType = productById.value.get(Number(row.productId))?.itemType || 'CONSUMABLE'
+    const itemType = productById.value.get(String(row.productId))?.itemType || 'CONSUMABLE'
     if (itemType === 'ASSET') result.assetQty += qty
     else if (itemType === 'FOOD') result.foodQty += qty
     else if (itemType === 'SERVICE') result.serviceQty += qty
@@ -516,16 +517,16 @@ const departmentSelectOptions = computed(() =>
 )
 const selectedDraftSheetIds = computed(() => {
   if (!selectedSheetRowKeys.value.length) return []
-  const selected = new Set(selectedSheetRowKeys.value.map((item) => Number(item)))
+  const selected = new Set(selectedSheetRowKeys.value.map((item) => String(item)))
   return sheets.value
-    .filter((item) => selected.has(Number(item.id)) && item.status !== 'CONFIRMED')
-    .map((item) => Number(item.id))
+    .filter((item) => selected.has(String(item.id)) && item.status !== 'CONFIRMED')
+    .map((item) => String(item.id))
 })
 
 const sheetRowSelection = computed(() => ({
   selectedRowKeys: selectedSheetRowKeys.value,
   onChange: (keys: Array<string | number>) => {
-    selectedSheetRowKeys.value = keys.map((item) => Number(item)).filter((item) => Number.isFinite(item))
+    selectedSheetRowKeys.value = keys.map((item) => String(item))
   }
 }))
 const retryableSheetFailures = computed(() => sheetBatchFailures.value.filter((item) => item.retryable))
@@ -594,8 +595,8 @@ async function fetchSheetData() {
     })
     sheets.value = res.list || []
     sheetTotal.value = res.total || 0
-    const availableIds = new Set((sheets.value || []).map((item) => Number(item.id)))
-    selectedSheetRowKeys.value = selectedSheetRowKeys.value.filter((id) => availableIds.has(Number(id)))
+    const availableIds = new Set((sheets.value || []).map((item) => String(item.id)))
+    selectedSheetRowKeys.value = selectedSheetRowKeys.value.filter((id) => availableIds.has(String(id)))
   } finally {
     sheetLoading.value = false
   }
@@ -650,12 +651,12 @@ function clearSheetSelection() {
 }
 
 function selectedSheetIds() {
-  return selectedSheetRowKeys.value.map((item) => Number(item)).filter((item) => Number.isFinite(item))
+  return selectedSheetRowKeys.value.map((item) => String(item))
 }
 
 function selectedSheetRecords() {
   const selected = new Set(selectedSheetIds())
-  return sheets.value.filter((item) => selected.has(Number(item.id)))
+  return sheets.value.filter((item) => selected.has(String(item.id)))
 }
 
 function openSelectedSheetDetail() {
@@ -705,7 +706,7 @@ async function confirmSelectedSheets() {
   const selectedRecords = selectedSheetRecords()
   const draftIds = selectedRecords
     .filter((item) => item.status !== 'CONFIRMED')
-    .map((item) => Number(item.id))
+    .map((item) => String(item.id))
   if (!draftIds.length) {
     message.info('勾选项中没有可确认出库的领用单')
     return
@@ -853,14 +854,14 @@ function latestSheetBatchAction() {
 
 function failedSheetIds(options?: { retryableOnly?: boolean }) {
   const source = options?.retryableOnly ? retryableSheetFailures.value : sheetBatchFailures.value
-  return Array.from(new Set(source.map((item) => Number(item.sheetId)).filter((id) => Number.isFinite(id))))
+  return Array.from(new Set(source.map((item) => String(item.sheetId)).filter((id) => id)))
 }
 
-async function runBatchConfirm(ids: number[], actionLabel = '批量确认出库') {
+async function runBatchConfirm(ids: Id[], actionLabel = '批量确认出库') {
   const startedAt = new Date().toISOString().replace('T', ' ').slice(0, 19)
   sheetBatchFailures.value = []
-  const successIds: number[] = []
-  const failedIds: number[] = []
+  const successIds: Id[] = []
+  const failedIds: Id[] = []
   startBatchProgress(`${actionLabel}处理中`, ids.length)
   for (const id of ids) {
     try {
@@ -892,8 +893,8 @@ async function runBatchConfirm(ids: number[], actionLabel = '批量确认出库'
     failed: failedIds.length
   }
   selectedSheetRowKeys.value = failedIds
-  if (sheetDetail.value?.id && successIds.includes(Number(sheetDetail.value.id))) {
-    sheetDetail.value = await getOutboundSheetDetail(Number(sheetDetail.value.id))
+  if (sheetDetail.value?.id && successIds.includes(String(sheetDetail.value.id))) {
+    sheetDetail.value = await getOutboundSheetDetail(String(sheetDetail.value.id))
   }
   await Promise.all([fetchSheetData(), fetchData()])
   if (failedIds.length) {
@@ -903,7 +904,7 @@ async function runBatchConfirm(ids: number[], actionLabel = '批量确认出库'
   }
 }
 
-async function runBatchExportPdf(ids: number[], actionLabel = '批量导出PDF') {
+async function runBatchExportPdf(ids: Id[], actionLabel = '批量导出PDF') {
   const startedAt = new Date().toISOString().replace('T', ' ').slice(0, 19)
   sheetBatchFailures.value = []
   let ok = 0
@@ -980,8 +981,8 @@ function exportCsvData() {
       领用单号: r.outboundNo || '',
       商品名称: r.productName,
       商品ID: r.productId,
-      业务域: domainLabel(productById.value.get(Number(r.productId))?.businessDomain),
-      物资类型: itemTypeLabel(productById.value.get(Number(r.productId))?.itemType),
+      业务域: domainLabel(productById.value.get(String(r.productId))?.businessDomain),
+      物资类型: itemTypeLabel(productById.value.get(String(r.productId))?.itemType),
       出库数量: r.changeQty,
       领取人: r.receiverName,
       类型: r.outType === 'SALE' ? '销售' : '领用',
@@ -1077,7 +1078,7 @@ async function submitOutboundSheet() {
       applyDept: sheetForm.applyDept ? String(sheetForm.applyDept).trim() || undefined : undefined,
       remark: sheetForm.remark.trim() || undefined,
       items: sheetForm.items.map((item): InventoryOutboundSheetItemRequest => ({
-        productId: item.productId as number | string,
+        productId: item.productId as Id,
         quantity: Number(item.quantity),
         reason: item.reason?.trim() || undefined
       }))
@@ -1091,20 +1092,20 @@ async function submitOutboundSheet() {
   }
 }
 
-async function openSheetDetail(id: number) {
+async function openSheetDetail(id: Id) {
   sheetDetail.value = await getOutboundSheetDetail(id)
   sheetDetailOpen.value = true
 }
 
-async function confirmSheet(id: number) {
+async function confirmSheet(id: Id) {
   Modal.confirm({
     title: '确认领取完成并执行出库？',
     content: '确认后会扣减库存并生成出库日志，操作不可撤销。',
     onOk: async () => {
       await confirmOutboundSheet(id)
       message.success('确认出库成功')
-      selectedSheetRowKeys.value = selectedSheetRowKeys.value.filter((item) => Number(item) !== Number(id))
-      if (sheetDetail.value?.id === id) {
+      selectedSheetRowKeys.value = selectedSheetRowKeys.value.filter((item) => String(item) !== String(id))
+      if (String(sheetDetail.value?.id || '') === String(id)) {
         sheetDetail.value = await getOutboundSheetDetail(id)
       }
       await Promise.all([fetchSheetData(), fetchData()])
@@ -1136,7 +1137,7 @@ async function batchExportSelectedPdf() {
   await runBatchExportPdf(ids, '批量导出PDF')
 }
 
-async function printSheet(id: number) {
+async function printSheet(id: Id) {
   const sheet = await getOutboundSheetDetail(id)
   const html = buildSheetHtml(sheet)
   const popup = window.open('', '_blank', 'width=980,height=760')
@@ -1150,7 +1151,7 @@ async function printSheet(id: number) {
   popup.print()
 }
 
-async function downloadSheetHtml(id: number) {
+async function downloadSheetHtml(id: Id) {
   const sheet = await getOutboundSheetDetail(id)
   const html = buildSheetHtml(sheet)
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
@@ -1165,7 +1166,7 @@ async function downloadSheetHtml(id: number) {
   message.success('领取单已下载')
 }
 
-async function downloadSheetPdf(id: number, notify = true) {
+async function downloadSheetPdf(id: Id, notify = true) {
   const sheet = await getOutboundSheetDetail(id)
   const doc = new jsPDF({
     orientation: 'p',
@@ -1291,9 +1292,9 @@ function buildSheetHtml(sheet: InventoryOutboundSheet) {
   `
 }
 
-function productSpecById(productId?: number | string) {
+function productSpecById(productId?: Id) {
   if (!productId) return '-'
-  const product = productById.value.get(Number(productId))
+  const product = productById.value.get(String(productId))
   if (!product) return '-'
   return product.unit || product.productCode || '-'
 }
@@ -1338,10 +1339,7 @@ function applyRouteFilters() {
   const domainRaw = Array.isArray(routeQuery.businessDomain) ? routeQuery.businessDomain[0] : routeQuery.businessDomain
   const itemTypeRaw = Array.isArray(routeQuery.itemType) ? routeQuery.itemType[0] : routeQuery.itemType
   if (outTypeRaw === 'SALE' || outTypeRaw === 'CONSUME') query.outType = outTypeRaw
-  if (productIdRaw !== undefined) {
-    const parsed = Number(productIdRaw)
-    query.productId = Number.isNaN(parsed) ? undefined : parsed
-  }
+  query.productId = normalizeId(productIdRaw)
   if (typeof domainRaw === 'string' && domainRaw) query.businessDomain = domainRaw
   if (typeof itemTypeRaw === 'string' && itemTypeRaw) query.itemType = itemTypeRaw
 }

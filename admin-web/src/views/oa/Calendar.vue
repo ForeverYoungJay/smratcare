@@ -295,7 +295,7 @@ import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
 import { useStaffOptions } from '../../composables/useStaffOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { useUserStore } from '../../stores/user'
-import type { BirthdayReminder, OaTask } from '../../types'
+import type { BirthdayReminder, Id, OaTask } from '../../types'
 
 type CalendarType = 'PERSONAL' | 'WORK' | 'DAILY' | 'COLLAB'
 type UrgencyType = 'NORMAL' | 'EMERGENCY'
@@ -315,7 +315,7 @@ const conflictPreviewItems = ref<Array<{ title?: string; assigneeName?: string; 
 const editOpen = ref(false)
 const dayDrawerOpen = ref(false)
 const selectedDate = ref<Dayjs>()
-const editingTaskId = ref<string | number | null>(null)
+const editingTaskId = ref<Id | null>(null)
 const calendarRef = ref<any>(null)
 let syncTimer: number | undefined
 
@@ -343,7 +343,7 @@ const form = reactive({
   title: '',
   startTime: undefined as Dayjs | undefined,
   endTime: undefined as Dayjs | undefined,
-  assigneeId: undefined as string | number | undefined,
+  assigneeId: undefined as Id | undefined,
   assigneeName: '',
   priority: 'NORMAL',
   description: '',
@@ -845,11 +845,11 @@ function resolveAssigneeIdForSubmit() {
   const currentRealName = String(userStore.staffInfo?.realName || '').trim()
   const currentUsername = String(userStore.staffInfo?.username || '').trim()
   const input = String(form.assigneeName || '').trim()
-  if (!input) return Number(currentId)
+  if (!input) return currentId
   if ((currentRealName && input === currentRealName) || (currentUsername && input === currentUsername)) {
-    return Number(currentId)
+    return currentId
   }
-  return form.assigneeId != null ? Number(form.assigneeId) : undefined
+  return form.assigneeId != null ? String(form.assigneeId) : undefined
 }
 
 function buildConflictMessage(items: Array<{ title?: string; assigneeName?: string; startTime?: string; endTime?: string; reason?: string }>) {

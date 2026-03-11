@@ -23,6 +23,16 @@ public class StaffProfile {
 
   private String employmentType;
 
+  private String contractNo;
+
+  private String contractType;
+
+  private String contractStatus;
+
+  private LocalDate contractStartDate;
+
+  private LocalDate contractEndDate;
+
   private LocalDate hireDate;
 
   private String qualificationLevel;

@@ -15,7 +15,7 @@
           </a-select>
         </a-form-item>
         <a-form-item label="机构ID">
-          <a-input-number v-model:value="query.orgId" :min="1" placeholder="默认当前机构" style="width: 160px" />
+          <a-input v-model:value="query.orgId" allow-clear placeholder="默认当前机构" style="width: 160px" />
         </a-form-item>
         <a-form-item label="院内老人">
           <a-select
@@ -158,7 +158,7 @@ const query = ref({
   fromDate: dayjs().subtract(29, 'day') as Dayjs,
   toDate: dayjs() as Dayjs,
   eventType: undefined as 'ADMISSION' | 'DISCHARGE' | undefined,
-  orgId: undefined as number | undefined,
+  orgId: undefined as Id | undefined,
   pageNo: 1,
   pageSize: 20
 })
@@ -494,10 +494,7 @@ function initFromRouteQuery() {
   if (eventType === 'ADMISSION' || eventType === 'DISCHARGE') {
     query.value.eventType = eventType
   }
-  const orgId = Number(route.query.orgId)
-  if (Number.isFinite(orgId) && orgId > 0) {
-    query.value.orgId = orgId
-  }
+  query.value.orgId = normalizeId(route.query.orgId)
   printElderId.value = normalizeId(route.query.elderId)
   const pageNo = Number(route.query.pageNo)
   if (Number.isFinite(pageNo) && pageNo > 0) {

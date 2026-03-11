@@ -56,7 +56,7 @@ export interface ElderInfoStatsResponse {
 }
 
 export interface OrgMonthlyOperationItem {
-  orgId?: number
+  orgId?: Id
   orgName?: string
   month: string
   admissions: number

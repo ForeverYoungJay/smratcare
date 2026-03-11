@@ -165,6 +165,7 @@ import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import { getProductPage } from '../../api/store'
+import { normalizeId } from '../../utils/id'
 import {
   MATERIAL_ORDER_STATUS,
   MATERIAL_PURCHASE_STATUS_OPTIONS,
@@ -184,6 +185,7 @@ import {
 } from '../../api/materialCenter'
 import { useSupplierOptions } from '../../composables/useSupplierOptions'
 import type {
+  Id,
   MaterialPurchaseOrder,
   MaterialPurchaseOrderItem,
   MaterialWarehouseItem,
@@ -273,7 +275,7 @@ const filteredProductOptions = computed(() =>
   products.value
     .filter((it) => matchDomainFilter(it.businessDomain))
     .filter((it) => productFilter.itemType === 'ALL' || (it.itemType || '') === productFilter.itemType)
-    .map((it) => ({ label: `${it.productName} (ID:${it.idStr || it.id})`, value: Number(it.idStr || it.id) }))
+    .map((it) => ({ label: `${it.productName} (ID:${it.idStr || it.id})`, value: String(it.id) }))
 )
 const summaryStats = computed(() => ({
   assetAmount: displayRows.value.reduce((sum, row) => sum + Number(row.assetAmount || 0), 0),
@@ -287,10 +289,10 @@ const displayRows = computed(() => {
 })
 
 const editorOpen = ref(false)
-const editingId = ref<number>()
+const editingId = ref<Id>()
 const form = reactive({
-  warehouseId: undefined as number | undefined,
-  supplierId: undefined as number | undefined,
+  warehouseId: undefined as Id | undefined,
+  supplierId: undefined as Id | undefined,
   orderDate: undefined as any,
   remark: '',
   items: [] as (MaterialPurchaseOrderItem & { _idx: number })[]
@@ -356,12 +358,12 @@ async function openCreate() {
     supplierId: undefined,
     orderDate: dayjs(),
     remark: routeRemark,
-    items: routePrefill.length ? routePrefill : [{ _idx: Date.now(), productId: 0, quantity: 1, unitPrice: 0 }]
+    items: routePrefill.length ? routePrefill : [{ _idx: Date.now(), productId: '' as Id, quantity: 1, unitPrice: 0 }]
   })
   editorOpen.value = true
 }
 
-async function openEdit(id: number) {
+async function openEdit(id: Id) {
   await loadOptions()
   productFilter.businessDomain = 'INTERNAL_OR_BOTH'
   productFilter.itemType = 'ALL'
@@ -388,7 +390,7 @@ async function openEdit(id: number) {
 }
 
 function sanitizeDisabledSelections() {
-  const selectedWarehouse = warehouses.value.find((it) => it.id === form.warehouseId)
+  const selectedWarehouse = warehouses.value.find((it) => String(it.id) === String(form.warehouseId))
   if (form.warehouseId && !selectedWarehouse) {
     form.warehouseId = undefined
     message.warning('原采购单仓库不可用，已自动清空，请重新选择（原因：仓库已停用或不存在）')
@@ -401,7 +403,7 @@ function sanitizeDisabledSelections() {
 }
 
 function addItem() {
-  form.items.push({ _idx: Date.now() + Math.random(), productId: 0, quantity: 1, unitPrice: 0 })
+  form.items.push({ _idx: Date.now() + Math.random(), productId: '' as Id, quantity: 1, unitPrice: 0 })
 }
 
 function removeItem(index: number) {
@@ -470,7 +472,7 @@ async function submit() {
     message.warning('请完善明细中的物资、数量与单价')
     return
   }
-  const productIds = form.items.map((it) => Number(it.productId))
+  const productIds = form.items.map((it) => String(it.productId))
   if (new Set(productIds).size !== productIds.length) {
     message.warning('同一物资不能重复添加')
     return
@@ -498,12 +500,12 @@ async function submit() {
   }
 }
 
-async function viewDetail(id: number) {
+async function viewDetail(id: Id) {
   detail.value = await getPurchaseDetail(id)
   detailOpen.value = true
 }
 
-async function approve(id: number) {
+async function approve(id: Id) {
   const confirmed = await confirmAction('确认审核采购单？', '审核后可执行入库流程')
   if (!confirmed) {
     return
@@ -513,7 +515,7 @@ async function approve(id: number) {
   fetchData()
 }
 
-async function complete(id: number) {
+async function complete(id: Id) {
   const confirmed = await confirmAction('确认完成采购单？', '完成后将执行采购入库并更新库存')
   if (!confirmed) {
     return
@@ -523,7 +525,7 @@ async function complete(id: number) {
   fetchData()
 }
 
-async function cancel(id: number) {
+async function cancel(id: Id) {
   const confirmed = await confirmAction('确认作废采购单？', '作废后该单据不可继续审核或完成')
   if (!confirmed) {
     return
@@ -544,7 +546,7 @@ async function confirmAction(title: string, content: string): Promise<boolean> {
   })
 }
 
-function parseQueryNumber(value: unknown): number | undefined {
+function parseQueryPositiveInt(value: unknown): number | undefined {
   const raw = Array.isArray(value) ? value[0] : value
   if (raw === undefined || raw === null || raw === '') return undefined
   const n = Number(raw)
@@ -557,8 +559,8 @@ function getRoutePrefillItems() {
   if (typeof productIdsRaw === 'string' && productIdsRaw.trim()) {
     const ids = productIdsRaw
       .split(',')
-      .map((item) => Number(item.trim()))
-      .filter((item) => Number.isFinite(item) && item > 0)
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0)
     const quantities = String(quantitiesRaw || '')
       .split(',')
       .map((item) => Math.max(Number(item.trim()) || 1, 1))
@@ -570,8 +572,8 @@ function getRoutePrefillItems() {
     }))
   }
 
-  const productId = parseQueryNumber(route.query.productId)
-  const quantity = Math.max(parseQueryNumber(route.query.quantity) || 1, 1)
+  const productId = normalizeId(route.query.productId)
+  const quantity = Math.max(parseQueryPositiveInt(route.query.quantity) || 1, 1)
   if (!productId) return []
   return [{ _idx: Date.now(), productId, quantity, unitPrice: 0 }]
 }

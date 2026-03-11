@@ -1,8 +1,8 @@
 <template>
-  <PageContainer title="合同到期提醒" subTitle="按到期天数预警续签与变更处理">
+  <PageContainer title="合同到期提醒" subTitle="员工劳动合同按到期天数预警">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
-        <ElderNameAutocomplete v-model:value="query.keyword" placeholder="长者姓名(编号)" width="220px" />
+        <a-input v-model:value="query.keyword" placeholder="姓名/工号/手机号/合同编号" allow-clear style="width: 240px" />
       </a-form-item>
       <a-form-item label="预警天数">
         <a-input-number v-model:value="query.warningDays" :min="0" :max="365" style="width: 140px" />
@@ -35,6 +35,9 @@
           <a-tag v-else-if="(record.remainingDays || 0) <= 30" color="orange">{{ record.remainingDays }} 天</a-tag>
           <span v-else>{{ record.remainingDays ?? '-' }} 天</span>
         </template>
+        <template v-else-if="column.key === 'contractStatus'">
+          <a-tag :color="contractStatusColor(record.contractStatus)">{{ contractStatusText(record.contractStatus) }}</a-tag>
+        </template>
       </template>
     </DataTable>
   </PageContainer>
@@ -45,7 +48,6 @@ import { onMounted, reactive, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
-import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { getHrContractReminderPage } from '../../api/hr'
 import type { HrContractReminderItem, PageResult } from '../../types'
 import { exportCsv, exportExcel } from '../../utils/export'
@@ -59,21 +61,47 @@ const query = reactive({
   pageSize: 10
 })
 
+const statusOptions = [
+  { label: '待签署', value: 'PENDING' },
+  { label: '已生效', value: 'ACTIVE' },
+  { label: '续签处理中', value: 'RENEWAL_PENDING' },
+  { label: '已到期', value: 'EXPIRED' },
+  { label: '已终止', value: 'TERMINATED' }
+]
 const rows = ref<HrContractReminderItem[]>([])
 const loading = ref(false)
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 
 const columns = [
-  { title: '合同号', dataIndex: 'contractNo', key: 'contractNo', width: 170 },
-  { title: '长者', dataIndex: 'elderName', key: 'elderName', width: 120 },
-  { title: '联系人', dataIndex: 'contactName', key: 'contactName', width: 120 },
-  { title: '联系电话', dataIndex: 'contactPhone', key: 'contactPhone', width: 140 },
-  { title: '生效开始', dataIndex: 'effectiveFrom', key: 'effectiveFrom', width: 120 },
-  { title: '到期日期', dataIndex: 'effectiveTo', key: 'effectiveTo', width: 120 },
-  { title: '剩余天数', dataIndex: 'remainingDays', key: 'remainingDays', width: 130 },
-  { title: '流程状态', dataIndex: 'status', key: 'status', width: 140 },
-  { title: '业务状态', dataIndex: 'contractStatus', key: 'contractStatus', width: 180 }
+  { title: '合同编号', dataIndex: 'contractNo', key: 'contractNo', width: 170 },
+  { title: '工号', dataIndex: 'staffNo', key: 'staffNo', width: 120 },
+  { title: '员工姓名', dataIndex: 'staffName', key: 'staffName', width: 120 },
+  { title: '手机号', dataIndex: 'phone', key: 'phone', width: 140 },
+  { title: '岗位', dataIndex: 'jobTitle', key: 'jobTitle', width: 130 },
+  { title: '合同类型', dataIndex: 'contractType', key: 'contractType', width: 120 },
+  { title: '合同状态', dataIndex: 'contractStatus', key: 'contractStatus', width: 120 },
+  { title: '生效开始', dataIndex: 'contractStartDate', key: 'contractStartDate', width: 120 },
+  { title: '到期日期', dataIndex: 'contractEndDate', key: 'contractEndDate', width: 120 },
+  { title: '剩余天数', dataIndex: 'remainingDays', key: 'remainingDays', width: 130 }
 ]
+
+function contractStatusText(status?: string) {
+  return statusOptions.find((item) => item.value === status)?.label || status || '-'
+}
+
+function contractStatusColor(status?: string) {
+  switch (status) {
+    case 'ACTIVE':
+      return 'green'
+    case 'RENEWAL_PENDING':
+      return 'orange'
+    case 'EXPIRED':
+    case 'TERMINATED':
+      return 'red'
+    default:
+      return 'default'
+  }
+}
 
 async function fetchData() {
   loading.value = true
@@ -122,23 +150,30 @@ function rowClassName(record: HrContractReminderItem) {
 }
 
 const exportFields = [
-  { key: 'contractNo', label: '合同号' },
-  { key: 'elderName', label: '长者' },
-  { key: 'contactName', label: '联系人' },
-  { key: 'contactPhone', label: '联系电话' },
-  { key: 'effectiveFrom', label: '生效开始' },
-  { key: 'effectiveTo', label: '到期日期' },
-  { key: 'remainingDays', label: '剩余天数' },
-  { key: 'status', label: '流程状态' },
-  { key: 'contractStatus', label: '业务状态' }
+  { key: 'contractNo', label: '合同编号' },
+  { key: 'staffNo', label: '工号' },
+  { key: 'staffName', label: '员工姓名' },
+  { key: 'phone', label: '手机号' },
+  { key: 'jobTitle', label: '岗位' },
+  { key: 'contractType', label: '合同类型' },
+  { key: 'contractStatusText', label: '合同状态' },
+  { key: 'contractStartDate', label: '生效开始' },
+  { key: 'contractEndDate', label: '到期日期' },
+  { key: 'remainingDays', label: '剩余天数' }
 ]
 
 function onExportCsv() {
-  exportCsv(mapByDict(rows.value as Record<string, any>[], exportFields), '合同到期提醒-当前筛选')
+  exportCsv(mapByDict(rows.value.map((item) => ({
+    ...item,
+    contractStatusText: contractStatusText(item.contractStatus)
+  })) as Record<string, any>[], exportFields), '合同到期提醒-当前筛选')
 }
 
 function onExportExcel() {
-  exportExcel(mapByDict(rows.value as Record<string, any>[], exportFields), '合同到期提醒-当前筛选')
+  exportExcel(mapByDict(rows.value.map((item) => ({
+    ...item,
+    contractStatusText: contractStatusText(item.contractStatus)
+  })) as Record<string, any>[], exportFields), '合同到期提醒-当前筛选')
 }
 
 onMounted(fetchData)

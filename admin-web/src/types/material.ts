@@ -1,7 +1,8 @@
 import type { MaterialEnableStatus, MaterialOrderStatus } from '../utils/materialStatus'
+import type { Id } from './common'
 
 export interface MaterialWarehouseItem {
-  id: number
+  id: Id
   warehouseCode: string
   warehouseName: string
   managerName?: string
@@ -13,7 +14,7 @@ export interface MaterialWarehouseItem {
 }
 
 export interface MaterialSupplierItem {
-  id: number
+  id: Id
   supplierCode: string
   supplierName: string
   contactName?: string
@@ -25,8 +26,8 @@ export interface MaterialSupplierItem {
 }
 
 export interface MaterialPurchaseOrderItem {
-  id?: number
-  productId: number
+  id?: Id
+  productId: Id
   productName?: string
   businessDomain?: 'INTERNAL' | 'MALL' | 'BOTH' | string
   itemType?: 'ASSET' | 'CONSUMABLE' | 'FOOD' | 'SERVICE' | string
@@ -36,11 +37,11 @@ export interface MaterialPurchaseOrderItem {
 }
 
 export interface MaterialPurchaseOrder {
-  id: number
+  id: Id
   orderNo: string
-  warehouseId?: number
+  warehouseId?: Id
   warehouseName?: string
-  supplierId?: number
+  supplierId?: Id
   supplierName?: string
   orderDate?: string
   status?: MaterialOrderStatus
@@ -57,18 +58,18 @@ export interface MaterialPurchaseOrder {
 }
 
 export interface MaterialTransferItem {
-  id?: number
-  productId: number
+  id?: Id
+  productId: Id
   productName?: string
   quantity: number
 }
 
 export interface MaterialTransferOrder {
-  id: number
+  id: Id
   transferNo: string
-  fromWarehouseId: number
+  fromWarehouseId: Id
   fromWarehouseName?: string
-  toWarehouseId: number
+  toWarehouseId: Id
   toWarehouseName?: string
   status?: MaterialOrderStatus
   remark?: string
@@ -78,10 +79,10 @@ export interface MaterialTransferOrder {
 
 export interface MaterialStockAmountItem {
   dimension?: 'PRODUCT' | 'WAREHOUSE' | 'CATEGORY'
-  productId?: number
+  productId?: Id
   productCode?: string
   productName?: string
-  warehouseId?: number
+  warehouseId?: Id
   warehouseName?: string
   category?: string
   totalQuantity: number

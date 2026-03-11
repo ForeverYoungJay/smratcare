@@ -36,14 +36,14 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { getStockAmount, getWarehousePage } from '../../api/materialCenter'
-import type { MaterialStockAmountItem } from '../../types'
+import type { Id, MaterialStockAmountItem, MaterialWarehouseItem } from '../../types'
 
 const loading = ref(false)
 const rows = ref<Array<MaterialStockAmountItem & { rowKey: string; displayName: string }>>([])
-const warehouseOptions = ref<Array<{ label: string; value: number }>>([])
+const warehouseOptions = ref<Array<{ label: string; value: Id }>>([])
 const query = reactive({
   dimension: 'PRODUCT' as 'PRODUCT' | 'WAREHOUSE' | 'CATEGORY',
-  warehouseId: undefined as number | undefined,
+  warehouseId: undefined as Id | undefined,
   category: ''
 })
 
@@ -89,7 +89,7 @@ async function fetchData() {
 onMounted(async () => {
   const warehouseRes = await getWarehousePage({ pageNo: 1, pageSize: 500, enabledOnly: true })
   warehouseOptions.value = (warehouseRes.list || [])
-    .map((it: { id: number; warehouseName?: string }) => ({ label: it.warehouseName || `仓库${it.id}`, value: it.id }))
+    .map((it: MaterialWarehouseItem) => ({ label: it.warehouseName || `仓库${it.id}`, value: it.id }))
   fetchData()
 })
 </script>

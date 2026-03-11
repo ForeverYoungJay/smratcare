@@ -96,14 +96,14 @@ import {
   getDiningMealOrderPage,
   getDiningDeliveryAreaList
 } from '../../api/dining'
-import type { DiningDeliveryRecord, DiningMealOrder, PageResult } from '../../types'
+import type { DiningDeliveryRecord, DiningMealOrder, Id, PageResult } from '../../types'
 
 const statusOptions = DINING_DELIVERY_STATUS_OPTIONS
 
 const loading = ref(false)
 const rows = ref<DiningDeliveryRecord[]>([])
-const mealOrderOptions = ref<{ label: string; value: number; orderNo: string; deliveryAreaId?: number; deliveryAreaName?: string }[]>([])
-const deliveryAreaOptions = ref<{ label: string; value: number; name: string }[]>([])
+const mealOrderOptions = ref<{ label: string; value: Id; orderNo: string; deliveryAreaId?: Id; deliveryAreaName?: string }[]>([])
+const deliveryAreaOptions = ref<{ label: string; value: Id; name: string }[]>([])
 const query = reactive({
   range: undefined as [Dayjs, Dayjs] | undefined,
   status: undefined as string | undefined,
@@ -115,10 +115,10 @@ const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChange
 const editOpen = ref(false)
 const saving = ref(false)
 const form = reactive({
-  id: undefined as number | undefined,
-  mealOrderId: undefined as number | undefined,
+  id: undefined as Id | undefined,
+  mealOrderId: undefined as Id | undefined,
   orderNo: '',
-  deliveryAreaId: undefined as number | undefined,
+  deliveryAreaId: undefined as Id | undefined,
   deliveryAreaName: '',
   deliveredByName: '',
   deliveredAt: undefined as Dayjs | undefined,
@@ -177,7 +177,7 @@ async function loadDeliveryAreaOptions() {
   const list = await getDiningDeliveryAreaList({})
   deliveryAreaOptions.value = (list || []).map((item: any) => ({
     label: `${item.areaCode}-${item.areaName}`,
-    value: Number(item.id),
+    value: String(item.id),
     name: item.areaName
   }))
 }
@@ -186,14 +186,14 @@ async function searchMealOrders(keyword = '') {
   const page = await getDiningMealOrderPage({ pageNo: 1, pageSize: 30, keyword })
   mealOrderOptions.value = (page.list || []).map((item: DiningMealOrder) => ({
     label: `${item.orderNo} / ${item.elderName || ''}`,
-    value: Number(item.id),
+    value: String(item.id),
     orderNo: item.orderNo,
     deliveryAreaId: item.deliveryAreaId,
     deliveryAreaName: item.deliveryAreaName
   }))
 }
 
-function onMealOrderChange(value: number | undefined) {
+function onMealOrderChange(value: Id | undefined) {
   const selected = mealOrderOptions.value.find((item) => item.value === value)
   form.orderNo = selected?.orderNo || ''
   form.deliveryAreaId = undefined
@@ -204,7 +204,7 @@ function onMealOrderChange(value: number | undefined) {
   }
 }
 
-function onDeliveryAreaChange(value: number | undefined) {
+function onDeliveryAreaChange(value: Id | undefined) {
   const selected = deliveryAreaOptions.value.find((item) => item.value === value)
   form.deliveryAreaName = selected?.name || ''
 }

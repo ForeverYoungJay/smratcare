@@ -256,7 +256,7 @@ import { getWarehousePage } from '../../api/materialCenter'
 import { getProductPage } from '../../api/store'
 import { createOaTask, uploadOaFile } from '../../api/oa'
 import { useUserStore } from '../../stores/user'
-import type { InventoryAdjustmentDiffItem, InventoryAdjustmentItem, PageResult, ProductItem } from '../../types'
+import type { Id, InventoryAdjustmentDiffItem, InventoryAdjustmentItem, MaterialWarehouseItem, PageResult, ProductItem } from '../../types'
 
 const userStore = useUserStore()
 const loading = ref(false)
@@ -267,7 +267,7 @@ const total = ref(0)
 const products = ref<ProductItem[]>([])
 const loadingReport = ref(false)
 const reportRows = ref<Array<InventoryAdjustmentDiffItem & { key: string }>>([])
-const warehouseOptions = ref<Array<{ label: string; value: number }>>([])
+const warehouseOptions = ref<Array<{ label: string; value: Id }>>([])
 const categoryOptions = ref<Array<{ label: string; value: string }>>([])
 const uploadedPhotoUrls = ref<string[]>([])
 const productOptions = computed(() =>
@@ -304,8 +304,8 @@ const periodTypeOptions = [
 ]
 
 const query = reactive({
-  productId: undefined as number | undefined,
-  warehouseId: undefined as number | undefined,
+  productId: undefined as Id | undefined,
+  warehouseId: undefined as Id | undefined,
   category: undefined as string | undefined,
   inventoryType: undefined as string | undefined,
   adjustType: undefined as 'GAIN' | 'LOSS' | undefined,
@@ -315,8 +315,8 @@ const query = reactive({
 })
 
 const createForm = reactive({
-  productId: undefined as number | undefined,
-  warehouseId: undefined as number | undefined,
+  productId: undefined as Id | undefined,
+  warehouseId: undefined as Id | undefined,
   inventoryType: 'MEDICINE',
   adjustType: 'GAIN' as 'GAIN' | 'LOSS',
   adjustQty: 1,
@@ -379,7 +379,7 @@ async function fetchDiffReport() {
     })
     reportRows.value = (res || []).map((it) => ({
       ...it,
-      key: `${it.productId || 0}-${it.warehouseId || 0}`
+      key: `${it.productId || ''}-${it.warehouseId || ''}`
     }))
   } catch (error: any) {
     message.error(error?.message || '加载盘点差异报表失败')
@@ -556,7 +556,7 @@ async function createPeriodicTaskIfNeeded(inventoryTypeLabelText: string) {
   const endTime = schedule.dueDate.endOf('day')
   const title = createForm.periodTitle.trim()
     || `${schedule.titleRange}全院${inventoryTypeLabelText}`
-  const productName = products.value.find((item) => item.id === createForm.productId)?.productName || '-'
+  const productName = products.value.find((item) => String(item.id) === String(createForm.productId))?.productName || '-'
   const trackingNo = `INV-${dayjs().format('YYYYMMDDHHmmss')}-${Math.floor(Math.random() * 900 + 100)}`
   return createOaTask({
     title,
@@ -646,7 +646,7 @@ onMounted(async () => {
       getProductPage({ pageNo: 1, pageSize: 500 })
     ])
     warehouseOptions.value = (warehouseRes?.list || [])
-      .map((it: { id: number; warehouseName?: string }) => ({ label: it.warehouseName || `仓库${it.id}`, value: it.id }))
+      .map((it: MaterialWarehouseItem) => ({ label: it.warehouseName || `仓库${it.id}`, value: it.id }))
     products.value = productRes?.list || []
     const categorySet = new Set<string>()
     for (const row of products.value) {

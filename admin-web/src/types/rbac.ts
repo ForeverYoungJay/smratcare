@@ -1,15 +1,17 @@
+import type { Id } from './common'
+
 export interface StaffItem {
-  id: number
+  id: Id
   username: string
   realName: string
   status: number
   departmentId?: number
-  orgId?: number
+  orgId?: Id
   staffNo?: string
   phone?: string
   email?: string
-  directLeaderId?: number
-  indirectLeaderId?: number
+  directLeaderId?: Id
+  indirectLeaderId?: Id
   gender?: number
   password?: string
   roleCodes?: string[]
@@ -21,7 +23,7 @@ export interface RoleItem {
   roleName: string
   roleCode: string
   roleDesc?: string
-  orgId?: number
+  orgId?: Id
   status?: number
 }
 
@@ -31,7 +33,7 @@ export interface DepartmentItem {
   deptCode?: string
   parentId?: number
   sortNo?: number
-  orgId?: number
+  orgId?: Id
   status?: number
 }
 
@@ -47,5 +49,6 @@ export interface OrgItem {
 }
 
 export interface StaffRoleAssignRequest {
+  staffId?: number
   roleIds: number[]
 }

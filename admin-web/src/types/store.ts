@@ -1,7 +1,7 @@
 import type { Id } from './common'
 
 export interface ProductItem {
-  id: number
+  id: Id
   idStr?: string
   productCode?: string
   productName: string
@@ -34,7 +34,7 @@ export interface OrderItem {
 }
 
 export interface OrderLineItem {
-  productId: number
+  productId: Id
   productName?: string
   quantity: number
   unitPrice?: number
@@ -55,22 +55,22 @@ export interface FifoLogItem {
 
 export interface StoreOrderPreviewRequest {
   elderId: Id
-  productId: number
+  productId: Id
   qty: number
 }
 
 export interface StoreOrderSubmitRequest {
   elderId: Id
-  productId: number
+  productId: Id
   qty: number
 }
 
 export interface OrderCancelRequest {
-  orderId: number
+  orderId: Id
 }
 
 export interface OrderRefundRequest {
-  orderId: number
+  orderId: Id
   reason?: string
 }
 
@@ -105,7 +105,7 @@ export interface ForbiddenTagGroup {
 
 export interface PointsAccountItem {
   id: Id
-  orgId?: number
+  orgId?: Id
   elderId: Id
   elderName?: string
   pointsBalance?: number

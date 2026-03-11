@@ -1,3 +1,5 @@
+import type { Id } from './common'
+
 export interface LogisticsNamedStatItem {
   name: string
   quantity: number
@@ -107,7 +109,7 @@ export interface LogisticsWorkbenchSummary {
 export type LogisticsEquipmentStatus = 'ENABLED' | 'DISABLED' | 'MAINTENANCE' | 'SCRAPPED'
 
 export interface LogisticsEquipmentArchive {
-  id: number
+  id: Id
   equipmentCode: string
   equipmentName: string
   category?: string
@@ -125,8 +127,8 @@ export interface LogisticsEquipmentArchive {
 }
 
 export interface LogisticsMaintenanceTodoJobLog {
-  id: number
-  orgId?: number
+  id: Id
+  orgId?: Id
   triggerType: 'MANUAL' | 'SCHEDULED' | 'RETRY'
   status: 'SUCCESS' | 'FAILED'
   days: number
@@ -135,7 +137,7 @@ export interface LogisticsMaintenanceTodoJobLog {
   skippedCount: number
   errorMessage?: string
   executedAt?: string
-  createdBy?: number
+  createdBy?: Id
   createTime?: string
   updateTime?: string
 }
@@ -154,7 +156,7 @@ export interface LogisticsMaintenanceTodoJobLogOverview {
   lastSkippedCount?: number
   lastErrorMessage?: string
 
-  lastFailedLogId?: number
+  lastFailedLogId?: Id
   lastFailedExecutedAt?: string
   lastFailedErrorMessage?: string
 }

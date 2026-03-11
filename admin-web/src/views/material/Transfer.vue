@@ -119,7 +119,7 @@ import {
   getWarehousePage,
   updateTransfer
 } from '../../api/materialCenter'
-import type { MaterialTransferOrder, MaterialWarehouseItem, PageResult, ProductItem } from '../../types'
+import type { Id, MaterialTransferOrder, MaterialWarehouseItem, PageResult, ProductItem } from '../../types'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -163,16 +163,16 @@ const warehouses = ref<MaterialWarehouseItem[]>([])
 const products = ref<ProductItem[]>([])
 const warehouseOptions = computed(() => warehouses.value.map((it) => ({ label: it.warehouseName, value: it.id })))
 const productOptions = computed(() =>
-  products.value.map((it) => ({ label: `${it.productName} (ID:${it.idStr || it.id})`, value: Number(it.idStr || it.id) }))
+  products.value.map((it) => ({ label: `${it.productName} (ID:${it.idStr || it.id})`, value: String(it.id) }))
 )
 
 const editorOpen = ref(false)
-const editingId = ref<number>()
+const editingId = ref<Id>()
 const form = reactive({
-  fromWarehouseId: undefined as number | undefined,
-  toWarehouseId: undefined as number | undefined,
+  fromWarehouseId: undefined as Id | undefined,
+  toWarehouseId: undefined as Id | undefined,
   remark: '',
-  items: [] as Array<{ _idx: number; productId: number; quantity: number }>
+  items: [] as Array<{ _idx: number; productId: Id; quantity: number }>
 })
 
 function statusColor(status?: string) {
@@ -228,12 +228,12 @@ async function openCreate() {
     fromWarehouseId: undefined,
     toWarehouseId: undefined,
     remark: '',
-    items: [{ _idx: Date.now(), productId: 0, quantity: 1 }]
+    items: [{ _idx: Date.now(), productId: '' as Id, quantity: 1 }]
   })
   editorOpen.value = true
 }
 
-async function openEdit(id: number) {
+async function openEdit(id: Id) {
   await loadOptions()
   const order = await getTransferDetail(id)
   if (order.status !== ORDER_STATUS.DRAFT) {
@@ -256,12 +256,12 @@ async function openEdit(id: number) {
 }
 
 function sanitizeDisabledWarehouseSelection() {
-  const fromWarehouse = warehouses.value.find((it) => it.id === form.fromWarehouseId)
+  const fromWarehouse = warehouses.value.find((it) => String(it.id) === String(form.fromWarehouseId))
   if (form.fromWarehouseId && !fromWarehouse) {
     form.fromWarehouseId = undefined
     message.warning('原调出仓库不可用，已自动清空，请重新选择（原因：仓库已停用或不存在）')
   }
-  const toWarehouse = warehouses.value.find((it) => it.id === form.toWarehouseId)
+  const toWarehouse = warehouses.value.find((it) => String(it.id) === String(form.toWarehouseId))
   if (form.toWarehouseId && !toWarehouse) {
     form.toWarehouseId = undefined
     message.warning('原调入仓库不可用，已自动清空，请重新选择（原因：仓库已停用或不存在）')
@@ -269,7 +269,7 @@ function sanitizeDisabledWarehouseSelection() {
 }
 
 function addItem() {
-  form.items.push({ _idx: Date.now() + Math.random(), productId: 0, quantity: 1 })
+  form.items.push({ _idx: Date.now() + Math.random(), productId: '' as Id, quantity: 1 })
 }
 
 function removeItem(index: number) {
@@ -281,13 +281,13 @@ async function submit() {
     message.warning('请选择调出和调入仓库')
     return
   }
-  const fromWarehouse = warehouses.value.find((it) => it.id === form.fromWarehouseId)
+  const fromWarehouse = warehouses.value.find((it) => String(it.id) === String(form.fromWarehouseId))
   if (!fromWarehouse) {
     message.warning('调出仓库不可用，请选择启用中的仓库（原因：仓库已停用或不存在）')
     form.fromWarehouseId = undefined
     return
   }
-  const toWarehouse = warehouses.value.find((it) => it.id === form.toWarehouseId)
+  const toWarehouse = warehouses.value.find((it) => String(it.id) === String(form.toWarehouseId))
   if (!toWarehouse) {
     message.warning('调入仓库不可用，请选择启用中的仓库（原因：仓库已停用或不存在）')
     form.toWarehouseId = undefined
@@ -306,7 +306,7 @@ async function submit() {
     message.warning('请完善明细中的物资和数量')
     return
   }
-  const productIds = form.items.map((it) => Number(it.productId))
+  const productIds = form.items.map((it) => String(it.productId))
   if (new Set(productIds).size !== productIds.length) {
     message.warning('同一物资不能重复添加')
     return
@@ -334,12 +334,12 @@ async function submit() {
   }
 }
 
-async function viewDetail(id: number) {
+async function viewDetail(id: Id) {
   detail.value = await getTransferDetail(id)
   detailOpen.value = true
 }
 
-async function complete(id: number) {
+async function complete(id: Id) {
   const confirmed = await confirmAction('确认执行调拨完成？', '执行后将同步扣减调出仓并增加调入仓库存')
   if (!confirmed) {
     return
@@ -349,7 +349,7 @@ async function complete(id: number) {
   fetchData()
 }
 
-async function cancel(id: number) {
+async function cancel(id: Id) {
   const confirmed = await confirmAction('确认作废调拨单？', '作废后该单据不可继续执行')
   if (!confirmed) {
     return

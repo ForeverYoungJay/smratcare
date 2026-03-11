@@ -1,12 +1,12 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import { getSupplierPage } from '../api/materialCenter'
-import type { MaterialSupplierItem, PageResult } from '../types'
+import type { Id, MaterialSupplierItem, PageResult } from '../types'
 import { subscribeLiveSync } from '../utils/liveSync'
 import { fuzzyScore, toPinyinInitials } from './entitySearch'
 
 export interface SupplierOption {
   label: string
-  value: number
+  value: Id
   name: string
 }
 
@@ -25,7 +25,7 @@ function toSupplierOption(item: MaterialSupplierItem): SupplierOption {
   const suffix = item.supplierCode ? ` (${item.supplierCode})` : ''
   return {
     label: `${name}${suffix}`,
-    value: item.id,
+    value: String(item.id),
     name
   }
 }
@@ -36,9 +36,10 @@ function supplierSearchText(item: MaterialSupplierItem) {
 }
 
 function dedupeSuppliers(rows: MaterialSupplierItem[]) {
-  const map = new Map<number, MaterialSupplierItem>()
+  const map = new Map<Id, MaterialSupplierItem>()
   rows.forEach((item) => {
-    if (!map.has(item.id)) map.set(item.id, item)
+    const key = String(item.id)
+    if (!map.has(key)) map.set(key, item)
   })
   return Array.from(map.values())
 }
@@ -93,13 +94,14 @@ export function useSupplierOptions(config: UseSupplierOptionsConfig = {}) {
     }
   }
 
-  function ensureSelectedSupplier(supplierId?: number, supplierName?: string) {
+  function ensureSelectedSupplier(supplierId?: Id, supplierName?: string) {
     if (!supplierId) return
-    if (supplierOptions.value.some((item) => item.value === supplierId)) return
+    const value = String(supplierId)
+    if (supplierOptions.value.some((item) => item.value === value)) return
     const name = supplierName || `供应商#${supplierId}`
     supplierOptions.value.unshift({
       label: name,
-      value: supplierId,
+      value,
       name
     })
   }

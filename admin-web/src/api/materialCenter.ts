@@ -36,11 +36,11 @@ export function createWarehouse(data: Partial<MaterialWarehouseItem>) {
   return request.post<void>('/api/material/warehouse', data)
 }
 
-export function updateWarehouse(id: number, data: Partial<MaterialWarehouseItem>) {
+export function updateWarehouse(id: Id, data: Partial<MaterialWarehouseItem>) {
   return request.put<void>(`/api/material/warehouse/${id}`, data)
 }
 
-export function deleteWarehouse(id: number) {
+export function deleteWarehouse(id: Id) {
   return request.delete<void>(`/api/material/warehouse/${id}`)
 }
 
@@ -57,32 +57,32 @@ export function createSupplier(data: Partial<MaterialSupplierItem>) {
   return request.post<void>('/api/material/supplier', data)
 }
 
-export function updateSupplier(id: number, data: Partial<MaterialSupplierItem>) {
+export function updateSupplier(id: Id, data: Partial<MaterialSupplierItem>) {
   return request.put<void>(`/api/material/supplier/${id}`, data)
 }
 
-export function deleteSupplier(id: number) {
+export function deleteSupplier(id: Id) {
   return request.delete<void>(`/api/material/supplier/${id}`)
 }
 
 export function getPurchasePage(params: {
   pageNo?: number
   pageSize?: number
-  warehouseId?: number
-  supplierId?: number
+  warehouseId?: Id
+  supplierId?: Id
   status?: MaterialOrderStatus
   keyword?: string
 }) {
   return fetchPage<MaterialPurchaseOrder>('/api/material/purchase/page', params)
 }
 
-export function getPurchaseDetail(id: number) {
+export function getPurchaseDetail(id: Id) {
   return request.get<MaterialPurchaseOrder>(`/api/material/purchase/${id}`)
 }
 
 export function createPurchase(data: {
-  warehouseId?: number
-  supplierId?: number
+  warehouseId?: Id
+  supplierId?: Id
   orderDate?: string
   remark?: string
   items: MaterialPurchaseOrderItem[]
@@ -91,10 +91,10 @@ export function createPurchase(data: {
 }
 
 export function updatePurchase(
-  id: number,
+  id: Id,
   data: {
-    warehouseId?: number
-    supplierId?: number
+    warehouseId?: Id
+    supplierId?: Id
     orderDate?: string
     remark?: string
     items: MaterialPurchaseOrderItem[]
@@ -103,15 +103,15 @@ export function updatePurchase(
   return request.put<void>(`/api/material/purchase/${id}`, data)
 }
 
-export function approvePurchase(id: number) {
+export function approvePurchase(id: Id) {
   return request.post<void>(`/api/material/purchase/${id}/approve`)
 }
 
-export function completePurchase(id: number) {
+export function completePurchase(id: Id) {
   return request.post<void>(`/api/material/purchase/${id}/complete`)
 }
 
-export function cancelPurchase(id: number) {
+export function cancelPurchase(id: Id) {
   return request.post<void>(`/api/material/purchase/${id}/cancel`)
 }
 
@@ -124,13 +124,13 @@ export function getTransferPage(params: {
   return fetchPage<MaterialTransferOrder>('/api/material/transfer/page', params)
 }
 
-export function getTransferDetail(id: number) {
+export function getTransferDetail(id: Id) {
   return request.get<MaterialTransferOrder>(`/api/material/transfer/${id}`)
 }
 
 export function createTransfer(data: {
-  fromWarehouseId: number
-  toWarehouseId: number
+  fromWarehouseId: Id
+  toWarehouseId: Id
   remark?: string
   items: MaterialTransferItem[]
 }) {
@@ -138,10 +138,10 @@ export function createTransfer(data: {
 }
 
 export function updateTransfer(
-  id: number,
+  id: Id,
   data: {
-    fromWarehouseId: number
-    toWarehouseId: number
+    fromWarehouseId: Id
+    toWarehouseId: Id
     remark?: string
     items: MaterialTransferItem[]
   }
@@ -149,17 +149,17 @@ export function updateTransfer(
   return request.put<void>(`/api/material/transfer/${id}`, data)
 }
 
-export function completeTransfer(id: number) {
+export function completeTransfer(id: Id) {
   return request.post<void>(`/api/material/transfer/${id}/complete`)
 }
 
-export function cancelTransfer(id: number) {
+export function cancelTransfer(id: Id) {
   return request.post<void>(`/api/material/transfer/${id}/cancel`)
 }
 
 export function getStockAmount(params?: {
   dimension?: 'PRODUCT' | 'WAREHOUSE' | 'CATEGORY'
-  warehouseId?: number
+  warehouseId?: Id
   category?: string
 }) {
   return request.get<MaterialStockAmountItem[]>('/api/material/stock/amount', { params })
@@ -209,7 +209,7 @@ export function getOutboundSheetPage(params: any) {
   return fetchPage<InventoryOutboundSheet>('/api/inventory/outbound/sheet/page', params)
 }
 
-export function getOutboundSheetDetail(id: number) {
+export function getOutboundSheetDetail(id: Id) {
   return request.get<InventoryOutboundSheet>('/api/inventory/outbound/sheet/detail', { params: { id } })
 }
 
@@ -217,7 +217,7 @@ export function getOutboundSheetPrefill(params?: { elderId?: Id }) {
   return request.get<InventoryOutboundSheetPrefill>('/api/inventory/outbound/sheet/prefill', { params })
 }
 
-export function confirmOutboundSheet(id: number) {
+export function confirmOutboundSheet(id: Id) {
   return request.post<InventoryOutboundSheet>('/api/inventory/outbound/sheet/confirm', null, { params: { id } })
 }
 

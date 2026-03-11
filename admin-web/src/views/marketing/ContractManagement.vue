@@ -97,7 +97,7 @@ import type { CrmContractItem, PageResult, SmsTaskItem } from '../../types'
 const loading = ref(false)
 const rows = ref<CrmContractItem[]>([])
 const total = ref(0)
-const selectedRowKeys = ref<Array<number | string>>([])
+const selectedRowKeys = ref<string[]>([])
 const selectedContracts = ref<CrmContractItem[]>([])
 
 const query = reactive({
@@ -127,8 +127,8 @@ const columns = [
 
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
-  onChange: (keys: (number | string)[], selectedRows: CrmContractItem[]) => {
-    selectedRowKeys.value = keys
+  onChange: (keys: Array<string | number>, selectedRows: CrmContractItem[]) => {
+    selectedRowKeys.value = keys.map((item) => String(item))
     selectedContracts.value = selectedRows
   }
 }))

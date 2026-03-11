@@ -4,6 +4,29 @@
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="姓名/工号/手机号" allow-clear />
       </a-form-item>
+      <a-form-item label="部门">
+        <a-select
+          v-model:value="query.departmentId"
+          allow-clear
+          show-search
+          :filter-option="false"
+          :options="departmentFilterOptions"
+          placeholder="选择部门"
+          style="width: 200px"
+          @search="searchDepartments"
+          @focus="() => !departmentOptions.length && searchDepartments('')"
+        />
+      </a-form-item>
+      <a-form-item label="角色">
+        <a-select
+          v-model:value="query.roleId"
+          allow-clear
+          show-search
+          :options="roleFilterOptions"
+          placeholder="选择角色"
+          style="width: 220px"
+        />
+      </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openDrawer()">新增档案</a-button>
         <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑档案</a-button>
@@ -58,6 +81,21 @@
         </a-form-item>
         <a-form-item label="用工类型">
           <a-select v-model:value="form.employmentType" :options="employmentOptions" />
+        </a-form-item>
+        <a-form-item label="合同编号">
+          <a-input v-model:value="form.contractNo" />
+        </a-form-item>
+        <a-form-item label="合同类型">
+          <a-select v-model:value="form.contractType" :options="contractTypeOptions" />
+        </a-form-item>
+        <a-form-item label="合同状态">
+          <a-select v-model:value="form.contractStatus" :options="contractStatusOptions" />
+        </a-form-item>
+        <a-form-item label="合同开始">
+          <a-date-picker v-model:value="form.contractStartDate" style="width: 100%" />
+        </a-form-item>
+        <a-form-item label="合同结束">
+          <a-date-picker v-model:value="form.contractEndDate" style="width: 100%" />
         </a-form-item>
         <a-form-item label="入职日期">
           <a-date-picker v-model:value="form.hireDate" style="width: 100%" />
@@ -115,16 +153,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { getHrStaffPage, getHrProfile, upsertHrProfile, terminateStaff, reinstateStaff } from '../../api/hr'
+import { getRolePage } from '../../api/rbac'
 import { openPrintTableReport } from '../../utils/print'
 import { useStaffOptions } from '../../composables/useStaffOptions'
-import type { HrStaffProfile, PageResult } from '../../types'
+import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
+import type { HrStaffProfile, PageResult, RoleItem } from '../../types'
 
 const props = withDefaults(defineProps<{
   title?: string
@@ -137,12 +178,22 @@ const props = withDefaults(defineProps<{
 const pageTitle = props.title
 const pageSubTitle = props.subTitle
 
-const query = reactive({ keyword: undefined as string | undefined, pageNo: 1, pageSize: 10 })
+const route = useRoute()
+const router = useRouter()
+const query = reactive({
+  keyword: undefined as string | undefined,
+  departmentId: undefined as number | undefined,
+  roleId: undefined as number | undefined,
+  pageNo: 1,
+  pageSize: 10
+})
 const rows = ref<HrStaffProfile[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const { staffOptions, staffLoading, searchStaff, ensureSelectedStaff } = useStaffOptions({ pageSize: 120 })
+const { departmentOptions, searchDepartments } = useDepartmentOptions({ pageSize: 200, preloadSize: 500 })
+const roles = ref<RoleItem[]>([])
 const selectedRowKeys = ref<string[]>([])
 
 const columns = [
@@ -152,6 +203,8 @@ const columns = [
   { title: '手机号', dataIndex: 'phone', key: 'phone', width: 140 },
   { title: '岗位', dataIndex: 'jobTitle', key: 'jobTitle', width: 140 },
   { title: '用工类型', dataIndex: 'employmentType', key: 'employmentType', width: 120 },
+  { title: '合同编号', dataIndex: 'contractNo', key: 'contractNo', width: 160 },
+  { title: '合同到期', dataIndex: 'contractEndDate', key: 'contractEndDate', width: 120 },
   { title: '离职日期', dataIndex: 'leaveDate', key: 'leaveDate', width: 120 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 100 }
 ]
@@ -167,6 +220,23 @@ const employmentOptions = [
   { label: '兼职', value: 'PARTTIME' },
   { label: '外包', value: 'OUTSOURCE' }
 ]
+const contractTypeOptions = [
+  { label: '固定期限', value: 'FIXED_TERM' },
+  { label: '无固定期限', value: 'OPEN_ENDED' },
+  { label: '实习协议', value: 'INTERNSHIP' },
+  { label: '劳务协议', value: 'SERVICE' }
+]
+const contractStatusOptions = [
+  { label: '待签署', value: 'PENDING' },
+  { label: '已生效', value: 'ACTIVE' },
+  { label: '续签处理中', value: 'RENEWAL_PENDING' },
+  { label: '已到期', value: 'EXPIRED' },
+  { label: '已终止', value: 'TERMINATED' }
+]
+const departmentFilterOptions = computed(() =>
+  departmentOptions.value.map((item) => ({ label: item.label, value: Number(item.value) })).filter((item) => Number.isFinite(item.value))
+)
+const roleFilterOptions = computed(() => roles.value.map((item) => ({ label: `${item.roleName} (${item.roleCode})`, value: item.id })))
 
 const drawerTitle = computed(() => (form.staffId ? '编辑档案' : '新增档案'))
 const rowSelection = computed(() => ({
@@ -190,6 +260,13 @@ async function fetchData() {
     }))
     pagination.total = res.total || res.list.length
     selectedRowKeys.value = []
+    if (!roles.value.length) {
+      const roleRes: PageResult<RoleItem> = await getRolePage({ pageNo: 1, pageSize: 200 })
+      roles.value = roleRes.list || []
+    }
+    if (!departmentOptions.value.length) {
+      await searchDepartments('')
+    }
   } catch {
     rows.value = []
   } finally {
@@ -206,8 +283,18 @@ function handleTableChange(pag: any) {
 }
 
 function onReset() {
+  query.keyword = undefined
+  query.departmentId = undefined
+  query.roleId = undefined
   query.pageNo = 1
   pagination.current = 1
+  router.replace({
+    query: {
+      ...route.query,
+      departmentId: undefined,
+      roleId: undefined
+    }
+  })
   fetchData()
 }
 
@@ -240,6 +327,12 @@ async function openDrawer(record?: HrStaffProfile) {
   if (form.hireDate && typeof form.hireDate === 'string') {
     form.hireDate = dayjs(form.hireDate)
   }
+  if (form.contractStartDate && typeof form.contractStartDate === 'string') {
+    form.contractStartDate = dayjs(form.contractStartDate)
+  }
+  if (form.contractEndDate && typeof form.contractEndDate === 'string') {
+    form.contractEndDate = dayjs(form.contractEndDate)
+  }
   if (form.leaveDate && typeof form.leaveDate === 'string') {
     form.leaveDate = dayjs(form.leaveDate)
   }
@@ -261,15 +354,21 @@ async function submit() {
   saving.value = true
   try {
     const payload = { ...form } as any
-    if (payload.hireDate && typeof payload.hireDate === 'object' && payload.hireDate.format) {
-      payload.hireDate = payload.hireDate.format('YYYY-MM-DD')
-    }
-    if (payload.leaveDate && typeof payload.leaveDate === 'object' && payload.leaveDate.format) {
-      payload.leaveDate = payload.leaveDate.format('YYYY-MM-DD')
-    }
-    if (payload.birthday && typeof payload.birthday === 'object' && payload.birthday.format) {
-      payload.birthday = payload.birthday.format('YYYY-MM-DD')
-    }
+    payload.hireDate = payload.hireDate && typeof payload.hireDate === 'object' && payload.hireDate.format
+      ? payload.hireDate.format('YYYY-MM-DD')
+      : null
+    payload.contractStartDate = payload.contractStartDate && typeof payload.contractStartDate === 'object' && payload.contractStartDate.format
+      ? payload.contractStartDate.format('YYYY-MM-DD')
+      : null
+    payload.contractEndDate = payload.contractEndDate && typeof payload.contractEndDate === 'object' && payload.contractEndDate.format
+      ? payload.contractEndDate.format('YYYY-MM-DD')
+      : null
+    payload.leaveDate = payload.leaveDate && typeof payload.leaveDate === 'object' && payload.leaveDate.format
+      ? payload.leaveDate.format('YYYY-MM-DD')
+      : null
+    payload.birthday = payload.birthday && typeof payload.birthday === 'object' && payload.birthday.format
+      ? payload.birthday.format('YYYY-MM-DD')
+      : null
     await upsertHrProfile(payload)
     message.success('保存成功')
     drawerOpen.value = false
@@ -428,6 +527,24 @@ function printBirthdayLedger() {
 }
 
 searchStaff('')
+function syncQueryFromRoute() {
+  const nextDepartmentId = route.query.departmentId == null || route.query.departmentId === '' ? undefined : Number(route.query.departmentId)
+  const nextRoleId = route.query.roleId == null || route.query.roleId === '' ? undefined : Number(route.query.roleId)
+  query.departmentId = Number.isFinite(nextDepartmentId as number) ? Number(nextDepartmentId) : undefined
+  query.roleId = Number.isFinite(nextRoleId as number) ? Number(nextRoleId) : undefined
+}
+
+watch(
+  () => [route.query.departmentId, route.query.roleId],
+  () => {
+    syncQueryFromRoute()
+    query.pageNo = 1
+    pagination.current = 1
+    fetchData()
+  }
+)
+
+syncQueryFromRoute()
 fetchData()
 </script>
 

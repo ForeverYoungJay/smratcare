@@ -114,7 +114,7 @@ import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { useStaffOptions } from '../../composables/useStaffOptions'
 import { createSchedule, deleteSchedule, getSchedulePage, updateSchedule } from '../../api/schedule'
-import type { PageResult, ScheduleItem } from '../../types'
+import type { Id, PageResult, ScheduleItem } from '../../types'
 import { resolveCareError } from './careError'
 
 const loading = ref(false)
@@ -143,7 +143,7 @@ const columns = [
 
 const editOpen = ref(false)
 const dutyDate = ref<Dayjs | undefined>()
-const form = reactive<Partial<ScheduleItem> & { staffId?: string | number }>({ status: 1 })
+const form = reactive<Partial<ScheduleItem> & { staffId?: Id }>({ status: 1 })
 
 async function fetchData() {
   loading.value = true
@@ -151,7 +151,7 @@ async function fetchData() {
     const res: PageResult<ScheduleItem> = await getSchedulePage({
       pageNo: query.pageNo,
       pageSize: query.pageSize,
-      staffId: query.staffId ? Number(query.staffId) : undefined,
+      staffId: query.staffId || undefined,
       status: query.status,
       dateFrom: query.range?.[0] ? dayjs(query.range[0]).format('YYYY-MM-DD') : undefined,
       dateTo: query.range?.[1] ? dayjs(query.range[1]).format('YYYY-MM-DD') : undefined
@@ -203,7 +203,7 @@ async function submit() {
   const selected = staffOptions.value.find((item) => String(item.value) === String(form.staffId))
   const payload = {
     ...form,
-    staffId: Number(form.staffId),
+    staffId: form.staffId as Id,
     staffName: selected?.name || form.staffName,
     dutyDate: dutyDate.value.format('YYYY-MM-DD')
   }

@@ -97,7 +97,7 @@ import {
   materialEnableStatusColor,
   materialEnableStatusLabel
 } from '../../utils/materialStatus'
-import type { MaterialSupplierItem, PageResult } from '../../types'
+import type { Id, MaterialSupplierItem, PageResult } from '../../types'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -125,7 +125,7 @@ const statusOptions = MATERIAL_ENABLE_STATUS_OPTIONS
 
 const editorOpen = ref(false)
 const formRef = ref()
-const editingId = ref<number>()
+const editingId = ref<Id>()
 const form = reactive<Partial<MaterialSupplierItem>>({
   supplierCode: '',
   supplierName: '',
@@ -213,7 +213,7 @@ async function submit() {
   }
 }
 
-async function handleDelete(id: number) {
+async function handleDelete(id: Id) {
   await deleteSupplier(id)
   message.success('已删除')
   fetchData()

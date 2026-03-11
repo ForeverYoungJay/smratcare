@@ -163,211 +163,368 @@
     <a-modal
       v-model:open="open"
       :title="contractModalTitle"
-      width="920px"
+      width="1120px"
       :confirm-loading="submitting"
       :footer="contractViewMode ? null : undefined"
       @ok="onContractModalOk"
     >
-      <a-form ref="formRef" :model="form" :rules="rules" layout="vertical" :disabled="contractViewMode">
+      <a-spin :spinning="elderSnapshotLoading">
         <a-alert
           type="info"
           show-icon
-          style="margin-bottom: 12px"
+          style="margin-bottom: 16px"
           :message="contractFormGuideText"
         />
-        <a-segmented
-          v-model:value="contractFormSection"
-          :options="contractFormSectionOptions"
-          style="margin-bottom: 12px"
-        />
-        <a-row :gutter="16">
-          <a-col v-if="contractFormSection === 'BASIC'" :span="12">
-            <a-form-item label="合同编号" name="contractNo">
-              <a-input :value="form.contractNo" disabled placeholder="保存后后端自动生成（gfyy+年月日+编号）" />
-            </a-form-item>
-          </a-col>
-          <a-col v-if="contractFormSection === 'BASIC'" :span="12">
-            <a-form-item label="合同状态">
-              <a-input v-model:value="form.contractStatus" disabled />
-            </a-form-item>
-          </a-col>
-          <a-col v-if="contractFormSection === 'BASIC'" :span="12">
-            <a-form-item label="流程阶段">
-              <a-input :value="flowStageText((form.flowStage as any) || 'PENDING_ASSESSMENT')" disabled />
-            </a-form-item>
-          </a-col>
-          <a-col v-if="contractFormSection === 'BASIC'" :span="12">
-            <a-form-item label="签约日期">
-              <a-date-picker v-model:value="form.contractSignedAt" value-format="YYYY-MM-DD HH:mm:ss" show-time style="width: 100%" />
-            </a-form-item>
-          </a-col>
-          <a-col v-if="contractFormSection === 'BASIC'" :span="12">
-            <a-form-item label="合同有效期止"><a-date-picker v-model:value="form.contractExpiryDate" value-format="YYYY-MM-DD" style="width: 100%" /></a-form-item>
-          </a-col>
-          <a-col v-if="contractFormSection === 'BASIC'" :span="12"><a-form-item label="营销人员"><a-input v-model:value="form.marketerName" placeholder="请输入负责营销人员姓名" /></a-form-item></a-col>
-          <a-col v-if="contractFormSection === 'BASIC'" :span="12">
-            <a-form-item label="优惠政策（联动运营政策，最多2条）">
-              <a-select
-                v-model:value="selectedPolicyValues"
-                mode="multiple"
-                :max-tag-count="2"
-                allow-clear
-                show-search
-                :loading="policyLoading"
-                :options="policyOptions"
-                placeholder="请选择运营政策（最多2条）"
-                :filter-option="policyFilterOption"
-                @change="onPolicySelectionChange"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col v-if="contractFormSection === 'ELDER'" :span="12">
-            <a-form-item label="签约房号">
-              <a-input
-                v-model:value="form.reservationRoomNo"
-                :disabled="!form.id"
-                :placeholder="form.id ? '入住办理后自动回填，可手动修正' : '新增合同无需填写，入住办理时自动选择'"
-              />
-            </a-form-item>
-          </a-col>
-          <a-col v-if="contractFormSection === 'ELDER'" :span="12"><a-form-item label="姓名" name="elderName"><a-input ref="elderNameInputRef" v-model:value="form.elderName" placeholder="请输入长者姓名" /></a-form-item></a-col>
-          <a-col v-if="contractFormSection === 'ELDER'" :span="12"><a-form-item label="联系电话"><a-input v-model:value="form.elderPhone" placeholder="请输入长者联系电话" /></a-form-item></a-col>
-          <a-col v-if="contractFormSection === 'ELDER'" :span="12"><a-form-item label="身份证号"><a-input v-model:value="form.idCardNo" placeholder="自动识别生日/年龄" /></a-form-item></a-col>
-          <a-col v-if="contractFormSection === 'ELDER'" :span="12"><a-form-item label="家庭地址"><a-input v-model:value="form.homeAddress" placeholder="请输入长者家庭住址" /></a-form-item></a-col>
-          <a-col v-if="contractFormSection === 'ELDER'" :span="6"><a-form-item label="性别"><a-select v-model:value="form.gender" allow-clear><a-select-option :value="1">男</a-select-option><a-select-option :value="2">女</a-select-option></a-select></a-form-item></a-col>
-          <a-col v-if="contractFormSection === 'ELDER'" :span="6"><a-form-item label="年龄"><a-input-number v-model:value="form.age" :min="0" :max="120" style="width: 100%" /></a-form-item></a-col>
-          <a-col v-if="contractFormSection === 'ELDER'" :span="6"><a-form-item label="生日"><a-input :value="formDerivedBirthDate || '-'" readonly /></a-form-item></a-col>
-          <a-col v-if="contractFormSection === 'ELDER'" :span="6"><a-form-item label="身份证识别"><a-input :value="formDerivedBirthDate ? '已识别' : '未识别'" readonly /></a-form-item></a-col>
-          <a-col v-if="contractFormSection === 'ELDER'" :span="12">
-            <a-form-item label="护理等级">
-              <a-input v-model:value="elderFormExtra.careLevel" placeholder="如：一级护理/二级护理" />
-            </a-form-item>
-          </a-col>
-          <a-col v-if="contractFormSection === 'ELDER'" :span="12">
-            <a-form-item label="风险预担">
-              <a-select v-model:value="elderFormExtra.riskPrecommit" allow-clear placeholder="请选择风险处置策略">
-                <a-select-option value="RESCUE_FIRST">第一时间抢救</a-select-option>
-                <a-select-option value="NOTIFY_FAMILY_FIRST">第一时间通知家属</a-select-option>
-              </a-select>
-            </a-form-item>
-          </a-col>
-          <a-col v-if="contractFormSection === 'EXTRA'" :span="24">
-            <a-form-item label="补充备注">
-              <a-input-text-area
-                v-model:value="form.remark"
-                :rows="4"
-                placeholder="可填写签约背景、特殊照护提示、补充说明等"
-              />
-            </a-form-item>
-          </a-col>
-        </a-row>
-      </a-form>
-      <a-divider v-if="contractFormSection !== 'BASIC' || contractViewMode" style="margin: 8px 0 14px">长者信息快照（与长者详情一致）</a-divider>
-      <a-spin v-if="contractFormSection !== 'BASIC' || contractViewMode" :spinning="elderSnapshotLoading">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px">
-          <span style="color: #595959">分页填写：{{ contractInfoPage === 1 ? '老人基础信息' : contractInfoPage === 2 ? '家属信息' : '基础疾病信息' }}</span>
-          <a-pagination
-            :current="contractInfoPage"
-            :total="3"
-            :page-size="1"
-            size="small"
-            simple
-            @change="(page) => (contractInfoPage = page)"
-          />
-        </div>
-        <a-card v-show="contractInfoPage === 1" size="small" title="老人基础信息" class="snapshot-card" :bordered="false">
-          <a-descriptions :column="1" size="small" bordered>
-            <a-descriptions-item label="姓名">{{ elderSnapshot.base.fullName || '-' }}</a-descriptions-item>
-            <a-descriptions-item label="身份证">{{ elderSnapshot.base.idCardNo || '-' }}</a-descriptions-item>
-            <a-descriptions-item label="床位">{{ elderSnapshot.base.bedNo || '-' }}</a-descriptions-item>
-            <a-descriptions-item label="护理等级">{{ elderSnapshot.base.careLevel || '-' }}</a-descriptions-item>
-            <a-descriptions-item label="状态">{{ elderStatusText(elderSnapshot.base.status) }}</a-descriptions-item>
-            <a-descriptions-item label="生日">{{ elderSnapshot.base.birthDate || '-' }}</a-descriptions-item>
-            <a-descriptions-item label="风险预担">{{ riskPrecommitText(elderSnapshot.base.riskPrecommit) }}</a-descriptions-item>
-            <a-descriptions-item label="入院日期">{{ elderSnapshot.base.admissionDate || '-' }}</a-descriptions-item>
-            <a-descriptions-item label="家庭地址">{{ elderSnapshot.base.homeAddress || '-' }}</a-descriptions-item>
-          </a-descriptions>
-        </a-card>
-        <a-card v-show="contractInfoPage === 2" size="small" title="家属信息" class="snapshot-card" :bordered="false">
-                <div style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center">
-                  <span style="color: #595959">可绑定多人家属（每人手机号、身份证必填）</span>
-                  <a-button v-if="!contractViewMode" size="small" type="dashed" @click="addFamilyDraftRow">新增家属</a-button>
+        <div class="contract-workbench">
+          <div class="contract-workbench-head">
+            <div>
+              <div class="contract-workbench-kicker">{{ contractViewMode ? '合同详情' : (isCreateContractMode ? '新建合同' : '编辑合同') }}</div>
+              <div class="contract-workbench-title">{{ contractViewMode ? '合同与长者资料概览' : '一屏完成合同、长者、家属与疾病信息' }}</div>
+            </div>
+            <div class="contract-workbench-badges">
+              <a-tag color="blue">流程 {{ flowStageText((form.flowStage as any) || 'PENDING_ASSESSMENT') }}</a-tag>
+              <a-tag color="green">{{ form.contractStatus || '待评估' }}</a-tag>
+            </div>
+          </div>
+          <div v-if="contractViewMode" class="contract-readonly">
+            <div class="contract-section">
+              <div class="contract-section-head">
+                <div class="contract-section-title">合同摘要</div>
+                <div class="contract-section-desc">聚焦签约状态、营销归属与当前推进结果。</div>
+              </div>
+              <div class="readonly-grid readonly-grid-4">
+                <div class="readonly-item">
+                  <span class="readonly-label">合同编号</span>
+                  <strong class="readonly-value">{{ form.contractNo || '-' }}</strong>
                 </div>
-                <a-table
-                  :data-source="familyDraftRows"
-                  :columns="familyDraftColumns"
-                  size="small"
-                  :pagination="false"
-                  row-key="key"
-                  :locale="{ emptyText: '请点击“新增家属”录入' }"
-                  style="margin-bottom: 10px"
-                >
-                  <template #bodyCell="{ column, record }">
-                    <template v-if="column.key === 'realName'">
-                      <a-input v-if="!contractViewMode" v-model:value="record.realName" placeholder="姓名" />
-                      <span v-else>{{ record.realName || '-' }}</span>
-                    </template>
-                    <template v-else-if="column.key === 'relation'">
-                      <a-select
-                        v-if="!contractViewMode"
-                        v-model:value="record.relation"
-                        :options="familyRelationOptions"
-                        allow-clear
-                        placeholder="请选择关系"
-                        style="width: 100%"
-                      />
-                      <span v-else>{{ record.relation || '-' }}</span>
-                    </template>
-                    <template v-else-if="column.key === 'phone'">
-                      <a-input v-if="!contractViewMode" v-model:value="record.phone" placeholder="手机号" />
-                      <span v-else>{{ record.phone || '-' }}</span>
-                    </template>
-                    <template v-else-if="column.key === 'idCardNo'">
-                      <a-input v-if="!contractViewMode" v-model:value="record.idCardNo" placeholder="身份证号" />
-                      <span v-else>{{ record.idCardNo || '-' }}</span>
-                    </template>
-                    <template v-else-if="column.key === 'isPrimary'">
-                      <a-switch
-                        v-if="!contractViewMode"
-                        v-model:checked="record.isPrimary"
-                        @change="() => setPrimaryFamilyDraftRow(record.key)"
-                      />
-                      <span v-else>{{ record.isPrimary ? '是' : '否' }}</span>
-                    </template>
-                    <template v-else-if="column.key === 'operation'">
-                      <a-button v-if="!contractViewMode" type="link" danger @click="removeFamilyDraftRow(record.key)">删除</a-button>
-                      <span v-else>-</span>
-                    </template>
-                  </template>
-                </a-table>
-                <a-table
-                  :data-source="elderSnapshot.families"
-                  :columns="snapshotFamilyColumns"
-                  size="small"
-                  :pagination="false"
-                  row-key="id"
-                  :locale="{ emptyText: '暂无家属信息' }"
+                <div class="readonly-item">
+                  <span class="readonly-label">合同状态</span>
+                  <strong class="readonly-value">{{ form.contractStatus || '待评估' }}</strong>
+                </div>
+                <div class="readonly-item">
+                  <span class="readonly-label">流程阶段</span>
+                  <strong class="readonly-value">{{ flowStageText((form.flowStage as any) || 'PENDING_ASSESSMENT') }}</strong>
+                </div>
+                <div class="readonly-item">
+                  <span class="readonly-label">营销人员</span>
+                  <strong class="readonly-value">{{ form.marketerName || '-' }}</strong>
+                </div>
+                <div class="readonly-item">
+                  <span class="readonly-label">签约日期</span>
+                  <strong class="readonly-value">{{ form.contractSignedAt || '-' }}</strong>
+                </div>
+                <div class="readonly-item">
+                  <span class="readonly-label">合同有效期止</span>
+                  <strong class="readonly-value">{{ form.contractExpiryDate || '-' }}</strong>
+                </div>
+                <div class="readonly-item">
+                  <span class="readonly-label">签约房号</span>
+                  <strong class="readonly-value">{{ form.reservationRoomNo || '-' }}</strong>
+                </div>
+                <div class="readonly-item readonly-policies">
+                  <span class="readonly-label">优惠政策</span>
+                  <div class="readonly-tags">
+                    <a-tag v-for="item in selectedPolicyValues" :key="item" color="blue">{{ item }}</a-tag>
+                    <span v-if="!selectedPolicyValues.length" class="readonly-empty">未配置</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="contract-section">
+              <div class="contract-section-head">
+                <div class="contract-section-title">长者信息</div>
+                <div class="contract-section-desc">身份、联系与照护信息统一查看，避免来回切换页面。</div>
+              </div>
+              <div class="readonly-grid readonly-grid-4">
+                <div class="readonly-item">
+                  <span class="readonly-label">姓名</span>
+                  <strong class="readonly-value">{{ form.elderName || '-' }}</strong>
+                </div>
+                <div class="readonly-item">
+                  <span class="readonly-label">联系电话</span>
+                  <strong class="readonly-value">{{ form.elderPhone || '-' }}</strong>
+                </div>
+                <div class="readonly-item">
+                  <span class="readonly-label">身份证号</span>
+                  <strong class="readonly-value">{{ form.idCardNo || '-' }}</strong>
+                </div>
+                <div class="readonly-item">
+                  <span class="readonly-label">性别 / 年龄</span>
+                  <strong class="readonly-value">{{ genderText(form.gender) }} / {{ form.age ?? '-' }}</strong>
+                </div>
+                <div class="readonly-item">
+                  <span class="readonly-label">生日</span>
+                  <strong class="readonly-value">{{ formDerivedBirthDate || '-' }}</strong>
+                </div>
+                <div class="readonly-item">
+                  <span class="readonly-label">护理等级</span>
+                  <strong class="readonly-value">{{ elderFormExtra.careLevel || '-' }}</strong>
+                </div>
+                <div class="readonly-item">
+                  <span class="readonly-label">风险预担</span>
+                  <strong class="readonly-value">{{ riskPrecommitLabel(elderFormExtra.riskPrecommit) }}</strong>
+                </div>
+                <div class="readonly-item readonly-address">
+                  <span class="readonly-label">家庭地址</span>
+                  <strong class="readonly-value">{{ form.homeAddress || '-' }}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="contract-section">
+              <div class="contract-section-head">
+                <div class="contract-section-title">家属与疾病</div>
+                <div class="contract-section-desc">家属联系人与基础疾病集中概览。</div>
+              </div>
+              <div class="readonly-family-list">
+                <div v-for="item in familyDraftRows" :key="item.key" class="family-card">
+                  <div class="family-card-head">
+                    <strong>{{ item.realName || '未命名家属' }}</strong>
+                    <a-tag :color="item.isPrimary ? 'green' : 'default'">{{ item.isPrimary ? '主联系人' : '联系人' }}</a-tag>
+                  </div>
+                  <div class="family-card-meta">{{ item.relation || '关系未填' }}</div>
+                  <div class="family-card-fields">
+                    <span>手机号 {{ item.phone || '-' }}</span>
+                    <span>身份证 {{ item.idCardNo || '-' }}</span>
+                  </div>
+                </div>
+                <a-empty v-if="!familyDraftRows.length" :image="null" description="暂无家属信息" />
+              </div>
+              <div class="readonly-disease-block">
+                <span class="readonly-label">基础疾病</span>
+                <div class="readonly-tags">
+                  <a-tag v-for="item in selectedDiseaseLabels" :key="item" color="blue">{{ item }}</a-tag>
+                  <span v-if="!selectedDiseaseLabels.length" class="readonly-empty">暂无疾病信息</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="contract-section">
+              <div class="contract-section-head">
+                <div class="contract-section-title">补充备注</div>
+              </div>
+              <div class="readonly-remark">{{ form.remark || '暂无补充备注' }}</div>
+            </div>
+          </div>
+          <a-form v-else ref="formRef" :model="form" :rules="rules" layout="vertical">
+            <div class="contract-section">
+              <div class="contract-section-head">
+                <div class="contract-section-title">合同信息</div>
+                <div class="contract-section-desc">先确认合同节奏，再补齐营销与签约字段。</div>
+              </div>
+              <a-row :gutter="[16, 4]">
+                <a-col :xs="24" :md="8">
+                  <a-form-item label="合同编号" name="contractNo">
+                    <a-input :value="form.contractNo" disabled placeholder="保存后后端自动生成（gfyy+年月日+编号）" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :md="8">
+                  <a-form-item label="合同状态">
+                    <a-input :value="form.contractStatus || '待评估'" disabled />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :md="8">
+                  <a-form-item label="流程阶段">
+                    <a-input :value="flowStageText((form.flowStage as any) || 'PENDING_ASSESSMENT')" disabled />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :md="8">
+                  <a-form-item label="签约日期">
+                    <a-date-picker v-model:value="form.contractSignedAt" value-format="YYYY-MM-DD HH:mm:ss" show-time style="width: 100%" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :md="8">
+                  <a-form-item label="合同有效期止">
+                    <a-date-picker v-model:value="form.contractExpiryDate" value-format="YYYY-MM-DD" style="width: 100%" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :md="8">
+                  <a-form-item label="营销人员">
+                    <a-input v-model:value="form.marketerName" placeholder="请输入负责营销人员姓名" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :md="12">
+                  <a-form-item label="优惠政策（最多 2 条）">
+                    <a-select
+                      v-model:value="selectedPolicyValues"
+                      mode="multiple"
+                      :max-tag-count="2"
+                      allow-clear
+                      show-search
+                      :loading="policyLoading"
+                      :options="policyOptions"
+                      placeholder="请选择运营政策（最多2条）"
+                      :filter-option="policyFilterOption"
+                      @change="onPolicySelectionChange"
+                    />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :md="12">
+                  <a-form-item label="签约房号">
+                    <a-input
+                      v-model:value="form.reservationRoomNo"
+                      :disabled="!form.id"
+                      :placeholder="form.id ? '入住办理后自动回填，可手动修正' : '新增合同无需填写，入住办理时自动选择'"
+                    />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+            </div>
+
+            <div class="contract-section">
+              <div class="contract-section-head">
+                <div class="contract-section-title">长者身份信息</div>
+                <div class="contract-section-desc">身份证、联系方式、地址集中录入，自动识别生日与年龄。</div>
+              </div>
+              <a-row :gutter="[16, 4]">
+                <a-col :xs="24" :md="8">
+                  <a-form-item label="姓名" name="elderName">
+                    <a-input ref="elderNameInputRef" v-model:value="form.elderName" placeholder="请输入长者姓名" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :md="8">
+                  <a-form-item label="联系电话">
+                    <a-input v-model:value="form.elderPhone" placeholder="请输入长者联系电话" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :md="8">
+                  <a-form-item label="身份证号">
+                    <a-input v-model:value="form.idCardNo" placeholder="自动识别生日/年龄" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :md="6">
+                  <a-form-item label="性别">
+                    <a-select v-model:value="form.gender" allow-clear>
+                      <a-select-option :value="1">男</a-select-option>
+                      <a-select-option :value="2">女</a-select-option>
+                    </a-select>
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :md="6">
+                  <a-form-item label="年龄">
+                    <a-input-number v-model:value="form.age" :min="0" :max="120" style="width: 100%" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :md="6">
+                  <a-form-item label="生日">
+                    <a-input :value="formDerivedBirthDate || '-'" readonly />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :md="6">
+                  <a-form-item label="身份证识别">
+                    <a-input :value="formDerivedBirthDate ? '已识别' : '未识别'" readonly />
+                  </a-form-item>
+                </a-col>
+                <a-col :span="24">
+                  <a-form-item label="家庭地址">
+                    <a-input v-model:value="form.homeAddress" placeholder="请输入长者家庭住址" />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+            </div>
+
+            <div class="contract-section">
+              <div class="contract-section-head">
+                <div class="contract-section-title">照护资料</div>
+                <div class="contract-section-desc">护理等级、风险预担与疾病信息放在一起，便于评估和入住衔接。</div>
+              </div>
+              <a-row :gutter="[16, 4]">
+                <a-col :xs="24" :md="12">
+                  <a-form-item label="护理等级">
+                    <a-input v-model:value="elderFormExtra.careLevel" placeholder="如：一级护理/二级护理" />
+                  </a-form-item>
+                </a-col>
+                <a-col :xs="24" :md="12">
+                  <a-form-item label="风险预担">
+                    <a-select v-model:value="elderFormExtra.riskPrecommit" allow-clear placeholder="请选择风险处置策略">
+                      <a-select-option value="RESCUE_FIRST">第一时间抢救</a-select-option>
+                      <a-select-option value="NOTIFY_FAMILY_FIRST">第一时间通知家属</a-select-option>
+                    </a-select>
+                  </a-form-item>
+                </a-col>
+                <a-col :span="24">
+                  <a-form-item label="基础疾病信息">
+                    <a-select
+                      v-model:value="selectedDiseaseIds"
+                      mode="multiple"
+                      allow-clear
+                      show-search
+                      :options="diseaseOptions"
+                      placeholder="请选择基础疾病"
+                      :disabled="contractViewMode"
+                    />
+                  </a-form-item>
+                </a-col>
+              </a-row>
+            </div>
+
+            <div class="contract-section">
+              <div class="contract-section-head family-head">
+                <div>
+                  <div class="contract-section-title">家属信息</div>
+                  <div class="contract-section-desc">常用联系人集中录入，手机号与身份证号要求完整。</div>
+                </div>
+                <a-button size="small" type="dashed" @click="addFamilyDraftRow">新增家属</a-button>
+              </div>
+              <div class="family-editor-list">
+                <div v-for="item in familyDraftRows" :key="item.key" class="family-card family-card-editable">
+                  <div class="family-card-toolbar">
+                    <a-tag :color="item.isPrimary ? 'green' : 'default'">{{ item.isPrimary ? '主联系人' : '普通联系人' }}</a-tag>
+                    <a-button type="link" danger @click="removeFamilyDraftRow(item.key)">删除</a-button>
+                  </div>
+                  <a-row :gutter="[12, 4]">
+                    <a-col :xs="24" :md="10">
+                      <a-form-item label="姓名" class="compact-form-item">
+                        <a-input v-model:value="item.realName" placeholder="姓名" />
+                      </a-form-item>
+                    </a-col>
+                    <a-col :xs="24" :md="8">
+                      <a-form-item label="关系" class="compact-form-item">
+                        <a-select
+                          v-model:value="item.relation"
+                          :options="familyRelationOptions"
+                          allow-clear
+                          placeholder="请选择关系"
+                        />
+                      </a-form-item>
+                    </a-col>
+                    <a-col :xs="24" :md="6">
+                      <a-form-item label="主联系人" class="compact-form-item">
+                        <a-switch v-model:checked="item.isPrimary" @change="() => setPrimaryFamilyDraftRow(item.key)" />
+                      </a-form-item>
+                    </a-col>
+                    <a-col :xs="24" :md="12">
+                      <a-form-item label="手机号" class="compact-form-item">
+                        <a-input v-model:value="item.phone" placeholder="手机号" />
+                      </a-form-item>
+                    </a-col>
+                    <a-col :xs="24" :md="12">
+                      <a-form-item label="身份证号" class="compact-form-item">
+                        <a-input v-model:value="item.idCardNo" placeholder="身份证号" />
+                      </a-form-item>
+                    </a-col>
+                  </a-row>
+                </div>
+                <a-empty v-if="!familyDraftRows.length" :image="null" description="暂无家属信息，可直接新增录入" />
+              </div>
+            </div>
+
+            <div class="contract-section">
+              <div class="contract-section-head">
+                <div class="contract-section-title">补充备注</div>
+                <div class="contract-section-desc">记录签约背景、特殊照护提示或交接说明。</div>
+              </div>
+              <a-form-item label="备注">
+                <a-input-text-area
+                  v-model:value="form.remark"
+                  :rows="4"
+                  placeholder="可填写签约背景、特殊照护提示、补充说明等"
                 />
-        </a-card>
-        <a-card v-show="contractInfoPage === 3" size="small" title="基础疾病信息" class="snapshot-card" :bordered="false">
-                <a-form-item label="新建/编辑时录入疾病" style="margin-bottom: 10px">
-                  <a-select
-                    v-model:value="selectedDiseaseIds"
-                    mode="multiple"
-                    allow-clear
-                    show-search
-                    :options="diseaseOptions"
-                    placeholder="请选择基础疾病"
-                    :disabled="contractViewMode"
-                  />
-                </a-form-item>
-                <a-space wrap>
-                  <a-tag v-for="item in elderSnapshot.diseases" :key="item.id || item.diseaseId" color="blue">
-                    {{ item.diseaseName || `疾病#${item.diseaseId}` }}
-                  </a-tag>
-                  <span v-if="!elderSnapshot.diseases.length" style="color: #8c8c8c">暂无疾病信息</span>
-                </a-space>
-        </a-card>
+              </a-form-item>
+            </div>
+          </a-form>
+        </div>
       </a-spin>
     </a-modal>
 
@@ -462,7 +619,7 @@ import { bindFamily, createElder, getElderDetail, getElderDiseases, getElderPage
 import { getAdmissionRecords } from '../../api/elderLifecycle'
 import { getFamilyRelations, upsertFamilyUser } from '../../api/family'
 import { getDiseaseList } from '../../api/store'
-import type { ContractAttachmentItem, CrmContractItem, ElderDiseaseItem, ElderItem, FamilyRelationItem, MarketingPlanItem, PageResult } from '../../types'
+import type { ContractAttachmentItem, CrmContractItem, ElderItem, Id, MarketingPlanItem, PageResult } from '../../types'
 
 const router = useRouter()
 const route = useRoute()
@@ -489,7 +646,7 @@ const formRef = ref<FormInstance>()
 const elderNameInputRef = ref<any>()
 const rows = ref<CrmContractItem[]>([])
 const total = ref(0)
-const selectedRowKeys = ref<Array<number | string>>([])
+const selectedRowKeys = ref<string[]>([])
 const selectedRows = ref<CrmContractItem[]>([])
 const onlyMineDept = ref(false)
 const mineDept = ref<'MARKETING' | 'ASSESSMENT'>('MARKETING')
@@ -652,12 +809,6 @@ function applyQueryRouteFilter() {
 }
 
 const form = reactive<Partial<CrmContractItem>>({})
-const contractFormSection = ref<'BASIC' | 'ELDER' | 'EXTRA'>('BASIC')
-const contractFormSectionOptions = [
-  { label: '1 基础信息', value: 'BASIC' },
-  { label: '2 长者信息', value: 'ELDER' },
-  { label: '3 补充信息', value: 'EXTRA' }
-]
 const isCreateContractMode = computed(() => !form.id)
 const contractModalTitle = computed(() => {
   if (contractViewMode.value) return '查看合同'
@@ -684,8 +835,8 @@ const elderFormExtra = reactive({
 
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
-  onChange: (keys: (number | string)[], rows: CrmContractItem[]) => {
-    selectedRowKeys.value = keys
+  onChange: (keys: Array<string | number>, rows: CrmContractItem[]) => {
+    selectedRowKeys.value = keys.map((item) => String(item))
     selectedRows.value = rows
   }
 }))
@@ -772,7 +923,7 @@ function handleFlowGuardAction(item: { actionKey?: string }) {
   }
 }
 
-function sameId(left: number | string | undefined, right: number | string | undefined) {
+function sameId(left: Id | undefined, right: Id | undefined) {
   if (left == null || right == null) return false
   return String(left) === String(right)
 }
@@ -808,21 +959,6 @@ const attachmentColumns = [
   { title: '上传时间', dataIndex: 'createTime', key: 'createTime', width: 160 },
   { title: '操作', key: 'operation', width: 80 }
 ]
-const snapshotFamilyColumns = [
-  { title: '姓名', dataIndex: 'realName', key: 'realName', width: 110 },
-  { title: '关系', dataIndex: 'relation', key: 'relation', width: 90 },
-  { title: '电话', dataIndex: 'phone', key: 'phone', width: 130 },
-  { title: '身份证', dataIndex: 'idCardNo', key: 'idCardNo', width: 170 },
-  { title: '主联系人', dataIndex: 'isPrimary', key: 'isPrimary', width: 90 }
-]
-const familyDraftColumns = [
-  { title: '姓名', key: 'realName', width: 110 },
-  { title: '关系', key: 'relation', width: 100 },
-  { title: '手机号', key: 'phone', width: 130 },
-  { title: '身份证号', key: 'idCardNo', width: 190 },
-  { title: '主联系人', key: 'isPrimary', width: 90 },
-  { title: '操作', key: 'operation', width: 80 }
-]
 const familyRelationOptions = [
   { label: '配偶', value: '配偶' },
   { label: '子女', value: '子女' },
@@ -834,13 +970,6 @@ const familyRelationOptions = [
   { label: '其他', value: '其他' }
 ]
 const elderSnapshotLoading = ref(false)
-const contractInfoPage = ref(1)
-const elderSnapshot = reactive({
-  elderId: '' as string,
-  base: {} as Partial<ElderItem>,
-  families: [] as FamilyRelationItem[],
-  diseases: [] as ElderDiseaseItem[]
-})
 const familyDraftRows = ref<Array<{
   key: string
   realName: string
@@ -852,6 +981,12 @@ const familyDraftRows = ref<Array<{
 }>>([])
 const selectedDiseaseIds = ref<number[]>([])
 const diseaseOptions = ref<Array<{ label: string; value: number }>>([])
+const selectedDiseaseLabels = computed(() => {
+  const optionMap = new Map(diseaseOptions.value.map((item) => [Number(item.value), item.label]))
+  return selectedDiseaseIds.value
+    .map((item) => optionMap.get(Number(item)) || `疾病#${item}`)
+    .filter((item) => String(item || '').trim())
+})
 
 const finalizeOpen = ref(false)
 const finalizing = ref(false)
@@ -863,7 +998,7 @@ const assessmentCheckingMap = ref<Record<number, boolean>>({})
 const finalizeForm = reactive({
   contractNo: '',
   elderName: '',
-  elderId: 0,
+  elderId: '' as Id | '',
   remark: ''
 })
 
@@ -898,6 +1033,18 @@ function flowStageColor(stage?: CrmContractItem['flowStage']) {
 function ownerDeptText(dept?: CrmContractItem['currentOwnerDept']) {
   if (dept === 'ASSESSMENT') return '评估部'
   if (dept === 'MARKETING') return '营销部'
+  return '-'
+}
+
+function genderText(gender?: number) {
+  if (gender === 1) return '男'
+  if (gender === 2) return '女'
+  return '-'
+}
+
+function riskPrecommitLabel(value?: string) {
+  if (value === 'RESCUE_FIRST') return '第一时间抢救'
+  if (value === 'NOTIFY_FAMILY_FIRST') return '第一时间通知家属'
   return '-'
 }
 
@@ -1222,7 +1369,6 @@ function onContractModalOk() {
 
 function openForm(record?: CrmContractItem, readonly = false) {
   contractViewMode.value = readonly
-  contractFormSection.value = 'BASIC'
   Object.keys(form).forEach((key) => {
     delete (form as Record<string, any>)[key]
   })
@@ -1252,12 +1398,7 @@ function openForm(record?: CrmContractItem, readonly = false) {
     elderFormExtra.riskPrecommit = undefined
     familyDraftRows.value = []
     selectedDiseaseIds.value = []
-    elderSnapshot.elderId = ''
-    elderSnapshot.base = {}
-    elderSnapshot.families = []
-    elderSnapshot.diseases = []
   }
-  contractInfoPage.value = 1
   open.value = true
   loadDiseaseOptions().catch(() => {})
   loadElderSnapshotByForm().catch(() => {})
@@ -1737,19 +1878,6 @@ function syncIdCardDerivedFields(idCardNo?: string, overrideAge = true) {
   }
 }
 
-function elderStatusText(status?: number) {
-  if (status === 1) return '在院'
-  if (status === 2) return '请假'
-  if (status === 3) return '离院'
-  return '-'
-}
-
-function riskPrecommitText(value?: string) {
-  if (value === 'RESCUE_FIRST') return '第一时间抢救'
-  if (value === 'NOTIFY_FAMILY_FIRST') return '第一时间通知家属'
-  return '-'
-}
-
 function addFamilyDraftRow() {
   familyDraftRows.value.push({
     key: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -1821,32 +1949,17 @@ async function loadElderSnapshotByForm() {
   try {
     const elder = await findElderByContractForm()
     if (!elder?.id) {
-      elderSnapshot.elderId = ''
-      elderSnapshot.base = {
-        fullName: String(form.elderName || '').trim() || undefined,
-        idCardNo: String(form.idCardNo || '').trim() || undefined,
-        homeAddress: String(form.homeAddress || '').trim() || undefined,
-        phone: String(form.elderPhone || form.phone || '').trim() || undefined,
-        careLevel: elderFormExtra.careLevel || undefined,
-        riskPrecommit: elderFormExtra.riskPrecommit
-      }
-      elderSnapshot.families = []
-      elderSnapshot.diseases = []
       familyDraftRows.value = []
       selectedDiseaseIds.value = []
       return
     }
-    elderSnapshot.elderId = String(elder.id)
-    elderSnapshot.base = elder
     elderFormExtra.careLevel = String(elder.careLevel || elderFormExtra.careLevel || '')
     elderFormExtra.riskPrecommit = elder.riskPrecommit as any
     const [families, diseases] = await Promise.all([
       getFamilyRelations(String(elder.id)).catch(() => []),
       getElderDiseases(String(elder.id)).catch(() => [])
     ])
-    elderSnapshot.families = families || []
-    elderSnapshot.diseases = diseases || []
-    familyDraftRows.value = elderSnapshot.families.map((item, index) => ({
+    familyDraftRows.value = (families || []).map((item, index) => ({
       key: `existing-${String(item.id || item.familyUserId || index)}`,
       familyUserId: String(item.familyUserId || ''),
       realName: String(item.realName || ''),
@@ -1858,7 +1971,7 @@ async function loadElderSnapshotByForm() {
     if (!familyDraftRows.value.some((item) => item.isPrimary) && familyDraftRows.value.length) {
       familyDraftRows.value[0].isPrimary = true
     }
-    selectedDiseaseIds.value = elderSnapshot.diseases
+    selectedDiseaseIds.value = (diseases || [])
       .map((item) => Number(item.diseaseId))
       .filter((item) => Number.isFinite(item) && item > 0)
   } finally {
@@ -2132,5 +2245,216 @@ watch(
   margin-top: 6px;
   font-size: 24px;
   font-weight: 600;
+}
+
+.contract-workbench {
+  --contract-bg: linear-gradient(180deg, #f8fbff 0%, #fdfefe 100%);
+  --contract-border: rgba(100, 116, 139, 0.16);
+  --contract-strong: #0f172a;
+  --contract-muted: #64748b;
+  --contract-accent: #0f766e;
+  padding: 4px;
+}
+
+.contract-workbench-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+  border: 1px solid var(--contract-border);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at top right, rgba(15, 118, 110, 0.12), transparent 36%),
+    radial-gradient(circle at bottom left, rgba(59, 130, 246, 0.1), transparent 28%),
+    var(--contract-bg);
+}
+
+.contract-workbench-kicker {
+  color: var(--contract-accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.contract-workbench-title {
+  margin-top: 6px;
+  color: var(--contract-strong);
+  font-size: 22px;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.contract-workbench-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.contract-section {
+  margin-bottom: 16px;
+  padding: 18px 18px 6px;
+  border: 1px solid var(--contract-border);
+  border-radius: 18px;
+  background: var(--contract-bg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+.contract-section-head {
+  margin-bottom: 12px;
+}
+
+.family-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.contract-section-title {
+  color: var(--contract-strong);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.contract-section-desc {
+  margin-top: 4px;
+  color: var(--contract-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.contract-readonly {
+  display: grid;
+  gap: 16px;
+}
+
+.readonly-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.readonly-grid-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.readonly-item {
+  min-height: 88px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.readonly-label {
+  display: block;
+  color: var(--contract-muted);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.readonly-value {
+  display: block;
+  color: var(--contract-strong);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.readonly-policies,
+.readonly-address {
+  grid-column: span 2;
+}
+
+.readonly-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.readonly-empty {
+  color: var(--contract-muted);
+  font-size: 13px;
+}
+
+.readonly-family-list,
+.family-editor-list {
+  display: grid;
+  gap: 12px;
+}
+
+.family-card {
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.family-card-head,
+.family-card-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.family-card-meta {
+  color: var(--contract-muted);
+  font-size: 13px;
+}
+
+.family-card-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin-top: 10px;
+  color: var(--contract-strong);
+  font-size: 13px;
+}
+
+.family-card-editable {
+  background:
+    linear-gradient(180deg, rgba(248, 250, 252, 0.96) 0%, rgba(255, 255, 255, 0.98) 100%);
+}
+
+.compact-form-item {
+  margin-bottom: 8px;
+}
+
+.readonly-disease-block {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed rgba(148, 163, 184, 0.34);
+}
+
+.readonly-remark {
+  min-height: 76px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--contract-strong);
+  line-height: 1.7;
+}
+
+@media (max-width: 768px) {
+  .contract-workbench-head,
+  .family-head {
+    flex-direction: column;
+  }
+
+  .contract-workbench-title {
+    font-size: 18px;
+  }
+
+  .readonly-grid-4 {
+    grid-template-columns: 1fr;
+  }
+
+  .readonly-policies,
+  .readonly-address {
+    grid-column: span 1;
+  }
 }
 </style>

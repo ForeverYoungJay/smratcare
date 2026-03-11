@@ -1,4 +1,5 @@
 import request, { fetchPage } from '../utils/request'
+import type { Id } from '../types/common'
 import type {
   ScheduleItem,
   AttendanceItem,
@@ -15,11 +16,11 @@ export function createSchedule(data: Partial<ScheduleItem>) {
   return request.post<void>('/api/schedule', data)
 }
 
-export function updateSchedule(id: number, data: Partial<ScheduleItem>) {
+export function updateSchedule(id: Id, data: Partial<ScheduleItem>) {
   return request.put<void>(`/api/schedule/${id}`, data)
 }
 
-export function deleteSchedule(id: number) {
+export function deleteSchedule(id: Id) {
   return request.delete<void>(`/api/schedule/${id}`)
 }
 
@@ -54,7 +55,7 @@ export function getAttendancePage(params: any) {
   })
 }
 
-export function getAttendanceOverview(params: { staffId?: string | number; month?: string }) {
+export function getAttendanceOverview(params: { staffId?: Id; month?: string }) {
   return request.get<AttendanceDashboardOverview>('/api/attendance/overview', { params })
 }
 
@@ -66,10 +67,10 @@ export function saveAttendanceSeasonRule(data: AttendanceSeasonRule) {
   return request.post<AttendanceSeasonRule>('/api/attendance/season-rule', data)
 }
 
-export function getAttendanceStaffAvailability(staffId: string | number) {
+export function getAttendanceStaffAvailability(staffId: Id) {
   return request.get<AttendanceStaffAvailability>('/api/attendance/staff-availability', { params: { staffId } })
 }
 
-export function reviewAttendanceRecord(id: string | number, data?: { reviewed?: number; reviewRemark?: string }) {
+export function reviewAttendanceRecord(id: Id, data?: { reviewed?: number; reviewRemark?: string }) {
   return request.put<AttendanceItem>(`/api/attendance/${id}/review`, data || { reviewed: 1 })
 }

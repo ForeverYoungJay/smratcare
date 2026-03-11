@@ -9,7 +9,7 @@
           <a-date-picker v-model:value="query.to" picker="month" style="width: 160px" />
         </a-form-item>
         <a-form-item label="机构ID">
-          <a-input-number v-model:value="query.orgId" :min="1" placeholder="默认当前机构" style="width: 160px" />
+          <a-input v-model:value="query.orgId" allow-clear placeholder="默认当前机构" style="width: 160px" />
         </a-form-item>
         <a-form-item label="院内老人">
           <a-select
@@ -135,7 +135,7 @@ const refreshedAt = ref('')
 const query = reactive({
   from: dayjs().subtract(5, 'month') as Dayjs,
   to: dayjs() as Dayjs,
-  orgId: undefined as number | undefined,
+  orgId: undefined as Id | undefined,
   elderId: undefined as Id | undefined,
   printRemark: ''
 })
@@ -328,8 +328,7 @@ function initFromRouteQuery() {
   const to = String(route.query.to || '')
   if (dayjs(from).isValid()) query.from = dayjs(from)
   if (dayjs(to).isValid()) query.to = dayjs(to)
-  const orgId = Number(route.query.orgId)
-  if (Number.isFinite(orgId) && orgId > 0) query.orgId = orgId
+  query.orgId = normalizeId(route.query.orgId)
   query.elderId = normalizeId(route.query.elderId)
 }
 

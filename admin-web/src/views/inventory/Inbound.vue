@@ -103,7 +103,7 @@ import PageContainer from '../../components/PageContainer.vue'
 import { exportCsv } from '../../utils/export'
 import { createInbound, getInventoryInboundPage } from '../../api/materialCenter'
 import { getProductPage } from '../../api/store'
-import type { InventoryInboundRequest, InventoryLogItem, PageResult, ProductItem } from '../../types'
+import type { Id, InventoryInboundRequest, InventoryLogItem, PageResult, ProductItem } from '../../types'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -112,7 +112,7 @@ const total = ref(0)
 const products = ref<ProductItem[]>([])
 
 const query = reactive({
-  productId: undefined as number | undefined,
+  productId: undefined as Id | undefined,
   range: undefined as any,
   pageNo: 1,
   pageSize: 10

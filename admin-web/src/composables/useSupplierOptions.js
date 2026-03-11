@@ -10,7 +10,7 @@ function toSupplierOption(item) {
     const suffix = item.supplierCode ? ` (${item.supplierCode})` : '';
     return {
         label: `${name}${suffix}`,
-        value: item.id,
+        value: String(item.id),
         name
     };
 }
@@ -21,8 +21,9 @@ function supplierSearchText(item) {
 function dedupeSuppliers(rows) {
     const map = new Map();
     rows.forEach((item) => {
-        if (!map.has(item.id))
-            map.set(item.id, item);
+        const key = String(item.id);
+        if (!map.has(key))
+            map.set(key, item);
     });
     return Array.from(map.values());
 }
@@ -78,12 +79,13 @@ export function useSupplierOptions(config = {}) {
     function ensureSelectedSupplier(supplierId, supplierName) {
         if (!supplierId)
             return;
-        if (supplierOptions.value.some((item) => item.value === supplierId))
+        const value = String(supplierId);
+        if (supplierOptions.value.some((item) => item.value === value))
             return;
         const name = supplierName || `供应商#${supplierId}`;
         supplierOptions.value.unshift({
             label: name,
-            value: supplierId,
+            value,
             name
         });
     }

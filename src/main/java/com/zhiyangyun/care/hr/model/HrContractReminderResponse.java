@@ -6,13 +6,15 @@ import lombok.Data;
 @Data
 public class HrContractReminderResponse {
   private Long contractId;
+  private Long staffId;
+  private String staffNo;
+  private String staffName;
+  private String phone;
+  private String jobTitle;
   private String contractNo;
-  private String elderName;
-  private String contactName;
-  private String contactPhone;
-  private LocalDate effectiveFrom;
-  private LocalDate effectiveTo;
-  private Long remainingDays;
-  private String status;
   private String contractStatus;
+  private String contractType;
+  private LocalDate contractStartDate;
+  private LocalDate contractEndDate;
+  private Long remainingDays;
 }

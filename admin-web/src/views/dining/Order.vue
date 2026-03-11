@@ -203,25 +203,25 @@ const { elderOptions, searchElders: loadElderOptions, ensureSelectedElder } = us
   inHospitalOnly: true,
   signedOnly: true
 })
-const dishOptions = ref<{ label: string; value: number; price: number }[]>([])
-const prepZoneOptions = ref<{ label: string; value: number; name: string }[]>([])
-const deliveryAreaOptions = ref<{ label: string; value: number; name: string }[]>([])
+const dishOptions = ref<{ label: string; value: Id; price: number }[]>([])
+const prepZoneOptions = ref<{ label: string; value: Id; name: string }[]>([])
+const deliveryAreaOptions = ref<{ label: string; value: Id; name: string }[]>([])
 const riskResult = ref<DiningRiskCheckResponse | null>(null)
 
 const form = reactive({
-  id: undefined as number | undefined,
+  id: undefined as Id | undefined,
   elderId: undefined as Id | undefined,
   elderName: '',
   orderDate: dayjs(),
   mealType: DINING_MEAL_TYPES.lunch,
-  dishIdList: [] as number[],
+  dishIdList: [] as Id[],
   dishNames: '',
   totalAmount: 0,
-  prepZoneId: undefined as number | undefined,
+  prepZoneId: undefined as Id | undefined,
   prepZoneName: '',
-  deliveryAreaId: undefined as number | undefined,
+  deliveryAreaId: undefined as Id | undefined,
   deliveryAreaName: '',
-  overrideId: undefined as number | undefined,
+  overrideId: undefined as Id | undefined,
   overrideApplyReason: '',
   remark: ''
 })
@@ -278,7 +278,7 @@ async function loadDishOptions() {
   const list = await getDiningDishList({ mealType: form.mealType, status: DINING_STATUS.enabled })
   dishOptions.value = (list || []).map((item: any) => ({
     label: `${item.dishName} ¥${item.unitPrice || 0}`,
-    value: Number(item.id),
+    value: String(item.id),
     price: Number(item.unitPrice || 0)
   }))
 }
@@ -287,7 +287,7 @@ async function loadPrepZones() {
   const list = await getDiningPrepZoneList({})
   prepZoneOptions.value = (list || []).map((item: any) => ({
     label: `${item.zoneCode}-${item.zoneName}`,
-    value: Number(item.id),
+    value: String(item.id),
     name: item.zoneName
   }))
 }
@@ -296,7 +296,7 @@ async function loadDeliveryAreas() {
   const list = await getDiningDeliveryAreaList({})
   deliveryAreaOptions.value = (list || []).map((item: any) => ({
     label: `${item.areaCode}-${item.areaName}`,
-    value: Number(item.id),
+    value: String(item.id),
     name: item.areaName
   }))
 }
@@ -334,19 +334,19 @@ function onMealTypeChange() {
   loadDishOptions()
 }
 
-function onDishChange(values: number[]) {
+function onDishChange(values: Id[]) {
   const selected = dishOptions.value.filter((item) => values.includes(item.value))
   form.dishNames = selected.map((item) => item.label.split(' ¥')[0]).join(',')
   form.totalAmount = Number(selected.reduce((sum, item) => sum + item.price, 0).toFixed(2))
   riskResult.value = null
 }
 
-function onPrepZoneChange(value: number | undefined) {
+function onPrepZoneChange(value: Id | undefined) {
   const selected = prepZoneOptions.value.find((item) => item.value === value)
   form.prepZoneName = selected?.name || ''
 }
 
-function onDeliveryAreaChange(value: number | undefined) {
+function onDeliveryAreaChange(value: Id | undefined) {
   const selected = deliveryAreaOptions.value.find((item) => item.value === value)
   form.deliveryAreaName = selected?.name || ''
 }
@@ -403,7 +403,7 @@ async function openEdit(record: DiningMealOrder) {
   await Promise.all([loadDishOptions(), loadPrepZones(), loadDeliveryAreas()])
   form.dishIdList = (record.dishIds || '')
     .split(',')
-    .map((item) => Number(item.trim()))
+    .map((item) => item.trim())
     .filter((item) => !!item)
   form.dishNames = record.dishNames
   form.totalAmount = record.totalAmount || 0

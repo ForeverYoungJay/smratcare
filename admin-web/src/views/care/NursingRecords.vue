@@ -104,7 +104,7 @@ async function fetchData() {
       pageNo: query.pageNo,
       pageSize: query.pageSize,
       elderId: query.elderId,
-      staffId: query.staffId ? Number(query.staffId) : undefined,
+      staffId: query.staffId || undefined,
       keyword: query.keyword || undefined,
       timeFrom: query.range?.[0] ? dayjs(query.range[0]).format('YYYY-MM-DDTHH:mm:ss') : undefined,
       timeTo: query.range?.[1] ? dayjs(query.range[1]).format('YYYY-MM-DDTHH:mm:ss') : undefined

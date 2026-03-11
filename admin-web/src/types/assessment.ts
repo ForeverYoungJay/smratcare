@@ -19,7 +19,7 @@ export interface AssessmentRecord {
   age?: number
   phone?: string
   address?: string
-  orgId?: number
+  orgId?: Id
   orgName?: string
   assessmentType: AssessmentType
   assessmentTypeLabel?: string

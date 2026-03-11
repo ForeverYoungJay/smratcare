@@ -1,5 +1,5 @@
 import request, { fetchPage } from '../utils/request'
-import type { StaffItem, RoleItem, DepartmentItem, OrgItem, StaffRoleAssignRequest } from '../types'
+import type { Id, StaffItem, RoleItem, DepartmentItem, OrgItem, StaffRoleAssignRequest } from '../types'
 
 export function getOrgPage(params: any) {
   return fetchPage<OrgItem>('/api/admin/orgs', params)
@@ -36,6 +36,10 @@ export function updateStaff(id: number, data: Partial<StaffItem>) {
 export function updateStaffRoles(id: number, roleIds: number[]) {
   const body: StaffRoleAssignRequest = { staffId: id, roleIds }
   return request.post<void>('/api/admin/staff-roles/assign', body)
+}
+
+export function getStaffRoleAssignments(staffId: Id) {
+  return request.get<Array<{ roleId?: number }>>('/api/admin/staff-roles', { params: { staffId, orgId: 0 } })
 }
 
 export function appendStaffRole(id: number, roleId: number) {

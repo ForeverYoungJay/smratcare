@@ -1,15 +1,15 @@
 import type { Id } from './common'
 
 export interface InventoryBatchItem {
-  id: number
-  productId: number
+  id: Id
+  productId: Id
   productName?: string
   category?: string
   businessDomain?: 'INTERNAL' | 'MALL' | 'BOTH' | string
   itemType?: 'ASSET' | 'CONSUMABLE' | 'FOOD' | 'SERVICE' | string
   mallEnabled?: number
   safetyStock?: number
-  warehouseId?: number
+  warehouseId?: Id
   warehouseName?: string
   batchNo?: string
   quantity: number
@@ -20,17 +20,17 @@ export interface InventoryBatchItem {
 }
 
 export interface InventoryLogItem {
-  id: number
-  productId: number
+  id: Id
+  productId: Id
   productName?: string
-  batchId?: number
-  warehouseId?: number
+  batchId?: Id
+  warehouseId?: Id
   batchNo?: string
   outboundNo?: string
   changeType: 'IN' | 'OUT' | 'ADJUST'
   changeQty: number
-  refOrderId?: number
-  refAdjustmentId?: number
+  refOrderId?: Id
+  refAdjustmentId?: Id
   outType?: 'SALE' | 'CONSUME'
   receiverName?: string
   remark?: string
@@ -38,16 +38,16 @@ export interface InventoryLogItem {
 }
 
 export interface InventoryAlertItem {
-  productId: number
+  productId: Id
   productName?: string
   safetyStock: number
   currentStock: number
 }
 
 export interface InventoryExpiryAlertItem {
-  productId: number
+  productId: Id
   productName?: string
-  batchId: number
+  batchId: Id
   batchNo?: string
   quantity: number
   expireDate?: string
@@ -55,9 +55,9 @@ export interface InventoryExpiryAlertItem {
 }
 
 export interface InventoryAdjustRequest {
-  productId: number
-  warehouseId?: number
-  batchId?: number
+  productId: Id
+  warehouseId?: Id
+  batchId?: Id
   inventoryType?: string
   adjustType: 'GAIN' | 'LOSS'
   adjustQty: number
@@ -65,8 +65,8 @@ export interface InventoryAdjustRequest {
 }
 
 export interface InventoryInboundRequest {
-  productId: number | string
-  warehouseId?: number
+  productId: Id
+  warehouseId?: Id
   batchNo?: string
   quantity: number
   costPrice?: number
@@ -76,9 +76,9 @@ export interface InventoryInboundRequest {
 }
 
 export interface InventoryOutboundRequest {
-  productId: number | string
-  warehouseId?: number
-  batchId?: number
+  productId: Id
+  warehouseId?: Id
+  batchId?: Id
   quantity: number
   receiverName?: string
   outboundNo?: string
@@ -86,9 +86,9 @@ export interface InventoryOutboundRequest {
 }
 
 export interface InventoryOutboundSheetItemRequest {
-  productId: number | string
-  warehouseId?: number
-  batchId?: number
+  productId: Id
+  warehouseId?: Id
+  batchId?: Id
   quantity: number
   reason?: string
 }
@@ -111,57 +111,57 @@ export interface InventoryOutboundSheetPrefill {
 }
 
 export interface InventoryOutboundSheetItem {
-  id: number
-  productId: number
+  id: Id
+  productId: Id
   productName?: string
   productCode?: string
   unit?: string
-  warehouseId?: number
-  batchId?: number
+  warehouseId?: Id
+  batchId?: Id
   batchNo?: string
   quantity: number
   reason?: string
 }
 
 export interface InventoryOutboundSheet {
-  id: number
+  id: Id
   outboundNo: string
   receiverName: string
   elderId?: Id
   contractNo?: string
   applyDept?: string
-  operatorStaffId?: number
+  operatorStaffId?: Id
   operatorName?: string
   status: 'DRAFT' | 'CONFIRMED' | string
   remark?: string
-  confirmStaffId?: number
+  confirmStaffId?: Id
   confirmTime?: string
   createTime?: string
   items: InventoryOutboundSheetItem[]
 }
 
 export interface InventoryAdjustmentItem {
-  id: number
-  productId: number
+  id: Id
+  productId: Id
   productName?: string
   category?: string
-  batchId?: number
-  warehouseId?: number
+  batchId?: Id
+  warehouseId?: Id
   warehouseName?: string
   inventoryType?: string
   adjustType: 'GAIN' | 'LOSS'
   adjustQty: number
   reason?: string
-  operatorStaffId?: number
+  operatorStaffId?: Id
   createTime?: string
 }
 
 export interface InventoryAdjustmentDiffItem {
-  productId: number
+  productId: Id
   productName?: string
   category?: string
   inventoryType?: string
-  warehouseId?: number
+  warehouseId?: Id
   warehouseName?: string
   gainQty: number
   lossQty: number

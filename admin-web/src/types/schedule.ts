@@ -1,6 +1,8 @@
+import type { Id } from './common'
+
 export interface ScheduleItem {
-  id: number
-  staffId: number
+  id: Id
+  staffId: Id
   staffName?: string
   dutyDate: string
   shiftCode?: string
@@ -10,8 +12,8 @@ export interface ScheduleItem {
 }
 
 export interface AttendanceItem {
-  id: string | number
-  staffId: string | number
+  id: Id
+  staffId: Id
   staffName?: string
   workDate?: string
   checkInTime?: string
@@ -22,7 +24,7 @@ export interface AttendanceItem {
   lunchBreakEndTime?: string
   outingMinutes?: number
   reviewed?: number
-  reviewedBy?: string | number
+  reviewedBy?: Id
   reviewedAt?: string
   reviewRemark?: string
   note?: string
@@ -52,7 +54,7 @@ export interface AttendanceDashboardDayItem {
 }
 
 export interface AttendanceDashboardOverview {
-  staffId?: string | number
+  staffId?: Id
   staffName?: string
   month?: string
   seasonType?: 'WINTER' | 'SUMMER' | string
@@ -89,7 +91,7 @@ export interface AttendanceSeasonRule {
 }
 
 export interface AttendanceStaffAvailability {
-  staffId?: string | number
+  staffId?: Id
   staffName?: string
   available?: boolean
   status?: string

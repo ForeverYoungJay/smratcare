@@ -10,7 +10,7 @@ function toCardAccountOption(item) {
     const cardNo = item.cardNo || `CARD#${item.id}`;
     return {
         label: `${cardNo} - ${elderName}`,
-        value: Number(item.id),
+        value: String(item.id),
         cardNo,
         elderName
     };
@@ -22,8 +22,8 @@ function cardAccountSearchText(item) {
 function dedupeCardAccounts(rows) {
     const map = new Map();
     rows.forEach((item) => {
-        const id = Number(item.id);
-        if (!Number.isFinite(id))
+        const id = String(item.id || '').trim();
+        if (!id)
             return;
         if (!map.has(id))
             map.set(id, item);
@@ -80,12 +80,13 @@ export function useCardAccountOptions(config = {}) {
         }
     }
     function ensureSelectedCardAccount(cardAccountId, elderName, cardNo) {
-        if (!cardAccountId || cardAccountOptions.value.some((item) => item.value === Number(cardAccountId)))
+        const targetId = String(cardAccountId || '').trim();
+        if (!targetId || cardAccountOptions.value.some((item) => item.value === targetId))
             return;
-        const safeCardNo = cardNo || `CARD#${cardAccountId}`;
+        const safeCardNo = cardNo || `CARD#${targetId}`;
         const safeElderName = elderName || '-';
         cardAccountOptions.value.unshift({
-            value: Number(cardAccountId),
+            value: targetId,
             cardNo: safeCardNo,
             elderName: safeElderName,
             label: `${safeCardNo} - ${safeElderName}`

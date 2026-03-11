@@ -6,7 +6,7 @@ export type DiningOrderStatus = 'CREATED' | 'PREPARING' | 'DELIVERING' | 'DELIVE
 export type DiningDeliveryStatus = 'PENDING' | 'DELIVERED' | 'FAILED'
 
 export interface DiningDish {
-  id: number
+  id: Id
   dishName: string
   dishCategory?: string
   mealType?: DiningMealType
@@ -20,7 +20,7 @@ export interface DiningDish {
 }
 
 export interface DiningRecipe {
-  id: number
+  id: Id
   recipeName: string
   mealType?: DiningMealType
   dishIds?: string
@@ -32,7 +32,7 @@ export interface DiningRecipe {
 }
 
 export interface DiningPrepZone {
-  id: number
+  id: Id
   zoneCode: string
   zoneName: string
   kitchenArea?: string
@@ -43,7 +43,7 @@ export interface DiningPrepZone {
 }
 
 export interface DiningDeliveryArea {
-  id: number
+  id: Id
   areaCode: string
   areaName: string
   buildingName?: string
@@ -55,7 +55,7 @@ export interface DiningDeliveryArea {
 }
 
 export interface DiningMealOrder {
-  id: number
+  id: Id
   orderNo: string
   elderId?: Id
   elderName?: string
@@ -64,20 +64,20 @@ export interface DiningMealOrder {
   dishIds?: string
   dishNames: string
   totalAmount: number
-  prepZoneId?: number
+  prepZoneId?: Id
   prepZoneName?: string
-  deliveryAreaId?: number
+  deliveryAreaId?: Id
   deliveryAreaName?: string
-  overrideId?: number
+  overrideId?: Id
   status?: DiningOrderStatus
   remark?: string
 }
 
 export interface DiningDeliveryRecord {
-  id: number
-  mealOrderId: number
+  id: Id
+  mealOrderId: Id
   orderNo: string
-  deliveryAreaId?: number
+  deliveryAreaId?: Id
   deliveryAreaName?: string
   deliveredBy?: number
   deliveredByName?: string
@@ -122,7 +122,7 @@ export interface DiningRiskCheckResponse {
 }
 
 export interface DiningRiskOverride {
-  id: number
+  id: Id
   elderId: Id
   elderName?: string
   dishNames: string
@@ -133,7 +133,7 @@ export interface DiningRiskOverride {
 }
 
 export interface DiningRiskThresholdConfig {
-  id: number
+  id: Id
   metricCode: string
   metricName: string
   thresholdValue: number

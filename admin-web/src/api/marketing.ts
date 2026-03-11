@@ -55,7 +55,7 @@ export function getContractStageSummary(params?: { currentOwnerDept?: string }) 
   return request.get<CrmContractStageSummary>('/api/crm/contracts/stage-summary', { params })
 }
 
-export function getCrmContract(id: number | string) {
+export function getCrmContract(id: Id) {
   return request.get<CrmContractItem>(`/api/crm/contracts/${id}`)
 }
 
@@ -63,11 +63,11 @@ export function createCrmContract(data: CrmContractPayload) {
   return request.post<CrmContractItem>('/api/crm/contracts', data)
 }
 
-export function updateCrmContract(id: number | string, data: CrmContractPayload) {
+export function updateCrmContract(id: Id, data: CrmContractPayload) {
   return request.put<CrmContractItem>(`/api/crm/contracts/${id}`, data)
 }
 
-export function deleteCrmContract(id: number | string) {
+export function deleteCrmContract(id: Id) {
   return request.delete<void>(`/api/crm/contracts/${id}`)
 }
 
@@ -75,23 +75,23 @@ export function batchDeleteContracts(data: ContractBatchDeleteRequest) {
   return request.post<number>('/api/crm/contracts/batch/delete', data)
 }
 
-export function handoffContractToAssessment(contractId: number | string) {
+export function handoffContractToAssessment(contractId: Id) {
   return request.post<CrmContractItem>(`/api/crm/contracts/${contractId}/handoff-assessment`)
 }
 
-export function finalizeContract(contractId: number | string, remark?: string) {
+export function finalizeContract(contractId: Id, remark?: string) {
   return request.post<CrmContractItem>(`/api/crm/contracts/${contractId}/finalize`, { remark })
 }
 
-export function approveContract(contractId: number | string, remark?: string) {
+export function approveContract(contractId: Id, remark?: string) {
   return request.post<CrmContractItem>(`/api/crm/contracts/${contractId}/approve`, { remark })
 }
 
-export function rejectContract(contractId: number | string, remark?: string) {
+export function rejectContract(contractId: Id, remark?: string) {
   return request.post<CrmContractItem>(`/api/crm/contracts/${contractId}/reject`, { remark })
 }
 
-export function voidContract(contractId: number | string, remark?: string) {
+export function voidContract(contractId: Id, remark?: string) {
   return request.post<CrmContractItem>(`/api/crm/contracts/${contractId}/void`, { remark })
 }
 
@@ -107,27 +107,27 @@ export function handoffLeadToAssessment(contractNo: string) {
   return request.post<CrmLeadItem>(`/api/crm/leads/contract/${encodeURIComponent(contractNo)}/handoff-assessment`)
 }
 
-export function createLeadCallbackPlan(leadId: number | string, data: CallbackPlanCreateRequest) {
+export function createLeadCallbackPlan(leadId: Id, data: CallbackPlanCreateRequest) {
   return request.post<CallbackPlanItem>(`/api/crm/leads/${leadId}/callback-plans`, data)
 }
 
-export function getLeadCallbackPlans(leadId: number | string) {
+export function getLeadCallbackPlans(leadId: Id) {
   return request.get<CallbackPlanItem[]>(`/api/crm/leads/${leadId}/callback-plans`)
 }
 
-export function executeCallbackPlan(planId: number | string, data: CallbackExecuteRequest) {
+export function executeCallbackPlan(planId: Id, data: CallbackExecuteRequest) {
   return request.post<CallbackPlanItem>(`/api/crm/leads/callback-plans/${planId}/execute`, data)
 }
 
-export function createLeadAttachment(leadId: number | string, data: ContractAttachmentCreateRequest) {
+export function createLeadAttachment(leadId: Id, data: ContractAttachmentCreateRequest) {
   return request.post<ContractAttachmentItem>(`/api/crm/leads/${leadId}/attachments`, data)
 }
 
-export function getLeadAttachments(leadId: number | string) {
+export function getLeadAttachments(leadId: Id) {
   return request.get<ContractAttachmentItem[]>(`/api/crm/leads/${leadId}/attachments`)
 }
 
-export function deleteLeadAttachment(attachmentId: number | string) {
+export function deleteLeadAttachment(attachmentId: Id) {
   return request.delete<void>(`/api/crm/leads/attachments/${attachmentId}`)
 }
 
@@ -135,23 +135,23 @@ export function createSmsTasks(data: SmsTaskCreateRequest) {
   return request.post<SmsTaskItem[]>('/api/crm/leads/sms/tasks', data)
 }
 
-export function getSmsTasks(leadId?: number) {
+export function getSmsTasks(leadId?: Id) {
   return request.get<SmsTaskItem[]>('/api/crm/leads/sms/tasks', { params: { leadId } })
 }
 
-export function sendSmsTask(taskId: number | string) {
+export function sendSmsTask(taskId: Id) {
   return request.post<SmsTaskItem>(`/api/crm/leads/sms/tasks/${taskId}/send`)
 }
 
-export function createContractAttachment(contractId: number | string, data: ContractAttachmentCreateRequest) {
+export function createContractAttachment(contractId: Id, data: ContractAttachmentCreateRequest) {
   return request.post<ContractAttachmentItem>(`/api/crm/contracts/${contractId}/attachments`, data)
 }
 
-export function getContractAttachments(contractId: number | string) {
+export function getContractAttachments(contractId: Id) {
   return request.get<ContractAttachmentItem[]>(`/api/crm/contracts/${contractId}/attachments`)
 }
 
-export function deleteContractAttachment(attachmentId: number | string) {
+export function deleteContractAttachment(attachmentId: Id) {
   return request.delete<void>(`/api/crm/contracts/attachments/${attachmentId}`)
 }
 
@@ -159,11 +159,11 @@ export function createContractSmsTasks(data: SmsTaskCreateRequest) {
   return request.post<SmsTaskItem[]>('/api/crm/contracts/sms/tasks', data)
 }
 
-export function getContractSmsTasks(contractId?: number) {
+export function getContractSmsTasks(contractId?: Id) {
   return request.get<SmsTaskItem[]>('/api/crm/contracts/sms/tasks', { params: { contractId } })
 }
 
-export function sendContractSmsTask(taskId: number | string) {
+export function sendContractSmsTask(taskId: Id) {
   return request.post<SmsTaskItem>(`/api/crm/contracts/sms/tasks/${taskId}/send`)
 }
 
@@ -254,11 +254,11 @@ export function getContractLinkageByElder(elderId: Id) {
   return request.get<ContractLinkageSummary>('/api/crm/contracts/linkage', { params: { elderId } })
 }
 
-export function getContractLinkageByLead(leadId: number | string) {
+export function getContractLinkageByLead(leadId: Id) {
   return request.get<ContractLinkageSummary>(`/api/crm/contracts/${leadId}/linkage`)
 }
 
-export function getContractLinkageByContract(contractId: number | string) {
+export function getContractLinkageByContract(contractId: Id) {
   return request.get<ContractLinkageSummary>(`/api/crm/contracts/${contractId}/linkage-by-contract`)
 }
 
@@ -282,46 +282,46 @@ export function createMarketingPlan(data: MarketingPlanPayload) {
   return request.post<MarketingPlanItem>('/api/marketing/plans', data)
 }
 
-export function updateMarketingPlan(id: number | string, data: MarketingPlanPayload) {
+export function updateMarketingPlan(id: Id, data: MarketingPlanPayload) {
   return request.put<MarketingPlanItem>(`/api/marketing/plans/${id}`, data)
 }
 
-export function deleteMarketingPlan(id: number | string) {
+export function deleteMarketingPlan(id: Id) {
   return request.delete<void>(`/api/marketing/plans/${id}`)
 }
 
-export function getMarketingPlanDetail(id: number | string) {
+export function getMarketingPlanDetail(id: Id) {
   return request.get<MarketingPlanItem>(`/api/marketing/plans/${id}`)
 }
 
-export function submitMarketingPlan(id: number | string) {
+export function submitMarketingPlan(id: Id) {
   return request.post<MarketingPlanItem>(`/api/marketing/plans/${id}/submit`)
 }
 
-export function approveMarketingPlan(id: number | string, data?: MarketingPlanApprovalPayload) {
+export function approveMarketingPlan(id: Id, data?: MarketingPlanApprovalPayload) {
   return request.post<MarketingPlanItem>(`/api/marketing/plans/${id}/approve`, data || {})
 }
 
-export function rejectMarketingPlan(id: number | string, data?: MarketingPlanApprovalPayload) {
+export function rejectMarketingPlan(id: Id, data?: MarketingPlanApprovalPayload) {
   return request.post<MarketingPlanItem>(`/api/marketing/plans/${id}/reject`, data || {})
 }
 
-export function publishMarketingPlan(id: number | string) {
+export function publishMarketingPlan(id: Id) {
   return request.post<MarketingPlanItem>(`/api/marketing/plans/${id}/publish`)
 }
 
-export function deactivateMarketingPlan(id: number | string) {
+export function deactivateMarketingPlan(id: Id) {
   return request.post<MarketingPlanItem>(`/api/marketing/plans/${id}/deactivate`)
 }
 
-export function confirmMarketingPlanRead(id: number | string, data: MarketingPlanReadConfirmPayload) {
+export function confirmMarketingPlanRead(id: Id, data: MarketingPlanReadConfirmPayload) {
   return request.post<MarketingPlanItem>(`/api/marketing/plans/${id}/receipt`, data)
 }
 
-export function getMarketingPlanReceipts(id: number | string) {
+export function getMarketingPlanReceipts(id: Id) {
   return request.get<MarketingPlanReceiptItem[]>(`/api/marketing/plans/${id}/receipts`)
 }
 
-export function getMarketingPlanWorkflowSummary(id: number | string) {
+export function getMarketingPlanWorkflowSummary(id: Id) {
   return request.get<MarketingPlanWorkflowSummary>(`/api/marketing/plans/${id}/workflow-summary`)
 }

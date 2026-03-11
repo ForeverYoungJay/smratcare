@@ -1,12 +1,12 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import { getCardAccountPage } from '../api/card'
 import { subscribeLiveSync } from '../utils/liveSync'
-import type { CardAccount, PageResult } from '../types'
+import type { CardAccount, Id, PageResult } from '../types'
 import { fuzzyScore, toPinyinInitials } from './entitySearch'
 
 export interface CardAccountOption {
   label: string
-  value: number
+  value: Id
   cardNo: string
   elderName: string
 }
@@ -26,7 +26,7 @@ function toCardAccountOption(item: CardAccount): CardAccountOption {
   const cardNo = item.cardNo || `CARD#${item.id}`
   return {
     label: `${cardNo} - ${elderName}`,
-    value: Number(item.id),
+    value: String(item.id),
     cardNo,
     elderName
   }
@@ -38,10 +38,10 @@ function cardAccountSearchText(item: CardAccount) {
 }
 
 function dedupeCardAccounts(rows: CardAccount[]) {
-  const map = new Map<number, CardAccount>()
+  const map = new Map<Id, CardAccount>()
   rows.forEach((item) => {
-    const id = Number(item.id)
-    if (!Number.isFinite(id)) return
+    const id = String(item.id || '').trim()
+    if (!id) return
     if (!map.has(id)) map.set(id, item)
   })
   return Array.from(map.values())
@@ -97,12 +97,13 @@ export function useCardAccountOptions(config: UseCardAccountOptionsConfig = {}) 
     }
   }
 
-  function ensureSelectedCardAccount(cardAccountId?: number, elderName?: string, cardNo?: string) {
-    if (!cardAccountId || cardAccountOptions.value.some((item) => item.value === Number(cardAccountId))) return
-    const safeCardNo = cardNo || `CARD#${cardAccountId}`
+  function ensureSelectedCardAccount(cardAccountId?: Id, elderName?: string, cardNo?: string) {
+    const targetId = String(cardAccountId || '').trim()
+    if (!targetId || cardAccountOptions.value.some((item) => item.value === targetId)) return
+    const safeCardNo = cardNo || `CARD#${targetId}`
     const safeElderName = elderName || '-'
     cardAccountOptions.value.unshift({
-      value: Number(cardAccountId),
+      value: targetId,
       cardNo: safeCardNo,
       elderName: safeElderName,
       label: `${safeCardNo} - ${safeElderName}`

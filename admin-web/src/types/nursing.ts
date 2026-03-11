@@ -99,7 +99,7 @@ export interface NursingRecordItem {
   recordTime?: string
   elderId?: Id
   elderName?: string
-  staffId?: number
+  staffId?: Id
   staffName?: string
   serviceName?: string
   planId?: number
@@ -110,7 +110,7 @@ export interface NursingRecordItem {
 }
 
 export interface NursingStaffWorkloadItem {
-  staffId?: number
+  staffId?: Id
   staffName?: string
   bookingCount?: number
   completedBookingCount?: number

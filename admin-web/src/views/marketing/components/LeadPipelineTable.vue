@@ -339,7 +339,7 @@ import {
 } from '../../../api/marketing'
 import { useUserStore } from '../../../stores/user'
 import { hasMinisterOrHigher } from '../../../utils/roleAccess'
-import type { CrmLeadItem, MarketingLeadEntrySummary, MarketingLeadMode, PageResult } from '../../../types'
+import type { CrmLeadItem, Id, MarketingLeadEntrySummary, MarketingLeadMode, PageResult } from '../../../types'
 
 const props = withDefaults(defineProps<{
   mode: 'consultation' | 'intent' | 'reservation' | 'invalid' | 'callback' | 'pipeline'
@@ -361,7 +361,7 @@ const loading = ref(false)
 const tableError = ref('')
 const rows = ref<CrmLeadItem[]>([])
 const total = ref(0)
-const selectedRowKeys = ref<Array<string | number>>([])
+const selectedRowKeys = ref<string[]>([])
 const summaryLoading = ref(false)
 const summaryError = ref('')
 const summary = reactive<MarketingLeadEntrySummary>({
@@ -412,13 +412,13 @@ const planForm = reactive({
 })
 const executeOpen = ref(false)
 const executeSubmitting = ref(false)
-const pendingExecutePlanId = ref<string | number>()
+const pendingExecutePlanId = ref<Id>()
 const executeForm = reactive({
   executeNote: '页面执行',
   followupResult: '',
   nextFollowDate: ''
 })
-const callbackSnapshot = ref<Record<string, { title?: string; followupContent?: string; followupResult?: string; planId?: string | number }>>({})
+const callbackSnapshot = ref<Record<string, { title?: string; followupContent?: string; followupResult?: string; planId?: Id }>>({})
 const todayText = dayjs().format('YYYY-MM-DD')
 
 const rules: FormRules = {
@@ -428,8 +428,8 @@ const rules: FormRules = {
 
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
-  onChange: (keys: (string | number)[]) => {
-    selectedRowKeys.value = keys
+  onChange: (keys: Array<string | number>) => {
+    selectedRowKeys.value = keys.map((item) => String(item))
   }
 }))
 const selectedCount = computed(() => selectedRowKeys.value.length)
@@ -743,7 +743,7 @@ function requireSingleSelection(actionLabel: string) {
   return selectedRows.value[0]
 }
 
-function sameId(left: string | number | undefined, right: string | number | undefined) {
+function sameId(left: Id | undefined, right: Id | undefined) {
   if (left == null || right == null) return false
   return String(left) === String(right)
 }

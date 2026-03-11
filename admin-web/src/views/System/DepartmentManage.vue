@@ -28,6 +28,8 @@
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
+            <a-button type="link" @click="openHrProfile(record)">档案中心</a-button>
+            <a-button type="link" @click="openAccountAccess(record)">账号设置</a-button>
             <a-button type="link" @click="openDrawer(record)">编辑</a-button>
             <a-popconfirm title="确认删除该部门吗？" ok-text="确认" cancel-text="取消" @confirm="remove(record)">
               <a-button type="link" danger>删除</a-button>
@@ -76,6 +78,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
@@ -85,6 +88,7 @@ import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import type { DepartmentItem, PageResult } from '../../types'
 
+const router = useRouter()
 const query = reactive({ keyword: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const rows = ref<DepartmentItem[]>([])
 const allRows = ref<DepartmentItem[]>([])
@@ -194,6 +198,20 @@ async function remove(record: DepartmentItem) {
   await deleteDepartment(record.id)
   message.success('删除成功')
   fetchData()
+}
+
+function openHrProfile(record: DepartmentItem) {
+  router.push({
+    path: '/hr/profile/basic',
+    query: { departmentId: record.id }
+  })
+}
+
+function openAccountAccess(record: DepartmentItem) {
+  router.push({
+    path: '/hr/profile/account-access',
+    query: { departmentId: record.id }
+  })
 }
 
 fetchData()

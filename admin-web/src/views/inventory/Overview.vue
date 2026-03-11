@@ -126,7 +126,7 @@
           />
         </a-form-item>
         <a-form-item label="批次ID">
-          <a-input-number v-model:value="adjustForm.batchId" :min="1" style="width: 100%" />
+          <a-input v-model:value="adjustForm.batchId" />
         </a-form-item>
         <a-form-item label="调整类型" name="adjustType">
           <a-select v-model:value="adjustForm.adjustType">
@@ -161,7 +161,8 @@ import { exportCsv } from '../../utils/export'
 import { adjustInventory, getInventoryBatchPage } from '../../api/materialCenter'
 import { getWarehousePage } from '../../api/materialCenter'
 import { getProductPage } from '../../api/store'
-import type { InventoryBatchItem, PageResult, ProductItem } from '../../types'
+import { normalizeId } from '../../utils/id'
+import type { Id, InventoryBatchItem, MaterialWarehouseItem, PageResult, ProductItem } from '../../types'
 
 const loading = ref(false)
 const route = useRoute()
@@ -171,8 +172,8 @@ const products = ref<ProductItem[]>([])
 
 const query = reactive({
   keyword: '',
-  productId: undefined as number | undefined,
-  warehouseId: undefined as number | undefined,
+  productId: undefined as Id | undefined,
+  warehouseId: undefined as Id | undefined,
   category: undefined as string | undefined,
   businessDomain: undefined as string | undefined,
   itemType: undefined as string | undefined,
@@ -182,7 +183,7 @@ const query = reactive({
   pageNo: 1,
   pageSize: 10
 })
-const warehouseOptions = ref<Array<{ label: string; value: number }>>([])
+const warehouseOptions = ref<Array<{ label: string; value: Id }>>([])
 const categoryOptions = ref<Array<{ label: string; value: string }>>([])
 const businessDomainOptions = [
   { label: '企业内部', value: 'INTERNAL' },
@@ -236,8 +237,8 @@ const adjustOpen = ref(false)
 const adjusting = ref(false)
 const adjustFormRef = ref()
 const adjustForm = reactive<{
-  productId?: number
-  batchId?: number
+  productId?: Id
+  batchId?: Id
   inventoryType: 'ASSET' | 'MATERIAL' | 'CONSUMABLE'
   adjustType: 'GAIN' | 'LOSS'
   adjustQty: number
@@ -350,7 +351,7 @@ async function submitAdjust() {
   adjusting.value = true
   try {
     await adjustInventory({
-      productId: Number(adjustForm.productId),
+      productId: adjustForm.productId as Id,
       batchId: adjustForm.batchId,
       inventoryType: adjustForm.inventoryType,
       adjustType: adjustForm.adjustType,
@@ -381,10 +382,7 @@ function applyRouteQuery() {
   if (queryCategory) query.category = queryCategory
   if (queryBusinessDomain) query.businessDomain = queryBusinessDomain
   if (queryItemType) query.itemType = queryItemType
-  if (productIdRaw !== undefined) {
-    const parsed = Number(productIdRaw)
-    query.productId = Number.isNaN(parsed) ? undefined : parsed
-  }
+  query.productId = normalizeId(productIdRaw)
   if (expiryDaysRaw !== undefined) {
     const parsed = Number(expiryDaysRaw)
     query.expiryDays = Number.isNaN(parsed) ? undefined : parsed
@@ -433,7 +431,10 @@ onMounted(async () => {
     getWarehousePage({ pageNo: 1, pageSize: 500 }),
     getProductPage({ pageNo: 1, pageSize: 500 })
   ])
-  warehouseOptions.value = warehouseRes.list.map((it: { id: number; warehouseName?: string }) => ({ label: it.warehouseName || `仓库${it.id}`, value: it.id }))
+  warehouseOptions.value = (warehouseRes.list || []).map((it: MaterialWarehouseItem) => ({
+    label: it.warehouseName || `仓库${it.id}`,
+    value: it.id
+  }))
   products.value = productRes.list || []
   const categorySet = new Set<string>()
   for (const row of products.value) {

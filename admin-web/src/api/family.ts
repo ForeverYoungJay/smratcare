@@ -14,10 +14,10 @@ export function upsertFamilyUser(data: {
   return request.post<FamilyUserItem>('/api/admin/family/users/upsert', data)
 }
 
-export function getFamilyRelations(elderId: Id | number) {
+export function getFamilyRelations(elderId: Id) {
   return request.get<FamilyRelationItem[]>('/api/admin/family/relations', { params: { elderId } })
 }
 
-export function removeFamilyRelation(relationId: number | string) {
+export function removeFamilyRelation(relationId: Id) {
   return request.delete<void>(`/api/admin/family/relations/${relationId}`)
 }

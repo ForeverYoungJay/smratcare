@@ -9,7 +9,7 @@
           <a-date-picker v-model:value="query.to" picker="month" style="width: 160px" />
         </a-form-item>
         <a-form-item label="机构ID">
-          <a-input-number v-model:value="query.orgId" :min="1" placeholder="默认当前机构" style="width: 160px" />
+          <a-input v-model:value="query.orgId" allow-clear placeholder="默认当前机构" style="width: 160px" />
         </a-form-item>
         <a-form-item label="月份筛选">
           <a-input v-model:value="query.monthKeyword" allow-clear placeholder="如 2026-03" style="width: 140px" />
@@ -68,12 +68,13 @@ import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import StatsMetaHint from '../../components/stats/StatsMetaHint.vue'
 import { exportOrgElderFlowCsv, getOrgElderFlow } from '../../api/stats'
-import type { MonthFlowItem } from '../../types'
+import type { Id, MonthFlowItem } from '../../types'
 import { useECharts } from '../../plugins/echarts'
 import { message } from 'ant-design-vue'
 import { printTableReport } from '../../utils/print'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { copyText } from '../../utils/clipboard'
+import { normalizeId } from '../../utils/id'
 
 const route = useRoute()
 const router = useRouter()
@@ -82,7 +83,7 @@ const refreshedAt = ref('')
 const query = ref({
   from: dayjs().subtract(5, 'month') as Dayjs,
   to: dayjs() as Dayjs,
-  orgId: undefined as number | undefined,
+  orgId: undefined as Id | undefined,
   monthKeyword: '',
   printRemark: ''
 })
@@ -258,8 +259,7 @@ function initFromRouteQuery() {
   const to = String(route.query.to || '')
   if (dayjs(from).isValid()) query.value.from = dayjs(from)
   if (dayjs(to).isValid()) query.value.to = dayjs(to)
-  const orgId = Number(route.query.orgId)
-  if (Number.isFinite(orgId) && orgId > 0) query.value.orgId = orgId
+  query.value.orgId = normalizeId(route.query.orgId)
   const monthKeyword = String(route.query.monthKeyword || '')
   if (monthKeyword) query.value.monthKeyword = monthKeyword
 }

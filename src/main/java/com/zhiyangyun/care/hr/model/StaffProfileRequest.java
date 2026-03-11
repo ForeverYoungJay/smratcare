@@ -8,6 +8,11 @@ public class StaffProfileRequest {
   private Long staffId;
   private String jobTitle;
   private String employmentType;
+  private String contractNo;
+  private String contractType;
+  private String contractStatus;
+  private LocalDate contractStartDate;
+  private LocalDate contractEndDate;
   private LocalDate hireDate;
   private String qualificationLevel;
   private String certificateNo;

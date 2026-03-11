@@ -100,7 +100,7 @@ import {
   getLogisticsEquipmentPage,
   updateLogisticsEquipment
 } from '../../api/logistics'
-import type { LogisticsEquipmentArchive, PageResult } from '../../types'
+import type { Id, LogisticsEquipmentArchive, PageResult } from '../../types'
 
 const router = useRouter()
 const route = useRoute()
@@ -119,7 +119,7 @@ const query = reactive({
 })
 
 const form = reactive({
-  id: undefined as number | undefined,
+  id: undefined as Id | undefined,
   equipmentCode: '',
   equipmentName: '',
   category: '',

@@ -92,14 +92,14 @@ import {
   getDiningMealTypeLabel
 } from '../../constants/dining'
 import { getDiningRecipePage, createDiningRecipe, updateDiningRecipe, deleteDiningRecipe, getDiningDishList } from '../../api/dining'
-import type { DiningRecipe, PageResult } from '../../types'
+import type { DiningRecipe, Id, PageResult } from '../../types'
 
 const mealOptions = DINING_MEAL_TYPE_OPTIONS
 const statusOptions = DINING_ENABLE_STATUS_OPTIONS
 
 const loading = ref(false)
 const rows = ref<DiningRecipe[]>([])
-const dishOptions = ref<{ label: string; value: number; name: string }[]>([])
+const dishOptions = ref<{ label: string; value: Id; name: string }[]>([])
 const query = reactive({
   range: undefined as [Dayjs, Dayjs] | undefined,
   keyword: '',
@@ -112,11 +112,11 @@ const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChange
 const editOpen = ref(false)
 const saving = ref(false)
 const form = reactive({
-  id: undefined as number | undefined,
+  id: undefined as Id | undefined,
   recipeName: '',
   mealType: undefined as string | undefined,
   planDate: undefined as Dayjs | undefined,
-  dishIdList: [] as number[],
+  dishIdList: [] as Id[],
   dishNames: '',
   suitableCrowd: '',
   status: DINING_STATUS.enabled,
@@ -179,7 +179,7 @@ async function loadDishOptions() {
   const list = await getDiningDishList({ mealType: form.mealType, status: DINING_STATUS.enabled })
   dishOptions.value = (list || []).map((item: any) => ({
     label: `${item.dishName} ¥${item.unitPrice || 0}`,
-    value: Number(item.id),
+    value: String(item.id),
     name: item.dishName
   }))
 }
@@ -190,7 +190,7 @@ function onMealTypeChange() {
   loadDishOptions()
 }
 
-function onDishChange(values: number[]) {
+function onDishChange(values: Id[]) {
   const selected = dishOptions.value.filter((item) => values.includes(item.value))
   form.dishNames = selected.map((item) => item.name).join(',')
 }

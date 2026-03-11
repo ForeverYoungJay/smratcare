@@ -2748,7 +2748,7 @@ function selectedRecordElderContext() {
     message.warning('请先勾选当前页 1 条记录')
     return null
   }
-  const elderId = Number(selected.elderId || 0)
+  const elderId = String(selected.elderId || '').trim()
   const elderName = String(selected.elderName || '').trim()
   if (!elderId) {
     message.warning('该评估记录未关联长者ID')

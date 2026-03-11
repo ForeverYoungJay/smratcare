@@ -25,6 +25,7 @@
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
+            <a-button type="link" @click="openLinkedStaff(record)">关联员工</a-button>
             <a-button type="link" @click="openDrawer(record)">编辑</a-button>
             <a-popconfirm title="确认删除该角色吗？" ok-text="确认" cancel-text="取消" @confirm="remove(record)">
               <a-button type="link" danger>删除</a-button>
@@ -61,6 +62,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
@@ -68,6 +70,7 @@ import DataTable from '../../components/DataTable.vue'
 import { getRolePage, createRole, updateRole, deleteRole } from '../../api/rbac'
 import type { RoleItem, PageResult } from '../../types'
 
+const router = useRouter()
 const query = reactive({ keyword: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const rows = ref<RoleItem[]>([])
 const loading = ref(false)
@@ -158,6 +161,13 @@ async function remove(record: RoleItem) {
   await deleteRole(record.id)
   message.success('删除成功')
   fetchData()
+}
+
+function openLinkedStaff(record: RoleItem) {
+  router.push({
+    path: '/hr/profile/account-access',
+    query: { roleId: record.id }
+  })
 }
 
 fetchData()

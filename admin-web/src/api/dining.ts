@@ -25,15 +25,15 @@ export function createDiningDish(data: Partial<DiningDish>) {
   return request.post<DiningDish>('/api/life/dining/dish', data)
 }
 
-export function updateDiningDish(id: number, data: Partial<DiningDish>) {
+export function updateDiningDish(id: Id, data: Partial<DiningDish>) {
   return request.put<DiningDish>(`/api/life/dining/dish/${id}`, data)
 }
 
-export function updateDiningDishStatus(id: number, status: string) {
+export function updateDiningDishStatus(id: Id, status: string) {
   return request.put<DiningDish>(`/api/life/dining/dish/${id}/status`, null, { params: { status } })
 }
 
-export function deleteDiningDish(id: number) {
+export function deleteDiningDish(id: Id) {
   return request.delete<void>(`/api/life/dining/dish/${id}`)
 }
 
@@ -45,11 +45,11 @@ export function createDiningRecipe(data: Partial<DiningRecipe>) {
   return request.post<DiningRecipe>('/api/life/dining/recipe', data)
 }
 
-export function updateDiningRecipe(id: number, data: Partial<DiningRecipe>) {
+export function updateDiningRecipe(id: Id, data: Partial<DiningRecipe>) {
   return request.put<DiningRecipe>(`/api/life/dining/recipe/${id}`, data)
 }
 
-export function deleteDiningRecipe(id: number) {
+export function deleteDiningRecipe(id: Id) {
   return request.delete<void>(`/api/life/dining/recipe/${id}`)
 }
 
@@ -65,11 +65,11 @@ export function createDiningPrepZone(data: Partial<DiningPrepZone>) {
   return request.post<DiningPrepZone>('/api/life/dining/prep-zone', data)
 }
 
-export function updateDiningPrepZone(id: number, data: Partial<DiningPrepZone>) {
+export function updateDiningPrepZone(id: Id, data: Partial<DiningPrepZone>) {
   return request.put<DiningPrepZone>(`/api/life/dining/prep-zone/${id}`, data)
 }
 
-export function deleteDiningPrepZone(id: number) {
+export function deleteDiningPrepZone(id: Id) {
   return request.delete<void>(`/api/life/dining/prep-zone/${id}`)
 }
 
@@ -85,11 +85,11 @@ export function createDiningDeliveryArea(data: Partial<DiningDeliveryArea>) {
   return request.post<DiningDeliveryArea>('/api/life/dining/delivery-area', data)
 }
 
-export function updateDiningDeliveryArea(id: number, data: Partial<DiningDeliveryArea>) {
+export function updateDiningDeliveryArea(id: Id, data: Partial<DiningDeliveryArea>) {
   return request.put<DiningDeliveryArea>(`/api/life/dining/delivery-area/${id}`, data)
 }
 
-export function deleteDiningDeliveryArea(id: number) {
+export function deleteDiningDeliveryArea(id: Id) {
   return request.delete<void>(`/api/life/dining/delivery-area/${id}`)
 }
 
@@ -141,15 +141,15 @@ export function createDiningDeliveryRecord(data: Partial<DiningDeliveryRecord>) 
   return request.post<DiningDeliveryRecord>('/api/life/dining/delivery-record', data)
 }
 
-export function updateDiningDeliveryRecord(id: number, data: Partial<DiningDeliveryRecord>) {
+export function updateDiningDeliveryRecord(id: Id, data: Partial<DiningDeliveryRecord>) {
   return request.put<DiningDeliveryRecord>(`/api/life/dining/delivery-record/${id}`, data)
 }
 
-export function redispatchDiningDeliveryRecord(id: number, data: any) {
+export function redispatchDiningDeliveryRecord(id: Id, data: any) {
   return request.put<DiningDeliveryRecord>(`/api/life/dining/delivery-record/${id}/redispatch`, data)
 }
 
-export function deleteDiningDeliveryRecord(id: number) {
+export function deleteDiningDeliveryRecord(id: Id) {
   return request.delete<void>(`/api/life/dining/delivery-record/${id}`)
 }
 

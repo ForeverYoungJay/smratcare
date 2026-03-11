@@ -508,7 +508,7 @@ const reviewForm = reactive<CareTaskReviewRequest>({
 })
 const generateForm = reactive({ date: dayjs(), force: false })
 const createForm = reactive<any>({
-  elderId: '',
+  elderId: '' as Id | '',
   templateId: 0,
   taskName: '',
   custom: false,
@@ -837,7 +837,7 @@ function openReview(row: CareTaskItem) {
 }
 
 function openCreate() {
-  createForm.elderId = 0
+  createForm.elderId = ''
   createForm.templateId = 0
   createForm.taskName = ''
   createForm.custom = false
@@ -959,7 +959,7 @@ async function submitAction() {
       message.success('任务已生成')
     } else if (actionMode.value === 'create') {
       await createTask({
-        elderId: Number(createForm.elderId),
+        elderId: createForm.elderId as Id,
         templateId: createForm.custom ? undefined : Number(createForm.templateId),
         taskName: createForm.custom ? createForm.taskName : undefined,
         planTime: dayjs(createForm.planTime).format('YYYY-MM-DDTHH:mm:ss'),

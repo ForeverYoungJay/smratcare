@@ -79,7 +79,7 @@ const attachments = ref<ContractAttachmentItem[]>([])
 const loadingContracts = ref(false)
 const loadingAttachments = ref(false)
 const attachmentOpen = ref(false)
-const selectedRowKeys = ref<Array<string | number>>([])
+const selectedRowKeys = ref<string[]>([])
 const selectedContracts = ref<CrmContractItem[]>([])
 
 const contractColumns = [
@@ -98,7 +98,7 @@ const attachmentColumns = [
 ]
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
-  onChange: (keys: (string | number)[], rows: CrmContractItem[]) => {
+  onChange: (keys: Array<string | number>, rows: CrmContractItem[]) => {
     selectedRowKeys.value = keys.map((item) => String(item))
     selectedContracts.value = rows
   }

@@ -162,6 +162,9 @@ export function getContractLinkageByLead(leadId) {
 export function getContractLinkageByContract(contractId) {
     return request.get(`/api/crm/contracts/${contractId}/linkage-by-contract`);
 }
+export function getContractArchiveRule() {
+    return request.get('/api/crm/contracts/linkage-archive-rule');
+}
 export function getContractAssessmentOverview(params) {
     return request.get('/api/crm/contracts/assessment-overview', { params });
 }

@@ -24,7 +24,7 @@ export function createProduct(data: Partial<ProductItem>) {
   return request.post<void>('/api/store/product', data)
 }
 
-export function updateProduct(id: number, data: Partial<ProductItem>) {
+export function updateProduct(id: Id, data: Partial<ProductItem>) {
   return request.put<void>(`/api/store/product/${id}`, data)
 }
 
@@ -52,7 +52,7 @@ export function refundOrder(data: OrderRefundRequest) {
   return request.post<void>('/api/store/order/refund', data)
 }
 
-export function fulfillOrder(orderId: number) {
+export function fulfillOrder(orderId: Id) {
   return request.post<void>('/api/store/order/fulfill', { orderId })
 }
 

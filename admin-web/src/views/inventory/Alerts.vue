@@ -93,7 +93,7 @@ import { getInventoryAlerts, getInventoryExpiryAlerts } from '../../api/material
 import { getProductPage } from '../../api/store'
 import { uploadOaFile } from '../../api/oa'
 import { useUserStore } from '../../stores/user'
-import type { InventoryAlertItem, InventoryExpiryAlertItem, PageResult, ProductItem } from '../../types'
+import type { Id, InventoryAlertItem, InventoryExpiryAlertItem, PageResult, ProductItem } from '../../types'
 
 const activeKey = ref('low')
 const router = useRouter()
@@ -123,22 +123,22 @@ const itemTypeOptions = [
   { label: '服务', value: 'SERVICE' }
 ]
 const productById = computed(() => {
-  const map = new Map<number, ProductItem>()
+  const map = new Map<Id, ProductItem>()
   for (const product of products.value) {
-    map.set(Number(product.idStr || product.id), product)
+    map.set(String(product.idStr || product.id), product)
   }
   return map
 })
 const lowRowsFiltered = computed(() =>
-  lowRows.value.filter((row) => matchProductFilters(Number(row.productId)))
+  lowRows.value.filter((row) => matchProductFilters(row.productId))
 )
 const expiryRowsFiltered = computed(() =>
-  expiryRows.value.filter((row) => matchProductFilters(Number(row.productId)))
+  expiryRows.value.filter((row) => matchProductFilters(row.productId))
 )
 const summaryStats = computed(() => {
   const stats = { assetCount: 0, consumableCount: 0, foodCount: 0, serviceCount: 0 }
   for (const row of lowRowsFiltered.value) {
-    const itemType = productById.value.get(Number(row.productId))?.itemType || 'CONSUMABLE'
+    const itemType = productById.value.get(String(row.productId))?.itemType || 'CONSUMABLE'
     if (itemType === 'ASSET') stats.assetCount += 1
     else if (itemType === 'FOOD') stats.foodCount += 1
     else if (itemType === 'SERVICE') stats.serviceCount += 1
@@ -203,8 +203,8 @@ function exportSuggestions() {
       类型: '低库存',
       商品名称: r.productName,
       商品ID: r.productId,
-      业务域: domainLabel(productById.value.get(Number(r.productId))?.businessDomain),
-      物资类型: itemTypeLabel(productById.value.get(Number(r.productId))?.itemType),
+      业务域: domainLabel(productById.value.get(String(r.productId))?.businessDomain),
+      物资类型: itemTypeLabel(productById.value.get(String(r.productId))?.itemType),
       安全库存: r.safetyStock,
       当前库存: r.currentStock,
       建议采购数量: Math.max(Number(r.safetyStock || 0) - Number(r.currentStock || 0), 0),
@@ -378,14 +378,13 @@ function toBatchPurchase() {
     return
   }
   const validRows = lowRowsFiltered.value.filter((item) => {
-    const id = Number(item.productId || 0)
-    return Number.isFinite(id) && id > 0
+    return String(item.productId || '').trim().length > 0
   })
   if (!validRows.length) {
     message.info('低库存记录缺少有效商品ID')
     return
   }
-  const productIds = validRows.map((item) => Number(item.productId))
+  const productIds = validRows.map((item) => String(item.productId))
   const quantities = validRows.map((item) => suggestQty(item))
   router.push({
     path: '/logistics/storage/purchase',
@@ -432,8 +431,10 @@ watch(
   }
 )
 
-function matchProductFilters(productId: number) {
-  const product = productById.value.get(productId)
+function matchProductFilters(productId?: Id) {
+  const normalizedProductId = String(productId || '').trim()
+  if (!normalizedProductId) return true
+  const product = productById.value.get(normalizedProductId)
   if (!product) return true
   if (filters.businessDomain && (product.businessDomain || 'BOTH') !== filters.businessDomain) {
     return false

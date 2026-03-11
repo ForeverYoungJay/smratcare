@@ -5,8 +5,10 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zhiyangyun.care.audit.service.AuditLogService;
 import com.zhiyangyun.care.auth.entity.StaffAccount;
+import com.zhiyangyun.care.auth.entity.StaffRole;
 import com.zhiyangyun.care.auth.mapper.RoleMapper;
 import com.zhiyangyun.care.auth.mapper.StaffMapper;
+import com.zhiyangyun.care.auth.mapper.StaffRoleMapper;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.model.StaffOptionResponse;
 import com.zhiyangyun.care.auth.security.AuthContext;
@@ -35,16 +37,19 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminStaffController {
   private final StaffMapper staffMapper;
   private final RoleMapper roleMapper;
+  private final StaffRoleMapper staffRoleMapper;
   private final AuditLogService auditLogService;
   private final PasswordEncoder passwordEncoder;
 
   public AdminStaffController(
       StaffMapper staffMapper,
       RoleMapper roleMapper,
+      StaffRoleMapper staffRoleMapper,
       AuditLogService auditLogService,
       PasswordEncoder passwordEncoder) {
     this.staffMapper = staffMapper;
     this.roleMapper = roleMapper;
+    this.staffRoleMapper = staffRoleMapper;
     this.auditLogService = auditLogService;
     this.passwordEncoder = passwordEncoder;
   }
@@ -141,12 +146,30 @@ public class AdminStaffController {
       @RequestParam(defaultValue = "1") long page,
       @RequestParam(defaultValue = "20") long size,
       @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) Long departmentId,
+      @RequestParam(required = false) Long roleId,
       @RequestParam(required = false) String sortBy,
       @RequestParam(defaultValue = "desc") String order) {
     Long orgId = AuthContext.getOrgId();
+    List<Long> matchedRoleStaffIds = roleId == null ? List.of() : staffRoleMapper.selectList(Wrappers.lambdaQuery(StaffRole.class)
+            .eq(StaffRole::getIsDeleted, 0)
+            .eq(orgId != null, StaffRole::getOrgId, orgId)
+            .eq(StaffRole::getRoleId, roleId))
+        .stream()
+        .map(StaffRole::getStaffId)
+        .distinct()
+        .toList();
     var wrapper = Wrappers.lambdaQuery(StaffAccount.class)
         .eq(StaffAccount::getIsDeleted, 0)
-        .eq(orgId != null, StaffAccount::getOrgId, orgId);
+        .eq(orgId != null, StaffAccount::getOrgId, orgId)
+        .eq(departmentId != null, StaffAccount::getDepartmentId, departmentId);
+    if (roleId != null) {
+      if (matchedRoleStaffIds.isEmpty()) {
+        wrapper.eq(StaffAccount::getId, -1L);
+      } else {
+        wrapper.in(StaffAccount::getId, matchedRoleStaffIds);
+      }
+    }
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(StaffAccount::getUsername, keyword)
           .or().like(StaffAccount::getRealName, keyword)

@@ -171,7 +171,7 @@ import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { getBaseConfigItemList } from '../../api/baseConfig'
 import { exportCsv } from '../../utils/export'
 import { getOrderPage, getOrderDetail, cancelOrder, refundOrder, fulfillOrder } from '../../api/store'
-import type { BaseConfigItem, OrderItem, PageResult } from '../../types'
+import type { BaseConfigItem, Id, OrderItem, PageResult } from '../../types'
 
 const loading = ref(false)
 const router = useRouter()
@@ -179,10 +179,10 @@ const rows = ref<OrderItem[]>([])
 const total = ref(0)
 const detailOpen = ref(false)
 const detail = ref<OrderItem | null>(null)
-const fulfillingIds = ref<Set<number>>(new Set())
+const fulfillingIds = ref<Set<Id>>(new Set())
 const refundOpen = ref(false)
 const refundSubmitting = ref(false)
-const refundOrderId = ref<number | null>(null)
+const refundOrderId = ref<Id | null>(null)
 const refundReason = ref('')
 const refundReasonOptions = ref<{ label: string; value: string }[]>([])
 
@@ -397,9 +397,9 @@ function createPurchaseByDetail() {
     message.info('暂无可转采购商品')
     return
   }
-  const merged = new Map<number, number>()
+  const merged = new Map<Id, number>()
   for (const item of items as any[]) {
-    const productId = Number(item.productId || 0)
+    const productId = String(item.productId || '').trim()
     if (!productId) continue
     const qty = Math.max(Number(item.quantity || 1), 1)
     merged.set(productId, (merged.get(productId) || 0) + qty)

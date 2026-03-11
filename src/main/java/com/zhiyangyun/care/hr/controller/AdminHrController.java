@@ -10,8 +10,6 @@ import com.zhiyangyun.care.auth.mapper.StaffMapper;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.audit.service.AuditLogService;
-import com.zhiyangyun.care.crm.entity.CrmContract;
-import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.finance.entity.CardAccount;
@@ -23,6 +21,8 @@ import com.zhiyangyun.care.hr.entity.StaffTrainingRecord;
 import com.zhiyangyun.care.hr.model.HrExpenseItemResponse;
 import com.zhiyangyun.care.hr.mapper.StaffProfileMapper;
 import com.zhiyangyun.care.hr.mapper.StaffTrainingRecordMapper;
+import com.zhiyangyun.care.auth.entity.StaffRole;
+import com.zhiyangyun.care.auth.mapper.StaffRoleMapper;
 import com.zhiyangyun.care.hr.model.HrAttendanceAbnormalResponse;
 import com.zhiyangyun.care.hr.model.HrAttendanceRecordResponse;
 import com.zhiyangyun.care.hr.model.HrGenericApprovalResponse;
@@ -91,6 +91,7 @@ public class AdminHrController {
   private final StaffProfileMapper staffProfileMapper;
   private final StaffTrainingRecordMapper trainingRecordMapper;
   private final StaffMapper staffMapper;
+  private final StaffRoleMapper staffRoleMapper;
   private final StaffPointsService staffPointsService;
   private final StaffPointsRuleService staffPointsRuleService;
   private final HrPerformanceService performanceService;
@@ -101,7 +102,6 @@ public class AdminHrController {
   private final OaDocumentMapper oaDocumentMapper;
   private final OaDocumentFolderMapper oaDocumentFolderMapper;
   private final AttendanceRecordMapper attendanceRecordMapper;
-  private final CrmContractMapper crmContractMapper;
   private final CardAccountMapper cardAccountMapper;
   private final ElderMapper elderMapper;
   private final ObjectMapper objectMapper;
@@ -109,6 +109,7 @@ public class AdminHrController {
   public AdminHrController(StaffProfileMapper staffProfileMapper,
       StaffTrainingRecordMapper trainingRecordMapper,
       StaffMapper staffMapper,
+      StaffRoleMapper staffRoleMapper,
       StaffPointsService staffPointsService,
       StaffPointsRuleService staffPointsRuleService,
       HrPerformanceService performanceService,
@@ -119,13 +120,13 @@ public class AdminHrController {
       OaDocumentMapper oaDocumentMapper,
       OaDocumentFolderMapper oaDocumentFolderMapper,
       AttendanceRecordMapper attendanceRecordMapper,
-      CrmContractMapper crmContractMapper,
       CardAccountMapper cardAccountMapper,
       ElderMapper elderMapper,
       ObjectMapper objectMapper) {
     this.staffProfileMapper = staffProfileMapper;
     this.trainingRecordMapper = trainingRecordMapper;
     this.staffMapper = staffMapper;
+    this.staffRoleMapper = staffRoleMapper;
     this.staffPointsService = staffPointsService;
     this.staffPointsRuleService = staffPointsRuleService;
     this.performanceService = performanceService;
@@ -136,7 +137,6 @@ public class AdminHrController {
     this.oaDocumentMapper = oaDocumentMapper;
     this.oaDocumentFolderMapper = oaDocumentFolderMapper;
     this.attendanceRecordMapper = attendanceRecordMapper;
-    this.crmContractMapper = crmContractMapper;
     this.cardAccountMapper = cardAccountMapper;
     this.elderMapper = elderMapper;
     this.objectMapper = objectMapper;
@@ -163,44 +163,27 @@ public class AdminHrController {
       profile.setOrgId(orgId);
       profile.setStaffId(request.getStaffId());
     }
-    if (request.getJobTitle() != null) {
-      profile.setJobTitle(request.getJobTitle());
-    }
-    if (request.getEmploymentType() != null) {
-      profile.setEmploymentType(request.getEmploymentType());
-    }
-    if (request.getHireDate() != null) {
-      profile.setHireDate(request.getHireDate());
-    }
-    if (request.getQualificationLevel() != null) {
-      profile.setQualificationLevel(request.getQualificationLevel());
-    }
-    if (request.getCertificateNo() != null) {
-      profile.setCertificateNo(request.getCertificateNo());
-    }
-    if (request.getEmergencyContactName() != null) {
-      profile.setEmergencyContactName(request.getEmergencyContactName());
-    }
-    if (request.getEmergencyContactPhone() != null) {
-      profile.setEmergencyContactPhone(request.getEmergencyContactPhone());
-    }
-    if (request.getBirthday() != null) {
-      profile.setBirthday(request.getBirthday());
-    }
+    profile.setJobTitle(normalizeBlank(request.getJobTitle()));
+    profile.setEmploymentType(normalizeBlank(request.getEmploymentType()));
+    profile.setContractNo(normalizeBlank(request.getContractNo()));
+    profile.setContractType(normalizeBlank(request.getContractType()));
+    profile.setContractStatus(normalizeBlank(request.getContractStatus()));
+    profile.setContractStartDate(request.getContractStartDate());
+    profile.setContractEndDate(request.getContractEndDate());
+    profile.setHireDate(request.getHireDate());
+    profile.setQualificationLevel(normalizeBlank(request.getQualificationLevel()));
+    profile.setCertificateNo(normalizeBlank(request.getCertificateNo()));
+    profile.setEmergencyContactName(normalizeBlank(request.getEmergencyContactName()));
+    profile.setEmergencyContactPhone(normalizeBlank(request.getEmergencyContactPhone()));
+    profile.setBirthday(request.getBirthday());
     if (request.getStatus() != null) {
       profile.setStatus(request.getStatus());
       staff.setStatus(request.getStatus());
       staffMapper.updateById(staff);
     }
-    if (request.getLeaveDate() != null) {
-      profile.setLeaveDate(request.getLeaveDate());
-    }
-    if (request.getLeaveReason() != null) {
-      profile.setLeaveReason(request.getLeaveReason());
-    }
-    if (request.getRemark() != null) {
-      profile.setRemark(request.getRemark());
-    }
+    profile.setLeaveDate(request.getLeaveDate());
+    profile.setLeaveReason(normalizeBlank(request.getLeaveReason()));
+    profile.setRemark(normalizeBlank(request.getRemark()));
 
     if (profile.getId() == null) {
       if (profile.getStatus() == null) {
@@ -234,16 +217,37 @@ public class AdminHrController {
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) String keyword,
-      @RequestParam(required = false) Integer status) {
+      @RequestParam(required = false) Integer status,
+      @RequestParam(required = false) Long departmentId,
+      @RequestParam(required = false) Long roleId,
+      @RequestParam(required = false) String contractStatus) {
     Long orgId = AuthContext.getOrgId();
+    List<Long> matchedContractStaffIds = findMatchedContractStaffIds(orgId, keyword, contractStatus);
+    List<Long> matchedRoleStaffIds = findRoleStaffIds(orgId, roleId);
     var wrapper = Wrappers.lambdaQuery(StaffAccount.class)
         .eq(StaffAccount::getIsDeleted, 0)
         .eq(orgId != null, StaffAccount::getOrgId, orgId)
+        .eq(departmentId != null, StaffAccount::getDepartmentId, departmentId)
         .eq(status != null, StaffAccount::getStatus, status);
+    if (contractStatus != null && !contractStatus.isBlank()) {
+      if (matchedContractStaffIds.isEmpty()) {
+        wrapper.eq(StaffAccount::getId, -1L);
+      } else {
+        wrapper.in(StaffAccount::getId, matchedContractStaffIds);
+      }
+    }
+    if (roleId != null) {
+      if (matchedRoleStaffIds.isEmpty()) {
+        wrapper.eq(StaffAccount::getId, -1L);
+      } else {
+        wrapper.in(StaffAccount::getId, matchedRoleStaffIds);
+      }
+    }
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(StaffAccount::getRealName, keyword)
           .or().like(StaffAccount::getStaffNo, keyword)
-          .or().like(StaffAccount::getPhone, keyword));
+          .or().like(StaffAccount::getPhone, keyword)
+          .or(!matchedContractStaffIds.isEmpty(), x -> x.in(StaffAccount::getId, matchedContractStaffIds)));
     }
     IPage<StaffAccount> page = staffMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
     List<Long> staffIds = page.getRecords().stream().map(StaffAccount::getId).toList();
@@ -304,13 +308,14 @@ public class AdminHrController {
         .ge(AttendanceRecord::getCheckInTime, dayStart)
         .lt(AttendanceRecord::getCheckInTime, dayEnd)));
 
-    Long contractExpiringCount = count(crmContractMapper.selectCount(Wrappers.lambdaQuery(CrmContract.class)
-        .eq(CrmContract::getIsDeleted, 0)
-        .eq(orgId != null, CrmContract::getOrgId, orgId)
-        .isNotNull(CrmContract::getEffectiveTo)
-        .ge(CrmContract::getEffectiveTo, today)
-        .le(CrmContract::getEffectiveTo, warningDeadline)
-        .ne(CrmContract::getStatus, "VOID")));
+    Long contractExpiringCount = count(staffProfileMapper.selectCount(Wrappers.lambdaQuery(StaffProfile.class)
+        .eq(StaffProfile::getIsDeleted, 0)
+        .eq(orgId != null, StaffProfile::getOrgId, orgId)
+        .isNotNull(StaffProfile::getContractEndDate)
+        .ge(StaffProfile::getContractEndDate, today)
+        .le(StaffProfile::getContractEndDate, warningDeadline)
+        .and(w -> w.isNull(StaffProfile::getContractStatus)
+            .or().notIn(StaffProfile::getContractStatus, List.of("TERMINATED", "VOID")))));
 
     List<StaffProfile> birthdayProfiles = staffProfileMapper.selectList(Wrappers.lambdaQuery(StaffProfile.class)
         .eq(StaffProfile::getIsDeleted, 0)
@@ -431,41 +436,29 @@ public class AdminHrController {
     LocalDate today = LocalDate.now();
     LocalDate warningDeadline = today.plusDays(resolvedWarningDays);
 
-    var wrapper = Wrappers.lambdaQuery(CrmContract.class)
-        .eq(CrmContract::getIsDeleted, 0)
-        .eq(orgId != null, CrmContract::getOrgId, orgId)
-        .isNotNull(CrmContract::getEffectiveTo)
-        .le(CrmContract::getEffectiveTo, warningDeadline)
-        .ne(CrmContract::getStatus, "VOID");
+    var wrapper = Wrappers.lambdaQuery(StaffProfile.class)
+        .eq(StaffProfile::getIsDeleted, 0)
+        .eq(orgId != null, StaffProfile::getOrgId, orgId)
+        .isNotNull(StaffProfile::getContractEndDate)
+        .le(StaffProfile::getContractEndDate, warningDeadline)
+        .and(w -> w.isNull(StaffProfile::getContractStatus)
+            .or().notIn(StaffProfile::getContractStatus, List.of("TERMINATED", "VOID")));
     if (!showExpired) {
-      wrapper.ge(CrmContract::getEffectiveTo, today);
+      wrapper.ge(StaffProfile::getContractEndDate, today);
     }
     if (keyword != null && !keyword.isBlank()) {
-      wrapper.and(w -> w.like(CrmContract::getContractNo, keyword.trim())
-          .or().like(CrmContract::getElderName, keyword.trim())
-          .or().like(CrmContract::getName, keyword.trim())
-          .or().like(CrmContract::getPhone, keyword.trim()));
+      List<Long> matchedStaffIds = findMatchedStaffIds(orgId, keyword);
+      wrapper.and(w -> w.like(StaffProfile::getContractNo, keyword.trim())
+          .or(matchedStaffIds != null && !matchedStaffIds.isEmpty(), x -> x.in(StaffProfile::getStaffId, matchedStaffIds)));
     }
-    wrapper.orderByAsc(CrmContract::getEffectiveTo).orderByDesc(CrmContract::getUpdateTime);
-    IPage<CrmContract> page = crmContractMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
+    wrapper.orderByAsc(StaffProfile::getContractEndDate).orderByDesc(StaffProfile::getUpdateTime);
+    IPage<StaffProfile> page = staffProfileMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
+    Map<Long, StaffAccount> staffMap = loadStaffMap(page.getRecords().stream().map(StaffProfile::getStaffId).toList());
 
     IPage<HrContractReminderResponse> resp = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
-    resp.setRecords(page.getRecords().stream().map(contract -> {
-      HrContractReminderResponse item = new HrContractReminderResponse();
-      item.setContractId(contract.getId());
-      item.setContractNo(contract.getContractNo());
-      item.setElderName(contract.getElderName());
-      item.setContactName(contract.getName());
-      item.setContactPhone(contract.getPhone());
-      item.setEffectiveFrom(contract.getEffectiveFrom());
-      item.setEffectiveTo(contract.getEffectiveTo());
-      item.setStatus(contract.getStatus());
-      item.setContractStatus(contract.getContractStatus());
-      if (contract.getEffectiveTo() != null) {
-        item.setRemainingDays(ChronoUnit.DAYS.between(today, contract.getEffectiveTo()));
-      }
-      return item;
-    }).toList());
+    resp.setRecords(page.getRecords().stream()
+        .map(profile -> toContractReminderResponse(profile, staffMap.get(profile.getStaffId()), today))
+        .toList());
     return Result.ok(resp);
   }
 
@@ -751,22 +744,27 @@ public class AdminHrController {
     LocalDate from = parseDate(dateFrom);
     LocalDate to = parseDate(dateTo);
     LocalDate today = LocalDate.now();
-    var wrapper = Wrappers.lambdaQuery(CrmContract.class)
-        .eq(CrmContract::getIsDeleted, 0)
-        .eq(orgId != null, CrmContract::getOrgId, orgId)
-        .eq(status != null && !status.isBlank(), CrmContract::getStatus, status)
-        .ge(from != null, CrmContract::getEffectiveTo, from)
-        .le(to != null, CrmContract::getEffectiveTo, to);
+    var wrapper = Wrappers.lambdaQuery(StaffProfile.class)
+        .eq(StaffProfile::getIsDeleted, 0)
+        .eq(orgId != null, StaffProfile::getOrgId, orgId)
+        .and(w -> w.isNotNull(StaffProfile::getContractNo)
+            .or().isNotNull(StaffProfile::getContractStartDate)
+            .or().isNotNull(StaffProfile::getContractEndDate))
+        .eq(status != null && !status.isBlank(), StaffProfile::getContractStatus, status)
+        .ge(from != null, StaffProfile::getContractEndDate, from)
+        .le(to != null, StaffProfile::getContractEndDate, to);
     if (keyword != null && !keyword.isBlank()) {
-      wrapper.and(w -> w.like(CrmContract::getContractNo, keyword.trim())
-          .or().like(CrmContract::getElderName, keyword.trim())
-          .or().like(CrmContract::getName, keyword.trim())
-          .or().like(CrmContract::getPhone, keyword.trim()));
+      List<Long> matchedStaffIds = findMatchedStaffIds(orgId, keyword);
+      wrapper.and(w -> w.like(StaffProfile::getContractNo, keyword.trim())
+          .or(matchedStaffIds != null && !matchedStaffIds.isEmpty(), x -> x.in(StaffProfile::getStaffId, matchedStaffIds)));
     }
-    wrapper.orderByAsc(CrmContract::getEffectiveTo).orderByDesc(CrmContract::getUpdateTime);
-    IPage<CrmContract> page = crmContractMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
+    wrapper.orderByAsc(StaffProfile::getContractEndDate).orderByDesc(StaffProfile::getUpdateTime);
+    IPage<StaffProfile> page = staffProfileMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
+    Map<Long, StaffAccount> staffMap = loadStaffMap(page.getRecords().stream().map(StaffProfile::getStaffId).toList());
     IPage<HrProfileContractResponse> resp = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
-    resp.setRecords(page.getRecords().stream().map(item -> toProfileContractResponse(item, today)).toList());
+    resp.setRecords(page.getRecords().stream()
+        .map(item -> toProfileContractResponse(item, staffMap.get(item.getStaffId()), today))
+        .toList());
     return Result.ok(resp);
   }
 
@@ -1571,20 +1569,22 @@ public class AdminHrController {
     return response;
   }
 
-  private HrProfileContractResponse toProfileContractResponse(CrmContract item, LocalDate today) {
+  private HrProfileContractResponse toProfileContractResponse(StaffProfile item, StaffAccount staff, LocalDate today) {
     HrProfileContractResponse response = new HrProfileContractResponse();
     response.setContractId(item == null ? null : item.getId());
+    response.setStaffId(staff == null ? null : staff.getId());
+    response.setStaffNo(staff == null ? null : staff.getStaffNo());
+    response.setStaffName(staff == null ? null : staff.getRealName());
+    response.setPhone(staff == null ? null : staff.getPhone());
+    response.setJobTitle(item == null ? null : item.getJobTitle());
+    response.setEmploymentType(item == null ? null : item.getEmploymentType());
     response.setContractNo(item == null ? null : item.getContractNo());
-    response.setElderName(item == null ? null : item.getElderName());
-    response.setContactName(item == null ? null : item.getName());
-    response.setContactPhone(item == null ? null : item.getPhone());
-    response.setStatus(item == null ? null : item.getStatus());
     response.setContractStatus(item == null ? null : item.getContractStatus());
-    response.setFlowStage(item == null ? null : item.getFlowStage());
-    response.setEffectiveFrom(item == null ? null : item.getEffectiveFrom());
-    response.setEffectiveTo(item == null ? null : item.getEffectiveTo());
-    if (item != null && item.getEffectiveTo() != null && today != null) {
-      response.setRemainingDays(ChronoUnit.DAYS.between(today, item.getEffectiveTo()));
+    response.setContractType(item == null ? null : item.getContractType());
+    response.setContractStartDate(item == null ? null : item.getContractStartDate());
+    response.setContractEndDate(item == null ? null : item.getContractEndDate());
+    if (item != null && item.getContractEndDate() != null && today != null) {
+      response.setRemainingDays(ChronoUnit.DAYS.between(today, item.getContractEndDate()));
     }
     return response;
   }
@@ -1974,6 +1974,11 @@ public class AdminHrController {
     if (profile != null) {
       response.setJobTitle(profile.getJobTitle());
       response.setEmploymentType(profile.getEmploymentType());
+      response.setContractNo(profile.getContractNo());
+      response.setContractType(profile.getContractType());
+      response.setContractStatus(profile.getContractStatus());
+      response.setContractStartDate(profile.getContractStartDate());
+      response.setContractEndDate(profile.getContractEndDate());
       response.setHireDate(profile.getHireDate());
       response.setQualificationLevel(profile.getQualificationLevel());
       response.setCertificateNo(profile.getCertificateNo());
@@ -1987,6 +1992,90 @@ public class AdminHrController {
       response.setUpdateTime(profile.getUpdateTime());
     }
     return response;
+  }
+
+  private HrContractReminderResponse toContractReminderResponse(StaffProfile profile, StaffAccount staff, LocalDate today) {
+    HrContractReminderResponse item = new HrContractReminderResponse();
+    item.setContractId(profile == null ? null : profile.getId());
+    item.setStaffId(staff == null ? null : staff.getId());
+    item.setStaffNo(staff == null ? null : staff.getStaffNo());
+    item.setStaffName(staff == null ? null : staff.getRealName());
+    item.setPhone(staff == null ? null : staff.getPhone());
+    item.setJobTitle(profile == null ? null : profile.getJobTitle());
+    item.setContractNo(profile == null ? null : profile.getContractNo());
+    item.setContractStatus(profile == null ? null : profile.getContractStatus());
+    item.setContractType(profile == null ? null : profile.getContractType());
+    item.setContractStartDate(profile == null ? null : profile.getContractStartDate());
+    item.setContractEndDate(profile == null ? null : profile.getContractEndDate());
+    if (profile != null && profile.getContractEndDate() != null && today != null) {
+      item.setRemainingDays(ChronoUnit.DAYS.between(today, profile.getContractEndDate()));
+    }
+    return item;
+  }
+
+  private Map<Long, StaffAccount> loadStaffMap(List<Long> staffIds) {
+    List<Long> sanitizedStaffIds = sanitizeIds(staffIds);
+    if (sanitizedStaffIds.isEmpty()) {
+      return Map.of();
+    }
+    return staffMapper.selectBatchIdsSafe(sanitizedStaffIds).stream()
+        .collect(Collectors.toMap(StaffAccount::getId, s -> s, (a, b) -> a));
+  }
+
+  private List<Long> findMatchedStaffIds(Long orgId, String keyword) {
+    if (keyword == null || keyword.isBlank()) {
+      return List.of();
+    }
+    return staffMapper.selectList(Wrappers.lambdaQuery(StaffAccount.class)
+            .eq(StaffAccount::getIsDeleted, 0)
+            .eq(orgId != null, StaffAccount::getOrgId, orgId)
+            .and(w -> w.like(StaffAccount::getRealName, keyword.trim())
+                .or().like(StaffAccount::getStaffNo, keyword.trim())
+                .or().like(StaffAccount::getPhone, keyword.trim())))
+        .stream()
+        .map(StaffAccount::getId)
+        .filter(id -> id != null && id > 0)
+        .distinct()
+        .toList();
+  }
+
+  private List<Long> findMatchedContractStaffIds(Long orgId, String keyword, String contractStatus) {
+    if ((keyword == null || keyword.isBlank()) && (contractStatus == null || contractStatus.isBlank())) {
+      return List.of();
+    }
+    return staffProfileMapper.selectList(Wrappers.lambdaQuery(StaffProfile.class)
+            .eq(StaffProfile::getIsDeleted, 0)
+            .eq(orgId != null, StaffProfile::getOrgId, orgId)
+            .eq(contractStatus != null && !contractStatus.isBlank(), StaffProfile::getContractStatus, contractStatus)
+            .like(keyword != null && !keyword.isBlank(), StaffProfile::getContractNo, keyword == null ? null : keyword.trim()))
+        .stream()
+        .map(StaffProfile::getStaffId)
+        .filter(id -> id != null && id > 0)
+        .distinct()
+        .toList();
+  }
+
+  private List<Long> findRoleStaffIds(Long orgId, Long roleId) {
+    if (roleId == null) {
+      return List.of();
+    }
+    return staffRoleMapper.selectList(Wrappers.lambdaQuery(StaffRole.class)
+            .eq(StaffRole::getIsDeleted, 0)
+            .eq(orgId != null, StaffRole::getOrgId, orgId)
+            .eq(StaffRole::getRoleId, roleId))
+        .stream()
+        .map(StaffRole::getStaffId)
+        .filter(id -> id != null && id > 0)
+        .distinct()
+        .toList();
+  }
+
+  private String normalizeBlank(String value) {
+    if (value == null) {
+      return null;
+    }
+    String trimmed = value.trim();
+    return trimmed.isEmpty() ? null : trimmed;
   }
 
   private HrStaffBirthdayResponse toBirthdayResponse(StaffProfile profile, StaffAccount staff, LocalDate today) {

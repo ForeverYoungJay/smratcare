@@ -1,3 +1,5 @@
+import type { Id } from './common'
+
 export interface LoginRequest {
   username: string
   password: string
@@ -6,15 +8,15 @@ export interface LoginRequest {
 export interface LoginResponse {
   token: string
   staffInfo: {
-    id: number
-    orgId: number
+    id: Id
+    orgId: Id
     departmentId: number
     staffNo?: string
     username: string
     realName: string
     phone?: string
-    directLeaderId?: number
-    indirectLeaderId?: number
+    directLeaderId?: Id
+    indirectLeaderId?: Id
     status: number
   }
   roles: string[]

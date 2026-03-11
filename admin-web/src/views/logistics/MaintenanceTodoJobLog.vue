@@ -96,11 +96,11 @@ import {
   rerunLatestFailedMaintenanceTodoJobLog,
   rerunMaintenanceTodoJobLog
 } from '../../api/logistics'
-import type { LogisticsMaintenanceTodoJobLog, LogisticsMaintenanceTodoJobLogOverview, PageResult } from '../../types'
+import type { Id, LogisticsMaintenanceTodoJobLog, LogisticsMaintenanceTodoJobLogOverview, PageResult } from '../../types'
 
 const loading = ref(false)
 const rows = ref<LogisticsMaintenanceTodoJobLog[]>([])
-const selectedRowKeys = ref<number[]>([])
+const selectedRowKeys = ref<Id[]>([])
 const overviewDays = ref(7)
 const overviewDayOptions = [
   { label: '近7天', value: 7 },
@@ -147,7 +147,7 @@ const columns = [
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: Array<number | string>) => {
-    selectedRowKeys.value = keys.map((item) => Number(item)).filter((item) => Number.isFinite(item))
+    selectedRowKeys.value = keys.map((item) => String(item))
   }
 }))
 
@@ -163,7 +163,7 @@ async function fetchData() {
     })
     rows.value = res.list || []
     pagination.total = res.total || 0
-    selectedRowKeys.value = selectedRowKeys.value.filter((key) => rows.value.some((row) => Number(row.id) === Number(key)))
+    selectedRowKeys.value = selectedRowKeys.value.filter((key) => rows.value.some((row) => String(row.id) === String(key)))
   } finally {
     loading.value = false
   }
@@ -239,8 +239,8 @@ function triggerPlanLabel(triggerType?: string) {
 }
 
 function getSelectedRows() {
-  const selectedSet = new Set(selectedRowKeys.value.map((item) => Number(item)))
-  return rows.value.filter((row) => selectedSet.has(Number(row.id)))
+  const selectedSet = new Set(selectedRowKeys.value.map((item) => String(item)))
+  return rows.value.filter((row) => selectedSet.has(String(row.id)))
 }
 
 function toggleSelectAll() {
@@ -248,7 +248,7 @@ function toggleSelectAll() {
     selectedRowKeys.value = []
     return
   }
-  selectedRowKeys.value = rows.value.map((row) => Number(row.id))
+  selectedRowKeys.value = rows.value.map((row) => String(row.id))
 }
 
 function exportSelectedRows() {

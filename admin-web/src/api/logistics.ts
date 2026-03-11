@@ -2,6 +2,7 @@ import request from '../utils/request'
 import { fetchPage } from '../utils/request'
 import { exportCsvByRequest } from '../utils/export'
 import type {
+  Id,
   LogisticsEquipmentArchive,
   LogisticsMaintenanceTodoJobLog,
   LogisticsMaintenanceTodoJobLogOverview,
@@ -23,15 +24,15 @@ export function createLogisticsEquipment(data: Partial<LogisticsEquipmentArchive
   return request.post<LogisticsEquipmentArchive>('/api/logistics/equipment', data)
 }
 
-export function updateLogisticsEquipment(id: number, data: Partial<LogisticsEquipmentArchive>) {
+export function updateLogisticsEquipment(id: Id, data: Partial<LogisticsEquipmentArchive>) {
   return request.put<LogisticsEquipmentArchive>(`/api/logistics/equipment/${id}`, data)
 }
 
-export function deleteLogisticsEquipment(id: number) {
+export function deleteLogisticsEquipment(id: Id) {
   return request.delete<void>(`/api/logistics/equipment/${id}`)
 }
 
-export function generateEquipmentMaintenance(id: number) {
+export function generateEquipmentMaintenance(id: Id) {
   return request.put(`/api/logistics/equipment/${id}/generate-maintenance`)
 }
 
@@ -43,7 +44,7 @@ export function getMaintenanceTodoJobLogPage(params: any) {
   return fetchPage<LogisticsMaintenanceTodoJobLog>('/api/logistics/maintenance-todo-job-log/page', params)
 }
 
-export function rerunMaintenanceTodoJobLog(id: number) {
+export function rerunMaintenanceTodoJobLog(id: Id) {
   return request.post(`/api/logistics/maintenance-todo-job-log/${id}/rerun`)
 }
 

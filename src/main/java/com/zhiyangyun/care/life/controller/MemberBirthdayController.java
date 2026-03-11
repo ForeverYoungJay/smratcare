@@ -18,6 +18,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,6 +29,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/life/birthday")
 public class MemberBirthdayController {
+  private static final Logger log = LoggerFactory.getLogger(MemberBirthdayController.class);
+
   private final JdbcTemplate jdbcTemplate;
   private final BedMapper bedMapper;
   private final RoomMapper roomMapper;
@@ -84,7 +88,8 @@ public class MemberBirthdayController {
             .collect(Collectors.toMap(Room::getId, r -> r, (a, b) -> a));
 
     List<BirthdayReminderResponse> list = elders.stream()
-        .map(elder -> toResponse(elder, bedMap.get(elder.getBedId()), roomMap, today))
+        .map(elder -> safeToResponse(elder, safeMapGet(bedMap, elder == null ? null : elder.getBedId()), roomMap, today))
+        .filter(Objects::nonNull)
         .filter(item -> item.getNextBirthday() != null)
         .filter(item -> normalizedMonth == null || item.getNextBirthday().getMonthValue() == normalizedMonth)
         .filter(item -> normalizedDaysAhead == null || item.getDaysUntil() <= normalizedDaysAhead)
@@ -104,6 +109,27 @@ public class MemberBirthdayController {
     IPage<BirthdayReminderResponse> page = new Page<>(safePageNo, safePageSize, total);
     page.setRecords(records);
     return Result.ok(page);
+  }
+
+  private BirthdayReminderResponse safeToResponse(
+      ElderProfile elder, Bed bed, Map<Long, Room> roomMap, LocalDate today) {
+    try {
+      return toResponse(elder, bed, roomMap, today);
+    } catch (RuntimeException ex) {
+      log.warn("Skip invalid birthday reminder row, elderId={}, fullName={}, birthDate={}",
+          elder == null ? null : elder.getId(),
+          elder == null ? null : elder.getFullName(),
+          elder == null ? null : elder.getBirthDate(),
+          ex);
+      return null;
+    }
+  }
+
+  private <K, V> V safeMapGet(Map<K, V> map, K key) {
+    if (map == null || key == null) {
+      return null;
+    }
+    return map.get(key);
   }
 
   private List<ElderProfile> loadBirthdayElders(Long orgId, String keyword) {
@@ -196,7 +222,7 @@ public class MemberBirthdayController {
     }
     if (bed != null) {
       resp.setBedNo(bed.getBedNo());
-      Room room = roomMap.get(bed.getRoomId());
+      Room room = safeMapGet(roomMap, bed.getRoomId());
       if (room != null) {
         resp.setRoomNo(room.getRoomNo());
       }

@@ -1,3 +1,5 @@
+import type { Id } from './common'
+
 export interface HrStaffProfile {
   staffId: string | number
   staffNo?: string
@@ -6,6 +8,12 @@ export interface HrStaffProfile {
   departmentId?: number
   jobTitle?: string
   employmentType?: string
+  contractNo?: string
+  contractType?: string
+  contractStatus?: string
+  contractStartDate?: string
+  contractEndDate?: string
+  remainingDays?: number
   hireDate?: string
   qualificationLevel?: string
   certificateNo?: string
@@ -143,16 +151,18 @@ export interface HrStaffBirthdayItem {
 }
 
 export interface HrContractReminderItem {
-  contractId?: number | string
+  contractId?: Id
+  staffId?: Id
+  staffNo?: string
+  staffName?: string
+  phone?: string
+  jobTitle?: string
   contractNo?: string
-  elderName?: string
-  contactName?: string
-  contactPhone?: string
-  effectiveFrom?: string
-  effectiveTo?: string
-  remainingDays?: number
-  status?: string
   contractStatus?: string
+  contractType?: string
+  contractStartDate?: string
+  contractEndDate?: string
+  remainingDays?: number
 }
 
 export interface HrAttendanceAbnormalItem {
@@ -222,16 +232,18 @@ export interface HrPolicyAlertItem {
 }
 
 export interface HrProfileContractItem {
-  contractId?: number | string
+  contractId?: Id
+  staffId?: Id
+  staffNo?: string
+  staffName?: string
+  phone?: string
+  jobTitle?: string
+  employmentType?: string
   contractNo?: string
-  elderName?: string
-  contactName?: string
-  contactPhone?: string
-  status?: string
   contractStatus?: string
-  flowStage?: string
-  effectiveFrom?: string
-  effectiveTo?: string
+  contractType?: string
+  contractStartDate?: string
+  contractEndDate?: string
   remainingDays?: number
 }
 
@@ -271,8 +283,8 @@ export interface HrAccessControlRecordItem {
 }
 
 export interface HrCardSyncItem {
-  cardAccountId?: number | string
-  elderId?: string
+  cardAccountId?: Id
+  elderId?: Id
   elderName?: string
   cardNo?: string
   cardStatus?: string

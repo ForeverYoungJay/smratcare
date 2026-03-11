@@ -135,19 +135,19 @@ export interface OaActivityPlan {
 }
 
 export interface OaTask {
-  id: string | number
+  id: Id
   title: string
   description?: string
   startTime?: string
   endTime?: string
-  assigneeId?: string | number
+  assigneeId?: Id
   priority?: string
   status?: string
   calendarType?: 'PERSONAL' | 'WORK' | 'DAILY' | 'COLLAB'
   planCategory?: string
   urgency?: 'NORMAL' | 'EMERGENCY'
   eventColor?: string
-  collaboratorIds?: Array<string | number> | string
+  collaboratorIds?: Id[] | string
   collaboratorNames?: string[] | string
   recurring?: boolean
   recurrenceRule?: 'DAILY' | 'WEEKLY' | 'MONTHLY'
@@ -157,7 +157,7 @@ export interface OaTask {
 }
 
 export interface OaTaskConflictItem {
-  taskId: string | number
+  taskId: Id
   title: string
   assigneeName?: string
   startTime?: string
@@ -278,3 +278,4 @@ export interface OaSuggestion {
   status?: string
   createTime?: string
 }
+import type { Id } from './common'

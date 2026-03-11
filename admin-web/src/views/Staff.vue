@@ -4,6 +4,29 @@
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="姓名/账号" />
       </a-form-item>
+      <a-form-item label="部门">
+        <a-select
+          v-model:value="query.departmentId"
+          allow-clear
+          show-search
+          :filter-option="false"
+          :options="departmentSelectOptions"
+          style="width: 200px"
+          placeholder="选择部门"
+          @search="searchDepartments"
+          @focus="() => !departmentOptions.length && searchDepartments('')"
+        />
+      </a-form-item>
+      <a-form-item label="角色">
+        <a-select
+          v-model:value="query.roleId"
+          allow-clear
+          show-search
+          :options="roleFilterOptions"
+          style="width: 220px"
+          placeholder="选择角色"
+        />
+      </a-form-item>
       <template #extra>
         <a-button type="primary" v-permission="accountManagerRoles" @click="openDrawer()">新增员工</a-button>
         <a-button :type="showSupervisorAnomaliesOnly ? 'primary' : 'default'" @click="toggleSupervisorAnomalyView">
@@ -153,7 +176,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../components/PageContainer.vue'
@@ -161,11 +184,12 @@ import SearchForm from '../components/SearchForm.vue'
 import DataTable from '../components/DataTable.vue'
 import { getStaffPage, createStaff, updateStaff, updateStaffRoles, getStaffSupervisorAnomalies } from '../api/staff'
 import { getRolePage } from '../api/role'
+import { getStaffRoleAssignments } from '../api/rbac'
 import { useDepartmentOptions } from '../composables/useDepartmentOptions'
 import { useStaffOptions } from '../composables/useStaffOptions'
 import { useLiveSyncRefresh } from '../composables/useLiveSyncRefresh'
 import { canBeDirectLeader, canBeIndirectLeader, ensureSupervisorOrder, mergeRoleCodes } from '../utils/supervisor'
-import type { StaffItem, RoleItem, PageResult } from '../types'
+import type { Id, StaffItem, RoleItem, PageResult } from '../types'
 
 const props = withDefaults(defineProps<{ title?: string; subTitle?: string }>(), {
   title: '员工管理',
@@ -174,7 +198,13 @@ const props = withDefaults(defineProps<{ title?: string; subTitle?: string }>(),
 
 const accountManagerRoles = ['HR_EMPLOYEE', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
 
-const query = reactive({ keyword: undefined as string | undefined, pageNo: 1, pageSize: 10 })
+const query = reactive({
+  keyword: undefined as string | undefined,
+  departmentId: undefined as number | undefined,
+  roleId: undefined as number | undefined,
+  pageNo: 1,
+  pageSize: 10
+})
 const rows = ref<StaffItem[]>([])
 const route = useRoute()
 const router = useRouter()
@@ -183,12 +213,12 @@ const saving = ref(false)
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const showSupervisorAnomaliesOnly = ref(false)
 const supervisorAnomalies = ref<Array<{
-  staffId: number
+  staffId: Id
   staffNo?: string
   staffName?: string
   departmentId?: number
-  directLeaderId?: number
-  indirectLeaderId?: number
+  directLeaderId?: Id
+  indirectLeaderId?: Id
   issue: string
 }>>([])
 
@@ -213,7 +243,7 @@ const statusOptions = [
 ]
 
 const roleOpen = ref(false)
-const roleForm = reactive<{ staffId?: number; roleIds: number[] }>({ roleIds: [] })
+const roleForm = reactive<{ staffId?: Id; roleIds: number[] }>({ roleIds: [] })
 const { departmentOptions, searchDepartments, ensureSelectedDepartment } = useDepartmentOptions({ pageSize: 260, preloadSize: 600 })
 const { staffOptions, staffLoading, searchStaff, ensureSelectedStaff } = useStaffOptions({ pageSize: 220, preloadSize: 600 })
 
@@ -222,6 +252,7 @@ const pageTitle = computed(() => props.title || '员工管理')
 const pageSubTitle = computed(() => props.subTitle || '账号与角色配置')
 
 const roleOptions = computed(() => roles.value.map((r) => ({ label: r.roleName, value: r.id })))
+const roleFilterOptions = computed(() => roles.value.map((r) => ({ label: `${r.roleName} (${r.roleCode})`, value: r.id })))
 const departmentNameMap = computed(() => new Map(departmentOptions.value.map((item) => [String(item.value), item.name])))
 const staffNameMap = computed(() => {
   const map = new Map<string, string>()
@@ -260,10 +291,9 @@ const staffSelectOptions = computed(() =>
     .filter((item) => String(item.value) !== String(form.id || ''))
     .map((item) => ({
       label: item.label,
-      value: Number(item.value),
+      value: String(item.value),
       departmentId: item.departmentId
     }))
-    .filter((item) => Number.isFinite(item.value))
 )
 const formRoleCodes = computed(() => {
   if (Array.isArray(form.roleCodes) && form.roleCodes.length) {
@@ -290,13 +320,13 @@ const indirectLeaderSelectOptions = computed(() => {
 })
 const recommendedDirectLeaderId = computed(() => {
   if (!directLeaderSelectOptions.value.length) return undefined
-  return Number(directLeaderSelectOptions.value[0].value)
+  return String(directLeaderSelectOptions.value[0].value)
 })
 const recommendedIndirectLeaderId = computed(() => {
   if (!indirectLeaderSelectOptions.value.length) return undefined
-  const direct = Number(form.directLeaderId || recommendedDirectLeaderId.value || 0)
-  const preferred = indirectLeaderSelectOptions.value.find((item) => Number(item.value) !== direct)
-  return Number((preferred || indirectLeaderSelectOptions.value[0]).value)
+  const direct = String(form.directLeaderId || recommendedDirectLeaderId.value || '')
+  const preferred = indirectLeaderSelectOptions.value.find((item) => String(item.value) !== direct)
+  return String((preferred || indirectLeaderSelectOptions.value[0]).value)
 })
 const directLeaderRuleHint = computed(() => {
   if (formRoleCodes.value.some((code) => String(code).endsWith('_EMPLOYEE'))) {
@@ -353,8 +383,18 @@ function handleTableChange(pag: any) {
 }
 
 function onReset() {
+  query.keyword = undefined
+  query.departmentId = undefined
+  query.roleId = undefined
   query.pageNo = 1
   pagination.current = 1
+  router.replace({
+    query: {
+      ...route.query,
+      departmentId: undefined,
+      roleId: undefined
+    }
+  })
   fetchData()
 }
 
@@ -448,11 +488,11 @@ async function submit() {
     message.warning('直接领导与间接领导不能为同一人')
     return
   }
-  if (form.id && Number(form.directLeaderId) === Number(form.id)) {
+  if (form.id && String(form.directLeaderId || '') === String(form.id)) {
     message.warning('直接领导不能设置为本人')
     return
   }
-  if (form.id && Number(form.indirectLeaderId) === Number(form.id)) {
+  if (form.id && String(form.indirectLeaderId || '') === String(form.id)) {
     message.warning('间接领导不能设置为本人')
     return
   }
@@ -460,7 +500,7 @@ async function submit() {
     const directRoleCodes = staffRoleCodeMap.value.get(String(form.directLeaderId)) || []
     if (!canBeDirectLeader(
       { id: form.id, departmentId: form.departmentId, roleCodes: formRoleCodes.value },
-      { id: form.directLeaderId, departmentId: staffOptions.value.find((item) => Number(item.value) === Number(form.directLeaderId))?.departmentId, roleCodes: directRoleCodes }
+      { id: form.directLeaderId, departmentId: staffOptions.value.find((item) => String(item.value) === String(form.directLeaderId))?.departmentId, roleCodes: directRoleCodes }
     )) {
       message.warning('当前组织规则下，直接领导应为本部门部长（员工）或院长/SYS_ADMIN（部长）')
       return
@@ -470,7 +510,7 @@ async function submit() {
     const indirectRoleCodes = staffRoleCodeMap.value.get(String(form.indirectLeaderId)) || []
     if (!canBeIndirectLeader(
       { id: form.id, departmentId: form.departmentId, roleCodes: formRoleCodes.value },
-      { id: form.indirectLeaderId, departmentId: staffOptions.value.find((item) => Number(item.value) === Number(form.indirectLeaderId))?.departmentId, roleCodes: indirectRoleCodes }
+      { id: form.indirectLeaderId, departmentId: staffOptions.value.find((item) => String(item.value) === String(form.indirectLeaderId))?.departmentId, roleCodes: indirectRoleCodes }
     )) {
       message.warning('当前组织规则下，间接领导需为院长或SYS_ADMIN')
       return
@@ -483,8 +523,8 @@ async function submit() {
       username,
       realName,
       staffNo,
-      directLeaderId: form.directLeaderId ? Number(form.directLeaderId) : 0,
-      indirectLeaderId: form.indirectLeaderId ? Number(form.indirectLeaderId) : 0
+      directLeaderId: form.directLeaderId ? String(form.directLeaderId) : undefined,
+      indirectLeaderId: form.indirectLeaderId ? String(form.indirectLeaderId) : undefined
     }
     if (!payload.password) delete payload.password
     if (form.id) {
@@ -505,7 +545,16 @@ async function submit() {
 function openRole(record: StaffItem) {
   roleForm.staffId = record.id
   roleForm.roleIds = []
-  roleOpen.value = true
+  getStaffRoleAssignments(record.id)
+    .then((rows) => {
+      roleForm.roleIds = (rows || []).map((item) => Number(item.roleId)).filter((item) => Number.isFinite(item))
+    })
+    .catch(() => {
+      roleForm.roleIds = []
+    })
+    .finally(() => {
+      roleOpen.value = true
+    })
 }
 
 async function submitRole() {
@@ -522,6 +571,29 @@ async function submitRole() {
 if (String(route.query.view || '') === 'supervisor-anomalies') {
   showSupervisorAnomaliesOnly.value = true
 }
+
+function syncQueryFromRoute() {
+  const nextDepartmentId = route.query.departmentId == null || route.query.departmentId === ''
+    ? undefined
+    : Number(route.query.departmentId)
+  const nextRoleId = route.query.roleId == null || route.query.roleId === ''
+    ? undefined
+    : Number(route.query.roleId)
+  query.departmentId = Number.isFinite(nextDepartmentId as number) ? Number(nextDepartmentId) : undefined
+  query.roleId = Number.isFinite(nextRoleId as number) ? Number(nextRoleId) : undefined
+}
+
+watch(
+  () => [route.query.departmentId, route.query.roleId],
+  () => {
+    syncQueryFromRoute()
+    query.pageNo = 1
+    pagination.current = 1
+    fetchData()
+  }
+)
+
+syncQueryFromRoute()
 fetchData()
 
 useLiveSyncRefresh({

@@ -1,5 +1,6 @@
 import request, { fetchPage } from '../utils/request'
 import type {
+  Id,
   OaNotice,
   OaTodo,
   OaTodoSummary,
@@ -381,8 +382,8 @@ export function getOaTaskSummary(params: any) {
 
 export interface OaQuickChatStatePayload {
   id?: number
-  orgId?: number
-  staffId?: number
+  orgId?: Id
+  staffId?: Id
   stateJson?: string
   updateTime?: string
 }
