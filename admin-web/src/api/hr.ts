@@ -101,6 +101,14 @@ export function createHrProfileAttachment(data: Partial<HrProfileDocumentItem>) 
   return request.post<HrProfileDocumentItem>('/api/admin/hr/profile/attachment', data)
 }
 
+export function getHrContractAttachmentPage(params: any) {
+  return fetchPage<HrProfileDocumentItem>('/api/admin/hr/profile/contract-attachment/page', params)
+}
+
+export function createHrContractAttachment(data: Partial<HrProfileDocumentItem>) {
+  return request.post<HrProfileDocumentItem>('/api/admin/hr/profile/contract-attachment', data)
+}
+
 export function getHrProfileCertificatePage(params: any) {
   return fetchPage<HrStaffCertificateItem>('/api/admin/hr/profile/certificate/page', params)
 }

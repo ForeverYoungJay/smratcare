@@ -67,6 +67,7 @@ import com.zhiyangyun.care.schedule.mapper.AttendanceRecordMapper;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -165,7 +166,12 @@ public class AdminHrController {
     }
     profile.setJobTitle(normalizeBlank(request.getJobTitle()));
     profile.setEmploymentType(normalizeBlank(request.getEmploymentType()));
-    profile.setContractNo(normalizeBlank(request.getContractNo()));
+    String requestContractNo = normalizeBlank(request.getContractNo());
+    if (requestContractNo != null) {
+      profile.setContractNo(requestContractNo);
+    } else if (normalizeBlank(profile.getContractNo()) == null) {
+      profile.setContractNo(generateStaffContractNo(orgId, request.getStaffId()));
+    }
     profile.setContractType(normalizeBlank(request.getContractType()));
     profile.setContractStatus(normalizeBlank(request.getContractStatus()));
     profile.setContractStartDate(request.getContractStartDate());
@@ -796,6 +802,21 @@ public class AdminHrController {
   @PostMapping("/profile/attachment")
   public Result<OaDocument> createProfileAttachment(@RequestBody HrProfileDocumentRequest request) {
     return Result.ok(createProfileDocument("档案附件", request));
+  }
+
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @GetMapping("/profile/contract-attachment/page")
+  public Result<IPage<OaDocument>> profileContractAttachmentPage(
+      @RequestParam(defaultValue = "1") long pageNo,
+      @RequestParam(defaultValue = "20") long pageSize,
+      @RequestParam(required = false) String keyword) {
+    return Result.ok(queryProfileDocuments("合同附件", pageNo, pageSize, keyword));
+  }
+
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PostMapping("/profile/contract-attachment")
+  public Result<OaDocument> createProfileContractAttachment(@RequestBody HrProfileDocumentRequest request) {
+    return Result.ok(createProfileDocument("合同附件", request));
   }
 
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
@@ -2076,6 +2097,13 @@ public class AdminHrController {
     }
     String trimmed = value.trim();
     return trimmed.isEmpty() ? null : trimmed;
+  }
+
+  private String generateStaffContractNo(Long orgId, Long staffId) {
+    String orgSegment = String.format("%02d", Math.abs(orgId == null ? 0 : orgId.intValue()) % 100);
+    String staffSegment = String.format("%06d", Math.abs(staffId == null ? 0 : staffId.intValue()) % 1_000_000);
+    String timeSegment = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
+    return "HT" + orgSegment + timeSegment + staffSegment;
   }
 
   private HrStaffBirthdayResponse toBirthdayResponse(StaffProfile profile, StaffAccount staff, LocalDate today) {

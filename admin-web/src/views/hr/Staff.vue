@@ -76,14 +76,20 @@
           />
           <a-input v-else v-model:value="form.realName" disabled />
         </a-form-item>
-        <a-form-item label="岗位/职称">
-          <a-input v-model:value="form.jobTitle" />
+        <a-form-item label="岗位/角色">
+          <a-select
+            v-model:value="selectedRoleId"
+            show-search
+            :options="roleFormOptions"
+            :placeholder="form.jobTitle ? `当前：${form.jobTitle}` : '选择角色后自动带出岗位名称'"
+            @change="onRoleChange"
+          />
         </a-form-item>
         <a-form-item label="用工类型">
           <a-select v-model:value="form.employmentType" :options="employmentOptions" />
         </a-form-item>
         <a-form-item label="合同编号">
-          <a-input v-model:value="form.contractNo" />
+          <a-input :value="form.contractNo || ''" disabled placeholder="保存后后端自动生成" />
         </a-form-item>
         <a-form-item label="合同类型">
           <a-select v-model:value="form.contractType" :options="contractTypeOptions" />
@@ -161,11 +167,12 @@ import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { getHrStaffPage, getHrProfile, upsertHrProfile, terminateStaff, reinstateStaff } from '../../api/hr'
-import { getRolePage } from '../../api/rbac'
+import { appendStaffRole, getRolePage, getStaffRoleAssignments } from '../../api/rbac'
 import { openPrintTableReport } from '../../utils/print'
 import { useStaffOptions } from '../../composables/useStaffOptions'
 import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
 import type { HrStaffProfile, PageResult, RoleItem } from '../../types'
+import { resolveHrError } from './hrError'
 
 const props = withDefaults(defineProps<{
   title?: string
@@ -194,6 +201,8 @@ const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChange
 const { staffOptions, staffLoading, searchStaff, ensureSelectedStaff } = useStaffOptions({ pageSize: 120 })
 const { departmentOptions, searchDepartments } = useDepartmentOptions({ pageSize: 200, preloadSize: 500 })
 const roles = ref<RoleItem[]>([])
+const selectedRoleId = ref<number | undefined>()
+const initialRoleIds = ref<number[]>([])
 const selectedRowKeys = ref<string[]>([])
 
 const columns = [
@@ -237,6 +246,7 @@ const departmentFilterOptions = computed(() =>
   departmentOptions.value.map((item) => ({ label: item.label, value: Number(item.value) })).filter((item) => Number.isFinite(item.value))
 )
 const roleFilterOptions = computed(() => roles.value.map((item) => ({ label: `${item.roleName} (${item.roleCode})`, value: item.id })))
+const roleFormOptions = computed(() => roles.value.map((item) => ({ label: item.roleName, value: item.id })))
 
 const drawerTitle = computed(() => (form.staffId ? '编辑档案' : '新增档案'))
 const rowSelection = computed(() => ({
@@ -305,13 +315,24 @@ function onStaffChange(val: string | number) {
   }
 }
 
+function onRoleChange(roleId?: number) {
+  const selected = roles.value.find((item) => item.id === roleId)
+  form.jobTitle = selected?.roleName || undefined
+}
+
 async function openDrawer(record?: HrStaffProfile) {
   Object.keys(form).forEach((key) => {
     ;(form as any)[key] = undefined
   })
+  selectedRoleId.value = undefined
+  initialRoleIds.value = []
   Object.assign(form, record || { status: 1 })
   if (!record) {
     await searchStaff('')
+  }
+  if (!roles.value.length) {
+    const roleRes: PageResult<RoleItem> = await getRolePage({ pageNo: 1, pageSize: 200 })
+    roles.value = roleRes.list || []
   }
   if (record?.staffId && record?.realName) {
     ensureSelectedStaff(record.staffId, record.realName)
@@ -322,6 +343,21 @@ async function openDrawer(record?: HrStaffProfile) {
       Object.assign(form, profile)
     } catch {
       // ignore
+    }
+    try {
+      const assignments = await getStaffRoleAssignments(record.staffId)
+      initialRoleIds.value = (assignments || [])
+        .map((item) => Number(item.roleId))
+        .filter((item) => Number.isFinite(item))
+      selectedRoleId.value = initialRoleIds.value[0]
+    } catch {
+      initialRoleIds.value = []
+    }
+  }
+  if (!selectedRoleId.value && form.jobTitle) {
+    const matchedRole = roles.value.find((item) => item.roleName === form.jobTitle)
+    if (matchedRole?.id != null) {
+      selectedRoleId.value = matchedRole.id
     }
   }
   if (form.hireDate && typeof form.hireDate === 'string') {
@@ -369,12 +405,18 @@ async function submit() {
     payload.birthday = payload.birthday && typeof payload.birthday === 'object' && payload.birthday.format
       ? payload.birthday.format('YYYY-MM-DD')
       : null
-    await upsertHrProfile(payload)
-    message.success('保存成功')
+    const saved = await upsertHrProfile(payload)
+    const staffId = Number(saved?.staffId || form.staffId)
+    if (selectedRoleId.value && Number.isFinite(staffId) && !initialRoleIds.value.includes(selectedRoleId.value)) {
+      await appendStaffRole(staffId, selectedRoleId.value)
+      initialRoleIds.value = [...initialRoleIds.value, selectedRoleId.value]
+    }
+    Object.assign(form, saved || {})
+    message.success(saved?.contractNo ? `保存成功，合同编号：${saved.contractNo}` : '保存成功')
     drawerOpen.value = false
     fetchData()
-  } catch {
-    message.error('保存失败')
+  } catch (error) {
+    message.error(resolveHrError(error, '保存失败'))
   } finally {
     saving.value = false
   }

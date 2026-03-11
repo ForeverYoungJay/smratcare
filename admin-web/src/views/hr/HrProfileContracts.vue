@@ -48,7 +48,7 @@
           <a-input :value="form.jobTitle || '-'" disabled />
         </a-form-item>
         <a-form-item label="合同编号">
-          <a-input v-model:value="form.contractNo" allow-clear />
+          <a-input :value="form.contractNo || ''" disabled placeholder="保存后后端自动生成" />
         </a-form-item>
         <a-form-item label="合同类型">
           <a-select v-model:value="form.contractType" allow-clear :options="contractTypeOptions" />
@@ -62,22 +62,30 @@
         <a-form-item label="合同结束日期">
           <a-date-picker v-model:value="form.contractEndDate" style="width: 100%" />
         </a-form-item>
+        <a-form-item label="合同附件">
+          <a-upload :show-upload-list="false" :before-upload="beforeUploadContractAttachment">
+            <a-button :loading="uploadingAttachment">上传合同附件</a-button>
+          </a-upload>
+          <div class="upload-hint">{{ contractAttachmentHint }}</div>
+        </a-form-item>
       </a-form>
     </a-modal>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
-import { getHrProfile, getHrStaffPage, upsertHrProfile } from '../../api/hr'
+import { createHrContractAttachment, getHrProfile, getHrStaffPage, upsertHrProfile } from '../../api/hr'
+import { uploadOaFile } from '../../api/oa'
 import type { HrStaffProfile, PageResult } from '../../types'
 import { exportCsv, exportExcel } from '../../utils/export'
 import { mapByDict } from './hrExportFields'
+import { resolveHrError } from './hrError'
 
 const query = reactive({
   keyword: undefined as string | undefined,
@@ -116,10 +124,14 @@ const columns = [
 const rows = ref<HrStaffProfile[]>([])
 const loading = ref(false)
 const saving = ref(false)
+const uploadingAttachment = ref(false)
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 
 const modalOpen = ref(false)
 const form = reactive<Partial<HrStaffProfile>>({})
+const contractAttachmentHint = computed(() => (
+  form.contractNo ? `当前合同号：${form.contractNo}` : '请先保存合同，系统生成合同编号后再上传附件'
+))
 
 function computeRemainingDays(item: HrStaffProfile) {
   if (!item.contractEndDate) return undefined
@@ -221,7 +233,6 @@ async function submit() {
   try {
     const payload: any = {
       staffId: form.staffId,
-      contractNo: form.contractNo,
       contractType: form.contractType,
       contractStatus: form.contractStatus,
       contractStartDate: null,
@@ -233,15 +244,43 @@ async function submit() {
     if (form.contractEndDate && typeof form.contractEndDate === 'object' && 'format' in form.contractEndDate) {
       payload.contractEndDate = (form.contractEndDate as any).format('YYYY-MM-DD')
     }
-    await upsertHrProfile(payload)
-    message.success('合同已更新')
+    const saved = await upsertHrProfile(payload)
+    Object.assign(form, saved || {})
+    message.success(saved?.contractNo ? `合同已更新，编号：${saved.contractNo}` : '合同已更新')
     modalOpen.value = false
     fetchData()
-  } catch {
-    message.error('合同保存失败')
+  } catch (error) {
+    message.error(resolveHrError(error, '合同保存失败'))
   } finally {
     saving.value = false
   }
+}
+
+async function beforeUploadContractAttachment(file: File) {
+  if (!form.staffId) {
+    message.warning('请先选择员工')
+    return false
+  }
+  if (!form.contractNo) {
+    message.warning('请先保存合同，生成合同编号后再上传附件')
+    return false
+  }
+  uploadingAttachment.value = true
+  try {
+    const uploaded = await uploadOaFile(file, 'hr-staff-contract-attachment')
+    await createHrContractAttachment({
+      name: uploaded.originalFileName || uploaded.fileName || file.name,
+      url: uploaded.fileUrl || '',
+      sizeBytes: uploaded.fileSize || file.size || 0,
+      remark: `员工:${form.realName || '-'} 工号:${form.staffNo || '-'} 合同号:${form.contractNo || '-'} staffId:${form.staffId}`
+    })
+    message.success('合同附件上传成功')
+  } catch (error) {
+    message.error(resolveHrError(error, '合同附件上传失败'))
+  } finally {
+    uploadingAttachment.value = false
+  }
+  return false
 }
 
 const exportFields = [
@@ -282,5 +321,11 @@ onMounted(fetchData)
 
 :deep(.hr-row-warning) {
   background: #fffbe6 !important;
+}
+
+.upload-hint {
+  margin-top: 8px;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
 }
 </style>

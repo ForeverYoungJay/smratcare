@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="档案附件" subTitle="员工档案中心 / 档案附件">
+  <PageContainer title="其他附件" subTitle="员工档案中心 / 其他附件">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="附件名/上传人/备注" allow-clear />
@@ -30,10 +30,16 @@
       </template>
     </DataTable>
 
-    <a-drawer v-model:open="drawerOpen" title="新增档案附件" width="520">
+    <a-drawer v-model:open="drawerOpen" title="新增其他附件" width="520">
       <a-form :model="form" layout="vertical">
         <a-form-item label="附件名称" required>
           <a-input v-model:value="form.name" />
+        </a-form-item>
+        <a-form-item label="上传文件">
+          <a-upload :show-upload-list="false" :before-upload="beforeUploadAttachment">
+            <a-button :loading="uploading">上传其他附件</a-button>
+          </a-upload>
+          <div class="upload-hint">{{ uploadHint }}</div>
         </a-form-item>
         <a-form-item label="附件链接" required>
           <a-input v-model:value="form.url" placeholder="可填写上传后文件 URL" />
@@ -56,12 +62,13 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { createHrProfileAttachment, getHrProfileAttachmentPage } from '../../api/hr'
+import { uploadOaFile } from '../../api/oa'
 import type { HrProfileDocumentItem, PageResult } from '../../types'
 import { resolveHrError } from './hrError'
 import { exportCsv, exportExcel } from '../../utils/export'
@@ -82,10 +89,15 @@ const columns = [
 const rows = ref<HrProfileDocumentItem[]>([])
 const loading = ref(false)
 const saving = ref(false)
+const uploading = ref(false)
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 
 const drawerOpen = ref(false)
 const form = reactive<Partial<HrProfileDocumentItem>>({})
+const uploadHint = computed(() => {
+  if (!form.url) return '支持直接上传文件，系统会自动回填名称、链接和大小'
+  return `已回填链接：${form.url}`
+})
 
 async function fetchData() {
   loading.value = true
@@ -130,6 +142,24 @@ function openDrawer() {
   drawerOpen.value = true
 }
 
+async function beforeUploadAttachment(file: File) {
+  uploading.value = true
+  try {
+    const uploaded = await uploadOaFile(file, 'hr-profile-attachment')
+    if (!form.name) {
+      form.name = uploaded.originalFileName || uploaded.fileName || file.name
+    }
+    form.url = uploaded.fileUrl || ''
+    form.sizeBytes = uploaded.fileSize || file.size || 0
+    message.success('附件上传成功')
+  } catch (error) {
+    message.error(resolveHrError(error, '附件上传失败'))
+  } finally {
+    uploading.value = false
+  }
+  return false
+}
+
 function rowClassName(record: HrProfileDocumentItem) {
   if (!record.url) return 'hr-row-warning'
   return ''
@@ -144,11 +174,11 @@ const exportFields = [
 ]
 
 function onExportCsv() {
-  exportCsv(mapByDict(rows.value as Record<string, any>[], exportFields), '档案附件-当前筛选')
+  exportCsv(mapByDict(rows.value as Record<string, any>[], exportFields), '其他附件-当前筛选')
 }
 
 function onExportExcel() {
-  exportExcel(mapByDict(rows.value as Record<string, any>[], exportFields), '档案附件-当前筛选')
+  exportExcel(mapByDict(rows.value as Record<string, any>[], exportFields), '其他附件-当前筛选')
 }
 
 async function submit() {
@@ -175,5 +205,11 @@ onMounted(fetchData)
 <style scoped>
 :deep(.hr-row-warning) {
   background: #fffbe6 !important;
+}
+
+.upload-hint {
+  margin-top: 8px;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
 }
 </style>
