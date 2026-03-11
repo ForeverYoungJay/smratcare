@@ -731,7 +731,7 @@ async function loadContractGuardState() {
     guardContract.value = (page.list || []).find((item) => item.contractNo === contractNo) || null
     if (guardContract.value?.elderId) {
       form.elderId = guardContract.value.elderId as any
-      ensureSelectedElder(String(guardContract.value.elderId), guardContract.value.elderName || '未命名长者')
+      ensureSelectedElder(String(guardContract.value.elderId), guardContract.value.elderName || undefined)
       if (!recordQuery.keyword && guardContract.value.elderName) {
         recordQuery.keyword = guardContract.value.elderName
       }

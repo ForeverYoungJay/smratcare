@@ -52,17 +52,11 @@
 
           <a-form layout="inline" class="search-bar" :model="selector">
             <a-form-item label="长者">
-              <a-select
-                v-model:value="selector.elderId"
-                style="width: 220px"
-                show-search
-                allow-clear
-                :filter-option="false"
-                :options="elderOptions"
-                :loading="elderLoading"
+              <ElderNameAutocomplete
+                v-model:value="selectorInput"
+                width="220px"
                 placeholder="请输入长者姓名/拼音首字母"
-                @search="searchElders"
-                @focus="() => !elderOptions.length && searchElders('')"
+                @select="onSelectorPick"
               />
             </a-form-item>
             <a-form-item>
@@ -208,6 +202,7 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
 import LifecycleStageBar from '../../../components/LifecycleStageBar.vue'
+import ElderNameAutocomplete from '../../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
 import { copyText } from '../../../utils/clipboard'
@@ -275,6 +270,7 @@ const { elderOptions, elderLoading, searchElders, ensureSelectedElder, findElder
 const selector = reactive({
   elderId: undefined as string | undefined
 })
+const selectorInput = ref('')
 const filters = reactive({
   kind: 'ALL',
   keyword: ''
@@ -500,8 +496,10 @@ function applyDocumentQueryFromRoute() {
   if (elderId) {
     selector.elderId = elderId
     ensureSelectedElder(elderId, routeElderName || undefined)
+    selectorInput.value = routeElderName || String(findElderName(elderId) || '').trim()
   } else {
     selector.elderId = undefined
+    selectorInput.value = ''
   }
 
   const kind = firstRouteQueryText(route.query.docKind).toUpperCase()
@@ -509,6 +507,17 @@ function applyDocumentQueryFromRoute() {
   filters.keyword = firstRouteQueryText(route.query.docKeyword)
   searchSnapshot.kind = filters.kind
   searchSnapshot.keyword = filters.keyword
+}
+
+function onSelectorPick(payload: { elderId: string; elderName: string }) {
+  const elderId = String(payload?.elderId || '').trim()
+  const elderName = String(payload?.elderName || '').trim()
+  if (!elderId) return
+  selector.elderId = elderId
+  if (elderName) {
+    selectorInput.value = elderName
+  }
+  ensureSelectedElder(elderId, elderName || undefined)
 }
 
 function buildDocumentRouteQuery() {
@@ -747,10 +756,17 @@ async function loadAll() {
     if (linkageElderId) {
       if (likelyName) {
         ensureSelectedElder(linkageElderId, likelyName)
+        if (!selectorInput.value.trim()) {
+          selectorInput.value = likelyName
+        }
       } else {
         try {
           const elder = await getElderDetail(linkageElderId)
-          ensureSelectedElder(linkageElderId, String(elder?.fullName || '').trim() || undefined)
+          const detailName = String(elder?.fullName || '').trim() || undefined
+          ensureSelectedElder(linkageElderId, detailName)
+          if (detailName && !selectorInput.value.trim()) {
+            selectorInput.value = detailName
+          }
         } catch {
           ensureSelectedElder(linkageElderId)
         }
@@ -788,13 +804,25 @@ onMounted(async () => {
     if (fromRoute) {
       ensureSelectedElder(fromRoute, routeElderName || undefined)
       selector.elderId = fromRoute
+      selectorInput.value = routeElderName || String(findElderName(fromRoute) || '').trim()
     } else {
       selector.elderId = elderOptions.value[0]?.value
+      if (selector.elderId) {
+        selectorInput.value = String(findElderName(selector.elderId) || '').trim()
+      }
     }
   }
   await syncDocumentQueryToRoute().catch(() => {})
   await loadAll()
 })
+
+watch(
+  () => selectorInput.value,
+  (value) => {
+    if (String(value || '').trim()) return
+    selector.elderId = undefined
+  }
+)
 
 watch(
   () => route.query,

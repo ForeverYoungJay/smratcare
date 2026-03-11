@@ -282,7 +282,7 @@ function printSpecificElder() {
     message.warning('未找到匹配老人')
     return
   }
-  const elderText = selectedElder.value ? `${selectedElder.value.name}` : '未命名长者'
+  const elderText = selectedElder.value ? `${selectedElder.value.name}` : '姓名待完善'
   renderPrint(`消费统计（${elderText}）`, filtered)
 }
 

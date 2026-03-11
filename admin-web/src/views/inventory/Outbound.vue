@@ -1302,7 +1302,7 @@ function itemSpec(item: { unit?: string; productCode?: string }) {
 }
 
 function resolveSheetElderName(sheet?: Pick<InventoryOutboundSheet, 'elderName'> | null) {
-  return String(sheet?.elderName || '').trim() || '未命名长者'
+  return String(sheet?.elderName || '').trim() || '姓名待完善'
 }
 
 function safeHtml(value: unknown) {

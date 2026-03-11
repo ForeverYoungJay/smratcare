@@ -206,7 +206,15 @@ export function useElderOptions(config = {}) {
             return '';
         const target = String(elderId);
         const selected = elderOptions.value.find((item) => String(item.value) === target);
-        return selected?.name || '';
+        if (selected?.name)
+            return selected.name;
+        for (const rows of elderPoolCache.values()) {
+            const matched = rows.find((row) => String(row.id || '').trim() === target);
+            const matchedName = String(matched?.fullName || '').trim();
+            if (matchedName)
+                return matchedName;
+        }
+        return '';
     }
     function ensureSelectedElder(elderId, elderName) {
         const targetId = String(elderId || '').trim();

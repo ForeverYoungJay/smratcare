@@ -105,7 +105,7 @@ async function loadData() {
 async function executeOne(row: FinanceDischargeStatusSyncRow) {
   const confirmed = await confirmAction({
     title: '确认执行该条状态回写？',
-    content: `结算单#${row.settlementId || '-'} / 老人：${row.elderName || '未命名长者'}`,
+    content: `结算单#${row.settlementId || '-'} / 老人：${row.elderName || '姓名待完善'}`,
     impactItems: ['老人状态将回写为已退住', '老人档案床位将清空', '床位状态将释放为空床'],
     okText: '确认回写',
     danger: true

@@ -6,7 +6,7 @@ const cardAccountPoolCache = new Map();
 const cardAccountPoolFetchedAt = new Map();
 const CARD_ACCOUNT_POOL_CACHE_TTL = 90 * 1000;
 function toCardAccountOption(item) {
-    const elderName = item.elderName || '未命名长者';
+    const elderName = item.elderName || '姓名待完善';
     const cardNo = item.cardNo || `CARD#${item.id}`;
     return {
         label: `${cardNo} - ${elderName}`,

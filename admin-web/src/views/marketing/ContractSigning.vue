@@ -1635,7 +1635,7 @@ async function removeAttachment(attachmentId: number) {
 }
 
 function normalizeLeadName(lead: CrmContractItem) {
-  return (lead.elderName || lead.name || '').trim() || '未命名长者'
+  return (lead.elderName || lead.name || '').trim() || '姓名待完善'
 }
 
 function resolveBirthDateAndAgeFromIdCard(idCardNo?: string) {
@@ -1813,7 +1813,7 @@ async function loadElderSnapshotByForm() {
 async function syncContractElderData(savedContract: CrmContractItem) {
   const { birthDate } = resolveBirthDateAndAgeFromIdCard(String(form.idCardNo || '').trim())
   const payload = {
-    fullName: String(form.elderName || '').trim() || '未命名长者',
+    fullName: String(form.elderName || form.name || '').trim() || '姓名待完善',
     idCardNo: String(form.idCardNo || '').trim() || undefined,
     gender: form.gender,
     birthDate: birthDate || undefined,

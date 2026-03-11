@@ -235,9 +235,9 @@ const resolvedElderName = computed(() => {
   const current = detail.value
   if (!current) return '-'
   if (current.elderName) return current.elderName
-  if (current.elderId) return findElderName(current.elderId) || '未命名长者'
-  if (fixQuery.elderId) return findElderName(fixQuery.elderId) || '未命名长者'
-  return '未命名长者'
+  if (current.elderId) return findElderName(current.elderId) || '姓名待完善'
+  if (fixQuery.elderId) return findElderName(fixQuery.elderId) || '姓名待完善'
+  return '姓名待完善'
 })
 
 const payOpen = ref(false)

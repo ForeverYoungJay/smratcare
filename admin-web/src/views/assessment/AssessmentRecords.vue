@@ -1617,7 +1617,7 @@ function resolveAssessmentElderName(record: Record<string, any>) {
     const fromCache = String(findElderName(elderId as any) || '').trim()
     if (fromCache) return fromCache
   }
-  return '未命名长者'
+  return '姓名待完善'
 }
 
 function orgDisplayName(record: AssessmentRecord & Record<string, any>) {
@@ -1943,7 +1943,7 @@ function openForm(record?: AssessmentRecord, readonly = false) {
       if (routeElderName) {
         form.elderName = routeElderName
       }
-      ensureSelectedElder(routeElderId.value, routeElderName || '未命名长者')
+      ensureSelectedElder(routeElderId.value, routeElderName || undefined)
     }
     if (isAdmissionAssessment.value && selectedPendingContract.value) {
       const contract = selectedPendingContract.value
@@ -2249,7 +2249,7 @@ async function autoOpenAdmissionFromRoute() {
     form.elderId = residentId
     const elderName = findElderName(residentId) || elderNameFromRoute || ''
     form.elderName = elderName
-    ensureSelectedElder(residentId, elderName || '未命名长者')
+    ensureSelectedElder(residentId, elderName || undefined)
   } else if (elderNameFromRoute) {
     form.elderName = elderNameFromRoute
   }
