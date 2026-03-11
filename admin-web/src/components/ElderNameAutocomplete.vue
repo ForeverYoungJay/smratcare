@@ -25,12 +25,14 @@ const props = withDefaults(defineProps<{
   width?: string
   allowClear?: boolean
   inHospitalOnly?: boolean
+  signedOnly?: boolean
 }>(), {
   value: '',
   placeholder: '',
   width: '',
   allowClear: true,
-  inHospitalOnly: false
+  inHospitalOnly: false,
+  signedOnly: false
 })
 
 const emit = defineEmits<{
@@ -42,7 +44,8 @@ const innerValue = ref(String(props.value || ''))
 const hostRef = ref<HTMLElement | null>(null)
 const { elderOptions, searchElders } = useElderOptions({
   pageSize: 80,
-  inHospitalOnly: props.inHospitalOnly
+  inHospitalOnly: props.inHospitalOnly,
+  signedOnly: props.signedOnly
 })
 
 watch(

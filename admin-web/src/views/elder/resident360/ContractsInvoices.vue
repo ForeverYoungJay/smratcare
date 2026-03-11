@@ -56,6 +56,7 @@
                 v-model:value="selectorInput"
                 width="220px"
                 placeholder="请输入长者姓名/拼音首字母"
+                :signed-only="true"
                 @select="onSelectorPick"
               />
             </a-form-item>

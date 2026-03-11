@@ -16,6 +16,12 @@ services:
       - ./docker/mysql/init/1_schema.sql:/docker-entrypoint-initdb.d/1_schema.sql:ro
       - ./docker/mysql/init/2_data.sql:/docker-entrypoint-initdb.d/2_data.sql:ro
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$${MYSQL_ROOT_PASSWORD}\" --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
   redis:
     image: redis:7.2
     container_name: smartcare-redis
@@ -24,6 +30,12 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
 
   backend:
     build:
@@ -33,6 +45,9 @@ services:
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      DB_HOST: ${DB_HOST:-mysql}
+      DB_PORT: ${DB_PORT:-3306}
+      DB_NAME: ${DB_NAME:-zhiyangyun}
       DB_USER: ${DB_USER:-app}
       DB_PASSWORD: ${DB_PASSWORD:-app123456}
       JWT_SECRET: ${JWT_SECRET:-change-me-please-change-me-please-change-me}
@@ -42,8 +57,10 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - mysql
-      - redis
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   frontend:
     build:
@@ -54,7 +71,8 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_started
 volumes:
   mysql_data:
   redis_data:
