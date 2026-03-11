@@ -132,7 +132,7 @@ async function printCurrentElderLogs() {
     message.warning('请先从老人账户进入流水页，或指定某个老人后再打印')
     return
   }
-  const elderName = rows.value[0]?.elderName || '姓名待完善'
+  const elderName = rows.value[0]?.elderName || '未命名长者'
   const blob = await printElderAccountLogPdf({
     elderId: query.elderId,
     keyword: query.keyword || undefined

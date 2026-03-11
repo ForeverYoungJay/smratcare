@@ -1618,7 +1618,7 @@ function resolveAssessmentElderName(record: Record<string, any>) {
     const fromCache = String(findElderName(elderId as any) || '').trim()
     if (fromCache) return fromCache
   }
-  return '姓名待完善'
+  return '未命名长者'
 }
 
 function orgDisplayName(record: AssessmentRecord & Record<string, any>) {

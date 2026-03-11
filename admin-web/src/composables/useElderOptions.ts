@@ -19,7 +19,7 @@ interface UseElderOptionsConfig {
 
 function toElderOption(item: ElderItem): ElderOption {
   const fullName = String(item.fullName || '').trim()
-  const name = fullName || (item.elderCode ? `长者${item.elderCode}` : '姓名待完善')
+  const name = fullName || (item.elderCode ? `长者${item.elderCode}` : '未命名长者')
   const suffix = item.elderCode ? ` (${item.elderCode})` : ''
   return {
     label: `${name}${suffix}`,
@@ -125,7 +125,7 @@ function upgradeOptionWithName(option: ElderOption, elderName?: string) {
   const nextName = String(elderName || '').trim()
   if (!nextName) return option
   const currentName = String(option?.name || '').trim()
-  const shouldUpgrade = !currentName || currentName === '姓名待完善' || /^\d+$/.test(currentName) || currentName.startsWith('长者E')
+  const shouldUpgrade = !currentName || currentName === '未命名长者' || /^\d+$/.test(currentName) || currentName.startsWith('长者E')
   if (!shouldUpgrade || currentName === nextName) return option
   return {
     ...option,
@@ -242,7 +242,7 @@ export function useElderOptions(config: UseElderOptionsConfig = {}) {
       elderOptions.value.splice(existingIndex, 1, next)
       return
     }
-    const name = resolvedName || '姓名待完善'
+    const name = resolvedName || '未命名长者'
     elderOptions.value.unshift({ label: name, value: targetId, name })
   }
 

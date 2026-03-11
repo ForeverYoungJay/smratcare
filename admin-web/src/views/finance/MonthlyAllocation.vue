@@ -379,7 +379,7 @@ function formatElderLabels(raw?: string, snapshotJson?: string) {
   const residentNameMap = new Map<number, string>(
     allocationResidents.value.map(item => [Number(item.elderId), String(item.elderName || '').trim()])
   )
-  return ids.map(id => residentNameMap.get(id) || findElderName(id) || '姓名待完善').join('、')
+  return ids.map(id => residentNameMap.get(id) || findElderName(id) || '未命名长者').join('、')
 }
 
 function resolveAvgAmount(record: MonthlyAllocationItem) {
@@ -639,7 +639,7 @@ function printCurrent() {
   try {
     printTableReport({
       title: '月分摊费',
-      subtitle: `月份：${query.month ? dayjs(query.month).format('YYYY-MM') : '全部'}；状态：${query.status || '全部'}；老人：${query.elderId ? (findElderName(query.elderId) || '姓名待完善') : '全部'}；备注：${query.printRemark || '-'}`,
+      subtitle: `月份：${query.month ? dayjs(query.month).format('YYYY-MM') : '全部'}；状态：${query.status || '全部'}；老人：${query.elderId ? (findElderName(query.elderId) || '未命名长者') : '全部'}；备注：${query.printRemark || '-'}`,
       columns: [
         { key: 'allocationMonth', title: '月份' },
         { key: 'allocationName', title: '分摊项目' },

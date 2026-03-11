@@ -1634,7 +1634,15 @@ async function removeAttachment(attachmentId: number) {
 }
 
 function normalizeLeadName(lead: CrmContractItem) {
-  return (lead.elderName || lead.name || '').trim() || '姓名待完善'
+  const explicit = (lead.elderName || lead.name || '').trim()
+  if (explicit) return explicit
+  const phoneTail = String(lead.elderPhone || lead.phone || '').replace(/\D/g, '').slice(-4)
+  if (phoneTail) return `长者${phoneTail}`
+  const idCardTail = String(lead.idCardNo || '').trim().slice(-4)
+  if (idCardTail) return `长者${idCardTail}`
+  const contractNo = String(lead.contractNo || '').trim()
+  if (contractNo) return `长者${contractNo.slice(-4)}`
+  return `长者${String(lead.id || '').slice(-4) || '未命名'}`
 }
 
 function resolveBirthDateAndAgeFromIdCard(idCardNo?: string) {
@@ -1811,8 +1819,19 @@ async function loadElderSnapshotByForm() {
 
 async function syncContractElderData(savedContract: CrmContractItem) {
   const { birthDate } = resolveBirthDateAndAgeFromIdCard(String(form.idCardNo || '').trim())
+  const fallbackName = (() => {
+    const explicit = String(form.elderName || form.name || '').trim()
+    if (explicit) return explicit
+    const phoneTail = String(form.elderPhone || form.phone || '').replace(/\D/g, '').slice(-4)
+    if (phoneTail) return `长者${phoneTail}`
+    const idCardTail = String(form.idCardNo || '').trim().slice(-4)
+    if (idCardTail) return `长者${idCardTail}`
+    const contractTail = String(savedContract.contractNo || '').trim().slice(-4)
+    if (contractTail) return `长者${contractTail}`
+    return '未命名长者'
+  })()
   const payload = {
-    fullName: String(form.elderName || form.name || '').trim() || '姓名待完善',
+    fullName: fallbackName,
     idCardNo: String(form.idCardNo || '').trim() || undefined,
     gender: form.gender,
     birthDate: birthDate || undefined,
