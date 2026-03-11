@@ -3,7 +3,7 @@
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-form">
         <a-form-item label="姓名">
-          <ElderNameAutocomplete v-model:value="query.fullName" placeholder="姓名(编号)" width="180px" />
+          <ElderNameAutocomplete v-model:value="query.fullName" placeholder="姓名(编号)" width="180px" @select="runSearch" />
         </a-form-item>
         <a-form-item label="身份证">
           <a-input v-model:value="query.idCardNo" placeholder="身份证号" allow-clear />

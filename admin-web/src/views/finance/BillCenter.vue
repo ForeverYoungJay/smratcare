@@ -6,7 +6,7 @@
           <a-date-picker v-model:value="query.month" picker="month" allow-clear style="width: 160px" />
         </a-form-item>
         <a-form-item label="老人姓名">
-          <ElderNameAutocomplete v-model:value="query.keyword" width="180px" placeholder="老人姓名(编号)" />
+          <ElderNameAutocomplete v-model:value="query.keyword" width="180px" placeholder="老人姓名(编号)" @select="() => runQuery(true)" />
         </a-form-item>
         <a-form-item label="收款方式">
           <a-select v-model:value="query.payMethod" allow-clear style="width: 140px">

@@ -6,7 +6,7 @@
           <a-range-picker v-model:value="query.range" style="width: 260px" />
         </a-form-item>
         <a-form-item label="长者">
-          <ElderNameAutocomplete v-model:value="query.keyword" allow-clear placeholder="姓名(编号)" width="200px" />
+          <ElderNameAutocomplete v-model:value="query.keyword" allow-clear placeholder="姓名(编号)" width="200px" @select="loadData" />
         </a-form-item>
         <a-form-item label="打印备注">
           <a-input v-model:value="query.printRemark" allow-clear style="width: 180px" />

@@ -90,7 +90,7 @@
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
       <a-form :model="recordQuery" layout="inline" class="search-bar">
         <a-form-item label="老人姓名">
-          <ElderNameAutocomplete v-model:value="recordQuery.keyword" placeholder="请输入老人姓名(编号)" width="220px" />
+          <ElderNameAutocomplete v-model:value="recordQuery.keyword" placeholder="请输入老人姓名(编号)" width="220px" @select="runRecordSearch" />
         </a-form-item>
         <a-form-item label="合同号">
           <a-input v-model:value="recordQuery.contractNo" placeholder="请输入合同号" allow-clear />

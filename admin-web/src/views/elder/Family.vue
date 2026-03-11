@@ -9,7 +9,7 @@
           <a-input v-model:value="query.phone" placeholder="手机号" allow-clear />
         </a-form-item>
         <a-form-item label="关联老人">
-          <ElderNameAutocomplete v-model:value="query.elderName" placeholder="老人姓名(编号)" width="220px" />
+          <ElderNameAutocomplete v-model:value="query.elderName" placeholder="老人姓名(编号)" width="220px" @select="() => { query.pageNo = 1; fetchData() }" />
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="query.status" allow-clear style="width: 120px">

@@ -25,7 +25,7 @@
             <a-input v-model:value="query.consultantPhone" placeholder="请输入 联系电话" allow-clear />
           </a-form-item>
           <a-form-item label="老人姓名">
-            <ElderNameAutocomplete v-model:value="query.elderName" placeholder="老人姓名(编号)" width="220px" />
+            <a-input v-model:value="query.elderName" placeholder="请输入 老人姓名" allow-clear />
           </a-form-item>
           <a-form-item label="老人联系电话">
             <a-input v-model:value="query.elderPhone" placeholder="请输入 老人联系电话" allow-clear />
@@ -47,7 +47,7 @@
 
         <template v-else-if="effectiveMode === 'intent' || effectiveMode === 'invalid'">
           <a-form-item label="老人姓名">
-            <ElderNameAutocomplete v-model:value="query.elderName" placeholder="老人姓名(编号)" width="220px" />
+            <a-input v-model:value="query.elderName" placeholder="请输入 老人姓名" allow-clear />
           </a-form-item>
           <a-form-item label="老人联系电话">
             <a-input v-model:value="query.elderPhone" placeholder="请输入 老人联系电话" allow-clear />
@@ -65,7 +65,7 @@
 
         <template v-else-if="effectiveMode === 'reservation'">
           <a-form-item label="姓名">
-            <ElderNameAutocomplete v-model:value="query.elderName" placeholder="姓名(编号)" width="220px" />
+            <a-input v-model:value="query.elderName" placeholder="请输入 姓名" allow-clear />
           </a-form-item>
           <a-form-item label="联系电话">
             <a-input v-model:value="query.elderPhone" placeholder="请输入 联系电话" allow-clear />
@@ -74,7 +74,7 @@
 
         <template v-else>
           <a-form-item label="客户姓名">
-            <ElderNameAutocomplete v-model:value="query.elderName" placeholder="客户姓名(编号)" width="220px" />
+            <a-input v-model:value="query.elderName" placeholder="请输入 客户姓名" allow-clear />
           </a-form-item>
           <a-form-item label="联系电话">
             <a-input v-model:value="query.elderPhone" placeholder="请输入 联系电话" allow-clear />
@@ -324,7 +324,6 @@ import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
-import ElderNameAutocomplete from '../../../components/ElderNameAutocomplete.vue'
 import MarketingQuickNav from './MarketingQuickNav.vue'
 import MarketingListToolbar from './MarketingListToolbar.vue'
 import {

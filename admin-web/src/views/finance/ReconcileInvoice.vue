@@ -23,7 +23,7 @@
           </a-select>
         </a-form-item>
         <a-form-item label="长者">
-          <ElderNameAutocomplete v-model:value="query.keyword" allow-clear placeholder="姓名(编号)" width="220px" />
+          <ElderNameAutocomplete v-model:value="query.keyword" allow-clear placeholder="姓名(编号)" width="220px" @select="() => { query.pageNo = 1; fetchData() }" />
         </a-form-item>
         <a-form-item>
           <a-space>

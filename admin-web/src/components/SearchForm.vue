@@ -1,6 +1,12 @@
 <template>
   <a-card class="card-elevated search-form-card" :bordered="false">
-    <a-form :model="model" layout="inline" @finish="onSearch" class="search-form">
+    <a-form
+      :model="model"
+      layout="inline"
+      @finish="onSearch"
+      @elder-autosearch="onAutoSearch"
+      class="search-form"
+    >
       <slot />
       <slot name="extra" />
       <a-form-item>
@@ -27,6 +33,10 @@ onMounted(() => {
 })
 
 function onSearch() {
+  emit('search')
+}
+
+function onAutoSearch() {
   emit('search')
 }
 

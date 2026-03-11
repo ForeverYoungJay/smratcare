@@ -8,6 +8,7 @@
             v-model:value="query.keyword"
             :placeholder="`${pageConfig.keywordLabel}(编号)`"
             width="220px"
+            @select="onSearch"
           />
           <a-input v-else v-model:value="query.keyword" :placeholder="pageConfig.keywordPlaceholder" allow-clear />
         </a-form-item>

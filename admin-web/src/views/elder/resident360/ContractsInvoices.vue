@@ -518,6 +518,7 @@ function onSelectorPick(payload: { elderId: string; elderName: string }) {
     selectorInput.value = elderName
   }
   ensureSelectedElder(elderId, elderName || undefined)
+  loadBySelectedElder().catch(() => {})
 }
 
 function buildDocumentRouteQuery() {

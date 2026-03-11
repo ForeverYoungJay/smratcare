@@ -4,7 +4,7 @@
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item label="姓名">
-          <ElderNameAutocomplete v-model:value="query.keyword" placeholder="姓名(编号)" width="220px" />
+          <a-input v-model:value="query.keyword" placeholder="请输入 姓名" allow-clear style="width: 220px" />
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="query.status" allow-clear style="width: 130px">
@@ -63,7 +63,6 @@ import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
-import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import MarketingQuickNav from './components/MarketingQuickNav.vue'
 import MarketingListToolbar from './components/MarketingListToolbar.vue'
 import { getElderPage } from '../../api/elder'

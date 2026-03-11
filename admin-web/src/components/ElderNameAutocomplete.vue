@@ -1,16 +1,18 @@
 <template>
-  <a-auto-complete
-    :value="innerValue"
-    :options="autoCompleteOptions"
-    :placeholder="placeholder || '请输入长者姓名/拼音首字母'"
-    :allow-clear="allowClear"
-    :style="mergedStyle"
-    @update:value="onUpdateValue"
-    @search="onSearch"
-    @select="onSelect"
-    @focus="onFocus"
-    @clear="onClear"
-  />
+  <div ref="hostRef">
+    <a-auto-complete
+      :value="innerValue"
+      :options="autoCompleteOptions"
+      :placeholder="placeholder || '请输入长者姓名/拼音首字母'"
+      :allow-clear="allowClear"
+      :style="mergedStyle"
+      @update:value="onUpdateValue"
+      @search="onSearch"
+      @select="onSelect"
+      @focus="onFocus"
+      @clear="onClear"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -37,6 +39,7 @@ const emit = defineEmits<{
 }>()
 
 const innerValue = ref(String(props.value || ''))
+const hostRef = ref<HTMLElement | null>(null)
 const { elderOptions, searchElders } = useElderOptions({
   pageSize: 80,
   inHospitalOnly: props.inHospitalOnly
@@ -85,6 +88,11 @@ function onSelect(value: string, option: any) {
   if (elderId) {
     emit('select', { elderId, elderName })
   }
+  // Bubble a native event so parent search forms can auto-trigger query.
+  hostRef.value?.dispatchEvent(new CustomEvent('elder-autosearch', {
+    bubbles: true,
+    detail: { elderId, elderName }
+  }))
 }
 
 function onFocus() {

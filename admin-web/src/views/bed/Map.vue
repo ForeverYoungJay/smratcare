@@ -9,7 +9,7 @@
           <a-input v-model:value="query.roomNo" placeholder="请输入房间号" allow-clear />
         </a-form-item>
         <a-form-item label="老人">
-          <ElderNameAutocomplete v-model:value="query.elderName" placeholder="请输入老人姓名(编号)" width="220px" />
+          <ElderNameAutocomplete v-model:value="query.elderName" placeholder="请输入老人姓名(编号)" width="220px" @select="applySearch" />
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="query.status" allow-clear style="width: 120px">

@@ -3,7 +3,7 @@
     <a-card class="card-elevated" :bordered="false">
       <a-form layout="inline" :model="query" class="search-form">
         <a-form-item label="关键词">
-          <ElderNameAutocomplete v-model:value="query.keyword" placeholder="老人姓名(编号)" width="220px" />
+          <ElderNameAutocomplete v-model:value="query.keyword" placeholder="老人姓名(编号)" width="220px" @select="() => { query.pageNo = 1; fetchData() }" />
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="query.status" allow-clear style="width: 120px">

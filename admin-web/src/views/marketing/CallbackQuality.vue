@@ -3,11 +3,8 @@
     <MarketingQuickNav parent-path="/marketing/callback" />
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline">
-        <a-form-item label="长者">
-          <ElderNameAutocomplete v-model:value="query.keyword" allow-clear placeholder="姓名(编号)" width="220px" />
-        </a-form-item>
-        <a-form-item label="电话">
-          <a-input v-model:value="query.phone" allow-clear placeholder="请输入电话" />
+        <a-form-item label="姓名">
+          <a-input v-model:value="query.keyword" allow-clear placeholder="姓名/电话" />
         </a-form-item>
         <a-form-item label="开始日期">
           <a-date-picker v-model:value="query.dateFrom" value-format="YYYY-MM-DD" />
@@ -89,7 +86,6 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
-import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import MarketingQuickNav from './components/MarketingQuickNav.vue'
 import MarketingListToolbar from './components/MarketingListToolbar.vue'
 import { getMarketingCallbackReport } from '../../api/marketing'
@@ -109,7 +105,6 @@ const query = reactive({
   pageNo: 1,
   pageSize: 10,
   keyword: '',
-  phone: '',
   dateFrom: undefined as string | undefined,
   dateTo: undefined as string | undefined,
   lowScoreOnly: false
@@ -129,11 +124,8 @@ const filteredRows = computed(() => {
   const keyword = query.keyword.trim()
   return allRows.value.filter((item) => {
     if (keyword) {
-      if (!String(item.name || '').includes(keyword)) return false
-    }
-    const phone = query.phone.trim()
-    if (phone && !String(item.phone || '').includes(phone)) {
-      return false
+      const haystack = `${item.name || ''} ${item.phone || ''}`
+      if (!haystack.includes(keyword)) return false
     }
     if (query.dateFrom && item.nextFollowDate && item.nextFollowDate < query.dateFrom) return false
     if (query.dateTo && item.nextFollowDate && item.nextFollowDate > query.dateTo) return false
@@ -197,7 +189,6 @@ function onReset() {
   query.pageNo = 1
   query.pageSize = 10
   query.keyword = ''
-  query.phone = ''
   query.dateFrom = undefined
   query.dateTo = undefined
   query.lowScoreOnly = false

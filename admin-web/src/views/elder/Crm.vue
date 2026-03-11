@@ -2,11 +2,8 @@
   <PageContainer title="CRM线索" subTitle="潜在客户管理">
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
-        <a-form-item label="老人">
-          <ElderNameAutocomplete v-model:value="query.keyword" placeholder="姓名(编号)" width="220px" />
-        </a-form-item>
-        <a-form-item label="手机号">
-          <a-input v-model:value="query.phone" placeholder="请输入手机号" allow-clear style="width: 180px" />
+        <a-form-item label="关键字">
+          <a-input v-model:value="query.keyword" placeholder="姓名/手机号" allow-clear />
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="query.status" allow-clear style="width: 140px">
@@ -114,7 +111,6 @@ import { onMounted, reactive, ref } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
-import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { getBaseConfigItemList } from '../../api/baseConfig'
 import { getCrmLeadPage, createCrmLead, updateCrmLead, deleteCrmLead } from '../../api/crm'
 import type { BaseConfigItem, CrmLeadItem, PageResult } from '../../types'
@@ -127,7 +123,6 @@ const customerTagOptions = ref<{ label: string; value: string }[]>([])
 
 const query = reactive({
   keyword: '',
-  phone: '',
   status: undefined as number | undefined,
   source: undefined as string | undefined,
   customerTag: undefined as string | undefined,
@@ -185,7 +180,7 @@ async function fetchData() {
     const res: PageResult<CrmLeadItem> = await getCrmLeadPage({
       pageNo: query.pageNo,
       pageSize: query.pageSize,
-      keyword: query.keyword || query.phone,
+      keyword: query.keyword,
       status: query.status,
       source: query.source,
       customerTag: query.customerTag
@@ -199,7 +194,6 @@ async function fetchData() {
 
 function reset() {
   query.keyword = ''
-  query.phone = ''
   query.status = undefined
   query.source = undefined
   query.customerTag = undefined

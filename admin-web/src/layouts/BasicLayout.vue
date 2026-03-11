@@ -1025,7 +1025,7 @@ const activeQuickChatMemberRows = computed(() => {
 const quickChatUnreadCount = computed(() =>
   myQuickChatRooms.value
     .filter((room) => !isRoomArchivedByCurrentUser(room))
-    .reduce((sum, item) => sum + Number(item.unreadCount || 0), 0)
+    .reduce((sum, item) => sum + resolveRoomUnreadForCurrentUser(item), 0)
 )
 const quickChatPressureTag = computed(() => {
   const unread = quickChatUnreadCount.value
@@ -2033,6 +2033,32 @@ function quickChatIdentityAliases() {
   return aliases
 }
 
+function resolveRoomUnreadByUserForCurrent(unreadByUser?: Record<string, number>) {
+  const bucket = unreadByUser || {}
+  let maxUnread = 0
+  quickChatIdentityAliases().forEach((alias) => {
+    const raw = Number(bucket[alias] || 0)
+    if (!Number.isFinite(raw)) return
+    if (raw > maxUnread) maxUnread = raw
+  })
+  return Math.max(0, Math.floor(maxUnread))
+}
+
+function resolveRoomUnreadForCurrentUser(room: QuickChatRoom) {
+  const byUser = resolveRoomUnreadByUserForCurrent(room?.unreadByUser)
+  const fallback = Number(room?.unreadCount || 0)
+  if (!Number.isFinite(fallback)) return byUser
+  return Math.max(byUser, Math.max(0, Math.floor(fallback)))
+}
+
+function resolveRoomArchivedByCurrentUser(room: QuickChatRoom) {
+  const map = room?.archivedByUser || {}
+  for (const alias of quickChatIdentityAliases()) {
+    if (map[alias] === true) return true
+  }
+  return false
+}
+
 function isCurrentQuickChatIdentity(rawId: unknown) {
   const rawText = String(rawId || '').trim()
   const normalized = normalizeQuickChatMemberId(rawText)
@@ -2169,7 +2195,10 @@ function normalizeQuickChatRooms(parsed: any[]) {
     memberIds: Array.isArray(room?.memberIds)
       ? Array.from(new Set(room.memberIds.map((id: any) => normalizeQuickChatMemberId(id)).filter(Boolean)))
       : [],
-    unreadCount: Number(room?.unreadByUser?.[currentQuickChatKeyId()] ?? room?.unreadCount ?? 0),
+    unreadCount: Math.max(
+      resolveRoomUnreadByUserForCurrent(typeof room?.unreadByUser === 'object' ? room.unreadByUser : undefined),
+      Number(room?.unreadCount || 0)
+    ),
     unreadByUser: typeof room?.unreadByUser === 'object' && room?.unreadByUser
       ? Object.fromEntries(Object.entries(room.unreadByUser).map(([key, value]) => [String(key), Number(value || 0)]))
       : {
@@ -2224,7 +2253,6 @@ function cloneQuickChatRoomRow(room: QuickChatRoom): QuickChatRoom {
 }
 
 function mergeQuickChatRoomRows(localRooms: QuickChatRoom[], remoteRooms: QuickChatRoom[]) {
-  const currentId = currentQuickChatKeyId()
   const merged = new Map<string, QuickChatRoom>()
   localRooms.forEach((room) => {
     merged.set(room.id, cloneQuickChatRoomRow(room))
@@ -2294,7 +2322,7 @@ function mergeQuickChatRoomRows(localRooms: QuickChatRoom[], remoteRooms: QuickC
       createdAt: existed.createdAt || remoteRoom.createdAt || dayjs().toISOString(),
       updatedAt: dayjs(Math.max(localTs || 0, remoteTs || 0, Date.now())).toISOString()
     }
-    mergedRoom.unreadCount = Number(mergedRoom.unreadByUser[currentId] || 0)
+    mergedRoom.unreadCount = resolveRoomUnreadForCurrentUser(mergedRoom)
     merged.set(mergedRoom.id, mergedRoom)
   })
   return Array.from(merged.values()).sort((a, b) => {
@@ -2685,7 +2713,14 @@ function appendRoomSystemMessage(room: QuickChatRoom, text: string, notifyOthers
 }
 
 function isRoomArchivedByCurrentUser(room: QuickChatRoom) {
-  return room.archivedByUser?.[currentQuickChatKeyId()] === true
+  const archived = resolveRoomArchivedByCurrentUser(room)
+  if (!archived) return false
+  room.archivedByUser = room.archivedByUser || {}
+  const currentId = currentQuickChatKeyId()
+  if (currentId && room.archivedByUser[currentId] !== true) {
+    room.archivedByUser[currentId] = true
+  }
+  return true
 }
 
 function shouldDeliverUnread(room: QuickChatRoom, memberId: string, mentionTargetIds?: string[], force = false) {
@@ -3193,13 +3228,12 @@ function emitQuickChatSync() {
 }
 
 function rehydrateQuickChatUnread() {
-  const currentId = currentQuickChatKeyId()
   quickChatRooms.value = quickChatRooms.value.map((room) => {
     const unreadByUser = room.unreadByUser || {}
     return {
       ...room,
       unreadByUser,
-      unreadCount: Number(unreadByUser[currentId] || 0)
+      unreadCount: resolveRoomUnreadForCurrentUser({ ...room, unreadByUser } as QuickChatRoom)
     }
   })
 }

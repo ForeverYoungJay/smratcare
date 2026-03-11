@@ -7,7 +7,7 @@
           <a-input v-model:value="query.contractNo" allow-clear />
         </a-form-item>
         <a-form-item label="长者姓名">
-          <ElderNameAutocomplete v-model:value="query.elderName" placeholder="长者姓名(编号)" width="220px" />
+          <a-input v-model:value="query.elderName" allow-clear placeholder="请输入 长者姓名" style="width: 220px" />
         </a-form-item>
         <a-form-item>
           <a-space>
@@ -64,7 +64,6 @@
 import { computed, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
-import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import MarketingQuickNav from './components/MarketingQuickNav.vue'
 import MarketingListToolbar from './components/MarketingListToolbar.vue'
 import { getContractAttachments, getContractPage } from '../../api/marketing'

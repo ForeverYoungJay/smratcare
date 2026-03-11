@@ -17,7 +17,7 @@
           />
         </a-form-item>
         <a-form-item label="关键词">
-          <ElderNameAutocomplete v-model:value="query.keyword" allow-clear placeholder="请输入老人姓名(编号)/护理等级/来源渠道" width="280px" />
+          <ElderNameAutocomplete v-model:value="query.keyword" allow-clear placeholder="请输入老人姓名(编号)/护理等级/来源渠道" width="280px" @select="() => { query.pageNo = 1; fetchData() }" />
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="query.status" allow-clear style="width: 180px" placeholder="请选择状态">
