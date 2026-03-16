@@ -110,8 +110,8 @@ export function confirmOutboundSheet(id) {
 export function getInventoryAlerts() {
     return request.get('/api/inventory/alerts');
 }
-export function getInventoryExpiryAlerts() {
-    return request.get('/api/inventory/expiry-alerts');
+export function getInventoryExpiryAlerts(days) {
+    return request.get('/api/inventory/expiry-alerts', { params: { days } });
 }
 export function getMaterialCenterOverview(params) {
     return request.get('/api/material-center/overview', { params });

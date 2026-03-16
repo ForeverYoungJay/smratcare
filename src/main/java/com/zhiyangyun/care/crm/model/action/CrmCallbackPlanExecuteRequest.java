@@ -7,4 +7,6 @@ public class CrmCallbackPlanExecuteRequest {
   private String executeNote;
   private String followupResult;
   private String nextFollowDate;
+  private String callbackType;
+  private Double score;
 }

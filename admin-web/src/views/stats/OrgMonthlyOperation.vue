@@ -30,6 +30,69 @@
       </a-form>
     </a-card>
 
+    <StatsWorkspacePanel
+      page-key="stats-org-monthly-operation"
+      title="机构运营策略区"
+      :summary-text="workspaceSummary"
+      :current-payload="workspacePayload"
+      :target-fields="targetFields"
+      :data-health="dataHealth"
+      :empty-state="emptyState"
+      @apply-preset="applyPreset"
+      @targets-change="onTargetsChange"
+    />
+
+    <StatsInsightDeck :items="visibleInsightItems" />
+
+    <StatsCommandCenter
+      page-key="stats-org-monthly-operation-command"
+      title="机构经营协同台"
+      share-title="机构月运营协同包"
+      :summary-text="commandSummary"
+      :current-payload="workspacePayload"
+      :action-items="commandActionItems"
+      :anomalies="commandAnomalies"
+      :metric-notes="metricNotes"
+      :panel-options="panelOptions"
+      :selected-panel-keys="panelKeys"
+      :template-column-options="printColumnOptions"
+      :selected-template-columns="selectedPrintColumns"
+      @trigger-action="onCommandAction"
+      @panel-change="onPanelChange"
+      @apply-template="applyReportTemplate"
+    />
+
+    <a-row :gutter="16" style="margin-top: 16px;">
+      <a-col :xs="24" :lg="12">
+        <a-card class="card-elevated" :bordered="false" title="机构营收对比">
+          <div class="compare-list" v-if="topRevenueOrgs.length">
+            <div v-for="item in topRevenueOrgs" :key="`revenue-${item.orgName}`" class="compare-item">
+              <div>
+                <div class="compare-name">{{ item.orgName }}</div>
+                <div class="compare-meta">累计入住 {{ item.admissions }} · 累计离院 {{ item.discharges }}</div>
+              </div>
+              <div class="compare-value">{{ item.revenue.toFixed(2) }} 元</div>
+            </div>
+          </div>
+          <a-empty v-else description="暂无机构对比数据" />
+        </a-card>
+      </a-col>
+      <a-col :xs="24" :lg="12">
+        <a-card class="card-elevated" :bordered="false" title="容量压力机构">
+          <div class="compare-list" v-if="highPressureOrgs.length">
+            <div v-for="item in highPressureOrgs" :key="`pressure-${item.orgName}`" class="compare-item">
+              <div>
+                <div class="compare-name">{{ item.orgName }}</div>
+                <div class="compare-meta">总床位 {{ item.totalBeds }} · 已使用 {{ item.occupiedBeds }}</div>
+              </div>
+              <div class="compare-value">{{ item.occupancyRate.toFixed(2) }}%</div>
+            </div>
+          </div>
+          <a-empty v-else description="暂无床位压力对比" />
+        </a-card>
+      </a-col>
+    </a-row>
+
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="机构月运营趋势">
       <div ref="trendRef" style="height: 320px;"></div>
     </a-card>
@@ -56,13 +119,19 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
+import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
+import StatsWorkspacePanel from '../../components/stats/StatsWorkspacePanel.vue'
+import StatsInsightDeck from '../../components/stats/StatsInsightDeck.vue'
+import StatsCommandCenter from '../../components/stats/StatsCommandCenter.vue'
 import { exportOrgMonthlyOperationCsv, getOrgMonthlyOperation } from '../../api/stats'
 import type { OrgMonthlyOperationItem } from '../../types'
 import { useECharts } from '../../plugins/echarts'
 import { message } from 'ant-design-vue'
 import { printTableReport } from '../../utils/print'
+import { buildComparisonSummary, buildPeriodSeries } from '../../utils/statsInsight'
 
+const router = useRouter()
 const query = ref({
   from: dayjs().subtract(5, 'month') as Dayjs,
   to: dayjs() as Dayjs,
@@ -72,6 +141,10 @@ const query = ref({
 })
 const rows = ref<OrgMonthlyOperationItem[]>([])
 const { chartRef: trendRef, setOption } = useECharts()
+const targets = ref<Record<string, number>>({
+  revenue: 0,
+  occupancyRate: 90
+})
 const columnSettingOpen = ref(false)
 const printColumnOptions = [
   { label: '机构', value: 'orgName' },
@@ -84,6 +157,7 @@ const printColumnOptions = [
   { label: '床位使用率(%)', value: 'occupancyRate' }
 ]
 const selectedPrintColumns = ref<string[]>(['orgName', 'month', 'admissions', 'discharges', 'revenue', 'occupiedBeds', 'totalBeds', 'occupancyRate'])
+const panelKeys = ref<string[]>([])
 const printableRows = computed(() => (rows.value || []).map(item => ({
   orgName: item.orgName || `机构#${item.orgId || '-'}`,
   month: item.month,
@@ -99,6 +173,142 @@ const displayRows = computed(() => {
   if (!keyword) return rows.value
   return rows.value.filter(item => String(item.orgName || '').includes(keyword))
 })
+const workspaceSummary = computed(() => `围绕营收、床位占用和入住离院联动观察机构月经营表现。当前展示 ${displayRows.value.length} 条记录。`)
+const workspacePayload = computed(() => ({
+  from: dayjs(query.value.from).format('YYYY-MM'),
+  to: dayjs(query.value.to).format('YYYY-MM'),
+  orgId: query.value.orgId ? String(query.value.orgId) : '',
+  orgNameKeyword: query.value.orgNameKeyword || ''
+}))
+const targetFields = computed(() => ([
+  { key: 'revenue', label: '月营收目标(元)', value: targets.value.revenue, min: 0, max: 999999999, step: 1000 },
+  { key: 'occupancyRate', label: '床位使用率目标(%)', value: targets.value.occupancyRate, min: 0, max: 100, step: 1 }
+]))
+const dataHealth = computed(() => ({
+  freshness: dayjs().format('YYYY-MM-DD HH:mm:ss'),
+  completeness: `${displayRows.value.length}/${rows.value.length || 0} 条记录可视`,
+  issues: [
+    query.value.orgNameKeyword ? `机构名称关键字：${query.value.orgNameKeyword}` : ''
+  ].filter(Boolean)
+}))
+const emptyState = computed(() => ({
+  visible: !displayRows.value.length,
+  title: '当前筛选下没有机构运营数据',
+  description: '建议清空机构名称关键字或扩大月份范围。',
+  hints: [
+    '机构月运营明细适合做横向比对和经营周报',
+    '若只看单机构，建议同时对照床位占用与营收目标',
+    '可以保存成常用周会方案'
+  ]
+}))
+const insightItems = computed(() => {
+  const revenueSeries = buildPeriodSeries(displayRows.value, 'month', 'revenue')
+  const occupancySeries = buildPeriodSeries(displayRows.value, 'month', 'occupancyRate')
+  const revenueSummary = buildComparisonSummary(revenueSeries, targets.value.revenue)
+  const occupancySummary = buildComparisonSummary(occupancySeries, targets.value.occupancyRate)
+  return [
+    {
+      key: 'revenue',
+      label: '营收走势',
+      valueText: `${Number(revenueSummary.latestValue || 0).toFixed(2)} 元`,
+      trendText: revenueSummary.momRate == null ? '暂无环比' : `较上期 ${revenueSummary.momRate >= 0 ? '+' : ''}${revenueSummary.momRate}%`,
+      detail: revenueSummary.target != null ? `目标差 ${Number(revenueSummary.targetGap || 0).toFixed(2)} 元` : revenueSummary.anomalyText,
+      tone: revenueSummary.targetGap != null && revenueSummary.targetGap < 0 ? 'warning' : (revenueSummary.anomalyLevel || 'good')
+    },
+    {
+      key: 'occupancy',
+      label: '床位使用率',
+      valueText: `${Number(occupancySummary.latestValue || 0).toFixed(2)}%`,
+      trendText: `目标 ${Number(targets.value.occupancyRate || 0).toFixed(2)}%`,
+      detail: occupancySummary.anomalyText,
+      tone: Number(occupancySummary.latestValue || 0) > Number(targets.value.occupancyRate || 0) ? 'warning' : 'good'
+    },
+    {
+      key: 'admission',
+      label: '入住动能',
+      valueText: `${Number(displayRows.value.reduce((sum, item) => sum + Number(item.admissions || 0), 0))}`,
+      trendText: `离院 ${Number(displayRows.value.reduce((sum, item) => sum + Number(item.discharges || 0), 0))}`,
+      detail: '适合结合营收一起判断经营节奏',
+      tone: 'neutral'
+    },
+    {
+      key: 'rows',
+      label: '机构样本',
+      valueText: `${displayRows.value.length}`,
+      trendText: query.value.orgId ? `机构ID ${query.value.orgId}` : '当前机构视角',
+      detail: '如需周会使用，建议保存当前机构与月份组合',
+      tone: 'neutral'
+    }
+  ]
+})
+const visibleInsightItems = computed(() => {
+  const selected = panelKeys.value.length ? new Set(panelKeys.value) : null
+  return insightItems.value.filter((item) => !selected || selected.has(item.key))
+})
+const commandSummary = computed(() => '把机构横向经营对比、模板化报表和跨页钻取收口到经营协同台。')
+const commandActionItems = computed(() => ([
+  { key: 'open-revenue', label: '查看收入趋势', description: '回到月收入统计核对整体趋势', route: '/stats/monthly-revenue', tone: 'danger' as const },
+  { key: 'open-bed-usage', label: '查看床位使用', description: '联动床位容量判断经营压力', route: '/stats/org/bed-usage', tone: 'warning' as const },
+  { key: 'open-org-flow', label: '查看机构出入', description: '联动入住离院波动', route: '/stats/org/elder-flow', tone: 'neutral' as const }
+]))
+const commandAnomalies = computed(() =>
+  insightItems.value
+    .filter((item) => item.tone === 'danger' || item.tone === 'warning')
+    .map((item) => ({ key: item.key, label: item.label, detail: item.detail, tone: item.tone }))
+)
+const metricNotes = computed(() => ([
+  { key: 'revenue', label: '营收走势', note: '可结合机构维度横向对比找出强弱机构。' },
+  { key: 'occupancy', label: '床位使用率', note: '床位使用率偏高时建议继续联动床位和出入统计。' },
+  { key: 'admission', label: '入住动能', note: '入住与离院一起看，才能判断经营增长是否健康。' }
+]))
+const panelOptions = computed(() =>
+  insightItems.value.map((item) => ({
+    key: item.key,
+    label: item.label,
+    description: item.detail || item.trendText
+  }))
+)
+const orgCompareRows = computed(() => {
+  const map = new Map<string, {
+    orgName: string
+    revenue: number
+    admissions: number
+    discharges: number
+    occupiedBeds: number
+    totalBeds: number
+    occupancyRate: number
+  }>()
+  displayRows.value.forEach((item) => {
+    const orgName = String(item.orgName || `机构#${item.orgId || '-'}`)
+    const current = map.get(orgName) || {
+      orgName,
+      revenue: 0,
+      admissions: 0,
+      discharges: 0,
+      occupiedBeds: 0,
+      totalBeds: 0,
+      occupancyRate: 0
+    }
+    current.revenue += Number(item.revenue || 0)
+    current.admissions += Number(item.admissions || 0)
+    current.discharges += Number(item.discharges || 0)
+    current.occupiedBeds = Math.max(current.occupiedBeds, Number(item.occupiedBeds || 0))
+    current.totalBeds = Math.max(current.totalBeds, Number(item.totalBeds || 0))
+    current.occupancyRate = Math.max(current.occupancyRate, Number(item.occupancyRate || 0))
+    map.set(orgName, current)
+  })
+  return Array.from(map.values())
+})
+const topRevenueOrgs = computed(() =>
+  [...orgCompareRows.value]
+    .sort((left, right) => right.revenue - left.revenue)
+    .slice(0, 3)
+)
+const highPressureOrgs = computed(() =>
+  [...orgCompareRows.value]
+    .sort((left, right) => right.occupancyRate - left.occupancyRate)
+    .slice(0, 3)
+)
 
 async function loadData() {
   if (query.value.from.isAfter(query.value.to, 'month')) {
@@ -153,6 +363,38 @@ function reset() {
   loadData()
 }
 
+function applyPreset(payload: Record<string, any>) {
+  if (payload.from && dayjs(String(payload.from)).isValid()) query.value.from = dayjs(String(payload.from))
+  if (payload.to && dayjs(String(payload.to)).isValid()) query.value.to = dayjs(String(payload.to))
+  query.value.orgId = payload.orgId ? Number(payload.orgId) : undefined
+  query.value.orgNameKeyword = String(payload.orgNameKeyword || '')
+  loadData()
+}
+
+function onTargetsChange(payload: Record<string, number>) {
+  targets.value = {
+    ...targets.value,
+    ...(payload || {})
+  }
+}
+
+function onPanelChange(keys: string[]) {
+  panelKeys.value = keys.length ? [...keys] : insightItems.value.map((item) => item.key)
+}
+
+function onCommandAction(item: { route?: string }) {
+  if (item.route) {
+    router.push(item.route)
+  }
+}
+
+function applyReportTemplate(payload: { payload: Record<string, any>; columns: string[] }) {
+  if (payload.columns?.length) {
+    selectedPrintColumns.value = [...payload.columns]
+  }
+  applyPreset(payload.payload || {})
+}
+
 function openColumnSetting() {
   columnSettingOpen.value = true
 }
@@ -197,3 +439,38 @@ function renderPrint(title: string, data: Array<Record<string, any>>) {
 
 onMounted(loadData)
 </script>
+
+<style scoped>
+.compare-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.compare-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(248, 250, 252, 0.86);
+}
+
+.compare-name {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.compare-meta {
+  margin-top: 4px;
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.62);
+}
+
+.compare-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+}
+</style>

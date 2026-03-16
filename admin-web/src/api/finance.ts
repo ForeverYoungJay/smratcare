@@ -16,6 +16,20 @@ import type {
   FinanceWorkbenchOverview,
   FinanceOpsInsight,
   FinanceInvoiceReceiptItem,
+  FinanceHandleActionRequest,
+  FinanceHandleLogItem,
+  FinanceIssueCenterItem,
+  FinanceCollectionFollowUpItem,
+  FinanceMonthCloseSummary,
+  FinanceMonthCloseExecuteRequest,
+  FinanceMonthCloseExecuteResponse,
+  FinanceMonthLockStatus,
+  FinanceMonthUnlockRequest,
+  FinanceCrossPeriodApprovalRequest,
+  FinanceCrossPeriodApprovalResponse,
+  FinancePaymentAdjustmentApprovalRequest,
+  FinancePaymentAdjustmentItem,
+  FinanceSearchResponse,
   FinanceAutoDebitExceptionItem,
   FinanceRoomOpsDetailResponse,
   FinanceAllocationRuleItem,
@@ -146,6 +160,202 @@ export async function exportFinanceLedgerHealthCsv(params?: { limit?: number }) 
 
 export function getFinanceInvoiceReceiptPage(params: any) {
   return fetchPage<FinanceInvoiceReceiptItem>('/api/finance/workbench/invoice/page', params)
+}
+
+export function getFinancePaymentAdjustmentPage(params: any) {
+  return fetchPage<FinancePaymentAdjustmentItem>('/api/finance/workbench/payment-adjustments/page', params)
+}
+
+export async function exportFinancePaymentAdjustmentCsv(params?: { month?: string }) {
+  const url = new URL('/api/finance/workbench/payment-adjustments/export', window.location.origin)
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      url.searchParams.set(key, String(value))
+    }
+  })
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${getToken()}` }
+  })
+  if (!response.ok) {
+    throw new Error('导出失败')
+  }
+  const blob = await response.blob()
+  const contentDisposition = response.headers.get('content-disposition') || ''
+  const filenameMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/)
+  const filename = filenameMatch?.[1] || `finance-payment-adjustments-${new Date().toISOString().slice(0, 10)}.csv`
+  const link = document.createElement('a')
+  const objectUrl = URL.createObjectURL(blob)
+  link.href = objectUrl
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(objectUrl)
+}
+
+export function getFinanceIssueCenterPage(params: any) {
+  return fetchPage<FinanceIssueCenterItem>('/api/finance/workbench/issue-center/page', params)
+}
+
+export async function exportFinanceIssueCenterCsv(params?: {
+  date?: string
+  riskLevel?: string
+  sourceModule?: string
+  keyword?: string
+}) {
+  const url = new URL('/api/finance/workbench/issue-center/export', window.location.origin)
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      url.searchParams.set(key, String(value))
+    }
+  })
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${getToken()}` }
+  })
+  if (!response.ok) {
+    throw new Error('导出失败')
+  }
+  const blob = await response.blob()
+  const contentDisposition = response.headers.get('content-disposition') || ''
+  const filenameMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/)
+  const filename = filenameMatch?.[1] || `finance-issue-center-${new Date().toISOString().slice(0, 10)}.csv`
+  const link = document.createElement('a')
+  const objectUrl = URL.createObjectURL(blob)
+  link.href = objectUrl
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(objectUrl)
+}
+
+export function getFinanceCollectionFollowUpPage(params: any) {
+  return fetchPage<FinanceCollectionFollowUpItem>('/api/finance/workbench/collection-follow-up/page', params)
+}
+
+export async function exportFinanceCollectionFollowUpCsv(params?: {
+  month?: string
+  riskLevel?: string
+  stage?: string
+  keyword?: string
+}) {
+  const url = new URL('/api/finance/workbench/collection-follow-up/export', window.location.origin)
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      url.searchParams.set(key, String(value))
+    }
+  })
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${getToken()}` }
+  })
+  if (!response.ok) {
+    throw new Error('导出失败')
+  }
+  const blob = await response.blob()
+  const contentDisposition = response.headers.get('content-disposition') || ''
+  const filenameMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/)
+  const filename = filenameMatch?.[1] || `finance-collection-follow-up-${new Date().toISOString().slice(0, 10)}.csv`
+  const link = document.createElement('a')
+  const objectUrl = URL.createObjectURL(blob)
+  link.href = objectUrl
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(objectUrl)
+}
+
+export function getFinanceMonthCloseSummary(params?: { month?: string }) {
+  return request.get<FinanceMonthCloseSummary>('/api/finance/workbench/month-close/summary', { params })
+}
+
+export function getFinanceMonthCloseStatus(params?: { month?: string }) {
+  return request.get<FinanceMonthLockStatus>('/api/finance/workbench/month-close/status', { params })
+}
+
+export async function exportFinanceMonthCloseCsv(params?: { month?: string }) {
+  const url = new URL('/api/finance/workbench/month-close/export', window.location.origin)
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      url.searchParams.set(key, String(value))
+    }
+  })
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${getToken()}` }
+  })
+  if (!response.ok) {
+    throw new Error('导出失败')
+  }
+  const blob = await response.blob()
+  const contentDisposition = response.headers.get('content-disposition') || ''
+  const filenameMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/)
+  const filename = filenameMatch?.[1] || `finance-month-close-${new Date().toISOString().slice(0, 10)}.csv`
+  const link = document.createElement('a')
+  const objectUrl = URL.createObjectURL(blob)
+  link.href = objectUrl
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(objectUrl)
+}
+
+export function handleFinanceIssueCenter(data: FinanceHandleActionRequest) {
+  return request.post<FinanceHandleLogItem>('/api/finance/workbench/issue-center/handle', data)
+}
+
+export function getFinanceIssueHandleLogs(params?: { billId?: Id; paymentId?: Id; elderId?: Id; sourceModule?: string; limit?: number }) {
+  return request.get<FinanceHandleLogItem[]>('/api/finance/workbench/issue-center/handle-logs', { params })
+}
+
+export function handleFinanceCollectionFollowUp(data: FinanceHandleActionRequest) {
+  return request.post<FinanceHandleLogItem>('/api/finance/workbench/collection-follow-up/handle', data)
+}
+
+export function getFinanceCollectionFollowUpLogs(params?: { elderId?: Id; limit?: number }) {
+  return request.get<FinanceHandleLogItem[]>('/api/finance/workbench/collection-follow-up/logs', { params })
+}
+
+export function executeFinanceMonthClose(data: FinanceMonthCloseExecuteRequest) {
+  return request.post<FinanceMonthCloseExecuteResponse>('/api/finance/workbench/month-close/execute', data)
+}
+
+export function unlockFinanceMonthClose(data: FinanceMonthUnlockRequest) {
+  return request.post<FinanceMonthLockStatus>('/api/finance/workbench/month-close/unlock', data)
+}
+
+export function requestFinanceCrossPeriodApproval(data: FinanceCrossPeriodApprovalRequest) {
+  return request.post<FinanceCrossPeriodApprovalResponse>('/api/finance/workbench/month-close/cross-period/request', data)
+}
+
+export function requestFinancePaymentAdjustmentApproval(data: FinancePaymentAdjustmentApprovalRequest) {
+  return request.post<FinancePaymentAdjustmentItem>('/api/finance/workbench/payment-adjustments/approval/request', data)
+}
+
+export function financeSearch(params: { keyword: string; limit?: number }) {
+  return request.get<FinanceSearchResponse>('/api/finance/workbench/search', { params })
+}
+
+export async function exportFinanceSearchCsv(params: { keyword: string; limit?: number }) {
+  const url = new URL('/api/finance/workbench/search/export', window.location.origin)
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      url.searchParams.set(key, String(value))
+    }
+  })
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${getToken()}` }
+  })
+  if (!response.ok) {
+    throw new Error('导出失败')
+  }
+  const blob = await response.blob()
+  const contentDisposition = response.headers.get('content-disposition') || ''
+  const filenameMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/)
+  const filename = filenameMatch?.[1] || `finance-search-${new Date().toISOString().slice(0, 10)}.csv`
+  const link = document.createElement('a')
+  const objectUrl = URL.createObjectURL(blob)
+  link.href = objectUrl
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(objectUrl)
 }
 
 export async function exportFinanceInvoiceReceiptCsv(params?: {

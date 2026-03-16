@@ -4,9 +4,10 @@
       <a-descriptions :column="2" size="small" bordered>
         <a-descriptions-item label="姓名">{{ elder?.fullName || '-' }}</a-descriptions-item>
         <a-descriptions-item label="身份证">{{ elder?.idCardNo || '-' }}</a-descriptions-item>
-        <a-descriptions-item label="床位">{{ elder?.bedNo || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="床位">{{ elder?.bedNo || elder?.currentBed?.bedNo || '-' }}</a-descriptions-item>
         <a-descriptions-item label="护理等级">{{ elder?.careLevel || '-' }}</a-descriptions-item>
         <a-descriptions-item label="状态">{{ statusText(elder?.status) }}</a-descriptions-item>
+        <a-descriptions-item label="档案来源">{{ sourceTypeText(elder?.sourceType) }}</a-descriptions-item>
         <a-descriptions-item label="生日">{{ elder?.birthDate || '-' }}</a-descriptions-item>
         <a-descriptions-item label="风险预担">{{ riskPrecommitText(elder?.riskPrecommit) }}</a-descriptions-item>
         <a-descriptions-item label="入院日期">{{ elder?.admissionDate || '-' }}</a-descriptions-item>
@@ -29,6 +30,9 @@
             <a-form-item label="老人编号" name="elderCode">
               <a-input v-model:value="baseForm.elderCode" />
             </a-form-item>
+            <a-form-item label="档案来源">
+              <a-tag color="blue">{{ sourceTypeText(baseForm.sourceType) }}</a-tag>
+            </a-form-item>
             <a-form-item label="姓名" name="fullName">
               <a-input v-model:value="baseForm.fullName" />
             </a-form-item>
@@ -40,6 +44,15 @@
             </a-form-item>
             <a-form-item label="生日" name="birthDate">
               <a-date-picker v-model:value="baseForm.birthDate" value-format="YYYY-MM-DD" style="width: 100%" />
+            </a-form-item>
+            <a-form-item label="历史合同附件">
+              <a-space>
+                <a-upload :show-upload-list="false" :before-upload="beforeUploadHistoricalContract">
+                  <a-button :loading="uploadingHistoricalContract">上传文件</a-button>
+                </a-upload>
+                <a-typography-text type="secondary">{{ fileLabel(baseForm.historicalContractFileUrl, '未上传') }}</a-typography-text>
+                <a-button v-if="baseForm.historicalContractFileUrl" type="link" @click="openFile(baseForm.historicalContractFileUrl)">查看</a-button>
+              </a-space>
             </a-form-item>
             <a-form-item label="家庭地址" name="homeAddress">
               <a-input v-model:value="baseForm.homeAddress" />
@@ -147,7 +160,7 @@ import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import LifecycleStageBar from '../../components/LifecycleStageBar.vue'
-import { getElderDetail, updateElder, getElderDiseases, updateElderDiseases, bindFamily } from '../../api/elder'
+import { bindFamily, getElderDetail, getElderDiseases, updateElder, updateElderDiseases, uploadElderFile } from '../../api/elder'
 import { getContractLinkageByElder } from '../../api/marketing'
 import { getDiseaseList } from '../../api/store'
 import { getFamilyRelations, getFamilyUserPage, removeFamilyRelation } from '../../api/family'
@@ -163,6 +176,7 @@ const contractLinkage = ref<ContractLinkageSummary | null>(null)
 const baseForm = reactive<Partial<ElderItem>>({})
 const baseFormRef = ref<FormInstance>()
 const saving = ref(false)
+const uploadingHistoricalContract = ref(false)
 const activeKey = ref('base')
 
 const baseRules: FormRules = {
@@ -267,6 +281,12 @@ function riskPrecommitText(value?: string) {
   return '-'
 }
 
+function sourceTypeText(value?: string) {
+  if (value === 'HISTORICAL_IMPORT') return '历史补录'
+  if (value === 'MARKETING_CONTRACT') return '合同流程'
+  return '未标记'
+}
+
 async function load() {
   try {
     const detail = await getElderDetail(elderId.value)
@@ -335,11 +355,41 @@ async function saveBase() {
     await updateElder(elderId.value, baseForm)
     message.success('保存成功')
     await load()
-  } catch {
-    message.error('保存失败')
+  } catch (error: any) {
+    message.error(error?.message || error?.response?.data?.message || '保存失败')
   } finally {
     saving.value = false
   }
+}
+
+async function beforeUploadHistoricalContract(file: File) {
+  uploadingHistoricalContract.value = true
+  try {
+    const uploaded = await uploadElderFile(file, 'elder-historical-contract')
+    const url = uploaded?.fileUrl || ''
+    if (!url) {
+      message.error('上传失败：未返回文件地址')
+      return false
+    }
+    baseForm.historicalContractFileUrl = url
+    message.success('上传成功')
+  } catch (error: any) {
+    message.error(error?.message || '上传失败')
+  } finally {
+    uploadingHistoricalContract.value = false
+  }
+  return false
+}
+
+function fileLabel(url?: string, fallback = '') {
+  if (!url) return fallback
+  const text = String(url).split('/').pop() || url
+  return decodeURIComponent(text)
+}
+
+function openFile(url?: string) {
+  if (!url) return
+  window.open(url, '_blank')
 }
 
 function openFamilyBind() {

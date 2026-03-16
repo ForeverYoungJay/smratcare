@@ -9,5 +9,7 @@ public class MarketingCallbackItem {
   private String phone;
   private String source;
   private String nextFollowDate;
+  private String callbackType;
+  private Double score;
   private String remark;
 }

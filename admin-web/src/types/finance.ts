@@ -19,6 +19,7 @@ export interface ReconcileDailyItem {
   reconcileDate?: string
   totalReceived: number
   mismatchFlag: boolean | number
+  mismatch?: boolean
   remark?: string
   createTime?: string
 }
@@ -186,6 +187,9 @@ export interface FinancePendingCard {
   pendingDiscountCount: number
   pendingRefundCount: number
   pendingDischargeSettlementCount: number
+  issueTodoCount?: number
+  collectionReminderCount?: number
+  lockedMonthCount?: number
 }
 
 export interface FinanceRevenueStructureCard {
@@ -357,6 +361,250 @@ export interface FinanceInvoiceReceiptItem {
   receiptNo: string
   remark?: string
   paidAt: string
+}
+
+export interface FinancePaymentAdjustmentItem {
+  type: 'INVALID_BILL' | 'PAYMENT_ADJUSTMENT'
+  typeLabel: string
+  billId?: Id
+  paymentId?: Id
+  elderId?: Id
+  elderName?: string
+  amount: number
+  status?: string
+  detail?: string
+  remark?: string
+  approvalId?: Id
+  approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED' | string
+  approvalStatusLabel?: string
+  approvalTitle?: string
+  occurredAt?: string
+}
+
+export interface FinanceIssueCenterItem {
+  sourceModule: 'LEDGER' | 'RECONCILE' | 'AUTO_DEBIT' | 'PAYMENT_ADJUSTMENT' | string
+  sourceModuleLabel: string
+  issueType: string
+  issueTypeLabel: string
+  riskLevel: 'HIGH' | 'MEDIUM' | 'LOW' | string
+  riskLevelLabel: string
+  billId?: Id
+  paymentId?: Id
+  elderId?: Id
+  elderName?: string
+  amount: number
+  detail: string
+  suggestion?: string
+  actionPath?: string
+  actionLabel?: string
+  latestHandleStatus?: string
+  latestHandleStatusLabel?: string
+  latestHandleRemark?: string
+  latestOwnerName?: string
+  latestDueDate?: string
+  latestReviewResult?: string
+  latestHandleAt?: string
+  occurredAt?: string
+}
+
+export interface FinanceCollectionFollowUpItem {
+  elderId?: Id
+  elderName?: string
+  primaryBillId?: Id
+  oldestBillMonth?: string
+  latestBillMonth?: string
+  outstandingAmount: number
+  balance: number
+  overdueMonths: number
+  riskLevel: 'HIGH' | 'MEDIUM' | 'LOW' | string
+  riskLevelLabel: string
+  stage: 'URGENT' | 'FOLLOW_UP' | 'WATCH' | string
+  stageLabel: string
+  lastPaymentAt?: string
+  contractExpireDate?: string
+  followUpReason?: string
+  suggestion?: string
+  actionPath?: string
+  actionLabel?: string
+  latestHandleStatus?: string
+  latestHandleStatusLabel?: string
+  latestHandleRemark?: string
+  latestOwnerName?: string
+  latestContactName?: string
+  latestContactChannel?: string
+  latestContactResult?: string
+  promisedDate?: string
+  nextReminderAt?: string
+  latestHandleAt?: string
+}
+
+export interface FinanceHandleActionRequest {
+  sourceModule?: string
+  issueType?: string
+  billId?: Id
+  paymentId?: Id
+  elderId?: Id
+  status?: string
+  stage?: string
+  nextAction?: string
+  remark?: string
+  promisedDate?: string
+  ownerName?: string
+  dueDate?: string
+  reviewResult?: string
+  contactName?: string
+  contactChannel?: string
+  contactResult?: string
+  nextReminderAt?: string
+}
+
+export interface FinanceHandleLogItem {
+  id: Id
+  sourceModule?: string
+  sourceModuleLabel?: string
+  issueType?: string
+  issueTypeLabel?: string
+  status?: string
+  statusLabel?: string
+  stage?: string
+  stageLabel?: string
+  nextAction?: string
+  remark?: string
+  promisedDate?: string
+  ownerName?: string
+  dueDate?: string
+  reviewResult?: string
+  contactName?: string
+  contactChannel?: string
+  contactResult?: string
+  nextReminderAt?: string
+  billId?: Id
+  paymentId?: Id
+  elderId?: Id
+  actorName?: string
+  createTime?: string
+}
+
+export interface FinanceMonthCloseStep {
+  key: string
+  label: string
+  status: 'COMPLETED' | 'IN_PROGRESS' | 'BLOCKED' | string
+  statusLabel: string
+  count: number
+  detail: string
+  actionPath?: string
+  actionLabel?: string
+}
+
+export interface FinanceMonthCloseSummary {
+  month: string
+  completionRate: number
+  totalSteps: number
+  completedSteps: number
+  blockedSteps: number
+  warningSteps: number
+  billCount: number
+  settledBillCount: number
+  outstandingBillCount: number
+  paymentCount: number
+  adjustmentCount: number
+  unlinkedInvoiceCount: number
+  issueCount: number
+  closeStatus?: string
+  closeStatusLabel?: string
+  closeRemark?: string
+  closedBy?: string
+  closedAt?: string
+  locked?: boolean
+  lockStatusLabel?: string
+  unlockedBy?: string
+  unlockedAt?: string
+  unlockReason?: string
+  canClose?: boolean
+  notes: string[]
+  steps: FinanceMonthCloseStep[]
+}
+
+export interface FinanceMonthCloseExecuteRequest {
+  month?: string
+  forceClose?: boolean
+  remark?: string
+}
+
+export interface FinanceMonthLockStatus {
+  month: string
+  locked: boolean
+  closeStatus?: string
+  closeStatusLabel?: string
+  lockedBy?: string
+  lockedAt?: string
+  unlockedBy?: string
+  unlockedAt?: string
+  unlockReason?: string
+}
+
+export interface FinanceMonthUnlockRequest {
+  month?: string
+  reason?: string
+  remark?: string
+}
+
+export interface FinanceCrossPeriodApprovalRequest {
+  month?: string
+  actionType?: string
+  billId?: Id
+  paymentId?: Id
+  elderId?: Id
+  reason?: string
+  remark?: string
+}
+
+export interface FinanceCrossPeriodApprovalResponse {
+  month?: string
+  approvalId?: Id
+  approvalStatus?: string
+  approvalStatusLabel?: string
+  approvalTitle?: string
+  message?: string
+}
+
+export interface FinanceMonthCloseExecuteResponse {
+  success: boolean
+  status: string
+  statusLabel: string
+  message: string
+  month: string
+  actorName?: string
+  occurredAt?: string
+}
+
+export interface FinancePaymentAdjustmentApprovalRequest {
+  type: string
+  billId?: Id
+  paymentId?: Id
+  elderId?: Id
+  elderName?: string
+  amount: number
+  reason?: string
+  remark?: string
+}
+
+export interface FinanceSearchRow {
+  type: string
+  id: Id
+  title: string
+  subtitle?: string
+  extra?: string
+  actionPath?: string
+  time?: string
+}
+
+export interface FinanceSearchResponse {
+  keyword: string
+  elders: FinanceSearchRow[]
+  bills: FinanceSearchRow[]
+  payments: FinanceSearchRow[]
+  contracts: FinanceSearchRow[]
 }
 
 export interface FinanceAutoDebitExceptionItem {

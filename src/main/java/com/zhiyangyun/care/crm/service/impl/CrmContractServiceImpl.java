@@ -40,7 +40,13 @@ public class CrmContractServiceImpl implements CrmContractService {
   private static final String FLOW_PENDING_BED_SELECT = "PENDING_BED_SELECT";
   private static final String FLOW_PENDING_SIGN = "PENDING_SIGN";
   private static final String FLOW_SIGNED = "SIGNED";
+  private static final String CHANGE_NONE = "NONE";
+  private static final String CHANGE_IN_PROGRESS = "IN_PROGRESS";
+  private static final String CHANGE_PENDING_APPROVAL = "PENDING_APPROVAL";
+  private static final String CHANGE_APPROVED = "APPROVED";
+  private static final String CHANGE_REJECTED = "REJECTED";
   private static final Map<String, Set<String>> STATUS_TRANSITION_RULES = buildStatusTransitionRules();
+  private static final Map<String, Set<String>> CHANGE_WORKFLOW_RULES = buildChangeWorkflowRules();
 
   private final CrmContractMapper contractMapper;
   private final CrmLeadMapper leadMapper;
@@ -80,6 +86,9 @@ public class CrmContractServiceImpl implements CrmContractService {
       if (contract.getContractStatus() == null || contract.getContractStatus().isBlank()) {
         contract.setContractStatus(resolveContractStatus(contract.getFlowStage(), contract.getStatus()));
       }
+      if (blankToNull(contract.getChangeWorkflowStatus()) == null) {
+        contract.setChangeWorkflowStatus(CHANGE_NONE);
+      }
       contract.setCreatedBy(staffId);
       try {
         contractMapper.insert(contract);
@@ -104,6 +113,7 @@ public class CrmContractServiceImpl implements CrmContractService {
     CrmContract before = cloneContract(existing);
     String previousNo = existing.getContractNo();
     applyRequest(existing, request, existing);
+    preserveManagedWorkflowFields(existing, before, request);
     existing.setContractNo(resolveContractNo(tenantId, request == null ? null : request.getContractNo(), existing));
     if (existing.getCurrentOwnerDept() == null) {
       existing.setCurrentOwnerDept(resolveOwnerDept(existing.getFlowStage()));
@@ -113,6 +123,9 @@ public class CrmContractServiceImpl implements CrmContractService {
     }
     if (existing.getContractStatus() == null || existing.getContractStatus().isBlank()) {
       existing.setContractStatus(resolveContractStatus(existing.getFlowStage(), existing.getStatus()));
+    }
+    if (blankToNull(existing.getChangeWorkflowStatus()) == null) {
+      existing.setChangeWorkflowStatus(CHANGE_NONE);
     }
     validateStatusTransition(before, existing);
     contractMapper.updateById(existing);
@@ -143,6 +156,7 @@ public class CrmContractServiceImpl implements CrmContractService {
       String flowStage,
       String contractStatus,
       String status,
+      String changeWorkflowStatus,
       Boolean overdueOnly,
       Boolean sortByOverdue,
       String currentOwnerDept) {
@@ -172,6 +186,9 @@ public class CrmContractServiceImpl implements CrmContractService {
     }
     if (status != null && !status.isBlank()) {
       wrapper.eq(CrmContract::getStatus, status.trim());
+    }
+    if (changeWorkflowStatus != null && !changeWorkflowStatus.isBlank()) {
+      wrapper.eq(CrmContract::getChangeWorkflowStatus, changeWorkflowStatus.trim());
     }
     if (currentOwnerDept != null && !currentOwnerDept.isBlank()) {
       wrapper.eq(CrmContract::getCurrentOwnerDept, currentOwnerDept.trim());
@@ -261,6 +278,42 @@ public class CrmContractServiceImpl implements CrmContractService {
     return toResponse(contract);
   }
 
+  @Override
+  @Transactional
+  public CrmContractResponse moveToBedSelect(Long tenantId, Long id) {
+    return updateManagedFlowStage(tenantId, id, FLOW_PENDING_BED_SELECT, "MARKETING", "待办理入住", "PENDING_APPROVAL");
+  }
+
+  @Override
+  @Transactional
+  public CrmContractResponse moveToPendingSign(Long tenantId, Long id) {
+    return updateManagedFlowStage(tenantId, id, FLOW_PENDING_SIGN, "MARKETING", "待签署", "APPROVED");
+  }
+
+  @Override
+  @Transactional
+  public CrmContractResponse startChange(Long tenantId, Long id, String remark) {
+    return updateChangeWorkflow(tenantId, id, CHANGE_IN_PROGRESS, remark, false);
+  }
+
+  @Override
+  @Transactional
+  public CrmContractResponse submitChange(Long tenantId, Long id, String remark) {
+    return updateChangeWorkflow(tenantId, id, CHANGE_PENDING_APPROVAL, remark, false);
+  }
+
+  @Override
+  @Transactional
+  public CrmContractResponse approveChange(Long tenantId, Long id, String remark) {
+    return updateChangeWorkflow(tenantId, id, CHANGE_APPROVED, remark, false);
+  }
+
+  @Override
+  @Transactional
+  public CrmContractResponse rejectChange(Long tenantId, Long id, String remark) {
+    return updateChangeWorkflow(tenantId, id, CHANGE_REJECTED, remark, false);
+  }
+
   private void archiveAdmissionAssessmentsAfterSign(CrmContract contract) {
     if (contract == null || contract.getTenantId() == null) {
       return;
@@ -293,6 +346,62 @@ public class CrmContractServiceImpl implements CrmContractService {
       record.setStatus("ARCHIVED");
       assessmentRecordMapper.updateById(record);
     }
+  }
+
+  private CrmContractResponse updateManagedFlowStage(
+      Long tenantId,
+      Long id,
+      String flowStage,
+      String ownerDept,
+      String contractStatus,
+      String status) {
+    CrmContract contract = contractMapper.selectById(id);
+    if (!isOwnedContract(contract, tenantId)) {
+      return null;
+    }
+    if ("VOID".equals(normalizeDomainStatus(contract.getStatus()))) {
+      throw new IllegalStateException("作废合同不允许继续推进流程");
+    }
+    if ("SIGNED".equals(normalizeDomainStatus(contract.getStatus())) || "EFFECTIVE".equals(normalizeDomainStatus(contract.getStatus()))) {
+      throw new IllegalStateException("已签署合同不允许回退到办理流程");
+    }
+    CrmContract before = cloneContract(contract);
+    contract.setFlowStage(flowStage);
+    contract.setCurrentOwnerDept(ownerDept);
+    contract.setContractStatus(contractStatus);
+    contract.setStatus(status);
+    validateStatusTransition(before, contract);
+    contractMapper.updateById(contract);
+    syncLeadProjection(contract, false);
+    return toResponse(contract);
+  }
+
+  private CrmContractResponse updateChangeWorkflow(
+      Long tenantId,
+      Long id,
+      String changeWorkflowStatus,
+      String remark,
+      boolean syncLead) {
+    CrmContract contract = contractMapper.selectById(id);
+    if (!isOwnedContract(contract, tenantId)) {
+      return null;
+    }
+    if ("VOID".equals(normalizeDomainStatus(contract.getStatus()))) {
+      throw new IllegalStateException("作废合同不允许发起变更");
+    }
+    String normalizedChangeStatus = normalizeChangeWorkflowStatus(changeWorkflowStatus);
+    if (normalizedChangeStatus != null) {
+      validateChangeWorkflowTransition(contract.getChangeWorkflowStatus(), normalizedChangeStatus);
+      contract.setChangeWorkflowStatus(normalizedChangeStatus);
+    }
+    if (remark != null && !remark.isBlank()) {
+      contract.setChangeWorkflowRemark(remark.trim());
+    }
+    contractMapper.updateById(contract);
+    if (syncLead) {
+      syncLeadProjection(contract, false);
+    }
+    return toResponse(contract);
   }
 
   @Override
@@ -349,6 +458,7 @@ public class CrmContractServiceImpl implements CrmContractService {
     CrmContract before = cloneContract(contract);
     contract.setStatus("VOID");
     contract.setContractStatus("作废");
+    contract.setChangeWorkflowStatus(CHANGE_NONE);
     if (remark != null && !remark.isBlank()) {
       contract.setRemark(remark.trim());
     }
@@ -454,12 +564,51 @@ public class CrmContractServiceImpl implements CrmContractService {
     String normalizedPolicy = normalizePolicySelection(request.getOrgName());
     target.setOrgName(firstNonBlank(blankToNull(normalizedPolicy), current == null ? null : current.getOrgName()));
     target.setStatus(firstNonBlank(blankToNull(request.getStatus()), current == null ? null : current.getStatus()));
+    target.setChangeWorkflowStatus(firstNonBlank(
+        normalizeChangeWorkflowStatus(request.getChangeWorkflowStatus()),
+        current == null ? null : current.getChangeWorkflowStatus()));
+    target.setChangeWorkflowRemark(firstNonBlank(
+        blankToNull(request.getChangeWorkflowRemark()),
+        current == null ? null : current.getChangeWorkflowRemark()));
     target.setRemark(firstNonBlank(blankToNull(request.getRemark()), current == null ? null : current.getRemark()));
     if (request.getSmsSendCount() != null) {
       target.setSmsSendCount(Math.max(0, request.getSmsSendCount()));
     } else if (current == null || current.getSmsSendCount() == null) {
       target.setSmsSendCount(0);
     }
+  }
+
+  private void preserveManagedWorkflowFields(CrmContract target, CrmContract before, CrmContractRequest request) {
+    if (target == null || before == null || request == null) {
+      return;
+    }
+    if (isWorkflowFieldMutation(request.getStatus(), before.getStatus())) {
+      target.setStatus(before.getStatus());
+    }
+    if (isWorkflowFieldMutation(request.getFlowStage(), before.getFlowStage())) {
+      target.setFlowStage(before.getFlowStage());
+    }
+    if (isWorkflowFieldMutation(request.getCurrentOwnerDept(), before.getCurrentOwnerDept())) {
+      target.setCurrentOwnerDept(before.getCurrentOwnerDept());
+    }
+    if (isWorkflowFieldMutation(request.getContractStatus(), before.getContractStatus())) {
+      target.setContractStatus(before.getContractStatus());
+    }
+    if (isWorkflowFieldMutation(normalizeChangeWorkflowStatus(request.getChangeWorkflowStatus()), before.getChangeWorkflowStatus())) {
+      target.setChangeWorkflowStatus(before.getChangeWorkflowStatus());
+    }
+  }
+
+  private boolean isWorkflowFieldMutation(String requested, String current) {
+    String requestedValue = blankToNull(requested);
+    if (requestedValue == null) {
+      return false;
+    }
+    String currentValue = blankToNull(current);
+    if (currentValue == null) {
+      return true;
+    }
+    return !currentValue.equalsIgnoreCase(requestedValue);
   }
 
   private void syncLeadProjection(CrmContract contract, boolean createWhenMissing) {
@@ -656,6 +805,16 @@ public class CrmContractServiceImpl implements CrmContractService {
     return rules;
   }
 
+  private static Map<String, Set<String>> buildChangeWorkflowRules() {
+    Map<String, Set<String>> rules = new HashMap<>();
+    rules.put(CHANGE_NONE, Set.of(CHANGE_NONE, CHANGE_IN_PROGRESS));
+    rules.put(CHANGE_IN_PROGRESS, Set.of(CHANGE_IN_PROGRESS, CHANGE_PENDING_APPROVAL));
+    rules.put(CHANGE_PENDING_APPROVAL, Set.of(CHANGE_PENDING_APPROVAL, CHANGE_APPROVED, CHANGE_REJECTED));
+    rules.put(CHANGE_REJECTED, Set.of(CHANGE_REJECTED, CHANGE_IN_PROGRESS));
+    rules.put(CHANGE_APPROVED, Set.of(CHANGE_APPROVED, CHANGE_IN_PROGRESS));
+    return rules;
+  }
+
   private void validateStatusTransition(CrmContract before, CrmContract after) {
     if (after == null) {
       return;
@@ -679,6 +838,33 @@ public class CrmContractServiceImpl implements CrmContractService {
     return value == null ? null : value.toUpperCase(Locale.ROOT);
   }
 
+  private String normalizeChangeWorkflowStatus(String status) {
+    String value = blankToNull(status);
+    if (value == null) {
+      return null;
+    }
+    String normalized = value.toUpperCase(Locale.ROOT);
+    return switch (normalized) {
+      case CHANGE_NONE, CHANGE_IN_PROGRESS, CHANGE_PENDING_APPROVAL, CHANGE_APPROVED, CHANGE_REJECTED -> normalized;
+      default -> null;
+    };
+  }
+
+  private void validateChangeWorkflowTransition(String currentStatus, String nextStatus) {
+    String from = normalizeChangeWorkflowStatus(currentStatus);
+    if (from == null) {
+      from = CHANGE_NONE;
+    }
+    String to = normalizeChangeWorkflowStatus(nextStatus);
+    if (to == null) {
+      return;
+    }
+    Set<String> allowed = CHANGE_WORKFLOW_RULES.get(from);
+    if (allowed != null && !allowed.contains(to)) {
+      throw new IllegalStateException("合同变更状态不允许从 " + from + " 变更为 " + to);
+    }
+  }
+
   private CrmContract cloneContract(CrmContract source) {
     if (source == null) {
       return null;
@@ -686,12 +872,19 @@ public class CrmContractServiceImpl implements CrmContractService {
     CrmContract target = new CrmContract();
     target.setId(source.getId());
     target.setStatus(source.getStatus());
+    target.setChangeWorkflowStatus(source.getChangeWorkflowStatus());
+    target.setChangeWorkflowRemark(source.getChangeWorkflowRemark());
     target.setFlowStage(source.getFlowStage());
+    target.setCurrentOwnerDept(source.getCurrentOwnerDept());
+    target.setContractStatus(source.getContractStatus());
     target.setSignedAt(source.getSignedAt());
     return target;
   }
 
   private String resolveContractStatus(String flowStage, String status) {
+    if ("VOID".equals(status)) {
+      return "作废";
+    }
     if ("SIGNED".equals(status) || FLOW_SIGNED.equals(flowStage)) {
       return "已审批,已通过";
     }
@@ -743,6 +936,8 @@ public class CrmContractServiceImpl implements CrmContractService {
     response.setCurrentOwnerDept(contract.getCurrentOwnerDept());
     response.setOrgName(contract.getOrgName());
     response.setStatus(contract.getStatus());
+    response.setChangeWorkflowStatus(contract.getChangeWorkflowStatus());
+    response.setChangeWorkflowRemark(contract.getChangeWorkflowRemark());
     response.setSmsSendCount(contract.getSmsSendCount());
     response.setRemark(contract.getRemark());
     response.setCreateTime(contract.getCreateTime());

@@ -1360,7 +1360,9 @@ const summary = reactive<OaPortalSummary>({
   workflowTodos: [],
   marketingChannels: [],
   collaborationGantt: [],
-  latestSuggestions: []
+  latestSuggestions: [],
+  pendingMedicalOrderCount: 0,
+  elderContractExpiringCount: 0
 })
 const myTodoSummary = reactive({
   pendingApprovalCount: 0,
@@ -1745,11 +1747,11 @@ const riskReminders = computed(() => {
   const elderAbnormal = Number(summary.elderAbnormalCount || 0) + Number(summary.healthAbnormalCount || 0)
   const arrearsCount = Number(financeOverview.value?.risk?.overdueElderCount || 0)
   const inventoryCount = Number(summary.inventoryLowStockCount || 0)
-  const orderPendingCount = Number(dashboard.value.abnormalTasksToday || 0)
+  const orderPendingCount = Number(summary.pendingMedicalOrderCount || 0)
   const approvalTimeoutCount = Number(summary.approvalTimeoutCount || 0)
   const bedOccupancyRate = Number(dashboard.value.bedOccupancyRate || 0)
   const revenueGrowthRate = Number(dashboard.value.revenueGrowthRate || 0)
-  const contractExpiringCount = Number(hrSummary.value?.contractExpiringCount || summary.contractPendingCount || 0)
+  const contractExpiringCount = Number(summary.elderContractExpiringCount || 0)
   const supervisorAnomalyCount = Number(summary.supervisorAnomalyCount || 0)
   const birthdayReminderCount = birthdayRows.value
     .filter((item) => Number(item.daysUntil || 9999) >= 0 && Number(item.daysUntil || 9999) <= 7).length
@@ -1796,7 +1798,7 @@ const riskReminders = computed(() => {
     { title: '审批超时', count: approvalTimeoutCount, route: '/oa/approval', level: approvalTimeoutCount > 0 ? '紧急' : '普通通知' },
     { title: '监管链异常', count: supervisorAnomalyCount, route: '/hr/profile/account-access?view=supervisor-anomalies', level: supervisorAnomalyCount > 0 ? '紧急' : '普通通知' },
     { title: '证书到期', count: certificateReminderCount.value, route: '/hr/development/certificate-reminders', level: certificateReminderCount.value > 0 ? '预警' : '普通通知' },
-    { title: '合同到期', count: contractExpiringCount, route: '/hr/profile/contract-reminders', level: contractExpiringCount > 0 ? '预警' : '普通通知' }
+    { title: '合同到期', count: contractExpiringCount, route: '/marketing/contracts/renewal', level: contractExpiringCount > 0 ? '预警' : '普通通知' }
   ]
 })
 const displayRiskReminders = computed(() => {
@@ -1937,7 +1939,7 @@ const operationOverview = computed(() => [
 
 const financeOverviewItems = computed(() => [
   { title: '今日收入', value: money(financeOverview.value?.cashier?.todayCollectedTotal || 0), route: '/finance/payments/register?date=today' },
-  { title: '本月收入', value: money(financeOverview.value?.revenueStructure?.monthRevenueTotal || dashboard.value.totalRevenue || 0), route: '/finance/reports/revenue-structure' },
+  { title: '本月收入', value: money(financeOverview.value?.revenueStructure?.monthRevenueTotal || 0), route: '/finance/reports/revenue-structure' },
   { title: '欠费人数', value: Number(financeOverview.value?.risk?.overdueElderCount || 0), route: '/finance/bills/in-resident?filter=overdue' },
   { title: '欠费金额', value: money(financeOverview.value?.risk?.overdueAmount || 0), route: '/finance/reports/overall?focus=arrears' }
 ])
@@ -1984,17 +1986,17 @@ const expenseSections = computed(() => {
     {
       title: '我的费用',
       rows: [
-        { label: '本月报销金额', value: money(monthExpenseCount), route: '/hr/expense/approval-flow' },
-        { label: '待报销金额', value: money(monthExpenseCount), route: '/hr/expense/records?scene=training-reimburse' },
-        { label: '待审批报销', value: `${myTodoSummary.pendingApprovalCount || 0} 条`, route: '/hr/expense/approval-flow' }
+        { label: '本月已通过报销', value: money(monthExpenseCount), route: '/hr/expense/approval-flow' },
+        { label: '报销申请入口', value: '发起申请', route: '/hr/expense/records?scene=training-reimburse' },
+        { label: '我的审批待办', value: `${myTodoSummary.pendingApprovalCount || 0} 条`, route: '/oa/approval?scope=PENDING_REVIEW' }
       ]
     },
     {
       title: '部门费用',
       rows: [
         { label: '本月部门费用', value: money(deptExpenseCount), route: '/hr/workbench' },
-        { label: '部门预算使用率', value: deptExpenseCount > 0 ? '80%' : '0%', route: '/hr/workbench' },
-        { label: '超预算提醒', value: deptExpenseCount > 0 ? '1 条' : '0 条', route: '/hr/workbench' }
+        { label: '待审报销单', value: `${summary.reimbursePendingCount || 0} 条`, route: '/oa/approval?type=REIMBURSE&status=PENDING' },
+        { label: '待审采购单', value: `${summary.purchasePendingCount || 0} 条`, route: '/oa/approval?type=PURCHASE&status=PENDING' }
       ]
     },
     {

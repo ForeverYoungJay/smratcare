@@ -22,6 +22,7 @@ public class ElderAdmission {
   private String contractNo;
   private BigDecimal depositAmount;
   private String remark;
+  private String sourceType;
   private Long createdBy;
   @TableField(value = "create_time", fill = FieldFill.INSERT)
   private LocalDateTime createTime;

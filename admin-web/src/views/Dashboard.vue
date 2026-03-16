@@ -18,7 +18,7 @@
         </a-col>
       </a-row>
 
-      <a-card class="card-elevated" :bordered="false" style="margin-top: 16px" title="统计分析统一口径（近6个月）">
+      <a-card class="card-elevated" :bordered="false" style="margin-top: 16px" :title="`统计分析统一口径（${activeWindowText}）`">
         <template #extra>
           <a-space size="small">
             <span class="hint-text">更新时间：{{ refreshedAt || '--' }}</span>
@@ -52,7 +52,7 @@
           </a-space>
         </div>
         <a-row :gutter="[16, 16]">
-          <a-col :xs="24" :sm="12" :lg="8" v-for="item in unifiedCards" :key="item.title">
+          <a-col :xs="24" :sm="12" :lg="8" v-for="item in visibleUnifiedCards" :key="item.title">
             <PermissionGuardCard
               size="small"
               :can-access="item.canAccess"
@@ -69,6 +69,36 @@
           </a-col>
         </a-row>
       </a-card>
+
+      <StatsWorkspacePanel
+        page-key="dashboard"
+        title="经营指挥区"
+        :summary-text="dashboardWorkspaceSummary"
+        :current-payload="dashboardWorkspacePayload"
+        :target-fields="dashboardTargetFields"
+        :data-health="dashboardDataHealth"
+        @apply-preset="onDashboardPresetApply"
+        @targets-change="onDashboardTargetsChange"
+      />
+
+      <StatsInsightDeck :items="dashboardInsightItems" />
+
+      <StatsCommandCenter
+        page-key="dashboard-command"
+        title="经营协同台"
+        share-title="运营看板协同包"
+        :summary-text="dashboardCommandSummary"
+        :current-payload="dashboardWorkspacePayload"
+        :metric-version="summary.metricVersion || metricCatalog.metricVersion || ''"
+        :action-items="dashboardActionItems"
+        :anomalies="dashboardAnomalies"
+        :metric-notes="dashboardMetricNotes"
+        :panel-options="dashboardPanelOptions"
+        :selected-panel-keys="dashboardMetricKeys"
+        @trigger-action="onDashboardCommandAction"
+        @panel-change="onDashboardPanelChange"
+        @apply-template="onDashboardTemplateApply"
+      />
 
       <a-row :gutter="16" style="margin-top: 16px">
         <a-col :xs="24" :lg="16">
@@ -241,6 +271,9 @@ import PermissionGuardCard from '../components/PermissionGuardCard.vue'
 import { resolveRouteAccess } from '../utils/routeAccess'
 import StatefulBlock from '../components/StatefulBlock.vue'
 import ThresholdPreviewList from '../components/ThresholdPreviewList.vue'
+import StatsWorkspacePanel from '../components/stats/StatsWorkspacePanel.vue'
+import StatsInsightDeck from '../components/stats/StatsInsightDeck.vue'
+import StatsCommandCenter from '../components/stats/StatsCommandCenter.vue'
 import { copyText } from '../utils/clipboard'
 import {
   clearThresholdSnapshot,
@@ -352,6 +385,13 @@ const thresholdPreviewRows = computed(() =>
     toThresholdSnapshot(thresholdConfig.value)
   )
 )
+const dashboardTargets = ref<Record<string, number>>({
+  totalRevenue: 0,
+  totalConsumption: 0,
+  bedOccupancyRate: 95,
+  checkInNetIncrease: 0
+})
+const dashboardMetricKeys = ref<string[]>([])
 
 async function loadSummary() {
   loading.value = true
@@ -601,6 +641,12 @@ const unifiedCards = computed(() => {
     return { ...item, ...access }
   })
 })
+const visibleUnifiedCards = computed(() => {
+  const selected = dashboardMetricKeys.value.length
+    ? new Set(dashboardMetricKeys.value)
+    : null
+  return unifiedCards.value.filter((item) => !selected || selected.has(item.metricKey))
+})
 
 const trendOption = computed(() => ({
   tooltip: { trigger: 'axis' },
@@ -706,6 +752,179 @@ const billOption = computed(() => ({
   ]
 }))
 
+const dashboardWorkspaceSummary = computed(() => {
+  return `围绕收入、消费、床位与入住净增长统一查看当前口径，并沉淀筛选方案与订阅节奏。当前窗口 ${activeWindowText.value}。`
+})
+
+const dashboardWorkspacePayload = computed(() => ({
+  window: route.query.window || '',
+  from: route.query.from || '',
+  to: route.query.to || '',
+  metricVersion: summary.value.metricVersion || metricCatalog.value.metricVersion || '',
+  abnormalTaskThreshold: thresholdConfig.value.abnormalTaskThreshold,
+  inventoryAlertThreshold: thresholdConfig.value.inventoryAlertThreshold,
+  bedOccupancyThreshold: thresholdConfig.value.bedOccupancyThreshold,
+  revenueDropThreshold: thresholdConfig.value.revenueDropThreshold,
+  totalRevenue: dashboardTargets.value.totalRevenue,
+  totalConsumption: dashboardTargets.value.totalConsumption,
+  bedOccupancyRate: dashboardTargets.value.bedOccupancyRate,
+  checkInNetIncrease: dashboardTargets.value.checkInNetIncrease
+}))
+
+const dashboardTargetFields = computed(() => ([
+  { key: 'totalRevenue', label: '总收入目标(元)', value: dashboardTargets.value.totalRevenue, min: 0, max: 999999999, step: 1000 },
+  { key: 'totalConsumption', label: '总消费目标(元)', value: dashboardTargets.value.totalConsumption, min: 0, max: 999999999, step: 1000 },
+  { key: 'bedOccupancyRate', label: '床位使用率上限(%)', value: dashboardTargets.value.bedOccupancyRate, min: 1, max: 100, step: 1 },
+  { key: 'checkInNetIncrease', label: '入住净增长目标', value: dashboardTargets.value.checkInNetIncrease, min: -9999, max: 9999, step: 1 }
+]))
+
+const dashboardDataHealth = computed(() => ({
+  freshness: refreshedAt.value || '--',
+  completeness: summary.value.metricVersion ? '已对齐统一口径' : '基础模式',
+  issues: alerts.value.map((item) => `${item.title}：${item.desc}`)
+}))
+
+const dashboardInsightItems = computed(() => {
+  const revenueTarget = Number(dashboardTargets.value.totalRevenue || 0)
+  const consumptionTarget = Number(dashboardTargets.value.totalConsumption || 0)
+  const revenueGap = Number(summary.value.totalRevenue || 0) - revenueTarget
+  const consumptionGap = Number(summary.value.totalConsumption || 0) - consumptionTarget
+  const hasRevenueTarget = revenueTarget > 0
+  const hasConsumptionTarget = consumptionTarget > 0
+  const occupancyGap = Number(summary.value.bedOccupancyRate || 0) - Number(dashboardTargets.value.bedOccupancyRate || 0)
+  const checkInGap = Number(summary.value.checkInNetIncrease || 0) - Number(dashboardTargets.value.checkInNetIncrease || 0)
+  return [
+    {
+      key: 'revenue',
+      label: '总收入对比',
+      valueText: `${fmtAmount(summary.value.totalRevenue)} 元`,
+      trendText: hasRevenueTarget ? `目标差 ${fmtAmount(revenueGap)} 元` : '等待配置目标',
+      detail: `当前窗口 ${activeWindowText.value} · 平均月收入 ${fmtAmount(summary.value.averageMonthlyRevenue)} 元`,
+      tone: hasRevenueTarget && revenueGap < 0 ? 'warning' : 'good'
+    },
+    {
+      key: 'consumption',
+      label: '总消费对比',
+      valueText: `${fmtAmount(summary.value.totalConsumption)} 元`,
+      trendText: hasConsumptionTarget ? `目标差 ${fmtAmount(consumptionGap)} 元` : '等待配置目标',
+      detail: `当前窗口 ${activeWindowText.value} · 账单占比 ${fmtPercent(summary.value.billConsumptionRatio)}%`,
+      tone: hasConsumptionTarget && consumptionGap < 0 ? 'warning' : 'good'
+    },
+    {
+      key: 'occupancy',
+      label: '床位使用率监测',
+      valueText: `${fmtPercent(summary.value.bedOccupancyRate)}%`,
+      trendText: occupancyGap > 0 ? `超目标 ${fmtPercent(occupancyGap)}%` : `距上限 ${fmtPercent(Math.abs(occupancyGap))}%`,
+      detail: `空闲率 ${fmtPercent(summary.value.bedAvailableRate)}% · 维护异常请联动床位处置`,
+      tone: occupancyGap > 0 ? 'danger' : 'good'
+    },
+    {
+      key: 'checkin',
+      label: '入住净增长目标',
+      valueText: `${summary.value.checkInNetIncrease || 0}`,
+      trendText: `目标差 ${checkInGap >= 0 ? '+' : ''}${checkInGap}`,
+      detail: `入住 ${summary.value.totalAdmissions || 0} / 离院 ${summary.value.totalDischarges || 0}`,
+      tone: checkInGap < 0 ? 'warning' : 'good'
+    }
+  ]
+})
+const dashboardCommandSummary = computed(() => {
+  return '把异常处置、协作分享、自定义指标和纠错入口集中在同一个操作台，减少在看板与统计页之间来回切换。'
+})
+const dashboardActionItems = computed(() => {
+  const rows = alertActions.value.map((item) => ({
+    key: item.title,
+    label: `处置${item.title}`,
+    description: `直达 ${item.route}`,
+    route: item.route,
+    tone: 'danger' as const
+  }))
+  rows.push(
+    {
+      key: 'share-dashboard',
+      label: '分享看板',
+      description: '复制当前口径和筛选说明',
+      route: '/dashboard',
+      tone: 'warning' as const
+    },
+    {
+      key: 'open-revenue',
+      label: '查看收入明细',
+      description: '联动月收入统计与机构经营页',
+      route: '/stats/monthly-revenue',
+      tone: 'neutral' as const
+    }
+  )
+  return rows
+})
+const dashboardAnomalies = computed(() =>
+  alerts.value.map((item, index) => ({
+    key: `alert-${index}`,
+    label: item.title,
+    detail: item.desc,
+    tone: item.level === '高' ? 'danger' : 'warning'
+  }))
+)
+const dashboardMetricNotes = computed(() => [
+  { key: 'consumption', label: '总消费', note: '总消费=账单消费+商城消费，分享时会附带当前时间窗口。' },
+  { key: 'revenue', label: '总收入', note: '总收入按账单总额统计，跟月运营收入页保持同口径。' },
+  { key: 'bed', label: '床位使用率', note: '当前已使用床位 / 总床位，维护床位不计入已使用。' },
+  { key: 'checkin', label: '入住净增长', note: '净增长=入住人数-离院人数，支持继续钻取到入住统计页。' }
+])
+const dashboardPanelOptions = computed(() =>
+  unifiedCards.value.map((item) => ({
+    key: item.metricKey,
+    label: item.title,
+    description: item.desc
+  }))
+)
+
+function onDashboardTargetsChange(payload: Record<string, number>) {
+  dashboardTargets.value = {
+    ...dashboardTargets.value,
+    ...(payload || {})
+  }
+}
+
+function onDashboardPresetApply(payload: Record<string, any>) {
+  thresholdConfig.value = mergeThresholdConfig(thresholdConfig.value, {
+    abnormalTaskThreshold: payload.abnormalTaskThreshold,
+    inventoryAlertThreshold: payload.inventoryAlertThreshold,
+    bedOccupancyThreshold: payload.bedOccupancyThreshold,
+    revenueDropThreshold: payload.revenueDropThreshold
+  })
+  dashboardTargets.value = {
+    ...dashboardTargets.value,
+    totalRevenue: normalizeTargetValue(payload.totalRevenue, dashboardTargets.value.totalRevenue ?? 0),
+    totalConsumption: normalizeTargetValue(payload.totalConsumption, dashboardTargets.value.totalConsumption ?? 0),
+    bedOccupancyRate: normalizeTargetValue(payload.bedOccupancyRate, dashboardTargets.value.bedOccupancyRate ?? 95),
+    checkInNetIncrease: normalizeTargetValue(payload.checkInNetIncrease, dashboardTargets.value.checkInNetIncrease ?? 0)
+  }
+  patchRouteQuery({
+    window: String(payload.window || '').trim() || undefined,
+    from: String(payload.from || '').trim() || undefined,
+    to: String(payload.to || '').trim() || undefined
+  })
+}
+
+function onDashboardPanelChange(keys: string[]) {
+  dashboardMetricKeys.value = keys.length ? [...keys] : unifiedCards.value.map((item) => item.metricKey)
+}
+
+function onDashboardCommandAction(item: { key: string; route?: string }) {
+  if (item.key === 'share-dashboard') {
+    copyDashboardShareLink()
+    return
+  }
+  if (item.route) {
+    go(item.route)
+  }
+}
+
+function onDashboardTemplateApply(payload: { payload: Record<string, any> }) {
+  onDashboardPresetApply(payload.payload || {})
+}
+
 function go(path: string) {
   router.push(path)
 }
@@ -765,6 +984,11 @@ function fmtAmount(value?: number) {
 
 function fmtPercent(value?: number) {
   return Number(value || 0).toFixed(2)
+}
+
+function normalizeTargetValue(value: unknown, fallback: number) {
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : fallback
 }
 
 watch(

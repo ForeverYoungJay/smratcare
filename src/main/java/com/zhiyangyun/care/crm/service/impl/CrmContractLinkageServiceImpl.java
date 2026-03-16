@@ -124,6 +124,7 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
         response.setContractExpiryDate(lead.getContractExpiryDate());
       }
     }
+    applyHistoricalSignedFallback(response, admission);
 
     fillBillingSummary(response, elderId, tenantId);
     fillAttachments(response, tenantId, contract == null ? null : contract.getId(), lead == null ? null : lead.getId(), response.getContractNo());
@@ -173,6 +174,7 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
       response.setDepositAmount(admission.getDepositAmount());
       response.setContractNo(firstNonBlank(response.getContractNo(), admission.getContractNo()));
     }
+    applyHistoricalSignedFallback(response, admission);
 
     fillAttachments(response, tenantId, contract == null ? null : contract.getId(), leadId, response.getContractNo());
     fillArchiveCompleteness(response, tenantId);
@@ -285,6 +287,23 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
         .orderByDesc(ElderAdmission::getAdmissionDate)
         .orderByDesc(ElderAdmission::getCreateTime)
         .last("LIMIT 1"));
+  }
+
+  private void applyHistoricalSignedFallback(CrmContractLinkageResponse response, ElderAdmission admission) {
+    if (response == null || admission == null) {
+      return;
+    }
+    String contractNo = firstNonBlank(response.getContractNo(), admission.getContractNo());
+    if (contractNo == null || contractNo.isBlank()) {
+      return;
+    }
+    response.setContractNo(contractNo);
+    if (response.getContractStatus() == null || response.getContractStatus().isBlank()) {
+      response.setContractStatus("SIGNED");
+    }
+    if (response.getFlowStage() == null || response.getFlowStage().isBlank()) {
+      response.setFlowStage("SIGNED");
+    }
   }
 
   private CrmContract loadLinkedContract(Long tenantId, ElderProfile elder, String contractNo, Long leadId) {

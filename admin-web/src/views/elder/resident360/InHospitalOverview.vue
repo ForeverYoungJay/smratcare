@@ -50,6 +50,9 @@
         <div class="linkage-title">协同联动</div>
         <div class="linkage-sub-title">
           {{ selectedResidentName ? `已选择：${selectedResidentName}` : '未选择长者，默认展示在院首位长者' }}
+          <a-tag v-if="selectedResidentSourceLabel" :color="selectedResidentSourceColor" style="margin-left: 8px">
+            {{ selectedResidentSourceLabel }}
+          </a-tag>
         </div>
       </div>
       <a-space wrap>
@@ -111,13 +114,14 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
 import LifecycleStageBar from '../../../components/LifecycleStageBar.vue'
+import { getElderDetail } from '../../../api/elder'
 import { getResidentOverview } from '../../../api/medicalCare'
-import { getContractLinkageByElder, getContractPage } from '../../../api/marketing'
+import { getContractLinkageByElder } from '../../../api/marketing'
 import { useElderOptions } from '../../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
 import { copyText } from '../../../utils/clipboard'
 import { lifecycleStageHint, normalizeLifecycleStage } from '../../../utils/lifecycleStage'
-import type { ContractLinkageSummary, CrmContractItem, MedicalResidentOverview, PageResult } from '../../../types'
+import type { ContractLinkageSummary, ElderItem, MedicalResidentOverview } from '../../../types'
 
 const router = useRouter()
 const route = useRoute()
@@ -126,6 +130,7 @@ const loading = ref(false)
 const errorMessage = ref('')
 const overview = ref<MedicalResidentOverview>()
 const contractLinkage = ref<ContractLinkageSummary>()
+const residentProfile = ref<ElderItem | null>(null)
 const expandedCardKeys = ref<string[]>([])
 const showWarningOnly = ref(false)
 const autoRefresh = ref(true)
@@ -135,10 +140,8 @@ const { elderOptions: residentOptionPool, elderLoading: residentLoading, searchE
   pageSize: 200,
   preloadSize: 600,
   inHospitalOnly: true,
-  signedOnly: true
+  signedOnly: false
 })
-const signedResidentIdSet = ref<Set<string>>(new Set())
-const signedResidentSetReady = ref(false)
 const residentOptions = computed(() => {
   const map = new Map<string, { label: string; value: string }>()
   residentOptionPool.value.forEach((item) => {
@@ -164,9 +167,6 @@ const residentOptions = computed(() => {
     }
   })
   let options = Array.from(map.values())
-  if (signedResidentSetReady.value) {
-    options = options.filter((item) => signedResidentIdSet.value.has(String(item.value || '').trim()))
-  }
   const codedNameSet = new Set<string>()
   options.forEach((option) => {
     const nameKey = String(option.label || '').replace(/\s*\([^)]*\)\s*$/, '').trim()
@@ -190,6 +190,17 @@ const selectedResidentName = computed(() => {
   const option = selectedResidentOption.value
   if (!option) return ''
   return String(option.label || '').replace(/\s*\([^)]*\)\s*$/, '').trim()
+})
+const selectedResidentSourceLabel = computed(() => {
+  const sourceType = String(residentProfile.value?.sourceType || '').trim()
+  if (sourceType === 'HISTORICAL_IMPORT') return '历史补录'
+  if (sourceType === 'MARKETING_CONTRACT') return '合同流程'
+  return ''
+})
+const selectedResidentSourceColor = computed(() => {
+  if (selectedResidentSourceLabel.value === '历史补录') return 'gold'
+  if (selectedResidentSourceLabel.value === '合同流程') return 'blue'
+  return 'default'
 })
 const lifecycleContext = computed(() => {
   const source = String(route.query.source || '').trim().toLowerCase()
@@ -408,33 +419,7 @@ async function resolveResidentId() {
 }
 
 async function searchResidentOptions(keyword = '') {
-  await Promise.all([searchElders(keyword), loadSignedResidentSet()])
-}
-
-async function loadSignedResidentSet() {
-  try {
-    const idSet = new Set<string>()
-    let pageNo = 1
-    let total = 0
-    do {
-      const page: PageResult<CrmContractItem> = await getContractPage({
-        pageNo,
-        pageSize: 200,
-        flowStage: 'SIGNED'
-      })
-      const list = page.list || []
-      list.forEach((item) => {
-        const elderId = String(item.elderId || '').trim()
-        if (elderId) idSet.add(elderId)
-      })
-      total = Number(page.total || 0)
-      pageNo += 1
-      if (pageNo > 20) break
-    } while ((pageNo - 1) * 200 < total)
-    signedResidentIdSet.value = idSet
-  } finally {
-    signedResidentSetReady.value = true
-  }
+  await searchElders(keyword)
 }
 
 function syncResidentToRoute() {
@@ -528,15 +513,18 @@ async function loadModules() {
     if (!residentId.value.trim()) {
       overview.value = undefined
       contractLinkage.value = undefined
+      residentProfile.value = null
       errorMessage.value = "暂无可用长者，请先创建长者档案"
       return
     }
-    const [overviewData, contractData] = await Promise.all([
+    const [overviewData, contractData, profileData] = await Promise.all([
       getResidentOverview(residentId.value),
-      safeContractLinkageByElder(residentId.value)
+      safeContractLinkageByElder(residentId.value),
+      safeElderDetail(residentId.value)
     ])
     overview.value = overviewData
     contractLinkage.value = contractData
+    residentProfile.value = profileData
     const generatedAt = String(overview.value?.generatedAt || '').trim()
     lastLoadedAt.value = generatedAt ? new Date(generatedAt).toLocaleString() : new Date().toLocaleString()
     expandedCardKeys.value = []
@@ -553,6 +541,14 @@ async function safeContractLinkageByElder(elderId: string) {
     return await getContractLinkageByElder(elderId)
   } catch {
     return undefined
+  }
+}
+
+async function safeElderDetail(elderId: string) {
+  try {
+    return await getElderDetail(elderId)
+  } catch {
+    return null
   }
 }
 

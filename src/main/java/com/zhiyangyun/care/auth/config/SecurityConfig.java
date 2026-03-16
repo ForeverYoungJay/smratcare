@@ -52,6 +52,19 @@ public class SecurityConfig {
             .requestMatchers("/api/family/payment/wechat/notify").permitAll()
             .requestMatchers("/ws/**").permitAll()
             .requestMatchers("/api/admin/**").authenticated()
+            .requestMatchers("/api/oa/**").hasAnyRole(
+                "STAFF",
+                "HR_EMPLOYEE", "HR_MINISTER",
+                "MEDICAL_EMPLOYEE", "MEDICAL_MINISTER",
+                "NURSING_EMPLOYEE", "NURSING_MINISTER",
+                "FINANCE_EMPLOYEE", "FINANCE_MINISTER",
+                "LOGISTICS_EMPLOYEE", "LOGISTICS_MINISTER",
+                "MARKETING_EMPLOYEE", "MARKETING_MINISTER",
+                "DIRECTOR", "SYS_ADMIN", "ADMIN")
+            .requestMatchers("/api/fire/**").hasAnyRole(
+                "GUARD",
+                "LOGISTICS_EMPLOYEE", "LOGISTICS_MINISTER",
+                "DIRECTOR", "SYS_ADMIN", "ADMIN")
             .requestMatchers("/api/guard/**").hasAnyRole("GUARD", "ADMIN")
             .requestMatchers("/api/family/**").hasRole("FAMILY")
             .anyRequest().authenticated())

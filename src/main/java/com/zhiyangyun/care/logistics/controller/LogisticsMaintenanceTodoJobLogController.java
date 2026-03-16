@@ -55,7 +55,7 @@ public class LogisticsMaintenanceTodoJobLogController {
     Long orgId = AuthContext.getOrgId();
     var wrapper = Wrappers.lambdaQuery(LogisticsMaintenanceTodoJobLog.class)
         .eq(LogisticsMaintenanceTodoJobLog::getIsDeleted, 0)
-        .and(orgId != null, w -> w.eq(LogisticsMaintenanceTodoJobLog::getOrgId, orgId).or().isNull(LogisticsMaintenanceTodoJobLog::getOrgId))
+        .eq(orgId != null, LogisticsMaintenanceTodoJobLog::getOrgId, orgId)
         .eq(triggerType != null && !triggerType.isBlank(), LogisticsMaintenanceTodoJobLog::getTriggerType, triggerType)
         .eq(status != null && !status.isBlank(), LogisticsMaintenanceTodoJobLog::getStatus, status)
         .orderByDesc(LogisticsMaintenanceTodoJobLog::getExecutedAt)
@@ -72,7 +72,7 @@ public class LogisticsMaintenanceTodoJobLogController {
     List<LogisticsMaintenanceTodoJobLog> recentLogs = jobLogMapper.selectList(
         Wrappers.lambdaQuery(LogisticsMaintenanceTodoJobLog.class)
             .eq(LogisticsMaintenanceTodoJobLog::getIsDeleted, 0)
-            .and(orgId != null, w -> w.eq(LogisticsMaintenanceTodoJobLog::getOrgId, orgId).or().isNull(LogisticsMaintenanceTodoJobLog::getOrgId))
+            .eq(orgId != null, LogisticsMaintenanceTodoJobLog::getOrgId, orgId)
             .ge(LogisticsMaintenanceTodoJobLog::getExecutedAt, now.minusDays(windowDays))
             .orderByDesc(LogisticsMaintenanceTodoJobLog::getExecutedAt)
             .orderByDesc(LogisticsMaintenanceTodoJobLog::getCreateTime));
@@ -121,7 +121,7 @@ public class LogisticsMaintenanceTodoJobLogController {
     Long orgId = AuthContext.getOrgId();
     var wrapper = Wrappers.lambdaQuery(LogisticsMaintenanceTodoJobLog.class)
         .eq(LogisticsMaintenanceTodoJobLog::getIsDeleted, 0)
-        .and(orgId != null, w -> w.eq(LogisticsMaintenanceTodoJobLog::getOrgId, orgId).or().isNull(LogisticsMaintenanceTodoJobLog::getOrgId))
+        .eq(orgId != null, LogisticsMaintenanceTodoJobLog::getOrgId, orgId)
         .eq(triggerType != null && !triggerType.isBlank(), LogisticsMaintenanceTodoJobLog::getTriggerType, triggerType)
         .eq(status != null && !status.isBlank(), LogisticsMaintenanceTodoJobLog::getStatus, status)
         .orderByDesc(LogisticsMaintenanceTodoJobLog::getExecutedAt)
@@ -151,14 +151,14 @@ public class LogisticsMaintenanceTodoJobLogController {
     return jobLogMapper.selectOne(Wrappers.lambdaQuery(LogisticsMaintenanceTodoJobLog.class)
         .eq(LogisticsMaintenanceTodoJobLog::getId, id)
         .eq(LogisticsMaintenanceTodoJobLog::getIsDeleted, 0)
-        .and(orgId != null, w -> w.eq(LogisticsMaintenanceTodoJobLog::getOrgId, orgId).or().isNull(LogisticsMaintenanceTodoJobLog::getOrgId))
+        .eq(orgId != null, LogisticsMaintenanceTodoJobLog::getOrgId, orgId)
         .last("LIMIT 1"));
   }
 
   private LogisticsMaintenanceTodoJobLog findLatestLog(Long orgId) {
     return jobLogMapper.selectOne(Wrappers.lambdaQuery(LogisticsMaintenanceTodoJobLog.class)
         .eq(LogisticsMaintenanceTodoJobLog::getIsDeleted, 0)
-        .and(orgId != null, w -> w.eq(LogisticsMaintenanceTodoJobLog::getOrgId, orgId).or().isNull(LogisticsMaintenanceTodoJobLog::getOrgId))
+        .eq(orgId != null, LogisticsMaintenanceTodoJobLog::getOrgId, orgId)
         .orderByDesc(LogisticsMaintenanceTodoJobLog::getExecutedAt)
         .orderByDesc(LogisticsMaintenanceTodoJobLog::getCreateTime)
         .last("LIMIT 1"));
@@ -167,7 +167,7 @@ public class LogisticsMaintenanceTodoJobLogController {
   private LogisticsMaintenanceTodoJobLog findLatestFailedLog(Long orgId) {
     return jobLogMapper.selectOne(Wrappers.lambdaQuery(LogisticsMaintenanceTodoJobLog.class)
         .eq(LogisticsMaintenanceTodoJobLog::getIsDeleted, 0)
-        .and(orgId != null, w -> w.eq(LogisticsMaintenanceTodoJobLog::getOrgId, orgId).or().isNull(LogisticsMaintenanceTodoJobLog::getOrgId))
+        .eq(orgId != null, LogisticsMaintenanceTodoJobLog::getOrgId, orgId)
         .eq(LogisticsMaintenanceTodoJobLog::getStatus, "FAILED")
         .orderByDesc(LogisticsMaintenanceTodoJobLog::getExecutedAt)
         .orderByDesc(LogisticsMaintenanceTodoJobLog::getCreateTime)
@@ -195,7 +195,7 @@ public class LogisticsMaintenanceTodoJobLogController {
     LogisticsMaintenanceTodoJobLog latestRetryLog = jobLogMapper.selectOne(
         Wrappers.lambdaQuery(LogisticsMaintenanceTodoJobLog.class)
             .eq(LogisticsMaintenanceTodoJobLog::getIsDeleted, 0)
-            .and(targetOrgId != null, w -> w.eq(LogisticsMaintenanceTodoJobLog::getOrgId, targetOrgId).or().isNull(LogisticsMaintenanceTodoJobLog::getOrgId))
+            .eq(targetOrgId != null, LogisticsMaintenanceTodoJobLog::getOrgId, targetOrgId)
             .eq(LogisticsMaintenanceTodoJobLog::getTriggerType, "RETRY")
             .orderByDesc(LogisticsMaintenanceTodoJobLog::getExecutedAt)
             .orderByDesc(LogisticsMaintenanceTodoJobLog::getCreateTime)

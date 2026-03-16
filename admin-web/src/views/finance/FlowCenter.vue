@@ -51,7 +51,13 @@
           <vxe-column title="操作" width="180" fixed="right">
             <template #default="{ row }">
               <a-space>
-                <a-button v-if="row.elderId" type="link" @click="go(`/finance/flows/consumption?elderId=${row.elderId}`)">消费明细</a-button>
+                <a-button
+                  v-if="supportsConsumptionDrilldown && row.elderId"
+                  type="link"
+                  @click="go(`/finance/flows/consumption?elderId=${row.elderId}`)"
+                >
+                  消费明细
+                </a-button>
                 <a-button type="link" @click="go('/finance/reconcile/exception')">异常处理</a-button>
               </a-space>
             </template>
@@ -63,7 +69,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, withDefaults } from 'vue'
+import { computed, onMounted, ref, withDefaults } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { useRouter } from 'vue-router'
@@ -109,6 +115,7 @@ const summary = ref<FinanceModuleEntrySummary>({
   topItems: []
 })
 const rows = ref<ConsumptionRecordItem[]>([])
+const supportsConsumptionDrilldown = computed(() => !['MEDICAL_ERRORS', 'ADJUSTMENTS'].includes(String(props.moduleKey || '').toUpperCase()))
 const query = ref({
   range: [dayjs().startOf('month'), dayjs()] as any,
   keyword: '',
@@ -138,7 +145,8 @@ async function loadData() {
         from: dayjs(query.value.range?.[0]).format('YYYY-MM-DD'),
         to: dayjs(query.value.range?.[1]).format('YYYY-MM-DD'),
         category: props.category,
-        keyword: query.value.keyword || undefined
+        keyword: query.value.keyword || undefined,
+        moduleKey: props.moduleKey || undefined
       }) as Promise<PageResult<ConsumptionRecordItem>>
     ])
     summary.value = summaryRes

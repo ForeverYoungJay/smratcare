@@ -6,6 +6,7 @@ import com.zhiyangyun.care.crm.model.CrmContractAssessmentOverviewResponse;
 import com.zhiyangyun.care.crm.model.CrmContractArchiveRuleResponse;
 import com.zhiyangyun.care.crm.model.CrmContractLinkageResponse;
 import com.zhiyangyun.care.crm.service.CrmContractLinkageService;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -15,27 +16,36 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/crm/contracts")
 public class CrmContractLinkageController {
+  private static final String CRM_CONTRACT_LINKAGE_READ =
+      "hasAnyRole('STAFF','HR_EMPLOYEE','HR_MINISTER','MEDICAL_EMPLOYEE','MEDICAL_MINISTER',"
+          + "'NURSING_EMPLOYEE','NURSING_MINISTER','FINANCE_EMPLOYEE','FINANCE_MINISTER',"
+          + "'LOGISTICS_EMPLOYEE','LOGISTICS_MINISTER','MARKETING_EMPLOYEE','MARKETING_MINISTER',"
+          + "'DIRECTOR','SYS_ADMIN','ADMIN')";
   private final CrmContractLinkageService linkageService;
 
   public CrmContractLinkageController(CrmContractLinkageService linkageService) {
     this.linkageService = linkageService;
   }
 
+  @PreAuthorize(CRM_CONTRACT_LINKAGE_READ)
   @GetMapping("/linkage")
   public Result<CrmContractLinkageResponse> linkageByElder(@RequestParam Long elderId) {
     return Result.ok(linkageService.getByElderId(AuthContext.getOrgId(), elderId));
   }
 
+  @PreAuthorize(CRM_CONTRACT_LINKAGE_READ)
   @GetMapping("/{leadId}/linkage")
   public Result<CrmContractLinkageResponse> linkageByLead(@PathVariable Long leadId) {
     return Result.ok(linkageService.getByLeadId(AuthContext.getOrgId(), leadId));
   }
 
+  @PreAuthorize(CRM_CONTRACT_LINKAGE_READ)
   @GetMapping("/{contractId}/linkage-by-contract")
   public Result<CrmContractLinkageResponse> linkageByContract(@PathVariable Long contractId) {
     return Result.ok(linkageService.getByContractId(AuthContext.getOrgId(), contractId));
   }
 
+  @PreAuthorize(CRM_CONTRACT_LINKAGE_READ)
   @GetMapping("/assessment-overview")
   public Result<CrmContractAssessmentOverviewResponse> assessmentOverview(
       @RequestParam(required = false) Long elderId,
@@ -43,6 +53,7 @@ public class CrmContractLinkageController {
     return Result.ok(linkageService.getAssessmentOverview(AuthContext.getOrgId(), elderId, leadId));
   }
 
+  @PreAuthorize(CRM_CONTRACT_LINKAGE_READ)
   @GetMapping("/linkage-archive-rule")
   public Result<CrmContractArchiveRuleResponse> linkageArchiveRule() {
     return Result.ok(linkageService.getArchiveRule(AuthContext.getOrgId()));

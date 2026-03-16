@@ -61,6 +61,37 @@
       </a-col>
     </a-row>
 
+    <StatsWorkspacePanel
+      page-key="stats-org-bed-usage"
+      title="床态策略区"
+      :summary-text="workspaceSummary"
+      :current-payload="workspacePayload"
+      :target-fields="targetFields"
+      :data-health="dataHealth"
+      @apply-preset="applyPreset"
+      @targets-change="onTargetsChange"
+    />
+
+    <StatsInsightDeck :items="visibleInsightItems" />
+
+    <StatsCommandCenter
+      page-key="stats-org-bed-usage-command"
+      title="床态协同台"
+      share-title="床位使用统计协同包"
+      :summary-text="commandSummary"
+      :current-payload="workspacePayload"
+      :action-items="commandActionItems"
+      :anomalies="commandAnomalies"
+      :metric-notes="metricNotes"
+      :panel-options="panelOptions"
+      :selected-panel-keys="panelKeys"
+      :template-column-options="printColumnOptions"
+      :selected-template-columns="selectedPrintColumns"
+      @trigger-action="onCommandAction"
+      @panel-change="onPanelChange"
+      @apply-template="applyReportTemplate"
+    />
+
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="床位状态分布">
       <div ref="pieRef" style="height: 360px;"></div>
     </a-card>
@@ -72,14 +103,19 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
+import StatsWorkspacePanel from '../../components/stats/StatsWorkspacePanel.vue'
+import StatsInsightDeck from '../../components/stats/StatsInsightDeck.vue'
+import StatsCommandCenter from '../../components/stats/StatsCommandCenter.vue'
 import { exportOrgBedUsageCsv, getOrgBedUsage } from '../../api/stats'
 import type { BedUsageStatsResponse } from '../../types'
 import { useECharts } from '../../plugins/echarts'
 import { message } from 'ant-design-vue'
 import { printTableReport } from '../../utils/print'
 
+const router = useRouter()
 const stats = reactive<BedUsageStatsResponse>({
   totalBeds: 0,
   occupiedBeds: 0,
@@ -105,6 +141,91 @@ const printColumnOptions = [
   { label: '空闲率(%)', value: 'availableRate' }
 ]
 const selectedPrintColumns = ref<string[]>(['totalBeds', 'occupiedBeds', 'availableBeds', 'maintenanceBeds', 'occupancyRate', 'availableRate'])
+const panelKeys = ref<string[]>([])
+const targets = ref<Record<string, number>>({
+  occupancyRate: 95,
+  availableRate: 10,
+  maintenanceBeds: 5
+})
+const workspaceSummary = computed(() => `聚焦床位使用率、空闲率和维护床位数量，支持固定巡检策略。当前总床位 ${stats.totalBeds || 0} 张。`)
+const workspacePayload = computed(() => ({
+  orgId: query.orgId ? String(query.orgId) : '',
+  targetType: query.targetType
+}))
+const targetFields = computed(() => ([
+  { key: 'occupancyRate', label: '床位使用率上限(%)', value: targets.value.occupancyRate, min: 1, max: 100, step: 1 },
+  { key: 'availableRate', label: '空闲率目标(%)', value: targets.value.availableRate, min: 0, max: 100, step: 1 },
+  { key: 'maintenanceBeds', label: '维护床位提醒线', value: targets.value.maintenanceBeds, min: 0, max: 9999, step: 1 }
+]))
+const dataHealth = computed(() => ({
+  freshness: '实时',
+  completeness: `${stats.totalBeds || 0} 床位已汇总`,
+  issues: [
+    Number(stats.occupancyRate || 0) > Number(targets.value.occupancyRate || 0) ? '床位使用率超过上限' : '',
+    Number(stats.maintenanceBeds || 0) > Number(targets.value.maintenanceBeds || 0) ? '维护床位超过提醒线' : ''
+  ].filter(Boolean)
+}))
+const insightItems = computed(() => [
+  {
+    key: 'occupancy',
+    label: '床位使用率',
+    valueText: `${Number(stats.occupancyRate || 0).toFixed(2)}%`,
+    trendText: `上限 ${Number(targets.value.occupancyRate || 0).toFixed(2)}%`,
+    detail: Number(stats.occupancyRate || 0) > Number(targets.value.occupancyRate || 0) ? '已进入高占用区，建议提前协调床位' : '使用率处于目标区间',
+    tone: Number(stats.occupancyRate || 0) > Number(targets.value.occupancyRate || 0) ? 'danger' : 'good'
+  },
+  {
+    key: 'available',
+    label: '空闲率',
+    valueText: `${Number(stats.availableRate || 0).toFixed(2)}%`,
+    trendText: `目标 ${Number(targets.value.availableRate || 0).toFixed(2)}%`,
+    detail: `空闲床位 ${stats.availableBeds || 0} 张`,
+    tone: Number(stats.availableRate || 0) < Number(targets.value.availableRate || 0) ? 'warning' : 'good'
+  },
+  {
+    key: 'maintenance',
+    label: '维护床位',
+    valueText: `${stats.maintenanceBeds || 0}`,
+    trendText: `提醒线 ${targets.value.maintenanceBeds || 0}`,
+    detail: `维护率 ${Number(stats.maintenanceRate || 0).toFixed(2)}%`,
+    tone: Number(stats.maintenanceBeds || 0) > Number(targets.value.maintenanceBeds || 0) ? 'warning' : 'good'
+  },
+  {
+    key: 'capacity',
+    label: '容量概览',
+    valueText: `${stats.occupiedBeds || 0}/${stats.totalBeds || 0}`,
+    trendText: '已使用 / 总床位',
+    detail: `空闲 ${stats.availableBeds || 0} · 维护 ${stats.maintenanceBeds || 0}`,
+    tone: 'neutral'
+  }
+])
+const visibleInsightItems = computed(() => {
+  const selected = panelKeys.value.length ? new Set(panelKeys.value) : null
+  return insightItems.value.filter((item) => !selected || selected.has(item.key))
+})
+const commandSummary = computed(() => '把高占用告警、模板化打印和后续钻取收口到床态协同台，适合床位巡检。')
+const commandActionItems = computed(() => ([
+  { key: 'open-flow-report', label: '查看出入报表', description: '高占用时继续排查入住离院明细', route: '/stats/elder-flow-report', tone: 'danger' as const },
+  { key: 'open-operation', label: '查看机构经营', description: '结合营收与入住判断床位压力', route: '/stats/org/monthly-operation', tone: 'warning' as const },
+  { key: 'open-dashboard', label: '返回看板', description: '回到经营总览', route: '/dashboard', tone: 'neutral' as const }
+]))
+const commandAnomalies = computed(() =>
+  insightItems.value
+    .filter((item) => item.tone === 'danger' || item.tone === 'warning')
+    .map((item) => ({ key: item.key, label: item.label, detail: item.detail, tone: item.tone }))
+)
+const metricNotes = computed(() => ([
+  { key: 'occupancy', label: '床位使用率', note: '已使用床位 / 总床位，用于判断高占用风险。' },
+  { key: 'available', label: '空闲率', note: '空闲率过低时应结合入住净增长和离院计划一起看。' },
+  { key: 'maintenance', label: '维护床位', note: '维护床位偏高会直接影响可售床位容量。' }
+]))
+const panelOptions = computed(() =>
+  insightItems.value.map((item) => ({
+    key: item.key,
+    label: item.label,
+    description: item.detail || item.trendText
+  }))
+)
 
 async function loadData() {
   try {
@@ -135,6 +256,37 @@ function reset() {
   query.targetType = 'ALL'
   query.printRemark = ''
   loadData()
+}
+
+function applyPreset(payload: Record<string, any>) {
+  query.orgId = payload.orgId ? Number(payload.orgId) : undefined
+  const targetType = String(payload.targetType || 'ALL')
+  query.targetType = ['ALL', 'OCCUPIED', 'AVAILABLE', 'MAINTENANCE'].includes(targetType) ? targetType as any : 'ALL'
+  loadData()
+}
+
+function onTargetsChange(payload: Record<string, number>) {
+  targets.value = {
+    ...targets.value,
+    ...(payload || {})
+  }
+}
+
+function onPanelChange(keys: string[]) {
+  panelKeys.value = keys.length ? [...keys] : insightItems.value.map((item) => item.key)
+}
+
+function onCommandAction(item: { route?: string }) {
+  if (item.route) {
+    router.push(item.route)
+  }
+}
+
+function applyReportTemplate(payload: { payload: Record<string, any>; columns: string[] }) {
+  if (payload.columns?.length) {
+    selectedPrintColumns.value = [...payload.columns]
+  }
+  applyPreset(payload.payload || {})
 }
 
 function openColumnSetting() {

@@ -25,6 +25,8 @@ public class CrmContractRequest {
   private String currentOwnerDept;
   private String orgName;
   private String status;
+  private String changeWorkflowStatus;
+  private String changeWorkflowRemark;
   private String remark;
   private Integer smsSendCount;
 }

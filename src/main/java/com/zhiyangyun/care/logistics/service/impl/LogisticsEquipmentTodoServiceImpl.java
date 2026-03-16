@@ -1,6 +1,8 @@
 package com.zhiyangyun.care.logistics.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.zhiyangyun.care.auth.entity.StaffAccount;
+import com.zhiyangyun.care.auth.mapper.StaffMapper;
 import com.zhiyangyun.care.logistics.entity.LogisticsEquipmentArchive;
 import com.zhiyangyun.care.logistics.entity.LogisticsMaintenanceTodoJobLog;
 import com.zhiyangyun.care.logistics.mapper.LogisticsEquipmentArchiveMapper;
@@ -23,16 +25,19 @@ public class LogisticsEquipmentTodoServiceImpl implements LogisticsEquipmentTodo
   private final LogisticsMaintenanceTodoJobLogMapper jobLogMapper;
   private final OaTodoMapper oaTodoMapper;
   private final OaTaskMapper oaTaskMapper;
+  private final StaffMapper staffMapper;
 
   public LogisticsEquipmentTodoServiceImpl(
       LogisticsEquipmentArchiveMapper equipmentMapper,
       LogisticsMaintenanceTodoJobLogMapper jobLogMapper,
       OaTodoMapper oaTodoMapper,
-      OaTaskMapper oaTaskMapper) {
+      OaTaskMapper oaTaskMapper,
+      StaffMapper staffMapper) {
     this.equipmentMapper = equipmentMapper;
     this.jobLogMapper = jobLogMapper;
     this.oaTodoMapper = oaTodoMapper;
     this.oaTaskMapper = oaTaskMapper;
+    this.staffMapper = staffMapper;
   }
 
   @Override
@@ -72,6 +77,7 @@ public class LogisticsEquipmentTodoServiceImpl implements LogisticsEquipmentTodo
         skipped++;
         continue;
       }
+      StaffAccount assignee = resolveAssignee(currentOrgId, equipment.getMaintainerName());
       OaTodo todo = new OaTodo();
       todo.setTenantId(currentOrgId);
       todo.setOrgId(currentOrgId);
@@ -79,7 +85,8 @@ public class LogisticsEquipmentTodoServiceImpl implements LogisticsEquipmentTodo
       todo.setContent(buildMaintenanceDescription(equipment));
       todo.setDueTime(equipment.getNextMaintainedAt());
       todo.setStatus("OPEN");
-      todo.setAssigneeName(equipment.getMaintainerName());
+      todo.setAssigneeId(assignee == null ? null : assignee.getId());
+      todo.setAssigneeName(resolveAssigneeName(assignee, equipment.getMaintainerName()));
       todo.setCreatedBy(operatorStaffId == null ? 0L : operatorStaffId);
       oaTodoMapper.insert(todo);
       syncTodoTask(todo);
@@ -170,5 +177,49 @@ public class LogisticsEquipmentTodoServiceImpl implements LogisticsEquipmentTodo
     } else {
       oaTaskMapper.updateById(task);
     }
+  }
+
+  private StaffAccount resolveAssignee(Long orgId, String maintainerName) {
+    String normalizedName = normalizeText(maintainerName);
+    if (normalizedName == null) {
+      return null;
+    }
+    StaffAccount enabled = staffMapper.selectOne(Wrappers.lambdaQuery(StaffAccount.class)
+        .eq(StaffAccount::getIsDeleted, 0)
+        .eq(orgId != null, StaffAccount::getOrgId, orgId)
+        .eq(StaffAccount::getStatus, 1)
+        .and(w -> w.eq(StaffAccount::getRealName, normalizedName)
+            .or()
+            .eq(StaffAccount::getUsername, normalizedName))
+        .last("LIMIT 1"));
+    if (enabled != null) {
+      return enabled;
+    }
+    return staffMapper.selectOne(Wrappers.lambdaQuery(StaffAccount.class)
+        .eq(StaffAccount::getIsDeleted, 0)
+        .eq(orgId != null, StaffAccount::getOrgId, orgId)
+        .and(w -> w.eq(StaffAccount::getRealName, normalizedName)
+            .or()
+            .eq(StaffAccount::getUsername, normalizedName))
+        .last("LIMIT 1"));
+  }
+
+  private String resolveAssigneeName(StaffAccount assignee, String fallbackName) {
+    if (assignee == null) {
+      return normalizeText(fallbackName);
+    }
+    String realName = normalizeText(assignee.getRealName());
+    if (realName != null) {
+      return realName;
+    }
+    return normalizeText(assignee.getUsername());
+  }
+
+  private String normalizeText(String value) {
+    if (value == null) {
+      return null;
+    }
+    String trimmed = value.trim();
+    return trimmed.isEmpty() ? null : trimmed;
   }
 }

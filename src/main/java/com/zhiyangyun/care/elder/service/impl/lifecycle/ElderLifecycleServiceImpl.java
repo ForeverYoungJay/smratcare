@@ -49,6 +49,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ElderLifecycleServiceImpl implements ElderLifecycleService {
+  private static final String SOURCE_TYPE_MARKETING_CONTRACT = "MARKETING_CONTRACT";
+  private static final String SOURCE_TYPE_HISTORICAL_IMPORT = "HISTORICAL_IMPORT";
   private final ElderAdmissionMapper admissionMapper;
   private final ElderDischargeMapper dischargeMapper;
   private final ElderChangeLogMapper changeLogMapper;
@@ -107,6 +109,9 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
     admission.setContractNo(normalizedContractNo);
     admission.setDepositAmount(request.getDepositAmount());
     admission.setRemark(request.getRemark());
+    admission.setSourceType(Boolean.TRUE.equals(request.getAllowMissingContractRecord())
+        ? SOURCE_TYPE_HISTORICAL_IMPORT
+        : SOURCE_TYPE_MARKETING_CONTRACT);
     admission.setCreatedBy(request.getCreatedBy());
     admissionMapper.insert(admission);
 
@@ -125,6 +130,9 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
 
     elder.setAdmissionDate(request.getAdmissionDate());
     elder.setStatus(1);
+    if (elder.getSourceType() == null || elder.getSourceType().isBlank()) {
+      elder.setSourceType(admission.getSourceType());
+    }
     elderMapper.updateById(elder);
 
     if (request.getBedId() != null
@@ -168,7 +176,7 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
   private CrmContract validateAdmissionContractGuard(AdmissionRequest request, ElderProfile elder) {
     String contractNo = request.getContractNo() == null ? null : request.getContractNo().trim();
     if (contractNo == null || contractNo.isBlank()) {
-      throw new IllegalStateException("请先填写合同号并完成入住评估");
+      throw new IllegalStateException("请先填写合同号");
     }
     CrmContract contract = crmContractMapper.selectOne(Wrappers.lambdaQuery(CrmContract.class)
         .eq(CrmContract::getIsDeleted, 0)
@@ -177,6 +185,9 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
         .orderByDesc(CrmContract::getUpdateTime)
         .last("LIMIT 1"));
     if (contract == null) {
+      if (Boolean.TRUE.equals(request.getAllowMissingContractRecord())) {
+        return null;
+      }
       throw new IllegalStateException("合同不存在，请先完成合同签约");
     }
     if ("VOID".equals(contract.getStatus())) {

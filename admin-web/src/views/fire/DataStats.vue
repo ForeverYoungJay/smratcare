@@ -7,7 +7,7 @@
         </a-form-item>
         <template #extra>
           <a-space>
-            <a-button :loading="loading" @click="fetchAll">一键生成巡查记录</a-button>
+            <a-button :loading="loading" @click="fetchAll">刷新统计</a-button>
             <a-button type="primary" :loading="exporting" @click="downloadReport">下载报告</a-button>
             <a-button @click="printReport">打印版</a-button>
           </a-space>
@@ -168,6 +168,8 @@ const summary = reactive<FireSafetyReportSummary>({
   handoverPunchCount: 0,
   equipmentUpdateCount: 0,
   equipmentAgingDisposalCount: 0,
+  expiringSoonCount: 0,
+  nextCheckDueSoonCount: 0,
   typeStats: []
 })
 

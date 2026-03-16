@@ -18,7 +18,7 @@
           <a-select-option value="PUBLISHED">已发布</a-select-option>
           <a-select-option value="INACTIVE">停用</a-select-option>
         </a-select>
-        <a-button type="primary" @click="openCreate">新增方案</a-button>
+        <a-button v-if="canManagePlanWrite" type="primary" @click="openCreate">新增方案</a-button>
       </a-space>
     </template>
 
@@ -44,8 +44,8 @@
               </div>
               <div class="plan-card-actions">
                 <a-button type="link" size="small" @click="openPreview(item)">查看详情</a-button>
-                <a-button type="link" size="small" :disabled="!canEdit(item)" @click="openEdit(item)">编辑</a-button>
-                <a-dropdown>
+                <a-button v-if="canManagePlanWrite" type="link" size="small" :disabled="!canEdit(item)" @click="openEdit(item)">编辑</a-button>
+                <a-dropdown v-if="canManagePlanWrite">
                   <a-button type="link" size="small">流程操作</a-button>
                   <template #overlay>
                     <a-menu>
@@ -57,7 +57,7 @@
                     </a-menu>
                   </template>
                 </a-dropdown>
-                <a-popconfirm title="确认删除该方案吗？" @confirm="onDelete(item.id)">
+                <a-popconfirm v-if="canManagePlanWrite" title="确认删除该方案吗？" @confirm="onDelete(item.id)">
                   <a-button type="link" danger size="small">删除</a-button>
                 </a-popconfirm>
               </div>
@@ -75,13 +75,13 @@
           >
             <a-space>
               <a-button :disabled="!selectedPlan" @click="previewSelected">详情</a-button>
-              <a-button :disabled="!canEditSelected" @click="editSelected">编辑</a-button>
-              <a-button :disabled="!canSubmitSelected" @click="submitSelected">提交审批</a-button>
-              <a-button :disabled="!canApproveSelected" @click="approveSelected">审批通过</a-button>
-              <a-button :disabled="!canRejectSelected" @click="rejectSelected">驳回</a-button>
-              <a-button :disabled="!canPublishSelected" @click="publishSelected">{{ selectedPublishLabel }}</a-button>
-              <a-button :disabled="!canDeactivateSelected" @click="deactivateSelected">停用</a-button>
-              <a-button :disabled="selectedCount === 0" danger @click="deleteSelected">删除</a-button>
+              <a-button v-if="canManagePlanWrite" :disabled="!canEditSelected" @click="editSelected">编辑</a-button>
+              <a-button v-if="canManagePlanWrite" :disabled="!canSubmitSelected" @click="submitSelected">提交审批</a-button>
+              <a-button v-if="canManagePlanWrite" :disabled="!canApproveSelected" @click="approveSelected">审批通过</a-button>
+              <a-button v-if="canManagePlanWrite" :disabled="!canRejectSelected" @click="rejectSelected">驳回</a-button>
+              <a-button v-if="canManagePlanWrite" :disabled="!canPublishSelected" @click="publishSelected">{{ selectedPublishLabel }}</a-button>
+              <a-button v-if="canManagePlanWrite" :disabled="!canDeactivateSelected" @click="deactivateSelected">停用</a-button>
+              <a-button v-if="canManagePlanWrite" :disabled="selectedCount === 0" danger @click="deleteSelected">删除</a-button>
             </a-space>
           </MarketingListToolbar>
           <a-table
@@ -262,6 +262,8 @@ import {
   updateMarketingPlan
 } from '../../api/marketing'
 import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
+import { useUserStore } from '../../stores/user'
+import { hasAnyRole } from '../../utils/roleAccess'
 import type {
   MarketingPlanItem,
   MarketingPlanPayload,
@@ -272,6 +274,7 @@ import type {
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const activeModule = ref<'SPEECH' | 'POLICY'>('SPEECH')
 const loading = ref(false)
 const submitLoading = ref(false)
@@ -360,6 +363,8 @@ const selectedPublishLabel = computed(() => {
   if (!selectedPlan.value || selectedPlans.value.length > 1) return '批量发布'
   return publishActionLabel(selectedPlan.value)
 })
+const canManagePlanWrite = computed(() =>
+  hasAnyRole(userStore.roles || [], ['MARKETING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']))
 const canEditSelected = computed(() => selectedPlans.value.length === 1 && selectedEditablePlans.value.length === 1)
 const canSubmitSelected = computed(() => selectedSubmittablePlans.value.length > 0)
 const canApproveSelected = computed(() => selectedApprovablePlans.value.length > 0)

@@ -50,8 +50,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -426,7 +428,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
 
   @Override
   public IPage<ConsumptionRecord> consumptionPage(Long orgId, long pageNo, long pageSize, Long elderId,
-      String from, String to, String category, String keyword) {
+      String from, String to, String category, String keyword, String moduleKey) {
     LocalDate fromDate = parseDateOrNull(from, "from");
     LocalDate toDate = parseDateOrNull(to, "to");
     if (fromDate != null && toDate != null && fromDate.isAfter(toDate)) {
@@ -434,6 +436,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     }
     String normalizedCategory = normalizeConsumptionCategory(category);
     String normalizedKeyword = normalizeOptionalText(keyword);
+    String normalizedModuleKey = normalizeOptionalText(moduleKey);
     var wrapper = Wrappers.lambdaQuery(ConsumptionRecord.class)
         .eq(ConsumptionRecord::getIsDeleted, 0)
         .eq(orgId != null, ConsumptionRecord::getOrgId, orgId)
@@ -455,7 +458,16 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     if (toDate != null) {
       wrapper.le(ConsumptionRecord::getConsumeDate, toDate);
     }
-    return consumptionRecordMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
+    if (!hasText(normalizedModuleKey)) {
+      return consumptionRecordMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
+    }
+    List<ConsumptionRecord> records = consumptionRecordMapper.selectList(wrapper);
+    List<ConsumptionRecord> filtered = filterConsumptionRecordsByModule(records, normalizedModuleKey);
+    Page<ConsumptionRecord> page = new Page<>(pageNo, pageSize, filtered.size());
+    int fromIndex = Math.min((int) ((pageNo - 1) * pageSize), filtered.size());
+    int toIndex = Math.min(fromIndex + (int) pageSize, filtered.size());
+    page.setRecords(filtered.subList(fromIndex, toIndex));
+    return page;
   }
 
   @Override
@@ -1132,6 +1144,99 @@ public class FeeManagementServiceImpl implements FeeManagementService {
 
   private boolean hasText(String value) {
     return value != null && !value.isBlank();
+  }
+
+  private List<ConsumptionRecord> filterConsumptionRecordsByModule(List<ConsumptionRecord> records, String moduleKey) {
+    String normalizedModuleKey = moduleKey == null ? "" : moduleKey.trim().toUpperCase(Locale.ROOT);
+    if (records == null || records.isEmpty()) {
+      return List.of();
+    }
+    if (!hasText(normalizedModuleKey)) {
+      return records;
+    }
+    Map<String, Long> duplicateCountMap = new HashMap<>();
+    for (ConsumptionRecord item : records) {
+      if (!"MEDICINE".equals(normalizeConsumptionCategory(item.getCategory()))) {
+        continue;
+      }
+      String signature = medicalDuplicateSignature(item);
+      if (!hasText(signature)) {
+        continue;
+      }
+      duplicateCountMap.merge(signature, 1L, Long::sum);
+    }
+    return records.stream()
+        .filter(item -> matchesModuleConsumption(item, normalizedModuleKey, duplicateCountMap))
+        .collect(Collectors.toList());
+  }
+
+  private boolean matchesModuleConsumption(
+      ConsumptionRecord item, String moduleKey, Map<String, Long> duplicateCountMap) {
+    return switch (moduleKey) {
+      case "MEDICAL_FLOW" -> "MEDICINE".equals(normalizeConsumptionCategory(item.getCategory()));
+      case "MEDICAL_ERRORS" -> isMedicalError(item, duplicateCountMap);
+      case "DINING_FLOW" -> "DINING".equals(normalizeConsumptionCategory(item.getCategory()));
+      case "LOGISTICS_FLOW" -> isLogisticsConsumption(item);
+      case "ADJUSTMENTS" -> isAdjustmentConsumption(item);
+      default -> true;
+    };
+  }
+
+  private boolean isMedicalError(ConsumptionRecord item, Map<String, Long> duplicateCountMap) {
+    if (!"MEDICINE".equals(normalizeConsumptionCategory(item.getCategory()))) {
+      return false;
+    }
+    String sourceType = normalizeOptionalText(item.getSourceType());
+    boolean missingSource = !hasText(sourceType) || item.getSourceId() == null;
+    boolean sourceMismatch = hasText(sourceType) && !sourceType.toUpperCase(Locale.ROOT).contains("MEDICAL");
+    String signature = medicalDuplicateSignature(item);
+    boolean duplicated = hasText(signature) && duplicateCountMap.getOrDefault(signature, 0L) > 1;
+    return missingSource || sourceMismatch || duplicated;
+  }
+
+  private String medicalDuplicateSignature(ConsumptionRecord item) {
+    if (item == null || item.getElderId() == null || item.getConsumeDate() == null || item.getAmount() == null) {
+      return null;
+    }
+    return item.getElderId() + "|" + item.getConsumeDate() + "|" + item.getAmount() + "|"
+        + normalizeOptionalText(item.getSourceType()) + "|" + item.getSourceId();
+  }
+
+  private boolean isLogisticsConsumption(ConsumptionRecord item) {
+    String category = normalizeConsumptionCategory(item.getCategory());
+    String sourceType = normalizeOptionalText(item.getSourceType());
+    if ("OTHER".equals(category)) {
+      return true;
+    }
+    if (!hasText(sourceType)) {
+      return false;
+    }
+    String normalized = sourceType.toUpperCase(Locale.ROOT);
+    return normalized.contains("LOGISTICS")
+        || normalized.contains("MATERIAL")
+        || normalized.contains("STORE");
+  }
+
+  private boolean isAdjustmentConsumption(ConsumptionRecord item) {
+    String sourceType = normalizeOptionalText(item.getSourceType());
+    String remark = normalizeOptionalText(item.getRemark());
+    String sourceUpper = sourceType == null ? "" : sourceType.toUpperCase(Locale.ROOT);
+    return sourceUpper.contains("ADJUST")
+        || sourceUpper.contains("REFUND")
+        || sourceUpper.contains("REVERSE")
+        || containsAnyKeyword(remark, "减免", "补录", "改价", "冲正", "退款", "作废");
+  }
+
+  private boolean containsAnyKeyword(String value, String... keywords) {
+    if (!hasText(value) || keywords == null || keywords.length == 0) {
+      return false;
+    }
+    for (String keyword : keywords) {
+      if (keyword != null && !keyword.isBlank() && value.contains(keyword)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private void validatePositiveAmount(BigDecimal amount, String fieldName) {

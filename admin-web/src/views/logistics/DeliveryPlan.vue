@@ -112,7 +112,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
@@ -144,7 +144,7 @@ const selectedRecord = ref<DiningDeliveryRecord>()
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const summary = reactive({ total: 0, delivered: 0, undelivered: 0 })
 const query = reactive({
-  status: (String(route.query.filter || '') === 'undelivered' ? 'PENDING' : undefined) as string | undefined,
+  status: undefined as string | undefined,
   date: undefined as string | undefined,
   pageNo: 1,
   pageSize: 10
@@ -203,6 +203,20 @@ function statusLabel(status?: string) {
   if (status === 'DELIVERED') return '已送达'
   if (status === 'FAILED') return '送达失败'
   return '待送达'
+}
+
+function applyRouteFilters() {
+  const statusRaw = Array.isArray(route.query.status) ? route.query.status[0] : route.query.status
+  const filterRaw = Array.isArray(route.query.filter) ? route.query.filter[0] : route.query.filter
+  const dateRaw = Array.isArray(route.query.date) ? route.query.date[0] : route.query.date
+  if (typeof statusRaw === 'string' && statusRaw) {
+    query.status = statusRaw
+  } else if (String(filterRaw || '') === 'undelivered') {
+    query.status = 'PENDING'
+  } else {
+    query.status = undefined
+  }
+  query.date = typeof dateRaw === 'string' && dateRaw ? dateRaw : undefined
 }
 
 async function fetchData() {
@@ -396,7 +410,16 @@ async function submitCreate() {
 }
 
 onMounted(async () => {
+  applyRouteFilters()
   await fetchData()
   await loadCreateOptions()
 })
+
+watch(
+  () => route.query,
+  () => {
+    applyRouteFilters()
+    fetchData()
+  }
+)
 </script>

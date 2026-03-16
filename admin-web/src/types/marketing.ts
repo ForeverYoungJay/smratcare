@@ -48,6 +48,8 @@ export interface MarketingCallbackItem {
   phone?: string
   source?: string
   nextFollowDate?: string
+  callbackType?: MarketingCallbackType
+  score?: number
   remark?: string
 }
 
@@ -59,11 +61,14 @@ export interface MarketingCallbackReport {
   records: MarketingCallbackItem[]
 }
 
+export type MarketingCallbackType = 'checkin' | 'trial' | 'discharge' | 'score'
+
 export interface MarketingReportQuery {
   dateFrom?: string
   dateTo?: string
   source?: string
   staffId?: number
+  type?: MarketingCallbackType
 }
 
 export interface MarketingDataQualityReport {
@@ -111,6 +116,8 @@ export interface CallbackPlanItem {
   followupContent?: string
   planExecuteTime: string
   executorName?: string
+  callbackType?: MarketingCallbackType
+  score?: number
   status: string
   executedTime?: string
   executeNote?: string
@@ -123,12 +130,15 @@ export interface CallbackPlanCreateRequest {
   followupContent?: string
   planExecuteTime: string
   executorName?: string
+  callbackType?: MarketingCallbackType
 }
 
 export interface CallbackExecuteRequest {
   executeNote?: string
   followupResult?: string
   nextFollowDate?: string
+  callbackType?: MarketingCallbackType
+  score?: number
 }
 
 export interface ContractAttachmentItem {
@@ -202,6 +212,8 @@ export interface CrmContractItem {
   currentOwnerDept?: 'MARKETING' | 'ASSESSMENT'
   orgName?: string
   status?: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'SIGNED' | 'EFFECTIVE' | 'VOID'
+  changeWorkflowStatus?: 'NONE' | 'IN_PROGRESS' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED'
+  changeWorkflowRemark?: string
   smsSendCount?: number
   remark?: string
   createTime?: string
@@ -231,6 +243,8 @@ export interface CrmContractPayload {
   currentOwnerDept?: CrmContractItem['currentOwnerDept']
   orgName?: string
   status?: CrmContractItem['status']
+  changeWorkflowStatus?: CrmContractItem['changeWorkflowStatus']
+  changeWorkflowRemark?: string
   smsSendCount?: number
   remark?: string
 }

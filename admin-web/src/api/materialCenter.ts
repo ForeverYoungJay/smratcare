@@ -225,8 +225,8 @@ export function getInventoryAlerts() {
   return request.get<InventoryAlertItem[]>('/api/inventory/alerts')
 }
 
-export function getInventoryExpiryAlerts() {
-  return request.get<InventoryExpiryAlertItem[]>('/api/inventory/expiry-alerts')
+export function getInventoryExpiryAlerts(days?: number) {
+  return request.get<InventoryExpiryAlertItem[]>('/api/inventory/expiry-alerts', { params: { days } })
 }
 
 export function getMaterialCenterOverview(params?: { expiryDays?: number }) {

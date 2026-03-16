@@ -24,6 +24,8 @@ public class CrmContract {
   private String idCardNo;
   private String homeAddress;
   private String status;
+  private String changeWorkflowStatus;
+  private String changeWorkflowRemark;
   private LocalDateTime signedAt;
   private LocalDate effectiveFrom;
   private LocalDate effectiveTo;

@@ -85,6 +85,173 @@ export async function exportFinanceLedgerHealthCsv(params) {
 export function getFinanceInvoiceReceiptPage(params) {
     return fetchPage('/api/finance/workbench/invoice/page', params);
 }
+export function getFinancePaymentAdjustmentPage(params) {
+    return fetchPage('/api/finance/workbench/payment-adjustments/page', params);
+}
+export async function exportFinancePaymentAdjustmentCsv(params) {
+    const url = new URL('/api/finance/workbench/payment-adjustments/export', window.location.origin);
+    Object.entries(params || {}).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            url.searchParams.set(key, String(value));
+        }
+    });
+    const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${getToken()}` }
+    });
+    if (!response.ok) {
+        throw new Error('导出失败');
+    }
+    const blob = await response.blob();
+    const contentDisposition = response.headers.get('content-disposition') || '';
+    const filenameMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/);
+    const filename = filenameMatch?.[1] || `finance-payment-adjustments-${new Date().toISOString().slice(0, 10)}.csv`;
+    const link = document.createElement('a');
+    const objectUrl = URL.createObjectURL(blob);
+    link.href = objectUrl;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(objectUrl);
+}
+export function getFinanceIssueCenterPage(params) {
+    return fetchPage('/api/finance/workbench/issue-center/page', params);
+}
+export async function exportFinanceIssueCenterCsv(params) {
+    const url = new URL('/api/finance/workbench/issue-center/export', window.location.origin);
+    Object.entries(params || {}).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            url.searchParams.set(key, String(value));
+        }
+    });
+    const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${getToken()}` }
+    });
+    if (!response.ok) {
+        throw new Error('导出失败');
+    }
+    const blob = await response.blob();
+    const contentDisposition = response.headers.get('content-disposition') || '';
+    const filenameMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/);
+    const filename = filenameMatch?.[1] || `finance-issue-center-${new Date().toISOString().slice(0, 10)}.csv`;
+    const link = document.createElement('a');
+    const objectUrl = URL.createObjectURL(blob);
+    link.href = objectUrl;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(objectUrl);
+}
+export function getFinanceCollectionFollowUpPage(params) {
+    return fetchPage('/api/finance/workbench/collection-follow-up/page', params);
+}
+export async function exportFinanceCollectionFollowUpCsv(params) {
+    const url = new URL('/api/finance/workbench/collection-follow-up/export', window.location.origin);
+    Object.entries(params || {}).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            url.searchParams.set(key, String(value));
+        }
+    });
+    const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${getToken()}` }
+    });
+    if (!response.ok) {
+        throw new Error('导出失败');
+    }
+    const blob = await response.blob();
+    const contentDisposition = response.headers.get('content-disposition') || '';
+    const filenameMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/);
+    const filename = filenameMatch?.[1] || `finance-collection-follow-up-${new Date().toISOString().slice(0, 10)}.csv`;
+    const link = document.createElement('a');
+    const objectUrl = URL.createObjectURL(blob);
+    link.href = objectUrl;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(objectUrl);
+}
+export function getFinanceMonthCloseSummary(params) {
+    return request.get('/api/finance/workbench/month-close/summary', { params });
+}
+export function getFinanceMonthCloseStatus(params) {
+    return request.get('/api/finance/workbench/month-close/status', { params });
+}
+export async function exportFinanceMonthCloseCsv(params) {
+    const url = new URL('/api/finance/workbench/month-close/export', window.location.origin);
+    Object.entries(params || {}).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            url.searchParams.set(key, String(value));
+        }
+    });
+    const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${getToken()}` }
+    });
+    if (!response.ok) {
+        throw new Error('导出失败');
+    }
+    const blob = await response.blob();
+    const contentDisposition = response.headers.get('content-disposition') || '';
+    const filenameMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/);
+    const filename = filenameMatch?.[1] || `finance-month-close-${new Date().toISOString().slice(0, 10)}.csv`;
+    const link = document.createElement('a');
+    const objectUrl = URL.createObjectURL(blob);
+    link.href = objectUrl;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(objectUrl);
+}
+export function handleFinanceIssueCenter(data) {
+    return request.post('/api/finance/workbench/issue-center/handle', data);
+}
+export function getFinanceIssueHandleLogs(params) {
+    return request.get('/api/finance/workbench/issue-center/handle-logs', { params });
+}
+export function handleFinanceCollectionFollowUp(data) {
+    return request.post('/api/finance/workbench/collection-follow-up/handle', data);
+}
+export function getFinanceCollectionFollowUpLogs(params) {
+    return request.get('/api/finance/workbench/collection-follow-up/logs', { params });
+}
+export function executeFinanceMonthClose(data) {
+    return request.post('/api/finance/workbench/month-close/execute', data);
+}
+export function unlockFinanceMonthClose(data) {
+    return request.post('/api/finance/workbench/month-close/unlock', data);
+}
+export function requestFinanceCrossPeriodApproval(data) {
+    return request.post('/api/finance/workbench/month-close/cross-period/request', data);
+}
+export function requestFinancePaymentAdjustmentApproval(data) {
+    return request.post('/api/finance/workbench/payment-adjustments/approval/request', data);
+}
+export function financeSearch(params) {
+    return request.get('/api/finance/workbench/search', { params });
+}
+export async function exportFinanceSearchCsv(params) {
+    const url = new URL('/api/finance/workbench/search/export', window.location.origin);
+    Object.entries(params || {}).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+            url.searchParams.set(key, String(value));
+        }
+    });
+    const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${getToken()}` }
+    });
+    if (!response.ok) {
+        throw new Error('导出失败');
+    }
+    const blob = await response.blob();
+    const contentDisposition = response.headers.get('content-disposition') || '';
+    const filenameMatch = contentDisposition.match(/filename=\"?([^\";]+)\"?/);
+    const filename = filenameMatch?.[1] || `finance-search-${new Date().toISOString().slice(0, 10)}.csv`;
+    const link = document.createElement('a');
+    const objectUrl = URL.createObjectURL(blob);
+    link.href = objectUrl;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(objectUrl);
+}
 export async function exportFinanceInvoiceReceiptCsv(params) {
     const url = new URL('/api/finance/workbench/invoice/export', window.location.origin);
     Object.entries(params || {}).forEach(([key, value]) => {

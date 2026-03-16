@@ -233,7 +233,7 @@ export const routes = [
                         path: 'create',
                         name: 'ElderCreate',
                         component: () => import('../views/elder/Create.vue'),
-                        meta: { title: '新增老人', hidden: true }
+                        meta: { title: '新建老人', hidden: true }
                     },
                     {
                         path: 'edit/:id',
@@ -1210,12 +1210,18 @@ export const routes = [
                 meta: { title: '财务收费与经营分析中心', icon: 'AccountBookOutlined', roles: ['FINANCE_EMPLOYEE', 'FINANCE_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
                 redirect: '/finance/workbench',
                 children: [
-                    {
-                        path: 'workbench',
-                        name: 'FinanceWorkbench',
-                        component: () => import('../views/finance/FinanceWorkbench.vue'),
-                        meta: { title: '财务工作台（首页）' }
-                    },
+                        {
+                            path: 'workbench',
+                            name: 'FinanceWorkbench',
+                            component: () => import('../views/finance/FinanceWorkbench.vue'),
+                            meta: { title: '财务工作台（首页）' }
+                        },
+                        {
+                            path: 'search',
+                            name: 'FinanceSearch',
+                            component: () => import('../views/finance/FinanceSearch.vue'),
+                            meta: { title: '财务搜索', hidden: true }
+                        },
                     {
                         path: 'accounts',
                         name: 'FinanceAccounts',
@@ -1294,6 +1300,12 @@ export const routes = [
                                     subTitle: '按老人、月份检索账单后进入详情页',
                                     defaultCurrentMonth: true
                                 }
+                            },
+                            {
+                                path: 'follow-up',
+                                name: 'FinanceBillsFollowUp',
+                                component: () => import('../views/finance/FinanceCollectionFollowUp.vue'),
+                                meta: { title: '欠费催缴跟进' }
                             }
                         ]
                     },
@@ -1304,6 +1316,12 @@ export const routes = [
                         meta: { title: '收费与支付' },
                         children: [
                             {
+                                path: 'cashier-desk',
+                                name: 'FinancePaymentsCashierDesk',
+                                component: () => import('../views/finance/CashierDesk.vue'),
+                                meta: { title: '收银台' }
+                            },
+                            {
                                 path: 'register',
                                 name: 'FinancePaymentsRegister',
                                 component: () => import('../views/finance/ResidentBillPayment.vue'),
@@ -1312,19 +1330,19 @@ export const routes = [
                             {
                                 path: 'refund-reversal',
                                 name: 'FinancePaymentsRefundReversal',
-                                component: () => import('../views/finance/DischargeFeeAudit.vue'),
+                                component: () => import('../views/finance/PaymentRefundReversal.vue'),
                                 meta: { title: '退款/冲正/作废' }
                             },
                             {
                                 path: 'shift-close',
                                 name: 'FinancePaymentsShiftClose',
-                                component: () => import('../views/finance/Reconcile.vue'),
+                                component: () => import('../views/finance/ShiftClose.vue'),
                                 meta: { title: '日结/交班（收银）' }
                             },
                             {
                                 path: 'records',
                                 name: 'FinancePaymentsRecords',
-                                component: () => import('../views/finance/Reconcile.vue'),
+                                component: () => import('../views/finance/PaymentRecords.vue'),
                                 meta: { title: '收款流水' }
                             }
                         ]
@@ -1358,8 +1376,18 @@ export const routes = [
                             {
                                 path: 'medical',
                                 name: 'FinanceFlowsMedical',
-                                component: () => import('../views/finance/AccountLog.vue'),
-                                meta: { title: '医护费用流水（医嘱/用药/治疗/检查）' }
+                                component: () => import('../views/finance/FlowCenter.vue'),
+                                meta: { title: '医护费用流水（医嘱/用药/治疗/检查）' },
+                                props: {
+                                    moduleKey: 'MEDICAL_FLOW',
+                                    moduleName: '医护费用流水',
+                                    description: '按医嘱、用药、治疗与检查动作汇总收费流水',
+                                    category: 'MEDICINE',
+                                    links: [
+                                        { label: '查看医护费用异常', to: '/finance/flows/medical-errors' },
+                                        { label: '查看费用调整单', to: '/finance/flows/adjustments' }
+                                    ]
+                                }
                             },
                             {
                                 path: 'medical-errors',
@@ -1525,6 +1553,18 @@ export const routes = [
                                 name: 'FinanceReconcileLedgerHealth',
                                 component: () => import('../views/finance/LedgerHealth.vue'),
                                 meta: { title: '财务一致性巡检' }
+                            },
+                            {
+                                path: 'issue-center',
+                                name: 'FinanceReconcileIssueCenter',
+                                component: () => import('../views/finance/FinanceIssueCenter.vue'),
+                                meta: { title: '异常修复中心' }
+                            },
+                            {
+                                path: 'month-close',
+                                name: 'FinanceReconcileMonthClose',
+                                component: () => import('../views/finance/FinanceMonthClose.vue'),
+                                meta: { title: '月结进度' }
                             }
                         ]
                     },
@@ -1948,7 +1988,11 @@ export const routes = [
             {
                 path: 'fire',
                 name: 'FireSafety',
-                meta: { title: '消防安全管理', icon: 'SafetyOutlined' },
+                meta: {
+                    title: '消防安全管理',
+                    icon: 'SafetyOutlined',
+                    roles: ['GUARD', 'LOGISTICS_EMPLOYEE', 'LOGISTICS_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
+                },
                 redirect: '/fire/facility-management',
                 children: [
                     {
@@ -2321,7 +2365,20 @@ export const routes = [
             {
                 path: 'oa',
                 name: 'OA',
-                meta: { title: '行政管理', icon: 'ApartmentOutlined' },
+                meta: {
+                    title: '行政管理',
+                    icon: 'ApartmentOutlined',
+                    roles: [
+                        'STAFF',
+                        'HR_EMPLOYEE', 'HR_MINISTER',
+                        'MEDICAL_EMPLOYEE', 'MEDICAL_MINISTER',
+                        'NURSING_EMPLOYEE', 'NURSING_MINISTER',
+                        'FINANCE_EMPLOYEE', 'FINANCE_MINISTER',
+                        'LOGISTICS_EMPLOYEE', 'LOGISTICS_MINISTER',
+                        'MARKETING_EMPLOYEE', 'MARKETING_MINISTER',
+                        'DIRECTOR', 'SYS_ADMIN', 'ADMIN'
+                    ]
+                },
                 redirect: '/oa/work-execution/task',
                 children: [
                     {
@@ -2542,7 +2599,7 @@ export const routes = [
                         path: 'workbench',
                         name: 'HrWorkbench',
                         component: () => import('../views/hr/HrWorkbench.vue'),
-                        meta: { title: '人事行政工作台', roles: ['ADMIN'] }
+                        meta: { title: '人事行政工作台', roles: ['HR_EMPLOYEE', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
                     },
                     {
                         path: 'recruitment',
@@ -2597,7 +2654,7 @@ export const routes = [
                     {
                         path: 'profile',
                         name: 'HrProfileCenter',
-                        meta: { title: '员工档案中心', roles: ['ADMIN'] },
+                        meta: { title: '员工档案中心', roles: ['HR_EMPLOYEE', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
                         redirect: '/hr/profile/basic',
                         children: [
                             {
@@ -2873,7 +2930,7 @@ export const routes = [
                     {
                         path: 'residence',
                         name: 'BaseConfigResidence',
-                        meta: { title: '入住', roles: ['ADMIN'], hidden: true },
+                        meta: { title: '入住', roles: ['ADMIN'] },
                         redirect: '/base-config/residence/bed-type',
                         children: [
                             {

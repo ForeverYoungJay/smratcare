@@ -10,7 +10,8 @@
           <a-input v-model:value="query.elderName" placeholder="请输入 长者姓名" allow-clear />
         </a-form-item>
         <a-form-item label="审批状态">
-          <a-select v-model:value="query.status" allow-clear style="width: 150px">
+          <a-select v-model:value="query.changeWorkflowStatus" allow-clear style="width: 150px">
+            <a-select-option value="IN_PROGRESS">变更中</a-select-option>
             <a-select-option value="PENDING_APPROVAL">待审批</a-select-option>
             <a-select-option value="APPROVED">已通过</a-select-option>
             <a-select-option value="REJECTED">已驳回</a-select-option>
@@ -29,13 +30,13 @@
       <MarketingListToolbar :selected-count="selectedRowKeys.length" tip="支持批量删除与批量处理">
         <a-space>
           <a-button :disabled="!selectedSingleRecord" @click="openEditSelected">编辑变更</a-button>
-          <a-button :disabled="!selectedSingleRecord" @click="startChangeSelected">发起变更</a-button>
-          <a-button :disabled="!selectedSingleRecord" @click="submitApprovalSelected">提交审批</a-button>
-          <a-button :disabled="selectedRowKeys.length === 0" @click="batchSubmitApproval">批量提交审批</a-button>
-          <a-button :disabled="!selectedSingleRecord" @click="approveSelected">审批通过</a-button>
-          <a-button :disabled="selectedRowKeys.length === 0" @click="batchApprove">批量审批通过</a-button>
-          <a-button :disabled="!selectedSingleRecord" danger @click="rejectSelected">审批驳回</a-button>
-          <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchReject">批量审批驳回</a-button>
+          <a-button :disabled="!canStartChangeSelected" @click="startChangeSelected">发起变更</a-button>
+          <a-button :disabled="!canSubmitApprovalSelected" @click="submitApprovalSelected">提交审批</a-button>
+          <a-button :disabled="!canBatchSubmitApproval" @click="batchSubmitApproval">批量提交审批</a-button>
+          <a-button :disabled="!canApproveSelected" @click="approveSelected">审批通过</a-button>
+          <a-button :disabled="!canBatchApprove" @click="batchApprove">批量审批通过</a-button>
+          <a-button :disabled="!canRejectSelected" danger @click="rejectSelected">审批驳回</a-button>
+          <a-button :disabled="!canBatchReject" danger @click="batchReject">批量审批驳回</a-button>
         </a-space>
       </MarketingListToolbar>
       <a-table
@@ -48,7 +49,7 @@
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'status'">
-            <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
+            <a-tag :color="statusColor(record.changeWorkflowStatus)">{{ statusText(record.changeWorkflowStatus) }}</a-tag>
           </template>
         </template>
       </a-table>
@@ -78,7 +79,7 @@
           <a-date-picker v-model:value="editForm.contractExpiryDate" value-format="YYYY-MM-DD" style="width: 100%" />
         </a-form-item>
         <a-form-item label="变更说明">
-          <a-textarea v-model:value="editForm.remark" :rows="4" />
+          <a-textarea v-model:value="editForm.changeWorkflowRemark" :rows="4" />
         </a-form-item>
       </a-form>
       <template #footer>
@@ -97,7 +98,14 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import MarketingQuickNav from './components/MarketingQuickNav.vue'
 import MarketingListToolbar from './components/MarketingListToolbar.vue'
-import { getContractPage, updateCrmContract } from '../../api/marketing'
+import {
+  approveContractChange,
+  getContractPage,
+  rejectContractChange,
+  startContractChange,
+  submitContractChange,
+  updateCrmContract
+} from '../../api/marketing'
 import type { CrmContractItem, PageResult } from '../../types'
 
 const loading = ref(false)
@@ -108,7 +116,7 @@ const selectedRowKeys = ref<string[]>([])
 const query = reactive({
   contractNo: '',
   elderName: '',
-  status: undefined as string | undefined,
+  changeWorkflowStatus: undefined as string | undefined,
   pageNo: 1,
   pageSize: 10
 })
@@ -118,9 +126,9 @@ const columns = [
   { title: '长者姓名', dataIndex: 'elderName', key: 'elderName', width: 140 },
   { title: '签约房号', dataIndex: 'reservationRoomNo', key: 'reservationRoomNo', width: 140 },
   { title: '到期日期', dataIndex: 'contractExpiryDate', key: 'contractExpiryDate', width: 140 },
-  { title: '审批状态', dataIndex: 'status', key: 'status', width: 120 },
+  { title: '审批状态', dataIndex: 'changeWorkflowStatus', key: 'status', width: 120 },
   { title: '合同状态', dataIndex: 'contractStatus', key: 'contractStatus', width: 140 },
-  { title: '变更备注', dataIndex: 'remark', key: 'remark' }
+  { title: '变更备注', dataIndex: 'changeWorkflowRemark', key: 'changeWorkflowRemark' }
 ]
 
 const rowSelection = computed(() => ({
@@ -131,26 +139,47 @@ const rowSelection = computed(() => ({
 }))
 const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(String(item.id))))
 const selectedSingleRecord = computed(() => (selectedRecords.value.length === 1 ? selectedRecords.value[0] : null))
+const canStartChangeSelected = computed(() => canStartChange(selectedSingleRecord.value))
+const canSubmitApprovalSelected = computed(() => canSubmitApproval(selectedSingleRecord.value))
+const canApproveSelected = computed(() => canApproveChange(selectedSingleRecord.value))
+const canRejectSelected = computed(() => canApproveChange(selectedSingleRecord.value))
+const canBatchSubmitApproval = computed(() => selectedRecords.value.length > 0 && selectedRecords.value.every((item) => canSubmitApproval(item)))
+const canBatchApprove = computed(() => selectedRecords.value.length > 0 && selectedRecords.value.every((item) => canApproveChange(item)))
+const canBatchReject = computed(() => selectedRecords.value.length > 0 && selectedRecords.value.every((item) => canApproveChange(item)))
 
 const editOpen = ref(false)
 const editForm = reactive<Partial<CrmContractItem>>({})
 
 function statusText(status?: string) {
-  if (status === 'DRAFT') return '草稿'
+  if (status === 'NONE') return '未发起'
+  if (status === 'IN_PROGRESS') return '变更中'
   if (status === 'PENDING_APPROVAL') return '待审批'
   if (status === 'APPROVED') return '已通过'
   if (status === 'REJECTED') return '已驳回'
-  if (status === 'SIGNED') return '已签署'
-  if (status === 'EFFECTIVE') return '已生效'
-  if (status === 'VOID') return '已作废'
   return status || '-'
 }
 
 function statusColor(status?: string) {
+  if (status === 'IN_PROGRESS') return 'blue'
   if (status === 'PENDING_APPROVAL') return 'gold'
-  if (status === 'APPROVED' || status === 'SIGNED') return 'green'
+  if (status === 'APPROVED') return 'green'
   if (status === 'REJECTED') return 'red'
   return 'default'
+}
+
+function canStartChange(record?: CrmContractItem | null) {
+  if (!record) return false
+  return ['NONE', 'APPROVED', 'REJECTED', ''].includes(String(record.changeWorkflowStatus || 'NONE'))
+}
+
+function canSubmitApproval(record?: CrmContractItem | null) {
+  if (!record) return false
+  return String(record.changeWorkflowStatus || 'NONE') === 'IN_PROGRESS'
+}
+
+function canApproveChange(record?: CrmContractItem | null) {
+  if (!record) return false
+  return String(record.changeWorkflowStatus || 'NONE') === 'PENDING_APPROVAL'
 }
 
 async function fetchData() {
@@ -161,9 +190,13 @@ async function fetchData() {
       pageSize: query.pageSize,
       contractNo: query.contractNo || undefined,
       elderName: query.elderName || undefined,
-      status: query.status || undefined
+      changeWorkflowStatus: query.changeWorkflowStatus || undefined
     })
-    rows.value = (page.list || []).map((item) => ({ ...item, id: String(item.id) }))
+    rows.value = (page.list || []).map((item) => ({
+      ...item,
+      id: String(item.id),
+      changeWorkflowRemark: item.changeWorkflowRemark || item.remark
+    }))
     total.value = page.total || 0
     selectedRowKeys.value = []
   } finally {
@@ -182,7 +215,7 @@ function requireSingle(action: string) {
 function openEditSelected() {
   const record = requireSingle('编辑')
   if (!record) return
-  Object.assign(editForm, record)
+  Object.assign(editForm, { ...record, changeWorkflowRemark: record.changeWorkflowRemark || record.remark })
   editOpen.value = true
 }
 
@@ -190,7 +223,11 @@ async function saveEdit() {
   if (!editForm.id) return
   saving.value = true
   try {
-    await updateCrmContract(String(editForm.id), { ...editForm })
+    await updateCrmContract(String(editForm.id), {
+      reservationRoomNo: editForm.reservationRoomNo,
+      contractExpiryDate: editForm.contractExpiryDate,
+      changeWorkflowRemark: editForm.changeWorkflowRemark
+    })
     message.success('变更保存成功')
     editOpen.value = false
     fetchData()
@@ -202,11 +239,7 @@ async function saveEdit() {
 async function startChangeSelected() {
   const record = requireSingle('发起变更')
   if (!record) return
-  await updateCrmContract(String(record.id), {
-    ...record,
-    contractStatus: '变更中',
-    remark: `${record.remark || ''} [变更发起]`.trim()
-  })
+  await startContractChange(String(record.id), `${record.changeWorkflowRemark || record.remark || ''} [变更发起]`.trim())
   message.success('已发起合同变更')
   fetchData()
 }
@@ -214,12 +247,7 @@ async function startChangeSelected() {
 async function submitApprovalSelected() {
   const record = requireSingle('提交审批')
   if (!record) return
-  await updateCrmContract(String(record.id), {
-    ...record,
-    status: 'PENDING_APPROVAL',
-    contractStatus: '变更待审批',
-    remark: `${record.remark || ''} [已提交审批]`.trim()
-  })
+  await submitContractChange(String(record.id), `${record.changeWorkflowRemark || record.remark || ''} [已提交审批]`.trim())
   message.success('已提交审批')
   fetchData()
 }
@@ -227,12 +255,7 @@ async function submitApprovalSelected() {
 async function approveSelected() {
   const record = requireSingle('审批通过')
   if (!record) return
-  await updateCrmContract(String(record.id), {
-    ...record,
-    status: 'APPROVED',
-    contractStatus: '变更已生效',
-    remark: `${record.remark || ''} [审批通过]`.trim()
-  })
+  await approveContractChange(String(record.id), `${record.changeWorkflowRemark || record.remark || ''} [审批通过]`.trim())
   message.success('审批通过')
   fetchData()
 }
@@ -240,19 +263,13 @@ async function approveSelected() {
 async function rejectSelected() {
   const record = requireSingle('审批驳回')
   if (!record) return
-  await updateCrmContract(String(record.id), {
-    ...record,
-    status: 'REJECTED',
-    contractStatus: '变更驳回',
-    remark: `${record.remark || ''} [审批驳回]`.trim()
-  })
+  await rejectContractChange(String(record.id), `${record.changeWorkflowRemark || record.remark || ''} [审批驳回]`.trim())
   message.success('已驳回')
   fetchData()
 }
 
 async function batchSetStatus(
-  status: CrmContractItem['status'],
-  contractStatus: string,
+  executor: (id: string, remark: string) => Promise<unknown>,
   remarkTag: string,
   actionText: string
 ) {
@@ -260,19 +277,10 @@ async function batchSetStatus(
     message.info(`请先勾选合同后再${actionText}`)
     return
   }
-  const targets = selectedRecords.value.filter((item) => String(item.status || '') !== String(status || ''))
-  if (!targets.length) {
-    message.info(`选中合同状态与目标状态一致，无需${actionText}`)
-    return
-  }
+  const targets = [...selectedRecords.value]
   await Promise.all(
     targets.map((item) =>
-      updateCrmContract(String(item.id), {
-        ...item,
-        status,
-        contractStatus,
-        remark: `${item.remark || ''} ${remarkTag}`.trim()
-      })
+      executor(String(item.id), `${item.changeWorkflowRemark || item.remark || ''} ${remarkTag}`.trim())
     )
   )
   message.success(`${actionText}完成：共处理 ${targets.length} 条`)
@@ -280,21 +288,21 @@ async function batchSetStatus(
 }
 
 function batchSubmitApproval() {
-  batchSetStatus('PENDING_APPROVAL', '变更待审批', '[已提交审批]', '批量提交审批')
+  batchSetStatus(submitContractChange, '[已提交审批]', '批量提交审批')
 }
 
 function batchApprove() {
-  batchSetStatus('APPROVED', '变更已生效', '[审批通过]', '批量审批通过')
+  batchSetStatus(approveContractChange, '[审批通过]', '批量审批通过')
 }
 
 function batchReject() {
-  batchSetStatus('REJECTED', '变更驳回', '[审批驳回]', '批量审批驳回')
+  batchSetStatus(rejectContractChange, '[审批驳回]', '批量审批驳回')
 }
 
 function reset() {
   query.contractNo = ''
   query.elderName = ''
-  query.status = undefined
+  query.changeWorkflowStatus = undefined
   query.pageNo = 1
   fetchData()
 }

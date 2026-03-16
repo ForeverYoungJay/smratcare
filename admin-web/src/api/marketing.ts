@@ -79,8 +79,32 @@ export function handoffContractToAssessment(contractId: Id) {
   return request.post<CrmContractItem>(`/api/crm/contracts/${contractId}/handoff-assessment`)
 }
 
+export function moveContractToBedSelect(contractId: Id) {
+  return request.post<CrmContractItem>(`/api/crm/contracts/${contractId}/move-to-bed-select`)
+}
+
+export function moveContractToPendingSign(contractId: Id) {
+  return request.post<CrmContractItem>(`/api/crm/contracts/${contractId}/move-to-pending-sign`)
+}
+
 export function finalizeContract(contractId: Id, remark?: string) {
   return request.post<CrmContractItem>(`/api/crm/contracts/${contractId}/finalize`, { remark })
+}
+
+export function startContractChange(contractId: Id, remark?: string) {
+  return request.post<CrmContractItem>(`/api/crm/contracts/${contractId}/change/start`, { remark })
+}
+
+export function submitContractChange(contractId: Id, remark?: string) {
+  return request.post<CrmContractItem>(`/api/crm/contracts/${contractId}/change/submit`, { remark })
+}
+
+export function approveContractChange(contractId: Id, remark?: string) {
+  return request.post<CrmContractItem>(`/api/crm/contracts/${contractId}/change/approve`, { remark })
+}
+
+export function rejectContractChange(contractId: Id, remark?: string) {
+  return request.post<CrmContractItem>(`/api/crm/contracts/${contractId}/change/reject`, { remark })
 }
 
 export function approveContract(contractId: Id, remark?: string) {

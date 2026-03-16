@@ -46,7 +46,7 @@
               <a-button @click="loadAll">刷新</a-button>
               <a-button @click="downloadBundle" :disabled="!filteredDocuments.length">导出清单</a-button>
               <a-button @click="copyQueryLink">复制查询链接</a-button>
-              <a-button type="primary" @click="goContractSigning">去上传附件</a-button>
+              <a-button type="primary" @click="goContractSigning">{{ isHistoricalImport ? '去完善历史资料' : '去上传附件' }}</a-button>
             </a-space>
           </template>
 
@@ -56,7 +56,6 @@
                 v-model:value="selectorInput"
                 width="220px"
                 placeholder="请输入长者姓名/拼音首字母"
-                :signed-only="true"
                 @select="onSelectorPick"
               />
             </a-form-item>
@@ -110,7 +109,7 @@
             show-icon
             style="margin-top: 12px"
             message="未检索到资料"
-            description="请先在营销管理-合同签约上传合同附件；入住评估完成后，评估报告会自动在此展示。"
+            :description="isHistoricalImport ? '请先在老人档案基础信息中上传历史合同附件；入住评估完成后，评估报告会自动在此展示。' : '请先上传合同附件；入住评估完成后，评估报告会自动在此展示。'"
           />
         </a-card>
       </a-col>
@@ -229,7 +228,8 @@ import type {
   ContractAssessmentOverview,
   ContractAssessmentReportItem,
   ContractAttachmentItem,
-  ContractLinkageSummary
+  ContractLinkageSummary,
+  ElderItem
 } from '../../../types'
 
 type DocumentKind = 'ATTACHMENT' | 'ASSESSMENT'
@@ -266,6 +266,7 @@ const lifecycleContext = computed(() => {
 const loading = ref(false)
 const errorMessage = ref('')
 const linkage = ref<ContractLinkageSummary>()
+const elderProfile = ref<ElderItem | null>(null)
 const assessmentOverview = ref<ContractAssessmentOverview>()
 const archiveRuleInfo = ref<ContractArchiveRuleInfo>()
 const docRouteSignature = ref('')
@@ -309,6 +310,18 @@ const documents = computed<DocumentItem[]>(() => {
     size: formatFileSize(item.fileSize),
     time: item.createTime || '-'
   }))
+  const historicalContract = elderProfile.value?.historicalContractFileUrl
+    ? [{
+        id: `elder-contract-${String(elderProfile.value?.id || '')}`,
+        kind: 'ATTACHMENT' as DocumentKind,
+        type: '历史合同附件',
+        name: fileNameFromUrl(elderProfile.value.historicalContractFileUrl) || '历史合同附件',
+        url: elderProfile.value.historicalContractFileUrl,
+        route: '',
+        size: '-',
+        time: elderProfile.value?.admissionDate || '-'
+      }]
+    : []
   const reports = flattenReports(assessmentOverview.value).map((report) => ({
     id: `report-${report.recordId}`,
     kind: 'ASSESSMENT' as DocumentKind,
@@ -321,7 +334,7 @@ const documents = computed<DocumentItem[]>(() => {
     size: '-',
     time: report.assessmentDate || '-'
   }))
-  return [...attachments, ...reports]
+  return [...historicalContract, ...attachments, ...reports]
 })
 
 const filteredDocuments = computed(() => {
@@ -335,7 +348,11 @@ const filteredDocuments = computed(() => {
   })
 })
 
-const contractAttachmentCount = computed(() => linkage.value?.attachmentCount || 0)
+const contractAttachmentCount = computed(() => {
+  const crmCount = Number(linkage.value?.attachmentCount || 0)
+  return crmCount + (elderProfile.value?.historicalContractFileUrl ? 1 : 0)
+})
+const isHistoricalImport = computed(() => elderProfile.value?.sourceType === 'HISTORICAL_IMPORT')
 const assessmentReportCount = computed(() => flattenReports(assessmentOverview.value).length)
 const resolvedLifecycleStage = computed(() =>
   normalizeLifecycleStage(linkage.value?.flowStage, linkage.value?.contractStatus)
@@ -377,24 +394,35 @@ function contractStatusText(status?: string) {
   if (value === 'VOID') return '已作废'
   return status || '-'
 }
-const hasContractAttachment = computed(() =>
-  linkage.value?.hasContractAttachment ?? contractAttachmentCount.value > 0
-)
-const hasInvoiceAttachment = computed(() =>
-  linkage.value?.hasInvoiceAttachment ?? (linkage.value?.attachments || []).some((item) => normalizeAttachmentType(item) === '收据/发票')
-)
-const hasIdAttachment = computed(() =>
-  linkage.value?.hasIdAttachment
-    ?? (linkage.value?.attachments || []).some((item) => {
-      const type = String(item.attachmentType || '').toUpperCase()
-      const fileName = String(item.fileName || '').toLowerCase()
-      return type.includes('ID') || type.includes('IDENT') || type === 'HOUSEHOLD' || type === 'MEDICAL_INSURANCE'
-        || fileName.includes('身份证') || fileName.includes('户口') || fileName.includes('医保')
-    })
-)
-const hasAssessmentReport = computed(() =>
-  linkage.value?.hasAssessmentReport ?? assessmentReportCount.value > 0
-)
+const hasContractAttachment = computed(() => {
+  if (linkage.value?.hasContractAttachment !== undefined && linkage.value?.hasContractAttachment !== null) {
+    return Boolean(linkage.value.hasContractAttachment)
+  }
+  return contractAttachmentCount.value > 0 || Boolean(elderProfile.value?.historicalContractFileUrl)
+})
+const hasInvoiceAttachment = computed(() => {
+  if (linkage.value?.hasInvoiceAttachment !== undefined && linkage.value?.hasInvoiceAttachment !== null) {
+    return Boolean(linkage.value.hasInvoiceAttachment)
+  }
+  return (linkage.value?.attachments || []).some((item) => normalizeAttachmentType(item) === '收据/发票')
+})
+const hasIdAttachment = computed(() => {
+  if (linkage.value?.hasIdAttachment !== undefined && linkage.value?.hasIdAttachment !== null) {
+    return Boolean(linkage.value.hasIdAttachment)
+  }
+  return (linkage.value?.attachments || []).some((item) => {
+    const type = String(item.attachmentType || '').toUpperCase()
+    const fileName = String(item.fileName || '').toLowerCase()
+    return type.includes('ID') || type.includes('IDENT') || type === 'HOUSEHOLD' || type === 'MEDICAL_INSURANCE'
+      || fileName.includes('身份证') || fileName.includes('户口') || fileName.includes('医保')
+  })
+})
+const hasAssessmentReport = computed(() => {
+  if (linkage.value?.hasAssessmentReport !== undefined && linkage.value?.hasAssessmentReport !== null) {
+    return Boolean(linkage.value.hasAssessmentReport)
+  }
+  return assessmentReportCount.value > 0
+})
 const archiveCompleteScore = computed(() => {
   const score = Number(linkage.value?.archiveScore)
   if (Number.isFinite(score)) return Math.max(0, Math.min(100, Math.round(score)))
@@ -584,6 +612,11 @@ function go(path: string) {
 }
 
 function goContractSigning() {
+  const elderId = String(linkage.value?.elderId || elderProfile.value?.id || '').trim()
+  if (isHistoricalImport.value && elderId) {
+    router.push(`/elder/detail/${elderId}?tab=base`)
+    return
+  }
   if (linkage.value?.contractNo) {
     router.push(`/marketing/contract-signing?contractNo=${encodeURIComponent(linkage.value.contractNo)}`)
     return
@@ -592,9 +625,13 @@ function goContractSigning() {
 }
 
 function goAttachmentUpload(attachmentType: 'CONTRACT' | 'HOUSEHOLD' | 'MEDICAL_INSURANCE' | 'MEDICAL_RECORD' | 'OTHER') {
+  const elderId = String(linkage.value?.elderId || elderProfile.value?.id || '').trim()
+  if (isHistoricalImport.value && elderId) {
+    router.push(`/elder/detail/${elderId}?tab=base`)
+    return
+  }
   const contractNo = String(linkage.value?.contractNo || '').trim()
   const elderName = String(resolvedLinkageElderName.value || '').trim()
-  const elderId = String(linkage.value?.elderId || '').trim()
   const query: Record<string, string> = {
     openAttachment: '1',
     attachmentType
@@ -606,6 +643,11 @@ function goAttachmentUpload(attachmentType: 'CONTRACT' | 'HOUSEHOLD' | 'MEDICAL_
 }
 
 function goContractManagement() {
+  const elderId = String(linkage.value?.elderId || elderProfile.value?.id || '').trim()
+  if (isHistoricalImport.value && elderId) {
+    router.push(`/elder/detail/${elderId}?tab=base`)
+    return
+  }
   if (linkage.value?.contractNo) {
     router.push(`/marketing/contract-management?contractNo=${encodeURIComponent(linkage.value.contractNo)}`)
     return
@@ -673,6 +715,12 @@ function formatFileSize(size?: number) {
   if (size < 1024) return `${size} B`
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function fileNameFromUrl(url?: string) {
+  if (!url) return ''
+  const text = String(url).split('/').pop() || url
+  return decodeURIComponent(text)
 }
 
 function formatAmount(value?: number) {
@@ -780,6 +828,7 @@ async function loadAll() {
   errorMessage.value = ''
   try {
     linkage.value = await resolveLinkage()
+    elderProfile.value = null
     if (!linkage.value) {
       assessmentOverview.value = undefined
       return
@@ -793,15 +842,22 @@ async function loadAll() {
         if (!selectorInput.value.trim()) {
           selectorInput.value = likelyName
         }
+        try {
+          elderProfile.value = await getElderDetail(linkageElderId)
+        } catch {
+          elderProfile.value = null
+        }
       } else {
         try {
           const elder = await getElderDetail(linkageElderId)
+          elderProfile.value = elder
           const detailName = String(elder?.fullName || '').trim() || undefined
           ensureSelectedElder(linkageElderId, detailName)
           if (detailName && !selectorInput.value.trim()) {
             selectorInput.value = detailName
           }
         } catch {
+          elderProfile.value = null
           ensureSelectedElder(linkageElderId)
         }
       }

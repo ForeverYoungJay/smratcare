@@ -196,8 +196,10 @@ export interface OaPortalSummary {
   documentCount?: number
   inventoryLowStockCount?: number
   approvalTimeoutCount?: number
+  pendingMedicalOrderCount?: number
   elderAbnormalCount?: number
   healthAbnormalCount?: number
+  elderContractExpiringCount?: number
   incidentOpenCount?: number
   materialTransferDraftCount?: number
   materialPurchaseDraftCount?: number

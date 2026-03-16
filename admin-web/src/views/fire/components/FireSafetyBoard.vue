@@ -16,7 +16,7 @@
       <template #extra>
         <a-space>
           <a-button v-if="props.recordType === 'MAINTENANCE_REPORT'" @click="downloadMaintenanceLog">一键下载维护保养日志</a-button>
-          <a-button @click="openScan">扫码完成</a-button>
+          <a-button v-if="viewConfig.supportsQr" @click="openScan">扫码完成</a-button>
           <a-button type="primary" @click="openCreate">新增记录</a-button>
         </a-space>
       </template>
@@ -27,16 +27,16 @@
       <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="处理中" :value="summary.openCount || 0" /></a-card></a-col>
       <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已关闭" :value="summary.closedCount || 0" /></a-card></a-col>
       <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="逾期项" :value="summary.overdueCount || 0" /></a-card></a-col>
-      <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="7天内待检" :value="summary.nextCheckDueSoonCount || 0" /></a-card></a-col>
-      <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="30天内到期" :value="summary.expiringSoonCount || 0" /></a-card></a-col>
+      <a-col v-if="viewConfig.showNextCheck" :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="7天内待检" :value="summary.nextCheckDueSoonCount || 0" /></a-card></a-col>
+      <a-col v-if="viewConfig.showProductLifecycle" :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="30天内到期" :value="summary.expiringSoonCount || 0" /></a-card></a-col>
     </a-row>
 
     <a-alert
-      v-if="(summary.overdueCount || 0) > 0 || (summary.expiringSoonCount || 0) > 0"
+      v-if="warningMessage"
       type="warning"
       show-icon
       style="margin-top: 12px"
-      :message="`异常提醒：逾期 ${summary.overdueCount || 0} 项，30天内到期 ${summary.expiringSoonCount || 0} 项，请优先处理。`"
+      :message="warningMessage"
     />
 
     <DataTable
@@ -62,9 +62,12 @@
         <template v-else-if="column.key === 'scanCompletedAt'">
           {{ record.scanCompletedAt || '-' }}
         </template>
+        <template v-else-if="column.key === 'nextCheckDate'">
+          {{ record.nextCheckDate || '-' }}
+        </template>
         <template v-else-if="column.key === 'action'">
           <a-space wrap>
-            <a-button type="link" @click="openQr(record)">生成二维码</a-button>
+            <a-button v-if="viewConfig.supportsQr" type="link" @click="openQr(record)">生成二维码</a-button>
             <a-button type="link" @click="openEdit(record)">编辑</a-button>
             <a-button type="link" :disabled="record.status === 'CLOSED'" @click="closeRecord(record)">关闭</a-button>
             <a-button type="link" danger @click="remove(record)">删除</a-button>
@@ -105,31 +108,34 @@
             </a-form-item>
           </a-col>
         </a-row>
-        <a-row :gutter="16">
-          <a-col :span="12">
+
+        <a-row v-if="viewConfig.showDutyRecord || viewConfig.showHandoverPunch" :gutter="16">
+          <a-col v-if="viewConfig.showDutyRecord" :span="12">
             <a-form-item label="值班记录">
               <a-textarea v-model:value="form.dutyRecord" :rows="2" />
             </a-form-item>
           </a-col>
-          <a-col :span="12">
+          <a-col v-if="viewConfig.showHandoverPunch" :span="12">
             <a-form-item label="交接班打卡时间">
               <a-date-picker v-model:value="form.handoverPunchTime" show-time style="width: 100%" />
             </a-form-item>
           </a-col>
         </a-row>
-        <a-row :gutter="16">
-          <a-col :span="12">
+
+        <a-row v-if="viewConfig.showEquipmentBatch || viewConfig.showProductLifecycle" :gutter="16">
+          <a-col v-if="viewConfig.showEquipmentBatch" :span="12">
             <a-form-item label="设备批号">
               <a-input v-model:value="form.equipmentBatchNo" placeholder="如：XF-2026-01" />
             </a-form-item>
           </a-col>
-          <a-col :span="12">
+          <a-col v-if="viewConfig.showProductLifecycle" :span="12">
             <a-form-item label="产品生产时间">
               <a-date-picker v-model:value="form.productProductionDate" style="width: 100%" />
             </a-form-item>
           </a-col>
         </a-row>
-        <a-row :gutter="16">
+
+        <a-row v-if="viewConfig.showProductLifecycle" :gutter="16">
           <a-col :span="12">
             <a-form-item label="产品过期时间">
               <a-date-picker v-model:value="form.productExpiryDate" style="width: 100%" />
@@ -141,31 +147,34 @@
             </a-form-item>
           </a-col>
         </a-row>
-        <a-row :gutter="16">
-          <a-col :span="12">
+
+        <a-row v-if="viewConfig.showEquipmentUpdateNote || viewConfig.showEquipmentAgingDisposal" :gutter="16">
+          <a-col v-if="viewConfig.showEquipmentUpdateNote" :span="12">
             <a-form-item label="设备更新记录">
-              <a-input v-model:value="form.equipmentUpdateNote" placeholder="设备更新内容" />
+              <a-textarea v-model:value="form.equipmentUpdateNote" :rows="2" />
             </a-form-item>
           </a-col>
-          <a-col :span="12">
+          <a-col v-if="viewConfig.showEquipmentAgingDisposal" :span="12">
             <a-form-item label="设备老化处置记录">
               <a-textarea v-model:value="form.equipmentAgingDisposal" :rows="2" />
             </a-form-item>
           </a-col>
         </a-row>
+
         <a-form-item label="问题描述">
           <a-textarea v-model:value="form.issueDescription" :rows="3" />
         </a-form-item>
         <a-form-item label="处置措施">
           <a-textarea v-model:value="form.actionTaken" :rows="3" />
         </a-form-item>
+
         <a-row :gutter="16">
-          <a-col :span="12">
+          <a-col v-if="viewConfig.showNextCheck" :span="12">
             <a-form-item label="下次检查日期">
               <a-date-picker v-model:value="form.nextCheckDate" style="width: 100%" />
             </a-form-item>
           </a-col>
-          <a-col :span="12">
+          <a-col :span="viewConfig.showNextCheck ? 12 : 24">
             <a-form-item label="状态">
               <a-select v-model:value="form.status" :options="statusOptions" />
             </a-form-item>
@@ -174,7 +183,7 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="qrOpen" title="巡查二维码" :footer="null" width="520px">
+    <a-modal v-if="viewConfig.supportsQr" v-model:open="qrOpen" title="巡查二维码" :footer="null" width="520px">
       <a-space direction="vertical" style="width: 100%" align="center">
         <img v-if="qrDataUrl" :src="qrDataUrl" alt="巡查二维码" style="width: 240px; height: 240px" />
         <a-typography-text copyable>{{ qrText }}</a-typography-text>
@@ -182,7 +191,7 @@
       </a-space>
     </a-modal>
 
-    <a-modal v-model:open="scanOpen" title="扫码完成巡查" :footer="null" width="560px">
+    <a-modal v-if="viewConfig.supportsQr" v-model:open="scanOpen" title="扫码完成巡查" :footer="null" width="560px">
       <a-form layout="vertical">
         <a-form-item label="二维码令牌" required>
           <a-input
@@ -207,7 +216,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import dayjs, { Dayjs } from 'dayjs'
 import QRCode from 'qrcode'
 import { message } from 'ant-design-vue'
@@ -225,7 +234,18 @@ import {
   getFireSafetySummary,
   updateFireSafetyRecord
 } from '../../../api/fire'
-import type { FireSafetyRecord, FireSafetyRecordType, FireSafetyReportSummary, FireSafetyStatus, PageResult } from '../../../types'
+import type { FireSafetyRecord, FireSafetyRecordType, FireSafetyReportSummary, FireSafetyStatus } from '../../../types'
+
+type FireBoardViewConfig = {
+  showDutyRecord: boolean
+  showHandoverPunch: boolean
+  showEquipmentBatch: boolean
+  showProductLifecycle: boolean
+  showEquipmentUpdateNote: boolean
+  showEquipmentAgingDisposal: boolean
+  showNextCheck: boolean
+  supportsQr: boolean
+}
 
 const props = defineProps<{
   title: string
@@ -244,7 +264,8 @@ const query = reactive({
   pageSize: 10
 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
-const summary = reactive<FireSafetyReportSummary>({
+
+const defaultSummary = (): FireSafetyReportSummary => ({
   totalCount: 0,
   openCount: 0,
   closedCount: 0,
@@ -260,20 +281,143 @@ const summary = reactive<FireSafetyReportSummary>({
   typeStats: []
 })
 
-const columns = [
-  { title: '标题', dataIndex: 'title', key: 'title', width: 180 },
-  { title: '区域/位置', dataIndex: 'location', key: 'location', width: 150 },
-  { title: '负责人', dataIndex: 'inspectorName', key: 'inspectorName', width: 100 },
-  { title: '检查时间', dataIndex: 'checkTime', key: 'checkTime', width: 170 },
-  { title: '设备批号', dataIndex: 'equipmentBatchNo', key: 'equipmentBatchNo', width: 140 },
-  { title: '生产时间', dataIndex: 'productProductionDate', key: 'productProductionDate', width: 120 },
-  { title: '过期时间', dataIndex: 'productExpiryDate', key: 'productExpiryDate', width: 120 },
-  { title: '检查周期(天)', dataIndex: 'checkCycleDays', key: 'checkCycleDays', width: 110 },
-  { title: '二维码令牌', dataIndex: 'qrToken', key: 'qrToken', width: 140 },
-  { title: '扫码完成时间', dataIndex: 'scanCompletedAt', key: 'scanCompletedAt', width: 160 },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 90 },
-  { title: '操作', key: 'action', width: 270 }
-]
+const summary = reactive<FireSafetyReportSummary>(defaultSummary())
+
+const viewConfigMap: Record<FireSafetyRecordType, FireBoardViewConfig> = {
+  FACILITY: {
+    showDutyRecord: false,
+    showHandoverPunch: false,
+    showEquipmentBatch: true,
+    showProductLifecycle: true,
+    showEquipmentUpdateNote: true,
+    showEquipmentAgingDisposal: true,
+    showNextCheck: true,
+    supportsQr: false
+  },
+  CONTROL_ROOM_DUTY: {
+    showDutyRecord: true,
+    showHandoverPunch: true,
+    showEquipmentBatch: false,
+    showProductLifecycle: false,
+    showEquipmentUpdateNote: false,
+    showEquipmentAgingDisposal: false,
+    showNextCheck: false,
+    supportsQr: false
+  },
+  MONTHLY_CHECK: {
+    showDutyRecord: false,
+    showHandoverPunch: false,
+    showEquipmentBatch: false,
+    showProductLifecycle: false,
+    showEquipmentUpdateNote: false,
+    showEquipmentAgingDisposal: false,
+    showNextCheck: true,
+    supportsQr: true
+  },
+  DAY_PATROL: {
+    showDutyRecord: false,
+    showHandoverPunch: false,
+    showEquipmentBatch: false,
+    showProductLifecycle: false,
+    showEquipmentUpdateNote: false,
+    showEquipmentAgingDisposal: false,
+    showNextCheck: true,
+    supportsQr: true
+  },
+  NIGHT_PATROL: {
+    showDutyRecord: false,
+    showHandoverPunch: false,
+    showEquipmentBatch: false,
+    showProductLifecycle: false,
+    showEquipmentUpdateNote: false,
+    showEquipmentAgingDisposal: false,
+    showNextCheck: true,
+    supportsQr: true
+  },
+  MAINTENANCE_REPORT: {
+    showDutyRecord: false,
+    showHandoverPunch: false,
+    showEquipmentBatch: true,
+    showProductLifecycle: true,
+    showEquipmentUpdateNote: true,
+    showEquipmentAgingDisposal: false,
+    showNextCheck: false,
+    supportsQr: false
+  },
+  FAULT_MAINTENANCE: {
+    showDutyRecord: false,
+    showHandoverPunch: false,
+    showEquipmentBatch: true,
+    showProductLifecycle: false,
+    showEquipmentUpdateNote: false,
+    showEquipmentAgingDisposal: false,
+    showNextCheck: false,
+    supportsQr: false
+  }
+}
+
+const viewConfig = computed(() => viewConfigMap[props.recordType])
+
+const warningMessage = computed(() => {
+  const warnings: string[] = []
+  if ((summary.overdueCount || 0) > 0) {
+    warnings.push(`逾期 ${summary.overdueCount || 0} 项`)
+  }
+  if (viewConfig.value.showProductLifecycle && (summary.expiringSoonCount || 0) > 0) {
+    warnings.push(`30天内到期 ${summary.expiringSoonCount || 0} 项`)
+  }
+  if (warnings.length === 0) {
+    return ''
+  }
+  return `异常提醒：${warnings.join('，')}，请优先处理。`
+})
+
+const columns = computed(() => {
+  const items: Array<Record<string, unknown>> = [
+    { title: '标题', dataIndex: 'title', key: 'title', width: 180 },
+    { title: '区域/位置', dataIndex: 'location', key: 'location', width: 150 },
+    { title: '负责人', dataIndex: 'inspectorName', key: 'inspectorName', width: 100 },
+    { title: '检查时间', dataIndex: 'checkTime', key: 'checkTime', width: 170 }
+  ]
+
+  if (viewConfig.value.showDutyRecord) {
+    items.push({ title: '值班记录', dataIndex: 'dutyRecord', key: 'dutyRecord', width: 220 })
+  }
+  if (viewConfig.value.showHandoverPunch) {
+    items.push({ title: '交接班打卡', dataIndex: 'handoverPunchTime', key: 'handoverPunchTime', width: 160 })
+  }
+  if (viewConfig.value.showEquipmentBatch) {
+    items.push({ title: '设备批号', dataIndex: 'equipmentBatchNo', key: 'equipmentBatchNo', width: 140 })
+  }
+  if (viewConfig.value.showProductLifecycle) {
+    items.push(
+      { title: '生产时间', dataIndex: 'productProductionDate', key: 'productProductionDate', width: 120 },
+      { title: '过期时间', dataIndex: 'productExpiryDate', key: 'productExpiryDate', width: 120 },
+      { title: '检查周期(天)', dataIndex: 'checkCycleDays', key: 'checkCycleDays', width: 110 }
+    )
+  }
+  if (viewConfig.value.showEquipmentUpdateNote) {
+    items.push({ title: '设备更新记录', dataIndex: 'equipmentUpdateNote', key: 'equipmentUpdateNote', width: 200 })
+  }
+  if (viewConfig.value.showEquipmentAgingDisposal) {
+    items.push({ title: '设备老化处置', dataIndex: 'equipmentAgingDisposal', key: 'equipmentAgingDisposal', width: 200 })
+  }
+  if (viewConfig.value.showNextCheck) {
+    items.push({ title: '下次检查日期', dataIndex: 'nextCheckDate', key: 'nextCheckDate', width: 130 })
+  }
+  if (viewConfig.value.supportsQr) {
+    items.push(
+      { title: '二维码令牌', dataIndex: 'qrToken', key: 'qrToken', width: 140 },
+      { title: '扫码完成时间', dataIndex: 'scanCompletedAt', key: 'scanCompletedAt', width: 160 }
+    )
+  }
+
+  items.push(
+    { title: '状态', dataIndex: 'status', key: 'status', width: 90 },
+    { title: '操作', key: 'action', width: viewConfig.value.supportsQr ? 270 : 200 }
+  )
+  return items
+})
 
 const editOpen = ref(false)
 const saving = ref(false)
@@ -317,6 +461,15 @@ const statusOptions = [
   { label: '已关闭', value: 'CLOSED' }
 ]
 
+function resetSummary() {
+  Object.assign(summary, defaultSummary())
+}
+
+function normalizeText(value: string) {
+  const trimmed = String(value || '').trim()
+  return trimmed || undefined
+}
+
 async function fetchData() {
   loading.value = true
   try {
@@ -334,13 +487,19 @@ async function fetchData() {
       }),
       getFireSafetySummary({
         recordType: props.recordType,
-        dateFrom: checkTimeStart ? dayjs(checkTimeStart).format('YYYY-MM-DD') : undefined,
-        dateTo: checkTimeEnd ? dayjs(checkTimeEnd).format('YYYY-MM-DD') : undefined
+        checkTimeStart,
+        checkTimeEnd
       })
     ])
     rows.value = res.list
+    pagination.current = res.pageNo || query.pageNo
+    pagination.pageSize = res.pageSize || query.pageSize
     pagination.total = res.total || res.list.length
-    Object.assign(summary, sum || {})
+    Object.assign(summary, defaultSummary(), sum || {})
+  } catch (_error) {
+    rows.value = []
+    pagination.total = 0
+    resetSummary()
   } finally {
     loading.value = false
   }
@@ -366,7 +525,7 @@ function onReset() {
   fetchData()
 }
 
-function openCreate() {
+function resetForm() {
   form.id = undefined
   form.title = ''
   form.location = ''
@@ -384,10 +543,15 @@ function openCreate() {
   form.checkCycleDays = undefined
   form.equipmentUpdateNote = ''
   form.equipmentAgingDisposal = ''
+}
+
+function openCreate() {
+  resetForm()
   editOpen.value = true
 }
 
 function openEdit(record: FireSafetyRecord) {
+  resetForm()
   form.id = record.id
   form.title = record.title
   form.location = record.location || ''
@@ -408,26 +572,65 @@ function openEdit(record: FireSafetyRecord) {
   editOpen.value = true
 }
 
+function validateForm() {
+  if (!normalizeText(form.title)) {
+    message.warning('请输入标题')
+    return false
+  }
+  if (!normalizeText(form.inspectorName)) {
+    message.warning('请输入负责人')
+    return false
+  }
+  if (!form.checkTime) {
+    message.warning('请选择检查时间')
+    return false
+  }
+  if (viewConfig.value.showProductLifecycle && form.productProductionDate && form.productExpiryDate
+    && form.productExpiryDate.isBefore(form.productProductionDate, 'day')) {
+    message.warning('产品过期时间不能早于生产时间')
+    return false
+  }
+  if (viewConfig.value.showNextCheck && form.nextCheckDate
+    && form.nextCheckDate.isBefore(form.checkTime.startOf('day'), 'day')) {
+    message.warning('下次检查日期不能早于检查日期')
+    return false
+  }
+  return true
+}
+
 async function submit() {
+  if (!validateForm()) {
+    return
+  }
+
   const payload = {
     recordType: props.recordType,
-    title: form.title,
-    location: form.location || undefined,
-    inspectorName: form.inspectorName,
+    title: normalizeText(form.title),
+    location: normalizeText(form.location),
+    inspectorName: normalizeText(form.inspectorName),
     checkTime: form.checkTime ? dayjs(form.checkTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
     status: form.status,
-    issueDescription: form.issueDescription || undefined,
-    actionTaken: form.actionTaken || undefined,
-    nextCheckDate: form.nextCheckDate ? dayjs(form.nextCheckDate).format('YYYY-MM-DD') : undefined,
-    dutyRecord: form.dutyRecord || undefined,
-    handoverPunchTime: form.handoverPunchTime ? dayjs(form.handoverPunchTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
-    equipmentBatchNo: form.equipmentBatchNo || undefined,
-    productProductionDate: form.productProductionDate ? dayjs(form.productProductionDate).format('YYYY-MM-DD') : undefined,
-    productExpiryDate: form.productExpiryDate ? dayjs(form.productExpiryDate).format('YYYY-MM-DD') : undefined,
-    checkCycleDays: form.checkCycleDays,
-    equipmentUpdateNote: form.equipmentUpdateNote || undefined,
-    equipmentAgingDisposal: form.equipmentAgingDisposal || undefined
+    issueDescription: normalizeText(form.issueDescription),
+    actionTaken: normalizeText(form.actionTaken),
+    nextCheckDate: viewConfig.value.showNextCheck && form.nextCheckDate
+      ? dayjs(form.nextCheckDate).format('YYYY-MM-DD')
+      : undefined,
+    dutyRecord: viewConfig.value.showDutyRecord ? normalizeText(form.dutyRecord) : undefined,
+    handoverPunchTime: viewConfig.value.showHandoverPunch && form.handoverPunchTime
+      ? dayjs(form.handoverPunchTime).format('YYYY-MM-DDTHH:mm:ss')
+      : undefined,
+    equipmentBatchNo: viewConfig.value.showEquipmentBatch ? normalizeText(form.equipmentBatchNo) : undefined,
+    productProductionDate: viewConfig.value.showProductLifecycle && form.productProductionDate
+      ? dayjs(form.productProductionDate).format('YYYY-MM-DD')
+      : undefined,
+    productExpiryDate: viewConfig.value.showProductLifecycle && form.productExpiryDate
+      ? dayjs(form.productExpiryDate).format('YYYY-MM-DD')
+      : undefined,
+    checkCycleDays: viewConfig.value.showProductLifecycle ? form.checkCycleDays : undefined,
+    equipmentUpdateNote: viewConfig.value.showEquipmentUpdateNote ? normalizeText(form.equipmentUpdateNote) : undefined,
+    equipmentAgingDisposal: viewConfig.value.showEquipmentAgingDisposal ? normalizeText(form.equipmentAgingDisposal) : undefined
   }
+
   saving.value = true
   try {
     if (form.id) {
@@ -436,7 +639,7 @@ async function submit() {
       await createFireSafetyRecord(payload)
     }
     editOpen.value = false
-    fetchData()
+    await fetchData()
   } finally {
     saving.value = false
   }
@@ -498,15 +701,11 @@ async function submitScan() {
   scanForm.qrToken = token
   scanSaving.value = true
   try {
-    const data = await completeFireSafetyByScan({
+    await completeFireSafetyByScan({
       qrToken: token,
-      inspectorName: scanForm.inspectorName || undefined,
-      actionTaken: scanForm.actionTaken || undefined
+      inspectorName: normalizeText(scanForm.inspectorName),
+      actionTaken: normalizeText(scanForm.actionTaken)
     })
-    if (!data) {
-      message.error('未匹配到巡查记录，请核对二维码')
-      return
-    }
     message.success('扫码完成成功')
     scanOpen.value = false
     fetchData()

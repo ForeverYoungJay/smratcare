@@ -10,6 +10,7 @@ import com.zhiyangyun.care.elder.model.ElderCreateRequest;
 import com.zhiyangyun.care.elder.model.ElderProfileChangeApprovalRequest;
 import com.zhiyangyun.care.elder.model.ElderResponse;
 import com.zhiyangyun.care.elder.model.ElderUpdateRequest;
+import com.zhiyangyun.care.elder.model.UnbindBedRequest;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.service.ElderService;
 import com.zhiyangyun.care.oa.entity.OaApproval;
@@ -113,9 +114,27 @@ public class ElderController {
       @RequestParam(required = false) String keyword,
       @RequestParam(defaultValue = "false") Boolean signedOnly,
       @RequestParam(required = false) Integer status,
-      @RequestParam(required = false) Integer elderStatus) {
+      @RequestParam(required = false) Integer elderStatus,
+      @RequestParam(required = false) String fullName,
+      @RequestParam(required = false) String idCardNo,
+      @RequestParam(required = false) String bedNo,
+      @RequestParam(required = false) String careLevel,
+      @RequestParam(required = false) String sortBy,
+      @RequestParam(required = false) String sortOrder) {
     Integer queryStatus = status == null ? elderStatus : status;
-    return Result.ok(elderService.page(AuthContext.getOrgId(), pageNo, pageSize, keyword, signedOnly, queryStatus));
+    return Result.ok(elderService.page(
+        AuthContext.getOrgId(),
+        pageNo,
+        pageSize,
+        keyword,
+        signedOnly,
+        queryStatus,
+        fullName,
+        idCardNo,
+        bedNo,
+        careLevel,
+        sortBy,
+        sortOrder));
   }
 
   @PostMapping("/{id}/assignBed")
@@ -131,10 +150,13 @@ public class ElderController {
 
   @PostMapping("/{id}/unbindBed")
   public Result<ElderResponse> unbindBed(@PathVariable Long id,
+      @RequestBody(required = false) UnbindBedRequest request,
       @RequestParam(required = false) LocalDate endDate,
       @RequestParam(required = false) String reason) {
     Long tenantId = AuthContext.getOrgId();
-    ElderResponse response = elderService.unbindBed(id, endDate, reason, tenantId, AuthContext.getStaffId());
+    LocalDate actualEndDate = request != null && request.getEndDate() != null ? request.getEndDate() : endDate;
+    String actualReason = request != null && request.getReason() != null ? request.getReason() : reason;
+    ElderResponse response = elderService.unbindBed(id, actualEndDate, actualReason, tenantId, AuthContext.getStaffId());
     auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "BED_UNBIND", "ELDER", id, "床位解绑");
     return Result.ok(response);

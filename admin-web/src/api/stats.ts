@@ -16,7 +16,7 @@ export function getCheckInStats(params?: { from?: string; to?: string; months?: 
   return request.get<CheckInStatsResponse>('/api/stats/check-in', { params })
 }
 
-export function getConsumptionStats(params?: { from?: string; to?: string; months?: number; orgId?: Id }) {
+export function getConsumptionStats(params?: { from?: string; to?: string; months?: number; elderId?: Id; orgId?: Id }) {
   return request.get<ConsumptionStatsResponse>('/api/stats/consumption', { params })
 }
 
@@ -90,7 +90,7 @@ export function exportCheckInStatsCsv(params?: { from?: string; to?: string; mon
   return exportStatsCsv('/api/stats/check-in/export', `check-in-stats-${new Date().toISOString().slice(0, 10)}.csv`, params)
 }
 
-export function exportConsumptionStatsCsv(params?: { from?: string; to?: string; months?: number; orgId?: Id }) {
+export function exportConsumptionStatsCsv(params?: { from?: string; to?: string; months?: number; elderId?: Id; orgId?: Id }) {
   return exportStatsCsv('/api/stats/consumption/export', `consumption-stats-${new Date().toISOString().slice(0, 10)}.csv`, params)
 }
 

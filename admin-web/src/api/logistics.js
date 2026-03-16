@@ -7,6 +7,9 @@ export function getLogisticsWorkbenchSummary(params, config) {
 export function getLogisticsEquipmentPage(params) {
     return fetchPage('/api/logistics/equipment/page', params);
 }
+export function getLogisticsEquipmentSummary(params) {
+    return request.get('/api/logistics/equipment/summary', { params });
+}
 export function createLogisticsEquipment(data) {
     return request.post('/api/logistics/equipment', data);
 }

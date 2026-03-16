@@ -126,6 +126,13 @@ export interface LogisticsEquipmentArchive {
   remark?: string
 }
 
+export interface LogisticsEquipmentArchiveSummary {
+  total: number
+  enabled: number
+  maintaining: number
+  dueSoon: number
+}
+
 export interface LogisticsMaintenanceTodoJobLog {
   id: Id
   orgId?: Id

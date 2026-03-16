@@ -16,6 +16,7 @@ import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -50,21 +51,33 @@ public class LogisticsEquipmentArchiveController {
       @RequestParam(required = false) String keyword,
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String category) {
-    Long orgId = AuthContext.getOrgId();
-    var wrapper = Wrappers.lambdaQuery(LogisticsEquipmentArchive.class)
-        .eq(LogisticsEquipmentArchive::getIsDeleted, 0)
-        .eq(orgId != null, LogisticsEquipmentArchive::getOrgId, orgId)
-        .eq(status != null && !status.isBlank(), LogisticsEquipmentArchive::getStatus, status)
-        .eq(category != null && !category.isBlank(), LogisticsEquipmentArchive::getCategory, category);
-    if (keyword != null && !keyword.isBlank()) {
-      wrapper.and(w -> w.like(LogisticsEquipmentArchive::getEquipmentCode, keyword)
-          .or().like(LogisticsEquipmentArchive::getEquipmentName, keyword)
-          .or().like(LogisticsEquipmentArchive::getCategory, keyword)
-          .or().like(LogisticsEquipmentArchive::getLocation, keyword)
-          .or().like(LogisticsEquipmentArchive::getSerialNo, keyword));
-    }
+    var wrapper = buildPageWrapper(AuthContext.getOrgId(), keyword, status, category);
     wrapper.orderByDesc(LogisticsEquipmentArchive::getCreateTime);
     return Result.ok(equipmentMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
+  }
+
+  @GetMapping("/summary")
+  public Result<Map<String, Long>> summary(
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String status,
+      @RequestParam(required = false) String category) {
+    List<LogisticsEquipmentArchive> rows = equipmentMapper.selectList(
+        buildPageWrapper(AuthContext.getOrgId(), keyword, status, category));
+    long total = rows.size();
+    long enabled = rows.stream().filter(item -> "ENABLED".equals(item.getStatus())).count();
+    long maintaining = rows.stream().filter(item -> "MAINTENANCE".equals(item.getStatus())).count();
+    LocalDateTime now = LocalDateTime.now();
+    long dueSoon = rows.stream()
+        .filter(item -> item.getNextMaintainedAt() != null
+            && !item.getNextMaintainedAt().isBefore(now)
+            && !item.getNextMaintainedAt().isAfter(now.plusDays(30)))
+        .count();
+    Map<String, Long> result = new HashMap<>();
+    result.put("total", total);
+    result.put("enabled", enabled);
+    result.put("maintaining", maintaining);
+    result.put("dueSoon", dueSoon);
+    return Result.ok(result);
   }
 
   @PostMapping
@@ -161,6 +174,26 @@ public class LogisticsEquipmentArchiveController {
         .eq(LogisticsEquipmentArchive::getIsDeleted, 0)
         .eq(orgId != null, LogisticsEquipmentArchive::getOrgId, orgId)
         .last("LIMIT 1"));
+  }
+
+  private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<LogisticsEquipmentArchive> buildPageWrapper(
+      Long orgId,
+      String keyword,
+      String status,
+      String category) {
+    var wrapper = Wrappers.lambdaQuery(LogisticsEquipmentArchive.class)
+        .eq(LogisticsEquipmentArchive::getIsDeleted, 0)
+        .eq(orgId != null, LogisticsEquipmentArchive::getOrgId, orgId)
+        .eq(status != null && !status.isBlank(), LogisticsEquipmentArchive::getStatus, status)
+        .eq(category != null && !category.isBlank(), LogisticsEquipmentArchive::getCategory, category);
+    if (keyword != null && !keyword.isBlank()) {
+      wrapper.and(w -> w.like(LogisticsEquipmentArchive::getEquipmentCode, keyword)
+          .or().like(LogisticsEquipmentArchive::getEquipmentName, keyword)
+          .or().like(LogisticsEquipmentArchive::getCategory, keyword)
+          .or().like(LogisticsEquipmentArchive::getLocation, keyword)
+          .or().like(LogisticsEquipmentArchive::getSerialNo, keyword));
+    }
+    return wrapper;
   }
 
   private void applyFields(

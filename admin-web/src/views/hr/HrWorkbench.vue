@@ -50,96 +50,43 @@
       </a-row>
     </a-card>
 
+    <a-card :bordered="false" class="card-elevated" style="margin-bottom: 12px" title="卡片2：快速查找与常用入口">
+      <a-space wrap style="margin-bottom: 12px">
+        <a-input-search v-model:value="actionKeyword" placeholder="搜索入口，如 合同 / 生日 / 报销 / 培训" allow-clear style="width: 320px" />
+        <a-tag color="blue">匹配 {{ matchedActionCount }} 项</a-tag>
+        <a-tag color="gold">已收藏 {{ favoriteActions.length }} 项</a-tag>
+      </a-space>
+      <div v-if="favoriteActions.length" class="favorite-actions">
+        <div v-for="action in favoriteActions" :key="`favorite-${action.path}`" class="favorite-action-item">
+          <a-button type="primary" ghost @click="go(action.path)">{{ action.label }}</a-button>
+          <a-tooltip title="移除常用">
+            <a-button type="text" size="small" class="favorite-toggle" @click.stop="toggleFavorite(action.path)">
+              <StarFilled />
+            </a-button>
+          </a-tooltip>
+        </div>
+      </div>
+      <a-empty v-else description="先把高频入口收藏到这里，后续会一直保留在当前浏览器中" />
+    </a-card>
+
     <a-row :gutter="12">
-      <a-col :xs="24" :xl="8" style="margin-bottom: 12px">
-        <a-card :bordered="false" class="card-elevated" title="招聘管理">
+      <a-col v-for="section in visibleSections" :key="section.title" :xs="24" :xl="8" style="margin-bottom: 12px">
+        <a-card :bordered="false" class="card-elevated" :title="section.title">
           <a-space wrap>
-            <a-button type="primary" @click="go('/hr/recruitment/needs')">招聘需求申请</a-button>
-            <a-button @click="go('/hr/recruitment/needs?scene=job-posting')">岗位发布</a-button>
-            <a-button @click="go('/hr/recruitment/needs?scene=candidates')">候选人库</a-button>
-            <a-button @click="go('/hr/recruitment/needs?scene=interviews')">面试管理</a-button>
-            <a-button @click="go('/hr/recruitment/needs?scene=onboarding')">入职办理</a-button>
-            <a-button @click="go('/hr/recruitment/needs?scene=materials')">入职资料收集</a-button>
-          </a-space>
-        </a-card>
-      </a-col>
-      <a-col :xs="24" :xl="8" style="margin-bottom: 12px">
-        <a-card :bordered="false" class="card-elevated" title="员工档案中心">
-          <a-space wrap>
-            <a-button type="primary" @click="go('/hr/profile/basic')">员工基本信息</a-button>
-            <a-button @click="go('/hr/profile/account-access')">账号与领导设置</a-button>
-            <a-button @click="go('/hr/profile/contracts')">劳动合同管理</a-button>
-            <a-button @click="go('/hr/profile/contract-templates')">合同模板库</a-button>
-            <a-button @click="go('/hr/profile/contract-print')">合同打印</a-button>
-            <a-button @click="go('/hr/profile/certificates')">证书上传</a-button>
-            <a-button @click="go('/hr/development/records?scene=records')">培训记录</a-button>
-            <a-button @click="go('/hr/profile/attachments')">档案附件</a-button>
-            <a-button @click="go('/hr/profile/contract-reminders')">合同到期提醒</a-button>
-          </a-space>
-        </a-card>
-      </a-col>
-      <a-col :xs="24" :xl="8" style="margin-bottom: 12px">
-        <a-card :bordered="false" class="card-elevated" title="排班与考勤管理">
-          <a-space wrap>
-            <a-button type="primary" @click="go('/hr/attendance/schemes')">排班方案</a-button>
-            <a-button @click="go('/hr/attendance/groups')">班组设置</a-button>
-            <a-button @click="go('/hr/attendance/calendar')">排班日历</a-button>
-            <a-button @click="go('/hr/attendance/leave-approval')">请假审批</a-button>
-            <a-button @click="go('/hr/attendance/leave-approval?scene=shift-change')">调班申请</a-button>
-            <a-button @click="go('/hr/attendance/leave-approval?scene=overtime')">加班申请</a-button>
-            <a-button @click="go('/hr/attendance/records')">考勤记录</a-button>
-            <a-button @click="go('/hr/attendance/abnormal')">考勤异常</a-button>
-            <a-button @click="go('/hr/attendance/access-control')">门禁对接</a-button>
-            <a-button @click="go('/hr/attendance/card-sync')">一卡通数据对接</a-button>
-          </a-space>
-        </a-card>
-      </a-col>
-      <a-col :xs="24" :xl="8" style="margin-bottom: 12px">
-        <a-card :bordered="false" class="card-elevated" title="行政协同（OA）">
-          <a-space wrap>
-            <a-button type="primary" @click="go('/oa/notice')">通知管理</a-button>
-            <a-button @click="go('/oa/work-execution/task')">任务管理</a-button>
-            <a-button @click="go('/oa/todo')">工作执行</a-button>
-            <a-button @click="go('/oa/activity-plan')">活动计划</a-button>
-            <a-button @click="go('/oa/document')">文档管理</a-button>
-            <a-button @click="go('/oa/knowledge')">知识库</a-button>
-            <a-button @click="go('/hr/compliance/policies')">规章制度库</a-button>
-            <a-button @click="go('/hr/compliance/policy-alerts')">制度更新预警</a-button>
-            <a-badge :count="summary.birthdayTodoCount || 0" :offset="[2, -2]">
-              <a-button @click="go('/oa/todo?keyword=生日提醒')">生日提醒待办</a-button>
-            </a-badge>
-            <a-button @click="go('/oa/group-settings')">分组设置</a-button>
-          </a-space>
-        </a-card>
-      </a-col>
-      <a-col :xs="24" :xl="8" style="margin-bottom: 12px">
-        <a-card :bordered="false" class="card-elevated" title="费用与报销">
-          <a-space wrap>
-            <a-button type="primary" @click="go('/hr/expense/records?scene=training-reimburse')">外出培训费用报销</a-button>
-            <a-button @click="go('/hr/expense/records?scene=subsidy')">补贴申请</a-button>
-            <a-button @click="go('/hr/expense/meal-fee')">员工餐费</a-button>
-            <a-button @click="go('/hr/expense/electricity-fee')">员工电费</a-button>
-            <a-button @click="go('/hr/expense/records?scene=salary-subsidy')">工资补贴记录</a-button>
-            <a-button @click="go('/hr/expense/approval-flow')">报销审批流</a-button>
-          </a-space>
-        </a-card>
-      </a-col>
-      <a-col :xs="24" :xl="8" style="margin-bottom: 12px">
-        <a-card :bordered="false" class="card-elevated" title="培训与发展 / 绩效考核">
-          <a-space wrap>
-            <a-button type="primary" @click="go('/hr/development/records?scene=plans')">培训计划</a-button>
-            <a-button @click="go('/hr/development/records?scene=enrollments')">培训报名</a-button>
-            <a-button @click="go('/hr/development/records?scene=signin')">培训签到</a-button>
-            <a-button @click="go('/hr/development/records?scene=records')">培训记录</a-button>
-            <a-button @click="go('/hr/development/certificates')">证书管理</a-button>
-            <a-button @click="go('/hr/development/certificate-reminders')">证书到期提醒</a-button>
-            <a-button @click="go('/hr/performance/reports?scene=nursing')">护理绩效</a-button>
-            <a-button @click="go('/hr/performance/reports?scene=sales')">销售绩效</a-button>
-            <a-button @click="go('/hr/performance/reports?scene=admin')">行政绩效</a-button>
-            <a-button @click="go('/hr/performance/scoring-rules')">评分规则配置</a-button>
-            <a-button @click="go('/hr/performance/reports?scene=generation')">绩效生成</a-button>
-            <a-button @click="go('/hr/performance/reports?scene=reports')">绩效报表</a-button>
-            <a-button @click="go('/hr/performance/reward-punishment')">奖惩记录</a-button>
+            <template v-for="action in section.actions" :key="action.path">
+              <div class="action-entry">
+                <a-badge v-if="action.path === '/oa/todo?keyword=生日提醒'" :count="summary.birthdayTodoCount || 0" :offset="[2, -2]">
+                  <a-button :type="action.primary ? 'primary' : 'default'" @click="go(action.path)">{{ action.label }}</a-button>
+                </a-badge>
+                <a-button v-else :type="action.primary ? 'primary' : 'default'" @click="go(action.path)">{{ action.label }}</a-button>
+                <a-tooltip :title="isFavorite(action.path) ? '移出常用入口' : '加入常用入口'">
+                  <a-button type="text" size="small" class="favorite-toggle" @click.stop="toggleFavorite(action.path)">
+                    <StarFilled v-if="isFavorite(action.path)" />
+                    <StarOutlined v-else />
+                  </a-button>
+                </a-tooltip>
+              </div>
+            </template>
           </a-space>
         </a-card>
       </a-col>
@@ -174,16 +121,25 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { StarFilled, StarOutlined } from '@ant-design/icons-vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { useRouter } from 'vue-router'
+import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { getHrStaffBirthdayPage, getHrWorkbenchSummary } from '../../api/hr'
 import { openPrintTableReport } from '../../utils/print'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
+import { resolveRouteAccess } from '../../utils/routeAccess'
+import { useUserStore } from '../../stores/user'
 import type { HrStaffBirthdayItem } from '../../types'
 
+type WorkbenchAction = { label: string; path: string; primary?: boolean }
+type WorkbenchSection = { title: string; actions: readonly WorkbenchAction[] }
+
 const router = useRouter()
+const userStore = useUserStore()
+const FAVORITE_STORAGE_KEY = 'hr-workbench-favorites'
 const summary = reactive({
   onJobCount: 0,
   leftCount: 0,
@@ -200,6 +156,8 @@ const birthdayModalOpen = ref(false)
 const birthdayScope = ref<'TODAY' | 'NEXT7'>('TODAY')
 const birthdayRows = ref<HrStaffBirthdayItem[]>([])
 const birthdayLoading = ref(false)
+const actionKeyword = ref('')
+const favoritePaths = ref<string[]>(readFavoritePaths())
 const birthdayColumns = [
   { title: '工号', dataIndex: 'staffNo', key: 'staffNo', width: 110 },
   { title: '姓名', dataIndex: 'realName', key: 'realName', width: 120 },
@@ -212,9 +170,166 @@ const birthdayColumns = [
 ]
 const birthdayModalTitle = computed(() => (birthdayScope.value === 'TODAY' ? '今日生日名单' : '近7天生日名单'))
 
+const sectionConfigs: readonly WorkbenchSection[] = [
+  {
+    title: '招聘管理',
+    actions: [
+      { label: '招聘需求申请', path: '/hr/recruitment/needs', primary: true },
+      { label: '岗位发布', path: '/hr/recruitment/needs?scene=job-posting' },
+      { label: '候选人库', path: '/hr/recruitment/needs?scene=candidates' },
+      { label: '面试管理', path: '/hr/recruitment/needs?scene=interviews' },
+      { label: '入职办理', path: '/hr/recruitment/needs?scene=onboarding' },
+      { label: '入职资料收集', path: '/hr/recruitment/needs?scene=materials' }
+    ]
+  },
+  {
+    title: '员工档案中心',
+    actions: [
+      { label: '入职向导', path: '/hr/profile/onboarding', primary: true },
+      { label: '员工基本信息', path: '/hr/profile/basic' },
+      { label: '账号与领导设置', path: '/hr/profile/account-access' },
+      { label: '劳动合同管理', path: '/hr/profile/contracts' },
+      { label: '合同模板库', path: '/hr/profile/contract-templates' },
+      { label: '合同打印', path: '/hr/profile/contract-print' },
+      { label: '证书上传', path: '/hr/profile/certificates' },
+      { label: '培训记录', path: '/hr/development/records?scene=records' },
+      { label: '档案附件', path: '/hr/profile/attachments' },
+      { label: '合同到期提醒', path: '/hr/profile/contract-reminders' }
+    ]
+  },
+  {
+    title: '排班与考勤管理',
+    actions: [
+      { label: '排班方案', path: '/hr/attendance/schemes', primary: true },
+      { label: '班组设置', path: '/hr/attendance/groups' },
+      { label: '排班日历', path: '/hr/attendance/calendar' },
+      { label: '请假审批', path: '/hr/attendance/leave-approval' },
+      { label: '调班申请', path: '/hr/attendance/leave-approval?scene=shift-change' },
+      { label: '加班申请', path: '/hr/attendance/leave-approval?scene=overtime' },
+      { label: '考勤记录', path: '/hr/attendance/records' },
+      { label: '考勤异常', path: '/hr/attendance/abnormal' },
+      { label: '门禁对接', path: '/hr/attendance/access-control' },
+      { label: '一卡通数据对接', path: '/hr/attendance/card-sync' }
+    ]
+  },
+  {
+    title: '行政协同（OA）',
+    actions: [
+      { label: '通知管理', path: '/oa/notice', primary: true },
+      { label: '任务管理', path: '/oa/work-execution/task' },
+      { label: '工作执行', path: '/oa/todo' },
+      { label: '活动计划', path: '/oa/activity-plan' },
+      { label: '文档管理', path: '/oa/document' },
+      { label: '知识库', path: '/oa/knowledge' },
+      { label: '规章制度库', path: '/hr/compliance/policies' },
+      { label: '制度更新预警', path: '/hr/compliance/policy-alerts' },
+      { label: '生日提醒待办', path: '/oa/todo?keyword=生日提醒' },
+      { label: '分组设置', path: '/oa/group-settings' }
+    ]
+  },
+  {
+    title: '费用与报销',
+    actions: [
+      { label: '外出培训费用报销', path: '/hr/expense/records?scene=training-reimburse', primary: true },
+      { label: '补贴申请', path: '/hr/expense/records?scene=subsidy' },
+      { label: '员工餐费', path: '/hr/expense/meal-fee' },
+      { label: '员工电费', path: '/hr/expense/electricity-fee' },
+      { label: '工资补贴记录', path: '/hr/expense/records?scene=salary-subsidy' },
+      { label: '报销审批流', path: '/hr/expense/approval-flow' }
+    ]
+  },
+  {
+    title: '培训与发展 / 绩效考核',
+    actions: [
+      { label: '培训计划', path: '/hr/development/records?scene=plans', primary: true },
+      { label: '培训报名', path: '/hr/development/records?scene=enrollments' },
+      { label: '培训签到', path: '/hr/development/records?scene=signin' },
+      { label: '培训记录', path: '/hr/development/records?scene=records' },
+      { label: '证书管理', path: '/hr/development/certificates' },
+      { label: '证书到期提醒', path: '/hr/development/certificate-reminders' },
+      { label: '护理绩效', path: '/hr/performance/reports?scene=nursing' },
+      { label: '销售绩效', path: '/hr/performance/reports?scene=sales' },
+      { label: '行政绩效', path: '/hr/performance/reports?scene=admin' },
+      { label: '评分规则配置', path: '/hr/performance/scoring-rules' },
+      { label: '绩效生成', path: '/hr/performance/reports?scene=generation' },
+      { label: '绩效报表', path: '/hr/performance/reports?scene=reports' },
+      { label: '奖惩记录', path: '/hr/performance/reward-punishment' }
+    ]
+  }
+] as const
+
+const normalizedActionKeyword = computed(() => actionKeyword.value.trim().toLowerCase())
+const allAccessibleActions = computed(() =>
+  sectionConfigs.flatMap((section) =>
+    section.actions
+      .filter((action) => canAccess(action.path))
+      .map((action) => ({ ...action, sectionTitle: section.title }))
+  )
+)
+const favoriteActions = computed(() =>
+  favoritePaths.value
+    .map((path) => allAccessibleActions.value.find((action) => action.path === path))
+    .filter((action): action is WorkbenchAction & { sectionTitle: string } => Boolean(action))
+)
+const visibleSections = computed(() =>
+  sectionConfigs
+    .map((section) => ({
+      ...section,
+      actions: section.actions.filter((action) => canAccess(action.path) && matchesAction(action, section.title))
+    }))
+    .filter((section) => section.actions.length > 0)
+)
+const matchedActionCount = computed(() => visibleSections.value.reduce((total, section) => total + section.actions.length, 0))
+
+function readFavoritePaths(): string[] {
+  if (typeof window === 'undefined') {
+    return []
+  }
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(FAVORITE_STORAGE_KEY) || '[]')
+    return Array.isArray(parsed) ? parsed.map((item) => String(item || '')).filter(Boolean) : []
+  } catch {
+    return []
+  }
+}
+
+function canAccess(path: string) {
+  return resolveRouteAccess(router, userStore.roles || [], path).canAccess
+}
+
+function matchesAction(action: WorkbenchAction, sectionTitle: string) {
+  const keyword = normalizedActionKeyword.value
+  if (!keyword) {
+    return true
+  }
+  return [action.label, sectionTitle, action.path].some((item) => String(item || '').toLowerCase().includes(keyword))
+}
+
+function isFavorite(path: string) {
+  return favoritePaths.value.includes(path)
+}
+
+function toggleFavorite(path: string) {
+  if (isFavorite(path)) {
+    favoritePaths.value = favoritePaths.value.filter((item) => item !== path)
+    return
+  }
+  favoritePaths.value = [path, ...favoritePaths.value].slice(0, 12)
+}
+
 function go(path: string) {
+  if (!canAccess(path)) {
+    message.warning('当前账号暂无权限访问该页面')
+    return
+  }
   router.push(path)
 }
+
+watch(favoritePaths, (value) => {
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem(FAVORITE_STORAGE_KEY, JSON.stringify(value))
+  }
+})
 
 async function loadSummary() {
   try {
@@ -292,6 +407,23 @@ useLiveSyncRefresh({
 </script>
 
 <style scoped>
+.favorite-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.favorite-action-item,
+.action-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.favorite-toggle {
+  color: #d48806;
+}
+
 .stat-clickable {
   border-radius: 8px;
   padding: 8px;

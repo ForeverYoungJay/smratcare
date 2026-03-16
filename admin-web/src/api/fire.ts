@@ -29,7 +29,13 @@ export function deleteFireSafetyRecord(id: number) {
   return request.delete<void>(`/api/fire/records/${id}`)
 }
 
-export function getFireSafetySummary(params?: { dateFrom?: string; dateTo?: string; recordType?: FireSafetyRecordType }) {
+export function getFireSafetySummary(params?: {
+  dateFrom?: string
+  dateTo?: string
+  checkTimeStart?: string
+  checkTimeEnd?: string
+  recordType?: FireSafetyRecordType
+}) {
   return request.get<FireSafetyReportSummary>('/api/fire/records/summary', { params })
 }
 
@@ -41,7 +47,7 @@ export function completeFireSafetyByScan(data: { qrToken: string; inspectorName?
   return request.post<FireSafetyRecord>('/api/fire/records/scan/complete', data)
 }
 
-export function getFireSafetyReportDetail(params?: { dateFrom?: string; dateTo?: string; limit?: number }) {
+export function getFireSafetyReportDetail(params?: { dateFrom?: string; dateTo?: string; recordType?: FireSafetyRecordType; limit?: number }) {
   return request.get<FireSafetyReportDetail>('/api/fire/records/report/detail', { params })
 }
 

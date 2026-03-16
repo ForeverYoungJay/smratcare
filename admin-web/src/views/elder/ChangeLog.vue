@@ -21,6 +21,11 @@
             <a-select-option value="ADMISSION">入住办理</a-select-option>
             <a-select-option value="DISCHARGE">退住办理</a-select-option>
             <a-select-option value="BED_CHANGE">床位变更</a-select-option>
+            <a-select-option value="STATUS_CHANGE">状态变更</a-select-option>
+            <a-select-option value="ADMISSION_DATE_CHANGE">入院日期变更</a-select-option>
+            <a-select-option value="CARE_LEVEL_CHANGE">护理等级变更</a-select-option>
+            <a-select-option value="SOURCE_TYPE_CHANGE">档案来源变更</a-select-option>
+            <a-select-option value="HISTORICAL_CONTRACT_FILE_CHANGE">历史合同附件变更</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="操作说明">
@@ -51,7 +56,13 @@
         :pagination="false"
         row-key="id"
         :scroll="{ y: 520 }"
-      />
+      >
+        <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'changeType'">
+            {{ changeTypeText(record.changeType) }}
+          </template>
+        </template>
+      </a-table>
       <a-pagination
         style="margin-top: 16px; text-align: right;"
         :current="query.pageNo"
@@ -94,6 +105,18 @@ const columns = [
   { title: '操作说明', dataIndex: 'reason', key: 'reason' },
   { title: '变更时间', dataIndex: 'createTime', key: 'createTime', width: 180 }
 ]
+
+function changeTypeText(value?: string) {
+  if (value === 'ADMISSION') return '入住办理'
+  if (value === 'DISCHARGE') return '退住办理'
+  if (value === 'BED_CHANGE') return '床位变更'
+  if (value === 'STATUS_CHANGE') return '状态变更'
+  if (value === 'ADMISSION_DATE_CHANGE') return '入院日期变更'
+  if (value === 'CARE_LEVEL_CHANGE') return '护理等级变更'
+  if (value === 'SOURCE_TYPE_CHANGE') return '档案来源变更'
+  if (value === 'HISTORICAL_CONTRACT_FILE_CHANGE') return '历史合同附件变更'
+  return value || '-'
+}
 
 async function fetchData() {
   loading.value = true

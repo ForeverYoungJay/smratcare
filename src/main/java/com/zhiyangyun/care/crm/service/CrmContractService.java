@@ -25,6 +25,7 @@ public interface CrmContractService {
       String flowStage,
       String contractStatus,
       String status,
+      String changeWorkflowStatus,
       Boolean overdueOnly,
       Boolean sortByOverdue,
       String currentOwnerDept);
@@ -32,6 +33,18 @@ public interface CrmContractService {
   int deleteBatch(Long tenantId, List<Long> ids, List<String> contractNos);
 
   CrmContractResponse handoffToAssessment(Long tenantId, Long id);
+
+  CrmContractResponse moveToBedSelect(Long tenantId, Long id);
+
+  CrmContractResponse moveToPendingSign(Long tenantId, Long id);
+
+  CrmContractResponse startChange(Long tenantId, Long id, String remark);
+
+  CrmContractResponse submitChange(Long tenantId, Long id, String remark);
+
+  CrmContractResponse approveChange(Long tenantId, Long id, String remark);
+
+  CrmContractResponse rejectChange(Long tenantId, Long id, String remark);
 
   CrmContractResponse approve(Long tenantId, Long id, String remark);
 

@@ -30,6 +30,8 @@ public class ElderCreateRequest {
   private String careLevel;
   private String riskPrecommit;
   private String remark;
+  private String sourceType;
+  private String historicalContractFileUrl;
   private Long bedId;
   private LocalDate bedStartDate;
 }

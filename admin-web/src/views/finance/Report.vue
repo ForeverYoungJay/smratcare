@@ -163,6 +163,8 @@ const activeCategory = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
 const arrears = ref<FinanceArrearsItem[]>([])
+const monthlyRevenueRows = ref<FinanceReportMonthlyItem[]>([])
+const storeSalesRows = ref<FinanceStoreSalesItem[]>([])
 const summary = ref<FinanceReportEntrySummary>({
   reportKey: 'OVERALL',
   periodFrom: '',
@@ -203,8 +205,8 @@ const pageMeta = computed(() => {
     return {
       title: '费用结构/营收占比',
       subTitle: '按费用科目查看营收构成与占比变化',
-      leftChartTitle: '月营收趋势',
-      rightChartTitle: '商城销售趋势',
+      leftChartTitle: '营收结构 Top',
+      rightChartTitle: '月营收趋势',
       leftTableTitle: '营收结构 Top',
       rightTableTitle: '房间收支 Top',
       leftTableLabel: '费用科目',
@@ -216,8 +218,8 @@ const pageMeta = computed(() => {
     return {
       title: '楼层/房间收支情况',
       subTitle: '按房间经营表现识别高收益与低收益区域',
-      leftChartTitle: '月营收趋势',
-      rightChartTitle: '商城销售趋势',
+      leftChartTitle: '房间收支 Top',
+      rightChartTitle: '欠费长者排行',
       leftTableTitle: '房间收支 Top',
       rightTableTitle: '营收结构 Top',
       leftTableLabel: '房间',
@@ -229,8 +231,8 @@ const pageMeta = computed(() => {
     return {
       title: '入住/床位/消费统计',
       subTitle: '聚合入住消费、房间收支和欠费风险',
-      leftChartTitle: '月营收趋势',
-      rightChartTitle: '商城销售趋势',
+      leftChartTitle: '房间营收 Top',
+      rightChartTitle: '营收结构 Top',
       leftTableTitle: '房间收支 Top',
       rightTableTitle: '营收结构 Top',
       leftTableLabel: '房间',
@@ -243,7 +245,7 @@ const pageMeta = computed(() => {
       title: '机构月运营详情',
       subTitle: '经营总览、风险预警与科目结构联动看板',
       leftChartTitle: '月营收趋势',
-      rightChartTitle: '商城销售趋势',
+      rightChartTitle: '营收结构 Top',
       leftTableTitle: '营收结构 Top',
       rightTableTitle: '房间收支 Top',
       leftTableLabel: '费用科目',
@@ -315,21 +317,11 @@ async function loadCharts() {
         top: 8
       })
     ])
+    monthlyRevenueRows.value = revenue || []
+    storeSalesRows.value = storeSales || []
     arrears.value = arrearsData || []
     summary.value = summaryData
-    setRevenueOption({
-      tooltip: { trigger: 'axis' },
-      xAxis: { type: 'category', data: revenue.map(item => item.month) },
-      yAxis: { type: 'value' },
-      series: [{ name: '营收', type: 'line', data: revenue.map(item => item.amount) }]
-    })
-
-    setStoreOption({
-      tooltip: { trigger: 'axis' },
-      xAxis: { type: 'category', data: storeSales.map(item => item.month) },
-      yAxis: { type: 'value' },
-      series: [{ name: '销售额', type: 'bar', data: storeSales.map(item => item.amount) }]
-    })
+    renderCharts()
     await loadCategoryAnalysis()
   } catch (error: any) {
     errorMessage.value = error?.message || '加载财务报表失败'
@@ -337,6 +329,81 @@ async function loadCharts() {
   } finally {
     loading.value = false
   }
+}
+
+function renderCharts() {
+  if (reportKey.value === 'REVENUE_STRUCTURE') {
+    setRevenueOption({
+      tooltip: { trigger: 'axis' },
+      xAxis: { type: 'category', data: (summary.value.topCategories || []).map(item => item.label) },
+      yAxis: { type: 'value' },
+      series: [{ name: '营收结构', type: 'bar', data: (summary.value.topCategories || []).map(item => item.amount) }]
+    })
+    setStoreOption({
+      tooltip: { trigger: 'axis' },
+      xAxis: { type: 'category', data: monthlyRevenueRows.value.map(item => item.month) },
+      yAxis: { type: 'value' },
+      series: [{ name: '月营收', type: 'line', smooth: true, data: monthlyRevenueRows.value.map(item => item.amount) }]
+    })
+    return
+  }
+  if (reportKey.value === 'FLOOR_ROOM') {
+    setRevenueOption({
+      tooltip: { trigger: 'axis' },
+      xAxis: { type: 'category', data: (summary.value.topRooms || []).map(item => item.label) },
+      yAxis: { type: 'value' },
+      series: [{ name: '房间收支', type: 'bar', data: (summary.value.topRooms || []).map(item => item.amount) }]
+    })
+    setStoreOption({
+      tooltip: { trigger: 'axis' },
+      xAxis: { type: 'category', data: arrears.value.map(item => item.elderName || '未知长者') },
+      yAxis: { type: 'value' },
+      series: [{ name: '欠费金额', type: 'bar', data: arrears.value.map(item => item.outstandingAmount) }]
+    })
+    return
+  }
+  if (reportKey.value === 'OCCUPANCY_CONSUMPTION') {
+    setRevenueOption({
+      tooltip: { trigger: 'axis' },
+      xAxis: { type: 'category', data: (summary.value.topRooms || []).map(item => item.label) },
+      yAxis: { type: 'value' },
+      series: [{ name: '房间营收', type: 'bar', data: (summary.value.topRooms || []).map(item => item.amount) }]
+    })
+    setStoreOption({
+      tooltip: { trigger: 'axis' },
+      xAxis: { type: 'category', data: (summary.value.topCategories || []).map(item => item.label) },
+      yAxis: { type: 'value' },
+      series: [{ name: '费用结构', type: 'bar', data: (summary.value.topCategories || []).map(item => item.amount) }]
+    })
+    return
+  }
+  if (reportKey.value === 'MONTHLY_OPS') {
+    setRevenueOption({
+      tooltip: { trigger: 'axis' },
+      xAxis: { type: 'category', data: monthlyRevenueRows.value.map(item => item.month) },
+      yAxis: { type: 'value' },
+      series: [{ name: '营收', type: 'line', smooth: true, data: monthlyRevenueRows.value.map(item => item.amount) }]
+    })
+    setStoreOption({
+      tooltip: { trigger: 'axis' },
+      xAxis: { type: 'category', data: (summary.value.topCategories || []).map(item => item.label) },
+      yAxis: { type: 'value' },
+      series: [{ name: '营收结构', type: 'bar', data: (summary.value.topCategories || []).map(item => item.amount) }]
+    })
+    return
+  }
+  setRevenueOption({
+    tooltip: { trigger: 'axis' },
+    xAxis: { type: 'category', data: monthlyRevenueRows.value.map(item => item.month) },
+    yAxis: { type: 'value' },
+    series: [{ name: '营收', type: 'line', data: monthlyRevenueRows.value.map(item => item.amount) }]
+  })
+  setStoreOption({
+    tooltip: { trigger: 'axis' },
+    xAxis: { type: 'category', data: storeSalesRows.value.map(item => item.month) },
+    yAxis: { type: 'value' },
+    series: [{ name: '销售额', type: 'bar', data: storeSalesRows.value.map(item => item.amount) }]
+  })
 }
 
 async function loadCategoryAnalysis() {

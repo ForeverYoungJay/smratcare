@@ -124,7 +124,8 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
@@ -132,11 +133,14 @@ import { getRoomList } from '../../api/bed'
 import { getMaintenancePage, createMaintenance, updateMaintenance, completeMaintenance, deleteMaintenance } from '../../api/life'
 import type { MaintenanceRequest, PageResult } from '../../types'
 
+const route = useRoute()
 const loading = ref(false)
 const rows = ref<MaintenanceRequest[]>([])
 const roomOptions = ref<any[]>([])
 const query = reactive({ status: undefined as string | undefined, keyword: '', pageNo: 1, pageSize: 10 })
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
+const overdueOnly = ref(false)
+const overdueDays = ref(2)
 const columns = [
   { title: '房间号', dataIndex: 'roomNo', key: 'roomNo', width: 120 },
   { title: '故障类型', dataIndex: 'issueType', key: 'issueType', width: 140 },
@@ -197,7 +201,9 @@ async function fetchData() {
       pageNo: query.pageNo,
       pageSize: query.pageSize,
       status: query.status,
-      keyword: query.keyword || undefined
+      keyword: query.keyword || undefined,
+      overdueOnly: overdueOnly.value || undefined,
+      overdueDays: overdueDays.value
     })
     rows.value = res.list
     pagination.total = res.total || res.list.length
@@ -217,9 +223,21 @@ function handleTableChange(pag: any) {
 function onReset() {
   query.status = undefined
   query.keyword = ''
+  overdueOnly.value = false
+  overdueDays.value = 2
   query.pageNo = 1
   pagination.current = 1
   fetchData()
+}
+
+function applyRouteFilters() {
+  const statusRaw = Array.isArray(route.query.status) ? route.query.status[0] : route.query.status
+  const filterRaw = Array.isArray(route.query.filter) ? route.query.filter[0] : route.query.filter
+  const overdueDaysRaw = Array.isArray(route.query.overdueDays) ? route.query.overdueDays[0] : route.query.overdueDays
+  query.status = typeof statusRaw === 'string' && statusRaw ? statusRaw : undefined
+  overdueOnly.value = String(filterRaw || '').toLowerCase() === 'overdue'
+  const parsedOverdueDays = Number(overdueDaysRaw)
+  overdueDays.value = Number.isFinite(parsedOverdueDays) && parsedOverdueDays > 0 ? parsedOverdueDays : 2
 }
 
 function openCreate() {
@@ -304,6 +322,17 @@ async function remove(record: MaintenanceRequest) {
   fetchData()
 }
 
-loadRooms()
-fetchData()
+onMounted(async () => {
+  applyRouteFilters()
+  await loadRooms()
+  await fetchData()
+})
+
+watch(
+  () => route.query,
+  () => {
+    applyRouteFilters()
+    fetchData()
+  }
+)
 </script>

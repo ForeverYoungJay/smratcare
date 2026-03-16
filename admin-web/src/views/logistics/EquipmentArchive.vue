@@ -87,7 +87,6 @@
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
@@ -98,9 +97,10 @@ import {
   deleteLogisticsEquipment,
   generateEquipmentMaintenance,
   getLogisticsEquipmentPage,
+  getLogisticsEquipmentSummary,
   updateLogisticsEquipment
 } from '../../api/logistics'
-import type { Id, LogisticsEquipmentArchive, PageResult } from '../../types'
+import type { Id, LogisticsEquipmentArchive, LogisticsEquipmentArchiveSummary, PageResult } from '../../types'
 
 const router = useRouter()
 const route = useRoute()
@@ -169,29 +169,25 @@ function statusColor(status?: string) {
   return 'green'
 }
 
-function calcSummary() {
-  summary.total = rows.value.length
-  summary.enabled = rows.value.filter((item) => item.status === 'ENABLED').length
-  summary.maintaining = rows.value.filter((item) => item.status === 'MAINTENANCE').length
-  summary.dueSoon = rows.value.filter((item) => {
-    if (!item.nextMaintainedAt) return false
-    const diff = dayjs(item.nextMaintainedAt).diff(dayjs(), 'day')
-    return diff >= 0 && diff <= 30
-  }).length
-}
-
 async function fetchData() {
   loading.value = true
   try {
-    const res: PageResult<LogisticsEquipmentArchive> = await getLogisticsEquipmentPage({
+    const params = {
       pageNo: query.pageNo,
       pageSize: query.pageSize,
       keyword: query.keyword || undefined,
       status: query.status || undefined
-    })
+    }
+    const [res, stats] = await Promise.all([
+      getLogisticsEquipmentPage(params) as Promise<PageResult<LogisticsEquipmentArchive>>,
+      getLogisticsEquipmentSummary(params) as Promise<LogisticsEquipmentArchiveSummary>
+    ])
     rows.value = res.list || []
     pagination.total = res.total || 0
-    calcSummary()
+    summary.total = Number(stats?.total || 0)
+    summary.enabled = Number(stats?.enabled || 0)
+    summary.maintaining = Number(stats?.maintaining || 0)
+    summary.dueSoon = Number(stats?.dueSoon || 0)
   } finally {
     loading.value = false
   }

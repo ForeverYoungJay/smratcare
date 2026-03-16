@@ -379,7 +379,7 @@ const cards = computed<WorkbenchCard[]>(() => {
       ],
       actions: [
         { label: '待维修', path: '/logistics/assets/maintenance-record?status=OPEN', primary: true },
-        { label: '超时维修', path: '/logistics/assets/maintenance-record?filter=overdue' },
+        { label: '超时维修', path: `/logistics/assets/maintenance-record?filter=overdue&overdueDays=${configuredQuery.value.overdueDays}` },
         { label: '维修成本', path: '/logistics/maintenance/cost' },
         { label: '设备档案', path: '/logistics/maintenance/assets' },
         { label: `生成${maintenanceDueDays}天维保待办`, path: 'action:generate-maintenance-todos' },

@@ -14,7 +14,7 @@
             <a-button @click="reset">重置</a-button>
             <a-button @click="severityFilter = 'HIGH'">仅看高风险</a-button>
             <a-button @click="severityFilter = 'ALL'">全部风险</a-button>
-            <a-button @click="go('/finance/reconcile/exception')">异常处理</a-button>
+            <a-button @click="go(`/finance/reconcile/issue-center?date=${dayjs(query.date).format('YYYY-MM-DD')}&sourceModule=RECONCILE`)">异常处理</a-button>
           </a-space>
         </a-form-item>
       </a-form>
@@ -53,6 +53,13 @@
             </a-statistic>
           </a-col>
         </a-row>
+        <a-alert
+          v-if="result?.remark"
+          style="margin-top: 12px;"
+          :type="result?.mismatchFlag ? 'warning' : 'success'"
+          show-icon
+          :message="result.remark"
+        />
       </a-card>
       <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="当日异常明细（分级）">
         <vxe-table border stripe show-overflow :data="filteredExceptions" height="260">
@@ -70,7 +77,7 @@
             <template #default="{ row }">
               <a-space>
                 <a-button type="link" @click="go(`/finance/bill/${row.billId}`)" v-if="row.billId">查看账单</a-button>
-                <a-button type="link" @click="go('/finance/reconcile/exception')">去处理</a-button>
+                <a-button type="link" @click="go(`/finance/reconcile/issue-center?date=${dayjs(query.date).format('YYYY-MM-DD')}&sourceModule=RECONCILE`)">去处理</a-button>
               </a-space>
             </template>
           </vxe-column>

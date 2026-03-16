@@ -77,6 +77,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
@@ -93,6 +94,8 @@ const query = reactive({
   pageNo: 1,
   pageSize: 10
 })
+const route = useRoute()
+const router = useRouter()
 
 const statusOptions = [
   { label: '待签署', value: 'PENDING' },
@@ -222,6 +225,7 @@ async function openContractModal(record: HrStaffProfile) {
     form.contractEndDate = dayjs(form.contractEndDate)
   }
   modalOpen.value = true
+  consumeAutoOpenQuery()
 }
 
 async function submit() {
@@ -283,6 +287,23 @@ async function beforeUploadContractAttachment(file: File) {
   return false
 }
 
+function consumeAutoOpenQuery() {
+  if (String(route.query.autoOpen || '') !== '1') return
+  router.replace({
+    query: {
+      ...route.query,
+      autoOpen: undefined,
+      from: undefined
+    }
+  })
+}
+
+async function maybeAutoOpenFromRoute() {
+  const staffId = String(route.query.staffId || '').trim()
+  if (String(route.query.autoOpen || '') !== '1' || !staffId) return
+  await openContractModal({ staffId } as HrStaffProfile)
+}
+
 const exportFields = [
   { key: 'staffNo', label: '工号' },
   { key: 'realName', label: '员工姓名' },
@@ -311,7 +332,10 @@ function onExportExcel() {
   })) as Record<string, any>[], exportFields), '劳动合同管理-当前筛选')
 }
 
-onMounted(fetchData)
+onMounted(async () => {
+  await fetchData()
+  await maybeAutoOpenFromRoute()
+})
 </script>
 
 <style scoped>

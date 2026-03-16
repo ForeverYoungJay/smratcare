@@ -22,9 +22,13 @@ public class ElderResponse {
   private LocalDate admissionDate;
   private Integer status;
   private Long bedId;
+  private String bedNo;
+  private String roomNo;
   private String careLevel;
   private String riskPrecommit;
   private String remark;
+  private String sourceType;
+  private String historicalContractFileUrl;
   private String lifecycleStage;
   private String lifecycleContractStatus;
   private BedResponse currentBed;

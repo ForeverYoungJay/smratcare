@@ -151,14 +151,6 @@ const pagedRows = computed(() => {
 const todayDueCount = computed(() => filteredRows.value.filter((item) => item._statusText === '今日待回访').length)
 const overdueCount = computed(() => filteredRows.value.filter((item) => item._statusText === '逾期未回访').length)
 
-function inferScenario(item: MarketingCallbackItem): 'checkin' | 'trial' | 'discharge' {
-  const text = `${item.source || ''} ${item.remark || ''}`.toLowerCase()
-  if (text.includes('试住')) return 'trial'
-  if (text.includes('退住') || text.includes('离院')) return 'discharge'
-  if (text.includes('入住') || text.includes('签约')) return 'checkin'
-  return 'checkin'
-}
-
 function buildStatus(nextFollowDate?: string) {
   if (!nextFollowDate) {
     return { text: '计划中', color: 'blue' as const }
@@ -179,9 +171,8 @@ function buildRisk(statusText: CallbackScenarioRow['_statusText']) {
 }
 
 async function loadData() {
-  const report = await getMarketingCallbackReport({ pageNo: 1, pageSize: 500 })
+  const report = await getMarketingCallbackReport({ pageNo: 1, pageSize: 500, type: props.type })
   allRows.value = (report.records || [])
-    .filter((item) => inferScenario(item) === props.type)
     .map((item) => {
       const status = buildStatus(item.nextFollowDate)
       const risk = buildRisk(status.text)

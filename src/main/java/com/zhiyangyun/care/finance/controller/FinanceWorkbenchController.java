@@ -3,6 +3,8 @@ package com.zhiyangyun.care.finance.controller;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zhiyangyun.care.audit.entity.AuditLog;
 import com.zhiyangyun.care.audit.mapper.AuditLogMapper;
 import com.zhiyangyun.care.audit.service.AuditLogService;
@@ -51,20 +53,35 @@ import com.zhiyangyun.care.finance.model.FinanceAllocationMeterValidateRequest;
 import com.zhiyangyun.care.finance.model.FinanceAllocationMeterValidateResponse;
 import com.zhiyangyun.care.finance.model.FinanceAllocationTemplateInitResponse;
 import com.zhiyangyun.care.finance.model.FinanceAutoDebitExceptionItem;
+import com.zhiyangyun.care.finance.model.FinanceCollectionFollowUpItem;
 import com.zhiyangyun.care.finance.model.FinanceConfigChangeLogItem;
+import com.zhiyangyun.care.finance.model.FinanceCrossPeriodApprovalRequest;
+import com.zhiyangyun.care.finance.model.FinanceCrossPeriodApprovalResponse;
 import com.zhiyangyun.care.finance.model.FinanceConfigImpactPreviewRequest;
 import com.zhiyangyun.care.finance.model.FinanceConfigImpactPreviewResponse;
 import com.zhiyangyun.care.finance.model.FinanceDischargeStatusSyncExecuteRequest;
 import com.zhiyangyun.care.finance.model.FinanceDischargeStatusSyncExecuteResponse;
 import com.zhiyangyun.care.finance.model.FinanceDischargeStatusSyncResponse;
 import com.zhiyangyun.care.finance.model.FinanceInvoiceReceiptItem;
+import com.zhiyangyun.care.finance.model.FinanceHandleActionRequest;
+import com.zhiyangyun.care.finance.model.FinanceHandleLogItem;
+import com.zhiyangyun.care.finance.model.FinanceIssueCenterItem;
 import com.zhiyangyun.care.finance.model.FinanceLedgerHealthResponse;
 import com.zhiyangyun.care.finance.model.FinanceModuleEntrySummaryResponse;
 import com.zhiyangyun.care.finance.model.FinanceMasterDataOverviewResponse;
+import com.zhiyangyun.care.finance.model.FinanceMonthCloseExecuteRequest;
+import com.zhiyangyun.care.finance.model.FinanceMonthCloseExecuteResponse;
+import com.zhiyangyun.care.finance.model.FinanceMonthLockStatusResponse;
+import com.zhiyangyun.care.finance.model.FinanceMonthCloseSummaryResponse;
+import com.zhiyangyun.care.finance.model.FinanceMonthUnlockRequest;
 import com.zhiyangyun.care.finance.model.FinanceOpsInsightResponse;
+import com.zhiyangyun.care.finance.model.FinancePaymentAdjustmentApprovalRequest;
+import com.zhiyangyun.care.finance.model.FinancePaymentAdjustmentItem;
 import com.zhiyangyun.care.finance.model.FinanceReconcileExceptionItem;
 import com.zhiyangyun.care.finance.model.FinanceRoomOpsDetailResponse;
+import com.zhiyangyun.care.finance.model.FinanceSearchResponse;
 import com.zhiyangyun.care.finance.model.FinanceWorkbenchOverviewResponse;
+import com.zhiyangyun.care.finance.service.FinanceMonthLockService;
 import com.zhiyangyun.care.oa.entity.OaApproval;
 import com.zhiyangyun.care.oa.mapper.OaApprovalMapper;
 import java.math.BigDecimal;
@@ -72,6 +89,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -91,6 +109,7 @@ import java.util.regex.Pattern;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -101,6 +120,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/finance/workbench")
+@PreAuthorize("hasAnyRole('FINANCE_EMPLOYEE','FINANCE_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
 public class FinanceWorkbenchController {
   private final PaymentRecordMapper paymentRecordMapper;
   private final BillMonthlyMapper billMonthlyMapper;
@@ -121,6 +141,8 @@ public class FinanceWorkbenchController {
   private final OaApprovalMapper oaApprovalMapper;
   private final AuditLogMapper auditLogMapper;
   private final AuditLogService auditLogService;
+  private final ObjectMapper objectMapper;
+  private final FinanceMonthLockService financeMonthLockService;
   private static final Pattern UPDATE_ROLLBACK_PATTERN =
       Pattern.compile("更新配置:\\s*([A-Z0-9_]+)@([0-9]{4}-[0-9]{2})\\s+([0-9\\.-]+)->([0-9\\.-]+)");
   private static final Pattern CREATE_ROLLBACK_PATTERN =
@@ -145,7 +167,9 @@ public class FinanceWorkbenchController {
       ElderMapper elderMapper,
       OaApprovalMapper oaApprovalMapper,
       AuditLogMapper auditLogMapper,
-      AuditLogService auditLogService) {
+      AuditLogService auditLogService,
+      ObjectMapper objectMapper,
+      FinanceMonthLockService financeMonthLockService) {
     this.paymentRecordMapper = paymentRecordMapper;
     this.billMonthlyMapper = billMonthlyMapper;
     this.billItemMapper = billItemMapper;
@@ -165,6 +189,8 @@ public class FinanceWorkbenchController {
     this.oaApprovalMapper = oaApprovalMapper;
     this.auditLogMapper = auditLogMapper;
     this.auditLogService = auditLogService;
+    this.objectMapper = objectMapper;
+    this.financeMonthLockService = financeMonthLockService;
   }
 
   @GetMapping("/overview")
@@ -197,7 +223,7 @@ public class FinanceWorkbenchController {
 
     response.setCashier(buildCashierCard(orgId, todayPayments, startOfToday, endOfToday));
     response.setRisk(buildRiskCard(orgId, outstandingBills, today));
-    response.setPending(buildPendingCard(orgId));
+    response.setPending(buildPendingCard(orgId, today));
     response.setRevenueStructure(buildRevenueStructureCard(orgId, thisMonthBills));
     response.setRoomOps(buildRoomOpsCard(orgId, thisMonthBills));
     response.setAutoDebit(buildAutoDebitCard(orgId, outstandingBills, todayPayments, thisMonth));
@@ -433,6 +459,419 @@ public class FinanceWorkbenchController {
             stringOf(item.getRemark())))
         .toList();
     return csvResponse("finance-invoice-receipt", headers, body);
+  }
+
+  @GetMapping("/payment-adjustments/page")
+  public Result<IPage<FinancePaymentAdjustmentItem>> paymentAdjustmentsPage(
+      @RequestParam(defaultValue = "1") long pageNo,
+      @RequestParam(defaultValue = "20") long pageSize,
+      @RequestParam(required = false) String month) {
+    Long orgId = AuthContext.getOrgId();
+    YearMonth targetMonth = month == null || month.isBlank() ? YearMonth.now() : YearMonth.parse(month);
+    List<FinancePaymentAdjustmentItem> rows = queryPaymentAdjustmentItems(orgId, targetMonth);
+    int fromIndex = (int) Math.max((pageNo - 1) * pageSize, 0);
+    int toIndex = (int) Math.min(fromIndex + pageSize, rows.size());
+    List<FinancePaymentAdjustmentItem> pageRows = fromIndex >= rows.size() ? List.of() : rows.subList(fromIndex, toIndex);
+    IPage<FinancePaymentAdjustmentItem> result = new Page<>(pageNo, pageSize, rows.size());
+    result.setRecords(pageRows);
+    return Result.ok(result);
+  }
+
+  @GetMapping(value = "/payment-adjustments/export", produces = "text/csv;charset=UTF-8")
+  public ResponseEntity<byte[]> exportPaymentAdjustments(
+      @RequestParam(required = false) String month) {
+    Long orgId = AuthContext.getOrgId();
+    YearMonth targetMonth = month == null || month.isBlank() ? YearMonth.now() : YearMonth.parse(month);
+    List<FinancePaymentAdjustmentItem> rows = queryPaymentAdjustmentItems(orgId, targetMonth);
+    List<String> headers = List.of(
+        "发生时间", "类型", "长者", "金额", "说明", "备注", "审批状态", "审批单", "账单ID", "收款ID");
+    List<List<String>> body = rows.stream()
+        .map(item -> List.of(
+            stringOf(item.getOccurredAt()),
+            stringOf(item.getTypeLabel()),
+            stringOf(item.getElderName()),
+            stringOf(item.getAmount()),
+            stringOf(item.getDetail()),
+            stringOf(item.getRemark()),
+            stringOf(item.getApprovalStatusLabel()),
+            stringOf(item.getApprovalTitle()),
+            stringOf(item.getBillId()),
+            stringOf(item.getPaymentId())))
+        .toList();
+    return csvResponse("finance-payment-adjustments", headers, body);
+  }
+
+  @GetMapping("/issue-center/page")
+  public Result<IPage<FinanceIssueCenterItem>> issueCenterPage(
+      @RequestParam(defaultValue = "1") long pageNo,
+      @RequestParam(defaultValue = "20") long pageSize,
+      @RequestParam(required = false) String date,
+      @RequestParam(required = false) String riskLevel,
+      @RequestParam(required = false) String sourceModule,
+      @RequestParam(required = false) String keyword) {
+    Long orgId = AuthContext.getOrgId();
+    LocalDate targetDate = (date == null || date.isBlank() || "today".equalsIgnoreCase(date))
+        ? LocalDate.now()
+        : LocalDate.parse(date);
+    List<FinanceIssueCenterItem> rows = buildIssueCenterItems(orgId, targetDate).stream()
+        .filter(item -> matchesIssueCenter(item, riskLevel, sourceModule, keyword))
+        .sorted(Comparator.comparing(
+            FinanceIssueCenterItem::getOccurredAt,
+            Comparator.nullsLast(LocalDateTime::compareTo)).reversed())
+        .toList();
+    int fromIndex = (int) Math.max((pageNo - 1) * pageSize, 0);
+    int toIndex = (int) Math.min(fromIndex + pageSize, rows.size());
+    List<FinanceIssueCenterItem> pageRows = fromIndex >= rows.size() ? List.of() : rows.subList(fromIndex, toIndex);
+    IPage<FinanceIssueCenterItem> result = new Page<>(pageNo, pageSize, rows.size());
+    result.setRecords(pageRows);
+    return Result.ok(result);
+  }
+
+  @GetMapping(value = "/issue-center/export", produces = "text/csv;charset=UTF-8")
+  public ResponseEntity<byte[]> exportIssueCenter(
+      @RequestParam(required = false) String date,
+      @RequestParam(required = false) String riskLevel,
+      @RequestParam(required = false) String sourceModule,
+      @RequestParam(required = false) String keyword) {
+    Long orgId = AuthContext.getOrgId();
+    LocalDate targetDate = (date == null || date.isBlank() || "today".equalsIgnoreCase(date))
+        ? LocalDate.now()
+        : LocalDate.parse(date);
+    List<FinanceIssueCenterItem> rows = buildIssueCenterItems(orgId, targetDate).stream()
+        .filter(item -> matchesIssueCenter(item, riskLevel, sourceModule, keyword))
+        .sorted(Comparator.comparing(
+            FinanceIssueCenterItem::getOccurredAt,
+            Comparator.nullsLast(LocalDateTime::compareTo)).reversed())
+        .toList();
+    List<String> headers = List.of(
+        "发生时间", "来源模块", "异常类型", "风险等级", "长者", "涉及金额", "异常描述", "处理建议",
+        "处理状态", "责任人", "处理时限", "复核结论", "最近处理时间", "最近处理备注", "账单ID", "收款ID");
+    List<List<String>> body = rows.stream()
+        .map(item -> List.of(
+            stringOf(item.getOccurredAt()),
+            stringOf(item.getSourceModuleLabel()),
+            stringOf(item.getIssueTypeLabel()),
+            stringOf(item.getRiskLevelLabel()),
+            stringOf(item.getElderName()),
+            stringOf(item.getAmount()),
+            stringOf(item.getDetail()),
+            stringOf(item.getSuggestion()),
+            stringOf(item.getLatestHandleStatusLabel()),
+            stringOf(item.getLatestOwnerName()),
+            stringOf(item.getLatestDueDate()),
+            stringOf(item.getLatestReviewResult()),
+            stringOf(item.getLatestHandleAt()),
+            stringOf(item.getLatestHandleRemark()),
+            stringOf(item.getBillId()),
+            stringOf(item.getPaymentId())))
+        .toList();
+    return csvResponse("finance-issue-center", headers, body);
+  }
+
+  @GetMapping("/collection-follow-up/page")
+  public Result<IPage<FinanceCollectionFollowUpItem>> collectionFollowUpPage(
+      @RequestParam(defaultValue = "1") long pageNo,
+      @RequestParam(defaultValue = "20") long pageSize,
+      @RequestParam(required = false) String month,
+      @RequestParam(required = false) String riskLevel,
+      @RequestParam(required = false) String stage,
+      @RequestParam(required = false) String keyword) {
+    Long orgId = AuthContext.getOrgId();
+    YearMonth targetMonth = month == null || month.isBlank() ? YearMonth.now() : YearMonth.parse(month);
+    List<FinanceCollectionFollowUpItem> rows = buildCollectionFollowUpItems(orgId, targetMonth).stream()
+        .filter(item -> matchesCollectionFollowUp(item, riskLevel, stage, keyword))
+        .sorted(Comparator
+            .comparing(FinanceCollectionFollowUpItem::getOutstandingAmount, Comparator.nullsLast(BigDecimal::compareTo))
+            .reversed()
+            .thenComparing(FinanceCollectionFollowUpItem::getOverdueMonths, Comparator.nullsLast(Integer::compareTo).reversed()))
+        .toList();
+    int fromIndex = (int) Math.max((pageNo - 1) * pageSize, 0);
+    int toIndex = (int) Math.min(fromIndex + pageSize, rows.size());
+    List<FinanceCollectionFollowUpItem> pageRows = fromIndex >= rows.size() ? List.of() : rows.subList(fromIndex, toIndex);
+    IPage<FinanceCollectionFollowUpItem> result = new Page<>(pageNo, pageSize, rows.size());
+    result.setRecords(pageRows);
+    return Result.ok(result);
+  }
+
+  @GetMapping(value = "/collection-follow-up/export", produces = "text/csv;charset=UTF-8")
+  public ResponseEntity<byte[]> exportCollectionFollowUp(
+      @RequestParam(required = false) String month,
+      @RequestParam(required = false) String riskLevel,
+      @RequestParam(required = false) String stage,
+      @RequestParam(required = false) String keyword) {
+    Long orgId = AuthContext.getOrgId();
+    YearMonth targetMonth = month == null || month.isBlank() ? YearMonth.now() : YearMonth.parse(month);
+    List<FinanceCollectionFollowUpItem> rows = buildCollectionFollowUpItems(orgId, targetMonth).stream()
+        .filter(item -> matchesCollectionFollowUp(item, riskLevel, stage, keyword))
+        .sorted(Comparator
+            .comparing(FinanceCollectionFollowUpItem::getOutstandingAmount, Comparator.nullsLast(BigDecimal::compareTo))
+            .reversed()
+            .thenComparing(FinanceCollectionFollowUpItem::getOverdueMonths, Comparator.nullsLast(Integer::compareTo).reversed()))
+        .toList();
+    List<String> headers = List.of(
+        "长者", "起始账期", "最近账期", "欠费金额", "账户余额", "拖欠月数", "风险等级", "跟进阶段",
+        "承诺付款日", "责任人", "联系人", "联系渠道", "联系结果", "下次提醒", "最近跟进", "最近跟进时间", "跟进理由", "建议动作", "主账单ID");
+    List<List<String>> body = rows.stream()
+        .map(item -> List.of(
+            stringOf(item.getElderName()),
+            stringOf(item.getOldestBillMonth()),
+            stringOf(item.getLatestBillMonth()),
+            stringOf(item.getOutstandingAmount()),
+            stringOf(item.getBalance()),
+            stringOf(item.getOverdueMonths()),
+            stringOf(item.getRiskLevelLabel()),
+            stringOf(item.getStageLabel()),
+            stringOf(item.getPromisedDate()),
+            stringOf(item.getLatestOwnerName()),
+            stringOf(item.getLatestContactName()),
+            stringOf(item.getLatestContactChannel()),
+            stringOf(item.getLatestContactResult()),
+            stringOf(item.getNextReminderAt()),
+            stringOf(item.getLatestHandleStatusLabel()),
+            stringOf(item.getLatestHandleAt()),
+            stringOf(item.getFollowUpReason()),
+            stringOf(item.getSuggestion()),
+            stringOf(item.getPrimaryBillId())))
+        .toList();
+    return csvResponse("finance-collection-follow-up", headers, body);
+  }
+
+  @GetMapping("/month-close/summary")
+  public Result<FinanceMonthCloseSummaryResponse> monthCloseSummary(
+      @RequestParam(required = false) String month) {
+    Long orgId = AuthContext.getOrgId();
+    YearMonth targetMonth = month == null || month.isBlank() ? YearMonth.now() : YearMonth.parse(month);
+    return Result.ok(buildMonthCloseSummary(orgId, targetMonth));
+  }
+
+  @GetMapping("/month-close/status")
+  public Result<FinanceMonthLockStatusResponse> monthCloseStatus(
+      @RequestParam(required = false) String month) {
+    Long orgId = AuthContext.getOrgId();
+    YearMonth targetMonth = month == null || month.isBlank() ? YearMonth.now() : YearMonth.parse(month);
+    return Result.ok(financeMonthLockService.getMonthLockStatus(orgId, targetMonth));
+  }
+
+  @GetMapping(value = "/month-close/export", produces = "text/csv;charset=UTF-8")
+  public ResponseEntity<byte[]> exportMonthCloseSummary(
+      @RequestParam(required = false) String month) {
+    Long orgId = AuthContext.getOrgId();
+    YearMonth targetMonth = month == null || month.isBlank() ? YearMonth.now() : YearMonth.parse(month);
+    FinanceMonthCloseSummaryResponse summary = buildMonthCloseSummary(orgId, targetMonth);
+    List<String> headers = List.of(
+        "月份", "关账状态", "锁账状态", "关账人", "关账时间", "反锁人", "反锁时间", "反锁原因", "步骤", "步骤状态", "当前数量", "说明", "动作路径");
+    List<List<String>> body = summary.getSteps().stream()
+        .map(step -> List.of(
+            stringOf(summary.getMonth()),
+            stringOf(summary.getCloseStatusLabel()),
+            stringOf(summary.getLockStatusLabel()),
+            stringOf(summary.getClosedBy()),
+            stringOf(summary.getClosedAt()),
+            stringOf(summary.getUnlockedBy()),
+            stringOf(summary.getUnlockedAt()),
+            stringOf(summary.getUnlockReason()),
+            stringOf(step.getLabel()),
+            stringOf(step.getStatusLabel()),
+            stringOf(step.getCount()),
+            stringOf(step.getDetail()),
+            stringOf(step.getActionPath())))
+        .toList();
+    return csvResponse("finance-month-close", headers, body);
+  }
+
+  @PostMapping("/issue-center/handle")
+  public Result<FinanceHandleLogItem> handleIssueCenterAction(
+      @RequestBody FinanceHandleActionRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    FinanceHandleLogItem item = recordHandleAction(
+        orgId,
+        "FINANCE_ISSUE_HANDLE",
+        request == null ? new FinanceHandleActionRequest() : request,
+        resolveAuditEntityId(request == null ? null : request.getBillId(),
+            request == null ? null : request.getPaymentId(),
+            request == null ? null : request.getElderId()),
+        "UPDATED");
+    return Result.ok(item);
+  }
+
+  @GetMapping("/issue-center/handle-logs")
+  public Result<List<FinanceHandleLogItem>> issueCenterHandleLogs(
+      @RequestParam(required = false) Long billId,
+      @RequestParam(required = false) Long paymentId,
+      @RequestParam(required = false) Long elderId,
+      @RequestParam(required = false) String sourceModule,
+      @RequestParam(defaultValue = "20") int limit) {
+    Long orgId = AuthContext.getOrgId();
+    return Result.ok(queryHandleLogs(orgId, "FINANCE_ISSUE_HANDLE", billId, paymentId, elderId, sourceModule, limit));
+  }
+
+  @PostMapping("/collection-follow-up/handle")
+  public Result<FinanceHandleLogItem> handleCollectionFollowUp(
+      @RequestBody FinanceHandleActionRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    FinanceHandleLogItem item = recordHandleAction(
+        orgId,
+        "FINANCE_COLLECTION_HANDLE",
+        request == null ? new FinanceHandleActionRequest() : request,
+        resolveAuditEntityId(null, null, request == null ? null : request.getElderId()),
+        "FOLLOWED");
+    return Result.ok(item);
+  }
+
+  @GetMapping("/collection-follow-up/logs")
+  public Result<List<FinanceHandleLogItem>> collectionFollowUpLogs(
+      @RequestParam(required = false) Long elderId,
+      @RequestParam(defaultValue = "20") int limit) {
+    Long orgId = AuthContext.getOrgId();
+    return Result.ok(queryHandleLogs(orgId, "FINANCE_COLLECTION_HANDLE", null, null, elderId, null, limit));
+  }
+
+  @PostMapping("/month-close/execute")
+  public Result<FinanceMonthCloseExecuteResponse> executeMonthClose(
+      @RequestBody(required = false) FinanceMonthCloseExecuteRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    FinanceMonthCloseExecuteRequest payload = request == null ? new FinanceMonthCloseExecuteRequest() : request;
+    YearMonth targetMonth = payload.getMonth() == null || payload.getMonth().isBlank() ? YearMonth.now() : YearMonth.parse(payload.getMonth());
+    FinanceMonthCloseSummaryResponse summary = buildMonthCloseSummary(orgId, targetMonth);
+    boolean blocked = (summary.getBlockedSteps() == null ? 0 : summary.getBlockedSteps()) > 0;
+    FinanceMonthCloseExecuteResponse response = new FinanceMonthCloseExecuteResponse();
+    response.setMonth(targetMonth.toString());
+    response.setActorName(AuthContext.getUsername());
+    response.setOccurredAt(LocalDateTime.now());
+    if (blocked && !Boolean.TRUE.equals(payload.getForceClose())) {
+      response.setSuccess(false);
+      response.setStatus("BLOCKED");
+      response.setStatusLabel("阻塞");
+      response.setMessage("当前仍有阻塞步骤，未执行关账。可修复后重试，或使用强制关账。");
+      return Result.ok(response);
+    }
+    Map<String, Object> detail = new LinkedHashMap<>();
+    detail.put("month", targetMonth.toString());
+    detail.put("status", blocked ? "FORCED_CLOSED" : "CLOSED");
+    detail.put("remark", normalizeText(payload.getRemark(), ""));
+    detail.put("blockedSteps", summary.getBlockedSteps());
+    detail.put("warningSteps", summary.getWarningSteps());
+    detail.put("completedSteps", summary.getCompletedSteps());
+    detail.put("issueCount", summary.getIssueCount());
+    writeAuditLog(orgId, "MONTH_CLOSE_EXECUTE", "FINANCE_MONTH_CLOSE", monthEntityId(targetMonth), detail);
+    response.setSuccess(true);
+    response.setStatus(blocked ? "FORCED_CLOSED" : "CLOSED");
+    response.setStatusLabel(blocked ? "强制关账" : "已关账");
+    response.setMessage(blocked ? "已按强制关账执行，并记录了阻塞项。" : "本月已记录为正式关账。");
+    return Result.ok(response);
+  }
+
+  @PostMapping("/month-close/unlock")
+  @PreAuthorize("hasAnyRole('FINANCE_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  public Result<FinanceMonthLockStatusResponse> unlockMonthClose(
+      @RequestBody(required = false) FinanceMonthUnlockRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    return Result.ok(financeMonthLockService.unlockMonth(orgId, request == null ? new FinanceMonthUnlockRequest() : request));
+  }
+
+  @PostMapping("/month-close/cross-period/request")
+  public Result<FinanceCrossPeriodApprovalResponse> requestCrossPeriodApproval(
+      @RequestBody FinanceCrossPeriodApprovalRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    return Result.ok(financeMonthLockService.requestCrossPeriodApproval(orgId, request));
+  }
+
+  @PostMapping("/payment-adjustments/approval/request")
+  public Result<FinancePaymentAdjustmentItem> requestPaymentAdjustmentApproval(
+      @RequestBody FinancePaymentAdjustmentApprovalRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    if (request == null) {
+      throw new IllegalArgumentException("审批请求不能为空");
+    }
+    OaApproval existing = oaApprovalMapper.selectList(
+            Wrappers.lambdaQuery(OaApproval.class)
+                .eq(OaApproval::getIsDeleted, 0)
+                .eq(orgId != null, OaApproval::getOrgId, orgId)
+                .eq(OaApproval::getApprovalType, "REIMBURSE")
+                .orderByDesc(OaApproval::getCreateTime))
+        .stream()
+        .filter(item -> paymentAdjustmentApprovalKey(item)
+            .equals(paymentAdjustmentApprovalKey(request.getType(), request.getBillId(), request.getPaymentId())))
+        .filter(item -> "PENDING".equalsIgnoreCase(item.getStatus()))
+        .findFirst()
+        .orElse(null);
+    if (existing != null) {
+      FinancePaymentAdjustmentItem item = new FinancePaymentAdjustmentItem();
+      item.setType(normalizeText(request.getType(), "PAYMENT_ADJUSTMENT"));
+      item.setBillId(request.getBillId());
+      item.setPaymentId(request.getPaymentId());
+      item.setElderId(request.getElderId());
+      item.setElderName(request.getElderName());
+      item.setAmount(safe(request.getAmount()));
+      fillPaymentAdjustmentApproval(item, existing);
+      item.setOccurredAt(existing.getCreateTime());
+      return Result.ok(item);
+    }
+    OaApproval approval = new OaApproval();
+    approval.setTenantId(orgId);
+    approval.setOrgId(orgId);
+    approval.setApprovalType("REIMBURSE");
+    approval.setTitle(buildAdjustmentApprovalTitle(request));
+    approval.setApplicantId(AuthContext.getStaffId());
+    approval.setApplicantName(AuthContext.getUsername());
+    approval.setAmount(safe(request.getAmount()));
+    approval.setStatus("PENDING");
+    approval.setRemark(request.getRemark());
+    Map<String, Object> form = new LinkedHashMap<>();
+    form.put("financeSource", "PAYMENT_ADJUSTMENT");
+    form.put("type", request.getType());
+    form.put("billId", request.getBillId());
+    form.put("paymentId", request.getPaymentId());
+    form.put("elderId", request.getElderId());
+    form.put("elderName", request.getElderName());
+    form.put("amount", safe(request.getAmount()));
+    form.put("reason", normalizeText(request.getReason(), ""));
+    form.put("remark", normalizeText(request.getRemark(), ""));
+    approval.setFormData(toJson(form));
+    approval.setCreatedBy(AuthContext.getStaffId());
+    oaApprovalMapper.insert(approval);
+
+    FinancePaymentAdjustmentItem item = new FinancePaymentAdjustmentItem();
+    item.setType(normalizeText(request.getType(), "PAYMENT_ADJUSTMENT"));
+    item.setBillId(request.getBillId());
+    item.setPaymentId(request.getPaymentId());
+    item.setElderId(request.getElderId());
+    item.setElderName(request.getElderName());
+    item.setAmount(safe(request.getAmount()));
+    item.setApprovalId(approval.getId());
+    item.setApprovalStatus(approval.getStatus());
+    item.setApprovalStatusLabel(approvalStatusLabel(approval.getStatus()));
+    item.setApprovalTitle(approval.getTitle());
+    item.setOccurredAt(approval.getCreateTime());
+    return Result.ok(item);
+  }
+
+  @GetMapping("/search")
+  public Result<FinanceSearchResponse> financeSearch(
+      @RequestParam String keyword,
+      @RequestParam(defaultValue = "8") int limit) {
+    Long orgId = AuthContext.getOrgId();
+    return Result.ok(buildFinanceSearchResponse(orgId, keyword, Math.min(Math.max(limit, 1), 20)));
+  }
+
+  @GetMapping(value = "/search/export", produces = "text/csv;charset=UTF-8")
+  public ResponseEntity<byte[]> exportFinanceSearch(
+      @RequestParam String keyword,
+      @RequestParam(defaultValue = "20") int limit) {
+    Long orgId = AuthContext.getOrgId();
+    FinanceSearchResponse response = buildFinanceSearchResponse(orgId, keyword, Math.min(Math.max(limit, 1), 50));
+    List<String> headers = List.of("分类", "ID", "标题", "副标题", "补充信息", "打开路径", "更新时间");
+    List<List<String>> body = flattenSearchRows(response).stream()
+        .map(item -> List.of(
+            stringOf(searchTypeLabel(item.getType())),
+            stringOf(item.getId()),
+            stringOf(item.getTitle()),
+            stringOf(item.getSubtitle()),
+            stringOf(item.getExtra()),
+            stringOf(item.getActionPath()),
+            stringOf(item.getTime())))
+        .toList();
+    return csvResponse("finance-search", headers, body);
   }
 
   @GetMapping("/auto-deduct/exceptions")
@@ -1570,7 +2009,7 @@ public class FinanceWorkbenchController {
     return card;
   }
 
-  private FinanceWorkbenchOverviewResponse.PendingCard buildPendingCard(Long orgId) {
+  private FinanceWorkbenchOverviewResponse.PendingCard buildPendingCard(Long orgId, LocalDate today) {
     FinanceWorkbenchOverviewResponse.PendingCard card = new FinanceWorkbenchOverviewResponse.PendingCard();
     Long pendingDiscount = admissionFeeAuditMapper.selectCount(
         Wrappers.lambdaQuery(AdmissionFeeAudit.class)
@@ -1592,6 +2031,18 @@ public class FinanceWorkbenchController {
     card.setPendingDiscountCount(pendingDiscount == null ? 0L : pendingDiscount);
     card.setPendingRefundCount(pendingRefund == null ? 0L : pendingRefund);
     card.setPendingDischargeSettlementCount(pendingSettlement == null ? 0L : pendingSettlement);
+    List<FinanceHandleLogItem> issueLogs = queryHandleLogs(orgId, "FINANCE_ISSUE_HANDLE", null, null, null, null, 500);
+    long issueTodoCount = latestHandleLogMap(issueLogs).values().stream()
+        .filter(item -> !"DONE".equalsIgnoreCase(item.getStatus()))
+        .count();
+    List<FinanceHandleLogItem> collectionLogs = queryHandleLogs(orgId, "FINANCE_COLLECTION_HANDLE", null, null, null, null, 500);
+    long reminderCount = latestCollectionHandleMap(collectionLogs).values().stream()
+        .filter(item -> !"DONE".equalsIgnoreCase(item.getStatus()))
+        .filter(item -> item.getNextReminderAt() != null && !item.getNextReminderAt().toLocalDate().isAfter(today))
+        .count();
+    card.setIssueTodoCount(issueTodoCount);
+    card.setCollectionReminderCount(reminderCount);
+    card.setLockedMonthCount(financeMonthLockService.getMonthLockStatus(orgId, YearMonth.from(today)).isLocked() ? 1L : 0L);
     return card;
   }
 
@@ -1885,6 +2336,10 @@ public class FinanceWorkbenchController {
 
   private List<FinanceWorkbenchOverviewResponse.QuickEntry> buildQuickEntries() {
     List<FinanceWorkbenchOverviewResponse.QuickEntry> entries = new ArrayList<>();
+    entries.add(quick("cashier_desk", "收银台", "/finance/payments/cashier-desk?from=finance_dashboard"));
+    entries.add(quick("issue_center", "异常修复中心", "/finance/reconcile/issue-center?from=finance_dashboard"));
+    entries.add(quick("collection_follow_up", "欠费催缴跟进", "/finance/bills/follow-up?from=finance_dashboard"));
+    entries.add(quick("month_close", "月结进度", "/finance/reconcile/month-close?from=finance_dashboard"));
     entries.add(quick("prepaid_recharge", "预存充值", "/finance/prepaid-recharge?from=finance_dashboard"));
     entries.add(quick("payment_register", "收款登记", "/finance/payments/register?from=finance_dashboard"));
     entries.add(quick("discharge_settlement", "退住结算", "/finance/discharge/settlement?from=finance_dashboard"));
@@ -1991,6 +2446,7 @@ public class FinanceWorkbenchController {
     response.setModuleKey(moduleKey);
     response.setBizDate(today);
     switch (moduleKey) {
+      case "MEDICAL_FLOW" -> fillConsumptionEntry(response, monthConsumption, todayConsumption, "MEDICINE", "医护收费存在来源缺失，请核查医嘱、处置与收费映射");
       case "MEDICAL_ERRORS" -> fillMedicalErrorEntry(response, orgId, startOfToday, endOfToday, monthConsumption);
       case "DINING_FLOW" -> fillConsumptionEntry(response, monthConsumption, todayConsumption, "DINING", "餐饮扣费数据缺失，请核查点餐与扣费映射");
       case "LOGISTICS_FLOW" -> fillLogisticsEntry(response, monthConsumption, todayConsumption);
@@ -2080,7 +2536,7 @@ public class FinanceWorkbenchController {
   }
 
   private void fillAdjustmentEntry(FinanceModuleEntrySummaryResponse response, Long orgId) {
-    FinanceWorkbenchOverviewResponse.PendingCard pendingCard = buildPendingCard(orgId);
+    FinanceWorkbenchOverviewResponse.PendingCard pendingCard = buildPendingCard(orgId, LocalDate.now());
     long pending = pendingCard.getPendingDiscountCount() + pendingCard.getPendingRefundCount()
         + pendingCard.getPendingDischargeSettlementCount();
     response.setTotalCount(pending);
@@ -2124,7 +2580,7 @@ public class FinanceWorkbenchController {
   }
 
   private void fillApprovalFlowEntry(FinanceModuleEntrySummaryResponse response, Long orgId) {
-    FinanceWorkbenchOverviewResponse.PendingCard pendingCard = buildPendingCard(orgId);
+    FinanceWorkbenchOverviewResponse.PendingCard pendingCard = buildPendingCard(orgId, LocalDate.now());
     Long oaPending = oaApprovalMapper.selectCount(
         Wrappers.lambdaQuery(OaApproval.class)
             .eq(OaApproval::getIsDeleted, 0)
@@ -2648,6 +3104,1206 @@ public class FinanceWorkbenchController {
         .map(payment -> toInvoiceItem(payment, billMap, elderMap))
         .filter(item -> filterInvoiceItem(item, invoiceStatus, keyword))
         .toList();
+  }
+
+  private List<FinancePaymentAdjustmentItem> queryPaymentAdjustmentItems(Long orgId, YearMonth targetMonth) {
+    String month = targetMonth.toString();
+    LocalDateTime startTime = targetMonth.atDay(1).atStartOfDay();
+    LocalDateTime endTime = targetMonth.plusMonths(1).atDay(1).atStartOfDay();
+
+    List<BillMonthly> invalidBills = billMonthlyMapper.selectList(
+        Wrappers.lambdaQuery(BillMonthly.class)
+            .eq(BillMonthly::getIsDeleted, 0)
+            .eq(orgId != null, BillMonthly::getOrgId, orgId)
+            .eq(BillMonthly::getBillMonth, month)
+            .eq(BillMonthly::getStatus, 9)
+            .orderByDesc(BillMonthly::getUpdateTime)
+            .orderByDesc(BillMonthly::getId));
+
+    List<PaymentRecord> adjustedPayments = paymentRecordMapper.selectList(
+        Wrappers.lambdaQuery(PaymentRecord.class)
+            .eq(PaymentRecord::getIsDeleted, 0)
+            .eq(orgId != null, PaymentRecord::getOrgId, orgId)
+            .ge(PaymentRecord::getPaidAt, startTime)
+            .lt(PaymentRecord::getPaidAt, endTime)
+            .orderByDesc(PaymentRecord::getPaidAt)
+            .orderByDesc(PaymentRecord::getId))
+        .stream()
+        .filter(item -> isPaymentAdjustmentRemark(item.getRemark()))
+        .toList();
+
+    Set<Long> elderIds = new HashSet<>();
+    invalidBills.stream().map(BillMonthly::getElderId).filter(Objects::nonNull).forEach(elderIds::add);
+    Set<Long> billIds = adjustedPayments.stream()
+        .map(PaymentRecord::getBillMonthlyId)
+        .filter(Objects::nonNull)
+        .collect(Collectors.toSet());
+    Map<Long, BillMonthly> paymentBillMap = billIds.isEmpty()
+        ? Map.of()
+        : billMonthlyMapper.selectBatchIds(billIds)
+            .stream()
+            .collect(Collectors.toMap(BillMonthly::getId, Function.identity(), (a, b) -> a));
+    paymentBillMap.values().stream().map(BillMonthly::getElderId).filter(Objects::nonNull).forEach(elderIds::add);
+    Map<Long, ElderProfile> elderMap = elderIds.isEmpty()
+        ? Map.of()
+        : elderMapper.selectBatchIds(new ArrayList<>(elderIds))
+            .stream()
+            .collect(Collectors.toMap(ElderProfile::getId, Function.identity(), (a, b) -> a));
+    List<OaApproval> approvals = oaApprovalMapper.selectList(
+        Wrappers.lambdaQuery(OaApproval.class)
+            .eq(OaApproval::getIsDeleted, 0)
+            .eq(orgId != null, OaApproval::getOrgId, orgId)
+            .eq(OaApproval::getApprovalType, "REIMBURSE")
+            .orderByDesc(OaApproval::getCreateTime));
+    Map<String, OaApproval> approvalMap = approvals.stream()
+        .filter(item -> containsAny(item.getFormData(), "PAYMENT_ADJUSTMENT"))
+        .collect(Collectors.toMap(
+            this::paymentAdjustmentApprovalKey,
+            Function.identity(),
+            (a, b) -> a.getUpdateTime() != null && b.getUpdateTime() != null && a.getUpdateTime().isAfter(b.getUpdateTime()) ? a : b));
+
+    List<FinancePaymentAdjustmentItem> rows = new ArrayList<>();
+    for (BillMonthly bill : invalidBills) {
+      FinancePaymentAdjustmentItem row = new FinancePaymentAdjustmentItem();
+      row.setType("INVALID_BILL");
+      row.setTypeLabel("作废账单");
+      row.setBillId(bill.getId());
+      row.setElderId(bill.getElderId());
+      ElderProfile elder = elderMap.get(bill.getElderId());
+      row.setElderName(elder == null ? null : elder.getFullName());
+      row.setAmount(safe(bill.getTotalAmount()));
+      row.setStatus("INVALID");
+      row.setDetail("账单已作废，需复核是否需要重新生成或回补收款");
+      row.setRemark(safe(bill.getOutstandingAmount()).compareTo(BigDecimal.ZERO) > 0 ? "作废时仍存在欠费金额" : "已作废");
+      fillPaymentAdjustmentApproval(row, approvalMap.get(paymentAdjustmentApprovalKey("INVALID_BILL", bill.getId(), null)));
+      row.setOccurredAt(bill.getUpdateTime() == null ? bill.getCreateTime() : bill.getUpdateTime());
+      rows.add(row);
+    }
+    for (PaymentRecord payment : adjustedPayments) {
+      FinancePaymentAdjustmentItem row = new FinancePaymentAdjustmentItem();
+      row.setType("PAYMENT_ADJUSTMENT");
+      row.setTypeLabel("收款修正");
+      row.setBillId(payment.getBillMonthlyId());
+      row.setPaymentId(payment.getId());
+      BillMonthly bill = paymentBillMap.get(payment.getBillMonthlyId());
+      Long elderId = bill == null ? null : bill.getElderId();
+      row.setElderId(elderId);
+      ElderProfile elder = elderMap.get(elderId);
+      row.setElderName(elder == null ? null : elder.getFullName());
+      row.setAmount(safe(payment.getAmount()));
+      row.setStatus("ADJUSTED");
+      row.setDetail(paymentAdjustmentDetail(payment.getRemark()));
+      row.setRemark(payment.getRemark());
+      fillPaymentAdjustmentApproval(row, approvalMap.get(paymentAdjustmentApprovalKey("PAYMENT_ADJUSTMENT", payment.getBillMonthlyId(), payment.getId())));
+      row.setOccurredAt(payment.getPaidAt() == null ? payment.getUpdateTime() : payment.getPaidAt());
+      rows.add(row);
+    }
+    rows.sort(Comparator.comparing(FinancePaymentAdjustmentItem::getOccurredAt, Comparator.nullsLast(LocalDateTime::compareTo)).reversed());
+    return rows;
+  }
+
+  private boolean isPaymentAdjustmentRemark(String remark) {
+    String normalized = normalizeText(remark, "");
+    if (normalized.isBlank()) {
+      return false;
+    }
+    String upper = normalized.toUpperCase(Locale.ROOT);
+    return upper.contains("支付方式变更")
+        || normalized.contains("冲正")
+        || normalized.contains("退款")
+        || normalized.contains("作废");
+  }
+
+  private void fillPaymentAdjustmentApproval(FinancePaymentAdjustmentItem item, OaApproval approval) {
+    if (item == null || approval == null) {
+      return;
+    }
+    item.setApprovalId(approval.getId());
+    item.setApprovalStatus(approval.getStatus());
+    item.setApprovalStatusLabel(approvalStatusLabel(approval.getStatus()));
+    item.setApprovalTitle(approval.getTitle());
+  }
+
+  private String paymentAdjustmentApprovalKey(String type, Long billId, Long paymentId) {
+    return normalizeText(type, "") + "|" + stringOf(billId) + "|" + stringOf(paymentId);
+  }
+
+  private String paymentAdjustmentApprovalKey(OaApproval approval) {
+    Map<String, Object> form = readAuditDetail(approval.getFormData());
+    return paymentAdjustmentApprovalKey(
+        stringValue(form.get("type")),
+        toLong(form.get("billId")),
+        toLong(form.get("paymentId")));
+  }
+
+  private String paymentAdjustmentDetail(String remark) {
+    String normalized = normalizeText(remark, "");
+    if (normalized.isBlank()) {
+      return "收款记录发生修正";
+    }
+    if (normalized.contains("支付方式变更")) {
+      return normalized;
+    }
+    if (normalized.contains("冲正")) {
+      return "收款已标记为冲正处理";
+    }
+    if (normalized.contains("退款")) {
+      return "收款已标记为退款处理";
+    }
+    if (normalized.contains("作废")) {
+      return "收款已标记为作废处理";
+    }
+    return normalized;
+  }
+
+  private FinanceHandleLogItem recordHandleAction(
+      Long orgId,
+      String entityType,
+      FinanceHandleActionRequest request,
+      Long entityId,
+      String defaultStatus) {
+    Map<String, Object> detail = new LinkedHashMap<>();
+    detail.put("sourceModule", normalizeText(request.getSourceModule(), ""));
+    detail.put("issueType", normalizeText(request.getIssueType(), ""));
+    detail.put("billId", request.getBillId());
+    detail.put("paymentId", request.getPaymentId());
+    detail.put("elderId", request.getElderId());
+    detail.put("status", normalizeText(request.getStatus(), defaultStatus));
+    detail.put("stage", normalizeText(request.getStage(), ""));
+    detail.put("nextAction", normalizeText(request.getNextAction(), ""));
+    detail.put("remark", normalizeText(request.getRemark(), ""));
+    detail.put("promisedDate", request.getPromisedDate() == null ? null : request.getPromisedDate().toString());
+    detail.put("ownerName", normalizeText(request.getOwnerName(), ""));
+    detail.put("dueDate", request.getDueDate() == null ? null : request.getDueDate().toString());
+    detail.put("reviewResult", normalizeText(request.getReviewResult(), ""));
+    detail.put("contactName", normalizeText(request.getContactName(), ""));
+    detail.put("contactChannel", normalizeText(request.getContactChannel(), ""));
+    detail.put("contactResult", normalizeText(request.getContactResult(), ""));
+    detail.put("nextReminderAt", request.getNextReminderAt() == null ? null : request.getNextReminderAt().toString());
+    AuditLog log = writeAuditLog(orgId, "FINANCE_HANDLE", entityType, entityId, detail);
+    return toHandleLogItem(log, detail);
+  }
+
+  private List<FinanceHandleLogItem> queryHandleLogs(
+      Long orgId,
+      String entityType,
+      Long billId,
+      Long paymentId,
+      Long elderId,
+      String sourceModule,
+      int limit) {
+    List<AuditLog> logs = auditLogMapper.selectList(
+        Wrappers.lambdaQuery(AuditLog.class)
+            .eq(AuditLog::getOrgId, orgId)
+            .eq(AuditLog::getEntityType, entityType)
+            .orderByDesc(AuditLog::getCreateTime)
+            .last("LIMIT " + Math.max(limit, 1)));
+    List<FinanceHandleLogItem> result = new ArrayList<>();
+    for (AuditLog log : logs) {
+      Map<String, Object> detail = readAuditDetail(log.getDetail());
+      if (billId != null && !Objects.equals(toLong(detail.get("billId")), billId)) {
+        continue;
+      }
+      if (paymentId != null && !Objects.equals(toLong(detail.get("paymentId")), paymentId)) {
+        continue;
+      }
+      if (elderId != null && !Objects.equals(toLong(detail.get("elderId")), elderId)) {
+        continue;
+      }
+      if (sourceModule != null && !sourceModule.isBlank()
+          && !normalizeText(sourceModule, "").equalsIgnoreCase(stringValue(detail.get("sourceModule")))) {
+        continue;
+      }
+      result.add(toHandleLogItem(log, detail));
+    }
+    return result;
+  }
+
+  private FinanceHandleLogItem toHandleLogItem(AuditLog log, Map<String, Object> detail) {
+    FinanceHandleLogItem item = new FinanceHandleLogItem();
+    item.setId(log.getId());
+    item.setSourceModule(stringValue(detail.get("sourceModule")));
+    item.setSourceModuleLabel(handleSourceModuleLabel(item.getSourceModule()));
+    item.setIssueType(stringValue(detail.get("issueType")));
+    item.setIssueTypeLabel(handleIssueTypeLabel(item.getIssueType()));
+    item.setStatus(stringValue(detail.get("status")));
+    item.setStatusLabel(handleStatusLabel(item.getStatus()));
+    item.setStage(stringValue(detail.get("stage")));
+    item.setStageLabel(collectionStageLabel(item.getStage()));
+    item.setNextAction(stringValue(detail.get("nextAction")));
+    item.setRemark(stringValue(detail.get("remark")));
+    item.setPromisedDate(toLocalDate(detail.get("promisedDate")));
+    item.setOwnerName(stringValue(detail.get("ownerName")));
+    item.setDueDate(toLocalDate(detail.get("dueDate")));
+    item.setReviewResult(stringValue(detail.get("reviewResult")));
+    item.setContactName(stringValue(detail.get("contactName")));
+    item.setContactChannel(stringValue(detail.get("contactChannel")));
+    item.setContactResult(stringValue(detail.get("contactResult")));
+    item.setNextReminderAt(toLocalDateTime(detail.get("nextReminderAt")));
+    item.setBillId(toLong(detail.get("billId")));
+    item.setPaymentId(toLong(detail.get("paymentId")));
+    item.setElderId(toLong(detail.get("elderId")));
+    item.setActorName(log.getActorName());
+    item.setCreateTime(log.getCreateTime());
+    return item;
+  }
+
+  private AuditLog writeAuditLog(
+      Long orgId,
+      String actionType,
+      String entityType,
+      Long entityId,
+      Map<String, Object> detail) {
+    AuditLog log = new AuditLog();
+    log.setTenantId(orgId);
+    log.setOrgId(orgId);
+    log.setActorId(AuthContext.getStaffId());
+    log.setActorName(AuthContext.getUsername());
+    log.setActionType(actionType);
+    log.setEntityType(entityType);
+    log.setEntityId(entityId);
+    log.setDetail(toJson(detail));
+    auditLogMapper.insert(log);
+    return log;
+  }
+
+  private Map<String, Object> readAuditDetail(String detail) {
+    if (detail == null || detail.isBlank()) {
+      return Map.of();
+    }
+    try {
+      return objectMapper.readValue(detail, new TypeReference<Map<String, Object>>() {});
+    } catch (Exception ex) {
+      return Map.of("raw", detail);
+    }
+  }
+
+  private String toJson(Map<String, Object> payload) {
+    try {
+      return objectMapper.writeValueAsString(payload);
+    } catch (Exception ex) {
+      return "{}";
+    }
+  }
+
+  private List<FinanceIssueCenterItem> buildIssueCenterItems(Long orgId, LocalDate targetDate) {
+    List<FinanceIssueCenterItem> rows = new ArrayList<>();
+    Map<String, FinanceHandleLogItem> latestHandleMap = latestHandleLogMap(
+        queryHandleLogs(orgId, "FINANCE_ISSUE_HANDLE", null, null, null, null, 500));
+    FinanceLedgerHealthResponse ledger = ledgerHealth(200).getData();
+    if (ledger != null && ledger.getIssues() != null) {
+      for (FinanceLedgerHealthResponse.IssueItem issue : ledger.getIssues()) {
+        BigDecimal amount = safe(issue.getExpectedAmount()).max(safe(issue.getActualAmount()));
+        String riskLevel = issueCenterRiskLevel("LEDGER", issue.getIssueType(), amount, issue.getDetail());
+        FinanceIssueCenterItem item = issueCenterItem(
+            "LEDGER",
+            "一致性巡检",
+            issue.getIssueType(),
+            issue.getIssueTypeLabel(),
+            riskLevel,
+            issue.getBillId(),
+            issue.getPaymentId(),
+            issue.getElderId(),
+            issue.getElderName(),
+            amount,
+            issue.getDetail(),
+            "优先校正账单与收款、流水之间的落账关系",
+            issue.getBillId() == null ? "/finance/reconcile/ledger-health" : "/finance/bill/" + issue.getBillId(),
+            issue.getBillId() == null ? "查看巡检" : "查看账单",
+            ledger.getCheckedAt());
+        applyLatestHandle(item, latestHandleMap.get(issueHandleKey(item.getSourceModule(), item.getBillId(), item.getPaymentId(), item.getElderId())));
+        rows.add(item);
+      }
+    }
+
+    for (FinanceReconcileExceptionItem issue : buildReconcileExceptions(orgId, targetDate, null)) {
+      String riskLevel = issueCenterRiskLevel("RECONCILE", issue.getExceptionType(), issue.getAmount(), issue.getDetail());
+      String actionPath = switch (normalizeText(issue.getExceptionType(), "")) {
+        case "INVOICE_UNLINKED" -> "/finance/reconcile/invoice?filter=unlinked";
+        case "DUPLICATED_PAYMENT" -> "/finance/payments/refund-reversal";
+        default -> issue.getBillId() == null ? "/finance/reconcile/center?filter=unmatched" : "/finance/bill/" + issue.getBillId();
+      };
+      FinanceIssueCenterItem item = issueCenterItem(
+          "RECONCILE",
+          "对账中心",
+          issue.getExceptionType(),
+          issue.getExceptionTypeLabel(),
+          riskLevel,
+          issue.getBillId(),
+          issue.getPaymentId(),
+          issue.getElderId(),
+          issue.getElderName(),
+          issue.getAmount(),
+          issue.getDetail(),
+          issue.getSuggestion(),
+          actionPath,
+          "去处理",
+          issue.getOccurredAt());
+      applyLatestHandle(item, latestHandleMap.get(issueHandleKey(item.getSourceModule(), item.getBillId(), item.getPaymentId(), item.getElderId())));
+      rows.add(item);
+    }
+
+    for (FinanceAutoDebitExceptionItem issue : autoDebitExceptions(targetDate.toString()).getData()) {
+      String detail = normalizeText(issue.getReasonLabel(), "自动扣费异常") + "，账期 " + normalizeText(issue.getBillMonth(), "-");
+      FinanceIssueCenterItem item = issueCenterItem(
+          "AUTO_DEBIT",
+          "催缴异常",
+          issue.getReasonCode(),
+          issue.getReasonLabel(),
+          issueCenterRiskLevel("AUTO_DEBIT", issue.getReasonCode(), issue.getOutstandingAmount(), detail),
+          issue.getBillId(),
+          null,
+          issue.getElderId(),
+          issue.getElderName(),
+          issue.getOutstandingAmount(),
+          detail,
+          issue.getSuggestion(),
+          issue.getBillId() == null ? "/finance/bills/auto-deduct-errors" : "/finance/bill/" + issue.getBillId(),
+          issue.getBillId() == null ? "查看异常" : "查看账单",
+          targetDate.atTime(18, 0));
+      applyLatestHandle(item, latestHandleMap.get(issueHandleKey(item.getSourceModule(), item.getBillId(), item.getPaymentId(), item.getElderId())));
+      rows.add(item);
+    }
+
+    YearMonth targetMonth = YearMonth.from(targetDate);
+    for (FinancePaymentAdjustmentItem item : queryPaymentAdjustmentItems(orgId, targetMonth).stream()
+        .filter(row -> row.getOccurredAt() != null && row.getOccurredAt().toLocalDate().isEqual(targetDate))
+        .toList()) {
+      String detail = normalizeText(item.getDetail(), item.getTypeLabel());
+      FinanceIssueCenterItem issueItem = issueCenterItem(
+          "PAYMENT_ADJUSTMENT",
+          "退款/冲正",
+          item.getType(),
+          item.getTypeLabel(),
+          issueCenterRiskLevel("PAYMENT_ADJUSTMENT", item.getType(), item.getAmount(), item.getRemark()),
+          item.getBillId(),
+          item.getPaymentId(),
+          item.getElderId(),
+          item.getElderName(),
+          item.getAmount(),
+          detail,
+          normalizeText(item.getRemark(), "需要复核是否已完成冲正、退款或重新出单"),
+          item.getBillId() == null ? "/finance/payments/refund-reversal" : "/finance/bill/" + item.getBillId(),
+          item.getBillId() == null ? "查看修正" : "查看账单",
+          item.getOccurredAt());
+      applyLatestHandle(issueItem, latestHandleMap.get(issueHandleKey(issueItem.getSourceModule(), issueItem.getBillId(), issueItem.getPaymentId(), issueItem.getElderId())));
+      rows.add(issueItem);
+    }
+    return rows;
+  }
+
+  private boolean matchesIssueCenter(
+      FinanceIssueCenterItem item,
+      String riskLevel,
+      String sourceModule,
+      String keyword) {
+    if (riskLevel != null && !riskLevel.isBlank()
+        && !normalizeText(riskLevel, "").equalsIgnoreCase(normalizeText(item.getRiskLevel(), ""))) {
+      return false;
+    }
+    if (sourceModule != null && !sourceModule.isBlank()
+        && !normalizeText(sourceModule, "").equalsIgnoreCase(normalizeText(item.getSourceModule(), ""))) {
+      return false;
+    }
+    if (keyword == null || keyword.isBlank()) {
+      return true;
+    }
+    String text = keyword.trim().toLowerCase(Locale.ROOT);
+    return containsAny(item.getElderName(), text)
+        || containsAny(item.getIssueTypeLabel(), text)
+        || containsAny(item.getDetail(), text)
+        || containsAny(item.getSuggestion(), text)
+        || containsAny(stringOf(item.getBillId()), text)
+        || containsAny(stringOf(item.getPaymentId()), text);
+  }
+
+  private FinanceIssueCenterItem issueCenterItem(
+      String sourceModule,
+      String sourceModuleLabel,
+      String issueType,
+      String issueTypeLabel,
+      String riskLevel,
+      Long billId,
+      Long paymentId,
+      Long elderId,
+      String elderName,
+      BigDecimal amount,
+      String detail,
+      String suggestion,
+      String actionPath,
+      String actionLabel,
+      LocalDateTime occurredAt) {
+    FinanceIssueCenterItem item = new FinanceIssueCenterItem();
+    item.setSourceModule(sourceModule);
+    item.setSourceModuleLabel(sourceModuleLabel);
+    item.setIssueType(issueType);
+    item.setIssueTypeLabel(issueTypeLabel);
+    item.setRiskLevel(riskLevel);
+    item.setRiskLevelLabel(riskLevelLabel(riskLevel));
+    item.setBillId(billId);
+    item.setPaymentId(paymentId);
+    item.setElderId(elderId);
+    item.setElderName(elderName);
+    item.setAmount(safe(amount));
+    item.setDetail(detail);
+    item.setSuggestion(suggestion);
+    item.setActionPath(actionPath);
+    item.setActionLabel(actionLabel);
+    item.setOccurredAt(occurredAt);
+    return item;
+  }
+
+  private List<FinanceCollectionFollowUpItem> buildCollectionFollowUpItems(Long orgId, YearMonth targetMonth) {
+    List<BillMonthly> overdueBills = billMonthlyMapper.selectList(
+        Wrappers.lambdaQuery(BillMonthly.class)
+            .eq(BillMonthly::getIsDeleted, 0)
+            .eq(orgId != null, BillMonthly::getOrgId, orgId)
+            .le(BillMonthly::getBillMonth, targetMonth.toString())
+            .gt(BillMonthly::getOutstandingAmount, BigDecimal.ZERO)
+            .orderByDesc(BillMonthly::getOutstandingAmount)
+            .orderByAsc(BillMonthly::getBillMonth));
+    if (overdueBills.isEmpty()) {
+      return List.of();
+    }
+
+    Map<Long, List<BillMonthly>> billsByElder = overdueBills.stream()
+        .filter(item -> item.getElderId() != null)
+        .collect(Collectors.groupingBy(BillMonthly::getElderId));
+    List<Long> elderIds = new ArrayList<>(billsByElder.keySet());
+    Map<Long, ElderProfile> elderMap = elderIds.isEmpty()
+        ? Map.of()
+        : elderMapper.selectBatchIds(elderIds).stream()
+            .collect(Collectors.toMap(ElderProfile::getId, Function.identity(), (a, b) -> a));
+    Map<Long, ElderAccount> accountMap = elderIds.isEmpty()
+        ? Map.of()
+        : elderAccountMapper.selectList(
+            Wrappers.lambdaQuery(ElderAccount.class)
+                .eq(ElderAccount::getIsDeleted, 0)
+                .eq(orgId != null, ElderAccount::getOrgId, orgId)
+                .in(ElderAccount::getElderId, elderIds))
+            .stream()
+            .collect(Collectors.toMap(ElderAccount::getElderId, Function.identity(), (a, b) -> a));
+    Map<Long, LocalDate> contractExpireMap = elderIds.isEmpty()
+        ? Map.of()
+        : crmContractMapper.selectList(
+            Wrappers.lambdaQuery(CrmContract.class)
+                .eq(CrmContract::getIsDeleted, 0)
+                .eq(orgId != null, CrmContract::getOrgId, orgId)
+                .in(CrmContract::getElderId, elderIds))
+            .stream()
+            .filter(item -> item.getElderId() != null && item.getEffectiveTo() != null)
+            .collect(Collectors.toMap(
+                CrmContract::getElderId,
+                CrmContract::getEffectiveTo,
+                (a, b) -> a.isAfter(b) ? a : b));
+
+    List<Long> billIds = overdueBills.stream().map(BillMonthly::getId).filter(Objects::nonNull).toList();
+    List<PaymentRecord> payments = billIds.isEmpty()
+        ? List.of()
+        : paymentRecordMapper.selectList(
+            Wrappers.lambdaQuery(PaymentRecord.class)
+                .eq(PaymentRecord::getIsDeleted, 0)
+                .eq(orgId != null, PaymentRecord::getOrgId, orgId)
+                .in(PaymentRecord::getBillMonthlyId, billIds)
+                .orderByDesc(PaymentRecord::getPaidAt));
+    Map<Long, Long> elderByBillId = overdueBills.stream()
+        .filter(item -> item.getId() != null && item.getElderId() != null)
+        .collect(Collectors.toMap(BillMonthly::getId, BillMonthly::getElderId, (a, b) -> a));
+    Map<Long, LocalDateTime> lastPaymentMap = new HashMap<>();
+    for (PaymentRecord payment : payments) {
+      Long elderId = elderByBillId.get(payment.getBillMonthlyId());
+      if (elderId == null || payment.getPaidAt() == null) {
+        continue;
+      }
+      LocalDateTime current = lastPaymentMap.get(elderId);
+      if (current == null || payment.getPaidAt().isAfter(current)) {
+        lastPaymentMap.put(elderId, payment.getPaidAt());
+      }
+    }
+
+    LocalDate baseDate = targetMonth.atEndOfMonth();
+    Map<Long, FinanceHandleLogItem> latestFollowMap = latestCollectionHandleMap(
+        queryHandleLogs(orgId, "FINANCE_COLLECTION_HANDLE", null, null, null, null, 500));
+    List<FinanceCollectionFollowUpItem> rows = new ArrayList<>();
+    for (Map.Entry<Long, List<BillMonthly>> entry : billsByElder.entrySet()) {
+      Long elderId = entry.getKey();
+      List<BillMonthly> elderBills = entry.getValue();
+      if (elderBills.isEmpty()) {
+        continue;
+      }
+      BigDecimal outstandingAmount = elderBills.stream()
+          .map(BillMonthly::getOutstandingAmount)
+          .filter(Objects::nonNull)
+          .reduce(BigDecimal.ZERO, BigDecimal::add);
+      BillMonthly primaryBill = elderBills.stream()
+          .max(Comparator.comparing(BillMonthly::getOutstandingAmount, Comparator.nullsLast(BigDecimal::compareTo))
+              .thenComparing(BillMonthly::getBillMonth, Comparator.nullsLast(String::compareTo)))
+          .orElse(elderBills.get(0));
+      String oldestBillMonth = elderBills.stream()
+          .map(BillMonthly::getBillMonth)
+          .filter(Objects::nonNull)
+          .min(String::compareTo)
+          .orElse(null);
+      String latestBillMonth = elderBills.stream()
+          .map(BillMonthly::getBillMonth)
+          .filter(Objects::nonNull)
+          .max(String::compareTo)
+          .orElse(null);
+      int overdueMonths = oldestBillMonth == null
+          ? 1
+          : (int) ChronoUnit.MONTHS.between(YearMonth.parse(oldestBillMonth), targetMonth) + 1;
+      ElderProfile elder = elderMap.get(elderId);
+      ElderAccount account = accountMap.get(elderId);
+      BigDecimal balance = account == null ? BigDecimal.ZERO : safe(account.getBalance());
+      LocalDate contractExpireDate = contractExpireMap.get(elderId);
+      List<String> reasons = new ArrayList<>();
+      if (overdueMonths >= 2) {
+        reasons.add("连续欠费" + overdueMonths + "个月");
+      } else {
+        reasons.add("存在当期未结账单");
+      }
+      if (balance.compareTo(BigDecimal.valueOf(200)) < 0) {
+        reasons.add("账户余额偏低");
+      }
+      if (contractExpireDate != null && !contractExpireDate.isAfter(baseDate.plusDays(30))) {
+        reasons.add("合同30天内到期");
+      }
+      String riskLevel = collectionRiskLevel(outstandingAmount, overdueMonths, balance, contractExpireDate, baseDate);
+      String stage = collectionStage(riskLevel);
+
+      FinanceCollectionFollowUpItem item = new FinanceCollectionFollowUpItem();
+      item.setElderId(elderId);
+      item.setElderName(elder == null ? null : elder.getFullName());
+      item.setPrimaryBillId(primaryBill.getId());
+      item.setOldestBillMonth(oldestBillMonth);
+      item.setLatestBillMonth(latestBillMonth);
+      item.setOutstandingAmount(outstandingAmount);
+      item.setBalance(balance);
+      item.setOverdueMonths(overdueMonths);
+      item.setRiskLevel(riskLevel);
+      item.setRiskLevelLabel(riskLevelLabel(riskLevel));
+      item.setStage(stage);
+      item.setStageLabel(collectionStageLabel(stage));
+      item.setLastPaymentAt(lastPaymentMap.get(elderId));
+      item.setContractExpireDate(contractExpireDate);
+      item.setFollowUpReason(String.join(" / ", reasons));
+      item.setSuggestion(collectionSuggestion(stage, contractExpireDate, balance));
+      item.setActionPath(primaryBill.getId() == null ? "/finance/accounts/list" : "/finance/bill/" + primaryBill.getId());
+      item.setActionLabel(primaryBill.getId() == null ? "查看账户" : "查看账单");
+      applyLatestCollectionHandle(item, latestFollowMap.get(elderId));
+      rows.add(item);
+    }
+    return rows;
+  }
+
+  private boolean matchesCollectionFollowUp(
+      FinanceCollectionFollowUpItem item,
+      String riskLevel,
+      String stage,
+      String keyword) {
+    if (riskLevel != null && !riskLevel.isBlank()
+        && !normalizeText(riskLevel, "").equalsIgnoreCase(normalizeText(item.getRiskLevel(), ""))) {
+      return false;
+    }
+    if (stage != null && !stage.isBlank()
+        && !normalizeText(stage, "").equalsIgnoreCase(normalizeText(item.getStage(), ""))) {
+      return false;
+    }
+    if (keyword == null || keyword.isBlank()) {
+      return true;
+    }
+    String text = keyword.trim().toLowerCase(Locale.ROOT);
+    return containsAny(item.getElderName(), text)
+        || containsAny(item.getFollowUpReason(), text)
+        || containsAny(item.getSuggestion(), text)
+        || containsAny(stringOf(item.getElderId()), text)
+        || containsAny(stringOf(item.getPrimaryBillId()), text);
+  }
+
+  private FinanceMonthCloseSummaryResponse buildMonthCloseSummary(Long orgId, YearMonth targetMonth) {
+    FinanceMonthCloseSummaryResponse response = new FinanceMonthCloseSummaryResponse();
+    response.setMonth(targetMonth.toString());
+
+    List<BillMonthly> monthBills = billMonthlyMapper.selectList(
+        Wrappers.lambdaQuery(BillMonthly.class)
+            .eq(BillMonthly::getIsDeleted, 0)
+            .eq(orgId != null, BillMonthly::getOrgId, orgId)
+            .eq(BillMonthly::getBillMonth, targetMonth.toString()));
+    LocalDateTime startTime = targetMonth.atDay(1).atStartOfDay();
+    LocalDateTime endTime = targetMonth.plusMonths(1).atDay(1).atStartOfDay();
+    List<PaymentRecord> monthPayments = paymentRecordMapper.selectList(
+        Wrappers.lambdaQuery(PaymentRecord.class)
+            .eq(PaymentRecord::getIsDeleted, 0)
+            .eq(orgId != null, PaymentRecord::getOrgId, orgId)
+            .ge(PaymentRecord::getPaidAt, startTime)
+            .lt(PaymentRecord::getPaidAt, endTime));
+    List<FinancePaymentAdjustmentItem> adjustments = queryPaymentAdjustmentItems(orgId, targetMonth);
+    FinanceLedgerHealthResponse ledger = ledgerHealth(200).getData();
+    List<FinanceCollectionFollowUpItem> followUps = buildCollectionFollowUpItems(orgId, targetMonth);
+
+    long billCount = monthBills.size();
+    long settledBillCount = monthBills.stream()
+        .filter(item -> safe(item.getOutstandingAmount()).compareTo(BigDecimal.ZERO) <= 0)
+        .count();
+    long outstandingBillCount = monthBills.stream()
+        .filter(item -> safe(item.getOutstandingAmount()).compareTo(BigDecimal.ZERO) > 0)
+        .count();
+    long unlinkedInvoiceCount = monthPayments.stream()
+        .filter(item -> !containsAny(item.getRemark(), "发票", "invoice", "收据"))
+        .count();
+    long issueCount = ledger == null ? 0L : ledger.getTotalIssueCount();
+    long highRiskFollowUpCount = followUps.stream()
+        .filter(item -> "HIGH".equalsIgnoreCase(item.getRiskLevel()))
+        .count();
+
+    response.setBillCount(billCount);
+    response.setSettledBillCount(settledBillCount);
+    response.setOutstandingBillCount(outstandingBillCount);
+    response.setPaymentCount((long) monthPayments.size());
+    response.setAdjustmentCount((long) adjustments.size());
+    response.setUnlinkedInvoiceCount(unlinkedInvoiceCount);
+    response.setIssueCount(issueCount);
+
+    response.getSteps().add(monthCloseStep(
+        "BILL_GENERATION",
+        "账单生成",
+        billCount > 0 ? "COMPLETED" : "BLOCKED",
+        billCount,
+        billCount > 0 ? "本月账单已生成，可继续推进收款、发票与月结动作" : "本月未发现账单，需先生成账单",
+        "/finance/bills/in-resident",
+        "查看账单"));
+    response.getSteps().add(monthCloseStep(
+        "PAYMENT_POSTING",
+        "收款入账",
+        outstandingBillCount == 0 ? "COMPLETED" : (monthPayments.isEmpty() ? "BLOCKED" : "IN_PROGRESS"),
+        outstandingBillCount,
+        outstandingBillCount == 0 ? "本月账单均已完成入账" : "仍有 " + outstandingBillCount + " 张账单未结清",
+        "/finance/payments/records",
+        "查看流水"));
+    response.getSteps().add(monthCloseStep(
+        "RECONCILE",
+        "对账巡检",
+        issueCount == 0 ? "COMPLETED" : "BLOCKED",
+        issueCount,
+        issueCount == 0 ? "账单、收款与流水一致" : "存在 " + issueCount + " 个一致性问题需要先修正",
+        "/finance/reconcile/issue-center",
+        "处理异常"));
+    response.getSteps().add(monthCloseStep(
+        "INVOICE_LINK",
+        "发票与收据",
+        unlinkedInvoiceCount == 0 ? "COMPLETED" : "IN_PROGRESS",
+        unlinkedInvoiceCount,
+        unlinkedInvoiceCount == 0 ? "本月收款均已完成票据关联" : "仍有 " + unlinkedInvoiceCount + " 笔收款未补齐票据关联",
+        "/finance/fees/payment-and-invoice",
+        "处理票据"));
+    response.getSteps().add(monthCloseStep(
+        "ADJUSTMENT_REVIEW",
+        "退款/冲正复核",
+        adjustments.isEmpty() ? "COMPLETED" : "IN_PROGRESS",
+        (long) adjustments.size(),
+        adjustments.isEmpty() ? "本月暂无待复核的退款/冲正/作废记录" : "本月存在 " + adjustments.size() + " 条收款修正记录待复核闭环",
+        "/finance/payments/refund-reversal",
+        "查看修正"));
+    response.getSteps().add(monthCloseStep(
+        "COLLECTION_FOLLOW_UP",
+        "欠费催缴",
+        followUps.isEmpty() ? "COMPLETED" : (highRiskFollowUpCount > 0 ? "BLOCKED" : "IN_PROGRESS"),
+        (long) followUps.size(),
+        followUps.isEmpty() ? "本月无欠费跟进对象" : "仍有 " + followUps.size() + " 位长者处于催缴跟进中",
+        "/finance/bills/follow-up",
+        "查看催缴"));
+
+    int totalSteps = response.getSteps().size();
+    int completedSteps = (int) response.getSteps().stream()
+        .filter(item -> "COMPLETED".equalsIgnoreCase(item.getStatus()))
+        .count();
+    int blockedSteps = (int) response.getSteps().stream()
+        .filter(item -> "BLOCKED".equalsIgnoreCase(item.getStatus()))
+        .count();
+    int warningSteps = (int) response.getSteps().stream()
+        .filter(item -> "IN_PROGRESS".equalsIgnoreCase(item.getStatus()))
+        .count();
+    response.setTotalSteps(totalSteps);
+    response.setCompletedSteps(completedSteps);
+    response.setBlockedSteps(blockedSteps);
+    response.setWarningSteps(warningSteps);
+    response.setCompletionRate(totalSteps <= 0 ? 0 : (int) Math.round(completedSteps * 100.0 / totalSteps));
+
+    if (issueCount > 0) {
+      response.getNotes().add("一致性巡检仍有 " + issueCount + " 个问题，建议先处理异常修复中心任务。");
+    }
+    if (unlinkedInvoiceCount > 0) {
+      response.getNotes().add("仍有 " + unlinkedInvoiceCount + " 笔收款未补齐发票/收据关联。");
+    }
+    if (highRiskFollowUpCount > 0) {
+      response.getNotes().add("当前存在 " + highRiskFollowUpCount + " 位高风险欠费长者，月结前需完成催缴闭环。");
+    }
+    if (response.getNotes().isEmpty()) {
+      response.getNotes().add("本月月结链路较为顺畅，可按计划执行关账与复盘。");
+    }
+    AuditLog closeLog = latestMonthCloseLog(orgId, targetMonth);
+    if (closeLog != null) {
+      Map<String, Object> detail = readAuditDetail(closeLog.getDetail());
+      response.setCloseRemark(stringValue(detail.get("remark")));
+    }
+    FinanceMonthLockStatusResponse lockStatus = financeMonthLockService.getMonthLockStatus(orgId, targetMonth);
+    response.setCloseStatus(lockStatus.getCloseStatus());
+    response.setCloseStatusLabel(lockStatus.getCloseStatusLabel());
+    response.setClosedBy(lockStatus.getLockedBy());
+    response.setClosedAt(lockStatus.getLockedAt());
+    response.setLocked(lockStatus.isLocked());
+    response.setLockStatusLabel(lockStatus.isLocked() ? "已锁账" : ("UNLOCKED".equalsIgnoreCase(lockStatus.getCloseStatus()) ? "已反锁" : "未锁账"));
+    response.setUnlockedBy(lockStatus.getUnlockedBy());
+    response.setUnlockedAt(lockStatus.getUnlockedAt());
+    response.setUnlockReason(lockStatus.getUnlockReason());
+    if (lockStatus.isLocked()) {
+      response.getNotes().add(0, "本月已锁账，如需跨期处理请先申请跨期审批或由主管反锁账。");
+    }
+    response.setCanClose(blockedSteps == 0);
+    return response;
+  }
+
+  private FinanceMonthCloseSummaryResponse.Step monthCloseStep(
+      String key,
+      String label,
+      String status,
+      Long count,
+      String detail,
+      String actionPath,
+      String actionLabel) {
+    FinanceMonthCloseSummaryResponse.Step step = new FinanceMonthCloseSummaryResponse.Step();
+    step.setKey(key);
+    step.setLabel(label);
+    step.setStatus(status);
+    step.setStatusLabel(monthCloseStatusLabel(status));
+    step.setCount(count == null ? 0L : count);
+    step.setDetail(detail);
+    step.setActionPath(actionPath);
+    step.setActionLabel(actionLabel);
+    return step;
+  }
+
+  private AuditLog latestMonthCloseLog(Long orgId, YearMonth month) {
+    return auditLogMapper.selectOne(
+        Wrappers.lambdaQuery(AuditLog.class)
+            .eq(AuditLog::getOrgId, orgId)
+            .eq(AuditLog::getEntityType, "FINANCE_MONTH_CLOSE")
+            .eq(AuditLog::getEntityId, monthEntityId(month))
+            .orderByDesc(AuditLog::getCreateTime)
+            .last("LIMIT 1"));
+  }
+
+  private void applyLatestHandle(FinanceIssueCenterItem item, FinanceHandleLogItem log) {
+    if (item == null || log == null) {
+      return;
+    }
+    item.setLatestHandleStatus(log.getStatus());
+    item.setLatestHandleStatusLabel(log.getStatusLabel());
+    item.setLatestHandleRemark(log.getRemark());
+    item.setLatestOwnerName(log.getOwnerName());
+    item.setLatestDueDate(log.getDueDate());
+    item.setLatestReviewResult(log.getReviewResult());
+    item.setLatestHandleAt(log.getCreateTime());
+  }
+
+  private void applyLatestCollectionHandle(FinanceCollectionFollowUpItem item, FinanceHandleLogItem log) {
+    if (item == null || log == null) {
+      return;
+    }
+    item.setLatestHandleStatus(log.getStatus());
+    item.setLatestHandleStatusLabel(log.getStatusLabel());
+    item.setLatestHandleRemark(log.getRemark());
+    item.setLatestOwnerName(log.getOwnerName());
+    item.setLatestContactName(log.getContactName());
+    item.setLatestContactChannel(log.getContactChannel());
+    item.setLatestContactResult(log.getContactResult());
+    item.setPromisedDate(log.getPromisedDate());
+    item.setNextReminderAt(log.getNextReminderAt());
+    item.setLatestHandleAt(log.getCreateTime());
+    if (log.getStage() != null && !log.getStage().isBlank()) {
+      item.setStage(log.getStage());
+      item.setStageLabel(collectionStageLabel(log.getStage()));
+    }
+  }
+
+  private Map<String, FinanceHandleLogItem> latestHandleLogMap(List<FinanceHandleLogItem> rows) {
+    Map<String, FinanceHandleLogItem> map = new HashMap<>();
+    for (FinanceHandleLogItem row : rows) {
+      String key = issueHandleKey(row.getSourceModule(), row.getBillId(), row.getPaymentId(), row.getElderId());
+      if (key.isBlank()) {
+        continue;
+      }
+      map.putIfAbsent(key, row);
+    }
+    return map;
+  }
+
+  private Map<Long, FinanceHandleLogItem> latestCollectionHandleMap(List<FinanceHandleLogItem> rows) {
+    Map<Long, FinanceHandleLogItem> map = new HashMap<>();
+    for (FinanceHandleLogItem row : rows) {
+      if (row.getElderId() == null) {
+        continue;
+      }
+      map.putIfAbsent(row.getElderId(), row);
+    }
+    return map;
+  }
+
+  private String issueHandleKey(String module, Long billId, Long paymentId, Long elderId) {
+    return normalizeText(module, "") + "|" + stringOf(billId) + "|" + stringOf(paymentId) + "|" + stringOf(elderId);
+  }
+
+  private Long resolveAuditEntityId(Long billId, Long paymentId, Long elderId) {
+    if (paymentId != null) return paymentId;
+    if (billId != null) return billId;
+    if (elderId != null) return elderId;
+    return 0L;
+  }
+
+  private Long monthEntityId(YearMonth month) {
+    return Long.valueOf(month.toString().replace("-", ""));
+  }
+
+  private String buildAdjustmentApprovalTitle(FinancePaymentAdjustmentApprovalRequest request) {
+    String typeLabel = "INVALID_BILL".equalsIgnoreCase(request.getType()) ? "作废账单复核" : "退款/冲正审批";
+    String elderName = normalizeText(request.getElderName(), "未绑定长者");
+    return "财务" + typeLabel + " - " + elderName;
+  }
+
+  private FinanceSearchResponse buildFinanceSearchResponse(Long orgId, String keyword, int limit) {
+    if (keyword == null || keyword.isBlank()) {
+      throw new IllegalArgumentException("搜索关键词不能为空");
+    }
+    String text = keyword.trim();
+    FinanceSearchResponse response = new FinanceSearchResponse();
+    response.setKeyword(text);
+
+    elderMapper.selectList(
+            Wrappers.lambdaQuery(ElderProfile.class)
+                .eq(ElderProfile::getIsDeleted, 0)
+                .eq(orgId != null, ElderProfile::getOrgId, orgId)
+                .and(q -> q.like(ElderProfile::getFullName, text)
+                    .or().like(ElderProfile::getPhone, text)
+                    .or().like(ElderProfile::getElderCode, text))
+                .orderByDesc(ElderProfile::getUpdateTime)
+                .last("LIMIT " + limit))
+        .forEach(item -> response.getElders().add(searchRow(
+            "ELDER", item.getId(), normalizeText(item.getFullName(), "未命名长者"),
+            "手机号 " + normalizeText(item.getPhone(), "-"),
+            "编号 " + normalizeText(item.getElderCode(), "-"),
+            "/elder/detail/" + item.getId(),
+            item.getUpdateTime())));
+
+    List<BillMonthly> bills = billMonthlyMapper.selectList(
+        Wrappers.lambdaQuery(BillMonthly.class)
+            .eq(BillMonthly::getIsDeleted, 0)
+            .eq(orgId != null, BillMonthly::getOrgId, orgId)
+            .and(q -> q.like(BillMonthly::getBillMonth, text)
+                .or().like(BillMonthly::getId, text))
+            .orderByDesc(BillMonthly::getUpdateTime)
+            .last("LIMIT " + limit));
+    Map<Long, ElderProfile> billElderMap = elderMapByIds(orgId, bills.stream().map(BillMonthly::getElderId).filter(Objects::nonNull).toList());
+    bills.forEach(item -> response.getBills().add(searchRow(
+        "BILL", item.getId(), "账单#" + item.getId(),
+        normalizeText(billElderMap.get(item.getElderId()) == null ? null : billElderMap.get(item.getElderId()).getFullName(), "未绑定长者")
+            + " · " + normalizeText(item.getBillMonth(), "-"),
+        "待收 " + safe(item.getOutstandingAmount()) + " 元",
+        "/finance/bill/" + item.getId(),
+        item.getUpdateTime())));
+
+    paymentRecordMapper.selectList(
+            Wrappers.lambdaQuery(PaymentRecord.class)
+                .eq(PaymentRecord::getIsDeleted, 0)
+                .eq(orgId != null, PaymentRecord::getOrgId, orgId)
+                .and(q -> q.like(PaymentRecord::getExternalTxnId, text)
+                    .or().like(PaymentRecord::getRemark, text)
+                    .or().like(PaymentRecord::getId, text))
+                .orderByDesc(PaymentRecord::getPaidAt)
+                .last("LIMIT " + limit))
+        .forEach(item -> response.getPayments().add(searchRow(
+            "PAYMENT",
+            item.getId(),
+            "收款#" + item.getId(),
+            payMethodLabel(normalizePayMethod(item.getPayMethod())) + " · " + safe(item.getAmount()) + " 元",
+            "外部流水 " + normalizeText(item.getExternalTxnId(), "-"),
+            item.getBillMonthlyId() == null ? "/finance/payments/records" : "/finance/bill/" + item.getBillMonthlyId(),
+            item.getPaidAt())));
+
+    crmContractMapper.selectList(
+            Wrappers.lambdaQuery(CrmContract.class)
+                .eq(CrmContract::getIsDeleted, 0)
+                .eq(orgId != null, CrmContract::getOrgId, orgId)
+                .and(q -> q.like(CrmContract::getContractNo, text)
+                    .or().like(CrmContract::getElderName, text)
+                    .or().like(CrmContract::getName, text))
+                .orderByDesc(CrmContract::getUpdateTime)
+                .last("LIMIT " + limit))
+        .forEach(item -> response.getContracts().add(searchRow(
+            "CONTRACT",
+            item.getId(),
+            normalizeText(item.getContractNo(), "合同#" + item.getId()),
+            normalizeText(item.getElderName(), normalizeText(item.getName(), "未命名合同")),
+            "到期 " + stringOf(item.getEffectiveTo()),
+            "/elder/contracts-invoices",
+            item.getUpdateTime())));
+    return response;
+  }
+
+  private FinanceSearchResponse.Row searchRow(
+      String type,
+      Long id,
+      String title,
+      String subtitle,
+      String extra,
+      String actionPath,
+      LocalDateTime time) {
+    FinanceSearchResponse.Row row = new FinanceSearchResponse.Row();
+    row.setType(type);
+    row.setId(id);
+    row.setTitle(title);
+    row.setSubtitle(subtitle);
+    row.setExtra(extra);
+    row.setActionPath(actionPath);
+    row.setTime(time);
+    return row;
+  }
+
+  private List<FinanceSearchResponse.Row> flattenSearchRows(FinanceSearchResponse response) {
+    List<FinanceSearchResponse.Row> rows = new ArrayList<>();
+    if (response == null) {
+      return rows;
+    }
+    if (response.getElders() != null) {
+      rows.addAll(response.getElders());
+    }
+    if (response.getBills() != null) {
+      rows.addAll(response.getBills());
+    }
+    if (response.getPayments() != null) {
+      rows.addAll(response.getPayments());
+    }
+    if (response.getContracts() != null) {
+      rows.addAll(response.getContracts());
+    }
+    rows.sort(Comparator.comparing(FinanceSearchResponse.Row::getTime, Comparator.nullsLast(LocalDateTime::compareTo)).reversed());
+    return rows;
+  }
+
+  private String searchTypeLabel(String type) {
+    if ("ELDER".equalsIgnoreCase(type)) return "长者";
+    if ("BILL".equalsIgnoreCase(type)) return "账单";
+    if ("PAYMENT".equalsIgnoreCase(type)) return "收款流水";
+    if ("CONTRACT".equalsIgnoreCase(type)) return "合同";
+    return normalizeText(type, "财务对象");
+  }
+
+  private Map<Long, ElderProfile> elderMapByIds(Long orgId, List<Long> elderIds) {
+    if (elderIds == null || elderIds.isEmpty()) {
+      return Map.of();
+    }
+    return elderMapper.selectList(
+            Wrappers.lambdaQuery(ElderProfile.class)
+                .eq(ElderProfile::getIsDeleted, 0)
+                .eq(orgId != null, ElderProfile::getOrgId, orgId)
+                .in(ElderProfile::getId, elderIds))
+        .stream()
+        .collect(Collectors.toMap(ElderProfile::getId, Function.identity(), (a, b) -> a));
+  }
+
+  private String issueCenterRiskLevel(String sourceModule, String issueType, BigDecimal amount, String detail) {
+    String module = normalizeText(sourceModule, "").toUpperCase(Locale.ROOT);
+    String type = normalizeText(issueType, "").toUpperCase(Locale.ROOT);
+    BigDecimal value = safe(amount);
+    if ("LEDGER".equals(module)) {
+      if ("MISSING_PAYMENT_FLOW".equals(type) || "PAID_AMOUNT_MISMATCH".equals(type)) {
+        return "HIGH";
+      }
+      return value.compareTo(BigDecimal.valueOf(3000)) >= 0 ? "HIGH" : "MEDIUM";
+    }
+    if ("RECONCILE".equals(module)) {
+      if ("DUPLICATED_PAYMENT".equals(type)) {
+        return "HIGH";
+      }
+      if ("BILL_PAID_UNMATCHED".equals(type)) {
+        return value.compareTo(BigDecimal.valueOf(1000)) >= 0 ? "HIGH" : "MEDIUM";
+      }
+      return value.compareTo(BigDecimal.valueOf(2000)) >= 0 ? "HIGH" : "LOW";
+    }
+    if ("AUTO_DEBIT".equals(module)) {
+      if (value.compareTo(BigDecimal.valueOf(3000)) >= 0 || containsAny(detail, "余额不足")) {
+        return "HIGH";
+      }
+      return value.compareTo(BigDecimal.valueOf(1000)) >= 0 ? "MEDIUM" : "LOW";
+    }
+    if ("PAYMENT_ADJUSTMENT".equals(module)) {
+      if ("INVALID_BILL".equals(type) && (containsAny(detail, "欠费") || value.compareTo(BigDecimal.valueOf(1000)) >= 0)) {
+        return "HIGH";
+      }
+      return value.compareTo(BigDecimal.valueOf(1000)) >= 0 ? "MEDIUM" : "LOW";
+    }
+    return "MEDIUM";
+  }
+
+  private String collectionRiskLevel(
+      BigDecimal outstandingAmount,
+      int overdueMonths,
+      BigDecimal balance,
+      LocalDate contractExpireDate,
+      LocalDate baseDate) {
+    if (safe(outstandingAmount).compareTo(BigDecimal.valueOf(3000)) >= 0 || overdueMonths >= 2) {
+      return "HIGH";
+    }
+    if (contractExpireDate != null && !contractExpireDate.isAfter(baseDate.plusDays(7))) {
+      return "HIGH";
+    }
+    if (safe(outstandingAmount).compareTo(BigDecimal.valueOf(1000)) >= 0 || overdueMonths >= 1) {
+      return "MEDIUM";
+    }
+    if (balance.compareTo(BigDecimal.valueOf(200)) < 0) {
+      return "MEDIUM";
+    }
+    if (contractExpireDate != null && !contractExpireDate.isAfter(baseDate.plusDays(30))) {
+      return "MEDIUM";
+    }
+    return "LOW";
+  }
+
+  private String collectionStage(String riskLevel) {
+    if ("HIGH".equalsIgnoreCase(riskLevel)) {
+      return "URGENT";
+    }
+    if ("MEDIUM".equalsIgnoreCase(riskLevel)) {
+      return "FOLLOW_UP";
+    }
+    return "WATCH";
+  }
+
+  private String collectionStageLabel(String stage) {
+    if ("URGENT".equalsIgnoreCase(stage)) {
+      return "立即催缴";
+    }
+    if ("FOLLOW_UP".equalsIgnoreCase(stage)) {
+      return "本周跟进";
+    }
+    return "持续观察";
+  }
+
+  private String collectionSuggestion(String stage, LocalDate contractExpireDate, BigDecimal balance) {
+    if ("URGENT".equalsIgnoreCase(stage)) {
+      return "建议当天电话沟通并同步家属，必要时先锁定退款/冲正处理后再推进补缴。";
+    }
+    if (contractExpireDate != null && balance.compareTo(BigDecimal.valueOf(200)) < 0) {
+      return "建议结合续约与充值一起推进，避免跨月继续挂账。";
+    }
+    return "建议通过短信或微信提醒后，在本周内完成一次人工回访。";
+  }
+
+  private String riskLevelLabel(String riskLevel) {
+    if ("HIGH".equalsIgnoreCase(riskLevel)) {
+      return "高风险";
+    }
+    if ("MEDIUM".equalsIgnoreCase(riskLevel)) {
+      return "中风险";
+    }
+    return "低风险";
+  }
+
+  private String monthCloseStatusLabel(String status) {
+    if ("COMPLETED".equalsIgnoreCase(status)) {
+      return "已完成";
+    }
+    if ("BLOCKED".equalsIgnoreCase(status)) {
+      return "阻塞";
+    }
+    return "处理中";
+  }
+
+  private String monthCloseExecuteStatusLabel(String status) {
+    if ("CLOSED".equalsIgnoreCase(status)) {
+      return "已关账";
+    }
+    if ("FORCED_CLOSED".equalsIgnoreCase(status)) {
+      return "强制关账";
+    }
+    if ("UNLOCKED".equalsIgnoreCase(status)) {
+      return "已反锁";
+    }
+    if ("OPEN".equalsIgnoreCase(status)) {
+      return "未关账";
+    }
+    return "阻塞";
+  }
+
+  private String handleStatusLabel(String status) {
+    if ("DONE".equalsIgnoreCase(status)) return "已完成";
+    if ("FOLLOWING".equalsIgnoreCase(status)) return "跟进中";
+    if ("UPDATED".equalsIgnoreCase(status)) return "已更新";
+    if ("WAITING".equalsIgnoreCase(status)) return "待回访";
+    if ("FOLLOWED".equalsIgnoreCase(status)) return "已跟进";
+    return normalizeText(status, "已记录");
+  }
+
+  private String handleSourceModuleLabel(String sourceModule) {
+    if ("LEDGER".equalsIgnoreCase(sourceModule)) return "一致性巡检";
+    if ("RECONCILE".equalsIgnoreCase(sourceModule)) return "对账中心";
+    if ("AUTO_DEBIT".equalsIgnoreCase(sourceModule)) return "催缴异常";
+    if ("PAYMENT_ADJUSTMENT".equalsIgnoreCase(sourceModule)) return "退款/冲正";
+    if ("COLLECTION".equalsIgnoreCase(sourceModule)) return "欠费催缴";
+    return normalizeText(sourceModule, "财务事项");
+  }
+
+  private String handleIssueTypeLabel(String issueType) {
+    if (issueType == null || issueType.isBlank()) {
+      return "财务处理";
+    }
+    return issueType;
+  }
+
+  private String approvalStatusLabel(String status) {
+    if ("PENDING".equalsIgnoreCase(status)) return "审批中";
+    if ("APPROVED".equalsIgnoreCase(status)) return "已通过";
+    if ("REJECTED".equalsIgnoreCase(status)) return "已驳回";
+    return "未提交";
+  }
+
+  private String stringValue(Object value) {
+    return value == null ? "" : String.valueOf(value);
+  }
+
+  private Long toLong(Object value) {
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof Number number) {
+      return number.longValue();
+    }
+    try {
+      return Long.valueOf(String.valueOf(value));
+    } catch (Exception ex) {
+      return null;
+    }
+  }
+
+  private LocalDate toLocalDate(Object value) {
+    if (value == null) {
+      return null;
+    }
+    try {
+      return LocalDate.parse(String.valueOf(value));
+    } catch (Exception ex) {
+      return null;
+    }
+  }
+
+  private LocalDateTime toLocalDateTime(Object value) {
+    if (value == null) {
+      return null;
+    }
+    try {
+      return LocalDateTime.parse(String.valueOf(value));
+    } catch (Exception ex) {
+      return null;
+    }
   }
 
   private ResponseEntity<byte[]> csvResponse(String filenamePrefix, List<String> headers, List<List<String>> rows) {

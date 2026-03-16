@@ -72,7 +72,7 @@ public class RoomCleaningController {
     task.setTenantId(orgId);
     task.setOrgId(orgId);
     task.setRoomId(request.getRoomId());
-    task.setRoomNo(resolveRoomNo(request.getRoomId()));
+    task.setRoomNo(resolveRoomNo(orgId, request.getRoomId()));
     task.setCleanerName(request.getCleanerName());
     task.setPlanDate(request.getPlanDate());
     task.setStatus(request.getStatus() == null ? "PENDING" : request.getStatus());
@@ -84,12 +84,13 @@ public class RoomCleaningController {
 
   @PutMapping("/{id}")
   public Result<RoomCleaningTask> update(@PathVariable Long id, @Valid @RequestBody RoomCleaningTaskRequest request) {
-    RoomCleaningTask task = taskMapper.selectById(id);
+    Long orgId = AuthContext.getOrgId();
+    RoomCleaningTask task = getTaskInOrg(id, orgId);
     if (task == null) {
       return Result.ok(null);
     }
     task.setRoomId(request.getRoomId());
-    task.setRoomNo(resolveRoomNo(request.getRoomId()));
+    task.setRoomNo(resolveRoomNo(orgId, request.getRoomId()));
     task.setCleanerName(request.getCleanerName());
     task.setPlanDate(request.getPlanDate());
     task.setStatus(request.getStatus() == null ? task.getStatus() : request.getStatus());
@@ -100,7 +101,7 @@ public class RoomCleaningController {
 
   @PutMapping("/{id}/done")
   public Result<RoomCleaningTask> done(@PathVariable Long id) {
-    RoomCleaningTask task = taskMapper.selectById(id);
+    RoomCleaningTask task = getTaskInOrg(id, AuthContext.getOrgId());
     if (task == null) {
       return Result.ok(null);
     }
@@ -112,7 +113,7 @@ public class RoomCleaningController {
 
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
-    RoomCleaningTask task = taskMapper.selectById(id);
+    RoomCleaningTask task = getTaskInOrg(id, AuthContext.getOrgId());
     if (task != null) {
       task.setIsDeleted(1);
       taskMapper.updateById(task);
@@ -120,11 +121,26 @@ public class RoomCleaningController {
     return Result.ok(null);
   }
 
-  private String resolveRoomNo(Long roomId) {
+  private RoomCleaningTask getTaskInOrg(Long id, Long orgId) {
+    return taskMapper.selectOne(Wrappers.lambdaQuery(RoomCleaningTask.class)
+        .eq(RoomCleaningTask::getId, id)
+        .eq(RoomCleaningTask::getIsDeleted, 0)
+        .eq(orgId != null, RoomCleaningTask::getOrgId, orgId)
+        .last("LIMIT 1"));
+  }
+
+  private String resolveRoomNo(Long orgId, Long roomId) {
     if (roomId == null) {
       return null;
     }
-    Room room = roomMapper.selectById(roomId);
+    Room room = roomMapper.selectOne(Wrappers.lambdaQuery(Room.class)
+        .eq(Room::getId, roomId)
+        .eq(Room::getIsDeleted, 0)
+        .eq(orgId != null, Room::getOrgId, orgId)
+        .last("LIMIT 1"));
+    if (room == null) {
+      throw new IllegalArgumentException("房间不存在或无权限");
+    }
     return room == null ? null : room.getRoomNo();
   }
 }

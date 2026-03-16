@@ -50,6 +50,10 @@ public class ElderProfile {
 
   private String remark;
 
+  private String sourceType;
+
+  private String historicalContractFileUrl;
+
   private Long createdBy;
 
   @TableField(value = "create_time", fill = FieldFill.INSERT)

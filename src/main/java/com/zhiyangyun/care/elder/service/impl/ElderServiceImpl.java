@@ -8,11 +8,13 @@ import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
 import com.zhiyangyun.care.elder.entity.Bed;
 import com.zhiyangyun.care.elder.entity.ElderBedRelation;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
+import com.zhiyangyun.care.elder.entity.lifecycle.ElderAdmission;
 import com.zhiyangyun.care.elder.mapper.BedMapper;
 import com.zhiyangyun.care.elder.mapper.ElderBedRelationMapper;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderChangeLogMapper;
+import com.zhiyangyun.care.elder.mapper.lifecycle.ElderAdmissionMapper;
 import com.zhiyangyun.care.elder.model.AssignBedRequest;
 import com.zhiyangyun.care.elder.model.BedResponse;
 import com.zhiyangyun.care.elder.model.ElderCreateRequest;
@@ -21,9 +23,9 @@ import com.zhiyangyun.care.elder.model.ElderUpdateRequest;
 import com.zhiyangyun.care.elder.service.ElderService;
 import com.zhiyangyun.care.elder.util.QrCodeUtil;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -41,6 +43,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class ElderServiceImpl implements ElderService {
   private static final String ELDER_NAME_PINYIN_BOUNDARY = "阿芭擦搭蛾发噶哈讥咔垃妈拿哦啪期然撒塌挖昔压匝";
   private static final String ELDER_NAME_PINYIN_INITIAL = "ABCDEFGHJKLMNOPQRSTWXYZ";
+  private static final String SOURCE_TYPE_MARKETING_CONTRACT = "MARKETING_CONTRACT";
+  private static final String SOURCE_TYPE_HISTORICAL_IMPORT = "HISTORICAL_IMPORT";
 
   private final ElderMapper elderMapper;
   private final BedMapper bedMapper;
@@ -48,19 +52,22 @@ public class ElderServiceImpl implements ElderService {
   private final RoomMapper roomMapper;
   private final ElderChangeLogMapper changeLogMapper;
   private final CrmContractMapper crmContractMapper;
+  private final ElderAdmissionMapper admissionMapper;
 
   public ElderServiceImpl(ElderMapper elderMapper, BedMapper bedMapper,
       ElderBedRelationMapper relationMapper, RoomMapper roomMapper, ElderChangeLogMapper changeLogMapper,
-      CrmContractMapper crmContractMapper) {
+      CrmContractMapper crmContractMapper, ElderAdmissionMapper admissionMapper) {
     this.elderMapper = elderMapper;
     this.bedMapper = bedMapper;
     this.relationMapper = relationMapper;
     this.roomMapper = roomMapper;
     this.changeLogMapper = changeLogMapper;
     this.crmContractMapper = crmContractMapper;
+    this.admissionMapper = admissionMapper;
   }
 
   @Override
+  @Transactional
   public ElderResponse create(ElderCreateRequest request) {
     validateCreateRequest(request);
     ElderProfile elder = new ElderProfile();
@@ -86,6 +93,8 @@ public class ElderServiceImpl implements ElderService {
     elder.setCareLevel(normalizeText(request.getCareLevel()));
     elder.setRiskPrecommit(normalizeText(request.getRiskPrecommit()));
     elder.setRemark(normalizeText(request.getRemark()));
+    elder.setSourceType(normalizeSourceType(request.getSourceType(), SOURCE_TYPE_HISTORICAL_IMPORT));
+    elder.setHistoricalContractFileUrl(normalizeText(request.getHistoricalContractFileUrl()));
     elder.setCreatedBy(request.getCreatedBy());
     elderMapper.insert(elder);
     if (request.getBedId() != null) {
@@ -101,6 +110,7 @@ public class ElderServiceImpl implements ElderService {
   }
 
   @Override
+  @Transactional
   public ElderResponse update(Long id, ElderUpdateRequest request) {
     ElderProfile elder = elderMapper.selectById(id);
     if (elder == null) {
@@ -108,6 +118,15 @@ public class ElderServiceImpl implements ElderService {
     }
     if (request.getTenantId() != null && !request.getTenantId().equals(elder.getTenantId())) {
       throw new IllegalArgumentException("无权限访问该老人");
+    }
+    Long currentBedId = elder.getBedId();
+    String previousStatus = elder.getStatus() == null ? null : String.valueOf(elder.getStatus());
+    String previousAdmissionDate = elder.getAdmissionDate() == null ? null : elder.getAdmissionDate().toString();
+    String previousCareLevel = elder.getCareLevel();
+    String previousSourceType = elder.getSourceType();
+    String previousHistoricalContractFileUrl = elder.getHistoricalContractFileUrl();
+    if (request.getElderCode() != null) {
+      elder.setElderCode(normalizeText(request.getElderCode()));
     }
     if (request.getFullName() != null) {
       elder.setFullName(normalizeText(request.getFullName()));
@@ -151,11 +170,29 @@ public class ElderServiceImpl implements ElderService {
     if (request.getRemark() != null) {
       elder.setRemark(normalizeText(request.getRemark()));
     }
+    if (request.getSourceType() != null) {
+      elder.setSourceType(normalizeSourceType(request.getSourceType(), null));
+    }
+    if (request.getHistoricalContractFileUrl() != null) {
+      elder.setHistoricalContractFileUrl(normalizeText(request.getHistoricalContractFileUrl()));
+    }
     elderMapper.updateById(elder);
-    if (request.getStatus() != null && request.getStatus() == 3 && elder.getBedId() != null) {
+    insertFieldChangeLog(elder, request.getUpdatedBy(), "STATUS_CHANGE", previousStatus,
+        elder.getStatus() == null ? null : String.valueOf(elder.getStatus()), "状态变更");
+    insertFieldChangeLog(elder, request.getUpdatedBy(), "ADMISSION_DATE_CHANGE", previousAdmissionDate,
+        elder.getAdmissionDate() == null ? null : elder.getAdmissionDate().toString(), "入院日期变更");
+    insertFieldChangeLog(elder, request.getUpdatedBy(), "CARE_LEVEL_CHANGE", previousCareLevel,
+        elder.getCareLevel(), "护理等级变更");
+    insertFieldChangeLog(elder, request.getUpdatedBy(), "SOURCE_TYPE_CHANGE", previousSourceType,
+        elder.getSourceType(), "档案来源变更");
+    insertFieldChangeLog(elder, request.getUpdatedBy(), "HISTORICAL_CONTRACT_FILE_CHANGE", previousHistoricalContractFileUrl,
+        elder.getHistoricalContractFileUrl(), "历史合同附件变更");
+    boolean shouldDischargeUnbind = request.getStatus() != null && request.getStatus() == 3 && currentBedId != null;
+    boolean shouldClearBed = Boolean.TRUE.equals(request.getClearBed()) && request.getBedId() == null && currentBedId != null;
+    if (shouldDischargeUnbind) {
       return unbindBed(elder.getId(), LocalDate.now(), "状态变更退住", request.getTenantId(), request.getUpdatedBy());
     }
-    if (request.getBedId() != null && !request.getBedId().equals(elder.getBedId())) {
+    if (request.getBedId() != null && !request.getBedId().equals(currentBedId)) {
       Integer nextStatus = request.getStatus() != null ? request.getStatus() : elder.getStatus();
       LocalDate nextAdmissionDate = request.getAdmissionDate() != null ? request.getAdmissionDate() : elder.getAdmissionDate();
       if (!Objects.equals(nextStatus, 1)) {
@@ -178,6 +215,9 @@ public class ElderServiceImpl implements ElderService {
       ElderResponse assigned = assignBed(elder.getId(), assign);
       return assigned == null ? toResponse(elder, null) : assigned;
     }
+    if (shouldClearBed) {
+      return unbindBed(elder.getId(), LocalDate.now(), "档案编辑解绑床位", request.getTenantId(), request.getUpdatedBy());
+    }
     Bed bed = elder.getBedId() == null ? null : bedMapper.selectById(elder.getBedId());
     return toResponse(elder, bed);
   }
@@ -192,11 +232,29 @@ public class ElderServiceImpl implements ElderService {
       return null;
     }
     Bed bed = elder.getBedId() == null ? null : bedMapper.selectById(elder.getBedId());
-    return toResponse(elder, bed);
+    ElderResponse response = toResponse(elder, bed);
+    CrmContract contract = resolveLatestContractMap(List.of(elder), tenantId).get(elder.getId());
+    ElderAdmission admission = resolveLatestAdmissionMap(List.of(elder), tenantId).get(elder.getId());
+    applyLifecycleFromContract(response, contract);
+    applyLifecycleFromAdmission(response, admission, contract);
+    applySourceType(response, contract, admission);
+    return response;
   }
 
   @Override
-  public IPage<ElderResponse> page(Long tenantId, long pageNo, long pageSize, String keyword, Boolean signedOnly, Integer status) {
+  public IPage<ElderResponse> page(
+      Long tenantId,
+      long pageNo,
+      long pageSize,
+      String keyword,
+      Boolean signedOnly,
+      Integer status,
+      String fullName,
+      String idCardNo,
+      String bedNo,
+      String careLevel,
+      String sortBy,
+      String sortOrder) {
     Set<Long> latestSignedElderIds = null;
     if (Boolean.TRUE.equals(signedOnly)) {
       latestSignedElderIds = resolveLatestSignedElderIds(tenantId);
@@ -211,41 +269,33 @@ public class ElderServiceImpl implements ElderService {
     if (latestSignedElderIds != null) {
       baseWrapper.in(ElderProfile::getId, latestSignedElderIds);
     }
-    String normalizedKeyword = keyword == null ? "" : keyword.trim();
-    if (!normalizedKeyword.isEmpty()) {
-      var wrapper = Wrappers.lambdaQuery(ElderProfile.class)
-          .eq(ElderProfile::getIsDeleted, 0)
-          .eq(tenantId != null, ElderProfile::getTenantId, tenantId)
-          .eq(status != null, ElderProfile::getStatus, status);
-      if (latestSignedElderIds != null) {
-        wrapper.in(ElderProfile::getId, latestSignedElderIds);
-      }
-      wrapper.and(w -> w.like(ElderProfile::getFullName, normalizedKeyword)
-          .or().like(ElderProfile::getElderCode, normalizedKeyword)
-          .or().like(ElderProfile::getPhone, normalizedKeyword));
-      wrapper.orderByDesc(ElderProfile::getCreateTime);
-      IPage<ElderProfile> page = elderMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
-      if (page.getTotal() > 0 || !isAlphabeticKeyword(normalizedKeyword)) {
-        return toPagedResponse(page, tenantId);
-      }
-      List<ElderProfile> allRows = elderMapper.selectList(baseWrapper.orderByDesc(ElderProfile::getCreateTime));
-      List<ElderProfile> filtered = allRows.stream()
-          .filter(elder -> matchByPinyinOrText(elder, normalizedKeyword))
-          .sorted(Comparator.comparing(ElderProfile::getCreateTime, Comparator.nullsLast(Comparator.reverseOrder())))
-          .collect(Collectors.toList());
-      Page<ElderProfile> manualPage = new Page<>(pageNo, pageSize, filtered.size());
-      int fromIndex = Math.max((int) ((pageNo - 1) * pageSize), 0);
-      int toIndex = Math.min(fromIndex + (int) pageSize, filtered.size());
-      if (fromIndex >= filtered.size()) {
-        manualPage.setRecords(List.of());
-      } else {
-        manualPage.setRecords(filtered.subList(fromIndex, toIndex));
-      }
-      return toPagedResponse(manualPage, tenantId);
+    List<ElderProfile> allRows = elderMapper.selectList(baseWrapper.orderByDesc(ElderProfile::getCreateTime));
+    Map<Long, Bed> bedMap = resolveBedMap(allRows);
+    String normalizedKeyword = normalizeText(keyword);
+    String normalizedFullName = normalizeText(fullName);
+    String normalizedIdCardNo = normalizeText(idCardNo);
+    String normalizedBedNo = normalizeText(bedNo);
+    String normalizedCareLevel = normalizeText(careLevel);
+    List<ElderProfile> filtered = allRows.stream()
+        .filter(elder -> matchesPageFilters(
+            elder,
+            bedMap.get(elder.getBedId()),
+            normalizedKeyword,
+            normalizedFullName,
+            normalizedIdCardNo,
+            normalizedBedNo,
+            normalizedCareLevel))
+        .sorted(buildPageComparator(sortBy, sortOrder, bedMap))
+        .collect(Collectors.toCollection(ArrayList::new));
+    Page<ElderProfile> manualPage = new Page<>(pageNo, pageSize, filtered.size());
+    int fromIndex = Math.max((int) ((pageNo - 1) * pageSize), 0);
+    int toIndex = Math.min(fromIndex + (int) pageSize, filtered.size());
+    if (fromIndex >= filtered.size()) {
+      manualPage.setRecords(List.of());
+    } else {
+      manualPage.setRecords(filtered.subList(fromIndex, toIndex));
     }
-    baseWrapper.orderByDesc(ElderProfile::getCreateTime);
-    IPage<ElderProfile> page = elderMapper.selectPage(new Page<>(pageNo, pageSize), baseWrapper);
-    return toPagedResponse(page, tenantId);
+    return toPagedResponse(manualPage, tenantId);
   }
 
   private void validateCreateRequest(ElderCreateRequest request) {
@@ -287,7 +337,20 @@ public class ElderServiceImpl implements ElderService {
     return trimmed.isEmpty() ? null : trimmed;
   }
 
+  private String normalizeSourceType(String value, String defaultValue) {
+    String normalized = normalizeText(value);
+    if (normalized == null) {
+      return defaultValue;
+    }
+    String upper = normalized.toUpperCase();
+    if (SOURCE_TYPE_HISTORICAL_IMPORT.equals(upper) || SOURCE_TYPE_MARKETING_CONTRACT.equals(upper)) {
+      return upper;
+    }
+    return defaultValue;
+  }
+
   private Set<Long> resolveLatestSignedElderIds(Long tenantId) {
+    Set<Long> signedElderIds = new java.util.LinkedHashSet<>();
     List<CrmContract> contracts = crmContractMapper.selectList(Wrappers.lambdaQuery(CrmContract.class)
         .eq(CrmContract::getIsDeleted, 0)
         .eq(tenantId != null, CrmContract::getTenantId, tenantId)
@@ -295,37 +358,63 @@ public class ElderServiceImpl implements ElderService {
         .orderByDesc(CrmContract::getUpdateTime)
         .orderByDesc(CrmContract::getCreateTime)
         .orderByDesc(CrmContract::getId));
-    if (contracts == null || contracts.isEmpty()) {
-      return Set.of();
-    }
-    Map<Long, CrmContract> latestByElder = new HashMap<>();
-    for (CrmContract contract : contracts) {
-      Long elderId = contract.getElderId();
-      if (elderId == null || latestByElder.containsKey(elderId)) {
-        continue;
+    if (contracts != null && !contracts.isEmpty()) {
+      Map<Long, CrmContract> latestByElder = new HashMap<>();
+      for (CrmContract contract : contracts) {
+        Long elderId = contract.getElderId();
+        if (elderId == null || latestByElder.containsKey(elderId)) {
+          continue;
+        }
+        latestByElder.put(elderId, contract);
       }
-      latestByElder.put(elderId, contract);
+      latestByElder.values().stream()
+          .filter(contract -> {
+            String status = contract.getStatus();
+            if (status == null) return false;
+            String normalized = status.trim().toUpperCase();
+            return "SIGNED".equals(normalized) || "EFFECTIVE".equals(normalized);
+          })
+          .map(CrmContract::getElderId)
+          .filter(Objects::nonNull)
+          .forEach(signedElderIds::add);
     }
-    return latestByElder.values().stream()
-        .filter(contract -> {
-          String status = contract.getStatus();
-          if (status == null) return false;
-          String normalized = status.trim().toUpperCase();
-          return "SIGNED".equals(normalized) || "EFFECTIVE".equals(normalized);
-        })
-        .map(CrmContract::getElderId)
-        .filter(Objects::nonNull)
-        .collect(Collectors.toSet());
+    List<ElderAdmission> admissions = admissionMapper.selectList(Wrappers.lambdaQuery(ElderAdmission.class)
+        .eq(ElderAdmission::getIsDeleted, 0)
+        .eq(tenantId != null, ElderAdmission::getTenantId, tenantId)
+        .isNotNull(ElderAdmission::getElderId)
+        .orderByDesc(ElderAdmission::getAdmissionDate)
+        .orderByDesc(ElderAdmission::getCreateTime)
+        .orderByDesc(ElderAdmission::getId));
+    if (admissions != null && !admissions.isEmpty()) {
+      Map<Long, ElderAdmission> latestByElder = new HashMap<>();
+      for (ElderAdmission admission : admissions) {
+        Long elderId = admission.getElderId();
+        if (elderId == null || latestByElder.containsKey(elderId)) {
+          continue;
+        }
+        latestByElder.put(elderId, admission);
+      }
+      latestByElder.values().stream()
+          .filter(admission -> admission.getContractNo() != null && !admission.getContractNo().trim().isBlank())
+          .map(ElderAdmission::getElderId)
+          .filter(Objects::nonNull)
+          .forEach(signedElderIds::add);
+    }
+    return signedElderIds;
   }
 
   private IPage<ElderResponse> toPagedResponse(IPage<ElderProfile> page, Long tenantId) {
     List<ElderProfile> records = page.getRecords() == null ? List.of() : page.getRecords();
     Map<Long, Bed> bedMap = resolveBedMap(records);
     Map<Long, CrmContract> contractMap = resolveLatestContractMap(records, tenantId);
+    Map<Long, ElderAdmission> admissionMap = resolveLatestAdmissionMap(records, tenantId);
     List<ElderResponse> responseRecords = records.stream().map((elder) -> {
       Bed bed = elder.getBedId() == null ? null : bedMap.get(elder.getBedId());
       ElderResponse response = toResponse(elder, bed);
-      applyLifecycleFromContract(response, contractMap.get(elder.getId()));
+      CrmContract contract = contractMap.get(elder.getId());
+      applyLifecycleFromContract(response, contract);
+      applyLifecycleFromAdmission(response, admissionMap.get(elder.getId()), contract);
+      applySourceType(response, contract, admissionMap.get(elder.getId()));
       return response;
     }).toList();
     Page<ElderResponse> responsePage = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
@@ -372,6 +461,32 @@ public class ElderServiceImpl implements ElderService {
     return map;
   }
 
+  private Map<Long, ElderAdmission> resolveLatestAdmissionMap(List<ElderProfile> elders, Long tenantId) {
+    Set<Long> elderIds = elders.stream()
+        .map(ElderProfile::getId)
+        .filter(Objects::nonNull)
+        .collect(Collectors.toSet());
+    if (elderIds.isEmpty()) {
+      return Map.of();
+    }
+    List<ElderAdmission> admissions = admissionMapper.selectList(Wrappers.lambdaQuery(ElderAdmission.class)
+        .eq(ElderAdmission::getIsDeleted, 0)
+        .eq(tenantId != null, ElderAdmission::getTenantId, tenantId)
+        .in(ElderAdmission::getElderId, elderIds)
+        .orderByDesc(ElderAdmission::getAdmissionDate)
+        .orderByDesc(ElderAdmission::getCreateTime)
+        .orderByDesc(ElderAdmission::getId));
+    Map<Long, ElderAdmission> map = new HashMap<>();
+    for (ElderAdmission admission : admissions) {
+      Long elderId = admission.getElderId();
+      if (elderId == null || map.containsKey(elderId)) {
+        continue;
+      }
+      map.put(elderId, admission);
+    }
+    return map;
+  }
+
   private void applyLifecycleFromContract(ElderResponse response, CrmContract contract) {
     if (response == null) {
       return;
@@ -392,6 +507,47 @@ public class ElderServiceImpl implements ElderService {
     }
   }
 
+  private void applyLifecycleFromAdmission(ElderResponse response, ElderAdmission admission, CrmContract contract) {
+    if (response == null || contract != null || admission == null) {
+      return;
+    }
+    String contractNo = admission.getContractNo();
+    if (contractNo == null || contractNo.trim().isBlank()) {
+      return;
+    }
+    if (response.getLifecycleStage() == null || response.getLifecycleStage().isBlank()) {
+      response.setLifecycleStage("SIGNED");
+    }
+    if (response.getLifecycleContractStatus() == null || response.getLifecycleContractStatus().isBlank()) {
+      response.setLifecycleContractStatus("SIGNED");
+    }
+  }
+
+  private void applySourceType(ElderResponse response, CrmContract contract, ElderAdmission admission) {
+    if (response == null) {
+      return;
+    }
+    String sourceType = normalizeSourceType(response.getSourceType(), null);
+    if (sourceType == null && contract != null) {
+      sourceType = SOURCE_TYPE_MARKETING_CONTRACT;
+    }
+    if (sourceType == null && admission != null && admission.getContractNo() != null && !admission.getContractNo().trim().isBlank()) {
+      sourceType = SOURCE_TYPE_HISTORICAL_IMPORT;
+    }
+    response.setSourceType(sourceType);
+  }
+
+  private void insertFieldChangeLog(ElderProfile elder, Long createdBy, String changeType,
+                                    String beforeValue, String afterValue, String reason) {
+    String normalizedBefore = normalizeText(beforeValue);
+    String normalizedAfter = normalizeText(afterValue);
+    if (Objects.equals(normalizedBefore, normalizedAfter)) {
+      return;
+    }
+    insertChangeLog(elder.getTenantId(), elder.getOrgId(), elder.getId(), createdBy, changeType,
+        normalizedBefore, normalizedAfter, reason);
+  }
+
   private boolean isAlphabeticKeyword(String keyword) {
     if (keyword == null || keyword.isBlank()) {
       return false;
@@ -399,12 +555,106 @@ public class ElderServiceImpl implements ElderService {
     return keyword.matches("[A-Za-z]+");
   }
 
+  private boolean matchesPageFilters(
+      ElderProfile elder,
+      Bed bed,
+      String keyword,
+      String fullName,
+      String idCardNo,
+      String bedNo,
+      String careLevel) {
+    if (fullName != null && !matchByPinyinOrText(elder, fullName)) {
+      return false;
+    }
+    if (keyword != null && !matchesSearchKeyword(elder, bed, keyword)) {
+      return false;
+    }
+    if (idCardNo != null && !containsIgnoreCase(elder.getIdCardNo(), idCardNo)) {
+      return false;
+    }
+    if (bedNo != null && !containsIgnoreCase(bed == null ? null : bed.getBedNo(), bedNo)) {
+      return false;
+    }
+    if (careLevel != null && !containsIgnoreCase(elder.getCareLevel(), careLevel)) {
+      return false;
+    }
+    return true;
+  }
+
+  private boolean matchesSearchKeyword(ElderProfile elder, Bed bed, String keyword) {
+    if (containsIgnoreCase(elder.getIdCardNo(), keyword)
+        || containsIgnoreCase(elder.getCareLevel(), keyword)
+        || containsIgnoreCase(bed == null ? null : bed.getBedNo(), keyword)) {
+      return true;
+    }
+    return matchByPinyinOrText(elder, keyword);
+  }
+
+  private boolean containsIgnoreCase(String source, String expected) {
+    if (expected == null || expected.isBlank()) {
+      return true;
+    }
+    if (source == null || source.isBlank()) {
+      return false;
+    }
+    return source.toLowerCase().contains(expected.trim().toLowerCase());
+  }
+
+  private Comparator<ElderProfile> buildPageComparator(String sortBy, String sortOrder, Map<Long, Bed> bedMap) {
+    Comparator<ElderProfile> comparator;
+    if ("fullName".equals(sortBy)) {
+      comparator = Comparator.comparing(
+          elder -> safeLowerText(elder.getFullName()),
+          Comparator.nullsLast(String::compareTo));
+    } else if ("birthDate".equals(sortBy)) {
+      comparator = Comparator.comparing(ElderProfile::getBirthDate, Comparator.nullsLast(LocalDate::compareTo));
+    } else if ("bedNo".equals(sortBy)) {
+      comparator = Comparator.comparing(
+          elder -> safeLowerText(resolveBedNo(bedMap.get(elder.getBedId()))),
+          Comparator.nullsLast(String::compareTo));
+    } else if ("careLevel".equals(sortBy)) {
+      comparator = Comparator.comparing(
+          elder -> safeLowerText(elder.getCareLevel()),
+          Comparator.nullsLast(String::compareTo));
+    } else if ("status".equals(sortBy)) {
+      comparator = Comparator.comparing(ElderProfile::getStatus, Comparator.nullsLast(Integer::compareTo));
+    } else {
+      comparator = Comparator.comparing(ElderProfile::getCreateTime, Comparator.nullsLast(Comparator.naturalOrder()));
+      sortOrder = "desc";
+    }
+    if (!"asc".equalsIgnoreCase(sortOrder)) {
+      comparator = comparator.reversed();
+    }
+    return comparator.thenComparing(ElderProfile::getId, Comparator.nullsLast(Long::compareTo));
+  }
+
+  private String safeLowerText(String value) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    return value.trim().toLowerCase();
+  }
+
+  private String resolveBedNo(Bed bed) {
+    if (bed == null || bed.getBedNo() == null || bed.getBedNo().isBlank()) {
+      return null;
+    }
+    return bed.getBedNo().trim();
+  }
+
   private boolean matchByPinyinOrText(ElderProfile elder, String keyword) {
     String fullName = elder.getFullName() == null ? "" : elder.getFullName();
     String elderCode = elder.getElderCode() == null ? "" : elder.getElderCode();
     String phone = elder.getPhone() == null ? "" : elder.getPhone();
+    String normalizedKeyword = keyword == null ? "" : keyword.trim().toLowerCase();
+    if (normalizedKeyword.isEmpty()) {
+      return true;
+    }
     String searchText = (fullName + " " + elderCode + " " + phone + " " + toPinyinInitials(fullName)).toLowerCase();
-    return searchText.contains(keyword.toLowerCase());
+    if (searchText.contains(normalizedKeyword)) {
+      return true;
+    }
+    return isAlphabeticKeyword(normalizedKeyword) && toPinyinInitials(fullName).contains(normalizedKeyword);
   }
 
   private String toPinyinInitials(String text) {
@@ -463,14 +713,14 @@ public class ElderServiceImpl implements ElderService {
   public ElderResponse assignBed(Long elderId, AssignBedRequest request) {
     ElderProfile elder = elderMapper.selectById(elderId);
     if (elder == null) {
-      return null;
+      throw new IllegalArgumentException("老人档案不存在");
     }
     if (request.getTenantId() != null && !request.getTenantId().equals(elder.getTenantId())) {
       throw new IllegalStateException("Org mismatch");
     }
     Bed bed = bedMapper.selectById(request.getBedId());
     if (bed == null) {
-      return null;
+      throw new IllegalArgumentException("床位不存在");
     }
     if (request.getTenantId() != null && !request.getTenantId().equals(bed.getTenantId())) {
       throw new IllegalStateException("Org mismatch");
@@ -559,7 +809,10 @@ public class ElderServiceImpl implements ElderService {
   public ElderResponse unbindBed(Long elderId, LocalDate endDate, String reason, Long tenantId, Long createdBy) {
     ElderProfile elder = elderMapper.selectById(elderId);
     if (elder == null) {
-      return null;
+      throw new IllegalArgumentException("老人档案不存在");
+    }
+    if (tenantId != null && !tenantId.equals(elder.getTenantId())) {
+      throw new IllegalArgumentException("无权限访问该老人");
     }
     ElderBedRelation elderActive = relationMapper.selectOne(
         Wrappers.lambdaQuery(ElderBedRelation.class)
@@ -588,7 +841,6 @@ public class ElderServiceImpl implements ElderService {
 
     Long previousBedId = elder.getBedId();
     elder.setBedId(null);
-    elder.setStatus(3);
     elderMapper.updateById(elder);
     insertChangeLog(elder.getTenantId(), elder.getOrgId(), elder.getId(), createdBy,
         "BED_CHANGE", previousBedId == null ? null : String.valueOf(previousBedId), null, reason);
@@ -635,17 +887,25 @@ public class ElderServiceImpl implements ElderService {
     response.setCareLevel(elder.getCareLevel());
     response.setRiskPrecommit(elder.getRiskPrecommit());
     response.setRemark(elder.getRemark());
+    response.setSourceType(elder.getSourceType());
+    response.setHistoricalContractFileUrl(elder.getHistoricalContractFileUrl());
     response.setLifecycleStage(resolveLifecycleStageByElderStatus(elder.getStatus()));
     response.setLifecycleContractStatus(null);
     if (bed != null) {
+      com.zhiyangyun.care.elder.entity.Room room =
+          bed.getRoomId() == null ? null : roomMapper.selectById(bed.getRoomId());
       BedResponse bedResponse = new BedResponse();
       bedResponse.setId(bed.getId());
+      bedResponse.setTenantId(bed.getTenantId());
       bedResponse.setOrgId(bed.getOrgId());
       bedResponse.setRoomId(bed.getRoomId());
       bedResponse.setBedNo(bed.getBedNo());
       bedResponse.setBedQrCode(bed.getBedQrCode());
       bedResponse.setStatus(bed.getStatus());
       bedResponse.setElderId(bed.getElderId());
+      bedResponse.setRoomNo(room == null ? null : room.getRoomNo());
+      response.setBedNo(bed.getBedNo());
+      response.setRoomNo(room == null ? null : room.getRoomNo());
       response.setCurrentBed(bedResponse);
     }
     return response;

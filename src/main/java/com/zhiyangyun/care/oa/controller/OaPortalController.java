@@ -1,22 +1,24 @@
 package com.zhiyangyun.care.oa.controller;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zhiyangyun.care.auth.entity.StaffAccount;
 import com.zhiyangyun.care.auth.mapper.RoleMapper;
 import com.zhiyangyun.care.auth.mapper.StaffMapper;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.SupervisorRuleHelper;
 import com.zhiyangyun.care.auth.security.AuthContext;
+import com.zhiyangyun.care.crm.entity.CrmContract;
+import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
 import com.zhiyangyun.care.crm.entity.CrmLead;
 import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
-import com.zhiyangyun.care.finance.entity.ElderAccount;
-import com.zhiyangyun.care.finance.entity.ElderAccountLog;
-import com.zhiyangyun.care.finance.mapper.ElderAccountLogMapper;
-import com.zhiyangyun.care.finance.mapper.ElderAccountMapper;
 import com.zhiyangyun.care.health.entity.HealthInspection;
+import com.zhiyangyun.care.health.entity.HealthMedicationTask;
 import com.zhiyangyun.care.health.mapper.HealthInspectionMapper;
+import com.zhiyangyun.care.health.mapper.HealthMedicationTaskMapper;
 import com.zhiyangyun.care.life.entity.IncidentReport;
 import com.zhiyangyun.care.life.mapper.IncidentReportMapper;
 import com.zhiyangyun.care.oa.entity.OaApproval;
@@ -49,8 +51,10 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -64,17 +68,18 @@ public class OaPortalController {
   private final OaDocumentMapper documentMapper;
   private final OaSuggestionMapper suggestionMapper;
   private final AttendanceRecordMapper attendanceRecordMapper;
-  private final ElderAccountMapper elderAccountMapper;
-  private final ElderAccountLogMapper elderAccountLogMapper;
   private final IncidentReportMapper incidentReportMapper;
   private final MaterialCenterOverviewService materialCenterOverviewService;
   private final HealthInspectionMapper healthInspectionMapper;
+  private final HealthMedicationTaskMapper healthMedicationTaskMapper;
   private final ElderMapper elderMapper;
+  private final CrmContractMapper crmContractMapper;
   private final CrmLeadMapper crmLeadMapper;
   private final SurveyTemplateMapper surveyTemplateMapper;
   private final SurveySubmissionMapper surveySubmissionMapper;
   private final StaffMapper staffMapper;
   private final RoleMapper roleMapper;
+  private final ObjectMapper objectMapper;
 
   public OaPortalController(
       OaNoticeMapper noticeMapper,
@@ -85,17 +90,18 @@ public class OaPortalController {
       OaDocumentMapper documentMapper,
       OaSuggestionMapper suggestionMapper,
       AttendanceRecordMapper attendanceRecordMapper,
-      ElderAccountMapper elderAccountMapper,
-      ElderAccountLogMapper elderAccountLogMapper,
       IncidentReportMapper incidentReportMapper,
       MaterialCenterOverviewService materialCenterOverviewService,
       HealthInspectionMapper healthInspectionMapper,
+      HealthMedicationTaskMapper healthMedicationTaskMapper,
       ElderMapper elderMapper,
+      CrmContractMapper crmContractMapper,
       CrmLeadMapper crmLeadMapper,
       SurveyTemplateMapper surveyTemplateMapper,
       SurveySubmissionMapper surveySubmissionMapper,
       StaffMapper staffMapper,
-      RoleMapper roleMapper) {
+      RoleMapper roleMapper,
+      ObjectMapper objectMapper) {
     this.noticeMapper = noticeMapper;
     this.todoMapper = todoMapper;
     this.approvalMapper = approvalMapper;
@@ -104,68 +110,63 @@ public class OaPortalController {
     this.documentMapper = documentMapper;
     this.suggestionMapper = suggestionMapper;
     this.attendanceRecordMapper = attendanceRecordMapper;
-    this.elderAccountMapper = elderAccountMapper;
-    this.elderAccountLogMapper = elderAccountLogMapper;
     this.incidentReportMapper = incidentReportMapper;
     this.materialCenterOverviewService = materialCenterOverviewService;
     this.healthInspectionMapper = healthInspectionMapper;
+    this.healthMedicationTaskMapper = healthMedicationTaskMapper;
     this.elderMapper = elderMapper;
+    this.crmContractMapper = crmContractMapper;
     this.crmLeadMapper = crmLeadMapper;
     this.surveyTemplateMapper = surveyTemplateMapper;
     this.surveySubmissionMapper = surveySubmissionMapper;
     this.staffMapper = staffMapper;
     this.roleMapper = roleMapper;
+    this.objectMapper = objectMapper;
   }
 
   @GetMapping("/summary")
-  public Result<OaPortalSummary> summary() {
+  public Result<OaPortalSummary> summary(@RequestParam(required = false) String scope) {
     Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
+    String username = trimToNull(AuthContext.getUsername());
+    boolean personalScope = "PERSONAL".equalsIgnoreCase(scope);
+    List<String> roleCodes = AuthContext.getRoleCodes().stream()
+        .map(item -> item == null ? null : item.trim().toUpperCase(Locale.ROOT))
+        .filter(item -> item != null && !item.isBlank())
+        .toList();
     LocalDate today = LocalDate.now();
     LocalDateTime now = LocalDateTime.now();
+    LocalDateTime monthStart = today.withDayOfMonth(1).atStartOfDay();
+    LocalDateTime nextMonthStart = today.plusMonths(1).withDayOfMonth(1).atStartOfDay();
 
     List<OaNotice> notices = noticeMapper.selectList(Wrappers.lambdaQuery(OaNotice.class)
         .eq(OaNotice::getIsDeleted, 0)
         .eq(orgId != null, OaNotice::getOrgId, orgId)
         .orderByDesc(OaNotice::getPublishTime)
         .last("LIMIT 5"));
-    List<OaTodo> todos = todoMapper.selectList(Wrappers.lambdaQuery(OaTodo.class)
-        .eq(OaTodo::getIsDeleted, 0)
-        .eq(orgId != null, OaTodo::getOrgId, orgId)
-        .eq(OaTodo::getStatus, "OPEN")
-        .orderByAsc(OaTodo::getDueTime)
-        .last("LIMIT 8"));
+    List<OaTodo> todos = listScopedTodos(orgId, personalScope, staffId, username, 8);
 
-    Long openTodoCount = count(todoMapper.selectCount(Wrappers.lambdaQuery(OaTodo.class)
-        .eq(OaTodo::getIsDeleted, 0)
-        .eq(orgId != null, OaTodo::getOrgId, orgId)
-        .eq(OaTodo::getStatus, "OPEN")));
-    Long birthdayTodoCount = count(todoMapper.selectCount(Wrappers.lambdaQuery(OaTodo.class)
-        .eq(OaTodo::getIsDeleted, 0)
-        .eq(orgId != null, OaTodo::getOrgId, orgId)
-        .eq(OaTodo::getStatus, "OPEN")
-        .like(OaTodo::getContent, "[BIRTHDAY_REMINDER:")));
-    Long overdueTodoCount = count(todoMapper.selectCount(Wrappers.lambdaQuery(OaTodo.class)
-        .eq(OaTodo::getIsDeleted, 0)
-        .eq(orgId != null, OaTodo::getOrgId, orgId)
-        .eq(OaTodo::getStatus, "OPEN")
-        .lt(OaTodo::getDueTime, now)));
-    Long pendingApprovalCount = count(approvalMapper.selectCount(Wrappers.lambdaQuery(OaApproval.class)
-        .eq(OaApproval::getIsDeleted, 0)
-        .eq(orgId != null, OaApproval::getOrgId, orgId)
-        .eq(OaApproval::getStatus, "PENDING")));
-    Long ongoingTaskCount = count(taskMapper.selectCount(Wrappers.lambdaQuery(OaTask.class)
-        .eq(OaTask::getIsDeleted, 0)
-        .eq(orgId != null, OaTask::getOrgId, orgId)
-        .in(OaTask::getStatus, "TODO", "DOING")));
-    Long submittedReportCount = count(workReportMapper.selectCount(Wrappers.lambdaQuery(OaWorkReport.class)
-        .eq(OaWorkReport::getIsDeleted, 0)
-        .eq(orgId != null, OaWorkReport::getOrgId, orgId)
-        .eq(OaWorkReport::getStatus, "SUBMITTED")
-        .ge(OaWorkReport::getReportDate, today.minusDays(30))));
+    Long openTodoCount = countScopedTodos(orgId, personalScope, staffId, username, false, false, now);
+    Long birthdayTodoCount = countScopedTodos(orgId, personalScope, staffId, username, true, false, now);
+    Long overdueTodoCount = countScopedTodos(orgId, personalScope, staffId, username, false, true, now);
+    Long pendingApprovalCount = personalScope
+        ? countPersonalPendingApprovals(orgId, staffId, roleCodes, false, now)
+        : count(approvalMapper.selectCount(Wrappers.lambdaQuery(OaApproval.class)
+            .eq(OaApproval::getIsDeleted, 0)
+            .eq(orgId != null, OaApproval::getOrgId, orgId)
+            .eq(OaApproval::getStatus, "PENDING")));
+    Long ongoingTaskCount = count(taskMapper.selectCount(taskScopeQuery(orgId, personalScope, staffId, username)
+        .eq(OaTask::getStatus, "OPEN")));
+    Long submittedReportCount = personalScope && staffId == null
+        ? 0L
+        : count(workReportMapper.selectCount(Wrappers.lambdaQuery(OaWorkReport.class)
+            .eq(OaWorkReport::getIsDeleted, 0)
+            .eq(orgId != null, OaWorkReport::getOrgId, orgId)
+            .eq(OaWorkReport::getStatus, "SUBMITTED")
+            .eq(personalScope && staffId != null, OaWorkReport::getReporterId, staffId)
+            .ge(OaWorkReport::getReportDate, today.minusDays(30))));
 
-    Long todayScheduleCount = count(taskMapper.selectCount(Wrappers.lambdaQuery(OaTask.class)
-        .eq(OaTask::getIsDeleted, 0)
-        .eq(orgId != null, OaTask::getOrgId, orgId)
+    Long todayScheduleCount = count(taskMapper.selectCount(taskScopeQuery(orgId, personalScope, staffId, username)
         .eq(OaTask::getStatus, "OPEN")
         .ge(OaTask::getStartTime, today.atStartOfDay())
         .lt(OaTask::getStartTime, today.plusDays(1).atStartOfDay())));
@@ -187,13 +188,8 @@ public class OaPortalController {
             .or().eq(CrmLead::getContractStatus, "待审批")
             .or().eq(CrmLead::getContractStatus, "审批中"))));
 
-    Long myExpenseCount = count(elderAccountMapper.selectCount(Wrappers.lambdaQuery(ElderAccount.class)
-        .eq(ElderAccount::getIsDeleted, 0)
-        .eq(orgId != null, ElderAccount::getOrgId, orgId)));
-    Long deptExpenseCount = count(elderAccountLogMapper.selectCount(Wrappers.lambdaQuery(ElderAccountLog.class)
-        .eq(ElderAccountLog::getIsDeleted, 0)
-        .eq(orgId != null, ElderAccountLog::getOrgId, orgId)
-        .ge(ElderAccountLog::getCreateTime, now.minusDays(30))));
+    Long myExpenseCount = sumApprovalAmount(orgId, staffId, List.of("REIMBURSE"), monthStart, nextMonthStart);
+    Long deptExpenseCount = sumApprovalAmount(orgId, null, List.of("REIMBURSE", "PURCHASE"), monthStart, nextMonthStart);
     Long documentCount = count(documentMapper.selectCount(Wrappers.lambdaQuery(OaDocument.class)
         .eq(OaDocument::getIsDeleted, 0)
         .eq(orgId != null, OaDocument::getOrgId, orgId)));
@@ -209,11 +205,18 @@ public class OaPortalController {
     MaterialCenterOverviewResponse materialOverview = materialCenterOverviewService.overview(orgId, 30);
     Long materialTransferDraftCount = materialOverview.getMaterialTransferDraftCount();
     Long materialPurchaseDraftCount = materialOverview.getMaterialPurchaseDraftCount();
-    Long approvalTimeoutCount = count(approvalMapper.selectCount(Wrappers.lambdaQuery(OaApproval.class)
-        .eq(OaApproval::getIsDeleted, 0)
-        .eq(orgId != null, OaApproval::getOrgId, orgId)
-        .eq(OaApproval::getStatus, "PENDING")
-        .lt(OaApproval::getCreateTime, now.minusHours(48))));
+    Long approvalTimeoutCount = personalScope
+        ? countPersonalPendingApprovals(orgId, staffId, roleCodes, true, now)
+        : count(approvalMapper.selectCount(Wrappers.lambdaQuery(OaApproval.class)
+            .eq(OaApproval::getIsDeleted, 0)
+            .eq(orgId != null, OaApproval::getOrgId, orgId)
+            .eq(OaApproval::getStatus, "PENDING")
+            .lt(OaApproval::getCreateTime, now.minusHours(48))));
+    Long pendingMedicalOrderCount = count(healthMedicationTaskMapper.selectCount(Wrappers.lambdaQuery(HealthMedicationTask.class)
+        .eq(HealthMedicationTask::getIsDeleted, 0)
+        .eq(orgId != null, HealthMedicationTask::getOrgId, orgId)
+        .eq(HealthMedicationTask::getTaskDate, today)
+        .eq(HealthMedicationTask::getStatus, "PENDING")));
 
     Long healthAbnormalCount = count(healthInspectionMapper.selectCount(Wrappers.lambdaQuery(HealthInspection.class)
         .eq(HealthInspection::getIsDeleted, 0)
@@ -244,6 +247,13 @@ public class OaPortalController {
         .ge(SurveySubmission::getCreateTime, today.atStartOfDay())
         .lt(SurveySubmission::getCreateTime, today.plusDays(1).atStartOfDay())));
     Long supervisorAnomalyCount = countSupervisorAnomalies(orgId);
+    Long elderContractExpiringCount = count(crmContractMapper.selectCount(Wrappers.lambdaQuery(CrmContract.class)
+        .eq(CrmContract::getIsDeleted, 0)
+        .eq(orgId != null, CrmContract::getOrgId, orgId)
+        .isNotNull(CrmContract::getElderId)
+        .in(CrmContract::getStatus, "SIGNED", "EFFECTIVE")
+        .isNotNull(CrmContract::getEffectiveTo)
+        .le(CrmContract::getEffectiveTo, today.plusDays(30))));
 
     List<OaPortalSummary.MarketingChannelItem> marketingChannels = queryMarketingChannels(orgId);
     List<OaPortalSummary.CollaborationGanttItem> collaborationGantt = queryCollaborationGantt(orgId);
@@ -275,8 +285,10 @@ public class OaPortalController {
     summary.setDocumentCount(documentCount);
     summary.setInventoryLowStockCount(inventoryLowStockCount);
     summary.setApprovalTimeoutCount(approvalTimeoutCount);
-    summary.setElderAbnormalCount(healthAbnormalCount);
+    summary.setPendingMedicalOrderCount(pendingMedicalOrderCount);
+    summary.setElderAbnormalCount(0L);
     summary.setHealthAbnormalCount(healthAbnormalCount);
+    summary.setElderContractExpiringCount(elderContractExpiringCount);
     summary.setIncidentOpenCount(incidentOpenCount);
     summary.setMaterialTransferDraftCount(materialTransferDraftCount);
     summary.setMaterialPurchaseDraftCount(materialPurchaseDraftCount);
@@ -310,7 +322,7 @@ public class OaPortalController {
       Long contractPendingCount) {
     List<OaPortalSummary.WorkflowTodoItem> items = new ArrayList<>();
     items.add(workflow("LEAVE", "请假审批", leavePendingCount, "/oa/approval"));
-    items.add(workflow("OVERTIME", "加班申请", 0L, "/oa/approval"));
+    items.add(workflow("OVERTIME", "加班申请", countByApprovalType(AuthContext.getOrgId(), "OVERTIME"), "/oa/approval"));
     items.add(workflow("REIMBURSE", "报销审批", reimbursePendingCount, "/oa/approval"));
     items.add(workflow("PURCHASE", "采购审批", purchasePendingCount, "/oa/approval"));
     items.add(workflow("MARKETING_PLAN", "营销方案审批", marketingPlanPendingCount, "/oa/approval?type=MARKETING_PLAN&status=PENDING"));
@@ -490,5 +502,220 @@ public class OaPortalController {
       }
     }
     return false;
+  }
+
+  private List<OaTodo> listScopedTodos(
+      Long orgId,
+      boolean personalScope,
+      Long staffId,
+      String username,
+      int limit) {
+    return todoMapper.selectList(todoScopeQuery(orgId, personalScope, staffId, username)
+        .eq(OaTodo::getStatus, "OPEN")
+        .orderByAsc(OaTodo::getDueTime)
+        .last("LIMIT " + Math.max(limit, 1)));
+  }
+
+  private Long countScopedTodos(
+      Long orgId,
+      boolean personalScope,
+      Long staffId,
+      String username,
+      boolean birthdayOnly,
+      boolean overdueOnly,
+      LocalDateTime now) {
+    var wrapper = todoScopeQuery(orgId, personalScope, staffId, username)
+        .eq(OaTodo::getStatus, "OPEN");
+    if (birthdayOnly) {
+      wrapper.like(OaTodo::getContent, "[BIRTHDAY_REMINDER:");
+    }
+    if (overdueOnly) {
+      wrapper.isNotNull(OaTodo::getDueTime).lt(OaTodo::getDueTime, now);
+    }
+    return count(todoMapper.selectCount(wrapper));
+  }
+
+  private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OaTodo> todoScopeQuery(
+      Long orgId,
+      boolean personalScope,
+      Long staffId,
+      String username) {
+    var wrapper = Wrappers.lambdaQuery(OaTodo.class)
+        .eq(OaTodo::getIsDeleted, 0)
+        .eq(orgId != null, OaTodo::getOrgId, orgId);
+    if (!personalScope) {
+      return wrapper;
+    }
+    if (staffId == null) {
+      wrapper.eq(OaTodo::getId, -1L);
+      return wrapper;
+    }
+    wrapper.and(w -> w.eq(OaTodo::getAssigneeId, staffId)
+        .or().eq(OaTodo::getCreatedBy, staffId)
+        .or().eq(username != null, OaTodo::getAssigneeName, username));
+    return wrapper;
+  }
+
+  private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OaTask> taskScopeQuery(
+      Long orgId,
+      boolean personalScope,
+      Long staffId,
+      String username) {
+    var wrapper = Wrappers.lambdaQuery(OaTask.class)
+        .eq(OaTask::getIsDeleted, 0)
+        .eq(orgId != null, OaTask::getOrgId, orgId);
+    if (!personalScope) {
+      return wrapper;
+    }
+    if (staffId == null) {
+      if (username == null) {
+        wrapper.eq(OaTask::getId, -1L);
+      } else {
+        wrapper.eq(OaTask::getAssigneeName, username);
+      }
+      return wrapper;
+    }
+    wrapper.and(w -> w.eq(OaTask::getCreatedBy, staffId)
+        .or().eq(OaTask::getAssigneeId, staffId)
+        .or().eq(username != null, OaTask::getAssigneeName, username)
+        .or().apply("FIND_IN_SET({0}, collaborator_ids)", staffId));
+    return wrapper;
+  }
+
+  private Long countPersonalPendingApprovals(
+      Long orgId,
+      Long staffId,
+      List<String> roleCodes,
+      boolean overdueOnly,
+      LocalDateTime now) {
+    if (staffId == null) {
+      return 0L;
+    }
+    var wrapper = Wrappers.lambdaQuery(OaApproval.class)
+        .eq(OaApproval::getIsDeleted, 0)
+        .eq(orgId != null, OaApproval::getOrgId, orgId)
+        .eq(OaApproval::getStatus, "PENDING");
+    if (!AuthContext.isMinisterOrHigher()) {
+      wrapper.eq(OaApproval::getApplicantId, staffId);
+    }
+    List<OaApproval> approvals = approvalMapper.selectList(wrapper);
+    return approvals.stream()
+        .filter(item -> !AuthContext.isMinisterOrHigher() || isPendingApprovalForCurrentUser(item, staffId, roleCodes))
+        .filter(item -> !overdueOnly || (item.getCreateTime() != null && item.getCreateTime().isBefore(now.minusHours(48))))
+        .count();
+  }
+
+  private boolean isPendingApprovalForCurrentUser(OaApproval approval, Long staffId, List<String> roleCodes) {
+    if (approval == null || staffId == null) {
+      return false;
+    }
+    Map<String, Object> formMap = readFormMap(approval.getFormData());
+    Long approverId = parseLong(formMap.get("currentApproverId"));
+    if (approverId != null) {
+      return approverId.equals(staffId);
+    }
+    String approverRole = parseString(formMap.get("currentApproverRole"));
+    if (approverRole == null) {
+      return AuthContext.isMinisterOrHigher();
+    }
+    return matchesApproverRole(approverRole, roleCodes);
+  }
+
+  private boolean matchesApproverRole(String approverRole, List<String> roleCodes) {
+    if (approverRole == null || approverRole.isBlank()) {
+      return false;
+    }
+    String normalized = approverRole.trim().toUpperCase(Locale.ROOT);
+    List<String> roles = roleCodes == null ? List.of() : roleCodes;
+    if ("DEPT_MANAGER".equals(normalized) || "MANAGER".equals(normalized)) {
+      return AuthContext.isMinisterOrHigher();
+    }
+    if ("DEAN".equals(normalized)) {
+      return roles.contains("DEAN") || roles.contains("DIRECTOR") || AuthContext.isAdmin();
+    }
+    if ("HR".equals(normalized)) {
+      return roles.stream().anyMatch(role -> role.contains("HR") || role.contains("PERSONNEL")) || AuthContext.isMinisterOrHigher();
+    }
+    if ("FINANCE".equals(normalized)) {
+      return roles.stream().anyMatch(role -> role.contains("FINANCE") || role.contains("CASHIER") || role.contains("ACCOUNTANT"))
+          || AuthContext.isMinisterOrHigher();
+    }
+    if ("WAREHOUSE".equals(normalized)) {
+      return roles.stream().anyMatch(role -> role.contains("WAREHOUSE") || role.contains("STORE") || role.contains("LOGISTICS"))
+          || AuthContext.isMinisterOrHigher();
+    }
+    if ("ADMIN_OFFICE".equals(normalized)) {
+      return roles.stream().anyMatch(role -> role.contains("OFFICE") || role.equals("ADMIN") || role.contains("HR"))
+          || AuthContext.isMinisterOrHigher();
+    }
+    if ("PURCHASING".equals(normalized)) {
+      return roles.stream().anyMatch(role -> role.contains("PURCHASE") || role.contains("PROCUREMENT") || role.contains("LOGISTICS"))
+          || AuthContext.isMinisterOrHigher();
+    }
+    return AuthContext.isMinisterOrHigher();
+  }
+
+  private Long sumApprovalAmount(
+      Long orgId,
+      Long applicantId,
+      List<String> approvalTypes,
+      LocalDateTime startTime,
+      LocalDateTime endTime) {
+    List<OaApproval> approvals = approvalMapper.selectList(Wrappers.lambdaQuery(OaApproval.class)
+        .eq(OaApproval::getIsDeleted, 0)
+        .eq(orgId != null, OaApproval::getOrgId, orgId)
+        .eq(applicantId != null, OaApproval::getApplicantId, applicantId)
+        .eq(OaApproval::getStatus, "APPROVED")
+        .in(approvalTypes != null && !approvalTypes.isEmpty(), OaApproval::getApprovalType, approvalTypes)
+        .ge(startTime != null, OaApproval::getCreateTime, startTime)
+        .lt(endTime != null, OaApproval::getCreateTime, endTime));
+    BigDecimal total = BigDecimal.ZERO;
+    for (OaApproval approval : approvals) {
+      if (approval.getAmount() != null) {
+        total = total.add(approval.getAmount());
+      }
+    }
+    return total.longValue();
+  }
+
+  private Map<String, Object> readFormMap(String formData) {
+    if (formData == null || formData.isBlank()) {
+      return new LinkedHashMap<>();
+    }
+    try {
+      return objectMapper.readValue(formData, new TypeReference<Map<String, Object>>() {});
+    } catch (Exception ignore) {
+      return new LinkedHashMap<>();
+    }
+  }
+
+  private Long parseLong(Object value) {
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof Number number) {
+      return number.longValue();
+    }
+    try {
+      return Long.parseLong(String.valueOf(value));
+    } catch (Exception ignore) {
+      return null;
+    }
+  }
+
+  private String parseString(Object value) {
+    if (value == null) {
+      return null;
+    }
+    String text = String.valueOf(value).trim();
+    return text.isEmpty() ? null : text;
+  }
+
+  private String trimToNull(String value) {
+    if (value == null) {
+      return null;
+    }
+    String text = value.trim();
+    return text.isEmpty() ? null : text;
   }
 }

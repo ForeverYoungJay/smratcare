@@ -22,7 +22,7 @@ public interface MarketingReportService {
       Long tenantId, String dateFrom, String dateTo, String source, Long staffId);
 
   MarketingCallbackReportResponse callback(
-      Long tenantId, long pageNo, long pageSize, String dateFrom, String dateTo, String source, Long staffId);
+      Long tenantId, long pageNo, long pageSize, String dateFrom, String dateTo, String source, Long staffId, String type);
 
   MarketingDataQualityResponse dataQuality(Long tenantId);
 

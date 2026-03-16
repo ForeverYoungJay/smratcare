@@ -612,6 +612,8 @@ import {
   getContractPage,
   getContractStageSummary,
   getMarketingPlanList,
+  moveContractToBedSelect,
+  moveContractToPendingSign,
   updateCrmContract,
   uploadMarketingFile
 } from '../../api/marketing'
@@ -1460,8 +1462,10 @@ function onPolicySelectionChange(values: string[]) {
 
 async function submit() {
   if (!formRef.value) return
+  let savedContract: CrmContractItem | undefined
   try {
     await formRef.value.validate()
+    validateFamilyDraftRows()
     submitting.value = true
     const isCreate = !form.id
     const payload: Partial<CrmContractItem> = {
@@ -1478,14 +1482,29 @@ async function submit() {
       orgName: selectedPolicyValues.value.length ? selectedPolicyValues.value.join('；') : undefined,
       age: Number.isFinite(Number(form.age)) ? Number(form.age) : undefined
     }
-    let saved: CrmContractItem
     if (form.id) {
-      saved = await updateCrmContract(form.id, payload)
+      savedContract = await updateCrmContract(form.id, payload)
     } else {
-      saved = await createCrmContract(payload)
+      savedContract = await createCrmContract(payload)
+      form.id = savedContract?.id
     }
-    await syncContractElderData(saved)
-    message.success(`保存成功，合同号：${saved?.contractNo || '生成中'}`)
+    if (savedContract?.contractNo) {
+      form.contractNo = savedContract.contractNo
+    }
+    if (savedContract?.leadId) {
+      form.leadId = savedContract.leadId
+    }
+    if (savedContract?.elderId) {
+      form.elderId = savedContract.elderId
+    }
+    try {
+      await syncContractElderData(savedContract)
+    } catch (syncError: any) {
+      message.warning(`合同已保存，但长者资料同步失败：${syncError?.message || '请稍后重试'}`)
+      await fetchData()
+      return
+    }
+    message.success(`保存成功，合同号：${savedContract?.contractNo || '生成中'}`)
     open.value = false
     await fetchData()
   } catch (error: any) {
@@ -1569,12 +1588,7 @@ async function goAdmissionProcessing(record: CrmContractItem) {
     }
     const lead = await ensureContractNo(record)
     const elder = await ensureElderFromLead(lead)
-    await updateCrmContract(lead.id, {
-      ...lead,
-      flowStage: 'PENDING_BED_SELECT',
-      currentOwnerDept: 'MARKETING',
-      contractStatus: '待办理入住'
-    })
+    await moveContractToBedSelect(lead.id)
     router.push(
       `/elder/admission-processing?residentId=${elder.id}&leadId=${lead.leadId || lead.id}&contractNo=${lead.contractNo || ''}&elderName=${encodeURIComponent(elder.fullName || lead.elderName || '')}`
     )
@@ -1631,12 +1645,7 @@ async function openFinalize(record: CrmContractItem) {
     const elder = await ensureElderFromLead(lead)
     const signingLead = normalizedFlowStage(lead) === 'PENDING_SIGN'
       ? lead
-      : await updateCrmContract(lead.id, {
-        ...lead,
-        flowStage: 'PENDING_SIGN',
-        currentOwnerDept: 'MARKETING',
-        contractStatus: '待签署'
-      })
+      : await moveContractToPendingSign(lead.id)
     finalizeLead.value = signingLead
     finalizeForm.contractNo = signingLead.contractNo || ''
     finalizeForm.elderName = elder.fullName
@@ -2029,21 +2038,6 @@ async function syncContractElderData(savedContract: CrmContractItem) {
   }
 
   if (familyDraftRows.value.length > 0) {
-    const invalidRow = familyDraftRows.value.find((item) =>
-      !String(item.realName || '').trim()
-      || !String(item.phone || '').trim()
-      || !String(item.idCardNo || '').trim())
-    if (invalidRow) {
-      throw new Error('家属信息需填写姓名、手机号和身份证号')
-    }
-    const invalidPhoneRow = familyDraftRows.value.find((item) => !/^1\d{10}$/.test(String(item.phone || '').trim()))
-    if (invalidPhoneRow) {
-      throw new Error(`家属手机号格式不正确：${String(invalidPhoneRow.realName || '未命名家属')}`)
-    }
-    const invalidIdCardRow = familyDraftRows.value.find((item) => !/^(\d{15}|\d{17}[\dXx])$/.test(String(item.idCardNo || '').trim()))
-    if (invalidIdCardRow) {
-      throw new Error(`家属身份证号格式不正确：${String(invalidIdCardRow.realName || '未命名家属')}`)
-    }
     await getFamilyRelations(elderId).catch(() => [])
     for (let i = 0; i < familyDraftRows.value.length; i += 1) {
       const familyRow = familyDraftRows.value[i]
@@ -2065,6 +2059,27 @@ async function syncContractElderData(savedContract: CrmContractItem) {
   }
 
   await loadElderSnapshotByForm()
+}
+
+function validateFamilyDraftRows() {
+  if (familyDraftRows.value.length === 0) {
+    return
+  }
+  const invalidRow = familyDraftRows.value.find((item) =>
+    !String(item.realName || '').trim()
+    || !String(item.phone || '').trim()
+    || !String(item.idCardNo || '').trim())
+  if (invalidRow) {
+    throw new Error('家属信息需填写姓名、手机号和身份证号')
+  }
+  const invalidPhoneRow = familyDraftRows.value.find((item) => !/^1\d{10}$/.test(String(item.phone || '').trim()))
+  if (invalidPhoneRow) {
+    throw new Error(`家属手机号格式不正确：${String(invalidPhoneRow.realName || '未命名家属')}`)
+  }
+  const invalidIdCardRow = familyDraftRows.value.find((item) => !/^(\d{15}|\d{17}[\dXx])$/.test(String(item.idCardNo || '').trim()))
+  if (invalidIdCardRow) {
+    throw new Error(`家属身份证号格式不正确：${String(invalidIdCardRow.realName || '未命名家属')}`)
+  }
 }
 
 async function ensureContractNo(record: CrmContractItem) {

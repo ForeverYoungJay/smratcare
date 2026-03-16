@@ -43,6 +43,39 @@
       />
     </a-card>
 
+    <StatsWorkspacePanel
+      page-key="stats-org-elder-flow"
+      title="出入趋势策略区"
+      :summary-text="workspaceSummary"
+      :current-payload="workspacePayload"
+      :target-fields="targetFields"
+      :data-health="dataHealth"
+      :empty-state="emptyState"
+      @apply-preset="applyPreset"
+      @targets-change="onTargetsChange"
+    />
+
+    <StatsInsightDeck :items="visibleInsightItems" />
+
+    <StatsCommandCenter
+      page-key="stats-org-elder-flow-command"
+      title="机构出入协同台"
+      share-title="机构老人出入协同包"
+      :summary-text="commandSummary"
+      :current-payload="workspacePayload"
+      :metric-version="String(route.query.metricVersion || '')"
+      :action-items="commandActionItems"
+      :anomalies="commandAnomalies"
+      :metric-notes="metricNotes"
+      :panel-options="panelOptions"
+      :selected-panel-keys="panelKeys"
+      :template-column-options="printColumnOptions"
+      :selected-template-columns="selectedPrintColumns"
+      @trigger-action="onCommandAction"
+      @panel-change="onPanelChange"
+      @apply-template="applyReportTemplate"
+    />
+
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="老人出入趋势">
       <div ref="trendRef" style="height: 320px;"></div>
     </a-card>
@@ -67,6 +100,9 @@ import dayjs, { type Dayjs } from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import StatsMetaHint from '../../components/stats/StatsMetaHint.vue'
+import StatsWorkspacePanel from '../../components/stats/StatsWorkspacePanel.vue'
+import StatsInsightDeck from '../../components/stats/StatsInsightDeck.vue'
+import StatsCommandCenter from '../../components/stats/StatsCommandCenter.vue'
 import { exportOrgElderFlowCsv, getOrgElderFlow } from '../../api/stats'
 import type { Id, MonthFlowItem } from '../../types'
 import { useECharts } from '../../plugins/echarts'
@@ -75,6 +111,7 @@ import { printTableReport } from '../../utils/print'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { copyText } from '../../utils/clipboard'
 import { normalizeId } from '../../utils/id'
+import { buildComparisonSummary, buildPeriodSeries } from '../../utils/statsInsight'
 
 const route = useRoute()
 const router = useRouter()
@@ -97,6 +134,11 @@ const printColumnOptions = [
   { label: '离院人数', value: 'discharges' }
 ]
 const selectedPrintColumns = ref<string[]>(['month', 'admissions', 'discharges'])
+const panelKeys = ref<string[]>([])
+const targets = ref<Record<string, number>>({
+  admissions: 0,
+  dischargeShare: 50
+})
 const metricTraceText = computed(() => {
   const version = String(route.query.metricVersion || '').trim()
   const source = String(route.query.fromSource || '').trim()
@@ -115,6 +157,105 @@ const displayRows = computed(() => {
   if (!keyword) return rows.value
   return rows.value.filter(item => String(item.month || '').includes(keyword))
 })
+const workspaceSummary = computed(() => `观察机构维度下的月度入住与离院波动，并沉淀常用筛选方案。当前可见 ${displayRows.value.length} 个月。`)
+const workspacePayload = computed(() => ({
+  from: dayjs(query.value.from).format('YYYY-MM'),
+  to: dayjs(query.value.to).format('YYYY-MM'),
+  orgId: query.value.orgId ? String(query.value.orgId) : '',
+  monthKeyword: query.value.monthKeyword || ''
+}))
+const targetFields = computed(() => ([
+  { key: 'admissions', label: '月入住目标', value: targets.value.admissions, min: 0, max: 99999, step: 1 },
+  { key: 'dischargeShare', label: '离院占比关注线(%)', value: targets.value.dischargeShare, min: 0, max: 100, step: 1 }
+]))
+const dataHealth = computed(() => ({
+  freshness: refreshedAt.value || '--',
+  completeness: `${displayRows.value.length}/${rows.value.length || 0} 月可视`,
+  issues: [
+    query.value.monthKeyword ? `月份关键字：${query.value.monthKeyword}` : ''
+  ].filter(Boolean)
+}))
+const emptyState = computed(() => ({
+  visible: !displayRows.value.length,
+  title: '当前时间范围没有出入趋势数据',
+  description: '建议扩大月份范围或清空月份关键字。',
+  hints: [
+    '趋势页适合与入住统计、月运营收入一起看',
+    '若离院偏高，可进一步钻取老人出入报表',
+    '建议保存季度版和半年版两套方案'
+  ]
+}))
+const insightItems = computed(() => {
+  const admissionSeries = buildPeriodSeries(displayRows.value, 'month', 'admissions')
+  const dischargeSeries = buildPeriodSeries(displayRows.value, 'month', 'discharges')
+  const admissionSummary = buildComparisonSummary(admissionSeries, targets.value.admissions)
+  const latestAdmission = Number(admissionSummary.latestValue || 0)
+  const latestDischarge = Number(dischargeSeries[dischargeSeries.length - 1]?.value || 0)
+  const dischargeShare = latestAdmission + latestDischarge > 0
+    ? Number(((latestDischarge / (latestAdmission + latestDischarge)) * 100).toFixed(2))
+    : 0
+  return [
+    {
+      key: 'admission',
+      label: '最新月入住',
+      valueText: `${latestAdmission}`,
+      trendText: admissionSummary.momRate == null ? '暂无环比' : `较上月 ${admissionSummary.momRate >= 0 ? '+' : ''}${admissionSummary.momRate}%`,
+      detail: admissionSummary.target != null ? `目标差 ${Number(admissionSummary.targetGap || 0)}` : admissionSummary.anomalyText,
+      tone: admissionSummary.targetGap != null && admissionSummary.targetGap < 0 ? 'warning' : (admissionSummary.anomalyLevel || 'good')
+    },
+    {
+      key: 'discharge',
+      label: '最新月离院',
+      valueText: `${latestDischarge}`,
+      trendText: `占比 ${dischargeShare.toFixed(2)}%`,
+      detail: dischargeShare > Number(targets.value.dischargeShare || 0) ? '离院占比高于关注线' : '离院占比处于关注线内',
+      tone: dischargeShare > Number(targets.value.dischargeShare || 0) ? 'danger' : 'good'
+    },
+    {
+      key: 'window',
+      label: '观察窗口',
+      valueText: `${displayRows.value.length} 月`,
+      trendText: `${dayjs(query.value.from).format('YYYY-MM')} ~ ${dayjs(query.value.to).format('YYYY-MM')}`,
+      detail: '建议结合季度节奏观察入住高峰',
+      tone: 'neutral'
+    },
+    {
+      key: 'balance',
+      label: '累计出入平衡',
+      valueText: `${displayRows.value.reduce((sum, item) => sum + Number(item.admissions || 0) - Number(item.discharges || 0), 0)}`,
+      trendText: '累计入住 - 累计离院',
+      detail: '可用于判断当前阶段净流入/净流出',
+      tone: 'neutral'
+    }
+  ]
+})
+const visibleInsightItems = computed(() => {
+  const selected = panelKeys.value.length ? new Set(panelKeys.value) : null
+  return insightItems.value.filter((item) => !selected || selected.has(item.key))
+})
+const commandSummary = computed(() => '把机构出入趋势、月度打印模板和异常联动入口放到统一协同台，方便经营例会使用。')
+const commandActionItems = computed(() => ([
+  { key: 'open-flow-report', label: '查看出入明细', description: '从月趋势继续钻取到明细报表', route: '/stats/elder-flow-report', tone: 'danger' as const },
+  { key: 'open-checkin', label: '查看入住统计', description: '对照入住净增长趋势', route: '/stats/check-in', tone: 'warning' as const },
+  { key: 'open-dashboard', label: '返回看板', description: '回到经营总览', route: '/dashboard', tone: 'neutral' as const }
+]))
+const commandAnomalies = computed(() =>
+  insightItems.value
+    .filter((item) => item.tone === 'danger' || item.tone === 'warning')
+    .map((item) => ({ key: item.key, label: item.label, detail: item.detail, tone: item.tone }))
+)
+const metricNotes = computed(() => ([
+  { key: 'admission', label: '最新月入住', note: '用于判断当前窗口内最新一个月的入住动能。' },
+  { key: 'discharge', label: '最新月离院', note: '离院占比偏高时建议直接钻取明细报表。' },
+  { key: 'balance', label: '累计出入平衡', note: '累计入住-累计离院可反映阶段性净流入或净流出。' }
+]))
+const panelOptions = computed(() =>
+  insightItems.value.map((item) => ({
+    key: item.key,
+    label: item.label,
+    description: item.detail || item.trendText
+  }))
+)
 
 async function loadData() {
   if (query.value.from.isAfter(query.value.to, 'month')) {
@@ -152,6 +293,38 @@ function reset() {
   query.value.printRemark = ''
   syncRouteQuery()
   loadData()
+}
+
+function applyPreset(payload: Record<string, any>) {
+  if (payload.from && dayjs(String(payload.from)).isValid()) query.value.from = dayjs(String(payload.from))
+  if (payload.to && dayjs(String(payload.to)).isValid()) query.value.to = dayjs(String(payload.to))
+  query.value.orgId = normalizeId(payload.orgId)
+  query.value.monthKeyword = String(payload.monthKeyword || '')
+  loadData()
+}
+
+function onTargetsChange(payload: Record<string, number>) {
+  targets.value = {
+    ...targets.value,
+    ...(payload || {})
+  }
+}
+
+function onPanelChange(keys: string[]) {
+  panelKeys.value = keys.length ? [...keys] : insightItems.value.map((item) => item.key)
+}
+
+function onCommandAction(item: { route?: string }) {
+  if (item.route) {
+    router.push(item.route)
+  }
+}
+
+function applyReportTemplate(payload: { payload: Record<string, any>; columns: string[] }) {
+  if (payload.columns?.length) {
+    selectedPrintColumns.value = [...payload.columns]
+  }
+  applyPreset(payload.payload || {})
 }
 
 async function exportCsvReport() {

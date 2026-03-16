@@ -15,6 +15,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
@@ -79,6 +80,34 @@ class StatisticsControllerTest {
         .andExpect(status().isOk())
         .andExpect(header().string("Content-Type", org.hamcrest.Matchers.containsString("text/csv")))
         .andExpect(header().string("Content-Disposition", org.hamcrest.Matchers.containsString("attachment;")));
+  }
+
+  @Test
+  @Sql(statements = {
+      "INSERT INTO bill_monthly (id, org_id, elder_id, bill_month, total_amount, paid_amount, outstanding_amount, status, is_deleted) "
+          + "VALUES (8101, 1, 200, '2026-01', 120.00, 120.00, 0.00, 2, 0)",
+      "INSERT INTO bill_monthly (id, org_id, elder_id, bill_month, total_amount, paid_amount, outstanding_amount, status, is_deleted) "
+          + "VALUES (8102, 1, 201, '2026-01', 80.00, 80.00, 0.00, 2, 0)",
+      "INSERT INTO `order` (id, org_id, order_no, elder_id, total_amount, points_used, payable_amount, pay_status, order_status, create_time, update_time, is_deleted) "
+          + "VALUES (8201, 1, 'O-200', 200, 30.00, 0, 30.00, 1, 1, TIMESTAMP '2026-01-15 10:00:00', TIMESTAMP '2026-01-15 10:00:00', 0)",
+      "INSERT INTO `order` (id, org_id, order_no, elder_id, total_amount, points_used, payable_amount, pay_status, order_status, create_time, update_time, is_deleted) "
+          + "VALUES (8202, 1, 'O-201', 201, 50.00, 0, 50.00, 1, 1, TIMESTAMP '2026-01-20 10:00:00', TIMESTAMP '2026-01-20 10:00:00', 0)"
+  })
+  void consumption_supports_elder_filter() throws Exception {
+    String token = loginAndGetToken("admin", "123456");
+
+    mockMvc.perform(get("/api/stats/consumption")
+            .param("from", "2026-01")
+            .param("to", "2026-01")
+            .param("elderId", "200")
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code", is(0)))
+        .andExpect(jsonPath("$.data.totalBillConsumption", is(120.00)))
+        .andExpect(jsonPath("$.data.totalStoreConsumption", is(30.00)))
+        .andExpect(jsonPath("$.data.totalConsumption", is(150.00)))
+        .andExpect(jsonPath("$.data.topConsumerElders.length()", is(1)))
+        .andExpect(jsonPath("$.data.topConsumerElders[0].elderId", is(200)));
   }
 
   private String loginAndGetToken(String username, String password) throws Exception {

@@ -399,9 +399,10 @@ function isCleaningOverdue(item: RoomCleaningTask) {
 }
 
 function isMaintenanceOverdue(item: MaintenanceRequest) {
+  const overdueDays = Number(resolvedSummaryQuery.value.overdueDays || 2)
   return Boolean(normalizeStatus(item.status) !== 'COMPLETED'
     && item.reportedAt
-    && dayjs(item.reportedAt).isBefore(dayjs().subtract(2, 'day')))
+    && dayjs(item.reportedAt).isBefore(dayjs().subtract(overdueDays, 'day')))
 }
 
 function isDeliveryOverdue(item: DiningDeliveryRecord) {

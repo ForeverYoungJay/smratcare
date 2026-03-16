@@ -7,6 +7,7 @@ import lombok.Data;
 public class ElderUpdateRequest {
   private Long tenantId;
   private Long updatedBy;
+  private String elderCode;
   private String fullName;
   private String idCardNo;
   private Integer gender;
@@ -21,6 +22,9 @@ public class ElderUpdateRequest {
   private String careLevel;
   private String riskPrecommit;
   private String remark;
+  private String sourceType;
+  private String historicalContractFileUrl;
   private Long bedId;
   private LocalDate bedStartDate;
+  private Boolean clearBed;
 }

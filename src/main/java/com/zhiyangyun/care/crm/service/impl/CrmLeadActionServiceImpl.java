@@ -20,6 +20,7 @@ import com.zhiyangyun.care.crm.model.action.CrmLeadBatchStatusRequest;
 import com.zhiyangyun.care.crm.model.action.CrmSmsTaskCreateRequest;
 import com.zhiyangyun.care.crm.model.action.CrmSmsTaskResponse;
 import com.zhiyangyun.care.crm.service.CrmLeadActionService;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -173,6 +174,7 @@ public class CrmLeadActionServiceImpl implements CrmLeadActionService {
       plan.setPlanExecuteTime(LocalDateTime.now());
     }
     plan.setExecutorName(blankToNull(request == null ? null : request.getExecutorName()));
+    plan.setCallbackType(resolveCallbackType(request == null ? null : request.getCallbackType(), lead));
     plan.setStatus("PENDING");
     plan.setCreatedBy(staffId);
     callbackPlanMapper.insert(plan);
@@ -207,6 +209,16 @@ public class CrmLeadActionServiceImpl implements CrmLeadActionService {
     plan.setExecutedTime(LocalDateTime.now());
     plan.setExecuteNote(blankToNull(request == null ? null : request.getExecuteNote()));
     plan.setFollowupResult(blankToNull(request == null ? null : request.getFollowupResult()));
+    String callbackType = resolveCallbackType(request == null ? null : request.getCallbackType(), null);
+    if (callbackType != null) {
+      plan.setCallbackType(callbackType);
+    } else if (blankToNull(plan.getCallbackType()) == null) {
+      CrmLead lead = leadMapper.selectById(plan.getLeadId());
+      plan.setCallbackType(resolveCallbackType(null, lead));
+    }
+    if (request != null && request.getScore() != null) {
+      plan.setScore(normalizeScore(request.getScore()));
+    }
     callbackPlanMapper.updateById(plan);
 
     CrmLead lead = leadMapper.selectById(plan.getLeadId());
@@ -353,6 +365,8 @@ public class CrmLeadActionServiceImpl implements CrmLeadActionService {
     response.setFollowupContent(plan.getFollowupContent());
     response.setPlanExecuteTime(plan.getPlanExecuteTime());
     response.setExecutorName(plan.getExecutorName());
+    response.setCallbackType(toClientCallbackType(plan.getCallbackType()));
+    response.setScore(plan.getScore() == null ? null : plan.getScore().doubleValue());
     response.setStatus(plan.getStatus());
     response.setExecutedTime(plan.getExecutedTime());
     response.setExecuteNote(plan.getExecuteNote());
@@ -455,6 +469,53 @@ public class CrmLeadActionServiceImpl implements CrmLeadActionService {
       normalized = normalized.substring(0, FILE_TYPE_MAX_LEN);
     }
     return normalized.isBlank() ? null : normalized;
+  }
+
+  private String resolveCallbackType(String rawType, CrmLead lead) {
+    String normalized = normalizeCallbackType(rawType);
+    if (normalized != null) {
+      return normalized;
+    }
+    String text = String.join(" ",
+        blankToDefault(lead == null ? null : lead.getCustomerTag(), ""),
+        blankToDefault(lead == null ? null : lead.getContractStatus(), ""),
+        blankToDefault(lead == null ? null : lead.getRemark(), ""));
+    String lower = text.toLowerCase(Locale.ROOT);
+    if (lower.contains("试住")) {
+      return "TRIAL";
+    }
+    if (lower.contains("退住") || lower.contains("离院") || lower.contains("出院")) {
+      return "DISCHARGE";
+    }
+    if (lower.contains("评分") || lower.contains("满意度") || lower.contains("星级")) {
+      return "SCORE";
+    }
+    return "CHECKIN";
+  }
+
+  private String normalizeCallbackType(String rawType) {
+    String value = blankToNull(rawType);
+    if (value == null) {
+      return null;
+    }
+    String normalized = value.trim().toUpperCase(Locale.ROOT);
+    return switch (normalized) {
+      case "CHECKIN", "TRIAL", "DISCHARGE", "SCORE" -> normalized;
+      default -> null;
+    };
+  }
+
+  private BigDecimal normalizeScore(Double score) {
+    if (score == null) {
+      return null;
+    }
+    double normalized = Math.max(0D, Math.min(5D, score));
+    return BigDecimal.valueOf(normalized).setScale(1, java.math.RoundingMode.HALF_UP);
+  }
+
+  private String toClientCallbackType(String callbackType) {
+    String normalized = normalizeCallbackType(callbackType);
+    return normalized == null ? null : normalized.toLowerCase(Locale.ROOT);
   }
 
   private String extractFileExt(String fileName) {

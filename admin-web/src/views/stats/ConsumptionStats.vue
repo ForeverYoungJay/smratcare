@@ -55,6 +55,39 @@
       />
     </a-card>
 
+    <StatsWorkspacePanel
+      page-key="stats-consumption"
+      title="消费策略区"
+      :summary-text="workspaceSummary"
+      :current-payload="workspacePayload"
+      :target-fields="targetFields"
+      :data-health="dataHealth"
+      :empty-state="emptyState"
+      @apply-preset="applyPreset"
+      @targets-change="onTargetsChange"
+    />
+
+    <StatsInsightDeck :items="visibleInsightItems" />
+
+    <StatsCommandCenter
+      page-key="stats-consumption-command"
+      title="消费协同台"
+      share-title="消费统计协同包"
+      :summary-text="commandSummary"
+      :current-payload="workspacePayload"
+      :metric-version="String(route.query.metricVersion || '')"
+      :action-items="commandActionItems"
+      :anomalies="commandAnomalies"
+      :metric-notes="metricNotes"
+      :panel-options="panelOptions"
+      :selected-panel-keys="panelKeys"
+      :template-column-options="printColumnOptions"
+      :selected-template-columns="selectedPrintColumns"
+      @trigger-action="onCommandAction"
+      @panel-change="onPanelChange"
+      @apply-template="applyReportTemplate"
+    />
+
     <a-row :gutter="16" style="margin-top: 16px;">
       <a-col :span="6">
         <a-card class="card-elevated" :bordered="false">
@@ -118,6 +151,9 @@ import dayjs, { type Dayjs } from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import StatsMetaHint from '../../components/stats/StatsMetaHint.vue'
+import StatsWorkspacePanel from '../../components/stats/StatsWorkspacePanel.vue'
+import StatsInsightDeck from '../../components/stats/StatsInsightDeck.vue'
+import StatsCommandCenter from '../../components/stats/StatsCommandCenter.vue'
 import { exportConsumptionStatsCsv, getConsumptionStats } from '../../api/stats'
 import type { ConsumptionStatsResponse, Id } from '../../types'
 import { useECharts } from '../../plugins/echarts'
@@ -127,6 +163,7 @@ import { useElderOptions } from '../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { copyText } from '../../utils/clipboard'
 import { normalizeId } from '../../utils/id'
+import { buildComparisonSummary, buildPeriodSeries } from '../../utils/statsInsight'
 
 const route = useRoute()
 const router = useRouter()
@@ -160,6 +197,12 @@ const printColumnOptions = [
   { label: '消费金额', value: 'amount' }
 ]
 const selectedPrintColumns = ref<string[]>(['elderName', 'amount'])
+const panelKeys = ref<string[]>([])
+const targets = ref<Record<string, number>>({
+  totalConsumption: 0,
+  billRatio: 70,
+  topConsumerAmount: 0
+})
 const metricTraceText = computed(() => {
   const version = String(route.query.metricVersion || '').trim()
   const source = String(route.query.fromSource || '').trim()
@@ -176,6 +219,104 @@ const displayTopRows = computed(() => {
   return list.filter((item) => String(item.elderId || '').trim() === elderId)
 })
 const selectedElder = computed(() => elderOptions.value.find((item) => String(item.value || '').trim() === String(query.elderId || '').trim()))
+const workspaceSummary = computed(() => `把总消费、账单占比与重点老人消费排行结合查看，并沉淀固定筛选方案。当前展示 ${displayTopRows.value.length} 位老人。`)
+const workspacePayload = computed(() => ({
+  from: dayjs(query.from).format('YYYY-MM'),
+  to: dayjs(query.to).format('YYYY-MM'),
+  orgId: query.orgId ? String(query.orgId) : '',
+  elderId: query.elderId ? String(query.elderId) : ''
+}))
+const targetFields = computed(() => ([
+  { key: 'totalConsumption', label: '总消费目标(元)', value: targets.value.totalConsumption, min: 0, max: 999999999, step: 1000 },
+  { key: 'billRatio', label: '账单消费占比目标(%)', value: targets.value.billRatio, min: 0, max: 100, step: 1 },
+  { key: 'topConsumerAmount', label: 'Top1 消费提醒线(元)', value: targets.value.topConsumerAmount, min: 0, max: 999999999, step: 100 }
+]))
+const dataHealth = computed(() => ({
+  freshness: refreshedAt.value || '--',
+  completeness: `${displayTopRows.value.length}/${(stats.topConsumerElders || []).length || 0} 人已展示`,
+  issues: [
+    query.elderId ? `当前已锁定院内老人：${selectedElder.value?.name || query.elderId}` : '',
+    Number(stats.billConsumptionRatio || 0) > Number(targets.value.billRatio || 0) ? '账单消费占比高于目标' : ''
+  ].filter(Boolean)
+}))
+const emptyState = computed(() => ({
+  visible: !(stats.monthlyTotalConsumption || []).length,
+  title: '当前时间范围内暂无消费数据',
+  description: '建议检查账单月结、商城订单或切换到更长的月份范围。',
+  hints: [
+    '确认财务账单已生成且未被软删除',
+    '若按老人筛选，先恢复为全部再判断是否为单体问题',
+    '对比账单消费与商城消费占比，确认数据是否偏科'
+  ]
+}))
+const insightItems = computed(() => {
+  const totalSeries = buildPeriodSeries(stats.monthlyTotalConsumption || [], 'month', 'amount')
+  const billSeries = buildPeriodSeries(stats.monthlyBillConsumption || [], 'month', 'amount')
+  const storeSeries = buildPeriodSeries(stats.monthlyStoreConsumption || [], 'month', 'amount')
+  const totalSummary = buildComparisonSummary(totalSeries, targets.value.totalConsumption)
+  const topAmount = Number((stats.topConsumerElders || [])[0]?.amount || 0)
+  return [
+    {
+      key: 'total',
+      label: '总消费走势',
+      valueText: `${Number(stats.totalConsumption || 0).toFixed(2)} 元`,
+      trendText: totalSummary.momRate == null ? '暂无环比' : `较上期 ${totalSummary.momRate >= 0 ? '+' : ''}${totalSummary.momRate}%`,
+      detail: totalSummary.target != null ? `目标差 ${Number(totalSummary.targetGap || 0).toFixed(2)} 元` : totalSummary.anomalyText,
+      tone: totalSummary.targetGap != null && totalSummary.targetGap < 0 ? 'warning' : (totalSummary.anomalyLevel || 'good')
+    },
+    {
+      key: 'bill-ratio',
+      label: '账单消费占比',
+      valueText: `${Number(stats.billConsumptionRatio || 0).toFixed(2)}%`,
+      trendText: `目标 ${Number(targets.value.billRatio || 0).toFixed(2)}%`,
+      detail: `商城占比 ${Number(stats.storeConsumptionRatio || 0).toFixed(2)}%`,
+      tone: Number(stats.billConsumptionRatio || 0) > Number(targets.value.billRatio || 0) ? 'warning' : 'good'
+    },
+    {
+      key: 'bill',
+      label: '账单与商城结构',
+      valueText: `${Number((billSeries[billSeries.length - 1]?.value || 0)).toFixed(2)} / ${Number((storeSeries[storeSeries.length - 1]?.value || 0)).toFixed(2)}`,
+      trendText: '最新月账单/商城',
+      detail: totalSummary.anomalyText,
+      tone: 'neutral'
+    },
+    {
+      key: 'top',
+      label: 'Top1 消费提醒',
+      valueText: `${topAmount.toFixed(2)} 元`,
+      trendText: `提醒线 ${Number(targets.value.topConsumerAmount || 0).toFixed(2)} 元`,
+      detail: topAmount > Number(targets.value.topConsumerAmount || 0) ? '重点老人消费已超过提醒线' : 'Top1 消费仍处于提醒线内',
+      tone: topAmount > Number(targets.value.topConsumerAmount || 0) ? 'warning' : 'good'
+    }
+  ]
+})
+const visibleInsightItems = computed(() => {
+  const selected = panelKeys.value.length ? new Set(panelKeys.value) : null
+  return insightItems.value.filter((item) => !selected || selected.has(item.key))
+})
+const commandSummary = computed(() => '把消费异常、重点老人、模板列和协作说明合并到一个操作入口，方便财务复核。')
+const commandActionItems = computed(() => ([
+  { key: 'open-revenue', label: '查看收入统计', description: '联动收入趋势判断经营结果', route: '/stats/monthly-revenue', tone: 'warning' as const },
+  { key: 'open-elder-info', label: '查看老人画像', description: '结合老人结构判断消费分层', route: '/stats/elder-info', tone: 'danger' as const },
+  { key: 'open-dashboard', label: '返回看板', description: '回到看板查看整体口径', route: '/dashboard', tone: 'neutral' as const }
+]))
+const commandAnomalies = computed(() =>
+  insightItems.value
+    .filter((item) => item.tone === 'danger' || item.tone === 'warning')
+    .map((item) => ({ key: item.key, label: item.label, detail: item.detail, tone: item.tone }))
+)
+const metricNotes = computed(() => ([
+  { key: 'total', label: '总消费', note: '总消费=账单消费+商城消费，老人筛选会同步作用于汇总和导出。' },
+  { key: 'bill', label: '账单占比', note: '账单占比过高时，建议对比商城消费和线下账单结构。' },
+  { key: 'top', label: 'Top10 排行', note: '排行口径默认取当前筛选下的前 10 位老人。' }
+]))
+const panelOptions = computed(() =>
+  insightItems.value.map((item) => ({
+    key: item.key,
+    label: item.label,
+    description: item.detail || item.trendText
+  }))
+)
 
 async function loadData() {
   if (query.from.isAfter(query.to, 'month')) {
@@ -186,6 +327,7 @@ async function loadData() {
     const data = await getConsumptionStats({
       from: dayjs(query.from).format('YYYY-MM'),
       to: dayjs(query.to).format('YYYY-MM'),
+      elderId: query.elderId,
       orgId: query.orgId
     })
     Object.assign(stats, data)
@@ -217,6 +359,38 @@ function reset() {
   loadData()
 }
 
+function applyPreset(payload: Record<string, any>) {
+  if (payload.from && dayjs(String(payload.from)).isValid()) query.from = dayjs(String(payload.from))
+  if (payload.to && dayjs(String(payload.to)).isValid()) query.to = dayjs(String(payload.to))
+  query.orgId = normalizeId(payload.orgId)
+  query.elderId = normalizeId(payload.elderId)
+  loadData()
+}
+
+function onTargetsChange(payload: Record<string, number>) {
+  targets.value = {
+    ...targets.value,
+    ...(payload || {})
+  }
+}
+
+function onPanelChange(keys: string[]) {
+  panelKeys.value = keys.length ? [...keys] : insightItems.value.map((item) => item.key)
+}
+
+function onCommandAction(item: { route?: string }) {
+  if (item.route) {
+    router.push(item.route)
+  }
+}
+
+function applyReportTemplate(payload: { payload: Record<string, any>; columns: string[] }) {
+  if (payload.columns?.length) {
+    selectedPrintColumns.value = [...payload.columns]
+  }
+  applyPreset(payload.payload || {})
+}
+
 function openColumnSetting() {
   columnSettingOpen.value = true
 }
@@ -238,6 +412,7 @@ async function exportSummary() {
     await exportConsumptionStatsCsv({
       from: dayjs(query.from).format('YYYY-MM'),
       to: dayjs(query.to).format('YYYY-MM'),
+      elderId: query.elderId,
       orgId: query.orgId
     })
     message.success('导出成功')
@@ -310,7 +485,7 @@ function renderPrint(title: string, rows: Array<Record<string, any>>) {
 
 function onElderChange(value?: Id) {
   query.elderId = value
-  syncRouteQuery()
+  loadData()
 }
 
 function syncRouteQuery() {

@@ -272,7 +272,7 @@ public class AdminHrController {
     return Result.ok(resp);
   }
 
-  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_EMPLOYEE','HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/workbench/summary")
   public Result<HrWorkbenchSummaryResponse> workbenchSummary(
       @RequestParam(required = false, defaultValue = "30") Integer warningDays) {
@@ -369,7 +369,7 @@ public class AdminHrController {
     return Result.ok(summary);
   }
 
-  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("hasAnyRole('HR_EMPLOYEE','HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/staff/birthday/page")
   public Result<IPage<HrStaffBirthdayResponse>> staffBirthdayPage(
       @RequestParam(defaultValue = "1") long pageNo,

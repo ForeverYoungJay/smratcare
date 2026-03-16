@@ -288,6 +288,14 @@
         <a-form-item label="计划标题">
           <a-input v-model:value="planForm.title" />
         </a-form-item>
+        <a-form-item label="回访类型">
+          <a-select v-model:value="planForm.callbackType">
+            <a-select-option value="checkin">入住后回访</a-select-option>
+            <a-select-option value="trial">试住回访</a-select-option>
+            <a-select-option value="discharge">退住回访</a-select-option>
+            <a-select-option value="score">满意度评分</a-select-option>
+          </a-select>
+        </a-form-item>
         <a-form-item label="回访内容">
           <a-textarea v-model:value="planForm.followupContent" :rows="3" placeholder="填写本次回访重点内容" />
         </a-form-item>
@@ -304,6 +312,17 @@
       <a-form :model="executeForm" layout="vertical">
         <a-form-item label="执行备注">
           <a-textarea v-model:value="executeForm.executeNote" :rows="2" />
+        </a-form-item>
+        <a-form-item label="回访类型">
+          <a-select v-model:value="executeForm.callbackType">
+            <a-select-option value="checkin">入住后回访</a-select-option>
+            <a-select-option value="trial">试住回访</a-select-option>
+            <a-select-option value="discharge">退住回访</a-select-option>
+            <a-select-option value="score">满意度评分</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="满意度评分">
+          <a-input-number v-model:value="executeForm.score" :min="0" :max="5" :step="0.5" style="width: 100%" />
         </a-form-item>
         <a-form-item label="回访结果">
           <a-textarea v-model:value="executeForm.followupResult" :rows="3" placeholder="填写回访结果或改进结论" />
@@ -339,7 +358,7 @@ import {
 } from '../../../api/marketing'
 import { useUserStore } from '../../../stores/user'
 import { hasMinisterOrHigher } from '../../../utils/roleAccess'
-import type { CrmLeadItem, Id, MarketingLeadEntrySummary, MarketingLeadMode, PageResult } from '../../../types'
+import type { CrmLeadItem, Id, MarketingCallbackType, MarketingLeadEntrySummary, MarketingLeadMode, PageResult } from '../../../types'
 
 const props = withDefaults(defineProps<{
   mode: 'consultation' | 'intent' | 'reservation' | 'invalid' | 'callback' | 'pipeline'
@@ -406,6 +425,7 @@ const planOpen = ref(false)
 const planSubmitting = ref(false)
 const planForm = reactive({
   title: '回访',
+  callbackType: 'checkin' as MarketingCallbackType,
   followupContent: '',
   planExecuteTime: dayjs().format('YYYY-MM-DD HH:mm:ss'),
   executorName: ''
@@ -415,6 +435,8 @@ const executeSubmitting = ref(false)
 const pendingExecutePlanId = ref<Id>()
 const executeForm = reactive({
   executeNote: '页面执行',
+  callbackType: 'checkin' as MarketingCallbackType,
+  score: undefined as number | undefined,
   followupResult: '',
   nextFollowDate: ''
 })
@@ -944,6 +966,14 @@ function onPageSizeChange(_current: number, size: number) {
   fetchData()
 }
 
+function defaultCallbackType(): MarketingCallbackType {
+  const scenario = String(props.scenario || route.query.type || route.query.scenario || '').trim()
+  if (scenario === 'trial') return 'trial'
+  if (scenario === 'discharge') return 'discharge'
+  if (scenario === 'score') return 'score'
+  return 'checkin'
+}
+
 async function handleTopAction(key: string) {
   if (key === 'create') {
     openForm()
@@ -1028,6 +1058,7 @@ async function handleTopAction(key: string) {
       return
     }
     planForm.title = '回访'
+    planForm.callbackType = defaultCallbackType()
     planForm.followupContent = ''
     planForm.planExecuteTime = dayjs().format('YYYY-MM-DD HH:mm:ss')
     planForm.executorName = ''
@@ -1176,6 +1207,8 @@ async function executeCallback(record: CrmLeadItem) {
     }
     pendingExecutePlanId.value = pending.id
     executeForm.executeNote = '页面执行'
+    executeForm.callbackType = pending.callbackType || defaultCallbackType()
+    executeForm.score = pending.score
     executeForm.followupResult = pending.followupResult || ''
     executeForm.nextFollowDate = record.nextFollowDate || ''
     executeOpen.value = true
@@ -1193,6 +1226,8 @@ async function submitExecuteCallback() {
   try {
     await executeCallbackPlan(pendingExecutePlanId.value, {
       executeNote: executeForm.executeNote,
+      callbackType: executeForm.callbackType,
+      score: executeForm.score,
       followupResult: executeForm.followupResult,
       nextFollowDate: executeForm.nextFollowDate || undefined
     })

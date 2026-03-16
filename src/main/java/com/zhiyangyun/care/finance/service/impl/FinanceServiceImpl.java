@@ -14,11 +14,17 @@ import com.zhiyangyun.care.finance.mapper.ReconciliationDailyMapper;
 import com.zhiyangyun.care.finance.model.PaymentRequest;
 import com.zhiyangyun.care.finance.model.PaymentResponse;
 import com.zhiyangyun.care.finance.model.ReconcileResponse;
+import com.zhiyangyun.care.finance.service.FinanceMonthLockService;
 import com.zhiyangyun.care.finance.service.FinanceService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,17 +35,20 @@ public class FinanceServiceImpl implements FinanceService {
   private final ReconciliationDailyMapper reconciliationDailyMapper;
   private final ConsumptionRecordMapper consumptionRecordMapper;
   private final ElderMapper elderMapper;
+  private final FinanceMonthLockService financeMonthLockService;
 
   public FinanceServiceImpl(BillMonthlyMapper billMonthlyMapper,
       PaymentRecordMapper paymentRecordMapper,
       ReconciliationDailyMapper reconciliationDailyMapper,
       ConsumptionRecordMapper consumptionRecordMapper,
-      ElderMapper elderMapper) {
+      ElderMapper elderMapper,
+      FinanceMonthLockService financeMonthLockService) {
     this.billMonthlyMapper = billMonthlyMapper;
     this.paymentRecordMapper = paymentRecordMapper;
     this.reconciliationDailyMapper = reconciliationDailyMapper;
     this.consumptionRecordMapper = consumptionRecordMapper;
     this.elderMapper = elderMapper;
+    this.financeMonthLockService = financeMonthLockService;
   }
 
   @Override
@@ -69,6 +78,7 @@ public class FinanceServiceImpl implements FinanceService {
     if (Integer.valueOf(9).equals(bill.getStatus())) {
       throw new IllegalStateException("Invalid bill can not be paid");
     }
+    financeMonthLockService.assertMonthEditable(bill.getOrgId(), YearMonth.parse(bill.getBillMonth()), "收款登记");
 
     BigDecimal paidAmount = bill.getPaidAmount() == null ? BigDecimal.ZERO : bill.getPaidAmount();
     BigDecimal totalAmount = bill.getTotalAmount() == null ? BigDecimal.ZERO : bill.getTotalAmount();
@@ -121,6 +131,7 @@ public class FinanceServiceImpl implements FinanceService {
     if (Integer.valueOf(9).equals(bill.getStatus())) {
       throw new IllegalStateException("Invalid bill can not edit payment");
     }
+    financeMonthLockService.assertMonthEditable(bill.getOrgId(), YearMonth.parse(bill.getBillMonth()), "修改收款");
     BigDecimal totalAmount = bill.getTotalAmount() == null ? BigDecimal.ZERO : bill.getTotalAmount();
     BigDecimal otherPaid = paymentRecordMapper.selectList(
             Wrappers.lambdaQuery(PaymentRecord.class)
@@ -165,11 +176,26 @@ public class FinanceServiceImpl implements FinanceService {
             .eq(PaymentRecord::getOrgId, orgId)
             .ge(PaymentRecord::getPaidAt, start)
             .lt(PaymentRecord::getPaidAt, end));
+    List<Long> billIds = records.stream()
+        .map(PaymentRecord::getBillMonthlyId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList();
+    Map<Long, BillMonthly> billMap = billIds.isEmpty()
+        ? Map.of()
+        : billMonthlyMapper.selectList(
+            Wrappers.lambdaQuery(BillMonthly.class)
+                .eq(BillMonthly::getIsDeleted, 0)
+                .in(BillMonthly::getId, billIds))
+            .stream()
+            .collect(java.util.stream.Collectors.toMap(BillMonthly::getId, item -> item, (a, b) -> a));
 
     BigDecimal total = BigDecimal.ZERO;
     for (PaymentRecord record : records) {
       total = total.add(record.getAmount());
     }
+    boolean mismatch = hasReconcileMismatch(records, billMap);
+    String remark = buildReconcileRemark(records, billMap, mismatch);
 
     List<ReconciliationDaily> existingList = reconciliationDailyMapper.selectList(
         Wrappers.lambdaQuery(ReconciliationDaily.class)
@@ -183,12 +209,14 @@ public class FinanceServiceImpl implements FinanceService {
       daily.setOrgId(orgId);
       daily.setReconcileDate(date);
       daily.setTotalReceived(total);
-      daily.setMismatchFlag(0);
+      daily.setMismatchFlag(mismatch ? 1 : 0);
+      daily.setRemark(remark);
       reconciliationDailyMapper.insert(daily);
     } else {
       daily = existingList.get(0);
       daily.setTotalReceived(total);
-      daily.setMismatchFlag(0);
+      daily.setMismatchFlag(mismatch ? 1 : 0);
+      daily.setRemark(remark);
       reconciliationDailyMapper.updateById(daily);
       for (int i = 1; i < existingList.size(); i++) {
         ReconciliationDaily duplicate = existingList.get(i);
@@ -200,7 +228,9 @@ public class FinanceServiceImpl implements FinanceService {
     ReconcileResponse response = new ReconcileResponse();
     response.setDate(date);
     response.setTotalReceived(total);
-    response.setMismatch(false);
+    response.setMismatchFlag(mismatch ? 1 : 0);
+    response.setMismatch(mismatch);
+    response.setRemark(remark);
     return response;
   }
 
@@ -214,6 +244,7 @@ public class FinanceServiceImpl implements FinanceService {
     if (Integer.valueOf(9).equals(bill.getStatus())) {
       return;
     }
+    financeMonthLockService.assertMonthEditable(bill.getOrgId(), YearMonth.parse(bill.getBillMonth()), "作废账单");
     bill.setStatus(9);
     bill.setOutstandingAmount(BigDecimal.ZERO);
     billMonthlyMapper.updateById(bill);
@@ -298,5 +329,69 @@ public class FinanceServiceImpl implements FinanceService {
       return changed;
     }
     return base + "；" + changed;
+  }
+
+  private boolean hasReconcileMismatch(List<PaymentRecord> records, Map<Long, BillMonthly> billMap) {
+    return !collectReconcileProblems(records, billMap).isEmpty();
+  }
+
+  private String buildReconcileRemark(List<PaymentRecord> records, Map<Long, BillMonthly> billMap, boolean mismatch) {
+    List<String> problems = collectReconcileProblems(records, billMap);
+    if (!mismatch || problems.isEmpty()) {
+      return "对账正常";
+    }
+    return String.join("；", problems);
+  }
+
+  private List<String> collectReconcileProblems(List<PaymentRecord> records, Map<Long, BillMonthly> billMap) {
+    List<String> problems = new ArrayList<>();
+    Map<String, Integer> duplicateCountMap = new HashMap<>();
+    for (PaymentRecord record : records) {
+      String signature = reconcileSignature(record);
+      duplicateCountMap.merge(signature, 1, Integer::sum);
+    }
+    long duplicateCount = records.stream()
+        .filter(record -> duplicateCountMap.getOrDefault(reconcileSignature(record), 0) > 1)
+        .count();
+    if (duplicateCount > 0) {
+      problems.add("疑似重复收款 " + duplicateCount + " 笔");
+    }
+    long missingBillCount = records.stream()
+        .filter(record -> record.getBillMonthlyId() == null || !billMap.containsKey(record.getBillMonthlyId()))
+        .count();
+    if (missingBillCount > 0) {
+      problems.add("存在未关联账单收款 " + missingBillCount + " 笔");
+    }
+    long invalidBillCount = records.stream()
+        .map(record -> billMap.get(record.getBillMonthlyId()))
+        .filter(Objects::nonNull)
+        .filter(bill -> Integer.valueOf(9).equals(bill.getStatus()))
+        .count();
+    if (invalidBillCount > 0) {
+      problems.add("无效账单仍有收款 " + invalidBillCount + " 笔");
+    }
+    long overpaidBillCount = billMap.values().stream()
+        .filter(Objects::nonNull)
+        .filter(bill -> {
+          BigDecimal totalAmount = bill.getTotalAmount() == null ? BigDecimal.ZERO : bill.getTotalAmount();
+          BigDecimal paidAmount = bill.getPaidAmount() == null ? BigDecimal.ZERO : bill.getPaidAmount();
+          BigDecimal outstanding = bill.getOutstandingAmount() == null ? BigDecimal.ZERO : bill.getOutstandingAmount();
+          return paidAmount.compareTo(totalAmount) > 0 || outstanding.compareTo(BigDecimal.ZERO) < 0;
+        })
+        .count();
+    if (overpaidBillCount > 0) {
+      problems.add("账单金额状态异常 " + overpaidBillCount + " 笔");
+    }
+    return problems;
+  }
+
+  private String reconcileSignature(PaymentRecord record) {
+    if (record == null) {
+      return "NULL";
+    }
+    return String.valueOf(record.getBillMonthlyId()) + "|"
+        + String.valueOf(record.getAmount()) + "|"
+        + safeMethod(record.getPayMethod()) + "|"
+        + String.valueOf(record.getPaidAt());
   }
 }

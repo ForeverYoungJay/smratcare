@@ -2,6 +2,7 @@ package com.zhiyangyun.care.oa.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
@@ -23,10 +24,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -52,10 +55,16 @@ public class OaDocumentController {
 
   private final OaDocumentMapper documentMapper;
   private final OaDocumentFolderMapper folderMapper;
+  private final JdbcTemplate jdbcTemplate;
+  private final Map<String, Boolean> schemaCapabilityCache = new ConcurrentHashMap<>();
 
-  public OaDocumentController(OaDocumentMapper documentMapper, OaDocumentFolderMapper folderMapper) {
+  public OaDocumentController(
+      OaDocumentMapper documentMapper,
+      OaDocumentFolderMapper folderMapper,
+      JdbcTemplate jdbcTemplate) {
     this.documentMapper = documentMapper;
     this.folderMapper = folderMapper;
+    this.jdbcTemplate = jdbcTemplate;
   }
 
   @GetMapping("/page")
@@ -75,20 +84,18 @@ public class OaDocumentController {
     Long staffId = AuthContext.getStaffId();
     String normalizedFolderVisibility = normalizeFolderVisibilityFilter(folderVisibility);
     String normalizedRegionCode = normalizeOptionalText(regionCode);
-    List<Long> accessibleFolderIds = listAccessibleFolderIds(orgId, staffId, normalizedFolderVisibility, normalizedRegionCode);
-    var wrapper = Wrappers.lambdaQuery(OaDocument.class)
-        .eq(OaDocument::getIsDeleted, 0)
-        .eq(orgId != null, OaDocument::getOrgId, orgId)
-        .eq(folderId != null, OaDocument::getFolderId, folderId)
-        .eq(folderId == null && folder != null && !folder.isBlank(), OaDocument::getFolder, folder.trim());
-    if (folderId == null && (folder == null || folder.isBlank())) {
-      if (accessibleFolderIds.isEmpty()) {
-        wrapper.isNull(OaDocument::getFolderId);
-      } else {
+    boolean folderIdSupported = hasDocumentFolderIdColumn();
+    List<Long> accessibleFolderIds =
+        listAccessibleFolderIds(orgId, staffId, normalizedFolderVisibility, normalizedRegionCode);
+    var wrapper = documentQuery(orgId)
+        .eq(folderIdSupported && folderId != null, OaDocument::getFolderId, folderId)
+        .eq((!folderIdSupported || folderId == null) && folder != null && !folder.isBlank(), OaDocument::getFolder, folder.trim());
+    if (folderIdSupported) {
+      if (folderId == null && (folder == null || folder.isBlank()) && !accessibleFolderIds.isEmpty()) {
         wrapper.and(w -> w.isNull(OaDocument::getFolderId).or().in(OaDocument::getFolderId, accessibleFolderIds));
+      } else if (folderId != null && !accessibleFolderIds.contains(folderId)) {
+        return Result.ok(new Page<>(resolvedPageNo, resolvedPageSize, 0));
       }
-    } else if (folderId != null && !accessibleFolderIds.contains(folderId)) {
-      return Result.ok(new Page<>(resolvedPageNo, resolvedPageSize, 0));
     }
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(OaDocument::getName, keyword)
@@ -100,20 +107,17 @@ public class OaDocumentController {
 
   @GetMapping("/folder/tree")
   public Result<List<OaDocumentFolderTreeNode>> folderTree() {
+    if (!hasDocumentFolderTable()) {
+      return Result.ok(List.of());
+    }
     Long orgId = AuthContext.getOrgId();
     Long staffId = AuthContext.getStaffId();
-    List<OaDocumentFolder> folders = folderMapper.selectList(Wrappers.lambdaQuery(OaDocumentFolder.class)
-        .eq(OaDocumentFolder::getIsDeleted, 0)
-        .eq(orgId != null, OaDocumentFolder::getOrgId, orgId)
-        .and(w -> w.eq(OaDocumentFolder::getVisibility, FOLDER_VISIBILITY_PUBLIC)
-            .or().isNull(OaDocumentFolder::getVisibility)
-            .or().eq(staffId != null, OaDocumentFolder::getCreatedBy, staffId))
+    List<OaDocumentFolder> folders = folderMapper.selectList(accessibleFolderQuery(orgId, staffId)
         .orderByAsc(OaDocumentFolder::getSortNo)
         .orderByAsc(OaDocumentFolder::getCreateTime));
-    List<OaDocument> docs = documentMapper.selectList(Wrappers.lambdaQuery(OaDocument.class)
-        .eq(OaDocument::getIsDeleted, 0)
-        .eq(orgId != null, OaDocument::getOrgId, orgId)
-        .isNotNull(OaDocument::getFolderId));
+    List<OaDocument> docs = hasDocumentFolderIdColumn()
+        ? documentMapper.selectList(documentQuery(orgId).isNotNull(OaDocument::getFolderId))
+        : List.of();
     Map<Long, Integer> folderDocCountMap = new HashMap<>();
     for (OaDocument doc : docs) {
       Long folderId = doc.getFolderId();
@@ -158,6 +162,7 @@ public class OaDocumentController {
 
   @PostMapping("/folder")
   public Result<OaDocumentFolder> createFolder(@Valid @RequestBody OaDocumentFolderRequest request) {
+    ensureFolderLibraryEnabled();
     Long orgId = AuthContext.getOrgId();
     Long parentId = normalizeParentId(request.getParentId());
     if (parentId != null && parentId > 0) {
@@ -187,6 +192,7 @@ public class OaDocumentController {
   public Result<OaDocumentFolder> updateFolder(
       @PathVariable Long id,
       @Valid @RequestBody OaDocumentFolderRequest request) {
+    ensureFolderLibraryEnabled();
     OaDocumentFolder folder = findAccessibleFolder(id);
     if (folder == null) {
       return Result.ok(null);
@@ -219,6 +225,7 @@ public class OaDocumentController {
 
   @DeleteMapping("/folder/{id}")
   public Result<Void> deleteFolder(@PathVariable Long id) {
+    ensureFolderLibraryEnabled();
     OaDocumentFolder folder = findAccessibleFolder(id);
     if (folder == null) {
       return Result.ok(null);
@@ -231,10 +238,12 @@ public class OaDocumentController {
     if (childCount != null && childCount > 0) {
       throw new IllegalArgumentException("请先删除子档案夹");
     }
-    Long docCount = documentMapper.selectCount(Wrappers.lambdaQuery(OaDocument.class)
-        .eq(OaDocument::getIsDeleted, 0)
-        .eq(orgId != null, OaDocument::getOrgId, orgId)
-        .eq(OaDocument::getFolderId, folder.getId()));
+    Long docCount = hasDocumentFolderIdColumn()
+        ? documentMapper.selectCount(Wrappers.lambdaQuery(OaDocument.class)
+            .eq(OaDocument::getIsDeleted, 0)
+            .eq(orgId != null, OaDocument::getOrgId, orgId)
+            .eq(OaDocument::getFolderId, folder.getId()))
+        : 0L;
     if (docCount != null && docCount > 0) {
       throw new IllegalArgumentException("档案夹内存在文档，无法删除");
     }
@@ -253,7 +262,7 @@ public class OaDocumentController {
     doc.setOrgId(orgId);
     String normalizedUrl = normalizeText(request.getUrl(), MAX_URL_LENGTH);
     String normalizedFolder = normalizeText(request.getFolder(), MAX_FOLDER_LENGTH);
-    Long resolvedFolderId = resolveFolderId(request.getFolderId(), normalizedFolder);
+    Long resolvedFolderId = hasDocumentFolderIdColumn() ? resolveFolderId(request.getFolderId(), normalizedFolder) : null;
     doc.setName(normalizeText(resolveDocumentName(request.getName(), normalizedUrl), MAX_NAME_LENGTH));
     doc.setFolderId(resolvedFolderId);
     doc.setFolder(resolveFolderName(resolvedFolderId, normalizedFolder));
@@ -279,7 +288,7 @@ public class OaDocumentController {
     validatePayload(request);
     String normalizedUrl = normalizeText(request.getUrl(), MAX_URL_LENGTH);
     String normalizedFolder = normalizeText(request.getFolder(), MAX_FOLDER_LENGTH);
-    Long resolvedFolderId = resolveFolderId(request.getFolderId(), normalizedFolder);
+    Long resolvedFolderId = hasDocumentFolderIdColumn() ? resolveFolderId(request.getFolderId(), normalizedFolder) : null;
     doc.setName(normalizeText(resolveDocumentName(request.getName(), normalizedUrl), MAX_NAME_LENGTH));
     doc.setFolderId(resolvedFolderId);
     doc.setFolder(resolveFolderName(resolvedFolderId, normalizedFolder));
@@ -305,9 +314,7 @@ public class OaDocumentController {
       return Result.ok(0);
     }
     Long orgId = AuthContext.getOrgId();
-    List<OaDocument> docs = documentMapper.selectList(Wrappers.lambdaQuery(OaDocument.class)
-        .eq(OaDocument::getIsDeleted, 0)
-        .eq(orgId != null, OaDocument::getOrgId, orgId)
+    List<OaDocument> docs = documentMapper.selectList(documentQuery(orgId)
         .in(OaDocument::getId, ids));
     for (OaDocument doc : docs) {
       doc.setIsDeleted(1);
@@ -327,23 +334,19 @@ public class OaDocumentController {
     Long staffId = AuthContext.getStaffId();
     String normalizedFolderVisibility = normalizeFolderVisibilityFilter(folderVisibility);
     String normalizedRegionCode = normalizeOptionalText(regionCode);
-    List<Long> accessibleFolderIds = listAccessibleFolderIds(orgId, staffId, normalizedFolderVisibility, normalizedRegionCode);
-    if (folderId != null && !accessibleFolderIds.contains(folderId)) {
+    boolean folderIdSupported = hasDocumentFolderIdColumn();
+    List<Long> accessibleFolderIds =
+        listAccessibleFolderIds(orgId, staffId, normalizedFolderVisibility, normalizedRegionCode);
+    if (folderIdSupported && folderId != null && !accessibleFolderIds.contains(folderId)) {
       return csvResponse("oa-document",
           List.of("ID", "文件名", "目录", "URL", "大小(B)", "上传人", "上传时间", "备注"),
           List.of());
     }
-    var wrapper = Wrappers.lambdaQuery(OaDocument.class)
-        .eq(OaDocument::getIsDeleted, 0)
-        .eq(orgId != null, OaDocument::getOrgId, orgId)
-        .eq(folderId != null, OaDocument::getFolderId, folderId)
-        .eq(folderId == null && folder != null && !folder.isBlank(), OaDocument::getFolder, folder.trim());
-    if (folderId == null && (folder == null || folder.isBlank())) {
-      if (accessibleFolderIds.isEmpty()) {
-        wrapper.isNull(OaDocument::getFolderId);
-      } else {
-        wrapper.and(w -> w.isNull(OaDocument::getFolderId).or().in(OaDocument::getFolderId, accessibleFolderIds));
-      }
+    var wrapper = documentQuery(orgId)
+        .eq(folderIdSupported && folderId != null, OaDocument::getFolderId, folderId)
+        .eq((!folderIdSupported || folderId == null) && folder != null && !folder.isBlank(), OaDocument::getFolder, folder.trim());
+    if (folderIdSupported && folderId == null && (folder == null || folder.isBlank()) && !accessibleFolderIds.isEmpty()) {
+      wrapper.and(w -> w.isNull(OaDocument::getFolderId).or().in(OaDocument::getFolderId, accessibleFolderIds));
     }
     wrapper.orderByDesc(OaDocument::getUploadedAt).orderByDesc(OaDocument::getCreateTime);
     if (keyword != null && !keyword.isBlank()) {
@@ -377,23 +380,20 @@ public class OaDocumentController {
 
   private OaDocument findAccessibleDocument(Long id) {
     Long orgId = AuthContext.getOrgId();
-    return documentMapper.selectOne(Wrappers.lambdaQuery(OaDocument.class)
+    return documentMapper.selectOne(documentQuery(orgId)
         .eq(OaDocument::getId, id)
         .eq(OaDocument::getIsDeleted, 0)
-        .eq(orgId != null, OaDocument::getOrgId, orgId)
         .last("LIMIT 1"));
   }
 
   private OaDocumentFolder findAccessibleFolder(Long id) {
+    if (!hasDocumentFolderTable()) {
+      return null;
+    }
     Long orgId = AuthContext.getOrgId();
     Long staffId = AuthContext.getStaffId();
-    return folderMapper.selectOne(Wrappers.lambdaQuery(OaDocumentFolder.class)
+    return folderMapper.selectOne(accessibleFolderQuery(orgId, staffId)
         .eq(OaDocumentFolder::getId, id)
-        .eq(OaDocumentFolder::getIsDeleted, 0)
-        .eq(orgId != null, OaDocumentFolder::getOrgId, orgId)
-        .and(w -> w.eq(OaDocumentFolder::getVisibility, FOLDER_VISIBILITY_PUBLIC)
-            .or().isNull(OaDocumentFolder::getVisibility)
-            .or().eq(staffId != null, OaDocumentFolder::getCreatedBy, staffId))
         .last("LIMIT 1"));
   }
 
@@ -449,6 +449,9 @@ public class OaDocumentController {
   }
 
   private Long resolveFolderId(Long folderId, String folderName) {
+    if (!hasDocumentFolderTable()) {
+      return null;
+    }
     if (folderId != null && folderId > 0) {
       OaDocumentFolder folder = findAccessibleFolder(folderId);
       if (folder == null) {
@@ -464,13 +467,8 @@ public class OaDocumentController {
     }
     Long orgId = AuthContext.getOrgId();
     Long staffId = AuthContext.getStaffId();
-    OaDocumentFolder sameName = folderMapper.selectOne(Wrappers.lambdaQuery(OaDocumentFolder.class)
-        .eq(OaDocumentFolder::getIsDeleted, 0)
-        .eq(orgId != null, OaDocumentFolder::getOrgId, orgId)
+    OaDocumentFolder sameName = folderMapper.selectOne(accessibleFolderQuery(orgId, staffId)
         .eq(OaDocumentFolder::getName, folderName.trim())
-        .and(w -> w.eq(OaDocumentFolder::getVisibility, FOLDER_VISIBILITY_PUBLIC)
-            .or().isNull(OaDocumentFolder::getVisibility)
-            .or().eq(staffId != null, OaDocumentFolder::getCreatedBy, staffId))
         .last("LIMIT 1"));
     if (sameName == null || FOLDER_STATUS_DISABLED.equals(sameName.getStatus())) {
       return null;
@@ -533,9 +531,8 @@ public class OaDocumentController {
 
   private void ensureFolderNameUnique(Long selfId, Long parentId, String name) {
     Long orgId = AuthContext.getOrgId();
-    OaDocumentFolder sameName = folderMapper.selectOne(Wrappers.lambdaQuery(OaDocumentFolder.class)
+    OaDocumentFolder sameName = folderMapper.selectOne(folderQuery(orgId)
         .eq(OaDocumentFolder::getIsDeleted, 0)
-        .eq(orgId != null, OaDocumentFolder::getOrgId, orgId)
         .eq(OaDocumentFolder::getParentId, parentId == null ? 0L : parentId)
         .eq(OaDocumentFolder::getName, name)
         .last("LIMIT 1"));
@@ -596,18 +593,144 @@ public class OaDocumentController {
   }
 
   private List<Long> listAccessibleFolderIds(Long orgId, Long staffId, String visibility, String regionCode) {
-    return folderMapper.selectList(Wrappers.lambdaQuery(OaDocumentFolder.class)
-            .eq(OaDocumentFolder::getIsDeleted, 0)
-            .eq(orgId != null, OaDocumentFolder::getOrgId, orgId)
-            .eq(visibility != null, OaDocumentFolder::getVisibility, visibility)
-            .like(regionCode != null && !regionCode.isBlank(), OaDocumentFolder::getRegionCode, regionCode)
-            .and(w -> w.eq(OaDocumentFolder::getVisibility, FOLDER_VISIBILITY_PUBLIC)
-                .or().isNull(OaDocumentFolder::getVisibility)
-                .or().eq(staffId != null, OaDocumentFolder::getCreatedBy, staffId)))
+    if (!hasDocumentFolderTable() || !hasDocumentFolderIdColumn()) {
+      return List.of();
+    }
+    return folderMapper.selectList(accessibleFolderQuery(orgId, staffId)
+            .eq(hasFolderVisibilityColumn() && visibility != null, OaDocumentFolder::getVisibility, visibility)
+            .like(hasFolderRegionCodeColumn() && regionCode != null && !regionCode.isBlank(), OaDocumentFolder::getRegionCode, regionCode))
         .stream()
         .map(OaDocumentFolder::getId)
         .filter(Objects::nonNull)
         .toList();
+  }
+
+  private void ensureFolderLibraryEnabled() {
+    if (!hasDocumentFolderTable() || !hasFolderVisibilityColumn()) {
+      throw new IllegalArgumentException("当前数据库未启用完整档案夹功能，请先执行 OA 文档目录迁移");
+    }
+  }
+
+  private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OaDocument> documentQuery(Long orgId) {
+    var wrapper = Wrappers.lambdaQuery(OaDocument.class)
+        .select(documentSelectColumns())
+        .eq(OaDocument::getIsDeleted, 0)
+        .eq(orgId != null, OaDocument::getOrgId, orgId);
+    return wrapper;
+  }
+
+  private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OaDocumentFolder> folderQuery(Long orgId) {
+    return Wrappers.lambdaQuery(OaDocumentFolder.class)
+        .select(folderSelectColumns())
+        .eq(OaDocumentFolder::getIsDeleted, 0)
+        .eq(orgId != null, OaDocumentFolder::getOrgId, orgId);
+  }
+
+  private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OaDocumentFolder> accessibleFolderQuery(
+      Long orgId, Long staffId) {
+    var wrapper = folderQuery(orgId);
+    if (hasFolderVisibilityColumn()) {
+      wrapper.and(w -> w.eq(OaDocumentFolder::getVisibility, FOLDER_VISIBILITY_PUBLIC)
+          .or().isNull(OaDocumentFolder::getVisibility)
+          .or().eq(staffId != null, OaDocumentFolder::getCreatedBy, staffId));
+    }
+    return wrapper;
+  }
+
+  @SuppressWarnings("unchecked")
+  private SFunction<OaDocument, ?>[] documentSelectColumns() {
+    List<SFunction<OaDocument, ?>> columns = new ArrayList<>();
+    columns.add(OaDocument::getId);
+    columns.add(OaDocument::getTenantId);
+    columns.add(OaDocument::getOrgId);
+    columns.add(OaDocument::getName);
+    columns.add(OaDocument::getFolder);
+    if (hasDocumentFolderIdColumn()) {
+      columns.add(OaDocument::getFolderId);
+    }
+    columns.add(OaDocument::getUrl);
+    columns.add(OaDocument::getSizeBytes);
+    columns.add(OaDocument::getUploaderId);
+    columns.add(OaDocument::getUploaderName);
+    columns.add(OaDocument::getUploadedAt);
+    columns.add(OaDocument::getRemark);
+    columns.add(OaDocument::getCreatedBy);
+    columns.add(OaDocument::getCreateTime);
+    columns.add(OaDocument::getUpdateTime);
+    columns.add(OaDocument::getIsDeleted);
+    return columns.toArray(new SFunction[0]);
+  }
+
+  @SuppressWarnings("unchecked")
+  private SFunction<OaDocumentFolder, ?>[] folderSelectColumns() {
+    List<SFunction<OaDocumentFolder, ?>> columns = new ArrayList<>();
+    columns.add(OaDocumentFolder::getId);
+    columns.add(OaDocumentFolder::getTenantId);
+    columns.add(OaDocumentFolder::getOrgId);
+    columns.add(OaDocumentFolder::getName);
+    columns.add(OaDocumentFolder::getParentId);
+    columns.add(OaDocumentFolder::getSortNo);
+    columns.add(OaDocumentFolder::getStatus);
+    if (hasFolderVisibilityColumn()) {
+      columns.add(OaDocumentFolder::getVisibility);
+    }
+    if (hasFolderRegionCodeColumn()) {
+      columns.add(OaDocumentFolder::getRegionCode);
+    }
+    columns.add(OaDocumentFolder::getRemark);
+    columns.add(OaDocumentFolder::getCreatedBy);
+    columns.add(OaDocumentFolder::getCreateTime);
+    columns.add(OaDocumentFolder::getUpdateTime);
+    columns.add(OaDocumentFolder::getIsDeleted);
+    return columns.toArray(new SFunction[0]);
+  }
+
+  private boolean hasDocumentFolderTable() {
+    return hasTable("oa_document_folder");
+  }
+
+  private boolean hasDocumentFolderIdColumn() {
+    return hasColumn("oa_document", "folder_id");
+  }
+
+  private boolean hasFolderVisibilityColumn() {
+    return hasColumn("oa_document_folder", "visibility");
+  }
+
+  private boolean hasFolderRegionCodeColumn() {
+    return hasColumn("oa_document_folder", "region_code");
+  }
+
+  private boolean hasTable(String tableName) {
+    return schemaCapabilityCache.computeIfAbsent("table:" + tableName, key -> {
+      Integer count = jdbcTemplate.queryForObject(
+          """
+              SELECT COUNT(1)
+              FROM information_schema.TABLES
+              WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = ?
+              """,
+          Integer.class,
+          tableName);
+      return count != null && count > 0;
+    });
+  }
+
+  private boolean hasColumn(String tableName, String columnName) {
+    return schemaCapabilityCache.computeIfAbsent("column:" + tableName + ":" + columnName, key -> {
+      Integer count = jdbcTemplate.queryForObject(
+          """
+              SELECT COUNT(1)
+              FROM information_schema.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = ?
+                AND COLUMN_NAME = ?
+              """,
+          Integer.class,
+          tableName,
+          columnName);
+      return count != null && count > 0;
+    });
   }
 
   private String safe(Object value) {

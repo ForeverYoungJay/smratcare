@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="老人管理" subTitle="档案维护与床位绑定">
+  <PageContainer title="老人管理" subTitle="档案维护与床位管理">
     <SearchForm :model="query" @search="onSearch" @reset="onReset">
       <a-form-item label="关键字">
         <ElderNameAutocomplete v-model:value="query.keyword" placeholder="姓名(编号)" width="220px" />
@@ -35,7 +35,7 @@
             <a @click="openDrawer(record)">编辑</a>
             <a @click="openDetail(record)">详情</a>
             <a @click="openAssign(record)">分配床位</a>
-            <a @click="openUnbind(record)">退住/解绑</a>
+            <a @click="openUnbind(record)">解绑床位</a>
           </a-space>
         </template>
       </template>
@@ -87,17 +87,17 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-model:open="unbindOpen" title="退住/解绑" @ok="submitUnbind">
+    <a-modal v-model:open="unbindOpen" title="解绑床位" @ok="submitUnbind">
       <a-form layout="vertical">
         <a-form-item label="结束日期">
           <a-date-picker v-model:value="unbindForm.endDate" value-format="YYYY-MM-DD" style="width: 100%" />
         </a-form-item>
         <a-form-item label="原因">
-          <a-select v-model:value="unbindForm.reason" allow-clear placeholder="请选择退住费用设置">
-            <a-select-option v-for="item in dischargeFeeConfigOptions" :key="item.value" :value="item.value">
-              {{ item.label }}
-            </a-select-option>
-          </a-select>
+          <a-input
+            v-model:value="unbindForm.reason"
+            allow-clear
+            placeholder="请输入解绑原因，如：换床、床位维护"
+          />
         </a-form-item>
       </a-form>
     </a-modal>
@@ -112,10 +112,9 @@ import PageContainer from '../components/PageContainer.vue'
 import SearchForm from '../components/SearchForm.vue'
 import DataTable from '../components/DataTable.vue'
 import ElderNameAutocomplete from '../components/ElderNameAutocomplete.vue'
-import { getBaseConfigItemList } from '../api/baseConfig'
 import { getElderPage, createElder, updateElder, assignBed, unbindBed } from '../api/elder'
 import { getBedList } from '../api/bed'
-import type { BaseConfigItem, ElderItem, PageResult, BedItem, Id } from '../types/api'
+import type { ElderItem, PageResult, BedItem, Id } from '../types/api'
 
 const query = reactive({ keyword: undefined as string | undefined, status: undefined as number | undefined, pageNo: 1, pageSize: 10 })
 const list = ref<ElderItem[]>([])
@@ -142,7 +141,6 @@ const current = ref<ElderItem | null>(null)
 const beds = ref<BedItem[]>([])
 const assignForm = reactive<{ elderId?: Id; bedId?: Id; startDate?: string }>({})
 const unbindForm = reactive<{ elderId?: Id; endDate?: string; reason?: string }>({})
-const dischargeFeeConfigOptions = ref<Array<{ label: string; value: string }>>([])
 
 const rules = {
   fullName: [{ required: true, message: '请输入姓名' }],
@@ -163,18 +161,6 @@ const bedOptions = computed(() =>
 )
 
 const drawerTitle = computed(() => (form.id ? '编辑老人' : '新增老人'))
-
-async function loadDischargeFeeConfigOptions() {
-  try {
-    const options = await getBaseConfigItemList({ configGroup: 'DISCHARGE_FEE_CONFIG', status: 1 })
-    dischargeFeeConfigOptions.value = (options || []).map((item: BaseConfigItem) => ({
-      label: item.itemName,
-      value: item.itemName
-    }))
-  } catch {
-    dischargeFeeConfigOptions.value = []
-  }
-}
 
 async function load() {
   loading.value = true
@@ -297,11 +283,11 @@ async function submitUnbind() {
   if (!unbindForm.elderId) return
   try {
     await unbindBed(unbindForm.elderId, unbindForm.endDate, unbindForm.reason)
-    message.success('已退住/解绑')
+    message.success('已解绑床位')
     unbindOpen.value = false
     load()
   } catch (err: any) {
-    message.error(err?.response?.data?.message || '解绑失败')
+    message.error(err?.response?.data?.message || '床位解绑失败')
   }
 }
 
@@ -312,6 +298,5 @@ function statusText(status?: number) {
   return '-'
 }
 
-loadDischargeFeeConfigOptions()
 load()
 </script>

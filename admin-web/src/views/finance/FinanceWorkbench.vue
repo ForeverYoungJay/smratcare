@@ -3,9 +3,42 @@
     <a-card class="card-elevated" :bordered="false" style="margin-bottom: 16px;">
       <a-space wrap>
         <a-tag color="blue">业务日期 {{ overview?.bizDate || '-' }}</a-tag>
-        <a-tag color="purple">工作台默认入口</a-tag>
+        <a-tag color="purple">{{ roleTone }}</a-tag>
         <a-button type="primary" @click="loadData">刷新数据</a-button>
       </a-space>
+    </a-card>
+
+    <a-card class="hero-board card-elevated" :bordered="false" style="margin-bottom: 16px;">
+      <div class="hero-board__main">
+        <div class="hero-board__eyebrow">Finance Operations Desk</div>
+        <h2>{{ roleHeadline }}</h2>
+        <p>{{ roleHint }}</p>
+        <a-space class="hero-search" wrap>
+          <a-input
+            v-model:value="searchKeyword"
+            allow-clear
+            placeholder="搜索长者 / 账单号 / 外部流水号 / 合同号"
+            style="width: 320px"
+            @pressEnter="openFinanceSearch"
+          />
+          <a-button @click="openFinanceSearch">财务搜索</a-button>
+        </a-space>
+        <a-space wrap>
+          <a-button type="primary" @click="go('/finance/payments/cashier-desk')">进入收银台</a-button>
+          <a-button @click="go('/finance/reconcile/issue-center')">异常修复中心</a-button>
+          <a-button @click="go('/finance/bills/follow-up')">欠费催缴跟进</a-button>
+          <a-button v-if="isManagerOrAbove" @click="go('/finance/reconcile/month-close')">月结进度</a-button>
+        </a-space>
+      </div>
+      <div class="hero-board__panel">
+        <div class="hero-board__panel-title">当前角色关注项</div>
+        <div class="hero-focus-list">
+          <div v-for="item in roleFocusItems" :key="item.title" class="hero-focus-item">
+            <div class="hero-focus-item__title">{{ item.title }}</div>
+            <div class="hero-focus-item__desc">{{ item.desc }}</div>
+          </div>
+        </div>
+      </div>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-bottom: 16px;">
@@ -24,7 +57,7 @@
             <a-tag color="purple">收款 {{ ledgerHealth?.paymentCount || 0 }}</a-tag>
             <a-tag color="cyan">流水 {{ ledgerHealth?.consumptionCount || 0 }}</a-tag>
             <a-button @click="go('/finance/reconcile/ledger-health')">巡检明细</a-button>
-            <a-button type="primary" ghost @click="go('/finance/reconcile/center?filter=unmatched')">去处理异常</a-button>
+            <a-button type="primary" ghost @click="go('/finance/reconcile/issue-center')">去处理异常</a-button>
           </a-space>
         </a-col>
         <a-col :span="24" v-if="(ledgerHealth?.issues || []).length">
@@ -131,8 +164,9 @@
             <a-divider />
             <a-space wrap>
               <a-button type="link" @click="go('/finance/bills/in-resident?filter=overdue')">欠费列表</a-button>
+              <a-button type="link" @click="go('/finance/bills/follow-up?riskLevel=HIGH')">高风险催缴</a-button>
               <a-button type="link" @click="go('/finance/accounts/list?filter=low_balance')">余额预警</a-button>
-              <a-button type="link" @click="go('/finance/bills/auto-deduct?filter=active')">自动催缴</a-button>
+              <a-button type="link" @click="go('/finance/bills/follow-up?stage=FOLLOW_UP')">自动催缴</a-button>
             </a-space>
           </a-card>
         </a-col>
@@ -273,7 +307,7 @@
               <a-col :span="8"><a-statistic title="发票未关联账单" :value="overview?.reconcile?.invoiceUnlinkedCount || 0" /></a-col>
             </a-row>
             <a-space wrap style="margin-top: 8px;">
-              <a-button type="link" @click="go('/finance/reconcile/center?filter=unmatched')">对账中心</a-button>
+              <a-button type="link" @click="go('/finance/reconcile/issue-center?sourceModule=RECONCILE')">异常修复中心</a-button>
               <a-button type="link" @click="go('/finance/reconcile/invoice?filter=unlinked')">发票对账</a-button>
             </a-space>
           </a-card>
@@ -294,7 +328,7 @@
             </div>
             <a-space wrap>
               <a-button
-                v-for="item in (overview?.quickEntries || [])"
+                v-for="item in visibleQuickEntries"
                 :key="item.key"
                 type="primary"
                 ghost
@@ -317,10 +351,12 @@ import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
 import { getFinanceConfigChangeLogPage, getFinanceLedgerHealth, getFinanceMasterDataOverview, getFinanceOpsInsights, getFinanceWorkbenchOverview } from '../../api/finance'
+import { useUserStore } from '../../stores/user'
 import type {
   FinanceConfigChangeLogItem,
   FinanceLedgerHealth,
   FinanceLedgerHealthIssueItem,
+  FinanceQuickEntry,
   FinanceMasterDataOverview,
   FinanceOpsInsight,
   FinanceRoomRanking,
@@ -329,8 +365,10 @@ import type {
 import { useECharts } from '../../plugins/echarts'
 
 const router = useRouter()
+const userStore = useUserStore()
 const loading = ref(false)
 const errorMessage = ref('')
+const searchKeyword = ref('')
 const overview = ref<FinanceWorkbenchOverview | null>(null)
 const masterOverview = ref<FinanceMasterDataOverview | null>(null)
 const latestConfigChange = ref<FinanceConfigChangeLogItem | null>(null)
@@ -339,10 +377,42 @@ const opsInsight = ref<FinanceOpsInsight | null>(null)
 
 const { chartRef: revenueChartRef, setOption: setRevenueOption } = useECharts()
 
+const userRoles = computed(() => userStore.roles || [])
+const isManagerOrAbove = computed(() => userRoles.value.some(role => ['FINANCE_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'].includes(role)))
+const roleTone = computed(() => isManagerOrAbove.value ? '主管/管理视角' : '一线收银视角')
+const roleHeadline = computed(() => isManagerOrAbove.value ? '先看风险、审批、催缴和月结推进。' : '先把收费、票据、退款和交班动作做顺。')
+const roleHint = computed(() => isManagerOrAbove.value
+  ? '工作台优先暴露异常修复、催缴跟进和月结进度，便于主管快速判断今天哪些链路会拖慢结账。'
+  : '工作台优先暴露收银台、票据处理和退款修正，减少一线财务在收费链路里的跳转次数。')
+const roleFocusItems = computed(() => isManagerOrAbove.value
+  ? [
+      { title: '异常修复', desc: '一致性巡检、对账和催缴异常统一进入一个修复池。' },
+      { title: '欠费推进', desc: '按风险和续约到期状态排序，先盯住高风险欠费。' },
+      { title: '月结收口', desc: '关账前直接看哪一步还在阻塞。' }
+    ]
+  : [
+      { title: '收银台', desc: '同页看当日收款、票据待办和退款修正。' },
+      { title: '票据处理', desc: '交班前先补齐收据和发票关联。' },
+      { title: '异常回捞', desc: '重复收款、作废账单和修正记录当天闭环。' }
+    ])
+const visibleQuickEntries = computed(() => {
+  const entries = overview.value?.quickEntries || []
+  const preferredKeys = isManagerOrAbove.value
+    ? ['issue_center', 'collection_follow_up', 'month_close', 'invoice_receipt', 'fee_adjustment', 'payment_register']
+    : ['cashier_desk', 'payment_register', 'invoice_receipt', 'fee_adjustment', 'prepaid_recharge', 'issue_center']
+  const score = new Map(preferredKeys.map((key, index) => [key, index]))
+  return [...entries]
+    .filter((item: FinanceQuickEntry) => isManagerOrAbove.value || item.key !== 'month_close')
+    .sort((a: FinanceQuickEntry, b: FinanceQuickEntry) => (score.get(a.key) ?? 99) - (score.get(b.key) ?? 99))
+})
+
 const pendingList = computed(() => [
   { label: '待审批减免单', value: overview.value?.pending?.pendingDiscountCount || 0 },
   { label: '待审批退款', value: overview.value?.pending?.pendingRefundCount || 0 },
-  { label: '待审核退住结算', value: overview.value?.pending?.pendingDischargeSettlementCount || 0 }
+  { label: '待审核退住结算', value: overview.value?.pending?.pendingDischargeSettlementCount || 0 },
+  { label: '异常工单待处理', value: overview.value?.pending?.issueTodoCount || 0 },
+  { label: '催缴提醒到期', value: overview.value?.pending?.collectionReminderCount || 0 },
+  { label: '当前已锁账月', value: overview.value?.pending?.lockedMonthCount || 0 }
 ])
 
 const topFloorText = computed(() => (overview.value?.roomOps?.floorTop || [])
@@ -378,6 +448,15 @@ function go(path: string) {
   router.push(path)
 }
 
+function openFinanceSearch() {
+  const keyword = searchKeyword.value.trim()
+  if (!keyword) {
+    message.warning('请输入搜索关键词')
+    return
+  }
+  go(`/finance/search?keyword=${encodeURIComponent(keyword)}`)
+}
+
 function openTopRoom() {
   const room = overview.value?.roomOps?.roomTop10?.[0]
   if (!room) {
@@ -406,7 +485,7 @@ function openLedgerIssue(item: FinanceLedgerHealthIssueItem) {
     go(`/finance/bill/${item.billId}`)
     return
   }
-  go('/finance/reconcile/center?filter=unmatched')
+  go('/finance/reconcile/issue-center')
 }
 
 function renderRevenueChart() {
@@ -454,8 +533,84 @@ onMounted(loadData)
 </script>
 
 <style scoped>
+.hero-board {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: 1.15fr 0.85fr;
+  background:
+    radial-gradient(circle at top left, rgba(34, 197, 94, 0.22), transparent 30%),
+    linear-gradient(135deg, #111827 0%, #1f2937 48%, #0f766e 100%);
+  color: #fff;
+}
+
+.hero-board__eyebrow {
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.hero-board h2 {
+  margin: 10px 0;
+  font-size: 28px;
+  line-height: 1.18;
+}
+
+.hero-board p {
+  margin: 0 0 16px;
+  max-width: 580px;
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.hero-search {
+  margin-bottom: 14px;
+}
+
+.hero-board__panel {
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+}
+
+.hero-board__panel-title {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.hero-focus-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.hero-focus-item {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.hero-focus-item__title {
+  font-weight: 700;
+  color: #fff;
+}
+
+.hero-focus-item__desc {
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+}
+
 .config-change-tip {
   color: #64748b;
   margin-bottom: 10px;
+}
+
+@media (max-width: 1100px) {
+  .hero-board {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

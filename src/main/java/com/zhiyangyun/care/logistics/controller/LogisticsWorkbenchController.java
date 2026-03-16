@@ -460,7 +460,7 @@ public class LogisticsWorkbenchController {
     LogisticsMaintenanceTodoJobLog latestJobLog = logisticsMaintenanceTodoJobLogMapper.selectOne(
         Wrappers.lambdaQuery(LogisticsMaintenanceTodoJobLog.class)
             .eq(LogisticsMaintenanceTodoJobLog::getIsDeleted, 0)
-            .and(orgId != null, w -> w.eq(LogisticsMaintenanceTodoJobLog::getOrgId, orgId).or().isNull(LogisticsMaintenanceTodoJobLog::getOrgId))
+            .eq(orgId != null, LogisticsMaintenanceTodoJobLog::getOrgId, orgId)
             .orderByDesc(LogisticsMaintenanceTodoJobLog::getExecutedAt)
             .orderByDesc(LogisticsMaintenanceTodoJobLog::getCreateTime)
             .last("LIMIT 1"));
@@ -475,7 +475,7 @@ public class LogisticsWorkbenchController {
     response.setMaintenanceTodoFailedCount7d(logisticsMaintenanceTodoJobLogMapper.selectCount(
         Wrappers.lambdaQuery(LogisticsMaintenanceTodoJobLog.class)
             .eq(LogisticsMaintenanceTodoJobLog::getIsDeleted, 0)
-            .and(orgId != null, w -> w.eq(LogisticsMaintenanceTodoJobLog::getOrgId, orgId).or().isNull(LogisticsMaintenanceTodoJobLog::getOrgId))
+            .eq(orgId != null, LogisticsMaintenanceTodoJobLog::getOrgId, orgId)
             .eq(LogisticsMaintenanceTodoJobLog::getStatus, "FAILED")
             .ge(LogisticsMaintenanceTodoJobLog::getExecutedAt, now.minusDays(7))));
 

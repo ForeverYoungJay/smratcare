@@ -41,7 +41,7 @@ export async function exportCsvByRequest(path, params, fallbackFilename) {
     const contentDisposition = response.headers.get('content-disposition') || '';
     const filenameMatch = contentDisposition.match(/filename\*?=(?:UTF-8''|\"?)([^\";]+)/i);
     const filename = filenameMatch?.[1] ? decodeURIComponent(filenameMatch[1]) : (fallbackFilename || 'export.csv');
-    downloadBlob(ensureUtf8Bom(blob), filename);
+    downloadBlob(await ensureUtf8Bom(blob), filename);
 }
 function downloadBlob(blob, filename) {
     const link = document.createElement('a');
@@ -59,8 +59,12 @@ function escapeHtml(value) {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
 }
-function ensureUtf8Bom(blob) {
+async function ensureUtf8Bom(blob) {
     if (!/text\/csv|application\/csv|application\/octet-stream/i.test(blob.type || '')) {
+        return blob;
+    }
+    const header = new Uint8Array(await blob.slice(0, 3).arrayBuffer());
+    if (header.length >= 3 && header[0] === 0xef && header[1] === 0xbb && header[2] === 0xbf) {
         return blob;
     }
     return new Blob(['\uFEFF', blob], { type: blob.type || 'text/csv;charset=utf-8;' });

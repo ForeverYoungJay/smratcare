@@ -3,7 +3,7 @@
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-form">
         <a-form-item label="姓名">
-          <ElderNameAutocomplete v-model:value="query.fullName" placeholder="姓名(编号)" width="180px" :signed-only="true" @select="runSearch" />
+          <ElderNameAutocomplete v-model:value="query.fullName" placeholder="姓名(编号)" width="180px" @select="runSearch" />
         </a-form-item>
         <a-form-item label="身份证">
           <a-input v-model:value="query.idCardNo" placeholder="身份证号" allow-clear />
@@ -51,8 +51,7 @@
       </a-space>
       <div class="table-actions">
         <a-space>
-          <a-button type="primary" @click="goCreate">新增老人</a-button>
-          <a-button type="primary"  @click="goQuickArchiveCreate">档案一键生成（直办入住）</a-button>
+          <a-button type="primary" @click="goCreate">新建老人</a-button>
           <a-button @click="exportCsvData">导出CSV</a-button>
           <a-button :disabled="selectedCount !== 1" @click="goDetailSelected">详情</a-button>
           <a-button :disabled="selectedCount !== 1" @click="goEditSelected">编辑</a-button>
@@ -82,6 +81,9 @@
             <a-tag :color="lifecycleStageColor(resolveLifecycleStage(record))">
               {{ lifecycleStageLabel(resolveLifecycleStage(record)) }}
             </a-tag>
+          </template>
+          <template v-else-if="column.key === 'sourceType'">
+            <a-tag :color="sourceTypeColor(record.sourceType)">{{ sourceTypeText(record.sourceType) }}</a-tag>
           </template>
           <template v-else-if="column.key === 'action'">
             <a-space size="small">
@@ -199,6 +201,7 @@ const columns = [
   { title: '家庭地址', dataIndex: 'homeAddress', key: 'homeAddress', width: 220 },
   { title: '床位号', dataIndex: 'bedNo', key: 'bedNo', width: 120, sorter: true },
   { title: '护理等级', dataIndex: 'careLevel', key: 'careLevel', width: 120, sorter: true },
+  { title: '来源', dataIndex: 'sourceType', key: 'sourceType', width: 120 },
   { title: '履约阶段', dataIndex: 'lifecycleStage', key: 'lifecycleStage', width: 120 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 100, sorter: true },
   { title: '联动操作', key: 'action', width: 220 }
@@ -229,7 +232,7 @@ const elderFlowCurrentIndex = computed(() => {
   return 1
 })
 const elderFlowStageText = computed(() => {
-  if (!selectedRows.value.length) return '已过滤为签署后长者'
+  if (!selectedRows.value.length) return '展示历史入住补录与合同流程转入住长者'
   return statusText(selectedRows.value[0].status)
 })
 const elderFlowStageColor = computed(() => {
@@ -240,7 +243,7 @@ const elderFlowStageColor = computed(() => {
   return 'default'
 })
 const elderFlowSubject = computed(() => {
-  if (!selectedRows.value.length) return `当前列表共 ${total.value} 位，支持营销签约与直办入住双来源`
+  if (!selectedRows.value.length) return `当前列表共 ${total.value} 位，统一管理历史入住补录与合同流程转入住长者`
   const row = selectedRows.value[0]
   return `长者 ${row.fullName} / 床位 ${row.bedNo || '-'}`
 })
@@ -251,7 +254,7 @@ const elderFlowBlockers = computed(() => {
   return []
 })
 const elderFlowHint = computed(() => {
-  if (!selectedRows.value.length) return '支持档案一键生成并直办入住；可与营销合同流程并行'
+  if (!selectedRows.value.length) return '新建老人用于补录平台启用前已入住长者；新入住老人仍需先走合同流程'
   return '可执行换床、退住、家属绑定与二维码打印等在院操作'
 })
 const rowSelection = computed(() => ({
@@ -303,6 +306,18 @@ function statusTag(status?: number) {
   return 'default'
 }
 
+function sourceTypeText(value?: string) {
+  if (value === 'HISTORICAL_IMPORT') return '历史补录'
+  if (value === 'MARKETING_CONTRACT') return '合同流程'
+  return '未标记'
+}
+
+function sourceTypeColor(value?: string) {
+  if (value === 'HISTORICAL_IMPORT') return 'blue'
+  if (value === 'MARKETING_CONTRACT') return 'purple'
+  return 'default'
+}
+
 function resolveLifecycleStage(item: ElderItem) {
   const fallback = item.status === 1 || item.status === 2 || item.status === 3 ? 'SIGNED' : 'PENDING_ASSESSMENT'
   return normalizeLifecycleStage(item.lifecycleStage, item.lifecycleContractStatus || fallback)
@@ -323,7 +338,6 @@ async function fetchData() {
     const res: PageResult<ElderItem> = await getElderPage({
       pageNo: query.pageNo,
       pageSize: query.pageSize,
-      signedOnly: true,
       fullName: query.fullName,
       idCardNo: query.idCardNo,
       bedNo: query.bedNo,
@@ -532,10 +546,6 @@ function exportCsvData() {
 
 function goCreate() {
   router.push('/elder/create')
-}
-
-function goQuickArchiveCreate() {
-  router.push('/elder/create?quickArchive=1')
 }
 
 function goEdit(id: Id) {

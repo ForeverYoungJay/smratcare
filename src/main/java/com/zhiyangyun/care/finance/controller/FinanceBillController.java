@@ -18,6 +18,7 @@ import com.zhiyangyun.care.finance.model.FinanceBillBindElderRequest;
 import com.zhiyangyun.care.finance.model.FinanceBillDetailResponse;
 import com.zhiyangyun.care.finance.model.PaymentRecordItem;
 import com.zhiyangyun.care.finance.model.StoreOrderSummary;
+import com.zhiyangyun.care.finance.service.FinanceMonthLockService;
 import com.zhiyangyun.care.store.entity.StoreOrder;
 import com.zhiyangyun.care.store.mapper.StoreOrderMapper;
 import java.time.LocalDate;
@@ -36,6 +37,7 @@ import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/finance/bill")
+@PreAuthorize("hasAnyRole('FINANCE_EMPLOYEE','FINANCE_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
 public class FinanceBillController {
   private final BillService billService;
   private final BillMonthlyMapper billMonthlyMapper;
@@ -44,6 +46,7 @@ public class FinanceBillController {
   private final StoreOrderMapper storeOrderMapper;
   private final StaffMapper staffMapper;
   private final AuditLogService auditLogService;
+  private final FinanceMonthLockService financeMonthLockService;
 
   public FinanceBillController(
       BillService billService,
@@ -52,7 +55,8 @@ public class FinanceBillController {
       PaymentRecordMapper paymentRecordMapper,
       StoreOrderMapper storeOrderMapper,
       StaffMapper staffMapper,
-      AuditLogService auditLogService) {
+      AuditLogService auditLogService,
+      FinanceMonthLockService financeMonthLockService) {
     this.billService = billService;
     this.billMonthlyMapper = billMonthlyMapper;
     this.elderMapper = elderMapper;
@@ -60,6 +64,7 @@ public class FinanceBillController {
     this.storeOrderMapper = storeOrderMapper;
     this.staffMapper = staffMapper;
     this.auditLogService = auditLogService;
+    this.financeMonthLockService = financeMonthLockService;
   }
 
   @GetMapping("/{billId}")
@@ -175,6 +180,7 @@ public class FinanceBillController {
     if (monthly == null) {
       return Result.error(404, "账单不存在");
     }
+    financeMonthLockService.assertMonthEditable(orgId, YearMonth.parse(monthly.getBillMonth()), "修复账单");
     ElderProfile elder = elderMapper.selectOne(
         Wrappers.lambdaQuery(ElderProfile.class)
             .eq(ElderProfile::getId, request.getElderId())

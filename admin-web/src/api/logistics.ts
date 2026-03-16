@@ -4,6 +4,7 @@ import { exportCsvByRequest } from '../utils/export'
 import type {
   Id,
   LogisticsEquipmentArchive,
+  LogisticsEquipmentArchiveSummary,
   LogisticsMaintenanceTodoJobLog,
   LogisticsMaintenanceTodoJobLogOverview,
   LogisticsWorkbenchSummary,
@@ -18,6 +19,10 @@ export function getLogisticsWorkbenchSummary(params?: LogisticsWorkbenchSummaryR
 
 export function getLogisticsEquipmentPage(params: any) {
   return fetchPage<LogisticsEquipmentArchive>('/api/logistics/equipment/page', params)
+}
+
+export function getLogisticsEquipmentSummary(params: any) {
+  return request.get<LogisticsEquipmentArchiveSummary>('/api/logistics/equipment/summary', { params })
 }
 
 export function createLogisticsEquipment(data: Partial<LogisticsEquipmentArchive>) {

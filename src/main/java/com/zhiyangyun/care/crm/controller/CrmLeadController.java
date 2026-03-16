@@ -8,6 +8,7 @@ import com.zhiyangyun.care.crm.model.CrmLeadRequest;
 import com.zhiyangyun.care.crm.model.CrmLeadResponse;
 import com.zhiyangyun.care.crm.service.CrmLeadService;
 import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,6 +22,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/crm/leads")
 public class CrmLeadController {
+  private static final String CRM_LEAD_READ =
+      "hasAnyRole('STAFF','HR_EMPLOYEE','HR_MINISTER','MEDICAL_EMPLOYEE','MEDICAL_MINISTER',"
+          + "'NURSING_EMPLOYEE','NURSING_MINISTER','FINANCE_EMPLOYEE','FINANCE_MINISTER',"
+          + "'LOGISTICS_EMPLOYEE','LOGISTICS_MINISTER','MARKETING_EMPLOYEE','MARKETING_MINISTER',"
+          + "'DIRECTOR','SYS_ADMIN','ADMIN')";
+  private static final String CRM_LEAD_WRITE =
+      "hasAnyRole('MARKETING_EMPLOYEE','MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')";
   private final CrmLeadService leadService;
   private final AuditLogService auditLogService;
 
@@ -29,6 +37,7 @@ public class CrmLeadController {
     this.auditLogService = auditLogService;
   }
 
+  @PreAuthorize(CRM_LEAD_WRITE)
   @PostMapping
   public Result<CrmLeadResponse> create(@Valid @RequestBody CrmLeadRequest request) {
     Long tenantId = AuthContext.getOrgId();
@@ -41,6 +50,7 @@ public class CrmLeadController {
     return Result.ok(response);
   }
 
+  @PreAuthorize(CRM_LEAD_WRITE)
   @PutMapping("/{id}")
   public Result<CrmLeadResponse> update(@PathVariable Long id, @Valid @RequestBody CrmLeadRequest request) {
     Long tenantId = AuthContext.getOrgId();
@@ -54,6 +64,7 @@ public class CrmLeadController {
     return Result.ok(response);
   }
 
+  @PreAuthorize(CRM_LEAD_READ)
   @GetMapping("/{id}")
   public Result<CrmLeadResponse> get(@PathVariable Long id) {
     Long currentStaffId = AuthContext.getStaffId();
@@ -61,6 +72,7 @@ public class CrmLeadController {
     return Result.ok(leadService.get(id, AuthContext.getOrgId(), currentStaffId, adminView));
   }
 
+  @PreAuthorize(CRM_LEAD_READ)
   @GetMapping("/page")
   public Result<IPage<CrmLeadResponse>> page(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -100,6 +112,7 @@ public class CrmLeadController {
         followupDateFrom, followupDateTo, followupDueOnly));
   }
 
+  @PreAuthorize(CRM_LEAD_WRITE)
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
     Long tenantId = AuthContext.getOrgId();

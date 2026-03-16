@@ -450,6 +450,10 @@ async function loadOverview() {
       conversion,
       followupReport,
       callbackReport,
+      checkinCallbackReport,
+      trialCallbackReport,
+      dischargeCallbackReport,
+      scoreCallbackReport,
       channelReport,
       leadPage,
       contractPage,
@@ -460,6 +464,10 @@ async function loadOverview() {
       getMarketingConversionReport({ dateFrom: rangeStart, dateTo: rangeEnd }),
       getMarketingFollowupReport({ dateFrom: rangeStart, dateTo: rangeEnd }) as Promise<MarketingFollowupReport>,
       getMarketingCallbackReport({ pageNo: 1, pageSize: 200, dateFrom: rangeStart, dateTo: rangeEnd }),
+      getMarketingCallbackReport({ pageNo: 1, pageSize: 1, dateFrom: rangeStart, dateTo: rangeEnd, type: 'checkin' }),
+      getMarketingCallbackReport({ pageNo: 1, pageSize: 1, dateFrom: rangeStart, dateTo: rangeEnd, type: 'trial' }),
+      getMarketingCallbackReport({ pageNo: 1, pageSize: 1, dateFrom: rangeStart, dateTo: rangeEnd, type: 'discharge' }),
+      getMarketingCallbackReport({ pageNo: 1, pageSize: 500, dateFrom: rangeStart, dateTo: rangeEnd, type: 'score' }),
       getMarketingChannelReport({ dateFrom: rangeStart, dateTo: rangeEnd }) as Promise<MarketingChannelReportItem[]>,
       getLeadPage({ pageNo: 1, pageSize: 300 }),
       getContractPage({ pageNo: 1, pageSize: 300 }),
@@ -500,13 +508,16 @@ async function loadOverview() {
     const diff = dayjs(item.contractExpiryDate).diff(dayjs(today), 'day')
     return diff >= 0 && diff <= 30
   }).length
-  contract.changePendingCount = contracts.filter((item) => String(item.status || '') === 'PENDING_APPROVAL').length
+  contract.changePendingCount = contracts.filter((item) => String(item.changeWorkflowStatus || '') === 'PENDING_APPROVAL').length
   contract.monthAmount = contracts.reduce((acc, item) => acc + Number(item.amount || item.contractAmount || 0), 0)
 
-  callback.checkinCount = callbackReport.todayDue || 0
-  callback.trialCount = leads.filter((item) => String(item.customerTag || '').includes('试住')).length
-  callback.dischargeCount = leads.filter((item) => String(item.customerTag || '').includes('退住')).length
-  callback.score = 4.5
+  callback.checkinCount = checkinCallbackReport.total || 0
+  callback.trialCount = trialCallbackReport.total || 0
+  callback.dischargeCount = dischargeCallbackReport.total || 0
+  const scoreRows = scoreCallbackReport.records || []
+  callback.score = scoreRows.length
+    ? Number((scoreRows.reduce((acc, item) => acc + Number(item.score || 0), 0) / scoreRows.length).toFixed(1))
+    : 0
 
   const marketerDealMap = new Map<string, { count: number; amount: number }>()
   contracts.forEach((item) => {

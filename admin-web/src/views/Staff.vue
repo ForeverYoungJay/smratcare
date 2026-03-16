@@ -44,6 +44,14 @@
       :message="`当前仅显示监管链异常员工（${displayRows.length}）`"
       description="规则：员工→本部门部长；部长→院长/SYS_ADMIN；间接领导→院长/SYS_ADMIN"
     />
+    <a-alert
+      v-if="String(route.query.autoOpen || '') === '1' && route.query.staffId"
+      type="info"
+      show-icon
+      style="margin-bottom: 10px;"
+      message="当前来自新增人员流程"
+      description="这里继续补充分配账号、领导链和角色。保存后可返回档案中心继续处理。"
+    />
 
     <DataTable
       rowKey="id"
@@ -182,7 +190,7 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../components/PageContainer.vue'
 import SearchForm from '../components/SearchForm.vue'
 import DataTable from '../components/DataTable.vue'
-import { getStaffPage, createStaff, updateStaff, updateStaffRoles, getStaffSupervisorAnomalies } from '../api/staff'
+import { getStaff, getStaffPage, createStaff, updateStaff, updateStaffRoles, getStaffSupervisorAnomalies } from '../api/staff'
 import { getRolePage } from '../api/role'
 import { getStaffRoleAssignments } from '../api/rbac'
 import { useDepartmentOptions } from '../composables/useDepartmentOptions'
@@ -449,6 +457,17 @@ function openDrawer(record?: StaffItem) {
   drawerOpen.value = true
 }
 
+function consumeAutoOpenQuery() {
+  if (String(route.query.autoOpen || '') !== '1') return
+  router.replace({
+    query: {
+      ...route.query,
+      autoOpen: undefined,
+      from: undefined
+    }
+  })
+}
+
 function applySupervisorRecommendation() {
   if (!form.id && !form.departmentId) {
     message.info('请先选择部门后再推荐领导')
@@ -542,6 +561,19 @@ async function submit() {
   }
 }
 
+async function maybeAutoOpenFromRoute() {
+  const staffId = String(route.query.staffId || '').trim()
+  if (String(route.query.autoOpen || '') !== '1' || !staffId) return
+  try {
+    const detail = await getStaff(staffId)
+    openDrawer(detail)
+  } catch {
+    // ignore
+  } finally {
+    consumeAutoOpenQuery()
+  }
+}
+
 function openRole(record: StaffItem) {
   roleForm.staffId = record.id
   roleForm.roleIds = []
@@ -593,8 +625,16 @@ watch(
   }
 )
 
+watch(
+  () => [route.query.staffId, route.query.autoOpen],
+  () => {
+    maybeAutoOpenFromRoute().catch(() => {})
+  }
+)
+
 syncQueryFromRoute()
 fetchData()
+maybeAutoOpenFromRoute().catch(() => {})
 
 useLiveSyncRefresh({
   topics: ['system', 'hr', 'oa'],

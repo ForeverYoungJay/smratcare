@@ -42,6 +42,8 @@ public class MaintenanceController {
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String keyword,
+      @RequestParam(required = false, defaultValue = "false") boolean overdueOnly,
+      @RequestParam(required = false, defaultValue = "2") Integer overdueDays,
       @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
       @RequestParam(required = false) LocalDate dateFrom,
       @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
@@ -63,6 +65,11 @@ public class MaintenanceController {
     if (dateTo != null) {
       wrapper.lt(MaintenanceRequest::getReportedAt, dateTo.plusDays(1).atStartOfDay());
     }
+    if (overdueOnly) {
+      int effectiveOverdueDays = Math.max(1, overdueDays == null ? 2 : overdueDays);
+      wrapper.in(MaintenanceRequest::getStatus, java.util.List.of("OPEN", "PROCESSING"))
+          .lt(MaintenanceRequest::getReportedAt, LocalDateTime.now().minusDays(effectiveOverdueDays));
+    }
     wrapper.orderByDesc(MaintenanceRequest::getReportedAt);
     return Result.ok(requestMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
   }
@@ -74,7 +81,7 @@ public class MaintenanceController {
     entity.setTenantId(orgId);
     entity.setOrgId(orgId);
     entity.setRoomId(request.getRoomId());
-    entity.setRoomNo(resolveRoomNo(request.getRoomId()));
+    entity.setRoomNo(resolveRoomNo(orgId, request.getRoomId()));
     entity.setReporterName(request.getReporterName());
     entity.setAssigneeName(request.getAssigneeName());
     entity.setIssueType(request.getIssueType());
@@ -93,12 +100,13 @@ public class MaintenanceController {
 
   @PutMapping("/{id}")
   public Result<MaintenanceRequest> update(@PathVariable Long id, @Valid @RequestBody MaintenanceRequestCreateRequest request) {
-    MaintenanceRequest entity = requestMapper.selectById(id);
+    Long orgId = AuthContext.getOrgId();
+    MaintenanceRequest entity = getRequestInOrg(id, orgId);
     if (entity == null) {
       return Result.ok(null);
     }
     entity.setRoomId(request.getRoomId());
-    entity.setRoomNo(resolveRoomNo(request.getRoomId()));
+    entity.setRoomNo(resolveRoomNo(orgId, request.getRoomId()));
     entity.setReporterName(request.getReporterName());
     entity.setAssigneeName(request.getAssigneeName());
     entity.setIssueType(request.getIssueType());
@@ -116,7 +124,7 @@ public class MaintenanceController {
 
   @PutMapping("/{id}/complete")
   public Result<MaintenanceRequest> complete(@PathVariable Long id) {
-    MaintenanceRequest entity = requestMapper.selectById(id);
+    MaintenanceRequest entity = getRequestInOrg(id, AuthContext.getOrgId());
     if (entity == null) {
       return Result.ok(null);
     }
@@ -128,7 +136,7 @@ public class MaintenanceController {
 
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
-    MaintenanceRequest entity = requestMapper.selectById(id);
+    MaintenanceRequest entity = getRequestInOrg(id, AuthContext.getOrgId());
     if (entity != null) {
       entity.setIsDeleted(1);
       requestMapper.updateById(entity);
@@ -136,11 +144,26 @@ public class MaintenanceController {
     return Result.ok(null);
   }
 
-  private String resolveRoomNo(Long roomId) {
+  private MaintenanceRequest getRequestInOrg(Long id, Long orgId) {
+    return requestMapper.selectOne(Wrappers.lambdaQuery(MaintenanceRequest.class)
+        .eq(MaintenanceRequest::getId, id)
+        .eq(MaintenanceRequest::getIsDeleted, 0)
+        .eq(orgId != null, MaintenanceRequest::getOrgId, orgId)
+        .last("LIMIT 1"));
+  }
+
+  private String resolveRoomNo(Long orgId, Long roomId) {
     if (roomId == null) {
       return null;
     }
-    Room room = roomMapper.selectById(roomId);
+    Room room = roomMapper.selectOne(Wrappers.lambdaQuery(Room.class)
+        .eq(Room::getId, roomId)
+        .eq(Room::getIsDeleted, 0)
+        .eq(orgId != null, Room::getOrgId, orgId)
+        .last("LIMIT 1"));
+    if (room == null) {
+      throw new IllegalArgumentException("房间不存在或无权限");
+    }
     return room == null ? null : room.getRoomNo();
   }
 

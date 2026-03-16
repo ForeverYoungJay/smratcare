@@ -154,6 +154,9 @@ function scoreColor(score: number) {
 }
 
 function parseScore(item: MarketingCallbackItem): number {
+  if (typeof item.score === 'number' && Number.isFinite(item.score)) {
+    return Number(item.score)
+  }
   const remark = String(item.remark || '')
   const matched = remark.match(/([1-5](?:\.\d)?)\s*(?:分|星)/)
   if (matched?.[1]) return Number(matched[1])
@@ -162,13 +165,13 @@ function parseScore(item: MarketingCallbackItem): number {
 }
 
 function buildRiskLevel(item: MarketingCallbackItem, score: number): '高风险' | '中风险' | '低风险' {
-  if (score < 3 || (item.nextFollowDate && item.nextFollowDate < today)) return '高风险'
+  if (score < 3) return '高风险'
   if (score < 4) return '中风险'
   return '低风险'
 }
 
 async function loadData() {
-  const report = await getMarketingCallbackReport({ pageNo: 1, pageSize: 500 })
+  const report = await getMarketingCallbackReport({ pageNo: 1, pageSize: 500, type: 'score' })
   completedCount.value = report.completed || 0
   allRows.value = (report.records || []).map((item) => {
     const score = parseScore(item)

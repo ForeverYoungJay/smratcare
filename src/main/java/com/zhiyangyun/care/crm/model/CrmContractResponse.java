@@ -30,6 +30,8 @@ public class CrmContractResponse {
   private String currentOwnerDept;
   private String orgName;
   private String status;
+  private String changeWorkflowStatus;
+  private String changeWorkflowRemark;
   private Integer smsSendCount;
   private String remark;
   private LocalDateTime createTime;

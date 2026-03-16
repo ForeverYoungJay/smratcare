@@ -1,4 +1,5 @@
 import type { Id } from './common'
+import type { BedItem } from './bed'
 
 export interface ElderItem {
   id: Id
@@ -16,6 +17,8 @@ export interface ElderItem {
   admissionDate?: string
   careLevel?: string
   riskPrecommit?: 'RESCUE_FIRST' | 'NOTIFY_FAMILY_FIRST'
+  sourceType?: 'HISTORICAL_IMPORT' | 'MARKETING_CONTRACT' | string
+  historicalContractFileUrl?: string
   status?: number
   lifecycleStage?: 'PENDING_ASSESSMENT' | 'PENDING_BED_SELECT' | 'PENDING_SIGN' | 'SIGNED' | string
   lifecycleContractStatus?: string
@@ -23,6 +26,7 @@ export interface ElderItem {
   bedStartDate?: string
   bedNo?: string
   roomNo?: string
+  currentBed?: BedItem
   checkInDate?: string
   diseases?: ElderDiseaseItem[]
   remark?: string
@@ -43,10 +47,13 @@ export interface ElderCreateRequest {
   admissionDate?: string
   careLevel?: string
   riskPrecommit?: 'RESCUE_FIRST' | 'NOTIFY_FAMILY_FIRST'
+  sourceType?: 'HISTORICAL_IMPORT' | 'MARKETING_CONTRACT' | string
+  historicalContractFileUrl?: string
   status?: number
   remark?: string
   bedId?: Id
   bedStartDate?: string
+  clearBed?: boolean
 }
 
 export interface ElderAssignBedRequest {
@@ -157,6 +164,7 @@ export interface AdmissionRequest {
   depositAmount?: number
   bedId?: Id
   bedStartDate?: string
+  allowMissingContractRecord?: boolean
   remark?: string
 }
 

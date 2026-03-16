@@ -29,8 +29,26 @@ export function batchDeleteContracts(data) {
 export function handoffContractToAssessment(contractId) {
     return request.post(`/api/crm/contracts/${contractId}/handoff-assessment`);
 }
+export function moveContractToBedSelect(contractId) {
+    return request.post(`/api/crm/contracts/${contractId}/move-to-bed-select`);
+}
+export function moveContractToPendingSign(contractId) {
+    return request.post(`/api/crm/contracts/${contractId}/move-to-pending-sign`);
+}
 export function finalizeContract(contractId, remark) {
     return request.post(`/api/crm/contracts/${contractId}/finalize`, { remark });
+}
+export function startContractChange(contractId, remark) {
+    return request.post(`/api/crm/contracts/${contractId}/change/start`, { remark });
+}
+export function submitContractChange(contractId, remark) {
+    return request.post(`/api/crm/contracts/${contractId}/change/submit`, { remark });
+}
+export function approveContractChange(contractId, remark) {
+    return request.post(`/api/crm/contracts/${contractId}/change/approve`, { remark });
+}
+export function rejectContractChange(contractId, remark) {
+    return request.post(`/api/crm/contracts/${contractId}/change/reject`, { remark });
 }
 export function approveContract(contractId, remark) {
     return request.post(`/api/crm/contracts/${contractId}/approve`, { remark });

@@ -105,6 +105,7 @@ const uploadingTotal = ref(false)
 const lowRows = ref<InventoryAlertItem[]>([])
 const expiryRows = ref<InventoryExpiryAlertItem[]>([])
 const products = ref<ProductItem[]>([])
+const expiryDays = ref<number | undefined>(undefined)
 type AlertPhotoAttachment = { name: string; url: string; photoType: 'ITEM' | 'TOTAL'; uploadedAt?: string }
 const photoAttachments = ref<AlertPhotoAttachment[]>([])
 const filters = reactive({
@@ -180,7 +181,7 @@ async function fetchAll() {
   try {
     const [low, expiry, productRes] = await Promise.all([
       getInventoryAlerts(),
-      getInventoryExpiryAlerts(),
+      getInventoryExpiryAlerts(expiryDays.value),
       getProductPage({ pageNo: 1, pageSize: 500 }) as Promise<PageResult<ProductItem>>
     ])
     lowRows.value = low
@@ -404,16 +405,28 @@ function applyRouteFilters() {
   const itemTypeRaw = Array.isArray(query.itemType) ? query.itemType[0] : query.itemType
   const focusRaw = Array.isArray(query.focus) ? query.focus[0] : query.focus
   const filterRaw = Array.isArray(query.filter) ? query.filter[0] : query.filter
+  const lowStockOnlyRaw = Array.isArray(query.lowStockOnly) ? query.lowStockOnly[0] : query.lowStockOnly
+  const expiryDaysRaw = Array.isArray(query.expiryDays) ? query.expiryDays[0] : query.expiryDays
   if (typeof domainRaw === 'string' && domainRaw) {
     filters.businessDomain = domainRaw
+  } else {
+    filters.businessDomain = undefined
   }
   if (typeof itemTypeRaw === 'string' && itemTypeRaw) {
     filters.itemType = itemTypeRaw
+  } else {
+    filters.itemType = undefined
   }
+  const parsedExpiryDays = Number(expiryDaysRaw)
+  expiryDays.value = Number.isFinite(parsedExpiryDays) && parsedExpiryDays > 0 ? parsedExpiryDays : undefined
   const focus = String(focusRaw || filterRaw || '').toLowerCase()
-  if (focus === 'expiry' || focus === 'expiring') {
+  const lowStockOnly = String(lowStockOnlyRaw || '').toLowerCase() === '1'
+    || String(lowStockOnlyRaw || '').toLowerCase() === 'true'
+  if (lowStockOnly || focus === 'low' || focus === 'low_stock') {
+    activeKey.value = 'low'
+  } else if (focus === 'expiry' || focus === 'expiring' || expiryDays.value) {
     activeKey.value = 'expiry'
-  } else if (focus === 'low' || focus === 'low_stock') {
+  } else {
     activeKey.value = 'low'
   }
 }
@@ -423,6 +436,14 @@ onMounted(() => {
   loadAttachments()
   fetchAll()
 })
+
+watch(
+  () => route.query,
+  () => {
+    applyRouteFilters()
+    fetchAll()
+  }
+)
 
 watch(
   () => [userStore.staffInfo?.orgId, userStore.staffInfo?.id],

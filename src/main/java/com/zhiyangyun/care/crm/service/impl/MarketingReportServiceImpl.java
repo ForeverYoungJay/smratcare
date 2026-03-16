@@ -1,10 +1,10 @@
 package com.zhiyangyun.care.crm.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.zhiyangyun.care.crm.entity.CrmCallbackPlan;
 import com.zhiyangyun.care.crm.entity.CrmLead;
+import com.zhiyangyun.care.crm.mapper.CrmCallbackPlanMapper;
 import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
 import com.zhiyangyun.care.crm.model.report.MarketingCallbackItem;
 import com.zhiyangyun.care.crm.model.report.MarketingCallbackReportResponse;
@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,9 +37,11 @@ public class MarketingReportServiceImpl implements MarketingReportService {
       Arrays.asList("自然到访", "线上咨询", "抖音", "微信", "转介绍", "社区活动", "其他"));
 
   private final CrmLeadMapper crmLeadMapper;
+  private final CrmCallbackPlanMapper callbackPlanMapper;
 
-  public MarketingReportServiceImpl(CrmLeadMapper crmLeadMapper) {
+  public MarketingReportServiceImpl(CrmLeadMapper crmLeadMapper, CrmCallbackPlanMapper callbackPlanMapper) {
     this.crmLeadMapper = crmLeadMapper;
+    this.callbackPlanMapper = callbackPlanMapper;
   }
 
   @Override
@@ -166,7 +169,7 @@ public class MarketingReportServiceImpl implements MarketingReportService {
 
   @Override
   public MarketingCallbackReportResponse callback(
-      Long tenantId, long pageNo, long pageSize, String dateFrom, String dateTo, String source, Long staffId) {
+      Long tenantId, long pageNo, long pageSize, String dateFrom, String dateTo, String source, Long staffId, String type) {
     LocalDate from = parseDateOrNull(dateFrom);
     LocalDate to = parseDateOrNull(dateTo);
     LocalDate today = LocalDate.now();
@@ -180,56 +183,395 @@ public class MarketingReportServiceImpl implements MarketingReportService {
       throw new IllegalArgumentException("dateFrom cannot be after dateTo");
     }
 
-    LambdaQueryWrapper<CrmLead> dueWrapper = Wrappers.lambdaQuery(CrmLead.class)
-        .eq(CrmLead::getIsDeleted, 0)
-        .eq(tenantId != null, CrmLead::getTenantId, tenantId)
-        .eq(source != null && !source.isBlank(), CrmLead::getSource, normalizeSource(source))
-        .eq(staffId != null, CrmLead::getCreatedBy, staffId)
+    String normalizedType = normalizeCallbackType(type);
+    if ("SCORE".equals(normalizedType)) {
+      return buildScoreCallbackResponse(tenantId, pageNo, pageSize, from, to, source, staffId);
+    }
+    List<CrmLead> dueLeads = crmLeadMapper.selectList(baseCallbackLeadWrapper(tenantId, source, staffId)
         .isNotNull(CrmLead::getNextFollowDate)
         .between(CrmLead::getNextFollowDate, from, to)
         .notIn(CrmLead::getStatus, List.of(2, 3))
         .le(CrmLead::getNextFollowDate, today)
         .orderByAsc(CrmLead::getNextFollowDate)
-        .orderByAsc(CrmLead::getId);
+        .orderByAsc(CrmLead::getId));
+    List<CrmLead> todayDueLeads = crmLeadMapper.selectList(baseCallbackLeadWrapper(tenantId, source, staffId)
+        .eq(CrmLead::getNextFollowDate, today)
+        .notIn(CrmLead::getStatus, List.of(2, 3)));
+    List<CrmLead> overdueLeads = crmLeadMapper.selectList(baseCallbackLeadWrapper(tenantId, source, staffId)
+        .isNotNull(CrmLead::getNextFollowDate)
+        .lt(CrmLead::getNextFollowDate, today)
+        .notIn(CrmLead::getStatus, List.of(2, 3)));
 
-    long total = crmLeadMapper.selectCount(dueWrapper);
-    IPage<CrmLead> page = crmLeadMapper.selectPage(new Page<>(Math.max(1, pageNo), Math.max(1, pageSize)), dueWrapper);
-    List<MarketingCallbackItem> records = page.getRecords().stream().map(item -> {
+    Map<Long, List<CrmCallbackPlan>> planMap = loadPlansByLeadIds(tenantId, collectLeadIds(dueLeads, todayDueLeads, overdueLeads));
+    List<CrmLead> filteredDueLeads = filterLeadsByCallbackType(dueLeads, planMap, normalizedType);
+    List<CrmLead> filteredTodayDueLeads = filterLeadsByCallbackType(todayDueLeads, planMap, normalizedType);
+    List<CrmLead> filteredOverdueLeads = filterLeadsByCallbackType(overdueLeads, planMap, normalizedType);
+
+    int safePageNo = (int) Math.max(1, pageNo);
+    int safePageSize = (int) Math.max(1, pageSize);
+    int startIndex = Math.max(0, (safePageNo - 1) * safePageSize);
+    int endIndex = Math.min(filteredDueLeads.size(), startIndex + safePageSize);
+    List<CrmLead> pageRecords = startIndex >= filteredDueLeads.size()
+        ? List.of()
+        : filteredDueLeads.subList(startIndex, endIndex);
+    List<MarketingCallbackItem> records = pageRecords.stream().map(item -> {
       MarketingCallbackItem result = new MarketingCallbackItem();
       result.setId(item.getId());
       result.setName(item.getName());
       result.setPhone(item.getPhone());
       result.setSource(item.getSource());
       result.setNextFollowDate(item.getNextFollowDate() == null ? null : item.getNextFollowDate().toString());
-      result.setRemark(item.getRemark());
+      result.setCallbackType(toClientCallbackType(resolveCallbackType(item, planMap.get(item.getId()))));
+      result.setScore(resolveCallbackScore(planMap.get(item.getId())));
+      result.setRemark(resolveCallbackRemark(item, planMap.get(item.getId())));
       return result;
     }).toList();
 
-    long todayDue = crmLeadMapper.selectCount(Wrappers.lambdaQuery(CrmLead.class)
-        .eq(CrmLead::getIsDeleted, 0)
-        .eq(tenantId != null, CrmLead::getTenantId, tenantId)
-        .eq(source != null && !source.isBlank(), CrmLead::getSource, normalizeSource(source))
-        .eq(staffId != null, CrmLead::getCreatedBy, staffId)
-        .eq(CrmLead::getNextFollowDate, today)
-        .notIn(CrmLead::getStatus, List.of(2, 3)));
-    long overdue = crmLeadMapper.selectCount(Wrappers.lambdaQuery(CrmLead.class)
-        .eq(CrmLead::getIsDeleted, 0)
-        .eq(tenantId != null, CrmLead::getTenantId, tenantId)
-        .eq(source != null && !source.isBlank(), CrmLead::getSource, normalizeSource(source))
-        .eq(staffId != null, CrmLead::getCreatedBy, staffId)
-        .isNotNull(CrmLead::getNextFollowDate)
-        .lt(CrmLead::getNextFollowDate, today)
-        .notIn(CrmLead::getStatus, List.of(2, 3)));
-    long completed = crmLeadMapper.selectCount(leadWrapperByCreateTime(tenantId, dateFrom, dateTo, source, staffId)
-        .eq(CrmLead::getStatus, 2));
-
     MarketingCallbackReportResponse response = new MarketingCallbackReportResponse();
-    response.setTodayDue(todayDue);
-    response.setOverdue(overdue);
-    response.setCompleted(completed);
-    response.setTotal(total);
+    response.setTodayDue(filteredTodayDueLeads.size());
+    response.setOverdue(filteredOverdueLeads.size());
+    response.setCompleted(countCompletedCallbacks(tenantId, from, to, source, staffId, normalizedType));
+    response.setTotal(filteredDueLeads.size());
     response.setRecords(records);
     return response;
+  }
+
+  private MarketingCallbackReportResponse buildScoreCallbackResponse(
+      Long tenantId,
+      long pageNo,
+      long pageSize,
+      LocalDate from,
+      LocalDate to,
+      String source,
+      Long staffId) {
+    List<CrmLead> candidateLeads = crmLeadMapper.selectList(baseCallbackLeadWrapper(tenantId, source, staffId));
+    MarketingCallbackReportResponse response = new MarketingCallbackReportResponse();
+    if (candidateLeads.isEmpty()) {
+      response.setTodayDue(0);
+      response.setOverdue(0);
+      response.setCompleted(0);
+      response.setTotal(0);
+      response.setRecords(List.of());
+      return response;
+    }
+    Map<Long, CrmLead> leadMap = candidateLeads.stream()
+        .filter(item -> item.getId() != null)
+        .collect(Collectors.toMap(CrmLead::getId, item -> item, (left, right) -> left, LinkedHashMap::new));
+    LocalDateTime executedFrom = from.atStartOfDay();
+    LocalDateTime executedTo = to.plusDays(1L).atStartOfDay();
+    List<CrmCallbackPlan> scoredPlans = callbackPlanMapper.selectList(Wrappers.lambdaQuery(CrmCallbackPlan.class)
+            .eq(CrmCallbackPlan::getIsDeleted, 0)
+            .eq(tenantId != null, CrmCallbackPlan::getTenantId, tenantId)
+            .eq(CrmCallbackPlan::getStatus, "DONE")
+            .isNotNull(CrmCallbackPlan::getExecutedTime)
+            .ge(CrmCallbackPlan::getExecutedTime, executedFrom)
+            .lt(CrmCallbackPlan::getExecutedTime, executedTo)
+            .in(CrmCallbackPlan::getLeadId, leadMap.keySet())
+            .orderByDesc(CrmCallbackPlan::getExecutedTime)
+            .orderByDesc(CrmCallbackPlan::getCreateTime))
+        .stream()
+        .filter(plan -> resolvePlanScore(plan) != null)
+        .toList();
+
+    int safePageNo = (int) Math.max(1, pageNo);
+    int safePageSize = (int) Math.max(1, pageSize);
+    int startIndex = Math.max(0, (safePageNo - 1) * safePageSize);
+    int endIndex = Math.min(scoredPlans.size(), startIndex + safePageSize);
+    List<CrmCallbackPlan> pagePlans = startIndex >= scoredPlans.size()
+        ? List.of()
+        : scoredPlans.subList(startIndex, endIndex);
+    List<MarketingCallbackItem> records = pagePlans.stream()
+        .map(plan -> buildScoreCallbackItem(plan, leadMap.get(plan.getLeadId())))
+        .toList();
+
+    response.setTodayDue(0);
+    response.setOverdue(0);
+    response.setCompleted(scoredPlans.size());
+    response.setTotal(scoredPlans.size());
+    response.setRecords(records);
+    return response;
+  }
+
+  private LambdaQueryWrapper<CrmLead> baseCallbackLeadWrapper(Long tenantId, String source, Long staffId) {
+    return Wrappers.lambdaQuery(CrmLead.class)
+        .eq(CrmLead::getIsDeleted, 0)
+        .eq(tenantId != null, CrmLead::getTenantId, tenantId)
+        .eq(source != null && !source.isBlank(), CrmLead::getSource, normalizeSource(source))
+        .eq(staffId != null, CrmLead::getCreatedBy, staffId);
+  }
+
+  private Set<Long> collectLeadIds(List<CrmLead>... leadGroups) {
+    Set<Long> leadIds = new LinkedHashSet<>();
+    for (List<CrmLead> group : leadGroups) {
+      if (group == null) {
+        continue;
+      }
+      for (CrmLead lead : group) {
+        if (lead != null && lead.getId() != null) {
+          leadIds.add(lead.getId());
+        }
+      }
+    }
+    return leadIds;
+  }
+
+  private Map<Long, List<CrmCallbackPlan>> loadPlansByLeadIds(Long tenantId, Set<Long> leadIds) {
+    if (leadIds == null || leadIds.isEmpty()) {
+      return Map.of();
+    }
+    return callbackPlanMapper.selectList(Wrappers.lambdaQuery(CrmCallbackPlan.class)
+            .eq(CrmCallbackPlan::getIsDeleted, 0)
+            .eq(tenantId != null, CrmCallbackPlan::getTenantId, tenantId)
+            .in(CrmCallbackPlan::getLeadId, leadIds)
+            .orderByDesc(CrmCallbackPlan::getPlanExecuteTime)
+            .orderByDesc(CrmCallbackPlan::getCreateTime))
+        .stream()
+        .collect(Collectors.groupingBy(CrmCallbackPlan::getLeadId, LinkedHashMap::new, Collectors.toList()));
+  }
+
+  private List<CrmLead> filterLeadsByCallbackType(
+      List<CrmLead> leads,
+      Map<Long, List<CrmCallbackPlan>> planMap,
+      String normalizedType) {
+    if (normalizedType == null || normalizedType.isBlank()) {
+      return leads;
+    }
+    List<CrmLead> result = new ArrayList<>();
+    for (CrmLead lead : leads) {
+      if (matchesCallbackType(lead, planMap.get(lead.getId()), normalizedType)) {
+        result.add(lead);
+      }
+    }
+    return result;
+  }
+
+  private long countCompletedCallbacks(
+      Long tenantId,
+      LocalDate from,
+      LocalDate to,
+      String source,
+      Long staffId,
+      String normalizedType) {
+    List<CrmLead> candidateLeads = crmLeadMapper.selectList(baseCallbackLeadWrapper(tenantId, source, staffId));
+    if (candidateLeads.isEmpty()) {
+      return 0;
+    }
+    Map<Long, CrmLead> leadMap = candidateLeads.stream()
+        .filter(item -> item.getId() != null)
+        .collect(Collectors.toMap(CrmLead::getId, item -> item, (left, right) -> left, LinkedHashMap::new));
+    LocalDateTime executedFrom = from.atStartOfDay();
+    LocalDateTime executedTo = to.plusDays(1L).atStartOfDay();
+    return callbackPlanMapper.selectList(Wrappers.lambdaQuery(CrmCallbackPlan.class)
+            .eq(CrmCallbackPlan::getIsDeleted, 0)
+            .eq(tenantId != null, CrmCallbackPlan::getTenantId, tenantId)
+            .eq(CrmCallbackPlan::getStatus, "DONE")
+            .isNotNull(CrmCallbackPlan::getExecutedTime)
+            .ge(CrmCallbackPlan::getExecutedTime, executedFrom)
+            .lt(CrmCallbackPlan::getExecutedTime, executedTo)
+            .in(CrmCallbackPlan::getLeadId, leadMap.keySet()))
+        .stream()
+        .filter(item -> matchesCallbackType(leadMap.get(item.getLeadId()), List.of(item), normalizedType))
+        .count();
+  }
+
+  private boolean matchesCallbackType(CrmLead lead, List<CrmCallbackPlan> plans, String normalizedType) {
+    if (normalizedType == null || normalizedType.isBlank()) {
+      return true;
+    }
+    if ("SCORE".equals(normalizedType)) {
+      return hasScoreEvidence(lead, plans);
+    }
+    return normalizedType.equals(resolveCallbackType(lead, plans));
+  }
+
+  private MarketingCallbackItem buildScoreCallbackItem(CrmCallbackPlan plan, CrmLead lead) {
+    MarketingCallbackItem item = new MarketingCallbackItem();
+    item.setId(plan.getId());
+    item.setName(lead == null ? null : firstNonBlank(blankToNull(lead.getName()), blankToNull(lead.getElderName())));
+    item.setPhone(lead == null ? null : firstNonBlank(blankToNull(lead.getPhone()), blankToNull(lead.getElderPhone())));
+    item.setSource(lead == null ? null : lead.getSource());
+    item.setNextFollowDate(plan.getExecutedTime() == null ? null : plan.getExecutedTime().toLocalDate().toString());
+    item.setCallbackType(toClientCallbackType(resolveCallbackType(lead, List.of(plan))));
+    item.setScore(resolvePlanScore(plan));
+    item.setRemark(resolveCallbackRemark(lead, List.of(plan)));
+    return item;
+  }
+
+  private String resolveCallbackType(CrmLead lead, List<CrmCallbackPlan> plans) {
+    if (plans != null) {
+      for (CrmCallbackPlan plan : plans) {
+        String normalized = normalizeCallbackType(plan.getCallbackType());
+        if (normalized != null) {
+          return normalized;
+        }
+      }
+    }
+    return inferCallbackType(lead, plans);
+  }
+
+  private String resolveCallbackRemark(CrmLead lead, List<CrmCallbackPlan> plans) {
+    if (plans != null) {
+      for (CrmCallbackPlan plan : plans) {
+        String remark = firstNonBlank(
+            plan.getFollowupResult(),
+            plan.getExecuteNote(),
+            plan.getFollowupContent(),
+            plan.getTitle());
+        if (remark != null) {
+          return remark;
+        }
+      }
+    }
+    return blankToNull(lead == null ? null : lead.getRemark());
+  }
+
+  private boolean hasScoreEvidence(CrmLead lead, List<CrmCallbackPlan> plans) {
+    if (resolveCallbackScore(plans) != null) {
+      return true;
+    }
+    if (containsScoreEvidence(lead == null ? null : lead.getRemark())) {
+      return true;
+    }
+    if (plans == null) {
+      return false;
+    }
+    for (CrmCallbackPlan plan : plans) {
+      if (containsScoreEvidence(plan.getFollowupResult())
+          || containsScoreEvidence(plan.getExecuteNote())
+          || containsScoreEvidence(plan.getFollowupContent())
+          || containsScoreEvidence(plan.getTitle())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private Double resolveCallbackScore(List<CrmCallbackPlan> plans) {
+    if (plans == null) {
+      return null;
+    }
+    for (CrmCallbackPlan plan : plans) {
+      Double score = resolvePlanScore(plan);
+      if (score != null) {
+        return score;
+      }
+    }
+    return null;
+  }
+
+  private Double resolvePlanScore(CrmCallbackPlan plan) {
+    if (plan == null) {
+      return null;
+    }
+    if (plan.getScore() != null) {
+      return plan.getScore().doubleValue();
+    }
+    return extractScore(plan.getFollowupResult(), plan.getExecuteNote(), plan.getFollowupContent(), plan.getTitle());
+  }
+
+  private Double extractScore(String... values) {
+    if (values == null) {
+      return null;
+    }
+    for (String value : values) {
+      String normalized = blankToNull(value);
+      if (normalized == null) {
+        continue;
+      }
+      java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("([1-5](?:\\.\\d)?)\\s*(分|星)").matcher(normalized);
+      if (matcher.find()) {
+        try {
+          return Double.parseDouble(matcher.group(1));
+        } catch (NumberFormatException ignored) {
+          return null;
+        }
+      }
+    }
+    return null;
+  }
+
+  private boolean containsScoreEvidence(String value) {
+    String normalized = blankToNull(value);
+    if (normalized == null) {
+      return false;
+    }
+    String text = normalized.toLowerCase(Locale.ROOT);
+    return text.contains("评分")
+        || text.contains("满意度")
+        || text.contains("星级")
+        || text.contains("分数")
+        || text.matches(".*[1-5](?:\\.\\d)?\\s*(分|星).*");
+  }
+
+  private String firstNonBlank(String... values) {
+    if (values == null) {
+      return null;
+    }
+    for (String value : values) {
+      String normalized = blankToNull(value);
+      if (normalized != null) {
+        return normalized;
+      }
+    }
+    return null;
+  }
+
+  private String inferCallbackType(CrmLead lead, List<CrmCallbackPlan> plans) {
+    String text = buildCallbackInferenceText(lead, plans);
+    if (text.contains("试住")) {
+      return "TRIAL";
+    }
+    if (text.contains("退住") || text.contains("离院") || text.contains("出院")) {
+      return "DISCHARGE";
+    }
+    if (text.contains("入住") || text.contains("签约") || text.contains("入院")) {
+      return "CHECKIN";
+    }
+    return "CHECKIN";
+  }
+
+  private String buildCallbackInferenceText(CrmLead lead, List<CrmCallbackPlan> plans) {
+    StringBuilder builder = new StringBuilder();
+    if (lead != null) {
+      appendInferenceText(builder, lead.getSource());
+      appendInferenceText(builder, lead.getRemark());
+      appendInferenceText(builder, lead.getContractStatus());
+      appendInferenceText(builder, lead.getFollowupStatus());
+    }
+    if (plans != null) {
+      for (CrmCallbackPlan plan : plans) {
+        appendInferenceText(builder, plan.getTitle());
+        appendInferenceText(builder, plan.getFollowupContent());
+        appendInferenceText(builder, plan.getFollowupResult());
+        appendInferenceText(builder, plan.getExecuteNote());
+      }
+    }
+    return builder.toString();
+  }
+
+  private void appendInferenceText(StringBuilder builder, String value) {
+    if (value == null || value.isBlank()) {
+      return;
+    }
+    if (builder.length() > 0) {
+      builder.append(' ');
+    }
+    builder.append(value.trim().toLowerCase(Locale.ROOT));
+  }
+
+  private String normalizeCallbackType(String type) {
+    if (type == null || type.isBlank()) {
+      return null;
+    }
+    String normalized = type.trim().toUpperCase(Locale.ROOT);
+    if ("CHECKIN".equals(normalized) || "TRIAL".equals(normalized) || "DISCHARGE".equals(normalized) || "SCORE".equals(normalized)) {
+      return normalized;
+    }
+    return null;
+  }
+
+  private String toClientCallbackType(String normalizedType) {
+    return normalizedType == null ? null : normalizedType.toLowerCase(Locale.ROOT);
   }
 
   @Override
@@ -490,6 +832,14 @@ public class MarketingReportServiceImpl implements MarketingReportService {
       return null;
     }
     return LocalDate.parse(value);
+  }
+
+  private String blankToNull(String value) {
+    if (value == null) {
+      return null;
+    }
+    String normalized = value.trim();
+    return normalized.isEmpty() ? null : normalized;
   }
 
   private String normalizeSource(String source) {

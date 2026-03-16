@@ -174,7 +174,10 @@
             {{ currentNode(record) }}
           </template>
           <template v-else-if="column.key === 'currentApprover'">
-            <div>{{ currentApprover(record) }}</div>
+            <div class="approver-cell">
+              <a-tag :color="approverStatusColor(record)">{{ approverStatusText(record) }}</a-tag>
+              <div>{{ currentApprover(record) }}</div>
+            </div>
             <div class="urge-meta">{{ urgeMetaText(record) }}</div>
           </template>
           <template v-else-if="column.key === 'approvalRounds'">
@@ -553,7 +556,7 @@ const columns = [
   { title: '标题', dataIndex: 'title', key: 'title', width: 200 },
   { title: '申请人', dataIndex: 'applicantName', key: 'applicantName', width: 120 },
   { title: '当前环节', key: 'currentNode', width: 130 },
-  { title: '当前审批人', key: 'currentApprover', width: 130 },
+  { title: '当前审批人', key: 'currentApprover', width: 190 },
   { title: '审批轮次', key: 'approvalRounds', width: 96 },
   { title: '金额', dataIndex: 'amount', key: 'amount', width: 120 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
@@ -1104,7 +1107,8 @@ function currentApprover(record: OaApproval) {
   const approverName = parsed?.currentApproverName || parsed?.nextApproverName
   const role = parsed?.currentApproverRole ? String(parsed.currentApproverRole).trim() : ''
   if (approverName) {
-    return approverName
+    const roleLabel = approverRoleLabel(role)
+    return roleLabel && roleLabel !== '待分配' ? `${approverName} · ${roleLabel}` : approverName
   }
   return approverRoleLabel(role)
 }
@@ -1114,6 +1118,31 @@ function approverRoleLabel(role?: string) {
   if (!value) return '待分配'
   const matched = approverRoleOptions.find((item) => String(item.value || '').toUpperCase() === value)
   return matched?.label || '待分配'
+}
+
+function approverStatusText(record: OaApproval) {
+  const parsed = parseFormData(record.formData)
+  if (record.status === 'APPROVED') return '流程完成'
+  if (record.status === 'REJECTED') return '已驳回'
+  const approverId = String(parsed?.currentApproverId || '').trim()
+  const role = String(parsed?.currentApproverRole || '').trim()
+  if (approverId) {
+    return approverId === String(userStore.staffInfo?.id || '') ? '当前轮到我' : '已指派'
+  }
+  if (role) {
+    return `待${approverRoleLabel(role)}处理`
+  }
+  return '待分配'
+}
+
+function approverStatusColor(record: OaApproval) {
+  const text = approverStatusText(record)
+  if (text === '流程完成') return 'green'
+  if (text === '已驳回') return 'red'
+  if (text === '当前轮到我') return 'blue'
+  if (text === '已指派') return 'gold'
+  if (text.startsWith('待')) return 'purple'
+  return 'default'
 }
 
 function urgeMetaText(record: OaApproval) {
@@ -1278,10 +1307,14 @@ async function submit() {
 
 function isCurrentUserApprover(record: OaApproval) {
   const parsed = parseFormData(record.formData)
+  const approverId = String(parsed?.currentApproverId || '').trim()
   const approverRole = String(parsed?.currentApproverRole || '').toUpperCase()
-  if (!approverRole) return canApproveFlow.value
   const roles = (userStore.roles || []).map((item) => String(item || '').toUpperCase())
   if (roles.includes('ADMIN') || roles.includes('SYS_ADMIN') || roles.includes('DIRECTOR')) return true
+  if (approverId) {
+    return approverId === String(userStore.staffInfo?.id || '')
+  }
+  if (!approverRole) return canApproveFlow.value
   if (approverRole === 'DEPT_MANAGER' || approverRole === 'MANAGER') {
     return hasMinisterOrHigher(roles)
   }
@@ -1789,6 +1822,12 @@ useLiveSyncRefresh({
   margin-top: 2px;
   color: rgba(0, 0, 0, 0.45);
   font-size: 12px;
+}
+
+.approver-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .timeline-title {

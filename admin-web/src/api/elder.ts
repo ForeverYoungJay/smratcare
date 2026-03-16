@@ -24,7 +24,7 @@ export function createElder(data: ElderCreateRequest) {
   return request.post<ElderItem>('/api/elder', data)
 }
 
-export function updateElder(id: Id, data: Partial<ElderCreateRequest>) {
+export function updateElder(id: Id, data: Partial<ElderCreateRequest> & { clearBed?: boolean }) {
   return request.put<void>(`/api/elder/${id}`, data)
 }
 

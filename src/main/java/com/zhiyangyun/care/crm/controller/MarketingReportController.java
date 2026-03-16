@@ -114,11 +114,12 @@ public class MarketingReportController {
       @RequestParam(required = false) String dateFrom,
       @RequestParam(required = false) String dateTo,
       @RequestParam(required = false) String source,
-      @RequestParam(required = false) Long staffId) {
+      @RequestParam(required = false) Long staffId,
+      @RequestParam(required = false) String type) {
     Long orgId = AuthContext.getOrgId();
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "MARKETING_REPORT_QUERY", "MARKETING_CALLBACK", null, "callback report");
-    return Result.ok(marketingReportService.callback(orgId, pageNo, pageSize, dateFrom, dateTo, source, staffId));
+    return Result.ok(marketingReportService.callback(orgId, pageNo, pageSize, dateFrom, dateTo, source, staffId, type));
   }
 
   @PreAuthorize("hasAnyRole('MARKETING_EMPLOYEE','MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")

@@ -28,8 +28,10 @@ public class OaPortalSummary {
   private Long documentCount;
   private Long inventoryLowStockCount;
   private Long approvalTimeoutCount;
+  private Long pendingMedicalOrderCount;
   private Long elderAbnormalCount;
   private Long healthAbnormalCount;
+  private Long elderContractExpiringCount;
   private Long incidentOpenCount;
   private Long materialTransferDraftCount;
   private Long materialPurchaseDraftCount;

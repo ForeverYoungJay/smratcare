@@ -1,22 +1,29 @@
 <template>
-  <PageContainer :title="quickArchiveMode ? '档案一键生成' : '新增老人'" :subTitle="quickArchiveMode ? '上传现有资料并直接办理入住（跳过营销合同流程）' : '录入老人档案'">
+  <PageContainer title="新建老人" subTitle="补录平台启用前已入住长者，保留历史合同与资料，不走营销流程">
     <a-card class="card-elevated" :bordered="false">
       <a-alert
-        v-if="quickArchiveMode"
         type="info"
         show-icon
         style="margin-bottom: 16px"
-        message="快捷建档模式：可直接上传医保/户口/病历资料并办理入住，不需要营销合同。"
+        message="新建老人用于补录平台启用前已入住长者，可直接上传历史资料并办理入住，不依赖营销线索或 CRM 合同流程。"
+      />
+      <a-alert
+        v-if="duplicateWarnings.length"
+        type="warning"
+        show-icon
+        style="margin-bottom: 16px"
+        message="发现可能重复的老人档案"
+        :description="duplicateWarningText"
       />
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical" style="max-width: 760px">
         <a-form-item label="姓名" name="fullName">
-          <a-input v-model:value="form.fullName" />
+          <a-input v-model:value="form.fullName" @blur="refreshDuplicateWarnings" />
         </a-form-item>
         <a-form-item label="身份证号" name="idCardNo">
-          <a-input v-model:value="form.idCardNo" />
+          <a-input v-model:value="form.idCardNo" @blur="refreshDuplicateWarnings" />
         </a-form-item>
         <a-form-item label="手机号" name="phone">
-          <a-input v-model:value="form.phone" />
+          <a-input v-model:value="form.phone" @blur="refreshDuplicateWarnings" />
         </a-form-item>
         <a-form-item label="家庭地址" name="homeAddress">
           <a-input v-model:value="form.homeAddress" />
@@ -55,13 +62,25 @@
           </a-select>
         </a-form-item>
         <a-form-item label="出生日期" name="birthDate">
-          <a-date-picker v-model:value="form.birthDate" value-format="YYYY-MM-DD" style="width: 100%" />
+          <a-date-picker v-model:value="form.birthDate" value-format="YYYY-MM-DD" style="width: 100%" @change="refreshDuplicateWarnings" />
         </a-form-item>
         <a-form-item label="入院日期" name="admissionDate">
           <a-date-picker v-model:value="form.admissionDate" value-format="YYYY-MM-DD" style="width: 100%" />
         </a-form-item>
-        <a-form-item v-if="!quickArchiveMode" label="合同号" name="contractNo">
-          <a-input v-model:value="form.contractNo" placeholder="营销链路下可填写，触发生命周期入住记录" />
+        <a-form-item label="历史合同号" name="contractNo">
+          <a-input
+            v-model:value="form.contractNo"
+            placeholder="请输入平台启用前已签署的历史/线下合同号"
+          />
+        </a-form-item>
+        <a-form-item label="历史合同附件">
+          <a-space>
+            <a-upload :show-upload-list="false" :before-upload="beforeUploadHistoricalContract">
+              <a-button :loading="uploading.historicalContract">上传文件</a-button>
+            </a-upload>
+            <a-typography-text type="secondary">{{ fileLabel(form.historicalContractFileUrl, '未上传') }}</a-typography-text>
+            <a-button v-if="form.historicalContractFileUrl" type="link" @click="openFile(form.historicalContractFileUrl)">查看</a-button>
+          </a-space>
         </a-form-item>
         <a-form-item label="初始余额(押金)" name="depositAmount">
           <a-input-number v-model:value="form.depositAmount" :min="0" style="width: 100%" />
@@ -132,21 +151,19 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
-import { createElder, uploadElderFile } from '../../api/elder'
+import { createElder, getElderPage, uploadElderFile } from '../../api/elder'
 import { admitElder } from '../../api/elderLifecycle'
 import { getBedList, getBuildingList, getFloorList, getRoomList } from '../../api/bed'
 import type { AdmissionRequest, BedItem, BuildingItem, ElderCreateRequest, ElderItem, FloorItem, Id, RoomItem } from '../../types'
 
-const route = useRoute()
 const router = useRouter()
 const formRef = ref<FormInstance>()
 const saving = ref(false)
-const quickArchiveMode = computed(() => String(route.query.quickArchive || '') === '1')
 
 const form = reactive<ElderCreateRequest & { contractNo?: string; depositAmount?: number }>({
   fullName: '',
@@ -156,6 +173,8 @@ const form = reactive<ElderCreateRequest & { contractNo?: string; depositAmount?
   medicalInsuranceCopyUrl: '',
   householdCopyUrl: '',
   medicalRecordFileUrl: '',
+  historicalContractFileUrl: '',
+  sourceType: 'HISTORICAL_IMPORT',
   gender: undefined,
   birthDate: undefined,
   admissionDate: undefined,
@@ -171,8 +190,10 @@ const form = reactive<ElderCreateRequest & { contractNo?: string; depositAmount?
 const uploading = reactive({
   medicalInsurance: false,
   household: false,
-  medicalRecord: false
+  medicalRecord: false,
+  historicalContract: false
 })
+const duplicateWarnings = ref<Array<{ elderId: string; reasons: string[]; label: string }>>([])
 
 const buildings = ref<BuildingItem[]>([])
 const floors = ref<FloorItem[]>([])
@@ -222,11 +243,19 @@ async function validateBirthDate(_rule: unknown, value?: string) {
 }
 
 async function validateAdmissionDate(_rule: unknown, value?: string) {
-  if (form.bedId && !value) {
-    return Promise.reject(new Error('选择床位时必须填写入院日期'))
+  if (!value) {
+    return Promise.reject(new Error('请填写入院日期'))
   }
   if (value && form.birthDate && dayjs(value).isBefore(dayjs(form.birthDate), 'day')) {
     return Promise.reject(new Error('入院日期不能早于出生日期'))
+  }
+  return Promise.resolve()
+}
+
+async function validateContractNo(_rule: unknown, value?: string) {
+  const text = trimText(value)
+  if (!text) {
+    return Promise.reject(new Error('请填写历史合同号'))
   }
   return Promise.resolve()
 }
@@ -273,6 +302,11 @@ const bedOptions = computed(() =>
     .filter((b) => !b.elderId && (b.status === 1 || b.status === undefined))
     .map((b) => ({ label: b.bedNo, value: b.id }))
 )
+const duplicateWarningText = computed(() =>
+  duplicateWarnings.value
+    .map((item) => `${item.label}（命中：${item.reasons.join('、')}）`)
+    .join('；')
+)
 
 const rules: FormRules = {
   fullName: [{ required: true, message: '请输入姓名' }],
@@ -280,6 +314,7 @@ const rules: FormRules = {
   phone: [{ validator: validatePhone, trigger: 'blur' }],
   birthDate: [{ validator: validateBirthDate, trigger: 'change' }],
   admissionDate: [{ validator: validateAdmissionDate, trigger: 'change' }],
+  contractNo: [{ validator: validateContractNo, trigger: 'blur' }],
   bedId: [{ validator: validateBedId, trigger: 'change' }],
   bedStartDate: [{ validator: validateBedStartDate, trigger: 'change' }],
   status: [{ required: true, message: '请选择状态' }]
@@ -293,9 +328,11 @@ async function submit() {
   if (!formRef.value) return
   try {
     await formRef.value.validate()
+    await refreshDuplicateWarnings()
     saving.value = true
     const normalizedContractNo = String(form.contractNo || '').trim()
-    const shouldAdmit = !quickArchiveMode.value && !!form.admissionDate && !!normalizedContractNo
+    const shouldAdmit = !!form.admissionDate && !!normalizedContractNo
+    let successMessage = '保存成功'
     const payload: ElderCreateRequest = {
       fullName: trimText(form.fullName),
       idCardNo: trimText(form.idCardNo) || undefined,
@@ -304,6 +341,8 @@ async function submit() {
       medicalInsuranceCopyUrl: form.medicalInsuranceCopyUrl,
       householdCopyUrl: form.householdCopyUrl,
       medicalRecordFileUrl: form.medicalRecordFileUrl,
+      historicalContractFileUrl: form.historicalContractFileUrl,
+      sourceType: form.sourceType,
       gender: form.gender,
       birthDate: form.birthDate,
       admissionDate: form.admissionDate,
@@ -322,17 +361,20 @@ async function submit() {
         contractNo: normalizedContractNo || undefined,
         depositAmount: form.depositAmount,
         bedId: form.bedId,
-        bedStartDate: form.bedStartDate
+        bedStartDate: form.bedStartDate,
+        allowMissingContractRecord: true
       }
       try {
         await admitElder(admission)
+        successMessage = '已完成历史入住补录'
       } catch (admitError: any) {
-        message.warning(admitError?.message || '老人档案已创建，但自动办理入住失败，请到“入住办理”继续处理')
+        message.warning(
+          admitError?.message
+            || '老人档案已创建，但自动办理入住失败，请到“入住办理”继续处理'
+        )
       }
-    } else if (form.admissionDate && form.bedId) {
-      message.success('已按直办入住完成建档与床位分配')
     }
-    message.success('保存成功')
+    message.success(successMessage)
     router.push('/elder/list')
   } catch (error: any) {
     message.error(error?.message || error?.response?.data?.message || '保存失败')
@@ -341,7 +383,11 @@ async function submit() {
   }
 }
 
-async function uploadArchiveFile(field: 'medicalInsuranceCopyUrl' | 'householdCopyUrl' | 'medicalRecordFileUrl', loadingKey: 'medicalInsurance' | 'household' | 'medicalRecord', file: File) {
+async function uploadArchiveFile(
+  field: 'medicalInsuranceCopyUrl' | 'householdCopyUrl' | 'medicalRecordFileUrl' | 'historicalContractFileUrl',
+  loadingKey: 'medicalInsurance' | 'household' | 'medicalRecord' | 'historicalContract',
+  file: File
+) {
   uploading[loadingKey] = true
   try {
     const uploaded = await uploadElderFile(file, `elder-${field}`)
@@ -372,6 +418,10 @@ function beforeUploadMedicalRecord(file: File) {
   return uploadArchiveFile('medicalRecordFileUrl', 'medicalRecord', file)
 }
 
+function beforeUploadHistoricalContract(file: File) {
+  return uploadArchiveFile('historicalContractFileUrl', 'historicalContract', file)
+}
+
 function fileLabel(url?: string, fallback = '') {
   if (!url) return fallback
   const text = String(url).split('/').pop() || url
@@ -381,6 +431,44 @@ function fileLabel(url?: string, fallback = '') {
 function openFile(url?: string) {
   if (!url) return
   window.open(url, '_blank')
+}
+
+async function refreshDuplicateWarnings() {
+  const idCardNo = trimText(form.idCardNo)
+  const phone = trimText(form.phone)
+  const fullName = trimText(form.fullName)
+  const birthDate = trimText(form.birthDate)
+  if (!idCardNo && !phone && !(fullName && birthDate)) {
+    duplicateWarnings.value = []
+    return
+  }
+  try {
+    const [idCardPage, phonePage, fullNamePage] = await Promise.all([
+      idCardNo ? getElderPage({ pageNo: 1, pageSize: 10, idCardNo }) : Promise.resolve({ list: [] as ElderItem[] }),
+      phone ? getElderPage({ pageNo: 1, pageSize: 20, keyword: phone }) : Promise.resolve({ list: [] as ElderItem[] }),
+      fullName ? getElderPage({ pageNo: 1, pageSize: 20, fullName }) : Promise.resolve({ list: [] as ElderItem[] })
+    ])
+    const warningMap = new Map<string, { elderId: string; label: string; reasons: string[] }>()
+    const collect = (rows: ElderItem[], reason: string, matcher: (row: ElderItem) => boolean) => {
+      rows.forEach((row) => {
+        const elderId = String(row.id || '').trim()
+        if (!elderId || !matcher(row)) return
+        const current = warningMap.get(elderId) || {
+          elderId,
+          label: `${row.fullName || '未命名'}${row.elderCode ? `（${row.elderCode}）` : ''}`,
+          reasons: []
+        }
+        if (!current.reasons.includes(reason)) current.reasons.push(reason)
+        warningMap.set(elderId, current)
+      })
+    }
+    collect(idCardPage.list || [], '身份证号相同', (row) => trimText(row.idCardNo) === idCardNo)
+    collect(phonePage.list || [], '手机号相同', (row) => trimText(row.phone) === phone)
+    collect(fullNamePage.list || [], '姓名和出生日期相同', (row) => trimText(row.fullName) === fullName && trimText(row.birthDate) === birthDate)
+    duplicateWarnings.value = Array.from(warningMap.values()).slice(0, 5)
+  } catch {
+    duplicateWarnings.value = []
+  }
 }
 
 async function loadBeds() {

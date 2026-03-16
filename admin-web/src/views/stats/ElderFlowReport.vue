@@ -17,6 +17,9 @@
         <a-form-item label="机构ID">
           <a-input v-model:value="query.orgId" allow-clear placeholder="默认当前机构" style="width: 160px" />
         </a-form-item>
+        <a-form-item label="老人姓名">
+          <a-input v-model:value="query.keyword" allow-clear placeholder="按姓名关键字检索" style="width: 180px" />
+        </a-form-item>
         <a-form-item label="院内老人">
           <a-select
             v-model:value="printElderId"
@@ -57,6 +60,38 @@
         :note-text="metricTraceText"
       />
     </a-card>
+
+    <StatsWorkspacePanel
+      page-key="stats-elder-flow-report"
+      title="出入报表策略区"
+      :summary-text="workspaceSummary"
+      :current-payload="workspacePayload"
+      :target-fields="targetFields"
+      :data-health="dataHealth"
+      :empty-state="emptyState"
+      @apply-preset="applyPreset"
+      @targets-change="onTargetsChange"
+    />
+
+    <StatsInsightDeck :items="visibleInsightItems" />
+
+    <StatsCommandCenter
+      page-key="stats-elder-flow-report-command"
+      title="出入报表协同台"
+      share-title="老人出入报表协同包"
+      :summary-text="commandSummary"
+      :current-payload="workspacePayload"
+      :action-items="commandActionItems"
+      :anomalies="commandAnomalies"
+      :metric-notes="metricNotes"
+      :panel-options="panelOptions"
+      :selected-panel-keys="panelKeys"
+      :template-column-options="printColumnOptions"
+      :selected-template-columns="selectedPrintColumns"
+      @trigger-action="onCommandAction"
+      @panel-change="onPanelChange"
+      @apply-template="applyReportTemplate"
+    />
 
     <a-row :gutter="16" style="margin-top: 16px;">
       <a-col :span="8">
@@ -142,6 +177,9 @@ import dayjs, { type Dayjs } from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import StatsMetaHint from '../../components/stats/StatsMetaHint.vue'
+import StatsWorkspacePanel from '../../components/stats/StatsWorkspacePanel.vue'
+import StatsInsightDeck from '../../components/stats/StatsInsightDeck.vue'
+import StatsCommandCenter from '../../components/stats/StatsCommandCenter.vue'
 import { exportElderFlowReportCsv, getElderFlowReport } from '../../api/stats'
 import type { FlowReportItem, Id } from '../../types'
 import { message, Modal } from 'ant-design-vue'
@@ -150,6 +188,7 @@ import { useElderOptions } from '../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { copyText } from '../../utils/clipboard'
 import { normalizeId } from '../../utils/id'
+import { buildComparisonSummary, buildPeriodSeries } from '../../utils/statsInsight'
 
 const route = useRoute()
 const router = useRouter()
@@ -158,6 +197,7 @@ const query = ref({
   fromDate: dayjs().subtract(29, 'day') as Dayjs,
   toDate: dayjs() as Dayjs,
   eventType: undefined as 'ADMISSION' | 'DISCHARGE' | undefined,
+  keyword: '',
   orgId: undefined as Id | undefined,
   pageNo: 1,
   pageSize: 20
@@ -185,6 +225,11 @@ const printColumnOptions = [
   { label: '备注', value: 'remark' }
 ]
 const selectedPrintColumns = ref<string[]>(['eventDate', 'eventTypeLabel', 'elderName', 'remark'])
+const panelKeys = ref<string[]>([])
+const targets = ref<Record<string, number>>({
+  totalRecords: 0,
+  dischargeShare: 50
+})
 const { elderOptions, elderLoading, searchElders } = useElderOptions({ pageSize: 100, inHospitalOnly: true, signedOnly: true })
 const LARGE_PRINT_ROW_THRESHOLD = 200
 const metricTraceText = computed(() => {
@@ -205,6 +250,115 @@ const printRows = computed(() => rows.value.map(item => ({
 })))
 const selectedPrintElder = computed(() => elderOptions.value.find((item) => String(item.value || '').trim() === String(printElderId.value || '').trim()))
 const canPrintSpecific = computed(() => !!printRows.value.length && !!printElderId.value)
+const workspaceSummary = computed(() => `对老人出入院明细做分页检索、批量操作和固定筛选保存。当前命中 ${summary.value.total} 条记录。`)
+const workspacePayload = computed(() => ({
+  fromDate: dayjs(query.value.fromDate).format('YYYY-MM-DD'),
+  toDate: dayjs(query.value.toDate).format('YYYY-MM-DD'),
+  eventType: query.value.eventType || '',
+  keyword: query.value.keyword || '',
+  orgId: query.value.orgId ? String(query.value.orgId) : '',
+  elderId: printElderId.value ? String(printElderId.value) : ''
+}))
+const targetFields = computed(() => ([
+  { key: 'totalRecords', label: '匹配记录目标', value: targets.value.totalRecords, min: 0, max: 999999, step: 10 },
+  { key: 'dischargeShare', label: '离院占比关注线(%)', value: targets.value.dischargeShare, min: 0, max: 100, step: 1 }
+]))
+const dataHealth = computed(() => {
+  const dischargeShare = Number(summary.value.total || 0) > 0
+    ? Number(((Number(summary.value.dischargeCount || 0) / Number(summary.value.total || 1)) * 100).toFixed(2))
+    : 0
+  return {
+    freshness: refreshedAt.value || '--',
+    completeness: `${rows.value.length}/${summary.value.total || 0} 条已加载`,
+    issues: [
+      query.value.keyword ? `姓名关键字：${query.value.keyword}` : '',
+      dischargeShare > Number(targets.value.dischargeShare || 0) ? '离院占比高于关注线' : ''
+    ].filter(Boolean)
+  }
+})
+const emptyState = computed(() => ({
+  visible: !rows.value.length,
+  title: '当前筛选下没有出入院记录',
+  description: '建议先移除姓名关键字或院内老人筛选，再扩大日期范围。',
+  hints: [
+    '如果仅筛某位老人，先确认该老人是否存在出入院记录',
+    '若只看离院，可尝试切换全部事件确认是否为单侧无数据',
+    '支持直接复制当前筛选链接给业务同事复核'
+  ]
+}))
+const insightItems = computed(() => {
+  const dailySeriesMap = new Map<string, number>()
+  rows.value.forEach((item) => {
+    const key = String(item.eventDate || '')
+    dailySeriesMap.set(key, Number(dailySeriesMap.get(key) || 0) + 1)
+  })
+  const series = Array.from(dailySeriesMap.entries()).map(([period, value]) => ({ period, value }))
+  const seriesSummary = buildComparisonSummary(series, targets.value.totalRecords)
+  const dischargeShare = Number(summary.value.total || 0) > 0
+    ? Number(((Number(summary.value.dischargeCount || 0) / Number(summary.value.total || 1)) * 100).toFixed(2))
+    : 0
+  return [
+    {
+      key: 'total',
+      label: '匹配总记录',
+      valueText: `${summary.value.total || 0}`,
+      trendText: `目标差 ${Number((summary.value.total || 0) - Number(targets.value.totalRecords || 0)) >= 0 ? '+' : ''}${Number((summary.value.total || 0) - Number(targets.value.totalRecords || 0))}`,
+      detail: seriesSummary.anomalyText,
+      tone: Number(summary.value.total || 0) < Number(targets.value.totalRecords || 0) ? 'warning' : 'good'
+    },
+    {
+      key: 'admission',
+      label: '入院记录',
+      valueText: `${summary.value.admissionCount || 0}`,
+      trendText: `占比 ${summary.value.total ? ((Number(summary.value.admissionCount || 0) / Number(summary.value.total || 1)) * 100).toFixed(2) : '0.00'}%`,
+      detail: '适合排查新入住高峰与批量办理周期',
+      tone: 'neutral'
+    },
+    {
+      key: 'discharge',
+      label: '离院记录',
+      valueText: `${summary.value.dischargeCount || 0}`,
+      trendText: `关注线 ${Number(targets.value.dischargeShare || 0).toFixed(2)}%`,
+      detail: dischargeShare > Number(targets.value.dischargeShare || 0) ? '当前离院占比偏高，建议联动离院原因排查' : '离院占比处于关注线内',
+      tone: dischargeShare > Number(targets.value.dischargeShare || 0) ? 'danger' : 'good'
+    },
+    {
+      key: 'loaded',
+      label: '当前页加载',
+      valueText: `${rows.value.length}`,
+      trendText: `页码 ${query.value.pageNo}/${Math.max(1, Math.ceil(Number(summary.value.total || 0) / Number(query.value.pageSize || 20)))}`,
+      detail: printElderId.value ? `已锁定老人 ${selectedPrintElder.value?.name || printElderId.value}` : '当前为全量老人视角',
+      tone: 'neutral'
+    }
+  ]
+})
+const visibleInsightItems = computed(() => {
+  const selected = panelKeys.value.length ? new Set(panelKeys.value) : null
+  return insightItems.value.filter((item) => !selected || selected.has(item.key))
+})
+const commandSummary = computed(() => '把离院异常、批量打印模板、协作链接和纠错入口合并到出入报表工作台。')
+const commandActionItems = computed(() => ([
+  { key: 'open-checkin', label: '查看入住统计', description: '回到月度入住趋势判断波峰', route: '/stats/check-in', tone: 'warning' as const },
+  { key: 'open-elder-info', label: '查看老人画像', description: '核对出入老人结构', route: '/stats/elder-info', tone: 'danger' as const },
+  { key: 'open-org-flow', label: '查看机构出入趋势', description: '切到机构维度看月度波动', route: '/stats/org/elder-flow', tone: 'neutral' as const }
+]))
+const commandAnomalies = computed(() =>
+  insightItems.value
+    .filter((item) => item.tone === 'danger' || item.tone === 'warning')
+    .map((item) => ({ key: item.key, label: item.label, detail: item.detail, tone: item.tone }))
+)
+const metricNotes = computed(() => ([
+  { key: 'keyword', label: '姓名关键字', note: '姓名关键字检索已直通后端分页与导出，不再只是前端过滤。' },
+  { key: 'discharge', label: '离院占比', note: '离院占比偏高时，建议联动离院原因、床位周转和收入变化一起判断。' },
+  { key: 'batch', label: '批量操作', note: '当前页支持勾选批量打印与导出，适合业务复核。' }
+]))
+const panelOptions = computed(() =>
+  insightItems.value.map((item) => ({
+    key: item.key,
+    label: item.label,
+    description: item.detail || item.trendText
+  }))
+)
 
 async function loadData() {
   if (query.value.fromDate.isAfter(query.value.toDate, 'day')) {
@@ -217,6 +371,7 @@ async function loadData() {
       toDate: dayjs(query.value.toDate).format('YYYY-MM-DD'),
       eventType: query.value.eventType,
       elderId: printElderId.value,
+      keyword: query.value.keyword,
       pageNo: query.value.pageNo,
       pageSize: query.value.pageSize,
       orgId: query.value.orgId
@@ -244,6 +399,42 @@ function search() {
   loadData()
 }
 
+function applyPreset(payload: Record<string, any>) {
+  if (payload.fromDate && dayjs(String(payload.fromDate)).isValid()) query.value.fromDate = dayjs(String(payload.fromDate))
+  if (payload.toDate && dayjs(String(payload.toDate)).isValid()) query.value.toDate = dayjs(String(payload.toDate))
+  const eventType = String(payload.eventType || '')
+  query.value.eventType = eventType === 'ADMISSION' || eventType === 'DISCHARGE' ? eventType : undefined
+  query.value.keyword = String(payload.keyword || '')
+  query.value.orgId = normalizeId(payload.orgId)
+  printElderId.value = normalizeId(payload.elderId)
+  query.value.pageNo = 1
+  loadData()
+}
+
+function onTargetsChange(payload: Record<string, number>) {
+  targets.value = {
+    ...targets.value,
+    ...(payload || {})
+  }
+}
+
+function onPanelChange(keys: string[]) {
+  panelKeys.value = keys.length ? [...keys] : insightItems.value.map((item) => item.key)
+}
+
+function onCommandAction(item: { route?: string }) {
+  if (item.route) {
+    router.push(item.route)
+  }
+}
+
+function applyReportTemplate(payload: { payload: Record<string, any>; columns: string[] }) {
+  if (payload.columns?.length) {
+    selectedPrintColumns.value = [...payload.columns]
+  }
+  applyPreset(payload.payload || {})
+}
+
 function buildRowKey(row: FlowReportItem, index: number) {
   return [
     row.eventDate || 'NA',
@@ -257,6 +448,7 @@ function reset() {
   query.value.fromDate = dayjs().subtract(29, 'day')
   query.value.toDate = dayjs()
   query.value.eventType = undefined
+  query.value.keyword = ''
   query.value.orgId = undefined
   query.value.pageNo = 1
   query.value.pageSize = 20
@@ -285,6 +477,7 @@ async function exportCsvReport() {
       toDate: dayjs(query.value.toDate).format('YYYY-MM-DD'),
       eventType: query.value.eventType,
       elderId: printElderId.value,
+      keyword: query.value.keyword,
       orgId: query.value.orgId
     })
     message.success('报表导出成功')
@@ -300,6 +493,7 @@ async function copyFilterLink() {
       fromDate: dayjs(query.value.fromDate).format('YYYY-MM-DD'),
       toDate: dayjs(query.value.toDate).format('YYYY-MM-DD'),
       eventType: query.value.eventType || '',
+      keyword: query.value.keyword || '',
       orgId: query.value.orgId ? String(query.value.orgId) : '',
       elderId: printElderId.value ? String(printElderId.value) : '',
       pageNo: String(query.value.pageNo),
@@ -464,7 +658,8 @@ function buildPrintScopeText(baseScope: string) {
     : query.value.eventType === 'DISCHARGE'
       ? '仅离院'
       : '全部事件'
-  return `${baseScope}；事件类型：${eventTypeText}`
+  const keywordText = query.value.keyword ? `；姓名关键字：${query.value.keyword}` : ''
+  return `${baseScope}；事件类型：${eventTypeText}${keywordText}`
 }
 
 function syncRouteQuery() {
@@ -475,6 +670,7 @@ function syncRouteQuery() {
     pageSize: String(query.value.pageSize)
   }
   if (query.value.eventType) nextQuery.eventType = query.value.eventType
+  if (query.value.keyword) nextQuery.keyword = query.value.keyword
   if (query.value.orgId) nextQuery.orgId = String(query.value.orgId)
   if (printElderId.value) nextQuery.elderId = String(printElderId.value)
 
@@ -494,6 +690,7 @@ function initFromRouteQuery() {
   if (eventType === 'ADMISSION' || eventType === 'DISCHARGE') {
     query.value.eventType = eventType
   }
+  query.value.keyword = String(route.query.keyword || '').trim()
   query.value.orgId = normalizeId(route.query.orgId)
   printElderId.value = normalizeId(route.query.elderId)
   const pageNo = Number(route.query.pageNo)

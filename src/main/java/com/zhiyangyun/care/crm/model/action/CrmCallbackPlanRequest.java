@@ -8,4 +8,5 @@ public class CrmCallbackPlanRequest {
   private String followupContent;
   private String planExecuteTime;
   private String executorName;
+  private String callbackType;
 }

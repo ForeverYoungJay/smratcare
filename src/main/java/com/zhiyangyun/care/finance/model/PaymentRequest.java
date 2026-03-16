@@ -16,4 +16,5 @@ public class PaymentRequest {
   private LocalDateTime paidAt;
   private String remark;
   private String externalTxnId;
+  private Long crossPeriodApprovalId;
 }

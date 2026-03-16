@@ -6,11 +6,15 @@ export function getStaffPage(params: any) {
 }
 
 export function createStaff(data: Partial<StaffItem>) {
-  return request.post<void>('/api/admin/staff', data)
+  return request.post<StaffItem>('/api/admin/staff', data)
 }
 
 export function updateStaff(id: Id, data: Partial<StaffItem>) {
-  return request.put<void>('/api/admin/staff', { ...data, id })
+  return request.put<StaffItem>('/api/admin/staff', { ...data, id })
+}
+
+export function getStaff(id: Id) {
+  return request.get<StaffItem>(`/api/admin/staff/${id}`)
 }
 
 export function updateStaffRoles(id: Id, roleIds: number[]) {

@@ -15,6 +15,8 @@ public class CrmCallbackPlanResponse {
   private String followupContent;
   private LocalDateTime planExecuteTime;
   private String executorName;
+  private String callbackType;
+  private Double score;
   private String status;
   private LocalDateTime executedTime;
   private String executeNote;

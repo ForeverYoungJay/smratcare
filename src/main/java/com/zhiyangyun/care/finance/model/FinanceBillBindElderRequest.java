@@ -8,4 +8,5 @@ public class FinanceBillBindElderRequest {
   @NotNull
   private Long elderId;
   private String remark;
+  private Long crossPeriodApprovalId;
 }

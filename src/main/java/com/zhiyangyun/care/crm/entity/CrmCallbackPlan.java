@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import lombok.Data;
 
@@ -20,6 +21,8 @@ public class CrmCallbackPlan {
   private String followupContent;
   private LocalDateTime planExecuteTime;
   private String executorName;
+  private String callbackType;
+  private BigDecimal score;
   private String status;
   private LocalDateTime executedTime;
   private String executeNote;

@@ -246,9 +246,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { message } from 'ant-design-vue'
+import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { exportCsv } from '../../utils/export'
 import { adjustInventory, getInventoryAdjustmentDiffReport, getInventoryAdjustmentPage } from '../../api/materialCenter'
@@ -259,6 +260,7 @@ import { useUserStore } from '../../stores/user'
 import type { Id, InventoryAdjustmentDiffItem, InventoryAdjustmentItem, MaterialWarehouseItem, PageResult, ProductItem } from '../../types'
 
 const userStore = useUserStore()
+const route = useRoute()
 const loading = ref(false)
 const saving = ref(false)
 const createOpen = ref(false)
@@ -365,6 +367,13 @@ async function fetchData() {
   } finally {
     loading.value = false
   }
+}
+
+function applyRouteFilters() {
+  const adjustTypeRaw = Array.isArray(route.query.adjustType) ? route.query.adjustType[0] : route.query.adjustType
+  query.adjustType = adjustTypeRaw === 'GAIN' || adjustTypeRaw === 'LOSS'
+    ? adjustTypeRaw
+    : undefined
 }
 
 async function fetchDiffReport() {
@@ -640,6 +649,7 @@ async function submitCreate() {
 }
 
 onMounted(async () => {
+  applyRouteFilters()
   try {
     const [warehouseRes, productRes] = await Promise.all([
       getWarehousePage({ pageNo: 1, pageSize: 500 }),
@@ -663,6 +673,14 @@ onMounted(async () => {
     await fetchDiffReport()
   }
 })
+
+watch(
+  () => route.query,
+  () => {
+    applyRouteFilters()
+    fetchData()
+  }
+)
 </script>
 
 <style scoped>

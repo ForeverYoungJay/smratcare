@@ -151,9 +151,10 @@ public class FeeManagementController {
       @RequestParam(required = false) String from,
       @RequestParam(required = false) String to,
       @RequestParam(required = false) String category,
-      @RequestParam(required = false) String keyword) {
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String moduleKey) {
     Long orgId = AuthContext.getOrgId();
-    return Result.ok(feeManagementService.consumptionPage(orgId, pageNo, pageSize, elderId, from, to, category, keyword));
+    return Result.ok(feeManagementService.consumptionPage(orgId, pageNo, pageSize, elderId, from, to, category, keyword, moduleKey));
   }
 
   @PostMapping("/consumption")

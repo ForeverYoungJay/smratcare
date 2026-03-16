@@ -35,7 +35,7 @@
       </a-col>
       <a-col :xs="24" :sm="8">
         <a-card class="card-elevated" :bordered="false">
-          <a-statistic title="已完成（预订）" :value="completed" />
+          <a-statistic title="已完成回访" :value="completed" />
           <a style="font-size: 12px;" @click="goList">查看清单</a>
         </a-card>
       </a-col>
@@ -120,7 +120,10 @@ const columns = [
 ]
 
 async function loadData() {
-  const report = await getMarketingCallbackReport(query)
+  const report = await getMarketingCallbackReport({
+    ...query,
+    type: (callbackType.value || undefined) as MarketingReportQuery['type']
+  })
   rows.value = report.records || []
   total.value = report.total || 0
   todayDue.value = report.todayDue || 0

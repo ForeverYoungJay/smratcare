@@ -28,7 +28,8 @@
         />
       </a-form-item>
       <template #extra>
-        <a-button type="primary" @click="openDrawer()">新增档案</a-button>
+        <a-button @click="router.push('/hr/profile/onboarding')">入职向导</a-button>
+        <a-button type="primary" @click="openDrawer()">新增人员</a-button>
         <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑档案</a-button>
         <a-button :disabled="!selectedSingleRecord" @click="viewSelected">查看</a-button>
         <a-button :disabled="!canTerminateSingle" @click="terminateSelected">离职</a-button>
@@ -39,6 +40,15 @@
         <span class="selection-tip">已勾选 {{ selectedRowKeys.length }} 条</span>
       </template>
     </SearchForm>
+
+    <a-alert
+      v-if="String(route.query.autoCreate || '') === '1' && String(route.query.wizard || '') === '1'"
+      type="info"
+      show-icon
+      style="margin-bottom: 12px"
+      message="当前来自入职向导"
+      description="保存后可以直接继续去账号设置、合同维护或附件上传。"
+    />
 
     <DataTable
       rowKey="staffId"
@@ -60,9 +70,55 @@
 
     <a-drawer v-model:open="drawerOpen" :title="drawerTitle" width="560">
       <a-form :model="form" layout="vertical">
+        <a-alert
+          v-if="!form.staffId"
+          type="info"
+          show-icon
+          style="margin-bottom: 16px"
+          message="推荐流程：先建员工主档，再同步档案、合同和附件"
+          description="默认走新增人员；如果账号已经存在，也可以切换为“选择现有账号建档”。"
+        />
+        <a-form-item v-if="!form.staffId" label="建档方式">
+          <a-radio-group v-model:value="createMode">
+            <a-radio-button value="new">新增人员</a-radio-button>
+            <a-radio-button value="existing">选择现有账号建档</a-radio-button>
+          </a-radio-group>
+        </a-form-item>
+        <template v-if="!form.staffId && createMode === 'new'">
+          <a-form-item label="登录账号" required>
+            <a-input v-model:value="accountForm.username" placeholder="建议英文/拼音账号" />
+          </a-form-item>
+          <a-form-item label="初始密码" required>
+            <a-input-password v-model:value="accountForm.password" placeholder="至少 6 位" />
+          </a-form-item>
+          <a-form-item label="工号" required>
+            <a-input v-model:value="accountForm.staffNo" placeholder="院内工号" />
+          </a-form-item>
+          <a-form-item label="姓名" required>
+            <a-input v-model:value="accountForm.realName" @change="syncRealNameFromAccount" />
+          </a-form-item>
+          <a-form-item label="部门">
+            <a-select
+              v-model:value="accountForm.departmentId"
+              allow-clear
+              show-search
+              :filter-option="false"
+              :options="departmentFilterOptions"
+              placeholder="选择部门"
+              @search="searchDepartments"
+              @focus="() => !departmentOptions.length && searchDepartments('')"
+            />
+          </a-form-item>
+          <a-form-item label="手机号">
+            <a-input v-model:value="accountForm.phone" />
+          </a-form-item>
+          <a-form-item label="账号状态">
+            <a-select v-model:value="accountForm.status" :options="statusOptions" />
+          </a-form-item>
+        </template>
         <a-form-item label="员工" required>
           <a-select
-            v-if="!form.staffId"
+            v-if="!form.staffId && createMode === 'existing'"
             v-model:value="form.staffId"
             allow-clear
             show-search
@@ -74,7 +130,7 @@
             @focus="() => !staffOptions.length && searchStaff('')"
             @change="onStaffChange"
           />
-          <a-input v-else v-model:value="form.realName" disabled />
+          <a-input v-else :value="form.realName || accountForm.realName || ''" disabled />
         </a-form-item>
         <a-form-item label="岗位/角色">
           <a-select
@@ -137,7 +193,10 @@
       <template #footer>
         <a-space>
           <a-button @click="drawerOpen = false">取消</a-button>
-          <a-button type="primary" :loading="saving" @click="submit">保存</a-button>
+          <a-button :loading="saving" @click="submit('save')">保存</a-button>
+          <a-button :loading="saving" @click="submit('account')">保存并设置账号</a-button>
+          <a-button :loading="saving" @click="submit('contract')">保存并维护合同</a-button>
+          <a-button type="primary" :loading="saving" @click="submit('attachment')">保存并上传附件</a-button>
         </a-space>
       </template>
     </a-drawer>
@@ -168,10 +227,11 @@ import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { getHrStaffPage, getHrProfile, upsertHrProfile, terminateStaff, reinstateStaff } from '../../api/hr'
 import { appendStaffRole, getRolePage, getStaffRoleAssignments } from '../../api/rbac'
+import { createStaff as createStaffAccount } from '../../api/staff'
 import { openPrintTableReport } from '../../utils/print'
 import { useStaffOptions } from '../../composables/useStaffOptions'
 import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
-import type { HrStaffProfile, PageResult, RoleItem } from '../../types'
+import type { HrStaffProfile, PageResult, RoleItem, StaffItem } from '../../types'
 import { resolveHrError } from './hrError'
 
 const props = withDefaults(defineProps<{
@@ -220,6 +280,10 @@ const columns = [
 
 const drawerOpen = ref(false)
 const form = reactive<Partial<HrStaffProfile>>({})
+const createMode = ref<'new' | 'existing'>('new')
+const accountForm = reactive<Partial<StaffItem>>({
+  status: 1
+})
 const statusOptions = [
   { label: '在职', value: 1 },
   { label: '离职', value: 0 }
@@ -248,7 +312,7 @@ const departmentFilterOptions = computed(() =>
 const roleFilterOptions = computed(() => roles.value.map((item) => ({ label: `${item.roleName} (${item.roleCode})`, value: item.id })))
 const roleFormOptions = computed(() => roles.value.map((item) => ({ label: item.roleName, value: item.id })))
 
-const drawerTitle = computed(() => (form.staffId ? '编辑档案' : '新增档案'))
+const drawerTitle = computed(() => (form.staffId ? '编辑档案' : '新增人员'))
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: (string | number)[]) => {
@@ -315,6 +379,12 @@ function onStaffChange(val: string | number) {
   }
 }
 
+function syncRealNameFromAccount() {
+  if (!form.staffId) {
+    form.realName = accountForm.realName
+  }
+}
+
 function onRoleChange(roleId?: number) {
   const selected = roles.value.find((item) => item.id === roleId)
   form.jobTitle = selected?.roleName || undefined
@@ -324,6 +394,11 @@ async function openDrawer(record?: HrStaffProfile) {
   Object.keys(form).forEach((key) => {
     ;(form as any)[key] = undefined
   })
+  Object.keys(accountForm).forEach((key) => {
+    ;(accountForm as any)[key] = undefined
+  })
+  accountForm.status = 1
+  createMode.value = 'new'
   selectedRoleId.value = undefined
   initialRoleIds.value = []
   Object.assign(form, record || { status: 1 })
@@ -376,20 +451,59 @@ async function openDrawer(record?: HrStaffProfile) {
     form.birthday = dayjs(form.birthday)
   }
   drawerOpen.value = true
+  consumeWizardCreateQuery()
 }
 
 async function viewProfile(record: HrStaffProfile) {
   await openDrawer(record)
 }
 
-async function submit() {
-  if (!form.staffId) {
-    message.error('请选择员工')
-    return
-  }
+async function submit(nextStep: 'save' | 'account' | 'contract' | 'attachment' = 'save') {
   saving.value = true
   try {
+    let resolvedStaffId = form.staffId
+    if (!resolvedStaffId) {
+      if (createMode.value === 'existing') {
+        message.error('请选择员工')
+        return
+      }
+      const username = String(accountForm.username || '').trim()
+      const password = String(accountForm.password || '').trim()
+      const realName = String(accountForm.realName || '').trim()
+      const staffNo = String(accountForm.staffNo || '').trim()
+      if (!username || !password || !realName || !staffNo) {
+        message.error('新增人员需填写账号、密码、姓名和工号')
+        return
+      }
+      if (password.length < 6) {
+        message.error('初始密码至少 6 位')
+        return
+      }
+      const created = await createStaffAccount({
+        username,
+        password,
+        realName,
+        staffNo,
+        departmentId: accountForm.departmentId,
+        phone: accountForm.phone,
+        status: accountForm.status ?? 1
+      })
+      resolvedStaffId = created?.id
+      form.staffId = created?.id
+      form.realName = created?.realName || realName
+      form.staffNo = created?.staffNo || staffNo
+      form.phone = created?.phone || String(accountForm.phone || '')
+      if (created?.departmentId != null) {
+        form.departmentId = Number(created.departmentId)
+      }
+      ensureSelectedStaff(created?.id, created?.realName || realName)
+    }
+    if (!resolvedStaffId) {
+      message.error('员工主档创建失败')
+      return
+    }
     const payload = { ...form } as any
+    payload.staffId = resolvedStaffId
     payload.hireDate = payload.hireDate && typeof payload.hireDate === 'object' && payload.hireDate.format
       ? payload.hireDate.format('YYYY-MM-DD')
       : null
@@ -406,7 +520,7 @@ async function submit() {
       ? payload.birthday.format('YYYY-MM-DD')
       : null
     const saved = await upsertHrProfile(payload)
-    const staffId = Number(saved?.staffId || form.staffId)
+    const staffId = Number(saved?.staffId || resolvedStaffId)
     if (selectedRoleId.value && Number.isFinite(staffId) && !initialRoleIds.value.includes(selectedRoleId.value)) {
       await appendStaffRole(staffId, selectedRoleId.value)
       initialRoleIds.value = [...initialRoleIds.value, selectedRoleId.value]
@@ -414,12 +528,51 @@ async function submit() {
     Object.assign(form, saved || {})
     message.success(saved?.contractNo ? `保存成功，合同编号：${saved.contractNo}` : '保存成功')
     drawerOpen.value = false
-    fetchData()
+    await fetchData()
+    jumpToNextStep(staffId, nextStep)
   } catch (error) {
     message.error(resolveHrError(error, '保存失败'))
   } finally {
     saving.value = false
   }
+}
+
+function jumpToNextStep(staffId: number, nextStep: 'save' | 'account' | 'contract' | 'attachment') {
+  if (!Number.isFinite(staffId) || nextStep === 'save') {
+    return
+  }
+  const query = { staffId: String(staffId), autoOpen: '1', from: 'hr-profile-basic' }
+  if (nextStep === 'account') {
+    router.push({ path: '/hr/profile/account-access', query })
+    return
+  }
+  if (nextStep === 'contract') {
+    router.push({ path: '/hr/profile/contracts', query })
+    return
+  }
+  router.push({ path: '/hr/profile/attachments', query })
+}
+
+function consumeWizardCreateQuery() {
+  if (String(route.query.autoCreate || '') !== '1' && String(route.query.autoOpen || '') !== '1') return
+  router.replace({
+    query: {
+      ...route.query,
+      autoCreate: undefined,
+      autoOpen: undefined
+    }
+  })
+}
+
+function maybeAutoOpenCreate() {
+  if (String(route.query.autoCreate || '') !== '1') return
+  openDrawer().catch(() => {})
+}
+
+function maybeAutoOpenProfile() {
+  const staffId = String(route.query.staffId || '').trim()
+  if (String(route.query.autoOpen || '') !== '1' || !staffId) return
+  openDrawer({ staffId } as HrStaffProfile).catch(() => {})
 }
 
 const terminateOpen = ref(false)
@@ -588,6 +741,8 @@ watch(
 
 syncQueryFromRoute()
 fetchData()
+maybeAutoOpenCreate()
+maybeAutoOpenProfile()
 </script>
 
 <style scoped>

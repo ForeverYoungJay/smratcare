@@ -48,6 +48,9 @@ public class FinanceWorkbenchOverviewResponse {
     private Long pendingDiscountCount;
     private Long pendingRefundCount;
     private Long pendingDischargeSettlementCount;
+    private Long issueTodoCount;
+    private Long collectionReminderCount;
+    private Long lockedMonthCount;
   }
 
   @Data

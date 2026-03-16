@@ -15,6 +15,8 @@ import com.zhiyangyun.care.elder.mapper.BedMapper;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderAdmissionMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeMapper;
+import com.zhiyangyun.care.report.mapper.StatisticsFlowReportMapper;
+import com.zhiyangyun.care.report.model.FlowReportRow;
 import com.zhiyangyun.care.store.entity.StoreOrder;
 import com.zhiyangyun.care.store.mapper.StoreOrderMapper;
 import jakarta.validation.constraints.Max;
@@ -61,6 +63,7 @@ public class StatisticsController {
   private final StoreOrderMapper storeOrderMapper;
   private final BedMapper bedMapper;
   private final OrgMapper orgMapper;
+  private final StatisticsFlowReportMapper statisticsFlowReportMapper;
 
   public StatisticsController(
       ElderAdmissionMapper admissionMapper,
@@ -69,7 +72,8 @@ public class StatisticsController {
       BillMonthlyMapper billMonthlyMapper,
       StoreOrderMapper storeOrderMapper,
       BedMapper bedMapper,
-      OrgMapper orgMapper) {
+      OrgMapper orgMapper,
+      StatisticsFlowReportMapper statisticsFlowReportMapper) {
     this.admissionMapper = admissionMapper;
     this.dischargeMapper = dischargeMapper;
     this.elderMapper = elderMapper;
@@ -77,6 +81,7 @@ public class StatisticsController {
     this.storeOrderMapper = storeOrderMapper;
     this.bedMapper = bedMapper;
     this.orgMapper = orgMapper;
+    this.statisticsFlowReportMapper = statisticsFlowReportMapper;
   }
 
   @GetMapping("/check-in")
@@ -160,6 +165,7 @@ public class StatisticsController {
       @RequestParam(required = false) @Pattern(regexp = MONTH_PATTERN, message = "from must be YYYY-MM") String from,
       @RequestParam(required = false) @Pattern(regexp = MONTH_PATTERN, message = "to must be YYYY-MM") String to,
       @RequestParam(defaultValue = "6") @Min(1) @Max(36) int months,
+      @RequestParam(required = false) @Min(1) Long elderId,
       @RequestParam(required = false) Long orgId) {
     Long scopedOrgId = resolveAccessibleOrgId(orgId);
     YearMonth end = parseYearMonth(to, YearMonth.now());
@@ -172,12 +178,14 @@ public class StatisticsController {
         Wrappers.lambdaQuery(BillMonthly.class)
             .eq(BillMonthly::getIsDeleted, 0)
             .eq(scopedOrgId != null, BillMonthly::getOrgId, scopedOrgId)
+            .eq(elderId != null, BillMonthly::getElderId, elderId)
             .ge(BillMonthly::getBillMonth, start.toString())
             .le(BillMonthly::getBillMonth, end.toString()));
     List<StoreOrder> orders = storeOrderMapper.selectList(
         Wrappers.lambdaQuery(StoreOrder.class)
             .eq(StoreOrder::getIsDeleted, 0)
             .eq(scopedOrgId != null, StoreOrder::getOrgId, scopedOrgId)
+            .eq(elderId != null, StoreOrder::getElderId, elderId)
             .ge(StoreOrder::getCreateTime, startTime)
             .lt(StoreOrder::getCreateTime, endTime));
 
@@ -242,8 +250,9 @@ public class StatisticsController {
       @RequestParam(required = false) @Pattern(regexp = MONTH_PATTERN, message = "from must be YYYY-MM") String from,
       @RequestParam(required = false) @Pattern(regexp = MONTH_PATTERN, message = "to must be YYYY-MM") String to,
       @RequestParam(defaultValue = "6") @Min(1) @Max(36) int months,
+      @RequestParam(required = false) @Min(1) Long elderId,
       @RequestParam(required = false) Long orgId) {
-    ConsumptionStatsResponse stats = consumption(from, to, months, orgId).getData();
+    ConsumptionStatsResponse stats = consumption(from, to, months, elderId, orgId).getData();
     List<String> headers = List.of("月份", "账单消费", "商城消费", "总消费", "账单占比(%)", "商城占比(%)", "月均消费");
     List<List<String>> body = stats.getMonthlyTotalConsumption().stream()
         .map(item -> {
@@ -561,14 +570,21 @@ public class StatisticsController {
     LocalDate end = parseDate(toDate, LocalDate.now());
     LocalDate start = parseDate(fromDate, end.minusDays(29));
     validateDateRange(start, end, 366);
-
-    List<FlowReportItem> filtered = buildFlowRows(scopedOrgId, start, end, eventType, elderId, keyword);
-    long admissionCount = filtered.stream().filter(item -> "ADMISSION".equals(item.getEventType())).count();
-    long dischargeCount = filtered.stream().filter(item -> "DISCHARGE".equals(item.getEventType())).count();
-    long total = filtered.size();
-    int startIndex = (int) Math.max((pageNo - 1) * pageSize, 0);
-    int endIndex = (int) Math.min(startIndex + pageSize, total);
-    List<FlowReportItem> pageList = startIndex >= total ? List.of() : filtered.subList(startIndex, endIndex);
+    String normalizedType = normalizeEventType(eventType);
+    String normalizedKeyword = normalizeKeyword(keyword);
+    long offset = Math.max((pageNo - 1) * pageSize, 0);
+    long admissionCount = "DISCHARGE".equals(normalizedType)
+        ? 0L
+        : statisticsFlowReportMapper.countAdmissions(scopedOrgId, start, end, elderId, normalizedKeyword);
+    long dischargeCount = "ADMISSION".equals(normalizedType)
+        ? 0L
+        : statisticsFlowReportMapper.countDischarges(scopedOrgId, start, end, elderId, normalizedKeyword);
+    long total = admissionCount + dischargeCount;
+    List<FlowReportItem> pageList = statisticsFlowReportMapper.selectFlowRows(
+            scopedOrgId, start, end, normalizedType, elderId, normalizedKeyword, offset, pageSize)
+        .stream()
+        .map(this::toFlowReportItem)
+        .toList();
 
     FlowReportPageResponse response = new FlowReportPageResponse();
     response.setList(pageList);
@@ -592,8 +608,13 @@ public class StatisticsController {
     LocalDate end = parseDate(toDate, LocalDate.now());
     LocalDate start = parseDate(fromDate, end.minusDays(29));
     validateDateRange(start, end, 366);
-
-    List<FlowReportItem> rows = buildFlowRows(scopedOrgId, start, end, eventType, elderId, keyword);
+    String normalizedType = normalizeEventType(eventType);
+    String normalizedKeyword = normalizeKeyword(keyword);
+    List<FlowReportItem> rows = statisticsFlowReportMapper.selectFlowRows(
+            scopedOrgId, start, end, normalizedType, elderId, normalizedKeyword, null, null)
+        .stream()
+        .map(this::toFlowReportItem)
+        .toList();
     List<String> headers = List.of("日期", "事件类型", "老人ID", "老人姓名", "备注");
     List<List<String>> body = rows.stream()
         .map(item -> List.of(
@@ -696,65 +717,6 @@ public class StatisticsController {
     return result;
   }
 
-  private List<FlowReportItem> buildFlowRows(
-      Long orgId, LocalDate start, LocalDate end, String eventType, Long elderId, String keyword) {
-    String normalizedType = normalizeEventType(eventType);
-    List<FlowReportItem> rows = new ArrayList<>();
-
-    if (!"DISCHARGE".equals(normalizedType)) {
-      List<ElderAdmission> admissions = admissionMapper.selectList(
-          Wrappers.lambdaQuery(ElderAdmission.class)
-              .eq(ElderAdmission::getIsDeleted, 0)
-              .eq(orgId != null, ElderAdmission::getOrgId, orgId)
-              .eq(elderId != null, ElderAdmission::getElderId, elderId)
-              .ge(ElderAdmission::getAdmissionDate, start)
-              .le(ElderAdmission::getAdmissionDate, end));
-      for (ElderAdmission item : admissions) {
-        FlowReportItem row = new FlowReportItem();
-        row.setEventType("ADMISSION");
-        row.setEventDate(item.getAdmissionDate());
-        row.setElderId(item.getElderId());
-        row.setRemark(item.getRemark());
-        rows.add(row);
-      }
-    }
-    if (!"ADMISSION".equals(normalizedType)) {
-      List<ElderDischarge> discharges = dischargeMapper.selectList(
-          Wrappers.lambdaQuery(ElderDischarge.class)
-              .eq(ElderDischarge::getIsDeleted, 0)
-              .eq(orgId != null, ElderDischarge::getOrgId, orgId)
-              .eq(elderId != null, ElderDischarge::getElderId, elderId)
-              .ge(ElderDischarge::getDischargeDate, start)
-              .le(ElderDischarge::getDischargeDate, end));
-      for (ElderDischarge item : discharges) {
-        FlowReportItem row = new FlowReportItem();
-        row.setEventType("DISCHARGE");
-        row.setEventDate(item.getDischargeDate());
-        row.setElderId(item.getElderId());
-        row.setRemark(item.getReason());
-        rows.add(row);
-      }
-    }
-
-    Map<Long, ElderProfile> elderMap = buildElderMap(rows.stream()
-        .map(FlowReportItem::getElderId)
-        .filter(Objects::nonNull)
-        .distinct()
-        .toList());
-
-    return rows.stream()
-        .peek(row -> {
-          if (row.getElderId() != null) {
-            ElderProfile elder = elderMap.get(row.getElderId());
-            row.setElderName(elder == null ? null : elder.getFullName());
-          }
-        })
-        .filter(item -> keyword == null || keyword.isBlank()
-            || (item.getElderName() != null && item.getElderName().contains(keyword)))
-        .sorted(Comparator.comparing(FlowReportItem::getEventDate, Comparator.nullsLast(Comparator.naturalOrder())).reversed())
-        .toList();
-  }
-
   private String normalizeEventType(String eventType) {
     if (eventType == null || eventType.isBlank()) {
       return null;
@@ -766,6 +728,24 @@ public class StatisticsController {
       return "DISCHARGE";
     }
     throw new IllegalArgumentException("eventType must be ADMISSION or DISCHARGE");
+  }
+
+  private String normalizeKeyword(String keyword) {
+    if (keyword == null) {
+      return null;
+    }
+    String normalized = keyword.trim();
+    return normalized.isEmpty() ? null : normalized;
+  }
+
+  private FlowReportItem toFlowReportItem(FlowReportRow row) {
+    FlowReportItem item = new FlowReportItem();
+    item.setEventType(row.getEventType());
+    item.setEventDate(row.getEventDate());
+    item.setElderId(row.getElderId());
+    item.setElderName(row.getElderName());
+    item.setRemark(row.getRemark());
+    return item;
   }
 
   private Long resolveAccessibleOrgId(Long requestedOrgId) {

@@ -64,10 +64,11 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
-import { createHrProfileAttachment, getHrProfileAttachmentPage } from '../../api/hr'
+import { createHrProfileAttachment, getHrProfile, getHrProfileAttachmentPage } from '../../api/hr'
 import { uploadOaFile } from '../../api/oa'
 import type { HrProfileDocumentItem, PageResult } from '../../types'
 import { resolveHrError } from './hrError'
@@ -79,6 +80,8 @@ const query = reactive({
   pageNo: 1,
   pageSize: 10
 })
+const route = useRoute()
+const router = useRouter()
 const columns = [
   { title: '附件名称', dataIndex: 'name', key: 'name', width: 260 },
   { title: '上传人', dataIndex: 'uploaderName', key: 'uploaderName', width: 120 },
@@ -140,6 +143,7 @@ function openDrawer() {
   form.sizeBytes = undefined
   form.remark = undefined
   drawerOpen.value = true
+  consumeAutoOpenQuery()
 }
 
 async function beforeUploadAttachment(file: File) {
@@ -199,7 +203,33 @@ async function submit() {
   }
 }
 
-onMounted(fetchData)
+function consumeAutoOpenQuery() {
+  if (String(route.query.autoOpen || '') !== '1') return
+  router.replace({
+    query: {
+      ...route.query,
+      autoOpen: undefined,
+      from: undefined
+    }
+  })
+}
+
+async function maybeAutoOpenFromRoute() {
+  const staffId = String(route.query.staffId || '').trim()
+  if (String(route.query.autoOpen || '') !== '1' || !staffId) return
+  openDrawer()
+  try {
+    const profile = await getHrProfile(staffId)
+    form.remark = `员工:${profile.realName || '-'} 工号:${profile.staffNo || '-'} staffId:${profile.staffId || staffId}`
+  } catch {
+    form.remark = `staffId:${staffId}`
+  }
+}
+
+onMounted(async () => {
+  await fetchData()
+  await maybeAutoOpenFromRoute()
+})
 </script>
 
 <style scoped>

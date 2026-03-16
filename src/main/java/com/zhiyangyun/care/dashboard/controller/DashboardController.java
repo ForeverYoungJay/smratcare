@@ -28,17 +28,23 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import jakarta.validation.constraints.Pattern;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@Validated
 @RequestMapping("/api/dashboard")
 public class DashboardController {
+  private static final String MONTH_PATTERN = "^\\d{4}-(0[1-9]|1[0-2])$";
   private static final int SUMMARY_MONTH_SPAN = 6;
   private static final int INVENTORY_EXPIRY_DAYS = 30;
   private static final String METRIC_VERSION = "2026.03";
@@ -73,7 +79,9 @@ public class DashboardController {
   }
 
   @GetMapping("/summary")
-  public Result<DashboardSummary> summary() {
+  public Result<DashboardSummary> summary(
+      @RequestParam(required = false) @Pattern(regexp = MONTH_PATTERN, message = "from must be YYYY-MM") String from,
+      @RequestParam(required = false) @Pattern(regexp = MONTH_PATTERN, message = "to must be YYYY-MM") String to) {
     Long orgId = AuthContext.getOrgId();
     LocalDate today = LocalDate.now();
 
@@ -96,8 +104,10 @@ public class DashboardController {
         .eq(orgId != null, BillMonthly::getOrgId, orgId)
         .lt(BillMonthly::getStatus, 2));
 
-    YearMonth end = YearMonth.now();
-    YearMonth start = end.minusMonths(SUMMARY_MONTH_SPAN - 1L);
+    YearMonth end = parseYearMonth(to, YearMonth.now());
+    YearMonth start = parseYearMonth(from, end.minusMonths(SUMMARY_MONTH_SPAN - 1L));
+    validateMonthRange(start, end, 36);
+    int statsMonthSpan = monthSpan(start, end);
     LocalDate startDate = start.atDay(1);
     LocalDate endDate = end.atEndOfMonth();
     LocalDateTime startTime = startDate.atStartOfDay();
@@ -181,7 +191,7 @@ public class DashboardController {
     summary.setTotalBillConsumption(totalBillConsumption);
     summary.setTotalStoreConsumption(totalStoreConsumption);
     summary.setTotalConsumption(totalConsumption);
-    summary.setAverageMonthlyConsumption(calculateAverage(totalConsumption, SUMMARY_MONTH_SPAN));
+    summary.setAverageMonthlyConsumption(calculateAverage(totalConsumption, statsMonthSpan));
     summary.setBillConsumptionRatio(calculateShareRate(totalBillConsumption, totalConsumption));
     summary.setStoreConsumptionRatio(calculateShareRate(totalStoreConsumption, totalConsumption));
     summary.setInHospitalCount(inHospitalCount);
@@ -193,7 +203,7 @@ public class DashboardController {
     summary.setBedAvailableRate(calculateRate(availableBeds, totalBeds));
     BigDecimal totalRevenue = revenueByMonth.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
     summary.setTotalRevenue(totalRevenue);
-    summary.setAverageMonthlyRevenue(calculateAverage(totalRevenue, SUMMARY_MONTH_SPAN));
+    summary.setAverageMonthlyRevenue(calculateAverage(totalRevenue, statsMonthSpan));
     summary.setRevenueGrowthRate(calculateMonthOverMonthGrowth(revenueByMonth));
     summary.setStatsFromMonth(start.toString());
     summary.setStatsToMonth(end.toString());
@@ -332,5 +342,30 @@ public class DashboardController {
     return current.subtract(previous)
         .multiply(BigDecimal.valueOf(100))
         .divide(previous, 2, RoundingMode.HALF_UP);
+  }
+
+  private YearMonth parseYearMonth(String value, YearMonth fallback) {
+    if (value == null || value.isBlank()) {
+      return fallback;
+    }
+    try {
+      return YearMonth.parse(value);
+    } catch (DateTimeParseException ex) {
+      throw new IllegalArgumentException("Invalid month format, expected YYYY-MM");
+    }
+  }
+
+  private void validateMonthRange(YearMonth start, YearMonth end, int maxSpanMonths) {
+    if (start.isAfter(end)) {
+      throw new IllegalArgumentException("from must be earlier than or equal to to");
+    }
+    long span = monthSpan(start, end);
+    if (span > maxSpanMonths) {
+      throw new IllegalArgumentException("Date range is too large");
+    }
+  }
+
+  private int monthSpan(YearMonth start, YearMonth end) {
+    return (int) (end.getYear() * 12L + end.getMonthValue() - (start.getYear() * 12L + start.getMonthValue()) + 1);
   }
 }

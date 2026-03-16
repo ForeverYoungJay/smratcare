@@ -41,7 +41,7 @@ public interface FeeManagementService {
       DischargeSettlementConfirmRequest request);
 
   IPage<ConsumptionRecord> consumptionPage(Long orgId, long pageNo, long pageSize, Long elderId,
-      String from, String to, String category, String keyword);
+      String from, String to, String category, String keyword, String moduleKey);
 
   ConsumptionRecord createConsumption(Long orgId, Long operatorId, ConsumptionRecordCreateRequest request);
 
