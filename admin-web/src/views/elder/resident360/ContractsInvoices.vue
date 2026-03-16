@@ -276,7 +276,7 @@ const DOC_ROUTE_OBSERVE_KEYS = ['elderId', 'residentId', 'contractId', 'leadId']
 const { elderOptions, elderLoading, searchElders, ensureSelectedElder, findElderName } = useElderOptions({
   pageSize: 120,
   inHospitalOnly: false,
-  signedOnly: true
+  signedOnly: false
 })
 const selector = reactive({
   elderId: undefined as string | undefined

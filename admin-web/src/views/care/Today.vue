@@ -484,7 +484,7 @@ const { elderOptions, searchElders: searchElderOptions, findElderName } = useEld
   pageSize: 80,
   preloadSize: 300,
   inHospitalOnly: true,
-  signedOnly: true
+  signedOnly: false
 })
 const staffMap = ref<Record<number, string>>({})
 const summary = reactive<CareTaskSummary>({

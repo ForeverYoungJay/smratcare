@@ -53,6 +53,8 @@
                 show-search
                 :filter-option="false"
                 :options="elderOptions"
+                :loading="elderLoading"
+                option-filter-prop="label"
                 placeholder="请选择老人"
                 @search="loadElders"
                 @focus="() => !elderOptions.length && loadElders('')"
@@ -202,9 +204,9 @@ const query = reactive({
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const editOpen = ref(false)
 const saving = ref(false)
-const { elderOptions, searchElders: loadElderOptions, ensureSelectedElder } = useElderOptions({
-  pageSize: 120,
-  preloadSize: 400,
+const { elderOptions, elderLoading, searchElders: loadElderOptions, ensureSelectedElder } = useElderOptions({
+  pageSize: 200,
+  preloadSize: 600,
   inHospitalOnly: true,
   signedOnly: false
 })

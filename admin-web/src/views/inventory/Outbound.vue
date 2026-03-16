@@ -378,7 +378,12 @@ type SheetBatchReceipt = {
 const loading = ref(false)
 const route = useRoute()
 const userStore = useUserStore()
-const { elderOptions, elderLoading, searchElders } = useElderOptions({ pageSize: 80, inHospitalOnly: true, signedOnly: true })
+const { elderOptions, elderLoading, searchElders } = useElderOptions({
+  pageSize: 200,
+  preloadSize: 600,
+  inHospitalOnly: true,
+  signedOnly: false
+})
 const { departmentOptions, departmentLoading, searchDepartments } = useDepartmentOptions({ pageSize: 120 })
 const rows = ref<InventoryLogItem[]>([])
 const total = ref(0)
