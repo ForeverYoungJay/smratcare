@@ -230,7 +230,7 @@ const targets = ref<Record<string, number>>({
   totalRecords: 0,
   dischargeShare: 50
 })
-const { elderOptions, elderLoading, searchElders } = useElderOptions({ pageSize: 100, inHospitalOnly: true, signedOnly: false })
+const { elderOptions, elderLoading, searchElders } = useElderOptions({ pageSize: 100, inHospitalOnly: true, signedOnly: true })
 const LARGE_PRINT_ROW_THRESHOLD = 200
 const metricTraceText = computed(() => {
   const version = String(route.query.metricVersion || '').trim()
