@@ -136,7 +136,7 @@ class FeeManagementServiceTest {
   void consumption_page_should_validate_invalid_date_range() {
     IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
         () -> feeManagementService.consumptionPage(1L, 1L, 10L, null,
-            "2026-03-01", "2026-02-01", null, null));
+            "2026-03-01", "2026-02-01", null, null, null));
     assertEquals("开始日期不能晚于结束日期", ex.getMessage());
   }
 

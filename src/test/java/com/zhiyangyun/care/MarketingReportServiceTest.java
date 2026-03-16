@@ -5,8 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.zhiyangyun.care.crm.mapper.CrmCallbackPlanMapper;
 import com.zhiyangyun.care.crm.entity.CrmLead;
 import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
 import com.zhiyangyun.care.crm.model.report.MarketingCallbackReportResponse;
@@ -30,11 +29,14 @@ class MarketingReportServiceTest {
   @Mock
   private CrmLeadMapper crmLeadMapper;
 
+  @Mock
+  private CrmCallbackPlanMapper callbackPlanMapper;
+
   private MarketingReportServiceImpl service;
 
   @BeforeEach
   void setUp() {
-    service = new MarketingReportServiceImpl(crmLeadMapper);
+    service = new MarketingReportServiceImpl(crmLeadMapper, callbackPlanMapper);
   }
 
   @Test
@@ -99,13 +101,12 @@ class MarketingReportServiceTest {
     lead.setNextFollowDate(LocalDate.now().minusDays(1));
     lead.setRemark("待回访");
 
-    IPage<CrmLead> page = new Page<>(1, 10, 1);
-    page.setRecords(List.of(lead));
-    when(crmLeadMapper.selectPage(any(), any())).thenReturn(page);
-    when(crmLeadMapper.selectCount(any())).thenReturn(1L, 0L, 1L, 3L);
+    when(crmLeadMapper.selectList(any()))
+        .thenReturn(List.of(lead), List.of(), List.of(lead), List.of(lead));
+    when(callbackPlanMapper.selectList(any())).thenReturn(List.of(), List.of());
 
     MarketingCallbackReportResponse response =
-        service.callback(1L, 1, 10, null, null, null, null);
+        service.callback(1L, 1, 10, null, null, null, null, null);
 
     assertEquals(1L, response.getTotal());
     assertEquals(1, response.getRecords().size());
