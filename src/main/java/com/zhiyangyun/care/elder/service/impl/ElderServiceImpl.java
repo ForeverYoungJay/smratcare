@@ -45,6 +45,20 @@ public class ElderServiceImpl implements ElderService {
   private static final String ELDER_NAME_PINYIN_INITIAL = "ABCDEFGHJKLMNOPQRSTWXYZ";
   private static final String SOURCE_TYPE_MARKETING_CONTRACT = "MARKETING_CONTRACT";
   private static final String SOURCE_TYPE_HISTORICAL_IMPORT = "HISTORICAL_IMPORT";
+  private static final String[] ELDER_PAGE_COLUMNS = {
+      "id", "tenant_id", "org_id", "elder_code", "elder_qr_code", "full_name", "id_card_no",
+      "gender", "birth_date", "phone", "home_address", "medical_insurance_copy_url",
+      "household_copy_url", "medical_record_file_url", "admission_date", "status", "bed_id",
+      "care_level", "risk_precommit", "remark", "created_by", "create_time", "update_time", "is_deleted"
+  };
+  private static final String[] CONTRACT_PAGE_COLUMNS = {
+      "id", "tenant_id", "org_id", "lead_id", "elder_id", "contract_no", "status", "signed_at",
+      "effective_from", "effective_to", "contract_status", "flow_stage", "create_time", "update_time", "is_deleted"
+  };
+  private static final String[] ADMISSION_PAGE_COLUMNS = {
+      "id", "tenant_id", "org_id", "elder_id", "admission_date", "contract_no", "deposit_amount",
+      "remark", "created_by", "create_time", "update_time", "is_deleted"
+  };
 
   private final ElderMapper elderMapper;
   private final BedMapper bedMapper;
@@ -269,7 +283,9 @@ public class ElderServiceImpl implements ElderService {
     if (latestSignedElderIds != null) {
       baseWrapper.in(ElderProfile::getId, latestSignedElderIds);
     }
-    List<ElderProfile> allRows = elderMapper.selectList(baseWrapper.orderByDesc(ElderProfile::getCreateTime));
+    List<ElderProfile> allRows = elderMapper.selectList(baseWrapper
+        .select(ELDER_PAGE_COLUMNS)
+        .orderByDesc("create_time"));
     Map<Long, Bed> bedMap = resolveBedMap(allRows);
     String normalizedKeyword = normalizeText(keyword);
     String normalizedFullName = normalizeText(fullName);
@@ -443,13 +459,14 @@ public class ElderServiceImpl implements ElderService {
     if (elderIds.isEmpty()) {
       return Map.of();
     }
-    List<CrmContract> contracts = crmContractMapper.selectList(Wrappers.lambdaQuery(CrmContract.class)
-        .eq(CrmContract::getIsDeleted, 0)
-        .eq(tenantId != null, CrmContract::getTenantId, tenantId)
-        .in(CrmContract::getElderId, elderIds)
-        .orderByDesc(CrmContract::getUpdateTime)
-        .orderByDesc(CrmContract::getCreateTime)
-        .orderByDesc(CrmContract::getId));
+    List<CrmContract> contracts = crmContractMapper.selectList(Wrappers.<CrmContract>query()
+        .select(CONTRACT_PAGE_COLUMNS)
+        .eq("is_deleted", 0)
+        .eq(tenantId != null, "tenant_id", tenantId)
+        .in("elder_id", elderIds)
+        .orderByDesc("update_time")
+        .orderByDesc("create_time")
+        .orderByDesc("id"));
     Map<Long, CrmContract> map = new HashMap<>();
     for (CrmContract contract : contracts) {
       Long elderId = contract.getElderId();
@@ -469,13 +486,14 @@ public class ElderServiceImpl implements ElderService {
     if (elderIds.isEmpty()) {
       return Map.of();
     }
-    List<ElderAdmission> admissions = admissionMapper.selectList(Wrappers.lambdaQuery(ElderAdmission.class)
-        .eq(ElderAdmission::getIsDeleted, 0)
-        .eq(tenantId != null, ElderAdmission::getTenantId, tenantId)
-        .in(ElderAdmission::getElderId, elderIds)
-        .orderByDesc(ElderAdmission::getAdmissionDate)
-        .orderByDesc(ElderAdmission::getCreateTime)
-        .orderByDesc(ElderAdmission::getId));
+    List<ElderAdmission> admissions = admissionMapper.selectList(Wrappers.<ElderAdmission>query()
+        .select(ADMISSION_PAGE_COLUMNS)
+        .eq("is_deleted", 0)
+        .eq(tenantId != null, "tenant_id", tenantId)
+        .in("elder_id", elderIds)
+        .orderByDesc("admission_date")
+        .orderByDesc("create_time")
+        .orderByDesc("id"));
     Map<Long, ElderAdmission> map = new HashMap<>();
     for (ElderAdmission admission : admissions) {
       Long elderId = admission.getElderId();
