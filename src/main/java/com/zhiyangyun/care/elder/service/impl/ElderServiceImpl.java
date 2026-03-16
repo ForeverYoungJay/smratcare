@@ -59,6 +59,13 @@ public class ElderServiceImpl implements ElderService {
       "id", "tenant_id", "org_id", "elder_id", "admission_date", "contract_no", "deposit_amount",
       "remark", "created_by", "create_time", "update_time", "is_deleted"
   };
+  private static final String[] BED_PAGE_COLUMNS = {
+      "id", "tenant_id", "org_id", "room_id", "bed_no", "bed_qr_code", "status", "elder_id",
+      "create_time", "update_time", "is_deleted"
+  };
+  private static final String[] ROOM_PAGE_COLUMNS = {
+      "id", "tenant_id", "org_id", "room_no", "capacity", "status", "create_time", "update_time", "is_deleted"
+  };
 
   private final ElderMapper elderMapper;
   private final BedMapper bedMapper;
@@ -366,13 +373,14 @@ public class ElderServiceImpl implements ElderService {
 
   private Set<Long> resolveLatestSignedElderIds(Long tenantId) {
     Set<Long> signedElderIds = new java.util.LinkedHashSet<>();
-    List<CrmContract> contracts = crmContractMapper.selectList(Wrappers.lambdaQuery(CrmContract.class)
-        .eq(CrmContract::getIsDeleted, 0)
-        .eq(tenantId != null, CrmContract::getTenantId, tenantId)
-        .isNotNull(CrmContract::getElderId)
-        .orderByDesc(CrmContract::getUpdateTime)
-        .orderByDesc(CrmContract::getCreateTime)
-        .orderByDesc(CrmContract::getId));
+    List<CrmContract> contracts = crmContractMapper.selectList(Wrappers.<CrmContract>query()
+        .select(CONTRACT_PAGE_COLUMNS)
+        .eq("is_deleted", 0)
+        .eq(tenantId != null, "tenant_id", tenantId)
+        .isNotNull("elder_id")
+        .orderByDesc("update_time")
+        .orderByDesc("create_time")
+        .orderByDesc("id"));
     if (contracts != null && !contracts.isEmpty()) {
       Map<Long, CrmContract> latestByElder = new HashMap<>();
       for (CrmContract contract : contracts) {
@@ -393,13 +401,14 @@ public class ElderServiceImpl implements ElderService {
           .filter(Objects::nonNull)
           .forEach(signedElderIds::add);
     }
-    List<ElderAdmission> admissions = admissionMapper.selectList(Wrappers.lambdaQuery(ElderAdmission.class)
-        .eq(ElderAdmission::getIsDeleted, 0)
-        .eq(tenantId != null, ElderAdmission::getTenantId, tenantId)
-        .isNotNull(ElderAdmission::getElderId)
-        .orderByDesc(ElderAdmission::getAdmissionDate)
-        .orderByDesc(ElderAdmission::getCreateTime)
-        .orderByDesc(ElderAdmission::getId));
+    List<ElderAdmission> admissions = admissionMapper.selectList(Wrappers.<ElderAdmission>query()
+        .select(ADMISSION_PAGE_COLUMNS)
+        .eq("is_deleted", 0)
+        .eq(tenantId != null, "tenant_id", tenantId)
+        .isNotNull("elder_id")
+        .orderByDesc("admission_date")
+        .orderByDesc("create_time")
+        .orderByDesc("id"));
     if (admissions != null && !admissions.isEmpty()) {
       Map<Long, ElderAdmission> latestByElder = new HashMap<>();
       for (ElderAdmission admission : admissions) {
@@ -445,9 +454,28 @@ public class ElderServiceImpl implements ElderService {
     if (bedIds.isEmpty()) {
       return Map.of();
     }
-    return bedMapper.selectBatchIds(bedIds).stream()
+    return bedMapper.selectList(Wrappers.<Bed>query()
+            .select(BED_PAGE_COLUMNS)
+            .in("id", bedIds))
+        .stream()
         .filter(Objects::nonNull)
         .collect(Collectors.toMap(Bed::getId, item -> item, (left, right) -> left));
+  }
+
+  private Map<Long, com.zhiyangyun.care.elder.entity.Room> resolveRoomMap(List<Bed> beds) {
+    Set<Long> roomIds = beds.stream()
+        .map(Bed::getRoomId)
+        .filter(Objects::nonNull)
+        .collect(Collectors.toSet());
+    if (roomIds.isEmpty()) {
+      return Map.of();
+    }
+    return roomMapper.selectList(Wrappers.<com.zhiyangyun.care.elder.entity.Room>query()
+            .select(ROOM_PAGE_COLUMNS)
+            .in("id", roomIds))
+        .stream()
+        .filter(Objects::nonNull)
+        .collect(Collectors.toMap(com.zhiyangyun.care.elder.entity.Room::getId, item -> item, (left, right) -> left));
   }
 
   private Map<Long, CrmContract> resolveLatestContractMap(List<ElderProfile> elders, Long tenantId) {
@@ -909,8 +937,9 @@ public class ElderServiceImpl implements ElderService {
     response.setLifecycleStage(resolveLifecycleStageByElderStatus(elder.getStatus()));
     response.setLifecycleContractStatus(null);
     if (bed != null) {
+      Map<Long, com.zhiyangyun.care.elder.entity.Room> roomMap = resolveRoomMap(List.of(bed));
       com.zhiyangyun.care.elder.entity.Room room =
-          bed.getRoomId() == null ? null : roomMapper.selectById(bed.getRoomId());
+          bed.getRoomId() == null ? null : roomMap.get(bed.getRoomId());
       BedResponse bedResponse = new BedResponse();
       bedResponse.setId(bed.getId());
       bedResponse.setTenantId(bed.getTenantId());
