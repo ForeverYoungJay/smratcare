@@ -13,4 +13,5 @@ public class DischargeApplyCreateRequest {
   private LocalDate plannedDischargeDate;
   @NotBlank
   private String reason;
+  private String proofFileUrl;
 }

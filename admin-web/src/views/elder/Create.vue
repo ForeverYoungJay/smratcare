@@ -16,10 +16,12 @@
         :description="duplicateWarningText"
       />
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical" style="max-width: 920px">
-        <a-form-item label="姓名" name="fullName">
+        <a-form-item name="fullName">
+          <template #label><span class="required-label">姓名</span></template>
           <a-input v-model:value="form.fullName" @blur="refreshDuplicateWarnings" />
         </a-form-item>
-        <a-form-item label="身份证号" name="idCardNo">
+        <a-form-item name="idCardNo">
+          <template #label><span class="required-label">身份证号</span></template>
           <a-input v-model:value="form.idCardNo" @blur="refreshDuplicateWarnings" />
         </a-form-item>
         <a-row :gutter="16">
@@ -34,10 +36,12 @@
             </a-form-item>
           </a-col>
         </a-row>
-        <a-form-item label="手机号" name="phone">
+        <a-form-item name="phone">
+          <template #label><span class="required-label">手机号</span></template>
           <a-input v-model:value="form.phone" @blur="refreshDuplicateWarnings" />
         </a-form-item>
-        <a-form-item label="家庭地址" name="homeAddress">
+        <a-form-item name="homeAddress">
+          <template #label><span class="required-label">家庭地址</span></template>
           <a-input v-model:value="form.homeAddress" />
         </a-form-item>
         <a-form-item label="医保复印件">
@@ -67,7 +71,8 @@
             <a-button v-if="form.medicalRecordFileUrl" type="link" @click="openFile(form.medicalRecordFileUrl)">查看</a-button>
           </a-space>
         </a-form-item>
-        <a-form-item label="性别" name="gender">
+        <a-form-item name="gender">
+          <template #label><span class="required-label">性别</span></template>
           <a-select v-model:value="form.gender" placeholder="请选择">
             <a-select-option :value="1">男</a-select-option>
             <a-select-option :value="2">女</a-select-option>
@@ -118,7 +123,7 @@
         </a-form-item>
         <div style="margin: 8px 0 16px; display: flex; justify-content: space-between; align-items: center;">
           <div>
-            <div style="font-weight: 600;">家属信息</div>
+            <div class="required-section-title" style="font-weight: 600;">家属信息</div>
             <div style="color: rgba(0, 0, 0, 0.45); font-size: 12px;">常用联系人集中录入，手机号与身份证号要求完整。</div>
           </div>
           <a-button size="small" type="dashed" @click="addFamilyDraftRow">新增家属</a-button>
@@ -131,7 +136,8 @@
             </div>
             <a-row :gutter="[12, 4]">
               <a-col :xs="24" :md="10">
-                <a-form-item label="姓名" class="compact-form-item">
+                <a-form-item class="compact-form-item">
+                  <template #label><span class="required-label">姓名</span></template>
                   <a-input v-model:value="item.realName" placeholder="姓名" />
                 </a-form-item>
               </a-col>
@@ -151,12 +157,14 @@
                 </a-form-item>
               </a-col>
               <a-col :xs="24" :md="12">
-                <a-form-item label="手机号" class="compact-form-item">
+                <a-form-item class="compact-form-item">
+                  <template #label><span class="required-label">手机号</span></template>
                   <a-input v-model:value="item.phone" placeholder="手机号" />
                 </a-form-item>
               </a-col>
               <a-col :xs="24" :md="12">
-                <a-form-item label="身份证号" class="compact-form-item">
+                <a-form-item class="compact-form-item">
+                  <template #label><span class="required-label">身份证号</span></template>
                   <a-input v-model:value="item.idCardNo" placeholder="身份证号" />
                 </a-form-item>
               </a-col>
@@ -323,7 +331,7 @@ function resolveBirthDateAndAgeFromIdCard(idCardNo?: string) {
 async function validateIdCardNo(_rule: unknown, value?: string) {
   const text = trimText(value)
   if (!text) {
-    return Promise.resolve()
+    return Promise.reject(new Error('请输入身份证号'))
   }
   if (!/^(?:\d{15}|\d{17}[\dXx])$/.test(text)) {
     return Promise.reject(new Error('身份证号格式不正确'))
@@ -334,10 +342,24 @@ async function validateIdCardNo(_rule: unknown, value?: string) {
 async function validatePhone(_rule: unknown, value?: string) {
   const text = trimText(value)
   if (!text) {
-    return Promise.resolve()
+    return Promise.reject(new Error('请输入手机号'))
   }
   if (!/^1\d{10}$/.test(text)) {
     return Promise.reject(new Error('手机号格式不正确'))
+  }
+  return Promise.resolve()
+}
+
+async function validateGender(_rule: unknown, value?: number) {
+  if (value !== 1 && value !== 2) {
+    return Promise.reject(new Error('请选择性别'))
+  }
+  return Promise.resolve()
+}
+
+async function validateHomeAddress(_rule: unknown, value?: string) {
+  if (!trimText(value)) {
+    return Promise.reject(new Error('请输入家庭地址'))
   }
   return Promise.resolve()
 }
@@ -422,6 +444,8 @@ const rules: FormRules = {
   fullName: [{ required: true, message: '请输入姓名' }],
   idCardNo: [{ validator: validateIdCardNo, trigger: 'blur' }],
   phone: [{ validator: validatePhone, trigger: 'blur' }],
+  homeAddress: [{ validator: validateHomeAddress, trigger: 'blur' }],
+  gender: [{ validator: validateGender, trigger: 'change' }],
   birthDate: [{ validator: validateBirthDate, trigger: 'change' }],
   admissionDate: [{ validator: validateAdmissionDate, trigger: 'change' }],
   contractNo: [{ validator: validateContractNo, trigger: 'blur' }],
@@ -591,7 +615,9 @@ function setPrimaryFamilyDraftRow(key: string) {
 }
 
 function validateFamilyDraftRows() {
-  if (familyDraftRows.value.length === 0) return
+  if (familyDraftRows.value.length === 0) {
+    throw new Error('请至少填写一位家属信息')
+  }
   const invalidRow = familyDraftRows.value.find((item) =>
     !trimText(item.realName) || !trimText(item.phone) || !trimText(item.idCardNo))
   if (invalidRow) {
@@ -769,5 +795,13 @@ onMounted(() => {
 
 .compact-form-item {
   margin-bottom: 10px;
+}
+
+.required-label::before,
+.required-section-title::before {
+  content: "*";
+  color: #ff4d4f;
+  margin-right: 4px;
+  font-weight: 700;
 }
 </style>

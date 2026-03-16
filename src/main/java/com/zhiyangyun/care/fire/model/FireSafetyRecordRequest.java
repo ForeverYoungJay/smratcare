@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.Data;
 
 @Data
@@ -45,4 +46,16 @@ public class FireSafetyRecordRequest {
   private String equipmentUpdateNote;
 
   private String equipmentAgingDisposal;
+
+  private List<String> imageUrls;
+
+  private String thirdPartyMaintenanceFileUrl;
+
+  private String purchaseContractFileUrl;
+
+  private LocalDate contractStartDate;
+
+  private LocalDate contractEndDate;
+
+  private List<String> purchaseDocumentUrls;
 }

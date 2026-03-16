@@ -379,22 +379,26 @@
               </div>
               <a-row :gutter="[16, 4]">
                 <a-col :xs="24" :md="8">
-                  <a-form-item label="姓名" name="elderName">
+                  <a-form-item name="elderName">
+                    <template #label><span class="required-label">姓名</span></template>
                     <a-input ref="elderNameInputRef" v-model:value="form.elderName" placeholder="请输入长者姓名" />
                   </a-form-item>
                 </a-col>
                 <a-col :xs="24" :md="8">
-                  <a-form-item label="联系电话">
+                  <a-form-item name="elderPhone">
+                    <template #label><span class="required-label">联系电话</span></template>
                     <a-input v-model:value="form.elderPhone" placeholder="请输入长者联系电话" />
                   </a-form-item>
                 </a-col>
                 <a-col :xs="24" :md="8">
-                  <a-form-item label="身份证号">
+                  <a-form-item name="idCardNo">
+                    <template #label><span class="required-label">身份证号</span></template>
                     <a-input v-model:value="form.idCardNo" placeholder="自动识别生日/年龄" />
                   </a-form-item>
                 </a-col>
                 <a-col :xs="24" :md="6">
-                  <a-form-item label="性别">
+                  <a-form-item name="gender">
+                    <template #label><span class="required-label">性别</span></template>
                     <a-select v-model:value="form.gender" allow-clear>
                       <a-select-option :value="1">男</a-select-option>
                       <a-select-option :value="2">女</a-select-option>
@@ -417,7 +421,8 @@
                   </a-form-item>
                 </a-col>
                 <a-col :span="24">
-                  <a-form-item label="家庭地址">
+                  <a-form-item name="homeAddress">
+                    <template #label><span class="required-label">家庭地址</span></template>
                     <a-input v-model:value="form.homeAddress" placeholder="请输入长者家庭住址" />
                   </a-form-item>
                 </a-col>
@@ -462,7 +467,7 @@
             <div class="contract-section">
               <div class="contract-section-head family-head">
                 <div>
-                  <div class="contract-section-title">家属信息</div>
+                  <div class="contract-section-title required-section-title">家属信息</div>
                   <div class="contract-section-desc">常用联系人集中录入，手机号与身份证号要求完整。</div>
                 </div>
                 <a-button size="small" type="dashed" @click="addFamilyDraftRow">新增家属</a-button>
@@ -475,7 +480,8 @@
                   </div>
                   <a-row :gutter="[12, 4]">
                     <a-col :xs="24" :md="10">
-                      <a-form-item label="姓名" class="compact-form-item">
+                      <a-form-item class="compact-form-item">
+                        <template #label><span class="required-label">姓名</span></template>
                         <a-input v-model:value="item.realName" placeholder="姓名" />
                       </a-form-item>
                     </a-col>
@@ -495,12 +501,14 @@
                       </a-form-item>
                     </a-col>
                     <a-col :xs="24" :md="12">
-                      <a-form-item label="手机号" class="compact-form-item">
+                      <a-form-item class="compact-form-item">
+                        <template #label><span class="required-label">手机号</span></template>
                         <a-input v-model:value="item.phone" placeholder="手机号" />
                       </a-form-item>
                     </a-col>
                     <a-col :xs="24" :md="12">
-                      <a-form-item label="身份证号" class="compact-form-item">
+                      <a-form-item class="compact-form-item">
+                        <template #label><span class="required-label">身份证号</span></template>
                         <a-input v-model:value="item.idCardNo" placeholder="身份证号" />
                       </a-form-item>
                     </a-col>
@@ -827,8 +835,34 @@ const contractFormGuideText = computed(() => {
 })
 const formDerivedBirthDate = ref('')
 const selectedPolicyValues = ref<string[]>([])
+async function validateElderPhone(_rule: unknown, value?: string) {
+  const text = String(value || '').trim()
+  if (!text) {
+    return Promise.reject(new Error('请输入长者联系电话'))
+  }
+  if (!/^1\d{10}$/.test(text)) {
+    return Promise.reject(new Error('长者联系电话格式不正确'))
+  }
+  return Promise.resolve()
+}
+
+async function validateElderIdCardNo(_rule: unknown, value?: string) {
+  const text = String(value || '').trim()
+  if (!text) {
+    return Promise.reject(new Error('请输入长者身份证号'))
+  }
+  if (!/^(\d{15}|\d{17}[\dXx])$/.test(text)) {
+    return Promise.reject(new Error('长者身份证号格式不正确'))
+  }
+  return Promise.resolve()
+}
+
 const rules: FormRules = {
-  elderName: [{ required: true, message: '请输入姓名' }]
+  elderName: [{ required: true, message: '请输入长者姓名' }],
+  elderPhone: [{ validator: validateElderPhone, trigger: 'blur' }],
+  idCardNo: [{ validator: validateElderIdCardNo, trigger: 'blur' }],
+  gender: [{ required: true, message: '请选择长者性别', trigger: 'change' }],
+  homeAddress: [{ required: true, message: '请输入长者家庭地址', trigger: 'blur' }]
 }
 const elderFormExtra = reactive({
   careLevel: '',
@@ -2063,7 +2097,7 @@ async function syncContractElderData(savedContract: CrmContractItem) {
 
 function validateFamilyDraftRows() {
   if (familyDraftRows.value.length === 0) {
-    return
+    throw new Error('请至少填写一位家属信息')
   }
   const invalidRow = familyDraftRows.value.find((item) =>
     !String(item.realName || '').trim()
@@ -2436,6 +2470,14 @@ watch(
 
 .compact-form-item {
   margin-bottom: 8px;
+}
+
+.required-label::before,
+.required-section-title::before {
+  content: "*";
+  color: #ff4d4f;
+  margin-right: 4px;
+  font-weight: 700;
 }
 
 .readonly-disease-block {

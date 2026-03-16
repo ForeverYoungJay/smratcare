@@ -5,6 +5,10 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
+import com.zhiyangyun.care.elder.entity.Bed;
+import com.zhiyangyun.care.elder.entity.ElderProfile;
+import com.zhiyangyun.care.elder.mapper.BedMapper;
+import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.life.entity.DiningDeliveryArea;
 import com.zhiyangyun.care.life.entity.DiningDeliveryRecord;
 import com.zhiyangyun.care.life.entity.DiningMealOrder;
@@ -14,7 +18,13 @@ import com.zhiyangyun.care.life.mapper.DiningMealOrderMapper;
 import com.zhiyangyun.care.life.model.DiningConstants;
 import com.zhiyangyun.care.life.model.DiningDeliveryRedispatchRequest;
 import com.zhiyangyun.care.life.model.DiningDeliveryRecordRequest;
+import com.zhiyangyun.care.life.model.DiningDeliveryScanSignoffRequest;
+import com.zhiyangyun.care.life.model.DiningDeliverySignoffQrResponse;
 import jakarta.validation.Valid;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -33,14 +43,20 @@ public class DiningDeliveryRecordController {
   private final DiningDeliveryRecordMapper deliveryRecordMapper;
   private final DiningMealOrderMapper mealOrderMapper;
   private final DiningDeliveryAreaMapper deliveryAreaMapper;
+  private final ElderMapper elderMapper;
+  private final BedMapper bedMapper;
 
   public DiningDeliveryRecordController(
       DiningDeliveryRecordMapper deliveryRecordMapper,
       DiningMealOrderMapper mealOrderMapper,
-      DiningDeliveryAreaMapper deliveryAreaMapper) {
+      DiningDeliveryAreaMapper deliveryAreaMapper,
+      ElderMapper elderMapper,
+      BedMapper bedMapper) {
     this.deliveryRecordMapper = deliveryRecordMapper;
     this.mealOrderMapper = mealOrderMapper;
     this.deliveryAreaMapper = deliveryAreaMapper;
+    this.elderMapper = elderMapper;
+    this.bedMapper = bedMapper;
   }
 
   @GetMapping("/page")
@@ -85,7 +101,9 @@ public class DiningDeliveryRecordController {
           .or().like(DiningDeliveryRecord::getDeliveredByName, keyword));
     }
     wrapper.orderByDesc(DiningDeliveryRecord::getDeliveredAt).orderByDesc(DiningDeliveryRecord::getCreateTime);
-    return Result.ok(deliveryRecordMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
+    IPage<DiningDeliveryRecord> page = deliveryRecordMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
+    hydrateRecords(page.getRecords());
+    return Result.ok(page);
   }
 
   @PostMapping
@@ -97,6 +115,55 @@ public class DiningDeliveryRecordController {
     fillRecordFields(record, orgId, request, true);
     record.setCreatedBy(AuthContext.getStaffId());
     deliveryRecordMapper.insert(record);
+    hydrateRecord(record);
+    syncOrderStatus(record);
+    return Result.ok(record);
+  }
+
+  @PostMapping("/{id}/qr/generate")
+  public Result<DiningDeliverySignoffQrResponse> generateSignoffQr(@PathVariable Long id) {
+    DiningDeliveryRecord record = getRecordInOrg(id, AuthContext.getOrgId());
+    if (record == null) {
+      return Result.ok(null);
+    }
+    DiningMealOrder order = resolveMealOrder(AuthContext.getOrgId(), record.getMealOrderId());
+    String qrCode = resolveResidentQrCode(order);
+    if (qrCode == null || qrCode.isBlank()) {
+      throw new IllegalArgumentException("当前订单关联长者未配置床位二维码或老人二维码");
+    }
+    LocalDateTime now = LocalDateTime.now();
+
+    DiningDeliverySignoffQrResponse response = new DiningDeliverySignoffQrResponse();
+    response.setRecordId(record.getId());
+    response.setQrToken(qrCode);
+    response.setQrContent(qrCode);
+    response.setGeneratedAt(now);
+    return Result.ok(response);
+  }
+
+  @PostMapping("/scan/signoff")
+  public Result<DiningDeliveryRecord> scanSignoff(@Valid @RequestBody DiningDeliveryScanSignoffRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    String token = request.getQrToken() == null ? null : request.getQrToken().trim();
+    DiningDeliveryRecord record = resolveCurrentRecordByResidentQr(orgId, token);
+    if (record == null) {
+      return Result.error(404, "未匹配到送餐签收记录，请核对二维码");
+    }
+    record.setStatus(DiningConstants.DELIVERY_STATUS_DELIVERED);
+    record.setQrScanAt(request.getQrScanAt() == null ? LocalDateTime.now() : request.getQrScanAt());
+    record.setSignedAt(request.getSignedAt() == null ? record.getQrScanAt() : request.getSignedAt());
+    if (request.getDeliveredByName() != null && !request.getDeliveredByName().isBlank()) {
+      record.setDeliveredByName(normalizeText(request.getDeliveredByName()));
+    }
+    if (record.getDeliveredAt() == null) {
+      record.setDeliveredAt(record.getSignedAt());
+    }
+    record.setSignoffImageUrlsText(joinImageUrls(request.getSignoffImageUrls()));
+    if (request.getRemark() != null && !request.getRemark().isBlank()) {
+      record.setRemark(normalizeText(request.getRemark()));
+    }
+    deliveryRecordMapper.updateById(record);
+    hydrateRecord(record);
     syncOrderStatus(record);
     return Result.ok(record);
   }
@@ -110,6 +177,7 @@ public class DiningDeliveryRecordController {
     }
     fillRecordFields(record, orgId, request, false);
     deliveryRecordMapper.updateById(record);
+    hydrateRecord(record);
     syncOrderStatus(record);
     return Result.ok(record);
   }
@@ -125,11 +193,15 @@ public class DiningDeliveryRecordController {
     }
     record.setStatus(DiningConstants.DELIVERY_STATUS_PENDING);
     record.setDeliveredAt(null);
+    record.setSignedAt(null);
+    record.setQrScanAt(null);
+    record.setSignoffImageUrlsText(null);
     record.setRedispatchStatus("REDISPATCHED");
     record.setRedispatchAt(request == null ? LocalDateTime.now() : request.getRedispatchAt());
     record.setRedispatchByName(request == null ? null : normalizeText(request.getRedispatchByName()));
     record.setRedispatchRemark(request == null ? null : normalizeText(request.getRedispatchRemark()));
     deliveryRecordMapper.updateById(record);
+    hydrateRecord(record);
     syncOrderStatus(record);
     return Result.ok(record);
   }
@@ -166,6 +238,9 @@ public class DiningDeliveryRecordController {
         ? record.getRedispatchRemark()
         : normalizeText(request.getRedispatchRemark()));
     record.setDeliveredAt(resolveDeliveredAt(request.getDeliveredAt(), status, record.getDeliveredAt()));
+    record.setSignedAt(resolveSignedAt(request.getSignedAt(), request.getQrScanAt(), status, record.getSignedAt()));
+    record.setQrScanAt(request.getQrScanAt() == null ? record.getQrScanAt() : request.getQrScanAt());
+    record.setSignoffImageUrlsText(joinImageUrls(request.getSignoffImageUrls()));
     if (create) {
       if (record.getDeliveryAreaId() == null && order.getDeliveryAreaId() != null) {
         record.setDeliveryAreaId(order.getDeliveryAreaId());
@@ -229,6 +304,50 @@ public class DiningDeliveryRecordController {
     return order;
   }
 
+  private DiningDeliveryRecord resolveCurrentRecordByResidentQr(Long orgId, String qrCode) {
+    if (qrCode == null || qrCode.isBlank()) {
+      throw new IllegalArgumentException("qrToken 不能为空");
+    }
+    List<DiningDeliveryRecord> candidates = deliveryRecordMapper.selectList(Wrappers.lambdaQuery(DiningDeliveryRecord.class)
+        .eq(DiningDeliveryRecord::getIsDeleted, 0)
+        .eq(orgId != null, DiningDeliveryRecord::getOrgId, orgId)
+        .in(DiningDeliveryRecord::getStatus, DiningConstants.DELIVERY_STATUS_PENDING, DiningConstants.DELIVERY_STATUS_FAILED)
+        .orderByDesc(DiningDeliveryRecord::getCreateTime));
+    for (DiningDeliveryRecord candidate : candidates) {
+      DiningMealOrder order = resolveMealOrder(orgId, candidate.getMealOrderId());
+      String residentQrCode = resolveResidentQrCode(order);
+      if (qrCode.equals(residentQrCode)) {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  private String resolveResidentQrCode(DiningMealOrder order) {
+    if (order == null || order.getElderId() == null) {
+      return null;
+    }
+    ElderProfile elder = elderMapper.selectOne(Wrappers.lambdaQuery(ElderProfile.class)
+        .eq(ElderProfile::getId, order.getElderId())
+        .eq(ElderProfile::getIsDeleted, 0)
+        .eq(order.getOrgId() != null, ElderProfile::getOrgId, order.getOrgId())
+        .last("LIMIT 1"));
+    if (elder == null) {
+      return null;
+    }
+    if (elder.getBedId() != null) {
+      Bed bed = bedMapper.selectOne(Wrappers.lambdaQuery(Bed.class)
+          .eq(Bed::getId, elder.getBedId())
+          .eq(Bed::getIsDeleted, 0)
+          .eq(order.getOrgId() != null, Bed::getOrgId, order.getOrgId())
+          .last("LIMIT 1"));
+      if (bed != null && bed.getBedQrCode() != null && !bed.getBedQrCode().isBlank()) {
+        return bed.getBedQrCode().trim();
+      }
+    }
+    return elder.getElderQrCode() == null ? null : elder.getElderQrCode().trim();
+  }
+
   private void applyDeliveryArea(DiningDeliveryRecord record, Long orgId, Long areaId, String areaName) {
     if (areaId == null) {
       record.setDeliveryAreaId(null);
@@ -256,6 +375,64 @@ public class DiningDeliveryRecordController {
       return LocalDateTime.now();
     }
     return currentValue;
+  }
+
+  private LocalDateTime resolveSignedAt(
+      LocalDateTime signedAt,
+      LocalDateTime qrScanAt,
+      String status,
+      LocalDateTime currentValue) {
+    if (signedAt != null) {
+      return signedAt;
+    }
+    if (qrScanAt != null) {
+      return qrScanAt;
+    }
+    if (DiningConstants.DELIVERY_STATUS_DELIVERED.equals(status)) {
+      return currentValue;
+    }
+    return currentValue;
+  }
+
+  private void hydrateRecords(List<DiningDeliveryRecord> records) {
+    if (records == null || records.isEmpty()) {
+      return;
+    }
+    records.forEach(this::hydrateRecord);
+  }
+
+  private void hydrateRecord(DiningDeliveryRecord record) {
+    if (record == null) {
+      return;
+    }
+    record.setSignoffImageUrls(splitImageUrls(record.getSignoffImageUrlsText()));
+  }
+
+  private String joinImageUrls(List<String> imageUrls) {
+    if (imageUrls == null || imageUrls.isEmpty()) {
+      return null;
+    }
+    List<String> normalized = imageUrls.stream()
+        .map(this::normalizeText)
+        .filter(item -> item != null)
+        .distinct()
+        .limit(9)
+        .toList();
+    if (normalized.isEmpty()) {
+      return null;
+    }
+    return String.join("\n", normalized);
+  }
+
+  private List<String> splitImageUrls(String imageUrlsText) {
+    if (imageUrlsText == null || imageUrlsText.isBlank()) {
+      return Collections.emptyList();
+    }
+    return Arrays.stream(imageUrlsText.split("\\R+"))
+        .map(this::normalizeText)
+        .filter(item -> item != null)
+        .distinct()
+        .collect(Collectors.toList());
   }
 
   private void validateStatus(String status) {

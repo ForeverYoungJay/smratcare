@@ -413,10 +413,16 @@
                 <span class="quick-chat-recalled">该消息已撤回</span>
               </template>
               <template v-if="msg.kind === 'IMAGE' && msg.fileUrl">
-                <img :src="msg.fileUrl" :alt="msg.fileName || '图片'" class="quick-chat-image" />
+                <div class="quick-chat-image-wrap">
+                  <img :src="msg.fileUrl" :alt="msg.fileName || '图片'" class="quick-chat-image" />
+                  <div v-if="msg.uploadStatus === 'UPLOADING'" class="quick-chat-upload-mask">上传中...</div>
+                </div>
               </template>
               <template v-else-if="msg.kind === 'FILE'">
-                <a :href="msg.fileUrl || '#'" target="_blank" rel="noreferrer">{{ msg.fileName || '附件' }}</a>
+                <span v-if="msg.uploadStatus === 'UPLOADING'" class="quick-chat-uploading-file">
+                  {{ msg.fileName || '附件' }} 上传中...
+                </span>
+                <a v-else :href="msg.fileUrl || '#'" target="_blank" rel="noreferrer">{{ msg.fileName || '附件' }}</a>
               </template>
               <template v-else-if="!msg.recalled">
                 {{ msg.content }}
@@ -586,7 +592,7 @@
         <a-tag color="purple">未读会话 {{ quickChatExecutionOverview.unreadChats }}</a-tag>
       </a-space>
     </div>
-    <a-space style="margin-bottom: 10px;">
+    <a-space class="quick-chat-todo-toolbar" wrap>
       <a-button size="small" type="primary" @click="openQuickChatTodoEditorManual">新增待办</a-button>
       <a-button size="small" :disabled="!quickChatTodoItems.length" @click="clearCompletedQuickChatTodo">清理已完成</a-button>
       <a-button size="small" :disabled="!quickChatTodoOverdueCount" @click="nudgeOverdueQuickChatTodos">催办逾期待办</a-button>
@@ -596,52 +602,55 @@
       <a-tag color="blue">待完成 {{ quickChatTodoPendingCount }}</a-tag>
       <a-tag v-if="quickChatTodoOverdueCount > 0" color="red">逾期 {{ quickChatTodoOverdueCount }}</a-tag>
     </a-space>
-    <a-list :data-source="filteredQuickChatTodoItems" :locale="{ emptyText: '暂无聊天待办' }" size="small">
+    <a-list :data-source="filteredQuickChatTodoItems" :locale="{ emptyText: '暂无聊天待办' }" size="small" class="quick-chat-todo-list">
       <template #renderItem="{ item }">
-        <a-list-item>
-          <a-list-item-meta :description="quickChatTodoDescription(item)">
-            <template #title>
-              <a-space size="small">
-                <span :class="{ 'quick-chat-todo-done': item.done }">{{ item.content }}</span>
+        <a-list-item class="quick-chat-todo-item">
+          <div class="quick-chat-todo-card">
+            <div class="quick-chat-todo-head">
+              <div class="quick-chat-todo-title-wrap">
+                <span class="quick-chat-todo-title" :class="{ 'quick-chat-todo-done': item.done }">{{ item.content }}</span>
+              </div>
+              <div class="quick-chat-todo-tags">
                 <a-tag :color="quickChatTodoPriorityColor(item.priority)">{{ quickChatTodoPriorityLabel(item.priority) }}</a-tag>
                 <a-tag v-if="!item.done && isQuickChatTodoOverdue(item)" color="red">已逾期</a-tag>
                 <a-tag v-if="!item.done && quickChatTodoEscalationTag(item)" :color="quickChatTodoEscalationTag(item)?.color">
                   {{ quickChatTodoEscalationTag(item)?.text }}
                 </a-tag>
                 <a-tag v-if="item.calendarSynced" color="cyan">已同步日历</a-tag>
-              </a-space>
-            </template>
-          </a-list-item-meta>
-          <template #actions>
-            <a-button size="small" type="link" @click="jumpToQuickChatTodo(item.id)">定位</a-button>
-            <a-button
-              size="small"
-              type="link"
-              :disabled="item.done"
-              @click="nudgeQuickChatTodo(item.id)"
-            >
-              催办
-            </a-button>
-            <a-button
-              size="small"
-              type="link"
-              :disabled="item.done || !isQuickChatTodoOverdue(item)"
-              @click="escalateQuickChatTodo(item.id)"
-            >
-              升级
-            </a-button>
-            <a-button
-              size="small"
-              type="link"
-              :disabled="item.done || !item.dueAt"
-              @click="syncQuickChatTodoToCalendar(item.id)"
-            >
-              同步日历
-            </a-button>
-            <a-button size="small" type="link" @click="openQuickChatTodoEditor(item.id)">编辑</a-button>
-            <a-button size="small" type="link" @click="toggleQuickChatTodoDone(item.id)">{{ item.done ? '重开' : '完成' }}</a-button>
-            <a-button size="small" type="link" danger @click="removeQuickChatTodo(item.id)">删除</a-button>
-          </template>
+              </div>
+            </div>
+            <div class="quick-chat-todo-desc">{{ quickChatTodoDescription(item) }}</div>
+            <div class="quick-chat-todo-actions">
+              <a-button size="small" type="link" @click="jumpToQuickChatTodo(item.id)">定位</a-button>
+              <a-button
+                size="small"
+                type="link"
+                :disabled="item.done"
+                @click="nudgeQuickChatTodo(item.id)"
+              >
+                催办
+              </a-button>
+              <a-button
+                size="small"
+                type="link"
+                :disabled="item.done || !isQuickChatTodoOverdue(item)"
+                @click="escalateQuickChatTodo(item.id)"
+              >
+                升级
+              </a-button>
+              <a-button
+                size="small"
+                type="link"
+                :disabled="item.done || !item.dueAt"
+                @click="syncQuickChatTodoToCalendar(item.id)"
+              >
+                同步日历
+              </a-button>
+              <a-button size="small" type="link" @click="openQuickChatTodoEditor(item.id)">编辑</a-button>
+              <a-button size="small" type="link" @click="toggleQuickChatTodoDone(item.id)">{{ item.done ? '重开' : '完成' }}</a-button>
+              <a-button size="small" type="link" danger @click="removeQuickChatTodo(item.id)">删除</a-button>
+            </div>
+          </div>
         </a-list-item>
       </template>
     </a-list>
@@ -716,7 +725,7 @@ import { getMenuTree } from './menu'
 import { getMe } from '../api/auth'
 import { getStaffPage } from '../api/rbac'
 import { updateStaff } from '../api/staff'
-import { fanoutQuickChatState, getQuickChatState, publishQuickChatEventBatch, saveQuickChatState } from '../api/oa'
+import { createOaTask, fanoutQuickChatState, getQuickChatState, publishQuickChatEventBatch, saveQuickChatState, uploadOaFile } from '../api/oa'
 import { useDepartmentOptions } from '../composables/useDepartmentOptions'
 import { useStaffOptions } from '../composables/useStaffOptions'
 import { canBeDirectLeader, canBeIndirectLeader, ensureSupervisorOrder } from '../utils/supervisor'
@@ -827,6 +836,7 @@ type QuickChatMessage = {
   content: string
   fileName?: string
   fileUrl?: string
+  uploadStatus?: 'UPLOADING'
   timeText: string
   createdAt: string
   recalled?: boolean
@@ -865,6 +875,7 @@ type QuickChatTodoItem = {
   escalationLevel?: 0 | 1 | 2
   lastEscalatedAt?: string
   calendarSynced?: boolean
+  calendarTaskId?: string
   doneAt?: string
   createdAt: string
   createdAtText: string
@@ -2121,6 +2132,7 @@ function loadQuickChatTodo() {
       escalationLevel: [0, 1, 2].includes(Number(item?.escalationLevel)) ? Number(item.escalationLevel) as 0 | 1 | 2 : 0,
       lastEscalatedAt: item?.lastEscalatedAt ? String(item.lastEscalatedAt) : undefined,
       calendarSynced: item?.calendarSynced === true,
+      calendarTaskId: item?.calendarTaskId ? String(item.calendarTaskId) : undefined,
       doneAt: item?.doneAt ? String(item.doneAt) : undefined,
       createdAt: String(item?.createdAt || dayjs().toISOString()),
       createdAtText: String(item?.createdAtText || dayjs().format('MM-DD HH:mm')),
@@ -3633,6 +3645,8 @@ function submitQuickChatTodoEditor() {
     row.priority = quickChatTodoForm.priority
     row.dueAt = dueAt
     row.dueAtText = dueAtText
+    row.calendarSynced = false
+    row.calendarTaskId = undefined
     if (!row.creatorId) row.creatorId = currentQuickChatSenderId.value
     if (!row.creatorName) row.creatorName = currentQuickChatSenderName.value
     row.escalationLevel = 0
@@ -3656,6 +3670,8 @@ function submitQuickChatTodoEditor() {
     dueAt,
     dueAtText,
     escalationLevel: 0,
+    calendarSynced: false,
+    calendarTaskId: undefined,
     doneAt: undefined,
     createdAt: dayjs().toISOString(),
     createdAtText: dayjs().format('MM-DD HH:mm'),
@@ -3765,25 +3781,68 @@ function escalateOverdueQuickChatTodos() {
   message.success(`已升级催办 ${overdueRows.length} 条逾期待办`)
 }
 
-function syncQuickChatTodoToCalendar(todoId: string) {
+function resolveQuickChatTodoCalendarAssigneeId(assigneeId?: string) {
+  const normalized = String(assigneeId || '').trim()
+  if (!normalized) return undefined
+  const numericSelfId = currentQuickChatSenderNumericId.value
+  if (normalized === currentQuickChatSenderId.value && numericSelfId) {
+    return Number(numericSelfId)
+  }
+  if (!/^\d+$/.test(normalized)) return undefined
+  const parsed = Number(normalized)
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined
+}
+
+function quickChatTodoCalendarQuery(row: QuickChatTodoItem, taskId?: string) {
+  return {
+    from: 'quickChatTodo',
+    date: row.dueAt ? dayjs(row.dueAt).format('YYYY-MM-DD') : undefined,
+    taskId: taskId || row.calendarTaskId || undefined
+  }
+}
+
+async function syncQuickChatTodoToCalendar(todoId: string) {
   const row = quickChatTodoItems.value.find((item) => item.id === todoId)
   if (!row || !row.dueAt) return
-  const title = `【聊天待办】${row.content}`
   const date = dayjs(row.dueAt).format('YYYY-MM-DD')
-  router.push({
-    path: '/oa/work-execution/calendar',
-    query: {
-      from: 'quickChatTodo',
-      title,
-      dueAt: row.dueAt,
-      roomId: row.roomId,
-      assignee: row.assigneeName || ''
+  try {
+    if (row.calendarTaskId) {
+      router.push({
+        path: '/oa/work-execution/calendar',
+        query: quickChatTodoCalendarQuery(row)
+      })
+      quickChatTodoOpen.value = false
+      message.success(`该待办已同步到日历（${date}）`)
+      return
     }
-  })
-  row.calendarSynced = true
-  persistQuickChatTodo()
-  quickChatTodoOpen.value = false
-  message.success(`已跳转到协同日历（${date}）`)
+    const title = `【聊天待办】${row.content}`
+    const endAt = dayjs(row.dueAt)
+    const startAt = endAt.subtract(30, 'minute')
+    const created = await createOaTask({
+      title,
+      description: `来源会话：${row.roomName}${row.assigneeName ? `\n责任人：${row.assigneeName}` : ''}${row.createdAtText ? `\n创建时间：${row.createdAtText}` : ''}`,
+      startTime: startAt.format('YYYY-MM-DDTHH:mm:ss'),
+      endTime: endAt.format('YYYY-MM-DDTHH:mm:ss'),
+      priority: row.priority === 'MEDIUM' ? 'NORMAL' : row.priority,
+      status: 'OPEN',
+      assigneeId: resolveQuickChatTodoCalendarAssigneeId(row.assigneeId),
+      assigneeName: row.assigneeName || currentQuickChatSenderName.value,
+      calendarType: 'WORK',
+      planCategory: '聊天待办',
+      urgency: row.priority === 'HIGH' ? 'EMERGENCY' : 'NORMAL'
+    })
+    row.calendarTaskId = created?.id != null ? String(created.id) : undefined
+    row.calendarSynced = true
+    persistQuickChatTodo()
+    router.push({
+      path: '/oa/work-execution/calendar',
+      query: quickChatTodoCalendarQuery(row, row.calendarTaskId)
+    })
+    quickChatTodoOpen.value = false
+    message.success(`已同步到协同日历（${date}）`)
+  } catch (error: any) {
+    message.error(error?.message || '同步到日历失败')
+  }
 }
 
 function exportQuickChatTodoReport() {
@@ -3996,27 +4055,50 @@ const beforeQuickChatUpload: UploadProps['beforeUpload'] = async (file) => {
     message.info('请先选择会话')
     return false
   }
-  const blobUrl = URL.createObjectURL(file as File)
-  const isImage = String((file as File).type || '').startsWith('image/')
-  const outgoingMessage = createQuickChatMessage({
+  const currentFile = file as File
+  const isImage = String(currentFile.type || '').startsWith('image/')
+  const tempPreviewUrl = isImage ? URL.createObjectURL(currentFile) : ''
+  const tempMessage = createQuickChatMessage({
     id: `m_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     senderId: currentId,
     senderName: currentQuickChatSenderName.value,
     kind: isImage ? 'IMAGE' : 'FILE',
-    content: isImage ? '[图片]' : '[文件]',
-    fileName: (file as File).name,
-    fileUrl: blobUrl
+    content: isImage ? '[图片上传中]' : '[文件上传中]',
+    fileName: currentFile.name,
+    fileUrl: tempPreviewUrl || undefined,
+    uploadStatus: 'UPLOADING'
   })
-  room.memberIds.forEach((memberId) => {
-    outgoingMessage.readByUser = outgoingMessage.readByUser || {}
-    if (!isCurrentQuickChatIdentity(memberId)) outgoingMessage.readByUser[memberId] = false
-  })
-  room.messages.push(outgoingMessage)
+  room.messages.push(tempMessage)
   room.updatedAt = dayjs().toISOString()
-  incrementRoomUnread(room)
-  persistQuickChatState()
-  void pushQuickChatRoomToMembers(room)
   scrollQuickChatToBottom()
+  try {
+    const uploaded = await uploadOaFile(currentFile, isImage ? 'oa-quick-chat-image' : 'oa-quick-chat-file')
+    const fileUrl = String(uploaded?.fileUrl || '').trim()
+    if (!fileUrl) {
+      room.messages = room.messages.filter((item) => item.id !== tempMessage.id)
+      if (tempPreviewUrl) URL.revokeObjectURL(tempPreviewUrl)
+      message.error('发送失败：未返回文件地址')
+      return false
+    }
+    tempMessage.content = isImage ? '[图片]' : '[文件]'
+    tempMessage.fileName = uploaded?.originalFileName || uploaded?.fileName || currentFile.name
+    tempMessage.fileUrl = fileUrl
+    tempMessage.uploadStatus = undefined
+    room.memberIds.forEach((memberId) => {
+      tempMessage.readByUser = tempMessage.readByUser || {}
+      if (!isCurrentQuickChatIdentity(memberId)) tempMessage.readByUser[memberId] = false
+    })
+    room.updatedAt = dayjs().toISOString()
+    incrementRoomUnread(room)
+    persistQuickChatState()
+    void pushQuickChatRoomToMembers(room)
+    scrollQuickChatToBottom()
+    if (tempPreviewUrl) URL.revokeObjectURL(tempPreviewUrl)
+  } catch (error: any) {
+    room.messages = room.messages.filter((item) => item.id !== tempMessage.id)
+    if (tempPreviewUrl) URL.revokeObjectURL(tempPreviewUrl)
+    message.error(error?.message || '发送失败')
+  }
   return false
 }
 
@@ -4782,6 +4864,73 @@ function onQuickChatStorageChange(event: StorageEvent) {
   background: rgba(248, 250, 252, 0.85);
 }
 
+.quick-chat-todo-toolbar {
+  display: flex;
+  margin-bottom: 10px;
+}
+
+.quick-chat-todo-list :deep(.ant-list-items) {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.quick-chat-todo-item {
+  padding-block: 0 !important;
+}
+
+.quick-chat-todo-card {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fff 0%, rgba(248, 250, 252, 0.92) 100%);
+}
+
+.quick-chat-todo-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.quick-chat-todo-title-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.quick-chat-todo-title {
+  display: block;
+  color: var(--ink);
+  font-weight: 600;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.quick-chat-todo-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.quick-chat-todo-desc {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+  word-break: break-word;
+}
+
+.quick-chat-todo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+
 .quick-chat-todo-rank {
   margin-top: 10px;
   padding-top: 10px;
@@ -4910,6 +5059,28 @@ function onQuickChatStorageChange(event: StorageEvent) {
   display: block;
 }
 
+.quick-chat-image-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.quick-chat-upload-mask {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.38);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.quick-chat-uploading-file {
+  color: var(--muted);
+}
+
 .quick-chat-input {
   border-top: 1px solid var(--border);
   padding: 10px 12px;
@@ -4957,6 +5128,14 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
   .quick-chat-room-list {
     max-height: 180px;
+  }
+
+  .quick-chat-todo-head {
+    flex-direction: column;
+  }
+
+  .quick-chat-todo-tags {
+    justify-content: flex-start;
   }
 }
 </style>

@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import lombok.Data;
 
 @Data
@@ -15,6 +16,8 @@ public class DiningMealOrderRequest {
 
   @NotNull
   private LocalDate orderDate;
+
+  private LocalDateTime expectedDeliveryTime;
 
   @NotBlank
   private String mealType;

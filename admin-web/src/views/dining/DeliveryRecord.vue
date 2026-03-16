@@ -24,12 +24,21 @@
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
+            <a-button type="link" @click="openQr(record)">签收码</a-button>
             <a-button type="link" @click="openEdit(record)">编辑</a-button>
             <a-button type="link" danger @click="remove(record)">删除</a-button>
           </a-space>
         </template>
       </template>
     </DataTable>
+
+    <a-modal v-model:open="qrOpen" title="送餐签收二维码" :footer="null" width="460px">
+      <div class="qr-modal">
+        <img v-if="qrDataUrl" :src="qrDataUrl" alt="送餐签收二维码" class="qr-image" />
+        <a-typography-text v-if="qrText" copyable>{{ qrText }}</a-typography-text>
+        <a-typography-text type="secondary">这里展示的是当前长者已有的床位二维码，若未绑定床位则回退为老人二维码。</a-typography-text>
+      </div>
+    </a-modal>
 
     <a-modal v-model:open="editOpen" title="送餐记录" :confirm-loading="saving" @ok="submit">
       <a-form layout="vertical">
@@ -62,6 +71,22 @@
         <a-form-item label="送达时间">
           <a-date-picker v-model:value="form.deliveredAt" show-time style="width: 100%" />
         </a-form-item>
+        <a-form-item label="床头码签收时间">
+          <a-date-picker v-model:value="form.signedAt" show-time style="width: 100%" />
+        </a-form-item>
+        <a-form-item label="床头码扫码回传时间">
+          <a-date-picker v-model:value="form.qrScanAt" show-time style="width: 100%" />
+        </a-form-item>
+        <a-form-item label="签收图片">
+          <a-upload :before-upload="beforeUploadSignoffImage" :show-upload-list="false" accept="image/*" multiple>
+            <a-button :loading="uploadingSignoffImage">上传签收图片</a-button>
+          </a-upload>
+          <a-space v-if="form.signoffImageUrls.length" wrap style="margin-top: 8px">
+            <a-tag v-for="(url, index) in form.signoffImageUrls" :key="`${url}_${index}`" closable @close.prevent="removeSignoffImage(index)">
+              <a :href="url" target="_blank" rel="noopener noreferrer">图片{{ index + 1 }}</a>
+            </a-tag>
+          </a-space>
+        </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="form.status" :options="statusOptions" />
         </a-form-item>
@@ -76,11 +101,13 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import dayjs from 'dayjs'
+import QRCode from 'qrcode'
 import { message } from 'ant-design-vue'
 import type { Dayjs } from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
+import { uploadOaFile } from '../../api/oa'
 import {
   DINING_DELIVERY_STATUS_OPTIONS,
   DINING_MESSAGES,
@@ -93,6 +120,7 @@ import {
   createDiningDeliveryRecord,
   updateDiningDeliveryRecord,
   deleteDiningDeliveryRecord,
+  generateDiningDeliverySignoffQr,
   getDiningMealOrderPage,
   getDiningDeliveryAreaList
 } from '../../api/dining'
@@ -114,6 +142,10 @@ const query = reactive({
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const editOpen = ref(false)
 const saving = ref(false)
+const uploadingSignoffImage = ref(false)
+const qrOpen = ref(false)
+const qrText = ref('')
+const qrDataUrl = ref('')
 const form = reactive({
   id: undefined as Id | undefined,
   mealOrderId: undefined as Id | undefined,
@@ -122,6 +154,9 @@ const form = reactive({
   deliveryAreaName: '',
   deliveredByName: '',
   deliveredAt: undefined as Dayjs | undefined,
+  signedAt: undefined as Dayjs | undefined,
+  qrScanAt: undefined as Dayjs | undefined,
+  signoffImageUrls: [] as string[],
   status: DINING_STATUS.pending,
   remark: ''
 })
@@ -132,8 +167,10 @@ const columns = [
   { title: '送餐区域', dataIndex: 'deliveryAreaName', key: 'deliveryAreaName', width: 130 },
   { title: '送餐人', dataIndex: 'deliveredByName', key: 'deliveredByName', width: 120 },
   { title: '送达时间', dataIndex: 'deliveredAt', key: 'deliveredAt', width: 180 },
+  { title: '签收时间', dataIndex: 'signedAt', key: 'signedAt', width: 180 },
+  { title: '签收图片', key: 'signoffImageUrls', width: 110, customRender: ({ record }: any) => `${record.signoffImageUrls?.length || 0}张` },
   { title: '状态', dataIndex: 'status', key: 'status', width: 120 },
-  { title: '操作', key: 'action', width: 140 }
+  { title: '操作', key: 'action', width: 190 }
 ]
 
 async function fetchData() {
@@ -217,6 +254,9 @@ async function openCreate() {
   form.deliveryAreaName = ''
   form.deliveredByName = ''
   form.deliveredAt = undefined
+  form.signedAt = undefined
+  form.qrScanAt = undefined
+  form.signoffImageUrls = []
   form.status = DINING_STATUS.pending
   form.remark = ''
   await Promise.all([searchMealOrders(), loadDeliveryAreaOptions()])
@@ -231,6 +271,9 @@ async function openEdit(record: DiningDeliveryRecord) {
   form.deliveryAreaName = record.deliveryAreaName || ''
   form.deliveredByName = record.deliveredByName || ''
   form.deliveredAt = record.deliveredAt ? dayjs(record.deliveredAt) : undefined
+  form.signedAt = record.signedAt ? dayjs(record.signedAt) : undefined
+  form.qrScanAt = record.qrScanAt ? dayjs(record.qrScanAt) : undefined
+  form.signoffImageUrls = Array.isArray(record.signoffImageUrls) ? [...record.signoffImageUrls] : []
   form.status = record.status || DINING_STATUS.pending
   form.remark = record.remark || ''
   await Promise.all([searchMealOrders(record.orderNo || ''), loadDeliveryAreaOptions()])
@@ -251,6 +294,9 @@ async function submit() {
       deliveryAreaName: form.deliveryAreaName,
       deliveredByName: form.deliveredByName.trim() || undefined,
       deliveredAt: form.deliveredAt ? dayjs(form.deliveredAt).format('YYYY-MM-DD HH:mm:ss') : undefined,
+      signedAt: form.signedAt ? dayjs(form.signedAt).format('YYYY-MM-DD HH:mm:ss') : undefined,
+      qrScanAt: form.qrScanAt ? dayjs(form.qrScanAt).format('YYYY-MM-DD HH:mm:ss') : undefined,
+      signoffImageUrls: form.signoffImageUrls,
       status: form.status,
       remark: form.remark.trim() || undefined
     }
@@ -271,7 +317,57 @@ async function remove(record: DiningDeliveryRecord) {
   fetchData()
 }
 
+async function openQr(record: DiningDeliveryRecord) {
+  const payload = await generateDiningDeliverySignoffQr(record.id)
+  qrText.value = payload.qrContent || payload.qrToken || ''
+  qrDataUrl.value = qrText.value ? await QRCode.toDataURL(qrText.value) : ''
+  qrOpen.value = true
+}
+
+async function beforeUploadSignoffImage(file: File) {
+  uploadingSignoffImage.value = true
+  try {
+    const uploaded = await uploadOaFile(file, 'dining-delivery-signoff')
+    const url = String(uploaded?.fileUrl || '').trim()
+    if (!url) {
+      message.error('上传失败：未返回图片地址')
+      return false
+    }
+    if (!form.signoffImageUrls.includes(url)) {
+      form.signoffImageUrls = [...form.signoffImageUrls, url]
+    }
+    if (!form.signedAt) {
+      form.signedAt = dayjs()
+    }
+    if (!form.qrScanAt) {
+      form.qrScanAt = dayjs()
+    }
+    message.success('签收图片上传成功')
+  } finally {
+    uploadingSignoffImage.value = false
+  }
+  return false
+}
+
+function removeSignoffImage(index: number) {
+  form.signoffImageUrls = form.signoffImageUrls.filter((_, currentIndex) => currentIndex !== index)
+}
+
 searchMealOrders()
 loadDeliveryAreaOptions()
 fetchData()
 </script>
+
+<style scoped>
+.qr-modal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.qr-image {
+  width: 220px;
+  height: 220px;
+}
+</style>

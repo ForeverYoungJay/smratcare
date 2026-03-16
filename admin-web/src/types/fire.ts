@@ -7,7 +7,7 @@ export type FireSafetyRecordType =
   | 'MAINTENANCE_REPORT'
   | 'FAULT_MAINTENANCE'
 
-export type FireSafetyStatus = 'OPEN' | 'CLOSED'
+export type FireSafetyStatus = 'OPEN' | 'RUNNING' | 'CLOSED'
 
 export interface FireSafetyRecord {
   id: number
@@ -31,6 +31,12 @@ export interface FireSafetyRecord {
   checkCycleDays?: number
   equipmentUpdateNote?: string
   equipmentAgingDisposal?: string
+  imageUrls?: string[]
+  thirdPartyMaintenanceFileUrl?: string
+  purchaseContractFileUrl?: string
+  contractStartDate?: string
+  contractEndDate?: string
+  purchaseDocumentUrls?: string[]
 }
 
 export interface FireSafetyRecordQuery {
@@ -91,6 +97,12 @@ export interface FireSafetyReportRecordItem {
   equipmentAgingDisposal?: string
   issueDescription?: string
   actionTaken?: string
+  imageUrls?: string[]
+  thirdPartyMaintenanceFileUrl?: string
+  purchaseContractFileUrl?: string
+  contractStartDate?: string
+  contractEndDate?: string
+  purchaseDocumentUrls?: string[]
 }
 
 export interface FireSafetyReportDetail {

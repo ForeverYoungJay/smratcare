@@ -27,6 +27,8 @@ public class DiningMealOrder {
 
   private LocalDate orderDate;
 
+  private LocalDateTime expectedDeliveryTime;
+
   private String mealType;
 
   private String dishIds;

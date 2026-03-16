@@ -21,6 +21,7 @@ public class ElderDischargeApply {
   private LocalDate applyDate;
   private LocalDate plannedDischargeDate;
   private String reason;
+  private String proofFileUrl;
   private String status;
   private Long linkedDischargeId;
   private String autoDischargeStatus;

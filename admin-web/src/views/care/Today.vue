@@ -17,6 +17,19 @@
             @search="searchStaff"
           />
         </a-form-item>
+        <a-form-item label="老人">
+          <a-select
+            v-model:value="query.elderId"
+            show-search
+            allow-clear
+            placeholder="输入姓名搜索"
+            :filter-option="false"
+            :options="elderOptions"
+            style="width: 180px"
+            @search="searchElders"
+            @focus="() => !elderOptions.length && searchElders('')"
+          />
+        </a-form-item>
         <a-form-item label="房间">
           <a-input v-model:value="query.roomNo" placeholder="房间号" allow-clear />
         </a-form-item>
@@ -242,8 +255,8 @@
         <a-radio-group v-model:value="actionMode">
           <a-space direction="vertical">
             <a-radio value="generate">自动生成（按模板/日期）</a-radio>
-            <a-radio value="create">手动新建（单条）</a-radio>
-            <a-radio value="batch">批量派发（按护工/楼层/房间）</a-radio>
+            <a-radio value="create">手动新建（支持单个老人连续多天）</a-radio>
+            <a-radio value="batch">选择性派发（按老人/日期/任务派给护工）</a-radio>
           </a-space>
         </a-radio-group>
       </div>
@@ -270,6 +283,9 @@
               @focus="() => !elderOptions.length && searchElders('')"
             />
           </a-form-item>
+          <a-form-item label="连续多天">
+            <a-switch v-model:checked="createForm.multiDay" />
+          </a-form-item>
           <a-form-item label="自定义任务">
             <a-switch v-model:checked="createForm.custom" />
           </a-form-item>
@@ -278,9 +294,16 @@
           </a-form-item>
           <a-form-item v-else label="护理模板" name="templateId" required>
             <a-select v-model:value="createForm.templateId" :options="templateOptions" placeholder="选择模板" />
+            <div v-if="!templateOptions.length" class="template-empty-tip">
+              暂无可用护理模板，当前无法进入下一步。
+              <a class="template-empty-link" @click="goToTemplatePage">点击前往护理模板配置</a>
+            </div>
           </a-form-item>
           <a-form-item label="计划时间" name="planTime" required>
             <a-date-picker v-model:value="createForm.planTime" show-time style="width: 100%" />
+          </a-form-item>
+          <a-form-item v-if="createForm.multiDay" label="任务日期范围" name="dateRange" required>
+            <a-range-picker v-model:value="createForm.dateRange" style="width: 100%" />
           </a-form-item>
           <a-form-item label="护工">
             <a-select
@@ -304,8 +327,23 @@
               @search="searchStaff"
             />
           </a-form-item>
+          <a-form-item label="指定老人">
+            <a-select
+              v-model:value="batchForm.elderId"
+              show-search
+              allow-clear
+              placeholder="输入老人姓名搜索"
+              :filter-option="false"
+              :options="elderOptions"
+              @search="searchElders"
+              @focus="() => !elderOptions.length && searchElders('')"
+            />
+          </a-form-item>
           <a-form-item label="日期范围">
             <a-range-picker v-model:value="batchForm.range" />
+          </a-form-item>
+          <a-form-item label="任务关键词">
+            <a-input v-model:value="batchForm.taskKeyword" placeholder="输入任务名称、任务ID筛选" />
           </a-form-item>
           <a-form-item label="楼栋">
             <a-input v-model:value="batchForm.building" />
@@ -343,6 +381,11 @@
           <a-descriptions-item v-if="actionMode === 'create'" label="老人">
             {{ elderName(createForm.elderId) }}
           </a-descriptions-item>
+          <a-descriptions-item v-if="actionMode === 'create' && createForm.multiDay" label="任务日期范围">
+            {{ createForm.dateRange?.[0] ? dayjs(createForm.dateRange[0]).format('YYYY-MM-DD') : '-' }}
+            ~
+            {{ createForm.dateRange?.[1] ? dayjs(createForm.dateRange[1]).format('YYYY-MM-DD') : '-' }}
+          </a-descriptions-item>
           <a-descriptions-item v-if="actionMode === 'create'" label="任务">
             {{ createForm.custom ? createForm.taskName : templateLabel }}
           </a-descriptions-item>
@@ -352,10 +395,16 @@
           <a-descriptions-item v-if="actionMode === 'batch'" label="护工">
             {{ staffName(batchForm.staffId) }}
           </a-descriptions-item>
+          <a-descriptions-item v-if="actionMode === 'batch'" label="指定老人">
+            {{ elderName(batchForm.elderId) }}
+          </a-descriptions-item>
           <a-descriptions-item v-if="actionMode === 'batch'" label="日期范围">
             {{ batchForm.range?.[0] ? dayjs(batchForm.range[0]).format('YYYY-MM-DD') : '-' }}
             ~
             {{ batchForm.range?.[1] ? dayjs(batchForm.range[1]).format('YYYY-MM-DD') : '-' }}
+          </a-descriptions-item>
+          <a-descriptions-item v-if="actionMode === 'batch'" label="任务关键词">
+            {{ batchForm.taskKeyword || '-' }}
           </a-descriptions-item>
           <a-descriptions-item v-if="actionMode === 'batch'" label="覆盖已分配">
             {{ batchForm.force ? '是' : '否' }}
@@ -366,7 +415,7 @@
       <template #footer>
         <a-space>
           <a-button v-if="actionStep > 0" @click="prevStep">上一步</a-button>
-          <a-button v-if="actionStep < 2" type="primary" @click="nextStep">下一步</a-button>
+          <a-button v-if="actionStep < 2" type="primary" :disabled="nextStepDisabled" @click="nextStep">下一步</a-button>
           <a-button v-else type="primary" :loading="actionLoading" @click="submitAction">确认执行</a-button>
         </a-space>
       </template>
@@ -385,7 +434,6 @@ import {
   getTaskSummary,
   getTaskExecuteLogs,
   assignTask,
-  assignTaskBatch,
   reviewTask,
   generateTasks,
   getTemplatePage,
@@ -456,6 +504,7 @@ const activeMetric = ref<'total' | 'pending' | 'done' | 'exception' | 'overdue'>
 const query = reactive({
   range: [dayjs().subtract(1, 'day'), dayjs().add(1, 'day')] as any,
   staffId: undefined as number | undefined,
+  elderId: undefined as number | undefined,
   roomNo: '',
   careLevel: '',
   status: undefined as string | undefined,
@@ -496,7 +545,9 @@ const reviewerOptions = [
 const assignForm = reactive<CareTaskAssignRequest>({ taskDailyId: 0, staffId: 0, force: true })
 const batchForm = reactive<CareTaskBatchAssignRequest>({
   staffId: 0,
-  range: [dayjs().subtract(1, 'day'), dayjs().add(1, 'day')] as any,
+  range: [dayjs(), dayjs()] as any,
+  elderId: undefined as any,
+  taskKeyword: '',
   force: true
 } as any)
 const reviewForm = reactive<CareTaskReviewRequest>({
@@ -512,7 +563,9 @@ const createForm = reactive<any>({
   templateId: 0,
   taskName: '',
   custom: false,
+  multiDay: false,
   planTime: dayjs(),
+  dateRange: undefined as any,
   staffId: undefined
 })
 
@@ -540,7 +593,15 @@ const createRules = {
       }
     }
   ],
-  planTime: [{ required: true, message: '请选择计划时间' }]
+  planTime: [{ required: true, message: '请选择计划时间' }],
+  dateRange: [
+    {
+      validator: (_: any, value: any) => {
+        if (!createForm.multiDay) return Promise.resolve()
+        return value?.[0] && value?.[1] ? Promise.resolve() : Promise.reject(new Error('请选择任务日期范围'))
+      }
+    }
+  ]
 }
 
 const actionModeLabel = computed(() => {
@@ -548,7 +609,7 @@ const actionModeLabel = computed(() => {
     case 'create':
       return '手动新建'
     case 'batch':
-      return '批量派发'
+      return '选择性派发'
     default:
       return '自动生成'
   }
@@ -558,6 +619,13 @@ const templateLabel = computed(() => {
   const current = templateOptions.value.find((t) => t.value === Number(createForm.templateId))
   return current?.label || '未选择模板'
 })
+
+const nextStepDisabled = computed(() => (
+  actionStep.value === 1
+  && actionMode.value === 'create'
+  && !createForm.custom
+  && templateOptions.value.length === 0
+))
 
 function statusLabel(status?: string) {
   switch (status) {
@@ -593,6 +661,7 @@ async function search() {
       dateFrom: query.range?.[0] ? query.range[0].format('YYYY-MM-DD') : undefined,
       dateTo: query.range?.[1] ? query.range[1].format('YYYY-MM-DD') : undefined,
       staffId: query.staffId || undefined,
+      elderId: query.elderId || undefined,
       roomNo: trimmedRoomNo || undefined,
       careLevel: trimmedCareLevel || undefined,
       status: query.status,
@@ -648,6 +717,7 @@ function syncQueryToRoute() {
   if (query.range?.[0]) nextQuery.dateFrom = query.range[0].format('YYYY-MM-DD')
   if (query.range?.[1]) nextQuery.dateTo = query.range[1].format('YYYY-MM-DD')
   if (query.staffId) nextQuery.staffId = String(query.staffId)
+  if (query.elderId) nextQuery.elderId = String(query.elderId)
   if (query.roomNo) nextQuery.roomNo = query.roomNo
   if (query.careLevel) nextQuery.careLevel = query.careLevel
   if (query.status) nextQuery.status = query.status
@@ -667,6 +737,7 @@ function initFromRoute() {
     query.range = [start, end] as any
   }
   query.staffId = parsePositiveInt(route.query.staffId)
+  query.elderId = parsePositiveInt(route.query.elderId)
   query.roomNo = route.query.roomNo ? String(route.query.roomNo) : ''
   query.careLevel = route.query.careLevel ? String(route.query.careLevel) : ''
   const routeStatus = route.query.status ? String(route.query.status) : undefined
@@ -690,6 +761,7 @@ function parsePositiveInt(value: unknown) {
 function reset() {
   query.range = [dayjs().subtract(1, 'day'), dayjs().add(1, 'day')]
   query.staffId = undefined
+  query.elderId = undefined
   query.roomNo = ''
   query.careLevel = ''
   query.status = undefined
@@ -841,7 +913,9 @@ function openCreate() {
   createForm.templateId = 0
   createForm.taskName = ''
   createForm.custom = false
+  createForm.multiDay = false
   createForm.planTime = dayjs()
+  createForm.dateRange = undefined
   createForm.staffId = undefined
 }
 
@@ -852,7 +926,9 @@ function openGenerate() {
 
 function openBatchAssign() {
   batchForm.staffId = 0
-  batchForm.range = [dayjs().subtract(1, 'day'), dayjs().add(1, 'day')]
+  batchForm.range = [dayjs(), dayjs()]
+  batchForm.elderId = undefined
+  batchForm.taskKeyword = ''
   batchForm.roomNo = ''
   batchForm.floorNo = ''
   batchForm.building = ''
@@ -868,6 +944,11 @@ function openAction() {
   openCreate()
   openBatchAssign()
   actionOpen.value = true
+}
+
+function goToTemplatePage() {
+  actionOpen.value = false
+  void router.push('/care/template')
 }
 
 async function submitAssign() {
@@ -958,27 +1039,35 @@ async function submitAction() {
       })
       message.success('任务已生成')
     } else if (actionMode.value === 'create') {
-      await createTask({
-        elderId: createForm.elderId as Id,
-        templateId: createForm.custom ? undefined : Number(createForm.templateId),
-        taskName: createForm.custom ? createForm.taskName : undefined,
-        planTime: dayjs(createForm.planTime).format('YYYY-MM-DDTHH:mm:ss'),
-        staffId: createForm.staffId ? Number(createForm.staffId) : undefined
-      })
-      message.success('任务创建成功')
+      const createDates = resolveCreateDates()
+      for (const targetDate of createDates) {
+        await createTask({
+          elderId: createForm.elderId as Id,
+          templateId: createForm.custom ? undefined : Number(createForm.templateId),
+          taskName: createForm.custom ? createForm.taskName : undefined,
+          planTime: buildPlanTimeForDate(targetDate),
+          staffId: createForm.staffId ? Number(createForm.staffId) : undefined
+        })
+      }
+      message.success(createDates.length > 1 ? `已为该老人创建 ${createDates.length} 天任务` : '任务创建成功')
     } else {
-      await assignTaskBatch({
-        staffId: Number(batchForm.staffId),
-        dateFrom: batchForm.range?.[0] ? batchForm.range[0].format('YYYY-MM-DD') : undefined,
-        dateTo: batchForm.range?.[1] ? batchForm.range[1].format('YYYY-MM-DD') : undefined,
-        roomNo: batchForm.roomNo || undefined,
-        floorNo: batchForm.floorNo || undefined,
-        building: batchForm.building || undefined,
-        careLevel: batchForm.careLevel || undefined,
-        status: batchForm.status || undefined,
-        force: !!batchForm.force
-      })
-      message.success('批量派发完成')
+      if (!hasBatchScope()) {
+        message.warning('请选择老人、日期范围、任务关键词或房间等至少一个派发条件')
+        return
+      }
+      const candidateTasks = await collectBatchCandidateTasks()
+      if (!candidateTasks.length) {
+        message.warning('没有找到符合条件的任务')
+        return
+      }
+      for (const task of candidateTasks) {
+        await assignTask({
+          taskDailyId: Number(task.taskDailyId),
+          staffId: Number(batchForm.staffId),
+          force: !!batchForm.force
+        })
+      }
+      message.success(`已派发 ${candidateTasks.length} 条任务`)
     }
     actionOpen.value = false
     search()
@@ -1029,6 +1118,73 @@ async function searchElders(keyword: string) {
   } catch (error) {
     message.error(resolveCareError(error, '加载老人失败'))
   }
+}
+
+function resolveCreateDates() {
+  if (!createForm.multiDay || !createForm.dateRange?.[0] || !createForm.dateRange?.[1]) {
+    return [dayjs(createForm.planTime)]
+  }
+  const start = dayjs(createForm.dateRange[0]).startOf('day')
+  const end = dayjs(createForm.dateRange[1]).startOf('day')
+  const dates: any[] = []
+  let cursor = start
+  while (cursor.isBefore(end) || cursor.isSame(end, 'day')) {
+    dates.push(cursor)
+    cursor = cursor.add(1, 'day')
+  }
+  return dates
+}
+
+function buildPlanTimeForDate(targetDate: any) {
+  const source = dayjs(createForm.planTime)
+  return dayjs(targetDate)
+    .hour(source.hour())
+    .minute(source.minute())
+    .second(source.second())
+    .format('YYYY-MM-DDTHH:mm:ss')
+}
+
+function hasBatchScope() {
+  return !!(
+    batchForm.elderId
+    || batchForm.taskKeyword
+    || batchForm.range?.[0]
+    || batchForm.range?.[1]
+    || batchForm.roomNo
+    || batchForm.floorNo
+    || batchForm.building
+    || batchForm.careLevel
+    || batchForm.status
+  )
+}
+
+async function collectBatchCandidateTasks() {
+  const pageSize = 200
+  const rows: CareTaskItem[] = []
+  const taskKeyword = String(batchForm.taskKeyword || '').trim().toLowerCase()
+  let pageNo = 1
+  let total = 0
+  do {
+    const pageRes: PageResult<CareTaskItem> = await getTaskPage({
+      pageNo,
+      pageSize,
+      dateFrom: batchForm.range?.[0] ? dayjs(batchForm.range[0]).format('YYYY-MM-DD') : undefined,
+      dateTo: batchForm.range?.[1] ? dayjs(batchForm.range[1]).format('YYYY-MM-DD') : undefined,
+      elderId: batchForm.elderId || undefined,
+      roomNo: batchForm.roomNo || undefined,
+      careLevel: batchForm.careLevel || undefined,
+      status: batchForm.status || undefined
+    })
+    rows.push(...(pageRes.list || []))
+    total = Number(pageRes.total || 0)
+    pageNo += 1
+    if (pageNo > 10) break
+  } while (rows.length < total)
+
+  return rows.filter((item) => {
+    if (!taskKeyword) return true
+    return `${item.taskName || ''} ${item.taskDailyId || ''}`.toLowerCase().includes(taskKeyword)
+  })
 }
 
 function staffName(staffId?: number) {
@@ -1092,6 +1248,14 @@ search()
   margin-bottom: 8px;
   color: #64748b;
   font-size: 12px;
+}
+.template-empty-tip {
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 12px;
+}
+.template-empty-link {
+  margin-left: 6px;
 }
 .log-toolbar {
   display: flex;

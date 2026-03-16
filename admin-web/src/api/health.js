@@ -98,6 +98,12 @@ export function updateHealthInspection(id, data) {
 export function deleteHealthInspection(id) {
     return request.delete(`/api/health/inspection/${id}`);
 }
+export function getHealthInspectionVitalThresholdList() {
+    return request.get('/api/health/inspection/vital-threshold/list');
+}
+export function upsertHealthInspectionVitalThreshold(data) {
+    return request.post('/api/health/inspection/vital-threshold/upsert', data);
+}
 export function getHealthNursingLogPage(params) {
     return fetchPage('/api/health/nursing-log/page', params);
 }

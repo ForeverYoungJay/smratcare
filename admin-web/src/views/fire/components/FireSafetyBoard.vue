@@ -16,6 +16,7 @@
       <template #extra>
         <a-space>
           <a-button v-if="props.recordType === 'MAINTENANCE_REPORT'" @click="downloadMaintenanceLog">一键下载维护保养日志</a-button>
+          <a-button v-if="canPrintSelected" :disabled="!selectedRows.length" @click="printSelectedRows">打印勾选记录</a-button>
           <a-button v-if="viewConfig.supportsQr" @click="openScan">扫码完成</a-button>
           <a-button type="primary" @click="openCreate">新增记录</a-button>
         </a-space>
@@ -24,7 +25,7 @@
 
     <a-row :gutter="[12, 12]">
       <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="记录总数" :value="summary.totalCount || 0" /></a-card></a-col>
-      <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="处理中" :value="summary.openCount || 0" /></a-card></a-col>
+      <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="未关闭项" :value="summary.openCount || 0" /></a-card></a-col>
       <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="已关闭" :value="summary.closedCount || 0" /></a-card></a-col>
       <a-col :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="逾期项" :value="summary.overdueCount || 0" /></a-card></a-col>
       <a-col v-if="viewConfig.showNextCheck" :xs="12" :lg="4"><a-card class="card-elevated" :bordered="false" size="small"><a-statistic title="7天内待检" :value="summary.nextCheckDueSoonCount || 0" /></a-card></a-col>
@@ -44,13 +45,14 @@
       :columns="columns"
       :data-source="rows"
       :loading="loading"
+      :row-selection="rowSelection"
       :pagination="pagination"
       @change="handleTableChange"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
-          <a-tag :color="record.status === 'CLOSED' ? 'green' : 'orange'">
-            {{ record.status === 'CLOSED' ? '已关闭' : '处理中' }}
+          <a-tag :color="statusColor(record.status)">
+            {{ statusText(record.status) }}
           </a-tag>
         </template>
         <template v-else-if="column.key === 'qrToken'">
@@ -65,9 +67,38 @@
         <template v-else-if="column.key === 'nextCheckDate'">
           {{ record.nextCheckDate || '-' }}
         </template>
+        <template v-else-if="column.key === 'imageUrls'">
+          <a-space v-if="record.imageUrls?.length" wrap size="small">
+            <a-image
+              v-for="(url, index) in record.imageUrls.slice(0, 3)"
+              :key="`${record.id}-${index}`"
+              :src="url"
+              :width="44"
+              :height="44"
+              style="object-fit: cover; border-radius: 6px"
+            />
+            <a-tag v-if="record.imageUrls.length > 3">+{{ record.imageUrls.length - 3 }}</a-tag>
+          </a-space>
+          <span v-else>-</span>
+        </template>
+        <template v-else-if="column.key === 'thirdPartyMaintenanceFileUrl'">
+          <a v-if="record.thirdPartyMaintenanceFileUrl" :href="record.thirdPartyMaintenanceFileUrl" target="_blank" rel="noopener noreferrer">查看附件</a>
+          <span v-else>-</span>
+        </template>
+        <template v-else-if="column.key === 'purchaseContractFileUrl'">
+          <a v-if="record.purchaseContractFileUrl" :href="record.purchaseContractFileUrl" target="_blank" rel="noopener noreferrer">查看合同</a>
+          <span v-else>-</span>
+        </template>
+        <template v-else-if="column.key === 'contractPeriod'">
+          {{ formatContractPeriod(record.contractStartDate, record.contractEndDate) }}
+        </template>
+        <template v-else-if="column.key === 'purchaseDocumentUrls'">
+          <span v-if="record.purchaseDocumentUrls?.length">已上传{{ record.purchaseDocumentUrls.length }}份</span>
+          <span v-else>-</span>
+        </template>
         <template v-else-if="column.key === 'action'">
           <a-space wrap>
-            <a-button v-if="viewConfig.supportsQr" type="link" @click="openQr(record)">生成二维码</a-button>
+            <a-button v-if="viewConfig.supportsQr" type="link" @click="openQr(record)">{{ qrButtonText }}</a-button>
             <a-button type="link" @click="openEdit(record)">编辑</a-button>
             <a-button type="link" :disabled="record.status === 'CLOSED'" @click="closeRecord(record)">关闭</a-button>
             <a-button type="link" danger @click="remove(record)">删除</a-button>
@@ -167,6 +198,87 @@
         <a-form-item label="处置措施">
           <a-textarea v-model:value="form.actionTaken" :rows="3" />
         </a-form-item>
+        <a-form-item v-if="viewConfig.showImageUpload" label="现场图片">
+          <a-upload :before-upload="beforeUploadImage" :show-upload-list="false" accept="image/*" multiple>
+            <a-button :loading="uploadingImage">上传图片</a-button>
+          </a-upload>
+          <a-space v-if="form.imageUrls.length" wrap style="margin-top: 8px">
+            <a-tag
+              v-for="(url, index) in form.imageUrls"
+              :key="`${url}-${index}`"
+              closable
+              @close="removeImage(index)"
+            >
+              <a :href="url" target="_blank" rel="noopener noreferrer">图片{{ index + 1 }}</a>
+            </a-tag>
+          </a-space>
+          <div
+            v-if="form.imageUrls.length"
+            style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px"
+          >
+            <a-image
+              v-for="(url, index) in form.imageUrls"
+              :key="`${url}-preview-${index}`"
+              :src="url"
+              :width="72"
+              :height="72"
+              style="object-fit: cover; border-radius: 8px"
+            />
+          </div>
+        </a-form-item>
+        <template v-if="viewConfig.showMaintenanceAttachments">
+          <a-row :gutter="16">
+            <a-col :span="12">
+              <a-form-item label="第三方维保记录单">
+                <a-upload :before-upload="beforeUploadThirdPartyFile" :show-upload-list="false">
+                  <a-button :loading="uploadingThirdPartyFile">上传维保记录单</a-button>
+                </a-upload>
+                <a-space v-if="form.thirdPartyMaintenanceFileUrl" style="margin-top: 8px">
+                  <a :href="form.thirdPartyMaintenanceFileUrl" target="_blank" rel="noopener noreferrer">查看已上传文件</a>
+                  <a-button type="link" danger @click="form.thirdPartyMaintenanceFileUrl = ''">移除</a-button>
+                </a-space>
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="采购合同">
+                <a-upload :before-upload="beforeUploadPurchaseContract" :show-upload-list="false">
+                  <a-button :loading="uploadingPurchaseContract">上传采购合同</a-button>
+                </a-upload>
+                <a-space v-if="form.purchaseContractFileUrl" style="margin-top: 8px">
+                  <a :href="form.purchaseContractFileUrl" target="_blank" rel="noopener noreferrer">查看采购合同</a>
+                  <a-button type="link" danger @click="form.purchaseContractFileUrl = ''">移除</a-button>
+                </a-space>
+              </a-form-item>
+            </a-col>
+          </a-row>
+          <a-row :gutter="16">
+            <a-col :span="12">
+              <a-form-item label="合约开始日期">
+                <a-date-picker v-model:value="form.contractStartDate" style="width: 100%" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="合约结束日期">
+                <a-date-picker v-model:value="form.contractEndDate" style="width: 100%" />
+              </a-form-item>
+            </a-col>
+          </a-row>
+          <a-form-item label="采购单据">
+            <a-upload :before-upload="beforeUploadPurchaseDocument" :show-upload-list="false" multiple>
+              <a-button :loading="uploadingPurchaseDocument">上传单据</a-button>
+            </a-upload>
+            <a-space v-if="form.purchaseDocumentUrls.length" wrap style="margin-top: 8px">
+              <a-tag
+                v-for="(url, index) in form.purchaseDocumentUrls"
+                :key="`${url}-${index}`"
+                closable
+                @close="removePurchaseDocument(index)"
+              >
+                <a :href="url" target="_blank" rel="noopener noreferrer">单据{{ index + 1 }}</a>
+              </a-tag>
+            </a-space>
+          </a-form-item>
+        </template>
 
         <a-row :gutter="16">
           <a-col v-if="viewConfig.showNextCheck" :span="12">
@@ -183,21 +295,21 @@
       </a-form>
     </a-modal>
 
-    <a-modal v-if="viewConfig.supportsQr" v-model:open="qrOpen" title="巡查二维码" :footer="null" width="520px">
+    <a-modal v-if="viewConfig.supportsQr" v-model:open="qrOpen" :title="qrModalTitle" :footer="null" width="520px">
       <a-space direction="vertical" style="width: 100%" align="center">
         <img v-if="qrDataUrl" :src="qrDataUrl" alt="巡查二维码" style="width: 240px; height: 240px" />
         <a-typography-text copyable>{{ qrText }}</a-typography-text>
-        <a-typography-text type="secondary">扫码后自动完成该条巡查记录并闭环。</a-typography-text>
+        <a-typography-text type="secondary">{{ qrHintText }}</a-typography-text>
       </a-space>
     </a-modal>
 
-    <a-modal v-if="viewConfig.supportsQr" v-model:open="scanOpen" title="扫码完成巡查" :footer="null" width="560px">
+    <a-modal v-if="viewConfig.supportsQr" v-model:open="scanOpen" :title="scanModalTitle" :footer="null" width="560px">
       <a-form layout="vertical">
         <a-form-item label="二维码令牌" required>
           <a-input
             ref="scanInputRef"
             v-model:value="scanForm.qrToken"
-            placeholder="扫码枪扫码后会自动提交，无需手点确认"
+            :placeholder="scanPlaceholder"
             @pressEnter="onScannerConfirm(scanForm.qrToken)"
           />
         </a-form-item>
@@ -232,8 +344,11 @@ import {
   generateFireSafetyQr,
   getFireSafetyRecordPage,
   getFireSafetySummary,
+  uploadFireSafetyFile,
+  uploadFireSafetyImage,
   updateFireSafetyRecord
 } from '../../../api/fire'
+import { printTableReport } from '../../../utils/print'
 import type { FireSafetyRecord, FireSafetyRecordType, FireSafetyReportSummary, FireSafetyStatus } from '../../../types'
 
 type FireBoardViewConfig = {
@@ -245,6 +360,8 @@ type FireBoardViewConfig = {
   showEquipmentAgingDisposal: boolean
   showNextCheck: boolean
   supportsQr: boolean
+  showImageUpload: boolean
+  showMaintenanceAttachments: boolean
 }
 
 const props = defineProps<{
@@ -292,7 +409,9 @@ const viewConfigMap: Record<FireSafetyRecordType, FireBoardViewConfig> = {
     showEquipmentUpdateNote: true,
     showEquipmentAgingDisposal: true,
     showNextCheck: true,
-    supportsQr: false
+    supportsQr: true,
+    showImageUpload: false,
+    showMaintenanceAttachments: false
   },
   CONTROL_ROOM_DUTY: {
     showDutyRecord: true,
@@ -302,7 +421,9 @@ const viewConfigMap: Record<FireSafetyRecordType, FireBoardViewConfig> = {
     showEquipmentUpdateNote: false,
     showEquipmentAgingDisposal: false,
     showNextCheck: false,
-    supportsQr: false
+    supportsQr: false,
+    showImageUpload: true,
+    showMaintenanceAttachments: false
   },
   MONTHLY_CHECK: {
     showDutyRecord: false,
@@ -312,7 +433,9 @@ const viewConfigMap: Record<FireSafetyRecordType, FireBoardViewConfig> = {
     showEquipmentUpdateNote: false,
     showEquipmentAgingDisposal: false,
     showNextCheck: true,
-    supportsQr: true
+    supportsQr: true,
+    showImageUpload: false,
+    showMaintenanceAttachments: false
   },
   DAY_PATROL: {
     showDutyRecord: false,
@@ -322,7 +445,9 @@ const viewConfigMap: Record<FireSafetyRecordType, FireBoardViewConfig> = {
     showEquipmentUpdateNote: false,
     showEquipmentAgingDisposal: false,
     showNextCheck: true,
-    supportsQr: true
+    supportsQr: true,
+    showImageUpload: false,
+    showMaintenanceAttachments: false
   },
   NIGHT_PATROL: {
     showDutyRecord: false,
@@ -332,7 +457,9 @@ const viewConfigMap: Record<FireSafetyRecordType, FireBoardViewConfig> = {
     showEquipmentUpdateNote: false,
     showEquipmentAgingDisposal: false,
     showNextCheck: true,
-    supportsQr: true
+    supportsQr: true,
+    showImageUpload: false,
+    showMaintenanceAttachments: false
   },
   MAINTENANCE_REPORT: {
     showDutyRecord: false,
@@ -342,7 +469,9 @@ const viewConfigMap: Record<FireSafetyRecordType, FireBoardViewConfig> = {
     showEquipmentUpdateNote: true,
     showEquipmentAgingDisposal: false,
     showNextCheck: false,
-    supportsQr: false
+    supportsQr: false,
+    showImageUpload: false,
+    showMaintenanceAttachments: true
   },
   FAULT_MAINTENANCE: {
     showDutyRecord: false,
@@ -352,11 +481,29 @@ const viewConfigMap: Record<FireSafetyRecordType, FireBoardViewConfig> = {
     showEquipmentUpdateNote: false,
     showEquipmentAgingDisposal: false,
     showNextCheck: false,
-    supportsQr: false
+    supportsQr: false,
+    showImageUpload: false,
+    showMaintenanceAttachments: false
   }
 }
 
 const viewConfig = computed(() => viewConfigMap[props.recordType])
+const canPrintSelected = computed(() => props.recordType === 'CONTROL_ROOM_DUTY')
+const qrButtonText = computed(() => (props.recordType === 'FACILITY' ? '制作二维码' : '生成二维码'))
+const qrModalTitle = computed(() => (props.recordType === 'FACILITY' ? '日常消防填报二维码' : '巡查二维码'))
+const qrHintText = computed(() => (
+  props.recordType === 'FACILITY'
+    ? '消防安全员扫码后可进入日常消防安全填报与闭环处理。'
+    : '扫码后自动完成该条巡查记录并闭环。'
+))
+const scanModalTitle = computed(() => (
+  props.recordType === 'FACILITY' ? '扫码填写日常消防记录' : '扫码完成巡查'
+))
+const scanPlaceholder = computed(() => (
+  props.recordType === 'FACILITY'
+    ? '扫码后自动填充，可补充本次消防安全填报内容'
+    : '扫码枪扫码后会自动提交，无需手点确认'
+))
 
 const warningMessage = computed(() => {
   const warnings: string[] = []
@@ -405,6 +552,17 @@ const columns = computed(() => {
   if (viewConfig.value.showNextCheck) {
     items.push({ title: '下次检查日期', dataIndex: 'nextCheckDate', key: 'nextCheckDate', width: 130 })
   }
+  if (viewConfig.value.showImageUpload) {
+    items.push({ title: '现场图片', dataIndex: 'imageUrls', key: 'imageUrls', width: 180 })
+  }
+  if (viewConfig.value.showMaintenanceAttachments) {
+    items.push(
+      { title: '第三方维保单', dataIndex: 'thirdPartyMaintenanceFileUrl', key: 'thirdPartyMaintenanceFileUrl', width: 140 },
+      { title: '采购合同', dataIndex: 'purchaseContractFileUrl', key: 'purchaseContractFileUrl', width: 140 },
+      { title: '合约期', dataIndex: 'contractPeriod', key: 'contractPeriod', width: 190 },
+      { title: '采购单据', dataIndex: 'purchaseDocumentUrls', key: 'purchaseDocumentUrls', width: 140 }
+    )
+  }
   if (viewConfig.value.supportsQr) {
     items.push(
       { title: '二维码令牌', dataIndex: 'qrToken', key: 'qrToken', width: 140 },
@@ -421,6 +579,10 @@ const columns = computed(() => {
 
 const editOpen = ref(false)
 const saving = ref(false)
+const uploadingImage = ref(false)
+const uploadingThirdPartyFile = ref(false)
+const uploadingPurchaseContract = ref(false)
+const uploadingPurchaseDocument = ref(false)
 const form = reactive({
   id: undefined as number | undefined,
   title: '',
@@ -438,7 +600,26 @@ const form = reactive({
   productExpiryDate: undefined as Dayjs | undefined,
   checkCycleDays: undefined as number | undefined,
   equipmentUpdateNote: '',
-  equipmentAgingDisposal: ''
+  equipmentAgingDisposal: '',
+  imageUrls: [] as string[],
+  thirdPartyMaintenanceFileUrl: '',
+  purchaseContractFileUrl: '',
+  contractStartDate: undefined as Dayjs | undefined,
+  contractEndDate: undefined as Dayjs | undefined,
+  purchaseDocumentUrls: [] as string[]
+})
+const selectedRowKeys = ref<number[]>([])
+const selectedRows = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(item.id)))
+const rowSelection = computed(() => {
+  if (!canPrintSelected.value) {
+    return undefined
+  }
+  return {
+    selectedRowKeys: selectedRowKeys.value,
+    onChange: (keys: Array<string | number>) => {
+      selectedRowKeys.value = keys.map((item) => Number(item))
+    }
+  }
 })
 
 const qrOpen = ref(false)
@@ -458,8 +639,21 @@ const scanForm = reactive({
 
 const statusOptions = [
   { label: '处理中', value: 'OPEN' },
+  { label: '运行中', value: 'RUNNING' },
   { label: '已关闭', value: 'CLOSED' }
 ]
+
+function statusText(status?: FireSafetyStatus) {
+  if (status === 'CLOSED') return '已关闭'
+  if (status === 'RUNNING') return '运行中'
+  return '处理中'
+}
+
+function statusColor(status?: FireSafetyStatus) {
+  if (status === 'CLOSED') return 'green'
+  if (status === 'RUNNING') return 'blue'
+  return 'orange'
+}
 
 function resetSummary() {
   Object.assign(summary, defaultSummary())
@@ -492,6 +686,7 @@ async function fetchData() {
       })
     ])
     rows.value = res.list
+    selectedRowKeys.value = selectedRowKeys.value.filter((id) => rows.value.some((item) => item.id === id))
     pagination.current = res.pageNo || query.pageNo
     pagination.pageSize = res.pageSize || query.pageSize
     pagination.total = res.total || res.list.length
@@ -543,6 +738,12 @@ function resetForm() {
   form.checkCycleDays = undefined
   form.equipmentUpdateNote = ''
   form.equipmentAgingDisposal = ''
+  form.imageUrls = []
+  form.thirdPartyMaintenanceFileUrl = ''
+  form.purchaseContractFileUrl = ''
+  form.contractStartDate = undefined
+  form.contractEndDate = undefined
+  form.purchaseDocumentUrls = []
 }
 
 function openCreate() {
@@ -569,6 +770,12 @@ function openEdit(record: FireSafetyRecord) {
   form.checkCycleDays = record.checkCycleDays
   form.equipmentUpdateNote = record.equipmentUpdateNote || ''
   form.equipmentAgingDisposal = record.equipmentAgingDisposal || ''
+  form.imageUrls = Array.isArray(record.imageUrls) ? [...record.imageUrls] : []
+  form.thirdPartyMaintenanceFileUrl = record.thirdPartyMaintenanceFileUrl || ''
+  form.purchaseContractFileUrl = record.purchaseContractFileUrl || ''
+  form.contractStartDate = record.contractStartDate ? dayjs(record.contractStartDate) : undefined
+  form.contractEndDate = record.contractEndDate ? dayjs(record.contractEndDate) : undefined
+  form.purchaseDocumentUrls = Array.isArray(record.purchaseDocumentUrls) ? [...record.purchaseDocumentUrls] : []
   editOpen.value = true
 }
 
@@ -593,6 +800,11 @@ function validateForm() {
   if (viewConfig.value.showNextCheck && form.nextCheckDate
     && form.nextCheckDate.isBefore(form.checkTime.startOf('day'), 'day')) {
     message.warning('下次检查日期不能早于检查日期')
+    return false
+  }
+  if (viewConfig.value.showMaintenanceAttachments && form.contractStartDate && form.contractEndDate
+    && form.contractEndDate.isBefore(form.contractStartDate, 'day')) {
+    message.warning('合约结束日期不能早于开始日期')
     return false
   }
   return true
@@ -628,7 +840,17 @@ async function submit() {
       : undefined,
     checkCycleDays: viewConfig.value.showProductLifecycle ? form.checkCycleDays : undefined,
     equipmentUpdateNote: viewConfig.value.showEquipmentUpdateNote ? normalizeText(form.equipmentUpdateNote) : undefined,
-    equipmentAgingDisposal: viewConfig.value.showEquipmentAgingDisposal ? normalizeText(form.equipmentAgingDisposal) : undefined
+    equipmentAgingDisposal: viewConfig.value.showEquipmentAgingDisposal ? normalizeText(form.equipmentAgingDisposal) : undefined,
+    imageUrls: viewConfig.value.showImageUpload ? form.imageUrls : undefined,
+    thirdPartyMaintenanceFileUrl: viewConfig.value.showMaintenanceAttachments ? normalizeText(form.thirdPartyMaintenanceFileUrl) : undefined,
+    purchaseContractFileUrl: viewConfig.value.showMaintenanceAttachments ? normalizeText(form.purchaseContractFileUrl) : undefined,
+    contractStartDate: viewConfig.value.showMaintenanceAttachments && form.contractStartDate
+      ? dayjs(form.contractStartDate).format('YYYY-MM-DD')
+      : undefined,
+    contractEndDate: viewConfig.value.showMaintenanceAttachments && form.contractEndDate
+      ? dayjs(form.contractEndDate).format('YYYY-MM-DD')
+      : undefined,
+    purchaseDocumentUrls: viewConfig.value.showMaintenanceAttachments ? form.purchaseDocumentUrls : undefined
   }
 
   saving.value = true
@@ -642,6 +864,145 @@ async function submit() {
     await fetchData()
   } finally {
     saving.value = false
+  }
+}
+
+async function beforeUploadImage(file: File) {
+  uploadingImage.value = true
+  try {
+    const uploaded = await uploadFireSafetyImage(file, 'fire-control-room-record')
+    const url = uploaded?.fileUrl || ''
+    if (!url) {
+      message.error('上传失败：未返回图片地址')
+      return false
+    }
+    if (!form.imageUrls.includes(url)) {
+      form.imageUrls = [...form.imageUrls, url]
+    }
+    message.success('图片上传成功')
+  } catch (error: any) {
+    message.error(error?.message || '图片上传失败')
+  } finally {
+    uploadingImage.value = false
+  }
+  return false
+}
+
+function removeImage(index: number) {
+  form.imageUrls.splice(index, 1)
+}
+
+async function uploadSingleFireFile(
+  file: File,
+  bizType: string,
+  loadingRef: { value: boolean },
+  onSuccess: (url: string) => void,
+  successText: string
+) {
+  loadingRef.value = true
+  try {
+    const uploaded = await uploadFireSafetyFile(file, bizType)
+    const url = uploaded?.fileUrl || ''
+    if (!url) {
+      message.error('上传失败：未返回文件地址')
+      return false
+    }
+    onSuccess(url)
+    message.success(successText)
+  } catch (error: any) {
+    message.error(error?.message || '文件上传失败')
+  } finally {
+    loadingRef.value = false
+  }
+  return false
+}
+
+async function beforeUploadThirdPartyFile(file: File) {
+  return uploadSingleFireFile(
+    file,
+    'fire-maintenance-third-party-record',
+    uploadingThirdPartyFile,
+    (url) => {
+      form.thirdPartyMaintenanceFileUrl = url
+    },
+    '第三方维保记录单上传成功'
+  )
+}
+
+async function beforeUploadPurchaseContract(file: File) {
+  return uploadSingleFireFile(
+    file,
+    'fire-maintenance-purchase-contract',
+    uploadingPurchaseContract,
+    (url) => {
+      form.purchaseContractFileUrl = url
+    },
+    '采购合同上传成功'
+  )
+}
+
+async function beforeUploadPurchaseDocument(file: File) {
+  return uploadSingleFireFile(
+    file,
+    'fire-maintenance-purchase-document',
+    uploadingPurchaseDocument,
+    (url) => {
+      if (!form.purchaseDocumentUrls.includes(url)) {
+        form.purchaseDocumentUrls = [...form.purchaseDocumentUrls, url]
+      }
+    },
+    '采购单据上传成功'
+  )
+}
+
+function removePurchaseDocument(index: number) {
+  form.purchaseDocumentUrls.splice(index, 1)
+}
+
+function formatContractPeriod(start?: string, end?: string) {
+  if (!start && !end) {
+    return '-'
+  }
+  return `${start || '-'} ~ ${end || '-'}`
+}
+
+function printSelectedRows() {
+  if (!selectedRows.value.length) {
+    message.warning('请先勾选要打印的记录')
+    return
+  }
+  try {
+    printTableReport({
+      title: `${props.title}打印单`,
+      subtitle: `打印时间：${dayjs().format('YYYY-MM-DD HH:mm:ss')}；记录数：${selectedRows.value.length}`,
+      columns: [
+        { key: 'title', title: '标题' },
+        { key: 'location', title: '区域/位置' },
+        { key: 'inspectorName', title: '负责人' },
+        { key: 'checkTime', title: '检查时间' },
+        { key: 'dutyRecord', title: '值班记录' },
+        { key: 'handoverPunchTime', title: '交接班打卡时间' },
+        { key: 'issueDescription', title: '问题描述' },
+        { key: 'actionTaken', title: '处置措施' },
+        { key: 'imageSummary', title: '图片' },
+        { key: 'statusText', title: '状态' }
+      ],
+      rows: selectedRows.value.map((item) => ({
+        title: item.title || '-',
+        location: item.location || '-',
+        inspectorName: item.inspectorName || '-',
+        checkTime: item.checkTime || '-',
+        dutyRecord: item.dutyRecord || '-',
+        handoverPunchTime: item.handoverPunchTime || '-',
+        issueDescription: item.issueDescription || '-',
+        actionTaken: item.actionTaken || '-',
+        imageSummary: item.imageUrls?.length ? `已上传${item.imageUrls.length}张` : '无',
+        statusText: statusText(item.status)
+      })),
+      signatures: ['值班人', '复核人']
+    })
+  } catch (error: any) {
+    message.error(error?.message || '打印失败')
   }
 }
 

@@ -77,14 +77,17 @@ public class ResidenceBootstrapServiceImpl implements ResidenceBootstrapService 
     int buildingNo = seed;
 
     for (int index = 0; index < buildingCount; index++) {
-      while (existsBuildingName(tenantId, buildingPrefix + buildingNo)) {
+      String buildingCode = buildBuildingCode(buildingNo);
+      while (existsBuildingName(tenantId, buildingPrefix + buildingNo)
+          || existsBuildingCode(tenantId, buildingCode)) {
         buildingNo++;
+        buildingCode = buildBuildingCode(buildingNo);
       }
       Building building = new Building();
       building.setTenantId(tenantId);
       building.setOrgId(tenantId);
       building.setName(buildingPrefix + buildingNo);
-      building.setCode("B" + buildingNo);
+      building.setCode(buildingCode);
       building.setStatus(1);
       building.setSortNo(buildingNo);
       building.setCreatedBy(createdBy);
@@ -170,14 +173,18 @@ public class ResidenceBootstrapServiceImpl implements ResidenceBootstrapService 
     String[] buildingNames = new String[] {"A栋", "B栋"};
 
     for (String buildingName : buildingNames) {
+      String buildingCode = buildingName.substring(0, 1).toUpperCase();
       if (existsBuildingName(tenantId, buildingName)) {
         throw new IllegalArgumentException("楼栋已存在：" + buildingName + "，请先删除或更换模板");
+      }
+      if (existsBuildingCode(tenantId, buildingCode)) {
+        throw new IllegalArgumentException("楼栋编码已存在：" + buildingCode + "，请先删除或更换模板");
       }
       Building building = new Building();
       building.setTenantId(tenantId);
       building.setOrgId(tenantId);
       building.setName(buildingName);
-      building.setCode(buildingName.substring(0, 1).toUpperCase());
+      building.setCode(buildingCode);
       building.setStatus(1);
       building.setSortNo(createdBuilding + 1);
       building.setCreatedBy(createdBy);
@@ -251,6 +258,13 @@ public class ResidenceBootstrapServiceImpl implements ResidenceBootstrapService 
         .eq(Building::getName, name)) > 0;
   }
 
+  private boolean existsBuildingCode(Long tenantId, String code) {
+    return buildingMapper.selectCount(Wrappers.lambdaQuery(Building.class)
+        .eq(Building::getIsDeleted, 0)
+        .eq(Building::getTenantId, tenantId)
+        .eq(Building::getCode, code)) > 0;
+  }
+
   private boolean existsRoomNo(Long tenantId, String roomNo) {
     return roomMapper.selectCount(Wrappers.lambdaQuery(Room.class)
         .eq(Room::getIsDeleted, 0)
@@ -273,6 +287,10 @@ public class ResidenceBootstrapServiceImpl implements ResidenceBootstrapService 
   private String normalizePrefix(String value, String fallback) {
     if (value == null || value.isBlank()) return fallback;
     return value.trim();
+  }
+
+  private String buildBuildingCode(int buildingNo) {
+    return "B" + buildingNo;
   }
 
   private String normalizeValue(String value, String fallback) {

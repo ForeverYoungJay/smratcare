@@ -814,6 +814,7 @@ export const routes = [
                             { path: 'recipe', name: 'LogisticsDiningRecipe', component: () => import('../views/dining/Recipe.vue'), meta: { title: '食谱管理' } },
                             { path: 'order', name: 'LogisticsDiningOrder', component: () => import('../views/dining/Order.vue'), meta: { title: '点餐管理（个性化）' } },
                             { path: 'stats', name: 'LogisticsDiningStats', component: () => import('../views/dining/Stats.vue'), meta: { title: '订餐统计' } },
+                            { path: 'procurement-plan', name: 'LogisticsDiningProcurementPlan', component: () => import('../views/dining/ProcurementPlan.vue'), meta: { title: '采购计划单' } },
                             { path: 'prep-zone', name: 'LogisticsDiningPrepZone', component: () => import('../views/dining/PrepZone.vue'), meta: { title: '分区备餐' } },
                             { path: 'delivery-area', name: 'LogisticsDiningDeliveryArea', component: () => import('../views/dining/DeliveryArea.vue'), meta: { title: '送餐区域' } },
                             {
@@ -2208,6 +2209,12 @@ export const routes = [
                         name: 'DiningStats',
                         redirect: '/logistics/dining/stats',
                         meta: { title: '订餐统计' }
+                    },
+                    {
+                        path: 'procurement-plan',
+                        name: 'DiningProcurementPlan',
+                        redirect: '/logistics/dining/procurement-plan',
+                        meta: { title: '采购计划单' }
                     },
                     {
                         path: 'recipe',

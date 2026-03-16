@@ -405,6 +405,7 @@ export interface DischargeApplyItem {
   applyDate?: string
   plannedDischargeDate: string
   reason: string
+  proofFileUrl?: string
   status?: DischargeApplyStatus
   linkedDischargeId?: Id
   autoDischargeStatus?: 'SUCCESS' | 'FAILED'
@@ -420,6 +421,7 @@ export interface DischargeApplyCreateRequest {
   elderId: Id
   plannedDischargeDate: string
   reason: string
+  proofFileUrl?: string
 }
 
 export interface DischargeApplyReviewRequest {

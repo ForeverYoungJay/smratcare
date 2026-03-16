@@ -10,5 +10,11 @@ public class DiningStatsSummaryResponse {
   private BigDecimal totalAmount;
   private long deliveredOrders;
   private BigDecimal deliveryRate;
+  private long onTimeDeliveredOrders;
+  private long trackedDeliveryOrders;
+  private BigDecimal onTimeDeliveryRate;
+  private BigDecimal nextMonthEstimatedCost;
   private List<DiningStatsMealTypeItem> mealTypeStats;
+  private List<DiningStatsBuildingItem> buildingStats;
+  private List<DiningStatsProcurementItem> procurementItems;
 }

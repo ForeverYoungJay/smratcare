@@ -26,6 +26,12 @@ public class DiningDish {
 
   private BigDecimal unitPrice;
 
+  private Integer currentDiningCount;
+
+  private BigDecimal purchaseQty;
+
+  private String purchaseUnit;
+
   private Integer calories;
 
   private String nutritionInfo;

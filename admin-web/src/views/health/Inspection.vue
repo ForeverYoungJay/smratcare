@@ -25,11 +25,18 @@
       </a-space>
     </a-card>
 
+    <a-card :bordered="false" class="summary-row" title="基础健康限值">
+      <a-space wrap>
+        <a-tag v-for="item in thresholdSummaryTags" :key="item.key" color="geekblue">{{ item.label }}</a-tag>
+        <a-button size="small" @click="openThresholdModal">设置基础限值</a-button>
+      </a-space>
+    </a-card>
+
     <a-card :bordered="false" class="summary-row" title="巡检任务看板（计划-执行）">
-      <a-space wrap style="margin-bottom: 10px">
-        <a-tag color="blue">今日待巡检：{{ boardStats.todayPending }}</a-tag>
-        <a-tag color="green">今日已巡检：{{ boardStats.todayDone }}</a-tag>
-        <a-tag color="red">今日超时：{{ boardStats.todayOverdue }}</a-tag>
+        <a-space wrap style="margin-bottom: 10px">
+          <a-tag color="blue">今日待巡检：{{ boardStats.todayPending }}</a-tag>
+          <a-tag color="green">今日已巡检：{{ boardStats.todayDone }}</a-tag>
+          <a-tag color="red">今日超时：{{ boardStats.todayOverdue }}</a-tag>
         <a-input v-model:value="board.floor" allow-clear placeholder="楼层关键字（如 3F）" style="width: 160px" />
         <a-input v-model:value="board.group" allow-clear placeholder="护理组关键字（如 A组）" style="width: 170px" />
         <a-button type="primary" @click="openBoardRecord()">巡检录入（抽屉）</a-button>
@@ -193,9 +200,17 @@
           <a-col :span="8"><a-form-item label="皮肤情况"><a-input v-model:value="boardForm.skin" /></a-form-item></a-col>
         </a-row>
         <a-space style="margin-bottom: 8px">
-          <a-checkbox v-model:checked="boardForm.abnormal">异常标记</a-checkbox>
-          <a-checkbox v-model:checked="boardForm.needReport">需上报</a-checkbox>
+          <a-checkbox v-model:checked="boardForm.abnormal" :disabled="boardVitalAlerts.length > 0">异常标记</a-checkbox>
+          <a-checkbox v-model:checked="boardForm.needReport" :disabled="boardVitalAlerts.length > 0">需上报</a-checkbox>
         </a-space>
+        <a-alert
+          v-if="boardAbnormalPrompt"
+          type="warning"
+          show-icon
+          :message="boardAbnormalPrompt"
+          :description="boardAbnormalDescription"
+          style="margin-bottom: 12px"
+        />
         <a-form-item label="处理方式" v-if="boardForm.abnormal">
           <a-input v-model:value="boardForm.handleAction" placeholder="异常项必须填写处理方式" />
         </a-form-item>
@@ -213,7 +228,7 @@
           <a-textarea v-model:value="boardForm.otherNote" :rows="2" placeholder="可补充症状、处理过程、沟通情况等" />
         </a-form-item>
         <a-form-item label="巡检结论">
-          <a-radio-group v-model:value="boardForm.conclusion">
+          <a-radio-group v-model:value="boardForm.conclusion" :disabled="boardVitalAlerts.length > 0">
             <a-radio value="NORMAL">正常</a-radio>
             <a-radio value="FOLLOWING">需观察</a-radio>
             <a-radio value="ABNORMAL">需医护介入</a-radio>
@@ -231,6 +246,33 @@
     >
       <a-image v-for="(url, index) in previewState.urls" :key="`${url}-${index}`" :src="url" style="display: none" />
     </a-image-preview-group>
+
+    <a-modal v-model:open="thresholdOpen" title="基础健康限值设置" :confirm-loading="thresholdSaving" @ok="saveThresholds" width="820px">
+      <a-alert
+        type="info"
+        show-icon
+        message="用于健康巡检自动判定异常。超过上限或低于下限时，会提醒二次测量并建议申报异常。"
+        style="margin-bottom: 12px"
+      />
+      <a-table :data-source="thresholdForms" :pagination="false" size="small" row-key="key">
+        <a-table-column title="指标" data-index="label" key="label" />
+        <a-table-column title="下限" key="minValue">
+          <template #default="{ record }">
+            <a-input-number v-model:value="record.minValue" :precision="record.precision" :step="record.step" style="width: 100%" />
+          </template>
+        </a-table-column>
+        <a-table-column title="上限" key="maxValue">
+          <template #default="{ record }">
+            <a-input-number v-model:value="record.maxValue" :precision="record.precision" :step="record.step" style="width: 100%" />
+          </template>
+        </a-table-column>
+        <a-table-column title="说明" key="remark">
+          <template #default="{ record }">
+            <a-input v-model:value="record.remark" placeholder="可选说明" />
+          </template>
+        </a-table-column>
+      </a-table>
+    </a-modal>
   </PageContainer>
 </template>
 
@@ -255,7 +297,9 @@ import {
   getHealthInspectionSummary,
   createHealthInspection,
   updateHealthInspection,
-  deleteHealthInspection
+  deleteHealthInspection,
+  getHealthInspectionVitalThresholdList,
+  upsertHealthInspectionVitalThreshold
 } from '../../api/health'
 import { useUserStore } from '../../stores/user'
 import type { HealthInspection, HealthInspectionSummary, Id, PageResult } from '../../types'
@@ -264,6 +308,28 @@ type InspectionPhotoFile = {
   name: string
   url: string
 }
+
+type ThresholdFormRow = {
+  key: string
+  label: string
+  type: string
+  metricCode?: string
+  minValue?: number
+  maxValue?: number
+  remark?: string
+  precision?: number
+  step?: number
+}
+
+const THRESHOLD_DEFAULTS: ThresholdFormRow[] = [
+  { key: 'TEMP_DEFAULT', label: '体温(℃)', type: 'TEMP', minValue: 36, maxValue: 37.3, precision: 1, step: 0.1 },
+  { key: 'BP_SBP', label: '收缩压(mmHg)', type: 'BP', metricCode: 'SBP', minValue: 90, maxValue: 140, precision: 0, step: 1 },
+  { key: 'BP_DBP', label: '舒张压(mmHg)', type: 'BP', metricCode: 'DBP', minValue: 60, maxValue: 90, precision: 0, step: 1 },
+  { key: 'HR_DEFAULT', label: '脉搏(次/分)', type: 'HR', minValue: 60, maxValue: 100, precision: 0, step: 1 },
+  { key: 'RESP_DEFAULT', label: '呼吸(次/分)', type: 'RESP', minValue: 12, maxValue: 20, precision: 0, step: 1 },
+  { key: 'SPO2_DEFAULT', label: '血氧(%)', type: 'SPO2', minValue: 95, maxValue: 100, precision: 0, step: 1 },
+  { key: 'BS_DEFAULT', label: '血糖(mmol/L)', type: 'BS', minValue: 3.9, maxValue: 10, precision: 1, step: 0.1 }
+]
 
 const loading = ref(false)
 const exporting = ref(false)
@@ -346,6 +412,9 @@ const board = reactive({
   group: ''
 })
 const boardOpen = ref(false)
+const thresholdOpen = ref(false)
+const thresholdSaving = ref(false)
+const thresholdForms = ref<ThresholdFormRow[]>([])
 const boardForm = reactive({
   elderId: undefined as Id | undefined,
   elderName: '',
@@ -390,6 +459,122 @@ const boardStats = computed(() => ({
   todayOverdue: boardOverdueRows.value.length,
   pendingRows: boardPendingRows.value
 }))
+const thresholdSummaryTags = computed(() => thresholdForms.value.map((item) => {
+  const range = `${formatThresholdValue(item.minValue)}-${formatThresholdValue(item.maxValue)}`
+  return { key: item.key, label: `${item.label} ${range}` }
+}))
+const boardVitalAlerts = computed(() => {
+  const alerts: Array<{ label: string; current: number; min?: number; max?: number }> = []
+  collectAlert(alerts, '体温', Number(boardForm.temp), findThreshold('TEMP'))
+  collectAlert(alerts, '收缩压', Number(boardForm.bpSystolic), findThreshold('BP', 'SBP'))
+  collectAlert(alerts, '舒张压', Number(boardForm.bpDiastolic), findThreshold('BP', 'DBP'))
+  collectAlert(alerts, '脉搏', Number(boardForm.pulse), findThreshold('HR'))
+  collectAlert(alerts, '呼吸', Number(boardForm.respiration), findThreshold('RESP'))
+  collectAlert(alerts, '血氧', Number(boardForm.spo2), findThreshold('SPO2'))
+  collectAlert(alerts, '血糖', Number(boardForm.glucose), findThreshold('BS'))
+  return alerts
+})
+const boardAbnormalPrompt = computed(() => {
+  if (!boardVitalAlerts.value.length) return ''
+  return '检测值超出基础健康限值，请进行二次测量并申报异常情况'
+})
+const boardAbnormalDescription = computed(() => {
+  if (!boardVitalAlerts.value.length) return ''
+  return boardVitalAlerts.value.map((item) => {
+    const range = `${formatThresholdValue(item.min)}-${formatThresholdValue(item.max)}`
+    return `${item.label}${formatThresholdValue(item.current)}，标准范围 ${range}`
+  }).join('；')
+})
+
+function cloneDefaultThresholds() {
+  return THRESHOLD_DEFAULTS.map((item) => ({ ...item }))
+}
+
+function findThreshold(type: string, metricCode?: string) {
+  const targetType = String(type || '').trim().toUpperCase()
+  const targetMetric = String(metricCode || '').trim().toUpperCase()
+  return thresholdForms.value.find((item) => (
+    item.type.toUpperCase() === targetType
+    && String(item.metricCode || '').trim().toUpperCase() === targetMetric
+  ))
+}
+
+function formatThresholdValue(value?: number) {
+  if (typeof value !== 'number' || Number.isNaN(value)) return '--'
+  return Number.isInteger(value) ? String(value) : value.toFixed(1)
+}
+
+function collectAlert(
+  alerts: Array<{ label: string; current: number; min?: number; max?: number }>,
+  label: string,
+  current: number,
+  threshold?: ThresholdFormRow
+) {
+  if (!threshold || Number.isNaN(current)) return
+  const minValue = typeof threshold.minValue === 'number' ? threshold.minValue : undefined
+  const maxValue = typeof threshold.maxValue === 'number' ? threshold.maxValue : undefined
+  if (minValue != null && current < minValue) {
+    alerts.push({ label, current, min: minValue, max: maxValue })
+    return
+  }
+  if (maxValue != null && current > maxValue) {
+    alerts.push({ label, current, min: minValue, max: maxValue })
+  }
+}
+
+function openThresholdModal() {
+  thresholdOpen.value = true
+}
+
+async function loadVitalThresholds() {
+  try {
+    const list = await getHealthInspectionVitalThresholdList()
+    const next = cloneDefaultThresholds()
+    ;(list || []).forEach((item) => {
+      const target = next.find((row) => row.type === item.type && String(row.metricCode || '') === String(item.metricCode || ''))
+      if (!target) return
+      target.minValue = item.minValue == null ? target.minValue : Number(item.minValue)
+      target.maxValue = item.maxValue == null ? target.maxValue : Number(item.maxValue)
+      target.remark = item.remark || ''
+    })
+    thresholdForms.value = next
+  } catch (error) {
+    thresholdForms.value = cloneDefaultThresholds()
+    message.error(resolveHealthError(error, '加载基础健康限值失败'))
+  }
+}
+
+async function saveThresholds() {
+  thresholdSaving.value = true
+  try {
+    const invalidRow = thresholdForms.value.find((item) => (
+      typeof item.minValue === 'number'
+      && typeof item.maxValue === 'number'
+      && item.minValue > item.maxValue
+    ))
+    if (invalidRow) {
+      message.error(`${invalidRow.label} 的下限不能大于上限`)
+      return
+    }
+    for (const item of thresholdForms.value) {
+      await upsertHealthInspectionVitalThreshold({
+        type: item.type,
+        metricCode: item.metricCode,
+        minValue: item.minValue,
+        maxValue: item.maxValue,
+        status: 1,
+        remark: item.remark
+      })
+    }
+    message.success('基础健康限值已保存')
+    thresholdOpen.value = false
+    await loadVitalThresholds()
+  } catch (error) {
+    message.error(resolveHealthError(error, '保存基础健康限值失败'))
+  } finally {
+    thresholdSaving.value = false
+  }
+}
 
 async function fetchData() {
   loading.value = true
@@ -676,6 +861,9 @@ async function submitBoard() {
   const bloodPressure = boardForm.bpSystolic != null && boardForm.bpDiastolic != null
     ? `${boardForm.bpSystolic}/${boardForm.bpDiastolic}`
     : '-'
+  const autoReason = boardVitalAlerts.value.length
+    ? `超限提醒：${boardVitalAlerts.value.map((item) => `${item.label}${formatThresholdValue(item.current)}`).join('、')}，建议5-10分钟后复测并申报异常`
+    : ''
   const vitalText = [
     `体温:${formatBoardNumber(boardForm.temp)}`,
     `血压:${bloodPressure}`,
@@ -697,7 +885,7 @@ async function submitBoard() {
     elderName: findElderName(boardForm.elderId) || boardForm.elderName,
     inspectionDate: dayjs(boardForm.inspectionDate).format('YYYY-MM-DD'),
     inspectionItem: '基础体征与身体状况巡检',
-    result: `${vitalText}；${bodyText}`,
+    result: `${vitalText}；${bodyText}${autoReason ? `；${autoReason}` : ''}`,
     status: boardForm.conclusion,
     inspectorName: boardForm.inspectorName.trim(),
     followUpAction: boardForm.abnormal ? boardForm.handleAction : '',
@@ -914,6 +1102,7 @@ async function loadExportRecords() {
 
 fetchData()
 searchElders('')
+loadVitalThresholds()
 syncMedicalAlertRules().catch(() => {})
 
 watch(
@@ -922,6 +1111,24 @@ watch(
     query.pageNo = 1
     pagination.current = 1
     fetchData()
+  }
+)
+
+watch(
+  () => boardVitalAlerts.value.length,
+  (count) => {
+    if (count > 0) {
+      boardForm.abnormal = true
+      boardForm.needReport = true
+      boardForm.conclusion = 'ABNORMAL'
+      if (!boardForm.handleAction.trim()) {
+        boardForm.handleAction = '建议二次测量，已申报异常并通知医护跟进'
+      }
+      return
+    }
+    if (boardForm.handleAction === '建议二次测量，已申报异常并通知医护跟进') {
+      boardForm.handleAction = ''
+    }
   }
 )
 </script>

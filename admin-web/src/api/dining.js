@@ -17,6 +17,9 @@ export function updateDiningDishStatus(id, status) {
 export function deleteDiningDish(id) {
     return request.delete(`/api/life/dining/dish/${id}`);
 }
+export function getDiningDishAnalytics(params) {
+    return request.get('/api/life/dining/dish/analytics', { params });
+}
 export function getDiningRecipePage(params) {
     return fetchPage('/api/life/dining/recipe/page', params);
 }
@@ -97,6 +100,12 @@ export function createDiningDeliveryRecord(data) {
 }
 export function updateDiningDeliveryRecord(id, data) {
     return request.put(`/api/life/dining/delivery-record/${id}`, data);
+}
+export function generateDiningDeliverySignoffQr(id) {
+    return request.post(`/api/life/dining/delivery-record/${id}/qr/generate`);
+}
+export function completeDiningDeliveryByScan(data) {
+    return request.post('/api/life/dining/delivery-record/scan/signoff', data);
 }
 export function redispatchDiningDeliveryRecord(id, data) {
     return request.put(`/api/life/dining/delivery-record/${id}/redispatch`, data);

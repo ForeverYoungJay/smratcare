@@ -1,5 +1,14 @@
 import request, { fetchPage } from '../utils/request';
 import { exportCsvByRequest } from '../utils/export';
+export function uploadFireSafetyFile(file, bizType = 'fire-safety-record') {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('bizType', bizType);
+    return request.post('/api/files/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    });
+}
+export const uploadFireSafetyImage = uploadFireSafetyFile;
 export function getFireSafetyRecordPage(params) {
     return fetchPage('/api/fire/records/page', params);
 }

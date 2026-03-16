@@ -20,6 +20,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,7 +55,7 @@ public class FireSafetyRecordController {
       "NIGHT_PATROL",
       "MAINTENANCE_REPORT",
       "FAULT_MAINTENANCE");
-  private static final Set<String> QR_ENABLED_TYPES = Set.of("MONTHLY_CHECK", "DAY_PATROL", "NIGHT_PATROL");
+  private static final Set<String> QR_ENABLED_TYPES = Set.of("FACILITY", "MONTHLY_CHECK", "DAY_PATROL", "NIGHT_PATROL");
 
   private static final List<String> TYPE_ORDER = List.of(
       "FACILITY",
@@ -64,7 +66,8 @@ public class FireSafetyRecordController {
       "MAINTENANCE_REPORT",
       "FAULT_MAINTENANCE");
 
-  private static final Set<String> ALLOWED_STATUS = Set.of("OPEN", "CLOSED");
+  private static final Set<String> ALLOWED_STATUS = Set.of("OPEN", "RUNNING", "CLOSED");
+  private static final Set<String> ACTIVE_STATUSES = Set.of("OPEN", "RUNNING");
 
   private final FireSafetyRecordMapper recordMapper;
 
@@ -87,7 +90,9 @@ public class FireSafetyRecordController {
     Long orgId = requireOrgId();
     var wrapper = buildQueryWrapper(orgId, keyword, recordType, inspectorName, status, checkTimeStart, checkTimeEnd);
     wrapper.orderByDesc(FireSafetyRecord::getCheckTime);
-    return Result.ok(recordMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
+    IPage<FireSafetyRecord> page = recordMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
+    hydrateRecords(page.getRecords());
+    return Result.ok(page);
   }
 
   @PostMapping
@@ -99,6 +104,7 @@ public class FireSafetyRecordController {
     applyRequest(record, request);
     record.setCreatedBy(AuthContext.getStaffId());
     recordMapper.insert(record);
+    hydrateRecord(record);
     return Result.ok(record);
   }
 
@@ -107,6 +113,7 @@ public class FireSafetyRecordController {
     FireSafetyRecord existing = findRequiredRecord(id);
     applyRequest(existing, request);
     recordMapper.updateById(existing);
+    hydrateRecord(existing);
     return Result.ok(existing);
   }
 
@@ -116,6 +123,7 @@ public class FireSafetyRecordController {
     existing.setStatus("CLOSED");
     existing.setUpdateTime(LocalDateTime.now());
     recordMapper.updateById(existing);
+    hydrateRecord(existing);
     return Result.ok(existing);
   }
 
@@ -161,6 +169,7 @@ public class FireSafetyRecordController {
       existing.setActionTaken(request.getActionTaken().trim());
     }
     recordMapper.updateById(existing);
+    hydrateRecord(existing);
     return Result.ok(existing);
   }
 
@@ -194,13 +203,13 @@ public class FireSafetyRecordController {
     long totalCount = recordMapper.selectCount(baseWrapper);
 
     long openCount = recordMapper.selectCount(buildPeriodWrapper(orgId, normalizedRecordType, startTime, endTime)
-        .eq(FireSafetyRecord::getStatus, "OPEN"));
+        .in(FireSafetyRecord::getStatus, ACTIVE_STATUSES));
 
     long closedCount = recordMapper.selectCount(buildPeriodWrapper(orgId, normalizedRecordType, startTime, endTime)
         .eq(FireSafetyRecord::getStatus, "CLOSED"));
 
     long overdueCount = recordMapper.selectCount(buildPeriodWrapper(orgId, normalizedRecordType, startTime, endTime)
-        .eq(FireSafetyRecord::getStatus, "OPEN")
+        .in(FireSafetyRecord::getStatus, ACTIVE_STATUSES)
         .isNotNull(FireSafetyRecord::getNextCheckDate)
         .lt(FireSafetyRecord::getNextCheckDate, LocalDate.now()));
 
@@ -261,7 +270,7 @@ public class FireSafetyRecordController {
         .eq(FireSafetyRecord::getIsDeleted, 0)
         .eq(orgId != null, FireSafetyRecord::getOrgId, orgId)
         .eq(normalizedRecordType != null, FireSafetyRecord::getRecordType, normalizedRecordType)
-        .eq(FireSafetyRecord::getStatus, "OPEN")
+        .in(FireSafetyRecord::getStatus, ACTIVE_STATUSES)
         .isNotNull(FireSafetyRecord::getNextCheckDate)
         .between(FireSafetyRecord::getNextCheckDate, LocalDate.now(), LocalDate.now().plusDays(7))));
     response.setTypeStats(typeStats);
@@ -287,6 +296,7 @@ public class FireSafetyRecordController {
     List<FireSafetyRecord> records = recordMapper.selectList(buildPeriodWrapper(orgId, normalizedRecordType, startTime, endTime)
         .orderByDesc(FireSafetyRecord::getCheckTime)
         .last("limit " + safeLimit));
+    hydrateRecords(records);
 
     FireSafetyReportDetailResponse response = new FireSafetyReportDetailResponse();
     response.setTotalCount(totalCount);
@@ -333,6 +343,12 @@ public class FireSafetyRecordController {
       item.setEquipmentAgingDisposal(record.getEquipmentAgingDisposal());
       item.setIssueDescription(record.getIssueDescription());
       item.setActionTaken(record.getActionTaken());
+      item.setImageUrls(record.getImageUrls() == null ? new ArrayList<>() : new ArrayList<>(record.getImageUrls()));
+      item.setThirdPartyMaintenanceFileUrl(record.getThirdPartyMaintenanceFileUrl());
+      item.setPurchaseContractFileUrl(record.getPurchaseContractFileUrl());
+      item.setContractStartDate(formatDate(record.getContractStartDate()));
+      item.setContractEndDate(formatDate(record.getContractEndDate()));
+      item.setPurchaseDocumentUrls(record.getPurchaseDocumentUrls() == null ? new ArrayList<>() : new ArrayList<>(record.getPurchaseDocumentUrls()));
       items.add(item);
     }
     response.setRecords(items);
@@ -366,6 +382,11 @@ public class FireSafetyRecordController {
         "检查周期(天)",
         "设备更新记录",
         "设备老化处置",
+        "第三方维保记录单",
+        "采购合同",
+        "合约开始日期",
+        "合约结束日期",
+        "采购单据",
         "问题描述",
         "处置措施");
     List<List<String>> rows = records.stream().map(item -> List.of(
@@ -385,6 +406,11 @@ public class FireSafetyRecordController {
         stringOf(item.getCheckCycleDays()),
         stringOf(item.getEquipmentUpdateNote()),
         stringOf(item.getEquipmentAgingDisposal()),
+        stringOf(item.getThirdPartyMaintenanceFileUrl()),
+        stringOf(item.getPurchaseContractFileUrl()),
+        formatDate(item.getContractStartDate()),
+        formatDate(item.getContractEndDate()),
+        stringOf(joinLines(item.getPurchaseDocumentUrls())),
         stringOf(item.getIssueDescription()),
         stringOf(item.getActionTaken()))).toList();
     return csvResponse("fire-safety-report", headers, rows);
@@ -413,6 +439,11 @@ public class FireSafetyRecordController {
         "产品生产日期",
         "产品过期日期",
         "检查周期(天)",
+        "第三方维保记录单",
+        "采购合同",
+        "合约开始日期",
+        "合约结束日期",
+        "采购单据",
         "状态",
         "问题描述",
         "处置措施");
@@ -426,6 +457,11 @@ public class FireSafetyRecordController {
         formatDate(item.getProductProductionDate()),
         formatDate(item.getProductExpiryDate()),
         stringOf(item.getCheckCycleDays()),
+        stringOf(item.getThirdPartyMaintenanceFileUrl()),
+        stringOf(item.getPurchaseContractFileUrl()),
+        formatDate(item.getContractStartDate()),
+        formatDate(item.getContractEndDate()),
+        stringOf(joinLines(item.getPurchaseDocumentUrls())),
         stringOf(item.getStatus()),
         stringOf(item.getIssueDescription()),
         stringOf(item.getActionTaken()))).toList();
@@ -508,6 +544,12 @@ public class FireSafetyRecordController {
     record.setCheckCycleDays(request.getCheckCycleDays());
     record.setEquipmentUpdateNote(trimToNull(request.getEquipmentUpdateNote()));
     record.setEquipmentAgingDisposal(trimToNull(request.getEquipmentAgingDisposal()));
+    record.setImageUrlsText(joinImageUrls(request.getImageUrls()));
+    record.setThirdPartyMaintenanceFileUrl(trimToNull(request.getThirdPartyMaintenanceFileUrl()));
+    record.setPurchaseContractFileUrl(trimToNull(request.getPurchaseContractFileUrl()));
+    record.setContractStartDate(request.getContractStartDate());
+    record.setContractEndDate(request.getContractEndDate());
+    record.setPurchaseDocumentUrlsText(joinImageUrls(request.getPurchaseDocumentUrls()));
   }
 
   private void validateRequest(FireSafetyRecordRequest request) {
@@ -523,6 +565,11 @@ public class FireSafetyRecordController {
         && request.getCheckTime() != null
         && request.getNextCheckDate().isBefore(request.getCheckTime().toLocalDate())) {
       throw new IllegalArgumentException("下次检查日期不能早于检查日期");
+    }
+    if (request.getContractStartDate() != null
+        && request.getContractEndDate() != null
+        && request.getContractEndDate().isBefore(request.getContractStartDate())) {
+      throw new IllegalArgumentException("合约结束日期不能早于开始日期");
     }
   }
 
@@ -606,7 +653,7 @@ public class FireSafetyRecordController {
     }
     String normalized = status.trim().toUpperCase();
     if (!ALLOWED_STATUS.contains(normalized)) {
-      throw new IllegalArgumentException("status 仅支持 OPEN/CLOSED");
+      throw new IllegalArgumentException("status 仅支持 OPEN/RUNNING/CLOSED");
     }
     return normalized;
   }
@@ -617,6 +664,55 @@ public class FireSafetyRecordController {
     }
     String normalized = normalizeStatus(status);
     return normalized == null ? "OPEN" : normalized;
+  }
+
+  private void hydrateRecords(List<FireSafetyRecord> records) {
+    if (records == null || records.isEmpty()) {
+      return;
+    }
+    records.forEach(this::hydrateRecord);
+  }
+
+  private void hydrateRecord(FireSafetyRecord record) {
+    if (record == null) {
+      return;
+    }
+    record.setImageUrls(splitImageUrls(record.getImageUrlsText()));
+    record.setPurchaseDocumentUrls(splitImageUrls(record.getPurchaseDocumentUrlsText()));
+  }
+
+  private String joinLines(List<String> values) {
+    if (values == null || values.isEmpty()) {
+      return null;
+    }
+    return values.stream().filter(item -> item != null && !item.isBlank()).collect(Collectors.joining("\n"));
+  }
+
+  private String joinImageUrls(List<String> imageUrls) {
+    if (imageUrls == null || imageUrls.isEmpty()) {
+      return null;
+    }
+    List<String> normalized = imageUrls.stream()
+        .map(this::trimToNull)
+        .filter(item -> item != null)
+        .distinct()
+        .limit(9)
+        .toList();
+    if (normalized.isEmpty()) {
+      return null;
+    }
+    return String.join("\n", normalized);
+  }
+
+  private List<String> splitImageUrls(String imageUrlsText) {
+    if (imageUrlsText == null || imageUrlsText.isBlank()) {
+      return Collections.emptyList();
+    }
+    return Arrays.stream(imageUrlsText.split("\\R+"))
+        .map(this::trimToNull)
+        .filter(item -> item != null)
+        .distinct()
+        .toList();
   }
 
   private boolean notBlank(String text) {

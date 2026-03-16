@@ -838,6 +838,7 @@ public class ElderResidenceController {
     record.setApplyDate(LocalDate.now());
     record.setPlannedDischargeDate(request.getPlannedDischargeDate());
     record.setReason(request.getReason());
+    record.setProofFileUrl(request.getProofFileUrl());
     record.setStatus(ResidenceLifecycleConstants.DISCHARGE_APPLY_PENDING);
     record.setCreatedBy(AuthContext.getStaffId());
     try {

@@ -663,81 +663,116 @@ const timelineItems = computed(() => {
   const record = timelineRecord.value
   if (!record) return []
   const parsed = parseFormData(record.formData)
-  const items: Array<{ key: string; title: string; desc: string; timeText: string; color: string }> = []
+  const items: Array<{
+    key: string
+    title: string
+    desc: string
+    timeText: string
+    color: string
+    sortTime: number
+    order: number
+  }> = []
   const start = record.startTime ? dayjs(record.startTime) : null
   const end = record.endTime ? dayjs(record.endTime) : null
   const now = dayjs()
+  const pushItem = (
+    key: string,
+    title: string,
+    desc: string,
+    rawTime: string | undefined,
+    color: string,
+    fallbackOrder: number
+  ) => {
+    const time = rawTime ? dayjs(rawTime) : null
+    items.push({
+      key,
+      title,
+      desc,
+      timeText: formatTimelineTime(rawTime),
+      color,
+      sortTime: time && time.isValid() ? time.valueOf() : Number.MAX_SAFE_INTEGER,
+      order: fallbackOrder
+    })
+  }
   items.push({
     key: 'created',
     title: '申请创建',
     desc: `${record.applicantName || '-'} 提交 ${typeLabel(record.approvalType)} 申请`,
     timeText: formatTimelineTime(record.startTime),
-    color: 'blue'
+    color: 'blue',
+    sortTime: start && start.isValid() ? start.valueOf() : 0,
+    order: 0
   })
-  if (parsed?.lastApprovalRemark) {
-    items.push({
-      key: 'remark',
-      title: '审批意见更新',
-      desc: parsed.lastApprovalRemark,
-      timeText: formatTimelineTime(parsed.lastApprovalAt),
-      color: 'cyan'
-    })
-  }
   const urgeCount = Number(parsed?.urgeCount || 0)
-  if (urgeCount > 0) {
-    items.push({
-      key: 'urge',
-      title: `催办记录（${urgeCount}次）`,
-      desc: parsed?.lastUrgedBy ? `最近催办人：${parsed.lastUrgedBy}` : '已发生催办',
-      timeText: formatTimelineTime(parsed?.lastUrgedAt),
-      color: 'orange'
-    })
-  }
   const approverHistory = Array.isArray(parsed?.approverHistory) ? parsed.approverHistory : []
   approverHistory.slice(-6).forEach((entry: any, index: number) => {
     if (!entry) return
-    items.push({
-      key: `approver-${index}-${entry?.at || ''}`,
-      title: '责任人变更',
-      desc: `${entry?.from || '未分配'} → ${entry?.to || '未分配'}`,
-      timeText: formatTimelineTime(entry?.at),
-      color: 'gold'
-    })
+    pushItem(
+      `approver-${index}-${entry?.at || ''}`,
+      '责任人变更',
+      `${entry?.from || '未分配'} → ${entry?.to || '未分配'}`,
+      entry?.at,
+      'gold',
+      20 + index
+    )
   })
   const urgeHistory = Array.isArray(parsed?.urgeHistory) ? parsed.urgeHistory : []
   urgeHistory.slice(-6).forEach((entry: any, index: number) => {
     if (!entry) return
-    items.push({
-      key: `urge-history-${index}-${entry?.at || ''}`,
-      title: '催办动作',
-      desc: `${entry?.by || '-'} 催办${entry?.count ? `（第${entry.count}次）` : ''}`,
-      timeText: formatTimelineTime(entry?.at),
-      color: 'orange'
-    })
+    pushItem(
+      `urge-history-${index}-${entry?.at || ''}`,
+      '催办动作',
+      `${entry?.by || '-'} 催办${entry?.count ? `（第${entry.count}次）` : ''}`,
+      entry?.at,
+      'orange',
+      40 + index
+    )
   })
+  if (urgeCount > 0 && urgeHistory.length === 0) {
+    pushItem(
+      'urge',
+      `催办记录（${urgeCount}次）`,
+      parsed?.lastUrgedBy ? `最近催办人：${parsed.lastUrgedBy}` : '已发生催办',
+      parsed?.lastUrgedAt,
+      'orange',
+      60
+    )
+  }
   const approvalRounds = Array.isArray(parsed?.approvalRounds) ? parsed.approvalRounds : []
   approvalRounds.slice(-8).forEach((entry: any, index: number) => {
     if (!entry) return
     const action = String(entry?.action || '').toUpperCase()
     const actionText = action === 'APPROVED' ? '通过' : action === 'REJECTED' ? '驳回' : action || '处理'
-    items.push({
-      key: `round-${index}-${entry?.at || ''}`,
-      title: `第${Number(entry?.round || index + 1)}轮审批 · ${actionText}`,
-      desc: `${entry?.nodeName || '未知节点'} · ${entry?.approverName || '-'}${entry?.remark ? `：${entry.remark}` : ''}`,
-      timeText: formatTimelineTime(entry?.at),
-      color: action === 'REJECTED' ? 'red' : 'green'
-    })
+    pushItem(
+      `round-${index}-${entry?.at || ''}`,
+      `第${Number(entry?.round || index + 1)}轮审批 · ${actionText}`,
+      `${entry?.nodeName || '未知节点'} · ${entry?.approverName || '-'}${entry?.remark ? `：${entry.remark}` : ''}`,
+      entry?.at,
+      action === 'REJECTED' ? 'red' : 'green',
+      80 + index
+    )
   })
+  if (parsed?.lastApprovalRemark && approvalRounds.length === 0) {
+    pushItem(
+      'remark',
+      '审批意见更新',
+      parsed.lastApprovalRemark,
+      parsed.lastApprovalAt,
+      'cyan',
+      100
+    )
+  }
   const notifyHistory = Array.isArray(parsed?.notifyHistory) ? parsed.notifyHistory : []
   notifyHistory.slice(-8).forEach((entry: any, index: number) => {
     if (!entry) return
-    items.push({
-      key: `notify-${index}-${entry?.at || ''}`,
-      title: '自动同步审批人',
-      desc: `${entry?.toName || approverRoleLabel(entry?.toRole) || '待分配'}${entry?.message ? `：${entry.message}` : ''}`,
-      timeText: formatTimelineTime(entry?.at),
-      color: 'blue'
-    })
+    pushItem(
+      `notify-${index}-${entry?.at || ''}`,
+      '自动同步审批人',
+      `${entry?.toName || approverRoleLabel(entry?.toRole) || '待分配'}${entry?.message ? `：${entry.message}` : ''}`,
+      entry?.at,
+      'blue',
+      120 + index
+    )
   })
   if (record.status === 'PENDING' && start && start.isValid()) {
     const pendingHours = now.diff(start, 'hour')
@@ -747,7 +782,9 @@ const timelineItems = computed(() => {
       title: overdue ? '审批超时预警' : '在途处理时长',
       desc: overdue ? `已超时 ${pendingHours - 48} 小时（总 ${pendingHours} 小时）` : `当前已在途 ${pendingHours} 小时`,
       timeText: `阈值：48小时`,
-      color: overdue ? 'red' : 'blue'
+      color: overdue ? 'red' : 'blue',
+      sortTime: Number.MAX_SAFE_INTEGER - 2,
+      order: 1000
     })
   }
   if (record.status === 'APPROVED') {
@@ -756,7 +793,9 @@ const timelineItems = computed(() => {
       title: '审批通过',
       desc: record.remark || '流程结束',
       timeText: formatTimelineTime(record.endTime),
-      color: 'green'
+      color: 'green',
+      sortTime: end && end.isValid() ? end.valueOf() : Number.MAX_SAFE_INTEGER - 3,
+      order: 1100
     })
   }
   if (record.status === 'REJECTED') {
@@ -765,7 +804,9 @@ const timelineItems = computed(() => {
       title: '审批驳回',
       desc: record.remark || '已驳回，待重提',
       timeText: formatTimelineTime(record.endTime),
-      color: 'red'
+      color: 'red',
+      sortTime: end && end.isValid() ? end.valueOf() : Number.MAX_SAFE_INTEGER - 3,
+      order: 1100
     })
   }
   if (start && start.isValid()) {
@@ -776,10 +817,17 @@ const timelineItems = computed(() => {
       title: '流程总耗时',
       desc: `${durationHours} 小时`,
       timeText: end && end.isValid() ? `截至 ${formatTimelineTime(record.endTime)}` : '仍在处理中',
-      color: 'purple'
+      color: 'purple',
+      sortTime: Number.MAX_SAFE_INTEGER - 1,
+      order: 1200
     })
   }
   return items
+    .sort((a, b) => {
+      if (a.sortTime !== b.sortTime) return a.sortTime - b.sortTime
+      return a.order - b.order
+    })
+    .map(({ sortTime, order, ...item }) => item)
 })
 const canApproveFlow = computed(() => {
   const roles = (userStore.roles || []).map((item) => String(item || '').toUpperCase())

@@ -35,5 +35,11 @@ public class FireSafetyReportDetailResponse {
     private String equipmentAgingDisposal;
     private String issueDescription;
     private String actionTaken;
+    private List<String> imageUrls = new ArrayList<>();
+    private String thirdPartyMaintenanceFileUrl;
+    private String purchaseContractFileUrl;
+    private String contractStartDate;
+    private String contractEndDate;
+    private List<String> purchaseDocumentUrls = new ArrayList<>();
   }
 }

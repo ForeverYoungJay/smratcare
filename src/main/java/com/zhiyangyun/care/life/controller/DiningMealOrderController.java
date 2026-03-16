@@ -286,6 +286,7 @@ public class DiningMealOrderController {
   private void fillOrderFields(DiningMealOrder order, DiningMealOrderRequest request, boolean create) {
     Long orgId = AuthContext.getOrgId();
     order.setOrderDate(request.getOrderDate());
+    order.setExpectedDeliveryTime(request.getExpectedDeliveryTime());
     order.setMealType(request.getMealType());
     order.setDishIds(request.getDishIds());
     order.setDishNames(request.getDishNames());

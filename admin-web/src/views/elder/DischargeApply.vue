@@ -59,6 +59,10 @@
           <template v-if="column.key === 'status'">
             <a-tag :color="statusColor(record.status)">{{ statusText(record.status) }}</a-tag>
           </template>
+          <template v-else-if="column.key === 'proofFileUrl'">
+            <a v-if="record.proofFileUrl" :href="record.proofFileUrl" target="_blank" rel="noreferrer">查看附件</a>
+            <span v-else>-</span>
+          </template>
           <template v-else-if="column.key === 'autoDischargeStatus'">
             <a-tag v-if="record.autoDischargeStatus === 'SUCCESS'" color="green">成功</a-tag>
             <a-tag v-else-if="record.autoDischargeStatus === 'FAILED'" color="red">失败</a-tag>
@@ -94,12 +98,19 @@
         <a-form-item label="计划退住日期" name="plannedDischargeDate">
           <a-date-picker v-model:value="form.plannedDischargeDate" value-format="YYYY-MM-DD" style="width: 100%" />
         </a-form-item>
-        <a-form-item label="申请原因" name="reason">
-          <a-select v-model:value="form.reason" placeholder="请选择退住费用设置">
-            <a-select-option v-for="item in dischargeFeeConfigOptions" :key="item.value" :value="item.value">
-              {{ item.label }}
-            </a-select-option>
-          </a-select>
+        <a-form-item name="reason">
+          <template #label><span class="required-label">申请原因</span></template>
+          <a-textarea v-model:value="form.reason" :rows="4" placeholder="请手动填写退住申请原因" />
+        </a-form-item>
+        <a-form-item>
+          <template #label><span class="required-label">证明附件</span></template>
+          <a-space>
+            <a-upload :show-upload-list="false" :before-upload="beforeUploadProof">
+              <a-button :loading="proofUploading">上传附件</a-button>
+            </a-upload>
+            <a-typography-text type="secondary">{{ fileLabel(form.proofFileUrl, '未上传') }}</a-typography-text>
+            <a-button v-if="form.proofFileUrl" type="link" @click="openFile(form.proofFileUrl)">查看</a-button>
+          </a-space>
         </a-form-item>
       </a-form>
     </a-modal>
@@ -121,7 +132,7 @@ import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
-import { getBaseConfigItemList } from '../../api/baseConfig'
+import { uploadElderFile } from '../../api/elder'
 import { useElderOptions } from '../../composables/useElderOptions'
 import {
   createDischargeApply,
@@ -131,7 +142,6 @@ import {
   reviewDischargeApply
 } from '../../api/elderResidence'
 import type {
-  BaseConfigItem,
   DischargeApplyCreateRequest,
   DischargeApplyItem,
   DischargeApplyStatus,
@@ -153,7 +163,7 @@ const reviewStatus = ref<'APPROVED' | 'REJECTED'>('APPROVED')
 const reviewRemark = ref('')
 const route = useRoute()
 const router = useRouter()
-const dischargeFeeConfigOptions = ref<{ label: string; value: string }[]>([])
+const proofUploading = ref(false)
 const { elderOptions, elderLoading, searchElders, ensureSelectedElder } = useElderOptions({ pageSize: 80 })
 const selectedRowKeys = ref<Id[]>([])
 const rowSelection = computed(() => ({
@@ -175,7 +185,8 @@ const query = reactive({
 const form = reactive<DischargeApplyCreateRequest>({
   elderId: '' as Id,
   plannedDischargeDate: '',
-  reason: ''
+  reason: '',
+  proofFileUrl: ''
 })
 
 const rules: FormRules = {
@@ -189,6 +200,7 @@ const columns = [
   { title: '申请日期', dataIndex: 'applyDate', key: 'applyDate', width: 120 },
   { title: '计划退住日期', dataIndex: 'plannedDischargeDate', key: 'plannedDischargeDate', width: 120 },
   { title: '申请原因', dataIndex: 'reason', key: 'reason' },
+  { title: '证明附件', dataIndex: 'proofFileUrl', key: 'proofFileUrl', width: 180 },
   { title: '自动退住状态', key: 'autoDischargeStatus', width: 100 },
   { title: '自动退住说明', dataIndex: 'autoDischargeMessage', key: 'autoDischargeMessage', width: 180 },
   { title: '退住单号', dataIndex: 'linkedDischargeId', key: 'linkedDischargeId', width: 120 },
@@ -200,14 +212,6 @@ const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKe
 const canReviewSelected = computed(
   () => selectedRecords.value.length === 1 && selectedRecords.value[0]?.status === 'PENDING'
 )
-
-async function loadDischargeFeeConfigOptions() {
-  const options = await getBaseConfigItemList({ configGroup: 'DISCHARGE_FEE_CONFIG', status: 1 })
-  dischargeFeeConfigOptions.value = (options || []).map((item: BaseConfigItem) => ({
-    label: item.itemName,
-    value: item.itemName
-  }))
-}
 
 async function fetchData() {
   loading.value = true
@@ -244,6 +248,7 @@ function openCreate() {
   form.elderId = '' as Id
   form.plannedDischargeDate = ''
   form.reason = ''
+  form.proofFileUrl = ''
 }
 
 function tryOpenCreateFromRoute() {
@@ -257,6 +262,37 @@ function tryOpenCreateFromRoute() {
   form.elderId = elderId
   form.plannedDischargeDate = dayjs().format('YYYY-MM-DD')
   form.reason = ''
+  form.proofFileUrl = ''
+}
+
+async function beforeUploadProof(file: File) {
+  proofUploading.value = true
+  try {
+    const uploaded = await uploadElderFile(file, 'elder-discharge-apply-proof')
+    const url = uploaded?.fileUrl || ''
+    if (!url) {
+      message.error('上传失败：未返回文件地址')
+      return false
+    }
+    form.proofFileUrl = url
+    message.success('证明附件上传成功')
+  } catch (error: any) {
+    message.error(error?.message || '上传失败')
+  } finally {
+    proofUploading.value = false
+  }
+  return false
+}
+
+function fileLabel(url?: string, fallback = '') {
+  if (!url) return fallback
+  const text = String(url).split('/').pop() || url
+  return decodeURIComponent(text)
+}
+
+function openFile(url?: string) {
+  if (!url) return
+  window.open(url, '_blank')
 }
 
 async function submitCreate() {
@@ -365,7 +401,6 @@ function onPageSizeChange(current: number, size: number) {
 }
 
 onMounted(async () => {
-  await loadDischargeFeeConfigOptions()
   await searchElders('')
   tryOpenCreateFromRoute()
   await fetchData()
@@ -375,5 +410,12 @@ onMounted(async () => {
 <style scoped>
 .search-bar {
   margin-bottom: 12px;
+}
+
+.required-label::before {
+  content: "*";
+  color: #ff4d4f;
+  margin-right: 4px;
+  font-weight: 700;
 }
 </style>

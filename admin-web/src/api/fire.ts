@@ -9,6 +9,19 @@ import type {
   FireSafetyReportSummary
 } from '../types'
 
+export function uploadFireSafetyFile(file: File, bizType = 'fire-safety-record') {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('bizType', bizType)
+  return request.post<{ fileName?: string; originalFileName?: string; fileUrl?: string; fileType?: string; fileSize?: number }>(
+    '/api/files/upload',
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  )
+}
+
+export const uploadFireSafetyImage = uploadFireSafetyFile
+
 export function getFireSafetyRecordPage(params: FireSafetyRecordQuery) {
   return fetchPage<FireSafetyRecord>('/api/fire/records/page', params)
 }

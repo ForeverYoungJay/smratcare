@@ -7,7 +7,9 @@ import type {
   DiningDeliveryArea,
   DiningMealOrder,
   DiningDeliveryRecord,
+  DiningDeliverySignoffQrPayload,
   DiningStatsSummary,
+  DiningDishAnalyticsResponse,
   DiningRiskCheckResponse,
   DiningRiskOverride,
   DiningRiskThresholdConfig
@@ -35,6 +37,10 @@ export function updateDiningDishStatus(id: Id, status: string) {
 
 export function deleteDiningDish(id: Id) {
   return request.delete<void>(`/api/life/dining/dish/${id}`)
+}
+
+export function getDiningDishAnalytics(params: any) {
+  return request.get<DiningDishAnalyticsResponse>('/api/life/dining/dish/analytics', { params })
 }
 
 export function getDiningRecipePage(params: any) {
@@ -143,6 +149,21 @@ export function createDiningDeliveryRecord(data: Partial<DiningDeliveryRecord>) 
 
 export function updateDiningDeliveryRecord(id: Id, data: Partial<DiningDeliveryRecord>) {
   return request.put<DiningDeliveryRecord>(`/api/life/dining/delivery-record/${id}`, data)
+}
+
+export function generateDiningDeliverySignoffQr(id: Id) {
+  return request.post<DiningDeliverySignoffQrPayload>(`/api/life/dining/delivery-record/${id}/qr/generate`)
+}
+
+export function completeDiningDeliveryByScan(data: {
+  qrToken: string
+  deliveredByName?: string
+  signedAt?: string
+  qrScanAt?: string
+  signoffImageUrls?: string[]
+  remark?: string
+}) {
+  return request.post<DiningDeliveryRecord>('/api/life/dining/delivery-record/scan/signoff', data)
 }
 
 export function redispatchDiningDeliveryRecord(id: Id, data: any) {

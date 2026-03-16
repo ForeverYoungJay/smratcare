@@ -66,6 +66,11 @@
             </a-form-item>
           </a-col>
           <a-col :span="12">
+            <a-form-item label="期望送达时间">
+              <a-date-picker v-model:value="form.expectedDeliveryTime" show-time style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
             <a-form-item label="餐次" required>
               <a-select v-model:value="form.mealType" :options="mealOptions" @change="onMealTypeChange" />
             </a-form-item>
@@ -201,7 +206,7 @@ const { elderOptions, searchElders: loadElderOptions, ensureSelectedElder } = us
   pageSize: 120,
   preloadSize: 400,
   inHospitalOnly: true,
-  signedOnly: true
+  signedOnly: false
 })
 const dishOptions = ref<{ label: string; value: Id; price: number }[]>([])
 const prepZoneOptions = ref<{ label: string; value: Id; name: string }[]>([])
@@ -213,6 +218,7 @@ const form = reactive({
   elderId: undefined as Id | undefined,
   elderName: '',
   orderDate: dayjs(),
+  expectedDeliveryTime: undefined as Dayjs | undefined,
   mealType: DINING_MEAL_TYPES.lunch,
   dishIdList: [] as Id[],
   dishNames: '',
@@ -230,6 +236,7 @@ const columns = [
   { title: '订单号', dataIndex: 'orderNo', key: 'orderNo', width: 150 },
   { title: '老人', dataIndex: 'elderName', key: 'elderName', width: 100 },
   { title: '订餐日期', dataIndex: 'orderDate', key: 'orderDate', width: 120 },
+  { title: '期望送达', dataIndex: 'expectedDeliveryTime', key: 'expectedDeliveryTime', width: 170 },
   { title: '餐次', dataIndex: 'mealType', key: 'mealType', width: 100 },
   { title: '菜品清单', dataIndex: 'dishNames', key: 'dishNames' },
   { title: '金额', dataIndex: 'totalAmount', key: 'totalAmount', width: 100 },
@@ -374,6 +381,7 @@ async function openCreate() {
   form.elderId = undefined
   form.elderName = ''
   form.orderDate = dayjs()
+  form.expectedDeliveryTime = undefined
   form.mealType = DINING_MEAL_TYPES.lunch
   form.dishIdList = []
   form.dishNames = ''
@@ -386,7 +394,7 @@ async function openCreate() {
   form.overrideApplyReason = ''
   form.remark = ''
   riskResult.value = null
-  await Promise.all([loadDishOptions(), loadPrepZones(), loadDeliveryAreas()])
+  await Promise.all([loadElders(''), loadDishOptions(), loadPrepZones(), loadDeliveryAreas()])
   editOpen.value = true
 }
 
@@ -395,12 +403,14 @@ async function openEdit(record: DiningMealOrder) {
   form.elderId = record.elderId
   form.elderName = record.elderName || ''
   form.orderDate = dayjs(record.orderDate)
+  form.expectedDeliveryTime = record.expectedDeliveryTime ? dayjs(record.expectedDeliveryTime) : undefined
   form.mealType = record.mealType
   form.prepZoneId = record.prepZoneId
   form.prepZoneName = record.prepZoneName || ''
   form.deliveryAreaId = record.deliveryAreaId
   form.deliveryAreaName = record.deliveryAreaName || ''
-  await Promise.all([loadDishOptions(), loadPrepZones(), loadDeliveryAreas()])
+  await Promise.all([loadElders(form.elderName || ''), loadDishOptions(), loadPrepZones(), loadDeliveryAreas()])
+  ensureSelectedElder(form.elderId, form.elderName)
   form.dishIdList = (record.dishIds || '')
     .split(',')
     .map((item) => item.trim())
@@ -474,6 +484,7 @@ async function submit() {
       elderId: form.elderId,
       elderName: form.elderName,
       orderDate: dayjs(form.orderDate).format('YYYY-MM-DD'),
+      expectedDeliveryTime: form.expectedDeliveryTime ? dayjs(form.expectedDeliveryTime).format('YYYY-MM-DD HH:mm:ss') : undefined,
       mealType: form.mealType,
       dishIds: form.dishIdList.join(','),
       dishNames: form.dishNames,

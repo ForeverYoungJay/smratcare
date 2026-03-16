@@ -12,6 +12,7 @@ import type {
   HealthDataRecord,
   HealthDataSummary,
   HealthInspection,
+  HealthInspectionVitalThreshold,
   HealthInspectionSummary,
   HealthNursingLog,
   HealthNursingLogSummary
@@ -147,6 +148,14 @@ export function updateHealthInspection(id: Id, data: Partial<HealthInspection>) 
 
 export function deleteHealthInspection(id: Id) {
   return request.delete<void>(`/api/health/inspection/${id}`)
+}
+
+export function getHealthInspectionVitalThresholdList() {
+  return request.get<HealthInspectionVitalThreshold[]>('/api/health/inspection/vital-threshold/list')
+}
+
+export function upsertHealthInspectionVitalThreshold(data: Partial<HealthInspectionVitalThreshold>) {
+  return request.post<HealthInspectionVitalThreshold>('/api/health/inspection/vital-threshold/upsert', data)
 }
 
 export function getHealthNursingLogPage(params: any) {

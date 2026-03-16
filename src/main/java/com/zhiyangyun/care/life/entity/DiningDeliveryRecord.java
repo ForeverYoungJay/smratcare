@@ -1,10 +1,12 @@
 package com.zhiyangyun.care.life.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.Data;
 
 @Data
@@ -30,6 +32,17 @@ public class DiningDeliveryRecord {
   private String deliveredByName;
 
   private LocalDateTime deliveredAt;
+
+  private LocalDateTime signedAt;
+
+  @JsonIgnore
+  @TableField("signoff_image_urls")
+  private String signoffImageUrlsText;
+
+  @TableField(exist = false)
+  private List<String> signoffImageUrls;
+
+  private LocalDateTime qrScanAt;
 
   private String status;
 

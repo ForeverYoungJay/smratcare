@@ -136,6 +136,17 @@ export interface HealthInspection {
   remark?: string
 }
 
+export interface HealthInspectionVitalThreshold {
+  id?: Id
+  orgId?: Id
+  type: string
+  metricCode?: string
+  minValue?: number
+  maxValue?: number
+  status?: number
+  remark?: string
+}
+
 export interface HealthInspectionSummary {
   totalCount: number
   abnormalCount: number

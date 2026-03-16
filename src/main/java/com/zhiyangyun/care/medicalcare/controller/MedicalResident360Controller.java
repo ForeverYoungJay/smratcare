@@ -485,7 +485,7 @@ public class MedicalResident360Controller {
             "最新照片：展示最近4张缩略图（相册模块）",
             "未来7天活动预告：请查看活动日历"),
         List.of(
-            action("查看活动日历", "/oa/work-execution/calendar?residentId=" + resolvedResidentId, true),
+            action("查看活动日历", "/oa/activity-plan?residentId=" + resolvedResidentId, true),
             action("上传照片", "/oa/album?residentId=" + resolvedResidentId + "&mode=upload", false),
             action("查看相册", "/oa/album?residentId=" + resolvedResidentId, false)),
         "活动参与与家属可见相册联动"), 0, 0));

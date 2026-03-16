@@ -11,6 +11,9 @@ export interface DiningDish {
   dishCategory?: string
   mealType?: DiningMealType
   unitPrice: number
+  currentDiningCount?: number
+  purchaseQty?: number
+  purchaseUnit?: string
   calories?: number
   nutritionInfo?: string
   allergenTags?: string
@@ -60,6 +63,7 @@ export interface DiningMealOrder {
   elderId?: Id
   elderName?: string
   orderDate: string
+  expectedDeliveryTime?: string
   mealType: DiningMealType
   dishIds?: string
   dishNames: string
@@ -82,6 +86,9 @@ export interface DiningDeliveryRecord {
   deliveredBy?: number
   deliveredByName?: string
   deliveredAt?: string
+  signedAt?: string
+  signoffImageUrls?: string[]
+  qrScanAt?: string
   status?: DiningDeliveryStatus
   failureReason?: string
   redispatchStatus?: 'NONE' | 'REDISPATCHED'
@@ -101,7 +108,78 @@ export interface DiningStatsSummary {
   totalAmount: number
   deliveredOrders: number
   deliveryRate: number
+  onTimeDeliveredOrders: number
+  trackedDeliveryOrders: number
+  onTimeDeliveryRate: number
+  nextMonthEstimatedCost: number
   mealTypeStats: DiningStatsMealTypeItem[]
+  buildingStats: DiningStatsBuildingItem[]
+  procurementItems: DiningStatsProcurementItem[]
+}
+
+export interface DiningStatsBuildingItem {
+  buildingName: string
+  orderCount: number
+  totalAmount: number
+}
+
+export interface DiningStatsProcurementItem {
+  dishId: Id
+  dishName: string
+  dishCategory?: string
+  mealType?: DiningMealType
+  recipeCount: number
+  currentDiningCount?: number
+  purchaseQty: number
+  purchaseUnit?: string
+  totalPlannedQty: number
+  estimatedCost: number
+}
+
+export interface DiningDishAnalyticsItem {
+  id: Id
+  dishName: string
+  dishCategory?: string
+  mealType?: DiningMealType
+  unitPrice: number
+  currentDiningCount?: number
+  purchaseQty: number
+  purchaseUnit?: string
+  monthlyRecipeCount: number
+  monthlyOrderCount: number
+  monthlyPlannedPurchaseQty: number
+  monthlyEstimatedCost: number
+}
+
+export interface DiningDishAnalyticsResponse {
+  month: string
+  totalDishCount: number
+  totalRecipeCount: number
+  totalPlannedPurchaseQty: number
+  totalEstimatedCost: number
+  items: DiningDishAnalyticsItem[]
+}
+
+export interface DiningProcurementPlanItem {
+  id: Id
+  dishName: string
+  dishCategory?: string
+  mealType?: DiningMealType
+  currentDiningCount?: number
+  purchaseQty: number
+  purchaseUnit?: string
+  monthlyRecipeCount: number
+  monthlyPlannedPurchaseQty: number
+  monthlyEstimatedCost: number
+  fixedPlannedQty: number
+  fixedEstimatedCost: number
+}
+
+export interface DiningDeliverySignoffQrPayload {
+  recordId: Id
+  qrToken: string
+  qrContent: string
+  generatedAt: string
 }
 
 export interface DiningRiskReasonItem {

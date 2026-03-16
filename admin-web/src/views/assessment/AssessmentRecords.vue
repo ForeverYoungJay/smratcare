@@ -133,6 +133,11 @@
           <template v-if="column.key === 'flowStage'">
             {{ pendingFlowStageText(record.flowStage) }}
           </template>
+          <template v-else-if="column.key === 'actions'">
+            <a-button type="link" size="small" @click.stop="openAdmissionFormForContract(record)">
+              直接登记
+            </a-button>
+          </template>
         </template>
       </a-table>
       <a-alert
@@ -1430,7 +1435,8 @@ const pendingAdmissionColumns = [
   { title: '老人姓名', dataIndex: 'elderName', key: 'elderName', width: 140 },
   { title: '流程阶段', dataIndex: 'flowStage', key: 'flowStage', width: 120 },
   { title: '状态', dataIndex: 'contractStatus', key: 'contractStatus', width: 120 },
-  { title: '签约时间', dataIndex: 'contractSignedAt', key: 'contractSignedAt', width: 170 }
+  { title: '签约时间', dataIndex: 'contractSignedAt', key: 'contractSignedAt', width: 170 },
+  { title: '操作', key: 'actions', width: 100, fixed: 'right' as const }
 ]
 const pendingAdmissionRowSelection = computed(() => ({
   type: 'radio' as const,
@@ -1690,16 +1696,11 @@ async function choosePendingContract(contractNo?: string) {
   selectedRowKeys.value = []
   selectedByFilter.value = false
   selectedPendingContractNo.value = normalized
-  const nextQuery: Record<string, any> = { ...route.query, contractNo: normalized }
-  if (target.elderId) nextQuery.residentId = target.elderId
-  if (target.elderName) nextQuery.elderName = target.elderName
-  const nextSignature = buildAssessmentRouteSignature(nextQuery)
-  if (nextSignature === buildAssessmentRouteSignature(route.query as Record<string, unknown>)) {
-    return
-  }
-  skipNextAssessmentRouteWatch.value = true
-  assessmentRouteSignature.value = nextSignature
-  await router.replace({ path: route.path, query: nextQuery })
+}
+
+async function openAdmissionFormForContract(record: CrmContractItem) {
+  await choosePendingContract(record.contractNo || '')
+  openForm()
 }
 
 function pendingAdmissionCustomRow(record: CrmContractItem) {

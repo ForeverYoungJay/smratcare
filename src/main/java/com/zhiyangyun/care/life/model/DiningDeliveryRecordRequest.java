@@ -1,6 +1,7 @@
 package com.zhiyangyun.care.life.model;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.Data;
 
 @Data
@@ -18,6 +19,12 @@ public class DiningDeliveryRecordRequest {
   private String deliveredByName;
 
   private LocalDateTime deliveredAt;
+
+  private LocalDateTime signedAt;
+
+  private List<String> signoffImageUrls;
+
+  private LocalDateTime qrScanAt;
 
   private String status;
 

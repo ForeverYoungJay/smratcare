@@ -75,16 +75,14 @@ function fuzzyScore(text, keyword) {
 function normalizeElderStatus(config) {
     if (typeof config.status === 'number')
         return config.status;
-    if (config.inHospitalOnly === false)
-        return undefined;
-    return 1;
+    if (config.inHospitalOnly === true)
+        return 1;
+    return undefined;
 }
 function normalizeSignedOnly(config) {
     if (typeof config.signedOnly === 'boolean')
         return config.signedOnly;
-    if (config.inHospitalOnly === false)
-        return false;
-    return true;
+    return false;
 }
 function buildCacheKey(config) {
     const status = normalizeElderStatus(config);

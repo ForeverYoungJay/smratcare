@@ -46,7 +46,10 @@ public class OaActivityPlanController {
       @RequestParam(required = false) String status,
       @RequestParam(required = false) LocalDate dateFrom,
       @RequestParam(required = false) LocalDate dateTo,
-      @RequestParam(required = false) String keyword) {
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String organizer,
+      @RequestParam(required = false) String location,
+      @RequestParam(required = false) String participantTarget) {
     if (dateFrom != null && dateTo != null && dateFrom.isAfter(dateTo)) {
       throw new IllegalArgumentException("开始日期不能晚于结束日期");
     }
@@ -57,7 +60,10 @@ public class OaActivityPlanController {
         .eq(orgId != null, OaActivityPlan::getOrgId, orgId)
         .eq(normalizedStatus != null, OaActivityPlan::getStatus, normalizedStatus)
         .ge(dateFrom != null, OaActivityPlan::getPlanDate, dateFrom)
-        .le(dateTo != null, OaActivityPlan::getPlanDate, dateTo);
+        .le(dateTo != null, OaActivityPlan::getPlanDate, dateTo)
+        .like(organizer != null && !organizer.isBlank(), OaActivityPlan::getOrganizer, organizer)
+        .like(location != null && !location.isBlank(), OaActivityPlan::getLocation, location)
+        .like(participantTarget != null && !participantTarget.isBlank(), OaActivityPlan::getParticipantTarget, participantTarget);
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(OaActivityPlan::getTitle, keyword)
           .or().like(OaActivityPlan::getOrganizer, keyword)
@@ -195,7 +201,10 @@ public class OaActivityPlanController {
       @RequestParam(required = false) String status,
       @RequestParam(required = false) LocalDate dateFrom,
       @RequestParam(required = false) LocalDate dateTo,
-      @RequestParam(required = false) String keyword) {
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String organizer,
+      @RequestParam(required = false) String location,
+      @RequestParam(required = false) String participantTarget) {
     if (dateFrom != null && dateTo != null && dateFrom.isAfter(dateTo)) {
       throw new IllegalArgumentException("开始日期不能晚于结束日期");
     }
@@ -207,6 +216,9 @@ public class OaActivityPlanController {
         .eq(normalizedStatus != null, OaActivityPlan::getStatus, normalizedStatus)
         .ge(dateFrom != null, OaActivityPlan::getPlanDate, dateFrom)
         .le(dateTo != null, OaActivityPlan::getPlanDate, dateTo)
+        .like(organizer != null && !organizer.isBlank(), OaActivityPlan::getOrganizer, organizer)
+        .like(location != null && !location.isBlank(), OaActivityPlan::getLocation, location)
+        .like(participantTarget != null && !participantTarget.isBlank(), OaActivityPlan::getParticipantTarget, participantTarget)
         .orderByDesc(OaActivityPlan::getPlanDate)
         .orderByDesc(OaActivityPlan::getCreateTime);
     if (keyword != null && !keyword.isBlank()) {
