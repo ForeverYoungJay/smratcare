@@ -15,13 +15,25 @@
         message="发现可能重复的老人档案"
         :description="duplicateWarningText"
       />
-      <a-form ref="formRef" :model="form" :rules="rules" layout="vertical" style="max-width: 760px">
+      <a-form ref="formRef" :model="form" :rules="rules" layout="vertical" style="max-width: 920px">
         <a-form-item label="姓名" name="fullName">
           <a-input v-model:value="form.fullName" @blur="refreshDuplicateWarnings" />
         </a-form-item>
         <a-form-item label="身份证号" name="idCardNo">
           <a-input v-model:value="form.idCardNo" @blur="refreshDuplicateWarnings" />
         </a-form-item>
+        <a-row :gutter="16">
+          <a-col :xs="24" :md="12">
+            <a-form-item label="身份证识别">
+              <a-input :value="formDerivedBirthDate ? '已识别' : '未识别'" readonly />
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :md="12">
+            <a-form-item label="识别生日">
+              <a-input :value="formDerivedBirthDate || '-'" readonly />
+            </a-form-item>
+          </a-col>
+        </a-row>
         <a-form-item label="手机号" name="phone">
           <a-input v-model:value="form.phone" @blur="refreshDuplicateWarnings" />
         </a-form-item>
@@ -86,12 +98,7 @@
           <a-input-number v-model:value="form.depositAmount" :min="0" style="width: 100%" />
         </a-form-item>
         <a-form-item label="护理等级" name="careLevel">
-          <a-select v-model:value="form.careLevel" placeholder="请选择护理等级">
-            <a-select-option value="A">A</a-select-option>
-            <a-select-option value="B">B</a-select-option>
-            <a-select-option value="C">C</a-select-option>
-            <a-select-option value="D">D</a-select-option>
-          </a-select>
+          <a-input v-model:value="form.careLevel" placeholder="如：一级护理/二级护理" />
         </a-form-item>
         <a-form-item label="风险预担" name="riskPrecommit">
           <a-select v-model:value="form.riskPrecommit" placeholder="请选择突发风险处置优先策略" allow-clear>
@@ -99,6 +106,64 @@
             <a-select-option value="NOTIFY_FAMILY_FIRST">第一时间通知家属</a-select-option>
           </a-select>
         </a-form-item>
+        <a-form-item label="基础疾病信息">
+          <a-select
+            v-model:value="selectedDiseaseIds"
+            mode="multiple"
+            allow-clear
+            show-search
+            :options="diseaseOptions"
+            placeholder="请选择基础疾病"
+          />
+        </a-form-item>
+        <div style="margin: 8px 0 16px; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div style="font-weight: 600;">家属信息</div>
+            <div style="color: rgba(0, 0, 0, 0.45); font-size: 12px;">常用联系人集中录入，手机号与身份证号要求完整。</div>
+          </div>
+          <a-button size="small" type="dashed" @click="addFamilyDraftRow">新增家属</a-button>
+        </div>
+        <div class="family-editor-list">
+          <div v-for="item in familyDraftRows" :key="item.key" class="family-card family-card-editable">
+            <div class="family-card-toolbar">
+              <a-tag :color="item.isPrimary ? 'green' : 'default'">{{ item.isPrimary ? '主联系人' : '普通联系人' }}</a-tag>
+              <a-button type="link" danger @click="removeFamilyDraftRow(item.key)">删除</a-button>
+            </div>
+            <a-row :gutter="[12, 4]">
+              <a-col :xs="24" :md="10">
+                <a-form-item label="姓名" class="compact-form-item">
+                  <a-input v-model:value="item.realName" placeholder="姓名" />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :md="8">
+                <a-form-item label="关系" class="compact-form-item">
+                  <a-select
+                    v-model:value="item.relation"
+                    :options="familyRelationOptions"
+                    allow-clear
+                    placeholder="请选择关系"
+                  />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :md="6">
+                <a-form-item label="主联系人" class="compact-form-item">
+                  <a-switch v-model:checked="item.isPrimary" @change="() => setPrimaryFamilyDraftRow(item.key)" />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :md="12">
+                <a-form-item label="手机号" class="compact-form-item">
+                  <a-input v-model:value="item.phone" placeholder="手机号" />
+                </a-form-item>
+              </a-col>
+              <a-col :xs="24" :md="12">
+                <a-form-item label="身份证号" class="compact-form-item">
+                  <a-input v-model:value="item.idCardNo" placeholder="身份证号" />
+                </a-form-item>
+              </a-col>
+            </a-row>
+          </div>
+          <a-empty v-if="!familyDraftRows.length" :image="null" description="暂无家属信息，可直接新增录入" />
+        </div>
         <a-form-item label="楼栋" name="buildingId">
           <a-select v-model:value="assetSelect.buildingId" allow-clear placeholder="选择楼栋" :disabled="form.status !== 1">
             <a-select-option v-for="item in buildingOptions" :key="item.value" :value="item.value">
@@ -156,14 +221,17 @@ import dayjs from 'dayjs'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
-import { createElder, getElderPage, uploadElderFile } from '../../api/elder'
+import { bindFamily, createElder, getElderPage, updateElderDiseases, uploadElderFile } from '../../api/elder'
 import { admitElder } from '../../api/elderLifecycle'
+import { upsertFamilyUser } from '../../api/family'
 import { getBedList, getBuildingList, getFloorList, getRoomList } from '../../api/bed'
+import { getDiseaseList } from '../../api/store'
 import type { AdmissionRequest, BedItem, BuildingItem, ElderCreateRequest, ElderItem, FloorItem, Id, RoomItem } from '../../types'
 
 const router = useRouter()
 const formRef = ref<FormInstance>()
 const saving = ref(false)
+const formDerivedBirthDate = ref('')
 
 const form = reactive<ElderCreateRequest & { contractNo?: string; depositAmount?: number }>({
   fullName: '',
@@ -194,6 +262,27 @@ const uploading = reactive({
   historicalContract: false
 })
 const duplicateWarnings = ref<Array<{ elderId: string; reasons: string[]; label: string }>>([])
+const selectedDiseaseIds = ref<number[]>([])
+const diseaseOptions = ref<Array<{ label: string; value: number }>>([])
+const familyDraftRows = ref<Array<{
+  key: string
+  familyUserId?: string
+  realName: string
+  relation: string
+  phone: string
+  idCardNo: string
+  isPrimary: boolean
+}>>([])
+const familyRelationOptions = [
+  { label: '配偶', value: '配偶' },
+  { label: '子女', value: '子女' },
+  { label: '孙辈', value: '孙辈' },
+  { label: '兄弟姐妹', value: '兄弟姐妹' },
+  { label: '亲属', value: '亲属' },
+  { label: '监护人', value: '监护人' },
+  { label: '朋友', value: '朋友' },
+  { label: '其他', value: '其他' }
+]
 
 const buildings = ref<BuildingItem[]>([])
 const floors = ref<FloorItem[]>([])
@@ -208,6 +297,27 @@ const assetSelect = reactive({
 
 function trimText(value?: string) {
   return String(value || '').trim()
+}
+
+function resolveBirthDateAndAgeFromIdCard(idCardNo?: string) {
+  const normalized = trimText(idCardNo)
+  const now = dayjs()
+  const toValidBirthDate = (value: string) => {
+    const d = dayjs(value)
+    if (!d.isValid()) return null
+    if (d.format('YYYY-MM-DD') !== value) return null
+    if (d.isAfter(now)) return null
+    return d
+  }
+  if (/^\d{17}[\dXx]$/.test(normalized)) {
+    const birthDate = toValidBirthDate(`${normalized.slice(6, 10)}-${normalized.slice(10, 12)}-${normalized.slice(12, 14)}`)
+    return birthDate ? birthDate.format('YYYY-MM-DD') : ''
+  }
+  if (/^\d{15}$/.test(normalized)) {
+    const birthDate = toValidBirthDate(`19${normalized.slice(6, 8)}-${normalized.slice(8, 10)}-${normalized.slice(10, 12)}`)
+    return birthDate ? birthDate.format('YYYY-MM-DD') : ''
+  }
+  return ''
 }
 
 async function validateIdCardNo(_rule: unknown, value?: string) {
@@ -328,6 +438,7 @@ async function submit() {
   if (!formRef.value) return
   try {
     await formRef.value.validate()
+    validateFamilyDraftRows()
     await refreshDuplicateWarnings()
     saving.value = true
     const normalizedContractNo = String(form.contractNo || '').trim()
@@ -354,6 +465,28 @@ async function submit() {
     payload.bedId = form.bedId
     payload.bedStartDate = form.bedStartDate
     const created: ElderItem = await createElder(payload)
+    if (created?.id && selectedDiseaseIds.value.length > 0) {
+      await updateElderDiseases(created.id, selectedDiseaseIds.value)
+    }
+    if (created?.id && familyDraftRows.value.length > 0) {
+      for (let i = 0; i < familyDraftRows.value.length; i += 1) {
+        const familyRow = familyDraftRows.value[i]
+        const user = await upsertFamilyUser({
+          realName: trimText(familyRow.realName),
+          phone: trimText(familyRow.phone),
+          idCardNo: trimText(familyRow.idCardNo),
+          status: 1
+        })
+        const familyUserId = String(user?.id || familyRow.familyUserId || '').trim()
+        if (!familyUserId) continue
+        await bindFamily({
+          elderId: created.id,
+          familyUserId,
+          relation: trimText(familyRow.relation) || '家属',
+          isPrimary: familyRow.isPrimary ? 1 : 0
+        })
+      }
+    }
     if (shouldAdmit && created?.id) {
       const admission: AdmissionRequest = {
         elderId: created.id,
@@ -433,6 +566,47 @@ function openFile(url?: string) {
   window.open(url, '_blank')
 }
 
+function addFamilyDraftRow() {
+  familyDraftRows.value.push({
+    key: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    realName: '',
+    relation: '',
+    phone: '',
+    idCardNo: '',
+    isPrimary: familyDraftRows.value.length === 0
+  })
+}
+
+function removeFamilyDraftRow(key: string) {
+  familyDraftRows.value = familyDraftRows.value.filter((item) => item.key !== key)
+  if (!familyDraftRows.value.some((item) => item.isPrimary) && familyDraftRows.value.length) {
+    familyDraftRows.value[0].isPrimary = true
+  }
+}
+
+function setPrimaryFamilyDraftRow(key: string) {
+  familyDraftRows.value.forEach((item) => {
+    item.isPrimary = item.key === key
+  })
+}
+
+function validateFamilyDraftRows() {
+  if (familyDraftRows.value.length === 0) return
+  const invalidRow = familyDraftRows.value.find((item) =>
+    !trimText(item.realName) || !trimText(item.phone) || !trimText(item.idCardNo))
+  if (invalidRow) {
+    throw new Error('家属信息需填写姓名、手机号和身份证号')
+  }
+  const invalidPhoneRow = familyDraftRows.value.find((item) => !/^1\d{10}$/.test(trimText(item.phone)))
+  if (invalidPhoneRow) {
+    throw new Error(`家属手机号格式不正确：${trimText(invalidPhoneRow.realName) || '未命名家属'}`)
+  }
+  const invalidIdCardRow = familyDraftRows.value.find((item) => !/^(\d{15}|\d{17}[\dXx])$/.test(trimText(item.idCardNo)))
+  if (invalidIdCardRow) {
+    throw new Error(`家属身份证号格式不正确：${trimText(invalidIdCardRow.realName) || '未命名家属'}`)
+  }
+}
+
 async function refreshDuplicateWarnings() {
   const idCardNo = trimText(form.idCardNo)
   const phone = trimText(form.phone)
@@ -499,6 +673,29 @@ async function loadAssets() {
   }
 }
 
+async function loadDiseaseOptions() {
+  try {
+    const list = await getDiseaseList()
+    diseaseOptions.value = (list || []).map((item: any) => ({
+      label: String(item.diseaseName || item.name || `疾病#${item.id}`),
+      value: Number(item.id)
+    }))
+  } catch {
+    diseaseOptions.value = []
+  }
+}
+
+watch(
+  () => form.idCardNo,
+  (value) => {
+    const parsedBirthDate = resolveBirthDateAndAgeFromIdCard(value)
+    formDerivedBirthDate.value = parsedBirthDate
+    if (parsedBirthDate && !form.birthDate) {
+      form.birthDate = parsedBirthDate
+    }
+  },
+  { immediate: true }
+)
 watch(
   () => assetSelect.buildingId,
   () => {
@@ -542,5 +739,35 @@ watch(
   }
 )
 
-onMounted(loadAssets)
+onMounted(() => {
+  loadAssets()
+  loadDiseaseOptions()
+})
 </script>
+
+<style scoped>
+.family-editor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.family-card {
+  border: 1px solid #f0f0f0;
+  border-radius: 12px;
+  padding: 14px 16px 4px;
+  background: #fafafa;
+}
+
+.family-card-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.compact-form-item {
+  margin-bottom: 10px;
+}
+</style>
