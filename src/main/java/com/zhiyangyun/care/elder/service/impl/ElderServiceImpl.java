@@ -301,7 +301,7 @@ public class ElderServiceImpl implements ElderService {
     List<ElderProfile> filtered = allRows.stream()
         .filter(elder -> matchesPageFilters(
             elder,
-            bedMap.get(elder.getBedId()),
+            elder.getBedId() == null ? null : bedMap.get(elder.getBedId()),
             normalizedKeyword,
             normalizedFullName,
             normalizedIdCardNo,
