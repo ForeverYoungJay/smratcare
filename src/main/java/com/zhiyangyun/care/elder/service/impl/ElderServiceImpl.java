@@ -276,16 +276,15 @@ public class ElderServiceImpl implements ElderService {
         return new Page<>(pageNo, pageSize);
       }
     }
-    var baseWrapper = Wrappers.lambdaQuery(ElderProfile.class)
-        .eq(ElderProfile::getIsDeleted, 0)
-        .eq(tenantId != null, ElderProfile::getTenantId, tenantId)
-        .eq(status != null, ElderProfile::getStatus, status);
-    if (latestSignedElderIds != null) {
-      baseWrapper.in(ElderProfile::getId, latestSignedElderIds);
-    }
-    List<ElderProfile> allRows = elderMapper.selectList(baseWrapper
+    var baseWrapper = Wrappers.<ElderProfile>query()
         .select(ELDER_PAGE_COLUMNS)
-        .orderByDesc("create_time"));
+        .eq("is_deleted", 0)
+        .eq(tenantId != null, "tenant_id", tenantId)
+        .eq(status != null, "status", status);
+    if (latestSignedElderIds != null) {
+      baseWrapper.in("id", latestSignedElderIds);
+    }
+    List<ElderProfile> allRows = elderMapper.selectList(baseWrapper.orderByDesc("create_time"));
     Map<Long, Bed> bedMap = resolveBedMap(allRows);
     String normalizedKeyword = normalizeText(keyword);
     String normalizedFullName = normalizeText(fullName);
