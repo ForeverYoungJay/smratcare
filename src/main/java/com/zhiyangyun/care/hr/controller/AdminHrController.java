@@ -1219,7 +1219,7 @@ public class AdminHrController {
     plan.setStaffNo(normalizeBlank(staff.getStaffNo()));
     plan.setStaffName(normalizeBlank(staff.getRealName()));
     plan.setDepartmentId(staff.getDepartmentId());
-    plan.setDepartmentName(department == null ? null : normalizeBlank(department.getName()));
+    plan.setDepartmentName(department == null ? null : normalizeBlank(department.getDeptName()));
     if (request.getBreakfastEnabled() != null || plan.getId() == null) {
       plan.setBreakfastEnabled(normalizeFlag(request.getBreakfastEnabled()));
     }
@@ -1308,7 +1308,7 @@ public class AdminHrController {
       bill.setStaffNo(normalizeBlank(staff.getStaffNo()));
       bill.setStaffName(normalizeBlank(staff.getRealName()));
       bill.setDepartmentId(staff.getDepartmentId());
-      bill.setDepartmentName(department == null ? null : normalizeBlank(department.getName()));
+      bill.setDepartmentName(department == null ? null : normalizeBlank(department.getDeptName()));
       bill.setTitle("员工餐费 " + feeMonth + " " + defaultText(staff.getRealName(), defaultText(staff.getUsername(), "员工")));
       bill.setQuantity(java.math.BigDecimal.valueOf(totalMealDays(plan)));
       bill.setUnitPrice(resolveAverageUnitPrice(amount, totalMealDays(plan)));
@@ -1374,7 +1374,7 @@ public class AdminHrController {
       plan.setStaffNo(normalizeBlank(staff.getStaffNo()));
       plan.setStaffName(normalizeBlank(staff.getRealName()));
       plan.setDepartmentId(staff.getDepartmentId());
-      plan.setDepartmentName(department == null ? null : normalizeBlank(department.getName()));
+      plan.setDepartmentName(department == null ? null : normalizeBlank(department.getDeptName()));
       if (normalizeBlank(row.getDormitoryBuilding()) != null) {
         plan.setDormitoryBuilding(normalizeBlank(row.getDormitoryBuilding()));
       }
@@ -1412,7 +1412,7 @@ public class AdminHrController {
       bill.setStaffNo(normalizeBlank(staff.getStaffNo()));
       bill.setStaffName(normalizeBlank(staff.getRealName()));
       bill.setDepartmentId(staff.getDepartmentId());
-      bill.setDepartmentName(department == null ? null : normalizeBlank(department.getName()));
+      bill.setDepartmentName(department == null ? null : normalizeBlank(department.getDeptName()));
       bill.setTitle("员工电费 " + feeMonth + " " + defaultText(staff.getRealName(), defaultText(staff.getUsername(), "员工")));
       bill.setQuantity(java.math.BigDecimal.ONE);
       bill.setUnitPrice(normalizeMoney(row.getAmount()));
@@ -2631,7 +2631,7 @@ public class AdminHrController {
     response.setStaffNo(staff == null ? (plan == null ? null : plan.getStaffNo()) : staff.getStaffNo());
     response.setStaffName(staff == null ? (plan == null ? null : plan.getStaffName()) : staff.getRealName());
     response.setDepartmentId(staff == null ? (plan == null ? null : plan.getDepartmentId()) : staff.getDepartmentId());
-    response.setDepartmentName(department == null ? (plan == null ? null : plan.getDepartmentName()) : department.getName());
+    response.setDepartmentName(department == null ? (plan == null ? null : plan.getDepartmentName()) : department.getDeptName());
     response.setBreakfastEnabled(plan == null ? 0 : normalizeFlag(plan.getBreakfastEnabled()));
     response.setBreakfastUnitPrice(plan == null ? null : plan.getBreakfastUnitPrice());
     response.setBreakfastDaysPerMonth(plan == null ? null : plan.getBreakfastDaysPerMonth());

@@ -402,6 +402,10 @@ public class ContractSignedLinkageServiceImpl implements ContractSignedLinkageSe
     return third;
   }
 
+  private static <T> T firstNonNull(T first, T second) {
+    return first != null ? first : second;
+  }
+
   private static String firstNonBlank(String first, String second) {
     if (!isBlank(first)) {
       return first.trim();
