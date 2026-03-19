@@ -19,60 +19,18 @@
           </a-select>
         </a-form-item>
         <a-form-item label="区域">
-          <a-select
-            v-model:value="query.areaCode"
-            allow-clear
-            show-search
-            option-filter-prop="label"
-            style="width: 160px"
-            placeholder="区域"
-          >
-            <a-select-option
-              v-for="item in areaOptions"
-              :key="item.value"
-              :value="item.value"
-              :label="item.label"
-            >
-              {{ item.label }}
-            </a-select-option>
+          <a-select v-model:value="query.areaCode" allow-clear show-search option-filter-prop="label" style="width: 160px" placeholder="区域">
+            <a-select-option v-for="item in areaOptions" :key="item.value" :value="item.value" :label="item.label">{{ item.label }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="房型">
-          <a-select
-            v-model:value="query.roomType"
-            allow-clear
-            show-search
-            option-filter-prop="label"
-            style="width: 160px"
-            placeholder="房型"
-          >
-            <a-select-option
-              v-for="item in roomTypeOptions"
-              :key="item.value"
-              :value="item.value"
-              :label="item.label"
-            >
-              {{ item.label }}
-            </a-select-option>
+          <a-select v-model:value="query.roomType" allow-clear show-search option-filter-prop="label" style="width: 160px" placeholder="房型">
+            <a-select-option v-for="item in roomTypeOptions" :key="item.value" :value="item.value" :label="item.label">{{ item.label }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="床型">
-          <a-select
-            v-model:value="query.bedType"
-            allow-clear
-            show-search
-            option-filter-prop="label"
-            style="width: 160px"
-            placeholder="床型"
-          >
-            <a-select-option
-              v-for="item in bedTypeOptions"
-              :key="item.value"
-              :value="item.value"
-              :label="item.label"
-            >
-              {{ item.label }}
-            </a-select-option>
+          <a-select v-model:value="query.bedType" allow-clear show-search option-filter-prop="label" style="width: 160px" placeholder="床型">
+            <a-select-option v-for="item in bedTypeOptions" :key="item.value" :value="item.value" :label="item.label">{{ item.label }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item>
@@ -113,12 +71,7 @@
           <a-button @click="openBedManage">床位管理</a-button>
           <a-button v-if="!isMarketingMode" type="primary" @click="openElderBedPanorama">后勤房态图入口</a-button>
         </a-space>
-        <a-radio-group
-          v-if="viewMode === 'grid'"
-          v-model:value="matrixQuickFilter"
-          size="small"
-          class="matrix-filter-switch"
-        >
+        <a-radio-group v-if="viewMode === 'grid'" v-model:value="matrixQuickFilter" size="small" class="matrix-filter-switch">
           <a-radio-button value="all">全部</a-radio-button>
           <a-radio-button value="idle">仅空床</a-radio-button>
           <a-radio-button value="occupied">仅入住</a-radio-button>
@@ -129,9 +82,7 @@
         <a-space wrap>
           <a-tag color="blue" v-if="selectedBuilding">楼栋：{{ selectedBuilding }}</a-tag>
           <a-tag color="cyan" v-if="selectedFloor">楼层：{{ selectedFloor }}</a-tag>
-          <span v-if="!selectedBuilding && !selectedFloor" class="matrix-tip">
-            可点击楼栋头部与楼层条快速聚焦，不同楼层结构不会再混排
-          </span>
+          <span v-if="!selectedBuilding && !selectedFloor" class="matrix-tip">可点击楼栋头部与楼层条快速聚焦，不同楼层结构不会再混排</span>
           <a-button size="small" v-if="selectedBuilding || selectedFloor" @click="clearMatrixSelection">清除楼层筛选</a-button>
         </a-space>
       </div>
@@ -139,47 +90,28 @@
       <div v-if="viewMode === 'grid'" class="tower-board">
         <a-empty v-if="!displayBuildings.length" description="当前筛选下暂无房态数据" />
         <div v-else class="tower-grid">
-          <section
-            v-for="building in displayBuildings"
-            :key="building.key"
-            class="tower-building"
-            :class="{ active: selectedBuilding === building.name }"
-          >
+          <section v-for="building in displayBuildings" :key="building.key" class="tower-building" :class="{ active: selectedBuilding === building.name }">
             <button type="button" class="tower-building-head" @click="toggleBuilding(building.name)">
               <div>
                 <div class="building-name">{{ building.name }}</div>
                 <div class="building-kpi">{{ building.floors.length }} 层 · {{ building.roomCount }} 间 · {{ building.bedCount }} 床</div>
               </div>
               <div class="building-trend">按楼独立加载</div>
-              <div v-if="resolveVisibleRemark(building.remark)" class="building-remark">
-                {{ resolveVisibleRemark(building.remark) }}
-              </div>
+              <div v-if="resolveVisibleRemark(building.remark)" class="building-remark">{{ resolveVisibleRemark(building.remark) }}</div>
             </button>
             <div class="tower-building-body">
-              <div
-                v-for="floor in building.floors"
-                :key="floor.key"
-                class="tower-floor"
-                :class="{ active: selectedFloor === floor.label }"
-              >
+              <div v-for="floor in building.floors" :key="floor.key" class="tower-floor" :class="{ active: selectedFloor === floor.label }">
                 <button type="button" class="tower-floor-badge" @click="toggleFloor(floor.label)">
                   <span>{{ floor.label }}</span>
                   <small>{{ floor.rooms.length }} 间</small>
                 </button>
                 <div class="tower-floor-content">
-                  <div
-                    v-for="room in floor.rooms"
-                    :key="room.key"
-                    class="room-cube"
-                    @dblclick="openRoomSceneDetail(room)"
-                  >
+                  <div v-for="room in floor.rooms" :key="room.key" class="room-cube" @dblclick="openRoomSceneDetail(room)">
                     <div class="room-head">
                       <div class="room-title">{{ room.roomNo }}</div>
                       <div class="room-meta">{{ room.occupiedBeds }}/{{ room.totalBeds }} 床 · {{ room.elderCount }} 人</div>
                     </div>
-                    <div v-if="resolveVisibleRemark(room.remark)" class="room-remark">
-                      {{ resolveVisibleRemark(room.remark) }}
-                    </div>
+                    <div v-if="resolveVisibleRemark(room.remark)" class="room-remark">{{ resolveVisibleRemark(room.remark) }}</div>
                     <div class="bed-grid">
                       <button
                         v-for="bed in room.beds"
@@ -229,14 +161,7 @@
       </template>
     </a-card>
 
-    <a-modal
-      v-model:open="detailOpen"
-      title="床位与老人详情"
-      width="560px"
-      @ok="printBedQr"
-      ok-text="打印床位二维码"
-      @cancel="() => (detailOpen = false)"
-    >
+    <a-modal v-model:open="detailOpen" title="床位与老人详情" width="560px" @ok="printBedQr" ok-text="打印床位二维码" @cancel="() => (detailOpen = false)">
       <a-descriptions bordered :column="2" size="small">
         <a-descriptions-item label="楼栋">{{ current?.building || '-' }}</a-descriptions-item>
         <a-descriptions-item label="楼层">{{ current?.floorNo || '-' }}</a-descriptions-item>
@@ -332,7 +257,6 @@ type BuildingScene = {
 const router = useRouter()
 const route = useRoute()
 const { plainBeds, roomTypeItems, bedTypeItems, areaItems, ensureBedMapLoaded, ensureResidenceConfigLoaded, refreshBedMapDataset } = useBedMapDataset()
-
 const detailOpen = ref(false)
 const roomDetailOpen = ref(false)
 const current = ref<BedItem | null>(null)
@@ -347,10 +271,8 @@ const matrixQuickFilter = ref<'all' | 'idle' | 'occupied'>('all')
 const selectedBuilding = ref('')
 const selectedFloor = ref('')
 const isMarketingMode = computed(() => route.name === 'MarketingRoomPanorama' || route.path.startsWith('/marketing/'))
-const pageTitle = computed(() => '房态图')
-const pageSubTitle = computed(() =>
-  isMarketingMode.value ? '按楼独立展开，楼层不再混排的轻量房态图' : '按楼独立展开，优先保证加载速度与操作清晰度'
-)
+const pageTitle = computed(() => (isMarketingMode.value ? '房态图' : '房态图'))
+const pageSubTitle = computed(() => (isMarketingMode.value ? '按楼独立展开，楼层不再混排的轻量房态图' : '按楼独立展开，优先保证加载速度与操作清晰度'))
 
 const query = reactive({
   bedNo: '',
@@ -433,7 +355,6 @@ const buildingScenes = computed<BuildingScene[]>(() => {
               }
             })
             .sort((a, b) => a.roomNo.localeCompare(b.roomNo, 'zh-CN'))
-
           return {
             key: `${buildingName}-${floorNo}`,
             label: floorNo,
@@ -496,13 +417,10 @@ function floorSortValue(text: string) {
   if (!raw) return -999
   const normalized = raw.replace(/\s+/g, '').toUpperCase()
   if (/^(ROOF|RF|屋顶|天台)$/.test(normalized)) return 999
-
   const basement = normalized.match(/(?:地下|负|B)([0-9]+|[一二三四五六七八九十百两]+)/)
   if (basement) return -parseFloorToken(basement[1])
-
   const match = normalized.match(/([0-9]+|[一二三四五六七八九十百两]+)(?:F|楼|层)?/)
   if (match) return parseFloorToken(match[1])
-
   if (/夹层|M/.test(normalized)) return 0.5
   return -999
 }
@@ -518,7 +436,6 @@ function parseChineseNumber(text: string) {
   const digitMap: Record<string, number> = { 零: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 }
   if (!chars.length) return 0
   if (chars.length === 1) return digitMap[chars[0]] ?? 0
-
   let result = 0
   let section = 0
   let number = 0
@@ -707,9 +624,7 @@ async function openRoomSceneDetail(room: RoomScene) {
   roomResidentLoading.value = true
   try {
     const results = await Promise.allSettled(elderIds.map((elderId) => getElderDetail(elderId)))
-    roomResidents.value = results
-      .filter((item): item is PromiseFulfilledResult<ElderItem> => item.status === 'fulfilled')
-      .map((item) => item.value)
+    roomResidents.value = results.filter((item): item is PromiseFulfilledResult<ElderItem> => item.status === 'fulfilled').map((item) => item.value)
   } finally {
     roomResidentLoading.value = false
   }
@@ -720,9 +635,7 @@ async function openBed(bed: BedItem) {
   detailOpen.value = true
   elderDetail.value = null
   elderLoading.value = false
-
   qrDataUrl.value = await QRCode.toDataURL(bed.bedQrCode || `BED:${bed.id}`)
-
   if (!bed.elderId) return
   elderLoading.value = true
   try {

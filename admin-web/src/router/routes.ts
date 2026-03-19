@@ -732,7 +732,7 @@ export const routes: RouteRecordRaw[] = [
                 path: 'bed-management',
                 name: 'LogisticsBedManagement',
                 component: () => import('../views/bed/Manage.vue'),
-                props: { initialTab: 'beds', allowedTabs: ['beds'] },
+                props: { initialTab: 'beds' },
                 meta: { title: '床位管理' }
               },
               {

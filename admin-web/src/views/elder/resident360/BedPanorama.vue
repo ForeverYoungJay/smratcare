@@ -206,8 +206,8 @@ import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../../components/PageContainer.vue'
 import FlowGuardBar from '../../../components/FlowGuardBar.vue'
+import { getBedMap, getRoomList } from '../../../api/bed'
 import { getElderDetail } from '../../../api/elder'
-import { useBedMapDataset } from '../../../composables/useBedMapDataset'
 import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
 import type { BedItem, ElderItem, RoomItem } from '../../../types'
 
@@ -227,7 +227,7 @@ type RoomScene = {
 
 const router = useRouter()
 const route = useRoute()
-const { plainBeds, riskBeds, roomList, ensureBedMapLoaded, ensureRoomListLoaded, refreshBedMapDataset } = useBedMapDataset()
+const beds = ref<BedItem[]>([])
 const roomTypeMap = ref<Record<string, string>>({})
 const roomCapacityMap = ref<Record<string, number>>({})
 const keyword = ref('')
@@ -268,8 +268,6 @@ const lifecycleContext = computed(() => {
     message: active ? '当前来自入住状态变更联动，可在床态视图快速确认清洁/维修与空床调配。' : ''
   }
 })
-
-const beds = computed(() => (riskDataReady.value ? riskBeds.value : plainBeds.value))
 
 const filteredBeds = computed(() => beds.value.filter((b) => {
   if (keyword.value) {
@@ -785,9 +783,11 @@ function openBedManage() {
 }
 
 async function loadBeds(includeRisk = false) {
-  await ensureBedMapLoaded(includeRisk)
+  beds.value = await getBedMap({ params: { includeRisk } })
   if (includeRisk) {
     riskDataReady.value = true
+  } else {
+    riskDataReady.value = false
   }
 }
 
@@ -802,10 +802,10 @@ async function ensureRiskDataLoaded() {
 }
 
 async function loadRooms() {
+  const rooms: RoomItem[] = await getRoomList()
   const typeMap: Record<string, string> = {}
   const capMap: Record<string, number> = {}
-  await ensureRoomListLoaded()
-  ;(roomList.value as RoomItem[]).forEach((item) => {
+  rooms.forEach((item) => {
     const id = String(item.id)
     typeMap[id] = item.roomType || '标准间'
     capMap[id] = Number(item.capacity || 1)
@@ -817,9 +817,7 @@ async function loadRooms() {
 useLiveSyncRefresh({
   topics: ['elder', 'bed', 'lifecycle', 'finance', 'care', 'dining'],
   refresh: async () => {
-    await refreshBedMapDataset({ rooms: true })
-    riskDataReady.value = false
-    await loadRooms()
+    await Promise.all([loadBeds(false), loadRooms()])
     if (riskFilterEnabled.value) {
       await ensureRiskDataLoaded()
     }

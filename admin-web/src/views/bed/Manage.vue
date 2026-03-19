@@ -60,22 +60,11 @@
           <a-tabs v-model:activeKey="activeTab">
             <a-tab-pane v-if="isTabEnabled('buildings')" key="buildings" tab="楼栋管理">
               <a-form :model="buildingQuery" layout="inline" class="search-bar">
-                <a-form-item label="楼栋">
-                  <a-select
-                    v-model:value="buildingQuery.keyword"
-                    allow-clear
-                    show-search
-                    option-filter-prop="label"
-                    style="min-width: 220px"
-                    placeholder="请选择楼栋"
-                  >
-                    <a-select-option v-for="item in buildingKeywordOptions" :key="item.value" :value="item.value" :label="item.label">
-                      {{ item.label }}
-                    </a-select-option>
-                  </a-select>
+                <a-form-item label="关键字">
+                  <a-input v-model:value="buildingQuery.keyword" placeholder="楼栋名称/编码" allow-clear />
                 </a-form-item>
                 <a-form-item label="状态">
-                  <a-select v-model:value="buildingQuery.status" allow-clear show-search style="min-width: 140px">
+                  <a-select v-model:value="buildingQuery.status" allow-clear style="min-width: 140px">
                     <a-select-option :value="1">启用</a-select-option>
                     <a-select-option :value="0">停用</a-select-option>
                   </a-select>
@@ -144,26 +133,15 @@
             <a-tab-pane v-if="isTabEnabled('floors')" key="floors" tab="楼层管理">
               <a-form :model="floorQuery" layout="inline" class="search-bar">
                 <a-form-item label="楼栋">
-                  <a-select v-model:value="floorQuery.buildingId" allow-clear show-search option-filter-prop="label" style="min-width: 180px">
-                    <a-select-option v-for="b in buildingSelectOptions" :key="b.value" :value="b.value" :label="b.label">{{ b.label }}</a-select-option>
+                  <a-select v-model:value="floorQuery.buildingId" allow-clear style="min-width: 160px">
+                    <a-select-option v-for="b in buildingList" :key="b.id" :value="b.id">{{ b.name }}</a-select-option>
                   </a-select>
                 </a-form-item>
-                <a-form-item label="楼层">
-                  <a-select
-                    v-model:value="floorQuery.keyword"
-                    allow-clear
-                    show-search
-                    option-filter-prop="label"
-                    style="min-width: 220px"
-                    placeholder="请选择楼层"
-                  >
-                    <a-select-option v-for="item in floorKeywordOptionsForQuery" :key="item.value" :value="item.value" :label="item.label">
-                      {{ item.label }}
-                    </a-select-option>
-                  </a-select>
+                <a-form-item label="关键字">
+                  <a-input v-model:value="floorQuery.keyword" placeholder="楼层/名称" allow-clear />
                 </a-form-item>
                 <a-form-item label="状态">
-                  <a-select v-model:value="floorQuery.status" allow-clear show-search style="min-width: 140px">
+                  <a-select v-model:value="floorQuery.status" allow-clear style="min-width: 140px">
                     <a-select-option :value="1">启用</a-select-option>
                     <a-select-option :value="0">停用</a-select-option>
                   </a-select>
@@ -231,38 +209,27 @@
             <a-tab-pane v-if="isTabEnabled('rooms')" key="rooms" tab="房间管理">
               <a-form :model="roomQuery" layout="inline" class="search-bar">
                 <a-form-item label="房间号">
-                  <a-select
-                    v-model:value="roomQuery.roomNo"
-                    allow-clear
-                    show-search
-                    option-filter-prop="label"
-                    style="min-width: 200px"
-                    placeholder="请选择房间"
-                  >
-                    <a-select-option v-for="item in roomNoOptionsForQuery" :key="item.value" :value="item.value" :label="item.label">
-                      {{ item.label }}
-                    </a-select-option>
-                  </a-select>
+                  <a-input v-model:value="roomQuery.roomNo" placeholder="如 A101" allow-clear />
                 </a-form-item>
                 <a-form-item label="楼栋">
-                  <a-select v-model:value="roomQuery.buildingId" allow-clear show-search option-filter-prop="label" style="min-width: 180px">
-                    <a-select-option v-for="b in buildingSelectOptions" :key="b.value" :value="b.value" :label="b.label">{{ b.label }}</a-select-option>
+                  <a-select v-model:value="roomQuery.buildingId" allow-clear style="min-width: 140px">
+                    <a-select-option v-for="b in buildingList" :key="b.id" :value="b.id">{{ b.name }}</a-select-option>
                   </a-select>
                 </a-form-item>
                 <a-form-item label="楼层">
-                  <a-select v-model:value="roomQuery.floorId" allow-clear show-search option-filter-prop="label" style="min-width: 180px">
-                    <a-select-option v-for="f in floorSelectOptionsForRoomQuery" :key="f.value" :value="f.value" :label="f.label">{{ f.label }}</a-select-option>
+                  <a-select v-model:value="roomQuery.floorId" allow-clear style="min-width: 140px">
+                    <a-select-option v-for="f in floorList" :key="f.id" :value="f.id">{{ f.floorNo }}</a-select-option>
                   </a-select>
                 </a-form-item>
                 <a-form-item label="状态">
-                  <a-select v-model:value="roomQuery.status" allow-clear show-search style="min-width: 140px">
+                  <a-select v-model:value="roomQuery.status" allow-clear style="min-width: 140px">
                     <a-select-option :value="1">可用</a-select-option>
                     <a-select-option :value="0">停用</a-select-option>
                   </a-select>
                 </a-form-item>
                 <a-form-item label="房型">
-                  <a-select v-model:value="roomQuery.roomType" allow-clear show-search option-filter-prop="label" style="min-width: 180px" placeholder="全部房型">
-                    <a-select-option v-for="item in roomTypeOptions" :key="item.value" :value="item.value" :label="item.label">{{ item.label }}</a-select-option>
+                  <a-select v-model:value="roomQuery.roomType" allow-clear style="min-width: 160px" placeholder="全部房型">
+                    <a-select-option v-for="item in roomTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
                   </a-select>
                 </a-form-item>
                 <a-form-item>
@@ -339,59 +306,16 @@
             <a-tab-pane v-if="isTabEnabled('beds')" key="beds" tab="床位管理">
               <a-form :model="bedQuery" layout="inline" class="search-bar">
                 <a-form-item label="床位号">
-                  <a-select
-                    v-model:value="bedQuery.bedNo"
-                    allow-clear
-                    show-search
-                    option-filter-prop="label"
-                    style="min-width: 180px"
-                    placeholder="请选择床位"
-                  >
-                    <a-select-option v-for="item in bedNoOptionsForQuery" :key="item.value" :value="item.value" :label="item.label">
-                      {{ item.label }}
-                    </a-select-option>
-                  </a-select>
-                </a-form-item>
-                <a-form-item label="楼栋">
-                  <a-select v-model:value="bedQuery.buildingId" allow-clear show-search option-filter-prop="label" style="min-width: 180px">
-                    <a-select-option v-for="b in buildingSelectOptions" :key="b.value" :value="b.value" :label="b.label">{{ b.label }}</a-select-option>
-                  </a-select>
-                </a-form-item>
-                <a-form-item label="楼层">
-                  <a-select v-model:value="bedQuery.floorId" allow-clear show-search option-filter-prop="label" style="min-width: 180px">
-                    <a-select-option v-for="f in floorSelectOptionsForBedQuery" :key="f.value" :value="f.value" :label="f.label">{{ f.label }}</a-select-option>
-                  </a-select>
+                  <a-input v-model:value="bedQuery.bedNo" placeholder="如 01" allow-clear />
                 </a-form-item>
                 <a-form-item label="房间号">
-                  <a-select
-                    v-model:value="bedQuery.roomNo"
-                    allow-clear
-                    show-search
-                    option-filter-prop="label"
-                    style="min-width: 200px"
-                    placeholder="请选择房间"
-                  >
-                    <a-select-option v-for="item in roomNoOptionsForBedQuery" :key="item.value" :value="item.value" :label="item.label">
-                      {{ item.label }}
-                    </a-select-option>
-                  </a-select>
+                  <a-input v-model:value="bedQuery.roomNo" placeholder="如 A101" allow-clear />
                 </a-form-item>
                 <a-form-item label="老人">
-                  <a-select
-                    v-model:value="bedQuery.elderName"
-                    allow-clear
-                    show-search
-                    option-filter-prop="label"
-                    style="min-width: 220px"
-                    placeholder="搜索老人姓名"
-                  >
-                    <a-select-option v-for="item in elderSearchOptionsForQuery" :key="item.value" :value="item.value" :label="item.label">
-                      {{ item.label }}
-                    </a-select-option>
-                  </a-select>
+                  <a-input v-model:value="bedQuery.elderName" placeholder="姓名" allow-clear />
                 </a-form-item>
                 <a-form-item label="状态">
-                  <a-select v-model:value="bedQuery.status" allow-clear show-search style="min-width: 140px">
+                  <a-select v-model:value="bedQuery.status" allow-clear style="min-width: 140px">
                     <a-select-option :value="1">空床</a-select-option>
                     <a-select-option :value="2">入住</a-select-option>
                     <a-select-option :value="3">维护</a-select-option>
@@ -399,13 +323,13 @@
                   </a-select>
                 </a-form-item>
                 <a-form-item label="房型">
-                  <a-select v-model:value="bedQuery.roomType" allow-clear show-search option-filter-prop="label" style="min-width: 180px" placeholder="全部房型">
-                    <a-select-option v-for="item in roomTypeOptions" :key="item.value" :value="item.value" :label="item.label">{{ item.label }}</a-select-option>
+                  <a-select v-model:value="bedQuery.roomType" allow-clear style="min-width: 160px" placeholder="全部房型">
+                    <a-select-option v-for="item in roomTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
                   </a-select>
                 </a-form-item>
                 <a-form-item label="床型">
-                  <a-select v-model:value="bedQuery.bedType" allow-clear show-search option-filter-prop="label" style="min-width: 180px" placeholder="全部床型">
-                    <a-select-option v-for="item in bedTypeOptions" :key="item.value" :value="item.value" :label="item.label">{{ item.label }}</a-select-option>
+                  <a-select v-model:value="bedQuery.bedType" allow-clear style="min-width: 160px" placeholder="全部床型">
+                    <a-select-option v-for="item in bedTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
                   </a-select>
                 </a-form-item>
                 <a-form-item>
@@ -524,8 +448,8 @@
     <a-modal v-model:open="floorOpen" title="楼层信息" width="420px" :confirm-loading="floorSubmitting" @ok="submitFloor" @cancel="() => (floorOpen = false)">
       <a-form ref="floorFormRef" :model="floorForm" :rules="floorRules" layout="vertical">
         <a-form-item label="楼栋" name="buildingId">
-          <a-select v-model:value="floorForm.buildingId" placeholder="请选择" show-search option-filter-prop="label">
-            <a-select-option v-for="b in buildingSelectOptions" :key="b.value" :value="b.value" :label="b.label">{{ b.label }}</a-select-option>
+          <a-select v-model:value="floorForm.buildingId" placeholder="请选择">
+            <a-select-option v-for="b in buildingList" :key="b.id" :value="b.id">{{ b.name }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="楼层编号" name="floorNo">
@@ -553,14 +477,12 @@
         </a-form-item>
         <a-form-item label="楼栋" name="buildingId">
           <a-select v-model:value="roomForm.buildingId" placeholder="请选择" show-search option-filter-prop="label">
-            <a-select-option v-for="b in buildingSelectOptions" :key="b.value" :value="b.value" :label="b.label">{{ b.label }}</a-select-option>
+            <a-select-option v-for="b in buildingList" :key="b.id" :value="b.id">{{ b.name }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="楼层" name="floorId">
-          <a-select v-model:value="roomForm.floorId" placeholder="请选择" show-search option-filter-prop="label">
-            <a-select-option v-for="f in roomFloorOptions" :key="f.id" :value="f.id" :label="`${f.floorNo}${f.name ? ` / ${f.name}` : ''}`">
-              {{ `${f.floorNo}${f.name ? ` / ${f.name}` : ''}` }}
-            </a-select-option>
+          <a-select v-model:value="roomForm.floorId" placeholder="请选择">
+            <a-select-option v-for="f in roomFloorOptions" :key="f.id" :value="f.id">{{ f.floorNo }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="床位容量" name="capacity">
@@ -598,19 +520,9 @@
 
     <a-modal v-model:open="bedOpen" title="床位信息" width="420px" :confirm-loading="bedSubmitting" @ok="submitBed" @cancel="() => (bedOpen = false)">
       <a-form ref="bedFormRef" :model="bedForm" :rules="bedRules" layout="vertical">
-        <a-form-item label="楼栋" name="buildingId">
-          <a-select v-model:value="bedForm.buildingId" placeholder="请选择" show-search option-filter-prop="label">
-            <a-select-option v-for="b in buildingSelectOptions" :key="b.value" :value="b.value" :label="b.label">{{ b.label }}</a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="楼层" name="floorId">
-          <a-select v-model:value="bedForm.floorId" placeholder="请选择" show-search option-filter-prop="label">
-            <a-select-option v-for="f in bedFormFloorOptions" :key="f.value" :value="f.value" :label="f.label">{{ f.label }}</a-select-option>
-          </a-select>
-        </a-form-item>
         <a-form-item label="房间" name="roomId">
-          <a-select v-model:value="bedForm.roomId" placeholder="请选择" show-search option-filter-prop="label">
-            <a-select-option v-for="option in bedFormRoomOptions" :key="option.value" :value="option.value" :label="option.label">{{ option.label }}</a-select-option>
+          <a-select v-model:value="bedForm.roomId" placeholder="请选择">
+            <a-select-option v-for="option in roomOptions" :key="option.value" :value="option.value">{{ option.label }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="床位号" name="bedNo">
@@ -827,8 +739,7 @@ const bedOpen = ref(false)
 const buildingOpen = ref(false)
 const floorOpen = ref(false)
 const roomForm = reactive<Partial<RoomItem>>({ status: 1 })
-type BedEditorForm = Partial<BedItem> & { buildingId?: Id; floorId?: Id }
-const bedForm = reactive<BedEditorForm>({ status: 1, buildingId: undefined, floorId: undefined })
+const bedForm = reactive<Partial<BedItem>>({ status: 1 })
 const buildingForm = reactive<Partial<BuildingItem>>({ status: 1, sortNo: 0 })
 const floorForm = reactive<Partial<FloorItem>>({ status: 1, sortNo: 0 })
 const buildingRemarkSlots = reactive([
@@ -899,8 +810,6 @@ const roomQuery = reactive({
 })
 const bedQuery = reactive({
   bedNo: '',
-  buildingId: undefined as Id | undefined,
-  floorId: undefined as Id | undefined,
   roomNo: '',
   elderName: '',
   roomType: undefined as string | undefined,
@@ -927,121 +836,6 @@ const floorPage = reactive({ pageNo: 1, pageSize: 10, total: 0 })
 const roomOptions = computed(() =>
   roomList.value.map((r) => ({ label: `${r.roomNo}${r.building ? '-' + r.building : ''}`, value: r.id }))
 )
-const buildingSelectOptions = computed(() =>
-  buildingList.value.map((item) => ({
-    label: item.code ? `${item.name} / ${item.code}` : item.name,
-    value: item.id
-  }))
-)
-const buildingKeywordOptions = computed(() =>
-  buildingList.value.map((item) => ({
-    label: item.code ? `${item.name} / ${item.code}` : item.name,
-    value: item.name
-  }))
-)
-const floorSelectOptions = computed(() =>
-  floorList.value.map((item) => ({
-    label: `${buildingNameMap.value[item.buildingId] || '未分配楼栋'} / ${item.floorNo}${item.name ? ` / ${item.name}` : ''}`,
-    value: item.id
-  }))
-)
-const floorKeywordOptions = computed(() =>
-  floorList.value.map((item) => ({
-    label: `${buildingNameMap.value[item.buildingId] || '未分配楼栋'} / ${item.floorNo}${item.name ? ` / ${item.name}` : ''}`,
-    value: item.floorNo || item.name || ''
-  }))
-)
-const floorKeywordOptionsForQuery = computed(() => {
-  if (!floorQuery.buildingId) return floorKeywordOptions.value
-  return floorKeywordOptions.value.filter((item) =>
-    floorList.value.some((floor) => floor.buildingId === floorQuery.buildingId && (floor.floorNo || floor.name || '') === item.value)
-  )
-})
-const floorSelectOptionsForRoomQuery = computed(() => {
-  if (!roomQuery.buildingId) return floorSelectOptions.value
-  return floorSelectOptions.value.filter((item) =>
-    floorList.value.some((floor) => floor.id === item.value && floor.buildingId === roomQuery.buildingId)
-  )
-})
-const roomNoOptions = computed(() =>
-  roomList.value.map((item) => ({
-    label: `${item.roomNo}${item.building ? ` / ${item.building}` : ''}${item.floorNo ? ` / ${item.floorNo}` : ''}`,
-    value: item.roomNo
-  }))
-)
-const roomNoOptionsForQuery = computed(() => {
-  return roomList.value
-    .filter((item) => {
-      if (roomQuery.buildingId && item.buildingId !== roomQuery.buildingId) return false
-      if (roomQuery.floorId && item.floorId !== roomQuery.floorId) return false
-      return true
-    })
-    .map((item) => ({
-      label: `${item.roomNo}${item.building ? ` / ${item.building}` : ''}${item.floorNo ? ` / ${item.floorNo}` : ''}`,
-      value: item.roomNo
-    }))
-})
-const floorSelectOptionsForBedQuery = computed(() => {
-  if (!bedQuery.buildingId) return floorSelectOptions.value
-  return floorSelectOptions.value.filter((item) =>
-    floorList.value.some((floor) => floor.id === item.value && floor.buildingId === bedQuery.buildingId)
-  )
-})
-const roomNoOptionsForBedQuery = computed(() => {
-  return roomList.value
-    .filter((item) => {
-      if (bedQuery.buildingId && item.buildingId !== bedQuery.buildingId) return false
-      if (bedQuery.floorId && item.floorId !== bedQuery.floorId) return false
-      return true
-    })
-    .map((item) => ({
-      label: `${item.roomNo}${item.building ? ` / ${item.building}` : ''}${item.floorNo ? ` / ${item.floorNo}` : ''}`,
-      value: item.roomNo
-    }))
-})
-const bedNoOptions = computed(() =>
-  bedList.value.map((item) => ({
-    label: `${item.bedNo}${item.roomNo ? ` / ${item.roomNo}` : ''}${item.building ? ` / ${item.building}` : ''}`,
-    value: item.bedNo
-  }))
-)
-const bedNoOptionsForQuery = computed(() => {
-  return bedList.value
-    .filter((item) => {
-      if (bedQuery.buildingId && item.buildingId !== bedQuery.buildingId) return false
-      const floor = floorList.value.find((entry) => entry.id === bedQuery.floorId)
-      if (bedQuery.floorId && floor && String(item.floorNo || '') !== String(floor.floorNo || '')) return false
-      if (bedQuery.roomNo && item.roomNo !== bedQuery.roomNo) return false
-      return true
-    })
-    .map((item) => ({
-      label: `${item.bedNo}${item.roomNo ? ` / ${item.roomNo}` : ''}${item.building ? ` / ${item.building}` : ''}`,
-      value: item.bedNo
-    }))
-})
-const elderSearchOptions = computed(() =>
-  Array.from(new Set(bedList.value.map((item) => String(item.elderName || '').trim()).filter(Boolean))).map((name) => ({
-    label: name,
-    value: name
-  }))
-)
-const elderSearchOptionsForQuery = computed(() => {
-  return Array.from(
-    new Set(
-      bedList.value
-        .filter((item) => {
-          if (bedQuery.buildingId && item.buildingId !== bedQuery.buildingId) return false
-          const floor = floorList.value.find((entry) => entry.id === bedQuery.floorId)
-          if (bedQuery.floorId && floor && String(item.floorNo || '') !== String(floor.floorNo || '')) return false
-          if (bedQuery.roomNo && item.roomNo !== bedQuery.roomNo) return false
-          if (bedQuery.bedNo && item.bedNo !== bedQuery.bedNo) return false
-          return true
-        })
-        .map((item) => String(item.elderName || '').trim())
-        .filter(Boolean)
-    )
-  ).map((name) => ({ label: name, value: name }))
-})
 const roomTypeOptions = computed(() => roomTypeItems.value.map((item) => ({ label: item.itemName, value: item.itemCode })))
 const bedTypeOptions = computed(() => bedTypeItems.value.map((item) => ({ label: item.itemName, value: item.itemCode })))
 const areaOptions = computed(() => areaItems.value.map((item) => ({ label: item.itemName, value: item.itemCode })))
@@ -1060,27 +854,6 @@ const bedTypeLabelMap = computed(() =>
 const roomFloorOptions = computed(() => {
   if (!roomForm.buildingId) return floorList.value
   return floorList.value.filter((item) => item.buildingId === roomForm.buildingId)
-})
-const bedFormFloorOptions = computed(() => {
-  const source = !bedForm.buildingId
-    ? floorList.value
-    : floorList.value.filter((item) => item.buildingId === bedForm.buildingId)
-  return source.map((item) => ({
-    value: item.id,
-    label: `${item.floorNo}${item.name ? ` / ${item.name}` : ''}`
-  }))
-})
-const bedFormRoomOptions = computed(() => {
-  return roomList.value
-    .filter((item) => {
-      if (bedForm.buildingId && item.buildingId !== bedForm.buildingId) return false
-      if (bedForm.floorId && item.floorId !== bedForm.floorId) return false
-      return true
-    })
-    .map((item) => ({
-      value: item.id,
-      label: `${item.roomNo}${item.building ? ` / ${item.building}` : ''}${item.floorNo ? ` / ${item.floorNo}` : ''}`
-    }))
 })
 const treeData = computed<TreeNode[]>(() => buildTreeKey(assetTree.value, 'ROOT'))
 const areaNameByCode = computed(() =>
@@ -1135,8 +908,6 @@ const roomRules: FormRules = {
 }
 
 const bedRules: FormRules = {
-  buildingId: [{ required: true, message: '请选择楼栋' }],
-  floorId: [{ required: true, message: '请选择楼层' }],
   roomId: [{ required: true, message: '请选择房间' }],
   bedNo: [{ required: true, message: '请输入床位号' }],
   status: [{ required: true, message: '请选择状态' }]
@@ -1360,8 +1131,6 @@ async function searchBeds() {
       pageNo: bedPage.pageNo,
       pageSize: bedPage.pageSize,
       bedNo: bedQuery.bedNo,
-      buildingId: bedQuery.buildingId,
-      floorId: bedQuery.floorId,
       roomNo: bedQuery.roomNo,
       elderName: bedQuery.elderName,
       roomType: bedQuery.roomType,
@@ -1395,8 +1164,6 @@ function onTreeSelect(node: any) {
     roomQuery.buildingId = data.id
     roomQuery.floorId = undefined
     bedQuery.bedNo = ''
-    bedQuery.buildingId = data.id
-    bedQuery.floorId = undefined
     bedQuery.roomNo = ''
     activeTab.value = 'rooms'
     searchRooms()
@@ -1409,8 +1176,6 @@ function onTreeSelect(node: any) {
     roomQuery.buildingId = data.buildingId
     roomQuery.floorId = data.id
     bedQuery.bedNo = ''
-    bedQuery.buildingId = data.buildingId
-    bedQuery.floorId = data.id
     bedQuery.roomNo = ''
     activeTab.value = 'rooms'
     searchRooms()
@@ -1418,8 +1183,6 @@ function onTreeSelect(node: any) {
   }
   if (data.type === 'ROOM') {
     bedQuery.bedNo = ''
-    bedQuery.buildingId = data.buildingId
-    bedQuery.floorId = data.floorId
     bedQuery.roomNo = data.roomNo || data.name
     activeTab.value = 'beds'
     searchBeds()
@@ -1427,8 +1190,6 @@ function onTreeSelect(node: any) {
   }
   if (data.type === 'BED') {
     bedQuery.roomNo = ''
-    bedQuery.buildingId = data.buildingId
-    bedQuery.floorId = data.floorId
     bedQuery.bedNo = data.bedNo || data.name
     activeTab.value = 'beds'
     searchBeds()
@@ -1486,8 +1247,6 @@ function resetRooms() {
 
 function resetBeds() {
   bedQuery.bedNo = ''
-  bedQuery.buildingId = undefined
-  bedQuery.floorId = undefined
   bedQuery.roomNo = ''
   bedQuery.elderName = ''
   bedQuery.roomType = undefined
@@ -1668,19 +1427,8 @@ async function submitRoom() {
 function openBed(row?: BedItem) {
   if (row) {
     Object.assign(bedForm, row)
-    const matchedRoom = roomList.value.find((item) => item.id === row.roomId)
-    bedForm.buildingId = matchedRoom?.buildingId
-    bedForm.floorId = matchedRoom?.floorId
   } else {
-    Object.assign(bedForm, {
-      id: undefined,
-      buildingId: undefined,
-      floorId: undefined,
-      roomId: undefined,
-      bedNo: '',
-      bedType: undefined,
-      status: 1
-    })
+    Object.assign(bedForm, { id: undefined, roomId: undefined, bedNo: '', bedType: undefined, status: 1 })
   }
   bedOpen.value = true
 }
@@ -1690,17 +1438,10 @@ async function submitBed() {
   try {
     await bedFormRef.value.validate()
     bedSubmitting.value = true
-    const payload = {
-      id: bedForm.id,
-      roomId: bedForm.roomId,
-      bedNo: bedForm.bedNo,
-      bedType: bedForm.bedType,
-      status: bedForm.status
-    }
     if (bedForm.id) {
-      await updateBed(bedForm.id, payload)
+      await updateBed(bedForm.id, bedForm)
     } else {
-      await createBed(payload)
+      await createBed(bedForm)
     }
     message.success('保存成功')
     bedOpen.value = false
@@ -2370,125 +2111,11 @@ async function loadResidenceConfigOptions() {
 }
 
 watch(
-  () => floorQuery.buildingId,
-  () => {
-    const exists = floorList.value.some(
-      (item) => item.buildingId === floorQuery.buildingId && (item.floorNo || item.name || '') === floorQuery.keyword
-    )
-    if (!exists) floorQuery.keyword = ''
-  }
-)
-
-watch(
-  () => roomQuery.buildingId,
-  () => {
-    const floorExists = floorList.value.some((item) => item.id === roomQuery.floorId && item.buildingId === roomQuery.buildingId)
-    if (!floorExists) roomQuery.floorId = undefined
-    const roomExists = roomList.value.some((item) => {
-      if (item.roomNo !== roomQuery.roomNo) return false
-      if (roomQuery.buildingId && item.buildingId !== roomQuery.buildingId) return false
-      if (roomQuery.floorId && item.floorId !== roomQuery.floorId) return false
-      return true
-    })
-    if (!roomExists) roomQuery.roomNo = ''
-  }
-)
-
-watch(
-  () => roomQuery.floorId,
-  () => {
-    const roomExists = roomList.value.some((item) => item.roomNo === roomQuery.roomNo && item.floorId === roomQuery.floorId)
-    if (!roomExists) roomQuery.roomNo = ''
-  }
-)
-
-watch(
-  () => bedQuery.buildingId,
-  () => {
-    const floorExists = floorList.value.some((item) => item.id === bedQuery.floorId && item.buildingId === bedQuery.buildingId)
-    if (!floorExists) bedQuery.floorId = undefined
-    const roomExists = roomList.value.some((item) => {
-      if (item.roomNo !== bedQuery.roomNo) return false
-      if (bedQuery.buildingId && item.buildingId !== bedQuery.buildingId) return false
-      if (bedQuery.floorId && item.floorId !== bedQuery.floorId) return false
-      return true
-    })
-    if (!roomExists) bedQuery.roomNo = ''
-    const bedExists = bedList.value.some((item) => {
-      if (item.bedNo !== bedQuery.bedNo) return false
-      if (bedQuery.buildingId && item.buildingId !== bedQuery.buildingId) return false
-      return true
-    })
-    if (!bedExists) bedQuery.bedNo = ''
-  }
-)
-
-watch(
-  () => bedQuery.floorId,
-  () => {
-    const roomExists = roomList.value.some((item) => item.roomNo === bedQuery.roomNo && item.floorId === bedQuery.floorId)
-    if (!roomExists) bedQuery.roomNo = ''
-    const floor = floorList.value.find((item) => item.id === bedQuery.floorId)
-    const bedExists = bedList.value.some((item) => {
-      if (item.bedNo !== bedQuery.bedNo) return false
-      if (!floor) return true
-      return String(item.floorNo || '') === String(floor.floorNo || '')
-    })
-    if (!bedExists) bedQuery.bedNo = ''
-  }
-)
-
-watch(
-  () => bedQuery.roomNo,
-  () => {
-    const bedExists = bedList.value.some((item) => {
-      if (item.bedNo !== bedQuery.bedNo) return false
-      if (bedQuery.roomNo && item.roomNo !== bedQuery.roomNo) return false
-      return true
-    })
-    if (!bedExists) bedQuery.bedNo = ''
-  }
-)
-
-watch(
   () => roomForm.buildingId,
   () => {
     if (!roomForm.floorId) return
     const exists = roomFloorOptions.value.some((item) => item.id === roomForm.floorId)
     if (!exists) roomForm.floorId = undefined
-  }
-)
-
-watch(
-  () => bedForm.buildingId,
-  () => {
-    const floorExists = floorList.value.some((item) => item.id === bedForm.floorId && item.buildingId === bedForm.buildingId)
-    if (!floorExists) bedForm.floorId = undefined
-    const roomExists = roomList.value.some((item) => {
-      if (item.id !== bedForm.roomId) return false
-      if (bedForm.buildingId && item.buildingId !== bedForm.buildingId) return false
-      if (bedForm.floorId && item.floorId !== bedForm.floorId) return false
-      return true
-    })
-    if (!roomExists) bedForm.roomId = undefined
-  }
-)
-
-watch(
-  () => bedForm.floorId,
-  () => {
-    const roomExists = roomList.value.some((item) => item.id === bedForm.roomId && item.floorId === bedForm.floorId)
-    if (!roomExists) bedForm.roomId = undefined
-  }
-)
-
-watch(
-  () => bedForm.roomId,
-  (roomId) => {
-    const room = roomList.value.find((item) => item.id === roomId)
-    if (!room) return
-    if (bedForm.buildingId !== room.buildingId) bedForm.buildingId = room.buildingId
-    if (bedForm.floorId !== room.floorId) bedForm.floorId = room.floorId
   }
 )
 
