@@ -11,6 +11,9 @@ public class VisitBookRequest {
   @NotNull
   private Long elderId;
   private Long familyUserId;
+  private String visitorName;
+  private String visitorPhone;
+  private String visitorRelation;
   @NotNull
   private LocalDateTime visitTime;
   @NotBlank

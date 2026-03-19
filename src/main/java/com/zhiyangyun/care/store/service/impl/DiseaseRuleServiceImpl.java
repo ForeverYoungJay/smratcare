@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -130,11 +131,16 @@ public class DiseaseRuleServiceImpl implements DiseaseRuleService {
   @Override
   @Transactional
   public void saveElderDiseases(Long orgId, Long elderId, List<Long> diseaseIds) {
+    List<Long> sanitizedDiseaseIds = diseaseIds == null ? List.of() : diseaseIds.stream()
+        .filter(Objects::nonNull)
+        .distinct()
+        .collect(Collectors.toList());
+
     elderDiseaseMapper.delete(Wrappers.lambdaQuery(ElderDisease.class)
         .eq(ElderDisease::getOrgId, orgId)
         .eq(ElderDisease::getElderId, elderId));
 
-    for (Long diseaseId : diseaseIds) {
+    for (Long diseaseId : sanitizedDiseaseIds) {
       ElderDisease record = new ElderDisease();
       record.setOrgId(orgId);
       record.setElderId(elderId);

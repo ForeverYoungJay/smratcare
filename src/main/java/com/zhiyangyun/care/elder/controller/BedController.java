@@ -59,8 +59,9 @@ public class BedController {
   }
 
   @GetMapping("/map")
-  public Result<java.util.List<BedResponse>> map() {
-    return Result.ok(bedService.map(AuthContext.getOrgId()));
+  public Result<java.util.List<BedResponse>> map(
+      @RequestParam(defaultValue = "true") boolean includeRisk) {
+    return Result.ok(bedService.map(AuthContext.getOrgId(), includeRisk));
   }
 
   @GetMapping("/page")

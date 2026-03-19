@@ -92,7 +92,6 @@
           <a-space>
             <a-button type="primary" @click="runSearch">搜 索</a-button>
             <a-button @click="reset">清 空</a-button>
-            <a-button @click="copySearchLink">复制筛选链接</a-button>
           </a-space>
         </a-form-item>
       </a-form>
@@ -115,6 +114,7 @@
           <a-button v-if="!isSignedMode" type="primary" @click="openForm()">新增合同</a-button>
           <a-button :disabled="!hasSingleSelection" @click="viewSelected">查看</a-button>
           <a-button :disabled="!hasSingleSelection" @click="editSelected">编辑</a-button>
+          <a-button :disabled="!hasSingleSelection" @click="assessmentSelected">入住评估</a-button>
           <a-button :disabled="!hasSingleSelection" @click="openAttachmentSelected">附件</a-button>
           <a-button :disabled="!hasSingleSelection" @click="admissionSelected">入住办理</a-button>
           <a-button :disabled="!hasSingleSelection" @click="finalizeSelected">最终签署</a-button>
@@ -146,6 +146,13 @@
           </template>
           <template v-else-if="column.key === 'currentOwnerDept'">
             <a-tag>{{ ownerDeptText(normalizedOwnerDept(record)) }}</a-tag>
+          </template>
+          <template v-else-if="column.key === 'operation'">
+            <a-space wrap size="small">
+              <a-button type="link" size="small" @click="handleNextStep(record)">{{ nextStepLabel(record) }}</a-button>
+              <a-button type="link" size="small" @click="openAttachment(record)">附件</a-button>
+              <a-button type="link" size="small" @click="view(record)">查看</a-button>
+            </a-space>
           </template>
         </template>
       </a-table>
@@ -595,6 +602,34 @@
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <a-modal v-model:open="signedLinkageOpen" title="签约联动完成" width="820px" :footer="null">
+      <a-alert
+        type="success"
+        show-icon
+        :message="signedLinkageHeadline"
+        :description="signedLinkageDescription"
+      />
+      <a-row :gutter="[12, 12]" style="margin-top: 16px;">
+        <a-col :xs="24" :md="12" v-for="item in signedLinkageCards" :key="item.key">
+          <a-card class="signed-linkage-card" :bordered="false">
+            <div class="signed-linkage-card__header">
+              <div>
+                <div class="signed-linkage-card__title">{{ item.title }}</div>
+                <div class="signed-linkage-card__desc">{{ item.description }}</div>
+              </div>
+              <a-tag :color="item.color">{{ item.statusText }}</a-tag>
+            </div>
+            <a-space wrap style="margin-top: 14px;">
+              <a-button type="primary" @click="openSignedSystem(item.primaryKey || item.key)">{{ item.primaryLabel || '进入系统' }}</a-button>
+              <a-button v-if="item.secondaryLabel" @click="openSignedSystem(item.secondaryKey || item.key)">
+                {{ item.secondaryLabel }}
+              </a-button>
+            </a-space>
+          </a-card>
+        </a-col>
+      </a-row>
+    </a-modal>
   </PageContainer>
 </template>
 
@@ -615,6 +650,7 @@ import {
   deleteContractAttachment,
   deleteCrmContract,
   finalizeContract,
+  getCrmContract,
   getContractAssessmentOverview,
   getContractAttachments,
   getContractPage,
@@ -629,7 +665,7 @@ import { bindFamily, createElder, getElderDetail, getElderDiseases, getElderPage
 import { getAdmissionRecords } from '../../api/elderLifecycle'
 import { getFamilyRelations, upsertFamilyUser } from '../../api/family'
 import { getDiseaseList } from '../../api/store'
-import type { ContractAttachmentItem, CrmContractItem, ElderItem, Id, MarketingPlanItem, PageResult } from '../../types'
+import type { ContractAttachmentItem, ContractSystemLinkageSummary, CrmContractItem, ElderItem, Id, MarketingPlanItem, PageResult } from '../../types'
 
 const router = useRouter()
 const route = useRoute()
@@ -644,8 +680,27 @@ const props = withDefaults(defineProps<{
   subTitle: '营销建合同 -> 长者管理入住评估 -> 入住办理 -> 最终签署',
   disableDefaultFlowStagePreset: false
 })
-const pageTitle = computed(() => props.title || '合同签约')
-const pageSubTitle = computed(() => props.subTitle || '营销建合同 -> 长者管理入住评估 -> 入住办理 -> 最终签署')
+const routeDrivenFlowStage = computed(() => {
+  const text = firstQueryText(route.query.flowStage)
+  if (text === 'PENDING_ASSESSMENT' || text === 'PENDING_BED_SELECT' || text === 'PENDING_SIGN' || text === 'SIGNED') {
+    return text as CrmContractItem['flowStage']
+  }
+  return undefined
+})
+const pageTitle = computed(() => {
+  const routeStage = routeDrivenFlowStage.value
+  if (props.disableDefaultFlowStagePreset && routeStage) {
+    return flowStagePageTitle(routeStage)
+  }
+  return props.title || '合同签约'
+})
+const pageSubTitle = computed(() => {
+  const routeStage = routeDrivenFlowStage.value
+  if (props.disableDefaultFlowStagePreset && routeStage) {
+    return flowStagePageSubTitle(routeStage)
+  }
+  return props.subTitle || '营销建合同 -> 长者管理入住评估 -> 入住办理 -> 最终签署'
+})
 const resolvedStatusPreset = computed(() => String(props.statusPreset || route.query.status || '').trim())
 const isSignedMode = computed(() => resolvedStatusPreset.value === 'signed')
 const loading = ref(false)
@@ -713,7 +768,7 @@ const query = reactive({
 function applyStatusPreset() {
   const statusPreset = resolvedStatusPreset.value
   if (props.disableDefaultFlowStagePreset && statusPreset === 'pending_sign') {
-    query.flowStage = undefined
+    query.flowStage = routeDrivenFlowStage.value || 'PENDING_SIGN'
     return
   }
   if (statusPreset === 'pending_sign') {
@@ -921,11 +976,24 @@ const flowGuardBlockers = computed(() => {
   if (record.status === 'VOID') blockers.push({ code: 'G401', text: '合同已作废，不可继续办理' })
   if (!record.contractNo) blockers.push({ code: 'G101', text: '合同号未生成', actionLabel: '编辑合同', actionKey: 'edit' })
   const stage = normalizedFlowStage(record)
+  const id = Number(record.id || 0)
   if (stage === 'PENDING_ASSESSMENT') {
-    blockers.push({ code: 'G201', text: '需先完成入住评估', actionLabel: '去评估', actionKey: 'go-assessment' })
+    if (assessmentCheckingMap.value[id]) {
+      blockers.push({ code: 'G200', text: '正在校验入住评估资料...' })
+    } else if (isAssessmentReady(record)) {
+      blockers.push({ code: 'G203', text: '入住评估已完成，下一步可直接办理入住', actionLabel: '去入住办理', actionKey: 'go-admission' })
+    } else {
+      blockers.push({ code: 'G201', text: '需先完成入住评估', actionLabel: '去评估', actionKey: 'go-assessment' })
+    }
   }
   if (stage === 'PENDING_BED_SELECT') {
-    blockers.push({ code: 'G202', text: '需先办理入住并完成选床', actionLabel: '去入住办理', actionKey: 'go-admission' })
+    if (finalizeCheckingMap.value[id]) {
+      blockers.push({ code: 'G210', text: '正在校验入住办理状态...' })
+    } else if (isAdmissionReady(record)) {
+      blockers.push({ code: 'G204', text: '入住已办理，下一步可直接最终签署', actionLabel: '去最终签署', actionKey: 'go-finalize' })
+    } else {
+      blockers.push({ code: 'G202', text: '需先办理入住并完成选床', actionLabel: '去入住办理', actionKey: 'go-admission' })
+    }
   }
   return blockers
 })
@@ -934,12 +1002,14 @@ const flowGuardHint = computed(() => {
   if (!record) return ''
   if (record.status === 'VOID') return ''
   const stage = normalizedFlowStage(record)
+  if (stage === 'PENDING_ASSESSMENT' && isAssessmentReady(record)) return '评估资料已齐，可直接进入入住办理'
+  if (stage === 'PENDING_BED_SELECT' && isAdmissionReady(record)) return '入住资料已齐，可直接进入最终签署'
   if (stage === 'PENDING_SIGN') return '当前可执行最终签署'
   if (stage === 'SIGNED') return '合同流程已闭环完成'
   return '请按流程完成上一环节后继续'
 })
 
-function handleFlowGuardAction(item: { actionKey?: string }) {
+async function handleFlowGuardAction(item: { actionKey?: string }) {
   const record = selectedContractForFlow.value
   if (!record) return
   if (item.actionKey === 'edit') {
@@ -947,21 +1017,201 @@ function handleFlowGuardAction(item: { actionKey?: string }) {
     return
   }
   if (item.actionKey === 'go-assessment') {
-    const query: Record<string, string> = { autoOpen: '1', mode: 'new' }
-    if (record.leadId) query.leadId = String(record.leadId)
-    if (record.contractNo) query.contractNo = record.contractNo
-    if (record.elderName) query.elderName = record.elderName
-    router.push({ path: '/elder/assessment/ability/admission', query })
+    await goAssessment(record)
     return
   }
   if (item.actionKey === 'go-admission') {
-    admissionSelected()
+    await goAdmissionProcessing(record)
+    return
+  }
+  if (item.actionKey === 'go-finalize') {
+    await openFinalize(record)
   }
 }
 
 function sameId(left: Id | undefined, right: Id | undefined) {
   if (left == null || right == null) return false
   return String(left) === String(right)
+}
+
+function resolveLinkedBillMonth(record?: Partial<CrmContractItem>) {
+  const summaryMonth = String(record?.linkageSummary?.billMonth || '').trim()
+  if (summaryMonth) return summaryMonth
+  const signedAt = String(record?.contractSignedAt || record?.updateTime || record?.createTime || '').trim()
+  const parsed = dayjs(signedAt)
+  if (parsed.isValid()) {
+    return parsed.format('YYYY-MM')
+  }
+  return dayjs().format('YYYY-MM')
+}
+
+async function openSignedLinkageHub(record: CrmContractItem) {
+  try {
+    let latest = record
+    if (!latest.elderId || !latest.elderName || !latest.linkageSummary) {
+      latest = await getCrmContract(record.id).catch(() => record)
+    }
+    if (!latest.elderId) {
+      const ensured = await ensureContractNo(latest)
+      const elder = await ensureElderFromLead(ensured)
+      latest = {
+        ...ensured,
+        elderId: elder.id,
+        elderName: ensured.elderName || elder.fullName
+      }
+    }
+    if (!latest.elderName) {
+      latest = {
+        ...latest,
+        elderName: latest.name || normalizeLeadName(latest)
+      }
+    }
+    signedLinkageRecord.value = latest
+    signedLinkageOpen.value = true
+  } catch (error: any) {
+    message.error(error?.message || '打开签约联动入口失败')
+  }
+}
+
+function openSignedSystem(key: string) {
+  const record = signedLinkageRecord.value
+  if (!record?.elderId) {
+    message.warning('当前合同还未绑定长者档案，请先补齐长者信息')
+    return
+  }
+  const elderId = String(record.elderId)
+  const elderName = String(record.elderName || record.name || '').trim()
+  const contractNo = String(record.contractNo || '').trim()
+  const billMonth = resolveLinkedBillMonth(record)
+  const summary = signedLinkageSummary.value
+  signedLinkageOpen.value = false
+  if (key === 'elder') {
+    router.push({
+      path: '/elder/resident-360',
+      query: {
+        residentId: elderId,
+        residentName: elderName || undefined,
+        contractNo: contractNo || undefined,
+        from: 'contractSigned'
+      }
+    })
+    return
+  }
+  if (key === 'finance-bill-detail' && summary.billId) {
+    router.push({
+      path: `/finance/bill/${summary.billId}`,
+      query: {
+        source: 'contract_signed',
+        entryScene: 'signed_onboarding',
+        elderId,
+        elderName: elderName || undefined,
+        contractNo: contractNo || undefined,
+        itemCount: summary.billItemCount != null ? String(summary.billItemCount) : undefined,
+        totalAmount: summary.billTotalAmount != null ? String(summary.billTotalAmount) : undefined
+      }
+    })
+    return
+  }
+  if (key === 'finance') {
+    router.push({
+      path: '/finance/bill-center',
+      query: {
+        elderId,
+        elderName: elderName || undefined,
+        month: billMonth,
+        scene: 'ADMISSION',
+        source: 'contract_signed',
+        entryScene: 'signed_onboarding',
+        contractNo: contractNo || undefined
+      }
+    })
+    return
+  }
+  if (key === 'finance-account') {
+    router.push({
+      path: '/finance/accounts/list',
+      query: {
+        keyword: elderName || undefined,
+        elderId,
+        source: 'contract_signed',
+        entryScene: 'signed_onboarding',
+        contractNo: contractNo || undefined
+      }
+    })
+    return
+  }
+  if (key === 'logistics') {
+    router.push({
+      path: '/logistics/workbench',
+      query: {
+        residentId: elderId,
+        residentName: elderName || undefined,
+        source: 'contract_signed',
+        entryScene: 'signed_onboarding',
+        contractNo: contractNo || undefined
+      }
+    })
+    return
+  }
+  if (key === 'logistics-task') {
+    router.push({
+      path: '/logistics/task-center',
+      query: {
+        residentId: elderId,
+        residentName: elderName || undefined,
+        source: 'contract_signed',
+        entryScene: 'signed_onboarding',
+        contractNo: contractNo || undefined,
+        tab: 'delivery'
+      }
+    })
+    return
+  }
+  if (key === 'medical-inspection') {
+    router.push({
+      path: '/medical-care/inspection',
+      query: {
+        elderId,
+        residentId: elderId,
+        residentName: elderName || undefined,
+        source: 'contract_signed',
+        entryScene: 'signed_onboarding',
+        contractNo: contractNo || undefined,
+        inspectionId: summary.starterInspectionId ? String(summary.starterInspectionId) : undefined
+      }
+    })
+    return
+  }
+  if (key === 'medical-care-task') {
+    router.push({
+      path: '/medical-care/care-task-board',
+      query: {
+        elderId,
+        residentId: elderId,
+        residentName: elderName || undefined,
+        source: 'contract_signed',
+        entryScene: 'signed_onboarding',
+        contractNo: contractNo || undefined,
+        taskId: summary.starterCareTaskId ? String(summary.starterCareTaskId) : undefined,
+        date: 'today',
+        filter: 'all'
+      }
+    })
+    return
+  }
+  if (key === 'medical' || key === 'medical-workbench') {
+    router.push({
+      path: key === 'medical' ? '/medical-care/center' : '/medical-care/workbench',
+      query: {
+        elderId,
+        residentId: elderId,
+        residentName: elderName || undefined,
+        source: 'contract_signed',
+        entryScene: 'signed_onboarding',
+        contractNo: contractNo || undefined
+      }
+    })
+  }
 }
 
 const columns = [
@@ -974,7 +1224,8 @@ const columns = [
   { title: '营销人员', dataIndex: 'marketerName', key: 'marketerName', width: 120 },
   { title: '优惠政策', dataIndex: 'orgName', key: 'orgName', width: 220 },
   { title: '合同状态', dataIndex: 'contractStatus', key: 'contractStatus', width: 130 },
-  { title: '超时预警', dataIndex: 'slaWarning', key: 'slaWarning', width: 150 }
+  { title: '超时预警', dataIndex: 'slaWarning', key: 'slaWarning', width: 150 },
+  { title: '下一步', key: 'operation', width: 240, fixed: 'right' as const }
 ]
 
 const attachmentOpen = ref(false)
@@ -1037,9 +1288,100 @@ const finalizeForm = reactive({
   elderId: '' as Id | '',
   remark: ''
 })
+const signedLinkageOpen = ref(false)
+const signedLinkageRecord = ref<CrmContractItem>()
 
 const tableRows = computed(() => rows.value)
 const displayTotal = computed(() => total.value)
+const signedLinkageSummary = computed<ContractSystemLinkageSummary>(() => {
+  const summary = (signedLinkageRecord.value?.linkageSummary || {}) as ContractSystemLinkageSummary
+  if (Object.keys(summary).length > 0) {
+    return summary
+  }
+  const record = signedLinkageRecord.value
+  if (!record) {
+    return {}
+  }
+  const billMonth = resolveLinkedBillMonth(record)
+  return {
+    elderId: record.elderId,
+    elderName: record.elderName,
+    elderArchiveReady: !!record.elderId,
+    financeAccountReady: true,
+    financeBillReady: !!billMonth,
+    logisticsReady: true,
+    medicalRecordReady: true,
+    billMonth
+  }
+})
+const signedLinkageHeadline = computed(() => {
+  const record = signedLinkageRecord.value
+  return `长者 ${record?.elderName || '-'} 已完成最终签约并接入四条业务线`
+})
+const signedLinkageDescription = computed(() => {
+  const summary = signedLinkageSummary.value
+  const billMonth = summary.billMonth ? `当前账期 ${summary.billMonth}` : '当前账期待财务确认'
+  const billText = summary.billItemCount
+    ? `已生成首期账单 ${summary.billItemCount} 项，金额 ${Number(summary.billTotalAmount || 0).toFixed(2)} 元`
+    : '首期账单待财务确认'
+  const medicalText = summary.starterInspectionId || summary.starterCareTaskId
+    ? '首次巡检与护理交接任务已准备'
+    : '医护起步任务待确认'
+  return `已同步进入长者管理、账单账务、后勤协同、医护健康；${billMonth}，${billText}，${medicalText}。前台可直接从这里进入下一步。`
+})
+const signedLinkageCards = computed(() => {
+  const summary = signedLinkageSummary.value
+  return [
+    {
+      key: 'elder',
+      title: '长者管理',
+      description: '查看长者总览、合同、床位和在院状态。',
+      ready: summary.elderArchiveReady !== false,
+      statusText: summary.elderArchiveReady === false ? '待补齐' : '已建档',
+      color: summary.elderArchiveReady === false ? 'orange' : 'green'
+    },
+    {
+      key: 'finance',
+      title: '账单账务',
+      description: summary.billId
+        ? `已生成${summary.billItemCount || 0}项首期费用${summary.billTotalAmount != null ? `，合计 ${Number(summary.billTotalAmount).toFixed(2)} 元` : ''}。`
+        : `进入账单中心${summary.billMonth ? `，当前账期 ${summary.billMonth}` : ''}。`,
+      ready: summary.financeBillReady !== false,
+      statusText: summary.financeBillReady === false ? '待补齐' : '已接账',
+      color: summary.financeBillReady === false ? 'orange' : 'green',
+      primaryLabel: summary.billId ? '查看首期账单' : '进入账单中心',
+      primaryKey: summary.billId ? 'finance-bill-detail' : 'finance',
+      secondaryLabel: '长者账户',
+      secondaryKey: 'finance-account'
+    },
+    {
+      key: 'logistics',
+      title: '后勤协同',
+      description: '已切到签约接管场景，可继续送餐衔接、床位复核和物资协同。',
+      ready: summary.logisticsReady !== false,
+      statusText: summary.logisticsReady === false ? '待确认' : '可进入',
+      color: summary.logisticsReady === false ? 'orange' : 'green',
+      primaryLabel: '后勤任务中心',
+      primaryKey: 'logistics-task',
+      secondaryLabel: '后勤工作台',
+      secondaryKey: 'logistics'
+    },
+    {
+      key: 'medical',
+      title: '医护健康',
+      description: summary.starterInspectionId || summary.starterCareTaskId
+        ? `已准备首次巡检${summary.starterCareTaskId ? '与护理交接任务' : ''}，可直接进入执行。`
+        : '进入医护服务中心，继续评估、巡检与护理跟进。',
+      ready: summary.medicalRecordReady !== false,
+      statusText: summary.medicalRecordReady === false ? '待补齐' : '已建档',
+      color: summary.medicalRecordReady === false ? 'orange' : 'green',
+      primaryLabel: summary.starterInspectionId ? '查看首次巡检' : '进入服务中心',
+      primaryKey: summary.starterInspectionId ? 'medical-inspection' : 'medical',
+      secondaryLabel: summary.starterCareTaskId ? '护理交接任务' : '医护工作台',
+      secondaryKey: summary.starterCareTaskId ? 'medical-care-task' : 'medical-workbench'
+    }
+  ]
+})
 
 function normalizedFlowStage(record: CrmContractItem): CrmContractItem['flowStage'] {
   return (record.flowStage || 'PENDING_ASSESSMENT') as CrmContractItem['flowStage']
@@ -1070,6 +1412,22 @@ function ownerDeptText(dept?: CrmContractItem['currentOwnerDept']) {
   if (dept === 'ASSESSMENT') return '评估部'
   if (dept === 'MARKETING') return '营销部'
   return '-'
+}
+
+function flowStagePageTitle(stage?: CrmContractItem['flowStage']) {
+  if (stage === 'PENDING_ASSESSMENT') return '待评估合同'
+  if (stage === 'PENDING_BED_SELECT') return '待办理入住合同'
+  if (stage === 'PENDING_SIGN') return '待签约合同'
+  if (stage === 'SIGNED') return '已签合同'
+  return '合同签约'
+}
+
+function flowStagePageSubTitle(stage?: CrmContractItem['flowStage']) {
+  if (stage === 'PENDING_ASSESSMENT') return '营销建合同 -> 入住评估 -> 办理入住 -> 最终签约，当前聚焦待评估合同'
+  if (stage === 'PENDING_BED_SELECT') return '营销建合同 -> 入住评估 -> 办理入住 -> 最终签约，当前聚焦待办理入住合同'
+  if (stage === 'PENDING_SIGN') return '营销建合同 -> 入住评估 -> 办理入住 -> 最终签约，当前聚焦待签署合同'
+  if (stage === 'SIGNED') return '已完成最终签署的合同统一归档查看'
+  return '营销建合同 -> 长者管理入住评估 -> 入住办理 -> 最终签署'
 }
 
 function genderText(gender?: number) {
@@ -1137,11 +1495,23 @@ function admissionDisabledReason(record: CrmContractItem) {
   return '仅完成入住评估后的合同才可办理入住'
 }
 
+function isAssessmentReady(record: CrmContractItem) {
+  const id = Number(record.id || 0)
+  if (!id) return false
+  return Boolean(assessmentReadyMap.value[id])
+}
+
 function isFinalizeDisabled(record: CrmContractItem) {
   const id = Number(record.id || 0)
   if (!id) return true
   if (finalizeCheckingMap.value[id]) return true
   return !finalizeReadyMap.value[id]
+}
+
+function isAdmissionReady(record: CrmContractItem) {
+  const id = Number(record.id || 0)
+  if (!id) return false
+  return Boolean(finalizeReadyMap.value[id])
 }
 
 function finalizeDisabledReason(record: CrmContractItem) {
@@ -1337,17 +1707,6 @@ function triggerSearchRefresh() {
   syncSearchQueryToRoute().catch(() => {})
 }
 
-async function copySearchLink() {
-  const href = router.resolve({ path: route.path, query: buildSearchRouteQuery() }).href
-  const fullUrl = /^https?:\/\//i.test(href) ? href : `${window.location.origin}${href}`
-  try {
-    await navigator.clipboard.writeText(fullUrl)
-    message.success('筛选链接已复制')
-  } catch {
-    message.warning('当前环境不支持自动复制，请手动复制地址栏链接')
-  }
-}
-
 function requireSingleSelection(actionLabel: string) {
   if (selectedRowKeys.value.length !== 1) {
     message.info(`请先勾选 1 条合同再执行“${actionLabel}”`)
@@ -1383,6 +1742,12 @@ async function openAttachmentSelected() {
   await openAttachment(row)
 }
 
+async function assessmentSelected() {
+  const row = requireSingleSelection('入住评估')
+  if (!row) return
+  await goAssessment(row)
+}
+
 async function admissionSelected() {
   const row = requireSingleSelection('入住办理')
   if (!row) return
@@ -1393,6 +1758,53 @@ async function finalizeSelected() {
   const row = requireSingleSelection('最终签署')
   if (!row) return
   await openFinalize(row)
+}
+
+function nextStepLabel(record: CrmContractItem) {
+  if (record.status === 'VOID') return '查看'
+  const stage = normalizedFlowStage(record)
+  if (stage === 'SIGNED') return '进入系统'
+  if (stage === 'PENDING_ASSESSMENT') {
+    return isAssessmentReady(record) ? '去入住办理' : '去入住评估'
+  }
+  if (stage === 'PENDING_BED_SELECT') {
+    return isAdmissionReady(record) ? '去最终签署' : '去入住办理'
+  }
+  if (stage === 'PENDING_SIGN') return '去最终签署'
+  return '查看'
+}
+
+async function handleNextStep(record: CrmContractItem) {
+  if (record.status === 'VOID') {
+    view(record)
+    return
+  }
+  const stage = normalizedFlowStage(record)
+  if (stage === 'SIGNED') {
+    await openSignedLinkageHub(record)
+    return
+  }
+  if (stage === 'PENDING_ASSESSMENT') {
+    if (isAssessmentReady(record)) {
+      await goAdmissionProcessing(record)
+      return
+    }
+    await goAssessment(record)
+    return
+  }
+  if (stage === 'PENDING_BED_SELECT') {
+    if (isAdmissionReady(record)) {
+      await openFinalize(record)
+      return
+    }
+    await goAdmissionProcessing(record)
+    return
+  }
+  if (stage === 'PENDING_SIGN') {
+    await openFinalize(record)
+    return
+  }
+  view(record)
 }
 
 function onContractModalOk() {
@@ -1631,6 +2043,35 @@ async function goAdmissionProcessing(record: CrmContractItem) {
   }
 }
 
+async function goAssessment(record: CrmContractItem) {
+  try {
+    if (record.status === 'VOID') {
+      message.warning('作废合同不可发起入住评估')
+      return
+    }
+    if (normalizedFlowStage(record) === 'SIGNED' || record.status === 'SIGNED' || record.status === 'EFFECTIVE') {
+      message.warning('合同已完成最终签署，无需重复发起入住评估')
+      return
+    }
+    const contract = await ensureContractNo(record)
+    const query: Record<string, string> = {
+      autoOpen: '1',
+      closeLoop: '1',
+      mode: isAssessmentReady(contract) ? 'continue' : 'new'
+    }
+    if (contract.leadId) query.leadId = String(contract.leadId)
+    if (contract.elderId) query.elderId = String(contract.elderId)
+    if (contract.contractNo) query.contractNo = contract.contractNo
+    if (contract.elderName) query.elderName = contract.elderName
+    if (contract.elderPhone) query.elderPhone = contract.elderPhone
+    if (contract.idCardNo) query.idCardNo = contract.idCardNo
+    if (contract.homeAddress) query.homeAddress = contract.homeAddress
+    router.push({ path: '/elder/assessment/ability/admission', query })
+  } catch (error: any) {
+    message.error(error?.message || '跳转入住评估失败')
+  }
+}
+
 async function checkAssessmentReady(record: CrmContractItem) {
   const stage = normalizedFlowStage(record)
   if (stage === 'PENDING_BED_SELECT' || stage === 'PENDING_SIGN' || stage === 'SIGNED') {
@@ -1695,10 +2136,11 @@ async function submitFinalize() {
   if (!finalizeLead.value) return
   finalizing.value = true
   try {
-    await finalizeContract(finalizeLead.value.id, finalizeForm.remark || finalizeLead.value.remark)
-    message.success('最终签署完成')
+    const finalized = await finalizeContract(finalizeLead.value.id, finalizeForm.remark || finalizeLead.value.remark)
+    message.success('最终签署完成，已同步进入长者、账单、后勤和医护系统')
     finalizeOpen.value = false
     await fetchData()
+    await openSignedLinkageHub(finalized || finalizeLead.value)
   } catch (error: any) {
     message.error(error?.message || '最终签署失败')
   } finally {
@@ -2493,6 +2935,32 @@ watch(
   background: rgba(255, 255, 255, 0.72);
   color: var(--contract-strong);
   line-height: 1.7;
+}
+
+.signed-linkage-card {
+  min-height: 172px;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.98) 0%, rgba(255, 255, 255, 1) 100%);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.signed-linkage-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.signed-linkage-card__title {
+  color: var(--contract-strong);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.signed-linkage-card__desc {
+  margin-top: 8px;
+  color: var(--contract-muted);
+  line-height: 1.6;
 }
 
 @media (max-width: 768px) {

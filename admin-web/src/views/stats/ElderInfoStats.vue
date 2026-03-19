@@ -281,7 +281,7 @@ const visibleInsightItems = computed(() => {
   const selected = panelKeys.value.length ? new Set(panelKeys.value) : null
   return insightItems.value.filter((item) => !selected || selected.has(item.key))
 })
-const commandSummary = computed(() => '把老人分群观察、模板化打印、协作分享和纠错反馈集中到画像协同台。')
+const commandSummary = computed(() => '把老人分群观察、模板化打印和纠错反馈集中到画像协同台。')
 const commandActionItems = computed(() => ([
   { key: 'open-checkin', label: '查看入住统计', description: '结合在院规模和净增长判断画像变化', route: '/stats/check-in', tone: 'warning' as const },
   { key: 'open-flow-report', label: '查看出入报表', description: '排查离院偏高的具体老人', route: '/stats/elder-flow-report', tone: 'danger' as const },

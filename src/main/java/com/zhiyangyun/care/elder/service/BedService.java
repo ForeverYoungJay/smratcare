@@ -16,7 +16,11 @@ public interface BedService {
 
   java.util.List<BedResponse> list(Long orgId);
 
-  java.util.List<BedResponse> map(Long orgId);
+  default java.util.List<BedResponse> map(Long orgId) {
+    return map(orgId, true);
+  }
+
+  java.util.List<BedResponse> map(Long orgId, boolean includeRisk);
 
   void delete(Long id, Long tenantId);
 }

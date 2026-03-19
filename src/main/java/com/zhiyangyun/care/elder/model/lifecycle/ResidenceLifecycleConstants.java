@@ -17,6 +17,7 @@ public final class ResidenceLifecycleConstants {
   public static final String DISCHARGE_APPLY_APPROVED = "APPROVED";
   public static final String DISCHARGE_APPLY_REJECTED = "REJECTED";
 
+  public static final String AUTO_DISCHARGE_PENDING_SETTLEMENT = "PENDING_SETTLEMENT";
   public static final String AUTO_DISCHARGE_SUCCESS = "SUCCESS";
   public static final String AUTO_DISCHARGE_FAILED = "FAILED";
 

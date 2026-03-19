@@ -129,7 +129,9 @@
 
       <a-layout-content class="app-content">
         <router-view v-slot="{ Component }">
-          <component :is="Component" :key="viewRenderKey" />
+          <keep-alive :max="aliveViewMax">
+            <component :is="Component" :key="viewRenderKey" />
+          </keep-alive>
         </router-view>
       </a-layout-content>
     </a-layout>
@@ -414,13 +416,17 @@
               </template>
               <template v-if="msg.kind === 'IMAGE' && msg.fileUrl">
                 <div class="quick-chat-image-wrap">
-                  <img :src="msg.fileUrl" :alt="msg.fileName || '图片'" class="quick-chat-image" />
+                  <a-image :src="msg.fileUrl" :alt="msg.fileName || '图片'" class="quick-chat-image" />
                   <div v-if="msg.uploadStatus === 'UPLOADING'" class="quick-chat-upload-mask">上传中...</div>
+                  <div v-else-if="msg.uploadStatus === 'FAILED'" class="quick-chat-upload-mask quick-chat-upload-mask-failed">上传失败</div>
                 </div>
               </template>
               <template v-else-if="msg.kind === 'FILE'">
                 <span v-if="msg.uploadStatus === 'UPLOADING'" class="quick-chat-uploading-file">
                   {{ msg.fileName || '附件' }} 上传中...
+                </span>
+                <span v-else-if="msg.uploadStatus === 'FAILED'" class="quick-chat-upload-failed-file">
+                  {{ msg.fileName || '附件' }} 上传失败，请重试
                 </span>
                 <a v-else :href="msg.fileUrl || '#'" target="_blank" rel="noreferrer">{{ msg.fileName || '附件' }}</a>
               </template>
@@ -740,7 +746,7 @@ const openKeys = ref<string[]>([])
 const routeTabsWrapRef = ref<HTMLElement | null>(null)
 const routeTabs = ref<Array<{ key: string; path: string; title: string; closable: boolean }>>([])
 const activeTabKey = ref('')
-const refreshSeed = ref(0)
+const tabRefreshSeeds = reactive<Record<string, number>>({})
 const tabContext = reactive({
   visible: false,
   x: 0,
@@ -836,7 +842,7 @@ type QuickChatMessage = {
   content: string
   fileName?: string
   fileUrl?: string
-  uploadStatus?: 'UPLOADING'
+  uploadStatus?: 'UPLOADING' | 'FAILED'
   timeText: string
   createdAt: string
   recalled?: boolean
@@ -1301,7 +1307,9 @@ const menuItems = computed(() => {
 })
 
 const selectedKeys = computed(() => [route.path])
-const viewRenderKey = computed(() => `${route.fullPath}::${refreshSeed.value}`)
+const currentRouteTabKey = computed(() => normalizeTabKey(route.path || route.fullPath) || route.fullPath)
+const aliveViewMax = computed(() => Math.max(routeTabs.value.length + 4, 12))
+const viewRenderKey = computed(() => `${currentRouteTabKey.value}::${tabRefreshSeeds[currentRouteTabKey.value] || 0}`)
 
 const currentTitle = computed(() => {
   const title = route.meta?.title as string | undefined
@@ -1458,6 +1466,15 @@ function syncRouteTab(pathKey: string, fullPath: string) {
   persistRouteTabs()
 }
 
+function pruneTabRefreshSeeds() {
+  const allowedKeys = new Set(routeTabs.value.map((item) => item.key))
+  Object.keys(tabRefreshSeeds).forEach((key) => {
+    if (!allowedKeys.has(key)) {
+      delete tabRefreshSeeds[key]
+    }
+  })
+}
+
 function onTabChange(key: string) {
   if (!key) return
   const tab = routeTabs.value.find((item) => item.key === key)
@@ -1477,6 +1494,8 @@ function closeTab(targetKey: string) {
   const tab = routeTabs.value[idx]
   if (!tab.closable) return
   routeTabs.value.splice(idx, 1)
+  delete tabRefreshSeeds[targetKey]
+  pruneTabRefreshSeeds()
   persistRouteTabs()
   if (activeTabKey.value !== targetKey) return
   const fallback = routeTabs.value[idx] || routeTabs.value[idx - 1]
@@ -1532,19 +1551,24 @@ function autoScrollTabNav(clientX: number) {
 function closeOtherTabs(keepKey?: string) {
   const keep = keepKey || activeTabKey.value || route.fullPath
   routeTabs.value = routeTabs.value.filter((item) => !item.closable || item.key === keep)
+  pruneTabRefreshSeeds()
   persistRouteTabs()
   closeTabContextMenu()
 }
 
 function closeAllTabs() {
   routeTabs.value = routeTabs.value.filter((item) => !item.closable)
+  pruneTabRefreshSeeds()
   persistRouteTabs()
   closeTabContextMenu()
   router.push('/portal')
 }
 
 function refreshCurrentTab() {
-  refreshSeed.value += 1
+  const tabKey = currentRouteTabKey.value || activeTabKey.value || normalizeTabKey(route.fullPath)
+  if (tabKey) {
+    tabRefreshSeeds[tabKey] = (tabRefreshSeeds[tabKey] || 0) + 1
+  }
   closeTabContextMenu()
 }
 
@@ -1572,6 +1596,7 @@ function closeLeftTabs() {
     return
   }
   routeTabs.value = routeTabs.value.filter((item, i) => i >= idx || !item.closable)
+  pruneTabRefreshSeeds()
   persistRouteTabs()
   ensureActiveTabAvailable()
   closeTabContextMenu()
@@ -1584,6 +1609,7 @@ function closeRightTabs() {
     return
   }
   routeTabs.value = routeTabs.value.filter((item, i) => i <= idx || !item.closable)
+  pruneTabRefreshSeeds()
   persistRouteTabs()
   ensureActiveTabAvailable()
   closeTabContextMenu()
@@ -1629,6 +1655,7 @@ function restoreRouteTabs() {
         return acc
       }, [])
       .slice(-20)
+    pruneTabRefreshSeeds()
   } catch {}
 }
 
@@ -4075,8 +4102,12 @@ const beforeQuickChatUpload: UploadProps['beforeUpload'] = async (file) => {
     const uploaded = await uploadOaFile(currentFile, isImage ? 'oa-quick-chat-image' : 'oa-quick-chat-file')
     const fileUrl = String(uploaded?.fileUrl || '').trim()
     if (!fileUrl) {
-      room.messages = room.messages.filter((item) => item.id !== tempMessage.id)
+      tempMessage.uploadStatus = 'FAILED'
+      tempMessage.content = isImage ? '[图片上传失败]' : '[文件上传失败]'
+      if (isImage) tempMessage.fileUrl = undefined
       if (tempPreviewUrl) URL.revokeObjectURL(tempPreviewUrl)
+      room.updatedAt = dayjs().toISOString()
+      persistQuickChatState()
       message.error('发送失败：未返回文件地址')
       return false
     }
@@ -4095,8 +4126,12 @@ const beforeQuickChatUpload: UploadProps['beforeUpload'] = async (file) => {
     scrollQuickChatToBottom()
     if (tempPreviewUrl) URL.revokeObjectURL(tempPreviewUrl)
   } catch (error: any) {
-    room.messages = room.messages.filter((item) => item.id !== tempMessage.id)
+    tempMessage.uploadStatus = 'FAILED'
+    tempMessage.content = isImage ? '[图片上传失败]' : '[文件上传失败]'
+    if (isImage) tempMessage.fileUrl = undefined
     if (tempPreviewUrl) URL.revokeObjectURL(tempPreviewUrl)
+    room.updatedAt = dayjs().toISOString()
+    persistQuickChatState()
     message.error(error?.message || '发送失败')
   }
   return false
@@ -5053,10 +5088,15 @@ function onQuickChatStorageChange(event: StorageEvent) {
 }
 
 .quick-chat-image {
+  display: inline-flex;
+}
+
+.quick-chat-image :deep(.ant-image-img) {
   max-width: 220px;
   border-radius: 8px;
   border: 1px solid var(--border);
   display: block;
+  cursor: zoom-in;
 }
 
 .quick-chat-image-wrap {
@@ -5077,8 +5117,16 @@ function onQuickChatStorageChange(event: StorageEvent) {
   font-weight: 600;
 }
 
+.quick-chat-upload-mask-failed {
+  background: rgba(185, 28, 28, 0.72);
+}
+
 .quick-chat-uploading-file {
   color: var(--muted);
+}
+
+.quick-chat-upload-failed-file {
+  color: #b91c1c;
 }
 
 .quick-chat-input {

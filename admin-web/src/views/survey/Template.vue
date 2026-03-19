@@ -187,7 +187,6 @@
         <a-typography-text type="secondary">扫码后自动进入家属端问卷填写页</a-typography-text>
         <a-input v-model:value="qrLink" readonly />
         <a-space>
-          <a-button @click="copyQrLink">复制链接</a-button>
           <a-button @click="openQrLink">打开链接</a-button>
         </a-space>
       </a-space>
@@ -715,16 +714,6 @@ function syncTagColor(record: SurveyTemplate) {
   if (record.status !== 1) return 'default'
   if (!state) return 'blue'
   return state.valid ? 'green' : 'red'
-}
-
-async function copyQrLink() {
-  if (!qrLink.value) return
-  try {
-    await navigator.clipboard.writeText(qrLink.value)
-    message.success('链接已复制')
-  } catch {
-    message.warning('复制失败，请手动复制链接')
-  }
 }
 
 function openQrLink() {

@@ -52,5 +52,5 @@ public interface CrmContractService {
 
   CrmContractResponse voidContract(Long tenantId, Long id, String remark);
 
-  CrmContractResponse finalizeSign(Long tenantId, Long id, String remark);
+  CrmContractResponse finalizeSign(Long tenantId, Long operatorId, Long id, String remark);
 }

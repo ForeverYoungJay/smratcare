@@ -28,7 +28,6 @@
           <a-space>
             <a-button type="primary" @click="loadData">刷新</a-button>
             <a-button @click="exportCsvReport">导出报表</a-button>
-            <a-button @click="copyFilterLink">复制筛选链接</a-button>
             <a-button @click="openColumnSetting">列设置</a-button>
             <a-button :disabled="!displayRows.length" @click="printCurrent">打印当前列</a-button>
             <a-button :disabled="!query.monthKeyword.trim() || !displayRows.length" @click="printSpecificMonth">打印指定月份</a-button>
@@ -109,7 +108,6 @@ import { useECharts } from '../../plugins/echarts'
 import { message } from 'ant-design-vue'
 import { printTableReport } from '../../utils/print'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
-import { copyText } from '../../utils/clipboard'
 import { normalizeId } from '../../utils/id'
 import { buildComparisonSummary, buildPeriodSeries } from '../../utils/statsInsight'
 
@@ -341,24 +339,6 @@ async function exportCsvReport() {
     message.success('报表导出成功')
   } catch (error: any) {
     message.error(error?.message || '报表导出失败')
-  }
-}
-
-async function copyFilterLink() {
-  const resolved = router.resolve({
-    path: route.path,
-    query: {
-      from: dayjs(query.value.from).format('YYYY-MM'),
-      to: dayjs(query.value.to).format('YYYY-MM'),
-      orgId: query.value.orgId ? String(query.value.orgId) : '',
-      monthKeyword: query.value.monthKeyword || ''
-    }
-  })
-  const ok = await copyText(`${window.location.origin}${resolved.fullPath}`)
-  if (ok) {
-    message.success('筛选链接已复制')
-  } else {
-    message.warning('复制失败，请手动复制地址栏链接')
   }
 }
 

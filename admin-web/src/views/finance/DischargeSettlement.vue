@@ -121,6 +121,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
+import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
@@ -131,11 +132,14 @@ import { createDischargeSettlement, getDischargeSettlementPage, confirmDischarge
 import type { BaseConfigItem, DischargeSettlementItem, Id, PageResult } from '../../types'
 import { confirmAction } from '../../utils/actionConfirm'
 import { computed } from 'vue'
+import { normalizeResidentId } from '../../utils/id'
 
 const loading = ref(false)
 const rows = ref<DischargeSettlementItem[]>([])
+const route = useRoute()
 
 const query = reactive({
+  elderId: undefined as Id | undefined,
   keyword: '',
   status: undefined as string | undefined,
   pageNo: 1,
@@ -186,7 +190,7 @@ const createForm = reactive({
   dischargeFeeConfig: '',
   remark: ''
 })
-const { elderOptions, searchElders: searchElderOptions } = useElderOptions({ pageSize: 20 })
+const { elderOptions, searchElders: searchElderOptions, ensureSelectedElder } = useElderOptions({ pageSize: 20 })
 const feeItemOptions = ref<{ label: string; value: string }[]>([])
 const dischargeFeeConfigOptions = ref<{ label: string; value: string }[]>([])
 
@@ -196,6 +200,7 @@ async function fetchData() {
     const res: PageResult<DischargeSettlementItem> = await getDischargeSettlementPage({
       pageNo: query.pageNo,
       pageSize: query.pageSize,
+      elderId: query.elderId,
       status: query.status,
       keyword: query.keyword || undefined
     })
@@ -215,6 +220,7 @@ function handleTableChange(pag: any) {
 }
 
 function onReset() {
+  query.elderId = undefined
   query.keyword = ''
   query.status = undefined
   query.pageNo = 1
@@ -229,6 +235,25 @@ function openCreate() {
   createForm.feeItem = ''
   createForm.dischargeFeeConfig = ''
   createForm.remark = ''
+  createOpen.value = true
+}
+
+function applyRoutePrefill() {
+  const elderId = normalizeResidentId(route.query as Record<string, unknown>)
+  const elderName = String(route.query.elderName || '').trim()
+  const dischargeApplyId = String(route.query.dischargeApplyId || '').trim()
+  const openCreateFlag = String(route.query.openCreate || '') === '1'
+  if (!elderId) return
+  query.elderId = elderId
+  if (elderName) {
+    query.keyword = elderName
+    ensureSelectedElder(elderId, elderName)
+  } else {
+    ensureSelectedElder(elderId)
+  }
+  if (!openCreateFlag) return
+  createForm.elderId = elderId
+  createForm.dischargeApplyId = dischargeApplyId || undefined
   createOpen.value = true
 }
 
@@ -360,6 +385,8 @@ function riskColor(item: DischargeSettlementItem) {
 
 onMounted(async () => {
   await loadOptions()
+  await searchElders('')
+  applyRoutePrefill()
   await fetchData()
 })
 </script>

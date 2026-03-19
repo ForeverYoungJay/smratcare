@@ -10,6 +10,7 @@ import com.zhiyangyun.care.store.model.OrderPreviewRequest;
 import com.zhiyangyun.care.store.model.OrderStatus;
 import com.zhiyangyun.care.store.service.DiseaseRuleService;
 import com.zhiyangyun.care.store.service.StoreOrderService;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,6 +52,14 @@ class DiseaseRuleServiceTest {
   void elder_disease_update_and_read() {
     diseaseRuleService.saveElderDiseases(1L, 4003L, List.of(1002L));
     List<Long> ids = diseaseRuleService.getElderDiseaseIds(1L, 4003L);
+    assertTrue(ids.contains(1002L));
+  }
+
+  @Test
+  void elder_disease_update_ignores_null_ids() {
+    diseaseRuleService.saveElderDiseases(1L, 4003L, Arrays.asList(1002L, null));
+    List<Long> ids = diseaseRuleService.getElderDiseaseIds(1L, 4003L);
+    assertEquals(1, ids.size());
     assertTrue(ids.contains(1002L));
   }
 }

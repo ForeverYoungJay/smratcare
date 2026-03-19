@@ -61,7 +61,7 @@
     </a-card>
 
     <a-modal v-model:open="editOpen" :title="editingId ? '编辑来访预约' : '新增来访预约'" @ok="submitEdit" :confirm-loading="submitting" width="520px">
-      <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
+        <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
         <a-form-item label="老人" name="elderId">
           <a-select
             v-model:value="form.elderId"
@@ -72,7 +72,29 @@
             placeholder="请输入老人姓名/拼音首字母"
             @search="searchElders"
             @focus="() => !elderOptions.length && searchElders('')"
+            @change="onFormElderChange"
           />
+        </a-form-item>
+        <a-form-item label="已绑定家属">
+          <a-select
+            v-model:value="form.familyUserId"
+            allow-clear
+            show-search
+            :filter-option="filterFamilyOption"
+            :options="familyOptions"
+            :loading="familyLoading"
+            placeholder="可选，选择后自动带出来访人信息"
+            @change="onFamilyRelationChange"
+          />
+        </a-form-item>
+        <a-form-item label="来访人姓名" name="visitorName">
+          <a-input v-model:value="form.visitorName" placeholder="请输入来访人姓名" />
+        </a-form-item>
+        <a-form-item label="联系电话">
+          <a-input v-model:value="form.visitorPhone" placeholder="请输入联系电话" />
+        </a-form-item>
+        <a-form-item label="与长者关系">
+          <a-input v-model:value="form.visitorRelation" placeholder="如：女儿、儿子、朋友" />
         </a-form-item>
         <a-form-item label="来访时间" name="visitTime">
           <a-date-picker v-model:value="form.visitTime" show-time value-format="YYYY-MM-DDTHH:mm:ss" style="width: 100%" />
@@ -99,9 +121,10 @@ import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
+import { getFamilyRelations } from '../../api/family'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { guardBookVisit, guardCheckin, guardDeleteVisit, guardGetPrintTicket, guardTodayVisits, guardUpdateVisit } from '../../api/visit'
-import type { Id, VisitBookRequest, VisitBookingItem } from '../../types'
+import type { FamilyRelationItem, Id, VisitBookRequest, VisitBookingItem } from '../../types'
 import { normalizeResidentId } from '../../utils/id'
 
 const loading = ref(false)
@@ -113,7 +136,15 @@ const submitting = ref(false)
 const errorMessage = ref('')
 const editingId = ref<Id | undefined>(undefined)
 const formRef = ref<FormInstance>()
+const familyLoading = ref(false)
+const familyRelations = ref<FamilyRelationItem[]>([])
 const { elderOptions, elderLoading, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 80 })
+const familyOptions = computed(() =>
+  familyRelations.value.map((item) => ({
+    label: `${item.realName || '未命名家属'}${item.relation ? ` · ${item.relation}` : ''}${item.phone ? ` · ${item.phone}` : ''}`,
+    value: item.familyUserId
+  }))
+)
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: (string | number)[]) => {
@@ -126,6 +157,10 @@ const query = reactive({
 })
 const form = reactive<VisitBookRequest>({
   elderId: '' as Id,
+  familyUserId: undefined,
+  visitorName: '',
+  visitorPhone: '',
+  visitorRelation: '',
   visitTime: '',
   visitTimeSlot: '',
   visitorCount: 1,
@@ -134,11 +169,14 @@ const form = reactive<VisitBookRequest>({
 })
 const rules: FormRules = {
   elderId: [{ required: true, message: '请选择老人' }],
+  visitorName: [{ required: true, message: '请输入来访人姓名' }],
   visitTime: [{ required: true, message: '请选择来访时间' }]
 }
 
 const columns = [
-  { title: '家属姓名', dataIndex: 'familyName', key: 'familyName', width: 120 },
+  { title: '来访人', dataIndex: 'visitorName', key: 'visitorName', width: 120 },
+  { title: '关系', dataIndex: 'visitorRelation', key: 'visitorRelation', width: 120 },
+  { title: '联系电话', dataIndex: 'visitorPhone', key: 'visitorPhone', width: 140 },
   { title: '老人姓名', dataIndex: 'elderName', key: 'elderName', width: 120 },
   { title: '居住楼层', dataIndex: 'floorNo', key: 'floorNo', width: 120 },
   { title: '房号', dataIndex: 'roomNo', key: 'roomNo', width: 120 },
@@ -152,6 +190,53 @@ function resolveElderName(elderId?: Id) {
   return findElderName(elderId) || '未命名长者'
 }
 
+function filterFamilyOption(input: string, option: { label?: string }) {
+  const keyword = String(input || '').trim().toLowerCase()
+  if (!keyword) return true
+  return String(option?.label || '').toLowerCase().includes(keyword)
+}
+
+async function loadFamilyRelations(elderId?: Id) {
+  const targetId = String(elderId || '').trim()
+  familyRelations.value = []
+  if (!targetId) return
+  familyLoading.value = true
+  try {
+    familyRelations.value = await getFamilyRelations(targetId)
+  } catch {
+    familyRelations.value = []
+  } finally {
+    familyLoading.value = false
+  }
+}
+
+function fillVisitorFromRelation(relation?: FamilyRelationItem) {
+  if (!relation) return
+  form.familyUserId = relation.familyUserId
+  form.visitorName = relation.realName || ''
+  form.visitorPhone = relation.phone || ''
+  form.visitorRelation = relation.relation || ''
+}
+
+async function onFormElderChange(elderId?: Id) {
+  form.familyUserId = undefined
+  form.visitorName = ''
+  form.visitorPhone = ''
+  form.visitorRelation = ''
+  await loadFamilyRelations(elderId)
+  const primaryRelation = familyRelations.value.find((item) => Number(item.isPrimary || 0) === 1) || familyRelations.value[0]
+  if (primaryRelation) {
+    fillVisitorFromRelation(primaryRelation)
+  }
+}
+
+function onFamilyRelationChange(familyUserId?: Id) {
+  const targetId = String(familyUserId || '').trim()
+  if (!targetId) return
+  const matched = familyRelations.value.find((item) => String(item.familyUserId || '') === targetId)
+  fillVisitorFromRelation(matched)
+}
+
 async function fetchData() {
   loading.value = true
   errorMessage.value = ''
@@ -162,7 +247,10 @@ async function fetchData() {
       .filter((item) => (query.status !== undefined ? item.status === query.status : true))
       .map((item) => ({
         ...item,
-        elderName: item.elderName || resolveElderName(item.elderId)
+        elderName: item.elderName || resolveElderName(item.elderId),
+        visitorName: item.visitorName || item.familyName || '未填写',
+        visitorPhone: item.visitorPhone || '',
+        visitorRelation: item.visitorRelation || ''
       }))
     selectedRowKeys.value = selectedRowKeys.value.filter((id) => rows.value.some((item) => item.id === id))
   } catch (error: any) {
@@ -199,6 +287,9 @@ function buildPrintableTicket(record: {
   ticketNo?: string
   elderName?: string
   familyName?: string
+  visitorName?: string
+  visitorPhone?: string
+  visitorRelation?: string
   visitTime?: string
   visitorCount?: number
   floorNo?: string
@@ -210,7 +301,9 @@ function buildPrintableTicket(record: {
   const lines = [
     `词条编号：${record.ticketNo || '-'}`,
     `老人：${record.elderName || '-'}`,
-    `访客：${record.familyName || '-'}`,
+    `来访人：${record.visitorName || record.familyName || '-'}`,
+    `关系：${record.visitorRelation || '-'}`,
+    `联系电话：${record.visitorPhone || '-'}`,
     `来访时间：${record.visitTime || '-'}`,
     `访客人数：${record.visitorCount || 1}`,
     `楼层/房间：${record.floorNo || '-'} / ${record.roomNo || '-'}`,
@@ -225,6 +318,9 @@ function printVisitTicket(record: {
   ticketNo?: string
   elderName?: string
   familyName?: string
+  visitorName?: string
+  visitorPhone?: string
+  visitorRelation?: string
   visitTime?: string
   visitorCount?: number
   floorNo?: string
@@ -271,6 +367,9 @@ async function printSelectedTicket() {
       ticketNo: ticket.ticketNo,
       elderName: ticket.elderName,
       familyName: ticket.familyName,
+      visitorName: ticket.visitorName,
+      visitorPhone: ticket.visitorPhone,
+      visitorRelation: ticket.visitorRelation,
       visitTime: ticket.visitTime,
       visitorCount: ticket.visitorCount,
       floorNo: ticket.floorNo,
@@ -287,15 +386,20 @@ async function printSelectedTicket() {
 function openCreate() {
   editingId.value = undefined
   form.elderId = '' as Id
+  form.familyUserId = undefined
+  form.visitorName = ''
+  form.visitorPhone = ''
+  form.visitorRelation = ''
   form.visitTime = ''
   form.visitTimeSlot = ''
   form.visitorCount = 1
   form.carPlate = ''
   form.remark = ''
+  familyRelations.value = []
   editOpen.value = true
 }
 
-function openEditSelected() {
+async function openEditSelected() {
   if (selectedRowKeys.value.length !== 1) return
   const record = rows.value.find((item) => item.id === selectedRowKeys.value[0])
   if (!record) return
@@ -304,13 +408,18 @@ function openEditSelected() {
     return
   }
   ensureSelectedElder(record.elderId, record.elderName)
+  await loadFamilyRelations(record.elderId)
   editingId.value = record.id
   form.elderId = record.elderId
+  form.familyUserId = record.familyUserId
+  form.visitorName = record.visitorName || record.familyName || ''
+  form.visitorPhone = record.visitorPhone || ''
+  form.visitorRelation = record.visitorRelation || ''
   form.visitTime = record.visitTime
   form.visitTimeSlot = ''
   form.visitorCount = record.visitorCount || 1
   form.carPlate = record.carPlate || ''
-  form.remark = ''
+  form.remark = record.remark || ''
   editOpen.value = true
 }
 
@@ -328,7 +437,10 @@ async function submitEdit() {
   try {
     const payload: VisitBookRequest = {
       elderId: form.elderId,
-      familyUserId: undefined,
+      familyUserId: form.familyUserId || undefined,
+      visitorName: form.visitorName || undefined,
+      visitorPhone: form.visitorPhone || undefined,
+      visitorRelation: form.visitorRelation || undefined,
       visitTime: form.visitTime,
       visitTimeSlot: buildTimeSlot(form.visitTime),
       visitorCount: form.visitorCount || 1,
@@ -371,6 +483,7 @@ onMounted(async () => {
   if (elderId) {
     ensureSelectedElder(elderId)
     query.elderId = elderId
+    await loadFamilyRelations(elderId)
   }
   await fetchData()
 })

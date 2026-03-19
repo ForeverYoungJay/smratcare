@@ -80,6 +80,7 @@
 <script setup lang="ts">
 import { h, onMounted, reactive, ref } from 'vue'
 import { Input, message, Modal } from 'ant-design-vue'
+import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
@@ -89,12 +90,15 @@ import { getBaseConfigItemList } from '../../api/baseConfig'
 import { createDischargeFeeAudit, getDischargeFeeAuditPage, reviewDischargeFeeAudit } from '../../api/financeFee'
 import type { BaseConfigItem, DischargeFeeAuditItem, Id, PageResult } from '../../types'
 import { computed } from 'vue'
+import { normalizeResidentId } from '../../utils/id'
 
 const loading = ref(false)
 const rows = ref<DischargeFeeAuditItem[]>([])
+const route = useRoute()
 const query = reactive({
   pageNo: 1,
   pageSize: 10,
+  elderId: undefined as Id | undefined,
   status: undefined as string | undefined,
   riskLevel: undefined as 'HIGH' | 'MEDIUM' | 'LOW' | undefined,
   keyword: ''
@@ -125,7 +129,7 @@ const totalAmount = computed(() => filteredRows.value.reduce((sum, item) => sum 
 
 const createOpen = ref(false)
 const creating = ref(false)
-const { elderOptions, searchElders: searchElderOptions } = useElderOptions({ pageSize: 20 })
+const { elderOptions, searchElders: searchElderOptions, ensureSelectedElder } = useElderOptions({ pageSize: 20 })
 const feeItemOptions = ref<{ label: string; value: string }[]>([])
 const dischargeFeeConfigOptions = ref<{ label: string; value: string }[]>([])
 const createForm = reactive({
@@ -143,6 +147,7 @@ async function fetchData() {
     const res: PageResult<DischargeFeeAuditItem> = await getDischargeFeeAuditPage({
       pageNo: query.pageNo,
       pageSize: query.pageSize,
+      elderId: query.elderId,
       status: query.status,
       keyword: query.keyword || undefined
     })
@@ -155,6 +160,7 @@ async function fetchData() {
 
 function onReset() {
   query.pageNo = 1
+  query.elderId = undefined
   query.status = undefined
   query.riskLevel = undefined
   query.keyword = ''
@@ -181,6 +187,25 @@ function openCreate() {
   createForm.feeItem = ''
   createForm.dischargeFeeConfig = ''
   createForm.remark = ''
+  createOpen.value = true
+}
+
+function applyRoutePrefill() {
+  const elderId = normalizeResidentId(route.query as Record<string, unknown>)
+  const elderName = String(route.query.elderName || '').trim()
+  const dischargeApplyId = String(route.query.dischargeApplyId || '').trim()
+  const openCreateFlag = String(route.query.openCreate || '') === '1'
+  if (!elderId) return
+  query.elderId = elderId
+  if (elderName) {
+    query.keyword = elderName
+    ensureSelectedElder(elderId, elderName)
+  } else {
+    ensureSelectedElder(elderId)
+  }
+  if (!openCreateFlag) return
+  createForm.elderId = elderId
+  createForm.dischargeApplyId = dischargeApplyId || undefined
   createOpen.value = true
 }
 
@@ -286,6 +311,8 @@ function riskColor(item: DischargeFeeAuditItem) {
 
 onMounted(async () => {
   await loadOptions()
+  await searchElders('')
+  applyRoutePrefill()
   await fetchData()
 })
 </script>

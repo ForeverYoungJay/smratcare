@@ -216,7 +216,7 @@ public class CrmContractController {
   public Result<CrmContractResponse> finalizeContract(
       @PathVariable Long id, @RequestBody(required = false) CrmContractFinalizeRequest request) {
     String remark = request == null ? null : request.getRemark();
-    return Result.ok(contractService.finalizeSign(AuthContext.getOrgId(), id, remark));
+    return Result.ok(contractService.finalizeSign(AuthContext.getOrgId(), AuthContext.getStaffId(), id, remark));
   }
 
   @PreAuthorize(CRM_CONTRACT_WRITE)

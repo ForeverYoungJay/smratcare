@@ -45,7 +45,6 @@
             <a-space wrap>
               <a-button @click="loadAll">刷新</a-button>
               <a-button @click="downloadBundle" :disabled="!filteredDocuments.length">导出清单</a-button>
-              <a-button @click="copyQueryLink">复制查询链接</a-button>
               <a-button type="primary" @click="goContractSigning">{{ isHistoricalImport ? '去完善历史资料' : '去上传附件' }}</a-button>
             </a-space>
           </template>
@@ -213,7 +212,6 @@ import LifecycleStageBar from '../../../components/LifecycleStageBar.vue'
 import ElderNameAutocomplete from '../../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
-import { copyText } from '../../../utils/clipboard'
 import { lifecycleStageHint, normalizeLifecycleStage } from '../../../utils/lifecycleStage'
 import { getElderDetail } from '../../../api/elder'
 import {
@@ -594,17 +592,6 @@ async function syncDocumentQueryToRoute() {
   skipNextDocRouteWatch.value = true
   docRouteSignature.value = buildDocRouteSignature(nextQuery)
   await router.replace({ path: route.path, query: nextQuery })
-}
-
-async function copyQueryLink() {
-  const href = router.resolve({ path: route.path, query: buildDocumentRouteQuery() }).href
-  const fullUrl = /^https?:\/\//i.test(href) ? href : `${window.location.origin}${href}`
-  const copied = await copyText(fullUrl)
-  if (copied) {
-    message.success('查询链接已复制')
-    return
-  }
-  message.warning('复制失败，请手动复制地址栏链接')
 }
 
 function go(path: string) {

@@ -13,6 +13,7 @@ import com.zhiyangyun.care.auth.mapper.StaffMapper;
 import com.zhiyangyun.care.auth.mapper.StaffRoleMapper;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
+import com.zhiyangyun.care.audit.service.AuditLogService;
 import com.zhiyangyun.care.hr.model.StaffPointsAdjustRequest;
 import com.zhiyangyun.care.hr.service.StaffPointsService;
 import com.zhiyangyun.care.oa.entity.OaApproval;
@@ -25,6 +26,14 @@ import com.zhiyangyun.care.oa.model.OaApprovalBatchRejectRequest;
 import com.zhiyangyun.care.oa.model.OaBatchIdsRequest;
 import com.zhiyangyun.care.oa.model.OaApprovalSummaryResponse;
 import com.zhiyangyun.care.oa.model.OaApprovalRequest;
+import com.zhiyangyun.care.store.entity.InventoryOutboundSheet;
+import com.zhiyangyun.care.store.entity.InventoryOutboundSheetItem;
+import com.zhiyangyun.care.store.entity.MaterialPurchaseOrder;
+import com.zhiyangyun.care.store.mapper.InventoryOutboundSheetItemMapper;
+import com.zhiyangyun.care.store.mapper.InventoryOutboundSheetMapper;
+import com.zhiyangyun.care.store.mapper.MaterialPurchaseOrderMapper;
+import com.zhiyangyun.care.store.model.InventoryOutboundRequest;
+import com.zhiyangyun.care.store.service.InventoryService;
 import jakarta.validation.Valid;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -39,6 +48,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -59,6 +69,11 @@ public class OaApprovalController {
   private final RoleMapper roleMapper;
   private final StaffRoleMapper staffRoleMapper;
   private final StaffPointsService staffPointsService;
+  private final MaterialPurchaseOrderMapper materialPurchaseOrderMapper;
+  private final InventoryOutboundSheetMapper inventoryOutboundSheetMapper;
+  private final InventoryOutboundSheetItemMapper inventoryOutboundSheetItemMapper;
+  private final InventoryService inventoryService;
+  private final AuditLogService auditLogService;
   private final ObjectMapper objectMapper;
 
   public OaApprovalController(
@@ -69,6 +84,11 @@ public class OaApprovalController {
       RoleMapper roleMapper,
       StaffRoleMapper staffRoleMapper,
       StaffPointsService staffPointsService,
+      MaterialPurchaseOrderMapper materialPurchaseOrderMapper,
+      InventoryOutboundSheetMapper inventoryOutboundSheetMapper,
+      InventoryOutboundSheetItemMapper inventoryOutboundSheetItemMapper,
+      InventoryService inventoryService,
+      AuditLogService auditLogService,
       ObjectMapper objectMapper) {
     this.approvalMapper = approvalMapper;
     this.taskMapper = taskMapper;
@@ -77,6 +97,11 @@ public class OaApprovalController {
     this.roleMapper = roleMapper;
     this.staffRoleMapper = staffRoleMapper;
     this.staffPointsService = staffPointsService;
+    this.materialPurchaseOrderMapper = materialPurchaseOrderMapper;
+    this.inventoryOutboundSheetMapper = inventoryOutboundSheetMapper;
+    this.inventoryOutboundSheetItemMapper = inventoryOutboundSheetItemMapper;
+    this.inventoryService = inventoryService;
+    this.auditLogService = auditLogService;
     this.objectMapper = objectMapper;
   }
 
@@ -183,6 +208,7 @@ public class OaApprovalController {
   }
 
   @PutMapping("/{id}/approve")
+  @Transactional
   public Result<OaApproval> approve(@PathVariable Long id, @RequestParam(required = false) String remark) {
     ensureApprovePermission();
     OaApproval approval = findAccessibleApproval(id);
@@ -680,6 +706,99 @@ public class OaApprovalController {
     if ("POINTS_CASH".equalsIgnoreCase(approval.getApprovalType())) {
       applyPointsCashRedeem(approval);
     }
+    if ("PURCHASE".equalsIgnoreCase(approval.getApprovalType())) {
+      applyPurchaseApproval(approval);
+    }
+    if ("MATERIAL_APPLY".equalsIgnoreCase(approval.getApprovalType())) {
+      applyOutboundApproval(approval);
+    }
+  }
+
+  private void applyPurchaseApproval(OaApproval approval) {
+    Map<String, Object> formMap = readFormMap(approval == null ? null : approval.getFormData());
+    Long purchaseOrderId = parseLong(formMap.get("purchaseOrderId"));
+    if (purchaseOrderId == null) {
+      return;
+    }
+    MaterialPurchaseOrder order = materialPurchaseOrderMapper.selectById(purchaseOrderId);
+    if (order == null || (order.getIsDeleted() != null && order.getIsDeleted() == 1)) {
+      return;
+    }
+    if (approval.getOrgId() != null && order.getOrgId() != null && !approval.getOrgId().equals(order.getOrgId())) {
+      return;
+    }
+    String status = parseString(order.getStatus());
+    if (status == null) {
+      return;
+    }
+    status = status.toUpperCase();
+    if ("APPROVED".equals(status) || "COMPLETED".equals(status) || "CANCELLED".equals(status)) {
+      return;
+    }
+    if (!"DRAFT".equals(status)) {
+      return;
+    }
+    order.setStatus("APPROVED");
+    materialPurchaseOrderMapper.updateById(order);
+  }
+
+  private void applyOutboundApproval(OaApproval approval) {
+    Map<String, Object> formMap = readFormMap(approval == null ? null : approval.getFormData());
+    Long outboundSheetId = parseLong(formMap.get("outboundSheetId"));
+    if (outboundSheetId == null) {
+      return;
+    }
+    InventoryOutboundSheet sheet = inventoryOutboundSheetMapper.selectById(outboundSheetId);
+    if (sheet == null || (sheet.getIsDeleted() != null && sheet.getIsDeleted() == 1)) {
+      return;
+    }
+    if (approval.getOrgId() != null && sheet.getOrgId() != null && !approval.getOrgId().equals(sheet.getOrgId())) {
+      return;
+    }
+    String status = parseString(sheet.getStatus());
+    if ("CONFIRMED".equalsIgnoreCase(status)) {
+      return;
+    }
+    if (status != null && !"DRAFT".equalsIgnoreCase(status)) {
+      return;
+    }
+    List<InventoryOutboundSheetItem> items = inventoryOutboundSheetItemMapper.selectList(
+        Wrappers.lambdaQuery(InventoryOutboundSheetItem.class)
+            .eq(InventoryOutboundSheetItem::getIsDeleted, 0)
+            .eq(InventoryOutboundSheetItem::getSheetId, outboundSheetId)
+            .orderByAsc(InventoryOutboundSheetItem::getItemSort)
+            .orderByAsc(InventoryOutboundSheetItem::getId));
+    if (items.isEmpty()) {
+      return;
+    }
+    Long orgId = sheet.getOrgId() != null ? sheet.getOrgId() : approval.getOrgId();
+    Long operatorStaffId = approval.getApplicantId() != null ? approval.getApplicantId() : sheet.getOperatorStaffId();
+    for (InventoryOutboundSheetItem item : items) {
+      InventoryOutboundRequest outbound = new InventoryOutboundRequest();
+      outbound.setOrgId(orgId);
+      outbound.setOperatorStaffId(operatorStaffId);
+      outbound.setProductId(item.getProductId());
+      outbound.setWarehouseId(item.getWarehouseId());
+      outbound.setBatchId(item.getBatchId());
+      outbound.setQuantity(item.getQuantity());
+      outbound.setReceiverName(sheet.getReceiverName());
+      outbound.setReason(item.getReason());
+      outbound.setOutboundNo(sheet.getOutboundNo());
+      inventoryService.outbound(outbound);
+    }
+    sheet.setStatus("CONFIRMED");
+    sheet.setConfirmStaffId(AuthContext.getStaffId());
+    sheet.setConfirmTime(LocalDateTime.now());
+    inventoryOutboundSheetMapper.updateById(sheet);
+    auditLogService.record(
+        orgId,
+        orgId,
+        AuthContext.getStaffId(),
+        resolveCurrentStaffName(),
+        "INVENTORY_OUTBOUND_SHEET_CONFIRM",
+        "OUTBOUND_SHEET",
+        sheet.getId(),
+        "OA审批通过自动确认出库:" + sheet.getOutboundNo());
   }
 
   private void handleAfterRejected(OaApproval approval) {

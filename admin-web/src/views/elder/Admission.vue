@@ -72,8 +72,15 @@
           </a-select>
         </a-form-item>
         <a-form-item label="床位" name="bedId">
-          <a-select v-model:value="form.bedId" allow-clear placeholder="请选择床位">
-            <a-select-option v-for="item in bedOptions" :key="item.value" :value="item.value">
+          <a-select
+            v-model:value="form.bedId"
+            allow-clear
+            show-search
+            option-filter-prop="label"
+            :disabled="!assetSelect.roomId"
+            :placeholder="assetSelect.roomId ? '请选择床位' : '请先选择房间'"
+          >
+            <a-select-option v-for="item in bedOptions" :key="item.value" :value="item.value" :label="item.label">
               {{ item.label }}
             </a-select-option>
           </a-select>
@@ -110,7 +117,6 @@
             <a-button type="primary" @click="runRecordSearch">搜索</a-button>
             <a-button @click="resetRecordQuery">清空</a-button>
             <a-button @click="exportRecords">导出</a-button>
-            <a-button @click="copyRecordSearchLink">复制检索链接</a-button>
           </a-space>
         </a-form-item>
       </a-form>
@@ -234,7 +240,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message } from 'ant-design-vue'
@@ -244,7 +250,6 @@ import LifecycleStageBar from '../../components/LifecycleStageBar.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { useElderOptions } from '../../composables/useElderOptions'
-import { copyText } from '../../utils/clipboard'
 import { lifecycleStageHint, normalizeLifecycleStage } from '../../utils/lifecycleStage'
 import { getFamilyRelations } from '../../api/family'
 import { getBedList, getBuildingList, getFloorList, getRoomList } from '../../api/bed'
@@ -293,31 +298,51 @@ const buildings = ref<BuildingItem[]>([])
 const floors = ref<FloorItem[]>([])
 const rooms = ref<RoomItem[]>([])
 const beds = ref<BedItem[]>([])
+const syncingAssetSelection = ref(false)
 
 const assetSelect = reactive({
-  buildingId: undefined as number | undefined,
-  floorId: undefined as number | undefined,
-  roomId: undefined as number | undefined
+  buildingId: undefined as Id | undefined,
+  floorId: undefined as Id | undefined,
+  roomId: undefined as Id | undefined
 })
 
 const buildingOptions = computed(() =>
   buildings.value.map((b) => ({ label: b.name, value: b.id }))
+)
+const buildingNameById = computed(() =>
+  new Map(buildings.value.map((item) => [String(item.id), String(item.name || '').trim()]))
 )
 const floorOptions = computed(() =>
   floors.value
     .filter((f) => (assetSelect.buildingId ? f.buildingId === assetSelect.buildingId : true))
     .map((f) => ({ label: f.floorNo, value: f.id }))
 )
+const floorNoById = computed(() =>
+  new Map(floors.value.map((item) => [String(item.id), String(item.floorNo || '').trim()]))
+)
 const roomOptions = computed(() =>
   rooms.value
     .filter((r) => (assetSelect.floorId ? r.floorId === assetSelect.floorId : true))
     .map((r) => ({ label: r.roomNo, value: r.id }))
 )
+const roomById = computed(() =>
+  new Map(rooms.value.map((item) => [String(item.id), item]))
+)
+
+function formatBedOptionLabel(bed: BedItem) {
+  const room = roomById.value.get(String(bed.roomId || ''))
+  const building = room?.buildingId != null ? buildingNameById.value.get(String(room.buildingId)) : ''
+  const floorNo = room?.floorId != null ? floorNoById.value.get(String(room.floorId)) : ''
+  const roomNo = String(room?.roomNo || bed.roomNo || '').trim()
+  const bedNo = String(bed.bedNo || '').trim()
+  return [building, floorNo, roomNo, bedNo].filter(Boolean).join(' / ') || bedNo || String(bed.id)
+}
+
 const bedOptions = computed(() =>
   beds.value
-    .filter((b) => (assetSelect.roomId ? b.roomId === assetSelect.roomId : true))
+    .filter((b) => (assetSelect.roomId ? b.roomId === assetSelect.roomId : false))
     .filter((b) => !b.elderId && (b.status === 1 || b.status === undefined))
-    .map((b) => ({ label: b.bedNo, value: b.id }))
+    .map((b) => ({ label: formatBedOptionLabel(b), value: b.id }))
 )
 
 const rules: FormRules = {
@@ -902,17 +927,6 @@ async function exportRecords() {
   })
 }
 
-async function copyRecordSearchLink() {
-  const href = router.resolve({ path: route.path, query: buildRecordRouteQuery() }).href
-  const fullUrl = /^https?:\/\//i.test(href) ? href : `${window.location.origin}${href}`
-  const copied = await copyText(fullUrl)
-  if (copied) {
-    message.success('检索链接已复制')
-    return
-  }
-  message.warning('当前环境不支持自动复制，请手动复制地址栏链接')
-}
-
 async function loadAssets() {
   try {
     const [buildingList, floorList, roomList, bedList] = await Promise.all([
@@ -933,12 +947,32 @@ async function loadAssets() {
   }
 }
 
+async function applyBedRoutePrefill(bedId: Id | undefined) {
+  const normalizedBedId = normalizeId(bedId)
+  if (!normalizedBedId) {
+    return
+  }
+  const matchedBed = beds.value.find((item) => String(item.id || '').trim() === normalizedBedId)
+  if (!matchedBed) {
+    return
+  }
+  const matchedRoom = roomById.value.get(String(matchedBed.roomId || ''))
+  syncingAssetSelection.value = true
+  assetSelect.buildingId = matchedRoom?.buildingId
+  assetSelect.floorId = matchedRoom?.floorId
+  assetSelect.roomId = matchedBed.roomId
+  form.bedId = matchedBed.id
+  await nextTick()
+  syncingAssetSelection.value = false
+}
+
 function applyRoutePrefill() {
   applyRecordQueryFromRoute()
   const residentIdText = normalizeResidentId(route.query as Record<string, unknown>)
   const leadId = normalizeId(route.query.leadId)
   const contractNo = String(route.query.contractNo || '').trim()
   const elderName = String(route.query.elderName || '').trim()
+  const bedId = normalizeId(route.query.bedId)
   if (residentIdText && !recordQuery.keyword) {
     ensureSelectedElder(residentIdText, elderName || findElderName(residentIdText) || undefined)
     form.elderId = residentIdText as Id
@@ -958,6 +992,9 @@ function applyRoutePrefill() {
   }
   if (!form.admissionDate) {
     form.admissionDate = dayjs().format('YYYY-MM-DD')
+  }
+  if (bedId) {
+    applyBedRoutePrefill(bedId as Id).catch(() => {})
   }
 }
 
@@ -996,6 +1033,9 @@ function onPageSizeChange(current: number, size: number) {
 watch(
   () => assetSelect.buildingId,
   () => {
+    if (syncingAssetSelection.value) {
+      return
+    }
     assetSelect.floorId = undefined
     assetSelect.roomId = undefined
     form.bedId = undefined
@@ -1004,6 +1044,9 @@ watch(
 watch(
   () => assetSelect.floorId,
   () => {
+    if (syncingAssetSelection.value) {
+      return
+    }
     assetSelect.roomId = undefined
     form.bedId = undefined
   }
@@ -1011,6 +1054,9 @@ watch(
 watch(
   () => assetSelect.roomId,
   () => {
+    if (syncingAssetSelection.value) {
+      return
+    }
     form.bedId = undefined
   }
 )

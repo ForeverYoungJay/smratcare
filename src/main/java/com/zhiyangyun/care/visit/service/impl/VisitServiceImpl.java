@@ -62,11 +62,17 @@ public class VisitServiceImpl implements VisitService {
     if (elder == null) {
       throw new IllegalArgumentException("Elder not found");
     }
+    Long familyUserId = resolveFamilyUserId(request.getOrgId(), request.getElderId(), request.getFamilyUserId());
+    FamilyUser familyUser = familyUserMapper.selectById(familyUserId);
+    ElderFamily relation = resolveFamilyRelation(request.getOrgId(), request.getElderId(), familyUserId);
 
     VisitBooking booking = new VisitBooking();
     booking.setOrgId(request.getOrgId());
     booking.setElderId(request.getElderId());
-    booking.setFamilyUserId(resolveFamilyUserId(request.getOrgId(), request.getElderId(), request.getFamilyUserId()));
+    booking.setFamilyUserId(familyUserId);
+    booking.setVisitorName(resolveVisitorName(request, familyUser));
+    booking.setVisitorPhone(resolveVisitorPhone(request, familyUser));
+    booking.setVisitorRelation(resolveVisitorRelation(request, relation));
     booking.setVisitTime(request.getVisitTime());
     booking.setVisitDate(request.getVisitTime().toLocalDate());
     booking.setVisitTimeSlot(request.getVisitTimeSlot());
@@ -78,8 +84,7 @@ public class VisitServiceImpl implements VisitService {
     booking.setRemark(request.getRemark());
     bookingMapper.insert(booking);
 
-    FamilyUser familyUser = familyUserMapper.selectById(booking.getFamilyUserId());
-    return toResponse(booking, elder, familyUser);
+    return toResponse(booking, elder, familyUser, relation);
   }
 
   @Override
@@ -96,7 +101,8 @@ public class VisitServiceImpl implements VisitService {
     for (VisitBooking booking : bookings) {
       ElderProfile elder = elderMapper.selectById(booking.getElderId());
       FamilyUser familyUser = familyUserMapper.selectById(booking.getFamilyUserId());
-      responses.add(toResponse(booking, elder, familyUser));
+      ElderFamily relation = resolveFamilyRelation(orgId, booking.getElderId(), booking.getFamilyUserId());
+      responses.add(toResponse(booking, elder, familyUser, relation));
     }
     return responses;
   }
@@ -113,7 +119,8 @@ public class VisitServiceImpl implements VisitService {
     for (VisitBooking booking : bookings) {
       ElderProfile elder = elderMapper.selectById(booking.getElderId());
       FamilyUser familyUser = familyUserMapper.selectById(booking.getFamilyUserId());
-      responses.add(toResponse(booking, elder, familyUser));
+      ElderFamily relation = resolveFamilyRelation(orgId, booking.getElderId(), booking.getFamilyUserId());
+      responses.add(toResponse(booking, elder, familyUser, relation));
     }
     return responses;
   }
@@ -170,8 +177,14 @@ public class VisitServiceImpl implements VisitService {
     if (elder == null) {
       throw new IllegalArgumentException("Elder not found");
     }
+    Long familyUserId = resolveFamilyUserId(orgId, request.getElderId(), request.getFamilyUserId());
+    FamilyUser familyUser = familyUserMapper.selectById(familyUserId);
+    ElderFamily relation = resolveFamilyRelation(orgId, request.getElderId(), familyUserId);
     booking.setElderId(request.getElderId());
-    booking.setFamilyUserId(resolveFamilyUserId(orgId, request.getElderId(), request.getFamilyUserId()));
+    booking.setFamilyUserId(familyUserId);
+    booking.setVisitorName(resolveVisitorName(request, familyUser));
+    booking.setVisitorPhone(resolveVisitorPhone(request, familyUser));
+    booking.setVisitorRelation(resolveVisitorRelation(request, relation));
     booking.setVisitTime(request.getVisitTime());
     booking.setVisitDate(request.getVisitTime().toLocalDate());
     booking.setVisitTimeSlot(request.getVisitTimeSlot());
@@ -179,8 +192,7 @@ public class VisitServiceImpl implements VisitService {
     booking.setCarPlate(request.getCarPlate());
     booking.setRemark(request.getRemark());
     bookingMapper.updateById(booking);
-    FamilyUser familyUser = familyUserMapper.selectById(booking.getFamilyUserId());
-    return toResponse(booking, elder, familyUser);
+    return toResponse(booking, elder, familyUser, relation);
   }
 
   @Override
@@ -204,13 +216,17 @@ public class VisitServiceImpl implements VisitService {
     }
     ElderProfile elder = elderMapper.selectById(booking.getElderId());
     FamilyUser familyUser = familyUserMapper.selectById(booking.getFamilyUserId());
-    VisitBookingResponse source = toResponse(booking, elder, familyUser);
+    ElderFamily relation = resolveFamilyRelation(orgId, booking.getElderId(), booking.getFamilyUserId());
+    VisitBookingResponse source = toResponse(booking, elder, familyUser, relation);
 
     VisitPrintTicketResponse response = new VisitPrintTicketResponse();
     response.setBookingId(booking.getId());
     response.setTicketNo("VST-" + booking.getId());
     response.setElderName(source.getElderName());
     response.setFamilyName(source.getFamilyName());
+    response.setVisitorName(source.getVisitorName());
+    response.setVisitorPhone(source.getVisitorPhone());
+    response.setVisitorRelation(source.getVisitorRelation());
     response.setFloorNo(source.getFloorNo());
     response.setRoomNo(source.getRoomNo());
     response.setVisitTime(source.getVisitTime());
@@ -251,7 +267,57 @@ public class VisitServiceImpl implements VisitService {
     return 0L;
   }
 
-  private VisitBookingResponse toResponse(VisitBooking booking, ElderProfile elder, FamilyUser familyUser) {
+  private ElderFamily resolveFamilyRelation(Long orgId, Long elderId, Long familyUserId) {
+    if (familyUserId == null || familyUserId <= 0 || elderId == null) {
+      return null;
+    }
+    return elderFamilyMapper.selectOne(Wrappers.lambdaQuery(ElderFamily.class)
+        .eq(ElderFamily::getOrgId, orgId)
+        .eq(ElderFamily::getIsDeleted, 0)
+        .eq(ElderFamily::getElderId, elderId)
+        .eq(ElderFamily::getFamilyUserId, familyUserId)
+        .orderByDesc(ElderFamily::getIsPrimary)
+        .orderByDesc(ElderFamily::getUpdateTime)
+        .last("LIMIT 1"));
+  }
+
+  private String resolveVisitorName(VisitBookRequest request, FamilyUser familyUser) {
+    String visitorName = trimToNull(request.getVisitorName());
+    if (visitorName != null) {
+      return visitorName;
+    }
+    String familyName = trimToNull(familyUser == null ? null : familyUser.getRealName());
+    if (familyName != null) {
+      return familyName;
+    }
+    throw new IllegalArgumentException("来访人姓名不能为空");
+  }
+
+  private String resolveVisitorPhone(VisitBookRequest request, FamilyUser familyUser) {
+    String visitorPhone = trimToNull(request.getVisitorPhone());
+    if (visitorPhone != null) {
+      return visitorPhone;
+    }
+    return trimToNull(familyUser == null ? null : familyUser.getPhone());
+  }
+
+  private String resolveVisitorRelation(VisitBookRequest request, ElderFamily relation) {
+    String visitorRelation = trimToNull(request.getVisitorRelation());
+    if (visitorRelation != null) {
+      return visitorRelation;
+    }
+    return trimToNull(relation == null ? null : relation.getRelation());
+  }
+
+  private String trimToNull(String value) {
+    if (value == null) {
+      return null;
+    }
+    String normalized = value.trim();
+    return normalized.isEmpty() ? null : normalized;
+  }
+
+  private VisitBookingResponse toResponse(VisitBooking booking, ElderProfile elder, FamilyUser familyUser, ElderFamily relation) {
     VisitBookingResponse response = new VisitBookingResponse();
     response.setId(booking.getId());
     response.setOrgId(booking.getOrgId());
@@ -259,6 +325,9 @@ public class VisitServiceImpl implements VisitService {
     response.setElderName(elder == null ? null : elder.getFullName());
     response.setFamilyUserId(booking.getFamilyUserId());
     response.setFamilyName(familyUser == null ? null : familyUser.getRealName());
+    response.setVisitorName(trimToNull(booking.getVisitorName()) != null ? booking.getVisitorName() : response.getFamilyName());
+    response.setVisitorPhone(trimToNull(booking.getVisitorPhone()) != null ? booking.getVisitorPhone() : (familyUser == null ? null : familyUser.getPhone()));
+    response.setVisitorRelation(trimToNull(booking.getVisitorRelation()) != null ? booking.getVisitorRelation() : (relation == null ? null : relation.getRelation()));
     response.setVisitCode(booking.getVisitCode());
     response.setVerifyCode(booking.getVerifyCode());
     if (elder != null && elder.getBedId() != null) {

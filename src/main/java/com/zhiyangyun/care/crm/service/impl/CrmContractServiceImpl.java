@@ -11,6 +11,8 @@ import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
 import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
 import com.zhiyangyun.care.crm.model.CrmContractRequest;
 import com.zhiyangyun.care.crm.model.CrmContractResponse;
+import com.zhiyangyun.care.crm.model.ContractSystemLinkageSummary;
+import com.zhiyangyun.care.crm.service.ContractSignedLinkageService;
 import com.zhiyangyun.care.crm.service.CrmContractService;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderAdmission;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderAdmissionMapper;
@@ -52,16 +54,19 @@ public class CrmContractServiceImpl implements CrmContractService {
   private final CrmLeadMapper leadMapper;
   private final ElderAdmissionMapper admissionMapper;
   private final AssessmentRecordMapper assessmentRecordMapper;
+  private final ContractSignedLinkageService contractSignedLinkageService;
 
   public CrmContractServiceImpl(
       CrmContractMapper contractMapper,
       CrmLeadMapper leadMapper,
       ElderAdmissionMapper admissionMapper,
-      AssessmentRecordMapper assessmentRecordMapper) {
+      AssessmentRecordMapper assessmentRecordMapper,
+      ContractSignedLinkageService contractSignedLinkageService) {
     this.contractMapper = contractMapper;
     this.leadMapper = leadMapper;
     this.admissionMapper = admissionMapper;
     this.assessmentRecordMapper = assessmentRecordMapper;
+    this.contractSignedLinkageService = contractSignedLinkageService;
   }
 
   @Override
@@ -470,7 +475,7 @@ public class CrmContractServiceImpl implements CrmContractService {
 
   @Override
   @Transactional
-  public CrmContractResponse finalizeSign(Long tenantId, Long id, String remark) {
+  public CrmContractResponse finalizeSign(Long tenantId, Long operatorId, Long id, String remark) {
     CrmContract contract = contractMapper.selectById(id);
     if (!isOwnedContract(contract, tenantId)) {
       return null;
@@ -490,10 +495,15 @@ public class CrmContractServiceImpl implements CrmContractService {
     if (remark != null && !remark.isBlank()) {
       contract.setRemark(remark.trim());
     }
+    ContractSystemLinkageSummary linkageSummary =
+        contractSignedLinkageService.ensureSignedLinkage(contract, operatorId);
     validateStatusTransition(before, contract);
     contractMapper.updateById(contract);
+    archiveAdmissionAssessmentsAfterSign(contract);
     syncLeadProjection(contract, false);
-    return toResponse(contract);
+    CrmContractResponse response = toResponse(contract);
+    response.setLinkageSummary(linkageSummary);
+    return response;
   }
 
   private boolean hasAdmission(CrmContract contract) {

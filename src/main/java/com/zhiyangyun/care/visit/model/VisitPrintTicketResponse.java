@@ -9,6 +9,9 @@ public class VisitPrintTicketResponse {
   private String ticketNo;
   private String elderName;
   private String familyName;
+  private String visitorName;
+  private String visitorPhone;
+  private String visitorRelation;
   private String floorNo;
   private String roomNo;
   private LocalDateTime visitTime;

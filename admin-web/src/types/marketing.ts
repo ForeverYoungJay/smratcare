@@ -166,6 +166,27 @@ export interface ContractAttachmentCreateRequest {
   remark?: string
 }
 
+export interface ContractSystemLinkageSummary {
+  elderId?: Id
+  elderName?: string
+  elderArchiveReady?: boolean
+  financeAccountReady?: boolean
+  financeBillReady?: boolean
+  logisticsReady?: boolean
+  medicalRecordReady?: boolean
+  billMonth?: string
+  healthRecordDate?: string
+  billId?: Id
+  billItemCount?: number
+  billTotalAmount?: number
+  medicalInspectionReady?: boolean
+  starterInspectionId?: Id
+  starterInspectionDate?: string
+  medicalCareTaskReady?: boolean
+  starterCareTaskId?: Id
+  starterCareTaskDate?: string
+}
+
 export interface SmsTaskItem {
   id: Id
   leadId: Id
@@ -216,6 +237,7 @@ export interface CrmContractItem {
   changeWorkflowRemark?: string
   smsSendCount?: number
   remark?: string
+  linkageSummary?: ContractSystemLinkageSummary
   createTime?: string
   updateTime?: string
 }

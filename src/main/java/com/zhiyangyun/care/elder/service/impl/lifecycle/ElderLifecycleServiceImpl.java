@@ -355,6 +355,13 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
         .map(ElderChangeLog::getElderId)
         .distinct()
         .toList();
+    List<Long> bedIds = page.getRecords().stream()
+        .filter(item -> "BED_CHANGE".equalsIgnoreCase(item.getChangeType()))
+        .flatMap(item -> java.util.stream.Stream.of(item.getBeforeValue(), item.getAfterValue()))
+        .map(this::parseBedId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList();
     Map<Long, ElderProfile> elderMap = elderIds.isEmpty()
         ? java.util.Map.of()
         : elderMapper.selectList(Wrappers.lambdaQuery(ElderProfile.class)
@@ -362,6 +369,25 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
             .eq(ElderProfile::getIsDeleted, 0))
             .stream()
             .collect(java.util.stream.Collectors.toMap(ElderProfile::getId, item -> item, (a, b) -> a));
+    Map<Long, Bed> bedMap = bedIds.isEmpty()
+        ? java.util.Map.of()
+        : bedMapper.selectList(Wrappers.lambdaQuery(Bed.class)
+            .in(Bed::getId, bedIds)
+            .eq(Bed::getIsDeleted, 0))
+            .stream()
+            .collect(java.util.stream.Collectors.toMap(Bed::getId, item -> item, (a, b) -> a));
+    List<Long> roomIds = bedMap.values().stream()
+        .map(Bed::getRoomId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList();
+    Map<Long, Room> roomMap = roomIds.isEmpty()
+        ? java.util.Map.of()
+        : roomMapper.selectList(Wrappers.lambdaQuery(Room.class)
+            .in(Room::getId, roomIds)
+            .eq(Room::getIsDeleted, 0))
+            .stream()
+            .collect(java.util.stream.Collectors.toMap(Room::getId, item -> item, (a, b) -> a));
     return page.convert(log -> {
       ChangeLogResponse response = new ChangeLogResponse();
       response.setId(log.getId());
@@ -371,12 +397,53 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
       ElderProfile elder = elderMap.get(log.getElderId());
       response.setElderName(elder == null ? null : elder.getFullName());
       response.setChangeType(log.getChangeType());
-      response.setBeforeValue(log.getBeforeValue());
-      response.setAfterValue(log.getAfterValue());
+      response.setBeforeValue(formatChangeValue(log.getChangeType(), log.getBeforeValue(), bedMap, roomMap));
+      response.setAfterValue(formatChangeValue(log.getChangeType(), log.getAfterValue(), bedMap, roomMap));
       response.setReason(log.getReason());
       response.setCreateTime(log.getCreateTime() == null ? null : log.getCreateTime().toString());
       return response;
     });
+  }
+
+  private Long parseBedId(String raw) {
+    String text = raw == null ? null : raw.trim();
+    if (text == null || text.isEmpty() || !text.matches("\\d+")) {
+      return null;
+    }
+    try {
+      return Long.valueOf(text);
+    } catch (NumberFormatException ex) {
+      return null;
+    }
+  }
+
+  private String formatChangeValue(String changeType, String value, Map<Long, Bed> bedMap, Map<Long, Room> roomMap) {
+    if (!"BED_CHANGE".equalsIgnoreCase(changeType)) {
+      return value;
+    }
+    Long bedId = parseBedId(value);
+    if (bedId == null) {
+      return value;
+    }
+    Bed bed = bedMap.get(bedId);
+    if (bed == null) {
+      return value;
+    }
+    Room room = roomMap.get(bed.getRoomId());
+    java.util.List<String> parts = new java.util.ArrayList<>();
+    if (room != null && room.getBuilding() != null && !room.getBuilding().isBlank()) {
+      parts.add(room.getBuilding().trim());
+    }
+    if (room != null && room.getFloorNo() != null && !room.getFloorNo().isBlank()) {
+      parts.add(room.getFloorNo().trim());
+    }
+    if (room != null && room.getRoomNo() != null && !room.getRoomNo().isBlank()) {
+      parts.add(room.getRoomNo().trim());
+    }
+    if (bed.getBedNo() != null && !bed.getBedNo().isBlank()) {
+      parts.add(bed.getBedNo().trim());
+    }
+    return parts.isEmpty() ? value : String.join(" / ", parts);
   }
 
   @Override

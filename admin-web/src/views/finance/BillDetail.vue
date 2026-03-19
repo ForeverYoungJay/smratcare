@@ -34,6 +34,21 @@
 
     <template v-else>
     <a-card class="card-elevated" :bordered="false">
+      <a-alert
+        v-if="signedLinkageContext.active"
+        type="success"
+        show-icon
+        style="margin-bottom: 16px;"
+        :message="signedLinkageContext.message"
+        :description="signedLinkageContext.description"
+      >
+        <template #action>
+          <a-space wrap>
+            <a-button size="small" @click="goSignedResident360">长者360</a-button>
+            <a-button size="small" @click="goSignedAccountList">长者账户</a-button>
+          </a-space>
+        </template>
+      </a-alert>
       <a-row :gutter="16">
         <a-col :span="6">
           <a-statistic title="老人" :value="resolvedElderName" />
@@ -240,6 +255,24 @@ const resolvedElderName = computed(() => {
   if (fixQuery.elderId) return findElderName(fixQuery.elderId) || '未命名长者'
   return '未命名长者'
 })
+const signedLinkageContext = computed(() => {
+  const source = routeQueryText(route.query.source).toLowerCase()
+  const entryScene = routeQueryText(route.query.entryScene).toLowerCase()
+  const elderId = normalizeId(route.query.elderId)
+  const elderName = routeQueryText(route.query.elderName)
+  const active = !!elderId && (source === 'contract_signed' || entryScene === 'signed_onboarding')
+  const itemCount = Number(route.query.itemCount || detail.value?.items?.length || 0)
+  const totalAmount = Number(route.query.totalAmount || detail.value?.totalAmount || 0)
+  return {
+    active,
+    elderId,
+    elderName,
+    message: active ? `当前为新签约长者 ${elderName || resolvedElderName.value} 的首期账单` : '',
+    description: active
+      ? `已同步生成${itemCount > 0 ? ` ${itemCount} 项费用` : '首期费用'}${totalAmount > 0 ? `，合计 ${totalAmount.toFixed(2)} 元` : ''}，可直接继续收款或核对费用。`
+      : ''
+  }
+})
 
 const payOpen = ref(false)
 const paying = ref(false)
@@ -263,6 +296,35 @@ const payRules = {
   amount: [{ required: true, message: '请输入金额' }],
   method: [{ required: true, message: '请选择方式' }],
   paidAt: [{ required: true, message: '请选择时间' }]
+}
+
+function routeQueryText(value: unknown) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function goSignedResident360() {
+  if (!signedLinkageContext.value.elderId) return
+  router.push({
+    path: '/elder/resident-360',
+    query: {
+      residentId: String(signedLinkageContext.value.elderId),
+      residentName: signedLinkageContext.value.elderName || undefined,
+      from: 'contractSigned'
+    }
+  })
+}
+
+function goSignedAccountList() {
+  if (!signedLinkageContext.value.elderId) return
+  router.push({
+    path: '/finance/accounts/list',
+    query: {
+      elderId: String(signedLinkageContext.value.elderId),
+      keyword: signedLinkageContext.value.elderName || undefined,
+      source: 'contract_signed',
+      entryScene: 'signed_onboarding'
+    }
+  })
 }
 
 function orderStatusText(status?: number) {

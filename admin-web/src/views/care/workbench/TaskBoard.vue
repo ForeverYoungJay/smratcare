@@ -17,9 +17,25 @@
       </a-col>
     </a-row>
 
+    <a-alert
+      v-if="signedLinkageContext.active"
+      style="margin: 12px 0;"
+      type="success"
+      show-icon
+      :message="signedLinkageContext.message"
+      :description="signedLinkageContext.description"
+    >
+      <template #action>
+        <a-space wrap>
+          <a-button size="small" @click="go('/medical-care/inspection')">首次巡检</a-button>
+          <a-button size="small" @click="go('/elder/resident-360')">长者360</a-button>
+        </a-space>
+      </template>
+    </a-alert>
+
     <a-card class="card-elevated" :bordered="false">
       <StatefulBlock :loading="loading" :error="errorMessage" :empty="!rows.length" empty-text="暂无照护任务" @retry="reload">
-        <a-table :columns="columns" :data-source="rows" :pagination="false" row-key="taskDailyId">
+        <a-table :columns="columns" :data-source="rows" :pagination="false" row-key="taskDailyId" :row-class-name="resolveRowClassName">
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'status'">
               <a-tag :color="statusColor(record.status)">{{ record.status || '-' }}</a-tag>
@@ -39,20 +55,21 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
 import { getTaskPage, getTaskSummary } from '../../../api/care'
-import { normalizeResidentId } from '../../../utils/id'
+import { normalizeId, normalizeResidentId } from '../../../utils/id'
 import type { CareTaskItem, CareTaskSummary, Id } from '../../../types'
 import { resolveCareError } from '../careError'
 
 const route = useRoute()
 const router = useRouter()
 const residentId = computed<Id | undefined>(() => normalizeResidentId(route.query as Record<string, unknown>))
+const activeTaskId = computed<Id | undefined>(() => normalizeId(route.query.taskId))
 const filter = computed(() => String(route.query.filter || 'all'))
 const initialDate = String(route.query.date || '')
 const dateValue = ref(initialDate === 'today' || !initialDate ? dayjs().format('YYYY-MM-DD') : initialDate)
@@ -78,6 +95,17 @@ const summaryCards = computed(() => [
   { title: '已完成', value: summary.value.doneCount || 0, desc: `完成率 ${Math.round((summary.value.completionRate || 0) * 100)}%` },
   { title: '异常/超时', value: (summary.value.exceptionCount || 0) + (summary.value.overdueCount || 0), desc: '优先处理' }
 ])
+const signedLinkageContext = computed(() => {
+  const source = routeQueryText(route.query.source).toLowerCase()
+  const entryScene = routeQueryText(route.query.entryScene).toLowerCase()
+  const residentName = routeQueryText(route.query.residentName)
+  const active = !!residentId.value && (source === 'contract_signed' || entryScene === 'signed_onboarding')
+  return {
+    active,
+    message: active ? `当前为新签约长者 ${residentName || '当前长者'} 的护理交接任务` : '',
+    description: active ? '已默认聚焦今日照护任务，请先确认交接、执行安排和责任人。' : ''
+  }
+})
 
 function statusColor(status?: string) {
   if (status === 'DONE') return 'green'
@@ -101,6 +129,17 @@ function go(path: string) {
   router.push({ path: pathname, query })
 }
 
+function routeQueryText(value: unknown) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function resolveRowClassName(record: CareTaskItem) {
+  if (activeTaskId.value && String(record.taskDailyId || '') === String(activeTaskId.value)) {
+    return 'task-row-focus'
+  }
+  return ''
+}
+
 async function reload() {
   loading.value = true
   errorMessage.value = ''
@@ -122,6 +161,13 @@ async function reload() {
 }
 
 onMounted(reload)
+
+watch(
+  () => [route.query.residentId, route.query.elderId, route.query.taskId, route.query.date, route.query.filter],
+  () => {
+    reload()
+  }
+)
 </script>
 
 <style scoped>
@@ -129,5 +175,8 @@ onMounted(reload)
   margin-top: 4px;
   color: var(--muted);
   font-size: 12px;
+}
+:deep(.task-row-focus > td) {
+  background: #e6f4ff !important;
 }
 </style>

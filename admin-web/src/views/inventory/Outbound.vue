@@ -121,6 +121,7 @@
         <a-button :disabled="selectedSheetRowKeys.length === 0" @click="printSelectedSheets">打印领取单</a-button>
         <a-button :disabled="selectedSheetRowKeys.length === 0" @click="downloadSelectedSheetsPdf">导出PDF</a-button>
         <a-button :disabled="selectedSheetRowKeys.length === 0" @click="downloadSelectedSheetsHtml">下载领取单</a-button>
+        <a-button :disabled="selectedDraftSheetIds.length === 0" @click="submitSelectedSheetsApproval">发起出库审批</a-button>
         <a-button type="primary" :disabled="selectedDraftSheetIds.length === 0" @click="confirmSelectedSheets">确认出库</a-button>
         <a-button :disabled="selectedSheetRowKeys.length === 0" @click="clearSheetSelection">清空勾选</a-button>
       </a-space>
@@ -208,6 +209,7 @@
         <a-button @click="printSheet(sheetDetail.id)">打印领取单</a-button>
         <a-button @click="downloadSheetPdf(sheetDetail.id)">导出PDF</a-button>
         <a-button @click="downloadSheetHtml(sheetDetail.id)">下载领取单</a-button>
+        <a-button v-if="sheetDetail.status !== 'CONFIRMED'" @click="submitSheetApproval(sheetDetail.id)">发起出库审批</a-button>
         <a-button v-if="sheetDetail.status !== 'CONFIRMED'" type="primary" @click="confirmSheet(sheetDetail.id)">确认出库</a-button>
       </a-space>
     </a-drawer>
@@ -318,7 +320,7 @@
         </a-table-column>
       </a-table>
       <a-button style="margin-top: 10px;" @click="appendSheetItem">+ 增加物品</a-button>
-      <a-alert style="margin-top: 10px;" type="info" show-icon message="保存后生成领用单；领取完成后请点击“确认出库”，并打印领取单给家属签字。" />
+      <a-alert style="margin-top: 10px;" type="info" show-icon message="保存后生成领用单；可先发起 OA 出库审批，审批完成后再执行确认出库并打印领取单。" />
     </a-modal>
 
   </PageContainer>
@@ -326,7 +328,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Modal, message } from 'ant-design-vue'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -345,6 +347,7 @@ import {
   getOutboundSheetPrefill,
   getOutboundSheetPage
 } from '../../api/materialCenter'
+import { createApproval } from '../../api/oa'
 import { getProductPage } from '../../api/store'
 import type {
   Id,
@@ -377,6 +380,7 @@ type SheetBatchReceipt = {
 
 const loading = ref(false)
 const route = useRoute()
+const router = useRouter()
 const userStore = useUserStore()
 const { elderOptions, elderLoading, searchElders } = useElderOptions({ pageSize: 80, inHospitalOnly: true, signedOnly: true })
 const { departmentOptions, departmentLoading, searchDepartments } = useDepartmentOptions({ pageSize: 120 })
@@ -731,6 +735,41 @@ async function confirmSelectedSheets() {
       } else {
         message.success(`确认出库完成：成功 ${success}`)
       }
+    }
+  })
+}
+
+function buildSheetApprovalPayload(sheet: InventoryOutboundSheet) {
+  return {
+    approvalType: 'MATERIAL_APPLY',
+    title: `出库审批：${sheet.outboundNo || `领用单#${sheet.id}`}`,
+    formData: JSON.stringify({
+      outboundSheetId: Number(sheet.id),
+      outboundNo: sheet.outboundNo,
+      receiverName: sheet.receiverName,
+      elderId: sheet.elderId ? Number(sheet.elderId) : undefined,
+      applyDept: sheet.applyDept,
+      itemCount: sheet.items?.length || 0
+    }),
+    remark: sheet.remark || undefined
+  }
+}
+
+async function submitSelectedSheetsApproval() {
+  const draftRecords = selectedSheetRecords().filter((item) => item.status !== 'CONFIRMED')
+  if (!draftRecords.length) {
+    message.info('勾选项中没有可提交审批的领用单')
+    return
+  }
+  Modal.confirm({
+    title: `发起出库审批（${draftRecords.length}）？`,
+    content: '提交后会进入 OA 审批流，审批通过后再执行确认出库更稳妥。',
+    onOk: async () => {
+      for (const sheet of draftRecords) {
+        await createApproval(buildSheetApprovalPayload(sheet))
+      }
+      message.success(`已发起 ${draftRecords.length} 条出库审批`)
+      router.push({ path: '/oa/approval', query: { type: 'MATERIAL_APPLY' } })
     }
   })
 }
@@ -1113,6 +1152,19 @@ async function confirmSheet(id: Id) {
   })
 }
 
+async function submitSheetApproval(id: Id) {
+  const cachedSheet = sheets.value.find((item) => String(item.id) === String(id))
+    || (sheetDetail.value && String(sheetDetail.value.id) === String(id) ? sheetDetail.value : null)
+  const sheet = cachedSheet || await getOutboundSheetDetail(id)
+  if (!sheet || sheet.status === 'CONFIRMED') {
+    message.info('当前领用单无需再发起审批')
+    return
+  }
+  await createApproval(buildSheetApprovalPayload(sheet))
+  message.success('已发起 OA 出库审批')
+  router.push({ path: '/oa/approval', query: { type: 'MATERIAL_APPLY', keyword: sheet.outboundNo } })
+}
+
 async function batchConfirmSelected() {
   if (!selectedDraftSheetIds.value.length) {
     message.info('请先勾选待确认领用单')
@@ -1342,6 +1394,10 @@ function applyRouteFilters() {
   query.productId = normalizeId(productIdRaw)
   if (typeof domainRaw === 'string' && domainRaw) query.businessDomain = domainRaw
   if (typeof itemTypeRaw === 'string' && itemTypeRaw) query.itemType = itemTypeRaw
+  const openCreateRaw = Array.isArray(routeQuery.openCreate) ? routeQuery.openCreate[0] : routeQuery.openCreate
+  if (String(openCreateRaw || '') === '1') {
+    openOutboundSheet()
+  }
 }
 
 useLiveSyncRefresh({

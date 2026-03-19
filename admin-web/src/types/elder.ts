@@ -408,7 +408,7 @@ export interface DischargeApplyItem {
   proofFileUrl?: string
   status?: DischargeApplyStatus
   linkedDischargeId?: Id
-  autoDischargeStatus?: 'SUCCESS' | 'FAILED'
+  autoDischargeStatus?: 'PENDING_SETTLEMENT' | 'SUCCESS' | 'FAILED'
   autoDischargeMessage?: string
   reviewRemark?: string
   reviewedBy?: number

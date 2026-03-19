@@ -49,7 +49,7 @@
             <a-space>
               <a @click="viewDetail(record.id)">明细</a>
               <a v-if="record.status === ORDER_STATUS.DRAFT" @click="openEdit(record.id)">编辑</a>
-              <a v-if="record.status === ORDER_STATUS.DRAFT" @click="approve(record.id)">审核</a>
+              <a v-if="record.status === ORDER_STATUS.DRAFT" @click="approve(record)">审批流程</a>
               <a v-if="record.status === ORDER_STATUS.APPROVED" @click="complete(record.id)">完成</a>
               <a v-if="record.status === ORDER_STATUS.DRAFT || record.status === ORDER_STATUS.APPROVED" @click="cancel(record.id)">作废</a>
             </a-space>
@@ -174,7 +174,6 @@ import {
   materialOrderStatusLabel
 } from '../../utils/materialStatus'
 import {
-  approvePurchase,
   cancelPurchase,
   completePurchase,
   createPurchase,
@@ -183,6 +182,7 @@ import {
   getWarehousePage,
   updatePurchase
 } from '../../api/materialCenter'
+import { createApproval } from '../../api/oa'
 import { useSupplierOptions } from '../../composables/useSupplierOptions'
 import type {
   Id,
@@ -505,14 +505,34 @@ async function viewDetail(id: Id) {
   detailOpen.value = true
 }
 
-async function approve(id: Id) {
-  const confirmed = await confirmAction('确认审核采购单？', '审核后可执行入库流程')
+async function approve(record: MaterialPurchaseOrder) {
+  const confirmed = await confirmAction('发起采购审批流程？', '审批通过后采购单会自动转为“已审核”，再执行入库流程')
   if (!confirmed) {
     return
   }
-  await approvePurchase(id)
-  message.success('已审核')
-  fetchData()
+  await createApproval({
+    approvalType: 'PURCHASE',
+    title: `采购审批：${record.orderNo || `采购单#${record.id}`}`,
+    amount: Number(record.totalAmount || 0),
+    formData: JSON.stringify({
+      purchaseOrderId: Number(record.id),
+      orderNo: record.orderNo,
+      warehouseId: record.warehouseId,
+      warehouseName: record.warehouseName,
+      supplierId: record.supplierId,
+      supplierName: record.supplierName,
+      source: record.source
+    }),
+    remark: record.remark || undefined
+  })
+  message.success('已发起OA采购审批')
+  router.push({
+    path: '/oa/approval',
+    query: {
+      type: 'PURCHASE',
+      keyword: record.orderNo || String(record.id || '')
+    }
+  })
 }
 
 async function complete(id: Id) {

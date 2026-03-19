@@ -113,17 +113,21 @@
 
 <script setup lang="ts">
 import { computed, reactive, h, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
 import { getPortalSummary } from '../../api/oa'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { useUserStore } from '../../stores/user'
 import { hasMinisterOrHigher } from '../../utils/roleAccess'
+import { resolveRouteAccess } from '../../utils/routeAccess'
 import type { OaPortalSummary, OaNotice, OaTodo, OaWorkflowTodoItem } from '../../types'
 
 const summary = reactive<OaPortalSummary>({ notices: [], todos: [] })
 const loading = ref(false)
 const errorText = ref('')
+const router = useRouter()
 const userStore = useUserStore()
 const PORTAL_SCOPE_STORAGE_KEY = 'oa-portal-scope'
 const canSwitchScope = computed(() => hasMinisterOrHigher(userStore.roles || []))
@@ -146,14 +150,18 @@ const todoCardTitle = computed(() =>
 const workflowQuickActions = computed<OaWorkflowTodoItem[]>(() =>
   (summary.workflowTodos || []).filter((item) => Number(item.count || 0) > 0).slice(0, 6)
 )
-const commonActions = [
+const commonActions = computed(() => ([
   { label: '审批流程', path: '/oa/approval' },
   { label: '待办事项', path: '/oa/todo' },
   { label: '任务管理', path: '/oa/work-execution/task' },
   { label: '文档管理', path: '/oa/document' },
   { label: '通知管理', path: '/oa/notice' },
-  { label: '工作总结', path: '/oa/work-report' }
-] as const
+  { label: '工作总结', path: '/oa/work-report' },
+  { label: '入住评估', path: '/elder/assessment/ability/admission' },
+  { label: '入住办理', path: '/elder/admission-processing' },
+  { label: '营销合同闭环', path: '/marketing/contracts/pending?flowStage=PENDING_ASSESSMENT' },
+  { label: '人事行政', path: '/hr/workbench' }
+]).filter((item) => canAccess(item.path)))
 
 function readInitialPortalScope(): 'PERSONAL' | 'ORG' {
   if (typeof window === 'undefined') {
@@ -176,8 +184,16 @@ function renderTodo(item: OaTodo) {
   ])
 }
 
+function canAccess(path: string) {
+  return resolveRouteAccess(router, userStore.roles || [], path).canAccess
+}
+
 function openPath(path: string) {
-  window.location.hash = `#${path}`
+  if (!canAccess(path)) {
+    message.warning('当前账号暂无权限访问该页面')
+    return
+  }
+  router.push(path)
 }
 
 async function load() {

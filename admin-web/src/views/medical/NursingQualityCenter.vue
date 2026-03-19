@@ -5,7 +5,6 @@
         <a-tag color="blue">业务日期 {{ summary.snapshotDate || '-' }}</a-tag>
         <a-tag color="geekblue">事件窗口 {{ configuredQuery.incidentWindowDays }} 天</a-tag>
         <a-tag color="orange">超时阈值 {{ configuredQuery.overdueHours }} 小时</a-tag>
-        <a-button @click="copyShareLink">复制分享链接</a-button>
         <a-button type="primary" ghost @click="reloadData">刷新</a-button>
       </a-space>
     </template>
@@ -460,16 +459,6 @@ function applyFilters() {
 function resetFilters() {
   draftQuery.value = normalizeMedicalWorkbenchQuery(MEDICAL_WORKBENCH_QUERY_DEFAULTS)
   applyFilters()
-}
-
-async function copyShareLink() {
-  const url = `${window.location.origin}${route.fullPath}`
-  try {
-    await navigator.clipboard.writeText(url)
-    message.success('分享链接已复制')
-  } catch (error) {
-    message.warning('复制失败，请手动复制地址栏链接')
-  }
 }
 
 function shortDate(value?: string) {

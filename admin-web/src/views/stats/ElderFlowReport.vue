@@ -46,7 +46,6 @@
           <a-space>
             <a-button type="primary" @click="search">查询</a-button>
             <a-button @click="exportCsvReport">导出报表</a-button>
-            <a-button @click="copyFilterLink">复制筛选链接</a-button>
             <a-button @click="openColumnSetting">列设置</a-button>
             <a-button :disabled="!printRows.length" @click="printCurrent">打印当前列</a-button>
             <a-button :disabled="!canPrintSpecific" @click="printSpecificElder">打印指定老人</a-button>
@@ -186,7 +185,6 @@ import { message, Modal } from 'ant-design-vue'
 import { printTableReport } from '../../utils/print'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
-import { copyText } from '../../utils/clipboard'
 import { normalizeId } from '../../utils/id'
 import { buildComparisonSummary, buildPeriodSeries } from '../../utils/statsInsight'
 
@@ -283,7 +281,7 @@ const emptyState = computed(() => ({
   hints: [
     '如果仅筛某位老人，先确认该老人是否存在出入院记录',
     '若只看离院，可尝试切换全部事件确认是否为单侧无数据',
-    '支持直接复制当前筛选链接给业务同事复核'
+    '支持在同一页面下快速复核当前筛选结果'
   ]
 }))
 const insightItems = computed(() => {
@@ -483,28 +481,6 @@ async function exportCsvReport() {
     message.success('报表导出成功')
   } catch (error: any) {
     message.error(error?.message || '报表导出失败')
-  }
-}
-
-async function copyFilterLink() {
-  const resolved = router.resolve({
-    path: route.path,
-    query: {
-      fromDate: dayjs(query.value.fromDate).format('YYYY-MM-DD'),
-      toDate: dayjs(query.value.toDate).format('YYYY-MM-DD'),
-      eventType: query.value.eventType || '',
-      keyword: query.value.keyword || '',
-      orgId: query.value.orgId ? String(query.value.orgId) : '',
-      elderId: printElderId.value ? String(printElderId.value) : '',
-      pageNo: String(query.value.pageNo),
-      pageSize: String(query.value.pageSize)
-    }
-  })
-  const ok = await copyText(`${window.location.origin}${resolved.fullPath}`)
-  if (ok) {
-    message.success('筛选链接已复制')
-  } else {
-    message.warning('复制失败，请手动复制地址栏链接')
   }
 }
 

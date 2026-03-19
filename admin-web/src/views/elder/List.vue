@@ -25,7 +25,6 @@
           <a-space>
             <a-button type="primary" @click="runSearch">搜索</a-button>
             <a-button @click="reset">重置</a-button>
-            <a-button @click="copySearchLink">复制查询链接</a-button>
           </a-space>
         </a-form-item>
       </a-form>
@@ -165,7 +164,6 @@ import FlowGuardBar from '../../components/FlowGuardBar.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { exportCsv } from '../../utils/export'
-import { copyText } from '../../utils/clipboard'
 import { lifecycleStageColor, lifecycleStageLabel, normalizeLifecycleStage } from '../../utils/lifecycleStage'
 import { getElderPage, assignBed, bindFamily } from '../../api/elder'
 import { getBedList } from '../../api/bed'
@@ -474,17 +472,6 @@ async function runSearch() {
   query.pageNo = 1
   await syncQueryToRoute()
   await fetchData()
-}
-
-async function copySearchLink() {
-  const href = router.resolve({ path: route.path, query: buildQueryRouteQuery() }).href
-  const fullUrl = /^https?:\/\//i.test(href) ? href : `${window.location.origin}${href}`
-  const copied = await copyText(fullUrl)
-  if (copied) {
-    message.success('查询链接已复制')
-    return
-  }
-  message.warning('复制失败，请手动复制地址栏链接')
 }
 
 function reset() {

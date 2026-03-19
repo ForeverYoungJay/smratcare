@@ -4,7 +4,6 @@
       <a-space wrap>
         <a-tag :color="dutyMode ? 'gold' : 'default'">{{ dutyMode ? '值班高密度模式' : '标准模式' }}</a-tag>
         <span class="refresh-meta">最近刷新：{{ lastLoadedAt || '-' }}</span>
-        <a-button @click="copyShareLink">复制分享链接</a-button>
         <a-button type="primary" ghost @click="loadSummary">刷新数据</a-button>
         <a-switch v-model:checked="autoRefresh" checked-children="自动刷新" un-checked-children="手动刷新" />
         <a-switch v-model:checked="dutyMode" checked-children="值班" un-checked-children="标准" @change="handleModeChange" />
@@ -42,6 +41,23 @@
         </a-form-item>
       </a-form>
     </a-card>
+
+    <a-alert
+      v-if="signedLinkageContext.active"
+      style="margin-bottom: 12px"
+      type="success"
+      show-icon
+      :message="signedLinkageContext.message"
+      :description="signedLinkageContext.description"
+    >
+      <template #action>
+        <a-space wrap>
+          <a-button size="small" @click="go('/elder/resident-360?residentId=' + signedLinkageContext.residentId + '&from=contractSigned')">长者总览</a-button>
+          <a-button size="small" @click="go('/elder/bed-panorama?from=contractSigned')">床态全景</a-button>
+          <a-button size="small" @click="go('/logistics/task-center?source=contract_signed&entryScene=signed_onboarding&residentId=' + signedLinkageContext.residentId + '&residentName=' + encodeURIComponent(signedLinkageContext.residentName || '') + '&tab=delivery')">后勤任务中心</a-button>
+        </a-space>
+      </template>
+    </a-alert>
 
     <StatefulBlock :loading="loading" :error="errorMessage" :empty="!summary" empty-text="暂无后勤数据" @retry="loadSummary">
       <a-card class="card-elevated workbench-hero" :bordered="false" style="margin-bottom: 12px">
@@ -220,6 +236,20 @@ const activeQuery = ref<LogisticsWorkbenchSummaryQuery>({})
 const draftQuery = ref<Required<LogisticsWorkbenchSummaryQuery>>({ ...LOGISTICS_WORKBENCH_QUERY_DEFAULTS })
 const loadedQuerySignature = ref('')
 const hasLoadedSummary = ref(false)
+const signedLinkageContext = computed(() => {
+  const source = routeQueryText(route.query.source).toLowerCase()
+  const entryScene = routeQueryText(route.query.entryScene).toLowerCase()
+  const residentId = routeQueryText(route.query.residentId || route.query.elderId)
+  const residentName = routeQueryText(route.query.residentName || route.query.elderName)
+  const active = !!residentId && (source === 'contract_signed' || entryScene === 'signed_onboarding')
+  return {
+    active,
+    residentId,
+    residentName,
+    message: active ? `新签约长者 ${residentName || '该长者'} 已进入后勤协同范围` : '',
+    description: active ? '可继续核对床位、送餐、维修和值班任务。' : ''
+  }
+})
 let refreshTimer: number | undefined
 
 const configuredQuery = computed(() =>
@@ -480,6 +510,16 @@ function percent(value?: number) {
   return `${Number(value || 0).toFixed(2)}%`
 }
 
+function routeQueryText(value: unknown) {
+  if (Array.isArray(value)) {
+    return routeQueryText(value[0])
+  }
+  if (value == null) {
+    return ''
+  }
+  return String(value).trim()
+}
+
 function resolveDutyMode(raw: unknown) {
   return String(Array.isArray(raw) ? raw[0] : raw || '').toLowerCase() === 'duty'
 }
@@ -503,7 +543,13 @@ function visibleActions(actions: WorkbenchAction[]) {
 }
 
 function buildTaskCenterPath(tab: string) {
-  const query = buildLogisticsWorkbenchRouteQuery(configuredQuery.value, { tab })
+  const query = buildLogisticsWorkbenchRouteQuery(configuredQuery.value, {
+    tab,
+    source: signedLinkageContext.value.active ? 'contract_signed' : undefined,
+    entryScene: signedLinkageContext.value.active ? 'signed_onboarding' : undefined,
+    residentId: signedLinkageContext.value.active ? signedLinkageContext.value.residentId : undefined,
+    residentName: signedLinkageContext.value.active ? signedLinkageContext.value.residentName : undefined
+  })
   return `/logistics/task-center?${new URLSearchParams(query).toString()}`
 }
 
@@ -588,36 +634,6 @@ function stopAutoRefreshTimer() {
     window.clearInterval(refreshTimer)
     refreshTimer = undefined
   }
-}
-
-function toAbsoluteUrl(resolvedHref: string) {
-  if (/^https?:\/\//i.test(resolvedHref)) {
-    return resolvedHref
-  }
-  if (resolvedHref.startsWith('#')) {
-    return `${window.location.origin}${window.location.pathname}${resolvedHref}`
-  }
-  return `${window.location.origin}${resolvedHref}`
-}
-
-async function copyShareLink() {
-  const query: Record<string, string> = {}
-  if (Object.keys(activeQuery.value).length > 0) {
-    Object.assign(query, buildLogisticsWorkbenchRouteQuery(configuredQuery.value))
-  }
-  if (dutyMode.value) {
-    query.mode = 'duty'
-  }
-  const href = router.resolve({ path: route.path, query }).href
-  const fullUrl = toAbsoluteUrl(href)
-  try {
-    if (navigator?.clipboard?.writeText) {
-      await navigator.clipboard.writeText(fullUrl)
-      message.success('分享链接已复制')
-      return
-    }
-  } catch {}
-  message.warning('当前环境不支持自动复制，请手动复制地址栏链接')
 }
 
 async function triggerMaintenanceTodos() {

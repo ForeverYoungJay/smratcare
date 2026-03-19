@@ -12,6 +12,9 @@ public class VisitBookingResponse {
   private String elderName;
   private Long familyUserId;
   private String familyName;
+  private String visitorName;
+  private String visitorPhone;
+  private String visitorRelation;
   private String visitCode;
   private String verifyCode;
   private String floorNo;

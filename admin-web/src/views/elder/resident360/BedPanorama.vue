@@ -41,7 +41,6 @@
           <a-button @click="openBedMap">查看床位全景</a-button>
           <a-button type="primary" @click="openBedManage">床位管理</a-button>
           <a-button @click="resetFilters">重置筛选</a-button>
-          <a-button @click="copyShareLink">复制分享链接</a-button>
         </div>
       </div>
 
@@ -210,7 +209,6 @@ import FlowGuardBar from '../../../components/FlowGuardBar.vue'
 import { getBedMap, getRoomList } from '../../../api/bed'
 import { getElderDetail } from '../../../api/elder'
 import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
-import { copyText } from '../../../utils/clipboard'
 import type { BedItem, ElderItem, RoomItem } from '../../../types'
 
 type RoomScene = {
@@ -242,6 +240,8 @@ const roomResidentLoading = ref(false)
 const quickFilter = ref<'ALL' | 'IDLE' | 'OCCUPIED'>('ALL')
 const riskFilterEnabled = ref(false)
 const riskFilterLevel = ref<'ALL' | 'HIGH' | 'MEDIUM' | 'LOW'>('ALL')
+const riskDataLoading = ref(false)
+const riskDataReady = ref(false)
 const selectedBuilding = ref('')
 const selectedFloor = ref('')
 const quickFilterOptions = [
@@ -374,7 +374,7 @@ const sourceBeds = computed(() => {
     if (quickFilter.value === 'OCCUPIED') return !!item.elderId
     return true
   })
-  if (!riskFilterEnabled.value) return bedsByQuick
+  if (!riskFilterEnabled.value || !riskDataReady.value) return bedsByQuick
   return bedsByQuick.filter((item) => {
     if (!item.riskLevel) return false
     if (riskFilterLevel.value === 'ALL') return true
@@ -526,17 +526,6 @@ async function syncFiltersToRoute() {
   skipNextBedRouteWatch.value = true
   bedRouteSignature.value = buildBedRouteSignature(nextQuery)
   await router.replace({ path: route.path, query: nextQuery })
-}
-
-async function copyShareLink() {
-  const href = router.resolve({ path: route.path, query: buildFiltersRouteQuery() }).href
-  const fullUrl = /^https?:\/\//i.test(href) ? href : `${window.location.origin}${href}`
-  const copied = await copyText(fullUrl)
-  if (copied) {
-    message.success('分享链接已复制')
-    return
-  }
-  message.warning('复制失败，请手动复制地址栏链接')
 }
 
 function floorSortValue(text: string) {
@@ -793,8 +782,23 @@ function openBedManage() {
   router.push('/bed/manage')
 }
 
-async function loadBeds() {
-  beds.value = await getBedMap()
+async function loadBeds(includeRisk = false) {
+  beds.value = await getBedMap({ params: { includeRisk } })
+  if (includeRisk) {
+    riskDataReady.value = true
+  } else {
+    riskDataReady.value = false
+  }
+}
+
+async function ensureRiskDataLoaded() {
+  if (riskDataReady.value || riskDataLoading.value) return
+  riskDataLoading.value = true
+  try {
+    await loadBeds(true)
+  } finally {
+    riskDataLoading.value = false
+  }
 }
 
 async function loadRooms() {
@@ -813,16 +817,31 @@ async function loadRooms() {
 useLiveSyncRefresh({
   topics: ['elder', 'bed', 'lifecycle', 'finance', 'care', 'dining'],
   refresh: async () => {
-    await Promise.all([loadBeds(), loadRooms()])
+    await Promise.all([loadBeds(false), loadRooms()])
+    if (riskFilterEnabled.value) {
+      await ensureRiskDataLoaded()
+    }
   }
 })
 
 onMounted(async () => {
   applyFiltersFromRoute()
   bedRouteSignature.value = buildBedRouteSignature(route.query as Record<string, unknown>)
-  await Promise.all([loadBeds(), loadRooms()])
+  await Promise.all([loadBeds(false), loadRooms()])
+  if (riskFilterEnabled.value) {
+    await ensureRiskDataLoaded()
+  }
   await syncFiltersToRoute().catch(() => {})
 })
+
+watch(
+  riskFilterEnabled,
+  (enabled) => {
+    if (enabled) {
+      ensureRiskDataLoaded().catch(() => {})
+    }
+  }
+)
 
 watch(sourceBeds, () => {
   if (selectedBuilding.value && !sourceBeds.value.some((item) => String(item.building || '') === selectedBuilding.value)) {

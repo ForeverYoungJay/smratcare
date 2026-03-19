@@ -10,14 +10,12 @@ import com.zhiyangyun.care.elder.entity.lifecycle.ElderDeathRegister;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderChangeLog;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderDischargeApply;
-import com.zhiyangyun.care.elder.entity.lifecycle.ElderDischarge;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderMedicalOutingRecord;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderOutingRecord;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderTrialStay;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderChangeLogMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDeathRegisterMapper;
-import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeApplyMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderMedicalOutingRecordMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderOutingRecordMapper;
@@ -27,7 +25,6 @@ import com.zhiyangyun.care.elder.model.lifecycle.DeathRegisterCreateRequest;
 import com.zhiyangyun.care.elder.model.lifecycle.DeathRegisterUpdateRequest;
 import com.zhiyangyun.care.elder.model.lifecycle.DischargeApplyCreateRequest;
 import com.zhiyangyun.care.elder.model.lifecycle.DischargeApplyReviewRequest;
-import com.zhiyangyun.care.elder.model.lifecycle.DischargeRequest;
 import com.zhiyangyun.care.elder.model.lifecycle.MedicalOutingCreateRequest;
 import com.zhiyangyun.care.elder.model.lifecycle.MedicalOutingReturnRequest;
 import com.zhiyangyun.care.elder.model.lifecycle.OutingCreateRequest;
@@ -35,7 +32,6 @@ import com.zhiyangyun.care.elder.model.lifecycle.OutingReturnRequest;
 import com.zhiyangyun.care.elder.model.lifecycle.ResidenceLifecycleConstants;
 import com.zhiyangyun.care.elder.model.lifecycle.ResidenceStatusSummaryResponse;
 import com.zhiyangyun.care.elder.model.lifecycle.TrialStayRequest;
-import com.zhiyangyun.care.elder.service.lifecycle.ElderLifecycleService;
 import com.zhiyangyun.care.life.entity.IncidentReport;
 import com.zhiyangyun.care.life.mapper.IncidentReportMapper;
 import jakarta.validation.Valid;
@@ -47,8 +43,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
@@ -68,18 +62,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/elder/lifecycle")
 public class ElderResidenceController {
-  private static final Logger log = LoggerFactory.getLogger(ElderResidenceController.class);
-
   private final ElderOutingRecordMapper outingMapper;
   private final ElderChangeLogMapper changeLogMapper;
   private final ElderMedicalOutingRecordMapper medicalOutingMapper;
   private final ElderDeathRegisterMapper deathRegisterMapper;
   private final ElderTrialStayMapper trialStayMapper;
   private final ElderDischargeApplyMapper dischargeApplyMapper;
-  private final ElderDischargeMapper dischargeMapper;
   private final ElderMapper elderMapper;
   private final IncidentReportMapper incidentReportMapper;
-  private final ElderLifecycleService lifecycleService;
   private final AuditLogService auditLogService;
 
   public ElderResidenceController(ElderOutingRecordMapper outingMapper,
@@ -88,10 +78,8 @@ public class ElderResidenceController {
                                   ElderDeathRegisterMapper deathRegisterMapper,
                                   ElderTrialStayMapper trialStayMapper,
                                   ElderDischargeApplyMapper dischargeApplyMapper,
-                                  ElderDischargeMapper dischargeMapper,
                                   ElderMapper elderMapper,
                                   IncidentReportMapper incidentReportMapper,
-                                  ElderLifecycleService lifecycleService,
                                   AuditLogService auditLogService) {
     this.outingMapper = outingMapper;
     this.changeLogMapper = changeLogMapper;
@@ -99,10 +87,8 @@ public class ElderResidenceController {
     this.deathRegisterMapper = deathRegisterMapper;
     this.trialStayMapper = trialStayMapper;
     this.dischargeApplyMapper = dischargeApplyMapper;
-    this.dischargeMapper = dischargeMapper;
     this.elderMapper = elderMapper;
     this.incidentReportMapper = incidentReportMapper;
-    this.lifecycleService = lifecycleService;
     this.auditLogService = auditLogService;
   }
 
@@ -878,53 +864,9 @@ public class ElderResidenceController {
     record.setReviewedTime(LocalDateTime.now());
 
     if (ResidenceLifecycleConstants.DISCHARGE_APPLY_APPROVED.equals(status)) {
-      long dischargeCount = dischargeMapper.selectCount(Wrappers.lambdaQuery(ElderDischarge.class)
-          .eq(ElderDischarge::getIsDeleted, 0)
-          .eq(ElderDischarge::getOrgId, orgId)
-          .eq(ElderDischarge::getElderId, record.getElderId()));
-      try {
-        if (dischargeCount == 0) {
-          DischargeRequest dischargeRequest = new DischargeRequest();
-          dischargeRequest.setTenantId(orgId);
-          dischargeRequest.setOrgId(orgId);
-          dischargeRequest.setCreatedBy(AuthContext.getStaffId());
-          dischargeRequest.setElderId(record.getElderId());
-          dischargeRequest.setDischargeDate(record.getPlannedDischargeDate());
-          dischargeRequest.setReason(record.getReason());
-          dischargeRequest.setRemark("退住申请审核通过自动触发");
-          var dischargeResponse = lifecycleService.discharge(dischargeRequest);
-          record.setLinkedDischargeId(dischargeResponse.getId());
-          record.setAutoDischargeStatus(ResidenceLifecycleConstants.AUTO_DISCHARGE_SUCCESS);
-          record.setAutoDischargeMessage("自动退住成功");
-        } else {
-          ElderDischarge discharge = dischargeMapper.selectOne(Wrappers.lambdaQuery(ElderDischarge.class)
-              .eq(ElderDischarge::getIsDeleted, 0)
-              .eq(ElderDischarge::getOrgId, orgId)
-              .eq(ElderDischarge::getElderId, record.getElderId())
-              .orderByDesc(ElderDischarge::getCreateTime)
-              .last("limit 1"));
-          record.setLinkedDischargeId(discharge == null ? null : discharge.getId());
-          record.setAutoDischargeStatus(ResidenceLifecycleConstants.AUTO_DISCHARGE_SUCCESS);
-          record.setAutoDischargeMessage("已存在退住登记，自动关联");
-        }
-      } catch (RuntimeException ex) {
-        record.setAutoDischargeStatus(ResidenceLifecycleConstants.AUTO_DISCHARGE_FAILED);
-        record.setAutoDischargeMessage(ex.getMessage());
-        record.setReviewRemark(request.getReviewRemark());
-        int failUpdated = dischargeApplyMapper.update(
-            record,
-            Wrappers.lambdaUpdate(ElderDischargeApply.class)
-                .eq(ElderDischargeApply::getId, record.getId())
-                .eq(ElderDischargeApply::getStatus, ResidenceLifecycleConstants.DISCHARGE_APPLY_PENDING));
-        if (failUpdated == 0) {
-          throw new IllegalStateException("申请状态已变更，请刷新后重试");
-        }
-        log.warn("Auto discharge failed, applyId={}, elderId={}, reason={}",
-            record.getId(), record.getElderId(), ex.getMessage());
-        throw ex;
-      }
-      auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
-          "DISCHARGE_AUTO", "ELDER", record.getElderId(), "退住申请审核通过自动退住");
+      record.setLinkedDischargeId(null);
+      record.setAutoDischargeStatus(ResidenceLifecycleConstants.AUTO_DISCHARGE_PENDING_SETTLEMENT);
+      record.setAutoDischargeMessage("审核已通过，请先完成退住费用审核与退院结算，财务退款后自动释放床位并回写离院状态");
     } else {
       record.setAutoDischargeStatus(null);
       record.setAutoDischargeMessage(null);

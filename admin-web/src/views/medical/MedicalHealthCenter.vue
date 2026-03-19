@@ -5,7 +5,6 @@
         <a-tag color="blue">业务日期 {{ summary.snapshotDate || '-' }}</a-tag>
         <a-tag color="geekblue">窗口 {{ configuredQuery.incidentWindowDays }} 天</a-tag>
         <a-tag :color="riskTagColor">{{ riskLabel }}</a-tag>
-        <a-button @click="copyShareLink">复制分享链接</a-button>
         <a-button type="primary" ghost @click="loadSummary">刷新</a-button>
       </a-space>
     </template>
@@ -43,6 +42,23 @@
         </a-form-item>
       </a-form>
     </a-card>
+
+    <a-alert
+      v-if="signedLinkageContext.active"
+      style="margin-top: 12px"
+      type="success"
+      show-icon
+      :message="signedLinkageContext.message"
+      :description="signedLinkageContext.description"
+    >
+      <template #action>
+        <a-space wrap>
+          <a-button size="small" @click="go('/elder/resident-360', { residentId: signedLinkageContext.elderId, residentName: signedLinkageContext.elderName })">长者360</a-button>
+          <a-button size="small" @click="go('/medical-care/assessment/tcm', { residentId: signedLinkageContext.elderId, residentName: signedLinkageContext.elderName })">中医评估</a-button>
+          <a-button size="small" @click="go('/medical-care/inspection', { residentId: signedLinkageContext.elderId, residentName: signedLinkageContext.elderName })">健康巡检</a-button>
+        </a-space>
+      </template>
+    </a-alert>
 
     <StatefulBlock :loading="loading" :error="errorText" :empty="false" @retry="loadSummary">
       <a-card class="card-elevated risk-hero" :bordered="false">
@@ -248,6 +264,20 @@ const summary = ref<MedicalCareWorkbenchSummary>(createMedicalWorkbenchSummaryDe
 
 const activeQuery = ref<MedicalCareWorkbenchSummaryQuery>(normalizeMedicalWorkbenchQuery(MEDICAL_WORKBENCH_QUERY_DEFAULTS))
 const draftQuery = ref<MedicalCareWorkbenchSummaryQuery>(normalizeMedicalWorkbenchQuery(MEDICAL_WORKBENCH_QUERY_DEFAULTS))
+const signedLinkageContext = computed(() => {
+  const source = routeQueryText(route.query.source).toLowerCase()
+  const entryScene = routeQueryText(route.query.entryScene).toLowerCase()
+  const elderId = routeQueryText(route.query.elderId || route.query.residentId)
+  const elderName = routeQueryText(route.query.elderName || route.query.residentName)
+  const active = !!elderId && (source === 'contract_signed' || entryScene === 'signed_onboarding')
+  return {
+    active,
+    elderId,
+    elderName,
+    message: active ? `新签约长者 ${elderName || '该长者'} 已进入医护健康服务中心` : '',
+    description: active ? '可继续做评估、巡检、护理任务和风险跟进。' : ''
+  }
+})
 
 const configuredQuery = computed(() =>
   normalizeMedicalWorkbenchQuery({
@@ -414,6 +444,16 @@ function pickStableQueryContext() {
   return passThrough
 }
 
+function routeQueryText(value: unknown) {
+  if (Array.isArray(value)) {
+    return routeQueryText(value[0])
+  }
+  if (value == null) {
+    return ''
+  }
+  return String(value).trim()
+}
+
 function routeFilters() {
   const routePatch = parseMedicalWorkbenchQueryPatch(route.query)
   const carryResident = isAutoCarryResidentContextEnabled()
@@ -496,16 +536,6 @@ function resetFilters() {
   const defaults = normalizeMedicalWorkbenchQuery(MEDICAL_WORKBENCH_QUERY_DEFAULTS)
   draftQuery.value = { ...defaults }
   pushQuery(defaults)
-}
-
-async function copyShareLink() {
-  const url = `${window.location.origin}${route.fullPath}`
-  try {
-    await navigator.clipboard.writeText(url)
-    message.success('分享链接已复制')
-  } catch (error) {
-    message.warning('复制失败，请手动复制地址栏链接')
-  }
 }
 
 watch(

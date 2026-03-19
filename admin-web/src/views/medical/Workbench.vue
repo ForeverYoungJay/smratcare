@@ -4,7 +4,6 @@
       <a-space>
         <a-tag color="blue">业务日期 {{ summary.snapshotDate || '-' }}</a-tag>
         <a-tag :color="compactMode ? 'gold' : 'default'">{{ compactMode ? '交班紧凑模式' : '标准模式' }}</a-tag>
-        <a-button @click="copyShareLink">复制分享链接</a-button>
         <a-button type="primary" ghost @click="load">刷新数据</a-button>
         <a-switch v-model:checked="compactMode" checked-children="紧凑" un-checked-children="标准" @change="handleModeChange" />
       </a-space>
@@ -556,36 +555,6 @@ function resetFilters() {
   const query: Record<string, string> = compactMode.value ? { mode: 'compact' } : {}
   router.replace({ query })
   message.success('已恢复默认参数')
-}
-
-function toAbsoluteUrl(resolvedHref: string) {
-  if (/^https?:\/\//i.test(resolvedHref)) {
-    return resolvedHref
-  }
-  if (resolvedHref.startsWith('#')) {
-    return `${window.location.origin}${window.location.pathname}${resolvedHref}`
-  }
-  return `${window.location.origin}${resolvedHref}`
-}
-
-async function copyShareLink() {
-  const query: Record<string, string> = {}
-  if (Object.keys(activeQuery.value).length > 0) {
-    Object.assign(query, buildMedicalWorkbenchRouteQuery(configuredQuery.value))
-  }
-  if (compactMode.value) {
-    query.mode = 'compact'
-  }
-  const href = router.resolve({ path: route.path, query }).href
-  const fullUrl = toAbsoluteUrl(href)
-  try {
-    if (navigator?.clipboard?.writeText) {
-      await navigator.clipboard.writeText(fullUrl)
-      message.success('分享链接已复制')
-      return
-    }
-  } catch {}
-  message.warning('当前环境不支持自动复制，请手动复制地址栏链接')
 }
 
 async function load() {

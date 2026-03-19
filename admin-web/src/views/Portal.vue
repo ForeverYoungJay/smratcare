@@ -1113,7 +1113,7 @@ import {
   checkOaTaskConflicts
 } from '../api/oa'
 import { getBirthdayPage } from '../api/life'
-import type { OaPortalSummary, OaTask, PageResult, BedItem, CrmContractItem, CrmLeadItem, OaApproval, BirthdayReminder } from '../types'
+import type { OaPortalSummary, OaTask, PageResult, BedItem, CrmContractItem, OaApproval, BirthdayReminder } from '../types'
 import { useLiveSyncRefresh } from '../composables/useLiveSyncRefresh'
 import {
   getDashboardSummary,
@@ -1123,7 +1123,7 @@ import {
 } from '../api/dashboard'
 import { getFinanceWorkbenchOverview } from '../api/finance'
 import type { FinanceWorkbenchOverview, HrWorkbenchSummary } from '../types'
-import { getMarketingConversionReport, getLeadPage, getContractPage } from '../api/marketing'
+import { getMarketingConversionReport, getContractPage } from '../api/marketing'
 import { getResidenceStatusSummary } from '../api/elderResidence'
 import { getBedMap } from '../api/bed'
 import { getHrProfileCertificateReminderPage, getHrWorkbenchSummary } from '../api/hr'
@@ -1913,7 +1913,10 @@ const quickLaunchGroups = [
     title: '运营',
     actions: [
       { label: '新增长者', route: '/elder/create' },
-      { label: '新建线索', route: '/marketing/leads/all?quick=create' }
+      { label: '新建线索', route: '/marketing/leads/all?quick=create' },
+      { label: '入住评估', route: '/elder/assessment/ability/admission' },
+      { label: '入住办理', route: '/elder/admission-processing' },
+      { label: '合同签约', route: '/marketing/contracts/pending?flowStage=PENDING_ASSESSMENT' }
     ]
   },
   {
@@ -1946,8 +1949,8 @@ const financeOverviewItems = computed(() => [
 
 const salesFunnelItems = computed(() => [
   { title: '今日新增咨询', value: salesFunnel.todayConsultCount || 0, route: '/marketing/leads/all?tab=consultation' },
-  { title: '待评估人数', value: salesFunnel.evaluationCount || 0, route: '/marketing/funnel/evaluation' },
-  { title: '待签约人数', value: salesFunnel.pendingSignCount || 0, route: '/marketing/contracts/pending' },
+  { title: '待评估人数', value: salesFunnel.evaluationCount || 0, route: '/marketing/contracts/pending?flowStage=PENDING_ASSESSMENT' },
+  { title: '待签约人数', value: salesFunnel.pendingSignCount || 0, route: '/marketing/contracts/pending?flowStage=PENDING_SIGN' },
   { title: '本月签约数', value: salesFunnel.monthDealCount || 0, route: '/marketing/contracts/signed' }
 ])
 
@@ -4174,14 +4177,14 @@ async function loadSalesFunnel() {
   const today = dayjs().format('YYYY-MM-DD')
   const monthStart = dayjs().startOf('month').format('YYYY-MM-DD')
 
-  const [conversion, evalPage, pendingSignPage] = await Promise.all([
+  const [conversion, pendingAssessmentPage, pendingSignPage] = await Promise.all([
     getMarketingConversionReport({ dateFrom: monthStart, dateTo: today }, { silent403: true }),
-    getLeadPage({ pageNo: 1, pageSize: 1, status: 1 }, { silent403: true }) as Promise<PageResult<CrmLeadItem>>,
+    getContractPage({ pageNo: 1, pageSize: 1, flowStage: 'PENDING_ASSESSMENT' }, { silent403: true }) as Promise<PageResult<CrmContractItem>>,
     getContractPage({ pageNo: 1, pageSize: 1, flowStage: 'PENDING_SIGN' }, { silent403: true }) as Promise<PageResult<CrmContractItem>>
   ])
 
   salesFunnel.todayConsultCount = Number(conversion.consultCount || 0)
-  salesFunnel.evaluationCount = Number(evalPage.total || 0)
+  salesFunnel.evaluationCount = Number(pendingAssessmentPage.total || 0)
   salesFunnel.pendingSignCount = Number(pendingSignPage.total || 0)
   salesFunnel.monthDealCount = Number(conversion.contractCount || 0)
 }

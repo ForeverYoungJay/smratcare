@@ -40,7 +40,6 @@
           <a-space>
             <a-button type="primary" @click="loadData">刷新</a-button>
             <a-button @click="exportSummary">导出统计</a-button>
-            <a-button @click="copyFilterLink">复制筛选链接</a-button>
             <a-button @click="openColumnSetting">列设置</a-button>
             <a-button :disabled="!displayTopRows.length" @click="printCurrent">打印当前列</a-button>
             <a-button :disabled="!query.elderId || !displayTopRows.length" @click="printSpecificElder">打印指定老人</a-button>
@@ -161,7 +160,6 @@ import { message } from 'ant-design-vue'
 import { printTableReport } from '../../utils/print'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
-import { copyText } from '../../utils/clipboard'
 import { normalizeId } from '../../utils/id'
 import { buildComparisonSummary, buildPeriodSeries } from '../../utils/statsInsight'
 
@@ -418,24 +416,6 @@ async function exportSummary() {
     message.success('导出成功')
   } catch (error: any) {
     message.error(error?.message || '导出失败')
-  }
-}
-
-async function copyFilterLink() {
-  const resolved = router.resolve({
-    path: route.path,
-    query: {
-      from: dayjs(query.from).format('YYYY-MM'),
-      to: dayjs(query.to).format('YYYY-MM'),
-      orgId: query.orgId ? String(query.orgId) : '',
-      elderId: query.elderId ? String(query.elderId) : ''
-    }
-  })
-  const ok = await copyText(`${window.location.origin}${resolved.fullPath}`)
-  if (ok) {
-    message.success('筛选链接已复制')
-  } else {
-    message.warning('复制失败，请手动复制地址栏链接')
   }
 }
 

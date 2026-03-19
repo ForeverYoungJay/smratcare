@@ -20,7 +20,6 @@
         <a-tag v-if="dutyMode" color="red">值班中：30秒自动刷新 + 仅预警</a-tag>
         <a-tag v-if="lastLoadedAt" color="blue">更新于 {{ lastLoadedAt }}</a-tag>
         <a-button @click="loadModules">立即刷新</a-button>
-        <a-button @click="copyShareLink">复制分享链接</a-button>
       </a-space>
     </template>
     <template #stats>
@@ -119,7 +118,6 @@ import { getResidentOverview } from '../../../api/medicalCare'
 import { getContractLinkageByElder } from '../../../api/marketing'
 import { useElderOptions } from '../../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
-import { copyText } from '../../../utils/clipboard'
 import { lifecycleStageHint, normalizeLifecycleStage } from '../../../utils/lifecycleStage'
 import type { ContractLinkageSummary, ElderItem, MedicalResidentOverview } from '../../../types'
 
@@ -137,10 +135,12 @@ const autoRefresh = ref(true)
 const dutyMode = ref(false)
 const lastLoadedAt = ref('')
 const { elderOptions: residentOptionPool, elderLoading: residentLoading, searchElders, ensureSelectedElder } = useElderOptions({
-  pageSize: 200,
+  pageSize: 600,
   preloadSize: 600,
-  inHospitalOnly: true,
-  signedOnly: false
+  inHospitalOnly: false,
+  signedOnly: false,
+  loadAll: true,
+  resultLimit: 0
 })
 const residentOptions = computed(() => {
   const map = new Map<string, { label: string; value: string }>()
@@ -467,17 +467,6 @@ function hasSameRouteQuery(nextQuery: Record<string, any>) {
   const nextKeys = Object.keys(nextFlatten)
   if (currentKeys.length !== nextKeys.length) return false
   return nextKeys.every((key) => currentQuery[key] === nextFlatten[key])
-}
-
-async function copyShareLink() {
-  const href = router.resolve({ path: route.path, query: buildResidentRouteQuery() }).href
-  const fullUrl = /^https?:\/\//i.test(href) ? href : `${window.location.origin}${href}`
-  const copied = await copyText(fullUrl)
-  if (copied) {
-    message.success('分享链接已复制')
-    return
-  }
-  message.warning('复制失败，请手动复制地址栏链接')
 }
 
 function onResidentChange() {

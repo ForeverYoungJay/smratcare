@@ -63,10 +63,6 @@ public class BillServiceImpl implements BillService {
   @Override
   @Transactional
   public BillGenerateResponse generateMonthlyBills(String billMonth) {
-    YearMonth ym = YearMonth.parse(billMonth);
-    LocalDate startDate = ym.atDay(1);
-    LocalDate endDate = ym.atEndOfMonth();
-
     List<ElderProfile> elders = elderMapper.selectList(
         Wrappers.lambdaQuery(ElderProfile.class)
             .eq(ElderProfile::getStatus, 1));
@@ -80,51 +76,17 @@ public class BillServiceImpl implements BillService {
         response.setSkippedCount(response.getSkippedCount() + 1);
         continue;
       }
-      BillMonthly existing = billMonthlyMapper.selectOne(
-          Wrappers.lambdaQuery(BillMonthly.class)
-              .eq(BillMonthly::getOrgId, elder.getOrgId())
-              .eq(BillMonthly::getElderId, elder.getId())
-              .eq(BillMonthly::getBillMonth, billMonth));
-      if (existing != null) {
-        Long itemCount = billItemMapper.selectCount(
-            Wrappers.lambdaQuery(BillItem.class)
-                .eq(BillItem::getBillMonthlyId, existing.getId())
-                .eq(BillItem::getIsDeleted, 0));
-        if (itemCount != null && itemCount > 0) {
-          response.setSkippedCount(response.getSkippedCount() + 1);
-          response.getBillIds().add(existing.getId());
-          continue;
-        }
-        BigDecimal total = appendBillItems(existing, elder, startDate, endDate, ym, billMonth);
-        existing.setTotalAmount(total);
-        if (existing.getPaidAmount() == null) {
-          existing.setPaidAmount(BigDecimal.ZERO);
-        }
-        existing.setOutstandingAmount(total.subtract(existing.getPaidAmount()));
-        existing.setElderContractId(signedContract.getId());
-        existing.setContractNoSnapshot(signedContract.getContractNo());
-        billMonthlyMapper.updateById(existing);
+      EnsureBillResult result = ensureMonthlyBillInternal(
+          elder,
+          billMonth,
+          signedContract.getId(),
+          signedContract.getContractNo());
+      response.getBillIds().add(result.billId);
+      if (result.generated) {
         response.setGeneratedCount(response.getGeneratedCount() + 1);
-        response.getBillIds().add(existing.getId());
-        continue;
+      } else {
+        response.setSkippedCount(response.getSkippedCount() + 1);
       }
-
-      BillMonthly monthly = new BillMonthly();
-      monthly.setOrgId(elder.getOrgId());
-      monthly.setElderId(elder.getId());
-      monthly.setBillMonth(billMonth);
-      monthly.setTotalAmount(BigDecimal.ZERO);
-      monthly.setStatus(0);
-      monthly.setElderContractId(signedContract.getId());
-      monthly.setContractNoSnapshot(signedContract.getContractNo());
-      billMonthlyMapper.insert(monthly);
-
-      BigDecimal total = appendBillItems(monthly, elder, startDate, endDate, ym, billMonth);
-      monthly.setTotalAmount(total);
-      billMonthlyMapper.updateById(monthly);
-
-      response.setGeneratedCount(response.getGeneratedCount() + 1);
-      response.getBillIds().add(monthly.getId());
     }
 
     if (response.getSkippedCount() > 0) {
@@ -133,6 +95,40 @@ public class BillServiceImpl implements BillService {
       response.setMessage("Generated monthly bills");
     }
     return response;
+  }
+
+  @Override
+  @Transactional
+  public BillDetailResponse ensureMonthlyBillForElder(
+      Long orgId,
+      Long elderId,
+      String billMonth,
+      Long contractId,
+      String contractNo) {
+    if (elderId == null || billMonth == null || billMonth.isBlank()) {
+      BillDetailResponse response = new BillDetailResponse();
+      response.setElderId(elderId);
+      response.setBillMonth(billMonth);
+      response.setMessage("Bill not found");
+      return response;
+    }
+    ElderProfile elder = elderMapper.selectById(elderId);
+    if (elder == null) {
+      BillDetailResponse response = new BillDetailResponse();
+      response.setElderId(elderId);
+      response.setBillMonth(billMonth);
+      response.setMessage("Bill not found");
+      return response;
+    }
+    if (orgId != null && elder.getOrgId() != null && !orgId.equals(elder.getOrgId())) {
+      orgId = elder.getOrgId();
+    }
+    EnsureBillResult result = ensureMonthlyBillInternal(
+        elder,
+        billMonth,
+        contractId,
+        contractNo);
+    return getBillDetailById(result.billId);
   }
 
   private CrmContract resolveSignedContract(Long orgId, Long elderId) {
@@ -174,6 +170,87 @@ public class BillServiceImpl implements BillService {
     CrmContract fallback = new CrmContract();
     fallback.setContractNo(admission.getContractNo());
     return fallback;
+  }
+
+  private EnsureBillResult ensureMonthlyBillInternal(
+      ElderProfile elder,
+      String billMonth,
+      Long contractId,
+      String contractNo) {
+    YearMonth ym = YearMonth.parse(billMonth);
+    LocalDate startDate = ym.atDay(1);
+    LocalDate endDate = ym.atEndOfMonth();
+    BillMonthly existing = billMonthlyMapper.selectOne(
+        Wrappers.lambdaQuery(BillMonthly.class)
+            .eq(BillMonthly::getOrgId, elder.getOrgId())
+            .eq(BillMonthly::getElderId, elder.getId())
+            .eq(BillMonthly::getBillMonth, billMonth)
+            .last("LIMIT 1"));
+    if (existing != null) {
+      boolean changed = applyContractSnapshot(existing, contractId, contractNo);
+      Long itemCount = billItemMapper.selectCount(
+          Wrappers.lambdaQuery(BillItem.class)
+              .eq(BillItem::getBillMonthlyId, existing.getId())
+              .eq(BillItem::getIsDeleted, 0));
+      if (itemCount != null && itemCount > 0) {
+        if (existing.getTotalAmount() == null) {
+          existing.setTotalAmount(BigDecimal.ZERO);
+          changed = true;
+        }
+        if (existing.getPaidAmount() == null) {
+          existing.setPaidAmount(BigDecimal.ZERO);
+          changed = true;
+        }
+        if (existing.getOutstandingAmount() == null && existing.getTotalAmount() != null && existing.getPaidAmount() != null) {
+          existing.setOutstandingAmount(existing.getTotalAmount().subtract(existing.getPaidAmount()));
+          changed = true;
+        }
+        if (changed) {
+          billMonthlyMapper.updateById(existing);
+        }
+        return new EnsureBillResult(existing.getId(), false);
+      }
+      BigDecimal total = appendBillItems(existing, elder, startDate, endDate, ym, billMonth);
+      existing.setTotalAmount(total);
+      if (existing.getPaidAmount() == null) {
+        existing.setPaidAmount(BigDecimal.ZERO);
+      }
+      existing.setOutstandingAmount(total.subtract(existing.getPaidAmount()));
+      billMonthlyMapper.updateById(existing);
+      return new EnsureBillResult(existing.getId(), true);
+    }
+
+    BillMonthly monthly = new BillMonthly();
+    monthly.setOrgId(elder.getOrgId());
+    monthly.setElderId(elder.getId());
+    monthly.setBillMonth(billMonth);
+    monthly.setTotalAmount(BigDecimal.ZERO);
+    monthly.setPaidAmount(BigDecimal.ZERO);
+    monthly.setOutstandingAmount(BigDecimal.ZERO);
+    monthly.setStatus(0);
+    monthly.setElderContractId(contractId);
+    monthly.setContractNoSnapshot(contractNo);
+    billMonthlyMapper.insert(monthly);
+
+    BigDecimal total = appendBillItems(monthly, elder, startDate, endDate, ym, billMonth);
+    monthly.setTotalAmount(total);
+    monthly.setOutstandingAmount(total);
+    billMonthlyMapper.updateById(monthly);
+    return new EnsureBillResult(monthly.getId(), true);
+  }
+
+  private boolean applyContractSnapshot(BillMonthly monthly, Long contractId, String contractNo) {
+    boolean changed = false;
+    if (monthly.getElderContractId() == null && contractId != null) {
+      monthly.setElderContractId(contractId);
+      changed = true;
+    }
+    if ((monthly.getContractNoSnapshot() == null || monthly.getContractNoSnapshot().isBlank())
+        && contractNo != null && !contractNo.isBlank()) {
+      monthly.setContractNoSnapshot(contractNo);
+      changed = true;
+    }
+    return changed;
   }
 
   private BigDecimal appendBillItems(BillMonthly monthly, ElderProfile elder, LocalDate startDate,
@@ -331,5 +408,15 @@ public class BillServiceImpl implements BillService {
       }
     }
     return total;
+  }
+
+  private static final class EnsureBillResult {
+    private final Long billId;
+    private final boolean generated;
+
+    private EnsureBillResult(Long billId, boolean generated) {
+      this.billId = billId;
+      this.generated = generated;
+    }
   }
 }

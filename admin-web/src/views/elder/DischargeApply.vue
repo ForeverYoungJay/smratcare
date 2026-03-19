@@ -43,8 +43,10 @@
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
       <a-space style="margin-bottom: 12px" wrap>
         <a-tag color="blue">已选 {{ selectedRowKeys.length }} 条</a-tag>
-        <a-button :disabled="!canReviewSelected" @click="reviewSelected('APPROVED')">通过</a-button>
+        <a-button :disabled="!canReviewSelected" @click="reviewSelected('APPROVED')">审核</a-button>
         <a-button danger :disabled="!canReviewSelected" @click="reviewSelected('REJECTED')">驳回</a-button>
+        <a-button :disabled="!canOpenFinanceAuditSelected" @click="openSelectedFinanceAudit">退住费用审核</a-button>
+        <a-button :disabled="!canOpenSettlementSelected" @click="openSelectedSettlement">退院结算</a-button>
         <a-button danger :disabled="selectedRowKeys.length === 0" @click="deleteSelected">删除</a-button>
       </a-space>
       <a-table
@@ -64,9 +66,18 @@
             <span v-else>-</span>
           </template>
           <template v-else-if="column.key === 'autoDischargeStatus'">
-            <a-tag v-if="record.autoDischargeStatus === 'SUCCESS'" color="green">成功</a-tag>
+            <a-tag v-if="record.autoDischargeStatus === 'PENDING_SETTLEMENT'" color="orange">待退院结算</a-tag>
+            <a-tag v-else-if="record.autoDischargeStatus === 'SUCCESS'" color="green">成功</a-tag>
             <a-tag v-else-if="record.autoDischargeStatus === 'FAILED'" color="red">失败</a-tag>
             <span v-else>-</span>
+          </template>
+          <template v-else-if="column.key === 'action'">
+            <a-space wrap>
+              <a-button type="link" :disabled="record.status !== 'PENDING'" @click="openReview(record, 'APPROVED')">审核</a-button>
+              <a-button type="link" danger :disabled="record.status !== 'PENDING'" @click="openReview(record, 'REJECTED')">驳回</a-button>
+              <a-button type="link" :disabled="record.status !== 'APPROVED'" @click="goToDischargeFeeAudit(record)">费用审核</a-button>
+              <a-button type="link" :disabled="record.status !== 'APPROVED'" @click="goToDischargeSettlement(record)">退院结算</a-button>
+            </a-space>
           </template>
         </template>
       </a-table>
@@ -117,8 +128,26 @@
 
     <a-modal v-model:open="reviewOpen" :title="reviewStatus === 'APPROVED' ? '通过申请' : '驳回申请'" @ok="submitReview" :confirm-loading="reviewSubmitting" width="480px">
       <a-form layout="vertical">
+        <a-form-item v-if="reviewStatus === 'APPROVED'" label="审核清单">
+          <a-space direction="vertical" style="width: 100%">
+            <a-checkbox v-model:checked="reviewChecklist.proofChecked">退住原因与附件已核验</a-checkbox>
+            <a-checkbox v-model:checked="reviewChecklist.planChecked">已确认计划退住日期与沟通对象</a-checkbox>
+            <a-checkbox v-model:checked="reviewChecklist.financeHandoffReady">确认通过后进入退住费用审核与退院结算</a-checkbox>
+          </a-space>
+        </a-form-item>
+        <a-alert
+          v-if="reviewStatus === 'APPROVED'"
+          type="info"
+          show-icon
+          style="margin-bottom: 12px"
+          message="申请审核通过后，不再直接退住；需先完成退住费用审核、退院结算，财务退款完成后系统自动释放床位并回写离院状态。"
+        />
         <a-form-item label="审核备注">
-          <a-textarea v-model:value="reviewRemark" :rows="3" />
+          <a-textarea
+            v-model:value="reviewRemark"
+            :rows="3"
+            :placeholder="reviewStatus === 'APPROVED' ? '可补充账单核对、家属沟通、特殊风险说明' : '驳回时请填写原因'"
+          />
         </a-form-item>
       </a-form>
     </a-modal>
@@ -161,6 +190,11 @@ const reviewSubmitting = ref(false)
 const reviewId = ref<Id | undefined>(undefined)
 const reviewStatus = ref<'APPROVED' | 'REJECTED'>('APPROVED')
 const reviewRemark = ref('')
+const reviewChecklist = reactive({
+  proofChecked: true,
+  planChecked: true,
+  financeHandoffReady: true
+})
 const route = useRoute()
 const router = useRouter()
 const proofUploading = ref(false)
@@ -201,16 +235,23 @@ const columns = [
   { title: '计划退住日期', dataIndex: 'plannedDischargeDate', key: 'plannedDischargeDate', width: 120 },
   { title: '申请原因', dataIndex: 'reason', key: 'reason' },
   { title: '证明附件', dataIndex: 'proofFileUrl', key: 'proofFileUrl', width: 180 },
-  { title: '自动退住状态', key: 'autoDischargeStatus', width: 100 },
-  { title: '自动退住说明', dataIndex: 'autoDischargeMessage', key: 'autoDischargeMessage', width: 180 },
-  { title: '退住单号', dataIndex: 'linkedDischargeId', key: 'linkedDischargeId', width: 120 },
+  { title: '后续流程状态', key: 'autoDischargeStatus', width: 120 },
+  { title: '后续流程说明', dataIndex: 'autoDischargeMessage', key: 'autoDischargeMessage', width: 260 },
+  { title: '关联退住单号', dataIndex: 'linkedDischargeId', key: 'linkedDischargeId', width: 120 },
   { title: '审核人', dataIndex: 'reviewedByName', key: 'reviewedByName', width: 100 },
   { title: '审核备注', dataIndex: 'reviewRemark', key: 'reviewRemark' },
-  { title: '审核状态', key: 'status', width: 100 }
+  { title: '审核状态', key: 'status', width: 100 },
+  { title: '操作', key: 'action', width: 260 }
 ]
 const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(item.id)))
 const canReviewSelected = computed(
   () => selectedRecords.value.length === 1 && selectedRecords.value[0]?.status === 'PENDING'
+)
+const canOpenFinanceAuditSelected = computed(
+  () => selectedRecords.value.length === 1 && selectedRecords.value[0]?.status === 'APPROVED'
+)
+const canOpenSettlementSelected = computed(
+  () => selectedRecords.value.length === 1 && selectedRecords.value[0]?.status === 'APPROVED'
 )
 
 async function fetchData() {
@@ -313,6 +354,9 @@ function openReview(record: DischargeApplyItem, status: 'APPROVED' | 'REJECTED')
   reviewId.value = record.id
   reviewStatus.value = status
   reviewRemark.value = ''
+  reviewChecklist.proofChecked = true
+  reviewChecklist.planChecked = true
+  reviewChecklist.financeHandoffReady = true
   reviewOpen.value = true
 }
 
@@ -324,27 +368,38 @@ function reviewSelected(status: 'APPROVED' | 'REJECTED') {
 
 async function submitReview() {
   if (!reviewId.value) return
+  if (reviewStatus.value === 'APPROVED') {
+    const checklistPassed = reviewChecklist.proofChecked && reviewChecklist.planChecked && reviewChecklist.financeHandoffReady
+    if (!checklistPassed) {
+      message.warning('通过前请完成审核清单确认')
+      return
+    }
+  }
   if (reviewStatus.value === 'REJECTED' && !reviewRemark.value.trim()) {
     message.warning('驳回时请填写审核备注')
     return
   }
   reviewSubmitting.value = true
   try {
-    await reviewDischargeApply(reviewId.value, { status: reviewStatus.value, reviewRemark: reviewRemark.value || undefined })
+    const approvalNotes = reviewStatus.value === 'APPROVED'
+      ? ['资料已核验', '计划日期已确认', '已移交退住费用审核/退院结算']
+      : []
+    const mergedReviewRemark = [...approvalNotes, reviewRemark.value.trim()].filter(Boolean).join('；')
+    await reviewDischargeApply(reviewId.value, {
+      status: reviewStatus.value,
+      reviewRemark: mergedReviewRemark || undefined
+    })
     if (reviewStatus.value === 'APPROVED') {
-      message.success('审核通过并已触发自动退住登记')
-      router.push({ path: '/elder/discharge', query: { highlightApplyId: String(reviewId.value) } })
+      message.success('审核通过，已进入退住费用审核与退院结算阶段')
     } else {
       message.success('审核完成')
     }
     reviewOpen.value = false
     fetchData()
   } catch (error: any) {
-    if (reviewStatus.value === 'APPROVED') {
-      const msg = error?.msg || error?.message || '自动退住失败，请处理账单后重试'
-      message.error(msg)
-      fetchData()
-    }
+    const msg = error?.msg || error?.message || '审核失败，请重试'
+    message.error(msg)
+    fetchData()
   } finally {
     reviewSubmitting.value = false
   }
@@ -360,6 +415,42 @@ function statusColor(status?: string) {
   if (status === 'APPROVED') return 'green'
   if (status === 'REJECTED') return 'red'
   return 'orange'
+}
+
+function goToDischargeFeeAudit(record: DischargeApplyItem) {
+  router.push({
+    path: '/finance/discharge/review',
+    query: {
+      elderId: String(record.elderId || ''),
+      elderName: String(record.elderName || ''),
+      dischargeApplyId: String(record.id || ''),
+      openCreate: '1'
+    }
+  })
+}
+
+function goToDischargeSettlement(record: DischargeApplyItem) {
+  router.push({
+    path: '/finance/discharge/settlement',
+    query: {
+      elderId: String(record.elderId || ''),
+      elderName: String(record.elderName || ''),
+      dischargeApplyId: String(record.id || ''),
+      openCreate: '1'
+    }
+  })
+}
+
+function openSelectedFinanceAudit() {
+  const record = selectedRecords.value[0]
+  if (!record) return
+  goToDischargeFeeAudit(record)
+}
+
+function openSelectedSettlement() {
+  const record = selectedRecords.value[0]
+  if (!record) return
+  goToDischargeSettlement(record)
 }
 
 async function exportRows() {

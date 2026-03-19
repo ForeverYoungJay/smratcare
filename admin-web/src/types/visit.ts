@@ -4,18 +4,26 @@ export interface VisitBookingItem {
   id: Id
   elderId: Id
   elderName?: string
+  familyUserId?: Id
   familyName?: string
+  visitorName?: string
+  visitorPhone?: string
+  visitorRelation?: string
   floorNo?: string
   roomNo?: string
   visitTime: string
   visitorCount: number
   carPlate?: string
   status?: number
+  remark?: string
 }
 
 export interface VisitBookRequest {
   elderId: Id
   familyUserId?: Id
+  visitorName?: string
+  visitorPhone?: string
+  visitorRelation?: string
   visitTime: string
   visitTimeSlot: string
   visitorCount: number
@@ -32,6 +40,9 @@ export interface VisitPrintTicket {
   ticketNo: string
   elderName?: string
   familyName?: string
+  visitorName?: string
+  visitorPhone?: string
+  visitorRelation?: string
   floorNo?: string
   roomNo?: string
   visitTime?: string

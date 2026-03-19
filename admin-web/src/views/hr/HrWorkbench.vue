@@ -228,6 +228,17 @@ const sectionConfigs: readonly WorkbenchSection[] = [
     ]
   },
   {
+    title: '业务协同入口',
+    actions: [
+      { label: '营销合同闭环', path: '/marketing/contracts/pending?flowStage=PENDING_ASSESSMENT', primary: true },
+      { label: '入住评估', path: '/elder/assessment/ability/admission' },
+      { label: '入住办理', path: '/elder/admission-processing' },
+      { label: '在院总览', path: '/elder/in-hospital-overview' },
+      { label: '床位房态图', path: '/elder/bed-panorama' },
+      { label: 'OA 门户', path: '/oa/portal' }
+    ]
+  },
+  {
     title: '费用与报销',
     actions: [
       { label: '外出培训费用报销', path: '/hr/expense/records?scene=training-reimburse', primary: true },

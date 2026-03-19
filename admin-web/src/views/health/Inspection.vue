@@ -16,6 +16,14 @@
         <a-tag v-if="!summary.statusStats.length" color="default">暂无状态统计</a-tag>
       </a-space>
     </a-card>
+    <a-card v-if="signedLinkageContext.active" :bordered="false" class="summary-row context-card">
+      <a-space wrap>
+        <a-tag color="success">新签约长者：{{ signedLinkageContext.name }}</a-tag>
+        <span>{{ signedLinkageContext.description }}</span>
+        <a-button size="small" @click="goWithResident('/medical-care/care-task-board')">护理交接任务</a-button>
+        <a-button size="small" @click="goWithResident('/elder/resident-360')">长者360</a-button>
+      </a-space>
+    </a-card>
     <a-card v-if="residentContext.active" :bordered="false" class="summary-row context-card">
       <a-space wrap>
         <a-tag color="processing">当前长者：{{ residentContext.name }}</a-tag>
@@ -354,6 +362,17 @@ const residentContext = computed(() => {
     active: !!residentId,
     residentId,
     name: residentName || ''
+  }
+})
+const activeInspectionId = computed<Id | undefined>(() => normalizeId(route.query.inspectionId))
+const signedLinkageContext = computed(() => {
+  const source = routeQueryText(route.query.source).toLowerCase()
+  const entryScene = routeQueryText(route.query.entryScene).toLowerCase()
+  const active = residentContext.value.active && (source === 'contract_signed' || entryScene === 'signed_onboarding')
+  return {
+    active,
+    name: residentContext.value.name || '当前长者',
+    description: activeInspectionId.value ? '首次健康巡检已自动准备，请尽快完成首检与体征记录。' : '当前为新签约接管场景，可继续完成首次健康巡检。'
   }
 })
 const currentStaffName = computed(() => {
@@ -996,6 +1015,10 @@ function clearResidentContext() {
   router.push({ path: route.path, query: nextQuery })
 }
 
+function routeQueryText(value: unknown) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
 async function exportCsvData() {
   const records = await loadExportRecords()
   if (!records.length) {
@@ -1059,6 +1082,7 @@ function formatBoardNumber(value?: number) {
 }
 
 function resolveRowClassName(record: HealthInspection) {
+  if (activeInspectionId.value && String(record.id || '') === String(activeInspectionId.value)) return 'health-row-focus'
   if (record.status === 'ABNORMAL' && !resolveAttachmentFiles(record.attachmentUrls).length) return 'health-row-warning'
   if (record.status === 'ABNORMAL' || record.status === 'FOLLOWING') return 'health-row-danger'
   return ''
@@ -1142,6 +1166,9 @@ watch(
 }
 :deep(.health-row-warning > td) {
   background: #fff7e6 !important;
+}
+:deep(.health-row-focus > td) {
+  background: #e6f4ff !important;
 }
 .context-card {
   background: #f0f9ff;

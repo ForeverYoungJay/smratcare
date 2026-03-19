@@ -50,7 +50,6 @@
           <a-space>
             <a-button type="primary" @click="onSearch">搜索</a-button>
             <a-button @click="reset">清空</a-button>
-            <a-button @click="copyQueryLink">复制查询链接</a-button>
           </a-space>
         </a-form-item>
       </a-form>
@@ -611,7 +610,6 @@ import LifecycleStageBar from '../../components/LifecycleStageBar.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
-import { copyText } from '../../utils/clipboard'
 import { lifecycleStageHint, normalizeLifecycleStage } from '../../utils/lifecycleStage'
 import { getContractPage } from '../../api/marketing'
 import {
@@ -1367,17 +1365,6 @@ async function syncAssessmentQueryToRoute() {
   skipNextAssessmentRouteWatch.value = true
   assessmentRouteSignature.value = buildAssessmentRouteSignature(nextQuery)
   await router.replace({ path: route.path, query: nextQuery })
-}
-
-async function copyQueryLink() {
-  const href = router.resolve({ path: route.path, query: buildAssessmentRouteQuery() }).href
-  const fullUrl = /^https?:\/\//i.test(href) ? href : `${window.location.origin}${href}`
-  const copied = await copyText(fullUrl)
-  if (copied) {
-    message.success('查询链接已复制')
-    return
-  }
-  message.warning('复制失败，请手动复制地址栏链接')
 }
 
 const open = ref(false)

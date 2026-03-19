@@ -29,11 +29,26 @@
           <a-space>
             <a-button type="primary" @click="runQuery">查询</a-button>
             <a-button @click="reset">重置</a-button>
-            <a-button @click="copyQueryLink">复制查询链接</a-button>
           </a-space>
         </a-form-item>
       </a-form>
     </a-card>
+
+    <a-alert
+      v-if="signedLinkageContext.active"
+      style="margin-top: 16px;"
+      type="success"
+      show-icon
+      :message="signedLinkageContext.message"
+      :description="signedLinkageContext.description"
+    >
+      <template #action>
+        <a-space wrap>
+          <a-button size="small" @click="goSignedResident360">长者总览</a-button>
+          <a-button size="small" @click="goSignedAccountList">长者账户</a-button>
+        </a-space>
+      </template>
+    </a-alert>
 
     <a-row :gutter="[12, 12]" style="margin-top: 16px;">
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="当前账单数" :value="total" /></a-card></a-col>
@@ -248,6 +263,18 @@ const query = reactive({
   pageNo: 1,
   pageSize: 10
 })
+const signedLinkageContext = computed(() => {
+  const source = routeQueryText(route.query.source).toLowerCase()
+  const entryScene = routeQueryText(route.query.entryScene).toLowerCase()
+  const elderName = routeQueryText(route.query.elderName || route.query.residentName)
+  const active = !!query.elderId && (source === 'contract_signed' || entryScene === 'signed_onboarding')
+  return {
+    active,
+    elderName,
+    message: active ? `当前账单中心已定位到新签约长者 ${elderName || '该长者'}` : '',
+    description: active ? `当前账期、首期账单和收款都可以直接在这里继续办理。` : ''
+  }
+})
 
 const generateOpen = ref(false)
 const generating = ref(false)
@@ -259,6 +286,16 @@ const payOpen = ref(false)
 const paying = ref(false)
 const payFormRef = ref()
 const activePaymentId = ref<Id | null>(null)
+
+function routeQueryText(value: unknown) {
+  if (Array.isArray(value)) {
+    return routeQueryText(value[0])
+  }
+  if (value == null) {
+    return ''
+  }
+  return String(value).trim()
+}
 const originalPayMethod = ref<string>('CASH')
 type PayForm = {
   amount: number
@@ -373,16 +410,6 @@ async function syncQueryToRoute() {
   await router.replace({ path: route.path, query: nextQuery })
 }
 
-function toAbsoluteUrl(resolvedHref: string) {
-  if (/^https?:\/\//i.test(resolvedHref)) {
-    return resolvedHref
-  }
-  if (resolvedHref.startsWith('#')) {
-    return `${window.location.origin}${window.location.pathname}${resolvedHref}`
-  }
-  return `${window.location.origin}${resolvedHref}`
-}
-
 async function fetchData() {
   loading.value = true
   try {
@@ -429,6 +456,33 @@ function reset() {
   runQuery(false).catch(() => {})
 }
 
+function goSignedResident360() {
+  if (!query.elderId) {
+    message.warning('当前没有定位到长者')
+    return
+  }
+  router.push({
+    path: '/elder/resident-360',
+    query: {
+      residentId: String(query.elderId),
+      residentName: signedLinkageContext.value.elderName || undefined,
+      from: 'contractSigned'
+    }
+  })
+}
+
+function goSignedAccountList() {
+  router.push({
+    path: '/finance/accounts/list',
+    query: {
+      keyword: signedLinkageContext.value.elderName || query.keyword || undefined,
+      elderId: query.elderId ? String(query.elderId) : undefined,
+      source: 'contract_signed',
+      entryScene: 'signed_onboarding'
+    }
+  })
+}
+
 async function onPageChange(page: number) {
   query.pageNo = page
   await syncQueryToRoute()
@@ -440,19 +494,6 @@ async function onPageSizeChange(current: number, size: number) {
   query.pageSize = size
   await syncQueryToRoute()
   await fetchData()
-}
-
-async function copyQueryLink() {
-  const href = router.resolve({ path: route.path, query: buildQueryRouteQuery() }).href
-  const fullUrl = toAbsoluteUrl(href)
-  try {
-    if (navigator?.clipboard?.writeText) {
-      await navigator.clipboard.writeText(fullUrl)
-      message.success('查询链接已复制')
-      return
-    }
-  } catch {}
-  message.warning('当前环境不支持自动复制，请手动复制地址栏链接')
 }
 
 function exportCsvData() {

@@ -34,6 +34,7 @@ public class CrmContractResponse {
   private String changeWorkflowRemark;
   private Integer smsSendCount;
   private String remark;
+  private ContractSystemLinkageSummary linkageSummary;
   private LocalDateTime createTime;
   private LocalDateTime updateTime;
 }

@@ -6,7 +6,6 @@
         <a-switch v-model:checked="alertOnly" checked-children="仅异常状态" un-checked-children="全部状态" />
         <a-switch v-model:checked="autoRefresh" checked-children="自动刷新" un-checked-children="手动刷新" />
         <a-button @click="fetchRealStats">刷新</a-button>
-        <a-button @click="copyShareLink">复制分享链接</a-button>
       </a-space>
     </template>
     <a-alert type="error" show-icon :message="pendingAlertMessage" style="margin-bottom: 16px" />
@@ -158,7 +157,6 @@ import { getPortalSummary } from '../../../api/oa'
 import { getMedicalCareWorkbenchSummary } from '../../../api/medicalCare'
 import { getLogisticsWorkbenchSummary } from '../../../api/logistics'
 import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
-import { copyText } from '../../../utils/clipboard'
 import type {
   LogisticsWorkbenchSummary,
   MedicalCareWorkbenchSummary,
@@ -474,17 +472,6 @@ async function syncStatusQueryToRoute() {
   skipNextStatusRouteWatch.value = true
   statusRouteSignature.value = buildStatusRouteSignature(nextQuery)
   await router.replace({ path: route.path, query: nextQuery })
-}
-
-async function copyShareLink() {
-  const href = router.resolve({ path: route.path, query: buildStatusRouteQuery() }).href
-  const fullUrl = /^https?:\/\//i.test(href) ? href : `${window.location.origin}${href}`
-  const copied = await copyText(fullUrl)
-  if (copied) {
-    message.success('分享链接已复制')
-    return
-  }
-  message.warning('复制失败，请手动复制地址栏链接')
 }
 
 function clearAutoRefresh() {

@@ -663,7 +663,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'bed',
         name: 'Bed',
-        meta: { title: '床位管理', icon: 'HomeOutlined', hidden: true },
+        meta: { title: '床位管理', icon: 'HomeOutlined' },
         redirect: '/bed/map',
         children: [
           {

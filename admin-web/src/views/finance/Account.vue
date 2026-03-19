@@ -12,6 +12,15 @@
       </template>
     </SearchForm>
 
+    <a-alert
+      v-if="signedLinkageContext.active"
+      style="margin-bottom: 12px;"
+      type="success"
+      show-icon
+      :message="signedLinkageContext.message"
+      :description="'当前可直接查看余额、押金/预存与账户流水。'"
+    />
+
     <a-row :gutter="[12, 12]" style="margin-bottom: 12px;">
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="账户总数" :value="rows.length" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="低余额账户" :value="lowBalanceCount" /></a-card></a-col>
@@ -113,8 +122,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
+import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
@@ -125,6 +135,7 @@ import { getElderAccountPage, adjustElderAccount, getElderAccountWarnings, getFi
 import type { ElderAccount, FinanceModuleEntrySummary, Id, PageResult } from '../../types'
 import router from '../../router'
 
+const route = useRoute()
 const loading = ref(false)
 const rows = ref<ElderAccount[]>([])
 const warnings = ref<ElderAccount[]>([])
@@ -145,6 +156,17 @@ const query = reactive({
   keyword: '',
   pageNo: 1,
   pageSize: 10
+})
+const signedLinkageContext = computed(() => {
+  const source = routeQueryText(route.query.source).toLowerCase()
+  const entryScene = routeQueryText(route.query.entryScene).toLowerCase()
+  const elderName = routeQueryText(route.query.keyword || route.query.elderName || route.query.residentName)
+  const active = !!elderName && (source === 'contract_signed' || entryScene === 'signed_onboarding')
+  return {
+    active,
+    elderName,
+    message: active ? `当前账户中心已定位到新签约长者 ${elderName}` : ''
+  }
 })
 
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
@@ -197,6 +219,21 @@ const statusOptions = [
   { label: '启用', value: 1 },
   { label: '停用', value: 0 }
 ]
+
+function routeQueryText(value: unknown) {
+  if (Array.isArray(value)) {
+    return routeQueryText(value[0])
+  }
+  if (value == null) {
+    return ''
+  }
+  return String(value).trim()
+}
+
+function applyRouteFilters() {
+  const keyword = routeQueryText(route.query.keyword || route.query.elderName || route.query.residentName)
+  query.keyword = keyword
+}
 
 async function fetchData() {
   loading.value = true
@@ -313,7 +350,17 @@ async function searchElders(keyword: string) {
   await searchElderOptions(keyword)
 }
 
+applyRouteFilters()
 fetchData()
+
+watch(
+  () => route.query,
+  () => {
+    applyRouteFilters()
+    fetchData().catch(() => {})
+  },
+  { deep: true }
+)
 
 useLiveSyncRefresh({
   topics: ['finance', 'elder', 'oa'],

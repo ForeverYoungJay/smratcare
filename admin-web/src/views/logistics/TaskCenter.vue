@@ -8,7 +8,6 @@
       <a-space>
         <a-tag :color="viewMode === 'DUTY' ? 'gold' : 'blue'">{{ viewMode === 'DUTY' ? '值班视图' : '全量视图' }}</a-tag>
         <a-tag :color="densityMode === 'dense' ? 'orange' : 'default'">{{ densityMode === 'dense' ? '大屏密度' : '标准密度' }}</a-tag>
-        <a-button @click="copyShareLink">复制分享链接</a-button>
         <a-button type="primary" ghost @click="loadData({ preserveSelection: true })">刷新数据</a-button>
       </a-space>
     </template>
@@ -343,10 +342,17 @@ const { syncStateFromRoute, buildTaskCenterRouteQuery, syncRouteQueryFromState }
 const lifecycleContext = computed(() => {
   const source = firstTaskCenterQueryValue(route.query.source).toLowerCase()
   const scene = firstTaskCenterQueryValue(route.query.scene).toLowerCase()
-  const active = source === 'lifecycle' || scene === 'status-change'
+  const entryScene = firstTaskCenterQueryValue(route.query.entryScene).toLowerCase()
+  const residentName = firstTaskCenterQueryValue(route.query.residentName || route.query.elderName)
+  const signedLinkage = source === 'contract_signed' || entryScene === 'signed_onboarding'
+  const active = source === 'lifecycle' || scene === 'status-change' || signedLinkage
   return {
     active,
-    message: active ? '当前为入住状态变更联动场景，已优先聚焦后勤超时任务。' : ''
+    message: !active
+      ? ''
+      : signedLinkage
+        ? `当前为最终签约后的后勤协同场景${residentName ? `：${residentName}` : ''}，已优先聚焦送餐/任务衔接。`
+        : '当前为入住状态变更联动场景，已优先聚焦后勤超时任务。'
   }
 })
 
@@ -884,18 +890,6 @@ function go(path: string) {
   router.push(path)
 }
 
-async function copyShareLink() {
-  const query = buildTaskCenterRouteQuery()
-  const resolved = router.resolve({ path: route.path, query })
-  const shareLink = `${window.location.origin}${resolved.fullPath}`
-  try {
-    await navigator.clipboard.writeText(shareLink)
-    message.success('分享链接已复制')
-  } catch {
-    message.warning('当前环境不支持自动复制，请手动复制地址栏链接')
-  }
-}
-
 function normalizeStatus(status?: string) {
   return String(status || '').trim().toUpperCase()
 }
@@ -1264,7 +1258,9 @@ function exportActionLogs() {
 function applyLifecycleScenePreset() {
   const source = firstTaskCenterQueryValue(route.query.source).toLowerCase()
   const scene = firstTaskCenterQueryValue(route.query.scene).toLowerCase()
-  const lifecycleScene = source === 'lifecycle' || scene === 'status-change'
+  const entryScene = firstTaskCenterQueryValue(route.query.entryScene).toLowerCase()
+  const signedLinkage = source === 'contract_signed' || entryScene === 'signed_onboarding'
+  const lifecycleScene = source === 'lifecycle' || scene === 'status-change' || signedLinkage
   if (!lifecycleScene) {
     return
   }
@@ -1273,7 +1269,7 @@ function applyLifecycleScenePreset() {
   const hasFocus = Boolean(firstTaskCenterQueryValue(route.query.lifecycleFocus))
   const hasOverdue = Boolean(firstTaskCenterQueryValue(route.query.overdueOnly))
   if (!hasFocus) {
-    lifecycleFocus.value = 'maintenance'
+    lifecycleFocus.value = signedLinkage ? 'delivery' : 'maintenance'
   }
   if (!hasTab) {
     activeTab.value = (lifecycleFocus.value || 'maintenance') as TaskCenterTab

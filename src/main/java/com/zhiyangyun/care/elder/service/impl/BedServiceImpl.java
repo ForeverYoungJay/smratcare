@@ -239,7 +239,7 @@ public class BedServiceImpl implements BedService {
   }
 
   @Override
-  public List<BedResponse> map(Long orgId) {
+  public List<BedResponse> map(Long orgId, boolean includeRisk) {
     Long tenantId = orgId;
     List<Long> activeRoomIds = resolveActiveRoomIds(tenantId);
     if (activeRoomIds.isEmpty()) {
@@ -300,7 +300,9 @@ public class BedServiceImpl implements BedService {
       }
       return response;
     }).toList();
-    enrichRiskInfo(orgId, responses);
+    if (includeRisk) {
+      enrichRiskInfo(orgId, responses);
+    }
     return responses;
   }
 

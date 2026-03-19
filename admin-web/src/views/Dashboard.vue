@@ -27,7 +27,6 @@
             <a-tag v-if="thresholdDirty" color="orange">未保存修改</a-tag>
             <a-button size="small" @click="metricDrawerOpen = true">口径详情</a-button>
             <a-button size="small" @click="thresholdDrawerOpen = true">阈值设置</a-button>
-            <a-button size="small" @click="copyDashboardShareLink">复制筛选链接</a-button>
           </a-space>
         </template>
         <div class="hint-text" style="margin-bottom: 12px;">
@@ -274,7 +273,6 @@ import ThresholdPreviewList from '../components/ThresholdPreviewList.vue'
 import StatsWorkspacePanel from '../components/stats/StatsWorkspacePanel.vue'
 import StatsInsightDeck from '../components/stats/StatsInsightDeck.vue'
 import StatsCommandCenter from '../components/stats/StatsCommandCenter.vue'
-import { copyText } from '../utils/clipboard'
 import {
   clearThresholdSnapshot,
   loadThresholdLogs,
@@ -286,7 +284,6 @@ import {
 } from '../utils/dashboardThreshold'
 import {
   DASHBOARD_THRESHOLD_PRESETS,
-  buildDashboardShareQuery,
   mergeThresholdConfig,
   parseDashboardRouteFilters,
   parseThresholdQuery,
@@ -829,7 +826,7 @@ const dashboardInsightItems = computed(() => {
   ]
 })
 const dashboardCommandSummary = computed(() => {
-  return '把异常处置、协作分享、自定义指标和纠错入口集中在同一个操作台，减少在看板与统计页之间来回切换。'
+  return '把异常处置、自定义指标和纠错入口集中在同一个操作台，减少在看板与统计页之间来回切换。'
 })
 const dashboardActionItems = computed(() => {
   const rows = alertActions.value.map((item) => ({
@@ -840,13 +837,6 @@ const dashboardActionItems = computed(() => {
     tone: 'danger' as const
   }))
   rows.push(
-    {
-      key: 'share-dashboard',
-      label: '分享看板',
-      description: '复制当前口径和筛选说明',
-      route: '/dashboard',
-      tone: 'warning' as const
-    },
     {
       key: 'open-revenue',
       label: '查看收入明细',
@@ -866,7 +856,7 @@ const dashboardAnomalies = computed(() =>
   }))
 )
 const dashboardMetricNotes = computed(() => [
-  { key: 'consumption', label: '总消费', note: '总消费=账单消费+商城消费，分享时会附带当前时间窗口。' },
+  { key: 'consumption', label: '总消费', note: '总消费=账单消费+商城消费，并与当前时间窗口保持一致。' },
   { key: 'revenue', label: '总收入', note: '总收入按账单总额统计，跟月运营收入页保持同口径。' },
   { key: 'bed', label: '床位使用率', note: '当前已使用床位 / 总床位，维护床位不计入已使用。' },
   { key: 'checkin', label: '入住净增长', note: '净增长=入住人数-离院人数，支持继续钻取到入住统计页。' }
@@ -912,10 +902,6 @@ function onDashboardPanelChange(keys: string[]) {
 }
 
 function onDashboardCommandAction(item: { key: string; route?: string }) {
-  if (item.key === 'share-dashboard') {
-    copyDashboardShareLink()
-    return
-  }
   if (item.route) {
     go(item.route)
   }
@@ -957,25 +943,6 @@ function goUnifiedCard(card: { route: string; metricKey: string }) {
     path: card.route,
     query: buildDrillQuery(card.metricKey, card.route)
   })
-}
-
-async function copyDashboardShareLink() {
-  const query = buildDashboardShareQuery({
-    metricVersion: summary.value.metricVersion || metricCatalog.value.metricVersion || '',
-    threshold: toThresholdSnapshot(thresholdConfig.value),
-    from: summary.value.statsFromMonth,
-    to: summary.value.statsToMonth
-  })
-  const resolved = router.resolve({
-    path: route.path,
-    query
-  })
-  const ok = await copyText(`${window.location.origin}${resolved.fullPath}`)
-  if (ok) {
-    message.success('链接已复制')
-  } else {
-    message.warning('复制失败，请手动复制地址栏链接')
-  }
 }
 
 function fmtAmount(value?: number) {

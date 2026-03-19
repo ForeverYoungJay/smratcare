@@ -226,7 +226,7 @@ const visibleInsightItems = computed(() => {
   const selected = panelKeys.value.length ? new Set(panelKeys.value) : null
   return insightItems.value.filter((item) => !selected || selected.has(item.key))
 })
-const commandSummary = computed(() => '把收入异常、跨页钻取、协作分享和模板化报表入口合在一起，适合财务和经营复盘。')
+const commandSummary = computed(() => '把收入异常、跨页钻取和模板化报表入口合在一起，适合财务和经营复盘。')
 const commandActionItems = computed(() => ([
   { key: 'open-org-operation', label: '查看机构经营', description: '联动机构月运营横向对比', route: '/stats/org/monthly-operation', tone: 'danger' as const },
   { key: 'open-consumption', label: '查看消费结构', description: '核对消费与收入同步关系', route: '/stats/consumption', tone: 'warning' as const },

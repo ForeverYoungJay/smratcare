@@ -50,11 +50,14 @@
         <a-button type="primary" ghost @click="goFollowup('overdue')">
           处理逾期跟进（{{ followup.overdue }}）
         </a-button>
+        <a-button type="primary" ghost @click="goContractLifecycle('PENDING_ASSESSMENT')">
+          补齐待评估（{{ funnel.evaluationCount }}）
+        </a-button>
+        <a-button type="primary" ghost @click="goContractLifecycle('PENDING_BED_SELECT')">
+          办理待入住（{{ funnel.pendingAdmissionCount }}）
+        </a-button>
         <a-button type="primary" ghost @click="goContract('pending')">
           推进待签署（{{ contract.pendingSignCount }}）
-        </a-button>
-        <a-button type="primary" ghost @click="goReservation('expiring')">
-          处理锁床到期（{{ followup.lockExpiringCount }}）
         </a-button>
         <a-button type="primary" ghost @click="goPlan({ status: 'PENDING_APPROVAL' })">
           审批营销方案（{{ plan.pendingApprovalCount }}）
@@ -66,15 +69,16 @@
         <a-card class="card-elevated" :bordered="false" title="卡片1：销售漏斗总览（核心卡）">
           <a-row :gutter="[12, 12]">
             <a-col :span="12"><div class="stat-link" @click="goLead('all', { tab: 'consultation' })"><a-statistic title="今日新增咨询数" :value="funnel.todayConsultCount" /></div></a-col>
-            <a-col :span="12"><div class="stat-link" @click="goFunnel('evaluation')"><a-statistic title="待评估人数" :value="funnel.evaluationCount" /></div></a-col>
+            <a-col :span="12"><div class="stat-link" @click="goContractLifecycle('PENDING_ASSESSMENT')"><a-statistic title="待评估人数" :value="funnel.evaluationCount" /></div></a-col>
             <a-col :span="12"><div class="stat-link" @click="goContract('pending')"><a-statistic title="待签约人数" :value="funnel.pendingSignCount" /></div></a-col>
-            <a-col :span="12"><div class="stat-link" @click="goFunnel('admission')"><a-statistic title="待入住人数" :value="funnel.pendingAdmissionCount" /></div></a-col>
+            <a-col :span="12"><div class="stat-link" @click="goContractLifecycle('PENDING_BED_SELECT')"><a-statistic title="待入住人数" :value="funnel.pendingAdmissionCount" /></div></a-col>
             <a-col :span="12"><div class="stat-link" @click="goContract('signed')"><a-statistic title="本月成交数" :value="funnel.monthDealCount" /></div></a-col>
             <a-col :span="12"><div class="stat-link" @click="goReport('conversion')"><a-statistic title="本月转化率" :value="funnel.monthConversionRate" suffix="%" /></div></a-col>
           </a-row>
           <v-chart :option="funnelOption" autoresize style="height: 240px; margin-top: 12px" />
           <a-space wrap>
-            <a-button size="small" @click="goFunnel('evaluation')">待评估</a-button>
+            <a-button size="small" @click="goContractLifecycle('PENDING_ASSESSMENT')">待评估</a-button>
+            <a-button size="small" @click="goContractLifecycle('PENDING_BED_SELECT')">待入住</a-button>
             <a-button size="small" @click="goContract('pending')">待签约</a-button>
             <a-button size="small" @click="goReport('conversion')">转化率</a-button>
           </a-space>
@@ -398,6 +402,13 @@ function goContract(entry: 'pending' | 'signed' | 'renewal' | 'change' | 'attach
   router.push(buildContractRoute(entry, query))
 }
 
+function goContractLifecycle(stage: CrmContractItem['flowStage']) {
+  router.push({
+    path: '/marketing/contracts/pending',
+    query: stage ? { flowStage: stage } : {}
+  })
+}
+
 function goFunnel(entry: 'consultation' | 'evaluation' | 'signing' | 'admission' | 'lost', query?: Record<string, string>) {
   router.push(buildFunnelRoute(entry, query))
 }
@@ -484,7 +495,7 @@ async function loadOverview() {
     const conv = conversion as MarketingConversionReport
 
   funnel.todayConsultCount = conv.consultCount || 0
-  funnel.evaluationCount = leads.filter((item) => Number(item.status) === 1).length
+  funnel.evaluationCount = contracts.filter((item) => String(item.flowStage || '') === 'PENDING_ASSESSMENT').length
   funnel.pendingSignCount = contracts.filter((item) => String(item.flowStage || '') === 'PENDING_SIGN').length
   funnel.pendingAdmissionCount = contracts.filter((item) => String(item.flowStage || '') === 'PENDING_BED_SELECT').length
   funnel.monthDealCount = conv.contractCount || 0
@@ -498,7 +509,10 @@ async function loadOverview() {
   const emptyBeds = beds.filter((item) => Number(item.status) === 1)
   bedSales.emptyCount = emptyBeds.length
   bedSales.lockCount = leads.filter((item) => String(item.reservationStatus || '').includes('锁')).length
-  bedSales.reservedUnsignedCount = leads.filter((item) => Number(item.status) === 2 && !item.contractSignedFlag).length
+  bedSales.reservedUnsignedCount = contracts.filter((item) => {
+    const stage = String(item.flowStage || '')
+    return stage === 'PENDING_BED_SELECT' || stage === 'PENDING_SIGN'
+  }).length
   bedSales.premiumEmptyCount = emptyBeds.filter((item) => String(item.roomType || '').includes('高') || String(item.roomNo || '').startsWith('V')).length
 
   contract.pendingSignCount = contracts.filter((item) => String(item.flowStage || '') === 'PENDING_SIGN').length

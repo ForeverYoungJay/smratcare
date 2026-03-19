@@ -9,7 +9,6 @@
       <a-space wrap>
         <a-button @click="templateOpen = true">报表模板</a-button>
         <a-button @click="panelOpen = true">自定义面板</a-button>
-        <a-button @click="shareOpen = true">协作分享</a-button>
         <a-button @click="feedbackOpen = true">数据纠错</a-button>
       </a-space>
     </div>
@@ -93,18 +92,6 @@
       </a-checkbox-group>
     </a-modal>
 
-    <a-modal v-model:open="shareOpen" title="权限内协作分享" :footer="null">
-      <div class="share-shell">
-        <div class="share-title">{{ shareTitle }}</div>
-        <div class="share-copy">{{ shareText }}</div>
-        <a-alert type="info" show-icon :message="permissionNote" style="margin-top: 12px" />
-        <a-space style="margin-top: 12px">
-          <a-button type="primary" @click="copyShareText">复制说明</a-button>
-          <a-button @click="copyCurrentUrl">复制当前链接</a-button>
-        </a-space>
-      </div>
-    </a-modal>
-
     <a-modal v-model:open="feedbackOpen" title="数据纠错" @ok="saveFeedback" ok-text="提交" cancel-text="取消">
       <a-form layout="vertical">
         <a-form-item label="问题标题">
@@ -139,7 +126,6 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
-import { copyText } from '../../utils/clipboard'
 import {
   listStatsFeedback,
   listStatsReportTemplates,
@@ -200,12 +186,10 @@ const anomalyRows = computed(() => props.anomalies || [])
 const metricNotes = computed(() => props.metricNotes || [])
 const panelOptions = computed(() => props.panelOptions || [])
 const columnOptions = computed(() => props.templateColumnOptions || [])
-const permissionNote = computed(() => props.permissionNote || '接收人打开链接后仍只会看到自己权限范围内的数据。')
 const reportTemplates = ref<StatsReportTemplateRecord[]>([])
 const feedbackRows = ref<StatsFeedbackRecord[]>([])
 const templateOpen = ref(false)
 const panelOpen = ref(false)
-const shareOpen = ref(false)
 const feedbackOpen = ref(false)
 const templateColumns = ref<string[]>([])
 const localPanelKeys = ref<string[]>([])
@@ -224,20 +208,6 @@ const urgencyOptions = [
   { label: '中', value: 'MEDIUM' },
   { label: '高', value: 'HIGH' }
 ]
-
-const shareText = computed(() => {
-  const payloadText = Object.entries(props.currentPayload || {})
-    .filter(([, value]) => value !== undefined && value !== null && value !== '')
-    .map(([key, value]) => `${key}: ${value}`)
-    .join('\n')
-  return [
-    `主题：${props.shareTitle}`,
-    `生成时间：${dayjs().format('YYYY-MM-DD HH:mm:ss')}`,
-    `口径版本：${props.metricVersion || '--'}`,
-    payloadText ? `筛选条件：\n${payloadText}` : '筛选条件：当前页默认口径',
-    `权限说明：${permissionNote.value}`
-  ].join('\n')
-})
 
 function reloadTemplates() {
   reportTemplates.value = listStatsReportTemplates(props.pageKey)
@@ -322,24 +292,6 @@ function savePanel() {
   emit('panel-change', nextKeys)
   panelOpen.value = false
   message.success('自定义面板已保存')
-}
-
-async function copyShareText() {
-  const ok = await copyText(shareText.value)
-  if (ok) {
-    message.success('协作说明已复制')
-    return
-  }
-  message.warning('复制失败，请手动复制')
-}
-
-async function copyCurrentUrl() {
-  const ok = await copyText(window.location.href)
-  if (ok) {
-    message.success('当前链接已复制')
-    return
-  }
-  message.warning('复制失败，请手动复制')
 }
 
 function saveFeedback() {
@@ -501,28 +453,6 @@ onMounted(() => {
 .panel-option {
   padding: 10px 0;
   border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-}
-
-.share-shell {
-  padding: 4px 0;
-}
-
-.share-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.share-copy {
-  margin-top: 12px;
-  padding: 14px 16px;
-  border-radius: 16px;
-  background: rgba(248, 250, 252, 0.9);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  white-space: pre-wrap;
-  font-size: 13px;
-  line-height: 1.7;
-  color: rgba(15, 23, 42, 0.74);
 }
 
 @media (max-width: 960px) {

@@ -28,7 +28,6 @@
           <a-space>
             <a-button type="primary" @click="loadData">刷新</a-button>
             <a-button @click="exportSummary">导出汇总</a-button>
-            <a-button @click="copyFilterLink">复制筛选链接</a-button>
             <a-button @click="openColumnSetting">列设置</a-button>
             <a-button :disabled="!displayRows.length" @click="printCurrent">打印当前列</a-button>
             <a-button :disabled="!query.monthKeyword.trim() || !displayRows.length" @click="printSpecificMonth">打印指定月份</a-button>
@@ -141,7 +140,6 @@ import { useECharts } from '../../plugins/echarts'
 import { message } from 'ant-design-vue'
 import { printTableReport } from '../../utils/print'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
-import { copyText } from '../../utils/clipboard'
 import { normalizeId } from '../../utils/id'
 import { buildComparisonSummary, buildPeriodSeries } from '../../utils/statsInsight'
 
@@ -285,7 +283,7 @@ const visibleInsightItems = computed(() => {
   const selected = panelKeys.value.length ? new Set(panelKeys.value) : null
   return insightItems.value.filter((item) => !selected || selected.has(item.key))
 })
-const commandSummary = computed(() => '把入住波动、打印模板、分享说明和问题反馈集中管理，方便周会与异常排查。')
+const commandSummary = computed(() => '把入住波动、打印模板和问题反馈集中管理，方便周会与异常排查。')
 const commandActionItems = computed(() => ([
   { key: 'open-flow-report', label: '查看出入报表', description: '继续钻取到老人出入明细', route: '/stats/elder-flow-report', tone: 'danger' as const },
   { key: 'open-elder-info', label: '查看老人画像', description: '联动当前在院规模和结构', route: '/stats/elder-info', tone: 'warning' as const },
@@ -407,24 +405,6 @@ async function exportSummary() {
     message.success('导出成功')
   } catch (error: any) {
     message.error(error?.message || '导出失败')
-  }
-}
-
-async function copyFilterLink() {
-  const resolved = router.resolve({
-    path: route.path,
-    query: {
-      from: dayjs(query.from).format('YYYY-MM'),
-      to: dayjs(query.to).format('YYYY-MM'),
-      orgId: query.orgId ? String(query.orgId) : '',
-      monthKeyword: query.monthKeyword || ''
-    }
-  })
-  const ok = await copyText(`${window.location.origin}${resolved.fullPath}`)
-  if (ok) {
-    message.success('筛选链接已复制')
-  } else {
-    message.warning('复制失败，请手动复制地址栏链接')
   }
 }
 

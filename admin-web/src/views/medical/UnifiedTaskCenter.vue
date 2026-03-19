@@ -5,7 +5,6 @@
         <a-tag color="blue">任务总数 {{ summary.totalPending }}</a-tag>
         <a-tag color="orange">高风险 {{ summary.highRiskCount }}</a-tag>
         <a-tag color="purple">超时 {{ summary.overdueCount }}</a-tag>
-        <a-button @click="copyShareLink">复制分享链接</a-button>
         <a-button type="primary" ghost :loading="loading" @click="loadData">刷新</a-button>
       </a-space>
     </template>
@@ -696,16 +695,6 @@ function exportExcelData() {
     exportExcel(data, `统一任务中心-${dayjs().format('YYYYMMDD-HHmmss')}.xls`)
     message.success('Excel导出成功')
   })
-}
-
-async function copyShareLink() {
-  const url = `${window.location.origin}${route.fullPath}`
-  try {
-    await navigator.clipboard.writeText(url)
-    message.success('分享链接已复制')
-  } catch (error) {
-    message.warning('复制失败，请手动复制地址栏链接')
-  }
 }
 
 watch(

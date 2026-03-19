@@ -17,6 +17,9 @@ public class VisitBooking {
   private Long orgId;
   private Long elderId;
   private Long familyUserId;
+  private String visitorName;
+  private String visitorPhone;
+  private String visitorRelation;
   private LocalDate visitDate;
   private LocalDateTime visitTime;
   private String visitTimeSlot;

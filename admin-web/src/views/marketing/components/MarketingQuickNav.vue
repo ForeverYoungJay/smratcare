@@ -29,12 +29,25 @@
         {{ item.label }}
       </a-tag>
     </a-space>
+    <a-space v-if="collaborationLinks.length" wrap class="quick-nav-collab">
+      <span class="collab-label">协同入口</span>
+      <a-button
+        v-for="item in collaborationLinks"
+        :key="item.path"
+        size="small"
+        @click="router.push(item.path)"
+      >
+        {{ item.label }}
+      </a-button>
+    </a-space>
   </a-card>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useUserStore } from '../../../stores/user'
+import { resolveRouteAccess } from '../../../utils/routeAccess'
 
 const props = withDefaults(defineProps<{
   parentPath?: string
@@ -46,6 +59,7 @@ const props = withDefaults(defineProps<{
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const workbenchPath = computed(() => props.workbenchPath || '/marketing/workbench')
 const sectionLinks = computed(() => [
   { label: '线索', path: '/marketing/leads/all' },
@@ -67,6 +81,13 @@ const quickCreateRoutes: Record<string, { path: string; query?: Record<string, s
   reservation: { path: '/marketing/reservation/records', query: { quick: '1' } },
   plan: { path: '/marketing/plan', query: { quick: '1' } }
 }
+const collaborationLinks = computed(() => ([
+  { label: '入住评估', path: '/elder/assessment/ability/admission' },
+  { label: '入住办理', path: '/elder/admission-processing' },
+  { label: 'OA审批', path: '/oa/approval' },
+  { label: 'OA待办', path: '/oa/todo' },
+  { label: '人事行政', path: '/hr/workbench' }
+]).filter((item) => canAccess(item.path)))
 
 function goParent() {
   if (props.parentPath) {
@@ -90,6 +111,10 @@ function isActiveSection(path: string) {
   return current.startsWith(normalized)
 }
 
+function canAccess(path: string) {
+  return resolveRouteAccess(router, userStore.roles || [], path).canAccess
+}
+
 function onQuickCreate(event: { key: string | number }) {
   const target = quickCreateRoutes[String(event?.key || '')]
   if (!target) return
@@ -110,6 +135,15 @@ function onQuickCreate(event: { key: string | number }) {
 
 .quick-nav-sections {
   margin-top: 2px;
+}
+
+.quick-nav-collab {
+  margin-top: 8px;
+}
+
+.collab-label {
+  color: #64748b;
+  font-size: 12px;
 }
 
 .section-tag {
