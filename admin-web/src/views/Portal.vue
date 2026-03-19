@@ -391,7 +391,7 @@
                   </div>
                 </a-col>
               </a-row>
-              <a-button type="link" style="padding-left: 0; margin-top: 8px;" @click="go('/elder/bed-panorama')">点击 → 床态全景</a-button>
+              <a-button type="link" style="padding-left: 0; margin-top: 8px;" @click="go('/logistics/assets/room-state-map')">点击 → 房态图</a-button>
             </a-card>
           </a-col>
 
@@ -1292,7 +1292,7 @@ interface PortalCustomCardTemplate {
 
 const defaultCustomCards: PortalCustomCardItem[] = [
   { id: 'elder-overview', title: '长者总览', route: '/elder/in-hospital-overview', description: '快速查看在住长者信息', themeColor: '#1677ff', openMode: 'current', icon: '👴', category: 'OPS', visible: true, audience: ['ALL'], height: 168 },
-  { id: 'bed-panorama', title: '床态全景', route: '/elder/bed-panorama', description: '查看空床、清洁中与占用床位', themeColor: '#13c2c2', openMode: 'current', icon: '🛏️', category: 'OPS', visible: true, audience: ['ALL'], height: 168 },
+  { id: 'bed-panorama', title: '房态图', route: '/logistics/assets/room-state-map', description: '查看空床、清洁中与占用床位', themeColor: '#13c2c2', openMode: 'current', icon: '🛏️', category: 'OPS', visible: true, audience: ['ALL'], height: 168 },
   { id: 'finance-risk', title: '欠费看板', route: '/finance/bills/in-resident?filter=overdue', description: '快速追踪欠费风险', themeColor: '#fa8c16', openMode: 'current', icon: '💰', category: 'FINANCE', visible: true, audience: ['FINANCE', 'DIRECTOR', 'ADMIN'], height: 168 },
   { id: 'oa-calendar', title: '行政日历/协同日历', route: '/oa/work-execution/calendar', description: '查看个人/部门工作/日常/协同计划', themeColor: '#722ed1', openMode: 'current', icon: '📅', category: 'OA', visible: true, audience: ['ALL'], height: 168 }
 ]
@@ -1518,7 +1518,7 @@ const searchAliases: Record<string, string[]> = {
   '/oa/work-execution/calendar': ['日历', '协同日历', '行政日历', '排班'],
   '/oa/life/birthday': ['生日', '生日提醒', '生日计划', '老人生日'],
   '/oa/attendance-leave': ['请假', '考勤', '值班', '调班', '加班'],
-  '/elder/bed-panorama': ['床态', '空床', '清洁中', '床位全景'],
+  '/logistics/assets/room-state-map': ['房态图', '床态', '空床', '清洁中', '床位图'],
   '/marketing/reports/conversion': ['漏斗', '销售分析', '签约', '转化'],
   '/finance/reports/overall': ['财务分析', '欠费', '收入', '对账'],
   '/medical-care/orders': ['医嘱', '医嘱执行', '医护任务'],
@@ -1531,7 +1531,7 @@ const searchPinnedRoutes = [
   '/oa/work-execution/calendar',
   '/oa/attendance-leave',
   '/oa/life/birthday',
-  '/elder/bed-panorama',
+  '/logistics/assets/room-state-map',
   '/marketing/reports/conversion',
   '/finance/reports/overall',
   '/medical-care/orders',
@@ -1930,7 +1930,7 @@ const quickLaunchGroups = [
 
 const operationOverview = computed(() => [
   { title: '在住人数', value: dashboard.value.inHospitalCount || 0, route: '/elder/in-hospital-overview' },
-  { title: '空床数量', value: dashboard.value.availableBeds || 0, route: '/elder/bed-panorama' },
+  { title: '空床数量', value: dashboard.value.availableBeds || 0, route: '/logistics/assets/room-state-map' },
   { title: '今日入住', value: dashboard.value.totalAdmissions || 0, route: '/elder/admission-processing' },
   { title: '今日退住', value: dashboard.value.totalDischarges || 0, route: '/elder/status-change/discharge-apply' },
   {
@@ -1976,7 +1976,7 @@ const bedAndElderStatusItems = computed(() => [
   { title: '在住', value: bedAndElderStatus.inHospital, route: '/elder/in-hospital-overview' },
   { title: '外出', value: bedAndElderStatus.outing, route: '/elder/status-change/outing' },
   { title: '医疗观察', value: bedAndElderStatus.medicalObservation, route: '/elder/status-change/medical-outing' },
-  { title: '空床', value: bedAndElderStatus.emptyBeds, route: '/elder/bed-panorama?quick=empty' },
+  { title: '空床', value: bedAndElderStatus.emptyBeds, route: '/logistics/assets/room-state-map?quick=empty' },
   { title: '清洁中', value: bedAndElderStatus.cleaningBeds, route: '/life/room-cleaning?status=PENDING' }
 ])
 

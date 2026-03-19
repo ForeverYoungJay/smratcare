@@ -35,6 +35,9 @@ export function bootstrapHrMaterialsFolders(params) {
 export function getHrPolicyPage(params) {
     return fetchPage('/api/admin/hr/policy/page', params);
 }
+export function createHrPolicy(data) {
+    return request.post('/api/admin/hr/policy', data);
+}
 export function getHrPolicyAlertPage(params) {
     return fetchPage('/api/admin/hr/policy-alert/page', params);
 }
@@ -74,6 +77,21 @@ export function getHrMealFeePage(params) {
 export function getHrElectricityFeePage(params) {
     return fetchPage('/api/admin/hr/expense/electricity-fee/page', params);
 }
+export function getHrStaffServicePlan(staffId) {
+    return request.get(`/api/admin/hr/expense/service-plan/${staffId}`);
+}
+export function upsertHrStaffServicePlan(data) {
+    return request.post('/api/admin/hr/expense/service-plan', data);
+}
+export function generateHrMealFee(data) {
+    return request.post('/api/admin/hr/expense/meal-fee/generate', data);
+}
+export function importHrElectricityFee(data) {
+    return request.post('/api/admin/hr/expense/electricity-fee/import', data);
+}
+export function syncHrMonthlyFeeToFinance(data) {
+    return request.post('/api/admin/hr/expense/monthly-fee/sync-finance', data);
+}
 export function getHrTrainingReimbursePage(params) {
     return fetchPage('/api/admin/hr/expense/training-reimburse/page', params);
 }
@@ -106,6 +124,12 @@ export function getHrProfile(staffId) {
 }
 export function upsertHrProfile(data) {
     return request.post('/api/admin/hr/profile', data);
+}
+export function getHrSocialSecuritySummary() {
+    return request.get('/api/admin/hr/social-security/summary');
+}
+export function getHrSocialSecurityReminderPage(params) {
+    return fetchPage('/api/admin/hr/social-security/reminder/page', params);
 }
 export function getHrTrainingPage(params) {
     return fetchPage('/api/admin/hr/training/page', params);

@@ -11,6 +11,7 @@
         <a-space>
           <a-button @click="onExportCsv">导出 CSV</a-button>
           <a-button @click="onExportExcel">导出 Excel</a-button>
+          <a-button type="primary" @click="openDrawer">新增制度</a-button>
           <a-button @click="fetchData">刷新</a-button>
         </a-space>
       </template>
@@ -32,16 +33,49 @@
         </template>
       </template>
     </DataTable>
+
+    <a-drawer v-model:open="drawerOpen" title="新增规章制度" width="520">
+      <a-form :model="form" layout="vertical">
+        <a-form-item label="制度名称" required>
+          <a-input v-model:value="form.name" placeholder="例如：员工考勤制度" />
+        </a-form-item>
+        <a-form-item label="所属目录">
+          <a-input v-model:value="form.folder" placeholder="默认：规章制度" />
+        </a-form-item>
+        <a-form-item label="上传文件" required>
+          <a-upload :show-upload-list="false" :before-upload="beforeUploadPolicy">
+            <a-button :loading="uploading">上传制度文件</a-button>
+          </a-upload>
+          <div class="upload-hint">{{ uploadHint }}</div>
+        </a-form-item>
+        <a-form-item label="更新时间" required>
+          <a-date-picker v-model:value="uploadedAtValue" show-time style="width: 100%" />
+        </a-form-item>
+        <a-form-item label="备注">
+          <a-textarea v-model:value="form.remark" :rows="3" />
+        </a-form-item>
+      </a-form>
+      <template #footer>
+        <a-space>
+          <a-button @click="drawerOpen = false">取消</a-button>
+          <a-button type="primary" :loading="saving" @click="submit">保存</a-button>
+        </a-space>
+      </template>
+    </a-drawer>
   </PageContainer>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
+import dayjs, { type Dayjs } from 'dayjs'
+import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
-import { getHrPolicyPage } from '../../api/hr'
+import { createHrPolicy, getHrPolicyPage } from '../../api/hr'
+import { uploadOaFile } from '../../api/oa'
 import type { OaDocument, PageResult } from '../../types'
+import { resolveHrError } from './hrError'
 import { exportCsv, exportExcel } from '../../utils/export'
 import { mapByDict } from './hrExportFields'
 
@@ -55,12 +89,22 @@ const columns = [
   { title: '文档名称', dataIndex: 'name', key: 'name', width: 240 },
   { title: '目录', dataIndex: 'folder', key: 'folder', width: 180 },
   { title: '上传人', dataIndex: 'uploaderName', key: 'uploaderName', width: 120 },
-  { title: '上传时间', dataIndex: 'uploadedAt', key: 'uploadedAt', width: 180 },
+  { title: '更新时间', dataIndex: 'uploadedAt', key: 'uploadedAt', width: 180 },
   { title: '链接', dataIndex: 'url', key: 'url', width: 100 }
 ]
 const rows = ref<OaDocument[]>([])
 const loading = ref(false)
+const saving = ref(false)
+const uploading = ref(false)
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
+
+const drawerOpen = ref(false)
+const form = reactive<Partial<OaDocument>>({})
+const uploadedAtValue = ref<Dayjs | undefined>()
+const uploadHint = computed(() => {
+  if (!form.url) return '上传后会自动回填文件链接，更新时间可按制度实际生效时间填写'
+  return `已上传：${form.name || '文件'}`
+})
 
 async function fetchData() {
   loading.value = true
@@ -99,6 +143,34 @@ function onReset() {
   fetchData()
 }
 
+function openDrawer() {
+  form.name = undefined
+  form.folder = '规章制度'
+  form.url = undefined
+  form.sizeBytes = undefined
+  form.remark = undefined
+  uploadedAtValue.value = dayjs()
+  drawerOpen.value = true
+}
+
+async function beforeUploadPolicy(file: File) {
+  uploading.value = true
+  try {
+    const uploaded = await uploadOaFile(file, 'hr-policy')
+    if (!form.name) {
+      form.name = uploaded.originalFileName || uploaded.fileName || file.name
+    }
+    form.url = uploaded.fileUrl || ''
+    form.sizeBytes = uploaded.fileSize || file.size || 0
+    message.success('制度文件上传成功')
+  } catch (error) {
+    message.error(resolveHrError(error, '制度文件上传失败'))
+  } finally {
+    uploading.value = false
+  }
+  return false
+}
+
 function rowClassName(record: OaDocument) {
   if (!record.url) return 'hr-row-warning'
   return ''
@@ -108,7 +180,7 @@ const exportFields = [
   { key: 'name', label: '文档名称' },
   { key: 'folder', label: '目录' },
   { key: 'uploaderName', label: '上传人' },
-  { key: 'uploadedAt', label: '上传时间' },
+  { key: 'uploadedAt', label: '更新时间' },
   { key: 'url', label: '链接' }
 ]
 
@@ -120,11 +192,39 @@ function onExportExcel() {
   exportExcel(mapByDict(rows.value as Record<string, any>[], exportFields), '规章制度库-当前筛选')
 }
 
+async function submit() {
+  if (!form.name || !form.url || !uploadedAtValue.value) {
+    message.warning('请填写制度名称、上传文件和更新时间')
+    return
+  }
+  saving.value = true
+  try {
+    await createHrPolicy({
+      ...form,
+      folder: form.folder || '规章制度',
+      uploadedAt: uploadedAtValue.value.format('YYYY-MM-DD HH:mm:ss')
+    })
+    message.success('制度已新增')
+    drawerOpen.value = false
+    fetchData()
+  } catch (error) {
+    message.error(resolveHrError(error, '保存失败'))
+  } finally {
+    saving.value = false
+  }
+}
+
 onMounted(fetchData)
 </script>
 
 <style scoped>
 :deep(.hr-row-warning) {
   background: #fffbe6 !important;
+}
+
+.upload-hint {
+  margin-top: 8px;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
 }
 </style>

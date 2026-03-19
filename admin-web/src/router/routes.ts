@@ -69,7 +69,7 @@ export const routes: RouteRecordRaw[] = [
             path: 'bed-panorama',
             name: 'ElderBedPanorama',
             component: () => import('../views/elder/resident360/BedPanorama.vue'),
-            meta: { title: '床态全景' }
+            meta: { title: '床态全景', hidden: true }
           },
           {
             path: 'list',
@@ -663,20 +663,20 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'bed',
         name: 'Bed',
-        meta: { title: '床位管理', icon: 'HomeOutlined' },
-        redirect: '/bed/map',
+        meta: { title: '床位管理', icon: 'HomeOutlined', hidden: true },
+        redirect: '/logistics/assets/room-state-map',
         children: [
           {
             path: 'map',
             name: 'BedMap',
-            component: () => import('../views/bed/Map.vue'),
-            meta: { title: '房态图' }
+            redirect: '/logistics/assets/room-state-map',
+            meta: { title: '房态图', hidden: true }
           },
           {
             path: 'manage',
             name: 'BedManage',
-            component: () => import('../views/bed/Manage.vue'),
-            meta: { title: '床位管理' }
+            redirect: '/logistics/assets/bed-management',
+            meta: { title: '床位管理', hidden: true }
           }
         ]
       },
@@ -702,34 +702,37 @@ export const routes: RouteRecordRaw[] = [
             path: 'assets',
             name: 'LogisticsAssets',
             meta: { title: '资产与床态管理' },
-            redirect: '/logistics/assets/bed-panorama',
+            redirect: '/logistics/assets/room-state-map',
             children: [
               {
                 path: 'building-management',
                 name: 'LogisticsBuildingManagement',
-                component: () => import('../views/bed/Manage.vue'),
-                props: { initialTab: 'buildings' },
-                meta: { title: '楼栋管理' }
+                redirect: '/logistics/assets/bed-management',
+                meta: { title: '楼栋管理', hidden: true }
               },
               {
                 path: 'floor-management',
                 name: 'LogisticsFloorManagement',
-                component: () => import('../views/bed/Manage.vue'),
-                props: { initialTab: 'floors' },
-                meta: { title: '楼层管理' }
+                redirect: '/logistics/assets/bed-management',
+                meta: { title: '楼层管理', hidden: true }
               },
               {
                 path: 'room-management',
                 name: 'LogisticsRoomManagement',
-                component: () => import('../views/bed/Manage.vue'),
-                props: { initialTab: 'rooms' },
-                meta: { title: '房间管理' }
+                redirect: '/logistics/assets/bed-management',
+                meta: { title: '房间管理', hidden: true }
+              },
+              {
+                path: 'room-state-map',
+                name: 'LogisticsRoomStateMap',
+                component: () => import('../views/bed/Map.vue'),
+                meta: { title: '房态图' }
               },
               {
                 path: 'bed-management',
                 name: 'LogisticsBedManagement',
                 component: () => import('../views/bed/Manage.vue'),
-                props: { initialTab: 'beds' },
+                props: { initialTab: 'beds', allowedTabs: ['beds'] },
                 meta: { title: '床位管理' }
               },
               {
@@ -756,8 +759,8 @@ export const routes: RouteRecordRaw[] = [
               {
                 path: 'bed-panorama',
                 name: 'LogisticsBedPanorama',
-                component: () => import('../views/elder/resident360/BedPanorama.vue'),
-                meta: { title: '床态全景' }
+                redirect: '/logistics/assets/room-state-map',
+                meta: { title: '床态全景', hidden: true }
               },
               {
                 path: 'bed-status-record',
@@ -1909,6 +1912,12 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: '长者患者列表' }
           },
           {
+            path: 'basic-diseases',
+            name: 'MedicalCareResidentDiseases',
+            component: () => import('../views/medical/ResidentDiseaseManager.vue'),
+            meta: { title: '基础疾病维护' }
+          },
+          {
             path: 'care-task-board',
             name: 'MedicalCareTaskBoard',
             component: () => import('../views/care/workbench/TaskBoard.vue'),
@@ -2727,6 +2736,12 @@ export const routes: RouteRecordRaw[] = [
                 name: 'HrProfileContractReminders',
                 component: () => import('../views/hr/HrContractReminder.vue'),
                 meta: { title: '合同到期提醒', roles: ['ADMIN'] }
+              },
+              {
+                path: 'social-security-reminders',
+                name: 'HrProfileSocialSecurityReminders',
+                component: () => import('../views/hr/HrSocialSecurityReminder.vue'),
+                meta: { title: '社保到期/未办理', roles: ['HR_EMPLOYEE', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
               }
             ]
           },
@@ -2739,7 +2754,7 @@ export const routes: RouteRecordRaw[] = [
               {
                 path: 'schemes',
                 name: 'HrAttendanceSchemes',
-                component: () => import('../views/care/ShiftTemplates.vue'),
+                component: () => import('../views/hr/HrAttendanceSchemes.vue'),
                 meta: { title: '排班方案', roles: ['ADMIN'] }
               },
               {
@@ -2845,7 +2860,7 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: '培训与发展', roles: ['ADMIN'] },
             redirect: '/hr/development/records',
             children: [
-              { path: 'plans', name: 'HrDevelopmentPlans', redirect: '/hr/development/records?scene=plans', meta: { title: '培训计划（兼容）', roles: ['ADMIN'], hidden: true } },
+              { path: 'plans', name: 'HrDevelopmentPlans', redirect: '/hr/development/records?scene=plans', meta: { title: '培训计划', roles: ['ADMIN'] } },
               { path: 'enrollments', name: 'HrDevelopmentEnrollments', redirect: '/hr/development/records?scene=enrollments', meta: { title: '培训报名（兼容）', roles: ['ADMIN'], hidden: true } },
               { path: 'signin', name: 'HrDevelopmentSignin', redirect: '/hr/development/records?scene=signin', meta: { title: '培训签到（兼容）', roles: ['ADMIN'], hidden: true } },
               { path: 'records', name: 'HrDevelopmentRecords', component: () => import('../views/hr/Training.vue'), meta: { title: '培训记录', roles: ['ADMIN'] } },
@@ -2969,8 +2984,8 @@ export const routes: RouteRecordRaw[] = [
               {
                 path: 'building-management',
                 name: 'BaseConfigResidenceBuildingManagement',
-                redirect: '/logistics/assets/building-management',
-                meta: { title: '楼栋管理', roles: ['ADMIN'] }
+                redirect: '/logistics/assets/bed-management',
+                meta: { title: '楼栋管理', roles: ['ADMIN'], hidden: true }
               }
             ]
           },

@@ -9,7 +9,7 @@
         <a-button @click="exportCurrent">导出CSV</a-button>
         <a-button @click="printCurrent">打印当前</a-button>
         <a-button @click="go('/finance/discharge/settlement')">查看退住结算</a-button>
-        <a-button @click="go('/elder/bed-panorama')">查看床态全景</a-button>
+        <a-button @click="go('/logistics/assets/room-state-map')">查看房态图</a-button>
       </a-space>
     </a-card>
 

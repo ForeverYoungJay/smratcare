@@ -9,5 +9,6 @@ public class HrProfileDocumentRequest {
   private String url;
   private Long sizeBytes;
   private String uploaderName;
+  private String uploadedAt;
   private String remark;
 }

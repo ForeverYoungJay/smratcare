@@ -234,7 +234,7 @@ const sectionConfigs: readonly WorkbenchSection[] = [
       { label: '入住评估', path: '/elder/assessment/ability/admission' },
       { label: '入住办理', path: '/elder/admission-processing' },
       { label: '在院总览', path: '/elder/in-hospital-overview' },
-      { label: '床位房态图', path: '/elder/bed-panorama' },
+      { label: '床位房态图', path: '/logistics/assets/room-state-map' },
       { label: 'OA 门户', path: '/oa/portal' }
     ]
   },

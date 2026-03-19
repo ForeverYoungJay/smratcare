@@ -2,11 +2,13 @@ package com.zhiyangyun.care.auth.config;
 
 import com.zhiyangyun.care.auth.model.Result;
 import jakarta.validation.ConstraintViolationException;
+import java.io.IOException;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -15,10 +17,12 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.ObjectError;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -85,6 +89,34 @@ public class GlobalExceptionHandler {
         .body(Result.error(400, resolveDataIntegrityMessage(ex)));
   }
 
+  @ExceptionHandler(NoResourceFoundException.class)
+  public ResponseEntity<Result<Void>> handleNoResourceFound(NoResourceFoundException ex) {
+    log.warn("Resource not found: {}", ex.getResourcePath());
+    return ResponseEntity.status(HttpStatus.NOT_FOUND)
+        .body(Result.error(404, "请求资源不存在"));
+  }
+
+  @ExceptionHandler(AsyncRequestNotUsableException.class)
+  public void handleAsyncRequestNotUsable(AsyncRequestNotUsableException ex) {
+    log.warn("Client disconnected before response completed: {}", ex.getMessage());
+  }
+
+  @ExceptionHandler(IOException.class)
+  public void handleIoException(IOException ex) throws IOException {
+    if (isClientAbort(ex)) {
+      log.warn("Client connection aborted: {}", ex.getMessage());
+      return;
+    }
+    throw ex;
+  }
+
+  @ExceptionHandler(BadSqlGrammarException.class)
+  public ResponseEntity<Result<Void>> handleBadSqlGrammar(BadSqlGrammarException ex) {
+    log.error("Database schema not ready: {}", ex.getMessage());
+    return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+        .body(Result.error(503, "数据库结构未完成升级，请先执行最新迁移"));
+  }
+
   @ExceptionHandler(Exception.class)
   @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
   public Result<Void> handleOther(Exception ex) {
@@ -123,10 +155,32 @@ public class GlobalExceptionHandler {
     if (normalized.contains("uk_room_tenant_room_no")) {
       return "房间号已存在，请调整后重试";
     }
+    if (normalized.contains("uk_room_org_room_no")) {
+      return "房间号已存在，请调整后重试";
+    }
+    if (normalized.contains("uk_staff_org_username")) {
+      return "账号或手机号已存在，请调整后重试";
+    }
     if (normalized.contains("duplicate entry")) {
       return "数据已存在，请勿重复提交";
     }
     return "数据保存失败，请检查是否存在重复或无效数据";
+  }
+
+  private boolean isClientAbort(Throwable ex) {
+    Throwable current = ex;
+    while (current != null) {
+      String name = current.getClass().getName();
+      String message = current.getMessage();
+      if (name.contains("ClientAbortException")) {
+        return true;
+      }
+      if (message != null && message.toLowerCase(Locale.ROOT).contains("broken pipe")) {
+        return true;
+      }
+      current = current.getCause();
+    }
+    return false;
   }
 
   private String defaultText(String value, String fallback) {

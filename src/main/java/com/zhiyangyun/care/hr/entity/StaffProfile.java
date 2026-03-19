@@ -45,6 +45,14 @@ public class StaffProfile {
 
   private LocalDate birthday;
 
+  private String socialSecurityStatus;
+
+  private LocalDate socialSecurityStartDate;
+
+  private Integer socialSecurityReminderDays;
+
+  private String socialSecurityRemark;
+
   private Integer status;
 
   private LocalDate leaveDate;

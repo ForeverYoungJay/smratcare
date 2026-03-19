@@ -12,7 +12,7 @@
             </a-form-item>
             <a-space>
               <a-button type="primary" @click="goTaskBoard">查看任务</a-button>
-              <a-button @click="go('/elder/bed-panorama')">床态全景</a-button>
+              <a-button @click="go('/logistics/assets/room-state-map')">房态图</a-button>
             </a-space>
           </a-form>
         </a-card>

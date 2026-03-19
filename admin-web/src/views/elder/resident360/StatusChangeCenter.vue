@@ -400,7 +400,7 @@ const activeReceiptActions = computed(() => {
       label: '打开后勤工作台',
       path: '/logistics/workbench?source=lifecycle&scene=status-change&focus=maintenance'
     },
-    { label: '打开床态全景', path: '/elder/bed-panorama?source=lifecycle&scene=status-change' }
+    { label: '打开房态图', path: '/logistics/assets/room-state-map?source=lifecycle&scene=status-change' }
   ]
 })
 let refreshTimer: number | null = null

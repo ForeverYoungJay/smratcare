@@ -206,8 +206,8 @@ import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../../components/PageContainer.vue'
 import FlowGuardBar from '../../../components/FlowGuardBar.vue'
-import { getBedMap, getRoomList } from '../../../api/bed'
 import { getElderDetail } from '../../../api/elder'
+import { useBedMapDataset } from '../../../composables/useBedMapDataset'
 import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
 import type { BedItem, ElderItem, RoomItem } from '../../../types'
 
@@ -227,7 +227,7 @@ type RoomScene = {
 
 const router = useRouter()
 const route = useRoute()
-const beds = ref<BedItem[]>([])
+const { plainBeds, riskBeds, roomList, ensureBedMapLoaded, ensureRoomListLoaded, refreshBedMapDataset } = useBedMapDataset()
 const roomTypeMap = ref<Record<string, string>>({})
 const roomCapacityMap = ref<Record<string, number>>({})
 const keyword = ref('')
@@ -268,6 +268,8 @@ const lifecycleContext = computed(() => {
     message: active ? '当前来自入住状态变更联动，可在床态视图快速确认清洁/维修与空床调配。' : ''
   }
 })
+
+const beds = computed(() => (riskDataReady.value ? riskBeds.value : plainBeds.value))
 
 const filteredBeds = computed(() => beds.value.filter((b) => {
   if (keyword.value) {
@@ -775,19 +777,17 @@ function goScan() {
 }
 
 function openBedMap() {
-  router.push('/bed/map')
+  router.push('/logistics/assets/room-state-map')
 }
 
 function openBedManage() {
-  router.push('/bed/manage')
+  router.push('/logistics/assets/bed-management')
 }
 
 async function loadBeds(includeRisk = false) {
-  beds.value = await getBedMap({ params: { includeRisk } })
+  await ensureBedMapLoaded(includeRisk)
   if (includeRisk) {
     riskDataReady.value = true
-  } else {
-    riskDataReady.value = false
   }
 }
 
@@ -802,10 +802,10 @@ async function ensureRiskDataLoaded() {
 }
 
 async function loadRooms() {
-  const rooms: RoomItem[] = await getRoomList()
   const typeMap: Record<string, string> = {}
   const capMap: Record<string, number> = {}
-  rooms.forEach((item) => {
+  await ensureRoomListLoaded()
+  ;(roomList.value as RoomItem[]).forEach((item) => {
     const id = String(item.id)
     typeMap[id] = item.roomType || '标准间'
     capMap[id] = Number(item.capacity || 1)
@@ -817,7 +817,9 @@ async function loadRooms() {
 useLiveSyncRefresh({
   topics: ['elder', 'bed', 'lifecycle', 'finance', 'care', 'dining'],
   refresh: async () => {
-    await Promise.all([loadBeds(false), loadRooms()])
+    await refreshBedMapDataset({ rooms: true })
+    riskDataReady.value = false
+    await loadRooms()
     if (riskFilterEnabled.value) {
       await ensureRiskDataLoaded()
     }
@@ -879,95 +881,127 @@ watch(
 </script>
 
 <style scoped>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+.portal-page {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  letter-spacing: -0.01em;
+}
+
 .selector-strip {
   display: grid;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
 .selector-group {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
 .selector-label {
-  min-width: 40px;
-  color: #475569;
-  font-weight: 600;
+  min-width: 48px;
+  color: #1e3a8a;
+  font-weight: 700;
+  font-size: 13px;
 }
 
 .matrix-selection-bar {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+  padding: 0 4px;
 }
 
 .matrix-tip {
   color: #64748b;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .plan-stage {
-  min-height: 460px;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  background: linear-gradient(145deg, #f8fbff 0%, #ffffff 75%);
-  padding: 12px;
+  min-height: 480px;
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(239, 246, 255, 0.4) 0%, rgba(255, 255, 255, 0.6) 100%);
+  padding: 16px;
+  backdrop-filter: blur(8px);
 }
 
 .matrix-viewport {
   overflow-x: auto;
+  padding-bottom: 8px;
 }
 
 .matrix-grid {
   display: grid;
   min-width: max-content;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 16px;
+  overflow: hidden;
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
 }
 
 .matrix-corner,
 .matrix-building-head,
 .matrix-floor-axis,
 .matrix-cell {
-  border-right: 1px solid #e5e7eb;
-  border-bottom: 1px solid #e5e7eb;
+  border-right: 1px solid rgba(226, 232, 240, 0.6);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.6);
 }
 
 .matrix-corner {
   position: sticky;
   left: 0;
-  z-index: 3;
-  background: #f1f5f9;
+  z-index: 10;
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 64px;
-  font-weight: 700;
-  color: #334155;
+  min-height: 72px;
+  font-weight: 800;
+  color: #1e3a8a;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .matrix-building-head {
   border: 0;
   appearance: none;
-  background: #f8fafc;
-  min-height: 64px;
-  width: 100%;
-  padding: 10px 12px;
-  font-weight: 700;
+  background: #ffffff;
+  min-height: 72px;
+  padding: 14px 16px;
+  font-weight: 800;
   color: #0f172a;
   text-align: left;
   cursor: pointer;
-  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+  transition: all 0.3s ease;
+  font-size: 16px;
+}
+
+.matrix-building-head:hover {
+  background: #f8fafc;
 }
 
 .matrix-building-head.active {
-  background: #dbeafe;
-  box-shadow: inset 0 0 0 1px #60a5fa;
+  background: #eff6ff;
+  box-shadow: inset 0 -4px 0 #3b82f6;
+  color: #2563eb;
 }
 
 .building-remark {
   margin-top: 4px;
-  color: #64748b;
-  font-size: 12px;
+  color: #94a3b8;
+  font-size: 11px;
   font-weight: 500;
+  font-style: italic;
 }
 
 .matrix-floor-axis {
@@ -975,56 +1009,80 @@ watch(
   appearance: none;
   position: sticky;
   left: 0;
-  z-index: 2;
-  background: #f8fafc;
-  min-height: 220px;
+  z-index: 5;
+  background: #ffffff;
+  min-height: 240px;
   width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 700;
-  color: #334155;
+  font-weight: 800;
+  color: #1e3a8a;
   cursor: pointer;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition: all 0.3s ease;
+  font-size: 16px;
+}
+
+.matrix-floor-axis:hover {
+  background: #f8fafc;
 }
 
 .matrix-floor-axis.active {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: #eff6ff;
+  box-shadow: inset -4px 0 0 #3b82f6;
+  color: #2563eb;
 }
 
 .matrix-cell {
-  background: #fff;
-  min-height: 220px;
-  max-height: 220px;
-  padding: 10px;
+  background: transparent;
+  min-height: 240px;
+  max-height: 240px;
+  padding: 14px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   align-content: start;
   gap: 12px;
-  overflow: auto;
+  overflow-y: auto;
+  scrollbar-width: none;
 }
 
+.matrix-cell::-webkit-scrollbar { display: none; }
+
 .matrix-empty {
-  color: #94a3b8;
+  color: #cbd5e1;
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 60px;
+  font-style: italic;
+  font-size: 14px;
 }
 
 .room-block {
-  border: 1px solid #dbeafe;
-  border-radius: 10px;
-  background: #ffffff;
-  padding: 8px;
-  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 12px;
+  backdrop-filter: blur(10px);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.05),
+    0 10px 15px -3px rgba(30, 64, 175, 0.04);
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  cursor: pointer;
+}
+
+.room-block:hover {
+  transform: translateY(-6px);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 20px 25px -5px rgba(30, 64, 175, 0.1);
+  border-color: #3b82f6;
 }
 
 .bed-matrix {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+  margin-top: 10px;
 }
 
 .room-head {
@@ -1034,45 +1092,64 @@ watch(
 }
 
 .room-title {
-  font-weight: 700;
-  color: #0f172a;
+  font-weight: 800;
+  color: #1e293b;
+  font-size: 15px;
 }
 
 .room-type {
-  font-size: 12px;
-  color: #2563eb;
+  font-size: 11px;
+  font-weight: 700;
+  color: #3b82f6;
+  text-transform: uppercase;
 }
 
 .room-meta {
-  margin: 6px 0 6px;
+  margin: 6px 0 2px;
   color: #64748b;
   font-size: 11px;
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
 }
 
 .room-remark {
-  margin: 0 0 6px;
+  margin-bottom: 6px;
   color: #2563eb;
   font-size: 11px;
+  font-weight: 600;
+  background: rgba(37, 99, 235, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 .bed-tile {
   border: 0;
-  border-radius: 8px;
-  padding: 6px 5px;
+  border-radius: 10px;
+  padding: 10px 8px;
   text-align: left;
   cursor: pointer;
   display: flex;
   flex-direction: column;
   position: relative;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+  overflow: hidden;
+}
+
+.bed-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
 }
 
 .bed-no {
-  font-weight: 700;
-  font-size: 12px;
+  font-weight: 800;
+  font-size: 13px;
 }
 
 .bed-name {
   font-size: 12px;
+  font-weight: 500;
   margin-top: 2px;
 }
 
@@ -1082,80 +1159,64 @@ watch(
 
 .risk-corner {
   position: absolute;
-  right: 4px;
-  top: 4px;
-  border-radius: 10px;
-  padding: 1px 5px;
+  right: 6px;
+  top: 6px;
+  border-radius: 6px;
+  padding: 2px 4px;
   font-size: 10px;
-  line-height: 1.2;
+  font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
 }
 
-.risk-high {
-  background: #ef4444;
-  color: #fff;
-}
-
-.risk-medium {
-  background: #f59e0b;
-  color: #fff;
-}
-
-.risk-low {
-  background: #38bdf8;
-  color: #fff;
-}
+.risk-high { background: #ef4444; color: #fff; box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3); }
+.risk-medium { background: #f59e0b; color: #fff; box-shadow: 0 2px 6px rgba(245, 158, 11, 0.3); }
+.risk-low { background: #38bdf8; color: #fff; box-shadow: 0 2px 6px rgba(56, 189, 248, 0.3); }
 
 .is-idle {
-  background: #f3f4f6;
-  color: #111827;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  color: #475569;
 }
 
 .is-reserved {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  color: #1e40af;
 }
 
 .is-occupied {
-  background: #dcfce7;
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
   color: #166534;
 }
 
 .gender-female {
-  box-shadow: inset 0 0 0 2px #ff85c0;
+  border-left: 4px solid #ff85c0;
 }
 
 .gender-male {
-  box-shadow: inset 0 0 0 2px #69b1ff;
+  border-left: 4px solid #3b82f6;
 }
 
 .is-maintenance {
-  background: #ffedd5;
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
   color: #9a3412;
 }
 
 .is-cleaning {
-  background: #cffafe;
+  background: linear-gradient(135deg, #ecfeff 0%, #cffafe 100%);
   color: #0e7490;
 }
 
 .is-locked {
-  background: #fee2e2;
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
   color: #991b1b;
 }
 
 @media (max-width: 1400px) {
-  .matrix-cell {
-    grid-template-columns: 1fr;
-  }
+  .matrix-cell { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 640px) {
-  .selector-label {
-    min-width: 58px;
-  }
-
-  .room-block {
-    grid-column: span 1 !important;
-  }
+  .selector-label { min-width: 58px; }
+  .room-block { grid-column: span 1 !important; }
 }
 </style>

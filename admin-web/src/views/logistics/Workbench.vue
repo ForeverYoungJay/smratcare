@@ -53,7 +53,7 @@
       <template #action>
         <a-space wrap>
           <a-button size="small" @click="go('/elder/resident-360?residentId=' + signedLinkageContext.residentId + '&from=contractSigned')">长者总览</a-button>
-          <a-button size="small" @click="go('/elder/bed-panorama?from=contractSigned')">床态全景</a-button>
+          <a-button size="small" @click="go('/logistics/assets/room-state-map?from=contractSigned')">房态图</a-button>
           <a-button size="small" @click="go('/logistics/task-center?source=contract_signed&entryScene=signed_onboarding&residentId=' + signedLinkageContext.residentId + '&residentName=' + encodeURIComponent(signedLinkageContext.residentName || '') + '&tab=delivery')">后勤任务中心</a-button>
         </a-space>
       </template>
@@ -392,7 +392,7 @@ const cards = computed<WorkbenchCard[]>(() => {
         `床位占用率：${Number(data.bedOccupancyRate || 0).toFixed(2)}%`
       ],
       actions: [
-        { label: '床态全景', path: '/elder/bed-panorama?filter=occupied', primary: true },
+        { label: '房态图', path: '/logistics/assets/room-state-map?filter=occupied', primary: true },
         { label: '清洁中床位', path: '/life/room-cleaning?status=PENDING' },
         { label: '维修中床位', path: '/logistics/assets/maintenance-record?status=PROCESSING' }
       ]

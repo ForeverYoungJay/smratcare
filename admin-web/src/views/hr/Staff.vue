@@ -50,6 +50,27 @@
       description="保存后可以直接继续去账号设置、合同维护或附件上传。"
     />
 
+    <a-row :gutter="12" style="margin-bottom: 12px">
+      <a-col :xs="24" :md="8">
+        <a-card size="small" :loading="summaryLoading" class="summary-card" @click="goToSocialSecurityDetail('COMPLETED')">
+          <div class="summary-label">本月新增参保</div>
+          <div class="summary-value">{{ socialSecuritySummary.thisMonthNewParticipantCount || 0 }}</div>
+        </a-card>
+      </a-col>
+      <a-col :xs="24" :md="8">
+        <a-card size="small" :loading="summaryLoading" class="summary-card" @click="goToSocialSecurityDetail('DUE')">
+          <div class="summary-label">本日需提醒缴纳</div>
+          <div class="summary-value summary-warning">{{ socialSecuritySummary.dueReminderCount || 0 }}</div>
+        </a-card>
+      </a-col>
+      <a-col :xs="24" :md="8">
+        <a-card size="small" :loading="summaryLoading" class="summary-card" @click="goToSocialSecurityDetail('UPCOMING')">
+          <div class="summary-label">7日内将触发提醒</div>
+          <div class="summary-value">{{ socialSecuritySummary.upcomingReminderCount || 0 }}</div>
+        </a-card>
+      </a-col>
+    </a-row>
+
     <DataTable
       rowKey="staffId"
       :row-selection="rowSelection"
@@ -97,7 +118,7 @@
           <a-form-item label="姓名" required>
             <a-input v-model:value="accountForm.realName" @change="syncRealNameFromAccount" />
           </a-form-item>
-          <a-form-item label="部门">
+          <a-form-item label="部门" required>
             <a-select
               v-model:value="accountForm.departmentId"
               allow-clear
@@ -186,6 +207,25 @@
         <a-form-item label="离职原因">
           <a-input v-model:value="form.leaveReason" />
         </a-form-item>
+        <a-divider orientation="left">员工社保缴纳</a-divider>
+        <a-form-item label="社保状态">
+          <a-select v-model:value="form.socialSecurityStatus" :options="socialSecurityStatusOptions" />
+        </a-form-item>
+        <a-form-item label="参保开始日期">
+          <a-date-picker v-model:value="socialSecurityStartDateValue" style="width: 100%" />
+        </a-form-item>
+        <a-form-item label="提醒天数">
+          <a-input-number
+            v-model:value="form.socialSecurityReminderDays"
+            :min="0"
+            :max="365"
+            style="width: 100%"
+            placeholder="入职后多少天开始提醒缴纳社保"
+          />
+        </a-form-item>
+        <a-form-item label="社保备注">
+          <a-textarea v-model:value="form.socialSecurityRemark" :rows="2" placeholder="可记录办理进度、补缴说明等" />
+        </a-form-item>
         <a-form-item label="备注">
           <a-textarea v-model:value="form.remark" :rows="3" />
         </a-form-item>
@@ -225,13 +265,13 @@ import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
-import { getHrStaffPage, getHrProfile, upsertHrProfile, terminateStaff, reinstateStaff } from '../../api/hr'
+import { getHrSocialSecuritySummary, getHrStaffPage, getHrProfile, upsertHrProfile, terminateStaff, reinstateStaff } from '../../api/hr'
 import { appendStaffRole, getRolePage, getStaffRoleAssignments } from '../../api/rbac'
 import { createStaff as createStaffAccount } from '../../api/staff'
 import { openPrintTableReport } from '../../utils/print'
 import { useStaffOptions } from '../../composables/useStaffOptions'
 import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
-import type { HrStaffProfile, PageResult, RoleItem, StaffItem } from '../../types'
+import type { HrSocialSecuritySummary, HrStaffProfile, PageResult, RoleItem, StaffItem } from '../../types'
 import { resolveHrError } from './hrError'
 
 const props = withDefaults(defineProps<{
@@ -257,6 +297,7 @@ const query = reactive({
 const rows = ref<HrStaffProfile[]>([])
 const loading = ref(false)
 const saving = ref(false)
+const summaryLoading = ref(false)
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const { staffOptions, staffLoading, searchStaff, ensureSelectedStaff } = useStaffOptions({ pageSize: 120 })
 const { departmentOptions, searchDepartments } = useDepartmentOptions({ pageSize: 200, preloadSize: 500 })
@@ -264,6 +305,8 @@ const roles = ref<RoleItem[]>([])
 const selectedRoleId = ref<number | undefined>()
 const initialRoleIds = ref<number[]>([])
 const selectedRowKeys = ref<string[]>([])
+const socialSecuritySummary = reactive<HrSocialSecuritySummary>({})
+const socialSecurityStartDateValue = ref<any>()
 
 const columns = [
   { title: '工号', dataIndex: 'staffNo', key: 'staffNo', width: 120 },
@@ -306,6 +349,12 @@ const contractStatusOptions = [
   { label: '已到期', value: 'EXPIRED' },
   { label: '已终止', value: 'TERMINATED' }
 ]
+const socialSecurityStatusOptions = [
+  { label: '待办理', value: 'PENDING' },
+  { label: '办理中', value: 'PROCESSING' },
+  { label: '已参保', value: 'COMPLETED' },
+  { label: '暂停缴纳', value: 'STOPPED' }
+]
 const departmentFilterOptions = computed(() =>
   departmentOptions.value.map((item) => ({ label: item.label, value: Number(item.value) })).filter((item) => Number.isFinite(item.value))
 )
@@ -346,6 +395,24 @@ async function fetchData() {
   } finally {
     loading.value = false
   }
+}
+
+async function fetchSocialSecuritySummary() {
+  summaryLoading.value = true
+  try {
+    const res = await getHrSocialSecuritySummary()
+    Object.assign(socialSecuritySummary, res || {})
+  } catch {
+    socialSecuritySummary.dueReminderCount = 0
+    socialSecuritySummary.upcomingReminderCount = 0
+    socialSecuritySummary.thisMonthNewParticipantCount = 0
+  } finally {
+    summaryLoading.value = false
+  }
+}
+
+function goToSocialSecurityDetail(scope: 'DUE' | 'UPCOMING' | 'COMPLETED') {
+  router.push({ path: '/hr/profile/social-security-reminders', query: { scope } })
 }
 
 function handleTableChange(pag: any) {
@@ -450,6 +517,14 @@ async function openDrawer(record?: HrStaffProfile) {
   if (form.birthday && typeof form.birthday === 'string') {
     form.birthday = dayjs(form.birthday)
   }
+  if (form.socialSecurityStartDate && typeof form.socialSecurityStartDate === 'string') {
+    socialSecurityStartDateValue.value = dayjs(form.socialSecurityStartDate)
+  } else {
+    socialSecurityStartDateValue.value = undefined
+  }
+  if (form.socialSecurityReminderDays == null && !record?.staffId) {
+    form.socialSecurityReminderDays = 30
+  }
   drawerOpen.value = true
   consumeWizardCreateQuery()
 }
@@ -473,6 +548,10 @@ async function submit(nextStep: 'save' | 'account' | 'contract' | 'attachment' =
       const staffNo = String(accountForm.staffNo || '').trim()
       if (!username || !password || !realName || !staffNo) {
         message.error('新增人员需填写账号、密码、姓名和工号')
+        return
+      }
+      if (!accountForm.departmentId) {
+        message.error('新增人员时必须选择部门，否则员工主档无法创建')
         return
       }
       if (password.length < 6) {
@@ -519,6 +598,9 @@ async function submit(nextStep: 'save' | 'account' | 'contract' | 'attachment' =
     payload.birthday = payload.birthday && typeof payload.birthday === 'object' && payload.birthday.format
       ? payload.birthday.format('YYYY-MM-DD')
       : null
+    payload.socialSecurityStartDate = socialSecurityStartDateValue.value && socialSecurityStartDateValue.value.format
+      ? socialSecurityStartDateValue.value.format('YYYY-MM-DD')
+      : null
     const saved = await upsertHrProfile(payload)
     const staffId = Number(saved?.staffId || resolvedStaffId)
     if (selectedRoleId.value && Number.isFinite(staffId) && !initialRoleIds.value.includes(selectedRoleId.value)) {
@@ -529,6 +611,7 @@ async function submit(nextStep: 'save' | 'account' | 'contract' | 'attachment' =
     message.success(saved?.contractNo ? `保存成功，合同编号：${saved.contractNo}` : '保存成功')
     drawerOpen.value = false
     await fetchData()
+    await fetchSocialSecuritySummary()
     jumpToNextStep(staffId, nextStep)
   } catch (error) {
     message.error(resolveHrError(error, '保存失败'))
@@ -741,6 +824,7 @@ watch(
 
 syncQueryFromRoute()
 fetchData()
+fetchSocialSecuritySummary()
 maybeAutoOpenCreate()
 maybeAutoOpenProfile()
 </script>
@@ -749,5 +833,25 @@ maybeAutoOpenProfile()
 .selection-tip {
   color: rgba(0, 0, 0, 0.45);
   font-size: 12px;
+}
+
+.summary-label {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+
+.summary-value {
+  margin-top: 6px;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.summary-warning {
+  color: #cf1322;
+}
+
+.summary-card {
+  cursor: pointer;
 }
 </style>

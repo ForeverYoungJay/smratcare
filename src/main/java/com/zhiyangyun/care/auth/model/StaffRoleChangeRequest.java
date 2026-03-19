@@ -5,7 +5,6 @@ import lombok.Data;
 
 @Data
 public class StaffRoleChangeRequest {
-  @NotNull
   private Long orgId;
   @NotNull
   private Long staffId;

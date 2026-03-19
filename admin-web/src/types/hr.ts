@@ -23,23 +23,71 @@ export interface HrStaffProfile {
   status?: number
   leaveDate?: string
   leaveReason?: string
+  socialSecurityStatus?: string
+  socialSecurityStartDate?: string
+  socialSecurityReminderDays?: number
+  socialSecurityRemark?: string
   remark?: string
   updateTime?: string
 }
 
+export interface HrSocialSecuritySummary {
+  dueReminderCount?: number
+  upcomingReminderCount?: number
+  thisMonthNewParticipantCount?: number
+}
+
+export interface HrSocialSecurityReminderItem {
+  staffId?: string | number
+  staffNo?: string
+  staffName?: string
+  phone?: string
+  departmentId?: number
+  jobTitle?: string
+  hireDate?: string
+  socialSecurityStatus?: string
+  socialSecurityStartDate?: string
+  socialSecurityReminderDays?: number
+  reminderDate?: string
+  remainingDays?: number
+  reminderScope?: string
+  socialSecurityRemark?: string
+}
+
 export interface StaffTrainingRecord {
   id?: string | number
+  sourceTrainingId?: string | number
+  trainingScene?: 'PLAN' | 'RECORD' | 'CERTIFICATE'
+  trainingYear?: number
+  departmentId?: string | number
+  departmentName?: string
   staffId?: string | number
+  staffNo?: string
   staffName?: string
   trainingName?: string
   trainingType?: string
   provider?: string
+  instructor?: string
   startDate?: string
   endDate?: string
   hours?: number
   score?: number
+  attendanceStatus?: string
+  testResult?: string
+  certificateRequired?: number
+  certificateStatus?: string
   status?: number
   certificateNo?: string
+  attachments?: Array<{
+    name?: string
+    url?: string
+    fileName?: string
+    fileUrl?: string
+    size?: number
+    fileSize?: number
+    type?: string
+    fileType?: string
+  }>
   remark?: string
   createTime?: string
 }
@@ -306,6 +354,97 @@ export interface HrExpenseItem {
   applyEndTime?: string
   createTime?: string
   remark?: string
+}
+
+export interface HrStaffServicePlan {
+  id?: Id
+  staffId?: Id
+  staffNo?: string
+  staffName?: string
+  departmentId?: Id
+  departmentName?: string
+  breakfastEnabled?: number
+  breakfastUnitPrice?: number
+  breakfastDaysPerMonth?: number
+  lunchEnabled?: number
+  lunchUnitPrice?: number
+  lunchDaysPerMonth?: number
+  dinnerEnabled?: number
+  dinnerUnitPrice?: number
+  dinnerDaysPerMonth?: number
+  liveInDormitory?: number
+  dormitoryBuilding?: string
+  dormitoryRoomNo?: string
+  dormitoryBedNo?: string
+  meterNo?: string
+  status?: string
+  mealPlanSummary?: string
+  remark?: string
+  updateTime?: string
+}
+
+export interface HrStaffMonthlyFeeBillItem {
+  id?: Id
+  staffId?: Id
+  staffNo?: string
+  staffName?: string
+  departmentId?: Id
+  departmentName?: string
+  feeMonth?: string
+  feeType?: 'MEAL' | 'ELECTRICITY' | string
+  title?: string
+  quantity?: number
+  unitPrice?: number
+  amount?: number
+  status?: string
+  financeSyncStatus?: string
+  financeSyncId?: Id
+  financeSyncAt?: string
+  financeSyncByName?: string
+  dormitoryBuilding?: string
+  dormitoryRoomNo?: string
+  dormitoryBedNo?: string
+  meterNo?: string
+  mealPlanSummary?: string
+  detailSummary?: string
+  remark?: string
+  createTime?: string
+  updateTime?: string
+}
+
+export interface HrStaffFeeGenerateRequest {
+  month?: string
+}
+
+export interface HrStaffElectricityImportRow {
+  staffId?: Id
+  staffNo?: string
+  staffName?: string
+  amount?: number
+  dormitoryBuilding?: string
+  dormitoryRoomNo?: string
+  dormitoryBedNo?: string
+  meterNo?: string
+  remark?: string
+}
+
+export interface HrStaffElectricityImportRequest {
+  month?: string
+  rows?: HrStaffElectricityImportRow[]
+}
+
+export interface HrStaffFeeSyncRequest {
+  feeType?: 'MEAL' | 'ELECTRICITY' | string
+  month?: string
+  ids?: Array<Id>
+}
+
+export interface HrBatchActionSummary {
+  totalCount?: number
+  successCount?: number
+  skippedCount?: number
+  totalAmount?: number
+  message?: string
 }
 
 export interface HrExpenseApprovalRequest {

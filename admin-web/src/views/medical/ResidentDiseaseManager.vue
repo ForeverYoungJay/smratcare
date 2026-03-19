@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="长者患者列表" subTitle="护理/医护共同入口">
+  <PageContainer title="基础疾病维护" subTitle="医护侧统一维护长者基础疾病，并联动商城禁忌与配餐风险">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="长者">
         <ElderNameAutocomplete v-model:value="query.fullName" allow-clear placeholder="姓名(编号)" width="220px" />
@@ -19,8 +19,8 @@
       </a-form-item>
       <template #extra>
         <a-space>
-          <a-button @click="go('/medical-care/basic-diseases')">基础疾病维护</a-button>
           <a-button @click="go('/medical-care/center')">服务中心</a-button>
+          <a-button @click="go('/logistics/commerce/risk')">疾病字典/禁忌规则</a-button>
           <a-button type="primary" @click="fetchData">刷新</a-button>
         </a-space>
       </template>
@@ -28,16 +28,20 @@
 
     <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="onTableChange">
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'status'">
+        <template v-if="column.key === 'diseaseSummary'">
+          <a-space v-if="diseaseSummaryMap[String(record.id)]?.length" wrap>
+            <a-tag v-for="item in diseaseSummaryMap[String(record.id)].slice(0, 3)" :key="item" color="blue">{{ item }}</a-tag>
+            <a-tag v-if="diseaseSummaryMap[String(record.id)].length > 3" color="default">+{{ diseaseSummaryMap[String(record.id)].length - 3 }}</a-tag>
+          </a-space>
+          <span v-else class="disease-empty">未维护</span>
+        </template>
+        <template v-else-if="column.key === 'status'">
           <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
-            <a-button type="link" @click="openDiseaseDrawer(record)">基础疾病</a-button>
-            <a-button type="link" @click="go(`/elder/resident-360?residentId=${record.id}&from=medicalCare`)">长者总览</a-button>
-            <a-button type="link" @click="go(`/medical-care/assessment/tcm?residentId=${record.id}&from=residentList`)">中医评估</a-button>
-            <a-button type="link" @click="go(`/medical-care/assessment/cvd?residentId=${record.id}&from=residentList`)">心血管评估</a-button>
-            <a-button type="link" @click="go(`/medical-care/inspection?residentId=${record.id}&from=residentList`)">健康巡检</a-button>
+            <a-button type="link" @click="openDiseaseDrawer(record)">维护基础疾病</a-button>
+            <a-button type="link" @click="go(`/elder/resident-360?residentId=${record.id}&from=medicalDiseaseManager`)">长者总览</a-button>
           </a-space>
         </template>
       </template>
@@ -48,13 +52,14 @@
       :elder-id="activeResident?.id"
       :elder-name="activeResident?.fullName"
       title="维护长者基础疾病"
+      @saved="handleDiseaseSaved"
     />
   </PageContainer>
 </template>
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
@@ -62,14 +67,17 @@ import DataTable from '../../components/DataTable.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import ElderDiseaseEditorDrawer from '../../components/ElderDiseaseEditorDrawer.vue'
 import { getElderPage } from '../../api/elder'
+import { useElderDiseaseCatalog } from '../../composables/useElderDiseaseCatalog'
 import type { ElderItem, PageResult } from '../../types'
 import { resolveMedicalError } from './medicalError'
 
 const router = useRouter()
+const route = useRoute()
 const loading = ref(false)
 const rows = ref<ElderItem[]>([])
 const drawerOpen = ref(false)
 const activeResident = ref<ElderItem | null>(null)
+const diseaseSummaryMap = ref<Record<string, string[]>>({})
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const query = reactive({
   fullName: '',
@@ -79,15 +87,16 @@ const query = reactive({
   pageNo: 1,
   pageSize: 10
 })
+const { ensureDiseaseCatalogLoaded, loadDiseaseSummaryMap } = useElderDiseaseCatalog()
 
 const columns = [
   { title: '长者', dataIndex: 'fullName', key: 'fullName', width: 120 },
   { title: '床位', dataIndex: 'bedNo', key: 'bedNo', width: 110 },
   { title: '护理等级', dataIndex: 'careLevel', key: 'careLevel', width: 120 },
+  { title: '基础疾病', key: 'diseaseSummary', width: 280 },
   { title: '联系电话', dataIndex: 'phone', key: 'phone', width: 140 },
-  { title: '入住日期', dataIndex: 'admissionDate', key: 'admissionDate', width: 120 },
   { title: '状态', key: 'status', width: 100 },
-  { title: '操作', key: 'action', width: 420 }
+  { title: '操作', key: 'action', width: 240 }
 ]
 
 function buildParams() {
@@ -101,15 +110,22 @@ function buildParams() {
   }
 }
 
+async function refreshDiseaseSummary(records: ElderItem[]) {
+  diseaseSummaryMap.value = await loadDiseaseSummaryMap((records || []).map((item) => item.id))
+}
+
 async function fetchData() {
   loading.value = true
   try {
+    await ensureDiseaseCatalogLoaded()
     const res = await getElderPage(buildParams()) as PageResult<ElderItem>
     rows.value = res.list || []
     pagination.total = res.total || 0
+    await refreshDiseaseSummary(rows.value)
   } catch (error) {
     message.error(resolveMedicalError(error, '加载长者列表失败'))
     rows.value = []
+    diseaseSummaryMap.value = {}
     pagination.total = 0
   } finally {
     loading.value = false
@@ -121,7 +137,7 @@ function onTableChange(pag: any) {
   pagination.pageSize = pag.pageSize
   query.pageNo = pag.current
   query.pageSize = pag.pageSize
-  fetchData()
+  fetchData().catch(() => {})
 }
 
 function onReset() {
@@ -132,12 +148,31 @@ function onReset() {
   query.pageNo = 1
   query.pageSize = pagination.pageSize
   pagination.current = 1
-  fetchData()
+  fetchData().catch(() => {})
 }
 
 function openDiseaseDrawer(record: ElderItem) {
   activeResident.value = record
   drawerOpen.value = true
+}
+
+function openDiseaseDrawerByRoute() {
+  const elderId = route.query.elderId || route.query.residentId
+  if (!elderId) return
+  activeResident.value = {
+    id: elderId as string,
+    fullName: String(route.query.residentName || '')
+  } as ElderItem
+  drawerOpen.value = true
+}
+
+function handleDiseaseSaved(payload: { elderId?: string | number; diseaseLabels: string[] }) {
+  const elderId = String(payload.elderId || '')
+  if (!elderId) return
+  diseaseSummaryMap.value = {
+    ...diseaseSummaryMap.value,
+    [elderId]: payload.diseaseLabels || []
+  }
 }
 
 function statusLabel(status?: number) {
@@ -158,5 +193,14 @@ function go(path: string) {
   router.push(path)
 }
 
-onMounted(fetchData)
+onMounted(() => {
+  fetchData().catch(() => {})
+  openDiseaseDrawerByRoute()
+})
 </script>
+
+<style scoped>
+.disease-empty {
+  color: #94a3b8;
+}
+</style>

@@ -1907,6 +1907,12 @@ export const routes = [
                         meta: { title: '长者患者列表' }
                     },
                     {
+                        path: 'basic-diseases',
+                        name: 'MedicalCareResidentDiseases',
+                        component: () => import('../views/medical/ResidentDiseaseManager.vue'),
+                        meta: { title: '基础疾病维护' }
+                    },
+                    {
                         path: 'care-task-board',
                         name: 'MedicalCareTaskBoard',
                         component: () => import('../views/care/workbench/TaskBoard.vue'),
@@ -2719,6 +2725,12 @@ export const routes = [
                                 name: 'HrProfileContractReminders',
                                 component: () => import('../views/hr/HrContractReminder.vue'),
                                 meta: { title: '合同到期提醒', roles: ['ADMIN'] }
+                            },
+                            {
+                                path: 'social-security-reminders',
+                                name: 'HrProfileSocialSecurityReminders',
+                                component: () => import('../views/hr/HrSocialSecurityReminder.vue'),
+                                meta: { title: '社保到期/未办理', roles: ['HR_EMPLOYEE', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
                             }
                         ]
                     },
@@ -2731,7 +2743,7 @@ export const routes = [
                             {
                                 path: 'schemes',
                                 name: 'HrAttendanceSchemes',
-                                component: () => import('../views/care/ShiftTemplates.vue'),
+                                component: () => import('../views/hr/HrAttendanceSchemes.vue'),
                                 meta: { title: '排班方案', roles: ['ADMIN'] }
                             },
                             {
@@ -2837,7 +2849,7 @@ export const routes = [
                         meta: { title: '培训与发展', roles: ['ADMIN'] },
                         redirect: '/hr/development/records',
                         children: [
-                            { path: 'plans', name: 'HrDevelopmentPlans', redirect: '/hr/development/records?scene=plans', meta: { title: '培训计划（兼容）', roles: ['ADMIN'], hidden: true } },
+                            { path: 'plans', name: 'HrDevelopmentPlans', redirect: '/hr/development/records?scene=plans', meta: { title: '培训计划', roles: ['ADMIN'] } },
                             { path: 'enrollments', name: 'HrDevelopmentEnrollments', redirect: '/hr/development/records?scene=enrollments', meta: { title: '培训报名（兼容）', roles: ['ADMIN'], hidden: true } },
                             { path: 'signin', name: 'HrDevelopmentSignin', redirect: '/hr/development/records?scene=signin', meta: { title: '培训签到（兼容）', roles: ['ADMIN'], hidden: true } },
                             { path: 'records', name: 'HrDevelopmentRecords', component: () => import('../views/hr/Training.vue'), meta: { title: '培训记录', roles: ['ADMIN'] } },

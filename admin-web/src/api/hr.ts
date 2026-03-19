@@ -6,6 +6,7 @@ import type {
   HrProfileContractItem,
   HrProfileDocumentItem,
   HrRecruitmentNeedItem,
+  HrSocialSecurityReminderItem,
   HrAccessControlRecordItem,
   HrCardSyncItem,
   HrExpenseItem,
@@ -14,6 +15,13 @@ import type {
   HrAttendanceRecordItem,
   HrStaffBirthdayItem,
   HrStaffCertificateItem,
+  HrStaffServicePlan,
+  HrStaffMonthlyFeeBillItem,
+  HrStaffFeeGenerateRequest,
+  HrStaffElectricityImportRequest,
+  HrStaffFeeSyncRequest,
+  HrBatchActionSummary,
+  HrSocialSecuritySummary,
   HrWorkbenchSummary,
   HrStaffProfile,
   StaffTrainingRecord,
@@ -77,6 +85,10 @@ export function getHrPolicyPage(params: any) {
   return fetchPage<HrProfileDocumentItem>('/api/admin/hr/policy/page', params)
 }
 
+export function createHrPolicy(data: Partial<HrProfileDocumentItem>) {
+  return request.post<HrProfileDocumentItem>('/api/admin/hr/policy', data)
+}
+
 export function getHrPolicyAlertPage(params: any) {
   return fetchPage<HrPolicyAlertItem>('/api/admin/hr/policy-alert/page', params)
 }
@@ -130,11 +142,31 @@ export function getHrCardSyncPage(params: any) {
 }
 
 export function getHrMealFeePage(params: any) {
-  return fetchPage<HrExpenseItem>('/api/admin/hr/expense/meal-fee/page', params)
+  return fetchPage<HrStaffMonthlyFeeBillItem>('/api/admin/hr/expense/meal-fee/page', params)
 }
 
 export function getHrElectricityFeePage(params: any) {
-  return fetchPage<HrExpenseItem>('/api/admin/hr/expense/electricity-fee/page', params)
+  return fetchPage<HrStaffMonthlyFeeBillItem>('/api/admin/hr/expense/electricity-fee/page', params)
+}
+
+export function getHrStaffServicePlan(staffId: string | number) {
+  return request.get<HrStaffServicePlan>(`/api/admin/hr/expense/service-plan/${staffId}`)
+}
+
+export function upsertHrStaffServicePlan(data: HrStaffServicePlan) {
+  return request.post<HrStaffServicePlan>('/api/admin/hr/expense/service-plan', data)
+}
+
+export function generateHrMealFee(data: HrStaffFeeGenerateRequest) {
+  return request.post<HrBatchActionSummary>('/api/admin/hr/expense/meal-fee/generate', data)
+}
+
+export function importHrElectricityFee(data: HrStaffElectricityImportRequest) {
+  return request.post<HrBatchActionSummary>('/api/admin/hr/expense/electricity-fee/import', data)
+}
+
+export function syncHrMonthlyFeeToFinance(data: HrStaffFeeSyncRequest) {
+  return request.post<HrBatchActionSummary>('/api/admin/hr/expense/monthly-fee/sync-finance', data)
 }
 
 export function getHrTrainingReimbursePage(params: any) {
@@ -179,6 +211,14 @@ export function getHrProfile(staffId: string | number) {
 
 export function upsertHrProfile(data: Partial<HrStaffProfile>) {
   return request.post<HrStaffProfile>('/api/admin/hr/profile', data)
+}
+
+export function getHrSocialSecuritySummary() {
+  return request.get<HrSocialSecuritySummary>('/api/admin/hr/social-security/summary')
+}
+
+export function getHrSocialSecurityReminderPage(params: any) {
+  return fetchPage<HrSocialSecurityReminderItem>('/api/admin/hr/social-security/reminder/page', params)
 }
 
 export function getHrTrainingPage(params: any) {

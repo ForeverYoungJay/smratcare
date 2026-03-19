@@ -54,6 +54,7 @@
       <template #action>
         <a-space wrap>
           <a-button size="small" @click="go('/elder/resident-360', { residentId: signedLinkageContext.elderId, residentName: signedLinkageContext.elderName })">长者360</a-button>
+          <a-button size="small" @click="go('/medical-care/basic-diseases', { elderId: signedLinkageContext.elderId, residentId: signedLinkageContext.elderId, residentName: signedLinkageContext.elderName })">基础疾病</a-button>
           <a-button size="small" @click="go('/medical-care/assessment/tcm', { residentId: signedLinkageContext.elderId, residentName: signedLinkageContext.elderName })">中医评估</a-button>
           <a-button size="small" @click="go('/medical-care/inspection', { residentId: signedLinkageContext.elderId, residentName: signedLinkageContext.elderName })">健康巡检</a-button>
         </a-space>
@@ -166,6 +167,7 @@
                   <a-list-item-meta :title="item.elderName || '-'" :description="item.keyRiskFactors || '暂无关键风险因子'" />
                   <template #actions>
                     <a-tag :color="residentRiskColor(item.riskLevel)">{{ item.riskLevel || '-' }}</a-tag>
+                    <a-button type="link" @click="go('/medical-care/basic-diseases', { elderId: item.elderId, residentId: item.elderId, residentName: item.elderName })">基础疾病</a-button>
                     <a-button type="link" @click="go('/elder/resident-360', { residentId: item.elderId })">长者360</a-button>
                   </template>
                 </a-list-item>
@@ -179,6 +181,7 @@
         <a-space wrap>
           <a-button type="primary" @click="go('/medical-care/orders')">医嘱管理</a-button>
           <a-button type="primary" @click="go('/medical-care/unified-task-center')">统一任务中心</a-button>
+          <a-button @click="go('/medical-care/basic-diseases')">基础疾病维护</a-button>
           <a-button @click="go('/medical-care/nursing-quality?tab=medication')">用药管理</a-button>
           <a-button @click="go('/medical-care/inspection')">健康巡检</a-button>
           <a-button @click="go('/medical-care/care-task-board')">护理任务看板</a-button>

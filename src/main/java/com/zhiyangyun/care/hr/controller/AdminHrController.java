@@ -5,7 +5,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zhiyangyun.care.auth.entity.Department;
 import com.zhiyangyun.care.auth.entity.StaffAccount;
+import com.zhiyangyun.care.auth.mapper.DepartmentMapper;
 import com.zhiyangyun.care.auth.mapper.StaffMapper;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
@@ -17,22 +19,36 @@ import com.zhiyangyun.care.finance.mapper.CardAccountMapper;
 import com.zhiyangyun.care.hr.model.HrAccessControlRecordResponse;
 import com.zhiyangyun.care.hr.model.HrCardSyncItemResponse;
 import com.zhiyangyun.care.hr.entity.StaffProfile;
+import com.zhiyangyun.care.hr.entity.StaffMonthlyFeeBill;
+import com.zhiyangyun.care.hr.entity.StaffServicePlan;
 import com.zhiyangyun.care.hr.entity.StaffTrainingRecord;
+import com.zhiyangyun.care.hr.mapper.StaffMonthlyFeeBillMapper;
 import com.zhiyangyun.care.hr.model.HrExpenseItemResponse;
+import com.zhiyangyun.care.hr.mapper.StaffServicePlanMapper;
 import com.zhiyangyun.care.hr.mapper.StaffProfileMapper;
 import com.zhiyangyun.care.hr.mapper.StaffTrainingRecordMapper;
 import com.zhiyangyun.care.auth.entity.StaffRole;
 import com.zhiyangyun.care.auth.mapper.StaffRoleMapper;
 import com.zhiyangyun.care.hr.model.HrAttendanceAbnormalResponse;
 import com.zhiyangyun.care.hr.model.HrAttendanceRecordResponse;
+import com.zhiyangyun.care.hr.model.HrBatchActionSummaryResponse;
 import com.zhiyangyun.care.hr.model.HrGenericApprovalResponse;
 import com.zhiyangyun.care.hr.model.HrContractReminderResponse;
 import com.zhiyangyun.care.hr.model.HrExpenseApprovalRequest;
+import com.zhiyangyun.care.hr.model.HrStaffElectricityImportRequest;
+import com.zhiyangyun.care.hr.model.HrStaffElectricityImportRowRequest;
+import com.zhiyangyun.care.hr.model.HrStaffFeeGenerateRequest;
+import com.zhiyangyun.care.hr.model.HrStaffFeeSyncRequest;
+import com.zhiyangyun.care.hr.model.HrStaffMonthlyFeeBillResponse;
 import com.zhiyangyun.care.hr.model.HrPolicyAlertResponse;
 import com.zhiyangyun.care.hr.model.HrProfileContractResponse;
 import com.zhiyangyun.care.hr.model.HrProfileDocumentRequest;
 import com.zhiyangyun.care.hr.model.HrRecruitmentNeedRequest;
 import com.zhiyangyun.care.hr.model.HrRecruitmentNeedResponse;
+import com.zhiyangyun.care.hr.model.HrSocialSecurityReminderResponse;
+import com.zhiyangyun.care.hr.model.HrSocialSecuritySummaryResponse;
+import com.zhiyangyun.care.hr.model.HrStaffServicePlanRequest;
+import com.zhiyangyun.care.hr.model.HrStaffServicePlanResponse;
 import com.zhiyangyun.care.hr.model.HrStaffBirthdayResponse;
 import com.zhiyangyun.care.hr.model.HrStaffCertificateRequest;
 import com.zhiyangyun.care.hr.model.HrStaffCertificateResponse;
@@ -67,6 +83,7 @@ import com.zhiyangyun.care.schedule.mapper.AttendanceRecordMapper;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -74,6 +91,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Locale;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -91,7 +110,10 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminHrController {
   private final StaffProfileMapper staffProfileMapper;
   private final StaffTrainingRecordMapper trainingRecordMapper;
+  private final StaffServicePlanMapper staffServicePlanMapper;
+  private final StaffMonthlyFeeBillMapper staffMonthlyFeeBillMapper;
   private final StaffMapper staffMapper;
+  private final DepartmentMapper departmentMapper;
   private final StaffRoleMapper staffRoleMapper;
   private final StaffPointsService staffPointsService;
   private final StaffPointsRuleService staffPointsRuleService;
@@ -109,7 +131,10 @@ public class AdminHrController {
 
   public AdminHrController(StaffProfileMapper staffProfileMapper,
       StaffTrainingRecordMapper trainingRecordMapper,
+      StaffServicePlanMapper staffServicePlanMapper,
+      StaffMonthlyFeeBillMapper staffMonthlyFeeBillMapper,
       StaffMapper staffMapper,
+      DepartmentMapper departmentMapper,
       StaffRoleMapper staffRoleMapper,
       StaffPointsService staffPointsService,
       StaffPointsRuleService staffPointsRuleService,
@@ -126,7 +151,10 @@ public class AdminHrController {
       ObjectMapper objectMapper) {
     this.staffProfileMapper = staffProfileMapper;
     this.trainingRecordMapper = trainingRecordMapper;
+    this.staffServicePlanMapper = staffServicePlanMapper;
+    this.staffMonthlyFeeBillMapper = staffMonthlyFeeBillMapper;
     this.staffMapper = staffMapper;
+    this.departmentMapper = departmentMapper;
     this.staffRoleMapper = staffRoleMapper;
     this.staffPointsService = staffPointsService;
     this.staffPointsRuleService = staffPointsRuleService;
@@ -189,6 +217,10 @@ public class AdminHrController {
     }
     profile.setLeaveDate(request.getLeaveDate());
     profile.setLeaveReason(normalizeBlank(request.getLeaveReason()));
+    profile.setSocialSecurityStatus(normalizeBlank(request.getSocialSecurityStatus()));
+    profile.setSocialSecurityStartDate(request.getSocialSecurityStartDate());
+    profile.setSocialSecurityReminderDays(request.getSocialSecurityReminderDays());
+    profile.setSocialSecurityRemark(normalizeBlank(request.getSocialSecurityRemark()));
     profile.setRemark(normalizeBlank(request.getRemark()));
 
     if (profile.getId() == null) {
@@ -711,6 +743,12 @@ public class AdminHrController {
   }
 
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PostMapping("/policy")
+  public Result<OaDocument> createPolicy(@RequestBody HrProfileDocumentRequest request) {
+    return Result.ok(createProfileDocument("规章制度", request));
+  }
+
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/policy-alert/page")
   public Result<IPage<HrPolicyAlertResponse>> policyAlertPage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -774,6 +812,104 @@ public class AdminHrController {
     return Result.ok(resp);
   }
 
+  @PreAuthorize("hasAnyRole('HR_EMPLOYEE','HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @GetMapping("/social-security/summary")
+  public Result<HrSocialSecuritySummaryResponse> socialSecuritySummary() {
+    Long orgId = AuthContext.getOrgId();
+    LocalDate today = LocalDate.now();
+    LocalDate monthStart = today.withDayOfMonth(1);
+    LocalDate monthEnd = monthStart.plusMonths(1).minusDays(1);
+    LocalDate upcomingDeadline = today.plusDays(7);
+
+    List<StaffProfile> profiles = staffProfileMapper.selectList(Wrappers.lambdaQuery(StaffProfile.class)
+        .eq(StaffProfile::getIsDeleted, 0)
+        .eq(orgId != null, StaffProfile::getOrgId, orgId));
+    Map<Long, StaffAccount> staffMap = loadStaffMap(profiles.stream().map(StaffProfile::getStaffId).toList());
+
+    long thisMonthNewParticipantCount = profiles.stream()
+        .filter(profile -> profile.getSocialSecurityStartDate() != null)
+        .filter(profile -> !profile.getSocialSecurityStartDate().isBefore(monthStart))
+        .filter(profile -> !profile.getSocialSecurityStartDate().isAfter(monthEnd))
+        .count();
+
+    long dueReminderCount = profiles.stream()
+        .filter(profile -> shouldTrackSocialSecurity(profile, staffMap.get(profile.getStaffId())))
+        .map(this::resolveSocialSecurityReminderDate)
+        .filter(Objects::nonNull)
+        .filter(date -> !date.isAfter(today))
+        .count();
+
+    long upcomingReminderCount = profiles.stream()
+        .filter(profile -> shouldTrackSocialSecurity(profile, staffMap.get(profile.getStaffId())))
+        .map(this::resolveSocialSecurityReminderDate)
+        .filter(Objects::nonNull)
+        .filter(date -> date.isAfter(today) && !date.isAfter(upcomingDeadline))
+        .count();
+
+    HrSocialSecuritySummaryResponse response = new HrSocialSecuritySummaryResponse();
+    response.setDueReminderCount(dueReminderCount);
+    response.setUpcomingReminderCount(upcomingReminderCount);
+    response.setThisMonthNewParticipantCount(thisMonthNewParticipantCount);
+    return Result.ok(response);
+  }
+
+  @PreAuthorize("hasAnyRole('HR_EMPLOYEE','HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @GetMapping("/social-security/reminder/page")
+  public Result<IPage<HrSocialSecurityReminderResponse>> socialSecurityReminderPage(
+      @RequestParam(defaultValue = "1") long pageNo,
+      @RequestParam(defaultValue = "20") long pageSize,
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String scope,
+      @RequestParam(required = false) String status) {
+    Long orgId = AuthContext.getOrgId();
+    LocalDate today = LocalDate.now();
+    LocalDate upcomingDeadline = today.plusDays(7);
+    String scopeCode = scope == null ? "ALL" : scope.trim().toUpperCase(Locale.ROOT);
+    String statusCode = status == null ? null : status.trim().toUpperCase(Locale.ROOT);
+
+    List<StaffProfile> profiles = staffProfileMapper.selectList(Wrappers.lambdaQuery(StaffProfile.class)
+        .eq(StaffProfile::getIsDeleted, 0)
+        .eq(orgId != null, StaffProfile::getOrgId, orgId)
+        .and(statusCode != null && !statusCode.isBlank(),
+            w -> w.eq(StaffProfile::getSocialSecurityStatus, statusCode)
+                .or().eq(StaffProfile::getSocialSecurityStatus, status)));
+    Map<Long, StaffAccount> staffMap = loadStaffMap(profiles.stream().map(StaffProfile::getStaffId).toList());
+
+    List<HrSocialSecurityReminderResponse> rows = profiles.stream()
+        .map(profile -> toSocialSecurityReminderResponse(profile, staffMap.get(profile.getStaffId()), today))
+        .filter(item -> item.getStaffId() != null)
+        .filter(item -> matchSocialSecurityScope(item, scopeCode, today, upcomingDeadline))
+        .filter(item -> {
+          if (keyword == null || keyword.isBlank()) {
+            return true;
+          }
+          String key = keyword.trim();
+          return (item.getStaffName() != null && item.getStaffName().contains(key))
+              || (item.getStaffNo() != null && item.getStaffNo().contains(key))
+              || (item.getPhone() != null && item.getPhone().contains(key));
+        })
+        .sorted((a, b) -> {
+          long aDays = a.getRemainingDays() == null ? Long.MAX_VALUE : a.getRemainingDays();
+          long bDays = b.getRemainingDays() == null ? Long.MAX_VALUE : b.getRemainingDays();
+          int cmp = Long.compare(aDays, bDays);
+          if (cmp != 0) {
+            return cmp;
+          }
+          String aName = a.getStaffName() == null ? "" : a.getStaffName();
+          String bName = b.getStaffName() == null ? "" : b.getStaffName();
+          return aName.compareTo(bName);
+        })
+        .toList();
+
+    long total = rows.size();
+    int fromIndex = (int) Math.max((pageNo - 1) * pageSize, 0);
+    int toIndex = Math.min(fromIndex + (int) pageSize, rows.size());
+    List<HrSocialSecurityReminderResponse> paged = fromIndex >= toIndex ? List.of() : rows.subList(fromIndex, toIndex);
+    IPage<HrSocialSecurityReminderResponse> page = new Page<>(pageNo, pageSize, total);
+    page.setRecords(paged);
+    return Result.ok(page);
+  }
+
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/profile/template/page")
   public Result<IPage<OaDocument>> profileTemplatePage(
@@ -835,7 +971,8 @@ public class AdminHrController {
         .eq(StaffTrainingRecord::getIsDeleted, 0)
         .eq(orgId != null, StaffTrainingRecord::getOrgId, orgId)
         .eq(staffId != null, StaffTrainingRecord::getStaffId, staffId)
-        .eq(StaffTrainingRecord::getTrainingType, "CERTIFICATE")
+        .and(w -> w.eq(StaffTrainingRecord::getTrainingScene, "CERTIFICATE")
+            .or().eq(StaffTrainingRecord::getTrainingType, "CERTIFICATE"))
         .ge(from != null, StaffTrainingRecord::getEndDate, from)
         .le(to != null, StaffTrainingRecord::getEndDate, to);
     if (keyword != null && !keyword.isBlank()) {
@@ -856,6 +993,7 @@ public class AdminHrController {
     StaffTrainingRecord record = new StaffTrainingRecord();
     record.setOrgId(orgId);
     record.setStaffId(request.getStaffId());
+    record.setTrainingScene("CERTIFICATE");
     record.setTrainingType("CERTIFICATE");
     record.setTrainingName(request.getCertificateName());
     record.setCertificateNo(request.getCertificateNo());
@@ -863,7 +1001,10 @@ public class AdminHrController {
     record.setStartDate(request.getIssueDate());
     record.setEndDate(request.getExpiryDate());
     record.setStatus(1);
+    record.setCertificateRequired(1);
+    record.setCertificateStatus("ISSUED");
     record.setRemark(request.getRemark());
+    fillTrainingSnapshots(record, request.getStaffId(), null, null, request.getIssueDate(), false);
     trainingRecordMapper.insert(record);
     IPage<StaffTrainingRecord> page = new Page<>(1, 1, 1);
     page.setRecords(List.of(record));
@@ -887,7 +1028,8 @@ public class AdminHrController {
     var wrapper = Wrappers.lambdaQuery(StaffTrainingRecord.class)
         .eq(StaffTrainingRecord::getIsDeleted, 0)
         .eq(orgId != null, StaffTrainingRecord::getOrgId, orgId)
-        .eq(StaffTrainingRecord::getTrainingType, "CERTIFICATE")
+        .and(w -> w.eq(StaffTrainingRecord::getTrainingScene, "CERTIFICATE")
+            .or().eq(StaffTrainingRecord::getTrainingType, "CERTIFICATE"))
         .isNotNull(StaffTrainingRecord::getEndDate)
         .le(StaffTrainingRecord::getEndDate, deadline);
     if (!showExpired) {
@@ -1013,22 +1155,361 @@ public class AdminHrController {
 
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/expense/meal-fee/page")
-  public Result<IPage<HrExpenseItemResponse>> expenseMealFeePage(
+  public Result<IPage<HrStaffMonthlyFeeBillResponse>> expenseMealFeePage(
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) String keyword,
-      @RequestParam(required = false) String status) {
-    return Result.ok(pageExpenseByKeyword(pageNo, pageSize, keyword, status, "餐费", "meal"));
+      @RequestParam(required = false) String month,
+      @RequestParam(required = false) String financeSyncStatus) {
+    return Result.ok(pageStaffMonthlyFee(pageNo, pageSize, keyword, month, financeSyncStatus, "MEAL"));
   }
 
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/expense/electricity-fee/page")
-  public Result<IPage<HrExpenseItemResponse>> expenseElectricityFeePage(
+  public Result<IPage<HrStaffMonthlyFeeBillResponse>> expenseElectricityFeePage(
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) String keyword,
-      @RequestParam(required = false) String status) {
-    return Result.ok(pageExpenseByKeyword(pageNo, pageSize, keyword, status, "电费", "electricity"));
+      @RequestParam(required = false) String month,
+      @RequestParam(required = false) String financeSyncStatus) {
+    return Result.ok(pageStaffMonthlyFee(pageNo, pageSize, keyword, month, financeSyncStatus, "ELECTRICITY"));
+  }
+
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @GetMapping("/expense/service-plan/{staffId}")
+  public Result<HrStaffServicePlanResponse> getStaffServicePlan(@PathVariable Long staffId) {
+    Long orgId = AuthContext.getOrgId();
+    StaffAccount staff = findStaff(orgId, staffId);
+    if (staff == null) {
+      return Result.error(404, "员工不存在");
+    }
+    StaffServicePlan plan = staffServicePlanMapper.selectOne(
+        Wrappers.lambdaQuery(StaffServicePlan.class)
+            .eq(StaffServicePlan::getOrgId, orgId)
+            .eq(StaffServicePlan::getStaffId, staffId)
+            .eq(StaffServicePlan::getIsDeleted, 0)
+            .last("LIMIT 1"));
+    Department department = staff.getDepartmentId() == null ? null : departmentMapper.selectById(staff.getDepartmentId());
+    return Result.ok(toServicePlanResponse(plan, staff, department));
+  }
+
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PostMapping("/expense/service-plan")
+  public Result<HrStaffServicePlanResponse> upsertStaffServicePlan(@RequestBody HrStaffServicePlanRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    if (request == null || request.getStaffId() == null) {
+      return Result.error(400, "staffId required");
+    }
+    StaffAccount staff = findStaff(orgId, request.getStaffId());
+    if (staff == null) {
+      return Result.error(404, "员工不存在");
+    }
+    Department department = staff.getDepartmentId() == null ? null : departmentMapper.selectById(staff.getDepartmentId());
+    StaffServicePlan plan = staffServicePlanMapper.selectOne(
+        Wrappers.lambdaQuery(StaffServicePlan.class)
+            .eq(StaffServicePlan::getOrgId, orgId)
+            .eq(StaffServicePlan::getStaffId, request.getStaffId())
+            .eq(StaffServicePlan::getIsDeleted, 0)
+            .last("LIMIT 1"));
+    if (plan == null) {
+      plan = new StaffServicePlan();
+      plan.setOrgId(orgId);
+      plan.setStaffId(staff.getId());
+    }
+    plan.setStaffNo(normalizeBlank(staff.getStaffNo()));
+    plan.setStaffName(normalizeBlank(staff.getRealName()));
+    plan.setDepartmentId(staff.getDepartmentId());
+    plan.setDepartmentName(department == null ? null : normalizeBlank(department.getName()));
+    if (request.getBreakfastEnabled() != null || plan.getId() == null) {
+      plan.setBreakfastEnabled(normalizeFlag(request.getBreakfastEnabled()));
+    }
+    if (request.getBreakfastUnitPrice() != null || plan.getId() == null) {
+      plan.setBreakfastUnitPrice(request.getBreakfastUnitPrice() == null ? null : normalizeMoney(request.getBreakfastUnitPrice()));
+    }
+    if (request.getBreakfastDaysPerMonth() != null || plan.getId() == null) {
+      plan.setBreakfastDaysPerMonth(normalizeDays(request.getBreakfastDaysPerMonth()));
+    }
+    if (request.getLunchEnabled() != null || plan.getId() == null) {
+      plan.setLunchEnabled(normalizeFlag(request.getLunchEnabled()));
+    }
+    if (request.getLunchUnitPrice() != null || plan.getId() == null) {
+      plan.setLunchUnitPrice(request.getLunchUnitPrice() == null ? null : normalizeMoney(request.getLunchUnitPrice()));
+    }
+    if (request.getLunchDaysPerMonth() != null || plan.getId() == null) {
+      plan.setLunchDaysPerMonth(normalizeDays(request.getLunchDaysPerMonth()));
+    }
+    if (request.getDinnerEnabled() != null || plan.getId() == null) {
+      plan.setDinnerEnabled(normalizeFlag(request.getDinnerEnabled()));
+    }
+    if (request.getDinnerUnitPrice() != null || plan.getId() == null) {
+      plan.setDinnerUnitPrice(request.getDinnerUnitPrice() == null ? null : normalizeMoney(request.getDinnerUnitPrice()));
+    }
+    if (request.getDinnerDaysPerMonth() != null || plan.getId() == null) {
+      plan.setDinnerDaysPerMonth(normalizeDays(request.getDinnerDaysPerMonth()));
+    }
+    if (request.getLiveInDormitory() != null || plan.getId() == null) {
+      plan.setLiveInDormitory(normalizeFlag(request.getLiveInDormitory()));
+    }
+    if (request.getDormitoryBuilding() != null || plan.getId() == null) {
+      plan.setDormitoryBuilding(normalizeBlank(request.getDormitoryBuilding()));
+    }
+    if (request.getDormitoryRoomNo() != null || plan.getId() == null) {
+      plan.setDormitoryRoomNo(normalizeBlank(request.getDormitoryRoomNo()));
+    }
+    if (request.getDormitoryBedNo() != null || plan.getId() == null) {
+      plan.setDormitoryBedNo(normalizeBlank(request.getDormitoryBedNo()));
+    }
+    if (request.getMeterNo() != null || plan.getId() == null) {
+      plan.setMeterNo(normalizeBlank(request.getMeterNo()));
+    }
+    if (request.getStatus() != null || plan.getId() == null) {
+      plan.setStatus(normalizeBlank(request.getStatus()) == null ? "ENABLED" : normalizeBlank(request.getStatus()).toUpperCase(Locale.ROOT));
+    }
+    if (request.getRemark() != null || plan.getId() == null) {
+      plan.setRemark(normalizeBlank(request.getRemark()));
+    }
+    if (plan.getId() == null) {
+      staffServicePlanMapper.insert(plan);
+    } else {
+      staffServicePlanMapper.updateById(plan);
+    }
+    return Result.ok(toServicePlanResponse(plan, staff, department));
+  }
+
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PostMapping("/expense/meal-fee/generate")
+  public Result<HrBatchActionSummaryResponse> generateMealFee(@RequestBody HrStaffFeeGenerateRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    Long operatorId = AuthContext.getStaffId();
+    YearMonth feeMonth = resolveFeeMonth(request == null ? null : request.getMonth());
+    List<StaffAccount> activeStaff = listActiveStaff(orgId);
+    Map<Long, Department> departmentMap = loadDepartmentMap(activeStaff);
+    Map<Long, StaffServicePlan> planMap = loadServicePlanMap(orgId, activeStaff.stream().map(StaffAccount::getId).toList());
+    int successCount = 0;
+    int skippedCount = 0;
+    java.math.BigDecimal totalAmount = java.math.BigDecimal.ZERO;
+    for (StaffAccount staff : activeStaff) {
+      StaffServicePlan plan = planMap.get(staff.getId());
+      if (!isPlanEnabled(plan) || mealEnabledCount(plan) == 0) {
+        skippedCount++;
+        continue;
+      }
+      Department department = departmentMap.get(staff.getDepartmentId());
+      StaffMonthlyFeeBill bill = findMonthlyFeeBill(orgId, staff.getId(), feeMonth.toString(), "MEAL");
+      if (bill == null) {
+        bill = new StaffMonthlyFeeBill();
+        bill.setOrgId(orgId);
+        bill.setStaffId(staff.getId());
+        bill.setFeeMonth(feeMonth.toString());
+        bill.setFeeType("MEAL");
+        bill.setCreatedBy(operatorId);
+      }
+      java.math.BigDecimal amount = mealBillAmount(plan);
+      bill.setStaffNo(normalizeBlank(staff.getStaffNo()));
+      bill.setStaffName(normalizeBlank(staff.getRealName()));
+      bill.setDepartmentId(staff.getDepartmentId());
+      bill.setDepartmentName(department == null ? null : normalizeBlank(department.getName()));
+      bill.setTitle("员工餐费 " + feeMonth + " " + defaultText(staff.getRealName(), defaultText(staff.getUsername(), "员工")));
+      bill.setQuantity(java.math.BigDecimal.valueOf(totalMealDays(plan)));
+      bill.setUnitPrice(resolveAverageUnitPrice(amount, totalMealDays(plan)));
+      bill.setAmount(amount);
+      bill.setStatus("GENERATED");
+      markFinancePending(bill);
+      bill.setDormitoryBuilding(normalizeBlank(plan.getDormitoryBuilding()));
+      bill.setDormitoryRoomNo(normalizeBlank(plan.getDormitoryRoomNo()));
+      bill.setDormitoryBedNo(normalizeBlank(plan.getDormitoryBedNo()));
+      bill.setMeterNo(normalizeBlank(plan.getMeterNo()));
+      bill.setDetailJson(writeJson(buildMealFeeDetail(plan)));
+      bill.setRemark(normalizeBlank(plan.getRemark()));
+      saveMonthlyFeeBill(bill);
+      successCount++;
+      totalAmount = totalAmount.add(zeroIfNull(amount));
+    }
+    HrBatchActionSummaryResponse response = new HrBatchActionSummaryResponse();
+    response.setTotalCount(activeStaff.size());
+    response.setSuccessCount(successCount);
+    response.setSkippedCount(skippedCount);
+    response.setTotalAmount(totalAmount);
+    response.setMessage("员工餐费已按 " + feeMonth + " 生成");
+    return Result.ok(response);
+  }
+
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PostMapping("/expense/electricity-fee/import")
+  public Result<HrBatchActionSummaryResponse> importElectricityFee(@RequestBody HrStaffElectricityImportRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    Long operatorId = AuthContext.getStaffId();
+    if (request == null || request.getRows() == null || request.getRows().isEmpty()) {
+      return Result.error(400, "rows required");
+    }
+    YearMonth feeMonth = resolveFeeMonth(request.getMonth());
+    List<StaffAccount> activeStaff = listActiveStaff(orgId);
+    Map<Long, StaffAccount> staffById = activeStaff.stream()
+        .filter(item -> item.getId() != null)
+        .collect(Collectors.toMap(StaffAccount::getId, item -> item, (a, b) -> a));
+    Map<String, StaffAccount> staffByNo = activeStaff.stream()
+        .filter(item -> normalizeBlank(item.getStaffNo()) != null)
+        .collect(Collectors.toMap(item -> item.getStaffNo().trim().toLowerCase(Locale.ROOT), item -> item, (a, b) -> a));
+    Map<String, StaffAccount> staffByName = activeStaff.stream()
+        .filter(item -> normalizeBlank(item.getRealName()) != null)
+        .collect(Collectors.toMap(item -> item.getRealName().trim().toLowerCase(Locale.ROOT), item -> item, (a, b) -> a));
+    Map<Long, Department> departmentMap = loadDepartmentMap(activeStaff);
+    Map<Long, StaffServicePlan> planMap = loadServicePlanMap(orgId, activeStaff.stream().map(StaffAccount::getId).toList());
+    int successCount = 0;
+    int skippedCount = 0;
+    java.math.BigDecimal totalAmount = java.math.BigDecimal.ZERO;
+    for (HrStaffElectricityImportRowRequest row : request.getRows()) {
+      StaffAccount staff = resolveImportStaff(row, staffById, staffByNo, staffByName);
+      if (staff == null || zeroIfNull(row.getAmount()).signum() <= 0) {
+        skippedCount++;
+        continue;
+      }
+      Department department = departmentMap.get(staff.getDepartmentId());
+      StaffServicePlan plan = planMap.get(staff.getId());
+      if (plan == null) {
+        plan = new StaffServicePlan();
+        plan.setOrgId(orgId);
+        plan.setStaffId(staff.getId());
+      }
+      plan.setStaffNo(normalizeBlank(staff.getStaffNo()));
+      plan.setStaffName(normalizeBlank(staff.getRealName()));
+      plan.setDepartmentId(staff.getDepartmentId());
+      plan.setDepartmentName(department == null ? null : normalizeBlank(department.getName()));
+      if (normalizeBlank(row.getDormitoryBuilding()) != null) {
+        plan.setDormitoryBuilding(normalizeBlank(row.getDormitoryBuilding()));
+      }
+      if (normalizeBlank(row.getDormitoryRoomNo()) != null) {
+        plan.setDormitoryRoomNo(normalizeBlank(row.getDormitoryRoomNo()));
+      }
+      if (normalizeBlank(row.getDormitoryBedNo()) != null) {
+        plan.setDormitoryBedNo(normalizeBlank(row.getDormitoryBedNo()));
+      }
+      if (normalizeBlank(row.getMeterNo()) != null) {
+        plan.setMeterNo(normalizeBlank(row.getMeterNo()));
+      }
+      if (normalizeFlag(plan.getLiveInDormitory()) == 0 && (
+          normalizeBlank(plan.getDormitoryBuilding()) != null
+              || normalizeBlank(plan.getDormitoryRoomNo()) != null
+              || normalizeBlank(plan.getDormitoryBedNo()) != null
+              || normalizeBlank(plan.getMeterNo()) != null)) {
+        plan.setLiveInDormitory(1);
+      }
+      if (normalizeBlank(plan.getStatus()) == null) {
+        plan.setStatus("ENABLED");
+      }
+      saveServicePlan(plan);
+      planMap.put(staff.getId(), plan);
+
+      StaffMonthlyFeeBill bill = findMonthlyFeeBill(orgId, staff.getId(), feeMonth.toString(), "ELECTRICITY");
+      if (bill == null) {
+        bill = new StaffMonthlyFeeBill();
+        bill.setOrgId(orgId);
+        bill.setStaffId(staff.getId());
+        bill.setFeeMonth(feeMonth.toString());
+        bill.setFeeType("ELECTRICITY");
+        bill.setCreatedBy(operatorId);
+      }
+      bill.setStaffNo(normalizeBlank(staff.getStaffNo()));
+      bill.setStaffName(normalizeBlank(staff.getRealName()));
+      bill.setDepartmentId(staff.getDepartmentId());
+      bill.setDepartmentName(department == null ? null : normalizeBlank(department.getName()));
+      bill.setTitle("员工电费 " + feeMonth + " " + defaultText(staff.getRealName(), defaultText(staff.getUsername(), "员工")));
+      bill.setQuantity(java.math.BigDecimal.ONE);
+      bill.setUnitPrice(normalizeMoney(row.getAmount()));
+      bill.setAmount(normalizeMoney(row.getAmount()));
+      bill.setStatus("IMPORTED");
+      markFinancePending(bill);
+      bill.setDormitoryBuilding(firstNonBlank(normalizeBlank(row.getDormitoryBuilding()), normalizeBlank(plan.getDormitoryBuilding())));
+      bill.setDormitoryRoomNo(firstNonBlank(normalizeBlank(row.getDormitoryRoomNo()), normalizeBlank(plan.getDormitoryRoomNo())));
+      bill.setDormitoryBedNo(firstNonBlank(normalizeBlank(row.getDormitoryBedNo()), normalizeBlank(plan.getDormitoryBedNo())));
+      bill.setMeterNo(firstNonBlank(normalizeBlank(row.getMeterNo()), normalizeBlank(plan.getMeterNo())));
+      bill.setDetailJson(writeJson(buildElectricityFeeDetail(row, plan)));
+      bill.setRemark(normalizeBlank(row.getRemark()));
+      saveMonthlyFeeBill(bill);
+      successCount++;
+      totalAmount = totalAmount.add(zeroIfNull(row.getAmount()));
+    }
+    HrBatchActionSummaryResponse response = new HrBatchActionSummaryResponse();
+    response.setTotalCount(request.getRows().size());
+    response.setSuccessCount(successCount);
+    response.setSkippedCount(skippedCount);
+    response.setTotalAmount(totalAmount);
+    response.setMessage("员工电费已导入 " + feeMonth);
+    return Result.ok(response);
+  }
+
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PostMapping("/expense/monthly-fee/sync-finance")
+  public Result<HrBatchActionSummaryResponse> syncMonthlyFeeToFinance(@RequestBody HrStaffFeeSyncRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    Long operatorId = AuthContext.getStaffId();
+    if (request == null || normalizeBlank(request.getFeeType()) == null) {
+      return Result.error(400, "feeType required");
+    }
+    String feeType = request.getFeeType().trim().toUpperCase(Locale.ROOT);
+    if (!Set.of("MEAL", "ELECTRICITY").contains(feeType)) {
+      return Result.error(400, "feeType only supports MEAL/ELECTRICITY");
+    }
+    YearMonth feeMonth = resolveFeeMonth(request.getMonth());
+    List<Long> ids = sanitizeIds(request.getIds());
+    List<StaffMonthlyFeeBill> rows = staffMonthlyFeeBillMapper.selectList(
+        Wrappers.lambdaQuery(StaffMonthlyFeeBill.class)
+            .eq(StaffMonthlyFeeBill::getOrgId, orgId)
+            .eq(StaffMonthlyFeeBill::getIsDeleted, 0)
+            .eq(StaffMonthlyFeeBill::getFeeType, feeType)
+            .eq(StaffMonthlyFeeBill::getFeeMonth, feeMonth.toString())
+            .in(!ids.isEmpty(), StaffMonthlyFeeBill::getId, ids)
+            .orderByAsc(StaffMonthlyFeeBill::getStaffNo)
+            .orderByAsc(StaffMonthlyFeeBill::getStaffName));
+    int successCount = 0;
+    int skippedCount = 0;
+    java.math.BigDecimal totalAmount = java.math.BigDecimal.ZERO;
+    for (StaffMonthlyFeeBill bill : rows) {
+      if (zeroIfNull(bill.getAmount()).signum() <= 0) {
+        skippedCount++;
+        continue;
+      }
+      OaApproval approval = bill.getFinanceSyncId() == null ? null : oaApprovalMapper.selectOne(
+          Wrappers.lambdaQuery(OaApproval.class)
+              .eq(OaApproval::getId, bill.getFinanceSyncId())
+              .eq(orgId != null, OaApproval::getOrgId, orgId)
+              .eq(OaApproval::getIsDeleted, 0)
+              .last("LIMIT 1"));
+      if (approval == null) {
+        approval = new OaApproval();
+        approval.setTenantId(orgId);
+        approval.setOrgId(orgId);
+        approval.setApprovalType("REIMBURSE");
+        approval.setApplicantName("HR自动同步");
+        approval.setCreatedBy(operatorId);
+      }
+      approval.setTitle(bill.getTitle());
+      approval.setAmount(bill.getAmount());
+      approval.setStartTime(feeMonth.atDay(1).atStartOfDay());
+      approval.setEndTime(feeMonth.atEndOfMonth().atTime(LocalTime.MAX));
+      approval.setStatus("PENDING");
+      approval.setRemark(buildFinanceSyncRemark(bill));
+      approval.setFormData(writeJson(buildFinanceSyncFormData(bill)));
+      if (approval.getId() == null) {
+        oaApprovalMapper.insert(approval);
+      } else {
+        oaApprovalMapper.updateById(approval);
+      }
+      bill.setFinanceSyncStatus("SYNCED");
+      bill.setFinanceSyncId(approval.getId());
+      bill.setFinanceSyncAt(LocalDateTime.now());
+      bill.setFinanceSyncBy(operatorId);
+      staffMonthlyFeeBillMapper.updateById(bill);
+      successCount++;
+      totalAmount = totalAmount.add(zeroIfNull(bill.getAmount()));
+    }
+    HrBatchActionSummaryResponse response = new HrBatchActionSummaryResponse();
+    response.setTotalCount(rows.size());
+    response.setSuccessCount(successCount);
+    response.setSkippedCount(skippedCount);
+    response.setTotalAmount(totalAmount);
+    response.setMessage("已同步到财务审批 " + feeMonth);
+    return Result.ok(response);
   }
 
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
@@ -1307,21 +1788,12 @@ public class AdminHrController {
     Long orgId = AuthContext.getOrgId();
     StaffTrainingRecord record = new StaffTrainingRecord();
     record.setOrgId(orgId);
-    record.setStaffId(request.getStaffId());
-    record.setTrainingName(request.getTrainingName());
-    record.setTrainingType(request.getTrainingType());
-    record.setProvider(request.getProvider());
-    record.setStartDate(request.getStartDate());
-    record.setEndDate(request.getEndDate());
-    record.setHours(request.getHours());
-    record.setScore(request.getScore());
-    record.setStatus(request.getStatus());
-    record.setCertificateNo(request.getCertificateNo());
-    record.setRemark(request.getRemark());
+    applyTrainingRequest(record, request, false);
     if (record.getStatus() == null) {
-      record.setStatus(1);
+      record.setStatus("PLAN".equals(record.getTrainingScene()) ? 0 : 1);
     }
     trainingRecordMapper.insert(record);
+    syncTrainingCertificate(record);
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "CREATE", "STAFF_TRAINING", record.getId(), "新增培训记录");
     return Result.ok(record);
@@ -1336,40 +1808,9 @@ public class AdminHrController {
     if (record == null || (orgId != null && !orgId.equals(record.getOrgId()))) {
       return Result.error(404, "Training record not found");
     }
-    if (request.getStaffId() != null) {
-      record.setStaffId(request.getStaffId());
-    }
-    if (request.getTrainingName() != null) {
-      record.setTrainingName(request.getTrainingName());
-    }
-    if (request.getTrainingType() != null) {
-      record.setTrainingType(request.getTrainingType());
-    }
-    if (request.getProvider() != null) {
-      record.setProvider(request.getProvider());
-    }
-    if (request.getStartDate() != null) {
-      record.setStartDate(request.getStartDate());
-    }
-    if (request.getEndDate() != null) {
-      record.setEndDate(request.getEndDate());
-    }
-    if (request.getHours() != null) {
-      record.setHours(request.getHours());
-    }
-    if (request.getScore() != null) {
-      record.setScore(request.getScore());
-    }
-    if (request.getStatus() != null) {
-      record.setStatus(request.getStatus());
-    }
-    if (request.getCertificateNo() != null) {
-      record.setCertificateNo(request.getCertificateNo());
-    }
-    if (request.getRemark() != null) {
-      record.setRemark(request.getRemark());
-    }
+    applyTrainingRequest(record, request, true);
     trainingRecordMapper.updateById(record);
+    syncTrainingCertificate(record);
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "UPDATE", "STAFF_TRAINING", record.getId(), "更新培训记录");
     return Result.ok(record);
@@ -1395,18 +1836,28 @@ public class AdminHrController {
   public Result<IPage<StaffTrainingResponse>> trainingPage(
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
+      @RequestParam(required = false) String scene,
       @RequestParam(required = false) Long staffId,
+      @RequestParam(required = false) Long departmentId,
+      @RequestParam(required = false) Integer trainingYear,
       @RequestParam(required = false) String keyword,
       @RequestParam(required = false) String dateFrom,
       @RequestParam(required = false) String dateTo) {
     Long orgId = AuthContext.getOrgId();
+    String resolvedScene = normalizeTrainingScene(scene, "RECORD");
     var wrapper = Wrappers.lambdaQuery(StaffTrainingRecord.class)
         .eq(StaffTrainingRecord::getIsDeleted, 0)
         .eq(orgId != null, StaffTrainingRecord::getOrgId, orgId)
-        .eq(staffId != null, StaffTrainingRecord::getStaffId, staffId);
+        .eq(staffId != null, StaffTrainingRecord::getStaffId, staffId)
+        .eq(departmentId != null, StaffTrainingRecord::getDepartmentId, departmentId)
+        .eq(trainingYear != null, StaffTrainingRecord::getTrainingYear, trainingYear)
+        .eq(StaffTrainingRecord::getTrainingScene, resolvedScene);
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(StaffTrainingRecord::getTrainingName, keyword)
-          .or().like(StaffTrainingRecord::getProvider, keyword));
+          .or().like(StaffTrainingRecord::getProvider, keyword)
+          .or().like(StaffTrainingRecord::getInstructor, keyword)
+          .or().like(StaffTrainingRecord::getStaffNo, keyword)
+          .or().like(StaffTrainingRecord::getDepartmentName, keyword));
     }
     if (dateFrom != null && !dateFrom.isBlank()) {
       LocalDate start = parseDate(dateFrom);
@@ -1420,26 +1871,43 @@ public class AdminHrController {
     IPage<StaffTrainingRecord> page = trainingRecordMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
 
     Map<Long, StaffAccount> staffMap = staffMapper.selectBatchIdsSafe(
-            page.getRecords().stream().map(StaffTrainingRecord::getStaffId).distinct().toList())
+            page.getRecords().stream().map(StaffTrainingRecord::getStaffId).filter(id -> id != null).distinct().toList())
         .stream()
         .collect(Collectors.toMap(StaffAccount::getId, s -> s));
+    Map<Long, Department> departmentMap = departmentMapper.selectBatchIds(
+            page.getRecords().stream().map(StaffTrainingRecord::getDepartmentId).filter(id -> id != null).distinct().toList())
+        .stream()
+        .collect(Collectors.toMap(Department::getId, item -> item, (a, b) -> a));
 
     IPage<StaffTrainingResponse> resp = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
     resp.setRecords(page.getRecords().stream().map(record -> {
       StaffTrainingResponse item = new StaffTrainingResponse();
       StaffAccount staff = staffMap.get(record.getStaffId());
+      Department department = record.getDepartmentId() == null ? null : departmentMap.get(record.getDepartmentId());
       item.setId(record.getId());
+      item.setSourceTrainingId(record.getSourceTrainingId());
+      item.setTrainingScene(record.getTrainingScene());
+      item.setTrainingYear(record.getTrainingYear());
+      item.setDepartmentId(record.getDepartmentId());
+      item.setDepartmentName(record.getDepartmentName() != null ? record.getDepartmentName() : (department == null ? null : department.getDeptName()));
       item.setStaffId(record.getStaffId());
+      item.setStaffNo(record.getStaffNo() != null ? record.getStaffNo() : (staff == null ? null : staff.getStaffNo()));
       item.setStaffName(staff == null ? null : staff.getRealName());
       item.setTrainingName(record.getTrainingName());
       item.setTrainingType(record.getTrainingType());
       item.setProvider(record.getProvider());
+      item.setInstructor(record.getInstructor());
       item.setStartDate(record.getStartDate());
       item.setEndDate(record.getEndDate());
       item.setHours(record.getHours());
       item.setScore(record.getScore());
+      item.setAttendanceStatus(record.getAttendanceStatus());
+      item.setTestResult(record.getTestResult());
+      item.setCertificateRequired(record.getCertificateRequired());
+      item.setCertificateStatus(record.getCertificateStatus());
       item.setStatus(record.getStatus());
       item.setCertificateNo(record.getCertificateNo());
+      item.setAttachments(parseTrainingAttachments(record.getAttachmentsJson()));
       item.setRemark(record.getRemark());
       item.setCreateTime(record.getCreateTime());
       return item;
@@ -1637,7 +2105,7 @@ public class AdminHrController {
     entity.setUploaderId(AuthContext.getStaffId());
     entity.setUploaderName(request == null || request.getUploaderName() == null || request.getUploaderName().isBlank()
         ? AuthContext.getUsername() : request.getUploaderName());
-    entity.setUploadedAt(LocalDateTime.now());
+    entity.setUploadedAt(parseDateTime(request == null ? null : request.getUploadedAt(), LocalDateTime.now()));
     entity.setRemark(request == null ? null : request.getRemark());
     entity.setCreatedBy(AuthContext.getStaffId());
     oaDocumentMapper.insert(entity);
@@ -1669,6 +2137,234 @@ public class AdminHrController {
       return row;
     }).toList());
     return resp;
+  }
+
+  private void applyTrainingRequest(StaffTrainingRecord record, StaffTrainingRequest request, boolean partialUpdate) {
+    if (!partialUpdate || request.getSourceTrainingId() != null) {
+      record.setSourceTrainingId(request.getSourceTrainingId());
+    }
+    if (!partialUpdate || request.getTrainingScene() != null) {
+      record.setTrainingScene(normalizeTrainingScene(request.getTrainingScene(), record.getTrainingScene()));
+    }
+    if (!partialUpdate || request.getTrainingYear() != null) {
+      record.setTrainingYear(request.getTrainingYear());
+    }
+    if (!partialUpdate || request.getStaffId() != null) {
+      record.setStaffId(request.getStaffId());
+    }
+    if (!partialUpdate || request.getTrainingName() != null) {
+      record.setTrainingName(request.getTrainingName());
+    }
+    if (!partialUpdate || request.getTrainingType() != null) {
+      record.setTrainingType(request.getTrainingType());
+    }
+    if (!partialUpdate || request.getProvider() != null) {
+      record.setProvider(request.getProvider());
+    }
+    if (!partialUpdate || request.getInstructor() != null) {
+      record.setInstructor(request.getInstructor());
+    }
+    if (!partialUpdate || request.getStartDate() != null) {
+      record.setStartDate(request.getStartDate());
+    }
+    if (!partialUpdate || request.getEndDate() != null) {
+      record.setEndDate(request.getEndDate());
+    }
+    if (!partialUpdate || request.getHours() != null) {
+      record.setHours(request.getHours());
+    }
+    if (!partialUpdate || request.getScore() != null) {
+      record.setScore(request.getScore());
+    }
+    if (!partialUpdate || request.getAttendanceStatus() != null) {
+      record.setAttendanceStatus(normalizeOptionalText(request.getAttendanceStatus()));
+    }
+    if (!partialUpdate || request.getTestResult() != null) {
+      record.setTestResult(normalizeOptionalText(request.getTestResult()));
+    }
+    if (!partialUpdate || request.getCertificateRequired() != null) {
+      record.setCertificateRequired(request.getCertificateRequired() == null ? 0 : request.getCertificateRequired());
+    }
+    if (!partialUpdate || request.getCertificateStatus() != null) {
+      record.setCertificateStatus(normalizeCertificateStatus(request.getCertificateStatus(), record.getCertificateStatus()));
+    }
+    if (!partialUpdate || request.getStatus() != null) {
+      record.setStatus(request.getStatus());
+    }
+    if (!partialUpdate || request.getCertificateNo() != null) {
+      record.setCertificateNo(normalizeOptionalText(request.getCertificateNo()));
+    }
+    if (!partialUpdate || request.getRemark() != null) {
+      record.setRemark(request.getRemark());
+    }
+    if (!partialUpdate || request.getAttachments() != null) {
+      record.setAttachmentsJson(toAttachmentsJson(request.getAttachments()));
+    }
+    fillTrainingSnapshots(
+        record,
+        record.getStaffId(),
+        request.getDepartmentId(),
+        request.getDepartmentName(),
+        request.getStartDate() != null ? request.getStartDate() : record.getStartDate(),
+        partialUpdate);
+    if (record.getCertificateRequired() == null) {
+      record.setCertificateRequired(0);
+    }
+    if (record.getCertificateRequired() != null && record.getCertificateRequired() == 1) {
+      if (normalizeOptionalText(record.getCertificateStatus()) == null) {
+        record.setCertificateStatus("PENDING");
+      }
+    } else {
+      record.setCertificateStatus("NONE");
+    }
+  }
+
+  private void fillTrainingSnapshots(
+      StaffTrainingRecord record,
+      Long staffId,
+      Long requestedDepartmentId,
+      String requestedDepartmentName,
+      LocalDate fallbackDate,
+      boolean partialUpdate) {
+    StaffAccount staff = staffId == null ? null : staffMapper.selectById(staffId);
+    Long resolvedDepartmentId = requestedDepartmentId != null
+        ? requestedDepartmentId
+        : (staff == null ? record.getDepartmentId() : staff.getDepartmentId());
+    Department department = resolvedDepartmentId == null ? null : departmentMapper.selectById(resolvedDepartmentId);
+
+    if (!partialUpdate || staffId != null) {
+      record.setStaffId(staffId);
+      record.setStaffNo(staff == null ? record.getStaffNo() : staff.getStaffNo());
+    }
+    if (!partialUpdate || requestedDepartmentId != null || staffId != null) {
+      record.setDepartmentId(resolvedDepartmentId);
+    }
+    if (!partialUpdate || requestedDepartmentName != null || requestedDepartmentId != null || staffId != null) {
+      String departmentName = requestedDepartmentName != null && !requestedDepartmentName.isBlank()
+          ? requestedDepartmentName.trim()
+          : (department == null ? record.getDepartmentName() : department.getDeptName());
+      record.setDepartmentName(departmentName);
+    }
+    if (record.getTrainingYear() == null) {
+      LocalDate baseDate = fallbackDate != null ? fallbackDate : record.getEndDate();
+      record.setTrainingYear(baseDate == null ? LocalDate.now().getYear() : baseDate.getYear());
+    }
+  }
+
+  private void syncTrainingCertificate(StaffTrainingRecord record) {
+    if (record == null
+        || !"RECORD".equals(normalizeTrainingScene(record.getTrainingScene(), "RECORD"))
+        || record.getStaffId() == null
+        || record.getStatus() == null
+        || record.getStatus() != 1
+        || record.getCertificateRequired() == null
+        || record.getCertificateRequired() != 1) {
+      return;
+    }
+    StaffTrainingRecord certificateRecord = trainingRecordMapper.selectOne(Wrappers.lambdaQuery(StaffTrainingRecord.class)
+        .eq(StaffTrainingRecord::getIsDeleted, 0)
+        .eq(StaffTrainingRecord::getOrgId, record.getOrgId())
+        .eq(StaffTrainingRecord::getSourceTrainingId, record.getId())
+        .eq(StaffTrainingRecord::getTrainingScene, "CERTIFICATE")
+        .last("LIMIT 1"));
+    if (certificateRecord == null) {
+      certificateRecord = new StaffTrainingRecord();
+      certificateRecord.setOrgId(record.getOrgId());
+      certificateRecord.setSourceTrainingId(record.getId());
+      certificateRecord.setTrainingScene("CERTIFICATE");
+      certificateRecord.setTrainingType("CERTIFICATE");
+      certificateRecord.setStatus(1);
+      certificateRecord.setCertificateRequired(1);
+    }
+    certificateRecord.setStaffId(record.getStaffId());
+    certificateRecord.setStaffNo(record.getStaffNo());
+    certificateRecord.setDepartmentId(record.getDepartmentId());
+    certificateRecord.setDepartmentName(record.getDepartmentName());
+    certificateRecord.setTrainingYear(record.getTrainingYear());
+    certificateRecord.setTrainingName(record.getTrainingName());
+    certificateRecord.setProvider(record.getInstructor() != null && !record.getInstructor().isBlank() ? record.getInstructor() : record.getProvider());
+    certificateRecord.setInstructor(record.getInstructor());
+    certificateRecord.setStartDate(record.getEndDate() != null ? record.getEndDate() : record.getStartDate());
+    certificateRecord.setEndDate(null);
+    certificateRecord.setHours(record.getHours());
+    certificateRecord.setScore(record.getScore());
+    certificateRecord.setAttendanceStatus(record.getAttendanceStatus());
+    certificateRecord.setTestResult(record.getTestResult());
+    certificateRecord.setCertificateStatus("ISSUED");
+    certificateRecord.setCertificateNo(resolveCertificateNo(record));
+    certificateRecord.setRemark(buildAutoCertificateRemark(record));
+    if (certificateRecord.getId() == null) {
+      trainingRecordMapper.insert(certificateRecord);
+    } else {
+      trainingRecordMapper.updateById(certificateRecord);
+    }
+    record.setCertificateStatus("GENERATED");
+    record.setCertificateNo(certificateRecord.getCertificateNo());
+    trainingRecordMapper.updateById(record);
+  }
+
+  private String buildAutoCertificateRemark(StaffTrainingRecord record) {
+    String base = normalizeOptionalText(record.getRemark());
+    String prefix = "培训完成自动生成证书";
+    return base == null ? prefix : prefix + "；" + base;
+  }
+
+  private String resolveCertificateNo(StaffTrainingRecord record) {
+    String existing = normalizeOptionalText(record.getCertificateNo());
+    if (existing != null) {
+      return existing;
+    }
+    String staffNo = normalizeOptionalText(record.getStaffNo());
+    String suffix = staffNo != null ? staffNo : String.valueOf(record.getStaffId());
+    String date = (record.getEndDate() != null ? record.getEndDate() : LocalDate.now()).format(DateTimeFormatter.BASIC_ISO_DATE);
+    return "TRN-" + date + "-" + suffix;
+  }
+
+  private String normalizeTrainingScene(String scene, String fallback) {
+    String normalized = normalizeOptionalText(scene);
+    if (normalized == null) {
+      return fallback == null ? "RECORD" : fallback;
+    }
+    normalized = normalized.toUpperCase(Locale.ROOT);
+    if (!List.of("PLAN", "RECORD", "CERTIFICATE").contains(normalized)) {
+      return fallback == null ? "RECORD" : fallback;
+    }
+    return normalized;
+  }
+
+  private String normalizeCertificateStatus(String status, String fallback) {
+    String normalized = normalizeOptionalText(status);
+    if (normalized == null) {
+      return fallback;
+    }
+    return normalized.toUpperCase(Locale.ROOT);
+  }
+
+  private String normalizeOptionalText(String value) {
+    return normalizeBlank(value);
+  }
+
+  private List<Map<String, Object>> parseTrainingAttachments(String attachmentsJson) {
+    String normalized = normalizeOptionalText(attachmentsJson);
+    if (normalized == null) {
+      return List.of();
+    }
+    try {
+      return objectMapper.readValue(normalized, new TypeReference<List<Map<String, Object>>>() {});
+    } catch (Exception ex) {
+      return List.of();
+    }
+  }
+
+  private String toAttachmentsJson(List<Map<String, Object>> attachments) {
+    if (attachments == null || attachments.isEmpty()) {
+      return null;
+    }
+    try {
+      return objectMapper.writeValueAsString(attachments);
+    } catch (Exception ex) {
+      throw new IllegalArgumentException("培训附件数据格式错误");
+    }
   }
 
   private String resolveAccessResult(String status) {
@@ -1797,6 +2493,406 @@ public class AdminHrController {
       return "培训费用";
     }
     return "报销";
+  }
+
+  private IPage<HrStaffMonthlyFeeBillResponse> pageStaffMonthlyFee(
+      long pageNo, long pageSize, String keyword, String month, String financeSyncStatus, String feeType) {
+    Long orgId = AuthContext.getOrgId();
+    YearMonth feeMonth = resolveFeeMonth(month);
+    String normalizedKeyword = normalizeBlank(keyword);
+    String normalizedFinanceSyncStatus = normalizeBlank(financeSyncStatus);
+    var wrapper = Wrappers.lambdaQuery(StaffMonthlyFeeBill.class)
+        .eq(StaffMonthlyFeeBill::getOrgId, orgId)
+        .eq(StaffMonthlyFeeBill::getIsDeleted, 0)
+        .eq(StaffMonthlyFeeBill::getFeeMonth, feeMonth.toString())
+        .eq(StaffMonthlyFeeBill::getFeeType, feeType)
+        .eq(normalizedFinanceSyncStatus != null, StaffMonthlyFeeBill::getFinanceSyncStatus, normalizedFinanceSyncStatus)
+        .orderByAsc(StaffMonthlyFeeBill::getDepartmentName)
+        .orderByAsc(StaffMonthlyFeeBill::getStaffNo)
+        .orderByAsc(StaffMonthlyFeeBill::getStaffName)
+        .orderByDesc(StaffMonthlyFeeBill::getUpdateTime);
+    if (normalizedKeyword != null) {
+      wrapper.and(w -> w.like(StaffMonthlyFeeBill::getStaffNo, normalizedKeyword)
+          .or().like(StaffMonthlyFeeBill::getStaffName, normalizedKeyword)
+          .or().like(StaffMonthlyFeeBill::getDepartmentName, normalizedKeyword)
+          .or().like(StaffMonthlyFeeBill::getTitle, normalizedKeyword)
+          .or().like(StaffMonthlyFeeBill::getDormitoryRoomNo, normalizedKeyword)
+          .or().like(StaffMonthlyFeeBill::getMeterNo, normalizedKeyword)
+          .or().like(StaffMonthlyFeeBill::getRemark, normalizedKeyword));
+    }
+    IPage<StaffMonthlyFeeBill> page = staffMonthlyFeeBillMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
+    Map<Long, String> financeSyncStaffNameMap = loadStaffNameMap(page.getRecords().stream()
+        .map(StaffMonthlyFeeBill::getFinanceSyncBy)
+        .toList());
+    IPage<HrStaffMonthlyFeeBillResponse> response = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
+    response.setRecords(page.getRecords().stream()
+        .map(item -> toMonthlyFeeBillResponse(item, financeSyncStaffNameMap))
+        .toList());
+    return response;
+  }
+
+  private HrStaffMonthlyFeeBillResponse toMonthlyFeeBillResponse(
+      StaffMonthlyFeeBill item, Map<Long, String> financeSyncStaffNameMap) {
+    HrStaffMonthlyFeeBillResponse row = new HrStaffMonthlyFeeBillResponse();
+    row.setId(item.getId());
+    row.setStaffId(item.getStaffId());
+    row.setStaffNo(item.getStaffNo());
+    row.setStaffName(item.getStaffName());
+    row.setDepartmentId(item.getDepartmentId());
+    row.setDepartmentName(item.getDepartmentName());
+    row.setFeeMonth(item.getFeeMonth());
+    row.setFeeType(item.getFeeType());
+    row.setTitle(item.getTitle());
+    row.setQuantity(item.getQuantity());
+    row.setUnitPrice(item.getUnitPrice());
+    row.setAmount(item.getAmount());
+    row.setStatus(item.getStatus());
+    row.setFinanceSyncStatus(item.getFinanceSyncStatus());
+    row.setFinanceSyncId(item.getFinanceSyncId());
+    row.setFinanceSyncAt(item.getFinanceSyncAt());
+    row.setFinanceSyncByName(financeSyncStaffNameMap.get(item.getFinanceSyncBy()));
+    row.setDormitoryBuilding(item.getDormitoryBuilding());
+    row.setDormitoryRoomNo(item.getDormitoryRoomNo());
+    row.setDormitoryBedNo(item.getDormitoryBedNo());
+    row.setMeterNo(item.getMeterNo());
+    row.setRemark(item.getRemark());
+    row.setCreateTime(item.getCreateTime());
+    row.setUpdateTime(item.getUpdateTime());
+    Map<String, Object> detail = parseJson(item.getDetailJson());
+    row.setMealPlanSummary(asString(detail.get("mealPlanSummary")));
+    row.setDetailSummary(asString(detail.get("detailSummary")));
+    return row;
+  }
+
+  private StaffAccount findStaff(Long orgId, Long staffId) {
+    if (staffId == null) {
+      return null;
+    }
+    return staffMapper.selectOne(Wrappers.lambdaQuery(StaffAccount.class)
+        .eq(StaffAccount::getId, staffId)
+        .eq(orgId != null, StaffAccount::getOrgId, orgId)
+        .eq(StaffAccount::getIsDeleted, 0)
+        .last("LIMIT 1"));
+  }
+
+  private List<StaffAccount> listActiveStaff(Long orgId) {
+    return staffMapper.selectList(Wrappers.lambdaQuery(StaffAccount.class)
+        .eq(orgId != null, StaffAccount::getOrgId, orgId)
+        .eq(StaffAccount::getIsDeleted, 0)
+        .eq(StaffAccount::getStatus, 1)
+        .orderByAsc(StaffAccount::getDepartmentId)
+        .orderByAsc(StaffAccount::getStaffNo)
+        .orderByAsc(StaffAccount::getRealName));
+  }
+
+  private Map<Long, Department> loadDepartmentMap(List<StaffAccount> staffRows) {
+    List<Long> departmentIds = sanitizeIds(staffRows.stream()
+        .map(StaffAccount::getDepartmentId)
+        .toList());
+    if (departmentIds.isEmpty()) {
+      return Map.of();
+    }
+    return departmentMapper.selectBatchIds(departmentIds).stream()
+        .filter(item -> item.getId() != null)
+        .collect(Collectors.toMap(Department::getId, item -> item, (a, b) -> a));
+  }
+
+  private Map<Long, StaffServicePlan> loadServicePlanMap(Long orgId, List<Long> staffIds) {
+    List<Long> sanitizedStaffIds = sanitizeIds(staffIds);
+    if (sanitizedStaffIds.isEmpty()) {
+      return Map.of();
+    }
+    return staffServicePlanMapper.selectList(
+            Wrappers.lambdaQuery(StaffServicePlan.class)
+                .eq(StaffServicePlan::getOrgId, orgId)
+                .eq(StaffServicePlan::getIsDeleted, 0)
+                .in(StaffServicePlan::getStaffId, sanitizedStaffIds))
+        .stream()
+        .filter(item -> item.getStaffId() != null)
+        .collect(Collectors.toMap(StaffServicePlan::getStaffId, item -> item, (a, b) -> a));
+  }
+
+  private StaffMonthlyFeeBill findMonthlyFeeBill(Long orgId, Long staffId, String feeMonth, String feeType) {
+    return staffMonthlyFeeBillMapper.selectOne(
+        Wrappers.lambdaQuery(StaffMonthlyFeeBill.class)
+            .eq(StaffMonthlyFeeBill::getOrgId, orgId)
+            .eq(StaffMonthlyFeeBill::getStaffId, staffId)
+            .eq(StaffMonthlyFeeBill::getFeeMonth, feeMonth)
+            .eq(StaffMonthlyFeeBill::getFeeType, feeType)
+            .eq(StaffMonthlyFeeBill::getIsDeleted, 0)
+            .last("LIMIT 1"));
+  }
+
+  private HrStaffServicePlanResponse toServicePlanResponse(
+      StaffServicePlan plan, StaffAccount staff, Department department) {
+    HrStaffServicePlanResponse response = new HrStaffServicePlanResponse();
+    response.setId(plan == null ? null : plan.getId());
+    response.setStaffId(staff == null ? (plan == null ? null : plan.getStaffId()) : staff.getId());
+    response.setStaffNo(staff == null ? (plan == null ? null : plan.getStaffNo()) : staff.getStaffNo());
+    response.setStaffName(staff == null ? (plan == null ? null : plan.getStaffName()) : staff.getRealName());
+    response.setDepartmentId(staff == null ? (plan == null ? null : plan.getDepartmentId()) : staff.getDepartmentId());
+    response.setDepartmentName(department == null ? (plan == null ? null : plan.getDepartmentName()) : department.getName());
+    response.setBreakfastEnabled(plan == null ? 0 : normalizeFlag(plan.getBreakfastEnabled()));
+    response.setBreakfastUnitPrice(plan == null ? null : plan.getBreakfastUnitPrice());
+    response.setBreakfastDaysPerMonth(plan == null ? null : plan.getBreakfastDaysPerMonth());
+    response.setLunchEnabled(plan == null ? 0 : normalizeFlag(plan.getLunchEnabled()));
+    response.setLunchUnitPrice(plan == null ? null : plan.getLunchUnitPrice());
+    response.setLunchDaysPerMonth(plan == null ? null : plan.getLunchDaysPerMonth());
+    response.setDinnerEnabled(plan == null ? 0 : normalizeFlag(plan.getDinnerEnabled()));
+    response.setDinnerUnitPrice(plan == null ? null : plan.getDinnerUnitPrice());
+    response.setDinnerDaysPerMonth(plan == null ? null : plan.getDinnerDaysPerMonth());
+    response.setLiveInDormitory(plan == null ? 0 : normalizeFlag(plan.getLiveInDormitory()));
+    response.setDormitoryBuilding(plan == null ? null : plan.getDormitoryBuilding());
+    response.setDormitoryRoomNo(plan == null ? null : plan.getDormitoryRoomNo());
+    response.setDormitoryBedNo(plan == null ? null : plan.getDormitoryBedNo());
+    response.setMeterNo(plan == null ? null : plan.getMeterNo());
+    response.setStatus(plan == null ? "ENABLED" : defaultText(plan.getStatus(), "ENABLED"));
+    response.setMealPlanSummary(buildMealPlanSummary(plan));
+    response.setRemark(plan == null ? null : plan.getRemark());
+    response.setUpdateTime(plan == null ? null : plan.getUpdateTime());
+    return response;
+  }
+
+  private void saveServicePlan(StaffServicePlan plan) {
+    if (plan.getId() == null) {
+      staffServicePlanMapper.insert(plan);
+    } else {
+      staffServicePlanMapper.updateById(plan);
+    }
+  }
+
+  private void saveMonthlyFeeBill(StaffMonthlyFeeBill bill) {
+    if (bill.getId() == null) {
+      staffMonthlyFeeBillMapper.insert(bill);
+    } else {
+      staffMonthlyFeeBillMapper.updateById(bill);
+    }
+  }
+
+  private boolean isPlanEnabled(StaffServicePlan plan) {
+    return plan != null && !"DISABLED".equalsIgnoreCase(defaultText(plan.getStatus(), "ENABLED"));
+  }
+
+  private int mealEnabledCount(StaffServicePlan plan) {
+    int count = 0;
+    if (plan != null && normalizeFlag(plan.getBreakfastEnabled()) == 1) count++;
+    if (plan != null && normalizeFlag(plan.getLunchEnabled()) == 1) count++;
+    if (plan != null && normalizeFlag(plan.getDinnerEnabled()) == 1) count++;
+    return count;
+  }
+
+  private int totalMealDays(StaffServicePlan plan) {
+    if (plan == null) {
+      return 0;
+    }
+    int total = 0;
+    if (normalizeFlag(plan.getBreakfastEnabled()) == 1) {
+      total += normalizeDays(plan.getBreakfastDaysPerMonth());
+    }
+    if (normalizeFlag(plan.getLunchEnabled()) == 1) {
+      total += normalizeDays(plan.getLunchDaysPerMonth());
+    }
+    if (normalizeFlag(plan.getDinnerEnabled()) == 1) {
+      total += normalizeDays(plan.getDinnerDaysPerMonth());
+    }
+    return total;
+  }
+
+  private java.math.BigDecimal mealBillAmount(StaffServicePlan plan) {
+    if (plan == null) {
+      return java.math.BigDecimal.ZERO;
+    }
+    java.math.BigDecimal total = java.math.BigDecimal.ZERO;
+    if (normalizeFlag(plan.getBreakfastEnabled()) == 1) {
+      total = total.add(zeroIfNull(plan.getBreakfastUnitPrice())
+          .multiply(java.math.BigDecimal.valueOf(normalizeDays(plan.getBreakfastDaysPerMonth()))));
+    }
+    if (normalizeFlag(plan.getLunchEnabled()) == 1) {
+      total = total.add(zeroIfNull(plan.getLunchUnitPrice())
+          .multiply(java.math.BigDecimal.valueOf(normalizeDays(plan.getLunchDaysPerMonth()))));
+    }
+    if (normalizeFlag(plan.getDinnerEnabled()) == 1) {
+      total = total.add(zeroIfNull(plan.getDinnerUnitPrice())
+          .multiply(java.math.BigDecimal.valueOf(normalizeDays(plan.getDinnerDaysPerMonth()))));
+    }
+    return total;
+  }
+
+  private java.math.BigDecimal resolveAverageUnitPrice(java.math.BigDecimal totalAmount, int totalDays) {
+    if (totalDays <= 0 || totalAmount == null || totalAmount.signum() <= 0) {
+      return java.math.BigDecimal.ZERO;
+    }
+    return totalAmount.divide(java.math.BigDecimal.valueOf(totalDays), 2, java.math.RoundingMode.HALF_UP);
+  }
+
+  private Map<String, Object> buildMealFeeDetail(StaffServicePlan plan) {
+    Map<String, Object> detail = new HashMap<>();
+    List<String> lines = new ArrayList<>();
+    if (normalizeFlag(plan.getBreakfastEnabled()) == 1) {
+      lines.add("早餐 " + normalizeDays(plan.getBreakfastDaysPerMonth()) + "天 x "
+          + zeroIfNull(plan.getBreakfastUnitPrice()).setScale(2, java.math.RoundingMode.HALF_UP) + "元");
+    }
+    if (normalizeFlag(plan.getLunchEnabled()) == 1) {
+      lines.add("中餐 " + normalizeDays(plan.getLunchDaysPerMonth()) + "天 x "
+          + zeroIfNull(plan.getLunchUnitPrice()).setScale(2, java.math.RoundingMode.HALF_UP) + "元");
+    }
+    if (normalizeFlag(plan.getDinnerEnabled()) == 1) {
+      lines.add("晚餐 " + normalizeDays(plan.getDinnerDaysPerMonth()) + "天 x "
+          + zeroIfNull(plan.getDinnerUnitPrice()).setScale(2, java.math.RoundingMode.HALF_UP) + "元");
+    }
+    detail.put("mealPlanSummary", buildMealPlanSummary(plan));
+    detail.put("detailSummary", String.join("；", lines));
+    detail.put("breakfastEnabled", normalizeFlag(plan.getBreakfastEnabled()));
+    detail.put("breakfastUnitPrice", plan.getBreakfastUnitPrice());
+    detail.put("breakfastDaysPerMonth", normalizeDays(plan.getBreakfastDaysPerMonth()));
+    detail.put("lunchEnabled", normalizeFlag(plan.getLunchEnabled()));
+    detail.put("lunchUnitPrice", plan.getLunchUnitPrice());
+    detail.put("lunchDaysPerMonth", normalizeDays(plan.getLunchDaysPerMonth()));
+    detail.put("dinnerEnabled", normalizeFlag(plan.getDinnerEnabled()));
+    detail.put("dinnerUnitPrice", plan.getDinnerUnitPrice());
+    detail.put("dinnerDaysPerMonth", normalizeDays(plan.getDinnerDaysPerMonth()));
+    return detail;
+  }
+
+  private Map<String, Object> buildElectricityFeeDetail(HrStaffElectricityImportRowRequest row, StaffServicePlan plan) {
+    Map<String, Object> detail = new HashMap<>();
+    detail.put("detailSummary", "电费上传金额 " + zeroIfNull(row.getAmount()).setScale(2, java.math.RoundingMode.HALF_UP) + "元");
+    detail.put("mealPlanSummary", buildMealPlanSummary(plan));
+    detail.put("dormitoryBuilding", firstNonBlank(normalizeBlank(row.getDormitoryBuilding()), plan == null ? null : normalizeBlank(plan.getDormitoryBuilding())));
+    detail.put("dormitoryRoomNo", firstNonBlank(normalizeBlank(row.getDormitoryRoomNo()), plan == null ? null : normalizeBlank(plan.getDormitoryRoomNo())));
+    detail.put("dormitoryBedNo", firstNonBlank(normalizeBlank(row.getDormitoryBedNo()), plan == null ? null : normalizeBlank(plan.getDormitoryBedNo())));
+    detail.put("meterNo", firstNonBlank(normalizeBlank(row.getMeterNo()), plan == null ? null : normalizeBlank(plan.getMeterNo())));
+    return detail;
+  }
+
+  private String buildMealPlanSummary(StaffServicePlan plan) {
+    if (plan == null) {
+      return "未维护";
+    }
+    List<String> items = new ArrayList<>();
+    if (normalizeFlag(plan.getBreakfastEnabled()) == 1) {
+      items.add("早餐 " + normalizeDays(plan.getBreakfastDaysPerMonth()) + "天");
+    }
+    if (normalizeFlag(plan.getLunchEnabled()) == 1) {
+      items.add("中餐 " + normalizeDays(plan.getLunchDaysPerMonth()) + "天");
+    }
+    if (normalizeFlag(plan.getDinnerEnabled()) == 1) {
+      items.add("晚餐 " + normalizeDays(plan.getDinnerDaysPerMonth()) + "天");
+    }
+    return items.isEmpty() ? "未启用餐费方案" : String.join(" / ", items);
+  }
+
+  private void markFinancePending(StaffMonthlyFeeBill bill) {
+    bill.setFinanceSyncStatus("PENDING");
+    bill.setFinanceSyncId(null);
+    bill.setFinanceSyncAt(null);
+    bill.setFinanceSyncBy(null);
+  }
+
+  private StaffAccount resolveImportStaff(
+      HrStaffElectricityImportRowRequest row,
+      Map<Long, StaffAccount> staffById,
+      Map<String, StaffAccount> staffByNo,
+      Map<String, StaffAccount> staffByName) {
+    if (row == null) {
+      return null;
+    }
+    if (row.getStaffId() != null && staffById.containsKey(row.getStaffId())) {
+      return staffById.get(row.getStaffId());
+    }
+    String staffNo = normalizeBlank(row.getStaffNo());
+    if (staffNo != null && staffByNo.containsKey(staffNo.toLowerCase(Locale.ROOT))) {
+      return staffByNo.get(staffNo.toLowerCase(Locale.ROOT));
+    }
+    String staffName = normalizeBlank(row.getStaffName());
+    if (staffName != null && staffByName.containsKey(staffName.toLowerCase(Locale.ROOT))) {
+      return staffByName.get(staffName.toLowerCase(Locale.ROOT));
+    }
+    return null;
+  }
+
+  private Map<String, Object> buildFinanceSyncFormData(StaffMonthlyFeeBill bill) {
+    Map<String, Object> payload = new HashMap<>();
+    payload.put("scene", "MEAL".equalsIgnoreCase(bill.getFeeType()) ? "staff-meal-monthly" : "staff-electricity-monthly");
+    payload.put("expenseType", "MEAL".equalsIgnoreCase(bill.getFeeType()) ? "员工餐费" : "员工电费");
+    payload.put("feeBillId", bill.getId());
+    payload.put("staffId", bill.getStaffId());
+    payload.put("staffNo", bill.getStaffNo());
+    payload.put("staffName", bill.getStaffName());
+    payload.put("departmentName", bill.getDepartmentName());
+    payload.put("feeMonth", bill.getFeeMonth());
+    payload.put("dormitoryRoomNo", bill.getDormitoryRoomNo());
+    payload.put("meterNo", bill.getMeterNo());
+    payload.put("detailJson", bill.getDetailJson());
+    return payload;
+  }
+
+  private String buildFinanceSyncRemark(StaffMonthlyFeeBill bill) {
+    List<String> lines = new ArrayList<>();
+    lines.add("月度" + ("MEAL".equalsIgnoreCase(bill.getFeeType()) ? "餐费" : "电费") + "同步");
+    lines.add("员工：" + defaultText(bill.getStaffName(), defaultText(bill.getStaffNo(), "未知")));
+    lines.add("月份：" + defaultText(bill.getFeeMonth(), "-"));
+    if (normalizeBlank(bill.getDormitoryRoomNo()) != null) {
+      lines.add("宿舍：" + bill.getDormitoryRoomNo());
+    }
+    if (normalizeBlank(bill.getMeterNo()) != null) {
+      lines.add("电表：" + bill.getMeterNo());
+    }
+    if (normalizeBlank(bill.getRemark()) != null) {
+      lines.add("备注：" + bill.getRemark().trim());
+    }
+    return String.join("；", lines);
+  }
+
+  private Map<Long, String> loadStaffNameMap(List<Long> staffIds) {
+    List<Long> sanitized = sanitizeIds(staffIds);
+    if (sanitized.isEmpty()) {
+      return Map.of();
+    }
+    return staffMapper.selectBatchIdsSafe(sanitized).stream()
+        .filter(item -> item.getId() != null)
+        .collect(Collectors.toMap(StaffAccount::getId, item -> defaultText(item.getRealName(), item.getUsername()), (a, b) -> a));
+  }
+
+  private YearMonth resolveFeeMonth(String month) {
+    String normalized = normalizeBlank(month);
+    return normalized == null ? YearMonth.now() : YearMonth.parse(normalized);
+  }
+
+  private Integer normalizeFlag(Integer value) {
+    return value != null && value == 1 ? 1 : 0;
+  }
+
+  private Integer normalizeDays(Integer value) {
+    if (value == null || value < 0) {
+      return 0;
+    }
+    return value;
+  }
+
+  private java.math.BigDecimal normalizeMoney(java.math.BigDecimal value) {
+    return zeroIfNull(value).setScale(2, java.math.RoundingMode.HALF_UP);
+  }
+
+  private java.math.BigDecimal zeroIfNull(java.math.BigDecimal value) {
+    return value == null ? java.math.BigDecimal.ZERO : value;
+  }
+
+  private String defaultText(String value, String fallback) {
+    return normalizeBlank(value) == null ? fallback : value.trim();
+  }
+
+  private String firstNonBlank(String... values) {
+    if (values == null) {
+      return null;
+    }
+    for (String value : values) {
+      String normalized = normalizeBlank(value);
+      if (normalized != null) {
+        return normalized;
+      }
+    }
+    return null;
   }
 
   private Map<String, Object> buildRecruitmentExt(HrRecruitmentNeedRequest request) {
@@ -1969,6 +3065,25 @@ public class AdminHrController {
     }
   }
 
+  private LocalDateTime parseDateTime(String value, LocalDateTime fallback) {
+    String normalized = normalizeBlank(value);
+    if (normalized == null) {
+      return fallback;
+    }
+    List<DateTimeFormatter> formatters = List.of(
+        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
+        DateTimeFormatter.ISO_LOCAL_DATE_TIME,
+        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+    for (DateTimeFormatter formatter : formatters) {
+      try {
+        return LocalDateTime.parse(normalized, formatter);
+      } catch (Exception ex) {
+        // try next formatter
+      }
+    }
+    return fallback;
+  }
+
   private String empty(String value) {
     return value == null ? "" : value;
   }
@@ -2009,10 +3124,105 @@ public class AdminHrController {
       response.setStatus(profile.getStatus());
       response.setLeaveDate(profile.getLeaveDate());
       response.setLeaveReason(profile.getLeaveReason());
+      response.setSocialSecurityStatus(profile.getSocialSecurityStatus());
+      response.setSocialSecurityStartDate(profile.getSocialSecurityStartDate());
+      response.setSocialSecurityReminderDays(profile.getSocialSecurityReminderDays());
+      response.setSocialSecurityRemark(profile.getSocialSecurityRemark());
       response.setRemark(profile.getRemark());
       response.setUpdateTime(profile.getUpdateTime());
     }
     return response;
+  }
+
+  private boolean shouldTrackSocialSecurity(StaffProfile profile, StaffAccount staff) {
+    if (profile == null || profile.getHireDate() == null) {
+      return false;
+    }
+    if (staff != null && !Integer.valueOf(1).equals(staff.getStatus())) {
+      return false;
+    }
+    String status = normalizeBlank(profile.getSocialSecurityStatus());
+    if (status == null) {
+      return true;
+    }
+    return !List.of("COMPLETED", "PAID", "STOPPED").contains(status.toUpperCase(Locale.ROOT));
+  }
+
+  private LocalDate resolveSocialSecurityReminderDate(StaffProfile profile) {
+    if (profile == null || profile.getHireDate() == null) {
+      return null;
+    }
+    Integer reminderDays = profile.getSocialSecurityReminderDays();
+    int days = reminderDays == null || reminderDays < 0 ? 30 : reminderDays;
+    return profile.getHireDate().plusDays(days);
+  }
+
+  private HrSocialSecurityReminderResponse toSocialSecurityReminderResponse(
+      StaffProfile profile, StaffAccount staff, LocalDate today) {
+    HrSocialSecurityReminderResponse response = new HrSocialSecurityReminderResponse();
+    if (staff != null) {
+      response.setStaffId(staff.getId());
+      response.setStaffNo(staff.getStaffNo());
+      response.setStaffName(staff.getRealName());
+      response.setPhone(staff.getPhone());
+      response.setDepartmentId(staff.getDepartmentId());
+    }
+    if (profile != null) {
+      response.setStaffId(response.getStaffId() == null ? profile.getStaffId() : response.getStaffId());
+      response.setJobTitle(profile.getJobTitle());
+      response.setHireDate(profile.getHireDate());
+      response.setSocialSecurityStatus(profile.getSocialSecurityStatus());
+      response.setSocialSecurityStartDate(profile.getSocialSecurityStartDate());
+      response.setSocialSecurityReminderDays(profile.getSocialSecurityReminderDays());
+      response.setSocialSecurityRemark(profile.getSocialSecurityRemark());
+      LocalDate reminderDate = resolveSocialSecurityReminderDate(profile);
+      response.setReminderDate(reminderDate);
+      if (today != null && reminderDate != null) {
+        response.setRemainingDays(ChronoUnit.DAYS.between(today, reminderDate));
+      }
+      response.setReminderScope(resolveSocialSecurityScope(response, today, today == null ? null : today.plusDays(7)));
+    }
+    return response;
+  }
+
+  private boolean matchSocialSecurityScope(
+      HrSocialSecurityReminderResponse item,
+      String scopeCode,
+      LocalDate today,
+      LocalDate upcomingDeadline) {
+    if (item == null) {
+      return false;
+    }
+    String normalized = scopeCode == null ? "ALL" : scopeCode;
+    if ("ALL".equals(normalized)) {
+      return true;
+    }
+    String resolvedScope = resolveSocialSecurityScope(item, today, upcomingDeadline);
+    return normalized.equals(resolvedScope);
+  }
+
+  private String resolveSocialSecurityScope(
+      HrSocialSecurityReminderResponse item,
+      LocalDate today,
+      LocalDate upcomingDeadline) {
+    if (item == null) {
+      return "ALL";
+    }
+    String status = normalizeBlank(item.getSocialSecurityStatus());
+    if (status != null && List.of("COMPLETED", "PAID").contains(status.toUpperCase(Locale.ROOT))) {
+      return "COMPLETED";
+    }
+    LocalDate reminderDate = item.getReminderDate();
+    if (reminderDate == null) {
+      return "PENDING";
+    }
+    if (today != null && !reminderDate.isAfter(today)) {
+      return "DUE";
+    }
+    if (today != null && upcomingDeadline != null && reminderDate.isAfter(today) && !reminderDate.isAfter(upcomingDeadline)) {
+      return "UPCOMING";
+    }
+    return "PENDING";
   }
 
   private HrContractReminderResponse toContractReminderResponse(StaffProfile profile, StaffAccount staff, LocalDate today) {

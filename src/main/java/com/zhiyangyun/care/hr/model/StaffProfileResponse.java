@@ -25,6 +25,10 @@ public class StaffProfileResponse {
   private String emergencyContactName;
   private String emergencyContactPhone;
   private LocalDate birthday;
+  private String socialSecurityStatus;
+  private LocalDate socialSecurityStartDate;
+  private Integer socialSecurityReminderDays;
+  private String socialSecurityRemark;
   private Integer status;
   private LocalDate leaveDate;
   private String leaveReason;
