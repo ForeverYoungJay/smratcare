@@ -15,8 +15,10 @@ import com.zhiyangyun.care.elder.model.RoomRequest;
 import com.zhiyangyun.care.elder.model.RoomResponse;
 import com.zhiyangyun.care.elder.service.RoomService;
 import com.zhiyangyun.care.elder.util.QrCodeUtil;
+import java.util.List;
 import java.util.Objects;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RoomServiceImpl implements RoomService {
@@ -143,6 +145,7 @@ public class RoomServiceImpl implements RoomService {
   }
 
   @Override
+  @Transactional(rollbackFor = Exception.class)
   public void delete(Long id, Long tenantId) {
     Room room = roomMapper.selectById(id);
     if (room == null || Integer.valueOf(1).equals(room.getIsDeleted())) {
@@ -151,12 +154,18 @@ public class RoomServiceImpl implements RoomService {
     if (tenantId == null || !tenantId.equals(room.getTenantId())) {
       throw new IllegalArgumentException("无权限删除该房间");
     }
-    long bedCount = bedMapper.selectCount(Wrappers.lambdaQuery(Bed.class)
+    List<Bed> beds = bedMapper.selectList(Wrappers.lambdaQuery(Bed.class)
         .eq(Bed::getIsDeleted, 0)
         .eq(Bed::getTenantId, room.getTenantId())
         .eq(Bed::getRoomId, room.getId()));
-    if (bedCount > 0) {
-      throw new IllegalArgumentException("当前房间下仍存在床位，请先删除或迁移床位");
+    boolean hasOccupiedBed = beds.stream().anyMatch(bed ->
+        bed.getElderId() != null || Integer.valueOf(2).equals(bed.getStatus()));
+    if (hasOccupiedBed) {
+      throw new IllegalArgumentException("当前房间下存在已入住床位，请先办理退床或换床");
+    }
+    for (Bed bed : beds) {
+      bed.setIsDeleted(1);
+      bedMapper.updateById(bed);
     }
     room.setIsDeleted(1);
     roomMapper.updateById(room);

@@ -8,18 +8,24 @@ import com.zhiyangyun.care.asset.mapper.FloorMapper;
 import com.zhiyangyun.care.asset.model.FloorRequest;
 import com.zhiyangyun.care.asset.model.FloorResponse;
 import com.zhiyangyun.care.asset.service.FloorService;
+import com.zhiyangyun.care.elder.entity.Bed;
 import com.zhiyangyun.care.elder.entity.Room;
+import com.zhiyangyun.care.elder.mapper.BedMapper;
 import com.zhiyangyun.care.elder.mapper.RoomMapper;
+import java.util.List;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class FloorServiceImpl implements FloorService {
   private final FloorMapper floorMapper;
   private final RoomMapper roomMapper;
+  private final BedMapper bedMapper;
 
-  public FloorServiceImpl(FloorMapper floorMapper, RoomMapper roomMapper) {
+  public FloorServiceImpl(FloorMapper floorMapper, RoomMapper roomMapper, BedMapper bedMapper) {
     this.floorMapper = floorMapper;
     this.roomMapper = roomMapper;
+    this.bedMapper = bedMapper;
   }
 
   @Override
@@ -92,6 +98,7 @@ public class FloorServiceImpl implements FloorService {
   }
 
   @Override
+  @Transactional(rollbackFor = Exception.class)
   public void delete(Long id, Long tenantId) {
     Floor floor = floorMapper.selectById(id);
     if (floor == null || Integer.valueOf(1).equals(floor.getIsDeleted())) {
@@ -100,12 +107,29 @@ public class FloorServiceImpl implements FloorService {
     if (tenantId == null || !tenantId.equals(floor.getTenantId())) {
       throw new IllegalArgumentException("无权限删除该楼层");
     }
-    long roomCount = roomMapper.selectCount(Wrappers.lambdaQuery(Room.class)
+    List<Room> rooms = roomMapper.selectList(Wrappers.lambdaQuery(Room.class)
         .eq(Room::getIsDeleted, 0)
         .eq(Room::getTenantId, tenantId)
         .eq(Room::getFloorId, id));
-    if (roomCount > 0) {
-      throw new IllegalArgumentException("当前楼层下仍存在房间，请先删除或迁移房间");
+    List<Long> roomIds = rooms.stream().map(Room::getId).toList();
+    List<Bed> beds = roomIds.isEmpty()
+        ? List.of()
+        : bedMapper.selectList(Wrappers.lambdaQuery(Bed.class)
+            .eq(Bed::getIsDeleted, 0)
+            .eq(Bed::getTenantId, tenantId)
+            .in(Bed::getRoomId, roomIds));
+    boolean hasOccupiedBed = beds.stream().anyMatch(bed ->
+        bed.getElderId() != null || Integer.valueOf(2).equals(bed.getStatus()));
+    if (hasOccupiedBed) {
+      throw new IllegalArgumentException("当前楼层下存在已入住床位，请先办理退床或换床");
+    }
+    for (Bed bed : beds) {
+      bed.setIsDeleted(1);
+      bedMapper.updateById(bed);
+    }
+    for (Room room : rooms) {
+      room.setIsDeleted(1);
+      roomMapper.updateById(room);
     }
     floor.setIsDeleted(1);
     floorMapper.updateById(floor);

@@ -1767,7 +1767,7 @@ async function quickDeleteBuildings() {
     return
   }
   try {
-    await confirmAction(`确认删除 ${targets.length} 个楼栋吗？`, '一键删除楼栋')
+    await confirmAction(`确认删除 ${targets.length} 个楼栋吗？系统会自动删除楼栋下未入住的楼层、房间和床位。`, '一键删除楼栋')
     const results = await Promise.allSettled(targets.map((item) => deleteBuilding(item.id)))
     const success = results.filter((item) => item.status === 'fulfilled').length
     const failed = results.length - success
@@ -1823,7 +1823,7 @@ async function quickDeleteFloors() {
     return
   }
   try {
-    await confirmAction(`确认删除 ${targets.length} 个楼层吗？`, '一键删除楼层')
+    await confirmAction(`确认删除 ${targets.length} 个楼层吗？系统会自动删除楼层下未入住的房间和床位。`, '一键删除楼层')
     const results = await Promise.allSettled(targets.map((item) => deleteFloor(item.id)))
     const success = results.filter((item) => item.status === 'fulfilled').length
     const failed = results.length - success
@@ -1887,7 +1887,7 @@ async function quickDeleteRooms() {
     return
   }
   try {
-    await confirmAction(`确认删除 ${targets.length} 个房间吗？`, '一键删除房间')
+    await confirmAction(`确认删除 ${targets.length} 个房间吗？系统会自动删除房间下未入住的床位。`, '一键删除房间')
     const results = await Promise.allSettled(targets.map((item) => deleteRoom(item.id)))
     const success = results.filter((item) => item.status === 'fulfilled').length
     const failed = results.length - success
@@ -1962,7 +1962,7 @@ async function quickDeleteBeds() {
 
 async function removeBuilding(id: Id) {
   try {
-    await confirmAction('确认删除该楼栋吗？', '提示')
+    await confirmAction('确认删除该楼栋吗？系统会自动删除楼栋下未入住的楼层、房间和床位。', '提示')
     await deleteBuilding(id)
     message.success('已删除')
     await refreshBuildings()
@@ -1975,7 +1975,7 @@ async function removeBuilding(id: Id) {
 
 async function removeFloor(id: Id) {
   try {
-    await confirmAction('确认删除该楼层吗？', '提示')
+    await confirmAction('确认删除该楼层吗？系统会自动删除楼层下未入住的房间和床位。', '提示')
     await deleteFloor(id)
     message.success('已删除')
     await refreshFloors()
@@ -1988,7 +1988,7 @@ async function removeFloor(id: Id) {
 
 async function removeRoom(id: Id) {
   try {
-    await confirmAction('确认删除该房间吗？', '提示')
+    await confirmAction('确认删除该房间吗？系统会自动删除房间下未入住的床位。', '提示')
     await deleteRoom(id)
     message.success('已删除')
     await refreshRooms()
