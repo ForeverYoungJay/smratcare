@@ -4447,21 +4447,25 @@ onBeforeUnmount(() => {
 .portal-page {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 16px;
   padding: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  letter-spacing: -0.01em;
 }
 
 .hero-card {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #eef6ff 0%, #f8fbff 55%, #ffffff 100%);
-  border: 1px solid #cfe4ff;
-  box-shadow: 0 8px 24px rgba(30, 64, 175, 0.1), 0 2px 8px rgba(15, 23, 42, 0.05);
+  gap: 16px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #f0f7ff 0%, #e1effe 100%);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 10px 30px rgba(30, 58, 138, 0.06), inset 0 2px 20px rgba(255, 255, 255, 0.6);
   position: relative;
   overflow: hidden;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .hero-card::after {
@@ -4477,7 +4481,7 @@ onBeforeUnmount(() => {
 }
 
 .portal-page :deep(.ant-card .ant-card-body) {
-  padding: 12px 14px;
+  padding: 16px 20px;
 }
 
 .portal-page :deep(.module-card .ant-card-head) {
@@ -4494,10 +4498,12 @@ onBeforeUnmount(() => {
 
 .portal-page :deep(.module-card .ant-card-head-title) {
   white-space: normal;
-  line-height: 1.25;
-  padding: 10px 0;
-  font-size: 15px;
+  line-height: 1.3;
+  padding: 14px 0;
+  font-size: 16px;
+  font-weight: 700;
   color: #0f172a;
+  letter-spacing: -0.3px;
 }
 
 .portal-page :deep(.module-card .ant-card-extra) {
@@ -4615,19 +4621,23 @@ onBeforeUnmount(() => {
 }
 
 .module-card {
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
   position: relative;
   overflow: hidden;
-  background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
 }
 
 .todo-focus-card {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(248, 251, 255, 0.96)),
-    linear-gradient(130deg, rgba(59, 130, 246, 0.08), rgba(56, 189, 248, 0.03));
-  border-color: #cfe4ff;
+    linear-gradient(135deg, rgba(239, 246, 255, 0.9), rgba(255, 255, 255, 0.95)),
+    linear-gradient(130deg, rgba(59, 130, 246, 0.15), rgba(56, 189, 248, 0.05));
+  border-color: rgba(191, 219, 254, 0.8);
+  box-shadow: 0 10px 30px rgba(59, 130, 246, 0.08);
 }
 
 .todo-focus-card :deep(.ant-card-head) {
@@ -4635,9 +4645,10 @@ onBeforeUnmount(() => {
 }
 
 .module-card:hover {
-  border-color: #bfdbfe;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
-  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 1);
+  box-shadow: 0 16px 40px rgba(37, 99, 235, 0.08);
+  transform: translateY(-4px);
+  background: rgba(255, 255, 255, 0.85);
 }
 
 .full-height {
@@ -4645,16 +4656,21 @@ onBeforeUnmount(() => {
 }
 
 .metric-cell {
-  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
-  border: 1px solid #dbeafe;
-  border-radius: 10px;
-  padding: 12px;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 12px;
+  padding: 16px;
   cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+  transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+  backdrop-filter: blur(10px);
 }
 
 .metric-cell:hover {
-  border-color: #60a5fa;
-  background: #f0f7ff;
+  border-color: #93c5fd;
+  background: rgba(255, 255, 255, 0.95);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.08);
 }
 
 .metric-title {
