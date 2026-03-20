@@ -28,14 +28,16 @@ const emit = defineEmits(['click-room', 'click-bed'])
 
 const containerRef = ref<HTMLElement | null>(null)
 const canvasRef = ref<HTMLElement | null>(null)
-const currentLevel = ref<'PARK' | 'BUILDING' | 'FLOOR'>('PARK')
+const currentLevel = ref<'PARK' | 'BUILDING' | 'FLOOR' | 'ROOM'>('PARK')
 const selectedBuilding = ref<string>('')
 const selectedFloor = ref<string>('')
+const selectedRoom = ref<string>('')
 
 const breadcrumbText = computed(() => {
   let text = '园区全景'
   if (selectedBuilding.value) text += ` > ${selectedBuilding.value}`
   if (selectedFloor.value) text += ` > ${selectedFloor.value}`
+  if (selectedRoom.value) text += ` > 房间 ${selectedRoom.value}`
   return text
 })
 
@@ -56,11 +58,19 @@ const materials = {
   floor: new THREE.MeshStandardMaterial({ color: 0xe2e8f0, transparent: true, opacity: 0.9 }),
   room: new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 1.0, roughness: 0.8 }),
   roomHover: new THREE.MeshStandardMaterial({ color: 0x60a5fa }),
-  hover: new THREE.MeshStandardMaterial({ color: 0x2563eb, emissive: 0x1e3a8a })
+  hover: new THREE.MeshStandardMaterial({ color: 0x2563eb, emissive: 0x1e3a8a }),
+  bedIdle: new THREE.MeshStandardMaterial({ color: 0x22c55e }), // Green
+  bedOccupied: new THREE.MeshStandardMaterial({ color: 0xef4444 }), // Red
+  bedReserved: new THREE.MeshStandardMaterial({ color: 0x3b82f6 }), // Blue
+  bedCleaning: new THREE.MeshStandardMaterial({ color: 0xeab308 }), // Yellow
+  bedMaintenance: new THREE.MeshStandardMaterial({ color: 0x9ca3af }), // Gray
+  bedBlink: new THREE.MeshStandardMaterial({ color: 0xf97316 }), // Orange
+  bedPulse: new THREE.MeshStandardMaterial({ color: 0xef4444 }) // Red pulse
 }
 
 const objectsMap = new Map<string, THREE.Object3D>() // key -> mesh or group
 const interactableObjects: THREE.Object3D[] = []
+const animatedBeds: { mesh: THREE.Mesh, type: 'blink' | 'pulse' }[] = []
 
 function initScene() {
   if (!canvasRef.value) return
@@ -115,6 +125,7 @@ function initScene() {
 
 function clearScene() {
   interactableObjects.length = 0
+  animatedBeds.length = 0
   objectsMap.clear()
   const toRemove: THREE.Object3D[] = []
   scene.value.children.forEach(child => {
@@ -267,16 +278,32 @@ function buildSceneData() {
           roomItem.beds.forEach((bed: any, bIndex: number) => {
                const bGeo = new THREE.BoxGeometry(bedSizeX * 0.8, 0.4, bedSizeZ * 0.8)
                // Determine bed color
-               let bedColor = 0xcbd5e1 // Idle
-               if (bed.elderId) bedColor = 0x22c55e // occupied
-               else if (bed.status === 2) bedColor = 0xf97316 // maintenance
-               else if (bed.status === 3) bedColor = 0x06b6d4 // cleaning
-               else if (bed.status === 0) bedColor = 0xef4444 // locked
-               else if (String(bed.bedNo || '').endsWith('R')) bedColor = 0x3b82f6 // reserved
+               let bedMat = materials.bedIdle
+               let animType: 'blink' | 'pulse' | null = null
 
-               const bMat = new THREE.MeshStandardMaterial({ color: bedColor })
-               const bMesh = new THREE.Mesh(bGeo, bMat)
-               bMesh.userData = { type: 'bed', bed: bed }
+               const riskLevel = bed.riskLevel || ''
+               const bStatus = bed.status || 0
+               const isAlert = riskLevel === 'HIGH' || bStatus === 0 || bed.abnormalVital24hCount > 0
+
+               if (isAlert) {
+                  animType = 'pulse'
+                  bedMat = materials.bedPulse.clone()
+               } else if (riskLevel === 'MEDIUM') {
+                  animType = 'blink'
+                  bedMat = materials.bedBlink.clone()
+               } else if (bed.elderId) {
+                  bedMat = materials.bedOccupied
+               } else if (bStatus === 2) {
+                  bedMat = materials.bedMaintenance
+               } else if (bStatus === 3) {
+                  bedMat = materials.bedCleaning
+               } else if (String(bed.bedNo || '').endsWith('R')) {
+                  bedMat = materials.bedReserved
+               }
+
+               const bMesh = new THREE.Mesh(bGeo, bedMat)
+               bMesh.userData = { type: 'bed', bed: bed, originalMat: bedMat }
+               if (animType) animatedBeds.push({ mesh: bMesh, type: animType })
 
                const rbb = Math.floor(bIndex / bCols)
                const rbc = bIndex % bCols
@@ -286,7 +313,7 @@ function buildSceneData() {
 
                // Attach Bed Info Card
                const bedCard = createBedCard(bed, roomItem.roomNo)
-               bedCard.visible = false // Hidden by default, show on FLOOR level
+               bedCard.visible = false // Hidden by default, show on FLOOR/ROOM level
                bedCard.userData = { type: 'bedCard' }
                bMesh.add(bedCard)
 
@@ -386,7 +413,7 @@ function updateVisibility() {
         } else {
           obj.visible = false
         }
-      } else if (currentLevel.value === 'FLOOR') {
+      } else if (currentLevel.value === 'FLOOR' || currentLevel.value === 'ROOM') {
         if (bName === selectedBuilding.value) {
           obj.visible = true
           if (hitbox) hitbox.visible = false
@@ -396,19 +423,28 @@ function updateVisibility() {
               if (c.userData.name === selectedFloor.value) {
                 c.visible = true
                 gsap.to(c.position, { y: 0, duration: 0.8, ease: "power2.out" })
-                // Hide room label, show bed cards
+                
                 c.children.forEach(cc => {
                   if (cc.userData.type === 'room') {
-                    const rl = cc.children.find(ccc => ccc instanceof CSS2DObject && ccc.element.className.includes('room-label'))
-                    if (rl) rl.visible = false
+                    const isRoomSelected = currentLevel.value === 'ROOM' && cc.userData.room.roomNo === selectedRoom.value
+                    
+                    if (currentLevel.value === 'ROOM' && !isRoomSelected) {
+                      // Hide other rooms in Room mode
+                      cc.visible = false
+                    } else {
+                      cc.visible = true
+                      const rl = cc.children.find(ccc => ccc instanceof CSS2DObject && ccc.element.className.includes('room-label'))
+                      if (rl) rl.visible = currentLevel.value === 'FLOOR' // Show label only in Floor view
 
-                    cc.children.forEach(roomChild => {
-                      if (roomChild.userData.type === 'roomTile') return
-                      if (roomChild.userData.type === 'bed') {
-                        const bc = roomChild.children.find(bedChild => bedChild.userData?.type === 'bedCard')
-                        if (bc) bc.visible = true
-                      }
-                    })
+                      // Show bed cards
+                      cc.children.forEach(roomChild => {
+                        if (roomChild.userData.type === 'roomTile') return
+                        if (roomChild.userData.type === 'bed') {
+                          const bc = roomChild.children.find(bedChild => bedChild.userData?.type === 'bedCard')
+                          if (bc) bc.visible = true
+                        }
+                      })
+                    }
                   }
                   if (cc instanceof CSS2DObject && cc.element.className.includes('floor-label')) cc.visible = false
                 })
@@ -441,7 +477,8 @@ function onPointerMove(event: PointerEvent) {
     } else if (hoveredObj.userData.type === 'roomTile') {
       (hoveredObj as THREE.Mesh).material = materials.room
     } else if (hoveredObj.userData.type === 'bed') {
-      hoveredObj.position.y -= 0.1 // Reset bed hover bump
+      (hoveredObj as THREE.Mesh).scale.set(1, 1, 1) // Reset scale
+      ;(hoveredObj as THREE.Mesh).material = hoveredObj.userData.originalMat;
     }
     hoveredObj = null
   }
@@ -455,7 +492,13 @@ function onPointerMove(event: PointerEvent) {
       } else if (obj.userData.type === 'roomTile') {
         ;(obj as THREE.Mesh).material = materials.roomHover
       } else if (obj.userData.type === 'bed') {
-        obj.position.y += 0.1 // Bump up bed on hover
+        (obj as THREE.Mesh).scale.set(1.1, 1.1, 1.1) // Slight scale up
+        // Do not alter material if it's animating so we don't break the animation,
+        // but for idle/occupied we can add a slight emissive.
+        const isAnim = animatedBeds.some(b => b.mesh === obj)
+        if (!isAnim) {
+           (obj as THREE.Mesh).material = materials.hover // Use hover material
+        }
       }
       hoveredObj = obj
     }
@@ -479,14 +522,23 @@ function onClick() {
       const floorGroup = objectsMap.get(`floor_${selectedBuilding.value}_${selectedFloor.value}`)
       if (floorGroup) zoomToObject(floorGroup, true)
     } else if (hoveredObj.userData.type === 'roomTile') {
-      emit('click-room', hoveredObj.userData.ref.userData.room)
+      if (currentLevel.value !== 'ROOM') {
+        // Drill down to ROOM
+        selectedRoom.value = hoveredObj.userData.ref.userData.room.roomNo
+        currentLevel.value = 'ROOM'
+        updateVisibility()
+        zoomToObject(hoveredObj.userData.ref, false, 20) // Zoom closer
+      }
     } else if (hoveredObj.userData.type === 'bed') {
       emit('click-bed', hoveredObj.userData.bed)
     }
+  } else {
+    // Clicked empty space
+    goUpLevel();
   }
 }
 
-function zoomToObject(obj: THREE.Object3D, topDown = false) {
+function zoomToObject(obj: THREE.Object3D, topDown = false, overrideZ?: number) {
   if (!camera.value || !controls.value) return
   const box = new THREE.Box3().setFromObject(obj)
   const center = box.getCenter(new THREE.Vector3())
@@ -494,11 +546,11 @@ function zoomToObject(obj: THREE.Object3D, topDown = false) {
   
   const maxDim = Math.max(size.x, size.y, size.z)
   const fov = camera.value.fov * (Math.PI / 180)
-  let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5
+  let cameraZ = overrideZ || (Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5)
 
   gsap.to(camera.value.position, {
     x: topDown ? center.x : center.x + cameraZ * 0.5,
-    y: topDown ? center.y + cameraZ : center.y + size.y / 2 + 10,
+    y: topDown ? center.y + cameraZ : center.y + size.y / 2 + (overrideZ ? 5 : 10),
     z: topDown ? center.z : center.z + cameraZ,
     duration: 1.0,
     ease: 'power3.inOut'
@@ -513,7 +565,13 @@ function zoomToObject(obj: THREE.Object3D, topDown = false) {
 }
 
 function goUpLevel() {
-  if (currentLevel.value === 'FLOOR') {
+  if (currentLevel.value === 'ROOM') {
+    currentLevel.value = 'FLOOR'
+    selectedRoom.value = ''
+    updateVisibility()
+    const floorGroup = objectsMap.get(`floor_${selectedBuilding.value}_${selectedFloor.value}`)
+    if (floorGroup) zoomToObject(floorGroup, true)
+  } else if (currentLevel.value === 'FLOOR') {
     currentLevel.value = 'BUILDING'
     selectedFloor.value = ''
     updateVisibility()
@@ -551,6 +609,22 @@ function onWindowResize() {
 function animate() {
   animationFrameId = requestAnimationFrame(animate)
   if (controls.value) controls.value.update()
+  
+  // Bed Animations (Pulse / Blink)
+  const time = Date.now() * 0.003
+  animatedBeds.forEach(item => {
+    const mat = item.mesh.material as THREE.MeshStandardMaterial
+    if (item.type === 'pulse') {
+      const v = (Math.sin(time * 2) + 1) / 2 // 0 to 1
+      mat.emissive.setHex(0xef4444)
+      mat.emissiveIntensity = v * 0.8
+    } else if (item.type === 'blink') {
+      const v = Math.sin(time * 3) > 0 ? 1 : 0
+      mat.emissive.setHex(0xf97316)
+      mat.emissiveIntensity = v * 0.6
+    }
+  })
+
   if (renderer.value && camera.value && scene.value) {
     renderer.value.render(scene.value, camera.value)
     cssRenderer.value?.render(scene.value, camera.value)
