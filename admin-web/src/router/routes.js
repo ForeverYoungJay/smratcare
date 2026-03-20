@@ -497,7 +497,7 @@ export const routes = [
                                 path: 'pending',
                                 name: 'MarketingContractsPending',
                                 component: () => import('../views/marketing/ContractSigning.vue'),
-                                props: { statusPreset: 'pending_sign', title: '待签约合同', subTitle: '待签署合同统一处理：查看、入住办理、最终签署', disableDefaultFlowStagePreset: true },
+                                props: { statusPreset: 'unsigned', title: '待签约合同', subTitle: '除已签署外的合同统一处理：查看、入住办理、最终签署', disableDefaultFlowStagePreset: true },
                                 meta: { title: '待签约合同' }
                             },
                             {

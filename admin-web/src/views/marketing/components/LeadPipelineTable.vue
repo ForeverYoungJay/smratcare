@@ -7,6 +7,12 @@
       style="margin-bottom: 12px"
       :message="canViewAllLeads ? '当前账号可查看本机构营销线索。' : `当前账号仅查看本人创建线索（${currentUserDisplayName}）。`"
     />
+    <a-alert
+      show-icon
+      type="info"
+      style="margin-bottom: 12px"
+      :message="moduleLogicMessage"
+    />
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline" class="search-bar">
         <a-form-item v-if="props.mode === 'pipeline'" label="线索视图">
@@ -365,8 +371,10 @@ const props = withDefaults(defineProps<{
   title: string
   subTitle: string
   scenario?: string
+  callbackType?: MarketingCallbackType | ''
 }>(), {
-  mode: 'consultation'
+  mode: 'consultation',
+  callbackType: ''
 })
 
 const router = useRouter()
@@ -440,8 +448,20 @@ const executeForm = reactive({
   followupResult: '',
   nextFollowDate: ''
 })
-const callbackSnapshot = ref<Record<string, { title?: string; followupContent?: string; followupResult?: string; planId?: Id }>>({})
+const callbackSnapshot = ref<Record<string, {
+  title?: string
+  followupContent?: string
+  followupResult?: string
+  planId?: Id
+  callbackType?: string
+}>>({})
 const todayText = dayjs().format('YYYY-MM-DD')
+const moduleLogicMessage = computed(() => {
+  if (effectiveMode.value === 'callback') {
+    return '回访管理和跟进管理都基于 crm_lead 线索池联动 crm_callback_plan；这里可以直接新增计划、执行回访和推进转预订。'
+  }
+  return '线索数据统一来自 crm_lead：咨询=status 0，意向=status 1，预订=status 2，失效=status 3；签约与入住阶段改在合同模块处理，所以不会在这里直接展示已签合同。'
+})
 
 const rules: FormRules = {
   consultantName: [{ required: true, message: '请输入咨询人姓名' }],
@@ -688,18 +708,28 @@ function textContains(value: unknown, keyword: string) {
   return String(value || '').toLowerCase().includes(keyword.toLowerCase())
 }
 
-function applyScenarioFilters(list: CrmLeadItem[]) {
+function applyScenarioFilters(
+  list: CrmLeadItem[],
+  snapshotMap: Record<string, { callbackType?: string }> = {}
+) {
   const scenario = String(props.scenario || route.query.scenario || '').trim()
   const source = String(route.query.source || '').trim()
   const filter = String(route.query.filter || '').trim()
   const stage = String(route.query.stage || '').trim()
+  const callbackType = String(props.callbackType || route.query.type || '').trim().toLowerCase()
 
   return (list || []).filter((item) => {
+    const snapshot = snapshotMap[String(item.id)] || {}
     const nextFollow = String(item.nextFollowDate || '').slice(0, 10)
     const infoSource = String(item.infoSource || '')
     const mediaChannel = String(item.mediaChannel || '')
     const customerTag = String(item.customerTag || '')
     const reservationStatus = String(item.reservationStatus || '')
+    const snapshotType = String(snapshot.callbackType || '').trim().toLowerCase()
+
+    if (callbackType && effectiveMode.value === 'callback' && snapshotType !== callbackType) {
+      return false
+    }
 
     if (source === 'medical') {
       const isMedicalSource = textContains(infoSource, '医') || textContains(infoSource, '门诊') || textContains(mediaChannel, '医')
@@ -792,6 +822,7 @@ function buildQueryParams() {
   const callbackDueOnly = isCallback && (!!callbackScenario || !!callbackFilter)
   const routeSource = String(route.query.source || '').trim()
   const normalizedSource = query.infoSource || routeSource || undefined
+  const callbackType = isCallback ? String(props.callbackType || route.query.type || '').trim() : ''
   return {
     pageNo: query.pageNo,
     pageSize: query.pageSize,
@@ -807,6 +838,7 @@ function buildQueryParams() {
     infoSource: normalizedSource,
     customerTag: query.customerTag || undefined,
     marketerName: query.marketerName || undefined,
+    callbackType: callbackType || undefined,
     followupDueOnly: callbackDueOnly ? true : undefined,
     followupDateTo: callbackDueOnly ? dayjs().format('YYYY-MM-DD') : undefined
   }
@@ -841,10 +873,10 @@ async function fetchData() {
       getMarketingLeadEntrySummary(buildSummaryParams())
     ])
     const rawList = (page.list || []).map((item) => ({ ...item, id: String(item.id) }))
-    rows.value = applyScenarioFilters(rawList)
-    total.value = rows.value.length
     Object.assign(summary, summaryRes || {})
-    await hydrateCallbackSnapshot(rows.value)
+    const snapshots = await hydrateCallbackSnapshot(rawList)
+    rows.value = applyScenarioFilters(rawList, snapshots)
+    total.value = rows.value.length
   } catch (error: any) {
     const text = error?.message || '请求失败，请稍后重试'
     tableError.value = text
@@ -859,7 +891,7 @@ async function hydrateCallbackSnapshot(list: CrmLeadItem[]) {
   const mode = effectiveMode.value
   if (mode !== 'intent' && mode !== 'callback') {
     callbackSnapshot.value = {}
-    return
+    return {}
   }
   const pairs = await Promise.all(list.map(async (item) => {
     try {
@@ -870,13 +902,16 @@ async function hydrateCallbackSnapshot(list: CrmLeadItem[]) {
         title: latest?.title,
         followupContent: latest?.followupContent,
         followupResult: latest?.followupResult,
-        planId: pending?.id || latest?.id
+        planId: pending?.id || latest?.id,
+        callbackType: pending?.callbackType || latest?.callbackType
       }] as const
     } catch {
       return [item.id, {}] as const
     }
   }))
-  callbackSnapshot.value = Object.fromEntries(pairs)
+  const snapshotMap = Object.fromEntries(pairs)
+  callbackSnapshot.value = snapshotMap
+  return snapshotMap
 }
 
 function onSearch() {

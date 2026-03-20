@@ -26,6 +26,7 @@ public interface CrmContractService {
       String contractStatus,
       String status,
       String changeWorkflowStatus,
+      Boolean excludeSigned,
       Boolean overdueOnly,
       Boolean sortByOverdue,
       String currentOwnerDept);

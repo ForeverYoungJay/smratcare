@@ -35,6 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/staff")
 public class AdminStaffController {
+  private static final String DEFAULT_INITIAL_PASSWORD = "123456";
   private final StaffMapper staffMapper;
   private final RoleMapper roleMapper;
   private final StaffRoleMapper staffRoleMapper;
@@ -57,19 +58,24 @@ public class AdminStaffController {
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping
   public Result<StaffAccount> create(@Valid @RequestBody StaffCreateRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    String staffNo = resolveStaffNo(orgId, request.getStaffNo());
+    String username = resolveUsername(request.getUsername(), staffNo);
+    String password = resolvePassword(request.getPassword());
     StaffAccount staff = new StaffAccount();
-    staff.setOrgId(AuthContext.getOrgId());
+    staff.setOrgId(orgId);
     staff.setDepartmentId(request.getDepartmentId());
-    staff.setStaffNo(request.getStaffNo());
-    staff.setUsername(request.getUsername());
-    staff.setPasswordHash(passwordEncoder.encode(request.getPassword()));
-    staff.setRealName(request.getRealName());
-    staff.setPhone(request.getPhone());
-    staff.setEmail(request.getEmail());
+    staff.setStaffNo(staffNo);
+    staff.setUsername(username);
+    staff.setPasswordHash(passwordEncoder.encode(password));
+    staff.setRealName(normalizeText(request.getRealName()));
+    staff.setPhone(normalizeText(request.getPhone()));
+    staff.setEmail(normalizeText(request.getEmail()));
     staff.setDirectLeaderId(request.getDirectLeaderId() == null || request.getDirectLeaderId() <= 0 ? null : request.getDirectLeaderId());
     staff.setIndirectLeaderId(request.getIndirectLeaderId() == null || request.getIndirectLeaderId() <= 0 ? null : request.getIndirectLeaderId());
     staff.setGender(request.getGender());
-    staff.setStatus(request.getStatus());
+    staff.setStatus(request.getStatus() == null ? 1 : request.getStatus());
+    ensureUniqueStaffIdentity(orgId, username, staffNo, null);
     validateSupervisorChain(staff, null, staff.getDirectLeaderId(), staff.getIndirectLeaderId());
     staffMapper.insert(staff);
     fillRoleCodes(staff);
@@ -90,16 +96,16 @@ public class AdminStaffController {
       staff.setDepartmentId(request.getDepartmentId());
     }
     if (request.getPassword() != null && !request.getPassword().isBlank()) {
-      staff.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+      staff.setPasswordHash(passwordEncoder.encode(request.getPassword().trim()));
     }
     if (request.getRealName() != null) {
-      staff.setRealName(request.getRealName());
+      staff.setRealName(normalizeText(request.getRealName()));
     }
     if (request.getPhone() != null) {
-      staff.setPhone(request.getPhone());
+      staff.setPhone(normalizeText(request.getPhone()));
     }
     if (request.getEmail() != null) {
-      staff.setEmail(request.getEmail());
+      staff.setEmail(normalizeText(request.getEmail()));
     }
     if (request.getDirectLeaderId() != null) {
       staff.setDirectLeaderId(request.getDirectLeaderId() <= 0 ? null : request.getDirectLeaderId());
@@ -113,6 +119,7 @@ public class AdminStaffController {
     if (request.getStatus() != null) {
       staff.setStatus(request.getStatus());
     }
+    ensureUniqueStaffIdentity(staff.getOrgId(), staff.getUsername(), staff.getStaffNo(), staff.getId());
     validateSupervisorChain(staff, request.getId(), staff.getDirectLeaderId(), staff.getIndirectLeaderId());
     staffMapper.updateById(staff);
     fillRoleCodes(staff);
@@ -136,6 +143,26 @@ public class AdminStaffController {
   @GetMapping("/{id}")
   public Result<StaffAccount> get(@PathVariable Long id) {
     StaffAccount staff = staffMapper.selectById(id);
+    fillRoleCodes(staff);
+    return Result.ok(staff);
+  }
+
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PutMapping("/{id}/lock")
+  public Result<StaffAccount> lock(@PathVariable Long id) {
+    StaffAccount staff = requireStaff(id);
+    staff.setStatus(0);
+    staffMapper.updateById(staff);
+    fillRoleCodes(staff);
+    return Result.ok(staff);
+  }
+
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PutMapping("/{id}/unlock")
+  public Result<StaffAccount> unlock(@PathVariable Long id) {
+    StaffAccount staff = requireStaff(id);
+    staff.setStatus(1);
+    staffMapper.updateById(staff);
     fillRoleCodes(staff);
     return Result.ok(staff);
   }
@@ -239,6 +266,77 @@ public class AdminStaffController {
       return;
     }
     staff.setRoleCodes(roleMapper.selectRoleCodesByStaff(staff.getId(), staff.getOrgId()));
+  }
+
+  private StaffAccount requireStaff(Long id) {
+    StaffAccount staff = staffMapper.selectById(id);
+    if (staff == null || staff.getIsDeleted() != null && staff.getIsDeleted() == 1) {
+      throw new IllegalArgumentException("员工不存在");
+    }
+    return staff;
+  }
+
+  private void ensureUniqueStaffIdentity(Long orgId, String username, String staffNo, Long excludeId) {
+    if (username != null) {
+      StaffAccount existing = staffMapper.selectOne(Wrappers.lambdaQuery(StaffAccount.class)
+          .eq(StaffAccount::getIsDeleted, 0)
+          .eq(orgId != null, StaffAccount::getOrgId, orgId)
+          .eq(StaffAccount::getUsername, username)
+          .ne(excludeId != null, StaffAccount::getId, excludeId)
+          .last("LIMIT 1"));
+      if (existing != null) {
+        throw new IllegalArgumentException("登录账号已存在，请调整后重试");
+      }
+    }
+    if (staffNo != null) {
+      StaffAccount existing = staffMapper.selectOne(Wrappers.lambdaQuery(StaffAccount.class)
+          .eq(StaffAccount::getIsDeleted, 0)
+          .eq(orgId != null, StaffAccount::getOrgId, orgId)
+          .eq(StaffAccount::getStaffNo, staffNo)
+          .ne(excludeId != null, StaffAccount::getId, excludeId)
+          .last("LIMIT 1"));
+      if (existing != null) {
+        throw new IllegalArgumentException("职工号已存在，请调整后重试");
+      }
+    }
+  }
+
+  private String resolveStaffNo(Long orgId, String requestStaffNo) {
+    String normalized = normalizeText(requestStaffNo);
+    if (normalized != null) {
+      return normalized;
+    }
+    String orgSegment = String.format("%02d", Math.abs(orgId == null ? 0 : orgId.intValue()) % 100);
+    for (int index = 1; index <= 99; index++) {
+      String candidate = "YG" + orgSegment + java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyMMddHHmm"))
+          + String.format("%02d", index);
+      Long count = staffMapper.selectCount(Wrappers.lambdaQuery(StaffAccount.class)
+          .eq(StaffAccount::getIsDeleted, 0)
+          .eq(orgId != null, StaffAccount::getOrgId, orgId)
+          .eq(StaffAccount::getStaffNo, candidate));
+      if (count == null || count == 0) {
+        return candidate;
+      }
+    }
+    return "YG" + orgSegment + System.currentTimeMillis();
+  }
+
+  private String resolveUsername(String requestUsername, String staffNo) {
+    String normalized = normalizeText(requestUsername);
+    return normalized == null ? staffNo : normalized;
+  }
+
+  private String resolvePassword(String requestPassword) {
+    String normalized = normalizeText(requestPassword);
+    return normalized == null ? DEFAULT_INITIAL_PASSWORD : normalized;
+  }
+
+  private String normalizeText(String value) {
+    if (value == null) {
+      return null;
+    }
+    String trimmed = value.trim();
+    return trimmed.isEmpty() ? null : trimmed;
   }
 
   private StaffOptionResponse toStaffOptionResponse(StaffAccount staff) {

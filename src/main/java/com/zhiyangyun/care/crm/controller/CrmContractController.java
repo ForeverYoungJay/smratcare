@@ -72,6 +72,7 @@ public class CrmContractController {
       @RequestParam(required = false) String contractStatus,
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String changeWorkflowStatus,
+      @RequestParam(required = false) Boolean excludeSigned,
       @RequestParam(required = false) Boolean overdueOnly,
       @RequestParam(required = false) Boolean sortByOverdue,
       @RequestParam(required = false) String currentOwnerDept) {
@@ -89,6 +90,7 @@ public class CrmContractController {
         contractStatus,
         status,
         changeWorkflowStatus,
+        excludeSigned,
         overdueOnly,
         sortByOverdue,
         currentOwnerDept));
@@ -129,6 +131,7 @@ public class CrmContractController {
             null,
             null,
             null,
+            false,
             overdueOnly,
             false,
             currentOwnerDept)

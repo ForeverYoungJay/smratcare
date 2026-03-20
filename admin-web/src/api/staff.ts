@@ -17,6 +17,14 @@ export function getStaff(id: Id) {
   return request.get<StaffItem>(`/api/admin/staff/${id}`)
 }
 
+export function lockStaff(id: Id) {
+  return request.put<StaffItem>(`/api/admin/staff/${id}/lock`)
+}
+
+export function unlockStaff(id: Id) {
+  return request.put<StaffItem>(`/api/admin/staff/${id}/unlock`)
+}
+
 export function updateStaffRoles(id: Id, roleIds: number[]) {
   return request.post<void>('/api/admin/staff-roles/assign', { staffId: id, roleIds })
 }

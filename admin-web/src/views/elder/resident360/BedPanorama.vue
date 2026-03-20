@@ -67,71 +67,13 @@
 
       <div class="plan-stage">
         <a-empty v-if="!matrixBuildings.length || !matrixFloors.length" description="暂无床位数据" />
-        <div v-else class="matrix-viewport">
-          <div class="matrix-grid" :style="{ gridTemplateColumns: `140px repeat(${Math.max(matrixBuildings.length, 1)}, minmax(300px, 1fr))` }">
-            <div class="matrix-corner">楼层 \\ 楼栋</div>
-            <button
-              v-for="building in matrixBuildings"
-              :key="building"
-              type="button"
-              class="matrix-building-head"
-              :class="{ active: selectedBuilding === building }"
-              @click="toggleBuilding(building)"
-            >
-              <div>{{ building }}</div>
-              <div v-if="resolveVisibleRemark(buildingRemarkByName(building))" class="building-remark">
-                {{ resolveVisibleRemark(buildingRemarkByName(building)) }}
-              </div>
-            </button>
-            <template v-for="floor in matrixFloors" :key="floor">
-              <button
-                type="button"
-                class="matrix-floor-axis"
-                :class="{ active: selectedFloor === floor }"
-                @click="toggleFloor(floor)"
-              >
-                {{ floor }}
-              </button>
-              <div v-for="building in matrixBuildings" :key="`${building}-${floor}`" class="matrix-cell">
-                <template v-if="roomsAt(building, floor).length">
-                  <div
-                    v-for="room in roomsAt(building, floor)"
-                    :key="room.key"
-                    class="room-block"
-                    :style="{ gridColumn: `span ${room.autoSpan}` }"
-                    @dblclick="openRoomDetail(room)"
-                  >
-                    <div class="room-head">
-                      <div class="room-title">{{ room.roomNo }}</div>
-                      <div class="room-type">{{ resolveRoomTypeLabel(room.roomType) }} · {{ room.capacity }}床</div>
-                    </div>
-                    <div class="room-meta">
-                      {{ room.occupiedBeds }}/{{ room.totalBeds }} 床 · {{ room.elderCount }} 人 · 空床 {{ room.emptyBeds }}
-                    </div>
-                    <div v-if="resolveVisibleRemark(room.remark)" class="room-remark">
-                      {{ resolveVisibleRemark(room.remark) }}
-                    </div>
-                    <div class="bed-matrix">
-                      <button
-                        v-for="bed in room.beds"
-                        :key="bed.id"
-                        type="button"
-                        class="bed-tile"
-                        :class="[statusClass(resolveStatus(bed)), genderClass(bed), { 'empty-priority': isEmptyBed(bed) }]"
-                        @click="selectBed(bed)"
-                      >
-                        <span v-if="bedRiskLabel(bed)" class="risk-corner" :class="`risk-${bedRiskLevel(bed)}`">{{ bedRiskLabel(bed) }}</span>
-                        <span class="bed-no">{{ bed.bedNo }}</span>
-                        <span class="bed-name">{{ bed.elderName || '空床' }}</span>
-                      </button>
-                    </div>
-                  </div>
-                </template>
-                <div v-else class="matrix-empty">-</div>
-              </div>
-            </template>
-          </div>
-        </div>
+        <Panorama3D
+          v-else
+          :buildings="matrixBuildings"
+          :floors="matrixFloors"
+          :room-lookup="roomSceneLookup"
+          @click-room="openRoomDetail"
+        />
       </div>
     </a-card>
 
@@ -206,6 +148,7 @@ import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../../components/PageContainer.vue'
 import FlowGuardBar from '../../../components/FlowGuardBar.vue'
+import Panorama3D from './Panorama3D.vue'
 import { getBedMap, getRoomList } from '../../../api/bed'
 import { getElderDetail } from '../../../api/elder'
 import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'

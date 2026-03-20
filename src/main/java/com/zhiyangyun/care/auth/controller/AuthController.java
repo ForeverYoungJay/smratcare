@@ -183,14 +183,21 @@ public class AuthController {
 
   @PostMapping("/login")
   public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
+    String loginId = defaultText(request.getUsername(), "");
     Authentication authentication = authenticationManager.authenticate(
-        new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
+        new UsernamePasswordAuthenticationToken(loginId, request.getPassword()));
     SecurityContextHolder.getContext().setAuthentication(authentication);
 
     StaffAccount staff = staffMapper.selectOne(
         Wrappers.lambdaQuery(StaffAccount.class)
-            .eq(StaffAccount::getUsername, request.getUsername())
+            .and(w -> w.eq(StaffAccount::getUsername, loginId).or().eq(StaffAccount::getStaffNo, loginId))
+            .eq(StaffAccount::getStatus, 1)
             .eq(StaffAccount::getIsDeleted, 0));
+    if (staff == null) {
+      throw new IllegalArgumentException("账号不存在或已停用");
+    }
+    staff.setLastLoginTime(java.time.LocalDateTime.now());
+    staffMapper.updateById(staff);
     List<String> roles = RoleCodeHelper.normalizeRoles(
         roleMapper.selectRoleCodesByStaff(staff.getId(), staff.getOrgId()));
 

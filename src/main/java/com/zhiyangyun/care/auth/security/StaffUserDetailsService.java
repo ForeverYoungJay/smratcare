@@ -26,9 +26,13 @@ public class StaffUserDetailsService implements UserDetailsService {
 
   @Override
   public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+    String loginId = username == null ? null : username.trim();
+    if (loginId == null || loginId.isBlank()) {
+      throw new UsernameNotFoundException("User not found");
+    }
     StaffAccount staff = staffMapper.selectOne(
         Wrappers.lambdaQuery(StaffAccount.class)
-            .eq(StaffAccount::getUsername, username)
+            .and(w -> w.eq(StaffAccount::getUsername, loginId).or().eq(StaffAccount::getStaffNo, loginId))
             .eq(StaffAccount::getStatus, 1)
             .eq(StaffAccount::getIsDeleted, 0));
     if (staff == null) {

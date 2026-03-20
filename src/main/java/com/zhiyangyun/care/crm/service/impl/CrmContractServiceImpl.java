@@ -162,6 +162,7 @@ public class CrmContractServiceImpl implements CrmContractService {
       String contractStatus,
       String status,
       String changeWorkflowStatus,
+      Boolean excludeSigned,
       Boolean overdueOnly,
       Boolean sortByOverdue,
       String currentOwnerDept) {
@@ -185,6 +186,9 @@ public class CrmContractServiceImpl implements CrmContractService {
     }
     if (flowStage != null && !flowStage.isBlank()) {
       wrapper.eq(CrmContract::getFlowStage, flowStage.trim());
+    }
+    if (Boolean.TRUE.equals(excludeSigned)) {
+      wrapper.and(w -> w.ne(CrmContract::getFlowStage, FLOW_SIGNED).or().isNull(CrmContract::getFlowStage));
     }
     if (contractStatus != null && !contractStatus.isBlank()) {
       wrapper.eq(CrmContract::getContractStatus, contractStatus.trim());

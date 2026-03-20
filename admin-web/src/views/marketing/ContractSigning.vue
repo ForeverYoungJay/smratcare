@@ -670,7 +670,7 @@ import type { ContractAttachmentItem, ContractSystemLinkageSummary, CrmContractI
 const router = useRouter()
 const route = useRoute()
 const props = withDefaults(defineProps<{
-  statusPreset?: 'pending_sign' | 'signed' | 'pending_assessment' | 'pending_bed_select' | ''
+  statusPreset?: 'pending_sign' | 'unsigned' | 'signed' | 'pending_assessment' | 'pending_bed_select' | ''
   title?: string
   subTitle?: string
   disableDefaultFlowStagePreset?: boolean
@@ -702,6 +702,7 @@ const pageSubTitle = computed(() => {
   return props.subTitle || '营销建合同 -> 长者管理入住评估 -> 入住办理 -> 最终签署'
 })
 const resolvedStatusPreset = computed(() => String(props.statusPreset || route.query.status || '').trim())
+const isUnsignedMode = computed(() => resolvedStatusPreset.value === 'unsigned')
 const isSignedMode = computed(() => resolvedStatusPreset.value === 'signed')
 const loading = ref(false)
 const submitting = ref(false)
@@ -773,6 +774,12 @@ function applyStatusPreset() {
   }
   if (statusPreset === 'pending_sign') {
     query.flowStage = 'PENDING_SIGN'
+    return
+  }
+  if (statusPreset === 'unsigned') {
+    query.flowStage = routeDrivenFlowStage.value && routeDrivenFlowStage.value !== 'SIGNED'
+      ? routeDrivenFlowStage.value
+      : undefined
     return
   }
   if (statusPreset === 'signed') {
@@ -1588,6 +1595,7 @@ function buildContractPageParams() {
     marketerName: query.marketerName || undefined,
     orgName: query.orgName || undefined,
     flowStage: query.flowStage || undefined,
+    excludeSigned: isUnsignedMode.value && !query.flowStage ? true : undefined,
     currentOwnerDept: onlyMineDept.value ? mineDept.value : undefined,
     overdueOnly: onlyOverdue.value || undefined,
     sortByOverdue: sortByOverdue.value || undefined

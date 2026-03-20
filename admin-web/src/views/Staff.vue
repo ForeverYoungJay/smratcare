@@ -64,7 +64,7 @@
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'status'">
           <a-tag :color="record.status === 1 ? 'green' : 'default'">
-            {{ record.status === 1 ? '启用' : '停用' }}
+            {{ record.status === 1 ? '启用' : '已锁定' }}
           </a-tag>
         </template>
         <template v-else-if="column.key === 'departmentId'">
@@ -92,6 +92,8 @@
             >
               推荐修复
             </a>
+            <a v-if="record.status === 1" v-permission="accountManagerRoles" @click="toggleStaffLock(record, true)">一键锁定</a>
+            <a v-else v-permission="accountManagerRoles" @click="toggleStaffLock(record, false)">解除锁定</a>
             <a v-permission="accountManagerRoles" @click="openRole(record)">分配角色</a>
           </a-space>
         </template>
@@ -101,16 +103,22 @@
     <a-drawer v-model:open="drawerOpen" :title="drawerTitle" width="520">
       <a-form :model="form" layout="vertical">
         <a-form-item label="账号" required>
-          <a-input v-model:value="form.username" />
+          <a-input v-model:value="form.username" :disabled="!form.id" placeholder="默认与职工号一致" />
+          <div class="form-rule-tip">新建时默认使用自动生成的职工号作为登录账号。</div>
         </a-form-item>
         <a-form-item label="职工号（登录ID）" required>
-          <a-input v-model:value="form.staffNo" :disabled="!!form.id" placeholder="建议使用院内职工号" />
+          <a-input v-model:value="form.staffNo" :disabled="!!form.id" placeholder="保存前可自动生成" />
+          <a-space v-if="!form.id" style="margin-top: 8px">
+            <a-button size="small" @click="regenerateStaffCredentials">重新生成职工号</a-button>
+            <span class="form-rule-tip">默认初始密码：123456</span>
+          </a-space>
         </a-form-item>
         <a-form-item label="姓名" required>
           <a-input v-model:value="form.realName" />
         </a-form-item>
         <a-form-item :label="form.id ? '重置密码（可选）' : '初始密码'" :required="!form.id">
           <a-input-password v-model:value="form.password" :placeholder="form.id ? '留空则不修改密码' : '请输入初始密码'" />
+          <div v-if="!form.id" class="form-rule-tip">新账号默认密码为 123456，可保存前修改。</div>
         </a-form-item>
         <a-form-item label="部门">
           <a-select
@@ -185,12 +193,13 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
+import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../components/PageContainer.vue'
 import SearchForm from '../components/SearchForm.vue'
 import DataTable from '../components/DataTable.vue'
-import { getStaff, getStaffPage, createStaff, updateStaff, updateStaffRoles, getStaffSupervisorAnomalies } from '../api/staff'
+import { getStaff, getStaffPage, createStaff, updateStaff, updateStaffRoles, getStaffSupervisorAnomalies, lockStaff, unlockStaff } from '../api/staff'
 import { getRolePage } from '../api/role'
 import { getStaffRoleAssignments } from '../api/rbac'
 import { useDepartmentOptions } from '../composables/useDepartmentOptions'
@@ -245,9 +254,10 @@ const columns = [
 
 const drawerOpen = ref(false)
 const form = reactive<Partial<StaffItem>>({})
+const DEFAULT_INITIAL_PASSWORD = '123456'
 const statusOptions = [
   { label: '启用', value: 1 },
-  { label: '停用', value: 0 }
+  { label: '已锁定', value: 0 }
 ]
 
 const roleOpen = ref(false)
@@ -448,6 +458,10 @@ function openDrawer(record?: StaffItem) {
     ;(form as any)[key] = undefined
   })
   Object.assign(form, record || { status: 1 })
+  if (!record) {
+    regenerateStaffCredentials()
+    form.password = DEFAULT_INITIAL_PASSWORD
+  }
   ensureSelectedDepartment(form.departmentId)
   if (form.directLeaderId != null) ensureSelectedStaff(form.directLeaderId)
   if (form.indirectLeaderId != null) ensureSelectedStaff(form.indirectLeaderId)
@@ -455,6 +469,19 @@ function openDrawer(record?: StaffItem) {
     searchStaff('').catch(() => {})
   }
   drawerOpen.value = true
+}
+
+function generateStaffNo() {
+  return `YG${dayjs().format('YYMMDDHHmmssSSS')}`
+}
+
+function regenerateStaffCredentials() {
+  if (form.id) return
+  form.staffNo = generateStaffNo()
+  form.username = form.staffNo
+  if (!String(form.password || '').trim()) {
+    form.password = DEFAULT_INITIAL_PASSWORD
+  }
 }
 
 function consumeAutoOpenQuery() {
@@ -558,6 +585,21 @@ async function submit() {
     message.error('保存失败')
   } finally {
     saving.value = false
+  }
+}
+
+async function toggleStaffLock(record: StaffItem, lock: boolean) {
+  try {
+    if (lock) {
+      await lockStaff(record.id)
+      message.success('账号已锁定')
+    } else {
+      await unlockStaff(record.id)
+      message.success('账号已解除锁定')
+    }
+    fetchData()
+  } catch {
+    message.error(lock ? '锁定失败' : '解锁失败')
   }
 }
 

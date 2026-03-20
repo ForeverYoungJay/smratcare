@@ -4,7 +4,9 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zhiyangyun.care.crm.entity.CrmContract;
+import com.zhiyangyun.care.crm.entity.CrmCallbackPlan;
 import com.zhiyangyun.care.crm.entity.CrmLead;
+import com.zhiyangyun.care.crm.mapper.CrmCallbackPlanMapper;
 import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
 import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
 import com.zhiyangyun.care.crm.model.CrmLeadRequest;
@@ -21,6 +23,8 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
@@ -33,16 +37,19 @@ public class CrmLeadServiceImpl implements CrmLeadService {
   private static final String FLOW_PENDING_SIGN = "PENDING_SIGN";
   private static final String FLOW_SIGNED = "SIGNED";
   private final CrmLeadMapper leadMapper;
+  private final CrmCallbackPlanMapper callbackPlanMapper;
   private final CrmContractMapper contractMapper;
   private final ElderMapper elderMapper;
   private final ElderAdmissionMapper admissionMapper;
 
   public CrmLeadServiceImpl(
       CrmLeadMapper leadMapper,
+      CrmCallbackPlanMapper callbackPlanMapper,
       CrmContractMapper contractMapper,
       ElderMapper elderMapper,
       ElderAdmissionMapper admissionMapper) {
     this.leadMapper = leadMapper;
+    this.callbackPlanMapper = callbackPlanMapper;
     this.contractMapper = contractMapper;
     this.elderMapper = elderMapper;
     this.admissionMapper = admissionMapper;
@@ -164,7 +171,7 @@ public class CrmLeadServiceImpl implements CrmLeadService {
                                      String consultantName, String consultantPhone, String elderName, String elderPhone,
                                      String consultDateFrom, String consultDateTo, String consultType, String mediaChannel,
                                      String infoSource, String marketerName, String followupStatus, String reservationChannel,
-                                     String contractNo, String contractStatus, String flowStage, String currentOwnerDept,
+                                     String contractNo, String contractStatus, String flowStage, String currentOwnerDept, String callbackType,
                                      String followupDateFrom, String followupDateTo, Boolean followupDueOnly) {
     var wrapper = Wrappers.lambdaQuery(CrmLead.class)
         .eq(CrmLead::getIsDeleted, 0)
@@ -226,6 +233,22 @@ public class CrmLeadServiceImpl implements CrmLeadService {
     }
     if (currentOwnerDept != null && !currentOwnerDept.isBlank()) {
       wrapper.eq(CrmLead::getCurrentOwnerDept, currentOwnerDept);
+    }
+    if (callbackType != null && !callbackType.isBlank()) {
+      Set<Long> leadIds = callbackPlanMapper.selectList(Wrappers.lambdaQuery(CrmCallbackPlan.class)
+              .select(CrmCallbackPlan::getLeadId)
+              .eq(CrmCallbackPlan::getTenantId, tenantId)
+              .eq(CrmCallbackPlan::getIsDeleted, 0)
+              .eq(CrmCallbackPlan::getCallbackType, callbackType.trim()))
+          .stream()
+          .map(CrmCallbackPlan::getLeadId)
+          .filter(id -> id != null)
+          .collect(Collectors.toSet());
+      if (leadIds.isEmpty()) {
+        wrapper.eq(CrmLead::getId, -1L);
+      } else {
+        wrapper.in(CrmLead::getId, leadIds);
+      }
     }
     LocalDate consultFrom = parseDate(consultDateFrom);
     LocalDate consultTo = parseDate(consultDateTo);

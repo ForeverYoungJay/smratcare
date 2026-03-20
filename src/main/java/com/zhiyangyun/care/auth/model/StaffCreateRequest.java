@@ -9,11 +9,8 @@ public class StaffCreateRequest {
   private Long orgId;
   @NotNull
   private Long departmentId;
-  @NotBlank
   private String staffNo;
-  @NotBlank
   private String username;
-  @NotBlank
   private String password;
   @NotBlank
   private String realName;

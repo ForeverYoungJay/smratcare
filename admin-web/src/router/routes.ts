@@ -69,7 +69,7 @@ export const routes: RouteRecordRaw[] = [
             path: 'bed-panorama',
             name: 'ElderBedPanorama',
             component: () => import('../views/elder/resident360/BedPanorama.vue'),
-            meta: { title: '床态全景', hidden: true }
+            meta: { title: '床态全景' }
           },
           {
             path: 'list',

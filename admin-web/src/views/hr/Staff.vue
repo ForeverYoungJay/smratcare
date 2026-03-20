@@ -107,13 +107,18 @@
         </a-form-item>
         <template v-if="!form.staffId && createMode === 'new'">
           <a-form-item label="登录账号" required>
-            <a-input v-model:value="accountForm.username" placeholder="建议英文/拼音账号" />
+            <a-input v-model:value="accountForm.username" placeholder="默认与自动生成职工号一致" />
+            <div class="form-rule-tip">新员工默认用职工号作为登录账号。</div>
           </a-form-item>
           <a-form-item label="初始密码" required>
             <a-input-password v-model:value="accountForm.password" placeholder="至少 6 位" />
+            <div class="form-rule-tip">默认初始密码：123456，可保存前修改。</div>
           </a-form-item>
           <a-form-item label="工号" required>
             <a-input v-model:value="accountForm.staffNo" placeholder="院内工号" />
+            <a-space style="margin-top: 8px">
+              <a-button size="small" @click="regenerateNewStaffCredentials">重新生成职工号</a-button>
+            </a-space>
           </a-form-item>
           <a-form-item label="姓名" required>
             <a-input v-model:value="accountForm.realName" @change="syncRealNameFromAccount" />
@@ -324,6 +329,7 @@ const columns = [
 const drawerOpen = ref(false)
 const form = reactive<Partial<HrStaffProfile>>({})
 const createMode = ref<'new' | 'existing'>('new')
+const DEFAULT_INITIAL_PASSWORD = '123456'
 const accountForm = reactive<Partial<StaffItem>>({
   status: 1
 })
@@ -470,6 +476,9 @@ async function openDrawer(record?: HrStaffProfile) {
   initialRoleIds.value = []
   Object.assign(form, record || { status: 1 })
   if (!record) {
+    regenerateNewStaffCredentials()
+  }
+  if (!record) {
     await searchStaff('')
   }
   if (!roles.value.length) {
@@ -527,6 +536,16 @@ async function openDrawer(record?: HrStaffProfile) {
   }
   drawerOpen.value = true
   consumeWizardCreateQuery()
+}
+
+function generateStaffNo() {
+  return `YG${dayjs().format('YYMMDDHHmmssSSS')}`
+}
+
+function regenerateNewStaffCredentials() {
+  accountForm.staffNo = generateStaffNo()
+  accountForm.username = accountForm.staffNo
+  accountForm.password = DEFAULT_INITIAL_PASSWORD
 }
 
 async function viewProfile(record: HrStaffProfile) {
@@ -853,5 +872,11 @@ maybeAutoOpenProfile()
 
 .summary-card {
   cursor: pointer;
+}
+
+.form-rule-tip {
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
 }
 </style>
