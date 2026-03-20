@@ -33,11 +33,11 @@
             v-model:value="form.elderId"
             show-search
             :filter-option="false"
-            :options="elderOptions"
+            :options="admissionElderOptions"
             :loading="elderLoading"
             placeholder="请输入老人姓名/拼音首字母"
             @search="searchElders"
-            @focus="() => !elderOptions.length && searchElders('')"
+            @focus="() => !admissionElderOptions.length && searchElders('')"
             @change="onElderChange"
           />
         </a-form-item>
@@ -293,6 +293,26 @@ const guardContract = ref<CrmContractItem | null>(null)
 const { elderOptions, elderLoading, searchElders, findElderName, ensureSelectedElder } = useElderOptions({
   pageSize: 120,
   inHospitalOnly: false
+})
+const pendingBedSelectContracts = ref<CrmContractItem[]>([])
+const admissionElderOptions = computed(() => {
+  const map = new Map<string, { label: string; value: string; name: string }>()
+  ;(elderOptions.value || []).forEach((item) => {
+    const id = String(item.value || '').trim()
+    if (!id) return
+    map.set(id, {
+      label: String(item.label || item.name || id),
+      value: id,
+      name: String(item.name || item.label || id)
+    })
+  })
+  ;(pendingBedSelectContracts.value || []).forEach((item) => {
+    const elderId = String(item.elderId || '').trim()
+    const elderName = String(item.elderName || item.name || '').trim()
+    if (!elderId || !elderName || map.has(elderId)) return
+    map.set(elderId, { label: elderName, value: elderId, name: elderName })
+  })
+  return Array.from(map.values())
 })
 const buildings = ref<BuildingItem[]>([])
 const floors = ref<FloorItem[]>([])
@@ -816,6 +836,23 @@ async function resolveContractNoByElder(elderIdRaw: string | number | undefined)
   }
 }
 
+async function loadPendingBedSelectContracts() {
+  try {
+    const page: PageResult<CrmContractItem> = await getContractPage({
+      pageNo: 1,
+      pageSize: 300,
+      flowStage: 'PENDING_BED_SELECT'
+    })
+    pendingBedSelectContracts.value = page.list || []
+    pendingBedSelectContracts.value.forEach((item) => {
+      if (!item?.elderId) return
+      ensureSelectedElder(String(item.elderId), String(item.elderName || item.name || '').trim() || undefined)
+    })
+  } catch {
+    pendingBedSelectContracts.value = []
+  }
+}
+
 async function onElderChange(value: string | number | undefined) {
   form.elderId = (normalizeId(value) || ('' as Id)) as Id
   await resolveContractNoByElder(value)
@@ -1086,6 +1123,7 @@ useLiveSyncRefresh({
   topics: ['elder', 'bed', 'lifecycle', 'finance', 'care'],
   refresh: () => {
     searchElders('')
+    loadPendingBedSelectContracts()
     loadAssets()
     refreshAdmissionRecordPanel()
   },
@@ -1094,6 +1132,7 @@ useLiveSyncRefresh({
 
 onMounted(async () => {
   await searchElders('')
+  await loadPendingBedSelectContracts()
   await loadAssets()
   applyRoutePrefill()
   if (!form.contractNo && form.elderId) {

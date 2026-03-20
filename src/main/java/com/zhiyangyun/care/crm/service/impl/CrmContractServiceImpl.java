@@ -154,6 +154,7 @@ public class CrmContractServiceImpl implements CrmContractService {
       long pageSize,
       String keyword,
       String contractNo,
+      Long elderId,
       String elderName,
       String elderPhone,
       String marketerName,
@@ -171,6 +172,9 @@ public class CrmContractServiceImpl implements CrmContractService {
         .eq(CrmContract::getIsDeleted, 0);
     if (contractNo != null && !contractNo.isBlank()) {
       wrapper.like(CrmContract::getContractNo, contractNo.trim());
+    }
+    if (elderId != null) {
+      wrapper.eq(CrmContract::getElderId, elderId);
     }
     if (elderName != null && !elderName.isBlank()) {
       wrapper.like(CrmContract::getElderName, elderName.trim());

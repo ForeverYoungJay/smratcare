@@ -18,6 +18,7 @@ public interface CrmContractService {
       long pageSize,
       String keyword,
       String contractNo,
+      Long elderId,
       String elderName,
       String elderPhone,
       String marketerName,

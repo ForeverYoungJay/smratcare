@@ -843,6 +843,7 @@ function resetSearchFilters() {
   query.elderPhone = ''
   query.marketerName = ''
   query.orgName = undefined
+  query.flowStage = undefined
   query.pageNo = 1
   query.pageSize = 10
   onlyMineDept.value = false

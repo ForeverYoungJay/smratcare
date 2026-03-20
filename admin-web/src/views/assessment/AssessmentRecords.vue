@@ -363,11 +363,11 @@
                 allow-clear
                 show-search
                 :filter-option="false"
-                :options="elderOptions"
+                :options="admissionFormElderOptions"
                 :loading="elderLoading"
                 placeholder="请输入老人姓名/拼音首字母"
                 @search="searchElderOptions"
-                @focus="() => !elderOptions.length && loadElderOptions()"
+                @focus="() => !admissionFormElderOptions.length && loadElderOptions()"
                 @change="onElderChange"
               />
             </a-form-item>
@@ -1402,6 +1402,25 @@ const scoreAutoChecked = ref(false)
 const pendingAdmissionLoading = ref(false)
 const pendingAdmissionContracts = ref<CrmContractItem[]>([])
 const selectedPendingContractNo = ref('')
+const admissionFormElderOptions = computed(() => {
+  const map = new Map<string, { label: string; value: string; name: string }>()
+  ;(elderOptions.value || []).forEach((item) => {
+    const id = String(item.value || '').trim()
+    if (!id) return
+    map.set(id, {
+      label: String(item.label || item.name || id),
+      value: id,
+      name: String(item.name || item.label || id)
+    })
+  })
+  ;(pendingAdmissionContracts.value || []).forEach((item) => {
+    const elderId = String(item.elderId || '').trim()
+    const elderName = String(item.elderName || item.name || '').trim()
+    if (!elderId || !elderName || map.has(elderId)) return
+    map.set(elderId, { label: elderName, value: elderId, name: elderName })
+  })
+  return Array.from(map.values())
+})
 
 const rules: FormRules = {
   elderId: [{ required: true, message: '请选择老人' }],
@@ -1660,6 +1679,10 @@ async function loadPendingAdmissionContracts() {
       elderId: elderIdFromRoute || undefined
     })
     pendingAdmissionContracts.value = page.list || []
+    pendingAdmissionContracts.value.forEach((item) => {
+      if (!item?.elderId) return
+      ensureSelectedElder(String(item.elderId), String(item.elderName || item.name || '').trim() || undefined)
+    })
     const routeContractNo = admissionContractNoFromRoute.value
     if (routeContractNo && pendingAdmissionContracts.value.some((item) => item.contractNo === routeContractNo)) {
       selectedPendingContractNo.value = routeContractNo
