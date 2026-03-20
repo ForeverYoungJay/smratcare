@@ -338,6 +338,7 @@ public class RoomServiceImpl implements RoomService {
     if (prefixDigits.isBlank()) {
       prefixDigits = "1";
     }
+    final String roomPrefix = prefixDigits;
     List<Room> rooms = roomMapper.selectList(Wrappers.lambdaQuery(Room.class)
         .eq(Room::getIsDeleted, 0)
         .eq(Room::getTenantId, tenantId)
@@ -346,12 +347,12 @@ public class RoomServiceImpl implements RoomService {
         .map(Room::getRoomNo)
         .filter(Objects::nonNull)
         .map(value -> value.replaceAll("[^0-9]", ""))
-        .filter(value -> value.startsWith(prefixDigits) && value.length() > prefixDigits.length())
-        .map(value -> value.substring(prefixDigits.length()))
+        .filter(value -> value.startsWith(roomPrefix) && value.length() > roomPrefix.length())
+        .map(value -> value.substring(roomPrefix.length()))
         .filter(value -> !value.isBlank())
         .mapToInt(Integer::parseInt)
         .max()
         .orElse(0) + 1;
-    return prefixDigits + String.format("%02d", nextSeq);
+    return roomPrefix + String.format("%02d", nextSeq);
   }
 }
