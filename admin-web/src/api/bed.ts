@@ -7,6 +7,9 @@ import type {
   AssetTreeNode,
   ResidenceBootstrapRequest,
   ResidenceBootstrapResponse,
+  ResidenceBatchGenerationRequest,
+  ResidenceBatchPreviewResponse,
+  ResidenceBatchCommitResponse,
   Id
 } from '../types'
 
@@ -52,6 +55,14 @@ export function deleteBuilding(id: Id) {
 
 export function bootstrapResidence(data: ResidenceBootstrapRequest) {
   return request.post<ResidenceBootstrapResponse>('/api/asset/buildings/bootstrap-residence', data)
+}
+
+export function previewResidenceBatchGeneration(data: ResidenceBatchGenerationRequest) {
+  return request.post<ResidenceBatchPreviewResponse>('/api/asset/buildings/batch-generation/preview', data)
+}
+
+export function commitResidenceBatchGeneration(previewToken: string) {
+  return request.post<ResidenceBatchCommitResponse>('/api/asset/buildings/batch-generation/commit', { previewToken })
 }
 
 export function getFloorPage(params: any) {

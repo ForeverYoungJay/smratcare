@@ -1,6 +1,5 @@
 package com.zhiyangyun.care.elder.model;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -10,7 +9,6 @@ public class BedRequest {
   private Long orgId;
   @NotNull
   private Long roomId;
-  @NotBlank
   private String bedNo;
   private String bedType;
   private Integer status = 1;

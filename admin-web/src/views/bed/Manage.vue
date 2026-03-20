@@ -569,7 +569,7 @@
           <a-input v-model:value="buildingForm.name" :disabled="buildingDrawerMode === 'view'" placeholder="如 1 号楼" />
         </a-form-item>
         <a-form-item label="编码" name="code">
-          <a-input v-model:value="buildingForm.code" :disabled="buildingDrawerMode === 'view'" placeholder="如 B1" />
+          <a-input v-model:value="buildingForm.code" disabled placeholder="系统自动生成" />
         </a-form-item>
         <a-form-item label="区域" name="areaCode">
           <a-select v-model:value="buildingForm.areaCode" :disabled="buildingDrawerMode === 'view'" allow-clear placeholder="请选择区域">
@@ -577,7 +577,7 @@
           </a-select>
         </a-form-item>
         <a-form-item label="排序" name="sortNo">
-          <a-input-number v-model:value="buildingForm.sortNo" :disabled="buildingDrawerMode === 'view'" style="width: 100%" :min="0" />
+          <a-input-number v-model:value="buildingForm.sortNo" disabled style="width: 100%" :min="0" />
         </a-form-item>
         <a-form-item label="状态" name="status">
           <a-select v-model:value="buildingForm.status" :disabled="buildingDrawerMode === 'view'" placeholder="请选择">
@@ -631,13 +631,13 @@
           </a-select>
         </a-form-item>
         <a-form-item label="楼层编号" name="floorNo">
-          <a-input v-model:value="floorForm.floorNo" :disabled="floorDrawerMode === 'view'" placeholder="如 3" />
+          <a-input v-model:value="floorForm.floorNo" disabled placeholder="系统自动生成，如 1F / 2F" />
         </a-form-item>
         <a-form-item label="名称" name="name">
           <a-input v-model:value="floorForm.name" :disabled="floorDrawerMode === 'view'" placeholder="如 三层" />
         </a-form-item>
         <a-form-item label="排序" name="sortNo">
-          <a-input-number v-model:value="floorForm.sortNo" :disabled="floorDrawerMode === 'view'" style="width: 100%" :min="0" />
+          <a-input-number v-model:value="floorForm.sortNo" disabled style="width: 100%" :min="0" />
         </a-form-item>
         <a-form-item label="状态" name="status">
           <a-select v-model:value="floorForm.status" :disabled="floorDrawerMode === 'view'" placeholder="请选择">
@@ -665,7 +665,7 @@
     >
       <a-form ref="roomFormRef" :model="roomForm" :rules="roomRules" layout="vertical">
         <a-form-item label="房间号" name="roomNo">
-          <a-input v-model:value="roomForm.roomNo" :disabled="roomDrawerMode === 'view'" placeholder="如 A101" />
+          <a-input v-model:value="roomForm.roomNo" disabled placeholder="系统自动生成，如 301 / 302" />
         </a-form-item>
         <a-form-item label="楼栋" name="buildingId">
           <a-select v-model:value="roomForm.buildingId" :disabled="roomDrawerMode === 'view'" placeholder="请选择" show-search option-filter-prop="label">
@@ -732,7 +732,7 @@
           </a-select>
         </a-form-item>
         <a-form-item label="床位号" name="bedNo">
-          <a-input v-model:value="bedForm.bedNo" :disabled="bedDrawerMode === 'view'" placeholder="如 01" />
+          <a-input v-model:value="bedForm.bedNo" disabled placeholder="系统自动生成，如 301-A / 301-B" />
         </a-form-item>
         <a-form-item label="床位类型" name="bedType">
           <a-select v-model:value="bedForm.bedType" :disabled="bedDrawerMode === 'view'" allow-clear placeholder="请选择">
@@ -961,6 +961,8 @@ import {
   updateBuilding,
   deleteBuilding,
   bootstrapResidence,
+  previewResidenceBatchGeneration,
+  commitResidenceBatchGeneration,
   getFloorPage,
   getFloorList,
   createFloor,
@@ -977,6 +979,8 @@ import type {
   AssetTreeNode,
   PageResult,
   ResidenceBootstrapRequest,
+  ResidenceBatchGenerationRequest,
+  ResidenceBatchPreviewResponse,
   Id
 } from '../../types'
 
@@ -1309,12 +1313,10 @@ const buildingRules: FormRules = {
 }
 
 const floorRules: FormRules = {
-  buildingId: [{ required: true, message: '请选择楼栋' }],
-  floorNo: [{ required: true, message: '请输入楼层编号' }]
+  buildingId: [{ required: true, message: '请选择楼栋' }]
 }
 
 const roomRules: FormRules = {
-  roomNo: [{ required: true, message: '请输入房间号' }],
   buildingId: [{ required: true, message: '请选择楼栋' }],
   floorId: [{ required: true, message: '请选择楼层' }],
   status: [{ required: true, message: '请选择状态' }]
@@ -1322,7 +1324,6 @@ const roomRules: FormRules = {
 
 const bedRules: FormRules = {
   roomId: [{ required: true, message: '请选择房间' }],
-  bedNo: [{ required: true, message: '请输入床位号' }],
   status: [{ required: true, message: '请选择状态' }]
 }
 
@@ -2132,127 +2133,134 @@ async function submitBootstrap() {
 async function submitGenerateWizard() {
   generateSubmitting.value = true
   try {
-    if (generateTarget.value === 'buildings') {
-      const numbers = buildingList.value
-        .map((item) => Number(String(item.name || '').match(/\d+/)?.[0] || 0))
-        .filter((item) => item > 0)
-      let currentMax = numbers.length ? Math.max(...numbers) : 0
-      for (let i = 0; i < Number(generateForm.buildingCount || 0); i++) {
-        currentMax += 1
-        const name = `${generateForm.buildingPrefix || '楼栋'}${currentMax}`
-        await createBuilding({
-          name,
-          code: `B${currentMax}`,
-          status: 1,
-          sortNo: currentMax
-        })
-      }
-      message.success(`已生成 ${generateForm.buildingCount} 栋楼栋`)
-      generateOpen.value = false
-      await Promise.all([refreshBuildings(), loadBuildingList(), refreshTree()])
+    const preview = await previewResidenceBatchGeneration(buildResidenceBatchRequest())
+    if (preview.conflictCount > 0) {
+      Modal.warning({
+        title: '预览存在冲突，暂不能提交',
+        content: formatPreviewSummary(preview)
+      })
       return
     }
-
-    if (generateTarget.value === 'floors') {
-      const buildingId = generateForm.buildingId || buildingList.value[0]?.id
-      if (!buildingId) {
-        message.warning('请先选择楼栋')
-        return
-      }
-      const allFloors = await getFloorList({ buildingId })
-      const existed = new Set(allFloors.map((item) => String(item.floorNo || '').toUpperCase()))
-      const tasks: Promise<void>[] = []
-      for (let i = Number(generateForm.floorStart || 1); i <= Number(generateForm.floorEnd || 1); i++) {
-        const floorNo = `${i}F`
-        if (existed.has(floorNo)) continue
-        tasks.push(createFloor({ buildingId, floorNo, name: `${i}F`, status: 1, sortNo: i }))
-      }
-      if (!tasks.length) {
-        message.info('当前楼栋内目标楼层都已存在')
-        return
-      }
-      await Promise.all(tasks)
-      message.success(`已生成 ${tasks.length} 层楼层`)
-      generateOpen.value = false
-      await Promise.all([refreshFloors(), loadFloorList(), refreshTree()])
-      return
-    }
-
-    if (generateTarget.value === 'rooms') {
-      const floorId = generateForm.floorId || floorList.value[0]?.id
-      if (!floorId) {
-        message.warning('请先选择楼层')
-        return
-      }
-      const floor = floorList.value.find((item) => item.id === floorId)
-      const building = buildingList.value.find((item) => item.id === floor?.buildingId)
-      if (!floor || !building) {
-        message.warning('楼栋或楼层信息缺失，请刷新后重试')
-        return
-      }
-      const floorNoNumeric = Number(String(floor.floorNo || '').replace(/[^\d]/g, '') || 1)
-      const head = String(building.name || 'A').slice(0, 1).toUpperCase()
-      const existed = new Set(roomList.value.filter((item) => item.floorId === floor.id).map((item) => item.roomNo))
-      const tasks: Promise<void>[] = []
-      for (let i = Number(generateForm.roomStart || 1); i <= Number(generateForm.roomEnd || 1); i++) {
-        const roomNo = `${head}${floorNoNumeric}${String(i).padStart(2, '0')}`
-        if (existed.has(roomNo)) continue
-        tasks.push(
-          createRoom({
-            buildingId: building.id,
-            floorId: floor.id,
-            roomNo,
-            capacity: Number(generateForm.roomCapacity || 2),
-            roomType: inferRoomTypeByCapacity(Number(generateForm.roomCapacity || 2)),
-            status: 1
-          })
-        )
-      }
-      if (!tasks.length) {
-        message.info('当前楼层内目标房号都已存在')
-        return
-      }
-      await Promise.all(tasks)
-      message.success(`已生成 ${tasks.length} 间房`)
-      generateOpen.value = false
-      await Promise.all([refreshRooms(), loadRoomList(), refreshTree()])
-      return
-    }
-
-    const roomMap = new Map(roomList.value.map((item) => [item.id, item]))
-    const bedCountByRoom = bedList.value.reduce((acc, item) => {
-      acc[item.roomId] = (acc[item.roomId] || 0) + 1
-      return acc
-    }, {} as Record<string | number, number>)
-    const targets = (generateForm.bedScope === 'all' ? roomList.value : (rooms.value.length ? rooms.value : roomList.value)).slice(0, 200)
-    const tasks: Promise<void>[] = []
-    targets.forEach((room) => {
-      const roomData = roomMap.get(room.id) || room
-      const capacity = Number(resolveRoomCapacity(roomData) || 0)
-      if (!capacity) return
-      const existing = Number(bedCountByRoom[room.id] || 0)
-      for (let i = existing + 1; i <= capacity; i++) {
-        tasks.push(createBed({
-          roomId: room.id,
-          bedNo: String(i).padStart(2, '0'),
-          bedType: generateForm.bedType || bedTypeOptions.value[0]?.value,
-          status: 1
-        }))
-      }
+    await new Promise<void>((resolve, reject) => {
+      Modal.confirm({
+        title: '请确认批量生成预览',
+        content: formatPreviewSummary(preview),
+        okText: '确认提交',
+        cancelText: '返回调整',
+        onOk: async () => {
+          try {
+            const result = await commitResidenceBatchGeneration(preview.previewToken)
+            message.success(
+              `批量生成完成：新增 ${result.createdBuildingCount} 栋 / ${result.createdFloorCount} 层 / ${result.createdRoomCount} 间 / ${result.createdBedCount} 床`
+            )
+            if (result.updatedRoomCount || result.updatedBedCount) {
+              message.info(`安全覆盖：房间 ${result.updatedRoomCount}，床位 ${result.updatedBedCount}`)
+            }
+            generateOpen.value = false
+            await Promise.all([
+              refreshTree(),
+              searchBuildings(),
+              searchFloors(),
+              searchRooms(),
+              searchBeds(),
+              loadRoomList(),
+              loadBedList(),
+              loadBuildingList(),
+              loadFloorList()
+            ])
+            resolve()
+          } catch (error) {
+            reject(error)
+          }
+        },
+        onCancel: () => reject()
+      })
     })
-    if (!tasks.length) {
-      message.info('当前范围内床位已与房间容量一致')
-      return
-    }
-    await Promise.all(tasks)
-    message.success(`已生成 ${tasks.length} 个床位`)
-    generateOpen.value = false
-    await Promise.all([refreshBeds(), loadBedList(), refreshTree()])
   } catch (error: any) {
+    if (!error) return
     message.error(errorMessage(error, '批量生成失败'))
   } finally {
     generateSubmitting.value = false
   }
+}
+
+function buildResidenceBatchRequest(): ResidenceBatchGenerationRequest {
+  if (generateTarget.value === 'buildings') {
+    return {
+      mode: 'BUILDING_ONLY',
+      strategy: 'FILL_MISSING',
+      buildingCount: Number(generateForm.buildingCount || 1),
+      buildingStartNo: 1,
+      buildingNameStyle: 'NUMERIC_SUFFIX',
+      buildingCodePrefix: 'B'
+    }
+  }
+  if (generateTarget.value === 'floors') {
+    return {
+      mode: 'FLOOR_ONLY',
+      strategy: 'FILL_MISSING',
+      buildingId: generateForm.buildingId || buildingList.value[0]?.id,
+      floorStartNo: Number(generateForm.floorStart || 1),
+      floorEndNo: Number(generateForm.floorEnd || 1),
+      roomStartNo: 1,
+      roomEndNo: 1,
+      roomSeqWidth: 2,
+      bedsPerRoom: 0,
+      roomType: 'ROOM_DOUBLE',
+      bedLabelStyle: 'ALPHA',
+      floorRules: Array.from({ length: Math.max(Number(generateForm.floorEnd || 1) - Number(generateForm.floorStart || 1) + 1, 0) }).map((_, index) => ({
+        floorNo: Number(generateForm.floorStart || 1) + index,
+        skipRoomGeneration: true
+      }))
+    }
+  }
+  if (generateTarget.value === 'rooms') {
+    return {
+      mode: 'ROOM_ONLY',
+      strategy: 'FILL_MISSING',
+      floorId: generateForm.floorId || floorList.value[0]?.id,
+      roomStartNo: Number(generateForm.roomStart || 1),
+      roomEndNo: Number(generateForm.roomEnd || 1),
+      roomSeqWidth: 2,
+      roomType: inferRoomTypeByCapacity(Number(generateForm.roomCapacity || 2)) || 'ROOM_DOUBLE',
+      bedsPerRoom: Number(generateForm.roomCapacity || 2),
+      bedLabelStyle: 'ALPHA',
+      defaultBedType: generateForm.bedType || bedTypeOptions.value[0]?.value
+    }
+  }
+  const targetRoomId = generateForm.bedScope === 'all'
+    ? undefined
+    : rooms.value.length === 1
+      ? rooms.value[0]?.id
+      : selectedTreeNode.value?.type === 'ROOM'
+        ? selectedTreeNode.value.id
+        : undefined
+  return {
+    mode: 'BED_ONLY',
+    strategy: 'FILL_MISSING',
+    roomId: targetRoomId || roomList.value[0]?.id,
+    defaultBedType: generateForm.bedType || bedTypeOptions.value[0]?.value,
+    bedLabelStyle: 'ALPHA'
+  }
+}
+
+function formatPreviewSummary(preview: ResidenceBatchPreviewResponse) {
+  const lines = [
+    `新增楼栋：${preview.createBuildingCount}`,
+    `新增楼层：${preview.createFloorCount}`,
+    `新增房间：${preview.createRoomCount}`,
+    `新增床位：${preview.createBedCount}`,
+    `安全覆盖：${preview.overwriteSafeCount}`,
+    `跳过数量：${preview.skipCount}`,
+    `冲突数量：${preview.conflictCount}`
+  ]
+  if (preview.warnings?.length) {
+    lines.push(`提示：${preview.warnings.slice(0, 3).join('；')}`)
+  }
+  if (preview.conflicts?.length) {
+    lines.push(`冲突：${preview.conflicts.slice(0, 3).join('；')}`)
+  }
+  return lines.join('\n')
 }
 
 async function batchUpdateBuildingsStatus(status: 1 | 0) {

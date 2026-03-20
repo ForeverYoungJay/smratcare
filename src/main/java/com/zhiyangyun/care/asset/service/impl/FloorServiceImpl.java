@@ -13,6 +13,7 @@ import com.zhiyangyun.care.elder.entity.Room;
 import com.zhiyangyun.care.elder.mapper.BedMapper;
 import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import java.util.List;
+import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +31,15 @@ public class FloorServiceImpl implements FloorService {
 
   @Override
   public FloorResponse create(FloorRequest request) {
+    if (request.getFloorNo() == null || request.getFloorNo().isBlank()) {
+      request.setFloorNo(resolveNextFloorNo(request.getTenantId(), request.getBuildingId()));
+    }
+    if (request.getSortNo() == null) {
+      request.setSortNo(extractFloorSortNo(request.getFloorNo()));
+    }
+    if (request.getName() == null || request.getName().isBlank()) {
+      request.setName(request.getFloorNo());
+    }
     ensureFloorUnique(null, request.getTenantId(), request.getBuildingId(), request.getFloorNo());
     Floor floor = new Floor();
     floor.setTenantId(request.getTenantId());
@@ -49,6 +59,15 @@ public class FloorServiceImpl implements FloorService {
     Floor floor = floorMapper.selectById(id);
     if (floor == null) {
       return null;
+    }
+    if (request.getFloorNo() == null || request.getFloorNo().isBlank()) {
+      request.setFloorNo(floor.getFloorNo());
+    }
+    if (request.getSortNo() == null) {
+      request.setSortNo(floor.getSortNo() == null ? extractFloorSortNo(request.getFloorNo()) : floor.getSortNo());
+    }
+    if (request.getName() == null || request.getName().isBlank()) {
+      request.setName(floor.getName() == null || floor.getName().isBlank() ? request.getFloorNo() : floor.getName());
     }
     if (!request.getTenantId().equals(floor.getTenantId())) {
       throw new IllegalArgumentException("无权限访问该楼层");
@@ -164,6 +183,30 @@ public class FloorServiceImpl implements FloorService {
     if (floorMapper.selectCount(wrapper) > 0) {
       throw new IllegalArgumentException("楼层编号已存在");
     }
+  }
+
+  private String resolveNextFloorNo(Long tenantId, Long buildingId) {
+    List<Floor> floors = floorMapper.selectList(Wrappers.lambdaQuery(Floor.class)
+        .eq(Floor::getIsDeleted, 0)
+        .eq(Floor::getTenantId, tenantId)
+        .eq(Floor::getBuildingId, buildingId));
+    int next = floors.stream()
+        .map(Floor::getFloorNo)
+        .filter(Objects::nonNull)
+        .map(value -> value.replaceAll("[^0-9]", ""))
+        .filter(value -> !value.isBlank())
+        .mapToInt(Integer::parseInt)
+        .max()
+        .orElse(0) + 1;
+    return next + "F";
+  }
+
+  private Integer extractFloorSortNo(String floorNo) {
+    if (floorNo == null || floorNo.isBlank()) {
+      return 0;
+    }
+    String digits = floorNo.replaceAll("[^0-9]", "");
+    return digits.isBlank() ? 0 : Integer.parseInt(digits);
   }
 
   private FloorResponse toResponse(Floor floor) {

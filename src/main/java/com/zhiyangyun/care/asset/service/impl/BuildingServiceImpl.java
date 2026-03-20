@@ -15,6 +15,7 @@ import com.zhiyangyun.care.elder.entity.Room;
 import com.zhiyangyun.care.elder.mapper.BedMapper;
 import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import java.util.List;
+import java.util.Objects;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +36,12 @@ public class BuildingServiceImpl implements BuildingService {
   @Override
   public BuildingResponse create(BuildingRequest request) {
     ensureNameUnique(null, request.getTenantId(), request.getName());
+    if (request.getSortNo() == null) {
+      request.setSortNo(resolveNextSortNo(request.getTenantId()));
+    }
+    if (request.getCode() == null || request.getCode().isBlank()) {
+      request.setCode(resolveNextBuildingCode(request.getTenantId(), request.getSortNo()));
+    }
     Building building = new Building();
     building.setTenantId(request.getTenantId());
     building.setOrgId(request.getOrgId());
@@ -60,6 +67,14 @@ public class BuildingServiceImpl implements BuildingService {
       throw new IllegalArgumentException("无权限访问该楼栋");
     }
     ensureNameUnique(id, request.getTenantId(), request.getName());
+    if (request.getSortNo() == null) {
+      request.setSortNo(building.getSortNo() == null ? resolveNextSortNo(request.getTenantId()) : building.getSortNo());
+    }
+    if (request.getCode() == null || request.getCode().isBlank()) {
+      request.setCode(building.getCode() == null || building.getCode().isBlank()
+          ? resolveNextBuildingCode(request.getTenantId(), request.getSortNo())
+          : building.getCode());
+    }
     building.setName(request.getName());
     building.setCode(request.getCode());
     building.setAreaCode(request.getAreaCode());
@@ -177,6 +192,30 @@ public class BuildingServiceImpl implements BuildingService {
     if (buildingMapper.selectCount(wrapper) > 0) {
       throw new IllegalArgumentException("楼栋名称已存在");
     }
+  }
+
+  private Integer resolveNextSortNo(Long tenantId) {
+    List<Building> buildings = buildingMapper.selectList(Wrappers.lambdaQuery(Building.class)
+        .eq(Building::getIsDeleted, 0)
+        .eq(Building::getTenantId, tenantId));
+    return buildings.stream()
+        .map(Building::getSortNo)
+        .filter(Objects::nonNull)
+        .max(Integer::compareTo)
+        .orElse(0) + 1;
+  }
+
+  private String resolveNextBuildingCode(Long tenantId, Integer sortNo) {
+    int next = sortNo == null ? resolveNextSortNo(tenantId) : sortNo;
+    String candidate = "B" + String.format("%02d", next);
+    while (buildingMapper.selectCount(Wrappers.lambdaQuery(Building.class)
+        .eq(Building::getIsDeleted, 0)
+        .eq(Building::getTenantId, tenantId)
+        .eq(Building::getCode, candidate)) > 0) {
+      next += 1;
+      candidate = "B" + String.format("%02d", next);
+    }
+    return candidate;
   }
 
   private BuildingResponse toResponse(Building building) {

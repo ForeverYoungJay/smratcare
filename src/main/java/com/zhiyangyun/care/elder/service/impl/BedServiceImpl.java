@@ -58,6 +58,9 @@ public class BedServiceImpl implements BedService {
 
   @Override
   public BedResponse create(BedRequest request) {
+    if (request.getBedNo() == null || request.getBedNo().isBlank()) {
+      request.setBedNo(resolveNextBedNo(request.getTenantId(), request.getRoomId()));
+    }
     ensureBedNoUnique(null, request.getTenantId(), request.getRoomId(), request.getBedNo());
     ensureRoomTenant(request.getTenantId(), request.getRoomId());
     ensureRoomBedQuota(request.getTenantId(), request.getRoomId(), null);
@@ -79,6 +82,9 @@ public class BedServiceImpl implements BedService {
     Bed bed = bedMapper.selectById(id);
     if (bed == null) {
       return null;
+    }
+    if (request.getBedNo() == null || request.getBedNo().isBlank()) {
+      request.setBedNo(bed.getBedNo());
     }
     if (bed.getElderId() != null && !Objects.equals(bed.getRoomId(), request.getRoomId())) {
       throw new IllegalArgumentException("当前床位已绑定长者，不可直接变更所属房间");
@@ -538,6 +544,44 @@ public class BedServiceImpl implements BedService {
       return 3;
     }
     return null;
+  }
+
+  private String resolveNextBedNo(Long tenantId, Long roomId) {
+    Room room = roomMapper.selectById(roomId);
+    String roomNo = room == null ? "ROOM" : room.getRoomNo();
+    List<Bed> beds = bedMapper.selectList(Wrappers.lambdaQuery(Bed.class)
+        .eq(Bed::getIsDeleted, 0)
+        .eq(Bed::getTenantId, tenantId)
+        .eq(Bed::getRoomId, roomId));
+    int nextAlphaIndex = beds.stream()
+        .map(Bed::getBedNo)
+        .filter(Objects::nonNull)
+        .map(value -> value.contains("-") ? value.substring(value.lastIndexOf('-') + 1) : value)
+        .map(String::trim)
+        .filter(value -> value.matches("[A-Z]+"))
+        .mapToInt(this::alphaToIndex)
+        .max()
+        .orElse(0) + 1;
+    return roomNo + "-" + indexToAlpha(nextAlphaIndex);
+  }
+
+  private int alphaToIndex(String value) {
+    int result = 0;
+    for (int i = 0; i < value.length(); i++) {
+      result = result * 26 + (value.charAt(i) - 'A' + 1);
+    }
+    return result;
+  }
+
+  private String indexToAlpha(int index) {
+    int number = Math.max(index, 1);
+    StringBuilder builder = new StringBuilder();
+    while (number > 0) {
+      int mod = (number - 1) % 26;
+      builder.insert(0, (char) ('A' + mod));
+      number = (number - 1) / 26;
+    }
+    return builder.toString();
   }
 
   private void ensureBedNoUnique(Long id, Long tenantId, Long roomId, String bedNo) {

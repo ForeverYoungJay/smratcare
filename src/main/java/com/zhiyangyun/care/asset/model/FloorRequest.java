@@ -1,6 +1,5 @@
 package com.zhiyangyun.care.asset.model;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -10,7 +9,6 @@ public class FloorRequest {
   private Long orgId;
   @NotNull
   private Long buildingId;
-  @NotBlank
   private String floorNo;
   private String name;
   private Integer status = 1;

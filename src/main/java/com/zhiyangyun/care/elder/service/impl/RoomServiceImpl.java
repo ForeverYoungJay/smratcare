@@ -36,6 +36,10 @@ public class RoomServiceImpl implements RoomService {
 
   @Override
   public RoomResponse create(RoomRequest request) {
+    applyBuildingFloorPlaceholders(request);
+    if (request.getRoomNo() == null || request.getRoomNo().isBlank()) {
+      request.setRoomNo(resolveNextRoomNo(request.getTenantId(), request.getFloorId(), request.getFloorNo()));
+    }
     ensureRoomNoUnique(null, request.getTenantId(), request.getRoomNo());
     Integer normalizedCapacity = normalizeCapacityByRoomType(request.getRoomType(), request.getCapacity());
     String normalizedRoomType = normalizeRoomTypeByCapacity(request.getRoomType(), normalizedCapacity);
@@ -67,6 +71,10 @@ public class RoomServiceImpl implements RoomService {
     Room room = roomMapper.selectById(id);
     if (room == null) {
       return null;
+    }
+    applyBuildingFloorPlaceholders(request);
+    if (request.getRoomNo() == null || request.getRoomNo().isBlank()) {
+      request.setRoomNo(room.getRoomNo());
     }
     ensureRoomNoUnique(id, request.getTenantId(), request.getRoomNo());
     Integer normalizedCapacity = normalizeCapacityByRoomType(request.getRoomType(), request.getCapacity());
@@ -311,5 +319,39 @@ public class RoomServiceImpl implements RoomService {
     } else {
       room.setFloorNo(fallbackFloorNo);
     }
+  }
+
+  private void applyBuildingFloorPlaceholders(RoomRequest request) {
+    if (request == null) {
+      return;
+    }
+    if (request.getFloorNo() == null || request.getFloorNo().isBlank()) {
+      Floor floor = request.getFloorId() == null ? null : floorMapper.selectById(request.getFloorId());
+      if (floor != null) {
+        request.setFloorNo(floor.getFloorNo());
+      }
+    }
+  }
+
+  private String resolveNextRoomNo(Long tenantId, Long floorId, String floorNo) {
+    String prefixDigits = floorNo == null ? "" : floorNo.replaceAll("[^0-9]", "");
+    if (prefixDigits.isBlank()) {
+      prefixDigits = "1";
+    }
+    List<Room> rooms = roomMapper.selectList(Wrappers.lambdaQuery(Room.class)
+        .eq(Room::getIsDeleted, 0)
+        .eq(Room::getTenantId, tenantId)
+        .eq(Room::getFloorId, floorId));
+    int nextSeq = rooms.stream()
+        .map(Room::getRoomNo)
+        .filter(Objects::nonNull)
+        .map(value -> value.replaceAll("[^0-9]", ""))
+        .filter(value -> value.startsWith(prefixDigits) && value.length() > prefixDigits.length())
+        .map(value -> value.substring(prefixDigits.length()))
+        .filter(value -> !value.isBlank())
+        .mapToInt(Integer::parseInt)
+        .max()
+        .orElse(0) + 1;
+    return prefixDigits + String.format("%02d", nextSeq);
   }
 }

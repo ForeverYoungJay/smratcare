@@ -3,8 +3,13 @@ package com.zhiyangyun.care.asset.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.zhiyangyun.care.asset.model.BuildingRequest;
 import com.zhiyangyun.care.asset.model.BuildingResponse;
+import com.zhiyangyun.care.asset.model.ResidenceBatchCommitRequest;
+import com.zhiyangyun.care.asset.model.ResidenceBatchCommitResponse;
+import com.zhiyangyun.care.asset.model.ResidenceBatchGenerationRequest;
+import com.zhiyangyun.care.asset.model.ResidenceBatchPreviewResponse;
 import com.zhiyangyun.care.asset.model.ResidenceBootstrapRequest;
 import com.zhiyangyun.care.asset.model.ResidenceBootstrapResponse;
+import com.zhiyangyun.care.asset.service.ResidenceBatchGenerationService;
 import com.zhiyangyun.care.asset.service.BuildingService;
 import com.zhiyangyun.care.asset.service.ResidenceBootstrapService;
 import com.zhiyangyun.care.audit.service.AuditLogService;
@@ -26,14 +31,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class BuildingController {
   private final BuildingService buildingService;
   private final ResidenceBootstrapService residenceBootstrapService;
+  private final ResidenceBatchGenerationService residenceBatchGenerationService;
   private final AuditLogService auditLogService;
 
   public BuildingController(
       BuildingService buildingService,
       ResidenceBootstrapService residenceBootstrapService,
+      ResidenceBatchGenerationService residenceBatchGenerationService,
       AuditLogService auditLogService) {
     this.buildingService = buildingService;
     this.residenceBootstrapService = residenceBootstrapService;
+    this.residenceBatchGenerationService = residenceBatchGenerationService;
     this.auditLogService = auditLogService;
   }
 
@@ -96,6 +104,24 @@ public class BuildingController {
     ResidenceBootstrapResponse response = residenceBootstrapService.bootstrap(tenantId, AuthContext.getStaffId(), request);
     auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "CREATE", "RESIDENCE_BOOTSTRAP", null, "一键生成楼层房床");
+    return Result.ok(response);
+  }
+
+  @PostMapping("/batch-generation/preview")
+  public Result<ResidenceBatchPreviewResponse> previewBatchGeneration(@Valid @RequestBody ResidenceBatchGenerationRequest request) {
+    Long tenantId = AuthContext.getOrgId();
+    ResidenceBatchPreviewResponse response = residenceBatchGenerationService.preview(tenantId, AuthContext.getStaffId(), request);
+    auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "PREVIEW", "RESIDENCE_BATCH_GENERATION", null, "预览楼栋楼层房间床位批量生成");
+    return Result.ok(response);
+  }
+
+  @PostMapping("/batch-generation/commit")
+  public Result<ResidenceBatchCommitResponse> commitBatchGeneration(@Valid @RequestBody ResidenceBatchCommitRequest request) {
+    Long tenantId = AuthContext.getOrgId();
+    ResidenceBatchCommitResponse response = residenceBatchGenerationService.commit(tenantId, AuthContext.getStaffId(), request);
+    auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "CREATE", "RESIDENCE_BATCH_GENERATION", null, "提交楼栋楼层房间床位批量生成");
     return Result.ok(response);
   }
 }

@@ -1,6 +1,5 @@
 package com.zhiyangyun.care.elder.model;
 
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -14,7 +13,6 @@ public class RoomRequest {
   private Long floorId;
   private String building;
   private String floorNo;
-  @NotBlank
   private String roomNo;
   private String roomType;
   private Integer capacity = 1;

@@ -96,3 +96,88 @@ export interface ResidenceBootstrapResponse {
   roomCount: number
   bedCount: number
 }
+
+export interface ResidenceGenerationFloorRule {
+  floorNo?: number
+  skipRoomGeneration?: boolean
+  roomType?: string
+  genderLimit?: string
+  excludedRoomNos?: string[]
+}
+
+export interface ResidenceGenerationSpecialRoomRule {
+  floorNo?: number
+  roomNo?: string
+  usageType?: string
+  roomType?: string
+  bedCount?: number
+  skipBedGeneration?: boolean
+  genderLimit?: string
+}
+
+export interface ResidenceBatchGenerationRequest {
+  mode: 'BUILDING_ONLY' | 'FULL_INIT' | 'FLOOR_ONLY' | 'ROOM_ONLY' | 'BED_ONLY'
+  strategy?: 'SKIP_EXISTING' | 'FILL_MISSING' | 'OVERWRITE_SAFE'
+  buildingNames?: string[]
+  buildingCount?: number
+  buildingStartNo?: number
+  buildingNameStyle?: string
+  buildingCodePrefix?: string
+  buildingId?: Id
+  floorId?: Id
+  roomId?: Id
+  floorStartNo?: number
+  floorEndNo?: number
+  floorNameStyle?: string
+  roomStartNo?: number
+  roomEndNo?: number
+  roomSeqWidth?: number
+  roomType?: string
+  defaultGenderLimit?: string
+  defaultBedType?: string
+  bedsPerRoom?: number
+  bedLabelStyle?: string
+  bedNoSeparator?: string
+  floorRules?: ResidenceGenerationFloorRule[]
+  specialRooms?: ResidenceGenerationSpecialRoomRule[]
+}
+
+export interface ResidenceBatchPreviewItem {
+  entityType: string
+  action: string
+  identifier: string
+  parentIdentifier?: string
+  displayName?: string
+  reason?: string
+  safeOverwrite?: boolean
+  payload?: Record<string, any>
+}
+
+export interface ResidenceBatchPreviewResponse {
+  previewToken: string
+  mode: string
+  strategy: string
+  createBuildingCount: number
+  createFloorCount: number
+  createRoomCount: number
+  createBedCount: number
+  overwriteSafeCount: number
+  skipCount: number
+  conflictCount: number
+  warnings: string[]
+  conflicts: string[]
+  skipped: string[]
+  safeOverwriteTargets: string[]
+  items: ResidenceBatchPreviewItem[]
+}
+
+export interface ResidenceBatchCommitResponse {
+  createdBuildingCount: number
+  createdFloorCount: number
+  createdRoomCount: number
+  createdBedCount: number
+  updatedRoomCount: number
+  updatedBedCount: number
+  skippedCount: number
+  messages: string[]
+}
