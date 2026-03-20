@@ -1,137 +1,193 @@
 <template>
   <PageContainer :title="pageTitle" :subTitle="pageSubTitle">
-    <a-row :gutter="16" class="summary-row">
-      <a-col :xs="24" :md="8">
-        <a-card class="summary-card" :bordered="false">
-          <div class="summary-title">房间总数</div>
-          <div class="summary-value">{{ roomStats.total }}</div>
-          <div class="summary-sub">可用 {{ roomStats.active }} / 停用 {{ roomStats.inactive }}</div>
-        </a-card>
-      </a-col>
-      <a-col :xs="24" :md="8">
-        <a-card class="summary-card" :bordered="false">
-          <div class="summary-title">床位总数</div>
-          <div class="summary-value">{{ bedStats.total }}</div>
-          <div class="summary-sub">
-            空床 {{ bedStats.available }} / 入住 {{ bedStats.occupied }} / 维护 {{ bedStats.maintenance }}
-          </div>
-        </a-card>
-      </a-col>
-      <a-col :xs="24" :md="8">
-        <a-card class="summary-card" :bordered="false">
-          <div class="summary-title">当前模块</div>
-          <div class="summary-value">{{ activeTabLabel }}</div>
-          <div class="summary-sub">已选床位 {{ selected.length }}</div>
-        </a-card>
-      </a-col>
-    </a-row>
-    <div class="entry-actions">
-      <a-space wrap>
-        <a-button @click="openBedMap">查看房态图</a-button>
-        <a-button type="primary" @click="openElderBedPanorama">打开后勤房态图</a-button>
-      </a-space>
-    </div>
+    <div class="bed-management-page">
+      <a-row :gutter="20" class="workspace-grid">
+        <a-col :xs="24" :xl="6">
+          <a-card class="asset-tree-panel" :bordered="false">
+            <div class="tree-panel-head">
+              <div>
+                <div class="panel-eyebrow">资产结构</div>
+                <div class="tree-title">楼栋 - 楼层 - 房间 - 床位</div>
+                <div class="tree-summary">
+                  {{ treeStats.buildings }} 栋 / {{ treeStats.floors }} 层 / {{ treeStats.rooms }} 房 / {{ treeStats.beds }} 床
+                </div>
+              </div>
+              <a-button size="small" @click="refreshTree">刷新</a-button>
+            </div>
+            <a-tree
+              :tree-data="treeData"
+              :field-names="{ title: 'name', key: 'treeKey', children: 'children' }"
+              :loading="treeLoading"
+              show-line
+              class="asset-tree"
+              @select="(_, info) => onTreeSelect(info.node)"
+            >
+              <template #title="node">
+                <div class="tree-node-card">
+                  <div class="tree-node-main">
+                    <span class="tree-node-type">{{ treeTypeLabel(node.type || node.dataRef?.type) }}</span>
+                    <span class="tree-node-name">{{ node.name || node.dataRef?.name }}</span>
+                  </div>
+                  <div class="tree-node-meta">
+                    {{ formatTreeNodeSummary(node.dataRef || node) }}
+                  </div>
+                </div>
+              </template>
+            </a-tree>
+          </a-card>
+        </a-col>
+        <a-col :xs="24" :xl="18">
+          <div class="workspace-shell">
+            <a-card class="workspace-hero" :bordered="false">
+              <div class="workspace-topbar">
+                <div>
+                  <div class="workspace-path">{{ currentPathText }}</div>
+                  <h2 class="workspace-title">{{ activeTabLabel }}</h2>
+                  <p class="workspace-subtitle">{{ currentScopeHint }}</p>
+                </div>
+                <a-radio-group :value="currentWorkspaceMode" button-style="solid" @change="onWorkspaceModeChange">
+                  <a-radio-button value="manage">床位管理</a-radio-button>
+                  <a-radio-button value="map">房态图</a-radio-button>
+                  <a-radio-button value="panorama">床态全景</a-radio-button>
+                </a-radio-group>
+              </div>
+              <a-tabs v-model:activeKey="activeTab" class="management-tabs">
+                <a-tab-pane v-if="isTabEnabled('buildings')" key="buildings" tab="楼栋管理" />
+                <a-tab-pane v-if="isTabEnabled('floors')" key="floors" tab="楼层管理" />
+                <a-tab-pane v-if="isTabEnabled('rooms')" key="rooms" tab="房间管理" />
+                <a-tab-pane v-if="isTabEnabled('beds')" key="beds" tab="床位管理" />
+              </a-tabs>
+            </a-card>
 
-    <a-row :gutter="16">
-      <a-col :xs="24" :md="6">
-        <a-card class="card-elevated" :bordered="false">
-          <div class="tree-header">
-            <div class="tree-title">资产树</div>
-            <a-button size="small" @click="refreshTree">刷新</a-button>
-          </div>
-          <a-tree
-            :tree-data="treeData"
-            :field-names="{ title: 'name', key: 'treeKey', children: 'children' }"
-            :loading="treeLoading"
-            show-line
-            @select="(_, info) => onTreeSelect(info.node)"
-          >
-            <template #title="node">
-              <span class="tree-node">
-                <span class="tree-node-type">{{ treeTypeLabel(node.type || node.dataRef?.type) }}</span>
-                <span class="tree-node-name">{{ node.name || node.dataRef?.name }}</span>
-              </span>
-            </template>
-          </a-tree>
-        </a-card>
-      </a-col>
-      <a-col :xs="24" :md="18">
-        <a-card class="card-elevated" :bordered="false">
-          <a-tabs v-model:activeKey="activeTab">
-            <a-tab-pane v-if="isTabEnabled('buildings')" key="buildings" tab="楼栋管理">
-              <a-form :model="buildingQuery" layout="inline" class="search-bar">
-                <a-form-item label="关键字">
-                  <a-input v-model:value="buildingQuery.keyword" placeholder="楼栋名称/编码" allow-clear />
-                </a-form-item>
+            <a-row :gutter="[16, 16]" class="overview-row">
+              <a-col v-for="card in overviewCards" :key="card.label" :xs="24" :md="12" :xl="6">
+                <a-card class="overview-card" :bordered="false">
+                  <div class="overview-label">{{ card.label }}</div>
+                  <div class="overview-value">{{ card.value }}</div>
+                  <div class="overview-meta">{{ card.meta }}</div>
+                </a-card>
+              </a-col>
+            </a-row>
+
+            <div v-if="activeTab === 'buildings'" class="workspace-stack">
+              <a-card class="section-card filter-card" :bordered="false">
+                <div class="section-head">
+                  <div>
+                    <div class="section-title">筛选条件</div>
+                    <div class="section-desc">快速定位楼栋并查看启用状态与区域信息</div>
+                  </div>
+                  <a-button type="link" @click="resetBuildings">清空筛选</a-button>
+                </div>
+                <a-form :model="buildingQuery" layout="inline" class="search-bar">
+                  <a-form-item label="关键字">
+                    <a-input v-model:value="buildingQuery.keyword" placeholder="楼栋名称/编码" allow-clear />
+                  </a-form-item>
                 <a-form-item label="状态">
                   <a-select v-model:value="buildingQuery.status" allow-clear style="min-width: 140px">
                     <a-select-option :value="1">启用</a-select-option>
                     <a-select-option :value="0">停用</a-select-option>
                   </a-select>
                 </a-form-item>
-                <a-form-item>
-                  <a-space>
-                    <a-button type="primary" @click="searchBuildings">查询</a-button>
-                    <a-button @click="resetBuildings">重置</a-button>
-                  </a-space>
-                </a-form-item>
-              </a-form>
-
-              <div class="table-actions">
-                <a-space wrap>
-                  <a-button type="primary" @click="openBuilding()">新增楼栋</a-button>
-                  <a-button @click="quickGenerateBuildings">一键生成</a-button>
-                  <a-button danger @click="quickDeleteBuildings">一键删除</a-button>
-                  <a-button type="primary" @click="openBootstrap">一键生成楼层房床</a-button>
-                  <a-button @click="refreshBuildings">刷新</a-button>
-                </a-space>
-                <a-space wrap>
-                  <div class="selection-info">已选 {{ selectedBuildings.length }} 个楼栋</div>
-                  <a-button :disabled="!selectedBuildings.length" @click="batchUpdateBuildingsStatus(1)">批量启用</a-button>
-                  <a-button :disabled="!selectedBuildings.length" @click="batchUpdateBuildingsStatus(0)">批量停用</a-button>
-                </a-space>
-              </div>
-
-              <a-table
-                :data-source="buildings"
-                :columns="buildingColumns"
-                :loading="loadingBuildings"
-                :pagination="false"
-                row-key="id"
-                :scroll="{ y: 420 }"
-                :row-selection="buildingRowSelection"
-              >
-                <template #bodyCell="{ column, record }">
-                  <template v-if="column.key === 'status'">
-                    <a-tag :color="record.status === 1 ? 'green' : 'default'">
-                      {{ record.status === 1 ? '启用' : '停用' }}
-                    </a-tag>
-                  </template>
-                  <template v-else-if="column.key === 'remark'">
-                    {{ resolvePublicRemark(record.remark) || '-' }}
-                  </template>
-                  <template v-else-if="column.key === 'action'">
+                  <a-form-item>
                     <a-space>
-                      <a-button type="link" @click="openBuilding(record)">编辑</a-button>
-                      <a-button type="link" danger @click="removeBuilding(record.id)">删除</a-button>
+                      <a-button type="primary" @click="searchBuildings">查询</a-button>
+                      <a-button @click="resetBuildings">重置</a-button>
                     </a-space>
-                  </template>
-                </template>
-              </a-table>
-              <div class="pager">
-                <a-pagination
-                  :current="buildingPage.pageNo"
-                  :page-size="buildingPage.pageSize"
-                  :total="buildingPage.total"
-                  show-size-changer
-                  @change="onBuildingPageChange"
-                  @showSizeChange="onBuildingPageSizeChange"
-                />
-              </div>
-            </a-tab-pane>
+                  </a-form-item>
+                </a-form>
+              </a-card>
 
-            <a-tab-pane v-if="isTabEnabled('floors')" key="floors" tab="楼层管理">
-              <a-form :model="floorQuery" layout="inline" class="search-bar">
+              <a-card class="section-card action-card" :bordered="false">
+                <div class="toolbar-row">
+                  <div class="toolbar-main">
+                    <a-button type="primary" @click="openBuilding()">新增楼栋</a-button>
+                    <a-button @click="openGenerateWizard('buildings')">批量生成</a-button>
+                    <a-button danger :disabled="!selectedBuildings.length" @click="quickDeleteBuildings">批量删除</a-button>
+                  </div>
+                  <div class="toolbar-side">
+                    <div class="selection-badge">已选 {{ selectedBuildings.length }} 个楼栋</div>
+                    <a-button :disabled="!selectedBuildings.length" @click="batchUpdateBuildingsStatus(1)">批量启用</a-button>
+                    <a-button :disabled="!selectedBuildings.length" @click="batchUpdateBuildingsStatus(0)">批量停用</a-button>
+                    <a-dropdown>
+                      <a-button>更多操作</a-button>
+                      <template #overlay>
+                        <a-menu>
+                          <a-menu-item key="structure" @click="openBootstrap">结构生成向导</a-menu-item>
+                          <a-menu-item key="refresh" @click="refreshBuildings">刷新列表</a-menu-item>
+                        </a-menu>
+                      </template>
+                    </a-dropdown>
+                  </div>
+                </div>
+              </a-card>
+
+              <a-card class="section-card table-card" :bordered="false">
+                <div class="section-head">
+                  <div>
+                    <div class="section-title">楼栋列表</div>
+                    <div class="section-desc">当前共 {{ buildingPage.total }} 条记录</div>
+                  </div>
+                </div>
+                <a-table
+                  :data-source="buildings"
+                  :columns="buildingColumns"
+                  :loading="loadingBuildings"
+                  :pagination="false"
+                  row-key="id"
+                  :scroll="{ y: 420 }"
+                  :row-selection="buildingRowSelection"
+                >
+                  <template #bodyCell="{ column, record }">
+                    <template v-if="column.key === 'status'">
+                      <a-tag :color="record.status === 1 ? 'green' : 'default'">
+                        {{ record.status === 1 ? '启用' : '停用' }}
+                      </a-tag>
+                    </template>
+                    <template v-else-if="column.key === 'remark'">
+                      {{ resolvePublicRemark(record.remark) || '-' }}
+                    </template>
+                    <template v-else-if="column.key === 'action'">
+                      <div class="row-actions">
+                        <a-button type="link" @click="openBuilding(record, 'view')">查看</a-button>
+                        <a-button type="link" @click="openBuilding(record, 'edit')">编辑</a-button>
+                        <a-dropdown>
+                          <a-button type="link">更多</a-button>
+                          <template #overlay>
+                            <a-menu>
+                              <a-menu-item :key="`toggle-${record.id}`" @click="toggleBuildingStatus(record)">
+                                {{ record.status === 1 ? '停用' : '启用' }}
+                              </a-menu-item>
+                              <a-menu-item :key="`delete-${record.id}`" danger @click="removeBuilding(record.id)">删除</a-menu-item>
+                            </a-menu>
+                          </template>
+                        </a-dropdown>
+                      </div>
+                    </template>
+                  </template>
+                </a-table>
+                <div class="pager">
+                  <a-pagination
+                    :current="buildingPage.pageNo"
+                    :page-size="buildingPage.pageSize"
+                    :total="buildingPage.total"
+                    show-size-changer
+                    @change="onBuildingPageChange"
+                    @showSizeChange="onBuildingPageSizeChange"
+                  />
+                </div>
+              </a-card>
+            </div>
+
+            <div v-if="activeTab === 'floors'" class="workspace-stack">
+              <a-card class="section-card filter-card" :bordered="false">
+                <div class="section-head">
+                  <div>
+                    <div class="section-title">筛选条件</div>
+                    <div class="section-desc">先选楼栋，再按楼层范围管理楼层资产</div>
+                  </div>
+                  <a-button type="link" @click="resetFloors">清空筛选</a-button>
+                </div>
+                <a-form :model="floorQuery" layout="inline" class="search-bar">
                 <a-form-item label="楼栋">
                   <a-select v-model:value="floorQuery.buildingId" allow-clear style="min-width: 160px">
                     <a-select-option v-for="b in buildingList" :key="b.id" :value="b.id">{{ b.name }}</a-select-option>
@@ -153,61 +209,98 @@
                   </a-space>
                 </a-form-item>
               </a-form>
+              </a-card>
 
-              <div class="table-actions">
-                <a-space wrap>
-                  <a-button type="primary" @click="openFloor()">新增楼层</a-button>
-                  <a-button @click="quickGenerateFloors">一键生成</a-button>
-                  <a-button danger @click="quickDeleteFloors">一键删除</a-button>
-                  <a-button @click="refreshFloors">刷新</a-button>
-                </a-space>
-                <a-space wrap>
-                  <div class="selection-info">已选 {{ selectedFloors.length }} 个楼层</div>
-                  <a-button :disabled="!selectedFloors.length" @click="batchUpdateFloorsStatus(1)">批量启用</a-button>
-                  <a-button :disabled="!selectedFloors.length" @click="batchUpdateFloorsStatus(0)">批量停用</a-button>
-                </a-space>
-              </div>
+              <a-card class="section-card action-card" :bordered="false">
+                <div class="toolbar-row">
+                  <div class="toolbar-main">
+                    <a-button type="primary" @click="openFloor()">新增楼层</a-button>
+                    <a-button @click="openGenerateWizard('floors')">批量生成</a-button>
+                    <a-button danger :disabled="!selectedFloors.length" @click="quickDeleteFloors">批量删除</a-button>
+                  </div>
+                  <div class="toolbar-side">
+                    <div class="selection-badge">已选 {{ selectedFloors.length }} 个楼层</div>
+                    <a-button :disabled="!selectedFloors.length" @click="batchUpdateFloorsStatus(1)">批量启用</a-button>
+                    <a-button :disabled="!selectedFloors.length" @click="batchUpdateFloorsStatus(0)">批量停用</a-button>
+                    <a-dropdown>
+                      <a-button>更多操作</a-button>
+                      <template #overlay>
+                        <a-menu>
+                          <a-menu-item key="refresh" @click="refreshFloors">刷新列表</a-menu-item>
+                        </a-menu>
+                      </template>
+                    </a-dropdown>
+                  </div>
+                </div>
+              </a-card>
 
-              <a-table
-                :data-source="floors"
-                :columns="floorColumns"
-                :loading="loadingFloors"
-                :pagination="false"
-                row-key="id"
-                :scroll="{ y: 420 }"
-                :row-selection="floorRowSelection"
-              >
-                <template #bodyCell="{ column, record }">
-                  <template v-if="column.key === 'buildingId'">
-                    {{ buildingNameMap[record.buildingId] || '-' }}
+              <a-card class="section-card table-card" :bordered="false">
+                <div class="section-head">
+                  <div>
+                    <div class="section-title">楼层列表</div>
+                    <div class="section-desc">当前共 {{ floorPage.total }} 条记录</div>
+                  </div>
+                </div>
+                <a-table
+                  :data-source="floors"
+                  :columns="floorColumns"
+                  :loading="loadingFloors"
+                  :pagination="false"
+                  row-key="id"
+                  :scroll="{ y: 420 }"
+                  :row-selection="floorRowSelection"
+                >
+                  <template #bodyCell="{ column, record }">
+                    <template v-if="column.key === 'buildingId'">
+                      {{ buildingNameMap[record.buildingId] || '-' }}
+                    </template>
+                    <template v-else-if="column.key === 'status'">
+                      <a-tag :color="record.status === 1 ? 'green' : 'default'">
+                        {{ record.status === 1 ? '启用' : '停用' }}
+                      </a-tag>
+                    </template>
+                    <template v-else-if="column.key === 'action'">
+                      <div class="row-actions">
+                        <a-button type="link" @click="openFloor(record, 'view')">查看</a-button>
+                        <a-button type="link" @click="openFloor(record, 'edit')">编辑</a-button>
+                        <a-dropdown>
+                          <a-button type="link">更多</a-button>
+                          <template #overlay>
+                            <a-menu>
+                              <a-menu-item :key="`toggle-${record.id}`" @click="toggleFloorStatus(record)">
+                                {{ record.status === 1 ? '停用' : '启用' }}
+                              </a-menu-item>
+                              <a-menu-item :key="`delete-${record.id}`" danger @click="removeFloor(record.id)">删除</a-menu-item>
+                            </a-menu>
+                          </template>
+                        </a-dropdown>
+                      </div>
+                    </template>
                   </template>
-                  <template v-else-if="column.key === 'status'">
-                    <a-tag :color="record.status === 1 ? 'green' : 'default'">
-                      {{ record.status === 1 ? '启用' : '停用' }}
-                    </a-tag>
-                  </template>
-                  <template v-else-if="column.key === 'action'">
-                    <a-space>
-                      <a-button type="link" @click="openFloor(record)">编辑</a-button>
-                      <a-button type="link" danger @click="removeFloor(record.id)">删除</a-button>
-                    </a-space>
-                  </template>
-                </template>
-              </a-table>
-              <div class="pager">
-                <a-pagination
-                  :current="floorPage.pageNo"
-                  :page-size="floorPage.pageSize"
-                  :total="floorPage.total"
-                  show-size-changer
-                  @change="onFloorPageChange"
-                  @showSizeChange="onFloorPageSizeChange"
-                />
-              </div>
-            </a-tab-pane>
+                </a-table>
+                <div class="pager">
+                  <a-pagination
+                    :current="floorPage.pageNo"
+                    :page-size="floorPage.pageSize"
+                    :total="floorPage.total"
+                    show-size-changer
+                    @change="onFloorPageChange"
+                    @showSizeChange="onFloorPageSizeChange"
+                  />
+                </div>
+              </a-card>
+            </div>
 
-            <a-tab-pane v-if="isTabEnabled('rooms')" key="rooms" tab="房间管理">
-              <a-form :model="roomQuery" layout="inline" class="search-bar">
+            <div v-if="activeTab === 'rooms'" class="workspace-stack">
+              <a-card class="section-card filter-card" :bordered="false">
+                <div class="section-head">
+                  <div>
+                    <div class="section-title">筛选条件</div>
+                    <div class="section-desc">按楼栋、楼层和房型快速定位房间</div>
+                  </div>
+                  <a-button type="link" @click="resetRooms">清空筛选</a-button>
+                </div>
+                <a-form :model="roomQuery" layout="inline" class="search-bar">
                 <a-form-item label="房间号">
                   <a-input v-model:value="roomQuery.roomNo" placeholder="如 A101" allow-clear />
                 </a-form-item>
@@ -239,72 +332,108 @@
                   </a-space>
                 </a-form-item>
               </a-form>
+              </a-card>
 
-              <div class="table-actions">
-                <a-space wrap>
-                  <a-button type="primary" @click="openRoom()">新增房间</a-button>
-                  <a-button @click="quickGenerateRooms">一键生成</a-button>
-                  <a-button danger @click="quickDeleteRooms">一键删除</a-button>
-                  <a-button @click="refreshRooms">刷新</a-button>
-                </a-space>
-                <a-space wrap>
-                  <div class="selection-info">已选 {{ selectedRooms.length }} 个房间</div>
-                  <a-button :disabled="!selectedRooms.length" @click="batchUpdateRoomsStatus(1)">批量启用</a-button>
-                  <a-button :disabled="!selectedRooms.length" @click="batchUpdateRoomsStatus(0)">批量停用</a-button>
-                </a-space>
-              </div>
+              <a-card class="section-card action-card" :bordered="false">
+                <div class="toolbar-row">
+                  <div class="toolbar-main">
+                    <a-button type="primary" @click="openRoom()">新增房间</a-button>
+                    <a-button @click="openGenerateWizard('rooms')">批量生成</a-button>
+                    <a-button danger :disabled="!selectedRooms.length" @click="quickDeleteRooms">批量删除</a-button>
+                  </div>
+                  <div class="toolbar-side">
+                    <div class="selection-badge">已选 {{ selectedRooms.length }} 个房间</div>
+                    <a-button :disabled="!selectedRooms.length" @click="batchUpdateRoomsStatus(1)">批量启用</a-button>
+                    <a-button :disabled="!selectedRooms.length" @click="batchUpdateRoomsStatus(0)">批量停用</a-button>
+                    <a-dropdown>
+                      <a-button>更多操作</a-button>
+                      <template #overlay>
+                        <a-menu>
+                          <a-menu-item key="refresh" @click="refreshRooms">刷新列表</a-menu-item>
+                        </a-menu>
+                      </template>
+                    </a-dropdown>
+                  </div>
+                </div>
+              </a-card>
 
-              <a-table
-                :data-source="rooms"
-                :columns="roomColumns"
-                :loading="loadingRooms"
-                :pagination="false"
-                row-key="id"
-                :scroll="{ y: 420 }"
-                :row-selection="roomRowSelection"
-                @change="onRoomTableChange"
-              >
-                <template #bodyCell="{ column, record }">
-                  <template v-if="column.key === 'roomType'">
-                    {{ resolveRoomTypeLabel(record.roomType) }}
+              <a-card class="section-card table-card" :bordered="false">
+                <div class="section-head">
+                  <div>
+                    <div class="section-title">房间列表</div>
+                    <div class="section-desc">当前共 {{ roomPage.total }} 条记录</div>
+                  </div>
+                </div>
+                <a-table
+                  :data-source="rooms"
+                  :columns="roomColumns"
+                  :loading="loadingRooms"
+                  :pagination="false"
+                  row-key="id"
+                  :scroll="{ y: 420 }"
+                  :row-selection="roomRowSelection"
+                  @change="onRoomTableChange"
+                >
+                  <template #bodyCell="{ column, record }">
+                    <template v-if="column.key === 'roomType'">
+                      {{ resolveRoomTypeLabel(record.roomType) }}
+                    </template>
+                    <template v-else-if="column.key === 'remark'">
+                      {{ resolvePublicRemark(record.remark) || '-' }}
+                    </template>
+                    <template v-else-if="column.key === 'capacity'">
+                      <a-tag v-if="resolveCapacityMismatch(record)" color="gold">
+                        {{ resolveRoomCapacity(record) }}（已按房型修正）
+                      </a-tag>
+                      <span v-else>{{ resolveRoomCapacity(record) }}</span>
+                    </template>
+                    <template v-else-if="column.key === 'status'">
+                      <a-tag :color="record.status === 1 ? 'green' : 'default'">
+                        {{ record.status === 1 ? '可用' : '停用' }}
+                      </a-tag>
+                    </template>
+                    <template v-else-if="column.key === 'action'">
+                      <div class="row-actions">
+                        <a-button type="link" @click="openRoom(record, 'view')">查看</a-button>
+                        <a-button type="link" @click="openRoom(record, 'edit')">编辑</a-button>
+                        <a-dropdown>
+                          <a-button type="link">更多</a-button>
+                          <template #overlay>
+                            <a-menu>
+                              <a-menu-item :key="`toggle-${record.id}`" @click="toggleRoomStatus(record)">
+                                {{ record.status === 1 ? '停用' : '启用' }}
+                              </a-menu-item>
+                              <a-menu-item :key="`delete-${record.id}`" danger @click="removeRoom(record.id)">删除</a-menu-item>
+                            </a-menu>
+                          </template>
+                        </a-dropdown>
+                      </div>
+                    </template>
                   </template>
-                  <template v-else-if="column.key === 'remark'">
-                    {{ resolvePublicRemark(record.remark) || '-' }}
-                  </template>
-                  <template v-else-if="column.key === 'capacity'">
-                    <a-tag v-if="resolveCapacityMismatch(record)" color="gold">
-                      {{ resolveRoomCapacity(record) }}（已按房型修正）
-                    </a-tag>
-                    <span v-else>{{ resolveRoomCapacity(record) }}</span>
-                  </template>
-                  <template v-else-if="column.key === 'status'">
-                    <a-tag :color="record.status === 1 ? 'green' : 'default'">
-                      {{ record.status === 1 ? '可用' : '停用' }}
-                    </a-tag>
-                  </template>
-                  <template v-else-if="column.key === 'action'">
-                    <a-space>
-                      <a-button type="link" @click="openRoom(record)">编辑</a-button>
-                      <a-button type="link" @click="toggleRoomStatus(record)">{{ record.status === 1 ? '停用' : '启用' }}</a-button>
-                      <a-button type="link" danger @click="removeRoom(record.id)">删除</a-button>
-                    </a-space>
-                  </template>
-                </template>
-              </a-table>
-              <div class="pager">
-                <a-pagination
-                  :current="roomPage.pageNo"
-                  :page-size="roomPage.pageSize"
-                  :total="roomPage.total"
-                  show-size-changer
-                  @change="onRoomPageChange"
-                  @showSizeChange="onRoomPageSizeChange"
-                />
-              </div>
-            </a-tab-pane>
+                </a-table>
+                <div class="pager">
+                  <a-pagination
+                    :current="roomPage.pageNo"
+                    :page-size="roomPage.pageSize"
+                    :total="roomPage.total"
+                    show-size-changer
+                    @change="onRoomPageChange"
+                    @showSizeChange="onRoomPageSizeChange"
+                  />
+                </div>
+              </a-card>
+            </div>
 
-            <a-tab-pane v-if="isTabEnabled('beds')" key="beds" tab="床位管理">
-              <a-form :model="bedQuery" layout="inline" class="search-bar">
+            <div v-if="activeTab === 'beds'" class="workspace-stack">
+              <a-card class="section-card filter-card" :bordered="false">
+                <div class="section-head">
+                  <div>
+                    <div class="section-title">筛选条件</div>
+                    <div class="section-desc">按楼栋路径和状态快速定位床位与入住信息</div>
+                  </div>
+                  <a-button type="link" @click="resetBeds">清空筛选</a-button>
+                </div>
+                <a-form :model="bedQuery" layout="inline" class="search-bar">
                 <a-form-item label="床位号">
                   <a-input v-model:value="bedQuery.bedNo" placeholder="如 01" allow-clear />
                 </a-form-item>
@@ -339,202 +468,279 @@
                   </a-space>
                 </a-form-item>
               </a-form>
+              </a-card>
 
-              <div class="table-actions">
-                <a-space wrap>
-                  <a-button type="primary" @click="openBed()">新增床位</a-button>
-                  <a-button @click="quickGenerateBeds">一键生成</a-button>
-                  <a-button danger @click="quickDeleteBeds">一键删除</a-button>
-                  <a-button @click="batchQr">批量二维码</a-button>
-                  <a-button @click="exportBedCsv">导出CSV</a-button>
-                  <a-button @click="refreshBeds">刷新</a-button>
-                </a-space>
-                <a-space wrap>
-                  <div class="selection-info">已选 {{ selected.length }} 个床位</div>
-                  <a-button :disabled="!selected.length" @click="batchUpdateBedsStatus(1)">批量启用</a-button>
-                  <a-button :disabled="!selected.length" @click="batchUpdateBedsStatus(0)">批量停用</a-button>
-                </a-space>
-              </div>
+              <a-card class="section-card action-card" :bordered="false">
+                <div class="toolbar-row">
+                  <div class="toolbar-main">
+                    <a-button type="primary" @click="openBed()">新增床位</a-button>
+                    <a-button @click="openGenerateWizard('beds')">批量生成</a-button>
+                    <a-button danger :disabled="!selected.length" @click="quickDeleteBeds">批量删除</a-button>
+                  </div>
+                  <div class="toolbar-side">
+                    <div class="selection-badge">已选 {{ selected.length }} 个床位</div>
+                    <a-button :disabled="!selected.length" @click="batchUpdateBedsStatus(1)">批量启用</a-button>
+                    <a-button :disabled="!selected.length" @click="batchUpdateBedsStatus(0)">批量停用</a-button>
+                    <a-dropdown>
+                      <a-button>更多操作</a-button>
+                      <template #overlay>
+                        <a-menu>
+                          <a-menu-item key="qr" :disabled="!selected.length" @click="batchQr">批量二维码</a-menu-item>
+                          <a-menu-item key="csv" @click="exportBedCsv">导出 CSV</a-menu-item>
+                          <a-menu-item key="refresh" @click="refreshBeds">刷新列表</a-menu-item>
+                        </a-menu>
+                      </template>
+                    </a-dropdown>
+                  </div>
+                </div>
+              </a-card>
 
-              <a-table
-                :data-source="beds"
-                :columns="bedColumns"
-                :loading="loadingBeds"
-                :pagination="false"
-                row-key="id"
-                :scroll="{ y: 420 }"
-                :row-selection="bedRowSelection"
-                @change="onBedTableChange"
-              >
-                <template #bodyCell="{ column, record }">
-                  <template v-if="column.key === 'bedType'">
-                    {{ resolveBedTypeLabel(record.bedType) }}
+              <a-card class="section-card table-card" :bordered="false">
+                <div class="section-head">
+                  <div>
+                    <div class="section-title">床位列表</div>
+                    <div class="section-desc">当前共 {{ bedPage.total }} 条记录</div>
+                  </div>
+                </div>
+                <a-table
+                  :data-source="beds"
+                  :columns="bedColumns"
+                  :loading="loadingBeds"
+                  :pagination="false"
+                  row-key="id"
+                  :scroll="{ y: 420 }"
+                  :row-selection="bedRowSelection"
+                  @change="onBedTableChange"
+                >
+                  <template #bodyCell="{ column, record }">
+                    <template v-if="column.key === 'bedType'">
+                      {{ resolveBedTypeLabel(record.bedType) }}
+                    </template>
+                    <template v-else-if="column.key === 'status'">
+                      <a-tag :color="statusTag(record.status)">{{ statusLabel(record.status) }}</a-tag>
+                    </template>
+                    <template v-else-if="column.key === 'action'">
+                      <div class="row-actions">
+                        <a-button type="link" @click="openBed(record, 'view')">查看</a-button>
+                        <a-button type="link" @click="openBed(record, 'edit')">编辑</a-button>
+                        <a-dropdown>
+                          <a-button type="link">更多</a-button>
+                          <template #overlay>
+                            <a-menu>
+                              <a-menu-item :key="`qr-${record.id}`" @click="printSingle(record)">生成二维码</a-menu-item>
+                              <a-menu-item :key="`toggle-${record.id}`" @click="toggleBedStatus(record)">
+                                {{ record.status === 1 ? '停用' : '启用' }}
+                              </a-menu-item>
+                              <a-menu-item :key="`delete-${record.id}`" danger @click="removeBed(record.id)">删除</a-menu-item>
+                            </a-menu>
+                          </template>
+                        </a-dropdown>
+                      </div>
+                    </template>
                   </template>
-                  <template v-else-if="column.key === 'status'">
-                    <a-tag :color="statusTag(record.status)">{{ statusLabel(record.status) }}</a-tag>
-                  </template>
-                  <template v-else-if="column.key === 'action'">
-                    <a-space>
-                      <a-button type="link" @click="openBed(record)">编辑</a-button>
-                      <a-button type="link" @click="printSingle(record)">二维码</a-button>
-                      <a-button type="link" @click="toggleBedStatus(record)">{{ record.status === 1 ? '停用' : '启用' }}</a-button>
-                      <a-button type="link" danger @click="removeBed(record.id)">删除</a-button>
-                    </a-space>
-                  </template>
-                </template>
-              </a-table>
-              <div class="pager">
-                <a-pagination
-                  :current="bedPage.pageNo"
-                  :page-size="bedPage.pageSize"
-                  :total="bedPage.total"
-                  show-size-changer
-                  @change="onBedPageChange"
-                  @showSizeChange="onBedPageSizeChange"
-                />
-              </div>
-            </a-tab-pane>
-          </a-tabs>
-        </a-card>
-      </a-col>
-    </a-row>
+                </a-table>
+                <div class="pager">
+                  <a-pagination
+                    :current="bedPage.pageNo"
+                    :page-size="bedPage.pageSize"
+                    :total="bedPage.total"
+                    show-size-changer
+                    @change="onBedPageChange"
+                    @showSizeChange="onBedPageSizeChange"
+                  />
+                </div>
+              </a-card>
+            </div>
+          </div>
+        </a-col>
+      </a-row>
+    </div>
 
-    <a-modal v-model:open="buildingOpen" title="楼栋信息" width="420px" :confirm-loading="buildingSubmitting" @ok="submitBuilding" @cancel="() => (buildingOpen = false)">
+    <a-drawer
+      v-model:open="buildingOpen"
+      :title="buildingDrawerTitle"
+      width="480"
+      placement="right"
+      :destroy-on-close="false"
+      @close="() => (buildingOpen = false)"
+    >
       <a-form ref="buildingFormRef" :model="buildingForm" :rules="buildingRules" layout="vertical">
         <a-form-item label="楼栋名称" name="name">
-          <a-input v-model:value="buildingForm.name" placeholder="如 1 号楼" />
+          <a-input v-model:value="buildingForm.name" :disabled="buildingDrawerMode === 'view'" placeholder="如 1 号楼" />
         </a-form-item>
         <a-form-item label="编码" name="code">
-          <a-input v-model:value="buildingForm.code" placeholder="如 B1" />
+          <a-input v-model:value="buildingForm.code" :disabled="buildingDrawerMode === 'view'" placeholder="如 B1" />
         </a-form-item>
         <a-form-item label="区域" name="areaCode">
-          <a-select v-model:value="buildingForm.areaCode" allow-clear placeholder="请选择区域">
+          <a-select v-model:value="buildingForm.areaCode" :disabled="buildingDrawerMode === 'view'" allow-clear placeholder="请选择区域">
             <a-select-option v-for="item in areaOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="排序" name="sortNo">
-          <a-input-number v-model:value="buildingForm.sortNo" style="width: 100%" :min="0" />
+          <a-input-number v-model:value="buildingForm.sortNo" :disabled="buildingDrawerMode === 'view'" style="width: 100%" :min="0" />
         </a-form-item>
         <a-form-item label="状态" name="status">
-          <a-select v-model:value="buildingForm.status" placeholder="请选择">
+          <a-select v-model:value="buildingForm.status" :disabled="buildingDrawerMode === 'view'" placeholder="请选择">
             <a-select-option :value="1">启用</a-select-option>
             <a-select-option :value="0">停用</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="备注" name="remark">
-          <a-input v-model:value="buildingForm.remark" placeholder="可选" />
+          <a-input v-model:value="buildingForm.remark" :disabled="buildingDrawerMode === 'view'" placeholder="可选" />
         </a-form-item>
         <a-form-item label="备注1（可公开）">
           <a-space style="display: flex">
-            <a-switch v-model:checked="buildingRemarkSlots[0].visible" checked-children="显示" un-checked-children="隐藏" />
-            <a-input v-model:value="buildingRemarkSlots[0].text" placeholder="例如：自理老人楼" />
+            <a-switch v-model:checked="buildingRemarkSlots[0].visible" :disabled="buildingDrawerMode === 'view'" checked-children="显示" un-checked-children="隐藏" />
+            <a-input v-model:value="buildingRemarkSlots[0].text" :disabled="buildingDrawerMode === 'view'" placeholder="例如：自理老人楼" />
           </a-space>
         </a-form-item>
         <a-form-item label="备注2（可公开）">
           <a-space style="display: flex">
-            <a-switch v-model:checked="buildingRemarkSlots[1].visible" checked-children="显示" un-checked-children="隐藏" />
-            <a-input v-model:value="buildingRemarkSlots[1].text" placeholder="例如：靠近活动中心" />
+            <a-switch v-model:checked="buildingRemarkSlots[1].visible" :disabled="buildingDrawerMode === 'view'" checked-children="显示" un-checked-children="隐藏" />
+            <a-input v-model:value="buildingRemarkSlots[1].text" :disabled="buildingDrawerMode === 'view'" placeholder="例如：靠近活动中心" />
           </a-space>
         </a-form-item>
         <a-form-item label="备注3（可公开）">
           <a-space style="display: flex">
-            <a-switch v-model:checked="buildingRemarkSlots[2].visible" checked-children="显示" un-checked-children="隐藏" />
-            <a-input v-model:value="buildingRemarkSlots[2].text" placeholder="例如：夜间安静区" />
+            <a-switch v-model:checked="buildingRemarkSlots[2].visible" :disabled="buildingDrawerMode === 'view'" checked-children="显示" un-checked-children="隐藏" />
+            <a-input v-model:value="buildingRemarkSlots[2].text" :disabled="buildingDrawerMode === 'view'" placeholder="例如：夜间安静区" />
           </a-space>
         </a-form-item>
       </a-form>
-    </a-modal>
+      <template #footer>
+        <a-space>
+          <a-button @click="buildingOpen = false">关闭</a-button>
+          <a-button v-if="buildingDrawerMode === 'view'" type="primary" @click="buildingDrawerMode = 'edit'">转为编辑</a-button>
+          <a-button v-else type="primary" :loading="buildingSubmitting" @click="submitBuilding">保存</a-button>
+        </a-space>
+      </template>
+    </a-drawer>
 
-    <a-modal v-model:open="floorOpen" title="楼层信息" width="420px" :confirm-loading="floorSubmitting" @ok="submitFloor" @cancel="() => (floorOpen = false)">
+    <a-drawer
+      v-model:open="floorOpen"
+      :title="floorDrawerTitle"
+      width="480"
+      placement="right"
+      :destroy-on-close="false"
+      @close="() => (floorOpen = false)"
+    >
       <a-form ref="floorFormRef" :model="floorForm" :rules="floorRules" layout="vertical">
         <a-form-item label="楼栋" name="buildingId">
-          <a-select v-model:value="floorForm.buildingId" placeholder="请选择">
+          <a-select v-model:value="floorForm.buildingId" :disabled="floorDrawerMode === 'view'" placeholder="请选择">
             <a-select-option v-for="b in buildingList" :key="b.id" :value="b.id">{{ b.name }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="楼层编号" name="floorNo">
-          <a-input v-model:value="floorForm.floorNo" placeholder="如 3" />
+          <a-input v-model:value="floorForm.floorNo" :disabled="floorDrawerMode === 'view'" placeholder="如 3" />
         </a-form-item>
         <a-form-item label="名称" name="name">
-          <a-input v-model:value="floorForm.name" placeholder="如 三层" />
+          <a-input v-model:value="floorForm.name" :disabled="floorDrawerMode === 'view'" placeholder="如 三层" />
         </a-form-item>
         <a-form-item label="排序" name="sortNo">
-          <a-input-number v-model:value="floorForm.sortNo" style="width: 100%" :min="0" />
+          <a-input-number v-model:value="floorForm.sortNo" :disabled="floorDrawerMode === 'view'" style="width: 100%" :min="0" />
         </a-form-item>
         <a-form-item label="状态" name="status">
-          <a-select v-model:value="floorForm.status" placeholder="请选择">
+          <a-select v-model:value="floorForm.status" :disabled="floorDrawerMode === 'view'" placeholder="请选择">
             <a-select-option :value="1">启用</a-select-option>
             <a-select-option :value="0">停用</a-select-option>
           </a-select>
         </a-form-item>
       </a-form>
-    </a-modal>
+      <template #footer>
+        <a-space>
+          <a-button @click="floorOpen = false">关闭</a-button>
+          <a-button v-if="floorDrawerMode === 'view'" type="primary" @click="floorDrawerMode = 'edit'">转为编辑</a-button>
+          <a-button v-else type="primary" :loading="floorSubmitting" @click="submitFloor">保存</a-button>
+        </a-space>
+      </template>
+    </a-drawer>
 
-    <a-modal v-model:open="roomOpen" title="房间信息" width="420px" :confirm-loading="roomSubmitting" @ok="submitRoom" @cancel="() => (roomOpen = false)">
+    <a-drawer
+      v-model:open="roomOpen"
+      :title="roomDrawerTitle"
+      width="520"
+      placement="right"
+      :destroy-on-close="false"
+      @close="() => (roomOpen = false)"
+    >
       <a-form ref="roomFormRef" :model="roomForm" :rules="roomRules" layout="vertical">
         <a-form-item label="房间号" name="roomNo">
-          <a-input v-model:value="roomForm.roomNo" placeholder="如 A101" />
+          <a-input v-model:value="roomForm.roomNo" :disabled="roomDrawerMode === 'view'" placeholder="如 A101" />
         </a-form-item>
         <a-form-item label="楼栋" name="buildingId">
-          <a-select v-model:value="roomForm.buildingId" placeholder="请选择" show-search option-filter-prop="label">
+          <a-select v-model:value="roomForm.buildingId" :disabled="roomDrawerMode === 'view'" placeholder="请选择" show-search option-filter-prop="label">
             <a-select-option v-for="b in buildingList" :key="b.id" :value="b.id">{{ b.name }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="楼层" name="floorId">
-          <a-select v-model:value="roomForm.floorId" placeholder="请选择">
+          <a-select v-model:value="roomForm.floorId" :disabled="roomDrawerMode === 'view'" placeholder="请选择">
             <a-select-option v-for="f in roomFloorOptions" :key="f.id" :value="f.id">{{ f.floorNo }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="床位容量" name="capacity">
-          <a-input-number v-model:value="roomForm.capacity" style="width: 100%" :min="1" />
+          <a-input-number v-model:value="roomForm.capacity" :disabled="roomDrawerMode === 'view'" style="width: 100%" :min="1" />
         </a-form-item>
         <a-form-item label="状态" name="status">
-          <a-select v-model:value="roomForm.status" placeholder="请选择">
+          <a-select v-model:value="roomForm.status" :disabled="roomDrawerMode === 'view'" placeholder="请选择">
             <a-select-option :value="1">可用</a-select-option>
             <a-select-option :value="0">停用</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="备注" name="remark">
-          <a-input v-model:value="roomForm.remark" placeholder="如 重点照护区/近电梯口" />
+          <a-input v-model:value="roomForm.remark" :disabled="roomDrawerMode === 'view'" placeholder="如 重点照护区/近电梯口" />
         </a-form-item>
         <a-form-item label="备注1（可公开）">
           <a-space style="display: flex">
-            <a-switch v-model:checked="roomRemarkSlots[0].visible" checked-children="显示" un-checked-children="隐藏" />
-            <a-input v-model:value="roomRemarkSlots[0].text" placeholder="例如：高风险重点巡视房" />
+            <a-switch v-model:checked="roomRemarkSlots[0].visible" :disabled="roomDrawerMode === 'view'" checked-children="显示" un-checked-children="隐藏" />
+            <a-input v-model:value="roomRemarkSlots[0].text" :disabled="roomDrawerMode === 'view'" placeholder="例如：高风险重点巡视房" />
           </a-space>
         </a-form-item>
         <a-form-item label="备注2（可公开）">
           <a-space style="display: flex">
-            <a-switch v-model:checked="roomRemarkSlots[1].visible" checked-children="显示" un-checked-children="隐藏" />
-            <a-input v-model:value="roomRemarkSlots[1].text" placeholder="例如：近护士站" />
+            <a-switch v-model:checked="roomRemarkSlots[1].visible" :disabled="roomDrawerMode === 'view'" checked-children="显示" un-checked-children="隐藏" />
+            <a-input v-model:value="roomRemarkSlots[1].text" :disabled="roomDrawerMode === 'view'" placeholder="例如：近护士站" />
           </a-space>
         </a-form-item>
         <a-form-item label="备注3（可公开）">
           <a-space style="display: flex">
-            <a-switch v-model:checked="roomRemarkSlots[2].visible" checked-children="显示" un-checked-children="隐藏" />
-            <a-input v-model:value="roomRemarkSlots[2].text" placeholder="例如：家属探视优先房" />
+            <a-switch v-model:checked="roomRemarkSlots[2].visible" :disabled="roomDrawerMode === 'view'" checked-children="显示" un-checked-children="隐藏" />
+            <a-input v-model:value="roomRemarkSlots[2].text" :disabled="roomDrawerMode === 'view'" placeholder="例如：家属探视优先房" />
           </a-space>
         </a-form-item>
       </a-form>
-    </a-modal>
+      <template #footer>
+        <a-space>
+          <a-button @click="roomOpen = false">关闭</a-button>
+          <a-button v-if="roomDrawerMode === 'view'" type="primary" @click="roomDrawerMode = 'edit'">转为编辑</a-button>
+          <a-button v-else type="primary" :loading="roomSubmitting" @click="submitRoom">保存</a-button>
+        </a-space>
+      </template>
+    </a-drawer>
 
-    <a-modal v-model:open="bedOpen" title="床位信息" width="420px" :confirm-loading="bedSubmitting" @ok="submitBed" @cancel="() => (bedOpen = false)">
+    <a-drawer
+      v-model:open="bedOpen"
+      :title="bedDrawerTitle"
+      width="520"
+      placement="right"
+      :destroy-on-close="false"
+      @close="() => (bedOpen = false)"
+    >
       <a-form ref="bedFormRef" :model="bedForm" :rules="bedRules" layout="vertical">
         <a-form-item label="房间" name="roomId">
-          <a-select v-model:value="bedForm.roomId" placeholder="请选择">
+          <a-select v-model:value="bedForm.roomId" :disabled="bedDrawerMode === 'view'" placeholder="请选择">
             <a-select-option v-for="option in roomOptions" :key="option.value" :value="option.value">{{ option.label }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="床位号" name="bedNo">
-          <a-input v-model:value="bedForm.bedNo" placeholder="如 01" />
+          <a-input v-model:value="bedForm.bedNo" :disabled="bedDrawerMode === 'view'" placeholder="如 01" />
         </a-form-item>
         <a-form-item label="床位类型" name="bedType">
-          <a-select v-model:value="bedForm.bedType" allow-clear placeholder="请选择">
+          <a-select v-model:value="bedForm.bedType" :disabled="bedDrawerMode === 'view'" allow-clear placeholder="请选择">
             <a-select-option v-for="item in bedTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="状态" name="status">
-          <a-select v-model:value="bedForm.status" placeholder="请选择">
+          <a-select v-model:value="bedForm.status" :disabled="bedDrawerMode === 'view'" placeholder="请选择">
             <a-select-option :value="1">空床</a-select-option>
             <a-select-option :value="2">入住</a-select-option>
             <a-select-option :value="3">维护</a-select-option>
@@ -542,7 +748,14 @@
           </a-select>
         </a-form-item>
       </a-form>
-    </a-modal>
+      <template #footer>
+        <a-space>
+          <a-button @click="bedOpen = false">关闭</a-button>
+          <a-button v-if="bedDrawerMode === 'view'" type="primary" @click="bedDrawerMode = 'edit'">转为编辑</a-button>
+          <a-button v-else type="primary" :loading="bedSubmitting" @click="submitBed">保存</a-button>
+        </a-space>
+      </template>
+    </a-drawer>
 
     <a-modal v-model:open="printOpen" title="二维码打印" width="520px" @ok="print" ok-text="打印" @cancel="() => (printOpen = false)">
       <div class="print-grid">
@@ -555,7 +768,7 @@
 
     <a-modal
       v-model:open="bootstrapOpen"
-      title="一键生成楼层房床"
+      title="结构生成向导"
       width="520px"
       :confirm-loading="bootstrapSubmitting"
       @ok="submitBootstrap"
@@ -629,6 +842,95 @@
         </a-row>
       </a-form>
     </a-modal>
+
+    <a-modal
+      v-model:open="generateOpen"
+      :title="generateWizardTitle"
+      width="560px"
+      :confirm-loading="generateSubmitting"
+      ok-text="开始生成"
+      @ok="submitGenerateWizard"
+      @cancel="() => (generateOpen = false)"
+    >
+      <div class="wizard-steps">
+        <div class="wizard-step is-active">1. 选择范围</div>
+        <div class="wizard-step is-active">2. 设置参数</div>
+        <div class="wizard-step is-active">3. 确认生成</div>
+      </div>
+      <div class="wizard-hint">{{ generateWizardHint }}</div>
+      <a-form :model="generateForm" layout="vertical">
+        <template v-if="generateTarget === 'buildings'">
+          <a-form-item label="生成数量">
+            <a-input-number v-model:value="generateForm.buildingCount" style="width: 100%" :min="1" :max="20" />
+          </a-form-item>
+          <a-form-item label="楼栋前缀">
+            <a-input v-model:value="generateForm.buildingPrefix" placeholder="如 楼栋" />
+          </a-form-item>
+        </template>
+
+        <template v-else-if="generateTarget === 'floors'">
+          <a-form-item label="所属楼栋">
+            <a-select v-model:value="generateForm.buildingId" placeholder="请选择楼栋">
+              <a-select-option v-for="b in buildingList" :key="b.id" :value="b.id">{{ b.name }}</a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-row :gutter="12">
+            <a-col :span="12">
+              <a-form-item label="起始楼层">
+                <a-input-number v-model:value="generateForm.floorStart" style="width: 100%" :min="1" :max="50" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="结束楼层">
+                <a-input-number v-model:value="generateForm.floorEnd" style="width: 100%" :min="1" :max="50" />
+              </a-form-item>
+            </a-col>
+          </a-row>
+        </template>
+
+        <template v-else-if="generateTarget === 'rooms'">
+          <a-form-item label="所属楼层">
+            <a-select v-model:value="generateForm.floorId" placeholder="请选择楼层">
+              <a-select-option v-for="f in floorList" :key="f.id" :value="f.id">
+                {{ buildingNameMap[f.buildingId] || '未命名楼栋' }} / {{ f.floorNo }}
+              </a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-row :gutter="12">
+            <a-col :span="12">
+              <a-form-item label="起始房号">
+                <a-input-number v-model:value="generateForm.roomStart" style="width: 100%" :min="1" :max="999" />
+              </a-form-item>
+            </a-col>
+            <a-col :span="12">
+              <a-form-item label="结束房号">
+                <a-input-number v-model:value="generateForm.roomEnd" style="width: 100%" :min="1" :max="999" />
+              </a-form-item>
+            </a-col>
+          </a-row>
+          <a-form-item label="每间房床位容量">
+            <a-input-number v-model:value="generateForm.roomCapacity" style="width: 100%" :min="1" :max="8" />
+          </a-form-item>
+        </template>
+
+        <template v-else>
+          <a-form-item label="补齐范围">
+            <a-radio-group v-model:value="generateForm.bedScope">
+              <a-radio value="current">当前列表范围</a-radio>
+              <a-radio value="all">全部房间</a-radio>
+            </a-radio-group>
+          </a-form-item>
+          <a-form-item label="默认床型">
+            <a-select v-model:value="generateForm.bedType" allow-clear placeholder="默认取系统首个启用床型">
+              <a-select-option v-for="item in bedTypeOptions" :key="item.value" :value="item.value">{{ item.label }}</a-select-option>
+            </a-select>
+          </a-form-item>
+        </template>
+      </a-form>
+      <div class="wizard-preview">
+        {{ generatePreviewText }}
+      </div>
+    </a-modal>
   </PageContainer>
 </template>
 
@@ -685,6 +987,10 @@ const props = withDefaults(defineProps<{
   initialTab: 'buildings'
 })
 
+type TabKey = 'buildings' | 'floors' | 'rooms' | 'beds'
+type DrawerMode = 'create' | 'edit' | 'view'
+type WorkspaceMode = 'manage' | 'map' | 'panorama'
+
 const router = useRouter()
 const rooms = ref<RoomItem[]>([])
 const beds = ref<BedItem[]>([])
@@ -706,12 +1012,12 @@ const loadingRooms = ref(false)
 const loadingBeds = ref(false)
 const loadingBuildings = ref(false)
 const loadingFloors = ref(false)
-const enabledTabs = computed<Array<'buildings' | 'floors' | 'rooms' | 'beds'>>(() => {
+const enabledTabs = computed<Array<TabKey>>(() => {
   const tabs = (props.allowedTabs && props.allowedTabs.length ? props.allowedTabs : ['buildings', 'floors', 'rooms', 'beds'])
     .filter((item, index, list) => list.indexOf(item) === index)
   return tabs.length ? tabs : ['beds']
 })
-const activeTab = ref<'buildings' | 'floors' | 'rooms' | 'beds'>(enabledTabs.value.includes(props.initialTab) ? props.initialTab : enabledTabs.value[0])
+const activeTab = ref<TabKey>(enabledTabs.value.includes(props.initialTab) ? props.initialTab : enabledTabs.value[0])
 const pageTitle = computed(() => enabledTabs.value.length === 1 && enabledTabs.value[0] === 'beds' ? '床位管理' : '床位管理')
 const pageSubTitle = computed(() => enabledTabs.value.length === 1 && enabledTabs.value[0] === 'beds'
   ? '后勤保障模块下的床位维护与状态同步'
@@ -720,8 +1026,8 @@ const pageSubTitle = computed(() => enabledTabs.value.length === 1 && enabledTab
 watch(
   () => [props.initialTab, enabledTabs.value.join(',')],
   ([value]) => {
-    if (value && enabledTabs.value.includes(value as 'buildings' | 'floors' | 'rooms' | 'beds') && activeTab.value !== value) {
-      activeTab.value = value as 'buildings' | 'floors' | 'rooms' | 'beds'
+    if (value && enabledTabs.value.includes(value as TabKey) && activeTab.value !== value) {
+      activeTab.value = value as TabKey
       return
     }
     if (!enabledTabs.value.includes(activeTab.value)) {
@@ -730,7 +1036,7 @@ watch(
   }
 )
 
-function isTabEnabled(tab: 'buildings' | 'floors' | 'rooms' | 'beds') {
+function isTabEnabled(tab: TabKey) {
   return enabledTabs.value.includes(tab)
 }
 
@@ -738,6 +1044,10 @@ const roomOpen = ref(false)
 const bedOpen = ref(false)
 const buildingOpen = ref(false)
 const floorOpen = ref(false)
+const buildingDrawerMode = ref<DrawerMode>('create')
+const floorDrawerMode = ref<DrawerMode>('create')
+const roomDrawerMode = ref<DrawerMode>('create')
+const bedDrawerMode = ref<DrawerMode>('create')
 const roomForm = reactive<Partial<RoomItem>>({ status: 1 })
 const bedForm = reactive<Partial<BedItem>>({ status: 1 })
 const buildingForm = reactive<Partial<BuildingItem>>({ status: 1, sortNo: 0 })
@@ -762,6 +1072,11 @@ const buildingSubmitting = ref(false)
 const floorSubmitting = ref(false)
 const bootstrapOpen = ref(false)
 const bootstrapSubmitting = ref(false)
+const generateOpen = ref(false)
+const generateSubmitting = ref(false)
+const generateTarget = ref<TabKey>('beds')
+const selectedTreeNode = ref<AssetTreeNode | null>(null)
+const selectedTreePath = ref<AssetTreeNode[]>([])
 
 const assetTree = ref<AssetTreeNode[]>([])
 const treeLoading = ref(false)
@@ -795,6 +1110,20 @@ const bootstrapForm = reactive<ResidenceBootstrapRequest>({
   roomPrefix: 'R',
   bedPrefix: 'B',
   templateCode: 'CUSTOM'
+})
+
+const generateForm = reactive({
+  buildingCount: 1,
+  buildingPrefix: '楼栋',
+  buildingId: undefined as Id | undefined,
+  floorId: undefined as Id | undefined,
+  floorStart: 1,
+  floorEnd: 6,
+  roomStart: 1,
+  roomEnd: 30,
+  roomCapacity: 2,
+  bedType: undefined as string | undefined,
+  bedScope: 'current' as 'current' | 'all'
 })
 
 const roomQuery = reactive({
@@ -889,6 +1218,90 @@ const activeTabLabel = computed(() => {
   if (activeTab.value === 'floors') return '楼层管理'
   if (activeTab.value === 'rooms') return '房间管理'
   return '床位管理'
+})
+
+const currentWorkspaceMode = computed<WorkspaceMode>(() => 'manage')
+
+const buildingDrawerTitle = computed(() => drawerTitle('楼栋', buildingDrawerMode.value))
+const floorDrawerTitle = computed(() => drawerTitle('楼层', floorDrawerMode.value))
+const roomDrawerTitle = computed(() => drawerTitle('房间', roomDrawerMode.value))
+const bedDrawerTitle = computed(() => drawerTitle('床位', bedDrawerMode.value))
+
+const currentPathText = computed(() => {
+  const labels = selectedTreePath.value.map((item) => item.name).filter(Boolean)
+  return [...(labels.length ? labels : ['全院']), activeTabLabel.value].join(' / ')
+})
+
+const currentScopeHint = computed(() => {
+  const scopeName = selectedTreeNode.value?.name || '当前院区'
+  if (activeTab.value === 'buildings') return `聚焦 ${scopeName} 的楼栋档案、区域属性与启停状态。`
+  if (activeTab.value === 'floors') return `聚焦 ${scopeName} 的楼层结构，适合分层维护和批量补齐。`
+  if (activeTab.value === 'rooms') return `聚焦 ${scopeName} 的房间配置，便于容量、房型和使用状态统一管理。`
+  return `聚焦 ${scopeName} 的床位分配与状态维护，适合快速处理入住、停用和二维码操作。`
+})
+
+const treeStats = computed(() => countTreeStats(assetTree.value))
+
+const overviewCards = computed(() => {
+  if (activeTab.value === 'buildings') {
+    return [
+      { label: '楼栋总数', value: String(buildingPage.total || buildingList.value.length), meta: `启用 ${buildingList.value.filter((item) => item.status === 1).length} 栋` },
+      { label: '楼层覆盖', value: `${treeStats.value.floors}`, meta: '来自当前资产树统计' },
+      { label: '选中数量', value: `${selectedBuildings.value.length}`, meta: '可用于批量启停与删除' },
+      { label: '当前路径', value: selectedTreeNode.value?.name || '全院', meta: '资产树焦点范围' }
+    ]
+  }
+  if (activeTab.value === 'floors') {
+    return [
+      { label: '楼层总数', value: String(floorPage.total || floorList.value.length), meta: `所属楼栋 ${new Set(floorList.value.map((item) => item.buildingId)).size} 栋` },
+      { label: '当前楼栋', value: floorQuery.buildingId ? buildingNameMap.value[floorQuery.buildingId] || '已选楼栋' : '未限定', meta: '筛选范围' },
+      { label: '选中数量', value: `${selectedFloors.value.length}`, meta: '可批量启停与删除' },
+      { label: '已启用', value: `${floorList.value.filter((item) => item.status === 1).length}`, meta: '楼层可用状态' }
+    ]
+  }
+  if (activeTab.value === 'rooms') {
+    return [
+      { label: '房间总数', value: `${roomStats.value.total}`, meta: `可用 ${roomStats.value.active} / 停用 ${roomStats.value.inactive}` },
+      { label: '当前筛选', value: roomQuery.floorId ? '单层' : roomQuery.buildingId ? '单栋' : '全院', meta: '按楼栋楼层快速聚焦' },
+      { label: '已选房间', value: `${selectedRooms.value.length}`, meta: '适合批量启停和删除' },
+      { label: '房型配置', value: `${roomTypeOptions.value.length}`, meta: '当前启用房型项' }
+    ]
+  }
+  return [
+    { label: '床位总数', value: `${bedStats.value.total}`, meta: `空床 ${bedStats.value.available} / 入住 ${bedStats.value.occupied} / 维护 ${bedStats.value.maintenance}` },
+    { label: '已选床位', value: `${selected.value.length}`, meta: '支持批量二维码、启停、删除' },
+    { label: '当前焦点', value: selectedTreeNode.value?.name || '全院', meta: '结合资产树快速定位' },
+    { label: '入住老人', value: `${bedStats.value.occupied}`, meta: '床位入住中数量' }
+  ]
+})
+
+const generateWizardTitle = computed(() => {
+  if (generateTarget.value === 'buildings') return '批量生成楼栋'
+  if (generateTarget.value === 'floors') return '批量生成楼层'
+  if (generateTarget.value === 'rooms') return '批量生成房间'
+  return '批量生成床位'
+})
+
+const generateWizardHint = computed(() => {
+  if (generateTarget.value === 'buildings') return '先确认需要新增多少楼栋，再统一生成基础楼栋编码。'
+  if (generateTarget.value === 'floors') return '在指定楼栋内补齐楼层，已存在的楼层会自动跳过。'
+  if (generateTarget.value === 'rooms') return '在指定楼层内连续补齐房号，并自动配置房间容量和房型。'
+  return '根据房间容量补齐缺失床位，不会重复生成已存在的床位。'
+})
+
+const generatePreviewText = computed(() => {
+  if (generateTarget.value === 'buildings') {
+    return `将新增 ${generateForm.buildingCount} 栋楼，名称前缀为“${generateForm.buildingPrefix || '楼栋'}”。`
+  }
+  if (generateTarget.value === 'floors') {
+    return `将在所选楼栋内尝试生成 ${generateForm.floorStart}F - ${generateForm.floorEnd}F，已存在楼层自动跳过。`
+  }
+  if (generateTarget.value === 'rooms') {
+    return `将在所选楼层内尝试补齐 ${String(generateForm.roomStart).padStart(2, '0')} - ${String(generateForm.roomEnd).padStart(2, '0')} 号房，每间 ${generateForm.roomCapacity} 床。`
+  }
+  return generateForm.bedScope === 'all'
+    ? '将扫描全部房间，按房间容量补齐缺失床位。'
+    : '将仅扫描当前列表范围内的房间，按房间容量补齐缺失床位。'
 })
 
 const buildingRules: FormRules = {
@@ -1062,6 +1475,70 @@ function treeTypeLabel(type?: string) {
   return '-'
 }
 
+function drawerTitle(label: string, mode: DrawerMode) {
+  if (mode === 'view') return `查看${label}`
+  if (mode === 'edit') return `编辑${label}`
+  return `新增${label}`
+}
+
+function countTreeStats(nodes: AssetTreeNode[]) {
+  const stats = { buildings: 0, floors: 0, rooms: 0, beds: 0 }
+  const walk = (items: AssetTreeNode[]) => {
+    items.forEach((node) => {
+      if (node.type === 'BUILDING') stats.buildings += 1
+      if (node.type === 'FLOOR') stats.floors += 1
+      if (node.type === 'ROOM') stats.rooms += 1
+      if (node.type === 'BED') stats.beds += 1
+      if (node.children?.length) walk(node.children)
+    })
+  }
+  walk(nodes)
+  return stats
+}
+
+function summarizeNode(node?: AssetTreeNode | null) {
+  const target = node || undefined
+  if (!target) return { floors: 0, rooms: 0, beds: 0 }
+  const stats = { floors: 0, rooms: 0, beds: 0 }
+  const walk = (item?: AssetTreeNode) => {
+    if (!item) return
+    if (item.type === 'FLOOR') stats.floors += 1
+    if (item.type === 'ROOM') stats.rooms += 1
+    if (item.type === 'BED') stats.beds += 1
+    item.children?.forEach((child) => walk(child))
+  }
+  walk(target)
+  return stats
+}
+
+function formatTreeNodeSummary(node?: AssetTreeNode | null) {
+  const stats = summarizeNode(node)
+  if (!node) return ''
+  if (node.type === 'BUILDING') return `${stats.floors}层 / ${stats.rooms}房 / ${stats.beds}床`
+  if (node.type === 'FLOOR') return `${stats.rooms}房 / ${stats.beds}床`
+  if (node.type === 'ROOM') return `${stats.beds}床`
+  return statusLabel(node.status)
+}
+
+function findTreePath(nodes: AssetTreeNode[], id: Id): AssetTreeNode[] {
+  const path: AssetTreeNode[] = []
+  const dfs = (items: AssetTreeNode[], parents: AssetTreeNode[]): boolean => {
+    for (const item of items) {
+      const nextPath = [...parents, item]
+      if (item.id === id) {
+        path.push(...nextPath)
+        return true
+      }
+      if (item.children?.length && dfs(item.children, nextPath)) {
+        return true
+      }
+    }
+    return false
+  }
+  dfs(nodes, [])
+  return path
+}
+
 async function searchBuildings() {
   loadingBuildings.value = true
   try {
@@ -1157,6 +1634,8 @@ async function refreshTree() {
 
 function onTreeSelect(node: any) {
   const data = node?.dataRef || node
+  selectedTreeNode.value = data
+  selectedTreePath.value = findTreePath(assetTree.value, data.id)
   if (data.type === 'BUILDING') {
     roomQuery.roomNo = ''
     roomQuery.building = ''
@@ -1316,17 +1795,6 @@ function onBedPageSizeChange(current: number, size: number) {
   searchBeds()
 }
 
-function openBuilding(row?: BuildingItem) {
-  if (row) {
-    Object.assign(buildingForm, row)
-    hydrateRemarkSlots(buildingRemarkSlots, row.remark)
-  } else {
-    Object.assign(buildingForm, { id: undefined, name: '', code: '', areaCode: undefined, areaName: undefined, status: 1, sortNo: 0, remark: '' })
-    hydrateRemarkSlots(buildingRemarkSlots, '')
-  }
-  buildingOpen.value = true
-}
-
 async function submitBuilding() {
   if (!buildingFormRef.value) return
   try {
@@ -1353,7 +1821,8 @@ async function submitBuilding() {
   }
 }
 
-function openFloor(row?: FloorItem) {
+function openFloor(row?: FloorItem, mode: DrawerMode = row ? 'edit' : 'create') {
+  floorDrawerMode.value = mode
   if (row) {
     Object.assign(floorForm, row)
   } else {
@@ -1383,7 +1852,8 @@ async function submitFloor() {
   }
 }
 
-function openRoom(row?: RoomItem) {
+function openRoom(row?: RoomItem, mode: DrawerMode = row ? 'edit' : 'create') {
+  roomDrawerMode.value = mode
   if (row) {
     Object.assign(roomForm, row)
     hydrateRemarkSlots(roomRemarkSlots, row.remark)
@@ -1424,13 +1894,26 @@ async function submitRoom() {
   }
 }
 
-function openBed(row?: BedItem) {
+function openBed(row?: BedItem, mode: DrawerMode = row ? 'edit' : 'create') {
+  bedDrawerMode.value = mode
   if (row) {
     Object.assign(bedForm, row)
   } else {
     Object.assign(bedForm, { id: undefined, roomId: undefined, bedNo: '', bedType: undefined, status: 1 })
   }
   bedOpen.value = true
+}
+
+function openBuilding(row?: BuildingItem, mode: DrawerMode = row ? 'edit' : 'create') {
+  buildingDrawerMode.value = mode
+  if (row) {
+    Object.assign(buildingForm, row)
+    hydrateRemarkSlots(buildingRemarkSlots, row.remark)
+  } else {
+    Object.assign(buildingForm, { id: undefined, name: '', code: '', areaCode: undefined, areaName: undefined, status: 1, sortNo: 0, remark: '' })
+    hydrateRemarkSlots(buildingRemarkSlots, '')
+  }
+  buildingOpen.value = true
 }
 
 async function submitBed() {
@@ -1451,6 +1934,28 @@ async function submitBed() {
     message.error(errorMessage(error, '保存失败'))
   } finally {
     bedSubmitting.value = false
+  }
+}
+
+async function toggleBuildingStatus(row: BuildingItem) {
+  try {
+    const nextStatus = row.status === 1 ? 0 : 1
+    await updateBuilding(row.id, { ...row, status: nextStatus })
+    await refreshBuildings()
+    await loadBuildingList()
+  } catch (error: any) {
+    message.warning(errorMessage(error, '更新楼栋状态失败'))
+  }
+}
+
+async function toggleFloorStatus(row: FloorItem) {
+  try {
+    const nextStatus = row.status === 1 ? 0 : 1
+    await updateFloor(row.id, { ...row, status: nextStatus })
+    await refreshFloors()
+    await loadFloorList()
+  } catch (error: any) {
+    message.warning(errorMessage(error, '更新楼层状态失败'))
   }
 }
 
@@ -1559,6 +2064,22 @@ function openBootstrap() {
   bootstrapOpen.value = true
 }
 
+function openGenerateWizard(target: TabKey = activeTab.value) {
+  generateTarget.value = target
+  generateForm.buildingCount = 1
+  generateForm.buildingPrefix = '楼栋'
+  generateForm.buildingId = floorQuery.buildingId || roomQuery.buildingId || buildingList.value[0]?.id
+  generateForm.floorId = roomQuery.floorId || floorList.value[0]?.id
+  generateForm.floorStart = 1
+  generateForm.floorEnd = 6
+  generateForm.roomStart = 1
+  generateForm.roomEnd = 30
+  generateForm.roomCapacity = 2
+  generateForm.bedType = bedTypeOptions.value[0]?.value
+  generateForm.bedScope = 'current'
+  generateOpen.value = true
+}
+
 function applyBootstrapPreset(preset: 'AB_F1_6_R101_130_B01_03' | 'CUSTOM') {
   if (preset === 'AB_F1_6_R101_130_B01_03') {
     Object.assign(bootstrapForm, {
@@ -1605,6 +2126,132 @@ async function submitBootstrap() {
     message.error(errorMessage(error, '一键生成失败'))
   } finally {
     bootstrapSubmitting.value = false
+  }
+}
+
+async function submitGenerateWizard() {
+  generateSubmitting.value = true
+  try {
+    if (generateTarget.value === 'buildings') {
+      const numbers = buildingList.value
+        .map((item) => Number(String(item.name || '').match(/\d+/)?.[0] || 0))
+        .filter((item) => item > 0)
+      let currentMax = numbers.length ? Math.max(...numbers) : 0
+      for (let i = 0; i < Number(generateForm.buildingCount || 0); i++) {
+        currentMax += 1
+        const name = `${generateForm.buildingPrefix || '楼栋'}${currentMax}`
+        await createBuilding({
+          name,
+          code: `B${currentMax}`,
+          status: 1,
+          sortNo: currentMax
+        })
+      }
+      message.success(`已生成 ${generateForm.buildingCount} 栋楼栋`)
+      generateOpen.value = false
+      await Promise.all([refreshBuildings(), loadBuildingList(), refreshTree()])
+      return
+    }
+
+    if (generateTarget.value === 'floors') {
+      const buildingId = generateForm.buildingId || buildingList.value[0]?.id
+      if (!buildingId) {
+        message.warning('请先选择楼栋')
+        return
+      }
+      const allFloors = await getFloorList({ buildingId })
+      const existed = new Set(allFloors.map((item) => String(item.floorNo || '').toUpperCase()))
+      const tasks: Promise<void>[] = []
+      for (let i = Number(generateForm.floorStart || 1); i <= Number(generateForm.floorEnd || 1); i++) {
+        const floorNo = `${i}F`
+        if (existed.has(floorNo)) continue
+        tasks.push(createFloor({ buildingId, floorNo, name: `${i}F`, status: 1, sortNo: i }))
+      }
+      if (!tasks.length) {
+        message.info('当前楼栋内目标楼层都已存在')
+        return
+      }
+      await Promise.all(tasks)
+      message.success(`已生成 ${tasks.length} 层楼层`)
+      generateOpen.value = false
+      await Promise.all([refreshFloors(), loadFloorList(), refreshTree()])
+      return
+    }
+
+    if (generateTarget.value === 'rooms') {
+      const floorId = generateForm.floorId || floorList.value[0]?.id
+      if (!floorId) {
+        message.warning('请先选择楼层')
+        return
+      }
+      const floor = floorList.value.find((item) => item.id === floorId)
+      const building = buildingList.value.find((item) => item.id === floor?.buildingId)
+      if (!floor || !building) {
+        message.warning('楼栋或楼层信息缺失，请刷新后重试')
+        return
+      }
+      const floorNoNumeric = Number(String(floor.floorNo || '').replace(/[^\d]/g, '') || 1)
+      const head = String(building.name || 'A').slice(0, 1).toUpperCase()
+      const existed = new Set(roomList.value.filter((item) => item.floorId === floor.id).map((item) => item.roomNo))
+      const tasks: Promise<void>[] = []
+      for (let i = Number(generateForm.roomStart || 1); i <= Number(generateForm.roomEnd || 1); i++) {
+        const roomNo = `${head}${floorNoNumeric}${String(i).padStart(2, '0')}`
+        if (existed.has(roomNo)) continue
+        tasks.push(
+          createRoom({
+            buildingId: building.id,
+            floorId: floor.id,
+            roomNo,
+            capacity: Number(generateForm.roomCapacity || 2),
+            roomType: inferRoomTypeByCapacity(Number(generateForm.roomCapacity || 2)),
+            status: 1
+          })
+        )
+      }
+      if (!tasks.length) {
+        message.info('当前楼层内目标房号都已存在')
+        return
+      }
+      await Promise.all(tasks)
+      message.success(`已生成 ${tasks.length} 间房`)
+      generateOpen.value = false
+      await Promise.all([refreshRooms(), loadRoomList(), refreshTree()])
+      return
+    }
+
+    const roomMap = new Map(roomList.value.map((item) => [item.id, item]))
+    const bedCountByRoom = bedList.value.reduce((acc, item) => {
+      acc[item.roomId] = (acc[item.roomId] || 0) + 1
+      return acc
+    }, {} as Record<string | number, number>)
+    const targets = (generateForm.bedScope === 'all' ? roomList.value : (rooms.value.length ? rooms.value : roomList.value)).slice(0, 200)
+    const tasks: Promise<void>[] = []
+    targets.forEach((room) => {
+      const roomData = roomMap.get(room.id) || room
+      const capacity = Number(resolveRoomCapacity(roomData) || 0)
+      if (!capacity) return
+      const existing = Number(bedCountByRoom[room.id] || 0)
+      for (let i = existing + 1; i <= capacity; i++) {
+        tasks.push(createBed({
+          roomId: room.id,
+          bedNo: String(i).padStart(2, '0'),
+          bedType: generateForm.bedType || bedTypeOptions.value[0]?.value,
+          status: 1
+        }))
+      }
+    })
+    if (!tasks.length) {
+      message.info('当前范围内床位已与房间容量一致')
+      return
+    }
+    await Promise.all(tasks)
+    message.success(`已生成 ${tasks.length} 个床位`)
+    generateOpen.value = false
+    await Promise.all([refreshBeds(), loadBedList(), refreshTree()])
+  } catch (error: any) {
+    message.error(errorMessage(error, '批量生成失败'))
+  } finally {
+    generateSubmitting.value = false
   }
 }
 
@@ -1761,13 +2408,13 @@ async function quickGenerateBuildings() {
 }
 
 async function quickDeleteBuildings() {
-  const targets = selectedBuildings.value.length ? selectedBuildings.value : buildings.value
+  const targets = selectedBuildings.value
   if (!targets.length) {
-    message.warning('当前页没有可删除楼栋')
+    message.warning('请先勾选需要删除的楼栋')
     return
   }
   try {
-    await confirmAction(`确认删除 ${targets.length} 个楼栋吗？系统会自动删除楼栋下未入住的楼层、房间和床位。`, '一键删除楼栋')
+    await confirmAction(`确认删除 ${targets.length} 个楼栋吗？将联动删除其下未入住的楼层、房间和床位，请确认影响范围。`, '批量删除楼栋')
     const results = await Promise.allSettled(targets.map((item) => deleteBuilding(item.id)))
     const success = results.filter((item) => item.status === 'fulfilled').length
     const failed = results.length - success
@@ -1817,13 +2464,13 @@ async function quickGenerateFloors() {
 }
 
 async function quickDeleteFloors() {
-  const targets = selectedFloors.value.length ? selectedFloors.value : floors.value
+  const targets = selectedFloors.value
   if (!targets.length) {
-    message.warning('当前页没有可删除楼层')
+    message.warning('请先勾选需要删除的楼层')
     return
   }
   try {
-    await confirmAction(`确认删除 ${targets.length} 个楼层吗？系统会自动删除楼层下未入住的房间和床位。`, '一键删除楼层')
+    await confirmAction(`确认删除 ${targets.length} 个楼层吗？将联动删除其下未入住的房间和床位，请确认影响范围。`, '批量删除楼层')
     const results = await Promise.allSettled(targets.map((item) => deleteFloor(item.id)))
     const success = results.filter((item) => item.status === 'fulfilled').length
     const failed = results.length - success
@@ -1881,13 +2528,13 @@ async function quickGenerateRooms() {
 }
 
 async function quickDeleteRooms() {
-  const targets = selectedRooms.value.length ? selectedRooms.value : rooms.value
+  const targets = selectedRooms.value
   if (!targets.length) {
-    message.warning('当前页没有可删除房间')
+    message.warning('请先勾选需要删除的房间')
     return
   }
   try {
-    await confirmAction(`确认删除 ${targets.length} 个房间吗？系统会自动删除房间下未入住的床位。`, '一键删除房间')
+    await confirmAction(`确认删除 ${targets.length} 个房间吗？将联动删除其下未入住的床位，请确认影响范围。`, '批量删除房间')
     const results = await Promise.allSettled(targets.map((item) => deleteRoom(item.id)))
     const success = results.filter((item) => item.status === 'fulfilled').length
     const failed = results.length - success
@@ -1940,13 +2587,13 @@ async function quickGenerateBeds() {
 }
 
 async function quickDeleteBeds() {
-  const targets = selected.value.length ? selected.value : beds.value
+  const targets = selected.value
   if (!targets.length) {
-    message.warning('当前页没有可删除床位')
+    message.warning('请先勾选需要删除的床位')
     return
   }
   try {
-    await confirmAction(`确认删除 ${targets.length} 个床位吗？`, '一键删除床位')
+    await confirmAction(`确认删除 ${targets.length} 个床位吗？删除后将无法恢复，请确认影响范围。`, '批量删除床位')
     const results = await Promise.allSettled(targets.map((item) => deleteBed(item.id)))
     const success = results.filter((item) => item.status === 'fulfilled').length
     const failed = results.length - success
@@ -2059,7 +2706,19 @@ function openBedMap() {
 }
 
 function openElderBedPanorama() {
-  router.push('/logistics/assets/room-state-map')
+  router.push('/elder/bed-panorama')
+}
+
+function onWorkspaceModeChange(event: any) {
+  const mode = event?.target?.value as WorkspaceMode
+  if (mode === 'map') {
+    openBedMap()
+    return
+  }
+  if (mode === 'panorama') {
+    openElderBedPanorama()
+    return
+  }
 }
 
 function exportBedCsv() {
@@ -2185,45 +2844,182 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.summary-row {
-  margin-bottom: 16px;
+.bed-management-page {
+  --panel-bg: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+  --panel-border: rgba(15, 23, 42, 0.08);
+  --panel-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+  --accent: #2563eb;
+  --accent-soft: rgba(37, 99, 235, 0.08);
+  --text-main: #10203a;
+  --text-sub: #5b6b84;
+  --surface-soft: #f5f8fc;
 }
-.entry-actions {
+.workspace-grid {
+  align-items: stretch;
+}
+.asset-tree-panel,
+.workspace-hero,
+.section-card,
+.overview-card {
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  box-shadow: var(--panel-shadow);
+  border-radius: 20px;
+}
+.asset-tree-panel {
+  min-height: 100%;
+}
+.tree-panel-head,
+.workspace-topbar,
+.toolbar-row,
+.section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.panel-eyebrow,
+.workspace-path,
+.overview-label {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-sub);
+}
+.tree-title,
+.workspace-title,
+.section-title {
+  color: var(--text-main);
+  font-weight: 700;
+}
+.tree-title {
+  font-size: 20px;
+  margin-top: 4px;
+}
+.tree-summary,
+.workspace-subtitle,
+.section-desc,
+.overview-meta,
+.wizard-hint,
+.wizard-preview,
+.bootstrap-hint,
+.print-text {
+  color: var(--text-sub);
+  font-size: 13px;
+}
+.asset-tree {
+  margin-top: 18px;
+}
+.tree-node-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+  padding: 6px 0;
+}
+.tree-node-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.tree-node-type {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--text-sub);
+  font-size: 12px;
+}
+.tree-node-name {
+  color: var(--text-main);
+  font-weight: 600;
+}
+.tree-node-meta {
+  padding-left: 52px;
+  font-size: 12px;
+  color: var(--text-sub);
+}
+.workspace-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.workspace-hero {
+  overflow: hidden;
+}
+.workspace-title {
+  margin: 8px 0 6px;
+  font-size: 30px;
+  line-height: 1.1;
+}
+.workspace-subtitle {
+  margin: 0;
+}
+.management-tabs {
+  margin-top: 16px;
+}
+.overview-row {
+  margin: 0;
+}
+.overview-card :deep(.ant-card-body) {
+  padding: 18px 20px;
+}
+.overview-value {
+  margin-top: 10px;
+  color: var(--text-main);
+  font-size: 28px;
+  font-weight: 700;
+}
+.workspace-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.section-card :deep(.ant-card-body) {
+  padding: 18px 20px;
+}
+.section-title {
+  font-size: 17px;
+}
+.filter-card :deep(.ant-form-item) {
   margin-bottom: 12px;
-}
-.summary-card {
-  padding: 16px;
-}
-.summary-title {
-  color: var(--muted);
-  font-size: 12px;
-}
-.summary-value {
-  font-size: 24px;
-  margin: 6px 0;
-}
-.summary-sub {
-  font-size: 12px;
-  color: var(--muted);
 }
 .search-bar {
-  margin-bottom: 12px;
+  margin-top: 16px;
 }
-.table-actions {
-  display: flex;
-  justify-content: space-between;
+.toolbar-row {
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
 }
-.selection-info {
-  color: var(--muted);
+.toolbar-main,
+.toolbar-side,
+.row-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.selection-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--text-sub);
   font-size: 13px;
-  white-space: nowrap;
+}
+.table-card :deep(.ant-table-wrapper) {
+  margin-top: 16px;
+}
+.row-actions :deep(.ant-btn-link) {
+  padding-inline: 4px;
 }
 .pager {
-  margin-top: 12px;
+  margin-top: 16px;
   text-align: right;
 }
 .print-grid {
@@ -2232,40 +3028,54 @@ onMounted(async () => {
 }
 .print-item {
   width: 200px;
-  text-align: center;
   margin: 8px;
+  text-align: center;
 }
 .bootstrap-presets {
   margin-bottom: 12px;
 }
-.bootstrap-hint {
-  margin-top: 8px;
-  color: #64748b;
-  font-size: 12px;
+.wizard-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
 }
-.print-text {
-  font-size: 12px;
-  margin-top: 6px;
+.wizard-step {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--surface-soft);
+  color: var(--text-sub);
+  text-align: center;
+  font-size: 13px;
 }
-.tree-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-.tree-title {
+.wizard-step.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
   font-weight: 600;
 }
-.tree-node {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.wizard-hint {
+  margin-bottom: 12px;
 }
-.tree-node-type {
-  font-size: 12px;
-  color: var(--muted);
+.wizard-preview {
+  margin-top: 8px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--surface-soft);
 }
-.tree-node-name {
-  font-weight: 500;
+@media (max-width: 1200px) {
+  .workspace-topbar {
+    flex-direction: column;
+  }
+}
+@media (max-width: 768px) {
+  .workspace-title {
+    font-size: 24px;
+  }
+  .tree-panel-head,
+  .toolbar-row,
+  .section-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 </style>

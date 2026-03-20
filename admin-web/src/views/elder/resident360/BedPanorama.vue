@@ -73,6 +73,7 @@
           :floors="matrixFloors"
           :room-lookup="roomSceneLookup"
           @click-room="openRoomDetail"
+          @click-bed="selectBed"
         />
       </div>
     </a-card>
