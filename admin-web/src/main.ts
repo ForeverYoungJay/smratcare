@@ -12,10 +12,8 @@ import { setupEditor } from './plugins/editor'
 import { setupFlow } from './plugins/flow'
 import { setupAntdx } from './plugins/antdx'
 import { permission, permissionCode } from './directives'
-import Tres from '@tresjs/core'
 
 const app = createApp(App)
-app.use(Tres)
 app.use(createPinia())
 app.use(router)
 setupAntd(app)
