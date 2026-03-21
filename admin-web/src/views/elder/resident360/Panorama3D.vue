@@ -110,8 +110,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, reactive } from 'vue'
-import { TresCanvas, useRenderLoop } from '@tresjs/core'
+import { ref, computed, watch, reactive, onMounted, onBeforeUnmount } from 'vue'
+import { TresCanvas } from '@tresjs/core'
 import { OrbitControls } from '@tresjs/cientos'
 import { usePanoramaStore } from '../../../store/panorama3d'
 import gsap from 'gsap'
@@ -141,9 +141,19 @@ const breadcrumbText = computed(() => {
 
 // Time loop for animations (pulsing and blinking beds)
 const time = ref(0)
-const { onLoop } = useRenderLoop()
-onLoop(({ elapsed }) => {
-  time.value = elapsed
+let animationFrameId = 0
+
+function animateLoop() {
+  time.value = performance.now() * 0.001
+  animationFrameId = requestAnimationFrame(animateLoop)
+}
+
+onMounted(() => {
+  animateLoop()
+})
+
+onBeforeUnmount(() => {
+  cancelAnimationFrame(animationFrameId)
 })
 
 function getBedEmissiveIntensity(animType: string | null, t: number) {
