@@ -114,7 +114,7 @@ public class ElderServiceImpl implements ElderService {
     elder.setCareLevel(normalizeText(request.getCareLevel()));
     elder.setRiskPrecommit(normalizeText(request.getRiskPrecommit()));
     elder.setRemark(normalizeText(request.getRemark()));
-    elder.setSourceType(normalizeSourceType(request.getSourceType(), SOURCE_TYPE_HISTORICAL_IMPORT));
+    elder.setSourceType(normalizeSourceType(request.getSourceType(), null));
     elder.setHistoricalContractFileUrl(normalizeText(request.getHistoricalContractFileUrl()));
     elder.setCreatedBy(request.getCreatedBy());
     elderMapper.insert(elder);
@@ -573,7 +573,16 @@ public class ElderServiceImpl implements ElderService {
       return;
     }
     String sourceType = normalizeSourceType(response.getSourceType(), null);
+    String admissionSourceType = admission == null ? null : normalizeSourceType(admission.getSourceType(), null);
     if (sourceType == null && contract != null) {
+      sourceType = SOURCE_TYPE_MARKETING_CONTRACT;
+    }
+    if (sourceType == null && admissionSourceType != null) {
+      sourceType = admissionSourceType;
+    }
+    if (SOURCE_TYPE_HISTORICAL_IMPORT.equals(sourceType)
+        && contract != null
+        && SOURCE_TYPE_MARKETING_CONTRACT.equals(admissionSourceType)) {
       sourceType = SOURCE_TYPE_MARKETING_CONTRACT;
     }
     if (sourceType == null && admission != null && admission.getContractNo() != null && !admission.getContractNo().trim().isBlank()) {

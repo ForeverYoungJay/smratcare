@@ -2495,7 +2495,8 @@ async function syncContractElderData(savedContract: CrmContractItem) {
     homeAddress: String(form.homeAddress || '').trim() || undefined,
     careLevel: elderFormExtra.careLevel || undefined,
     riskPrecommit: elderFormExtra.riskPrecommit,
-    remark: String(form.remark || '').trim() || undefined
+    remark: String(form.remark || '').trim() || undefined,
+    sourceType: 'MARKETING_CONTRACT'
   } as Partial<ElderItem>
 
   const existed = await findElderByContractForm()
@@ -2604,7 +2605,8 @@ async function ensureElderFromLead(lead: CrmContractItem): Promise<ElderItem> {
     medicalRecordFileUrl: pickLatestAttachment(leadAttachments, 'MEDICAL_RECORD')?.fileUrl,
     medicalInsuranceCopyUrl: pickLatestAttachment(leadAttachments, 'MEDICAL_INSURANCE')?.fileUrl,
     householdCopyUrl: pickLatestAttachment(leadAttachments, 'HOUSEHOLD')?.fileUrl,
-    remark: lead.remark
+    remark: lead.remark,
+    sourceType: 'MARKETING_CONTRACT'
   }
   if (existing?.id) {
     await updateElder(existing.id, elderPayload)
