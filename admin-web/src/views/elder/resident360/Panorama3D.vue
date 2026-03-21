@@ -113,7 +113,7 @@
 import { ref, computed, watch, reactive } from 'vue'
 import { TresCanvas, useRenderLoop } from '@tresjs/core'
 import { OrbitControls } from '@tresjs/cientos'
-import { usePanoramaStore } from '@/store/panorama3d'
+import { usePanoramaStore } from '../../../store/panorama3d'
 import gsap from 'gsap'
 
 const props = defineProps<{
