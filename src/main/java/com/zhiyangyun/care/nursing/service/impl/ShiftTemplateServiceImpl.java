@@ -178,13 +178,14 @@ public class ShiftTemplateServiceImpl implements ShiftTemplateService {
     if (start == null || end == null || end.isBefore(start)) {
       throw new IllegalArgumentException("实施日期范围不合法");
     }
-    List<ShiftTemplate> templates = shiftTemplateMapper.selectList(Wrappers.lambdaQuery(ShiftTemplate.class)
+    var templateWrapper = Wrappers.lambdaQuery(ShiftTemplate.class)
         .eq(ShiftTemplate::getIsDeleted, 0)
         .eq(ShiftTemplate::getTenantId, tenantId)
         .eq(ShiftTemplate::getName, seed.getName())
         .eq(ShiftTemplate::getEnabled, 1)
         .orderByAsc(ShiftTemplate::getRuleSort)
-        .orderByAsc(ShiftTemplate::getShiftCode()));
+        .orderByAsc(ShiftTemplate::getShiftCode);
+    List<ShiftTemplate> templates = shiftTemplateMapper.selectList(templateWrapper);
     if (templates.isEmpty()) {
       templates = List.of(seed);
     }
