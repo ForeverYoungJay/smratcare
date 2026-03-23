@@ -802,7 +802,9 @@ public class OaActivityPlanController {
       return new ArrayList<>();
     }
     try {
-      return objectMapper.readValue(json, new TypeReference<List<LinkedHashMap<String, Object>>>() {});
+      List<LinkedHashMap<String, Object>> parsed =
+          objectMapper.readValue(json, new TypeReference<List<LinkedHashMap<String, Object>>>() {});
+      return new ArrayList<>(parsed);
     } catch (Exception ex) {
       throw new IllegalArgumentException("审批流程数据格式错误");
     }
