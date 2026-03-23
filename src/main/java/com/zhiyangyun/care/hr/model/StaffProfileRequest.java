@@ -1,5 +1,6 @@
 package com.zhiyangyun.care.hr.model;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import lombok.Data;
 
@@ -22,6 +23,11 @@ public class StaffProfileRequest {
   private String socialSecurityStatus;
   private LocalDate socialSecurityStartDate;
   private Integer socialSecurityReminderDays;
+  private Integer socialSecurityCompanyApply;
+  private Integer socialSecurityNeedDirectorApproval;
+  private String socialSecurityWorkflowStatus;
+  private BigDecimal socialSecurityMonthlyAmount;
+  private String socialSecurityLastBilledMonth;
   private String socialSecurityRemark;
   private Integer status;
   private LocalDate leaveDate;

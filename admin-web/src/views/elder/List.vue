@@ -86,6 +86,7 @@
           </template>
           <template v-else-if="column.key === 'action'">
             <a-space size="small">
+              <a-button type="link" size="small" @click="goDetail(record.id)">详情</a-button>
               <a-button type="link" size="small" @click="goInHospitalOverview(record)">总览</a-button>
               <a-button type="link" size="small" @click="goAssessmentArchive(record)">评估</a-button>
               <a-button type="link" size="small" @click="goContractsInvoices(record)">合同票据</a-button>
@@ -202,7 +203,7 @@ const columns = [
   { title: '来源', dataIndex: 'sourceType', key: 'sourceType', width: 120 },
   { title: '履约阶段', dataIndex: 'lifecycleStage', key: 'lifecycleStage', width: 120 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 100, sorter: true },
-  { title: '联动操作', key: 'action', width: 220 }
+  { title: '联动操作', key: 'action', width: 280 }
 ]
 const selectedCount = computed(() => selectedRowKeys.value.length)
 const selectedRows = computed(() => rows.value.filter((item) => selectedRowKeys.value.some((id) => String(id) === String(item.id))))

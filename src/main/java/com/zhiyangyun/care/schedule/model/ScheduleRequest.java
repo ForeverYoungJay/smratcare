@@ -10,6 +10,8 @@ public class ScheduleRequest {
   private Long id;
   @NotNull
   private Long staffId;
+  private Long sourceTemplateId;
+  private String sourceTemplateName;
   @NotNull
   private LocalDate dutyDate;
   private String shiftCode;

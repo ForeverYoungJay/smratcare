@@ -127,6 +127,49 @@ public class FireSafetyRecordController {
     return Result.ok(existing);
   }
 
+  @PostMapping("/{id}/recheck")
+  public Result<FireSafetyRecord> recheck(@PathVariable Long id) {
+    FireSafetyRecord existing = findRequiredRecord(id);
+    if (!"FACILITY".equals(existing.getRecordType())) {
+      throw new IllegalArgumentException("当前记录类型暂不支持二次检查登记");
+    }
+    LocalDateTime now = LocalDateTime.now();
+    FireSafetyRecord record = new FireSafetyRecord();
+    record.setTenantId(existing.getTenantId());
+    record.setOrgId(existing.getOrgId());
+    record.setRecordType(existing.getRecordType());
+    record.setTitle(existing.getTitle());
+    record.setLocation(existing.getLocation());
+    record.setInspectorName(existing.getInspectorName());
+    record.setCheckTime(now);
+    record.setStatus("OPEN");
+    record.setIssueDescription(null);
+    record.setActionTaken(null);
+    record.setNextCheckDate(resolveRecheckNextCheckDate(existing, now));
+    record.setDailyReminderEnabled(Boolean.TRUE.equals(existing.getDailyReminderEnabled()));
+    record.setDailyReminderTime(existing.getDailyReminderTime());
+    record.setSourceRecordId(existing.getSourceRecordId() == null ? existing.getId() : existing.getSourceRecordId());
+    record.setCheckRound(existing.getCheckRound() == null ? 2 : existing.getCheckRound() + 1);
+    record.setDutyRecord(existing.getDutyRecord());
+    record.setHandoverPunchTime(null);
+    record.setEquipmentBatchNo(existing.getEquipmentBatchNo());
+    record.setProductProductionDate(existing.getProductProductionDate());
+    record.setProductExpiryDate(existing.getProductExpiryDate());
+    record.setCheckCycleDays(existing.getCheckCycleDays());
+    record.setEquipmentUpdateNote(existing.getEquipmentUpdateNote());
+    record.setEquipmentAgingDisposal(existing.getEquipmentAgingDisposal());
+    record.setImageUrlsText(existing.getImageUrlsText());
+    record.setThirdPartyMaintenanceFileUrl(existing.getThirdPartyMaintenanceFileUrl());
+    record.setPurchaseContractFileUrl(existing.getPurchaseContractFileUrl());
+    record.setContractStartDate(existing.getContractStartDate());
+    record.setContractEndDate(existing.getContractEndDate());
+    record.setPurchaseDocumentUrlsText(existing.getPurchaseDocumentUrlsText());
+    record.setCreatedBy(AuthContext.getStaffId());
+    recordMapper.insert(record);
+    hydrateRecord(record);
+    return Result.ok(record);
+  }
+
   @PostMapping("/{id}/qr/generate")
   public Result<FireSafetyQrResponse> generateQr(@PathVariable Long id) {
     FireSafetyRecord existing = findRequiredRecord(id);
@@ -536,6 +579,8 @@ public class FireSafetyRecordController {
     record.setIssueDescription(trimToNull(request.getIssueDescription()));
     record.setActionTaken(trimToNull(request.getActionTaken()));
     record.setNextCheckDate(request.getNextCheckDate());
+    record.setDailyReminderEnabled(Boolean.TRUE.equals(request.getDailyReminderEnabled()));
+    record.setDailyReminderTime(Boolean.TRUE.equals(request.getDailyReminderEnabled()) ? request.getDailyReminderTime() : null);
     record.setDutyRecord(trimToNull(request.getDutyRecord()));
     record.setHandoverPunchTime(request.getHandoverPunchTime());
     record.setEquipmentBatchNo(trimToNull(request.getEquipmentBatchNo()));
@@ -566,11 +611,25 @@ public class FireSafetyRecordController {
         && request.getNextCheckDate().isBefore(request.getCheckTime().toLocalDate())) {
       throw new IllegalArgumentException("下次检查日期不能早于检查日期");
     }
+    if (Boolean.TRUE.equals(request.getDailyReminderEnabled()) && request.getDailyReminderTime() == null) {
+      throw new IllegalArgumentException("开启每日提醒后必须设置提醒时间");
+    }
     if (request.getContractStartDate() != null
         && request.getContractEndDate() != null
         && request.getContractEndDate().isBefore(request.getContractStartDate())) {
       throw new IllegalArgumentException("合约结束日期不能早于开始日期");
     }
+  }
+
+  private LocalDate resolveRecheckNextCheckDate(FireSafetyRecord existing, LocalDateTime now) {
+    if (existing.getCheckCycleDays() != null && existing.getCheckCycleDays() > 0) {
+      return now.toLocalDate().plusDays(existing.getCheckCycleDays());
+    }
+    LocalDate nextCheckDate = existing.getNextCheckDate();
+    if (nextCheckDate != null && nextCheckDate.isBefore(now.toLocalDate())) {
+      return now.toLocalDate();
+    }
+    return nextCheckDate;
   }
 
   private FireSafetyRecord findRequiredRecord(Long id) {
@@ -679,6 +738,9 @@ public class FireSafetyRecordController {
     }
     record.setImageUrls(splitImageUrls(record.getImageUrlsText()));
     record.setPurchaseDocumentUrls(splitImageUrls(record.getPurchaseDocumentUrlsText()));
+    if (record.getCheckRound() == null || record.getCheckRound() <= 0) {
+      record.setCheckRound(1);
+    }
   }
 
   private String joinLines(List<String> values) {

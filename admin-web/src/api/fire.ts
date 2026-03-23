@@ -38,6 +38,10 @@ export function closeFireSafetyRecord(id: number) {
   return request.put<FireSafetyRecord>(`/api/fire/records/${id}/close`)
 }
 
+export function recheckFireSafetyRecord(id: number) {
+  return request.post<FireSafetyRecord>(`/api/fire/records/${id}/recheck`)
+}
+
 export function deleteFireSafetyRecord(id: number) {
   return request.delete<void>(`/api/fire/records/${id}`)
 }

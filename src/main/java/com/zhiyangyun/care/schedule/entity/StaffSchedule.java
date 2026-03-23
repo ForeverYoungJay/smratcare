@@ -17,10 +17,14 @@ public class StaffSchedule {
   private Long tenantId;
   private Long orgId;
   private Long staffId;
+  private Long sourceTemplateId;
+  private String sourceTemplateName;
   private LocalDate dutyDate;
   private String shiftCode;
   private LocalDateTime startTime;
   private LocalDateTime endTime;
+  private Long calendarTaskId;
+  private Long dutyTodoId;
   private Integer status;
   private Long createdBy;
   @TableField(value = "create_time", fill = FieldFill.INSERT)

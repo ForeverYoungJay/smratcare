@@ -201,6 +201,7 @@ import {
 import { createDocument, uploadOaFile } from '../../api/oa'
 import type { HrRecruitmentNeedItem, PageResult } from '../../types'
 import { resolveHrError } from './hrError'
+import { formatChineseDate } from '../../utils/dateLocale'
 import { exportCsv, exportExcel } from '../../utils/export'
 import { mapByDict } from './hrExportFields'
 
@@ -518,7 +519,7 @@ function openDrawer(record?: HrRecruitmentNeedItem) {
     materialsChecklist.value = parseJsonList(record.checklistJson)
   }
   if (!form.title) {
-    form.title = `${pageTitle.value}-${new Date().toLocaleDateString()}`
+    form.title = `${pageTitle.value}-${formatChineseDate(new Date())}`
   }
   drawerOpen.value = true
 }

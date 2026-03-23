@@ -337,6 +337,7 @@ const uploadDisplayText = computed(() => {
 async function fetchFolderTree() {
   const data = await getDocumentFolderTree()
   folders.value = normalizeFolderTree(data || [])
+  reconcileFolderSelections()
 }
 
 async function fetchData() {
@@ -390,7 +391,7 @@ function onReset() {
 function onFolderSelect(keys: (string | number)[]) {
   const key = String(keys?.[0] || ROOT_KEY)
   selectedFolderKey.value = key
-  query.folderId = key === ROOT_KEY ? '' : key
+  query.folderId = resolveExistingFolderKey(key)
   query.pageNo = 1
   pagination.current = 1
   fetchData()
@@ -399,7 +400,7 @@ function onFolderSelect(keys: (string | number)[]) {
 function openCreate() {
   form.id = undefined
   form.name = ''
-  form.folderId = selectedFolderKey.value === ROOT_KEY ? undefined : selectedFolderKey.value
+  form.folderId = resolveExistingFormFolderId(selectedFolderKey.value)
   form.url = ''
   form.sizeBytes = undefined
   form.uploaderName = ''
@@ -410,7 +411,7 @@ function openCreate() {
 function openEdit(record: OaDocument) {
   form.id = String(record.id)
   form.name = record.name || ''
-  form.folderId = record.folderId ? String(record.folderId) : undefined
+  form.folderId = resolveExistingFormFolderId(record.folderId ? String(record.folderId) : undefined)
   form.url = record.url || ''
   form.sizeBytes = record.sizeBytes
   form.uploaderName = record.uploaderName || ''
@@ -423,6 +424,7 @@ async function submit() {
     message.warning('请先上传文档，或至少填写文件名/文件地址')
     return
   }
+  form.folderId = resolveExistingFormFolderId(form.folderId)
   const selectedFolder = form.folderId ? folderNodeMap.value.get(String(form.folderId)) : null
   const payload = {
     name: form.name,
@@ -623,6 +625,29 @@ function normalizeTreeNodeId(id?: string) {
   const parsed = Number(id)
   if (!Number.isFinite(parsed) || parsed <= 0) return undefined
   return parsed
+}
+
+function resolveExistingFolderKey(id?: string) {
+  if (!id || id === ROOT_KEY) return ''
+  return folderNodeMap.value.has(String(id)) ? String(id) : ''
+}
+
+function resolveExistingFormFolderId(id?: string) {
+  const normalized = resolveExistingFolderKey(id)
+  return normalized || undefined
+}
+
+function reconcileFolderSelections() {
+  if (selectedFolderKey.value !== ROOT_KEY && !folderNodeMap.value.has(selectedFolderKey.value)) {
+    selectedFolderKey.value = ROOT_KEY
+    query.folderId = ''
+  }
+  if (form.folderId && !folderNodeMap.value.has(String(form.folderId))) {
+    form.folderId = undefined
+  }
+  if (folderForm.parentId && !folderNodeMap.value.has(String(folderForm.parentId))) {
+    folderForm.parentId = undefined
+  }
 }
 
 function transformFolderTreeToUi(nodes: OaDocumentFolder[]) {

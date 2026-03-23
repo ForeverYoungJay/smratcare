@@ -5,6 +5,7 @@ import com.zhiyangyun.care.audit.service.AuditLogService;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.nursing.model.ShiftTemplateApplyRequest;
+import com.zhiyangyun.care.nursing.model.ShiftTemplateBatchSaveRequest;
 import com.zhiyangyun.care.nursing.model.ShiftTemplateRequest;
 import com.zhiyangyun.care.nursing.model.ShiftTemplateResponse;
 import com.zhiyangyun.care.nursing.service.ShiftTemplateService;
@@ -42,6 +43,16 @@ public class ShiftTemplateController {
     ShiftTemplateResponse response = shiftTemplateService.create(request);
     auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "CREATE", "SHIFT_TEMPLATE", response == null ? null : response.getId(), "创建排班方案");
+    return Result.ok(response);
+  }
+
+  @PostMapping("/batch-save")
+  public Result<List<ShiftTemplateResponse>> saveBatch(@Valid @RequestBody ShiftTemplateBatchSaveRequest request) {
+    Long tenantId = AuthContext.getOrgId();
+    List<ShiftTemplateResponse> response = shiftTemplateService.saveBatch(
+        request, tenantId, tenantId, AuthContext.getStaffId());
+    auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "BATCH_SAVE", "SHIFT_TEMPLATE", null, "批量保存排班方案");
     return Result.ok(response);
   }
 

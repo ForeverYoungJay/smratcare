@@ -614,6 +614,7 @@ const typeOptions = [
   { label: '积分兑现金', value: 'POINTS_CASH' },
   { label: '物资申领', value: 'MATERIAL_APPLY' },
   { label: '用章申请', value: 'OFFICIAL_SEAL' },
+  { label: '换班申请', value: 'SHIFT_CHANGE' },
   { label: '营销方案审批', value: 'MARKETING_PLAN' }
 ]
 const approverRoleOptions = [
@@ -844,6 +845,7 @@ const workflowStepsMap: Record<string, string[]> = {
   BANK_CARD: ['员工申请', '人事审核', '财务确认收入', '行政盖章', '归档'],
   POINTS_CASH: ['员工申请', '院长审批', '自动扣减积分', '财务发放现金', '归档'],
   OFFICIAL_SEAL: ['申请人提交', '行政审核', '院长审批', '盖章归档'],
+  SHIFT_CHANGE: ['申请人提交', '被换班员工确认', '人事审批', '部门主管审批', '归档'],
   MARKETING_PLAN: ['营销经理提交方案', '院长审批', '审批意见回写方案', '发布执行']
 }
 const workflowHintMap: Record<string, string> = {
@@ -856,6 +858,7 @@ const workflowHintMap: Record<string, string> = {
   BANK_CARD: '银行卡办理同收入证明流程，支持追加辅助证明材料。',
   POINTS_CASH: '按 300 积分 = 10 元自动换算，审批通过后自动扣减积分余额。',
   OFFICIAL_SEAL: '请明确用途、对象、时间，避免跨用途盖章风险。',
+  SHIFT_CHANGE: '换班申请需先由被换班员工确认，同意后再进入人事与主管审批，最终自动更新双方排班与日程。',
   MARKETING_PLAN: '营销方案提交后会同步到营销管理的审批状态，并支持发布/驳回意见联动。'
 }
 const workflowSteps = computed(() => workflowStepsMap[form.approvalType] || ['申请', '审批', '归档'])

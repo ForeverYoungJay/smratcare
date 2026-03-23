@@ -67,6 +67,9 @@
         <template v-else-if="column.key === 'nextCheckDate'">
           {{ record.nextCheckDate || '-' }}
         </template>
+        <template v-else-if="column.key === 'dailyReminder'">
+          {{ dailyReminderText(record) }}
+        </template>
         <template v-else-if="column.key === 'imageUrls'">
           <a-space v-if="record.imageUrls?.length" wrap size="small">
             <a-image
@@ -99,6 +102,7 @@
         <template v-else-if="column.key === 'action'">
           <a-space wrap>
             <a-button v-if="viewConfig.supportsQr" type="link" @click="openQr(record)">{{ qrButtonText }}</a-button>
+            <a-button v-if="viewConfig.supportsRecheck" type="link" @click="triggerRecheck(record)">二次检查登记</a-button>
             <a-button type="link" @click="openEdit(record)">编辑</a-button>
             <a-button type="link" :disabled="record.status === 'CLOSED'" @click="closeRecord(record)">关闭</a-button>
             <a-button type="link" danger @click="remove(record)">删除</a-button>
@@ -292,6 +296,25 @@
             </a-form-item>
           </a-col>
         </a-row>
+        <a-row v-if="viewConfig.showDailyReminder" :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="每日提醒检查">
+              <a-switch v-model:checked="form.dailyReminderEnabled" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="几点检查">
+              <a-time-picker
+                v-model:value="form.dailyReminderTime"
+                value-format="HH:mm:ss"
+                format="HH:mm"
+                style="width: 100%"
+                :disabled="!form.dailyReminderEnabled"
+                placeholder="请选择提醒时间"
+              />
+            </a-form-item>
+          </a-col>
+        </a-row>
       </a-form>
     </a-modal>
 
@@ -331,7 +354,7 @@
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import dayjs, { Dayjs } from 'dayjs'
 import QRCode from 'qrcode'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
 import SearchForm from '../../../components/SearchForm.vue'
 import DataTable from '../../../components/DataTable.vue'
@@ -344,6 +367,7 @@ import {
   generateFireSafetyQr,
   getFireSafetyRecordPage,
   getFireSafetySummary,
+  recheckFireSafetyRecord,
   uploadFireSafetyFile,
   uploadFireSafetyImage,
   updateFireSafetyRecord
@@ -360,8 +384,10 @@ type FireBoardViewConfig = {
   showEquipmentAgingDisposal: boolean
   showNextCheck: boolean
   supportsQr: boolean
+  supportsRecheck: boolean
   showImageUpload: boolean
   showMaintenanceAttachments: boolean
+  showDailyReminder: boolean
 }
 
 const props = defineProps<{
@@ -410,8 +436,10 @@ const viewConfigMap: Record<FireSafetyRecordType, FireBoardViewConfig> = {
     showEquipmentAgingDisposal: true,
     showNextCheck: true,
     supportsQr: true,
+    supportsRecheck: true,
     showImageUpload: false,
-    showMaintenanceAttachments: false
+    showMaintenanceAttachments: false,
+    showDailyReminder: true
   },
   CONTROL_ROOM_DUTY: {
     showDutyRecord: true,
@@ -422,8 +450,10 @@ const viewConfigMap: Record<FireSafetyRecordType, FireBoardViewConfig> = {
     showEquipmentAgingDisposal: false,
     showNextCheck: false,
     supportsQr: false,
+    supportsRecheck: false,
     showImageUpload: true,
-    showMaintenanceAttachments: false
+    showMaintenanceAttachments: false,
+    showDailyReminder: false
   },
   MONTHLY_CHECK: {
     showDutyRecord: false,
@@ -434,8 +464,10 @@ const viewConfigMap: Record<FireSafetyRecordType, FireBoardViewConfig> = {
     showEquipmentAgingDisposal: false,
     showNextCheck: true,
     supportsQr: true,
+    supportsRecheck: false,
     showImageUpload: false,
-    showMaintenanceAttachments: false
+    showMaintenanceAttachments: false,
+    showDailyReminder: false
   },
   DAY_PATROL: {
     showDutyRecord: false,
@@ -446,8 +478,10 @@ const viewConfigMap: Record<FireSafetyRecordType, FireBoardViewConfig> = {
     showEquipmentAgingDisposal: false,
     showNextCheck: true,
     supportsQr: true,
+    supportsRecheck: false,
     showImageUpload: false,
-    showMaintenanceAttachments: false
+    showMaintenanceAttachments: false,
+    showDailyReminder: false
   },
   NIGHT_PATROL: {
     showDutyRecord: false,
@@ -458,8 +492,10 @@ const viewConfigMap: Record<FireSafetyRecordType, FireBoardViewConfig> = {
     showEquipmentAgingDisposal: false,
     showNextCheck: true,
     supportsQr: true,
+    supportsRecheck: false,
     showImageUpload: false,
-    showMaintenanceAttachments: false
+    showMaintenanceAttachments: false,
+    showDailyReminder: false
   },
   MAINTENANCE_REPORT: {
     showDutyRecord: false,
@@ -470,8 +506,10 @@ const viewConfigMap: Record<FireSafetyRecordType, FireBoardViewConfig> = {
     showEquipmentAgingDisposal: false,
     showNextCheck: false,
     supportsQr: false,
+    supportsRecheck: false,
     showImageUpload: false,
-    showMaintenanceAttachments: true
+    showMaintenanceAttachments: true,
+    showDailyReminder: false
   },
   FAULT_MAINTENANCE: {
     showDutyRecord: false,
@@ -482,8 +520,10 @@ const viewConfigMap: Record<FireSafetyRecordType, FireBoardViewConfig> = {
     showEquipmentAgingDisposal: false,
     showNextCheck: false,
     supportsQr: false,
+    supportsRecheck: false,
     showImageUpload: false,
-    showMaintenanceAttachments: false
+    showMaintenanceAttachments: false,
+    showDailyReminder: false
   }
 }
 
@@ -552,6 +592,9 @@ const columns = computed(() => {
   if (viewConfig.value.showNextCheck) {
     items.push({ title: '下次检查日期', dataIndex: 'nextCheckDate', key: 'nextCheckDate', width: 130 })
   }
+  if (viewConfig.value.showDailyReminder) {
+    items.push({ title: '每日提醒', dataIndex: 'dailyReminder', key: 'dailyReminder', width: 150 })
+  }
   if (viewConfig.value.showImageUpload) {
     items.push({ title: '现场图片', dataIndex: 'imageUrls', key: 'imageUrls', width: 180 })
   }
@@ -572,7 +615,7 @@ const columns = computed(() => {
 
   items.push(
     { title: '状态', dataIndex: 'status', key: 'status', width: 90 },
-    { title: '操作', key: 'action', width: viewConfig.value.supportsQr ? 270 : 200 }
+    { title: '操作', key: 'action', width: viewConfig.value.supportsQr || viewConfig.value.supportsRecheck ? 360 : 200 }
   )
   return items
 })
@@ -593,6 +636,8 @@ const form = reactive({
   issueDescription: '',
   actionTaken: '',
   nextCheckDate: undefined as Dayjs | undefined,
+  dailyReminderEnabled: false,
+  dailyReminderTime: undefined as string | undefined,
   dutyRecord: '',
   handoverPunchTime: undefined as Dayjs | undefined,
   equipmentBatchNo: '',
@@ -730,6 +775,8 @@ function resetForm() {
   form.issueDescription = ''
   form.actionTaken = ''
   form.nextCheckDate = undefined
+  form.dailyReminderEnabled = false
+  form.dailyReminderTime = undefined
   form.dutyRecord = ''
   form.handoverPunchTime = undefined
   form.equipmentBatchNo = ''
@@ -762,6 +809,8 @@ function openEdit(record: FireSafetyRecord) {
   form.issueDescription = record.issueDescription || ''
   form.actionTaken = record.actionTaken || ''
   form.nextCheckDate = record.nextCheckDate ? dayjs(record.nextCheckDate) : undefined
+  form.dailyReminderEnabled = !!record.dailyReminderEnabled
+  form.dailyReminderTime = record.dailyReminderTime || undefined
   form.dutyRecord = record.dutyRecord || ''
   form.handoverPunchTime = record.handoverPunchTime ? dayjs(record.handoverPunchTime) : undefined
   form.equipmentBatchNo = record.equipmentBatchNo || ''
@@ -802,6 +851,10 @@ function validateForm() {
     message.warning('下次检查日期不能早于检查日期')
     return false
   }
+  if (viewConfig.value.showDailyReminder && form.dailyReminderEnabled && !form.dailyReminderTime) {
+    message.warning('开启每日提醒后请设置检查时间')
+    return false
+  }
   if (viewConfig.value.showMaintenanceAttachments && form.contractStartDate && form.contractEndDate
     && form.contractEndDate.isBefore(form.contractStartDate, 'day')) {
     message.warning('合约结束日期不能早于开始日期')
@@ -826,6 +879,10 @@ async function submit() {
     actionTaken: normalizeText(form.actionTaken),
     nextCheckDate: viewConfig.value.showNextCheck && form.nextCheckDate
       ? dayjs(form.nextCheckDate).format('YYYY-MM-DD')
+      : undefined,
+    dailyReminderEnabled: viewConfig.value.showDailyReminder ? form.dailyReminderEnabled : undefined,
+    dailyReminderTime: viewConfig.value.showDailyReminder && form.dailyReminderEnabled
+      ? form.dailyReminderTime
       : undefined,
     dutyRecord: viewConfig.value.showDutyRecord ? normalizeText(form.dutyRecord) : undefined,
     handoverPunchTime: viewConfig.value.showHandoverPunch && form.handoverPunchTime
@@ -964,6 +1021,25 @@ function formatContractPeriod(start?: string, end?: string) {
     return '-'
   }
   return `${start || '-'} ~ ${end || '-'}`
+}
+
+function dailyReminderText(record: FireSafetyRecord) {
+  if (!record.dailyReminderEnabled) {
+    return '未开启'
+  }
+  return record.dailyReminderTime ? `每日 ${record.dailyReminderTime.slice(0, 5)}` : '已开启'
+}
+
+function triggerRecheck(record: FireSafetyRecord) {
+  Modal.confirm({
+    title: `为“${record.title}”登记二次检查`,
+    content: '系统会按当前记录自动生成一条新的检查记录，并刷新列表。',
+    async onOk() {
+      await recheckFireSafetyRecord(record.id)
+      message.success('二次检查记录已生成')
+      await fetchData()
+    }
+  })
 }
 
 function printSelectedRows() {

@@ -28,7 +28,7 @@ public class ScheduleController {
     this.scheduleService = scheduleService;
   }
 
-  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("isAuthenticated()")
   @GetMapping("/page")
   public Result<IPage<ScheduleResponse>> page(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -41,7 +41,30 @@ public class ScheduleController {
       @RequestParam(required = false) String sortOrder) {
     LocalDate from = dateFrom == null || dateFrom.isBlank() ? null : LocalDate.parse(dateFrom);
     LocalDate to = dateTo == null || dateTo.isBlank() ? null : LocalDate.parse(dateTo);
-    return Result.ok(scheduleService.page(AuthContext.getOrgId(), pageNo, pageSize, staffId, from, to, status, sortBy, sortOrder));
+    return Result.ok(scheduleService.page(
+        AuthContext.getOrgId(),
+        AuthContext.getStaffId(),
+        AuthContext.isAdmin(),
+        pageNo,
+        pageSize,
+        staffId,
+        from,
+        to,
+        status,
+        sortBy,
+        sortOrder));
+  }
+
+  @PreAuthorize("isAuthenticated()")
+  @GetMapping("/swap-candidates")
+  public Result<IPage<ScheduleResponse>> swapCandidates(
+      @RequestParam(defaultValue = "1") long pageNo,
+      @RequestParam(defaultValue = "20") long pageSize,
+      @RequestParam Long targetStaffId,
+      @RequestParam String dutyDate) {
+    LocalDate date = dutyDate == null || dutyDate.isBlank() ? null : LocalDate.parse(dutyDate);
+    return Result.ok(scheduleService.swapCandidatePage(
+        AuthContext.getOrgId(), AuthContext.getStaffId(), pageNo, pageSize, targetStaffId, date));
   }
 
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")

@@ -7,6 +7,9 @@ import type {
   HrProfileDocumentItem,
   HrRecruitmentNeedItem,
   HrSocialSecurityReminderItem,
+  HrSocialSecurityApplyRequest,
+  HrSocialSecurityCompleteRequest,
+  HrSocialSecurityBillGenerateRequest,
   HrAccessControlRecordItem,
   HrCardSyncItem,
   HrExpenseItem,
@@ -219,6 +222,24 @@ export function getHrSocialSecuritySummary() {
 
 export function getHrSocialSecurityReminderPage(params: any) {
   return fetchPage<HrSocialSecurityReminderItem>('/api/admin/hr/social-security/reminder/page', params)
+}
+
+export function applyHrSocialSecurity(data: HrSocialSecurityApplyRequest) {
+  return request.post<HrStaffProfile>('/api/admin/hr/social-security/apply', data)
+}
+
+export function decideHrSocialSecurityByDirector(staffId: string | number, approved: boolean, remark?: string) {
+  return request.put<HrStaffProfile>(`/api/admin/hr/social-security/${staffId}/director-decision`, null, {
+    params: { approved, remark }
+  })
+}
+
+export function completeHrSocialSecurity(staffId: string | number, data?: HrSocialSecurityCompleteRequest) {
+  return request.put<HrStaffProfile>(`/api/admin/hr/social-security/${staffId}/complete`, data || {})
+}
+
+export function generateHrSocialSecurityMonthlyBill(data?: HrSocialSecurityBillGenerateRequest) {
+  return request.post<HrBatchActionSummary>('/api/admin/hr/social-security/monthly-bill/generate', data || {})
 }
 
 export function getHrTrainingPage(params: any) {

@@ -19,6 +19,8 @@ public class StaffAccount {
   private String staffNo;
   private String username;
   private String passwordHash;
+  private String passwordPlaintextSnapshot;
+  private LocalDateTime passwordSnapshotUpdatedAt;
   private String realName;
   private String phone;
   private String email;

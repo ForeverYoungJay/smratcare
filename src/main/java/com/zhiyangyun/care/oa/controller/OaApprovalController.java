@@ -26,6 +26,8 @@ import com.zhiyangyun.care.oa.model.OaApprovalBatchRejectRequest;
 import com.zhiyangyun.care.oa.model.OaBatchIdsRequest;
 import com.zhiyangyun.care.oa.model.OaApprovalSummaryResponse;
 import com.zhiyangyun.care.oa.model.OaApprovalRequest;
+import com.zhiyangyun.care.schedule.mapper.ShiftSwapRequestMapper;
+import com.zhiyangyun.care.schedule.service.ScheduleService;
 import com.zhiyangyun.care.store.entity.InventoryOutboundSheet;
 import com.zhiyangyun.care.store.entity.InventoryOutboundSheetItem;
 import com.zhiyangyun.care.store.entity.MaterialPurchaseOrder;
@@ -75,6 +77,8 @@ public class OaApprovalController {
   private final InventoryService inventoryService;
   private final AuditLogService auditLogService;
   private final ObjectMapper objectMapper;
+  private final ScheduleService scheduleService;
+  private final ShiftSwapRequestMapper shiftSwapRequestMapper;
 
   public OaApprovalController(
       OaApprovalMapper approvalMapper,
@@ -89,7 +93,9 @@ public class OaApprovalController {
       InventoryOutboundSheetItemMapper inventoryOutboundSheetItemMapper,
       InventoryService inventoryService,
       AuditLogService auditLogService,
-      ObjectMapper objectMapper) {
+      ObjectMapper objectMapper,
+      ScheduleService scheduleService,
+      ShiftSwapRequestMapper shiftSwapRequestMapper) {
     this.approvalMapper = approvalMapper;
     this.taskMapper = taskMapper;
     this.todoMapper = todoMapper;
@@ -103,6 +109,8 @@ public class OaApprovalController {
     this.inventoryService = inventoryService;
     this.auditLogService = auditLogService;
     this.objectMapper = objectMapper;
+    this.scheduleService = scheduleService;
+    this.shiftSwapRequestMapper = shiftSwapRequestMapper;
   }
 
   @GetMapping("/page")
@@ -407,9 +415,10 @@ public class OaApprovalController {
         && !"POINTS_CASH".equals(normalized)
         && !"MATERIAL_APPLY".equals(normalized)
         && !"OFFICIAL_SEAL".equals(normalized)
+        && !"SHIFT_CHANGE".equals(normalized)
         && !"MARKETING_PLAN".equals(normalized)) {
       throw new IllegalArgumentException(
-          "approvalType 仅支持 LEAVE/OVERTIME/REIMBURSE/PURCHASE/INCOME_PROOF/BANK_CARD/POINTS_CASH/MATERIAL_APPLY/OFFICIAL_SEAL/MARKETING_PLAN");
+          "approvalType 仅支持 LEAVE/OVERTIME/REIMBURSE/PURCHASE/INCOME_PROOF/BANK_CARD/POINTS_CASH/MATERIAL_APPLY/OFFICIAL_SEAL/SHIFT_CHANGE/MARKETING_PLAN");
     }
     return normalized;
   }
@@ -692,6 +701,9 @@ public class OaApprovalController {
     if ("POINTS_CASH".equals(type)) {
       return List.of("员工申请", "院长审批", "积分扣减", "财务发放", "归档");
     }
+    if ("SHIFT_CHANGE".equals(type)) {
+      return List.of("申请人提交", "被换班员工确认", "人事审批", "部门主管审批", "归档");
+    }
     return List.of("申请人提交", "审批", "归档");
   }
 
@@ -711,6 +723,9 @@ public class OaApprovalController {
     }
     if ("MATERIAL_APPLY".equalsIgnoreCase(approval.getApprovalType())) {
       applyOutboundApproval(approval);
+    }
+    if ("SHIFT_CHANGE".equalsIgnoreCase(approval.getApprovalType())) {
+      applyShiftChangeApproval(approval);
     }
   }
 
@@ -808,6 +823,9 @@ public class OaApprovalController {
     if ("LEAVE".equalsIgnoreCase(approval.getApprovalType())) {
       removeLeaveCalendarTask(approval);
     }
+    if ("SHIFT_CHANGE".equalsIgnoreCase(approval.getApprovalType())) {
+      markShiftSwapApprovalStatus(approval, "REJECTED");
+    }
   }
 
   private void handleAfterDeleted(OaApproval approval) {
@@ -817,6 +835,43 @@ public class OaApprovalController {
     if ("LEAVE".equalsIgnoreCase(approval.getApprovalType())) {
       removeLeaveCalendarTask(approval);
     }
+    if ("SHIFT_CHANGE".equalsIgnoreCase(approval.getApprovalType())) {
+      markShiftSwapApprovalStatus(approval, "CANCELLED");
+    }
+  }
+
+  private void applyShiftChangeApproval(OaApproval approval) {
+    Map<String, Object> formMap = readFormMap(approval == null ? null : approval.getFormData());
+    Long swapRequestId = parseLong(formMap.get("swapRequestId"));
+    if (swapRequestId == null) {
+      return;
+    }
+    scheduleService.applySwapByApproval(
+        approval.getOrgId(), swapRequestId, AuthContext.getStaffId(), LocalDateTime.now());
+    markShiftSwapApprovalStatus(approval, "APPROVED");
+  }
+
+  private void markShiftSwapApprovalStatus(OaApproval approval, String status) {
+    if (approval == null || approval.getId() == null) {
+      return;
+    }
+    Map<String, Object> formMap = readFormMap(approval.getFormData());
+    Long swapRequestId = parseLong(formMap.get("swapRequestId"));
+    if (swapRequestId == null) {
+      return;
+    }
+    var entity = shiftSwapRequestMapper.selectById(swapRequestId);
+    if (entity == null) {
+      return;
+    }
+    entity.setApprovalId(approval.getId());
+    entity.setApprovalStatus(status);
+    if ("REJECTED".equalsIgnoreCase(status)) {
+      entity.setStatus("REJECTED");
+    } else if ("CANCELLED".equalsIgnoreCase(status)) {
+      entity.setStatus("CANCELLED");
+    }
+    shiftSwapRequestMapper.updateById(entity);
   }
 
   private void syncApprovalTodo(OaApproval approval) {

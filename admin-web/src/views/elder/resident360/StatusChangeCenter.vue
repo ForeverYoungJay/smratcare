@@ -157,6 +157,7 @@ import { getPortalSummary } from '../../../api/oa'
 import { getMedicalCareWorkbenchSummary } from '../../../api/medicalCare'
 import { getLogisticsWorkbenchSummary } from '../../../api/logistics'
 import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
+import { formatChineseDateTime } from '../../../utils/dateLocale'
 import type {
   LogisticsWorkbenchSummary,
   MedicalCareWorkbenchSummary,
@@ -244,9 +245,7 @@ const visibleStatusItems = computed(() => {
 const linkageUpdatedAtText = computed(() => {
   const raw = String(linkageUpdatedAt.value || '').trim()
   if (!raw) return '-'
-  const date = new Date(raw)
-  if (Number.isNaN(date.getTime())) return '-'
-  return date.toLocaleString()
+  return formatChineseDateTime(raw, '-')
 })
 const linkageReceiptCards = computed(() => {
   const oaPending = linkageSnapshot.value.oa.openTodoCount + linkageSnapshot.value.oa.pendingApprovalCount + linkageSnapshot.value.oa.ongoingTaskCount
@@ -604,7 +603,7 @@ async function fetchRealStats() {
     }
     const generatedAt = String(data.generatedAt || '').trim()
     lastUpdatedAtRaw.value = generatedAt || new Date().toISOString()
-    lastUpdatedAt.value = generatedAt ? new Date(generatedAt).toLocaleString() : new Date().toLocaleString()
+    lastUpdatedAt.value = generatedAt ? formatChineseDateTime(generatedAt) : formatChineseDateTime(new Date())
   } catch (error: any) {
     errorMessage.value = error?.message || '加载状态统计失败'
     message.error(errorMessage.value)

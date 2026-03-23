@@ -228,6 +228,27 @@
             placeholder="入职后多少天开始提醒缴纳社保"
           />
         </a-form-item>
+        <a-form-item label="企业购买社保">
+          <a-switch v-model:checked="socialSecurityCompanyApplyChecked" checked-children="是" un-checked-children="否" />
+        </a-form-item>
+        <a-form-item label="发送院长审核">
+          <a-switch v-model:checked="socialSecurityNeedDirectorApprovalChecked" checked-children="发送" un-checked-children="直送财务" />
+        </a-form-item>
+        <a-form-item label="每月社保费用">
+          <a-input-number
+            v-model:value="form.socialSecurityMonthlyAmount"
+            :min="0"
+            :precision="2"
+            style="width: 100%"
+            placeholder="填写每人每月企业社保费用"
+          />
+        </a-form-item>
+        <a-form-item label="社保流程">
+          <a-input :value="socialSecurityWorkflowText(form.socialSecurityWorkflowStatus)" disabled />
+        </a-form-item>
+        <a-form-item label="最近记账月份">
+          <a-input :value="form.socialSecurityLastBilledMonth || ''" disabled placeholder="未生成" />
+        </a-form-item>
         <a-form-item label="社保备注">
           <a-textarea v-model:value="form.socialSecurityRemark" :rows="2" placeholder="可记录办理进度、补缴说明等" />
         </a-form-item>
@@ -312,6 +333,8 @@ const initialRoleIds = ref<number[]>([])
 const selectedRowKeys = ref<string[]>([])
 const socialSecuritySummary = reactive<HrSocialSecuritySummary>({})
 const socialSecurityStartDateValue = ref<any>()
+const socialSecurityCompanyApplyChecked = ref(false)
+const socialSecurityNeedDirectorApprovalChecked = ref(false)
 
 const columns = [
   { title: '工号', dataIndex: 'staffNo', key: 'staffNo', width: 120 },
@@ -360,6 +383,14 @@ const socialSecurityStatusOptions = [
   { label: '办理中', value: 'PROCESSING' },
   { label: '已参保', value: 'COMPLETED' },
   { label: '暂停缴纳', value: 'STOPPED' }
+]
+const socialSecurityWorkflowOptions = [
+  { label: '待发起', value: 'DRAFT' },
+  { label: '待院长审核', value: 'PENDING_DIRECTOR' },
+  { label: '待财务办理', value: 'PENDING_FINANCE' },
+  { label: '已生效', value: 'ACTIVE' },
+  { label: '已驳回', value: 'REJECTED' },
+  { label: '已停缴', value: 'STOPPED' }
 ]
 const departmentFilterOptions = computed(() =>
   departmentOptions.value.map((item) => ({ label: item.label, value: Number(item.value) })).filter((item) => Number.isFinite(item.value))
@@ -463,6 +494,10 @@ function onRoleChange(roleId?: number) {
   form.jobTitle = selected?.roleName || undefined
 }
 
+function socialSecurityWorkflowText(value?: string) {
+  return socialSecurityWorkflowOptions.find((item) => item.value === value)?.label || value || '待发起'
+}
+
 async function openDrawer(record?: HrStaffProfile) {
   Object.keys(form).forEach((key) => {
     ;(form as any)[key] = undefined
@@ -531,6 +566,8 @@ async function openDrawer(record?: HrStaffProfile) {
   } else {
     socialSecurityStartDateValue.value = undefined
   }
+  socialSecurityCompanyApplyChecked.value = Number(form.socialSecurityCompanyApply || 0) === 1
+  socialSecurityNeedDirectorApprovalChecked.value = Number(form.socialSecurityNeedDirectorApproval || 0) === 1
   if (form.socialSecurityReminderDays == null && !record?.staffId) {
     form.socialSecurityReminderDays = 30
   }
@@ -620,6 +657,8 @@ async function submit(nextStep: 'save' | 'account' | 'contract' | 'attachment' =
     payload.socialSecurityStartDate = socialSecurityStartDateValue.value && socialSecurityStartDateValue.value.format
       ? socialSecurityStartDateValue.value.format('YYYY-MM-DD')
       : null
+    payload.socialSecurityCompanyApply = socialSecurityCompanyApplyChecked.value ? 1 : 0
+    payload.socialSecurityNeedDirectorApproval = socialSecurityNeedDirectorApprovalChecked.value ? 1 : 0
     const saved = await upsertHrProfile(payload)
     const staffId = Number(saved?.staffId || resolvedStaffId)
     if (selectedRoleId.value && Number.isFinite(staffId) && !initialRoleIds.value.includes(selectedRoleId.value)) {

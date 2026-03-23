@@ -14,8 +14,20 @@ export interface StaffItem {
   indirectLeaderId?: Id
   gender?: number
   password?: string
+  passwordPlaintextSnapshot?: string
+  passwordSnapshotUpdatedAt?: string
   roleCodes?: string[]
   roles?: RoleItem[]
+}
+
+export interface StaffCredentialItem {
+  staffId: Id
+  staffNo?: string
+  username?: string
+  realName?: string
+  status?: number
+  passwordPlaintextSnapshot?: string
+  passwordSnapshotUpdatedAt?: string
 }
 
 export interface RoleItem {

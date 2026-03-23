@@ -177,11 +177,11 @@ export function exportApproval(params: any) {
 }
 
 export function getDocumentPage(params: any) {
-  return fetchPage<OaDocument>('/api/oa/document/page', params)
+  return fetchPage<OaDocument>('/api/oa/document/page', normalizeDocumentParams(params))
 }
 
 export function createDocument(data: Partial<OaDocument>) {
-  return request.post<OaDocument>('/api/oa/document', data)
+  return request.post<OaDocument>('/api/oa/document', normalizeDocumentPayload(data))
 }
 
 export function getDocumentFolderTree() {
@@ -201,7 +201,7 @@ export function deleteDocumentFolder(id: string | number) {
 }
 
 export function updateDocument(id: string | number, data: Partial<OaDocument>) {
-  return request.put<OaDocument>(`/api/oa/document/${id}`, data)
+  return request.put<OaDocument>(`/api/oa/document/${id}`, normalizeDocumentPayload(data))
 }
 
 export function deleteDocument(id: string | number) {
@@ -213,7 +213,32 @@ export function batchDeleteDocument(ids: Array<string | number>) {
 }
 
 export function exportDocument(params: any) {
-  return request.get<Blob>('/api/oa/document/export', { params, responseType: 'blob' })
+  return request.get<Blob>('/api/oa/document/export', { params: normalizeDocumentParams(params), responseType: 'blob' })
+}
+
+function normalizeDocumentPayload(data: Partial<OaDocument>) {
+  const folderId = normalizePositiveId(data.folderId)
+  const folder = typeof data.folder === 'string' ? data.folder.trim() : data.folder
+  return {
+    ...data,
+    folderId,
+    folder: folderId ? folder : (folder || undefined)
+  }
+}
+
+function normalizeDocumentParams(params: any) {
+  if (!params || typeof params !== 'object') return params
+  return {
+    ...params,
+    folderId: normalizePositiveId(params.folderId)
+  }
+}
+
+function normalizePositiveId(value: unknown) {
+  if (value == null || value === '') return undefined
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed <= 0) return undefined
+  return parsed
 }
 
 export function getAlbumPage(params: any) {
@@ -328,6 +353,10 @@ export function getActivityPlanPage(params: any) {
   return fetchPage<OaActivityPlan>('/api/oa/activity-plan/page', params)
 }
 
+export function getActivityPlan(id: string | number) {
+  return request.get<OaActivityPlan>(`/api/oa/activity-plan/${id}`)
+}
+
 export function createActivityPlan(data: Partial<OaActivityPlan>) {
   return request.post<OaActivityPlan>('/api/oa/activity-plan', data)
 }
@@ -336,12 +365,43 @@ export function updateActivityPlan(id: string | number, data: Partial<OaActivity
   return request.put<OaActivityPlan>(`/api/oa/activity-plan/${id}`, data)
 }
 
+export function submitActivityPlanScheme(id: string | number) {
+  return request.put<OaActivityPlan>(`/api/oa/activity-plan/${id}/submit-scheme`)
+}
+
+export function approveActivityPlan(id: string | number, opinion?: string) {
+  return request.put<OaActivityPlan>(`/api/oa/activity-plan/${id}/approve`, { opinion })
+}
+
+export function rejectActivityPlan(id: string | number, opinion?: string) {
+  return request.put<OaActivityPlan>(`/api/oa/activity-plan/${id}/reject`, { opinion })
+}
+
 export function startActivityPlan(id: string | number) {
   return request.put<OaActivityPlan>(`/api/oa/activity-plan/${id}/start`)
 }
 
 export function completeActivityPlan(id: string | number) {
   return request.put<OaActivityPlan>(`/api/oa/activity-plan/${id}/done`)
+}
+
+export function saveActivityPlanExecution(id: string | number, data: {
+  actualCount?: number
+  signInRecords?: string[]
+  photoUrls?: string[]
+  executionRemark?: string
+}) {
+  return request.put<OaActivityPlan>(`/api/oa/activity-plan/${id}/execution`, data)
+}
+
+export function saveActivityPlanReview(id: string | number, data: {
+  actualExpense?: number
+  effectEvaluation?: string
+  elderFeedback?: string
+  riskSituation?: string
+  reportContent?: string
+}) {
+  return request.put<OaActivityPlan>(`/api/oa/activity-plan/${id}/review`, data)
 }
 
 export function cancelActivityPlan(id: string | number) {

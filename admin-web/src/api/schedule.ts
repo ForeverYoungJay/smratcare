@@ -2,6 +2,7 @@ import request, { fetchPage } from '../utils/request'
 import type { Id } from '../types/common'
 import type {
   ScheduleItem,
+  ShiftSwapRequestItem,
   AttendanceItem,
   AttendanceDashboardOverview,
   AttendanceSeasonRule,
@@ -10,6 +11,10 @@ import type {
 
 export function getSchedulePage(params: any) {
   return fetchPage<ScheduleItem>('/api/schedule/page', params)
+}
+
+export function getSwapCandidatePage(params: { pageNo?: number; pageSize?: number; targetStaffId: Id; dutyDate: string }) {
+  return fetchPage<ScheduleItem>('/api/schedule/swap-candidates', params)
 }
 
 export function createSchedule(data: Partial<ScheduleItem>) {
@@ -22,6 +27,22 @@ export function updateSchedule(id: Id, data: Partial<ScheduleItem>) {
 
 export function deleteSchedule(id: Id) {
   return request.delete<void>(`/api/schedule/${id}`)
+}
+
+export function getShiftSwapPage(params: any) {
+  return fetchPage<ShiftSwapRequestItem>('/api/schedule/shift-swap/page', params)
+}
+
+export function createShiftSwap(data: { applicantScheduleId: Id; targetScheduleId: Id; applicantRemark?: string }) {
+  return request.post<ShiftSwapRequestItem>('/api/schedule/shift-swap', data)
+}
+
+export function agreeShiftSwap(id: Id, data?: { remark?: string }) {
+  return request.put<ShiftSwapRequestItem>(`/api/schedule/shift-swap/${id}/target-agree`, data || {})
+}
+
+export function rejectShiftSwap(id: Id, data?: { remark?: string }) {
+  return request.put<ShiftSwapRequestItem>(`/api/schedule/shift-swap/${id}/target-reject`, data || {})
 }
 
 export function getAttendancePage(params: any) {

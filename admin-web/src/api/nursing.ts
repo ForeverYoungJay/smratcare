@@ -2,6 +2,7 @@ import request, { fetchPage } from '../utils/request'
 import type {
   CaregiverGroupItem,
   ShiftTemplateItem,
+  ShiftTemplateBatchSaveRequest,
   ShiftHandoverItem,
   CareLevelItem,
   ServicePlanItem,
@@ -40,6 +41,10 @@ export function getShiftTemplateList(params?: any) {
 
 export function createShiftTemplate(data: Partial<ShiftTemplateItem>) {
   return request.post<ShiftTemplateItem>('/api/nursing/shift-templates', data)
+}
+
+export function saveShiftTemplateBatch(data: ShiftTemplateBatchSaveRequest) {
+  return request.post<ShiftTemplateItem[]>('/api/nursing/shift-templates/batch-save', data)
 }
 
 export function updateShiftTemplate(id: number, data: Partial<ShiftTemplateItem>) {

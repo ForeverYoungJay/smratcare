@@ -37,6 +37,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { formatChineseDateTime } from '../utils/dateLocale'
 import {
   LIFECYCLE_STAGE_OPTIONS,
   LIFECYCLE_STAGE_ORDER,
@@ -99,9 +100,7 @@ const progressStrokeColor = computed(() => {
 const generatedAtText = computed(() => {
   const raw = String(props.generatedAt || '').trim()
   if (!raw) return ''
-  const date = new Date(raw)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toLocaleString()
+  return formatChineseDateTime(raw)
 })
 
 function stepClass(index: number) {

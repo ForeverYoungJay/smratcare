@@ -20,6 +20,10 @@ export interface FireSafetyRecord {
   issueDescription?: string
   actionTaken?: string
   nextCheckDate?: string
+  dailyReminderEnabled?: boolean
+  dailyReminderTime?: string
+  sourceRecordId?: number
+  checkRound?: number
   qrToken?: string
   qrGeneratedAt?: string
   scanCompletedAt?: string

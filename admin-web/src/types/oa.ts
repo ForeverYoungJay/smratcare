@@ -123,15 +123,47 @@ export interface OaGroupSetting {
 export interface OaActivityPlan {
   id: string | number
   title: string
+  activityType?: string
   planDate?: string
   startTime?: string
   endTime?: string
   location?: string
   organizer?: string
   participantTarget?: string
+  participantTags?: string
+  participantElderIds?: string
+  estimatedCount?: number
+  needMedicalStaff?: boolean
+  riskLevel?: 'LOW' | 'MEDIUM' | 'HIGH' | string
+  needBudget?: boolean
+  budgetAmount?: number
+  budgetDescription?: string
   status?: string
   content?: string
+  schemeAttachmentName?: string
+  schemeAttachmentUrl?: string
+  approvalLogsJson?: string
+  currentApprovalStep?: number
+  currentApproverRole?: string
+  currentApproverId?: number
+  currentApproverName?: string
+  submittedAt?: string
+  approvedAt?: string
+  startedAt?: string
+  completedAt?: string
+  signInRecordsJson?: string
+  actualCount?: number
+  photoUrlsJson?: string
+  executionRemark?: string
+  actualExpense?: number
+  effectEvaluation?: 'GOOD' | 'NORMAL' | 'BAD' | string
+  elderFeedback?: string
+  riskSituation?: string
+  reportContent?: string
   remark?: string
+  createdBy?: number
+  createTime?: string
+  updateTime?: string
 }
 
 export interface OaTask {

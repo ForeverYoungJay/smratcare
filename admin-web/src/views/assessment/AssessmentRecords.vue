@@ -605,6 +605,7 @@ import { message, Modal } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../../stores/user'
 import { hasMinisterOrHigher } from '../../utils/roleAccess'
+import { formatChineseDateTime } from '../../utils/dateLocale'
 import PageContainer from '../../components/PageContainer.vue'
 import LifecycleStageBar from '../../components/LifecycleStageBar.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
@@ -2398,7 +2399,7 @@ function clearSelection() {
 }
 
 function markLastBatchAction(text: string) {
-  const timeText = new Date().toLocaleString()
+  const timeText = formatChineseDateTime(new Date())
   lastBatchAction.value = `${timeText}：${text}`
 }
 
@@ -2629,7 +2630,7 @@ function exportSelectedPdf() {
       </head>
       <body>
         <h2>评估记录（勾选导出）</h2>
-        <div style="margin-bottom:8px;">导出时间：${safeHtml(new Date().toLocaleString())}</div>
+        <div style="margin-bottom:8px;">导出时间：${safeHtml(formatChineseDateTime(new Date()))}</div>
         <table>
           <thead>
             <tr>
@@ -2879,7 +2880,7 @@ function exportCurrentPagePdf() {
       </head>
       <body>
         <h2>评估档案（本页）</h2>
-        <div style="margin-bottom:8px;">导出时间：${safeHtml(new Date().toLocaleString())}</div>
+        <div style="margin-bottom:8px;">导出时间：${safeHtml(formatChineseDateTime(new Date()))}</div>
         <table>
           <thead>
             <tr>

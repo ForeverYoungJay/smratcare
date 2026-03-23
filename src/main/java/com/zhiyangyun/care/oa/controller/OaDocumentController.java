@@ -454,13 +454,12 @@ public class OaDocumentController {
     }
     if (folderId != null && folderId > 0) {
       OaDocumentFolder folder = findAccessibleFolder(folderId);
-      if (folder == null) {
-        throw new IllegalArgumentException("档案夹不存在");
+      if (folder != null) {
+        if (FOLDER_STATUS_DISABLED.equals(folder.getStatus())) {
+          throw new IllegalArgumentException("档案夹已停用，无法保存文档");
+        }
+        return folder.getId();
       }
-      if (FOLDER_STATUS_DISABLED.equals(folder.getStatus())) {
-        throw new IllegalArgumentException("档案夹已停用，无法保存文档");
-      }
-      return folder.getId();
     }
     if (folderName == null || folderName.isBlank()) {
       return null;

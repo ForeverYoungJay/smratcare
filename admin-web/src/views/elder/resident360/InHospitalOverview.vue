@@ -118,6 +118,7 @@ import { getResidentOverview } from '../../../api/medicalCare'
 import { getContractLinkageByElder } from '../../../api/marketing'
 import { useElderOptions } from '../../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
+import { formatChineseDateTime } from '../../../utils/dateLocale'
 import { lifecycleStageHint, normalizeLifecycleStage } from '../../../utils/lifecycleStage'
 import type { ContractLinkageSummary, ElderItem, MedicalResidentOverview } from '../../../types'
 
@@ -515,7 +516,7 @@ async function loadModules() {
     contractLinkage.value = contractData
     residentProfile.value = profileData
     const generatedAt = String(overview.value?.generatedAt || '').trim()
-    lastLoadedAt.value = generatedAt ? new Date(generatedAt).toLocaleString() : new Date().toLocaleString()
+    lastLoadedAt.value = generatedAt ? formatChineseDateTime(generatedAt) : formatChineseDateTime(new Date())
     expandedCardKeys.value = []
   } catch (error: any) {
     errorMessage.value = error?.message || '加载在院服务总览失败'

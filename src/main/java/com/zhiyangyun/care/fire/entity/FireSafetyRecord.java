@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import lombok.Data;
 
@@ -37,6 +38,14 @@ public class FireSafetyRecord {
   private String actionTaken;
 
   private LocalDate nextCheckDate;
+
+  private Boolean dailyReminderEnabled;
+
+  private LocalTime dailyReminderTime;
+
+  private Long sourceRecordId;
+
+  private Integer checkRound;
 
   private String qrToken;
 

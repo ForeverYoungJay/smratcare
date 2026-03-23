@@ -35,6 +35,7 @@ public class BuildingServiceImpl implements BuildingService {
 
   @Override
   public BuildingResponse create(BuildingRequest request) {
+    releaseDeletedUniqueConflicts(null, request.getTenantId(), request.getName(), request.getCode());
     ensureNameUnique(null, request.getTenantId(), request.getName());
     if (request.getSortNo() == null) {
       request.setSortNo(resolveNextSortNo(request.getTenantId()));
@@ -66,6 +67,7 @@ public class BuildingServiceImpl implements BuildingService {
     if (!request.getTenantId().equals(building.getTenantId())) {
       throw new IllegalArgumentException("无权限访问该楼栋");
     }
+    releaseDeletedUniqueConflicts(id, request.getTenantId(), request.getName(), request.getCode());
     ensureNameUnique(id, request.getTenantId(), request.getName());
     if (request.getSortNo() == null) {
       request.setSortNo(building.getSortNo() == null ? resolveNextSortNo(request.getTenantId()) : building.getSortNo());
@@ -160,8 +162,65 @@ public class BuildingServiceImpl implements BuildingService {
       floor.setIsDeleted(1);
       floorMapper.updateById(floor);
     }
+    releaseDeletedMarker(building);
     building.setIsDeleted(1);
     buildingMapper.updateById(building);
+  }
+
+  private void releaseDeletedUniqueConflicts(Long currentId, Long tenantId, String name, String code) {
+    if (tenantId == null) {
+      return;
+    }
+    var wrapper = Wrappers.lambdaQuery(Building.class)
+        .eq(Building::getTenantId, tenantId)
+        .eq(Building::getIsDeleted, 1);
+    boolean hasName = name != null && !name.isBlank();
+    boolean hasCode = code != null && !code.isBlank();
+    if (!hasName && !hasCode) {
+      return;
+    }
+    wrapper.and(w -> {
+      boolean appended = false;
+      if (hasName) {
+        w.eq(Building::getName, name);
+        appended = true;
+      }
+      if (hasCode) {
+        if (appended) {
+          w.or();
+        }
+        w.eq(Building::getCode, code);
+      }
+    });
+    if (currentId != null) {
+      wrapper.ne(Building::getId, currentId);
+    }
+    List<Building> deletedConflicts = buildingMapper.selectList(wrapper);
+    for (Building deleted : deletedConflicts) {
+      releaseDeletedMarker(deleted);
+      buildingMapper.updateById(deleted);
+    }
+  }
+
+  private void releaseDeletedMarker(Building building) {
+    if (building == null || building.getId() == null) {
+      return;
+    }
+    String suffix = "_DEL_" + building.getId();
+    if (building.getName() != null && !building.getName().isBlank()) {
+      building.setName(truncateForSuffix(building.getName(), 64, suffix) + suffix);
+    }
+    if (building.getCode() != null && !building.getCode().isBlank()) {
+      building.setCode(truncateForSuffix(building.getCode(), 32, suffix) + suffix);
+    }
+  }
+
+  private String truncateForSuffix(String value, int maxLength, String suffix) {
+    if (value == null) {
+      return "";
+    }
+    int keepLength = Math.max(0, maxLength - suffix.length());
+    return value.length() <= keepLength ? value : value.substring(0, keepLength);
   }
 
   private void syncRoomBuildingName(Building building) {

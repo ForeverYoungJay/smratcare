@@ -1,5 +1,5 @@
 import request, { fetchPage } from '../utils/request'
-import type { Id, StaffItem } from '../types'
+import type { Id, StaffCredentialItem, StaffItem } from '../types'
 
 export function getStaffPage(params: any) {
   return fetchPage<StaffItem>('/api/admin/staff', params)
@@ -15,6 +15,10 @@ export function updateStaff(id: Id, data: Partial<StaffItem>) {
 
 export function getStaff(id: Id) {
   return request.get<StaffItem>(`/api/admin/staff/${id}`)
+}
+
+export function getStaffCredentials(id: Id) {
+  return request.get<StaffCredentialItem>(`/api/admin/staff/${id}/credentials`)
 }
 
 export function lockStaff(id: Id) {

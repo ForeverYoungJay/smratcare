@@ -34,6 +34,9 @@ import com.zhiyangyun.care.hr.model.HrAttendanceRecordResponse;
 import com.zhiyangyun.care.hr.model.HrBatchActionSummaryResponse;
 import com.zhiyangyun.care.hr.model.HrGenericApprovalResponse;
 import com.zhiyangyun.care.hr.model.HrContractReminderResponse;
+import com.zhiyangyun.care.hr.model.HrSocialSecurityApplyRequest;
+import com.zhiyangyun.care.hr.model.HrSocialSecurityBillGenerateRequest;
+import com.zhiyangyun.care.hr.model.HrSocialSecurityCompleteRequest;
 import com.zhiyangyun.care.hr.model.HrExpenseApprovalRequest;
 import com.zhiyangyun.care.hr.model.HrStaffElectricityImportRequest;
 import com.zhiyangyun.care.hr.model.HrStaffElectricityImportRowRequest;
@@ -220,6 +223,18 @@ public class AdminHrController {
     profile.setSocialSecurityStatus(normalizeBlank(request.getSocialSecurityStatus()));
     profile.setSocialSecurityStartDate(request.getSocialSecurityStartDate());
     profile.setSocialSecurityReminderDays(request.getSocialSecurityReminderDays());
+    profile.setSocialSecurityCompanyApply(normalizeFlag(request.getSocialSecurityCompanyApply()));
+    profile.setSocialSecurityNeedDirectorApproval(normalizeFlag(request.getSocialSecurityNeedDirectorApproval()));
+    String workflowStatus = normalizeBlank(request.getSocialSecurityWorkflowStatus());
+    if (workflowStatus != null) {
+      profile.setSocialSecurityWorkflowStatus(normalizeSocialSecurityWorkflowStatus(workflowStatus));
+    } else if (normalizeBlank(profile.getSocialSecurityWorkflowStatus()) == null) {
+      profile.setSocialSecurityWorkflowStatus(resolveInitialSocialSecurityWorkflowStatus(profile.getSocialSecurityStatus()));
+    }
+    profile.setSocialSecurityMonthlyAmount(normalizeMoney(request.getSocialSecurityMonthlyAmount()));
+    if (normalizeBlank(request.getSocialSecurityLastBilledMonth()) != null) {
+      profile.setSocialSecurityLastBilledMonth(normalizeBlank(request.getSocialSecurityLastBilledMonth()));
+    }
     profile.setSocialSecurityRemark(normalizeBlank(request.getSocialSecurityRemark()));
     profile.setRemark(normalizeBlank(request.getRemark()));
 
@@ -910,6 +925,153 @@ public class AdminHrController {
     return Result.ok(page);
   }
 
+  @PreAuthorize("hasAnyRole('HR_EMPLOYEE','HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PostMapping("/social-security/apply")
+  public Result<StaffProfileResponse> applySocialSecurity(@RequestBody HrSocialSecurityApplyRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    if (request == null || request.getStaffId() == null) {
+      return Result.error(400, "staffId required");
+    }
+    StaffAccount staff = findStaff(orgId, request.getStaffId());
+    if (staff == null) {
+      return Result.error(404, "Staff not found");
+    }
+    StaffProfile profile = ensureSocialSecurityProfile(orgId, staff);
+    profile.setSocialSecurityCompanyApply(normalizeFlag(request.getSocialSecurityCompanyApply()) == 1 ? 1 : 0);
+    profile.setSocialSecurityNeedDirectorApproval(normalizeFlag(request.getSocialSecurityNeedDirectorApproval()));
+    profile.setSocialSecurityMonthlyAmount(normalizeMoney(request.getSocialSecurityMonthlyAmount()));
+    if (normalizeBlank(request.getSocialSecurityRemark()) != null) {
+      profile.setSocialSecurityRemark(normalizeBlank(request.getSocialSecurityRemark()));
+    }
+    profile.setSocialSecurityApplySubmittedAt(LocalDateTime.now());
+    profile.setSocialSecurityApplySubmittedBy(AuthContext.getStaffId());
+    profile.setSocialSecurityDirectorDecisionAt(null);
+    profile.setSocialSecurityDirectorDecisionBy(null);
+    profile.setSocialSecurityCompletedAt(null);
+    if (normalizeFlag(profile.getSocialSecurityNeedDirectorApproval()) == 1) {
+      profile.setSocialSecurityWorkflowStatus("PENDING_DIRECTOR");
+      profile.setSocialSecurityStatus("PROCESSING");
+      clearSocialSecurityFinanceTodo(orgId, profile);
+      syncSocialSecurityDirectorTodo(orgId, staff, profile);
+    } else {
+      profile.setSocialSecurityWorkflowStatus("PENDING_FINANCE");
+      profile.setSocialSecurityStatus("PROCESSING");
+      clearSocialSecurityDirectorTodos(orgId, staff.getId());
+      syncSocialSecurityFinanceTodo(orgId, staff, profile);
+    }
+    staffProfileMapper.updateById(profile);
+    return Result.ok(toProfileResponse(staff, profile));
+  }
+
+  @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PutMapping("/social-security/{staffId}/director-decision")
+  public Result<StaffProfileResponse> socialSecurityDirectorDecision(
+      @PathVariable Long staffId,
+      @RequestParam boolean approved,
+      @RequestParam(required = false) String remark) {
+    Long orgId = AuthContext.getOrgId();
+    StaffAccount staff = findStaff(orgId, staffId);
+    if (staff == null) {
+      return Result.error(404, "Staff not found");
+    }
+    StaffProfile profile = ensureSocialSecurityProfile(orgId, staff);
+    if (!"PENDING_DIRECTOR".equals(normalizeBlank(profile.getSocialSecurityWorkflowStatus()))) {
+      return Result.error(400, "当前不是院长待审状态");
+    }
+    profile.setSocialSecurityDirectorDecisionAt(LocalDateTime.now());
+    profile.setSocialSecurityDirectorDecisionBy(AuthContext.getStaffId());
+    if (normalizeBlank(remark) != null) {
+      profile.setSocialSecurityRemark(normalizeBlank(remark));
+    }
+    clearSocialSecurityDirectorTodos(orgId, staffId);
+    if (approved) {
+      profile.setSocialSecurityWorkflowStatus("PENDING_FINANCE");
+      profile.setSocialSecurityStatus("PROCESSING");
+      syncSocialSecurityFinanceTodo(orgId, staff, profile);
+    } else {
+      profile.setSocialSecurityWorkflowStatus("REJECTED");
+      profile.setSocialSecurityStatus("PENDING");
+      clearSocialSecurityFinanceTodo(orgId, profile);
+    }
+    staffProfileMapper.updateById(profile);
+    return Result.ok(toProfileResponse(staff, profile));
+  }
+
+  @PreAuthorize("hasAnyRole('HR_EMPLOYEE','HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN','FINANCE_MINISTER','FINANCE_EMPLOYEE','ACCOUNTANT','CASHIER','FINANCE')")
+  @PutMapping("/social-security/{staffId}/complete")
+  public Result<StaffProfileResponse> completeSocialSecurity(
+      @PathVariable Long staffId,
+      @RequestBody(required = false) HrSocialSecurityCompleteRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    StaffAccount staff = findStaff(orgId, staffId);
+    if (staff == null) {
+      return Result.error(404, "Staff not found");
+    }
+    StaffProfile profile = ensureSocialSecurityProfile(orgId, staff);
+    if (normalizeBlank(profile.getSocialSecurityWorkflowStatus()) == null
+        || List.of("DRAFT", "REJECTED", "STOPPED").contains(profile.getSocialSecurityWorkflowStatus())) {
+      return Result.error(400, "请先发起社保申请流程");
+    }
+    if (request != null && request.getSocialSecurityStartDate() != null) {
+      profile.setSocialSecurityStartDate(request.getSocialSecurityStartDate());
+    } else if (profile.getSocialSecurityStartDate() == null) {
+      profile.setSocialSecurityStartDate(LocalDate.now());
+    }
+    if (request != null && normalizeBlank(request.getSocialSecurityRemark()) != null) {
+      profile.setSocialSecurityRemark(normalizeBlank(request.getSocialSecurityRemark()));
+    }
+    profile.setSocialSecurityStatus("COMPLETED");
+    profile.setSocialSecurityWorkflowStatus("ACTIVE");
+    profile.setSocialSecurityCompletedAt(LocalDateTime.now());
+    clearSocialSecurityDirectorTodos(orgId, staffId);
+    clearSocialSecurityFinanceTodo(orgId, profile);
+    if (zeroIfNull(profile.getSocialSecurityMonthlyAmount()).signum() > 0) {
+      upsertSocialSecurityMonthlyBill(orgId, staff, profile, YearMonth.now(), AuthContext.getStaffId());
+    }
+    staffProfileMapper.updateById(profile);
+    return Result.ok(toProfileResponse(staff, profile));
+  }
+
+  @PreAuthorize("hasAnyRole('HR_EMPLOYEE','HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN','FINANCE_MINISTER','FINANCE_EMPLOYEE','ACCOUNTANT','CASHIER','FINANCE')")
+  @PostMapping("/social-security/monthly-bill/generate")
+  public Result<HrBatchActionSummaryResponse> generateSocialSecurityMonthlyBill(
+      @RequestBody(required = false) HrSocialSecurityBillGenerateRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    Long operatorId = AuthContext.getStaffId();
+    YearMonth feeMonth = resolveFeeMonth(request == null ? null : request.getMonth());
+    List<Long> filterStaffIds = sanitizeIds(request == null ? null : request.getStaffIds());
+    List<StaffProfile> profiles = staffProfileMapper.selectList(Wrappers.lambdaQuery(StaffProfile.class)
+        .eq(StaffProfile::getOrgId, orgId)
+        .eq(StaffProfile::getIsDeleted, 0)
+        .in(!filterStaffIds.isEmpty(), StaffProfile::getStaffId, filterStaffIds));
+    Map<Long, StaffAccount> staffMap = loadStaffMap(profiles.stream().map(StaffProfile::getStaffId).toList());
+
+    int successCount = 0;
+    int skippedCount = 0;
+    java.math.BigDecimal totalAmount = java.math.BigDecimal.ZERO;
+    for (StaffProfile profile : profiles) {
+      StaffAccount staff = staffMap.get(profile.getStaffId());
+      if (!canGenerateSocialSecurityBill(profile, staff, feeMonth)) {
+        skippedCount++;
+        continue;
+      }
+      StaffMonthlyFeeBill bill = upsertSocialSecurityMonthlyBill(orgId, staff, profile, feeMonth, operatorId);
+      if (bill == null) {
+        skippedCount++;
+        continue;
+      }
+      successCount++;
+      totalAmount = totalAmount.add(zeroIfNull(bill.getAmount()));
+    }
+    HrBatchActionSummaryResponse response = new HrBatchActionSummaryResponse();
+    response.setTotalCount(profiles.size());
+    response.setSuccessCount(successCount);
+    response.setSkippedCount(skippedCount);
+    response.setTotalAmount(totalAmount);
+    response.setMessage("社保月度记账已生成 " + feeMonth);
+    return Result.ok(response);
+  }
+
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/profile/template/page")
   public Result<IPage<OaDocument>> profileTemplatePage(
@@ -1447,8 +1609,8 @@ public class AdminHrController {
       return Result.error(400, "feeType required");
     }
     String feeType = request.getFeeType().trim().toUpperCase(Locale.ROOT);
-    if (!Set.of("MEAL", "ELECTRICITY").contains(feeType)) {
-      return Result.error(400, "feeType only supports MEAL/ELECTRICITY");
+    if (!Set.of("MEAL", "ELECTRICITY", "SOCIAL_SECURITY").contains(feeType)) {
+      return Result.error(400, "feeType only supports MEAL/ELECTRICITY/SOCIAL_SECURITY");
     }
     YearMonth feeMonth = resolveFeeMonth(request.getMonth());
     List<Long> ids = sanitizeIds(request.getIds());
@@ -1640,7 +1802,7 @@ public class AdminHrController {
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) String keyword,
       @RequestParam(required = false) String status) {
-    return Result.ok(pageGenericApprovals(pageNo, pageSize, keyword, status, "LEAVE", "shift-change"));
+    return Result.ok(pageGenericApprovals(pageNo, pageSize, keyword, status, "SHIFT_CHANGE", "shift-change"));
   }
 
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
@@ -2489,6 +2651,9 @@ public class AdminHrController {
     if (title.contains("电") || unionText.contains("electricity")) {
       return "电费";
     }
+    if (title.contains("社保") || unionText.contains("social_security") || unionText.contains("social security")) {
+      return "社保费用";
+    }
     if (title.contains("培训") || unionText.contains("training")) {
       return "培训费用";
     }
@@ -2813,8 +2978,17 @@ public class AdminHrController {
 
   private Map<String, Object> buildFinanceSyncFormData(StaffMonthlyFeeBill bill) {
     Map<String, Object> payload = new HashMap<>();
-    payload.put("scene", "MEAL".equalsIgnoreCase(bill.getFeeType()) ? "staff-meal-monthly" : "staff-electricity-monthly");
-    payload.put("expenseType", "MEAL".equalsIgnoreCase(bill.getFeeType()) ? "员工餐费" : "员工电费");
+    String feeType = defaultText(bill.getFeeType(), "MEAL").toUpperCase(Locale.ROOT);
+    payload.put("scene", switch (feeType) {
+      case "ELECTRICITY" -> "staff-electricity-monthly";
+      case "SOCIAL_SECURITY" -> "staff-social-security-monthly";
+      default -> "staff-meal-monthly";
+    });
+    payload.put("expenseType", switch (feeType) {
+      case "ELECTRICITY" -> "员工电费";
+      case "SOCIAL_SECURITY" -> "员工社保";
+      default -> "员工餐费";
+    });
     payload.put("feeBillId", bill.getId());
     payload.put("staffId", bill.getStaffId());
     payload.put("staffNo", bill.getStaffNo());
@@ -2829,7 +3003,12 @@ public class AdminHrController {
 
   private String buildFinanceSyncRemark(StaffMonthlyFeeBill bill) {
     List<String> lines = new ArrayList<>();
-    lines.add("月度" + ("MEAL".equalsIgnoreCase(bill.getFeeType()) ? "餐费" : "电费") + "同步");
+    String feeLabel = switch (defaultText(bill.getFeeType(), "MEAL").toUpperCase(Locale.ROOT)) {
+      case "ELECTRICITY" -> "电费";
+      case "SOCIAL_SECURITY" -> "社保费";
+      default -> "餐费";
+    };
+    lines.add("月度" + feeLabel + "同步");
     lines.add("员工：" + defaultText(bill.getStaffName(), defaultText(bill.getStaffNo(), "未知")));
     lines.add("月份：" + defaultText(bill.getFeeMonth(), "-"));
     if (normalizeBlank(bill.getDormitoryRoomNo()) != null) {
@@ -3127,6 +3306,14 @@ public class AdminHrController {
       response.setSocialSecurityStatus(profile.getSocialSecurityStatus());
       response.setSocialSecurityStartDate(profile.getSocialSecurityStartDate());
       response.setSocialSecurityReminderDays(profile.getSocialSecurityReminderDays());
+      response.setSocialSecurityCompanyApply(profile.getSocialSecurityCompanyApply());
+      response.setSocialSecurityNeedDirectorApproval(profile.getSocialSecurityNeedDirectorApproval());
+      response.setSocialSecurityWorkflowStatus(profile.getSocialSecurityWorkflowStatus());
+      response.setSocialSecurityMonthlyAmount(profile.getSocialSecurityMonthlyAmount());
+      response.setSocialSecurityApplySubmittedAt(profile.getSocialSecurityApplySubmittedAt());
+      response.setSocialSecurityDirectorDecisionAt(profile.getSocialSecurityDirectorDecisionAt());
+      response.setSocialSecurityCompletedAt(profile.getSocialSecurityCompletedAt());
+      response.setSocialSecurityLastBilledMonth(profile.getSocialSecurityLastBilledMonth());
       response.setSocialSecurityRemark(profile.getSocialSecurityRemark());
       response.setRemark(profile.getRemark());
       response.setUpdateTime(profile.getUpdateTime());
@@ -3174,6 +3361,14 @@ public class AdminHrController {
       response.setSocialSecurityStatus(profile.getSocialSecurityStatus());
       response.setSocialSecurityStartDate(profile.getSocialSecurityStartDate());
       response.setSocialSecurityReminderDays(profile.getSocialSecurityReminderDays());
+      response.setSocialSecurityCompanyApply(profile.getSocialSecurityCompanyApply());
+      response.setSocialSecurityNeedDirectorApproval(profile.getSocialSecurityNeedDirectorApproval());
+      response.setSocialSecurityWorkflowStatus(profile.getSocialSecurityWorkflowStatus());
+      response.setSocialSecurityMonthlyAmount(profile.getSocialSecurityMonthlyAmount());
+      response.setSocialSecurityApplySubmittedAt(profile.getSocialSecurityApplySubmittedAt());
+      response.setSocialSecurityDirectorDecisionAt(profile.getSocialSecurityDirectorDecisionAt());
+      response.setSocialSecurityCompletedAt(profile.getSocialSecurityCompletedAt());
+      response.setSocialSecurityLastBilledMonth(profile.getSocialSecurityLastBilledMonth());
       response.setSocialSecurityRemark(profile.getSocialSecurityRemark());
       LocalDate reminderDate = resolveSocialSecurityReminderDate(profile);
       response.setReminderDate(reminderDate);
@@ -3223,6 +3418,223 @@ public class AdminHrController {
       return "UPCOMING";
     }
     return "PENDING";
+  }
+
+  private StaffProfile ensureSocialSecurityProfile(Long orgId, StaffAccount staff) {
+    StaffProfile profile = staffProfileMapper.selectOne(Wrappers.lambdaQuery(StaffProfile.class)
+        .eq(StaffProfile::getOrgId, orgId)
+        .eq(StaffProfile::getStaffId, staff.getId())
+        .eq(StaffProfile::getIsDeleted, 0)
+        .last("LIMIT 1"));
+    if (profile != null) {
+      if (normalizeBlank(profile.getSocialSecurityWorkflowStatus()) == null) {
+        profile.setSocialSecurityWorkflowStatus(resolveInitialSocialSecurityWorkflowStatus(profile.getSocialSecurityStatus()));
+      }
+      if (profile.getSocialSecurityMonthlyAmount() == null) {
+        profile.setSocialSecurityMonthlyAmount(java.math.BigDecimal.ZERO.setScale(2, java.math.RoundingMode.HALF_UP));
+      }
+      return profile;
+    }
+    profile = new StaffProfile();
+    profile.setOrgId(orgId);
+    profile.setStaffId(staff.getId());
+    profile.setStatus(staff.getStatus());
+    profile.setSocialSecurityCompanyApply(0);
+    profile.setSocialSecurityNeedDirectorApproval(0);
+    profile.setSocialSecurityWorkflowStatus("DRAFT");
+    profile.setSocialSecurityMonthlyAmount(java.math.BigDecimal.ZERO.setScale(2, java.math.RoundingMode.HALF_UP));
+    staffProfileMapper.insert(profile);
+    return profile;
+  }
+
+  private String resolveInitialSocialSecurityWorkflowStatus(String socialSecurityStatus) {
+    String normalized = normalizeBlank(socialSecurityStatus);
+    if (normalized == null) {
+      return "DRAFT";
+    }
+    normalized = normalized.toUpperCase(Locale.ROOT);
+    if (List.of("COMPLETED", "PAID").contains(normalized)) {
+      return "ACTIVE";
+    }
+    if ("PROCESSING".equals(normalized)) {
+      return "PENDING_FINANCE";
+    }
+    if ("STOPPED".equals(normalized)) {
+      return "STOPPED";
+    }
+    return "DRAFT";
+  }
+
+  private String normalizeSocialSecurityWorkflowStatus(String value) {
+    String normalized = normalizeBlank(value);
+    if (normalized == null) {
+      return null;
+    }
+    normalized = normalized.toUpperCase(Locale.ROOT);
+    if (!Set.of("DRAFT", "PENDING_DIRECTOR", "PENDING_FINANCE", "ACTIVE", "REJECTED", "STOPPED").contains(normalized)) {
+      throw new IllegalArgumentException("socialSecurityWorkflowStatus unsupported");
+    }
+    return normalized;
+  }
+
+  private boolean canGenerateSocialSecurityBill(StaffProfile profile, StaffAccount staff, YearMonth feeMonth) {
+    if (profile == null || staff == null || staff.getId() == null) {
+      return false;
+    }
+    if (!Integer.valueOf(1).equals(staff.getStatus())) {
+      return false;
+    }
+    if (normalizeFlag(profile.getSocialSecurityCompanyApply()) != 1) {
+      return false;
+    }
+    if (!List.of("ACTIVE").contains(defaultText(profile.getSocialSecurityWorkflowStatus(), "DRAFT").toUpperCase(Locale.ROOT))
+        && !List.of("COMPLETED", "PAID").contains(defaultText(profile.getSocialSecurityStatus(), "PENDING").toUpperCase(Locale.ROOT))) {
+      return false;
+    }
+    if (zeroIfNull(profile.getSocialSecurityMonthlyAmount()).signum() <= 0) {
+      return false;
+    }
+    return !feeMonth.toString().equals(normalizeBlank(profile.getSocialSecurityLastBilledMonth()));
+  }
+
+  private StaffMonthlyFeeBill upsertSocialSecurityMonthlyBill(
+      Long orgId, StaffAccount staff, StaffProfile profile, YearMonth feeMonth, Long operatorId) {
+    if (orgId == null || staff == null || profile == null || feeMonth == null) {
+      return null;
+    }
+    Department department = staff.getDepartmentId() == null ? null : departmentMapper.selectById(staff.getDepartmentId());
+    StaffMonthlyFeeBill bill = findMonthlyFeeBill(orgId, staff.getId(), feeMonth.toString(), "SOCIAL_SECURITY");
+    if (bill == null) {
+      bill = new StaffMonthlyFeeBill();
+      bill.setOrgId(orgId);
+      bill.setStaffId(staff.getId());
+      bill.setFeeMonth(feeMonth.toString());
+      bill.setFeeType("SOCIAL_SECURITY");
+      bill.setCreatedBy(operatorId);
+    }
+    java.math.BigDecimal amount = normalizeMoney(profile.getSocialSecurityMonthlyAmount());
+    bill.setStaffNo(normalizeBlank(staff.getStaffNo()));
+    bill.setStaffName(normalizeBlank(staff.getRealName()));
+    bill.setDepartmentId(staff.getDepartmentId());
+    bill.setDepartmentName(department == null ? null : normalizeBlank(department.getDeptName()));
+    bill.setTitle("员工社保 " + feeMonth + " " + defaultText(staff.getRealName(), defaultText(staff.getUsername(), "员工")));
+    bill.setQuantity(java.math.BigDecimal.ONE);
+    bill.setUnitPrice(amount);
+    bill.setAmount(amount);
+    bill.setStatus("GENERATED");
+    markFinancePending(bill);
+    Map<String, Object> detail = new HashMap<>();
+    detail.put("detailSummary", "社保月度费用 " + amount.setScale(2, java.math.RoundingMode.HALF_UP) + "元/人");
+    detail.put("workflowStatus", profile.getSocialSecurityWorkflowStatus());
+    detail.put("socialSecurityStartDate", profile.getSocialSecurityStartDate() == null ? null : profile.getSocialSecurityStartDate().toString());
+    detail.put("completedAt", profile.getSocialSecurityCompletedAt() == null ? null : profile.getSocialSecurityCompletedAt().toString());
+    bill.setDetailJson(writeJson(detail));
+    bill.setRemark(firstNonBlank(normalizeBlank(profile.getSocialSecurityRemark()), "社保自动记账"));
+    saveMonthlyFeeBill(bill);
+    profile.setSocialSecurityLastBilledMonth(feeMonth.toString());
+    staffProfileMapper.updateById(profile);
+    return bill;
+  }
+
+  private void syncSocialSecurityDirectorTodo(Long orgId, StaffAccount staff, StaffProfile profile) {
+    if (staff == null || profile == null) {
+      return;
+    }
+    clearSocialSecurityDirectorTodos(orgId, staff.getId());
+    StaffAccount assignee = findFirstActiveStaffByRoleCodes(orgId, List.of("DIRECTOR", "DEAN", "ADMIN", "SYS_ADMIN"));
+    OaTodo todo = new OaTodo();
+    todo.setTenantId(orgId);
+    todo.setOrgId(orgId);
+    todo.setTitle("【社保审核】" + defaultText(staff.getRealName(), defaultText(staff.getStaffNo(), "员工")) + " 企业社保申请");
+    todo.setContent(socialSecurityDirectorTodoMarker(staff.getId())
+        + " 员工工号：" + defaultText(staff.getStaffNo(), "-")
+        + "；月费用：" + normalizeMoney(profile.getSocialSecurityMonthlyAmount()).setScale(2, java.math.RoundingMode.HALF_UP) + "元"
+        + "；备注：" + defaultText(profile.getSocialSecurityRemark(), "无"));
+    todo.setDueTime(LocalDateTime.now().plusHours(4));
+    todo.setStatus("OPEN");
+    todo.setAssigneeId(assignee == null ? null : assignee.getId());
+    todo.setAssigneeName(assignee == null ? "院长" : defaultText(assignee.getRealName(), assignee.getUsername()));
+    todo.setCreatedBy(AuthContext.getStaffId());
+    oaTodoMapper.insert(todo);
+  }
+
+  private void syncSocialSecurityFinanceTodo(Long orgId, StaffAccount staff, StaffProfile profile) {
+    if (staff == null || profile == null) {
+      return;
+    }
+    clearSocialSecurityFinanceTodo(orgId, profile);
+    StaffAccount assignee = findFirstActiveStaffByRoleCodes(orgId,
+        List.of("FINANCE_MINISTER", "FINANCE_EMPLOYEE", "ACCOUNTANT", "CASHIER", "FINANCE"));
+    OaTodo todo = new OaTodo();
+    todo.setTenantId(orgId);
+    todo.setOrgId(orgId);
+    todo.setTitle("【社保办理】" + defaultText(staff.getRealName(), defaultText(staff.getStaffNo(), "员工")) + " 新增社保购买任务");
+    todo.setContent(socialSecurityFinanceTodoMarker(staff.getId())
+        + " 员工工号：" + defaultText(staff.getStaffNo(), "-")
+        + "；月费用：" + normalizeMoney(profile.getSocialSecurityMonthlyAmount()).setScale(2, java.math.RoundingMode.HALF_UP) + "元"
+        + "；是否院长审批：" + (normalizeFlag(profile.getSocialSecurityNeedDirectorApproval()) == 1 ? "是" : "否")
+        + "；备注：" + defaultText(profile.getSocialSecurityRemark(), "无"));
+    todo.setDueTime(LocalDateTime.now().plusHours(8));
+    todo.setStatus("OPEN");
+    todo.setAssigneeId(assignee == null ? null : assignee.getId());
+    todo.setAssigneeName(assignee == null ? "财务部" : defaultText(assignee.getRealName(), assignee.getUsername()));
+    todo.setCreatedBy(AuthContext.getStaffId());
+    oaTodoMapper.insert(todo);
+    profile.setSocialSecurityFinanceTodoId(todo.getId());
+  }
+
+  private StaffAccount findFirstActiveStaffByRoleCodes(Long orgId, List<String> roleCodes) {
+    if (roleCodes == null || roleCodes.isEmpty()) {
+      return null;
+    }
+    for (String roleCode : roleCodes) {
+      List<StaffAccount> candidates = staffMapper.selectByRoleCode(orgId, roleCode);
+      for (StaffAccount candidate : candidates) {
+        if (candidate != null && candidate.getId() != null
+            && Integer.valueOf(1).equals(candidate.getStatus())
+            && Objects.equals(candidate.getOrgId(), orgId)
+            && !Objects.equals(candidate.getIsDeleted(), 1)) {
+          return candidate;
+        }
+      }
+    }
+    return null;
+  }
+
+  private void clearSocialSecurityDirectorTodos(Long orgId, Long staffId) {
+    closeSocialSecurityTodos(orgId, socialSecurityDirectorTodoMarker(staffId), "院长审核已处理");
+  }
+
+  private void clearSocialSecurityFinanceTodo(Long orgId, StaffProfile profile) {
+    if (profile == null || profile.getStaffId() == null) {
+      return;
+    }
+    closeSocialSecurityTodos(orgId, socialSecurityFinanceTodoMarker(profile.getStaffId()), "财务办理已完成");
+    profile.setSocialSecurityFinanceTodoId(null);
+  }
+
+  private void closeSocialSecurityTodos(Long orgId, String markerPrefix, String message) {
+    if (normalizeBlank(markerPrefix) == null) {
+      return;
+    }
+    List<OaTodo> todos = oaTodoMapper.selectList(Wrappers.lambdaQuery(OaTodo.class)
+        .eq(OaTodo::getIsDeleted, 0)
+        .eq(orgId != null, OaTodo::getOrgId, orgId)
+        .eq(OaTodo::getStatus, "OPEN")
+        .like(OaTodo::getContent, markerPrefix));
+    for (OaTodo todo : todos) {
+      todo.setStatus("DONE");
+      todo.setContent(defaultText(todo.getContent(), "") + "；" + defaultText(message, "已处理"));
+      oaTodoMapper.updateById(todo);
+    }
+  }
+
+  private String socialSecurityDirectorTodoMarker(Long staffId) {
+    return "[SOCIAL_SECURITY_DIRECTOR:" + staffId + "]";
+  }
+
+  private String socialSecurityFinanceTodoMarker(Long staffId) {
+    return "[SOCIAL_SECURITY_FINANCE:" + staffId + "]";
   }
 
   private HrContractReminderResponse toContractReminderResponse(StaffProfile profile, StaffAccount staff, LocalDate today) {

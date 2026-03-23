@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.Data;
@@ -50,6 +51,28 @@ public class StaffProfile {
   private LocalDate socialSecurityStartDate;
 
   private Integer socialSecurityReminderDays;
+
+  private Integer socialSecurityCompanyApply;
+
+  private Integer socialSecurityNeedDirectorApproval;
+
+  private String socialSecurityWorkflowStatus;
+
+  private BigDecimal socialSecurityMonthlyAmount;
+
+  private LocalDateTime socialSecurityApplySubmittedAt;
+
+  private Long socialSecurityApplySubmittedBy;
+
+  private LocalDateTime socialSecurityDirectorDecisionAt;
+
+  private Long socialSecurityDirectorDecisionBy;
+
+  private Long socialSecurityFinanceTodoId;
+
+  private LocalDateTime socialSecurityCompletedAt;
+
+  private String socialSecurityLastBilledMonth;
 
   private String socialSecurityRemark;
 

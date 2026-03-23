@@ -4,11 +4,43 @@ export interface ScheduleItem {
   id: Id
   staffId: Id
   staffName?: string
+  sourceTemplateId?: Id
+  sourceTemplateName?: string
   dutyDate: string
   shiftCode?: string
   startTime?: string
   endTime?: string
+  calendarTaskId?: Id
+  dutyTodoId?: Id
   status?: number
+}
+
+export interface ShiftSwapRequestItem {
+  id: Id
+  applicantStaffId?: Id
+  applicantStaffName?: string
+  applicantScheduleId?: Id
+  applicantDutyDate?: string
+  applicantShiftCode?: string
+  applicantStartTime?: string
+  applicantEndTime?: string
+  targetStaffId?: Id
+  targetStaffName?: string
+  targetScheduleId?: Id
+  targetDutyDate?: string
+  targetShiftCode?: string
+  targetStartTime?: string
+  targetEndTime?: string
+  status?: string
+  targetConfirmStatus?: string
+  approvalId?: Id
+  approvalStatus?: string
+  applicantRemark?: string
+  targetRemark?: string
+  targetConfirmedAt?: string
+  approvalSubmittedAt?: string
+  completedAt?: string
+  createTime?: string
 }
 
 export interface AttendanceItem {

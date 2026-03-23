@@ -13,6 +13,7 @@ export interface CaregiverGroupItem {
 export interface ShiftTemplateItem {
   id: number
   name: string
+  ruleSort?: number
   shiftCode: string
   startTime: string
   endTime: string
@@ -24,6 +25,29 @@ export interface ShiftTemplateItem {
   attendanceLinked?: number
   enabled?: number
   remark?: string
+}
+
+export interface ShiftTemplateBatchSaveItem {
+  id?: number
+  shiftCode: string
+  startTime: string
+  endTime: string
+  crossDay?: number
+  requiredStaffCount?: number
+  recurrenceType?: 'DAILY_ONCE' | 'WEEKLY_ONCE' | 'WEEKLY_TWICE'
+  executeStaffId?: number
+  executeStaffName?: string
+  attendanceLinked?: number
+  enabled?: number
+  remark?: string
+}
+
+export interface ShiftTemplateBatchSaveRequest {
+  name: string
+  enabled?: number
+  remark?: string
+  replaceExisting?: number
+  items: ShiftTemplateBatchSaveItem[]
 }
 
 export interface ShiftHandoverItem {

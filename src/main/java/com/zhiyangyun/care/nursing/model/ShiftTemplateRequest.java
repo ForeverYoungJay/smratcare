@@ -11,6 +11,7 @@ public class ShiftTemplateRequest {
   private Long orgId;
   @NotBlank
   private String name;
+  private Integer ruleSort = 0;
   @NotBlank
   private String shiftCode;
   @NotNull

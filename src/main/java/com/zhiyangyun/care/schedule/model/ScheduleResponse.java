@@ -9,9 +9,13 @@ public class ScheduleResponse {
   private Long id;
   private Long staffId;
   private String staffName;
+  private Long sourceTemplateId;
+  private String sourceTemplateName;
   private LocalDate dutyDate;
   private String shiftCode;
   private LocalDateTime startTime;
   private LocalDateTime endTime;
+  private Long calendarTaskId;
+  private Long dutyTodoId;
   private Integer status;
 }

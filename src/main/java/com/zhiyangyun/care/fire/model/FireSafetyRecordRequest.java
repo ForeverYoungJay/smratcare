@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import lombok.Data;
 
@@ -30,6 +31,10 @@ public class FireSafetyRecordRequest {
   private String actionTaken;
 
   private LocalDate nextCheckDate;
+
+  private Boolean dailyReminderEnabled;
+
+  private LocalTime dailyReminderTime;
 
   private String dutyRecord;
 

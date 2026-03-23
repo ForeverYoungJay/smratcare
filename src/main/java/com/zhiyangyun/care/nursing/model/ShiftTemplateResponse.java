@@ -9,6 +9,7 @@ public class ShiftTemplateResponse {
   private Long tenantId;
   private Long orgId;
   private String name;
+  private Integer ruleSort;
   private String shiftCode;
   private LocalTime startTime;
   private LocalTime endTime;

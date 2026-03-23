@@ -92,6 +92,8 @@
             >
               推荐修复
             </a>
+            <a v-permission="credentialViewerRoles" @click="openCredential(record.id)">查看密码</a>
+            <a v-permission="credentialViewerRoles" @click="openCredential(record.id, true)">打印账号密码</a>
             <a v-if="record.status === 1" v-permission="accountManagerRoles" @click="toggleStaffLock(record, true)">一键锁定</a>
             <a v-else v-permission="accountManagerRoles" @click="toggleStaffLock(record, false)">解除锁定</a>
             <a v-permission="accountManagerRoles" @click="openRole(record)">分配角色</a>
@@ -102,25 +104,42 @@
 
     <a-drawer v-model:open="drawerOpen" :title="drawerTitle" width="520">
       <a-form :model="form" layout="vertical">
-        <a-form-item label="账号" required>
-          <a-input v-model:value="form.username" :disabled="!form.id" placeholder="默认与职工号一致" />
-          <div class="form-rule-tip">新建时默认使用自动生成的职工号作为登录账号。</div>
-        </a-form-item>
-        <a-form-item label="职工号（登录ID）" required>
-          <a-input v-model:value="form.staffNo" :disabled="!!form.id" placeholder="保存前可自动生成" />
-          <a-space v-if="!form.id" style="margin-top: 8px">
-            <a-button size="small" @click="regenerateStaffCredentials">重新生成职工号</a-button>
-            <span class="form-rule-tip">默认初始密码：123456</span>
-          </a-space>
-        </a-form-item>
-        <a-form-item label="姓名" required>
-          <a-input v-model:value="form.realName" />
-        </a-form-item>
+        <div v-if="form.id" class="identity-shell">
+          <div class="identity-head">
+            <div>
+              <div class="identity-title">人员主档</div>
+              <div class="form-rule-tip">姓名、工号、部门、手机号统一在“员工基本信息”维护，账号页只处理账号、密码、角色与监管链。</div>
+            </div>
+            <a-button size="small" @click="goToProfileBasic">去基本信息</a-button>
+          </div>
+          <a-descriptions :column="2" size="small" bordered>
+            <a-descriptions-item label="姓名">{{ form.realName || '-' }}</a-descriptions-item>
+            <a-descriptions-item label="职工号">{{ form.staffNo || '-' }}</a-descriptions-item>
+            <a-descriptions-item label="部门">{{ departmentNameMap.get(String(form.departmentId || '')) || '-' }}</a-descriptions-item>
+            <a-descriptions-item label="手机号">{{ form.phone || '-' }}</a-descriptions-item>
+          </a-descriptions>
+        </div>
+        <template v-else>
+          <a-form-item label="账号" required>
+            <a-input v-model:value="form.username" :disabled="!form.id" placeholder="默认与职工号一致" />
+            <div class="form-rule-tip">新建时默认使用自动生成的职工号作为登录账号。</div>
+          </a-form-item>
+          <a-form-item label="职工号（登录ID）" required>
+            <a-input v-model:value="form.staffNo" :disabled="!!form.id" placeholder="保存前可自动生成" />
+            <a-space style="margin-top: 8px">
+              <a-button size="small" @click="regenerateStaffCredentials">重新生成职工号</a-button>
+              <span class="form-rule-tip">默认初始密码：123456</span>
+            </a-space>
+          </a-form-item>
+          <a-form-item label="姓名" required>
+            <a-input v-model:value="form.realName" />
+          </a-form-item>
+        </template>
         <a-form-item :label="form.id ? '重置密码（可选）' : '初始密码'" :required="!form.id">
           <a-input-password v-model:value="form.password" :placeholder="form.id ? '留空则不修改密码' : '请输入初始密码'" />
           <div v-if="!form.id" class="form-rule-tip">新账号默认密码为 123456，可保存前修改。</div>
         </a-form-item>
-        <a-form-item label="部门">
+        <a-form-item v-if="!form.id" label="部门" required>
           <a-select
             v-model:value="form.departmentId"
             allow-clear
@@ -166,7 +185,7 @@
             <span class="form-rule-tip">自动按规则推荐：员工→本部门部长；部长→院长/SYS_ADMIN。</span>
           </a-space>
         </a-form-item>
-        <a-form-item label="手机号">
+        <a-form-item v-if="!form.id" label="手机号">
           <a-input v-model:value="form.phone" />
         </a-form-item>
         <a-form-item label="状态">
@@ -176,6 +195,7 @@
       <template #footer>
         <a-space>
           <a-button @click="drawerOpen = false">取消</a-button>
+          <a-button v-if="!form.id" :loading="saving" @click="submit(true)">保存并打印账号密码</a-button>
           <a-button type="primary" :loading="saving" @click="submit">保存</a-button>
         </a-space>
       </template>
@@ -188,6 +208,27 @@
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <a-modal v-model:open="credentialOpen" title="账号密码" width="560px" :footer="null">
+      <a-descriptions :column="1" bordered size="small">
+        <a-descriptions-item label="姓名">{{ credentialForm.realName || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="职工号">{{ credentialForm.staffNo || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="登录账号">{{ credentialForm.username || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="当前密码">
+          <span v-if="credentialForm.passwordPlaintextSnapshot">{{ credentialForm.passwordPlaintextSnapshot }}</span>
+          <span v-else class="credential-empty">暂无可查看密码快照，请先重置密码后再查看。</span>
+        </a-descriptions-item>
+        <a-descriptions-item label="最近更新时间">
+          {{ credentialForm.passwordSnapshotUpdatedAt ? dayjs(credentialForm.passwordSnapshotUpdatedAt).format('YYYY-MM-DD HH:mm:ss') : '-' }}
+        </a-descriptions-item>
+      </a-descriptions>
+      <div class="credential-actions">
+        <a-space>
+          <a-button @click="credentialOpen = false">关闭</a-button>
+          <a-button type="primary" :disabled="!credentialForm.passwordPlaintextSnapshot" @click="printCredentialCard">打印账号密码</a-button>
+        </a-space>
+      </div>
+    </a-modal>
   </PageContainer>
 </template>
 
@@ -199,14 +240,15 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../components/PageContainer.vue'
 import SearchForm from '../components/SearchForm.vue'
 import DataTable from '../components/DataTable.vue'
-import { getStaff, getStaffPage, createStaff, updateStaff, updateStaffRoles, getStaffSupervisorAnomalies, lockStaff, unlockStaff } from '../api/staff'
+import { getStaff, getStaffCredentials, getStaffPage, createStaff, updateStaff, updateStaffRoles, getStaffSupervisorAnomalies, lockStaff, unlockStaff } from '../api/staff'
 import { getRolePage } from '../api/role'
 import { getStaffRoleAssignments } from '../api/rbac'
 import { useDepartmentOptions } from '../composables/useDepartmentOptions'
 import { useStaffOptions } from '../composables/useStaffOptions'
 import { useLiveSyncRefresh } from '../composables/useLiveSyncRefresh'
+import { openPrintTableReport } from '../utils/print'
 import { canBeDirectLeader, canBeIndirectLeader, ensureSupervisorOrder, mergeRoleCodes } from '../utils/supervisor'
-import type { Id, StaffItem, RoleItem, PageResult } from '../types'
+import type { Id, StaffCredentialItem, StaffItem, RoleItem, PageResult } from '../types'
 
 const props = withDefaults(defineProps<{ title?: string; subTitle?: string }>(), {
   title: '员工管理',
@@ -214,6 +256,7 @@ const props = withDefaults(defineProps<{ title?: string; subTitle?: string }>(),
 })
 
 const accountManagerRoles = ['HR_EMPLOYEE', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
+const credentialViewerRoles = ['HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
 
 const query = reactive({
   keyword: undefined as string | undefined,
@@ -249,7 +292,7 @@ const columns = [
   { title: '监管状态', key: 'supervisorIssue', width: 200 },
   { title: '手机号', dataIndex: 'phone', key: 'phone', width: 140 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 100 },
-  { title: '操作', key: 'action', width: 160 }
+  { title: '操作', key: 'action', width: 260 }
 ]
 
 const drawerOpen = ref(false)
@@ -262,6 +305,8 @@ const statusOptions = [
 
 const roleOpen = ref(false)
 const roleForm = reactive<{ staffId?: Id; roleIds: number[] }>({ roleIds: [] })
+const credentialOpen = ref(false)
+const credentialForm = reactive<Partial<StaffCredentialItem>>({})
 const { departmentOptions, searchDepartments, ensureSelectedDepartment } = useDepartmentOptions({ pageSize: 260, preloadSize: 600 })
 const { staffOptions, staffLoading, searchStaff, ensureSelectedStaff } = useStaffOptions({ pageSize: 220, preloadSize: 600 })
 
@@ -471,6 +516,17 @@ function openDrawer(record?: StaffItem) {
   drawerOpen.value = true
 }
 
+function goToProfileBasic() {
+  if (!form.id) return
+  router.push({
+    path: '/hr/profile/basic',
+    query: {
+      staffId: String(form.id),
+      autoOpen: '1'
+    }
+  })
+}
+
 function generateStaffNo() {
   return `YG${dayjs().format('YYMMDDHHmmssSSS')}`
 }
@@ -518,12 +574,16 @@ function openDrawerWithRecommendation(record: StaffItem) {
   applySupervisorRecommendation()
 }
 
-async function submit() {
+async function submit(printAfterSave = false) {
   const username = String(form.username || '').trim()
   const realName = String(form.realName || '').trim()
   const staffNo = String(form.staffNo || '').trim()
   if (!username || !realName || !staffNo) {
     message.warning('账号、姓名、职工号为必填项')
+    return
+  }
+  if (!form.departmentId) {
+    message.warning('部门为必填项，请先选择部门')
     return
   }
   if (!form.id && String(form.password || '').trim().length < 6) {
@@ -573,14 +633,18 @@ async function submit() {
       indirectLeaderId: form.indirectLeaderId ? String(form.indirectLeaderId) : undefined
     }
     if (!payload.password) delete payload.password
+    let saved: StaffItem
     if (form.id) {
-      await updateStaff(form.id, payload)
+      saved = await updateStaff(form.id, payload)
     } else {
-      await createStaff(payload)
+      saved = await createStaff(payload)
     }
     message.success('保存成功')
     drawerOpen.value = false
-    fetchData()
+    await fetchData()
+    if (printAfterSave && saved?.id) {
+      await openCredential(saved.id, true)
+    }
   } catch {
     message.error('保存失败')
   } finally {
@@ -601,6 +665,48 @@ async function toggleStaffLock(record: StaffItem, lock: boolean) {
   } catch {
     message.error(lock ? '锁定失败' : '解锁失败')
   }
+}
+
+async function openCredential(staffId?: Id, autoPrint = false) {
+  if (!staffId) return
+  try {
+    const detail = await getStaffCredentials(staffId)
+    Object.keys(credentialForm).forEach((key) => {
+      ;(credentialForm as any)[key] = undefined
+    })
+    Object.assign(credentialForm, detail || {})
+    credentialOpen.value = true
+    if (autoPrint) {
+      printCredentialCard()
+    }
+  } catch {
+    message.error('获取账号密码失败')
+  }
+}
+
+function printCredentialCard() {
+  if (!credentialForm.username || !credentialForm.passwordPlaintextSnapshot) {
+    message.warning('当前没有可打印的账号密码')
+    return
+  }
+  openPrintTableReport({
+    title: '员工账号密码单',
+    subtitle: `打印时间：${dayjs().format('YYYY-MM-DD HH:mm:ss')}`,
+    columns: [
+      { key: 'realName', title: '姓名' },
+      { key: 'staffNo', title: '职工号' },
+      { key: 'username', title: '登录账号' },
+      { key: 'password', title: '当前密码' },
+      { key: 'updatedAt', title: '密码更新时间' }
+    ],
+    rows: [{
+      realName: credentialForm.realName || '-',
+      staffNo: credentialForm.staffNo || '-',
+      username: credentialForm.username || '-',
+      password: credentialForm.passwordPlaintextSnapshot || '-',
+      updatedAt: credentialForm.passwordSnapshotUpdatedAt ? dayjs(credentialForm.passwordSnapshotUpdatedAt).format('YYYY-MM-DD HH:mm:ss') : '-'
+    }]
+  })
 }
 
 async function maybeAutoOpenFromRoute() {
@@ -692,6 +798,37 @@ useLiveSyncRefresh({
 .form-rule-tip {
   margin-bottom: 6px;
   font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.identity-shell {
+  margin-bottom: 16px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+}
+
+.identity-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.identity-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.credential-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.credential-empty {
   color: rgba(0, 0, 0, 0.45);
 }
 </style>

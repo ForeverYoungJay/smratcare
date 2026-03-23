@@ -103,6 +103,32 @@
         <template v-else-if="column.key === 'status'">
           <a-tag :color="statusColor(record.status)">{{ statusLabel(record.status) }}</a-tag>
         </template>
+        <template v-else-if="column.key === 'remark'">
+          <div class="remark-cell">
+            <template v-if="isEditingRemark(record.id)">
+              <a-input
+                v-model:value="remarkDraft"
+                size="small"
+                :maxlength="1000"
+                placeholder="输入备注，失焦或回车自动保存"
+                @pressEnter="saveRemark(record)"
+                @blur="saveRemark(record)"
+              />
+              <a-tag color="processing" class="remark-save-tag">
+                {{ isSavingRemark(record.id) ? '保存中...' : '自动保存' }}
+              </a-tag>
+            </template>
+            <template v-else>
+              <a-tag
+                :color="record.remark ? 'blue' : 'default'"
+                class="remark-tag"
+                @click="startRemarkEdit(record)"
+              >
+                {{ record.remark || '添加备注' }}
+              </a-tag>
+            </template>
+          </div>
+        </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
             <a-button type="link" @click="goNursingLogs(record)">护理日志</a-button>
@@ -388,6 +414,7 @@ const columns = [
   { title: '巡检人', dataIndex: 'inspectorName', key: 'inspectorName', width: 120 },
   { title: '附件', key: 'attachmentCount', width: 100 },
   { title: '其他说明', dataIndex: 'otherNote', key: 'otherNote', width: 180 },
+  { title: '备注', dataIndex: 'remark', key: 'remark', width: 220 },
   { title: '跟进措施', dataIndex: 'followUpAction', key: 'followUpAction' },
   { title: '操作', key: 'action', width: 120 }
 ]
@@ -411,6 +438,9 @@ const form = reactive({
 })
 const formPhotoFiles = ref<InspectionPhotoFile[]>([])
 const boardPhotoFiles = ref<InspectionPhotoFile[]>([])
+const editingRemarkId = ref<string>('')
+const remarkDraft = ref('')
+const savingRemarkMap = reactive<Record<string, boolean>>({})
 const uploadingFormPhoto = ref(false)
 const uploadingBoardPhoto = ref(false)
 const maxPhotoCount = 9
@@ -680,6 +710,57 @@ function openEdit(record: HealthInspection) {
   form.remark = record.remark || ''
   formPhotoFiles.value = resolveAttachmentFiles(record.attachmentUrls)
   editOpen.value = true
+}
+
+function remarkKey(id?: Id) {
+  return id == null ? '' : String(id)
+}
+
+function isEditingRemark(id?: Id) {
+  return editingRemarkId.value !== '' && editingRemarkId.value === remarkKey(id)
+}
+
+function isSavingRemark(id?: Id) {
+  const key = remarkKey(id)
+  return !!key && !!savingRemarkMap[key]
+}
+
+function startRemarkEdit(record: HealthInspection) {
+  editingRemarkId.value = remarkKey(record.id)
+  remarkDraft.value = record.remark || ''
+}
+
+async function saveRemark(record: HealthInspection) {
+  const key = remarkKey(record.id)
+  if (!key || savingRemarkMap[key]) return
+  const nextRemark = remarkDraft.value.trim()
+  if ((record.remark || '') === nextRemark) {
+    editingRemarkId.value = ''
+    return
+  }
+  savingRemarkMap[key] = true
+  try {
+    await updateHealthInspection(record.id, {
+      elderId: record.elderId,
+      elderName: record.elderName,
+      inspectionDate: record.inspectionDate,
+      inspectionItem: record.inspectionItem,
+      result: record.result,
+      status: record.status,
+      inspectorName: record.inspectorName,
+      followUpAction: record.followUpAction,
+      attachmentUrls: record.attachmentUrls,
+      otherNote: record.otherNote,
+      remark: nextRemark
+    })
+    record.remark = nextRemark
+    message.success('备注已保存')
+    editingRemarkId.value = ''
+  } catch (error) {
+    message.error(resolveHealthError(error, '备注保存失败'))
+  } finally {
+    savingRemarkMap[key] = false
+  }
 }
 
 function onElderChange(elderId?: Id) {
@@ -1172,5 +1253,21 @@ watch(
 }
 .context-card {
   background: #f0f9ff;
+}
+.remark-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+:deep(.remark-tag) {
+  cursor: pointer;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.remark-save-tag {
+  flex-shrink: 0;
 }
 </style>

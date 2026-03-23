@@ -1513,6 +1513,8 @@ const modulePresetMap: Record<'director' | 'nurse' | 'finance', PortalModuleKey[
 }
 
 const searchAliases: Record<string, string[]> = {
+  '/elder/list': ['老人详情', '长者详情', '老人档案', '长者档案', '档案详情'],
+  '/elder/in-hospital-overview': ['在院总览', '在院服务总览', '长者总览', '协同联动'],
   '/oa/approval': ['审批', '待审批', '流程审批', '批量审批', '请假审批'],
   '/oa/todo': ['待办', '任务', '待处理', '超时'],
   '/oa/work-execution/calendar': ['日历', '协同日历', '行政日历', '排班'],
@@ -1524,6 +1526,26 @@ const searchAliases: Record<string, string[]> = {
   '/medical-care/orders': ['医嘱', '医嘱执行', '医护任务'],
   '/logistics/task-center': ['任务中心', '后勤任务', '工单']
 }
+
+const searchRouteRedirects: Record<string, { route: string; keywords?: string }> = {
+  '/elder/detail/:id': {
+    route: '/elder/list',
+    keywords: '老人详情 长者详情 档案详情 详情页'
+  },
+  '/elder/edit/:id': {
+    route: '/elder/list',
+    keywords: '编辑老人 长者编辑 编辑档案 修改档案'
+  }
+}
+
+const searchRouteExcludes = new Set([
+  '/',
+  '/home',
+  '/dashboard',
+  '/login',
+  '/403',
+  '/:pathMatch(.*)*'
+])
 
 const searchPinnedRoutes = [
   '/oa/todo',
@@ -3222,17 +3244,23 @@ function buildSearchIndex() {
     .map((record) => {
       const title = String((record.meta as any)?.title || '')
       const path = String(record.path || '')
+      const redirectConfig = searchRouteRedirects[path]
+      const route = redirectConfig?.route || path
       const hasVisibleTitle = !!title && title !== 'Dashboard'
-      if (!path.startsWith('/')) return null
-      if (!hasVisibleTitle && !searchAliases[path]) return null
-      if (String((record.meta as any)?.hidden || '') === 'true') return null
-      const aliasWords = searchAliases[path] || []
-      const rawKeywords = [title, path, String(record.name || ''), aliasWords.join(' ')].filter(Boolean).join(' ')
+      if (!route.startsWith('/')) return null
+      if (searchRouteExcludes.has(path) || searchRouteExcludes.has(route)) return null
+      if (path.includes('/:') && !redirectConfig) return null
+      const aliasWords = [...(searchAliases[path] || []), ...(searchAliases[route] || [])]
+      const extraKeywords = String(redirectConfig?.keywords || '').trim()
+      if (!hasVisibleTitle && aliasWords.length === 0 && !extraKeywords) return null
+      const rawKeywords = [title, path, route, String(record.name || ''), aliasWords.join(' '), extraKeywords]
+        .filter(Boolean)
+        .join(' ')
       const keywordInitials = toPinyinInitials(rawKeywords)
       const keywords = `${rawKeywords} ${keywordInitials}`.trim()
       return {
         title: hasVisibleTitle ? title : aliasWords[0] || path,
-        route: path,
+        route,
         keywords
       }
     })
@@ -3240,7 +3268,16 @@ function buildSearchIndex() {
 
   const dedup = new Map<string, { title: string; route: string; keywords: string }>()
   dynamicEntries.forEach((item) => {
-    if (!dedup.has(item.route)) dedup.set(item.route, item)
+    const existing = dedup.get(item.route)
+    if (!existing) {
+      dedup.set(item.route, item)
+      return
+    }
+    dedup.set(item.route, {
+      title: existing.title,
+      route: item.route,
+      keywords: `${existing.keywords} ${item.keywords}`.trim()
+    })
   })
   searchIndex.value = Array.from(dedup.values())
 }

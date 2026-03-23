@@ -10,12 +10,14 @@ import com.zhiyangyun.care.auth.mapper.RoleMapper;
 import com.zhiyangyun.care.auth.mapper.StaffMapper;
 import com.zhiyangyun.care.auth.mapper.StaffRoleMapper;
 import com.zhiyangyun.care.auth.model.Result;
+import com.zhiyangyun.care.auth.model.StaffCredentialResponse;
 import com.zhiyangyun.care.auth.model.StaffOptionResponse;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.auth.security.SupervisorRuleHelper;
 import com.zhiyangyun.care.auth.model.StaffCreateRequest;
 import com.zhiyangyun.care.auth.model.StaffUpdateRequest;
 import jakarta.validation.Valid;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -68,6 +70,8 @@ public class AdminStaffController {
     staff.setStaffNo(staffNo);
     staff.setUsername(username);
     staff.setPasswordHash(passwordEncoder.encode(password));
+    staff.setPasswordPlaintextSnapshot(password);
+    staff.setPasswordSnapshotUpdatedAt(LocalDateTime.now());
     staff.setRealName(normalizeText(request.getRealName()));
     staff.setPhone(normalizeText(request.getPhone()));
     staff.setEmail(normalizeText(request.getEmail()));
@@ -80,7 +84,7 @@ public class AdminStaffController {
     staffMapper.insert(staff);
     fillRoleCodes(staff);
     recordSupervisorAudit(staff, null, null);
-    return Result.ok(staff);
+    return Result.ok(sanitizeStaffResponse(staff));
   }
 
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
@@ -96,7 +100,10 @@ public class AdminStaffController {
       staff.setDepartmentId(request.getDepartmentId());
     }
     if (request.getPassword() != null && !request.getPassword().isBlank()) {
-      staff.setPasswordHash(passwordEncoder.encode(request.getPassword().trim()));
+      String normalizedPassword = request.getPassword().trim();
+      staff.setPasswordHash(passwordEncoder.encode(normalizedPassword));
+      staff.setPasswordPlaintextSnapshot(normalizedPassword);
+      staff.setPasswordSnapshotUpdatedAt(LocalDateTime.now());
     }
     if (request.getRealName() != null) {
       staff.setRealName(normalizeText(request.getRealName()));
@@ -124,7 +131,7 @@ public class AdminStaffController {
     staffMapper.updateById(staff);
     fillRoleCodes(staff);
     recordSupervisorAudit(staff, beforeDirectLeaderId, beforeIndirectLeaderId);
-    return Result.ok(staff);
+    return Result.ok(sanitizeStaffResponse(staff));
   }
 
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
@@ -144,7 +151,14 @@ public class AdminStaffController {
   public Result<StaffAccount> get(@PathVariable Long id) {
     StaffAccount staff = staffMapper.selectById(id);
     fillRoleCodes(staff);
-    return Result.ok(staff);
+    return Result.ok(sanitizeStaffResponse(staff));
+  }
+
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @GetMapping("/{id}/credentials")
+  public Result<StaffCredentialResponse> getCredentials(@PathVariable Long id) {
+    StaffAccount staff = requireStaff(id);
+    return Result.ok(toCredentialResponse(staff));
   }
 
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
@@ -154,7 +168,7 @@ public class AdminStaffController {
     staff.setStatus(0);
     staffMapper.updateById(staff);
     fillRoleCodes(staff);
-    return Result.ok(staff);
+    return Result.ok(sanitizeStaffResponse(staff));
   }
 
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
@@ -164,7 +178,7 @@ public class AdminStaffController {
     staff.setStatus(1);
     staffMapper.updateById(staff);
     fillRoleCodes(staff);
-    return Result.ok(staff);
+    return Result.ok(sanitizeStaffResponse(staff));
   }
 
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
@@ -214,7 +228,10 @@ public class AdminStaffController {
       }
     }
     IPage<StaffAccount> result = staffMapper.selectPage(new Page<>(page, size), wrapper);
-    result.getRecords().forEach(this::fillRoleCodes);
+    result.getRecords().forEach(item -> {
+      fillRoleCodes(item);
+      sanitizeStaffResponse(item);
+    });
     return Result.ok(result);
   }
 
@@ -266,6 +283,27 @@ public class AdminStaffController {
       return;
     }
     staff.setRoleCodes(roleMapper.selectRoleCodesByStaff(staff.getId(), staff.getOrgId()));
+  }
+
+  private StaffAccount sanitizeStaffResponse(StaffAccount staff) {
+    if (staff == null) {
+      return null;
+    }
+    staff.setPasswordHash(null);
+    staff.setPasswordPlaintextSnapshot(null);
+    return staff;
+  }
+
+  private StaffCredentialResponse toCredentialResponse(StaffAccount staff) {
+    StaffCredentialResponse response = new StaffCredentialResponse();
+    response.setStaffId(staff.getId());
+    response.setStaffNo(staff.getStaffNo());
+    response.setUsername(staff.getUsername());
+    response.setRealName(staff.getRealName());
+    response.setStatus(staff.getStatus());
+    response.setPasswordPlaintextSnapshot(staff.getPasswordPlaintextSnapshot());
+    response.setPasswordSnapshotUpdatedAt(staff.getPasswordSnapshotUpdatedAt());
+    return response;
   }
 
   private StaffAccount requireStaff(Long id) {

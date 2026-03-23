@@ -212,6 +212,7 @@ import LifecycleStageBar from '../../../components/LifecycleStageBar.vue'
 import ElderNameAutocomplete from '../../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
+import { formatChineseDateTime } from '../../../utils/dateLocale'
 import { lifecycleStageHint, normalizeLifecycleStage } from '../../../utils/lifecycleStage'
 import { getElderDetail } from '../../../api/elder'
 import {
@@ -721,9 +722,7 @@ function archiveItemStateTagColor(ready: boolean) {
 function formatGeneratedAt(value?: string) {
   const text = String(value || '').trim()
   if (!text) return '-'
-  const date = new Date(text)
-  if (Number.isNaN(date.getTime())) return '-'
-  return date.toLocaleString()
+  return formatChineseDateTime(text, '-')
 }
 
 function downloadBundle() {

@@ -26,6 +26,14 @@ export interface HrStaffProfile {
   socialSecurityStatus?: string
   socialSecurityStartDate?: string
   socialSecurityReminderDays?: number
+  socialSecurityCompanyApply?: number
+  socialSecurityNeedDirectorApproval?: number
+  socialSecurityWorkflowStatus?: string
+  socialSecurityMonthlyAmount?: number
+  socialSecurityApplySubmittedAt?: string
+  socialSecurityDirectorDecisionAt?: string
+  socialSecurityCompletedAt?: string
+  socialSecurityLastBilledMonth?: string
   socialSecurityRemark?: string
   remark?: string
   updateTime?: string
@@ -48,10 +56,37 @@ export interface HrSocialSecurityReminderItem {
   socialSecurityStatus?: string
   socialSecurityStartDate?: string
   socialSecurityReminderDays?: number
+  socialSecurityCompanyApply?: number
+  socialSecurityNeedDirectorApproval?: number
+  socialSecurityWorkflowStatus?: string
+  socialSecurityMonthlyAmount?: number
+  socialSecurityApplySubmittedAt?: string
+  socialSecurityDirectorDecisionAt?: string
+  socialSecurityCompletedAt?: string
+  socialSecurityLastBilledMonth?: string
   reminderDate?: string
   remainingDays?: number
   reminderScope?: string
   socialSecurityRemark?: string
+}
+
+export interface HrSocialSecurityApplyRequest {
+  staffId: string | number
+  socialSecurityCompanyApply?: number
+  socialSecurityNeedDirectorApproval?: number
+  socialSecurityMonthlyAmount?: number
+  socialSecurityRemark?: string
+}
+
+export interface HrSocialSecurityCompleteRequest {
+  staffId: string | number
+  socialSecurityStartDate?: string
+  socialSecurityRemark?: string
+}
+
+export interface HrSocialSecurityBillGenerateRequest {
+  month?: string
+  staffIds?: Array<string | number>
 }
 
 export interface StaffTrainingRecord {
