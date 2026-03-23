@@ -1292,10 +1292,16 @@ public class AdminHrController {
     }
     wrapper.orderByDesc(CardAccount::getUpdateTime);
     IPage<CardAccount> page = cardAccountMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
-    Map<Long, ElderProfile> elderMap = elderMapper.selectBatchIds(
-            page.getRecords().stream().map(CardAccount::getElderId).filter(x -> x != null).distinct().toList())
-        .stream()
-        .collect(Collectors.toMap(ElderProfile::getId, e -> e, (a, b) -> a));
+    List<Long> elderIds = page.getRecords().stream()
+        .map(CardAccount::getElderId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList();
+    Map<Long, ElderProfile> elderMap = elderIds.isEmpty()
+        ? Map.of()
+        : elderMapper.selectBatchIds(elderIds)
+            .stream()
+            .collect(Collectors.toMap(ElderProfile::getId, e -> e, (a, b) -> a));
     IPage<HrCardSyncItemResponse> resp = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
     resp.setRecords(page.getRecords().stream().map(item -> {
       HrCardSyncItemResponse row = new HrCardSyncItemResponse();
