@@ -135,31 +135,7 @@
       <template v-else>
         <a-row :gutter="16">
           <a-col v-for="bed in pagedBeds" :key="bed.id" :xs="24" :sm="12" :md="8" :lg="6" :xl="4">
-            <div class="bed-info-card" :class="[isBedAlert(bed) ? 'is-alert' : '']" @click="openBed(bed)">
-              <div class="bed-card-header">
-                <div class="bed-card-title">
-                  <span class="bed-icon">💡</span>
-                  <span class="elder-name">{{ bed.elderName || '空床' }}</span>
-                  <span class="room-bed-no">— {{ bed.roomNo || '-' }} — {{ bed.bedNo }}</span>
-                </div>
-                <div class="bed-card-more">•••</div>
-              </div>
-              <div class="bed-card-body">
-                <div class="status-graphic">
-                  <div class="graphic-bed" :class="{'occupied': bed.elderId, 'empty': !bed.elderId, 'alert': isBedAlert(bed)}"></div>
-                  <div class="graphic-wave"></div>
-                </div>
-                <div class="status-text" :class="isBedAlert(bed) ? 'text-alert' : ''">{{ bedStatusText(bed) }}</div>
-              </div>
-              <div class="bed-card-footer">
-                <div class="vitals">
-                  <span class="vital-item">❤️ {{ getHeartRate(bed) }}</span>
-                  <span class="vital-item">🫁 {{ getBreathRate(bed) }}</span>
-                  <span class="vital-item wave-anim" v-if="bed.elderId">||||||||||</span>
-                </div>
-                <div class="status-badge" :class="bedBadgeClass(bed)">{{ bedBadgeText(bed) }}</div>
-              </div>
-            </div>
+            <BedInfoCard :bed="bed" @click="openBed(bed)" />
           </a-col>
         </a-row>
 
@@ -237,6 +213,7 @@ import { useRoute, useRouter } from 'vue-router'
 import QRCode from 'qrcode'
 import PageContainer from '../../components/PageContainer.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
+import BedInfoCard from '../../components/bed/BedInfoCard.vue'
 import { getElderDetail } from '../../api/elder'
 import { useBedMapDataset } from '../../composables/useBedMapDataset'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
@@ -485,40 +462,6 @@ function statusText(status?: number, elderId?: string) {
   if (status === 3) return '维修'
   if (elderId) return '入住'
   return '空床'
-}
-
-function isBedAlert(bed: BedItem) {
-  return bed.riskLevel === 'HIGH' || bed.status === 0 || (bed.abnormalVital24hCount && bed.abnormalVital24hCount > 0)
-}
-
-function bedStatusText(bed: BedItem) {
-  if (!bed.elderId) return '空闲'
-  if (bed.status === 2) return '维修'
-  if (bed.status === 3) return '清洁中'
-  if (isBedAlert(bed)) return bed.riskLabel || '正在告警'
-  return '静卧'
-}
-
-function getHeartRate(bed: BedItem) {
-  if (!bed.elderId) return '--'
-  return Math.floor(Math.random() * 20) + 60
-}
-
-function getBreathRate(bed: BedItem) {
-  if (!bed.elderId) return '--'
-  return Math.floor(Math.random() * 5) + 16
-}
-
-function bedBadgeClass(bed: BedItem) {
-  if (isBedAlert(bed)) return 'badge-alert'
-  if (bed.elderId) return 'badge-normal'
-  return 'badge-idle'
-}
-
-function bedBadgeText(bed: BedItem) {
-  if (!bed.elderId) return '空闲'
-  if (isBedAlert(bed)) return '异常'
-  return '静卧'
 }
 
 function statusTag(status?: number, elderId?: string) {
@@ -930,9 +873,11 @@ watch(filteredBeds, () => {
 }
 
 .room-meta {
-  font-size: 11px;
-  color: #64748b;
-  font-weight: 700;
+  font-size: 12px;
+  color: #94a3b8;
+  background: #f8fafc;
+  padding: 2px 8px;
+  border-radius: 12px;
 }
 
 .room-remark {
@@ -949,30 +894,43 @@ watch(filteredBeds, () => {
 }
 
 .bed-pill {
-  border: none;
-  border-radius: 10px;
-  min-width: 54px;
-  height: 28px;
-  padding: 0 10px;
-  font-size: 11px;
-  font-weight: 700;
+  border: 1px solid transparent;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
+  transition: all 0.2s;
 }
 
 .bed-pill.is-occupied {
-  color: #ffffff;
-  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  background: #eff6ff;
+  color: #1e40af;
+  border-color: #bfdbfe;
+}
+.bed-pill.is-occupied:hover {
+  background: #dbeafe;
+  border-color: #93c5fd;
 }
 
 .bed-pill.is-idle {
+  background: #f0fdf4;
   color: #166534;
-  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-  border: 1px solid #bbf7d0;
+  border-color: #bbf7d0;
+}
+.bed-pill.is-idle:hover {
+  background: #dcfce7;
+  border-color: #86efac;
 }
 
 .bed-pill.is-maintain {
-  color: #ffffff;
-  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  background: #fffbeb;
+  color: #b45309;
+  border-color: #fde68a;
+}
+.bed-pill.is-maintain:hover {
+  background: #fef3c7;
+  border-color: #fcd34d;
 }
 
 .bed-card {
@@ -998,179 +956,6 @@ watch(filteredBeds, () => {
   margin-bottom: 6px;
 }
 
-.bed-info-card {
-  width: 100%;
-  background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%);
-  border: 1px solid #334155;
-  border-radius: 12px;
-  padding: 16px;
-  color: #f8fafc;
-  font-family: 'Inter', sans-serif;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  cursor: pointer;
-  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-  margin-bottom: 16px;
-}
-
-.bed-info-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-  border-color: #64748b;
-}
-
-.bed-info-card.is-alert {
-  border-color: #ef4444;
-  box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
-}
-
-.bed-info-card .bed-card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #334155;
-  padding-bottom: 10px;
-  margin-bottom: 14px;
-}
-
-.bed-info-card .bed-card-title {
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
-}
-
-.bed-info-card .elder-name {
-  font-weight: 600;
-  color: #e2e8f0;
-}
-
-.bed-info-card .room-bed-no {
-  color: #94a3b8;
-  font-size: 12px;
-}
-
-.bed-info-card .bed-card-more {
-  color: #64748b;
-  letter-spacing: 2px;
-  font-weight: bold;
-}
-
-.bed-info-card .bed-card-body {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 90px;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 19px,
-    rgba(51, 65, 85, 0.3) 19px,
-    rgba(51, 65, 85, 0.3) 20px
-  ), repeating-linear-gradient(
-    90deg,
-    transparent,
-    transparent 19px,
-    rgba(51, 65, 85, 0.3) 19px,
-    rgba(51, 65, 85, 0.3) 20px
-  );
-  border-radius: 8px;
-  margin-bottom: 14px;
-  position: relative;
-  overflow: hidden;
-}
-
-.bed-info-card .status-graphic {
-  position: relative;
-  width: 100%;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.bed-info-card .graphic-bed {
-  width: 66px;
-  height: 33px;
-  border-bottom: 4px solid #475569;
-  border-left: 4px solid #475569;
-  border-right: 4px solid #475569;
-  border-radius: 2px 2px 0 0;
-  position: relative;
-}
-.bed-info-card .graphic-bed::after {
-  content: '';
-  position: absolute;
-  bottom: 0px;
-  left: 4px;
-  width: 50px;
-  height: 14px;
-  background: #3b82f6; /* occupied */
-  border-radius: 2px;
-}
-.bed-info-card .graphic-bed.empty::after {
-  background: #64748b;
-}
-.bed-info-card .graphic-bed.alert::after {
-  background: #ef4444;
-}
-
-.bed-info-card .status-text {
-  font-size: 13px;
-  font-weight: bold;
-  margin-top: 8px;
-  color: #cbd5e1;
-}
-.bed-info-card .status-text.text-alert {
-  color: #f87171;
-}
-
-.bed-info-card .bed-card-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.bed-info-card .vitals {
-  display: flex;
-  gap: 12px;
-  font-size: 12px;
-  color: #cbd5e1;
-}
-
-.bed-info-card .vital-item.wave-anim {
-  color: #3b82f6;
-  font-weight: bold;
-  letter-spacing: 1px;
-  opacity: 0.8;
-  animation: pulseOpacity 1.5s infinite alternate;
-}
-
-@keyframes pulseOpacity {
-  0% { opacity: 0.4; }
-  100% { opacity: 1; }
-}
-
-.bed-info-card .status-badge {
-  padding: 4px 10px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 600;
-}
-.bed-info-card .badge-idle {
-  background: #334155;
-  color: #94a3b8;
-}
-.bed-info-card .badge-normal {
-  background: #1e3a8a;
-  color: #93c5fd;
-}
-.bed-info-card .badge-alert {
-  background: rgba(239, 68, 68, 0.2);
-  color: #fca5a5;
-  border: 1px solid rgba(239, 68, 68, 0.5);
-}
 
 .modal-tip {
   color: #94a3b8;

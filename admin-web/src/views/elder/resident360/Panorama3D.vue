@@ -1,12 +1,20 @@
 <template>
   <div class="panorama-container" ref="containerRef">
     <div class="ui-panel">
+      <div class="ui-panel-bg"></div>
       <a-space align="center">
-        <a-button v-if="currentLevel !== 'PARK'" type="primary" @click="goUpLevel">返回上级</a-button>
-        <a-button @click="resetCamera">重置视角</a-button>
-        <a-tag color="blue" style="margin-left: 12px">{{ breadcrumbText }}</a-tag>
+        <a-button v-if="currentLevel !== 'PARK'" class="tech-btn" @click="goUpLevel">返回上级</a-button>
+        <a-button class="tech-btn" @click="resetCamera">重置视角</a-button>
+        <span class="tech-breadcrumb">{{ breadcrumbText }}</span>
       </a-space>
     </div>
+    
+    <!-- Hover Tooltip -->
+    <div v-show="tooltip.visible" class="tech-tooltip" :style="{ left: tooltip.x + 'px', top: tooltip.y + 'px' }">
+      <div class="tt-header">{{ tooltip.title }}</div>
+      <div class="tt-body" v-html="tooltip.content"></div>
+    </div>
+
     <div ref="canvasRef" class="canvas-wrapper"></div>
   </div>
 </template>
@@ -33,6 +41,8 @@ const selectedBuilding = ref<string>('')
 const selectedFloor = ref<string>('')
 const selectedRoom = ref<string>('')
 
+const tooltip = ref({ visible: false, x: 0, y: 0, title: '', content: '' })
+
 const breadcrumbText = computed(() => {
   let text = '园区全景'
   if (selectedBuilding.value) text += ` > ${selectedBuilding.value}`
@@ -54,18 +64,18 @@ const raycaster = new THREE.Raycaster()
 let hoveredObj: THREE.Object3D | null = null
 
 const materials = {
-  building: new THREE.MeshStandardMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.8, roughness: 0.2, metalness: 0.1 }),
-  floor: new THREE.MeshStandardMaterial({ color: 0xe2e8f0, transparent: true, opacity: 0.9 }),
-  room: new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 1.0, roughness: 0.8 }),
-  roomHover: new THREE.MeshStandardMaterial({ color: 0x60a5fa }),
-  hover: new THREE.MeshStandardMaterial({ color: 0x2563eb, emissive: 0x1e3a8a }),
-  bedIdle: new THREE.MeshStandardMaterial({ color: 0x22c55e }), // Green
-  bedOccupied: new THREE.MeshStandardMaterial({ color: 0xef4444 }), // Red
-  bedReserved: new THREE.MeshStandardMaterial({ color: 0x3b82f6 }), // Blue
-  bedCleaning: new THREE.MeshStandardMaterial({ color: 0xeab308 }), // Yellow
-  bedMaintenance: new THREE.MeshStandardMaterial({ color: 0x9ca3af }), // Gray
-  bedBlink: new THREE.MeshStandardMaterial({ color: 0xf97316 }), // Orange
-  bedPulse: new THREE.MeshStandardMaterial({ color: 0xef4444 }) // Red pulse
+  building: new THREE.MeshStandardMaterial({ color: 0x0284c7, transparent: true, opacity: 0.15, roughness: 0.1, metalness: 0.8, side: THREE.DoubleSide }),
+  floor: new THREE.MeshStandardMaterial({ color: 0x0f172a, transparent: true, opacity: 0.85, roughness: 0.5 }),
+  room: new THREE.MeshStandardMaterial({ color: 0x0ea5e9, transparent: true, opacity: 0.08, depthWrite: false }),
+  roomHover: new THREE.MeshStandardMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.25 }),
+  hover: new THREE.MeshStandardMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.3, emissive: 0x0ea5e9, emissiveIntensity: 0.6 }),
+  bedIdle: new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x16a34a, emissiveIntensity: 0.5 }), // Green
+  bedOccupied: new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xdc2626, emissiveIntensity: 0.5 }), // Red
+  bedReserved: new THREE.MeshStandardMaterial({ color: 0x3b82f6, emissive: 0x2563eb, emissiveIntensity: 0.5 }), // Blue
+  bedCleaning: new THREE.MeshStandardMaterial({ color: 0xeab308, emissive: 0xca8a04, emissiveIntensity: 0.5 }), // Yellow
+  bedMaintenance: new THREE.MeshStandardMaterial({ color: 0x9ca3af, emissive: 0x6b7280, emissiveIntensity: 0.3 }), // Gray
+  bedBlink: new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0xf97316, emissiveIntensity: 0.9 }), // Orange
+  bedPulse: new THREE.MeshStandardMaterial({ color: 0xef4444, emissive: 0xef4444, emissiveIntensity: 1.0 }) // Red pulse
 }
 
 const objectsMap = new Map<string, THREE.Object3D>() // key -> mesh or group
@@ -86,7 +96,7 @@ function initScene() {
   renderer.value = new THREE.WebGLRenderer({ antialias: true, alpha: true })
   renderer.value.setSize(width, height)
   renderer.value.setPixelRatio(window.devicePixelRatio)
-  renderer.value.setClearColor(0xf1f5f9, 1)
+  renderer.value.setClearColor(0x020617, 1) // Deep space/slate-950
   canvasRef.value.appendChild(renderer.value.domElement)
 
   // CSS2DRenderer for Labels
@@ -104,14 +114,20 @@ function initScene() {
   controls.value.maxPolarAngle = Math.PI / 2 - 0.05 // don't go below ground
 
   // Lighting
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6)
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.4)
   scene.value.add(ambientLight)
-  const dirLight = new THREE.DirectionalLight(0xffffff, 0.8)
+  
+  const dirLight = new THREE.DirectionalLight(0xe0f2fe, 1.2)
   dirLight.position.set(50, 100, 50)
   scene.value.add(dirLight)
+  
+  const fillLight = new THREE.DirectionalLight(0x38bdf8, 0.5)
+  fillLight.position.set(-50, 20, -50)
+  scene.value.add(fillLight)
 
-  // Ground
-  const gridHelper = new THREE.GridHelper(200, 50, 0xcbd5e1, 0xe2e8f0)
+  // Cyber Ground Grid
+  const gridHelper = new THREE.GridHelper(300, 60, 0x1e3a8a, 0x0f172a)
+  gridHelper.position.y = -0.1
   scene.value.add(gridHelper)
 
   // Events
@@ -138,14 +154,16 @@ function createLabel(text: string, className: string) {
   const div = document.createElement('div')
   div.className = `3d-label ${className}`
   div.textContent = text
-  div.style.padding = '4px 8px'
-  div.style.background = 'rgba(255,255,255,0.9)'
-  div.style.color = '#1e293b'
+  div.style.padding = '4px 10px'
+  div.style.background = 'rgba(15, 23, 42, 0.75)'
+  div.style.border = '1px solid rgba(56, 189, 248, 0.4)'
+  div.style.color = '#e0f2fe'
   div.style.borderRadius = '4px'
   div.style.fontSize = '12px'
   div.style.fontWeight = 'bold'
+  div.style.backdropFilter = 'blur(4px)'
   div.style.pointerEvents = 'none'
-  div.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)'
+  div.style.boxShadow = '0 0 10px rgba(2, 132, 199, 0.3)'
   return new CSS2DObject(div)
 }
 
@@ -217,9 +235,15 @@ function buildSceneData() {
         const rGeo = new THREE.BoxGeometry(roomSize, 0.2, roomSize)
         const roomMesh = new THREE.Mesh(rGeo, materials.room.clone())
         roomMesh.position.y = 0.1
-        roomMesh.userData = { type: 'roomTile', ref: rGroup }
+        roomMesh.userData = { type: 'roomTile', ref: rGroup, data: roomItem, floorName }
         rGroup.add(roomMesh)
         interactableObjects.push(roomMesh)
+
+        // Room wireframe
+        const rEdges = new THREE.EdgesGeometry(rGeo)
+        const rLine = new THREE.LineSegments(rEdges, new THREE.LineBasicMaterial({ color: 0x0ea5e9, opacity: 0.35, transparent: true }))
+        rLine.position.y = 0.1
+        rGroup.add(rLine)
 
         // Render beds inside the room
         const numBeds = roomItem.beds.length
@@ -291,9 +315,21 @@ function buildSceneData() {
     const hitGeo = new THREE.BoxGeometry(10, totalHeight, 10)
     const hitMesh = new THREE.Mesh(hitGeo, materials.building.clone())
     hitMesh.position.y = totalHeight / 2
-    hitMesh.userData = { type: 'buildingHitbox', name: buildingName, ref: bGroup }
+    hitMesh.userData = { 
+      type: 'buildingHitbox', 
+      name: buildingName, 
+      ref: bGroup,
+      totalFloors,
+      totalRooms: bFloors.reduce((acc, f) => acc + (props.roomLookup.get(`${buildingName}@@${f}`)?.length || 0), 0)
+    }
     bGroup.add(hitMesh)
     interactableObjects.push(hitMesh)
+    
+    // Building Wireframe Glow
+    const bEdges = new THREE.EdgesGeometry(hitGeo)
+    const bLine = new THREE.LineSegments(bEdges, new THREE.LineBasicMaterial({ color: 0x38bdf8, opacity: 0.7, transparent: true }))
+    bLine.position.y = totalHeight / 2
+    bGroup.add(bLine)
     
     // Building Label
     const bLabel = createLabel(buildingName, 'building-label')
@@ -422,6 +458,38 @@ function onPointerMove(event: PointerEvent) {
 
   if (hits.length > 0) {
     const obj = hits[0].object
+    
+    // Hover Tooltip Logic
+    tooltip.value.visible = true
+    // Smooth follow cursor with slight offset
+    tooltip.value.x = Object.is(tooltip.value.x, 0) ? event.clientX + 15 : tooltip.value.x + (event.clientX + 15 - tooltip.value.x) * 0.5
+    tooltip.value.y = Object.is(tooltip.value.y, 0) ? event.clientY + 15 : tooltip.value.y + (event.clientY + 15 - tooltip.value.y) * 0.5
+
+    if (obj.userData.type === 'buildingHitbox') {
+      tooltip.value.title = obj.userData.name
+      tooltip.value.content = `<div class="tt-row"><span>楼层书：</span><span class="tt-val cyan">${obj.userData.totalFloors}层</span></div>
+                               <div class="tt-row"><span>总计房间：</span><span class="tt-val">${obj.userData.totalRooms}间</span></div>
+                               <div class="tt-tip">点击展开内部结构</div>`
+    } else if (obj.userData.type === 'floorSlab') {
+      tooltip.value.title = `${obj.userData.building} - ${obj.userData.floor}`
+      tooltip.value.content = `<div class="tt-tip">双击/单机下钻至楼层</div>`
+    } else if (obj.userData.type === 'roomTile') {
+      const rd = obj.userData.data
+      tooltip.value.title = `房间：${rd.roomNo || '-'}`
+      tooltip.value.content = `<div class="tt-row"><span>楼栋/楼层：</span><span class="tt-val">${obj.userData.ref.userData.building} / ${obj.userData.floorName}</span></div>
+                               <div class="tt-row"><span>入住情况：</span><span class="tt-val ${rd.occupiedBeds >= rd.totalBeds ? 'red' : 'green'}">${rd.occupiedBeds}/${rd.totalBeds} 床</span></div>
+                               <div class="tt-tip">点击进入房间内部视角</div>`
+    } else if (obj.userData.type === 'bed') {
+      const bd = obj.userData.bed
+      const occStr = bd.elderId ? `已入住 (${bd.elderName})` : '空闲'
+      tooltip.value.title = `床位：${bd.bedNo}`
+      tooltip.value.content = `<div class="tt-row"><span>状态：</span><span class="tt-val">${occStr}</span></div>
+                               <div class="tt-tip">点击查看详细资产档案</div>`
+    } else {
+      tooltip.value.visible = false
+    }
+
+    // Material Highlights
     if (obj !== hoveredObj) {
       if (obj.userData.type === 'buildingHitbox' || obj.userData.type === 'floorSlab') {
         obj.userData.originalMat = (obj as THREE.Mesh).material
@@ -429,18 +497,17 @@ function onPointerMove(event: PointerEvent) {
       } else if (obj.userData.type === 'roomTile') {
         ;(obj as THREE.Mesh).material = materials.roomHover
       } else if (obj.userData.type === 'bed') {
-        (obj as THREE.Mesh).scale.set(1.1, 1.1, 1.1) // Slight scale up
-        // Do not alter material if it's animating so we don't break the animation,
-        // but for idle/occupied we can add a slight emissive.
+        (obj as THREE.Mesh).scale.set(1.2, 1.2, 1.2) // Pronounced scale up
         const isAnim = animatedBeds.some(b => b.mesh === obj)
         if (!isAnim) {
-           (obj as THREE.Mesh).material = materials.hover // Use hover material
+           (obj as THREE.Mesh).material = materials.hover 
         }
       }
       hoveredObj = obj
     }
     renderer.value!.domElement.style.cursor = 'pointer'
   } else {
+    tooltip.value.visible = false
     renderer.value!.domElement.style.cursor = 'default'
   }
 }
@@ -484,19 +551,22 @@ function zoomToObject(obj: THREE.Object3D, topDown = false, overrideZ?: number) 
   const maxDim = Math.max(size.x, size.y, size.z)
   const fov = camera.value.fov * (Math.PI / 180)
   let cameraZ = overrideZ || (Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5)
+  // Give it a more dynamic tech-angle (offset X and Z)
+  const offsetX = topDown ? 0 : cameraZ * 0.4
+  const offsetZ = topDown ? 0 : cameraZ
 
   gsap.to(camera.value.position, {
-    x: topDown ? center.x : center.x + cameraZ * 0.5,
-    y: topDown ? center.y + cameraZ : center.y + size.y / 2 + (overrideZ ? 5 : 10),
-    z: topDown ? center.z : center.z + cameraZ,
-    duration: 1.0,
+    x: center.x + offsetX,
+    y: topDown ? center.y + cameraZ : center.y + size.y / 2 + (overrideZ ? 8 : 12),
+    z: center.z + offsetZ,
+    duration: 1.2,
     ease: 'power3.inOut'
   })
   gsap.to(controls.value.target, {
     x: center.x,
     y: center.y,
     z: center.z,
-    duration: 1.0,
+    duration: 1.2,
     ease: 'power3.inOut'
   })
 }
@@ -592,21 +662,106 @@ onBeforeUnmount(() => {
   position: relative;
   border-radius: 12px;
   overflow: hidden;
-  background: #f1f5f9;
+  background: #020617; /* Matches clearColor */
+  box-shadow: inset 0 0 100px rgba(2, 132, 199, 0.05); /* subtle inner glow */
 }
 .canvas-wrapper {
   width: 100%;
   height: 100%;
 }
+
+/* Cyber UI Panel */
 .ui-panel {
   position: absolute;
   top: 16px;
-  right: 16px;
+  left: 16px;
   z-index: 10;
-  background: rgba(255, 255, 255, 0.85);
+  display: flex;
+  align-items: center;
   padding: 8px 16px;
   border-radius: 8px;
-  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
-  backdrop-filter: blur(4px);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5), inset 0 0 10px rgba(56, 189, 248, 0.1);
+  overflow: hidden;
+}
+.ui-panel-bg {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(8px);
+  z-index: -1;
+}
+.tech-btn {
+  background: rgba(2, 132, 199, 0.2);
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  color: #bae6fd;
+  font-weight: 600;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+.tech-btn:hover {
+  background: rgba(14, 165, 233, 0.4);
+  color: #fff;
+  border-color: #7dd3fc;
+  box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+}
+.tech-breadcrumb {
+  color: #7dd3fc;
+  font-weight: 700;
+  letter-spacing: 1px;
+  font-size: 13px;
+  margin-left: 12px;
+  text-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+}
+
+/* Hover Tooltip */
+.tech-tooltip {
+  position: fixed;
+  z-index: 100;
+  pointer-events: none;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 15px rgba(2, 132, 199, 0.3);
+  backdrop-filter: blur(8px);
+  border-radius: 6px;
+  padding: 12px;
+  min-width: 180px;
+  transform: translate(0, 0); /* Let JS position it */
+  font-family: 'Inter', sans-serif;
+  transition: opacity 0.2s;
+}
+.tech-tooltip .tt-header {
+  font-size: 14px;
+  font-weight: 800;
+  color: #e0f2fe;
+  border-bottom: 1px solid rgba(56, 189, 248, 0.3);
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.tech-tooltip .tt-body {
+  font-size: 12px;
+  color: #94a3b8;
+}
+.tech-tooltip :deep(.tt-row) {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.tech-tooltip :deep(.tt-val) {
+  font-weight: bold;
+  color: #f8fafc;
+}
+.tech-tooltip :deep(.tt-val.cyan) { color: #38bdf8; }
+.tech-tooltip :deep(.tt-val.green) { color: #4ade80; }
+.tech-tooltip :deep(.tt-val.red) { color: #f87171; }
+.tech-tooltip :deep(.tt-tip) {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(100, 116, 139, 0.3);
+  font-size: 11px;
+  color: #0ea5e9;
+  font-style: italic;
 }
 </style>
