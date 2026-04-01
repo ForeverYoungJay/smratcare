@@ -91,8 +91,8 @@ export const ROLE_PAGE_PRESETS: Record<string, RolePagePreset> = {
   },
   HR_MINISTER: {
     label: '行政人事部部长',
-    description: '行政人事工作台、行政管理、统计分析、角色管理、权限总览、基础配置',
-    paths: [...commonPersonalPaths, '/hr', '/oa', '/stats', '/system/role', '/system/permission-overview', '/base-config']
+    description: '行政人事工作台、行政管理、统计分析、官网配置、角色管理、权限总览、基础配置',
+    paths: [...commonPersonalPaths, '/hr', '/oa', '/stats', '/system/site-config', '/system/role', '/system/permission-overview', '/base-config']
   },
   HR_EMPLOYEE: {
     label: '行政人事部员工',

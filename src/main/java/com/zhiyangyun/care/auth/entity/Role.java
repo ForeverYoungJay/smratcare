@@ -14,6 +14,8 @@ public class Role {
   @TableId(type = IdType.ASSIGN_ID)
   private Long id;
   private Long orgId;
+  private Long departmentId;
+  private Long superiorRoleId;
   private String roleName;
   private String roleCode;
   private String roleDesc;

@@ -14,6 +14,7 @@
           <a v-for="item in navItems" :key="item.id" @click="scrollTo(item.id)">{{ item.label }}</a>
         </nav>
         <div class="top-actions">
+          <a-button v-if="canManageSiteConfig" @click="goSiteConfig">官网配置</a-button>
           <a-button type="primary" @click="goAdmin">进入管理后台</a-button>
           <a-button @click="goLogin">员工登录</a-button>
         </div>
@@ -27,6 +28,7 @@
     </a-drawer>
 
     <div class="floating-actions">
+      <a-button v-if="canManageSiteConfig" @click="goSiteConfig">官网配置</a-button>
       <a-button type="primary" @click="goAdmin">后台入口</a-button>
       <a-button @click="openConsultModal">预约参观</a-button>
       <a-button @click="toggleReadingMode">{{ readingMode ? '标准模式' : '阅读模式' }}</a-button>
@@ -685,6 +687,9 @@ const router = useRouter()
 const userStore = useUserStore()
 const PROFILE_OVERRIDE_STORAGE_KEY = 'enterprise_profile_override_v1'
 const hasToken = computed(() => Boolean(getToken()))
+const canManageSiteConfig = computed(() =>
+  (userStore.roles || []).some((role) => ['ADMIN', 'SYS_ADMIN', 'DIRECTOR', 'HR_MINISTER'].includes(String(role || '').toUpperCase()))
+)
 const profileConfigOpen = ref(false)
 const profileConfigSaving = ref(false)
 const profileConfigDraft = ref('')
@@ -1128,6 +1133,10 @@ function goLogin() {
 
 function goAdmin() {
   router.push(hasToken.value ? '/portal' : '/admin')
+}
+
+function goSiteConfig() {
+  router.push('/system/site-config')
 }
 
 function openMapNavigation() {

@@ -34,8 +34,9 @@ export interface RoleItem {
   id: number
   roleName: string
   roleCode: string
-  roleDesc?: string
   orgId?: Id
+  departmentId?: Id
+  superiorRoleId?: Id
   status?: number
   routePermissionsJson?: string
 }
@@ -43,8 +44,6 @@ export interface RoleItem {
 export interface DepartmentItem {
   id: number
   deptName: string
-  deptCode?: string
-  parentId?: number
   sortNo?: number
   orgId?: Id
   status?: number

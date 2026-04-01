@@ -39,8 +39,9 @@ import { getMenuTree } from '../../layouts/menu'
 
 const userStore = useUserStore()
 const roles = computed(() => userStore.roles || [])
+const pagePermissions = computed(() => userStore.pagePermissions || [])
 const keyword = ref('')
-const menuTree = computed(() => getMenuTree(roles.value))
+const menuTree = computed(() => getMenuTree(roles.value, pagePermissions.value))
 
 const menuNodeCount = computed(() => {
   const walk = (items: any[]): number =>

@@ -1,16 +1,14 @@
 package com.zhiyangyun.care.auth.model;
 
-import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @Data
 public class RoleRequest {
   private Long orgId;
-  @NotBlank
+  private Long departmentId;
+  private Long superiorRoleId;
   private String roleName;
-  @NotBlank
   private String roleCode;
-  private String roleDesc;
   private String routePermissionsJson;
   private Integer status = 1;
 }

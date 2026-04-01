@@ -21,16 +21,15 @@ const DEPARTMENT_POOL_CACHE_TTL = 120 * 1000
 
 function toDepartmentOption(item: DepartmentItem): DepartmentOption {
   const name = item.deptName || `部门#${item.id}`
-  const suffix = item.deptCode ? ` (${item.deptCode})` : ''
   return {
-    label: `${name}${suffix}`,
+    label: name,
     value: String(item.id),
     name
   }
 }
 
 function departmentSearchText(item: DepartmentItem) {
-  const text = `${item.deptName || ''} ${item.deptCode || ''}`.trim()
+  const text = `${item.deptName || ''}`.trim()
   return `${text} ${toPinyinInitials(text)}`
 }
 

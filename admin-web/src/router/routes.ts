@@ -3063,8 +3063,14 @@ export const routes: RouteRecordRaw[] = [
         path: 'system',
         name: 'System',
         meta: { title: '系统管理', icon: 'SettingOutlined', roles: ['DIRECTOR', 'SYS_ADMIN', 'ADMIN', 'HR_MINISTER'] },
-        redirect: '/system/org-info',
+        redirect: '/system/site-config',
         children: [
+          {
+            path: 'site-config',
+            name: 'SystemSiteConfigCenter',
+            component: () => import('../views/System/SiteConfigCenter.vue'),
+            meta: { title: '官网配置中心', roles: ['ADMIN', 'HR_MINISTER'] }
+          },
           {
             path: 'org-info',
             name: 'SystemOrgInfo',
@@ -3074,29 +3080,26 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'org-manage',
             name: 'SystemOrgManage',
-            meta: { title: '机构管理', roles: ['ADMIN'] },
-            redirect: '/system/org-manage/intro',
+            meta: { title: '机构管理（已下沉）', roles: ['ADMIN'], hidden: true },
+            redirect: '/system/site-config?tab=profile',
             children: [
               {
                 path: 'intro',
                 name: 'SystemOrgIntro',
-                component: () => import('../views/base-config/Index.vue'),
-                props: { title: '机构介绍', groupCode: 'SYSTEM_ORG_INTRO' },
-                meta: { title: '机构介绍', roles: ['ADMIN'] }
+                redirect: '/system/site-config?tab=profile',
+                meta: { title: '机构介绍', roles: ['ADMIN'], hidden: true }
               },
               {
                 path: 'news',
                 name: 'SystemOrgNews',
-                component: () => import('../views/base-config/Index.vue'),
-                props: { title: '机构动态', groupCode: 'SYSTEM_ORG_NEWS' },
-                meta: { title: '机构动态', roles: ['ADMIN'] }
+                redirect: '/system/site-config?tab=profile',
+                meta: { title: '机构动态', roles: ['ADMIN'], hidden: true }
               },
               {
                 path: 'life',
                 name: 'SystemLifeEntertainment',
-                component: () => import('../views/base-config/Index.vue'),
-                props: { title: '生活娱乐', groupCode: 'SYSTEM_LIFE_ENTERTAINMENT' },
-                meta: { title: '生活娱乐', roles: ['ADMIN'] }
+                redirect: '/system/site-config?tab=profile',
+                meta: { title: '生活娱乐', roles: ['ADMIN'], hidden: true }
               }
             ]
           },
@@ -3115,23 +3118,20 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'app-version',
             name: 'SystemAppVersion',
-            component: () => import('../views/base-config/Index.vue'),
-            props: { title: 'APP版本管理', groupCode: 'SYSTEM_APP_VERSION' },
-            meta: { title: 'APP版本管理', roles: ['ADMIN'] }
+            redirect: '/system/site-config?tab=profile',
+            meta: { title: 'APP版本管理（已下沉）', roles: ['ADMIN'], hidden: true }
           },
           {
             path: 'dict',
             name: 'SystemDictionary',
-            component: () => import('../views/base-config/Index.vue'),
-            props: { title: '系统字典', groupCode: 'SYSTEM_DICTIONARY' },
-            meta: { title: '系统字典', roles: ['ADMIN'] }
+            redirect: '/base-config/elder-type',
+            meta: { title: '系统字典（并入基础数据配置）', roles: ['ADMIN'], hidden: true }
           },
           {
             path: 'message',
             name: 'SystemMessageManage',
-            component: () => import('../views/base-config/Index.vue'),
-            props: { title: '留言管理', groupCode: 'SYSTEM_MESSAGE' },
-            meta: { title: '留言管理', roles: ['ADMIN'] }
+            redirect: '/system/site-config?tab=consult',
+            meta: { title: '留言管理', roles: ['ADMIN'], hidden: true }
           },
           {
             path: 'staff',
@@ -3143,7 +3143,7 @@ export const routes: RouteRecordRaw[] = [
             path: 'menu-preview',
             name: 'SystemMenuPreview',
             component: () => import('../views/System/MenuPreview.vue'),
-            meta: { title: '菜单预览', roles: ['ADMIN'] }
+            meta: { title: '菜单预览', roles: ['ADMIN'], hidden: true }
           },
           {
             path: 'permission-overview',

@@ -1,8 +1,8 @@
 <template>
-  <PageContainer title="角色管理" subTitle="维护角色与权限基础信息">
+  <PageContainer title="角色管理" subTitle="只维护角色名称、所属部门、上级领导角色和页面权限">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
-        <a-input v-model:value="query.keyword" placeholder="角色名称/编码" allow-clear />
+        <a-input v-model:value="query.keyword" placeholder="角色名称" allow-clear />
       </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openDrawer()">新增角色</a-button>
@@ -18,15 +18,17 @@
       @change="handleTableChange"
     >
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'status'">
-          <a-tag :color="record.status === 1 ? 'green' : 'default'">
-            {{ record.status === 1 ? '启用' : '停用' }}
-          </a-tag>
+        <template v-if="column.key === 'departmentName'">
+          {{ resolveDepartmentName(record.departmentId) }}
+        </template>
+        <template v-else-if="column.key === 'superiorRoleName'">
+          {{ resolveRoleName(record.superiorRoleId) }}
+        </template>
+        <template v-else-if="column.key === 'status'">
+          <a-tag :color="record.status === 1 ? 'green' : 'default'">{{ record.status === 1 ? '启用' : '停用' }}</a-tag>
         </template>
         <template v-else-if="column.key === 'pagePermissions'">
-          <a-tag color="blue">
-            {{ parseRoutePermissionsJson(record.routePermissionsJson).length || 0 }} 项
-          </a-tag>
+          <a-tag color="blue">{{ parseRoutePermissionsJson(record.routePermissionsJson).length || 0 }} 项</a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
@@ -40,16 +42,30 @@
       </template>
     </DataTable>
 
-    <a-drawer v-model:open="drawerOpen" :title="drawerTitle" width="520">
+    <a-drawer v-model:open="drawerOpen" :title="drawerTitle" width="620">
       <a-form :model="form" layout="vertical">
         <a-form-item label="角色名称" required>
-          <a-input v-model:value="form.roleName" />
+          <a-input v-model:value="form.roleName" placeholder="例如：行政人事部部长" />
         </a-form-item>
-        <a-form-item label="角色编码" required>
-          <a-input v-model:value="form.roleCode" />
+        <a-form-item label="所属部门" required>
+          <a-select
+            v-model:value="form.departmentId"
+            show-search
+            allow-clear
+            :options="departmentOptions"
+            :filter-option="filterOption"
+            placeholder="选择所属部门"
+          />
         </a-form-item>
-        <a-form-item label="角色描述">
-          <a-textarea v-model:value="form.roleDesc" :rows="3" />
+        <a-form-item label="上级领导角色">
+          <a-select
+            v-model:value="form.superiorRoleId"
+            show-search
+            allow-clear
+            :options="superiorRoleOptions"
+            :filter-option="filterOption"
+            placeholder="不选则表示本角色无上级领导角色"
+          />
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="form.status" :options="statusOptions" />
@@ -59,13 +75,11 @@
             <a-alert
               type="info"
               show-icon
-              message="页面权限按角色生效"
-              description="可直接套用组织架构预设，也可以按页面树自定义。未配置时仍按原有角色规则访问。"
+              :message="recommendedPreset ? `推荐预设：${recommendedPreset.label}` : '当前角色暂无推荐预设'"
+              :description="recommendedPreset?.description || '可直接按页面树勾选。角色编码由系统自动生成，不需要人工填写。'"
             />
             <a-space wrap>
-              <a-button size="small" @click="applyPresetPermissions" :disabled="!recommendedPreset">
-                套用{{ recommendedPreset?.label || '组织架构' }}预设
-              </a-button>
+              <a-button size="small" @click="applyPresetPermissions" :disabled="!recommendedPreset">套用推荐预设</a-button>
               <a-button size="small" @click="checkedPagePermissions = []">清空页面权限</a-button>
               <span class="permission-summary">已选 {{ checkedPagePermissions.length }} 个页面</span>
             </a-space>
@@ -96,18 +110,15 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
-import { getRolePage, createRole, updateRole, deleteRole } from '../../api/rbac'
-import type { RoleItem, PageResult } from '../../types'
-import {
-  getPagePermissionTree,
-  getRolePagePreset,
-  parseRoutePermissionsJson,
-  serializeRoutePermissions
-} from '../../utils/pageAccess'
+import { getRolePage, createRole, updateRole, deleteRole, getDepartmentOptionPage } from '../../api/rbac'
+import type { DepartmentItem, PageResult, RoleItem } from '../../types'
+import { getPagePermissionTree, getRolePagePreset, parseRoutePermissionsJson, serializeRoutePermissions } from '../../utils/pageAccess'
 
 const router = useRouter()
 const query = reactive({ keyword: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const rows = ref<RoleItem[]>([])
+const allRoles = ref<RoleItem[]>([])
+const departments = ref<DepartmentItem[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const drawerOpen = ref(false)
@@ -123,22 +134,55 @@ const statusOptions = [
 
 const columns = [
   { title: '角色名称', dataIndex: 'roleName', key: 'roleName', width: 180 },
-  { title: '角色编码', dataIndex: 'roleCode', key: 'roleCode', width: 180 },
+  { title: '所属部门', key: 'departmentName', width: 180 },
+  { title: '上级领导角色', key: 'superiorRoleName', width: 180 },
   { title: '页面权限', key: 'pagePermissions', width: 120 },
-  { title: '角色描述', dataIndex: 'roleDesc', key: 'roleDesc' },
   { title: '状态', key: 'status', width: 100 },
-  { title: '操作', key: 'action', width: 120 }
+  { title: '操作', key: 'action', width: 140 }
 ]
 
 const drawerTitle = computed(() => (form.id ? '编辑角色' : '新增角色'))
-const recommendedPreset = computed(() => getRolePagePreset(form.roleCode))
+const recommendedPreset = computed(() => getRolePagePreset(form.roleCode || form.roleName))
+const departmentOptions = computed(() =>
+  departments.value.map((item) => ({ label: item.deptName, value: item.id }))
+)
+const superiorRoleOptions = computed(() =>
+  allRoles.value
+    .filter((item) => item.id !== form.id)
+    .map((item) => ({ label: item.roleName, value: item.id }))
+)
+
+function filterOption(input: string, option: { label?: string }) {
+  return String(option?.label || '').toLowerCase().includes(String(input || '').toLowerCase())
+}
+
+function resolveDepartmentName(departmentId?: string | number) {
+  if (departmentId == null || departmentId === '') return '-'
+  return departments.value.find((item) => String(item.id) === String(departmentId))?.deptName || `#${departmentId}`
+}
+
+function resolveRoleName(roleId?: string | number) {
+  if (roleId == null || roleId === '') return '-'
+  return allRoles.value.find((item) => String(item.id) === String(roleId))?.roleName || `#${roleId}`
+}
+
+async function fetchRoles(pageParams = query) {
+  const res: PageResult<RoleItem> = await getRolePage(pageParams)
+  rows.value = res.list || []
+  pagination.total = res.total || rows.value.length
+  const allRes: PageResult<RoleItem> = await getRolePage({ pageNo: 1, pageSize: 300 })
+  allRoles.value = allRes.list || []
+}
+
+async function fetchDepartments() {
+  const res: PageResult<DepartmentItem> = await getDepartmentOptionPage({ pageNo: 1, pageSize: 300, activeOnly: false })
+  departments.value = res.list || []
+}
 
 async function fetchData() {
   loading.value = true
   try {
-    const res: PageResult<RoleItem> = await getRolePage(query)
-    rows.value = res.list
-    pagination.total = res.total || res.list.length
+    await Promise.all([fetchRoles(), fetchDepartments()])
   } finally {
     loading.value = false
   }
@@ -164,7 +208,8 @@ function openDrawer(record?: RoleItem) {
     id: record?.id,
     roleName: record?.roleName || '',
     roleCode: record?.roleCode || '',
-    roleDesc: record?.roleDesc || '',
+    departmentId: record?.departmentId,
+    superiorRoleId: record?.superiorRoleId,
     routePermissionsJson: record?.routePermissionsJson || '',
     status: record?.status ?? 1
   })
@@ -178,29 +223,32 @@ function onPermissionCheck(checkedKeys: string[] | { checked: string[] }) {
 
 function applyPresetPermissions() {
   if (!recommendedPreset.value) {
-    message.warning('当前角色没有预设页面权限，可手动勾选')
+    message.warning('当前角色没有推荐预设，可手动勾选')
     return
   }
   checkedPagePermissions.value = [...recommendedPreset.value.paths]
-  message.success(`已套用${recommendedPreset.value.label}预设`)
 }
 
 async function submit() {
-  if (!form.roleName || !form.roleCode) {
-    message.error('请填写角色名称和角色编码')
+  if (!form.roleName) {
+    message.error('请填写角色名称')
+    return
+  }
+  if (!form.departmentId) {
+    message.error('请选择所属部门')
     return
   }
   saving.value = true
   try {
     const payload = {
       roleName: form.roleName,
-      roleCode: form.roleCode,
-      roleDesc: form.roleDesc,
+      departmentId: form.departmentId,
+      superiorRoleId: form.superiorRoleId,
       routePermissionsJson: serializeRoutePermissions(checkedPagePermissions.value),
       status: form.status ?? 1
     }
     if (form.id) {
-      await updateRole(form.id, payload)
+      await updateRole(Number(form.id), payload)
     } else {
       await createRole(payload)
     }

@@ -35,9 +35,9 @@ public class AdminDepartmentController {
   public Result<Department> create(@Valid @RequestBody DepartmentRequest request) {
     Department department = new Department();
     department.setOrgId(AuthContext.getOrgId());
-    department.setParentId(request.getParentId());
+    department.setParentId(null);
     department.setDeptName(request.getDeptName());
-    department.setDeptCode(request.getDeptCode());
+    department.setDeptCode(null);
     department.setSortNo(request.getSortNo());
     department.setStatus(request.getStatus());
     departmentMapper.insert(department);
@@ -52,9 +52,9 @@ public class AdminDepartmentController {
       return Result.error(404, "Department not found");
     }
     department.setOrgId(AuthContext.getOrgId());
-    department.setParentId(request.getParentId());
+    department.setParentId(null);
     department.setDeptName(request.getDeptName());
-    department.setDeptCode(request.getDeptCode());
+    department.setDeptCode(null);
     department.setSortNo(request.getSortNo());
     department.setStatus(request.getStatus());
     departmentMapper.updateById(department);
@@ -92,15 +92,12 @@ public class AdminDepartmentController {
         .eq(Department::getIsDeleted, 0)
         .eq(orgId != null, Department::getOrgId, orgId);
     if (keyword != null && !keyword.isBlank()) {
-      wrapper.and(w -> w.like(Department::getDeptName, keyword)
-          .or().like(Department::getDeptCode, keyword));
+      wrapper.like(Department::getDeptName, keyword);
     }
     if (sortBy != null && !sortBy.isBlank()) {
       boolean asc = "asc".equalsIgnoreCase(order);
       if ("deptName".equals(sortBy)) {
         wrapper.orderBy(true, asc, Department::getDeptName);
-      } else if ("deptCode".equals(sortBy)) {
-        wrapper.orderBy(true, asc, Department::getDeptCode);
       } else if ("createTime".equals(sortBy)) {
         wrapper.orderBy(true, asc, Department::getCreateTime);
       }
@@ -121,8 +118,7 @@ public class AdminDepartmentController {
         .eq(orgId != null, Department::getOrgId, orgId)
         .eq(activeOnly, Department::getStatus, 1);
     if (keyword != null && !keyword.isBlank()) {
-      wrapper.and(w -> w.like(Department::getDeptName, keyword)
-          .or().like(Department::getDeptCode, keyword));
+      wrapper.like(Department::getDeptName, keyword);
     }
     wrapper.orderByAsc(Department::getSortNo).orderByAsc(Department::getId);
     IPage<Department> sourcePage = departmentMapper.selectPage(new Page<>(page, size), wrapper);
@@ -135,8 +131,6 @@ public class AdminDepartmentController {
     DepartmentOptionResponse row = new DepartmentOptionResponse();
     row.setId(department.getId());
     row.setDeptName(department.getDeptName());
-    row.setDeptCode(department.getDeptCode());
-    row.setParentId(department.getParentId());
     row.setSortNo(department.getSortNo());
     row.setOrgId(department.getOrgId());
     row.setStatus(department.getStatus());

@@ -204,7 +204,7 @@
     <a-modal v-model:open="roleOpen" title="分配角色" @ok="submitRole">
       <a-form layout="vertical">
         <a-form-item label="角色" required>
-          <a-select v-model:value="roleForm.roleIds" mode="multiple" :options="roleOptions" />
+          <a-select v-model:value="roleForm.roleIds" mode="multiple" :options="roleFilterOptions" />
         </a-form-item>
       </a-form>
     </a-modal>
@@ -314,7 +314,6 @@ const roles = ref<RoleItem[]>([])
 const pageTitle = computed(() => props.title || '员工管理')
 const pageSubTitle = computed(() => props.subTitle || '账号与角色配置')
 
-const roleOptions = computed(() => roles.value.map((r) => ({ label: r.roleName, value: r.id })))
 const roleFilterOptions = computed(() => roles.value.map((r) => ({ label: `${r.roleName} (${r.roleCode})`, value: r.id })))
 const departmentNameMap = computed(() => new Map(departmentOptions.value.map((item) => [String(item.value), item.name])))
 const staffNameMap = computed(() => {
@@ -435,6 +434,14 @@ async function fetchData() {
   } finally {
     loading.value = false
   }
+}
+
+async function ensureRolesLoaded() {
+  if (roles.value.length > 0) {
+    return
+  }
+  const roleRes: PageResult<RoleItem> = await getRolePage({ pageNo: 1, pageSize: 200 })
+  roles.value = roleRes.list || []
 }
 
 function handleTableChange(pag: any) {
@@ -722,19 +729,17 @@ async function maybeAutoOpenFromRoute() {
   }
 }
 
-function openRole(record: StaffItem) {
+async function openRole(record: StaffItem) {
+  await ensureRolesLoaded()
   roleForm.staffId = record.id
   roleForm.roleIds = []
-  getStaffRoleAssignments(record.id)
-    .then((rows) => {
-      roleForm.roleIds = (rows || []).map((item) => Number(item.roleId)).filter((item) => Number.isFinite(item))
-    })
-    .catch(() => {
-      roleForm.roleIds = []
-    })
-    .finally(() => {
-      roleOpen.value = true
-    })
+  roleOpen.value = true
+  try {
+    const rows = await getStaffRoleAssignments(record.id)
+    roleForm.roleIds = (rows || []).map((item) => Number(item.roleId)).filter((item) => Number.isFinite(item))
+  } catch {
+    roleForm.roleIds = []
+  }
 }
 
 async function submitRole() {

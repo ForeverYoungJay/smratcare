@@ -1,8 +1,8 @@
 <template>
-  <PageContainer title="部门管理" subTitle="维护机构部门层级与状态">
+  <PageContainer title="部门管理" subTitle="只维护部门名称和状态，不再设置部门编码和上级部门">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
-        <a-input v-model:value="query.keyword" placeholder="部门名称/编码" allow-clear />
+        <a-input v-model:value="query.keyword" placeholder="部门名称" allow-clear />
       </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openDrawer()">新增部门</a-button>
@@ -23,9 +23,6 @@
             {{ record.status === 1 ? '启用' : '停用' }}
           </a-tag>
         </template>
-        <template v-else-if="column.key === 'parentId'">
-          {{ resolveParentName(record.parentId) }}
-        </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
             <a-button type="link" @click="openHrProfile(record)">档案中心</a-button>
@@ -43,21 +40,6 @@
       <a-form :model="form" layout="vertical">
         <a-form-item label="部门名称" required>
           <a-input v-model:value="form.deptName" />
-        </a-form-item>
-        <a-form-item label="部门编码">
-          <a-input v-model:value="form.deptCode" />
-        </a-form-item>
-        <a-form-item label="上级部门">
-          <a-select
-            v-model:value="form.parentId"
-            allow-clear
-            show-search
-            :filter-option="false"
-            :options="parentOptions"
-            placeholder="输入部门名称/拼音首字母"
-            @search="searchDepartments"
-            @focus="() => !departmentOptions.length && searchDepartments('')"
-          />
         </a-form-item>
         <a-form-item label="排序">
           <a-input-number v-model:value="form.sortNo" :min="0" style="width: 100%" />
@@ -84,20 +66,17 @@ import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { getDepartmentPage, createDepartment, updateDepartment, deleteDepartment } from '../../api/rbac'
-import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import type { DepartmentItem, PageResult } from '../../types'
 
 const router = useRouter()
 const query = reactive({ keyword: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const rows = ref<DepartmentItem[]>([])
-const allRows = ref<DepartmentItem[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const drawerOpen = ref(false)
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const form = reactive<Partial<DepartmentItem>>({ status: 1, sortNo: 0 })
-const { departmentOptions, searchDepartments, ensureSelectedDepartment } = useDepartmentOptions({ pageSize: 400, preloadSize: 1000 })
 
 const statusOptions = [
   { label: '启用', value: 1 },
@@ -106,24 +85,12 @@ const statusOptions = [
 
 const columns = [
   { title: '部门名称', dataIndex: 'deptName', key: 'deptName', width: 180 },
-  { title: '部门编码', dataIndex: 'deptCode', key: 'deptCode', width: 160 },
-  { title: '上级部门', key: 'parentId', width: 150 },
   { title: '排序', dataIndex: 'sortNo', key: 'sortNo', width: 90 },
   { title: '状态', key: 'status', width: 100 },
   { title: '操作', key: 'action', width: 120 }
 ]
 
 const drawerTitle = computed(() => (form.id ? '编辑部门' : '新增部门'))
-const parentOptions = computed(() =>
-  departmentOptions.value
-    .map((item) => ({ label: item.label, value: Number(item.value) }))
-    .filter((item) => Number.isFinite(item.value) && item.value !== form.id)
-)
-
-function resolveParentName(parentId?: number) {
-  if (!parentId) return '-'
-  return allRows.value.find((item) => item.id === parentId)?.deptName || `#${parentId}`
-}
 
 async function fetchData() {
   loading.value = true
@@ -131,9 +98,6 @@ async function fetchData() {
     const res: PageResult<DepartmentItem> = await getDepartmentPage(query)
     rows.value = res.list
     pagination.total = res.total || res.list.length
-    const allRes: PageResult<DepartmentItem> = await getDepartmentPage({ pageNo: 1, pageSize: 1000 })
-    allRows.value = allRes.list
-    if (!departmentOptions.value.length) await searchDepartments('')
   } finally {
     loading.value = false
   }
@@ -158,12 +122,9 @@ function openDrawer(record?: DepartmentItem) {
   Object.assign(form, {
     id: record?.id,
     deptName: record?.deptName || '',
-    deptCode: record?.deptCode || '',
-    parentId: record?.parentId,
     sortNo: record?.sortNo ?? 0,
     status: record?.status ?? 1
   })
-  ensureSelectedDepartment(form.parentId)
   drawerOpen.value = true
 }
 
@@ -176,8 +137,6 @@ async function submit() {
   try {
     const payload = {
       deptName: form.deptName,
-      deptCode: form.deptCode,
-      parentId: form.parentId,
       sortNo: form.sortNo ?? 0,
       status: form.status ?? 1
     }

@@ -6,8 +6,6 @@ import lombok.Data;
 public class DepartmentOptionResponse {
   private Long id;
   private String deptName;
-  private String deptCode;
-  private Long parentId;
   private Integer sortNo;
   private Long orgId;
   private Integer status;

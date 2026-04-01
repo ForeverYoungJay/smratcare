@@ -6,6 +6,16 @@ export interface RouteAccessResult {
   requiredRoles: string[]
 }
 
+const legacyPagePathMap: Record<string, string> = {
+  '/system/org-manage': '/system/site-config',
+  '/system/org-manage/intro': '/system/site-config',
+  '/system/org-manage/news': '/system/site-config',
+  '/system/org-manage/life': '/system/site-config',
+  '/system/app-version': '/system/site-config',
+  '/system/message': '/system/site-config',
+  '/system/dict': '/base-config'
+}
+
 function normalizePath(path: string): string {
   const base = String(path || '').split('?')[0].split('#')[0].trim()
   if (!base) return '/'
@@ -18,9 +28,17 @@ function normalizePath(path: string): string {
 
 export function hasExplicitPageAccess(pagePermissions: string[], path: string): boolean {
   const normalizedPath = normalizePath(path)
+  const effectivePath = legacyPagePathMap[normalizedPath] || normalizedPath
+  const acceptablePaths = new Set([effectivePath])
+  if (effectivePath === '/system/site-config') {
+    acceptablePaths.add('/system/role')
+    acceptablePaths.add('/system/permission-overview')
+  }
   return (pagePermissions || []).some((permissionPath) => {
     const normalizedPermission = normalizePath(permissionPath)
-    return normalizedPath === normalizedPermission || normalizedPath.startsWith(`${normalizedPermission}/`)
+    return Array.from(acceptablePaths).some(
+      (candidatePath) => candidatePath === normalizedPermission || candidatePath.startsWith(`${normalizedPermission}/`)
+    )
   })
 }
 
