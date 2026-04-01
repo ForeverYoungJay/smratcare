@@ -224,10 +224,6 @@
                   <span class="readonly-label">合同有效期止</span>
                   <strong class="readonly-value">{{ form.contractExpiryDate || '-' }}</strong>
                 </div>
-                <div class="readonly-item">
-                  <span class="readonly-label">签约房号</span>
-                  <strong class="readonly-value">{{ form.reservationRoomNo || '-' }}</strong>
-                </div>
                 <div class="readonly-item readonly-policies">
                   <span class="readonly-label">优惠政策</span>
                   <div class="readonly-tags">
@@ -348,7 +344,17 @@
                 </a-col>
                 <a-col :xs="24" :md="8">
                   <a-form-item label="营销人员">
-                    <a-input v-model:value="form.marketerName" placeholder="请输入负责营销人员姓名" />
+                    <a-select
+                      v-model:value="form.marketerName"
+                      allow-clear
+                      show-search
+                      :filter-option="false"
+                      :options="marketerOptions"
+                      :loading="marketerLoading"
+                      placeholder="请输入员工姓名/工号搜索"
+                      @search="searchMarketers"
+                      @focus="() => !marketerOptions.length && searchMarketers('')"
+                    />
                   </a-form-item>
                 </a-col>
                 <a-col :xs="24" :md="12">
@@ -364,15 +370,6 @@
                       placeholder="请选择运营政策（最多2条）"
                       :filter-option="policyFilterOption"
                       @change="onPolicySelectionChange"
-                    />
-                  </a-form-item>
-                </a-col>
-                <a-col :xs="24" :md="12">
-                  <a-form-item label="签约房号">
-                    <a-input
-                      v-model:value="form.reservationRoomNo"
-                      :disabled="!form.id"
-                      :placeholder="form.id ? '入住办理后自动回填，可手动修正' : '新增合同无需填写，入住办理时自动选择'"
                     />
                   </a-form-item>
                 </a-col>
@@ -457,15 +454,26 @@
                 </a-col>
                 <a-col :span="24">
                   <a-form-item label="基础疾病信息">
-                    <a-select
-                      v-model:value="selectedDiseaseIds"
-                      mode="multiple"
-                      allow-clear
-                      show-search
-                      :options="diseaseOptions"
-                      placeholder="请选择基础疾病"
-                      :disabled="contractViewMode"
-                    />
+                    <a-space direction="vertical" style="width: 100%">
+                      <a-select
+                        v-model:value="selectedDiseaseIds"
+                        mode="multiple"
+                        allow-clear
+                        show-search
+                        :options="diseaseOptions"
+                        placeholder="请选择基础疾病"
+                        :disabled="contractViewMode"
+                      />
+                      <a-space>
+                        <a-input
+                          v-model:value="quickDiseaseName"
+                          :maxlength="32"
+                          placeholder="数据库没有时，可快捷新增基础疾病"
+                          @pressEnter="createQuickDisease"
+                        />
+                        <a-button :loading="quickDiseaseSubmitting" @click="createQuickDisease">快捷新增疾病</a-button>
+                      </a-space>
+                    </a-space>
                   </a-form-item>
                 </a-col>
               </a-row>
@@ -531,7 +539,7 @@
                 <div class="contract-section-desc">记录签约背景、特殊照护提示或交接说明。</div>
               </div>
               <a-form-item label="备注">
-                <a-input-text-area
+                <a-textarea
                   v-model:value="form.remark"
                   :rows="4"
                   placeholder="可填写签约背景、特殊照护提示、补充说明等"
@@ -664,11 +672,14 @@ import {
 import { bindFamily, createElder, getElderDetail, getElderDiseases, getElderPage, updateElder, updateElderDiseases } from '../../api/elder'
 import { getAdmissionRecords } from '../../api/elderLifecycle'
 import { getFamilyRelations, upsertFamilyUser } from '../../api/family'
-import { getDiseaseList } from '../../api/store'
+import { createDisease, getDiseaseList } from '../../api/store'
+import { getStaffPage } from '../../api/staff'
+import { useUserStore } from '../../stores/user'
 import type { ContractAttachmentItem, ContractSystemLinkageSummary, CrmContractItem, ElderItem, Id, MarketingPlanItem, PageResult } from '../../types'
 
 const router = useRouter()
 const route = useRoute()
+const userStore = useUserStore()
 const props = withDefaults(defineProps<{
   statusPreset?: 'pending_sign' | 'unsigned' | 'signed' | 'pending_assessment' | 'pending_bed_select' | ''
   title?: string
@@ -708,6 +719,10 @@ const loading = ref(false)
 const submitting = ref(false)
 const open = ref(false)
 const contractViewMode = ref(false)
+const marketerLoading = ref(false)
+const marketerOptions = ref<Array<{ label: string; value: string }>>([])
+const quickDiseaseName = ref('')
+const quickDiseaseSubmitting = ref(false)
 const formRef = ref<FormInstance>()
 const elderNameInputRef = ref<any>()
 const rows = ref<CrmContractItem[]>([])
@@ -749,6 +764,18 @@ const SEARCH_ROUTE_KEYS = [
 const stageBoardGeneratedAtText = computed(() =>
   stageBoardGeneratedAt.value ? dayjs(stageBoardGeneratedAt.value).format('MM-DD HH:mm:ss') : '-'
 )
+const currentStaffDisplayName = computed(() => {
+  const realName = String(userStore.staffInfo?.realName || '').trim()
+  if (realName) return realName
+  return String(userStore.staffInfo?.username || '').trim()
+})
+
+function ensureMarketerOption(name?: string) {
+  const text = String(name || '').trim()
+  if (!text) return
+  if (marketerOptions.value.some((item) => String(item.value || '').trim() === text)) return
+  marketerOptions.value.unshift({ label: text, value: text })
+}
 
 const mineDeptOptions = [
   { label: '营销部', value: 'MARKETING' },
@@ -1227,7 +1254,6 @@ const columns = [
   { title: '姓名', dataIndex: 'elderName', key: 'elderName', width: 120 },
   { title: '流程阶段', dataIndex: 'flowStage', key: 'flowStage', width: 120 },
   { title: '当前责任部门', dataIndex: 'currentOwnerDept', key: 'currentOwnerDept', width: 130 },
-  { title: '签约房号', dataIndex: 'reservationRoomNo', key: 'reservationRoomNo', width: 140 },
   { title: '联系电话', dataIndex: 'elderPhone', key: 'elderPhone', width: 140 },
   { title: '营销人员', dataIndex: 'marketerName', key: 'marketerName', width: 120 },
   { title: '优惠政策', dataIndex: 'orgName', key: 'orgName', width: 220 },
@@ -1847,6 +1873,7 @@ function openForm(record?: CrmContractItem, readonly = false) {
       flowStage: 'PENDING_ASSESSMENT',
       currentOwnerDept: 'ASSESSMENT',
       reservationRoomNo: undefined,
+      marketerName: currentStaffDisplayName.value || '',
       orgName: undefined
     } as Partial<CrmContractItem>)
     selectedPolicyValues.value = []
@@ -1856,7 +1883,11 @@ function openForm(record?: CrmContractItem, readonly = false) {
     familyDraftRows.value = []
     selectedDiseaseIds.value = []
   }
+  ensureMarketerOption(form.marketerName)
   open.value = true
+  searchMarketers(String(form.marketerName || '')).catch(() => {
+    ensureMarketerOption(form.marketerName)
+  })
   loadDiseaseOptions().catch(() => {})
   loadElderSnapshotByForm().catch(() => {})
 }
@@ -2405,6 +2436,51 @@ async function loadDiseaseOptions() {
     }))
   } catch {
     diseaseOptions.value = []
+  }
+}
+
+async function searchMarketers(keyword = '') {
+  marketerLoading.value = true
+  try {
+    const page = await getStaffPage({ pageNo: 1, pageSize: 50, keyword: String(keyword || '').trim() || undefined })
+    marketerOptions.value = (page.list || []).map((item: any) => {
+      const realName = String(item.realName || '').trim()
+      const staffNo = String(item.staffNo || '').trim()
+      const username = String(item.username || '').trim()
+      return {
+        label: [realName || username || '未命名员工', staffNo].filter(Boolean).join(' / '),
+        value: realName || username || staffNo
+      }
+    })
+    ensureMarketerOption(form.marketerName)
+    if (!String(keyword || '').trim()) {
+      ensureMarketerOption(currentStaffDisplayName.value)
+    }
+  } finally {
+    marketerLoading.value = false
+  }
+}
+
+async function createQuickDisease() {
+  const diseaseName = String(quickDiseaseName.value || '').trim()
+  if (!diseaseName) {
+    message.warning('请输入疾病名称')
+    return
+  }
+  quickDiseaseSubmitting.value = true
+  try {
+    await createDisease({ diseaseName, name: diseaseName, status: 1 })
+    await loadDiseaseOptions()
+    const created = diseaseOptions.value.find((item) => String(item.label || '').trim() === diseaseName)
+    if (created && !selectedDiseaseIds.value.includes(Number(created.value))) {
+      selectedDiseaseIds.value = [...selectedDiseaseIds.value, Number(created.value)]
+    }
+    quickDiseaseName.value = ''
+    message.success('基础疾病已新增并选中')
+  } catch (error: any) {
+    message.error(error?.message || '新增基础疾病失败')
+  } finally {
+    quickDiseaseSubmitting.value = false
   }
 }
 

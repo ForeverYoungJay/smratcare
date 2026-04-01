@@ -44,6 +44,9 @@
         <a-form-item label="收费开始日期" name="admissionDate">
           <a-date-picker v-model:value="form.admissionDate" value-format="YYYY-MM-DD" style="width: 100%" />
         </a-form-item>
+        <a-form-item label="操作员姓名">
+          <a-input :value="currentStaffDisplayName" disabled />
+        </a-form-item>
         <a-form-item label="合同号（自动回填）" name="contractNo">
           <a-input :value="form.contractNo" disabled placeholder="选择老人后自动填入，不可修改" />
         </a-form-item>
@@ -258,6 +261,7 @@ import { getElderDetail, getElderDiseases } from '../../api/elder'
 import { getContractAttachments, getContractPage } from '../../api/marketing'
 import { getCrmLead, updateCrmLead } from '../../api/crm'
 import { normalizeId, normalizeResidentId } from '../../utils/id'
+import { useUserStore } from '../../stores/user'
 import type {
   AdmissionRecordDimensionItem,
   AdmissionRecordItem,
@@ -274,6 +278,7 @@ import type {
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const lifecycleContext = computed(() => {
   const source = String(route.query.source || '').trim().toLowerCase()
   const scene = String(route.query.scene || '').trim().toLowerCase()
@@ -282,6 +287,11 @@ const lifecycleContext = computed(() => {
     active,
     message: active ? '当前由状态变更联动进入，建议优先核对床位交接与合同资料后再提交入住办理。' : ''
   }
+})
+const currentStaffDisplayName = computed(() => {
+  const realName = String(userStore.staffInfo?.realName || '').trim()
+  if (realName) return realName
+  return String(userStore.staffInfo?.username || '').trim()
 })
 const formRef = ref<FormInstance>()
 const form = reactive<AdmissionRequest>({ elderId: '' as Id, admissionDate: '', bedId: undefined, bedStartDate: undefined })

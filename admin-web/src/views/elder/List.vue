@@ -1,36 +1,66 @@
 <template>
-  <PageContainer title="老人列表" subTitle="档案查询与床位管理">
-    <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline" class="search-form">
-        <a-form-item label="姓名">
-          <ElderNameAutocomplete v-model:value="query.fullName" placeholder="姓名(编号)" width="180px" @select="runSearch" />
-        </a-form-item>
-        <a-form-item label="身份证">
-          <a-input v-model:value="query.idCardNo" placeholder="身份证号" allow-clear />
-        </a-form-item>
-        <a-form-item label="床位号">
-          <a-input v-model:value="query.bedNo" placeholder="床位号" allow-clear />
-        </a-form-item>
-        <a-form-item label="护理等级">
-          <a-input v-model:value="query.careLevel" placeholder="等级" allow-clear />
-        </a-form-item>
-        <a-form-item label="状态">
-          <a-select v-model:value="query.status" allow-clear style="width: 120px">
-            <a-select-option :value="1">在院</a-select-option>
-            <a-select-option :value="2">请假</a-select-option>
-            <a-select-option :value="3">离院</a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="runSearch">搜索</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
-    </a-card>
+  <PageContainer title="长者档案" subTitle="高频查询、在院状态和服务动作集中处理">
+    <template #stats>
+      <div class="elder-overview-grid">
+        <div class="overview-card">
+          <span>当前列表</span>
+          <strong>{{ total }}</strong>
+          <small>按当前筛选口径统计</small>
+        </div>
+        <div class="overview-card">
+          <span>在院长者</span>
+          <strong>{{ statusCounters.inHospital }}</strong>
+          <small>需持续照护与跟进</small>
+        </div>
+        <div class="overview-card">
+          <span>待办理入住</span>
+          <strong>{{ lifecycleStageCounters.pendingBedSelect }}</strong>
+          <small>优先推进选床与入住</small>
+        </div>
+        <div class="overview-card">
+          <span>已选记录</span>
+          <strong>{{ selectedCount }}</strong>
+          <small>批量动作可直接执行</small>
+        </div>
+      </div>
+    </template>
 
-    <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
+    <SearchForm :model="query" @search="runSearch" @reset="reset">
+      <a-form-item label="姓名">
+        <ElderNameAutocomplete v-model:value="query.fullName" placeholder="姓名(编号)" width="220px" @select="runSearch" />
+      </a-form-item>
+      <a-form-item label="身份证">
+        <a-input v-model:value="query.idCardNo" placeholder="身份证号" allow-clear />
+      </a-form-item>
+      <a-form-item label="床位号">
+        <a-input v-model:value="query.bedNo" placeholder="床位号" allow-clear />
+      </a-form-item>
+      <a-form-item label="护理等级">
+        <a-input v-model:value="query.careLevel" placeholder="护理等级" allow-clear />
+      </a-form-item>
+      <a-form-item label="状态">
+        <a-select v-model:value="query.status" allow-clear style="width: 140px">
+          <a-select-option :value="1">在院</a-select-option>
+          <a-select-option :value="2">请假</a-select-option>
+          <a-select-option :value="3">离院</a-select-option>
+        </a-select>
+      </a-form-item>
+    </SearchForm>
+
+    <section class="surface-toolbar">
+      <div class="surface-toolbar-title">
+        <strong>入院流程与在院动作</strong>
+        <span>保持原有业务联动，优先突出高频员工操作。</span>
+      </div>
+      <a-space wrap>
+        <a-tag color="gold">待评估 {{ lifecycleStageCounters.pendingAssessment }}</a-tag>
+        <a-tag color="blue">待办理入住 {{ lifecycleStageCounters.pendingBedSelect }}</a-tag>
+        <a-tag color="purple">待签署 {{ lifecycleStageCounters.pendingSign }}</a-tag>
+        <a-tag color="green">已签署 {{ lifecycleStageCounters.signed }}</a-tag>
+      </a-space>
+    </section>
+
+    <section class="card-elevated elder-workspace">
       <FlowGuardBar
         title="长者入院守卫"
         :subject="elderFlowSubject"
@@ -40,40 +70,55 @@
         :current-index="elderFlowCurrentIndex"
         :blockers="elderFlowBlockers"
         :hint="elderFlowHint"
-        style="margin-bottom: 12px"
+        style="margin-bottom: 14px"
       />
-      <a-space wrap style="margin-bottom: 10px">
-        <a-tag color="gold">待评估 {{ lifecycleStageCounters.pendingAssessment }}</a-tag>
-        <a-tag color="blue">待办理入住 {{ lifecycleStageCounters.pendingBedSelect }}</a-tag>
-        <a-tag color="purple">待签署 {{ lifecycleStageCounters.pendingSign }}</a-tag>
-        <a-tag color="green">已签署 {{ lifecycleStageCounters.signed }}</a-tag>
-      </a-space>
-      <div class="table-actions">
-        <a-space>
-          <a-button type="primary" @click="goCreate">新建老人</a-button>
+
+      <div class="action-toolbar">
+        <div class="action-toolbar-main">
+          <a-button type="primary" @click="goCreate">新建长者</a-button>
           <a-button @click="exportCsvData">导出CSV</a-button>
-          <a-button :disabled="selectedCount !== 1" @click="goDetailSelected">详情</a-button>
-          <a-button :disabled="selectedCount !== 1" @click="goEditSelected">编辑</a-button>
+          <a-button :disabled="selectedCount !== 1" @click="goDetailSelected">查看详情</a-button>
+          <a-button :disabled="selectedCount !== 1" @click="goEditSelected">编辑档案</a-button>
           <a-button :disabled="selectedCount !== 1" @click="openChangeBedSelected">换床</a-button>
           <a-button :disabled="selectedCount !== 1" @click="openCheckoutSelected">退住申请</a-button>
+        </div>
+        <div class="action-toolbar-side">
+          <span class="selection-pill">已勾选 {{ selectedCount }} 位长者</span>
           <a-button :disabled="selectedCount !== 1" @click="openBindFamilySelected">绑定家属</a-button>
           <a-button :disabled="selectedCount !== 1" @click="printElderQrSelected">打印二维码</a-button>
-          <span class="selection-tip">已勾选 {{ selectedCount }} 条</span>
-        </a-space>
+        </div>
       </div>
 
-      <a-table
-        :data-source="rows"
+      <DataTable
+        row-key="id"
         :columns="columns"
+        :data-source="rows"
         :loading="loading"
         :pagination="false"
-        row-key="id"
         :row-selection="rowSelection"
-        :scroll="{ x: 1450, y: 520 }"
+        :scroll="{ x: 1450, y: 560 }"
         @change="onTableChange"
       >
+        <template #toolbar>
+          <div class="table-head">
+            <div>
+              <strong>长者列表</strong>
+              <span>支持排序、批量选择和在院动作直达。</span>
+            </div>
+            <a-space wrap>
+              <a-tag color="processing">第 {{ query.pageNo }} / {{ totalPageCount }} 页</a-tag>
+              <a-tag color="default">共 {{ total }} 条</a-tag>
+            </a-space>
+          </div>
+        </template>
         <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'status'">
+          <template v-if="column.key === 'fullName'">
+            <div class="elder-name-cell">
+              <strong>{{ record.fullName }}</strong>
+              <span>{{ record.roomNo || '-' }} / {{ record.bedNo || '未分配床位' }}</span>
+            </div>
+          </template>
+          <template v-else-if="column.key === 'status'">
             <a-tag :color="statusTag(record.status)">{{ statusText(record.status) }}</a-tag>
           </template>
           <template v-else-if="column.key === 'lifecycleStage'">
@@ -85,26 +130,27 @@
             <a-tag :color="sourceTypeColor(record.sourceType)">{{ sourceTypeText(record.sourceType) }}</a-tag>
           </template>
           <template v-else-if="column.key === 'action'">
-            <a-space size="small">
+            <div class="row-action-links">
               <a-button type="link" size="small" @click="goDetail(record.id)">详情</a-button>
               <a-button type="link" size="small" @click="goInHospitalOverview(record)">总览</a-button>
               <a-button type="link" size="small" @click="goAssessmentArchive(record)">评估</a-button>
               <a-button type="link" size="small" @click="goContractsInvoices(record)">合同票据</a-button>
-            </a-space>
+            </div>
           </template>
         </template>
-      </a-table>
+      </DataTable>
 
-      <a-pagination
-        style="margin-top: 16px; text-align: right;"
-        :current="query.pageNo"
-        :page-size="query.pageSize"
-        :total="total"
-        show-size-changer
-        @change="onPageChange"
-        @showSizeChange="onPageSizeChange"
-      />
-    </a-card>
+      <div class="pager-row">
+        <a-pagination
+          :current="query.pageNo"
+          :page-size="query.pageSize"
+          :total="total"
+          show-size-changer
+          @change="onPageChange"
+          @showSizeChange="onPageSizeChange"
+        />
+      </div>
+    </section>
 
     <a-modal v-model:open="changeBedOpen" title="换床" width="420px" @ok="submitChangeBed" @cancel="() => (changeBedOpen = false)">
       <a-form ref="changeBedFormRef" :model="changeBedForm" :rules="changeBedRules" layout="vertical">
@@ -161,6 +207,8 @@ import { message } from 'ant-design-vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import QRCode from 'qrcode'
 import PageContainer from '../../components/PageContainer.vue'
+import SearchForm from '../../components/SearchForm.vue'
+import DataTable from '../../components/DataTable.vue'
 import FlowGuardBar from '../../components/FlowGuardBar.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
@@ -194,18 +242,19 @@ const query = reactive({
 })
 
 const columns = [
-  { title: '姓名', dataIndex: 'fullName', key: 'fullName', width: 120, sorter: true },
+  { title: '长者信息', dataIndex: 'fullName', key: 'fullName', width: 180, sorter: true },
   { title: '身份证', dataIndex: 'idCardNo', key: 'idCardNo', width: 180 },
   { title: '生日', dataIndex: 'birthDate', key: 'birthDate', width: 130, sorter: true },
-  { title: '家庭地址', dataIndex: 'homeAddress', key: 'homeAddress', width: 220 },
-  { title: '床位号', dataIndex: 'bedNo', key: 'bedNo', width: 120, sorter: true },
+  { title: '家庭地址', dataIndex: 'homeAddress', key: 'homeAddress', width: 240 },
   { title: '护理等级', dataIndex: 'careLevel', key: 'careLevel', width: 120, sorter: true },
   { title: '来源', dataIndex: 'sourceType', key: 'sourceType', width: 120 },
-  { title: '履约阶段', dataIndex: 'lifecycleStage', key: 'lifecycleStage', width: 120 },
+  { title: '履约阶段', dataIndex: 'lifecycleStage', key: 'lifecycleStage', width: 130 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 100, sorter: true },
-  { title: '联动操作', key: 'action', width: 280 }
+  { title: '快捷操作', key: 'action', width: 280, fixed: 'right' }
 ]
+
 const selectedCount = computed(() => selectedRowKeys.value.length)
+const totalPageCount = computed(() => Math.max(1, Math.ceil(total.value / query.pageSize)))
 const selectedRows = computed(() => rows.value.filter((item) => selectedRowKeys.value.some((id) => String(id) === String(item.id))))
 const lifecycleStageCounters = computed(() => {
   const counters = {
@@ -223,6 +272,13 @@ const lifecycleStageCounters = computed(() => {
   })
   return counters
 })
+
+const statusCounters = computed(() => ({
+  inHospital: rows.value.filter((item) => item.status === 1).length,
+  outing: rows.value.filter((item) => item.status === 2).length,
+  discharged: rows.value.filter((item) => item.status === 3).length
+}))
+
 const elderFlowSteps = ['档案建档', '办理入住', '在院管理']
 const elderFlowCurrentIndex = computed(() => {
   if (!selectedRows.value.length) return 2
@@ -256,6 +312,7 @@ const elderFlowHint = computed(() => {
   if (!selectedRows.value.length) return '新建老人用于补录平台启用前已入住长者；新入住老人仍需先走合同流程'
   return '可执行换床、退住、家属绑定与二维码打印等在院操作'
 })
+
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
   onChange: (keys: Id[]) => {
@@ -715,25 +772,134 @@ watch(
 </script>
 
 <style scoped>
-.search-form {
-  row-gap: 12px;
+.elder-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
 }
-.table-actions {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 12px;
+
+.overview-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid #dce9f2;
+  background: rgba(255, 255, 255, 0.84);
 }
-.selection-tip {
-  color: var(--muted);
+
+.overview-card span,
+.table-head span {
+  color: #6d8aa3;
   font-size: 12px;
 }
+
+.overview-card strong {
+  color: #173854;
+  font-size: 24px;
+}
+
+.overview-card small {
+  color: #7a97b0;
+}
+
+.elder-workspace {
+  padding: 16px;
+}
+
+.action-toolbar,
+.action-toolbar-main,
+.action-toolbar-side,
+.table-head,
+.elder-name-cell,
+.row-action-links,
+.pager-row {
+  display: flex;
+  align-items: center;
+}
+
+.action-toolbar {
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.action-toolbar-main,
+.action-toolbar-side {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.selection-pill {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #eef8fc;
+  color: #1b6282;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.table-head {
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.table-head strong {
+  display: block;
+  color: #173854;
+  font-size: 16px;
+}
+
+.elder-name-cell {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.elder-name-cell strong {
+  color: #173854;
+}
+
+.elder-name-cell span {
+  color: #6d8aa3;
+  font-size: 12px;
+}
+
+.row-action-links {
+  gap: 2px;
+  flex-wrap: wrap;
+}
+
+.pager-row {
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
 .qr-preview {
   display: grid;
   justify-items: center;
   gap: 8px;
 }
+
 .qr-text {
   font-size: 12px;
   color: var(--muted);
+}
+
+@media (max-width: 1200px) {
+  .elder-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .elder-overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .elder-workspace {
+    padding: 12px;
+  }
 }
 </style>

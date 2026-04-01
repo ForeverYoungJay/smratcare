@@ -511,7 +511,7 @@
         <a-row :gutter="16">
           <a-col :span="12">
             <a-form-item label="评估人">
-              <a-input v-model:value="form.assessorName" :disabled="formReadonly" />
+              <a-input v-model:value="form.assessorName" :disabled="formReadonly || isAdmissionAssessment" />
             </a-form-item>
           </a-col>
           <a-col :span="12">
@@ -657,6 +657,11 @@ const lifecycleContext = computed(() => {
   }
 })
 const userStore = useUserStore()
+const currentStaffDisplayName = computed(() => {
+  const realName = String(userStore.staffInfo?.realName || '').trim()
+  if (realName) return realName
+  return String(userStore.staffInfo?.username || '').trim()
+})
 const assessmentRouteSignature = ref('')
 const skipNextAssessmentRouteWatch = ref(false)
 const ASSESSMENT_ROUTE_KEYS = [
@@ -1958,6 +1963,7 @@ function openForm(record?: AssessmentRecord, readonly = false) {
     })
     scoreAutoChecked.value = false
     if (isAdmissionAssessment.value) {
+      form.assessorName = currentStaffDisplayName.value || ''
       resetAdmissionScores()
       form.score = admissionTotalScore.value
       form.levelCode = admissionLevelText.value === '待完成评分' ? '' : admissionLevelText.value.split('：')[0]
@@ -2125,7 +2131,7 @@ async function submit() {
       assessmentDate: form.assessmentDate,
       nextAssessmentDate: form.nextAssessmentDate,
       status: form.status,
-      assessorName: form.assessorName,
+      assessorName: isAdmissionAssessment.value ? (currentStaffDisplayName.value || form.assessorName) : form.assessorName,
       archiveNo: form.archiveNo,
       resultSummary: form.resultSummary,
       suggestion: form.suggestion,

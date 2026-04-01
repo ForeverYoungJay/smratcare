@@ -114,14 +114,6 @@
       </a-col>
 
       <a-col :xs="24" :lg="8">
-        <LifecycleStageBar
-          title="合同履约阶段"
-          :subject="lifecycleSubject"
-          :stage="resolvedLifecycleStage"
-          :generated-at="linkage?.generatedAt"
-          :hint="lifecycleHint"
-          style="margin-bottom: 16px"
-        />
         <a-card title="合同结构化信息" class="card-elevated" :bordered="false" style="margin-bottom: 16px">
           <StatefulBlock :loading="loading" :error="errorMessage" @retry="loadAll">
             <a-descriptions :column="1" size="small" bordered>
@@ -190,13 +182,6 @@
           </StatefulBlock>
         </a-card>
 
-        <a-card title="快捷入口" class="card-elevated" :bordered="false">
-          <a-space direction="vertical" style="width: 100%">
-            <a-button block @click="goContractManagement">合同到期管理</a-button>
-            <a-button block @click="goAssessmentArchive">评估档案</a-button>
-            <a-button block @click="go('/finance/resident-bill-payment')">费用账单</a-button>
-          </a-space>
-        </a-card>
       </a-col>
     </a-row>
   </PageContainer>
@@ -208,12 +193,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
-import LifecycleStageBar from '../../../components/LifecycleStageBar.vue'
 import ElderNameAutocomplete from '../../../components/ElderNameAutocomplete.vue'
 import { useElderOptions } from '../../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
 import { formatChineseDateTime } from '../../../utils/dateLocale'
-import { lifecycleStageHint, normalizeLifecycleStage } from '../../../utils/lifecycleStage'
+import { normalizeLifecycleStage } from '../../../utils/lifecycleStage'
 import { getElderDetail } from '../../../api/elder'
 import {
   getContractArchiveRule,
@@ -367,17 +351,6 @@ const resolvedLinkageElderName = computed(() => {
   }
   return rawName || '-'
 })
-const lifecycleSubject = computed(() => {
-  if (!linkage.value) return '未匹配到合同信息'
-  return `合同 ${linkage.value.contractNo || '-'} / 长者 ${resolvedLinkageElderName.value}`
-})
-const lifecycleHint = computed(() => {
-  if (missingArchiveItems.value.length > 0) {
-    return `当前仍有资料缺口：${missingArchiveItemsLabel.value}，建议先补齐后再推进签署。`
-  }
-  return lifecycleStageHint(resolvedLifecycleStage.value)
-})
-
 function contractStatusText(status?: string) {
   const value = String(status || '').trim().toUpperCase()
   if (!value) return '-'
@@ -628,28 +601,6 @@ function goAttachmentUpload(attachmentType: 'CONTRACT' | 'HOUSEHOLD' | 'MEDICAL_
   if (!contractNo && elderName) query.elderName = elderName
   if (!contractNo && !elderName && elderId) query.elderId = elderId
   router.push({ path: '/marketing/contract-signing', query })
-}
-
-function goContractManagement() {
-  const elderId = String(linkage.value?.elderId || elderProfile.value?.id || '').trim()
-  if (isHistoricalImport.value && elderId) {
-    router.push(`/elder/detail/${elderId}?tab=base`)
-    return
-  }
-  if (linkage.value?.contractNo) {
-    router.push(`/marketing/contract-management?contractNo=${encodeURIComponent(linkage.value.contractNo)}`)
-    return
-  }
-  router.push('/marketing/contract-management')
-}
-
-function goAssessmentArchive() {
-  const elderId = linkage.value?.elderId
-  if (elderId) {
-    router.push(`/elder/assessment/ability/archive?elderId=${elderId}`)
-    return
-  }
-  router.push('/elder/assessment/ability/archive')
 }
 
 function flattenReports(source?: ContractAssessmentOverview) {

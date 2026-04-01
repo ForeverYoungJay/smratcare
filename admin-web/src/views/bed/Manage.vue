@@ -2853,14 +2853,14 @@ onMounted(async () => {
 
 <style scoped>
 .bed-management-page {
-  --panel-bg: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
-  --panel-border: rgba(15, 23, 42, 0.08);
-  --panel-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
-  --accent: #2563eb;
-  --accent-soft: rgba(37, 99, 235, 0.08);
-  --text-main: #10203a;
-  --text-sub: #5b6b84;
-  --surface-soft: #f5f8fc;
+  --panel-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(246, 251, 255, 1) 100%);
+  --panel-border: #dce8f1;
+  --panel-shadow: 0 16px 34px rgba(73, 130, 178, 0.12);
+  --accent: #1f8fbe;
+  --accent-soft: rgba(31, 143, 190, 0.1);
+  --text-main: #173854;
+  --text-sub: #6d8aa3;
+  --surface-soft: #f5fafc;
 }
 .workspace-grid {
   align-items: stretch;
@@ -2876,6 +2876,8 @@ onMounted(async () => {
 }
 .asset-tree-panel {
   min-height: 100%;
+  position: sticky;
+  top: 20px;
 }
 .tree-panel-head,
 .workspace-topbar,
@@ -2917,13 +2919,16 @@ onMounted(async () => {
 }
 .asset-tree {
   margin-top: 18px;
+  max-height: calc(100vh - 240px);
+  overflow: auto;
+  padding-right: 4px;
 }
 .tree-node-card {
   display: flex;
   min-width: 0;
   flex-direction: column;
   gap: 3px;
-  padding: 6px 0;
+  padding: 8px 0;
 }
 .tree-node-main {
   display: flex;
@@ -2938,9 +2943,10 @@ onMounted(async () => {
   min-width: 42px;
   padding: 2px 8px;
   border-radius: 999px;
-  background: var(--surface-soft);
+  background: #eef7fb;
   color: var(--text-sub);
   font-size: 12px;
+  border: 1px solid #dbeaf3;
 }
 .tree-node-name {
   color: var(--text-main);
@@ -2958,6 +2964,19 @@ onMounted(async () => {
 }
 .workspace-hero {
   overflow: hidden;
+  position: relative;
+}
+
+.workspace-hero::after {
+  content: '';
+  position: absolute;
+  right: -40px;
+  top: -40px;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(87, 215, 255, 0.14) 0%, rgba(87, 215, 255, 0) 70%);
+  pointer-events: none;
 }
 .workspace-title {
   margin: 8px 0 6px;
@@ -2970,6 +2989,11 @@ onMounted(async () => {
 .management-tabs {
   margin-top: 16px;
 }
+
+.management-tabs :deep(.ant-tabs-tab) {
+  padding: 10px 14px;
+  border-radius: 12px 12px 0 0;
+}
 .overview-row {
   margin: 0;
 }
@@ -2981,6 +3005,9 @@ onMounted(async () => {
   color: var(--text-main);
   font-size: 28px;
   font-weight: 700;
+}
+.overview-label {
+  color: var(--text-sub);
 }
 .workspace-stack {
   display: flex;
@@ -2998,6 +3025,10 @@ onMounted(async () => {
 }
 .search-bar {
   margin-top: 16px;
+  padding: 14px 16px 4px;
+  border-radius: 16px;
+  background: #f8fbfe;
+  border: 1px solid #e4eef5;
 }
 .toolbar-row {
   align-items: center;
@@ -3016,12 +3047,16 @@ onMounted(async () => {
   align-items: center;
   padding: 7px 12px;
   border-radius: 999px;
-  background: var(--surface-soft);
-  color: var(--text-sub);
+  background: #eef7fb;
+  color: #1b6586;
   font-size: 13px;
+  font-weight: 700;
 }
 .table-card :deep(.ant-table-wrapper) {
   margin-top: 16px;
+}
+.table-card :deep(.ant-table) {
+  border-radius: 16px;
 }
 .row-actions :deep(.ant-btn-link) {
   padding-inline: 4px;
@@ -3051,15 +3086,17 @@ onMounted(async () => {
 .wizard-step {
   padding: 10px 12px;
   border-radius: 14px;
-  background: var(--surface-soft);
+  background: #f5fafc;
   color: var(--text-sub);
   text-align: center;
   font-size: 13px;
+  border: 1px solid #e4eef5;
 }
 .wizard-step.is-active {
   background: var(--accent-soft);
   color: var(--accent);
   font-weight: 600;
+  border-color: rgba(31, 143, 190, 0.18);
 }
 .wizard-hint {
   margin-bottom: 12px;
@@ -3068,11 +3105,16 @@ onMounted(async () => {
   margin-top: 8px;
   padding: 12px 14px;
   border-radius: 14px;
-  background: var(--surface-soft);
+  background: #f7fbfe;
+  border: 1px solid #e4eef5;
 }
 @media (max-width: 1200px) {
   .workspace-topbar {
     flex-direction: column;
+  }
+
+  .asset-tree-panel {
+    position: static;
   }
 }
 @media (max-width: 768px) {
