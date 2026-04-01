@@ -66,6 +66,7 @@
             :filter-option="filterOption"
             placeholder="不选则表示本角色无上级领导角色"
           />
+          <div class="permission-summary">用于员工账号里的“直接领导/间接领导”自动推荐。先定角色上级，再落到具体员工。</div>
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="form.status" :options="statusOptions" />

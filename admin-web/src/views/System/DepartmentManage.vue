@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="部门管理" subTitle="只维护部门名称和状态，不再设置部门编码和上级部门">
+  <PageContainer title="部门管理" subTitle="只维护部门名称和状态，不再设置排序、部门编码和上级部门">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
         <a-input v-model:value="query.keyword" placeholder="部门名称" allow-clear />
@@ -41,9 +41,6 @@
         <a-form-item label="部门名称" required>
           <a-input v-model:value="form.deptName" />
         </a-form-item>
-        <a-form-item label="排序">
-          <a-input-number v-model:value="form.sortNo" :min="0" style="width: 100%" />
-        </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="form.status" :options="statusOptions" />
         </a-form-item>
@@ -76,7 +73,7 @@ const loading = ref(false)
 const saving = ref(false)
 const drawerOpen = ref(false)
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
-const form = reactive<Partial<DepartmentItem>>({ status: 1, sortNo: 0 })
+const form = reactive<Partial<DepartmentItem>>({ status: 1 })
 
 const statusOptions = [
   { label: '启用', value: 1 },
@@ -85,7 +82,6 @@ const statusOptions = [
 
 const columns = [
   { title: '部门名称', dataIndex: 'deptName', key: 'deptName', width: 180 },
-  { title: '排序', dataIndex: 'sortNo', key: 'sortNo', width: 90 },
   { title: '状态', key: 'status', width: 100 },
   { title: '操作', key: 'action', width: 120 }
 ]
@@ -122,7 +118,6 @@ function openDrawer(record?: DepartmentItem) {
   Object.assign(form, {
     id: record?.id,
     deptName: record?.deptName || '',
-    sortNo: record?.sortNo ?? 0,
     status: record?.status ?? 1
   })
   drawerOpen.value = true
@@ -137,7 +132,6 @@ async function submit() {
   try {
     const payload = {
       deptName: form.deptName,
-      sortNo: form.sortNo ?? 0,
       status: form.status ?? 1
     }
     if (form.id) {

@@ -182,9 +182,16 @@
         <a-form-item label="快速修复">
           <a-space wrap>
             <a-button size="small" @click="applySupervisorRecommendation">一键推荐领导</a-button>
-            <span class="form-rule-tip">自动按规则推荐：员工→本部门部长；部长→院长/SYS_ADMIN。</span>
+            <span class="form-rule-tip">优先按角色的上级领导角色推荐；未配置时，自动回退为“员工→本部门部长，部长→院长层级”。</span>
           </a-space>
         </a-form-item>
+        <a-alert
+          type="info"
+          show-icon
+          style="margin-bottom: 12px"
+          :message="leaderStrategyTitle"
+          :description="leaderStrategyDescription"
+        />
         <a-form-item v-if="!form.id" label="手机号">
           <a-input v-model:value="form.phone" />
         </a-form-item>
@@ -314,7 +321,7 @@ const roles = ref<RoleItem[]>([])
 const pageTitle = computed(() => props.title || '员工管理')
 const pageSubTitle = computed(() => props.subTitle || '账号与角色配置')
 
-const roleFilterOptions = computed(() => roles.value.map((r) => ({ label: `${r.roleName} (${r.roleCode})`, value: r.id })))
+const roleFilterOptions = computed(() => roles.value.map((r) => ({ label: r.roleName, value: r.id })))
 const departmentNameMap = computed(() => new Map(departmentOptions.value.map((item) => [String(item.value), item.name])))
 const staffNameMap = computed(() => {
   const map = new Map<string, string>()
@@ -366,31 +373,103 @@ const formRoleCodes = computed(() => {
   }
   return []
 })
+const roleByCodeMap = computed(() => {
+  const map = new Map<string, RoleItem>()
+  roles.value.forEach((item) => {
+    const code = String(item.roleCode || '').trim().toUpperCase()
+    if (code) map.set(code, item)
+  })
+  return map
+})
+const roleByIdMap = computed(() => {
+  const map = new Map<string, RoleItem>()
+  roles.value.forEach((item) => {
+    if (item.id != null) map.set(String(item.id), item)
+  })
+  return map
+})
+const formRoleRecords = computed(() =>
+  formRoleCodes.value
+    .map((code) => roleByCodeMap.value.get(String(code || '').trim().toUpperCase()))
+    .filter((item): item is RoleItem => Boolean(item))
+)
+function resolveSuperiorRoleCodes(level = 1) {
+  const result = new Set<string>()
+  formRoleRecords.value.forEach((role) => {
+    let current = role
+    let depth = 0
+    while (current?.superiorRoleId != null && depth < level) {
+      const next = roleByIdMap.value.get(String(current.superiorRoleId))
+      if (!next) break
+      current = next
+      depth += 1
+    }
+    if (depth === level) {
+      const code = String(current.roleCode || '').trim().toUpperCase()
+      if (code) result.add(code)
+    }
+  })
+  return Array.from(result)
+}
+const expectedDirectLeaderRoleCodes = computed(() => resolveSuperiorRoleCodes(1))
+const expectedIndirectLeaderRoleCodes = computed(() => resolveSuperiorRoleCodes(2))
+const expectedDirectLeaderRoleNames = computed(() =>
+  expectedDirectLeaderRoleCodes.value
+    .map((code) => roleByCodeMap.value.get(code)?.roleName)
+    .filter(Boolean)
+)
+const expectedIndirectLeaderRoleNames = computed(() =>
+  expectedIndirectLeaderRoleCodes.value
+    .map((code) => roleByCodeMap.value.get(code)?.roleName)
+    .filter(Boolean)
+)
+function candidateMatchScore(candidateId: string | number, expectedRoleCodes: string[]) {
+  if (!expectedRoleCodes.length) return 0
+  const codes = new Set((staffRoleCodeMap.value.get(String(candidateId)) || []).map((item) => String(item || '').toUpperCase()))
+  return expectedRoleCodes.some((code) => codes.has(String(code || '').toUpperCase())) ? 1 : 0
+}
+function sortLeaderOptions<T extends { value: string | number; label: string }>(options: T[], expectedRoleCodes: string[]) {
+  return [...options].sort((a, b) => {
+    const scoreB = candidateMatchScore(b.value, expectedRoleCodes)
+    const scoreA = candidateMatchScore(a.value, expectedRoleCodes)
+    if (scoreB !== scoreA) return scoreB - scoreA
+    return String(a.label || '').localeCompare(String(b.label || ''), 'zh-CN')
+  })
+}
 const directLeaderSelectOptions = computed(() => {
   const target = { id: form.id, departmentId: form.departmentId, roleCodes: formRoleCodes.value }
-  return staffSelectOptions.value.filter((candidate) => {
+  const available = staffSelectOptions.value.filter((candidate) => {
     const roleCodes = staffRoleCodeMap.value.get(String(candidate.value)) || []
     return canBeDirectLeader(target, { id: candidate.value, departmentId: candidate.departmentId, roleCodes })
   })
+  return sortLeaderOptions(available, expectedDirectLeaderRoleCodes.value)
 })
 const indirectLeaderSelectOptions = computed(() => {
   const target = { id: form.id, departmentId: form.departmentId, roleCodes: formRoleCodes.value }
-  return staffSelectOptions.value.filter((candidate) => {
+  const available = staffSelectOptions.value.filter((candidate) => {
     const roleCodes = staffRoleCodeMap.value.get(String(candidate.value)) || []
     return canBeIndirectLeader(target, { id: candidate.value, departmentId: candidate.departmentId, roleCodes })
   })
+  return sortLeaderOptions(available, expectedIndirectLeaderRoleCodes.value)
 })
 const recommendedDirectLeaderId = computed(() => {
   if (!directLeaderSelectOptions.value.length) return undefined
-  return String(directLeaderSelectOptions.value[0].value)
+  const preferred = directLeaderSelectOptions.value.find((item) => candidateMatchScore(item.value, expectedDirectLeaderRoleCodes.value) > 0)
+  return String((preferred || directLeaderSelectOptions.value[0]).value)
 })
 const recommendedIndirectLeaderId = computed(() => {
   if (!indirectLeaderSelectOptions.value.length) return undefined
   const direct = String(form.directLeaderId || recommendedDirectLeaderId.value || '')
-  const preferred = indirectLeaderSelectOptions.value.find((item) => String(item.value) !== direct)
+  const preferred = indirectLeaderSelectOptions.value.find((item) =>
+    String(item.value) !== direct && candidateMatchScore(item.value, expectedIndirectLeaderRoleCodes.value) > 0
+  )
+    || indirectLeaderSelectOptions.value.find((item) => String(item.value) !== direct)
   return String((preferred || indirectLeaderSelectOptions.value[0]).value)
 })
 const directLeaderRuleHint = computed(() => {
+  if (expectedDirectLeaderRoleNames.value.length) {
+    return `规则：优先由角色上级自动推荐，当前推荐角色：${expectedDirectLeaderRoleNames.value.join(' / ')}`
+  }
   if (formRoleCodes.value.some((code) => String(code).endsWith('_EMPLOYEE'))) {
     return '规则：员工 → 直接领导仅可选本部门部长'
   }
@@ -399,7 +478,31 @@ const directLeaderRuleHint = computed(() => {
   }
   return '规则：未知层级时可选同部门部长或院长层级'
 })
-const indirectLeaderRuleHint = computed(() => '规则：间接领导仅可选院长/DIRECTOR/SYS_ADMIN')
+const indirectLeaderRuleHint = computed(() => {
+  if (expectedIndirectLeaderRoleNames.value.length) {
+    return `规则：优先由角色上级链自动推荐，当前推荐角色：${expectedIndirectLeaderRoleNames.value.join(' / ')}`
+  }
+  return '规则：间接领导仅可选院长或院长层级管理者'
+})
+const leaderStrategyTitle = computed(() => {
+  if (expectedDirectLeaderRoleNames.value.length || expectedIndirectLeaderRoleNames.value.length) {
+    return '当前账号已匹配角色领导关系'
+  }
+  return '当前账号未配置完整角色领导关系'
+})
+const leaderStrategyDescription = computed(() => {
+  const parts: string[] = []
+  if (expectedDirectLeaderRoleNames.value.length) {
+    parts.push(`直接领导建议：${expectedDirectLeaderRoleNames.value.join(' / ')}`)
+  }
+  if (expectedIndirectLeaderRoleNames.value.length) {
+    parts.push(`间接领导建议：${expectedIndirectLeaderRoleNames.value.join(' / ')}`)
+  }
+  if (parts.length) {
+    return `${parts.join('；')}。若员工有特殊汇报关系，再手动微调个人直接领导和间接领导。`
+  }
+  return '建议做法：先在角色管理里给角色设置“上级领导角色”，再回到这里一键推荐。员工个人层面的直接领导、间接领导只用于落地到具体负责人。'
+})
 const drawerTitle = computed(() => (form.id ? '编辑员工' : '新增员工'))
 const supervisorAnomalyMap = computed(() => {
   const map = new Map<string, string>()
