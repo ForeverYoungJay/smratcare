@@ -1,118 +1,157 @@
 <template>
   <PageContainer title="库存总览" subTitle="批次库存、临期与低库存监控">
-    <a-card class="card-elevated" :bordered="false">
-      <a-form layout="inline" :model="query" class="search-form">
-        <a-form-item label="关键词">
-          <a-input v-model:value="query.keyword" placeholder="商品名/编码/批次号" allow-clear />
-        </a-form-item>
-        <a-form-item label="商品">
-          <a-select
-            v-model:value="query.productId"
-            :options="productOptions"
-            allow-clear
-            show-search
-            option-filter-prop="label"
-            style="width: 220px"
-          />
-        </a-form-item>
-        <a-form-item label="仓库">
-          <a-select v-model:value="query.warehouseId" :options="warehouseOptions" allow-clear style="width: 180px" />
-        </a-form-item>
-        <a-form-item label="分类">
-          <a-select v-model:value="query.category" :options="categoryOptions" allow-clear style="width: 180px" />
-        </a-form-item>
-        <a-form-item label="业务域">
-          <a-select v-model:value="query.businessDomain" allow-clear style="width: 140px" :options="businessDomainOptions" />
-        </a-form-item>
-        <a-form-item label="物资类型">
-          <a-select v-model:value="query.itemType" allow-clear style="width: 140px" :options="itemTypeOptions" />
-        </a-form-item>
-        <a-form-item label="商城可售">
-          <a-select v-model:value="query.mallEnabled" allow-clear style="width: 120px">
-            <a-select-option :value="1">是</a-select-option>
-            <a-select-option :value="0">否</a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item label="临期天数<=">
-          <a-input-number v-model:value="query.expiryDays" :min="0" style="width: 120px" />
-        </a-form-item>
-        <a-form-item label="仅低库存">
-          <a-switch v-model:checked="query.lowStockOnly" />
-        </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="handleSearch">搜索</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
-    </a-card>
+    <template #stats>
+      <div class="inventory-overview-grid">
+        <div class="overview-card">
+          <span>固定资产库存</span>
+          <strong>{{ summaryStats.assetQty }}</strong>
+          <small>大件资产与耐用品总量</small>
+        </div>
+        <div class="overview-card">
+          <span>耗材库存</span>
+          <strong>{{ summaryStats.consumableQty }}</strong>
+          <small>护理与日常耗材即时可用量</small>
+        </div>
+        <div class="overview-card">
+          <span>食材库存</span>
+          <strong>{{ summaryStats.foodQty }}</strong>
+          <small>餐饮备货与加工原料数量</small>
+        </div>
+        <div class="overview-card">
+          <span>库存风险</span>
+          <strong>{{ summaryStats.lowStockCount + summaryStats.expiringCount }}</strong>
+          <small>低库存与临期项目合计</small>
+        </div>
+      </div>
+    </template>
 
-    <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
+    <SearchForm :model="query" @search="handleSearch" @reset="reset">
+      <a-form-item label="关键词">
+        <a-input v-model:value="query.keyword" placeholder="商品名/编码/批次号" allow-clear />
+      </a-form-item>
+      <a-form-item label="商品">
+        <a-select
+          v-model:value="query.productId"
+          :options="productOptions"
+          allow-clear
+          show-search
+          option-filter-prop="label"
+          style="width: 220px"
+        />
+      </a-form-item>
+      <a-form-item label="仓库">
+        <a-select v-model:value="query.warehouseId" :options="warehouseOptions" allow-clear style="width: 180px" />
+      </a-form-item>
+      <a-form-item label="分类">
+        <a-select v-model:value="query.category" :options="categoryOptions" allow-clear style="width: 180px" />
+      </a-form-item>
+      <a-form-item label="业务域">
+        <a-select v-model:value="query.businessDomain" allow-clear style="width: 140px" :options="businessDomainOptions" />
+      </a-form-item>
+      <a-form-item label="物资类型">
+        <a-select v-model:value="query.itemType" allow-clear style="width: 140px" :options="itemTypeOptions" />
+      </a-form-item>
+      <a-form-item label="商城可售">
+        <a-select v-model:value="query.mallEnabled" allow-clear style="width: 120px">
+          <a-select-option :value="1">是</a-select-option>
+          <a-select-option :value="0">否</a-select-option>
+        </a-select>
+      </a-form-item>
+      <a-form-item label="临期天数<=">
+        <a-input-number v-model:value="query.expiryDays" :min="0" style="width: 120px" />
+      </a-form-item>
+      <a-form-item label="仅低库存">
+        <a-switch v-model:checked="query.lowStockOnly" />
+      </a-form-item>
+    </SearchForm>
+
+    <section class="surface-toolbar">
+      <div class="surface-toolbar-title">
+        <strong>库存监控工作台</strong>
+        <span>优先锁定仓库、商品和风险口径，快速识别低库存、临期批次与需要盘点调整的项目。</span>
+      </div>
+      <a-space wrap>
+        <a-tag color="processing">低库存 {{ summaryStats.lowStockCount }}</a-tag>
+        <a-tag color="gold">临期 {{ summaryStats.expiringCount }}</a-tag>
+        <a-tag color="blue">缺口 {{ summaryStats.lowStockGap }}</a-tag>
+        <a-tag color="green">物资类型 {{ query.itemType ? itemTypeLabel(query.itemType) : '全部' }}</a-tag>
+      </a-space>
+    </section>
+
+    <section class="card-elevated inventory-workspace">
       <div class="table-actions">
-        <a-space>
+        <div class="table-head">
+          <div>
+            <strong>库存批次列表</strong>
+            <span>支持按仓库、类别、业务域与临期规则筛选，便于仓储人员持续跟进风险库存。</span>
+          </div>
+          <a-space wrap>
+            <a-tag color="default">共 {{ total }} 条</a-tag>
+            <a-tag color="purple">低库存缺口 {{ summaryStats.lowStockGap }}</a-tag>
+          </a-space>
+        </div>
+        <div class="toolbar-actions">
           <a-button @click="exportCsvData">导出CSV</a-button>
           <a-button type="primary" @click="openAdjust">盘点调整</a-button>
-        </a-space>
+        </div>
       </div>
-      <a-row :gutter="12" style="margin-bottom: 12px">
-        <a-col :span="6"><a-statistic title="固定资产库存" :value="summaryStats.assetQty" /></a-col>
-        <a-col :span="6"><a-statistic title="耗材库存" :value="summaryStats.consumableQty" /></a-col>
-        <a-col :span="6"><a-statistic title="食材库存" :value="summaryStats.foodQty" /></a-col>
-        <a-col :span="6"><a-statistic title="服务库存" :value="summaryStats.serviceQty" /></a-col>
-      </a-row>
-      <a-row :gutter="12" style="margin-bottom: 12px">
-        <a-col :span="8"><a-statistic title="低库存条目" :value="summaryStats.lowStockCount" /></a-col>
-        <a-col :span="8"><a-statistic title="临期条目(<=30天)" :value="summaryStats.expiringCount" /></a-col>
-        <a-col :span="8"><a-statistic title="低库存缺口" :value="summaryStats.lowStockGap" /></a-col>
-      </a-row>
 
-      <vxe-toolbar custom export></vxe-toolbar>
-      <vxe-table
-        border
-        stripe
-        show-overflow
-        height="520"
-        :loading="loading"
-        :data="rows"
-        :column-config="{ resizable: true }"
-      >
-        <vxe-column field="productName" title="商品名称" min-width="160" />
-        <vxe-column field="productId" title="商品ID" width="120" />
-        <vxe-column field="businessDomain" title="业务域" width="110">
-          <template #default="{ row }">
-            <a-tag :color="domainColor(row.businessDomain)">{{ domainLabel(row.businessDomain) }}</a-tag>
-          </template>
-        </vxe-column>
-        <vxe-column field="itemType" title="类型" width="110">
-          <template #default="{ row }">{{ itemTypeLabel(row.itemType) }}</template>
-        </vxe-column>
-        <vxe-column field="batchNo" title="批次号" min-width="160" />
-        <vxe-column field="quantity" title="库存数量" width="120">
-          <template #default="{ row }">
-            <a-tag :color="lowStock(row) ? 'red' : 'blue'">{{ row.quantity }}</a-tag>
-          </template>
-        </vxe-column>
-        <vxe-column field="safetyStock" title="安全库存" width="120" />
-        <vxe-column field="expireDate" title="有效期" width="140">
-          <template #default="{ row }">
-            <a-tag :color="expiring(row) ? 'orange' : 'default'">{{ row.expireDate || '-' }}</a-tag>
-          </template>
-        </vxe-column>
-        <vxe-column field="warehouseLocation" title="库位" width="120" />
-        <vxe-column field="createTime" title="入库时间" width="180" />
-      </vxe-table>
+      <div class="table-frame">
+        <vxe-toolbar class="inventory-vxe-toolbar" custom export></vxe-toolbar>
+        <vxe-table
+          class="inventory-vxe-table"
+          border
+          stripe
+          show-overflow
+          height="520"
+          :loading="loading"
+          :data="rows"
+          :column-config="{ resizable: true }"
+        >
+          <vxe-column field="productName" title="商品名称" min-width="220">
+            <template #default="{ row }">
+              <div class="inventory-name-cell">
+                <strong>{{ row.productName }}</strong>
+                <span>{{ row.batchNo || '未填写批次号' }}</span>
+              </div>
+            </template>
+          </vxe-column>
+          <vxe-column field="productId" title="商品ID" width="120" />
+          <vxe-column field="businessDomain" title="业务域" width="110">
+            <template #default="{ row }">
+              <a-tag :color="domainColor(row.businessDomain)">{{ domainLabel(row.businessDomain) }}</a-tag>
+            </template>
+          </vxe-column>
+          <vxe-column field="itemType" title="类型" width="110">
+            <template #default="{ row }">{{ itemTypeLabel(row.itemType) }}</template>
+          </vxe-column>
+          <vxe-column field="quantity" title="库存数量" width="120">
+            <template #default="{ row }">
+              <a-tag :color="lowStock(row) ? 'red' : 'blue'">{{ row.quantity }}</a-tag>
+            </template>
+          </vxe-column>
+          <vxe-column field="safetyStock" title="安全库存" width="120" />
+          <vxe-column field="expireDate" title="有效期" width="140">
+            <template #default="{ row }">
+              <a-tag :color="expiring(row) ? 'orange' : 'default'">{{ row.expireDate || '-' }}</a-tag>
+            </template>
+          </vxe-column>
+          <vxe-column field="warehouseLocation" title="库位" width="120" />
+          <vxe-column field="createTime" title="入库时间" width="180" />
+        </vxe-table>
+      </div>
 
-      <a-pagination
-        style="margin-top: 16px; text-align: right;"
-        :current="query.pageNo"
-        :page-size="query.pageSize"
-        :total="total"
-        show-size-changer
-        @change="onPageChange"
-        @showSizeChange="onPageSizeChange"
-      />
-    </a-card>
+      <div class="pager-row">
+        <a-pagination
+          :current="query.pageNo"
+          :page-size="query.pageSize"
+          :total="total"
+          show-size-changer
+          @change="onPageChange"
+          @showSizeChange="onPageSizeChange"
+        />
+      </div>
+    </section>
 
     <a-modal v-model:open="adjustOpen" title="盘点调整" @ok="submitAdjust" :confirm-loading="adjusting">
       <a-form layout="vertical" :model="adjustForm" :rules="adjustRules" ref="adjustFormRef">
@@ -157,6 +196,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
+import SearchForm from '../../components/SearchForm.vue'
 import { exportCsv } from '../../utils/export'
 import { adjustInventory, getInventoryBatchPage } from '../../api/materialCenter'
 import { getWarehousePage } from '../../api/materialCenter'
@@ -445,12 +485,113 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.search-form {
-  row-gap: 8px;
+.inventory-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
 }
+
+.overview-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid #dce9f2;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.overview-card span,
+.table-head span,
+.inventory-name-cell span {
+  color: #6d8aa3;
+  font-size: 12px;
+}
+
+.overview-card strong {
+  color: #173854;
+  font-size: 24px;
+}
+
+.overview-card small {
+  color: #7a97b0;
+}
+
+.inventory-workspace {
+  padding: 16px;
+}
+
+.table-actions,
+.toolbar-actions,
+.table-head,
+.inventory-name-cell,
+.pager-row {
+  display: flex;
+  align-items: center;
+}
+
 .table-actions {
   display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.toolbar-actions {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.table-head {
+  justify-content: space-between;
+  gap: 12px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.table-head strong,
+.inventory-name-cell strong {
+  color: #173854;
+}
+
+.table-head strong {
+  display: block;
+  font-size: 16px;
+}
+
+.table-frame {
+  border: 1px solid #e4edf4;
+  border-radius: 18px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.inventory-name-cell {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.pager-row {
   justify-content: flex-end;
-  margin-bottom: 8px;
+  margin-top: 16px;
+}
+
+@media (max-width: 1200px) {
+  .inventory-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .inventory-overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .table-actions,
+  .table-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>

@@ -100,11 +100,11 @@ function handleClick() {
   border: 1px solid rgba(87, 215, 255, 0.2);
   border-radius: 18px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(242, 249, 255, 0.98) 100%);
+    linear-gradient(180deg, rgba(12, 30, 54, 0.94) 0%, rgba(7, 18, 34, 0.96) 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.8),
-    0 12px 28px rgba(73, 130, 178, 0.12);
-  color: #173854;
+    inset 0 1px 0 rgba(134, 216, 255, 0.14),
+    0 18px 44px rgba(0, 0, 0, 0.32);
+  color: var(--cockpit-text);
   padding: 16px;
   text-align: left;
   cursor: pointer;
@@ -115,17 +115,17 @@ function handleClick() {
   transform: translateY(-3px);
   border-color: rgba(87, 215, 255, 0.42);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.86),
-    0 16px 32px rgba(73, 130, 178, 0.16),
-    0 0 24px rgba(44, 179, 255, 0.1);
+    inset 0 1px 0 rgba(134, 216, 255, 0.18),
+    0 18px 44px rgba(0, 0, 0, 0.4),
+    0 0 24px rgba(44, 179, 255, 0.16);
 }
 
 .bed-info-card.is-alert {
   border-color: rgba(255, 93, 124, 0.56);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.86),
-    0 16px 32px rgba(73, 130, 178, 0.16),
-    0 0 24px rgba(255, 93, 124, 0.14);
+    inset 0 1px 0 rgba(255, 160, 186, 0.18),
+    0 20px 48px rgba(0, 0, 0, 0.42),
+    0 0 28px rgba(255, 93, 124, 0.22);
 }
 
 .bed-card-top,
@@ -145,7 +145,7 @@ function handleClick() {
   font-size: 12px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #6d8aa3;
+  color: var(--cockpit-muted);
 }
 
 .bed-name {
@@ -162,7 +162,7 @@ function handleClick() {
   border: 1px solid rgba(87, 215, 255, 0.2);
   font-size: 12px;
   font-weight: 700;
-  color: #18506f;
+  color: #bff4ff;
 }
 
 .bed-card-center {
@@ -176,7 +176,7 @@ function handleClick() {
   min-width: 90px;
   border-radius: 16px;
   background:
-    linear-gradient(180deg, rgba(87, 215, 255, 0.08) 0%, rgba(87, 215, 255, 0.02) 100%);
+    linear-gradient(180deg, rgba(87, 215, 255, 0.1) 0%, rgba(87, 215, 255, 0.02) 100%);
   border: 1px solid rgba(87, 215, 255, 0.12);
   overflow: hidden;
 }
@@ -233,12 +233,12 @@ function handleClick() {
 .state-title {
   font-size: 14px;
   font-weight: 700;
-  color: #173854;
+  color: #e9fbff;
 }
 
 .state-subtitle {
   font-size: 12px;
-  color: #6d8aa3;
+  color: var(--cockpit-muted);
   line-height: 1.6;
 }
 
@@ -254,7 +254,7 @@ function handleClick() {
 
 .metric-label {
   font-size: 11px;
-  color: #6d8aa3;
+  color: var(--cockpit-muted);
   text-transform: uppercase;
   letter-spacing: 0.12em;
 }
@@ -262,7 +262,7 @@ function handleClick() {
 .metric-item strong {
   font-size: 16px;
   font-weight: 700;
-  color: #173854;
+  color: #f5fcff;
 }
 
 .is-idle .bed-status-chip,

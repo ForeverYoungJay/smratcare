@@ -1,5 +1,6 @@
 package com.zhiyangyun.care.bill.controller;
 
+import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.bill.entity.BillingCareLevelFee;
 import com.zhiyangyun.care.bill.entity.BillingConfigEntry;
 import com.zhiyangyun.care.bill.model.BillingCareLevelFeeRequest;
@@ -11,6 +12,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/admin/billing")
+@PreAuthorize("hasAnyRole('FINANCE_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
 public class BillingAdminController {
   private final BillingConfigService billingConfigService;
 
@@ -29,8 +32,9 @@ public class BillingAdminController {
 
   @PostMapping("/config")
   public BillingConfigResponse upsertConfig(@Valid @RequestBody BillingConfigRequest request) {
+    Long scopedOrgId = AuthContext.resolveAccessibleOrgId(request.getOrgId());
     BillingConfigEntry entry = new BillingConfigEntry();
-    entry.setOrgId(request.getOrgId());
+    entry.setOrgId(scopedOrgId);
     entry.setConfigKey(request.getConfigKey());
     entry.setConfigValue(request.getConfigValue());
     entry.setEffectiveMonth(request.getEffectiveMonth());
@@ -45,15 +49,17 @@ public class BillingAdminController {
   public List<BillingConfigResponse> listConfigs(
       @RequestParam Long orgId,
       @RequestParam(required = false) @Pattern(regexp = "\\d{4}-\\d{2}") String month) {
-    return billingConfigService.listConfigs(orgId, month).stream()
+    Long scopedOrgId = AuthContext.resolveAccessibleOrgId(orgId);
+    return billingConfigService.listConfigs(scopedOrgId, month).stream()
         .map(this::toResponse)
         .collect(Collectors.toList());
   }
 
   @PostMapping("/care-level")
   public BillingCareLevelFeeResponse upsertCareLevel(@Valid @RequestBody BillingCareLevelFeeRequest request) {
+    Long scopedOrgId = AuthContext.resolveAccessibleOrgId(request.getOrgId());
     BillingCareLevelFee fee = new BillingCareLevelFee();
-    fee.setOrgId(request.getOrgId());
+    fee.setOrgId(scopedOrgId);
     fee.setCareLevel(request.getCareLevel());
     fee.setFeeMonthly(request.getFeeMonthly());
     fee.setEffectiveMonth(request.getEffectiveMonth());
@@ -68,7 +74,8 @@ public class BillingAdminController {
   public List<BillingCareLevelFeeResponse> listCareLevels(
       @RequestParam Long orgId,
       @RequestParam(required = false) @Pattern(regexp = "\\d{4}-\\d{2}") String month) {
-    return billingConfigService.listCareLevelFees(orgId, month).stream()
+    Long scopedOrgId = AuthContext.resolveAccessibleOrgId(orgId);
+    return billingConfigService.listCareLevelFees(scopedOrgId, month).stream()
         .map(this::toResponse)
         .collect(Collectors.toList());
   }

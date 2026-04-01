@@ -47,32 +47,7 @@
       </a-form-item>
     </SearchForm>
 
-    <section class="surface-toolbar">
-      <div class="surface-toolbar-title">
-        <strong>入院流程与在院动作</strong>
-        <span>保持原有业务联动，优先突出高频员工操作。</span>
-      </div>
-      <a-space wrap>
-        <a-tag color="gold">待评估 {{ lifecycleStageCounters.pendingAssessment }}</a-tag>
-        <a-tag color="blue">待办理入住 {{ lifecycleStageCounters.pendingBedSelect }}</a-tag>
-        <a-tag color="purple">待签署 {{ lifecycleStageCounters.pendingSign }}</a-tag>
-        <a-tag color="green">已签署 {{ lifecycleStageCounters.signed }}</a-tag>
-      </a-space>
-    </section>
-
     <section class="card-elevated elder-workspace">
-      <FlowGuardBar
-        title="长者入院守卫"
-        :subject="elderFlowSubject"
-        :stage-text="elderFlowStageText"
-        :stage-color="elderFlowStageColor"
-        :steps="elderFlowSteps"
-        :current-index="elderFlowCurrentIndex"
-        :blockers="elderFlowBlockers"
-        :hint="elderFlowHint"
-        style="margin-bottom: 14px"
-      />
-
       <div class="action-toolbar">
         <div class="action-toolbar-main">
           <a-button type="primary" @click="goCreate">新建长者</a-button>
@@ -209,7 +184,6 @@ import QRCode from 'qrcode'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
-import FlowGuardBar from '../../components/FlowGuardBar.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { exportCsv } from '../../utils/export'
@@ -278,40 +252,6 @@ const statusCounters = computed(() => ({
   outing: rows.value.filter((item) => item.status === 2).length,
   discharged: rows.value.filter((item) => item.status === 3).length
 }))
-
-const elderFlowSteps = ['档案建档', '办理入住', '在院管理']
-const elderFlowCurrentIndex = computed(() => {
-  if (!selectedRows.value.length) return 2
-  const row = selectedRows.value[0]
-  if (row.status === 1 || row.status === 2) return 2
-  return 1
-})
-const elderFlowStageText = computed(() => {
-  if (!selectedRows.value.length) return '展示历史入住补录与合同流程转入住长者'
-  return statusText(selectedRows.value[0].status)
-})
-const elderFlowStageColor = computed(() => {
-  if (!selectedRows.value.length) return 'blue'
-  const status = selectedRows.value[0].status
-  if (status === 1) return 'green'
-  if (status === 2) return 'orange'
-  return 'default'
-})
-const elderFlowSubject = computed(() => {
-  if (!selectedRows.value.length) return `当前列表共 ${total.value} 位，统一管理历史入住补录与合同流程转入住长者`
-  const row = selectedRows.value[0]
-  return `长者 ${row.fullName} / 床位 ${row.bedNo || '-'}`
-})
-const elderFlowBlockers = computed(() => {
-  if (!selectedRows.value.length) return []
-  const row = selectedRows.value[0]
-  if (!row.bedNo) return ['未分配床位']
-  return []
-})
-const elderFlowHint = computed(() => {
-  if (!selectedRows.value.length) return '新建老人用于补录平台启用前已入住长者；新入住老人仍需先走合同流程'
-  return '可执行换床、退住、家属绑定与二维码打印等在院操作'
-})
 
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,

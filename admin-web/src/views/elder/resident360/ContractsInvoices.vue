@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="合同与票据" subTitle="合同附件、票据与评估报告统一归档">
+  <PageContainer title="合同与票据" subTitle="合同附件与评估报告统一归档">
     <a-row :gutter="16" style="margin-bottom: 12px">
       <a-col :xs="24" :sm="12" :lg="6">
         <a-card class="card-elevated" :bordered="false" size="small">
@@ -63,12 +63,12 @@
             </a-form-item>
           </a-form>
 
-          <a-form layout="inline" class="search-bar" :model="filters">
+          <a-form layout="inline" class="search-bar compact-toolbar" :model="filters">
             <a-form-item label="资料类型">
-              <a-select v-model:value="filters.kind" style="width: 140px">
-                <a-select-option value="ALL">全部</a-select-option>
-                <a-select-option value="ATTACHMENT">合同附件</a-select-option>
-                <a-select-option value="ASSESSMENT">评估报告</a-select-option>
+              <a-select v-model:value="filters.type" style="width: 180px">
+                <a-select-option v-for="item in documentTypeOptions" :key="item.value" :value="item.value">
+                  {{ item.label }}
+                </a-select-option>
               </a-select>
             </a-form-item>
             <a-form-item label="关键字">
@@ -87,7 +87,7 @@
               <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'kind'">
                   <a-tag :color="record.kind === 'ASSESSMENT' ? 'purple' : 'blue'">
-                    {{ record.kind === 'ASSESSMENT' ? '评估报告' : '合同附件' }}
+                    {{ record.kind === 'ASSESSMENT' ? '评估报告' : '附件资料' }}
                   </a-tag>
                 </template>
                 <template v-else-if="column.key === 'type'">
@@ -141,9 +141,6 @@
                 >
                   合同附件 {{ hasContractAttachment ? '已上传' : '缺失' }}
                 </a-tag>
-                <a-tag :color="archiveItemStateTagColor(hasInvoiceAttachment)">
-                  发票/收据 {{ hasInvoiceAttachment ? '已归档' : '缺失' }}
-                </a-tag>
                 <a-tag
                   :color="archiveItemStateTagColor(hasIdAttachment)"
                   class="archive-item-action"
@@ -155,29 +152,9 @@
                   评估报告 {{ hasAssessmentReport ? '已归档' : '待生成' }}
                 </a-tag>
               </a-space>
-              <a-alert
-                v-if="missingArchiveItems.length"
-                type="warning"
-                show-icon
-                style="margin-top: 10px"
-                :message="`待补齐：${missingArchiveItemsLabel}`"
-              />
               <div v-if="linkage?.generatedAt" class="archive-generated-time">
                 规则评估时间：{{ formatGeneratedAt(linkage?.generatedAt) }}
               </div>
-            </div>
-            <div class="archive-rule-block">
-              <div class="archive-rule-head">
-                <span>{{ archiveRuleTitleText }}</span>
-                <a-tag color="geekblue">版本 {{ archiveRuleVersionText }}</a-tag>
-              </div>
-              <div class="archive-rule-desc">{{ archiveRuleDescriptionText }}</div>
-              <div v-if="archiveRuleRequiredItemsDisplay.length" class="archive-rule-required">
-                必需项：{{ archiveRuleRequiredItemsDisplay.join('、') }}
-              </div>
-              <a-space direction="vertical" size="small" style="width: 100%; margin-top: 8px">
-                <a-tag v-for="item in archiveRuleTipsDisplay" :key="item">{{ item }}</a-tag>
-              </a-space>
             </div>
           </StatefulBlock>
         </a-card>
@@ -197,17 +174,14 @@ import ElderNameAutocomplete from '../../../components/ElderNameAutocomplete.vue
 import { useElderOptions } from '../../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
 import { formatChineseDateTime } from '../../../utils/dateLocale'
-import { normalizeLifecycleStage } from '../../../utils/lifecycleStage'
 import { getElderDetail } from '../../../api/elder'
 import {
-  getContractArchiveRule,
   getContractAssessmentOverview,
   getContractLinkageByContract,
   getContractLinkageByElder,
   getContractLinkageByLead
 } from '../../../api/marketing'
 import type {
-  ContractArchiveRuleInfo,
   ContractAssessmentOverview,
   ContractAssessmentReportItem,
   ContractAttachmentItem,
@@ -220,19 +194,13 @@ type DocumentKind = 'ATTACHMENT' | 'ASSESSMENT'
 interface DocumentItem {
   id: string
   kind: DocumentKind
+  typeCode: string
   type: string
   name: string
   url?: string
   route?: string
   size: string
   time: string
-}
-
-const ARCHIVE_MISSING_LABEL_MAP: Record<string, string> = {
-  CONTRACT_ATTACHMENT: '合同附件',
-  INVOICE_ATTACHMENT: '发票/收据',
-  ID_ATTACHMENT: '身份证/证件',
-  ASSESSMENT_REPORT: '评估报告'
 }
 
 const router = useRouter()
@@ -251,7 +219,6 @@ const errorMessage = ref('')
 const linkage = ref<ContractLinkageSummary>()
 const elderProfile = ref<ElderItem | null>(null)
 const assessmentOverview = ref<ContractAssessmentOverview>()
-const archiveRuleInfo = ref<ContractArchiveRuleInfo>()
 const docRouteSignature = ref('')
 const skipNextDocRouteWatch = ref(false)
 const DOC_ROUTE_KEYS = ['docElderId', 'docKind', 'docKeyword'] as const
@@ -266,13 +233,22 @@ const selector = reactive({
 })
 const selectorInput = ref('')
 const filters = reactive({
-  kind: 'ALL',
+  type: 'ALL',
   keyword: ''
 })
 const searchSnapshot = reactive({
-  kind: 'ALL',
+  type: 'ALL',
   keyword: ''
 })
+const documentTypeOptions = [
+  { label: '全部', value: 'ALL' },
+  { label: '病历资料', value: 'MEDICAL_RECORD' },
+  { label: '医保复印件', value: 'MEDICAL_INSURANCE' },
+  { label: '户口复印件', value: 'HOUSEHOLD' },
+  { label: '合同附件', value: 'CONTRACT' },
+  { label: '其他附件', value: 'OTHER' },
+  { label: '评估报告', value: 'ASSESSMENT_REPORT' }
+]
 
 const columns = [
   { title: '来源', dataIndex: 'kind', key: 'kind', width: 110 },
@@ -286,6 +262,7 @@ const documents = computed<DocumentItem[]>(() => {
   const attachments = (linkage.value?.attachments || []).map((item) => ({
     id: `att-${item.id}`,
     kind: 'ATTACHMENT' as DocumentKind,
+    typeCode: normalizeAttachmentTypeCode(item),
     type: normalizeAttachmentType(item),
     name: item.fileName || '未命名附件',
     url: item.fileUrl,
@@ -297,6 +274,7 @@ const documents = computed<DocumentItem[]>(() => {
     ? [{
         id: `elder-contract-${String(elderProfile.value?.id || '')}`,
         kind: 'ATTACHMENT' as DocumentKind,
+        typeCode: 'CONTRACT',
         type: '历史合同附件',
         name: fileNameFromUrl(elderProfile.value.historicalContractFileUrl) || '历史合同附件',
         url: elderProfile.value.historicalContractFileUrl,
@@ -308,6 +286,7 @@ const documents = computed<DocumentItem[]>(() => {
   const reports = flattenReports(assessmentOverview.value).map((report) => ({
     id: `report-${report.recordId}`,
     kind: 'ASSESSMENT' as DocumentKind,
+    typeCode: 'ASSESSMENT_REPORT',
     type: mapAssessmentType(report.assessmentType),
     name: report.reportFileName || buildAssessmentReportName(report),
     url: report.reportFileUrl || '',
@@ -323,11 +302,11 @@ const documents = computed<DocumentItem[]>(() => {
 const filteredDocuments = computed(() => {
   const keyword = searchSnapshot.keyword.trim().toLowerCase()
   return documents.value.filter((item) => {
-    const kindMatch = searchSnapshot.kind === 'ALL' ? true : item.kind === searchSnapshot.kind
+    const typeMatch = searchSnapshot.type === 'ALL' ? true : item.typeCode === searchSnapshot.type
     const keywordMatch = !keyword
       ? true
       : item.name.toLowerCase().includes(keyword) || item.type.toLowerCase().includes(keyword)
-    return kindMatch && keywordMatch
+    return typeMatch && keywordMatch
   })
 })
 
@@ -337,9 +316,6 @@ const contractAttachmentCount = computed(() => {
 })
 const isHistoricalImport = computed(() => elderProfile.value?.sourceType === 'HISTORICAL_IMPORT')
 const assessmentReportCount = computed(() => flattenReports(assessmentOverview.value).length)
-const resolvedLifecycleStage = computed(() =>
-  normalizeLifecycleStage(linkage.value?.flowStage, linkage.value?.contractStatus)
-)
 const resolvedLinkageElderName = computed(() => {
   const rawName = String(linkage.value?.elderName || '').trim()
   const elderId = String(linkage.value?.elderId || '').trim()
@@ -372,12 +348,6 @@ const hasContractAttachment = computed(() => {
   }
   return contractAttachmentCount.value > 0 || Boolean(elderProfile.value?.historicalContractFileUrl)
 })
-const hasInvoiceAttachment = computed(() => {
-  if (linkage.value?.hasInvoiceAttachment !== undefined && linkage.value?.hasInvoiceAttachment !== null) {
-    return Boolean(linkage.value.hasInvoiceAttachment)
-  }
-  return (linkage.value?.attachments || []).some((item) => normalizeAttachmentType(item) === '收据/发票')
-})
 const hasIdAttachment = computed(() => {
   if (linkage.value?.hasIdAttachment !== undefined && linkage.value?.hasIdAttachment !== null) {
     return Boolean(linkage.value.hasIdAttachment)
@@ -399,10 +369,9 @@ const archiveCompleteScore = computed(() => {
   const score = Number(linkage.value?.archiveScore)
   if (Number.isFinite(score)) return Math.max(0, Math.min(100, Math.round(score)))
   let fallbackScore = 0
-  if (hasContractAttachment.value) fallbackScore += 35
-  if (hasInvoiceAttachment.value) fallbackScore += 20
-  if (hasIdAttachment.value) fallbackScore += 20
-  if (hasAssessmentReport.value) fallbackScore += 25
+  if (hasContractAttachment.value) fallbackScore += 40
+  if (hasIdAttachment.value) fallbackScore += 30
+  if (hasAssessmentReport.value) fallbackScore += 30
   return fallbackScore
 })
 const archiveLevelText = computed(() => {
@@ -428,52 +397,14 @@ const archiveProgressColor = computed(() => {
   if (archiveLevelText.value === '中') return '#d97706'
   return '#dc2626'
 })
-const missingArchiveItems = computed(() => {
-  const fromBackend = linkage.value?.missingRequiredAttachmentTypes || []
-  if (fromBackend.length) {
-    return fromBackend
-  }
-  const fallback: string[] = []
-  if (!hasContractAttachment.value) fallback.push('CONTRACT_ATTACHMENT')
-  if (!hasInvoiceAttachment.value) fallback.push('INVOICE_ATTACHMENT')
-  if (!hasIdAttachment.value) fallback.push('ID_ATTACHMENT')
-  if (!hasAssessmentReport.value && resolvedLifecycleStage.value !== 'PENDING_ASSESSMENT') fallback.push('ASSESSMENT_REPORT')
-  return fallback
-})
-const missingArchiveItemsLabel = computed(() =>
-  missingArchiveItems.value.map((item) => ARCHIVE_MISSING_LABEL_MAP[item] || item).join('、')
-)
-const archiveRuleVersionText = computed(() => {
-  const fromLinkage = String(linkage.value?.archiveRuleVersion || '').trim()
-  if (fromLinkage) return fromLinkage
-  const fromRule = String(archiveRuleInfo.value?.ruleVersion || '').trim()
-  return fromRule || '-'
-})
-const archiveRuleTitleText = computed(() => {
-  const title = String(archiveRuleInfo.value?.title || '').trim()
-  return title || '合同归档规则说明'
-})
-const archiveRuleDescriptionText = computed(() => {
-  const text = String(archiveRuleInfo.value?.description || '').trim()
-  return text || '规则会按合同阶段和业务进度自动判定必需归档项。'
-})
-const archiveRuleTipsDisplay = computed(() => {
-  const linkageTips = (linkage.value?.archiveRuleTips || []).filter((item) => String(item || '').trim())
-  if (linkageTips.length) return linkageTips
-  return (archiveRuleInfo.value?.stageNotes || []).filter((item) => String(item || '').trim())
-})
-const archiveRuleRequiredItemsDisplay = computed(() =>
-  (archiveRuleInfo.value?.requiredItems || []).filter((item) => String(item || '').trim())
-)
-
 function applyFilters() {
-  searchSnapshot.kind = filters.kind
+  searchSnapshot.type = filters.type
   searchSnapshot.keyword = filters.keyword
   syncDocumentQueryToRoute().catch(() => {})
 }
 
 function resetFilters() {
-  filters.kind = 'ALL'
+  filters.type = 'ALL'
   filters.keyword = ''
   applyFilters()
 }
@@ -512,9 +443,9 @@ function applyDocumentQueryFromRoute() {
   }
 
   const kind = firstRouteQueryText(route.query.docKind).toUpperCase()
-  filters.kind = kind === 'ATTACHMENT' || kind === 'ASSESSMENT' ? kind : 'ALL'
+  filters.type = documentTypeOptions.some((item) => item.value === kind) ? kind : 'ALL'
   filters.keyword = firstRouteQueryText(route.query.docKeyword)
-  searchSnapshot.kind = filters.kind
+  searchSnapshot.type = filters.type
   searchSnapshot.keyword = filters.keyword
 }
 
@@ -547,7 +478,7 @@ function buildDocumentRouteQuery() {
     nextQuery[key] = value
   })
   if (selector.elderId) nextQuery.docElderId = String(selector.elderId)
-  if (searchSnapshot.kind !== 'ALL') nextQuery.docKind = searchSnapshot.kind
+  if (searchSnapshot.type !== 'ALL') nextQuery.docKind = searchSnapshot.type
   if (searchSnapshot.keyword.trim()) nextQuery.docKeyword = searchSnapshot.keyword.trim()
   return nextQuery
 }
@@ -618,17 +549,23 @@ function flattenReports(source?: ContractAssessmentOverview) {
 }
 
 function normalizeAttachmentType(item: ContractAttachmentItem) {
-  const type = (item.attachmentType || '').toUpperCase()
+  const type = normalizeAttachmentTypeCode(item)
   if (type === 'ASSESSMENT_REPORT') return '评估报告'
-  if (type === 'INVOICE') return '收据/发票'
-  if (type === 'CONTRACT') return '合同'
   if (type === 'MEDICAL_RECORD') return '病历资料'
   if (type === 'MEDICAL_INSURANCE') return '医保复印件'
   if (type === 'HOUSEHOLD') return '户口复印件'
-  const fileName = (item.fileName || '').toLowerCase()
-  if (fileName.includes('发票') || fileName.includes('invoice') || fileName.includes('receipt')) return '收据/发票'
-  if (fileName.includes('合同') || fileName.includes('contract')) return '合同'
-  return item.fileType || '附件'
+  if (type === 'CONTRACT') return '合同附件'
+  return '其他附件'
+}
+
+function normalizeAttachmentTypeCode(item: ContractAttachmentItem) {
+  const type = (item.attachmentType || '').toUpperCase()
+  if (type === 'ASSESSMENT_REPORT') return 'ASSESSMENT_REPORT'
+  if (type === 'MEDICAL_RECORD') return 'MEDICAL_RECORD'
+  if (type === 'MEDICAL_INSURANCE') return 'MEDICAL_INSURANCE'
+  if (type === 'HOUSEHOLD') return 'HOUSEHOLD'
+  if (type === 'CONTRACT') return 'CONTRACT'
+  return 'OTHER'
 }
 
 function buildAssessmentReportName(report: ContractAssessmentReportItem) {
@@ -752,14 +689,6 @@ async function loadBySelectedElder() {
   await loadAll()
 }
 
-async function loadArchiveRuleInfo() {
-  try {
-    archiveRuleInfo.value = await getContractArchiveRule()
-  } catch {
-    archiveRuleInfo.value = undefined
-  }
-}
-
 async function loadAll() {
   loading.value = true
   errorMessage.value = ''
@@ -823,7 +752,6 @@ async function loadAll() {
 onMounted(async () => {
   applyDocumentQueryFromRoute()
   docRouteSignature.value = buildDocRouteSignature(route.query as Record<string, unknown>)
-  await loadArchiveRuleInfo()
   await searchElders('')
   if (!selector.elderId) {
     const fromRoute = firstRouteQueryText(route.query.docElderId || route.query.elderId || route.query.residentId)
@@ -890,6 +818,10 @@ useLiveSyncRefresh({
   margin-bottom: 12px;
 }
 
+.compact-toolbar :deep(.ant-form-item) {
+  margin-bottom: 8px;
+}
+
 .archive-progress-block {
   margin-top: 12px;
   padding: 10px;
@@ -911,37 +843,6 @@ useLiveSyncRefresh({
 .archive-generated-time {
   margin-top: 8px;
   color: #64748b;
-  font-size: 12px;
-}
-
-.archive-rule-block {
-  margin-top: 10px;
-  padding: 10px;
-  border-radius: 10px;
-  border: 1px solid rgba(30, 64, 175, 0.18);
-  background: linear-gradient(130deg, rgba(239, 246, 255, 0.88) 0%, rgba(248, 250, 252, 0.88) 100%);
-}
-
-.archive-rule-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-  color: #1e293b;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.archive-rule-desc {
-  margin-top: 6px;
-  color: #475569;
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.archive-rule-required {
-  margin-top: 6px;
-  color: #334155;
   font-size: 12px;
 }
 

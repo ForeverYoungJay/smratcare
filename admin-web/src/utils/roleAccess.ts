@@ -19,16 +19,25 @@ export const DEPARTMENT_MINISTER_ROLES = [
 export const DEPARTMENT_ALL_ROLES = [...DEPARTMENT_EMPLOYEE_ROLES, ...DEPARTMENT_MINISTER_ROLES]
 
 const moduleRoleMap: Array<{ prefixes: string[]; employeeRoles: string[]; ministerRoles: string[] }> = [
-  { prefixes: ['/medical-care', '/health'], employeeRoles: ['MEDICAL_EMPLOYEE'], ministerRoles: ['MEDICAL_MINISTER'] },
+  {
+    prefixes: ['/medical-care', '/health'],
+    employeeRoles: ['MEDICAL_EMPLOYEE', 'NURSING_EMPLOYEE'],
+    ministerRoles: ['MEDICAL_MINISTER', 'NURSING_MINISTER']
+  },
   { prefixes: ['/care'], employeeRoles: ['NURSING_EMPLOYEE'], ministerRoles: ['NURSING_MINISTER'] },
   { prefixes: ['/finance'], employeeRoles: ['FINANCE_EMPLOYEE'], ministerRoles: ['FINANCE_MINISTER'] },
   {
-    prefixes: ['/logistics', '/material', '/inventory', '/store'],
+    prefixes: ['/logistics', '/material', '/inventory', '/store', '/bed', '/dining'],
     employeeRoles: ['LOGISTICS_EMPLOYEE'],
     ministerRoles: ['LOGISTICS_MINISTER']
   },
   { prefixes: ['/marketing'], employeeRoles: ['MARKETING_EMPLOYEE'], ministerRoles: ['MARKETING_MINISTER'] },
   { prefixes: ['/hr', '/oa', '/schedule', '/attendance'], employeeRoles: ['HR_EMPLOYEE'], ministerRoles: ['HR_MINISTER'] },
+  {
+    prefixes: ['/stats'],
+    employeeRoles: ['HR_EMPLOYEE', 'FINANCE_EMPLOYEE', 'LOGISTICS_EMPLOYEE', 'MARKETING_EMPLOYEE'],
+    ministerRoles: ['HR_MINISTER', 'FINANCE_MINISTER', 'LOGISTICS_MINISTER', 'MARKETING_MINISTER']
+  },
   {
     prefixes: ['/elder/assessment', '/assessment'],
     employeeRoles: ['MEDICAL_EMPLOYEE', 'NURSING_EMPLOYEE'],

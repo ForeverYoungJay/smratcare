@@ -1,9 +1,9 @@
-import { getRoles, getToken } from '../utils/auth';
-import { hasRouteAccess } from '../utils/roleAccess';
+import { getPagePermissions, getRoles, getToken } from '../utils/auth';
+import { resolveRouteAccess } from '../utils/routeAccess';
 export function setupPermission(router) {
     router.beforeEach((to, _from, next) => {
         const token = getToken();
-        const publicPages = ['/home', '/enterprise', '/admin', '/login'];
+        const publicPages = ['/home', '/enterprise', '/admin', '/login', '/403'];
         if (!token && !publicPages.includes(to.path)) {
             next('/home');
             return;
@@ -14,8 +14,9 @@ export function setupPermission(router) {
             return;
         }
         const roles = getRoles();
-        const required = to.meta?.roles || [];
-        if (!hasRouteAccess(roles, required, to.path)) {
+        const pagePermissions = getPagePermissions();
+        const access = resolveRouteAccess(router, roles, to.path, pagePermissions);
+        if (!access.canAccess) {
             next('/403');
             return;
         }

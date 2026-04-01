@@ -4,8 +4,10 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zhiyangyun.care.audit.service.AuditLogService;
+import com.zhiyangyun.care.auth.entity.Department;
 import com.zhiyangyun.care.auth.entity.StaffAccount;
 import com.zhiyangyun.care.auth.entity.StaffRole;
+import com.zhiyangyun.care.auth.mapper.DepartmentMapper;
 import com.zhiyangyun.care.auth.mapper.RoleMapper;
 import com.zhiyangyun.care.auth.mapper.StaffMapper;
 import com.zhiyangyun.care.auth.mapper.StaffRoleMapper;
@@ -39,6 +41,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminStaffController {
   private static final String DEFAULT_INITIAL_PASSWORD = "123456";
   private final StaffMapper staffMapper;
+  private final DepartmentMapper departmentMapper;
   private final RoleMapper roleMapper;
   private final StaffRoleMapper staffRoleMapper;
   private final AuditLogService auditLogService;
@@ -46,11 +49,13 @@ public class AdminStaffController {
 
   public AdminStaffController(
       StaffMapper staffMapper,
+      DepartmentMapper departmentMapper,
       RoleMapper roleMapper,
       StaffRoleMapper staffRoleMapper,
       AuditLogService auditLogService,
       PasswordEncoder passwordEncoder) {
     this.staffMapper = staffMapper;
+    this.departmentMapper = departmentMapper;
     this.roleMapper = roleMapper;
     this.staffRoleMapper = staffRoleMapper;
     this.auditLogService = auditLogService;
@@ -61,12 +66,13 @@ public class AdminStaffController {
   @PostMapping
   public Result<StaffAccount> create(@Valid @RequestBody StaffCreateRequest request) {
     Long orgId = AuthContext.getOrgId();
+    Department department = requireDepartment(orgId, request.getDepartmentId(), "所属部门");
     String staffNo = resolveStaffNo(orgId, request.getStaffNo());
     String username = resolveUsername(request.getUsername(), staffNo);
     String password = resolvePassword(request.getPassword());
     StaffAccount staff = new StaffAccount();
     staff.setOrgId(orgId);
-    staff.setDepartmentId(request.getDepartmentId());
+    staff.setDepartmentId(department.getId());
     staff.setStaffNo(staffNo);
     staff.setUsername(username);
     staff.setPasswordHash(passwordEncoder.encode(password));
@@ -90,14 +96,11 @@ public class AdminStaffController {
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PutMapping
   public Result<StaffAccount> update(@Valid @RequestBody StaffUpdateRequest request) {
-    StaffAccount staff = staffMapper.selectById(request.getId());
-    if (staff == null) {
-      return Result.error(404, "Staff not found");
-    }
+    StaffAccount staff = requireStaff(request.getId());
     Long beforeDirectLeaderId = staff.getDirectLeaderId();
     Long beforeIndirectLeaderId = staff.getIndirectLeaderId();
     if (request.getDepartmentId() != null) {
-      staff.setDepartmentId(request.getDepartmentId());
+      staff.setDepartmentId(requireDepartment(staff.getOrgId(), request.getDepartmentId(), "所属部门").getId());
     }
     if (request.getPassword() != null && !request.getPassword().isBlank()) {
       String normalizedPassword = request.getPassword().trim();
@@ -137,10 +140,7 @@ public class AdminStaffController {
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
-    StaffAccount staff = staffMapper.selectById(id);
-    if (staff == null) {
-      return Result.error(404, "Staff not found");
-    }
+    StaffAccount staff = requireStaff(id);
     staff.setIsDeleted(1);
     staffMapper.updateById(staff);
     return Result.ok(null);
@@ -149,7 +149,7 @@ public class AdminStaffController {
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/{id}")
   public Result<StaffAccount> get(@PathVariable Long id) {
-    StaffAccount staff = staffMapper.selectById(id);
+    StaffAccount staff = requireStaff(id);
     fillRoleCodes(staff);
     return Result.ok(sanitizeStaffResponse(staff));
   }
@@ -311,7 +311,19 @@ public class AdminStaffController {
     if (staff == null || staff.getIsDeleted() != null && staff.getIsDeleted() == 1) {
       throw new IllegalArgumentException("员工不存在");
     }
+    AuthContext.requireOrgAccess(staff.getOrgId());
     return staff;
+  }
+
+  private Department requireDepartment(Long orgId, Long departmentId, String label) {
+    Department department = departmentMapper.selectById(departmentId);
+    if (department == null || department.getIsDeleted() != null && department.getIsDeleted() == 1) {
+      throw new IllegalArgumentException(label + "不存在");
+    }
+    if (orgId == null || !orgId.equals(department.getOrgId())) {
+      throw new IllegalArgumentException(label + "不属于当前机构");
+    }
+    return department;
   }
 
   private void ensureUniqueStaffIdentity(Long orgId, String username, String staffNo, Long excludeId) {

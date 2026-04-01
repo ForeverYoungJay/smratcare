@@ -1220,6 +1220,7 @@ onMounted(async () => {
   syncConflictPolicyFromStorage()
   await Promise.all([fetchAll(), fetchStaffOptions(), fetchDepartmentOptions()])
   syncTimer = window.setInterval(() => {
+    if (document.visibilityState !== 'visible') return
     fetchAll().catch(() => {})
   }, 15000)
   calendarStorageHandler = (event: StorageEvent) => {

@@ -7,7 +7,6 @@
       <div class="toolbar-left">
         <a-button v-if="currentLevel !== 'PARK'" class="tech-btn" @click="goUpLevel">返回上级</a-button>
         <a-button class="tech-btn" @click="resetCamera">重置视角</a-button>
-        <a-button class="tech-btn" @click="toggleAutoRotate">{{ autoRotateEnabled ? '停止旋转' : '自动巡航' }}</a-button>
       </div>
       <div class="toolbar-center">
         <span class="toolbar-eyebrow">Current Scope</span>
@@ -34,14 +33,6 @@
       <div class="hud-panel">
         <span class="hud-label">运行状态</span>
         <strong>{{ focusStatus }}</strong>
-      </div>
-      <div class="hud-panel hud-panel-wide">
-        <span class="hud-label">空间观察</span>
-        <strong>{{ sceneInsight }}</strong>
-      </div>
-      <div class="hud-panel hud-panel-wide">
-        <span class="hud-label">操作提示</span>
-        <strong>单击选择，下钻仅在对象上触发；拖拽浏览不会误点</strong>
       </div>
     </div>
 
@@ -77,14 +68,7 @@ const selectedFloor = ref('')
 const selectedRoom = ref('')
 const focusTitle = ref('园区总览')
 const focusStatus = ref('等待交互')
-const sceneInsight = ref('自动巡航已启动')
-const autoRotateEnabled = ref(false)
 const tooltip = ref({ visible: false, x: 0, y: 0, title: '', content: '' })
-const pointerState = {
-  downX: 0,
-  downY: 0,
-  moved: false
-}
 
 const breadcrumbText = computed(() => {
   let text = '园区全景'
@@ -111,7 +95,6 @@ const objectsMap = new Map<string, THREE.Object3D>()
 const interactableObjects: THREE.Object3D[] = []
 const animatedBeds: Array<{ mesh: THREE.Mesh; type: 'pulse' | 'blink' | 'sleep'; baseIntensity: number }> = []
 let particles: THREE.Points | null = null
-let selectedPulseRing: THREE.Mesh | null = null
 let animationFrameId = 0
 const pickPosition = new THREE.Vector2()
 const raycaster = new THREE.Raycaster()
@@ -166,15 +149,8 @@ function initScene() {
   controls.value.minDistance = 8
   controls.value.maxDistance = 180
   controls.value.maxPolarAngle = Math.PI / 2 - 0.04
-  controls.value.minPolarAngle = Math.PI / 5
-  controls.value.screenSpacePanning = true
-  controls.value.rotateSpeed = 0.55
-  controls.value.zoomSpeed = 0.9
-  controls.value.panSpeed = 0.7
-  controls.value.autoRotate = false
+  controls.value.autoRotate = true
   controls.value.autoRotateSpeed = 0.18
-  controls.value.mouseButtons.LEFT = THREE.MOUSE.PAN
-  controls.value.mouseButtons.RIGHT = THREE.MOUSE.ROTATE
 
   const ambientLight = new THREE.AmbientLight(0xd8efff, 0.62)
   scene.value.add(ambientLight)
@@ -194,8 +170,6 @@ function initScene() {
   buildAtmosphere()
 
   renderer.value.domElement.addEventListener('pointermove', onPointerMove)
-  renderer.value.domElement.addEventListener('pointerdown', onPointerDown)
-  renderer.value.domElement.addEventListener('pointerup', onPointerUp)
   renderer.value.domElement.addEventListener('click', onClick)
   window.addEventListener('resize', onWindowResize)
 
@@ -220,15 +194,6 @@ function buildAtmosphere() {
   ringMesh.position.y = -0.08
   ringMesh.userData.isGenerated = true
   scene.value.add(ringMesh)
-
-  const pulseGeo = new THREE.RingGeometry(1.8, 2.3, 80)
-  const pulseMat = new THREE.MeshBasicMaterial({ color: 0x57d7ff, transparent: true, opacity: 0, side: THREE.DoubleSide })
-  selectedPulseRing = new THREE.Mesh(pulseGeo, pulseMat)
-  selectedPulseRing.rotation.x = -Math.PI / 2
-  selectedPulseRing.position.set(0, 0.06, 0)
-  selectedPulseRing.visible = false
-  selectedPulseRing.userData.isGenerated = true
-  scene.value.add(selectedPulseRing)
 
   const particleGeometry = new THREE.BufferGeometry()
   const particleCount = 320
@@ -306,17 +271,6 @@ function createBedUnit(bed: any, width: number, depth: number) {
   headboard.position.set(0, 0.34, -depth * 0.36)
   group.add(headboard)
 
-  const sideRailLeft = new THREE.Mesh(
-    new THREE.BoxGeometry(0.05, 0.2, depth * 0.8),
-    new THREE.MeshStandardMaterial({ color: 0x426b92, metalness: 0.48, roughness: 0.24 })
-  )
-  sideRailLeft.position.set(-width * 0.42, 0.22, 0)
-  group.add(sideRailLeft)
-
-  const sideRailRight = sideRailLeft.clone()
-  sideRailRight.position.x = width * 0.42
-  group.add(sideRailRight)
-
   const glow = new THREE.Mesh(
     new THREE.PlaneGeometry(width * 0.96, depth * 0.88),
     new THREE.MeshBasicMaterial({
@@ -329,19 +283,6 @@ function createBedUnit(bed: any, width: number, depth: number) {
   glow.position.y = 0.02
   group.add(glow)
 
-  if (state !== 'normal') {
-    const beacon = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.06, 0.12, 1.2, 12, 1, true),
-      new THREE.MeshBasicMaterial({
-        color: mattressMaterial.color,
-        transparent: true,
-        opacity: state === 'alert' ? 0.22 : 0.12
-      })
-    )
-    beacon.position.set(0, 0.78, 0)
-    group.add(beacon)
-  }
-
   if (state === 'alert') {
     animatedBeds.push({ mesh: mattress, type: 'pulse', baseIntensity: 0.76 })
   } else if (state === 'warning') {
@@ -351,35 +292,6 @@ function createBedUnit(bed: any, width: number, depth: number) {
   }
 
   return group
-}
-
-function createRoomShell(roomSize: number, occupancyRate: number) {
-  const shell = new THREE.Group()
-  const wallMaterial = new THREE.MeshStandardMaterial({
-    color: occupancyRate >= 1 ? 0x3d1f2f : 0x14355a,
-    transparent: true,
-    opacity: 0.22,
-    metalness: 0.42,
-    roughness: 0.28
-  })
-  const wallHeight = 0.78
-  const wallThickness = 0.08
-  const sideWallGeo = new THREE.BoxGeometry(wallThickness, wallHeight, roomSize)
-  const rearWallGeo = new THREE.BoxGeometry(roomSize, wallHeight, wallThickness)
-
-  const leftWall = new THREE.Mesh(sideWallGeo, wallMaterial)
-  leftWall.position.set(-roomSize / 2, wallHeight / 2 + 0.11, 0)
-  shell.add(leftWall)
-
-  const rightWall = leftWall.clone()
-  rightWall.position.x = roomSize / 2
-  shell.add(rightWall)
-
-  const rearWall = new THREE.Mesh(rearWallGeo, wallMaterial)
-  rearWall.position.set(0, wallHeight / 2 + 0.11, -roomSize / 2)
-  shell.add(rearWall)
-
-  return shell
 }
 
 function clearScene() {
@@ -470,29 +382,12 @@ function buildSceneData() {
         roomGroup.add(roomTile)
         interactableObjects.push(roomTile)
 
-        const roomShell = createRoomShell(roomSize, roomItem.totalBeds ? roomItem.occupiedBeds / roomItem.totalBeds : 0)
-        roomShell.position.y = 0.11
-        roomGroup.add(roomShell)
-
         const roomEdges = new THREE.LineSegments(
           new THREE.EdgesGeometry(new THREE.BoxGeometry(roomSize, 0.22, roomSize)),
           new THREE.LineBasicMaterial({ color: 0x2bcfff, transparent: true, opacity: 0.26 })
         )
         roomEdges.position.y = 0.11
         roomGroup.add(roomEdges)
-
-        const roomAccent = new THREE.Mesh(
-          new THREE.RingGeometry(roomSize * 0.24, roomSize * 0.28, 48),
-          new THREE.MeshBasicMaterial({
-            color: roomItem.occupiedBeds >= roomItem.totalBeds ? 0xff5d7c : 0x57d7ff,
-            transparent: true,
-            opacity: 0.18,
-            side: THREE.DoubleSide
-          })
-        )
-        roomAccent.rotation.x = -Math.PI / 2
-        roomAccent.position.y = 0.14
-        roomGroup.add(roomAccent)
 
         const bedCount = roomItem.beds.length
         if (bedCount) {
@@ -560,7 +455,7 @@ function buildSceneData() {
 }
 
 function updateVisibility() {
-  controls.value!.autoRotate = autoRotateEnabled.value && currentLevel.value === 'PARK'
+  controls.value!.autoRotate = currentLevel.value === 'PARK'
   objectsMap.forEach((obj, key) => {
     if (!key.startsWith('building_')) return
     const buildingName = obj.userData.name
@@ -637,7 +532,6 @@ function updateTooltip(event: PointerEvent, obj: THREE.Object3D) {
       <div class="tt-tip">点击展开楼栋内部结构</div>`
     focusTitle.value = obj.userData.name
     focusStatus.value = '楼栋级观察'
-    sceneInsight.value = `共 ${obj.userData.totalRooms} 间房 / ${obj.userData.totalFloors} 层`
     return
   }
 
@@ -647,7 +541,6 @@ function updateTooltip(event: PointerEvent, obj: THREE.Object3D) {
       <div class="tt-tip">点击进入楼层鸟瞰视图</div>`
     focusTitle.value = `${obj.userData.building} ${obj.userData.floor}`
     focusStatus.value = '楼层级观察'
-    sceneInsight.value = '楼层爆炸视图已展开'
     return
   }
 
@@ -659,7 +552,6 @@ function updateTooltip(event: PointerEvent, obj: THREE.Object3D) {
       <div class="tt-tip">${currentLevel.value === 'ROOM' ? '再次点击打开房间详情' : '点击进入房间视角'}</div>`
     focusTitle.value = `房间 ${roomData.roomNo || '-'}`
     focusStatus.value = `${roomData.occupiedBeds}/${roomData.totalBeds} 床位占用`
-    sceneInsight.value = `${roomData.roomType || '房间'} / 空床 ${roomData.emptyBeds}`
     return
   }
 
@@ -673,7 +565,6 @@ function updateTooltip(event: PointerEvent, obj: THREE.Object3D) {
       <div class="tt-tip">点击查看业务详情</div>`
     focusTitle.value = `${bed.roomNo || '-'} / ${bed.bedNo || '-'}`
     focusStatus.value = bed.riskLabel || (bed.elderId ? '在住监测中' : '床位空闲')
-    sceneInsight.value = `异常 ${bed.abnormalVital24hCount || 0} 次 / 护理 ${bed.careLevel || '未配置'}`
     return
   }
 
@@ -694,9 +585,6 @@ function restoreHoverObject(obj: THREE.Object3D) {
 }
 
 function onPointerMove(event: PointerEvent) {
-  if (Math.abs(event.clientX - pointerState.downX) > 6 || Math.abs(event.clientY - pointerState.downY) > 6) {
-    pointerState.moved = true
-  }
   if (!canvasRef.value || !camera.value) return
   const rect = canvasRef.value.getBoundingClientRect()
   pickPosition.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
@@ -739,21 +627,9 @@ function onPointerMove(event: PointerEvent) {
   renderer.value!.domElement.style.cursor = 'pointer'
 }
 
-function onPointerDown(event: PointerEvent) {
-  pointerState.downX = event.clientX
-  pointerState.downY = event.clientY
-  pointerState.moved = false
-}
-
-function onPointerUp(event: PointerEvent) {
-  if (Math.abs(event.clientX - pointerState.downX) > 6 || Math.abs(event.clientY - pointerState.downY) > 6) {
-    pointerState.moved = true
-  }
-}
-
 function onClick() {
-  if (pointerState.moved) return
   if (!hoveredObj) {
+    goUpLevel()
     return
   }
 
@@ -763,7 +639,6 @@ function onClick() {
     selectedRoom.value = ''
     currentLevel.value = 'BUILDING'
     updateVisibility()
-    updateSelectionBeacon(hoveredObj.userData.ref)
     zoomToObject(hoveredObj.userData.ref)
     return
   }
@@ -774,10 +649,7 @@ function onClick() {
     currentLevel.value = 'FLOOR'
     updateVisibility()
     const floorGroup = objectsMap.get(`floor_${selectedBuilding.value}_${selectedFloor.value}`)
-    if (floorGroup) {
-      updateSelectionBeacon(floorGroup)
-      zoomToObject(floorGroup, true)
-    }
+    if (floorGroup) zoomToObject(floorGroup, true)
     return
   }
 
@@ -789,27 +661,13 @@ function onClick() {
     selectedRoom.value = hoveredObj.userData.ref.userData.room.roomNo
     currentLevel.value = 'ROOM'
     updateVisibility()
-    updateSelectionBeacon(hoveredObj.userData.ref)
     zoomToObject(hoveredObj.userData.ref, false, 18)
     return
   }
 
   if (hoveredObj.userData.type === 'bed') {
-    updateSelectionBeacon(hoveredObj)
     emit('click-bed', hoveredObj.userData.bed)
   }
-}
-
-function updateSelectionBeacon(target: THREE.Object3D) {
-  if (!selectedPulseRing) return
-  const box = new THREE.Box3().setFromObject(target)
-  const center = box.getCenter(new THREE.Vector3())
-  const size = box.getSize(new THREE.Vector3())
-  const radius = Math.max(size.x, size.z) * 0.26 + 0.8
-  selectedPulseRing.visible = true
-  selectedPulseRing.position.set(center.x, Math.max(0.06, box.min.y + 0.08), center.z)
-  selectedPulseRing.scale.set(radius, radius, 1)
-  selectedPulseRing.userData.baseRadius = radius
 }
 
 function zoomToObject(obj: THREE.Object3D, topDown = false, overrideZ?: number) {
@@ -875,17 +733,9 @@ function resetCamera() {
   selectedRoom.value = ''
   focusTitle.value = '园区总览'
   focusStatus.value = '等待交互'
-  sceneInsight.value = autoRotateEnabled.value ? '自动巡航已启动' : '自由浏览已就绪'
-  if (selectedPulseRing) selectedPulseRing.visible = false
   updateVisibility()
   gsap.to(camera.value.position, { x: 42, y: 38, z: 64, duration: 1.1, ease: 'power3.out' })
   gsap.to(controls.value.target, { x: 0, y: 0, z: 0, duration: 1.1, ease: 'power3.out' })
-}
-
-function toggleAutoRotate() {
-  autoRotateEnabled.value = !autoRotateEnabled.value
-  sceneInsight.value = autoRotateEnabled.value ? '自动巡航已启动' : '自动巡航已关闭'
-  updateVisibility()
 }
 
 function onWindowResize() {
@@ -919,23 +769,6 @@ function animate() {
     particles.position.y = Math.sin(time * 0.8) * 0.6
   }
 
-  if (selectedPulseRing) {
-    const pulseMaterial = selectedPulseRing.material as THREE.MeshBasicMaterial
-    if (selectedPulseRing.visible) {
-      const scale = 1 + Math.sin(time * 3.2) * 0.08
-      const baseRadius = Number(selectedPulseRing.userData.baseRadius || 1)
-      pulseMaterial.opacity = 0.18 + (Math.sin(time * 3.2) + 1) * 0.08
-      selectedPulseRing.rotation.z = time * 0.18
-      selectedPulseRing.scale.set(baseRadius * scale, baseRadius * scale, 1)
-    } else {
-      pulseMaterial.opacity = 0
-    }
-  }
-
-  if (camera.value && currentLevel.value === 'PARK') {
-    camera.value.position.y += Math.sin(time * 0.7) * 0.01
-  }
-
   renderer.value?.render(scene.value, camera.value!)
   cssRenderer.value?.render(scene.value, camera.value!)
 }
@@ -951,8 +784,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   cancelAnimationFrame(animationFrameId)
   renderer.value?.domElement.removeEventListener('pointermove', onPointerMove)
-  renderer.value?.domElement.removeEventListener('pointerdown', onPointerDown)
-  renderer.value?.domElement.removeEventListener('pointerup', onPointerUp)
   renderer.value?.domElement.removeEventListener('click', onClick)
   window.removeEventListener('resize', onWindowResize)
   controls.value?.dispose()
@@ -969,10 +800,10 @@ onBeforeUnmount(() => {
   overflow: hidden;
   border-radius: 24px;
   background:
-    radial-gradient(circle at 12% 12%, rgba(87, 215, 255, 0.22), transparent 28%),
-    radial-gradient(circle at 82% 0%, rgba(107, 163, 255, 0.16), transparent 26%),
-    linear-gradient(180deg, #eef8ff 0%, #dff1ff 46%, #f6fbff 100%);
-  box-shadow: inset 0 0 80px rgba(43, 207, 255, 0.06);
+    radial-gradient(circle at 12% 12%, rgba(87, 215, 255, 0.14), transparent 26%),
+    radial-gradient(circle at 82% 0%, rgba(143, 116, 255, 0.16), transparent 28%),
+    linear-gradient(180deg, #05101d 0%, #030914 100%);
+  box-shadow: inset 0 0 120px rgba(43, 207, 255, 0.08);
 }
 
 .canvas-wrapper {
@@ -990,13 +821,13 @@ onBeforeUnmount(() => {
 
 .scene-atmosphere {
   background:
-    radial-gradient(circle at center, transparent 38%, rgba(186, 219, 246, 0.34) 100%);
+    radial-gradient(circle at center, transparent 38%, rgba(3, 10, 20, 0.54) 100%);
 }
 
 .scene-scanlines {
-  background: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0, rgba(255, 255, 255, 0.18) 1px, transparent 1px, transparent 5px);
+  background: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0, rgba(255, 255, 255, 0.02) 1px, transparent 1px, transparent 4px);
   mix-blend-mode: screen;
-  opacity: 0.08;
+  opacity: 0.16;
 }
 
 .scene-toolbar,
@@ -1037,14 +868,10 @@ onBeforeUnmount(() => {
 .hud-panel {
   padding: 12px 16px;
   border-radius: 18px;
-  border: 1px solid rgba(87, 215, 255, 0.22);
-  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(87, 215, 255, 0.18);
+  background: rgba(5, 16, 31, 0.8);
   backdrop-filter: blur(12px);
-  box-shadow: 0 16px 32px rgba(44, 110, 172, 0.14);
-}
-
-.hud-panel-wide {
-  min-width: 220px;
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.28);
 }
 
 .toolbar-center {
@@ -1059,18 +886,18 @@ onBeforeUnmount(() => {
   font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: #6588a6;
+  color: #88a9c3;
 }
 
 .toolbar-center strong,
 .hud-panel strong {
-  color: #11324d;
+  color: #ebfbff;
 }
 
 .tech-btn {
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(87, 215, 255, 0.28);
-  color: #184161;
+  background: rgba(7, 22, 42, 0.86);
+  border: 1px solid rgba(87, 215, 255, 0.22);
+  color: #dff6ff;
   border-radius: 14px;
 }
 
@@ -1084,10 +911,9 @@ onBeforeUnmount(() => {
   padding: 6px 10px;
   border-radius: 999px;
   border: 1px solid transparent;
-  background: rgba(255, 255, 255, 0.74);
+  background: rgba(5, 16, 31, 0.76);
   font-size: 12px;
-  color: #184161;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+  color: #dff6ff;
 }
 
 .status-normal {
@@ -1116,10 +942,10 @@ onBeforeUnmount(() => {
   min-width: 210px;
   border-radius: 16px;
   border: 1px solid rgba(87, 215, 255, 0.24);
-  background: rgba(255, 255, 255, 0.92);
-  color: #173854;
+  background: rgba(6, 18, 34, 0.9);
+  color: #eaf7ff;
   backdrop-filter: blur(12px);
-  box-shadow: 0 18px 36px rgba(44, 110, 172, 0.16), 0 0 24px rgba(43, 207, 255, 0.1);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.42), 0 0 24px rgba(43, 207, 255, 0.14);
   padding: 14px;
   pointer-events: none;
 }
@@ -1134,7 +960,7 @@ onBeforeUnmount(() => {
 
 .tt-body {
   font-size: 12px;
-  color: #5f7d97;
+  color: #9ebcd4;
 }
 
 .tech-tooltip :deep(.tt-row) {
@@ -1176,21 +1002,15 @@ onBeforeUnmount(() => {
   padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid rgba(87, 215, 255, 0.24);
-  background: rgba(255, 255, 255, 0.86);
-  color: #173854;
+  background: rgba(6, 18, 34, 0.82);
+  color: #eaf7ff;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   backdrop-filter: blur(8px);
-  box-shadow: 0 8px 18px rgba(44, 110, 172, 0.12);
+  box-shadow: 0 0 18px rgba(43, 207, 255, 0.12);
   white-space: nowrap;
-}
-
-:global(.scene-label.room-label) {
-  border-radius: 12px;
-  padding: 6px 10px;
-  font-size: 10px;
 }
 
 @media (max-width: 960px) {

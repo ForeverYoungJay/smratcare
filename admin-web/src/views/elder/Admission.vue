@@ -1,15 +1,13 @@
 <template>
   <PageContainer title="入住办理" subTitle="分床、押金账户、合同信息与二维码配置">
     <a-card class="card-elevated" :bordered="false">
-      <h3>办理入住流程</h3>
-      <LifecycleStageBar
-        title="入住办理阶段"
-        :subject="admissionFlowSubject"
-        :stage="admissionLifecycleStage"
-        :generated-at="guardContract?.updateTime"
-        :hint="admissionLifecycleHint"
-        style="margin-bottom: 12px"
-      />
+      <div class="admission-form-head">
+        <div>
+          <h3>办理入住</h3>
+          <p>将高频字段压缩到一屏完成，减少录入时的上下切换。</p>
+        </div>
+        <a-button type="primary" :loading="submitting || submitChecklistLoading" @click="openSubmitConfirm">提交入住办理</a-button>
+      </div>
       <a-alert
         v-if="lifecycleContext.active"
         type="info"
@@ -27,8 +25,10 @@
           </a-space>
         </template>
       </a-alert>
-      <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
-        <a-form-item label="老人姓名" name="elderId">
+      <a-form ref="formRef" :model="form" :rules="rules" layout="vertical" class="admission-compact-form">
+        <a-row :gutter="[12, 0]">
+          <a-col :xs="24" :md="12" :xl="6">
+            <a-form-item label="老人姓名" name="elderId" class="compact-form-item">
           <a-select
             v-model:value="form.elderId"
             show-search
@@ -40,41 +40,57 @@
             @focus="() => !admissionElderOptions.length && searchElders('')"
             @change="onElderChange"
           />
-        </a-form-item>
-        <a-form-item label="收费开始日期" name="admissionDate">
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :md="12" :xl="6">
+            <a-form-item label="收费开始日期" name="admissionDate" class="compact-form-item">
           <a-date-picker v-model:value="form.admissionDate" value-format="YYYY-MM-DD" style="width: 100%" />
-        </a-form-item>
-        <a-form-item label="操作员姓名">
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :md="12" :xl="6">
+            <a-form-item label="操作员姓名" class="compact-form-item">
           <a-input :value="currentStaffDisplayName" disabled />
-        </a-form-item>
-        <a-form-item label="合同号（自动回填）" name="contractNo">
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :md="12" :xl="6">
+            <a-form-item label="合同号（自动回填）" name="contractNo" class="compact-form-item">
           <a-input :value="form.contractNo" disabled placeholder="选择老人后自动填入，不可修改" />
-        </a-form-item>
-        <a-form-item label="初始余额(押金)" name="depositAmount">
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :md="12" :xl="6">
+            <a-form-item label="初始余额(押金)" name="depositAmount" class="compact-form-item">
           <a-input-number v-model:value="form.depositAmount" :min="0" style="width: 100%" placeholder="请输入押金金额" />
-        </a-form-item>
-        <a-form-item label="楼栋" name="buildingId">
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :md="12" :xl="6">
+            <a-form-item label="楼栋" name="buildingId" class="compact-form-item">
           <a-select v-model:value="assetSelect.buildingId" allow-clear placeholder="请选择楼栋">
             <a-select-option v-for="item in buildingOptions" :key="item.value" :value="item.value">
               {{ item.label }}
             </a-select-option>
           </a-select>
-        </a-form-item>
-        <a-form-item label="楼层" name="floorId">
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :md="12" :xl="6">
+            <a-form-item label="楼层" name="floorId" class="compact-form-item">
           <a-select v-model:value="assetSelect.floorId" allow-clear placeholder="请选择楼层">
             <a-select-option v-for="item in floorOptions" :key="item.value" :value="item.value">
               {{ item.label }}
             </a-select-option>
           </a-select>
-        </a-form-item>
-        <a-form-item label="房间" name="roomId">
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :md="12" :xl="6">
+            <a-form-item label="房间" name="roomId" class="compact-form-item">
           <a-select v-model:value="assetSelect.roomId" allow-clear placeholder="请选择房间">
             <a-select-option v-for="item in roomOptions" :key="item.value" :value="item.value">
               {{ item.label }}
             </a-select-option>
           </a-select>
-        </a-form-item>
-        <a-form-item label="床位" name="bedId">
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :md="12" :xl="6">
+            <a-form-item label="床位" name="bedId" class="compact-form-item">
           <a-select
             v-model:value="form.bedId"
             allow-clear
@@ -87,14 +103,15 @@
               {{ item.label }}
             </a-select-option>
           </a-select>
-        </a-form-item>
-        <a-form-item label="备注" name="remark">
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :xl="18">
+            <a-form-item label="备注" name="remark" class="compact-form-item">
           <a-input v-model:value="form.remark" placeholder="请输入备注" />
-        </a-form-item>
+            </a-form-item>
+          </a-col>
+        </a-row>
       </a-form>
-      <div style="text-align: right; margin-top: 8px;">
-        <a-button type="primary" :loading="submitting || submitChecklistLoading" @click="openSubmitConfirm">提交入住办理</a-button>
-      </div>
     </a-card>
 
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
@@ -249,11 +266,9 @@ import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
-import LifecycleStageBar from '../../components/LifecycleStageBar.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { useElderOptions } from '../../composables/useElderOptions'
-import { lifecycleStageHint, normalizeLifecycleStage } from '../../utils/lifecycleStage'
 import { getFamilyRelations } from '../../api/family'
 import { getBedList, getBuildingList, getFloorList, getRoomList } from '../../api/bed'
 import { admitElder, exportAdmissionRecords, getAdmissionRecordSummary, getAdmissionRecords } from '../../api/elderLifecycle'
@@ -594,25 +609,6 @@ const columns = [
   { title: '操作员姓名', key: 'operatorName', width: 140 },
   { title: '登记时间', dataIndex: 'createTime', key: 'createTime', width: 180 }
 ]
-const admissionFlowSubject = computed(() => {
-  if (!form.contractNo) return '请先选择老人并自动回填合同号'
-  if (!guardContract.value) return `合同号 ${form.contractNo} 未匹配`
-  return `合同 ${guardContract.value.contractNo || '-'} / 长者 ${guardContract.value.elderName || '-'}`
-})
-const admissionLifecycleStage = computed(() =>
-  normalizeLifecycleStage(guardContract.value?.flowStage, guardContract.value?.contractStatus || guardContract.value?.status)
-)
-const admissionLifecycleHint = computed(() => {
-  if (!form.contractNo) return '请先选择长者，系统会自动匹配合同号并同步流程阶段。'
-  if (!guardContract.value) {
-    return '未找到合同，请到合同签约核对合同号。'
-  }
-  if (guardContract.value.status === 'VOID') {
-    return '合同已作废，不能继续办理入住。'
-  }
-  return lifecycleStageHint(admissionLifecycleStage.value)
-})
-
 function statusText(status?: number) {
   if (status === 1) return '在院'
   if (status === 2) return '请假'
@@ -1159,6 +1155,33 @@ onMounted(async () => {
 <style scoped>
 .search-bar {
   margin-bottom: 12px;
+}
+
+.admission-form-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.admission-form-head h3 {
+  margin: 0;
+}
+
+.admission-form-head p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.admission-compact-form :deep(.ant-form-item) {
+  margin-bottom: 10px;
+}
+
+.compact-form-item :deep(.ant-form-item-label) {
+  padding-bottom: 4px;
 }
 
 .admission-summary-card {

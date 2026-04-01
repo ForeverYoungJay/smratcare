@@ -3,6 +3,7 @@ package com.zhiyangyun.care.auth.security;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -70,6 +71,36 @@ public class AuthContext {
 
   public static boolean isAdmin() {
     return hasRole("ADMIN") || hasRole("SYS_ADMIN") || hasRole("DIRECTOR");
+  }
+
+  public static Long resolveAccessibleOrgId(Long requestedOrgId) {
+    Long currentOrgId = getOrgId();
+    boolean admin = isAdmin();
+
+    if (requestedOrgId == null) {
+      if (currentOrgId != null) {
+        return currentOrgId;
+      }
+      if (admin) {
+        throw new IllegalArgumentException("Admin request requires orgId");
+      }
+      throw new IllegalArgumentException("Unable to determine orgId from token");
+    }
+
+    if (admin) {
+      return requestedOrgId;
+    }
+    if (currentOrgId == null || !requestedOrgId.equals(currentOrgId)) {
+      throw new AccessDeniedException("No permission to access another organization");
+    }
+    return requestedOrgId;
+  }
+
+  public static void requireOrgAccess(Long targetOrgId) {
+    if (targetOrgId == null) {
+      throw new IllegalArgumentException("Target orgId is required");
+    }
+    resolveAccessibleOrgId(targetOrgId);
   }
 
   public static List<String> getRoleCodes() {

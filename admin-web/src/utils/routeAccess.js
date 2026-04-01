@@ -1,15 +1,62 @@
-export function resolveRouteAccess(router, roles, path) {
+import { hasRouteAccess, moduleRolesByPath } from './roleAccess';
+const legacyPagePathMap = {
+    '/system/org-manage': '/system/site-config',
+    '/system/org-manage/intro': '/system/site-config',
+    '/system/org-manage/news': '/system/site-config',
+    '/system/org-manage/life': '/system/site-config',
+    '/system/app-version': '/system/site-config',
+    '/system/message': '/system/site-config',
+    '/system/dict': '/base-config'
+};
+function normalizePath(path) {
+    const base = String(path || '').split('?')[0].split('#')[0].trim();
+    if (!base)
+        return '/';
+    const normalized = base.replace(/\/+/g, '/');
+    if (normalized.length > 1 && normalized.endsWith('/')) {
+        return normalized.slice(0, -1);
+    }
+    return normalized.startsWith('/') ? normalized : `/${normalized}`;
+}
+export function hasExplicitPageAccess(pagePermissions, path) {
+    const normalizedPath = normalizePath(path);
+    const effectivePath = legacyPagePathMap[normalizedPath] || normalizedPath;
+    const acceptablePaths = new Set([effectivePath]);
+    if (effectivePath === '/system/site-config') {
+        acceptablePaths.add('/system/role');
+        acceptablePaths.add('/system/permission-overview');
+    }
+    return (pagePermissions || []).some((permissionPath) => {
+        const normalizedPermission = normalizePath(permissionPath);
+        return Array.from(acceptablePaths).some((candidatePath) => candidatePath === normalizedPermission || candidatePath.startsWith(`${normalizedPermission}/`));
+    });
+}
+export function canAccessPath(roles, required, path, pagePermissions = []) {
+    if (normalizePath(path) === '/403') {
+        return true;
+    }
+    if ((pagePermissions || []).length > 0) {
+        return hasExplicitPageAccess(pagePermissions, path);
+    }
+    const inferredRequired = (required || []).length > 0 ? required : moduleRolesByPath(normalizePath(path));
+    return hasRouteAccess(roles, inferredRequired, path);
+}
+export function resolveRouteAccess(router, roles, path, pagePermissions = []) {
     const resolved = router.resolve(path);
     if (!resolved.matched.length) {
         return { canAccess: false, requiredRoles: [] };
     }
     const roleGroups = resolved.matched
-        .map((record) => (record.meta?.roles || []).filter(Boolean))
+        .map((record) => ((record.meta?.roles) || []).filter(Boolean))
         .filter((group) => group.length > 0);
     if (roleGroups.length === 0) {
-        return { canAccess: true, requiredRoles: [] };
+        const inferredRoles = moduleRolesByPath(resolved.path || path);
+        return {
+            canAccess: canAccessPath(roles, inferredRoles, resolved.path || path, pagePermissions),
+            requiredRoles: inferredRoles
+        };
     }
-    const canAccess = roleGroups.every((group) => group.some((role) => roles.includes(role)));
     const requiredRoles = Array.from(new Set(roleGroups.flat()));
+    const canAccess = canAccessPath(roles, requiredRoles, resolved.path || path, pagePermissions);
     return { canAccess, requiredRoles };
 }

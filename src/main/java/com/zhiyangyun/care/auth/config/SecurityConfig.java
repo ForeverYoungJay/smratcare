@@ -17,6 +17,51 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
+  private static final String[] STAFF_ROLES = {
+      "STAFF",
+      "HR_EMPLOYEE", "HR_MINISTER",
+      "MEDICAL_EMPLOYEE", "MEDICAL_MINISTER",
+      "NURSING_EMPLOYEE", "NURSING_MINISTER",
+      "FINANCE_EMPLOYEE", "FINANCE_MINISTER",
+      "LOGISTICS_EMPLOYEE", "LOGISTICS_MINISTER",
+      "MARKETING_EMPLOYEE", "MARKETING_MINISTER",
+      "DIRECTOR", "SYS_ADMIN", "ADMIN"
+  };
+  private static final String[] MINISTER_OR_HIGHER_ROLES = {
+      "HR_MINISTER",
+      "MEDICAL_MINISTER",
+      "NURSING_MINISTER",
+      "FINANCE_MINISTER",
+      "LOGISTICS_MINISTER",
+      "MARKETING_MINISTER",
+      "DIRECTOR", "SYS_ADMIN", "ADMIN"
+  };
+  private static final String[] MEDICAL_AND_NURSING_ROLES = {
+      "MEDICAL_EMPLOYEE", "MEDICAL_MINISTER",
+      "NURSING_EMPLOYEE", "NURSING_MINISTER",
+      "DIRECTOR", "SYS_ADMIN", "ADMIN"
+  };
+  private static final String[] LOGISTICS_ROLES = {
+      "LOGISTICS_EMPLOYEE", "LOGISTICS_MINISTER",
+      "DIRECTOR", "SYS_ADMIN", "ADMIN"
+  };
+  private static final String[] MARKETING_ROLES = {
+      "MARKETING_EMPLOYEE", "MARKETING_MINISTER",
+      "DIRECTOR", "SYS_ADMIN", "ADMIN"
+  };
+  private static final String[] STATS_ROLES = {
+      "HR_EMPLOYEE", "HR_MINISTER",
+      "FINANCE_EMPLOYEE", "FINANCE_MINISTER",
+      "LOGISTICS_EMPLOYEE", "LOGISTICS_MINISTER",
+      "MARKETING_EMPLOYEE", "MARKETING_MINISTER",
+      "DIRECTOR", "SYS_ADMIN", "ADMIN"
+  };
+  private static final String[] SURVEY_ROLES = {
+      "HR_EMPLOYEE", "HR_MINISTER",
+      "MEDICAL_EMPLOYEE", "MEDICAL_MINISTER",
+      "NURSING_EMPLOYEE", "NURSING_MINISTER",
+      "DIRECTOR", "SYS_ADMIN", "ADMIN"
+  };
   private final JwtAuthenticationFilter jwtFilter;
   private final ResponseContentTypeFilter responseContentTypeFilter;
   private final RestAuthenticationEntryPoint authenticationEntryPoint;
@@ -51,7 +96,22 @@ public class SecurityConfig {
                 "/api/family/register").permitAll()
             .requestMatchers("/api/family/payment/wechat/notify").permitAll()
             .requestMatchers("/ws/**").permitAll()
-            .requestMatchers("/api/admin/**").authenticated()
+            .requestMatchers("/api/files/**").authenticated()
+            .requestMatchers("/api/auth/**").authenticated()
+            .requestMatchers("/api/admin/**").hasAnyRole(MINISTER_OR_HIGHER_ROLES)
+            .requestMatchers("/api/base-config/**").hasAnyRole(MINISTER_OR_HIGHER_ROLES)
+            .requestMatchers("/api/medical-care/**", "/api/health/**", "/api/vital/**").hasAnyRole(MEDICAL_AND_NURSING_ROLES)
+            .requestMatchers(
+                "/api/asset/**",
+                "/api/material/**",
+                "/api/material-center/**",
+                "/api/inventory/**",
+                "/api/store/**",
+                "/api/logistics/**",
+                "/api/life/dining/**").hasAnyRole(LOGISTICS_ROLES)
+            .requestMatchers("/api/marketing/**").hasAnyRole(MARKETING_ROLES)
+            .requestMatchers("/api/stats/**").hasAnyRole(STATS_ROLES)
+            .requestMatchers("/api/survey/**").hasAnyRole(SURVEY_ROLES)
             .requestMatchers("/api/oa/**").hasAnyRole(
                 "STAFF",
                 "HR_EMPLOYEE", "HR_MINISTER",
@@ -67,6 +127,7 @@ public class SecurityConfig {
                 "DIRECTOR", "SYS_ADMIN", "ADMIN")
             .requestMatchers("/api/guard/**").hasAnyRole("GUARD", "ADMIN")
             .requestMatchers("/api/family/**").hasRole("FAMILY")
+            .requestMatchers("/api/**").hasAnyRole(STAFF_ROLES)
             .anyRequest().authenticated())
         .addFilterBefore(responseContentTypeFilter, UsernamePasswordAuthenticationFilter.class)
         .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);

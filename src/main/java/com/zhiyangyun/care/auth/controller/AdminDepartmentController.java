@@ -47,11 +47,7 @@ public class AdminDepartmentController {
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PutMapping("/{id}")
   public Result<Department> update(@PathVariable Long id, @Valid @RequestBody DepartmentRequest request) {
-    Department department = departmentMapper.selectById(id);
-    if (department == null) {
-      return Result.error(404, "Department not found");
-    }
-    department.setOrgId(AuthContext.getOrgId());
+    Department department = requireDepartment(id);
     department.setParentId(null);
     department.setDeptName(request.getDeptName());
     department.setDeptCode(null);
@@ -64,10 +60,7 @@ public class AdminDepartmentController {
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
-    Department department = departmentMapper.selectById(id);
-    if (department == null) {
-      return Result.error(404, "Department not found");
-    }
+    Department department = requireDepartment(id);
     department.setIsDeleted(1);
     departmentMapper.updateById(department);
     return Result.ok(null);
@@ -76,7 +69,7 @@ public class AdminDepartmentController {
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @GetMapping("/{id}")
   public Result<Department> get(@PathVariable Long id) {
-    return Result.ok(departmentMapper.selectById(id));
+    return Result.ok(requireDepartment(id));
   }
 
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
@@ -135,5 +128,14 @@ public class AdminDepartmentController {
     row.setOrgId(department.getOrgId());
     row.setStatus(department.getStatus());
     return row;
+  }
+
+  private Department requireDepartment(Long id) {
+    Department department = departmentMapper.selectById(id);
+    if (department == null || department.getIsDeleted() != null && department.getIsDeleted() == 1) {
+      throw new IllegalArgumentException("Department not found");
+    }
+    AuthContext.requireOrgAccess(department.getOrgId());
+    return department;
   }
 }

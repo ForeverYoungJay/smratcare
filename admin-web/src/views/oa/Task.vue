@@ -848,7 +848,7 @@ function startAutoRefreshTimer() {
     return
   }
   autoRefreshTimer = window.setInterval(() => {
-    if (loading.value || summaryLoading.value || calendarLoading.value) return
+    if (loading.value || summaryLoading.value || calendarLoading.value || document.visibilityState !== 'visible') return
     fetchData()
     if (activeKey.value === 'calendar') {
       loadCalendarData()

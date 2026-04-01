@@ -44,33 +44,6 @@
         </a-space>
       </template>
     </a-alert>
-    <a-card class="card-elevated linkage-card" :bordered="false">
-      <div class="linkage-head">
-        <div class="linkage-title">协同联动</div>
-        <div class="linkage-sub-title">
-          {{ selectedResidentName ? `已选择：${selectedResidentName}` : '未选择长者，默认展示在院首位长者' }}
-          <a-tag v-if="selectedResidentSourceLabel" :color="selectedResidentSourceColor" style="margin-left: 8px">
-            {{ selectedResidentSourceLabel }}
-          </a-tag>
-        </div>
-      </div>
-      <a-space wrap>
-        <a-button type="primary" @click="openResidentProfile">长者档案</a-button>
-        <a-button @click="go('/elder/assessment/ability/archive')">评估档案</a-button>
-        <a-button @click="go('/elder/contracts-invoices')">合同与票据</a-button>
-        <a-button @click="go('/elder/admission-processing')">入住办理</a-button>
-        <a-button @click="go('/elder/status-change')">入住状态变更</a-button>
-        <a-button @click="go('/finance/bills/in-resident')">账单中心</a-button>
-      </a-space>
-    </a-card>
-    <LifecycleStageBar
-      title="长者履约阶段"
-      :subject="residentLifecycleSubject"
-      :stage="residentLifecycleStage"
-      :generated-at="residentLifecycleGeneratedAt"
-      :hint="residentLifecycleHint"
-      style="margin-bottom: 12px"
-    />
     <StatefulBlock :loading="loading" :error="errorMessage" :empty="!modules.length" empty-text="暂无在院服务数据" @retry="loadModules">
       <a-row :gutter="16">
         <a-col v-for="item in modules" :key="item.title" :xs="24" :sm="24" :lg="12" :xl="12" style="margin-bottom: 12px">
@@ -112,14 +85,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
-import LifecycleStageBar from '../../../components/LifecycleStageBar.vue'
 import { getElderDetail } from '../../../api/elder'
 import { getResidentOverview } from '../../../api/medicalCare'
 import { getContractLinkageByElder } from '../../../api/marketing'
 import { useElderOptions } from '../../../composables/useElderOptions'
 import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
 import { formatChineseDateTime } from '../../../utils/dateLocale'
-import { lifecycleStageHint, normalizeLifecycleStage } from '../../../utils/lifecycleStage'
 import type { ContractLinkageSummary, ElderItem, MedicalResidentOverview } from '../../../types'
 
 const router = useRouter()
@@ -270,29 +241,6 @@ const alertTotalCount = computed(() => baseModules.value.reduce((sum, item) => s
 const effectiveShowWarningOnly = computed(() => dutyMode.value || showWarningOnly.value)
 const effectiveAutoRefresh = computed(() => dutyMode.value || autoRefresh.value)
 const refreshIntervalMs = computed(() => (dutyMode.value ? 30000 : 60000))
-const residentLifecycleStage = computed(() =>
-  normalizeLifecycleStage(contractLinkage.value?.flowStage, contractLinkage.value?.contractStatus)
-)
-const residentLifecycleSubject = computed(() => {
-  if (!residentId.value) return '未选择长者'
-  const residentLabel = selectedResidentName.value || `长者ID ${residentId.value}`
-  const contractNo = contractLinkage.value?.contractNo || '-'
-  return `${residentLabel} / 合同 ${contractNo}`
-})
-const residentLifecycleHint = computed(() => {
-  if (!contractLinkage.value) {
-    return '未检索到合同联动信息，建议先在合同与票据确认签约状态。'
-  }
-  const tips = contractLinkage.value.archiveRuleTips || []
-  if (tips.length > 0) {
-    return tips[0]
-  }
-  return lifecycleStageHint(residentLifecycleStage.value)
-})
-const residentLifecycleGeneratedAt = computed(() =>
-  String(contractLinkage.value?.generatedAt || overview.value?.generatedAt || '').trim()
-)
-
 function go(path: string) {
   const targetPath = appendResidentId(path)
   forceScrollTop()
@@ -479,7 +427,7 @@ function setupAutoRefresh() {
   clearAutoRefresh()
   if (!effectiveAutoRefresh.value) return
   refreshTimer = window.setInterval(() => {
-    if (!loading.value) loadModules()
+    if (!loading.value && document.visibilityState === 'visible') loadModules()
   }, refreshIntervalMs.value)
 }
 
@@ -631,28 +579,6 @@ useLiveSyncRefresh({
   line-height: 1.65;
   min-height: 30px;
   font-size: 13px;
-}
-
-.linkage-card {
-  margin-bottom: 12px;
-  border: 1px solid #e6f4ff;
-  background: linear-gradient(132deg, #f6fbff 0%, #f0f7ff 45%, #ffffff 100%);
-}
-
-.linkage-head {
-  margin-bottom: 10px;
-}
-
-.linkage-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #0f172a;
-}
-
-.linkage-sub-title {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #64748b;
 }
 
 .line-item {

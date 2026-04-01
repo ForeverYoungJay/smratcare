@@ -13,91 +13,95 @@
       style="margin-bottom: 12px"
       :message="moduleLogicMessage"
     />
-    <a-card class="card-elevated" :bordered="false">
-      <a-form :model="query" layout="inline" class="search-bar">
-        <a-form-item v-if="props.mode === 'pipeline'" label="线索视图">
-          <a-radio-group v-model:value="pipelineTab" button-style="solid" @change="onPipelineTabChange">
-            <a-radio-button value="consultation">咨询</a-radio-button>
-            <a-radio-button value="intent">意向</a-radio-button>
-            <a-radio-button value="callback">待回访</a-radio-button>
-          </a-radio-group>
+    <SearchForm :model="query" @search="onSearch" @reset="reset">
+      <a-form-item v-if="props.mode === 'pipeline'" label="线索视图">
+        <a-radio-group v-model:value="pipelineTab" button-style="solid" @change="onPipelineTabChange">
+          <a-radio-button value="consultation">咨询</a-radio-button>
+          <a-radio-button value="intent">意向</a-radio-button>
+          <a-radio-button value="callback">待回访</a-radio-button>
+        </a-radio-group>
+      </a-form-item>
+
+      <template v-if="effectiveMode === 'consultation'">
+        <a-form-item label="咨询人姓名">
+          <a-input v-model:value="query.consultantName" placeholder="请输入 咨询人姓名" allow-clear />
         </a-form-item>
-
-        <template v-if="effectiveMode === 'consultation'">
-          <a-form-item label="咨询人姓名">
-            <a-input v-model:value="query.consultantName" placeholder="请输入 咨询人姓名" allow-clear />
-          </a-form-item>
-          <a-form-item label="联系电话">
-            <a-input v-model:value="query.consultantPhone" placeholder="请输入 联系电话" allow-clear />
-          </a-form-item>
-          <a-form-item label="老人姓名">
-            <a-input v-model:value="query.elderName" placeholder="请输入 老人姓名" allow-clear />
-          </a-form-item>
-          <a-form-item label="老人联系电话">
-            <a-input v-model:value="query.elderPhone" placeholder="请输入 老人联系电话" allow-clear />
-          </a-form-item>
-          <a-form-item label="咨询日期">
-            <a-range-picker
-              v-model:value="query.consultDateRange"
-              value-format="YYYY-MM-DD"
-              :placeholder="['开始日期', '结束日期']"
-            />
-          </a-form-item>
-          <a-form-item label="咨询类型">
-            <a-input v-model:value="query.consultType" placeholder="请选择 咨询类型" allow-clear />
-          </a-form-item>
-          <a-form-item label="媒体渠道">
-            <a-input v-model:value="query.mediaChannel" placeholder="请选择 媒体渠道" allow-clear />
-          </a-form-item>
-        </template>
-
-        <template v-else-if="effectiveMode === 'intent' || effectiveMode === 'invalid'">
-          <a-form-item label="老人姓名">
-            <a-input v-model:value="query.elderName" placeholder="请输入 老人姓名" allow-clear />
-          </a-form-item>
-          <a-form-item label="老人联系电话">
-            <a-input v-model:value="query.elderPhone" placeholder="请输入 老人联系电话" allow-clear />
-          </a-form-item>
-          <a-form-item label="信息来源">
-            <a-input v-model:value="query.infoSource" placeholder="请选择 信息来源" allow-clear />
-          </a-form-item>
-          <a-form-item label="客户标签">
-            <a-input v-model:value="query.customerTag" placeholder="请选择 客户标签" allow-clear />
-          </a-form-item>
-          <a-form-item label="归属营销人员">
-            <a-input v-model:value="query.marketerName" placeholder="请选择 归属营销人员" allow-clear />
-          </a-form-item>
-        </template>
-
-        <template v-else-if="effectiveMode === 'reservation'">
-          <a-form-item label="姓名">
-            <a-input v-model:value="query.elderName" placeholder="请输入 姓名" allow-clear />
-          </a-form-item>
-          <a-form-item label="联系电话">
-            <a-input v-model:value="query.elderPhone" placeholder="请输入 联系电话" allow-clear />
-          </a-form-item>
-        </template>
-
-        <template v-else>
-          <a-form-item label="客户姓名">
-            <a-input v-model:value="query.elderName" placeholder="请输入 客户姓名" allow-clear />
-          </a-form-item>
-          <a-form-item label="联系电话">
-            <a-input v-model:value="query.elderPhone" placeholder="请输入 联系电话" allow-clear />
-          </a-form-item>
-          <a-form-item label="跟进人">
-            <a-input v-model:value="query.marketerName" placeholder="请输入 跟进人" allow-clear />
-          </a-form-item>
-        </template>
-
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="onSearch">搜 索</a-button>
-            <a-button @click="reset">清 空</a-button>
-          </a-space>
+        <a-form-item label="联系电话">
+          <a-input v-model:value="query.consultantPhone" placeholder="请输入 联系电话" allow-clear />
         </a-form-item>
-      </a-form>
-    </a-card>
+        <a-form-item label="老人姓名">
+          <a-input v-model:value="query.elderName" placeholder="请输入 老人姓名" allow-clear />
+        </a-form-item>
+        <a-form-item label="老人联系电话">
+          <a-input v-model:value="query.elderPhone" placeholder="请输入 老人联系电话" allow-clear />
+        </a-form-item>
+        <a-form-item label="咨询日期">
+          <a-range-picker
+            v-model:value="query.consultDateRange"
+            value-format="YYYY-MM-DD"
+            :placeholder="['开始日期', '结束日期']"
+          />
+        </a-form-item>
+        <a-form-item label="咨询类型">
+          <a-input v-model:value="query.consultType" placeholder="请选择 咨询类型" allow-clear />
+        </a-form-item>
+        <a-form-item label="媒体渠道">
+          <a-input v-model:value="query.mediaChannel" placeholder="请选择 媒体渠道" allow-clear />
+        </a-form-item>
+      </template>
+
+      <template v-else-if="effectiveMode === 'intent' || effectiveMode === 'invalid'">
+        <a-form-item label="老人姓名">
+          <a-input v-model:value="query.elderName" placeholder="请输入 老人姓名" allow-clear />
+        </a-form-item>
+        <a-form-item label="老人联系电话">
+          <a-input v-model:value="query.elderPhone" placeholder="请输入 老人联系电话" allow-clear />
+        </a-form-item>
+        <a-form-item label="信息来源">
+          <a-input v-model:value="query.infoSource" placeholder="请选择 信息来源" allow-clear />
+        </a-form-item>
+        <a-form-item label="客户标签">
+          <a-input v-model:value="query.customerTag" placeholder="请选择 客户标签" allow-clear />
+        </a-form-item>
+        <a-form-item label="归属营销人员">
+          <a-input v-model:value="query.marketerName" placeholder="请选择 归属营销人员" allow-clear />
+        </a-form-item>
+      </template>
+
+      <template v-else-if="effectiveMode === 'reservation'">
+        <a-form-item label="姓名">
+          <a-input v-model:value="query.elderName" placeholder="请输入 姓名" allow-clear />
+        </a-form-item>
+        <a-form-item label="联系电话">
+          <a-input v-model:value="query.elderPhone" placeholder="请输入 联系电话" allow-clear />
+        </a-form-item>
+      </template>
+
+      <template v-else>
+        <a-form-item label="客户姓名">
+          <a-input v-model:value="query.elderName" placeholder="请输入 客户姓名" allow-clear />
+        </a-form-item>
+        <a-form-item label="联系电话">
+          <a-input v-model:value="query.elderPhone" placeholder="请输入 联系电话" allow-clear />
+        </a-form-item>
+        <a-form-item label="跟进人">
+          <a-input v-model:value="query.marketerName" placeholder="请输入 跟进人" allow-clear />
+        </a-form-item>
+      </template>
+    </SearchForm>
+
+    <section class="surface-toolbar marketing-toolbar">
+      <div class="surface-toolbar-title">
+        <strong>营销线索工作台</strong>
+        <span>当前模式为 {{ modeLabel }}，优先处理数据质量、回访逾期、预订转签约和批量状态推进。</span>
+      </div>
+      <a-space wrap>
+        <a-tag color="processing">{{ modeLabel }}</a-tag>
+        <a-tag color="gold">已勾选 {{ selectedCount }} 条</a-tag>
+        <a-tag color="blue">当前池 {{ summary.modeCount || 0 }}</a-tag>
+        <a-tag color="volcano" v-if="warningMessage">{{ warningMessage }}</a-tag>
+      </a-space>
+    </section>
 
     <StatefulBlock :loading="summaryLoading" :error="summaryError" :empty="false" @retry="fetchData">
       <a-row :gutter="[12, 12]" style="margin-top: 16px">
@@ -116,7 +120,17 @@
       />
     </StatefulBlock>
 
-    <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
+    <section class="card-elevated marketing-workspace">
+      <div class="table-head">
+        <div>
+          <strong>{{ modeLabel }}列表</strong>
+          <span>支持批量状态推进、回访执行、转预订与客户明细查看，方便营销人员持续推进线索闭环。</span>
+        </div>
+        <a-space wrap>
+          <a-tag color="default">共 {{ displayTotal }} 条</a-tag>
+          <a-tag color="purple">已勾选 {{ selectedCount }} 条</a-tag>
+        </a-space>
+      </div>
       <MarketingListToolbar
         :selected-count="selectedCount"
         :tip="selectedCount > 0 ? '批量状态操作仅处理状态不同项' : '可通过勾选后执行批量操作'"
@@ -163,7 +177,7 @@
           </template>
         </a-table>
         <a-pagination
-          style="margin-top: 16px; text-align: right;"
+          class="marketing-pagination"
           :current="query.pageNo"
           :page-size="query.pageSize"
           :total="displayTotal"
@@ -172,7 +186,7 @@
           @showSizeChange="onPageSizeChange"
         />
       </StatefulBlock>
-    </a-card>
+    </section>
 
     <a-modal v-model:open="open" :title="modalTitle" width="820px" :confirm-loading="submitting" @ok="submit">
       <a-form ref="formRef" :model="form" :rules="rules" layout="vertical">
@@ -348,6 +362,7 @@ import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import PageContainer from '../../../components/PageContainer.vue'
+import SearchForm from '../../../components/SearchForm.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
 import MarketingQuickNav from './MarketingQuickNav.vue'
 import MarketingListToolbar from './MarketingListToolbar.vue'
@@ -476,6 +491,13 @@ const rowSelection = computed(() => ({
 }))
 const selectedCount = computed(() => selectedRowKeys.value.length)
 const selectedRows = computed(() => rows.value.filter((item) => selectedRowKeys.value.some((id) => sameId(item.id, id))))
+const modeLabel = computed(() => {
+  if (effectiveMode.value === 'consultation') return '咨询管理'
+  if (effectiveMode.value === 'intent') return '意向客户'
+  if (effectiveMode.value === 'reservation') return '预订管理'
+  if (effectiveMode.value === 'invalid') return '失效用户'
+  return '待回访提醒'
+})
 
 const modalTitle = computed(() => form.id ? '编辑客户' : '新增客户')
 
@@ -1450,7 +1472,43 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.search-bar {
-  margin-bottom: 12px;
+.marketing-toolbar {
+  margin-top: 2px;
+}
+
+.marketing-workspace {
+  padding: 16px;
+}
+
+.table-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.table-head strong {
+  display: block;
+  color: #173854;
+  font-size: 16px;
+}
+
+.table-head span {
+  color: #6d8aa3;
+  font-size: 12px;
+}
+
+.marketing-pagination {
+  margin-top: 16px;
+  text-align: right;
+}
+
+@media (max-width: 768px) {
+  .table-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>

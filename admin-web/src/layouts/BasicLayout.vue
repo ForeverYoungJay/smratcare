@@ -136,8 +136,9 @@
       <a-layout-content class="app-content">
         <router-view v-slot="{ Component }">
           <keep-alive :max="aliveViewMax">
-            <component :is="Component" :key="viewRenderKey" />
+            <component v-if="shouldCacheCurrentRoute" :is="Component" :key="viewRenderKey" />
           </keep-alive>
+          <component v-if="!shouldCacheCurrentRoute" :is="Component" :key="viewRenderKey" />
         </router-view>
       </a-layout-content>
     </a-layout>
@@ -744,6 +745,20 @@ import { canBeDirectLeader, canBeIndirectLeader, ensureSupervisorOrder } from '.
 import { emitLiveSync, subscribeLiveSync, type LiveSyncPayload } from '../utils/liveSync'
 import { getToken } from '../utils/auth'
 
+const MAX_RESTORED_ROUTE_TABS = 12
+const MAX_ALIVE_VIEW_CACHE = 6
+const NON_CACHED_ROUTE_NAME_KEYWORDS = ['portal', 'dashboard', 'workbench', 'taskcenter', 'todo', 'approval', 'calendar', 'panorama']
+const NON_CACHED_ROUTE_PATH_PATTERNS = [
+  /^\/portal$/,
+  /^\/dashboard$/,
+  /^\/oa\/(approval|todo|calendar|portal|task)(\/|$)/,
+  /^\/logistics\/(workbench|task-center)(\/|$)/,
+  /^\/marketing\/workbench(\/|$)/,
+  /^\/elder\/(resident-360|in-hospital-overview|bed-panorama)(\/|$)/,
+  /^\/elder\/status-change\/center(\/|$)/,
+  /^\/medical\/(workbench|unified-task-center|medical-health-center|nursing-quality-center)(\/|$)/
+]
+
 const collapsed = ref(false)
 const route = useRoute()
 const router = useRouter()
@@ -1198,13 +1213,15 @@ let quickChatFanoutRetryTimer: number | undefined
 let quickChatEventEmitTimer: number | undefined
 let quickChatWsReconnectTimer: number | undefined
 let quickChatPermissionWarned = false
+let quickChatAliasHydrated = false
 const quickChatWsReconnectAttempt = ref(0)
 let quickChatWebSocket: WebSocket | null = null
 let quickChatWebSocketManualClose = false
-const QUICK_CHAT_CLOUD_PULL_INTERVAL_MS = 10000
+const quickChatRuntimeStarted = ref(false)
+const QUICK_CHAT_CLOUD_PULL_INTERVAL_MS = 30000
 const QUICK_CHAT_CLOUD_SAVE_DEBOUNCE_MS = 900
 const QUICK_CHAT_FANOUT_DEBOUNCE_MS = 700
-const QUICK_CHAT_FANOUT_RETRY_INTERVAL_MS = 8000
+const QUICK_CHAT_FANOUT_RETRY_INTERVAL_MS = 20000
 const QUICK_CHAT_EVENT_EMIT_DEBOUNCE_MS = 400
 const QUICK_CHAT_ARCHIVE_UNDO_WINDOW_MS = 5 * 60 * 1000
 const quickChatCloudReady = ref(false)
@@ -1238,6 +1255,9 @@ const canUndoQuickChatArchive = computed(() => {
   return Date.now() - quickChatLastArchivedAt.value <= QUICK_CHAT_ARCHIVE_UNDO_WINDOW_MS
 })
 const quickChatCloudStatus = computed(() => {
+  if (!quickChatRuntimeStarted.value) {
+    return { text: '按需同步', color: 'default' }
+  }
   if (quickChatCloudSyncing.value || quickChatCloudSavePending.value) {
     return { text: '云端同步中', color: 'blue' }
   }
@@ -1253,6 +1273,9 @@ const quickChatCloudStatus = computed(() => {
   }
 })
 const quickChatFanoutStatus = computed(() => {
+  if (!quickChatRuntimeStarted.value) {
+    return { text: '分发待启用', color: 'default' }
+  }
   if (quickChatFanoutPending.value) {
     return { text: '成员分发中', color: 'blue' }
   }
@@ -1270,6 +1293,9 @@ const quickChatFanoutStatus = computed(() => {
   return { text: '分发待初始化', color: 'default' }
 })
 const quickChatWsStatus = computed(() => {
+  if (!quickChatRuntimeStarted.value) {
+    return { text: '推送待启用', color: 'default' }
+  }
   if (quickChatWsConnected.value) {
     return { text: '推送已连接', color: 'green' }
   }
@@ -1326,7 +1352,7 @@ const menuItems = computed(() => {
 
 const selectedKeys = computed(() => [route.path])
 const currentRouteTabKey = computed(() => normalizeTabKey(route.path || route.fullPath) || route.fullPath)
-const aliveViewMax = computed(() => Math.max(routeTabs.value.length + 4, 12))
+const aliveViewMax = computed(() => Math.min(Math.max(routeTabs.value.length, 4), MAX_ALIVE_VIEW_CACHE))
 const viewRenderKey = computed(() => `${currentRouteTabKey.value}::${tabRefreshSeeds[currentRouteTabKey.value] || 0}`)
 
 const currentTitle = computed(() => {
@@ -1368,6 +1394,13 @@ watch(
   }
 )
 watch(
+  () => quickChatOpen.value,
+  (opened) => {
+    if (!opened) return
+    ensureQuickChatRuntime()
+  }
+)
+watch(
   () => currentQuickChatSenderId.value,
   () => {
     quickChatCloudLastPayload = ''
@@ -1400,18 +1433,15 @@ watch(
       window.clearTimeout(quickChatEventEmitTimer)
       quickChatEventEmitTimer = undefined
     }
-    quickChatWebSocketManualClose = false
-    connectQuickChatWebSocket()
     loadQuickChatState()
     reconcileQuickChatSelfIdentity()
-    hydrateQuickChatAliasMap().then(() => {
-      reconcileQuickChatSelfIdentity()
-    })
-    pullQuickChatStateFromCloud(true)
     rehydrateQuickChatUnread()
     ensureActiveQuickChatVisible()
     loadQuickChatTodo()
     loadQuickChatTodoAutomation()
+    if (quickChatRuntimeStarted.value) {
+      ensureQuickChatRuntime()
+    }
   }
 )
 watch(
@@ -1461,6 +1491,22 @@ function normalizeTabKey(pathLike: string) {
   const [purePath] = text.split('?')
   return purePath || text
 }
+
+function shouldCacheRouteView(pathLike: string, routeName: unknown, keepAliveMeta?: unknown) {
+  if (keepAliveMeta === true) return true
+  if (keepAliveMeta === false) return false
+  const normalizedPath = normalizeTabKey(pathLike).toLowerCase()
+  const normalizedName = String(routeName || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  if (NON_CACHED_ROUTE_PATH_PATTERNS.some((pattern) => pattern.test(normalizedPath))) {
+    return false
+  }
+  if (NON_CACHED_ROUTE_NAME_KEYWORDS.some((keyword) => normalizedName.includes(keyword))) {
+    return false
+  }
+  return true
+}
+
+const shouldCacheCurrentRoute = computed(() => shouldCacheRouteView(route.path, route.name, route.meta?.keepAlive))
 
 function syncRouteTab(pathKey: string, fullPath: string) {
   if (!fullPath || fullPath.startsWith('/login') || fullPath.startsWith('/403')) return
@@ -1647,7 +1693,7 @@ function routeTabsStorageKey() {
 function persistRouteTabs() {
   try {
     const payload = routeTabs.value
-      .slice(-20)
+      .slice(-MAX_RESTORED_ROUTE_TABS)
       .map((item) => ({ key: item.key, path: item.path, title: item.title, closable: item.closable }))
     localStorage.setItem(routeTabsStorageKey(), JSON.stringify(payload))
   } catch {}
@@ -1672,7 +1718,7 @@ function restoreRouteTabs() {
         acc.push(item)
         return acc
       }, [])
-      .slice(-20)
+      .slice(-MAX_RESTORED_ROUTE_TABS)
     pruneTabRefreshSeeds()
   } catch {}
 }
@@ -1849,6 +1895,9 @@ function persistHeaderSettings() {
 function openHeaderSettings() {
   syncHeaderIdentityFromStore()
   syncDepartmentName()
+  if (!headerSettings.staffNo) {
+    hydrateStaffNo().catch(() => {})
+  }
   if (!departmentOptions.value.length) {
     searchDepartments('').then(syncDepartmentName).catch(() => {})
   }
@@ -2059,6 +2108,27 @@ async function hydrateQuickChatAliasMap() {
     })
     ;(page.list || []).forEach((row: any) => rememberQuickChatStaffAlias(row))
   } catch {}
+}
+
+function ensureQuickChatRuntime(options?: { forcePull?: boolean }) {
+  const forcePull = options?.forcePull !== false
+  const startedThisTime = !quickChatRuntimeStarted.value
+  if (startedThisTime) {
+    quickChatRuntimeStarted.value = true
+  }
+  setupQuickChatCloudPullTimer()
+  setupQuickChatFanoutRetryTimer()
+  if (!quickChatAliasHydrated) {
+    quickChatAliasHydrated = true
+    hydrateQuickChatAliasMap().then(() => {
+      reconcileQuickChatSelfIdentity()
+    }).catch(() => {})
+  }
+  quickChatWebSocketManualClose = false
+  connectQuickChatWebSocket()
+  if (forcePull) {
+    pullQuickChatStateFromCloud(startedThisTime)
+  }
 }
 
 function normalizeQuickChatMemberId(rawId: unknown) {
@@ -2439,7 +2509,11 @@ async function pushQuickChatStateToCloud(stateJson: string) {
 }
 
 function scheduleQuickChatCloudSave(stateJson: string) {
-  if (!quickChatCloudReady.value || !stateJson) return
+  if (!stateJson || !quickChatRuntimeStarted.value) return
+  if (!quickChatCloudReady.value) {
+    quickChatCloudQueuedPayload = stateJson
+    return
+  }
   if (stateJson === quickChatCloudLastPayload) return
   if (quickChatCloudSaveTimer) {
     window.clearTimeout(quickChatCloudSaveTimer)
@@ -2963,9 +3037,11 @@ function resolveQuickChatConflictUseCloud() {
 }
 
 async function pullQuickChatStateFromCloud(force = false) {
+  if (!quickChatRuntimeStarted.value) return
   if (!userStore.staffInfo?.id) return
   if (quickChatCloudSyncing.value && !force) return
   let status: 'ok' | 'error' | 'conflict' = 'ok'
+  let flushQueuedSave = false
   quickChatCloudSyncing.value = true
   try {
     const remote = await getQuickChatState()
@@ -3013,6 +3089,7 @@ async function pullQuickChatStateFromCloud(force = false) {
     quickChatCloudRemoteUpdatedAt.value = remoteLatestMs || Date.now()
     quickChatCloudLastPayload = remoteJson
     clearQuickChatSyncConflict()
+    flushQueuedSave = true
   } catch (error: any) {
     quickChatCloudReady.value = true
     const statusCode = Number(error?.response?.status || error?.status || 0)
@@ -3023,11 +3100,17 @@ async function pullQuickChatStateFromCloud(force = false) {
     status = 'error'
   } finally {
     quickChatCloudSyncing.value = false
+    if (flushQueuedSave && quickChatCloudQueuedPayload && quickChatCloudQueuedPayload !== quickChatCloudLastPayload && !quickChatCloudSavePending.value) {
+      const queued = quickChatCloudQueuedPayload
+      quickChatCloudQueuedPayload = ''
+      pushQuickChatStateToCloud(queued)
+    }
   }
   return status
 }
 
 function forceQuickChatCloudSync() {
+  ensureQuickChatRuntime({ forcePull: false })
   pullQuickChatStateFromCloud(true)
     .then((status) => {
       if (status === 'error') {
@@ -3043,6 +3126,7 @@ function forceQuickChatCloudSync() {
 }
 
 function setupQuickChatCloudPullTimer() {
+  if (!quickChatRuntimeStarted.value) return
   if (quickChatCloudPullTimer) {
     window.clearInterval(quickChatCloudPullTimer)
     quickChatCloudPullTimer = undefined
@@ -3056,6 +3140,7 @@ function setupQuickChatCloudPullTimer() {
 }
 
 function onQuickChatCloudVisibilityChange() {
+  if (!quickChatRuntimeStarted.value) return
   if (document.visibilityState !== 'visible') return
   if (!quickChatWsConnected.value) {
     quickChatWebSocketManualClose = false
@@ -3331,7 +3416,7 @@ function loadPresenceState() {
 
 function openQuickChat() {
   quickChatOpen.value = true
-  pullQuickChatStateFromCloud(false)
+  ensureQuickChatRuntime()
   if (!activeQuickChatRoomId.value && sortedQuickChatRooms.value.length) {
     activeQuickChatRoomId.value = sortedQuickChatRooms.value[0].id
   }
@@ -4508,24 +4593,18 @@ function setupQuickChatTodoEscalationTimer() {
 }
 
 onMounted(() => {
-  quickChatWebSocketManualClose = false
-  connectQuickChatWebSocket()
   updateQuickChatDrawerWidth()
   hydrateCurrentStaffInfo()
-    .then(() => Promise.allSettled([searchDepartments(''), searchStaff('')]))
-    .then(() => hydrateQuickChatAliasMap())
     .then(() => {
       syncDepartmentName()
       loadHeaderSettings()
       loadQuickChatState()
       reconcileQuickChatSelfIdentity()
-      pullQuickChatStateFromCloud(true)
       loadQuickChatTodo()
       loadQuickChatTodoAutomation()
       loadPresenceState()
       rehydrateQuickChatUnread()
       ensureActiveQuickChatVisible()
-      return hydrateStaffNo()
     })
     .finally(() => {
       restoreRouteTabs()
@@ -4543,8 +4622,6 @@ onMounted(() => {
     if (payload.url !== '/local/quick-chat') return
     syncQuickChatFromStorage()
   })
-  setupQuickChatCloudPullTimer()
-  setupQuickChatFanoutRetryTimer()
   setupQuickChatTodoEscalationTimer()
   window.setTimeout(() => runAutoEscalationIfNeeded(), 800)
   window.addEventListener('resize', updateQuickChatDrawerWidth)

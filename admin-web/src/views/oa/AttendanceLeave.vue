@@ -448,7 +448,7 @@ async function saveRule() {
 function startAutoRefresh() {
   if (!autoRefresh.value || autoRefreshTimer !== undefined) return
   autoRefreshTimer = window.setInterval(() => {
-    if (loading.value) return
+    if (loading.value || document.visibilityState !== 'visible') return
     fetchData()
   }, 60 * 1000)
 }

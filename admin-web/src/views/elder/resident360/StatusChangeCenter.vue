@@ -484,7 +484,7 @@ function setupAutoRefresh() {
   clearAutoRefresh()
   if (!autoRefresh.value) return
   refreshTimer = window.setInterval(() => {
-    if (loading.value) return
+    if (loading.value || document.visibilityState !== 'visible') return
     fetchRealStats()
   }, 60000)
 }

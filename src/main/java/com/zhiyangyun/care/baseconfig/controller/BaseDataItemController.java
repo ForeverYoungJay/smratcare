@@ -21,6 +21,7 @@ import java.util.Map;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,6 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/base-config/items")
+@PreAuthorize("hasAnyRole('HR_MINISTER','MEDICAL_MINISTER','NURSING_MINISTER','FINANCE_MINISTER','LOGISTICS_MINISTER','MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
 public class BaseDataItemController {
   private final BaseDataItemService baseDataItemService;
   private final AuditLogService auditLogService;

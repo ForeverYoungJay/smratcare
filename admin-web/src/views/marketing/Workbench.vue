@@ -615,7 +615,7 @@ function startAutoRefresh() {
   stopAutoRefresh()
   if (!autoRefresh.value) return
   refreshTimer = window.setInterval(() => {
-    if (dashboardLoading.value) return
+    if (dashboardLoading.value || document.visibilityState !== 'visible') return
     loadOverview()
   }, AUTO_REFRESH_INTERVAL_MS)
 }

@@ -1,5 +1,5 @@
 import type { Router } from 'vue-router'
-import { hasRouteAccess } from './roleAccess'
+import { hasRouteAccess, moduleRolesByPath } from './roleAccess'
 
 export interface RouteAccessResult {
   canAccess: boolean
@@ -49,7 +49,8 @@ export function canAccessPath(roles: string[], required: string[], path: string,
   if ((pagePermissions || []).length > 0) {
     return hasExplicitPageAccess(pagePermissions, path)
   }
-  return hasRouteAccess(roles, required, path)
+  const inferredRequired = (required || []).length > 0 ? required : moduleRolesByPath(normalizePath(path))
+  return hasRouteAccess(roles, inferredRequired, path)
 }
 
 export function resolveRouteAccess(router: Router, roles: string[], path: string, pagePermissions: string[] = []): RouteAccessResult {
@@ -63,7 +64,11 @@ export function resolveRouteAccess(router: Router, roles: string[], path: string
     .filter((group) => group.length > 0)
 
   if (roleGroups.length === 0) {
-    return { canAccess: canAccessPath(roles, [], resolved.path || path, pagePermissions), requiredRoles: [] }
+    const inferredRoles = moduleRolesByPath(resolved.path || path)
+    return {
+      canAccess: canAccessPath(roles, inferredRoles, resolved.path || path, pagePermissions),
+      requiredRoles: inferredRoles
+    }
   }
 
   const requiredRoles = Array.from(new Set(roleGroups.flat()))

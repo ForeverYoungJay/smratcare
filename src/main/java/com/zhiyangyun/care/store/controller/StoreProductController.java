@@ -105,7 +105,7 @@ public class StoreProductController {
 
   @GetMapping("/{id}")
   public Result<Product> get(@PathVariable Long id) {
-    return Result.ok(productMapper.selectById(id));
+    return Result.ok(requireProduct(id));
   }
 
   @PostMapping
@@ -121,10 +121,10 @@ public class StoreProductController {
 
   @PutMapping("/{id}")
   public Result<Product> update(@PathVariable Long id, @Valid @RequestBody Product product) {
-    Long orgId = AuthContext.getOrgId();
+    Product existing = requireProduct(id);
+    Long orgId = existing.getOrgId();
     product.setId(id);
     product.setOrgId(orgId);
-    Product existing = productMapper.selectById(id);
     applyDefaultsForUpdate(product, existing);
     productMapper.updateById(product);
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
@@ -134,15 +134,22 @@ public class StoreProductController {
 
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
-    Long orgId = AuthContext.getOrgId();
-    Product existing = productMapper.selectById(id);
-    if (existing != null) {
-      existing.setIsDeleted(1);
-      productMapper.updateById(existing);
-    }
+    Product existing = requireProduct(id);
+    Long orgId = existing.getOrgId();
+    existing.setIsDeleted(1);
+    productMapper.updateById(existing);
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "DELETE", "PRODUCT", id, "删除商品");
     return Result.ok(null);
+  }
+
+  private Product requireProduct(Long id) {
+    Product product = productMapper.selectById(id);
+    if (product == null || product.getIsDeleted() != null && product.getIsDeleted() == 1) {
+      throw new IllegalArgumentException("商品不存在");
+    }
+    AuthContext.requireOrgAccess(product.getOrgId());
+    return product;
   }
 
   private void applyDefaultsForCreate(Product product) {

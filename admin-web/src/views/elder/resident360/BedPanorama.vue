@@ -119,20 +119,6 @@
       </aside>
 
       <main class="cockpit-core">
-        <section class="tech-panel flow-panel">
-          <FlowGuardBar
-            title="在院床态守卫"
-            :subject="bedGuardSubject"
-            :stage-text="bedGuardStageText"
-            :stage-color="bedGuardStageColor"
-            :steps="bedGuardSteps"
-            :current-index="bedGuardCurrentIndex"
-            :blockers="bedGuardBlockers"
-            :hint="bedGuardHint"
-            @action="handleBedGuardAction"
-          />
-        </section>
-
         <section class="tech-panel stage-panel">
           <div class="stage-heading">
             <div>
@@ -188,23 +174,9 @@
                 }}
               </div>
               <div class="overlay-tags" v-if="selectedBed">
-                <span class="overlay-chip" :class="statusChipClass(selectedBed)">{{ resolveStatus(selectedBed) }}</span>
-                <span class="overlay-chip" :class="riskChipClass(selectedBed)" v-if="selectedBed.riskLabel">{{ selectedBed.riskLabel }}</span>
-                <span class="overlay-chip is-metric">异常 {{ selectedBed.abnormalVital24hCount || 0 }}</span>
-              </div>
-              <div v-if="selectedBed" class="overlay-vitals">
-                <div class="vital-badge">
-                  <span>HR</span>
-                  <strong>{{ deriveHeartRate(selectedBed) }}</strong>
-                </div>
-                <div class="vital-badge">
-                  <span>RR</span>
-                  <strong>{{ deriveBreathRate(selectedBed) }}</strong>
-                </div>
-                <div class="vital-badge">
-                  <span>在线</span>
-                  <strong>{{ bedDeviceState(selectedBed) }}</strong>
-                </div>
+                <span class="overlay-chip">{{ resolveStatus(selectedBed) }}</span>
+                <span class="overlay-chip" v-if="selectedBed.riskLabel">{{ selectedBed.riskLabel }}</span>
+                <span class="overlay-chip">异常 {{ selectedBed.abnormalVital24hCount || 0 }}</span>
               </div>
             </div>
           </div>
@@ -304,23 +276,9 @@
             <div class="selected-title">{{ selectedBed.bedNo || '-' }} / {{ selectedBed.elderName || '空床' }}</div>
             <div class="selected-meta">{{ selectedBed.building || '-' }} · {{ selectedBed.floorNo || '-' }} · {{ selectedBed.roomNo || '-' }}</div>
             <div class="selected-badges">
-              <span class="overlay-chip" :class="statusChipClass(selectedBed)">{{ resolveStatus(selectedBed) }}</span>
-              <span class="overlay-chip" :class="riskChipClass(selectedBed)" v-if="selectedBed.riskLabel">{{ selectedBed.riskLabel }}</span>
-              <span class="overlay-chip is-metric">{{ selectedBed.careLevel || '未配置护理等级' }}</span>
-            </div>
-            <div class="selected-health-strip">
-              <div class="health-cell">
-                <span>心率</span>
-                <strong>{{ deriveHeartRate(selectedBed) }}</strong>
-              </div>
-              <div class="health-cell">
-                <span>呼吸</span>
-                <strong>{{ deriveBreathRate(selectedBed) }}</strong>
-              </div>
-              <div class="health-cell">
-                <span>设备</span>
-                <strong>{{ bedDeviceState(selectedBed) }}</strong>
-              </div>
+              <span class="overlay-chip">{{ resolveStatus(selectedBed) }}</span>
+              <span class="overlay-chip" v-if="selectedBed.riskLabel">{{ selectedBed.riskLabel }}</span>
+              <span class="overlay-chip">{{ selectedBed.careLevel || '未配置护理等级' }}</span>
             </div>
           </div>
           <a-empty v-else description="点击床位后显示详情与快捷操作" />
@@ -408,7 +366,6 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../../components/PageContainer.vue'
-import FlowGuardBar from '../../../components/FlowGuardBar.vue'
 import BedInfoCard from '../../../components/bed/BedInfoCard.vue'
 import Panorama3D from './Panorama3D.vue'
 import { getBedMap, getRoomList } from '../../../api/bed'
@@ -726,56 +683,42 @@ function buildTrend(base: number, multipliers: number[]) {
 const occupancyTrendOption = computed(() => buildLineOption({
   labels: trendLabels.value,
   data: buildTrend(stats.value.occupied, [0.84, 0.88, 0.9, 0.94, 0.95, 0.97, 1]),
-  comparison: buildTrend(Math.round(stats.value.occupied * 0.92), [0.82, 0.84, 0.87, 0.88, 0.91, 0.92, 0.94]),
   color: '#52f3c4',
-  areaColor: 'rgba(62, 232, 181, 0.22)',
-  metricLabel: '占用床位'
+  areaColor: 'rgba(62, 232, 181, 0.22)'
 }))
 
 const sleepTrendOption = computed(() => buildLineOption({
   labels: trendLabels.value,
   data: buildTrend(sleepStableCount.value, [0.76, 0.8, 0.82, 0.85, 0.88, 0.92, 1]),
-  comparison: buildTrend(Math.max(1, Math.round(sleepStableCount.value * 0.9)), [0.72, 0.74, 0.78, 0.8, 0.84, 0.87, 0.9]),
   color: '#9e88ff',
-  areaColor: 'rgba(155, 123, 255, 0.22)',
-  metricLabel: '稳定睡眠'
+  areaColor: 'rgba(155, 123, 255, 0.22)'
 }))
 
 const alertTrendOption = computed(() => buildLineOption({
   labels: trendLabels.value,
   data: buildTrend(Math.max(1, alertBeds.value.length), [1.34, 1.2, 1.12, 0.92, 0.98, 1.05, 1]),
-  comparison: buildTrend(Math.max(1, Math.round(alertBeds.value.length * 0.88)), [1.08, 1.02, 0.96, 0.9, 0.93, 0.96, 0.94]),
   color: '#ff6d89',
-  areaColor: 'rgba(255, 93, 124, 0.2)',
-  metricLabel: '告警事件'
+  areaColor: 'rgba(255, 93, 124, 0.2)'
 }))
 
 const deviceTrendOption = computed(() => buildLineOption({
   labels: trendLabels.value,
   data: buildTrend(deviceOnlineRate.value, [0.91, 0.92, 0.94, 0.95, 0.97, 0.98, 1]),
-  comparison: buildTrend(Math.max(1, Math.round(deviceOnlineRate.value * 0.97)), [0.88, 0.89, 0.91, 0.92, 0.94, 0.95, 0.96]),
   color: '#57d7ff',
   areaColor: 'rgba(87, 215, 255, 0.2)',
-  formatter: '{value}%',
-  metricLabel: '在线率'
+  formatter: '{value}%'
 }))
 
-function buildLineOption(config: { labels: string[]; data: number[]; comparison?: number[]; color: string; areaColor: string; formatter?: string; metricLabel: string }) {
-  const maxValue = Math.max(...config.data)
-  const maxIndex = config.data.findIndex((item) => item === maxValue)
+function buildLineOption(config: { labels: string[]; data: number[]; color: string; areaColor: string; formatter?: string }) {
   return {
     animationDuration: 900,
     animationEasing: 'cubicOut',
     grid: { left: 14, right: 18, top: 24, bottom: 22, containLabel: true },
     tooltip: {
       trigger: 'axis',
-      backgroundColor: 'rgba(255, 255, 255, 0.96)',
+      backgroundColor: 'rgba(6, 18, 34, 0.92)',
       borderColor: 'rgba(87, 215, 255, 0.3)',
-      textStyle: { color: '#173854' },
-      axisPointer: {
-        type: 'line',
-        lineStyle: { color: 'rgba(87, 151, 204, 0.28)' }
-      }
+      textStyle: { color: '#eaf7ff' }
     },
     xAxis: {
       type: 'category',
@@ -794,32 +737,9 @@ function buildLineOption(config: { labels: string[]; data: number[]; comparison?
       {
         type: 'line',
         smooth: true,
-        symbol: 'none',
-        data: config.comparison || [],
-        lineStyle: { width: 1, color: 'rgba(162, 189, 213, 0.45)', type: 'dashed' },
-        itemStyle: { color: 'rgba(162, 189, 213, 0.45)' },
-        areaStyle: { opacity: 0 }
-      },
-      {
-        type: 'line',
-        smooth: true,
         symbol: 'circle',
         symbolSize: 7,
         data: config.data,
-        markPoint: {
-          symbol: 'circle',
-          symbolSize: 42,
-          itemStyle: {
-            color: 'rgba(255, 255, 255, 0.98)',
-            borderColor: config.color,
-            borderWidth: 2
-          },
-          label: {
-            color: '#173854',
-            formatter: ({ value }: any) => `${config.metricLabel}\n${value}`
-          },
-          data: maxIndex >= 0 ? [{ coord: [config.labels[maxIndex], maxValue], value: maxValue }] : []
-        },
         lineStyle: { width: 2, color: config.color, shadowBlur: 14, shadowColor: config.color },
         itemStyle: { color: config.color, borderColor: '#ffffff', borderWidth: 1 },
         areaStyle: {
@@ -974,45 +894,6 @@ function resolveStatus(bed: BedItem): '空闲' | '预定' | '在住' | '维修' 
   if (bed.status === 3) return '清洁中'
   if (String(bed.bedNo || '').endsWith('R')) return '预定'
   return '空闲'
-}
-
-function bedHashSeed(bed: BedItem) {
-  return `${bed.id || ''}${bed.bedNo || ''}${bed.roomNo || ''}`
-    .split('')
-    .reduce((sum, char) => sum + char.charCodeAt(0), 0)
-}
-
-function deriveHeartRate(bed: BedItem) {
-  if (!bed.elderId) return '--'
-  return 62 + (bedHashSeed(bed) % 24)
-}
-
-function deriveBreathRate(bed: BedItem) {
-  if (!bed.elderId) return '--'
-  return 15 + (bedHashSeed(bed) % 7)
-}
-
-function bedDeviceState(bed: BedItem) {
-  if (bed.status === 0) return '离线'
-  if (bed.status === 2) return '检修'
-  return '在线'
-}
-
-function statusChipClass(bed: BedItem) {
-  const status = resolveStatus(bed)
-  if (status === '在住') return 'is-occupied'
-  if (status === '预定') return 'is-reserved'
-  if (status === '维修') return 'is-maintenance'
-  if (status === '清洁中') return 'is-cleaning'
-  if (status === '锁定') return 'is-offline'
-  return 'is-idle'
-}
-
-function riskChipClass(bed: BedItem) {
-  if (bed.riskLevel === 'HIGH') return 'is-alert'
-  if (bed.riskLevel === 'MEDIUM') return 'is-warning'
-  if (bed.riskLevel === 'LOW') return 'is-sleep'
-  return 'is-idle'
 }
 
 function resolveRoomTypeLabel(roomType?: string) {
@@ -1307,27 +1188,27 @@ watch(
 <style scoped>
 .bed-cockpit-page {
   --panel-border: rgba(87, 215, 255, 0.18);
-  --panel-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(242, 249, 255, 0.98) 100%);
-  --panel-shadow: 0 16px 36px rgba(73, 130, 178, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  --panel-bg: linear-gradient(180deg, rgba(10, 25, 46, 0.92) 0%, rgba(6, 16, 31, 0.94) 100%);
+  --panel-shadow: 0 18px 48px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(106, 217, 255, 0.12);
 }
 
 .bed-cockpit-page :deep(.page-head) {
   border: 1px solid var(--panel-border);
   background:
-    radial-gradient(circle at top right, rgba(77, 124, 255, 0.12), transparent 30%),
-    radial-gradient(circle at left top, rgba(87, 215, 255, 0.1), transparent 28%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(240, 248, 255, 1) 100%);
+    radial-gradient(circle at top right, rgba(77, 124, 255, 0.18), transparent 30%),
+    radial-gradient(circle at left top, rgba(87, 215, 255, 0.14), transparent 28%),
+    linear-gradient(180deg, rgba(7, 20, 38, 0.94) 0%, rgba(4, 11, 23, 0.98) 100%);
   box-shadow: var(--panel-shadow);
 }
 
 .bed-cockpit-page :deep(.page-title) {
-  color: #173854;
+  color: #ecfbff;
   font-size: 28px;
   letter-spacing: 0.08em;
 }
 
 .bed-cockpit-page :deep(.page-subtitle) {
-  color: #6d8aa3;
+  color: #8db2cf;
 }
 
 .cockpit-topbar,
@@ -1352,7 +1233,7 @@ watch(
 
 .topbar-status {
   gap: 10px;
-  color: #6d8aa3;
+  color: #8db2cf;
   font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1377,12 +1258,12 @@ watch(
 }
 
 .clock-date {
-  color: #6d8aa3;
+  color: #8db2cf;
   font-size: 12px;
 }
 
 .clock-time {
-  color: #173854;
+  color: #effcff;
   font-size: 26px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -1400,25 +1281,25 @@ watch(
   gap: 6px;
   padding: 16px 18px;
   border-radius: 18px;
-  border: 1px solid rgba(87, 215, 255, 0.14);
-  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(87, 215, 255, 0.16);
+  background: rgba(7, 19, 35, 0.68);
 }
 
 .metric-label {
   font-size: 12px;
-  color: #6d8aa3;
+  color: #8db2cf;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .metric-value {
-  color: #173854;
+  color: #f5fdff;
   font-size: 30px;
   line-height: 1;
 }
 
 .metric-meta {
-  color: #7a97b0;
+  color: #9fbcd3;
   font-size: 12px;
 }
 
@@ -1485,7 +1366,7 @@ watch(
 .section-head h3,
 .stage-heading h2 {
   margin: 0;
-  color: #173854;
+  color: #ecfbff;
 }
 
 .section-head p,
@@ -1495,7 +1376,7 @@ watch(
 .timeline-item p,
 .selected-meta {
   margin: 4px 0 0;
-  color: #6d8aa3;
+  color: #86a9c4;
   line-height: 1.6;
   font-size: 12px;
 }
@@ -1512,7 +1393,7 @@ watch(
   padding: 14px;
   border-radius: 18px;
   border: 1px solid rgba(87, 215, 255, 0.14);
-  background: rgba(246, 251, 255, 0.96);
+  background: rgba(5, 15, 28, 0.6);
 }
 
 .metric-tile span,
@@ -1520,18 +1401,18 @@ watch(
 .overlay-title,
 .event-type {
   font-size: 12px;
-  color: #6d8aa3;
+  color: #8db2cf;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .metric-tile strong {
-  color: #173854;
+  color: #f5fdff;
   font-size: 24px;
 }
 
 .metric-tile small {
-  color: #7896af;
+  color: #9dbbd3;
 }
 
 .distribution-list,
@@ -1546,7 +1427,7 @@ watch(
 .distribution-top {
   justify-content: space-between;
   margin-bottom: 8px;
-  color: #214b6b;
+  color: #c8e8ff;
 }
 
 .distribution-track {
@@ -1636,13 +1517,13 @@ watch(
 }
 
 .stage-kpis span {
-  color: #6d8aa3;
+  color: #8db2cf;
   font-size: 11px;
   text-transform: uppercase;
 }
 
 .stage-kpis strong {
-  color: #173854;
+  color: #effcff;
   font-size: 22px;
 }
 
@@ -1673,23 +1554,23 @@ watch(
   padding: 16px;
   border-radius: 18px;
   border: 1px solid rgba(87, 215, 255, 0.2);
-  background: rgba(255, 255, 255, 0.88);
+  background: rgba(5, 16, 31, 0.84);
   backdrop-filter: blur(12px);
-  box-shadow: 0 16px 30px rgba(73, 130, 178, 0.14);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.3);
 }
 
 .overlay-name,
 .selected-title,
 .event-card strong,
 .timeline-item strong {
-  color: #173854;
+  color: #ecfbff;
   font-size: 16px;
   font-weight: 700;
 }
 
 .overlay-meta {
   margin-top: 6px;
-  color: #6d8aa3;
+  color: #8db2cf;
   line-height: 1.6;
   font-size: 12px;
 }
@@ -1701,75 +1582,13 @@ watch(
   margin-top: 12px;
 }
 
-.overlay-vitals,
-.selected-health-strip {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 14px;
-}
-
 .overlay-chip {
   padding: 5px 10px;
   border-radius: 999px;
   border: 1px solid rgba(87, 215, 255, 0.16);
   background: rgba(87, 215, 255, 0.08);
-  color: #173854;
+  color: #d7f8ff;
   font-size: 12px;
-}
-
-.overlay-chip.is-occupied {
-  border-color: rgba(62, 232, 181, 0.28);
-  background: rgba(62, 232, 181, 0.12);
-}
-
-.overlay-chip.is-reserved,
-.overlay-chip.is-cleaning,
-.overlay-chip.is-warning {
-  border-color: rgba(255, 174, 87, 0.28);
-  background: rgba(255, 174, 87, 0.12);
-}
-
-.overlay-chip.is-alert {
-  border-color: rgba(255, 93, 124, 0.34);
-  background: rgba(255, 93, 124, 0.14);
-}
-
-.overlay-chip.is-sleep {
-  border-color: rgba(155, 123, 255, 0.3);
-  background: rgba(155, 123, 255, 0.14);
-}
-
-.overlay-chip.is-offline,
-.overlay-chip.is-maintenance,
-.overlay-chip.is-idle,
-.overlay-chip.is-metric {
-  border-color: rgba(141, 178, 207, 0.2);
-  background: rgba(141, 178, 207, 0.08);
-}
-
-.vital-badge,
-.health-cell {
-  display: grid;
-  gap: 4px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: rgba(247, 252, 255, 0.96);
-  border: 1px solid rgba(87, 215, 255, 0.12);
-}
-
-.vital-badge span,
-.health-cell span {
-  font-size: 11px;
-  color: #6d8aa3;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-}
-
-.vital-badge strong,
-.health-cell strong {
-  color: #173854;
-  font-size: 16px;
 }
 
 .chart-grid {
@@ -1795,7 +1614,7 @@ watch(
   padding: 14px;
   border-radius: 18px;
   border: 1px solid rgba(87, 215, 255, 0.14);
-  background: rgba(248, 252, 255, 0.96);
+  background: rgba(4, 14, 26, 0.56);
 }
 
 .event-top {
@@ -1805,7 +1624,7 @@ watch(
 }
 
 .event-time {
-  color: #6d8aa3;
+  color: #86a9c4;
   font-size: 12px;
 }
 
@@ -1863,15 +1682,15 @@ watch(
 .bed-cockpit-page :deep(.ant-segmented),
 .bed-cockpit-page :deep(.ant-alert),
 .bed-cockpit-page :deep(.ant-switch) {
-  background: rgba(255, 255, 255, 0.94);
+  background: rgba(8, 20, 38, 0.92);
   border-color: rgba(87, 215, 255, 0.14);
-  color: #173854;
+  color: #ecfbff;
 }
 
 .bed-cockpit-page :deep(.ant-btn) {
-  background: rgba(255, 255, 255, 0.94);
+  background: rgba(8, 20, 38, 0.92);
   border-color: rgba(87, 215, 255, 0.18);
-  color: #173854;
+  color: #dff7ff;
 }
 
 .bed-cockpit-page :deep(.ant-btn-primary) {
@@ -1880,7 +1699,7 @@ watch(
 }
 
 .bed-cockpit-page :deep(.ant-empty-description) {
-  color: #6d8aa3;
+  color: #86a9c4;
 }
 
 @media (max-width: 1600px) {

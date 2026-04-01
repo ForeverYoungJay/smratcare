@@ -1,6 +1,6 @@
 import type { Router } from 'vue-router'
 import { getPagePermissions, getRoles, getToken } from '../utils/auth'
-import { canAccessPath } from '../utils/routeAccess'
+import { resolveRouteAccess } from '../utils/routeAccess'
 
 export function setupPermission(router: Router) {
   router.beforeEach((to, _from, next) => {
@@ -20,8 +20,8 @@ export function setupPermission(router: Router) {
 
     const roles = getRoles()
     const pagePermissions = getPagePermissions()
-    const required = (to.meta?.roles as string[] | undefined) || []
-    if (!canAccessPath(roles, required, to.path, pagePermissions)) {
+    const access = resolveRouteAccess(router, roles, to.path, pagePermissions)
+    if (!access.canAccess) {
       next('/403')
       return
     }

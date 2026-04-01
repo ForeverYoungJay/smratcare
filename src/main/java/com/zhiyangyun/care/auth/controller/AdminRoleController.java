@@ -3,8 +3,8 @@ package com.zhiyangyun.care.auth.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.zhiyangyun.care.auth.entity.Role;
 import com.zhiyangyun.care.auth.entity.Department;
+import com.zhiyangyun.care.auth.entity.Role;
 import com.zhiyangyun.care.auth.mapper.DepartmentMapper;
 import com.zhiyangyun.care.auth.mapper.RoleMapper;
 import com.zhiyangyun.care.auth.model.Result;
@@ -43,10 +43,13 @@ public class AdminRoleController {
     if (!StringUtils.hasText(request.getRoleName())) {
       return Result.error(400, "Role name is required");
     }
+    Long orgId = AuthContext.getOrgId();
+    Department department = requireDepartmentInOrg(request.getDepartmentId(), orgId, "所属部门");
+    Role superiorRole = requireRoleInOrg(request.getSuperiorRoleId(), orgId, null, "上级角色");
     Role role = new Role();
-    role.setOrgId(AuthContext.getOrgId());
-    role.setDepartmentId(request.getDepartmentId());
-    role.setSuperiorRoleId(request.getSuperiorRoleId());
+    role.setOrgId(orgId);
+    role.setDepartmentId(department == null ? null : department.getId());
+    role.setSuperiorRoleId(superiorRole == null ? null : superiorRole.getId());
     role.setRoleName(request.getRoleName());
     role.setRoleCode(resolveRoleCode(request.getRoleCode(), request.getRoleName(), request.getDepartmentId()));
     role.setRoleDesc(null);
@@ -62,13 +65,11 @@ public class AdminRoleController {
     if (!StringUtils.hasText(request.getRoleName())) {
       return Result.error(400, "Role name is required");
     }
-    Role role = roleMapper.selectById(id);
-    if (role == null) {
-      return Result.error(404, "Role not found");
-    }
-    role.setOrgId(AuthContext.getOrgId());
-    role.setDepartmentId(request.getDepartmentId());
-    role.setSuperiorRoleId(request.getSuperiorRoleId());
+    Role role = requireRole(id);
+    Department department = requireDepartmentInOrg(request.getDepartmentId(), role.getOrgId(), "所属部门");
+    Role superiorRole = requireRoleInOrg(request.getSuperiorRoleId(), role.getOrgId(), id, "上级角色");
+    role.setDepartmentId(department == null ? null : department.getId());
+    role.setSuperiorRoleId(superiorRole == null ? null : superiorRole.getId());
     role.setRoleName(request.getRoleName());
     role.setRoleCode(resolveRoleCode(request.getRoleCode(), request.getRoleName(), request.getDepartmentId()));
     role.setRoleDesc(null);
@@ -81,10 +82,7 @@ public class AdminRoleController {
   @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN','HR_MINISTER')")
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
-    Role role = roleMapper.selectById(id);
-    if (role == null) {
-      return Result.error(404, "Role not found");
-    }
+    Role role = requireRole(id);
     role.setIsDeleted(1);
     roleMapper.updateById(role);
     return Result.ok(null);
@@ -93,7 +91,7 @@ public class AdminRoleController {
   @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN','HR_MINISTER')")
   @GetMapping("/{id}")
   public Result<Role> get(@PathVariable Long id) {
-    return Result.ok(roleMapper.selectById(id));
+    return Result.ok(requireRole(id));
   }
 
   @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN','HR_MINISTER')")
@@ -184,5 +182,45 @@ public class AdminRoleController {
       return "MINISTER";
     }
     return "EMPLOYEE";
+  }
+
+  private Role requireRole(Long id) {
+    Role role = roleMapper.selectById(id);
+    if (role == null || role.getIsDeleted() != null && role.getIsDeleted() == 1) {
+      throw new IllegalArgumentException("Role not found");
+    }
+    AuthContext.requireOrgAccess(role.getOrgId());
+    return role;
+  }
+
+  private Department requireDepartmentInOrg(Long departmentId, Long orgId, String label) {
+    if (departmentId == null) {
+      return null;
+    }
+    Department department = departmentMapper.selectById(departmentId);
+    if (department == null || department.getIsDeleted() != null && department.getIsDeleted() == 1) {
+      throw new IllegalArgumentException(label + "不存在");
+    }
+    if (orgId == null || !orgId.equals(department.getOrgId())) {
+      throw new IllegalArgumentException(label + "不属于当前机构");
+    }
+    return department;
+  }
+
+  private Role requireRoleInOrg(Long roleId, Long orgId, Long currentRoleId, String label) {
+    if (roleId == null) {
+      return null;
+    }
+    if (currentRoleId != null && currentRoleId.equals(roleId)) {
+      throw new IllegalArgumentException(label + "不能设置为自身");
+    }
+    Role role = roleMapper.selectById(roleId);
+    if (role == null || role.getIsDeleted() != null && role.getIsDeleted() == 1) {
+      throw new IllegalArgumentException(label + "不存在");
+    }
+    if (orgId == null || !orgId.equals(role.getOrgId())) {
+      throw new IllegalArgumentException(label + "不属于当前机构");
+    }
+    return role;
   }
 }

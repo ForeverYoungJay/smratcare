@@ -14,15 +14,6 @@
         <a-descriptions-item label="家庭地址" :span="2">{{ elder?.homeAddress || '-' }}</a-descriptions-item>
       </a-descriptions>
     </a-card>
-    <LifecycleStageBar
-      title="长者履约阶段"
-      :subject="detailLifecycleSubject"
-      :stage="detailLifecycleStage"
-      :generated-at="detailLifecycleGeneratedAt"
-      :hint="detailLifecycleHint"
-      style="margin-top: 12px"
-    />
-
     <a-card class="card-elevated" :bordered="false" style="margin-top: 16px">
       <a-tabs v-model:activeKey="activeKey">
         <a-tab-pane key="base" tab="基础信息">
@@ -159,20 +150,15 @@ import { useRoute } from 'vue-router'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
-import LifecycleStageBar from '../../components/LifecycleStageBar.vue'
 import { bindFamily, getElderDetail, getElderDiseases, updateElder, updateElderDiseases, uploadElderFile } from '../../api/elder'
-import { getContractLinkageByElder } from '../../api/marketing'
 import { getDiseaseList } from '../../api/store'
 import { getFamilyRelations, getFamilyUserPage, removeFamilyRelation } from '../../api/family'
-import { lifecycleStageHint, normalizeLifecycleStage } from '../../utils/lifecycleStage'
 import type { DiseaseItem, ElderItem, FamilyRelationItem, FamilyBindRequest, FamilyUserItem, PageResult, Id } from '../../types/api'
-import type { ContractLinkageSummary } from '../../types'
 
 const route = useRoute()
 const elderId = computed(() => String(route.params.id || ''))
 
 const elder = ref<ElderItem | null>(null)
-const contractLinkage = ref<ContractLinkageSummary | null>(null)
 const baseForm = reactive<Partial<ElderItem>>({})
 const baseFormRef = ref<FormInstance>()
 const saving = ref(false)
@@ -250,24 +236,6 @@ const pagedFamilies = computed(() => {
   const start = (familyQuery.pageNo - 1) * familyQuery.pageSize
   return filteredFamilies.value.slice(start, start + familyQuery.pageSize)
 })
-const detailLifecycleStage = computed(() =>
-  normalizeLifecycleStage(contractLinkage.value?.flowStage, contractLinkage.value?.contractStatus)
-)
-const detailLifecycleSubject = computed(() =>
-  `长者 ${elder.value?.fullName || '-'} / 合同 ${contractLinkage.value?.contractNo || '-'}`
-)
-const detailLifecycleHint = computed(() => {
-  if (!contractLinkage.value) {
-    return '未检索到合同联动信息，可到“合同与票据”页完成关联合同。'
-  }
-  const tips = contractLinkage.value.archiveRuleTips || []
-  if (tips.length > 0) return tips[0]
-  return lifecycleStageHint(detailLifecycleStage.value)
-})
-const detailLifecycleGeneratedAt = computed(() =>
-  String(contractLinkage.value?.generatedAt || '').trim()
-)
-
 function statusText(status?: number) {
   if (status === 1) return '在院'
   if (status === 2) return '请假'
@@ -292,17 +260,8 @@ async function load() {
     const detail = await getElderDetail(elderId.value)
     elder.value = detail
     Object.assign(baseForm, elder.value)
-    contractLinkage.value = await safeContractLinkageByElder(elderId.value)
   } catch {
     message.error('加载失败')
-  }
-}
-
-async function safeContractLinkageByElder(id: string) {
-  try {
-    return await getContractLinkageByElder(id)
-  } catch {
-    return null
   }
 }
 

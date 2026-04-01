@@ -749,26 +749,7 @@ public class StatisticsController {
   }
 
   private Long resolveAccessibleOrgId(Long requestedOrgId) {
-    Long currentOrgId = AuthContext.getOrgId();
-    boolean admin = AuthContext.isAdmin();
-
-    if (requestedOrgId == null) {
-      if (currentOrgId != null) {
-        return currentOrgId;
-      }
-      if (admin) {
-        throw new IllegalArgumentException("Admin request requires orgId");
-      }
-      throw new IllegalArgumentException("Unable to determine orgId from token");
-    }
-
-    if (admin) {
-      return requestedOrgId;
-    }
-    if (currentOrgId == null || !requestedOrgId.equals(currentOrgId)) {
-      throw new AccessDeniedException("No permission to access another organization");
-    }
-    return requestedOrgId;
+    return AuthContext.resolveAccessibleOrgId(requestedOrgId);
   }
 
   private Map<Long, ElderProfile> buildElderMap(List<Long> elderIds) {

@@ -18,6 +18,8 @@ import com.zhiyangyun.care.auth.mapper.StaffRoleMapper;
 import com.zhiyangyun.care.auth.model.LoginRequest;
 import com.zhiyangyun.care.oa.entity.OaTodo;
 import com.zhiyangyun.care.oa.mapper.OaTodoMapper;
+import com.zhiyangyun.care.store.entity.Product;
+import com.zhiyangyun.care.store.mapper.ProductMapper;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -55,6 +57,9 @@ class ApiPermissionIsolationRegressionTest {
 
   @Autowired
   private OaTodoMapper todoMapper;
+
+  @Autowired
+  private ProductMapper productMapper;
 
   @Test
   void todo_page_should_isolate_records_for_employee() throws Exception {
@@ -204,12 +209,59 @@ class ApiPermissionIsolationRegressionTest {
     }
   }
 
+  @Test
+  void finance_minister_should_not_query_billing_of_other_org() throws Exception {
+    String username = "finance_scope_" + ID_SEQ.incrementAndGet();
+    createStaffWithRole(username, "FINANCE_MINISTER", 1L);
+    String token = loginAndGetToken(username, "123456");
+
+    mockMvc.perform(get("/api/admin/billing/config")
+            .header("Authorization", "Bearer " + token)
+            .param("orgId", "2"))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void logistics_staff_should_not_read_product_from_other_org() throws Exception {
+    Product product = createProduct(2L, "跨机构商品");
+    String username = "logistics_scope_" + ID_SEQ.incrementAndGet();
+    createStaffWithRole(username, "LOGISTICS_EMPLOYEE", 1L);
+    String token = loginAndGetToken(username, "123456");
+
+    mockMvc.perform(get("/api/store/product/" + product.getId())
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void admin_should_not_assign_role_from_other_org_to_target_staff() throws Exception {
+    Long targetStaffId = createStaffWithRole("org2_target_" + ID_SEQ.incrementAndGet(), "HR_EMPLOYEE", 2L);
+    Long org1RoleId = ensureRole("MARKETING_EMPLOYEE", 1L);
+    String adminToken = loginAndGetToken("admin", "123456");
+
+    mockMvc.perform(post("/api/admin/staff-roles/assign")
+            .header("Authorization", "Bearer " + adminToken)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {
+                  "staffId": %d,
+                  "roleIds": [%d]
+                }
+                """.formatted(targetStaffId, org1RoleId)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code", is(400)));
+  }
+
   private Long createStaffWithRole(String username, String roleCode) {
-    Long roleId = ensureRole(roleCode);
+    return createStaffWithRole(username, roleCode, 1L);
+  }
+
+  private Long createStaffWithRole(String username, String roleCode, Long orgId) {
+    Long roleId = ensureRole(roleCode, orgId);
     Long staffId = ID_SEQ.incrementAndGet();
     StaffAccount staff = new StaffAccount();
     staff.setId(staffId);
-    staff.setOrgId(1L);
+    staff.setOrgId(orgId);
     staff.setDepartmentId(10L);
     staff.setStaffNo("S" + staffId);
     staff.setUsername(username);
@@ -221,7 +273,7 @@ class ApiPermissionIsolationRegressionTest {
 
     StaffRole staffRole = new StaffRole();
     staffRole.setId(ID_SEQ.incrementAndGet());
-    staffRole.setOrgId(1L);
+    staffRole.setOrgId(orgId);
     staffRole.setStaffId(staffId);
     staffRole.setRoleId(roleId);
     staffRoleMapper.insert(staffRole);
@@ -229,8 +281,12 @@ class ApiPermissionIsolationRegressionTest {
   }
 
   private Long ensureRole(String roleCode) {
+    return ensureRole(roleCode, 1L);
+  }
+
+  private Long ensureRole(String roleCode, Long orgId) {
     Role exists = roleMapper.selectOne(com.baomidou.mybatisplus.core.toolkit.Wrappers.lambdaQuery(Role.class)
-        .eq(Role::getOrgId, 1L)
+        .eq(Role::getOrgId, orgId)
         .eq(Role::getRoleCode, roleCode)
         .eq(Role::getIsDeleted, 0)
         .last("LIMIT 1"));
@@ -238,13 +294,32 @@ class ApiPermissionIsolationRegressionTest {
 
     Role role = new Role();
     role.setId(ID_SEQ.incrementAndGet());
-    role.setOrgId(1L);
+    role.setOrgId(orgId);
     role.setRoleCode(roleCode);
     role.setRoleName(roleCode);
     role.setRoleDesc("test role " + roleCode);
     role.setStatus(1);
     roleMapper.insert(role);
     return role.getId();
+  }
+
+  private Product createProduct(Long orgId, String productName) {
+    Product product = new Product();
+    product.setId(ID_SEQ.incrementAndGet());
+    product.setOrgId(orgId);
+    product.setProductCode("P" + product.getId());
+    product.setProductName(productName);
+    product.setCategory("SUPPLY");
+    product.setBusinessDomain("STORE");
+    product.setItemType("CONSUMABLE");
+    product.setMallEnabled(1);
+    product.setPrice(java.math.BigDecimal.TEN);
+    product.setPointsPrice(0);
+    product.setSafetyStock(0);
+    product.setStatus(1);
+    product.setIsDeleted(0);
+    productMapper.insert(product);
+    return product;
   }
 
   private String loginAndGetToken(String username, String password) throws Exception {

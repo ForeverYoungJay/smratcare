@@ -711,7 +711,7 @@ function startAutoRefreshTimer() {
     return
   }
   autoRefreshTimer = window.setInterval(() => {
-    if (loading.value || summaryLoading.value) return
+    if (loading.value || summaryLoading.value || document.visibilityState !== 'visible') return
     fetchData()
   }, AUTO_REFRESH_INTERVAL_MS)
 }
