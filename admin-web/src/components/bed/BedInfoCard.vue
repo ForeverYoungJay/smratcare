@@ -1,29 +1,40 @@
 <template>
-  <div class="bed-info-card" :class="[isBedAlert ? 'is-alert' : '']" @click="handleClick">
-    <div class="bed-card-header">
-      <div class="bed-card-title">
-        <span class="bed-icon">💡</span>
-        <span class="elder-name">{{ bed.elderName || '空床' }}</span>
-        <span class="room-bed-no">— {{ bed.roomNo || '-' }} — {{ bed.bedNo }}</span>
+  <button class="bed-info-card" :class="[`is-${statusMeta.key}`, isAlert ? 'is-alert' : '']" @click="handleClick">
+    <div class="bed-card-top">
+      <div>
+        <div class="bed-code">{{ bed.roomNo || '-' }} / {{ bed.bedNo || '-' }}</div>
+        <div class="bed-name">{{ bed.elderName || '空床待命' }}</div>
       </div>
-      <div class="bed-card-more">•••</div>
+      <div class="bed-status-chip">{{ statusMeta.label }}</div>
     </div>
-    <div class="bed-card-body">
-      <div class="status-graphic">
-        <div class="graphic-bed" :class="{'occupied': !!bed.elderId, 'empty': !bed.elderId, 'alert': isBedAlert}"></div>
-        <div class="graphic-wave"></div>
+
+    <div class="bed-card-center">
+      <div class="bed-silhouette">
+        <span class="bed-frame"></span>
+        <span class="bed-mattress"></span>
+        <span class="bed-signal"></span>
       </div>
-      <div class="status-text" :class="isBedAlert ? 'text-alert' : ''">{{ bedStatusText }}</div>
-    </div>
-    <div class="bed-card-footer">
-      <div class="vitals">
-        <span class="vital-item">❤️ {{ heartRate }}</span>
-        <span class="vital-item">🫁 {{ breathRate }}</span>
-        <span class="vital-item wave-anim" v-if="bed.elderId">||||||||||</span>
+      <div class="bed-state-copy">
+        <div class="state-title">{{ stateText }}</div>
+        <div class="state-subtitle">{{ subText }}</div>
       </div>
-      <div class="status-badge" :class="bedBadgeClass">{{ bedBadgeText }}</div>
     </div>
-  </div>
+
+    <div class="bed-card-metrics">
+      <div class="metric-item">
+        <span class="metric-label">心率</span>
+        <strong>{{ heartRate }}</strong>
+      </div>
+      <div class="metric-item">
+        <span class="metric-label">呼吸</span>
+        <strong>{{ breathRate }}</strong>
+      </div>
+      <div class="metric-item">
+        <span class="metric-label">异常</span>
+        <strong>{{ bed.abnormalVital24hCount || 0 }}</strong>
+      </div>
+    </div>
+  </button>
 </template>
 
 <script setup lang="ts">
@@ -35,38 +46,47 @@ const props = defineProps<{
 
 const emit = defineEmits(['click'])
 
-const isBedAlert = computed(() => {
-  return props.bed.riskLevel === 'HIGH' || props.bed.status === 0 || (props.bed.abnormalVital24hCount && props.bed.abnormalVital24hCount > 0)
+const isAlert = computed(() => {
+  return props.bed.riskLevel === 'HIGH' || props.bed.status === 0 || Number(props.bed.abnormalVital24hCount || 0) > 0
 })
 
-const bedStatusText = computed(() => {
-  if (!props.bed.elderId) return '空闲'
-  if (props.bed.status === 2) return '维修'
-  if (props.bed.status === 3) return '清洁中'
-  if (isBedAlert.value) return props.bed.riskLabel || '正在告警'
-  return '静卧'
+const statusMeta = computed(() => {
+  if (props.bed.status === 2) return { key: 'maintenance', label: '维修' }
+  if (props.bed.status === 3) return { key: 'cleaning', label: '清洁中' }
+  if (!props.bed.elderId && String(props.bed.bedNo || '').endsWith('R')) return { key: 'reserved', label: '预定' }
+  if (!props.bed.elderId) return { key: 'idle', label: '空闲' }
+  if (props.bed.riskLevel === 'HIGH') return { key: 'alert', label: '告警' }
+  if (props.bed.riskLevel === 'MEDIUM') return { key: 'warning', label: '关注' }
+  if (props.bed.riskLevel === 'LOW') return { key: 'sleep', label: '睡眠' }
+  return { key: 'occupied', label: '在住' }
 })
+
+const stateText = computed(() => {
+  if (!props.bed.elderId) return '床位空闲，可执行分配'
+  if (props.bed.status === 2) return '设备维护中'
+  if (props.bed.status === 3) return '清洁与消杀执行中'
+  if (isAlert.value) return props.bed.riskLabel || '异常监测触发'
+  if (props.bed.riskLevel === 'LOW') return '睡眠状态平稳'
+  return '生命体征监测正常'
+})
+
+const subText = computed(() => {
+  return props.bed.careLevel || props.bed.riskSource || '实时床态采集中'
+})
+
+function hashSeed() {
+  const source = `${props.bed.id || ''}${props.bed.bedNo || ''}${props.bed.roomNo || ''}`
+  return source.split('').reduce((sum: number, char: string) => sum + char.charCodeAt(0), 0)
+}
 
 const heartRate = computed(() => {
   if (!props.bed.elderId) return '--'
-  return Math.floor(Math.random() * 20) + 60
+  return 62 + (hashSeed() % 22)
 })
 
 const breathRate = computed(() => {
   if (!props.bed.elderId) return '--'
-  return Math.floor(Math.random() * 5) + 16
-})
-
-const bedBadgeClass = computed(() => {
-  if (isBedAlert.value) return 'badge-alert'
-  if (props.bed.elderId) return 'badge-normal'
-  return 'badge-idle'
-})
-
-const bedBadgeText = computed(() => {
-  if (!props.bed.elderId) return '空闲'
-  if (isBedAlert.value) return '异常'
-  return '静卧'
+  return 15 + (hashSeed() % 6)
 })
 
 function handleClick() {
@@ -75,179 +95,247 @@ function handleClick() {
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
 .bed-info-card {
   width: 100%;
-  background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%);
-  border: 1px solid #334155;
-  border-radius: 12px;
+  border: 1px solid rgba(87, 215, 255, 0.2);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(12, 30, 54, 0.94) 0%, rgba(7, 18, 34, 0.96) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(134, 216, 255, 0.14),
+    0 18px 44px rgba(0, 0, 0, 0.32);
+  color: var(--cockpit-text);
   padding: 16px;
-  color: #f8fafc;
-  font-family: 'Inter', sans-serif;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  text-align: left;
   cursor: pointer;
-  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-  margin-bottom: 16px;
+  transition: transform 0.28s ease, border-color 0.28s ease, box-shadow 0.28s ease;
 }
 
 .bed-info-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
-  border-color: #64748b;
+  transform: translateY(-3px);
+  border-color: rgba(87, 215, 255, 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(134, 216, 255, 0.18),
+    0 18px 44px rgba(0, 0, 0, 0.4),
+    0 0 24px rgba(44, 179, 255, 0.16);
 }
 
 .bed-info-card.is-alert {
-  border-color: #ef4444;
-  box-shadow: 0 0 20px rgba(239, 68, 68, 0.3);
+  border-color: rgba(255, 93, 124, 0.56);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 160, 186, 0.18),
+    0 20px 48px rgba(0, 0, 0, 0.42),
+    0 0 28px rgba(255, 93, 124, 0.22);
 }
 
-.bed-info-card .bed-card-header {
+.bed-card-top,
+.bed-card-center,
+.bed-card-metrics {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #334155;
-  padding-bottom: 10px;
+  gap: 14px;
+}
+
+.bed-card-top {
   margin-bottom: 14px;
 }
 
-.bed-info-card .bed-card-title {
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
-}
-
-.bed-info-card .elder-name {
-  font-weight: 600;
-  color: #e2e8f0;
-}
-
-.bed-info-card .room-bed-no {
-  color: #94a3b8;
+.bed-code {
   font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cockpit-muted);
 }
 
-.bed-info-card .bed-card-more {
-  color: #64748b;
-  letter-spacing: 2px;
-  font-weight: bold;
+.bed-name {
+  margin-top: 4px;
+  font-size: 17px;
+  font-weight: 700;
 }
 
-.bed-info-card .bed-card-body {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 90px;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 19px,
-    rgba(51, 65, 85, 0.3) 19px,
-    rgba(51, 65, 85, 0.3) 20px
-  ), repeating-linear-gradient(
-    90deg,
-    transparent,
-    transparent 19px,
-    rgba(51, 65, 85, 0.3) 19px,
-    rgba(51, 65, 85, 0.3) 20px
-  );
-  border-radius: 8px;
+.bed-status-chip {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(87, 215, 255, 0.14);
+  border: 1px solid rgba(87, 215, 255, 0.2);
+  font-size: 12px;
+  font-weight: 700;
+  color: #bff4ff;
+}
+
+.bed-card-center {
+  align-items: stretch;
   margin-bottom: 14px;
+}
+
+.bed-silhouette {
   position: relative;
+  width: 90px;
+  min-width: 90px;
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(87, 215, 255, 0.1) 0%, rgba(87, 215, 255, 0.02) 100%);
+  border: 1px solid rgba(87, 215, 255, 0.12);
   overflow: hidden;
 }
 
-.bed-info-card .status-graphic {
-  position: relative;
-  width: 100%;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.bed-info-card .graphic-bed {
-  width: 66px;
-  height: 33px;
-  border-bottom: 4px solid #475569;
-  border-left: 4px solid #475569;
-  border-right: 4px solid #475569;
-  border-radius: 2px 2px 0 0;
-  position: relative;
-}
-.bed-info-card .graphic-bed::after {
+.bed-silhouette::before {
   content: '';
   position: absolute;
-  bottom: 0px;
-  left: 4px;
-  width: 50px;
-  height: 14px;
-  background: #3b82f6; /* occupied */
-  border-radius: 2px;
-}
-.bed-info-card .graphic-bed.empty::after {
-  background: #64748b;
-}
-.bed-info-card .graphic-bed.alert::after {
-  background: #ef4444;
+  inset: 0;
+  background:
+    repeating-linear-gradient(0deg, transparent, transparent 14px, rgba(87, 215, 255, 0.06) 14px, rgba(87, 215, 255, 0.06) 15px);
 }
 
-.bed-info-card .status-text {
-  font-size: 13px;
-  font-weight: bold;
-  margin-top: 8px;
-  color: #cbd5e1;
-}
-.bed-info-card .status-text.text-alert {
-  color: #f87171;
+.bed-frame,
+.bed-mattress,
+.bed-signal {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
-.bed-info-card .bed-card-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.bed-frame {
+  top: 18px;
+  width: 54px;
+  height: 34px;
+  border: 2px solid rgba(130, 169, 204, 0.7);
+  border-bottom-width: 4px;
+  border-radius: 8px 8px 4px 4px;
 }
 
-.bed-info-card .vitals {
-  display: flex;
-  gap: 12px;
+.bed-mattress {
+  top: 24px;
+  width: 40px;
+  height: 18px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--cockpit-cyan), var(--cockpit-blue));
+  box-shadow: 0 0 16px rgba(87, 215, 255, 0.38);
+}
+
+.bed-signal {
+  bottom: 14px;
+  width: 46px;
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(87, 215, 255, 0.12), rgba(87, 215, 255, 0.72), rgba(87, 215, 255, 0.12));
+  animation: bedSignal 2.4s linear infinite;
+}
+
+.bed-state-copy {
+  display: grid;
+  gap: 6px;
+  align-content: center;
+}
+
+.state-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #e9fbff;
+}
+
+.state-subtitle {
   font-size: 12px;
-  color: #cbd5e1;
+  color: var(--cockpit-muted);
+  line-height: 1.6;
 }
 
-.bed-info-card .vital-item.wave-anim {
-  color: #3b82f6;
-  font-weight: bold;
-  letter-spacing: 1px;
-  opacity: 0.8;
-  animation: pulseOpacity 1.5s infinite alternate;
+.bed-card-metrics {
+  padding-top: 12px;
+  border-top: 1px solid rgba(87, 215, 255, 0.12);
 }
 
-@keyframes pulseOpacity {
-  0% { opacity: 0.4; }
-  100% { opacity: 1; }
+.metric-item {
+  display: grid;
+  gap: 4px;
 }
 
-.bed-info-card .status-badge {
-  padding: 4px 10px;
-  border-radius: 12px;
+.metric-label {
   font-size: 11px;
-  font-weight: 600;
+  color: var(--cockpit-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
 }
-.bed-info-card .badge-idle {
-  background: #334155;
-  color: #94a3b8;
+
+.metric-item strong {
+  font-size: 16px;
+  font-weight: 700;
+  color: #f5fcff;
 }
-.bed-info-card .badge-normal {
-  background: #1e3a8a;
-  color: #93c5fd;
+
+.is-idle .bed-status-chip,
+.is-maintenance .bed-status-chip {
+  color: #c8d4df;
+  background: rgba(125, 145, 165, 0.14);
+  border-color: rgba(125, 145, 165, 0.2);
 }
-.bed-info-card .badge-alert {
-  background: rgba(239, 68, 68, 0.2);
-  color: #fca5a5;
-  border: 1px solid rgba(239, 68, 68, 0.5);
+
+.is-occupied .bed-status-chip {
+  color: #c6ffef;
+  background: rgba(62, 232, 181, 0.12);
+  border-color: rgba(62, 232, 181, 0.22);
+}
+
+.is-sleep .bed-status-chip {
+  color: #eadbff;
+  background: rgba(155, 123, 255, 0.14);
+  border-color: rgba(155, 123, 255, 0.24);
+}
+
+.is-warning .bed-status-chip,
+.is-cleaning .bed-status-chip,
+.is-reserved .bed-status-chip {
+  color: #ffe1bc;
+  background: rgba(255, 174, 87, 0.14);
+  border-color: rgba(255, 174, 87, 0.24);
+}
+
+.is-alert .bed-status-chip {
+  color: #ffd3dc;
+  background: rgba(255, 93, 124, 0.16);
+  border-color: rgba(255, 93, 124, 0.28);
+}
+
+.is-idle .bed-mattress,
+.is-maintenance .bed-mattress {
+  background: linear-gradient(90deg, #70839a, #94a6ba);
+  box-shadow: none;
+}
+
+.is-occupied .bed-mattress {
+  background: linear-gradient(90deg, #25c78d, #53f0c0);
+}
+
+.is-sleep .bed-mattress {
+  background: linear-gradient(90deg, #7c61ff, #9e88ff);
+}
+
+.is-warning .bed-mattress,
+.is-cleaning .bed-mattress,
+.is-reserved .bed-mattress {
+  background: linear-gradient(90deg, #ff9a53, #ffbf74);
+}
+
+.is-alert .bed-mattress {
+  background: linear-gradient(90deg, #ff5875, #ff7f92);
+}
+
+@keyframes bedSignal {
+  0% {
+    transform: translateX(-50%) scaleX(0.88);
+    opacity: 0.35;
+  }
+
+  50% {
+    transform: translateX(-50%) scaleX(1.02);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateX(-50%) scaleX(0.88);
+    opacity: 0.35;
+  }
 }
 </style>

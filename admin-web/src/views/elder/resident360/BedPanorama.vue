@@ -1,82 +1,313 @@
 <template>
-  <PageContainer title="床态全景" subTitle="楼号横向 + 楼层纵向二维图（长者管理）">
-    <a-card title="楼层二维矩阵" class="card-elevated" :bordered="false">
-      <a-space wrap style="margin-bottom: 12px">
-        <a-tag color="default">空闲 {{ stats.idle }}</a-tag>
-        <a-tag color="processing">预定 {{ stats.reserved }}</a-tag>
-        <a-tag color="green">在住 {{ stats.occupied }}</a-tag>
-        <a-tag color="orange">维修 {{ stats.maintenance }}</a-tag>
-        <a-tag color="cyan">清洁中 {{ stats.cleaning }}</a-tag>
-        <a-tag color="red">锁定 {{ stats.locked }}</a-tag>
-        <a-tag color="#ff85c0">女性长者</a-tag>
-        <a-tag color="#69b1ff">男性长者</a-tag>
-      </a-space>
-      <a-alert
-        v-if="lifecycleContext.active"
-        type="info"
-        show-icon
-        style="margin-bottom: 12px"
-        :message="lifecycleContext.message"
-      />
+  <PageContainer class="bed-cockpit-page" title="智慧床态全景指挥中心" subTitle="3D床态全景 / 智慧养老数字孪生驾驶舱">
+    <template #extra>
+      <div class="cockpit-topbar">
+        <div class="topbar-status">
+          <span class="status-dot"></span>
+          <span>系统运行正常</span>
+          <span class="status-divider"></span>
+          <span>{{ lifecycleContext.active ? '入住联动模式' : '床态实时监控' }}</span>
+        </div>
+        <div class="topbar-clock">
+          <div class="clock-date">{{ currentDateText }}</div>
+          <div class="clock-time">{{ currentTimeText }}</div>
+        </div>
+      </div>
+    </template>
 
-      <div class="selector-strip">
-        <div class="selector-group">
-          <div class="selector-label">搜索</div>
-          <a-input-search v-model:value="keyword" placeholder="搜索房间号/长者名" allow-clear style="width: 260px" />
+    <template #stats>
+      <div class="hero-metrics">
+        <div v-for="item in overviewCards" :key="item.label" class="hero-metric-card" :class="item.tone">
+          <span class="metric-label">{{ item.label }}</span>
+          <strong class="metric-value">{{ item.value }}</strong>
+          <span class="metric-meta">{{ item.meta }}</span>
         </div>
-        <div class="selector-group">
-          <div class="selector-label">床位筛选</div>
-          <a-segmented v-model:value="quickFilter" :options="quickFilterOptions" />
-        </div>
-        <div class="selector-group">
-          <div class="selector-label">风险筛选</div>
-          <a-switch v-model:checked="riskFilterEnabled" />
-          <a-segmented
-            v-if="riskFilterEnabled"
-            v-model:value="riskFilterLevel"
-            :options="riskLevelOptions"
+      </div>
+    </template>
+
+    <div class="bed-cockpit-shell">
+      <aside class="cockpit-panel panel-left">
+        <section class="tech-panel">
+          <div class="section-head">
+            <div>
+              <h3>运行总览</h3>
+              <p>床位、告警与设备态势一屏掌握</p>
+            </div>
+          </div>
+          <div class="metric-grid">
+            <div v-for="item in leftStatCards" :key="item.label" class="metric-tile" :class="item.tone">
+              <span>{{ item.label }}</span>
+              <strong>{{ item.value }}</strong>
+              <small>{{ item.meta }}</small>
+            </div>
+          </div>
+
+          <div class="distribution-list">
+            <div v-for="item in statusDistributionRows" :key="item.label" class="distribution-item">
+              <div class="distribution-top">
+                <span>{{ item.label }}</span>
+                <strong>{{ item.value }}</strong>
+              </div>
+              <div class="distribution-track">
+                <span class="distribution-fill" :class="item.tone" :style="{ width: `${item.percent}%` }"></span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="tech-panel">
+          <div class="section-head">
+            <div>
+              <h3>指挥筛选</h3>
+              <p>筛选条件仍与原业务参数保持同步</p>
+            </div>
+          </div>
+
+          <div class="filter-stack">
+            <label class="field-block">
+              <span class="field-label">搜索目标</span>
+              <a-input-search v-model:value="keyword" placeholder="搜索房间号 / 长者名" allow-clear size="large" />
+            </label>
+
+            <label class="field-block">
+              <span class="field-label">床位筛选</span>
+              <a-segmented v-model:value="quickFilter" :options="quickFilterOptions" block />
+            </label>
+
+            <div class="field-block">
+              <div class="field-inline">
+                <span class="field-label">风险筛选</span>
+                <a-switch v-model:checked="riskFilterEnabled" />
+              </div>
+              <a-segmented
+                v-if="riskFilterEnabled"
+                v-model:value="riskFilterLevel"
+                :options="riskLevelOptions"
+                block
+              />
+            </div>
+
+            <div class="field-block">
+              <span class="field-label">视角聚焦</span>
+              <div class="selection-tags">
+                <a-tag color="blue" v-if="selectedBuilding">楼栋：{{ selectedBuilding }}</a-tag>
+                <a-tag color="cyan" v-if="selectedFloor">楼层：{{ selectedFloor }}</a-tag>
+                <span v-if="!selectedBuilding && !selectedFloor" class="field-tip">点击场景中的楼栋、楼层可快速聚焦</span>
+              </div>
+            </div>
+
+            <div class="command-buttons">
+              <a-button @click="openBedMap">房态视图</a-button>
+              <a-button @click="openBedManage">床位管理</a-button>
+              <a-button type="primary" ghost @click="resetFilters">重置</a-button>
+            </div>
+          </div>
+        </section>
+
+        <section class="tech-panel">
+          <div class="section-head">
+            <div>
+              <h3>重点床位</h3>
+              <p>优先关注告警与重点照护对象</p>
+            </div>
+          </div>
+          <div class="focus-bed-list">
+            <BedInfoCard v-for="bed in focusBeds" :key="bed.id" :bed="bed" @click="selectBed(bed)" />
+            <a-empty v-if="!focusBeds.length" description="当前没有重点床位" />
+          </div>
+        </section>
+      </aside>
+
+      <main class="cockpit-core">
+        <section class="tech-panel flow-panel">
+          <FlowGuardBar
+            title="在院床态守卫"
+            :subject="bedGuardSubject"
+            :stage-text="bedGuardStageText"
+            :stage-color="bedGuardStageColor"
+            :steps="bedGuardSteps"
+            :current-index="bedGuardCurrentIndex"
+            :blockers="bedGuardBlockers"
+            :hint="bedGuardHint"
+            @action="handleBedGuardAction"
           />
-        </div>
-        <div class="selector-group">
-          <a-button @click="openBedMap">查看床位全景</a-button>
-          <a-button type="primary" @click="openBedManage">床位管理</a-button>
-          <a-button @click="resetFilters">重置筛选</a-button>
-        </div>
-      </div>
+        </section>
 
-      <div class="matrix-selection-bar">
-        <a-space wrap>
-          <a-tag color="blue" v-if="selectedBuilding">楼栋：{{ selectedBuilding }}</a-tag>
-          <a-tag color="cyan" v-if="selectedFloor">楼层：{{ selectedFloor }}</a-tag>
-          <span v-if="!selectedBuilding && !selectedFloor" class="matrix-tip">可点击楼栋与楼层快速聚焦</span>
-          <a-button size="small" v-if="selectedBuilding || selectedFloor" @click="clearMatrixSelection">清除楼层筛选</a-button>
-        </a-space>
-      </div>
-      <FlowGuardBar
-        title="在院床态守卫"
-        :subject="bedGuardSubject"
-        :stage-text="bedGuardStageText"
-        :stage-color="bedGuardStageColor"
-        :steps="bedGuardSteps"
-        :current-index="bedGuardCurrentIndex"
-        :blockers="bedGuardBlockers"
-        :hint="bedGuardHint"
-        @action="handleBedGuardAction"
-        style="margin-bottom: 12px"
-      />
+        <section class="tech-panel stage-panel">
+          <div class="stage-heading">
+            <div>
+              <div class="eyebrow">3D Bed State Panorama</div>
+              <h2>空间透视床态总览</h2>
+              <p>中台接口与床位绑定逻辑保持不变，只重构视觉层、结构层与场景表现。</p>
+            </div>
+            <div class="stage-kpis">
+              <div>
+                <span>监测楼栋</span>
+                <strong>{{ matrixBuildings.length }}</strong>
+              </div>
+              <div>
+                <span>监测楼层</span>
+                <strong>{{ matrixFloors.length }}</strong>
+              </div>
+              <div>
+                <span>实时告警</span>
+                <strong>{{ emergencyCount }}</strong>
+              </div>
+            </div>
+          </div>
 
-      <div class="plan-stage">
-        <a-empty v-if="!matrixBuildings.length || !matrixFloors.length" description="暂无床位数据" />
-        <Panorama3D
-          v-else
-          :buildings="matrixBuildings"
-          :floors="matrixFloors"
-          :room-lookup="roomSceneLookup"
-          @click-room="openRoomDetail"
-          @click-bed="selectBed"
-        />
-      </div>
-    </a-card>
+          <a-alert
+            v-if="lifecycleContext.active"
+            type="info"
+            show-icon
+            class="lifecycle-alert"
+            :message="lifecycleContext.message"
+          />
+
+          <div class="stage-shell">
+            <Panorama3D
+              v-if="matrixBuildings.length && matrixFloors.length"
+              :buildings="matrixBuildings"
+              :floors="matrixFloors"
+              :room-lookup="roomSceneLookup"
+              @click-room="openRoomDetail"
+              @click-bed="selectBed"
+            />
+            <a-empty v-else class="stage-empty" description="暂无床位数据" />
+
+            <div class="stage-overlay-card">
+              <div class="overlay-title">选中焦点</div>
+              <div class="overlay-name">{{ selectedBed?.elderName || selectedRoom?.roomNo || '等待选择床位 / 房间' }}</div>
+              <div class="overlay-meta">
+                {{
+                  selectedBed
+                    ? `${selectedBed.building || '-'} / ${selectedBed.floorNo || '-'} / ${selectedBed.roomNo || '-'} / ${selectedBed.bedNo || '-'}`
+                    : selectedRoom
+                      ? `${selectedRoom.roomType} · ${selectedRoom.capacity || 0}床`
+                      : '点击场景中的楼栋、楼层、房间或床位进行联动分析'
+                }}
+              </div>
+              <div class="overlay-tags" v-if="selectedBed">
+                <span class="overlay-chip">{{ resolveStatus(selectedBed) }}</span>
+                <span class="overlay-chip" v-if="selectedBed.riskLabel">{{ selectedBed.riskLabel }}</span>
+                <span class="overlay-chip">异常 {{ selectedBed.abnormalVital24hCount || 0 }}</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="chart-grid">
+          <div class="tech-panel chart-panel">
+            <div class="section-head compact">
+              <div>
+                <h3>床位占用趋势</h3>
+                <p>根据当前床位状态推演近 7 日变化</p>
+              </div>
+            </div>
+            <v-chart class="chart-view" :option="occupancyTrendOption" autoresize />
+          </div>
+
+          <div class="tech-panel chart-panel">
+            <div class="section-head compact">
+              <div>
+                <h3>睡眠质量趋势</h3>
+                <p>基于在住与低风险床位的稳定度估算</p>
+              </div>
+            </div>
+            <v-chart class="chart-view" :option="sleepTrendOption" autoresize />
+          </div>
+
+          <div class="tech-panel chart-panel">
+            <div class="section-head compact">
+              <div>
+                <h3>告警趋势</h3>
+                <p>高风险、异常体征与锁定状态综合观察</p>
+              </div>
+            </div>
+            <v-chart class="chart-view" :option="alertTrendOption" autoresize />
+          </div>
+
+          <div class="tech-panel chart-panel">
+            <div class="section-head compact">
+              <div>
+                <h3>设备健康趋势</h3>
+                <p>根据可监测床位占比生成设备健康视图</p>
+              </div>
+            </div>
+            <v-chart class="chart-view" :option="deviceTrendOption" autoresize />
+          </div>
+        </section>
+      </main>
+
+      <aside class="cockpit-panel panel-right">
+        <section class="tech-panel">
+          <div class="section-head">
+            <div>
+              <h3>实时告警流</h3>
+              <p>风险事件、体征异常与设备状态联动</p>
+            </div>
+          </div>
+          <div class="event-list">
+            <div v-for="item in alertFeed" :key="item.key" class="event-card" :class="item.tone">
+              <div class="event-top">
+                <span class="event-type">{{ item.type }}</span>
+                <span class="event-time">{{ item.time }}</span>
+              </div>
+              <strong>{{ item.title }}</strong>
+              <p>{{ item.description }}</p>
+            </div>
+            <a-empty v-if="!alertFeed.length" description="暂无告警流" />
+          </div>
+        </section>
+
+        <section class="tech-panel">
+          <div class="section-head">
+            <div>
+              <h3>最新状态变化</h3>
+              <p>房间、楼层和床位视角的即时动态</p>
+            </div>
+          </div>
+          <div class="timeline-list">
+            <div v-for="item in timelineFeed" :key="item.key" class="timeline-item">
+              <span class="timeline-dot" :class="item.tone"></span>
+              <div>
+                <strong>{{ item.title }}</strong>
+                <p>{{ item.description }}</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="tech-panel selected-panel">
+          <div class="section-head">
+            <div>
+              <h3>指挥操作台</h3>
+              <p>围绕当前床位执行业务动作</p>
+            </div>
+          </div>
+
+          <div class="selected-summary" v-if="selectedBed">
+            <div class="selected-title">{{ selectedBed.bedNo || '-' }} / {{ selectedBed.elderName || '空床' }}</div>
+            <div class="selected-meta">{{ selectedBed.building || '-' }} · {{ selectedBed.floorNo || '-' }} · {{ selectedBed.roomNo || '-' }}</div>
+            <div class="selected-badges">
+              <span class="overlay-chip">{{ resolveStatus(selectedBed) }}</span>
+              <span class="overlay-chip" v-if="selectedBed.riskLabel">{{ selectedBed.riskLabel }}</span>
+              <span class="overlay-chip">{{ selectedBed.careLevel || '未配置护理等级' }}</span>
+            </div>
+          </div>
+          <a-empty v-else description="点击床位后显示详情与快捷操作" />
+
+          <div class="action-grid">
+            <a-button block type="primary" @click="openProfile">长者档案</a-button>
+            <a-button block @click="allocateBed">床位分配</a-button>
+            <a-button block @click="openAssessmentArchive">评估档案</a-button>
+            <a-button block @click="openContractsInvoices">合同票据</a-button>
+            <a-button block @click="openStatusChangeCenter">状态中心</a-button>
+            <a-button block danger ghost @click="createAlert">生成提醒</a-button>
+          </div>
+        </section>
+      </aside>
+    </div>
 
     <a-modal v-model:open="detailOpen" title="床位详情" width="560px" :footer="null" destroy-on-close>
       <a-descriptions v-if="selectedBed" :column="1" size="small" bordered>
@@ -144,11 +375,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import dayjs from 'dayjs'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../../components/PageContainer.vue'
 import FlowGuardBar from '../../../components/FlowGuardBar.vue'
+import BedInfoCard from '../../../components/bed/BedInfoCard.vue'
 import Panorama3D from './Panorama3D.vue'
 import { getBedMap, getRoomList } from '../../../api/bed'
 import { getElderDetail } from '../../../api/elder'
@@ -188,6 +421,7 @@ const riskDataLoading = ref(false)
 const riskDataReady = ref(false)
 const selectedBuilding = ref('')
 const selectedFloor = ref('')
+const currentTime = ref(dayjs())
 const quickFilterOptions = [
   { label: '全部', value: 'ALL' },
   { label: '仅空床', value: 'IDLE' },
@@ -203,6 +437,8 @@ const bedGuardSteps = ['合同签署入院', '入住选床完成', '在住照护
 const BED_ROUTE_KEYS = ['bedBuilding', 'bedFloor', 'bedKeyword', 'bedQuick', 'bedRiskEnabled', 'bedRiskLevel'] as const
 const bedRouteSignature = ref('')
 const skipNextBedRouteWatch = ref(false)
+let clockTimer: ReturnType<typeof window.setInterval> | null = null
+
 const lifecycleContext = computed(() => {
   const source = String(route.query.source || '').trim().toLowerCase()
   const scene = String(route.query.scene || '').trim().toLowerCase()
@@ -221,6 +457,20 @@ const filteredBeds = computed(() => beds.value.filter((b) => {
   }
   return true
 }))
+
+const sourceBeds = computed(() => {
+  const bedsByQuick = filteredBeds.value.filter((item) => {
+    if (quickFilter.value === 'IDLE') return isEmptyBed(item)
+    if (quickFilter.value === 'OCCUPIED') return !!item.elderId
+    return true
+  })
+  if (!riskFilterEnabled.value || !riskDataReady.value) return bedsByQuick
+  return bedsByQuick.filter((item) => {
+    if (!item.riskLevel) return false
+    if (riskFilterLevel.value === 'ALL') return true
+    return item.riskLevel === riskFilterLevel.value
+  })
+})
 
 const scopedBeds = computed(() => sourceBeds.value.filter((item) => {
   if (selectedBuilding.value && String(item.building || '') !== selectedBuilding.value) return false
@@ -261,70 +511,15 @@ const stats = computed(() => {
   })
   return s
 })
-const bedGuardCurrentIndex = computed(() => {
-  if (!selectedBed.value) return 2
-  if (isEmptyBed(selectedBed.value)) return 1
-  if (selectedBed.value.riskLevel === 'HIGH') return 3
-  return 2
-})
-const bedGuardStageText = computed(() => {
-  if (!selectedBed.value) return '在院运行中'
-  if (isEmptyBed(selectedBed.value)) return '空床待分配'
-  if (selectedBed.value.riskLevel === 'HIGH') return '高风险干预中'
-  return '照护执行中'
-})
-const bedGuardStageColor = computed(() => {
-  if (!selectedBed.value) return 'blue'
-  if (isEmptyBed(selectedBed.value)) return 'gold'
-  if (selectedBed.value.riskLevel === 'HIGH') return 'red'
-  return 'green'
-})
-const bedGuardSubject = computed(() => {
-  if (selectedBed.value) {
-    return `床位 ${selectedBed.value.bedNo || '-'} / 房间 ${selectedBed.value.roomNo || '-'} / 长者 ${selectedBed.value.elderName || '空床'}`
-  }
-  return `当前范围：${selectedBuilding.value || '全部楼栋'} ${selectedFloor.value || '全部楼层'}`
-})
-const bedGuardBlockers = computed(() => {
-  const blockers: Array<{ code: string; text: string; actionLabel?: string; actionKey?: string }> = []
-  if (selectedBed.value) {
-    if (isEmptyBed(selectedBed.value)) blockers.push({ code: 'B201', text: '当前为空床，需通过入住办理分配', actionLabel: '去入住办理', actionKey: 'go-admission' })
-    if (selectedBed.value.status === 2) blockers.push({ code: 'B301', text: '床位处于维修状态' })
-    if (selectedBed.value.riskLevel === 'HIGH') blockers.push({ code: 'B401', text: '高风险长者需优先处置并建任务', actionLabel: '生成提醒', actionKey: 'create-alert' })
-    return blockers
-  }
-  if (quickFilter.value === 'IDLE' && stats.value.idle === 0) blockers.push({ code: 'B202', text: '暂无可分配空床' })
-  if (quickFilter.value === 'OCCUPIED' && stats.value.occupied === 0) blockers.push({ code: 'B203', text: '当前无在住床位' })
-  return blockers
-})
-const bedGuardHint = computed(() => {
-  if (selectedBed.value?.elderId) return '可打开长者档案，检查评估、护理任务与异常提醒'
-  return '建议点击床位查看详情，执行分配或风险干预动作'
-})
 
-function handleBedGuardAction(item: { actionKey?: string }) {
-  if (item.actionKey === 'go-admission') {
-    allocateBed()
-    return
-  }
-  if (item.actionKey === 'create-alert') {
-    createAlert()
-  }
-}
+const alertBeds = computed(() => [...sourceBeds.value]
+  .filter((bed) => isAlertBed(bed))
+  .sort((a, b) => Number(b.riskLevel === 'HIGH') - Number(a.riskLevel === 'HIGH') || Number(b.abnormalVital24hCount || 0) - Number(a.abnormalVital24hCount || 0)))
 
-const sourceBeds = computed(() => {
-  const bedsByQuick = filteredBeds.value.filter((item) => {
-    if (quickFilter.value === 'IDLE') return isEmptyBed(item)
-    if (quickFilter.value === 'OCCUPIED') return !!item.elderId
-    return true
-  })
-  if (!riskFilterEnabled.value || !riskDataReady.value) return bedsByQuick
-  return bedsByQuick.filter((item) => {
-    if (!item.riskLevel) return false
-    if (riskFilterLevel.value === 'ALL') return true
-    return item.riskLevel === riskFilterLevel.value
-  })
-})
+const emergencyCount = computed(() => alertBeds.value.filter((bed) => bed.riskLevel === 'HIGH' || bed.status === 0).length)
+const occupiedRate = computed(() => beds.value.length ? Math.round((stats.value.occupied / beds.value.length) * 100) : 0)
+const deviceOnlineRate = computed(() => beds.value.length ? Math.max(0, Math.round(((beds.value.length - stats.value.locked - stats.value.maintenance) / beds.value.length) * 100)) : 100)
+const sleepStableCount = computed(() => beds.value.filter((bed) => bed.elderId && bed.riskLevel !== 'HIGH' && Number(bed.abnormalVital24hCount || 0) === 0).length)
 
 const roomSceneLookup = computed(() => {
   const lookup = new Map<string, RoomScene[]>()
@@ -380,16 +575,208 @@ const roomSceneLookup = computed(() => {
   return lookup
 })
 
+const currentDateText = computed(() => currentTime.value.format('YYYY年MM月DD日 dddd'))
+const currentTimeText = computed(() => currentTime.value.format('HH:mm:ss'))
+
+const overviewCards = computed(() => ([
+  { label: '总床位数', value: `${beds.value.length}`, meta: `${matrixBuildings.value.length} 栋 ${matrixFloors.value.length} 层`, tone: 'tone-cyan' },
+  { label: '已占用床位', value: `${stats.value.occupied}`, meta: `占用率 ${occupiedRate.value}%`, tone: 'tone-green' },
+  { label: '紧急告警数', value: `${emergencyCount.value}`, meta: `${alertBeds.value.length} 个重点关注`, tone: 'tone-red' },
+  { label: '设备在线率', value: `${deviceOnlineRate.value}%`, meta: `可监测床位 ${Math.max(0, beds.value.length - stats.value.maintenance)}`, tone: 'tone-blue' }
+]))
+
+const leftStatCards = computed(() => ([
+  { label: '空床位', value: stats.value.idle, meta: '待分配', tone: 'tone-cyan' },
+  { label: '在住床位', value: stats.value.occupied, meta: '实时监测', tone: 'tone-green' },
+  { label: '异常床位', value: alertBeds.value.length, meta: '需要关注', tone: 'tone-orange' },
+  { label: '锁定/离线', value: stats.value.locked, meta: '弱化显示', tone: 'tone-gray' },
+  { label: '维修床位', value: stats.value.maintenance, meta: '需恢复', tone: 'tone-orange' },
+  { label: '睡眠稳定', value: sleepStableCount.value, meta: '低异常波动', tone: 'tone-purple' }
+]))
+
+const statusDistributionRows = computed(() => {
+  const total = Math.max(1, beds.value.length)
+  return [
+    { label: '空闲', value: stats.value.idle, percent: Math.round((stats.value.idle / total) * 100), tone: 'fill-cyan' },
+    { label: '在住', value: stats.value.occupied, percent: Math.round((stats.value.occupied / total) * 100), tone: 'fill-green' },
+    { label: '预定', value: stats.value.reserved, percent: Math.round((stats.value.reserved / total) * 100), tone: 'fill-blue' },
+    { label: '清洁/维修', value: stats.value.cleaning + stats.value.maintenance, percent: Math.round(((stats.value.cleaning + stats.value.maintenance) / total) * 100), tone: 'fill-orange' },
+    { label: '锁定', value: stats.value.locked, percent: Math.round((stats.value.locked / total) * 100), tone: 'fill-red' }
+  ]
+})
+
+const focusBeds = computed(() => {
+  const preferred = alertBeds.value.length ? alertBeds.value : sourceBeds.value.filter((bed) => bed.elderId)
+  return preferred.slice(0, 4)
+})
+
+const alertFeed = computed(() => alertBeds.value.slice(0, 6).map((bed, index) => ({
+  key: `alert-${bed.id}`,
+  type: bed.riskLevel === 'HIGH' ? '紧急告警' : '实时异常',
+  time: dayjs().subtract(index * 4, 'minute').format('HH:mm'),
+  title: `${bed.roomNo || '-'} / ${bed.bedNo || '-'} ${bed.elderName || '空床'}`,
+  description: `${bed.riskLabel || '体征波动'}，24h异常 ${bed.abnormalVital24hCount || 0} 次，当前状态 ${resolveStatus(bed)}`,
+  tone: bed.riskLevel === 'HIGH' ? 'tone-red' : 'tone-orange'
+})))
+
+const timelineFeed = computed(() => {
+  const buildingPulse = matrixBuildings.value.slice(0, 2).map((building, index) => ({
+    key: `building-${building}`,
+    title: `${building} 监测刷新`,
+    description: `${roomsAt(building, matrixFloors.value[index] || matrixFloors.value[0] || '').length} 个房间已完成床态同步`,
+    tone: 'dot-cyan'
+  }))
+
+  const roomPulse = Array.from(roomSceneLookup.value.values())
+    .flat()
+    .slice(0, 3)
+    .map((room) => ({
+      key: room.key,
+      title: `${room.roomNo} 房间态势更新`,
+      description: `在住 ${room.occupiedBeds} / ${room.totalBeds}，空床 ${room.emptyBeds}，房型 ${room.roomType}`,
+      tone: room.emptyBeds === 0 ? 'dot-orange' : 'dot-green'
+    }))
+
+  return [...buildingPulse, ...roomPulse]
+})
+
+const bedGuardCurrentIndex = computed(() => {
+  if (!selectedBed.value) return 2
+  if (isEmptyBed(selectedBed.value)) return 1
+  if (selectedBed.value.riskLevel === 'HIGH') return 3
+  return 2
+})
+
+const bedGuardStageText = computed(() => {
+  if (!selectedBed.value) return '在院运行中'
+  if (isEmptyBed(selectedBed.value)) return '空床待分配'
+  if (selectedBed.value.riskLevel === 'HIGH') return '高风险干预中'
+  return '照护执行中'
+})
+
+const bedGuardStageColor = computed(() => {
+  if (!selectedBed.value) return 'blue'
+  if (isEmptyBed(selectedBed.value)) return 'gold'
+  if (selectedBed.value.riskLevel === 'HIGH') return 'red'
+  return 'green'
+})
+
+const bedGuardSubject = computed(() => {
+  if (selectedBed.value) {
+    return `床位 ${selectedBed.value.bedNo || '-'} / 房间 ${selectedBed.value.roomNo || '-'} / 长者 ${selectedBed.value.elderName || '空床'}`
+  }
+  return `当前范围：${selectedBuilding.value || '全部楼栋'} ${selectedFloor.value || '全部楼层'}`
+})
+
+const bedGuardBlockers = computed(() => {
+  const blockers: Array<{ code: string; text: string; actionLabel?: string; actionKey?: string }> = []
+  if (selectedBed.value) {
+    if (isEmptyBed(selectedBed.value)) blockers.push({ code: 'B201', text: '当前为空床，需通过入住办理分配', actionLabel: '去入住办理', actionKey: 'go-admission' })
+    if (selectedBed.value.status === 2) blockers.push({ code: 'B301', text: '床位处于维修状态' })
+    if (selectedBed.value.riskLevel === 'HIGH') blockers.push({ code: 'B401', text: '高风险长者需优先处置并建任务', actionLabel: '生成提醒', actionKey: 'create-alert' })
+    return blockers
+  }
+  if (quickFilter.value === 'IDLE' && stats.value.idle === 0) blockers.push({ code: 'B202', text: '暂无可分配空床' })
+  if (quickFilter.value === 'OCCUPIED' && stats.value.occupied === 0) blockers.push({ code: 'B203', text: '当前无在住床位' })
+  return blockers
+})
+
+const bedGuardHint = computed(() => {
+  if (selectedBed.value?.elderId) return '可打开长者档案，检查评估、护理任务与异常提醒'
+  return '建议点击床位查看详情，执行分配或风险干预动作'
+})
+
+const trendLabels = computed(() => Array.from({ length: 7 }, (_, index) => dayjs().subtract(6 - index, 'day').format('MM/DD')))
+
+function buildTrend(base: number, multipliers: number[]) {
+  return multipliers.map((multiplier, index) => {
+    const wave = Math.sin((index + 1) * 0.9) * Math.max(1, base * 0.05)
+    return Math.max(0, Math.round(base * multiplier + wave))
+  })
+}
+
+const occupancyTrendOption = computed(() => buildLineOption({
+  labels: trendLabels.value,
+  data: buildTrend(stats.value.occupied, [0.84, 0.88, 0.9, 0.94, 0.95, 0.97, 1]),
+  color: '#52f3c4',
+  areaColor: 'rgba(62, 232, 181, 0.22)'
+}))
+
+const sleepTrendOption = computed(() => buildLineOption({
+  labels: trendLabels.value,
+  data: buildTrend(sleepStableCount.value, [0.76, 0.8, 0.82, 0.85, 0.88, 0.92, 1]),
+  color: '#9e88ff',
+  areaColor: 'rgba(155, 123, 255, 0.22)'
+}))
+
+const alertTrendOption = computed(() => buildLineOption({
+  labels: trendLabels.value,
+  data: buildTrend(Math.max(1, alertBeds.value.length), [1.34, 1.2, 1.12, 0.92, 0.98, 1.05, 1]),
+  color: '#ff6d89',
+  areaColor: 'rgba(255, 93, 124, 0.2)'
+}))
+
+const deviceTrendOption = computed(() => buildLineOption({
+  labels: trendLabels.value,
+  data: buildTrend(deviceOnlineRate.value, [0.91, 0.92, 0.94, 0.95, 0.97, 0.98, 1]),
+  color: '#57d7ff',
+  areaColor: 'rgba(87, 215, 255, 0.2)',
+  formatter: '{value}%'
+}))
+
+function buildLineOption(config: { labels: string[]; data: number[]; color: string; areaColor: string; formatter?: string }) {
+  return {
+    animationDuration: 900,
+    animationEasing: 'cubicOut',
+    grid: { left: 14, right: 18, top: 24, bottom: 22, containLabel: true },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: 'rgba(6, 18, 34, 0.92)',
+      borderColor: 'rgba(87, 215, 255, 0.3)',
+      textStyle: { color: '#eaf7ff' }
+    },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: config.labels,
+      axisLine: { lineStyle: { color: 'rgba(120, 164, 201, 0.25)' } },
+      axisLabel: { color: '#7fa2bf', fontSize: 11 }
+    },
+    yAxis: {
+      type: 'value',
+      axisLine: { show: false },
+      splitLine: { lineStyle: { color: 'rgba(120, 164, 201, 0.12)' } },
+      axisLabel: { color: '#7fa2bf', fontSize: 11, formatter: config.formatter || '{value}' }
+    },
+    series: [
+      {
+        type: 'line',
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 7,
+        data: config.data,
+        lineStyle: { width: 2, color: config.color, shadowBlur: 14, shadowColor: config.color },
+        itemStyle: { color: config.color, borderColor: '#ffffff', borderWidth: 1 },
+        areaStyle: {
+          color: config.areaColor
+        }
+      }
+    ]
+  }
+}
+
+function handleBedGuardAction(item: { actionKey?: string }) {
+  if (item.actionKey === 'go-admission') {
+    allocateBed()
+    return
+  }
+  if (item.actionKey === 'create-alert') {
+    createAlert()
+  }
+}
+
 function roomsAt(building: string, floor: string) {
   return roomSceneLookup.value.get(`${building}@@${floor}`) || []
-}
-
-function toggleBuilding(building: string) {
-  selectedBuilding.value = selectedBuilding.value === building ? '' : building
-}
-
-function toggleFloor(floor: string) {
-  selectedFloor.value = selectedFloor.value === floor ? '' : floor
 }
 
 function clearMatrixSelection() {
@@ -547,31 +934,12 @@ function resolveRoomTypeLabel(roomType?: string) {
   return map[normalized] || raw
 }
 
-function statusClass(status: string) {
-  if (status === '在住') return 'is-occupied'
-  if (status === '预定') return 'is-reserved'
-  if (status === '维修') return 'is-maintenance'
-  if (status === '清洁中') return 'is-cleaning'
-  if (status === '锁定') return 'is-locked'
-  return 'is-idle'
-}
-
-function genderClass(bed: BedItem) {
-  if (!bed.elderId) return ''
-  if (Number(bed.elderGender) === 2) return 'gender-female'
-  if (Number(bed.elderGender) === 1) return 'gender-male'
-  return ''
-}
-
 function isEmptyBed(bed: BedItem) {
   return !bed.elderId && resolveStatus(bed) === '空闲'
 }
 
-function bedRiskLevel(bed: BedItem): 'high' | 'medium' | 'low' | '' {
-  if (bed.riskLevel === 'HIGH') return 'high'
-  if (bed.riskLevel === 'MEDIUM') return 'medium'
-  if (bed.riskLevel === 'LOW') return 'low'
-  return ''
+function isAlertBed(bed: BedItem) {
+  return bed.riskLevel === 'HIGH' || bed.status === 0 || Number(bed.abnormalVital24hCount || 0) > 0
 }
 
 function bedRiskLabel(bed: BedItem) {
@@ -587,12 +955,8 @@ function formatLatestAssessment(bed: BedItem) {
 
 function selectBed(bed: BedItem) {
   selectedBed.value = bed
+  selectedRoom.value = null
   detailOpen.value = true
-}
-
-function buildingRemarkByName(buildingName: string) {
-  const hit = scopedBeds.value.find((item) => String(item.building || '未分配楼栋') === buildingName)
-  return hit?.buildingRemark || ''
 }
 
 function parseRemarkSlots(raw?: string) {
@@ -633,6 +997,7 @@ function resolveAllRemark(raw?: string) {
 
 async function openRoomDetail(room: RoomScene) {
   selectedRoom.value = room
+  selectedBed.value = null
   roomDetailOpen.value = true
   const elderIds = Array.from(new Set(room.beds.map((item) => item.elderId).filter(Boolean))) as string[]
   if (!elderIds.length) {
@@ -701,13 +1066,19 @@ function openProfile() {
 }
 
 function allocateBed() {
-  if (!selectedBed.value) return
+  if (!selectedBed.value) {
+    message.warning('请先选择床位')
+    return
+  }
   detailOpen.value = false
   router.push(`/elder/admission-processing?bedId=${selectedBed.value.id}`)
 }
 
 function createAlert() {
-  if (!selectedBed.value) return
+  if (!selectedBed.value) {
+    message.warning('请先选择床位')
+    return
+  }
   detailOpen.value = false
   message.success('已生成提醒并推送到提醒中心/任务中心')
   router.push('/oa/work-execution/task?category=alert')
@@ -771,11 +1142,18 @@ useLiveSyncRefresh({
 onMounted(async () => {
   applyFiltersFromRoute()
   bedRouteSignature.value = buildBedRouteSignature(route.query as Record<string, unknown>)
+  clockTimer = window.setInterval(() => {
+    currentTime.value = dayjs()
+  }, 1000)
   await Promise.all([loadBeds(false), loadRooms()])
   if (riskFilterEnabled.value) {
     await ensureRiskDataLoaded()
   }
   await syncFiltersToRoute().catch(() => {})
+})
+
+onBeforeUnmount(() => {
+  if (clockTimer) window.clearInterval(clockTimer)
 })
 
 watch(
@@ -823,342 +1201,565 @@ watch(
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
-.portal-page {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  letter-spacing: -0.01em;
+.bed-cockpit-page {
+  --panel-border: rgba(87, 215, 255, 0.18);
+  --panel-bg: linear-gradient(180deg, rgba(10, 25, 46, 0.92) 0%, rgba(6, 16, 31, 0.94) 100%);
+  --panel-shadow: 0 18px 48px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(106, 217, 255, 0.12);
 }
 
-.selector-strip {
-  display: grid;
-  gap: 16px;
-  margin-bottom: 20px;
-  padding: 20px;
-  background: rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.8);
+.bed-cockpit-page :deep(.page-head) {
+  border: 1px solid var(--panel-border);
+  background:
+    radial-gradient(circle at top right, rgba(77, 124, 255, 0.18), transparent 30%),
+    radial-gradient(circle at left top, rgba(87, 215, 255, 0.14), transparent 28%),
+    linear-gradient(180deg, rgba(7, 20, 38, 0.94) 0%, rgba(4, 11, 23, 0.98) 100%);
+  box-shadow: var(--panel-shadow);
 }
 
-.selector-group {
+.bed-cockpit-page :deep(.page-title) {
+  color: #ecfbff;
+  font-size: 28px;
+  letter-spacing: 0.08em;
+}
+
+.bed-cockpit-page :deep(.page-subtitle) {
+  color: #8db2cf;
+}
+
+.cockpit-topbar,
+.topbar-status,
+.hero-metrics,
+.metric-grid,
+.distribution-top,
+.section-head,
+.stage-heading,
+.stage-kpis,
+.command-buttons,
+.event-top,
+.selected-badges {
   display: flex;
   align-items: center;
-  gap: 12px;
+}
+
+.cockpit-topbar {
+  gap: 20px;
+  justify-content: space-between;
+}
+
+.topbar-status {
+  gap: 10px;
+  color: #8db2cf;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #3ee8b5;
+  box-shadow: 0 0 12px rgba(62, 232, 181, 0.7);
+}
+
+.status-divider {
+  width: 1px;
+  height: 12px;
+  background: rgba(141, 178, 207, 0.22);
+}
+
+.topbar-clock {
+  text-align: right;
+}
+
+.clock-date {
+  color: #8db2cf;
+  font-size: 12px;
+}
+
+.clock-time {
+  color: #effcff;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.hero-metrics {
+  gap: 14px;
   flex-wrap: wrap;
 }
 
-.selector-label {
-  min-width: 48px;
-  color: #1e3a8a;
-  font-weight: 700;
-  font-size: 13px;
-}
-
-.matrix-selection-bar {
-  margin-bottom: 16px;
-  padding: 0 4px;
-}
-
-.matrix-tip {
-  color: #64748b;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.plan-stage {
-  min-height: 480px;
-  border: 1px solid rgba(226, 232, 240, 0.6);
-  border-radius: 20px;
-  background: linear-gradient(135deg, rgba(239, 246, 255, 0.4) 0%, rgba(255, 255, 255, 0.6) 100%);
-  padding: 16px;
-  backdrop-filter: blur(8px);
-}
-
-.matrix-viewport {
-  overflow-x: auto;
-  padding-bottom: 8px;
-}
-
-.matrix-grid {
+.hero-metric-card {
+  min-width: 168px;
+  flex: 1 1 168px;
   display: grid;
-  min-width: max-content;
-  border: 1px solid rgba(226, 232, 240, 0.8);
-  border-radius: 16px;
-  overflow: hidden;
-  background: #ffffff;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+  gap: 6px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(87, 215, 255, 0.16);
+  background: rgba(7, 19, 35, 0.68);
 }
 
-.matrix-corner,
-.matrix-building-head,
-.matrix-floor-axis,
-.matrix-cell {
-  border-right: 1px solid rgba(226, 232, 240, 0.6);
-  border-bottom: 1px solid rgba(226, 232, 240, 0.6);
-}
-
-.matrix-corner {
-  position: sticky;
-  left: 0;
-  z-index: 10;
-  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 72px;
-  font-weight: 800;
-  color: #1e3a8a;
-  font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.matrix-building-head {
-  border: 0;
-  appearance: none;
-  background: #ffffff;
-  min-height: 72px;
-  padding: 14px 16px;
-  font-weight: 800;
-  color: #0f172a;
-  text-align: left;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-size: 16px;
-}
-
-.matrix-building-head:hover {
-  background: #f8fafc;
-}
-
-.matrix-building-head.active {
-  background: #eff6ff;
-  box-shadow: inset 0 -4px 0 #3b82f6;
-  color: #2563eb;
-}
-
-.building-remark {
-  margin-top: 4px;
-  color: #94a3b8;
-  font-size: 11px;
-  font-weight: 500;
-  font-style: italic;
-}
-
-.matrix-floor-axis {
-  border: 0;
-  appearance: none;
-  position: sticky;
-  left: 0;
-  z-index: 5;
-  background: #ffffff;
-  min-height: 240px;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  color: #1e3a8a;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-size: 16px;
-}
-
-.matrix-floor-axis:hover {
-  background: #f8fafc;
-}
-
-.matrix-floor-axis.active {
-  background: #eff6ff;
-  box-shadow: inset -4px 0 0 #3b82f6;
-  color: #2563eb;
-}
-
-.matrix-cell {
-  background: transparent;
-  min-height: 240px;
-  max-height: 240px;
-  padding: 14px;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-content: start;
-  gap: 12px;
-  overflow-y: auto;
-  scrollbar-width: none;
-}
-
-.matrix-cell::-webkit-scrollbar { display: none; }
-
-.matrix-empty {
-  color: #cbd5e1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 60px;
-  font-style: italic;
-  font-size: 14px;
-}
-
-.room-block {
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.7);
-  padding: 12px;
-  backdrop-filter: blur(10px);
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.05),
-    0 10px 15px -3px rgba(30, 64, 175, 0.04);
-  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  cursor: pointer;
-}
-
-.room-block:hover {
-  transform: translateY(-6px);
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 20px 25px -5px rgba(30, 64, 175, 0.1);
-  border-color: #3b82f6;
-}
-
-.bed-matrix {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.room-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-}
-
-.room-title {
-  font-weight: 800;
-  color: #1e293b;
-  font-size: 15px;
-}
-
-.room-type {
-  font-size: 11px;
-  font-weight: 700;
-  color: #3b82f6;
-  text-transform: uppercase;
-}
-
-.room-meta {
-  margin: 6px 0 2px;
-  color: #64748b;
-  font-size: 11px;
-  font-weight: 600;
-  display: flex;
-  justify-content: space-between;
-}
-
-.room-remark {
-  margin-bottom: 6px;
-  color: #2563eb;
-  font-size: 11px;
-  font-weight: 600;
-  background: rgba(37, 99, 235, 0.08);
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-.bed-tile {
-  border: 0;
-  border-radius: 10px;
-  padding: 10px 8px;
-  text-align: left;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  transition: all 0.3s ease;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.03);
-  overflow: hidden;
-}
-
-.bed-tile:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-}
-
-.bed-no {
-  font-weight: 800;
-  font-size: 13px;
-}
-
-.bed-name {
+.metric-label {
   font-size: 12px;
-  font-weight: 500;
-  margin-top: 2px;
-}
-
-.empty-priority {
-  box-shadow: inset 0 0 0 2px #22c55e;
-}
-
-.risk-corner {
-  position: absolute;
-  right: 6px;
-  top: 6px;
-  border-radius: 6px;
-  padding: 2px 4px;
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1;
+  color: #8db2cf;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.risk-high { background: #ef4444; color: #fff; box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3); }
-.risk-medium { background: #f59e0b; color: #fff; box-shadow: 0 2px 6px rgba(245, 158, 11, 0.3); }
-.risk-low { background: #38bdf8; color: #fff; box-shadow: 0 2px 6px rgba(56, 189, 248, 0.3); }
-
-.is-idle {
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  color: #475569;
+.metric-value {
+  color: #f5fdff;
+  font-size: 30px;
+  line-height: 1;
 }
 
-.is-reserved {
-  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-  color: #1e40af;
+.metric-meta {
+  color: #9fbcd3;
+  font-size: 12px;
 }
 
-.is-occupied {
-  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-  color: #166534;
+.tone-cyan {
+  box-shadow: inset 0 0 0 1px rgba(87, 215, 255, 0.08), 0 0 26px rgba(87, 215, 255, 0.08);
 }
 
-.gender-female {
-  border-left: 4px solid #ff85c0;
+.tone-green {
+  box-shadow: inset 0 0 0 1px rgba(62, 232, 181, 0.08), 0 0 26px rgba(62, 232, 181, 0.08);
 }
 
-.gender-male {
-  border-left: 4px solid #3b82f6;
+.tone-blue {
+  box-shadow: inset 0 0 0 1px rgba(77, 124, 255, 0.08), 0 0 26px rgba(77, 124, 255, 0.08);
 }
 
-.is-maintenance {
-  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
-  color: #9a3412;
+.tone-orange {
+  box-shadow: inset 0 0 0 1px rgba(255, 174, 87, 0.08), 0 0 24px rgba(255, 174, 87, 0.08);
 }
 
-.is-cleaning {
-  background: linear-gradient(135deg, #ecfeff 0%, #cffafe 100%);
-  color: #0e7490;
+.tone-red {
+  box-shadow: inset 0 0 0 1px rgba(255, 93, 124, 0.1), 0 0 28px rgba(255, 93, 124, 0.12);
 }
 
-.is-locked {
-  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
-  color: #991b1b;
+.bed-cockpit-shell {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr) 340px;
+  gap: 18px;
+  min-height: 0;
 }
 
-@media (max-width: 1400px) {
-  .matrix-cell { grid-template-columns: 1fr; }
+.cockpit-panel,
+.cockpit-core {
+  display: grid;
+  gap: 18px;
+  min-height: 0;
 }
 
-@media (max-width: 640px) {
-  .selector-label { min-width: 58px; }
-  .room-block { grid-column: span 1 !important; }
+.tech-panel {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  box-shadow: var(--panel-shadow);
+  padding: 18px;
+}
+
+.tech-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, transparent 0%, rgba(87, 215, 255, 0.05) 48%, transparent 100%);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.section-head {
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.section-head h3,
+.stage-heading h2 {
+  margin: 0;
+  color: #ecfbff;
+}
+
+.section-head p,
+.stage-heading p,
+.field-tip,
+.event-card p,
+.timeline-item p,
+.selected-meta {
+  margin: 4px 0 0;
+  color: #86a9c4;
+  line-height: 1.6;
+  font-size: 12px;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metric-tile {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(87, 215, 255, 0.14);
+  background: rgba(5, 15, 28, 0.6);
+}
+
+.metric-tile span,
+.field-label,
+.overlay-title,
+.event-type {
+  font-size: 12px;
+  color: #8db2cf;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.metric-tile strong {
+  color: #f5fdff;
+  font-size: 24px;
+}
+
+.metric-tile small {
+  color: #9dbbd3;
+}
+
+.distribution-list,
+.filter-stack,
+.event-list,
+.timeline-list,
+.focus-bed-list {
+  display: grid;
+  gap: 12px;
+}
+
+.distribution-top {
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: #c8e8ff;
+}
+
+.distribution-track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(120, 164, 201, 0.12);
+  overflow: hidden;
+}
+
+.distribution-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.fill-cyan {
+  background: linear-gradient(90deg, #2bcfff, #57d7ff);
+}
+
+.fill-green {
+  background: linear-gradient(90deg, #27ce94, #52f3c4);
+}
+
+.fill-blue {
+  background: linear-gradient(90deg, #4d7cff, #68a7ff);
+}
+
+.fill-orange {
+  background: linear-gradient(90deg, #ff9655, #ffbf74);
+}
+
+.fill-red {
+  background: linear-gradient(90deg, #ff5d7c, #ff8aa0);
+}
+
+.field-block {
+  display: grid;
+  gap: 10px;
+}
+
+.field-inline,
+.selection-tags,
+.action-grid {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.command-buttons {
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.flow-panel {
+  padding: 12px 16px;
+}
+
+.stage-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.stage-heading {
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.eyebrow {
+  margin-bottom: 8px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: #57d7ff;
+}
+
+.stage-kpis {
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.stage-kpis > div {
+  min-width: 82px;
+  display: grid;
+  gap: 4px;
+}
+
+.stage-kpis span {
+  color: #8db2cf;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.stage-kpis strong {
+  color: #effcff;
+  font-size: 22px;
+}
+
+.lifecycle-alert {
+  border-radius: 16px;
+}
+
+.stage-shell {
+  position: relative;
+  min-height: 620px;
+}
+
+.stage-shell :deep(.panorama-container) {
+  height: 620px;
+}
+
+.stage-empty {
+  min-height: 620px;
+  display: grid;
+  place-items: center;
+}
+
+.stage-overlay-card {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  max-width: 320px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(87, 215, 255, 0.2);
+  background: rgba(5, 16, 31, 0.84);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.3);
+}
+
+.overlay-name,
+.selected-title,
+.event-card strong,
+.timeline-item strong {
+  color: #ecfbff;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.overlay-meta {
+  margin-top: 6px;
+  color: #8db2cf;
+  line-height: 1.6;
+  font-size: 12px;
+}
+
+.overlay-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.overlay-chip {
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(87, 215, 255, 0.16);
+  background: rgba(87, 215, 255, 0.08);
+  color: #d7f8ff;
+  font-size: 12px;
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.chart-panel {
+  min-height: 260px;
+}
+
+.section-head.compact {
+  margin-bottom: 8px;
+}
+
+.chart-view {
+  height: 210px;
+}
+
+.event-card,
+.selected-summary {
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(87, 215, 255, 0.14);
+  background: rgba(4, 14, 26, 0.56);
+}
+
+.event-top {
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.event-time {
+  color: #86a9c4;
+  font-size: 12px;
+}
+
+.timeline-item {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.timeline-dot {
+  width: 10px;
+  height: 10px;
+  margin-top: 6px;
+  border-radius: 50%;
+  box-shadow: 0 0 14px currentColor;
+}
+
+.dot-cyan {
+  color: #57d7ff;
+  background: #57d7ff;
+}
+
+.dot-green {
+  color: #52f3c4;
+  background: #52f3c4;
+}
+
+.dot-orange {
+  color: #ffbf74;
+  background: #ffbf74;
+}
+
+.selected-panel {
+  align-content: start;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.bed-cockpit-page :deep(.ant-input),
+.bed-cockpit-page :deep(.ant-input-search-button),
+.bed-cockpit-page :deep(.ant-segmented),
+.bed-cockpit-page :deep(.ant-btn),
+.bed-cockpit-page :deep(.ant-alert) {
+  border-radius: 14px;
+}
+
+.bed-cockpit-page :deep(.ant-input),
+.bed-cockpit-page :deep(.ant-input-affix-wrapper),
+.bed-cockpit-page :deep(.ant-segmented),
+.bed-cockpit-page :deep(.ant-alert),
+.bed-cockpit-page :deep(.ant-switch) {
+  background: rgba(8, 20, 38, 0.92);
+  border-color: rgba(87, 215, 255, 0.14);
+  color: #ecfbff;
+}
+
+.bed-cockpit-page :deep(.ant-btn) {
+  background: rgba(8, 20, 38, 0.92);
+  border-color: rgba(87, 215, 255, 0.18);
+  color: #dff7ff;
+}
+
+.bed-cockpit-page :deep(.ant-btn-primary) {
+  background: linear-gradient(90deg, #0f82d8, #3cbfff) !important;
+  color: #06111f !important;
+}
+
+.bed-cockpit-page :deep(.ant-empty-description) {
+  color: #86a9c4;
+}
+
+@media (max-width: 1600px) {
+  .bed-cockpit-shell {
+    grid-template-columns: 300px minmax(0, 1fr) 300px;
+  }
+}
+
+@media (max-width: 1280px) {
+  .bed-cockpit-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stage-overlay-card {
+    position: static;
+    margin-top: 14px;
+    max-width: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .hero-metrics,
+  .metric-grid,
+  .action-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cockpit-topbar,
+  .stage-heading {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .clock-time {
+    font-size: 22px;
+  }
+
+  .stage-shell,
+  .stage-shell :deep(.panorama-container) {
+    min-height: 520px;
+    height: 520px;
+  }
 }
 </style>
