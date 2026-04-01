@@ -37,6 +37,7 @@ export interface RoleItem {
   roleDesc?: string
   orgId?: Id
   status?: number
+  routePermissionsJson?: string
 }
 
 export interface DepartmentItem {

@@ -29,7 +29,7 @@ public class AdminRoleController {
     this.roleMapper = roleMapper;
   }
 
-  @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN','HR_MINISTER')")
   @PostMapping
   public Result<Role> create(@Valid @RequestBody RoleRequest request) {
     Role role = new Role();
@@ -37,12 +37,13 @@ public class AdminRoleController {
     role.setRoleName(request.getRoleName());
     role.setRoleCode(request.getRoleCode());
     role.setRoleDesc(request.getRoleDesc());
+    role.setRoutePermissionsJson(request.getRoutePermissionsJson());
     role.setStatus(request.getStatus());
     roleMapper.insert(role);
     return Result.ok(role);
   }
 
-  @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN','HR_MINISTER')")
   @PutMapping("/{id}")
   public Result<Role> update(@PathVariable Long id, @Valid @RequestBody RoleRequest request) {
     Role role = roleMapper.selectById(id);
@@ -53,12 +54,13 @@ public class AdminRoleController {
     role.setRoleName(request.getRoleName());
     role.setRoleCode(request.getRoleCode());
     role.setRoleDesc(request.getRoleDesc());
+    role.setRoutePermissionsJson(request.getRoutePermissionsJson());
     role.setStatus(request.getStatus());
     roleMapper.updateById(role);
     return Result.ok(role);
   }
 
-  @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN','HR_MINISTER')")
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
     Role role = roleMapper.selectById(id);
@@ -70,13 +72,13 @@ public class AdminRoleController {
     return Result.ok(null);
   }
 
-  @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN','HR_MINISTER')")
   @GetMapping("/{id}")
   public Result<Role> get(@PathVariable Long id) {
     return Result.ok(roleMapper.selectById(id));
   }
 
-  @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN','HR_MINISTER')")
   @GetMapping
   public Result<IPage<Role>> list(
       @RequestParam(defaultValue = "1") long page,

@@ -1,6 +1,6 @@
 import type { RouteRecordRaw } from 'vue-router'
 import { routes } from '../router/routes'
-import { hasRouteAccess } from '../utils/roleAccess'
+import { canAccessPath } from '../utils/routeAccess'
 
 export interface MenuItem {
   key: string
@@ -17,16 +17,23 @@ function joinPath(base: string, path: string) {
   return `${base}/${path}`.replace(/\/+/g, '/')
 }
 
-function hasAccess(route: RouteRecordRaw, roles: string[], fullPath: string) {
+function hasAccess(route: RouteRecordRaw, roles: string[], pagePermissions: string[], fullPath: string) {
   const required = (route.meta?.roles as string[] | undefined) || []
-  return hasRouteAccess(roles, required, fullPath)
+  return canAccessPath(roles, required, fullPath, pagePermissions)
 }
 
-function buildMenu(routes: RouteRecordRaw[], roles: string[], basePath = ''): MenuItem[] {
+function buildMenu(routes: RouteRecordRaw[], roles: string[], pagePermissions: string[], basePath = ''): MenuItem[] {
   return routes
     .filter((r) => !r.meta?.hidden)
-    .filter((r) => hasAccess(r, roles, joinPath(basePath, r.path || '')))
     .map((r) => {
+      const routePath = joinPath(basePath, r.path || '')
+      const selfAccessible = hasAccess(r, roles, pagePermissions, routePath)
+      const children = r.children?.length
+        ? buildMenu(r.children, roles, pagePermissions, routePath)
+        : []
+      if (!selfAccessible && children.length === 0) {
+        return null
+      }
       const fullPath = r.children ? undefined : joinPath(basePath, r.path || '')
       const node: MenuItem = {
         key: String(r.name || fullPath || r.path),
@@ -34,18 +41,19 @@ function buildMenu(routes: RouteRecordRaw[], roles: string[], basePath = ''): Me
         icon: r.meta?.icon as string | undefined,
         roles: r.meta?.roles as string[] | undefined
       }
-      if (r.children && r.children.length > 0) {
-        const children = buildMenu(r.children, roles, joinPath(basePath, r.path || ''))
+      if (children.length > 0) {
         if (children.length > 0) node.children = children
-      } else if (fullPath) {
+      } else if (fullPath && selfAccessible) {
         node.path = fullPath
       }
       return node
     })
+    .filter(Boolean)
     .filter((m) => !m.children || m.children.length > 0)
+    as MenuItem[]
 }
 
-export function getMenuTree(roles: string[]) {
+export function getMenuTree(roles: string[], pagePermissions: string[] = []) {
   const layout = routes.find((r) => r.path === '/' && r.children)
-  return buildMenu(layout?.children || [], roles, '')
+  return buildMenu(layout?.children || [], roles, pagePermissions, '')
 }

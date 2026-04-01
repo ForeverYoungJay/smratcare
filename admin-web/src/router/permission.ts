@@ -1,11 +1,11 @@
 import type { Router } from 'vue-router'
-import { getRoles, getToken } from '../utils/auth'
-import { hasRouteAccess } from '../utils/roleAccess'
+import { getPagePermissions, getRoles, getToken } from '../utils/auth'
+import { canAccessPath } from '../utils/routeAccess'
 
 export function setupPermission(router: Router) {
   router.beforeEach((to, _from, next) => {
     const token = getToken()
-    const publicPages = ['/home', '/enterprise', '/admin', '/login']
+    const publicPages = ['/home', '/enterprise', '/admin', '/login', '/403']
 
     if (!token && !publicPages.includes(to.path)) {
       next('/home')
@@ -19,8 +19,9 @@ export function setupPermission(router: Router) {
     }
 
     const roles = getRoles()
+    const pagePermissions = getPagePermissions()
     const required = (to.meta?.roles as string[] | undefined) || []
-    if (!hasRouteAccess(roles, required, to.path)) {
+    if (!canAccessPath(roles, required, to.path, pagePermissions)) {
       next('/403')
       return
     }

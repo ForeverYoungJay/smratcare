@@ -1,0 +1,2 @@
+ALTER TABLE role
+  ADD COLUMN route_permissions_json MEDIUMTEXT DEFAULT NULL COMMENT '页面访问权限JSON';

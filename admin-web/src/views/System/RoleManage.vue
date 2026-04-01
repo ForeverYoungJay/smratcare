@@ -23,6 +23,11 @@
             {{ record.status === 1 ? '启用' : '停用' }}
           </a-tag>
         </template>
+        <template v-else-if="column.key === 'pagePermissions'">
+          <a-tag color="blue">
+            {{ parseRoutePermissionsJson(record.routePermissionsJson).length || 0 }} 项
+          </a-tag>
+        </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
             <a-button type="link" @click="openLinkedStaff(record)">关联员工</a-button>
@@ -49,6 +54,30 @@
         <a-form-item label="状态">
           <a-select v-model:value="form.status" :options="statusOptions" />
         </a-form-item>
+        <a-form-item label="页面权限">
+          <a-space direction="vertical" style="width: 100%">
+            <a-alert
+              type="info"
+              show-icon
+              message="页面权限按角色生效"
+              description="可直接套用组织架构预设，也可以按页面树自定义。未配置时仍按原有角色规则访问。"
+            />
+            <a-space wrap>
+              <a-button size="small" @click="applyPresetPermissions" :disabled="!recommendedPreset">
+                套用{{ recommendedPreset?.label || '组织架构' }}预设
+              </a-button>
+              <a-button size="small" @click="checkedPagePermissions = []">清空页面权限</a-button>
+              <span class="permission-summary">已选 {{ checkedPagePermissions.length }} 个页面</span>
+            </a-space>
+            <a-tree
+              checkable
+              default-expand-all
+              :tree-data="pagePermissionTree"
+              :checked-keys="checkedPagePermissions"
+              @check="onPermissionCheck"
+            />
+          </a-space>
+        </a-form-item>
       </a-form>
       <template #footer>
         <a-space>
@@ -69,6 +98,12 @@ import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { getRolePage, createRole, updateRole, deleteRole } from '../../api/rbac'
 import type { RoleItem, PageResult } from '../../types'
+import {
+  getPagePermissionTree,
+  getRolePagePreset,
+  parseRoutePermissionsJson,
+  serializeRoutePermissions
+} from '../../utils/pageAccess'
 
 const router = useRouter()
 const query = reactive({ keyword: undefined as string | undefined, pageNo: 1, pageSize: 10 })
@@ -76,8 +111,10 @@ const rows = ref<RoleItem[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const drawerOpen = ref(false)
+const checkedPagePermissions = ref<string[]>([])
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 const form = reactive<Partial<RoleItem>>({ status: 1 })
+const pagePermissionTree = getPagePermissionTree()
 
 const statusOptions = [
   { label: '启用', value: 1 },
@@ -87,12 +124,14 @@ const statusOptions = [
 const columns = [
   { title: '角色名称', dataIndex: 'roleName', key: 'roleName', width: 180 },
   { title: '角色编码', dataIndex: 'roleCode', key: 'roleCode', width: 180 },
+  { title: '页面权限', key: 'pagePermissions', width: 120 },
   { title: '角色描述', dataIndex: 'roleDesc', key: 'roleDesc' },
   { title: '状态', key: 'status', width: 100 },
   { title: '操作', key: 'action', width: 120 }
 ]
 
 const drawerTitle = computed(() => (form.id ? '编辑角色' : '新增角色'))
+const recommendedPreset = computed(() => getRolePagePreset(form.roleCode))
 
 async function fetchData() {
   loading.value = true
@@ -126,9 +165,24 @@ function openDrawer(record?: RoleItem) {
     roleName: record?.roleName || '',
     roleCode: record?.roleCode || '',
     roleDesc: record?.roleDesc || '',
+    routePermissionsJson: record?.routePermissionsJson || '',
     status: record?.status ?? 1
   })
+  checkedPagePermissions.value = parseRoutePermissionsJson(record?.routePermissionsJson)
   drawerOpen.value = true
+}
+
+function onPermissionCheck(checkedKeys: string[] | { checked: string[] }) {
+  checkedPagePermissions.value = Array.isArray(checkedKeys) ? checkedKeys : checkedKeys.checked || []
+}
+
+function applyPresetPermissions() {
+  if (!recommendedPreset.value) {
+    message.warning('当前角色没有预设页面权限，可手动勾选')
+    return
+  }
+  checkedPagePermissions.value = [...recommendedPreset.value.paths]
+  message.success(`已套用${recommendedPreset.value.label}预设`)
 }
 
 async function submit() {
@@ -142,6 +196,7 @@ async function submit() {
       roleName: form.roleName,
       roleCode: form.roleCode,
       roleDesc: form.roleDesc,
+      routePermissionsJson: serializeRoutePermissions(checkedPagePermissions.value),
       status: form.status ?? 1
     }
     if (form.id) {
@@ -149,7 +204,7 @@ async function submit() {
     } else {
       await createRole(payload)
     }
-    message.success('保存成功')
+    message.success('保存成功，相关账号重新登录后生效')
     drawerOpen.value = false
     fetchData()
   } finally {
@@ -172,3 +227,10 @@ function openLinkedStaff(record: RoleItem) {
 
 fetchData()
 </script>
+
+<style scoped>
+.permission-summary {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+</style>

@@ -18,11 +18,16 @@ import type {
   OaKnowledge,
   OaGroupSetting,
   OaActivityPlan,
+  OaMyInfoSummary,
   OaSuggestion
 } from '../types'
 
 export function getPortalSummary(config?: Record<string, any>) {
   return request.get<OaPortalSummary>('/api/oa/portal/summary', config)
+}
+
+export function getMyInfoSummary(params?: { staffIds?: Array<string | number> }) {
+  return request.get<OaMyInfoSummary>('/api/oa/my-info/summary', { params })
 }
 
 export function uploadOaFile(file: File, bizType = 'oa-approval-proof') {

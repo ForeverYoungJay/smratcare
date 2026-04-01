@@ -252,6 +252,49 @@ export interface OaPortalSummary {
   myPerformanceLevel?: string
 }
 
+export interface OaMyInfoItem {
+  staffId: string | number
+  staffNo?: string
+  staffName?: string
+  username?: string
+  phone?: string
+  departmentId?: string | number
+  departmentName?: string
+  jobTitle?: string
+  hireDate?: string
+  probationEndDate?: string
+  probationRemainingDays?: number
+  contractSignDueDate?: string
+  contractSignRemainingDays?: number
+  salarySource?: string
+  currentMonthSalary?: number
+  previousMonthSalary?: number
+  nextMonthSalary?: number
+  taskOpenCount?: number
+  taskOverdueCount?: number
+  taskCompletedThisMonth?: number
+  dutyTasks?: string[]
+  performanceAvgScore?: number
+  performancePointsBalance?: number
+  performanceRedeemableCash?: number
+  performanceSuccessCount?: number
+  reimbursePendingCount?: number
+  reimburseMonthCount?: number
+  reimburseMonthAmount?: number
+  electricityMonth?: string
+  electricityAmount?: number
+  meterNo?: string
+  dormitoryLabel?: string
+}
+
+export interface OaMyInfoSummary {
+  currentMonth?: string
+  previousMonth?: string
+  nextMonth?: string
+  compareEnabled?: boolean
+  items?: OaMyInfoItem[]
+}
+
 export interface OaWorkReport {
   id: string | number
   title: string

@@ -185,7 +185,7 @@ function renderTodo(item: OaTodo) {
 }
 
 function canAccess(path: string) {
-  return resolveRouteAccess(router, userStore.roles || [], path).canAccess
+  return resolveRouteAccess(router, userStore.roles || [], path, userStore.pagePermissions || []).canAccess
 }
 
 function openPath(path: string) {

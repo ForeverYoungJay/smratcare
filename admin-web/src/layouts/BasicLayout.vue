@@ -1293,7 +1293,7 @@ const quickChatSyncConflictDesc = computed(() => {
 
 const filteredMenu = computed(() => {
   const roles = userStore.roles || []
-  return getMenuTree(roles)
+  return getMenuTree(roles, userStore.pagePermissions || [])
 })
 
 const menuItems = computed(() => {

@@ -17,6 +17,7 @@ public class Role {
   private String roleName;
   private String roleCode;
   private String roleDesc;
+  private String routePermissionsJson;
   private Integer status;
   @TableField(value = "create_time", fill = FieldFill.INSERT)
   private LocalDateTime createTime;

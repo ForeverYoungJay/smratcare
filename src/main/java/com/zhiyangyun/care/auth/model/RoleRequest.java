@@ -11,5 +11,6 @@ public class RoleRequest {
   @NotBlank
   private String roleCode;
   private String roleDesc;
+  private String routePermissionsJson;
   private Integer status = 1;
 }

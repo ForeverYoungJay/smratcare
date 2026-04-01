@@ -1,6 +1,7 @@
 const TOKEN_KEY = 'zhiyangyun_token'
 const ROLES_KEY = 'zhiyangyun_roles'
 const PERMISSIONS_KEY = 'zhiyangyun_permissions'
+const PAGE_PERMISSIONS_KEY = 'zhiyangyun_page_permissions'
 const STAFF_INFO_KEY = 'zhiyangyun_staff_info'
 
 export function normalizeRoles(roles: string[]): string[] {
@@ -64,6 +65,19 @@ export function setPermissions(permissions: string[]) {
 
 export function clearPermissions() {
   localStorage.removeItem(PERMISSIONS_KEY)
+}
+
+export function getPagePermissions(): string[] {
+  const raw = localStorage.getItem(PAGE_PERMISSIONS_KEY)
+  return raw ? JSON.parse(raw) : []
+}
+
+export function setPagePermissions(pagePermissions: string[]) {
+  localStorage.setItem(PAGE_PERMISSIONS_KEY, JSON.stringify(pagePermissions || []))
+}
+
+export function clearPagePermissions() {
+  localStorage.removeItem(PAGE_PERMISSIONS_KEY)
 }
 
 export function getStaffInfo<T = any>(): T | null {

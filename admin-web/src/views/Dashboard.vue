@@ -536,7 +536,7 @@ const coreCards = computed(() => {
   ]
   const roles = userStore.roles || []
   return cardDefs.map((item) => {
-    const access = resolveRouteAccess(router, roles, item.route)
+    const access = resolveRouteAccess(router, roles, item.route, userStore.pagePermissions || [])
     return { ...item, ...access }
   })
 })
@@ -634,7 +634,7 @@ const unifiedCards = computed(() => {
   ]
   const roles = userStore.roles || []
   return cardDefs.map((item) => {
-    const access = resolveRouteAccess(router, roles, item.route)
+    const access = resolveRouteAccess(router, roles, item.route, userStore.pagePermissions || [])
     return { ...item, ...access }
   })
 })

@@ -12,4 +12,10 @@ public interface RoleMapper extends BaseMapper<Role> {
       + "WHERE sr.staff_id = #{staffId} AND sr.org_id = #{orgId} "
       + "AND r.is_deleted = 0 AND sr.is_deleted = 0")
   List<String> selectRoleCodesByStaff(@Param("staffId") Long staffId, @Param("orgId") Long orgId);
+
+  @Select("SELECT r.* FROM role r "
+      + "JOIN staff_role sr ON r.id = sr.role_id "
+      + "WHERE sr.staff_id = #{staffId} AND sr.org_id = #{orgId} "
+      + "AND r.is_deleted = 0 AND sr.is_deleted = 0")
+  List<Role> selectRolesByStaff(@Param("staffId") Long staffId, @Param("orgId") Long orgId);
 }

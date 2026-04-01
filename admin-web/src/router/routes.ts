@@ -2576,6 +2576,12 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: '门户与待办' }
           },
           {
+            path: 'my-info',
+            name: 'OaMyInfo',
+            component: () => import('../views/oa/MyInfo.vue'),
+            meta: { title: '我的信息' }
+          },
+          {
             path: 'todo',
             name: 'OaTodo',
             component: () => import('../views/oa/Todo.vue'),
@@ -3056,7 +3062,7 @@ export const routes: RouteRecordRaw[] = [
       {
         path: 'system',
         name: 'System',
-        meta: { title: '系统管理', icon: 'SettingOutlined', roles: ['DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
+        meta: { title: '系统管理', icon: 'SettingOutlined', roles: ['DIRECTOR', 'SYS_ADMIN', 'ADMIN', 'HR_MINISTER'] },
         redirect: '/system/org-info',
         children: [
           {
@@ -3098,7 +3104,7 @@ export const routes: RouteRecordRaw[] = [
             path: 'role',
             name: 'SystemRoleManage',
             component: () => import('../views/System/RoleManage.vue'),
-            meta: { title: '角色管理', roles: ['ADMIN'] }
+            meta: { title: '角色管理', roles: ['ADMIN', 'HR_MINISTER'] }
           },
           {
             path: 'department',

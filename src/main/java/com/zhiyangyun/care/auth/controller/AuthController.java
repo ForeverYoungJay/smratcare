@@ -1,6 +1,9 @@
 package com.zhiyangyun.care.auth.controller;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zhiyangyun.care.auth.entity.Role;
 import com.zhiyangyun.care.auth.entity.StaffAccount;
 import com.zhiyangyun.care.auth.mapper.RoleMapper;
 import com.zhiyangyun.care.auth.mapper.StaffMapper;
@@ -27,6 +30,8 @@ import com.zhiyangyun.care.elder.entity.FamilyUser;
 import com.zhiyangyun.care.elder.mapper.FamilyUserMapper;
 import com.zhiyangyun.care.family.service.FamilySmsCodeService;
 import jakarta.validation.Valid;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -54,6 +59,7 @@ public class AuthController {
   private final PermissionRegistry permissionRegistry;
   private final FamilySmsCodeService familySmsCodeService;
   private final PasswordEncoder passwordEncoder;
+  private final ObjectMapper objectMapper;
 
   public AuthController(AuthenticationManager authenticationManager,
       TokenProvider tokenProvider,
@@ -64,7 +70,8 @@ public class AuthController {
       FamilyUserMapper familyUserMapper,
       PermissionRegistry permissionRegistry,
       FamilySmsCodeService familySmsCodeService,
-      PasswordEncoder passwordEncoder) {
+      PasswordEncoder passwordEncoder,
+      ObjectMapper objectMapper) {
     this.authenticationManager = authenticationManager;
     this.tokenProvider = tokenProvider;
     this.staffMapper = staffMapper;
@@ -75,6 +82,7 @@ public class AuthController {
     this.permissionRegistry = permissionRegistry;
     this.familySmsCodeService = familySmsCodeService;
     this.passwordEncoder = passwordEncoder;
+    this.objectMapper = objectMapper;
   }
 
   @GetMapping("/family/bootstrap")
@@ -200,12 +208,14 @@ public class AuthController {
     staffMapper.updateById(staff);
     List<String> roles = RoleCodeHelper.normalizeRoles(
         roleMapper.selectRoleCodesByStaff(staff.getId(), staff.getOrgId()));
+    List<Role> roleEntities = roleMapper.selectRolesByStaff(staff.getId(), staff.getOrgId());
 
     String token = tokenProvider.generateToken(staff.getId(), staff.getUsername(), staff.getOrgId(), roles);
     LoginResponse response = new LoginResponse();
     response.setToken(token);
     response.setRoles(roles);
     response.setPermissions(permissionRegistry.getPermissionsByRoles(roles));
+    response.setPagePermissions(mergeRoutePermissions(roleEntities));
     response.setStaffInfo(toStaffInfo(staff));
     return Result.ok(response);
   }
@@ -338,5 +348,31 @@ public class AuthController {
     info.setIndirectLeaderId(staff.getIndirectLeaderId());
     info.setStatus(staff.getStatus());
     return info;
+  }
+
+  private List<String> mergeRoutePermissions(List<Role> roles) {
+    if (roles == null || roles.isEmpty()) {
+      return List.of();
+    }
+    LinkedHashSet<String> merged = new LinkedHashSet<>();
+    for (Role role : roles) {
+      if (role == null || role.getRoutePermissionsJson() == null || role.getRoutePermissionsJson().isBlank()) {
+        continue;
+      }
+      try {
+        List<String> parsed = objectMapper.readValue(role.getRoutePermissionsJson(), new TypeReference<List<String>>() {});
+        if (parsed == null) {
+          continue;
+        }
+        for (String item : parsed) {
+          if (item != null && !item.isBlank()) {
+            merged.add(item.trim());
+          }
+        }
+      } catch (Exception ignored) {
+        // ignore malformed permission config
+      }
+    }
+    return new ArrayList<>(merged);
   }
 }

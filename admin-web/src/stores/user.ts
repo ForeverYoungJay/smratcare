@@ -1,13 +1,16 @@
 import { defineStore } from 'pinia'
 import {
+  getPagePermissions,
   getPermissions,
   getRoles,
   getStaffInfo,
   getToken,
+  setPagePermissions,
   setPermissions,
   setRoles,
   setStaffInfo,
   setToken,
+  clearPagePermissions,
   clearPermissions,
   clearRoles,
   clearStaffInfo,
@@ -21,6 +24,7 @@ export const useUserStore = defineStore('user', {
     token: getToken(),
     roles: getRoles(),
     permissions: getPermissions(),
+    pagePermissions: getPagePermissions(),
     staffInfo: getStaffInfo<LoginResponse['staffInfo']>() as LoginResponse['staffInfo'] | null
   }),
   actions: {
@@ -37,19 +41,23 @@ export const useUserStore = defineStore('user', {
       this.token = payload.token
       this.roles = roles
       this.permissions = payload.permissions || []
+      this.pagePermissions = payload.pagePermissions || []
       this.setStaffProfile(payload.staffInfo)
       setToken(payload.token)
       setRoles(roles)
       setPermissions(payload.permissions || [])
+      setPagePermissions(payload.pagePermissions || [])
     },
     clear() {
       this.token = ''
       this.roles = []
       this.permissions = []
+      this.pagePermissions = []
       this.setStaffProfile(null)
       clearToken()
       clearRoles()
       clearPermissions()
+      clearPagePermissions()
     }
   }
 })

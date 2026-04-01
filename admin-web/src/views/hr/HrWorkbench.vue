@@ -305,7 +305,7 @@ function readFavoritePaths(): string[] {
 }
 
 function canAccess(path: string) {
-  return resolveRouteAccess(router, userStore.roles || [], path).canAccess
+  return resolveRouteAccess(router, userStore.roles || [], path, userStore.pagePermissions || []).canAccess
 }
 
 function matchesAction(action: WorkbenchAction, sectionTitle: string) {

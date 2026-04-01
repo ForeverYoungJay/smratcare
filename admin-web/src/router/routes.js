@@ -2564,17 +2564,23 @@ export const routes = [
                         redirect: '/hr/development/records',
                         meta: { title: '培训管理（兼容）', hidden: true }
                     },
-                    {
-                        path: 'portal',
-                        name: 'OaPortal',
-                        component: () => import('../views/oa/Portal.vue'),
-                        meta: { title: '门户与待办' }
-                    },
-                    {
-                        path: 'todo',
-                        name: 'OaTodo',
-                        component: () => import('../views/oa/Todo.vue'),
-                        meta: { title: '待办事项' }
+          {
+            path: 'portal',
+            name: 'OaPortal',
+            component: () => import('../views/oa/Portal.vue'),
+            meta: { title: '门户与待办' }
+          },
+          {
+            path: 'my-info',
+            name: 'OaMyInfo',
+            component: () => import('../views/oa/MyInfo.vue'),
+            meta: { title: '我的信息' }
+          },
+          {
+            path: 'todo',
+            name: 'OaTodo',
+            component: () => import('../views/oa/Todo.vue'),
+            meta: { title: '待办事项' }
                     },
                     {
                         path: 'approval',

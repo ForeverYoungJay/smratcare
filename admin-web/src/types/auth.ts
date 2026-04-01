@@ -21,4 +21,5 @@ export interface LoginResponse {
   }
   roles: string[]
   permissions?: string[]
+  pagePermissions?: string[]
 }
