@@ -9,7 +9,7 @@
         </div>
       </div>
       <a-menu
-        theme="dark"
+        theme="light"
         mode="inline"
         :selectedKeys="selectedKeys"
         :openKeys="openKeys"
@@ -4652,6 +4652,15 @@ function onQuickChatStorageChange(event: StorageEvent) {
   padding-bottom: 10px;
 }
 
+.side-menu :deep(.ant-menu) {
+  background: transparent !important;
+  color: #4f6f89 !important;
+}
+
+.side-menu :deep(.ant-menu-sub) {
+  background: rgba(247, 251, 254, 0.92) !important;
+}
+
 .side-menu .ant-menu-item,
 .side-menu .ant-menu-submenu-title {
   border-radius: 12px;
@@ -4659,11 +4668,38 @@ function onQuickChatStorageChange(event: StorageEvent) {
   min-height: 42px;
   display: flex;
   align-items: center;
+  color: #4f6f89 !important;
+  font-weight: 600;
 }
 
-.side-menu .ant-menu-item-selected {
+.side-menu .ant-menu-item:hover,
+.side-menu .ant-menu-submenu-title:hover {
+  color: #173854 !important;
+  background: #edf7fb !important;
+}
+
+.side-menu :deep(.ant-menu-submenu-selected > .ant-menu-submenu-title),
+.side-menu :deep(.ant-menu-submenu-open > .ant-menu-submenu-title) {
+  color: #173854 !important;
+}
+
+.side-menu .ant-menu-item-selected,
+.side-menu :deep(.ant-menu-submenu-selected .ant-menu-item-selected) {
   background: linear-gradient(90deg, rgba(31, 143, 190, 0.14) 0%, rgba(111, 196, 226, 0.22) 100%) !important;
   box-shadow: inset 0 0 0 1px rgba(31, 143, 190, 0.12);
+  color: #173854 !important;
+  font-weight: 700;
+}
+
+.side-menu :deep(.ant-menu-item-selected::after) {
+  display: none !important;
+}
+
+.side-menu :deep(.ant-menu-submenu-arrow),
+.side-menu :deep(.ant-menu-item-icon),
+.side-menu :deep(.ant-menu-submenu .ant-menu-title-content),
+.side-menu :deep(.ant-menu-title-content) {
+  color: inherit !important;
 }
 
 .app-main {
