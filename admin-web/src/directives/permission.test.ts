@@ -8,6 +8,17 @@ vi.mock('../utils/auth', () => ({
 }))
 
 describe('permission directive', () => {
+  it('keeps guarded elements for super roles', () => {
+    mockRoles = ['ADMIN']
+    const parent = document.createElement('div')
+    const el = document.createElement('button')
+    parent.appendChild(el)
+
+    permission.mounted?.(el, { value: ['HR_MINISTER'] } as any)
+
+    expect(parent.contains(el)).toBe(true)
+  })
+
   it('removes admin-only elements for minister roles without explicit admin', () => {
     mockRoles = ['HR_MINISTER']
     const parent = document.createElement('div')

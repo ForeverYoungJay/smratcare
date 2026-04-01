@@ -84,6 +84,7 @@ export function hasStaffOrHigher(userRoles: string[]): boolean {
 }
 
 export function hasRouteAccess(userRoles: string[], required: string[], path: string): boolean {
+  if (hasSuperRole(userRoles)) return true
   if (!required || required.length === 0) return true
   if (hasAnyRole(userRoles, required)) return true
   const moduleRoles = moduleRoleGroupByPath(path)

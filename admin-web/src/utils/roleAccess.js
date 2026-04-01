@@ -78,6 +78,8 @@ export function hasStaffOrHigher(userRoles) {
     return hasAnyRole(userRoles, ['STAFF', ...SUPER_ROLES, ...LEGACY_MANAGER_ROLES, ...DEPARTMENT_ALL_ROLES]);
 }
 export function hasRouteAccess(userRoles, required, path) {
+    if (hasSuperRole(userRoles))
+        return true;
     if (!required || required.length === 0)
         return true;
     if (hasAnyRole(userRoles, required))

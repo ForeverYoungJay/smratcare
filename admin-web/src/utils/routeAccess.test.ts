@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { canAccessPath } from './routeAccess'
 
 describe('routeAccess utils', () => {
+  it('allows super roles to access any guarded route', () => {
+    expect(canAccessPath(['ADMIN'], ['HR_MINISTER'], '/hr/staff')).toBe(true)
+    expect(canAccessPath(['SYS_ADMIN'], ['MEDICAL_EMPLOYEE'], '/health/management/archive')).toBe(true)
+  })
+
   it('falls back to module roles for hidden health routes', () => {
     expect(canAccessPath(['MEDICAL_EMPLOYEE'], [], '/health/management/archive')).toBe(true)
     expect(canAccessPath(['NURSING_EMPLOYEE'], [], '/health/management/archive')).toBe(true)
