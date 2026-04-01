@@ -1,6 +1,12 @@
 <template>
   <a-layout class="app-layout">
-    <a-layout-sider v-model:collapsed="collapsed" collapsible class="app-sider">
+    <a-layout-sider
+      v-model:collapsed="collapsed"
+      collapsible
+      :width="244"
+      :collapsed-width="80"
+      class="app-sider"
+    >
       <div class="brand">
         <div class="logo">智</div>
         <div class="brand-text" v-if="!collapsed">
@@ -721,7 +727,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import type { UploadProps } from 'ant-design-vue'
 import dayjs from 'dayjs'
@@ -1296,11 +1302,23 @@ const filteredMenu = computed(() => {
   return getMenuTree(roles, userStore.pagePermissions || [])
 })
 
+function renderMenuLabel(label: string) {
+  return h(
+    'span',
+    {
+      class: 'side-menu-label',
+      title: label
+    },
+    label
+  )
+}
+
 const menuItems = computed(() => {
   const map = (items: any[]): any[] =>
     items.map((item) => ({
       key: item.path || item.key,
-      label: item.label,
+      label: renderMenuLabel(String(item.label || '')),
+      title: String(item.label || ''),
       children: item.children ? map(item.children) : undefined
     }))
   return map(filteredMenu.value)
@@ -4665,9 +4683,13 @@ function onQuickChatStorageChange(event: StorageEvent) {
 .side-menu .ant-menu-submenu-title {
   border-radius: 12px;
   margin: 4px 12px;
-  min-height: 42px;
+  height: auto;
+  min-height: 46px;
   display: flex;
   align-items: center;
+  line-height: 1.35;
+  padding-top: 10px;
+  padding-bottom: 10px;
   color: #4f6f89 !important;
   font-weight: 600;
 }
@@ -4700,6 +4722,23 @@ function onQuickChatStorageChange(event: StorageEvent) {
 .side-menu :deep(.ant-menu-submenu .ant-menu-title-content),
 .side-menu :deep(.ant-menu-title-content) {
   color: inherit !important;
+}
+
+.side-menu :deep(.ant-menu-title-content) {
+  flex: 1;
+  min-width: 0;
+  overflow: visible;
+}
+
+.side-menu :deep(.ant-menu-item .side-menu-label),
+.side-menu :deep(.ant-menu-submenu-title .side-menu-label) {
+  display: -webkit-box;
+  overflow: hidden;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .app-main {

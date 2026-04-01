@@ -1,5 +1,30 @@
 <template>
   <PageContainer title="审批流程" subTitle="请假/加班/报销/采购/收入证明/物资申请/用章审批/营销方案审批">
+    <template #stats>
+      <div class="approval-overview-grid">
+        <div class="overview-card">
+          <span>审批总单</span>
+          <strong>{{ summary.totalCount || 0 }}</strong>
+          <small>覆盖当前筛选口径与工作视角</small>
+        </div>
+        <div class="overview-card">
+          <span>待审批</span>
+          <strong>{{ summary.pendingCount || 0 }}</strong>
+          <small>优先处理待我审批与超时任务</small>
+        </div>
+        <div class="overview-card">
+          <span>超时待审</span>
+          <strong>{{ summary.timeoutPendingCount || 0 }}</strong>
+          <small>需要尽快推进，避免流程积压</small>
+        </div>
+        <div class="overview-card">
+          <span>批量可处理</span>
+          <strong>{{ canApproveFlow ? selectedPendingCount : selectedCount }}</strong>
+          <small>{{ canApproveFlow ? '已选待审批记录可直接批量处理' : '当前账号以我的申请与跟进为主' }}</small>
+        </div>
+      </div>
+    </template>
+
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="标题/申请人/备注" allow-clear style="width: 240px" />
@@ -37,28 +62,54 @@
         </a-space>
       </a-form-item>
       <template #extra>
-        <a-space wrap>
-          <a-button type="primary" @click="openCreate">新增审批</a-button>
-          <a-button @click="downloadExport">导出CSV</a-button>
-          <a-divider type="vertical" />
-          <span class="action-group-title">单条操作</span>
-          <a-button :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="editSelected">编辑</a-button>
-          <a-button v-if="canApproveFlow" :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="approveSelected">同意</a-button>
-          <a-button v-if="canApproveFlow" :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="rejectSelected">驳回</a-button>
-          <a-button :disabled="!selectedSingleRecord || !isSelectedSingleRejected" @click="resubmitSelected">驳回后重提</a-button>
-          <a-button :disabled="!selectedSingleRecord" @click="openSelectedTimeline">查看时间线</a-button>
-          <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
-          <a-divider type="vertical" />
-          <span class="action-group-title">批量操作</span>
-          <a-button v-if="canApproveFlow" :disabled="selectedPendingCount === 0" @click="batchApprove">批量同意</a-button>
-          <a-button v-if="canApproveFlow" :disabled="selectedPendingCount === 0" @click="batchReject">批量驳回</a-button>
-          <a-button v-if="canApproveFlow" :disabled="selectedPendingCount === 0" @click="batchUrge">批量催办</a-button>
-          <a-button :disabled="selectedRowKeys.length === 0" danger @click="batchRemove">批量删除</a-button>
-          <a-tag color="blue">已勾选 {{ selectedRowKeys.length }} 条</a-tag>
-          <span class="selection-tip">{{ canApproveFlow ? '批量审批仅对待审批生效' : '当前账号仅可发起/编辑本人申请' }}</span>
-        </a-space>
+        <div class="approval-commandbar">
+          <div class="command-group">
+            <span class="action-group-title">快捷操作</span>
+            <a-space wrap>
+              <a-button type="primary" @click="openCreate">新增审批</a-button>
+              <a-button @click="downloadExport">导出CSV</a-button>
+            </a-space>
+          </div>
+          <div class="command-group">
+            <span class="action-group-title">单条处理</span>
+            <a-space wrap>
+              <a-button :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="editSelected">编辑</a-button>
+              <a-button v-if="canApproveFlow" :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="approveSelected">同意</a-button>
+              <a-button v-if="canApproveFlow" :disabled="!selectedSingleRecord || !isSelectedSinglePending" @click="rejectSelected">驳回</a-button>
+              <a-button :disabled="!selectedSingleRecord || !isSelectedSingleRejected" @click="resubmitSelected">驳回后重提</a-button>
+              <a-button :disabled="!selectedSingleRecord" @click="openSelectedTimeline">查看时间线</a-button>
+              <a-button :disabled="!selectedSingleRecord" danger @click="removeSelected">删除</a-button>
+            </a-space>
+          </div>
+          <div class="command-group">
+            <span class="action-group-title">批量处理</span>
+            <a-space wrap>
+              <a-button v-if="canApproveFlow" :disabled="selectedPendingCount === 0" @click="batchApprove">批量同意</a-button>
+              <a-button v-if="canApproveFlow" :disabled="selectedPendingCount === 0" @click="batchReject">批量驳回</a-button>
+              <a-button v-if="canApproveFlow" :disabled="selectedPendingCount === 0" @click="batchUrge">批量催办</a-button>
+              <a-button :disabled="selectedCount === 0" danger @click="batchRemove">批量删除</a-button>
+            </a-space>
+            <div class="command-group-meta">
+              <a-tag color="blue">已勾选 {{ selectedCount }} 条</a-tag>
+              <span class="selection-tip">{{ canApproveFlow ? '批量审批仅对待审批生效' : '当前账号仅可发起和编辑本人申请' }}</span>
+            </div>
+          </div>
+        </div>
       </template>
     </SearchForm>
+
+    <section class="surface-toolbar approval-toolbar">
+      <div class="surface-toolbar-title">
+        <strong>审批工作台</strong>
+        <span>当前视角为 {{ approvalScopeLabel }}，优先处理超时待审、催办单和需要你立即决策的事项。</span>
+      </div>
+      <a-space wrap>
+        <a-tag color="processing">视角 {{ approvalScopeLabel }}</a-tag>
+        <a-tag color="gold">已催办 {{ urgedRecordCount }}</a-tag>
+        <a-tag color="volcano">在途超时 {{ overduePendingCount }}</a-tag>
+        <span class="selection-pill">已勾选 {{ selectedCount }} 条</span>
+      </a-space>
+    </section>
 
     <a-alert
       v-if="lifecycleContext.active"
@@ -157,13 +208,32 @@
         :row-selection="rowSelection"
         :columns="columns"
         :data-source="rows"
+        :row-class-name="approvalRowClassName"
         :loading="false"
         :pagination="pagination"
         @change="handleTableChange"
       >
+        <template #toolbar>
+          <div class="table-head">
+            <div>
+              <strong>审批单列表</strong>
+              <span>支持批量审批、时间线查看、驳回后重提和角色责任追踪。</span>
+            </div>
+            <a-space wrap>
+              <a-tag color="processing">第 {{ pagination.current }} / {{ totalPageCount }} 页</a-tag>
+              <a-tag color="default">共 {{ pagination.total }} 条</a-tag>
+            </a-space>
+          </div>
+        </template>
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'approvalType'">
             {{ typeLabel(record.approvalType) }}
+          </template>
+          <template v-else-if="column.key === 'title'">
+            <div class="approval-title-cell">
+              <strong>{{ record.title || '-' }}</strong>
+              <span>{{ approvalPeriodText(record) }}</span>
+            </div>
           </template>
           <template v-else-if="column.key === 'status'">
             <a-tag :color="record.status === 'APPROVED' ? 'green' : record.status === 'REJECTED' ? 'red' : 'orange'">
@@ -176,12 +246,15 @@
           <template v-else-if="column.key === 'currentApprover'">
             <div class="approver-cell">
               <a-tag :color="approverStatusColor(record)">{{ approverStatusText(record) }}</a-tag>
-              <div>{{ currentApprover(record) }}</div>
+              <div class="approver-name">{{ currentApprover(record) }}</div>
             </div>
             <div class="urge-meta">{{ urgeMetaText(record) }}</div>
           </template>
           <template v-else-if="column.key === 'approvalRounds'">
             {{ approvalRoundCount(record) }}
+          </template>
+          <template v-else-if="column.key === 'amount'">
+            <span class="approval-amount">{{ formatApprovalAmount(record.amount) }}</span>
           </template>
           <template v-else-if="column.key === 'approvalOpinion'">
             {{ approvalOpinion(record) }}
@@ -651,6 +724,7 @@ const rowSelection = computed(() => ({
   }
 }))
 const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(String(item.id))))
+const selectedCount = computed(() => selectedRowKeys.value.length)
 const selectedSingleRecord = computed(() => (selectedRecords.value.length === 1 ? selectedRecords.value[0] : null))
 const isSelectedSinglePending = computed(() => selectedSingleRecord.value?.status === 'PENDING')
 const isSelectedSingleRejected = computed(() => selectedSingleRecord.value?.status === 'REJECTED')
@@ -660,6 +734,12 @@ const selectedPendingIds = computed(() =>
 )
 const urgedRecordCount = computed(() => rows.value.filter((item) => Number(parseFormData(item.formData)?.urgeCount || 0) > 0).length)
 const overduePendingCount = computed(() => rows.value.filter((item) => isApprovalOverdue(item)).length)
+const totalPageCount = computed(() => Math.max(1, Math.ceil(Number(pagination.total || 0) / Number(pagination.pageSize || 10))))
+const approvalScopeLabel = computed(() => {
+  if (approvalScope.value === 'PENDING_REVIEW') return '待我审批'
+  if (approvalScope.value === 'ALL') return '全部审批'
+  return '我的申请'
+})
 const timelineItems = computed(() => {
   const record = timelineRecord.value
   if (!record) return []
@@ -887,6 +967,25 @@ function typeLabel(type?: string) {
   return option?.label || type || '-'
 }
 
+function approvalPeriodText(record: OaApproval) {
+  const start = record.startTime ? dayjs(record.startTime).format('MM-DD HH:mm') : ''
+  const end = record.endTime ? dayjs(record.endTime).format('MM-DD HH:mm') : ''
+  if (start && end) {
+    return `${start} - ${end}`
+  }
+  if (start) {
+    return `提交时间 ${start}`
+  }
+  return '待补充时间范围'
+}
+
+function formatApprovalAmount(value?: number | null) {
+  if (value == null || Number.isNaN(Number(value))) {
+    return '-'
+  }
+  return `${Number(value).toFixed(2)} 元`
+}
+
 function formatTimelineTime(value?: string) {
   if (!value) return '时间未知'
   const time = dayjs(value)
@@ -954,6 +1053,10 @@ function isApprovalOverdue(item: OaApproval) {
   if (!start || !start.isValid()) return false
   if (item.status !== 'PENDING') return false
   return dayjs().diff(start, 'hour') > 48
+}
+
+function approvalRowClassName(record: OaApproval) {
+  return isApprovalOverdue(record) ? 'is-urgent-row' : ''
 }
 
 function handleTableChange(pag: any) {
@@ -1818,6 +1921,112 @@ useLiveSyncRefresh({
 </script>
 
 <style scoped>
+.approval-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.overview-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid #dce9f2;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.overview-card span,
+.table-head span {
+  color: #6d8aa3;
+  font-size: 12px;
+}
+
+.overview-card strong {
+  color: #173854;
+  font-size: 24px;
+}
+
+.overview-card small,
+.approval-title-cell span,
+.upload-hint,
+.selection-tip,
+.urge-meta,
+.timeline-time {
+  color: #6d8aa3;
+  font-size: 12px;
+}
+
+.approval-commandbar {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.command-group {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid #e5eef5;
+  border-radius: 14px;
+  background: rgba(247, 251, 254, 0.88);
+}
+
+.command-group-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.approval-toolbar {
+  margin-top: 2px;
+}
+
+.selection-pill {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #eef8fc;
+  color: #1b6282;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.table-head,
+.approval-title-cell,
+.approver-cell {
+  display: flex;
+}
+
+.table-head {
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.table-head strong {
+  display: block;
+  color: #173854;
+  font-size: 16px;
+}
+
+.approval-title-cell,
+.approver-cell {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.approval-title-cell strong,
+.approver-name,
+.approval-amount {
+  color: #173854;
+  font-weight: 700;
+}
+
 .proof-list {
   margin-top: 8px;
   display: flex;
@@ -1825,14 +2034,10 @@ useLiveSyncRefresh({
   gap: 6px;
 }
 
-.selection-tip {
-  color: rgba(0, 0, 0, 0.45);
-  font-size: 12px;
-}
-
 .action-group-title {
   font-size: 12px;
-  color: rgba(0, 0, 0, 0.55);
+  color: #5e788f;
+  font-weight: 700;
 }
 
 .summary-filter-card {
@@ -1851,8 +2056,6 @@ useLiveSyncRefresh({
 
 .upload-hint {
   margin-top: 6px;
-  color: rgba(0, 0, 0, 0.45);
-  font-size: 12px;
 }
 
 .leave-policy-card :deep(.ant-typography) {
@@ -1871,29 +2074,45 @@ useLiveSyncRefresh({
 
 .urge-meta {
   margin-top: 2px;
-  color: rgba(0, 0, 0, 0.45);
-  font-size: 12px;
-}
-
-.approver-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
 }
 
 .timeline-title {
   font-weight: 600;
-  color: rgba(0, 0, 0, 0.88);
+  color: #173854;
 }
 
 .timeline-desc {
   margin-top: 2px;
-  color: rgba(0, 0, 0, 0.65);
+  color: #4f6f86;
 }
 
 .timeline-time {
   margin-top: 2px;
-  color: rgba(0, 0, 0, 0.45);
-  font-size: 12px;
+}
+
+:deep(.is-urgent-row > td) {
+  background: rgba(255, 247, 230, 0.82);
+}
+
+@media (max-width: 1200px) {
+  .approval-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .approval-overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .approval-commandbar,
+  .table-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .command-group {
+    width: 100%;
+  }
 }
 </style>

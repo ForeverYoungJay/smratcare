@@ -1,42 +1,77 @@
 <template>
   <PageContainer :title="pageTitle" :subTitle="pageSubTitle">
-    <a-card class="card-elevated" :bordered="false">
-      <a-form layout="inline" :model="query" class="search-form">
-        <a-form-item label="月份">
-          <a-date-picker v-model:value="query.month" picker="month" allow-clear style="width: 160px" />
-        </a-form-item>
-        <a-form-item label="老人姓名">
-          <ElderNameAutocomplete v-model:value="query.keyword" width="180px" placeholder="老人姓名(编号)" @select="() => runQuery(true)" />
-        </a-form-item>
-        <a-form-item label="收款方式">
-          <a-select v-model:value="query.payMethod" allow-clear style="width: 140px">
-            <a-select-option value="CASH">现金</a-select-option>
-            <a-select-option value="CARD">刷卡</a-select-option>
-            <a-select-option value="BANK">转账</a-select-option>
-            <a-select-option value="ALIPAY">支付宝</a-select-option>
-            <a-select-option value="WECHAT">微信</a-select-option>
-            <a-select-option value="WECHAT_OFFLINE">微信线下</a-select-option>
-            <a-select-option value="QR_CODE">扫码</a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item v-if="!props.lockScene" label="账单场景">
-          <a-select v-model:value="query.scene" allow-clear style="width: 140px">
-            <a-select-option value="ADMISSION">入住首期</a-select-option>
-            <a-select-option value="RESIDENT">在住周期</a-select-option>
-          </a-select>
-        </a-form-item>
-        <a-form-item>
-          <a-space>
-            <a-button type="primary" @click="runQuery">查询</a-button>
-            <a-button @click="reset">重置</a-button>
-          </a-space>
-        </a-form-item>
-      </a-form>
-    </a-card>
+    <template #stats>
+      <div class="bill-overview-grid">
+        <div class="overview-card">
+          <span>当前账单数</span>
+          <strong>{{ total }}</strong>
+          <small>按当前筛选条件实时统计</small>
+        </div>
+        <div class="overview-card">
+          <span>欠费笔数</span>
+          <strong>{{ overdueCount }}</strong>
+          <small>需优先安排催缴与跟进</small>
+        </div>
+        <div class="overview-card">
+          <span>欠费金额</span>
+          <strong>{{ formatAmount(overdueAmount) }}</strong>
+          <small>帮助财务快速识别风险账单</small>
+        </div>
+        <div class="overview-card">
+          <span>已收金额</span>
+          <strong>{{ formatAmount(paidAmount) }}</strong>
+          <small>当前页收款完成率 {{ collectionRate }}%</small>
+        </div>
+      </div>
+    </template>
+
+    <SearchForm :model="query" @search="runQuery" @reset="reset">
+      <a-form-item label="月份">
+        <a-date-picker v-model:value="query.month" picker="month" allow-clear style="width: 160px" />
+      </a-form-item>
+      <a-form-item label="老人姓名">
+        <ElderNameAutocomplete
+          v-model:value="query.keyword"
+          width="200px"
+          placeholder="老人姓名(编号)"
+          @select="() => runQuery(true)"
+        />
+      </a-form-item>
+      <a-form-item label="收款方式">
+        <a-select v-model:value="query.payMethod" allow-clear style="width: 148px">
+          <a-select-option value="CASH">现金</a-select-option>
+          <a-select-option value="CARD">刷卡</a-select-option>
+          <a-select-option value="BANK">转账</a-select-option>
+          <a-select-option value="ALIPAY">支付宝</a-select-option>
+          <a-select-option value="WECHAT">微信</a-select-option>
+          <a-select-option value="WECHAT_OFFLINE">微信线下</a-select-option>
+          <a-select-option value="QR_CODE">扫码</a-select-option>
+        </a-select>
+      </a-form-item>
+      <a-form-item v-if="!props.lockScene" label="账单场景">
+        <a-select v-model:value="query.scene" allow-clear style="width: 148px">
+          <a-select-option value="ADMISSION">入住首期</a-select-option>
+          <a-select-option value="RESIDENT">在住周期</a-select-option>
+        </a-select>
+      </a-form-item>
+    </SearchForm>
+
+    <section class="surface-toolbar">
+      <div class="surface-toolbar-title">
+        <strong>账单生成与收款工作台</strong>
+        <span>先锁定账期和长者，再完成生成、收款登记、异常识别与历史追溯。</span>
+      </div>
+      <a-space wrap>
+        <a-tag color="processing">账期 {{ currentMonthLabel }}</a-tag>
+        <a-tag :color="query.scene ? 'blue' : 'default'">{{ currentSceneLabel }}</a-tag>
+        <a-tag color="gold">欠费 {{ overdueCount }} 笔</a-tag>
+        <a-tag color="green">收款完成率 {{ collectionRate }}%</a-tag>
+      </a-space>
+    </section>
 
     <a-alert
       v-if="signedLinkageContext.active"
-      style="margin-top: 16px;"
+      class="linkage-alert"
       type="success"
       show-icon
       :message="signedLinkageContext.message"
@@ -50,91 +85,128 @@
       </template>
     </a-alert>
 
-    <a-row :gutter="[12, 12]" style="margin-top: 16px;">
-      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="当前账单数" :value="total" /></a-card></a-col>
-      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="当前欠费笔数" :value="overdueCount" /></a-card></a-col>
-      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="当前欠费金额" :value="overdueAmount" suffix="元" :precision="2" /></a-card></a-col>
-      <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="当前已收金额" :value="paidAmount" suffix="元" :precision="2" /></a-card></a-col>
-      <a-col :span="24">
-        <a-alert
-          :type="summary.warningMessage ? 'warning' : 'info'"
-          show-icon
-          :message="summary.warningMessage || `全院风险摘要：欠费 ${summary.totalCount} 人，低余额 ${summary.pendingCount} 人，合同到期风险 ${summary.exceptionCount} 人`"
-          :description="`今日收款 ${Number(summary.todayAmount || 0).toFixed(2)} 元，累计欠费 ${Number(summary.monthAmount || 0).toFixed(2)} 元`"
-        />
-      </a-col>
-    </a-row>
-
-    <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;">
-      <div class="table-actions">
-        <a-space>
-          <a-button @click="exportCsvData">导出</a-button>
-          <a-button type="primary" @click="openGenerate">生成账单</a-button>
-        </a-space>
+    <section class="card-elevated bill-workspace">
+      <div class="bill-insight-grid">
+        <div class="bill-insight-card">
+          <span>全院风险摘要</span>
+          <strong>{{ riskSummaryText }}</strong>
+          <small>{{ riskSummaryDescription }}</small>
+        </div>
+        <div class="bill-insight-card is-soft">
+          <span>当前页工作提示</span>
+          <strong>{{ total }} 条账单，{{ invalidBillCount }} 条已作废</strong>
+          <small>支持直接查看详情、登记收款、修正最近收款与查看消费明细。</small>
+        </div>
       </div>
 
-      <vxe-toolbar custom export></vxe-toolbar>
-      <vxe-table
-        border
-        stripe
-        show-overflow
-        height="520"
-        :loading="loading"
-        :data="displayRows"
-        :column-config="{ resizable: true }"
-      >
-        <vxe-column field="billMonth" title="账单月份" width="120" />
-        <vxe-column field="elderName" title="老人" min-width="140">
-          <template #default="{ row }">
-            <span>{{ row.elderName || '未知老人' }}</span>
-          </template>
-        </vxe-column>
-        <vxe-column field="careLevel" title="护理级别" width="120" />
-        <vxe-column field="totalAmount" title="总额" width="120" />
-        <vxe-column field="nursingFee" title="护理费" width="120" />
-        <vxe-column field="bedFee" title="床位费" width="120" />
-        <vxe-column field="insuranceFee" title="保险费" width="120" />
-        <vxe-column field="paidAmount" title="已付" width="120" />
-        <vxe-column field="outstandingAmount" title="欠费" width="120">
-          <template #default="{ row }">
-            <a-tag :color="row.outstandingAmount > 0 ? 'red' : 'green'">{{ row.outstandingAmount ?? 0 }}</a-tag>
-          </template>
-        </vxe-column>
-        <vxe-column field="lastPayMethod" title="收款方式" width="130">
-          <template #default="{ row }">
-            <span>{{ payMethodText(row.lastPayMethod) }}</span>
-          </template>
-        </vxe-column>
-        <vxe-column field="status" title="状态" width="140">
-          <template #default="{ row }">
-            <a-tag :color="statusColor(row.status)">{{ statusText(row.status) }}</a-tag>
-          </template>
-        </vxe-column>
-        <vxe-column title="操作" width="320" fixed="right">
-          <template #default="{ row }">
-            <a-space>
-              <a-button type="link" @click="openDetail(row)">查看</a-button>
-              <a-button v-if="row.status !== 9" type="link" @click="openPay(row)">登记收款</a-button>
-              <a-button v-if="row.status !== 9 && row.lastPaymentId" type="link" @click="openEditLatestPayment(row)">改最近收款</a-button>
-              <a-button type="link" @click="openHistory(row)">收款历史</a-button>
-              <a-button v-if="row.status !== 9" type="link" danger @click="markInvalid(row)">无效账单</a-button>
-              <a-tag v-else color="default">已无效</a-tag>
-              <a-button type="link" @click="goConsumption(row)">消费明细</a-button>
-            </a-space>
-          </template>
-        </vxe-column>
-      </vxe-table>
+      <div class="action-toolbar">
+        <div class="table-head">
+          <div>
+            <strong>账单列表</strong>
+            <span>保留原有账单业务逻辑，优化筛选、风险识别和收款操作的工作顺序。</span>
+          </div>
+          <a-space wrap>
+            <a-tag color="default">共 {{ total }} 条</a-tag>
+            <a-tag color="purple">已作废 {{ invalidBillCount }} 条</a-tag>
+          </a-space>
+        </div>
+        <div class="action-toolbar-main">
+          <a-button @click="exportCsvData">导出CSV</a-button>
+          <a-button type="primary" @click="openGenerate">生成账单</a-button>
+        </div>
+      </div>
 
-      <a-pagination
-        style="margin-top: 16px; text-align: right;"
-        :current="query.pageNo"
-        :page-size="query.pageSize"
-        :total="total"
-        show-size-changer
-        @change="onPageChange"
-        @showSizeChange="onPageSizeChange"
-      />
-    </a-card>
+      <div class="bill-table-frame">
+        <vxe-toolbar class="finance-vxe-toolbar" custom export></vxe-toolbar>
+        <vxe-table
+          class="finance-vxe-table"
+          border
+          stripe
+          show-overflow
+          height="520"
+          :loading="loading"
+          :data="displayRows"
+          :column-config="{ resizable: true }"
+        >
+          <vxe-column field="billMonth" title="账单月份" width="120" />
+          <vxe-column field="elderName" title="老人" min-width="180">
+            <template #default="{ row }">
+              <div class="bill-person-cell">
+                <strong>{{ row.elderName || '未知老人' }}</strong>
+                <span>{{ row.lastPaidAt ? `最近收款 ${dayjs(row.lastPaidAt).format('MM-DD HH:mm')}` : '暂无收款记录' }}</span>
+              </div>
+            </template>
+          </vxe-column>
+          <vxe-column field="careLevel" title="护理级别" width="120" />
+          <vxe-column field="totalAmount" title="总额" width="120">
+            <template #default="{ row }">
+              <span class="amount-text">{{ formatAmount(row.totalAmount) }}</span>
+            </template>
+          </vxe-column>
+          <vxe-column field="nursingFee" title="护理费" width="120">
+            <template #default="{ row }">
+              <span class="amount-subtext">{{ formatAmount(row.nursingFee) }}</span>
+            </template>
+          </vxe-column>
+          <vxe-column field="bedFee" title="床位费" width="120">
+            <template #default="{ row }">
+              <span class="amount-subtext">{{ formatAmount(row.bedFee) }}</span>
+            </template>
+          </vxe-column>
+          <vxe-column field="insuranceFee" title="保险费" width="120">
+            <template #default="{ row }">
+              <span class="amount-subtext">{{ formatAmount(row.insuranceFee) }}</span>
+            </template>
+          </vxe-column>
+          <vxe-column field="paidAmount" title="已付" width="120">
+            <template #default="{ row }">
+              <span class="amount-text is-positive">{{ formatAmount(row.paidAmount) }}</span>
+            </template>
+          </vxe-column>
+          <vxe-column field="outstandingAmount" title="欠费" width="120">
+            <template #default="{ row }">
+              <span class="amount-chip" :class="Number(row.outstandingAmount || 0) > 0 ? 'is-danger' : 'is-safe'">
+                {{ formatAmount(row.outstandingAmount) }}
+              </span>
+            </template>
+          </vxe-column>
+          <vxe-column field="lastPayMethod" title="收款方式" width="130">
+            <template #default="{ row }">
+              <span class="pay-method-pill">{{ payMethodText(row.lastPayMethod) }}</span>
+            </template>
+          </vxe-column>
+          <vxe-column field="status" title="状态" width="140">
+            <template #default="{ row }">
+              <a-tag :color="statusColor(row.status)">{{ statusText(row.status) }}</a-tag>
+            </template>
+          </vxe-column>
+          <vxe-column title="操作" width="320" fixed="right">
+            <template #default="{ row }">
+              <div class="row-action-links">
+                <a-button type="link" @click="openDetail(row)">查看</a-button>
+                <a-button v-if="row.status !== 9" type="link" @click="openPay(row)">登记收款</a-button>
+                <a-button v-if="row.status !== 9 && row.lastPaymentId" type="link" @click="openEditLatestPayment(row)">改最近收款</a-button>
+                <a-button type="link" @click="openHistory(row)">收款历史</a-button>
+                <a-button v-if="row.status !== 9" type="link" danger @click="markInvalid(row)">无效账单</a-button>
+                <a-tag v-else color="default">已无效</a-tag>
+                <a-button type="link" @click="goConsumption(row)">消费明细</a-button>
+              </div>
+            </template>
+          </vxe-column>
+        </vxe-table>
+      </div>
+
+      <div class="pager-row">
+        <a-pagination
+          :current="query.pageNo"
+          :page-size="query.pageSize"
+          :total="total"
+          show-size-changer
+          @change="onPageChange"
+          @showSizeChange="onPageSizeChange"
+        />
+      </div>
+    </section>
 
     <a-drawer v-model:open="historyOpen" width="760" title="收款历史" :footer-style="{ textAlign: 'right' }">
       <div style="margin-bottom: 8px;">
@@ -202,6 +274,7 @@ import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
+import SearchForm from '../../components/SearchForm.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { exportCsv } from '../../utils/export'
 import { getBillPage, generateBill, invalidateBill, payBill } from '../../api/bill'
@@ -326,6 +399,31 @@ const displayRows = computed(() => rows.value)
 const overdueCount = computed(() => displayRows.value.filter(item => Number(item.outstandingAmount || 0) > 0).length)
 const overdueAmount = computed(() => displayRows.value.reduce((sum, item) => sum + Number(item.outstandingAmount || 0), 0))
 const paidAmount = computed(() => displayRows.value.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0))
+const totalAmount = computed(() => displayRows.value.reduce((sum, item) => sum + Number(item.totalAmount || 0), 0))
+const invalidBillCount = computed(() => displayRows.value.filter(item => Number(item.status) === 9).length)
+const collectionRate = computed(() => {
+  if (totalAmount.value <= 0) {
+    return 0
+  }
+  return Math.round((paidAmount.value / totalAmount.value) * 100)
+})
+const currentMonthLabel = computed(() => (query.month ? dayjs(query.month).format('YYYY年MM月') : '全部账期'))
+const currentSceneLabel = computed(() => {
+  if (query.scene === 'ADMISSION') return '入住首期'
+  if (query.scene === 'RESIDENT') return '在住周期'
+  return '全部场景'
+})
+const riskSummaryText = computed(() => (
+  summary.value.warningMessage
+    || `欠费 ${summary.value.totalCount} 人，低余额 ${summary.value.pendingCount} 人，合同到期风险 ${summary.value.exceptionCount} 人`
+))
+const riskSummaryDescription = computed(() => (
+  `今日收款 ${formatAmount(summary.value.todayAmount)} 元，累计欠费 ${formatAmount(summary.value.monthAmount)} 元`
+))
+
+function formatAmount(value?: number | string) {
+  return Number(value || 0).toFixed(2)
+}
 
 function statusText(status?: number) {
   if (status === 9) return '无效'
@@ -714,3 +812,225 @@ onMounted(async () => {
   await runQuery(false)
 })
 </script>
+
+<style scoped>
+.bill-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.overview-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid #dce9f2;
+  background: rgba(255, 255, 255, 0.86);
+}
+
+.overview-card span,
+.table-head span,
+.bill-insight-card span {
+  color: #6d8aa3;
+  font-size: 12px;
+}
+
+.overview-card strong {
+  color: #173854;
+  font-size: 24px;
+}
+
+.overview-card small,
+.bill-insight-card small,
+.bill-person-cell span {
+  color: #7a97b0;
+  font-size: 12px;
+}
+
+.linkage-alert {
+  margin-top: 2px;
+}
+
+.bill-workspace {
+  padding: 16px;
+}
+
+.bill-insight-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.bill-insight-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid #dce9f2;
+  background: linear-gradient(135deg, rgba(232, 247, 253, 0.96) 0%, rgba(255, 255, 255, 0.96) 100%);
+}
+
+.bill-insight-card.is-soft {
+  background: linear-gradient(135deg, rgba(246, 250, 253, 0.96) 0%, rgba(255, 255, 255, 0.98) 100%);
+}
+
+.bill-insight-card strong,
+.table-head strong {
+  color: #173854;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.action-toolbar,
+.action-toolbar-main,
+.table-head,
+.bill-person-cell,
+.row-action-links,
+.pager-row {
+  display: flex;
+  align-items: center;
+}
+
+.action-toolbar {
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.action-toolbar-main,
+.row-action-links {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.table-head {
+  justify-content: space-between;
+  gap: 12px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.bill-table-frame {
+  border: 1px solid #e4edf4;
+  border-radius: 18px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.bill-person-cell {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.bill-person-cell strong {
+  color: #173854;
+}
+
+.amount-text,
+.amount-subtext {
+  font-variant-numeric: tabular-nums;
+}
+
+.amount-text {
+  color: #173854;
+  font-weight: 700;
+}
+
+.amount-text.is-positive {
+  color: #1f8f63;
+}
+
+.amount-subtext {
+  color: #4f6f86;
+}
+
+.amount-chip,
+.pay-method-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.amount-chip {
+  font-variant-numeric: tabular-nums;
+}
+
+.amount-chip.is-danger {
+  background: #fff1f0;
+  color: #cf3f3f;
+}
+
+.amount-chip.is-safe {
+  background: #edf8f2;
+  color: #1f8f63;
+}
+
+.pay-method-pill {
+  background: #eef8fc;
+  color: #1b6282;
+}
+
+.row-action-links {
+  gap: 2px;
+}
+
+.pager-row {
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.finance-vxe-toolbar :deep(.vxe-toolbar) {
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid #e8f0f6;
+  background: rgba(246, 250, 253, 0.88);
+}
+
+.finance-vxe-table :deep(.vxe-table--header-wrapper) {
+  background: #f7fbfe;
+}
+
+.finance-vxe-table :deep(.vxe-header--column),
+.finance-vxe-table :deep(.vxe-body--column) {
+  height: 54px;
+}
+
+.finance-vxe-table :deep(.vxe-header--column) {
+  color: #59758c;
+  font-weight: 700;
+}
+
+.finance-vxe-table :deep(.vxe-body--row:hover) {
+  background: rgba(234, 246, 252, 0.82);
+}
+
+@media (max-width: 1200px) {
+  .bill-overview-grid,
+  .bill-insight-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .bill-overview-grid,
+  .bill-insight-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .table-head,
+  .action-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .pager-row {
+    justify-content: stretch;
+  }
+}
+</style>
