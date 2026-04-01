@@ -999,14 +999,20 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.dashboard-page {
+  display: grid;
+  gap: 16px;
+}
+
 .chart {
-  height: 260px;
+  height: 280px;
 }
 
 .card-meta {
   margin-top: 12px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   color: var(--muted);
 }
@@ -1019,6 +1025,7 @@ onBeforeUnmount(() => {
 .metric-def-line {
   margin-top: 2px;
   color: var(--muted);
+  line-height: 1.7;
 }
 
 .threshold-preset-row {
@@ -1030,6 +1037,53 @@ onBeforeUnmount(() => {
 }
 
 .window-toolbar {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #f7fbfe 0%, #eef7fb 100%);
+  border: 1px solid #e0edf5;
+}
+
+:deep(.clickable-card) {
+  position: relative;
+  overflow: hidden;
+}
+
+:deep(.clickable-card)::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 3px;
+  background: linear-gradient(90deg, #1f8fbe 0%, #70c4e0 100%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+:deep(.clickable-card:hover)::after {
+  opacity: 1;
+}
+
+:deep(.ant-statistic) {
+  padding: 2px 0;
+}
+
+:deep(.ant-statistic-content) {
+  color: #173854;
+  font-weight: 700;
+}
+
+:deep(.ant-list-item-meta-title) {
+  color: #173854;
+  font-weight: 600;
+}
+
+:deep(.ant-table-small .ant-table-thead > tr > th) {
+  font-size: 12px;
+}
+
+@media (max-width: 768px) {
+  .chart {
+    height: 240px;
+  }
 }
 </style>

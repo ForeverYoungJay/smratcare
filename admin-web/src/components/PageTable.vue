@@ -1,9 +1,10 @@
 <template>
-  <a-card class="card-elevated table-card" :bordered="false">
+  <section class="page-table-shell card-elevated">
     <div v-if="$slots.search" class="search-slot">
       <slot name="search" />
     </div>
     <a-table
+      class="page-table"
       :columns="columns"
       :data-source="dataSource"
       :row-key="rowKey"
@@ -21,7 +22,7 @@
         </div>
       </template>
     </a-table>
-  </a-card>
+  </section>
 </template>
 
 <script setup lang="ts">
@@ -45,7 +46,9 @@ const pagination = reactive<TablePaginationConfig>({
   pageSize: 10,
   total: 0,
   showSizeChanger: true,
-  showTotal: (total) => `共 ${total} 条`
+  showQuickJumper: true,
+  pageSizeOptions: ['10', '20', '50', '100'],
+  showTotal: (total) => `共 ${total} 条记录`
 })
 
 async function load(extra?: Record<string, any>) {
@@ -87,7 +90,11 @@ defineExpose({ reload: load })
 </script>
 
 <style scoped>
+.page-table-shell {
+  overflow: hidden;
+}
+
 .search-slot {
-  margin-bottom: 16px;
+  padding: 16px 16px 0;
 }
 </style>

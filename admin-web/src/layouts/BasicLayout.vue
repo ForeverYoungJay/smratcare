@@ -4594,12 +4594,13 @@ function onQuickChatStorageChange(event: StorageEvent) {
 }
 
 .app-sider {
-  background: linear-gradient(180deg, #08316d 0%, #0e4a99 100%);
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, #f8fbfe 0%, #eef6fb 100%);
+  border-right: 1px solid #dbe8f2;
   height: 100vh;
   position: sticky;
   top: 0;
   left: 0;
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.5);
 }
 
 .app-sider :deep(.ant-layout-sider-children) {
@@ -4614,18 +4615,21 @@ function onQuickChatStorageChange(event: StorageEvent) {
   align-items: center;
   gap: 12px;
   padding: 20px 16px;
-  color: #f8fafc;
+  color: #173854;
+  border-bottom: 1px solid #e7eff5;
+  background: rgba(255, 255, 255, 0.72);
 }
 
 .logo {
   width: 40px;
   height: 40px;
-  border-radius: 10px;
-  background: #ffffff;
-  color: #0b2f6b;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #1f8fbe 0%, #70c4e0 100%);
+  color: #ffffff;
   font-weight: 700;
   display: grid;
   place-items: center;
+  box-shadow: 0 10px 20px rgba(31, 143, 190, 0.2);
 }
 
 .title {
@@ -4635,7 +4639,7 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 .subtitle {
   font-size: 12px;
-  color: rgba(248, 250, 252, 0.65);
+  color: #7b97ae;
 }
 
 .side-menu {
@@ -4650,12 +4654,16 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 .side-menu .ant-menu-item,
 .side-menu .ant-menu-submenu-title {
-  border-radius: 10px;
-  margin: 6px 12px;
+  border-radius: 12px;
+  margin: 4px 12px;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
 }
 
 .side-menu .ant-menu-item-selected {
-  background: rgba(255, 255, 255, 0.18) !important;
+  background: linear-gradient(90deg, rgba(31, 143, 190, 0.14) 0%, rgba(111, 196, 226, 0.22) 100%) !important;
+  box-shadow: inset 0 0 0 1px rgba(31, 143, 190, 0.12);
 }
 
 .app-main {
@@ -4671,7 +4679,7 @@ function onQuickChatStorageChange(event: StorageEvent) {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: linear-gradient(120deg, rgba(255, 255, 255, 0.92) 0%, rgba(244, 249, 255, 0.92) 100%);
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.94) 0%, rgba(246, 251, 255, 0.94) 100%);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
   display: flex;
@@ -4686,11 +4694,12 @@ function onQuickChatStorageChange(event: StorageEvent) {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
 .page-title {
-  font-weight: 600;
-  font-size: 16px;
+  font-weight: 700;
+  font-size: 18px;
   color: var(--ink);
 }
 
@@ -4702,20 +4711,26 @@ function onQuickChatStorageChange(event: StorageEvent) {
 .header-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .today-label {
-  padding: 4px 10px;
+  padding: 6px 12px;
   font-size: 12px;
   border-radius: 999px;
-  color: #2455a8;
-  background: rgba(39, 111, 229, 0.12);
+  color: #1d6181;
+  background: rgba(31, 143, 190, 0.1);
 }
 
 .system-name {
   color: var(--muted);
   font-size: 12px;
+  max-width: 220px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .user-link {
@@ -4748,7 +4763,7 @@ function onQuickChatStorageChange(event: StorageEvent) {
   align-items: center;
   gap: 8px;
   padding: 8px 24px 0;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.84);
   border-bottom: 1px solid var(--border);
   overflow: hidden;
 }
@@ -4792,6 +4807,7 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 .tab-tools-btn {
   margin-bottom: 6px;
+  background: #ffffff;
 }
 
 .route-tab-title {
@@ -4822,12 +4838,12 @@ function onQuickChatStorageChange(event: StorageEvent) {
   min-width: 140px;
   background: #fff;
   border: 1px solid #e5e7eb;
-  border-radius: 8px;
+  border-radius: 14px;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
 }
 
 .app-content {
-  padding: 24px;
+  padding: 20px 24px 24px;
   flex: 1;
   min-height: 0;
   overflow: auto;

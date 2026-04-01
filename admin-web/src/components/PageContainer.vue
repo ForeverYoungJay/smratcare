@@ -3,8 +3,9 @@
     <section class="page-head card-elevated">
       <div class="page-head-main">
         <div class="page-title-wrap">
+          <div class="page-kicker">智慧养老管理平台</div>
           <h1 class="page-title">{{ title }}</h1>
-          <p class="page-subtitle" v-if="subTitle">{{ subTitle }}</p>
+          <p class="page-subtitle" v-if="subTitle || subTitleAlias">{{ subTitle || subTitleAlias }}</p>
         </div>
         <div class="page-head-extra">
           <slot name="extra" />
@@ -21,7 +22,8 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{ title: string; subTitle?: string }>()
+const props = defineProps<{ title: string; subTitle?: string; subTitleAlias?: string }>()
+const subTitleAlias = props.subTitleAlias
 </script>
 
 <style scoped>
@@ -32,18 +34,29 @@ defineProps<{ title: string; subTitle?: string }>()
 .page-head {
   position: relative;
   overflow: hidden;
-  padding: 18px 20px;
+  padding: 22px 24px;
 }
 
 .page-head::before {
   content: '';
   position: absolute;
-  width: 320px;
-  height: 320px;
+  inset: auto auto -80px -60px;
+  width: 240px;
+  height: 240px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(57, 133, 255, 0.2) 0%, rgba(57, 133, 255, 0) 72%);
-  right: -100px;
-  top: -200px;
+  background: radial-gradient(circle, rgba(87, 215, 255, 0.14) 0%, rgba(87, 215, 255, 0) 70%);
+  pointer-events: none;
+}
+
+.page-head::after {
+  content: '';
+  position: absolute;
+  top: -80px;
+  right: -50px;
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(121, 177, 255, 0.16) 0%, rgba(121, 177, 255, 0) 70%);
   pointer-events: none;
 }
 
@@ -52,24 +65,37 @@ defineProps<{ title: string; subTitle?: string }>()
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
 }
 
 .page-title-wrap {
   min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.page-kicker {
+  color: #6d8aa3;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-weight: 700;
 }
 
 .page-title {
   margin: 0;
-  font-size: 24px;
-  line-height: 1.2;
-  letter-spacing: 0.4px;
+  font-size: 28px;
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+  color: #173854;
 }
 
 .page-subtitle {
-  margin: 6px 0 0;
+  margin: 0;
+  max-width: 760px;
   font-size: 13px;
-  color: var(--muted);
+  color: #6d8aa3;
+  line-height: 1.7;
 }
 
 .page-head-extra {
@@ -82,7 +108,7 @@ defineProps<{ title: string; subTitle?: string }>()
 
 .page-head-stats {
   position: relative;
-  margin-top: 14px;
+  margin-top: 18px;
 }
 
 .page-body {
@@ -92,6 +118,10 @@ defineProps<{ title: string; subTitle?: string }>()
 }
 
 @media (max-width: 992px) {
+  .page-head {
+    padding: 18px;
+  }
+
   .page-head-main {
     flex-direction: column;
   }
@@ -99,6 +129,10 @@ defineProps<{ title: string; subTitle?: string }>()
   .page-head-extra {
     justify-content: flex-start;
     width: 100%;
+  }
+
+  .page-title {
+    font-size: 24px;
   }
 }
 </style>

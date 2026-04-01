@@ -4484,7 +4484,7 @@ onBeforeUnmount(() => {
 .portal-page {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
   padding: 0;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   letter-spacing: -0.01em;
@@ -4496,9 +4496,11 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 16px;
   border-radius: 20px;
-  background: linear-gradient(135deg, #f0f7ff 0%, #e1effe 100%);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  box-shadow: 0 10px 30px rgba(30, 58, 138, 0.06), inset 0 2px 20px rgba(255, 255, 255, 0.6);
+  background:
+    radial-gradient(circle at right top, rgba(87, 215, 255, 0.16), transparent 24%),
+    linear-gradient(135deg, #ffffff 0%, #eff8fc 58%, #e8f3fb 100%);
+  border: 1px solid #dce9f2;
+  box-shadow: 0 16px 36px rgba(73, 130, 178, 0.12), inset 0 2px 20px rgba(255, 255, 255, 0.7);
   position: relative;
   overflow: hidden;
   backdrop-filter: blur(16px);
@@ -4554,15 +4556,15 @@ onBeforeUnmount(() => {
 }
 
 .hero-title {
-  font-size: 20px;
+  font-size: 28px;
   font-weight: 700;
-  color: #0f172a;
+  color: #173854;
 }
 
 .hero-subtitle {
   margin-top: 6px;
-  font-size: 13px;
-  color: #475569;
+  font-size: 14px;
+  color: #6d8aa3;
 }
 
 .hero-kpis {
@@ -4573,11 +4575,12 @@ onBeforeUnmount(() => {
 }
 
 .hero-kpi-item {
-  min-width: 92px;
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 6px 10px;
+  min-width: 132px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid #dce9f2;
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow: 0 8px 18px rgba(73, 130, 178, 0.08);
 }
 
 .hero-kpi-item.clickable {
@@ -4591,13 +4594,14 @@ onBeforeUnmount(() => {
 
 .hero-kpi-label {
   display: block;
-  color: #64748b;
+  color: #6d8aa3;
   font-size: 12px;
 }
 
 .hero-kpi-value {
-  color: #0f172a;
-  font-size: 18px;
+  color: #173854;
+  font-size: 26px;
+  font-weight: 700;
 }
 
 .hero-actions {
@@ -4614,17 +4618,25 @@ onBeforeUnmount(() => {
   width: 100%;
   display: flex;
   justify-content: flex-end;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid #dce9f2;
+  background: rgba(255, 255, 255, 0.82);
 }
 
 .hero-actions-meta {
   width: 100%;
   display: flex;
   justify-content: flex-end;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid #dce9f2;
+  background: rgba(255, 255, 255, 0.78);
 }
 
 .hero-actions-tip {
   font-size: 12px;
-  color: #64748b;
+  color: #6d8aa3;
 }
 
 .hero-actions-tip-row {
@@ -4650,7 +4662,7 @@ onBeforeUnmount(() => {
 .hero-search-hint {
   margin-top: 6px;
   font-size: 12px;
-  color: #64748b;
+  color: #6d8aa3;
 }
 
 .section-row {
@@ -4659,22 +4671,22 @@ onBeforeUnmount(() => {
 
 .module-card {
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.7);
+  border: 1px solid #dce9f2;
   transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
   position: relative;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.65);
+  background: rgba(255, 255, 255, 0.84);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+  box-shadow: 0 12px 26px rgba(73, 130, 178, 0.08);
 }
 
 .todo-focus-card {
   background:
-    linear-gradient(135deg, rgba(239, 246, 255, 0.9), rgba(255, 255, 255, 0.95)),
-    linear-gradient(130deg, rgba(59, 130, 246, 0.15), rgba(56, 189, 248, 0.05));
-  border-color: rgba(191, 219, 254, 0.8);
-  box-shadow: 0 10px 30px rgba(59, 130, 246, 0.08);
+    linear-gradient(135deg, rgba(244, 250, 255, 0.96), rgba(255, 255, 255, 0.98)),
+    linear-gradient(130deg, rgba(31, 143, 190, 0.12), rgba(87, 215, 255, 0.05));
+  border-color: rgba(188, 224, 238, 0.9);
+  box-shadow: 0 14px 30px rgba(73, 130, 178, 0.1);
 }
 
 .todo-focus-card :deep(.ant-card-head) {
@@ -4682,10 +4694,10 @@ onBeforeUnmount(() => {
 }
 
 .module-card:hover {
-  border-color: rgba(255, 255, 255, 1);
-  box-shadow: 0 16px 40px rgba(37, 99, 235, 0.08);
+  border-color: #cde1ee;
+  box-shadow: 0 18px 36px rgba(73, 130, 178, 0.12);
   transform: translateY(-4px);
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.94);
 }
 
 .full-height {
@@ -4693,33 +4705,33 @@ onBeforeUnmount(() => {
 }
 
 .metric-cell {
-  background: rgba(255, 255, 255, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f4f9fc 100%);
+  border: 1px solid #dce9f2;
+  border-radius: 14px;
   padding: 16px;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 8px 16px rgba(73, 130, 178, 0.06);
   transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
   backdrop-filter: blur(10px);
 }
 
 .metric-cell:hover {
-  border-color: #93c5fd;
+  border-color: #b9dae9;
   background: rgba(255, 255, 255, 0.95);
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.08);
+  box-shadow: 0 12px 24px rgba(73, 130, 178, 0.1);
 }
 
 .metric-title {
   font-size: 12px;
-  color: #64748b;
+  color: #6d8aa3;
 }
 
 .metric-value {
   margin-top: 6px;
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 700;
-  color: #0f172a;
+  color: #173854;
   word-break: break-all;
 }
 
@@ -4739,15 +4751,16 @@ onBeforeUnmount(() => {
 .birthday-filter-bar {
   margin-top: 10px;
   padding: 8px 10px;
-  border: 1px dashed #bfdbfe;
-  border-radius: 10px;
-  background: #f8fbff;
+  border: 1px dashed #c9ddea;
+  border-radius: 12px;
+  background: #f7fbfe;
 }
 
 .reminder-count {
   min-width: 42px;
   text-align: right;
-  color: #475569;
+  color: #173854;
+  font-weight: 700;
 }
 
 .reminder-card :deep(.ant-card-head-wrapper) {
@@ -4772,7 +4785,7 @@ onBeforeUnmount(() => {
 }
 
 .reminder-unread {
-  background: rgba(239, 246, 255, 0.78);
+  background: rgba(223, 243, 250, 0.42);
 }
 
 .quick-group {
