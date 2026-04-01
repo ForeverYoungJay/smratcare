@@ -23,34 +23,35 @@ function hasAccess(route: RouteRecordRaw, roles: string[], pagePermissions: stri
 }
 
 function buildMenu(routes: RouteRecordRaw[], roles: string[], pagePermissions: string[], basePath = ''): MenuItem[] {
-  return routes
-    .filter((r) => !r.meta?.hidden)
-    .map((r) => {
-      const routePath = joinPath(basePath, r.path || '')
-      const selfAccessible = hasAccess(r, roles, pagePermissions, routePath)
-      const children = r.children?.length
-        ? buildMenu(r.children, roles, pagePermissions, routePath)
-        : []
-      if (!selfAccessible && children.length === 0) {
-        return null
-      }
-      const fullPath = r.children ? undefined : joinPath(basePath, r.path || '')
-      const node: MenuItem = {
-        key: String(r.name || fullPath || r.path),
-        label: String(r.meta?.title || r.name || r.path),
-        icon: r.meta?.icon as string | undefined,
-        roles: r.meta?.roles as string[] | undefined
-      }
-      if (children.length > 0) {
-        if (children.length > 0) node.children = children
-      } else if (fullPath && selfAccessible) {
-        node.path = fullPath
-      }
-      return node
-    })
-    .filter(Boolean)
-    .filter((m) => !m.children || m.children.length > 0)
-    as MenuItem[]
+  return (
+    routes
+      .filter((r) => !r.meta?.hidden)
+      .map((r) => {
+        const routePath = joinPath(basePath, r.path || '')
+        const selfAccessible = hasAccess(r, roles, pagePermissions, routePath)
+        const children = r.children?.length
+          ? buildMenu(r.children, roles, pagePermissions, routePath)
+          : []
+        if (!selfAccessible && children.length === 0) {
+          return null
+        }
+        const fullPath = r.children ? undefined : joinPath(basePath, r.path || '')
+        const node: MenuItem = {
+          key: String(r.name || fullPath || r.path),
+          label: String(r.meta?.title || r.name || r.path),
+          icon: r.meta?.icon as string | undefined,
+          roles: r.meta?.roles as string[] | undefined
+        }
+        if (children.length > 0) {
+          node.children = children
+        } else if (fullPath && selfAccessible) {
+          node.path = fullPath
+        }
+        return node
+      })
+      .filter(Boolean)
+      .filter((m) => !m?.children || m.children.length > 0)
+  ) as MenuItem[]
 }
 
 export function getMenuTree(roles: string[], pagePermissions: string[] = []) {
