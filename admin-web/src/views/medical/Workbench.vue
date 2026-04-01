@@ -4,7 +4,7 @@
       <a-space>
         <a-tag color="blue">业务日期 {{ summary.snapshotDate || '-' }}</a-tag>
         <a-tag :color="compactMode ? 'gold' : 'default'">{{ compactMode ? '交班紧凑模式' : '标准模式' }}</a-tag>
-        <a-button type="primary" ghost @click="load">刷新数据</a-button>
+        <a-button type="primary" @click="load">刷新数据</a-button>
         <a-switch v-model:checked="compactMode" checked-children="紧凑" un-checked-children="标准" @change="handleModeChange" />
       </a-space>
     </template>

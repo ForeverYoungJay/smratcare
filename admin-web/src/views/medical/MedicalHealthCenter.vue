@@ -5,7 +5,7 @@
         <a-tag color="blue">业务日期 {{ summary.snapshotDate || '-' }}</a-tag>
         <a-tag color="geekblue">窗口 {{ configuredQuery.incidentWindowDays }} 天</a-tag>
         <a-tag :color="riskTagColor">{{ riskLabel }}</a-tag>
-        <a-button type="primary" ghost @click="loadSummary">刷新</a-button>
+        <a-button type="primary" @click="loadSummary">刷新</a-button>
       </a-space>
     </template>
 

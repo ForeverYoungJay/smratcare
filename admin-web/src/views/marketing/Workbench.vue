@@ -47,19 +47,19 @@
     <a-card class="card-elevated action-board" :bordered="false" style="margin-bottom: 16px">
       <a-space wrap>
         <span class="quick-label">今日建议动作：</span>
-        <a-button type="primary" ghost @click="goFollowup('overdue')">
+        <a-button type="primary" @click="goFollowup('overdue')">
           处理逾期跟进（{{ followup.overdue }}）
         </a-button>
-        <a-button type="primary" ghost @click="goContractLifecycle('PENDING_ASSESSMENT')">
+        <a-button type="primary" @click="goContractLifecycle('PENDING_ASSESSMENT')">
           补齐待评估（{{ funnel.evaluationCount }}）
         </a-button>
-        <a-button type="primary" ghost @click="goContractLifecycle('PENDING_BED_SELECT')">
+        <a-button type="primary" @click="goContractLifecycle('PENDING_BED_SELECT')">
           办理待入住（{{ funnel.pendingAdmissionCount }}）
         </a-button>
-        <a-button type="primary" ghost @click="goContract('pending')">
+        <a-button type="primary" @click="goContract('pending')">
           推进待签署（{{ contract.pendingSignCount }}）
         </a-button>
-        <a-button type="primary" ghost @click="goPlan({ status: 'PENDING_APPROVAL' })">
+        <a-button type="primary" @click="goPlan({ status: 'PENDING_APPROVAL' })">
           审批营销方案（{{ plan.pendingApprovalCount }}）
         </a-button>
       </a-space>

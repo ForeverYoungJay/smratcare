@@ -57,7 +57,7 @@
             <a-tag color="purple">收款 {{ ledgerHealth?.paymentCount || 0 }}</a-tag>
             <a-tag color="cyan">流水 {{ ledgerHealth?.consumptionCount || 0 }}</a-tag>
             <a-button @click="go('/finance/reconcile/ledger-health')">巡检明细</a-button>
-            <a-button type="primary" ghost @click="go('/finance/reconcile/issue-center')">去处理异常</a-button>
+            <a-button type="primary" @click="go('/finance/reconcile/issue-center')">去处理异常</a-button>
           </a-space>
         </a-col>
         <a-col :span="24" v-if="(ledgerHealth?.issues || []).length">

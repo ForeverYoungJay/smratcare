@@ -16,7 +16,7 @@
               <a-button type="primary" @click="loadData">刷新摘要</a-button>
               <a-button @click="exportData">导出月结单</a-button>
               <a-button @click="printSummary">打印月结单</a-button>
-              <a-button type="primary" ghost :disabled="summary?.locked" @click="openCloseModal">发起关账</a-button>
+              <a-button type="primary" :disabled="summary?.locked" @click="openCloseModal">发起关账</a-button>
               <a-button v-if="summary?.locked" danger @click="openUnlockModal">反锁账</a-button>
               <a-button v-if="summary?.locked" @click="openCrossPeriodModal">跨期申请</a-button>
               <a-button @click="go('/finance/reconcile/issue-center')">异常修复中心</a-button>

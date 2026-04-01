@@ -99,7 +99,7 @@
             <div class="command-buttons">
               <a-button @click="openBedMap">房态视图</a-button>
               <a-button @click="openBedManage">床位管理</a-button>
-              <a-button type="primary" ghost @click="resetFilters">重置</a-button>
+              <a-button type="primary" @click="resetFilters">重置</a-button>
             </div>
           </div>
         </section>

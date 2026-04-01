@@ -4,7 +4,7 @@
       <a-space wrap>
         <a-tag :color="dutyMode ? 'gold' : 'default'">{{ dutyMode ? '值班高密度模式' : '标准模式' }}</a-tag>
         <span class="refresh-meta">最近刷新：{{ lastLoadedAt || '-' }}</span>
-        <a-button type="primary" ghost @click="loadSummary">刷新数据</a-button>
+        <a-button type="primary" @click="loadSummary">刷新数据</a-button>
         <a-switch v-model:checked="autoRefresh" checked-children="自动刷新" un-checked-children="手动刷新" />
         <a-switch v-model:checked="dutyMode" checked-children="值班" un-checked-children="标准" @change="handleModeChange" />
       </a-space>

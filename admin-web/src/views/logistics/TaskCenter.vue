@@ -8,7 +8,7 @@
       <a-space>
         <a-tag :color="viewMode === 'DUTY' ? 'gold' : 'blue'">{{ viewMode === 'DUTY' ? '值班视图' : '全量视图' }}</a-tag>
         <a-tag :color="densityMode === 'dense' ? 'orange' : 'default'">{{ densityMode === 'dense' ? '大屏密度' : '标准密度' }}</a-tag>
-        <a-button type="primary" ghost @click="loadData({ preserveSelection: true })">刷新数据</a-button>
+        <a-button type="primary" @click="loadData({ preserveSelection: true })">刷新数据</a-button>
       </a-space>
     </template>
     <StatefulBlock :loading="loading" :error="errorMessage" :empty="false" @retry="loadData">

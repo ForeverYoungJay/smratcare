@@ -5,7 +5,7 @@
         <a-tag color="blue">任务总数 {{ summary.totalPending }}</a-tag>
         <a-tag color="orange">高风险 {{ summary.highRiskCount }}</a-tag>
         <a-tag color="purple">超时 {{ summary.overdueCount }}</a-tag>
-        <a-button type="primary" ghost :loading="loading" @click="loadData">刷新</a-button>
+        <a-button type="primary" :loading="loading" @click="loadData">刷新</a-button>
       </a-space>
     </template>
 

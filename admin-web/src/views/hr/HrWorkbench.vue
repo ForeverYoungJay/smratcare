@@ -58,7 +58,7 @@
       </a-space>
       <div v-if="favoriteActions.length" class="favorite-actions">
         <div v-for="action in favoriteActions" :key="`favorite-${action.path}`" class="favorite-action-item">
-          <a-button type="primary" ghost @click="go(action.path)">{{ action.label }}</a-button>
+          <a-button type="primary" @click="go(action.path)">{{ action.label }}</a-button>
           <a-tooltip title="移除常用">
             <a-button type="text" size="small" class="favorite-toggle" @click.stop="toggleFavorite(action.path)">
               <StarFilled />
