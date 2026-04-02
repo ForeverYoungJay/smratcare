@@ -39,13 +39,21 @@
 
       <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="对账结果">
         <a-row :gutter="16">
-          <a-col :span="8">
+          <a-col :span="6">
             <a-statistic title="日期" :value="result?.date || '-'" />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
             <a-statistic title="当日收款" :value="result?.totalReceived ?? 0" />
           </a-col>
-          <a-col :span="8">
+          <a-col :span="6">
+            <a-statistic title="当日退款" :value="result?.totalRefund ?? 0" />
+          </a-col>
+          <a-col :span="6">
+            <a-statistic title="净收款" :value="result?.netReceived ?? 0" />
+          </a-col>
+        </a-row>
+        <a-row :gutter="16" style="margin-top: 12px;">
+          <a-col :span="24">
             <a-statistic title="是否异常">
               <template #value>
                 <a-tag :color="result?.mismatchFlag ? 'red' : 'green'">{{ result?.mismatchFlag ? '存在差异' : '正常' }}</a-tag>
@@ -110,6 +118,8 @@
           </template>
         </vxe-column>
         <vxe-column field="totalReceived" title="收款总额" width="140" />
+        <vxe-column field="totalRefund" title="退款总额" width="140" />
+        <vxe-column field="netReceived" title="净收款" width="140" />
         <vxe-column field="mismatchFlag" title="是否异常" width="120">
           <template #default="{ row }">
             <a-tag :color="row.mismatchFlag ? 'red' : 'green'">{{ row.mismatchFlag ? '异常' : '正常' }}</a-tag>
@@ -281,6 +291,8 @@ function printHistory() {
       columns: [
         { key: 'reconcileDate', title: '对账日期' },
         { key: 'totalReceived', title: '收款总额' },
+        { key: 'totalRefund', title: '退款总额' },
+        { key: 'netReceived', title: '净收款' },
         { key: 'mismatchText', title: '是否异常' },
         { key: 'remark', title: '备注' },
         { key: 'createTime', title: '生成时间' }
@@ -288,6 +300,8 @@ function printHistory() {
       rows: history.value.map(item => ({
         reconcileDate: item.reconcileDate || item.date || '-',
         totalReceived: item.totalReceived ?? 0,
+        totalRefund: item.totalRefund ?? 0,
+        netReceived: item.netReceived ?? 0,
         mismatchText: item.mismatchFlag ? '异常' : '正常',
         remark: item.remark || '-',
         createTime: item.createTime || '-'

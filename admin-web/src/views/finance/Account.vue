@@ -26,6 +26,9 @@
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="低余额账户" :value="lowBalanceCount" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="账户总余额" :value="totalBalance" suffix="元" :precision="2" /></a-card></a-col>
       <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="停用账户" :value="disabledCount" /></a-card></a-col>
+      <a-col :xs="24" :xl="8"><a-card class="card-elevated" :bordered="false"><a-statistic title="押金余额合计" :value="totalDepositBalance" suffix="元" :precision="2" /></a-card></a-col>
+      <a-col :xs="24" :xl="8"><a-card class="card-elevated" :bordered="false"><a-statistic title="预收余额合计" :value="totalPrepaidBalance" suffix="元" :precision="2" /></a-card></a-col>
+      <a-col :xs="24" :xl="8"><a-card class="card-elevated" :bordered="false"><a-statistic title="历史未拆分余额" :value="totalUnclassifiedBalance" suffix="元" :precision="2" /></a-card></a-col>
       <a-col :span="24">
         <a-alert
           :type="moduleSummary.warningMessage ? 'warning' : 'info'"
@@ -85,6 +88,9 @@
         </a-form-item>
         <a-form-item label="方向" required>
           <a-select v-model:value="adjustForm.direction" :options="directionOptions" />
+        </a-form-item>
+        <a-form-item label="资金类型" required>
+          <a-select v-model:value="adjustForm.fundType" :options="fundTypeOptions" />
         </a-form-item>
         <a-form-item label="金额" required>
           <a-input-number v-model:value="adjustForm.amount" style="width: 100%" :min="0.01" />
@@ -173,10 +179,15 @@ const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChange
 const lowBalanceCount = computed(() => rows.value.filter(item => Number(item.balance || 0) <= Number(item.warnThreshold || 0)).length)
 const disabledCount = computed(() => rows.value.filter(item => Number(item.status || 0) !== 1).length)
 const totalBalance = computed(() => rows.value.reduce((sum, item) => sum + Number(item.balance || 0), 0))
+const totalDepositBalance = computed(() => rows.value.reduce((sum, item) => sum + Number(item.depositBalance || 0), 0))
+const totalPrepaidBalance = computed(() => rows.value.reduce((sum, item) => sum + Number(item.prepaidBalance || 0), 0))
+const totalUnclassifiedBalance = computed(() => rows.value.reduce((sum, item) => sum + Number(item.unclassifiedBalance || 0), 0))
 
 const columns = [
   { title: '老人', dataIndex: 'elderName', key: 'elderName', width: 140 },
   { title: '余额', dataIndex: 'balance', key: 'balance', width: 120 },
+  { title: '押金', dataIndex: 'depositBalance', key: 'depositBalance', width: 120 },
+  { title: '预收', dataIndex: 'prepaidBalance', key: 'prepaidBalance', width: 120 },
   { title: '积分余额', dataIndex: 'pointsBalance', key: 'pointsBalance', width: 120 },
   { title: '信用额度', dataIndex: 'creditLimit', key: 'creditLimit', width: 120 },
   { title: '预警阈值', dataIndex: 'warnThreshold', key: 'warnThreshold', width: 120 },
@@ -207,6 +218,7 @@ const configForm = reactive({
 const adjustForm = reactive({
   elderId: undefined as Id | undefined,
   direction: 'CREDIT',
+  fundType: 'PREPAID' as 'PREPAID' | 'DEPOSIT' | 'AUTO',
   amount: 0,
   remark: ''
 })
@@ -215,6 +227,16 @@ const directionOptions = [
   { label: '充值', value: 'CREDIT' },
   { label: '扣费', value: 'DEBIT' }
 ]
+const fundTypeOptions = computed(() => adjustForm.direction === 'CREDIT'
+  ? [
+      { label: '预收', value: 'PREPAID' },
+      { label: '押金', value: 'DEPOSIT' }
+    ]
+  : [
+      { label: '自动抵扣', value: 'AUTO' },
+      { label: '预收', value: 'PREPAID' },
+      { label: '押金', value: 'DEPOSIT' }
+    ])
 const statusOptions = [
   { label: '启用', value: 1 },
   { label: '停用', value: 0 }
@@ -272,6 +294,7 @@ function onReset() {
 function openAdjust() {
   adjustForm.elderId = undefined
   adjustForm.direction = 'CREDIT'
+  adjustForm.fundType = 'PREPAID'
   adjustForm.amount = 0
   adjustForm.remark = ''
   searchElderOptions('')
@@ -294,6 +317,7 @@ async function submitAdjust() {
       elderName: findElderName(adjustForm.elderId),
       amount: adjustForm.amount,
       direction: adjustForm.direction as 'DEBIT' | 'CREDIT',
+      fundType: adjustForm.fundType,
       remark: adjustForm.remark
     })
     message.success('调整成功')
@@ -349,6 +373,13 @@ async function openWarnings() {
 async function searchElders(keyword: string) {
   await searchElderOptions(keyword)
 }
+
+watch(
+  () => adjustForm.direction,
+  (direction) => {
+    adjustForm.fundType = direction === 'DEBIT' ? 'AUTO' : 'PREPAID'
+  }
+)
 
 applyRouteFilters()
 fetchData()

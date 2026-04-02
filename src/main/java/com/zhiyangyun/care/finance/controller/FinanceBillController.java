@@ -25,7 +25,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -193,11 +195,22 @@ public class FinanceBillController {
     Long beforeElderId = monthly.getElderId();
     monthly.setElderId(elder.getId());
     billMonthlyMapper.updateById(monthly);
-    auditLogService.record(
+    Map<String, Object> beforeSnapshot = new LinkedHashMap<>();
+    beforeSnapshot.put("elderId", beforeElderId);
+    beforeSnapshot.put("billMonth", monthly.getBillMonth());
+    beforeSnapshot.put("status", monthly.getStatus());
+    Map<String, Object> afterSnapshot = new LinkedHashMap<>();
+    afterSnapshot.put("elderId", elder.getId());
+    afterSnapshot.put("billMonth", monthly.getBillMonth());
+    afterSnapshot.put("status", monthly.getStatus());
+    Map<String, Object> context = new LinkedHashMap<>();
+    context.put("remark", request.getRemark());
+    auditLogService.recordStructured(
         orgId, orgId, staffId, username,
         "FIN_BILL_BIND_ELDER", "FINANCE_BILL", monthly.getId(),
         "修复账单老人: " + beforeElderId + "->" + elder.getId()
-            + (request.getRemark() == null || request.getRemark().isBlank() ? "" : ("；备注:" + request.getRemark().trim())));
+            + (request.getRemark() == null || request.getRemark().isBlank() ? "" : ("；备注:" + request.getRemark().trim())),
+        beforeSnapshot, afterSnapshot, context);
     return detail(billId);
   }
 }

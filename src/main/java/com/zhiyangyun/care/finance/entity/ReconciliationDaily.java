@@ -18,6 +18,8 @@ public class ReconciliationDaily {
   private Long orgId;
   private LocalDate reconcileDate;
   private BigDecimal totalReceived;
+  private BigDecimal totalRefund;
+  private BigDecimal netReceived;
   private Integer mismatchFlag;
   private String remark;
   @TableField(value = "create_time", fill = FieldFill.INSERT)

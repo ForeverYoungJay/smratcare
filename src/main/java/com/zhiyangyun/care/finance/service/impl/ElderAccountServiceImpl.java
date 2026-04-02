@@ -42,10 +42,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ElderAccountServiceImpl implements ElderAccountService {
+  private static final String FUND_TYPE_PREPAID = "PREPAID";
+  private static final String FUND_TYPE_DEPOSIT = "DEPOSIT";
+  private static final String FUND_TYPE_AUTO = "AUTO";
   private final ElderAccountMapper accountMapper;
   private final ElderAccountLogMapper logMapper;
   private final ElderMapper elderMapper;
@@ -73,22 +77,7 @@ public class ElderAccountServiceImpl implements ElderAccountService {
   @Override
   @Transactional
   public ElderAccountResponse getOrCreate(Long orgId, Long elderId, Long operatorId) {
-    ElderAccount account = accountMapper.selectOne(Wrappers.lambdaQuery(ElderAccount.class)
-        .eq(ElderAccount::getIsDeleted, 0)
-        .eq(orgId != null, ElderAccount::getOrgId, orgId)
-        .eq(ElderAccount::getElderId, elderId));
-    if (account == null) {
-      account = new ElderAccount();
-      account.setTenantId(orgId);
-      account.setOrgId(orgId);
-      account.setElderId(elderId);
-      account.setBalance(BigDecimal.ZERO);
-      account.setCreditLimit(BigDecimal.ZERO);
-      account.setWarnThreshold(BigDecimal.ZERO);
-      account.setStatus(1);
-      account.setCreatedBy(operatorId);
-      accountMapper.insert(account);
-    }
+    ElderAccount account = loadOrCreateAccountForUpdate(orgId, elderId, operatorId);
     List<Long> elderIds = List.of(elderId);
     return toAccountResponse(account,
         elderNameMap(elderIds).get(elderId),
@@ -205,12 +194,15 @@ public class ElderAccountServiceImpl implements ElderAccountService {
       meta.setSpacingAfter(10);
       document.add(meta);
 
-      PdfPTable table = new PdfPTable(new float[] {1.2f, 0.9f, 1.0f, 1.0f, 1.2f, 1.1f, 1.4f, 1.4f, 1.8f});
+      PdfPTable table = new PdfPTable(new float[] {1.0f, 0.8f, 0.9f, 0.9f, 0.9f, 0.9f, 0.9f, 1.0f, 1.1f, 1.3f, 1.8f});
       table.setWidthPercentage(100);
       addHeaderCell(table, "老人", headerFont);
       addHeaderCell(table, "方向", headerFont);
       addHeaderCell(table, "金额", headerFont);
       addHeaderCell(table, "余额", headerFont);
+      addHeaderCell(table, "资金类型", headerFont);
+      addHeaderCell(table, "押金结余", headerFont);
+      addHeaderCell(table, "预收结余", headerFont);
       addHeaderCell(table, "来源", headerFont);
       addHeaderCell(table, "充值方式", headerFont);
       addHeaderCell(table, "充值时间", headerFont);
@@ -222,6 +214,9 @@ public class ElderAccountServiceImpl implements ElderAccountService {
         addBodyCell(table, formatDirection(row.getDirection()), bodyFont);
         addBodyCell(table, formatAmount(row.getAmount()), bodyFont);
         addBodyCell(table, formatAmount(row.getBalanceAfter()), bodyFont);
+        addBodyCell(table, formatFundType(row.getFundType()), bodyFont);
+        addBodyCell(table, formatAmount(row.getDepositBalanceAfter()), bodyFont);
+        addBodyCell(table, formatAmount(row.getPrepaidBalanceAfter()), bodyFont);
         addBodyCell(table, row.getSourceType(), bodyFont);
         addBodyCell(table, parseRechargeMethod(row.getRemark()), bodyFont);
         addBodyCell(table, parseRechargeTime(row.getRemark()), bodyFont);
@@ -231,7 +226,7 @@ public class ElderAccountServiceImpl implements ElderAccountService {
 
       if (records.isEmpty()) {
         PdfPCell emptyCell = new PdfPCell(new Phrase("暂无流水数据", bodyFont));
-        emptyCell.setColspan(9);
+        emptyCell.setColspan(11);
         emptyCell.setHorizontalAlignment(Element.ALIGN_CENTER);
         emptyCell.setPadding(8);
         table.addCell(emptyCell);
@@ -258,24 +253,9 @@ public class ElderAccountServiceImpl implements ElderAccountService {
     if (elderId == null) {
       throw new IllegalArgumentException("elderId or elderName required");
     }
-    ElderAccount account = accountMapper.selectOne(Wrappers.lambdaQuery(ElderAccount.class)
-        .eq(ElderAccount::getIsDeleted, 0)
-        .eq(orgId != null, ElderAccount::getOrgId, orgId)
-        .eq(ElderAccount::getElderId, elderId));
-    if (account == null) {
-      account = new ElderAccount();
-      account.setTenantId(orgId);
-      account.setOrgId(orgId);
-      account.setElderId(elderId);
-      account.setBalance(BigDecimal.ZERO);
-      account.setCreditLimit(BigDecimal.ZERO);
-      account.setWarnThreshold(BigDecimal.ZERO);
-      account.setStatus(1);
-      account.setCreatedBy(operatorId);
-      accountMapper.insert(account);
-    }
-    applyChange(account, request.getAmount(), request.getDirection(), "ADJUST", null,
-        request.getRemark(), operatorId);
+    ElderAccount account = loadOrCreateAccountForUpdate(orgId, elderId, operatorId);
+    applyChange(account, request.getAmount(), request.getDirection(), request.getFundType(),
+        "ADJUST", null, request.getRemark(), operatorId);
     List<Long> elderIds = List.of(account.getElderId());
     return toAccountResponse(account,
         elderNameMap(elderIds).get(account.getElderId()),
@@ -292,22 +272,7 @@ public class ElderAccountServiceImpl implements ElderAccountService {
     if (elderId == null) {
       throw new IllegalArgumentException("elderId or elderName required");
     }
-    ElderAccount account = accountMapper.selectOne(Wrappers.lambdaQuery(ElderAccount.class)
-        .eq(ElderAccount::getIsDeleted, 0)
-        .eq(orgId != null, ElderAccount::getOrgId, orgId)
-        .eq(ElderAccount::getElderId, elderId));
-    if (account == null) {
-      account = new ElderAccount();
-      account.setTenantId(orgId);
-      account.setOrgId(orgId);
-      account.setElderId(elderId);
-      account.setBalance(BigDecimal.ZERO);
-      account.setCreditLimit(BigDecimal.ZERO);
-      account.setWarnThreshold(BigDecimal.ZERO);
-      account.setStatus(1);
-      account.setCreatedBy(operatorId);
-      accountMapper.insert(account);
-    }
+    ElderAccount account = loadOrCreateAccountForUpdate(orgId, elderId, operatorId);
     if (request.getCreditLimit() != null) {
       account.setCreditLimit(request.getCreditLimit());
     }
@@ -334,23 +299,8 @@ public class ElderAccountServiceImpl implements ElderAccountService {
     if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
       return;
     }
-    ElderAccount account = accountMapper.selectOne(Wrappers.lambdaQuery(ElderAccount.class)
-        .eq(ElderAccount::getIsDeleted, 0)
-        .eq(orgId != null, ElderAccount::getOrgId, orgId)
-        .eq(ElderAccount::getElderId, elderId));
-    if (account == null) {
-      account = new ElderAccount();
-      account.setTenantId(orgId);
-      account.setOrgId(orgId);
-      account.setElderId(elderId);
-      account.setBalance(BigDecimal.ZERO);
-      account.setCreditLimit(BigDecimal.ZERO);
-      account.setWarnThreshold(BigDecimal.ZERO);
-      account.setStatus(1);
-      account.setCreatedBy(operatorId);
-      accountMapper.insert(account);
-    }
-    applyChange(account, amount, "DEBIT", "TASK", taskDailyId, remark, operatorId);
+    ElderAccount account = loadOrCreateAccountForUpdate(orgId, elderId, operatorId);
+    applyChange(account, amount, "DEBIT", FUND_TYPE_AUTO, "TASK", taskDailyId, remark, operatorId);
   }
 
   @Override
@@ -376,19 +326,42 @@ public class ElderAccountServiceImpl implements ElderAccountService {
         .toList();
   }
 
-  private void applyChange(ElderAccount account, BigDecimal amount, String direction,
+  private void applyChange(ElderAccount account, BigDecimal amount, String direction, String requestedFundType,
       String sourceType, Long sourceId, String remark, Long operatorId) {
     if (direction == null || (!direction.equalsIgnoreCase("DEBIT") && !direction.equalsIgnoreCase("CREDIT"))) {
       throw new IllegalArgumentException("direction must be DEBIT or CREDIT");
     }
-    BigDecimal balance = account.getBalance() == null ? BigDecimal.ZERO : account.getBalance();
-    BigDecimal delta = amount;
+    ensureSplitBalances(account);
+    String fundType = normalizeFundType(requestedFundType, direction, sourceType, remark);
+    BigDecimal balance = safeAmount(account.getBalance());
+    BigDecimal depositBalance = safeAmount(account.getDepositBalance());
+    BigDecimal prepaidBalance = safeAmount(account.getPrepaidBalance());
     if (direction.equalsIgnoreCase("DEBIT")) {
-      balance = balance.subtract(delta);
+      balance = balance.subtract(amount);
+      if (FUND_TYPE_DEPOSIT.equals(fundType)) {
+        depositBalance = depositBalance.subtract(amount.min(depositBalance));
+      } else if (FUND_TYPE_PREPAID.equals(fundType)) {
+        prepaidBalance = prepaidBalance.subtract(amount.min(prepaidBalance));
+      } else {
+        BigDecimal prepaidDebit = amount.min(prepaidBalance);
+        prepaidBalance = prepaidBalance.subtract(prepaidDebit);
+        BigDecimal remain = amount.subtract(prepaidDebit);
+        if (remain.compareTo(BigDecimal.ZERO) > 0) {
+          depositBalance = depositBalance.subtract(remain.min(depositBalance));
+        }
+      }
     } else {
-      balance = balance.add(delta);
+      balance = balance.add(amount);
+      if (FUND_TYPE_DEPOSIT.equals(fundType)) {
+        depositBalance = depositBalance.add(amount);
+      } else {
+        prepaidBalance = prepaidBalance.add(amount);
+      }
     }
-    account.setBalance(balance);
+    AccountSplit aligned = alignBalances(balance, depositBalance, prepaidBalance);
+    account.setBalance(aligned.balance());
+    account.setDepositBalance(aligned.depositBalance());
+    account.setPrepaidBalance(aligned.prepaidBalance());
     accountMapper.updateById(account);
 
     ElderAccountLog log = new ElderAccountLog();
@@ -397,13 +370,53 @@ public class ElderAccountServiceImpl implements ElderAccountService {
     log.setElderId(account.getElderId());
     log.setAccountId(account.getId());
     log.setAmount(amount);
-    log.setBalanceAfter(balance);
+    log.setBalanceAfter(account.getBalance());
     log.setDirection(direction.toUpperCase());
+    log.setFundType(fundType);
+    log.setDepositBalanceAfter(account.getDepositBalance());
+    log.setPrepaidBalanceAfter(account.getPrepaidBalance());
     log.setSourceType(sourceType);
     log.setSourceId(sourceId);
     log.setRemark(remark);
     log.setCreatedBy(operatorId);
     logMapper.insert(log);
+  }
+
+  private ElderAccount loadOrCreateAccountForUpdate(Long orgId, Long elderId, Long operatorId) {
+    ElderAccount account = findAccountForUpdate(orgId, elderId);
+    if (account != null) {
+      return account;
+    }
+    ElderAccount fresh = new ElderAccount();
+    fresh.setTenantId(orgId);
+    fresh.setOrgId(orgId);
+    fresh.setElderId(elderId);
+    fresh.setBalance(BigDecimal.ZERO);
+    fresh.setDepositBalance(BigDecimal.ZERO);
+    fresh.setPrepaidBalance(BigDecimal.ZERO);
+    fresh.setCreditLimit(BigDecimal.ZERO);
+    fresh.setWarnThreshold(BigDecimal.ZERO);
+    fresh.setStatus(1);
+    fresh.setCreatedBy(operatorId);
+    try {
+      accountMapper.insert(fresh);
+    } catch (DuplicateKeyException ex) {
+      account = findAccountForUpdate(orgId, elderId);
+      if (account != null) {
+        return account;
+      }
+      throw ex;
+    }
+    account = findAccountForUpdate(orgId, elderId);
+    return account == null ? fresh : account;
+  }
+
+  private ElderAccount findAccountForUpdate(Long orgId, Long elderId) {
+    return accountMapper.selectOne(Wrappers.lambdaQuery(ElderAccount.class)
+        .eq(ElderAccount::getIsDeleted, 0)
+        .eq(orgId != null, ElderAccount::getOrgId, orgId)
+        .eq(ElderAccount::getElderId, elderId)
+        .last("LIMIT 1 FOR UPDATE"));
   }
 
   private Map<Long, String> elderNameMap(List<Long> elderIds) {
@@ -454,11 +467,15 @@ public class ElderAccountServiceImpl implements ElderAccountService {
 
   private ElderAccountResponse toAccountResponse(ElderAccount account, String elderName,
       ElderPointsAccount pointsAccount) {
+    ensureSplitBalances(account);
     ElderAccountResponse resp = new ElderAccountResponse();
     resp.setId(account.getId());
     resp.setElderId(account.getElderId());
     resp.setElderName(elderName);
     resp.setBalance(account.getBalance());
+    resp.setDepositBalance(account.getDepositBalance());
+    resp.setPrepaidBalance(account.getPrepaidBalance());
+    resp.setUnclassifiedBalance(unclassifiedBalance(account));
     resp.setCreditLimit(account.getCreditLimit());
     resp.setWarnThreshold(account.getWarnThreshold());
     resp.setStatus(account.getStatus());
@@ -481,6 +498,9 @@ public class ElderAccountServiceImpl implements ElderAccountService {
     resp.setAmount(log.getAmount());
     resp.setBalanceAfter(log.getBalanceAfter());
     resp.setDirection(log.getDirection());
+    resp.setFundType(log.getFundType());
+    resp.setDepositBalanceAfter(log.getDepositBalanceAfter());
+    resp.setPrepaidBalanceAfter(log.getPrepaidBalanceAfter());
     resp.setSourceType(log.getSourceType());
     resp.setSourceId(log.getSourceId());
     resp.setRemark(log.getRemark());
@@ -553,6 +573,18 @@ public class ElderAccountServiceImpl implements ElderAccountService {
     return direction;
   }
 
+  private String formatFundType(String fundType) {
+    if (fundType == null || fundType.isBlank()) {
+      return "-";
+    }
+    return switch (fundType.trim().toUpperCase()) {
+      case FUND_TYPE_DEPOSIT -> "押金";
+      case FUND_TYPE_PREPAID -> "预收";
+      case FUND_TYPE_AUTO -> "自动";
+      default -> fundType;
+    };
+  }
+
   private String formatAmount(BigDecimal amount) {
     return amount == null ? "-" : amount.toPlainString();
   }
@@ -587,5 +619,75 @@ public class ElderAccountServiceImpl implements ElderAccountService {
       return fallback;
     }
     return value;
+  }
+
+  private String normalizeFundType(String requestedFundType, String direction, String sourceType, String remark) {
+    if (requestedFundType != null && !requestedFundType.isBlank()) {
+      String normalized = requestedFundType.trim().toUpperCase();
+      if (!FUND_TYPE_PREPAID.equals(normalized)
+          && !FUND_TYPE_DEPOSIT.equals(normalized)
+          && !FUND_TYPE_AUTO.equals(normalized)) {
+        throw new IllegalArgumentException("fundType must be PREPAID, DEPOSIT or AUTO");
+      }
+      return normalized;
+    }
+    String normalizedSource = sourceType == null ? "" : sourceType.trim().toUpperCase();
+    String normalizedRemark = remark == null ? "" : remark.trim();
+    if ("CREDIT".equalsIgnoreCase(direction)) {
+      if ("ADMISSION_DEPOSIT".equals(normalizedSource) || normalizedRemark.contains("押金")) {
+        return FUND_TYPE_DEPOSIT;
+      }
+      return FUND_TYPE_PREPAID;
+    }
+    return FUND_TYPE_AUTO;
+  }
+
+  private void ensureSplitBalances(ElderAccount account) {
+    if (account == null) {
+      return;
+    }
+    AccountSplit split = alignBalances(
+        safeAmount(account.getBalance()),
+        safeAmount(account.getDepositBalance()),
+        safeAmount(account.getPrepaidBalance()));
+    account.setBalance(split.balance());
+    account.setDepositBalance(split.depositBalance());
+    account.setPrepaidBalance(split.prepaidBalance());
+  }
+
+  private BigDecimal unclassifiedBalance(ElderAccount account) {
+    if (account == null) {
+      return BigDecimal.ZERO;
+    }
+    BigDecimal positiveBalance = safeAmount(account.getBalance()).max(BigDecimal.ZERO);
+    return positiveBalance
+        .subtract(safeAmount(account.getDepositBalance()))
+        .subtract(safeAmount(account.getPrepaidBalance()))
+        .max(BigDecimal.ZERO);
+  }
+
+  private BigDecimal safeAmount(BigDecimal value) {
+    return value == null ? BigDecimal.ZERO : value;
+  }
+
+  private AccountSplit alignBalances(BigDecimal balance, BigDecimal depositBalance, BigDecimal prepaidBalance) {
+    BigDecimal safeBalance = safeAmount(balance);
+    BigDecimal deposit = safeAmount(depositBalance).max(BigDecimal.ZERO);
+    BigDecimal prepaid = safeAmount(prepaidBalance).max(BigDecimal.ZERO);
+    BigDecimal allocatedLimit = safeBalance.max(BigDecimal.ZERO);
+    BigDecimal allocated = deposit.add(prepaid);
+    if (allocated.compareTo(allocatedLimit) > 0) {
+      BigDecimal overflow = allocated.subtract(allocatedLimit);
+      BigDecimal prepaidReduce = overflow.min(prepaid);
+      prepaid = prepaid.subtract(prepaidReduce);
+      overflow = overflow.subtract(prepaidReduce);
+      if (overflow.compareTo(BigDecimal.ZERO) > 0) {
+        deposit = deposit.subtract(overflow.min(deposit));
+      }
+    }
+    return new AccountSplit(safeBalance, deposit, prepaid);
+  }
+
+  private record AccountSplit(BigDecimal balance, BigDecimal depositBalance, BigDecimal prepaidBalance) {
   }
 }

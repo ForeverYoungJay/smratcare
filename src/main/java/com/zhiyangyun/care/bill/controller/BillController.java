@@ -143,9 +143,10 @@ public class BillController {
     }
     if (!normalizedPayMethod.isEmpty()) {
       wrapper.apply(
-          "UPPER(COALESCE((SELECT p.pay_method FROM payment_record p "
-              + "WHERE p.bill_monthly_id = bill_monthly.id AND p.is_deleted = 0 "
-              + "ORDER BY p.paid_at DESC, p.create_time DESC LIMIT 1), '')) = {0}",
+          "EXISTS (SELECT 1 FROM payment_record p "
+              + "WHERE p.bill_monthly_id = bill_monthly.id "
+              + "AND p.is_deleted = 0 "
+              + "AND UPPER(COALESCE(p.pay_method, '')) = {0})",
           normalizedPayMethod);
     }
     wrapper.orderByDesc(BillMonthly::getBillMonth).orderByDesc(BillMonthly::getId);

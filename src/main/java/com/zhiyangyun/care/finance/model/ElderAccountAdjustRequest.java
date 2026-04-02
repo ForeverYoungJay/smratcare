@@ -16,5 +16,7 @@ public class ElderAccountAdjustRequest {
   @NotNull
   private String direction;
 
+  private String fundType;
+
   private String remark;
 }

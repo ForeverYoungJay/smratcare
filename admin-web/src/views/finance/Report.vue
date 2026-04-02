@@ -21,10 +21,17 @@
 
     <StatefulBlock style="margin-top: 16px;" :loading="loading" :error="errorMessage" @retry="loadCharts">
       <a-row :gutter="[16, 16]">
-        <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="总营收" :value="summary.totalRevenue" suffix="元" :precision="2" /></a-card></a-col>
-        <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="商城销售" :value="summary.totalStoreSales" suffix="元" :precision="2" /></a-card></a-col>
-        <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="欠费金额" :value="summary.arrearsTotal" suffix="元" :precision="2" /></a-card></a-col>
-        <a-col :xs="24" :xl="6"><a-card class="card-elevated" :bordered="false"><a-statistic title="欠费长者" :value="summary.arrearsElderCount" /></a-card></a-col>
+        <a-col :xs="24" :xl="8"><a-card class="card-elevated" :bordered="false"><a-statistic title="净营收" :value="summary.netRevenue ?? summary.totalRevenue" suffix="元" :precision="2" /></a-card></a-col>
+        <a-col :xs="24" :xl="8"><a-card class="card-elevated" :bordered="false"><a-statistic title="开账金额" :value="summary.billedRevenue ?? 0" suffix="元" :precision="2" /></a-card></a-col>
+        <a-col :xs="24" :xl="8"><a-card class="card-elevated" :bordered="false"><a-statistic title="实收金额" :value="summary.totalReceived ?? 0" suffix="元" :precision="2" /></a-card></a-col>
+        <a-col :xs="24" :xl="8"><a-card class="card-elevated" :bordered="false"><a-statistic title="退款金额" :value="summary.refundTotal ?? 0" suffix="元" :precision="2" /></a-card></a-col>
+        <a-col :xs="24" :xl="8"><a-card class="card-elevated" :bordered="false"><a-statistic title="商城销售" :value="summary.totalStoreSales" suffix="元" :precision="2" /></a-card></a-col>
+        <a-col :xs="24" :xl="8">
+          <a-card class="card-elevated" :bordered="false">
+            <a-statistic title="欠费金额" :value="summary.arrearsTotal" suffix="元" :precision="2" />
+            <div style="margin-top: 8px; color: #64748b;">欠费长者 {{ summary.arrearsElderCount }} 人</div>
+          </a-card>
+        </a-col>
       </a-row>
       <a-alert v-if="summary.warningMessage" style="margin-top: 12px;" type="warning" show-icon :message="summary.warningMessage" />
 
@@ -170,6 +177,10 @@ const summary = ref<FinanceReportEntrySummary>({
   periodFrom: '',
   periodTo: '',
   totalRevenue: 0,
+  billedRevenue: 0,
+  totalReceived: 0,
+  refundTotal: 0,
+  netRevenue: 0,
   totalStoreSales: 0,
   arrearsTotal: 0,
   arrearsElderCount: 0,
@@ -298,6 +309,18 @@ function go(path: string) {
   router.push(path)
 }
 
+function monthNetValue(item: FinanceReportMonthlyItem) {
+  return Number(item.netAmount ?? item.amount ?? 0)
+}
+
+function monthReceivedValue(item: FinanceReportMonthlyItem) {
+  return Number(item.receivedAmount ?? item.amount ?? 0)
+}
+
+function monthRefundValue(item: FinanceReportMonthlyItem) {
+  return Number(item.refundAmount ?? 0)
+}
+
 async function loadCharts() {
   loading.value = true
   errorMessage.value = ''
@@ -343,7 +366,10 @@ function renderCharts() {
       tooltip: { trigger: 'axis' },
       xAxis: { type: 'category', data: monthlyRevenueRows.value.map(item => item.month) },
       yAxis: { type: 'value' },
-      series: [{ name: '月营收', type: 'line', smooth: true, data: monthlyRevenueRows.value.map(item => item.amount) }]
+      series: [
+        { name: '净营收', type: 'line', smooth: true, data: monthlyRevenueRows.value.map(monthNetValue) },
+        { name: '退款', type: 'bar', data: monthlyRevenueRows.value.map(monthRefundValue) }
+      ]
     })
     return
   }
@@ -382,7 +408,10 @@ function renderCharts() {
       tooltip: { trigger: 'axis' },
       xAxis: { type: 'category', data: monthlyRevenueRows.value.map(item => item.month) },
       yAxis: { type: 'value' },
-      series: [{ name: '营收', type: 'line', smooth: true, data: monthlyRevenueRows.value.map(item => item.amount) }]
+      series: [
+        { name: '净营收', type: 'line', smooth: true, data: monthlyRevenueRows.value.map(monthNetValue) },
+        { name: '实收', type: 'bar', data: monthlyRevenueRows.value.map(monthReceivedValue) }
+      ]
     })
     setStoreOption({
       tooltip: { trigger: 'axis' },
@@ -396,7 +425,10 @@ function renderCharts() {
     tooltip: { trigger: 'axis' },
     xAxis: { type: 'category', data: monthlyRevenueRows.value.map(item => item.month) },
     yAxis: { type: 'value' },
-    series: [{ name: '营收', type: 'line', data: monthlyRevenueRows.value.map(item => item.amount) }]
+    series: [
+      { name: '净营收', type: 'line', data: monthlyRevenueRows.value.map(monthNetValue) },
+      { name: '退款', type: 'bar', data: monthlyRevenueRows.value.map(monthRefundValue) }
+    ]
   })
   setStoreOption({
     tooltip: { trigger: 'axis' },

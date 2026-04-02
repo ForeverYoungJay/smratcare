@@ -155,6 +155,7 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
       adjust.setElderId(request.getElderId());
       adjust.setAmount(request.getDepositAmount());
       adjust.setDirection("CREDIT");
+      adjust.setFundType("DEPOSIT");
       adjust.setRemark("入院押金");
       accountService.adjust(request.getOrgId(), request.getCreatedBy(), adjust);
     }

@@ -7,4 +7,8 @@ import lombok.Data;
 public class FinanceReportMonthlyItem {
   private String month;
   private BigDecimal amount;
+  private BigDecimal billedAmount;
+  private BigDecimal receivedAmount;
+  private BigDecimal refundAmount;
+  private BigDecimal netAmount;
 }

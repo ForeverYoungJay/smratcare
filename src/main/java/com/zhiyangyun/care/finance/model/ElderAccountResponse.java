@@ -10,6 +10,9 @@ public class ElderAccountResponse {
   private Long elderId;
   private String elderName;
   private BigDecimal balance;
+  private BigDecimal depositBalance;
+  private BigDecimal prepaidBalance;
+  private BigDecimal unclassifiedBalance;
   private BigDecimal creditLimit;
   private BigDecimal warnThreshold;
   private Integer status;

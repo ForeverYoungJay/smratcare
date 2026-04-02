@@ -288,6 +288,8 @@ CREATE TABLE bill_monthly (
   id BIGINT NOT NULL PRIMARY KEY,
   org_id BIGINT NOT NULL,
   elder_id BIGINT NOT NULL,
+  elder_contract_id BIGINT DEFAULT NULL,
+  contract_no_snapshot VARCHAR(64) DEFAULT NULL,
   bill_month CHAR(7) NOT NULL,
   total_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
   paid_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
@@ -318,8 +320,37 @@ CREATE TABLE reconciliation_daily (
   org_id BIGINT NOT NULL,
   reconcile_date DATE NOT NULL,
   total_received DECIMAL(10,2) NOT NULL DEFAULT 0,
+  total_refund DECIMAL(10,2) NOT NULL DEFAULT 0,
+  net_received DECIMAL(10,2) NOT NULL DEFAULT 0,
   mismatch_flag TINYINT NOT NULL DEFAULT 0,
   remark VARCHAR(255) DEFAULT NULL,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0
+);
+
+CREATE UNIQUE INDEX uk_bill_monthly_org_elder_month_del
+  ON bill_monthly (org_id, elder_id, bill_month, is_deleted);
+CREATE UNIQUE INDEX uk_payment_record_org_external_del
+  ON payment_record (org_id, external_txn_id, is_deleted);
+CREATE UNIQUE INDEX uk_reconciliation_daily_org_date_del
+  ON reconciliation_daily (org_id, reconcile_date, is_deleted);
+
+CREATE TABLE finance_refund_voucher (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL DEFAULT 1,
+  org_id BIGINT NOT NULL,
+  settlement_id BIGINT NOT NULL,
+  elder_id BIGINT NOT NULL,
+  elder_name VARCHAR(64),
+  voucher_no VARCHAR(64) NOT NULL,
+  amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+  status VARCHAR(16) NOT NULL DEFAULT 'PAID',
+  pay_method VARCHAR(32),
+  executed_by BIGINT,
+  executed_by_name VARCHAR(64),
+  executed_at DATETIME,
+  remark VARCHAR(255),
   create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   is_deleted TINYINT NOT NULL DEFAULT 0
@@ -631,6 +662,64 @@ CREATE TABLE inventory_batch (
   cost_price DECIMAL(10,2) NOT NULL DEFAULT 0,
   expire_date DATE DEFAULT NULL,
   warehouse_location VARCHAR(64) DEFAULT NULL,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE audit_log (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL DEFAULT 1,
+  org_id BIGINT NOT NULL,
+  actor_id BIGINT DEFAULT NULL,
+  actor_name VARCHAR(64) DEFAULT NULL,
+  action_type VARCHAR(64) NOT NULL,
+  entity_type VARCHAR(64) NOT NULL,
+  entity_id BIGINT DEFAULT NULL,
+  detail VARCHAR(1000) DEFAULT NULL,
+  before_snapshot CLOB,
+  after_snapshot CLOB,
+  context_json CLOB,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE elder_account (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL DEFAULT 1,
+  org_id BIGINT NOT NULL,
+  elder_id BIGINT NOT NULL,
+  balance DECIMAL(12,2) NOT NULL DEFAULT 0,
+  deposit_balance DECIMAL(12,2) NOT NULL DEFAULT 0,
+  prepaid_balance DECIMAL(12,2) NOT NULL DEFAULT 0,
+  credit_limit DECIMAL(12,2) NOT NULL DEFAULT 0,
+  warn_threshold DECIMAL(12,2) NOT NULL DEFAULT 0,
+  status TINYINT NOT NULL DEFAULT 1,
+  remark VARCHAR(255) DEFAULT NULL,
+  created_by BIGINT DEFAULT NULL,
+  create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  is_deleted TINYINT NOT NULL DEFAULT 0
+);
+
+CREATE UNIQUE INDEX uk_elder_account_org_elder_del
+  ON elder_account (org_id, elder_id, is_deleted);
+
+CREATE TABLE elder_account_log (
+  id BIGINT NOT NULL PRIMARY KEY,
+  tenant_id BIGINT NOT NULL DEFAULT 1,
+  org_id BIGINT NOT NULL,
+  elder_id BIGINT NOT NULL,
+  account_id BIGINT NOT NULL,
+  amount DECIMAL(12,2) NOT NULL,
+  balance_after DECIMAL(12,2) NOT NULL,
+  direction VARCHAR(16) NOT NULL,
+  fund_type VARCHAR(16) DEFAULT NULL,
+  deposit_balance_after DECIMAL(12,2) NOT NULL DEFAULT 0,
+  prepaid_balance_after DECIMAL(12,2) NOT NULL DEFAULT 0,
+  source_type VARCHAR(32) DEFAULT NULL,
+  source_id BIGINT DEFAULT NULL,
+  remark VARCHAR(255) DEFAULT NULL,
+  created_by BIGINT DEFAULT NULL,
   create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   update_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   is_deleted TINYINT NOT NULL DEFAULT 0

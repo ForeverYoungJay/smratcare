@@ -6,9 +6,13 @@ import com.zhiyangyun.care.bill.mapper.BillMonthlyMapper;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.finance.entity.ConsumptionRecord;
+import com.zhiyangyun.care.finance.entity.DischargeSettlement;
+import com.zhiyangyun.care.finance.entity.FinanceRefundVoucher;
 import com.zhiyangyun.care.finance.entity.PaymentRecord;
 import com.zhiyangyun.care.finance.entity.ReconciliationDaily;
 import com.zhiyangyun.care.finance.mapper.ConsumptionRecordMapper;
+import com.zhiyangyun.care.finance.mapper.DischargeSettlementMapper;
+import com.zhiyangyun.care.finance.mapper.FinanceRefundVoucherMapper;
 import com.zhiyangyun.care.finance.mapper.PaymentRecordMapper;
 import com.zhiyangyun.care.finance.mapper.ReconciliationDailyMapper;
 import com.zhiyangyun.care.finance.model.PaymentRequest;
@@ -26,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -34,6 +39,8 @@ public class FinanceServiceImpl implements FinanceService {
   private final PaymentRecordMapper paymentRecordMapper;
   private final ReconciliationDailyMapper reconciliationDailyMapper;
   private final ConsumptionRecordMapper consumptionRecordMapper;
+  private final FinanceRefundVoucherMapper financeRefundVoucherMapper;
+  private final DischargeSettlementMapper dischargeSettlementMapper;
   private final ElderMapper elderMapper;
   private final FinanceMonthLockService financeMonthLockService;
 
@@ -41,12 +48,16 @@ public class FinanceServiceImpl implements FinanceService {
       PaymentRecordMapper paymentRecordMapper,
       ReconciliationDailyMapper reconciliationDailyMapper,
       ConsumptionRecordMapper consumptionRecordMapper,
+      FinanceRefundVoucherMapper financeRefundVoucherMapper,
+      DischargeSettlementMapper dischargeSettlementMapper,
       ElderMapper elderMapper,
       FinanceMonthLockService financeMonthLockService) {
     this.billMonthlyMapper = billMonthlyMapper;
     this.paymentRecordMapper = paymentRecordMapper;
     this.reconciliationDailyMapper = reconciliationDailyMapper;
     this.consumptionRecordMapper = consumptionRecordMapper;
+    this.financeRefundVoucherMapper = financeRefundVoucherMapper;
+    this.dischargeSettlementMapper = dischargeSettlementMapper;
     this.elderMapper = elderMapper;
     this.financeMonthLockService = financeMonthLockService;
   }
@@ -57,21 +68,7 @@ public class FinanceServiceImpl implements FinanceService {
     if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
       throw new IllegalArgumentException("Payment amount must be positive");
     }
-    if (request.getExternalTxnId() != null && !request.getExternalTxnId().isBlank()) {
-      PaymentRecord existing = paymentRecordMapper.selectOne(
-          Wrappers.lambdaQuery(PaymentRecord.class)
-              .eq(PaymentRecord::getBillMonthlyId, billId)
-              .eq(PaymentRecord::getExternalTxnId, request.getExternalTxnId()));
-      if (existing != null) {
-        BillMonthly bill = billMonthlyMapper.selectById(existing.getBillMonthlyId());
-        if (bill == null) {
-          throw new IllegalStateException("Payment exists but bill is missing");
-        }
-        return toResponse(bill);
-      }
-    }
-
-    BillMonthly bill = billMonthlyMapper.selectById(billId);
+    BillMonthly bill = findBillForUpdate(billId);
     if (bill == null) {
       throw new IllegalArgumentException("Bill not found");
     }
@@ -79,6 +76,22 @@ public class FinanceServiceImpl implements FinanceService {
       throw new IllegalStateException("Invalid bill can not be paid");
     }
     financeMonthLockService.assertMonthEditable(bill.getOrgId(), YearMonth.parse(bill.getBillMonth()), "收款登记");
+
+    String externalTxnId = normalizeExternalTxnId(request.getExternalTxnId());
+    if (externalTxnId != null) {
+      PaymentRecord existing = paymentRecordMapper.selectOne(
+          Wrappers.lambdaQuery(PaymentRecord.class)
+              .eq(PaymentRecord::getIsDeleted, 0)
+              .eq(PaymentRecord::getOrgId, bill.getOrgId())
+              .eq(PaymentRecord::getExternalTxnId, externalTxnId)
+              .last("LIMIT 1"));
+      if (existing != null) {
+        if (!Objects.equals(existing.getBillMonthlyId(), billId)) {
+          throw new IllegalStateException("External transaction already belongs to another bill");
+        }
+        return toResponse(bill);
+      }
+    }
 
     BigDecimal paidAmount = bill.getPaidAmount() == null ? BigDecimal.ZERO : bill.getPaidAmount();
     BigDecimal totalAmount = bill.getTotalAmount() == null ? BigDecimal.ZERO : bill.getTotalAmount();
@@ -93,11 +106,33 @@ public class FinanceServiceImpl implements FinanceService {
     record.setBillMonthlyId(bill.getId());
     record.setAmount(request.getAmount());
     record.setPayMethod(safeMethod(request.getMethod()));
-    record.setExternalTxnId(request.getExternalTxnId());
+    record.setExternalTxnId(externalTxnId);
     record.setPaidAt(request.getPaidAt());
     record.setOperatorStaffId(operatorStaffId);
     record.setRemark(request.getRemark());
-    paymentRecordMapper.insert(record);
+    try {
+      paymentRecordMapper.insert(record);
+    } catch (DuplicateKeyException ex) {
+      if (externalTxnId != null) {
+        PaymentRecord existing = paymentRecordMapper.selectOne(
+            Wrappers.lambdaQuery(PaymentRecord.class)
+                .eq(PaymentRecord::getIsDeleted, 0)
+                .eq(PaymentRecord::getOrgId, bill.getOrgId())
+                .eq(PaymentRecord::getExternalTxnId, externalTxnId)
+                .last("LIMIT 1"));
+        if (existing != null && Objects.equals(existing.getBillMonthlyId(), billId)) {
+          BillMonthly latestBill = findBillForUpdate(billId);
+          if (latestBill == null) {
+            throw new IllegalStateException("Payment exists but bill is missing");
+          }
+          return toResponse(latestBill);
+        }
+        if (existing != null) {
+          throw new IllegalStateException("External transaction already belongs to another bill", ex);
+        }
+      }
+      throw ex;
+    }
     upsertPaymentConsumptionRecord(record, bill);
 
     BigDecimal newPaid = paidAmount.add(request.getAmount());
@@ -120,11 +155,11 @@ public class FinanceServiceImpl implements FinanceService {
     if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
       throw new IllegalArgumentException("Payment amount must be positive");
     }
-    PaymentRecord paymentRecord = paymentRecordMapper.selectById(paymentRecordId);
-    if (paymentRecord == null || Integer.valueOf(1).equals(paymentRecord.getIsDeleted())) {
+    PaymentRecord paymentRecord = findPaymentRecordForUpdate(paymentRecordId);
+    if (paymentRecord == null) {
       throw new IllegalArgumentException("Payment record not found");
     }
-    BillMonthly bill = billMonthlyMapper.selectById(paymentRecord.getBillMonthlyId());
+    BillMonthly bill = findBillForUpdate(paymentRecord.getBillMonthlyId());
     if (bill == null) {
       throw new IllegalArgumentException("Bill not found");
     }
@@ -173,6 +208,7 @@ public class FinanceServiceImpl implements FinanceService {
 
     List<PaymentRecord> records = paymentRecordMapper.selectList(
         Wrappers.lambdaQuery(PaymentRecord.class)
+            .eq(PaymentRecord::getIsDeleted, 0)
             .eq(PaymentRecord::getOrgId, orgId)
             .ge(PaymentRecord::getPaidAt, start)
             .lt(PaymentRecord::getPaidAt, end));
@@ -194,27 +230,52 @@ public class FinanceServiceImpl implements FinanceService {
     for (PaymentRecord record : records) {
       total = total.add(record.getAmount());
     }
-    boolean mismatch = hasReconcileMismatch(records, billMap);
-    String remark = buildReconcileRemark(records, billMap, mismatch);
+    BigDecimal totalRefund = sumRefundAmount(orgId, start, end);
+    BigDecimal netReceived = total.subtract(totalRefund);
+    boolean mismatch = hasReconcileMismatch(orgId, records, billMap, start, end);
+    String remark = buildReconcileRemark(orgId, records, billMap, mismatch, start, end, totalRefund);
 
     List<ReconciliationDaily> existingList = reconciliationDailyMapper.selectList(
         Wrappers.lambdaQuery(ReconciliationDaily.class)
             .eq(ReconciliationDaily::getOrgId, orgId)
             .eq(ReconciliationDaily::getReconcileDate, date)
             .eq(ReconciliationDaily::getIsDeleted, 0)
-            .orderByDesc(ReconciliationDaily::getId));
+            .orderByDesc(ReconciliationDaily::getId)
+            .last("FOR UPDATE"));
     ReconciliationDaily daily;
     if (existingList == null || existingList.isEmpty()) {
       daily = new ReconciliationDaily();
       daily.setOrgId(orgId);
       daily.setReconcileDate(date);
       daily.setTotalReceived(total);
+      daily.setTotalRefund(totalRefund);
+      daily.setNetReceived(netReceived);
       daily.setMismatchFlag(mismatch ? 1 : 0);
       daily.setRemark(remark);
-      reconciliationDailyMapper.insert(daily);
+      try {
+        reconciliationDailyMapper.insert(daily);
+      } catch (DuplicateKeyException ex) {
+        daily = reconciliationDailyMapper.selectOne(
+            Wrappers.lambdaQuery(ReconciliationDaily.class)
+                .eq(ReconciliationDaily::getOrgId, orgId)
+                .eq(ReconciliationDaily::getReconcileDate, date)
+                .eq(ReconciliationDaily::getIsDeleted, 0)
+                .last("LIMIT 1 FOR UPDATE"));
+        if (daily == null) {
+          throw ex;
+        }
+        daily.setTotalReceived(total);
+        daily.setTotalRefund(totalRefund);
+        daily.setNetReceived(netReceived);
+        daily.setMismatchFlag(mismatch ? 1 : 0);
+        daily.setRemark(remark);
+        reconciliationDailyMapper.updateById(daily);
+      }
     } else {
       daily = existingList.get(0);
       daily.setTotalReceived(total);
+      daily.setTotalRefund(totalRefund);
+      daily.setNetReceived(netReceived);
       daily.setMismatchFlag(mismatch ? 1 : 0);
       daily.setRemark(remark);
       reconciliationDailyMapper.updateById(daily);
@@ -228,6 +289,8 @@ public class FinanceServiceImpl implements FinanceService {
     ReconcileResponse response = new ReconcileResponse();
     response.setDate(date);
     response.setTotalReceived(total);
+    response.setTotalRefund(totalRefund);
+    response.setNetReceived(netReceived);
     response.setMismatchFlag(mismatch ? 1 : 0);
     response.setMismatch(mismatch);
     response.setRemark(remark);
@@ -237,7 +300,7 @@ public class FinanceServiceImpl implements FinanceService {
   @Override
   @Transactional
   public void invalidateBill(Long billId, Long operatorStaffId) {
-    BillMonthly bill = billMonthlyMapper.selectById(billId);
+    BillMonthly bill = findBillForUpdate(billId);
     if (bill == null) {
       throw new IllegalArgumentException("Bill not found");
     }
@@ -245,6 +308,13 @@ public class FinanceServiceImpl implements FinanceService {
       return;
     }
     financeMonthLockService.assertMonthEditable(bill.getOrgId(), YearMonth.parse(bill.getBillMonth()), "作废账单");
+    Long paymentCount = paymentRecordMapper.selectCount(
+        Wrappers.lambdaQuery(PaymentRecord.class)
+            .eq(PaymentRecord::getIsDeleted, 0)
+            .eq(PaymentRecord::getBillMonthlyId, billId));
+    if (paymentCount != null && paymentCount > 0) {
+      throw new IllegalStateException("Bill has payment records, refund/reversal is required before invalidation");
+    }
     bill.setStatus(9);
     bill.setOutstandingAmount(BigDecimal.ZERO);
     billMonthlyMapper.updateById(bill);
@@ -331,19 +401,36 @@ public class FinanceServiceImpl implements FinanceService {
     return base + "；" + changed;
   }
 
-  private boolean hasReconcileMismatch(List<PaymentRecord> records, Map<Long, BillMonthly> billMap) {
-    return !collectReconcileProblems(records, billMap).isEmpty();
+  private boolean hasReconcileMismatch(
+      Long orgId,
+      List<PaymentRecord> records,
+      Map<Long, BillMonthly> billMap,
+      LocalDateTime start,
+      LocalDateTime end) {
+    return !collectReconcileProblems(orgId, records, billMap, start, end).isEmpty();
   }
 
-  private String buildReconcileRemark(List<PaymentRecord> records, Map<Long, BillMonthly> billMap, boolean mismatch) {
-    List<String> problems = collectReconcileProblems(records, billMap);
+  private String buildReconcileRemark(
+      Long orgId,
+      List<PaymentRecord> records,
+      Map<Long, BillMonthly> billMap,
+      boolean mismatch,
+      LocalDateTime start,
+      LocalDateTime end,
+      BigDecimal totalRefund) {
+    List<String> problems = collectReconcileProblems(orgId, records, billMap, start, end);
     if (!mismatch || problems.isEmpty()) {
-      return "对账正常";
+      return "对账正常；退款 " + totalRefund;
     }
     return String.join("；", problems);
   }
 
-  private List<String> collectReconcileProblems(List<PaymentRecord> records, Map<Long, BillMonthly> billMap) {
+  private List<String> collectReconcileProblems(
+      Long orgId,
+      List<PaymentRecord> records,
+      Map<Long, BillMonthly> billMap,
+      LocalDateTime start,
+      LocalDateTime end) {
     List<String> problems = new ArrayList<>();
     Map<String, Integer> duplicateCountMap = new HashMap<>();
     for (PaymentRecord record : records) {
@@ -382,6 +469,28 @@ public class FinanceServiceImpl implements FinanceService {
     if (overpaidBillCount > 0) {
       problems.add("账单金额状态异常 " + overpaidBillCount + " 笔");
     }
+    long refundWithoutVoucherCount = dischargeSettlementMapper.selectCount(
+        Wrappers.lambdaQuery(DischargeSettlement.class)
+            .eq(DischargeSettlement::getIsDeleted, 0)
+            .eq(orgId != null, DischargeSettlement::getOrgId, orgId)
+            .eq(DischargeSettlement::getFinanceRefunded, 1)
+            .isNull(DischargeSettlement::getRefundVoucherId)
+            .ge(DischargeSettlement::getFinanceRefundTime, start)
+            .lt(DischargeSettlement::getFinanceRefundTime, end));
+    if (refundWithoutVoucherCount > 0) {
+      problems.add("退款缺少凭证 " + refundWithoutVoucherCount + " 笔");
+    }
+    long invalidRefundCount = financeRefundVoucherMapper.selectCount(
+        Wrappers.lambdaQuery(FinanceRefundVoucher.class)
+            .eq(FinanceRefundVoucher::getIsDeleted, 0)
+            .eq(orgId != null, FinanceRefundVoucher::getOrgId, orgId)
+            .eq(FinanceRefundVoucher::getStatus, "PAID")
+            .ge(FinanceRefundVoucher::getExecutedAt, start)
+            .lt(FinanceRefundVoucher::getExecutedAt, end)
+            .le(FinanceRefundVoucher::getAmount, BigDecimal.ZERO));
+    if (invalidRefundCount > 0) {
+      problems.add("退款金额异常 " + invalidRefundCount + " 笔");
+    }
     return problems;
   }
 
@@ -393,5 +502,61 @@ public class FinanceServiceImpl implements FinanceService {
         + String.valueOf(record.getAmount()) + "|"
         + safeMethod(record.getPayMethod()) + "|"
         + String.valueOf(record.getPaidAt());
+  }
+
+  private BillMonthly findBillForUpdate(Long billId) {
+    if (billId == null) {
+      return null;
+    }
+    return billMonthlyMapper.selectOne(
+        Wrappers.lambdaQuery(BillMonthly.class)
+            .eq(BillMonthly::getId, billId)
+            .eq(BillMonthly::getIsDeleted, 0)
+            .last("LIMIT 1 FOR UPDATE"));
+  }
+
+  private PaymentRecord findPaymentRecordForUpdate(Long paymentRecordId) {
+    if (paymentRecordId == null) {
+      return null;
+    }
+    return paymentRecordMapper.selectOne(
+        Wrappers.lambdaQuery(PaymentRecord.class)
+            .eq(PaymentRecord::getId, paymentRecordId)
+            .eq(PaymentRecord::getIsDeleted, 0)
+            .last("LIMIT 1 FOR UPDATE"));
+  }
+
+  private String normalizeExternalTxnId(String externalTxnId) {
+    if (externalTxnId == null || externalTxnId.isBlank()) {
+      return null;
+    }
+    return externalTxnId.trim();
+  }
+
+  private BigDecimal sumRefundAmount(Long orgId, LocalDateTime start, LocalDateTime end) {
+    BigDecimal voucherAmount = financeRefundVoucherMapper.selectList(
+            Wrappers.lambdaQuery(FinanceRefundVoucher.class)
+                .eq(FinanceRefundVoucher::getIsDeleted, 0)
+                .eq(orgId != null, FinanceRefundVoucher::getOrgId, orgId)
+                .eq(FinanceRefundVoucher::getStatus, "PAID")
+                .ge(FinanceRefundVoucher::getExecutedAt, start)
+                .lt(FinanceRefundVoucher::getExecutedAt, end))
+        .stream()
+        .map(FinanceRefundVoucher::getAmount)
+        .filter(Objects::nonNull)
+        .reduce(BigDecimal.ZERO, BigDecimal::add);
+    BigDecimal legacyAmount = dischargeSettlementMapper.selectList(
+            Wrappers.lambdaQuery(DischargeSettlement.class)
+                .eq(DischargeSettlement::getIsDeleted, 0)
+                .eq(orgId != null, DischargeSettlement::getOrgId, orgId)
+                .eq(DischargeSettlement::getFinanceRefunded, 1)
+                .isNull(DischargeSettlement::getRefundVoucherId)
+                .ge(DischargeSettlement::getFinanceRefundTime, start)
+                .lt(DischargeSettlement::getFinanceRefundTime, end))
+        .stream()
+        .map(DischargeSettlement::getRefundAmount)
+        .filter(Objects::nonNull)
+        .reduce(BigDecimal.ZERO, BigDecimal::add);
+    return voucherAmount.add(legacyAmount);
   }
 }

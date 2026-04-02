@@ -1,15 +1,20 @@
 package com.zhiyangyun.care;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.finance.entity.DischargeSettlement;
+import com.zhiyangyun.care.finance.entity.FinanceRefundVoucher;
 import com.zhiyangyun.care.finance.mapper.DischargeSettlementMapper;
+import com.zhiyangyun.care.finance.mapper.FinanceRefundVoucherMapper;
 import com.zhiyangyun.care.finance.model.AdmissionFeeAuditCreateRequest;
 import com.zhiyangyun.care.finance.model.DischargeFeeAuditCreateRequest;
+import com.zhiyangyun.care.finance.model.DischargeSettlementConfirmRequest;
 import com.zhiyangyun.care.finance.model.DischargeSettlementCreateRequest;
 import com.zhiyangyun.care.finance.model.FeeAuditReviewRequest;
 import com.zhiyangyun.care.finance.model.FeeWorkflowConstants;
@@ -47,6 +52,9 @@ class FeeManagementServiceTest {
   @Autowired
   private DischargeSettlementMapper dischargeSettlementMapper;
 
+  @Autowired
+  private FinanceRefundVoucherMapper financeRefundVoucherMapper;
+
   @Test
   void confirm_settlement_rejects_when_balance_insufficient() {
     Long elderId = createElder("结算测试A");
@@ -56,29 +64,36 @@ class FeeManagementServiceTest {
     req.setElderId(elderId);
     req.setPayableAmount(BigDecimal.valueOf(100));
     DischargeSettlement settlement = feeManagementService.createDischargeSettlement(1L, 500L, req);
+    approveSettlement(settlement.getId());
 
     assertThrows(IllegalStateException.class,
-        () -> feeManagementService.confirmDischargeSettlement(1L, 500L, settlement.getId(), null));
+        () -> feeManagementService.confirmDischargeSettlement(1L, 500L, settlement.getId(), financeRefundRequest("财务A")));
   }
 
   @Test
   void confirm_settlement_is_idempotent_and_clears_balance() {
     Long elderId = createElder("结算测试B");
-    recharge(elderId, BigDecimal.valueOf(200));
+    deposit(elderId, BigDecimal.valueOf(200));
 
     DischargeSettlementCreateRequest req = new DischargeSettlementCreateRequest();
     req.setElderId(elderId);
     req.setPayableAmount(BigDecimal.valueOf(120));
     DischargeSettlement settlement = feeManagementService.createDischargeSettlement(1L, 500L, req);
+    approveSettlement(settlement.getId());
 
-    DischargeSettlement first = feeManagementService.confirmDischargeSettlement(1L, 500L, settlement.getId(), null);
+    DischargeSettlement first = feeManagementService.confirmDischargeSettlement(1L, 500L, settlement.getId(), financeRefundRequest("财务A"));
     assertEquals(FeeWorkflowConstants.SETTLEMENT_SETTLED, first.getStatus());
+    assertNotNull(first.getRefundVoucherId());
+    assertNotNull(first.getRefundVoucherNo());
 
-    DischargeSettlement second = feeManagementService.confirmDischargeSettlement(1L, 500L, settlement.getId(), null);
+    DischargeSettlement second = feeManagementService.confirmDischargeSettlement(1L, 500L, settlement.getId(), financeRefundRequest("财务B"));
     assertEquals(FeeWorkflowConstants.SETTLEMENT_SETTLED, second.getStatus());
 
     var account = elderAccountService.getOrCreate(1L, elderId, 500L);
     assertEquals(0, BigDecimal.ZERO.compareTo(account.getBalance()));
+    FinanceRefundVoucher voucher = financeRefundVoucherMapper.selectById(first.getRefundVoucherId());
+    assertNotNull(voucher);
+    assertEquals(0, BigDecimal.valueOf(80).compareTo(voucher.getAmount()));
   }
 
   @Test
@@ -220,24 +235,25 @@ class FeeManagementServiceTest {
   @Test
   void confirm_settlement_concurrently_should_not_double_deduct() throws Exception {
     Long elderId = createElder("并发结算校验");
-    recharge(elderId, BigDecimal.valueOf(180));
+    deposit(elderId, BigDecimal.valueOf(180));
 
     DischargeSettlementCreateRequest req = new DischargeSettlementCreateRequest();
     req.setElderId(elderId);
     req.setPayableAmount(BigDecimal.valueOf(120));
     DischargeSettlement settlement = feeManagementService.createDischargeSettlement(1L, 500L, req);
+    approveSettlement(settlement.getId());
 
     ExecutorService executor = Executors.newFixedThreadPool(2);
     CountDownLatch latch = new CountDownLatch(1);
     List<Callable<String>> tasks = new ArrayList<>();
     tasks.add(() -> {
       latch.await();
-      feeManagementService.confirmDischargeSettlement(1L, 500L, settlement.getId(), null);
+      feeManagementService.confirmDischargeSettlement(1L, 500L, settlement.getId(), financeRefundRequest("财务A"));
       return "OK";
     });
     tasks.add(() -> {
       latch.await();
-      feeManagementService.confirmDischargeSettlement(1L, 500L, settlement.getId(), null);
+      feeManagementService.confirmDischargeSettlement(1L, 500L, settlement.getId(), financeRefundRequest("财务B"));
       return "OK";
     });
     List<Future<String>> futures;
@@ -264,6 +280,55 @@ class FeeManagementServiceTest {
     assertEquals(0, BigDecimal.ZERO.compareTo(account.getBalance()));
   }
 
+  @Test
+  void elder_account_should_split_deposit_and_prepaid_balances() {
+    Long elderId = createElder("账户拆分校验");
+    recharge(elderId, BigDecimal.valueOf(50));
+    deposit(elderId, BigDecimal.valueOf(100));
+
+    ElderAccountAdjustRequest debit = new ElderAccountAdjustRequest();
+    debit.setElderId(elderId);
+    debit.setAmount(BigDecimal.valueOf(70));
+    debit.setDirection("DEBIT");
+    debit.setFundType("AUTO");
+    debit.setRemark("自动抵扣测试");
+    elderAccountService.adjust(1L, 500L, debit);
+
+    var account = elderAccountService.getOrCreate(1L, elderId, 500L);
+    assertEquals(0, BigDecimal.valueOf(80).compareTo(account.getBalance()));
+    assertEquals(0, BigDecimal.valueOf(80).compareTo(account.getDepositBalance()));
+    assertEquals(0, BigDecimal.ZERO.compareTo(account.getPrepaidBalance()));
+    assertEquals(0, BigDecimal.ZERO.compareTo(account.getUnclassifiedBalance()));
+
+    var logs = elderAccountService.logPage(1L, 1L, 10L, elderId, null, null).getRecords();
+    assertFalse(logs.isEmpty());
+    var latest = logs.get(0);
+    assertEquals("AUTO", latest.getFundType());
+    assertEquals(0, BigDecimal.valueOf(80).compareTo(latest.getDepositBalanceAfter()));
+    assertEquals(0, BigDecimal.ZERO.compareTo(latest.getPrepaidBalanceAfter()));
+  }
+
+  private void approveSettlement(Long settlementId) {
+    feeManagementService.confirmDischargeSettlement(1L, 500L, settlementId, approvalRequest("FRONTDESK_APPROVE", "前台"));
+    feeManagementService.confirmDischargeSettlement(1L, 500L, settlementId, approvalRequest("NURSING_APPROVE", "护理部"));
+  }
+
+  private DischargeSettlementConfirmRequest approvalRequest(String action, String signerName) {
+    DischargeSettlementConfirmRequest request = new DischargeSettlementConfirmRequest();
+    request.setAction(action);
+    request.setSignerName(signerName);
+    request.setRemark("测试签字");
+    return request;
+  }
+
+  private DischargeSettlementConfirmRequest financeRefundRequest(String signerName) {
+    DischargeSettlementConfirmRequest request = new DischargeSettlementConfirmRequest();
+    request.setAction("FINANCE_REFUND");
+    request.setSignerName(signerName);
+    request.setRemark("测试退款");
+    return request;
+  }
+
   private Long createElder(String name) {
     ElderProfile elder = new ElderProfile();
     elder.setTenantId(1L);
@@ -278,10 +343,19 @@ class FeeManagementServiceTest {
   }
 
   private void recharge(Long elderId, BigDecimal amount) {
+    recharge(elderId, amount, "PREPAID");
+  }
+
+  private void deposit(Long elderId, BigDecimal amount) {
+    recharge(elderId, amount, "DEPOSIT");
+  }
+
+  private void recharge(Long elderId, BigDecimal amount, String fundType) {
     ElderAccountAdjustRequest adjust = new ElderAccountAdjustRequest();
     adjust.setElderId(elderId);
     adjust.setAmount(amount);
     adjust.setDirection("CREDIT");
+    adjust.setFundType(fundType);
     adjust.setRemark("测试充值");
     elderAccountService.adjust(1L, 500L, adjust);
   }

@@ -2,17 +2,26 @@ package com.zhiyangyun.care;
 
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zhiyangyun.care.audit.entity.AuditLog;
+import com.zhiyangyun.care.audit.mapper.AuditLogMapper;
 import com.zhiyangyun.care.auth.model.LoginRequest;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.finance.model.AdmissionFeeAuditCreateRequest;
+import com.zhiyangyun.care.finance.model.DischargeSettlementConfirmRequest;
+import com.zhiyangyun.care.finance.model.DischargeSettlementCreateRequest;
+import com.zhiyangyun.care.finance.model.ElderAccountAdjustRequest;
+import com.zhiyangyun.care.finance.service.ElderAccountService;
 import com.zhiyangyun.care.finance.service.FeeManagementService;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -39,6 +48,12 @@ class FeeManagementControllerTest {
 
   @Autowired
   private FeeManagementService feeManagementService;
+
+  @Autowired
+  private ElderAccountService elderAccountService;
+
+  @Autowired
+  private AuditLogMapper auditLogMapper;
 
   @Test
   void consumption_page_rejects_invalid_date_range() throws Exception {
@@ -94,6 +109,33 @@ class FeeManagementControllerTest {
         .andExpect(jsonPath("$.data.list[0].id", notNullValue()));
   }
 
+  @Test
+  void discharge_settlement_confirm_should_write_structured_audit_log() throws Exception {
+    Long elderId = createElder("结构化审计结算");
+    deposit(elderId, BigDecimal.valueOf(120));
+
+    DischargeSettlementCreateRequest request = new DischargeSettlementCreateRequest();
+    request.setElderId(elderId);
+    request.setPayableAmount(BigDecimal.valueOf(40));
+    var settlement = feeManagementService.createDischargeSettlement(1L, 500L, request);
+
+    String token = loginAndGetToken("admin", "123456");
+    confirmSettlement(token, settlement.getId(), "FRONTDESK_APPROVE", "前台", "前台签字");
+    confirmSettlement(token, settlement.getId(), "NURSING_APPROVE", "护理部", "护理签字");
+    confirmSettlement(token, settlement.getId(), "FINANCE_REFUND", "财务", "财务退款");
+
+    AuditLog latest = auditLogMapper.selectOne(Wrappers.lambdaQuery(AuditLog.class)
+        .eq(AuditLog::getActionType, "FIN_DISCHARGE_SETTLEMENT_CONFIRM")
+        .eq(AuditLog::getEntityId, settlement.getId())
+        .orderByDesc(AuditLog::getId)
+        .last("LIMIT 1"));
+    assertNotNull(latest);
+    assertNotNull(latest.getBeforeSnapshot());
+    assertNotNull(latest.getAfterSnapshot());
+    assertNotNull(latest.getContextJson());
+    assertTrue(latest.getContextJson().contains("FINANCE_REFUND"));
+  }
+
   private Long createElder(String name) {
     ElderProfile elder = new ElderProfile();
     elder.setTenantId(1L);
@@ -122,5 +164,28 @@ class FeeManagementControllerTest {
 
     return objectMapper.readTree(response).path("data").path("token").asText();
   }
-}
 
+  private void deposit(Long elderId, BigDecimal amount) {
+    ElderAccountAdjustRequest adjust = new ElderAccountAdjustRequest();
+    adjust.setElderId(elderId);
+    adjust.setAmount(amount);
+    adjust.setDirection("CREDIT");
+    adjust.setFundType("DEPOSIT");
+    adjust.setRemark("控制器测试押金充值");
+    elderAccountService.adjust(1L, 500L, adjust);
+  }
+
+  private void confirmSettlement(String token, Long settlementId, String action, String signerName, String remark)
+      throws Exception {
+    DischargeSettlementConfirmRequest request = new DischargeSettlementConfirmRequest();
+    request.setAction(action);
+    request.setSignerName(signerName);
+    request.setRemark(remark);
+    mockMvc.perform(post("/api/finance/fee/discharge-settlement/{id}/confirm", settlementId)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(request))
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code", is(0)));
+  }
+}

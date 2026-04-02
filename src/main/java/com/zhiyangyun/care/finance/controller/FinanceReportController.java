@@ -18,6 +18,12 @@ import com.zhiyangyun.care.finance.model.FinanceCategoryConsumptionAnalysisRespo
 import com.zhiyangyun.care.finance.model.FinanceReportEntrySummaryResponse;
 import com.zhiyangyun.care.finance.model.FinanceReportMonthlyItem;
 import com.zhiyangyun.care.finance.model.FinanceStoreSalesItem;
+import com.zhiyangyun.care.finance.entity.DischargeSettlement;
+import com.zhiyangyun.care.finance.entity.FinanceRefundVoucher;
+import com.zhiyangyun.care.finance.entity.PaymentRecord;
+import com.zhiyangyun.care.finance.mapper.DischargeSettlementMapper;
+import com.zhiyangyun.care.finance.mapper.FinanceRefundVoucherMapper;
+import com.zhiyangyun.care.finance.mapper.PaymentRecordMapper;
 import com.zhiyangyun.care.store.entity.InventoryBatch;
 import com.zhiyangyun.care.store.entity.OrderItem;
 import com.zhiyangyun.care.store.entity.Product;
@@ -60,6 +66,9 @@ public class FinanceReportController {
   private final OrderItemMapper orderItemMapper;
   private final ProductMapper productMapper;
   private final InventoryBatchMapper inventoryBatchMapper;
+  private final PaymentRecordMapper paymentRecordMapper;
+  private final FinanceRefundVoucherMapper financeRefundVoucherMapper;
+  private final DischargeSettlementMapper dischargeSettlementMapper;
 
   public FinanceReportController(
       BillMonthlyMapper billMonthlyMapper,
@@ -70,7 +79,10 @@ public class FinanceReportController {
       RoomMapper roomMapper,
       OrderItemMapper orderItemMapper,
       ProductMapper productMapper,
-      InventoryBatchMapper inventoryBatchMapper) {
+      InventoryBatchMapper inventoryBatchMapper,
+      PaymentRecordMapper paymentRecordMapper,
+      FinanceRefundVoucherMapper financeRefundVoucherMapper,
+      DischargeSettlementMapper dischargeSettlementMapper) {
     this.billMonthlyMapper = billMonthlyMapper;
     this.billItemMapper = billItemMapper;
     this.storeOrderMapper = storeOrderMapper;
@@ -80,6 +92,9 @@ public class FinanceReportController {
     this.orderItemMapper = orderItemMapper;
     this.productMapper = productMapper;
     this.inventoryBatchMapper = inventoryBatchMapper;
+    this.paymentRecordMapper = paymentRecordMapper;
+    this.financeRefundVoucherMapper = financeRefundVoucherMapper;
+    this.dischargeSettlementMapper = dischargeSettlementMapper;
   }
 
   @GetMapping("/entry-summary")
@@ -102,12 +117,13 @@ public class FinanceReportController {
             .eq(orgId != null, BillMonthly::getOrgId, orgId)
             .ge(BillMonthly::getBillMonth, start.toString())
             .le(BillMonthly::getBillMonth, end.toString()));
-    List<StoreOrder> orders = storeOrderMapper.selectList(
-        Wrappers.lambdaQuery(StoreOrder.class)
-            .eq(StoreOrder::getIsDeleted, 0)
-            .eq(orgId != null, StoreOrder::getOrgId, orgId)
-            .ge(StoreOrder::getCreateTime, startTime)
-            .lt(StoreOrder::getCreateTime, endTime));
+    List<PaymentRecord> payments = paymentRecordMapper.selectList(
+        Wrappers.lambdaQuery(PaymentRecord.class)
+            .eq(PaymentRecord::getIsDeleted, 0)
+            .eq(orgId != null, PaymentRecord::getOrgId, orgId)
+            .ge(PaymentRecord::getPaidAt, startTime)
+            .lt(PaymentRecord::getPaidAt, endTime));
+    List<StoreOrder> orders = paidStoreOrders(orgId, startTime, endTime);
     List<Bed> beds = bedMapper.selectList(
         Wrappers.lambdaQuery(Bed.class)
             .eq(Bed::getIsDeleted, 0)
@@ -127,7 +143,15 @@ public class FinanceReportController {
     response.setReportKey(normalizedKey);
     response.setPeriodFrom(start.toString());
     response.setPeriodTo(end.toString());
-    response.setTotalRevenue(sumBillAmount(bills, false));
+    BigDecimal billedRevenue = sumBillAmount(bills, false);
+    BigDecimal totalReceived = sumPayments(payments);
+    BigDecimal refundTotal = sumRefundAmount(orgId, startTime, endTime);
+    BigDecimal netRevenue = totalReceived.subtract(refundTotal);
+    response.setBilledRevenue(billedRevenue);
+    response.setTotalReceived(totalReceived);
+    response.setRefundTotal(refundTotal);
+    response.setNetRevenue(netRevenue);
+    response.setTotalRevenue(netRevenue);
     response.setArrearsTotal(sumBillAmount(bills, true));
     response.setArrearsElderCount((long) bills.stream()
         .filter(item -> safe(item.getOutstandingAmount()).compareTo(BigDecimal.ZERO) > 0)
@@ -140,16 +164,10 @@ public class FinanceReportController {
         .filter(Objects::nonNull)
         .reduce(BigDecimal.ZERO, BigDecimal::add));
 
-    List<Long> billIds = bills.stream().map(BillMonthly::getId).filter(Objects::nonNull).toList();
-    if (!billIds.isEmpty()) {
-      List<BillItem> items = billItemMapper.selectList(
-          Wrappers.lambdaQuery(BillItem.class)
-              .eq(BillItem::getIsDeleted, 0)
-              .eq(orgId != null, BillItem::getOrgId, orgId)
-              .in(BillItem::getBillMonthlyId, billIds));
-      response.setTopCategories(topCategories(items, top));
-    }
-    response.setTopRooms(topRooms(bills, elderBedMap, roomMap, top));
+    Map<Long, BillMonthly> paymentBillMap = loadPaymentBillMap(payments);
+    Map<Long, List<BillItem>> itemsByBillId = loadBillItemsByBillId(orgId, paymentBillMap.keySet());
+    response.setTopCategories(topCategories(payments, paymentBillMap, itemsByBillId, top));
+    response.setTopRooms(topRooms(payments, paymentBillMap, elderBedMap, roomMap, top));
     applyReportWarning(response);
     return Result.ok(response);
   }
@@ -162,28 +180,57 @@ public class FinanceReportController {
     Long orgId = AuthContext.getOrgId();
     YearMonth end = to == null || to.isBlank() ? YearMonth.now() : YearMonth.parse(to);
     YearMonth start = from == null || from.isBlank() ? end.minusMonths(months - 1L) : YearMonth.parse(from);
+    LocalDateTime startTime = start.atDay(1).atStartOfDay();
+    LocalDateTime endTime = end.plusMonths(1).atDay(1).atStartOfDay();
     List<BillMonthly> bills = billMonthlyMapper.selectList(
         Wrappers.lambdaQuery(BillMonthly.class)
             .eq(BillMonthly::getIsDeleted, 0)
             .eq(orgId != null, BillMonthly::getOrgId, orgId)
             .ge(BillMonthly::getBillMonth, start.toString())
             .le(BillMonthly::getBillMonth, end.toString()));
+    List<PaymentRecord> payments = paymentRecordMapper.selectList(
+        Wrappers.lambdaQuery(PaymentRecord.class)
+            .eq(PaymentRecord::getIsDeleted, 0)
+            .eq(orgId != null, PaymentRecord::getOrgId, orgId)
+            .ge(PaymentRecord::getPaidAt, startTime)
+            .lt(PaymentRecord::getPaidAt, endTime));
+    Map<String, BigDecimal> refundMap = refundAmountByMonth(orgId, startTime, endTime);
     Map<String, BigDecimal> sumMap = new LinkedHashMap<>();
+    Map<String, BigDecimal> billedMap = new LinkedHashMap<>();
+    Map<String, BigDecimal> receivedMap = new LinkedHashMap<>();
     YearMonth cursor = start;
     while (!cursor.isAfter(end)) {
       sumMap.put(cursor.toString(), BigDecimal.ZERO);
+      billedMap.put(cursor.toString(), BigDecimal.ZERO);
+      receivedMap.put(cursor.toString(), BigDecimal.ZERO);
       cursor = cursor.plusMonths(1);
     }
     for (BillMonthly bill : bills) {
       String month = bill.getBillMonth();
       BigDecimal amount = bill.getTotalAmount() == null ? BigDecimal.ZERO : bill.getTotalAmount();
-      sumMap.put(month, sumMap.getOrDefault(month, BigDecimal.ZERO).add(amount));
+      billedMap.put(month, billedMap.getOrDefault(month, BigDecimal.ZERO).add(amount));
+    }
+    for (PaymentRecord payment : payments) {
+      if (payment.getPaidAt() == null) {
+        continue;
+      }
+      String month = YearMonth.from(payment.getPaidAt()).toString();
+      BigDecimal amount = payment.getAmount() == null ? BigDecimal.ZERO : payment.getAmount();
+      receivedMap.put(month, receivedMap.getOrDefault(month, BigDecimal.ZERO).add(amount));
+    }
+    for (Map.Entry<String, BigDecimal> entry : receivedMap.entrySet()) {
+      BigDecimal refundAmount = refundMap.getOrDefault(entry.getKey(), BigDecimal.ZERO);
+      sumMap.put(entry.getKey(), entry.getValue().subtract(refundAmount));
     }
     List<FinanceReportMonthlyItem> result = new ArrayList<>();
     for (Map.Entry<String, BigDecimal> entry : sumMap.entrySet()) {
       FinanceReportMonthlyItem item = new FinanceReportMonthlyItem();
       item.setMonth(entry.getKey());
       item.setAmount(entry.getValue());
+      item.setBilledAmount(billedMap.getOrDefault(entry.getKey(), BigDecimal.ZERO));
+      item.setReceivedAmount(receivedMap.getOrDefault(entry.getKey(), BigDecimal.ZERO));
+      item.setRefundAmount(refundMap.getOrDefault(entry.getKey(), BigDecimal.ZERO));
+      item.setNetAmount(entry.getValue());
       result.add(item);
     }
     return Result.ok(result);
@@ -238,12 +285,7 @@ public class FinanceReportController {
     LocalDate endDate = end.atEndOfMonth();
     LocalDateTime startTime = startDate.atStartOfDay();
     LocalDateTime endTime = endDate.plusDays(1).atStartOfDay();
-    List<StoreOrder> orders = storeOrderMapper.selectList(
-        Wrappers.lambdaQuery(StoreOrder.class)
-            .eq(StoreOrder::getIsDeleted, 0)
-            .eq(orgId != null, StoreOrder::getOrgId, orgId)
-            .ge(StoreOrder::getCreateTime, startTime)
-            .lt(StoreOrder::getCreateTime, endTime));
+    List<StoreOrder> orders = paidStoreOrders(orgId, startTime, endTime);
     Map<String, BigDecimal> sumMap = new LinkedHashMap<>();
     YearMonth cursor = start;
     while (!cursor.isAfter(end)) {
@@ -251,7 +293,11 @@ public class FinanceReportController {
       cursor = cursor.plusMonths(1);
     }
     for (StoreOrder order : orders) {
-      String month = YearMonth.from(order.getCreateTime()).toString();
+      LocalDateTime paidTime = effectiveOrderTime(order);
+      if (paidTime == null) {
+        continue;
+      }
+      String month = YearMonth.from(paidTime).toString();
       BigDecimal amount = order.getTotalAmount() == null ? BigDecimal.ZERO : order.getTotalAmount();
       sumMap.put(month, sumMap.getOrDefault(month, BigDecimal.ZERO).add(amount));
     }
@@ -281,13 +327,7 @@ public class FinanceReportController {
     LocalDateTime startTime = start.atStartOfDay();
     LocalDateTime endTime = end.plusDays(1).atStartOfDay();
 
-    List<StoreOrder> orders = storeOrderMapper.selectList(
-        Wrappers.lambdaQuery(StoreOrder.class)
-            .eq(StoreOrder::getIsDeleted, 0)
-            .eq(StoreOrder::getPayStatus, 1)
-            .eq(orgId != null, StoreOrder::getOrgId, orgId)
-            .ge(StoreOrder::getCreateTime, startTime)
-            .lt(StoreOrder::getCreateTime, endTime));
+    List<StoreOrder> orders = paidStoreOrders(orgId, startTime, endTime);
     String buildingFilter = normalizeText(building, "");
     String floorFilter = normalizeText(floorNo, "");
     if (!buildingFilter.isBlank() || !floorFilter.isBlank()) {
@@ -363,10 +403,11 @@ public class FinanceReportController {
 
     for (OrderItem item : items) {
       StoreOrder order = orderMap.get(item.getOrderId());
-      if (order == null || order.getCreateTime() == null) {
+      LocalDateTime orderTime = effectiveOrderTime(order);
+      if (order == null || orderTime == null) {
         continue;
       }
-      LocalDate day = order.getCreateTime().toLocalDate();
+      LocalDate day = orderTime.toLocalDate();
       BigDecimal itemAmount = safe(item.getTotalAmount());
       totalAmount = totalAmount.add(itemAmount);
       dayTotalMap.merge(day, itemAmount, BigDecimal::add);
@@ -427,11 +468,24 @@ public class FinanceReportController {
         .reduce(BigDecimal.ZERO, BigDecimal::add);
   }
 
-  private List<FinanceReportEntrySummaryResponse.NameAmountItem> topCategories(List<BillItem> items, int top) {
+  private List<FinanceReportEntrySummaryResponse.NameAmountItem> topCategories(
+      List<PaymentRecord> payments,
+      Map<Long, BillMonthly> paymentBillMap,
+      Map<Long, List<BillItem>> itemsByBillId,
+      int top) {
     Map<String, BigDecimal> sumMap = new HashMap<>();
-    for (BillItem item : items) {
-      String key = normalizeCategory(item.getItemType(), item.getItemName());
-      sumMap.merge(key, safe(item.getAmount()), BigDecimal::add);
+    for (PaymentRecord payment : payments) {
+      BillMonthly bill = payment.getBillMonthlyId() == null ? null : paymentBillMap.get(payment.getBillMonthlyId());
+      if (bill == null) {
+        continue;
+      }
+      List<BillItem> items = itemsByBillId.getOrDefault(bill.getId(), List.of());
+      Map<BillItem, BigDecimal> allocated = allocatePaymentToItems(items, safe(payment.getAmount()), safe(bill.getTotalAmount()));
+      for (Map.Entry<BillItem, BigDecimal> entry : allocated.entrySet()) {
+        BillItem item = entry.getKey();
+        String key = normalizeCategory(item.getItemType(), item.getItemName());
+        sumMap.merge(key, entry.getValue(), BigDecimal::add);
+      }
     }
     return sumMap.entrySet().stream()
         .sorted(Map.Entry.<String, BigDecimal>comparingByValue().reversed())
@@ -447,12 +501,17 @@ public class FinanceReportController {
   }
 
   private List<FinanceReportEntrySummaryResponse.NameAmountItem> topRooms(
-      List<BillMonthly> bills,
+      List<PaymentRecord> payments,
+      Map<Long, BillMonthly> paymentBillMap,
       Map<Long, Bed> elderBedMap,
       Map<Long, Room> roomMap,
       int top) {
     Map<String, BigDecimal> roomIncome = new HashMap<>();
-    for (BillMonthly bill : bills) {
+    for (PaymentRecord payment : payments) {
+      BillMonthly bill = payment.getBillMonthlyId() == null ? null : paymentBillMap.get(payment.getBillMonthlyId());
+      if (bill == null) {
+        continue;
+      }
       if (bill.getElderId() == null) continue;
       Bed bed = elderBedMap.get(bill.getElderId());
       if (bed == null || bed.getRoomId() == null) continue;
@@ -461,7 +520,7 @@ public class FinanceReportController {
       String roomLabel = normalizeText(room.getBuilding(), "未标注楼栋")
           + "-" + normalizeText(room.getFloorNo(), "未标注楼层")
           + "-" + normalizeText(room.getRoomNo(), "未知房间");
-      roomIncome.merge(roomLabel, safe(bill.getTotalAmount()), BigDecimal::add);
+      roomIncome.merge(roomLabel, safe(payment.getAmount()), BigDecimal::add);
     }
     return roomIncome.entrySet().stream()
         .sorted(Map.Entry.<String, BigDecimal>comparingByValue().reversed())
@@ -494,9 +553,128 @@ public class FinanceReportController {
     }
     if ("MONTHLY_OPS".equals(key)
         && response.getArrearsElderCount() > 0
-        && response.getArrearsTotal().compareTo(response.getTotalRevenue().multiply(BigDecimal.valueOf(0.3))) > 0) {
+        && response.getArrearsTotal().compareTo(safe(response.getNetRevenue()).multiply(BigDecimal.valueOf(0.3))) > 0) {
       response.setWarningMessage("欠费占比偏高，建议优先处理回款与续费");
     }
+  }
+
+  private List<StoreOrder> paidStoreOrders(Long orgId, LocalDateTime startTime, LocalDateTime endTime) {
+    return storeOrderMapper.selectList(
+            Wrappers.lambdaQuery(StoreOrder.class)
+                .eq(StoreOrder::getIsDeleted, 0)
+                .eq(orgId != null, StoreOrder::getOrgId, orgId)
+                .eq(StoreOrder::getPayStatus, 1))
+        .stream()
+        .filter(item -> {
+          LocalDateTime paidTime = effectiveOrderTime(item);
+          return paidTime != null && !paidTime.isBefore(startTime) && paidTime.isBefore(endTime);
+        })
+        .toList();
+  }
+
+  private LocalDateTime effectiveOrderTime(StoreOrder order) {
+    if (order == null) {
+      return null;
+    }
+    return order.getPayTime() == null ? order.getCreateTime() : order.getPayTime();
+  }
+
+  private Map<Long, BillMonthly> loadPaymentBillMap(List<PaymentRecord> payments) {
+    List<Long> billIds = payments.stream()
+        .map(PaymentRecord::getBillMonthlyId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList();
+    if (billIds.isEmpty()) {
+      return Map.of();
+    }
+    return billMonthlyMapper.selectBatchIds(billIds).stream()
+        .filter(item -> item != null && !Integer.valueOf(1).equals(item.getIsDeleted()))
+        .collect(Collectors.toMap(BillMonthly::getId, Function.identity(), (a, b) -> a));
+  }
+
+  private Map<Long, List<BillItem>> loadBillItemsByBillId(Long orgId, java.util.Set<Long> billIds) {
+    if (billIds == null || billIds.isEmpty()) {
+      return Map.of();
+    }
+    return billItemMapper.selectList(
+            Wrappers.lambdaQuery(BillItem.class)
+                .eq(BillItem::getIsDeleted, 0)
+                .eq(orgId != null, BillItem::getOrgId, orgId)
+                .in(BillItem::getBillMonthlyId, billIds))
+        .stream()
+        .collect(Collectors.groupingBy(BillItem::getBillMonthlyId));
+  }
+
+  private Map<BillItem, BigDecimal> allocatePaymentToItems(
+      List<BillItem> items,
+      BigDecimal paymentAmount,
+      BigDecimal billTotalAmount) {
+    if (items == null || items.isEmpty() || paymentAmount.compareTo(BigDecimal.ZERO) <= 0
+        || billTotalAmount.compareTo(BigDecimal.ZERO) <= 0) {
+      return Map.of();
+    }
+    Map<BillItem, BigDecimal> result = new LinkedHashMap<>();
+    BigDecimal allocated = BigDecimal.ZERO;
+    for (int i = 0; i < items.size(); i++) {
+      BillItem item = items.get(i);
+      BigDecimal amount;
+      if (i == items.size() - 1) {
+        amount = paymentAmount.subtract(allocated);
+      } else {
+        amount = paymentAmount.multiply(safe(item.getAmount()))
+            .divide(billTotalAmount, 2, RoundingMode.HALF_UP);
+        allocated = allocated.add(amount);
+      }
+      result.put(item, amount.max(BigDecimal.ZERO));
+    }
+    return result;
+  }
+
+  private BigDecimal sumPayments(List<PaymentRecord> payments) {
+    return payments.stream()
+        .map(PaymentRecord::getAmount)
+        .filter(Objects::nonNull)
+        .reduce(BigDecimal.ZERO, BigDecimal::add);
+  }
+
+  private BigDecimal sumRefundAmount(Long orgId, LocalDateTime startTime, LocalDateTime endTime) {
+    return refundAmountByMonth(orgId, startTime, endTime).values().stream()
+        .reduce(BigDecimal.ZERO, BigDecimal::add);
+  }
+
+  private Map<String, BigDecimal> refundAmountByMonth(Long orgId, LocalDateTime startTime, LocalDateTime endTime) {
+    Map<String, BigDecimal> result = new LinkedHashMap<>();
+    financeRefundVoucherMapper.selectList(
+            Wrappers.lambdaQuery(FinanceRefundVoucher.class)
+                .eq(FinanceRefundVoucher::getIsDeleted, 0)
+                .eq(orgId != null, FinanceRefundVoucher::getOrgId, orgId)
+                .eq(FinanceRefundVoucher::getStatus, "PAID")
+                .ge(FinanceRefundVoucher::getExecutedAt, startTime)
+                .lt(FinanceRefundVoucher::getExecutedAt, endTime))
+        .forEach(item -> {
+          if (item.getExecutedAt() == null) {
+            return;
+          }
+          String month = YearMonth.from(item.getExecutedAt()).toString();
+          result.merge(month, safe(item.getAmount()), BigDecimal::add);
+        });
+    dischargeSettlementMapper.selectList(
+            Wrappers.lambdaQuery(DischargeSettlement.class)
+                .eq(DischargeSettlement::getIsDeleted, 0)
+                .eq(orgId != null, DischargeSettlement::getOrgId, orgId)
+                .eq(DischargeSettlement::getFinanceRefunded, 1)
+                .isNull(DischargeSettlement::getRefundVoucherId)
+                .ge(DischargeSettlement::getFinanceRefundTime, startTime)
+                .lt(DischargeSettlement::getFinanceRefundTime, endTime))
+        .forEach(item -> {
+          if (item.getFinanceRefundTime() == null) {
+            return;
+          }
+          String month = YearMonth.from(item.getFinanceRefundTime()).toString();
+          result.merge(month, safe(item.getRefundAmount()), BigDecimal::add);
+        });
+    return result;
   }
 
   private String normalizeCategory(String itemType, String itemName) {

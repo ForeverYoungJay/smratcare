@@ -4,7 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.zhiyangyun.care.bill.entity.BillMonthly;
 import com.zhiyangyun.care.bill.mapper.BillMonthlyMapper;
+import com.zhiyangyun.care.finance.entity.FinanceRefundVoucher;
 import com.zhiyangyun.care.finance.entity.ReconciliationDaily;
+import com.zhiyangyun.care.finance.mapper.FinanceRefundVoucherMapper;
 import com.zhiyangyun.care.finance.mapper.ReconciliationDailyMapper;
 import com.zhiyangyun.care.finance.model.PaymentRequest;
 import com.zhiyangyun.care.finance.service.FinanceService;
@@ -28,6 +30,9 @@ class FinanceReconcileTest {
   @Autowired
   private ReconciliationDailyMapper reconciliationDailyMapper;
 
+  @Autowired
+  private FinanceRefundVoucherMapper financeRefundVoucherMapper;
+
   @Test
   void reconcile_counts_payments() {
     BillMonthly bill = new BillMonthly();
@@ -46,8 +51,26 @@ class FinanceReconcileTest {
 
     financeService.pay(bill.getId(), request, 500L);
 
+    FinanceRefundVoucher voucher = new FinanceRefundVoucher();
+    voucher.setTenantId(1L);
+    voucher.setOrgId(1L);
+    voucher.setSettlementId(9001L);
+    voucher.setElderId(210L);
+    voucher.setElderName("对账测试");
+    voucher.setVoucherNo("RF-TEST-" + System.nanoTime());
+    voucher.setAmount(BigDecimal.TEN);
+    voucher.setStatus("PAID");
+    voucher.setPayMethod("OFFLINE_REFUND");
+    voucher.setExecutedBy(500L);
+    voucher.setExecutedByName("财务");
+    voucher.setExecutedAt(LocalDateTime.now());
+    financeRefundVoucherMapper.insert(voucher);
+
     var resp = financeService.reconcile(1L, LocalDate.now());
     assertEquals(0, resp.isMismatch() ? 1 : 0);
+    assertEquals(0, BigDecimal.valueOf(30).compareTo(resp.getTotalReceived()));
+    assertEquals(0, BigDecimal.TEN.compareTo(resp.getTotalRefund()));
+    assertEquals(0, BigDecimal.valueOf(20).compareTo(resp.getNetReceived()));
   }
 
   @Test

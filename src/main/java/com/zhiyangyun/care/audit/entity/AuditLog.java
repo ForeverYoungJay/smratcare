@@ -21,6 +21,9 @@ public class AuditLog {
   private String entityType;
   private Long entityId;
   private String detail;
+  private String beforeSnapshot;
+  private String afterSnapshot;
+  private String contextJson;
   @TableField(value = "create_time", fill = FieldFill.INSERT)
   private LocalDateTime createTime;
 }

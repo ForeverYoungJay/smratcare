@@ -36,6 +36,8 @@ public class DischargeSettlement {
   private Integer financeRefunded;
   private String financeRefundOperatorName;
   private LocalDateTime financeRefundTime;
+  private Long refundVoucherId;
+  private String refundVoucherNo;
   private String remark;
   private Long settledBy;
   private LocalDateTime settledTime;

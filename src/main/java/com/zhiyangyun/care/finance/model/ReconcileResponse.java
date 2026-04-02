@@ -8,6 +8,8 @@ import lombok.Data;
 public class ReconcileResponse {
   private LocalDate date;
   private BigDecimal totalReceived;
+  private BigDecimal totalRefund;
+  private BigDecimal netReceived;
   private Integer mismatchFlag;
   private boolean mismatch;
   private String remark;

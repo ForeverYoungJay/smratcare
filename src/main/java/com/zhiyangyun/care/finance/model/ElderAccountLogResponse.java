@@ -13,6 +13,9 @@ public class ElderAccountLogResponse {
   private BigDecimal amount;
   private BigDecimal balanceAfter;
   private String direction;
+  private String fundType;
+  private BigDecimal depositBalanceAfter;
+  private BigDecimal prepaidBalanceAfter;
   private String sourceType;
   private Long sourceId;
   private String remark;

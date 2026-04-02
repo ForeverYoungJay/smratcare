@@ -22,6 +22,10 @@ public class ElderAccount {
 
   private BigDecimal balance;
 
+  private BigDecimal depositBalance;
+
+  private BigDecimal prepaidBalance;
+
   private BigDecimal creditLimit;
 
   private BigDecimal warnThreshold;

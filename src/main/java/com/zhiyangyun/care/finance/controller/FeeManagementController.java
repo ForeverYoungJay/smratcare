@@ -9,6 +9,7 @@ import com.zhiyangyun.care.finance.entity.ConsumptionRecord;
 import com.zhiyangyun.care.finance.entity.DischargeFeeAudit;
 import com.zhiyangyun.care.finance.entity.DischargeSettlement;
 import com.zhiyangyun.care.finance.entity.MonthlyAllocation;
+import com.zhiyangyun.care.finance.mapper.DischargeSettlementMapper;
 import com.zhiyangyun.care.finance.model.AdmissionFeeAuditCreateRequest;
 import com.zhiyangyun.care.finance.model.ConsumptionRecordCreateRequest;
 import com.zhiyangyun.care.finance.model.DischargeFeeAuditCreateRequest;
@@ -21,6 +22,8 @@ import com.zhiyangyun.care.finance.model.MonthlyAllocationPreviewResponse;
 import com.zhiyangyun.care.finance.model.MonthlyAllocationRollbackRequest;
 import com.zhiyangyun.care.finance.service.FeeManagementService;
 import jakarta.validation.Valid;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -37,10 +40,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class FeeManagementController {
   private final FeeManagementService feeManagementService;
   private final AuditLogService auditLogService;
+  private final DischargeSettlementMapper dischargeSettlementMapper;
 
-  public FeeManagementController(FeeManagementService feeManagementService, AuditLogService auditLogService) {
+  public FeeManagementController(FeeManagementService feeManagementService, AuditLogService auditLogService,
+      DischargeSettlementMapper dischargeSettlementMapper) {
     this.feeManagementService = feeManagementService;
     this.auditLogService = auditLogService;
+    this.dischargeSettlementMapper = dischargeSettlementMapper;
   }
 
   @GetMapping("/admission-audit/page")
@@ -59,8 +65,10 @@ public class FeeManagementController {
     Long orgId = AuthContext.getOrgId();
     Long operatorId = AuthContext.getStaffId();
     AdmissionFeeAudit result = feeManagementService.createAdmissionAudit(orgId, operatorId, request);
-    auditLogService.record(orgId, orgId, operatorId, AuthContext.getUsername(),
-        "FIN_ADMISSION_AUDIT_CREATE", "FINANCE_FEE", result.getId(), "入住费用审核创建");
+    auditLogService.recordStructured(
+        orgId, orgId, operatorId, AuthContext.getUsername(),
+        "FIN_ADMISSION_AUDIT_CREATE", "FINANCE_FEE", result.getId(), "入住费用审核创建",
+        null, result, request);
     return Result.ok(result);
   }
 
@@ -71,8 +79,10 @@ public class FeeManagementController {
     Long orgId = AuthContext.getOrgId();
     Long operatorId = AuthContext.getStaffId();
     AdmissionFeeAudit result = feeManagementService.reviewAdmissionAudit(orgId, operatorId, id, request);
-    auditLogService.record(orgId, orgId, operatorId, AuthContext.getUsername(),
-        "FIN_ADMISSION_AUDIT_REVIEW", "FINANCE_FEE", id, "入住费用审核:" + request.getStatus());
+    auditLogService.recordStructured(
+        orgId, orgId, operatorId, AuthContext.getUsername(),
+        "FIN_ADMISSION_AUDIT_REVIEW", "FINANCE_FEE", id, "入住费用审核:" + request.getStatus(),
+        null, result, request);
     return Result.ok(result);
   }
 
@@ -92,8 +102,10 @@ public class FeeManagementController {
     Long orgId = AuthContext.getOrgId();
     Long operatorId = AuthContext.getStaffId();
     DischargeFeeAudit result = feeManagementService.createDischargeAudit(orgId, operatorId, request);
-    auditLogService.record(orgId, orgId, operatorId, AuthContext.getUsername(),
-        "FIN_DISCHARGE_AUDIT_CREATE", "FINANCE_FEE", result.getId(), "退住费用审核创建");
+    auditLogService.recordStructured(
+        orgId, orgId, operatorId, AuthContext.getUsername(),
+        "FIN_DISCHARGE_AUDIT_CREATE", "FINANCE_FEE", result.getId(), "退住费用审核创建",
+        null, result, request);
     return Result.ok(result);
   }
 
@@ -104,8 +116,10 @@ public class FeeManagementController {
     Long orgId = AuthContext.getOrgId();
     Long operatorId = AuthContext.getStaffId();
     DischargeFeeAudit result = feeManagementService.reviewDischargeAudit(orgId, operatorId, id, request);
-    auditLogService.record(orgId, orgId, operatorId, AuthContext.getUsername(),
-        "FIN_DISCHARGE_AUDIT_REVIEW", "FINANCE_FEE", id, "退住费用审核:" + request.getStatus());
+    auditLogService.recordStructured(
+        orgId, orgId, operatorId, AuthContext.getUsername(),
+        "FIN_DISCHARGE_AUDIT_REVIEW", "FINANCE_FEE", id, "退住费用审核:" + request.getStatus(),
+        null, result, request);
     return Result.ok(result);
   }
 
@@ -126,8 +140,17 @@ public class FeeManagementController {
     Long orgId = AuthContext.getOrgId();
     Long operatorId = AuthContext.getStaffId();
     DischargeSettlement result = feeManagementService.createDischargeSettlement(orgId, operatorId, request);
-    auditLogService.record(orgId, orgId, operatorId, AuthContext.getUsername(),
-        "FIN_DISCHARGE_SETTLEMENT_CREATE", "FINANCE_FEE", result.getId(), "退住结算单创建");
+    Map<String, Object> context = new LinkedHashMap<>();
+    context.put("elderId", request.getElderId());
+    context.put("dischargeApplyId", request.getDischargeApplyId());
+    context.put("payableAmount", request.getPayableAmount());
+    context.put("feeItem", request.getFeeItem());
+    context.put("dischargeFeeConfig", request.getDischargeFeeConfig());
+    context.put("remark", request.getRemark());
+    auditLogService.recordStructured(
+        orgId, orgId, operatorId, AuthContext.getUsername(),
+        "FIN_DISCHARGE_SETTLEMENT_CREATE", "FINANCE_FEE", result.getId(), "退住结算单创建",
+        null, result, context);
     return Result.ok(result);
   }
 
@@ -137,9 +160,16 @@ public class FeeManagementController {
       @RequestBody(required = false) DischargeSettlementConfirmRequest request) {
     Long orgId = AuthContext.getOrgId();
     Long operatorId = AuthContext.getStaffId();
+    DischargeSettlement beforeSnapshot = dischargeSettlementMapper.selectById(id);
     DischargeSettlement result = feeManagementService.confirmDischargeSettlement(orgId, operatorId, id, request);
-    auditLogService.record(orgId, orgId, operatorId, AuthContext.getUsername(),
-        "FIN_DISCHARGE_SETTLEMENT_CONFIRM", "FINANCE_FEE", id, "退住结算确认");
+    Map<String, Object> context = new LinkedHashMap<>();
+    context.put("action", request == null ? null : request.getAction());
+    context.put("signerName", request == null ? null : request.getSignerName());
+    context.put("remark", request == null ? null : request.getRemark());
+    auditLogService.recordStructured(
+        orgId, orgId, operatorId, AuthContext.getUsername(),
+        "FIN_DISCHARGE_SETTLEMENT_CONFIRM", "FINANCE_FEE", id, "退住结算确认",
+        beforeSnapshot, result, context);
     return Result.ok(result);
   }
 
@@ -162,8 +192,10 @@ public class FeeManagementController {
     Long orgId = AuthContext.getOrgId();
     Long operatorId = AuthContext.getStaffId();
     ConsumptionRecord result = feeManagementService.createConsumption(orgId, operatorId, request);
-    auditLogService.record(orgId, orgId, operatorId, AuthContext.getUsername(),
-        "FIN_CONSUMPTION_CREATE", "FINANCE_FEE", result.getId(), "消费登记");
+    auditLogService.recordStructured(
+        orgId, orgId, operatorId, AuthContext.getUsername(),
+        "FIN_CONSUMPTION_CREATE", "FINANCE_FEE", result.getId(), "消费登记",
+        null, result, request);
     return Result.ok(result);
   }
 
@@ -183,8 +215,10 @@ public class FeeManagementController {
     Long orgId = AuthContext.getOrgId();
     Long operatorId = AuthContext.getStaffId();
     MonthlyAllocation result = feeManagementService.createMonthlyAllocation(orgId, operatorId, request);
-    auditLogService.record(orgId, orgId, operatorId, AuthContext.getUsername(),
-        "FIN_MONTHLY_ALLOCATION_CREATE", "FINANCE_FEE", result.getId(), "月分摊费创建");
+    auditLogService.recordStructured(
+        orgId, orgId, operatorId, AuthContext.getUsername(),
+        "FIN_MONTHLY_ALLOCATION_CREATE", "FINANCE_FEE", result.getId(), "月分摊费创建",
+        null, result, request);
     return Result.ok(result);
   }
 
@@ -203,8 +237,10 @@ public class FeeManagementController {
     Long orgId = AuthContext.getOrgId();
     Long operatorId = AuthContext.getStaffId();
     MonthlyAllocation result = feeManagementService.rollbackMonthlyAllocation(orgId, operatorId, id, request);
-    auditLogService.record(orgId, orgId, operatorId, AuthContext.getUsername(),
-        "FIN_MONTHLY_ALLOCATION_ROLLBACK", "FINANCE_FEE", result.getId(), "月分摊回滚");
+    auditLogService.recordStructured(
+        orgId, orgId, operatorId, AuthContext.getUsername(),
+        "FIN_MONTHLY_ALLOCATION_ROLLBACK", "FINANCE_FEE", result.getId(), "月分摊回滚",
+        null, result, request);
     return Result.ok(result);
   }
 }

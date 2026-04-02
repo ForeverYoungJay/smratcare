@@ -21,12 +21,14 @@ import com.zhiyangyun.care.finance.entity.ConsumptionRecord;
 import com.zhiyangyun.care.finance.entity.DischargeFeeAudit;
 import com.zhiyangyun.care.finance.entity.DischargeSettlement;
 import com.zhiyangyun.care.finance.entity.ElderAccount;
+import com.zhiyangyun.care.finance.entity.FinanceRefundVoucher;
 import com.zhiyangyun.care.finance.entity.MonthlyAllocation;
 import com.zhiyangyun.care.finance.mapper.AdmissionFeeAuditMapper;
 import com.zhiyangyun.care.finance.mapper.ConsumptionRecordMapper;
 import com.zhiyangyun.care.finance.mapper.DischargeFeeAuditMapper;
 import com.zhiyangyun.care.finance.mapper.DischargeSettlementMapper;
 import com.zhiyangyun.care.finance.mapper.ElderAccountMapper;
+import com.zhiyangyun.care.finance.mapper.FinanceRefundVoucherMapper;
 import com.zhiyangyun.care.finance.mapper.MonthlyAllocationMapper;
 import com.zhiyangyun.care.finance.model.AdmissionFeeAuditCreateRequest;
 import com.zhiyangyun.care.finance.model.ConsumptionRecordCreateRequest;
@@ -72,6 +74,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
   private final ElderMapper elderMapper;
   private final RoomMapper roomMapper;
   private final ElderAccountMapper elderAccountMapper;
+  private final FinanceRefundVoucherMapper financeRefundVoucherMapper;
   private final ElderDischargeApplyMapper elderDischargeApplyMapper;
   private final ElderAccountService elderAccountService;
   private final FinanceService financeService;
@@ -88,6 +91,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
       ElderMapper elderMapper,
       RoomMapper roomMapper,
       ElderAccountMapper elderAccountMapper,
+      FinanceRefundVoucherMapper financeRefundVoucherMapper,
       ElderDischargeApplyMapper elderDischargeApplyMapper,
       ElderAccountService elderAccountService,
       FinanceService financeService) {
@@ -102,6 +106,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     this.elderMapper = elderMapper;
     this.roomMapper = roomMapper;
     this.elderAccountMapper = elderAccountMapper;
+    this.financeRefundVoucherMapper = financeRefundVoucherMapper;
     this.elderDischargeApplyMapper = elderDischargeApplyMapper;
     this.elderAccountService = elderAccountService;
     this.financeService = financeService;
@@ -389,15 +394,20 @@ public class FeeManagementServiceImpl implements FeeManagementService {
       debitFee.setElderId(current.getElderId());
       debitFee.setAmount(amounts.fromDepositAmount());
       debitFee.setDirection("DEBIT");
+      debitFee.setFundType("DEPOSIT");
       debitFee.setRemark("退住结算扣费#" + current.getId());
       elderAccountService.adjust(orgId, operatorId, debitFee);
     }
+    FinanceRefundVoucher refundVoucher = null;
     if (amounts.refundAmount().compareTo(BigDecimal.ZERO) > 0) {
+      refundVoucher = upsertRefundVoucher(current, amounts.refundAmount(), operatorId, signerName, remark);
       ElderAccountAdjustRequest debitRefund = new ElderAccountAdjustRequest();
       debitRefund.setElderId(current.getElderId());
       debitRefund.setAmount(amounts.refundAmount());
       debitRefund.setDirection("DEBIT");
-      debitRefund.setRemark("退住结算退款#" + current.getId());
+      debitRefund.setFundType("DEPOSIT");
+      debitRefund.setRemark("退住结算退款#" + current.getId()
+          + (refundVoucher == null || !hasText(refundVoucher.getVoucherNo()) ? "" : (" 凭证:" + refundVoucher.getVoucherNo())));
       elderAccountService.adjust(orgId, operatorId, debitRefund);
     }
 
@@ -414,6 +424,8 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     current.setFinanceRefunded(1);
     current.setFinanceRefundOperatorName(hasText(signerName) ? signerName : "财务");
     current.setFinanceRefundTime(LocalDateTime.now());
+    current.setRefundVoucherId(refundVoucher == null ? null : refundVoucher.getId());
+    current.setRefundVoucherNo(refundVoucher == null ? null : refundVoucher.getVoucherNo());
     current.setSettledBy(operatorId);
     current.setSettledTime(LocalDateTime.now());
     String linkageRemark = String.join("；", linkageDetails);
@@ -962,10 +974,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
         .eq(orgId != null, ElderAccount::getOrgId, orgId)
         .eq(ElderAccount::getElderId, elderId)
         .last("LIMIT 1"));
-    if (account == null || account.getBalance() == null) {
-      return BigDecimal.ZERO;
-    }
-    return account.getBalance();
+    return settlementAvailableBalance(account);
   }
 
   private BigDecimal currentBalanceForUpdate(Long orgId, Long elderId) {
@@ -974,10 +983,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
         .eq(orgId != null, ElderAccount::getOrgId, orgId)
         .eq(ElderAccount::getElderId, elderId)
         .last("FOR UPDATE"));
-    if (account == null || account.getBalance() == null) {
-      return BigDecimal.ZERO;
-    }
-    return account.getBalance();
+    return settlementAvailableBalance(account);
   }
 
   private SettlementAmounts calculateSettlement(BigDecimal balance, BigDecimal payable) {
@@ -995,11 +1001,25 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     return new SettlementAmounts(fromDeposit, refund, supplement);
   }
 
+  private BigDecimal settlementAvailableBalance(ElderAccount account) {
+    if (account == null) {
+      return BigDecimal.ZERO;
+    }
+    BigDecimal totalBalance = safe(account.getBalance()).max(BigDecimal.ZERO);
+    BigDecimal depositBalance = safe(account.getDepositBalance()).max(BigDecimal.ZERO);
+    BigDecimal prepaidBalance = safe(account.getPrepaidBalance()).max(BigDecimal.ZERO);
+    BigDecimal legacyUnclassified = totalBalance.subtract(depositBalance).subtract(prepaidBalance).max(BigDecimal.ZERO);
+    return depositBalance.add(legacyUnclassified);
+  }
+
   private String runDailyReconcile(Long orgId) {
     try {
       ReconcileResponse response = financeService.reconcile(orgId, LocalDate.now());
       String mismatch = response.isMismatch() ? "有异常" : "无异常";
-      return response.getDate() + " 收款" + money(response.getTotalReceived()) + "，" + mismatch;
+      return response.getDate() + " 收款" + money(response.getTotalReceived())
+          + "，退款" + money(response.getTotalRefund())
+          + "，净额" + money(response.getNetReceived())
+          + "，" + mismatch;
     } catch (RuntimeException exception) {
       return "失败(" + exception.getMessage() + ")";
     }
@@ -1105,6 +1125,49 @@ public class FeeManagementServiceImpl implements FeeManagementService {
   private String generateDetailNo(Long elderId) {
     long tail = elderId == null ? 0L : Math.abs(elderId % 1000);
     return "DS" + System.currentTimeMillis() + String.format("%03d", tail);
+  }
+
+  private FinanceRefundVoucher upsertRefundVoucher(
+      DischargeSettlement settlement,
+      BigDecimal refundAmount,
+      Long operatorId,
+      String signerName,
+      String remark) {
+    FinanceRefundVoucher voucher = financeRefundVoucherMapper.selectOne(
+        Wrappers.lambdaQuery(FinanceRefundVoucher.class)
+            .eq(FinanceRefundVoucher::getIsDeleted, 0)
+            .eq(FinanceRefundVoucher::getOrgId, settlement.getOrgId())
+            .eq(FinanceRefundVoucher::getSettlementId, settlement.getId())
+            .last("LIMIT 1 FOR UPDATE"));
+    LocalDateTime executedAt = LocalDateTime.now();
+    if (voucher == null) {
+      voucher = new FinanceRefundVoucher();
+      voucher.setTenantId(settlement.getOrgId());
+      voucher.setOrgId(settlement.getOrgId());
+      voucher.setSettlementId(settlement.getId());
+      voucher.setElderId(settlement.getElderId());
+      voucher.setElderName(settlement.getElderName());
+      voucher.setVoucherNo(generateRefundVoucherNo(settlement.getElderId()));
+    }
+    voucher.setAmount(refundAmount);
+    voucher.setStatus("PAID");
+    voucher.setPayMethod("OFFLINE_REFUND");
+    voucher.setExecutedBy(operatorId);
+    voucher.setExecutedByName(hasText(signerName) ? signerName : "财务");
+    voucher.setExecutedAt(executedAt);
+    voucher.setRemark(truncateRemark(mergeRemark(voucher.getRemark(),
+        "退住结算退款#" + settlement.getId() + (hasText(remark) ? "；" + remark : ""))));
+    if (voucher.getId() == null) {
+      financeRefundVoucherMapper.insert(voucher);
+      return voucher;
+    }
+    financeRefundVoucherMapper.updateById(voucher);
+    return voucher;
+  }
+
+  private String generateRefundVoucherNo(Long elderId) {
+    long tail = elderId == null ? 0L : Math.abs(elderId % 1000);
+    return "RF" + System.currentTimeMillis() + String.format("%03d", tail);
   }
 
   private String normalizeConsumptionCategory(String category) {

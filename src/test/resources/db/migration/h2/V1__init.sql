@@ -124,6 +124,9 @@ CREATE TABLE audit_log (
   entity_type VARCHAR(64) NOT NULL,
   entity_id BIGINT DEFAULT NULL,
   detail VARCHAR(1000) DEFAULT NULL,
+  before_snapshot CLOB,
+  after_snapshot CLOB,
+  context_json CLOB,
   create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -368,6 +371,13 @@ CREATE TABLE reconciliation_daily (
   is_deleted TINYINT NOT NULL DEFAULT 0
 );
 
+CREATE UNIQUE INDEX uk_bill_monthly_org_elder_month_del
+  ON bill_monthly (org_id, elder_id, bill_month, is_deleted);
+CREATE UNIQUE INDEX uk_payment_record_org_external_del
+  ON payment_record (org_id, external_txn_id, is_deleted);
+CREATE UNIQUE INDEX uk_reconciliation_daily_org_date_del
+  ON reconciliation_daily (org_id, reconcile_date, is_deleted);
+
 CREATE TABLE org (
   id BIGINT NOT NULL PRIMARY KEY,
   org_code VARCHAR(64) NOT NULL,
@@ -525,6 +535,8 @@ CREATE TABLE elder_account (
   org_id BIGINT NOT NULL,
   elder_id BIGINT NOT NULL,
   balance DECIMAL(12,2) NOT NULL DEFAULT 0,
+  deposit_balance DECIMAL(12,2) NOT NULL DEFAULT 0,
+  prepaid_balance DECIMAL(12,2) NOT NULL DEFAULT 0,
   credit_limit DECIMAL(12,2) NOT NULL DEFAULT 0,
   warn_threshold DECIMAL(12,2) NOT NULL DEFAULT 0,
   status TINYINT NOT NULL DEFAULT 1,
@@ -535,6 +547,9 @@ CREATE TABLE elder_account (
   is_deleted TINYINT NOT NULL DEFAULT 0
 );
 
+CREATE UNIQUE INDEX uk_elder_account_org_elder_del
+  ON elder_account (org_id, elder_id, is_deleted);
+
 CREATE TABLE elder_account_log (
   id BIGINT NOT NULL PRIMARY KEY,
   tenant_id BIGINT NOT NULL DEFAULT 1,
@@ -544,6 +559,9 @@ CREATE TABLE elder_account_log (
   amount DECIMAL(12,2) NOT NULL,
   balance_after DECIMAL(12,2) NOT NULL,
   direction VARCHAR(16) NOT NULL,
+  fund_type VARCHAR(16) DEFAULT NULL,
+  deposit_balance_after DECIMAL(12,2) NOT NULL DEFAULT 0,
+  prepaid_balance_after DECIMAL(12,2) NOT NULL DEFAULT 0,
   source_type VARCHAR(32) DEFAULT NULL,
   source_id BIGINT DEFAULT NULL,
   remark VARCHAR(255) DEFAULT NULL,

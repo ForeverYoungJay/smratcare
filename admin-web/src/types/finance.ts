@@ -18,6 +18,8 @@ export interface ReconcileDailyItem {
   date?: string
   reconcileDate?: string
   totalReceived: number
+  totalRefund?: number
+  netReceived?: number
   mismatchFlag: boolean | number
   mismatch?: boolean
   remark?: string
@@ -65,6 +67,10 @@ export interface StoreOrderSummary {
 export interface FinanceReportMonthlyItem {
   month: string
   amount: number
+  billedAmount?: number
+  receivedAmount?: number
+  refundAmount?: number
+  netAmount?: number
 }
 
 export interface FinanceArrearsItem {
@@ -108,6 +114,9 @@ export interface ElderAccount {
   elderId: Id
   elderName?: string
   balance: number
+  depositBalance?: number
+  prepaidBalance?: number
+  unclassifiedBalance?: number
   creditLimit: number
   warnThreshold: number
   status: number
@@ -126,6 +135,9 @@ export interface ElderAccountLog {
   amount: number
   balanceAfter: number
   direction: 'DEBIT' | 'CREDIT'
+  fundType?: 'PREPAID' | 'DEPOSIT' | 'AUTO'
+  depositBalanceAfter?: number
+  prepaidBalanceAfter?: number
   sourceType: string
   sourceId?: Id
   remark?: string
@@ -137,6 +149,7 @@ export interface ElderAccountAdjustRequest {
   elderName?: string
   amount: number
   direction: 'DEBIT' | 'CREDIT'
+  fundType?: 'PREPAID' | 'DEPOSIT' | 'AUTO'
   remark?: string
 }
 
@@ -845,6 +858,10 @@ export interface FinanceReportEntrySummary {
   periodFrom: string
   periodTo: string
   totalRevenue: number
+  billedRevenue?: number
+  totalReceived?: number
+  refundTotal?: number
+  netRevenue?: number
   totalStoreSales: number
   arrearsTotal: number
   arrearsElderCount: number

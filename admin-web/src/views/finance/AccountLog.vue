@@ -21,7 +21,19 @@
 
     <DataTable rowKey="id" :columns="columns" :data-source="rows" :loading="loading" :pagination="pagination" @change="handleTableChange">
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'rechargeMethod'">
+        <template v-if="column.key === 'direction'">
+          {{ formatDirection(record.direction) }}
+        </template>
+        <template v-else-if="column.key === 'fundType'">
+          {{ formatFundType(record.fundType) }}
+        </template>
+        <template v-else-if="column.key === 'depositBalanceAfter'">
+          {{ formatAmount(record.depositBalanceAfter) }}
+        </template>
+        <template v-else-if="column.key === 'prepaidBalanceAfter'">
+          {{ formatAmount(record.prepaidBalanceAfter) }}
+        </template>
+        <template v-else-if="column.key === 'rechargeMethod'">
           {{ parseRechargeMethod(record.remark) || '-' }}
         </template>
         <template v-else-if="column.key === 'rechargeTime'">
@@ -72,12 +84,34 @@ const columns = [
   { title: '方向', dataIndex: 'direction', key: 'direction', width: 80 },
   { title: '金额', dataIndex: 'amount', key: 'amount', width: 120 },
   { title: '余额', dataIndex: 'balanceAfter', key: 'balanceAfter', width: 120 },
+  { title: '资金类型', dataIndex: 'fundType', key: 'fundType', width: 100 },
+  { title: '押金结余', dataIndex: 'depositBalanceAfter', key: 'depositBalanceAfter', width: 120 },
+  { title: '预收结余', dataIndex: 'prepaidBalanceAfter', key: 'prepaidBalanceAfter', width: 120 },
   { title: '来源', dataIndex: 'sourceType', key: 'sourceType', width: 120 },
   { title: '充值方式', key: 'rechargeMethod', width: 120 },
   { title: '充值时间', key: 'rechargeTime', width: 180 },
   { title: '时间', dataIndex: 'createTime', key: 'createTime', width: 180 },
   { title: '备注', dataIndex: 'remark', key: 'remark', width: 200 }
 ]
+
+function formatDirection(direction?: string) {
+  const value = String(direction || '').toUpperCase()
+  if (value === 'DEBIT') return '支出'
+  if (value === 'CREDIT') return '收入'
+  return '-'
+}
+
+function formatFundType(fundType?: string) {
+  const value = String(fundType || '').toUpperCase()
+  if (value === 'DEPOSIT') return '押金'
+  if (value === 'PREPAID') return '预收'
+  if (value === 'AUTO') return '自动抵扣'
+  return value || '-'
+}
+
+function formatAmount(value?: number) {
+  return Number(value || 0).toFixed(2)
+}
 
 function parseRechargeMethod(remark?: string) {
   const match = String(remark || '').match(/充值方式:([^|]+)/)

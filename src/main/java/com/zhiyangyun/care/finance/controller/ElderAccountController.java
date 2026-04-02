@@ -3,6 +3,7 @@ package com.zhiyangyun.care.finance.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
+import com.zhiyangyun.care.audit.service.AuditLogService;
 import com.zhiyangyun.care.finance.model.ElderAccountAdjustRequest;
 import com.zhiyangyun.care.finance.model.ElderAccountLogResponse;
 import com.zhiyangyun.care.finance.model.ElderAccountResponse;
@@ -11,7 +12,9 @@ import com.zhiyangyun.care.finance.service.ElderAccountService;
 import jakarta.validation.Valid;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -28,9 +31,11 @@ import org.springframework.web.bind.annotation.RestController;
 @PreAuthorize("hasAnyRole('FINANCE_EMPLOYEE','FINANCE_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
 public class ElderAccountController {
   private final ElderAccountService accountService;
+  private final AuditLogService auditLogService;
 
-  public ElderAccountController(ElderAccountService accountService) {
+  public ElderAccountController(ElderAccountService accountService, AuditLogService auditLogService) {
     this.accountService = accountService;
+    this.auditLogService = auditLogService;
   }
 
   @GetMapping("/page")
@@ -68,12 +73,54 @@ public class ElderAccountController {
 
   @PostMapping("/adjust")
   public Result<ElderAccountResponse> adjust(@Valid @RequestBody ElderAccountAdjustRequest request) {
-    return Result.ok(accountService.adjust(AuthContext.getOrgId(), AuthContext.getStaffId(), request));
+    ElderAccountResponse beforeSnapshot = request.getElderId() == null
+        ? null
+        : accountService.getOrCreate(AuthContext.getOrgId(), request.getElderId(), AuthContext.getStaffId());
+    ElderAccountResponse response = accountService.adjust(AuthContext.getOrgId(), AuthContext.getStaffId(), request);
+    Map<String, Object> context = new LinkedHashMap<>();
+    context.put("direction", request.getDirection());
+    context.put("fundType", request.getFundType());
+    context.put("amount", request.getAmount());
+    context.put("remark", request.getRemark());
+    auditLogService.recordStructured(
+        AuthContext.getOrgId(),
+        AuthContext.getOrgId(),
+        AuthContext.getStaffId(),
+        AuthContext.getUsername(),
+        "FIN_ACCOUNT_ADJUST",
+        "ELDER_ACCOUNT",
+        response.getId(),
+        "老人账户调整",
+        beforeSnapshot,
+        response,
+        context);
+    return Result.ok(response);
   }
 
   @PostMapping("/update")
   public Result<ElderAccountResponse> update(@RequestBody ElderAccountUpdateRequest request) {
-    return Result.ok(accountService.updateAccount(AuthContext.getOrgId(), AuthContext.getStaffId(), request));
+    ElderAccountResponse beforeSnapshot = request.getElderId() == null
+        ? null
+        : accountService.getOrCreate(AuthContext.getOrgId(), request.getElderId(), AuthContext.getStaffId());
+    ElderAccountResponse response = accountService.updateAccount(AuthContext.getOrgId(), AuthContext.getStaffId(), request);
+    Map<String, Object> context = new LinkedHashMap<>();
+    context.put("creditLimit", request.getCreditLimit());
+    context.put("warnThreshold", request.getWarnThreshold());
+    context.put("status", request.getStatus());
+    context.put("remark", request.getRemark());
+    auditLogService.recordStructured(
+        AuthContext.getOrgId(),
+        AuthContext.getOrgId(),
+        AuthContext.getStaffId(),
+        AuthContext.getUsername(),
+        "FIN_ACCOUNT_UPDATE",
+        "ELDER_ACCOUNT",
+        response.getId(),
+        "老人账户设置更新",
+        beforeSnapshot,
+        response,
+        context);
+    return Result.ok(response);
   }
 
   @GetMapping("/warnings")

@@ -11,6 +11,10 @@ public class FinanceReportEntrySummaryResponse {
   private String periodFrom;
   private String periodTo;
   private BigDecimal totalRevenue = BigDecimal.ZERO;
+  private BigDecimal billedRevenue = BigDecimal.ZERO;
+  private BigDecimal totalReceived = BigDecimal.ZERO;
+  private BigDecimal refundTotal = BigDecimal.ZERO;
+  private BigDecimal netRevenue = BigDecimal.ZERO;
   private BigDecimal totalStoreSales = BigDecimal.ZERO;
   private BigDecimal arrearsTotal = BigDecimal.ZERO;
   private Long arrearsElderCount = 0L;

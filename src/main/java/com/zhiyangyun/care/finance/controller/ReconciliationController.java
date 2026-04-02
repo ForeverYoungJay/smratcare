@@ -81,11 +81,13 @@ public class ReconciliationController {
       wrapper.le(ReconciliationDaily::getReconcileDate, LocalDate.parse(to));
     }
     List<ReconciliationDaily> rows = reconciliationDailyMapper.selectList(wrapper);
-    List<String> headers = List.of("对账日期", "收款总额", "是否异常", "备注", "生成时间");
+    List<String> headers = List.of("对账日期", "收款总额", "退款总额", "净收款", "是否异常", "备注", "生成时间");
     List<List<String>> body = rows.stream()
         .map(item -> List.of(
             stringOf(item.getReconcileDate()),
             stringOf(item.getTotalReceived()),
+            stringOf(item.getTotalRefund()),
+            stringOf(item.getNetReceived()),
             item.getMismatchFlag() != null && item.getMismatchFlag() == 1 ? "异常" : "正常",
             stringOf(item.getRemark()),
             stringOf(item.getCreateTime())))
