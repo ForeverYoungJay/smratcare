@@ -85,8 +85,8 @@ const collaborationLinks = computed(() => ([
   { label: '入住评估', path: '/elder/assessment/ability/admission' },
   { label: '入住办理', path: '/elder/admission-processing' },
   { label: 'OA审批', path: '/oa/approval' },
-  { label: 'OA待办', path: '/oa/todo' },
-  { label: '人事行政', path: '/hr/workbench' }
+  { label: '我的待办', path: '/workbench/todo' },
+  { label: '人力资源中心', path: '/hr/overview' }
 ]).filter((item) => canAccess(item.path)))
 
 function goParent() {

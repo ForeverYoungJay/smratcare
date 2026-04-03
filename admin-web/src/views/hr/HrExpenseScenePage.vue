@@ -1,5 +1,5 @@
 <template>
-  <PageContainer :title="pageTitle" :subTitle="`费用与报销 / ${pageTitle}`">
+  <PageContainer :title="pageTitle" :subTitle="`薪酬与费用 / ${pageTitle}`">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="标题/申请人/备注" allow-clear />

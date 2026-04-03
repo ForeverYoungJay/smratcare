@@ -3,12 +3,14 @@ package com.zhiyangyun.care.auth.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zhiyangyun.care.auth.entity.Department;
 import com.zhiyangyun.care.auth.entity.Role;
 import com.zhiyangyun.care.auth.mapper.DepartmentMapper;
 import com.zhiyangyun.care.auth.mapper.RoleMapper;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
+import com.zhiyangyun.care.auth.security.PagePermissionPathHelper;
 import com.zhiyangyun.care.auth.model.RoleRequest;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -31,10 +33,12 @@ import java.util.Locale;
 public class AdminRoleController {
   private final RoleMapper roleMapper;
   private final DepartmentMapper departmentMapper;
+  private final ObjectMapper objectMapper;
 
-  public AdminRoleController(RoleMapper roleMapper, DepartmentMapper departmentMapper) {
+  public AdminRoleController(RoleMapper roleMapper, DepartmentMapper departmentMapper, ObjectMapper objectMapper) {
     this.roleMapper = roleMapper;
     this.departmentMapper = departmentMapper;
+    this.objectMapper = objectMapper;
   }
 
   @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN','HR_MINISTER')")
@@ -53,7 +57,7 @@ public class AdminRoleController {
     role.setRoleName(request.getRoleName());
     role.setRoleCode(resolveRoleCode(request.getRoleCode(), request.getRoleName(), request.getDepartmentId()));
     role.setRoleDesc(null);
-    role.setRoutePermissionsJson(request.getRoutePermissionsJson());
+    role.setRoutePermissionsJson(normalizeRoutePermissionsJson(request.getRoutePermissionsJson()));
     role.setStatus(request.getStatus());
     roleMapper.insert(role);
     return Result.ok(role);
@@ -73,7 +77,7 @@ public class AdminRoleController {
     role.setRoleName(request.getRoleName());
     role.setRoleCode(resolveRoleCode(request.getRoleCode(), request.getRoleName(), request.getDepartmentId()));
     role.setRoleDesc(null);
-    role.setRoutePermissionsJson(request.getRoutePermissionsJson());
+    role.setRoutePermissionsJson(normalizeRoutePermissionsJson(request.getRoutePermissionsJson()));
     role.setStatus(request.getStatus());
     roleMapper.updateById(role);
     return Result.ok(role);
@@ -222,5 +226,9 @@ public class AdminRoleController {
       throw new IllegalArgumentException(label + "不属于当前机构");
     }
     return role;
+  }
+
+  private String normalizeRoutePermissionsJson(String value) {
+    return PagePermissionPathHelper.normalizeJson(objectMapper, value);
   }
 }

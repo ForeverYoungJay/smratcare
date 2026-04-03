@@ -6,29 +6,43 @@ export interface RouteAccessResult {
   requiredRoles: string[]
 }
 
-const legacyPagePathMap: Record<string, string> = {
-  '/workbench': '/portal',
-  '/workbench/overview': '/portal',
-  '/workbench/todo': '/oa/todo',
-  '/workbench/my-info': '/oa/my-info',
-  '/workbench/attendance': '/oa/attendance-leave',
-  '/workbench/reports': '/oa/work-report',
-  '/workbench/approvals': '/oa/approval',
-  '/portal': '/workbench',
-  '/oa/todo': '/workbench/todo',
-  '/oa/my-info': '/workbench/my-info',
-  '/oa/attendance-leave': '/workbench/attendance',
-  '/oa/work-report': '/workbench/reports',
-  '/oa/approval': '/workbench/approvals',
-  '/hr/overview': '/hr/workbench',
-  '/hr/workbench': '/hr/overview',
-  '/system/org-manage': '/system/site-config',
-  '/system/org-manage/intro': '/system/site-config',
-  '/system/org-manage/news': '/system/site-config',
-  '/system/org-manage/life': '/system/site-config',
-  '/system/app-version': '/system/site-config',
-  '/system/message': '/system/site-config',
-  '/system/dict': '/base-config'
+const routePathAliases: Record<string, string[]> = {
+  '/workbench': ['/portal', '/workbench/overview'],
+  '/workbench/overview': ['/workbench', '/portal'],
+  '/portal': ['/workbench', '/workbench/overview'],
+  '/workbench/todo': ['/oa/todo'],
+  '/oa/todo': ['/workbench/todo'],
+  '/workbench/my-info': ['/oa/my-info'],
+  '/oa/my-info': ['/workbench/my-info'],
+  '/workbench/attendance': ['/oa/attendance-leave'],
+  '/oa/attendance-leave': ['/workbench/attendance'],
+  '/workbench/reports': ['/oa/work-report'],
+  '/oa/work-report': ['/workbench/reports'],
+  '/workbench/approvals': ['/oa/approval'],
+  '/oa/approval': ['/workbench/approvals'],
+  '/hr/overview': ['/hr/workbench'],
+  '/hr/workbench': ['/hr/overview'],
+  '/oa/activity-center/records': ['/oa/activity'],
+  '/oa/activity': ['/oa/activity-center/records'],
+  '/oa/activity-center/plan': ['/oa/activity-plan'],
+  '/oa/activity-plan': ['/oa/activity-center/plan'],
+  '/oa/activity-center/survey-manage': ['/oa/survey/manage'],
+  '/oa/survey/manage': ['/oa/activity-center/survey-manage'],
+  '/oa/activity-center/survey-stats': ['/oa/survey/stats'],
+  '/oa/survey/stats': ['/oa/activity-center/survey-stats'],
+  '/hr/incentive/ledger': ['/hr/points'],
+  '/hr/points': ['/hr/incentive/ledger'],
+  '/hr/incentive/rules': ['/hr/points-rule'],
+  '/hr/points-rule': ['/hr/incentive/rules'],
+  '/system/site-config': ['/system/org-manage', '/system/org-manage/intro', '/system/org-manage/news', '/system/org-manage/life', '/system/app-version', '/system/message'],
+  '/system/org-manage': ['/system/site-config'],
+  '/system/org-manage/intro': ['/system/site-config'],
+  '/system/org-manage/news': ['/system/site-config'],
+  '/system/org-manage/life': ['/system/site-config'],
+  '/system/app-version': ['/system/site-config'],
+  '/system/message': ['/system/site-config'],
+  '/base-config': ['/system/dict'],
+  '/system/dict': ['/base-config']
 }
 
 function normalizePath(path: string): string {
@@ -41,14 +55,30 @@ function normalizePath(path: string): string {
   return normalized.startsWith('/') ? normalized : `/${normalized}`
 }
 
-export function hasExplicitPageAccess(pagePermissions: string[], path: string): boolean {
+function collectAcceptablePaths(path: string): Set<string> {
   const normalizedPath = normalizePath(path)
-  const effectivePath = legacyPagePathMap[normalizedPath] || normalizedPath
-  const acceptablePaths = new Set([effectivePath])
-  if (effectivePath === '/system/site-config') {
-    acceptablePaths.add('/system/role')
-    acceptablePaths.add('/system/permission-overview')
+  const acceptablePaths = new Set<string>([normalizedPath])
+  const queue = [normalizedPath]
+  while (queue.length) {
+    const current = queue.shift() as string
+    ;(routePathAliases[current] || []).forEach((alias) => {
+      const normalizedAlias = normalizePath(alias)
+      if (acceptablePaths.has(normalizedAlias)) {
+        return
+      }
+      acceptablePaths.add(normalizedAlias)
+      queue.push(normalizedAlias)
+    })
   }
+  const siteConfigGroup = ['/system/site-config', '/system/role', '/system/permission-overview']
+  if (siteConfigGroup.some((item) => acceptablePaths.has(item))) {
+    siteConfigGroup.forEach((item) => acceptablePaths.add(item))
+  }
+  return acceptablePaths
+}
+
+export function hasExplicitPageAccess(pagePermissions: string[], path: string): boolean {
+  const acceptablePaths = collectAcceptablePaths(path)
   return (pagePermissions || []).some((permissionPath) => {
     const normalizedPermission = normalizePath(permissionPath)
     return Array.from(acceptablePaths).some(

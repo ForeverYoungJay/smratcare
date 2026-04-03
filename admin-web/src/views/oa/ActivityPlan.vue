@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="活动计划" subTitle="从计划、方案、审批到执行复盘的一体化工作台">
+  <PageContainer title="活动中心" subTitle="计划、方案、审批、执行与复盘在同一工作面完成。">
     <div class="activity-hero">
       <div class="hero-copy">
         <span class="hero-kicker">Activity Studio</span>
@@ -127,7 +127,7 @@
 
     <a-modal
       v-model:open="plannerOpen"
-      :title="plannerForm.id ? '编辑活动计划' : '新增活动计划'"
+      :title="plannerForm.id ? '编辑活动' : '新增活动'"
       width="920px"
       :confirm-loading="saving"
       @ok="submitPlanner"
@@ -899,10 +899,10 @@ async function submitPlanner() {
     }
     if (plannerForm.id) {
       await updateActivityPlan(plannerForm.id, payload)
-      message.success('活动计划已更新')
+      message.success('活动已更新')
     } else {
       await createActivityPlan(payload)
-      message.success('活动计划已创建，状态为待提交方案')
+      message.success('活动已创建，状态为待提交方案')
     }
     plannerOpen.value = false
     await fetchData()

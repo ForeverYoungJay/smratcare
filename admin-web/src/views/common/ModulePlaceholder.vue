@@ -19,7 +19,7 @@
         <a-divider />
         <a-space wrap>
           <a-button type="primary" @click="go('/workbench')">返回工作台</a-button>
-          <a-button @click="go('/oa/todo')">查看待办</a-button>
+          <a-button @click="go('/workbench/todo')">查看待办</a-button>
           <a-button @click="go('/oa/approval')">查看审批</a-button>
           <a-button @click="go('/dashboard')">查看看板</a-button>
         </a-space>

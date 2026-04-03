@@ -376,7 +376,7 @@ const activeReceiptActions = computed(() => {
       },
       {
         label: '打开OA待办中心',
-        path: '/oa/todo?source=lifecycle&scene=status-change&status=OPEN&quick=overdue'
+        path: '/workbench/todo?source=lifecycle&scene=status-change&status=OPEN&quick=overdue'
       }
     ]
   }

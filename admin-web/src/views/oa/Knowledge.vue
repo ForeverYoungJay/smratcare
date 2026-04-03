@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="知识库管理" subTitle="制度规范、护理手册、操作指引管理">
+  <PageContainer title="知识库" subTitle="制度规范、护理手册与操作指引统一归档。">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
         <a-input v-model:value="query.keyword" placeholder="标题/标签/作者" allow-clear />

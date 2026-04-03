@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="门禁对接" subTitle="排班与考勤管理 / 门禁对接">
+  <PageContainer title="门禁对接" subTitle="考勤与班组 / 门禁对接">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="姓名/工号/手机号" allow-clear />

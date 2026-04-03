@@ -42,7 +42,7 @@
         <strong>{{ summary.todayTrainingCount || 0 }}</strong>
         <small>待执行培训安排</small>
       </div>
-      <div class="summary-pill card-elevated" @click="openPath('/oa/todo?keyword=生日提醒')">
+      <div class="summary-pill card-elevated" @click="openPath('/workbench/todo?keyword=生日提醒')">
         <span>生日待办</span>
         <strong>{{ summary.birthdayTodoCount || 0 }}</strong>
         <small>关联 OA 协同待办</small>

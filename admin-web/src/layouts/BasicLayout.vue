@@ -812,7 +812,7 @@ const quickNotifyItems = computed(() => {
     { title: `聊天待办（${quickChatTodoPendingCount.value}${quickChatTodoOverdueCount.value ? `/逾期${quickChatTodoOverdueCount.value}` : ''}）`, action: 'openQuickChatTodo' },
     { title: `待办完成率（${quickChatTodoCompletionRate.value}%）`, action: 'openQuickChatTodo' },
     { title: `执行总览（${quickChatExecutionOverview.value.totalPressure}）`, action: 'openQuickChatTodo' },
-    { title: '我的待办', route: '/oa/todo' },
+    { title: '我的待办', route: '/workbench/todo' },
     { title: '待我审批', route: '/oa/approval?scope=PENDING_REVIEW' },
     { title: '行政日历/协同日历', route: '/oa/work-execution/calendar' },
     { title: '会员生日', route: '/oa/life/birthday' }

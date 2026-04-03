@@ -107,7 +107,7 @@ const sections = computed<CenterSection[]>(() => [
   {
     title: '活动与文化',
     kicker: 'Culture & Events',
-    desc: '把活动计划、执行记录、满意度调查和文化运营集中到一个分区。',
+    desc: '把活动策划、执行记录、满意度调查和文化运营集中到一个分区。',
     color: 'purple',
     actions: filterActions([
       { label: '活动中心', path: '/oa/activity-center/plan', tip: '计划、方案、审批、执行和复盘' },

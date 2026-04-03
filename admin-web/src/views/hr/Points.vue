@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="积分管理" subTitle="任务积分与手动调整">
+  <PageContainer title="积分台账" subTitle="任务积分、奖励扣减与人工调整。">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="员工">
         <a-select

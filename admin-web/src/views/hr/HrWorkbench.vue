@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="人事行政工作台" subTitle="招聘、档案、考勤、OA、培训、绩效一体化工作入口">
+  <PageContainer title="人力资源中心" subTitle="兼容入口会自动回到新的人力资源业务中心结构。">
     <a-card :bordered="false" class="card-elevated" style="margin-bottom: 12px" title="卡片1：今日人力概况">
       <a-row :gutter="16">
         <a-col :xs="12" :md="4">
@@ -43,7 +43,7 @@
           </div>
         </a-col>
         <a-col :xs="12" :md="4">
-          <div class="stat-clickable" @click="go('/oa/todo?keyword=生日提醒')">
+          <div class="stat-clickable" @click="go('/workbench/todo?keyword=生日提醒')">
             <a-statistic title="生日待办" :value="summary.birthdayTodoCount" :value-style="{ color: (summary.birthdayTodoCount || 0) > 0 ? '#cf1322' : undefined }" />
           </div>
         </a-col>
@@ -75,7 +75,7 @@
           <a-space wrap>
             <template v-for="action in section.actions" :key="action.path">
               <div class="action-entry">
-                <a-badge v-if="action.path === '/oa/todo?keyword=生日提醒'" :count="summary.birthdayTodoCount || 0" :offset="[2, -2]">
+                <a-badge v-if="action.path === '/workbench/todo?keyword=生日提醒'" :count="summary.birthdayTodoCount || 0" :offset="[2, -2]">
                   <a-button :type="action.primary ? 'primary' : 'default'" @click="go(action.path)">{{ action.label }}</a-button>
                 </a-badge>
                 <a-button v-else :type="action.primary ? 'primary' : 'default'" @click="go(action.path)">{{ action.label }}</a-button>
@@ -198,7 +198,7 @@ const sectionConfigs: readonly WorkbenchSection[] = [
     ]
   },
   {
-    title: '排班与考勤管理',
+    title: '考勤与班组',
     actions: [
       { label: '排班方案', path: '/hr/attendance/schemes', primary: true },
       { label: '班组设置', path: '/hr/attendance/groups' },
@@ -213,17 +213,17 @@ const sectionConfigs: readonly WorkbenchSection[] = [
     ]
   },
   {
-    title: '行政协同（OA）',
+    title: '行政中心（兼容）',
     actions: [
       { label: '通知管理', path: '/oa/notice', primary: true },
       { label: '任务管理', path: '/oa/work-execution/task' },
-      { label: '工作执行', path: '/oa/todo' },
-      { label: '活动计划', path: '/oa/activity-plan' },
-      { label: '文档管理', path: '/oa/document' },
+      { label: '我的待办', path: '/workbench/todo' },
+      { label: '活动中心', path: '/oa/activity-center/plan' },
+      { label: '文档中心', path: '/oa/document' },
       { label: '知识库', path: '/oa/knowledge' },
       { label: '规章制度库', path: '/hr/compliance/policies' },
       { label: '制度更新预警', path: '/hr/compliance/policy-alerts' },
-      { label: '生日提醒待办', path: '/oa/todo?keyword=生日提醒' },
+      { label: '生日提醒待办', path: '/workbench/todo?keyword=生日提醒' },
       { label: '分组设置', path: '/oa/group-settings' }
     ]
   },
@@ -235,11 +235,11 @@ const sectionConfigs: readonly WorkbenchSection[] = [
       { label: '入住办理', path: '/elder/admission-processing' },
       { label: '在院总览', path: '/elder/in-hospital-overview' },
       { label: '床位房态图', path: '/logistics/assets/room-state-map' },
-      { label: 'OA 门户', path: '/oa/portal' }
+      { label: '工作台', path: '/workbench' }
     ]
   },
   {
-    title: '费用与报销',
+    title: '薪酬与费用',
     actions: [
       { label: '外出培训费用报销', path: '/hr/expense/records?scene=training-reimburse', primary: true },
       { label: '补贴申请', path: '/hr/expense/records?scene=subsidy' },
@@ -250,7 +250,7 @@ const sectionConfigs: readonly WorkbenchSection[] = [
     ]
   },
   {
-    title: '培训与发展 / 绩效考核',
+    title: '培训发展 / 绩效管理',
     actions: [
       { label: '培训计划', path: '/hr/development/records?scene=plans', primary: true },
       { label: '培训报名', path: '/hr/development/records?scene=enrollments' },

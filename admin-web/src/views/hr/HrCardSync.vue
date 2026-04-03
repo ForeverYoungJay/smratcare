@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="一卡通数据对接" subTitle="排班与考勤管理 / 一卡通数据对接">
+  <PageContainer title="一卡通数据对接" subTitle="考勤与班组 / 一卡通数据对接">
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <ElderNameAutocomplete v-model:value="query.keyword" placeholder="长者姓名(编号)" width="220px" />

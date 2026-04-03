@@ -1,7 +1,6 @@
 package com.zhiyangyun.care.auth.controller;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zhiyangyun.care.auth.entity.Role;
 import com.zhiyangyun.care.auth.entity.StaffAccount;
@@ -24,6 +23,7 @@ import com.zhiyangyun.care.auth.model.FamilySmsCodeVerifyResponse;
 import com.zhiyangyun.care.auth.security.TokenBlacklistService;
 import com.zhiyangyun.care.auth.security.TokenProvider;
 import com.zhiyangyun.care.auth.security.PermissionRegistry;
+import com.zhiyangyun.care.auth.security.PagePermissionPathHelper;
 import com.zhiyangyun.care.auth.security.RoleCodeHelper;
 import com.zhiyangyun.care.auth.entity.Org;
 import com.zhiyangyun.care.elder.entity.FamilyUser;
@@ -356,22 +356,10 @@ public class AuthController {
     }
     LinkedHashSet<String> merged = new LinkedHashSet<>();
     for (Role role : roles) {
-      if (role == null || role.getRoutePermissionsJson() == null || role.getRoutePermissionsJson().isBlank()) {
+      if (role == null) {
         continue;
       }
-      try {
-        List<String> parsed = objectMapper.readValue(role.getRoutePermissionsJson(), new TypeReference<List<String>>() {});
-        if (parsed == null) {
-          continue;
-        }
-        for (String item : parsed) {
-          if (item != null && !item.isBlank()) {
-            merged.add(item.trim());
-          }
-        }
-      } catch (Exception ignored) {
-        // ignore malformed permission config
-      }
+      merged.addAll(PagePermissionPathHelper.parseAndNormalize(objectMapper, role.getRoutePermissionsJson()));
     }
     return new ArrayList<>(merged);
   }

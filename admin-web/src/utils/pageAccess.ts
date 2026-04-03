@@ -15,6 +15,28 @@ export interface RolePagePreset {
 
 const LAYOUT_ROOT = '/'
 const HIDDEN_PATHS = new Set(['/403'])
+const LEGACY_PERMISSION_PATH_MAP: Record<string, string> = {
+  '/portal': '/workbench',
+  '/oa/portal': '/workbench',
+  '/oa/todo': '/workbench/todo',
+  '/oa/my-info': '/workbench/my-info',
+  '/oa/attendance-leave': '/workbench/attendance',
+  '/oa/work-report': '/workbench/reports',
+  '/hr/workbench': '/hr/overview',
+  '/oa/activity': '/oa/activity-center/records',
+  '/oa/activity-plan': '/oa/activity-center/plan',
+  '/oa/survey/manage': '/oa/activity-center/survey-manage',
+  '/oa/survey/stats': '/oa/activity-center/survey-stats',
+  '/hr/points': '/hr/incentive/ledger',
+  '/hr/points-rule': '/hr/incentive/rules',
+  '/system/org-manage': '/system/site-config',
+  '/system/org-manage/intro': '/system/site-config',
+  '/system/org-manage/news': '/system/site-config',
+  '/system/org-manage/life': '/system/site-config',
+  '/system/app-version': '/system/site-config',
+  '/system/message': '/system/site-config',
+  '/system/dict': '/base-config'
+}
 
 function normalizePath(path: string): string {
   const base = String(path || '').split('?')[0].split('#')[0].trim()
@@ -24,6 +46,11 @@ function normalizePath(path: string): string {
     return normalized.slice(0, -1)
   }
   return normalized.startsWith('/') ? normalized : `/${normalized}`
+}
+
+function toCanonicalPermissionPath(path: string): string {
+  const normalized = normalizePath(path)
+  return LEGACY_PERMISSION_PATH_MAP[normalized] || normalized
 }
 
 function joinPath(base: string, path: string): string {
@@ -155,13 +182,14 @@ export function getPagePermissionOptions() {
 }
 
 export function getPageTitle(path: string): string {
-  return pageTitleMap.get(normalizePath(path)) || normalizePath(path)
+  const canonicalPath = toCanonicalPermissionPath(path)
+  return pageTitleMap.get(canonicalPath) || canonicalPath
 }
 
 export function normalizePagePermissions(paths: Array<string | null | undefined>): string[] {
   const normalized = new Set<string>()
   ;(paths || []).forEach((path) => {
-    const normalizedPath = normalizePath(String(path || ''))
+    const normalizedPath = toCanonicalPermissionPath(String(path || ''))
     if (!normalizedPath || normalizedPath === '/' || HIDDEN_PATHS.has(normalizedPath)) {
       return
     }

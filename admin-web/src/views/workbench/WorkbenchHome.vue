@@ -159,7 +159,7 @@ const metricItems = computed(() => [
   { label: '待我审批', value: summary.pendingApprovalCount || 0, desc: '需要我确认的流程', path: '/workbench/approvals' },
   { label: '进行中任务', value: summary.ongoingTaskCount || 0, desc: '仍在推进的任务', path: '/oa/work-execution/task' },
   { label: '已交总结', value: summary.submittedReportCount || 0, desc: '近30天已提交数量', path: '/workbench/reports' },
-  { label: '生日提醒', value: summary.birthdayTodoCount || 0, desc: '与我相关的生日待办', path: '/oa/todo?keyword=生日提醒' },
+  { label: '生日提醒', value: summary.birthdayTodoCount || 0, desc: '与我相关的生日待办', path: '/workbench/todo?keyword=生日提醒' },
   { label: '审批超时', value: summary.approvalTimeoutCount || 0, desc: '需要催办或升级处理', path: '/workbench/approvals' }
 ].filter((item) => canAccess(item.path)))
 
@@ -173,10 +173,10 @@ const personalActions = computed<ActionItem[]>(() => filterActions([
 
 const quickLaunchActions = computed<ActionItem[]>(() => filterActions([
   { label: '发起审批', path: '/oa/approval', tip: '请假、报销、采购等流程' },
-  { label: '创建待办', path: '/oa/todo', tip: '记录提醒、生日、协作事项' },
+  { label: '创建待办', path: '/workbench/todo', tip: '记录提醒、生日、协作事项' },
   { label: '任务管理', path: '/oa/work-execution/task', tip: '新增或跟进任务' },
   { label: '文档中心', path: '/oa/document', tip: '上传、查找和归档文件' },
-  { label: '活动中心', path: '/oa/activity-center/plan', tip: '活动计划、方案、执行和复盘' }
+  { label: '活动中心', path: '/oa/activity-center/plan', tip: '活动策划、方案、执行和复盘' }
 ]))
 
 const centerActions = computed<ActionItem[]>(() => filterActions([

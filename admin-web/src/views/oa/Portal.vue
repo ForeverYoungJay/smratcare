@@ -8,9 +8,9 @@
             <a-radio-button value="ORG">机构视角</a-radio-button>
           </a-radio-group>
           <a-tag :color="portalScope === 'ORG' ? 'purple' : 'blue'">{{ scopeDescription }}</a-tag>
-          <a-button size="small" type="primary" @click="openPath('/oa/todo')">进入待办</a-button>
+          <a-button size="small" type="primary" @click="openPath('/workbench/todo')">进入待办</a-button>
           <a-button size="small" @click="openPath('/oa/approval')">进入审批</a-button>
-          <a-button size="small" @click="openPath('/oa/work-report')">写工作总结</a-button>
+          <a-button size="small" @click="openPath('/workbench/reports')">写工作总结</a-button>
         </a-space>
       </div>
       <a-alert
@@ -27,7 +27,7 @@
           </a-card>
         </a-col>
         <a-col :xs="12" :md="4">
-          <a-card :bordered="false" class="card-elevated stat-card clickable" @click="openPath('/oa/todo?keyword=生日提醒')">
+          <a-card :bordered="false" class="card-elevated stat-card clickable" @click="openPath('/workbench/todo?keyword=生日提醒')">
             <a-statistic title="生日待办" :value="summary.birthdayTodoCount || 0" />
           </a-card>
         </a-col>
@@ -152,11 +152,11 @@ const workflowQuickActions = computed<OaWorkflowTodoItem[]>(() =>
 )
 const commonActions = computed(() => ([
   { label: '审批流程', path: '/oa/approval' },
-  { label: '待办事项', path: '/oa/todo' },
+  { label: '我的待办', path: '/workbench/todo' },
   { label: '任务管理', path: '/oa/work-execution/task' },
   { label: '文档管理', path: '/oa/document' },
   { label: '通知管理', path: '/oa/notice' },
-  { label: '工作总结', path: '/oa/work-report' },
+  { label: '我的总结', path: '/workbench/reports' },
   { label: '入住评估', path: '/elder/assessment/ability/admission' },
   { label: '入住办理', path: '/elder/admission-processing' },
   { label: '营销合同闭环', path: '/marketing/contracts/pending?flowStage=PENDING_ASSESSMENT' },

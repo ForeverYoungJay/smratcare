@@ -7,7 +7,7 @@
             <div class="hero-title">您好，{{ userStore.staffInfo?.realName || '管理员' }}</div>
             <div class="hero-subtitle">当前时间 {{ refreshedAt || '--' }}，优先处理“我的待办”可显著降低超时风险。</div>
             <div class="hero-kpis">
-              <div class="hero-kpi-item clickable" @click="go('/oa/todo')">
+              <div class="hero-kpi-item clickable" @click="go('/workbench/todo')">
                 <span class="hero-kpi-label">待办总量</span>
                 <strong class="hero-kpi-value">{{ totalTodoCount }}</strong>
               </div>
@@ -39,7 +39,7 @@
           <div class="hero-actions">
             <div class="hero-actions-main">
               <a-space wrap class="hero-action-btns">
-                <a-button type="primary" @click="go('/oa/todo')">进入待办中心</a-button>
+                <a-button type="primary" @click="go('/workbench/todo')">进入待办中心</a-button>
                 <a-button @click="init">刷新首页</a-button>
                 <a-button @click="openModuleCustomize">自定义首页</a-button>
                 <a-button @click="openCustomCardEditor()">新增卡面</a-button>
@@ -80,7 +80,7 @@
                 </a-col>
               </a-row>
               <a-space wrap style="margin-top: 12px;">
-                <a-button type="primary" @click="go('/oa/todo')">查看全部</a-button>
+                <a-button type="primary" @click="go('/workbench/todo')">查看全部</a-button>
                 <a-button @click="go('/oa/approval')">批量审批</a-button>
                 <a-button @click="go('/logistics/task-center')">打开任务中心</a-button>
               </a-space>
@@ -430,7 +430,7 @@
               <a-button size="small" @click="openCreateSchedule()">创建日程</a-button>
               <a-button size="small" @click="go('/oa/work-execution/calendar')">打开统一日历页面</a-button>
               <a-button size="small" @click="agendaDrawerOpen = true">今日/明日速览</a-button>
-              <a-button size="small" @click="go('/oa/attendance-leave?type=LEAVE&quick=1')">发起请假</a-button>
+              <a-button size="small" @click="go('/workbench/attendance?type=LEAVE&quick=1')">发起请假</a-button>
               <a-button size="small" @click="go('/oa/approval?type=LEAVE')">请假审批流程</a-button>
             </a-space>
           </template>
@@ -1516,10 +1516,10 @@ const searchAliases: Record<string, string[]> = {
   '/elder/list': ['老人详情', '长者详情', '老人档案', '长者档案', '档案详情'],
   '/elder/in-hospital-overview': ['在院总览', '在院服务总览', '长者总览', '协同联动'],
   '/oa/approval': ['审批', '待审批', '流程审批', '批量审批', '请假审批'],
-  '/oa/todo': ['待办', '任务', '待处理', '超时'],
+  '/workbench/todo': ['待办', '任务', '待处理', '超时'],
   '/oa/work-execution/calendar': ['日历', '协同日历', '行政日历', '排班'],
   '/oa/life/birthday': ['生日', '生日提醒', '生日计划', '老人生日'],
-  '/oa/attendance-leave': ['请假', '考勤', '值班', '调班', '加班'],
+  '/workbench/attendance': ['请假', '考勤', '值班', '调班', '加班'],
   '/logistics/assets/room-state-map': ['房态图', '床态', '空床', '清洁中', '床位图'],
   '/marketing/reports/conversion': ['漏斗', '销售分析', '签约', '转化'],
   '/finance/reports/overall': ['财务分析', '欠费', '收入', '对账'],
@@ -1548,10 +1548,10 @@ const searchRouteExcludes = new Set([
 ])
 
 const searchPinnedRoutes = [
-  '/oa/todo',
+  '/workbench/todo',
   '/oa/approval',
   '/oa/work-execution/calendar',
-  '/oa/attendance-leave',
+  '/workbench/attendance',
   '/oa/life/birthday',
   '/logistics/assets/room-state-map',
   '/marketing/reports/conversion',
@@ -1750,7 +1750,7 @@ const groupedCustomCards = computed(() => {
 
 const myTodoStats = computed(() => [
   { title: '待审批流程', value: myTodoSummary.pendingApprovalCount || 0, route: '/oa/approval?scope=PENDING_REVIEW' },
-  { title: '待处理任务', value: myTodoSummary.openTodoCount || 0, route: '/oa/todo' },
+  { title: '待处理任务', value: myTodoSummary.openTodoCount || 0, route: '/workbench/todo' },
   { title: '待确认事项', value: myTodoSummary.ongoingTaskCount || 0, route: '/oa/work-execution/task' },
   { title: '超时未处理', value: myTodoSummary.timeoutApprovalCount || 0, route: '/oa/approval?scope=PENDING_REVIEW&overdue=1' }
 ])
@@ -2019,7 +2019,7 @@ const expenseSections = computed(() => {
     {
       title: '部门费用',
       rows: [
-        { label: '本月部门费用', value: money(deptExpenseCount), route: '/hr/workbench' },
+        { label: '本月部门费用', value: money(deptExpenseCount), route: '/hr/overview' },
         { label: '待审报销单', value: `${summary.reimbursePendingCount || 0} 条`, route: '/oa/approval?type=REIMBURSE&status=PENDING' },
         { label: '待审采购单', value: `${summary.purchasePendingCount || 0} 条`, route: '/oa/approval?type=PURCHASE&status=PENDING' }
       ]
