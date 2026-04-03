@@ -8,7 +8,7 @@ export const routes: RouteRecordRaw[] = [
   },
   {
     path: '/admin',
-    redirect: '/login?redirect=/portal',
+    redirect: '/login?redirect=/workbench',
     meta: { title: '后台入口', hidden: true }
   },
   {
@@ -33,13 +33,58 @@ export const routes: RouteRecordRaw[] = [
     path: '/',
     name: 'Root',
     component: () => import('../layouts/BasicLayout.vue'),
-    redirect: '/portal',
+    redirect: '/workbench',
     children: [
       {
         path: 'portal',
         name: 'Portal',
-        component: () => import('../views/Portal.vue'),
-        meta: { title: '首页', icon: 'HomeOutlined' }
+        redirect: '/workbench',
+        meta: { title: '首页（兼容）', icon: 'HomeOutlined', hidden: true }
+      },
+      {
+        path: 'workbench',
+        name: 'Workbench',
+        component: () => import('../layouts/RouteView.vue'),
+        meta: { title: '工作台', icon: 'AppstoreOutlined' },
+        redirect: '/workbench/overview',
+        children: [
+          {
+            path: 'overview',
+            name: 'WorkbenchOverview',
+            component: () => import('../views/workbench/WorkbenchHome.vue'),
+            meta: { title: '我的工作台' }
+          },
+          {
+            path: 'todo',
+            name: 'WorkbenchTodo',
+            redirect: '/oa/todo',
+            meta: { title: '我的待办' }
+          },
+          {
+            path: 'my-info',
+            name: 'WorkbenchMyInfo',
+            redirect: '/oa/my-info',
+            meta: { title: '我的信息' }
+          },
+          {
+            path: 'attendance',
+            name: 'WorkbenchAttendance',
+            redirect: '/oa/attendance-leave',
+            meta: { title: '我的考勤与请假' }
+          },
+          {
+            path: 'reports',
+            name: 'WorkbenchReports',
+            redirect: '/oa/work-report',
+            meta: { title: '我的总结' }
+          },
+          {
+            path: 'approvals',
+            name: 'WorkbenchApprovals',
+            redirect: '/oa/approval',
+            meta: { title: '我的审批' }
+          }
+        ]
       },
       {
         path: 'dashboard',
@@ -2397,12 +2442,18 @@ export const routes: RouteRecordRaw[] = [
             'DIRECTOR', 'SYS_ADMIN', 'ADMIN'
           ]
         },
-        redirect: '/oa/work-execution/task',
+        redirect: '/oa/overview',
         children: [
+          {
+            path: 'overview',
+            name: 'OaOverview',
+            component: () => import('../views/oa/AdminCenter.vue'),
+            meta: { title: '行政中心' }
+          },
           {
             path: 'work-execution',
             name: 'OaWorkExecution',
-            meta: { title: '工作执行管理' },
+            meta: { title: '协同办公' },
             redirect: '/oa/work-execution/task',
             children: [
               {
@@ -2445,14 +2496,14 @@ export const routes: RouteRecordRaw[] = [
                 path: 'attendance-leave',
                 name: 'OaWorkExecutionAttendanceLeave',
                 redirect: '/oa/attendance-leave',
-                meta: { title: '考勤与请假' }
+                meta: { title: '考勤与请假（兼容）', hidden: true }
               }
             ]
           },
           {
             path: 'life',
             name: 'OaLife',
-            meta: { title: '生活管理' },
+            meta: { title: '生活服务' },
             redirect: '/oa/life/birthday',
             children: [
               {
@@ -2484,7 +2535,7 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'card',
             name: 'OaCard',
-            meta: { title: '一卡通管理' },
+            meta: { title: '一卡通' },
             redirect: '/oa/card/account',
             children: [
               {
@@ -2510,20 +2561,20 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'survey',
             name: 'OaSurvey',
-            meta: { title: '满意度问卷' },
-            redirect: '/oa/survey/manage',
+            meta: { title: '满意度问卷（兼容）', hidden: true },
+            redirect: '/oa/activity-center/survey-manage',
             children: [
               {
                 path: 'manage',
                 name: 'OaSurveyManage',
-                component: () => import('../views/survey/Template.vue'),
-                meta: { title: '问卷管理' }
+                redirect: '/oa/activity-center/survey-manage',
+                meta: { title: '问卷管理（兼容）', hidden: true }
               },
               {
                 path: 'stats',
                 name: 'OaSurveyStats',
-                component: () => import('../views/survey/Stats.vue'),
-                meta: { title: '问卷统计' }
+                redirect: '/oa/activity-center/survey-stats',
+                meta: { title: '问卷统计（兼容）', hidden: true }
               }
             ]
           },
@@ -2531,13 +2582,13 @@ export const routes: RouteRecordRaw[] = [
             path: 'knowledge',
             name: 'OaKnowledge',
             component: () => import('../views/oa/Knowledge.vue'),
-            meta: { title: '知识库管理' }
+            meta: { title: '知识库' }
           },
           {
             path: 'group-settings',
             name: 'OaGroupSettings',
             component: () => import('../views/oa/GroupSettings.vue'),
-            meta: { title: '分组设置' }
+            meta: { title: '分组设置（兼容）', hidden: true }
           },
           {
             path: 'notice',
@@ -2546,16 +2597,48 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: '通知公告' }
           },
           {
+            path: 'activity-center',
+            name: 'OaActivityCenter',
+            meta: { title: '活动与文化' },
+            redirect: '/oa/activity-center/plan',
+            children: [
+              {
+                path: 'plan',
+                name: 'OaActivityCenterPlan',
+                component: () => import('../views/oa/ActivityPlan.vue'),
+                meta: { title: '活动中心' }
+              },
+              {
+                path: 'records',
+                name: 'OaActivityCenterRecords',
+                component: () => import('../views/life/Activity.vue'),
+                meta: { title: '活动记录' }
+              },
+              {
+                path: 'survey-manage',
+                name: 'OaActivityCenterSurveyManage',
+                component: () => import('../views/survey/Template.vue'),
+                meta: { title: '满意度调查' }
+              },
+              {
+                path: 'survey-stats',
+                name: 'OaActivityCenterSurveyStats',
+                component: () => import('../views/survey/Stats.vue'),
+                meta: { title: '调查统计' }
+              }
+            ]
+          },
+          {
             path: 'activity',
             name: 'OaActivity',
-            component: () => import('../views/life/Activity.vue'),
-            meta: { title: '活动管理' }
+            redirect: '/oa/activity-center/records',
+            meta: { title: '活动管理（兼容）', hidden: true }
           },
           {
             path: 'activity-plan',
             name: 'OaActivityPlan',
-            component: () => import('../views/oa/ActivityPlan.vue'),
-            meta: { title: '活动计划' }
+            redirect: '/oa/activity-center/plan',
+            meta: { title: '活动计划（兼容）', hidden: true }
           },
           {
             path: 'reward-punishment',
@@ -2573,57 +2656,63 @@ export const routes: RouteRecordRaw[] = [
             path: 'portal',
             name: 'OaPortal',
             component: () => import('../views/oa/Portal.vue'),
-            meta: { title: '门户与待办' }
+            meta: { title: '门户与待办（兼容）', hidden: true }
           },
           {
             path: 'my-info',
             name: 'OaMyInfo',
             component: () => import('../views/oa/MyInfo.vue'),
-            meta: { title: '我的信息' }
+            meta: { title: '我的信息（兼容）', hidden: true }
           },
           {
             path: 'todo',
             name: 'OaTodo',
             component: () => import('../views/oa/Todo.vue'),
-            meta: { title: '待办事项' }
+            meta: { title: '待办事项（兼容）', hidden: true }
           },
           {
             path: 'approval',
             name: 'OaApproval',
             component: () => import('../views/oa/Approval.vue'),
-            meta: { title: '固定审批' }
+            meta: { title: '审批中心' }
           },
           {
             path: 'attendance-leave',
             name: 'OaAttendanceLeave',
             component: () => import('../views/oa/AttendanceLeave.vue'),
-            meta: { title: '考勤与请假' }
+            meta: { title: '考勤与请假（兼容）', hidden: true }
           },
           {
             path: 'document',
             name: 'OaDocument',
             component: () => import('../views/oa/Document.vue'),
-            meta: { title: '文档管理' }
+            meta: { title: '文档中心' }
           },
           {
             path: 'work-report',
             name: 'OaWorkReport',
             component: () => import('../views/oa/WorkReport.vue'),
-            meta: { title: '工作总结' }
+            meta: { title: '工作总结（兼容）', hidden: true }
           }
         ]
       },
       {
         path: 'hr',
         name: 'Hr',
-        meta: { title: '人事行政工作台', icon: 'SolutionOutlined', roles: ['HR_EMPLOYEE', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
-        redirect: '/hr/workbench',
+        meta: { title: '人力资源', icon: 'TeamOutlined', roles: ['HR_EMPLOYEE', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
+        redirect: '/hr/overview',
         children: [
+          {
+            path: 'overview',
+            name: 'HrOverview',
+            component: () => import('../views/hr/HrCenter.vue'),
+            meta: { title: '人力资源中心', roles: ['HR_EMPLOYEE', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
+          },
           {
             path: 'workbench',
             name: 'HrWorkbench',
-            component: () => import('../views/hr/HrWorkbench.vue'),
-            meta: { title: '人事行政工作台', roles: ['HR_EMPLOYEE', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] }
+            redirect: '/hr/overview',
+            meta: { title: '人事行政工作台（兼容）', roles: ['HR_EMPLOYEE', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'], hidden: true }
           },
           {
             path: 'recruitment',
@@ -2678,7 +2767,7 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'profile',
             name: 'HrProfileCenter',
-            meta: { title: '员工档案中心', roles: ['HR_EMPLOYEE', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
+            meta: { title: '员工档案', roles: ['HR_EMPLOYEE', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'] },
             redirect: '/hr/profile/basic',
             children: [
               {
@@ -2754,14 +2843,14 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'attendance',
             name: 'HrAttendance',
-            meta: { title: '排班与考勤管理', roles: ['ADMIN'] },
+            meta: { title: '考勤与班组', roles: ['ADMIN'] },
             redirect: '/hr/attendance/schemes',
             children: [
               {
                 path: 'schemes',
                 name: 'HrAttendanceSchemes',
                 component: () => import('../views/hr/HrAttendanceSchemes.vue'),
-                meta: { title: '排班方案', roles: ['ADMIN'] }
+                meta: { title: '排班管理', roles: ['ADMIN'] }
               },
               {
                 path: 'groups',
@@ -2848,7 +2937,7 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'expense',
             name: 'HrExpense',
-            meta: { title: '费用与报销', roles: ['ADMIN'] },
+            meta: { title: '薪酬与费用', roles: ['ADMIN'] },
             redirect: '/hr/expense/records?scene=training-reimburse',
             children: [
               { path: 'records', name: 'HrExpenseRecords', component: () => import('../views/hr/HrExpenseScenePage.vue'), meta: { title: '费用报销台', roles: ['ADMIN'] } },
@@ -2863,7 +2952,7 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'development',
             name: 'HrDevelopment',
-            meta: { title: '培训与发展', roles: ['ADMIN'] },
+            meta: { title: '培训发展', roles: ['ADMIN'] },
             redirect: '/hr/development/records',
             children: [
               { path: 'plans', name: 'HrDevelopmentPlans', redirect: '/hr/development/records?scene=plans', meta: { title: '培训计划', roles: ['ADMIN'] } },
@@ -2877,7 +2966,7 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'performance',
             name: 'HrPerformanceCenter',
-            meta: { title: '绩效考核', roles: ['ADMIN'] },
+            meta: { title: '绩效管理', roles: ['ADMIN'] },
             redirect: '/hr/performance/reports',
             children: [
               { path: 'nursing', name: 'HrPerformanceNursing', redirect: '/hr/performance/reports?scene=nursing', meta: { title: '护理绩效（兼容）', roles: ['ADMIN'], hidden: true } },
@@ -2902,16 +2991,36 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: '培训管理（兼容）', roles: ['ADMIN'], hidden: true }
           },
           {
+            path: 'incentive',
+            name: 'HrIncentive',
+            meta: { title: '积分激励', roles: ['ADMIN'] },
+            redirect: '/hr/incentive/ledger',
+            children: [
+              {
+                path: 'ledger',
+                name: 'HrIncentiveLedger',
+                component: () => import('../views/hr/Points.vue'),
+                meta: { title: '积分台账', roles: ['ADMIN'] }
+              },
+              {
+                path: 'rules',
+                name: 'HrIncentiveRules',
+                component: () => import('../views/hr/PointsRule.vue'),
+                meta: { title: '积分规则', roles: ['ADMIN'] }
+              }
+            ]
+          },
+          {
             path: 'points',
             name: 'HrPoints',
-            component: () => import('../views/hr/Points.vue'),
-            meta: { title: '积分管理', roles: ['ADMIN'] }
+            redirect: '/hr/incentive/ledger',
+            meta: { title: '积分管理（兼容）', roles: ['ADMIN'], hidden: true }
           },
           {
             path: 'points-rule',
             name: 'HrPointsRule',
-            component: () => import('../views/hr/PointsRule.vue'),
-            meta: { title: '积分规则', roles: ['ADMIN'] }
+            redirect: '/hr/incentive/rules',
+            meta: { title: '积分规则（兼容）', roles: ['ADMIN'], hidden: true }
           },
           {
             path: 'performance-board',

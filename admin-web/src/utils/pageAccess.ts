@@ -76,27 +76,27 @@ const pagePermissionFlat: Array<{ path: string; title: string }> = []
 flattenTree(pagePermissionTree, pagePermissionFlat)
 const pageTitleMap = new Map(pagePermissionFlat.map((item) => [item.path, item.title]))
 
-const commonPersonalPaths = ['/portal', '/oa/my-info', '/oa/portal', '/oa/todo']
+const commonPersonalPaths = ['/workbench', '/workbench/overview', '/workbench/todo', '/workbench/my-info', '/workbench/attendance', '/workbench/reports', '/workbench/approvals']
 
 export const ROLE_PAGE_PRESETS: Record<string, RolePagePreset> = {
   NURSING_MINISTER: {
     label: '护理部长',
     description: '首页、医护健康服务、长者管理、护理审批、工作总结、基础数据配置',
-    paths: [...commonPersonalPaths, '/medical-care', '/elder', '/oa/approval', '/oa/attendance-leave', '/oa/work-report', '/base-config']
+    paths: [...commonPersonalPaths, '/medical-care', '/elder', '/oa/approval', '/base-config']
   },
   NURSING_EMPLOYEE: {
     label: '护理生活管家',
     description: '个人首页、我的信息、医护健康服务中心、我的待办和快捷发起',
-    paths: [...commonPersonalPaths, '/medical-care', '/oa/approval', '/oa/attendance-leave', '/oa/work-report']
+    paths: [...commonPersonalPaths, '/medical-care', '/oa/approval']
   },
   HR_MINISTER: {
     label: '行政人事部部长',
-    description: '行政人事工作台、行政管理、统计分析、官网配置、角色管理、权限总览、基础配置',
+    description: '工作台、人力资源、行政管理、统计分析、官网配置、角色管理、权限总览、基础配置',
     paths: [...commonPersonalPaths, '/hr', '/oa', '/stats', '/system/site-config', '/system/role', '/system/permission-overview', '/base-config']
   },
   HR_EMPLOYEE: {
     label: '行政人事部员工',
-    description: '行政人事工作台、行政管理、统计分析，不包含角色和账号权限配置',
+    description: '工作台、人力资源、行政管理、统计分析，不包含角色和账号权限配置',
     paths: [...commonPersonalPaths, '/hr', '/oa', '/stats', '/base-config']
   },
   LOGISTICS_MINISTER: {
@@ -117,7 +117,7 @@ export const ROLE_PAGE_PRESETS: Record<string, RolePagePreset> = {
   MEDICAL_MINISTER: {
     label: '医务部长',
     description: '医护健康服务、长者管理、相关审批与工作总结',
-    paths: [...commonPersonalPaths, '/medical-care', '/elder', '/oa/approval', '/oa/work-report']
+    paths: [...commonPersonalPaths, '/medical-care', '/elder', '/oa/approval']
   },
   MEDICAL_EMPLOYEE: {
     label: '医务员工',
@@ -137,7 +137,7 @@ export const ROLE_PAGE_PRESETS: Record<string, RolePagePreset> = {
   MARKETING_MINISTER: {
     label: '营销部长',
     description: '营销中心、统计和工作总结',
-    paths: [...commonPersonalPaths, '/marketing', '/stats', '/oa/work-report']
+    paths: [...commonPersonalPaths, '/marketing', '/stats']
   },
   MARKETING_EMPLOYEE: {
     label: '营销员工',

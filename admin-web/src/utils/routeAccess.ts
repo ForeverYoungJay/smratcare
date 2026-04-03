@@ -7,6 +7,21 @@ export interface RouteAccessResult {
 }
 
 const legacyPagePathMap: Record<string, string> = {
+  '/workbench': '/portal',
+  '/workbench/overview': '/portal',
+  '/workbench/todo': '/oa/todo',
+  '/workbench/my-info': '/oa/my-info',
+  '/workbench/attendance': '/oa/attendance-leave',
+  '/workbench/reports': '/oa/work-report',
+  '/workbench/approvals': '/oa/approval',
+  '/portal': '/workbench',
+  '/oa/todo': '/workbench/todo',
+  '/oa/my-info': '/workbench/my-info',
+  '/oa/attendance-leave': '/workbench/attendance',
+  '/oa/work-report': '/workbench/reports',
+  '/oa/approval': '/workbench/approvals',
+  '/hr/overview': '/hr/workbench',
+  '/hr/workbench': '/hr/overview',
   '/system/org-manage': '/system/site-config',
   '/system/org-manage/intro': '/system/site-config',
   '/system/org-manage/news': '/system/site-config',

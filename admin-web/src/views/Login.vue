@@ -4,8 +4,8 @@
       <div class="brand">
         <div class="logo">智</div>
         <div>
-          <div class="title">智养云管理后台</div>
-          <div class="subtitle">SaaS 智慧养老 OA</div>
+          <div class="title">智养云运营中台</div>
+          <div class="subtitle">智慧养老管理平台</div>
         </div>
       </div>
       <a-form :model="form" @finish="onSubmit" layout="vertical">
@@ -129,7 +129,7 @@ async function onSubmit() {
     const res = await login(form)
     userStore.setAuth(res)
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
-    router.push(redirect || '/portal')
+    router.push(redirect || '/workbench')
   } catch (error: any) {
     const status = Number(error?.response?.status || 0)
     const backendMsg = String(error?.response?.data?.message || error?.response?.data?.msg || error?.message || '')

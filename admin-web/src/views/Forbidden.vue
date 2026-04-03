@@ -19,7 +19,7 @@ import { enterpriseProfile } from '../constants/enterpriseProfile'
 const router = useRouter()
 
 function goPortal() {
-  router.push('/portal')
+  router.push('/workbench')
 }
 
 function goEnterpriseHome() {

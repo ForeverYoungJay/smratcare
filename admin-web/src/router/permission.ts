@@ -14,7 +14,7 @@ export function setupPermission(router: Router) {
 
     if (to.path === '/login' && token) {
       const redirect = typeof to.query.redirect === 'string' ? to.query.redirect : ''
-      next(redirect || '/portal')
+      next(redirect || '/workbench')
       return
     }
 

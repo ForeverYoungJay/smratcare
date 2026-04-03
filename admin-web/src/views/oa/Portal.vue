@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="OA 门户" subTitle="公告与待办一览">
+  <PageContainer title="我的待办中心" subTitle="公告、待办和审批提醒统一在这里查看">
     <StatefulBlock :loading="loading" :error="errorText" :empty="false" @retry="load">
       <div class="portal-toolbar">
         <a-space wrap>
@@ -160,7 +160,7 @@ const commonActions = computed(() => ([
   { label: '入住评估', path: '/elder/assessment/ability/admission' },
   { label: '入住办理', path: '/elder/admission-processing' },
   { label: '营销合同闭环', path: '/marketing/contracts/pending?flowStage=PENDING_ASSESSMENT' },
-  { label: '人事行政', path: '/hr/workbench' }
+  { label: '人力资源中心', path: '/hr/overview' }
 ]).filter((item) => canAccess(item.path)))
 
 function readInitialPortalScope(): 'PERSONAL' | 'ORG' {

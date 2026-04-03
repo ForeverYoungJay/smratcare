@@ -1132,7 +1132,7 @@ function goLogin() {
 }
 
 function goAdmin() {
-  router.push(hasToken.value ? '/portal' : '/admin')
+  router.push(hasToken.value ? '/workbench' : '/admin')
 }
 
 function goSiteConfig() {

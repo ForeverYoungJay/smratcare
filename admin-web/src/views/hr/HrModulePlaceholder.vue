@@ -12,9 +12,9 @@ import { useRoute } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 
 const route = useRoute()
-const title = computed(() => String(route.meta.title || '人事行政模块'))
+const title = computed(() => String(route.meta.title || '人力资源模块'))
 const subTitle = computed(() => {
-  const section = typeof route.query.section === 'string' ? route.query.section : '人事行政工作台'
+  const section = typeof route.query.section === 'string' ? route.query.section : '人力资源中心'
   return `${section} / ${String(route.meta.title || '')}`.replace(/\s+\/\s*$/, '')
 })
 </script>

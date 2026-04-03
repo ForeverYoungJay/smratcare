@@ -10,8 +10,8 @@
       <div class="brand">
         <div class="logo">智</div>
         <div class="brand-text" v-if="!collapsed">
-          <div class="title">智养云</div>
-          <div class="subtitle">智慧养老 OA</div>
+          <div class="title">龟峰颐养</div>
+          <div class="subtitle">运营管理中台</div>
         </div>
       </div>
       <a-menu
@@ -1489,6 +1489,9 @@ function normalizeTabKey(pathLike: string) {
   const text = String(pathLike || '').trim()
   if (!text) return ''
   const [purePath] = text.split('?')
+  if (purePath === '/portal' || purePath === '/workbench') {
+    return '/workbench/overview'
+  }
   return purePath || text
 }
 
@@ -1519,7 +1522,7 @@ function syncRouteTab(pathKey: string, fullPath: string) {
     persistRouteTabs()
     return
   }
-  const isHomeTab = key === '/portal'
+  const isHomeTab = key === '/workbench/overview'
   routeTabs.value.push({
     key,
     path: fullPath,
@@ -1563,7 +1566,7 @@ function closeTab(targetKey: string) {
   persistRouteTabs()
   if (activeTabKey.value !== targetKey) return
   const fallback = routeTabs.value[idx] || routeTabs.value[idx - 1]
-  router.push(fallback?.key || '/portal')
+  router.push(fallback?.key || '/workbench/overview')
 }
 
 function onTabDragStart(key: string) {
@@ -1625,7 +1628,7 @@ function closeAllTabs() {
   pruneTabRefreshSeeds()
   persistRouteTabs()
   closeTabContextMenu()
-  router.push('/portal')
+  router.push('/workbench/overview')
 }
 
 function refreshCurrentTab() {
@@ -1683,7 +1686,7 @@ function ensureActiveTabAvailable() {
   const active = activeTabKey.value || route.fullPath
   if (routeTabs.value.some((item) => item.key === active)) return
   const fallback = routeTabs.value[routeTabs.value.length - 1]
-  router.push(fallback?.key || '/portal')
+  router.push(fallback?.key || '/workbench/overview')
 }
 
 function routeTabsStorageKey() {
@@ -1710,7 +1713,7 @@ function restoreRouteTabs() {
         key: normalizeTabKey(String(item?.path || item?.key || '')),
         path: String(item?.path || item?.key || ''),
         title: String(item?.title || '未命名页面'),
-        closable: normalizeTabKey(String(item?.path || item?.key || '')) !== '/portal'
+        closable: normalizeTabKey(String(item?.path || item?.key || '')) !== '/workbench/overview'
       }))
       .filter((item: any) => !!item.key && !!item.path)
       .reduce((acc: Array<{ key: string; path: string; title: string; closable: boolean }>, item: any) => {
