@@ -37,10 +37,12 @@
     <a-layout class="app-main">
       <a-layout-header class="app-header">
         <div class="header-left">
-          <a-button size="small" class="sider-toggle-btn" @click="toggleSidebar">
-            {{ manualCollapsed ? '展开导航' : '收起导航' }}
-          </a-button>
-          <div class="page-title">{{ currentTitle || '工作台' }}</div>
+          <div class="header-left-top">
+            <a-button size="small" class="sider-toggle-btn" @click="toggleSidebar">
+              {{ manualCollapsed ? '展开导航' : '收起导航' }}
+            </a-button>
+            <div class="page-title">{{ currentTitle || '工作台' }}</div>
+          </div>
           <a-breadcrumb class="breadcrumb">
             <a-breadcrumb-item v-for="(bc, idx) in breadcrumbs" :key="idx">
               {{ bc }}
@@ -4904,6 +4906,13 @@ function onQuickChatStorageChange(event: StorageEvent) {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
+}
+
+.header-left-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   min-width: 0;
 }
 
