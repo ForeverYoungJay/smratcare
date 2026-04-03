@@ -1,13 +1,13 @@
 <template>
-  <PageContainer title="收银台" subTitle="收费登记、票据处理、退款修正与日结动作放在同一页">
-    <div class="desk-shell">
-      <a-card class="desk-hero card-elevated" :bordered="false">
-        <div class="desk-hero__copy">
-          <div class="desk-kicker">Cashier Desk</div>
-          <h2>前台收费流程在一个操作面里闭环。</h2>
-          <p>适合一线财务按业务日期处理收款、票据待办和当日修正，减少菜单来回切换。</p>
+  <PageContainer title="收银台" subTitle="把收费、票据、修正和交班放进一条顺手的操作链。">
+    <div class="cashier-shell">
+      <section class="cashier-top fade-up">
+        <div class="cashier-top__copy">
+          <div class="cashier-kicker">Cashier Flow</div>
+          <h2>一线财务只需要盯住今天这四步。</h2>
+          <p>先收款，再补票据，再复核修正，最后打印交班单。页面不再让你来回找模块。</p>
         </div>
-        <div class="desk-hero__panel">
+        <div class="cashier-top__controls">
           <a-form layout="inline" :model="query" class="search-form">
             <a-form-item label="业务日期">
               <a-date-picker v-model:value="query.date" />
@@ -21,132 +21,193 @@
             </a-form-item>
             <a-form-item>
               <a-space>
-                <a-button type="primary" @click="loadData">刷新看板</a-button>
+                <a-button type="primary" @click="loadData">刷新</a-button>
                 <a-button @click="reset">重置</a-button>
               </a-space>
             </a-form-item>
           </a-form>
-          <div class="desk-actions">
+          <div class="preset-strip">
+            <button
+              v-for="preset in datePresets"
+              :key="preset.key"
+              class="preset-chip"
+              type="button"
+              @click="applyDatePreset(preset.key)"
+            >
+              {{ preset.label }}
+            </button>
+            <button class="preset-chip preset-chip--ghost" type="button" @click="query.method = undefined">
+              全部收款方式
+            </button>
+          </div>
+          <div class="cashier-top__actions">
             <a-button type="primary" @click="go('/finance/payments/register?from=cashier_desk')">收费登记</a-button>
-            <a-button @click="go('/finance/fees/payment-and-invoice?from=cashier_desk')">开票/收据</a-button>
+            <a-button @click="go('/finance/fees/payment-and-invoice?from=cashier_desk')">票据处理</a-button>
             <a-button @click="go('/finance/payments/refund-reversal?from=cashier_desk')">退款/冲正</a-button>
-            <a-button @click="go('/finance/reconcile/month-close?from=cashier_desk')">月结进度</a-button>
-            <a-button @click="exportPendingInvoices">导出票据待办</a-button>
             <a-button @click="printShiftSummary">打印交班单</a-button>
           </div>
         </div>
-      </a-card>
+      </section>
 
-      <StatefulBlock style="margin-top: 16px;" :loading="loading" :error="errorMessage" @retry="loadData">
-        <a-row :gutter="[14, 14]">
-          <a-col :xs="24" :xl="6">
-            <a-card class="metric-card metric-card--ink" :bordered="false">
-              <div class="metric-card__label">当日收款</div>
-              <div class="metric-card__value">{{ money(totalAmount) }}</div>
-              <div class="metric-card__hint">{{ filteredPayments.length }} 笔实际入账</div>
-            </a-card>
-          </a-col>
-          <a-col :xs="24" :xl="6">
-            <a-card class="metric-card metric-card--amber" :bordered="false">
-              <div class="metric-card__label">待补票据</div>
-              <div class="metric-card__value">{{ pendingInvoices.length }}</div>
-              <div class="metric-card__hint">{{ money(pendingInvoiceAmount) }} 待补关联</div>
-            </a-card>
-          </a-col>
-          <a-col :xs="24" :xl="6">
-            <a-card class="metric-card metric-card--red" :bordered="false">
-              <div class="metric-card__label">当日修正</div>
-              <div class="metric-card__value">{{ todayAdjustments.length }}</div>
-              <div class="metric-card__hint">{{ money(adjustmentAmount) }} 需复核</div>
-            </a-card>
-          </a-col>
-          <a-col :xs="24" :xl="6">
-            <a-card class="metric-card metric-card--green" :bordered="false">
-              <div class="metric-card__label">日结状态</div>
-              <div class="metric-card__value">{{ closingStatus }}</div>
-              <div class="metric-card__hint">{{ closingHint }}</div>
-            </a-card>
-          </a-col>
-        </a-row>
+      <section class="step-strip fade-up">
+        <article v-for="step in processSteps" :key="step.key" class="step-card">
+          <div class="step-card__index">{{ step.index }}</div>
+          <div class="step-card__copy">
+            <strong>{{ step.title }}</strong>
+            <span>{{ step.hint }}</span>
+          </div>
+          <a-tag :color="step.done ? 'green' : 'orange'">{{ step.status }}</a-tag>
+        </article>
+      </section>
 
-        <a-row :gutter="[16, 16]" style="margin-top: 16px;">
-          <a-col :xs="24" :xl="16">
-            <a-card class="card-elevated" :bordered="false" title="当日收款流水">
-              <div class="method-strip">
-                <button
-                  v-for="method in paymentMethodSummary"
-                  :key="method.method"
-                  class="method-pill"
-                  type="button"
-                  @click="query.method = method.method"
-                >
-                  <span>{{ method.label }}</span>
-                  <strong>{{ money(method.amount) }}</strong>
-                </button>
+      <StatefulBlock :loading="loading" :error="errorMessage" @retry="loadData">
+        <section class="summary-strip fade-up">
+          <div class="summary-tile summary-tile--ink">
+            <span>当日收款</span>
+            <strong>{{ money(totalAmount) }}</strong>
+            <small>{{ filteredPayments.length }} 笔流水</small>
+          </div>
+          <div class="summary-tile summary-tile--amber">
+            <span>待补票据</span>
+            <strong>{{ pendingInvoices.length }}</strong>
+            <small>{{ money(pendingInvoiceAmount) }} 待补齐</small>
+          </div>
+          <div class="summary-tile summary-tile--rose">
+            <span>待复核修正</span>
+            <strong>{{ todayAdjustments.length }}</strong>
+            <small>{{ money(adjustmentAmount) }} 需确认</small>
+          </div>
+          <div class="summary-tile summary-tile--green">
+            <span>交班状态</span>
+            <strong>{{ closingStatus }}</strong>
+            <small>{{ closingHint }}</small>
+          </div>
+        </section>
+
+        <section class="workspace-grid">
+          <article class="workspace-main fade-up">
+            <div class="panel-head">
+              <div>
+                <div class="panel-kicker">Payment Stream</div>
+                <h3>当日收款流水</h3>
               </div>
-              <vxe-table border stripe show-overflow :loading="loading" :data="filteredPayments" height="520">
-                <vxe-column field="billMonthlyId" title="账单ID" width="120" />
-                <vxe-column field="amount" title="金额" width="110">
-                  <template #default="{ row }">{{ money(row.amount) }}</template>
-                </vxe-column>
-                <vxe-column field="payMethod" title="方式" width="120" />
-                <vxe-column field="operatorStaffName" title="操作人" width="120" />
-                <vxe-column field="paidAt" title="收款时间" width="180" />
-                <vxe-column field="externalTxnId" title="外部流水号" min-width="180" />
-                <vxe-column field="remark" title="备注" min-width="220" />
-                <vxe-column title="操作" width="140" fixed="right">
-                  <template #default="{ row }">
-                    <a-button type="link" @click="go(`/finance/bill/${row.billMonthlyId}`)">查看账单</a-button>
-                  </template>
-                </vxe-column>
-              </vxe-table>
-            </a-card>
-          </a-col>
+              <a-button type="link" @click="go('/finance/payments/records')">全部流水</a-button>
+            </div>
+            <div class="method-strip">
+              <button
+                v-for="method in paymentMethodSummary"
+                :key="method.method"
+                class="method-pill"
+                type="button"
+                @click="query.method = method.method"
+              >
+                <span>{{ method.label }}</span>
+                <strong>{{ money(method.amount) }}</strong>
+              </button>
+              <button v-if="query.method" class="method-pill method-pill--clear" type="button" @click="query.method = undefined">
+                <span>清除筛选</span>
+                <strong>全部方式</strong>
+              </button>
+            </div>
+            <vxe-table border stripe show-overflow :loading="loading" :data="filteredPayments" height="560">
+              <vxe-column field="billMonthlyId" title="账单ID" width="120" />
+              <vxe-column field="amount" title="金额" width="110">
+                <template #default="{ row }">{{ money(row.amount) }}</template>
+              </vxe-column>
+              <vxe-column field="payMethod" title="方式" width="120">
+                <template #default="{ row }">{{ payMethodLabel(row.payMethod) }}</template>
+              </vxe-column>
+              <vxe-column field="operatorStaffName" title="操作人" width="120" />
+              <vxe-column field="paidAt" title="收款时间" width="180" />
+              <vxe-column field="externalTxnId" title="外部流水号" min-width="180" />
+              <vxe-column field="remark" title="备注" min-width="220" />
+              <vxe-column title="操作" width="130" fixed="right">
+                <template #default="{ row }">
+                  <a-button type="link" @click="go(`/finance/bill/${row.billMonthlyId}`)">查看账单</a-button>
+                </template>
+              </vxe-column>
+            </vxe-table>
+          </article>
 
-          <a-col :xs="24" :xl="8">
-            <a-card class="card-elevated side-card" :bordered="false" title="票据待办">
+          <aside class="workspace-side">
+            <article class="side-panel fade-up">
+              <div class="panel-head">
+                <div>
+                  <div class="panel-kicker">Invoice Queue</div>
+                  <h3>票据待办</h3>
+                </div>
+                <a-button type="link" @click="exportPendingInvoices">导出</a-button>
+              </div>
               <a-alert
                 show-icon
-                type="warning"
-                :message="pendingInvoices.length ? `还有 ${pendingInvoices.length} 笔收款未补齐票据关联` : '票据关联完整'"
-                :description="pendingInvoices.length ? '建议在交班前补齐收据号或发票关联，避免次日对账继续挂起。' : '当前查询日期未发现票据缺口。'"
+                :type="pendingInvoices.length ? 'warning' : 'success'"
+                :message="pendingInvoices.length ? `还有 ${pendingInvoices.length} 笔收款未补齐票据` : '票据关联已完整'"
+                :description="pendingInvoices.length ? '建议交班前补齐收据号或发票关联，避免对账继续挂起。' : '当前查询日期未发现票据缺口。'"
               />
-              <a-list class="side-list" :data-source="pendingInvoices.slice(0, 8)" item-layout="horizontal">
-                <template #renderItem="{ item }">
-                  <a-list-item>
-                    <a-list-item-meta :title="`${item.elderName || '未绑定长者'} · ${money(item.amount)}`" :description="item.remark || '未写备注'" />
-                    <template #actions>
-                      <a-button type="link" @click="go('/finance/fees/payment-and-invoice?from=cashier_desk')">补票据</a-button>
-                    </template>
-                  </a-list-item>
-                </template>
-              </a-list>
-            </a-card>
-
-            <a-card class="card-elevated side-card" :bordered="false" title="收款修正" style="margin-top: 16px;">
-              <a-list class="side-list" :data-source="todayAdjustments.slice(0, 8)" item-layout="horizontal">
-                <template #renderItem="{ item }">
-                  <a-list-item>
-                    <a-list-item-meta :title="`${item.typeLabel} · ${money(item.amount)}`" :description="item.detail || item.remark || '待复核'" />
-                    <template #actions>
-                      <a-button type="link" @click="go('/finance/payments/refund-reversal?from=cashier_desk')">去复核</a-button>
-                    </template>
-                  </a-list-item>
-                </template>
-              </a-list>
-            </a-card>
-
-            <a-card class="card-elevated side-card" :bordered="false" title="交班检查单" style="margin-top: 16px;">
-              <div v-for="item in closingChecklist" :key="item.label" class="check-row">
-                <div>
-                  <div class="check-row__label">{{ item.label }}</div>
-                  <div class="check-row__hint">{{ item.hint }}</div>
-                </div>
-                <a-tag :color="item.done ? 'green' : 'orange'">{{ item.done ? '完成' : '待处理' }}</a-tag>
+              <div class="side-list">
+                <button
+                  v-for="item in pendingInvoices.slice(0, 6)"
+                  :key="`${item.billId}-${item.paidAt}`"
+                  class="side-row"
+                  type="button"
+                  @click="go('/finance/fees/payment-and-invoice?from=cashier_desk')"
+                >
+                  <div>
+                    <strong>{{ item.elderName || '未绑定长者' }} · {{ money(item.amount) }}</strong>
+                    <span>{{ item.remark || '未写备注' }}</span>
+                  </div>
+                  <a-tag color="orange">去补齐</a-tag>
+                </button>
               </div>
-            </a-card>
-          </a-col>
-        </a-row>
+            </article>
+
+            <article class="side-panel fade-up">
+              <div class="panel-head">
+                <div>
+                  <div class="panel-kicker">Adjustments</div>
+                  <h3>退款与修正</h3>
+                </div>
+                <a-button type="link" @click="go('/finance/payments/refund-reversal?from=cashier_desk')">全部修正</a-button>
+              </div>
+              <div class="side-list">
+                <button
+                  v-for="item in todayAdjustments.slice(0, 6)"
+                  :key="`${item.type}-${item.billId}-${item.occurredAt}`"
+                  class="side-row"
+                  type="button"
+                  @click="go('/finance/payments/refund-reversal?from=cashier_desk')"
+                >
+                  <div>
+                    <strong>{{ item.typeLabel }} · {{ money(item.amount) }}</strong>
+                    <span>{{ item.detail || item.remark || '待复核' }}</span>
+                  </div>
+                  <a-tag :color="item.approvalStatus === 'APPROVED' ? 'green' : item.approvalStatus === 'PENDING' ? 'gold' : 'red'">
+                    {{ item.approvalStatusLabel || '待处理' }}
+                  </a-tag>
+                </button>
+                <div v-if="!todayAdjustments.length" class="side-empty">今天没有新增修正记录。</div>
+              </div>
+            </article>
+
+            <article class="side-panel fade-up">
+              <div class="panel-head">
+                <div>
+                  <div class="panel-kicker">Shift Checklist</div>
+                  <h3>交班检查单</h3>
+                </div>
+              </div>
+              <div class="checklist">
+                <div v-for="item in closingChecklist" :key="item.label" class="check-row">
+                  <div>
+                    <strong>{{ item.label }}</strong>
+                    <span>{{ item.hint }}</span>
+                  </div>
+                  <a-tag :color="item.done ? 'green' : 'orange'">{{ item.done ? '完成' : '待处理' }}</a-tag>
+                </div>
+              </div>
+            </article>
+          </aside>
+        </section>
       </StatefulBlock>
     </div>
   </PageContainer>
@@ -184,7 +245,7 @@ const pendingInvoiceAmount = computed(() => pendingInvoices.value.reduce((sum, i
 const todayAdjustments = computed(() => adjustments.value.filter(item => sameDate(item.occurredAt, query.date)))
 const adjustmentAmount = computed(() => todayAdjustments.value.reduce((sum, item) => sum + Number(item.amount || 0), 0))
 const closingStatus = computed(() => pendingInvoices.value.length || todayAdjustments.value.length ? '待收口' : '可交班')
-const closingHint = computed(() => pendingInvoices.value.length || todayAdjustments.value.length ? '票据或修正事项仍需处理' : '当日收银动作已基本闭环')
+const closingHint = computed(() => pendingInvoices.value.length || todayAdjustments.value.length ? '票据或修正仍需处理' : '当前日期的收银动作已基本闭环')
 const methodOptions = computed(() => paymentMethodSummary.value.map(item => ({ value: item.method, label: item.label })))
 const paymentMethodSummary = computed(() => {
   const bucket = new Map<string, number>()
@@ -198,6 +259,47 @@ const paymentMethodSummary = computed(() => {
     amount
   }))
 })
+const datePresets = [
+  { key: 'today', label: '今天' },
+  { key: 'yesterday', label: '昨天' },
+  { key: 'monthStart', label: '月初' }
+] as const
+
+const processSteps = computed(() => [
+  {
+    key: 'collect',
+    index: '01',
+    title: '登记收款',
+    hint: filteredPayments.value.length ? `已加载 ${filteredPayments.value.length} 笔流水供核对` : '当前筛选条件下暂无流水',
+    status: filteredPayments.value.length ? '进行中' : '待开始',
+    done: filteredPayments.value.length > 0
+  },
+  {
+    key: 'invoice',
+    index: '02',
+    title: '补齐票据',
+    hint: pendingInvoices.value.length ? `还有 ${pendingInvoices.value.length} 笔待补票据` : '收据和发票关联已完整',
+    status: pendingInvoices.value.length ? '待处理' : '完成',
+    done: pendingInvoices.value.length === 0
+  },
+  {
+    key: 'adjust',
+    index: '03',
+    title: '复核修正',
+    hint: todayAdjustments.value.length ? `今天有 ${todayAdjustments.value.length} 笔修正待复核` : '今日无新增修正',
+    status: todayAdjustments.value.length ? '待复核' : '完成',
+    done: todayAdjustments.value.length === 0
+  },
+  {
+    key: 'close',
+    index: '04',
+    title: '打印交班',
+    hint: closingHint.value,
+    status: closingStatus.value,
+    done: pendingInvoices.value.length === 0 && todayAdjustments.value.length === 0
+  }
+])
+
 const closingChecklist = computed(() => [
   {
     label: '票据关联',
@@ -239,6 +341,17 @@ function payMethodLabel(method?: string) {
 
 function sameDate(value: string | undefined, target: Dayjs) {
   return value ? dayjs(value).isSame(target, 'day') : false
+}
+
+function applyDatePreset(preset: typeof datePresets[number]['key']) {
+  if (preset === 'yesterday') {
+    query.date = dayjs().subtract(1, 'day')
+  } else if (preset === 'monthStart') {
+    query.date = dayjs().startOf('month')
+  } else {
+    query.date = dayjs()
+  }
+  loadData()
 }
 
 async function loadData() {
@@ -323,106 +436,231 @@ onMounted(loadData)
 </script>
 
 <style scoped>
-.desk-shell {
-  --desk-ink: #14213d;
-  --desk-sand: #f4efe6;
-  --desk-amber: #f7b538;
-  --desk-red: #d64933;
-  --desk-green: #285943;
+.cashier-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.desk-hero {
+.fade-up {
+  animation: fadeUp 0.42s ease both;
+}
+
+.cashier-top {
   display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 1fr);
   gap: 20px;
-  grid-template-columns: 1.3fr 1fr;
+  padding: 24px;
+  border-radius: 24px;
   background:
-    radial-gradient(circle at top left, rgba(247, 181, 56, 0.28), transparent 38%),
-    linear-gradient(140deg, #0f172a 0%, #14213d 52%, #1d3557 100%);
-  color: #fff;
-  overflow: hidden;
+    radial-gradient(circle at left top, rgba(245, 158, 11, 0.22), transparent 30%),
+    linear-gradient(135deg, #0f172a 0%, #12263f 46%, #173251 100%);
+  color: #f8fbff;
 }
 
-.desk-kicker {
-  display: inline-flex;
-  padding: 4px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  border-radius: 999px;
-  font-size: 12px;
-  letter-spacing: 0.12em;
+.cashier-kicker,
+.panel-kicker {
+  font-size: 11px;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
+  color: rgba(227, 238, 249, 0.64);
 }
 
-.desk-hero h2 {
-  margin: 14px 0 10px;
-  font-size: 28px;
-  line-height: 1.2;
+.cashier-top h2 {
+  margin: 10px 0 12px;
+  font-size: 34px;
+  line-height: 1.12;
+  color: #fff;
 }
 
-.desk-hero p {
+.cashier-top p {
   margin: 0;
   max-width: 560px;
-  color: rgba(255, 255, 255, 0.76);
+  color: rgba(227, 238, 249, 0.74);
+  line-height: 1.7;
 }
 
-.desk-hero__panel {
-  padding: 16px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.1);
+.cashier-top__controls {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 20px;
+  background: rgba(248, 251, 255, 0.08);
   backdrop-filter: blur(8px);
 }
 
-.desk-actions {
+.cashier-top__actions {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 14px;
 }
 
-.metric-card {
-  min-height: 138px;
-  color: #fff;
+.preset-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.preset-chip {
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(219, 231, 242, 0.24);
+  background: rgba(248, 251, 255, 0.1);
+  color: #eef5fb;
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.preset-chip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(248, 251, 255, 0.16);
+}
+
+.preset-chip--ghost {
+  color: rgba(238, 245, 251, 0.74);
+}
+
+.step-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.step-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
   border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
+  border: 1px solid #dbe7f2;
 }
 
-.metric-card__label {
-  font-size: 13px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0.8;
-}
-
-.metric-card__value {
-  margin-top: 14px;
-  font-size: 32px;
+.step-card__index {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #eaf2fb;
+  color: #1d4ed8;
   font-weight: 700;
 }
 
-.metric-card__hint {
-  margin-top: 12px;
-  opacity: 0.8;
+.step-card__copy {
+  min-width: 0;
+  flex: 1;
 }
 
-.metric-card--ink {
+.step-card__copy strong,
+.check-row strong,
+.side-row strong {
+  display: block;
+  color: #13263b;
+}
+
+.step-card__copy span,
+.check-row span,
+.side-row span {
+  display: block;
+  margin-top: 4px;
+  color: #66788c;
+  line-height: 1.6;
+}
+
+.summary-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.summary-tile {
+  min-height: 132px;
+  padding: 18px;
+  border-radius: 18px;
+  color: #fff;
+}
+
+.summary-tile span {
+  display: block;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.82;
+}
+
+.summary-tile strong {
+  display: block;
+  margin-top: 14px;
+  font-size: 32px;
+  line-height: 1.1;
+}
+
+.summary-tile small {
+  display: block;
+  margin-top: 12px;
+  opacity: 0.82;
+}
+
+.summary-tile--ink {
   background: linear-gradient(135deg, #111827, #1f2937);
 }
 
-.metric-card--amber {
-  background: linear-gradient(135deg, #a16207, #f59e0b);
+.summary-tile--amber {
+  background: linear-gradient(135deg, #9a6700, #f59e0b);
 }
 
-.metric-card--red {
-  background: linear-gradient(135deg, #7f1d1d, #dc2626);
+.summary-tile--rose {
+  background: linear-gradient(135deg, #7f1d3f, #e11d48);
 }
 
-.metric-card--green {
+.summary-tile--green {
   background: linear-gradient(135deg, #14532d, #15803d);
+}
+
+.workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.82fr);
+  gap: 16px;
+}
+
+.workspace-main,
+.side-panel {
+  padding: 22px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid #dbe7f2;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.05);
+}
+
+.workspace-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.panel-head h3 {
+  margin: 8px 0 0;
+  font-size: 24px;
+  line-height: 1.2;
+  color: #13263b;
 }
 
 .method-strip {
   display: grid;
-  gap: 10px;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  margin-bottom: 14px;
+  gap: 10px;
+  margin: 16px 0;
 }
 
 .method-pill {
@@ -431,52 +669,102 @@ onMounted(loadData)
   align-items: center;
   width: 100%;
   padding: 12px 14px;
-  border: 1px solid #dbe4f0;
+  border: 1px solid #dbe7f2;
   border-radius: 14px;
-  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  background: linear-gradient(180deg, #ffffff 0%, #f7fafc 100%);
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
-.method-pill:hover {
+.method-pill strong {
+  color: #13263b;
+}
+
+.method-pill:hover,
+.side-row:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 24px rgba(20, 33, 61, 0.08);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.06);
 }
 
-.side-card {
-  border-radius: 18px;
+.method-pill--clear {
+  border-style: dashed;
+  color: #64748b;
 }
 
-.side-list {
+.side-list,
+.checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   margin-top: 14px;
 }
 
+.side-row,
 .check-row {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px dashed #e5e7eb;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid #e3ecf5;
+  background: rgba(255, 255, 255, 0.85);
 }
 
-.check-row:last-child {
-  border-bottom: none;
+.side-row {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.check-row__label {
-  font-weight: 600;
-  color: #0f172a;
+.side-empty {
+  padding: 14px 0 2px;
+  color: #66788c;
 }
 
-.check-row__hint {
-  margin-top: 4px;
-  color: #64748b;
-  font-size: 13px;
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-@media (max-width: 1100px) {
-  .desk-hero {
+@media (max-width: 1200px) {
+  .cashier-top,
+  .workspace-grid {
     grid-template-columns: 1fr;
+  }
+
+  .step-strip,
+  .summary-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .cashier-top,
+  .workspace-main,
+  .side-panel {
+    padding: 18px;
+  }
+
+  .cashier-top h2 {
+    font-size: 28px;
+  }
+
+  .step-strip,
+  .summary-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .cashier-top__actions,
+  .panel-head {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 </style>
