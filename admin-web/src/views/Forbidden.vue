@@ -4,7 +4,7 @@
       <template #extra>
         <a-space>
           <a-button @click="goEnterpriseHome">返回企业首页</a-button>
-          <a-button type="primary" @click="goPortal">返回工作台</a-button>
+          <a-button type="primary" @click="goPortal">返回首页</a-button>
           <a-button @click="contactAdmin">联系管理员</a-button>
         </a-space>
       </template>
@@ -19,7 +19,7 @@ import { enterpriseProfile } from '../constants/enterpriseProfile'
 const router = useRouter()
 
 function goPortal() {
-  router.push('/workbench')
+  router.push('/portal')
 }
 
 function goEnterpriseHome() {

@@ -1,15 +1,23 @@
 <template>
+  <div
+    v-if="manualCollapsed && !sidebarPeekOpen"
+    class="sider-edge-sensor"
+    @mouseenter="openSidebarPeek"
+  ></div>
   <a-layout class="app-layout">
     <a-layout-sider
-      v-model:collapsed="collapsed"
+      :collapsed="siderCollapsed"
       collapsible
+      :trigger="null"
       :width="244"
-      :collapsed-width="80"
+      :collapsed-width="0"
       class="app-sider"
+      :class="{ 'is-peek-open': sidebarPeekOpen, 'is-manual-collapsed': manualCollapsed }"
+      @mouseleave="handleSidebarMouseLeave"
     >
       <div class="brand">
         <div class="logo">智</div>
-        <div class="brand-text" v-if="!collapsed">
+        <div class="brand-text" v-if="!siderCollapsed">
           <div class="title">龟峰颐养</div>
           <div class="subtitle">运营管理中台</div>
         </div>
@@ -29,6 +37,9 @@
     <a-layout class="app-main">
       <a-layout-header class="app-header">
         <div class="header-left">
+          <a-button size="small" class="sider-toggle-btn" @click="toggleSidebar">
+            {{ manualCollapsed ? '展开导航' : '收起导航' }}
+          </a-button>
           <div class="page-title">{{ currentTitle || '工作台' }}</div>
           <a-breadcrumb class="breadcrumb">
             <a-breadcrumb-item v-for="(bc, idx) in breadcrumbs" :key="idx">
@@ -759,7 +770,9 @@ const NON_CACHED_ROUTE_PATH_PATTERNS = [
   /^\/medical\/(workbench|unified-task-center|medical-health-center|nursing-quality-center)(\/|$)/
 ]
 
-const collapsed = ref(false)
+const manualCollapsed = ref(false)
+const sidebarPeekOpen = ref(false)
+const siderCollapsed = computed(() => manualCollapsed.value && !sidebarPeekOpen.value)
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
@@ -854,6 +867,23 @@ const displayUserName = computed(() => {
   if (realName && loginId) return `${realName}（${loginId}）`
   return realName || loginId || '管理员'
 })
+
+function toggleSidebar() {
+  manualCollapsed.value = !manualCollapsed.value
+  if (!manualCollapsed.value) {
+    sidebarPeekOpen.value = false
+  }
+}
+
+function openSidebarPeek() {
+  if (!manualCollapsed.value) return
+  sidebarPeekOpen.value = true
+}
+
+function handleSidebarMouseLeave() {
+  if (!manualCollapsed.value) return
+  sidebarPeekOpen.value = false
+}
 
 type QuickChatMessage = {
   id: string
@@ -1489,7 +1519,7 @@ function normalizeTabKey(pathLike: string) {
   const text = String(pathLike || '').trim()
   if (!text) return ''
   const [purePath] = text.split('?')
-  if (purePath === '/portal' || purePath === '/workbench') {
+  if (purePath === '/workbench') {
     return '/workbench/overview'
   }
   return purePath || text
@@ -1522,7 +1552,7 @@ function syncRouteTab(pathKey: string, fullPath: string) {
     persistRouteTabs()
     return
   }
-  const isHomeTab = key === '/workbench/overview'
+  const isHomeTab = key === '/portal'
   routeTabs.value.push({
     key,
     path: fullPath,
@@ -1566,7 +1596,7 @@ function closeTab(targetKey: string) {
   persistRouteTabs()
   if (activeTabKey.value !== targetKey) return
   const fallback = routeTabs.value[idx] || routeTabs.value[idx - 1]
-  router.push(fallback?.key || '/workbench/overview')
+  router.push(fallback?.key || '/portal')
 }
 
 function onTabDragStart(key: string) {
@@ -1628,7 +1658,7 @@ function closeAllTabs() {
   pruneTabRefreshSeeds()
   persistRouteTabs()
   closeTabContextMenu()
-  router.push('/workbench/overview')
+  router.push('/portal')
 }
 
 function refreshCurrentTab() {
@@ -1686,7 +1716,7 @@ function ensureActiveTabAvailable() {
   const active = activeTabKey.value || route.fullPath
   if (routeTabs.value.some((item) => item.key === active)) return
   const fallback = routeTabs.value[routeTabs.value.length - 1]
-  router.push(fallback?.key || '/workbench/overview')
+  router.push(fallback?.key || '/portal')
 }
 
 function routeTabsStorageKey() {
@@ -1713,7 +1743,7 @@ function restoreRouteTabs() {
         key: normalizeTabKey(String(item?.path || item?.key || '')),
         path: String(item?.path || item?.key || ''),
         title: String(item?.title || '未命名页面'),
-        closable: normalizeTabKey(String(item?.path || item?.key || '')) !== '/workbench/overview'
+        closable: normalizeTabKey(String(item?.path || item?.key || '')) !== '/portal'
       }))
       .filter((item: any) => !!item.key && !!item.path)
       .reduce((acc: Array<{ key: string; path: string; title: string; closable: boolean }>, item: any) => {
@@ -4691,6 +4721,16 @@ function onQuickChatStorageChange(event: StorageEvent) {
   overflow: hidden;
 }
 
+.sider-edge-sensor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 14px;
+  height: 100vh;
+  z-index: 120;
+  background: transparent;
+}
+
 .app-sider {
   background: linear-gradient(180deg, #f8fbfe 0%, #eef6fb 100%);
   border-right: 1px solid #dbe8f2;
@@ -4699,6 +4739,17 @@ function onQuickChatStorageChange(event: StorageEvent) {
   top: 0;
   left: 0;
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.5);
+  z-index: 121;
+  transition: all 0.22s ease;
+}
+
+.app-sider.is-peek-open {
+  box-shadow: 0 12px 36px rgba(23, 56, 84, 0.16), inset -1px 0 0 rgba(255, 255, 255, 0.5);
+}
+
+.app-sider.is-manual-collapsed:not(.is-peek-open) {
+  border-right-color: transparent;
+  box-shadow: none;
 }
 
 .app-sider :deep(.ant-layout-sider-children) {
@@ -4716,6 +4767,10 @@ function onQuickChatStorageChange(event: StorageEvent) {
   color: #173854;
   border-bottom: 1px solid #e7eff5;
   background: rgba(255, 255, 255, 0.72);
+}
+
+.sider-toggle-btn {
+  margin-right: 12px;
 }
 
 .logo {

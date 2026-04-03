@@ -9,7 +9,6 @@ import java.util.Map;
 
 public final class PagePermissionPathHelper {
   private static final Map<String, String> LEGACY_TO_CANONICAL = Map.ofEntries(
-      Map.entry("/portal", "/workbench"),
       Map.entry("/oa/portal", "/workbench"),
       Map.entry("/oa/todo", "/workbench/todo"),
       Map.entry("/oa/my-info", "/workbench/my-info"),
@@ -65,6 +64,9 @@ public final class PagePermissionPathHelper {
         continue;
       }
       normalized.add(canonical);
+      if ("/workbench".equals(canonical) || "/workbench/overview".equals(canonical)) {
+        normalized.add("/portal");
+      }
     }
     return new ArrayList<>(normalized);
   }

@@ -129,7 +129,7 @@ async function onSubmit() {
     const res = await login(form)
     userStore.setAuth(res)
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : ''
-    router.push(redirect || '/workbench')
+    router.push(redirect || '/portal')
   } catch (error: any) {
     const status = Number(error?.response?.status || 0)
     const backendMsg = String(error?.response?.data?.message || error?.response?.data?.msg || error?.message || '')

@@ -8,7 +8,7 @@ export const routes: RouteRecordRaw[] = [
   },
   {
     path: '/admin',
-    redirect: '/login?redirect=/workbench',
+    redirect: '/login?redirect=/portal',
     meta: { title: '后台入口', hidden: true }
   },
   {
@@ -33,13 +33,13 @@ export const routes: RouteRecordRaw[] = [
     path: '/',
     name: 'Root',
     component: () => import('../layouts/BasicLayout.vue'),
-    redirect: '/workbench',
+    redirect: '/portal',
     children: [
       {
         path: 'portal',
         name: 'Portal',
-        redirect: '/workbench',
-        meta: { title: '首页（兼容）', icon: 'HomeOutlined', hidden: true }
+        component: () => import('../views/Portal.vue'),
+        meta: { title: '首页', icon: 'HomeOutlined' }
       },
       {
         path: 'workbench',

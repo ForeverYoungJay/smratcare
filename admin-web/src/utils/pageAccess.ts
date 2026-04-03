@@ -16,7 +16,6 @@ export interface RolePagePreset {
 const LAYOUT_ROOT = '/'
 const HIDDEN_PATHS = new Set(['/403'])
 const LEGACY_PERMISSION_PATH_MAP: Record<string, string> = {
-  '/portal': '/workbench',
   '/oa/portal': '/workbench',
   '/oa/todo': '/workbench/todo',
   '/oa/my-info': '/workbench/my-info',
@@ -103,7 +102,7 @@ const pagePermissionFlat: Array<{ path: string; title: string }> = []
 flattenTree(pagePermissionTree, pagePermissionFlat)
 const pageTitleMap = new Map(pagePermissionFlat.map((item) => [item.path, item.title]))
 
-const commonPersonalPaths = ['/workbench', '/workbench/overview', '/workbench/todo', '/workbench/my-info', '/workbench/attendance', '/workbench/reports', '/workbench/approvals']
+const commonPersonalPaths = ['/portal', '/workbench', '/workbench/overview', '/workbench/todo', '/workbench/my-info', '/workbench/attendance', '/workbench/reports', '/workbench/approvals']
 
 export const ROLE_PAGE_PRESETS: Record<string, RolePagePreset> = {
   NURSING_MINISTER: {
@@ -194,6 +193,9 @@ export function normalizePagePermissions(paths: Array<string | null | undefined>
       return
     }
     normalized.add(normalizedPath)
+    if (normalizedPath === '/workbench' || normalizedPath === '/workbench/overview') {
+      normalized.add('/portal')
+    }
   })
   return Array.from(normalized)
 }
