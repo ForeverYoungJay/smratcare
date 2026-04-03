@@ -758,8 +758,8 @@ import { canBeDirectLeader, canBeIndirectLeader, ensureSupervisorOrder } from '.
 import { emitLiveSync, subscribeLiveSync, type LiveSyncPayload } from '../utils/liveSync'
 import { getToken } from '../utils/auth'
 
-const MAX_RESTORED_ROUTE_TABS = 12
-const MAX_ALIVE_VIEW_CACHE = 6
+const MAX_RESTORED_ROUTE_TABS = 8
+const MAX_ALIVE_VIEW_CACHE = 3
 const NON_CACHED_ROUTE_NAME_KEYWORDS = ['portal', 'dashboard', 'workbench', 'taskcenter', 'todo', 'approval', 'calendar', 'panorama']
 const NON_CACHED_ROUTE_PATH_PATTERNS = [
   /^\/portal$/,
@@ -1243,6 +1243,8 @@ let quickChatCloudSaveTimer: number | undefined
 let quickChatFanoutTimer: number | undefined
 let quickChatFanoutRetryTimer: number | undefined
 let quickChatEventEmitTimer: number | undefined
+let quickChatLocalPersistTimer: number | undefined
+let quickChatLocalPersistIdleTimer: number | undefined
 let quickChatWsReconnectTimer: number | undefined
 let quickChatPermissionWarned = false
 let quickChatAliasHydrated = false
@@ -1250,17 +1252,22 @@ const quickChatWsReconnectAttempt = ref(0)
 let quickChatWebSocket: WebSocket | null = null
 let quickChatWebSocketManualClose = false
 const quickChatRuntimeStarted = ref(false)
-const QUICK_CHAT_CLOUD_PULL_INTERVAL_MS = 30000
-const QUICK_CHAT_CLOUD_SAVE_DEBOUNCE_MS = 900
-const QUICK_CHAT_FANOUT_DEBOUNCE_MS = 700
-const QUICK_CHAT_FANOUT_RETRY_INTERVAL_MS = 20000
-const QUICK_CHAT_EVENT_EMIT_DEBOUNCE_MS = 400
+const QUICK_CHAT_CLOUD_PULL_INTERVAL_MS = 60000
+const QUICK_CHAT_CLOUD_SAVE_DEBOUNCE_MS = 1400
+const QUICK_CHAT_FANOUT_DEBOUNCE_MS = 1200
+const QUICK_CHAT_FANOUT_RETRY_INTERVAL_MS = 30000
+const QUICK_CHAT_EVENT_EMIT_DEBOUNCE_MS = 900
+const QUICK_CHAT_LOCAL_PERSIST_DEBOUNCE_MS = 900
 const QUICK_CHAT_ARCHIVE_UNDO_WINDOW_MS = 5 * 60 * 1000
+const QUICK_CHAT_MAX_ROOMS = 12
+const QUICK_CHAT_MAX_MESSAGES_PER_ROOM = 40
+const QUICK_CHAT_MAX_TODO_ITEMS = 80
 const quickChatCloudReady = ref(false)
 const quickChatCloudRemoteUpdatedAt = ref(0)
 const quickChatCloudSavePending = ref(false)
 const quickChatCloudSyncing = ref(false)
 let quickChatCloudLastPayload = ''
+let quickChatLastLocalPayload = ''
 let quickChatCloudQueuedPayload = ''
 let quickChatFanoutLastPayload = ''
 const quickChatFanoutQueuedPayload = ref('')
@@ -1281,6 +1288,11 @@ const quickChatSyncConflict = reactive({
 })
 const quickChatLastArchivedRoomId = ref('')
 const quickChatLastArchivedAt = ref(0)
+const quickChatPersistPending = reactive({
+  skipCloud: true,
+  skipFanout: true,
+  skipEvent: true
+})
 const canUndoQuickChatArchive = computed(() => {
   void presenceTick.value
   if (!quickChatLastArchivedRoomId.value || !quickChatLastArchivedAt.value) return false
@@ -1428,8 +1440,11 @@ watch(
 watch(
   () => quickChatOpen.value,
   (opened) => {
-    if (!opened) return
-    ensureQuickChatRuntime()
+    if (opened) {
+      ensureQuickChatRuntime()
+      return
+    }
+    stopQuickChatRuntime()
   }
 )
 watch(
@@ -2166,6 +2181,33 @@ function ensureQuickChatRuntime(options?: { forcePull?: boolean }) {
   }
 }
 
+function stopQuickChatRuntime() {
+  quickChatRuntimeStarted.value = false
+  quickChatCloudSyncing.value = false
+  quickChatCloudSavePending.value = false
+  if (quickChatCloudPullTimer) {
+    window.clearInterval(quickChatCloudPullTimer)
+    quickChatCloudPullTimer = undefined
+  }
+  if (quickChatCloudSaveTimer) {
+    window.clearTimeout(quickChatCloudSaveTimer)
+    quickChatCloudSaveTimer = undefined
+  }
+  if (quickChatFanoutTimer) {
+    window.clearTimeout(quickChatFanoutTimer)
+    quickChatFanoutTimer = undefined
+  }
+  if (quickChatFanoutRetryTimer) {
+    window.clearInterval(quickChatFanoutRetryTimer)
+    quickChatFanoutRetryTimer = undefined
+  }
+  if (quickChatEventEmitTimer) {
+    window.clearTimeout(quickChatEventEmitTimer)
+    quickChatEventEmitTimer = undefined
+  }
+  closeQuickChatWebSocket()
+}
+
 function normalizeQuickChatMemberId(rawId: unknown) {
   const text = String(rawId || '').trim()
   if (!text) return ''
@@ -2236,9 +2278,36 @@ function quickChatPresenceKey() {
   return `layout_quick_chat_presence_v1_${userStorageScope()}`
 }
 
+function cancelQuickChatIdlePersist() {
+  if (quickChatLocalPersistIdleTimer === undefined) return
+  const idleCancel = (window as any).cancelIdleCallback
+  if (typeof idleCancel === 'function') {
+    idleCancel(quickChatLocalPersistIdleTimer)
+  } else {
+    window.clearTimeout(quickChatLocalPersistIdleTimer)
+  }
+  quickChatLocalPersistIdleTimer = undefined
+}
+
+function scheduleQuickChatIdlePersist(task: () => void) {
+  cancelQuickChatIdlePersist()
+  const idleRequest = (window as any).requestIdleCallback
+  if (typeof idleRequest === 'function') {
+    quickChatLocalPersistIdleTimer = idleRequest(() => {
+      quickChatLocalPersistIdleTimer = undefined
+      task()
+    }, { timeout: 1200 })
+    return
+  }
+  quickChatLocalPersistIdleTimer = window.setTimeout(() => {
+    quickChatLocalPersistIdleTimer = undefined
+    task()
+  }, 80)
+}
+
 function persistQuickChatTodo() {
   try {
-    localStorage.setItem(quickChatTodoStorageKey(), JSON.stringify(quickChatTodoItems.value.slice(0, 200)))
+    localStorage.setItem(quickChatTodoStorageKey(), JSON.stringify(quickChatTodoItems.value.slice(0, QUICK_CHAT_MAX_TODO_ITEMS)))
   } catch {}
 }
 
@@ -2328,7 +2397,7 @@ function buildQuickChatRoomPayload(room: QuickChatRoom) {
     createdAt: room.createdAt,
     updatedAt: room.updatedAt || room.createdAt,
     messages: Array.isArray(room.messages)
-      ? room.messages.slice(-200).map((message) => ({
+      ? room.messages.slice(-QUICK_CHAT_MAX_MESSAGES_PER_ROOM).map((message) => ({
         id: message.id,
         senderId: message.senderId,
         senderName: message.senderName,
@@ -2346,11 +2415,11 @@ function buildQuickChatRoomPayload(room: QuickChatRoom) {
 }
 
 function buildQuickChatStatePayload() {
-  return quickChatRooms.value.slice(0, 50).map((room) => buildQuickChatRoomPayload(room))
+  return quickChatRooms.value.slice(0, QUICK_CHAT_MAX_ROOMS).map((room) => buildQuickChatRoomPayload(room))
 }
 
 function normalizeQuickChatRooms(parsed: any[]) {
-  return parsed.map((room: any) => ({
+  return parsed.slice(0, QUICK_CHAT_MAX_ROOMS).map((room: any) => ({
     id: String(room?.id || `room_${Date.now()}`),
     name: String(room?.name || '未命名群聊'),
     departmentIds: Array.isArray(room?.departmentIds) ? room.departmentIds.map((id: any) => String(id)) : [],
@@ -2377,7 +2446,7 @@ function normalizeQuickChatRooms(parsed: any[]) {
     createdAt: String(room?.createdAt || dayjs().toISOString()),
     updatedAt: String(room?.updatedAt || room?.createdAt || dayjs().toISOString()),
     messages: Array.isArray(room?.messages)
-      ? room.messages.map((message: any) => ({
+      ? room.messages.slice(-QUICK_CHAT_MAX_MESSAGES_PER_ROOM).map((message: any) => ({
         id: String(message?.id || `m_${Date.now()}`),
         senderId: String(message?.senderId || 'system'),
         senderName: String(message?.senderName || '系统'),
@@ -2817,22 +2886,44 @@ function scheduleQuickChatIncrementalEmit(snapshotJson: string) {
   }, QUICK_CHAT_EVENT_EMIT_DEBOUNCE_MS)
 }
 
-function persistQuickChatState(options?: { skipCloud?: boolean; skipFanout?: boolean; skipEvent?: boolean }) {
+function flushQuickChatStatePersist() {
+  quickChatLocalPersistTimer = undefined
   try {
     const payload = buildQuickChatStatePayload()
     const payloadJson = JSON.stringify(payload)
-    localStorage.setItem(quickChatStorageKey(), payloadJson)
-    emitQuickChatSync()
-    if (!options?.skipCloud) {
+    if (payloadJson !== quickChatLastLocalPayload) {
+      const storageKey = quickChatStorageKey()
+      scheduleQuickChatIdlePersist(() => {
+        try {
+          localStorage.setItem(storageKey, payloadJson)
+          quickChatLastLocalPayload = payloadJson
+          emitQuickChatSync()
+        } catch {}
+      })
+    }
+    if (!quickChatPersistPending.skipCloud && quickChatOpen.value) {
       scheduleQuickChatCloudSave(payloadJson)
     }
-    if (!options?.skipFanout) {
+    if (!quickChatPersistPending.skipFanout && quickChatOpen.value) {
       scheduleQuickChatFanout(payloadJson)
     }
-    if (!options?.skipEvent) {
+    if (!quickChatPersistPending.skipEvent && quickChatOpen.value) {
       scheduleQuickChatIncrementalEmit(payloadJson)
     }
   } catch {}
+  quickChatPersistPending.skipCloud = true
+  quickChatPersistPending.skipFanout = true
+  quickChatPersistPending.skipEvent = true
+}
+
+function persistQuickChatState(options?: { skipCloud?: boolean; skipFanout?: boolean; skipEvent?: boolean }) {
+  quickChatPersistPending.skipCloud = quickChatPersistPending.skipCloud && options?.skipCloud === true
+  quickChatPersistPending.skipFanout = quickChatPersistPending.skipFanout && options?.skipFanout === true
+  quickChatPersistPending.skipEvent = quickChatPersistPending.skipEvent && options?.skipEvent === true
+  if (quickChatLocalPersistTimer) {
+    window.clearTimeout(quickChatLocalPersistTimer)
+  }
+  quickChatLocalPersistTimer = window.setTimeout(flushQuickChatStatePersist, QUICK_CHAT_LOCAL_PERSIST_DEBOUNCE_MS)
 }
 
 function createQuickChatMessage(payload: Omit<QuickChatMessage, 'createdAt' | 'timeText' | 'readByUser'> & { createdAt?: string }) {
@@ -2998,6 +3089,7 @@ function loadQuickChatState() {
       quickChatRooms.value = []
       activeQuickChatRoomId.value = ''
       quickChatLastEventSnapshot.value = '[]'
+      quickChatLastLocalPayload = '[]'
       return
     }
     const parsed = JSON.parse(raw)
@@ -3005,14 +3097,17 @@ function loadQuickChatState() {
       quickChatRooms.value = []
       activeQuickChatRoomId.value = ''
       quickChatLastEventSnapshot.value = '[]'
+      quickChatLastLocalPayload = '[]'
       return
     }
     applyQuickChatRoomsFromPayload(parsed)
     quickChatLastEventSnapshot.value = raw
+    quickChatLastLocalPayload = raw
   } catch {
     quickChatRooms.value = []
     activeQuickChatRoomId.value = ''
     quickChatLastEventSnapshot.value = '[]'
+    quickChatLastLocalPayload = '[]'
   }
 }
 
@@ -4651,10 +4746,11 @@ onMounted(() => {
       quickChatTrainingUntil.value = ''
       persistPresenceState()
     }
-  }, 60 * 1000)
+  }, 2 * 60 * 1000)
   quickChatSyncUnsubscribe = subscribeLiveSync((payload) => {
     if (!payload?.topics?.includes('oa') && payload?.url !== '/local/quick-chat') return
     if (payload.url !== '/local/quick-chat') return
+    if (!quickChatOpen.value) return
     syncQuickChatFromStorage()
   })
   setupQuickChatTodoEscalationTimer()
@@ -4667,6 +4763,11 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  if (quickChatLocalPersistTimer) {
+    window.clearTimeout(quickChatLocalPersistTimer)
+    quickChatLocalPersistTimer = undefined
+  }
+  cancelQuickChatIdlePersist()
   closeQuickChatWebSocket()
   if (presenceTimer) {
     window.clearInterval(presenceTimer)
@@ -4702,15 +4803,18 @@ onBeforeUnmount(() => {
 
 function onQuickChatStorageChange(event: StorageEvent) {
   if (event.key === quickChatStorageKey()) {
+    if (!quickChatOpen.value) return
     syncQuickChatFromStorage()
     return
   }
   if (event.key === quickChatTodoStorageKey()) {
+    if (!quickChatOpen.value) return
     loadQuickChatTodo()
     runAutoEscalationIfNeeded()
     return
   }
   if (event.key === quickChatTodoAutomationStorageKey()) {
+    if (!quickChatOpen.value) return
     loadQuickChatTodoAutomation()
   }
 }

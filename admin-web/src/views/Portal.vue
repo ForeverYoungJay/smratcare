@@ -4419,11 +4419,13 @@ onMounted(() => {
   init()
   if (portalSyncTimer) window.clearInterval(portalSyncTimer)
   portalSyncTimer = window.setInterval(() => {
-    if (document.hidden || !autoSyncEnabled.value) return
+    if (document.hidden || !autoSyncEnabled.value || loading.value || syncingNow.value) return
     refreshPortalModules(true, '定时轮询').catch(() => {})
-  }, 20 * 1000)
+  }, 60 * 1000)
   portalVisibleHandler = () => {
-    if (!document.hidden && autoSyncEnabled.value) refreshPortalModules(true, '回到页面').catch(() => {})
+    if (!document.hidden && autoSyncEnabled.value && !loading.value && !syncingNow.value) {
+      refreshPortalModules(true, '回到页面').catch(() => {})
+    }
   }
   document.addEventListener('visibilitychange', portalVisibleHandler)
   calendarStorageHandler = (event: StorageEvent) => {
@@ -4445,7 +4447,9 @@ onMounted(() => {
       return
     }
     if (event.key === CALENDAR_SYNC_PULSE_KEY) {
-      refreshPortalModules(true, '跨页面同步').catch(() => {})
+      if (!loading.value && !syncingNow.value) {
+        refreshPortalModules(true, '跨页面同步').catch(() => {})
+      }
     }
   }
   window.addEventListener('storage', calendarStorageHandler)

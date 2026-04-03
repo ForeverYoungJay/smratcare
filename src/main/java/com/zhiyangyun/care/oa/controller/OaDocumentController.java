@@ -82,6 +82,7 @@ public class OaDocumentController {
     long resolvedPageSize = pageSize != null && pageSize > 0 ? pageSize : (size != null && size > 0 ? size : 20);
     Long orgId = AuthContext.getOrgId();
     Long staffId = AuthContext.getStaffId();
+    String normalizedFolder = normalizeOptionalText(folder);
     String normalizedFolderVisibility = normalizeFolderVisibilityFilter(folderVisibility);
     String normalizedRegionCode = normalizeOptionalText(regionCode);
     boolean folderIdSupported = hasDocumentFolderIdColumn();
@@ -89,9 +90,9 @@ public class OaDocumentController {
         listAccessibleFolderIds(orgId, staffId, normalizedFolderVisibility, normalizedRegionCode);
     var wrapper = documentQuery(orgId)
         .eq(folderIdSupported && folderId != null, OaDocument::getFolderId, folderId)
-        .eq((!folderIdSupported || folderId == null) && folder != null && !folder.isBlank(), OaDocument::getFolder, folder.trim());
+        .eq((!folderIdSupported || folderId == null) && normalizedFolder != null, OaDocument::getFolder, normalizedFolder);
     if (folderIdSupported) {
-      if (folderId == null && (folder == null || folder.isBlank()) && !accessibleFolderIds.isEmpty()) {
+      if (folderId == null && normalizedFolder == null && !accessibleFolderIds.isEmpty()) {
         wrapper.and(w -> w.isNull(OaDocument::getFolderId).or().in(OaDocument::getFolderId, accessibleFolderIds));
       } else if (folderId != null && !accessibleFolderIds.contains(folderId)) {
         return Result.ok(new Page<>(resolvedPageNo, resolvedPageSize, 0));
@@ -332,6 +333,7 @@ public class OaDocumentController {
       @RequestParam(required = false) String keyword) {
     Long orgId = AuthContext.getOrgId();
     Long staffId = AuthContext.getStaffId();
+    String normalizedFolder = normalizeOptionalText(folder);
     String normalizedFolderVisibility = normalizeFolderVisibilityFilter(folderVisibility);
     String normalizedRegionCode = normalizeOptionalText(regionCode);
     boolean folderIdSupported = hasDocumentFolderIdColumn();
@@ -344,8 +346,8 @@ public class OaDocumentController {
     }
     var wrapper = documentQuery(orgId)
         .eq(folderIdSupported && folderId != null, OaDocument::getFolderId, folderId)
-        .eq((!folderIdSupported || folderId == null) && folder != null && !folder.isBlank(), OaDocument::getFolder, folder.trim());
-    if (folderIdSupported && folderId == null && (folder == null || folder.isBlank()) && !accessibleFolderIds.isEmpty()) {
+        .eq((!folderIdSupported || folderId == null) && normalizedFolder != null, OaDocument::getFolder, normalizedFolder);
+    if (folderIdSupported && folderId == null && normalizedFolder == null && !accessibleFolderIds.isEmpty()) {
       wrapper.and(w -> w.isNull(OaDocument::getFolderId).or().in(OaDocument::getFolderId, accessibleFolderIds));
     }
     wrapper.orderByDesc(OaDocument::getUploadedAt).orderByDesc(OaDocument::getCreateTime);

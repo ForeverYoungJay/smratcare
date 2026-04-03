@@ -96,6 +96,9 @@ const interactableObjects: THREE.Object3D[] = []
 const animatedBeds: Array<{ mesh: THREE.Mesh; type: 'pulse' | 'blink' | 'sleep'; baseIntensity: number }> = []
 let particles: THREE.Points | null = null
 let animationFrameId = 0
+let rebuildSceneTimer = 0
+let lastPointerMoveAt = 0
+const sceneRenderingEnabled = ref(true)
 const pickPosition = new THREE.Vector2()
 const raycaster = new THREE.Raycaster()
 let hoveredObj: THREE.Object3D | null = null
@@ -586,6 +589,9 @@ function restoreHoverObject(obj: THREE.Object3D) {
 
 function onPointerMove(event: PointerEvent) {
   if (!canvasRef.value || !camera.value) return
+  const now = performance.now()
+  if (now - lastPointerMoveAt < 32) return
+  lastPointerMoveAt = now
   const rect = canvasRef.value.getBoundingClientRect()
   pickPosition.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
   pickPosition.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
@@ -748,8 +754,26 @@ function onWindowResize() {
   cssRenderer.value.setSize(width, height)
 }
 
+function scheduleBuildSceneData() {
+  if (rebuildSceneTimer) {
+    window.clearTimeout(rebuildSceneTimer)
+  }
+  rebuildSceneTimer = window.setTimeout(() => {
+    rebuildSceneTimer = 0
+    buildSceneData()
+  }, 80)
+}
+
+function handleVisibilityChange() {
+  sceneRenderingEnabled.value = !document.hidden
+  if (sceneRenderingEnabled.value && !animationFrameId) {
+    animate()
+  }
+}
+
 function animate() {
   animationFrameId = requestAnimationFrame(animate)
+  if (!sceneRenderingEnabled.value) return
   const time = Date.now() * 0.0014
   controls.value?.update()
 
@@ -773,19 +797,27 @@ function animate() {
   cssRenderer.value?.render(scene.value, camera.value!)
 }
 
-watch(() => props.buildings, buildSceneData, { deep: true })
-watch(() => props.floors, buildSceneData, { deep: true })
-watch(() => props.roomLookup, buildSceneData, { deep: true })
+watch(() => props.buildings, scheduleBuildSceneData, { deep: true })
+watch(() => props.floors, scheduleBuildSceneData, { deep: true })
+watch(() => props.roomLookup, scheduleBuildSceneData, { deep: true })
 
 onMounted(() => {
+  sceneRenderingEnabled.value = !document.hidden
   initScene()
+  document.addEventListener('visibilitychange', handleVisibilityChange)
 })
 
 onBeforeUnmount(() => {
   cancelAnimationFrame(animationFrameId)
+  animationFrameId = 0
+  if (rebuildSceneTimer) {
+    window.clearTimeout(rebuildSceneTimer)
+    rebuildSceneTimer = 0
+  }
   renderer.value?.domElement.removeEventListener('pointermove', onPointerMove)
   renderer.value?.domElement.removeEventListener('click', onClick)
   window.removeEventListener('resize', onWindowResize)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
   controls.value?.dispose()
   renderer.value?.dispose()
 })
