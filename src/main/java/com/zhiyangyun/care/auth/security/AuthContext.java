@@ -2,6 +2,8 @@ package com.zhiyangyun.care.auth.security;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
@@ -31,10 +33,9 @@ public class AuthContext {
     if (authentication == null) {
       return null;
     }
-    Object details = authentication.getDetails();
-    if (details instanceof java.util.Map) {
-      java.util.Map map = (java.util.Map) details;
-      Object orgId = map.get("orgId");
+    Map<?, ?> details = extractDetails(authentication);
+    if (details != null) {
+      Object orgId = details.get("orgId");
       if (orgId instanceof Number) {
         return ((Number) orgId).longValue();
       }
@@ -47,10 +48,9 @@ public class AuthContext {
     if (authentication == null) {
       return null;
     }
-    Object details = authentication.getDetails();
-    if (details instanceof java.util.Map) {
-      java.util.Map map = (java.util.Map) details;
-      Object username = map.get("username");
+    Map<?, ?> details = extractDetails(authentication);
+    if (details != null) {
+      Object username = details.get("username");
       return username == null ? null : username.toString();
     }
     return null;
@@ -60,13 +60,8 @@ public class AuthContext {
     if (roleCode == null || roleCode.isBlank()) {
       return false;
     }
-    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    if (authentication == null || authentication.getAuthorities() == null) {
-      return false;
-    }
-    String normalized = roleCode.startsWith("ROLE_") ? roleCode : "ROLE_" + roleCode;
-    return authentication.getAuthorities().stream()
-        .anyMatch(item -> normalized.equalsIgnoreCase(item.getAuthority()));
+    String normalized = roleCode.startsWith("ROLE_") ? roleCode.substring(5) : roleCode;
+    return getRoleCodes().stream().anyMatch(item -> normalized.equalsIgnoreCase(item));
   }
 
   public static boolean isAdmin() {
@@ -105,7 +100,18 @@ public class AuthContext {
 
   public static List<String> getRoleCodes() {
     Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-    if (authentication == null || authentication.getAuthorities() == null) {
+    if (authentication == null) {
+      return List.of();
+    }
+    Map<?, ?> details = extractDetails(authentication);
+    if (details != null) {
+      Object roleCodes = details.get("roleCodes");
+      List<String> normalized = normalizeRoleCodes(roleCodes);
+      if (!normalized.isEmpty()) {
+        return normalized;
+      }
+    }
+    if (authentication.getAuthorities() == null) {
       return List.of();
     }
     return authentication.getAuthorities().stream()
@@ -134,5 +140,28 @@ public class AuthContext {
         || roleCodes.contains("LEADER")
         || roleCodes.contains("MANAGER")
         || roleCodes.contains("SUPERVISOR");
+  }
+
+  private static Map<?, ?> extractDetails(Authentication authentication) {
+    if (authentication == null) {
+      return null;
+    }
+    Object details = authentication.getDetails();
+    if (details instanceof Map<?, ?> map) {
+      return map;
+    }
+    return null;
+  }
+
+  private static List<String> normalizeRoleCodes(Object roleCodes) {
+    if (!(roleCodes instanceof List<?> values)) {
+      return List.of();
+    }
+    return values.stream()
+        .filter(Objects::nonNull)
+        .map(Object::toString)
+        .filter(value -> value != null && !value.isBlank())
+        .map(value -> value.toUpperCase(Locale.ROOT))
+        .collect(Collectors.toList());
   }
 }

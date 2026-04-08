@@ -1,1 +1,0 @@
-import{f as i,r as e}from"./request-Du0AqNUg.js";function t(a){return i("/api/admin/family/users/page",a)}function n(a){return e.post("/api/admin/family/users/upsert",a)}function s(a){return e.get("/api/admin/family/relations",{params:{elderId:a}})}function m(a){return e.delete(`/api/admin/family/relations/${a}`)}export{s as a,t as g,m as r,n as u};

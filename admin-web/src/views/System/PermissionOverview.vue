@@ -1,5 +1,39 @@
 <template>
   <PageContainer title="权限总览" subTitle="先选员工，再分配角色。页面权限跟着角色走，不再做复杂模拟。">
+    <template #meta>
+      <a-space wrap size="small">
+        <span class="soft-pill">员工数：{{ staffOptions.length }}</span>
+        <span class="soft-pill">部门数：{{ departments.length }}</span>
+        <span class="selection-pill">当前账号角色：{{ selectedAccountRoleNames.length }}</span>
+        <span class="soft-pill">{{ accountForm.staffId ? '已选择授权员工' : '请先选择员工账号' }}</span>
+      </a-space>
+    </template>
+
+    <template #stats>
+      <div class="metric-grid metric-grid--4">
+        <div class="metric-card">
+          <span>角色模板</span>
+          <strong>{{ roleRows.length }}</strong>
+          <small>统一维护页面权限模板</small>
+        </div>
+        <div class="metric-card">
+          <span>启用角色</span>
+          <strong>{{ enabledRoleCount }}</strong>
+          <small>当前可分配给账号的角色</small>
+        </div>
+        <div class="metric-card">
+          <span>推荐组织模板</span>
+          <strong>{{ presetEntries.length }}</strong>
+          <small>帮助快速理解岗位分工</small>
+        </div>
+        <div class="metric-card">
+          <span>抽屉已选页面</span>
+          <strong>{{ checkedPagePermissions.length }}</strong>
+          <small>当前角色权限颗粒度</small>
+        </div>
+      </div>
+    </template>
+
     <a-row :gutter="[12, 12]">
       <a-col :xs="24" :xl="10">
         <a-card class="card-elevated" :bordered="false" title="1. 选择员工并分配角色">
@@ -169,6 +203,7 @@ const selectedAccountRoleNames = computed(() =>
 )
 const roleDrawerTitle = computed(() => (roleForm.id ? '编辑角色权限模板' : '新增角色权限模板'))
 const recommendedPreset = computed(() => getRolePagePreset(roleForm.roleCode || roleForm.roleName))
+const enabledRoleCount = computed(() => roleRows.value.filter((item) => Number(item.status) === 1).length)
 
 const roleColumns = [
   { title: '角色名称', dataIndex: 'roleName', key: 'roleName', width: 180 },

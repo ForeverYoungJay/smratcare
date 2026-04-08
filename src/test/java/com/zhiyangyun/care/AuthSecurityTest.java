@@ -147,6 +147,17 @@ class AuthSecurityTest {
   }
 
   @Test
+  void family_me_does_not_expose_staff_info() throws Exception {
+    String token = loginAndGetFamilyToken();
+
+    mockMvc.perform(get("/api/auth/me")
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code", is(0)))
+        .andExpect(jsonPath("$.data").isEmpty());
+  }
+
+  @Test
   void family_upload_rejects_dangerous_content_type() throws Exception {
     String token = loginAndGetFamilyToken();
     MockMultipartFile file = new MockMultipartFile(

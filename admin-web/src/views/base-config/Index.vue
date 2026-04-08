@@ -1,5 +1,39 @@
 <template>
   <PageContainer :title="pageTitle" subTitle="统一维护老人、营销、入住、活动、社区及费用等基础字典">
+    <template #meta>
+      <a-space wrap size="small">
+        <span class="soft-pill">当前分组：{{ activeGroupLabel }}</span>
+        <span class="soft-pill">可维护分组：{{ displayGroups.length }}</span>
+        <span class="selection-pill">已勾选：{{ selectedRowKeys.length }} 项</span>
+        <span v-for="tag in filterSummaryTags" :key="tag" class="soft-pill">{{ tag }}</span>
+      </a-space>
+    </template>
+
+    <template #stats>
+      <div class="metric-grid metric-grid--4">
+        <div class="metric-card">
+          <span>当前分组记录</span>
+          <strong>{{ total }}</strong>
+          <small>便于快速掌握该字典规模</small>
+        </div>
+        <div class="metric-card">
+          <span>当前页启用项</span>
+          <strong>{{ currentPageEnabledCount }}</strong>
+          <small>优先确认实际生效配置</small>
+        </div>
+        <div class="metric-card">
+          <span>当前页停用项</span>
+          <strong>{{ currentPageDisabledCount }}</strong>
+          <small>减少误用历史配置</small>
+        </div>
+        <div class="metric-card">
+          <span>待批量处理</span>
+          <strong>{{ selectedRowKeys.length }}</strong>
+          <small>支持启停和导出前集中确认</small>
+        </div>
+      </div>
+    </template>
+
     <a-card class="card-elevated" :bordered="false">
       <a-tabs v-if="showTabs" v-model:activeKey="activeGroup" @change="onGroupChange">
         <a-tab-pane v-for="item in displayGroups" :key="item.code" :tab="item.label" />
@@ -307,6 +341,16 @@ const rowSelection = computed(() => ({
 }))
 
 const hasImportErrors = computed(() => (importPreviewResult.value?.failCount || 0) > 0)
+const activeGroupLabel = computed(() => groupLabelMap.value[activeGroup.value] || activeGroup.value || '未选择')
+const currentPageEnabledCount = computed(() => rows.value.filter((item) => Number(item.status) === 1).length)
+const currentPageDisabledCount = computed(() => rows.value.filter((item) => Number(item.status) !== 1).length)
+const filterSummaryTags = computed(() => {
+  const tags: string[] = []
+  if (query.keyword) tags.push(`关键词：${query.keyword}`)
+  if (query.status !== undefined) tags.push(`状态：${query.status === 1 ? '启用' : '停用'}`)
+  if (!tags.length) tags.push('筛选：全部记录')
+  return tags
+})
 
 async function loadGroups() {
   groups.value = await getBaseConfigGroups()

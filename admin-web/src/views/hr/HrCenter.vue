@@ -1,5 +1,14 @@
 <template>
   <PageContainer title="人力资源中心" subTitle="招聘、档案、考勤、合规、费用、培训绩效与激励按业务域统一组织。">
+    <template #meta>
+      <a-space wrap size="small">
+        <span class="soft-pill">业务分区：{{ visibleSections.length }}</span>
+        <span class="soft-pill">可达动作：{{ visibleActionCount }}</span>
+        <span class="selection-pill">合同预警：{{ summary.contractExpiringCount || 0 }}</span>
+        <span class="soft-pill">考勤异常：{{ summary.attendanceAbnormalCount || 0 }}</span>
+      </a-space>
+    </template>
+
     <section class="hero-shell card-elevated">
       <div class="hero-main">
         <div class="hero-kicker">Human Resources</div>
@@ -171,6 +180,7 @@ const sections = computed<HrSection[]>(() => [
 ])
 
 const visibleSections = computed(() => sections.value.filter((item) => item.actions.length > 0))
+const visibleActionCount = computed(() => visibleSections.value.reduce((sum, item) => sum + item.actions.length, 0))
 
 function canAccess(path: string) {
   return resolveRouteAccess(router, userStore.roles || [], path, userStore.pagePermissions || []).canAccess

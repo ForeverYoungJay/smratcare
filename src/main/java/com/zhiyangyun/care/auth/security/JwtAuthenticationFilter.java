@@ -6,8 +6,10 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -63,9 +65,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         UsernamePasswordAuthenticationToken authentication =
             new UsernamePasswordAuthenticationToken(staffId, null, authorities);
-        java.util.Map<String, Object> details = new java.util.HashMap<>();
+        Map<String, Object> details = new HashMap<>();
         details.put("orgId", orgId);
         details.put("username", username);
+        details.put("roleCodes", roles);
+        details.put("grantedRoleCodes", authorityCodes.stream().collect(Collectors.toList()));
         authentication.setDetails(details);
         SecurityContextHolder.getContext().setAuthentication(authentication);
       } catch (Exception ex) {

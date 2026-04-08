@@ -1,5 +1,14 @@
 <template>
   <PageContainer title="库存总览" subTitle="批次库存、临期与低库存监控">
+    <template #meta>
+      <a-space wrap size="small">
+        <span class="soft-pill">当前仓库：{{ currentWarehouseLabel }}</span>
+        <span class="soft-pill">物资类型：{{ query.itemType ? itemTypeLabel(query.itemType) : '全部' }}</span>
+        <span class="selection-pill">风险合计：{{ summaryStats.lowStockCount + summaryStats.expiringCount }}</span>
+        <span v-for="tag in activeFilterSummary" :key="tag" class="soft-pill">{{ tag }}</span>
+      </a-space>
+    </template>
+
     <template #stats>
       <div class="inventory-overview-grid">
         <div class="overview-card">
@@ -271,6 +280,19 @@ const summaryStats = computed(() => {
     }
   }
   return stats
+})
+const currentWarehouseLabel = computed(() =>
+  warehouseOptions.value.find((item) => String(item.value) === String(query.warehouseId))?.label || '全部仓库'
+)
+const activeFilterSummary = computed(() => {
+  const tags: string[] = []
+  if (query.keyword) tags.push(`关键词：${query.keyword}`)
+  if (query.category) tags.push(`分类：${query.category}`)
+  if (query.businessDomain) tags.push(`业务域：${domainLabel(query.businessDomain)}`)
+  if (query.expiryDays !== undefined) tags.push(`临期≤${query.expiryDays}天`)
+  if (query.lowStockOnly) tags.push('仅看低库存')
+  if (!tags.length) tags.push('筛选：全部库存')
+  return tags
 })
 
 const adjustOpen = ref(false)

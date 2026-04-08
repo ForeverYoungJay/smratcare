@@ -1,1 +1,0 @@
-import{f as t,r as a}from"./request-Du0AqNUg.js";function d(e,r){return t("/api/crm/leads/page",e,r)}function s(e){return a.get(`/api/crm/leads/${e}`)}function u(e){return a.post("/api/crm/leads",e)}function c(e,r){return a.put(`/api/crm/leads/${e}`,r)}function m(e){return a.delete(`/api/crm/leads/${e}`)}export{d as a,u as c,m as d,s as g,c as u};

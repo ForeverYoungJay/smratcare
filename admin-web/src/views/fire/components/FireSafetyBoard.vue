@@ -1,5 +1,14 @@
 <template>
   <PageContainer :title="title" :subTitle="subTitle">
+    <template #meta>
+      <a-space wrap size="small">
+        <span class="soft-pill">记录类型：{{ recordTypeLabel }}</span>
+        <span class="soft-pill">当前状态：{{ query.status ? statusText(query.status) : '全部' }}</span>
+        <span class="selection-pill">已勾选：{{ selectedRows.length }} 条</span>
+        <span v-for="tag in activeFilterSummary" :key="tag" class="soft-pill">{{ tag }}</span>
+      </a-space>
+    </template>
+
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="标题/区域/问题描述/处置措施" allow-clear style="width: 300px" />
@@ -557,6 +566,24 @@ const warningMessage = computed(() => {
     return ''
   }
   return `异常提醒：${warnings.join('，')}，请优先处理。`
+})
+const recordTypeLabelMap: Record<FireSafetyRecordType, string> = {
+  FACILITY: '消防设施',
+  CONTROL_ROOM_DUTY: '中控室值班',
+  MONTHLY_CHECK: '月度检查',
+  DAY_PATROL: '日巡查',
+  NIGHT_PATROL: '夜巡查',
+  MAINTENANCE_REPORT: '维保报告',
+  FAULT_MAINTENANCE: '故障维修'
+}
+const recordTypeLabel = computed(() => recordTypeLabelMap[props.recordType] || props.title)
+const activeFilterSummary = computed(() => {
+  const tags: string[] = []
+  if (query.keyword) tags.push(`关键词：${query.keyword}`)
+  if (query.inspectorName) tags.push(`负责人：${query.inspectorName}`)
+  if (query.checkTimeRange?.length === 2) tags.push(`检查时间：${query.checkTimeRange[0]} 至 ${query.checkTimeRange[1]}`)
+  if (!tags.length) tags.push('筛选：全部记录')
+  return tags
 })
 
 const columns = computed(() => {

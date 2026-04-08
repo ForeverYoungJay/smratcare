@@ -322,13 +322,21 @@ public class AuthController {
 
   @GetMapping("/me")
   public Result<StaffInfo> me() {
+    if (com.zhiyangyun.care.auth.security.AuthContext.hasRole("FAMILY")) {
+      return Result.ok(null);
+    }
     Long staffId = com.zhiyangyun.care.auth.security.AuthContext.getStaffId();
     StaffAccount staff = staffId == null ? null : staffMapper.selectById(staffId);
     if (staff == null) {
       String username = com.zhiyangyun.care.auth.security.AuthContext.getUsername();
+      Long orgId = com.zhiyangyun.care.auth.security.AuthContext.getOrgId();
       staff = staffMapper.selectOne(
           Wrappers.lambdaQuery(StaffAccount.class)
-              .eq(StaffAccount::getUsername, username));
+              .eq(StaffAccount::getIsDeleted, 0)
+              .eq(StaffAccount::getStatus, 1)
+              .eq(orgId != null, StaffAccount::getOrgId, orgId)
+              .eq(StaffAccount::getUsername, username)
+              .last("LIMIT 1"));
     }
     return Result.ok(toStaffInfo(staff));
   }

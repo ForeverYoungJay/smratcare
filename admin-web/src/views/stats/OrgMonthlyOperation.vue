@@ -1,5 +1,14 @@
 <template>
   <PageContainer title="机构月运营详情" subTitle="先看经营结论，再做横向比较和下钻明细">
+    <template #meta>
+      <a-space wrap size="small">
+        <span class="soft-pill">月份范围：{{ periodLabel }}</span>
+        <span class="soft-pill">机构范围：{{ orgScopeLabel }}</span>
+        <span class="selection-pill">可视记录：{{ displayRows.length }} / {{ rows.length }}</span>
+        <span class="soft-pill">{{ query.orgNameKeyword ? `打印筛选：${query.orgNameKeyword}` : '打印筛选：全部机构' }}</span>
+      </a-space>
+    </template>
+
     <template #stats>
       <div class="headline-stats">
         <div class="headline-stat">
@@ -210,6 +219,8 @@ const displayRows = computed(() => {
   if (!keyword) return rows.value
   return rows.value.filter(item => String(item.orgName || '').includes(keyword))
 })
+const periodLabel = computed(() => `${dayjs(query.value.from).format('YYYY-MM')} 至 ${dayjs(query.value.to).format('YYYY-MM')}`)
+const orgScopeLabel = computed(() => query.value.orgId ? `机构ID ${query.value.orgId}` : '当前机构视角')
 const workspaceSummary = computed(() => `围绕营收、床位占用和入住离院联动观察机构月经营表现。当前展示 ${displayRows.value.length} 条记录。`)
 const workspacePayload = computed(() => ({
   from: dayjs(query.value.from).format('YYYY-MM'),

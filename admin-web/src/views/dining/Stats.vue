@@ -1,5 +1,14 @@
 <template>
   <PageContainer title="订餐统计" subTitle="查看楼栋点餐、次月采购成本与准点送率">
+    <template #meta>
+      <a-space wrap size="small">
+        <span class="soft-pill">统计周期：{{ rangeLabel }}</span>
+        <span class="soft-pill">楼栋数：{{ summary.buildingStats.length }}</span>
+        <span class="selection-pill">追踪配送：{{ summary.trackedDeliveryOrders }} 单</span>
+        <span class="soft-pill">采购预估：{{ formatCurrency(summary.nextMonthEstimatedCost) }}</span>
+      </a-space>
+    </template>
+
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="日期范围">
         <a-range-picker v-model:value="query.range" />
@@ -52,7 +61,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import dayjs from 'dayjs'
 import type { Dayjs } from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
@@ -76,6 +85,10 @@ const summary = reactive<DiningStatsSummary>({
   mealTypeStats: [],
   buildingStats: [],
   procurementItems: []
+})
+const rangeLabel = computed(() => {
+  if (!query.range) return '默认全量区间'
+  return `${query.range[0].format('YYYY-MM-DD')} 至 ${query.range[1].format('YYYY-MM-DD')}`
 })
 
 const mealColumns = [
