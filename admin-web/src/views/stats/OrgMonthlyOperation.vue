@@ -1,6 +1,23 @@
 <template>
-  <PageContainer title="机构月运营详情" subTitle="机构月度运营与床位利用情况">
-    <a-card class="card-elevated" :bordered="false">
+  <PageContainer title="机构月运营详情" subTitle="先看经营结论，再做横向比较和下钻明细">
+    <template #stats>
+      <div class="headline-stats">
+        <div class="headline-stat">
+          <span>记录条数</span>
+          <strong>{{ displayRows.length }}</strong>
+        </div>
+        <div class="headline-stat">
+          <span>最高营收机构</span>
+          <strong>{{ topRevenueOrgs[0]?.orgName || '-' }}</strong>
+        </div>
+        <div class="headline-stat">
+          <span>最高床位压力</span>
+          <strong>{{ highPressureOrgs[0]?.orgName || '-' }}</strong>
+        </div>
+      </div>
+    </template>
+
+    <section class="stats-toolbar-shell">
       <a-form layout="inline">
         <a-form-item label="起始月份">
           <a-date-picker v-model:value="query.from" picker="month" style="width: 160px" />
@@ -28,7 +45,7 @@
           </a-space>
         </a-form-item>
       </a-form>
-    </a-card>
+    </section>
 
     <StatsWorkspacePanel
       page-key="stats-org-monthly-operation"
@@ -62,9 +79,14 @@
       @apply-template="applyReportTemplate"
     />
 
-    <a-row :gutter="16" style="margin-top: 16px;">
-      <a-col :xs="24" :lg="12">
-        <a-card class="card-elevated" :bordered="false" title="机构营收对比">
+    <section class="stats-story-grid">
+      <div class="story-panel">
+        <div class="story-head">
+          <div>
+            <div class="story-kicker">Summary</div>
+            <h3>机构营收对比</h3>
+          </div>
+        </div>
           <div class="compare-list" v-if="topRevenueOrgs.length">
             <div v-for="item in topRevenueOrgs" :key="`revenue-${item.orgName}`" class="compare-item">
               <div>
@@ -75,10 +97,14 @@
             </div>
           </div>
           <a-empty v-else description="暂无机构对比数据" />
-        </a-card>
-      </a-col>
-      <a-col :xs="24" :lg="12">
-        <a-card class="card-elevated" :bordered="false" title="容量压力机构">
+      </div>
+      <div class="story-panel">
+        <div class="story-head">
+          <div>
+            <div class="story-kicker">Pressure</div>
+            <h3>容量压力机构</h3>
+          </div>
+        </div>
           <div class="compare-list" v-if="highPressureOrgs.length">
             <div v-for="item in highPressureOrgs" :key="`pressure-${item.orgName}`" class="compare-item">
               <div>
@@ -89,15 +115,26 @@
             </div>
           </div>
           <a-empty v-else description="暂无床位压力对比" />
-        </a-card>
-      </a-col>
-    </a-row>
+      </div>
+    </section>
 
-    <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="机构月运营趋势">
+    <section class="story-panel story-panel--chart">
+      <div class="story-head">
+        <div>
+          <div class="story-kicker">Trend</div>
+          <h3>机构月运营趋势</h3>
+        </div>
+      </div>
       <div ref="trendRef" style="height: 320px;"></div>
-    </a-card>
+    </section>
 
-    <a-card class="card-elevated" :bordered="false" style="margin-top: 16px;" title="机构月运营明细">
+    <section class="story-panel story-panel--table">
+      <div class="story-head">
+        <div>
+          <div class="story-kicker">Detail</div>
+          <h3>机构月运营明细</h3>
+        </div>
+      </div>
       <vxe-table border stripe show-overflow :data="displayRows" height="320">
         <vxe-column field="orgName" title="机构" min-width="140" />
         <vxe-column field="month" title="月份" width="120" />
@@ -108,7 +145,7 @@
         <vxe-column field="totalBeds" title="总床位" width="100" />
         <vxe-column field="occupancyRate" title="床位使用率(%)" width="120" />
       </vxe-table>
-    </a-card>
+    </section>
 
     <a-modal v-model:open="columnSettingOpen" title="打印列设置" @ok="columnSettingOpen = false" cancel-text="关闭" ok-text="确定">
       <a-checkbox-group v-model:value="selectedPrintColumns" :options="printColumnOptions" />
@@ -441,6 +478,74 @@ onMounted(loadData)
 </script>
 
 <style scoped>
+.headline-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.headline-stat {
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(208, 223, 234, 0.88);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.headline-stat span {
+  display: block;
+  font-size: 12px;
+  color: #6f8ba2;
+}
+
+.headline-stat strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 22px;
+  color: #173854;
+}
+
+.stats-toolbar-shell,
+.story-panel {
+  padding: 16px 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(208, 223, 234, 0.88);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.stats-story-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.story-panel--chart,
+.story-panel--table {
+  margin-top: 16px;
+}
+
+.story-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.story-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #7290a8;
+}
+
+.story-head h3 {
+  margin: 4px 0 0;
+  font-size: 18px;
+  color: #173854;
+}
+
 .compare-list {
   display: flex;
   flex-direction: column;
@@ -472,5 +577,12 @@ onMounted(loadData)
   font-size: 18px;
   font-weight: 700;
   color: #111827;
+}
+
+@media (max-width: 992px) {
+  .headline-stats,
+  .stats-story-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

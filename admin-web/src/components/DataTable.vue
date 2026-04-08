@@ -11,7 +11,9 @@
       :row-class-name="mergedRowClassName"
       :row-selection="rowSelection"
       :loading="loading"
+      :size="size || 'middle'"
       :pagination="mergedPagination"
+      :sticky="sticky === false ? false : { offsetHeader: 0 }"
       :scroll="mergedScroll"
       @change="onChange"
     >
@@ -20,7 +22,7 @@
       </template>
       <template #emptyText>
         <div class="empty-wrap">
-          <a-empty description="暂无数据" />
+          <a-empty :description="emptyDescription || '暂无数据'" />
         </div>
       </template>
     </a-table>
@@ -34,12 +36,16 @@ import { computed } from 'vue'
 const props = defineProps<{
   columns: any[]
   dataSource: any[]
-  rowKey: string
+  rowKey?: string
   rowClassName?: (record: any, index: number) => string
   rowSelection?: any
   loading?: boolean
   pagination?: TablePaginationConfig | false
   scroll?: any
+  size?: 'small' | 'middle' | 'large'
+  sticky?: boolean
+  emptyDescription?: string
+  showStriped?: boolean
 }>()
 
 const mergedPagination = computed<TablePaginationConfig | false>(() => {
@@ -49,6 +55,7 @@ const mergedPagination = computed<TablePaginationConfig | false>(() => {
     showQuickJumper: true,
     pageSizeOptions: ['10', '20', '50', '100'],
     showTotal: (total) => `共 ${total} 条记录`,
+    position: ['bottomRight'],
     ...(props.pagination || {})
   }
 })
@@ -60,7 +67,8 @@ const mergedScroll = computed(() => ({
 
 const mergedRowClassName = (record: any, index: number) => {
   const external = props.rowClassName ? props.rowClassName(record, index) : ''
-  return `${index % 2 === 1 ? 'is-striped-row' : ''} ${external}`.trim()
+  const striped = props.showStriped === false ? '' : index % 2 === 1 ? 'is-striped-row' : ''
+  return `${striped} ${external}`.trim()
 }
 
 const emit = defineEmits<{ (e: 'change', pagination: TablePaginationConfig, filters: any, sorter: any): void }>()
@@ -76,10 +84,14 @@ function onChange(pagination: TablePaginationConfig, filters: any, sorter: any) 
 }
 
 .table-shell-head {
-  padding: 14px 16px 0;
+  padding: 16px 18px 0;
+}
+
+.table-shell :deep(.ant-table-wrapper) {
+  padding: 0 4px 4px;
 }
 
 .data-table :deep(.is-striped-row > td) {
-  background: rgba(248, 252, 255, 0.78);
+  background: rgba(247, 251, 254, 0.88);
 }
 </style>

@@ -15,7 +15,11 @@ public class ResponseContentTypeFilter extends OncePerRequestFilter {
       HttpServletResponse response,
       FilterChain filterChain) throws ServletException, IOException {
     response.setCharacterEncoding("UTF-8");
-    response.setContentType("application/json;charset=UTF-8");
     filterChain.doFilter(request, response);
+    if (request.getRequestURI() != null
+        && request.getRequestURI().startsWith("/api/")
+        && response.getContentType() == null) {
+      response.setContentType("application/json;charset=UTF-8");
+    }
   }
 }

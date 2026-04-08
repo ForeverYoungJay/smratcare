@@ -1,5 +1,26 @@
 <template>
-  <PageContainer title="销售运营工作台" sub-title="营销管理首页：漏斗、跟进、床态、合同、回访、业绩、风险一屏总览">
+  <PageContainer title="销售运营工作台" sub-title="营销管理首页：漏斗、跟进、床态、合同、回访、业绩、风险一屏总览" mode="showcase">
+    <template #meta>
+      <span class="soft-pill">统计范围 {{ quickRangeLabel }}</span>
+      <span class="soft-pill">自动刷新 {{ autoRefresh ? '已开启' : '已关闭' }}</span>
+      <span class="soft-pill">更新于 {{ lastUpdated || '-' }}</span>
+    </template>
+
+    <template #stats>
+      <div class="marketing-overview-grid">
+        <div
+          v-for="item in overviewTiles"
+          :key="item.label"
+          class="overview-tile"
+          :class="`overview-tile--${item.tone}`"
+        >
+          <span>{{ item.label }}</span>
+          <strong>{{ item.value }}</strong>
+          <small>{{ item.hint }}</small>
+        </div>
+      </div>
+    </template>
+
     <a-card class="card-elevated dashboard-control" :bordered="false" style="margin-bottom: 12px">
       <a-space wrap>
         <a-tag color="blue">机会指数：{{ opportunityCount }}</a-tag>
@@ -66,7 +87,7 @@
     </a-card>
     <a-row :gutter="[16, 16]">
       <a-col :xs="24" :lg="12">
-        <a-card class="card-elevated" :bordered="false" title="卡片1：销售漏斗总览（核心卡）">
+        <a-card class="card-elevated" :bordered="false" title="销售漏斗总览">
           <a-row :gutter="[12, 12]">
             <a-col :span="12"><div class="stat-link" @click="goLead('all', { tab: 'consultation' })"><a-statistic title="今日新增咨询数" :value="funnel.todayConsultCount" /></div></a-col>
             <a-col :span="12"><div class="stat-link" @click="goContractLifecycle('PENDING_ASSESSMENT')"><a-statistic title="待评估人数" :value="funnel.evaluationCount" /></div></a-col>
@@ -86,7 +107,7 @@
       </a-col>
 
       <a-col :xs="24" :lg="12">
-        <a-card class="card-elevated" :bordered="false" title="卡片2：今日待跟进">
+        <a-card class="card-elevated" :bordered="false" title="今日待跟进">
           <a-row :gutter="[12, 12]">
             <a-col :span="12"><div class="stat-link" @click="goFollowup('today')"><a-statistic title="今日待回访数量" :value="followup.todayDue" /></div></a-col>
             <a-col :span="12"><div class="stat-link" @click="goFollowup('overdue')"><a-statistic title="逾期未跟进数量" :value="followup.overdue" /></div></a-col>
@@ -102,7 +123,7 @@
       </a-col>
 
       <a-col :xs="24" :lg="12">
-        <a-card class="card-elevated" :bordered="false" title="卡片3：渠道表现">
+        <a-card class="card-elevated" :bordered="false" title="渠道表现">
           <a-table
             :columns="channelColumns"
             :data-source="channelTop5"
@@ -128,7 +149,7 @@
       </a-col>
 
       <a-col :xs="24" :lg="12">
-        <a-card class="card-elevated" :bordered="false" title="卡片4：床位销售视图（销售版床态）">
+        <a-card class="card-elevated" :bordered="false" title="床位销售视图">
           <a-row :gutter="[12, 12]">
             <a-col :span="12"><div class="stat-link" @click="goReservation('panorama')"><a-statistic title="空床数量" :value="bedSales.emptyCount" /></div></a-col>
             <a-col :span="12"><div class="stat-link" @click="goReservation('lock')"><a-statistic title="锁床数量" :value="bedSales.lockCount" /></div></a-col>
@@ -143,7 +164,7 @@
       </a-col>
 
       <a-col :xs="24" :lg="12">
-        <a-card class="card-elevated" :bordered="false" title="卡片5：合同进度">
+        <a-card class="card-elevated" :bordered="false" title="合同进度">
           <a-row :gutter="[12, 12]">
             <a-col :span="12"><div class="stat-link" @click="goContract('pending')"><a-statistic title="待签合同" :value="contract.pendingSignCount" /></div></a-col>
             <a-col :span="12"><div class="stat-link" @click="goContract('renewal')"><a-statistic title="续签提醒" :value="contract.renewalDueCount" /></div></a-col>
@@ -160,7 +181,7 @@
       </a-col>
 
       <a-col :xs="24" :lg="12">
-        <a-card class="card-elevated" :bordered="false" title="卡片6：回访与满意度">
+        <a-card class="card-elevated" :bordered="false" title="回访与满意度">
           <a-row :gutter="[12, 12]">
             <a-col :span="12"><div class="stat-link" @click="goCallback('checkin')"><a-statistic title="入住7天回访数量" :value="callback.checkinCount" /></div></a-col>
             <a-col :span="12"><div class="stat-link" @click="goCallback('trial')"><a-statistic title="试住回访数量" :value="callback.trialCount" /></div></a-col>
@@ -177,7 +198,7 @@
       </a-col>
 
       <a-col :xs="24" :lg="12">
-        <a-card class="card-elevated" :bordered="false" title="卡片7：销售人员业绩">
+        <a-card class="card-elevated" :bordered="false" title="销售人员业绩">
           <a-row :gutter="[12, 12]">
             <a-col :span="12"><div class="stat-link" @click="goReport('sales-performance')"><a-statistic title="本月个人成交数" :value="performance.monthDealCount" /></div></a-col>
             <a-col :span="12"><div class="stat-link" @click="goReport('sales-performance')"><a-statistic title="本月签约金额" :value="performance.monthAmount" precision="2" prefix="¥" /></div></a-col>
@@ -191,7 +212,7 @@
       </a-col>
 
       <a-col :xs="24" :lg="12">
-        <a-card class="card-elevated" :bordered="false" title="卡片8：外来就医转线索">
+        <a-card class="card-elevated" :bordered="false" title="外来就医转线索">
           <a-row :gutter="[12, 12]">
             <a-col :span="12"><div class="stat-link" @click="goLead('medical-transfer', { source: 'medical' })"><a-statistic title="今日新增医疗转线索" :value="medical.todayCount" /></div></a-col>
             <a-col :span="12"><div class="stat-link" @click="goLead('medical-transfer', { source: 'medical' })"><a-statistic title="医护推荐潜客" :value="medical.referCount" /></div></a-col>
@@ -204,7 +225,7 @@
       </a-col>
 
       <a-col :xs="24" :lg="12">
-        <a-card class="card-elevated" :bordered="false" title="卡片9：营销方案与审批">
+        <a-card class="card-elevated" :bordered="false" title="营销方案与审批">
           <a-row :gutter="[12, 12]">
             <a-col :span="12"><div class="stat-link" @click="goPlan({ moduleType: 'SPEECH' })"><a-statistic title="话术库总数" :value="plan.speechCount" /></div></a-col>
             <a-col :span="12"><div class="stat-link" @click="goPlan({ moduleType: 'POLICY' })"><a-statistic title="季度政策总数" :value="plan.policyCount" /></div></a-col>
@@ -220,7 +241,7 @@
       </a-col>
 
       <a-col :xs="24">
-        <a-card class="card-elevated" :bordered="false" title="卡片10：销售风险预警">
+        <a-card class="card-elevated" :bordered="false" title="销售风险预警">
           <a-row :gutter="[12, 12]">
             <a-col :xs="12" :lg="6"><div class="stat-link" @click="goFollowup('overdue')"><a-statistic title="逾期跟进客户" :value="risk.overdueFollowupCount" /></div></a-col>
             <a-col :xs="12" :lg="6"><div class="stat-link" @click="goReservation('lock', { filter: 'unsigned_lock' })"><a-statistic title="锁床未签约客户" :value="risk.lockUnsignedCount" /></div></a-col>
@@ -359,6 +380,20 @@ const quickReportButtons = computed(() => {
     { key: 'callback', label: '回访统计', entry: 'callback' as MarketingReportEntry }
   ]
 })
+
+const quickRangeLabel = computed(() => {
+  if (quickRange.value === 'TODAY') return '今日'
+  if (quickRange.value === '7D') return '近7天'
+  if (quickRange.value === '30D') return '近30天'
+  return '本月'
+})
+
+const overviewTiles = computed(() => [
+  { label: '机会池', value: opportunityCount.value, hint: '待推进评估、签约与入住', tone: 'primary' },
+  { label: '风险项', value: riskCount.value, hint: '超时跟进、锁床未签与异常波动', tone: riskCount.value > 0 ? 'danger' : 'success' },
+  { label: '今日待跟进', value: followup.todayDue || 0, hint: '优先处理今天必须回访的客户', tone: 'warning' },
+  { label: '本月成交', value: funnel.monthDealCount || 0, hint: '用于观察当前转化推进节奏', tone: 'success' }
+])
 
 const funnelOption = computed(() => ({
   tooltip: { trigger: 'item' },
@@ -642,6 +677,54 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.marketing-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.overview-tile {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(216, 229, 239, 0.9);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.overview-tile span {
+  color: #5f7b95;
+  font-size: 12px;
+}
+
+.overview-tile strong {
+  color: #12314d;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.overview-tile small {
+  color: #7f96aa;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.overview-tile--primary {
+  background: linear-gradient(180deg, rgba(19, 108, 181, 0.1) 0%, rgba(255, 255, 255, 0.96) 100%);
+}
+
+.overview-tile--warning {
+  background: linear-gradient(180deg, rgba(217, 137, 34, 0.1) 0%, rgba(255, 255, 255, 0.96) 100%);
+}
+
+.overview-tile--success {
+  background: linear-gradient(180deg, rgba(47, 155, 102, 0.1) 0%, rgba(255, 255, 255, 0.96) 100%);
+}
+
+.overview-tile--danger {
+  background: linear-gradient(180deg, rgba(214, 76, 95, 0.1) 0%, rgba(255, 255, 255, 0.96) 100%);
+}
+
 .dashboard-control {
   border: 1px solid rgba(45, 108, 223, 0.16);
   background: linear-gradient(135deg, rgba(45, 108, 223, 0.08), rgba(24, 144, 255, 0.02));
@@ -665,5 +748,17 @@ onUnmounted(() => {
 
 .stat-link:hover {
   background-color: rgba(24, 144, 255, 0.08);
+}
+
+@media (max-width: 1200px) {
+  .marketing-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .marketing-overview-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

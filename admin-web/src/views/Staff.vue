@@ -1,5 +1,26 @@
 <template>
   <PageContainer :title="pageTitle" :subTitle="pageSubTitle">
+    <template #stats>
+      <div class="staff-overview">
+        <div class="staff-overview-item">
+          <span>当前员工</span>
+          <strong>{{ rows.length }}</strong>
+        </div>
+        <div class="staff-overview-item">
+          <span>监管异常</span>
+          <strong>{{ supervisorAnomalies.length }}</strong>
+        </div>
+        <div class="staff-overview-item">
+          <span>已锁定</span>
+          <strong>{{ lockedStaffCount }}</strong>
+        </div>
+        <div class="staff-overview-item">
+          <span>已分配角色</span>
+          <strong>{{ roleAssignedCount }}</strong>
+        </div>
+      </div>
+    </template>
+
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="姓名/账号" />
@@ -36,22 +57,25 @@
       </template>
     </SearchForm>
 
-    <a-alert
-      v-if="showSupervisorAnomaliesOnly"
-      type="warning"
-      show-icon
-      style="margin-bottom: 10px;"
-      :message="`当前仅显示监管链异常员工（${displayRows.length}）`"
-      description="规则：员工→本部门部长；部长→院长/SYS_ADMIN；间接领导→院长/SYS_ADMIN"
-    />
-    <a-alert
-      v-if="String(route.query.autoOpen || '') === '1' && route.query.staffId"
-      type="info"
-      show-icon
-      style="margin-bottom: 10px;"
-      message="当前来自新增人员流程"
-      description="这里继续补充分配账号、领导链和角色。保存后可返回档案中心继续处理。"
-    />
+    <section class="staff-focus-strip">
+      <div
+        class="focus-item"
+        :class="{ active: showSupervisorAnomaliesOnly }"
+        @click="toggleSupervisorAnomalyView"
+      >
+        <span class="focus-label">监管异常视图</span>
+        <strong class="focus-value">{{ showSupervisorAnomaliesOnly ? displayRows.length : supervisorAnomalies.length }}</strong>
+        <small>规则：员工到部长，部长到院长层级</small>
+      </div>
+      <div
+        v-if="String(route.query.autoOpen || '') === '1' && route.query.staffId"
+        class="focus-item focus-item--info"
+      >
+        <span class="focus-label">当前来自新增人员流程</span>
+        <strong class="focus-value">继续补充账号与监管链</strong>
+        <small>保存后可回到档案中心继续处理</small>
+      </div>
+    </section>
 
     <DataTable
       rowKey="id"
@@ -104,22 +128,25 @@
 
     <a-drawer v-model:open="drawerOpen" :title="drawerTitle" width="520">
       <a-form :model="form" layout="vertical">
-        <div v-if="form.id" class="identity-shell">
-          <div class="identity-head">
-            <div>
-              <div class="identity-title">人员主档</div>
-              <div class="form-rule-tip">姓名、工号、部门、手机号统一在“员工基本信息”维护，账号页只处理账号、密码、角色与监管链。</div>
+        <template v-if="form.id">
+          <div class="identity-shell">
+            <div class="identity-head">
+              <div>
+                <div class="identity-title">人员主档</div>
+                <div class="form-rule-tip">姓名、工号、部门、手机号统一在“员工基本信息”维护，账号页只处理账号、密码、角色与监管链。</div>
+              </div>
+              <a-button size="small" @click="goToProfileBasic">去基本信息</a-button>
             </div>
-            <a-button size="small" @click="goToProfileBasic">去基本信息</a-button>
+            <a-descriptions :column="2" size="small" bordered>
+              <a-descriptions-item label="姓名">{{ form.realName || '-' }}</a-descriptions-item>
+              <a-descriptions-item label="职工号">{{ form.staffNo || '-' }}</a-descriptions-item>
+              <a-descriptions-item label="部门">{{ departmentNameMap.get(String(form.departmentId || '')) || '-' }}</a-descriptions-item>
+              <a-descriptions-item label="手机号">{{ form.phone || '-' }}</a-descriptions-item>
+            </a-descriptions>
           </div>
-          <a-descriptions :column="2" size="small" bordered>
-            <a-descriptions-item label="姓名">{{ form.realName || '-' }}</a-descriptions-item>
-            <a-descriptions-item label="职工号">{{ form.staffNo || '-' }}</a-descriptions-item>
-            <a-descriptions-item label="部门">{{ departmentNameMap.get(String(form.departmentId || '')) || '-' }}</a-descriptions-item>
-            <a-descriptions-item label="手机号">{{ form.phone || '-' }}</a-descriptions-item>
-          </a-descriptions>
-        </div>
-        <template v-else>
+        </template>
+        <a-divider orientation="left">账号信息</a-divider>
+        <template v-if="!form.id">
           <a-form-item label="账号" required>
             <a-input v-model:value="form.username" :disabled="!form.id" placeholder="默认与职工号一致" />
             <div class="form-rule-tip">新建时默认使用自动生成的职工号作为登录账号。</div>
@@ -139,6 +166,7 @@
           <a-input-password v-model:value="form.password" :placeholder="form.id ? '留空则不修改密码' : '请输入初始密码'" />
           <div v-if="!form.id" class="form-rule-tip">新账号默认密码为 123456，可保存前修改。</div>
         </a-form-item>
+        <a-divider v-if="!form.id || form.departmentId" orientation="left">组织与监管</a-divider>
         <a-form-item v-if="!form.id" label="部门" required>
           <a-select
             v-model:value="form.departmentId"
@@ -192,6 +220,7 @@
           :message="leaderStrategyTitle"
           :description="leaderStrategyDescription"
         />
+        <a-divider orientation="left">账号状态</a-divider>
         <a-form-item v-if="!form.id" label="手机号">
           <a-input v-model:value="form.phone" />
         </a-form-item>
@@ -320,6 +349,8 @@ const { staffOptions, staffLoading, searchStaff, ensureSelectedStaff } = useStaf
 const roles = ref<RoleItem[]>([])
 const pageTitle = computed(() => props.title || '员工管理')
 const pageSubTitle = computed(() => props.subTitle || '账号与角色配置')
+const lockedStaffCount = computed(() => rows.value.filter((item) => Number(item.status) !== 1).length)
+const roleAssignedCount = computed(() => rows.value.filter((item) => (item.roleCodes || []).length > 0).length)
 
 const roleFilterOptions = computed(() => roles.value.map((r) => ({ label: r.roleName, value: r.id })))
 const departmentNameMap = computed(() => new Map(departmentOptions.value.map((item) => [String(item.value), item.name])))
@@ -903,18 +934,89 @@ useLiveSyncRefresh({
 </script>
 
 <style scoped>
+.staff-overview {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.staff-overview-item {
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(208, 223, 234, 0.9);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.staff-overview-item span {
+  display: block;
+  font-size: 12px;
+  color: #71879b;
+}
+
+.staff-overview-item strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 24px;
+  color: #173854;
+}
+
+.staff-focus-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.focus-item {
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(240, 165, 74, 0.28);
+  background: rgba(255, 249, 239, 0.92);
+  cursor: pointer;
+}
+
+.focus-item--info {
+  cursor: default;
+  border-color: rgba(27, 107, 207, 0.2);
+  background: rgba(243, 248, 255, 0.92);
+}
+
+.focus-item.active {
+  border-color: rgba(222, 91, 99, 0.34);
+  background: rgba(255, 243, 243, 0.94);
+}
+
+.focus-label {
+  display: block;
+  font-size: 12px;
+  color: #7c8d99;
+}
+
+.focus-value {
+  display: block;
+  margin-top: 6px;
+  font-size: 20px;
+  color: #173854;
+}
+
+.focus-item small {
+  display: block;
+  margin-top: 4px;
+  color: #6f879a;
+  line-height: 1.5;
+}
+
 .form-rule-tip {
   margin-bottom: 6px;
   font-size: 12px;
-  color: rgba(0, 0, 0, 0.45);
+  color: #72879a;
 }
 
 .identity-shell {
   margin-bottom: 16px;
-  padding: 12px;
-  border-radius: 12px;
-  background: #fafafa;
-  border: 1px solid #f0f0f0;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(247, 250, 253, 0.96);
+  border: 1px solid rgba(208, 223, 234, 0.88);
 }
 
 .identity-head {
@@ -927,7 +1029,7 @@ useLiveSyncRefresh({
 .identity-title {
   font-size: 14px;
   font-weight: 600;
-  color: rgba(0, 0, 0, 0.88);
+  color: #173854;
 }
 
 .credential-actions {
@@ -937,6 +1039,18 @@ useLiveSyncRefresh({
 }
 
 .credential-empty {
-  color: rgba(0, 0, 0, 0.45);
+  color: #72879a;
+}
+
+@media (max-width: 992px) {
+  .staff-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .staff-overview {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -1,17 +1,21 @@
 <template>
   <div class="stateful-wrap">
     <template v-if="loading">
-      <a-skeleton active :paragraph="{ rows: rows }" />
+      <div class="stateful-panel">
+        <a-skeleton active :paragraph="{ rows: rows }" />
+      </div>
     </template>
     <template v-else-if="error">
-      <a-result status="error" :title="errorTitle" :sub-title="error">
-        <template #extra>
-          <a-button type="primary" size="small" @click="$emit('retry')">重试</a-button>
-        </template>
-      </a-result>
+      <div class="stateful-panel">
+        <a-result status="error" :title="errorTitle" :sub-title="error">
+          <template #extra>
+            <a-button type="primary" size="small" @click="$emit('retry')">重试</a-button>
+          </template>
+        </a-result>
+      </div>
     </template>
     <template v-else-if="empty">
-      <div class="empty-wrap">
+      <div class="stateful-panel empty-wrap">
         <a-empty :description="emptyText" />
       </div>
     </template>
@@ -47,5 +51,9 @@ defineEmits<{ (e: 'retry'): void }>()
 <style scoped>
 .stateful-wrap {
   min-height: 64px;
+}
+
+.stateful-panel {
+  padding: 12px;
 }
 </style>

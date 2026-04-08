@@ -1,5 +1,36 @@
 <template>
   <PageContainer title="公告管理" subTitle="公告发布与维护">
+    <template #meta>
+      <span class="soft-pill">当前列表 {{ rows.length }} 条</span>
+      <span class="soft-pill">已勾选 {{ selectedRowKeys.length }} 条</span>
+      <span v-for="tag in activeFilterTags" :key="tag" class="selection-pill">{{ tag }}</span>
+    </template>
+
+    <template #stats>
+      <div class="metric-grid">
+        <div class="metric-card metric-card--primary">
+          <span class="metric-card__label">当前列表</span>
+          <strong class="metric-card__value">{{ pagination.total || rows.length }}</strong>
+          <span class="metric-card__hint">按当前筛选范围统计</span>
+        </div>
+        <div class="metric-card metric-card--success">
+          <span class="metric-card__label">已发布</span>
+          <strong class="metric-card__value">{{ publishedCount }}</strong>
+          <span class="metric-card__hint">面向员工可见的正式公告</span>
+        </div>
+        <div class="metric-card metric-card--warning">
+          <span class="metric-card__label">草稿</span>
+          <strong class="metric-card__value">{{ draftCount }}</strong>
+          <span class="metric-card__hint">仍待编辑或发布</span>
+        </div>
+        <div class="metric-card metric-card--danger">
+          <span class="metric-card__label">已选草稿</span>
+          <strong class="metric-card__value">{{ selectedDraftCount }}</strong>
+          <span class="metric-card__hint">可直接批量发布</span>
+        </div>
+      </div>
+    </template>
+
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
         <a-input v-model:value="query.keyword" placeholder="标题/内容" allow-clear />
@@ -104,6 +135,14 @@ const selectedDraftIds = computed(() =>
   selectedRecords.value.filter((item) => item.status === 'DRAFT').map((item) => String(item.id))
 )
 const selectedDraftCount = computed(() => selectedDraftIds.value.length)
+const publishedCount = computed(() => rows.value.filter((item) => item.status === 'PUBLISHED').length)
+const draftCount = computed(() => rows.value.filter((item) => item.status !== 'PUBLISHED').length)
+const activeFilterTags = computed(() => {
+  const tags: string[] = []
+  if (query.keyword) tags.push(`关键词: ${query.keyword}`)
+  if (query.status) tags.push(`状态: ${query.status === 'PUBLISHED' ? '已发布' : '草稿'}`)
+  return tags
+})
 
 async function fetchData() {
   loading.value = true

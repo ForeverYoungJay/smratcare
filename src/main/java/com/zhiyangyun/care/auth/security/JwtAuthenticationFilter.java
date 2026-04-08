@@ -10,6 +10,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -20,6 +22,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
+  private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
   private final TokenProvider tokenProvider;
   private final TokenBlacklistService tokenBlacklistService;
 
@@ -39,6 +42,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         Claims claims = tokenProvider.parseToken(token);
         String jti = claims.getId();
         if (tokenBlacklistService.isBlacklisted(jti)) {
+          log.info("Rejected blacklisted token for path={}, jti={}", request.getRequestURI(), jti);
           SecurityContextHolder.clearContext();
           filterChain.doFilter(request, response);
           return;
@@ -64,7 +68,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         details.put("username", username);
         authentication.setDetails(details);
         SecurityContextHolder.getContext().setAuthentication(authentication);
-      } catch (Exception ignored) {
+      } catch (Exception ex) {
+        log.warn("Invalid token for path={}: {}", request.getRequestURI(), ex.getMessage());
         SecurityContextHolder.clearContext();
       }
     }

@@ -765,14 +765,14 @@ public class ElderServiceImpl implements ElderService {
   @Override
   @Transactional
   public ElderResponse assignBed(Long elderId, AssignBedRequest request) {
-    ElderProfile elder = elderMapper.selectById(elderId);
+    ElderProfile elder = findElderForUpdate(elderId);
     if (elder == null) {
       throw new IllegalArgumentException("老人档案不存在");
     }
     if (request.getTenantId() != null && !request.getTenantId().equals(elder.getTenantId())) {
       throw new IllegalStateException("Org mismatch");
     }
-    Bed bed = bedMapper.selectById(request.getBedId());
+    Bed bed = findBedForUpdate(request.getBedId());
     if (bed == null) {
       throw new IllegalArgumentException("床位不存在");
     }
@@ -785,44 +785,63 @@ public class ElderServiceImpl implements ElderService {
     ensureNoDuplicateNameOccupied(elder);
 
     long occupied = bedMapper.selectCount(Wrappers.lambdaQuery(Bed.class)
+        .eq(elder.getOrgId() != null, Bed::getOrgId, elder.getOrgId())
+        .eq(elder.getTenantId() != null, Bed::getTenantId, elder.getTenantId())
         .eq(Bed::getRoomId, bed.getRoomId())
         .eq(Bed::getStatus, 2)
         .eq(Bed::getIsDeleted, 0));
     com.zhiyangyun.care.elder.entity.Room room = roomMapper.selectById(bed.getRoomId());
+    ElderBedRelation elderActive = findActiveRelationByElderForUpdate(elder.getTenantId(), elder.getOrgId(), elder.getId());
+    boolean sameRoomTransfer = false;
+    if (elderActive != null && elderActive.getBedId() != null) {
+      Bed currentBed = elder.getBedId() != null && elder.getBedId().equals(elderActive.getBedId())
+          ? findBedForUpdate(elder.getBedId())
+          : findBedForUpdate(elderActive.getBedId());
+      sameRoomTransfer = currentBed != null
+          && Objects.equals(currentBed.getRoomId(), bed.getRoomId())
+          && !Objects.equals(currentBed.getId(), bed.getId());
+      if (sameRoomTransfer && occupied > 0) {
+        occupied -= 1;
+      }
+    }
     if (room != null && room.getCapacity() != null && occupied >= room.getCapacity()) {
       throw new IllegalStateException("Room capacity exceeded");
     }
-    ElderBedRelation bedActive = relationMapper.selectOne(
-        Wrappers.lambdaQuery(ElderBedRelation.class)
-            .eq(ElderBedRelation::getOrgId, elder.getOrgId())
-            .eq(ElderBedRelation::getTenantId, elder.getTenantId())
-            .eq(ElderBedRelation::getBedId, bed.getId())
-            .eq(ElderBedRelation::getActiveFlag, 1)
-            .eq(ElderBedRelation::getIsDeleted, 0));
+    ElderBedRelation bedActive = findActiveRelationByBedForUpdate(elder.getTenantId(), elder.getOrgId(), bed.getId());
+    if (bedActive != null && bedActive.getElderId() != null && bedActive.getElderId().equals(elder.getId())
+        && Objects.equals(elder.getBedId(), bed.getId())
+        && Objects.equals(bed.getElderId(), elder.getId())) {
+      if (bed.getStatus() == null || bed.getStatus() != 2) {
+        bed.setStatus(2);
+        bedMapper.updateById(bed);
+      }
+      return toResponse(elder, bed);
+    }
     if (bedActive != null && !bedActive.getElderId().equals(elder.getId())) {
       throw new IllegalStateException("Bed already assigned");
     }
     if (bed.getElderId() != null && !bed.getElderId().equals(elder.getId())) {
       throw new IllegalStateException("Bed already assigned");
     }
-    if (bed.getStatus() != null && bed.getStatus() != 1) {
+    if (bed.getStatus() != null && bed.getStatus() != 1 && !Objects.equals(bed.getElderId(), elder.getId())) {
       throw new IllegalStateException("Bed is not available");
     }
-
-    ElderBedRelation elderActive = relationMapper.selectOne(
-        Wrappers.lambdaQuery(ElderBedRelation.class)
-            .eq(ElderBedRelation::getOrgId, elder.getOrgId())
-            .eq(ElderBedRelation::getTenantId, elder.getTenantId())
-            .eq(ElderBedRelation::getElderId, elder.getId())
-            .eq(ElderBedRelation::getActiveFlag, 1)
-            .eq(ElderBedRelation::getIsDeleted, 0));
     if (elderActive != null) {
+      if (Objects.equals(elderActive.getBedId(), bed.getId())
+          && Objects.equals(elder.getBedId(), bed.getId())
+          && Objects.equals(bed.getElderId(), elder.getId())) {
+        if (bed.getStatus() == null || bed.getStatus() != 2) {
+          bed.setStatus(2);
+          bedMapper.updateById(bed);
+        }
+        return toResponse(elder, bed);
+      }
       elderActive.setActiveFlag(0);
       elderActive.setEndDate(request.getStartDate().minusDays(1));
       relationMapper.updateById(elderActive);
 
-      Bed oldBed = bedMapper.selectById(elderActive.getBedId());
-      if (oldBed != null) {
+      Bed oldBed = findBedForUpdate(elderActive.getBedId());
+      if (oldBed != null && Objects.equals(oldBed.getElderId(), elder.getId())) {
         oldBed.setElderId(null);
         oldBed.setStatus(1);
         bedMapper.updateById(oldBed);
@@ -861,20 +880,14 @@ public class ElderServiceImpl implements ElderService {
   @Override
   @Transactional
   public ElderResponse unbindBed(Long elderId, LocalDate endDate, String reason, Long tenantId, Long createdBy) {
-    ElderProfile elder = elderMapper.selectById(elderId);
+    ElderProfile elder = findElderForUpdate(elderId);
     if (elder == null) {
       throw new IllegalArgumentException("老人档案不存在");
     }
     if (tenantId != null && !tenantId.equals(elder.getTenantId())) {
       throw new IllegalArgumentException("无权限访问该老人");
     }
-    ElderBedRelation elderActive = relationMapper.selectOne(
-        Wrappers.lambdaQuery(ElderBedRelation.class)
-            .eq(ElderBedRelation::getOrgId, elder.getOrgId())
-            .eq(ElderBedRelation::getTenantId, elder.getTenantId())
-            .eq(ElderBedRelation::getElderId, elder.getId())
-            .eq(ElderBedRelation::getActiveFlag, 1)
-            .eq(ElderBedRelation::getIsDeleted, 0));
+    ElderBedRelation elderActive = findActiveRelationByElderForUpdate(elder.getTenantId(), elder.getOrgId(), elder.getId());
     if (elderActive != null) {
       elderActive.setActiveFlag(0);
       elderActive.setEndDate(endDate == null ? LocalDate.now() : endDate);
@@ -885,8 +898,8 @@ public class ElderServiceImpl implements ElderService {
     }
 
     if (elder.getBedId() != null) {
-      Bed bed = bedMapper.selectById(elder.getBedId());
-      if (bed != null) {
+      Bed bed = findBedForUpdate(elder.getBedId());
+      if (bed != null && (Objects.equals(bed.getElderId(), elder.getId()) || bed.getElderId() == null)) {
         bed.setElderId(null);
         bed.setStatus(1);
         bedMapper.updateById(bed);
@@ -899,6 +912,56 @@ public class ElderServiceImpl implements ElderService {
     insertChangeLog(elder.getTenantId(), elder.getOrgId(), elder.getId(), createdBy,
         "BED_CHANGE", previousBedId == null ? null : String.valueOf(previousBedId), null, reason);
     return toResponse(elder, null);
+  }
+
+  private ElderProfile findElderForUpdate(Long elderId) {
+    if (elderId == null) {
+      return null;
+    }
+    return elderMapper.selectOne(
+        Wrappers.lambdaQuery(ElderProfile.class)
+            .eq(ElderProfile::getId, elderId)
+            .eq(ElderProfile::getIsDeleted, 0)
+            .last("LIMIT 1 FOR UPDATE"));
+  }
+
+  private Bed findBedForUpdate(Long bedId) {
+    if (bedId == null) {
+      return null;
+    }
+    return bedMapper.selectOne(
+        Wrappers.lambdaQuery(Bed.class)
+            .eq(Bed::getId, bedId)
+            .eq(Bed::getIsDeleted, 0)
+            .last("LIMIT 1 FOR UPDATE"));
+  }
+
+  private ElderBedRelation findActiveRelationByElderForUpdate(Long tenantId, Long orgId, Long elderId) {
+    if (elderId == null) {
+      return null;
+    }
+    return relationMapper.selectOne(
+        Wrappers.lambdaQuery(ElderBedRelation.class)
+            .eq(orgId != null, ElderBedRelation::getOrgId, orgId)
+            .eq(tenantId != null, ElderBedRelation::getTenantId, tenantId)
+            .eq(ElderBedRelation::getElderId, elderId)
+            .eq(ElderBedRelation::getActiveFlag, 1)
+            .eq(ElderBedRelation::getIsDeleted, 0)
+            .last("LIMIT 1 FOR UPDATE"));
+  }
+
+  private ElderBedRelation findActiveRelationByBedForUpdate(Long tenantId, Long orgId, Long bedId) {
+    if (bedId == null) {
+      return null;
+    }
+    return relationMapper.selectOne(
+        Wrappers.lambdaQuery(ElderBedRelation.class)
+            .eq(orgId != null, ElderBedRelation::getOrgId, orgId)
+            .eq(tenantId != null, ElderBedRelation::getTenantId, tenantId)
+            .eq(ElderBedRelation::getBedId, bedId)
+            .eq(ElderBedRelation::getActiveFlag, 1)
+            .eq(ElderBedRelation::getIsDeleted, 0)
+            .last("LIMIT 1 FOR UPDATE"));
   }
 
   private void insertChangeLog(Long tenantId, Long orgId, Long elderId, Long createdBy, String changeType,

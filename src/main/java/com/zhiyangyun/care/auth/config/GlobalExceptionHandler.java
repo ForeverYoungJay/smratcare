@@ -8,13 +8,17 @@ import java.util.Locale;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.ObjectError;
 import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
@@ -22,6 +26,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
@@ -31,8 +37,8 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(BadCredentialsException.class)
   @ResponseStatus(HttpStatus.UNAUTHORIZED)
   public Result<Void> handleBadCredentials(BadCredentialsException ex) {
-    log.warn("Bad credentials: {}", ex.getMessage());
-    return Result.error(401, defaultText(ex.getMessage(), "用户名或密码错误"));
+    log.warn("Bad credentials");
+    return Result.error(401, "用户名或密码错误");
   }
 
   @ExceptionHandler(AccessDeniedException.class)
@@ -49,6 +55,13 @@ public class GlobalExceptionHandler {
     return Result.error(400, resolveValidationMessage(ex));
   }
 
+  @ExceptionHandler(BindException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public Result<Void> handleBindException(BindException ex) {
+    log.warn("Bind validation error: {}", ex.getMessage());
+    return Result.error(400, resolveBindingMessage(ex));
+  }
+
   @ExceptionHandler(HttpMessageNotReadableException.class)
   @ResponseStatus(HttpStatus.BAD_REQUEST)
   public Result<Void> handleNotReadable(HttpMessageNotReadableException ex) {
@@ -63,6 +76,24 @@ public class GlobalExceptionHandler {
     return Result.error(400, resolveConstraintMessage(ex));
   }
 
+  @ExceptionHandler({
+      TypeMismatchException.class,
+      MissingServletRequestParameterException.class,
+      MissingServletRequestPartException.class
+  })
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public Result<Void> handleBadRequestParameter(Exception ex) {
+    log.warn("Bad request parameter: {}", ex.getMessage());
+    return Result.error(400, "请求参数不正确");
+  }
+
+  @ExceptionHandler(MaxUploadSizeExceededException.class)
+  @ResponseStatus(HttpStatus.BAD_REQUEST)
+  public Result<Void> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException ex) {
+    log.warn("Upload exceeded max size: {}", ex.getMessage());
+    return Result.error(400, "上传文件大小超过限制");
+  }
+
   @ExceptionHandler(IllegalArgumentException.class)
   @ResponseStatus(HttpStatus.BAD_REQUEST)
   public Result<Void> handleIllegalArgument(IllegalArgumentException ex) {
@@ -75,7 +106,7 @@ public class GlobalExceptionHandler {
     if (ex.getCause() != null) {
       log.error("Unhandled state exception", ex);
       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(Result.error(500, defaultText(ex.getMessage(), "Server error")));
+          .body(Result.error(500, "服务处理失败，请稍后重试"));
     }
     log.warn("Business state error: {}", ex.getMessage());
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -85,6 +116,13 @@ public class GlobalExceptionHandler {
   @ExceptionHandler(DataIntegrityViolationException.class)
   public ResponseEntity<Result<Void>> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
     log.warn("Data integrity violation: {}", ex.getMessage());
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        .body(Result.error(400, resolveDataIntegrityMessage(ex)));
+  }
+
+  @ExceptionHandler(DuplicateKeyException.class)
+  public ResponseEntity<Result<Void>> handleDuplicateKey(DuplicateKeyException ex) {
+    log.warn("Duplicate key violation: {}", ex.getMessage());
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .body(Result.error(400, resolveDataIntegrityMessage(ex)));
   }
@@ -112,7 +150,7 @@ public class GlobalExceptionHandler {
 
   @ExceptionHandler(BadSqlGrammarException.class)
   public ResponseEntity<Result<Void>> handleBadSqlGrammar(BadSqlGrammarException ex) {
-    log.error("Database schema not ready: {}", ex.getMessage());
+    log.error("Database schema not ready", ex);
     return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
         .body(Result.error(503, "数据库结构未完成升级，请先执行最新迁移"));
   }
@@ -121,7 +159,7 @@ public class GlobalExceptionHandler {
   @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
   public Result<Void> handleOther(Exception ex) {
     log.error("Unhandled exception", ex);
-    return Result.error(500, "Server error");
+    return Result.error(500, "服务异常，请稍后重试");
   }
 
   private String resolveValidationMessage(MethodArgumentNotValidException ex) {
@@ -142,9 +180,28 @@ public class GlobalExceptionHandler {
         .orElse("请求参数不正确");
   }
 
-  private String resolveDataIntegrityMessage(DataIntegrityViolationException ex) {
-    String raw = defaultText(ex.getMostSpecificCause() == null ? null : ex.getMostSpecificCause().getMessage(),
-        ex.getMessage());
+  private String resolveBindingMessage(BindException ex) {
+    Set<String> messages = new LinkedHashSet<>();
+    for (FieldError error : ex.getBindingResult().getFieldErrors()) {
+      messages.add(defaultText(error.getDefaultMessage(), error.getField() + " 参数不正确"));
+    }
+    for (ObjectError error : ex.getBindingResult().getGlobalErrors()) {
+      messages.add(defaultText(error.getDefaultMessage(), "请求参数不正确"));
+    }
+    return messages.isEmpty() ? "请求参数不正确" : String.join("；", messages);
+  }
+
+  private String resolveDataIntegrityMessage(Throwable ex) {
+    Throwable current = ex;
+    String raw = null;
+    while (current != null) {
+      if (current.getMessage() != null && !current.getMessage().isBlank()) {
+        raw = current.getMessage();
+        break;
+      }
+      current = current.getCause();
+    }
+    raw = defaultText(raw, ex == null ? null : ex.getMessage());
     String normalized = raw.toLowerCase(Locale.ROOT);
     if (normalized.contains("uk_building_tenant_code")) {
       return "楼栋编码已存在，请调整后重试";
@@ -160,6 +217,9 @@ public class GlobalExceptionHandler {
     }
     if (normalized.contains("uk_staff_org_username")) {
       return "账号或手机号已存在，请调整后重试";
+    }
+    if (normalized.contains("uk_family_user_org_phone")) {
+      return "手机号已存在，请调整后重试";
     }
     if (normalized.contains("duplicate entry")) {
       return "数据已存在，请勿重复提交";

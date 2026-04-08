@@ -50,39 +50,43 @@
           </a-breadcrumb>
         </div>
         <div class="header-right">
-          <span class="today-label">{{ todayLabel }}</span>
-          <a-badge status="processing" text="系统运行中" class="system-status" />
-          <span class="system-name">龟峰颐养中心智慧养老管理平台</span>
-          <a-dropdown trigger="click">
-            <a-tag :color="presenceStatus.color" class="presence-tag">{{ presenceStatus.label }}</a-tag>
-            <template #overlay>
-              <a-menu>
-                <a-menu-item @click="setPresenceTraining(2)">外出培训 2 小时</a-menu-item>
-                <a-menu-item @click="setPresenceTraining(4)">外出培训 4 小时</a-menu-item>
-                <a-menu-item @click="clearPresenceTraining">结束培训状态</a-menu-item>
-                <a-menu-item @click="toggleDnd">{{ quickChatDnd ? '关闭免打扰' : '开启免打扰' }}</a-menu-item>
-              </a-menu>
-            </template>
-          </a-dropdown>
-          <a-dropdown trigger="click">
-            <a-badge :count="quickNotifyItems.length" size="small">
-              <a-button size="small">快捷通知</a-button>
+          <div class="header-status-cluster">
+            <span class="today-label">{{ todayLabel }}</span>
+            <a-badge status="processing" text="系统运行中" class="system-status" />
+            <span class="system-name">龟峰颐养中心智慧养老管理平台</span>
+          </div>
+          <div class="header-action-cluster">
+            <a-dropdown trigger="click">
+              <a-tag :color="presenceStatus.color" class="presence-tag">{{ presenceStatus.label }}</a-tag>
+              <template #overlay>
+                <a-menu>
+                  <a-menu-item @click="setPresenceTraining(2)">外出培训 2 小时</a-menu-item>
+                  <a-menu-item @click="setPresenceTraining(4)">外出培训 4 小时</a-menu-item>
+                  <a-menu-item @click="clearPresenceTraining">结束培训状态</a-menu-item>
+                  <a-menu-item @click="toggleDnd">{{ quickChatDnd ? '关闭免打扰' : '开启免打扰' }}</a-menu-item>
+                </a-menu>
+              </template>
+            </a-dropdown>
+            <a-dropdown trigger="click">
+              <a-badge :count="quickNotifyItems.length" size="small">
+                <a-button size="small">通知</a-button>
+              </a-badge>
+              <template #overlay>
+                <a-menu>
+                  <a-menu-item v-for="item in quickNotifyItems" :key="item.title" @click="onQuickNotifyClick(item)">
+                    {{ item.title }}
+                  </a-menu-item>
+                </a-menu>
+              </template>
+            </a-dropdown>
+            <a-badge :count="quickChatUnreadCount" size="small">
+              <a-button size="small" @click="openQuickChat">聊天</a-button>
             </a-badge>
-            <template #overlay>
-              <a-menu>
-                <a-menu-item v-for="item in quickNotifyItems" :key="item.title" @click="onQuickNotifyClick(item)">
-                  {{ item.title }}
-                </a-menu-item>
-              </a-menu>
-            </template>
-          </a-dropdown>
-          <a-badge :count="quickChatUnreadCount" size="small">
-            <a-button size="small" @click="openQuickChat">快捷聊天</a-button>
-          </a-badge>
-          <a-badge :count="quickChatTodoPendingCount" size="small">
-            <a-button size="small" @click="openQuickChatTodoDrawer">聊天待办</a-button>
-          </a-badge>
-          <a-tag v-if="quickChatPressureTag" :color="quickChatPressureTag.color">{{ quickChatPressureTag.text }}</a-tag>
+            <a-badge :count="quickChatTodoPendingCount" size="small">
+              <a-button size="small" @click="openQuickChatTodoDrawer">待办</a-button>
+            </a-badge>
+            <a-tag v-if="quickChatPressureTag" :color="quickChatPressureTag.color">{{ quickChatPressureTag.text }}</a-tag>
+          </div>
           <a-dropdown>
             <a class="user-link user-entry">
               <a-avatar :size="28" :src="headerSettings.avatarUrl || undefined">
@@ -4823,7 +4827,9 @@ function onQuickChatStorageChange(event: StorageEvent) {
 <style scoped>
 .app-layout {
   height: 100vh;
-  background: var(--bg);
+  background:
+    radial-gradient(900px 320px at 100% 0%, rgba(19, 108, 181, 0.06), transparent 46%),
+    linear-gradient(180deg, #f7fbfd 0%, var(--bg) 32%, #f1f6fa 100%);
   overflow: hidden;
 }
 
@@ -4838,13 +4844,14 @@ function onQuickChatStorageChange(event: StorageEvent) {
 }
 
 .app-sider {
-  background: linear-gradient(180deg, #f8fbfe 0%, #eef6fb 100%);
-  border-right: 1px solid #dbe8f2;
+  background:
+    linear-gradient(180deg, rgba(250, 252, 253, 0.98) 0%, rgba(239, 246, 251, 0.98) 56%, rgba(233, 241, 247, 0.98) 100%);
+  border-right: 1px solid #d7e4ee;
   height: 100vh;
   position: sticky;
   top: 0;
   left: 0;
-  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.5);
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.5), 10px 0 30px rgba(18, 49, 77, 0.04);
   z-index: 121;
   transition: all 0.22s ease;
 }
@@ -4869,10 +4876,12 @@ function onQuickChatStorageChange(event: StorageEvent) {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 20px 16px;
-  color: #173854;
+  padding: 20px 18px 18px;
+  color: #12314d;
   border-bottom: 1px solid #e7eff5;
-  background: rgba(255, 255, 255, 0.72);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(247, 250, 252, 0.8) 100%);
+  backdrop-filter: blur(14px);
 }
 
 .sider-toggle-btn {
@@ -4880,15 +4889,15 @@ function onQuickChatStorageChange(event: StorageEvent) {
 }
 
 .logo {
-  width: 40px;
-  height: 40px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #1f8fbe 0%, #70c4e0 100%);
+  width: 42px;
+  height: 42px;
+  border-radius: 15px;
+  background: linear-gradient(135deg, #136cb5 0%, #36a1d9 100%);
   color: #ffffff;
   font-weight: 700;
   display: grid;
   place-items: center;
-  box-shadow: 0 10px 20px rgba(31, 143, 190, 0.2);
+  box-shadow: 0 14px 24px rgba(19, 108, 181, 0.24);
 }
 
 .title {
@@ -4899,6 +4908,7 @@ function onQuickChatStorageChange(event: StorageEvent) {
 .subtitle {
   font-size: 12px;
   color: #7b97ae;
+  letter-spacing: 0.04em;
 }
 
 .side-menu {
@@ -4922,10 +4932,10 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 .side-menu .ant-menu-item,
 .side-menu .ant-menu-submenu-title {
-  border-radius: 12px;
-  margin: 4px 12px;
+  border-radius: 14px;
+  margin: 3px 12px;
   height: auto;
-  min-height: 46px;
+  min-height: 48px;
   display: flex;
   align-items: center;
   line-height: 1.35;
@@ -4948,8 +4958,8 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 .side-menu .ant-menu-item-selected,
 .side-menu :deep(.ant-menu-submenu-selected .ant-menu-item-selected) {
-  background: linear-gradient(90deg, rgba(31, 143, 190, 0.14) 0%, rgba(111, 196, 226, 0.22) 100%) !important;
-  box-shadow: inset 0 0 0 1px rgba(31, 143, 190, 0.12);
+  background: linear-gradient(90deg, rgba(19, 108, 181, 0.14) 0%, rgba(95, 187, 212, 0.2) 100%) !important;
+  box-shadow: inset 0 0 0 1px rgba(19, 108, 181, 0.12), 0 6px 14px rgba(19, 108, 181, 0.08);
   color: #173854 !important;
   font-weight: 700;
 }
@@ -4995,15 +5005,15 @@ function onQuickChatStorageChange(event: StorageEvent) {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: linear-gradient(120deg, rgba(255, 255, 255, 0.94) 0%, rgba(246, 251, 255, 0.94) 100%);
-  backdrop-filter: blur(10px);
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.92) 0%, rgba(246, 251, 255, 0.88) 100%);
+  backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0 24px;
-  height: 64px;
-  box-shadow: var(--shadow-sm);
+  min-height: 72px;
+  box-shadow: 0 8px 24px rgba(18, 49, 77, 0.05);
 }
 
 .header-left {
@@ -5022,7 +5032,7 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 .page-title {
   font-weight: 700;
-  font-size: 18px;
+  font-size: 20px;
   color: var(--ink);
 }
 
@@ -5034,23 +5044,32 @@ function onQuickChatStorageChange(event: StorageEvent) {
 .header-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.header-status-cluster,
+.header-action-cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .today-label {
   padding: 6px 12px;
   font-size: 12px;
   border-radius: 999px;
-  color: #1d6181;
-  background: rgba(31, 143, 190, 0.1);
+  color: #0f5b99;
+  background: rgba(19, 108, 181, 0.12);
+  border: 1px solid rgba(19, 108, 181, 0.12);
 }
 
 .system-name {
   color: var(--muted);
   font-size: 12px;
-  max-width: 220px;
+  max-width: 180px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -5064,6 +5083,10 @@ function onQuickChatStorageChange(event: StorageEvent) {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid rgba(216, 229, 239, 0.9);
 }
 
 .system-status {
@@ -5085,8 +5108,8 @@ function onQuickChatStorageChange(event: StorageEvent) {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 24px 0;
-  background: rgba(255, 255, 255, 0.84);
+  padding: 10px 24px 0;
+  background: rgba(255, 255, 255, 0.74);
   border-bottom: 1px solid var(--border);
   overflow: hidden;
 }
@@ -5131,6 +5154,7 @@ function onQuickChatStorageChange(event: StorageEvent) {
 .tab-tools-btn {
   margin-bottom: 6px;
   background: #ffffff;
+  border-color: rgba(195, 217, 231, 0.9);
 }
 
 .route-tab-title {
@@ -5166,7 +5190,7 @@ function onQuickChatStorageChange(event: StorageEvent) {
 }
 
 .app-content {
-  padding: 20px 24px 24px;
+  padding: 24px 24px 26px;
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -5480,7 +5504,8 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 @media (max-width: 992px) {
   .app-header {
-    padding: 0 14px;
+    padding: 10px 14px;
+    align-items: flex-start;
   }
 
   .route-tabs-wrap {

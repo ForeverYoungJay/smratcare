@@ -57,7 +57,26 @@ class FamilyAuthTest {
         .andExpect(jsonPath("$.data.token").exists());
   }
 
-  private void ensureFamilyUser() {
+  @Test
+  void disabled_family_cannot_login() throws Exception {
+    FamilyUser user = ensureFamilyUser();
+    user.setStatus(0);
+    familyUserMapper.updateById(user);
+
+    FamilyLoginRequest request = new FamilyLoginRequest();
+    request.setOrgId(1L);
+    request.setPhone(TEST_PHONE);
+    request.setPassword(TEST_PASSWORD);
+
+    mockMvc.perform(post("/api/auth/family/login")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(request)))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code", is(400)))
+        .andExpect(jsonPath("$.message", is("账号或密码错误")));
+  }
+
+  private FamilyUser ensureFamilyUser() {
     FamilyUser user = familyUserMapper.selectOne(
         Wrappers.lambdaQuery(FamilyUser.class)
             .eq(FamilyUser::getOrgId, 1L)
@@ -73,12 +92,13 @@ class FamilyAuthTest {
       created.setStatus(1);
       created.setPasswordHash(passwordEncoder.encode(TEST_PASSWORD));
       familyUserMapper.insert(created);
-      return;
+      return created;
     }
     user.setUsername(TEST_PHONE);
     user.setStatus(1);
     user.setPasswordHash(passwordEncoder.encode(TEST_PASSWORD));
     familyUserMapper.updateById(user);
+    return user;
   }
 
   @Test

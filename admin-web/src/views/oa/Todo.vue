@@ -1,5 +1,12 @@
 <template>
   <PageContainer title="待办事项" subTitle="个人待办管理">
+    <template #meta>
+      <span class="soft-pill">总待办 {{ summary.totalCount || 0 }}</span>
+      <span class="selection-pill">已勾选 {{ selectedRowKeys.length }} 条</span>
+      <span class="soft-pill">逾期 {{ summary.overdueCount || 0 }}</span>
+      <span v-for="tag in activeFilterTags" :key="tag" class="selection-pill">{{ tag }}</span>
+    </template>
+
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键字">
         <a-input v-model:value="query.keyword" placeholder="标题/内容/负责人" allow-clear style="width: 240px" />
@@ -457,6 +464,19 @@ const selectedOpenBirthdayIds = computed(() =>
     .map((item) => String(item.id))
 )
 const selectedOpenBirthdayCount = computed(() => selectedOpenBirthdayIds.value.length)
+const activeFilterTags = computed(() => {
+  const tags: string[] = []
+  if (query.keyword) tags.push(`关键词: ${query.keyword}`)
+  if (query.status) {
+    const current = statusOptions.find((item) => item.value === query.status)
+    tags.push(`状态: ${current?.label || query.status}`)
+  }
+  if (query.sourceType) {
+    const current = sourceTypeOptions.find((item) => item.value === query.sourceType)
+    tags.push(`来源: ${current?.label || query.sourceType}`)
+  }
+  return tags
+})
 const snoozeDays = ref(1)
 const policyStorageKey = 'oa-todo-policy-v1'
 const policyForm = reactive({

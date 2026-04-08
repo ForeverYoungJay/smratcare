@@ -1,23 +1,36 @@
 <template>
   <PageContainer title="长者档案" subTitle="高频查询、在院状态和服务动作集中处理">
+    <template #meta>
+      <span class="soft-pill">当前列表 {{ total }} 位</span>
+      <span class="soft-pill">已启用筛选 {{ activeFilterTags.length }} 项</span>
+      <span v-for="tag in activeFilterTags.slice(0, 4)" :key="tag" class="selection-pill">{{ tag }}</span>
+    </template>
+
+    <template #extra>
+      <a-space wrap>
+        <a-button type="primary" @click="goCreate">新建长者</a-button>
+        <a-button @click="exportCsvData">导出名单</a-button>
+      </a-space>
+    </template>
+
     <template #stats>
       <div class="elder-overview-grid">
-        <div class="overview-card">
+        <div class="overview-card overview-card--primary">
           <span>当前列表</span>
           <strong>{{ total }}</strong>
           <small>按当前筛选口径统计</small>
         </div>
-        <div class="overview-card">
+        <div class="overview-card overview-card--success">
           <span>在院长者</span>
           <strong>{{ statusCounters.inHospital }}</strong>
           <small>需持续照护与跟进</small>
         </div>
-        <div class="overview-card">
+        <div class="overview-card overview-card--warning">
           <span>待办理入住</span>
           <strong>{{ lifecycleStageCounters.pendingBedSelect }}</strong>
           <small>优先推进选床与入住</small>
         </div>
-        <div class="overview-card">
+        <div class="overview-card overview-card--danger">
           <span>已选记录</span>
           <strong>{{ selectedCount }}</strong>
           <small>批量动作可直接执行</small>
@@ -49,9 +62,11 @@
 
     <section class="card-elevated elder-workspace">
       <div class="action-toolbar">
+        <div class="action-toolbar-copy">
+          <strong>批量动作与快捷处理</strong>
+          <span>先勾选长者，再直接进入详情、编辑、换床、退住或家属绑定。</span>
+        </div>
         <div class="action-toolbar-main">
-          <a-button type="primary" @click="goCreate">新建长者</a-button>
-          <a-button @click="exportCsvData">导出CSV</a-button>
           <a-button :disabled="selectedCount !== 1" @click="goDetailSelected">查看详情</a-button>
           <a-button :disabled="selectedCount !== 1" @click="goEditSelected">编辑档案</a-button>
           <a-button :disabled="selectedCount !== 1" @click="openChangeBedSelected">换床</a-button>
@@ -230,6 +245,15 @@ const columns = [
 const selectedCount = computed(() => selectedRowKeys.value.length)
 const totalPageCount = computed(() => Math.max(1, Math.ceil(total.value / query.pageSize)))
 const selectedRows = computed(() => rows.value.filter((item) => selectedRowKeys.value.some((id) => String(id) === String(item.id))))
+const activeFilterTags = computed(() => {
+  const tags: string[] = []
+  if (query.fullName) tags.push(`姓名: ${query.fullName}`)
+  if (query.idCardNo) tags.push(`身份证: ${query.idCardNo}`)
+  if (query.bedNo) tags.push(`床位: ${query.bedNo}`)
+  if (query.careLevel) tags.push(`护理等级: ${query.careLevel}`)
+  if (query.status) tags.push(`状态: ${statusText(query.status)}`)
+  return tags
+})
 const lifecycleStageCounters = computed(() => {
   const counters = {
     pendingAssessment: 0,
@@ -721,10 +745,26 @@ watch(
 .overview-card {
   display: grid;
   gap: 6px;
-  padding: 14px 16px;
+  padding: 16px 18px;
   border-radius: 16px;
   border: 1px solid #dce9f2;
-  background: rgba(255, 255, 255, 0.84);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.overview-card--primary {
+  background: linear-gradient(180deg, rgba(19, 108, 181, 0.1) 0%, rgba(255, 255, 255, 0.96) 100%);
+}
+
+.overview-card--success {
+  background: linear-gradient(180deg, rgba(47, 155, 102, 0.1) 0%, rgba(255, 255, 255, 0.96) 100%);
+}
+
+.overview-card--warning {
+  background: linear-gradient(180deg, rgba(217, 137, 34, 0.1) 0%, rgba(255, 255, 255, 0.96) 100%);
+}
+
+.overview-card--danger {
+  background: linear-gradient(180deg, rgba(214, 76, 95, 0.1) 0%, rgba(255, 255, 255, 0.96) 100%);
 }
 
 .overview-card span,
@@ -743,10 +783,11 @@ watch(
 }
 
 .elder-workspace {
-  padding: 16px;
+  padding: 18px;
 }
 
 .action-toolbar,
+.action-toolbar-copy,
 .action-toolbar-main,
 .action-toolbar-side,
 .table-head,
@@ -759,9 +800,27 @@ watch(
 
 .action-toolbar {
   justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
   flex-wrap: wrap;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(216, 229, 239, 0.7);
+}
+
+.action-toolbar-copy {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.action-toolbar-copy strong {
+  color: #12314d;
+  font-size: 15px;
+}
+
+.action-toolbar-copy span {
+  color: #5f7b95;
+  font-size: 12px;
 }
 
 .action-toolbar-main,
@@ -773,8 +832,8 @@ watch(
 .selection-pill {
   padding: 6px 12px;
   border-radius: 999px;
-  background: #eef8fc;
-  color: #1b6282;
+  background: #eef6fd;
+  color: #0f5b99;
   font-size: 12px;
   font-weight: 700;
 }

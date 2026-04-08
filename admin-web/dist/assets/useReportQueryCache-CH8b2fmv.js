@@ -1,0 +1,1 @@
+function i(o){const r=`marketing-report:${o}`;function c(t){try{const e=localStorage.getItem(r);if(!e)return t||{};const s=JSON.parse(e);return{...t||{},...s||{}}}catch{return t||{}}}function n(t){try{localStorage.setItem(r,JSON.stringify(t||{}))}catch{}}function a(){try{localStorage.removeItem(r)}catch{}}return{restore:c,persist:n,clear:a}}export{i as u};

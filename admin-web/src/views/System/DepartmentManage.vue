@@ -1,5 +1,37 @@
 <template>
   <PageContainer title="部门管理" subTitle="只维护部门名称和状态，不再设置排序、部门编码和上级部门">
+    <template #meta>
+      <span class="soft-pill">部门总数 {{ pagination.total || rows.length }}</span>
+      <span class="soft-pill">启用 {{ enabledCount }}</span>
+      <span class="soft-pill">停用 {{ disabledCount }}</span>
+      <span v-for="tag in activeFilterTags" :key="tag" class="selection-pill">{{ tag }}</span>
+    </template>
+
+    <template #stats>
+      <div class="metric-grid">
+        <div class="metric-card metric-card--primary">
+          <span class="metric-card__label">当前页部门</span>
+          <strong class="metric-card__value">{{ rows.length }}</strong>
+          <span class="metric-card__hint">用于维护组织基础结构</span>
+        </div>
+        <div class="metric-card metric-card--success">
+          <span class="metric-card__label">启用部门</span>
+          <strong class="metric-card__value">{{ enabledCount }}</strong>
+          <span class="metric-card__hint">可继续用于档案和账号归属</span>
+        </div>
+        <div class="metric-card metric-card--warning">
+          <span class="metric-card__label">停用部门</span>
+          <strong class="metric-card__value">{{ disabledCount }}</strong>
+          <span class="metric-card__hint">建议核对是否仍需保留</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-card__label">快捷入口</span>
+          <strong class="metric-card__value">2</strong>
+          <span class="metric-card__hint">支持跳转档案中心与账号设置</span>
+        </div>
+      </div>
+    </template>
+
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
         <a-input v-model:value="query.keyword" placeholder="部门名称" allow-clear />
@@ -87,6 +119,9 @@ const columns = [
 ]
 
 const drawerTitle = computed(() => (form.id ? '编辑部门' : '新增部门'))
+const enabledCount = computed(() => rows.value.filter((item) => item.status === 1).length)
+const disabledCount = computed(() => rows.value.filter((item) => item.status !== 1).length)
+const activeFilterTags = computed(() => (query.keyword ? [`关键词: ${query.keyword}`] : []))
 
 async function fetchData() {
   loading.value = true

@@ -44,8 +44,18 @@ class GlobalExceptionHandlerTest {
   }
 
   @Test
+  void illegal_state_with_cause_returns_generic_internal_message() {
+    ResponseEntity<Result<Void>> response =
+        handler.handleIllegalState(new IllegalStateException("底层 SQL 错误", new RuntimeException("syntax error")));
+
+    assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
+    assertEquals(500, response.getBody().getCode());
+    assertEquals("服务处理失败，请稍后重试", response.getBody().getMessage());
+  }
+
+  @Test
   void duplicate_key_returns_friendly_message() {
-    ResponseEntity<Result<Void>> response = handler.handleDataIntegrityViolation(
+    ResponseEntity<Result<Void>> response = handler.handleDuplicateKey(
         new DuplicateKeyException("Duplicate entry '1-B3' for key 'building.uk_building_tenant_code'"));
 
     assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());

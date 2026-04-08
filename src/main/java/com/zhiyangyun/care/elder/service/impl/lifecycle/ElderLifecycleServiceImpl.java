@@ -297,6 +297,8 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
 
     ElderBedRelation active = relationMapper.selectOne(Wrappers.lambdaQuery(ElderBedRelation.class)
         .eq(ElderBedRelation::getIsDeleted, 0)
+        .eq(request.getTenantId() != null, ElderBedRelation::getTenantId, request.getTenantId())
+        .eq(request.getOrgId() != null, ElderBedRelation::getOrgId, request.getOrgId())
         .eq(ElderBedRelation::getActiveFlag, 1)
         .eq(ElderBedRelation::getElderId, elder.getId()));
     if (active != null) {
@@ -307,7 +309,7 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
 
     if (previousBedId != null) {
       Bed bed = bedMapper.selectById(previousBedId);
-      if (bed != null) {
+      if (bed != null && (Objects.equals(bed.getElderId(), elder.getId()) || bed.getElderId() == null)) {
         bed.setElderId(null);
         bed.setStatus(1);
         bedMapper.updateById(bed);

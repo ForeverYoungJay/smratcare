@@ -1,5 +1,11 @@
 <template>
-  <PageContainer title="医护照护工作台" subTitle="Medical & Care 一体化管理">
+  <PageContainer title="医护照护工作台" subTitle="Medical & Care 一体化管理" mode="showcase">
+    <template #meta>
+      <span class="soft-pill">业务日期 {{ summary.snapshotDate || '-' }}</span>
+      <span class="soft-pill">风险等级 {{ riskLevelLabel }}</span>
+      <span class="selection-pill">风险指数 {{ riskIndex }}</span>
+    </template>
+
     <template #extra>
       <a-space>
         <a-tag color="blue">业务日期 {{ summary.snapshotDate || '-' }}</a-tag>

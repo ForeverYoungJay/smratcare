@@ -8,6 +8,8 @@ import com.zhiyangyun.care.common.file.service.FileStorageService;
 import java.io.InputStream;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -16,6 +18,17 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 @ConditionalOnProperty(prefix = "app.file-storage", name = "provider", havingValue = "oss")
 public class OssFileStorageServiceImpl implements FileStorageService {
+  private static final Set<String> DANGEROUS_CONTENT_TYPES = Set.of(
+      "text/html",
+      "application/javascript",
+      "text/javascript",
+      "application/x-javascript",
+      "application/x-msdownload",
+      "application/x-sh",
+      "application/x-bat",
+      "application/x-csh",
+      "application/x-httpd-php",
+      "text/x-php");
   private final FileStorageProperties properties;
 
   public OssFileStorageServiceImpl(FileStorageProperties properties) {
@@ -40,6 +53,7 @@ public class OssFileStorageServiceImpl implements FileStorageService {
     String originalName = safeFileName(file.getOriginalFilename());
     String extension = resolveExtension(originalName);
     validateExtension(extension);
+    validateContentType(file.getContentType());
     String objectName = buildObjectName(oss.getBasePath(), sanitizeBizType(bizType), extension);
 
     OSS client = new OSSClientBuilder().build(endpoint, accessKeyId, accessKeySecret);
@@ -94,6 +108,9 @@ public class OssFileStorageServiceImpl implements FileStorageService {
       return "common";
     }
     String normalized = bizType.trim().replaceAll("[^a-zA-Z0-9\\-_]", "-");
+    if (normalized.length() > 64) {
+      normalized = normalized.substring(0, 64);
+    }
     return normalized.isBlank() ? "common" : normalized;
   }
 
@@ -128,7 +145,31 @@ public class OssFileStorageServiceImpl implements FileStorageService {
     if (originalName == null || originalName.isBlank()) {
       return "unnamed";
     }
-    return originalName.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
+    String normalized = originalName.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
+    if (normalized.length() > 128) {
+      return normalized.substring(normalized.length() - 128);
+    }
+    return normalized;
+  }
+
+  private void validateContentType(String contentType) {
+    if (contentType == null || contentType.isBlank()) {
+      return;
+    }
+    String normalized = contentType.trim().toLowerCase(Locale.ROOT);
+    int separator = normalized.indexOf(';');
+    if (separator >= 0) {
+      normalized = normalized.substring(0, separator).trim();
+    }
+    if ("application/octet-stream".equals(normalized)) {
+      return;
+    }
+    if (DANGEROUS_CONTENT_TYPES.contains(normalized)
+        || normalized.contains("javascript")
+        || normalized.contains("shellscript")
+        || normalized.contains("executable")) {
+      throw new IllegalArgumentException("文件内容类型不支持");
+    }
   }
 
   private String requireText(String value, String message) {

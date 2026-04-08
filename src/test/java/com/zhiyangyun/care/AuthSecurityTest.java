@@ -4,6 +4,7 @@ import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -51,7 +52,11 @@ class AuthSecurityTest {
             .contentType(MediaType.APPLICATION_JSON)
             .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isOk())
+        .andExpect(header().exists("X-Request-Id"))
         .andExpect(jsonPath("$.code", is(0)))
+        .andExpect(jsonPath("$.success", is(true)))
+        .andExpect(jsonPath("$.timestamp").isNumber())
+        .andExpect(jsonPath("$.requestId").isString())
         .andExpect(jsonPath("$.data.token").exists());
   }
 
@@ -139,6 +144,25 @@ class AuthSecurityTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.code", is(0)))
         .andExpect(jsonPath("$.data.fileUrl").exists());
+  }
+
+  @Test
+  void family_upload_rejects_dangerous_content_type() throws Exception {
+    String token = loginAndGetFamilyToken();
+    MockMultipartFile file = new MockMultipartFile(
+        "file",
+        "voice.txt",
+        MediaType.TEXT_HTML_VALUE,
+        "<script>alert(1)</script>".getBytes());
+
+    mockMvc.perform(multipart("/api/files/upload")
+            .file(file)
+            .param("bizType", "family-voice")
+            .header("Authorization", "Bearer " + token))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code", is(400)))
+        .andExpect(jsonPath("$.success", is(false)))
+        .andExpect(jsonPath("$.message", is("文件内容类型不支持")));
   }
 
   private String loginAndGetToken(String username, String password) throws Exception {

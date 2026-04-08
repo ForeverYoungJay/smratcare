@@ -1,0 +1,1 @@
+import{s as n}from"./request-Du0AqNUg.js";import{o as u,I as m}from"./index-ook8yukD.js";function b(o){const i=o.debounceMs??500;let e;const t=()=>{e&&window.clearTimeout(e),e=window.setTimeout(()=>{Promise.resolve(o.refresh()).catch(()=>{})},i)};let s=()=>{};u(()=>{s=n(r=>{r.topics.some(c=>o.topics.includes(c))&&t()})}),m(()=>{s(),e&&window.clearTimeout(e)})}export{b as u};

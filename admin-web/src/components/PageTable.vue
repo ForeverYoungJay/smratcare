@@ -9,8 +9,11 @@
       :data-source="dataSource"
       :row-key="rowKey"
       :loading="loading"
+      size="middle"
+      :sticky="{ offsetHeader: 0 }"
       :pagination="pagination"
       :scroll="{ x: 'max-content' }"
+      :row-class-name="rowClassName"
       @change="onChange"
     >
       <template #bodyCell="slotProps">
@@ -40,6 +43,7 @@ const props = defineProps<{
 const rowKey = props.rowKey || 'id'
 const dataSource = ref<any[]>([])
 const loading = ref(false)
+const rowClassName = (_record: any, index: number) => (index % 2 === 1 ? 'is-striped-row' : '')
 
 const pagination = reactive<TablePaginationConfig>({
   current: 1,
@@ -48,7 +52,8 @@ const pagination = reactive<TablePaginationConfig>({
   showSizeChanger: true,
   showQuickJumper: true,
   pageSizeOptions: ['10', '20', '50', '100'],
-  showTotal: (total) => `共 ${total} 条记录`
+  showTotal: (total) => `共 ${total} 条记录`,
+  position: ['bottomRight']
 })
 
 async function load(extra?: Record<string, any>) {
@@ -95,6 +100,14 @@ defineExpose({ reload: load })
 }
 
 .search-slot {
-  padding: 16px 16px 0;
+  padding: 16px 18px 0;
+}
+
+.page-table-shell :deep(.ant-table-wrapper) {
+  padding: 0 4px 4px;
+}
+
+.page-table :deep(.is-striped-row > td) {
+  background: rgba(247, 251, 254, 0.88);
 }
 </style>

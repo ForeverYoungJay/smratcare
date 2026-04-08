@@ -7,7 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zhiyangyun.care.elder.entity.Bed;
+import com.zhiyangyun.care.elder.entity.ElderBedRelation;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
+import com.zhiyangyun.care.elder.mapper.ElderBedRelationMapper;
 import com.zhiyangyun.care.elder.model.AssignBedRequest;
 import com.zhiyangyun.care.elder.service.ElderService;
 import com.zhiyangyun.care.elder.mapper.BedMapper;
@@ -29,6 +31,9 @@ class ElderServiceTest {
 
   @Autowired
   private ElderMapper elderMapper;
+
+  @Autowired
+  private ElderBedRelationMapper relationMapper;
 
   @Test
   void bed_exclusive() {
@@ -60,6 +65,36 @@ class ElderServiceTest {
 
     var unbound = elderService.unbindBed(200L, LocalDate.now(), "discharge", null, null);
     assertNull(unbound.getBedId());
+  }
+
+  @Test
+  void reassign_same_bed_is_idempotent() {
+    Bed newBed = new Bed();
+    newBed.setOrgId(1L);
+    newBed.setRoomId(10L);
+    newBed.setBedNo("03");
+    newBed.setBedQrCode("QR-IDEMPOTENT");
+    newBed.setStatus(1);
+    bedMapper.insert(newBed);
+
+    AssignBedRequest request = new AssignBedRequest();
+    request.setBedId(newBed.getId());
+    request.setStartDate(LocalDate.now());
+
+    var first = elderService.assignBed(200L, request);
+    var second = elderService.assignBed(200L, request);
+
+    assertEquals(newBed.getId(), first.getBedId());
+    assertEquals(newBed.getId(), second.getBedId());
+    long activeCount = relationMapper.selectCount(
+        Wrappers.lambdaQuery(ElderBedRelation.class)
+            .eq(ElderBedRelation::getElderId, 200L)
+            .eq(ElderBedRelation::getBedId, newBed.getId())
+            .eq(ElderBedRelation::getActiveFlag, 1)
+            .eq(ElderBedRelation::getIsDeleted, 0));
+    assertEquals(1L, activeCount);
+
+    elderService.unbindBed(200L, LocalDate.now(), "cleanup", null, null);
   }
 
   @Test

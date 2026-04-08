@@ -1,5 +1,11 @@
 <template>
-  <PageContainer title="后勤工作台" subTitle="资产、物资、餐饮、维修的一体化运营看板">
+  <PageContainer title="后勤工作台" subTitle="资产、物资、餐饮、维修的一体化运营看板" mode="showcase">
+    <template #meta>
+      <span class="soft-pill">统计窗口 {{ configuredQuery.windowDays }} 天</span>
+      <span class="soft-pill">值班模式 {{ dutyMode ? '高密度' : '标准' }}</span>
+      <span class="selection-pill">风险指数 {{ riskIndex }}</span>
+    </template>
+
     <template #extra>
       <a-space wrap>
         <a-tag :color="dutyMode ? 'gold' : 'default'">{{ dutyMode ? '值班高密度模式' : '标准模式' }}</a-tag>

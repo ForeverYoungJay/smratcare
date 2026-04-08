@@ -1,12 +1,15 @@
 package com.zhiyangyun.care.auth.security;
 
 import java.time.Duration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
 public class TokenBlacklistService {
   private static final String PREFIX = "jwt:blacklist:";
+  private static final Logger log = LoggerFactory.getLogger(TokenBlacklistService.class);
   private final StringRedisTemplate redisTemplate;
   private final JwtProperties jwtProperties;
 
@@ -24,8 +27,8 @@ public class TokenBlacklistService {
     }
     try {
       redisTemplate.opsForValue().set(PREFIX + jti, "1", Duration.ofMillis(ttlMillis));
-    } catch (Exception ignored) {
-      // ignore redis errors
+    } catch (Exception ex) {
+      log.warn("Failed to blacklist token jti={}, ttlMillis={}", jti, ttlMillis, ex);
     }
   }
 
@@ -38,7 +41,8 @@ public class TokenBlacklistService {
     }
     try {
       return Boolean.TRUE.equals(redisTemplate.hasKey(PREFIX + jti));
-    } catch (Exception ignored) {
+    } catch (Exception ex) {
+      log.warn("Failed to query token blacklist jti={}", jti, ex);
       return false;
     }
   }

@@ -57,31 +57,31 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'todo',
             name: 'WorkbenchTodo',
-            redirect: '/oa/todo',
+            component: () => import('../views/oa/Todo.vue'),
             meta: { title: '我的待办' }
           },
           {
             path: 'my-info',
             name: 'WorkbenchMyInfo',
-            redirect: '/oa/my-info',
+            component: () => import('../views/oa/MyInfo.vue'),
             meta: { title: '我的信息' }
           },
           {
             path: 'attendance',
             name: 'WorkbenchAttendance',
-            redirect: '/oa/attendance-leave',
+            component: () => import('../views/oa/AttendanceLeave.vue'),
             meta: { title: '我的考勤与请假' }
           },
           {
             path: 'reports',
             name: 'WorkbenchReports',
-            redirect: '/oa/work-report',
+            component: () => import('../views/oa/WorkReport.vue'),
             meta: { title: '我的总结' }
           },
           {
             path: 'approvals',
             name: 'WorkbenchApprovals',
-            redirect: '/oa/approval',
+            component: () => import('../views/oa/Approval.vue'),
             meta: { title: '我的审批' }
           }
         ]

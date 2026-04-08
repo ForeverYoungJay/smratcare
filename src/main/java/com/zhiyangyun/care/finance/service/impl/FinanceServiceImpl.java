@@ -5,6 +5,7 @@ import com.zhiyangyun.care.bill.entity.BillMonthly;
 import com.zhiyangyun.care.bill.mapper.BillMonthlyMapper;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
+import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.finance.entity.ConsumptionRecord;
 import com.zhiyangyun.care.finance.entity.DischargeSettlement;
 import com.zhiyangyun.care.finance.entity.FinanceRefundVoucher;
@@ -72,6 +73,7 @@ public class FinanceServiceImpl implements FinanceService {
     if (bill == null) {
       throw new IllegalArgumentException("Bill not found");
     }
+    ensureOrgAccess(bill.getOrgId());
     if (Integer.valueOf(9).equals(bill.getStatus())) {
       throw new IllegalStateException("Invalid bill can not be paid");
     }
@@ -163,10 +165,27 @@ public class FinanceServiceImpl implements FinanceService {
     if (bill == null) {
       throw new IllegalArgumentException("Bill not found");
     }
+    ensureOrgAccess(bill.getOrgId());
+    if (paymentRecord.getOrgId() != null && !Objects.equals(paymentRecord.getOrgId(), bill.getOrgId())) {
+      throw new IllegalStateException("Payment record org mismatch");
+    }
     if (Integer.valueOf(9).equals(bill.getStatus())) {
       throw new IllegalStateException("Invalid bill can not edit payment");
     }
     financeMonthLockService.assertMonthEditable(bill.getOrgId(), YearMonth.parse(bill.getBillMonth()), "修改收款");
+    String externalTxnId = normalizeExternalTxnId(request.getExternalTxnId());
+    if (externalTxnId != null) {
+      PaymentRecord existing = paymentRecordMapper.selectOne(
+          Wrappers.lambdaQuery(PaymentRecord.class)
+              .eq(PaymentRecord::getIsDeleted, 0)
+              .eq(PaymentRecord::getOrgId, bill.getOrgId())
+              .eq(PaymentRecord::getExternalTxnId, externalTxnId)
+              .ne(PaymentRecord::getId, paymentRecordId)
+              .last("LIMIT 1"));
+      if (existing != null) {
+        throw new IllegalStateException("External transaction already exists");
+      }
+    }
     BigDecimal totalAmount = bill.getTotalAmount() == null ? BigDecimal.ZERO : bill.getTotalAmount();
     BigDecimal otherPaid = paymentRecordMapper.selectList(
             Wrappers.lambdaQuery(PaymentRecord.class)
@@ -186,10 +205,27 @@ public class FinanceServiceImpl implements FinanceService {
     String nextMethod = safeMethod(request.getMethod());
     paymentRecord.setAmount(request.getAmount());
     paymentRecord.setPayMethod(nextMethod);
+    paymentRecord.setExternalTxnId(externalTxnId);
     paymentRecord.setPaidAt(request.getPaidAt());
     paymentRecord.setRemark(mergePaymentRemark(request.getRemark(), beforeMethod, nextMethod));
     paymentRecord.setOperatorStaffId(operatorStaffId);
-    paymentRecordMapper.updateById(paymentRecord);
+    try {
+      paymentRecordMapper.updateById(paymentRecord);
+    } catch (DuplicateKeyException ex) {
+      if (externalTxnId != null) {
+        PaymentRecord existing = paymentRecordMapper.selectOne(
+            Wrappers.lambdaQuery(PaymentRecord.class)
+                .eq(PaymentRecord::getIsDeleted, 0)
+                .eq(PaymentRecord::getOrgId, bill.getOrgId())
+                .eq(PaymentRecord::getExternalTxnId, externalTxnId)
+                .ne(PaymentRecord::getId, paymentRecordId)
+                .last("LIMIT 1"));
+        if (existing != null) {
+          throw new IllegalStateException("External transaction already exists", ex);
+        }
+      }
+      throw ex;
+    }
 
     BigDecimal newOutstanding = totalAmount.subtract(newPaid);
     bill.setPaidAmount(newPaid);
@@ -203,6 +239,7 @@ public class FinanceServiceImpl implements FinanceService {
   @Override
   @Transactional
   public ReconcileResponse reconcile(Long orgId, LocalDate date) {
+    ensureOrgAccess(orgId);
     LocalDateTime start = date.atStartOfDay();
     LocalDateTime end = date.plusDays(1).atStartOfDay();
 
@@ -304,6 +341,7 @@ public class FinanceServiceImpl implements FinanceService {
     if (bill == null) {
       throw new IllegalArgumentException("Bill not found");
     }
+    ensureOrgAccess(bill.getOrgId());
     if (Integer.valueOf(9).equals(bill.getStatus())) {
       return;
     }
@@ -530,7 +568,24 @@ public class FinanceServiceImpl implements FinanceService {
     if (externalTxnId == null || externalTxnId.isBlank()) {
       return null;
     }
-    return externalTxnId.trim();
+    String normalized = externalTxnId.trim();
+    if (normalized.length() > 64) {
+      throw new IllegalArgumentException("External transaction id is too long");
+    }
+    return normalized;
+  }
+
+  private void ensureOrgAccess(Long targetOrgId) {
+    if (targetOrgId == null) {
+      return;
+    }
+    Long currentOrgId = AuthContext.getOrgId();
+    if (currentOrgId == null || AuthContext.isAdmin()) {
+      return;
+    }
+    if (!Objects.equals(currentOrgId, targetOrgId)) {
+      throw new org.springframework.security.access.AccessDeniedException("No permission to access another organization");
+    }
   }
 
   private BigDecimal sumRefundAmount(Long orgId, LocalDateTime start, LocalDateTime end) {

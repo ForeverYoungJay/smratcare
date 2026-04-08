@@ -1,5 +1,11 @@
 <template>
-  <PageContainer title="数据报表统计" subTitle="消防安全管理数据总览、日报/月报与打印版">
+  <PageContainer title="数据报表统计" subTitle="消防安全管理数据总览、日报/月报与打印版" mode="showcase">
+    <template #meta>
+      <span class="soft-pill">统计区间 {{ printRangeText }}</span>
+      <span class="soft-pill">生成时间 {{ generatedAt }}</span>
+      <span class="selection-pill">未关闭 {{ summary.openCount }}</span>
+    </template>
+
     <div class="no-print">
       <SearchForm :model="query" @search="fetchAll" @reset="onReset">
         <a-form-item label="统计日期">

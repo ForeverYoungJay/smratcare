@@ -250,7 +250,8 @@ public class AuthController {
             .eq(FamilyUser::getOrgId, orgId)
             .eq(FamilyUser::getPhone, phone)
             .eq(FamilyUser::getIsDeleted, 0));
-    if (user == null || !hasText(user.getPasswordHash())
+    if (user == null || user.getStatus() == null || user.getStatus() != 1
+        || !hasText(user.getPasswordHash())
         || !passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
       throw new IllegalArgumentException("账号或密码错误");
     }

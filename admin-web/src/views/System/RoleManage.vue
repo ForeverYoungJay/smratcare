@@ -1,5 +1,37 @@
 <template>
   <PageContainer title="角色管理" subTitle="只维护角色名称、所属部门、上级领导角色和页面权限">
+    <template #meta>
+      <span class="soft-pill">角色总数 {{ pagination.total || rows.length }}</span>
+      <span class="soft-pill">启用 {{ enabledRoleCount }}</span>
+      <span class="soft-pill">预设推荐 {{ recommendedPreset?.label || '无' }}</span>
+      <span v-for="tag in activeFilterTags" :key="tag" class="selection-pill">{{ tag }}</span>
+    </template>
+
+    <template #stats>
+      <div class="metric-grid">
+        <div class="metric-card metric-card--primary">
+          <span class="metric-card__label">当前页角色</span>
+          <strong class="metric-card__value">{{ rows.length }}</strong>
+          <span class="metric-card__hint">用于快速核对组织分工</span>
+        </div>
+        <div class="metric-card metric-card--success">
+          <span class="metric-card__label">启用角色</span>
+          <strong class="metric-card__value">{{ enabledRoleCount }}</strong>
+          <span class="metric-card__hint">可参与当前权限与监管链</span>
+        </div>
+        <div class="metric-card metric-card--warning">
+          <span class="metric-card__label">停用角色</span>
+          <strong class="metric-card__value">{{ disabledRoleCount }}</strong>
+          <span class="metric-card__hint">建议确认是否仍需保留</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-card__label">编辑中权限</span>
+          <strong class="metric-card__value">{{ checkedPagePermissions.length }}</strong>
+          <span class="metric-card__hint">当前已勾选页面权限数</span>
+        </div>
+      </div>
+    </template>
+
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="关键词">
         <a-input v-model:value="query.keyword" placeholder="角色名称" allow-clear />
@@ -144,6 +176,9 @@ const columns = [
 
 const drawerTitle = computed(() => (form.id ? '编辑角色' : '新增角色'))
 const recommendedPreset = computed(() => getRolePagePreset(form.roleCode || form.roleName))
+const enabledRoleCount = computed(() => rows.value.filter((item) => item.status === 1).length)
+const disabledRoleCount = computed(() => rows.value.filter((item) => item.status !== 1).length)
+const activeFilterTags = computed(() => (query.keyword ? [`关键词: ${query.keyword}`] : []))
 const departmentOptions = computed(() =>
   departments.value.map((item) => ({ label: item.deptName, value: item.id }))
 )

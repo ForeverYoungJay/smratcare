@@ -1,35 +1,59 @@
 <template>
-  <PageContainer title="工作台" subTitle="个人待办、常用入口和业务中心在同一入口完成定位。">
+  <PageContainer title="工作台" subTitle="个人待办、常用入口和业务中心在同一入口完成定位。" mode="showcase">
+    <template #meta>
+      <span class="status-pill">当前角色 {{ roleLabel }}</span>
+      <span class="soft-pill">个人视角</span>
+      <span class="soft-pill">最后刷新 {{ refreshedAt }}</span>
+    </template>
+
+    <template #extra>
+      <a-space wrap>
+        <a-button type="primary" @click="openPath('/workbench/todo')">查看我的待办</a-button>
+        <a-button @click="openPath('/workbench/approvals')">处理审批</a-button>
+      </a-space>
+    </template>
+
     <section class="hero-shell card-elevated">
       <div class="hero-copy">
         <div class="hero-kicker">Personal Workspace</div>
-        <h2>先处理我的事项，再进入业务中心。</h2>
-        <p>工作台只保留个人入口和跨模块快捷入口，不再混放行政、人资、配置类菜单。</p>
+        <h2>先扫重点，再处理待办，再进入业务中心。</h2>
+        <p>这里保留员工日常高频事项、跨模块快捷入口和职责中心，帮助你在 3 秒内找到今天最该处理的工作。</p>
         <a-space wrap>
-          <a-button type="primary" @click="openPath('/workbench/todo')">查看我的待办</a-button>
+          <a-button type="primary" @click="openPath('/workbench/todo')">进入待办</a-button>
           <a-button @click="openPath('/workbench/my-info')">查看我的信息</a-button>
-          <a-button @click="openPath('/workbench/reports')">填写我的总结</a-button>
+          <a-button @click="openPath('/oa/work-execution/task')">进入任务中心</a-button>
         </a-space>
       </div>
 
       <div class="hero-status">
-        <div class="status-chip">
-          <span>当前角色</span>
-          <strong>{{ roleLabel }}</strong>
+        <div class="hero-status-head">
+          <span>今日优先处理</span>
+          <strong>{{ priorityItems.length }} 项重点</strong>
         </div>
-        <div class="status-chip">
-          <span>统计口径</span>
-          <strong>个人视角</strong>
-        </div>
-        <div class="status-chip">
-          <span>最后刷新</span>
-          <strong>{{ refreshedAt }}</strong>
-        </div>
+        <button
+          v-for="item in priorityItems"
+          :key="item.label"
+          type="button"
+          class="priority-item"
+          @click="openPath(item.path)"
+        >
+          <div>
+            <span>{{ item.label }}</span>
+            <small>{{ item.desc }}</small>
+          </div>
+          <strong>{{ item.value }}</strong>
+        </button>
       </div>
     </section>
 
     <section class="metric-strip">
-      <div v-for="item in metricItems" :key="item.label" class="metric-tile card-elevated" @click="openPath(item.path)">
+      <div
+        v-for="item in metricItems"
+        :key="item.label"
+        class="metric-tile card-elevated"
+        :class="`metric-tile--${item.tone}`"
+        @click="openPath(item.path)"
+      >
         <span class="metric-label">{{ item.label }}</span>
         <strong class="metric-value">{{ item.value }}</strong>
         <span class="metric-desc">{{ item.desc }}</span>
@@ -155,13 +179,23 @@ const roleLabel = computed(() => {
 })
 
 const metricItems = computed(() => [
-  { label: '我的待办', value: summary.openTodoCount || 0, desc: '需要我处理的协同事项', path: '/workbench/todo' },
-  { label: '待我审批', value: summary.pendingApprovalCount || 0, desc: '需要我确认的流程', path: '/workbench/approvals' },
-  { label: '进行中任务', value: summary.ongoingTaskCount || 0, desc: '仍在推进的任务', path: '/oa/work-execution/task' },
-  { label: '已交总结', value: summary.submittedReportCount || 0, desc: '近30天已提交数量', path: '/workbench/reports' },
-  { label: '生日提醒', value: summary.birthdayTodoCount || 0, desc: '与我相关的生日待办', path: '/workbench/todo?keyword=生日提醒' },
-  { label: '审批超时', value: summary.approvalTimeoutCount || 0, desc: '需要催办或升级处理', path: '/workbench/approvals' }
+  { label: '我的待办', value: summary.openTodoCount || 0, desc: '需要我处理的协同事项', path: '/workbench/todo', tone: 'primary' },
+  { label: '待我审批', value: summary.pendingApprovalCount || 0, desc: '需要我确认的流程', path: '/workbench/approvals', tone: 'warning' },
+  { label: '进行中任务', value: summary.ongoingTaskCount || 0, desc: '仍在推进的任务', path: '/oa/work-execution/task', tone: 'success' },
+  { label: '已交总结', value: summary.submittedReportCount || 0, desc: '近30天已提交数量', path: '/workbench/reports', tone: 'neutral' },
+  { label: '生日提醒', value: summary.birthdayTodoCount || 0, desc: '与我相关的生日待办', path: '/workbench/todo?keyword=生日提醒', tone: 'success' },
+  { label: '审批超时', value: summary.approvalTimeoutCount || 0, desc: '需要催办或升级处理', path: '/workbench/approvals', tone: 'danger' }
 ].filter((item) => canAccess(item.path)))
+
+const priorityItems = computed(() =>
+  [
+    { label: '待办事项', value: summary.openTodoCount || 0, desc: '先清空今天必须处理的协同任务', path: '/workbench/todo' },
+    { label: '待我审批', value: summary.pendingApprovalCount || 0, desc: '优先处理影响他人推进的审批流', path: '/workbench/approvals' },
+    { label: '超时关注', value: summary.approvalTimeoutCount || 0, desc: '存在催办或升级处理风险', path: '/workbench/approvals' }
+  ]
+    .filter((item) => canAccess(item.path))
+    .sort((a, b) => Number(b.value) - Number(a.value))
+)
 
 const personalActions = computed<ActionItem[]>(() => filterActions([
   { label: '我的待办', path: '/workbench/todo', tip: '查看今天需要处理的事项' },
@@ -233,8 +267,8 @@ useLiveSyncRefresh({
   gap: 18px;
   padding: 24px;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(244, 250, 255, 0.9)),
-    radial-gradient(circle at top right, rgba(53, 156, 220, 0.18), transparent 38%);
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(244, 250, 255, 0.94)),
+    radial-gradient(circle at top right, rgba(53, 156, 220, 0.16), transparent 38%);
 }
 
 .hero-kicker,
@@ -248,7 +282,7 @@ useLiveSyncRefresh({
 
 .hero-copy h2 {
   margin: 10px 0 8px;
-  font-size: 28px;
+  font-size: 30px;
   line-height: 1.18;
   color: var(--ink);
 }
@@ -264,18 +298,71 @@ useLiveSyncRefresh({
   gap: 10px;
 }
 
-.status-chip {
-  padding: 16px 18px;
-  border-radius: 18px;
-  background: rgba(16, 55, 88, 0.9);
-  color: rgba(255, 255, 255, 0.74);
+.hero-status-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 4px 2px;
 }
 
-.status-chip strong {
-  display: block;
-  margin-top: 6px;
+.hero-status-head span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero-status-head strong {
+  color: var(--ink);
   font-size: 18px;
-  color: #fff;
+}
+
+.priority-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid rgba(19, 108, 181, 0.1);
+  border-radius: 18px;
+  background: rgba(248, 252, 255, 0.9);
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.priority-item:hover {
+  transform: translateY(-1px);
+  border-color: rgba(19, 108, 181, 0.24);
+  box-shadow: 0 14px 28px rgba(18, 49, 77, 0.08);
+}
+
+.priority-item span,
+.priority-item small {
+  display: block;
+}
+
+.priority-item span {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.priority-item small {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.priority-item strong {
+  min-width: 52px;
+  text-align: right;
+  color: var(--primary);
+  font-size: 28px;
+  line-height: 1;
 }
 
 .metric-strip {
@@ -290,6 +377,22 @@ useLiveSyncRefresh({
   cursor: pointer;
   display: grid;
   align-content: space-between;
+}
+
+.metric-tile--primary {
+  background: linear-gradient(180deg, rgba(19, 108, 181, 0.1) 0%, rgba(255, 255, 255, 0.96) 100%);
+}
+
+.metric-tile--warning {
+  background: linear-gradient(180deg, rgba(217, 137, 34, 0.1) 0%, rgba(255, 255, 255, 0.96) 100%);
+}
+
+.metric-tile--success {
+  background: linear-gradient(180deg, rgba(47, 155, 102, 0.1) 0%, rgba(255, 255, 255, 0.96) 100%);
+}
+
+.metric-tile--danger {
+  background: linear-gradient(180deg, rgba(214, 76, 95, 0.1) 0%, rgba(255, 255, 255, 0.96) 100%);
 }
 
 .metric-label {

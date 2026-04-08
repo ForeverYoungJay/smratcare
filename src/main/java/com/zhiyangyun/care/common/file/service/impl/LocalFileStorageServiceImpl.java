@@ -9,6 +9,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,17 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 @ConditionalOnProperty(prefix = "app.file-storage", name = "provider", havingValue = "local", matchIfMissing = true)
 public class LocalFileStorageServiceImpl implements FileStorageService {
+  private static final Set<String> DANGEROUS_CONTENT_TYPES = Set.of(
+      "text/html",
+      "application/javascript",
+      "text/javascript",
+      "application/x-javascript",
+      "application/x-msdownload",
+      "application/x-sh",
+      "application/x-bat",
+      "application/x-csh",
+      "application/x-httpd-php",
+      "text/x-php");
   private final FileStorageProperties properties;
 
   public LocalFileStorageServiceImpl(FileStorageProperties properties) {
@@ -34,12 +47,15 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
     String originalName = safeFileName(file.getOriginalFilename());
     String extension = resolveExtension(originalName);
     validateExtension(extension);
+    validateContentType(file.getContentType());
     String safeBizType = sanitizeBizType(bizType);
     String storageName = UUID.randomUUID().toString().replace("-", "") + extension;
     LocalDate today = LocalDate.now();
-    Path dir = Paths.get(properties.getBaseDir(), safeBizType, String.valueOf(today.getYear()),
-        String.format("%02d", today.getMonthValue()), String.format("%02d", today.getDayOfMonth()));
-    Path target = dir.resolve(storageName);
+    Path baseDir = Paths.get(properties.getBaseDir()).toAbsolutePath().normalize();
+    Path dir = baseDir.resolve(Paths.get(safeBizType, String.valueOf(today.getYear()),
+        String.format("%02d", today.getMonthValue()), String.format("%02d", today.getDayOfMonth()))).normalize();
+    Path target = dir.resolve(storageName).normalize();
+    ensureSafePath(baseDir, target);
     try {
       Files.createDirectories(dir);
       file.transferTo(target);
@@ -65,6 +81,9 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
       return "common";
     }
     String normalized = bizType.trim().replaceAll("[^a-zA-Z0-9\\-_]", "-");
+    if (normalized.length() > 64) {
+      normalized = normalized.substring(0, 64);
+    }
     return normalized.isBlank() ? "common" : normalized;
   }
 
@@ -99,7 +118,37 @@ public class LocalFileStorageServiceImpl implements FileStorageService {
     if (originalName == null || originalName.isBlank()) {
       return "unnamed";
     }
-    return originalName.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
+    String normalized = originalName.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
+    if (normalized.length() > 128) {
+      return normalized.substring(normalized.length() - 128);
+    }
+    return normalized;
+  }
+
+  private void validateContentType(String contentType) {
+    if (contentType == null || contentType.isBlank()) {
+      return;
+    }
+    String normalized = contentType.trim().toLowerCase(Locale.ROOT);
+    int separator = normalized.indexOf(';');
+    if (separator >= 0) {
+      normalized = normalized.substring(0, separator).trim();
+    }
+    if ("application/octet-stream".equals(normalized)) {
+      return;
+    }
+    if (DANGEROUS_CONTENT_TYPES.contains(normalized)
+        || normalized.contains("javascript")
+        || normalized.contains("shellscript")
+        || normalized.contains("executable")) {
+      throw new IllegalArgumentException("文件内容类型不支持");
+    }
+  }
+
+  private void ensureSafePath(Path baseDir, Path target) {
+    if (baseDir == null || target == null || !target.startsWith(baseDir)) {
+      throw new IllegalStateException("文件存储路径非法");
+    }
   }
 
   private String normalizePrefix(String prefix) {

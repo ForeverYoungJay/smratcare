@@ -1,5 +1,36 @@
 <template>
   <PageContainer title="健康档案" subTitle="维护老人长期健康信息，并补充基础疾病入口">
+    <template #meta>
+      <span class="soft-pill">档案总数 {{ pagination.total || rows.length }}</span>
+      <span class="soft-pill">已维护疾病 {{ diseaseMaintainedCount }}</span>
+      <span v-for="tag in activeFilterTags" :key="tag" class="selection-pill">{{ tag }}</span>
+    </template>
+
+    <template #stats>
+      <div class="metric-grid">
+        <div class="metric-card metric-card--primary">
+          <span class="metric-card__label">当前列表</span>
+          <strong class="metric-card__value">{{ rows.length }}</strong>
+          <span class="metric-card__hint">按当前长者查询范围统计</span>
+        </div>
+        <div class="metric-card metric-card--success">
+          <span class="metric-card__label">已维护疾病</span>
+          <strong class="metric-card__value">{{ diseaseMaintainedCount }}</strong>
+          <span class="metric-card__hint">具备结构化基础疾病信息</span>
+        </div>
+        <div class="metric-card metric-card--warning">
+          <span class="metric-card__label">待补充疾病</span>
+          <strong class="metric-card__value">{{ rows.length - diseaseMaintainedCount }}</strong>
+          <span class="metric-card__hint">建议补齐基础疾病标签</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-card__label">当前编辑对象</span>
+          <strong class="metric-card__value">{{ healthArchiveDiseaseLabels.length }}</strong>
+          <span class="metric-card__hint">表单中已同步的疾病标签数</span>
+        </div>
+      </div>
+    </template>
+
     <SearchForm :model="query" @search="fetchData" @reset="onReset">
       <a-form-item label="老人姓名">
         <ElderNameAutocomplete v-model:value="query.keyword" placeholder="老人姓名(编号)" width="220px" />
@@ -96,7 +127,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
@@ -141,6 +172,10 @@ const editOpen = ref(false)
 const saving = ref(false)
 const { elderOptions, searchElders, findElderName, ensureSelectedElder } = useElderOptions({ pageSize: 50 })
 const { loadDiseaseState, loadDiseaseSummaryMap } = useElderDiseaseCatalog()
+const activeFilterTags = computed(() => (query.keyword ? [`长者: ${query.keyword}`] : []))
+const diseaseMaintainedCount = computed(() =>
+  rows.value.filter((item) => (diseaseSummaryMap.value[String(item.elderId || '')] || []).length > 0).length
+)
 const form = reactive({
   id: undefined as Id | undefined,
   elderId: undefined as Id | undefined,

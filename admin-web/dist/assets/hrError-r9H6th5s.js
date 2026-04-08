@@ -1,0 +1,1 @@
+function n(r,s="操作失败"){var t;const e=((t=r==null?void 0:r.response)==null?void 0:t.data)||r;return e?typeof e=="string"?e||s:typeof(e==null?void 0:e.msg)=="string"&&e.msg?e.msg:typeof(e==null?void 0:e.message)=="string"&&e.message?e.message:typeof(e==null?void 0:e.error)=="string"&&e.error?e.error:s:s}export{n as r};
