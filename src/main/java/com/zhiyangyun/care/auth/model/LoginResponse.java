@@ -10,4 +10,5 @@ public class LoginResponse {
   private List<String> roles;
   private List<String> permissions;
   private List<String> pagePermissions;
+  private List<RolePagePermissionSnapshot> rolePagePermissions;
 }

@@ -88,12 +88,12 @@ export function hasExplicitPageAccess(pagePermissions: string[], path: string): 
   })
 }
 
-export function canAccessPath(roles: string[], required: string[], path: string, pagePermissions: string[] = []): boolean {
+export function canAccessPath(roles: string[], required: string[], path: string, pagePermissions?: string[] | null): boolean {
   if (normalizePath(path) === '/403') {
     return true
   }
   const explicitPagePermissions = normalizePagePermissions(pagePermissions || [])
-  if (explicitPagePermissions.length > 0) {
+  if (pagePermissions != null) {
     return hasExplicitPageAccess(explicitPagePermissions, path)
   }
   const recommendedPagePermissions = getRecommendedPagePermissionsByRoles(roles || [])
@@ -104,7 +104,7 @@ export function canAccessPath(roles: string[], required: string[], path: string,
   return hasRouteAccess(roles, inferredRequired, path)
 }
 
-export function resolveRouteAccess(router: Router, roles: string[], path: string, pagePermissions: string[] = []): RouteAccessResult {
+export function resolveRouteAccess(router: Router, roles: string[], path: string, pagePermissions?: string[] | null): RouteAccessResult {
   const resolved = router.resolve(path)
   if (!resolved.matched.length) {
     return { canAccess: false, requiredRoles: [] }

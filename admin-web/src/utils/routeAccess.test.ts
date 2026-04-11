@@ -26,6 +26,10 @@ describe('routeAccess utils', () => {
     expect(canAccessPath(['MARKETING_EMPLOYEE'], ['ADMIN'], '/system/site-config', [])).toBe(false)
   })
 
+  it('treats an empty resolved page-permission snapshot as no access', () => {
+    expect(canAccessPath(['LOGISTICS_MINISTER'], [], '/logistics/workbench', [])).toBe(false)
+  })
+
   it('supports page-level default permissions inside a module', () => {
     expect(canAccessPath(['LOGISTICS_EMPLOYEE'], [], '/logistics/workbench')).toBe(true)
     expect(canAccessPath(['LOGISTICS_EMPLOYEE'], [], '/logistics/storage/warehouse')).toBe(true)

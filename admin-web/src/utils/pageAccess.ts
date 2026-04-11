@@ -319,6 +319,17 @@ export function parseRoutePermissionsJson(value?: string | null): string[] {
   }
 }
 
+export function hasStoredPagePermissionsConfig(value?: string | null): boolean {
+  if (value == null || String(value).trim() === '') {
+    return false
+  }
+  try {
+    return Array.isArray(JSON.parse(String(value)))
+  } catch {
+    return false
+  }
+}
+
 export function serializeRoutePermissions(paths: Array<string | null | undefined>): string {
   return JSON.stringify(normalizePagePermissions(paths))
 }

@@ -57,8 +57,8 @@
           <template v-else-if="column.key === 'pagePermissions'">
             <a-space size="small">
               <a-tag color="blue">{{ getEffectivePagePermissions(record).length }} 项</a-tag>
-              <a-tag :color="parseRoutePermissionsJson(record.routePermissionsJson).length ? 'gold' : 'default'">
-                {{ parseRoutePermissionsJson(record.routePermissionsJson).length ? '自定义' : '默认' }}
+              <a-tag :color="hasStoredPagePermissionsConfig(record.routePermissionsJson) ? 'gold' : 'default'">
+                {{ hasStoredPagePermissionsConfig(record.routePermissionsJson) ? '自定义' : '默认' }}
               </a-tag>
             </a-space>
           </template>
@@ -80,7 +80,7 @@ import { useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { getDepartmentOptionPage, getRolePage } from '../../api/rbac'
 import type { DepartmentItem, PageResult, RoleItem } from '../../types'
-import { ROLE_PAGE_PRESETS, getRecommendedPagePermissions, getRolePagePreset, parseRoutePermissionsJson } from '../../utils/pageAccess'
+import { ROLE_PAGE_PRESETS, getRecommendedPagePermissions, getRolePagePreset, hasStoredPagePermissionsConfig, parseRoutePermissionsJson } from '../../utils/pageAccess'
 
 const router = useRouter()
 const roleRows = ref<RoleItem[]>([])
@@ -91,7 +91,7 @@ const roleLoading = ref(false)
 const presetEntries = computed(() => Object.entries(ROLE_PAGE_PRESETS).map(([code, preset]) => ({ code, ...preset })))
 const enabledRoleCount = computed(() => roleRows.value.filter((item) => Number(item.status) === 1).length)
 const defaultTemplateCount = computed(() =>
-  roleRows.value.filter((item) => parseRoutePermissionsJson(item.routePermissionsJson).length === 0).length
+  roleRows.value.filter((item) => !hasStoredPagePermissionsConfig(item.routePermissionsJson)).length
 )
 
 const roleColumns = [
@@ -115,9 +115,8 @@ function resolveRoleName(roleId?: string | number) {
 }
 
 function getEffectivePagePermissions(role?: Partial<RoleItem>) {
-  const explicitPermissions = parseRoutePermissionsJson(role?.routePermissionsJson)
-  if (explicitPermissions.length) {
-    return explicitPermissions
+  if (hasStoredPagePermissionsConfig(role?.routePermissionsJson)) {
+    return parseRoutePermissionsJson(role?.routePermissionsJson)
   }
   return getRecommendedPagePermissions(role?.roleCode || role?.roleName)
 }

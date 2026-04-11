@@ -54,11 +54,11 @@ export function createRole(data: Partial<RoleItem>) {
   return request.post<void>('/api/admin/roles', data)
 }
 
-export function updateRole(id: number, data: Partial<RoleItem>) {
+export function updateRole(id: Id, data: Partial<RoleItem>) {
   return request.put<void>(`/api/admin/roles/${id}`, data)
 }
 
-export function deleteRole(id: number) {
+export function deleteRole(id: Id) {
   return request.delete<void>(`/api/admin/roles/${id}`)
 }
 
