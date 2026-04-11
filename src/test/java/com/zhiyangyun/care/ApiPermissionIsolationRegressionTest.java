@@ -252,6 +252,42 @@ class ApiPermissionIsolationRegressionTest {
         .andExpect(jsonPath("$.code", is(400)));
   }
 
+  @Test
+  void role_update_should_keep_existing_role_code_when_request_omits_it() throws Exception {
+    ensureRole("NURSING_MINISTER", 1L);
+
+    Role customRole = new Role();
+    customRole.setId(ID_SEQ.incrementAndGet());
+    customRole.setOrgId(1L);
+    customRole.setDepartmentId(10L);
+    customRole.setRoleCode("CUSTOM_CARE_LEAD");
+    customRole.setRoleName("照护组长");
+    customRole.setRoleDesc("custom role");
+    customRole.setStatus(1);
+    roleMapper.insert(customRole);
+
+    String adminToken = loginAndGetToken("admin", "123456");
+
+    mockMvc.perform(put("/api/admin/roles/" + customRole.getId())
+            .header("Authorization", "Bearer " + adminToken)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {
+                  "roleName": "护理部部长",
+                  "departmentId": 10,
+                  "status": 1
+                }
+                """))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.code", is(0)))
+        .andExpect(jsonPath("$.data.roleCode", is("CUSTOM_CARE_LEAD")))
+        .andExpect(jsonPath("$.data.roleName", is("护理部部长")));
+
+    Role updated = roleMapper.selectById(customRole.getId());
+    org.junit.jupiter.api.Assertions.assertEquals("CUSTOM_CARE_LEAD", updated.getRoleCode());
+    org.junit.jupiter.api.Assertions.assertEquals("护理部部长", updated.getRoleName());
+  }
+
   private Long createStaffWithRole(String username, String roleCode) {
     return createStaffWithRole(username, roleCode, 1L);
   }

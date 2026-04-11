@@ -75,7 +75,7 @@ public class AdminRoleController {
     role.setDepartmentId(department == null ? null : department.getId());
     role.setSuperiorRoleId(superiorRole == null ? null : superiorRole.getId());
     role.setRoleName(request.getRoleName());
-    role.setRoleCode(resolveRoleCode(request.getRoleCode(), request.getRoleName(), request.getDepartmentId()));
+    role.setRoleCode(resolveRoleCodeForUpdate(role, request));
     role.setRoleDesc(null);
     role.setRoutePermissionsJson(normalizeRoutePermissionsJson(request.getRoutePermissionsJson()));
     role.setStatus(request.getStatus());
@@ -147,6 +147,16 @@ public class AdminRoleController {
       normalized = "ROLE_" + normalized;
     }
     return normalized;
+  }
+
+  private String resolveRoleCodeForUpdate(Role role, RoleRequest request) {
+    if (StringUtils.hasText(request.getRoleCode())) {
+      return resolveRoleCode(request.getRoleCode(), request.getRoleName(), request.getDepartmentId());
+    }
+    if (StringUtils.hasText(role.getRoleCode())) {
+      return role.getRoleCode().trim().toUpperCase(Locale.ROOT);
+    }
+    return resolveRoleCode(null, request.getRoleName(), request.getDepartmentId());
   }
 
   private String inferRoleCode(String roleName, Long departmentId) {
