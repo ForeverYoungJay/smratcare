@@ -50,7 +50,7 @@ services:
       DB_NAME: ${DB_NAME:-zhiyangyun}
       DB_USER: ${DB_USER:-app}
       DB_PASSWORD: ${DB_PASSWORD:-app123456}
-      JWT_SECRET: ${JWT_SECRET:-change-me-please-change-me-please-change-me}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env or the shell environment}
       DEMO_SEED_ENABLED: ${DEMO_SEED_ENABLED:-false}
     volumes:
       - ./output/uploads:/app/uploads
