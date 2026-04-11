@@ -1,6 +1,5 @@
 import type { Router } from 'vue-router'
 import { hasRouteAccess, moduleRolesByPath } from './roleAccess'
-import { getRecommendedPagePermissionsByRoles, normalizePagePermissions } from './pageAccess'
 
 export interface RouteAccessResult {
   canAccess: boolean
@@ -88,23 +87,18 @@ export function hasExplicitPageAccess(pagePermissions: string[], path: string): 
   })
 }
 
-export function canAccessPath(roles: string[], required: string[], path: string, pagePermissions?: string[] | null): boolean {
+export function canAccessPath(roles: string[], required: string[], path: string, pagePermissions: string[] = []): boolean {
   if (normalizePath(path) === '/403') {
     return true
   }
-  const explicitPagePermissions = normalizePagePermissions(pagePermissions || [])
-  if (pagePermissions != null) {
-    return hasExplicitPageAccess(explicitPagePermissions, path)
-  }
-  const recommendedPagePermissions = getRecommendedPagePermissionsByRoles(roles || [])
-  if (recommendedPagePermissions.length > 0) {
-    return hasExplicitPageAccess(recommendedPagePermissions, path)
+  if ((pagePermissions || []).length > 0) {
+    return hasExplicitPageAccess(pagePermissions, path)
   }
   const inferredRequired = (required || []).length > 0 ? required : moduleRolesByPath(normalizePath(path))
   return hasRouteAccess(roles, inferredRequired, path)
 }
 
-export function resolveRouteAccess(router: Router, roles: string[], path: string, pagePermissions?: string[] | null): RouteAccessResult {
+export function resolveRouteAccess(router: Router, roles: string[], path: string, pagePermissions: string[] = []): RouteAccessResult {
   const resolved = router.resolve(path)
   if (!resolved.matched.length) {
     return { canAccess: false, requiredRoles: [] }

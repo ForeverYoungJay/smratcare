@@ -165,7 +165,7 @@ import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { getRolePage, createRole, updateRole, deleteRole, getDepartmentOptionPage } from '../../api/rbac'
 import type { DepartmentItem, PageResult, RoleItem } from '../../types'
-import { getPagePermissionTree, getRecommendedPagePermissions, getRolePagePreset, hasStoredPagePermissionsConfig, parseRoutePermissionsJson, serializeRoutePermissions, shouldPersistExplicitPagePermissions } from '../../utils/pageAccess'
+import { getPagePermissionTree, getRecommendedPagePermissions, getRolePagePreset, parseRoutePermissionsJson, serializeRoutePermissions, shouldPersistExplicitPagePermissions } from '../../utils/pageAccess'
 
 const router = useRouter()
 const route = useRoute()
@@ -222,7 +222,7 @@ const departmentOptions = computed(() =>
 )
 const superiorRoleOptions = computed(() =>
   allRoles.value
-    .filter((item) => String(item.id) !== String(form.id || ''))
+    .filter((item) => item.id !== form.id)
     .map((item) => ({ label: item.roleName, value: item.id }))
 )
 
@@ -285,6 +285,7 @@ function onReset() {
 }
 
 function openDrawer(record?: RoleItem) {
+  const explicitPermissions = parseRoutePermissionsJson(record?.routePermissionsJson)
   Object.assign(form, {
     id: record?.id,
     roleName: record?.roleName || '',
@@ -294,23 +295,24 @@ function openDrawer(record?: RoleItem) {
     routePermissionsJson: record?.routePermissionsJson || '',
     status: record?.status ?? 1
   })
-  checkedPagePermissions.value = hasStoredPagePermissionsConfig(record?.routePermissionsJson)
-    ? parseRoutePermissionsJson(record?.routePermissionsJson)
+  checkedPagePermissions.value = explicitPermissions.length
+    ? explicitPermissions
     : getRecommendedPagePermissions(record?.roleCode || record?.roleName)
   drawerOpen.value = true
 }
 
 function getEffectivePagePermissions(role?: Partial<RoleItem>) {
-  if (hasStoredPagePermissionsConfig(role?.routePermissionsJson)) {
-    return parseRoutePermissionsJson(role?.routePermissionsJson)
+  const explicitPermissions = parseRoutePermissionsJson(role?.routePermissionsJson)
+  if (explicitPermissions.length) {
+    return explicitPermissions
   }
   return getRecommendedPagePermissions(role?.roleCode || role?.roleName)
 }
 
 function syncDrawerFromRoute() {
-  const editId = String(route.query.edit || route.query.roleId || '').trim()
-  if (editId) {
-    const matched = allRoles.value.find((item) => String(item.id) === editId) || rows.value.find((item) => String(item.id) === editId)
+  const editId = Number(route.query.edit || route.query.roleId || 0)
+  if (editId > 0) {
+    const matched = allRoles.value.find((item) => Number(item.id) === editId) || rows.value.find((item) => Number(item.id) === editId)
     if (matched) {
       openDrawer(matched)
       return
@@ -354,7 +356,7 @@ async function submit() {
       status: form.status ?? 1
     }
     if (form.id) {
-      await updateRole(String(form.id), payload)
+      await updateRole(Number(form.id), payload)
     } else {
       await createRole(payload)
     }

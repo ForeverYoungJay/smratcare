@@ -5,11 +5,6 @@ export interface LoginRequest {
   password: string
 }
 
-export interface RolePagePermissionSnapshot {
-  roleCode?: string
-  routePermissionsJson?: string
-}
-
 export interface LoginResponse {
   token: string
   staffInfo: {
@@ -27,5 +22,4 @@ export interface LoginResponse {
   roles: string[]
   permissions?: string[]
   pagePermissions?: string[]
-  rolePagePermissions?: RolePagePermissionSnapshot[]
 }

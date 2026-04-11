@@ -9,7 +9,6 @@ import com.zhiyangyun.care.auth.mapper.StaffMapper;
 import com.zhiyangyun.care.auth.mapper.OrgMapper;
 import com.zhiyangyun.care.auth.model.LoginRequest;
 import com.zhiyangyun.care.auth.model.LoginResponse;
-import com.zhiyangyun.care.auth.model.RolePagePermissionSnapshot;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.model.StaffInfo;
 import com.zhiyangyun.care.auth.model.FamilyLoginRequest;
@@ -217,7 +216,6 @@ public class AuthController {
     response.setRoles(roles);
     response.setPermissions(permissionRegistry.getPermissionsByRoles(roles));
     response.setPagePermissions(mergeRoutePermissions(roleEntities));
-    response.setRolePagePermissions(buildRolePagePermissions(roleEntities));
     response.setStaffInfo(toStaffInfo(staff));
     return Result.ok(response);
   }
@@ -373,22 +371,5 @@ public class AuthController {
       merged.addAll(PagePermissionPathHelper.parseAndNormalize(objectMapper, role.getRoutePermissionsJson()));
     }
     return new ArrayList<>(merged);
-  }
-
-  private List<RolePagePermissionSnapshot> buildRolePagePermissions(List<Role> roles) {
-    if (roles == null || roles.isEmpty()) {
-      return List.of();
-    }
-    List<RolePagePermissionSnapshot> snapshots = new ArrayList<>();
-    for (Role role : roles) {
-      if (role == null) {
-        continue;
-      }
-      RolePagePermissionSnapshot snapshot = new RolePagePermissionSnapshot();
-      snapshot.setRoleCode(role.getRoleCode());
-      snapshot.setRoutePermissionsJson(role.getRoutePermissionsJson());
-      snapshots.add(snapshot);
-    }
-    return snapshots;
   }
 }
