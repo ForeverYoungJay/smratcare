@@ -36,6 +36,26 @@
       <a-form-item label="关键词">
         <a-input v-model:value="query.keyword" placeholder="角色名称" allow-clear />
       </a-form-item>
+      <a-form-item label="所属部门">
+        <a-select
+          v-model:value="query.departmentId"
+          allow-clear
+          show-search
+          :options="departmentOptions"
+          :filter-option="filterOption"
+          placeholder="全部部门"
+          style="width: 220px"
+        />
+      </a-form-item>
+      <a-form-item label="状态">
+        <a-select
+          v-model:value="query.status"
+          allow-clear
+          :options="statusOptions"
+          placeholder="全部状态"
+          style="width: 140px"
+        />
+      </a-form-item>
       <template #extra>
         <a-button type="primary" @click="openDrawer()">新增角色</a-button>
       </template>
@@ -149,7 +169,13 @@ import { getPagePermissionTree, getRolePagePreset, parseRoutePermissionsJson, se
 
 const router = useRouter()
 const route = useRoute()
-const query = reactive({ keyword: undefined as string | undefined, pageNo: 1, pageSize: 10 })
+const query = reactive({
+  keyword: undefined as string | undefined,
+  departmentId: undefined as number | undefined,
+  status: undefined as number | undefined,
+  pageNo: 1,
+  pageSize: 50
+})
 const rows = ref<RoleItem[]>([])
 const allRoles = ref<RoleItem[]>([])
 const departments = ref<DepartmentItem[]>([])
@@ -157,7 +183,7 @@ const loading = ref(false)
 const saving = ref(false)
 const drawerOpen = ref(false)
 const checkedPagePermissions = ref<string[]>([])
-const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
+const pagination = reactive({ current: 1, pageSize: 50, total: 0, showSizeChanger: true })
 const form = reactive<Partial<RoleItem>>({ status: 1 })
 const pagePermissionTree = getPagePermissionTree()
 
@@ -179,7 +205,18 @@ const drawerTitle = computed(() => (form.id ? '编辑角色' : '新增角色'))
 const recommendedPreset = computed(() => getRolePagePreset(form.roleCode || form.roleName))
 const enabledRoleCount = computed(() => rows.value.filter((item) => item.status === 1).length)
 const disabledRoleCount = computed(() => rows.value.filter((item) => item.status !== 1).length)
-const activeFilterTags = computed(() => (query.keyword ? [`关键词: ${query.keyword}`] : []))
+const activeFilterTags = computed(() => {
+  const tags: string[] = []
+  if (query.keyword) tags.push(`关键词: ${query.keyword}`)
+  if (query.departmentId != null) {
+    const departmentName = departments.value.find((item) => Number(item.id) === Number(query.departmentId))?.deptName
+    tags.push(`部门: ${departmentName || query.departmentId}`)
+  }
+  if (query.status != null) {
+    tags.push(`状态: ${Number(query.status) === 1 ? '启用' : '停用'}`)
+  }
+  return tags
+})
 const departmentOptions = computed(() =>
   departments.value.map((item) => ({ label: item.deptName, value: item.id }))
 )
@@ -204,10 +241,14 @@ function resolveRoleName(roleId?: string | number) {
 }
 
 async function fetchRoles(pageParams = query) {
-  const res: PageResult<RoleItem> = await getRolePage(pageParams)
+  const res: PageResult<RoleItem> = await getRolePage({
+    ...pageParams,
+    sortBy: 'roleName',
+    order: 'asc'
+  })
   rows.value = res.list || []
   pagination.total = res.total || rows.value.length
-  const allRes: PageResult<RoleItem> = await getRolePage({ pageNo: 1, pageSize: 300 })
+  const allRes: PageResult<RoleItem> = await getRolePage({ pageNo: 1, pageSize: 300, sortBy: 'roleName', order: 'asc' })
   allRoles.value = allRes.list || []
 }
 
@@ -234,6 +275,9 @@ function handleTableChange(pag: any) {
 }
 
 function onReset() {
+  query.keyword = undefined
+  query.departmentId = undefined
+  query.status = undefined
   query.pageNo = 1
   query.pageSize = pagination.pageSize
   pagination.current = 1

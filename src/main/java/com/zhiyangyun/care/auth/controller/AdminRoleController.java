@@ -104,12 +104,16 @@ public class AdminRoleController {
       @RequestParam(defaultValue = "1") long page,
       @RequestParam(defaultValue = "20") long size,
       @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) Long departmentId,
+      @RequestParam(required = false) Integer status,
       @RequestParam(required = false) String sortBy,
       @RequestParam(defaultValue = "desc") String order) {
     Long orgId = AuthContext.getOrgId();
     var wrapper = Wrappers.lambdaQuery(Role.class)
         .eq(Role::getIsDeleted, 0)
-        .eq(orgId != null, Role::getOrgId, orgId);
+        .eq(orgId != null, Role::getOrgId, orgId)
+        .eq(departmentId != null, Role::getDepartmentId, departmentId)
+        .eq(status != null, Role::getStatus, status);
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(Role::getRoleName, keyword)
           .or().like(Role::getRoleCode, keyword));
@@ -123,6 +127,8 @@ public class AdminRoleController {
       } else if ("createTime".equals(sortBy)) {
         wrapper.orderBy(true, asc, Role::getCreateTime);
       }
+    } else {
+      wrapper.orderByAsc(Role::getDepartmentId).orderByAsc(Role::getRoleName).orderByDesc(Role::getCreateTime);
     }
     return Result.ok(roleMapper.selectPage(new Page<>(page, size), wrapper));
   }
