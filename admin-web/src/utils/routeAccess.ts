@@ -1,5 +1,6 @@
 import type { Router } from 'vue-router'
 import { hasRouteAccess, moduleRolesByPath } from './roleAccess'
+import { getRecommendedPagePermissionsByRoles, normalizePagePermissions } from './pageAccess'
 
 export interface RouteAccessResult {
   canAccess: boolean
@@ -91,8 +92,13 @@ export function canAccessPath(roles: string[], required: string[], path: string,
   if (normalizePath(path) === '/403') {
     return true
   }
-  if ((pagePermissions || []).length > 0) {
-    return hasExplicitPageAccess(pagePermissions, path)
+  const explicitPagePermissions = normalizePagePermissions(pagePermissions || [])
+  if (explicitPagePermissions.length > 0) {
+    return hasExplicitPageAccess(explicitPagePermissions, path)
+  }
+  const recommendedPagePermissions = getRecommendedPagePermissionsByRoles(roles || [])
+  if (recommendedPagePermissions.length > 0) {
+    return hasExplicitPageAccess(recommendedPagePermissions, path)
   }
   const inferredRequired = (required || []).length > 0 ? required : moduleRolesByPath(normalizePath(path))
   return hasRouteAccess(roles, inferredRequired, path)
