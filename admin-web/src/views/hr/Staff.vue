@@ -32,6 +32,7 @@
         <a-button type="primary" @click="openDrawer()">新增人员</a-button>
         <a-button :disabled="!selectedSingleRecord" @click="editSelected">编辑档案</a-button>
         <a-button :disabled="!selectedSingleRecord" @click="viewSelected">查看</a-button>
+        <a-button :disabled="!selectedSingleRecord" @click="openEffectivePermissionPanel()">生效页面权限</a-button>
         <a-button :disabled="!canTerminateSingle" @click="terminateSelected">离职</a-button>
         <a-button :disabled="!canReinstateSingle" @click="reinstateSelected">复职</a-button>
         <a-button :disabled="selectedRowKeys.length === 0" @click="batchTerminate">批量离职</a-button>
@@ -280,6 +281,62 @@
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <a-modal
+      v-model:open="effectivePermissionOpen"
+      title="员工最终生效页面权限"
+      :footer="null"
+      width="760"
+      destroy-on-close
+    >
+      <a-spin :spinning="effectivePermissionLoading">
+        <a-space direction="vertical" style="width: 100%" size="middle">
+          <a-alert
+            type="info"
+            show-icon
+            :message="effectivePermissionSummaryTitle"
+            description="当前展示的是该员工已绑定角色的页面权限并集。只要任一角色包含该页面，员工重新登录后就会看到。"
+          />
+          <div>
+            <div class="permission-panel__label">已绑定角色</div>
+            <a-space wrap>
+              <a-tag v-for="role in effectivePermissionRoles" :key="role.id" color="blue">
+                {{ role.roleName }} ({{ role.roleCode }})
+              </a-tag>
+              <span v-if="!effectivePermissionRoles.length" class="permission-panel__empty">暂无角色绑定</span>
+            </a-space>
+          </div>
+          <div>
+            <div class="permission-panel__label">最终生效页面</div>
+            <a-space wrap>
+              <a-tag v-for="path in effectivePermissionPaths" :key="path" color="geekblue">
+                {{ getPageTitle(path) }}
+              </a-tag>
+              <span v-if="!effectivePermissionPaths.length" class="permission-panel__empty">当前没有生效页面权限</span>
+            </a-space>
+          </div>
+          <a-table
+            size="small"
+            :pagination="false"
+            row-key="id"
+            :columns="effectivePermissionColumns"
+            :data-source="effectivePermissionRoleRows"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'source'">
+                <a-tag :color="record.source === '自定义' ? 'gold' : 'default'">{{ record.source }}</a-tag>
+              </template>
+              <template v-else-if="column.key === 'paths'">
+                <a-space wrap>
+                  <a-tag v-for="path in record.paths" :key="path">{{ getPageTitle(path) }}</a-tag>
+                  <span v-if="!record.paths.length" class="permission-panel__empty">无页面权限</span>
+                </a-space>
+              </template>
+            </template>
+          </a-table>
+        </a-space>
+      </a-spin>
+    </a-modal>
   </PageContainer>
 </template>
 
@@ -298,6 +355,7 @@ import { openPrintTableReport } from '../../utils/print'
 import { useStaffOptions } from '../../composables/useStaffOptions'
 import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
 import type { HrSocialSecuritySummary, HrStaffProfile, PageResult, RoleItem, StaffItem } from '../../types'
+import { getPageTitle, getRecommendedPagePermissions, parseRoutePermissionsJson } from '../../utils/pageAccess'
 import { resolveHrError } from './hrError'
 
 const props = withDefaults(defineProps<{
@@ -335,6 +393,11 @@ const socialSecuritySummary = reactive<HrSocialSecuritySummary>({})
 const socialSecurityStartDateValue = ref<any>()
 const socialSecurityCompanyApplyChecked = ref(false)
 const socialSecurityNeedDirectorApprovalChecked = ref(false)
+const effectivePermissionOpen = ref(false)
+const effectivePermissionLoading = ref(false)
+const effectivePermissionStaff = ref<HrStaffProfile | null>(null)
+const effectivePermissionRoles = ref<RoleItem[]>([])
+const effectivePermissionPaths = ref<string[]>([])
 
 const columns = [
   { title: '工号', dataIndex: 'staffNo', key: 'staffNo', width: 120 },
@@ -405,10 +468,30 @@ const rowSelection = computed(() => ({
     selectedRowKeys.value = keys.map((item) => String(item))
   }
 }))
+const effectivePermissionColumns = [
+  { title: '角色', dataIndex: 'roleName', key: 'roleName', width: 220 },
+  { title: '来源', key: 'source', width: 120 },
+  { title: '页面权限', key: 'paths' }
+]
 const selectedRecords = computed(() => rows.value.filter((item) => selectedRowKeys.value.includes(String(item.staffId))))
 const selectedSingleRecord = computed(() => (selectedRecords.value.length === 1 ? selectedRecords.value[0] : null))
 const canTerminateSingle = computed(() => !!selectedSingleRecord.value && Number(selectedSingleRecord.value.status) === 1)
 const canReinstateSingle = computed(() => !!selectedSingleRecord.value && Number(selectedSingleRecord.value.status) !== 1)
+const effectivePermissionSummaryTitle = computed(() => {
+  const name = effectivePermissionStaff.value?.realName || effectivePermissionStaff.value?.staffId || '当前员工'
+  return `${name} 当前共有 ${effectivePermissionRoles.value.length} 个角色，最终生效 ${effectivePermissionPaths.value.length} 个页面`
+})
+const effectivePermissionRoleRows = computed(() =>
+  effectivePermissionRoles.value.map((role) => {
+    const explicitPaths = parseRoutePermissionsJson(role.routePermissionsJson)
+    const paths = explicitPaths.length ? explicitPaths : getRecommendedPagePermissions(role.roleCode || role.roleName)
+    return {
+      ...role,
+      source: explicitPaths.length ? '自定义' : '默认',
+      paths
+    }
+  })
+)
 
 async function fetchData() {
   loading.value = true
@@ -587,6 +670,45 @@ function regenerateNewStaffCredentials() {
 
 async function viewProfile(record: HrStaffProfile) {
   await openDrawer(record)
+}
+
+async function openEffectivePermissionPanel(record?: HrStaffProfile) {
+  const target = record || selectedSingleRecord.value
+  if (!target?.staffId) {
+    message.info('请先选择 1 位员工')
+    return
+  }
+  effectivePermissionOpen.value = true
+  effectivePermissionLoading.value = true
+  effectivePermissionStaff.value = target
+  try {
+    if (!roles.value.length) {
+      const roleRes: PageResult<RoleItem> = await getRolePage({ pageNo: 1, pageSize: 300 })
+      roles.value = roleRes.list || []
+    }
+    const assignments = await getStaffRoleAssignments(target.staffId)
+    const roleIds = new Set(
+      (assignments || [])
+        .map((item) => Number(item.roleId))
+        .filter((item) => Number.isFinite(item))
+    )
+    const assignedRoles = roles.value.filter((role) => roleIds.has(Number(role.id)))
+    effectivePermissionRoles.value = assignedRoles
+    effectivePermissionPaths.value = Array.from(
+      new Set(
+        assignedRoles.flatMap((role) => {
+          const explicitPaths = parseRoutePermissionsJson(role.routePermissionsJson)
+          return explicitPaths.length ? explicitPaths : getRecommendedPagePermissions(role.roleCode || role.roleName)
+        })
+      )
+    )
+  } catch (error) {
+    effectivePermissionRoles.value = []
+    effectivePermissionPaths.value = []
+    message.error(resolveHrError(error, '读取员工生效页面权限失败'))
+  } finally {
+    effectivePermissionLoading.value = false
+  }
 }
 
 async function submit(nextStep: 'save' | 'account' | 'contract' | 'attachment' = 'save') {
@@ -917,5 +1039,17 @@ maybeAutoOpenProfile()
   margin-top: 6px;
   font-size: 12px;
   color: rgba(0, 0, 0, 0.45);
+}
+
+.permission-panel__label {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.permission-panel__empty {
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
 }
 </style>

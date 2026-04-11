@@ -31,7 +31,7 @@ export interface StaffCredentialItem {
 }
 
 export interface RoleItem {
-  id: number
+  id: Id
   roleName: string
   roleCode: string
   orgId?: Id

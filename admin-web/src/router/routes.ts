@@ -3275,8 +3275,8 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'permission-overview',
             name: 'SystemPermissionOverview',
-            component: () => import('../views/System/PermissionOverview.vue'),
-            meta: { title: '权限总览', roles: ['DIRECTOR', 'SYS_ADMIN', 'ADMIN', 'HR_MINISTER'] }
+            redirect: '/system/role',
+            meta: { title: '权限总览（已并入角色管理）', roles: ['DIRECTOR', 'SYS_ADMIN', 'ADMIN', 'HR_MINISTER'], hidden: true }
           }
         ]
       },

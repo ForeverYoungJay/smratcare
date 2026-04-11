@@ -84,7 +84,6 @@
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
-            <a-button type="link" @click="openLinkedStaff(record)">关联员工</a-button>
             <a-button type="link" @click="openDrawer(record)">编辑</a-button>
             <a-popconfirm title="确认删除该角色吗？" ok-text="确认" cancel-text="取消" @confirm="remove(record)">
               <a-button type="link" danger>删除</a-button>
@@ -118,7 +117,7 @@
             :filter-option="filterOption"
             placeholder="不选则表示本角色无上级领导角色"
           />
-          <div class="permission-summary">用于员工账号里的“直接领导/间接领导”自动推荐。先定角色上级，再落到具体员工。</div>
+          <div class="permission-summary">角色与所属部门自动绑定，这里只维护角色层级，供员工领导链自动推荐使用。</div>
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="form.status" :options="statusOptions" />
@@ -167,7 +166,6 @@ import { getRolePage, createRole, updateRole, deleteRole, getDepartmentOptionPag
 import type { DepartmentItem, PageResult, RoleItem } from '../../types'
 import { getPagePermissionTree, getRecommendedPagePermissions, getRolePagePreset, parseRoutePermissionsJson, serializeRoutePermissions, shouldPersistExplicitPagePermissions } from '../../utils/pageAccess'
 
-const router = useRouter()
 const route = useRoute()
 const query = reactive({
   keyword: undefined as string | undefined,
@@ -222,7 +220,7 @@ const departmentOptions = computed(() =>
 )
 const superiorRoleOptions = computed(() =>
   allRoles.value
-    .filter((item) => item.id !== form.id)
+    .filter((item) => String(item.id) !== String(form.id || ''))
     .map((item) => ({ label: item.roleName, value: item.id }))
 )
 
@@ -310,9 +308,9 @@ function getEffectivePagePermissions(role?: Partial<RoleItem>) {
 }
 
 function syncDrawerFromRoute() {
-  const editId = Number(route.query.edit || route.query.roleId || 0)
-  if (editId > 0) {
-    const matched = allRoles.value.find((item) => Number(item.id) === editId) || rows.value.find((item) => Number(item.id) === editId)
+  const editId = String(route.query.edit || route.query.roleId || '').trim()
+  if (editId) {
+    const matched = allRoles.value.find((item) => String(item.id) === editId) || rows.value.find((item) => String(item.id) === editId)
     if (matched) {
       openDrawer(matched)
       return
@@ -356,7 +354,7 @@ async function submit() {
       status: form.status ?? 1
     }
     if (form.id) {
-      await updateRole(Number(form.id), payload)
+      await updateRole(String(form.id), payload)
     } else {
       await createRole(payload)
     }
@@ -372,13 +370,6 @@ async function remove(record: RoleItem) {
   await deleteRole(record.id)
   message.success('删除成功')
   fetchData()
-}
-
-function openLinkedStaff(record: RoleItem) {
-  router.push({
-    path: '/hr/profile/account-access',
-    query: { roleId: record.id }
-  })
 }
 
 watch(

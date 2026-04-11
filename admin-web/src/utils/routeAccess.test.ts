@@ -19,8 +19,8 @@ describe('routeAccess utils', () => {
     expect(canAccessPath(['NURSING_EMPLOYEE'], [], '/stats/check-in')).toBe(false)
   })
 
-  it('treats explicit page permissions as an extra restriction instead of a bypass', () => {
-    expect(canAccessPath(['MARKETING_EMPLOYEE'], ['ADMIN'], '/system/site-config', ['/system/site-config'])).toBe(false)
+  it('treats explicit page permissions as the primary route allow rule', () => {
+    expect(canAccessPath(['MARKETING_EMPLOYEE'], ['ADMIN'], '/system/site-config', ['/system/site-config'])).toBe(true)
     expect(canAccessPath(['MARKETING_EMPLOYEE'], ['ADMIN'], '/system/site-config', [])).toBe(false)
     expect(canAccessPath(['HR_MINISTER'], ['ADMIN'], '/system/site-config', ['/system/site-config'])).toBe(true)
   })

@@ -25,6 +25,7 @@ import com.zhiyangyun.care.auth.security.TokenProvider;
 import com.zhiyangyun.care.auth.security.PermissionRegistry;
 import com.zhiyangyun.care.auth.security.PagePermissionPathHelper;
 import com.zhiyangyun.care.auth.security.RoleCodeHelper;
+import com.zhiyangyun.care.auth.security.RolePagePermissionPresetHelper;
 import com.zhiyangyun.care.auth.entity.Org;
 import com.zhiyangyun.care.elder.entity.FamilyUser;
 import com.zhiyangyun.care.elder.mapper.FamilyUserMapper;
@@ -368,7 +369,7 @@ public class AuthController {
       if (role == null) {
         continue;
       }
-      merged.addAll(PagePermissionPathHelper.parseAndNormalize(objectMapper, role.getRoutePermissionsJson()));
+      merged.addAll(RolePagePermissionPresetHelper.resolveEffectivePaths(objectMapper, role));
     }
     return new ArrayList<>(merged);
   }

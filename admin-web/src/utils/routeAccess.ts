@@ -70,7 +70,7 @@ function collectAcceptablePaths(path: string): Set<string> {
       queue.push(normalizedAlias)
     })
   }
-  const siteConfigGroup = ['/system/site-config', '/system/role', '/system/permission-overview']
+  const siteConfigGroup = ['/system/site-config', '/system/role']
   if (siteConfigGroup.some((item) => acceptablePaths.has(item))) {
     siteConfigGroup.forEach((item) => acceptablePaths.add(item))
   }
@@ -91,15 +91,11 @@ export function canAccessPath(roles: string[], required: string[], path: string,
   if (normalizePath(path) === '/403') {
     return true
   }
-  const inferredRequired = (required || []).length > 0 ? required : moduleRolesByPath(normalizePath(path))
-  const roleAllowed = hasRouteAccess(roles, inferredRequired, path)
-  if (!roleAllowed) {
-    return false
-  }
   if ((pagePermissions || []).length > 0) {
     return hasExplicitPageAccess(pagePermissions, path)
   }
-  return true
+  const inferredRequired = (required || []).length > 0 ? required : moduleRolesByPath(normalizePath(path))
+  return hasRouteAccess(roles, inferredRequired, path)
 }
 
 export function resolveRouteAccess(router: Router, roles: string[], path: string, pagePermissions: string[] = []): RouteAccessResult {
