@@ -42,7 +42,7 @@ export function getStaffRoleAssignments(staffId: Id) {
   return request.get<Array<{ roleId?: number }>>('/api/admin/staff-roles', { params: { staffId, orgId: 0 } })
 }
 
-export function appendStaffRole(id: number, roleId: number) {
+export function appendStaffRole(id: Id, roleId: number) {
   return request.post<void>('/api/admin/staff-roles/add', { staffId: id, roleId })
 }
 

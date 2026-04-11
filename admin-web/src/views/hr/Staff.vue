@@ -660,8 +660,8 @@ async function submit(nextStep: 'save' | 'account' | 'contract' | 'attachment' =
     payload.socialSecurityCompanyApply = socialSecurityCompanyApplyChecked.value ? 1 : 0
     payload.socialSecurityNeedDirectorApproval = socialSecurityNeedDirectorApprovalChecked.value ? 1 : 0
     const saved = await upsertHrProfile(payload)
-    const staffId = Number(saved?.staffId || resolvedStaffId)
-    if (selectedRoleId.value && Number.isFinite(staffId) && !initialRoleIds.value.includes(selectedRoleId.value)) {
+    const staffId = String(saved?.staffId || resolvedStaffId || '')
+    if (selectedRoleId.value && staffId && !initialRoleIds.value.includes(selectedRoleId.value)) {
       await appendStaffRole(staffId, selectedRoleId.value)
       initialRoleIds.value = [...initialRoleIds.value, selectedRoleId.value]
     }
@@ -678,8 +678,8 @@ async function submit(nextStep: 'save' | 'account' | 'contract' | 'attachment' =
   }
 }
 
-function jumpToNextStep(staffId: number, nextStep: 'save' | 'account' | 'contract' | 'attachment') {
-  if (!Number.isFinite(staffId) || nextStep === 'save') {
+function jumpToNextStep(staffId: string, nextStep: 'save' | 'account' | 'contract' | 'attachment') {
+  if (!staffId || nextStep === 'save') {
     return
   }
   const query = { staffId: String(staffId), autoOpen: '1', from: 'hr-profile-basic' }
