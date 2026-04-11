@@ -67,9 +67,9 @@ export function clearPermissions() {
   localStorage.removeItem(PERMISSIONS_KEY)
 }
 
-export function getPagePermissions(): string[] {
+export function getPagePermissions(): string[] | null {
   const raw = localStorage.getItem(PAGE_PERMISSIONS_KEY)
-  return raw ? JSON.parse(raw) : []
+  return raw ? JSON.parse(raw) : null
 }
 
 export function setPagePermissions(pagePermissions: string[]) {

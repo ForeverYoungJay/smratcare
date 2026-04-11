@@ -25,7 +25,7 @@ export const useUserStore = defineStore('user', {
     token: getToken(),
     roles: getRoles(),
     permissions: getPermissions(),
-    pagePermissions: getPagePermissions(),
+    pagePermissions: getPagePermissions() || [],
     staffInfo: getStaffInfo<LoginResponse['staffInfo']>() as LoginResponse['staffInfo'] | null
   }),
   actions: {
