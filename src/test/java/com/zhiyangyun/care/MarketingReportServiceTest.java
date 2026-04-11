@@ -6,14 +6,18 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import com.zhiyangyun.care.crm.mapper.CrmCallbackPlanMapper;
+import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
 import com.zhiyangyun.care.crm.entity.CrmLead;
 import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
+import com.zhiyangyun.care.crm.mapper.CrmMarketingPlanMapper;
 import com.zhiyangyun.care.crm.model.report.MarketingCallbackReportResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingConsultationTrendItem;
 import com.zhiyangyun.care.crm.model.report.MarketingConversionReportResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingDataQualityResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingFollowupReportResponse;
+import com.zhiyangyun.care.crm.service.CrmTraceService;
 import com.zhiyangyun.care.crm.service.impl.MarketingReportServiceImpl;
+import com.zhiyangyun.care.elder.mapper.BedMapper;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -33,11 +37,29 @@ class MarketingReportServiceTest {
   @Mock
   private CrmCallbackPlanMapper callbackPlanMapper;
 
+  @Mock
+  private CrmContractMapper crmContractMapper;
+
+  @Mock
+  private BedMapper bedMapper;
+
+  @Mock
+  private CrmMarketingPlanMapper crmMarketingPlanMapper;
+
+  @Mock
+  private CrmTraceService crmTraceService;
+
   private MarketingReportServiceImpl service;
 
   @BeforeEach
   void setUp() {
-    service = new MarketingReportServiceImpl(crmLeadMapper, callbackPlanMapper);
+    service = new MarketingReportServiceImpl(
+        crmLeadMapper,
+        callbackPlanMapper,
+        crmContractMapper,
+        bedMapper,
+        crmMarketingPlanMapper,
+        crmTraceService);
   }
 
   @Test
