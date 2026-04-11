@@ -62,5 +62,5 @@ export interface OrgItem {
 
 export interface StaffRoleAssignRequest {
   staffId?: Id
-  roleIds: number[]
+  roleIds: Id[]
 }

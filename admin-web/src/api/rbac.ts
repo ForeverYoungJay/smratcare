@@ -33,7 +33,7 @@ export function updateStaff(id: number, data: Partial<StaffItem>) {
   return request.put<void>('/api/admin/staff', { ...data, id })
 }
 
-export function updateStaffRoles(id: number, roleIds: number[]) {
+export function updateStaffRoles(id: Id, roleIds: Id[]) {
   const body: StaffRoleAssignRequest = { staffId: id, roleIds }
   return request.post<void>('/api/admin/staff-roles/assign', body)
 }
@@ -42,11 +42,11 @@ export function getStaffRoleAssignments(staffId: Id) {
   return request.get<Array<{ roleId?: Id }>>('/api/admin/staff-roles', { params: { staffId, orgId: 0 } })
 }
 
-export function appendStaffRole(id: Id, roleId: number) {
+export function appendStaffRole(id: Id, roleId: Id) {
   return request.post<void>('/api/admin/staff-roles/add', { staffId: id, roleId })
 }
 
-export function removeStaffRole(id: number, roleId: number) {
+export function removeStaffRole(id: Id, roleId: Id) {
   return request.delete<void>('/api/admin/staff-roles/remove', { data: { staffId: id, roleId } })
 }
 

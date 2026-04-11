@@ -124,6 +124,16 @@
           <a-form-item label="姓名" required>
             <a-input v-model:value="accountForm.realName" @change="syncRealNameFromAccount" />
           </a-form-item>
+          <a-form-item label="岗位/角色" required>
+            <a-select
+              v-model:value="selectedRoleId"
+              show-search
+              :options="roleFormOptions"
+              :placeholder="form.jobTitle ? `当前：${form.jobTitle}` : '选择角色后自动带出岗位名称和所属部门'"
+              @change="onRoleChange"
+            />
+            <div class="form-rule-tip">角色会自动带出岗位名称和所属部门。</div>
+          </a-form-item>
           <a-form-item label="部门" required>
             <a-select
               v-model:value="accountForm.departmentId"
@@ -160,12 +170,12 @@
           />
           <a-input v-else :value="form.realName || accountForm.realName || ''" disabled />
         </a-form-item>
-        <a-form-item label="岗位/角色">
+        <a-form-item v-if="form.staffId || createMode === 'existing'" label="岗位/角色" required>
           <a-select
             v-model:value="selectedRoleId"
             show-search
             :options="roleFormOptions"
-            :placeholder="form.jobTitle ? `当前：${form.jobTitle}` : '选择角色后自动带出岗位名称'"
+            :placeholder="form.jobTitle ? `当前：${form.jobTitle}` : '选择角色后自动带出岗位名称和所属部门'"
             @change="onRoleChange"
           />
           <div class="form-rule-tip">角色会自动带出岗位名称和所属部门。</div>
@@ -388,8 +398,8 @@ const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChange
 const { staffOptions, staffLoading, searchStaff, ensureSelectedStaff } = useStaffOptions({ pageSize: 120 })
 const { departmentOptions, searchDepartments } = useDepartmentOptions({ pageSize: 200, preloadSize: 500 })
 const roles = ref<RoleItem[]>([])
-const selectedRoleId = ref<number | undefined>()
-const initialRoleIds = ref<number[]>([])
+const selectedRoleId = ref<string | undefined>()
+const initialRoleIds = ref<string[]>([])
 const selectedRowKeys = ref<string[]>([])
 const socialSecuritySummary = reactive<HrSocialSecuritySummary>({})
 const socialSecurityStartDateValue = ref<any>()
@@ -577,8 +587,8 @@ function syncRealNameFromAccount() {
   }
 }
 
-function onRoleChange(roleId?: number) {
-  const selected = roles.value.find((item) => item.id === roleId)
+function onRoleChange(roleId?: string | number) {
+  const selected = roles.value.find((item) => String(item.id) === String(roleId || ''))
   form.jobTitle = selected?.roleName || undefined
   if (selected?.departmentId != null && selected.departmentId !== '') {
     const departmentId = Number(selected.departmentId)
@@ -628,8 +638,8 @@ async function openDrawer(record?: HrStaffProfile) {
     try {
       const assignments = await getStaffRoleAssignments(record.staffId)
       initialRoleIds.value = (assignments || [])
-        .map((item) => Number(item.roleId))
-        .filter((item) => Number.isFinite(item))
+        .map((item) => String(item.roleId || '').trim())
+        .filter(Boolean)
       selectedRoleId.value = initialRoleIds.value[0]
     } catch {
       initialRoleIds.value = []
@@ -638,7 +648,8 @@ async function openDrawer(record?: HrStaffProfile) {
   if (!selectedRoleId.value && form.jobTitle) {
     const matchedRole = roles.value.find((item) => item.roleName === form.jobTitle)
     if (matchedRole?.id != null) {
-      selectedRoleId.value = matchedRole.id
+      selectedRoleId.value = String(matchedRole.id)
+      onRoleChange(selectedRoleId.value)
     }
   }
   if (form.hireDate && typeof form.hireDate === 'string') {
@@ -701,10 +712,10 @@ async function openEffectivePermissionPanel(record?: HrStaffProfile) {
     const assignments = await getStaffRoleAssignments(target.staffId)
     const roleIds = new Set(
       (assignments || [])
-        .map((item) => Number(item.roleId))
-        .filter((item) => Number.isFinite(item))
+        .map((item) => String(item.roleId || '').trim())
+        .filter(Boolean)
     )
-    const assignedRoles = roles.value.filter((role) => roleIds.has(Number(role.id)))
+    const assignedRoles = roles.value.filter((role) => roleIds.has(String(role.id)))
     effectivePermissionRoles.value = assignedRoles
     effectivePermissionPaths.value = Array.from(
       new Set(
@@ -769,6 +780,10 @@ async function submit(nextStep: 'save' | 'account' | 'contract' | 'attachment' =
     }
     if (!resolvedStaffId) {
       message.error('员工主档创建失败')
+      return
+    }
+    if (!selectedRoleId.value) {
+      message.error('请选择岗位/角色')
       return
     }
     const payload = { ...form } as any
