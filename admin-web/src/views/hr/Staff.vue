@@ -135,6 +135,7 @@
               @search="searchDepartments"
               @focus="() => !departmentOptions.length && searchDepartments('')"
             />
+            <div class="form-rule-tip">选择岗位/角色后会按角色管理里的所属部门自动带出，也可手动调整。</div>
           </a-form-item>
           <a-form-item label="手机号">
             <a-input v-model:value="accountForm.phone" />
@@ -167,6 +168,7 @@
             :placeholder="form.jobTitle ? `当前：${form.jobTitle}` : '选择角色后自动带出岗位名称'"
             @change="onRoleChange"
           />
+          <div class="form-rule-tip">角色会自动带出岗位名称和所属部门。</div>
         </a-form-item>
         <a-form-item label="用工类型">
           <a-select v-model:value="form.employmentType" :options="employmentOptions" />
@@ -563,6 +565,9 @@ function onStaffChange(val: string | number) {
   const selected = staffOptions.value.find((item) => String(item.value) === String(val))
   if (selected) {
     form.realName = selected.label
+    if (selected.departmentId != null && selected.departmentId !== '') {
+      form.departmentId = Number(selected.departmentId)
+    }
   }
 }
 
@@ -575,6 +580,13 @@ function syncRealNameFromAccount() {
 function onRoleChange(roleId?: number) {
   const selected = roles.value.find((item) => item.id === roleId)
   form.jobTitle = selected?.roleName || undefined
+  if (selected?.departmentId != null && selected.departmentId !== '') {
+    const departmentId = Number(selected.departmentId)
+    form.departmentId = departmentId
+    if (!form.staffId) {
+      accountForm.departmentId = departmentId
+    }
+  }
 }
 
 function socialSecurityWorkflowText(value?: string) {
