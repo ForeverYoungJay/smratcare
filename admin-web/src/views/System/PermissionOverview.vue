@@ -1,11 +1,10 @@
 <template>
-  <PageContainer title="权限总览" subTitle="先选员工，再分配角色。页面权限跟着角色走，不再做复杂模拟。">
+  <PageContainer title="权限总览" subTitle="只维护角色模板与页面权限。账号赋权请前往员工账号设置。">
     <template #meta>
       <a-space wrap size="small">
-        <span class="soft-pill">员工数：{{ staffOptions.length }}</span>
         <span class="soft-pill">部门数：{{ departments.length }}</span>
-        <span class="selection-pill">当前账号角色：{{ selectedAccountRoleNames.length }}</span>
-        <span class="soft-pill">{{ accountForm.staffId ? '已选择授权员工' : '请先选择员工账号' }}</span>
+        <span class="soft-pill">角色模板：{{ roleRows.length }}</span>
+        <span class="selection-pill">推荐模板：{{ presetEntries.length }}</span>
       </a-space>
     </template>
 
@@ -34,46 +33,7 @@
       </div>
     </template>
 
-    <a-row :gutter="[12, 12]">
-      <a-col :xs="24" :xl="10">
-        <a-card class="card-elevated" :bordered="false" title="1. 选择员工并分配角色">
-          <a-form layout="vertical">
-            <a-form-item label="员工账号">
-              <a-select
-                v-model:value="accountForm.staffId"
-                show-search
-                allow-clear
-                placeholder="选择要授权的员工"
-                :options="staffOptions"
-                :filter-option="filterOption"
-                @change="handleStaffChange"
-              />
-            </a-form-item>
-            <a-form-item label="角色">
-              <a-select
-                v-model:value="accountForm.roleIds"
-                mode="multiple"
-                placeholder="勾选该员工拥有的角色"
-                :options="roleOptions"
-                :disabled="!accountForm.staffId"
-                :filter-option="filterOption"
-              />
-            </a-form-item>
-          </a-form>
-          <div class="section-actions">
-            <a-button type="primary" :loading="accountSaving" :disabled="!accountForm.staffId" @click="saveAccountRoles">
-              保存账号权限
-            </a-button>
-          </div>
-          <div v-if="selectedAccountRoleNames.length" class="selected-role-summary">
-            当前角色：
-            <a-tag v-for="role in selectedAccountRoleNames" :key="role" color="cyan">{{ role }}</a-tag>
-          </div>
-        </a-card>
-      </a-col>
-
-      <a-col :xs="24" :xl="14">
-        <a-card class="card-elevated" :bordered="false" title="2. 组织架构建议">
+    <a-card class="card-elevated" :bordered="false" title="1. 组织架构建议">
           <a-row :gutter="[12, 12]">
             <a-col v-for="preset in presetEntries" :key="preset.code" :xs="24" :md="12">
               <div class="preset-card">
@@ -82,11 +42,9 @@
               </div>
             </a-col>
           </a-row>
-        </a-card>
-      </a-col>
-    </a-row>
+    </a-card>
 
-    <a-card class="card-elevated" :bordered="false" title="3. 角色权限模板" style="margin-top: 12px">
+    <a-card class="card-elevated" :bordered="false" title="2. 角色权限模板" style="margin-top: 12px">
       <template #extra>
         <a-button type="primary" @click="openRoleDrawer()">新增角色</a-button>
       </template>
@@ -175,31 +133,24 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
-import { createRole, getDepartmentOptionPage, getRolePage, getStaffOptionPage, getStaffRoleAssignments, updateRole, updateStaffRoles } from '../../api/rbac'
-import type { DepartmentItem, PageResult, RoleItem, StaffItem } from '../../types'
+import { createRole, getDepartmentOptionPage, getRolePage, updateRole } from '../../api/rbac'
+import type { DepartmentItem, PageResult, RoleItem } from '../../types'
 import { ROLE_PAGE_PRESETS, getPagePermissionTree, getRecommendedPagePermissions, getRolePagePreset, parseRoutePermissionsJson, serializeRoutePermissions } from '../../utils/pageAccess'
 
 const roleRows = ref<RoleItem[]>([])
 const allRoles = ref<RoleItem[]>([])
 const departments = ref<DepartmentItem[]>([])
-const staffOptions = ref<Array<{ label: string; value: number }>>([])
 const roleLoading = ref(false)
 const roleSaving = ref(false)
 const roleDrawerOpen = ref(false)
-const accountSaving = ref(false)
 const checkedPagePermissions = ref<string[]>([])
 const pagePermissionTree = getPagePermissionTree()
 const roleForm = reactive<Partial<RoleItem>>({ status: 1 })
-const accountForm = reactive({ staffId: undefined as number | undefined, roleIds: [] as number[] })
 
 const presetEntries = computed(() => Object.entries(ROLE_PAGE_PRESETS).map(([code, preset]) => ({ code, ...preset })))
 const departmentOptions = computed(() => departments.value.map((item) => ({ label: item.deptName, value: item.id })))
-const roleOptions = computed(() => allRoles.value.map((item) => ({ label: item.roleName, value: item.id })))
 const superiorRoleOptions = computed(() =>
   allRoles.value.filter((item) => item.id !== roleForm.id).map((item) => ({ label: item.roleName, value: item.id }))
-)
-const selectedAccountRoleNames = computed(() =>
-  allRoles.value.filter((item) => accountForm.roleIds.includes(item.id)).map((item) => item.roleName)
 )
 const roleDrawerTitle = computed(() => (roleForm.id ? '编辑角色权限模板' : '新增角色权限模板'))
 const recommendedPreset = computed(() => getRolePagePreset(roleForm.roleCode || roleForm.roleName))
@@ -248,37 +199,6 @@ async function fetchRoles() {
 async function fetchDepartments() {
   const res: PageResult<DepartmentItem> = await getDepartmentOptionPage({ pageNo: 1, pageSize: 300, activeOnly: false })
   departments.value = res.list || []
-}
-
-async function fetchStaffOptions() {
-  const res: PageResult<StaffItem> = await getStaffOptionPage({ pageNo: 1, pageSize: 300, status: 1 })
-  staffOptions.value = (res.list || []).map((item) => ({
-    label: `${item.realName || item.username}${item.staffNo ? ` / ${item.staffNo}` : ''}`,
-    value: Number(item.id)
-  }))
-}
-
-async function handleStaffChange(staffId?: number) {
-  if (!staffId) {
-    accountForm.roleIds = []
-    return
-  }
-  const assignments = await getStaffRoleAssignments(staffId)
-  accountForm.roleIds = assignments.map((item) => Number(item.roleId)).filter((item) => Number.isFinite(item))
-}
-
-async function saveAccountRoles() {
-  if (!accountForm.staffId) {
-    message.warning('请先选择员工')
-    return
-  }
-  accountSaving.value = true
-  try {
-    await updateStaffRoles(accountForm.staffId, accountForm.roleIds)
-    message.success('账号权限已更新，目标账号重新登录后生效')
-  } finally {
-    accountSaving.value = false
-  }
 }
 
 function openRoleDrawer(record?: RoleItem) {
@@ -335,16 +255,11 @@ async function saveRole() {
 }
 
 onMounted(async () => {
-  await Promise.all([fetchRoles(), fetchDepartments(), fetchStaffOptions()])
+  await Promise.all([fetchRoles(), fetchDepartments()])
 })
 </script>
 
 <style scoped>
-.section-actions {
-  margin-top: 8px;
-}
-
-.selected-role-summary,
 .permission-summary {
   margin-top: 10px;
   color: rgba(0, 0, 0, 0.65);

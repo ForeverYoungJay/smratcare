@@ -2,24 +2,24 @@ import { describe, expect, it } from 'vitest'
 import { canAccessPath } from './routeAccess'
 
 describe('routeAccess utils', () => {
-  it('allows super roles to access any guarded route', () => {
-    expect(canAccessPath(['ADMIN'], ['HR_MINISTER'], '/hr/staff')).toBe(true)
-    expect(canAccessPath(['SYS_ADMIN'], ['MEDICAL_EMPLOYEE'], '/health/management/archive')).toBe(true)
+  it('denies any business page when explicit page permissions are empty', () => {
+    expect(canAccessPath(['ADMIN'], ['HR_MINISTER'], '/hr/staff')).toBe(false)
+    expect(canAccessPath(['SYS_ADMIN'], ['MEDICAL_EMPLOYEE'], '/health/management/archive')).toBe(false)
   })
 
-  it('falls back to module roles for hidden health routes', () => {
-    expect(canAccessPath(['MEDICAL_EMPLOYEE'], [], '/health/management/archive')).toBe(true)
-    expect(canAccessPath(['NURSING_EMPLOYEE'], [], '/health/management/archive')).toBe(true)
+  it('does not fall back to module roles for hidden routes', () => {
+    expect(canAccessPath(['MEDICAL_EMPLOYEE'], [], '/health/management/archive')).toBe(false)
+    expect(canAccessPath(['NURSING_EMPLOYEE'], [], '/health/management/archive')).toBe(false)
     expect(canAccessPath(['MARKETING_EMPLOYEE'], [], '/health/management/archive')).toBe(false)
   })
 
-  it('restricts stats routes when no explicit route meta is present', () => {
-    expect(canAccessPath(['LOGISTICS_EMPLOYEE'], [], '/stats/org/bed-usage')).toBe(true)
-    expect(canAccessPath(['HR_EMPLOYEE'], [], '/stats/check-in')).toBe(true)
+  it('denies routes without explicit page permissions even when meta is absent', () => {
+    expect(canAccessPath(['LOGISTICS_EMPLOYEE'], [], '/stats/org/bed-usage')).toBe(false)
+    expect(canAccessPath(['HR_EMPLOYEE'], [], '/stats/check-in')).toBe(false)
     expect(canAccessPath(['NURSING_EMPLOYEE'], [], '/stats/check-in')).toBe(false)
   })
 
-  it('keeps explicit page permissions as the highest-priority allow rule', () => {
+  it('allows access only when explicit page permissions include the path', () => {
     expect(canAccessPath(['MARKETING_EMPLOYEE'], ['ADMIN'], '/system/site-config', ['/system/site-config'])).toBe(true)
     expect(canAccessPath(['MARKETING_EMPLOYEE'], ['ADMIN'], '/system/site-config', [])).toBe(false)
   })
