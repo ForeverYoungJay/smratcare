@@ -222,7 +222,7 @@ const departmentOptions = computed(() =>
 )
 const superiorRoleOptions = computed(() =>
   allRoles.value
-    .filter((item) => item.id !== form.id)
+    .filter((item) => String(item.id) !== String(form.id || ''))
     .map((item) => ({ label: item.roleName, value: item.id }))
 )
 

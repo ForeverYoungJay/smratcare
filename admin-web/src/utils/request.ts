@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { message } from 'ant-design-vue'
 import router from '../router'
-import { getToken, clearToken, clearRoles, clearPermissions } from './auth'
+import { getToken, clearToken, clearRoles, clearPermissions, clearPagePermissions, clearStaffInfo } from './auth'
 import type { PageResult } from '../types/common'
 import { emitLiveSync, inferLiveSyncTopics } from './liveSync'
 
@@ -107,6 +107,8 @@ request.interceptors.response.use(
       clearToken()
       clearRoles()
       clearPermissions()
+      clearPagePermissions()
+      clearStaffInfo()
       router.push('/login')
       return Promise.reject(error)
     }
