@@ -137,8 +137,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
@@ -148,6 +148,7 @@ import type { DepartmentItem, PageResult, RoleItem } from '../../types'
 import { getPagePermissionTree, getRolePagePreset, parseRoutePermissionsJson, serializeRoutePermissions } from '../../utils/pageAccess'
 
 const router = useRouter()
+const route = useRoute()
 const query = reactive({ keyword: undefined as string | undefined, pageNo: 1, pageSize: 10 })
 const rows = ref<RoleItem[]>([])
 const allRoles = ref<RoleItem[]>([])
@@ -253,6 +254,20 @@ function openDrawer(record?: RoleItem) {
   drawerOpen.value = true
 }
 
+function syncDrawerFromRoute() {
+  const editId = Number(route.query.edit || route.query.roleId || 0)
+  if (editId > 0) {
+    const matched = allRoles.value.find((item) => Number(item.id) === editId) || rows.value.find((item) => Number(item.id) === editId)
+    if (matched) {
+      openDrawer(matched)
+      return
+    }
+  }
+  if (String(route.query.open || '') === 'new') {
+    openDrawer()
+  }
+}
+
 function onPermissionCheck(checkedKeys: string[] | { checked: string[] }) {
   checkedPagePermissions.value = Array.isArray(checkedKeys) ? checkedKeys : checkedKeys.checked || []
 }
@@ -309,7 +324,18 @@ function openLinkedStaff(record: RoleItem) {
   })
 }
 
-fetchData()
+watch(
+  () => [route.query.edit, route.query.roleId, route.query.open, allRoles.value.length].join('|'),
+  () => {
+    syncDrawerFromRoute()
+  },
+  { immediate: false }
+)
+
+onMounted(async () => {
+  await fetchData()
+  syncDrawerFromRoute()
+})
 </script>
 
 <style scoped>
