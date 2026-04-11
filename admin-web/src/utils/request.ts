@@ -19,6 +19,11 @@ const request = axios.create({
 let lastForbiddenToastAt = 0
 let lastForbiddenToastKey = ''
 const FORBIDDEN_TOAST_COOLDOWN_MS = 2500
+const GENERIC_FORBIDDEN_PATTERNS = [
+  /access denied/i,
+  /无权限访问该资源/,
+  /当前账号无该操作权限/
+]
 
 function resolveErrorMessage(payload: any, fallback = '请求失败') {
   if (!payload) return fallback
@@ -114,9 +119,11 @@ request.interceptors.response.use(
       }
       const payload = error?.response?.data
       const rawMessage = resolveErrorMessage(payload, '当前账号无该操作权限（403）')
-      const displayMessage = /access denied/i.test(rawMessage)
-        ? '当前账号无该操作权限（403），请联系管理员开通。'
-        : rawMessage
+      const isGenericForbidden = GENERIC_FORBIDDEN_PATTERNS.some((pattern) => pattern.test(rawMessage))
+      if (isGenericForbidden) {
+        return Promise.reject(error)
+      }
+      const displayMessage = rawMessage
       const now = Date.now()
       const key = `${url}|${displayMessage}`
       if (key !== lastForbiddenToastKey || now - lastForbiddenToastAt > FORBIDDEN_TOAST_COOLDOWN_MS) {

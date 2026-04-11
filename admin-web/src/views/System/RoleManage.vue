@@ -165,7 +165,7 @@ import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { getRolePage, createRole, updateRole, deleteRole, getDepartmentOptionPage } from '../../api/rbac'
 import type { DepartmentItem, PageResult, RoleItem } from '../../types'
-import { getPagePermissionTree, getRecommendedPagePermissions, getRolePagePreset, parseRoutePermissionsJson, serializeRoutePermissions } from '../../utils/pageAccess'
+import { getPagePermissionTree, getRecommendedPagePermissions, getRolePagePreset, parseRoutePermissionsJson, serializeRoutePermissions, shouldPersistExplicitPagePermissions } from '../../utils/pageAccess'
 
 const router = useRouter()
 const route = useRoute()
@@ -350,7 +350,9 @@ async function submit() {
       roleName: form.roleName,
       departmentId: form.departmentId,
       superiorRoleId: form.superiorRoleId,
-      routePermissionsJson: serializeRoutePermissions(checkedPagePermissions.value),
+      routePermissionsJson: shouldPersistExplicitPagePermissions(form.roleCode, form.roleName, checkedPagePermissions.value)
+        ? serializeRoutePermissions(checkedPagePermissions.value)
+        : '',
       status: form.status ?? 1
     }
     if (form.id) {

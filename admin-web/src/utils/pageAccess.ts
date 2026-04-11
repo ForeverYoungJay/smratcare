@@ -214,6 +214,23 @@ export function serializeRoutePermissions(paths: Array<string | null | undefined
   return JSON.stringify(normalizePagePermissions(paths))
 }
 
+export function shouldPersistExplicitPagePermissions(
+  roleCode: string | null | undefined,
+  roleName: string | null | undefined,
+  paths: Array<string | null | undefined>
+): boolean {
+  const normalizedPaths = normalizePagePermissions(paths)
+  const recommendedPaths = getRecommendedPagePermissions(roleCode || roleName)
+  if (normalizedPaths.length === 0) {
+    return recommendedPaths.length > 0
+  }
+  if (normalizedPaths.length !== recommendedPaths.length) {
+    return true
+  }
+  const normalizedSet = new Set(normalizedPaths)
+  return recommendedPaths.some((path) => !normalizedSet.has(path))
+}
+
 export function getRolePagePreset(roleCode?: string | null): RolePagePreset | null {
   const code = String(roleCode || '').trim().toUpperCase()
   return ROLE_PAGE_PRESETS[code] || null
