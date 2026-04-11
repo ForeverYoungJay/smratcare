@@ -236,7 +236,7 @@ public class ElderResidenceController {
     return Result.ok(record);
   }
 
-  @PreAuthorize(OUTING_ACCESS)
+  @PreAuthorize("@elderAuthz.canManageOuting()")
   @PutMapping("/outing/{id}/return")
   public Result<ElderOutingRecord> returnFromOuting(@PathVariable Long id, @RequestBody OutingReturnRequest request) {
     Long orgId = AuthContext.getOrgId();
@@ -274,7 +274,7 @@ public class ElderResidenceController {
   }
 
   @DeleteMapping("/outing/{id}")
-  @PreAuthorize("@elderAuthz.canManageDischarge()")
+  @PreAuthorize("@elderAuthz.canManageOuting()")
   public Result<Boolean> deleteOuting(@PathVariable Long id) {
     Long orgId = AuthContext.getOrgId();
     ElderOutingRecord record = outingMapper.selectById(id);
@@ -639,7 +639,7 @@ public class ElderResidenceController {
   }
 
   @GetMapping(value = "/death-register/export", produces = "text/csv;charset=UTF-8")
-  @PreAuthorize("hasAnyRole('MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("@elderAuthz.canManageOuting()")
   public ResponseEntity<byte[]> exportDeathRegister(
       @RequestParam(required = false) Long elderId,
       @RequestParam(required = false) String status,
