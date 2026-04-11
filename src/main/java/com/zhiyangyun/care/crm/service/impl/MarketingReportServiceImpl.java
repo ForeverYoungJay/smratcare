@@ -3,9 +3,13 @@ package com.zhiyangyun.care.crm.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zhiyangyun.care.crm.entity.CrmCallbackPlan;
+import com.zhiyangyun.care.crm.entity.CrmContract;
 import com.zhiyangyun.care.crm.entity.CrmLead;
+import com.zhiyangyun.care.crm.entity.CrmMarketingPlan;
 import com.zhiyangyun.care.crm.mapper.CrmCallbackPlanMapper;
+import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
 import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
+import com.zhiyangyun.care.crm.mapper.CrmMarketingPlanMapper;
 import com.zhiyangyun.care.crm.model.report.MarketingCallbackItem;
 import com.zhiyangyun.care.crm.model.report.MarketingCallbackReportResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingChannelReportItem;
@@ -14,7 +18,11 @@ import com.zhiyangyun.care.crm.model.report.MarketingConversionReportResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingDataQualityResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingFollowupReportResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingLeadEntrySummaryResponse;
+import com.zhiyangyun.care.crm.model.report.MarketingWorkbenchSummaryResponse;
+import com.zhiyangyun.care.crm.service.CrmTraceService;
 import com.zhiyangyun.care.crm.service.MarketingReportService;
+import com.zhiyangyun.care.elder.entity.Bed;
+import com.zhiyangyun.care.elder.mapper.BedMapper;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -26,6 +34,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
@@ -35,25 +44,44 @@ import org.springframework.transaction.annotation.Transactional;
 public class MarketingReportServiceImpl implements MarketingReportService {
   private static final Set<String> STANDARD_SOURCES = new LinkedHashSet<>(
       Arrays.asList("自然到访", "线上咨询", "抖音", "微信", "转介绍", "社区活动", "其他"));
+  private static final String FLOW_PENDING_ASSESSMENT = "PENDING_ASSESSMENT";
+  private static final String FLOW_PENDING_BED_SELECT = "PENDING_BED_SELECT";
+  private static final String FLOW_PENDING_SIGN = "PENDING_SIGN";
+  private static final String FLOW_SIGNED = "SIGNED";
+  private static final String CHANGE_PENDING_APPROVAL = "PENDING_APPROVAL";
 
   private final CrmLeadMapper crmLeadMapper;
   private final CrmCallbackPlanMapper callbackPlanMapper;
+  private final CrmContractMapper crmContractMapper;
+  private final BedMapper bedMapper;
+  private final CrmMarketingPlanMapper marketingPlanMapper;
+  private final CrmTraceService crmTraceService;
 
-  public MarketingReportServiceImpl(CrmLeadMapper crmLeadMapper, CrmCallbackPlanMapper callbackPlanMapper) {
+  public MarketingReportServiceImpl(
+      CrmLeadMapper crmLeadMapper,
+      CrmCallbackPlanMapper callbackPlanMapper,
+      CrmContractMapper crmContractMapper,
+      BedMapper bedMapper,
+      CrmMarketingPlanMapper marketingPlanMapper,
+      CrmTraceService crmTraceService) {
     this.crmLeadMapper = crmLeadMapper;
     this.callbackPlanMapper = callbackPlanMapper;
+    this.crmContractMapper = crmContractMapper;
+    this.bedMapper = bedMapper;
+    this.marketingPlanMapper = marketingPlanMapper;
+    this.crmTraceService = crmTraceService;
   }
 
   @Override
   public MarketingConversionReportResponse conversion(
       Long tenantId, String dateFrom, String dateTo, String source, Long staffId) {
-    LambdaQueryWrapper<CrmLead> baseWrapper = leadWrapperByCreateTime(tenantId, dateFrom, dateTo, source, staffId);
-    long total = crmLeadMapper.selectCount(baseWrapper);
-    long consult = countByStatus(tenantId, dateFrom, dateTo, source, staffId, 0);
-    long intent = countByStatus(tenantId, dateFrom, dateTo, source, staffId, 1);
-    long reserve = countByStatus(tenantId, dateFrom, dateTo, source, staffId, 2);
-    long invalid = countByStatus(tenantId, dateFrom, dateTo, source, staffId, 3);
-    long contractCount = countContracts(tenantId, dateFrom, dateTo, source, staffId);
+    List<CrmLead> leads = crmLeadMapper.selectList(leadWrapperByCreateTime(tenantId, dateFrom, dateTo, source, staffId));
+    long total = leads.size();
+    long consult = leads.stream().filter(this::isConsultLead).count();
+    long intent = leads.stream().filter(this::isIntentLead).count();
+    long reserve = leads.stream().filter(this::hasReservationEvidence).count();
+    long invalid = leads.stream().filter(this::isInvalidLead).count();
+    long contractCount = leads.stream().filter(this::isSignedLead).count();
 
     MarketingConversionReportResponse response = new MarketingConversionReportResponse();
     response.setTotalLeads(total);
@@ -65,6 +93,14 @@ public class MarketingReportServiceImpl implements MarketingReportService {
     response.setIntentRate(rate(intent, total));
     response.setReservationRate(rate(reserve, total));
     response.setContractRate(rate(contractCount, total));
+    crmTraceService.saveSnapshot(
+        tenantId,
+        tenantId,
+        "MARKETING_CONVERSION",
+        parseDateOrNull(dateFrom),
+        parseDateOrNull(dateTo),
+        buildReportSnapshotKey(source, staffId, null),
+        response);
     return response;
   }
 
@@ -82,7 +118,11 @@ public class MarketingReportServiceImpl implements MarketingReportService {
       throw new IllegalArgumentException("dateFrom cannot be after dateTo");
     }
 
-    LambdaQueryWrapper<CrmLead> wrapper = leadWrapperByCreateTime(tenantId, from.toString(), to.toString(), source, staffId);
+    LambdaQueryWrapper<CrmLead> wrapper = Wrappers.lambdaQuery(CrmLead.class)
+        .eq(CrmLead::getIsDeleted, 0)
+        .eq(tenantId != null, CrmLead::getTenantId, tenantId)
+        .eq(source != null && !source.isBlank(), CrmLead::getSource, normalizeSource(source));
+    applyLeadStaffScope(wrapper, staffId);
     List<CrmLead> leads = crmLeadMapper.selectList(wrapper);
 
     Map<String, MarketingConsultationTrendItem> map = new LinkedHashMap<>();
@@ -95,23 +135,36 @@ public class MarketingReportServiceImpl implements MarketingReportService {
     }
 
     for (CrmLead lead : leads) {
-      if (lead.getCreateTime() == null) {
+      LocalDate bucketDate = lead.getConsultDate();
+      if (bucketDate == null && lead.getCreateTime() != null) {
+        bucketDate = lead.getCreateTime().toLocalDate();
+      }
+      if (bucketDate == null || bucketDate.isBefore(from) || bucketDate.isAfter(to)) {
         continue;
       }
-      MarketingConsultationTrendItem day = map.get(lead.getCreateTime().toLocalDate().toString());
+      MarketingConsultationTrendItem day = map.get(bucketDate.toString());
       if (day == null) {
         continue;
       }
       day.setTotal(day.getTotal() + 1);
-      if (Integer.valueOf(0).equals(lead.getStatus())) {
+      if (isConsultLead(lead)) {
         day.setConsultCount(day.getConsultCount() + 1);
       }
-      if (Integer.valueOf(1).equals(lead.getStatus())) {
+      if (isIntentLead(lead)) {
         day.setIntentCount(day.getIntentCount() + 1);
       }
     }
 
-    return new ArrayList<>(map.values());
+    List<MarketingConsultationTrendItem> response = new ArrayList<>(map.values());
+    crmTraceService.saveSnapshot(
+        tenantId,
+        tenantId,
+        "MARKETING_CONSULTATION",
+        from,
+        to,
+        buildReportSnapshotKey(source, staffId, "days=" + days),
+        response);
+    return response;
   }
 
   @Override
@@ -127,34 +180,46 @@ public class MarketingReportServiceImpl implements MarketingReportService {
         return created;
       });
       item.setLeadCount(item.getLeadCount() + 1);
-      if (Integer.valueOf(2).equals(lead.getStatus()) || Integer.valueOf(1).equals(lead.getContractSignedFlag())) {
+      if (hasReservationEvidence(lead)) {
         item.setReservationCount(item.getReservationCount() + 1);
       }
-      if (Integer.valueOf(1).equals(lead.getContractSignedFlag())) {
+      if (isSignedLead(lead)) {
         item.setContractCount(item.getContractCount() + 1);
       }
     }
-    return new ArrayList<>(map.values());
+    List<MarketingChannelReportItem> response = new ArrayList<>(map.values());
+    crmTraceService.saveSnapshot(
+        tenantId,
+        tenantId,
+        "MARKETING_CHANNEL",
+        parseDateOrNull(dateFrom),
+        parseDateOrNull(dateTo),
+        buildReportSnapshotKey(null, staffId, null),
+        response);
+    return response;
   }
 
   @Override
   public MarketingFollowupReportResponse followup(
       Long tenantId, String dateFrom, String dateTo, String source, Long staffId) {
-    long total = crmLeadMapper.selectCount(leadWrapperByCreateTime(tenantId, dateFrom, dateTo, source, staffId));
-    long consult = countByStatus(tenantId, dateFrom, dateTo, source, staffId, 0);
-    long intent = countByStatus(tenantId, dateFrom, dateTo, source, staffId, 1);
-    long reserve = countByStatus(tenantId, dateFrom, dateTo, source, staffId, 2);
-    long invalid = countByStatus(tenantId, dateFrom, dateTo, source, staffId, 3);
+    List<CrmLead> leads = crmLeadMapper.selectList(leadWrapperByCreateTime(tenantId, dateFrom, dateTo, source, staffId));
+    long total = leads.size();
+    long consult = leads.stream().filter(this::isConsultLead).count();
+    long intent = leads.stream().filter(this::isIntentLead).count();
+    long reserve = leads.stream().filter(this::hasReservationEvidence).count();
+    long invalid = leads.stream().filter(this::isInvalidLead).count();
 
     LocalDate today = LocalDate.now();
-    long overdue = crmLeadMapper.selectCount(Wrappers.lambdaQuery(CrmLead.class)
+    LambdaQueryWrapper<CrmLead> overdueWrapper = Wrappers.lambdaQuery(CrmLead.class)
         .eq(CrmLead::getIsDeleted, 0)
         .eq(tenantId != null, CrmLead::getTenantId, tenantId)
         .eq(source != null && !source.isBlank(), CrmLead::getSource, normalizeSource(source))
-        .eq(staffId != null, CrmLead::getCreatedBy, staffId)
         .isNotNull(CrmLead::getNextFollowDate)
         .lt(CrmLead::getNextFollowDate, today)
-        .notIn(CrmLead::getStatus, List.of(2, 3)));
+        .ne(CrmLead::getContractSignedFlag, 1)
+        .ne(CrmLead::getStatus, 3);
+    applyLeadStaffScope(overdueWrapper, staffId);
+    long overdue = crmLeadMapper.selectCount(overdueWrapper);
 
     MarketingFollowupReportResponse response = new MarketingFollowupReportResponse();
     response.setTotalLeads(total);
@@ -164,6 +229,14 @@ public class MarketingReportServiceImpl implements MarketingReportService {
     response.setInvalidCount(invalid);
     response.setOverdueCount(overdue);
     response.setStages(buildStages(total, consult, intent, reserve, invalid));
+    crmTraceService.saveSnapshot(
+        tenantId,
+        tenantId,
+        "MARKETING_FOLLOWUP",
+        parseDateOrNull(dateFrom),
+        parseDateOrNull(dateTo),
+        buildReportSnapshotKey(source, staffId, null),
+        response);
     return response;
   }
 
@@ -185,22 +258,35 @@ public class MarketingReportServiceImpl implements MarketingReportService {
 
     String normalizedType = normalizeCallbackType(type);
     if ("SCORE".equals(normalizedType)) {
-      return buildScoreCallbackResponse(tenantId, pageNo, pageSize, from, to, source, staffId);
+      MarketingCallbackReportResponse scoreResponse =
+          buildScoreCallbackResponse(tenantId, pageNo, pageSize, from, to, source, staffId);
+      crmTraceService.saveSnapshot(
+          tenantId,
+          tenantId,
+          "MARKETING_CALLBACK",
+          from,
+          to,
+          buildReportSnapshotKey(source, staffId, normalizedType),
+          buildCallbackSnapshotPayload(scoreResponse));
+      return scoreResponse;
     }
     List<CrmLead> dueLeads = crmLeadMapper.selectList(baseCallbackLeadWrapper(tenantId, source, staffId)
         .isNotNull(CrmLead::getNextFollowDate)
         .between(CrmLead::getNextFollowDate, from, to)
-        .notIn(CrmLead::getStatus, List.of(2, 3))
+        .ne(CrmLead::getContractSignedFlag, 1)
+        .ne(CrmLead::getStatus, 3)
         .le(CrmLead::getNextFollowDate, today)
         .orderByAsc(CrmLead::getNextFollowDate)
         .orderByAsc(CrmLead::getId));
     List<CrmLead> todayDueLeads = crmLeadMapper.selectList(baseCallbackLeadWrapper(tenantId, source, staffId)
         .eq(CrmLead::getNextFollowDate, today)
-        .notIn(CrmLead::getStatus, List.of(2, 3)));
+        .ne(CrmLead::getContractSignedFlag, 1)
+        .ne(CrmLead::getStatus, 3));
     List<CrmLead> overdueLeads = crmLeadMapper.selectList(baseCallbackLeadWrapper(tenantId, source, staffId)
         .isNotNull(CrmLead::getNextFollowDate)
         .lt(CrmLead::getNextFollowDate, today)
-        .notIn(CrmLead::getStatus, List.of(2, 3)));
+        .ne(CrmLead::getContractSignedFlag, 1)
+        .ne(CrmLead::getStatus, 3));
 
     Map<Long, List<CrmCallbackPlan>> planMap = loadPlansByLeadIds(tenantId, collectLeadIds(dueLeads, todayDueLeads, overdueLeads));
     List<CrmLead> filteredDueLeads = filterLeadsByCallbackType(dueLeads, planMap, normalizedType);
@@ -233,6 +319,14 @@ public class MarketingReportServiceImpl implements MarketingReportService {
     response.setCompleted(countCompletedCallbacks(tenantId, from, to, source, staffId, normalizedType));
     response.setTotal(filteredDueLeads.size());
     response.setRecords(records);
+    crmTraceService.saveSnapshot(
+        tenantId,
+        tenantId,
+        "MARKETING_CALLBACK",
+        from,
+        to,
+        buildReportSnapshotKey(source, staffId, normalizedType),
+        buildCallbackSnapshotPayload(response));
     return response;
   }
 
@@ -293,11 +387,12 @@ public class MarketingReportServiceImpl implements MarketingReportService {
   }
 
   private LambdaQueryWrapper<CrmLead> baseCallbackLeadWrapper(Long tenantId, String source, Long staffId) {
-    return Wrappers.lambdaQuery(CrmLead.class)
+    LambdaQueryWrapper<CrmLead> wrapper = Wrappers.lambdaQuery(CrmLead.class)
         .eq(CrmLead::getIsDeleted, 0)
         .eq(tenantId != null, CrmLead::getTenantId, tenantId)
-        .eq(source != null && !source.isBlank(), CrmLead::getSource, normalizeSource(source))
-        .eq(staffId != null, CrmLead::getCreatedBy, staffId);
+        .eq(source != null && !source.isBlank(), CrmLead::getSource, normalizeSource(source));
+    applyLeadStaffScope(wrapper, staffId);
+    return wrapper;
   }
 
   private Set<Long> collectLeadIds(List<CrmLead>... leadGroups) {
@@ -574,6 +669,32 @@ public class MarketingReportServiceImpl implements MarketingReportService {
     return normalizedType == null ? null : normalizedType.toLowerCase(Locale.ROOT);
   }
 
+  private Map<String, Object> buildCallbackSnapshotPayload(MarketingCallbackReportResponse response) {
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("todayDue", response == null ? 0 : response.getTodayDue());
+    payload.put("overdue", response == null ? 0 : response.getOverdue());
+    payload.put("completed", response == null ? 0 : response.getCompleted());
+    payload.put("total", response == null ? 0 : response.getTotal());
+    payload.put("recordCount", response == null || response.getRecords() == null ? 0 : response.getRecords().size());
+    return payload;
+  }
+
+  private String buildReportSnapshotKey(String source, Long staffId, String extra) {
+    List<String> segments = new ArrayList<>();
+    String normalizedSource = blankToNull(source);
+    if (normalizedSource != null) {
+      segments.add("source=" + normalizeSource(normalizedSource));
+    }
+    if (staffId != null) {
+      segments.add("staffId=" + staffId);
+    }
+    String normalizedExtra = blankToNull(extra);
+    if (normalizedExtra != null) {
+      segments.add(normalizedExtra);
+    }
+    return segments.isEmpty() ? null : String.join("|", segments);
+  }
+
   @Override
   public MarketingDataQualityResponse dataQuality(Long tenantId) {
     long missingSource = crmLeadMapper.selectCount(Wrappers.lambdaQuery(CrmLead.class)
@@ -584,7 +705,8 @@ public class MarketingReportServiceImpl implements MarketingReportService {
     long missingNextFollowDate = crmLeadMapper.selectCount(Wrappers.lambdaQuery(CrmLead.class)
         .eq(CrmLead::getIsDeleted, 0)
         .eq(tenantId != null, CrmLead::getTenantId, tenantId)
-        .in(CrmLead::getStatus, List.of(0, 1))
+        .ne(CrmLead::getContractSignedFlag, 1)
+        .ne(CrmLead::getStatus, 3)
         .isNull(CrmLead::getNextFollowDate));
 
     List<CrmLead> sourceLeads = crmLeadMapper.selectList(Wrappers.lambdaQuery(CrmLead.class)
@@ -601,6 +723,165 @@ public class MarketingReportServiceImpl implements MarketingReportService {
     response.setMissingSourceCount(missingSource);
     response.setMissingNextFollowDateCount(missingNextFollowDate);
     response.setNonStandardSourceCount(nonStandard);
+    crmTraceService.saveSnapshot(
+        tenantId,
+        tenantId,
+        "MARKETING_DATA_QUALITY",
+        LocalDate.now(),
+        LocalDate.now(),
+        null,
+        response);
+    return response;
+  }
+
+  @Override
+  public MarketingWorkbenchSummaryResponse workbenchSummary(Long tenantId, String dateFrom, String dateTo) {
+    LocalDate from = parseDateOrNull(dateFrom);
+    LocalDate to = parseDateOrNull(dateTo);
+    if (from == null || to == null) {
+      to = LocalDate.now();
+      from = to.withDayOfMonth(1);
+    }
+    if (from.isAfter(to)) {
+      throw new IllegalArgumentException("dateFrom cannot be after dateTo");
+    }
+
+    String fromText = from.toString();
+    String toText = to.toString();
+    MarketingConversionReportResponse conversion = conversion(tenantId, fromText, toText, null, null);
+    MarketingFollowupReportResponse followupReport = followup(tenantId, fromText, toText, null, null);
+    MarketingCallbackReportResponse callbackReport = callback(tenantId, 1, 50, fromText, toText, null, null, null);
+    List<MarketingChannelReportItem> channelReport = channel(tenantId, fromText, toText, null);
+    List<CrmLead> leads = crmLeadMapper.selectList(Wrappers.lambdaQuery(CrmLead.class)
+        .eq(CrmLead::getIsDeleted, 0)
+        .eq(tenantId != null, CrmLead::getTenantId, tenantId));
+    List<CrmContract> contracts = crmContractMapper.selectList(Wrappers.lambdaQuery(CrmContract.class)
+        .eq(CrmContract::getIsDeleted, 0)
+        .eq(tenantId != null, CrmContract::getTenantId, tenantId));
+    List<Bed> beds = bedMapper.selectList(Wrappers.lambdaQuery(Bed.class)
+        .eq(Bed::getIsDeleted, 0)
+        .eq(tenantId != null, Bed::getTenantId, tenantId));
+    List<CrmMarketingPlan> plans = marketingPlanMapper.selectList(Wrappers.lambdaQuery(CrmMarketingPlan.class)
+        .eq(CrmMarketingPlan::getIsDeleted, 0)
+        .eq(tenantId != null, CrmMarketingPlan::getOrgId, tenantId));
+    LocalDate today = LocalDate.now();
+
+    MarketingWorkbenchSummaryResponse response = new MarketingWorkbenchSummaryResponse();
+    response.setDateFrom(fromText);
+    response.setDateTo(toText);
+    response.setGeneratedAt(LocalDateTime.now());
+
+    response.getFunnel().setTodayConsultCount(conversion.getConsultCount());
+    response.getFunnel().setEvaluationCount(countContractsByStage(contracts, FLOW_PENDING_ASSESSMENT));
+    response.getFunnel().setPendingAdmissionCount(countContractsByStage(contracts, FLOW_PENDING_BED_SELECT));
+    response.getFunnel().setPendingSignCount(countContractsByStage(contracts, FLOW_PENDING_SIGN));
+    response.getFunnel().setMonthDealCount(conversion.getContractCount());
+    response.getFunnel().setMonthConversionRate(conversion.getContractRate());
+
+    response.getFollowup().setTodayDue(callbackReport.getTodayDue());
+    response.getFollowup().setOverdue(callbackReport.getOverdue());
+    response.getFollowup().setHighIntentCount(leads.stream().filter(this::isIntentLead).count());
+    response.getFollowup().setLockExpiringCount(leads.stream()
+        .filter(this::hasReservationEvidence)
+        .filter(lead -> lead.getNextFollowDate() != null)
+        .count());
+
+    response.getBedSales().setEmptyCount(beds.stream()
+        .filter(this::isSellableEmptyBed)
+        .count());
+    response.getBedSales().setLockCount(beds.stream()
+        .filter(bed -> "RESERVATION".equalsIgnoreCase(blankToNull(bed.getOccupancySource())))
+        .count());
+    response.getBedSales().setReservedUnsignedCount(contracts.stream()
+        .filter(contract -> FLOW_PENDING_BED_SELECT.equals(blankToNull(contract.getFlowStage()))
+            || FLOW_PENDING_SIGN.equals(blankToNull(contract.getFlowStage())))
+        .count());
+    response.getBedSales().setPremiumEmptyCount(beds.stream()
+        .filter(this::isSellableEmptyBed)
+        .filter(bed -> {
+          String bedType = blankToNull(bed.getBedType());
+          return bedType != null && (bedType.contains("高") || bedType.toLowerCase(Locale.ROOT).contains("premium") || bedType.toLowerCase(Locale.ROOT).contains("vip"));
+        })
+        .count());
+
+    response.getContract().setPendingSignCount(countContractsByStage(contracts, FLOW_PENDING_SIGN));
+    response.getContract().setRenewalDueCount(contracts.stream().filter(contract -> isSignedContract(contract)
+        && contract.getEffectiveTo() != null
+        && !contract.getEffectiveTo().isBefore(today)
+        && contract.getEffectiveTo().isBefore(today.plusDays(31))).count());
+    response.getContract().setChangePendingCount(contracts.stream()
+        .filter(contract -> CHANGE_PENDING_APPROVAL.equalsIgnoreCase(blankToNull(contract.getChangeWorkflowStatus())))
+        .count());
+
+    response.getCallback().setCheckinCount(countCallbackPlansByType(tenantId, from, to, "CHECKIN"));
+    response.getCallback().setTrialCount(countCallbackPlansByType(tenantId, from, to, "TRIAL"));
+    response.getCallback().setDischargeCount(countCallbackPlansByType(tenantId, from, to, "DISCHARGE"));
+    response.getCallback().setScore(resolveAverageCallbackScore(tenantId, from, to));
+
+    Map<String, long[]> marketerStats = new LinkedHashMap<>();
+    contracts.stream()
+        .filter(this::isSignedContract)
+        .forEach(contract -> marketerStats.computeIfAbsent(firstNonBlank(blankToNull(contract.getMarketerName()), "未分配"), key -> new long[1])[0]++);
+    long bestDealCount = marketerStats.values().stream().mapToLong(item -> item[0]).max().orElse(0L);
+    response.getPerformance().setMonthDealCount(bestDealCount);
+    response.getPerformance().setRankNo(marketerStats.size());
+    response.getPerformance().setTimelyRate(ratePercentage(
+        Math.max((followupReport.getTotalLeads() - followupReport.getOverdueCount()), 0),
+        Math.max(followupReport.getTotalLeads(), 1)));
+
+    List<CrmLead> medicalLeads = leads.stream()
+        .filter(this::isMedicalTransferredLead)
+        .toList();
+    response.getMedical().setTodayCount(medicalLeads.stream()
+        .filter(item -> item.getCreateTime() != null && today.equals(item.getCreateTime().toLocalDate()))
+        .count());
+    response.getMedical().setReferCount(medicalLeads.size());
+    response.getMedical().setUnassignedCount(medicalLeads.stream().filter(item -> item.getOwnerStaffId() == null).count());
+
+    List<CrmMarketingPlan> speechPlans = plans.stream()
+        .filter(item -> "SPEECH".equalsIgnoreCase(blankToNull(item.getModuleType())))
+        .toList();
+    List<CrmMarketingPlan> policyPlans = plans.stream()
+        .filter(item -> "POLICY".equalsIgnoreCase(blankToNull(item.getModuleType())))
+        .toList();
+    response.getPlan().setSpeechCount(speechPlans.size());
+    response.getPlan().setPolicyCount(policyPlans.size());
+    response.getPlan().setPendingApprovalCount(plans.stream().filter(item -> "PENDING_APPROVAL".equalsIgnoreCase(blankToNull(item.getStatus()))).count());
+    response.getPlan().setRejectedCount(plans.stream().filter(item -> "REJECTED".equalsIgnoreCase(blankToNull(item.getStatus()))).count());
+    response.getPlan().setTotalBudgetAmount(plans.stream()
+        .map(CrmMarketingPlan::getBudgetAmount)
+        .filter(Objects::nonNull)
+        .reduce(BigDecimal.ZERO, BigDecimal::add));
+    response.getPlan().setTotalActualLeadCount(plans.stream().mapToLong(item -> calculatePlanActualLeadCount(item, leads)).sum());
+    response.getPlan().setTotalActualContractCount(plans.stream().mapToLong(item -> calculatePlanActualContractCount(item, leads)).sum());
+
+    response.getRisk().setOverdueFollowupCount(callbackReport.getOverdue());
+    response.getRisk().setLockUnsignedCount(leads.stream().filter(this::hasReservationEvidence).count());
+    response.getRisk().setHighIntentNoEvalCount(leads.stream()
+        .filter(this::isIntentLead)
+        .filter(item -> blankToNull(item.getFollowupStatus()) == null)
+        .count());
+    response.getRisk().setChannelDropCount(channelReport.stream()
+        .filter(item -> item.getLeadCount() > 0)
+        .filter(item -> rate(item.getContractCount(), item.getLeadCount()) < 10D)
+        .count());
+
+    List<MarketingChannelReportItem> topChannels = new ArrayList<>(channelReport);
+    topChannels.sort((left, right) -> Long.compare(right.getContractCount(), left.getContractCount()));
+    response.setChannelTop5(topChannels.stream().limit(5).map(item -> {
+      MarketingWorkbenchSummaryResponse.ChannelTop top = new MarketingWorkbenchSummaryResponse.ChannelTop();
+      top.setSource(firstNonBlank(blankToNull(item.getSource()), "未标记渠道"));
+      top.setLeadCount(item.getLeadCount());
+      top.setContractRate(item.getLeadCount() <= 0 ? "0%" : String.format(Locale.ROOT, "%.1f%%", rate(item.getContractCount(), item.getLeadCount())));
+      return top;
+    }).toList());
+    response.setChannelUnknownCount(channelReport.stream()
+        .filter(item -> blankToNull(item.getSource()) == null || String.valueOf(item.getSource()).contains("不明"))
+        .mapToLong(MarketingChannelReportItem::getLeadCount)
+        .sum());
+    response.setChannelMonthDeals(channelReport.stream().mapToLong(MarketingChannelReportItem::getContractCount).sum());
+
+    crmTraceService.saveSnapshot(tenantId, tenantId, "MARKETING_WORKBENCH", from, to, fromText + ":" + toText, response);
     return response;
   }
 
@@ -637,57 +918,38 @@ public class MarketingReportServiceImpl implements MarketingReportService {
     long total = crmLeadMapper.selectCount(buildLeadEntryWrapper(
         tenantId, keyword, null, consultantName, consultantPhone, elderName, elderPhone,
         consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName));
-    long consultCount = crmLeadMapper.selectCount(buildLeadEntryWrapper(
-        tenantId, keyword, 0, consultantName, consultantPhone, elderName, elderPhone,
+    List<CrmLead> leads = crmLeadMapper.selectList(buildLeadEntryWrapper(
+        tenantId, keyword, null, consultantName, consultantPhone, elderName, elderPhone,
         consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName));
-    long intentCount = crmLeadMapper.selectCount(buildLeadEntryWrapper(
-        tenantId, keyword, 1, consultantName, consultantPhone, elderName, elderPhone,
-        consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName));
-    long reservationCount = crmLeadMapper.selectCount(buildLeadEntryWrapper(
-        tenantId, keyword, 2, consultantName, consultantPhone, elderName, elderPhone,
-        consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName));
-    long invalidCount = crmLeadMapper.selectCount(buildLeadEntryWrapper(
-        tenantId, keyword, 3, consultantName, consultantPhone, elderName, elderPhone,
-        consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName));
+    long consultCount = leads.stream().filter(this::isConsultLead).count();
+    long intentCount = leads.stream().filter(this::isIntentLead).count();
+    long reservationCount = leads.stream().filter(this::hasReservationEvidence).count();
+    long invalidCount = leads.stream().filter(this::isInvalidLead).count();
 
     long modeCount = switch (normalizedMode) {
       case "CONSULTATION" -> consultCount;
       case "INTENT" -> intentCount;
       case "RESERVATION" -> reservationCount;
       case "INVALID" -> invalidCount;
-      case "CALLBACK" -> crmLeadMapper.selectCount(buildLeadEntryWrapper(
-          tenantId, keyword, null, consultantName, consultantPhone, elderName, elderPhone,
-          consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName)
-          .in(CrmLead::getStatus, List.of(0, 1))
-          .isNotNull(CrmLead::getNextFollowDate)
-          .le(CrmLead::getNextFollowDate, today));
+      case "CALLBACK" -> leads.stream()
+          .filter(lead -> !isInvalidLead(lead) && !isSignedLead(lead))
+          .filter(lead -> lead.getNextFollowDate() != null && !lead.getNextFollowDate().isAfter(today))
+          .count();
       default -> total;
     };
 
-    long signedContractCount = crmLeadMapper.selectCount(buildLeadEntryWrapper(
-        tenantId, keyword, null, consultantName, consultantPhone, elderName, elderPhone,
-        consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName)
-        .eq(CrmLead::getContractSignedFlag, 1));
-    long unsignedReservationCount = crmLeadMapper.selectCount(buildLeadEntryWrapper(
-        tenantId, keyword, 2, consultantName, consultantPhone, elderName, elderPhone,
-        consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName)
-        .ne(CrmLead::getContractSignedFlag, 1));
-    long refundedReservationCount = crmLeadMapper.selectCount(buildLeadEntryWrapper(
-        tenantId, keyword, 2, consultantName, consultantPhone, elderName, elderPhone,
-        consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName)
-        .eq(CrmLead::getRefunded, 1));
+    long signedContractCount = leads.stream().filter(this::isSignedLead).count();
+    long unsignedReservationCount = leads.stream().filter(this::hasReservationEvidence).filter(lead -> !isSignedLead(lead)).count();
+    long refundedReservationCount = leads.stream().filter(this::hasReservationEvidence).filter(lead -> Integer.valueOf(1).equals(lead.getRefunded())).count();
 
-    long callbackDueTodayCount = crmLeadMapper.selectCount(buildLeadEntryWrapper(
-        tenantId, keyword, null, consultantName, consultantPhone, elderName, elderPhone,
-        consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName)
-        .in(CrmLead::getStatus, List.of(0, 1))
-        .eq(CrmLead::getNextFollowDate, today));
-    long callbackOverdueCount = crmLeadMapper.selectCount(buildLeadEntryWrapper(
-        tenantId, keyword, null, consultantName, consultantPhone, elderName, elderPhone,
-        consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName)
-        .in(CrmLead::getStatus, List.of(0, 1))
-        .isNotNull(CrmLead::getNextFollowDate)
-        .lt(CrmLead::getNextFollowDate, today));
+    long callbackDueTodayCount = leads.stream()
+        .filter(lead -> !isInvalidLead(lead) && !isSignedLead(lead))
+        .filter(lead -> today.equals(lead.getNextFollowDate()))
+        .count();
+    long callbackOverdueCount = leads.stream()
+        .filter(lead -> !isInvalidLead(lead) && !isSignedLead(lead))
+        .filter(lead -> lead.getNextFollowDate() != null && lead.getNextFollowDate().isBefore(today))
+        .count();
 
     long missingSourceCount = crmLeadMapper.selectCount(buildLeadEntryWrapper(
         tenantId, keyword, null, consultantName, consultantPhone, elderName, elderPhone,
@@ -696,14 +958,11 @@ public class MarketingReportServiceImpl implements MarketingReportService {
     long missingNextFollowDateCount = crmLeadMapper.selectCount(buildLeadEntryWrapper(
         tenantId, keyword, null, consultantName, consultantPhone, elderName, elderPhone,
         consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName)
-        .in(CrmLead::getStatus, List.of(0, 1))
+        .ne(CrmLead::getContractSignedFlag, 1)
+        .ne(CrmLead::getStatus, 3)
         .isNull(CrmLead::getNextFollowDate));
 
-    List<CrmLead> sourceLeads = crmLeadMapper.selectList(buildLeadEntryWrapper(
-        tenantId, keyword, null, consultantName, consultantPhone, elderName, elderPhone,
-        consultDateFrom, consultDateTo, consultType, mediaChannel, infoSource, customerTag, marketerName)
-        .isNotNull(CrmLead::getSource));
-    long nonStandardSourceCount = sourceLeads.stream()
+    long nonStandardSourceCount = leads.stream()
         .map(CrmLead::getSource)
         .filter(value -> value != null && !value.isBlank())
         .filter(value -> !STANDARD_SOURCES.contains(normalizeSource(value)))
@@ -740,6 +999,184 @@ public class MarketingReportServiceImpl implements MarketingReportService {
         .eq(CrmLead::getContractSignedFlag, 1));
   }
 
+  private boolean isSignedLead(CrmLead lead) {
+    if (lead == null) {
+      return false;
+    }
+    return Integer.valueOf(1).equals(lead.getContractSignedFlag())
+        || "SIGNED".equalsIgnoreCase(blankToNull(lead.getFlowStage()));
+  }
+
+  private boolean isInvalidLead(CrmLead lead) {
+    return lead != null && Integer.valueOf(3).equals(lead.getStatus());
+  }
+
+  private boolean hasReservationEvidence(CrmLead lead) {
+    if (lead == null || isInvalidLead(lead) || isSignedLead(lead)) {
+      return false;
+    }
+    if (lead.getReservationBedId() != null || blankToNull(lead.getReservationRoomNo()) != null) {
+      return true;
+    }
+    if (lead.getReservationAmount() != null && lead.getReservationAmount().compareTo(BigDecimal.ZERO) > 0) {
+      return true;
+    }
+    String reservationStatus = blankToNull(lead.getReservationStatus());
+    if (reservationStatus != null) {
+      String normalized = reservationStatus.toLowerCase(Locale.ROOT);
+      if (normalized.contains("预") || normalized.contains("锁") || normalized.contains("reserve") || normalized.contains("lock")) {
+        return true;
+      }
+    }
+    String flowStage = blankToNull(lead.getFlowStage());
+    return "PENDING_BED_SELECT".equalsIgnoreCase(flowStage) || "PENDING_SIGN".equalsIgnoreCase(flowStage);
+  }
+
+  private boolean isIntentLead(CrmLead lead) {
+    return lead != null && !isInvalidLead(lead) && !isSignedLead(lead) && !hasReservationEvidence(lead)
+        && Integer.valueOf(1).equals(lead.getStatus());
+  }
+
+  private boolean isConsultLead(CrmLead lead) {
+    return lead != null && !isInvalidLead(lead) && !isSignedLead(lead) && !hasReservationEvidence(lead)
+        && !Integer.valueOf(1).equals(lead.getStatus());
+  }
+
+  private long countContractsByStage(List<CrmContract> contracts, String flowStage) {
+    return contracts.stream()
+        .filter(item -> flowStage.equalsIgnoreCase(blankToNull(item.getFlowStage())))
+        .count();
+  }
+
+  private boolean isSignedContract(CrmContract contract) {
+    if (contract == null) {
+      return false;
+    }
+    String status = blankToNull(contract.getStatus());
+    String flowStage = blankToNull(contract.getFlowStage());
+    return "SIGNED".equalsIgnoreCase(status)
+        || "EFFECTIVE".equalsIgnoreCase(status)
+        || FLOW_SIGNED.equalsIgnoreCase(flowStage);
+  }
+
+  private boolean isSellableEmptyBed(Bed bed) {
+    if (bed == null || Integer.valueOf(1).equals(bed.getIsDeleted())) {
+      return false;
+    }
+    if (bed.getElderId() != null) {
+      return false;
+    }
+    if ("RESERVATION".equalsIgnoreCase(blankToNull(bed.getOccupancySource()))
+        || "MAINTENANCE".equalsIgnoreCase(blankToNull(bed.getOccupancySource()))
+        || "FROZEN".equalsIgnoreCase(blankToNull(bed.getOccupancySource()))) {
+      return false;
+    }
+    return Integer.valueOf(1).equals(bed.getStatus());
+  }
+
+  private long countCallbackPlansByType(Long tenantId, LocalDate from, LocalDate to, String type) {
+    LocalDateTime fromTime = from.atStartOfDay();
+    LocalDateTime toTime = to.plusDays(1L).atStartOfDay();
+    return callbackPlanMapper.selectCount(Wrappers.lambdaQuery(CrmCallbackPlan.class)
+        .eq(CrmCallbackPlan::getIsDeleted, 0)
+        .eq(tenantId != null, CrmCallbackPlan::getTenantId, tenantId)
+        .eq(type != null, CrmCallbackPlan::getCallbackType, type)
+        .isNotNull(CrmCallbackPlan::getPlanExecuteTime)
+        .ge(CrmCallbackPlan::getPlanExecuteTime, fromTime)
+        .lt(CrmCallbackPlan::getPlanExecuteTime, toTime));
+  }
+
+  private double resolveAverageCallbackScore(Long tenantId, LocalDate from, LocalDate to) {
+    LocalDateTime fromTime = from.atStartOfDay();
+    LocalDateTime toTime = to.plusDays(1L).atStartOfDay();
+    List<CrmCallbackPlan> plans = callbackPlanMapper.selectList(Wrappers.lambdaQuery(CrmCallbackPlan.class)
+        .eq(CrmCallbackPlan::getIsDeleted, 0)
+        .eq(tenantId != null, CrmCallbackPlan::getTenantId, tenantId)
+        .eq(CrmCallbackPlan::getStatus, "DONE")
+        .isNotNull(CrmCallbackPlan::getExecutedTime)
+        .ge(CrmCallbackPlan::getExecutedTime, fromTime)
+        .lt(CrmCallbackPlan::getExecutedTime, toTime));
+    List<Double> scores = plans.stream()
+        .map(this::resolvePlanScore)
+        .filter(Objects::nonNull)
+        .toList();
+    if (scores.isEmpty()) {
+      return 0D;
+    }
+    double sum = scores.stream().mapToDouble(Double::doubleValue).sum();
+    return Double.parseDouble(String.format(Locale.ROOT, "%.1f", sum / scores.size()));
+  }
+
+  private boolean isMedicalTransferredLead(CrmLead lead) {
+    if (lead == null) {
+      return false;
+    }
+    String text = String.join(" ",
+        safeText(lead.getSource()),
+        safeText(lead.getInfoSource()),
+        safeText(lead.getMediaChannel()));
+    return text.contains("医");
+  }
+
+  private long calculatePlanActualLeadCount(CrmMarketingPlan plan, List<CrmLead> leads) {
+    return leads.stream().filter(lead -> matchesPlanLead(plan, lead)).count();
+  }
+
+  private long calculatePlanActualContractCount(CrmMarketingPlan plan, List<CrmLead> leads) {
+    return leads.stream().filter(lead -> matchesPlanLead(plan, lead)).filter(this::isSignedLead).count();
+  }
+
+  private boolean matchesPlanLead(CrmMarketingPlan plan, CrmLead lead) {
+    if (plan == null || lead == null) {
+      return false;
+    }
+    LocalDate effectiveDate = plan.getEffectiveDate();
+    if (effectiveDate != null) {
+      LocalDate consultDate = lead.getConsultDate();
+      if (consultDate == null && lead.getCreateTime() != null) {
+        consultDate = lead.getCreateTime().toLocalDate();
+      }
+      if (consultDate == null || consultDate.isBefore(effectiveDate.minusDays(30)) || consultDate.isAfter(effectiveDate.plusDays(120))) {
+        return false;
+      }
+    }
+    String sourceTag = normalizePlanTag(plan.getSourceTag());
+    String campaignCode = normalizePlanTag(plan.getCampaignCode());
+    if (sourceTag == null && campaignCode == null) {
+      return false;
+    }
+    String leadText = normalizePlanTag(String.join(" ",
+        safeText(lead.getSource()),
+        safeText(lead.getInfoSource()),
+        safeText(lead.getMediaChannel()),
+        safeText(lead.getCustomerTag()),
+        safeText(lead.getReferralChannel()),
+        safeText(lead.getReservationChannel()),
+        safeText(lead.getRemark())));
+    if (leadText == null) {
+      return false;
+    }
+    boolean sourceMatched = sourceTag == null || leadText.contains(sourceTag);
+    boolean campaignMatched = campaignCode == null || leadText.contains(campaignCode);
+    return sourceMatched && campaignMatched;
+  }
+
+  private String normalizePlanTag(String value) {
+    String text = blankToNull(value);
+    if (text == null) {
+      return null;
+    }
+    return text.replace("　", " ").replace(" ", "").toLowerCase(Locale.ROOT);
+  }
+
+  private double ratePercentage(long numerator, long denominator) {
+    return Double.parseDouble(String.format(Locale.ROOT, "%.1f", rate(numerator, denominator)));
+  }
+
+  private String safeText(String value) {
+    return value == null ? "" : value;
+  }
+
   private LambdaQueryWrapper<CrmLead> leadWrapperByCreateTime(
       Long tenantId, String dateFrom, String dateTo, String source, Long staffId) {
     LocalDate from = parseDateOrNull(dateFrom);
@@ -747,13 +1184,22 @@ public class MarketingReportServiceImpl implements MarketingReportService {
     LocalDateTime fromTime = from == null ? null : from.atStartOfDay();
     LocalDateTime toTime = to == null ? null : to.plusDays(1).atStartOfDay();
 
-    return Wrappers.lambdaQuery(CrmLead.class)
+    LambdaQueryWrapper<CrmLead> wrapper = Wrappers.lambdaQuery(CrmLead.class)
         .eq(CrmLead::getIsDeleted, 0)
         .eq(tenantId != null, CrmLead::getTenantId, tenantId)
         .eq(source != null && !source.isBlank(), CrmLead::getSource, normalizeSource(source))
-        .eq(staffId != null, CrmLead::getCreatedBy, staffId)
         .ge(fromTime != null, CrmLead::getCreateTime, fromTime)
         .lt(toTime != null, CrmLead::getCreateTime, toTime);
+    applyLeadStaffScope(wrapper, staffId);
+    return wrapper;
+  }
+
+  private void applyLeadStaffScope(LambdaQueryWrapper<CrmLead> wrapper, Long staffId) {
+    if (wrapper == null || staffId == null) {
+      return;
+    }
+    wrapper.and(w -> w.eq(CrmLead::getOwnerStaffId, staffId)
+        .or(x -> x.isNull(CrmLead::getOwnerStaffId).eq(CrmLead::getCreatedBy, staffId)));
   }
 
   private LambdaQueryWrapper<CrmLead> buildLeadEntryWrapper(
@@ -771,8 +1217,12 @@ public class MarketingReportServiceImpl implements MarketingReportService {
         .eq(consultType != null && !consultType.isBlank(), CrmLead::getConsultType, consultType)
         .eq(mediaChannel != null && !mediaChannel.isBlank(), CrmLead::getMediaChannel, mediaChannel)
         .eq(infoSource != null && !infoSource.isBlank(), CrmLead::getInfoSource, infoSource)
-        .eq(customerTag != null && !customerTag.isBlank(), CrmLead::getCustomerTag, customerTag)
-        .like(marketerName != null && !marketerName.isBlank(), CrmLead::getMarketerName, marketerName);
+        .eq(customerTag != null && !customerTag.isBlank(), CrmLead::getCustomerTag, customerTag);
+    if (marketerName != null && !marketerName.isBlank()) {
+      wrapper.and(w -> w.like(CrmLead::getOwnerStaffName, marketerName)
+          .or()
+          .like(CrmLead::getMarketerName, marketerName));
+    }
     LocalDate consultFrom = parseDateOrNull(consultDateFrom);
     LocalDate consultTo = parseDateOrNull(consultDateTo);
     wrapper.ge(consultFrom != null, CrmLead::getConsultDate, consultFrom);

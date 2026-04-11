@@ -53,7 +53,7 @@
           <a-button @click="go('/marketing/callback/checkin')">入住后回访</a-button>
           <a-button @click="go('/marketing/callback/trial')">试住回访</a-button>
           <a-button @click="go('/marketing/callback/discharge')">退住回访</a-button>
-          <a-button danger @click="go('/marketing/followup/overdue')">逾期未跟进</a-button>
+          <a-button danger @click="go('/marketing/interactions/overdue')">逾期未跟进</a-button>
         </a-space>
       </MarketingListToolbar>
       <a-table :columns="columns" :data-source="pagedRows" :pagination="false" row-key="id">

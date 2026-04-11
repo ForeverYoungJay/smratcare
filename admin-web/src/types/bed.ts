@@ -22,6 +22,14 @@ export interface BedItem {
   status?: 0 | 1 | 2 | 3
   bedQrCode?: string
   elderId?: Id
+  occupancySource?: 'SELF' | 'RESERVATION' | 'MAINTENANCE' | 'FROZEN' | 'CLEANING' | string
+  occupancyRefType?: 'ELDER' | 'LEAD' | 'CONTRACT' | 'SYSTEM' | string
+  occupancyRefId?: Id
+  occupancyRefNo?: string
+  lockExpiresAt?: string
+  occupancyNote?: string
+  lastReleaseReason?: string
+  lastReleasedAt?: string
   elderName?: string
   elderGender?: number
   careLevel?: string

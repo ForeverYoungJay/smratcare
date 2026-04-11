@@ -4,10 +4,15 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.audit.service.AuditLogService;
+import com.zhiyangyun.care.crm.model.CrmLeadAssignRequest;
 import com.zhiyangyun.care.crm.model.CrmLeadRequest;
 import com.zhiyangyun.care.crm.model.CrmLeadResponse;
+import com.zhiyangyun.care.crm.model.trace.CrmLeadAssignLogResponse;
+import com.zhiyangyun.care.crm.model.trace.CrmStageTransitionLogResponse;
 import com.zhiyangyun.care.crm.service.CrmLeadService;
+import com.zhiyangyun.care.crm.service.CrmTraceService;
 import jakarta.validation.Valid;
+import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,11 +34,17 @@ public class CrmLeadController {
           + "'DIRECTOR','SYS_ADMIN','ADMIN')";
   private static final String CRM_LEAD_WRITE =
       "hasAnyRole('MARKETING_EMPLOYEE','MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')";
+  private static final String CRM_LEAD_DELETE =
+      "hasAnyRole('MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')";
+  private static final String CRM_LEAD_ASSIGN =
+      "hasAnyRole('MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')";
   private final CrmLeadService leadService;
+  private final CrmTraceService crmTraceService;
   private final AuditLogService auditLogService;
 
-  public CrmLeadController(CrmLeadService leadService, AuditLogService auditLogService) {
+  public CrmLeadController(CrmLeadService leadService, CrmTraceService crmTraceService, AuditLogService auditLogService) {
     this.leadService = leadService;
+    this.crmTraceService = crmTraceService;
     this.auditLogService = auditLogService;
   }
 
@@ -61,6 +72,18 @@ public class CrmLeadController {
     CrmLeadResponse response = leadService.update(id, request, currentStaffId, adminView);
     auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "UPDATE", "CRM_LEAD", id, "更新CRM线索");
+    return Result.ok(response);
+  }
+
+  @PreAuthorize(CRM_LEAD_ASSIGN)
+  @PostMapping("/{id}/assign")
+  public Result<CrmLeadResponse> assign(@PathVariable Long id, @RequestBody CrmLeadAssignRequest request) {
+    Long tenantId = AuthContext.getOrgId();
+    Long operatorId = AuthContext.getStaffId();
+    boolean adminView = AuthContext.isMinisterOrHigher();
+    CrmLeadResponse response = leadService.assign(id, tenantId, operatorId, adminView, request);
+    auditLogService.record(tenantId, tenantId, operatorId, AuthContext.getUsername(),
+        "ASSIGN", "CRM_LEAD", id, "分配CRM线索负责人");
     return Result.ok(response);
   }
 
@@ -113,13 +136,41 @@ public class CrmLeadController {
         followupDateFrom, followupDateTo, followupDueOnly));
   }
 
-  @PreAuthorize(CRM_LEAD_WRITE)
+  @PreAuthorize(CRM_LEAD_READ)
+  @GetMapping("/{id}/assign-logs")
+  public Result<List<CrmLeadAssignLogResponse>> assignLogs(
+      @PathVariable Long id,
+      @RequestParam(defaultValue = "20") int limit) {
+    Long tenantId = AuthContext.getOrgId();
+    Long currentStaffId = AuthContext.getStaffId();
+    boolean adminView = AuthContext.isMinisterOrHigher();
+    leadService.get(id, tenantId, currentStaffId, adminView);
+    return Result.ok(crmTraceService.listLeadAssignments(tenantId, id, limit));
+  }
+
+  @PreAuthorize(CRM_LEAD_READ)
+  @GetMapping("/{id}/stage-logs")
+  public Result<List<CrmStageTransitionLogResponse>> stageLogs(
+      @PathVariable Long id,
+      @RequestParam(defaultValue = "20") int limit) {
+    Long tenantId = AuthContext.getOrgId();
+    Long currentStaffId = AuthContext.getStaffId();
+    boolean adminView = AuthContext.isMinisterOrHigher();
+    leadService.get(id, tenantId, currentStaffId, adminView);
+    return Result.ok(crmTraceService.listLeadStageTransitions(tenantId, id, limit));
+  }
+
+  @PreAuthorize(CRM_LEAD_DELETE)
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
     Long tenantId = AuthContext.getOrgId();
     Long currentStaffId = AuthContext.getStaffId();
     boolean adminView = AuthContext.isMinisterOrHigher();
     leadService.delete(id, tenantId, currentStaffId, adminView);
+    CrmLeadResponse afterDelete = leadService.get(id, tenantId, currentStaffId, adminView);
+    if (afterDelete != null) {
+      throw new IllegalStateException("当前线索不可删除，可能已进入受保护流程或无权限操作");
+    }
     auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "DELETE", "CRM_LEAD", id, "删除CRM线索");
     return Result.ok(null);

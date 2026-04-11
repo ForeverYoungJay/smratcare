@@ -1,6 +1,7 @@
 package com.zhiyangyun.care.crm.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.zhiyangyun.care.crm.model.CrmLeadAssignRequest;
 import com.zhiyangyun.care.crm.model.CrmLeadRequest;
 import com.zhiyangyun.care.crm.model.CrmLeadResponse;
 
@@ -14,5 +15,6 @@ public interface CrmLeadService {
                               String infoSource, String marketerName, String followupStatus, String reservationChannel,
                               String contractNo, String contractStatus, String flowStage, String currentOwnerDept, String callbackType,
                               String followupDateFrom, String followupDateTo, Boolean followupDueOnly);
+  CrmLeadResponse assign(Long id, Long tenantId, Long operatorId, boolean adminView, CrmLeadAssignRequest request);
   void delete(Long id, Long tenantId, Long currentStaffId, boolean adminView);
 }

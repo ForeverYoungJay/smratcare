@@ -9,7 +9,7 @@ export function buildLeadRoute(entry, query) {
 }
 export function buildFollowupRoute(entry, query) {
     return {
-        path: `/marketing/followup/${entry}`,
+        path: `/marketing/interactions/${entry}`,
         query: compactQuery(query || {})
     };
 }

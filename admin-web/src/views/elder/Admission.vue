@@ -274,7 +274,6 @@ import { getBedList, getBuildingList, getFloorList, getRoomList } from '../../ap
 import { admitElder, exportAdmissionRecords, getAdmissionRecordSummary, getAdmissionRecords } from '../../api/elderLifecycle'
 import { getElderDetail, getElderDiseases } from '../../api/elder'
 import { getContractAttachments, getContractPage } from '../../api/marketing'
-import { getCrmLead, updateCrmLead } from '../../api/crm'
 import { normalizeId, normalizeResidentId } from '../../utils/id'
 import { useUserStore } from '../../stores/user'
 import type {
@@ -636,7 +635,6 @@ async function submit() {
       form.bedStartDate = form.admissionDate || new Date().toISOString().slice(0, 10)
     }
     await admitElder(form)
-    await syncLeadStageAfterAdmission()
     message.success('入住办理成功')
     await refreshAdmissionRecordPanel()
   } catch (error: any) {
@@ -1038,25 +1036,6 @@ function applyRoutePrefill() {
   }
   if (bedId) {
     applyBedRoutePrefill(bedId as Id).catch(() => {})
-  }
-}
-
-async function syncLeadStageAfterAdmission() {
-  if (!linkedLeadId.value) return
-  try {
-    const lead = await getCrmLead(linkedLeadId.value)
-    if (!lead?.id) return
-    await updateCrmLead(lead.id, {
-      ...lead,
-      contractNo: form.contractNo || lead.contractNo,
-      reservationBedId: form.bedId || lead.reservationBedId,
-      flowStage: 'PENDING_SIGN',
-      currentOwnerDept: 'MARKETING',
-      contractStatus: '待签署',
-      status: 2
-    })
-  } catch {
-    message.warning('入住成功，但合同流程状态同步失败，请返回合同签约页重试')
   }
 }
 

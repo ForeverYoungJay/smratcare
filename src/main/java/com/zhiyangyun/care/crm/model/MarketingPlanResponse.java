@@ -2,6 +2,7 @@ package com.zhiyangyun.care.crm.model;
 
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -18,6 +19,16 @@ public class MarketingPlanResponse {
   private String quarterLabel;
   private String target;
   private String owner;
+  private String campaignCode;
+  private String sourceTag;
+  private BigDecimal budgetAmount;
+  private Integer targetLeadCount;
+  private Integer targetReservationCount;
+  private Integer targetContractCount;
+  private Long actualLeadCount;
+  private Long actualReservationCount;
+  private Long actualContractCount;
+  private Double actualContractRate;
   private Integer priority;
   private String status;
   private LocalDate effectiveDate;

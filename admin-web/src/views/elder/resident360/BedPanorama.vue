@@ -890,9 +890,9 @@ function parseChineseNumber(text: string) {
 function resolveStatus(bed: BedItem): '空闲' | '预定' | '在住' | '维修' | '清洁中' | '锁定' {
   if (bed.elderId) return '在住'
   if (bed.status === 0) return '锁定'
-  if (bed.status === 2) return '维修'
-  if (bed.status === 3) return '清洁中'
-  if (String(bed.bedNo || '').endsWith('R')) return '预定'
+  if (bed.occupancySource === 'CLEANING') return '清洁中'
+  if (bed.status === 3 || bed.occupancySource === 'MAINTENANCE') return '维修'
+  if (bed.occupancySource === 'RESERVATION') return '预定'
   return '空闲'
 }
 

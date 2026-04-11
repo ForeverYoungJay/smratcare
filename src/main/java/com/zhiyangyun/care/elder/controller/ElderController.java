@@ -18,6 +18,9 @@ import com.zhiyangyun.care.oa.mapper.OaApprovalMapper;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -46,6 +49,7 @@ public class ElderController {
     this.oaApprovalMapper = oaApprovalMapper;
   }
 
+  @PreAuthorize("@elderAuthz.canWriteElder()")
   @PostMapping
   public Result<ElderResponse> create(@Valid @RequestBody ElderCreateRequest request) {
     Long tenantId = AuthContext.getOrgId();
@@ -53,22 +57,29 @@ public class ElderController {
     request.setOrgId(tenantId);
     request.setCreatedBy(AuthContext.getStaffId());
     ElderResponse response = elderService.create(request);
-    auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
-        "CREATE", "ELDER", response == null ? null : response.getId(), "新增老人");
+    auditLogService.recordStructured(
+        tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "CREATE", "ELDER", response == null ? null : response.getId(), "新增老人",
+        null, response, request);
     return Result.ok(response);
   }
 
+  @PreAuthorize("@elderAuthz.canWriteElder()")
   @PutMapping("/{id}")
   public Result<ElderResponse> update(@PathVariable Long id, @Valid @RequestBody ElderUpdateRequest request) {
+    ElderResponse beforeSnapshot = elderService.get(id, AuthContext.getOrgId());
     request.setTenantId(AuthContext.getOrgId());
     request.setUpdatedBy(AuthContext.getStaffId());
     ElderResponse response = elderService.update(id, request);
     Long tenantId = AuthContext.getOrgId();
-    auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
-        "UPDATE", "ELDER", id, "更新老人档案");
+    auditLogService.recordStructured(
+        tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "UPDATE", "ELDER", id, "更新老人档案",
+        beforeSnapshot, response, request);
     return Result.ok(response);
   }
 
+  @PreAuthorize("@elderAuthz.canWriteElder()")
   @PostMapping("/{id}/profile-change-approval")
   public Result<OaApproval> applyProfileChangeApproval(
       @PathVariable Long id,
@@ -102,11 +113,13 @@ public class ElderController {
     return Result.ok(approval);
   }
 
+  @PreAuthorize("@elderAuthz.canReadElder()")
   @GetMapping("/{id}")
   public Result<ElderResponse> get(@PathVariable Long id) {
     return Result.ok(elderService.get(id, AuthContext.getOrgId()));
   }
 
+  @PreAuthorize("@elderAuthz.canReadElder()")
   @GetMapping("/page")
   public Result<IPage<ElderResponse>> page(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -115,6 +128,7 @@ public class ElderController {
       @RequestParam(defaultValue = "false") Boolean signedOnly,
       @RequestParam(required = false) Integer status,
       @RequestParam(required = false) Integer elderStatus,
+      @RequestParam(required = false) String lifecycleStatus,
       @RequestParam(required = false) String fullName,
       @RequestParam(required = false) String idCardNo,
       @RequestParam(required = false) String bedNo,
@@ -129,6 +143,7 @@ public class ElderController {
         keyword,
         signedOnly,
         queryStatus,
+        lifecycleStatus,
         fullName,
         idCardNo,
         bedNo,
@@ -137,28 +152,42 @@ public class ElderController {
         sortOrder));
   }
 
+  @PreAuthorize("@elderAuthz.canWriteElder()")
   @PostMapping("/{id}/assignBed")
   public Result<ElderResponse> assignBed(@PathVariable Long id, @Valid @RequestBody AssignBedRequest request) {
+    ElderResponse beforeSnapshot = elderService.get(id, AuthContext.getOrgId());
     request.setTenantId(AuthContext.getOrgId());
     request.setCreatedBy(AuthContext.getStaffId());
     ElderResponse response = elderService.assignBed(id, request);
     Long tenantId = AuthContext.getOrgId();
-    auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
-        "BED_ASSIGN", "ELDER", id, "床位分配");
+    Map<String, Object> context = new LinkedHashMap<>();
+    context.put("bedId", request.getBedId());
+    context.put("startDate", request.getStartDate());
+    auditLogService.recordStructured(
+        tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "BED_ASSIGN", "ELDER", id, "床位分配",
+        beforeSnapshot, response, context);
     return Result.ok(response);
   }
 
+  @PreAuthorize("@elderAuthz.canWriteElder()")
   @PostMapping("/{id}/unbindBed")
   public Result<ElderResponse> unbindBed(@PathVariable Long id,
       @RequestBody(required = false) UnbindBedRequest request,
       @RequestParam(required = false) LocalDate endDate,
       @RequestParam(required = false) String reason) {
     Long tenantId = AuthContext.getOrgId();
+    ElderResponse beforeSnapshot = elderService.get(id, tenantId);
     LocalDate actualEndDate = request != null && request.getEndDate() != null ? request.getEndDate() : endDate;
     String actualReason = request != null && request.getReason() != null ? request.getReason() : reason;
     ElderResponse response = elderService.unbindBed(id, actualEndDate, actualReason, tenantId, AuthContext.getStaffId());
-    auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
-        "BED_UNBIND", "ELDER", id, "床位解绑");
+    Map<String, Object> context = new LinkedHashMap<>();
+    context.put("endDate", actualEndDate);
+    context.put("reason", actualReason);
+    auditLogService.recordStructured(
+        tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "BED_UNBIND", "ELDER", id, "床位解绑",
+        beforeSnapshot, response, context);
     return Result.ok(response);
   }
 

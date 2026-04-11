@@ -28,6 +28,10 @@ public class CrmLeadResponse {
   private String receptionistName;
   private String homeAddress;
   private String marketerName;
+  @JsonSerialize(using = ToStringSerializer.class)
+  private Long ownerStaffId;
+  private String ownerStaffName;
+  private LocalDateTime assignedAt;
   private String followupStatus;
   private String referralChannel;
   private LocalDateTime invalidTime;

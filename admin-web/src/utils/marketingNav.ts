@@ -36,7 +36,7 @@ export function buildLeadRoute(entry: 'all' | 'intent' | 'invalid' | 'blacklist'
 
 export function buildFollowupRoute(entry: FollowupEntry, query?: Record<string, unknown>): RouteLocationRaw {
   return {
-    path: `/marketing/followup/${entry}`,
+    path: `/marketing/interactions/${entry}`,
     query: compactQuery(query || {})
   }
 }

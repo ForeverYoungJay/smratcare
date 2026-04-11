@@ -5,7 +5,7 @@
       :type="canViewAllLeads ? 'info' : 'warning'"
       show-icon
       style="margin-bottom: 12px"
-      :message="canViewAllLeads ? '当前账号可查看本机构营销线索。' : `当前账号仅查看本人创建线索（${currentUserDisplayName}）。`"
+      :message="canViewAllLeads ? '当前账号可查看并分配本机构营销线索。' : `当前账号仅查看本人负责线索（${currentUserDisplayName}）。`"
     />
     <a-alert
       show-icon
@@ -63,8 +63,8 @@
         <a-form-item label="客户标签">
           <a-input v-model:value="query.customerTag" placeholder="请选择 客户标签" allow-clear />
         </a-form-item>
-        <a-form-item label="归属营销人员">
-          <a-input v-model:value="query.marketerName" placeholder="请选择 归属营销人员" allow-clear />
+        <a-form-item label="负责人">
+          <a-input v-model:value="query.marketerName" placeholder="请输入 负责人/营销人员" allow-clear />
         </a-form-item>
       </template>
 
@@ -84,8 +84,8 @@
         <a-form-item label="联系电话">
           <a-input v-model:value="query.elderPhone" placeholder="请输入 联系电话" allow-clear />
         </a-form-item>
-        <a-form-item label="跟进人">
-          <a-input v-model:value="query.marketerName" placeholder="请输入 跟进人" allow-clear />
+        <a-form-item label="负责人">
+          <a-input v-model:value="query.marketerName" placeholder="请输入 负责人" allow-clear />
         </a-form-item>
       </template>
     </SearchForm>
@@ -124,7 +124,7 @@
       <div class="table-head">
         <div>
           <strong>{{ modeLabel }}列表</strong>
-          <span>支持批量状态推进、回访执行、转预订与客户明细查看，方便营销人员持续推进线索闭环。</span>
+          <span>支持批量状态推进、回访执行、转预订与客户明细查看，方便负责人持续推进线索闭环。</span>
         </div>
         <a-space wrap>
           <a-tag color="default">共 {{ displayTotal }} 条</a-tag>
@@ -255,7 +255,7 @@
             </a-form-item>
           </a-col>
           <a-col :span="12">
-            <a-form-item label="归属营销人员">
+            <a-form-item label="负责人">
               <a-input v-model:value="form.marketerName" />
             </a-form-item>
           </a-col>
@@ -291,7 +291,7 @@
           </a-col>
           <a-col :span="12">
             <a-form-item label="回访状态">
-              <a-input v-model:value="form.followupStatus" placeholder="已回访/未回访" />
+              <a-input v-model:value="form.followupStatus" placeholder="已回访/待回访" />
             </a-form-item>
           </a-col>
           <a-col :span="24">
@@ -310,10 +310,13 @@
         </a-form-item>
         <a-form-item label="回访类型">
           <a-select v-model:value="planForm.callbackType">
-            <a-select-option value="checkin">入住后回访</a-select-option>
-            <a-select-option value="trial">试住回访</a-select-option>
-            <a-select-option value="discharge">退住回访</a-select-option>
-            <a-select-option value="score">满意度评分</a-select-option>
+            <a-select-option
+              v-for="item in MARKETING_CALLBACK_TYPE_OPTIONS"
+              :key="item.value"
+              :value="item.value"
+            >
+              {{ item.label }}
+            </a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="回访内容">
@@ -335,10 +338,13 @@
         </a-form-item>
         <a-form-item label="回访类型">
           <a-select v-model:value="executeForm.callbackType">
-            <a-select-option value="checkin">入住后回访</a-select-option>
-            <a-select-option value="trial">试住回访</a-select-option>
-            <a-select-option value="discharge">退住回访</a-select-option>
-            <a-select-option value="score">满意度评分</a-select-option>
+            <a-select-option
+              v-for="item in MARKETING_CALLBACK_TYPE_OPTIONS"
+              :key="item.value"
+              :value="item.value"
+            >
+              {{ item.label }}
+            </a-select-option>
           </a-select>
         </a-form-item>
         <a-form-item label="满意度评分">
@@ -352,6 +358,72 @@
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <a-modal
+      v-model:open="assignOpen"
+      title="分配线索负责人"
+      :confirm-loading="assignSubmitting"
+      @ok="submitAssign"
+    >
+      <a-form :model="assignForm" layout="vertical">
+        <a-form-item label="负责人">
+          <a-select
+            v-model:value="assignForm.ownerStaffId"
+            show-search
+            allow-clear
+            placeholder="请选择负责人"
+            :options="staffOptions"
+            :filter-option="false"
+            @search="searchStaff"
+            @focus="() => !staffOptions.length && searchStaff('')"
+          />
+        </a-form-item>
+        <a-form-item label="分配说明">
+          <a-textarea v-model:value="assignForm.remark" :rows="3" placeholder="可选，记录分配原因或交接说明" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <a-drawer v-model:open="traceOpen" title="客户轨迹" width="760">
+      <a-spin :spinning="traceLoading">
+        <a-descriptions v-if="traceLead" :column="1" bordered size="small">
+          <a-descriptions-item label="客户">{{ traceLead.elderName || traceLead.consultantName || '-' }}</a-descriptions-item>
+          <a-descriptions-item label="联系电话">{{ traceLead.elderPhone || traceLead.consultantPhone || '-' }}</a-descriptions-item>
+          <a-descriptions-item label="当前负责人">{{ traceLead.ownerStaffName || traceLead.marketerName || '-' }}</a-descriptions-item>
+          <a-descriptions-item label="当前阶段">
+            {{ traceLead.flowStage || `线索状态 ${traceLead.status ?? '-'}` }}
+          </a-descriptions-item>
+          <a-descriptions-item label="下次跟进">{{ traceLead.nextFollowDate || '-' }}</a-descriptions-item>
+        </a-descriptions>
+
+        <MarketingTraceTimelineCard title="负责人分配记录" :items="leadAssignLogs" empty-text="暂无分配记录">
+          <template #default="{ item }">
+            <div class="trace-item-title">
+              {{ item.fromOwnerStaffName || '未分配' }} → {{ item.toOwnerStaffName || '未分配' }}
+            </div>
+            <div class="trace-item-meta">
+              {{ item.assignedAt || '-' }} · 操作人 {{ item.assignedByName || '-' }}
+            </div>
+            <div v-if="item.remark" class="trace-item-remark">{{ item.remark }}</div>
+          </template>
+        </MarketingTraceTimelineCard>
+
+        <MarketingTraceTimelineCard title="阶段流转记录" :items="leadStageLogs" empty-text="暂无阶段流转记录">
+          <template #default="{ item }">
+            <div class="trace-item-title">
+              {{ item.fromStage || item.fromStatus || '起始' }} → {{ item.toStage || item.toStatus || '当前' }}
+            </div>
+            <div class="trace-item-meta">
+              {{ item.operatedAt || '-' }} · {{ item.transitionType || '阶段变更' }} · {{ item.operatedByName || '-' }}
+            </div>
+            <div class="trace-item-meta">
+              归属部门 {{ item.fromOwnerDept || '-' }} → {{ item.toOwnerDept || '-' }}
+            </div>
+            <div v-if="item.remark" class="trace-item-remark">{{ item.remark }}</div>
+          </template>
+        </MarketingTraceTimelineCard>
+      </a-spin>
+    </a-drawer>
   </PageContainer>
 </template>
 
@@ -366,20 +438,34 @@ import SearchForm from '../../../components/SearchForm.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
 import MarketingQuickNav from './MarketingQuickNav.vue'
 import MarketingListToolbar from './MarketingListToolbar.vue'
+import MarketingTraceTimelineCard from './MarketingTraceTimelineCard.vue'
 import {
+  assignCrmLead,
   batchDeleteLeads,
   batchUpdateLeadStatus,
   createCrmLead,
   createLeadCallbackPlan,
   executeCallbackPlan,
+  getLeadAssignLogs,
   getLeadCallbackPlans,
   getMarketingLeadEntrySummary,
+  getLeadStageLogs,
   getLeadPage,
   updateCrmLead
 } from '../../../api/marketing'
+import { useStaffOptions } from '../../../composables/useStaffOptions'
 import { useUserStore } from '../../../stores/user'
+import { MARKETING_CALLBACK_TYPE_OPTIONS, MARKETING_LEAD_MODE_LABELS } from '../../../utils/marketingEnums'
 import { hasMinisterOrHigher } from '../../../utils/roleAccess'
-import type { CrmLeadItem, Id, MarketingCallbackType, MarketingLeadEntrySummary, MarketingLeadMode, PageResult } from '../../../types'
+import type {
+  CrmLeadAssignLogItem,
+  CrmLeadItem,
+  CrmStageTransitionLogItem,
+  Id,
+  MarketingCallbackType,
+  MarketingLeadEntrySummary,
+  MarketingLeadMode
+} from '../../../types'
 
 const props = withDefaults(defineProps<{
   mode: 'consultation' | 'intent' | 'reservation' | 'invalid' | 'callback' | 'pipeline'
@@ -438,11 +524,23 @@ const query = reactive({
   pageNo: 1,
   pageSize: 10
 })
+const { staffOptions, searchStaff, ensureSelectedStaff } = useStaffOptions({ pageSize: 120, preloadSize: 400 })
 
 const open = ref(false)
 const submitting = ref(false)
 const formRef = ref<FormInstance>()
 const form = reactive<Partial<CrmLeadItem>>({})
+const assignOpen = ref(false)
+const assignSubmitting = ref(false)
+const assignForm = reactive({
+  ownerStaffId: '',
+  remark: ''
+})
+const traceOpen = ref(false)
+const traceLoading = ref(false)
+const traceLead = ref<CrmLeadItem>()
+const leadAssignLogs = ref<CrmLeadAssignLogItem[]>([])
+const leadStageLogs = ref<CrmStageTransitionLogItem[]>([])
 
 const planOpen = ref(false)
 const planSubmitting = ref(false)
@@ -473,9 +571,9 @@ const callbackSnapshot = ref<Record<string, {
 const todayText = dayjs().format('YYYY-MM-DD')
 const moduleLogicMessage = computed(() => {
   if (effectiveMode.value === 'callback') {
-    return '回访管理和跟进管理都基于 crm_lead 线索池联动 crm_callback_plan；这里可以直接新增计划、执行回访和推进转预订。'
+    return '客户互动中心统一承接销售跟进、回访计划和执行轨迹；签后回访仍保留独立菜单，避免销售跟进与服务回访完全混在一起。'
   }
-  return '线索数据统一来自 crm_lead：咨询=status 0，意向=status 1，预订=status 2，失效=status 3；签约与入住阶段改在合同模块处理，所以不会在这里直接展示已签合同。'
+  return '线索数据统一来自 crm_lead：咨询=status 0，意向=status 1，失效=status 3；预订改按锁床/金额/阶段证据识别，签约与入住阶段统一在合同模块推进。'
 })
 
 const rules: FormRules = {
@@ -491,13 +589,8 @@ const rowSelection = computed(() => ({
 }))
 const selectedCount = computed(() => selectedRowKeys.value.length)
 const selectedRows = computed(() => rows.value.filter((item) => selectedRowKeys.value.some((id) => sameId(item.id, id))))
-const modeLabel = computed(() => {
-  if (effectiveMode.value === 'consultation') return '咨询管理'
-  if (effectiveMode.value === 'intent') return '意向客户'
-  if (effectiveMode.value === 'reservation') return '预订管理'
-  if (effectiveMode.value === 'invalid') return '失效用户'
-  return '待回访提醒'
-})
+const canAssignLead = computed(() => hasMinisterOrHigher(userStore.roles || []))
+const modeLabel = computed(() => MARKETING_LEAD_MODE_LABELS[effectiveMode.value] || '营销线索')
 
 const modalTitle = computed(() => form.id ? '编辑客户' : '新增客户')
 
@@ -516,6 +609,7 @@ const columns = computed(() => {
       { title: '媒体渠道', dataIndex: 'mediaChannel', key: 'mediaChannel', width: 120 },
       { title: '信息来源', dataIndex: 'infoSource', key: 'infoSource', width: 120 },
       { title: '接待人', dataIndex: 'receptionistName', key: 'receptionistName', width: 120 },
+      { title: '负责人', dataIndex: 'ownerDisplayName', key: 'ownerDisplayName', width: 120 },
       { title: '家庭地址', dataIndex: 'homeAddress', key: 'homeAddress', width: 160 },
       { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 }
     ]
@@ -532,7 +626,7 @@ const columns = computed(() => {
       { title: '回访结果', dataIndex: 'followupResult', key: 'followupResult', width: 180 },
       { title: '推荐渠道', dataIndex: 'referralChannel', key: 'referralChannel', width: 120 },
       { title: '客户标签', dataIndex: 'customerTag', key: 'customerTag', width: 120 },
-      { title: '归属营销人员', dataIndex: 'marketerName', key: 'marketerName', width: 140 },
+      { title: '负责人', dataIndex: 'ownerDisplayName', key: 'ownerDisplayName', width: 140 },
       { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 }
     ]
   }
@@ -545,7 +639,7 @@ const columns = computed(() => {
       { title: '联系电话', dataIndex: 'elderPhone', key: 'elderPhone', width: 130 },
       { title: '定金额度', dataIndex: 'reservationAmount', key: 'reservationAmount', width: 120 },
       { title: '预订房号', dataIndex: 'reservationRoomNo', key: 'reservationRoomNo', width: 140 },
-      { title: '营销人员', dataIndex: 'marketerName', key: 'marketerName', width: 120 },
+      { title: '负责人', dataIndex: 'ownerDisplayName', key: 'ownerDisplayName', width: 120 },
       { title: '收款时间', dataIndex: 'paymentTime', key: 'paymentTime', width: 170 },
       { title: '是否退款', dataIndex: 'refunded', key: 'refunded', width: 100 },
       { title: '预约渠道', dataIndex: 'reservationChannel', key: 'reservationChannel', width: 120 },
@@ -563,7 +657,7 @@ const columns = computed(() => {
       { title: '年龄', dataIndex: 'age', key: 'age', width: 80 },
       { title: '推荐渠道', dataIndex: 'referralChannel', key: 'referralChannel', width: 120 },
       { title: '客户标签', dataIndex: 'customerTag', key: 'customerTag', width: 120 },
-      { title: '归属营销人员', dataIndex: 'marketerName', key: 'marketerName', width: 140 },
+      { title: '负责人', dataIndex: 'ownerDisplayName', key: 'ownerDisplayName', width: 140 },
       { title: '失效时间', dataIndex: 'invalidTime', key: 'invalidTime', width: 170 },
       { title: '所属机构', dataIndex: 'orgName', key: 'orgName', width: 120 }
     ]
@@ -571,7 +665,7 @@ const columns = computed(() => {
   return [
     { title: '客户姓名', dataIndex: 'elderName', key: 'elderName', width: 140 },
     { title: '联系电话', dataIndex: 'elderPhone', key: 'elderPhone', width: 140 },
-    { title: '跟进人', dataIndex: 'marketerName', key: 'marketerName', width: 120 },
+    { title: '跟进负责人', dataIndex: 'ownerDisplayName', key: 'ownerDisplayName', width: 120 },
     { title: '计划执行时间', dataIndex: 'nextFollowDate', key: 'nextFollowDate', width: 170 },
     { title: '计划标题', dataIndex: 'planTitle', key: 'planTitle', width: 160 },
     { title: '回访内容', dataIndex: 'followupContent', key: 'followupContent', width: 220 },
@@ -586,7 +680,8 @@ const actionButtons = computed(() => {
     return [
       { key: 'create', label: '新增', type: 'primary' as const },
       { key: 'edit', label: '编辑', type: 'default' as const, disabled: selectedCount.value !== 1 },
-      { key: 'detail', label: '查看更多', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'detail', label: '客户轨迹', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'assign', label: '分配负责人', type: 'default' as const, disabled: selectedCount.value !== 1 || !canAssignLead.value },
       { key: 'setIntent', label: '设为意向', type: 'default' as const, disabled: selectedCount.value === 0 },
       { key: 'abandon', label: '放弃客户', type: 'default' as const, disabled: selectedCount.value === 0, danger: true },
       { key: 'delete', label: '删除', type: 'default' as const, disabled: selectedCount.value === 0, danger: true }
@@ -596,7 +691,8 @@ const actionButtons = computed(() => {
     return [
       { key: 'create', label: '新增', type: 'primary' as const },
       { key: 'edit', label: '编辑', type: 'default' as const, disabled: selectedCount.value !== 1 },
-      { key: 'detail', label: '查看更多', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'detail', label: '客户轨迹', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'assign', label: '分配负责人', type: 'default' as const, disabled: selectedCount.value !== 1 || !canAssignLead.value },
       { key: 'toReservation', label: '转预订', type: 'default' as const, disabled: selectedCount.value === 0 },
       { key: 'tag', label: '设置客户标签', type: 'default' as const, disabled: selectedCount.value === 0 },
       { key: 'callback', label: '添加回访计划', type: 'default' as const, disabled: selectedCount.value === 0 },
@@ -608,7 +704,8 @@ const actionButtons = computed(() => {
     return [
       { key: 'create', label: '新增', type: 'primary' as const },
       { key: 'edit', label: '编辑', type: 'default' as const, disabled: selectedCount.value !== 1 },
-      { key: 'detail', label: '查看更多', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'detail', label: '客户轨迹', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'assign', label: '分配负责人', type: 'default' as const, disabled: selectedCount.value !== 1 || !canAssignLead.value },
       { key: 'toggleRefund', label: '退款切换', type: 'default' as const, disabled: selectedCount.value !== 1 },
       { key: 'toAdmission', label: '转入住', type: 'default' as const, disabled: selectedCount.value !== 1 },
       { key: 'delete', label: '删除', type: 'default' as const, disabled: selectedCount.value === 0, danger: true }
@@ -616,7 +713,8 @@ const actionButtons = computed(() => {
   }
   if (mode === 'invalid') {
     return [
-      { key: 'detail', label: '查看详情', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'detail', label: '客户轨迹', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'assign', label: '分配负责人', type: 'default' as const, disabled: selectedCount.value !== 1 || !canAssignLead.value },
       { key: 'recover', label: '恢复客户', type: 'primary' as const, disabled: selectedCount.value === 0 },
       { key: 'delete', label: '删除', type: 'default' as const, disabled: selectedCount.value === 0, danger: true }
     ]
@@ -624,7 +722,8 @@ const actionButtons = computed(() => {
   if (mode === 'callback') {
     return [
       { key: 'edit', label: '编辑', type: 'default' as const, disabled: selectedCount.value !== 1 },
-      { key: 'detail', label: '查看详情', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'detail', label: '客户轨迹', type: 'default' as const, disabled: selectedCount.value !== 1 },
+      { key: 'assign', label: '分配负责人', type: 'default' as const, disabled: selectedCount.value !== 1 || !canAssignLead.value },
       { key: 'execute', label: '执行回访', type: 'primary' as const, disabled: selectedCount.value !== 1 },
       { key: 'setTodayFollow', label: '设今日回访', type: 'default' as const, disabled: selectedCount.value === 0 },
       { key: 'postponeFollow', label: '顺延3天', type: 'default' as const, disabled: selectedCount.value === 0 },
@@ -637,7 +736,8 @@ const actionButtons = computed(() => {
   }
   return [
     { key: 'edit', label: '编辑', type: 'default' as const, disabled: selectedCount.value !== 1 },
-    { key: 'detail', label: '查看详情', type: 'default' as const, disabled: selectedCount.value !== 1 },
+    { key: 'detail', label: '客户轨迹', type: 'default' as const, disabled: selectedCount.value !== 1 },
+    { key: 'assign', label: '分配负责人', type: 'default' as const, disabled: selectedCount.value !== 1 || !canAssignLead.value },
     { key: 'execute', label: '执行回访', type: 'primary' as const, disabled: selectedCount.value !== 1 },
     { key: 'setTodayFollow', label: '设今日回访', type: 'default' as const, disabled: selectedCount.value === 0 },
     { key: 'postponeFollow', label: '顺延3天', type: 'default' as const, disabled: selectedCount.value === 0 },
@@ -654,6 +754,7 @@ const displayRows = computed(() => rows.value.map((item, index) => {
   return {
     ...item,
     index: index + 1,
+    ownerDisplayName: item.ownerStaffName || item.marketerName || '未分配',
     planTitle: snapshot.title || item.remark,
     followupContent: snapshot.followupContent,
     followupResult: snapshot.followupResult
@@ -768,7 +869,7 @@ function applyScenarioFilters(
     if (filter === 'missing_followup' && String(item.followupStatus || '').trim()) return false
     if (filter === 'unsigned_lock') {
       if (!textContains(reservationStatus, '锁')) return false
-      if (item.contractSignedFlag) return false
+      if (isSignedLead(item)) return false
     }
 
     if (scenario === 'blacklist') {
@@ -795,9 +896,10 @@ function applyScenarioFilters(
       if (!nextFollow || nextFollow < todayText || dayjs(nextFollow).diff(dayjs(todayText), 'day') > 3) return false
     }
     if (stage === 'consultation' && Number(item.status) !== 0) return false
-    if (stage === 'evaluation' && Number(item.status) !== 1) return false
-    if (stage === 'signing' && Number(item.status) !== 2) return false
+    if (stage === 'evaluation' && !isIntentLead(item)) return false
+    if (stage === 'signing' && !hasReservationEvidence(item)) return false
     if (stage === 'lost' && Number(item.status) !== 3) return false
+    if (effectiveMode.value === 'reservation' && !hasReservationEvidence(item)) return false
     return true
   })
 }
@@ -825,9 +927,29 @@ function sameId(left: Id | undefined, right: Id | undefined) {
 function defaultStatus(mode: string) {
   if (mode === 'consultation') return 0
   if (mode === 'intent') return 1
-  if (mode === 'reservation') return 2
+  if (mode === 'reservation') return undefined
   if (mode === 'invalid') return 3
   return undefined
+}
+
+function isSignedLead(item: CrmLeadItem) {
+  return Number(item.contractSignedFlag || 0) === 1 || String(item.flowStage || '').toUpperCase() === 'SIGNED'
+}
+
+function hasReservationEvidence(item: CrmLeadItem) {
+  if (isSignedLead(item) || Number(item.status) === 3) return false
+  if (item.reservationBedId || String(item.reservationRoomNo || '').trim()) return true
+  if (Number(item.reservationAmount || 0) > 0) return true
+  const reservationStatus = String(item.reservationStatus || '').toLowerCase()
+  if (reservationStatus.includes('锁') || reservationStatus.includes('预') || reservationStatus.includes('lock') || reservationStatus.includes('reserve')) {
+    return true
+  }
+  const flowStage = String(item.flowStage || '').toUpperCase()
+  return flowStage === 'PENDING_BED_SELECT' || flowStage === 'PENDING_SIGN'
+}
+
+function isIntentLead(item: CrmLeadItem) {
+  return !isSignedLead(item) && !hasReservationEvidence(item) && Number(item.status) === 1
 }
 
 function genderText(gender?: number) {
@@ -1045,7 +1167,13 @@ async function handleTopAction(key: string) {
   if (key === 'detail') {
     const row = requireSingleSelection('查看详情')
     if (!row) return
-    viewMore(row)
+    openTraceDrawer(row)
+    return
+  }
+  if (key === 'assign') {
+    const row = requireSingleSelection('分配负责人')
+    if (!row) return
+    openAssignModal(row)
     return
   }
   if (key === 'execute') {
@@ -1176,7 +1304,7 @@ function openForm(row?: CrmLeadItem) {
       receptionistName: '',
       homeAddress: '',
       marketerName: '',
-      followupStatus: '未回访',
+      followupStatus: '待回访',
       customerTag: '',
       nextFollowDate: '',
       reservationAmount: undefined,
@@ -1185,7 +1313,7 @@ function openForm(row?: CrmLeadItem) {
       reservationStatus: effectiveMode.value === 'reservation' ? '预定' : '',
       refunded: 0,
       orgName: '弋阳龟峰颐养中心',
-      status: defaultStatus(effectiveMode.value) ?? 0
+      status: effectiveMode.value === 'reservation' ? 1 : (defaultStatus(effectiveMode.value) ?? 0)
     } as Partial<CrmLeadItem>)
   }
   open.value = true
@@ -1200,7 +1328,9 @@ async function submit() {
       ...form,
       name: form.name || form.elderName || form.consultantName || '未命名线索',
       phone: form.phone || form.elderPhone || form.consultantPhone,
-      status: defaultStatus(effectiveMode.value) ?? form.status ?? 0
+      status: effectiveMode.value === 'reservation'
+        ? 1
+        : (defaultStatus(effectiveMode.value) ?? form.status ?? 0)
     }
     if (form.id) {
       await updateCrmLead(form.id, payload)
@@ -1238,18 +1368,72 @@ async function submitCallbackPlan() {
   }
 }
 
-function viewMore(record: CrmLeadItem) {
-  Modal.info({
-    title: '客户详情',
-    content: `${record.elderName || '-'} / ${record.elderPhone || '-'} / ${record.remark || '-'}`
-  })
+function openAssignModal(record: CrmLeadItem) {
+  ensureSelectedStaff(record.ownerStaffId, record.ownerStaffName || record.marketerName)
+  assignForm.ownerStaffId = record.ownerStaffId == null ? '' : String(record.ownerStaffId)
+  assignForm.remark = ''
+  assignOpen.value = true
+}
+
+async function submitAssign() {
+  const row = requireSingleSelection('分配负责人')
+  if (!row) return
+  if (!assignForm.ownerStaffId) {
+    message.warning('请选择负责人')
+    return
+  }
+  assignSubmitting.value = true
+  try {
+    const target = staffOptions.value.find((item) => item.value === String(assignForm.ownerStaffId))
+    await assignCrmLead(row.id, {
+      ownerStaffId: Number(assignForm.ownerStaffId),
+      ownerStaffName: target?.name,
+      remark: assignForm.remark || undefined
+    })
+    message.success('负责人已更新')
+    assignOpen.value = false
+    fetchData()
+  } finally {
+    assignSubmitting.value = false
+  }
+}
+
+async function openTraceDrawer(record: CrmLeadItem) {
+  traceLead.value = record
+  traceOpen.value = true
+  traceLoading.value = true
+  try {
+    const [assignLogs, stageLogs] = await Promise.all([
+      getLeadAssignLogs(record.id, 20),
+      getLeadStageLogs(record.id, 20)
+    ])
+    leadAssignLogs.value = assignLogs || []
+    leadStageLogs.value = stageLogs || []
+  } catch {
+    leadAssignLogs.value = []
+    leadStageLogs.value = []
+    message.warning('轨迹数据加载失败，请稍后重试')
+  } finally {
+    traceLoading.value = false
+  }
 }
 
 function transferToAdmission(record: CrmLeadItem) {
-  updateCrmLead(record.id, { ...record, contractSignedFlag: 1, contractSignedAt: dayjs().format('YYYY-MM-DD HH:mm:ss') })
+  updateCrmLead(record.id, {
+    ...record,
+    status: 1,
+    contractSignedFlag: 0,
+    flowStage: 'PENDING_ASSESSMENT',
+    currentOwnerDept: 'ASSESSMENT',
+    contractStatus: record.contractStatus || '待评估',
+    reservationStatus: record.reservationStatus || '预定'
+  })
     .then(() => {
-      message.success('已标记转入住')
-      router.push('/marketing/contract-signing')
+      message.success('已转入签约评估流程')
+      router.push({
+        path: '/marketing/contracts/pending',
+        query: { flowStage: 'PENDING_ASSESSMENT' }
+      })
     })
     .catch(() => message.error('转入住失败'))
 }
@@ -1358,7 +1542,7 @@ async function batchMoveToReservation() {
     message.info('请先勾选要转预订的客户')
     return
   }
-  const selectedRows = rows.value.filter((item) => ids.some((id) => sameId(item.id, id)) && Number(item.status) !== 2)
+  const selectedRows = rows.value.filter((item) => ids.some((id) => sameId(item.id, id)) && !hasReservationEvidence(item))
   if (!selectedRows.length) {
     message.info('选中客户已是预订状态，无需重复操作')
     return
@@ -1367,7 +1551,7 @@ async function batchMoveToReservation() {
     selectedRows.map((item) =>
       updateCrmLead(item.id, {
         ...item,
-        status: 2,
+        status: 1,
         reservationStatus: item.reservationStatus || '预定'
       })
     )
@@ -1462,6 +1646,7 @@ watch(
 onMounted(() => {
   syncPipelineTabByRoute()
   syncQueryFiltersByRoute()
+  searchStaff('').catch(() => {})
   fetchData()
   const quick = String(route.query.quick || '').trim()
   if (quick === '1') {
@@ -1503,6 +1688,22 @@ onMounted(() => {
 .marketing-pagination {
   margin-top: 16px;
   text-align: right;
+}
+
+.trace-item-title {
+  color: #173854;
+  font-weight: 600;
+}
+
+.trace-item-meta {
+  color: #6d8aa3;
+  font-size: 12px;
+}
+
+.trace-item-remark {
+  color: #334155;
+  margin-top: 4px;
+  word-break: break-word;
 }
 
 @media (max-width: 768px) {

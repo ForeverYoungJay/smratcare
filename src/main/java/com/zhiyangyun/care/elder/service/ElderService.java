@@ -21,6 +21,7 @@ public interface ElderService {
       String keyword,
       Boolean signedOnly,
       Integer status,
+      String lifecycleStatus,
       String fullName,
       String idCardNo,
       String bedNo,

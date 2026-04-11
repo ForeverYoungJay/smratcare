@@ -6,6 +6,7 @@ export type MarketingReportEntry =
   | 'callback'
   | 'unknown-channel'
   | 'channel-rank'
+  | 'snapshots'
   | 'sales-performance'
 
 type ReportRouteConfig = {
@@ -41,6 +42,10 @@ const reportRouteMap: Record<MarketingReportEntry, ReportRouteConfig> = {
   'channel-rank': {
     path: '/marketing/reports/channel-rank',
     cacheKey: 'channel-rank'
+  },
+  snapshots: {
+    path: '/marketing/reports/snapshots',
+    cacheKey: 'snapshots'
   },
   'sales-performance': {
     path: '/marketing/reports/sales-performance',

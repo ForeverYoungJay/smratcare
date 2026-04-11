@@ -41,6 +41,10 @@ public class ElderProfile {
   private LocalDate admissionDate;
 
   private Integer status;
+  private String lifecycleStatus;
+  private String departureType;
+  private LocalDateTime lifecycleUpdatedAt;
+  private Long lastLifecycleEventId;
 
   private Long bedId;
 

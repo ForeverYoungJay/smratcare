@@ -6,22 +6,26 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zhiyangyun.care.bill.entity.BillMonthly;
 import com.zhiyangyun.care.bill.mapper.BillMonthlyMapper;
 import com.zhiyangyun.care.crm.entity.CrmContract;
+import com.zhiyangyun.care.crm.entity.CrmLead;
 import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
+import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
+import com.zhiyangyun.care.crm.service.CrmTraceService;
 import com.zhiyangyun.care.elder.model.AssignBedRequest;
 import com.zhiyangyun.care.elder.entity.Bed;
-import com.zhiyangyun.care.elder.entity.ElderBedRelation;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.entity.Room;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderAdmission;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderChangeLog;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderDischarge;
 import com.zhiyangyun.care.elder.mapper.BedMapper;
-import com.zhiyangyun.care.elder.mapper.ElderBedRelationMapper;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderAdmissionMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderChangeLogMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeMapper;
+import com.zhiyangyun.care.elder.model.ElderDepartureType;
+import com.zhiyangyun.care.elder.model.ElderLifecycleStatus;
+import com.zhiyangyun.care.elder.model.ElderStatus;
 import com.zhiyangyun.care.elder.model.lifecycle.AdmissionRequest;
 import com.zhiyangyun.care.elder.model.lifecycle.AdmissionRecordDimensionItem;
 import com.zhiyangyun.care.elder.model.lifecycle.AdmissionRecordResponse;
@@ -30,7 +34,9 @@ import com.zhiyangyun.care.elder.model.lifecycle.AdmissionResponse;
 import com.zhiyangyun.care.elder.model.lifecycle.ChangeLogResponse;
 import com.zhiyangyun.care.elder.model.lifecycle.DischargeRequest;
 import com.zhiyangyun.care.elder.model.lifecycle.DischargeResponse;
+import com.zhiyangyun.care.elder.service.ElderLifecycleStateService;
 import com.zhiyangyun.care.elder.service.lifecycle.ElderLifecycleService;
+import com.zhiyangyun.care.elder.service.ElderOccupancyService;
 import com.zhiyangyun.care.elder.service.ElderService;
 import com.zhiyangyun.care.finance.model.ElderAccountAdjustRequest;
 import com.zhiyangyun.care.finance.service.ElderAccountService;
@@ -40,6 +46,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -56,38 +63,47 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
   private final ElderChangeLogMapper changeLogMapper;
   private final ElderMapper elderMapper;
   private final BedMapper bedMapper;
-  private final ElderBedRelationMapper relationMapper;
   private final RoomMapper roomMapper;
   private final ElderService elderService;
   private final ElderAccountService accountService;
   private final BillMonthlyMapper billMonthlyMapper;
   private final ElderPointsAccountMapper pointsAccountMapper;
   private final CrmContractMapper crmContractMapper;
+  private final CrmLeadMapper crmLeadMapper;
+  private final CrmTraceService crmTraceService;
+  private final ElderLifecycleStateService elderLifecycleStateService;
+  private final ElderOccupancyService elderOccupancyService;
 
   public ElderLifecycleServiceImpl(ElderAdmissionMapper admissionMapper,
                                    ElderDischargeMapper dischargeMapper,
                                    ElderChangeLogMapper changeLogMapper,
                                    ElderMapper elderMapper,
                                    BedMapper bedMapper,
-                                   ElderBedRelationMapper relationMapper,
                                    RoomMapper roomMapper,
                                    ElderService elderService,
+                                   ElderLifecycleStateService elderLifecycleStateService,
+                                   ElderOccupancyService elderOccupancyService,
                                    ElderAccountService accountService,
                                    BillMonthlyMapper billMonthlyMapper,
                                    ElderPointsAccountMapper pointsAccountMapper,
-                                   CrmContractMapper crmContractMapper) {
+                                   CrmContractMapper crmContractMapper,
+                                   CrmLeadMapper crmLeadMapper,
+                                   CrmTraceService crmTraceService) {
     this.admissionMapper = admissionMapper;
     this.dischargeMapper = dischargeMapper;
     this.changeLogMapper = changeLogMapper;
     this.elderMapper = elderMapper;
     this.bedMapper = bedMapper;
-    this.relationMapper = relationMapper;
     this.roomMapper = roomMapper;
     this.elderService = elderService;
+    this.elderLifecycleStateService = elderLifecycleStateService;
+    this.elderOccupancyService = elderOccupancyService;
     this.accountService = accountService;
     this.billMonthlyMapper = billMonthlyMapper;
     this.pointsAccountMapper = pointsAccountMapper;
     this.crmContractMapper = crmContractMapper;
+    this.crmLeadMapper = crmLeadMapper;
+    this.crmTraceService = crmTraceService;
   }
 
   @Override
@@ -128,12 +144,31 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
       changeLogMapper.insert(change);
     }
 
+    Integer beforeStatus = elder.getStatus();
     elder.setAdmissionDate(request.getAdmissionDate());
-    elder.setStatus(1);
     if (elder.getSourceType() == null || elder.getSourceType().isBlank()) {
       elder.setSourceType(admission.getSourceType());
     }
-    elderMapper.updateById(elder);
+    elderLifecycleStateService.transitionFromLegacyStatus(
+        elder,
+        ElderStatus.IN_HOSPITAL,
+        null,
+        "ADMISSION_CREATE",
+        "入院办理",
+        "ELDER_ADMISSION",
+        admission.getId(),
+        request.getCreatedBy());
+    if (!Objects.equals(beforeStatus, ElderStatus.IN_HOSPITAL)) {
+      insertChangeLog(
+          request.getTenantId(),
+          request.getOrgId(),
+          request.getElderId(),
+          request.getCreatedBy(),
+          "STATUS",
+          beforeStatus == null ? null : String.valueOf(beforeStatus),
+          String.valueOf(ElderStatus.IN_HOSPITAL),
+          "入院办理");
+    }
 
     if (request.getBedId() != null
         && (elder.getBedId() == null || !request.getBedId().equals(elder.getBedId()))) {
@@ -160,7 +195,7 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
       accountService.adjust(request.getOrgId(), request.getCreatedBy(), adjust);
     }
     ensurePointsAccount(request.getOrgId(), request.getElderId());
-    syncContractAfterAdmission(contract, request);
+    syncCrmAfterAdmission(contract, request);
 
     AdmissionResponse response = new AdmissionResponse();
     response.setId(admission.getId());
@@ -206,10 +241,11 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
     return contract;
   }
 
-  private void syncContractAfterAdmission(CrmContract contract, AdmissionRequest request) {
+  private void syncCrmAfterAdmission(CrmContract contract, AdmissionRequest request) {
     if (contract == null) {
       return;
     }
+    CrmContract beforeContract = cloneContract(contract);
     boolean changed = false;
     if (contract.getElderId() == null && request.getElderId() != null) {
       contract.setElderId(request.getElderId());
@@ -245,7 +281,168 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
     }
     if (changed) {
       crmContractMapper.updateById(contract);
+      Map<String, Object> contractContext = new LinkedHashMap<>();
+      contractContext.put("elderId", request.getElderId());
+      contractContext.put("bedId", request.getBedId());
+      contractContext.put("contractNo", contract.getContractNo());
+      crmTraceService.recordContractWorkflow(
+          "ADMISSION_SYNC",
+          "入住办理后自动同步合同阶段",
+          beforeContract,
+          cloneContract(contract),
+          contractContext);
     }
+    syncLeadAfterAdmission(contract, request);
+  }
+
+  private void syncLeadAfterAdmission(CrmContract contract, AdmissionRequest request) {
+    CrmLead lead = null;
+    if (contract.getLeadId() != null) {
+      lead = crmLeadMapper.selectById(contract.getLeadId());
+      if (lead != null && !Objects.equals(lead.getTenantId(), contract.getTenantId())) {
+        lead = null;
+      }
+    }
+    if (lead == null && contract.getContractNo() != null && !contract.getContractNo().isBlank()) {
+      lead = crmLeadMapper.selectOne(Wrappers.lambdaQuery(CrmLead.class)
+          .eq(CrmLead::getIsDeleted, 0)
+          .eq(CrmLead::getTenantId, contract.getTenantId())
+          .eq(CrmLead::getContractNo, contract.getContractNo())
+          .orderByDesc(CrmLead::getUpdateTime)
+          .last("LIMIT 1"));
+    }
+    if (lead == null) {
+      return;
+    }
+    CrmLead beforeLead = cloneLead(lead);
+    boolean changed = false;
+    if (!Objects.equals(blankToNull(lead.getContractNo()), blankToNull(contract.getContractNo()))) {
+      lead.setContractNo(contract.getContractNo());
+      changed = true;
+    }
+    if (request.getBedId() != null && !Objects.equals(lead.getReservationBedId(), request.getBedId())) {
+      lead.setReservationBedId(request.getBedId());
+      changed = true;
+    }
+    if (!"PENDING_SIGN".equals(lead.getFlowStage())) {
+      lead.setFlowStage("PENDING_SIGN");
+      changed = true;
+    }
+    if (!"MARKETING".equals(lead.getCurrentOwnerDept())) {
+      lead.setCurrentOwnerDept("MARKETING");
+      changed = true;
+    }
+    if (!"待签署".equals(lead.getContractStatus())) {
+      lead.setContractStatus("待签署");
+      changed = true;
+    }
+    if (!Objects.equals(lead.getStatus(), 1)) {
+      lead.setStatus(1);
+      changed = true;
+    }
+    if (changed) {
+      crmLeadMapper.updateById(lead);
+      Map<String, Object> leadContext = new LinkedHashMap<>();
+      leadContext.put("elderId", request.getElderId());
+      leadContext.put("bedId", request.getBedId());
+      leadContext.put("contractNo", contract.getContractNo());
+      crmTraceService.recordLeadStageTransition(
+          "ADMISSION_SYNC",
+          "入住办理后自动同步线索阶段",
+          beforeLead,
+          cloneLead(lead),
+          leadContext);
+    }
+  }
+
+  private CrmContract cloneContract(CrmContract source) {
+    if (source == null) {
+      return null;
+    }
+    CrmContract target = new CrmContract();
+    target.setId(source.getId());
+    target.setTenantId(source.getTenantId());
+    target.setOrgId(source.getOrgId());
+    target.setLeadId(source.getLeadId());
+    target.setElderId(source.getElderId());
+    target.setContractNo(source.getContractNo());
+    target.setStatus(source.getStatus());
+    target.setChangeWorkflowStatus(source.getChangeWorkflowStatus());
+    target.setChangeWorkflowRemark(source.getChangeWorkflowRemark());
+    target.setSignedAt(source.getSignedAt());
+    target.setEffectiveFrom(source.getEffectiveFrom());
+    target.setEffectiveTo(source.getEffectiveTo());
+    target.setMarketerName(source.getMarketerName());
+    target.setSnapshotJson(source.getSnapshotJson());
+    target.setReservationRoomNo(source.getReservationRoomNo());
+    target.setReservationBedId(source.getReservationBedId());
+    target.setElderName(source.getElderName());
+    target.setElderPhone(source.getElderPhone());
+    target.setGender(source.getGender());
+    target.setAge(source.getAge());
+    target.setContractStatus(source.getContractStatus());
+    target.setFlowStage(source.getFlowStage());
+    target.setCurrentOwnerDept(source.getCurrentOwnerDept());
+    target.setOrgName(source.getOrgName());
+    target.setSmsSendCount(source.getSmsSendCount());
+    target.setRemark(source.getRemark());
+    target.setCreatedBy(source.getCreatedBy());
+    return target;
+  }
+
+  private CrmLead cloneLead(CrmLead source) {
+    if (source == null) {
+      return null;
+    }
+    CrmLead target = new CrmLead();
+    target.setId(source.getId());
+    target.setTenantId(source.getTenantId());
+    target.setOrgId(source.getOrgId());
+    target.setName(source.getName());
+    target.setPhone(source.getPhone());
+    target.setConsultantName(source.getConsultantName());
+    target.setConsultantPhone(source.getConsultantPhone());
+    target.setElderName(source.getElderName());
+    target.setElderPhone(source.getElderPhone());
+    target.setGender(source.getGender());
+    target.setAge(source.getAge());
+    target.setConsultDate(source.getConsultDate());
+    target.setConsultType(source.getConsultType());
+    target.setMediaChannel(source.getMediaChannel());
+    target.setInfoSource(source.getInfoSource());
+    target.setReceptionistName(source.getReceptionistName());
+    target.setHomeAddress(source.getHomeAddress());
+    target.setMarketerName(source.getMarketerName());
+    target.setOwnerStaffId(source.getOwnerStaffId());
+    target.setOwnerStaffName(source.getOwnerStaffName());
+    target.setAssignedAt(source.getAssignedAt());
+    target.setFollowupStatus(source.getFollowupStatus());
+    target.setNextFollowDate(source.getNextFollowDate());
+    target.setCustomerTag(source.getCustomerTag());
+    target.setStatus(source.getStatus());
+    target.setInvalidTime(source.getInvalidTime());
+    target.setReservationAmount(source.getReservationAmount());
+    target.setReservationRoomNo(source.getReservationRoomNo());
+    target.setReservationBedId(source.getReservationBedId());
+    target.setPaymentTime(source.getPaymentTime());
+    target.setRefunded(source.getRefunded());
+    target.setReservationChannel(source.getReservationChannel());
+    target.setReservationStatus(source.getReservationStatus());
+    target.setContractSignedFlag(source.getContractSignedFlag());
+    target.setContractSignedAt(source.getContractSignedAt());
+    target.setContractNo(source.getContractNo());
+    target.setContractStatus(source.getContractStatus());
+    target.setFlowStage(source.getFlowStage());
+    target.setCurrentOwnerDept(source.getCurrentOwnerDept());
+    target.setCreatedBy(source.getCreatedBy());
+    return target;
+  }
+
+  private String blankToNull(String value) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    return value.trim();
   }
 
   @Override
@@ -281,39 +478,26 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
     change.setElderId(request.getElderId());
     change.setChangeType("DISCHARGE");
     change.setBeforeValue(elder.getStatus() == null ? null : elder.getStatus().toString());
-    change.setAfterValue("3");
+    change.setAfterValue(String.valueOf(ElderStatus.DISCHARGED));
     change.setReason(request.getReason());
     change.setCreatedBy(request.getCreatedBy());
     changeLogMapper.insert(change);
 
     Long previousBedId = elder.getBedId();
-    elder.setStatus(3);
-    elder.setBedId(null);
-    elderMapper.updateById(elder);
+    elderLifecycleStateService.transitionFromLegacyStatus(
+        elder,
+        ElderStatus.DISCHARGED,
+        ElderDepartureType.NORMAL,
+        "DISCHARGE_COMPLETE",
+        request.getReason(),
+        "ELDER_DISCHARGE",
+        discharge.getId(),
+        request.getCreatedBy());
+    elderOccupancyService.releaseBedAndCloseRelation(
+        request.getTenantId(), request.getOrgId(), elder.getId(), request.getDischargeDate(), "退院释放床位");
     if (previousBedId != null) {
       insertChangeLog(request.getTenantId(), request.getOrgId(), request.getElderId(), request.getCreatedBy(),
           "BED_CHANGE", String.valueOf(previousBedId), null, "退院释放床位");
-    }
-
-    ElderBedRelation active = relationMapper.selectOne(Wrappers.lambdaQuery(ElderBedRelation.class)
-        .eq(ElderBedRelation::getIsDeleted, 0)
-        .eq(request.getTenantId() != null, ElderBedRelation::getTenantId, request.getTenantId())
-        .eq(request.getOrgId() != null, ElderBedRelation::getOrgId, request.getOrgId())
-        .eq(ElderBedRelation::getActiveFlag, 1)
-        .eq(ElderBedRelation::getElderId, elder.getId()));
-    if (active != null) {
-      active.setActiveFlag(0);
-      active.setEndDate(request.getDischargeDate());
-      relationMapper.updateById(active);
-    }
-
-    if (previousBedId != null) {
-      Bed bed = bedMapper.selectById(previousBedId);
-      if (bed != null && (Objects.equals(bed.getElderId(), elder.getId()) || bed.getElderId() == null)) {
-        bed.setElderId(null);
-        bed.setStatus(1);
-        bedMapper.updateById(bed);
-      }
     }
 
     DischargeResponse response = new DischargeResponse();
@@ -485,6 +669,7 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
       ElderProfile elder = elderMap.get(item.getElderId());
       response.setElderName(elder == null ? null : elder.getFullName());
       response.setElderStatus(elder == null ? null : elder.getStatus());
+      response.setElderLifecycleStatus(elder == null ? null : elder.getLifecycleStatus());
       return response;
     }).toList();
 
@@ -553,14 +738,27 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
       }
 
       ElderProfile elder = elderMap.get(admission.getElderId());
-      Integer status = elder == null ? null : elder.getStatus();
-      if (status == null) {
-        response.setOtherStatusCount(response.getOtherStatusCount() + 1);
-      } else if (status == 1) {
+      String lifecycleStatus = elder == null ? null : ElderLifecycleStatus.normalize(elder.getLifecycleStatus());
+      if (lifecycleStatus == null) {
+        Integer status = elder == null ? null : elder.getStatus();
+        if (status == null) {
+          response.setOtherStatusCount(response.getOtherStatusCount() + 1);
+        } else if (status == ElderStatus.IN_HOSPITAL) {
+          response.setInHospitalCount(response.getInHospitalCount() + 1);
+        } else if (status == ElderStatus.OUTING) {
+          response.setLeaveCount(response.getLeaveCount() + 1);
+        } else if (status == ElderStatus.DISCHARGED) {
+          response.setDischargedCount(response.getDischargedCount() + 1);
+        } else {
+          response.setOtherStatusCount(response.getOtherStatusCount() + 1);
+        }
+      } else if (ElderLifecycleStatus.IN_HOSPITAL.equals(lifecycleStatus)) {
         response.setInHospitalCount(response.getInHospitalCount() + 1);
-      } else if (status == 2) {
+      } else if (ElderLifecycleStatus.OUTING.equals(lifecycleStatus)
+          || ElderLifecycleStatus.MEDICAL_OUTING.equals(lifecycleStatus)) {
         response.setLeaveCount(response.getLeaveCount() + 1);
-      } else if (status == 3) {
+      } else if (ElderLifecycleStatus.DISCHARGED.equals(lifecycleStatus)
+          || ElderLifecycleStatus.DECEASED.equals(lifecycleStatus)) {
         response.setDischargedCount(response.getDischargedCount() + 1);
       } else {
         response.setOtherStatusCount(response.getOtherStatusCount() + 1);
@@ -743,7 +941,7 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
     created.setOrgId(orgId);
     created.setElderId(elderId);
     created.setPointsBalance(0);
-    created.setStatus(1);
+    created.setStatus(ElderStatus.IN_HOSPITAL);
     pointsAccountMapper.insert(created);
   }
 

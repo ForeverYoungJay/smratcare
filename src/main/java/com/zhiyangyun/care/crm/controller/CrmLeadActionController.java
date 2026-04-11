@@ -40,6 +40,7 @@ public class CrmLeadActionController {
   }
 
   @PostMapping("/batch/delete")
+  @PreAuthorize("hasAnyRole('MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   public Result<Integer> batchDelete(@RequestBody CrmLeadBatchDeleteRequest request) {
     return Result.ok(leadActionService.batchDelete(AuthContext.getOrgId(), request));
   }

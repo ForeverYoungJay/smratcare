@@ -7,6 +7,29 @@
       style="margin-bottom: 16px"
     />
 
+    <a-card v-if="elder" class="card-elevated resident-hero" :bordered="false" style="margin-bottom: 16px">
+      <div class="resident-hero__main">
+        <div>
+          <div class="resident-hero__title">
+            <strong>{{ elder.fullName || '未命名长者' }}</strong>
+            <a-tag :color="statusColor(elder.lifecycleStatus)">{{ statusLabel(elder.lifecycleStatus) }}</a-tag>
+            <a-tag v-if="elder.departureType === 'DEATH'" color="magenta">死亡离场</a-tag>
+          </div>
+          <div class="resident-hero__meta">
+            <span>床位：{{ elder.roomNo || '-' }} / {{ elder.bedNo || '未分配' }}</span>
+            <span>护理等级：{{ elder.careLevel || '未评定' }}</span>
+            <span>联系电话：{{ elder.phone || '未登记' }}</span>
+          </div>
+        </div>
+        <a-space wrap>
+          <a-button type="primary" @click="go(`/elder/detail/${residentId}`)">查看档案</a-button>
+          <a-button @click="go(`/elder/assessment/ability/archive?elderId=${residentId}`)">评估档案</a-button>
+          <a-button @click="go(`/elder/contracts-invoices?elderId=${residentId}`)">合同票据</a-button>
+          <a-button @click="go(`/elder/status-change/center?residentId=${residentId}`)">状态变更</a-button>
+        </a-space>
+      </div>
+    </a-card>
+
     <StatefulBlock :loading="loading" :error="errorMessage" :empty="!cards.length" empty-text="暂无长者总览数据" @retry="loadOverview">
       <a-row :gutter="16">
         <a-col v-for="card in cards" :key="card.key" :xs="24" :lg="12" style="margin-bottom: 16px">
@@ -49,9 +72,9 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../../components/PageContainer.vue'
 import StatefulBlock from '../../../components/StatefulBlock.vue'
 import { getResidentOverview } from '../../../api/medicalCare'
-import { getElderPage } from '../../../api/elder'
+import { getElderDetail, getElderPage } from '../../../api/elder'
 import { useLiveSyncRefresh } from '../../../composables/useLiveSyncRefresh'
-import type { MedicalResidentOverview } from '../../../types'
+import type { ElderItem, MedicalResidentOverview } from '../../../types'
 
 const router = useRouter()
 const route = useRoute()
@@ -60,6 +83,7 @@ const residentId = ref('')
 const loading = ref(false)
 const errorMessage = ref('')
 const overview = ref<MedicalResidentOverview>()
+const elder = ref<ElderItem>()
 
 const cards = computed(() => overview.value?.cards || [])
 
@@ -94,13 +118,42 @@ async function loadOverview() {
       errorMessage.value = "暂无可用长者，请先创建长者档案"
       return
     }
-    overview.value = await getResidentOverview(residentId.value)
+    const [elderDetail, residentOverview] = await Promise.all([
+      getElderDetail(residentId.value),
+      getResidentOverview(residentId.value)
+    ])
+    elder.value = elderDetail
+    overview.value = residentOverview
   } catch (error: any) {
     errorMessage.value = error?.message || '加载长者总览失败'
     message.error(errorMessage.value)
   } finally {
     loading.value = false
   }
+}
+
+function statusLabel(status?: string) {
+  if (status === 'INTENT') return '意向'
+  if (status === 'TRIAL') return '试住'
+  if (status === 'IN_HOSPITAL') return '在住'
+  if (status === 'OUTING') return '外出'
+  if (status === 'MEDICAL_OUTING') return '外出就医'
+  if (status === 'DISCHARGE_PENDING') return '待退住'
+  if (status === 'DISCHARGED') return '已退住'
+  if (status === 'DECEASED') return '已身故'
+  return '未标记'
+}
+
+function statusColor(status?: string) {
+  if (status === 'INTENT') return 'gold'
+  if (status === 'TRIAL') return 'cyan'
+  if (status === 'IN_HOSPITAL') return 'green'
+  if (status === 'OUTING') return 'orange'
+  if (status === 'MEDICAL_OUTING') return 'volcano'
+  if (status === 'DISCHARGE_PENDING') return 'blue'
+  if (status === 'DISCHARGED') return 'red'
+  if (status === 'DECEASED') return 'magenta'
+  return 'default'
 }
 
 onMounted(loadOverview)
@@ -119,5 +172,33 @@ useLiveSyncRefresh({
 .line-item {
   line-height: 1.9;
   color: #262626;
+}
+
+.resident-hero__main {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.resident-hero__title {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.resident-hero__title strong {
+  font-size: 18px;
+  color: #1f1f1f;
+}
+
+.resident-hero__meta {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  color: #595959;
 }
 </style>

@@ -96,12 +96,12 @@ export const routes: RouteRecordRaw[] = [
         path: 'elder',
         name: 'Elder',
         meta: { title: '长者管理', icon: 'TeamOutlined' },
-        redirect: '/elder/in-hospital-overview',
+        redirect: '/elder/resident-360',
         children: [
           {
             path: 'resident-360',
             name: 'ElderResident360',
-            component: () => import('../views/elder/resident360/InHospitalOverview.vue'),
+            component: () => import('../views/elder/resident360/Resident360.vue'),
             meta: { title: '长者总览', hidden: true }
           },
           {
@@ -423,16 +423,28 @@ export const routes: RouteRecordRaw[] = [
           },
           {
             path: 'followup',
-            name: 'MarketingFollowup',
-            meta: { title: '跟进管理' },
-            redirect: '/marketing/followup/records',
+            name: 'MarketingFollowupCompat',
+            meta: { title: '客户互动中心（兼容）', hidden: true },
+            redirect: '/marketing/interactions/records',
+            children: [
+              { path: 'records', redirect: '/marketing/interactions/records', meta: { hidden: true } },
+              { path: 'due', redirect: '/marketing/interactions/due', meta: { hidden: true } },
+              { path: 'today', redirect: '/marketing/interactions/today', meta: { hidden: true } },
+              { path: 'overdue', redirect: '/marketing/interactions/overdue', meta: { hidden: true } }
+            ]
+          },
+          {
+            path: 'interactions',
+            name: 'MarketingInteractions',
+            meta: { title: '客户互动中心' },
+            redirect: '/marketing/interactions/records',
             children: [
               {
                 path: 'records',
                 name: 'MarketingFollowupRecords',
                 component: () => import('../views/marketing/LeadScenarioPage.vue'),
-                props: { mode: 'callback', title: '跟进记录', subTitle: '营销跟进全量记录与回访轨迹' },
-                meta: { title: '跟进记录' }
+                props: { mode: 'callback', title: '客户互动记录', subTitle: '销售跟进、回访计划与执行轨迹统一收口' },
+                meta: { title: '客户互动记录' }
               },
               {
                 path: 'due',
@@ -577,7 +589,7 @@ export const routes: RouteRecordRaw[] = [
           {
             path: 'callback',
             name: 'MarketingCallback',
-            meta: { title: '回访管理' },
+            meta: { title: '签后回访管理' },
             redirect: '/marketing/callback/checkin',
             children: [
               {
@@ -662,6 +674,12 @@ export const routes: RouteRecordRaw[] = [
                 name: 'MarketingReportChannelRank',
                 component: () => import('../views/marketing/report/ChannelRank.vue'),
                 meta: { title: '渠道贡献排名' }
+              },
+              {
+                path: 'snapshots',
+                name: 'MarketingReportSnapshots',
+                component: () => import('../views/marketing/report/Snapshots.vue'),
+                meta: { title: '经营快照' }
               }
             ]
           },
@@ -700,7 +718,7 @@ export const routes: RouteRecordRaw[] = [
               { path: 'intent', redirect: '/marketing/leads/intent', meta: { hidden: true } },
               { path: 'reservation', redirect: '/marketing/reservation/records', meta: { hidden: true } },
               { path: 'invalid', redirect: '/marketing/leads/invalid', meta: { hidden: true } },
-              { path: 'callback', redirect: '/marketing/followup/due', meta: { hidden: true } }
+              { path: 'callback', redirect: '/marketing/interactions/due', meta: { hidden: true } }
             ]
           },
         ]

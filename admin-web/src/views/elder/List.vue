@@ -52,10 +52,15 @@
         <a-input v-model:value="query.careLevel" placeholder="护理等级" allow-clear />
       </a-form-item>
       <a-form-item label="状态">
-        <a-select v-model:value="query.status" allow-clear style="width: 140px">
-          <a-select-option :value="1">在院</a-select-option>
-          <a-select-option :value="2">请假</a-select-option>
-          <a-select-option :value="3">离院</a-select-option>
+        <a-select v-model:value="query.lifecycleStatus" allow-clear style="width: 160px">
+          <a-select-option value="INTENT">意向</a-select-option>
+          <a-select-option value="TRIAL">试住</a-select-option>
+          <a-select-option value="IN_HOSPITAL">在住</a-select-option>
+          <a-select-option value="OUTING">外出</a-select-option>
+          <a-select-option value="MEDICAL_OUTING">外出就医</a-select-option>
+          <a-select-option value="DISCHARGE_PENDING">待退住</a-select-option>
+          <a-select-option value="DISCHARGED">已退住</a-select-option>
+          <a-select-option value="DECEASED">已身故</a-select-option>
         </a-select>
       </a-form-item>
     </SearchForm>
@@ -109,7 +114,7 @@
             </div>
           </template>
           <template v-else-if="column.key === 'status'">
-            <a-tag :color="statusTag(record.status)">{{ statusText(record.status) }}</a-tag>
+            <a-tag :color="statusTag(record)">{{ statusText(record) }}</a-tag>
           </template>
           <template v-else-if="column.key === 'lifecycleStage'">
             <a-tag :color="lifecycleStageColor(resolveLifecycleStage(record))">
@@ -122,7 +127,7 @@
           <template v-else-if="column.key === 'action'">
             <div class="row-action-links">
               <a-button type="link" size="small" @click="goDetail(record.id)">详情</a-button>
-              <a-button type="link" size="small" @click="goInHospitalOverview(record)">总览</a-button>
+              <a-button type="link" size="small" @click="goResidentCenter(record)">长者中心</a-button>
               <a-button type="link" size="small" @click="goAssessmentArchive(record)">评估</a-button>
               <a-button type="link" size="small" @click="goContractsInvoices(record)">合同票据</a-button>
             </div>
@@ -216,14 +221,14 @@ const total = ref(0)
 const selectedRowKeys = ref<Id[]>([])
 const skipNextRouteWatch = ref(false)
 const routeSignature = ref('')
-const ELDER_LIST_ROUTE_KEYS = ['fullName', 'idCardNo', 'bedNo', 'careLevel', 'status', 'sortBy', 'sortOrder', 'pageNo', 'pageSize'] as const
+const ELDER_LIST_ROUTE_KEYS = ['fullName', 'idCardNo', 'bedNo', 'careLevel', 'lifecycleStatus', 'status', 'sortBy', 'sortOrder', 'pageNo', 'pageSize'] as const
 
 const query = reactive({
   fullName: undefined as string | undefined,
   idCardNo: undefined as string | undefined,
   bedNo: undefined as string | undefined,
   careLevel: undefined as string | undefined,
-  status: undefined as number | undefined,
+  lifecycleStatus: undefined as string | undefined,
   sortBy: undefined as string | undefined,
   sortOrder: undefined as string | undefined,
   pageNo: 1,
@@ -251,7 +256,7 @@ const activeFilterTags = computed(() => {
   if (query.idCardNo) tags.push(`身份证: ${query.idCardNo}`)
   if (query.bedNo) tags.push(`床位: ${query.bedNo}`)
   if (query.careLevel) tags.push(`护理等级: ${query.careLevel}`)
-  if (query.status) tags.push(`状态: ${statusText(query.status)}`)
+  if (query.lifecycleStatus) tags.push(`状态: ${statusText({ lifecycleStatus: query.lifecycleStatus })}`)
   return tags
 })
 const lifecycleStageCounters = computed(() => {
@@ -272,9 +277,9 @@ const lifecycleStageCounters = computed(() => {
 })
 
 const statusCounters = computed(() => ({
-  inHospital: rows.value.filter((item) => item.status === 1).length,
-  outing: rows.value.filter((item) => item.status === 2).length,
-  discharged: rows.value.filter((item) => item.status === 3).length
+  inHospital: rows.value.filter((item) => resolveResidentLifecycleStatus(item) === 'IN_HOSPITAL').length,
+  outing: rows.value.filter((item) => resolveResidentLifecycleStatus(item) === 'OUTING').length,
+  discharged: rows.value.filter((item) => resolveResidentLifecycleStatus(item) === 'DISCHARGED').length
 }))
 
 const rowSelection = computed(() => ({
@@ -312,17 +317,42 @@ const qrOpen = ref(false)
 const qrDataUrl = ref('')
 const qrText = ref('')
 
-function statusText(status?: number) {
-  if (status === 1) return '在院'
-  if (status === 2) return '请假'
-  if (status === 3) return '离院'
+function resolveResidentLifecycleStatus(item?: Partial<ElderItem>) {
+  const lifecycleStatus = String(item?.lifecycleStatus || '').trim().toUpperCase()
+  if (lifecycleStatus) return lifecycleStatus
+  if (item?.status === 1) return 'IN_HOSPITAL'
+  if (item?.status === 2) return 'OUTING'
+  if (item?.status === 3) return item?.departureType === 'DEATH' ? 'DECEASED' : 'DISCHARGED'
+  return ''
+}
+
+function statusText(item?: Partial<ElderItem> | number) {
+  const lifecycleStatus = typeof item === 'number'
+    ? resolveResidentLifecycleStatus({ status: item })
+    : resolveResidentLifecycleStatus(item)
+  if (lifecycleStatus === 'INTENT') return '意向'
+  if (lifecycleStatus === 'TRIAL') return '试住'
+  if (lifecycleStatus === 'IN_HOSPITAL') return '在住'
+  if (lifecycleStatus === 'OUTING') return '外出'
+  if (lifecycleStatus === 'MEDICAL_OUTING') return '外出就医'
+  if (lifecycleStatus === 'DISCHARGE_PENDING') return '待退住'
+  if (lifecycleStatus === 'DISCHARGED') return '已退住'
+  if (lifecycleStatus === 'DECEASED') return '已身故'
   return '未知'
 }
 
-function statusTag(status?: number) {
-  if (status === 1) return 'green'
-  if (status === 2) return 'orange'
-  if (status === 3) return 'red'
+function statusTag(item?: Partial<ElderItem> | number) {
+  const lifecycleStatus = typeof item === 'number'
+    ? resolveResidentLifecycleStatus({ status: item })
+    : resolveResidentLifecycleStatus(item)
+  if (lifecycleStatus === 'INTENT') return 'gold'
+  if (lifecycleStatus === 'TRIAL') return 'cyan'
+  if (lifecycleStatus === 'IN_HOSPITAL') return 'green'
+  if (lifecycleStatus === 'OUTING') return 'orange'
+  if (lifecycleStatus === 'MEDICAL_OUTING') return 'volcano'
+  if (lifecycleStatus === 'DISCHARGE_PENDING') return 'blue'
+  if (lifecycleStatus === 'DISCHARGED') return 'red'
+  if (lifecycleStatus === 'DECEASED') return 'magenta'
   return 'default'
 }
 
@@ -339,7 +369,10 @@ function sourceTypeColor(value?: string) {
 }
 
 function resolveLifecycleStage(item: ElderItem) {
-  const fallback = item.status === 1 || item.status === 2 || item.status === 3 ? 'SIGNED' : 'PENDING_ASSESSMENT'
+  const lifecycleStatus = resolveResidentLifecycleStatus(item)
+  const fallback = ['IN_HOSPITAL', 'OUTING', 'MEDICAL_OUTING', 'DISCHARGE_PENDING', 'DISCHARGED', 'DECEASED'].includes(lifecycleStatus)
+    ? 'SIGNED'
+    : 'PENDING_ASSESSMENT'
   return normalizeLifecycleStage(item.lifecycleStage, item.lifecycleContractStatus || fallback)
 }
 
@@ -362,7 +395,7 @@ async function fetchData() {
       idCardNo: query.idCardNo,
       bedNo: query.bedNo,
       careLevel: query.careLevel,
-      status: query.status,
+      lifecycleStatus: query.lifecycleStatus,
       sortBy: query.sortBy,
       sortOrder: query.sortOrder
     })
@@ -372,7 +405,7 @@ async function fetchData() {
       roomNo: r.roomNo ?? r.currentBed?.roomNo,
       lifecycleStage: normalizeLifecycleStage(
         r.lifecycleStage,
-        r.lifecycleContractStatus || (r.status === 1 || r.status === 2 || r.status === 3 ? 'SIGNED' : undefined)
+        r.lifecycleContractStatus || (['IN_HOSPITAL', 'OUTING', 'MEDICAL_OUTING', 'DISCHARGE_PENDING', 'DISCHARGED', 'DECEASED'].includes(resolveResidentLifecycleStatus(r)) ? 'SIGNED' : undefined)
       )
     }))
     total.value = res.total || res.list.length
@@ -447,8 +480,13 @@ function applyQueryFromRoute() {
   query.idCardNo = firstRouteQueryText(route.query.idCardNo) || undefined
   query.bedNo = firstRouteQueryText(route.query.bedNo) || undefined
   query.careLevel = firstRouteQueryText(route.query.careLevel) || undefined
-  const status = Number(firstRouteQueryText(route.query.status))
-  query.status = Number.isFinite(status) && status > 0 ? status : undefined
+  const lifecycleStatus = firstRouteQueryText(route.query.lifecycleStatus).toUpperCase()
+  if (lifecycleStatus) {
+    query.lifecycleStatus = lifecycleStatus
+  } else {
+    const status = Number(firstRouteQueryText(route.query.status))
+    query.lifecycleStatus = status === 1 ? 'IN_HOSPITAL' : status === 2 ? 'OUTING' : status === 3 ? 'DISCHARGED' : undefined
+  }
   query.sortBy = firstRouteQueryText(route.query.sortBy) || undefined
   const order = firstRouteQueryText(route.query.sortOrder).toLowerCase()
   query.sortOrder = order === 'asc' || order === 'desc' ? order : undefined
@@ -466,7 +504,7 @@ function buildQueryRouteQuery() {
   if (query.idCardNo) nextQuery.idCardNo = query.idCardNo
   if (query.bedNo) nextQuery.bedNo = query.bedNo
   if (query.careLevel) nextQuery.careLevel = query.careLevel
-  if (query.status) nextQuery.status = String(query.status)
+  if (query.lifecycleStatus) nextQuery.lifecycleStatus = query.lifecycleStatus
   if (query.sortBy) nextQuery.sortBy = query.sortBy
   if (query.sortOrder) nextQuery.sortOrder = query.sortOrder
   nextQuery.pageNo = String(parsePositiveInt(query.pageNo, 1))
@@ -503,7 +541,7 @@ function reset() {
   query.idCardNo = undefined
   query.bedNo = undefined
   query.careLevel = undefined
-  query.status = undefined
+  query.lifecycleStatus = undefined
   query.sortBy = undefined
   query.sortOrder = undefined
   selectedRowKeys.value = []
@@ -547,7 +585,7 @@ function exportCsvData() {
       家庭地址: r.homeAddress || '',
       床位号: r.bedNo || '',
       护理等级: r.careLevel || '',
-      状态: statusText(r.status)
+      状态: statusText(r)
     })),
     'elder-list.csv'
   )
@@ -565,9 +603,9 @@ function goDetail(id: Id) {
   router.push(`/elder/detail/${id}`)
 }
 
-function goInHospitalOverview(row: ElderItem) {
+function goResidentCenter(row: ElderItem) {
   router.push({
-    path: '/elder/in-hospital-overview',
+    path: '/elder/resident-360',
     query: {
       residentId: String(row.id),
       elderName: row.fullName || ''

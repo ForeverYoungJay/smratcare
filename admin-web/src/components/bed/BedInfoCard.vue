@@ -50,10 +50,16 @@ const isAlert = computed(() => {
   return props.bed.riskLevel === 'HIGH' || props.bed.status === 0 || Number(props.bed.abnormalVital24hCount || 0) > 0
 })
 
+const isOccupied = computed(() => props.bed.status === 2 || Boolean(props.bed.elderId))
+const isReserved = computed(() => props.bed.occupancySource === 'RESERVATION')
+const isCleaning = computed(() => props.bed.occupancySource === 'CLEANING')
+const isMaintenance = computed(() => props.bed.status === 3 || props.bed.occupancySource === 'MAINTENANCE')
+
 const statusMeta = computed(() => {
-  if (props.bed.status === 2) return { key: 'maintenance', label: '维修' }
-  if (props.bed.status === 3) return { key: 'cleaning', label: '清洁中' }
-  if (!props.bed.elderId && String(props.bed.bedNo || '').endsWith('R')) return { key: 'reserved', label: '预定' }
+  if (isMaintenance.value) return { key: 'maintenance', label: '维修' }
+  if (isCleaning.value) return { key: 'warning', label: '清洁中' }
+  if (isOccupied.value) return { key: 'occupied', label: '在住' }
+  if (!props.bed.elderId && isReserved.value) return { key: 'reserved', label: '预定' }
   if (!props.bed.elderId) return { key: 'idle', label: '空闲' }
   if (props.bed.riskLevel === 'HIGH') return { key: 'alert', label: '告警' }
   if (props.bed.riskLevel === 'MEDIUM') return { key: 'warning', label: '关注' }
@@ -62,16 +68,17 @@ const statusMeta = computed(() => {
 })
 
 const stateText = computed(() => {
-  if (!props.bed.elderId) return '床位空闲，可执行分配'
-  if (props.bed.status === 2) return '设备维护中'
-  if (props.bed.status === 3) return '清洁与消杀执行中'
+  if (isMaintenance.value) return '设备维护中'
+  if (isCleaning.value) return '清洁与消杀执行中'
+  if (isReserved.value) return '床位已预留，待转入住'
+  if (!isOccupied.value) return '床位空闲，可执行分配'
   if (isAlert.value) return props.bed.riskLabel || '异常监测触发'
   if (props.bed.riskLevel === 'LOW') return '睡眠状态平稳'
   return '生命体征监测正常'
 })
 
 const subText = computed(() => {
-  return props.bed.careLevel || props.bed.riskSource || '实时床态采集中'
+  return props.bed.occupancyNote || props.bed.careLevel || props.bed.riskSource || '实时床态采集中'
 })
 
 function hashSeed() {

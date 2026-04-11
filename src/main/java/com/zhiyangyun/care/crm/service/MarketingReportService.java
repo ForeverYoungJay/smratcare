@@ -7,6 +7,7 @@ import com.zhiyangyun.care.crm.model.report.MarketingConversionReportResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingFollowupReportResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingDataQualityResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingLeadEntrySummaryResponse;
+import com.zhiyangyun.care.crm.model.report.MarketingWorkbenchSummaryResponse;
 import java.util.List;
 
 public interface MarketingReportService {
@@ -25,6 +26,8 @@ public interface MarketingReportService {
       Long tenantId, long pageNo, long pageSize, String dateFrom, String dateTo, String source, Long staffId, String type);
 
   MarketingDataQualityResponse dataQuality(Long tenantId);
+
+  MarketingWorkbenchSummaryResponse workbenchSummary(Long tenantId, String dateFrom, String dateTo);
 
   int normalizeSources(Long tenantId);
 

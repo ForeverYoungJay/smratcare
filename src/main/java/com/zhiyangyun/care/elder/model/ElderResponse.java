@@ -21,6 +21,8 @@ public class ElderResponse {
   private String medicalRecordFileUrl;
   private LocalDate admissionDate;
   private Integer status;
+  private String lifecycleStatus;
+  private String departureType;
   private Long bedId;
   private String bedNo;
   private String roomNo;

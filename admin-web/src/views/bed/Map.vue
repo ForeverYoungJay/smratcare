@@ -118,7 +118,7 @@
                         :key="bed.id"
                         type="button"
                         class="bed-pill"
-                        :class="statusClass(bed.status, bed.elderId)"
+                        :class="statusClass(bed.status, bed.elderId, bed.occupancySource)"
                         @click="openBed(bed)"
                       >
                         {{ bed.bedNo }}
@@ -160,8 +160,9 @@
         <a-descriptions-item label="房间">{{ current?.roomNo || current?.roomId || '-' }}</a-descriptions-item>
         <a-descriptions-item label="床位">{{ current?.bedNo || '-' }}</a-descriptions-item>
         <a-descriptions-item label="床型">{{ resolveBedTypeLabel(current?.bedType) }}</a-descriptions-item>
-        <a-descriptions-item label="状态">{{ statusText(current?.status, current?.elderId) }}</a-descriptions-item>
+        <a-descriptions-item label="状态">{{ statusText(current?.status, current?.elderId, current?.occupancySource) }}</a-descriptions-item>
         <a-descriptions-item label="护理等级">{{ current?.careLevel || elderDetail?.careLevel || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="占用说明">{{ current?.occupancyNote || '-' }}</a-descriptions-item>
       </a-descriptions>
 
       <a-divider>老人信息</a-divider>
@@ -453,26 +454,33 @@ function isOccupiedBed(bed: BedItem) {
   return Boolean(bed.elderId) || bed.status === 2
 }
 
-function isIdleBed(bed: BedItem) {
-  return !isOccupiedBed(bed) && (bed.status === 1 || bed.status === undefined)
+function isReservedBed(bed: BedItem) {
+  return !isOccupiedBed(bed) && bed.occupancySource === 'RESERVATION'
 }
 
-function statusText(status?: number, elderId?: string) {
+function isIdleBed(bed: BedItem) {
+  return !isOccupiedBed(bed) && !isReservedBed(bed) && (bed.status === 1 || bed.status === undefined)
+}
+
+function statusText(status?: number, elderId?: string, occupancySource?: string) {
   if (status === 2) return '占用'
   if (status === 3) return '维修'
+  if (occupancySource === 'RESERVATION') return '预定'
   if (elderId) return '入住'
   return '空床'
 }
 
-function statusTag(status?: number, elderId?: string) {
+function statusTag(status?: number, elderId?: string, occupancySource?: string) {
   if (status === 2) return 'orange'
   if (status === 3) return 'red'
+  if (occupancySource === 'RESERVATION') return 'cyan'
   if (elderId) return 'blue'
   return 'green'
 }
 
-function statusClass(status?: number, elderId?: string) {
+function statusClass(status?: number, elderId?: string, occupancySource?: string) {
   if (status === 3) return 'is-maintain'
+  if (occupancySource === 'RESERVATION') return 'is-occupied'
   if (status === 2 || elderId) return 'is-occupied'
   return 'is-idle'
 }

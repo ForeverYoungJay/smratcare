@@ -10,12 +10,21 @@ import com.zhiyangyun.care.bill.mapper.BillMonthlyMapper;
 import com.zhiyangyun.care.elder.entity.Bed;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.entity.Room;
+import com.zhiyangyun.care.elder.entity.lifecycle.ElderDischarge;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderDischargeApply;
+import com.zhiyangyun.care.elder.entity.lifecycle.ElderChangeLog;
+import com.zhiyangyun.care.elder.model.BedReleaseResult;
+import com.zhiyangyun.care.elder.model.ElderDepartureType;
+import com.zhiyangyun.care.elder.model.ElderStatus;
 import com.zhiyangyun.care.elder.mapper.BedMapper;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.RoomMapper;
+import com.zhiyangyun.care.elder.mapper.lifecycle.ElderChangeLogMapper;
+import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDischargeApplyMapper;
 import com.zhiyangyun.care.elder.model.lifecycle.ResidenceLifecycleConstants;
+import com.zhiyangyun.care.elder.service.ElderLifecycleStateService;
+import com.zhiyangyun.care.elder.service.ElderOccupancyService;
 import com.zhiyangyun.care.finance.entity.AdmissionFeeAudit;
 import com.zhiyangyun.care.finance.entity.ConsumptionRecord;
 import com.zhiyangyun.care.finance.entity.DischargeFeeAudit;
@@ -73,9 +82,13 @@ public class FeeManagementServiceImpl implements FeeManagementService {
   private final BedMapper bedMapper;
   private final ElderMapper elderMapper;
   private final RoomMapper roomMapper;
+  private final ElderChangeLogMapper elderChangeLogMapper;
+  private final ElderDischargeMapper elderDischargeMapper;
   private final ElderAccountMapper elderAccountMapper;
   private final FinanceRefundVoucherMapper financeRefundVoucherMapper;
   private final ElderDischargeApplyMapper elderDischargeApplyMapper;
+  private final ElderLifecycleStateService elderLifecycleStateService;
+  private final ElderOccupancyService elderOccupancyService;
   private final ElderAccountService elderAccountService;
   private final FinanceService financeService;
 
@@ -90,9 +103,13 @@ public class FeeManagementServiceImpl implements FeeManagementService {
       BedMapper bedMapper,
       ElderMapper elderMapper,
       RoomMapper roomMapper,
+      ElderChangeLogMapper elderChangeLogMapper,
+      ElderDischargeMapper elderDischargeMapper,
       ElderAccountMapper elderAccountMapper,
       FinanceRefundVoucherMapper financeRefundVoucherMapper,
       ElderDischargeApplyMapper elderDischargeApplyMapper,
+      ElderLifecycleStateService elderLifecycleStateService,
+      ElderOccupancyService elderOccupancyService,
       ElderAccountService elderAccountService,
       FinanceService financeService) {
     this.admissionFeeAuditMapper = admissionFeeAuditMapper;
@@ -105,9 +122,13 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     this.bedMapper = bedMapper;
     this.elderMapper = elderMapper;
     this.roomMapper = roomMapper;
+    this.elderChangeLogMapper = elderChangeLogMapper;
+    this.elderDischargeMapper = elderDischargeMapper;
     this.elderAccountMapper = elderAccountMapper;
     this.financeRefundVoucherMapper = financeRefundVoucherMapper;
     this.elderDischargeApplyMapper = elderDischargeApplyMapper;
+    this.elderLifecycleStateService = elderLifecycleStateService;
+    this.elderOccupancyService = elderOccupancyService;
     this.elderAccountService = elderAccountService;
     this.financeService = financeService;
   }
@@ -414,7 +435,9 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     List<String> linkageDetails = new ArrayList<>();
     linkageDetails.add("费用清单:" + buildFeeSnapshot(current, amounts));
     linkageDetails.add("押金处理:" + buildDepositSummary(amounts));
-    linkageDetails.add("床位释放:" + releaseBedAndSyncElder(orgId, current.getElderId()));
+    LocalDate dischargeDate = LocalDate.now();
+    linkageDetails.add("床位释放:" + releaseBedAndSyncElder(orgId, operatorId, current.getElderId(), dischargeDate));
+    linkageDetails.add("退住闭环:" + closeDischargeApply(orgId, operatorId, current, dischargeDate));
     linkageDetails.add("自动对账:" + runDailyReconcile(orgId));
 
     current.setFromDepositAmount(amounts.fromDepositAmount());
@@ -1051,7 +1074,7 @@ public class FeeManagementServiceImpl implements FeeManagementService {
     return "押金抵扣" + money(amounts.fromDepositAmount()) + "，无需退款";
   }
 
-  private String releaseBedAndSyncElder(Long orgId, Long elderId) {
+  private String releaseBedAndSyncElder(Long orgId, Long operatorId, Long elderId, LocalDate dischargeDate) {
     ElderProfile elder = elderMapper.selectOne(Wrappers.lambdaQuery(ElderProfile.class)
         .eq(ElderProfile::getIsDeleted, 0)
         .eq(orgId != null, ElderProfile::getOrgId, orgId)
@@ -1061,27 +1084,119 @@ public class FeeManagementServiceImpl implements FeeManagementService {
       return "老人不存在";
     }
 
-    String bedRelease = "无需释放";
-    if (elder.getBedId() != null) {
-      Bed bed = bedMapper.selectById(elder.getBedId());
-      if (bed != null
-          && !Integer.valueOf(1).equals(bed.getIsDeleted())
-          && (orgId == null || Objects.equals(bed.getOrgId(), orgId))) {
-        bed.setElderId(null);
-        bed.setStatus(1);
-        bedMapper.updateById(bed);
-        bedRelease = "已释放床位#" + bed.getId();
-      } else {
-        bedRelease = "床位不存在或不在本机构";
-      }
-      elder.setBedId(null);
+    Integer beforeStatus = elder.getStatus();
+    BedReleaseResult releaseResult = elderOccupancyService.releaseBedAndCloseRelation(
+        elder.getTenantId(), elder.getOrgId(), elderId, dischargeDate, "退住结算自动释放床位");
+    elder.setBedId(null);
+
+    elderLifecycleStateService.transitionFromLegacyStatus(
+        elder,
+        ElderStatus.DISCHARGED,
+        ElderDepartureType.NORMAL,
+        "DISCHARGE_SETTLEMENT_COMPLETE",
+        "退住结算自动回写离院",
+        "DISCHARGE_SETTLEMENT",
+        null,
+        operatorId);
+    if (!Objects.equals(beforeStatus, ElderStatus.DISCHARGED)) {
+      insertAutoDischargeChangeLog(
+          orgId, operatorId, elderId,
+          "STATUS", elderStatusText(beforeStatus), elderStatusText(ElderStatus.DISCHARGED), "退住结算自动回写离院");
+    }
+    if (releaseResult.getPreviousBedId() != null) {
+      insertAutoDischargeChangeLog(
+          orgId, operatorId, elderId,
+          "BED_CHANGE", String.valueOf(releaseResult.getPreviousBedId()), null, "退住结算自动释放床位");
+    }
+    String bedRelease = releaseResult.hasReleasedBed()
+        ? "已释放床位#" + releaseResult.getReleasedBedId()
+        : (releaseResult.getPreviousBedId() == null ? "无需释放" : "床位未释放，请人工核查");
+    return bedRelease + "，床位关系关闭" + releaseResult.getClosedRelationCount() + "条，老人状态已回写离院";
+  }
+
+  private String closeDischargeApply(Long orgId, Long operatorId, DischargeSettlement settlement, LocalDate dischargeDate) {
+    if (settlement.getDischargeApplyId() == null) {
+      return "未关联退住申请";
+    }
+    ElderDischargeApply apply = elderDischargeApplyMapper.selectOne(
+        Wrappers.lambdaQuery(ElderDischargeApply.class)
+            .eq(ElderDischargeApply::getIsDeleted, 0)
+            .eq(orgId != null, ElderDischargeApply::getOrgId, orgId)
+            .eq(ElderDischargeApply::getId, settlement.getDischargeApplyId())
+            .last("LIMIT 1 FOR UPDATE"));
+    if (apply == null) {
+      return "退住申请不存在";
     }
 
-    if (elder.getStatus() == null || elder.getStatus() != 3) {
-      elder.setStatus(3);
+    ElderDischarge discharge = resolveOrCreateDischargeRecord(orgId, operatorId, apply, settlement, dischargeDate);
+    apply.setLinkedDischargeId(discharge.getId());
+    apply.setAutoDischargeStatus(ResidenceLifecycleConstants.AUTO_DISCHARGE_SUCCESS);
+    apply.setAutoDischargeMessage("财务结算已完成，系统已自动释放床位、关闭床位关系并回写离院状态");
+    elderDischargeApplyMapper.updateById(apply);
+    return "申请#" + apply.getId() + "已闭环，退住单#" + discharge.getId();
+  }
+
+  private ElderDischarge resolveOrCreateDischargeRecord(
+      Long orgId,
+      Long operatorId,
+      ElderDischargeApply apply,
+      DischargeSettlement settlement,
+      LocalDate dischargeDate) {
+    if (apply.getLinkedDischargeId() != null) {
+      ElderDischarge existing = elderDischargeMapper.selectById(apply.getLinkedDischargeId());
+      if (existing != null
+          && !Integer.valueOf(1).equals(existing.getIsDeleted())
+          && (orgId == null || Objects.equals(existing.getOrgId(), orgId))) {
+        existing.setDischargeDate(dischargeDate == null ? LocalDate.now() : dischargeDate);
+        existing.setReason(hasText(apply.getReason()) ? apply.getReason() : existing.getReason());
+        existing.setSettleAmount(settlement.getPayableAmount());
+        existing.setRemark(truncateRemark(mergeRemark(existing.getRemark(), "退住结算单#" + settlement.getId() + "已完成")));
+        elderDischargeMapper.updateById(existing);
+        return existing;
+      }
     }
-    elderMapper.updateById(elder);
-    return bedRelease + "，老人状态已回写离院";
+
+    ElderDischarge discharge = new ElderDischarge();
+    discharge.setTenantId(orgId);
+    discharge.setOrgId(orgId);
+    discharge.setElderId(settlement.getElderId());
+    discharge.setDischargeDate(dischargeDate == null ? LocalDate.now() : dischargeDate);
+    discharge.setReason(hasText(apply.getReason()) ? apply.getReason() : "退住结算完成自动退住");
+    discharge.setSettleAmount(settlement.getPayableAmount());
+    discharge.setRemark(truncateRemark("退住申请#" + apply.getId() + " 财务结算完成后自动生成"));
+    discharge.setCreatedBy(operatorId);
+    elderDischargeMapper.insert(discharge);
+    return discharge;
+  }
+
+  private void insertAutoDischargeChangeLog(
+      Long orgId,
+      Long operatorId,
+      Long elderId,
+      String changeType,
+      String beforeValue,
+      String afterValue,
+      String reason) {
+    if (orgId == null || elderId == null) {
+      return;
+    }
+    ElderChangeLog log = new ElderChangeLog();
+    log.setTenantId(orgId);
+    log.setOrgId(orgId);
+    log.setElderId(elderId);
+    log.setChangeType(changeType);
+    log.setBeforeValue(beforeValue);
+    log.setAfterValue(afterValue);
+    log.setReason(reason);
+    log.setCreatedBy(operatorId);
+    elderChangeLogMapper.insert(log);
+  }
+
+  private String elderStatusText(Integer status) {
+    if (status == null) {
+      return "";
+    }
+    return ElderStatus.text(status);
   }
 
   private String mergeRemark(String origin, String append) {

@@ -13,6 +13,10 @@ import com.zhiyangyun.care.elder.entity.lifecycle.ElderDischargeApply;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderMedicalOutingRecord;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderOutingRecord;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderTrialStay;
+import com.zhiyangyun.care.elder.model.BedReleaseResult;
+import com.zhiyangyun.care.elder.model.ElderDepartureType;
+import com.zhiyangyun.care.elder.model.ElderLifecycleStatus;
+import com.zhiyangyun.care.elder.model.ElderStatus;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderChangeLogMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderDeathRegisterMapper;
@@ -34,6 +38,8 @@ import com.zhiyangyun.care.elder.model.lifecycle.ResidenceStatusSummaryResponse;
 import com.zhiyangyun.care.elder.model.lifecycle.TrialStayRequest;
 import com.zhiyangyun.care.life.entity.IncidentReport;
 import com.zhiyangyun.care.life.mapper.IncidentReportMapper;
+import com.zhiyangyun.care.elder.service.ElderLifecycleStateService;
+import com.zhiyangyun.care.elder.service.ElderOccupancyService;
 import jakarta.validation.Valid;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -41,7 +47,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -71,6 +79,8 @@ public class ElderResidenceController {
   private final ElderMapper elderMapper;
   private final IncidentReportMapper incidentReportMapper;
   private final AuditLogService auditLogService;
+  private final ElderLifecycleStateService elderLifecycleStateService;
+  private final ElderOccupancyService elderOccupancyService;
 
   public ElderResidenceController(ElderOutingRecordMapper outingMapper,
                                   ElderChangeLogMapper changeLogMapper,
@@ -80,7 +90,9 @@ public class ElderResidenceController {
                                   ElderDischargeApplyMapper dischargeApplyMapper,
                                   ElderMapper elderMapper,
                                   IncidentReportMapper incidentReportMapper,
-                                  AuditLogService auditLogService) {
+                                  AuditLogService auditLogService,
+                                  ElderLifecycleStateService elderLifecycleStateService,
+                                  ElderOccupancyService elderOccupancyService) {
     this.outingMapper = outingMapper;
     this.changeLogMapper = changeLogMapper;
     this.medicalOutingMapper = medicalOutingMapper;
@@ -90,46 +102,50 @@ public class ElderResidenceController {
     this.elderMapper = elderMapper;
     this.incidentReportMapper = incidentReportMapper;
     this.auditLogService = auditLogService;
+    this.elderLifecycleStateService = elderLifecycleStateService;
+    this.elderOccupancyService = elderOccupancyService;
   }
 
+  @PreAuthorize("@elderAuthz.canReadResidence()")
   @GetMapping("/status-summary")
   public Result<ResidenceStatusSummaryResponse> statusSummary() {
     Long orgId = AuthContext.getOrgId();
     ResidenceStatusSummaryResponse response = new ResidenceStatusSummaryResponse();
-
     long inHospital = elderMapper.selectCount(Wrappers.lambdaQuery(ElderProfile.class)
         .eq(ElderProfile::getIsDeleted, 0)
         .eq(orgId != null, ElderProfile::getOrgId, orgId)
-        .eq(ElderProfile::getStatus, 1));
+        .eq(ElderProfile::getLifecycleStatus, ElderLifecycleStatus.IN_HOSPITAL));
     long outing = elderMapper.selectCount(Wrappers.lambdaQuery(ElderProfile.class)
         .eq(ElderProfile::getIsDeleted, 0)
         .eq(orgId != null, ElderProfile::getOrgId, orgId)
-        .eq(ElderProfile::getStatus, 2));
+        .eq(ElderProfile::getLifecycleStatus, ElderLifecycleStatus.OUTING));
     long discharged = elderMapper.selectCount(Wrappers.lambdaQuery(ElderProfile.class)
         .eq(ElderProfile::getIsDeleted, 0)
         .eq(orgId != null, ElderProfile::getOrgId, orgId)
-        .eq(ElderProfile::getStatus, 3));
+        .eq(ElderProfile::getLifecycleStatus, ElderLifecycleStatus.DISCHARGED));
     long intent = elderMapper.selectCount(Wrappers.lambdaQuery(ElderProfile.class)
         .eq(ElderProfile::getIsDeleted, 0)
         .eq(orgId != null, ElderProfile::getOrgId, orgId)
-        .notIn(ElderProfile::getStatus, 1, 2, 3));
+        .and(q -> q.isNull(ElderProfile::getLifecycleStatus)
+            .or()
+            .eq(ElderProfile::getLifecycleStatus, ElderLifecycleStatus.INTENT)));
 
-    long trial = trialStayMapper.selectCount(Wrappers.lambdaQuery(ElderTrialStay.class)
-        .eq(ElderTrialStay::getIsDeleted, 0)
-        .eq(orgId != null, ElderTrialStay::getOrgId, orgId)
-        .eq(ElderTrialStay::getStatus, ResidenceLifecycleConstants.TRIAL_REGISTERED));
-    long medicalOuting = medicalOutingMapper.selectCount(Wrappers.lambdaQuery(ElderMedicalOutingRecord.class)
-        .eq(ElderMedicalOutingRecord::getIsDeleted, 0)
-        .eq(orgId != null, ElderMedicalOutingRecord::getOrgId, orgId)
-        .eq(ElderMedicalOutingRecord::getStatus, ResidenceLifecycleConstants.MEDICAL_OUTING_OUT));
-    long dischargePending = dischargeApplyMapper.selectCount(Wrappers.lambdaQuery(ElderDischargeApply.class)
-        .eq(ElderDischargeApply::getIsDeleted, 0)
-        .eq(orgId != null, ElderDischargeApply::getOrgId, orgId)
-        .eq(ElderDischargeApply::getStatus, ResidenceLifecycleConstants.DISCHARGE_APPLY_PENDING));
-    long death = deathRegisterMapper.selectCount(Wrappers.lambdaQuery(ElderDeathRegister.class)
-        .eq(ElderDeathRegister::getIsDeleted, 0)
-        .eq(orgId != null, ElderDeathRegister::getOrgId, orgId)
-        .eq(ElderDeathRegister::getStatus, ResidenceLifecycleConstants.DEATH_REGISTERED));
+    long trial = elderMapper.selectCount(Wrappers.lambdaQuery(ElderProfile.class)
+        .eq(ElderProfile::getIsDeleted, 0)
+        .eq(orgId != null, ElderProfile::getOrgId, orgId)
+        .eq(ElderProfile::getLifecycleStatus, ElderLifecycleStatus.TRIAL));
+    long medicalOuting = elderMapper.selectCount(Wrappers.lambdaQuery(ElderProfile.class)
+        .eq(ElderProfile::getIsDeleted, 0)
+        .eq(orgId != null, ElderProfile::getOrgId, orgId)
+        .eq(ElderProfile::getLifecycleStatus, ElderLifecycleStatus.MEDICAL_OUTING));
+    long dischargePending = elderMapper.selectCount(Wrappers.lambdaQuery(ElderProfile.class)
+        .eq(ElderProfile::getIsDeleted, 0)
+        .eq(orgId != null, ElderProfile::getOrgId, orgId)
+        .eq(ElderProfile::getLifecycleStatus, ElderLifecycleStatus.DISCHARGE_PENDING));
+    long death = elderMapper.selectCount(Wrappers.lambdaQuery(ElderProfile.class)
+        .eq(ElderProfile::getIsDeleted, 0)
+        .eq(orgId != null, ElderProfile::getOrgId, orgId)
+        .eq(ElderProfile::getLifecycleStatus, ElderLifecycleStatus.DECEASED));
 
     LocalDateTime now = LocalDateTime.now();
     long overdueOuting = outingMapper.selectCount(Wrappers.lambdaQuery(ElderOutingRecord.class)
@@ -163,6 +179,7 @@ public class ElderResidenceController {
     return Result.ok(response);
   }
 
+  @PreAuthorize("@elderAuthz.canManageOuting()")
   @GetMapping("/outing/page")
   public Result<IPage<ElderOutingRecord>> outingPage(
       @RequestParam(defaultValue = "1") long pageNo,
@@ -180,10 +197,13 @@ public class ElderResidenceController {
     return Result.ok(outingMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
   }
 
+  @PreAuthorize("@elderAuthz.canManageOuting()")
   @PostMapping("/outing")
   public Result<ElderOutingRecord> createOuting(@Valid @RequestBody OutingCreateRequest request) {
     Long orgId = AuthContext.getOrgId();
     ensureNoActiveOuting(request.getElderId(), orgId);
+    ElderProfile elder = resolveElder(request.getElderId());
+    Integer beforeStatus = elder.getStatus();
     ElderOutingRecord record = new ElderOutingRecord();
     record.setTenantId(orgId);
     record.setOrgId(orgId);
@@ -198,11 +218,25 @@ public class ElderResidenceController {
     record.setRemark(request.getRemark());
     record.setCreatedBy(AuthContext.getStaffId());
     outingMapper.insert(record);
-    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
-        "OUTING_CREATE", "ELDER", request.getElderId(), "外出登记");
+    updateElderStatus(
+        elder,
+        ElderStatus.OUTING,
+        com.zhiyangyun.care.elder.model.ElderLifecycleStatus.OUTING,
+        null,
+        "OUTING_CREATE",
+        request.getReason(),
+        "ELDER_OUTING",
+        record.getId());
+    recordStatusChange(request.getElderId(), beforeStatus, ElderStatus.OUTING, "外出登记");
+    auditLogService.recordStructured(
+        orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "OUTING_CREATE", "ELDER", request.getElderId(), "外出登记",
+        buildStatusSnapshot(beforeStatus, elder.getBedId()), record,
+        buildStatusTransitionContext(beforeStatus, ElderStatus.OUTING, request.getReason()));
     return Result.ok(record);
   }
 
+  @PreAuthorize(OUTING_ACCESS)
   @PutMapping("/outing/{id}/return")
   public Result<ElderOutingRecord> returnFromOuting(@PathVariable Long id, @RequestBody OutingReturnRequest request) {
     Long orgId = AuthContext.getOrgId();
@@ -220,16 +254,27 @@ public class ElderResidenceController {
     ElderProfile elder = resolveElder(record.getElderId());
     Integer beforeStatus = elder.getStatus();
     if (!hasAnyActiveOuting(record.getElderId(), orgId)) {
-      updateElderStatus(elder, 1);
-      recordStatusChange(record.getElderId(), beforeStatus, 1, "外出返院");
+      updateElderStatus(
+          elder,
+          ElderStatus.IN_HOSPITAL,
+          com.zhiyangyun.care.elder.model.ElderLifecycleStatus.IN_HOSPITAL,
+          null,
+          "OUTING_RETURN",
+          "外出返院",
+          "ELDER_OUTING",
+          record.getId());
+      recordStatusChange(record.getElderId(), beforeStatus, ElderStatus.IN_HOSPITAL, "外出返院");
     }
-    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
-        "OUTING_RETURN", "ELDER", record.getElderId(), "外出返院登记");
+    auditLogService.recordStructured(
+        orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "OUTING_RETURN", "ELDER", record.getElderId(), "外出返院登记",
+        buildStatusSnapshot(beforeStatus, elder.getBedId()), record,
+        buildStatusTransitionContext(beforeStatus, hasAnyActiveOuting(record.getElderId(), orgId) ? beforeStatus : ElderStatus.IN_HOSPITAL, payload.getRemark()));
     return Result.ok(record);
   }
 
   @DeleteMapping("/outing/{id}")
-  @PreAuthorize("hasAnyRole('MEDICAL_MINISTER','NURSING_MINISTER','HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("@elderAuthz.canManageDischarge()")
   public Result<Boolean> deleteOuting(@PathVariable Long id) {
     Long orgId = AuthContext.getOrgId();
     ElderOutingRecord record = outingMapper.selectById(id);
@@ -242,8 +287,16 @@ public class ElderResidenceController {
     if (wasOut && !hasAnyActiveOuting(record.getElderId(), orgId)) {
       ElderProfile elder = resolveElder(record.getElderId());
       Integer beforeStatus = elder.getStatus();
-      updateElderStatus(elder, 1);
-      recordStatusChange(record.getElderId(), beforeStatus, 1, "删除外出记录");
+      updateElderStatus(
+          elder,
+          ElderStatus.IN_HOSPITAL,
+          com.zhiyangyun.care.elder.model.ElderLifecycleStatus.IN_HOSPITAL,
+          null,
+          "OUTING_DELETE",
+          "删除外出记录",
+          "ELDER_OUTING",
+          record.getId());
+      recordStatusChange(record.getElderId(), beforeStatus, ElderStatus.IN_HOSPITAL, "删除外出记录");
     }
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "OUTING_DELETE", "ELDER", record.getElderId(), "删除外出登记");
@@ -251,7 +304,7 @@ public class ElderResidenceController {
   }
 
   @GetMapping("/medical-outing/page")
-  @PreAuthorize("hasAnyRole('MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("@elderAuthz.canManageOuting()")
   public Result<IPage<ElderMedicalOutingRecord>> medicalOutingPage(
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
@@ -277,7 +330,7 @@ public class ElderResidenceController {
   }
 
   @PostMapping("/medical-outing")
-  @PreAuthorize("hasAnyRole('MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("@elderAuthz.canManageOuting()")
   public Result<ElderMedicalOutingRecord> createMedicalOuting(@Valid @RequestBody MedicalOutingCreateRequest request) {
     Long orgId = AuthContext.getOrgId();
     ensureNoActiveOuting(request.getElderId(), orgId);
@@ -299,15 +352,26 @@ public class ElderResidenceController {
     record.setRemark(request.getRemark());
     record.setCreatedBy(AuthContext.getStaffId());
     medicalOutingMapper.insert(record);
-    updateElderStatus(elder, 2);
-    recordStatusChange(request.getElderId(), beforeStatus, 2, "外出就医登记");
-    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
-        "MEDICAL_OUTING_CREATE", "ELDER", request.getElderId(), "外出就医登记");
+    updateElderStatus(
+        elder,
+        ElderStatus.OUTING,
+        com.zhiyangyun.care.elder.model.ElderLifecycleStatus.MEDICAL_OUTING,
+        null,
+        "MEDICAL_OUTING_CREATE",
+        request.getReason(),
+        "ELDER_MEDICAL_OUTING",
+        record.getId());
+    recordStatusChange(request.getElderId(), beforeStatus, ElderStatus.OUTING, "外出就医登记");
+    auditLogService.recordStructured(
+        orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "MEDICAL_OUTING_CREATE", "ELDER", request.getElderId(), "外出就医登记",
+        buildStatusSnapshot(beforeStatus, elder.getBedId()), record,
+        buildStatusTransitionContext(beforeStatus, ElderStatus.OUTING, request.getReason()));
     return Result.ok(record);
   }
 
   @PutMapping("/medical-outing/{id}/return")
-  @PreAuthorize("hasAnyRole('MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("@elderAuthz.canManageOuting()")
   public Result<ElderMedicalOutingRecord> returnFromMedicalOuting(@PathVariable Long id,
                                                                    @RequestBody MedicalOutingReturnRequest request) {
     Long orgId = AuthContext.getOrgId();
@@ -325,16 +389,27 @@ public class ElderResidenceController {
     }
     medicalOutingMapper.updateById(record);
     if (!hasAnyActiveOuting(record.getElderId(), orgId)) {
-      updateElderStatus(elder, 1);
-      recordStatusChange(record.getElderId(), beforeStatus, 1, "外出就医返院");
+      updateElderStatus(
+          elder,
+          ElderStatus.IN_HOSPITAL,
+          com.zhiyangyun.care.elder.model.ElderLifecycleStatus.IN_HOSPITAL,
+          null,
+          "MEDICAL_OUTING_RETURN",
+          "外出就医返院",
+          "ELDER_MEDICAL_OUTING",
+          record.getId());
+      recordStatusChange(record.getElderId(), beforeStatus, ElderStatus.IN_HOSPITAL, "外出就医返院");
     }
-    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
-        "MEDICAL_OUTING_RETURN", "ELDER", record.getElderId(), "外出就医返院登记");
+    auditLogService.recordStructured(
+        orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "MEDICAL_OUTING_RETURN", "ELDER", record.getElderId(), "外出就医返院登记",
+        buildStatusSnapshot(beforeStatus, elder.getBedId()), record,
+        buildStatusTransitionContext(beforeStatus, hasAnyActiveOuting(record.getElderId(), orgId) ? beforeStatus : ElderStatus.IN_HOSPITAL, payload.getRemark()));
     return Result.ok(record);
   }
 
   @DeleteMapping("/medical-outing/{id}")
-  @PreAuthorize("hasAnyRole('MEDICAL_MINISTER','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("@elderAuthz.canManageOuting()")
   public Result<Boolean> deleteMedicalOuting(@PathVariable Long id) {
     Long orgId = AuthContext.getOrgId();
     ElderMedicalOutingRecord record = medicalOutingMapper.selectById(id);
@@ -347,8 +422,16 @@ public class ElderResidenceController {
     if (wasOut && !hasAnyActiveOuting(record.getElderId(), orgId)) {
       ElderProfile elder = resolveElder(record.getElderId());
       Integer beforeStatus = elder.getStatus();
-      updateElderStatus(elder, 1);
-      recordStatusChange(record.getElderId(), beforeStatus, 1, "删除外出就医记录");
+      updateElderStatus(
+          elder,
+          ElderStatus.IN_HOSPITAL,
+          com.zhiyangyun.care.elder.model.ElderLifecycleStatus.IN_HOSPITAL,
+          null,
+          "MEDICAL_OUTING_DELETE",
+          "删除外出就医记录",
+          "ELDER_MEDICAL_OUTING",
+          record.getId());
+      recordStatusChange(record.getElderId(), beforeStatus, ElderStatus.IN_HOSPITAL, "删除外出就医记录");
     }
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "MEDICAL_OUTING_DELETE", "ELDER", record.getElderId(), "删除外出就医登记");
@@ -356,7 +439,7 @@ public class ElderResidenceController {
   }
 
   @GetMapping(value = "/medical-outing/export", produces = "text/csv;charset=UTF-8")
-  @PreAuthorize("hasAnyRole('MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("@elderAuthz.canManageOuting()")
   public ResponseEntity<byte[]> exportMedicalOuting(
       @RequestParam(required = false) Long elderId,
       @RequestParam(required = false) String status,
@@ -395,7 +478,7 @@ public class ElderResidenceController {
   }
 
   @GetMapping("/death-register/page")
-  @PreAuthorize("hasAnyRole('MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("@elderAuthz.canManageOuting()")
   public Result<IPage<ElderDeathRegister>> deathRegisterPage(
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
@@ -420,7 +503,7 @@ public class ElderResidenceController {
   }
 
   @PostMapping("/death-register")
-  @PreAuthorize("hasAnyRole('MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("@elderAuthz.canManageOuting()")
   public Result<ElderDeathRegister> createDeathRegister(@Valid @RequestBody DeathRegisterCreateRequest request) {
     Long orgId = AuthContext.getOrgId();
     long activeCount = deathRegisterMapper.selectCount(Wrappers.lambdaQuery(ElderDeathRegister.class)
@@ -433,6 +516,7 @@ public class ElderResidenceController {
     }
     ElderProfile elder = resolveElder(request.getElderId());
     Integer beforeStatus = elder.getStatus();
+    Long previousBedId = elder.getBedId();
     ElderDeathRegister record = new ElderDeathRegister();
     record.setTenantId(orgId);
     record.setOrgId(orgId);
@@ -450,15 +534,27 @@ public class ElderResidenceController {
     record.setRemark(request.getRemark());
     record.setCreatedBy(AuthContext.getStaffId());
     deathRegisterMapper.insert(record);
-    updateElderStatus(elder, 3);
-    recordStatusChange(request.getElderId(), beforeStatus, 3, "死亡登记");
-    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
-        "DEATH_REGISTER_CREATE", "ELDER", request.getElderId(), "死亡登记");
+    releaseBedForDeparture(elder, request.getDeathDate(), "死亡登记释放床位");
+    updateElderStatus(
+        elder,
+        ElderStatus.DISCHARGED,
+        com.zhiyangyun.care.elder.model.ElderLifecycleStatus.DECEASED,
+        ElderDepartureType.DEATH,
+        "DEATH_REGISTER_CREATE",
+        request.getCause(),
+        "ELDER_DEATH_REGISTER",
+        record.getId());
+    recordStatusChange(request.getElderId(), beforeStatus, ElderStatus.DISCHARGED, "死亡登记");
+    auditLogService.recordStructured(
+        orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "DEATH_REGISTER_CREATE", "ELDER", request.getElderId(), "死亡登记",
+        buildStatusSnapshot(beforeStatus, previousBedId), record,
+        buildDepartureContext(beforeStatus, ElderStatus.DISCHARGED, request.getCause(), previousBedId));
     return Result.ok(record);
   }
 
   @PutMapping("/death-register/{id}")
-  @PreAuthorize("hasAnyRole('MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("@elderAuthz.canManageOuting()")
   public Result<ElderDeathRegister> updateDeathRegister(@PathVariable Long id,
                                                         @Valid @RequestBody DeathRegisterUpdateRequest request) {
     Long orgId = AuthContext.getOrgId();
@@ -485,7 +581,7 @@ public class ElderResidenceController {
   }
 
   @PutMapping("/death-register/{id}/cancel")
-  @PreAuthorize("hasAnyRole('MEDICAL_MINISTER','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("@elderAuthz.canManageOuting()")
   public Result<ElderDeathRegister> cancelDeathRegister(@PathVariable Long id,
                                                         @RequestBody(required = false) DeathRegisterCancelRequest request) {
     Long orgId = AuthContext.getOrgId();
@@ -505,16 +601,27 @@ public class ElderResidenceController {
     record.setCancelledBy(AuthContext.getStaffId());
     record.setCancelledTime(LocalDateTime.now());
     deathRegisterMapper.updateById(record);
-    Integer rollbackStatus = record.getBeforeStatus() == null ? 1 : record.getBeforeStatus();
-    updateElderStatus(elder, rollbackStatus);
+    Integer rollbackStatus = record.getBeforeStatus() == null ? ElderStatus.IN_HOSPITAL : record.getBeforeStatus();
+    updateElderStatus(
+        elder,
+        rollbackStatus,
+        null,
+        null,
+        "DEATH_REGISTER_CANCEL",
+        "死亡登记作废",
+        "ELDER_DEATH_REGISTER",
+        record.getId());
     recordStatusChange(record.getElderId(), beforeStatus, rollbackStatus, "死亡登记作废");
-    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
-        "DEATH_REGISTER_CANCEL", "ELDER", record.getElderId(), "死亡登记作废");
+    auditLogService.recordStructured(
+        orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "DEATH_REGISTER_CANCEL", "ELDER", record.getElderId(), "死亡登记作废",
+        buildStatusSnapshot(beforeStatus, elder.getBedId()), record,
+        buildStatusTransitionContext(beforeStatus, rollbackStatus, request == null ? null : request.getRemark()));
     return Result.ok(record);
   }
 
   @DeleteMapping("/death-register/{id}")
-  @PreAuthorize("hasAnyRole('MEDICAL_MINISTER','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("@elderAuthz.canManageOuting()")
   public Result<Boolean> deleteDeathRegister(@PathVariable Long id) {
     Long orgId = AuthContext.getOrgId();
     ElderDeathRegister record = deathRegisterMapper.selectById(id);
@@ -570,6 +677,7 @@ public class ElderResidenceController {
   }
 
   @GetMapping("/trial-stay/page")
+  @PreAuthorize("@elderAuthz.canManageTrial()")
   public Result<IPage<ElderTrialStay>> trialStayPage(
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
@@ -605,6 +713,7 @@ public class ElderResidenceController {
   }
 
   @GetMapping(value = "/trial-stay/export", produces = "text/csv;charset=UTF-8")
+  @PreAuthorize("@elderAuthz.canManageTrial()")
   public ResponseEntity<byte[]> exportTrialStay(
       @RequestParam(required = false) Long elderId,
       @RequestParam(required = false) String status,
@@ -653,11 +762,13 @@ public class ElderResidenceController {
   }
 
   @PostMapping("/trial-stay")
+  @PreAuthorize("@elderAuthz.canManageTrial()")
   public Result<ElderTrialStay> createTrialStay(@Valid @RequestBody TrialStayRequest request) {
     if (request.getTrialEndDate().isBefore(request.getTrialStartDate())) {
       throw new IllegalArgumentException("试住结束日期不能早于开始日期");
     }
     Long orgId = AuthContext.getOrgId();
+    ElderProfile elder = resolveElder(request.getElderId());
     ElderTrialStay record = new ElderTrialStay();
     record.setTenantId(orgId);
     record.setOrgId(orgId);
@@ -673,12 +784,21 @@ public class ElderResidenceController {
     record.setRemark(request.getRemark());
     record.setCreatedBy(AuthContext.getStaffId());
     trialStayMapper.insert(record);
-    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
-        "TRIAL_STAY_CREATE", "ELDER", request.getElderId(), "试住登记");
+    syncTrialLifecycleForElder(
+        elder.getId(),
+        "TRIAL_STAY_CREATE",
+        "试住登记",
+        "ELDER_TRIAL_STAY",
+        record.getId());
+    auditLogService.recordStructured(
+        orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "TRIAL_STAY_CREATE", "ELDER", request.getElderId(), "试住登记",
+        null, record, request);
     return Result.ok(record);
   }
 
   @PutMapping("/trial-stay/{id}")
+  @PreAuthorize("@elderAuthz.canManageTrial()")
   public Result<ElderTrialStay> updateTrialStay(@PathVariable Long id, @Valid @RequestBody TrialStayRequest request) {
     if (request.getTrialEndDate().isBefore(request.getTrialStartDate())) {
       throw new IllegalArgumentException("试住结束日期不能早于开始日期");
@@ -688,6 +808,8 @@ public class ElderResidenceController {
     if (record == null || !Objects.equals(orgId, record.getOrgId()) || Integer.valueOf(1).equals(record.getIsDeleted())) {
       throw new IllegalArgumentException("记录不存在");
     }
+    Long previousElderId = record.getElderId();
+    ElderTrialStay beforeSnapshot = copyTrialStay(record);
     record.setElderId(request.getElderId());
     record.setElderName(resolveElderName(request.getElderId()));
     record.setTrialStartDate(request.getTrialStartDate());
@@ -700,27 +822,54 @@ public class ElderResidenceController {
     record.setCareLevel(request.getCareLevel());
     record.setRemark(request.getRemark());
     trialStayMapper.updateById(record);
-    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
-        "TRIAL_STAY_UPDATE", "ELDER", request.getElderId(), "试住登记更新");
+    syncTrialLifecycleForElder(
+        record.getElderId(),
+        "TRIAL_STAY_UPDATE",
+        "试住登记更新",
+        "ELDER_TRIAL_STAY",
+        record.getId());
+    if (previousElderId != null && !Objects.equals(previousElderId, record.getElderId())) {
+      syncTrialLifecycleForElder(
+          previousElderId,
+          "TRIAL_STAY_TRANSFER",
+          "试住登记转移后刷新状态",
+          "ELDER_TRIAL_STAY",
+          record.getId());
+    }
+    auditLogService.recordStructured(
+        orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "TRIAL_STAY_UPDATE", "ELDER", request.getElderId(), "试住登记更新",
+        beforeSnapshot, record, request);
     return Result.ok(record);
   }
 
   @DeleteMapping("/trial-stay/{id}")
-  @PreAuthorize("hasAnyRole('MEDICAL_MINISTER','NURSING_MINISTER','MARKETING_MINISTER','HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("@elderAuthz.canManageTrial()")
   public Result<Boolean> deleteTrialStay(@PathVariable Long id) {
     Long orgId = AuthContext.getOrgId();
     ElderTrialStay record = trialStayMapper.selectById(id);
     if (record == null || !Objects.equals(orgId, record.getOrgId()) || Integer.valueOf(1).equals(record.getIsDeleted())) {
       throw new IllegalArgumentException("记录不存在");
     }
+    ElderTrialStay beforeSnapshot = copyTrialStay(record);
+    Long elderId = record.getElderId();
     record.setIsDeleted(1);
     trialStayMapper.updateById(record);
-    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
-        "TRIAL_STAY_DELETE", "ELDER", record.getElderId(), "删除试住登记");
+    syncTrialLifecycleForElder(
+        elderId,
+        "TRIAL_STAY_DELETE",
+        "删除试住登记",
+        "ELDER_TRIAL_STAY",
+        record.getId());
+    auditLogService.recordStructured(
+        orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "TRIAL_STAY_DELETE", "ELDER", record.getElderId(), "删除试住登记",
+        beforeSnapshot, null, Map.of("trialStayId", id));
     return Result.ok(true);
   }
 
   @GetMapping("/discharge-apply/page")
+  @PreAuthorize("@elderAuthz.canManageDischarge()")
   public Result<IPage<ElderDischargeApply>> dischargeApplyPage(
       @RequestParam(defaultValue = "1") long pageNo,
       @RequestParam(defaultValue = "20") long pageSize,
@@ -756,6 +905,7 @@ public class ElderResidenceController {
   }
 
   @GetMapping(value = "/discharge-apply/export", produces = "text/csv;charset=UTF-8")
+  @PreAuthorize("@elderAuthz.canManageDischarge()")
   public ResponseEntity<byte[]> exportDischargeApply(
       @RequestParam(required = false) Long elderId,
       @RequestParam(required = false) String status,
@@ -805,7 +955,7 @@ public class ElderResidenceController {
   }
 
   @PostMapping("/discharge-apply")
-  @PreAuthorize("hasAnyRole('MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','HR_EMPLOYEE','HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("@elderAuthz.canManageDischarge()")
   public Result<ElderDischargeApply> createDischargeApply(@Valid @RequestBody DischargeApplyCreateRequest request) {
     Long orgId = AuthContext.getOrgId();
     long pendingCount = dischargeApplyMapper.selectCount(Wrappers.lambdaQuery(ElderDischargeApply.class)
@@ -832,13 +982,15 @@ public class ElderResidenceController {
     } catch (DuplicateKeyException ex) {
       throw new IllegalStateException("该老人已有待审核退住申请");
     }
-    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
-        "DISCHARGE_APPLY_CREATE", "ELDER", request.getElderId(), "退住申请");
+    auditLogService.recordStructured(
+        orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "DISCHARGE_APPLY_CREATE", "ELDER", request.getElderId(), "退住申请",
+        null, record, request);
     return Result.ok(record);
   }
 
   @PutMapping("/discharge-apply/{id}/review")
-  @PreAuthorize("hasAnyRole('MEDICAL_MINISTER','NURSING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("@elderAuthz.canApproveDischarge()")
   public Result<ElderDischargeApply> reviewDischargeApply(@PathVariable Long id,
                                                           @Valid @RequestBody DischargeApplyReviewRequest request) {
     Long orgId = AuthContext.getOrgId();
@@ -859,14 +1011,31 @@ public class ElderResidenceController {
       throw new IllegalArgumentException("驳回时请填写审核备注");
     }
 
+    ElderDischargeApply beforeSnapshot = copyDischargeApply(record);
     record.setReviewedBy(AuthContext.getStaffId());
     record.setReviewedByName(AuthContext.getUsername());
     record.setReviewedTime(LocalDateTime.now());
 
     if (ResidenceLifecycleConstants.DISCHARGE_APPLY_APPROVED.equals(status)) {
+      ElderProfile elder = resolveElder(record.getElderId());
+      String beforeLifecycleStatus = elder.getLifecycleStatus();
       record.setLinkedDischargeId(null);
       record.setAutoDischargeStatus(ResidenceLifecycleConstants.AUTO_DISCHARGE_PENDING_SETTLEMENT);
       record.setAutoDischargeMessage("审核已通过，请先完成退住费用审核与退院结算，财务退款后自动释放床位并回写离院状态");
+      updateElderStatus(
+          elder,
+          ElderStatus.IN_HOSPITAL,
+          com.zhiyangyun.care.elder.model.ElderLifecycleStatus.DISCHARGE_PENDING,
+          null,
+          "DISCHARGE_APPLY_APPROVE",
+          request.getReviewRemark(),
+          "ELDER_DISCHARGE_APPLY",
+          record.getId());
+      recordLifecycleStatusChange(
+          record.getElderId(),
+          beforeLifecycleStatus,
+          com.zhiyangyun.care.elder.model.ElderLifecycleStatus.DISCHARGE_PENDING,
+          "退住申请审核通过");
     } else {
       record.setAutoDischargeStatus(null);
       record.setAutoDischargeMessage(null);
@@ -883,13 +1052,15 @@ public class ElderResidenceController {
     if (updated == 0) {
       throw new IllegalStateException("申请状态已变更，请刷新后重试");
     }
-    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
-        "DISCHARGE_APPLY_REVIEW", "ELDER", record.getElderId(), "退住申请审核:" + status);
+    auditLogService.recordStructured(
+        orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "DISCHARGE_APPLY_REVIEW", "ELDER", record.getElderId(), "退住申请审核:" + status,
+        beforeSnapshot, record, request);
     return Result.ok(record);
   }
 
   @DeleteMapping("/discharge-apply/{id}")
-  @PreAuthorize("hasAnyRole('MEDICAL_MINISTER','NURSING_MINISTER','HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("@elderAuthz.canManageDischarge()")
   public Result<Boolean> deleteDischargeApply(@PathVariable Long id) {
     Long orgId = AuthContext.getOrgId();
     ElderDischargeApply record = dischargeApplyMapper.selectById(id);
@@ -1043,11 +1214,43 @@ public class ElderResidenceController {
   }
 
   private void updateElderStatus(ElderProfile elder, Integer status) {
+    updateElderStatus(elder, status, null, null, "STATUS_CHANGE", "状态变更", "ELDER", elder == null ? null : elder.getId());
+  }
+
+  private void updateElderStatus(
+      ElderProfile elder,
+      Integer status,
+      String lifecycleStatus,
+      String departureType,
+      String eventType,
+      String reason,
+      String bizRefType,
+      Long bizRefId) {
     if (elder == null || status == null) {
       return;
     }
     elder.setStatus(status);
-    elderMapper.updateById(elder);
+    if (lifecycleStatus == null || lifecycleStatus.isBlank()) {
+      elderLifecycleStateService.transitionFromLegacyStatus(
+          elder,
+          status,
+          departureType,
+          eventType,
+          reason,
+          bizRefType,
+          bizRefId,
+          AuthContext.getStaffId());
+      return;
+    }
+    elderLifecycleStateService.transition(
+        elder,
+        lifecycleStatus,
+        departureType,
+        eventType,
+        reason,
+        bizRefType,
+        bizRefId,
+        AuthContext.getStaffId());
   }
 
   private boolean hasAnyActiveOuting(Long elderId, Long orgId) {
@@ -1073,6 +1276,55 @@ public class ElderResidenceController {
     }
   }
 
+  private void syncTrialLifecycleForElder(
+      Long elderId,
+      String eventType,
+      String reason,
+      String bizRefType,
+      Long bizRefId) {
+    Long orgId = AuthContext.getOrgId();
+    if (elderId == null || orgId == null) {
+      return;
+    }
+    ElderProfile elder = resolveElder(elderId);
+    String beforeLifecycleStatus = elder.getLifecycleStatus();
+    String currentLifecycleStatus = ElderLifecycleStatus.normalize(beforeLifecycleStatus);
+    long activeTrialCount = trialStayMapper.selectCount(Wrappers.lambdaQuery(ElderTrialStay.class)
+        .eq(ElderTrialStay::getIsDeleted, 0)
+        .eq(ElderTrialStay::getOrgId, orgId)
+        .eq(ElderTrialStay::getElderId, elderId)
+        .eq(ElderTrialStay::getStatus, ResidenceLifecycleConstants.TRIAL_REGISTERED));
+    if (activeTrialCount > 0) {
+      if (currentLifecycleStatus == null
+          || ElderLifecycleStatus.INTENT.equals(currentLifecycleStatus)
+          || ElderLifecycleStatus.TRIAL.equals(currentLifecycleStatus)) {
+        elderLifecycleStateService.transition(
+            elder,
+            ElderLifecycleStatus.TRIAL,
+            null,
+            eventType,
+            reason,
+            bizRefType,
+            bizRefId,
+            AuthContext.getStaffId());
+        recordLifecycleStatusChange(elderId, beforeLifecycleStatus, ElderLifecycleStatus.TRIAL, reason);
+      }
+      return;
+    }
+    if (ElderLifecycleStatus.TRIAL.equals(currentLifecycleStatus)) {
+      elderLifecycleStateService.transition(
+          elder,
+          ElderLifecycleStatus.INTENT,
+          null,
+          eventType,
+          reason,
+          bizRefType,
+          bizRefId,
+          AuthContext.getStaffId());
+      recordLifecycleStatusChange(elderId, beforeLifecycleStatus, ElderLifecycleStatus.INTENT, reason);
+    }
+  }
+
   private void recordStatusChange(Long elderId, Integer beforeStatus, Integer afterStatus, String reason) {
     Long orgId = AuthContext.getOrgId();
     if (elderId == null || orgId == null) {
@@ -1090,12 +1342,126 @@ public class ElderResidenceController {
     changeLogMapper.insert(logRecord);
   }
 
+  private void recordBedChange(Long elderId, Long beforeBedId, Long afterBedId, String reason) {
+    Long orgId = AuthContext.getOrgId();
+    if (elderId == null || orgId == null) {
+      return;
+    }
+    ElderChangeLog logRecord = new ElderChangeLog();
+    logRecord.setTenantId(orgId);
+    logRecord.setOrgId(orgId);
+    logRecord.setElderId(elderId);
+    logRecord.setChangeType("BED_CHANGE");
+    logRecord.setBeforeValue(beforeBedId == null ? null : String.valueOf(beforeBedId));
+    logRecord.setAfterValue(afterBedId == null ? null : String.valueOf(afterBedId));
+    logRecord.setReason(reason);
+    logRecord.setCreatedBy(AuthContext.getStaffId());
+    changeLogMapper.insert(logRecord);
+  }
+
+  private void recordLifecycleStatusChange(Long elderId, String beforeLifecycleStatus, String afterLifecycleStatus, String reason) {
+    Long orgId = AuthContext.getOrgId();
+    if (elderId == null || orgId == null || Objects.equals(beforeLifecycleStatus, afterLifecycleStatus)) {
+      return;
+    }
+    ElderChangeLog logRecord = new ElderChangeLog();
+    logRecord.setTenantId(orgId);
+    logRecord.setOrgId(orgId);
+    logRecord.setElderId(elderId);
+    logRecord.setChangeType("LIFECYCLE_STATUS");
+    logRecord.setBeforeValue(beforeLifecycleStatus);
+    logRecord.setAfterValue(afterLifecycleStatus);
+    logRecord.setReason(reason);
+    logRecord.setCreatedBy(AuthContext.getStaffId());
+    changeLogMapper.insert(logRecord);
+  }
+
   private String elderStatusText(Integer status) {
     if (status == null) return "";
-    if (status == 1) return "在院";
-    if (status == 2) return "外出";
-    if (status == 3) return "离院";
-    return String.valueOf(status);
+    return ElderStatus.text(status);
+  }
+
+  private Map<String, Object> buildStatusSnapshot(Integer status, Long bedId) {
+    Map<String, Object> snapshot = new LinkedHashMap<>();
+    snapshot.put("elderStatus", status);
+    snapshot.put("elderStatusText", elderStatusText(status));
+    snapshot.put("bedId", bedId);
+    return snapshot;
+  }
+
+  private Map<String, Object> buildStatusTransitionContext(Integer beforeStatus, Integer afterStatus, String reason) {
+    Map<String, Object> context = new LinkedHashMap<>();
+    context.put("beforeStatus", beforeStatus);
+    context.put("beforeStatusText", elderStatusText(beforeStatus));
+    context.put("afterStatus", afterStatus);
+    context.put("afterStatusText", elderStatusText(afterStatus));
+    context.put("reason", reason);
+    return context;
+  }
+
+  private Map<String, Object> buildDepartureContext(
+      Integer beforeStatus,
+      Integer afterStatus,
+      String reason,
+      Long previousBedId) {
+    Map<String, Object> context = buildStatusTransitionContext(beforeStatus, afterStatus, reason);
+    context.put("previousBedId", previousBedId);
+    context.put("bedReleased", previousBedId != null);
+    return context;
+  }
+
+  private ElderTrialStay copyTrialStay(ElderTrialStay source) {
+    if (source == null) {
+      return null;
+    }
+    ElderTrialStay copy = new ElderTrialStay();
+    copy.setId(source.getId());
+    copy.setTenantId(source.getTenantId());
+    copy.setOrgId(source.getOrgId());
+    copy.setElderId(source.getElderId());
+    copy.setElderName(source.getElderName());
+    copy.setTrialStartDate(source.getTrialStartDate());
+    copy.setTrialEndDate(source.getTrialEndDate());
+    copy.setChannel(source.getChannel());
+    copy.setTrialPackage(source.getTrialPackage());
+    copy.setIntentLevel(source.getIntentLevel());
+    copy.setStatus(source.getStatus());
+    copy.setCareLevel(source.getCareLevel());
+    copy.setRemark(source.getRemark());
+    copy.setCreatedBy(source.getCreatedBy());
+    copy.setCreateTime(source.getCreateTime());
+    copy.setUpdateTime(source.getUpdateTime());
+    copy.setIsDeleted(source.getIsDeleted());
+    return copy;
+  }
+
+  private ElderDischargeApply copyDischargeApply(ElderDischargeApply source) {
+    if (source == null) {
+      return null;
+    }
+    ElderDischargeApply copy = new ElderDischargeApply();
+    copy.setId(source.getId());
+    copy.setTenantId(source.getTenantId());
+    copy.setOrgId(source.getOrgId());
+    copy.setElderId(source.getElderId());
+    copy.setElderName(source.getElderName());
+    copy.setApplyDate(source.getApplyDate());
+    copy.setPlannedDischargeDate(source.getPlannedDischargeDate());
+    copy.setReason(source.getReason());
+    copy.setProofFileUrl(source.getProofFileUrl());
+    copy.setStatus(source.getStatus());
+    copy.setLinkedDischargeId(source.getLinkedDischargeId());
+    copy.setAutoDischargeStatus(source.getAutoDischargeStatus());
+    copy.setAutoDischargeMessage(source.getAutoDischargeMessage());
+    copy.setReviewRemark(source.getReviewRemark());
+    copy.setReviewedBy(source.getReviewedBy());
+    copy.setReviewedByName(source.getReviewedByName());
+    copy.setReviewedTime(source.getReviewedTime());
+    copy.setCreatedBy(source.getCreatedBy());
+    copy.setCreateTime(source.getCreateTime());
+    copy.setUpdateTime(source.getUpdateTime());
+    copy.setIsDeleted(source.getIsDeleted());
+    return copy;
   }
 
   private ElderProfile resolveElder(Long elderId) {
@@ -1108,6 +1474,22 @@ public class ElderResidenceController {
       throw new IllegalArgumentException("老人不存在");
     }
     return elder;
+  }
+
+  private void releaseBedForDeparture(ElderProfile elder, LocalDate endDate, String reason) {
+    if (elder == null || elder.getId() == null) {
+      return;
+    }
+    BedReleaseResult releaseResult = elderOccupancyService.releaseBedAndCloseRelation(
+        elder.getTenantId(), elder.getOrgId(), elder.getId(), endDate, reason);
+    elder.setBedId(null);
+    if (releaseResult.getPreviousBedId() != null) {
+      recordBedChange(
+          elder.getId(),
+          releaseResult.getPreviousBedId(),
+          null,
+          reason + (releaseResult.getClosedRelationCount() > 0 ? "" : "（补记）"));
+    }
   }
 
   private String resolveElderName(Long elderId) {

@@ -227,9 +227,9 @@ function createLabel(text: string, className: string) {
 
 function resolveBedVisualState(bed: any): 'normal' | 'occupied' | 'sleep' | 'warning' | 'alert' | 'offline' {
   const abnormalCount = Number(bed.abnormalVital24hCount || 0)
-  if (bed.status === 0 || bed.status === 2) return 'offline'
+  if (bed.status === 0 || bed.occupancySource === 'MAINTENANCE' || bed.occupancySource === 'FROZEN') return 'offline'
   if (bed.riskLevel === 'HIGH' || abnormalCount > 0) return 'alert'
-  if (bed.riskLevel === 'MEDIUM' || bed.status === 3 || String(bed.bedNo || '').endsWith('R')) return 'warning'
+  if (bed.riskLevel === 'MEDIUM' || bed.status === 3 || bed.occupancySource === 'RESERVATION' || bed.occupancySource === 'CLEANING') return 'warning'
   if (bed.riskLevel === 'LOW' && bed.elderId) return 'sleep'
   if (bed.elderId) return 'occupied'
   return 'normal'

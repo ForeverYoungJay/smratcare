@@ -7,9 +7,14 @@ import type {
   CallbackExecuteRequest,
   CallbackPlanCreateRequest,
   CallbackPlanItem,
+  CrmContractWorkflowLogItem,
+  CrmLeadAssignLogItem,
+  CrmLeadAssignRequest,
   ContractAttachmentCreateRequest,
   ContractAttachmentItem,
   CrmLeadItem,
+  CrmSalesReportSnapshotItem,
+  CrmStageTransitionLogItem,
   LeadBatchDeleteRequest,
   LeadBatchStatusRequest,
   MarketingCallbackReport,
@@ -28,6 +33,7 @@ import type {
   MarketingLeadEntrySummary,
   MarketingLeadMode,
   MarketingReportQuery,
+  MarketingWorkbenchSummary,
   PageResult,
   SmsTaskCreateRequest,
   SmsTaskItem,
@@ -47,6 +53,18 @@ export function getLeadPage(params: any, config?: Record<string, any>) {
   return getCrmLeadPage(params, config)
 }
 
+export function assignCrmLead(id: Id, data: CrmLeadAssignRequest) {
+  return request.post<CrmLeadItem>(`/api/crm/leads/${id}/assign`, data)
+}
+
+export function getLeadAssignLogs(leadId: Id, limit = 20) {
+  return request.get<CrmLeadAssignLogItem[]>(`/api/crm/leads/${leadId}/assign-logs`, { params: { limit } })
+}
+
+export function getLeadStageLogs(leadId: Id, limit = 20) {
+  return request.get<CrmStageTransitionLogItem[]>(`/api/crm/leads/${leadId}/stage-logs`, { params: { limit } })
+}
+
 export function getContractPage(params: any, config?: Record<string, any>) {
   return fetchPage<CrmContractItem>('/api/crm/contracts/page', params, config)
 }
@@ -57,6 +75,10 @@ export function getContractStageSummary(params?: { currentOwnerDept?: string }) 
 
 export function getCrmContract(id: Id) {
   return request.get<CrmContractItem>(`/api/crm/contracts/${id}`)
+}
+
+export function getContractWorkflowLogs(contractId: Id, limit = 20) {
+  return request.get<CrmContractWorkflowLogItem[]>(`/api/crm/contracts/${contractId}/workflow-logs`, { params: { limit } })
 }
 
 export function createCrmContract(data: CrmContractPayload) {
@@ -250,6 +272,14 @@ export function getMarketingCallbackReport(params?: { pageNo?: number; pageSize?
 
 export function getMarketingDataQualityReport() {
   return request.get<MarketingDataQualityReport>('/api/marketing/report/data-quality')
+}
+
+export function getMarketingWorkbenchSummary(params?: Pick<MarketingReportQuery, 'dateFrom' | 'dateTo'>) {
+  return request.get<MarketingWorkbenchSummary>('/api/marketing/report/workbench-summary', { params })
+}
+
+export function getMarketingReportSnapshots(params?: { snapshotType?: string; limit?: number }) {
+  return request.get<CrmSalesReportSnapshotItem[]>('/api/marketing/report/snapshots', { params })
 }
 
 export function getMarketingLeadEntrySummary(params: {

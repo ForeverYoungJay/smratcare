@@ -47,6 +47,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../../../stores/user'
+import { MARKETING_ROUTE_PATHS, MARKETING_SECTION_LINKS } from '../../../utils/marketingRoutes'
 import { resolveRouteAccess } from '../../../utils/routeAccess'
 
 const props = withDefaults(defineProps<{
@@ -54,32 +55,24 @@ const props = withDefaults(defineProps<{
   workbenchPath?: string
 }>(), {
   parentPath: '',
-  workbenchPath: '/marketing/workbench'
+  workbenchPath: MARKETING_ROUTE_PATHS.workbench
 })
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
-const workbenchPath = computed(() => props.workbenchPath || '/marketing/workbench')
-const sectionLinks = computed(() => [
-  { label: '线索', path: '/marketing/leads/all' },
-  { label: '跟进', path: '/marketing/followup/records' },
-  { label: '漏斗', path: '/marketing/funnel/consultation' },
-  { label: '预定与床态', path: '/marketing/reservation/records' },
-  { label: '合同', path: '/marketing/contracts/pending' },
-  { label: '回访', path: '/marketing/callback/checkin' },
-  { label: '报表', path: '/marketing/reports/conversion' }
-])
+const workbenchPath = computed(() => props.workbenchPath || MARKETING_ROUTE_PATHS.workbench)
+const sectionLinks = computed(() => MARKETING_SECTION_LINKS)
 const currentSectionLabel = computed(() => {
   const hit = sectionLinks.value.find((item) => isActiveSection(item.path))
   return hit?.label || '营销管理'
 })
 const quickCreateRoutes: Record<string, { path: string; query?: Record<string, string> }> = {
-  lead: { path: '/marketing/leads/all', query: { quick: '1' } },
-  followup: { path: '/marketing/followup/records', query: { quick: '1' } },
-  contract: { path: '/marketing/contracts/pending', query: { quick: '1' } },
-  reservation: { path: '/marketing/reservation/records', query: { quick: '1' } },
-  plan: { path: '/marketing/plan', query: { quick: '1' } }
+  lead: { path: MARKETING_ROUTE_PATHS.leads, query: { quick: '1' } },
+  followup: { path: MARKETING_ROUTE_PATHS.interactions, query: { quick: '1' } },
+  contract: { path: MARKETING_ROUTE_PATHS.contracts, query: { quick: '1' } },
+  reservation: { path: MARKETING_ROUTE_PATHS.reservation, query: { quick: '1' } },
+  plan: { path: MARKETING_ROUTE_PATHS.plan, query: { quick: '1' } }
 }
 const collaborationLinks = computed(() => ([
   { label: '入住评估', path: '/elder/assessment/ability/admission' },
@@ -107,8 +100,11 @@ function goParent() {
 function isActiveSection(path: string) {
   const current = String(route.path || '')
   if (!path) return false
-  const normalized = path.replace(/\/+$/, '')
-  return current.startsWith(normalized)
+  const currentSection = sectionLinks.value.find((item) => item.path === path)
+  const candidates = Array.isArray((currentSection as any)?.activePaths)
+    ? (currentSection as any).activePaths
+    : [path]
+  return candidates.some((item: string) => current.startsWith(String(item || '').replace(/\/+$/, '')))
 }
 
 function canAccess(path: string) {

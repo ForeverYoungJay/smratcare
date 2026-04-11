@@ -21,6 +21,8 @@ public class CrmLeadRequest {
   private String receptionistName;
   private String homeAddress;
   private String marketerName;
+  private Long ownerStaffId;
+  private String ownerStaffName;
   private String followupStatus;
   private String referralChannel;
   private String invalidTime;

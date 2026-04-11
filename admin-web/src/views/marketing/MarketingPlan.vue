@@ -1,22 +1,19 @@
 <template>
-  <PageContainer title="营销方案" sub-title="方案起草-审批-发布-全员阅读闭环">
+  <PageContainer title="营销方案" sub-title="方案起草-审批-发布-线索归因-结果复盘闭环">
     <MarketingQuickNav />
     <template #extra>
       <a-space>
         <a-input-search
           v-model:value="query.keyword"
           allow-clear
-          placeholder="搜索标题/摘要/责任部门"
+          placeholder="搜索标题/摘要/责任部门/来源标签"
           style="width: 280px"
           @search="fetchData"
         />
         <a-select v-model:value="query.status" allow-clear placeholder="状态筛选" style="width: 160px" @change="fetchData">
-          <a-select-option value="DRAFT">草稿</a-select-option>
-          <a-select-option value="PENDING_APPROVAL">待审批</a-select-option>
-          <a-select-option value="APPROVED">审批通过</a-select-option>
-          <a-select-option value="REJECTED">已驳回</a-select-option>
-          <a-select-option value="PUBLISHED">已发布</a-select-option>
-          <a-select-option value="INACTIVE">停用</a-select-option>
+          <a-select-option v-for="item in MARKETING_PLAN_STATUS_OPTIONS" :key="item.value" :value="item.value">
+            {{ item.label }}
+          </a-select-option>
         </a-select>
         <a-button v-if="canManagePlanWrite" type="primary" @click="openCreate">新增方案</a-button>
       </a-space>
@@ -37,6 +34,18 @@
               <div class="plan-card-meta">
                 <span>优先级：{{ item.priority }}</span>
                 <span>生效：{{ item.effectiveDate || '--' }}</span>
+              </div>
+              <div class="plan-card-meta">
+                <span>预算：{{ item.budgetAmount != null ? `¥${item.budgetAmount}` : '--' }}</span>
+                <span>来源标签：{{ item.sourceTag || '--' }}</span>
+              </div>
+              <div class="plan-card-meta">
+                <span>实际线索：{{ item.actualLeadCount || 0 }}</span>
+                <span>实际签约：{{ item.actualContractCount || 0 }} · 转化 {{ formatPercent(item.actualContractRate) }}</span>
+              </div>
+              <div class="plan-card-meta">
+                <span>单线索成本：{{ formatPlanEfficiency(item, 'lead') }}</span>
+                <span>单签约成本：{{ formatPlanEfficiency(item, 'contract') }}</span>
               </div>
               <div class="plan-card-meta">
                 <span>阅读：{{ item.readCount || 0 }}/{{ item.totalStaffCount || 0 }}</span>
@@ -99,6 +108,12 @@
               </template>
               <template v-else-if="column.key === 'latestApprovalStatus'">
                 <a-tag :color="approvalStatusColor(record.latestApprovalStatus)">{{ approvalStatusLabel(record.latestApprovalStatus) }}</a-tag>
+              </template>
+              <template v-else-if="column.key === 'budgetAmount'">
+                {{ record.budgetAmount != null ? `¥${record.budgetAmount}` : '--' }}
+              </template>
+              <template v-else-if="column.key === 'actualContractRate'">
+                {{ formatPercent(record.actualContractRate) }}
               </template>
               <template v-else-if="column.key === 'workflow'">
                 <span>
@@ -168,6 +183,23 @@
             </a-form-item>
           </a-col>
         </a-row>
+        <a-row :gutter="12">
+          <a-col :span="8">
+            <a-form-item label="活动编码" name="campaignCode">
+              <a-input v-model:value="form.campaignCode" placeholder="如 SPRING-CARE-2026" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item label="来源标签" name="sourceTag">
+              <a-input v-model:value="form.sourceTag" placeholder="用于线索归因，如 社区活动/抖音" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item label="预算金额" name="budgetAmount">
+              <a-input-number v-model:value="form.budgetAmount" :min="0" :precision="2" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+        </a-row>
         <a-form-item label="联动负责部门" name="linkedDepartmentIds">
           <a-select
             v-model:value="form.linkedDepartmentIds"
@@ -184,6 +216,23 @@
         <a-form-item v-if="form.moduleType === 'POLICY'" label="运营目标" name="target">
           <a-input v-model:value="form.target" />
         </a-form-item>
+        <a-row :gutter="12" v-if="form.moduleType === 'POLICY'">
+          <a-col :span="8">
+            <a-form-item label="目标线索数" name="targetLeadCount">
+              <a-input-number v-model:value="form.targetLeadCount" :min="0" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item label="目标预定数" name="targetReservationCount">
+              <a-input-number v-model:value="form.targetReservationCount" :min="0" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item label="目标签约数" name="targetContractCount">
+              <a-input-number v-model:value="form.targetContractCount" :min="0" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+        </a-row>
         <a-form-item label="优先级" name="priority">
           <a-input-number v-model:value="form.priority" :min="1" :max="999" style="width: 100%" />
         </a-form-item>
@@ -201,6 +250,19 @@
         <a-descriptions-item label="摘要">{{ previewRecord.summary || '--' }}</a-descriptions-item>
         <a-descriptions-item label="季度">{{ previewRecord.quarterLabel || '--' }}</a-descriptions-item>
         <a-descriptions-item label="目标">{{ previewRecord.target || '--' }}</a-descriptions-item>
+        <a-descriptions-item label="活动编码">{{ previewRecord.campaignCode || '--' }}</a-descriptions-item>
+        <a-descriptions-item label="来源标签">{{ previewRecord.sourceTag || '--' }}</a-descriptions-item>
+        <a-descriptions-item label="预算">{{ previewRecord.budgetAmount != null ? `¥${previewRecord.budgetAmount}` : '--' }}</a-descriptions-item>
+        <a-descriptions-item label="目标/实际">
+          线索 {{ previewRecord.targetLeadCount || 0 }}/{{ previewRecord.actualLeadCount || 0 }}
+          ，预定 {{ previewRecord.targetReservationCount || 0 }}/{{ previewRecord.actualReservationCount || 0 }}
+          ，签约 {{ previewRecord.targetContractCount || 0 }}/{{ previewRecord.actualContractCount || 0 }}
+          ，签约转化 {{ formatPercent(previewRecord.actualContractRate) }}
+        </a-descriptions-item>
+        <a-descriptions-item label="预算效率">
+          单线索成本 {{ formatPlanEfficiency(previewRecord, 'lead') }}
+          ，单签约成本 {{ formatPlanEfficiency(previewRecord, 'contract') }}
+        </a-descriptions-item>
         <a-descriptions-item label="联动部门">{{ (previewRecord.linkedDepartmentNames || []).join('、') || '--' }}</a-descriptions-item>
         <a-descriptions-item label="审批状态">{{ previewRecord.latestApprovalStatus || '--' }}</a-descriptions-item>
         <a-descriptions-item label="审批意见">{{ previewRecord.latestApprovalRemark || '--' }}</a-descriptions-item>
@@ -263,6 +325,7 @@ import {
 } from '../../api/marketing'
 import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
 import { useUserStore } from '../../stores/user'
+import { MARKETING_MODULE_LABELS, MARKETING_PLAN_STATUS_COLORS, MARKETING_PLAN_STATUS_LABELS, MARKETING_PLAN_STATUS_OPTIONS } from '../../utils/marketingEnums'
 import { hasAnyRole } from '../../utils/roleAccess'
 import type {
   MarketingPlanItem,
@@ -308,6 +371,11 @@ const policyColumns = [
   { title: '季度', dataIndex: 'quarterLabel', key: 'quarterLabel', width: 120 },
   { title: '标题', dataIndex: 'title', key: 'title', width: 200 },
   { title: '运营目标', dataIndex: 'target', key: 'target', width: 240 },
+  { title: '来源标签', dataIndex: 'sourceTag', key: 'sourceTag', width: 140 },
+  { title: '预算', dataIndex: 'budgetAmount', key: 'budgetAmount', width: 120 },
+  { title: '实际线索', dataIndex: 'actualLeadCount', key: 'actualLeadCount', width: 110 },
+  { title: '实际签约', dataIndex: 'actualContractCount', key: 'actualContractCount', width: 110 },
+  { title: '签约转化', dataIndex: 'actualContractRate', key: 'actualContractRate', width: 110 },
   { title: '责任部门', dataIndex: 'owner', key: 'owner', width: 120 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 110 },
   { title: '审批状态', dataIndex: 'latestApprovalStatus', key: 'latestApprovalStatus', width: 130 },
@@ -330,6 +398,12 @@ const form = reactive({
   quarterLabel: '',
   target: '',
   owner: '',
+  campaignCode: '',
+  sourceTag: '',
+  budgetAmount: undefined as number | undefined,
+  targetLeadCount: undefined as number | undefined,
+  targetReservationCount: undefined as number | undefined,
+  targetContractCount: undefined as number | undefined,
   linkedDepartmentIds: [] as string[],
   priority: 50,
   status: 'DRAFT' as MarketingPlanStatus,
@@ -377,6 +451,18 @@ const rowSelection = computed(() => ({
     selectedRowKeys.value = keys.map((key) => String(key))
   }
 }))
+
+function formatPercent(value?: number | null) {
+  if (value == null || !Number.isFinite(Number(value))) return '--'
+  return `${Number(value).toFixed(1)}%`
+}
+
+function formatPlanEfficiency(item: Pick<MarketingPlanItem, 'budgetAmount' | 'actualLeadCount' | 'actualContractCount'>, mode: 'lead' | 'contract') {
+  const budget = Number(item.budgetAmount || 0)
+  const divisor = mode === 'lead' ? Number(item.actualLeadCount || 0) : Number(item.actualContractCount || 0)
+  if (!budget || divisor <= 0) return '--'
+  return `¥${(budget / divisor).toFixed(2)}`
+}
 
 function canSubmit(item: MarketingPlanItem) {
   return ['DRAFT', 'REJECTED', 'INACTIVE'].includes(item.status || '')
@@ -462,6 +548,12 @@ function openCreate() {
   form.quarterLabel = ''
   form.target = ''
   form.owner = ''
+  form.campaignCode = ''
+  form.sourceTag = ''
+  form.budgetAmount = undefined
+  form.targetLeadCount = undefined
+  form.targetReservationCount = undefined
+  form.targetContractCount = undefined
   form.linkedDepartmentIds = []
   form.priority = 50
   form.status = 'DRAFT'
@@ -482,6 +574,12 @@ function openEdit(item: MarketingPlanItem) {
   form.quarterLabel = item.quarterLabel || ''
   form.target = item.target || ''
   form.owner = item.owner || ''
+  form.campaignCode = item.campaignCode || ''
+  form.sourceTag = item.sourceTag || ''
+  form.budgetAmount = item.budgetAmount
+  form.targetLeadCount = item.targetLeadCount
+  form.targetReservationCount = item.targetReservationCount
+  form.targetContractCount = item.targetContractCount
   form.linkedDepartmentIds = item.linkedDepartmentIds || []
   form.priority = item.priority || 50
   form.status = item.status || 'DRAFT'
@@ -505,6 +603,12 @@ async function submitForm() {
       quarterLabel: trimOrUndefined(form.quarterLabel),
       target: trimOrUndefined(form.target),
       owner: trimOrUndefined(form.owner),
+      campaignCode: trimOrUndefined(form.campaignCode),
+      sourceTag: trimOrUndefined(form.sourceTag),
+      budgetAmount: form.budgetAmount,
+      targetLeadCount: form.targetLeadCount,
+      targetReservationCount: form.targetReservationCount,
+      targetContractCount: form.targetContractCount,
       linkedDepartmentIds: form.linkedDepartmentIds,
       priority: form.priority,
       status: form.status,
@@ -842,28 +946,15 @@ async function submitReadConfirm() {
 }
 
 function moduleLabel(moduleType: string) {
-  return moduleType === 'POLICY' ? '季度政策' : '营销话术'
+  return MARKETING_MODULE_LABELS[moduleType as keyof typeof MARKETING_MODULE_LABELS] || '营销话术'
 }
 
 function statusLabel(status?: string) {
-  const map: Record<string, string> = {
-    DRAFT: '草稿',
-    PENDING_APPROVAL: '待审批',
-    APPROVED: '审批通过（待发布）',
-    REJECTED: '已驳回',
-    PUBLISHED: '已发布',
-    INACTIVE: '停用',
-    ACTIVE: '已发布'
-  }
-  return map[status || ''] || status || '--'
+  return MARKETING_PLAN_STATUS_LABELS[status || ''] || status || '--'
 }
 
 function statusColor(status?: string) {
-  if (status === 'PUBLISHED' || status === 'ACTIVE') return 'green'
-  if (status === 'APPROVED') return 'blue'
-  if (status === 'PENDING_APPROVAL') return 'orange'
-  if (status === 'REJECTED') return 'red'
-  return 'default'
+  return MARKETING_PLAN_STATUS_COLORS[status || ''] || 'default'
 }
 
 function approvalStatusLabel(status?: string) {

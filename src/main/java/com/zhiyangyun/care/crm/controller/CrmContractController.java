@@ -9,6 +9,8 @@ import com.zhiyangyun.care.crm.model.CrmContractStageSummaryResponse;
 import com.zhiyangyun.care.crm.model.action.CrmContractBatchDeleteRequest;
 import com.zhiyangyun.care.crm.model.action.CrmContractFinalizeRequest;
 import com.zhiyangyun.care.crm.service.CrmContractService;
+import com.zhiyangyun.care.crm.model.trace.CrmContractWorkflowLogResponse;
+import com.zhiyangyun.care.crm.service.CrmTraceService;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -32,10 +34,14 @@ public class CrmContractController {
           + "'DIRECTOR','SYS_ADMIN','ADMIN')";
   private static final String CRM_CONTRACT_WRITE =
       "hasAnyRole('MARKETING_EMPLOYEE','MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')";
+  private static final String CRM_CONTRACT_APPROVE =
+      "hasAnyRole('MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')";
   private final CrmContractService contractService;
+  private final CrmTraceService crmTraceService;
 
-  public CrmContractController(CrmContractService contractService) {
+  public CrmContractController(CrmContractService contractService, CrmTraceService crmTraceService) {
     this.contractService = contractService;
+    this.crmTraceService = crmTraceService;
   }
 
   @PreAuthorize(CRM_CONTRACT_WRITE)
@@ -99,6 +105,16 @@ public class CrmContractController {
   }
 
   @PreAuthorize(CRM_CONTRACT_READ)
+  @GetMapping("/{id}/workflow-logs")
+  public Result<List<CrmContractWorkflowLogResponse>> workflowLogs(
+      @PathVariable Long id,
+      @RequestParam(defaultValue = "20") int limit) {
+    Long orgId = AuthContext.getOrgId();
+    contractService.get(orgId, id);
+    return Result.ok(crmTraceService.listContractWorkflowLogs(orgId, id, limit));
+  }
+
+  @PreAuthorize(CRM_CONTRACT_READ)
   @GetMapping("/stage-summary")
   public Result<CrmContractStageSummaryResponse> stageSummary(
       @RequestParam(required = false) String currentOwnerDept) {
@@ -141,7 +157,7 @@ public class CrmContractController {
         .getTotal();
   }
 
-  @PreAuthorize(CRM_CONTRACT_WRITE)
+  @PreAuthorize(CRM_CONTRACT_APPROVE)
   @PostMapping("/batch/delete")
   public Result<Integer> batchDelete(@RequestBody(required = false) CrmContractBatchDeleteRequest request) {
     return Result.ok(contractService.deleteBatch(
@@ -182,42 +198,42 @@ public class CrmContractController {
     return Result.ok(contractService.submitChange(AuthContext.getOrgId(), id, request == null ? null : request.getRemark()));
   }
 
-  @PreAuthorize(CRM_CONTRACT_WRITE)
+  @PreAuthorize(CRM_CONTRACT_APPROVE)
   @PostMapping("/{id}/change/approve")
   public Result<CrmContractResponse> approveChange(
       @PathVariable Long id, @RequestBody(required = false) CrmContractFinalizeRequest request) {
     return Result.ok(contractService.approveChange(AuthContext.getOrgId(), id, request == null ? null : request.getRemark()));
   }
 
-  @PreAuthorize(CRM_CONTRACT_WRITE)
+  @PreAuthorize(CRM_CONTRACT_APPROVE)
   @PostMapping("/{id}/change/reject")
   public Result<CrmContractResponse> rejectChange(
       @PathVariable Long id, @RequestBody(required = false) CrmContractFinalizeRequest request) {
     return Result.ok(contractService.rejectChange(AuthContext.getOrgId(), id, request == null ? null : request.getRemark()));
   }
 
-  @PreAuthorize(CRM_CONTRACT_WRITE)
+  @PreAuthorize(CRM_CONTRACT_APPROVE)
   @PostMapping("/{id}/approve")
   public Result<CrmContractResponse> approve(
       @PathVariable Long id, @RequestBody(required = false) CrmContractFinalizeRequest request) {
     return Result.ok(contractService.approve(AuthContext.getOrgId(), id, request == null ? null : request.getRemark()));
   }
 
-  @PreAuthorize(CRM_CONTRACT_WRITE)
+  @PreAuthorize(CRM_CONTRACT_APPROVE)
   @PostMapping("/{id}/reject")
   public Result<CrmContractResponse> reject(
       @PathVariable Long id, @RequestBody(required = false) CrmContractFinalizeRequest request) {
     return Result.ok(contractService.reject(AuthContext.getOrgId(), id, request == null ? null : request.getRemark()));
   }
 
-  @PreAuthorize(CRM_CONTRACT_WRITE)
+  @PreAuthorize(CRM_CONTRACT_APPROVE)
   @PostMapping("/{id}/void")
   public Result<CrmContractResponse> voidContract(
       @PathVariable Long id, @RequestBody(required = false) CrmContractFinalizeRequest request) {
     return Result.ok(contractService.voidContract(AuthContext.getOrgId(), id, request == null ? null : request.getRemark()));
   }
 
-  @PreAuthorize(CRM_CONTRACT_WRITE)
+  @PreAuthorize(CRM_CONTRACT_APPROVE)
   @PostMapping("/{id}/finalize")
   public Result<CrmContractResponse> finalizeContract(
       @PathVariable Long id, @RequestBody(required = false) CrmContractFinalizeRequest request) {
@@ -225,10 +241,13 @@ public class CrmContractController {
     return Result.ok(contractService.finalizeSign(AuthContext.getOrgId(), AuthContext.getStaffId(), id, remark));
   }
 
-  @PreAuthorize(CRM_CONTRACT_WRITE)
+  @PreAuthorize(CRM_CONTRACT_APPROVE)
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
-    contractService.deleteBatch(AuthContext.getOrgId(), List.of(id), null);
+    int affected = contractService.deleteBatch(AuthContext.getOrgId(), List.of(id), null);
+    if (affected <= 0) {
+      throw new IllegalStateException("当前合同不可删除，可能已进入受保护流程或无权限操作");
+    }
     return Result.ok(null);
   }
 }

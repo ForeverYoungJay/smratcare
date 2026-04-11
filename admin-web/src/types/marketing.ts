@@ -63,6 +63,75 @@ export interface MarketingCallbackReport {
 
 export type MarketingCallbackType = 'checkin' | 'trial' | 'discharge' | 'score'
 
+export interface CrmLeadAssignRequest {
+  ownerStaffId: Id
+  ownerStaffName?: string
+  remark?: string
+}
+
+export interface CrmLeadAssignLogItem {
+  id: Id
+  leadId: Id
+  fromOwnerStaffId?: Id
+  fromOwnerStaffName?: string
+  toOwnerStaffId?: Id
+  toOwnerStaffName?: string
+  assignedBy?: Id
+  assignedByName?: string
+  assignedAt?: string
+  remark?: string
+}
+
+export interface CrmStageTransitionLogItem {
+  id: Id
+  entityType: 'LEAD' | 'CONTRACT' | string
+  leadId?: Id
+  contractId?: Id
+  transitionType?: string
+  source?: string
+  fromStage?: string
+  toStage?: string
+  fromStatus?: string
+  toStatus?: string
+  fromOwnerDept?: string
+  toOwnerDept?: string
+  remark?: string
+  operatedBy?: Id
+  operatedByName?: string
+  operatedAt?: string
+}
+
+export interface CrmContractWorkflowLogItem {
+  id: Id
+  contractId: Id
+  leadId?: Id
+  actionType?: string
+  beforeStatus?: string
+  afterStatus?: string
+  beforeFlowStage?: string
+  afterFlowStage?: string
+  beforeChangeWorkflow?: string
+  afterChangeWorkflow?: string
+  remark?: string
+  snapshotJson?: string
+  operatedBy?: Id
+  operatedByName?: string
+  operatedAt?: string
+}
+
+export interface CrmSalesReportSnapshotItem {
+  id: Id
+  snapshotType: string
+  snapshotDate?: string
+  windowFrom?: string
+  windowTo?: string
+  snapshotKey?: string
+  metricsJson?: string
+  generatedBy?: Id
+  generatedByName?: string
+  generatedAt?: string
+}
+
 export interface MarketingReportQuery {
   dateFrom?: string
   dateTo?: string
@@ -75,6 +144,77 @@ export interface MarketingDataQualityReport {
   missingSourceCount: number
   missingNextFollowDateCount: number
   nonStandardSourceCount: number
+}
+
+export interface MarketingWorkbenchSummary {
+  funnel: {
+    todayConsultCount: number
+    evaluationCount: number
+    pendingSignCount: number
+    pendingAdmissionCount: number
+    monthDealCount: number
+    monthConversionRate: number
+  }
+  followup: {
+    todayDue: number
+    overdue: number
+    highIntentCount: number
+    lockExpiringCount: number
+  }
+  bedSales: {
+    emptyCount: number
+    lockCount: number
+    reservedUnsignedCount: number
+    premiumEmptyCount: number
+  }
+  contract: {
+    pendingSignCount: number
+    renewalDueCount: number
+    changePendingCount: number
+    monthAmount: number
+  }
+  callback: {
+    checkinCount: number
+    trialCount: number
+    dischargeCount: number
+    score: number
+  }
+  performance: {
+    monthDealCount: number
+    monthAmount: number
+    rankNo: number
+    timelyRate: number
+  }
+  medical: {
+    todayCount: number
+    referCount: number
+    unassignedCount: number
+  }
+  plan: {
+    speechCount: number
+    policyCount: number
+    pendingApprovalCount: number
+    rejectedCount: number
+    totalBudgetAmount?: number
+    totalActualLeadCount?: number
+    totalActualContractCount?: number
+  }
+  risk: {
+    overdueFollowupCount: number
+    lockUnsignedCount: number
+    highIntentNoEvalCount: number
+    channelDropCount: number
+  }
+  channelTop5: Array<{
+    source: string
+    leadCount: number
+    contractRate: string
+  }>
+  channelUnknownCount: number
+  channelMonthDeals: number
+  dateFrom?: string
+  dateTo?: string
+  generatedAt?: string
 }
 
 export type MarketingLeadMode = 'consultation' | 'intent' | 'reservation' | 'invalid' | 'callback'
@@ -226,6 +366,10 @@ export interface CrmContractItem {
   gender?: number
   age?: number
   marketerName?: string
+  amount?: number
+  contractAmount?: number
+  depositAmount?: number
+  reservationAmount?: number
   contractSignedAt?: string
   contractExpiryDate?: string
   contractStatus?: string
@@ -398,6 +542,16 @@ export interface MarketingPlanItem {
   quarterLabel?: string
   target?: string
   owner?: string
+  campaignCode?: string
+  sourceTag?: string
+  budgetAmount?: number
+  targetLeadCount?: number
+  targetReservationCount?: number
+  targetContractCount?: number
+  actualLeadCount?: number
+  actualReservationCount?: number
+  actualContractCount?: number
+  actualContractRate?: number
   priority: number
   status: MarketingPlanStatus
   effectiveDate?: string
@@ -433,6 +587,12 @@ export interface MarketingPlanPayload {
   quarterLabel?: string
   target?: string
   owner?: string
+  campaignCode?: string
+  sourceTag?: string
+  budgetAmount?: number
+  targetLeadCount?: number
+  targetReservationCount?: number
+  targetContractCount?: number
   priority?: number
   status?: MarketingPlanStatus
   effectiveDate?: string

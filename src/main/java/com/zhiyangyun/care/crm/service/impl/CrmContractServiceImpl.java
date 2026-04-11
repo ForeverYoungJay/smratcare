@@ -3,6 +3,8 @@ package com.zhiyangyun.care.crm.service.impl;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.zhiyangyun.care.audit.service.AuditLogService;
+import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.assessment.entity.AssessmentRecord;
 import com.zhiyangyun.care.assessment.mapper.AssessmentRecordMapper;
 import com.zhiyangyun.care.crm.entity.CrmContract;
@@ -14,6 +16,7 @@ import com.zhiyangyun.care.crm.model.CrmContractResponse;
 import com.zhiyangyun.care.crm.model.ContractSystemLinkageSummary;
 import com.zhiyangyun.care.crm.service.ContractSignedLinkageService;
 import com.zhiyangyun.care.crm.service.CrmContractService;
+import com.zhiyangyun.care.crm.service.CrmTraceService;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderAdmission;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderAdmissionMapper;
 import java.time.LocalDate;
@@ -55,18 +58,24 @@ public class CrmContractServiceImpl implements CrmContractService {
   private final ElderAdmissionMapper admissionMapper;
   private final AssessmentRecordMapper assessmentRecordMapper;
   private final ContractSignedLinkageService contractSignedLinkageService;
+  private final AuditLogService auditLogService;
+  private final CrmTraceService crmTraceService;
 
   public CrmContractServiceImpl(
       CrmContractMapper contractMapper,
       CrmLeadMapper leadMapper,
       ElderAdmissionMapper admissionMapper,
       AssessmentRecordMapper assessmentRecordMapper,
-      ContractSignedLinkageService contractSignedLinkageService) {
+      ContractSignedLinkageService contractSignedLinkageService,
+      AuditLogService auditLogService,
+      CrmTraceService crmTraceService) {
     this.contractMapper = contractMapper;
     this.leadMapper = leadMapper;
     this.admissionMapper = admissionMapper;
     this.assessmentRecordMapper = assessmentRecordMapper;
     this.contractSignedLinkageService = contractSignedLinkageService;
+    this.auditLogService = auditLogService;
+    this.crmTraceService = crmTraceService;
   }
 
   @Override
@@ -98,6 +107,7 @@ public class CrmContractServiceImpl implements CrmContractService {
       try {
         contractMapper.insert(contract);
         syncLeadProjection(contract, true);
+        auditContractMutation("CREATE", "创建合同", null, contract, Map.of("source", "create"));
         return toResponse(contract);
       } catch (DataIntegrityViolationException ex) {
         if (!isContractNoDuplicate(ex) || (requestedNo != null && !requestedNo.isBlank()) || attempt >= 5) {
@@ -138,6 +148,7 @@ public class CrmContractServiceImpl implements CrmContractService {
     if (previousNo != null && !previousNo.equals(existing.getContractNo())) {
       updateAdmissionContractNo(tenantId, previousNo, existing.getContractNo());
     }
+    auditContractMutation("UPDATE", "更新合同", before, existing, Map.of("source", "update"));
     return toResponse(existing);
   }
 
@@ -240,12 +251,16 @@ public class CrmContractServiceImpl implements CrmContractService {
     if (ids != null) {
       for (Long id : ids) {
         CrmContract contract = contractMapper.selectById(id);
-        if (!isOwnedContract(contract, tenantId) || Integer.valueOf(1).equals(contract.getIsDeleted())) {
+        if (!isOwnedContract(contract, tenantId)
+            || Integer.valueOf(1).equals(contract.getIsDeleted())
+            || isProtectedContractForDelete(contract)) {
           continue;
         }
+        CrmContract before = cloneContract(contract);
         contract.setIsDeleted(1);
         contractMapper.updateById(contract);
         syncLeadDelete(contract);
+        auditContractMutation("DELETE", "删除合同", before, null, Map.of("source", "batchDeleteById"));
         affected++;
       }
     }
@@ -263,9 +278,14 @@ public class CrmContractServiceImpl implements CrmContractService {
         if (contract == null) {
           continue;
         }
+        if (isProtectedContractForDelete(contract)) {
+          continue;
+        }
+        CrmContract before = cloneContract(contract);
         contract.setIsDeleted(1);
         contractMapper.updateById(contract);
         syncLeadDelete(contract);
+        auditContractMutation("DELETE", "删除合同", before, null, Map.of("source", "batchDeleteByNo"));
         affected++;
       }
     }
@@ -279,6 +299,8 @@ public class CrmContractServiceImpl implements CrmContractService {
     if (!isOwnedContract(contract, tenantId)) {
       return null;
     }
+    ensureContractNotVoided(contract, "作废合同不允许回退到评估流程");
+    ensureContractNotSigned(contract, "已签署合同不允许回退到评估流程");
     CrmContract before = cloneContract(contract);
     contract.setFlowStage(FLOW_PENDING_ASSESSMENT);
     contract.setCurrentOwnerDept("ASSESSMENT");
@@ -288,18 +310,40 @@ public class CrmContractServiceImpl implements CrmContractService {
     contractMapper.updateById(contract);
     archiveAdmissionAssessmentsAfterSign(contract);
     syncLeadProjection(contract, false);
+    auditContractMutation("HANDOFF_ASSESSMENT", "合同回退到待评估", before, contract, null);
     return toResponse(contract);
   }
 
   @Override
   @Transactional
   public CrmContractResponse moveToBedSelect(Long tenantId, Long id) {
+    CrmContract contract = contractMapper.selectById(id);
+    if (!isOwnedContract(contract, tenantId)) {
+      return null;
+    }
+    ensureContractNotVoided(contract, "作废合同不允许继续推进流程");
+    ensureContractNotSigned(contract, "已签署合同不允许回退到办理流程");
+    if (!hasCompletedAdmissionAssessment(contract)) {
+      throw new IllegalStateException("未完成入住评估，不能进入入住办理流程");
+    }
     return updateManagedFlowStage(tenantId, id, FLOW_PENDING_BED_SELECT, "MARKETING", "待办理入住", "PENDING_APPROVAL");
   }
 
   @Override
   @Transactional
   public CrmContractResponse moveToPendingSign(Long tenantId, Long id) {
+    CrmContract contract = contractMapper.selectById(id);
+    if (!isOwnedContract(contract, tenantId)) {
+      return null;
+    }
+    ensureContractNotVoided(contract, "作废合同不允许继续推进流程");
+    ensureContractNotSigned(contract, "已签署合同不允许回退到办理流程");
+    if (!hasCompletedAdmissionAssessment(contract)) {
+      throw new IllegalStateException("未完成入住评估，不能进入待签署流程");
+    }
+    if (!hasAdmission(contract)) {
+      throw new IllegalStateException("未完成入住办理，不能进入待签署流程");
+    }
     return updateManagedFlowStage(tenantId, id, FLOW_PENDING_SIGN, "MARKETING", "待签署", "APPROVED");
   }
 
@@ -386,6 +430,8 @@ public class CrmContractServiceImpl implements CrmContractService {
     validateStatusTransition(before, contract);
     contractMapper.updateById(contract);
     syncLeadProjection(contract, false);
+    auditContractMutation("FLOW_STAGE_CHANGE", "推进合同流程阶段", before, contract,
+        Map.of("flowStage", flowStage, "ownerDept", ownerDept));
     return toResponse(contract);
   }
 
@@ -402,6 +448,10 @@ public class CrmContractServiceImpl implements CrmContractService {
     if ("VOID".equals(normalizeDomainStatus(contract.getStatus()))) {
       throw new IllegalStateException("作废合同不允许发起变更");
     }
+    if (!isSignedOrEffective(contract)) {
+      throw new IllegalStateException("仅已签署或已生效合同允许发起变更流程");
+    }
+    CrmContract before = cloneContract(contract);
     String normalizedChangeStatus = normalizeChangeWorkflowStatus(changeWorkflowStatus);
     if (normalizedChangeStatus != null) {
       validateChangeWorkflowTransition(contract.getChangeWorkflowStatus(), normalizedChangeStatus);
@@ -414,6 +464,8 @@ public class CrmContractServiceImpl implements CrmContractService {
     if (syncLead) {
       syncLeadProjection(contract, false);
     }
+    auditContractMutation("CHANGE_WORKFLOW", "更新合同变更流程", before, contract,
+        Map.of("changeWorkflowStatus", normalizedChangeStatus, "syncLead", syncLead));
     return toResponse(contract);
   }
 
@@ -423,6 +475,13 @@ public class CrmContractServiceImpl implements CrmContractService {
     CrmContract contract = contractMapper.selectById(id);
     if (!isOwnedContract(contract, tenantId)) {
       return null;
+    }
+    ensureContractNotVoided(contract, "作废合同不允许审批");
+    ensureChangeWorkflowIdle(contract);
+    if (!"PENDING_APPROVAL".equals(normalizeDomainStatus(contract.getStatus()))
+        && !"REJECTED".equals(normalizeDomainStatus(contract.getStatus()))
+        && !"DRAFT".equals(normalizeDomainStatus(contract.getStatus()))) {
+      throw new IllegalStateException("当前合同状态不允许执行审批通过");
     }
     CrmContract before = cloneContract(contract);
     contract.setStatus("APPROVED");
@@ -437,6 +496,7 @@ public class CrmContractServiceImpl implements CrmContractService {
     validateStatusTransition(before, contract);
     contractMapper.updateById(contract);
     syncLeadProjection(contract, false);
+    auditContractMutation("APPROVE", "合同审批通过", before, contract, null);
     return toResponse(contract);
   }
 
@@ -446,6 +506,12 @@ public class CrmContractServiceImpl implements CrmContractService {
     CrmContract contract = contractMapper.selectById(id);
     if (!isOwnedContract(contract, tenantId)) {
       return null;
+    }
+    ensureContractNotVoided(contract, "作废合同不允许驳回");
+    ensureChangeWorkflowIdle(contract);
+    if (!"PENDING_APPROVAL".equals(normalizeDomainStatus(contract.getStatus()))
+        && !"APPROVED".equals(normalizeDomainStatus(contract.getStatus()))) {
+      throw new IllegalStateException("当前合同状态不允许执行驳回");
     }
     CrmContract before = cloneContract(contract);
     contract.setStatus("REJECTED");
@@ -458,6 +524,7 @@ public class CrmContractServiceImpl implements CrmContractService {
     validateStatusTransition(before, contract);
     contractMapper.updateById(contract);
     syncLeadProjection(contract, false);
+    auditContractMutation("REJECT", "合同审批驳回", before, contract, null);
     return toResponse(contract);
   }
 
@@ -468,16 +535,22 @@ public class CrmContractServiceImpl implements CrmContractService {
     if (!isOwnedContract(contract, tenantId)) {
       return null;
     }
+    if (remark == null || remark.isBlank()) {
+      throw new IllegalStateException("合同作废必须填写原因");
+    }
+    if ("VOID".equals(normalizeDomainStatus(contract.getStatus()))) {
+      throw new IllegalStateException("合同已作废，请勿重复操作");
+    }
+    ensureChangeWorkflowIdle(contract);
     CrmContract before = cloneContract(contract);
     contract.setStatus("VOID");
     contract.setContractStatus("作废");
     contract.setChangeWorkflowStatus(CHANGE_NONE);
-    if (remark != null && !remark.isBlank()) {
-      contract.setRemark(remark.trim());
-    }
+    contract.setRemark(remark.trim());
     validateStatusTransition(before, contract);
     contractMapper.updateById(contract);
     syncLeadProjection(contract, false);
+    auditContractMutation("VOID", "合同作废", before, contract, Map.of("reason", remark.trim()));
     return toResponse(contract);
   }
 
@@ -489,11 +562,19 @@ public class CrmContractServiceImpl implements CrmContractService {
       return null;
     }
     CrmContract before = cloneContract(contract);
+    ensureContractNotVoided(contract, "作废合同不能最终签署");
+    ensureChangeWorkflowIdle(contract);
     if (!hasAdmission(contract)) {
       throw new IllegalStateException("未完成入住办理，不能最终签署");
     }
-    if (!FLOW_PENDING_SIGN.equals(contract.getFlowStage()) && !FLOW_PENDING_BED_SELECT.equals(contract.getFlowStage())) {
+    if (!hasCompletedAdmissionAssessment(contract)) {
+      throw new IllegalStateException("未完成入住评估，不能最终签署");
+    }
+    if (!FLOW_PENDING_SIGN.equals(contract.getFlowStage())) {
       throw new IllegalStateException("合同当前阶段不允许最终签署");
+    }
+    if (!"APPROVED".equals(normalizeDomainStatus(contract.getStatus()))) {
+      throw new IllegalStateException("仅审批通过的合同允许最终签署");
     }
     contract.setFlowStage(FLOW_SIGNED);
     contract.setCurrentOwnerDept("MARKETING");
@@ -509,6 +590,8 @@ public class CrmContractServiceImpl implements CrmContractService {
     contractMapper.updateById(contract);
     archiveAdmissionAssessmentsAfterSign(contract);
     syncLeadProjection(contract, false);
+    auditContractMutation("FINALIZE_SIGN", "合同最终签署", before, contract,
+        Map.of("linkageReady", linkageSummary != null));
     CrmContractResponse response = toResponse(contract);
     response.setLinkageSummary(linkageSummary);
     return response;
@@ -546,6 +629,40 @@ public class CrmContractServiceImpl implements CrmContractService {
       return admissionByElder != null;
     }
     return false;
+  }
+
+  private boolean hasCompletedAdmissionAssessment(CrmContract contract) {
+    if (contract == null || contract.getTenantId() == null) {
+      return false;
+    }
+    String contractNo = blankToNull(contract.getContractNo());
+    if (contractNo != null) {
+      AssessmentRecord record = assessmentRecordMapper.selectOne(Wrappers.lambdaQuery(AssessmentRecord.class)
+          .eq(AssessmentRecord::getTenantId, contract.getTenantId())
+          .eq(AssessmentRecord::getIsDeleted, 0)
+          .eq(AssessmentRecord::getAssessmentType, "ADMISSION")
+          .eq(AssessmentRecord::getArchiveNo, contractNo)
+          .ne(AssessmentRecord::getStatus, "DRAFT")
+          .orderByDesc(AssessmentRecord::getAssessmentDate)
+          .orderByDesc(AssessmentRecord::getUpdateTime)
+          .last("LIMIT 1"));
+      if (record != null) {
+        return true;
+      }
+    }
+    if (contract.getElderId() == null) {
+      return false;
+    }
+    AssessmentRecord record = assessmentRecordMapper.selectOne(Wrappers.lambdaQuery(AssessmentRecord.class)
+        .eq(AssessmentRecord::getTenantId, contract.getTenantId())
+        .eq(AssessmentRecord::getIsDeleted, 0)
+        .eq(AssessmentRecord::getAssessmentType, "ADMISSION")
+        .eq(AssessmentRecord::getElderId, contract.getElderId())
+        .ne(AssessmentRecord::getStatus, "DRAFT")
+        .orderByDesc(AssessmentRecord::getAssessmentDate)
+        .orderByDesc(AssessmentRecord::getUpdateTime)
+        .last("LIMIT 1"));
+    return record != null;
   }
 
   private void applyRequest(CrmContract target, CrmContractRequest request, CrmContract current) {
@@ -657,7 +774,7 @@ public class CrmContractServiceImpl implements CrmContractService {
       lead.setOrgId(contract.getOrgId());
       lead.setName(firstNonBlank(contract.getName(), contract.getElderName()));
       lead.setPhone(firstNonBlank(contract.getPhone(), contract.getElderPhone()));
-      lead.setStatus(2);
+      lead.setStatus("SIGNED".equals(contract.getStatus()) || "EFFECTIVE".equals(contract.getStatus()) ? 2 : 1);
       lead.setCreatedBy(contract.getCreatedBy());
       lead.setSource("contract");
       lead.setConsultDate(LocalDate.now());
@@ -685,7 +802,7 @@ public class CrmContractServiceImpl implements CrmContractService {
     lead.setSmsSendCount(contract.getSmsSendCount() == null ? 0 : contract.getSmsSendCount());
     lead.setOrgName(contract.getOrgName());
     lead.setRemark(contract.getRemark());
-    lead.setStatus(2);
+    lead.setStatus("SIGNED".equals(contract.getStatus()) || "EFFECTIVE".equals(contract.getStatus()) ? 2 : 1);
     if (lead.getId() == null) {
       leadMapper.insert(lead);
       contract.setLeadId(lead.getId());
@@ -712,6 +829,9 @@ public class CrmContractServiceImpl implements CrmContractService {
   }
 
   private void syncLeadDelete(CrmContract contract) {
+    if (isProtectedLeadProjection(contract)) {
+      return;
+    }
     if (contract.getLeadId() != null) {
       CrmLead lead = leadMapper.selectById(contract.getLeadId());
       if (lead != null && contract.getTenantId().equals(lead.getTenantId())) {
@@ -732,6 +852,21 @@ public class CrmContractServiceImpl implements CrmContractService {
       lead.setIsDeleted(1);
       leadMapper.updateById(lead);
     }
+  }
+
+  private boolean isProtectedLeadProjection(CrmContract contract) {
+    if (contract == null) {
+      return false;
+    }
+    String status = blankToNull(contract.getStatus());
+    String flowStage = blankToNull(contract.getFlowStage());
+    return "SIGNED".equalsIgnoreCase(status)
+        || "EFFECTIVE".equalsIgnoreCase(status)
+        || "PENDING_APPROVAL".equalsIgnoreCase(status)
+        || "APPROVED".equalsIgnoreCase(status)
+        || "SIGNED".equalsIgnoreCase(flowStage)
+        || "PENDING_SIGN".equalsIgnoreCase(flowStage)
+        || "PENDING_BED_SELECT".equalsIgnoreCase(flowStage);
   }
 
   private void updateAdmissionContractNo(Long tenantId, String oldNo, String newNo) {
@@ -889,6 +1024,13 @@ public class CrmContractServiceImpl implements CrmContractService {
     }
     CrmContract target = new CrmContract();
     target.setId(source.getId());
+    target.setTenantId(source.getTenantId());
+    target.setOrgId(source.getOrgId());
+    target.setLeadId(source.getLeadId());
+    target.setElderId(source.getElderId());
+    target.setContractNo(source.getContractNo());
+    target.setName(source.getName());
+    target.setPhone(source.getPhone());
     target.setStatus(source.getStatus());
     target.setChangeWorkflowStatus(source.getChangeWorkflowStatus());
     target.setChangeWorkflowRemark(source.getChangeWorkflowRemark());
@@ -896,6 +1038,14 @@ public class CrmContractServiceImpl implements CrmContractService {
     target.setCurrentOwnerDept(source.getCurrentOwnerDept());
     target.setContractStatus(source.getContractStatus());
     target.setSignedAt(source.getSignedAt());
+    target.setReservationRoomNo(source.getReservationRoomNo());
+    target.setReservationBedId(source.getReservationBedId());
+    target.setElderName(source.getElderName());
+    target.setElderPhone(source.getElderPhone());
+    target.setMarketerName(source.getMarketerName());
+    target.setOrgName(source.getOrgName());
+    target.setRemark(source.getRemark());
+    target.setIsDeleted(source.getIsDeleted());
     return target;
   }
 
@@ -965,6 +1115,74 @@ public class CrmContractServiceImpl implements CrmContractService {
 
   private boolean isOwnedContract(CrmContract contract, Long tenantId) {
     return contract != null && Integer.valueOf(0).equals(contract.getIsDeleted()) && tenantId.equals(contract.getTenantId());
+  }
+
+  private void auditContractMutation(
+      String actionType,
+      String detail,
+      CrmContract before,
+      CrmContract after,
+      Object context) {
+    Long tenantId = before != null ? before.getTenantId() : after == null ? null : after.getTenantId();
+    Long orgId = before != null ? before.getOrgId() : after == null ? null : after.getOrgId();
+    Long entityId = before != null ? before.getId() : after == null ? null : after.getId();
+    if (tenantId == null || orgId == null) {
+      return;
+    }
+    auditLogService.recordStructured(
+        tenantId,
+        orgId,
+        AuthContext.getStaffId(),
+        AuthContext.getUsername(),
+        actionType,
+        "CRM_CONTRACT",
+        entityId,
+        detail,
+        before == null ? null : toResponse(before),
+        after == null ? null : toResponse(after),
+        context);
+    crmTraceService.recordContractWorkflow(actionType, detail, before, after, context);
+  }
+
+  private boolean isProtectedContractForDelete(CrmContract contract) {
+    if (contract == null) {
+      return false;
+    }
+    String status = normalizeDomainStatus(contract.getStatus());
+    String flowStage = blankToNull(contract.getFlowStage());
+    return "APPROVED".equals(status)
+        || "SIGNED".equals(status)
+        || "EFFECTIVE".equals(status)
+        || FLOW_PENDING_BED_SELECT.equalsIgnoreCase(flowStage)
+        || FLOW_PENDING_SIGN.equalsIgnoreCase(flowStage)
+        || FLOW_SIGNED.equalsIgnoreCase(flowStage);
+  }
+
+  private boolean isSignedOrEffective(CrmContract contract) {
+    String status = normalizeDomainStatus(contract == null ? null : contract.getStatus());
+    String flowStage = blankToNull(contract == null ? null : contract.getFlowStage());
+    return "SIGNED".equals(status)
+        || "EFFECTIVE".equals(status)
+        || FLOW_SIGNED.equalsIgnoreCase(flowStage);
+  }
+
+  private void ensureContractNotVoided(CrmContract contract, String message) {
+    if ("VOID".equals(normalizeDomainStatus(contract == null ? null : contract.getStatus()))) {
+      throw new IllegalStateException(message);
+    }
+  }
+
+  private void ensureContractNotSigned(CrmContract contract, String message) {
+    if (isSignedOrEffective(contract)) {
+      throw new IllegalStateException(message);
+    }
+  }
+
+  private void ensureChangeWorkflowIdle(CrmContract contract) {
+    String changeWorkflowStatus = normalizeChangeWorkflowStatus(contract == null ? null : contract.getChangeWorkflowStatus());
+    if (CHANGE_IN_PROGRESS.equals(changeWorkflowStatus) || CHANGE_PENDING_APPROVAL.equals(changeWorkflowStatus)) {
+      throw new IllegalStateException("合同变更流程处理中，当前操作已锁定");
+    }
   }
 
   private String blankToNull(String value) {

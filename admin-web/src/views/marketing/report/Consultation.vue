@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="咨询统计" sub-title="近14天咨询线索新增趋势">
+  <PageContainer title="咨询统计" sub-title="按咨询日期统计近14天线索新增趋势">
     <MarketingQuickNav parent-path="/marketing/reports" />
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline">

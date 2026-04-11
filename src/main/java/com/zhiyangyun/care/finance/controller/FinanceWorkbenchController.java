@@ -19,11 +19,18 @@ import com.zhiyangyun.care.bill.mapper.BillMonthlyMapper;
 import com.zhiyangyun.care.crm.entity.CrmContract;
 import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
 import com.zhiyangyun.care.elder.entity.Bed;
+import com.zhiyangyun.care.elder.entity.ElderBedRelation;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.entity.Room;
 import com.zhiyangyun.care.elder.mapper.BedMapper;
+import com.zhiyangyun.care.elder.mapper.ElderBedRelationMapper;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.RoomMapper;
+import com.zhiyangyun.care.elder.model.BedReleaseResult;
+import com.zhiyangyun.care.elder.model.ElderDepartureType;
+import com.zhiyangyun.care.elder.model.ElderLifecycleStatus;
+import com.zhiyangyun.care.elder.service.ElderLifecycleStateService;
+import com.zhiyangyun.care.elder.service.ElderOccupancyService;
 import com.zhiyangyun.care.finance.entity.AdmissionFeeAudit;
 import com.zhiyangyun.care.finance.entity.ConsumptionRecord;
 import com.zhiyangyun.care.finance.entity.DischargeFeeAudit;
@@ -120,7 +127,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/finance/workbench")
-@PreAuthorize("hasAnyRole('FINANCE_EMPLOYEE','FINANCE_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+@PreAuthorize("@elderAuthz.canUseFinanceWorkbench()")
 public class FinanceWorkbenchController {
   private final PaymentRecordMapper paymentRecordMapper;
   private final BillMonthlyMapper billMonthlyMapper;
@@ -136,6 +143,7 @@ public class FinanceWorkbenchController {
   private final ReconciliationDailyMapper reconciliationDailyMapper;
   private final CrmContractMapper crmContractMapper;
   private final BedMapper bedMapper;
+  private final ElderBedRelationMapper elderBedRelationMapper;
   private final RoomMapper roomMapper;
   private final ElderMapper elderMapper;
   private final OaApprovalMapper oaApprovalMapper;
@@ -143,6 +151,8 @@ public class FinanceWorkbenchController {
   private final AuditLogService auditLogService;
   private final ObjectMapper objectMapper;
   private final FinanceMonthLockService financeMonthLockService;
+  private final ElderLifecycleStateService elderLifecycleStateService;
+  private final ElderOccupancyService elderOccupancyService;
   private static final Pattern UPDATE_ROLLBACK_PATTERN =
       Pattern.compile("更新配置:\\s*([A-Z0-9_]+)@([0-9]{4}-[0-9]{2})\\s+([0-9\\.-]+)->([0-9\\.-]+)");
   private static final Pattern CREATE_ROLLBACK_PATTERN =
@@ -163,13 +173,16 @@ public class FinanceWorkbenchController {
       ReconciliationDailyMapper reconciliationDailyMapper,
       CrmContractMapper crmContractMapper,
       BedMapper bedMapper,
+      ElderBedRelationMapper elderBedRelationMapper,
       RoomMapper roomMapper,
       ElderMapper elderMapper,
       OaApprovalMapper oaApprovalMapper,
       AuditLogMapper auditLogMapper,
       AuditLogService auditLogService,
       ObjectMapper objectMapper,
-      FinanceMonthLockService financeMonthLockService) {
+      FinanceMonthLockService financeMonthLockService,
+      ElderLifecycleStateService elderLifecycleStateService,
+      ElderOccupancyService elderOccupancyService) {
     this.paymentRecordMapper = paymentRecordMapper;
     this.billMonthlyMapper = billMonthlyMapper;
     this.billItemMapper = billItemMapper;
@@ -184,6 +197,7 @@ public class FinanceWorkbenchController {
     this.reconciliationDailyMapper = reconciliationDailyMapper;
     this.crmContractMapper = crmContractMapper;
     this.bedMapper = bedMapper;
+    this.elderBedRelationMapper = elderBedRelationMapper;
     this.roomMapper = roomMapper;
     this.elderMapper = elderMapper;
     this.oaApprovalMapper = oaApprovalMapper;
@@ -191,6 +205,8 @@ public class FinanceWorkbenchController {
     this.auditLogService = auditLogService;
     this.objectMapper = objectMapper;
     this.financeMonthLockService = financeMonthLockService;
+    this.elderLifecycleStateService = elderLifecycleStateService;
+    this.elderOccupancyService = elderOccupancyService;
   }
 
   @GetMapping("/overview")
@@ -762,7 +778,7 @@ public class FinanceWorkbenchController {
   }
 
   @PostMapping("/month-close/unlock")
-  @PreAuthorize("hasAnyRole('FINANCE_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize("@elderAuthz.canManageFinanceWorkbenchAdmin()")
   public Result<FinanceMonthLockStatusResponse> unlockMonthClose(
       @RequestBody(required = false) FinanceMonthUnlockRequest request) {
     Long orgId = AuthContext.getOrgId();
@@ -926,7 +942,7 @@ public class FinanceWorkbenchController {
         item.setReasonCode("INSUFFICIENT_BALANCE");
         item.setReasonLabel("余额不足");
         item.setSuggestion("请先充值或转人工催缴");
-      } else if (elder != null && elder.getStatus() != null && elder.getStatus() != 1) {
+      } else if (elder != null && !isInHospitalLifecycle(elder)) {
         item.setReasonCode("STATUS_RESTRICTED");
         item.setReasonLabel("状态限制");
         item.setSuggestion("长者非在住状态，请确认扣费规则");
@@ -983,21 +999,18 @@ public class FinanceWorkbenchController {
             .eq(orgId != null, Room::getOrgId, orgId));
     Map<Long, Room> roomMap = rooms.stream()
         .collect(Collectors.toMap(Room::getId, Function.identity(), (a, b) -> a));
-    Map<Long, Bed> elderBedMap = beds.stream()
-        .filter(item -> item.getElderId() != null)
-        .collect(Collectors.toMap(Bed::getElderId, Function.identity(), (a, b) -> a));
+    Map<Long, Bed> elderBedMap = buildOccupiedBedMapByElderId(orgId, beds);
     Map<Long, BigDecimal> roomIncomeMap = new HashMap<>();
     for (BillMonthly billMonthly : bills) {
       Bed bed = elderBedMap.get(billMonthly.getElderId());
       if (bed == null || bed.getRoomId() == null) continue;
       roomIncomeMap.merge(bed.getRoomId(), safe(billMonthly.getTotalAmount()), BigDecimal::add);
     }
-    Map<Long, Integer> roomOccupied = new HashMap<>();
+    Map<Long, Integer> roomOccupied = countOccupiedBedsByRoom(orgId, beds);
     Map<Long, Integer> roomTotal = new HashMap<>();
     for (Bed bed : beds) {
       if (bed.getRoomId() == null) continue;
       roomTotal.merge(bed.getRoomId(), 1, Integer::sum);
-      if (bed.getElderId() != null) roomOccupied.merge(bed.getRoomId(), 1, Integer::sum);
     }
 
     FinanceRoomOpsDetailResponse response = new FinanceRoomOpsDetailResponse();
@@ -1121,10 +1134,9 @@ public class FinanceWorkbenchController {
         Wrappers.lambdaQuery(Bed.class)
             .eq(Bed::getIsDeleted, 0)
             .eq(orgId != null, Bed::getOrgId, orgId)
-            .in(Bed::getRoomId, roomIds)
-            .isNotNull(Bed::getElderId));
-    List<Long> elderIds = beds.stream()
-        .map(Bed::getElderId)
+            .in(Bed::getRoomId, roomIds));
+    Map<Long, Bed> occupiedBedMap = buildOccupiedBedMapByElderId(orgId, beds);
+    List<Long> elderIds = occupiedBedMap.keySet().stream()
         .filter(Objects::nonNull)
         .distinct()
         .toList();
@@ -1135,13 +1147,15 @@ public class FinanceWorkbenchController {
         Wrappers.lambdaQuery(ElderProfile.class)
             .eq(ElderProfile::getIsDeleted, 0)
             .eq(orgId != null, ElderProfile::getOrgId, orgId)
-            .in(ElderProfile::getId, elderIds)
-            .in(ElderProfile::getStatus, List.of(1, 2)))
+            .in(ElderProfile::getId, elderIds))
         .stream()
+        .filter(this::isResidentLifecycleVisible)
         .collect(Collectors.toMap(ElderProfile::getId, Function.identity(), (a, b) -> a));
 
-    for (Bed bedEntity : beds) {
-      ElderProfile elder = elderMap.get(bedEntity.getElderId());
+    for (Map.Entry<Long, Bed> entry : occupiedBedMap.entrySet()) {
+      Long elderId = entry.getKey();
+      Bed bedEntity = entry.getValue();
+      ElderProfile elder = elderMap.get(elderId);
       if (elder == null) {
         continue;
       }
@@ -1150,6 +1164,7 @@ public class FinanceWorkbenchController {
       row.setElderId(elder.getId());
       row.setElderName(normalizeText(elder.getFullName(), "未知老人"));
       row.setElderStatus(elder.getStatus());
+      row.setElderLifecycleStatus(elder.getLifecycleStatus());
       row.setBedId(bedEntity.getId());
       row.setBedNo(normalizeText(bedEntity.getBedNo(), ""));
       if (roomEntity != null) {
@@ -1488,6 +1503,8 @@ public class FinanceWorkbenchController {
   public Result<FinanceDischargeStatusSyncExecuteResponse> executeDischargeStatusSync(
       @RequestBody(required = false) FinanceDischargeStatusSyncExecuteRequest request) {
     Long orgId = AuthContext.getOrgId();
+    Long operatorId = AuthContext.getStaffId();
+    String operatorName = AuthContext.getUsername();
     FinanceDischargeStatusSyncExecuteRequest payload = request == null
         ? new FinanceDischargeStatusSyncExecuteRequest()
         : request;
@@ -1533,21 +1550,53 @@ public class FinanceWorkbenchController {
         response.getResults().add(result);
         continue;
       }
-      List<Bed> occupiedBeds = bedMapper.selectList(
-          Wrappers.lambdaQuery(Bed.class)
-              .eq(Bed::getIsDeleted, 0)
-              .eq(orgId != null, Bed::getOrgId, orgId)
-              .eq(Bed::getElderId, elder.getId()));
-      elder.setStatus(3);
+      Integer beforeStatus = elder.getStatus();
+      String beforeLifecycleStatus = elder.getLifecycleStatus();
+      String beforeDepartureType = elder.getDepartureType();
+      Long beforeBedId = elder.getBedId();
+      BedReleaseResult releaseResult = elderOccupancyService.releaseBedAndCloseRelation(
+          elder.getTenantId(), elder.getOrgId(), elder.getId(), LocalDate.now(), "财务退住状态同步");
       elder.setBedId(null);
-      elderMapper.updateById(elder);
-      for (Bed bedEntity : occupiedBeds) {
-        bedEntity.setElderId(null);
-        bedEntity.setStatus(1);
-        bedMapper.updateById(bedEntity);
-      }
+      elderLifecycleStateService.transition(
+          elder,
+          ElderLifecycleStatus.DISCHARGED,
+          ElderDepartureType.NORMAL,
+          "FINANCE_DISCHARGE_STATUS_SYNC",
+          "财务工位退住状态同步",
+          "DISCHARGE_SETTLEMENT",
+          row.getSettlementId(),
+          operatorId);
+      Map<String, Object> beforeSnapshot = new LinkedHashMap<>();
+      beforeSnapshot.put("status", beforeStatus);
+      beforeSnapshot.put("lifecycleStatus", beforeLifecycleStatus);
+      beforeSnapshot.put("departureType", beforeDepartureType);
+      beforeSnapshot.put("bedId", beforeBedId);
+      Map<String, Object> afterSnapshot = new LinkedHashMap<>();
+      afterSnapshot.put("status", elder.getStatus());
+      afterSnapshot.put("lifecycleStatus", elder.getLifecycleStatus());
+      afterSnapshot.put("departureType", elder.getDepartureType());
+      afterSnapshot.put("bedId", elder.getBedId());
+      Map<String, Object> context = new LinkedHashMap<>();
+      context.put("settlementId", row.getSettlementId());
+      context.put("releasedBedId", releaseResult.getReleasedBedId());
+      context.put("previousBedId", releaseResult.getPreviousBedId());
+      context.put("closedRelationCount", releaseResult.getClosedRelationCount());
+      auditLogService.recordStructured(
+          orgId,
+          orgId,
+          operatorId,
+          operatorName,
+          "FINANCE_DISCHARGE_STATUS_SYNC",
+          "ELDER",
+          elder.getId(),
+          "财务工位执行退住状态同步",
+          beforeSnapshot,
+          afterSnapshot,
+          context);
       result.setSuccess(true);
-      result.setMessage("状态回写成功");
+      result.setMessage(releaseResult.hasReleasedBed()
+          ? ("状态回写成功，释放床位#" + releaseResult.getReleasedBedId())
+          : (releaseResult.getPreviousBedId() == null ? "状态回写成功" : "状态回写成功，请复核床位释放"));
       response.setSuccessCount(response.getSuccessCount() + 1);
       response.getResults().add(result);
     }
@@ -2104,9 +2153,7 @@ public class FinanceWorkbenchController {
     Map<Long, Room> roomMap = rooms.stream()
         .collect(Collectors.toMap(Room::getId, Function.identity(), (a, b) -> a));
 
-    Map<Long, Bed> elderBedMap = beds.stream()
-        .filter(item -> item.getElderId() != null)
-        .collect(Collectors.toMap(Bed::getElderId, Function.identity(), (a, b) -> a));
+    Map<Long, Bed> elderBedMap = buildOccupiedBedMapByElderId(orgId, beds);
 
     Map<Long, BigDecimal> roomIncomeMap = new HashMap<>();
     for (BillMonthly bill : thisMonthBills) {
@@ -2117,16 +2164,13 @@ public class FinanceWorkbenchController {
       roomIncomeMap.merge(bed.getRoomId(), safe(bill.getTotalAmount()), BigDecimal::add);
     }
 
-    Map<Long, Integer> roomOccupiedBeds = new HashMap<>();
+    Map<Long, Integer> roomOccupiedBeds = countOccupiedBedsByRoom(orgId, beds);
     Map<Long, Integer> roomTotalBeds = new HashMap<>();
     for (Bed bed : beds) {
       if (bed.getRoomId() == null) {
         continue;
       }
       roomTotalBeds.merge(bed.getRoomId(), 1, Integer::sum);
-      if (bed.getElderId() != null) {
-        roomOccupiedBeds.merge(bed.getRoomId(), 1, Integer::sum);
-      }
     }
 
     Map<String, BigDecimal> floorIncome = new HashMap<>();
@@ -2373,7 +2417,7 @@ public class FinanceWorkbenchController {
             .eq(orgId != null, ElderProfile::getOrgId, orgId)
             .in(ElderProfile::getId, elderIds))
         .stream()
-        .filter(item -> item.getStatus() != null && item.getStatus() != 1)
+        .filter(item -> !isInHospitalLifecycle(item))
         .count();
   }
 
@@ -2965,16 +3009,7 @@ public class FinanceWorkbenchController {
                 .in(ElderProfile::getId, elderIds))
             .stream()
             .collect(Collectors.toMap(ElderProfile::getId, Function.identity(), (a, b) -> a));
-    Map<Long, Bed> occupiedBedMap = elderIds.isEmpty()
-        ? Map.of()
-        : bedMapper.selectList(
-            Wrappers.lambdaQuery(Bed.class)
-                .eq(Bed::getIsDeleted, 0)
-                .eq(orgId != null, Bed::getOrgId, orgId)
-                .in(Bed::getElderId, elderIds))
-            .stream()
-            .filter(item -> item.getElderId() != null)
-            .collect(Collectors.toMap(Bed::getElderId, Function.identity(), (a, b) -> a));
+    Map<Long, Bed> occupiedBedMap = loadOccupiedBedMapByElderId(orgId, elderIds);
 
     for (DischargeSettlement settlement : settlements) {
       ElderProfile elder = settlement.getElderId() == null ? null : elderMap.get(settlement.getElderId());
@@ -2984,7 +3019,7 @@ public class FinanceWorkbenchController {
       if (elder == null) {
         issueType = "ELDER_MISSING";
         issueMessage = "老人档案不存在，无法校验退住回写";
-      } else if (!Integer.valueOf(3).equals(elder.getStatus())) {
+      } else if (!isDischargedLifecycle(elder)) {
         issueType = "ELDER_STATUS_NOT_DISCHARGED";
         issueMessage = "老人状态未回写为“已退住”";
       } else if (elder.getBedId() != null || occupiedBed != null) {
@@ -3001,6 +3036,7 @@ public class FinanceWorkbenchController {
       row.setSettledTime(settlement.getSettledTime());
       row.setSettlementStatus(settlement.getStatus());
       row.setElderStatus(elder == null ? null : elder.getStatus());
+      row.setElderLifecycleStatus(elder == null ? null : elder.getLifecycleStatus());
       row.setElderBedId(elder == null ? null : elder.getBedId());
       row.setOccupiedBedId(occupiedBed == null ? null : occupiedBed.getId());
       row.setIssueType(issueType);
@@ -4304,6 +4340,151 @@ public class FinanceWorkbenchController {
     } catch (Exception ex) {
       return null;
     }
+  }
+
+  private boolean isInHospitalLifecycle(ElderProfile elder) {
+    if (elder == null) {
+      return false;
+    }
+    String lifecycleStatus = ElderLifecycleStatus.normalize(elder.getLifecycleStatus());
+    if (lifecycleStatus != null) {
+      return ElderLifecycleStatus.IN_HOSPITAL.equals(lifecycleStatus);
+    }
+    return Integer.valueOf(1).equals(elder.getStatus());
+  }
+
+  private boolean isResidentLifecycleVisible(ElderProfile elder) {
+    if (elder == null) {
+      return false;
+    }
+    String lifecycleStatus = ElderLifecycleStatus.normalize(elder.getLifecycleStatus());
+    if (lifecycleStatus == null) {
+      return Integer.valueOf(1).equals(elder.getStatus()) || Integer.valueOf(2).equals(elder.getStatus());
+    }
+    return ElderLifecycleStatus.IN_HOSPITAL.equals(lifecycleStatus)
+        || ElderLifecycleStatus.OUTING.equals(lifecycleStatus)
+        || ElderLifecycleStatus.MEDICAL_OUTING.equals(lifecycleStatus)
+        || ElderLifecycleStatus.DISCHARGE_PENDING.equals(lifecycleStatus);
+  }
+
+  private boolean isDischargedLifecycle(ElderProfile elder) {
+    if (elder == null) {
+      return false;
+    }
+    String lifecycleStatus = ElderLifecycleStatus.normalize(elder.getLifecycleStatus());
+    if (lifecycleStatus != null) {
+      return ElderLifecycleStatus.DISCHARGED.equals(lifecycleStatus)
+          || ElderLifecycleStatus.DECEASED.equals(lifecycleStatus);
+    }
+    return Integer.valueOf(3).equals(elder.getStatus());
+  }
+
+  private Map<Long, Bed> buildOccupiedBedMapByElderId(Long orgId, List<Bed> beds) {
+    if (beds == null || beds.isEmpty()) {
+      return Map.of();
+    }
+    Map<Long, Bed> bedById = beds.stream()
+        .filter(item -> item.getId() != null)
+        .collect(Collectors.toMap(Bed::getId, Function.identity(), (a, b) -> a));
+    if (bedById.isEmpty()) {
+      return Map.of();
+    }
+    List<Long> bedIds = new ArrayList<>(bedById.keySet());
+    List<ElderBedRelation> activeRelations = elderBedRelationMapper.selectList(
+        Wrappers.lambdaQuery(ElderBedRelation.class)
+            .eq(ElderBedRelation::getIsDeleted, 0)
+            .eq(orgId != null, ElderBedRelation::getOrgId, orgId)
+            .eq(ElderBedRelation::getActiveFlag, 1)
+            .in(ElderBedRelation::getBedId, bedIds));
+    Map<Long, Bed> occupiedBedMap = new LinkedHashMap<>();
+    Set<Long> relationBedIds = new HashSet<>();
+    for (ElderBedRelation relation : activeRelations) {
+      if (relation.getElderId() == null || relation.getBedId() == null) {
+        continue;
+      }
+      Bed bed = bedById.get(relation.getBedId());
+      if (bed == null) {
+        continue;
+      }
+      relationBedIds.add(relation.getBedId());
+      occupiedBedMap.putIfAbsent(relation.getElderId(), bed);
+    }
+    for (Bed bed : beds) {
+      if (bed.getId() == null || relationBedIds.contains(bed.getId()) || bed.getElderId() == null) {
+        continue;
+      }
+      occupiedBedMap.putIfAbsent(bed.getElderId(), bed);
+    }
+    return occupiedBedMap;
+  }
+
+  private Map<Long, Integer> countOccupiedBedsByRoom(Long orgId, List<Bed> beds) {
+    if (beds == null || beds.isEmpty()) {
+      return Map.of();
+    }
+    Map<Long, Integer> roomOccupied = new HashMap<>();
+    for (Bed bed : buildOccupiedBedMapByElderId(orgId, beds).values()) {
+      if (bed.getRoomId() == null) {
+        continue;
+      }
+      roomOccupied.merge(bed.getRoomId(), 1, Integer::sum);
+    }
+    return roomOccupied;
+  }
+
+  private Map<Long, Bed> loadOccupiedBedMapByElderId(Long orgId, List<Long> elderIds) {
+    if (elderIds == null || elderIds.isEmpty()) {
+      return Map.of();
+    }
+    List<ElderBedRelation> activeRelations = elderBedRelationMapper.selectList(
+        Wrappers.lambdaQuery(ElderBedRelation.class)
+            .eq(ElderBedRelation::getIsDeleted, 0)
+            .eq(orgId != null, ElderBedRelation::getOrgId, orgId)
+            .eq(ElderBedRelation::getActiveFlag, 1)
+            .in(ElderBedRelation::getElderId, elderIds));
+    Map<Long, Bed> occupiedBedMap = new LinkedHashMap<>();
+    List<Long> relationBedIds = activeRelations.stream()
+        .map(ElderBedRelation::getBedId)
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList();
+    if (!relationBedIds.isEmpty()) {
+      Map<Long, Bed> bedMap = bedMapper.selectList(
+              Wrappers.lambdaQuery(Bed.class)
+                  .eq(Bed::getIsDeleted, 0)
+                  .eq(orgId != null, Bed::getOrgId, orgId)
+                  .in(Bed::getId, relationBedIds))
+          .stream()
+          .filter(item -> item.getId() != null)
+          .collect(Collectors.toMap(Bed::getId, Function.identity(), (a, b) -> a));
+      for (ElderBedRelation relation : activeRelations) {
+        if (relation.getElderId() == null || relation.getBedId() == null) {
+          continue;
+        }
+        Bed bed = bedMap.get(relation.getBedId());
+        if (bed != null) {
+          occupiedBedMap.putIfAbsent(relation.getElderId(), bed);
+        }
+      }
+    }
+    List<Long> fallbackElderIds = elderIds.stream()
+        .filter(Objects::nonNull)
+        .filter(id -> !occupiedBedMap.containsKey(id))
+        .toList();
+    if (fallbackElderIds.isEmpty()) {
+      return occupiedBedMap;
+    }
+    bedMapper.selectList(
+            Wrappers.lambdaQuery(Bed.class)
+                .eq(Bed::getIsDeleted, 0)
+                .eq(orgId != null, Bed::getOrgId, orgId)
+                .in(Bed::getElderId, fallbackElderIds))
+        .forEach(item -> {
+          if (item.getElderId() != null) {
+            occupiedBedMap.putIfAbsent(item.getElderId(), item);
+          }
+        });
+    return occupiedBedMap;
   }
 
   private ResponseEntity<byte[]> csvResponse(String filenamePrefix, List<String> headers, List<List<String>> rows) {

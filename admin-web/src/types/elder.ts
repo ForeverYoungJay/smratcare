@@ -20,6 +20,8 @@ export interface ElderItem {
   sourceType?: 'HISTORICAL_IMPORT' | 'MARKETING_CONTRACT' | string
   historicalContractFileUrl?: string
   status?: number
+  lifecycleStatus?: 'INTENT' | 'TRIAL' | 'IN_HOSPITAL' | 'OUTING' | 'MEDICAL_OUTING' | 'DISCHARGE_PENDING' | 'DISCHARGED' | 'DECEASED' | string
+  departureType?: 'NORMAL' | 'DEATH' | string
   lifecycleStage?: 'PENDING_ASSESSMENT' | 'PENDING_BED_SELECT' | 'PENDING_SIGN' | 'SIGNED' | string
   lifecycleContractStatus?: string
   bedId?: Id
@@ -128,6 +130,9 @@ export interface CrmLeadItem {
   receptionistName?: string
   homeAddress?: string
   marketerName?: string
+  ownerStaffId?: Id
+  ownerStaffName?: string
+  assignedAt?: string
   followupStatus?: string
   referralChannel?: string
   invalidTime?: string

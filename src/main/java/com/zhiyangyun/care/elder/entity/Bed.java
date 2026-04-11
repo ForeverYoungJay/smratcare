@@ -21,6 +21,13 @@ public class Bed {
   private String bedQrCode;
   private Integer status;
   private Long elderId;
+  private String occupancySource;
+  private String occupancyRefType;
+  private Long occupancyRefId;
+  private LocalDateTime lockExpiresAt;
+  private String occupancyNote;
+  private String lastReleaseReason;
+  private LocalDateTime lastReleasedAt;
   private Long createdBy;
   @TableField(value = "create_time", fill = FieldFill.INSERT)
   private LocalDateTime createTime;

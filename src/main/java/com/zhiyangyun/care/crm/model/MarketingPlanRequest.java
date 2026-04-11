@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import lombok.Data;
@@ -32,6 +33,20 @@ public class MarketingPlanRequest {
 
   @Size(max = 64, message = "责任部门长度不能超过 64")
   private String owner;
+
+  @Size(max = 64, message = "活动编码长度不能超过 64")
+  private String campaignCode;
+
+  @Size(max = 64, message = "来源标签长度不能超过 64")
+  private String sourceTag;
+
+  private BigDecimal budgetAmount;
+
+  private Integer targetLeadCount;
+
+  private Integer targetReservationCount;
+
+  private Integer targetContractCount;
 
   @Min(value = 1, message = "优先级最小为 1")
   @Max(value = 999, message = "优先级最大为 999")

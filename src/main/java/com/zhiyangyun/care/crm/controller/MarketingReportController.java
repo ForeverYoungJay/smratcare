@@ -10,7 +10,10 @@ import com.zhiyangyun.care.crm.model.report.MarketingConversionReportResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingDataQualityResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingFollowupReportResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingLeadEntrySummaryResponse;
+import com.zhiyangyun.care.crm.model.report.MarketingWorkbenchSummaryResponse;
 import com.zhiyangyun.care.crm.service.MarketingReportService;
+import com.zhiyangyun.care.crm.model.trace.CrmSalesReportSnapshotResponse;
+import com.zhiyangyun.care.crm.service.CrmTraceService;
 import java.util.List;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,10 +26,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/marketing/report")
 public class MarketingReportController {
   private final MarketingReportService marketingReportService;
+  private final CrmTraceService crmTraceService;
   private final AuditLogService auditLogService;
 
-  public MarketingReportController(MarketingReportService marketingReportService, AuditLogService auditLogService) {
+  public MarketingReportController(
+      MarketingReportService marketingReportService,
+      CrmTraceService crmTraceService,
+      AuditLogService auditLogService) {
     this.marketingReportService = marketingReportService;
+    this.crmTraceService = crmTraceService;
     this.auditLogService = auditLogService;
   }
 
@@ -129,6 +137,28 @@ public class MarketingReportController {
     auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "MARKETING_REPORT_QUERY", "MARKETING_DATA_QUALITY", null, "data quality monitor");
     return Result.ok(marketingReportService.dataQuality(orgId));
+  }
+
+  @PreAuthorize("hasAnyRole('MARKETING_EMPLOYEE','MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @GetMapping("/workbench-summary")
+  public Result<MarketingWorkbenchSummaryResponse> workbenchSummary(
+      @RequestParam(required = false) String dateFrom,
+      @RequestParam(required = false) String dateTo) {
+    Long orgId = AuthContext.getOrgId();
+    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "MARKETING_REPORT_QUERY", "MARKETING_WORKBENCH_SUMMARY", null, "workbench summary");
+    return Result.ok(marketingReportService.workbenchSummary(orgId, dateFrom, dateTo));
+  }
+
+  @PreAuthorize("hasAnyRole('MARKETING_EMPLOYEE','MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @GetMapping("/snapshots")
+  public Result<List<CrmSalesReportSnapshotResponse>> snapshots(
+      @RequestParam(required = false) String snapshotType,
+      @RequestParam(defaultValue = "10") int limit) {
+    Long orgId = AuthContext.getOrgId();
+    auditLogService.record(orgId, orgId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "MARKETING_REPORT_QUERY", "MARKETING_REPORT_SNAPSHOTS", null, "report snapshots");
+    return Result.ok(crmTraceService.listSnapshots(orgId, snapshotType, limit));
   }
 
   @PreAuthorize("hasAnyRole('MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")

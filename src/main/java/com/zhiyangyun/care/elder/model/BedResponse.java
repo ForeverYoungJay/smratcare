@@ -1,6 +1,7 @@
 package com.zhiyangyun.care.elder.model;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import lombok.Data;
 
 @Data
@@ -14,6 +15,14 @@ public class BedResponse {
   private String bedQrCode;
   private Integer status;
   private Long elderId;
+  private String occupancySource;
+  private String occupancyRefType;
+  private Long occupancyRefId;
+  private String occupancyRefNo;
+  private LocalDateTime lockExpiresAt;
+  private String occupancyNote;
+  private String lastReleaseReason;
+  private LocalDateTime lastReleasedAt;
   private String roomNo;
   private String building;
   private String buildingRemark;

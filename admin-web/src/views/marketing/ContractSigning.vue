@@ -48,8 +48,8 @@
         <a-form-item label="联系电话">
           <a-input v-model:value="query.elderPhone" placeholder="请输入 联系电话" allow-clear />
         </a-form-item>
-        <a-form-item label="营销人员">
-          <a-input v-model:value="query.marketerName" placeholder="请输入 营销人员" allow-clear />
+        <a-form-item label="负责人">
+          <a-input v-model:value="query.marketerName" placeholder="请输入 负责人/营销人员" allow-clear />
         </a-form-item>
         <a-form-item label="优惠政策">
           <a-select
@@ -113,6 +113,7 @@
         <a-space>
           <a-button v-if="!isSignedMode" type="primary" @click="openForm()">新增合同</a-button>
           <a-button :disabled="!hasSingleSelection" @click="viewSelected">查看</a-button>
+          <a-button :disabled="!hasSingleSelection" @click="openTraceSelected">轨迹</a-button>
           <a-button :disabled="!hasSingleSelection" @click="editSelected">编辑</a-button>
           <a-button :disabled="!hasSingleSelection" @click="assessmentSelected">入住评估</a-button>
           <a-button :disabled="!hasSingleSelection" @click="openAttachmentSelected">附件</a-button>
@@ -152,6 +153,7 @@
               <a-button type="link" size="small" @click="handleNextStep(record)">{{ nextStepLabel(record) }}</a-button>
               <a-button type="link" size="small" @click="openAttachment(record)">附件</a-button>
               <a-button type="link" size="small" @click="view(record)">查看</a-button>
+              <a-button type="link" size="small" @click="openContractTrace(record)">轨迹</a-button>
             </a-space>
           </template>
         </template>
@@ -213,7 +215,7 @@
                   <strong class="readonly-value">{{ flowStageText((form.flowStage as any) || 'PENDING_ASSESSMENT') }}</strong>
                 </div>
                 <div class="readonly-item">
-                  <span class="readonly-label">营销人员</span>
+                  <span class="readonly-label">负责人</span>
                   <strong class="readonly-value">{{ form.marketerName || '-' }}</strong>
                 </div>
                 <div class="readonly-item">
@@ -343,7 +345,7 @@
                   </a-form-item>
                 </a-col>
                 <a-col :xs="24" :md="8">
-                  <a-form-item label="营销人员">
+                  <a-form-item label="负责人">
                     <a-select
                       v-model:value="form.marketerName"
                       allow-clear
@@ -638,6 +640,32 @@
         </a-col>
       </a-row>
     </a-modal>
+
+    <a-drawer v-model:open="traceOpen" title="合同流程轨迹" width="760">
+      <a-spin :spinning="traceLoading">
+        <a-descriptions v-if="traceContract" :column="1" bordered size="small">
+          <a-descriptions-item label="合同编号">{{ traceContract.contractNo || '-' }}</a-descriptions-item>
+          <a-descriptions-item label="长者">{{ traceContract.elderName || '-' }}</a-descriptions-item>
+          <a-descriptions-item label="联系电话">{{ traceContract.elderPhone || '-' }}</a-descriptions-item>
+          <a-descriptions-item label="当前流程">{{ flowStageText(normalizedFlowStage(traceContract)) }}</a-descriptions-item>
+          <a-descriptions-item label="当前状态">{{ traceContract.status || traceContract.contractStatus || '-' }}</a-descriptions-item>
+        </a-descriptions>
+        <MarketingTraceTimelineCard title="审批 / 变更 / 签署记录" :items="workflowLogs" empty-text="暂无流程日志">
+          <template #default="{ item }">
+            <div class="trace-item-title">
+              {{ item.actionType || '流程动作' }} · {{ item.beforeFlowStage || item.beforeStatus || '起始' }} → {{ item.afterFlowStage || item.afterStatus || '当前' }}
+            </div>
+            <div class="trace-item-meta">
+              {{ item.operatedAt || '-' }} · {{ item.operatedByName || '-' }}
+            </div>
+            <div class="trace-item-meta">
+              主状态 {{ item.beforeStatus || '-' }} → {{ item.afterStatus || '-' }}，变更流 {{ item.beforeChangeWorkflow || '-' }} → {{ item.afterChangeWorkflow || '-' }}
+            </div>
+            <div v-if="item.remark" class="trace-item-remark">{{ item.remark }}</div>
+          </template>
+        </MarketingTraceTimelineCard>
+      </a-spin>
+    </a-drawer>
   </PageContainer>
 </template>
 
@@ -651,18 +679,19 @@ import PageContainer from '../../components/PageContainer.vue'
 import FlowGuardBar from '../../components/FlowGuardBar.vue'
 import MarketingQuickNav from './components/MarketingQuickNav.vue'
 import MarketingListToolbar from './components/MarketingListToolbar.vue'
+import MarketingTraceTimelineCard from './components/MarketingTraceTimelineCard.vue'
 import {
   batchDeleteContracts,
   createContractAttachment,
   createCrmContract,
   deleteContractAttachment,
-  deleteCrmContract,
   finalizeContract,
   getCrmContract,
   getContractAssessmentOverview,
   getContractAttachments,
   getContractPage,
   getContractStageSummary,
+  getContractWorkflowLogs,
   getMarketingPlanList,
   moveContractToBedSelect,
   moveContractToPendingSign,
@@ -675,7 +704,16 @@ import { getFamilyRelations, upsertFamilyUser } from '../../api/family'
 import { createDisease, getDiseaseList } from '../../api/store'
 import { getStaffPage } from '../../api/staff'
 import { useUserStore } from '../../stores/user'
-import type { ContractAttachmentItem, ContractSystemLinkageSummary, CrmContractItem, ElderItem, Id, MarketingPlanItem, PageResult } from '../../types'
+import type {
+  ContractAttachmentItem,
+  ContractSystemLinkageSummary,
+  CrmContractItem,
+  CrmContractWorkflowLogItem,
+  ElderItem,
+  Id,
+  MarketingPlanItem,
+  PageResult
+} from '../../types'
 
 const router = useRouter()
 const route = useRoute()
@@ -718,6 +756,10 @@ const isSignedMode = computed(() => resolvedStatusPreset.value === 'signed')
 const loading = ref(false)
 const submitting = ref(false)
 const open = ref(false)
+const traceOpen = ref(false)
+const traceLoading = ref(false)
+const traceContract = ref<CrmContractItem>()
+const workflowLogs = ref<CrmContractWorkflowLogItem[]>([])
 const contractViewMode = ref(false)
 const marketerLoading = ref(false)
 const marketerOptions = ref<Array<{ label: string; value: string }>>([])
@@ -1255,7 +1297,7 @@ const columns = [
   { title: '流程阶段', dataIndex: 'flowStage', key: 'flowStage', width: 120 },
   { title: '当前责任部门', dataIndex: 'currentOwnerDept', key: 'currentOwnerDept', width: 130 },
   { title: '联系电话', dataIndex: 'elderPhone', key: 'elderPhone', width: 140 },
-  { title: '营销人员', dataIndex: 'marketerName', key: 'marketerName', width: 120 },
+  { title: '负责人', dataIndex: 'marketerName', key: 'marketerName', width: 120 },
   { title: '优惠政策', dataIndex: 'orgName', key: 'orgName', width: 220 },
   { title: '合同状态', dataIndex: 'contractStatus', key: 'contractStatus', width: 130 },
   { title: '超时预警', dataIndex: 'slaWarning', key: 'slaWarning', width: 150 },
@@ -1771,6 +1813,12 @@ function editSelected() {
   openForm(row)
 }
 
+async function openTraceSelected() {
+  const row = requireSingleSelection('轨迹')
+  if (!row) return
+  await openContractTrace(row)
+}
+
 async function openAttachmentSelected() {
   const row = requireSingleSelection('附件')
   if (!row) return
@@ -2012,17 +2060,13 @@ function batchDelete() {
   Modal.confirm({
     title: `确认删除 ${ids.length} 条合同记录吗？`,
     onOk: async () => {
-      let affected = contractNos.length
+      const affected = contractNos.length
         ? await batchDeleteContracts({ contractNos })
         : await batchDeleteContracts({ ids })
-      if (!affected && ids.length) {
-        await Promise.all(ids.map((id) => deleteCrmContract(id)))
-        affected = ids.length
-      }
       selectedRowKeys.value = []
       selectedRows.value = []
       if (!affected) {
-        message.warning('未删除任何合同，请刷新后重试')
+        message.warning('未删除任何合同，可能是合同已进入受保护流程或当前无权限删除')
         return
       }
       message.success(`删除成功（${affected} 条）`)
@@ -2035,16 +2079,11 @@ function removeContract(record: CrmContractItem) {
   Modal.confirm({
     title: `确认删除合同 ${record.contractNo || '-'} 吗？`,
     onOk: async () => {
-      let affected = 0
-      if (record.contractNo) {
-        affected = await batchDeleteContracts({ contractNos: [record.contractNo] })
-      }
+      const affected = record.contractNo
+        ? await batchDeleteContracts({ contractNos: [record.contractNo] })
+        : await batchDeleteContracts({ ids: [record.id] })
       if (!affected) {
-        await deleteCrmContract(record.id)
-        affected = 1
-      }
-      if (!affected) {
-        message.warning('未删除任何合同，请刷新后重试')
+        message.warning('未删除任何合同，可能是合同已进入受保护流程或当前无权限删除')
         return
       }
       message.success('删除成功')
@@ -2055,6 +2094,20 @@ function removeContract(record: CrmContractItem) {
 
 function view(record: CrmContractItem) {
   openForm(record, true)
+}
+
+async function openContractTrace(record: CrmContractItem) {
+  traceContract.value = record
+  traceOpen.value = true
+  traceLoading.value = true
+  try {
+    workflowLogs.value = await getContractWorkflowLogs(record.id, 30)
+  } catch {
+    workflowLogs.value = []
+    message.warning('合同轨迹加载失败，请稍后重试')
+  } finally {
+    traceLoading.value = false
+  }
 }
 
 async function goAdmissionProcessing(record: CrmContractItem) {
@@ -3048,6 +3101,22 @@ watch(
   margin-top: 8px;
   color: var(--contract-muted);
   line-height: 1.6;
+}
+
+.trace-item-title {
+  color: #173854;
+  font-weight: 600;
+}
+
+.trace-item-meta {
+  color: #6d8aa3;
+  font-size: 12px;
+}
+
+.trace-item-remark {
+  color: #334155;
+  margin-top: 4px;
+  word-break: break-word;
 }
 
 @media (max-width: 768px) {

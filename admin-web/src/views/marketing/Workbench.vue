@@ -3,6 +3,7 @@
     <template #meta>
       <span class="soft-pill">统计范围 {{ quickRangeLabel }}</span>
       <span class="soft-pill">自动刷新 {{ autoRefresh ? '已开启' : '已关闭' }}</span>
+      <span class="soft-pill">经营快照 {{ snapshotHints.length }} 条</span>
       <span class="soft-pill">更新于 {{ lastUpdated || '-' }}</span>
     </template>
 
@@ -41,6 +42,7 @@
         <a-switch v-model:checked="autoRefresh" />
         <span class="quick-label">自动刷新</span>
         <a-button size="small" :loading="dashboardLoading" @click="loadOverview">立即刷新</a-button>
+        <a-button size="small" @click="goSnapshots">查看快照</a-button>
         <span class="quick-label">更新于：{{ lastUpdated || '-' }}</span>
       </a-space>
       <a-alert
@@ -50,6 +52,11 @@
         show-icon
         :message="dashboardError"
       />
+      <a-space v-if="snapshotHints.length" wrap style="margin-top: 10px">
+        <a-tag v-for="item in snapshotHints" :key="item.id" color="blue">
+          经营快照 · {{ item.snapshotDate || item.generatedAt || '-' }}
+        </a-tag>
+      </a-space>
     </a-card>
     <a-card class="card-elevated" :bordered="false" style="margin-bottom: 16px">
       <a-space wrap>
@@ -112,7 +119,7 @@
             <a-col :span="12"><div class="stat-link" @click="goFollowup('today')"><a-statistic title="今日待回访数量" :value="followup.todayDue" /></div></a-col>
             <a-col :span="12"><div class="stat-link" @click="goFollowup('overdue')"><a-statistic title="逾期未跟进数量" :value="followup.overdue" /></div></a-col>
             <a-col :span="12"><div class="stat-link" @click="goLead('intent')"><a-statistic title="高意向客户数量" :value="followup.highIntentCount" /></div></a-col>
-            <a-col :span="12"><div class="stat-link" @click="goReservation('expiring')"><a-statistic title="锁床即将到期数量" :value="followup.lockExpiringCount" /></div></a-col>
+            <a-col :span="12"><div class="stat-link" @click="goReservation('expiring')"><a-statistic title="锁床待跟进数量" :value="followup.lockExpiringCount" /></div></a-col>
           </a-row>
           <a-space wrap style="margin-top: 12px">
             <a-button size="small" @click="goFollowup('today')">今日跟进计划</a-button>
@@ -200,9 +207,9 @@
       <a-col :xs="24" :lg="12">
         <a-card class="card-elevated" :bordered="false" title="销售人员业绩">
           <a-row :gutter="[12, 12]">
-            <a-col :span="12"><div class="stat-link" @click="goReport('sales-performance')"><a-statistic title="本月个人成交数" :value="performance.monthDealCount" /></div></a-col>
-            <a-col :span="12"><div class="stat-link" @click="goReport('sales-performance')"><a-statistic title="本月签约金额" :value="performance.monthAmount" precision="2" prefix="¥" /></div></a-col>
-            <a-col :span="12"><div class="stat-link" @click="goReport('sales-performance')"><a-statistic title="转化率排名" :value="performance.rankNo" suffix="名" /></div></a-col>
+            <a-col :span="12"><div class="stat-link" @click="goReport('sales-performance')"><a-statistic title="本月团队最高成交数" :value="performance.monthDealCount" /></div></a-col>
+            <a-col :span="12"><div class="stat-link" @click="goReport('sales-performance')"><a-statistic title="本月团队最高预收金额" :value="performance.monthAmount" precision="2" prefix="¥" /></div></a-col>
+            <a-col :span="12"><div class="stat-link" @click="goReport('sales-performance')"><a-statistic title="活跃销售人数" :value="performance.rankNo" suffix="人" /></div></a-col>
             <a-col :span="12"><div class="stat-link" @click="goReport('followup')"><a-statistic title="跟进及时率" :value="performance.timelyRate" suffix="%" /></div></a-col>
           </a-row>
           <a-space wrap style="margin-top: 12px">
@@ -271,22 +278,17 @@ import {
   buildReservationRoute,
   routeToUnknownSourceOrAll
 } from '../../utils/marketingNav'
-import { getBedMap } from '../../api/bed'
 import {
-  getContractPage,
-  getLeadPage,
-  getMarketingCallbackReport,
-  getMarketingChannelReport,
-  getMarketingConversionReport,
-  getMarketingFollowupReport,
-  getMarketingPlanPage
+  getMarketingReportSnapshots,
+  getMarketingWorkbenchSummary
 } from '../../api/marketing'
-import type { BedItem, CrmContractItem, CrmLeadItem, MarketingChannelReportItem, MarketingConversionReport, MarketingFollowupReport, PageResult } from '../../types'
+import type { CrmContractItem, CrmSalesReportSnapshotItem, MarketingWorkbenchSummary } from '../../types'
 
 const router = useRouter()
 const dashboardLoading = ref(false)
 const dashboardError = ref('')
 const lastUpdated = ref('')
+const snapshotHints = ref<CrmSalesReportSnapshotItem[]>([])
 const quickRange = ref<'TODAY' | '7D' | '30D' | 'MONTH'>('MONTH')
 const dateRange = ref<any[]>([dayjs().startOf('month').format('YYYY-MM-DD'), dayjs().format('YYYY-MM-DD')])
 const autoRefresh = ref(true)
@@ -377,7 +379,8 @@ const quickReportButtons = computed(() => {
     { key: 'followup', label: '跟进统计', entry: 'followup' as MarketingReportEntry },
     { key: 'channel', label: '渠道评估', entry: 'channel' as MarketingReportEntry },
     { key: 'consultation', label: '咨询统计', entry: 'consultation' as MarketingReportEntry },
-    { key: 'callback', label: '回访统计', entry: 'callback' as MarketingReportEntry }
+    { key: 'callback', label: '回访统计', entry: 'callback' as MarketingReportEntry },
+    { key: 'snapshots', label: '经营快照', entry: 'snapshots' as MarketingReportEntry }
   ]
 })
 
@@ -470,6 +473,10 @@ function goApproval(type: string) {
   })
 }
 
+function goSnapshots() {
+  router.push('/marketing/reports/snapshots')
+}
+
 function hasCache(cacheKey: string) {
   return hasReportCache(cacheKey)
 }
@@ -479,140 +486,40 @@ function quickLabel(entry: MarketingReportEntry, base: string) {
   return hasCache(config.cacheKey) ? `${base}（上次筛选）` : base
 }
 
-function isSignedContract(item: CrmContractItem) {
-  const flowStage = String(item.flowStage || '').toUpperCase()
-  const status = String(item.status || '').toUpperCase()
-  return flowStage === 'SIGNED' || status === 'SIGNED' || status === 'EFFECTIVE'
-}
-
 async function loadOverview() {
   const rangeStart = String(dateRange.value?.[0] || dayjs().startOf('month').format('YYYY-MM-DD'))
   const rangeEnd = String(dateRange.value?.[1] || dayjs().format('YYYY-MM-DD'))
-  const today = dayjs().format('YYYY-MM-DD')
   dashboardLoading.value = true
   dashboardError.value = ''
   try {
-    const [
-      conversion,
-      followupReport,
-      callbackReport,
-      checkinCallbackReport,
-      trialCallbackReport,
-      dischargeCallbackReport,
-      scoreCallbackReport,
-      channelReport,
-      leadPage,
-      contractPage,
-      bedMap,
-      speechPlanPage,
-      policyPlanPage
-    ] = await Promise.all([
-      getMarketingConversionReport({ dateFrom: rangeStart, dateTo: rangeEnd }),
-      getMarketingFollowupReport({ dateFrom: rangeStart, dateTo: rangeEnd }) as Promise<MarketingFollowupReport>,
-      getMarketingCallbackReport({ pageNo: 1, pageSize: 200, dateFrom: rangeStart, dateTo: rangeEnd }),
-      getMarketingCallbackReport({ pageNo: 1, pageSize: 1, dateFrom: rangeStart, dateTo: rangeEnd, type: 'checkin' }),
-      getMarketingCallbackReport({ pageNo: 1, pageSize: 1, dateFrom: rangeStart, dateTo: rangeEnd, type: 'trial' }),
-      getMarketingCallbackReport({ pageNo: 1, pageSize: 1, dateFrom: rangeStart, dateTo: rangeEnd, type: 'discharge' }),
-      getMarketingCallbackReport({ pageNo: 1, pageSize: 500, dateFrom: rangeStart, dateTo: rangeEnd, type: 'score' }),
-      getMarketingChannelReport({ dateFrom: rangeStart, dateTo: rangeEnd }) as Promise<MarketingChannelReportItem[]>,
-      getLeadPage({ pageNo: 1, pageSize: 300 }),
-      getContractPage({ pageNo: 1, pageSize: 300 }),
-      getBedMap(),
-      getMarketingPlanPage({ pageNo: 1, pageSize: 500, moduleType: 'SPEECH' }),
-      getMarketingPlanPage({ pageNo: 1, pageSize: 500, moduleType: 'POLICY' })
+    const [summary, snapshots] = await Promise.all([
+      getMarketingWorkbenchSummary({ dateFrom: rangeStart, dateTo: rangeEnd }) as Promise<MarketingWorkbenchSummary>,
+      getMarketingReportSnapshots({ snapshotType: 'MARKETING_WORKBENCH', limit: 3 })
     ])
-
-    const leads = (leadPage as PageResult<CrmLeadItem>).list || []
-    const contracts = (contractPage as PageResult<CrmContractItem>).list || []
-    const beds = (bedMap || []) as BedItem[]
-    const speechPlans = speechPlanPage.list || []
-    const policyPlans = policyPlanPage.list || []
-    const conv = conversion as MarketingConversionReport
-
-  funnel.todayConsultCount = conv.consultCount || 0
-  funnel.evaluationCount = contracts.filter((item) => String(item.flowStage || '') === 'PENDING_ASSESSMENT').length
-  funnel.pendingSignCount = contracts.filter((item) => String(item.flowStage || '') === 'PENDING_SIGN').length
-  funnel.pendingAdmissionCount = contracts.filter((item) => String(item.flowStage || '') === 'PENDING_BED_SELECT').length
-  funnel.monthDealCount = conv.contractCount || 0
-  funnel.monthConversionRate = Number(conv.contractRate || 0)
-
-  followup.todayDue = callbackReport.todayDue || 0
-  followup.overdue = callbackReport.overdue || 0
-  followup.highIntentCount = leads.filter((item) => Number(item.status) === 1).length
-  followup.lockExpiringCount = leads.filter((item) => String(item.reservationStatus || '').includes('锁') && item.nextFollowDate).length
-
-  const emptyBeds = beds.filter((item) => Number(item.status) === 1)
-  bedSales.emptyCount = emptyBeds.length
-  bedSales.lockCount = leads.filter((item) => String(item.reservationStatus || '').includes('锁')).length
-  bedSales.reservedUnsignedCount = contracts.filter((item) => {
-    const stage = String(item.flowStage || '')
-    return stage === 'PENDING_BED_SELECT' || stage === 'PENDING_SIGN'
-  }).length
-  bedSales.premiumEmptyCount = emptyBeds.filter((item) => String(item.roomType || '').includes('高') || String(item.roomNo || '').startsWith('V')).length
-
-  contract.pendingSignCount = contracts.filter((item) => String(item.flowStage || '') === 'PENDING_SIGN').length
-  contract.renewalDueCount = contracts.filter((item) => {
-    if (!isSignedContract(item)) return false
-    if (!item.contractExpiryDate) return false
-    const diff = dayjs(item.contractExpiryDate).diff(dayjs(today), 'day')
-    return diff >= 0 && diff <= 30
-  }).length
-  contract.changePendingCount = contracts.filter((item) => String(item.changeWorkflowStatus || '') === 'PENDING_APPROVAL').length
-  contract.monthAmount = contracts.reduce((acc, item) => acc + Number(item.amount || item.contractAmount || 0), 0)
-
-  callback.checkinCount = checkinCallbackReport.total || 0
-  callback.trialCount = trialCallbackReport.total || 0
-  callback.dischargeCount = dischargeCallbackReport.total || 0
-  const scoreRows = scoreCallbackReport.records || []
-  callback.score = scoreRows.length
-    ? Number((scoreRows.reduce((acc, item) => acc + Number(item.score || 0), 0) / scoreRows.length).toFixed(1))
-    : 0
-
-  const marketerDealMap = new Map<string, { count: number; amount: number }>()
-  contracts.forEach((item) => {
-    const key = String(item.marketerName || '未分配')
-    const current = marketerDealMap.get(key) || { count: 0, amount: 0 }
-    current.count += 1
-    current.amount += Number(item.amount || item.contractAmount || 0)
-    marketerDealMap.set(key, current)
-  })
-  const sortedMarketers = Array.from(marketerDealMap.values()).sort((a, b) => b.count - a.count)
-  performance.monthDealCount = sortedMarketers[0]?.count || 0
-  performance.monthAmount = sortedMarketers[0]?.amount || 0
-  performance.rankNo = sortedMarketers.length ? 1 : 0
-  performance.timelyRate = Number((((followupReport.totalLeads || 0) - (followupReport.overdueCount || 0)) / Math.max(followupReport.totalLeads || 1, 1) * 100).toFixed(1))
-
-  const medicalLeads = leads.filter((item) =>
-    String(item.infoSource || '').includes('医') || String(item.mediaChannel || '').includes('医')
-  )
-  medical.todayCount = medicalLeads.filter((item) => String(item.createTime || '').slice(0, 10) === today).length
-  medical.referCount = medicalLeads.length
-  medical.unassignedCount = medicalLeads.filter((item) => !item.marketerName).length
-
-  const allPlans = [...speechPlans, ...policyPlans]
-  plan.speechCount = speechPlans.length
-  plan.policyCount = policyPlans.length
-  plan.pendingApprovalCount = allPlans.filter((item) => String(item.status || '') === 'PENDING_APPROVAL').length
-  plan.rejectedCount = allPlans.filter((item) => String(item.status || '') === 'REJECTED').length
-
-  risk.overdueFollowupCount = callbackReport.overdue || 0
-  risk.lockUnsignedCount = leads.filter((item) => String(item.reservationStatus || '').includes('锁') && !item.contractSignedFlag).length
-  risk.highIntentNoEvalCount = leads.filter((item) => Number(item.status) === 1 && !item.followupStatus).length
-  risk.channelDropCount = channelReport.filter((item) => (item.leadCount || 0) > 0 && ((item.contractCount || 0) / item.leadCount) < 0.1).length
-
-  const top = [...channelReport]
-    .sort((a, b) => (b.contractCount || 0) - (a.contractCount || 0))
-    .slice(0, 5)
-  channelTop5.value = top.map((item) => ({
-    source: item.source || '未标记渠道',
-    leadCount: item.leadCount || 0,
-    contractRate: item.leadCount ? `${(((item.contractCount || 0) / item.leadCount) * 100).toFixed(1)}%` : '0%'
-  }))
-  channelUnknownCount.value = channelReport
-    .filter((item) => !String(item.source || '').trim() || String(item.source || '').includes('不明'))
-    .reduce((acc, item) => acc + Number(item.leadCount || 0), 0)
-  channelMonthDeals.value = channelReport.reduce((acc, item) => acc + Number(item.contractCount || 0), 0)
-  lastUpdated.value = dayjs().format('YYYY-MM-DD HH:mm:ss')
+    Object.assign(funnel, summary.funnel || {})
+    Object.assign(followup, summary.followup || {})
+    Object.assign(bedSales, summary.bedSales || {})
+    Object.assign(contract, {
+      pendingSignCount: Number(summary.contract?.pendingSignCount || 0),
+      renewalDueCount: Number(summary.contract?.renewalDueCount || 0),
+      changePendingCount: Number(summary.contract?.changePendingCount || 0),
+      monthAmount: Number(summary.contract?.monthAmount || 0)
+    })
+    Object.assign(callback, summary.callback || {})
+    Object.assign(performance, {
+      monthDealCount: Number(summary.performance?.monthDealCount || 0),
+      monthAmount: Number(summary.performance?.monthAmount || 0),
+      rankNo: Number(summary.performance?.rankNo || 0),
+      timelyRate: Number(summary.performance?.timelyRate || 0)
+    })
+    Object.assign(medical, summary.medical || {})
+    Object.assign(plan, summary.plan || {})
+    Object.assign(risk, summary.risk || {})
+    channelTop5.value = Array.isArray(summary.channelTop5) ? summary.channelTop5 : []
+    channelUnknownCount.value = Number(summary.channelUnknownCount || 0)
+    channelMonthDeals.value = Number(summary.channelMonthDeals || 0)
+    snapshotHints.value = Array.isArray(snapshots) ? snapshots : []
+    lastUpdated.value = summary.generatedAt ? dayjs(summary.generatedAt).format('YYYY-MM-DD HH:mm:ss') : dayjs().format('YYYY-MM-DD HH:mm:ss')
   } catch (error: any) {
     dashboardError.value = error?.message || '营销工作台数据加载失败'
   } finally {

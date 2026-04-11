@@ -27,6 +27,8 @@ public class ElderCreateRequest {
   private String medicalRecordFileUrl;
   private LocalDate admissionDate;
   private Integer status = 1;
+  private String lifecycleStatus;
+  private String departureType;
   private String careLevel;
   private String riskPrecommit;
   private String remark;

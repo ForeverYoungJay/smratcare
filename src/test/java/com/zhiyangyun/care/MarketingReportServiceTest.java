@@ -14,6 +14,7 @@ import com.zhiyangyun.care.crm.model.report.MarketingConversionReportResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingDataQualityResponse;
 import com.zhiyangyun.care.crm.model.report.MarketingFollowupReportResponse;
 import com.zhiyangyun.care.crm.service.impl.MarketingReportServiceImpl;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -41,18 +42,42 @@ class MarketingReportServiceTest {
 
   @Test
   void conversionShouldReturnExpectedCountsAndRates() {
-    when(crmLeadMapper.selectCount(any())).thenReturn(10L, 4L, 3L, 2L, 1L, 2L);
+    CrmLead consult = new CrmLead();
+    consult.setStatus(0);
+    CrmLead intentA = new CrmLead();
+    intentA.setStatus(1);
+    CrmLead intentB = new CrmLead();
+    intentB.setStatus(1);
+    CrmLead reservation = new CrmLead();
+    reservation.setStatus(1);
+    reservation.setReservationStatus("预定");
+    reservation.setReservationAmount(BigDecimal.valueOf(1000));
+    CrmLead invalid = new CrmLead();
+    invalid.setStatus(3);
+    CrmLead signed = new CrmLead();
+    signed.setStatus(2);
+    signed.setContractSignedFlag(1);
+    CrmLead consultB = new CrmLead();
+    consultB.setStatus(0);
+    CrmLead consultC = new CrmLead();
+    consultC.setStatus(0);
+    CrmLead consultD = new CrmLead();
+    consultD.setStatus(0);
+    CrmLead consultE = new CrmLead();
+    consultE.setStatus(0);
+    when(crmLeadMapper.selectList(any())).thenReturn(List.of(
+        consult, intentA, intentB, reservation, invalid, signed, consultB, consultC, consultD, consultE));
 
     MarketingConversionReportResponse response =
         service.conversion(1L, "2026-01-01", "2026-01-31", null, null);
 
     assertEquals(10L, response.getTotalLeads());
-    assertEquals(4L, response.getConsultCount());
-    assertEquals(3L, response.getIntentCount());
-    assertEquals(2L, response.getReservationCount());
+    assertEquals(5L, response.getConsultCount());
+    assertEquals(2L, response.getIntentCount());
+    assertEquals(1L, response.getReservationCount());
     assertEquals(1L, response.getInvalidCount());
-    assertEquals(2L, response.getContractCount());
-    assertEquals(30.0, response.getIntentRate());
+    assertEquals(1L, response.getContractCount());
+    assertEquals(20.0, response.getIntentRate());
   }
 
   @Test
@@ -80,12 +105,26 @@ class MarketingReportServiceTest {
 
   @Test
   void followupShouldReturnStagesAndOverdue() {
-    when(crmLeadMapper.selectCount(any())).thenReturn(20L, 8L, 5L, 4L, 3L, 2L);
+    CrmLead consult = new CrmLead();
+    consult.setStatus(0);
+    consult.setNextFollowDate(LocalDate.now().minusDays(1));
+    CrmLead intent = new CrmLead();
+    intent.setStatus(1);
+    intent.setNextFollowDate(LocalDate.now().minusDays(2));
+    CrmLead reservation = new CrmLead();
+    reservation.setStatus(1);
+    reservation.setReservationStatus("锁床");
+    reservation.setNextFollowDate(LocalDate.now().plusDays(2));
+    CrmLead invalid = new CrmLead();
+    invalid.setStatus(3);
+    List<CrmLead> leads = List.of(consult, intent, reservation, invalid);
+    when(crmLeadMapper.selectList(any())).thenReturn(leads);
+    when(crmLeadMapper.selectCount(any())).thenReturn(2L);
 
     MarketingFollowupReportResponse response =
         service.followup(1L, "2026-02-01", "2026-02-28", null, null);
 
-    assertEquals(20L, response.getTotalLeads());
+    assertEquals(4L, response.getTotalLeads());
     assertEquals(2L, response.getOverdueCount());
     assertNotNull(response.getStages());
     assertEquals(4, response.getStages().size());

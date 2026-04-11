@@ -21,6 +21,7 @@ public class FinanceAllocationResidentSyncResponse {
     private Long elderId;
     private String elderName;
     private Integer elderStatus;
+    private String elderLifecycleStatus;
     private Long bedId;
     private String bedNo;
     private Long roomId;

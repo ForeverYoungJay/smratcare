@@ -12,8 +12,8 @@
         <a-form-item label="联系电话">
           <a-input v-model:value="query.elderPhone" placeholder="请输入 联系电话" allow-clear />
         </a-form-item>
-        <a-form-item label="营销人员">
-          <a-input v-model:value="query.marketerName" placeholder="请选择营销人员" allow-clear />
+        <a-form-item label="负责人">
+          <a-input v-model:value="query.marketerName" placeholder="请输入 负责人/营销人员" allow-clear />
         </a-form-item>
         <a-form-item>
           <a-space>
@@ -116,7 +116,7 @@ const columns = [
   { title: '性别', dataIndex: 'gender', key: 'gender', width: 80 },
   { title: '年龄', dataIndex: 'age', key: 'age', width: 80 },
   { title: '联系电话', dataIndex: 'elderPhone', key: 'elderPhone', width: 140 },
-  { title: '营销人员', dataIndex: 'marketerName', key: 'marketerName', width: 120 },
+  { title: '负责人', dataIndex: 'marketerName', key: 'marketerName', width: 120 },
   { title: '签约时间', dataIndex: 'contractSignedAt', key: 'contractSignedAt', width: 170 },
   { title: '合同有效期', dataIndex: 'contractExpiryDate', key: 'contractExpiryDate', width: 140 },
   { title: '域状态', dataIndex: 'status', key: 'status', width: 110 },

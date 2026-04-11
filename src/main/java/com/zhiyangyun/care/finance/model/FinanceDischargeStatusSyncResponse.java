@@ -20,6 +20,7 @@ public class FinanceDischargeStatusSyncResponse {
     private LocalDateTime settledTime;
     private String settlementStatus;
     private Integer elderStatus;
+    private String elderLifecycleStatus;
     private Long elderBedId;
     private Long occupiedBedId;
     private String issueType;

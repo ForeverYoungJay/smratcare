@@ -15,5 +15,6 @@ public class AdmissionRecordResponse {
   private BigDecimal depositAmount;
   private String remark;
   private Integer elderStatus;
+  private String elderLifecycleStatus;
   private LocalDateTime createTime;
 }

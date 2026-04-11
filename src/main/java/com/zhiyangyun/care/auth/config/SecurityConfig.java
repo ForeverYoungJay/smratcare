@@ -1,7 +1,9 @@
 package com.zhiyangyun.care.auth.config;
 
 import com.zhiyangyun.care.auth.security.JwtAuthenticationFilter;
+import com.zhiyangyun.care.common.web.RequestTraceFilter;
 import com.zhiyangyun.care.common.web.ResponseContentTypeFilter;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -63,15 +65,18 @@ public class SecurityConfig {
       "DIRECTOR", "SYS_ADMIN", "ADMIN"
   };
   private final JwtAuthenticationFilter jwtFilter;
+  private final RequestTraceFilter requestTraceFilter;
   private final ResponseContentTypeFilter responseContentTypeFilter;
   private final RestAuthenticationEntryPoint authenticationEntryPoint;
   private final RestAccessDeniedHandler accessDeniedHandler;
 
   public SecurityConfig(JwtAuthenticationFilter jwtFilter,
+      RequestTraceFilter requestTraceFilter,
       ResponseContentTypeFilter responseContentTypeFilter,
       RestAuthenticationEntryPoint authenticationEntryPoint,
       RestAccessDeniedHandler accessDeniedHandler) {
     this.jwtFilter = jwtFilter;
+    this.requestTraceFilter = requestTraceFilter;
     this.responseContentTypeFilter = responseContentTypeFilter;
     this.authenticationEntryPoint = authenticationEntryPoint;
     this.accessDeniedHandler = accessDeniedHandler;
@@ -130,8 +135,16 @@ public class SecurityConfig {
             .requestMatchers("/api/**").hasAnyRole(STAFF_ROLES)
             .anyRequest().authenticated())
         .addFilterBefore(responseContentTypeFilter, UsernamePasswordAuthenticationFilter.class)
-        .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+        .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+        .addFilterAfter(requestTraceFilter, JwtAuthenticationFilter.class);
     return http.build();
+  }
+
+  @Bean
+  public FilterRegistrationBean<RequestTraceFilter> requestTraceFilterRegistration(RequestTraceFilter filter) {
+    FilterRegistrationBean<RequestTraceFilter> registration = new FilterRegistrationBean<>(filter);
+    registration.setEnabled(false);
+    return registration;
   }
 
   @Bean

@@ -1,10 +1,10 @@
 <template>
-  <PageContainer title="销售人员业绩" sub-title="按签约数与签约金额进行排行">
+  <PageContainer title="销售负责人业绩" sub-title="按已签合同数、可识别金额与跟进及时率进行排行">
     <MarketingQuickNav parent-path="/marketing/reports" />
     <a-card class="card-elevated" :bordered="false">
       <a-form :model="query" layout="inline">
-        <a-form-item label="营销人员">
-          <a-input v-model:value="query.marketerName" placeholder="姓名关键字" allow-clear />
+        <a-form-item label="负责人">
+          <a-input v-model:value="query.marketerName" placeholder="负责人/营销人员关键字" allow-clear />
         </a-form-item>
         <a-form-item label="流程阶段">
           <a-select v-model:value="query.flowStage" allow-clear style="width: 160px">
@@ -60,7 +60,7 @@ const rows = ref<Array<{
 
 const columns = [
   { title: '排名', dataIndex: 'rankNo', key: 'rankNo', width: 80 },
-  { title: '营销人员', dataIndex: 'marketerName', key: 'marketerName', width: 160 },
+  { title: '负责人', dataIndex: 'marketerName', key: 'marketerName', width: 160 },
   { title: '签约数', dataIndex: 'contractCount', key: 'contractCount', width: 120 },
   { title: '签约金额', dataIndex: 'contractAmount', key: 'contractAmount', width: 140 },
   { title: '转化率', dataIndex: 'conversionRate', key: 'conversionRate', width: 120 },
@@ -71,18 +71,35 @@ function toMoney(value: number) {
   return Number(value || 0).toFixed(2)
 }
 
+function isSignedContract(item: CrmContractItem) {
+  const flowStage = String(item.flowStage || '').toUpperCase()
+  const status = String(item.status || '').toUpperCase()
+  return flowStage === 'SIGNED' || status === 'SIGNED' || status === 'EFFECTIVE'
+}
+
+function resolveContractValue(item: CrmContractItem) {
+  const candidates = [item.amount, item.contractAmount, item.depositAmount, item.reservationAmount]
+  for (const candidate of candidates) {
+    const value = Number(candidate || 0)
+    if (Number.isFinite(value) && value > 0) {
+      return value
+    }
+  }
+  return 0
+}
+
 async function loadData() {
   const [contractPage, followup] = await Promise.all([
     getContractPage({ pageNo: 1, pageSize: 300, marketerName: query.marketerName || undefined, flowStage: query.flowStage || undefined }),
     getMarketingFollowupReport() as Promise<MarketingFollowupReport>
   ])
-  const list = (contractPage as PageResult<CrmContractItem>).list || []
+  const list = ((contractPage as PageResult<CrmContractItem>).list || []).filter((item) => isSignedContract(item))
   const map = new Map<string, { count: number; amount: number }>()
   list.forEach((item) => {
     const key = String(item.marketerName || '未分配')
     const current = map.get(key) || { count: 0, amount: 0 }
     current.count += 1
-    current.amount += Number(item.amount || item.contractAmount || 0)
+    current.amount += resolveContractValue(item)
     map.set(key, current)
   })
   const total = list.length || 1

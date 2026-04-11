@@ -13,8 +13,10 @@ import com.zhiyangyun.care.crm.entity.CrmMarketingPlanApproval;
 import com.zhiyangyun.care.crm.entity.CrmMarketingPlanDepartment;
 import com.zhiyangyun.care.crm.entity.CrmMarketingPlanPerformance;
 import com.zhiyangyun.care.crm.entity.CrmMarketingPlanReceipt;
+import com.zhiyangyun.care.crm.entity.CrmLead;
 import com.zhiyangyun.care.crm.mapper.CrmMarketingPlanApprovalMapper;
 import com.zhiyangyun.care.crm.mapper.CrmMarketingPlanDepartmentMapper;
+import com.zhiyangyun.care.crm.mapper.CrmLeadMapper;
 import com.zhiyangyun.care.crm.mapper.CrmMarketingPlanMapper;
 import com.zhiyangyun.care.crm.mapper.CrmMarketingPlanPerformanceMapper;
 import com.zhiyangyun.care.crm.mapper.CrmMarketingPlanReceiptMapper;
@@ -49,6 +51,7 @@ public class MarketingPlanServiceImpl implements MarketingPlanService {
   private final CrmMarketingPlanApprovalMapper approvalMapper;
   private final CrmMarketingPlanReceiptMapper receiptMapper;
   private final CrmMarketingPlanPerformanceMapper performanceMapper;
+  private final CrmLeadMapper crmLeadMapper;
   private final DepartmentMapper departmentMapper;
   private final StaffMapper staffMapper;
   private final OaTodoMapper todoMapper;
@@ -60,6 +63,7 @@ public class MarketingPlanServiceImpl implements MarketingPlanService {
       CrmMarketingPlanApprovalMapper approvalMapper,
       CrmMarketingPlanReceiptMapper receiptMapper,
       CrmMarketingPlanPerformanceMapper performanceMapper,
+      CrmLeadMapper crmLeadMapper,
       DepartmentMapper departmentMapper,
       StaffMapper staffMapper,
       OaTodoMapper todoMapper,
@@ -69,6 +73,7 @@ public class MarketingPlanServiceImpl implements MarketingPlanService {
     this.approvalMapper = approvalMapper;
     this.receiptMapper = receiptMapper;
     this.performanceMapper = performanceMapper;
+    this.crmLeadMapper = crmLeadMapper;
     this.departmentMapper = departmentMapper;
     this.staffMapper = staffMapper;
     this.todoMapper = todoMapper;
@@ -93,6 +98,10 @@ public class MarketingPlanServiceImpl implements MarketingPlanService {
             .like(CrmMarketingPlan::getSummary, keyword)
             .or()
             .like(CrmMarketingPlan::getTarget, keyword)
+            .or()
+            .like(CrmMarketingPlan::getCampaignCode, keyword)
+            .or()
+            .like(CrmMarketingPlan::getSourceTag, keyword)
             .or()
             .like(CrmMarketingPlan::getOwner, keyword))
         .orderByAsc(CrmMarketingPlan::getPriority)
@@ -558,6 +567,12 @@ public class MarketingPlanServiceImpl implements MarketingPlanService {
     entity.setQuarterLabel(trimToNull(request.getQuarterLabel()));
     entity.setTarget(trimToNull(request.getTarget()));
     entity.setOwner(trimToNull(request.getOwner()));
+    entity.setCampaignCode(trimToNull(request.getCampaignCode()));
+    entity.setSourceTag(trimToNull(request.getSourceTag()));
+    entity.setBudgetAmount(normalizeBudget(request.getBudgetAmount()));
+    entity.setTargetLeadCount(normalizeCount(request.getTargetLeadCount()));
+    entity.setTargetReservationCount(normalizeCount(request.getTargetReservationCount()));
+    entity.setTargetContractCount(normalizeCount(request.getTargetContractCount()));
     entity.setPriority(request.getPriority() == null ? 50 : request.getPriority());
     entity.setStatus(normalizeStatus(request.getStatus()));
     entity.setEffectiveDate(request.getEffectiveDate());
@@ -573,9 +588,16 @@ public class MarketingPlanServiceImpl implements MarketingPlanService {
     response.setQuarterLabel(entity.getQuarterLabel());
     response.setTarget(entity.getTarget());
     response.setOwner(entity.getOwner());
+    response.setCampaignCode(entity.getCampaignCode());
+    response.setSourceTag(entity.getSourceTag());
+    response.setBudgetAmount(entity.getBudgetAmount());
+    response.setTargetLeadCount(entity.getTargetLeadCount());
+    response.setTargetReservationCount(entity.getTargetReservationCount());
+    response.setTargetContractCount(entity.getTargetContractCount());
     response.setPriority(entity.getPriority());
     response.setStatus(entity.getStatus());
     response.setEffectiveDate(entity.getEffectiveDate());
+    applyEffectMetrics(entity, response);
 
     List<CrmMarketingPlanDepartment> departments = planDepartmentMapper.selectList(Wrappers.lambdaQuery(CrmMarketingPlanDepartment.class)
         .eq(CrmMarketingPlanDepartment::getIsDeleted, 0)
@@ -626,6 +648,108 @@ public class MarketingPlanServiceImpl implements MarketingPlanService {
     response.setCreateTime(entity.getCreateTime());
     response.setUpdateTime(entity.getUpdateTime());
     return response;
+  }
+
+  private void applyEffectMetrics(CrmMarketingPlan entity, MarketingPlanResponse response) {
+    if (entity == null || response == null) {
+      return;
+    }
+    List<CrmLead> leads = crmLeadMapper.selectList(Wrappers.lambdaQuery(CrmLead.class)
+        .eq(CrmLead::getIsDeleted, 0)
+        .eq(entity.getOrgId() != null, CrmLead::getTenantId, entity.getOrgId()));
+    long actualLeadCount = leads.stream().filter(lead -> matchesPlanLead(entity, lead)).count();
+    long actualReservationCount = leads.stream().filter(lead -> matchesPlanLead(entity, lead)).filter(this::hasReservationEvidence).count();
+    long actualContractCount = leads.stream().filter(lead -> matchesPlanLead(entity, lead)).filter(this::isSignedLead).count();
+    response.setActualLeadCount(actualLeadCount);
+    response.setActualReservationCount(actualReservationCount);
+    response.setActualContractCount(actualContractCount);
+    response.setActualContractRate(actualLeadCount <= 0 ? 0D : Double.parseDouble(String.format(java.util.Locale.ROOT, "%.1f", (actualContractCount * 100D) / actualLeadCount)));
+  }
+
+  private boolean matchesPlanLead(CrmMarketingPlan plan, CrmLead lead) {
+    if (plan == null || lead == null) {
+      return false;
+    }
+    if (plan.getEffectiveDate() != null) {
+      java.time.LocalDate consultDate = lead.getConsultDate();
+      if (consultDate == null && lead.getCreateTime() != null) {
+        consultDate = lead.getCreateTime().toLocalDate();
+      }
+      if (consultDate == null
+          || consultDate.isBefore(plan.getEffectiveDate().minusDays(30))
+          || consultDate.isAfter(plan.getEffectiveDate().plusDays(120))) {
+        return false;
+      }
+    }
+    String sourceTag = normalizeTraceText(plan.getSourceTag());
+    String campaignCode = normalizeTraceText(plan.getCampaignCode());
+    if (sourceTag == null && campaignCode == null) {
+      return false;
+    }
+    String leadText = normalizeTraceText(String.join(" ",
+        safeText(lead.getSource()),
+        safeText(lead.getInfoSource()),
+        safeText(lead.getMediaChannel()),
+        safeText(lead.getCustomerTag()),
+        safeText(lead.getReferralChannel()),
+        safeText(lead.getReservationChannel()),
+        safeText(lead.getRemark())));
+    if (leadText == null) {
+      return false;
+    }
+    boolean sourceMatched = sourceTag == null || leadText.contains(sourceTag);
+    boolean campaignMatched = campaignCode == null || leadText.contains(campaignCode);
+    return sourceMatched && campaignMatched;
+  }
+
+  private boolean hasReservationEvidence(CrmLead lead) {
+    if (lead == null || isSignedLead(lead) || Integer.valueOf(3).equals(lead.getStatus())) {
+      return false;
+    }
+    if (lead.getReservationBedId() != null || trimToNull(lead.getReservationRoomNo()) != null) {
+      return true;
+    }
+    if (lead.getReservationAmount() != null && lead.getReservationAmount().compareTo(BigDecimal.ZERO) > 0) {
+      return true;
+    }
+    String reservationStatus = trimToNull(lead.getReservationStatus());
+    if (reservationStatus == null) {
+      return false;
+    }
+    String text = reservationStatus.toLowerCase(java.util.Locale.ROOT);
+    return text.contains("预") || text.contains("锁") || text.contains("reserve") || text.contains("lock");
+  }
+
+  private boolean isSignedLead(CrmLead lead) {
+    return lead != null
+        && (Integer.valueOf(1).equals(lead.getContractSignedFlag())
+        || "SIGNED".equalsIgnoreCase(trimToNull(lead.getFlowStage())));
+  }
+
+  private BigDecimal normalizeBudget(BigDecimal budgetAmount) {
+    if (budgetAmount == null || budgetAmount.compareTo(BigDecimal.ZERO) < 0) {
+      return null;
+    }
+    return budgetAmount;
+  }
+
+  private Integer normalizeCount(Integer value) {
+    if (value == null || value < 0) {
+      return null;
+    }
+    return value;
+  }
+
+  private String normalizeTraceText(String value) {
+    String normalized = trimToNull(value);
+    if (normalized == null) {
+      return null;
+    }
+    return normalized.replace("　", " ").replace(" ", "").toLowerCase(java.util.Locale.ROOT);
+  }
+
+  private String safeText(String value) {
+    return value == null ? "" : value;
   }
 
   private CrmMarketingPlanApproval buildApproval(

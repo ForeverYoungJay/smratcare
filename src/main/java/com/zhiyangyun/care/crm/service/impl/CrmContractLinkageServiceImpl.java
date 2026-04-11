@@ -517,7 +517,8 @@ public class CrmContractLinkageServiceImpl implements CrmContractLinkageService 
     var wrapper = Wrappers.lambdaQuery(CrmLead.class)
         .eq(CrmLead::getTenantId, tenantId)
         .eq(CrmLead::getIsDeleted, 0)
-        .eq(CrmLead::getStatus, 2)
+        .and(w -> w.eq(CrmLead::getContractSignedFlag, 1)
+            .or(p -> p.eq(CrmLead::getFlowStage, "SIGNED")))
         .orderByDesc(CrmLead::getContractSignedAt)
         .orderByDesc(CrmLead::getCreateTime);
     if (elder.getIdCardNo() != null && !elder.getIdCardNo().isBlank()) {

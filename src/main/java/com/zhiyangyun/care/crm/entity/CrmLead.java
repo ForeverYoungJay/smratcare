@@ -31,6 +31,9 @@ public class CrmLead {
   private String receptionistName;
   private String homeAddress;
   private String marketerName;
+  private Long ownerStaffId;
+  private String ownerStaffName;
+  private LocalDateTime assignedAt;
   private String followupStatus;
   private String referralChannel;
   private LocalDateTime invalidTime;
