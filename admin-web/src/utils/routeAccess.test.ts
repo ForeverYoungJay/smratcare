@@ -19,8 +19,15 @@ describe('routeAccess utils', () => {
     expect(canAccessPath(['NURSING_EMPLOYEE'], [], '/stats/check-in')).toBe(false)
   })
 
-  it('keeps explicit page permissions as the highest-priority allow rule', () => {
-    expect(canAccessPath(['MARKETING_EMPLOYEE'], ['ADMIN'], '/system/site-config', ['/system/site-config'])).toBe(true)
+  it('treats explicit page permissions as an extra restriction instead of a bypass', () => {
+    expect(canAccessPath(['MARKETING_EMPLOYEE'], ['ADMIN'], '/system/site-config', ['/system/site-config'])).toBe(false)
     expect(canAccessPath(['MARKETING_EMPLOYEE'], ['ADMIN'], '/system/site-config', [])).toBe(false)
+    expect(canAccessPath(['HR_MINISTER'], ['ADMIN'], '/system/site-config', ['/system/site-config'])).toBe(true)
+  })
+
+  it('keeps module fallback aligned with marketing and fire routes', () => {
+    expect(canAccessPath(['MARKETING_EMPLOYEE'], [], '/crm/follow-up')).toBe(true)
+    expect(canAccessPath(['GUARD'], [], '/fire/day-patrol')).toBe(true)
+    expect(canAccessPath(['MARKETING_EMPLOYEE'], [], '/fire/day-patrol')).toBe(false)
   })
 })

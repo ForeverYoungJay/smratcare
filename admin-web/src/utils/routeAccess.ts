@@ -91,11 +91,15 @@ export function canAccessPath(roles: string[], required: string[], path: string,
   if (normalizePath(path) === '/403') {
     return true
   }
+  const inferredRequired = (required || []).length > 0 ? required : moduleRolesByPath(normalizePath(path))
+  const roleAllowed = hasRouteAccess(roles, inferredRequired, path)
+  if (!roleAllowed) {
+    return false
+  }
   if ((pagePermissions || []).length > 0) {
     return hasExplicitPageAccess(pagePermissions, path)
   }
-  const inferredRequired = (required || []).length > 0 ? required : moduleRolesByPath(normalizePath(path))
-  return hasRouteAccess(roles, inferredRequired, path)
+  return true
 }
 
 export function resolveRouteAccess(router: Router, roles: string[], path: string, pagePermissions: string[] = []): RouteAccessResult {

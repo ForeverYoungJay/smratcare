@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public final class PagePermissionPathHelper {
   private static final Map<String, String> LEGACY_TO_CANONICAL = Map.ofEntries(
@@ -29,6 +30,7 @@ public final class PagePermissionPathHelper {
       Map.entry("/system/message", "/system/site-config"),
       Map.entry("/system/dict", "/base-config")
   );
+  private static final Set<String> HIDDEN_PATHS = Set.of("/403");
 
   private PagePermissionPathHelper() {
   }
@@ -60,7 +62,7 @@ public final class PagePermissionPathHelper {
     LinkedHashSet<String> normalized = new LinkedHashSet<>();
     for (String path : paths) {
       String canonical = toCanonicalPath(path);
-      if (canonical == null || canonical.isBlank() || "/".equals(canonical)) {
+      if (canonical == null || canonical.isBlank() || "/".equals(canonical) || HIDDEN_PATHS.contains(canonical)) {
         continue;
       }
       normalized.add(canonical);

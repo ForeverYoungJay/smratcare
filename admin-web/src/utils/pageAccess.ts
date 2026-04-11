@@ -101,6 +101,7 @@ const pagePermissionTree = buildTree((layout?.children || []) as RouteRecordRaw[
 const pagePermissionFlat: Array<{ path: string; title: string }> = []
 flattenTree(pagePermissionTree, pagePermissionFlat)
 const pageTitleMap = new Map(pagePermissionFlat.map((item) => [item.path, item.title]))
+const knownPagePaths = new Set(pagePermissionFlat.map((item) => item.path))
 
 const commonPersonalPaths = ['/portal', '/workbench', '/workbench/overview', '/workbench/todo', '/workbench/my-info', '/workbench/attendance', '/workbench/reports', '/workbench/approvals']
 
@@ -190,6 +191,9 @@ export function normalizePagePermissions(paths: Array<string | null | undefined>
   ;(paths || []).forEach((path) => {
     const normalizedPath = toCanonicalPermissionPath(String(path || ''))
     if (!normalizedPath || normalizedPath === '/' || HIDDEN_PATHS.has(normalizedPath)) {
+      return
+    }
+    if (!knownPagePaths.has(normalizedPath)) {
       return
     }
     normalized.add(normalizedPath)

@@ -17,6 +17,7 @@ import {
   clearToken,
   normalizeRoles
 } from '../utils/auth'
+import { normalizePagePermissions } from '../utils/pageAccess'
 import type { LoginResponse } from '../types/api'
 
 export const useUserStore = defineStore('user', {
@@ -38,15 +39,16 @@ export const useUserStore = defineStore('user', {
     },
     setAuth(payload: LoginResponse) {
       const roles = normalizeRoles(payload.roles || [])
+      const pagePermissions = normalizePagePermissions(payload.pagePermissions || [])
       this.token = payload.token
       this.roles = roles
       this.permissions = payload.permissions || []
-      this.pagePermissions = payload.pagePermissions || []
+      this.pagePermissions = pagePermissions
       this.setStaffProfile(payload.staffInfo)
       setToken(payload.token)
       setRoles(roles)
       setPermissions(payload.permissions || [])
-      setPagePermissions(payload.pagePermissions || [])
+      setPagePermissions(pagePermissions)
     },
     clear() {
       this.token = ''
