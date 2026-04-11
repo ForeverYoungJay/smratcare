@@ -108,7 +108,7 @@
             </a-tag>
           </template>
           <template v-else-if="column.key === 'pagePermissions'">
-            <a-tag color="blue">{{ parseRoutePermissionsJson(record.routePermissionsJson).length }} 项</a-tag>
+            <a-tag color="blue">{{ getEffectivePagePermissions(record).length }} 项</a-tag>
           </template>
           <template v-else-if="column.key === 'status'">
             <a-tag :color="record.status === 1 ? 'green' : 'default'">{{ record.status === 1 ? '启用' : '停用' }}</a-tag>
@@ -129,7 +129,7 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
 import { getDepartmentOptionPage, getRolePage, getStaffOptionPage, getStaffRoleAssignments, updateStaffRoles } from '../../api/rbac'
 import type { DepartmentItem, PageResult, RoleItem, StaffItem } from '../../types'
-import { ROLE_PAGE_PRESETS, getRolePagePreset, parseRoutePermissionsJson } from '../../utils/pageAccess'
+import { ROLE_PAGE_PRESETS, getRecommendedPagePermissions, getRolePagePreset, parseRoutePermissionsJson } from '../../utils/pageAccess'
 
 const router = useRouter()
 const roleRows = ref<RoleItem[]>([])
@@ -169,6 +169,14 @@ function resolveDepartmentName(departmentId?: string | number) {
 function resolveRoleName(roleId?: string | number) {
   if (roleId == null || roleId === '') return '-'
   return allRoles.value.find((item) => String(item.id) === String(roleId))?.roleName || `#${roleId}`
+}
+
+function getEffectivePagePermissions(role?: Partial<RoleItem>) {
+  const explicitPermissions = parseRoutePermissionsJson(role?.routePermissionsJson)
+  if (explicitPermissions.length) {
+    return explicitPermissions
+  }
+  return getRecommendedPagePermissions(role?.roleCode || role?.roleName)
 }
 
 async function fetchRoles() {

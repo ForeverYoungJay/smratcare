@@ -80,7 +80,7 @@
           <a-tag :color="record.status === 1 ? 'green' : 'default'">{{ record.status === 1 ? '启用' : '停用' }}</a-tag>
         </template>
         <template v-else-if="column.key === 'pagePermissions'">
-          <a-tag color="blue">{{ parseRoutePermissionsJson(record.routePermissionsJson).length || 0 }} 项</a-tag>
+          <a-tag color="blue">{{ getEffectivePagePermissions(record).length || 0 }} 项</a-tag>
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
@@ -165,7 +165,7 @@ import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import { getRolePage, createRole, updateRole, deleteRole, getDepartmentOptionPage } from '../../api/rbac'
 import type { DepartmentItem, PageResult, RoleItem } from '../../types'
-import { getPagePermissionTree, getRolePagePreset, parseRoutePermissionsJson, serializeRoutePermissions } from '../../utils/pageAccess'
+import { getPagePermissionTree, getRecommendedPagePermissions, getRolePagePreset, parseRoutePermissionsJson, serializeRoutePermissions } from '../../utils/pageAccess'
 
 const router = useRouter()
 const route = useRoute()
@@ -285,6 +285,7 @@ function onReset() {
 }
 
 function openDrawer(record?: RoleItem) {
+  const explicitPermissions = parseRoutePermissionsJson(record?.routePermissionsJson)
   Object.assign(form, {
     id: record?.id,
     roleName: record?.roleName || '',
@@ -294,8 +295,18 @@ function openDrawer(record?: RoleItem) {
     routePermissionsJson: record?.routePermissionsJson || '',
     status: record?.status ?? 1
   })
-  checkedPagePermissions.value = parseRoutePermissionsJson(record?.routePermissionsJson)
+  checkedPagePermissions.value = explicitPermissions.length
+    ? explicitPermissions
+    : getRecommendedPagePermissions(record?.roleCode || record?.roleName)
   drawerOpen.value = true
+}
+
+function getEffectivePagePermissions(role?: Partial<RoleItem>) {
+  const explicitPermissions = parseRoutePermissionsJson(role?.routePermissionsJson)
+  if (explicitPermissions.length) {
+    return explicitPermissions
+  }
+  return getRecommendedPagePermissions(role?.roleCode || role?.roleName)
 }
 
 function syncDrawerFromRoute() {
