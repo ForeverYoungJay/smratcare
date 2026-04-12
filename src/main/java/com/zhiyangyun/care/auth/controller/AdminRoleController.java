@@ -6,14 +6,19 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zhiyangyun.care.auth.entity.Department;
 import com.zhiyangyun.care.auth.entity.Role;
+import com.zhiyangyun.care.auth.entity.StaffRole;
 import com.zhiyangyun.care.auth.mapper.DepartmentMapper;
 import com.zhiyangyun.care.auth.mapper.RoleMapper;
+import com.zhiyangyun.care.auth.mapper.StaffRoleMapper;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.auth.security.PagePermissionPathHelper;
 import com.zhiyangyun.care.auth.model.RoleRequest;
+import com.zhiyangyun.care.hr.entity.StaffProfile;
+import com.zhiyangyun.care.hr.mapper.StaffProfileMapper;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.util.StringUtils;
 
 import java.text.Normalizer;
+import java.util.List;
 import java.util.Locale;
 
 @RestController
@@ -33,11 +39,20 @@ import java.util.Locale;
 public class AdminRoleController {
   private final RoleMapper roleMapper;
   private final DepartmentMapper departmentMapper;
+  private final StaffRoleMapper staffRoleMapper;
+  private final StaffProfileMapper staffProfileMapper;
   private final ObjectMapper objectMapper;
 
-  public AdminRoleController(RoleMapper roleMapper, DepartmentMapper departmentMapper, ObjectMapper objectMapper) {
+  public AdminRoleController(
+      RoleMapper roleMapper,
+      DepartmentMapper departmentMapper,
+      StaffRoleMapper staffRoleMapper,
+      StaffProfileMapper staffProfileMapper,
+      ObjectMapper objectMapper) {
     this.roleMapper = roleMapper;
     this.departmentMapper = departmentMapper;
+    this.staffRoleMapper = staffRoleMapper;
+    this.staffProfileMapper = staffProfileMapper;
     this.objectMapper = objectMapper;
   }
 
@@ -64,12 +79,14 @@ public class AdminRoleController {
   }
 
   @PreAuthorize("hasAnyRole('DIRECTOR','SYS_ADMIN','ADMIN','HR_MINISTER')")
+  @Transactional
   @PutMapping("/{id}")
   public Result<Role> update(@PathVariable Long id, @Valid @RequestBody RoleRequest request) {
     if (!StringUtils.hasText(request.getRoleName())) {
       return Result.error(400, "Role name is required");
     }
     Role role = requireRole(id);
+    String previousRoleName = role.getRoleName();
     Department department = requireDepartmentInOrg(request.getDepartmentId(), role.getOrgId(), "所属部门");
     Role superiorRole = requireRoleInOrg(request.getSuperiorRoleId(), role.getOrgId(), id, "上级角色");
     role.setDepartmentId(department == null ? null : department.getId());
@@ -80,6 +97,7 @@ public class AdminRoleController {
     role.setRoutePermissionsJson(normalizeRoutePermissionsJson(request.getRoutePermissionsJson()));
     role.setStatus(request.getStatus());
     roleMapper.updateById(role);
+    syncStaffProfileJobTitles(role, previousRoleName);
     return Result.ok(role);
   }
 
@@ -246,5 +264,44 @@ public class AdminRoleController {
 
   private String normalizeRoutePermissionsJson(String value) {
     return PagePermissionPathHelper.normalizeJson(objectMapper, value);
+  }
+
+  private void syncStaffProfileJobTitles(Role role, String previousRoleName) {
+    if (role == null || role.getId() == null) {
+      return;
+    }
+    String oldName = normalizeBlank(previousRoleName);
+    String newName = normalizeBlank(role.getRoleName());
+    if (!StringUtils.hasText(oldName) || !StringUtils.hasText(newName) || oldName.equals(newName)) {
+      return;
+    }
+    List<Long> staffIds = staffRoleMapper.selectList(Wrappers.lambdaQuery(StaffRole.class)
+            .eq(StaffRole::getIsDeleted, 0)
+            .eq(StaffRole::getOrgId, role.getOrgId())
+            .eq(StaffRole::getRoleId, role.getId()))
+        .stream()
+        .map(StaffRole::getStaffId)
+        .distinct()
+        .toList();
+    if (staffIds.isEmpty()) {
+      return;
+    }
+    List<StaffProfile> profiles = staffProfileMapper.selectList(Wrappers.lambdaQuery(StaffProfile.class)
+        .eq(StaffProfile::getIsDeleted, 0)
+        .eq(StaffProfile::getOrgId, role.getOrgId())
+        .in(StaffProfile::getStaffId, staffIds)
+        .eq(StaffProfile::getJobTitle, oldName));
+    for (StaffProfile profile : profiles) {
+      profile.setJobTitle(newName);
+      staffProfileMapper.updateById(profile);
+    }
+  }
+
+  private String normalizeBlank(String value) {
+    if (value == null) {
+      return null;
+    }
+    String trimmed = value.trim();
+    return trimmed.isEmpty() ? null : trimmed;
   }
 }
