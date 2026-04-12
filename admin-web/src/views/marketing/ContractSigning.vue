@@ -471,10 +471,23 @@
                           v-model:value="quickDiseaseName"
                           :maxlength="32"
                           placeholder="数据库没有时，可快捷新增基础疾病"
+                          :disabled="contractViewMode || !!diseaseCatalogLoadError"
                           @pressEnter="createQuickDisease"
                         />
-                        <a-button :loading="quickDiseaseSubmitting" @click="createQuickDisease">快捷新增疾病</a-button>
+                        <a-button
+                          :loading="quickDiseaseSubmitting"
+                          :disabled="contractViewMode || !!diseaseCatalogLoadError"
+                          @click="createQuickDisease"
+                        >
+                          快捷新增疾病
+                        </a-button>
                       </a-space>
+                      <a-alert
+                        v-if="diseaseCatalogLoadError"
+                        type="warning"
+                        show-icon
+                        :message="diseaseCatalogLoadError"
+                      />
                     </a-space>
                   </a-form-item>
                 </a-col>
@@ -753,6 +766,7 @@ const pageSubTitle = computed(() => {
 const resolvedStatusPreset = computed(() => String(props.statusPreset || route.query.status || '').trim())
 const isUnsignedMode = computed(() => resolvedStatusPreset.value === 'unsigned')
 const isSignedMode = computed(() => resolvedStatusPreset.value === 'signed')
+const diseaseCatalogLoadError = ref('')
 const loading = ref(false)
 const submitting = ref(false)
 const open = ref(false)
@@ -2487,8 +2501,10 @@ async function loadDiseaseOptions() {
       label: String(item.diseaseName || item.name || `疾病#${item.id}`),
       value: Number(item.id)
     }))
-  } catch {
+    diseaseCatalogLoadError.value = ''
+  } catch (error: any) {
     diseaseOptions.value = []
+    diseaseCatalogLoadError.value = error?.message || '基础疾病字典暂不可用，当前账号暂无查看或维护权限'
   }
 }
 
@@ -2515,6 +2531,14 @@ async function searchMarketers(keyword = '') {
 }
 
 async function createQuickDisease() {
+  if (contractViewMode.value) {
+    message.warning('当前为只读查看模式，不能新增基础疾病')
+    return
+  }
+  if (diseaseCatalogLoadError.value) {
+    message.warning(diseaseCatalogLoadError.value)
+    return
+  }
   const diseaseName = String(quickDiseaseName.value || '').trim()
   if (!diseaseName) {
     message.warning('请输入疾病名称')

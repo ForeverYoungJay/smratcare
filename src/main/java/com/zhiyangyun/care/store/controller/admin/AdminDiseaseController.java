@@ -25,13 +25,23 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/disease")
 public class AdminDiseaseController {
+  private static final String DISEASE_READ_ROLES =
+      "hasAnyRole('MARKETING_EMPLOYEE','MARKETING_MINISTER','MEDICAL_EMPLOYEE','MEDICAL_MINISTER',"
+          + "'NURSING_EMPLOYEE','NURSING_MINISTER','HR_EMPLOYEE','HR_MINISTER',"
+          + "'LOGISTICS_EMPLOYEE','LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')";
+  private static final String DISEASE_WRITE_ROLES =
+      "hasAnyRole('MARKETING_EMPLOYEE','MARKETING_MINISTER','MEDICAL_EMPLOYEE','MEDICAL_MINISTER',"
+          + "'NURSING_EMPLOYEE','NURSING_MINISTER','HR_EMPLOYEE','HR_MINISTER',"
+          + "'LOGISTICS_EMPLOYEE','LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')";
+  private static final String DISEASE_DELETE_ROLES =
+      "hasAnyRole('LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')";
   private final DiseaseMapper diseaseMapper;
 
   public AdminDiseaseController(DiseaseMapper diseaseMapper) {
     this.diseaseMapper = diseaseMapper;
   }
 
-  @PreAuthorize("hasAnyRole('LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize(DISEASE_WRITE_ROLES)
   @PostMapping
   public Result<Disease> create(@Valid @RequestBody DiseaseRequest request) {
     Disease disease = new Disease();
@@ -43,7 +53,7 @@ public class AdminDiseaseController {
     return Result.ok(disease);
   }
 
-  @PreAuthorize("hasAnyRole('LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize(DISEASE_WRITE_ROLES)
   @PutMapping("/{id}")
   public Result<Disease> update(@PathVariable Long id, @Valid @RequestBody DiseaseRequest request) {
     Disease disease = diseaseMapper.selectById(id);
@@ -58,7 +68,7 @@ public class AdminDiseaseController {
     return Result.ok(disease);
   }
 
-  @PreAuthorize("hasAnyRole('LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize(DISEASE_DELETE_ROLES)
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
     Disease disease = diseaseMapper.selectById(id);
@@ -70,13 +80,13 @@ public class AdminDiseaseController {
     return Result.ok(null);
   }
 
-  @PreAuthorize("hasAnyRole('LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize(DISEASE_READ_ROLES)
   @GetMapping("/{id}")
   public Result<Disease> get(@PathVariable Long id) {
     return Result.ok(diseaseMapper.selectById(id));
   }
 
-  @PreAuthorize("hasAnyRole('LOGISTICS_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PreAuthorize(DISEASE_READ_ROLES)
   @GetMapping
   public Result<IPage<Disease>> page(
       @RequestParam(defaultValue = "1") long page,

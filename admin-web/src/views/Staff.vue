@@ -267,7 +267,7 @@ const props = withDefaults(defineProps<{ title?: string; subTitle?: string }>(),
   subTitle: '账号与角色配置'
 })
 
-const accountManagerRoles = ['HR_EMPLOYEE', 'HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
+const accountManagerRoles = ['HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
 const credentialViewerRoles = ['HR_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']
 
 const query = reactive({

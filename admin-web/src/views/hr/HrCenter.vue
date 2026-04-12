@@ -15,7 +15,7 @@
         <h2>人资入口回到“业务中心”，不再伪装成工作台。</h2>
         <p>这里是人力资源业务导航页，集中承接招聘、档案、考勤、费用和绩效激励。个人事项已经回到工作台。</p>
         <a-space wrap>
-          <a-button type="primary" @click="openPath('/hr/profile/basic')">进入员工档案</a-button>
+          <a-button type="primary" @click="openFirstAvailable(['/hr/profile/basic', '/hr/profile/social-security-reminders'])">进入员工档案</a-button>
           <a-button @click="openPath('/hr/attendance/schemes')">进入考勤与班组</a-button>
           <a-button @click="openPath('/workbench')">返回工作台</a-button>
         </a-space>
@@ -149,7 +149,8 @@ const sections = computed<HrSection[]>(() => [
       { label: '员工基本信息', path: '/hr/profile/basic', tip: '主档、部门、任职状态、社保' },
       { label: '账号与领导设置', path: '/hr/profile/account-access', tip: '账号初始化、角色与领导链' },
       { label: '劳动合同管理', path: '/hr/profile/contracts', tip: '合同签订、续签和提醒' },
-      { label: '证书管理', path: '/hr/development/certificates', tip: '证书和到期提醒' }
+      { label: '证书管理', path: '/hr/development/certificates', tip: '证书和到期提醒' },
+      { label: '社保提醒', path: '/hr/profile/social-security-reminders', tip: '到期、待办理与本月新增参保' }
     ])
   },
   {
@@ -196,6 +197,15 @@ function openPath(path: string) {
     return
   }
   router.push(path)
+}
+
+function openFirstAvailable(paths: string[]) {
+  const target = paths.find((item) => canAccess(item))
+  if (!target) {
+    message.warning('当前账号暂无权限访问该页面')
+    return
+  }
+  router.push(target)
 }
 
 async function load() {

@@ -123,8 +123,8 @@ export const ROLE_PAGE_PRESETS: Record<string, RolePagePreset> = {
   },
   HR_EMPLOYEE: {
     label: '行政人事部员工',
-    description: '工作台、人力资源、行政管理、统计分析，不包含角色和账号权限配置',
-    paths: [...commonPersonalPaths, '/hr', '/oa', '/stats', '/base-config']
+    description: '工作台、行政协同、人资总览与社保提醒，不包含账号权限和系统设置',
+    paths: [...commonPersonalPaths, '/hr/overview', '/hr/profile/social-security-reminders', '/oa']
   },
   LOGISTICS_MINISTER: {
     label: '后勤主管',
