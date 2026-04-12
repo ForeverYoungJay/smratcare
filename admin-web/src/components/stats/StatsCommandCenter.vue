@@ -217,13 +217,22 @@ function reloadFeedback() {
   feedbackRows.value = listStatsFeedback(props.pageKey)
 }
 
+function panelKeysEqual(left: string[] = [], right: string[] = []) {
+  if (left.length !== right.length) return false
+  return left.every((item, index) => item === right[index])
+}
+
 function syncPanelKeys() {
   const fallback = props.selectedPanelKeys?.length
     ? props.selectedPanelKeys
     : panelOptions.value.map((item) => item.key)
   const nextKeys = loadStatsPanelConfig(props.pageKey, fallback)
-  localPanelKeys.value = nextKeys
-  emit('panel-change', nextKeys)
+  if (!panelKeysEqual(localPanelKeys.value, nextKeys)) {
+    localPanelKeys.value = [...nextKeys]
+  }
+  if (!panelKeysEqual(props.selectedPanelKeys || [], nextKeys)) {
+    emit('panel-change', [...nextKeys])
+  }
 }
 
 function syncTemplateColumns() {
