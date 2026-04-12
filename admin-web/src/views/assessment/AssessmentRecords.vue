@@ -604,7 +604,7 @@ import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../../stores/user'
-import { hasMinisterOrHigher } from '../../utils/roleAccess'
+import { resolveRouteAccess } from '../../utils/routeAccess'
 import { formatChineseDateTime } from '../../utils/dateLocale'
 import PageContainer from '../../components/PageContainer.vue'
 import LifecycleStageBar from '../../components/LifecycleStageBar.vue'
@@ -1435,10 +1435,9 @@ const rules: FormRules = {
 }
 
 const tableColumns = computed(() => pageConfig.value.columns)
-const canDeleteAssessment = computed(() => {
-  const roles = (userStore.roles || []).map((item) => String(item || '').toUpperCase())
-  return hasMinisterOrHigher(roles)
-})
+const canDeleteAssessment = computed(() =>
+  resolveRouteAccess(router, userStore.roles || [], route.path, userStore.pagePermissions || []).canAccess
+)
 const selectedPendingContract = computed(() =>
   pendingAdmissionContracts.value.find((item) => item.contractNo === selectedPendingContractNo.value)
 )

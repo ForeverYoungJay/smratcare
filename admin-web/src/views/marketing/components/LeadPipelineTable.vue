@@ -456,7 +456,7 @@ import {
 import { useStaffOptions } from '../../../composables/useStaffOptions'
 import { useUserStore } from '../../../stores/user'
 import { MARKETING_CALLBACK_TYPE_OPTIONS, MARKETING_LEAD_MODE_LABELS } from '../../../utils/marketingEnums'
-import { hasMinisterOrHigher } from '../../../utils/roleAccess'
+import { resolveRouteAccess } from '../../../utils/routeAccess'
 import type {
   CrmLeadAssignLogItem,
   CrmLeadItem,
@@ -589,7 +589,8 @@ const rowSelection = computed(() => ({
 }))
 const selectedCount = computed(() => selectedRowKeys.value.length)
 const selectedRows = computed(() => rows.value.filter((item) => selectedRowKeys.value.some((id) => sameId(item.id, id))))
-const canAssignLead = computed(() => hasMinisterOrHigher(userStore.roles || []))
+const canAssignLead = computed(() =>
+  resolveRouteAccess(router, userStore.roles || [], route.path, userStore.pagePermissions || []).canAccess)
 const modeLabel = computed(() => MARKETING_LEAD_MODE_LABELS[effectiveMode.value] || '营销线索')
 
 const modalTitle = computed(() => form.id ? '编辑客户' : '新增客户')
@@ -820,7 +821,8 @@ const warningMessage = computed(() => {
   return ''
 })
 
-const canViewAllLeads = computed(() => hasMinisterOrHigher(userStore.roles || []))
+const canViewAllLeads = computed(() =>
+  resolveRouteAccess(router, userStore.roles || [], route.path, userStore.pagePermissions || []).canAccess)
 const currentUserDisplayName = computed(() => {
   const realName = String(userStore.staffInfo?.realName || '').trim()
   if (realName) return realName

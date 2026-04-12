@@ -326,7 +326,7 @@ import {
 import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
 import { useUserStore } from '../../stores/user'
 import { MARKETING_MODULE_LABELS, MARKETING_PLAN_STATUS_COLORS, MARKETING_PLAN_STATUS_LABELS, MARKETING_PLAN_STATUS_OPTIONS } from '../../utils/marketingEnums'
-import { hasAnyRole } from '../../utils/roleAccess'
+import { resolveRouteAccess } from '../../utils/routeAccess'
 import type {
   MarketingPlanItem,
   MarketingPlanPayload,
@@ -438,7 +438,7 @@ const selectedPublishLabel = computed(() => {
   return publishActionLabel(selectedPlan.value)
 })
 const canManagePlanWrite = computed(() =>
-  hasAnyRole(userStore.roles || [], ['MARKETING_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN']))
+  resolveRouteAccess(router, userStore.roles || [], route.path, userStore.pagePermissions || []).canAccess)
 const canEditSelected = computed(() => selectedPlans.value.length === 1 && selectedEditablePlans.value.length === 1)
 const canSubmitSelected = computed(() => selectedSubmittablePlans.value.length > 0)
 const canApproveSelected = computed(() => selectedApprovablePlans.value.length > 0)

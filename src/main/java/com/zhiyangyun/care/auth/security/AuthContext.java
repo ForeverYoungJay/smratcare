@@ -105,6 +105,11 @@ public class AuthContext {
     }
     Map<?, ?> details = extractDetails(authentication);
     if (details != null) {
+      Object grantedRoleCodes = details.get("grantedRoleCodes");
+      List<String> granted = normalizeRoleCodes(grantedRoleCodes);
+      if (!granted.isEmpty()) {
+        return granted;
+      }
       Object roleCodes = details.get("roleCodes");
       List<String> normalized = normalizeRoleCodes(roleCodes);
       if (!normalized.isEmpty()) {

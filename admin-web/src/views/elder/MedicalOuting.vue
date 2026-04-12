@@ -121,9 +121,10 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
+import { useUserStore } from '../../stores/user'
 import {
   createMedicalOuting,
   deleteMedicalOuting,
@@ -131,8 +132,7 @@ import {
   getMedicalOutingPage,
   returnMedicalOuting
 } from '../../api/elderResidence'
-import { getRoles } from '../../utils/auth'
-import { hasStaffOrHigher } from '../../utils/roleAccess'
+import { resolveRouteAccess } from '../../utils/routeAccess'
 import type { Id, MedicalOutingCreateRequest, MedicalOutingItem, PageResult } from '../../types'
 import { normalizeResidentId } from '../../utils/id'
 
@@ -144,6 +144,8 @@ const submitting = ref(false)
 const formRef = ref<FormInstance>()
 const selectedRowKeys = ref<Id[]>([])
 const route = useRoute()
+const router = useRouter()
+const userStore = useUserStore()
 const { elderOptions, elderLoading, searchElders, ensureSelectedElder } = useElderOptions({ pageSize: 80 })
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
@@ -151,8 +153,9 @@ const rowSelection = computed(() => ({
     selectedRowKeys.value = keys.map((key) => String(key)) as Id[]
   }
 }))
-const roles = getRoles()
-const canManage = hasStaffOrHigher(roles)
+const canManage = computed(() =>
+  resolveRouteAccess(router, userStore.roles || [], route.path, userStore.pagePermissions || []).canAccess
+)
 
 const query = reactive({
   elderId: undefined as Id | undefined,

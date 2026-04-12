@@ -1,5 +1,8 @@
 package com.zhiyangyun.care.auth.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zhiyangyun.care.auth.entity.Role;
+import com.zhiyangyun.care.auth.mapper.RoleMapper;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -27,10 +30,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
   private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
   private final TokenProvider tokenProvider;
   private final TokenBlacklistService tokenBlacklistService;
+  private final RoleMapper roleMapper;
+  private final ObjectMapper objectMapper;
 
-  public JwtAuthenticationFilter(TokenProvider tokenProvider, TokenBlacklistService tokenBlacklistService) {
+  public JwtAuthenticationFilter(
+      TokenProvider tokenProvider,
+      TokenBlacklistService tokenBlacklistService,
+      RoleMapper roleMapper,
+      ObjectMapper objectMapper) {
     this.tokenProvider = tokenProvider;
     this.tokenBlacklistService = tokenBlacklistService;
+    this.roleMapper = roleMapper;
+    this.objectMapper = objectMapper;
   }
 
   @Override
@@ -55,7 +66,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         @SuppressWarnings("unchecked")
         List<String> roles = RoleCodeHelper.normalizeRoles(claims.get("roles", List.class));
         Set<String> authorityCodes = new LinkedHashSet<>(roles);
-        if (shouldElevateToAdmin(request.getRequestURI(), authorityCodes)) {
+        List<String> pagePermissions = loadPagePermissions(staffId, orgId);
+        if (shouldElevateToAdmin(request.getRequestURI(), authorityCodes, pagePermissions)) {
           authorityCodes.add(RoleCodeHelper.ROLE_ADMIN);
         }
         List<SimpleGrantedAuthority> authorities = authorityCodes.stream()
@@ -70,6 +82,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         details.put("username", username);
         details.put("roleCodes", roles);
         details.put("grantedRoleCodes", authorityCodes.stream().collect(Collectors.toList()));
+        details.put("pagePermissions", pagePermissions);
         authentication.setDetails(details);
         SecurityContextHolder.getContext().setAuthentication(authentication);
       } catch (Exception ex) {
@@ -80,13 +93,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     filterChain.doFilter(request, response);
   }
 
-  private boolean shouldElevateToAdmin(String requestUri, Set<String> roleCodes) {
+  private boolean shouldElevateToAdmin(String requestUri, Set<String> roleCodes, List<String> pagePermissions) {
     if (requestUri == null || requestUri.isBlank()) {
       return false;
     }
     if (roleCodes.contains(RoleCodeHelper.ROLE_ADMIN)
         || roleCodes.contains(RoleCodeHelper.ROLE_SYS_ADMIN)
         || roleCodes.contains(RoleCodeHelper.ROLE_DIRECTOR)) {
+      return true;
+    }
+    if (PagePermissionPathHelper.matchesApiRequest(pagePermissions, requestUri)) {
       return true;
     }
     if ((requestUri.startsWith("/api/admin/hr")
@@ -140,6 +156,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
       return true;
     }
     return false;
+  }
+
+  private List<String> loadPagePermissions(String staffId, Long orgId) {
+    if (!StringUtils.hasText(staffId) || orgId == null) {
+      return List.of();
+    }
+    try {
+      Long resolvedStaffId = Long.valueOf(staffId);
+      return roleMapper.selectRolesByStaff(resolvedStaffId, orgId).stream()
+          .filter(role -> role != null)
+          .map(Role::getRoutePermissionsJson)
+          .flatMap(value -> PagePermissionPathHelper.parseAndNormalize(objectMapper, value).stream())
+          .distinct()
+          .toList();
+    } catch (Exception ignored) {
+      return List.of();
+    }
   }
 
   private boolean hasAnyRole(Set<String> roles, String... candidates) {

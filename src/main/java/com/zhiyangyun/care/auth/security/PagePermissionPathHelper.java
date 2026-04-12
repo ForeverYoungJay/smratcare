@@ -30,6 +30,56 @@ public final class PagePermissionPathHelper {
       Map.entry("/system/message", "/system/site-config"),
       Map.entry("/system/dict", "/base-config")
   );
+  private static final Map<String, List<String>> API_TO_PAGE_PREFIXES = Map.ofEntries(
+      Map.entry("/api/admin/hr", List.of("/hr")),
+      Map.entry("/api/admin/staff", List.of("/hr/profile/account-access", "/system/staff")),
+      Map.entry("/api/admin/staff-roles", List.of("/hr/profile/account-access", "/system/staff")),
+      Map.entry("/api/admin/roles", List.of("/system/role")),
+      Map.entry("/api/admin/departments", List.of("/system/department")),
+      Map.entry("/api/admin/orgs", List.of("/system/org-info")),
+      Map.entry("/api/admin/family", List.of("/elder")),
+      Map.entry("/api/admin/product-tag", List.of("/logistics/commerce/tag", "/logistics/commerce/product")),
+      Map.entry("/api/admin/product-category", List.of("/logistics/commerce/category", "/logistics/commerce/product")),
+      Map.entry("/api/admin/disease-forbidden", List.of("/logistics/commerce/risk")),
+      Map.entry("/api/base-config", List.of("/base-config", "/system/site-config")),
+      Map.entry("/api/dashboard", List.of("/portal", "/workbench")),
+      Map.entry("/api/oa", List.of("/oa", "/workbench")),
+      Map.entry("/api/schedule", List.of("/hr/attendance", "/workbench/attendance")),
+      Map.entry("/api/attendance", List.of("/hr/attendance", "/workbench/attendance")),
+      Map.entry("/api/marketing", List.of("/marketing")),
+      Map.entry("/api/crm", List.of("/marketing")),
+      Map.entry("/api/stats", List.of("/stats")),
+      Map.entry("/api/report", List.of("/stats")),
+      Map.entry("/api/medical-care", List.of("/medical-care", "/elder/resident-360", "/elder/in-hospital-overview", "/elder/status-change")),
+      Map.entry("/api/health", List.of("/medical-care", "/health", "/elder/resident-360")),
+      Map.entry("/api/medical", List.of("/medical-care", "/health", "/elder/resident-360")),
+      Map.entry("/api/vital", List.of("/medical-care", "/health", "/elder/resident-360")),
+      Map.entry("/api/assessment", List.of("/medical-care", "/elder/assessment", "/elder/resident-360")),
+      Map.entry("/api/nursing", List.of("/medical-care")),
+      Map.entry("/api/care", List.of("/medical-care")),
+      Map.entry("/api/fire", List.of("/fire")),
+      Map.entry("/api/guard", List.of("/fire")),
+      Map.entry("/api/logistics", List.of("/logistics")),
+      Map.entry("/api/life", List.of("/logistics")),
+      Map.entry("/api/material", List.of("/logistics")),
+      Map.entry("/api/material-center", List.of("/logistics")),
+      Map.entry("/api/inventory", List.of("/logistics")),
+      Map.entry("/api/asset", List.of("/elder", "/logistics")),
+      Map.entry("/api/store", List.of("/logistics", "/marketing/contracts", "/medical-care/basic-diseases", "/hr/incentive")),
+      Map.entry("/api/life/dining", List.of("/logistics")),
+      Map.entry("/api/finance/fee", List.of("/finance", "/elder", "/elder/contracts-invoices", "/elder/status-change")),
+      Map.entry("/api/finance", List.of("/finance", "/elder", "/elder/contracts-invoices", "/elder/status-change", "/medical-care/integrated-account")),
+      Map.entry("/api/bill", List.of("/finance")),
+      Map.entry("/api/admin/billing", List.of("/finance")),
+      Map.entry("/api/card/account", List.of("/finance")),
+      Map.entry("/api/elder/lifecycle", List.of("/elder", "/marketing/contracts", "/finance")),
+      Map.entry("/api/elder", List.of("/elder", "/medical-care", "/marketing/contracts", "/finance")),
+      Map.entry("/api/room", List.of("/elder")),
+      Map.entry("/api/bed", List.of("/elder")),
+      Map.entry("/api/standard", List.of("/medical-care", "/elder")),
+      Map.entry("/api/admin/disease", List.of("/medical-care/basic-diseases", "/marketing/contracts", "/health/archive", "/logistics/commerce/risk")),
+      Map.entry("/api/admin/survey", List.of("/oa/activity-center/survey-manage", "/oa/activity-center/survey-stats", "/oa"))
+  );
   private static final Set<String> HIDDEN_PATHS = Set.of("/403");
 
   private PagePermissionPathHelper() {
@@ -92,5 +142,37 @@ public final class PagePermissionPathHelper {
     } catch (Exception ignored) {
       return "[]";
     }
+  }
+
+  public static boolean hasPageAccess(List<String> pagePermissions, String path) {
+    if (pagePermissions == null || pagePermissions.isEmpty()) {
+      return false;
+    }
+    String normalizedPath = toCanonicalPath(path);
+    for (String permissionPath : pagePermissions) {
+      String normalizedPermission = toCanonicalPath(permissionPath);
+      if (normalizedPath.equals(normalizedPermission) || normalizedPath.startsWith(normalizedPermission + "/")) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  public static boolean matchesApiRequest(List<String> pagePermissions, String requestUri) {
+    if (pagePermissions == null || pagePermissions.isEmpty()) {
+      return false;
+    }
+    String normalizedUri = normalizePath(requestUri);
+    for (Map.Entry<String, List<String>> entry : API_TO_PAGE_PREFIXES.entrySet()) {
+      if (!normalizedUri.startsWith(entry.getKey())) {
+        continue;
+      }
+      for (String pagePath : entry.getValue()) {
+        if (hasPageAccess(pagePermissions, pagePath)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 }

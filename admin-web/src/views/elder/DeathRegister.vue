@@ -122,9 +122,10 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import { message, Modal } from 'ant-design-vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import PageContainer from '../../components/PageContainer.vue'
 import { useElderOptions } from '../../composables/useElderOptions'
+import { useUserStore } from '../../stores/user'
 import {
   cancelDeathRegister,
   createDeathRegister,
@@ -133,8 +134,7 @@ import {
   getDeathRegisterPage,
   updateDeathRegister
 } from '../../api/elderResidence'
-import { getRoles } from '../../utils/auth'
-import { hasMinisterOrHigher, hasStaffOrHigher } from '../../utils/roleAccess'
+import { resolveRouteAccess } from '../../utils/routeAccess'
 import type { DeathRegisterCreateRequest, DeathRegisterItem, Id, PageResult } from '../../types'
 import { normalizeResidentId } from '../../utils/id'
 
@@ -147,6 +147,8 @@ const formRef = ref<FormInstance>()
 const editingId = ref<Id | undefined>(undefined)
 const selectedRowKeys = ref<Id[]>([])
 const route = useRoute()
+const router = useRouter()
+const userStore = useUserStore()
 const { elderOptions, elderLoading, searchElders, ensureSelectedElder } = useElderOptions({ pageSize: 80 })
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
@@ -154,9 +156,10 @@ const rowSelection = computed(() => ({
     selectedRowKeys.value = keys.map((key) => String(key)) as Id[]
   }
 }))
-const roles = getRoles()
-const canManage = hasStaffOrHigher(roles)
-const canCancel = hasMinisterOrHigher(roles)
+const canManage = computed(() =>
+  resolveRouteAccess(router, userStore.roles || [], route.path, userStore.pagePermissions || []).canAccess
+)
+const canCancel = computed(() => canManage.value)
 
 const query = reactive({
   elderId: undefined as Id | undefined,

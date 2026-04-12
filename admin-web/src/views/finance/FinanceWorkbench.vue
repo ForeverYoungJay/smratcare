@@ -295,6 +295,7 @@ import PageContainer from '../../components/PageContainer.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
 import { getFinanceConfigChangeLogPage, getFinanceLedgerHealth, getFinanceMasterDataOverview, getFinanceOpsInsights, getFinanceWorkbenchOverview } from '../../api/finance'
 import { useUserStore } from '../../stores/user'
+import { resolveRouteAccess } from '../../utils/routeAccess'
 import type {
   FinanceConfigChangeLogItem,
   FinanceLedgerHealth,
@@ -362,7 +363,10 @@ const opsInsight = ref<FinanceOpsInsight | null>(null)
 const { chartRef: revenueChartRef, setOption: setRevenueOption } = useECharts()
 
 const userRoles = computed(() => userStore.roles || [])
-const isManagerOrAbove = computed(() => userRoles.value.some(role => ['FINANCE_MINISTER', 'DIRECTOR', 'SYS_ADMIN', 'ADMIN'].includes(role)))
+const canAccessMonthClose = computed(() =>
+  resolveRouteAccess(router, userRoles.value, '/finance/reconcile/month-close', userStore.pagePermissions || []).canAccess
+)
+const isManagerOrAbove = computed(() => canAccessMonthClose.value)
 const roleTone = computed(() => isManagerOrAbove.value ? '主管 / 结账视角' : '一线 / 收银视角')
 const roleHeadline = computed(() => isManagerOrAbove.value ? '先收口风险，再推进审批、催缴和月结。' : '先完成收费闭环，再补齐票据、修正和交班。')
 const roleHint = computed(() => isManagerOrAbove.value
