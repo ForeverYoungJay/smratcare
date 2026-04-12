@@ -45,8 +45,13 @@
     <a-modal v-model:open="attachmentOpen" title="附件清单" width="860px" :footer="null">
       <a-table :columns="attachmentColumns" :data-source="attachments" :loading="loadingAttachments" row-key="id" :pagination="false">
         <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'fileUrl'">
-            <a :href="record.fileUrl" target="_blank">{{ record.fileName }}</a>
+          <template v-if="column.key === 'preview'">
+            <a-button type="link" size="small" @click="previewAttachment(record)">预览</a-button>
+          </template>
+          <template v-else-if="column.key === 'fileUrl'">
+            <a :href="resolveAttachmentUrl(record.fileUrl)" target="_blank" rel="noopener noreferrer" style="color: #1677ff">
+              {{ record.fileName }}
+            </a>
           </template>
           <template v-else-if="column.key === 'attachmentType'">
             {{ attachmentTypeLabel(record.attachmentType) }}
@@ -56,6 +61,20 @@
           </template>
         </template>
       </a-table>
+    </a-modal>
+
+    <a-modal v-model:open="previewOpen" :title="previewTitle" width="960px" :footer="null">
+      <a-image
+        v-if="previewKind === 'image' && previewUrl"
+        :src="previewUrl"
+        style="max-width: 100%"
+      />
+      <iframe
+        v-else-if="previewUrl"
+        :src="previewUrl"
+        style="width: 100%; height: 72vh; border: 0"
+      />
+      <a-empty v-else description="附件链接缺失，暂时无法预览" />
     </a-modal>
   </PageContainer>
 </template>
@@ -79,6 +98,10 @@ const attachments = ref<ContractAttachmentItem[]>([])
 const loadingContracts = ref(false)
 const loadingAttachments = ref(false)
 const attachmentOpen = ref(false)
+const previewOpen = ref(false)
+const previewUrl = ref('')
+const previewTitle = ref('附件预览')
+const previewKind = ref<'image' | 'iframe'>('iframe')
 const selectedRowKeys = ref<string[]>([])
 const selectedContracts = ref<CrmContractItem[]>([])
 
@@ -90,6 +113,7 @@ const contractColumns = [
   { title: '附件', key: 'action', width: 120 }
 ]
 const attachmentColumns = [
+  { title: '预览', dataIndex: 'preview', key: 'preview', width: 90 },
   { title: '类型', dataIndex: 'attachmentType', key: 'attachmentType', width: 140 },
   { title: '文件名', dataIndex: 'fileName', key: 'fileName', width: 260 },
   { title: '文件链接', dataIndex: 'fileUrl', key: 'fileUrl', width: 300 },
@@ -120,6 +144,49 @@ function formatSize(size?: number) {
   if (bytes < 1024) return `${bytes}B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`
   return `${(bytes / 1024 / 1024).toFixed(1)}MB`
+}
+
+function resolveAttachmentUrl(fileUrl?: string) {
+  const text = String(fileUrl || '').trim()
+  if (!text) return ''
+  if (/^https?:\/\//i.test(text)) return text
+  try {
+    return new URL(text, window.location.origin).toString()
+  } catch (_error) {
+    return text
+  }
+}
+
+function isImageAttachment(record: ContractAttachmentItem) {
+  const fileType = String(record.fileType || '').toLowerCase()
+  if (fileType.startsWith('image/')) return true
+  const fileUrl = String(record.fileUrl || '').toLowerCase()
+  return ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'].some((suffix) => fileUrl.includes(suffix))
+}
+
+function isIframePreviewable(record: ContractAttachmentItem) {
+  if (isImageAttachment(record)) return true
+  const fileType = String(record.fileType || '').toLowerCase()
+  if (fileType.includes('pdf') || fileType.startsWith('text/')) return true
+  const fileUrl = String(record.fileUrl || '').toLowerCase()
+  return ['.pdf', '.txt', '.md', '.json', '.csv', '.log'].some((suffix) => fileUrl.includes(suffix))
+}
+
+function previewAttachment(record: ContractAttachmentItem) {
+  const url = resolveAttachmentUrl(record.fileUrl)
+  if (!url) {
+    message.warning('附件链接缺失，暂时无法预览')
+    return
+  }
+  if (isIframePreviewable(record)) {
+    previewTitle.value = record.fileName || '附件预览'
+    previewKind.value = isImageAttachment(record) ? 'image' : 'iframe'
+    previewUrl.value = url
+    previewOpen.value = true
+    return
+  }
+  window.open(url, '_blank', 'noopener,noreferrer')
+  message.info('该文件将通过浏览器新窗口打开，若浏览器不支持预览会直接下载')
 }
 
 async function loadContracts() {

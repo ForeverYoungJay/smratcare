@@ -587,20 +587,20 @@
       <a-table :data-source="attachments" :columns="attachmentColumns" :pagination="false" row-key="id" size="small">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'preview'">
-            <a-image
-              v-if="isImageAttachment(record)"
-              :src="record.fileUrl"
-              :width="40"
-              :height="40"
-              style="object-fit: cover; border-radius: 4px;"
-            />
-            <span v-else>-</span>
+            <a-button type="link" size="small" @click="previewAttachment(record)">预览</a-button>
           </template>
           <template v-else-if="column.key === 'remark'">
             {{ attachmentTypeLabel(record.attachmentType || record.remark) }}
           </template>
           <template v-else-if="column.key === 'fileUrl'">
-            <a :href="record.fileUrl" target="_blank">{{ record.fileName }}</a>
+            <a
+              :href="resolveAttachmentUrl(record.fileUrl)"
+              target="_blank"
+              rel="noopener noreferrer"
+              style="color: #1677ff"
+            >
+              {{ record.fileName }}
+            </a>
           </template>
           <template v-else-if="column.key === 'fileSize'">
             {{ formatFileSize(record.fileSize) }}
@@ -610,6 +610,20 @@
           </template>
         </template>
       </a-table>
+    </a-modal>
+
+    <a-modal v-model:open="attachmentPreviewOpen" :title="attachmentPreviewTitle" width="960px" :footer="null">
+      <a-image
+        v-if="attachmentPreviewKind === 'image' && attachmentPreviewUrl"
+        :src="attachmentPreviewUrl"
+        style="max-width: 100%"
+      />
+      <iframe
+        v-else-if="attachmentPreviewUrl"
+        :src="attachmentPreviewUrl"
+        style="width: 100%; height: 72vh; border: 0"
+      />
+      <a-empty v-else description="附件链接缺失，暂时无法预览" />
     </a-modal>
 
     <a-modal v-model:open="finalizeOpen" title="最终签署" width="620px" :confirm-loading="finalizing" @ok="submitFinalize">
@@ -1320,6 +1334,10 @@ const columns = [
 
 const attachmentOpen = ref(false)
 const attachmentSubmitting = ref(false)
+const attachmentPreviewOpen = ref(false)
+const attachmentPreviewUrl = ref('')
+const attachmentPreviewTitle = ref('附件预览')
+const attachmentPreviewKind = ref<'image' | 'iframe'>('iframe')
 const attachmentType = ref<'MEDICAL_RECORD' | 'MEDICAL_INSURANCE' | 'HOUSEHOLD' | 'CONTRACT' | 'OTHER'>('CONTRACT')
 const currentAttachmentLead = ref<CrmContractItem>()
 const attachments = ref<ContractAttachmentItem[]>([])
@@ -2397,7 +2415,43 @@ function isImageAttachment(record: ContractAttachmentItem) {
   const type = (record.fileType || '').toLowerCase()
   if (type.startsWith('image/')) return true
   const url = (record.fileUrl || '').toLowerCase()
-  return ['.jpg', '.jpeg', '.png', '.gif', '.webp'].some((suffix) => url.endsWith(suffix))
+  return ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'].some((suffix) => url.includes(suffix))
+}
+
+function resolveAttachmentUrl(fileUrl?: string) {
+  const text = String(fileUrl || '').trim()
+  if (!text) return ''
+  if (/^https?:\/\//i.test(text)) return text
+  try {
+    return new URL(text, window.location.origin).toString()
+  } catch (_error) {
+    return text
+  }
+}
+
+function isIframePreviewable(record: ContractAttachmentItem) {
+  if (isImageAttachment(record)) return true
+  const fileType = String(record.fileType || '').toLowerCase()
+  if (fileType.includes('pdf') || fileType.startsWith('text/')) return true
+  const fileUrl = String(record.fileUrl || '').toLowerCase()
+  return ['.pdf', '.txt', '.md', '.json', '.csv', '.log'].some((suffix) => fileUrl.includes(suffix))
+}
+
+function previewAttachment(record: ContractAttachmentItem) {
+  const url = resolveAttachmentUrl(record.fileUrl)
+  if (!url) {
+    message.warning('附件链接缺失，暂时无法预览')
+    return
+  }
+  if (isIframePreviewable(record)) {
+    attachmentPreviewTitle.value = record.fileName || '附件预览'
+    attachmentPreviewKind.value = isImageAttachment(record) ? 'image' : 'iframe'
+    attachmentPreviewUrl.value = url
+    attachmentPreviewOpen.value = true
+    return
+  }
+  window.open(url, '_blank', 'noopener,noreferrer')
+  message.info('该文件将通过浏览器新窗口打开，若浏览器不支持预览会直接下载')
 }
 
 function formatFileSize(size?: number) {
