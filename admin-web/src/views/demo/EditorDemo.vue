@@ -11,7 +11,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
-import { RichTextEditor } from '../../plugins/editor'
 
 const content = ref('<p>欢迎使用富文本编辑器</p>')
 </script>

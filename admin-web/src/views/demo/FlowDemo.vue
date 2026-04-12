@@ -13,7 +13,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import PageContainer from '../../components/PageContainer.vue'
-import { FlowDesigner } from '../../plugins/flow'
 
 const graph = ref({
   nodes: [
