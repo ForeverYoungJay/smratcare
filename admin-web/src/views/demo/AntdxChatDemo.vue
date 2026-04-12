@@ -8,6 +8,7 @@
 
 <script setup lang="ts">
 import PageContainer from '../../components/PageContainer.vue'
+import { AdxChat } from '../../plugins/antdx'
 </script>
 
 <style scoped>
