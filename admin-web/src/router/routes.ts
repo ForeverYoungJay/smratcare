@@ -1292,97 +1292,10 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: '财务搜索', hidden: true }
           },
           {
-            path: 'accounts',
-            name: 'FinanceAccounts',
-            redirect: '/finance/accounts/list',
-            meta: { title: '账户与预存' },
-            children: [
-              {
-                path: 'list',
-                name: 'FinanceAccountsList',
-                component: () => import('../views/finance/Account.vue'),
-                meta: { title: '长者账户列表' }
-              },
-              {
-                path: 'ledger',
-                name: 'FinanceAccountsLedger',
-                component: () => import('../views/finance/AccountLog.vue'),
-                meta: { title: '账户流水' }
-              },
-              {
-                path: 'warning-rules',
-                name: 'FinanceAccountsWarningRules',
-                component: () => import('../views/finance/BalanceWarningRules.vue'),
-                meta: { title: '余额预警规则' }
-              }
-            ]
-          },
-          {
-            path: 'bills',
-            name: 'FinanceBills',
-            redirect: '/finance/bills/in-resident',
-            meta: { title: '账单与欠费' },
-            children: [
-              {
-                path: 'in-admission',
-                name: 'FinanceBillsInAdmission',
-                component: () => import('../views/finance/AdmissionBillPayment.vue'),
-                meta: { title: '入住账单' }
-              },
-              {
-                path: 'in-resident',
-                name: 'FinanceBillsInResident',
-                component: () => import('../views/finance/ResidentBillPayment.vue'),
-                meta: { title: '在住周期账单' }
-              },
-              {
-                path: 'discharge',
-                name: 'FinanceBillsDischarge',
-                component: () => import('../views/finance/DischargeSettlement.vue'),
-                meta: { title: '退住结算账单' }
-              },
-              {
-                path: 'rules',
-                name: 'FinanceBillsRules',
-                component: () => import('../views/finance/BillingRulesConfig.vue'),
-                meta: { title: '计费规则与账单模板' }
-              },
-              {
-                path: 'auto-deduct',
-                name: 'FinanceBillsAutoDeduct',
-                component: () => import('../views/finance/AutoDebitManagement.vue'),
-                meta: { title: '自动扣费与催缴' }
-              },
-              {
-                path: 'auto-deduct-errors',
-                name: 'FinanceBillsAutoDeductErrors',
-                component: () => import('../views/finance/AutoDebitManagement.vue'),
-                meta: { title: '自动扣费异常' }
-              },
-              {
-                path: 'detail-query',
-                name: 'FinanceBillsDetailQuery',
-                component: () => import('../views/finance/BillCenter.vue'),
-                meta: { title: '账单查询' },
-                props: {
-                  title: '账单详情查询',
-                  subTitle: '按老人、月份检索账单后进入详情页',
-                  defaultCurrentMonth: true
-                }
-              },
-              {
-                path: 'follow-up',
-                name: 'FinanceBillsFollowUp',
-                component: () => import('../views/finance/FinanceCollectionFollowUp.vue'),
-                meta: { title: '欠费催缴跟进' }
-              }
-            ]
-          },
-          {
             path: 'payments',
             name: 'FinancePayments',
             redirect: '/finance/payments/cashier-desk',
-            meta: { title: '收款与交班' },
+            meta: { title: '收费与收款' },
             children: [
               {
                 path: 'cashier-desk',
@@ -1396,54 +1309,107 @@ export const routes: RouteRecordRaw[] = [
                 component: () => import('../views/finance/ResidentBillPayment.vue'),
                 meta: { title: '收费登记' }
               },
-                            {
-                                path: 'refund-reversal',
-                                name: 'FinancePaymentsRefundReversal',
-                                component: () => import('../views/finance/PaymentRefundReversal.vue'),
-                                meta: { title: '退款与冲正' }
-                            },
               {
-                path: 'shift-close',
-                name: 'FinancePaymentsShiftClose',
-                component: () => import('../views/finance/ShiftClose.vue'),
-                meta: { title: '日结与交班' }
+                path: 'records',
+                name: 'FinancePaymentsRecords',
+                component: () => import('../views/finance/PaymentRecords.vue'),
+                meta: { title: '收款流水' }
               },
-                            {
-                                path: 'records',
-                                name: 'FinancePaymentsRecords',
-                                component: () => import('../views/finance/PaymentRecords.vue'),
-                                meta: { title: '收款流水' }
-                            }
-            ]
-          },
-          {
-            path: 'fees',
-            name: 'FinanceFees',
-            redirect: '/finance/fees/payment-and-invoice',
-            meta: { title: '票据管理' },
-            children: [
               {
-                path: 'payment-and-invoice',
+                path: '/finance/fees/payment-and-invoice',
                 name: 'FinancePaymentsInvoice',
                 component: () => import('../views/finance/InvoiceReceiptManagement.vue'),
                 meta: { title: '发票与收据' }
+              },
+              {
+                path: '/finance/payments/refund-reversal',
+                name: 'FinancePaymentsRefundReversal',
+                component: () => import('../views/finance/PaymentRefundReversal.vue'),
+                meta: { title: '退款与冲正' }
+              },
+              {
+                path: '/finance/payments/shift-close',
+                name: 'FinancePaymentsShiftClose',
+                component: () => import('../views/finance/ShiftClose.vue'),
+                meta: { title: '日结与交班' }
               }
             ]
           },
           {
-            path: 'flows',
-            name: 'FinanceFlows',
-            redirect: '/finance/flows/consumption',
-            meta: { title: '流水与调整' },
+            path: 'billing',
+            name: 'FinanceBilling',
+            redirect: '/finance/bills/in-resident',
+            meta: { title: '账单与账户' },
             children: [
               {
-                path: 'consumption',
+                path: '/finance/bills/in-admission',
+                name: 'FinanceBillsInAdmission',
+                component: () => import('../views/finance/AdmissionBillPayment.vue'),
+                meta: { title: '入住账单' }
+              },
+              {
+                path: '/finance/bills/in-resident',
+                name: 'FinanceBillsInResident',
+                component: () => import('../views/finance/ResidentBillPayment.vue'),
+                meta: { title: '在住周期账单' }
+              },
+              {
+                path: '/finance/bills/detail-query',
+                name: 'FinanceBillsDetailQuery',
+                component: () => import('../views/finance/BillCenter.vue'),
+                meta: { title: '账单查询' },
+                props: {
+                  title: '账单详情查询',
+                  subTitle: '按老人、月份检索账单后进入详情页',
+                  defaultCurrentMonth: true
+                }
+              },
+              {
+                path: '/finance/accounts/list',
+                name: 'FinanceAccountsList',
+                component: () => import('../views/finance/Account.vue'),
+                meta: { title: '长者账户列表' }
+              },
+              {
+                path: '/finance/accounts/ledger',
+                name: 'FinanceAccountsLedger',
+                component: () => import('../views/finance/AccountLog.vue'),
+                meta: { title: '账户流水' }
+              },
+              {
+                path: '/finance/prepaid-recharge',
+                name: 'FinancePrepaidRecharge',
+                component: () => import('../views/finance/PrepaidRecharge.vue'),
+                meta: { title: '预存充值' }
+              },
+              {
+                path: '/finance/accounts/warning-rules',
+                name: 'FinanceAccountsWarningRules',
+                component: () => import('../views/finance/BalanceWarningRules.vue'),
+                meta: { title: '余额预警规则' }
+              },
+              {
+                path: '/finance/admission-fee-audit',
+                name: 'FinanceAdmissionFeeAudit',
+                component: () => import('../views/finance/AdmissionFeeAudit.vue'),
+                meta: { title: '入住费用审核' }
+              }
+            ]
+          },
+          {
+            path: 'sources',
+            name: 'FinanceSources',
+            redirect: '/finance/flows/consumption',
+            meta: { title: '消费与分摊' },
+            children: [
+              {
+                path: '/finance/flows/consumption',
                 name: 'FinanceFlowsConsumption',
                 component: () => import('../views/finance/ConsumptionRegister.vue'),
                 meta: { title: '消费登记' }
               },
               {
-                path: 'medical',
+                path: '/finance/flows/medical',
                 name: 'FinanceFlowsMedical',
                 component: () => import('../views/finance/FlowCenter.vue'),
                 meta: { title: '医护费用流水' },
@@ -1459,7 +1425,7 @@ export const routes: RouteRecordRaw[] = [
                 }
               },
               {
-                path: 'medical-errors',
+                path: '/finance/flows/medical-errors',
                 name: 'FinanceFlowsMedicalErrors',
                 component: () => import('../views/finance/FlowCenter.vue'),
                 meta: { title: '医护费用异常' },
@@ -1475,7 +1441,7 @@ export const routes: RouteRecordRaw[] = [
                 }
               },
               {
-                path: 'dining',
+                path: '/finance/flows/dining',
                 name: 'FinanceFlowsDining',
                 component: () => import('../views/finance/FlowCenter.vue'),
                 meta: { title: '餐饮扣费流水' },
@@ -1491,7 +1457,7 @@ export const routes: RouteRecordRaw[] = [
                 }
               },
               {
-                path: 'logistics',
+                path: '/finance/flows/logistics',
                 name: 'FinanceFlowsLogistics',
                 component: () => import('../views/finance/FlowCenter.vue'),
                 meta: { title: '物资/后勤收费流水' },
@@ -1507,7 +1473,7 @@ export const routes: RouteRecordRaw[] = [
                 }
               },
               {
-                path: 'adjustments',
+                path: '/finance/flows/adjustments',
                 name: 'FinanceFlowsAdjustments',
                 component: () => import('../views/finance/FlowCenter.vue'),
                 meta: { title: '费用调整单' },
@@ -1520,35 +1486,15 @@ export const routes: RouteRecordRaw[] = [
                     { label: '查看退住审核', to: '/finance/discharge/review?status=pending' }
                   ]
                 }
-              }
-            ]
-          },
-          {
-            path: 'allocation',
-            name: 'FinanceAllocation',
-            redirect: '/finance/allocation/public-cost',
-            meta: { title: '公共费用分摊' },
-            children: [
-              {
-                path: 'subjects',
-                name: 'FinanceAllocationSubjects',
-                component: () => import('../views/finance/FeeSubjectDictionary.vue'),
-                meta: { title: '费用科目管理' }
               },
               {
-                path: 'rules',
-                name: 'FinanceAllocationRules',
-                component: () => import('../views/finance/AllocationRules.vue'),
-                meta: { title: '分摊规则' }
-              },
-              {
-                path: 'public-cost',
+                path: '/finance/allocation/public-cost',
                 name: 'FinanceAllocationPublicCost',
                 component: () => import('../views/finance/MonthlyAllocation.vue'),
                 meta: { title: '公共费用计算' }
               },
               {
-                path: 'tasks',
+                path: '/finance/allocation/tasks',
                 name: 'FinanceAllocationTasks',
                 component: () => import('../views/finance/MonthlyAllocation.vue'),
                 meta: { title: '分摊入账任务' }
@@ -1556,10 +1502,54 @@ export const routes: RouteRecordRaw[] = [
             ]
           },
           {
+            path: 'risk',
+            name: 'FinanceRisk',
+            redirect: '/finance/bills/follow-up',
+            meta: { title: '欠费与异常' },
+            children: [
+              {
+                path: '/finance/bills/follow-up',
+                name: 'FinanceBillsFollowUp',
+                component: () => import('../views/finance/FinanceCollectionFollowUp.vue'),
+                meta: { title: '欠费催缴跟进' }
+              },
+              {
+                path: '/finance/bills/auto-deduct',
+                name: 'FinanceBillsAutoDeduct',
+                component: () => import('../views/finance/AutoDebitManagement.vue'),
+                meta: { title: '自动扣费与催缴' }
+              },
+              {
+                path: '/finance/bills/auto-deduct-errors',
+                name: 'FinanceBillsAutoDeductErrors',
+                component: () => import('../views/finance/AutoDebitManagement.vue'),
+                meta: { title: '自动扣费异常' }
+              },
+              {
+                path: '/finance/reconcile/exception',
+                name: 'FinanceReconcileException',
+                component: () => import('../views/finance/ReconcileException.vue'),
+                meta: { title: '对账异常处理' }
+              },
+              {
+                path: '/finance/reconcile/ledger-health',
+                name: 'FinanceReconcileLedgerHealth',
+                component: () => import('../views/finance/LedgerHealth.vue'),
+                meta: { title: '财务一致性巡检' }
+              },
+              {
+                path: '/finance/reconcile/issue-center',
+                name: 'FinanceReconcileIssueCenter',
+                component: () => import('../views/finance/FinanceIssueCenter.vue'),
+                meta: { title: '异常修复中心' }
+              }
+            ]
+          },
+          {
             path: 'discharge',
             name: 'FinanceDischarge',
             redirect: '/finance/discharge/review',
-            meta: { title: '退住结算与退款' },
+            meta: { title: '结算与月结' },
             children: [
               {
                 path: 'review',
@@ -1584,53 +1574,21 @@ export const routes: RouteRecordRaw[] = [
                 name: 'FinanceDischargeStatusSync',
                 component: () => import('../views/finance/DischargeStatusSync.vue'),
                 meta: { title: '结算状态回写' }
-              }
-            ]
-          },
-          {
-            path: 'reconcile',
-            name: 'FinanceReconcile',
-            redirect: '/finance/reconcile/center',
-            meta: { title: '对账与月结' },
-            children: [
+              },
               {
-                path: 'center',
+                path: '/finance/reconcile/center',
                 name: 'FinanceReconcileCenter',
                 component: () => import('../views/finance/Reconcile.vue'),
                 meta: { title: '对账中心' }
               },
               {
-                path: 'auto-deduct',
-                name: 'FinanceReconcileAutoDeduct',
-                redirect: '/finance/bills/auto-deduct',
-                meta: { title: '自动扣费对账' }
-              },
-              {
-                path: 'invoice',
+                path: '/finance/reconcile/invoice',
                 name: 'FinanceReconcileInvoice',
                 component: () => import('../views/finance/ReconcileInvoice.vue'),
                 meta: { title: '发票对账' }
               },
               {
-                path: 'exception',
-                name: 'FinanceReconcileException',
-                component: () => import('../views/finance/ReconcileException.vue'),
-                meta: { title: '对账异常处理' }
-              },
-              {
-                path: 'ledger-health',
-                name: 'FinanceReconcileLedgerHealth',
-                component: () => import('../views/finance/LedgerHealth.vue'),
-                meta: { title: '财务一致性巡检' }
-              },
-              {
-                path: 'issue-center',
-                name: 'FinanceReconcileIssueCenter',
-                component: () => import('../views/finance/FinanceIssueCenter.vue'),
-                meta: { title: '异常修复中心' }
-              },
-              {
-                path: 'month-close',
+                path: '/finance/reconcile/month-close',
                 name: 'FinanceReconcileMonthClose',
                 component: () => import('../views/finance/FinanceMonthClose.vue'),
                 meta: { title: '月结进度' }
@@ -1641,7 +1599,7 @@ export const routes: RouteRecordRaw[] = [
             path: 'reports',
             name: 'FinanceReports',
             redirect: '/finance/reports/overall',
-            meta: { title: '经营报表' },
+            meta: { title: '经营分析' },
             children: [
               {
                 path: 'overall',
@@ -1653,13 +1611,13 @@ export const routes: RouteRecordRaw[] = [
                 path: 'revenue-structure',
                 name: 'FinanceReportsRevenueStructure',
                 component: () => import('../views/finance/Report.vue'),
-                meta: { title: '费用结构/营收占比' }
+                meta: { title: '营收结构' }
               },
               {
                 path: 'floor-room-profit',
                 name: 'FinanceReportsFloorRoom',
                 component: () => import('../views/finance/Report.vue'),
-                meta: { title: '楼层/房间收支情况' }
+                meta: { title: '楼层房间收支' }
               },
               {
                 path: 'room-ops-detail',
@@ -1671,7 +1629,7 @@ export const routes: RouteRecordRaw[] = [
                 path: 'occupancy-consumption',
                 name: 'FinanceReportsOccupancyConsumption',
                 component: () => import('../views/finance/Report.vue'),
-                meta: { title: '入住/床位/消费统计' }
+                meta: { title: '入住与消费' }
               },
               {
                 path: 'monthly-ops',
@@ -1694,16 +1652,22 @@ export const routes: RouteRecordRaw[] = [
                 meta: { title: '主数据配置中心' }
               },
               {
-                path: 'fee-subjects',
+                path: '/finance/allocation/subjects',
                 name: 'FinanceConfigFeeSubjects',
                 component: () => import('../views/finance/FeeSubjectDictionary.vue'),
-                meta: { title: '费用科目字典' }
+                meta: { title: '费用科目' }
               },
               {
-                path: 'billing-pricing',
-                name: 'FinanceConfigBillingPricing',
-                redirect: '/finance/bills/rules',
+                path: '/finance/bills/rules',
+                name: 'FinanceBillsRules',
+                component: () => import('../views/finance/BillingRulesConfig.vue'),
                 meta: { title: '计费规则' }
+              },
+              {
+                path: '/finance/allocation/rules',
+                name: 'FinanceAllocationRules',
+                component: () => import('../views/finance/AllocationRules.vue'),
+                meta: { title: '分摊规则' }
               },
               {
                 path: 'payment-channels',
@@ -1732,10 +1696,40 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: '押金管理（兼容）', hidden: true }
           },
           {
-            path: 'admission-fee-audit',
-            name: 'FinanceAdmissionFeeAudit',
-            component: () => import('../views/finance/AdmissionFeeAudit.vue'),
-            meta: { title: '入住费用审核' }
+            path: 'accounts',
+            name: 'FinanceAccountsCompat',
+            redirect: '/finance/accounts/list',
+            meta: { title: '账户与预存（兼容）', hidden: true }
+          },
+          {
+            path: 'bills',
+            name: 'FinanceBillsCompat',
+            redirect: '/finance/bills/in-resident',
+            meta: { title: '账单与账户（兼容）', hidden: true }
+          },
+          {
+            path: 'flows',
+            name: 'FinanceFlowsCompat',
+            redirect: '/finance/flows/consumption',
+            meta: { title: '消费与分摊（兼容）', hidden: true }
+          },
+          {
+            path: 'fees',
+            name: 'FinanceFeesCompat',
+            redirect: '/finance/fees/payment-and-invoice',
+            meta: { title: '收费与票据（兼容）', hidden: true }
+          },
+          {
+            path: 'allocation',
+            name: 'FinanceAllocationCompat',
+            redirect: '/finance/allocation/public-cost',
+            meta: { title: '公共费用分摊（兼容）', hidden: true }
+          },
+          {
+            path: 'reconcile',
+            name: 'FinanceReconcileCompat',
+            redirect: '/finance/reconcile/center',
+            meta: { title: '欠费与异常（兼容）', hidden: true }
           },
           {
             path: 'admission-bill-payment',
@@ -1754,12 +1748,6 @@ export const routes: RouteRecordRaw[] = [
             name: 'FinanceMonthlyAllocation',
             redirect: '/finance/allocation/public-cost',
             meta: { title: '月分摊费（兼容）', hidden: true }
-          },
-          {
-            path: 'prepaid-recharge',
-            name: 'FinancePrepaidRecharge',
-            component: () => import('../views/finance/PrepaidRecharge.vue'),
-            meta: { title: '预存充值' }
           },
           {
             path: 'discharge-fee-audit',
