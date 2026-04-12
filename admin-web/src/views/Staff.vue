@@ -49,7 +49,7 @@
         />
       </a-form-item>
       <template #extra>
-        <a-button type="primary" v-permission="accountManagerRoles" @click="openDrawer()">新增员工</a-button>
+        <a-button type="primary" v-permission="accountManagerRoles" @click="goToProfileBasicCreate()">新增员工主档</a-button>
         <a-button :type="showSupervisorAnomaliesOnly ? 'primary' : 'default'" @click="toggleSupervisorAnomalyView">
           监管异常 {{ supervisorAnomalies.length }}
         </a-button>
@@ -146,39 +146,19 @@
           </div>
         </template>
         <a-divider orientation="left">账号信息</a-divider>
-        <template v-if="!form.id">
-          <a-form-item label="账号" required>
-            <a-input v-model:value="form.username" :disabled="!form.id" placeholder="默认与职工号一致" />
-            <div class="form-rule-tip">新建时默认使用自动生成的职工号作为登录账号。</div>
-          </a-form-item>
-          <a-form-item label="职工号（登录ID）" required>
-            <a-input v-model:value="form.staffNo" :disabled="!!form.id" placeholder="保存前可自动生成" />
-            <a-space style="margin-top: 8px">
-              <a-button size="small" @click="regenerateStaffCredentials">重新生成职工号</a-button>
-              <span class="form-rule-tip">默认初始密码：123456</span>
-            </a-space>
-          </a-form-item>
-          <a-form-item label="姓名" required>
-            <a-input v-model:value="form.realName" />
-          </a-form-item>
-        </template>
+        <a-alert
+          v-if="!form.id"
+          type="warning"
+          show-icon
+          style="margin-bottom: 12px"
+          message="员工主档请在“员工基本信息”新增"
+          description="账号与领导设置页只处理已有员工的账号、密码、角色和监管链。"
+        />
         <a-form-item :label="form.id ? '重置密码（可选）' : '初始密码'" :required="!form.id">
           <a-input-password v-model:value="form.password" :placeholder="form.id ? '留空则不修改密码' : '请输入初始密码'" />
-          <div v-if="!form.id" class="form-rule-tip">新账号默认密码为 123456，可保存前修改。</div>
+          <div v-if="!form.id" class="form-rule-tip">建议先到员工基本信息建档，再回这里初始化账号。</div>
         </a-form-item>
-        <a-divider v-if="!form.id || form.departmentId" orientation="left">组织与监管</a-divider>
-        <a-form-item v-if="!form.id" label="部门" required>
-          <a-select
-            v-model:value="form.departmentId"
-            allow-clear
-            show-search
-            :filter-option="false"
-            :options="departmentSelectOptions"
-            placeholder="输入部门名称/拼音首字母"
-            @search="searchDepartments"
-            @focus="() => !departmentOptions.length && searchDepartments('')"
-          />
-        </a-form-item>
+        <a-divider v-if="form.departmentId" orientation="left">组织与监管</a-divider>
         <a-form-item label="直接领导（一级监管）">
           <div class="form-rule-tip">{{ directLeaderRuleHint }}</div>
           <a-select
@@ -221,9 +201,6 @@
           :description="leaderStrategyDescription"
         />
         <a-divider orientation="left">账号状态</a-divider>
-        <a-form-item v-if="!form.id" label="手机号">
-          <a-input v-model:value="form.phone" />
-        </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="form.status" :options="statusOptions" />
         </a-form-item>
@@ -231,7 +208,6 @@
       <template #footer>
         <a-space>
           <a-button @click="drawerOpen = false">取消</a-button>
-          <a-button v-if="!form.id" :loading="saving" @click="submit(true)">保存并打印账号密码</a-button>
           <a-button type="primary" :loading="saving" @click="submit">保存</a-button>
         </a-space>
       </template>
@@ -276,7 +252,7 @@ import { message } from 'ant-design-vue'
 import PageContainer from '../components/PageContainer.vue'
 import SearchForm from '../components/SearchForm.vue'
 import DataTable from '../components/DataTable.vue'
-import { getStaff, getStaffCredentials, getStaffPage, createStaff, updateStaff, updateStaffRoles, getStaffSupervisorAnomalies, lockStaff, unlockStaff } from '../api/staff'
+import { getStaff, getStaffCredentials, getStaffPage, updateStaff, updateStaffRoles, getStaffSupervisorAnomalies, lockStaff, unlockStaff } from '../api/staff'
 import { getRolePage } from '../api/role'
 import { getStaffRoleAssignments } from '../api/rbac'
 import { useDepartmentOptions } from '../composables/useDepartmentOptions'
@@ -333,7 +309,6 @@ const columns = [
 
 const drawerOpen = ref(false)
 const form = reactive<Partial<StaffItem>>({})
-const DEFAULT_INITIAL_PASSWORD = '123456'
 const statusOptions = [
   { label: '启用', value: 1 },
   { label: '已锁定', value: 0 }
@@ -534,7 +509,7 @@ const leaderStrategyDescription = computed(() => {
   }
   return '建议做法：先在角色管理里给角色设置“上级领导角色”，再回到这里一键推荐。员工个人层面的直接领导、间接领导只用于落地到具体负责人。'
 })
-const drawerTitle = computed(() => (form.id ? '编辑员工' : '新增员工'))
+const drawerTitle = computed(() => (form.id ? '编辑账号与领导' : '初始化账号'))
 const supervisorAnomalyMap = computed(() => {
   const map = new Map<string, string>()
   supervisorAnomalies.value.forEach((item) => {
@@ -640,14 +615,15 @@ function exportSupervisorAnomalies() {
 }
 
 function openDrawer(record?: StaffItem) {
+  if (!record) {
+    message.info('员工主档请先在“员工基本信息”新增')
+    goToProfileBasicCreate()
+    return
+  }
   Object.keys(form).forEach((key) => {
     ;(form as any)[key] = undefined
   })
   Object.assign(form, record || { status: 1 })
-  if (!record) {
-    regenerateStaffCredentials()
-    form.password = DEFAULT_INITIAL_PASSWORD
-  }
   ensureSelectedDepartment(form.departmentId)
   if (form.directLeaderId != null) ensureSelectedStaff(form.directLeaderId)
   if (form.indirectLeaderId != null) ensureSelectedStaff(form.indirectLeaderId)
@@ -668,17 +644,8 @@ function goToProfileBasic() {
   })
 }
 
-function generateStaffNo() {
-  return `YG${dayjs().format('YYMMDDHHmmssSSS')}`
-}
-
-function regenerateStaffCredentials() {
-  if (form.id) return
-  form.staffNo = generateStaffNo()
-  form.username = form.staffNo
-  if (!String(form.password || '').trim()) {
-    form.password = DEFAULT_INITIAL_PASSWORD
-  }
+function goToProfileBasicCreate() {
+  router.push('/hr/profile/basic')
 }
 
 function consumeAutoOpenQuery() {
@@ -715,7 +682,12 @@ function openDrawerWithRecommendation(record: StaffItem) {
   applySupervisorRecommendation()
 }
 
-async function submit(printAfterSave = false) {
+async function submit() {
+  if (!form.id) {
+    message.warning('请先在员工基本信息创建员工主档，再回到这里初始化账号')
+    goToProfileBasicCreate()
+    return
+  }
   const username = String(form.username || '').trim()
   const realName = String(form.realName || '').trim()
   const staffNo = String(form.staffNo || '').trim()
@@ -772,20 +744,12 @@ async function submit(printAfterSave = false) {
       staffNo,
       directLeaderId: form.directLeaderId ? String(form.directLeaderId) : undefined,
       indirectLeaderId: form.indirectLeaderId ? String(form.indirectLeaderId) : undefined
-    }
-    if (!payload.password) delete payload.password
-    let saved: StaffItem
-    if (form.id) {
-      saved = await updateStaff(form.id, payload)
-    } else {
-      saved = await createStaff(payload)
-    }
+  }
+  if (!payload.password) delete payload.password
+    const saved = await updateStaff(form.id, payload)
     message.success('保存成功')
     drawerOpen.value = false
     await fetchData()
-    if (printAfterSave && saved?.id) {
-      await openCredential(saved.id, true)
-    }
   } catch {
     message.error('保存失败')
   } finally {

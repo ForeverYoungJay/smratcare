@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.zhiyangyun.care.auth.model.Result;
 import com.zhiyangyun.care.auth.security.AuthContext;
+import com.zhiyangyun.care.auth.security.PermissionChecker;
 import com.zhiyangyun.care.oa.entity.OaTask;
 import com.zhiyangyun.care.oa.mapper.OaTaskMapper;
 import com.zhiyangyun.care.oa.model.OaBatchIdsRequest;
@@ -44,9 +45,11 @@ import org.springframework.web.bind.annotation.RestController;
 @PreAuthorize("hasAnyRole('STAFF','HR_EMPLOYEE','HR_MINISTER','MEDICAL_EMPLOYEE','MEDICAL_MINISTER','NURSING_EMPLOYEE','NURSING_MINISTER','FINANCE_EMPLOYEE','FINANCE_MINISTER','LOGISTICS_EMPLOYEE','LOGISTICS_MINISTER','MARKETING_EMPLOYEE','MARKETING_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
 public class OaTaskController {
   private final OaTaskMapper taskMapper;
+  private final PermissionChecker permissionChecker;
 
-  public OaTaskController(OaTaskMapper taskMapper) {
+  public OaTaskController(OaTaskMapper taskMapper, PermissionChecker permissionChecker) {
     this.taskMapper = taskMapper;
+    this.permissionChecker = permissionChecker;
   }
 
   @GetMapping("/page")
@@ -260,7 +263,7 @@ public class OaTaskController {
   }
 
   @PostMapping
-  @PreAuthorize("@perm.has('oa.calendar.manage')")
+  @PreAuthorize("@perm.hasAny('oa.calendar.manage','oa.calendar.view')")
   public Result<OaTask> create(@Valid @RequestBody OaTaskRequest request) {
     Long orgId = AuthContext.getOrgId();
     validateDateRange(request.getStartTime(), request.getEndTime());
@@ -296,7 +299,7 @@ public class OaTaskController {
   }
 
   @PutMapping("/{id}")
-  @PreAuthorize("@perm.has('oa.calendar.manage')")
+  @PreAuthorize("@perm.hasAny('oa.calendar.manage','oa.calendar.view')")
   public Result<OaTask> update(@PathVariable Long id, @Valid @RequestBody OaTaskRequest request) {
     OaTask task = findAccessibleTask(id);
     if (task == null) {
@@ -334,7 +337,7 @@ public class OaTaskController {
   }
 
   @PutMapping("/{id}/done")
-  @PreAuthorize("@perm.has('oa.calendar.manage')")
+  @PreAuthorize("@perm.hasAny('oa.calendar.manage','oa.calendar.view')")
   public Result<OaTask> done(@PathVariable Long id) {
     OaTask task = findAccessibleTask(id);
     if (task == null) {
@@ -349,16 +352,18 @@ public class OaTaskController {
   }
 
   @PutMapping("/batch/done")
-  @PreAuthorize("@perm.has('oa.calendar.manage')")
+  @PreAuthorize("@perm.hasAny('oa.calendar.manage','oa.calendar.view')")
   public Result<Integer> batchDone(@RequestBody OaBatchIdsRequest request) {
     List<Long> ids = sanitizeIds(request == null ? null : request.getIds());
     if (ids.isEmpty()) {
       return Result.ok(0);
     }
     Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
     List<OaTask> tasks = taskMapper.selectList(Wrappers.lambdaQuery(OaTask.class)
         .eq(OaTask::getIsDeleted, 0)
         .eq(orgId != null, OaTask::getOrgId, orgId)
+        .and(!hasCalendarManagePermission(), w -> applyMyCalendarScope(w, staffId, false))
         .in(OaTask::getId, ids));
     int count = 0;
     for (OaTask task : tasks) {
@@ -373,16 +378,18 @@ public class OaTaskController {
   }
 
   @DeleteMapping("/batch")
-  @PreAuthorize("@perm.has('oa.calendar.manage')")
+  @PreAuthorize("@perm.hasAny('oa.calendar.manage','oa.calendar.view')")
   public Result<Integer> batchDelete(@RequestBody OaBatchIdsRequest request) {
     List<Long> ids = sanitizeIds(request == null ? null : request.getIds());
     if (ids.isEmpty()) {
       return Result.ok(0);
     }
     Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
     List<OaTask> tasks = taskMapper.selectList(Wrappers.lambdaQuery(OaTask.class)
         .eq(OaTask::getIsDeleted, 0)
         .eq(orgId != null, OaTask::getOrgId, orgId)
+        .and(!hasCalendarManagePermission(), w -> applyMyCalendarScope(w, staffId, false))
         .in(OaTask::getId, ids));
     for (OaTask task : tasks) {
       task.setIsDeleted(1);
@@ -422,7 +429,7 @@ public class OaTaskController {
   }
 
   @DeleteMapping("/{id}")
-  @PreAuthorize("@perm.has('oa.calendar.manage')")
+  @PreAuthorize("@perm.hasAny('oa.calendar.manage','oa.calendar.view')")
   public Result<Void> delete(@PathVariable Long id) {
     OaTask task = findAccessibleTask(id);
     if (task != null) {
@@ -434,11 +441,17 @@ public class OaTaskController {
 
   private OaTask findAccessibleTask(Long id) {
     Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
     return taskMapper.selectOne(Wrappers.lambdaQuery(OaTask.class)
         .eq(OaTask::getId, id)
         .eq(OaTask::getIsDeleted, 0)
         .eq(orgId != null, OaTask::getOrgId, orgId)
+        .and(!hasCalendarManagePermission(), w -> applyMyCalendarScope(w, staffId, false))
         .last("LIMIT 1"));
+  }
+
+  private boolean hasCalendarManagePermission() {
+    return permissionChecker.has("oa.calendar.manage");
   }
 
   private void validateDateRange(LocalDateTime startTime, LocalDateTime endTime) {
