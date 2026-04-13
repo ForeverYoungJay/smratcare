@@ -67,6 +67,7 @@
                 </a-menu>
               </template>
             </a-dropdown>
+            <a-tag v-if="quickChatDnd" color="red">免打扰</a-tag>
             <a-dropdown trigger="click">
               <a-badge :count="quickNotifyItems.length" size="small">
                 <a-button size="small">通知</a-button>
@@ -265,218 +266,342 @@
     title="快捷聊天"
     :width="quickChatDrawerWidth"
     placement="right"
+    :z-index="1600"
     class="quick-chat-drawer"
   >
-      <a-space wrap class="quick-chat-top-actions">
-        <a-button type="primary" @click="openCreateQuickChatRoom">发起群聊申请</a-button>
-        <a-button :disabled="!activeQuickChatRoom" @click="openInviteQuickChat">邀请部门/成员</a-button>
-        <a-button :disabled="!activeQuickChatRoom" @click="openRenameQuickChatRoom">重命名会话</a-button>
-        <a-select
-          v-model:value="activeQuickChatNotifyMode"
-          size="small"
-          :disabled="!activeQuickChatRoom"
-          :options="quickChatNotifyModeOptions"
-          style="width: 150px;"
-        />
-        <a-button :disabled="!activeQuickChatRoom" @click="togglePinActiveQuickChatRoom">
-          {{ activeQuickChatRoom?.pinned ? '取消置顶' : '置顶会话' }}
-        </a-button>
-        <a-button :disabled="!activeQuickChatRoom" @click="toggleArchiveActiveRoom">
-          {{ activeQuickChatRoom && isRoomArchivedByCurrentUser(activeQuickChatRoom) ? '恢复会话' : '归档会话' }}
-        </a-button>
-        <a-button size="small" :loading="quickChatCloudSyncing" @click="forceQuickChatCloudSync">立即同步</a-button>
-        <a-button
-          v-if="quickChatFanoutQueuedPayload"
-          size="small"
-          :loading="quickChatFanoutPending"
-          @click="retryQuickChatFanoutNow"
-        >
-          重试分发
-        </a-button>
-        <a-button :disabled="!activeQuickChatRoom" @click="nudgeActiveQuickChatRoom">催办提醒</a-button>
-        <a-button :disabled="!activeQuickChatRoom" @click="exportActiveQuickChatHistory">导出会话</a-button>
-        <a-badge :count="quickChatTodoPendingCount" size="small">
-          <a-button @click="openQuickChatTodoDrawer">聊天待办</a-button>
-        </a-badge>
-        <a-button danger :disabled="!activeQuickChatRoom" @click="exitActiveQuickChatRoom">退出会话</a-button>
-        <a-tag :color="presenceStatus.color">{{ presenceStatus.label }}</a-tag>
-        <a-tag :color="quickChatWsStatus.color">{{ quickChatWsStatus.text }}</a-tag>
-        <a-tag :color="quickChatCloudStatus.color">{{ quickChatCloudStatus.text }}</a-tag>
-        <a-tag :color="quickChatFanoutStatus.color">{{ quickChatFanoutStatus.text }}</a-tag>
-        <a-tag v-if="quickChatDnd" color="red">免打扰已开启</a-tag>
-        <a-tag v-if="quickChatPressureTag" :color="quickChatPressureTag.color">{{ quickChatPressureTag.text }}</a-tag>
-        <a-button
-          v-if="canUndoQuickChatArchive"
-          size="small"
-          type="link"
-          @click="undoLastArchivedQuickChatRoom"
-        >
-          撤销删除
-        </a-button>
-      </a-space>
-    <div class="quick-chat-layout">
-      <div class="quick-chat-room-list">
-        <div class="quick-chat-room-search">
-          <a-input v-model:value="quickChatKeyword" allow-clear placeholder="搜索会话名/成员名" />
-          <a-segmented v-model:value="quickChatRoomListMode" :options="quickChatRoomListModeOptions" size="small" style="margin-top: 8px; width: 100%;" />
-          <a-checkbox v-model:checked="quickChatUnreadOnly" style="margin-top: 6px;">仅看未读</a-checkbox>
-          <div class="quick-chat-batch-bar">
-            <a-button size="small" @click="toggleQuickChatBatchMode">{{ quickChatBatchMode ? '退出批量' : '批量管理' }}</a-button>
-            <template v-if="quickChatBatchMode">
-              <a-button size="small" @click="selectAllFilteredRooms">全选</a-button>
-              <a-button size="small" @click="clearBatchSelection">清空</a-button>
-              <a-button size="small" :disabled="!quickChatBatchSelectedIds.length" @click="batchMarkSelectedAsRead">批量已读</a-button>
-              <a-button size="small" :disabled="!quickChatBatchSelectedIds.length" @click="batchToggleArchiveSelected">批量归档/恢复</a-button>
-            </template>
+    <div class="quick-chat-shell">
+      <div class="quick-chat-top-actions">
+        <div class="quick-chat-overview">
+          <div class="quick-chat-overview-copy">
+            <div class="quick-chat-overline">Quick Collaboration</div>
+            <strong>快捷聊天工作台</strong>
+            <span>已读、会话待办、成员工作状态放在同一条操作视线里。</span>
+          </div>
+          <div class="quick-chat-overview-metrics">
+            <div class="quick-chat-overview-pill">
+              <span>进行中会话</span>
+              <strong>{{ visibleQuickChatRooms.length }}</strong>
+            </div>
+            <div class="quick-chat-overview-pill">
+              <span>未读会话</span>
+              <strong>{{ quickChatUnreadRoomCount }}</strong>
+            </div>
+            <div class="quick-chat-overview-pill">
+              <span>待办压力</span>
+              <strong>{{ quickChatTodoPendingCount }}</strong>
+            </div>
           </div>
         </div>
-        <a-list :data-source="filteredQuickChatRooms" size="small" :locale="{ emptyText: '暂无会话，先发起一个群聊' }">
-          <template #renderItem="{ item }">
-            <a-list-item
-              class="quick-chat-room-item"
-              :class="{ active: item.id === activeQuickChatRoomId }"
-              @click="selectQuickChatRoom(item.id)"
-            >
-              <a-checkbox
-                v-if="quickChatBatchMode"
-                class="quick-chat-room-check"
-                :checked="quickChatBatchSelectedIds.includes(item.id)"
-                @click.stop
-                @change="(event: any) => toggleBatchSelectRoom(item.id, event?.target?.checked === true)"
-              />
-              <a-list-item-meta :description="quickChatLastMessageText(item)">
-                <template #title>
-                  <a-space size="small">
-                    <span>{{ item.name }}</span>
+        <div class="quick-chat-commandbar">
+          <a-button type="primary" @click="openCreateQuickChatRoom">发起群聊</a-button>
+          <a-button :disabled="!activeQuickChatRoom" @click="openInviteQuickChat">邀请成员</a-button>
+          <a-button :disabled="!activeQuickChatRoom" @click="openRenameQuickChatRoom">重命名</a-button>
+          <a-select
+            v-model:value="activeQuickChatNotifyMode"
+            size="small"
+            :disabled="!activeQuickChatRoom"
+            :options="quickChatNotifyModeOptions"
+            style="width: 150px;"
+          />
+          <a-button :disabled="!activeQuickChatRoom" @click="togglePinActiveQuickChatRoom">
+            {{ activeQuickChatRoom?.pinned ? '取消置顶' : '置顶会话' }}
+          </a-button>
+          <a-button :disabled="!activeQuickChatRoom" @click="toggleArchiveActiveRoom">
+            {{ activeQuickChatRoom && isRoomArchivedByCurrentUser(activeQuickChatRoom) ? '恢复会话' : '归档会话' }}
+          </a-button>
+          <a-button :disabled="!activeQuickChatRoom" @click="nudgeActiveQuickChatRoom">催办提醒</a-button>
+          <a-badge :count="quickChatTodoPendingCount" size="small">
+            <a-button @click="openQuickChatTodoDrawer">聊天待办</a-button>
+          </a-badge>
+          <a-button size="small" :loading="quickChatCloudSyncing" @click="forceQuickChatCloudSync">立即同步</a-button>
+          <a-button
+            v-if="quickChatFanoutQueuedPayload"
+            size="small"
+            :loading="quickChatFanoutPending"
+            @click="retryQuickChatFanoutNow"
+          >
+            重试分发
+          </a-button>
+          <a-button :disabled="!activeQuickChatRoom" @click="exportActiveQuickChatHistory">导出会话</a-button>
+          <a-button danger :disabled="!activeQuickChatRoom" @click="exitActiveQuickChatRoom">退出会话</a-button>
+          <a-tag :color="presenceStatus.color">{{ presenceStatus.label }}</a-tag>
+          <a-tag v-if="quickChatDnd" color="red">免打扰已开启</a-tag>
+          <a-tag :color="quickChatWsStatus.color">{{ quickChatWsStatus.text }}</a-tag>
+          <a-tag :color="quickChatCloudStatus.color">{{ quickChatCloudStatus.text }}</a-tag>
+          <a-tag :color="quickChatFanoutStatus.color">{{ quickChatFanoutStatus.text }}</a-tag>
+          <a-tag v-if="quickChatPressureTag" :color="quickChatPressureTag.color">{{ quickChatPressureTag.text }}</a-tag>
+          <a-button
+            v-if="canUndoQuickChatArchive"
+            size="small"
+            type="link"
+            @click="undoLastArchivedQuickChatRoom"
+          >
+            撤销删除
+          </a-button>
+        </div>
+      </div>
+
+      <div class="quick-chat-layout">
+        <div class="quick-chat-room-list">
+          <div class="quick-chat-room-search">
+            <div class="quick-chat-rail-head">
+              <strong>会话列表</strong>
+              <span>{{ filteredQuickChatRooms.length }} 个结果</span>
+            </div>
+            <a-input v-model:value="quickChatKeyword" allow-clear placeholder="搜索会话名/成员名" />
+            <a-segmented v-model:value="quickChatRoomListMode" :options="quickChatRoomListModeOptions" size="small" style="margin-top: 8px; width: 100%;" />
+            <a-checkbox v-model:checked="quickChatUnreadOnly" style="margin-top: 6px;">仅看未读</a-checkbox>
+            <div class="quick-chat-batch-bar">
+              <a-button size="small" @click="toggleQuickChatBatchMode">{{ quickChatBatchMode ? '退出批量' : '批量管理' }}</a-button>
+              <template v-if="quickChatBatchMode">
+                <a-button size="small" @click="selectAllFilteredRooms">全选</a-button>
+                <a-button size="small" @click="clearBatchSelection">清空</a-button>
+                <a-button size="small" :disabled="!quickChatBatchSelectedIds.length" @click="batchMarkSelectedAsRead">批量已读</a-button>
+                <a-button size="small" :disabled="!quickChatBatchSelectedIds.length" @click="batchToggleArchiveSelected">批量归档/恢复</a-button>
+              </template>
+            </div>
+          </div>
+          <a-list :data-source="filteredQuickChatRooms" size="small" :locale="{ emptyText: '暂无会话，先发起一个群聊' }">
+            <template #renderItem="{ item }">
+              <a-list-item
+                class="quick-chat-room-item"
+                :class="{ active: item.id === activeQuickChatRoomId }"
+                @click="selectQuickChatRoom(item.id)"
+              >
+                <a-checkbox
+                  v-if="quickChatBatchMode"
+                  class="quick-chat-room-check"
+                  :checked="quickChatBatchSelectedIds.includes(item.id)"
+                  @click.stop
+                  @change="(event: any) => toggleBatchSelectRoom(item.id, event?.target?.checked === true)"
+                />
+                <div class="quick-chat-room-card">
+                  <div class="quick-chat-room-card-head">
+                    <strong>{{ item.name }}</strong>
+                    <a-tag v-if="item.unreadCount" color="red">{{ item.unreadCount }}</a-tag>
+                  </div>
+                  <div class="quick-chat-room-card-meta">
                     <a-tag v-if="item.pinned" color="gold">置顶</a-tag>
                     <a-tag v-if="quickChatRoomSlaTag(item)" :color="quickChatRoomSlaTag(item)?.color">
                       {{ quickChatRoomSlaTag(item)?.text }}
                     </a-tag>
-                    <a-tag v-if="item.unreadCount" color="red">{{ item.unreadCount }}</a-tag>
-                  </a-space>
-                </template>
-              </a-list-item-meta>
-            </a-list-item>
-          </template>
-        </a-list>
-      </div>
-      <div class="quick-chat-main">
-        <div v-if="activeQuickChatRoom?.notice" class="quick-chat-notice">
-          <strong>群公告：</strong>{{ activeQuickChatRoom.notice }}
-        </div>
-        <div v-if="quickChatSyncConflict.visible" class="quick-chat-sync-conflict">
-          <div class="quick-chat-sync-conflict-title">{{ quickChatSyncConflictTitle }}</div>
-          <div class="quick-chat-sync-conflict-desc">{{ quickChatSyncConflictDesc }}</div>
-          <a-space size="small">
-            <a-button size="small" type="primary" @click="resolveQuickChatConflictUseLocal">以本地覆盖云端</a-button>
-            <a-button size="small" @click="resolveQuickChatConflictUseCloud">使用云端覆盖本地</a-button>
-            <a-button size="small" type="link" @click="dismissQuickChatConflict">稍后处理</a-button>
-          </a-space>
-        </div>
-        <div class="quick-chat-header">
-          <strong>{{ activeQuickChatRoom?.name || '请选择会话' }}</strong>
-          <a-space size="small">
-            <span class="hint-text">{{ activeQuickChatRoom ? `成员 ${activeQuickChatRoom.memberIds.length} 人` : '' }}</span>
-            <a-button size="small" :disabled="!activeQuickChatRoom" @click="openQuickChatMembers">成员</a-button>
-            <a-input
-              v-model:value="quickChatMessageKeyword"
-              allow-clear
-              size="small"
-              placeholder="搜索本会话消息"
-              style="width: 180px;"
-            />
-            <a-button size="small" :disabled="!activeQuickChatRoom" @click="openNoticeEditor">编辑公告</a-button>
-            <a-button size="small" :disabled="!activeQuickChatRoom" @click="markActiveRoomRead">全部已读</a-button>
-            <a-button size="small" danger :disabled="!activeQuickChatRoom" @click="removeActiveQuickChatRoom">删除会话（可恢复）</a-button>
-          </a-space>
-        </div>
-        <div ref="quickChatMessagesRef" class="quick-chat-messages">
-          <a-empty v-if="!filteredActiveQuickChatMessages.length" description="暂无匹配消息" />
-          <div
-            v-for="msg in filteredActiveQuickChatMessages"
-            :key="msg.id"
-            class="quick-chat-message"
-            :class="{ self: isCurrentQuickChatIdentity(msg.senderId) }"
-            :data-message-id="msg.id"
-          >
-            <div class="quick-chat-message-meta">
-              <span>{{ msg.senderName }}</span>
-              <a-space size="small">
-                <span>{{ msg.timeText }}</span>
-                <a-button
-                  v-if="canRecallMessage(msg)"
-                  type="link"
-                  size="small"
-                  class="quick-chat-recall-btn"
-                  @click="recallQuickChatMessage(msg.id)"
-                >
-                  撤回
-                </a-button>
-                <a-button
-                  v-if="!msg.recalled"
-                  type="link"
-                  size="small"
-                  class="quick-chat-recall-btn"
-                  @click="openForwardMessage(msg.id)"
-                >
-                  转发
-                </a-button>
-                <a-dropdown trigger="click">
-                  <a-button type="link" size="small" class="quick-chat-recall-btn">更多</a-button>
-                  <template #overlay>
-                    <a-menu>
-                      <a-menu-item @click="copyQuickChatMessage(msg)">复制</a-menu-item>
-                      <a-menu-item v-if="!msg.recalled" @click="openForwardMessage(msg.id)">转发</a-menu-item>
-                      <a-menu-item v-if="!msg.recalled" @click="addMessageToQuickChatTodo(msg)">设为待办</a-menu-item>
-                      <a-menu-item v-if="canRecallMessage(msg)" @click="recallQuickChatMessage(msg.id)">撤回</a-menu-item>
-                    </a-menu>
-                  </template>
-                </a-dropdown>
-              </a-space>
-            </div>
-            <div class="quick-chat-message-body">
-              <template v-if="msg.recalled">
-                <span class="quick-chat-recalled">该消息已撤回</span>
-              </template>
-              <template v-if="msg.kind === 'IMAGE' && msg.fileUrl">
-                <div class="quick-chat-image-wrap">
-                  <a-image :src="msg.fileUrl" :alt="msg.fileName || '图片'" class="quick-chat-image" />
-                  <div v-if="msg.uploadStatus === 'UPLOADING'" class="quick-chat-upload-mask">上传中...</div>
-                  <div v-else-if="msg.uploadStatus === 'FAILED'" class="quick-chat-upload-mask quick-chat-upload-mask-failed">上传失败</div>
+                    <span>{{ item.memberIds.length }} 人</span>
+                  </div>
+                  <p>{{ quickChatLastMessageText(item) }}</p>
                 </div>
-              </template>
-              <template v-else-if="msg.kind === 'FILE'">
-                <span v-if="msg.uploadStatus === 'UPLOADING'" class="quick-chat-uploading-file">
-                  {{ msg.fileName || '附件' }} 上传中...
-                </span>
-                <span v-else-if="msg.uploadStatus === 'FAILED'" class="quick-chat-upload-failed-file">
-                  {{ msg.fileName || '附件' }} 上传失败，请重试
-                </span>
-                <a v-else :href="msg.fileUrl || '#'" target="_blank" rel="noreferrer">{{ msg.fileName || '附件' }}</a>
-              </template>
-              <template v-else-if="!msg.recalled">
-                {{ msg.content }}
-              </template>
+              </a-list-item>
+            </template>
+          </a-list>
+        </div>
+
+        <div class="quick-chat-main">
+          <div v-if="activeQuickChatRoom?.notice" class="quick-chat-notice">
+            <strong>群公告：</strong>{{ activeQuickChatRoom.notice }}
+          </div>
+          <div v-if="quickChatSyncConflict.visible" class="quick-chat-sync-conflict">
+            <div class="quick-chat-sync-conflict-title">{{ quickChatSyncConflictTitle }}</div>
+            <div class="quick-chat-sync-conflict-desc">{{ quickChatSyncConflictDesc }}</div>
+            <a-space size="small">
+              <a-button size="small" type="primary" @click="resolveQuickChatConflictUseLocal">以本地覆盖云端</a-button>
+              <a-button size="small" @click="resolveQuickChatConflictUseCloud">使用云端覆盖本地</a-button>
+              <a-button size="small" type="link" @click="dismissQuickChatConflict">稍后处理</a-button>
+            </a-space>
+          </div>
+
+          <div class="quick-chat-header">
+            <div class="quick-chat-header-main">
+              <strong>{{ activeQuickChatRoom?.name || '请选择会话' }}</strong>
+              <div class="quick-chat-header-meta">
+                <span class="hint-text">{{ activeQuickChatRoom ? `成员 ${activeQuickChatRoom.memberIds.length} 人` : '等待选择会话' }}</span>
+                <span class="hint-text" v-if="activeQuickChatRoom">最近更新 {{ quickChatActiveRoomUpdatedText }}</span>
+                <a-tag v-if="quickChatActiveRoomPendingTodoCount" color="processing">待办 {{ quickChatActiveRoomPendingTodoCount }}</a-tag>
+                <a-tag v-if="quickChatActiveRoomOverdueTodoCount" color="red">逾期 {{ quickChatActiveRoomOverdueTodoCount }}</a-tag>
+              </div>
             </div>
-            <div v-if="isCurrentQuickChatIdentity(msg.senderId) && !msg.recalled" class="quick-chat-read-status">
-              已读 {{ quickChatMessageReadCount(msg) }}/{{ activeQuickChatRoom?.memberIds.length || 0 }}
+            <div class="quick-chat-header-actions">
+              <a-button size="small" :disabled="!activeQuickChatRoom" @click="openQuickChatMembers">成员</a-button>
+              <a-input
+                v-model:value="quickChatMessageKeyword"
+                allow-clear
+                size="small"
+                placeholder="搜索本会话消息"
+                style="width: 180px;"
+              />
+              <a-button size="small" :disabled="!activeQuickChatRoom" @click="openNoticeEditor">编辑公告</a-button>
+              <a-button size="small" :disabled="!activeQuickChatRoom" @click="markActiveRoomRead">全部已读</a-button>
+              <a-button size="small" danger :disabled="!activeQuickChatRoom" @click="removeActiveQuickChatRoom">删除会话</a-button>
+            </div>
+          </div>
+
+          <div ref="quickChatMessagesRef" class="quick-chat-messages">
+            <a-empty v-if="!filteredActiveQuickChatMessages.length" description="暂无匹配消息" />
+            <div
+              v-for="msg in filteredActiveQuickChatMessages"
+              :key="msg.id"
+              class="quick-chat-message"
+              :class="{ self: isCurrentQuickChatIdentity(msg.senderId) }"
+              :data-message-id="msg.id"
+            >
+              <div class="quick-chat-message-meta">
+                <a-space size="small">
+                  <span>{{ msg.senderName }}</span>
+                  <a-tag
+                    v-if="!isCurrentQuickChatIdentity(msg.senderId)"
+                    :color="quickChatMessageWorkStatus(msg.senderId).color"
+                  >
+                    {{ quickChatMessageWorkStatus(msg.senderId).label }}
+                  </a-tag>
+                </a-space>
+                <a-space size="small">
+                  <span>{{ msg.timeText }}</span>
+                  <a-button
+                    v-if="canRecallMessage(msg)"
+                    type="link"
+                    size="small"
+                    class="quick-chat-recall-btn"
+                    @click="recallQuickChatMessage(msg.id)"
+                  >
+                    撤回
+                  </a-button>
+                  <a-button
+                    v-if="!msg.recalled"
+                    type="link"
+                    size="small"
+                    class="quick-chat-recall-btn"
+                    @click="openForwardMessage(msg.id)"
+                  >
+                    转发
+                  </a-button>
+                  <a-dropdown trigger="click">
+                    <a-button type="link" size="small" class="quick-chat-recall-btn">更多</a-button>
+                    <template #overlay>
+                      <a-menu>
+                        <a-menu-item @click="copyQuickChatMessage(msg)">复制</a-menu-item>
+                        <a-menu-item v-if="!msg.recalled" @click="openForwardMessage(msg.id)">转发</a-menu-item>
+                        <a-menu-item v-if="!msg.recalled" @click="addMessageToQuickChatTodo(msg)">设为待办</a-menu-item>
+                        <a-menu-item v-if="canRecallMessage(msg)" @click="recallQuickChatMessage(msg.id)">撤回</a-menu-item>
+                      </a-menu>
+                    </template>
+                  </a-dropdown>
+                </a-space>
+              </div>
+              <div class="quick-chat-message-body">
+                <template v-if="msg.recalled">
+                  <span class="quick-chat-recalled">该消息已撤回</span>
+                </template>
+                <template v-if="msg.kind === 'IMAGE' && msg.fileUrl">
+                  <div class="quick-chat-image-wrap">
+                    <a-image :src="msg.fileUrl" :alt="msg.fileName || '图片'" class="quick-chat-image" />
+                    <div v-if="msg.uploadStatus === 'UPLOADING'" class="quick-chat-upload-mask">上传中...</div>
+                    <div v-else-if="msg.uploadStatus === 'FAILED'" class="quick-chat-upload-mask quick-chat-upload-mask-failed">上传失败</div>
+                  </div>
+                </template>
+                <template v-else-if="msg.kind === 'FILE'">
+                  <span v-if="msg.uploadStatus === 'UPLOADING'" class="quick-chat-uploading-file">
+                    {{ msg.fileName || '附件' }} 上传中...
+                  </span>
+                  <span v-else-if="msg.uploadStatus === 'FAILED'" class="quick-chat-upload-failed-file">
+                    {{ msg.fileName || '附件' }} 上传失败，请重试
+                  </span>
+                  <a v-else :href="msg.fileUrl || '#'" target="_blank" rel="noreferrer">{{ msg.fileName || '附件' }}</a>
+                </template>
+                <template v-else-if="!msg.recalled">
+                  {{ msg.content }}
+                </template>
+              </div>
+              <div v-if="isCurrentQuickChatIdentity(msg.senderId) && !msg.recalled" class="quick-chat-read-status">
+                已读 {{ quickChatMessageReadCount(msg) }}/{{ activeQuickChatRoom?.memberIds.length || 0 }}
+              </div>
+            </div>
+          </div>
+
+          <div class="quick-chat-input">
+            <a-textarea
+              v-model:value="quickChatDraft"
+              :rows="3"
+              :disabled="!activeQuickChatRoom"
+              placeholder="输入消息...支持 @姓名 或 @all（Enter 发送，Shift+Enter 换行）"
+              @keydown="onQuickChatInputKeydown"
+            />
+            <div class="quick-chat-input-actions">
+              <a-space>
+                <a-upload :show-upload-list="false" :before-upload="beforeQuickChatUpload">
+                  <a-button :disabled="!activeQuickChatRoom">发送图片/文档</a-button>
+                </a-upload>
+                <a-button :disabled="!activeQuickChatRoom" @click="openQuickChatTodoEditorManual">新增待办</a-button>
+              </a-space>
+              <a-button type="primary" :disabled="!activeQuickChatRoom" @click="sendQuickChatText">发送</a-button>
             </div>
           </div>
         </div>
-        <div class="quick-chat-input">
-          <a-textarea
-            v-model:value="quickChatDraft"
-            :rows="3"
-            :disabled="!activeQuickChatRoom"
-            placeholder="输入消息...支持 @姓名 或 @all（Enter 发送，Shift+Enter 换行）"
-            @keydown="onQuickChatInputKeydown"
-          />
-          <a-space style="margin-top: 8px;">
-            <a-upload :show-upload-list="false" :before-upload="beforeQuickChatUpload">
-              <a-button :disabled="!activeQuickChatRoom">发送图片/文档</a-button>
-            </a-upload>
-            <a-button type="primary" :disabled="!activeQuickChatRoom" @click="sendQuickChatText">发送</a-button>
-          </a-space>
+
+        <div class="quick-chat-aside">
+          <div class="quick-chat-aside-card">
+            <div class="quick-chat-aside-head">
+              <strong>会话概览</strong>
+              <a-button type="link" size="small" :disabled="!activeQuickChatRoom" @click="openQuickChatMembers">查看全部成员</a-button>
+            </div>
+            <div class="quick-chat-aside-metrics">
+              <div>
+                <span>成员</span>
+                <strong>{{ activeQuickChatRoom?.memberIds.length || 0 }}</strong>
+              </div>
+              <div>
+                <span>消息</span>
+                <strong>{{ activeQuickChatMessages.length }}</strong>
+              </div>
+              <div>
+                <span>未读</span>
+                <strong>{{ activeQuickChatRoom?.unreadCount || 0 }}</strong>
+              </div>
+            </div>
+            <div class="quick-chat-member-stack">
+              <div v-for="item in activeQuickChatMemberRows.slice(0, 5)" :key="item.id" class="quick-chat-member-chip">
+                <div>
+                  <strong>{{ item.name }}</strong>
+                  <span>{{ item.statusLabel }}</span>
+                </div>
+                <a-tag :color="item.statusColor">{{ item.statusLabel }}</a-tag>
+              </div>
+            </div>
+          </div>
+
+          <div class="quick-chat-aside-card">
+            <div class="quick-chat-aside-head">
+              <strong>聊天待办</strong>
+              <a-button type="link" size="small" @click="openQuickChatTodoDrawer">展开看板</a-button>
+            </div>
+            <div class="quick-chat-aside-metrics">
+              <div>
+                <span>当前会话待办</span>
+                <strong>{{ quickChatActiveRoomPendingTodoCount }}</strong>
+              </div>
+              <div>
+                <span>当前会话逾期</span>
+                <strong>{{ quickChatActiveRoomOverdueTodoCount }}</strong>
+              </div>
+              <div>
+                <span>完成率</span>
+                <strong>{{ quickChatTodoCompletionRate }}%</strong>
+              </div>
+            </div>
+            <div v-if="quickChatFocusTodoItems.length" class="quick-chat-focus-todo-list">
+              <button
+                v-for="item in quickChatFocusTodoItems"
+                :key="item.id"
+                type="button"
+                class="quick-chat-focus-todo"
+                @click="jumpToQuickChatTodo(item.id)"
+              >
+                <div class="quick-chat-focus-todo-head">
+                  <strong>{{ item.content }}</strong>
+                  <a-tag :color="quickChatTodoPriorityColor(item.priority)">{{ quickChatTodoPriorityLabel(item.priority) }}</a-tag>
+                </div>
+                <span>{{ quickChatTodoDescription(item) }}</span>
+              </button>
+            </div>
+            <a-empty v-else description="当前会话暂无待办" />
+          </div>
         </div>
       </div>
     </div>
@@ -542,6 +667,7 @@
     title="群成员"
     width="360"
     placement="right"
+    :z-index="1700"
   >
     <a-list :data-source="activeQuickChatMemberRows" :locale="{ emptyText: '暂无成员' }" size="small">
       <template #renderItem="{ item }">
@@ -593,6 +719,7 @@
     title="聊天待办"
     width="420"
     placement="right"
+    :z-index="1720"
   >
     <div class="quick-chat-todo-summary">
       <a-segmented v-model:value="quickChatTodoScopeMode" :options="quickChatTodoScopeModeOptions" size="small" style="width: 100%; margin-bottom: 8px;" />
@@ -698,6 +825,7 @@
     v-model:open="quickChatTodoEditorOpen"
     :title="quickChatTodoEditorMode === 'create' ? '新增聊天待办' : '编辑聊天待办'"
     width="560"
+    :z-index="1760"
     @ok="submitQuickChatTodoEditor"
   >
     <a-form layout="vertical">
@@ -728,6 +856,7 @@
     v-model:open="quickChatTodoWeeklyOpen"
     title="聊天待办周报摘要"
     width="560"
+    :z-index="1760"
     :footer="null"
   >
     <a-descriptions bordered :column="2" size="small">
@@ -746,7 +875,7 @@
 
 <script setup lang="ts">
 import { computed, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { message } from 'ant-design-vue'
+import { message, notification } from 'ant-design-vue'
 import type { UploadProps } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
@@ -756,11 +885,13 @@ import { getMe } from '../api/auth'
 import { getStaffPage } from '../api/rbac'
 import { updateStaff } from '../api/staff'
 import { createOaTask, fanoutQuickChatState, getQuickChatState, publishQuickChatEventBatch, saveQuickChatState, uploadOaFile } from '../api/oa'
+import { getAttendanceOverview, punchAttendance } from '../api/schedule'
 import { useDepartmentOptions } from '../composables/useDepartmentOptions'
 import { useStaffOptions } from '../composables/useStaffOptions'
 import { canBeDirectLeader, canBeIndirectLeader, ensureSupervisorOrder } from '../utils/supervisor'
 import { emitLiveSync, subscribeLiveSync, type LiveSyncPayload } from '../utils/liveSync'
 import { getToken } from '../utils/auth'
+import type { AttendanceDashboardOverview } from '../types'
 
 const MAX_RESTORED_ROUTE_TABS = 8
 const MAX_ALIVE_VIEW_CACHE = 3
@@ -942,6 +1073,7 @@ type QuickChatTodoItem = {
   doneAt?: string
   createdAt: string
   createdAtText: string
+  updatedAt?: string
   done: boolean
 }
 
@@ -983,6 +1115,8 @@ const quickChatTodoForm = reactive({
 })
 const quickChatDnd = ref(false)
 const quickChatTrainingUntil = ref('')
+const quickChatAttendanceOverview = ref<AttendanceDashboardOverview | null>(null)
+const quickChatMemberWorkStatusMap = reactive<Record<string, { label: string; color: string }>>({})
 const quickChatKeyword = ref('')
 const quickChatUnreadOnly = ref(false)
 const quickChatRoomListMode = ref<'active' | 'archived' | 'all'>('active')
@@ -1068,6 +1202,9 @@ const sortedQuickChatRooms = computed(() =>
   })
 )
 const activeQuickChatRoom = computed(() => visibleQuickChatRooms.value.find((item) => item.id === activeQuickChatRoomId.value) || null)
+const quickChatUnreadRoomCount = computed(() =>
+  myQuickChatRooms.value.filter((room) => !isRoomArchivedByCurrentUser(room) && Number(room.unreadCount || 0) > 0).length
+)
 const activeQuickChatNotifyMode = computed({
   get: () => activeQuickChatRoom.value?.notificationMode || 'ALL',
   set: (value) => changeActiveRoomNotifyMode(value as 'ALL' | 'MENTION' | 'MUTE')
@@ -1086,6 +1223,30 @@ const quickChatForwardRoomOptions = computed(() =>
     .filter((room) => room.id !== activeQuickChatRoomId.value)
     .map((room) => ({ label: room.name, value: room.id }))
 )
+const quickChatActiveRoomTodoItems = computed(() => {
+  const roomId = activeQuickChatRoom.value?.id
+  if (!roomId) return [] as QuickChatTodoItem[]
+  return quickChatTodoItems.value.filter((item) => item.roomId === roomId)
+})
+const quickChatActiveRoomPendingTodoCount = computed(() =>
+  quickChatActiveRoomTodoItems.value.filter((item) => !item.done).length
+)
+const quickChatActiveRoomOverdueTodoCount = computed(() =>
+  quickChatActiveRoomTodoItems.value.filter((item) => !item.done && isQuickChatTodoOverdue(item)).length
+)
+const quickChatFocusTodoItems = computed(() =>
+  [...quickChatActiveRoomTodoItems.value]
+    .filter((item) => !item.done)
+    .sort((a, b) => Number(isQuickChatTodoOverdue(b)) - Number(isQuickChatTodoOverdue(a))
+      || Number(b.priority === 'HIGH') - Number(a.priority === 'HIGH')
+      || dayjs(a.dueAt || a.createdAt).valueOf() - dayjs(b.dueAt || b.createdAt).valueOf())
+    .slice(0, 4)
+)
+const quickChatActiveRoomUpdatedText = computed(() => {
+  const raw = activeQuickChatRoom.value?.updatedAt || activeQuickChatRoom.value?.createdAt
+  if (!raw) return '-'
+  return dayjs(raw).format('MM-DD HH:mm')
+})
 const activeQuickChatMemberRows = computed(() => {
   if (!activeQuickChatRoom.value) return [] as Array<{ id: string; name: string; statusLabel: string; statusColor: string }>
   return activeQuickChatRoom.value.memberIds.map((memberId) => {
@@ -1093,7 +1254,8 @@ const activeQuickChatMemberRows = computed(() => {
     if (isCurrentQuickChatIdentity(memberId)) {
       return { id: memberId, name, statusLabel: presenceStatus.value.label, statusColor: String(presenceStatus.value.color || 'default') }
     }
-    return { id: memberId, name, statusLabel: '在线', statusColor: 'green' }
+    const workStatus = quickChatMemberWorkStatus(memberId)
+    return { id: memberId, name, statusLabel: workStatus.label, statusColor: workStatus.color }
   })
 })
 const quickChatUnreadCount = computed(() =>
@@ -1230,7 +1392,16 @@ const quickChatStaffOptions = computed(() =>
 )
 const presenceStatus = computed(() => {
   void presenceTick.value
-  if (quickChatDnd.value) return { code: 'DND', label: '免打扰', color: 'red' }
+  const todayStatus = String(quickChatAttendanceOverview.value?.todayStatus || '').toUpperCase()
+  if (todayStatus === 'ON_LEAVE') return { code: 'ON_LEAVE', label: quickChatAttendanceOverview.value?.todayStatusLabel || '请假中', color: 'cyan' }
+  if (todayStatus === 'OUTING' && quickChatTrainingUntil.value && dayjs().isBefore(dayjs(quickChatTrainingUntil.value))) {
+    return { code: 'TRAINING', label: '外出培训', color: 'purple' }
+  }
+  if (todayStatus === 'OUTING') return { code: 'OUTING', label: quickChatAttendanceOverview.value?.todayStatusLabel || '外出中', color: 'orange' }
+  if (todayStatus === 'LUNCH_BREAK') return { code: 'LUNCH_BREAK', label: quickChatAttendanceOverview.value?.todayStatusLabel || '午休中', color: 'blue' }
+  if (todayStatus === 'ON_DUTY') return { code: 'WORK', label: quickChatAttendanceOverview.value?.todayStatusLabel || '上班', color: 'green' }
+  if (todayStatus === 'OFF_DUTY') return { code: 'OFF_DUTY', label: quickChatAttendanceOverview.value?.todayStatusLabel || '下班', color: 'purple' }
+  if (todayStatus === 'NOT_CHECKED_IN') return { code: 'NOT_CHECKED_IN', label: quickChatAttendanceOverview.value?.todayStatusLabel || '未打卡', color: 'default' }
   if (quickChatTrainingUntil.value && dayjs().isBefore(dayjs(quickChatTrainingUntil.value))) {
     return { code: 'TRAINING', label: '外出培训', color: 'purple' }
   }
@@ -1255,6 +1426,7 @@ let quickChatAliasHydrated = false
 const quickChatWsReconnectAttempt = ref(0)
 let quickChatWebSocket: WebSocket | null = null
 let quickChatWebSocketManualClose = false
+const quickChatNotifiedMessageIds = new Set<string>()
 const quickChatRuntimeStarted = ref(false)
 const QUICK_CHAT_CLOUD_PULL_INTERVAL_MS = 60000
 const QUICK_CHAT_CLOUD_SAVE_DEBOUNCE_MS = 1400
@@ -1266,6 +1438,7 @@ const QUICK_CHAT_ARCHIVE_UNDO_WINDOW_MS = 5 * 60 * 1000
 const QUICK_CHAT_MAX_ROOMS = 12
 const QUICK_CHAT_MAX_MESSAGES_PER_ROOM = 40
 const QUICK_CHAT_MAX_TODO_ITEMS = 80
+const QUICK_CHAT_NOTIFICATION_CACHE_LIMIT = 160
 const quickChatCloudReady = ref(false)
 const quickChatCloudRemoteUpdatedAt = ref(0)
 const quickChatCloudSavePending = ref(false)
@@ -1462,7 +1635,7 @@ watch(
     quickChatFanoutLastSuccessAt.value = 0
     quickChatFanoutLastErrorAt.value = 0
     quickChatFanoutLastAffected.value = 0
-    quickChatLastEventSnapshot.value = ''
+    quickChatLastEventSnapshot.value = '{"version":2,"rooms":[],"todos":[]}'
     quickChatEventQueuedSnapshot.value = ''
     quickChatCloudRemoteUpdatedAt.value = 0
     quickChatCloudReady.value = false
@@ -1500,6 +1673,13 @@ watch(
   () => {
     if (!quickChatOpen.value) return
     scrollQuickChatToBottom()
+    refreshActiveQuickChatMemberWorkStatuses().catch(() => {})
+  }
+)
+watch(
+  () => presenceStatus.value.label,
+  () => {
+    refreshActiveQuickChatMemberWorkStatuses().catch(() => {})
   }
 )
 watch(
@@ -2310,9 +2490,7 @@ function scheduleQuickChatIdlePersist(task: () => void) {
 }
 
 function persistQuickChatTodo() {
-  try {
-    localStorage.setItem(quickChatTodoStorageKey(), JSON.stringify(quickChatTodoItems.value.slice(0, QUICK_CHAT_MAX_TODO_ITEMS)))
-  } catch {}
+  persistQuickChatState()
 }
 
 function persistQuickChatTodoAutomation() {
@@ -2327,43 +2505,18 @@ function persistQuickChatTodoAutomation() {
 
 function loadQuickChatTodo() {
   try {
+    if (quickChatTodoItems.value.length) return
     const raw = localStorage.getItem(quickChatTodoStorageKey())
     if (!raw) {
-      quickChatTodoItems.value = []
       return
     }
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) {
-      quickChatTodoItems.value = []
       return
     }
-    quickChatTodoItems.value = parsed.map((item: any) => ({
-      id: String(item?.id || `todo_${Date.now()}`),
-      roomId: String(item?.roomId || ''),
-      roomName: String(item?.roomName || ''),
-      messageId: String(item?.messageId || ''),
-      content: String(item?.content || ''),
-      creatorId: item?.creatorId ? String(item.creatorId) : undefined,
-      creatorName: item?.creatorName ? String(item.creatorName) : undefined,
-      assigneeId: item?.assigneeId ? String(item.assigneeId) : undefined,
-      assigneeName: item?.assigneeName ? String(item.assigneeName) : undefined,
-      priority: (['HIGH', 'MEDIUM', 'LOW'].includes(String(item?.priority || 'MEDIUM'))
-        ? String(item.priority)
-        : 'MEDIUM') as QuickChatTodoItem['priority'],
-      dueAt: item?.dueAt ? String(item.dueAt) : undefined,
-      dueAtText: item?.dueAtText ? String(item.dueAtText) : undefined,
-      escalationLevel: [0, 1, 2].includes(Number(item?.escalationLevel)) ? Number(item.escalationLevel) as 0 | 1 | 2 : 0,
-      lastEscalatedAt: item?.lastEscalatedAt ? String(item.lastEscalatedAt) : undefined,
-      calendarSynced: item?.calendarSynced === true,
-      calendarTaskId: item?.calendarTaskId ? String(item.calendarTaskId) : undefined,
-      doneAt: item?.doneAt ? String(item.doneAt) : undefined,
-      createdAt: String(item?.createdAt || dayjs().toISOString()),
-      createdAtText: String(item?.createdAtText || dayjs().format('MM-DD HH:mm')),
-      done: item?.done === true
-    }))
-  } catch {
-    quickChatTodoItems.value = []
-  }
+    quickChatTodoItems.value = normalizeQuickChatTodos(parsed)
+    persistQuickChatState({ skipCloud: !quickChatOpen.value, skipFanout: !quickChatOpen.value, skipEvent: !quickChatOpen.value })
+  } catch {}
 }
 
 function loadQuickChatTodoAutomation() {
@@ -2418,8 +2571,87 @@ function buildQuickChatRoomPayload(room: QuickChatRoom) {
   }
 }
 
+function buildQuickChatTodoPayload(item: QuickChatTodoItem) {
+  return {
+    id: item.id,
+    roomId: item.roomId,
+    roomName: item.roomName,
+    messageId: item.messageId || '',
+    content: item.content || '',
+    creatorId: item.creatorId || '',
+    creatorName: item.creatorName || '',
+    assigneeId: item.assigneeId || '',
+    assigneeName: item.assigneeName || '',
+    priority: item.priority || 'MEDIUM',
+    dueAt: item.dueAt || '',
+    dueAtText: item.dueAtText || '',
+    escalationLevel: Number(item.escalationLevel || 0),
+    lastEscalatedAt: item.lastEscalatedAt || '',
+    calendarSynced: item.calendarSynced === true,
+    calendarTaskId: item.calendarTaskId || '',
+    doneAt: item.doneAt || '',
+    createdAt: item.createdAt,
+    createdAtText: item.createdAtText || dayjs(item.createdAt).format('MM-DD HH:mm'),
+    updatedAt: item.updatedAt || item.doneAt || item.createdAt,
+    done: item.done === true
+  }
+}
+
+function normalizeQuickChatTodos(parsed: any[]) {
+  return parsed
+    .slice(0, QUICK_CHAT_MAX_TODO_ITEMS)
+    .map((item: any) => {
+      const createdAt = String(item?.createdAt || dayjs().toISOString())
+      const roomId = String(item?.roomId || '')
+      if (!roomId) return null
+      return {
+        id: String(item?.id || `todo_${Date.now()}`),
+        roomId,
+        roomName: String(item?.roomName || ''),
+        messageId: String(item?.messageId || ''),
+        content: String(item?.content || ''),
+        creatorId: item?.creatorId ? normalizeQuickChatMemberId(item.creatorId) : undefined,
+        creatorName: item?.creatorName ? String(item.creatorName) : undefined,
+        assigneeId: item?.assigneeId ? normalizeQuickChatMemberId(item.assigneeId) : undefined,
+        assigneeName: item?.assigneeName ? String(item.assigneeName) : undefined,
+        priority: (['HIGH', 'MEDIUM', 'LOW'].includes(String(item?.priority || 'MEDIUM'))
+          ? String(item.priority)
+          : 'MEDIUM') as QuickChatTodoItem['priority'],
+        dueAt: item?.dueAt ? String(item.dueAt) : undefined,
+        dueAtText: item?.dueAtText ? String(item.dueAtText) : undefined,
+        escalationLevel: [0, 1, 2].includes(Number(item?.escalationLevel)) ? Number(item.escalationLevel) as 0 | 1 | 2 : 0,
+        lastEscalatedAt: item?.lastEscalatedAt ? String(item.lastEscalatedAt) : undefined,
+        calendarSynced: item?.calendarSynced === true,
+        calendarTaskId: item?.calendarTaskId ? String(item.calendarTaskId) : undefined,
+        doneAt: item?.doneAt ? String(item.doneAt) : undefined,
+        createdAt,
+        createdAtText: String(item?.createdAtText || dayjs(createdAt).format('MM-DD HH:mm')),
+        updatedAt: String(item?.updatedAt || item?.doneAt || createdAt),
+        done: item?.done === true
+      } as QuickChatTodoItem
+    })
+    .filter((item): item is QuickChatTodoItem => Boolean(item))
+}
+
+function parseQuickChatStateEnvelope(parsed: any) {
+  if (Array.isArray(parsed)) {
+    return { rooms: parsed, todos: [] as any[] }
+  }
+  if (parsed && typeof parsed === 'object') {
+    return {
+      rooms: Array.isArray(parsed.rooms) ? parsed.rooms : [],
+      todos: Array.isArray(parsed.todos) ? parsed.todos : []
+    }
+  }
+  return { rooms: [] as any[], todos: [] as any[] }
+}
+
 function buildQuickChatStatePayload() {
-  return quickChatRooms.value.slice(0, QUICK_CHAT_MAX_ROOMS).map((room) => buildQuickChatRoomPayload(room))
+  return {
+    version: 2,
+    rooms: quickChatRooms.value.slice(0, QUICK_CHAT_MAX_ROOMS).map((room) => buildQuickChatRoomPayload(room)),
+    todos: quickChatTodoItems.value.slice(0, QUICK_CHAT_MAX_TODO_ITEMS).map((item) => buildQuickChatTodoPayload(item))
+  }
 }
 
 function normalizeQuickChatRooms(parsed: any[]) {
@@ -2485,6 +2717,30 @@ function cloneQuickChatRoomRow(room: QuickChatRoom): QuickChatRoom {
     archivedByUser: { ...(room.archivedByUser || {}) },
     messages: Array.isArray(room.messages) ? room.messages.map((msg) => cloneQuickChatMessageRow(msg)) : []
   }
+}
+
+function cloneQuickChatTodoRow(item: QuickChatTodoItem): QuickChatTodoItem {
+  return { ...item }
+}
+
+function quickChatTodoUpdatedAtMs(item: Partial<QuickChatTodoItem>) {
+  return dayjs(item.updatedAt || item.doneAt || item.createdAt || dayjs().toISOString()).valueOf()
+}
+
+function mergeQuickChatTodoRows(localItems: QuickChatTodoItem[], remoteItems: QuickChatTodoItem[]) {
+  const merged = new Map<string, QuickChatTodoItem>()
+  localItems.forEach((item) => {
+    merged.set(item.id, cloneQuickChatTodoRow(item))
+  })
+  remoteItems.forEach((remoteItem) => {
+    const existed = merged.get(remoteItem.id)
+    if (!existed || quickChatTodoUpdatedAtMs(remoteItem) >= quickChatTodoUpdatedAtMs(existed)) {
+      merged.set(remoteItem.id, cloneQuickChatTodoRow(remoteItem))
+    }
+  })
+  return Array.from(merged.values())
+    .sort((a, b) => quickChatTodoUpdatedAtMs(b) - quickChatTodoUpdatedAtMs(a))
+    .slice(0, QUICK_CHAT_MAX_TODO_ITEMS)
 }
 
 function mergeQuickChatRoomRows(localRooms: QuickChatRoom[], remoteRooms: QuickChatRoom[]) {
@@ -2567,8 +2823,10 @@ function mergeQuickChatRoomRows(localRooms: QuickChatRoom[], remoteRooms: QuickC
   })
 }
 
-function applyQuickChatRoomsFromPayload(parsed: any[], preferredActiveId = '') {
-  quickChatRooms.value = normalizeQuickChatRooms(parsed)
+function applyQuickChatStatePayload(parsed: any, preferredActiveId = '') {
+  const envelope = parseQuickChatStateEnvelope(parsed)
+  quickChatRooms.value = normalizeQuickChatRooms(envelope.rooms)
+  quickChatTodoItems.value = normalizeQuickChatTodos(envelope.todos)
   activeQuickChatRoomId.value = preferredActiveId || sortedQuickChatRooms.value[0]?.id || ''
   rehydrateQuickChatUnread()
   ensureActiveQuickChatVisible()
@@ -2586,8 +2844,12 @@ function quickChatLatestRoomUpdateMs(rooms: Array<Partial<QuickChatRoom>>) {
   }, 0)
 }
 
+function quickChatLatestTodoUpdateMs(todos: Array<Partial<QuickChatTodoItem>>) {
+  return todos.reduce((maxTs, item) => Math.max(maxTs, quickChatTodoUpdatedAtMs(item)), 0)
+}
+
 function localQuickChatLatestMs() {
-  return quickChatLatestRoomUpdateMs(quickChatRooms.value)
+  return Math.max(quickChatLatestRoomUpdateMs(quickChatRooms.value), quickChatLatestTodoUpdateMs(quickChatTodoItems.value))
 }
 
 async function pushQuickChatStateToCloud(stateJson: string) {
@@ -2735,7 +2997,11 @@ async function pushQuickChatRoomToMembers(room?: QuickChatRoom | null) {
   if (!room) return
   const targets = roomMemberTargets(room)
   if (!targets.length) return
-  const stateJson = JSON.stringify([buildQuickChatRoomPayload(room)])
+  const stateJson = JSON.stringify({
+    version: 2,
+    rooms: [buildQuickChatRoomPayload(room)],
+    todos: quickChatTodoItems.value.filter((item) => item.roomId === room.id).map((item) => buildQuickChatTodoPayload(item))
+  })
   try {
     const affected = await fanoutQuickChatState(stateJson, targets)
     quickChatFanoutLastSuccessAt.value = Date.now()
@@ -2782,22 +3048,22 @@ function normalizeQuickChatEventMessage(messageRow: any) {
 
 function buildQuickChatIncrementalEvents(snapshotJson: string) {
   const events: any[] = []
-  const currentRooms = (() => {
+  const currentPayload = (() => {
     try {
-      const parsed = JSON.parse(snapshotJson || '[]')
-      return Array.isArray(parsed) ? parsed : []
+      return parseQuickChatStateEnvelope(JSON.parse(snapshotJson || '{}'))
     } catch {
-      return [] as any[]
+      return { rooms: [] as any[], todos: [] as any[] }
     }
   })()
-  const previousRooms = (() => {
+  const previousPayload = (() => {
     try {
-      const parsed = JSON.parse(quickChatLastEventSnapshot.value || '[]')
-      return Array.isArray(parsed) ? parsed : []
+      return parseQuickChatStateEnvelope(JSON.parse(quickChatLastEventSnapshot.value || '{}'))
     } catch {
-      return [] as any[]
+      return { rooms: [] as any[], todos: [] as any[] }
     }
   })()
+  const currentRooms = currentPayload.rooms
+  const previousRooms = previousPayload.rooms
   const prevMap = new Map<string, any>(previousRooms.map((room: any) => [String(room?.id || ''), room]))
   const currMap = new Map<string, any>(currentRooms.map((room: any) => [String(room?.id || ''), room]))
 
@@ -2858,6 +3124,43 @@ function buildQuickChatIncrementalEvents(snapshotJson: string) {
     if (!targets.length) return
     events.push({ eventType: 'ROOM_REMOVE', roomId, targetStaffIds: targets })
   })
+
+  const previousTodos = Array.isArray(previousPayload.todos) ? previousPayload.todos : []
+  const currentTodos = Array.isArray(currentPayload.todos) ? currentPayload.todos : []
+  const prevTodoMap = new Map<string, any>(previousTodos.map((item: any) => [String(item?.id || ''), item]))
+  const currTodoMap = new Map<string, any>(currentTodos.map((item: any) => [String(item?.id || ''), item]))
+
+  currTodoMap.forEach((todo, todoId) => {
+    if (!todoId) return
+    const roomId = String(todo?.roomId || '')
+    if (!roomId) return
+    const room = currMap.get(roomId) || prevMap.get(roomId)
+    const targets = roomMemberTargets(room)
+    if (!targets.length) return
+    const prevTodo = prevTodoMap.get(todoId)
+    const normalizedTodo = normalizeQuickChatTodos([todo])[0]
+    if (!normalizedTodo) return
+    const todoPayload = buildQuickChatTodoPayload(normalizedTodo)
+    if (!prevTodo) {
+      events.push({ eventType: 'TODO_UPSERT', roomId, meta: { todo: todoPayload }, targetStaffIds: targets })
+      return
+    }
+    const currentUpdated = String(todo?.updatedAt || todo?.doneAt || todo?.createdAt || '')
+    const previousUpdated = String(prevTodo?.updatedAt || prevTodo?.doneAt || prevTodo?.createdAt || '')
+    if (currentUpdated !== previousUpdated || Boolean(todo?.done) !== Boolean(prevTodo?.done) || String(todo?.content || '') !== String(prevTodo?.content || '')) {
+      events.push({ eventType: 'TODO_UPSERT', roomId, meta: { todo: todoPayload }, targetStaffIds: targets })
+    }
+  })
+
+  prevTodoMap.forEach((todo, todoId) => {
+    if (!todoId || currTodoMap.has(todoId)) return
+    const roomId = String(todo?.roomId || '')
+    if (!roomId) return
+    const room = prevMap.get(roomId)
+    const targets = roomMemberTargets(room)
+    if (!targets.length) return
+    events.push({ eventType: 'TODO_REMOVE', roomId, meta: { todoId }, targetStaffIds: targets })
+  })
   return events
 }
 
@@ -2893,8 +3196,7 @@ function scheduleQuickChatIncrementalEmit(snapshotJson: string) {
 function flushQuickChatStatePersist() {
   quickChatLocalPersistTimer = undefined
   try {
-    const payload = buildQuickChatStatePayload()
-    const payloadJson = JSON.stringify(payload)
+    const payloadJson = JSON.stringify(buildQuickChatStatePayload())
     if (payloadJson !== quickChatLastLocalPayload) {
       const storageKey = quickChatStorageKey()
       scheduleQuickChatIdlePersist(() => {
@@ -3091,27 +3393,22 @@ function loadQuickChatState() {
     const raw = localStorage.getItem(quickChatStorageKey())
     if (!raw) {
       quickChatRooms.value = []
+      quickChatTodoItems.value = []
       activeQuickChatRoomId.value = ''
-      quickChatLastEventSnapshot.value = '[]'
-      quickChatLastLocalPayload = '[]'
+      quickChatLastEventSnapshot.value = '{"version":2,"rooms":[],"todos":[]}'
+      quickChatLastLocalPayload = '{"version":2,"rooms":[],"todos":[]}'
       return
     }
     const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) {
-      quickChatRooms.value = []
-      activeQuickChatRoomId.value = ''
-      quickChatLastEventSnapshot.value = '[]'
-      quickChatLastLocalPayload = '[]'
-      return
-    }
-    applyQuickChatRoomsFromPayload(parsed)
+    applyQuickChatStatePayload(parsed)
     quickChatLastEventSnapshot.value = raw
     quickChatLastLocalPayload = raw
   } catch {
     quickChatRooms.value = []
+    quickChatTodoItems.value = []
     activeQuickChatRoomId.value = ''
-    quickChatLastEventSnapshot.value = '[]'
-    quickChatLastLocalPayload = '[]'
+    quickChatLastEventSnapshot.value = '{"version":2,"rooms":[],"todos":[]}'
+    quickChatLastLocalPayload = '{"version":2,"rooms":[],"todos":[]}'
   }
 }
 
@@ -3152,12 +3449,8 @@ function resolveQuickChatConflictUseCloud() {
   }
   try {
     const parsed = JSON.parse(remoteJson)
-    if (!Array.isArray(parsed)) {
-      message.warning('云端数据格式异常，无法覆盖')
-      return
-    }
     const previousActive = activeQuickChatRoomId.value
-    applyQuickChatRoomsFromPayload(parsed, previousActive)
+    applyQuickChatStatePayload(parsed, previousActive)
     localStorage.setItem(quickChatStorageKey(), remoteJson)
     emitQuickChatSync()
     quickChatLastEventSnapshot.value = remoteJson
@@ -3190,8 +3483,11 @@ async function pullQuickChatStateFromCloud(force = false) {
       return
     }
     const parsed = JSON.parse(remoteJson)
-    if (!Array.isArray(parsed)) return
-    const remotePayloadMs = quickChatLatestRoomUpdateMs(parsed as Array<Partial<QuickChatRoom>>)
+    const envelope = parseQuickChatStateEnvelope(parsed)
+    const remotePayloadMs = Math.max(
+      quickChatLatestRoomUpdateMs(envelope.rooms as Array<Partial<QuickChatRoom>>),
+      quickChatLatestTodoUpdateMs(envelope.todos as Array<Partial<QuickChatTodoItem>>)
+    )
     const remoteLatestMs = Math.max(serverMs || 0, remotePayloadMs || 0)
     if (!force && remoteLatestMs > 0 && remoteLatestMs <= quickChatCloudRemoteUpdatedAt.value) return
     const localLatestMs = localQuickChatLatestMs()
@@ -3202,11 +3498,17 @@ async function pullQuickChatStateFromCloud(force = false) {
         return
       }
       // 自动同步场景下，本地领先也要合并云端增量，避免新会话/新消息被本地时间戳压制。
-      const mergedRooms = mergeQuickChatRoomRows(quickChatRooms.value, normalizeQuickChatRooms(parsed))
+      const mergedRooms = mergeQuickChatRoomRows(quickChatRooms.value, normalizeQuickChatRooms(envelope.rooms))
+      const mergedTodos = mergeQuickChatTodoRows(quickChatTodoItems.value, normalizeQuickChatTodos(envelope.todos))
       quickChatRooms.value = mergedRooms
+      quickChatTodoItems.value = mergedTodos
       rehydrateQuickChatUnread()
       ensureActiveQuickChatVisible()
-      const mergedPayloadJson = JSON.stringify(mergedRooms.map((room) => buildQuickChatRoomPayload(room)))
+      const mergedPayloadJson = JSON.stringify({
+        version: 2,
+        rooms: mergedRooms.map((room) => buildQuickChatRoomPayload(room)),
+        todos: mergedTodos.map((item) => buildQuickChatTodoPayload(item))
+      })
       localStorage.setItem(quickChatStorageKey(), mergedPayloadJson)
       emitQuickChatSync()
       quickChatLastEventSnapshot.value = mergedPayloadJson
@@ -3217,7 +3519,7 @@ async function pullQuickChatStateFromCloud(force = false) {
     }
     // 云端更新默认自动吸收，避免接收方被冲突弹层拦住看不到新消息。
     const previousActive = activeQuickChatRoomId.value
-    applyQuickChatRoomsFromPayload(parsed, previousActive)
+    applyQuickChatStatePayload(parsed, previousActive)
     localStorage.setItem(quickChatStorageKey(), remoteJson)
     quickChatLastEventSnapshot.value = remoteJson
     quickChatCloudRemoteUpdatedAt.value = remoteLatestMs || Date.now()
@@ -3313,6 +3615,7 @@ function applyQuickChatRealtimeEvent(eventRow: any) {
     if (eventType === 'ROOM_REMOVE') {
       if (roomId) {
         quickChatRooms.value = quickChatRooms.value.filter((item) => item.id !== roomId)
+        quickChatTodoItems.value = quickChatTodoItems.value.filter((item) => item.roomId !== roomId)
       }
       ensureActiveQuickChatVisible()
       persistQuickChatState({ skipCloud: true, skipFanout: true, skipEvent: true })
@@ -3409,15 +3712,97 @@ function applyQuickChatRealtimeEvent(eventRow: any) {
           room.unreadByUser[currentId] = 0
         } else if (senderId && !isCurrentQuickChatIdentity(senderId)) {
           room.unreadByUser[currentId] = Number(room.unreadByUser[currentId] || 0) + 1
+          notifyQuickChatIncomingMessage(room, {
+            id: msgId,
+            senderId,
+            senderName: String(messagePayload.senderName || '新消息'),
+            kind: (['TEXT', 'IMAGE', 'FILE', 'SYSTEM'].includes(String(messagePayload.kind || 'TEXT')) ? String(messagePayload.kind || 'TEXT') : 'TEXT') as QuickChatMessage['kind'],
+            content: String(messagePayload.content || ''),
+            fileName: messagePayload.fileName ? String(messagePayload.fileName) : undefined,
+            fileUrl: messagePayload.fileUrl ? String(messagePayload.fileUrl) : undefined,
+            timeText: String(messagePayload.timeText || dayjs().format('MM-DD HH:mm')),
+            createdAt: String(messagePayload.createdAt || dayjs().toISOString()),
+            recalled: messagePayload.recalled === true,
+            readByUser: typeof messagePayload.readByUser === 'object' && messagePayload.readByUser
+              ? Object.fromEntries(Object.entries(messagePayload.readByUser).map(([k, v]) => [String(k), Boolean(v)]))
+              : {}
+          })
         }
       }
       room.unreadCount = Number(room.unreadByUser[currentId] || 0)
       persistQuickChatState({ skipCloud: true, skipFanout: true, skipEvent: true })
       return
     }
+    if (eventType === 'TODO_UPSERT') {
+      const todoPayload = eventRow?.meta?.todo
+      if (!todoPayload || typeof todoPayload !== 'object') return
+      const normalized = normalizeQuickChatTodos([todoPayload])[0]
+      if (!normalized) return
+      const existed = quickChatTodoItems.value.find((item) => item.id === normalized.id)
+      if (!existed) {
+        quickChatTodoItems.value.unshift(normalized)
+      } else {
+        Object.assign(existed, normalized)
+      }
+      quickChatTodoItems.value = mergeQuickChatTodoRows(quickChatTodoItems.value, [])
+      persistQuickChatState({ skipCloud: true, skipFanout: true, skipEvent: true })
+      return
+    }
+    if (eventType === 'TODO_REMOVE') {
+      const todoId = String(eventRow?.meta?.todoId || '')
+      if (!todoId) return
+      quickChatTodoItems.value = quickChatTodoItems.value.filter((item) => item.id !== todoId)
+      persistQuickChatState({ skipCloud: true, skipFanout: true, skipEvent: true })
+      return
+    }
   } finally {
     quickChatApplyingRemoteEvent.value = false
   }
+}
+
+function trimQuickChatNotificationCache() {
+  if (quickChatNotifiedMessageIds.size <= QUICK_CHAT_NOTIFICATION_CACHE_LIMIT) return
+  const removeCount = quickChatNotifiedMessageIds.size - QUICK_CHAT_NOTIFICATION_CACHE_LIMIT
+  let index = 0
+  for (const id of quickChatNotifiedMessageIds) {
+    quickChatNotifiedMessageIds.delete(id)
+    index += 1
+    if (index >= removeCount) break
+  }
+}
+
+function quickChatMessagePreview(messageRow: QuickChatMessage) {
+  if (messageRow.kind === 'IMAGE') return messageRow.fileName ? `[图片] ${messageRow.fileName}` : '[图片]'
+  if (messageRow.kind === 'FILE') return messageRow.fileName ? `[文件] ${messageRow.fileName}` : '[文件]'
+  const content = String(messageRow.content || '').trim()
+  return content || '你收到了一条新消息'
+}
+
+function openQuickChatByNotification(roomId: string) {
+  if (!roomId) return
+  quickChatOpen.value = true
+  nextTick(() => {
+    if (sortedQuickChatRooms.value.some((room) => room.id === roomId)) {
+      selectQuickChatRoom(roomId)
+    }
+  })
+}
+
+function notifyQuickChatIncomingMessage(room: QuickChatRoom, messageRow: QuickChatMessage) {
+  const msgId = String(messageRow.id || '').trim()
+  if (!msgId || quickChatNotifiedMessageIds.has(msgId)) return
+  if (quickChatDnd.value) return
+  if ((room.notificationMode || 'ALL') === 'MUTE') return
+  quickChatNotifiedMessageIds.add(msgId)
+  trimQuickChatNotificationCache()
+  notification.open({
+    key: `quick-chat-${msgId}`,
+    message: room.name || '快捷聊天',
+    description: `${messageRow.senderName || '同事'}：${quickChatMessagePreview(messageRow)}`,
+    placement: 'topRight',
+    duration: 4.5,
+    onClick: () => openQuickChatByNotification(room.id)
+  })
 }
 
 function handleQuickChatWebSocketMessage(raw: string) {
@@ -3551,6 +3936,7 @@ function loadPresenceState() {
 function openQuickChat() {
   quickChatOpen.value = true
   ensureQuickChatRuntime()
+  refreshQuickChatAttendanceOverview().catch(() => {})
   if (!activeQuickChatRoomId.value && sortedQuickChatRooms.value.length) {
     activeQuickChatRoomId.value = sortedQuickChatRooms.value[0].id
   }
@@ -3568,6 +3954,7 @@ function openQuickChat() {
     activeQuickChatRoom.value.unreadByUser[currentId] = 0
     if (unreadChanged || readChanged) persistQuickChatState()
   }
+  refreshActiveQuickChatMemberWorkStatuses().catch(() => {})
   scrollQuickChatToBottom()
 }
 
@@ -3650,6 +4037,40 @@ function openRenameQuickChatRoom() {
 function memberNameById(staffId: string) {
   const matched = staffOptions.value.find((item) => item.value === staffId || item.username === staffId)
   return matched?.name || `员工#${staffId}`
+}
+
+function resolveQuickChatMemberStaffId(rawId: unknown) {
+  const normalized = normalizeQuickChatMemberId(rawId)
+  const matched = staffOptions.value.find((item) => item.value === normalized || item.username === normalized)
+  if (matched?.value) return String(matched.value)
+  return /^\d+$/.test(normalized) ? normalized : ''
+}
+
+function attendancePresenceMeta(status?: string, label?: string) {
+  const normalized = String(status || '').toUpperCase()
+  if (normalized === 'ON_LEAVE') return { label: label || '请假中', color: 'cyan' }
+  if (normalized === 'OUTING') return { label: label || '外出中', color: 'orange' }
+  if (normalized === 'LUNCH_BREAK') return { label: label || '午休中', color: 'blue' }
+  if (normalized === 'ON_DUTY') return { label: label || '上班', color: 'green' }
+  if (normalized === 'OFF_DUTY') return { label: label || '下班', color: 'purple' }
+  if (normalized === 'NOT_CHECKED_IN') return { label: label || '未打卡', color: 'default' }
+  return { label: label || '在线', color: 'green' }
+}
+
+function quickChatMemberStatusKey(rawId: unknown) {
+  return normalizeQuickChatMemberId(rawId)
+}
+
+function quickChatMemberWorkStatus(rawId: unknown) {
+  const key = quickChatMemberStatusKey(rawId)
+  if (key && quickChatMemberWorkStatusMap[key]) {
+    return quickChatMemberWorkStatusMap[key]
+  }
+  return { label: '在线', color: 'green' }
+}
+
+function quickChatMessageWorkStatus(rawId: unknown) {
+  return quickChatMemberWorkStatus(rawId)
 }
 
 function expandDepartmentMemberIds(departmentIds: string[]) {
@@ -3929,6 +4350,7 @@ function submitQuickChatTodoEditor() {
     if (!row.creatorName) row.creatorName = currentQuickChatSenderName.value
     row.escalationLevel = 0
     row.lastEscalatedAt = undefined
+    row.updatedAt = dayjs().toISOString()
     persistQuickChatTodo()
     quickChatTodoEditorOpen.value = false
     message.success('聊天待办已更新')
@@ -3953,6 +4375,7 @@ function submitQuickChatTodoEditor() {
     doneAt: undefined,
     createdAt: dayjs().toISOString(),
     createdAtText: dayjs().format('MM-DD HH:mm'),
+    updatedAt: dayjs().toISOString(),
     done: false
   })
   persistQuickChatTodo()
@@ -3965,6 +4388,7 @@ function toggleQuickChatTodoDone(todoId: string) {
   if (!row) return
   row.done = !row.done
   row.doneAt = row.done ? dayjs().toISOString() : undefined
+  row.updatedAt = dayjs().toISOString()
   if (row.done) {
     const room = quickChatRooms.value.find((item) => item.id === row.roomId)
     if (room) {
@@ -4040,6 +4464,7 @@ function escalateQuickChatTodo(todoId: string, silent = false, forcedLevel?: 1 |
   )
   row.escalationLevel = targetLevel as 1 | 2
   row.lastEscalatedAt = dayjs().toISOString()
+  row.updatedAt = dayjs().toISOString()
   persistQuickChatTodo()
   persistQuickChatState()
   if (!silent) message.success(`${level}催办已发送`)
@@ -4111,6 +4536,7 @@ async function syncQuickChatTodoToCalendar(todoId: string) {
     })
     row.calendarTaskId = created?.id != null ? String(created.id) : undefined
     row.calendarSynced = true
+    row.updatedAt = dayjs().toISOString()
     persistQuickChatTodo()
     router.push({
       path: '/oa/work-execution/calendar',
@@ -4698,23 +5124,104 @@ function scrollQuickChatToBottom() {
   })
 }
 
+async function refreshQuickChatAttendanceOverview() {
+  try {
+    quickChatAttendanceOverview.value = await getAttendanceOverview({
+      month: dayjs().format('YYYY-MM')
+    })
+  } catch {
+  }
+}
+
+async function refreshActiveQuickChatMemberWorkStatuses() {
+  const room = activeQuickChatRoom.value
+  if (!room) return
+  const tasks = room.memberIds.map(async (memberId) => {
+    const key = quickChatMemberStatusKey(memberId)
+    if (!key) return
+    if (isCurrentQuickChatIdentity(memberId)) {
+      quickChatMemberWorkStatusMap[key] = {
+        label: presenceStatus.value.label,
+        color: String(presenceStatus.value.color || 'default')
+      }
+      return
+    }
+    const staffId = resolveQuickChatMemberStaffId(memberId)
+    if (!staffId) {
+      quickChatMemberWorkStatusMap[key] = { label: '在线', color: 'green' }
+      return
+    }
+    try {
+      const overview = await getAttendanceOverview({
+        staffId,
+        month: dayjs().format('YYYY-MM')
+      })
+      quickChatMemberWorkStatusMap[key] = attendancePresenceMeta(
+        overview?.todayStatus,
+        overview?.todayStatusLabel
+      )
+    } catch {
+      quickChatMemberWorkStatusMap[key] = { label: '在线', color: 'green' }
+    }
+  })
+  await Promise.all(tasks)
+}
+
 function toggleDnd() {
   quickChatDnd.value = !quickChatDnd.value
   persistPresenceState()
+  refreshActiveQuickChatMemberWorkStatuses().catch(() => {})
   message.success(quickChatDnd.value ? '已开启免打扰' : '已关闭免打扰')
 }
 
-function setPresenceTraining(hours: number) {
+async function setPresenceTraining(hours: number) {
   const safeHours = Math.min(Math.max(Number(hours || 2), 1), 12)
+  const todayStatus = String(quickChatAttendanceOverview.value?.todayStatus || '').toUpperCase()
+  try {
+    if (todayStatus === 'ON_LEAVE') {
+      message.warning('当前请假中，不能切换为外出培训状态')
+      return
+    }
+    if (todayStatus === 'OFF_DUTY') {
+      message.warning('当前已下班，请先上班打卡后再设置外出培训')
+      return
+    }
+    if (todayStatus === 'LUNCH_BREAK') {
+      message.warning('请先结束午休，再切换为外出培训')
+      return
+    }
+    if (todayStatus === 'NOT_CHECKED_IN' || !todayStatus) {
+      await punchAttendance('IN')
+      await punchAttendance('START_OUTING')
+    } else if (todayStatus === 'ON_DUTY') {
+      await punchAttendance('START_OUTING')
+    }
+  } catch (error: any) {
+    message.error(error?.message || '切换外出培训状态失败')
+    return
+  }
   quickChatTrainingUntil.value = dayjs().add(safeHours, 'hour').toISOString()
   quickChatDnd.value = false
   persistPresenceState()
+  await refreshQuickChatAttendanceOverview()
+  await refreshActiveQuickChatMemberWorkStatuses()
   message.success(`已进入外出培训状态（${safeHours}小时）`)
 }
 
-function clearPresenceTraining() {
+async function clearPresenceTraining() {
+  const todayStatus = String(quickChatAttendanceOverview.value?.todayStatus || '').toUpperCase()
+  if (todayStatus === 'OUTING') {
+    try {
+      await punchAttendance('END_OUTING')
+    } catch (error: any) {
+      message.error(error?.message || '结束培训状态失败')
+      return
+    }
+  }
   quickChatTrainingUntil.value = ''
   persistPresenceState()
+  await refreshQuickChatAttendanceOverview()
+  await refreshActiveQuickChatMemberWorkStatuses()
   message.success('已结束培训状态')
 }
 
@@ -4753,6 +5260,8 @@ onMounted(() => {
       loadPresenceState()
       rehydrateQuickChatUnread()
       ensureActiveQuickChatVisible()
+      refreshQuickChatAttendanceOverview().catch(() => {})
+      refreshActiveQuickChatMemberWorkStatuses().catch(() => {})
     })
     .finally(() => {
       restoreRouteTabs()
@@ -4763,9 +5272,16 @@ onMounted(() => {
     if (quickChatTrainingUntil.value && dayjs().isAfter(dayjs(quickChatTrainingUntil.value))) {
       quickChatTrainingUntil.value = ''
       persistPresenceState()
+      refreshActiveQuickChatMemberWorkStatuses().catch(() => {})
     }
+    refreshQuickChatAttendanceOverview().catch(() => {})
+    refreshActiveQuickChatMemberWorkStatuses().catch(() => {})
   }, 2 * 60 * 1000)
   quickChatSyncUnsubscribe = subscribeLiveSync((payload) => {
+    if (payload?.url?.startsWith?.('/api/attendance/') || payload?.topics?.includes('hr')) {
+      refreshQuickChatAttendanceOverview().catch(() => {})
+      refreshActiveQuickChatMemberWorkStatuses().catch(() => {})
+    }
     if (!payload?.topics?.includes('oa') && payload?.url !== '/local/quick-chat') return
     if (payload.url !== '/local/quick-chat') return
     if (!quickChatOpen.value) return
@@ -4823,12 +5339,6 @@ function onQuickChatStorageChange(event: StorageEvent) {
   if (event.key === quickChatStorageKey()) {
     if (!quickChatOpen.value) return
     syncQuickChatFromStorage()
-    return
-  }
-  if (event.key === quickChatTodoStorageKey()) {
-    if (!quickChatOpen.value) return
-    loadQuickChatTodo()
-    runAutoEscalationIfNeeded()
     return
   }
   if (event.key === quickChatTodoAutomationStorageKey()) {
@@ -5210,45 +5720,145 @@ function onQuickChatStorageChange(event: StorageEvent) {
   overflow: auto;
 }
 
+.quick-chat-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  height: 100%;
+}
+
 .quick-chat-layout {
   display: grid;
-  grid-template-columns: 240px 1fr;
-  gap: 12px;
+  grid-template-columns: 250px minmax(0, 1fr) 270px;
+  gap: 14px;
   min-height: 0;
-  max-height: calc(100vh - 180px);
+  max-height: calc(100vh - 220px);
 }
 
 .quick-chat-top-actions {
-  width: 100%;
+  display: grid;
+  gap: 12px;
+}
+
+.quick-chat-overview {
   display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border: 1px solid rgba(191, 219, 254, 0.72);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at top right, rgba(96, 165, 250, 0.18), transparent 30%),
+    linear-gradient(180deg, rgba(248, 251, 255, 0.98) 0%, rgba(238, 246, 255, 0.94) 100%);
+}
+
+.quick-chat-overline {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #7c93aa;
+  font-weight: 700;
+}
+
+.quick-chat-overview-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.quick-chat-overview-copy strong {
+  font-size: 24px;
+  color: #0f172a;
+}
+
+.quick-chat-overview-copy span {
+  color: #51667d;
+  font-size: 13px;
+}
+
+.quick-chat-overview-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 360px;
+}
+
+.quick-chat-overview-pill {
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+.quick-chat-overview-pill span {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.quick-chat-overview-pill strong {
+  display: block;
+  margin-top: 4px;
+  color: #0f172a;
+  font-size: 22px;
+}
+
+.quick-chat-commandbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 2px 0;
 }
 
 .quick-chat-drawer :deep(.ant-drawer-body) {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  background:
+    linear-gradient(180deg, rgba(249, 251, 255, 0.98) 0%, rgba(243, 247, 252, 0.98) 100%);
 }
 
 .quick-chat-room-list {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.92);
   overflow: auto;
   max-height: 100%;
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.06);
 }
 
 .quick-chat-room-search {
-  padding: 10px 10px 6px;
-  border-bottom: 1px solid var(--border);
+  padding: 14px 14px 8px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.92);
   position: sticky;
   top: 0;
   z-index: 1;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
 }
 
 .quick-chat-room-search :deep(.ant-checkbox-wrapper) {
   display: block;
   color: var(--muted);
+  font-size: 12px;
+}
+
+.quick-chat-rail-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.quick-chat-rail-head strong {
+  color: #0f172a;
+  font-size: 15px;
+}
+
+.quick-chat-rail-head span {
+  color: #64748b;
   font-size: 12px;
 }
 
@@ -5261,11 +5871,52 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 .quick-chat-room-item {
   cursor: pointer;
-  transition: background-color 0.16s ease;
+  transition: transform 0.16s ease, background-color 0.16s ease;
+  padding-inline: 10px !important;
 }
 
 .quick-chat-room-check {
   margin-right: 8px;
+}
+
+.quick-chat-room-card {
+  width: 100%;
+  padding: 12px 12px 10px;
+  border-radius: 16px;
+  border: 1px solid transparent;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.86) 0%, rgba(255, 255, 255, 0.98) 100%);
+}
+
+.quick-chat-room-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.quick-chat-room-card-head strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.quick-chat-room-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.quick-chat-room-card p {
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .quick-chat-todo-summary {
@@ -5355,21 +6006,160 @@ function onQuickChatStorageChange(event: StorageEvent) {
 }
 
 .quick-chat-room-item.active {
-  background: rgba(27, 102, 214, 0.08);
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.quick-chat-room-item:hover {
+  transform: translateY(-1px);
+}
+
+.quick-chat-room-item.active .quick-chat-room-card {
+  border-color: rgba(96, 165, 250, 0.68);
+  background:
+    radial-gradient(circle at top right, rgba(191, 219, 254, 0.4), transparent 40%),
+    linear-gradient(180deg, rgba(239, 246, 255, 0.96) 0%, rgba(255, 255, 255, 0.98) 100%);
 }
 
 .quick-chat-main {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.96);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   min-height: 0;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
+}
+
+.quick-chat-aside {
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+}
+
+.quick-chat-aside-card {
+  padding: 14px;
+  border-radius: 22px;
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.06);
+}
+
+.quick-chat-aside-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.quick-chat-aside-head strong {
+  color: #0f172a;
+  font-size: 15px;
+}
+
+.quick-chat-aside-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.quick-chat-aside-metrics div {
+  padding: 10px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.92) 0%, rgba(255, 255, 255, 0.96) 100%);
+  border: 1px solid rgba(226, 232, 240, 0.86);
+}
+
+.quick-chat-aside-metrics span {
+  display: block;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.quick-chat-aside-metrics strong {
+  display: block;
+  margin-top: 5px;
+  color: #0f172a;
+  font-size: 20px;
+}
+
+.quick-chat-member-stack {
+  display: grid;
+  gap: 8px;
+}
+
+.quick-chat-member-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(248, 250, 252, 0.86);
+  border: 1px solid rgba(226, 232, 240, 0.88);
+}
+
+.quick-chat-member-chip strong,
+.quick-chat-member-chip span {
+  display: block;
+}
+
+.quick-chat-member-chip strong {
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.quick-chat-member-chip span {
+  margin-top: 4px;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.quick-chat-focus-todo-list {
+  display: grid;
+  gap: 8px;
+}
+
+.quick-chat-focus-todo {
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.9) 0%, rgba(255, 255, 255, 0.98) 100%);
+  padding: 12px;
+  text-align: left;
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.quick-chat-focus-todo:hover {
+  transform: translateY(-1px);
+  border-color: rgba(147, 197, 253, 0.92);
+  box-shadow: 0 10px 20px rgba(59, 130, 246, 0.08);
+}
+
+.quick-chat-focus-todo-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.quick-chat-focus-todo-head strong {
+  color: #0f172a;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.quick-chat-focus-todo span {
+  display: block;
+  margin-top: 8px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .quick-chat-notice {
-  padding: 8px 12px;
+  padding: 10px 14px;
   background: rgba(245, 158, 11, 0.12);
   border-bottom: 1px solid rgba(245, 158, 11, 0.3);
   color: #92400e;
@@ -5397,29 +6187,55 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 .quick-chat-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.92);
+  background: linear-gradient(180deg, rgba(250, 252, 255, 0.98) 0%, rgba(255, 255, 255, 0.96) 100%);
+}
+
+.quick-chat-header-main {
+  display: grid;
+  gap: 6px;
+}
+
+.quick-chat-header-main strong {
+  color: #0f172a;
+  font-size: 18px;
+}
+
+.quick-chat-header-meta {
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
+}
+
+.quick-chat-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .quick-chat-messages {
   flex: 1;
-  padding: 12px;
+  padding: 16px;
   overflow-y: auto;
-  background: linear-gradient(180deg, rgba(245, 248, 255, 0.72) 0%, #fff 100%);
+  background:
+    radial-gradient(circle at top, rgba(219, 234, 254, 0.34), transparent 38%),
+    linear-gradient(180deg, rgba(245, 248, 255, 0.82) 0%, #fff 100%);
 }
 
 .quick-chat-message {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
   max-width: 76%;
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 8px 10px;
-  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.06);
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 16px;
+  padding: 10px 12px;
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
 }
 
 .quick-chat-message-focus {
@@ -5429,8 +6245,8 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 .quick-chat-message.self {
   margin-left: auto;
-  background: #eaf3ff;
-  border-color: rgba(27, 102, 214, 0.22);
+  background: linear-gradient(180deg, rgba(233, 243, 255, 0.98) 0%, rgba(247, 251, 255, 0.98) 100%);
+  border-color: rgba(96, 165, 250, 0.36);
 }
 
 .quick-chat-message-meta {
@@ -5507,8 +6323,17 @@ function onQuickChatStorageChange(event: StorageEvent) {
 }
 
 .quick-chat-input {
-  border-top: 1px solid var(--border);
-  padding: 10px 12px;
+  border-top: 1px solid rgba(226, 232, 240, 0.92);
+  padding: 14px 16px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.94) 100%);
+}
+
+.quick-chat-input-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
 }
 
 .hint-text {
@@ -5554,6 +6379,23 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
   .quick-chat-room-list {
     max-height: 180px;
+  }
+
+  .quick-chat-overview {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .quick-chat-overview-metrics,
+  .quick-chat-aside-metrics {
+    grid-template-columns: 1fr;
+    min-width: 0;
+  }
+
+  .quick-chat-header-actions,
+  .quick-chat-input-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .quick-chat-todo-head {

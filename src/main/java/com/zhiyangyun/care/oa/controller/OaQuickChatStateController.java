@@ -38,6 +38,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class OaQuickChatStateController {
   private static final int MAX_STATE_BYTES = 2 * 1024 * 1024;
   private static final TypeReference<List<Map<String, Object>>> ROOM_LIST_TYPE = new TypeReference<>() {};
+  private static final TypeReference<Map<String, Object>> STATE_OBJECT_TYPE = new TypeReference<>() {};
   private final OaQuickChatStateMapper quickChatStateMapper;
   private final StaffMapper staffMapper;
   private final ObjectMapper objectMapper;
@@ -94,7 +95,9 @@ public class OaQuickChatStateController {
     if (stateJson != null && stateJson.getBytes(StandardCharsets.UTF_8).length > MAX_STATE_BYTES) {
       throw new IllegalArgumentException("聊天同步数据过大，请减少历史记录后重试");
     }
-    List<Map<String, Object>> sourceRooms = parseRooms(stateJson);
+    Map<String, Object> sourceState = parseStateEnvelope(stateJson);
+    List<Map<String, Object>> sourceRooms = parseRooms(sourceState);
+    List<Map<String, Object>> sourceTodos = parseTodos(sourceState);
     if (sourceRooms.isEmpty()) {
       return Result.ok(0);
     }
@@ -109,6 +112,7 @@ public class OaQuickChatStateController {
       Long targetStaffId = target == null ? null : target.getId();
       if (targetStaffId == null || targetStaffId <= 0) continue;
       List<Map<String, Object>> visibleRooms = filterRoomsByMember(sourceRooms, target);
+      List<Map<String, Object>> visibleTodos = filterTodosByVisibleRooms(sourceTodos, visibleRooms);
       if (visibleRooms.isEmpty()) {
         continue;
       }
@@ -117,7 +121,7 @@ public class OaQuickChatStateController {
           .eq(orgId != null, OaQuickChatState::getOrgId, orgId)
           .eq(OaQuickChatState::getStaffId, targetStaffId)
           .last("limit 1"));
-      String mergedJson = visibleRoomsToJson(visibleRooms);
+      String mergedJson = stateEnvelopeToJson(visibleRooms, visibleTodos);
       if (mergedJson.getBytes(StandardCharsets.UTF_8).length > MAX_STATE_BYTES) {
         continue;
       }
@@ -130,9 +134,12 @@ public class OaQuickChatStateController {
         row.setStateJson(mergedJson);
         quickChatStateMapper.insert(row);
       } else {
-        List<Map<String, Object>> currentRooms = parseRooms(row.getStateJson());
+        Map<String, Object> currentState = parseStateEnvelope(row.getStateJson());
+        List<Map<String, Object>> currentRooms = parseRooms(currentState);
+        List<Map<String, Object>> currentTodos = parseTodos(currentState);
         List<Map<String, Object>> mergedRooms = mergeRooms(currentRooms, visibleRooms);
-        String finalJson = visibleRoomsToJson(mergedRooms);
+        List<Map<String, Object>> mergedTodos = mergeTodos(currentTodos, visibleTodos, visibleRooms);
+        String finalJson = stateEnvelopeToJson(mergedRooms, mergedTodos);
         if (finalJson.getBytes(StandardCharsets.UTF_8).length > MAX_STATE_BYTES) {
           continue;
         }
@@ -266,26 +273,69 @@ public class OaQuickChatStateController {
     return payload;
   }
 
-  private List<Map<String, Object>> parseRooms(String stateJson) {
+  private Map<String, Object> parseStateEnvelope(String stateJson) {
+    Map<String, Object> envelope = new LinkedHashMap<>();
+    envelope.put("rooms", List.of());
+    envelope.put("todos", List.of());
     if (stateJson == null || stateJson.isBlank()) {
-      return List.of();
+      return envelope;
+    }
+    try {
+      Map<String, Object> parsed = objectMapper.readValue(stateJson, STATE_OBJECT_TYPE);
+      if (parsed != null && !parsed.isEmpty() && (parsed.containsKey("rooms") || parsed.containsKey("todos"))) {
+        Object rooms = parsed.get("rooms");
+        Object todos = parsed.get("todos");
+        envelope.put("rooms", rooms instanceof List<?> list ? list : List.of());
+        envelope.put("todos", todos instanceof List<?> list ? list : List.of());
+        return envelope;
+      }
+    } catch (Exception ex) {
+      // ignore and fall back to legacy room-only array format
     }
     try {
       List<Map<String, Object>> rooms = objectMapper.readValue(stateJson, ROOM_LIST_TYPE);
-      if (rooms == null) {
-        return List.of();
-      }
-      return rooms.stream().filter(item -> item != null && !item.isEmpty()).toList();
+      envelope.put("rooms", rooms == null ? List.of() : rooms);
     } catch (Exception ex) {
-      return List.of();
+      envelope.put("rooms", List.of());
     }
+    return envelope;
   }
 
-  private String visibleRoomsToJson(List<Map<String, Object>> rooms) {
+  @SuppressWarnings("unchecked")
+  private List<Map<String, Object>> parseRooms(Map<String, Object> envelope) {
+    Object raw = envelope == null ? null : envelope.get("rooms");
+    if (!(raw instanceof List<?> rows)) {
+      return List.of();
+    }
+    return rows.stream()
+        .filter(item -> item instanceof Map<?, ?>)
+        .map(item -> (Map<String, Object>) item)
+        .filter(item -> item != null && !item.isEmpty())
+        .toList();
+  }
+
+  @SuppressWarnings("unchecked")
+  private List<Map<String, Object>> parseTodos(Map<String, Object> envelope) {
+    Object raw = envelope == null ? null : envelope.get("todos");
+    if (!(raw instanceof List<?> rows)) {
+      return List.of();
+    }
+    return rows.stream()
+        .filter(item -> item instanceof Map<?, ?>)
+        .map(item -> (Map<String, Object>) item)
+        .filter(item -> item != null && !item.isEmpty())
+        .toList();
+  }
+
+  private String stateEnvelopeToJson(List<Map<String, Object>> rooms, List<Map<String, Object>> todos) {
     try {
-      return objectMapper.writeValueAsString(rooms == null ? List.of() : rooms);
+      Map<String, Object> payload = new LinkedHashMap<>();
+      payload.put("version", 2);
+      payload.put("rooms", rooms == null ? List.of() : rooms);
+      payload.put("todos", todos == null ? List.of() : todos);
+      return objectMapper.writeValueAsString(payload);
     } catch (Exception ex) {
-      return "[]";
+      return "{\"version\":2,\"rooms\":[],\"todos\":[]}";
     }
   }
 
@@ -317,11 +367,86 @@ public class OaQuickChatStateController {
     return rows;
   }
 
+  private List<Map<String, Object>> filterTodosByVisibleRooms(
+      List<Map<String, Object>> todos,
+      List<Map<String, Object>> visibleRooms) {
+    if (todos == null || todos.isEmpty() || visibleRooms == null || visibleRooms.isEmpty()) {
+      return List.of();
+    }
+    Set<String> roomIds = new LinkedHashSet<>();
+    for (Map<String, Object> room : visibleRooms) {
+      String roomId = asText(room.get("id"));
+      if (!roomId.isBlank()) {
+        roomIds.add(roomId);
+      }
+    }
+    if (roomIds.isEmpty()) {
+      return List.of();
+    }
+    List<Map<String, Object>> visible = new ArrayList<>();
+    for (Map<String, Object> todo : todos) {
+      String roomId = asText(todo.get("roomId"));
+      if (roomIds.contains(roomId)) {
+        visible.add(todo);
+      }
+    }
+    return visible;
+  }
+
+  private List<Map<String, Object>> mergeTodos(
+      List<Map<String, Object>> currentTodos,
+      List<Map<String, Object>> incomingTodos,
+      List<Map<String, Object>> visibleRooms) {
+    Set<String> visibleRoomIds = new LinkedHashSet<>();
+    for (Map<String, Object> room : visibleRooms == null ? List.<Map<String, Object>>of() : visibleRooms) {
+      String roomId = asText(room.get("id"));
+      if (!roomId.isBlank()) {
+        visibleRoomIds.add(roomId);
+      }
+    }
+    Map<String, Map<String, Object>> merged = new LinkedHashMap<>();
+    for (Map<String, Object> todo : currentTodos == null ? List.<Map<String, Object>>of() : currentTodos) {
+      String todoId = asText(todo.get("id"));
+      String roomId = asText(todo.get("roomId"));
+      if (todoId.isBlank()) continue;
+      if (!roomId.isBlank() && visibleRoomIds.contains(roomId)) {
+        continue;
+      }
+      merged.put(todoId, todo);
+    }
+    for (Map<String, Object> todo : incomingTodos == null ? List.<Map<String, Object>>of() : incomingTodos) {
+      String todoId = asText(todo.get("id"));
+      if (todoId.isBlank()) continue;
+      merged.put(todoId, todo);
+    }
+    List<Map<String, Object>> rows = new ArrayList<>(merged.values());
+    rows.sort(Comparator.comparingLong(this::todoUpdatedAtMs).reversed());
+    return rows;
+  }
+
   private long roomUpdatedAtMs(Map<String, Object> room) {
     if (room == null) return 0L;
     String updatedAt = asText(room.get("updatedAt"));
     if (updatedAt.isBlank()) {
       updatedAt = asText(room.get("createdAt"));
+    }
+    try {
+      return java.time.Instant.parse(updatedAt).toEpochMilli();
+    } catch (Exception ignored) {}
+    try {
+      return java.time.LocalDateTime.parse(updatedAt).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
+    } catch (Exception ignored) {}
+    return 0L;
+  }
+
+  private long todoUpdatedAtMs(Map<String, Object> todo) {
+    if (todo == null) return 0L;
+    String updatedAt = asText(todo.get("updatedAt"));
+    if (updatedAt.isBlank()) {
+      updatedAt = asText(todo.get("doneAt"));
+    }
+    if (updatedAt.isBlank()) {
+      updatedAt = asText(todo.get("createdAt"));
     }
     try {
       return java.time.Instant.parse(updatedAt).toEpochMilli();
