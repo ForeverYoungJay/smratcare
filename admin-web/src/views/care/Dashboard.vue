@@ -117,7 +117,7 @@ function buildCharts(list: CareTaskItem[]) {
 
   const staffCountMap = new Map<string, number>()
   list.filter((t) => t.status === 'DONE').forEach((task) => {
-    const key = task.staffId ? (findStaffName(task.staffId) || `员工#${task.staffId}`) : '未分配'
+    const key = task.staffId ? (findStaffName(task.staffId) || '未识别员工') : '未分配'
     staffCountMap.set(key, (staffCountMap.get(key) || 0) + 1)
   })
   const rank = Array.from(staffCountMap.entries())

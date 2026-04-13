@@ -415,7 +415,7 @@ async function submitRedeem() {
   }
   redeeming.value = true
   try {
-    const staffName = staffOptions.value.find((item) => item.value === redeemForm.staffId)?.label || `员工#${redeemForm.staffId}`
+    const staffName = staffOptions.value.find((item) => item.value === redeemForm.staffId)?.label || '未识别员工'
     await createApproval({
       approvalType: 'POINTS_CASH',
       title: `积分兑现金申请-${staffName}`,

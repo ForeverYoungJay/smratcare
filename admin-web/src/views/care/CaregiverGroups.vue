@@ -276,7 +276,7 @@ const rules = {
 
 const staffOptions = computed(() =>
   staffDirectory.value.map((item) => ({
-    label: `${item.realName || item.username || `员工#${item.id}`}${item.staffNo ? ` (${item.staffNo})` : ''}`,
+    label: `${item.realName || item.username || '未识别员工'}${item.staffNo ? ` (${item.staffNo})` : ''}`,
     value: Number(item.id)
   }))
 )
@@ -337,7 +337,7 @@ function buildMemberRows(group?: CaregiverGroupItem | null) {
     const meta = profileStore.value[String(staffId)] || {}
     return {
       staffId,
-      name: staff?.realName || `员工#${staffId}`,
+      name: staff?.realName || staff?.username || '未识别员工',
       phone: staff?.phone,
       advantage: meta.advantage,
       specialty: meta.specialty

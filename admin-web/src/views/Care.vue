@@ -120,7 +120,7 @@ async function ensureStaffLoaded() {
 
 function staffName(staffId?: number) {
   if (!staffId) return '-'
-  return findStaffName(staffId) || `员工#${staffId}`
+  return findStaffName(staffId) || '未识别员工'
 }
 
 function handleTableChange(pag: any) {

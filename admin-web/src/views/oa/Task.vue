@@ -148,7 +148,7 @@
     <a-modal v-model:open="editOpen" title="任务" @ok="submit" :confirm-loading="saving" width="760px">
       <a-form layout="vertical">
         <a-form-item label="任务标题" required>
-          <a-input v-model:value="form.title" placeholder="例如：周例会资料整理" />
+          <a-input v-model:value="form.title" placeholder="请输入任务标题" />
         </a-form-item>
         <a-form-item label="任务描述">
           <a-textarea v-model:value="form.description" :rows="3" placeholder="可填写目标、交付标准、备注" />
@@ -161,9 +161,12 @@
                 v-model:value="form.assigneeName"
                 show-search
                 allow-clear
+                :filter-option="false"
+                :loading="staffLoading"
                 :options="assigneeOptions"
-                :filter-option="filterOptionByLabel"
                 placeholder="输入姓名搜索"
+                @focus="warmTaskStaffOptions"
+                @search="searchStaff"
               />
             </a-form-item>
           </a-col>
@@ -207,9 +210,12 @@
                 mode="multiple"
                 show-search
                 allow-clear
+                :filter-option="false"
+                :loading="staffLoading"
                 :options="collaboratorOptions"
-                :filter-option="filterOptionByLabel"
                 placeholder="输入姓名搜索"
+                @focus="warmTaskStaffOptions"
+                @search="searchStaff"
               />
             </a-form-item>
           </a-col>
@@ -264,6 +270,7 @@ import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
+import { useStaffOptions } from '../../composables/useStaffOptions'
 import {
   getOaTaskSummary,
   getOaTaskPage,
@@ -311,6 +318,7 @@ const summary = reactive<OaTaskSummary>({
   overdueCount: 0,
   unassignedCount: 0
 })
+const { staffOptions, staffLoading, searchStaff } = useStaffOptions({ pageSize: 160, preloadSize: 500 })
 
 const columns = [
   { title: '标题', dataIndex: 'title', key: 'title', width: 220 },
@@ -376,19 +384,30 @@ const planCategoryOptions = [
   { label: '跨部门协同', value: '跨部门协同' },
   { label: '院长督办', value: '院长督办' }
 ]
-const assigneeOptions = [
-  { label: '张院长', value: '张院长' },
-  { label: '李护士长', value: '李护士长' },
-  { label: '王行政', value: '王行政' },
-  { label: '赵运营', value: '赵运营' },
-  { label: '陈财务', value: '陈财务' }
-]
-const collaboratorOptions = [
-  { label: '护理部-刘主管', value: '护理部-刘主管' },
-  { label: '人事部-孙老师', value: '人事部-孙老师' },
-  { label: '后勤部-周主管', value: '后勤部-周主管' },
-  { label: '市场部-吴经理', value: '市场部-吴经理' }
-]
+const assigneeOptions = computed(() => {
+  const optionMap = new Map<string, { label: string; value: string }>()
+  ;(staffOptions.value || []).forEach((item) => {
+    const name = String(item.name || item.label || item.username || '').trim()
+    if (!name) return
+    optionMap.set(name, { label: name, value: name })
+  })
+  const current = String(form.assigneeName || '').trim()
+  if (current && !optionMap.has(current)) optionMap.set(current, { label: current, value: current })
+  return Array.from(optionMap.values())
+})
+const collaboratorOptions = computed(() => {
+  const optionMap = new Map<string, { label: string; value: string }>()
+  ;(staffOptions.value || []).forEach((item) => {
+    const name = String(item.name || item.label || item.username || '').trim()
+    if (!name) return
+    optionMap.set(name, { label: name, value: name })
+  })
+  ;(form.collaboratorNames || []).forEach((item) => {
+    const name = String(item || '').trim()
+    if (name && !optionMap.has(name)) optionMap.set(name, { label: name, value: name })
+  })
+  return Array.from(optionMap.values())
+})
 const lifecycleContext = computed(() => {
   const source = String(route.query.source || '').trim().toLowerCase()
   const scene = String(route.query.scene || '').trim().toLowerCase()
@@ -402,6 +421,12 @@ const lifecycleContext = computed(() => {
 function filterOptionByLabel(input: string, option: SelectProps['options'][number]) {
   const label = String((option as any)?.label || '')
   return label.toLowerCase().includes(input.toLowerCase())
+}
+
+function warmTaskStaffOptions() {
+  if (!staffOptions.value.length) {
+    searchStaff('').catch(() => {})
+  }
 }
 
 function priorityLabel(priority?: string) {
@@ -666,6 +691,7 @@ function onReset() {
 }
 
 function openCreate() {
+  warmTaskStaffOptions()
   form.id = undefined
   form.title = ''
   form.description = ''
@@ -694,6 +720,7 @@ function parseCollaboratorNames(value: unknown): string[] {
 }
 
 function openEdit(record: OaTask) {
+  warmTaskStaffOptions()
   form.id = String(record.id)
   form.title = record.title
   form.description = record.description || ''

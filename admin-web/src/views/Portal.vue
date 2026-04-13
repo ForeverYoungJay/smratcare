@@ -2784,7 +2784,7 @@ async function resolveCollaborators(departmentIds: string[], staffIds: string[])
     .filter((item) => staffIds.includes(item.value))
     .forEach((item) => collaboratorMap.set(String(item.value), item.name || item.label))
   for (const staffId of staffIds) {
-    if (!collaboratorMap.has(staffId)) collaboratorMap.set(staffId, `员工#${staffId}`)
+    if (!collaboratorMap.has(staffId)) collaboratorMap.set(staffId, '未识别员工')
   }
   if (departmentIds.length > 0) {
     const pages = await Promise.all(
@@ -2798,7 +2798,7 @@ async function resolveCollaborators(departmentIds: string[], staffIds: string[])
     pages.forEach((page) => {
       ;(page.list || []).forEach((item) => {
         const id = String(item.id)
-        const name = (item.realName || item.username || `员工#${id}`).trim()
+        const name = (item.realName || item.username || '未识别员工').trim()
         collaboratorMap.set(id, name)
       })
     })

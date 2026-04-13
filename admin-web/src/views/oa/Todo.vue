@@ -208,7 +208,7 @@
     <a-modal v-model:open="editOpen" title="待办" @ok="submit" :confirm-loading="saving" width="760px">
       <a-form layout="vertical">
         <a-form-item label="标题" required>
-          <a-input v-model:value="form.title" placeholder="例如：跟进张阿姨家属签约资料" />
+          <a-input v-model:value="form.title" placeholder="请输入待办标题" />
         </a-form-item>
         <a-row :gutter="12">
           <a-col :span="12">
@@ -235,10 +235,11 @@
               <a-select
                 v-model:value="form.relatedTarget"
                 show-search
+                mode="tags"
                 allow-clear
                 :options="relatedTargetOptions"
                 :filter-option="filterOptionByLabel"
-                placeholder="例如：合同/老人/审批单"
+                placeholder="输入并回车，可填写真实关联对象"
               />
             </a-form-item>
           </a-col>
@@ -261,9 +262,12 @@
                 :disabled="!canAssignOthers"
                 show-search
                 allow-clear
+                :filter-option="false"
+                :loading="staffLoading"
                 :options="assigneeOptions"
-                :filter-option="filterOptionByLabel"
                 :placeholder="canAssignOthers ? '输入姓名搜索' : '非管理角色固定为本人'"
+                @focus="warmTodoStaffOptions"
+                @search="searchStaff"
               />
             </a-form-item>
           </a-col>
@@ -294,6 +298,7 @@ import PageContainer from '../../components/PageContainer.vue'
 import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import StatefulBlock from '../../components/StatefulBlock.vue'
+import { useStaffOptions } from '../../composables/useStaffOptions'
 import {
   getTodoSummary,
   getTodoPage,
@@ -324,6 +329,7 @@ const tableError = ref('')
 const summaryLoading = ref(false)
 const summaryError = ref('')
 const rows = ref<OaTodo[]>([])
+const { staffOptions, staffLoading, searchStaff } = useStaffOptions({ pageSize: 160, preloadSize: 500 })
 const query = reactive({
   keyword: '',
   status: undefined as string | undefined,
@@ -400,24 +406,28 @@ const relatedModuleOptions = [
   { label: '文档管理', value: '文档管理' }
 ]
 const relatedTargetOptions = [
-  { label: '合同 gfyy20260303002', value: '合同 gfyy20260303002' },
-  { label: '长者 王桂英', value: '长者 王桂英' },
-  { label: '审批单 #2026-0310', value: '审批单 #2026-0310' },
-  { label: '线索 L-202603-088', value: '线索 L-202603-088' },
-  { label: '文档夹 入住资料-2026', value: '文档夹 入住资料-2026' }
+  { label: '合同', value: '合同' },
+  { label: '长者', value: '长者' },
+  { label: '审批单', value: '审批单' },
+  { label: '营销线索', value: '营销线索' },
+  { label: '文档资料', value: '文档资料' }
 ]
 const remindModeOptions = [
   { label: '系统站内', value: '系统站内' },
   { label: '短信提醒', value: '短信提醒' },
   { label: '站内 + 短信', value: '站内 + 短信' }
 ]
-const assigneeOptions = [
-  { label: '张院长', value: '张院长' },
-  { label: '李护士长', value: '李护士长' },
-  { label: '王行政', value: '王行政' },
-  { label: '赵运营', value: '赵运营' },
-  { label: '陈财务', value: '陈财务' }
-]
+const assigneeOptions = computed(() => {
+  const optionMap = new Map<string, { label: string; value: string }>()
+  ;(staffOptions.value || []).forEach((item) => {
+    const name = String(item.name || item.label || item.username || '').trim()
+    if (!name) return
+    optionMap.set(name, { label: name, value: name })
+  })
+  const current = String(form.assigneeName || '').trim()
+  if (current && !optionMap.has(current)) optionMap.set(current, { label: current, value: current })
+  return Array.from(optionMap.values())
+})
 const lifecycleContext = computed(() => {
   const source = String(route.query.source || '').trim().toLowerCase()
   const scene = String(route.query.scene || '').trim().toLowerCase()
@@ -431,6 +441,12 @@ const lifecycleContext = computed(() => {
 function filterOptionByLabel(input: string, option: SelectProps['options'][number]) {
   const label = String((option as any)?.label || '')
   return label.toLowerCase().includes(input.toLowerCase())
+}
+
+function warmTodoStaffOptions() {
+  if (!staffOptions.value.length) {
+    searchStaff('').catch(() => {})
+  }
 }
 const canAssignOthers = computed(() => {
   const roles = userStore.roles || []
@@ -738,6 +754,7 @@ function startAutoRefreshTimer() {
 }
 
 function openCreate() {
+  warmTodoStaffOptions()
   form.id = undefined
   form.title = ''
   form.content = ''
@@ -844,6 +861,7 @@ function openApprovalFromTodo(todo: OaTodo) {
 }
 
 function openEdit(record: OaTodo) {
+  warmTodoStaffOptions()
   const parsedMeta = decodeTodoMeta(record.content || '')
   form.id = String(record.id)
   form.title = record.title

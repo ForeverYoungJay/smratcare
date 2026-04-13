@@ -22,8 +22,29 @@ const staffPoolCache = new Map<string, StaffItem[]>()
 const staffPoolFetchedAt = new Map<string, number>()
 const STAFF_POOL_CACHE_TTL = 90 * 1000
 
+function safeStaffDisplayName(name?: string, username?: string, fallbackId?: string | number) {
+  const realName = String(name || '').trim()
+  if (realName) return realName
+  const loginName = String(username || '').trim()
+  if (loginName) return loginName
+  if (fallbackId != null && String(fallbackId).trim()) {
+    return `未识别员工(${String(fallbackId).trim()})`
+  }
+  return '未识别员工'
+}
+
+function findCachedStaff(staffId?: string | number) {
+  if (staffId == null || staffId === '') return undefined
+  const target = String(staffId)
+  for (const rows of staffPoolCache.values()) {
+    const hit = (rows || []).find((item) => String(item.id) === target)
+    if (hit) return hit
+  }
+  return undefined
+}
+
 function toStaffOption(item: StaffItem): StaffOption {
-  const name = item.realName || item.username || `员工#${item.id}`
+  const name = safeStaffDisplayName(item.realName, item.username, item.id)
   const suffix = item.staffNo ? ` (${item.staffNo})` : ''
   return {
     label: `${name}${suffix}`,
@@ -102,18 +123,27 @@ export function useStaffOptions(config: UseStaffOptionsConfig = {}) {
     if (staffId == null || staffId === '') return
     const value = String(staffId)
     if (staffOptions.value.some((item) => item.value === value)) return
-    const name = staffName || `员工#${value}`
+    const cached = findCachedStaff(value)
+    const name = safeStaffDisplayName(staffName || cached?.realName, cached?.username, value)
+    const suffix = cached?.staffNo ? ` (${cached.staffNo})` : ''
     staffOptions.value.unshift({
-      label: name,
+      label: `${name}${suffix}`,
       value,
       name,
-      roleCodes: []
+      username: String(cached?.username || '').trim() || undefined,
+      departmentId: cached?.departmentId == null ? undefined : String(cached.departmentId),
+      roleCodes: Array.isArray(cached?.roleCodes)
+        ? cached!.roleCodes.map((code) => String(code || '').trim().toUpperCase()).filter(Boolean)
+        : [],
     })
   }
 
   function findStaffName(staffId?: string | number) {
     if (staffId == null || staffId === '') return ''
-    return staffOptions.value.find((item) => item.value === String(staffId))?.name || ''
+    const optionName = staffOptions.value.find((item) => item.value === String(staffId))?.name
+    if (optionName) return optionName
+    const cached = findCachedStaff(staffId)
+    return safeStaffDisplayName(cached?.realName, cached?.username, staffId)
   }
 
   function invalidateStaffCache() {

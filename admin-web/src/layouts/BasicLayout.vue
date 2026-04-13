@@ -311,7 +311,7 @@
           </a-button>
           <a-button :disabled="!activeQuickChatRoom" @click="nudgeActiveQuickChatRoom">催办提醒</a-button>
           <a-badge :count="quickChatTodoPendingCount" size="small">
-            <a-button @click="openQuickChatTodoDrawer">聊天待办</a-button>
+            <a-button @click="openQuickChatTodoDrawer">聊天任务</a-button>
           </a-badge>
           <a-button size="small" :loading="quickChatCloudSyncing" @click="forceQuickChatCloudSync">立即同步</a-button>
           <a-button
@@ -518,7 +518,7 @@
           <div class="quick-chat-input">
             <a-textarea
               v-model:value="quickChatDraft"
-              :rows="3"
+              :rows="4"
               :disabled="!activeQuickChatRoom"
               placeholder="输入消息...支持 @姓名 或 @all（Enter 发送，Shift+Enter 换行）"
               @keydown="onQuickChatInputKeydown"
@@ -528,79 +528,10 @@
                 <a-upload :show-upload-list="false" :before-upload="beforeQuickChatUpload">
                   <a-button :disabled="!activeQuickChatRoom">发送图片/文档</a-button>
                 </a-upload>
-                <a-button :disabled="!activeQuickChatRoom" @click="openQuickChatTodoEditorManual">新增待办</a-button>
+                <a-button :disabled="!activeQuickChatRoom" @click="openQuickChatTodoEditorManual">新增任务</a-button>
               </a-space>
               <a-button type="primary" :disabled="!activeQuickChatRoom" @click="sendQuickChatText">发送</a-button>
             </div>
-          </div>
-        </div>
-
-        <div class="quick-chat-aside">
-          <div class="quick-chat-aside-card">
-            <div class="quick-chat-aside-head">
-              <strong>会话概览</strong>
-              <a-button type="link" size="small" :disabled="!activeQuickChatRoom" @click="openQuickChatMembers">查看全部成员</a-button>
-            </div>
-            <div class="quick-chat-aside-metrics">
-              <div>
-                <span>成员</span>
-                <strong>{{ activeQuickChatRoom?.memberIds.length || 0 }}</strong>
-              </div>
-              <div>
-                <span>消息</span>
-                <strong>{{ activeQuickChatMessages.length }}</strong>
-              </div>
-              <div>
-                <span>未读</span>
-                <strong>{{ activeQuickChatRoom?.unreadCount || 0 }}</strong>
-              </div>
-            </div>
-            <div class="quick-chat-member-stack">
-              <div v-for="item in activeQuickChatMemberRows.slice(0, 5)" :key="item.id" class="quick-chat-member-chip">
-                <div>
-                  <strong>{{ item.name }}</strong>
-                  <span>{{ item.statusLabel }}</span>
-                </div>
-                <a-tag :color="item.statusColor">{{ item.statusLabel }}</a-tag>
-              </div>
-            </div>
-          </div>
-
-          <div class="quick-chat-aside-card">
-            <div class="quick-chat-aside-head">
-              <strong>聊天待办</strong>
-              <a-button type="link" size="small" @click="openQuickChatTodoDrawer">展开看板</a-button>
-            </div>
-            <div class="quick-chat-aside-metrics">
-              <div>
-                <span>当前会话待办</span>
-                <strong>{{ quickChatActiveRoomPendingTodoCount }}</strong>
-              </div>
-              <div>
-                <span>当前会话逾期</span>
-                <strong>{{ quickChatActiveRoomOverdueTodoCount }}</strong>
-              </div>
-              <div>
-                <span>完成率</span>
-                <strong>{{ quickChatTodoCompletionRate }}%</strong>
-              </div>
-            </div>
-            <div v-if="quickChatFocusTodoItems.length" class="quick-chat-focus-todo-list">
-              <button
-                v-for="item in quickChatFocusTodoItems"
-                :key="item.id"
-                type="button"
-                class="quick-chat-focus-todo"
-                @click="jumpToQuickChatTodo(item.id)"
-              >
-                <div class="quick-chat-focus-todo-head">
-                  <strong>{{ item.content }}</strong>
-                  <a-tag :color="quickChatTodoPriorityColor(item.priority)">{{ quickChatTodoPriorityLabel(item.priority) }}</a-tag>
-                </div>
-                <span>{{ quickChatTodoDescription(item) }}</span>
-              </button>
-            </div>
-            <a-empty v-else description="当前会话暂无待办" />
           </div>
         </div>
       </div>
@@ -716,7 +647,7 @@
 
   <a-drawer
     v-model:open="quickChatTodoOpen"
-    title="聊天待办"
+    title="聊天任务"
     width="420"
     placement="right"
     :z-index="1720"
@@ -750,7 +681,7 @@
       </a-space>
     </div>
     <a-space class="quick-chat-todo-toolbar" wrap>
-      <a-button size="small" type="primary" @click="openQuickChatTodoEditorManual">新增待办</a-button>
+      <a-button size="small" type="primary" @click="openQuickChatTodoEditorManual">新增任务</a-button>
       <a-button size="small" :disabled="!quickChatTodoItems.length" @click="clearCompletedQuickChatTodo">清理已完成</a-button>
       <a-button size="small" :disabled="!quickChatTodoOverdueCount" @click="nudgeOverdueQuickChatTodos">催办逾期待办</a-button>
       <a-button size="small" :disabled="!quickChatTodoOverdueCount" @click="escalateOverdueQuickChatTodos">升级逾期待办</a-button>
@@ -759,7 +690,7 @@
       <a-tag color="blue">待完成 {{ quickChatTodoPendingCount }}</a-tag>
       <a-tag v-if="quickChatTodoOverdueCount > 0" color="red">逾期 {{ quickChatTodoOverdueCount }}</a-tag>
     </a-space>
-    <a-list :data-source="filteredQuickChatTodoItems" :locale="{ emptyText: '暂无聊天待办' }" size="small" class="quick-chat-todo-list">
+    <a-list :data-source="filteredQuickChatTodoItems" :locale="{ emptyText: '暂无聊天任务' }" size="small" class="quick-chat-todo-list">
       <template #renderItem="{ item }">
         <a-list-item class="quick-chat-todo-item">
           <div class="quick-chat-todo-card">
@@ -823,8 +754,8 @@
 
   <a-modal
     v-model:open="quickChatTodoEditorOpen"
-    :title="quickChatTodoEditorMode === 'create' ? '新增聊天待办' : '编辑聊天待办'"
-    width="560"
+    :title="quickChatTodoEditorMode === 'create' ? '新增任务' : '编辑任务'"
+    width="720"
     :z-index="1760"
     @ok="submitQuickChatTodoEditor"
   >
@@ -832,36 +763,58 @@
       <a-form-item label="待办内容" required>
         <a-textarea v-model:value="quickChatTodoForm.content" :rows="3" maxlength="180" show-count placeholder="请输入待办内容" />
       </a-form-item>
-      <a-form-item label="责任人">
-        <a-select
-          v-model:value="quickChatTodoForm.assigneeId"
-          show-search
-          allow-clear
-          :options="quickChatTodoAssigneeOptions"
-          placeholder="可选，不选默认本人"
-        />
-      </a-form-item>
-      <a-space style="width: 100%;" align="start">
-        <a-form-item label="优先级" style="flex: 1;">
+      <div class="quick-chat-todo-form-grid">
+        <a-form-item label="责任人">
+          <a-select
+            v-model:value="quickChatTodoForm.assigneeId"
+            show-search
+            allow-clear
+            :filter-option="false"
+            :loading="staffLoading"
+            :options="quickChatTodoAssigneeOptions"
+            placeholder="请选择责任人"
+            @focus="warmQuickChatTodoFormOptions"
+            @search="searchStaff"
+          />
+        </a-form-item>
+        <a-form-item label="优先级">
           <a-select v-model:value="quickChatTodoForm.priority" :options="quickChatTodoPriorityOptions" />
         </a-form-item>
-        <a-form-item label="截止规则" style="flex: 1;">
-          <a-select v-model:value="quickChatTodoForm.dueRule" :options="quickChatTodoDueRuleOptions" />
-        </a-form-item>
-      </a-space>
+      </div>
+      <a-form-item label="截止时间">
+        <a-date-picker
+          v-model:value="quickChatTodoDuePickerValue"
+          show-time
+          allow-clear
+          style="width: 100%;"
+          format="YYYY-MM-DD HH:mm"
+          placeholder="请选择截止时间"
+        />
+      </a-form-item>
+      <a-form-item>
+        <a-space size="small" wrap>
+          <a-button size="small" @click="setQuickChatTodoDuePreset('TODAY_18')">今天18:00</a-button>
+          <a-button size="small" @click="setQuickChatTodoDuePreset('TOMORROW_18')">明天18:00</a-button>
+          <a-button size="small" @click="setQuickChatTodoDuePreset('THREE_DAYS_18')">3天后18:00</a-button>
+          <a-button size="small" @click="setQuickChatTodoDuePreset('CLEAR')">清空截止时间</a-button>
+        </a-space>
+      </a-form-item>
+      <a-form-item v-if="quickChatTodoForm.dueAt">
+        <span class="hint-text">当前截止：{{ formatQuickChatTodoDueAtText(quickChatTodoForm.dueAt) }}</span>
+      </a-form-item>
     </a-form>
   </a-modal>
 
   <a-modal
     v-model:open="quickChatTodoWeeklyOpen"
-    title="聊天待办周报摘要"
+    title="聊天任务周报摘要"
     width="560"
     :z-index="1760"
     :footer="null"
   >
     <a-descriptions bordered :column="2" size="small">
       <a-descriptions-item label="统计周期">{{ quickChatTodoWeeklyStats.rangeText }}</a-descriptions-item>
-      <a-descriptions-item label="新增待办">{{ quickChatTodoWeeklyStats.created }}</a-descriptions-item>
+      <a-descriptions-item label="新增任务">{{ quickChatTodoWeeklyStats.created }}</a-descriptions-item>
       <a-descriptions-item label="完成待办">{{ quickChatTodoWeeklyStats.completed }}</a-descriptions-item>
       <a-descriptions-item label="完成率">{{ quickChatTodoWeeklyStats.completionRate }}%</a-descriptions-item>
       <a-descriptions-item label="逾期未完成">{{ quickChatTodoWeeklyStats.overduePending }}</a-descriptions-item>
@@ -959,7 +912,7 @@ const quickNotifyItems = computed(() => {
   if (!headerSettings.quickNotifyEnabled) return []
   return [
     { title: '发起快捷聊天', action: 'openQuickChat' },
-    { title: `聊天待办（${quickChatTodoPendingCount.value}${quickChatTodoOverdueCount.value ? `/逾期${quickChatTodoOverdueCount.value}` : ''}）`, action: 'openQuickChatTodo' },
+    { title: `聊天任务（${quickChatTodoPendingCount.value}${quickChatTodoOverdueCount.value ? `/逾期${quickChatTodoOverdueCount.value}` : ''}）`, action: 'openQuickChatTodo' },
     { title: `待办完成率（${quickChatTodoCompletionRate.value}%）`, action: 'openQuickChatTodo' },
     { title: `执行总览（${quickChatExecutionOverview.value.totalPressure}）`, action: 'openQuickChatTodo' },
     { title: '我的待办', route: '/workbench/todo' },
@@ -969,7 +922,7 @@ const quickNotifyItems = computed(() => {
   ]
 })
 const { departmentOptions, searchDepartments, ensureSelectedDepartment } = useDepartmentOptions({ pageSize: 200, preloadSize: 600 })
-const { staffOptions, staffLoading, searchStaff, ensureSelectedStaff } = useStaffOptions({ pageSize: 120, preloadSize: 500 })
+const { staffOptions, staffLoading, searchStaff, ensureSelectedStaff, findStaffName } = useStaffOptions({ pageSize: 120, preloadSize: 500 })
 const leaderOptions = computed(() => {
   const selfId = String(userStore.staffInfo?.id || '')
   return staffOptions.value
@@ -1111,7 +1064,7 @@ const quickChatTodoForm = reactive({
   content: '',
   assigneeId: undefined as string | undefined,
   priority: 'MEDIUM' as QuickChatTodoItem['priority'],
-  dueRule: 'TOMORROW_18' as 'TODAY_18' | 'TOMORROW_18' | 'THREE_DAYS_18' | 'NO_DUE'
+  dueAt: undefined as string | undefined
 })
 const quickChatDnd = ref(false)
 const quickChatTrainingUntil = ref('')
@@ -1170,12 +1123,6 @@ const quickChatTodoScopeModeOptions = [
   { label: '我负责', value: 'mine' },
   { label: '我创建', value: 'created' },
   { label: '全部', value: 'all' }
-]
-const quickChatTodoDueRuleOptions = [
-  { label: '今天 18:00', value: 'TODAY_18' },
-  { label: '明天 18:00', value: 'TOMORROW_18' },
-  { label: '3天后 18:00', value: 'THREE_DAYS_18' },
-  { label: '暂不设置', value: 'NO_DUE' }
 ]
 const quickChatRoomListModeOptions = [
   { label: '进行中', value: 'active' },
@@ -1366,8 +1313,26 @@ const quickChatTodoWeeklyStats = computed(() => {
 const quickChatTodoAssigneeOptions = computed(() => {
   const roomId = quickChatTodoForm.roomId || activeQuickChatRoom.value?.id || ''
   const room = quickChatRooms.value.find((item) => item.id === roomId)
-  if (!room) return []
-  return room.memberIds.map((memberId) => ({ label: memberNameById(memberId), value: memberId }))
+  const optionMap = new Map<string, { label: string; value: string }>()
+  ;(staffOptions.value || []).forEach((item) => {
+    const value = String(item.value || '').trim()
+    if (!value) return
+    optionMap.set(value, { label: item.label || item.name || item.username || '未识别员工', value })
+  })
+  ;(room?.memberIds || []).forEach((memberId) => {
+    const normalized = normalizeQuickChatMemberId(memberId)
+    if (!normalized) return
+    if (!optionMap.has(normalized)) {
+      optionMap.set(normalized, { label: memberNameById(normalized), value: normalized })
+    }
+  })
+  return Array.from(optionMap.values())
+})
+const quickChatTodoDuePickerValue = computed({
+  get: () => (quickChatTodoForm.dueAt ? dayjs(quickChatTodoForm.dueAt) : undefined),
+  set: (value) => {
+    quickChatTodoForm.dueAt = value ? dayjs(value).toISOString() : undefined
+  }
 })
 let quickChatTodoEscalationTimer: number | undefined
 const filteredQuickChatRooms = computed(() => {
@@ -2305,7 +2270,7 @@ function updateQuickChatDrawerWidth() {
     quickChatDrawerWidth.value = Math.max(320, viewport - 12)
     return
   }
-  quickChatDrawerWidth.value = Math.max(640, Math.min(980, viewport - 56))
+  quickChatDrawerWidth.value = Math.max(760, Math.min(1440, viewport - 24))
 }
 
 function quickChatStorageKey() {
@@ -4036,7 +4001,7 @@ function openRenameQuickChatRoom() {
 
 function memberNameById(staffId: string) {
   const matched = staffOptions.value.find((item) => item.value === staffId || item.username === staffId)
-  return matched?.name || `员工#${staffId}`
+  return matched?.name || findStaffName(staffId) || '未识别员工'
 }
 
 function resolveQuickChatMemberStaffId(rawId: unknown) {
@@ -4203,9 +4168,9 @@ function quickChatTodoPriorityColor(priority: QuickChatTodoItem['priority']) {
   return 'orange'
 }
 
-function resolveQuickChatTodoDueAt(rule: typeof quickChatTodoForm.dueRule) {
+function resolveQuickChatTodoPresetDueAt(rule: 'TODAY_18' | 'TOMORROW_18' | 'THREE_DAYS_18' | 'CLEAR') {
   const now = dayjs()
-  if (rule === 'NO_DUE') return undefined
+  if (rule === 'CLEAR') return undefined
   if (rule === 'TODAY_18') return now.hour(18).minute(0).second(0).millisecond(0).toISOString()
   if (rule === 'THREE_DAYS_18') return now.add(3, 'day').hour(18).minute(0).second(0).millisecond(0).toISOString()
   return now.add(1, 'day').hour(18).minute(0).second(0).millisecond(0).toISOString()
@@ -4262,11 +4227,23 @@ function resetQuickChatTodoEditorForm() {
   quickChatTodoForm.content = ''
   quickChatTodoForm.assigneeId = currentQuickChatSenderId.value
   quickChatTodoForm.priority = 'MEDIUM'
-  quickChatTodoForm.dueRule = 'TOMORROW_18'
+  quickChatTodoForm.dueAt = resolveQuickChatTodoPresetDueAt('TOMORROW_18')
+}
+
+function warmQuickChatTodoFormOptions() {
+  searchStaff('').catch(() => {})
+  quickChatTodoAssigneeOptions.value.forEach((item) => {
+    ensureSelectedStaff(item.value, item.label)
+  })
+}
+
+function setQuickChatTodoDuePreset(rule: 'TODAY_18' | 'TOMORROW_18' | 'THREE_DAYS_18' | 'CLEAR') {
+  quickChatTodoForm.dueAt = resolveQuickChatTodoPresetDueAt(rule)
 }
 
 function openQuickChatTodoEditorManual() {
   resetQuickChatTodoEditorForm()
+  warmQuickChatTodoFormOptions()
   quickChatTodoEditorMode.value = 'create'
   quickChatTodoEditingId.value = ''
   quickChatTodoEditorOpen.value = true
@@ -4281,7 +4258,7 @@ function addMessageToQuickChatTodo(messageRow: QuickChatMessage) {
   }
   const existed = quickChatTodoItems.value.find((item) => item.messageId === messageRow.id && item.roomId === room.id)
   if (existed) {
-    message.info('该消息已在聊天待办中')
+    message.info('该消息已在聊天任务中')
     return
   }
   resetQuickChatTodoEditorForm()
@@ -4294,6 +4271,7 @@ function addMessageToQuickChatTodo(messageRow: QuickChatMessage) {
       ? `[文件] ${messageRow.fileName || ''}`.trim()
       : (messageRow.content || '').trim()
   quickChatTodoForm.content = `${messageRow.senderName}：${content || '（空消息）'}`
+  warmQuickChatTodoFormOptions()
   quickChatTodoEditorMode.value = 'create'
   quickChatTodoEditingId.value = ''
   quickChatTodoEditorOpen.value = true
@@ -4310,14 +4288,8 @@ function openQuickChatTodoEditor(todoId: string) {
   quickChatTodoForm.content = row.content
   quickChatTodoForm.assigneeId = row.assigneeId || currentQuickChatSenderId.value
   quickChatTodoForm.priority = row.priority || 'MEDIUM'
-  if (!row.dueAt) {
-    quickChatTodoForm.dueRule = 'NO_DUE'
-  } else {
-    const diffHour = dayjs(row.dueAt).diff(dayjs(), 'hour')
-    if (diffHour <= 12) quickChatTodoForm.dueRule = 'TODAY_18'
-    else if (diffHour <= 36) quickChatTodoForm.dueRule = 'TOMORROW_18'
-    else quickChatTodoForm.dueRule = 'THREE_DAYS_18'
-  }
+  quickChatTodoForm.dueAt = row.dueAt
+  warmQuickChatTodoFormOptions()
   quickChatTodoEditorOpen.value = true
 }
 
@@ -4329,7 +4301,7 @@ function submitQuickChatTodoEditor() {
   }
   const roomId = quickChatTodoForm.roomId || activeQuickChatRoom.value?.id || ''
   const roomName = quickChatTodoForm.roomName || activeQuickChatRoom.value?.name || '未知会话'
-  const dueAt = resolveQuickChatTodoDueAt(quickChatTodoForm.dueRule)
+  const dueAt = quickChatTodoForm.dueAt
   const dueAtText = formatQuickChatTodoDueAtText(dueAt)
   const assigneeId = quickChatTodoForm.assigneeId || currentQuickChatSenderId.value
   const assigneeName = memberNameById(assigneeId)
@@ -4353,7 +4325,7 @@ function submitQuickChatTodoEditor() {
     row.updatedAt = dayjs().toISOString()
     persistQuickChatTodo()
     quickChatTodoEditorOpen.value = false
-    message.success('聊天待办已更新')
+    message.success('聊天任务已更新')
     return
   }
   quickChatTodoItems.value.unshift({
@@ -4380,7 +4352,7 @@ function submitQuickChatTodoEditor() {
   })
   persistQuickChatTodo()
   quickChatTodoEditorOpen.value = false
-  message.success('已加入聊天待办')
+  message.success('已加入聊天任务')
 }
 
 function toggleQuickChatTodoDone(todoId: string) {
@@ -4518,7 +4490,7 @@ async function syncQuickChatTodoToCalendar(todoId: string) {
       message.success(`该待办已同步到日历（${date}）`)
       return
     }
-    const title = `【聊天待办】${row.content}`
+    const title = `【聊天任务】${row.content}`
     const endAt = dayjs(row.dueAt)
     const startAt = endAt.subtract(30, 'minute')
     const created = await createOaTask({
@@ -4531,7 +4503,7 @@ async function syncQuickChatTodoToCalendar(todoId: string) {
       assigneeId: resolveQuickChatTodoCalendarAssigneeId(row.assigneeId),
       assigneeName: row.assigneeName || currentQuickChatSenderName.value,
       calendarType: 'WORK',
-      planCategory: '聊天待办',
+      planCategory: '聊天任务',
       urgency: row.priority === 'HIGH' ? 'EMERGENCY' : 'NORMAL'
     })
     row.calendarTaskId = created?.id != null ? String(created.id) : undefined
@@ -4552,7 +4524,7 @@ async function syncQuickChatTodoToCalendar(todoId: string) {
 function exportQuickChatTodoReport() {
   const rows = [...quickChatTodoItems.value]
   if (!rows.length) {
-    message.info('暂无可导出的聊天待办')
+    message.info('暂无可导出的聊天任务')
     return
   }
   const lines: string[] = []
@@ -4568,12 +4540,12 @@ function exportQuickChatTodoReport() {
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = `聊天待办看板-${dayjs().format('YYYYMMDD-HHmmss')}.txt`
+  anchor.download = `聊天任务看板-${dayjs().format('YYYYMMDD-HHmmss')}.txt`
   document.body.appendChild(anchor)
   anchor.click()
   document.body.removeChild(anchor)
   URL.revokeObjectURL(url)
-  message.success('聊天待办看板已导出')
+  message.success('聊天任务看板已导出')
 }
 
 function openQuickChatTodoWeeklySummary() {
@@ -4584,7 +4556,7 @@ function exportQuickChatTodoWeeklySummary() {
   const stats = quickChatTodoWeeklyStats.value
   const lines: string[] = []
   lines.push(`周报周期：${stats.rangeText}`)
-  lines.push(`新增待办：${stats.created}`)
+  lines.push(`新增任务：${stats.created}`)
   lines.push(`完成待办：${stats.completed}`)
   lines.push(`完成率：${stats.completionRate}%`)
   lines.push(`逾期未完成：${stats.overduePending}`)
@@ -4594,7 +4566,7 @@ function exportQuickChatTodoWeeklySummary() {
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = `聊天待办周报-${dayjs().format('YYYYMMDD-HHmmss')}.txt`
+  anchor.download = `聊天任务周报-${dayjs().format('YYYYMMDD-HHmmss')}.txt`
   document.body.appendChild(anchor)
   anchor.click()
   document.body.removeChild(anchor)
@@ -5723,17 +5695,18 @@ function onQuickChatStorageChange(event: StorageEvent) {
 .quick-chat-shell {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   min-height: 0;
   height: 100%;
 }
 
 .quick-chat-layout {
   display: grid;
-  grid-template-columns: 250px minmax(0, 1fr) 270px;
-  gap: 14px;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 16px;
   min-height: 0;
-  max-height: calc(100vh - 220px);
+  flex: 1;
+  max-height: calc(100vh - 186px);
 }
 
 .quick-chat-top-actions {
@@ -5746,9 +5719,9 @@ function onQuickChatStorageChange(event: StorageEvent) {
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px 18px;
-  border: 1px solid rgba(191, 219, 254, 0.72);
-  border-radius: 22px;
+  padding: 14px 18px;
+  border: 1px solid rgba(191, 219, 254, 0.66);
+  border-radius: 18px;
   background:
     radial-gradient(circle at top right, rgba(96, 165, 250, 0.18), transparent 30%),
     linear-gradient(180deg, rgba(248, 251, 255, 0.98) 0%, rgba(238, 246, 255, 0.94) 100%);
@@ -5768,25 +5741,25 @@ function onQuickChatStorageChange(event: StorageEvent) {
 }
 
 .quick-chat-overview-copy strong {
-  font-size: 24px;
+  font-size: 22px;
   color: #0f172a;
 }
 
 .quick-chat-overview-copy span {
   color: #51667d;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .quick-chat-overview-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  min-width: 360px;
+  gap: 8px;
+  min-width: 330px;
 }
 
 .quick-chat-overview-pill {
-  padding: 10px 12px;
-  border-radius: 16px;
+  padding: 8px 12px;
+  border-radius: 14px;
   background: rgba(255, 255, 255, 0.82);
   border: 1px solid rgba(226, 232, 240, 0.9);
 }
@@ -5801,14 +5774,14 @@ function onQuickChatStorageChange(event: StorageEvent) {
   display: block;
   margin-top: 4px;
   color: #0f172a;
-  font-size: 22px;
+  font-size: 20px;
 }
 
 .quick-chat-commandbar {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 10px 2px 0;
+  padding: 2px 2px 0;
 }
 
 .quick-chat-drawer :deep(.ant-drawer-body) {
@@ -5821,7 +5794,7 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 .quick-chat-room-list {
   border: 1px solid rgba(226, 232, 240, 0.9);
-  border-radius: 22px;
+  border-radius: 24px;
   background: rgba(255, 255, 255, 0.92);
   overflow: auto;
   max-height: 100%;
@@ -5881,8 +5854,8 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 .quick-chat-room-card {
   width: 100%;
-  padding: 12px 12px 10px;
-  border-radius: 16px;
+  padding: 14px 14px 12px;
+  border-radius: 18px;
   border: 1px solid transparent;
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.86) 0%, rgba(255, 255, 255, 0.98) 100%);
 }
@@ -5896,7 +5869,7 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 .quick-chat-room-card-head strong {
   color: #0f172a;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .quick-chat-room-card-meta {
@@ -5909,10 +5882,10 @@ function onQuickChatStorageChange(event: StorageEvent) {
 }
 
 .quick-chat-room-card p {
-  margin: 8px 0 0;
-  color: #64748b;
-  font-size: 12px;
-  line-height: 1.55;
+  margin: 10px 0 0;
+  color: #5a6f86;
+  font-size: 13px;
+  line-height: 1.6;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -6005,6 +5978,12 @@ function onQuickChatStorageChange(event: StorageEvent) {
   text-decoration: line-through;
 }
 
+.quick-chat-todo-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
 .quick-chat-room-item.active {
   background: rgba(37, 99, 235, 0.08);
 }
@@ -6021,141 +6000,16 @@ function onQuickChatStorageChange(event: StorageEvent) {
 }
 
 .quick-chat-main {
-  border: 1px solid rgba(226, 232, 240, 0.92);
-  border-radius: 24px;
-  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(214, 226, 240, 0.92);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top, rgba(219, 234, 254, 0.22), transparent 34%),
+    rgba(255, 255, 255, 0.98);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   min-height: 0;
-  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
-}
-
-.quick-chat-aside {
-  display: grid;
-  gap: 12px;
-  min-height: 0;
-}
-
-.quick-chat-aside-card {
-  padding: 14px;
-  border-radius: 22px;
-  border: 1px solid rgba(226, 232, 240, 0.92);
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.06);
-}
-
-.quick-chat-aside-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 12px;
-}
-
-.quick-chat-aside-head strong {
-  color: #0f172a;
-  font-size: 15px;
-}
-
-.quick-chat-aside-metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.quick-chat-aside-metrics div {
-  padding: 10px;
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(248, 250, 252, 0.92) 0%, rgba(255, 255, 255, 0.96) 100%);
-  border: 1px solid rgba(226, 232, 240, 0.86);
-}
-
-.quick-chat-aside-metrics span {
-  display: block;
-  color: #64748b;
-  font-size: 11px;
-}
-
-.quick-chat-aside-metrics strong {
-  display: block;
-  margin-top: 5px;
-  color: #0f172a;
-  font-size: 20px;
-}
-
-.quick-chat-member-stack {
-  display: grid;
-  gap: 8px;
-}
-
-.quick-chat-member-chip {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 14px;
-  background: rgba(248, 250, 252, 0.86);
-  border: 1px solid rgba(226, 232, 240, 0.88);
-}
-
-.quick-chat-member-chip strong,
-.quick-chat-member-chip span {
-  display: block;
-}
-
-.quick-chat-member-chip strong {
-  color: #0f172a;
-  font-size: 13px;
-}
-
-.quick-chat-member-chip span {
-  margin-top: 4px;
-  color: #64748b;
-  font-size: 11px;
-}
-
-.quick-chat-focus-todo-list {
-  display: grid;
-  gap: 8px;
-}
-
-.quick-chat-focus-todo {
-  border: 1px solid rgba(226, 232, 240, 0.9);
-  border-radius: 16px;
-  background: linear-gradient(180deg, rgba(248, 250, 252, 0.9) 0%, rgba(255, 255, 255, 0.98) 100%);
-  padding: 12px;
-  text-align: left;
-  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
-}
-
-.quick-chat-focus-todo:hover {
-  transform: translateY(-1px);
-  border-color: rgba(147, 197, 253, 0.92);
-  box-shadow: 0 10px 20px rgba(59, 130, 246, 0.08);
-}
-
-.quick-chat-focus-todo-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.quick-chat-focus-todo-head strong {
-  color: #0f172a;
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.quick-chat-focus-todo span {
-  display: block;
-  margin-top: 8px;
-  color: #64748b;
-  font-size: 12px;
-  line-height: 1.55;
+  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.08);
 }
 
 .quick-chat-notice {
@@ -6190,10 +6044,10 @@ function onQuickChatStorageChange(event: StorageEvent) {
   align-items: flex-start;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 12px;
-  padding: 14px 16px;
-  border-bottom: 1px solid rgba(226, 232, 240, 0.92);
-  background: linear-gradient(180deg, rgba(250, 252, 255, 0.98) 0%, rgba(255, 255, 255, 0.96) 100%);
+  gap: 16px;
+  padding: 18px 22px 16px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.88);
+  background: linear-gradient(180deg, rgba(248, 251, 255, 0.98) 0%, rgba(255, 255, 255, 0.98) 100%);
 }
 
 .quick-chat-header-main {
@@ -6203,13 +6057,15 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 .quick-chat-header-main strong {
   color: #0f172a;
-  font-size: 18px;
+  font-size: 28px;
+  line-height: 1.15;
 }
 
 .quick-chat-header-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  font-size: 13px;
 }
 
 .quick-chat-header-actions {
@@ -6217,25 +6073,26 @@ function onQuickChatStorageChange(event: StorageEvent) {
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
+  align-items: center;
 }
 
 .quick-chat-messages {
   flex: 1;
-  padding: 16px;
+  padding: 24px 26px 20px;
   overflow-y: auto;
   background:
-    radial-gradient(circle at top, rgba(219, 234, 254, 0.34), transparent 38%),
-    linear-gradient(180deg, rgba(245, 248, 255, 0.82) 0%, #fff 100%);
+    radial-gradient(circle at top, rgba(191, 219, 254, 0.3), transparent 34%),
+    linear-gradient(180deg, rgba(244, 248, 255, 0.88) 0%, #fff 100%);
 }
 
 .quick-chat-message {
-  margin-bottom: 12px;
-  max-width: 76%;
+  margin-bottom: 16px;
+  max-width: min(860px, 86%);
   background: rgba(255, 255, 255, 0.98);
-  border: 1px solid rgba(226, 232, 240, 0.9);
-  border-radius: 16px;
-  padding: 10px 12px;
-  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.06);
+  border: 1px solid rgba(219, 229, 240, 0.96);
+  border-radius: 22px;
+  padding: 14px 16px 12px;
+  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.06);
 }
 
 .quick-chat-message-focus {
@@ -6245,28 +6102,32 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 .quick-chat-message.self {
   margin-left: auto;
-  background: linear-gradient(180deg, rgba(233, 243, 255, 0.98) 0%, rgba(247, 251, 255, 0.98) 100%);
-  border-color: rgba(96, 165, 250, 0.36);
+  background: linear-gradient(180deg, rgba(229, 240, 255, 0.98) 0%, rgba(245, 249, 255, 0.98) 100%);
+  border-color: rgba(96, 165, 250, 0.42);
 }
 
 .quick-chat-message-meta {
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   color: var(--muted);
-  font-size: 12px;
-  margin-bottom: 4px;
+  font-size: 13px;
+  margin-bottom: 8px;
+  gap: 14px;
 }
 
 .quick-chat-message-body {
   color: var(--ink);
+  font-size: 17px;
+  line-height: 1.75;
   word-break: break-word;
 }
 
 .quick-chat-read-status {
-  margin-top: 4px;
+  margin-top: 8px;
   text-align: right;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .quick-chat-recall-btn {
@@ -6285,8 +6146,8 @@ function onQuickChatStorageChange(event: StorageEvent) {
 }
 
 .quick-chat-image :deep(.ant-image-img) {
-  max-width: 220px;
-  border-radius: 8px;
+  max-width: min(420px, 100%);
+  border-radius: 14px;
   border: 1px solid var(--border);
   display: block;
   cursor: zoom-in;
@@ -6323,9 +6184,17 @@ function onQuickChatStorageChange(event: StorageEvent) {
 }
 
 .quick-chat-input {
-  border-top: 1px solid rgba(226, 232, 240, 0.92);
-  padding: 14px 16px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.94) 100%);
+  border-top: 1px solid rgba(226, 232, 240, 0.88);
+  padding: 18px 22px 20px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(247, 250, 255, 0.96) 100%);
+}
+
+.quick-chat-input :deep(.ant-input) {
+  min-height: 120px;
+  border-radius: 20px;
+  padding: 18px 20px;
+  font-size: 18px;
+  line-height: 1.7;
 }
 
 .quick-chat-input-actions {
@@ -6333,7 +6202,7 @@ function onQuickChatStorageChange(event: StorageEvent) {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-top: 10px;
+  margin-top: 14px;
 }
 
 .hint-text {
@@ -6374,11 +6243,11 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
   .quick-chat-layout {
     grid-template-columns: 1fr;
-    max-height: calc(100vh - 210px);
+    max-height: calc(100vh - 198px);
   }
 
   .quick-chat-room-list {
-    max-height: 180px;
+    max-height: 240px;
   }
 
   .quick-chat-overview {
@@ -6386,8 +6255,7 @@ function onQuickChatStorageChange(event: StorageEvent) {
     align-items: stretch;
   }
 
-  .quick-chat-overview-metrics,
-  .quick-chat-aside-metrics {
+  .quick-chat-overview-metrics {
     grid-template-columns: 1fr;
     min-width: 0;
   }
@@ -6404,6 +6272,47 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
   .quick-chat-todo-tags {
     justify-content: flex-start;
+  }
+
+  .quick-chat-todo-form-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .quick-chat-header {
+    padding: 16px;
+  }
+
+  .quick-chat-header-main strong {
+    font-size: 22px;
+  }
+
+  .quick-chat-messages {
+    padding: 16px;
+  }
+
+  .quick-chat-message {
+    max-width: 100%;
+    padding: 12px 14px;
+  }
+
+  .quick-chat-message-meta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .quick-chat-message-body {
+    font-size: 15px;
+  }
+
+  .quick-chat-input {
+    padding: 14px 16px 16px;
+  }
+
+  .quick-chat-input :deep(.ant-input) {
+    min-height: 100px;
+    font-size: 16px;
+    padding: 14px 16px;
   }
 }
 </style>
