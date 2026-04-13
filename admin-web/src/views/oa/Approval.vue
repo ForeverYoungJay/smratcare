@@ -753,8 +753,9 @@ const timelineItems = computed(() => {
     sortTime: number
     order: number
   }> = []
-  const start = record.startTime ? dayjs(record.startTime) : null
-  const end = record.endTime ? dayjs(record.endTime) : null
+  const submittedAt = approvalSubmittedAt(record)
+  const activeSince = approvalCurrentNodeEnteredAt(record)
+  const finishedAt = approvalFinishedAt(record)
   const now = dayjs()
   const pushItem = (
     key: string,
@@ -779,9 +780,9 @@ const timelineItems = computed(() => {
     key: 'created',
     title: '申请创建',
     desc: `${record.applicantName || '-'} 提交 ${typeLabel(record.approvalType)} 申请`,
-    timeText: formatTimelineTime(record.startTime),
+    timeText: formatTimelineTime(submittedAt?.format('YYYY-MM-DDTHH:mm:ss')),
     color: 'blue',
-    sortTime: start && start.isValid() ? start.valueOf() : 0,
+    sortTime: submittedAt && submittedAt.isValid() ? submittedAt.valueOf() : 0,
     order: 0
   })
   const urgeCount = Number(parsed?.urgeCount || 0)
@@ -846,23 +847,28 @@ const timelineItems = computed(() => {
   const notifyHistory = Array.isArray(parsed?.notifyHistory) ? parsed.notifyHistory : []
   notifyHistory.slice(-8).forEach((entry: any, index: number) => {
     if (!entry) return
+    const roleText = approverRoleLabel(entry?.toRole)
+    const nameText = entry?.toName ? String(entry.toName).trim() : ''
+    const approverText = nameText && roleText && roleText !== '待分配'
+      ? `${nameText}（${roleText}）`
+      : nameText || roleText || '待分配'
     pushItem(
       `notify-${index}-${entry?.at || ''}`,
       '自动同步审批人',
-      `${entry?.toName || approverRoleLabel(entry?.toRole) || '待分配'}${entry?.message ? `：${entry.message}` : ''}`,
+      `${approverText}${entry?.message ? `：${entry.message}` : ''}`,
       entry?.at,
       'blue',
       120 + index
     )
   })
-  if (record.status === 'PENDING' && start && start.isValid()) {
-    const pendingHours = now.diff(start, 'hour')
+  if (record.status === 'PENDING' && activeSince && activeSince.isValid()) {
+    const pendingHours = Math.max(0, now.diff(activeSince, 'hour'))
     const overdue = pendingHours > 48
     items.push({
       key: 'pending-duration',
       title: overdue ? '审批超时预警' : '在途处理时长',
-      desc: overdue ? `已超时 ${pendingHours - 48} 小时（总 ${pendingHours} 小时）` : `当前已在途 ${pendingHours} 小时`,
-      timeText: `阈值：48小时`,
+      desc: overdue ? `已超时 ${pendingHours - 48} 小时（当前环节共 ${pendingHours} 小时）` : `当前环节已在途 ${pendingHours} 小时`,
+      timeText: `从 ${formatTimelineTime(activeSince.format('YYYY-MM-DDTHH:mm:ss'))} 开始计时`,
       color: overdue ? 'red' : 'blue',
       sortTime: Number.MAX_SAFE_INTEGER - 2,
       order: 1000
@@ -873,9 +879,9 @@ const timelineItems = computed(() => {
       key: 'approved',
       title: '审批通过',
       desc: record.remark || '流程结束',
-      timeText: formatTimelineTime(record.endTime),
+      timeText: formatTimelineTime(finishedAt?.format('YYYY-MM-DDTHH:mm:ss')),
       color: 'green',
-      sortTime: end && end.isValid() ? end.valueOf() : Number.MAX_SAFE_INTEGER - 3,
+      sortTime: finishedAt && finishedAt.isValid() ? finishedAt.valueOf() : Number.MAX_SAFE_INTEGER - 3,
       order: 1100
     })
   }
@@ -884,20 +890,22 @@ const timelineItems = computed(() => {
       key: 'rejected',
       title: '审批驳回',
       desc: record.remark || '已驳回，待重提',
-      timeText: formatTimelineTime(record.endTime),
+      timeText: formatTimelineTime(finishedAt?.format('YYYY-MM-DDTHH:mm:ss')),
       color: 'red',
-      sortTime: end && end.isValid() ? end.valueOf() : Number.MAX_SAFE_INTEGER - 3,
+      sortTime: finishedAt && finishedAt.isValid() ? finishedAt.valueOf() : Number.MAX_SAFE_INTEGER - 3,
       order: 1100
     })
   }
-  if (start && start.isValid()) {
-    const finishedAt = end && end.isValid() ? end : now
-    const durationHours = Math.max(0, finishedAt.diff(start, 'hour'))
+  if (submittedAt && submittedAt.isValid()) {
+    const durationEnd = finishedAt && finishedAt.isValid() ? finishedAt : now
+    const durationHours = Math.max(0, durationEnd.diff(submittedAt, 'hour'))
     items.push({
       key: 'duration',
       title: '流程总耗时',
       desc: `${durationHours} 小时`,
-      timeText: end && end.isValid() ? `截至 ${formatTimelineTime(record.endTime)}` : '仍在处理中',
+      timeText: finishedAt && finishedAt.isValid()
+        ? `截至 ${formatTimelineTime(finishedAt.format('YYYY-MM-DDTHH:mm:ss'))}`
+        : '仍在处理中',
       color: 'purple',
       sortTime: Number.MAX_SAFE_INTEGER - 1,
       order: 1200
@@ -988,9 +996,37 @@ function formatApprovalAmount(value?: number | null) {
 
 function formatTimelineTime(value?: string) {
   if (!value) return '时间未知'
-  const time = dayjs(value)
+  const time = dayjs(String(value).replace(' ', 'T'))
   if (!time.isValid()) return '时间未知'
   return time.format('YYYY-MM-DD HH:mm')
+}
+
+function parseApprovalMoment(value?: string) {
+  if (!value) return null
+  const time = dayjs(String(value).replace(' ', 'T'))
+  return time.isValid() ? time : null
+}
+
+function approvalSubmittedAt(record: OaApproval) {
+  const parsed = parseFormData(record.formData)
+  return parseApprovalMoment(parsed?.submittedAt || record.createTime || record.startTime)
+}
+
+function approvalCurrentNodeEnteredAt(record: OaApproval) {
+  const parsed = parseFormData(record.formData)
+  const currentNodeEnteredAt = parseApprovalMoment(parsed?.currentNodeEnteredAt)
+  if (currentNodeEnteredAt) return currentNodeEnteredAt
+  const notifyHistory = Array.isArray(parsed?.notifyHistory) ? parsed.notifyHistory : []
+  for (let i = notifyHistory.length - 1; i >= 0; i -= 1) {
+    const time = parseApprovalMoment(notifyHistory[i]?.at)
+    if (time) return time
+  }
+  return approvalSubmittedAt(record)
+}
+
+function approvalFinishedAt(record: OaApproval) {
+  const parsed = parseFormData(record.formData)
+  return parseApprovalMoment(parsed?.lastApprovalAt || record.updateTime || record.endTime)
 }
 
 async function fetchData() {
@@ -1049,10 +1085,10 @@ async function fetchData() {
 }
 
 function isApprovalOverdue(item: OaApproval) {
-  const start = item.startTime ? dayjs(item.startTime) : null
-  if (!start || !start.isValid()) return false
   if (item.status !== 'PENDING') return false
-  return dayjs().diff(start, 'hour') > 48
+  const activeSince = approvalCurrentNodeEnteredAt(item)
+  if (!activeSince || !activeSince.isValid()) return false
+  return dayjs().diff(activeSince, 'hour') > 48
 }
 
 function approvalRowClassName(record: OaApproval) {
@@ -1258,13 +1294,19 @@ function currentApprover(record: OaApproval) {
   const parsed = parseFormData(record.formData)
   if (record.status === 'APPROVED') return '-'
   if (record.status === 'REJECTED') return '-'
-  const approverName = parsed?.currentApproverName || parsed?.nextApproverName
+  const approverName = currentApproverNameOnly(record)
   const role = parsed?.currentApproverRole ? String(parsed.currentApproverRole).trim() : ''
   if (approverName) {
     const roleLabel = approverRoleLabel(role)
     return roleLabel && roleLabel !== '待分配' ? `${approverName} · ${roleLabel}` : approverName
   }
   return approverRoleLabel(role)
+}
+
+function currentApproverNameOnly(record: OaApproval) {
+  const parsed = parseFormData(record.formData)
+  const value = parsed?.currentApproverName || parsed?.nextApproverName
+  return value ? String(value).trim() : ''
 }
 
 function approverRoleLabel(role?: string) {
@@ -1280,11 +1322,13 @@ function approverStatusText(record: OaApproval) {
   if (record.status === 'REJECTED') return '已驳回'
   const approverId = String(parsed?.currentApproverId || '').trim()
   const role = String(parsed?.currentApproverRole || '').trim()
+  const approverName = currentApproverNameOnly(record)
   if (approverId) {
-    return approverId === String(userStore.staffInfo?.id || '') ? '当前轮到我' : '已指派'
+    if (approverId === String(userStore.staffInfo?.id || '')) return '当前轮到我'
+    return approverName ? `已指派给 ${approverName}` : role ? `已指派给${approverRoleLabel(role)}` : '已指派'
   }
   if (role) {
-    return `待${approverRoleLabel(role)}处理`
+    return approverName ? `待 ${approverName} 处理` : `待${approverRoleLabel(role)}处理`
   }
   return '待分配'
 }
@@ -1294,7 +1338,7 @@ function approverStatusColor(record: OaApproval) {
   if (text === '流程完成') return 'green'
   if (text === '已驳回') return 'red'
   if (text === '当前轮到我') return 'blue'
-  if (text === '已指派') return 'gold'
+  if (text.startsWith('已指派')) return 'gold'
   if (text.startsWith('待')) return 'purple'
   return 'default'
 }
@@ -1591,7 +1635,7 @@ async function urge(record: OaApproval, silent = false) {
     const urgeCount = Number(parsed?.urgeCount || 0) + 1
     const lastUrgedAt = dayjs().format('YYYY-MM-DDTHH:mm:ss')
     const lastUrgedBy = userStore.staffInfo?.realName || userStore.staffInfo?.username || '系统用户'
-    const currentApproverName = currentApprover(record)
+    const currentApproverName = currentApproverNameOnly(record)
     const previousApprover = String(parsed?.currentApproverName || parsed?.nextApproverName || '')
     const nextApprover = currentApproverName === '-' ? '' : currentApproverName
     const approverHistory = Array.isArray(parsed?.approverHistory) ? parsed.approverHistory.slice(-20) : []
@@ -1637,7 +1681,7 @@ async function urge(record: OaApproval, silent = false) {
       calendarType: 'WORK',
       urgency: 'EMERGENCY',
       status: 'OPEN',
-      assigneeName: currentApprover(record) !== '-' ? currentApprover(record) : undefined
+      assigneeName: currentApproverNameOnly(record) || undefined
     })
     if (!silent) message.success('催办已发送')
     await fetchData()

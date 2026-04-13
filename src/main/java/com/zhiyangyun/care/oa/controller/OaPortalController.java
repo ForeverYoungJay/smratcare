@@ -601,8 +601,44 @@ public class OaPortalController {
     List<OaApproval> approvals = approvalMapper.selectList(wrapper);
     return approvals.stream()
         .filter(item -> !AuthContext.isMinisterOrHigher() || isPendingApprovalForCurrentUser(item, staffId, roleCodes))
-        .filter(item -> !overdueOnly || (item.getCreateTime() != null && item.getCreateTime().isBefore(now.minusHours(48))))
+        .filter(item -> !overdueOnly || isApprovalTimeout(item, now))
         .count();
+  }
+
+  private boolean isApprovalTimeout(OaApproval approval, LocalDateTime now) {
+    if (approval == null || !"PENDING".equalsIgnoreCase(approval.getStatus())) {
+      return false;
+    }
+    LocalDateTime activeSince = resolveApprovalActiveSince(approval);
+    if (activeSince == null) {
+      return false;
+    }
+    return activeSince.isBefore(now.minusHours(48));
+  }
+
+  private LocalDateTime resolveApprovalActiveSince(OaApproval approval) {
+    Map<String, Object> formMap = readFormMap(approval == null ? null : approval.getFormData());
+    LocalDateTime currentNodeEnteredAt = parseDateTime(formMap.get("currentNodeEnteredAt"));
+    if (currentNodeEnteredAt != null) {
+      return currentNodeEnteredAt;
+    }
+    Object rawNotifyHistory = formMap.get("notifyHistory");
+    if (rawNotifyHistory instanceof List<?> list) {
+      for (int i = list.size() - 1; i >= 0; i--) {
+        Object item = list.get(i);
+        if (item instanceof Map<?, ?> row) {
+          LocalDateTime at = parseDateTime(row.get("at"));
+          if (at != null) {
+            return at;
+          }
+        }
+      }
+    }
+    LocalDateTime submittedAt = parseDateTime(formMap.get("submittedAt"));
+    if (submittedAt != null) {
+      return submittedAt;
+    }
+    return approval == null ? null : approval.getCreateTime();
   }
 
   private boolean isPendingApprovalForCurrentUser(OaApproval approval, Long staffId, List<String> roleCodes) {
@@ -709,6 +745,18 @@ public class OaPortalController {
     }
     String text = String.valueOf(value).trim();
     return text.isEmpty() ? null : text;
+  }
+
+  private LocalDateTime parseDateTime(Object value) {
+    String text = parseString(value);
+    if (text == null) {
+      return null;
+    }
+    try {
+      return LocalDateTime.parse(text.replace(' ', 'T'));
+    } catch (Exception ignore) {
+      return null;
+    }
   }
 
   private String trimToNull(String value) {

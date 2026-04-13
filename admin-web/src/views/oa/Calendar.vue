@@ -1,5 +1,5 @@
 <template>
-  <PageContainer title="行政日历 / 协同日历" subTitle="与首页一致：个人、部门工作、日常计划、协同日历统一视图">
+  <PageContainer title="我的行政日历 / 协同日历" subTitle="只显示与当前员工相关的个人、部门工作、日常计划和协同日历">
     <SearchForm :model="query" @search="fetchAll" @reset="onReset">
       <a-form-item label="日历种类">
         <a-select v-model:value="query.calendarType" :options="calendarTypeOptions" allow-clear style="width: 160px" />
@@ -9,9 +9,6 @@
       </a-form-item>
       <a-form-item label="状态">
         <a-select v-model:value="query.status" :options="statusOptions" allow-clear style="width: 160px" />
-      </a-form-item>
-      <a-form-item label="负责人">
-        <a-input v-model:value="query.assigneeName" placeholder="负责人" allow-clear />
       </a-form-item>
       <a-form-item label="日期范围">
         <a-range-picker v-model:value="query.range" />
@@ -26,29 +23,14 @@
 
     <a-card class="card-elevated calendar-surface" :bordered="false">
       <div class="calendar-toolbar">
-        <div>
-          <div class="calendar-title-tip">日历分层：个人、部门工作、日常计划、协同日历（与首页一致）</div>
+        <div class="calendar-toolbar-copy">
+          <div class="calendar-eyebrow">Personal Calendar Workspace</div>
+          <div class="calendar-title-tip">日历分层：个人、部门工作、日常计划、协同日历，仅显示当前员工相关内容</div>
           <a-space size="small" wrap class="calendar-insights">
             <a-tag v-for="item in calendarInsights" :key="item.label" :color="item.color">{{ item.label }} {{ item.value }}</a-tag>
           </a-space>
-          <a-space size="small" wrap class="calendar-loads" v-if="calendarLoadLeaders.length">
-            <a-tag color="geekblue">负责人负载</a-tag>
-            <a-tag v-for="item in calendarLoadLeaders" :key="item.name">{{ item.name }} {{ item.count }}条</a-tag>
-          </a-space>
-          <div class="calendar-week-trend" v-if="calendarWeeklyLoad.length">
-            <span class="repeat-tip">本周负载：</span>
-            <div
-              v-for="item in calendarWeeklyLoad"
-              :key="item.day"
-              class="calendar-week-bar"
-              :title="`${item.label} ${item.count}条`"
-              :style="{ height: `${Math.max(18, item.height)}px` }"
-            >
-              <span>{{ item.label }}</span>
-            </div>
-          </div>
         </div>
-        <a-space wrap>
+        <a-space wrap class="calendar-filter-pills">
           <a-checkable-tag
             v-for="item in calendarBuckets"
             :key="item.type"
@@ -61,7 +43,24 @@
           <a-button size="small" type="link" @click="showAllCalendarTypes">显示全部</a-button>
         </a-space>
       </div>
-      <FullCalendar ref="calendarRef" :options="calendarOptions" />
+      <div class="calendar-legend-grid">
+        <div
+          v-for="item in calendarLegendCards"
+          :key="item.type"
+          class="calendar-legend-card"
+          :class="`calendar-legend-card--${item.type.toLowerCase()}`"
+        >
+          <div class="calendar-legend-head">
+            <span class="calendar-legend-swatch" :style="{ background: item.color }"></span>
+            <strong>{{ item.label }}</strong>
+            <small>{{ item.count }} 项</small>
+          </div>
+          <p>{{ item.desc }}</p>
+        </div>
+      </div>
+      <div class="calendar-frame">
+        <FullCalendar ref="calendarRef" :options="calendarOptions" />
+      </div>
     </a-card>
 
     <a-drawer
@@ -77,40 +76,71 @@
           <a-button @click="quickCreateTemplate('协同会议')">协同会议</a-button>
         </a-space>
       </div>
-      <a-list :data-source="selectedDayEvents" :locale="{ emptyText: '当天暂无日程，可点击上方快速创建' }" item-layout="vertical">
-        <template #renderItem="{ item }">
-          <a-list-item :class="{ 'agenda-item-done': item.status === 'DONE' }">
-            <a-list-item-meta>
-              <template #title>
-                <a-space wrap>
-                  <span :class="{ 'agenda-title-done': item.status === 'DONE' }">{{ item.title }}</span>
-                  <a-tag v-if="item.status === 'DONE'">已完成</a-tag>
-                  <a-tag v-if="item.readonly" color="default">系统提醒</a-tag>
-                  <a-tag>{{ calendarTypeText(item.calendarType) }}</a-tag>
-                  <a-tag :color="item.urgency === 'EMERGENCY' ? 'red' : 'blue'">{{ item.urgency === 'EMERGENCY' ? '紧急' : '常规' }}</a-tag>
-                  <a-tag v-if="item.planCategory" color="purple">{{ item.planCategory }}</a-tag>
-                </a-space>
-              </template>
-              <template #description>
-                <div>
-                  <div>{{ formatRange(item.startTime, item.endTime) }}</div>
-                  <div>负责人：{{ item.assigneeName || '-' }}，协同：{{ (item.collaboratorNames || []).join('、') || '-' }}</div>
-                </div>
-              </template>
-            </a-list-item-meta>
-            <template #actions>
-              <a-button v-if="!item.readonly" type="link" size="small" @click="openEdit(item)">编辑</a-button>
-              <a-button v-if="!item.readonly" type="link" size="small" @click="markDone(item)">完成</a-button>
-              <a-button v-if="!item.readonly" type="link" size="small" danger @click="removeTask(item)">删除</a-button>
+      <div class="day-overview-bar">
+        <div class="day-overview-metric">
+          <span>当日日程</span>
+          <strong>{{ selectedDayOverview.total }}</strong>
+        </div>
+        <div class="day-overview-metric">
+          <span>待完成</span>
+          <strong>{{ selectedDayOverview.pending }}</strong>
+        </div>
+        <div class="day-overview-metric">
+          <span>提醒项</span>
+          <strong>{{ selectedDayOverview.readonly }}</strong>
+        </div>
+      </div>
+      <div v-if="selectedDayTimelineItems.length" class="timeline-shell">
+        <div
+          v-for="item in selectedDayTimelineItems"
+          :key="item.key"
+          class="timeline-item"
+          :class="[`timeline-item--${item.tone}`, { 'timeline-item--done': item.status === 'DONE' }]"
+        >
+          <div class="timeline-time">
+            <strong>{{ item.timeLabel }}</strong>
+            <span>{{ item.timeSubLabel }}</span>
+          </div>
+          <div class="timeline-dot"></div>
+          <div class="timeline-card">
+            <div class="timeline-card-head">
+              <div class="timeline-card-title">
+                <span class="timeline-icon">{{ item.icon }}</span>
+                <strong :class="{ 'agenda-title-done': item.status === 'DONE' }">{{ item.title }}</strong>
+              </div>
+              <a-space wrap>
+                <a-tag v-if="item.status === 'DONE'">已完成</a-tag>
+                <a-tag v-if="item.readonly" color="default">系统提醒</a-tag>
+                <a-tag>{{ item.typeLabel }}</a-tag>
+                <a-tag :color="item.urgency === 'EMERGENCY' ? 'red' : 'blue'">{{ item.urgency === 'EMERGENCY' ? '紧急' : '常规' }}</a-tag>
+                <a-tag v-if="item.planCategory" color="purple">{{ item.planCategory }}</a-tag>
+              </a-space>
+            </div>
+            <p class="timeline-summary">{{ item.summary }}</p>
+            <div class="timeline-meta">
+              <span>{{ item.periodText }}</span>
+              <span>负责人：{{ item.assigneeName || '-' }}</span>
+              <span>协同：{{ item.collaboratorText }}</span>
+            </div>
+            <div class="timeline-actions">
+              <a-button v-if="!item.readonly" type="link" size="small" @click="openEdit(item.raw)">编辑</a-button>
+              <a-button v-if="!item.readonly" type="link" size="small" @click="markDone(item.raw)">完成</a-button>
+              <a-button v-if="!item.readonly" type="link" size="small" danger @click="removeTask(item.raw)">删除</a-button>
               <span v-if="item.readonly" class="readonly-tip">{{ item.readonlyReason || '系统提醒' }}</span>
-            </template>
-          </a-list-item>
-        </template>
-      </a-list>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-else class="calendar-empty-state">
+        <div class="calendar-empty-art">+</div>
+        <strong>这一天还没有安排</strong>
+        <p>{{ selectedDate ? `${selectedDate.format('M月D日')}` : '当天' }} 目前是空白时段，可以直接从上方快速创建基础办公、行政日常或协同会议。</p>
+      </div>
     </a-drawer>
 
     <a-modal
       v-model:open="editOpen"
+      wrap-class-name="calendar-editor-modal"
       :title="modalTitle"
       @ok="submit"
       :confirm-loading="saving"
@@ -133,12 +163,7 @@
           </a-col>
         </a-row>
         <a-row :gutter="12">
-          <a-col :span="12">
-            <a-form-item label="负责人">
-              <a-input v-model:value="form.assigneeName" placeholder="例如：行政部" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
+          <a-col :span="24">
             <a-form-item label="优先级">
               <a-select v-model:value="form.priority" :options="priorityOptions" />
             </a-form-item>
@@ -335,7 +360,6 @@ const query = reactive({
   status: undefined as string | undefined,
   calendarType: undefined as CalendarType | undefined,
   urgency: undefined as UrgencyType | undefined,
-  assigneeName: '',
   range: undefined as [Dayjs, Dayjs] | undefined
 })
 
@@ -416,9 +440,11 @@ const majorFestivalEvents = computed(() => {
     end: `${item.date}T23:59:59`,
     allDay: true,
     color: '#f5222d',
+    classNames: ['calendar-event-festival'],
     extendedProps: {
       calendarType: 'DAILY',
-      urgency: 'EMERGENCY'
+      urgency: 'EMERGENCY',
+      kind: 'festival'
     }
   }))
 })
@@ -434,6 +460,7 @@ const birthdayReminderEvents = computed(() => birthdayRows.value
       start: `${date.format('YYYY-MM-DD')}T09:00:00`,
       end: `${date.format('YYYY-MM-DD')}T10:00:00`,
       color: urgency === 'EMERGENCY' ? '#eb2f96' : '#f759ab',
+      classNames: ['calendar-event-birthday'],
       extendedProps: {
         calendarType: 'DAILY',
         urgency,
@@ -441,7 +468,8 @@ const birthdayReminderEvents = computed(() => birthdayRows.value
         collaboratorNames: '',
         planCategory: '生日提醒',
         readonly: true,
-        readonlyReason: '生日提醒'
+        readonlyReason: '生日提醒',
+        kind: 'birthday'
       }
     }
   })
@@ -466,6 +494,13 @@ const calendarBuckets = computed(() => {
   }))
 })
 
+const calendarLegendCards = computed(() => ([
+  { type: 'PERSONAL', label: '个人计划', color: '#22c55e', count: calendarBuckets.value.find((item) => item.type === 'PERSONAL')?.count || 0, desc: '与当前员工本人直接相关的个人安排、请假与自用提醒。' },
+  { type: 'WORK', label: '部门工作', color: '#2563eb', count: calendarBuckets.value.find((item) => item.type === 'WORK')?.count || 0, desc: '工作推进类事项，强调执行节奏和完成状态。' },
+  { type: 'DAILY', label: '日常计划', color: '#f59e0b', count: calendarBuckets.value.find((item) => item.type === 'DAILY')?.count || 0, desc: '固定例行事务、节日节点和生日提醒，作为每日节奏底板。' },
+  { type: 'COLLAB', label: '协同日历', color: '#8b5cf6', count: calendarBuckets.value.find((item) => item.type === 'COLLAB')?.count || 0, desc: '跨部门或跨成员协同时段，突出同步、对齐和会面安排。' }
+]))
+
 const calendarInsights = computed(() => {
   const todayText = dayjs().format('YYYY-MM-DD')
   return [
@@ -475,43 +510,6 @@ const calendarInsights = computed(() => {
     { label: '节假日', value: majorFestivalEvents.value.length, color: 'orange' },
     { label: '生日提醒', value: birthdayReminderEvents.value.length, color: 'magenta' }
   ]
-})
-
-const calendarLoadLeaders = computed(() => {
-  const bucket = new Map<string, number>()
-  rows.value
-    .filter((task) => task.status !== 'DONE')
-    .forEach((task) => {
-      const name = (task.assigneeName || '未分配').trim()
-      bucket.set(name, Number(bucket.get(name) || 0) + 1)
-    })
-  return Array.from(bucket.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 4)
-    .map(([name, count]) => ({ name, count }))
-})
-
-const calendarWeeklyLoad = computed(() => {
-  const start = dayjs().startOf('week')
-  const list = Array.from({ length: 7 }).map((_, index) => {
-    const day = start.add(index, 'day')
-    const dayText = day.format('YYYY-MM-DD')
-    const count = rows.value.filter((task) => {
-      if (task.status === 'DONE') return false
-      const startTime = normalizeDateTimeValue(task.startTime || task.endTime)
-      return startTime ? dayjs(startTime).format('YYYY-MM-DD') === dayText : false
-    }).length
-    return {
-      day: dayText,
-      label: ['日', '一', '二', '三', '四', '五', '六'][day.day()],
-      count
-    }
-  })
-  const max = list.reduce((acc, item) => Math.max(acc, item.count), 1)
-  return list.map((item) => ({
-    ...item,
-    height: Math.round((item.count / max) * 48)
-  }))
 })
 
 const selectedDayEvents = computed<DayAgendaItem[]>(() => {
@@ -571,6 +569,49 @@ const selectedDayEvents = computed<DayAgendaItem[]>(() => {
     })
 })
 
+const selectedDayOverview = computed(() => {
+  const items = selectedDayEvents.value
+  return {
+    total: items.length,
+    pending: items.filter((item) => item.status !== 'DONE' && !item.readonly).length,
+    readonly: items.filter((item) => item.readonly).length
+  }
+})
+
+const selectedDayTimelineItems = computed(() => selectedDayEvents.value.map((item, index) => {
+  const start = normalizeDateTimeValue(item.startTime || item.endTime)
+  const end = normalizeDateTimeValue(item.endTime || item.startTime)
+  const typeLabel = calendarTypeText(item.calendarType)
+  const collaboratorText = item.collaboratorNames.length ? item.collaboratorNames.join('、') : '-'
+  const tone = item.readonly
+    ? item.planCategory === '节假日' ? 'festival' : 'birthday'
+    : String(item.calendarType || 'WORK').toLowerCase()
+  const icon = item.readonly
+    ? item.planCategory === '节假日' ? '✦' : '🎂'
+    : item.calendarType === 'COLLAB' ? '◎' : item.calendarType === 'DAILY' ? '◌' : item.calendarType === 'PERSONAL' ? '•' : '■'
+  return {
+    key: `${String(item.id)}_${index}`,
+    raw: item,
+    title: item.title || '未命名日程',
+    summary: item.readonly
+      ? `${item.readonlyReason || '系统提醒'} · ${item.planCategory || typeLabel}`
+      : `${typeLabel}${item.planCategory ? ` · ${item.planCategory}` : ''}${item.description ? ` · ${item.description}` : ''}`,
+    timeLabel: start ? dayjs(start).format('HH:mm') : '全天',
+    timeSubLabel: end ? dayjs(end).format('HH:mm') : '未设结束',
+    periodText: formatRange(item.startTime, item.endTime),
+    typeLabel,
+    assigneeName: item.assigneeName || '',
+    collaboratorText,
+    urgency: (item.urgency || 'NORMAL') as UrgencyType,
+    planCategory: item.planCategory || '',
+    readonly: item.readonly,
+    readonlyReason: item.readonlyReason,
+    status: item.status || 'OPEN',
+    tone,
+    icon
+  }
+}))
+
 const modalTitle = computed(() => (editingTaskId.value != null ? '编辑行政日程' : '新增行政日程'))
 const collaboratorTip = computed(() => {
   if (form.calendarType !== 'COLLAB') return ''
@@ -618,6 +659,33 @@ const calendarOptions = computed(() => ({
       currentCalendarView.value = viewType
     }
   },
+  dayCellDidMount: (arg: any) => {
+    const dateText = dayjs(arg?.date).format('YYYY-MM-DD')
+    if (!arg?.el || arg.el.classList.contains('fc-day-other')) return
+    const frame = arg.el.querySelector('.fc-daygrid-day-frame')
+    if (!frame) return
+    const dayState = calendarDayState(dateText)
+    if (dayState.isFestival) arg.el.classList.add('calendar-day--festival')
+    if (dayState.isBirthday) arg.el.classList.add('calendar-day--birthday')
+    if (dayState.isEmpty) arg.el.classList.add('calendar-day--empty')
+    if ((dayState.isFestival || dayState.isBirthday) && !frame.querySelector('.calendar-day-badges')) {
+      const badgeWrap = document.createElement('div')
+      badgeWrap.className = 'calendar-day-badges'
+      dayState.badges.forEach((text) => {
+        const badge = document.createElement('span')
+        badge.className = 'calendar-day-badge'
+        badge.textContent = text
+        badgeWrap.appendChild(badge)
+      })
+      frame.appendChild(badgeWrap)
+    }
+    if (!calendarHasEvents(dateText) && !frame.querySelector('.calendar-day-hint')) {
+      const hint = document.createElement('span')
+      hint.className = 'calendar-day-hint'
+      hint.textContent = dayState.hint
+      frame.appendChild(hint)
+    }
+  },
   eventDidMount: (arg: any) => {
     const event = arg?.event
     const taskType = calendarTypeText(event?.extendedProps?.calendarType)
@@ -646,13 +714,18 @@ const calendarOptions = computed(() => ({
         start: normalizeDateTimeValue(task.startTime || task.endTime),
         end: normalizeDateTimeValue(task.endTime || task.startTime),
         color: resolveTaskColor(task),
-        classNames: task.status === 'DONE' ? ['calendar-event-done'] : [],
+        classNames: [
+          task.status === 'DONE' ? 'calendar-event-done' : '',
+          `calendar-event-${String(task.calendarType || 'WORK').toLowerCase()}`,
+          task.urgency === 'EMERGENCY' ? 'calendar-event-emergency' : ''
+        ].filter(Boolean),
         extendedProps: {
           calendarType: task.calendarType || 'WORK',
           urgency: task.urgency || 'NORMAL',
           assigneeName: task.assigneeName || '',
           collaboratorNames: normalizeCollaboratorNames(task.collaboratorNames).join('、'),
-          planCategory: task.planCategory || ''
+          planCategory: task.planCategory || '',
+          kind: 'task'
         }
       })),
     ...birthdayReminderEvents.value,
@@ -695,6 +768,47 @@ function resolveCalendarTypeColor(calendarType: CalendarType, urgency: UrgencyTy
 function resolveTaskColor(task: OaTask) {
   if (task.status === 'DONE') return '#94a3b8'
   return resolveCalendarTypeColor((task.calendarType || 'WORK') as CalendarType, (task.urgency || 'NORMAL') as UrgencyType)
+}
+
+function calendarHasEvents(dateText: string) {
+  return rows.value.some((task) => {
+    const start = normalizeDateTimeValue(task.startTime || task.endTime)
+    return start ? dayjs(start).format('YYYY-MM-DD') === dateText : false
+  })
+    || birthdayReminderEvents.value.some((item) => dayjs(item.start).format('YYYY-MM-DD') === dateText)
+    || majorFestivalEvents.value.some((item) => dayjs(item.start).format('YYYY-MM-DD') === dateText)
+}
+
+function calendarHasFestival(dateText: string) {
+  return majorFestivalEvents.value.some((item) => dayjs(item.start).format('YYYY-MM-DD') === dateText)
+}
+
+function calendarHasBirthday(dateText: string) {
+  return birthdayReminderEvents.value.some((item) => dayjs(item.start).format('YYYY-MM-DD') === dateText)
+}
+
+function calendarDayHint(dateText: string) {
+  const date = dayjs(dateText)
+  if (date.day() === 1) return '周计划'
+  if (date.day() === 5) return '收尾'
+  if (date.day() === 0 || date.day() === 6) return '留白'
+  return '可安排'
+}
+
+function calendarDayState(dateText: string) {
+  const isFestival = calendarHasFestival(dateText)
+  const isBirthday = calendarHasBirthday(dateText)
+  const hasTask = rows.value.some((task) => {
+    const start = normalizeDateTimeValue(task.startTime || task.endTime)
+    return start ? dayjs(start).format('YYYY-MM-DD') === dateText : false
+  })
+  return {
+    isFestival,
+    isBirthday,
+    isEmpty: !isFestival && !isBirthday && !hasTask,
+    badges: [isFestival ? '节日' : '', isBirthday ? '生日' : ''].filter(Boolean),
+    hint: calendarDayHint(dateText)
+  }
 }
 
 function toggleCalendarType(type: CalendarType) {
@@ -842,14 +956,11 @@ async function resolveCollaborators(departmentIds: string[], staffIds: string[])
 function resolveAssigneeIdForSubmit() {
   const currentId = userStore.staffInfo?.id != null ? String(userStore.staffInfo.id) : ''
   if (!currentId) return undefined
-  const currentRealName = String(userStore.staffInfo?.realName || '').trim()
-  const currentUsername = String(userStore.staffInfo?.username || '').trim()
-  const input = String(form.assigneeName || '').trim()
-  if (!input) return currentId
-  if ((currentRealName && input === currentRealName) || (currentUsername && input === currentUsername)) {
-    return currentId
-  }
-  return form.assigneeId != null ? String(form.assigneeId) : undefined
+  return currentId
+}
+
+function resolveAssigneeNameForSubmit() {
+  return (userStore.staffInfo?.realName || userStore.staffInfo?.username || '').trim() || undefined
 }
 
 function buildConflictMessage(items: Array<{ title?: string; assigneeName?: string; startTime?: string; endTime?: string; reason?: string }>) {
@@ -899,7 +1010,7 @@ async function previewScheduleConflicts() {
     taskId: editingTaskId.value || undefined,
     startTime: dayjs(form.startTime).format('YYYY-MM-DDTHH:mm:ss'),
     endTime: form.endTime ? dayjs(form.endTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
-    assigneeName: form.assigneeName || undefined,
+    assigneeName: resolveAssigneeNameForSubmit(),
     collaboratorIds: collaboratorPayload.ids
   }
   conflictPreviewLoading.value = true
@@ -978,7 +1089,6 @@ async function fetchAll() {
       status: query.status,
       calendarType: query.calendarType,
       urgency: query.urgency,
-      assigneeName: query.assigneeName || undefined,
       startDate: query.range?.[0] ? dayjs(query.range[0]).format('YYYY-MM-DD') : undefined,
       endDate: query.range?.[1] ? dayjs(query.range[1]).format('YYYY-MM-DD') : undefined
     }),
@@ -999,7 +1109,6 @@ function onReset() {
   query.status = undefined
   query.calendarType = undefined
   query.urgency = undefined
-  query.assigneeName = ''
   query.range = undefined
   fetchAll()
 }
@@ -1035,8 +1144,8 @@ function openEdit(item: OaTask) {
   form.title = item.title || ''
   form.startTime = item.startTime ? dayjs(item.startTime) : undefined
   form.endTime = item.endTime ? dayjs(item.endTime) : undefined
-  form.assigneeId = item.assigneeId != null ? String(item.assigneeId) : undefined
-  form.assigneeName = item.assigneeName || ''
+  form.assigneeId = userStore.staffInfo?.id != null ? String(userStore.staffInfo.id) : undefined
+  form.assigneeName = (userStore.staffInfo?.realName || userStore.staffInfo?.username || '').trim()
   form.priority = item.priority || 'NORMAL'
   form.description = item.description || ''
   form.calendarType = (item.calendarType || 'WORK') as CalendarType
@@ -1136,7 +1245,7 @@ async function submit() {
     taskId: editingTaskId.value || undefined,
     startTime: firstStart,
     endTime: firstEnd,
-    assigneeName: form.assigneeName || undefined,
+    assigneeName: resolveAssigneeNameForSubmit(),
     collaboratorIds: collaboratorPayload.ids
   })
   if (!canContinue) return
@@ -1155,7 +1264,7 @@ async function submit() {
         endTime: form.endTime ? dayjs(form.endTime).format('YYYY-MM-DDTHH:mm:ss') : undefined,
         priority: form.priority,
         assigneeId: resolveAssigneeIdForSubmit(),
-        assigneeName: form.assigneeName || undefined,
+        assigneeName: resolveAssigneeNameForSubmit(),
         calendarType: form.calendarType,
         planCategory: form.planCategory || undefined,
         urgency: form.urgency,
@@ -1185,7 +1294,7 @@ async function submit() {
           priority: form.priority,
           status: 'OPEN',
           assigneeId: resolveAssigneeIdForSubmit(),
-          assigneeName: form.assigneeName || undefined,
+          assigneeName: resolveAssigneeNameForSubmit(),
           calendarType: form.calendarType,
           planCategory: form.planCategory || undefined,
           urgency: form.urgency,
@@ -1313,48 +1422,143 @@ useLiveSyncRefresh({
 </script>
 
 <style scoped>
+.calendar-surface {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top left, rgba(96, 165, 250, 0.16), transparent 24%),
+    radial-gradient(circle at top right, rgba(251, 191, 36, 0.14), transparent 22%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 248, 252, 0.98) 100%);
+  box-shadow:
+    0 22px 54px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86);
+}
+
+.calendar-surface::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.42), transparent 36%),
+    repeating-linear-gradient(
+      90deg,
+      rgba(148, 163, 184, 0.045) 0,
+      rgba(148, 163, 184, 0.045) 1px,
+      transparent 1px,
+      transparent 88px
+    );
+  pointer-events: none;
+}
+
 .calendar-toolbar {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 12px;
-  padding: 10px 12px;
-  border: 1px solid #dbeafe;
-  border-radius: 12px;
-  background: linear-gradient(135deg, #f7fbff 0%, #eef6ff 100%);
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 18px 20px;
+  border: 1px solid rgba(191, 219, 254, 0.72);
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(250, 252, 255, 0.9) 0%, rgba(239, 246, 255, 0.94) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 10px 24px rgba(59, 130, 246, 0.08);
+}
+
+.calendar-toolbar-copy {
+  display: grid;
+  gap: 8px;
+  max-width: 620px;
+}
+
+.calendar-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #7c93aa;
 }
 
 .calendar-title-tip {
+  color: #31475f;
+  font-size: 14px;
+  line-height: 1.6;
+  font-weight: 500;
+}
+
+.calendar-insights {
+  margin-top: 2px;
+}
+
+.calendar-filter-pills {
+  justify-content: flex-end;
+}
+
+.calendar-legend-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.calendar-legend-card {
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(226, 232, 240, 0.88);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.calendar-legend-card--personal {
+  background: linear-gradient(180deg, rgba(240, 253, 244, 0.96) 0%, rgba(255, 255, 255, 0.88) 100%);
+}
+
+.calendar-legend-card--work {
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.98) 0%, rgba(255, 255, 255, 0.88) 100%);
+}
+
+.calendar-legend-card--daily {
+  background: linear-gradient(180deg, rgba(255, 251, 235, 0.98) 0%, rgba(255, 255, 255, 0.88) 100%);
+}
+
+.calendar-legend-card--collab {
+  background: linear-gradient(180deg, rgba(245, 243, 255, 0.98) 0%, rgba(255, 255, 255, 0.88) 100%);
+}
+
+.calendar-legend-card p {
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.calendar-legend-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.calendar-legend-head strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.calendar-legend-head small {
+  margin-left: auto;
   color: #64748b;
   font-size: 12px;
 }
 
-.calendar-insights {
-  margin-top: 6px;
-}
-
-.calendar-loads {
-  margin-top: 2px;
-}
-
-.calendar-week-trend {
-  display: flex;
-  align-items: flex-end;
-  gap: 6px;
-}
-
-.calendar-week-bar {
-  min-width: 16px;
-  padding: 2px 4px;
-  border-radius: 6px 6px 2px 2px;
-  background: linear-gradient(180deg, #91caff 0%, #1677ff 100%);
-  color: #fff;
-  font-size: 11px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
+.calendar-legend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.72);
 }
 
 .legend-dot {
@@ -1363,20 +1567,268 @@ useLiveSyncRefresh({
   border-radius: 50%;
   display: inline-block;
   margin-right: 6px;
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.72);
+}
+
+.calendar-frame {
+  position: relative;
+  z-index: 1;
+  padding: 12px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.98) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 12px 32px rgba(15, 23, 42, 0.06);
 }
 
 .drawer-actions {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(226, 232, 240, 0.88);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.92) 0%, rgba(255, 255, 255, 0.96) 100%);
+}
+
+.day-overview-bar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.day-overview-metric {
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(226, 232, 240, 0.84);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.day-overview-metric span {
+  display: block;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.day-overview-metric strong {
+  display: block;
+  margin-top: 6px;
+  color: #0f172a;
+  font-size: 22px;
 }
 
 .repeat-card {
   margin-bottom: 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(219, 234, 254, 0.9);
+  background: linear-gradient(180deg, rgba(248, 251, 255, 0.94) 0%, rgba(255, 255, 255, 0.96) 100%);
 }
 
 .repeat-tip {
   color: #64748b;
   font-size: 12px;
   line-height: 32px;
+}
+
+.agenda-list :deep(.ant-list-item) {
+  margin-bottom: 10px;
+  padding: 14px 16px;
+  border: 1px solid rgba(226, 232, 240, 0.84);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.92) 100%);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.agenda-list :deep(.ant-list-item:hover) {
+  transform: translateY(-1px);
+  border-color: rgba(147, 197, 253, 0.96);
+  box-shadow: 0 14px 30px rgba(59, 130, 246, 0.08);
+}
+
+.timeline-shell {
+  position: relative;
+  display: grid;
+  gap: 14px;
+}
+
+.timeline-item {
+  display: grid;
+  grid-template-columns: 64px 18px minmax(0, 1fr);
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.timeline-time {
+  padding-top: 8px;
+  text-align: right;
+}
+
+.timeline-time strong,
+.timeline-time span {
+  display: block;
+}
+
+.timeline-time strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.timeline-time span {
+  margin-top: 4px;
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.timeline-dot {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  margin-top: 10px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.9);
+}
+
+.timeline-dot::after {
+  content: '';
+  position: absolute;
+  top: 18px;
+  left: 8px;
+  width: 2px;
+  height: calc(100% + 34px);
+  background: linear-gradient(180deg, rgba(203, 213, 225, 0.9), rgba(226, 232, 240, 0));
+}
+
+.timeline-item:last-child .timeline-dot::after {
+  display: none;
+}
+
+.timeline-card {
+  padding: 16px 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(226, 232, 240, 0.88);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(248, 250, 252, 0.94) 100%);
+}
+
+.timeline-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.timeline-card-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.timeline-card-title strong {
+  color: #0f172a;
+  font-size: 15px;
+}
+
+.timeline-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: rgba(241, 245, 249, 0.92);
+}
+
+.timeline-summary {
+  margin: 10px 0 0;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.timeline-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 10px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.timeline-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.timeline-item--personal .timeline-dot,
+.timeline-item--personal .timeline-icon {
+  background: rgba(34, 197, 94, 0.18);
+}
+
+.timeline-item--work .timeline-dot,
+.timeline-item--work .timeline-icon {
+  background: rgba(37, 99, 235, 0.16);
+}
+
+.timeline-item--daily .timeline-dot,
+.timeline-item--daily .timeline-icon {
+  background: rgba(245, 158, 11, 0.18);
+}
+
+.timeline-item--collab .timeline-dot,
+.timeline-item--collab .timeline-icon {
+  background: rgba(139, 92, 246, 0.16);
+}
+
+.timeline-item--birthday .timeline-dot,
+.timeline-item--birthday .timeline-icon {
+  background: rgba(236, 72, 153, 0.16);
+}
+
+.timeline-item--festival .timeline-dot,
+.timeline-item--festival .timeline-icon {
+  background: rgba(239, 68, 68, 0.16);
+}
+
+.timeline-item--done {
+  opacity: 0.78;
+}
+
+.calendar-empty-state {
+  padding: 34px 20px;
+  border-radius: 24px;
+  border: 1px dashed rgba(191, 219, 254, 0.92);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.92) 0%, rgba(255, 255, 255, 0.96) 100%);
+  text-align: center;
+}
+
+.calendar-empty-art {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 14px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(219, 234, 254, 0.92), rgba(254, 240, 138, 0.52));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #2563eb;
+  font-size: 28px;
+  font-weight: 300;
+}
+
+.calendar-empty-state strong {
+  display: block;
+  color: #0f172a;
+  font-size: 16px;
+}
+
+.calendar-empty-state p {
+  max-width: 360px;
+  margin: 10px auto 0;
+  color: #64748b;
+  line-height: 1.7;
 }
 
 .agenda-item-done {
@@ -1394,36 +1846,47 @@ useLiveSyncRefresh({
 }
 
 .calendar-surface :deep(.fc) {
-  --fc-border-color: #e2e8f0;
+  --fc-border-color: rgba(226, 232, 240, 0.95);
   --fc-page-bg-color: transparent;
   --fc-neutral-bg-color: #f8fafc;
   --fc-event-border-color: transparent;
+  --fc-today-bg-color: rgba(219, 234, 254, 0.36);
 }
 
 .calendar-surface :deep(.fc .fc-toolbar.fc-header-toolbar) {
-  margin-bottom: 10px;
-  padding: 8px 10px;
-  border: 1px solid #dbeafe;
-  border-radius: 10px;
-  background: #f8fbff;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(191, 219, 254, 0.72);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(249, 251, 255, 0.96) 0%, rgba(241, 245, 249, 0.96) 100%);
 }
 
 .calendar-surface :deep(.fc .fc-button) {
   border-radius: 999px;
-  border: 1px solid #bfdbfe;
-  background: #ffffff;
+  border: 1px solid rgba(191, 219, 254, 0.96);
+  background: rgba(255, 255, 255, 0.98);
   color: #1e3a8a;
   box-shadow: none;
+  transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease;
 }
 
 .calendar-surface :deep(.fc .fc-button:hover) {
   background: #eff6ff;
   border-color: #93c5fd;
+  transform: translateY(-1px);
+}
+
+.calendar-surface :deep(.fc .fc-button-primary:not(:disabled).fc-button-active),
+.calendar-surface :deep(.fc .fc-button-primary:not(:disabled):active) {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  border-color: #2563eb;
+  color: #fff;
 }
 
 .calendar-surface :deep(.fc .fc-col-header-cell-cushion) {
   color: #334155;
   font-weight: 600;
+  letter-spacing: 0.03em;
 }
 
 .calendar-surface :deep(.fc .fc-daygrid-day-number) {
@@ -1431,14 +1894,108 @@ useLiveSyncRefresh({
   font-weight: 600;
 }
 
+.calendar-surface :deep(.fc .fc-scrollgrid) {
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.calendar-surface :deep(.fc .fc-daygrid-day-frame) {
+  min-height: 124px;
+  padding: 4px 6px 8px;
+  transition: background 0.16s ease;
+}
+
+.calendar-surface :deep(.calendar-day-hint) {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(248, 250, 252, 0.92);
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+.calendar-surface :deep(.calendar-day-badges) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.calendar-surface :deep(.calendar-day-badge) {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #475569;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.calendar-surface :deep(.fc .fc-daygrid-day:hover .fc-daygrid-day-frame) {
+  background: rgba(248, 250, 252, 0.72);
+}
+
+.calendar-surface :deep(.fc .fc-daygrid-day.calendar-day--empty .fc-daygrid-day-frame) {
+  background:
+    linear-gradient(180deg, rgba(248, 250, 252, 0.76) 0%, rgba(255, 255, 255, 0.92) 100%);
+}
+
+.calendar-surface :deep(.fc .fc-daygrid-day.calendar-day--festival .fc-daygrid-day-frame) {
+  background:
+    radial-gradient(circle at top right, rgba(254, 215, 170, 0.42), transparent 42%),
+    linear-gradient(180deg, rgba(255, 247, 237, 0.96) 0%, rgba(255, 255, 255, 0.92) 100%);
+}
+
+.calendar-surface :deep(.fc .fc-daygrid-day.calendar-day--birthday .fc-daygrid-day-frame) {
+  background:
+    radial-gradient(circle at top right, rgba(251, 207, 232, 0.42), transparent 42%),
+    linear-gradient(180deg, rgba(253, 242, 248, 0.96) 0%, rgba(255, 255, 255, 0.92) 100%);
+}
+
+.calendar-surface :deep(.fc .fc-daygrid-day.calendar-day--festival .fc-daygrid-day-number) {
+  color: #c2410c;
+}
+
+.calendar-surface :deep(.fc .fc-daygrid-day.calendar-day--birthday .fc-daygrid-day-number) {
+  color: #be185d;
+}
+
 .calendar-surface :deep(.fc .fc-daygrid-day.fc-day-today) {
   background: rgba(219, 234, 254, 0.56);
 }
 
+.calendar-surface :deep(.fc .fc-daygrid-day.fc-day-today .fc-daygrid-day-number) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: #fff;
+}
+
 .calendar-surface :deep(.fc .fc-daygrid-event) {
-  border-radius: 8px;
-  padding: 1px 4px;
-  box-shadow: 0 2px 8px rgba(30, 64, 175, 0.14);
+  margin-top: 4px;
+  border-radius: 12px;
+  padding: 3px 7px;
+  box-shadow: 0 8px 18px rgba(30, 64, 175, 0.14);
+  transition: transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease;
+}
+
+.calendar-surface :deep(.fc .fc-daygrid-event:hover) {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 22px rgba(30, 64, 175, 0.18);
+  filter: saturate(1.06);
+}
+
+.calendar-surface :deep(.fc .fc-event-title) {
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .calendar-surface :deep(.calendar-event-done .fc-event-title) {
@@ -1447,5 +2004,129 @@ useLiveSyncRefresh({
 
 .calendar-surface :deep(.calendar-event-done) {
   opacity: 0.82;
+}
+
+.calendar-surface :deep(.calendar-event-personal) {
+  background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+}
+
+.calendar-surface :deep(.calendar-event-work) {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+}
+
+.calendar-surface :deep(.calendar-event-daily) {
+  background: linear-gradient(135deg, #f59e0b, #ea580c) !important;
+}
+
+.calendar-surface :deep(.calendar-event-collab) {
+  background: linear-gradient(135deg, #8b5cf6, #6d28d9) !important;
+}
+
+.calendar-surface :deep(.calendar-event-birthday) {
+  background: linear-gradient(135deg, #ec4899, #db2777) !important;
+}
+
+.calendar-surface :deep(.calendar-event-festival) {
+  background: linear-gradient(135deg, #f97316, #ef4444) !important;
+}
+
+.calendar-surface :deep(.calendar-event-emergency) {
+  box-shadow: 0 10px 22px rgba(239, 68, 68, 0.22);
+}
+
+.calendar-surface :deep(.ant-tag) {
+  border-radius: 999px;
+  padding-inline: 10px;
+  font-weight: 500;
+}
+
+.calendar-surface :deep(.ant-tag-checkable) {
+  padding: 7px 12px;
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  background: rgba(255, 255, 255, 0.82);
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+.calendar-surface :deep(.ant-tag-checkable:hover) {
+  transform: translateY(-1px);
+  border-color: rgba(147, 197, 253, 0.96);
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.calendar-surface :deep(.ant-tag-checkable-checked) {
+  border-color: rgba(37, 99, 235, 0.92);
+  background: rgba(219, 234, 254, 0.86);
+  color: #1d4ed8;
+}
+
+.calendar-editor-modal :deep(.ant-modal-content) {
+  border-radius: 26px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top right, rgba(96, 165, 250, 0.12), transparent 24%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.99) 0%, rgba(247, 250, 252, 0.98) 100%);
+  box-shadow: 0 28px 60px rgba(15, 23, 42, 0.16);
+}
+
+.calendar-editor-modal :deep(.ant-modal-header) {
+  padding: 18px 22px 0;
+  background: transparent;
+}
+
+.calendar-editor-modal :deep(.ant-modal-title) {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.calendar-editor-modal :deep(.ant-modal-body) {
+  padding: 18px 22px 10px;
+}
+
+.calendar-editor-modal :deep(.ant-modal-footer) {
+  padding: 12px 22px 20px;
+}
+
+.calendar-editor-modal :deep(.ant-form-item-label > label) {
+  color: #334155;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .calendar-legend-grid,
+  .day-overview-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .timeline-item {
+    grid-template-columns: 1fr;
+  }
+
+  .timeline-time {
+    text-align: left;
+    padding-top: 0;
+  }
+
+  .timeline-dot {
+    display: none;
+  }
+
+  .calendar-toolbar {
+    padding: 16px;
+    border-radius: 20px;
+  }
+
+  .calendar-frame {
+    padding: 8px;
+    border-radius: 20px;
+  }
+
+  .calendar-surface :deep(.fc .fc-toolbar.fc-header-toolbar) {
+    gap: 10px;
+  }
+
+  .calendar-surface :deep(.fc .fc-daygrid-day-frame) {
+    min-height: 92px;
+  }
 }
 </style>

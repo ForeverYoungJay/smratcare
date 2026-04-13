@@ -3,13 +3,9 @@
     <StatefulBlock :loading="loading" :error="errorText" :empty="false" @retry="load">
       <div class="portal-toolbar">
         <a-space wrap>
-          <a-radio-group v-if="canSwitchScope" v-model:value="portalScope" button-style="solid" size="small">
-            <a-radio-button value="PERSONAL">我的视角</a-radio-button>
-            <a-radio-button value="ORG">机构视角</a-radio-button>
-          </a-radio-group>
-          <a-tag :color="portalScope === 'ORG' ? 'purple' : 'blue'">{{ scopeDescription }}</a-tag>
+          <a-tag color="blue">{{ scopeDescription }}</a-tag>
           <a-button size="small" type="primary" @click="openPath('/workbench/todo')">进入待办</a-button>
-          <a-button size="small" @click="openPath('/oa/approval')">进入审批</a-button>
+          <a-button size="small" @click="openPath('/workbench/approvals')">进入审批</a-button>
           <a-button size="small" @click="openPath('/workbench/reports')">写工作总结</a-button>
         </a-space>
       </div>
@@ -23,7 +19,7 @@
           </p>
           <div class="hero-actions">
             <a-button type="primary" size="large" @click="openPath('/workbench/todo')">优先处理待办</a-button>
-            <a-button size="large" @click="openPath('/oa/approval')">查看审批队列</a-button>
+            <a-button size="large" @click="openPath('/workbench/approvals')">查看我的审批</a-button>
           </div>
         </div>
         <div class="hero-side">
@@ -94,23 +90,22 @@
         <div class="panel panel-workflow">
           <div class="panel-head">
             <div>
-              <div class="panel-kicker">Workflow</div>
-              <h3>审批快捷入口</h3>
+              <div class="panel-kicker">Approvals</div>
+              <h3>我的审批</h3>
             </div>
           </div>
-          <div v-if="workflowQuickActions.length" class="workflow-list">
+          <div class="workflow-list">
             <button
-              v-for="item in workflowQuickActions"
-              :key="item.code"
+              v-for="item in approvalQuickActions"
+              :key="item.label"
               type="button"
               class="workflow-item"
-              @click="openPath(item.route)"
+              @click="openPath(item.path)"
             >
-              <span>{{ item.name }}</span>
-              <strong>{{ item.count }}</strong>
+              <span>{{ item.label }}</span>
+              <strong>{{ item.value }}</strong>
             </button>
           </div>
-          <a-empty v-else description="当前没有需要优先处理的流程" />
         </div>
 
         <div class="panel panel-feed">
@@ -137,7 +132,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, h, onMounted, ref, watch } from 'vue'
+import { computed, reactive, h, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import PageContainer from '../../components/PageContainer.vue'
@@ -145,42 +140,24 @@ import StatefulBlock from '../../components/StatefulBlock.vue'
 import { getPortalSummary } from '../../api/oa'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { useUserStore } from '../../stores/user'
-import { hasMinisterOrHigher } from '../../utils/roleAccess'
 import { resolveRouteAccess } from '../../utils/routeAccess'
-import type { OaPortalSummary, OaNotice, OaTodo, OaWorkflowTodoItem } from '../../types'
+import type { OaPortalSummary, OaNotice, OaTodo } from '../../types'
 
 const summary = reactive<OaPortalSummary>({ notices: [], todos: [] })
 const loading = ref(false)
 const errorText = ref('')
 const router = useRouter()
 const userStore = useUserStore()
-const PORTAL_SCOPE_STORAGE_KEY = 'oa-portal-scope'
-const canSwitchScope = computed(() => hasMinisterOrHigher(userStore.roles || []))
-const portalScope = ref<'PERSONAL' | 'ORG'>(readInitialPortalScope())
-const pendingApprovalTitle = computed(() =>
-  portalScope.value === 'ORG'
-    ? '机构待审'
-    : hasMinisterOrHigher(userStore.roles || [])
-      ? '待我审批'
-      : '审批处理中'
-)
-const scopeDescription = computed(() =>
-  portalScope.value === 'ORG' ? '统计口径：机构整体协同情况' : '统计口径：只看我相关的待办、任务和审批'
-)
+const scopeDescription = computed(() => '统计口径：只看我相关的待办、审批、任务和总结')
 const todoCardTitle = computed(() =>
-  portalScope.value === 'ORG'
-    ? `机构待办（近30天机构已提交总结 ${summary.submittedReportCount || 0} 条）`
-    : `我的待办（近30天我已提交总结 ${summary.submittedReportCount || 0} 条）`
-)
-const workflowQuickActions = computed<OaWorkflowTodoItem[]>(() =>
-  (summary.workflowTodos || []).filter((item) => Number(item.count || 0) > 0).slice(0, 6)
+  `我的待办（近30天我已提交总结 ${summary.submittedReportCount || 0} 条）`
 )
 const heroDescription = computed(() =>
-  `当前${portalScope.value === 'ORG' ? '机构侧' : '个人侧'}共有 ${summary.openTodoCount || 0} 条待办，其中超期 ${summary.overdueTodoCount || 0} 条、审批待处理 ${summary.pendingApprovalCount || 0} 条。`
+  `当前我共有 ${summary.openTodoCount || 0} 条待办，其中超期 ${summary.overdueTodoCount || 0} 条、待处理审批 ${summary.pendingApprovalCount || 0} 条。`
 )
 const heroAlerts = computed(() => ([
   { label: '超期待办', value: summary.overdueTodoCount || 0, tone: (summary.overdueTodoCount || 0) > 0 ? 'danger' : 'calm' },
-  { label: pendingApprovalTitle.value, value: summary.pendingApprovalCount || 0, tone: (summary.pendingApprovalCount || 0) > 0 ? 'focus' : 'calm' },
+  { label: '待我审批', value: summary.pendingApprovalCount || 0, tone: (summary.pendingApprovalCount || 0) > 0 ? 'focus' : 'calm' },
   { label: '健康异常', value: summary.healthAbnormalCount || 0, tone: (summary.healthAbnormalCount || 0) > 0 ? 'warning' : 'calm' }
 ]))
 const heroMetrics = computed(() => ([
@@ -193,12 +170,18 @@ const heroMetrics = computed(() => ([
 ]))
 const priorityTasks = computed(() => ([
   { label: '超期处理', value: summary.overdueTodoCount || 0, path: '/workbench/todo?status=OVERDUE' },
-  { label: '审批排队', value: summary.pendingApprovalCount || 0, path: '/oa/approval' },
+  { label: '审批排队', value: summary.pendingApprovalCount || 0, path: '/workbench/approvals' },
   { label: '健康异常', value: summary.healthAbnormalCount || 0, path: '/health/management/archive' },
   { label: '生日关怀', value: summary.birthdayTodoCount || 0, path: '/workbench/todo?keyword=生日提醒' }
 ]).filter((item) => Number(item.value || 0) > 0))
+const approvalQuickActions = computed(() => ([
+  { label: '待我审批', value: summary.pendingApprovalCount || 0, path: '/workbench/approvals' },
+  { label: '超时审批', value: summary.approvalTimeoutCount || 0, path: '/workbench/approvals?scope=PENDING_REVIEW&overdue=1' },
+  { label: '请假处理中', value: summary.leavePendingCount || 0, path: '/workbench/approvals?type=LEAVE' },
+  { label: '报销处理中', value: summary.reimbursePendingCount || 0, path: '/workbench/approvals?type=REIMBURSE' }
+]))
 const commonActions = computed(() => ([
-  { label: '审批流程', path: '/oa/approval' },
+  { label: '我的审批', path: '/workbench/approvals' },
   { label: '我的待办', path: '/workbench/todo' },
   { label: '任务管理', path: '/oa/work-execution/task' },
   { label: '文档管理', path: '/oa/document' },
@@ -209,13 +192,6 @@ const commonActions = computed(() => ([
   { label: '营销合同闭环', path: '/marketing/contracts/pending?flowStage=PENDING_ASSESSMENT' },
   { label: '人力资源中心', path: '/hr/overview' }
 ]).filter((item) => canAccess(item.path)))
-
-function readInitialPortalScope(): 'PERSONAL' | 'ORG' {
-  if (typeof window === 'undefined') {
-    return 'PERSONAL'
-  }
-  return window.localStorage.getItem(PORTAL_SCOPE_STORAGE_KEY) === 'ORG' ? 'ORG' : 'PERSONAL'
-}
 
 function renderNotice(item: OaNotice) {
   return h('div', { class: 'list-item' }, [
@@ -247,7 +223,7 @@ async function load() {
   loading.value = true
   errorText.value = ''
   try {
-    const res = await getPortalSummary({ params: { scope: portalScope.value } })
+    const res = await getPortalSummary({ params: { scope: 'PERSONAL' } })
     Object.assign(summary, res || {})
     summary.notices = res.notices || []
     summary.todos = res.todos || []
@@ -257,19 +233,6 @@ async function load() {
     loading.value = false
   }
 }
-
-watch(canSwitchScope, (value) => {
-  if (!value && portalScope.value !== 'PERSONAL') {
-    portalScope.value = 'PERSONAL'
-  }
-}, { immediate: true })
-
-watch(portalScope, (value) => {
-  if (typeof window !== 'undefined') {
-    window.localStorage.setItem(PORTAL_SCOPE_STORAGE_KEY, value)
-  }
-  load().catch(() => {})
-})
 
 onMounted(() => {
   load().catch(() => {})

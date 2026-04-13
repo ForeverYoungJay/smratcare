@@ -131,7 +131,7 @@ public class OaTaskController {
     } else {
       wrapper.last("LIMIT 5000");
     }
-    applyMyCalendarScope(wrapper, staffId, false);
+    applyMyCalendarScope(wrapper, staffId, true);
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(OaTask::getTitle, keyword)
           .or().like(OaTask::getDescription, keyword));

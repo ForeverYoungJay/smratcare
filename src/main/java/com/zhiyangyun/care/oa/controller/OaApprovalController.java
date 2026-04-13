@@ -151,8 +151,9 @@ public class OaApprovalController {
     response.setPendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", normalizedType, normalizedApproverRole, applicantId, keyword, pendingMine))));
     response.setApprovedCount(count(approvalMapper.selectCount(buildQuery(orgId, "APPROVED", normalizedType, normalizedApproverRole, applicantId, keyword, pendingMine))));
     response.setRejectedCount(count(approvalMapper.selectCount(buildQuery(orgId, "REJECTED", normalizedType, normalizedApproverRole, applicantId, keyword, pendingMine))));
-    response.setTimeoutPendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", normalizedType, normalizedApproverRole, applicantId, keyword, pendingMine)
-        .lt(OaApproval::getCreateTime, now.minusHours(48)))));
+    response.setTimeoutPendingCount(approvalMapper.selectList(buildQuery(orgId, "PENDING", normalizedType, normalizedApproverRole, applicantId, keyword, pendingMine)).stream()
+        .filter(item -> isApprovalTimeout(item, now))
+        .count());
     response.setLeavePendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", "LEAVE", normalizedApproverRole, applicantId, keyword, pendingMine))));
     response.setReimbursePendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", "REIMBURSE", normalizedApproverRole, applicantId, keyword, pendingMine))));
     response.setPurchasePendingCount(count(approvalMapper.selectCount(buildQuery(orgId, "PENDING", "PURCHASE", normalizedApproverRole, applicantId, keyword, pendingMine))));
@@ -573,7 +574,9 @@ public class OaApprovalController {
     validateWorkflowRequest(type, request, map);
     map.put("workflowType", type);
     map.put("workflowVersion", "2026-Q1");
-    map.put("submittedAt", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+    if (parseString(map.get("submittedAt")) == null) {
+      map.put("submittedAt", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+    }
     bindApplicantSupervisors(map, applicantId);
     List<String> path = approvalPath(type, request);
     map.put("approvalPath", path);
@@ -605,7 +608,7 @@ public class OaApprovalController {
       map.put("directLeaderId", applicant.getDirectLeaderId());
       StaffAccount direct = staffMapper.selectById(applicant.getDirectLeaderId());
       if (direct != null) {
-        map.put("directLeaderName", direct.getRealName());
+        map.put("directLeaderName", parseString(direct.getRealName()) != null ? parseString(direct.getRealName()) : parseString(direct.getUsername()));
       }
     } else {
       map.put("directLeaderId", null);
@@ -615,7 +618,7 @@ public class OaApprovalController {
       map.put("indirectLeaderId", applicant.getIndirectLeaderId());
       StaffAccount indirect = staffMapper.selectById(applicant.getIndirectLeaderId());
       if (indirect != null) {
-        map.put("indirectLeaderName", indirect.getRealName());
+        map.put("indirectLeaderName", parseString(indirect.getRealName()) != null ? parseString(indirect.getRealName()) : parseString(indirect.getUsername()));
       }
     } else {
       map.put("indirectLeaderId", null);
@@ -1329,6 +1332,11 @@ public class OaApprovalController {
     if (map == null || path == null || path.isEmpty()) {
       return;
     }
+    if (parseString(map.get("currentNodeName")) != null
+        && parseInteger(map.get("currentNodeIndex")) != null
+        && parseString(map.get("currentApproverRole")) != null) {
+      return;
+    }
     int initialNodeIndex = path.size() > 1 ? 1 : 0;
     syncCurrentNodeMeta(map, path, initialNodeIndex, orgId);
     map.put("workflowState", "IN_REVIEW");
@@ -1375,6 +1383,7 @@ public class OaApprovalController {
     map.put("currentApproverRole", role);
     map.put("currentApproverId", assignment.staffId());
     map.put("currentApproverName", assignment.staffName());
+    map.put("currentNodeEnteredAt", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
   }
 
   private void appendApprovalRoundHistory(
@@ -1428,6 +1437,7 @@ public class OaApprovalController {
     Map<String, Object> row = new LinkedHashMap<>();
     row.put("toRole", parseString(toRole));
     row.put("toName", parseString(toName));
+    row.put("toId", parseLong(map.get("currentApproverId")));
     row.put("message", parseString(message));
     row.put("at", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
     row.put("by", resolveCurrentStaffName());
@@ -1491,6 +1501,54 @@ public class OaApprovalController {
     if ("PURCHASING".equals(roleCode)) return "采购执行人";
     if ("ARCHIVE".equals(roleCode)) return "系统归档";
     return "审批负责人";
+  }
+
+  private boolean isApprovalTimeout(OaApproval approval, LocalDateTime now) {
+    if (approval == null || !"PENDING".equalsIgnoreCase(approval.getStatus())) {
+      return false;
+    }
+    LocalDateTime enteredAt = resolveApprovalActiveSince(approval);
+    if (enteredAt == null) {
+      return false;
+    }
+    return enteredAt.isBefore(now.minusHours(48));
+  }
+
+  private LocalDateTime resolveApprovalActiveSince(OaApproval approval) {
+    Map<String, Object> map = readFormMap(approval == null ? null : approval.getFormData());
+    LocalDateTime currentNodeEnteredAt = parseDateTime(map.get("currentNodeEnteredAt"));
+    if (currentNodeEnteredAt != null) {
+      return currentNodeEnteredAt;
+    }
+    Object rawNotifyHistory = map.get("notifyHistory");
+    if (rawNotifyHistory instanceof List<?> list && !list.isEmpty()) {
+      for (int i = list.size() - 1; i >= 0; i--) {
+        Object item = list.get(i);
+        if (item instanceof Map<?, ?> row) {
+          LocalDateTime at = parseDateTime(row.get("at"));
+          if (at != null) {
+            return at;
+          }
+        }
+      }
+    }
+    LocalDateTime submittedAt = parseDateTime(map.get("submittedAt"));
+    if (submittedAt != null) {
+      return submittedAt;
+    }
+    return approval == null ? null : approval.getCreateTime();
+  }
+
+  private LocalDateTime parseDateTime(Object value) {
+    String text = parseString(value);
+    if (text == null) {
+      return null;
+    }
+    try {
+      return LocalDateTime.parse(text.replace(' ', 'T'));
+    } catch (Exception ignore) {
+      return null;
+    }
   }
 
   private boolean canApproveByRole(String roleCode) {
