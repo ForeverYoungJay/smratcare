@@ -755,24 +755,27 @@
   <a-modal
     v-model:open="quickChatTodoEditorOpen"
     :title="quickChatTodoEditorMode === 'create' ? '新增任务' : '编辑任务'"
-    width="720"
+    width="760"
     :z-index="1760"
     @ok="submitQuickChatTodoEditor"
   >
     <a-form layout="vertical">
-      <a-form-item label="待办内容" required>
-        <a-textarea v-model:value="quickChatTodoForm.content" :rows="3" maxlength="180" show-count placeholder="请输入待办内容" />
+      <a-form-item label="任务标题" required>
+        <a-input v-model:value="quickChatTodoForm.title" placeholder="请输入任务标题" />
+      </a-form-item>
+      <a-form-item label="任务描述">
+        <a-textarea v-model:value="quickChatTodoForm.description" :rows="3" placeholder="可填写目标、交付标准、备注" />
       </a-form-item>
       <div class="quick-chat-todo-form-grid">
-        <a-form-item label="责任人">
+        <a-form-item label="负责人（可搜索）">
           <a-select
-            v-model:value="quickChatTodoForm.assigneeId"
+            v-model:value="quickChatTodoForm.assigneeName"
             show-search
             allow-clear
             :filter-option="false"
             :loading="staffLoading"
             :options="quickChatTodoAssigneeOptions"
-            placeholder="请选择责任人"
+            placeholder="输入姓名搜索"
             @focus="warmQuickChatTodoFormOptions"
             @search="searchStaff"
           />
@@ -781,26 +784,76 @@
           <a-select v-model:value="quickChatTodoForm.priority" :options="quickChatTodoPriorityOptions" />
         </a-form-item>
       </div>
-      <a-form-item label="截止时间">
-        <a-date-picker
-          v-model:value="quickChatTodoDuePickerValue"
-          show-time
-          allow-clear
-          style="width: 100%;"
-          format="YYYY-MM-DD HH:mm"
-          placeholder="请选择截止时间"
-        />
-      </a-form-item>
-      <a-form-item>
-        <a-space size="small" wrap>
-          <a-button size="small" @click="setQuickChatTodoDuePreset('TODAY_18')">今天18:00</a-button>
-          <a-button size="small" @click="setQuickChatTodoDuePreset('TOMORROW_18')">明天18:00</a-button>
-          <a-button size="small" @click="setQuickChatTodoDuePreset('THREE_DAYS_18')">3天后18:00</a-button>
-          <a-button size="small" @click="setQuickChatTodoDuePreset('CLEAR')">清空截止时间</a-button>
-        </a-space>
-      </a-form-item>
-      <a-form-item v-if="quickChatTodoForm.dueAt">
-        <span class="hint-text">当前截止：{{ formatQuickChatTodoDueAtText(quickChatTodoForm.dueAt) }}</span>
+
+      <div class="quick-chat-todo-form-grid">
+        <a-form-item label="日历类型">
+          <a-select v-model:value="quickChatTodoForm.calendarType" :options="quickChatTaskCalendarTypeOptions" />
+        </a-form-item>
+        <a-form-item label="紧急程度">
+          <a-select v-model:value="quickChatTodoForm.urgency" :options="quickChatTaskUrgencyOptions" />
+        </a-form-item>
+      </div>
+
+      <div class="quick-chat-todo-form-grid">
+        <a-form-item label="任务分类（可搜索）">
+          <a-select
+            v-model:value="quickChatTodoForm.planCategory"
+            show-search
+            allow-clear
+            :options="quickChatTaskPlanCategoryOptions"
+            :filter-option="quickChatFilterOptionByLabel"
+            placeholder="如：基础办公、行政巡检"
+          />
+        </a-form-item>
+        <a-form-item label="协同成员（可搜索/可多选）">
+          <a-select
+            v-model:value="quickChatTodoForm.collaboratorNames"
+            mode="multiple"
+            show-search
+            allow-clear
+            :filter-option="false"
+            :loading="staffLoading"
+            :options="quickChatTodoCollaboratorOptions"
+            placeholder="输入姓名搜索"
+            @focus="warmQuickChatTodoFormOptions"
+            @search="searchStaff"
+          />
+        </a-form-item>
+      </div>
+
+      <div class="quick-chat-todo-form-grid">
+        <a-form-item label="开始时间">
+          <a-date-picker v-model:value="quickChatTodoForm.startTime" show-time style="width: 100%" />
+        </a-form-item>
+        <a-form-item label="结束时间">
+          <a-date-picker v-model:value="quickChatTodoForm.endTime" show-time style="width: 100%" />
+        </a-form-item>
+      </div>
+
+      <div class="quick-chat-todo-form-grid quick-chat-todo-form-grid--triple">
+        <a-form-item label="周期任务">
+          <a-switch v-model:checked="quickChatTodoForm.recurring" checked-children="开启" un-checked-children="关闭" />
+        </a-form-item>
+        <a-form-item label="周期规则">
+          <a-select
+            v-model:value="quickChatTodoForm.recurrenceRule"
+            :disabled="!quickChatTodoForm.recurring"
+            :options="quickChatTaskRecurrenceRuleOptions"
+          />
+        </a-form-item>
+        <a-form-item label="周期间隔">
+          <a-input-number
+            v-model:value="quickChatTodoForm.recurrenceInterval"
+            :disabled="!quickChatTodoForm.recurring"
+            :min="1"
+            :max="90"
+            style="width: 100%"
+          />
+        </a-form-item>
+      </div>
+
+      <a-form-item label="状态">
+        <a-select v-model:value="quickChatTodoForm.status" :options="quickChatTaskStatusOptions" disabled />
       </a-form-item>
     </a-form>
   </a-modal>
@@ -1012,6 +1065,7 @@ type QuickChatTodoItem = {
   roomName: string
   messageId: string
   content: string
+  description?: string
   creatorId?: string
   creatorName?: string
   assigneeId?: string
@@ -1019,6 +1073,15 @@ type QuickChatTodoItem = {
   priority: 'HIGH' | 'MEDIUM' | 'LOW'
   dueAt?: string
   dueAtText?: string
+  startTime?: string
+  endTime?: string
+  calendarType?: 'PERSONAL' | 'WORK' | 'DAILY' | 'COLLAB'
+  planCategory?: string
+  urgency?: 'NORMAL' | 'EMERGENCY'
+  collaboratorNames?: string[]
+  recurring?: boolean
+  recurrenceRule?: 'DAILY' | 'WEEKLY' | 'MONTHLY'
+  recurrenceInterval?: number
   escalationLevel?: 0 | 1 | 2
   lastEscalatedAt?: string
   calendarSynced?: boolean
@@ -1061,10 +1124,20 @@ const quickChatTodoForm = reactive({
   roomId: '',
   roomName: '',
   messageId: '',
-  content: '',
-  assigneeId: undefined as string | undefined,
-  priority: 'MEDIUM' as QuickChatTodoItem['priority'],
-  dueAt: undefined as string | undefined
+  title: '',
+  description: '',
+  assigneeName: '',
+  priority: 'NORMAL' as 'LOW' | 'NORMAL' | 'HIGH',
+  status: 'OPEN' as 'OPEN' | 'DONE',
+  calendarType: 'WORK' as 'PERSONAL' | 'WORK' | 'DAILY' | 'COLLAB',
+  planCategory: undefined as string | undefined,
+  urgency: 'NORMAL' as 'NORMAL' | 'EMERGENCY',
+  collaboratorNames: [] as string[],
+  startTime: undefined as any,
+  endTime: undefined as any,
+  recurring: false,
+  recurrenceRule: 'WEEKLY' as 'DAILY' | 'WEEKLY' | 'MONTHLY',
+  recurrenceInterval: 1
 })
 const quickChatDnd = ref(false)
 const quickChatTrainingUntil = ref('')
@@ -1108,10 +1181,36 @@ const quickChatNotifyModeOptions = [
   { label: '仅@我提醒', value: 'MENTION' },
   { label: '会话免打扰', value: 'MUTE' }
 ]
+const quickChatTaskStatusOptions = [
+  { label: '进行中', value: 'OPEN' },
+  { label: '已完成', value: 'DONE' }
+]
 const quickChatTodoPriorityOptions = [
-  { label: '高', value: 'HIGH' },
-  { label: '中', value: 'MEDIUM' },
-  { label: '低', value: 'LOW' }
+  { label: '低', value: 'LOW' },
+  { label: '普通', value: 'NORMAL' },
+  { label: '高', value: 'HIGH' }
+]
+const quickChatTaskCalendarTypeOptions = [
+  { label: '个人日历', value: 'PERSONAL' },
+  { label: '工作日历', value: 'WORK' },
+  { label: '日常计划', value: 'DAILY' },
+  { label: '协同日历', value: 'COLLAB' }
+]
+const quickChatTaskUrgencyOptions = [
+  { label: '常规', value: 'NORMAL' },
+  { label: '紧急', value: 'EMERGENCY' }
+]
+const quickChatTaskRecurrenceRuleOptions = [
+  { label: '每天', value: 'DAILY' },
+  { label: '每周', value: 'WEEKLY' },
+  { label: '每月', value: 'MONTHLY' }
+]
+const quickChatTaskPlanCategoryOptions = [
+  { label: '基础办公', value: '基础办公' },
+  { label: '行政日常', value: '行政日常' },
+  { label: '会议安排', value: '会议安排' },
+  { label: '跨部门协同', value: '跨部门协同' },
+  { label: '院长督办', value: '院长督办' }
 ]
 const quickChatTodoViewModeOptions = [
   { label: '待完成', value: 'pending' },
@@ -1315,24 +1414,36 @@ const quickChatTodoAssigneeOptions = computed(() => {
   const room = quickChatRooms.value.find((item) => item.id === roomId)
   const optionMap = new Map<string, { label: string; value: string }>()
   ;(staffOptions.value || []).forEach((item) => {
-    const value = String(item.value || '').trim()
-    if (!value) return
-    optionMap.set(value, { label: item.label || item.name || item.username || '未识别员工', value })
+    const name = String(item.name || item.label || item.username || '').trim()
+    if (!name) return
+    optionMap.set(name, { label: name, value: name })
   })
   ;(room?.memberIds || []).forEach((memberId) => {
     const normalized = normalizeQuickChatMemberId(memberId)
     if (!normalized) return
-    if (!optionMap.has(normalized)) {
-      optionMap.set(normalized, { label: memberNameById(normalized), value: normalized })
+    const name = memberNameById(normalized)
+    if (name && !optionMap.has(name)) {
+      optionMap.set(name, { label: name, value: name })
+    }
+  })
+  const current = String(quickChatTodoForm.assigneeName || '').trim()
+  if (current && !optionMap.has(current)) {
+    optionMap.set(current, { label: current, value: current })
+  }
+  return Array.from(optionMap.values())
+})
+const quickChatTodoCollaboratorOptions = computed(() => {
+  const optionMap = new Map<string, { label: string; value: string }>()
+  quickChatTodoAssigneeOptions.value.forEach((item) => {
+    optionMap.set(String(item.value), item)
+  })
+  ;(quickChatTodoForm.collaboratorNames || []).forEach((item) => {
+    const name = String(item || '').trim()
+    if (name && !optionMap.has(name)) {
+      optionMap.set(name, { label: name, value: name })
     }
   })
   return Array.from(optionMap.values())
-})
-const quickChatTodoDuePickerValue = computed({
-  get: () => (quickChatTodoForm.dueAt ? dayjs(quickChatTodoForm.dueAt) : undefined),
-  set: (value) => {
-    quickChatTodoForm.dueAt = value ? dayjs(value).toISOString() : undefined
-  }
 })
 let quickChatTodoEscalationTimer: number | undefined
 const filteredQuickChatRooms = computed(() => {
@@ -2543,6 +2654,7 @@ function buildQuickChatTodoPayload(item: QuickChatTodoItem) {
     roomName: item.roomName,
     messageId: item.messageId || '',
     content: item.content || '',
+    description: item.description || '',
     creatorId: item.creatorId || '',
     creatorName: item.creatorName || '',
     assigneeId: item.assigneeId || '',
@@ -2550,6 +2662,15 @@ function buildQuickChatTodoPayload(item: QuickChatTodoItem) {
     priority: item.priority || 'MEDIUM',
     dueAt: item.dueAt || '',
     dueAtText: item.dueAtText || '',
+    startTime: item.startTime || '',
+    endTime: item.endTime || '',
+    calendarType: item.calendarType || 'WORK',
+    planCategory: item.planCategory || '',
+    urgency: item.urgency || 'NORMAL',
+    collaboratorNames: Array.isArray(item.collaboratorNames) ? item.collaboratorNames : [],
+    recurring: item.recurring === true,
+    recurrenceRule: item.recurrenceRule || '',
+    recurrenceInterval: Number(item.recurrenceInterval || 1),
     escalationLevel: Number(item.escalationLevel || 0),
     lastEscalatedAt: item.lastEscalatedAt || '',
     calendarSynced: item.calendarSynced === true,
@@ -2575,6 +2696,7 @@ function normalizeQuickChatTodos(parsed: any[]) {
         roomName: String(item?.roomName || ''),
         messageId: String(item?.messageId || ''),
         content: String(item?.content || ''),
+        description: item?.description ? String(item.description) : undefined,
         creatorId: item?.creatorId ? normalizeQuickChatMemberId(item.creatorId) : undefined,
         creatorName: item?.creatorName ? String(item.creatorName) : undefined,
         assigneeId: item?.assigneeId ? normalizeQuickChatMemberId(item.assigneeId) : undefined,
@@ -2584,6 +2706,23 @@ function normalizeQuickChatTodos(parsed: any[]) {
           : 'MEDIUM') as QuickChatTodoItem['priority'],
         dueAt: item?.dueAt ? String(item.dueAt) : undefined,
         dueAtText: item?.dueAtText ? String(item.dueAtText) : undefined,
+        startTime: item?.startTime ? String(item.startTime) : undefined,
+        endTime: item?.endTime ? String(item.endTime) : undefined,
+        calendarType: (['PERSONAL', 'WORK', 'DAILY', 'COLLAB'].includes(String(item?.calendarType || 'WORK'))
+          ? String(item.calendarType)
+          : 'WORK') as QuickChatTodoItem['calendarType'],
+        planCategory: item?.planCategory ? String(item.planCategory) : undefined,
+        urgency: (['NORMAL', 'EMERGENCY'].includes(String(item?.urgency || 'NORMAL'))
+          ? String(item.urgency)
+          : 'NORMAL') as QuickChatTodoItem['urgency'],
+        collaboratorNames: Array.isArray(item?.collaboratorNames)
+          ? item.collaboratorNames.map((name: any) => String(name || '').trim()).filter(Boolean)
+          : [],
+        recurring: item?.recurring === true,
+        recurrenceRule: (['DAILY', 'WEEKLY', 'MONTHLY'].includes(String(item?.recurrenceRule || ''))
+          ? String(item.recurrenceRule)
+          : undefined) as QuickChatTodoItem['recurrenceRule'],
+        recurrenceInterval: Number(item?.recurrenceInterval || 1),
         escalationLevel: [0, 1, 2].includes(Number(item?.escalationLevel)) ? Number(item.escalationLevel) as 0 | 1 | 2 : 0,
         lastEscalatedAt: item?.lastEscalatedAt ? String(item.lastEscalatedAt) : undefined,
         calendarSynced: item?.calendarSynced === true,
@@ -4212,6 +4351,8 @@ function quickChatTodoDescription(item: QuickChatTodoItem) {
   const parts = [item.roomName, item.createdAtText]
   if (item.creatorName) parts.push(`创建人 ${item.creatorName}`)
   if (item.assigneeName) parts.push(`责任人 ${item.assigneeName}`)
+  if (item.planCategory) parts.push(item.planCategory)
+  if (item.collaboratorNames?.length) parts.push(`协同 ${item.collaboratorNames.join('、')}`)
   if (item.dueAtText) parts.push(`截止 ${item.dueAtText}`)
   const overdueHours = quickChatTodoOverdueHours(item)
   if (overdueHours > 0) parts.push(`逾期 ${Math.floor(overdueHours)}h`)
@@ -4219,26 +4360,57 @@ function quickChatTodoDescription(item: QuickChatTodoItem) {
   return parts.filter(Boolean).join(' · ')
 }
 
+function quickChatFilterOptionByLabel(input: string, option: any) {
+  const label = String(option?.label || '')
+  return label.toLowerCase().includes(String(input || '').toLowerCase())
+}
+
+function quickChatTaskPriorityToTodo(priority: 'LOW' | 'NORMAL' | 'HIGH') {
+  if (priority === 'LOW') return 'LOW'
+  if (priority === 'HIGH') return 'HIGH'
+  return 'MEDIUM'
+}
+
+function quickChatTodoPriorityToTask(priority?: QuickChatTodoItem['priority']) {
+  if (priority === 'LOW') return 'LOW'
+  if (priority === 'HIGH') return 'HIGH'
+  return 'NORMAL'
+}
+
+function quickChatResolveStaffIdByName(name?: string) {
+  const text = String(name || '').trim()
+  if (!text) return undefined
+  const matched = staffOptions.value.find((item) => {
+    const itemName = String(item.name || item.label || item.username || '').trim()
+    const itemLabel = String(item.label || '').trim()
+    return itemName === text || itemLabel === text
+  })
+  return matched?.value ? String(matched.value) : undefined
+}
+
 function resetQuickChatTodoEditorForm() {
   const room = activeQuickChatRoom.value
   quickChatTodoForm.roomId = room?.id || ''
   quickChatTodoForm.roomName = room?.name || ''
   quickChatTodoForm.messageId = ''
-  quickChatTodoForm.content = ''
-  quickChatTodoForm.assigneeId = currentQuickChatSenderId.value
-  quickChatTodoForm.priority = 'MEDIUM'
-  quickChatTodoForm.dueAt = resolveQuickChatTodoPresetDueAt('TOMORROW_18')
+  quickChatTodoForm.title = ''
+  quickChatTodoForm.description = ''
+  quickChatTodoForm.assigneeName = currentQuickChatSenderName.value
+  quickChatTodoForm.priority = 'NORMAL'
+  quickChatTodoForm.status = 'OPEN'
+  quickChatTodoForm.calendarType = 'WORK'
+  quickChatTodoForm.planCategory = undefined
+  quickChatTodoForm.urgency = 'NORMAL'
+  quickChatTodoForm.collaboratorNames = []
+  quickChatTodoForm.startTime = undefined
+  quickChatTodoForm.endTime = dayjs(resolveQuickChatTodoPresetDueAt('TOMORROW_18'))
+  quickChatTodoForm.recurring = false
+  quickChatTodoForm.recurrenceRule = 'WEEKLY'
+  quickChatTodoForm.recurrenceInterval = 1
 }
 
 function warmQuickChatTodoFormOptions() {
   searchStaff('').catch(() => {})
-  quickChatTodoAssigneeOptions.value.forEach((item) => {
-    ensureSelectedStaff(item.value, item.label)
-  })
-}
-
-function setQuickChatTodoDuePreset(rule: 'TODAY_18' | 'TOMORROW_18' | 'THREE_DAYS_18' | 'CLEAR') {
-  quickChatTodoForm.dueAt = resolveQuickChatTodoPresetDueAt(rule)
 }
 
 function openQuickChatTodoEditorManual() {
@@ -4270,7 +4442,7 @@ function addMessageToQuickChatTodo(messageRow: QuickChatMessage) {
     : messageRow.kind === 'FILE'
       ? `[文件] ${messageRow.fileName || ''}`.trim()
       : (messageRow.content || '').trim()
-  quickChatTodoForm.content = `${messageRow.senderName}：${content || '（空消息）'}`
+  quickChatTodoForm.title = `${messageRow.senderName}：${content || '（空消息）'}`
   warmQuickChatTodoFormOptions()
   quickChatTodoEditorMode.value = 'create'
   quickChatTodoEditingId.value = ''
@@ -4285,37 +4457,59 @@ function openQuickChatTodoEditor(todoId: string) {
   quickChatTodoForm.roomId = row.roomId
   quickChatTodoForm.roomName = row.roomName
   quickChatTodoForm.messageId = row.messageId
-  quickChatTodoForm.content = row.content
-  quickChatTodoForm.assigneeId = row.assigneeId || currentQuickChatSenderId.value
-  quickChatTodoForm.priority = row.priority || 'MEDIUM'
-  quickChatTodoForm.dueAt = row.dueAt
+  quickChatTodoForm.title = row.content
+  quickChatTodoForm.description = row.description || ''
+  quickChatTodoForm.assigneeName = row.assigneeName || currentQuickChatSenderName.value
+  quickChatTodoForm.priority = quickChatTodoPriorityToTask(row.priority)
+  quickChatTodoForm.status = row.done ? 'DONE' : 'OPEN'
+  quickChatTodoForm.calendarType = row.calendarType || 'WORK'
+  quickChatTodoForm.planCategory = row.planCategory || undefined
+  quickChatTodoForm.urgency = row.urgency || 'NORMAL'
+  quickChatTodoForm.collaboratorNames = Array.isArray(row.collaboratorNames) ? [...row.collaboratorNames] : []
+  quickChatTodoForm.startTime = row.startTime ? dayjs(row.startTime) : undefined
+  quickChatTodoForm.endTime = row.endTime ? dayjs(row.endTime) : (row.dueAt ? dayjs(row.dueAt) : undefined)
+  quickChatTodoForm.recurring = row.recurring === true
+  quickChatTodoForm.recurrenceRule = row.recurrenceRule || 'WEEKLY'
+  quickChatTodoForm.recurrenceInterval = Number(row.recurrenceInterval || 1)
   warmQuickChatTodoFormOptions()
   quickChatTodoEditorOpen.value = true
 }
 
 function submitQuickChatTodoEditor() {
-  const content = String(quickChatTodoForm.content || '').trim()
-  if (!content) {
-    message.warning('请填写待办内容')
+  const title = String(quickChatTodoForm.title || '').trim()
+  if (!title) {
+    message.warning('请填写任务标题')
     return
   }
   const roomId = quickChatTodoForm.roomId || activeQuickChatRoom.value?.id || ''
   const roomName = quickChatTodoForm.roomName || activeQuickChatRoom.value?.name || '未知会话'
-  const dueAt = quickChatTodoForm.dueAt
+  const endTime = quickChatTodoForm.endTime ? dayjs(quickChatTodoForm.endTime).toISOString() : undefined
+  const startTime = quickChatTodoForm.startTime ? dayjs(quickChatTodoForm.startTime).toISOString() : undefined
+  const dueAt = endTime || startTime
   const dueAtText = formatQuickChatTodoDueAtText(dueAt)
-  const assigneeId = quickChatTodoForm.assigneeId || currentQuickChatSenderId.value
-  const assigneeName = memberNameById(assigneeId)
+  const assigneeName = String(quickChatTodoForm.assigneeName || currentQuickChatSenderName.value).trim()
+  const assigneeId = quickChatResolveStaffIdByName(assigneeName) || currentQuickChatSenderId.value
   if (quickChatTodoEditorMode.value === 'edit') {
     const row = quickChatTodoItems.value.find((item) => item.id === quickChatTodoEditingId.value)
     if (!row) return
-    row.content = content
+    row.content = title
+    row.description = String(quickChatTodoForm.description || '').trim() || undefined
     row.roomId = roomId
     row.roomName = roomName
     row.assigneeId = assigneeId
     row.assigneeName = assigneeName
-    row.priority = quickChatTodoForm.priority
+    row.priority = quickChatTaskPriorityToTodo(quickChatTodoForm.priority)
     row.dueAt = dueAt
     row.dueAtText = dueAtText
+    row.startTime = startTime
+    row.endTime = endTime
+    row.calendarType = quickChatTodoForm.calendarType
+    row.planCategory = quickChatTodoForm.planCategory
+    row.urgency = quickChatTodoForm.urgency
+    row.collaboratorNames = [...quickChatTodoForm.collaboratorNames]
+    row.recurring = quickChatTodoForm.recurring === true
+    row.recurrenceRule = quickChatTodoForm.recurring ? quickChatTodoForm.recurrenceRule : undefined
+    row.recurrenceInterval = quickChatTodoForm.recurring ? Number(quickChatTodoForm.recurrenceInterval || 1) : undefined
     row.calendarSynced = false
     row.calendarTaskId = undefined
     if (!row.creatorId) row.creatorId = currentQuickChatSenderId.value
@@ -4333,14 +4527,24 @@ function submitQuickChatTodoEditor() {
     roomId,
     roomName,
     messageId: quickChatTodoForm.messageId,
-    content,
+    content: title,
+    description: String(quickChatTodoForm.description || '').trim() || undefined,
     creatorId: currentQuickChatSenderId.value,
     creatorName: currentQuickChatSenderName.value,
     assigneeId,
     assigneeName,
-    priority: quickChatTodoForm.priority,
+    priority: quickChatTaskPriorityToTodo(quickChatTodoForm.priority),
     dueAt,
     dueAtText,
+    startTime,
+    endTime,
+    calendarType: quickChatTodoForm.calendarType,
+    planCategory: quickChatTodoForm.planCategory,
+    urgency: quickChatTodoForm.urgency,
+    collaboratorNames: [...quickChatTodoForm.collaboratorNames],
+    recurring: quickChatTodoForm.recurring === true,
+    recurrenceRule: quickChatTodoForm.recurring ? quickChatTodoForm.recurrenceRule : undefined,
+    recurrenceInterval: quickChatTodoForm.recurring ? Number(quickChatTodoForm.recurrenceInterval || 1) : undefined,
     escalationLevel: 0,
     calendarSynced: false,
     calendarTaskId: undefined,
@@ -5695,33 +5899,33 @@ function onQuickChatStorageChange(event: StorageEvent) {
 .quick-chat-shell {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   min-height: 0;
   height: 100%;
 }
 
 .quick-chat-layout {
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 14px;
   min-height: 0;
   flex: 1;
-  max-height: calc(100vh - 186px);
+  max-height: calc(100vh - 132px);
 }
 
 .quick-chat-top-actions {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .quick-chat-overview {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 14px 18px;
+  gap: 14px;
+  padding: 12px 16px;
   border: 1px solid rgba(191, 219, 254, 0.66);
-  border-radius: 18px;
+  border-radius: 16px;
   background:
     radial-gradient(circle at top right, rgba(96, 165, 250, 0.18), transparent 30%),
     linear-gradient(180deg, rgba(248, 251, 255, 0.98) 0%, rgba(238, 246, 255, 0.94) 100%);
@@ -5737,29 +5941,31 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 .quick-chat-overview-copy {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .quick-chat-overview-copy strong {
-  font-size: 22px;
+  font-size: 18px;
   color: #0f172a;
+  line-height: 1.2;
 }
 
 .quick-chat-overview-copy span {
   color: #51667d;
-  font-size: 12px;
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .quick-chat-overview-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  min-width: 330px;
+  gap: 6px;
+  min-width: 276px;
 }
 
 .quick-chat-overview-pill {
-  padding: 8px 12px;
-  border-radius: 14px;
+  padding: 7px 10px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.82);
   border: 1px solid rgba(226, 232, 240, 0.9);
 }
@@ -5772,29 +5978,58 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 .quick-chat-overview-pill strong {
   display: block;
-  margin-top: 4px;
+  margin-top: 2px;
   color: #0f172a;
-  font-size: 20px;
+  font-size: 17px;
+  line-height: 1.15;
 }
 
 .quick-chat-commandbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 2px 2px 0;
+  gap: 6px;
+  padding: 0 2px;
+  align-items: center;
+}
+
+.quick-chat-commandbar :deep(.ant-btn),
+.quick-chat-commandbar :deep(.ant-select-selector),
+.quick-chat-header-actions :deep(.ant-btn),
+.quick-chat-header-actions :deep(.ant-input-affix-wrapper) {
+  border-radius: 999px;
+}
+
+.quick-chat-commandbar :deep(.ant-btn) {
+  height: 36px;
+  padding-inline: 14px;
+  font-size: 13px;
+}
+
+.quick-chat-commandbar :deep(.ant-select) {
+  min-width: 128px;
+}
+
+.quick-chat-commandbar :deep(.ant-select-selector) {
+  height: 36px !important;
+  padding-inline: 12px !important;
+}
+
+.quick-chat-commandbar :deep(.ant-select-selection-item) {
+  line-height: 34px !important;
 }
 
 .quick-chat-drawer :deep(.ant-drawer-body) {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  padding: 14px;
   background:
     linear-gradient(180deg, rgba(249, 251, 255, 0.98) 0%, rgba(243, 247, 252, 0.98) 100%);
 }
 
 .quick-chat-room-list {
   border: 1px solid rgba(226, 232, 240, 0.9);
-  border-radius: 24px;
+  border-radius: 22px;
   background: rgba(255, 255, 255, 0.92);
   overflow: auto;
   max-height: 100%;
@@ -5802,7 +6037,7 @@ function onQuickChatStorageChange(event: StorageEvent) {
 }
 
 .quick-chat-room-search {
-  padding: 14px 14px 8px;
+  padding: 12px 12px 8px;
   border-bottom: 1px solid rgba(226, 232, 240, 0.92);
   position: sticky;
   top: 0;
@@ -5854,8 +6089,8 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 .quick-chat-room-card {
   width: 100%;
-  padding: 14px 14px 12px;
-  border-radius: 18px;
+  padding: 12px 12px 10px;
+  border-radius: 16px;
   border: 1px solid transparent;
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.86) 0%, rgba(255, 255, 255, 0.98) 100%);
 }
@@ -5882,10 +6117,10 @@ function onQuickChatStorageChange(event: StorageEvent) {
 }
 
 .quick-chat-room-card p {
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   color: #5a6f86;
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: 12px;
+  line-height: 1.55;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -5984,6 +6219,10 @@ function onQuickChatStorageChange(event: StorageEvent) {
   gap: 14px;
 }
 
+.quick-chat-todo-form-grid--triple {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .quick-chat-room-item.active {
   background: rgba(37, 99, 235, 0.08);
 }
@@ -6001,7 +6240,7 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 .quick-chat-main {
   border: 1px solid rgba(214, 226, 240, 0.92);
-  border-radius: 28px;
+  border-radius: 24px;
   background:
     radial-gradient(circle at top, rgba(219, 234, 254, 0.22), transparent 34%),
     rgba(255, 255, 255, 0.98);
@@ -6044,8 +6283,8 @@ function onQuickChatStorageChange(event: StorageEvent) {
   align-items: flex-start;
   justify-content: space-between;
   flex-wrap: wrap;
-  gap: 16px;
-  padding: 18px 22px 16px;
+  gap: 12px;
+  padding: 16px 18px 14px;
   border-bottom: 1px solid rgba(226, 232, 240, 0.88);
   background: linear-gradient(180deg, rgba(248, 251, 255, 0.98) 0%, rgba(255, 255, 255, 0.98) 100%);
 }
@@ -6057,28 +6296,29 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 .quick-chat-header-main strong {
   color: #0f172a;
-  font-size: 28px;
-  line-height: 1.15;
+  font-size: 20px;
+  line-height: 1.2;
 }
 
 .quick-chat-header-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  font-size: 13px;
+  gap: 6px;
+  font-size: 12px;
 }
 
 .quick-chat-header-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   justify-content: flex-end;
   align-items: center;
 }
 
 .quick-chat-messages {
   flex: 1;
-  padding: 24px 26px 20px;
+  min-height: 320px;
+  padding: 18px 18px 14px;
   overflow-y: auto;
   background:
     radial-gradient(circle at top, rgba(191, 219, 254, 0.3), transparent 34%),
@@ -6086,12 +6326,12 @@ function onQuickChatStorageChange(event: StorageEvent) {
 }
 
 .quick-chat-message {
-  margin-bottom: 16px;
-  max-width: min(860px, 86%);
+  margin-bottom: 12px;
+  max-width: min(820px, 92%);
   background: rgba(255, 255, 255, 0.98);
   border: 1px solid rgba(219, 229, 240, 0.96);
-  border-radius: 22px;
-  padding: 14px 16px 12px;
+  border-radius: 18px;
+  padding: 12px 14px 10px;
   box-shadow: 0 14px 28px rgba(15, 23, 42, 0.06);
 }
 
@@ -6111,16 +6351,18 @@ function onQuickChatStorageChange(event: StorageEvent) {
   align-items: flex-start;
   justify-content: space-between;
   color: var(--muted);
-  font-size: 13px;
-  margin-bottom: 8px;
-  gap: 14px;
+  font-size: 12px;
+  margin-bottom: 6px;
+  gap: 10px;
 }
 
 .quick-chat-message-body {
   color: var(--ink);
-  font-size: 17px;
-  line-height: 1.75;
+  font-size: 15px;
+  line-height: 1.7;
+  white-space: pre-wrap;
   word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .quick-chat-read-status {
@@ -6185,24 +6427,25 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
 .quick-chat-input {
   border-top: 1px solid rgba(226, 232, 240, 0.88);
-  padding: 18px 22px 20px;
+  padding: 14px 18px 16px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(247, 250, 255, 0.96) 100%);
 }
 
 .quick-chat-input :deep(.ant-input) {
-  min-height: 120px;
-  border-radius: 20px;
-  padding: 18px 20px;
-  font-size: 18px;
-  line-height: 1.7;
+  min-height: 88px;
+  max-height: 180px;
+  border-radius: 18px;
+  padding: 14px 16px;
+  font-size: 15px;
+  line-height: 1.65;
 }
 
 .quick-chat-input-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  margin-top: 14px;
+  gap: 8px;
+  margin-top: 10px;
 }
 
 .hint-text {
@@ -6243,7 +6486,7 @@ function onQuickChatStorageChange(event: StorageEvent) {
 
   .quick-chat-layout {
     grid-template-columns: 1fr;
-    max-height: calc(100vh - 198px);
+    max-height: calc(100vh - 144px);
   }
 
   .quick-chat-room-list {
@@ -6280,20 +6523,21 @@ function onQuickChatStorageChange(event: StorageEvent) {
   }
 
   .quick-chat-header {
-    padding: 16px;
+    padding: 14px;
   }
 
   .quick-chat-header-main strong {
-    font-size: 22px;
+    font-size: 18px;
   }
 
   .quick-chat-messages {
-    padding: 16px;
+    min-height: 260px;
+    padding: 14px;
   }
 
   .quick-chat-message {
     max-width: 100%;
-    padding: 12px 14px;
+    padding: 11px 12px;
   }
 
   .quick-chat-message-meta {
@@ -6302,17 +6546,17 @@ function onQuickChatStorageChange(event: StorageEvent) {
   }
 
   .quick-chat-message-body {
-    font-size: 15px;
+    font-size: 14px;
   }
 
   .quick-chat-input {
-    padding: 14px 16px 16px;
+    padding: 12px 14px 14px;
   }
 
   .quick-chat-input :deep(.ant-input) {
-    min-height: 100px;
-    font-size: 16px;
-    padding: 14px 16px;
+    min-height: 84px;
+    font-size: 14px;
+    padding: 12px 14px;
   }
 }
 </style>
