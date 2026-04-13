@@ -66,10 +66,10 @@
     </a-alert>
 
     <a-alert
-      :type="canAssignOthers ? 'info' : 'warning'"
+      type="info"
       show-icon
       style="margin-bottom: 12px"
-      :message="canAssignOthers ? '当前账号可查看全院待办并可指定负责人。' : `当前账号仅可查看“我创建”或“我负责”的待办（${currentUserName || '当前用户'}）。`"
+      :message="canAssignOthers ? '当前页面仅显示与我相关的待办；管理角色新增时仍可指定负责人。' : `当前页面仅显示“我创建”或“我负责”的待办（${currentUserName || '当前用户'}）。`"
     />
 
     <a-card class="card-elevated" :bordered="false" style="margin-bottom: 12px">
@@ -495,7 +495,8 @@ async function fetchData() {
       pageSize: query.pageSize,
       status: query.status,
       sourceType: query.sourceType,
-      keyword: query.keyword || undefined
+      keyword: query.keyword || undefined,
+      mineOnly: true
     }
     const [res, sum] = await Promise.all([
       getTodoPage(params),
@@ -1017,7 +1018,8 @@ async function downloadExport() {
   const blob = await exportTodo({
     keyword: query.keyword || undefined,
     status: query.status,
-    sourceType: query.sourceType
+    sourceType: query.sourceType,
+    mineOnly: true
   })
   const href = URL.createObjectURL(blob)
   const link = document.createElement('a')
@@ -1070,7 +1072,7 @@ function cycleMarker(cycle: string, date: Date) {
 }
 
 async function clearDoneTodos() {
-  const donePage: PageResult<OaTodo> = await getTodoPage({ pageNo: 1, pageSize: 1000, status: 'DONE' })
+  const donePage: PageResult<OaTodo> = await getTodoPage({ pageNo: 1, pageSize: 1000, status: 'DONE', mineOnly: true })
   const ids = (donePage.list || []).map((item) => item.id).filter(Boolean)
   if (!ids.length) {
     message.info('暂无可清理的已完成待办')

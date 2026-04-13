@@ -15,6 +15,8 @@ public interface AttendanceService {
 
   AttendanceDashboardOverviewResponse overview(Long orgId, Long currentStaffId, Long queryStaffId, YearMonth month);
 
+  AttendanceResponse punch(Long orgId, Long currentStaffId, String action);
+
   AttendanceSeasonRuleResponse getSeasonRule(Long orgId);
 
   AttendanceSeasonRuleResponse saveSeasonRule(Long orgId, Long currentStaffId, AttendanceSeasonRuleRequest request);

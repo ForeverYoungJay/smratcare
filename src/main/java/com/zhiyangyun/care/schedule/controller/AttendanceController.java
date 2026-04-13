@@ -55,6 +55,11 @@ public class AttendanceController {
     return Result.ok(attendanceService.overview(AuthContext.getOrgId(), AuthContext.getStaffId(), staffId, targetMonth));
   }
 
+  @PostMapping("/punch")
+  public Result<AttendanceResponse> punch(@RequestParam String action) {
+    return Result.ok(attendanceService.punch(AuthContext.getOrgId(), AuthContext.getStaffId(), action));
+  }
+
   @GetMapping("/season-rule")
   public Result<AttendanceSeasonRuleResponse> seasonRule() {
     return Result.ok(attendanceService.getSeasonRule(AuthContext.getOrgId()));

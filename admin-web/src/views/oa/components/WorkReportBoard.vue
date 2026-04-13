@@ -207,6 +207,7 @@ async function fetchData() {
       pageSize: query.pageSize,
       keyword: query.keyword || undefined,
       status: query.status,
+      mineOnly: true,
       startDate: dateRange.value?.[0] ? dayjs(dateRange.value[0]).format('YYYY-MM-DD') : undefined,
       endDate: dateRange.value?.[1] ? dayjs(dateRange.value[1]).format('YYYY-MM-DD') : undefined
     }
@@ -230,6 +231,7 @@ async function fetchData() {
       reportType: props.reportType,
       status: query.status,
       keyword: query.keyword || undefined,
+      mineOnly: true,
       startDate: params.startDate,
       endDate: params.endDate
     })

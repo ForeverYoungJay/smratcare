@@ -80,6 +80,10 @@ export function getAttendanceOverview(params: { staffId?: Id; month?: string }) 
   return request.get<AttendanceDashboardOverview>('/api/attendance/overview', { params })
 }
 
+export function punchAttendance(action: 'IN' | 'OUT' | 'START_LUNCH' | 'END_LUNCH' | 'START_OUTING' | 'END_OUTING') {
+  return request.post<AttendanceItem>('/api/attendance/punch', null, { params: { action } })
+}
+
 export function getAttendanceSeasonRule() {
   return request.get<AttendanceSeasonRule>('/api/attendance/season-rule')
 }

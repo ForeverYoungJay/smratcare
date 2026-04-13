@@ -33,10 +33,12 @@ import org.springframework.util.StringUtils;
 import java.text.Normalizer;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/admin/roles")
 public class AdminRoleController {
+  private static final String RESERVED_SYS_ADMIN_CODE = "SYS_ADMIN";
   private final RoleMapper roleMapper;
   private final DepartmentMapper departmentMapper;
   private final StaffRoleMapper staffRoleMapper;
@@ -71,6 +73,7 @@ public class AdminRoleController {
     role.setSuperiorRoleId(superiorRole == null ? null : superiorRole.getId());
     role.setRoleName(request.getRoleName());
     role.setRoleCode(resolveRoleCode(request.getRoleCode(), request.getRoleName(), request.getDepartmentId()));
+    rejectReservedSysAdminRole(role.getRoleCode(), "系统超管仅限系统保留，不支持新增或配置");
     role.setRoleDesc(null);
     role.setRoutePermissionsJson(normalizeRoutePermissionsJson(request.getRoutePermissionsJson()));
     role.setStatus(request.getStatus());
@@ -86,6 +89,7 @@ public class AdminRoleController {
       return Result.error(400, "Role name is required");
     }
     Role role = requireRole(id);
+    rejectReservedSysAdminRole(role.getRoleCode(), "系统超管为系统保留角色，不支持修改");
     String previousRoleName = role.getRoleName();
     Department department = requireDepartmentInOrg(request.getDepartmentId(), role.getOrgId(), "所属部门");
     Role superiorRole = requireRoleInOrg(request.getSuperiorRoleId(), role.getOrgId(), id, "上级角色");
@@ -105,6 +109,7 @@ public class AdminRoleController {
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
     Role role = requireRole(id);
+    rejectReservedSysAdminRole(role.getRoleCode(), "系统超管为系统保留角色，不支持删除");
     role.setIsDeleted(1);
     roleMapper.updateById(role);
     return Result.ok(null);
@@ -124,6 +129,7 @@ public class AdminRoleController {
       @RequestParam(required = false) String keyword,
       @RequestParam(required = false) Long departmentId,
       @RequestParam(required = false) Integer status,
+      @RequestParam(required = false, defaultValue = "false") boolean includeReserved,
       @RequestParam(required = false) String sortBy,
       @RequestParam(defaultValue = "desc") String order) {
     Long orgId = AuthContext.getOrgId();
@@ -131,7 +137,8 @@ public class AdminRoleController {
         .eq(Role::getIsDeleted, 0)
         .eq(orgId != null, Role::getOrgId, orgId)
         .eq(departmentId != null, Role::getDepartmentId, departmentId)
-        .eq(status != null, Role::getStatus, status);
+        .eq(status != null, Role::getStatus, status)
+        .ne(!includeReserved, Role::getRoleCode, RESERVED_SYS_ADMIN_CODE);
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(Role::getRoleName, keyword)
           .or().like(Role::getRoleCode, keyword));
@@ -260,6 +267,19 @@ public class AdminRoleController {
       throw new IllegalArgumentException(label + "不属于当前机构");
     }
     return role;
+  }
+
+  private void rejectReservedSysAdminRole(String roleCode, String message) {
+    if (Objects.equals(RESERVED_SYS_ADMIN_CODE, normalizeRoleCode(roleCode))) {
+      throw new IllegalArgumentException(message);
+    }
+  }
+
+  private String normalizeRoleCode(String roleCode) {
+    if (!StringUtils.hasText(roleCode)) {
+      return null;
+    }
+    return roleCode.trim().toUpperCase(Locale.ROOT);
   }
 
   private String normalizeRoutePermissionsJson(String value) {

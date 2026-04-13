@@ -40,6 +40,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/admin/staff")
 public class AdminStaffController {
   private static final String DEFAULT_INITIAL_PASSWORD = "123456";
+  private static final String RESERVED_SYS_ADMIN_CODE = "SYS_ADMIN";
   private final StaffMapper staffMapper;
   private final DepartmentMapper departmentMapper;
   private final RoleMapper roleMapper;
@@ -97,6 +98,7 @@ public class AdminStaffController {
   @PutMapping
   public Result<StaffAccount> update(@Valid @RequestBody StaffUpdateRequest request) {
     StaffAccount staff = requireStaff(request.getId());
+    rejectProtectedSysAdminStaff(staff, request.getStatus(), "系统超管账号为超级保护账号，不支持修改状态或删除");
     Long beforeDirectLeaderId = staff.getDirectLeaderId();
     Long beforeIndirectLeaderId = staff.getIndirectLeaderId();
     if (request.getDepartmentId() != null) {
@@ -141,6 +143,7 @@ public class AdminStaffController {
   @DeleteMapping("/{id}")
   public Result<Void> delete(@PathVariable Long id) {
     StaffAccount staff = requireStaff(id);
+    rejectProtectedSysAdminStaff(staff, null, "系统超管账号为超级保护账号，不支持删除");
     staff.setIsDeleted(1);
     staffMapper.updateById(staff);
     return Result.ok(null);
@@ -165,6 +168,7 @@ public class AdminStaffController {
   @PutMapping("/{id}/lock")
   public Result<StaffAccount> lock(@PathVariable Long id) {
     StaffAccount staff = requireStaff(id);
+    rejectProtectedSysAdminStaff(staff, 0, "系统超管账号为超级保护账号，不支持锁定");
     staff.setStatus(0);
     staffMapper.updateById(staff);
     fillRoleCodes(staff);
@@ -175,6 +179,7 @@ public class AdminStaffController {
   @PutMapping("/{id}/unlock")
   public Result<StaffAccount> unlock(@PathVariable Long id) {
     StaffAccount staff = requireStaff(id);
+    rejectProtectedSysAdminStaff(staff, 1, "系统超管账号为超级保护账号，无需通过此入口解锁");
     staff.setStatus(1);
     staffMapper.updateById(staff);
     fillRoleCodes(staff);
@@ -283,6 +288,26 @@ public class AdminStaffController {
       return;
     }
     staff.setRoleCodes(roleMapper.selectRoleCodesByStaff(staff.getId(), staff.getOrgId()));
+  }
+
+  private void rejectProtectedSysAdminStaff(StaffAccount staff, Integer targetStatus, String message) {
+    if (staff == null || staff.getId() == null || staff.getOrgId() == null) {
+      return;
+    }
+    List<String> roleCodes = staff.getRoleCodes();
+    if (roleCodes == null || roleCodes.isEmpty()) {
+      roleCodes = roleMapper.selectRoleCodesByStaff(staff.getId(), staff.getOrgId());
+      staff.setRoleCodes(roleCodes);
+    }
+    boolean isProtected = roleCodes != null && roleCodes.stream()
+        .map(code -> code == null ? null : code.trim().toUpperCase())
+        .anyMatch(RESERVED_SYS_ADMIN_CODE::equals);
+    if (!isProtected) {
+      return;
+    }
+    if (targetStatus == null || targetStatus.intValue() != 1) {
+      throw new IllegalArgumentException(message);
+    }
   }
 
   private StaffAccount sanitizeStaffResponse(StaffAccount staff) {

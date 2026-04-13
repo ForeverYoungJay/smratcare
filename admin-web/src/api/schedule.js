@@ -44,6 +44,9 @@ export function getAttendancePage(params) {
 export function getAttendanceOverview(params) {
     return request.get('/api/attendance/overview', { params });
 }
+export function punchAttendance(action) {
+    return request.post('/api/attendance/punch', null, { params: { action } });
+}
 export function getAttendanceSeasonRule() {
     return request.get('/api/attendance/season-rule');
 }

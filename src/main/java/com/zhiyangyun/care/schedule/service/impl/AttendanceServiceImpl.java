@@ -248,6 +248,148 @@ public class AttendanceServiceImpl implements AttendanceService {
   }
 
   @Override
+  public AttendanceResponse punch(Long orgId, Long currentStaffId, String action) {
+    if (currentStaffId == null) {
+      throw new IllegalArgumentException("当前员工不存在，无法打卡");
+    }
+    String normalizedAction = action == null ? "" : action.trim().toUpperCase();
+    if (!"IN".equals(normalizedAction)
+        && !"OUT".equals(normalizedAction)
+        && !"START_LUNCH".equals(normalizedAction)
+        && !"END_LUNCH".equals(normalizedAction)
+        && !"START_OUTING".equals(normalizedAction)
+        && !"END_OUTING".equals(normalizedAction)) {
+      throw new IllegalArgumentException("action 仅支持 IN/OUT/START_LUNCH/END_LUNCH/START_OUTING/END_OUTING");
+    }
+    LocalDate today = LocalDate.now();
+    LocalDateTime now = LocalDateTime.now();
+    AttendanceRecord record = attendanceMapper.selectOne(Wrappers.lambdaQuery(AttendanceRecord.class)
+        .eq(AttendanceRecord::getIsDeleted, 0)
+        .eq(orgId != null, AttendanceRecord::getOrgId, orgId)
+        .eq(AttendanceRecord::getStaffId, currentStaffId)
+        .eq(AttendanceRecord::getWorkDate, today)
+        .orderByDesc(AttendanceRecord::getUpdateTime)
+        .last("LIMIT 1"));
+
+    if ("IN".equals(normalizedAction)) {
+      if (record == null) {
+        record = new AttendanceRecord();
+        record.setTenantId(orgId);
+        record.setOrgId(orgId);
+        record.setStaffId(currentStaffId);
+        record.setWorkDate(today);
+        record.setCreatedBy(currentStaffId);
+      }
+      if (record.getCheckInTime() != null) {
+        throw new IllegalArgumentException("今日已完成上班打卡");
+      }
+      record.setCheckInTime(now);
+      if (safe(record.getStatus()).isBlank() || "SCHEDULED".equalsIgnoreCase(record.getStatus())) {
+        record.setStatus("ON_TIME");
+      }
+      if (record.getId() == null) {
+        attendanceMapper.insert(record);
+      } else {
+        attendanceMapper.updateById(record);
+      }
+      return toAttendanceResponse(record);
+    }
+
+    if ("START_LUNCH".equals(normalizedAction)) {
+      if (record == null || record.getCheckInTime() == null) {
+        throw new IllegalArgumentException("请先完成上班打卡");
+      }
+      if (record.getCheckOutTime() != null) {
+        throw new IllegalArgumentException("今日已下班，无法开始午休");
+      }
+      if (record.getOutingStartTime() != null
+          && (record.getOutingEndTime() == null || record.getOutingEndTime().isBefore(record.getOutingStartTime()))) {
+        throw new IllegalArgumentException("外出中无法开始午休");
+      }
+      if (record.getLunchBreakStartTime() != null) {
+        throw new IllegalArgumentException("今日已记录午休开始");
+      }
+      record.setLunchBreakStartTime(now);
+      attendanceMapper.updateById(record);
+      return toAttendanceResponse(record);
+    }
+
+    if ("END_LUNCH".equals(normalizedAction)) {
+      if (record == null || record.getLunchBreakStartTime() == null) {
+        throw new IllegalArgumentException("当前没有进行中的午休");
+      }
+      if (record.getLunchBreakEndTime() != null && !record.getLunchBreakEndTime().isBefore(record.getLunchBreakStartTime())) {
+        throw new IllegalArgumentException("今日午休已结束");
+      }
+      record.setLunchBreakEndTime(now);
+      if (safe(record.getStatus()).isBlank() || "SCHEDULED".equalsIgnoreCase(record.getStatus())) {
+        record.setStatus("ON_TIME");
+      }
+      attendanceMapper.updateById(record);
+      return toAttendanceResponse(record);
+    }
+
+    if ("START_OUTING".equals(normalizedAction)) {
+      if (record == null || record.getCheckInTime() == null) {
+        throw new IllegalArgumentException("请先完成上班打卡");
+      }
+      if (record.getCheckOutTime() != null) {
+        throw new IllegalArgumentException("今日已下班，无法开始外出");
+      }
+      if (record.getLunchBreakStartTime() != null
+          && (record.getLunchBreakEndTime() == null || record.getLunchBreakEndTime().isBefore(record.getLunchBreakStartTime()))) {
+        throw new IllegalArgumentException("午休中无法开始外出");
+      }
+      if (record.getOutingStartTime() != null) {
+        throw new IllegalArgumentException("今日已记录外出开始");
+      }
+      record.setOutingStartTime(now);
+      attendanceMapper.updateById(record);
+      return toAttendanceResponse(record);
+    }
+
+    if ("END_OUTING".equals(normalizedAction)) {
+      if (record == null || record.getOutingStartTime() == null) {
+        throw new IllegalArgumentException("当前没有进行中的外出");
+      }
+      if (record.getOutingEndTime() != null && !record.getOutingEndTime().isBefore(record.getOutingStartTime())) {
+        throw new IllegalArgumentException("今日外出已结束");
+      }
+      record.setOutingEndTime(now);
+      int currentMinutes = safeInt(record.getOutingMinutes());
+      int deltaMinutes = Math.max((int) Duration.between(record.getOutingStartTime(), now).toMinutes(), 0);
+      record.setOutingMinutes(currentMinutes > 0 ? currentMinutes : deltaMinutes);
+      if (safe(record.getStatus()).isBlank() || "SCHEDULED".equalsIgnoreCase(record.getStatus())) {
+        record.setStatus("ON_TIME");
+      }
+      attendanceMapper.updateById(record);
+      return toAttendanceResponse(record);
+    }
+
+    if (record == null || record.getCheckInTime() == null) {
+      throw new IllegalArgumentException("请先完成上班打卡");
+    }
+    if (record.getLunchBreakStartTime() != null
+        && (record.getLunchBreakEndTime() == null || record.getLunchBreakEndTime().isBefore(record.getLunchBreakStartTime()))) {
+      throw new IllegalArgumentException("请先结束午休，再执行下班打卡");
+    }
+    if (record.getOutingStartTime() != null
+        && (record.getOutingEndTime() == null || record.getOutingEndTime().isBefore(record.getOutingStartTime()))) {
+      throw new IllegalArgumentException("请先结束外出，再执行下班打卡");
+    }
+    if (record.getCheckOutTime() != null) {
+      throw new IllegalArgumentException("今日已完成下班打卡");
+    }
+    record.setCheckOutTime(now);
+    if (safe(record.getStatus()).isBlank() || "SCHEDULED".equalsIgnoreCase(record.getStatus())
+        || "ON_TIME".equalsIgnoreCase(record.getStatus())) {
+      record.setStatus("NORMAL");
+    }
+    attendanceMapper.updateById(record);
+    return toAttendanceResponse(record);
+  }
+
+  @Override
   public AttendanceSeasonRuleResponse getSeasonRule(Long orgId) {
     AttendanceSeasonRule rule = getOrCreateRule(orgId, null);
     return toSeasonRuleResponse(rule);
@@ -331,26 +473,7 @@ public class AttendanceServiceImpl implements AttendanceService {
     record.setReviewRemark(reviewRemark == null || reviewRemark.isBlank() ? null : reviewRemark.trim());
     attendanceMapper.updateById(record);
 
-    AttendanceResponse response = new AttendanceResponse();
-    response.setId(record.getId());
-    response.setStaffId(record.getStaffId());
-    StaffAccount staff = staffMapper.selectById(record.getStaffId());
-    response.setStaffName(staff == null ? null : staff.getRealName());
-    response.setWorkDate(resolveWorkDate(record));
-    response.setCheckInTime(record.getCheckInTime());
-    response.setCheckOutTime(record.getCheckOutTime());
-    response.setOutingStartTime(record.getOutingStartTime());
-    response.setOutingEndTime(record.getOutingEndTime());
-    response.setLunchBreakStartTime(record.getLunchBreakStartTime());
-    response.setLunchBreakEndTime(record.getLunchBreakEndTime());
-    response.setOutingMinutes(record.getOutingMinutes());
-    response.setReviewed(record.getReviewed());
-    response.setReviewedBy(record.getReviewedBy());
-    response.setReviewedAt(record.getReviewedAt());
-    response.setReviewRemark(record.getReviewRemark());
-    response.setNote(record.getNote());
-    response.setStatus(record.getStatus());
-    return response;
+    return toAttendanceResponse(record);
   }
 
   private AttendanceDashboardDayItem emptyDay(LocalDate date) {
@@ -389,9 +512,17 @@ public class AttendanceServiceImpl implements AttendanceService {
     if (day.getCheckInTime() != null && day.getCheckOutTime() != null) {
       long workMinutes = Duration.between(day.getCheckInTime(), day.getCheckOutTime()).toMinutes() - lunch - outing;
       day.setWorkMinutes((int) Math.max(workMinutes, 0));
-      day.setStatus(record.getStatus() == null || record.getStatus().isBlank() ? "NORMAL" : record.getStatus());
+      day.setStatus("已下班");
     } else if (day.getCheckInTime() != null) {
       day.setStatus("在岗");
+    }
+    if (day.getLunchBreakStartTime() != null
+        && (day.getLunchBreakEndTime() == null || day.getLunchBreakEndTime().isBefore(day.getLunchBreakStartTime()))) {
+      day.setStatus("午休中");
+    }
+    if (day.getOutingStartTime() != null
+        && (day.getOutingEndTime() == null || day.getOutingEndTime().isBefore(day.getOutingStartTime()))) {
+      day.setStatus("外出中");
     }
 
     List<String> anomalies = new ArrayList<>();
@@ -616,6 +747,32 @@ public class AttendanceServiceImpl implements AttendanceService {
 
   private int safeInt(Integer value) {
     return value == null ? 0 : Math.max(value, 0);
+  }
+
+  private AttendanceResponse toAttendanceResponse(AttendanceRecord record) {
+    AttendanceResponse response = new AttendanceResponse();
+    if (record == null) {
+      return response;
+    }
+    response.setId(record.getId());
+    response.setStaffId(record.getStaffId());
+    StaffAccount staff = record.getStaffId() == null ? null : staffMapper.selectById(record.getStaffId());
+    response.setStaffName(staff == null ? null : staff.getRealName());
+    response.setWorkDate(resolveWorkDate(record));
+    response.setCheckInTime(record.getCheckInTime());
+    response.setCheckOutTime(record.getCheckOutTime());
+    response.setOutingStartTime(record.getOutingStartTime());
+    response.setOutingEndTime(record.getOutingEndTime());
+    response.setLunchBreakStartTime(record.getLunchBreakStartTime());
+    response.setLunchBreakEndTime(record.getLunchBreakEndTime());
+    response.setOutingMinutes(record.getOutingMinutes());
+    response.setReviewed(record.getReviewed());
+    response.setReviewedBy(record.getReviewedBy());
+    response.setReviewedAt(record.getReviewedAt());
+    response.setReviewRemark(record.getReviewRemark());
+    response.setNote(record.getNote());
+    response.setStatus(record.getStatus());
+    return response;
   }
 
   private TodayStatus resolveTodayStatus(Long staffId, Long orgId) {

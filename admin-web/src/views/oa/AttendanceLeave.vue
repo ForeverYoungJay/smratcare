@@ -41,6 +41,8 @@
               <a-space wrap>
                 <a-button type="primary" @click="fetchData">查询</a-button>
                 <a-button @click="reset">重置</a-button>
+                <a-button v-if="showPunchInButton" type="primary" :loading="punching" @click="handlePunch('IN')">上班打卡</a-button>
+                <a-button v-if="showPunchOutButton" :loading="punching" @click="handlePunch('OUT')">下班打卡</a-button>
                 <a-button @click="printCurrentEmployee">打印当前员工</a-button>
                 <a-button @click="exportCurrentEmployee">导出月报</a-button>
                 <a-button @click="goLeaveApproval">填写请假</a-button>
@@ -132,28 +134,15 @@
               <span>当季考勤时间：</span>
               <span>{{ seasonLabel }} {{ overview.expectedWorkStart || '--:--' }} - {{ overview.expectedWorkEnd || '--:--' }}</span>
             </div>
-          </a-space>
-        </a-card>
-
-        <a-card class="grid-card" :bordered="false" title="联系前状态检查" style="margin-top: 16px">
-          <a-space direction="vertical" style="width: 100%">
-            <a-select
-              v-model:value="contactTargetStaffId"
-              show-search
-              allow-clear
-              :filter-option="false"
-              :options="staffOptions"
-              :loading="staffLoading"
-              placeholder="选择要联系的员工"
-              @search="searchStaff"
-            />
-            <a-button type="primary" block @click="checkContactAvailability">检查状态</a-button>
-            <a-alert
-              v-if="availabilityMessage"
-              :type="availabilityAvailable ? 'success' : 'warning'"
-              :message="availabilityMessage"
-              show-icon
-            />
+            <a-space v-if="isViewingSelf" wrap>
+              <a-button v-if="showPunchInButton" type="primary" :loading="punching" @click="handlePunch('IN')">上班打卡</a-button>
+              <a-button v-if="showStartLunchButton" :loading="punching" @click="handlePunch('START_LUNCH')">开始午休</a-button>
+              <a-button v-if="showEndLunchButton" type="primary" ghost :loading="punching" @click="handlePunch('END_LUNCH')">结束午休</a-button>
+              <a-button v-if="showStartOutingButton" :loading="punching" @click="handlePunch('START_OUTING')">开始外出</a-button>
+              <a-button v-if="showEndOutingButton" type="primary" ghost :loading="punching" @click="handlePunch('END_OUTING')">结束外出</a-button>
+              <a-button v-if="showPunchOutButton" :loading="punching" @click="handlePunch('OUT')">下班打卡</a-button>
+              <span v-if="!showPunchInButton && !showStartLunchButton && !showEndLunchButton && !showStartOutingButton && !showEndOutingButton && !showPunchOutButton" class="muted">当前状态无需再次打卡</span>
+            </a-space>
           </a-space>
         </a-card>
 
@@ -227,7 +216,7 @@ import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import {
   getAttendanceOverview,
   getAttendanceSeasonRule,
-  getAttendanceStaffAvailability,
+  punchAttendance,
   saveAttendanceSeasonRule
 } from '../../api/schedule'
 import type { AttendanceDashboardOverview, AttendanceSeasonRule } from '../../types'
@@ -235,16 +224,15 @@ import type { AttendanceDashboardOverview, AttendanceSeasonRule } from '../../ty
 const router = useRouter()
 const userStore = useUserStore()
 const loading = ref(false)
+const punching = ref(false)
 const autoRefresh = ref(true)
 let autoRefreshTimer: number | undefined
 const overview = ref<AttendanceDashboardOverview>({ days: [] })
-const availabilityMessage = ref('')
-const availabilityAvailable = ref(true)
-const contactTargetStaffId = ref<string | number>()
 const { staffOptions, staffLoading, searchStaff } = useStaffOptions({ pageSize: 260, preloadSize: 800 })
+const currentStaffId = computed(() => userStore.staffInfo?.id ? String(userStore.staffInfo.id) : '')
 
 const query = reactive({
-  staffId: undefined as string | number | undefined,
+  staffId: (currentStaffId.value || undefined) as string | number | undefined,
   month: dayjs().format('YYYY-MM')
 })
 
@@ -309,6 +297,10 @@ const currentStaffName = computed(() => {
   const target = (staffOptions.value || []).find((item: any) => String(item.value) === String(query.staffId))
   return target?.label || ''
 })
+const isViewingSelf = computed(() => {
+  const targetStaffId = query.staffId != null ? String(query.staffId) : currentStaffId.value
+  return !!targetStaffId && targetStaffId === currentStaffId.value
+})
 
 const seasonLabel = computed(() => (overview.value?.seasonType === 'WINTER' ? '冬季' : '夏季'))
 
@@ -320,6 +312,42 @@ const todayStatusColor = computed(() => {
   if (status === 'ON_DUTY') return 'green'
   if (status === 'OFF_DUTY') return 'purple'
   return 'default'
+})
+const showPunchInButton = computed(() => {
+  if (!isViewingSelf.value) return false
+  const status = String(overview.value?.todayStatus || '').toUpperCase()
+  return !status || status === 'NOT_CHECKED_IN'
+})
+const showPunchOutButton = computed(() => {
+  if (!isViewingSelf.value) return false
+  const status = String(overview.value?.todayStatus || '').toUpperCase()
+  return status === 'ON_DUTY'
+})
+const showStartLunchButton = computed(() => {
+  if (!isViewingSelf.value) return false
+  const status = String(overview.value?.todayStatus || '').toUpperCase()
+  const hasLunchStarted = !!currentDayRecord.value?.lunchBreakStartTime
+  return status === 'ON_DUTY' && !hasLunchStarted
+})
+const showEndLunchButton = computed(() => {
+  if (!isViewingSelf.value) return false
+  const status = String(overview.value?.todayStatus || '').toUpperCase()
+  return status === 'LUNCH_BREAK'
+})
+const showStartOutingButton = computed(() => {
+  if (!isViewingSelf.value) return false
+  const status = String(overview.value?.todayStatus || '').toUpperCase()
+  const hasOutingStarted = !!currentDayRecord.value?.outingStartTime
+  return status === 'ON_DUTY' && !hasOutingStarted
+})
+const showEndOutingButton = computed(() => {
+  if (!isViewingSelf.value) return false
+  const status = String(overview.value?.todayStatus || '').toUpperCase()
+  return status === 'OUTING'
+})
+const currentDayRecord = computed(() => {
+  const today = dayjs().format('YYYY-MM-DD')
+  return (overview.value?.days || []).find((item: any) => String(item?.date || '') === today)
 })
 
 function statusColor(record: any) {
@@ -339,8 +367,7 @@ function formatDateTime(value?: string) {
 async function fetchData() {
   loading.value = true
   try {
-    const currentStaffId = userStore.staffInfo?.id ? String(userStore.staffInfo.id) : undefined
-    const targetStaffId = canManageAttendance.value ? query.staffId : currentStaffId
+    const targetStaffId = query.staffId ?? currentStaffId.value ?? undefined
     const [overviewResp, ruleResp] = await Promise.all([
       getAttendanceOverview({ staffId: targetStaffId, month: query.month }),
       getAttendanceSeasonRule()
@@ -356,8 +383,7 @@ async function fetchData() {
 
 function reset() {
   query.month = dayjs().format('YYYY-MM')
-  query.staffId = canManageAttendance.value ? undefined : userStore.staffInfo?.id ? String(userStore.staffInfo.id) : undefined
-  availabilityMessage.value = ''
+  query.staffId = currentStaffId.value || undefined
   fetchData()
 }
 
@@ -409,18 +435,39 @@ function exportCurrentEmployee() {
   exportCsv(rows, `${currentStaffName.value || '员工'}-考勤月报-${query.month}`)
 }
 
-async function checkContactAvailability() {
-  if (!contactTargetStaffId.value) {
-    message.warning('请先选择要联系的员工')
+async function handlePunch(action: 'IN' | 'OUT' | 'START_LUNCH' | 'END_LUNCH' | 'START_OUTING' | 'END_OUTING') {
+  if (!isViewingSelf.value) {
+    message.warning('只能为当前登录员工本人打卡')
     return
   }
+  punching.value = true
   try {
-    const result = await getAttendanceStaffAvailability(contactTargetStaffId.value)
-    availabilityMessage.value = result?.message || '已完成状态检查'
-    availabilityAvailable.value = Boolean(result?.available)
+    await punchAttendance(action)
+    message.success(resolvePunchSuccessText(action))
+    await fetchData()
   } catch (error: any) {
-    message.error(error?.message || '检查联系状态失败')
+    message.error(error?.message || resolvePunchErrorText(action))
+  } finally {
+    punching.value = false
   }
+}
+
+function resolvePunchSuccessText(action: 'IN' | 'OUT' | 'START_LUNCH' | 'END_LUNCH' | 'START_OUTING' | 'END_OUTING') {
+  if (action === 'IN') return '上班打卡成功'
+  if (action === 'OUT') return '下班打卡成功'
+  if (action === 'START_LUNCH') return '已开始午休'
+  if (action === 'END_LUNCH') return '已结束午休'
+  if (action === 'START_OUTING') return '已开始外出'
+  return '已结束外出'
+}
+
+function resolvePunchErrorText(action: 'IN' | 'OUT' | 'START_LUNCH' | 'END_LUNCH' | 'START_OUTING' | 'END_OUTING') {
+  if (action === 'IN') return '上班打卡失败'
+  if (action === 'OUT') return '下班打卡失败'
+  if (action === 'START_LUNCH') return '开始午休失败'
+  if (action === 'END_LUNCH') return '结束午休失败'
+  if (action === 'START_OUTING') return '开始外出失败'
+  return '结束外出失败'
 }
 
 async function saveRule() {
@@ -469,9 +516,7 @@ watch(autoRefresh, (enabled) => {
 })
 
 onMounted(async () => {
-  if (!canManageAttendance.value) {
-    query.staffId = userStore.staffInfo?.id ? String(userStore.staffInfo.id) : undefined
-  }
+  query.staffId = currentStaffId.value || undefined
   await searchStaff('')
   await fetchData()
   startAutoRefresh()

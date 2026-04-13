@@ -367,6 +367,8 @@ import { openPrintTableReport } from '../../utils/print'
 import { useStaffOptions } from '../../composables/useStaffOptions'
 import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
 import type { HrSocialSecuritySummary, HrStaffProfile, PageResult, RoleItem, StaffItem } from '../../types'
+
+const RESERVED_ROLE_CODES = new Set(['SYS_ADMIN'])
 import { getPageTitle, getRecommendedPagePermissions, parseRoutePermissionsJson } from '../../utils/pageAccess'
 import { resolveHrError } from './hrError'
 
@@ -473,6 +475,10 @@ const departmentFilterOptions = computed(() =>
 const roleFilterOptions = computed(() => roles.value.map((item) => ({ label: `${item.roleName} (${item.roleCode})`, value: item.id })))
 const roleFormOptions = computed(() => roles.value.map((item) => ({ label: item.roleName, value: item.id })))
 
+function isReservedRole(role?: Partial<RoleItem>) {
+  return RESERVED_ROLE_CODES.has(String(role?.roleCode || '').trim().toUpperCase())
+}
+
 const drawerTitle = computed(() => (form.staffId ? '编辑档案' : '新增人员'))
 const rowSelection = computed(() => ({
   selectedRowKeys: selectedRowKeys.value,
@@ -517,7 +523,7 @@ async function fetchData() {
     selectedRowKeys.value = []
     if (!roles.value.length) {
       const roleRes: PageResult<RoleItem> = await getRolePage({ pageNo: 1, pageSize: 200 })
-      roles.value = roleRes.list || []
+      roles.value = (roleRes.list || []).filter((item) => !isReservedRole(item))
     }
     if (!departmentOptions.value.length) {
       await searchDepartments('')
@@ -623,7 +629,7 @@ async function openDrawer(record?: HrStaffProfile) {
   }
   if (!roles.value.length) {
     const roleRes: PageResult<RoleItem> = await getRolePage({ pageNo: 1, pageSize: 200 })
-    roles.value = roleRes.list || []
+    roles.value = (roleRes.list || []).filter((item) => !isReservedRole(item))
   }
   if (record?.staffId && record?.realName) {
     ensureSelectedStaff(record.staffId, record.realName)
@@ -707,7 +713,7 @@ async function openEffectivePermissionPanel(record?: HrStaffProfile) {
   try {
     if (!roles.value.length) {
       const roleRes: PageResult<RoleItem> = await getRolePage({ pageNo: 1, pageSize: 300 })
-      roles.value = roleRes.list || []
+      roles.value = (roleRes.list || []).filter((item) => !isReservedRole(item))
     }
     const assignments = await getStaffRoleAssignments(target.staffId)
     const roleIds = new Set(

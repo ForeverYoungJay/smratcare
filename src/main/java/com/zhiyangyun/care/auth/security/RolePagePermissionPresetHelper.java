@@ -19,6 +19,19 @@ public final class RolePagePermissionPresetHelper {
       "/workbench/reports",
       "/workbench/approvals");
 
+  private static final List<String> ADMIN_MANAGEMENT_PATHS = List.of(
+      "/elder",
+      "/medical-care",
+      "/care",
+      "/finance",
+      "/logistics",
+      "/marketing",
+      "/hr",
+      "/oa",
+      "/stats",
+      "/system",
+      "/base-config");
+
   private static final Map<String, List<String>> ROLE_PAGE_PRESETS = Map.ofEntries(
       Map.entry("NURSING_MINISTER", concat(COMMON_PERSONAL_PATHS, "/medical-care", "/elder", "/oa/approval", "/base-config")),
       Map.entry("NURSING_EMPLOYEE", concat(COMMON_PERSONAL_PATHS, "/medical-care", "/oa/approval")),
@@ -33,8 +46,9 @@ public final class RolePagePermissionPresetHelper {
       Map.entry("FINANCE_EMPLOYEE", concat(COMMON_PERSONAL_PATHS, "/finance", "/oa/approval")),
       Map.entry("MARKETING_MINISTER", concat(COMMON_PERSONAL_PATHS, "/marketing", "/stats")),
       Map.entry("MARKETING_EMPLOYEE", concat(COMMON_PERSONAL_PATHS, "/marketing")),
-      Map.entry("DIRECTOR", concat(COMMON_PERSONAL_PATHS, "/elder", "/medical-care", "/care", "/finance", "/logistics", "/marketing", "/hr", "/oa", "/stats", "/system/site-config", "/system/role", "/base-config")),
-      Map.entry("SYS_ADMIN", concat(COMMON_PERSONAL_PATHS, "/elder", "/medical-care", "/care", "/finance", "/logistics", "/marketing", "/hr", "/oa", "/stats", "/system/site-config", "/system/role", "/base-config"))
+      Map.entry("ADMIN", concat(COMMON_PERSONAL_PATHS, ADMIN_MANAGEMENT_PATHS)),
+      Map.entry("DIRECTOR", concat(COMMON_PERSONAL_PATHS, ADMIN_MANAGEMENT_PATHS)),
+      Map.entry("SYS_ADMIN", concat(COMMON_PERSONAL_PATHS, ADMIN_MANAGEMENT_PATHS))
   );
 
   private RolePagePermissionPresetHelper() {
@@ -85,6 +99,18 @@ public final class RolePagePermissionPresetHelper {
   }
 
   private static List<String> concat(List<String> base, String... extra) {
+    LinkedHashSet<String> merged = new LinkedHashSet<>(base);
+    if (extra != null) {
+      for (String item : extra) {
+        if (item != null && !item.isBlank()) {
+          merged.add(item);
+        }
+      }
+    }
+    return new ArrayList<>(merged);
+  }
+
+  private static List<String> concat(List<String> base, List<String> extra) {
     LinkedHashSet<String> merged = new LinkedHashSet<>(base);
     if (extra != null) {
       for (String item : extra) {

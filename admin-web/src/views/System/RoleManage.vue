@@ -56,7 +56,7 @@
           style="width: 140px"
         />
       </a-form-item>
-      <template #extra>
+    <template #extra>
         <a-button type="primary" @click="openDrawer()">新增角色</a-button>
       </template>
     </SearchForm>
@@ -84,10 +84,15 @@
         </template>
         <template v-else-if="column.key === 'action'">
           <a-space>
-            <a-button type="link" @click="openDrawer(record)">编辑</a-button>
-            <a-popconfirm title="确认删除该角色吗？" ok-text="确认" cancel-text="取消" @confirm="remove(record)">
-              <a-button type="link" danger>删除</a-button>
-            </a-popconfirm>
+            <template v-if="isReservedRole(record)">
+              <a-tag color="gold">系统保留</a-tag>
+            </template>
+            <template v-else>
+              <a-button type="link" @click="openDrawer(record)">编辑</a-button>
+              <a-popconfirm title="确认删除该角色吗？" ok-text="确认" cancel-text="取消" @confirm="remove(record)">
+                <a-button type="link" danger>删除</a-button>
+              </a-popconfirm>
+            </template>
           </a-space>
         </template>
       </template>
@@ -165,6 +170,7 @@ import DataTable from '../../components/DataTable.vue'
 import { getRolePage, createRole, updateRole, deleteRole, getDepartmentOptionPage } from '../../api/rbac'
 import type { DepartmentItem, PageResult, RoleItem } from '../../types'
 import { getPagePermissionTree, getRecommendedPagePermissions, getRolePagePreset, parseRoutePermissionsJson, serializeRoutePermissions, shouldPersistExplicitPagePermissions } from '../../utils/pageAccess'
+const RESERVED_ROLE_CODES = new Set(['SYS_ADMIN'])
 
 const route = useRoute()
 const query = reactive({
@@ -220,9 +226,14 @@ const departmentOptions = computed(() =>
 )
 const superiorRoleOptions = computed(() =>
   allRoles.value
+    .filter((item) => !isReservedRole(item))
     .filter((item) => String(item.id) !== String(form.id || ''))
     .map((item) => ({ label: item.roleName, value: item.id }))
 )
+
+function isReservedRole(role?: Partial<RoleItem>) {
+  return RESERVED_ROLE_CODES.has(String(role?.roleCode || '').trim().toUpperCase())
+}
 
 function filterOption(input: string, option: { label?: string }) {
   return String(option?.label || '').toLowerCase().includes(String(input || '').toLowerCase())
@@ -283,6 +294,10 @@ function onReset() {
 }
 
 function openDrawer(record?: RoleItem) {
+  if (record && isReservedRole(record)) {
+    message.warning('系统超管为系统保留角色，不支持在此配置')
+    return
+  }
   const explicitPermissions = parseRoutePermissionsJson(record?.routePermissionsJson)
   Object.assign(form, {
     id: record?.id,

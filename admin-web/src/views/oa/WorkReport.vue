@@ -179,6 +179,7 @@ async function fetchData() {
       pageSize: query.pageSize,
       reportType: query.reportType,
       status: query.status,
+      mineOnly: true,
       startDate: dateRange.value?.[0] ? dayjs(dateRange.value[0]).format('YYYY-MM-DD') : undefined,
       endDate: dateRange.value?.[1] ? dayjs(dateRange.value[1]).format('YYYY-MM-DD') : undefined
     })

@@ -14,8 +14,10 @@ import com.zhiyangyun.care.auth.security.AuthContext;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -27,6 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/staff-roles")
 public class AdminStaffRoleController {
+  private static final String RESERVED_SYS_ADMIN_CODE = "SYS_ADMIN";
   private final StaffMapper staffMapper;
   private final RoleMapper roleMapper;
   private final StaffRoleMapper staffRoleMapper;
@@ -51,7 +54,9 @@ public class AdminStaffRoleController {
         .distinct()
         .toList();
     validateRolesBelongToOrg(roleIds, targetOrgId);
+    rejectReservedSysAdminAssignment(roleIds, targetOrgId, "系统超管仅限系统保留，不支持分配或替换");
     request.setOrgId(targetOrgId);
+    rejectReservedSysAdminReplacement(staff.getId(), targetOrgId, "系统超管账号为系统保留账号，不支持修改角色分配");
     staffRoleMapper.delete(Wrappers.lambdaQuery(StaffRole.class)
         .eq(StaffRole::getOrgId, request.getOrgId())
         .eq(StaffRole::getStaffId, request.getStaffId()));
@@ -85,6 +90,7 @@ public class AdminStaffRoleController {
     if (!staff.getOrgId().equals(role.getOrgId())) {
       throw new IllegalArgumentException("角色不属于当前机构");
     }
+    rejectReservedSysAdminRole(role, "系统超管仅限系统保留，不支持分配");
     request.setOrgId(staff.getOrgId());
     StaffRole staffRole = new StaffRole();
     staffRole.setOrgId(request.getOrgId());
@@ -102,6 +108,8 @@ public class AdminStaffRoleController {
     if (!staff.getOrgId().equals(role.getOrgId())) {
       throw new IllegalArgumentException("角色不属于当前机构");
     }
+    rejectReservedSysAdminRole(role, "系统超管账号为系统保留账号，不支持移除");
+    rejectReservedSysAdminReplacement(staff.getId(), staff.getOrgId(), "系统超管账号为系统保留账号，不支持修改角色分配");
     request.setOrgId(staff.getOrgId());
     staffRoleMapper.delete(Wrappers.lambdaQuery(StaffRole.class)
         .eq(StaffRole::getOrgId, request.getOrgId())
@@ -134,6 +142,56 @@ public class AdminStaffRoleController {
       if (!orgId.equals(role.getOrgId())) {
         throw new IllegalArgumentException("角色不属于当前机构");
       }
+    }
+  }
+
+  private void rejectReservedSysAdminAssignment(List<Long> roleIds, Long orgId, String message) {
+    if (roleIds == null || roleIds.isEmpty()) {
+      return;
+    }
+    List<Role> roles = roleMapper.selectBatchIds(roleIds);
+    for (Role role : roles) {
+      if (role == null || role.getIsDeleted() != null && role.getIsDeleted() == 1) {
+        continue;
+      }
+      if (orgId != null && !orgId.equals(role.getOrgId())) {
+        continue;
+      }
+      rejectReservedSysAdminRole(role, message);
+    }
+  }
+
+  private void rejectReservedSysAdminReplacement(Long staffId, Long orgId, String message) {
+    if (staffId == null || orgId == null) {
+      return;
+    }
+    Set<Long> currentRoleIds = staffRoleMapper.selectList(Wrappers.lambdaQuery(StaffRole.class)
+            .eq(StaffRole::getIsDeleted, 0)
+            .eq(StaffRole::getOrgId, orgId)
+            .eq(StaffRole::getStaffId, staffId))
+        .stream()
+        .map(StaffRole::getRoleId)
+        .filter(Objects::nonNull)
+        .collect(java.util.stream.Collectors.toSet());
+    if (currentRoleIds.isEmpty()) {
+      return;
+    }
+    List<Role> roles = roleMapper.selectBatchIds(currentRoleIds);
+    for (Role role : roles) {
+      if (role == null) {
+        continue;
+      }
+      rejectReservedSysAdminRole(role, message);
+    }
+  }
+
+  private void rejectReservedSysAdminRole(Role role, String message) {
+    if (role == null) {
+      return;
+    }
+    String roleCode = role.getRoleCode();
+    if (StringUtils.hasText(roleCode) && RESERVED_SYS_ADMIN_CODE.equals(roleCode.trim().toUpperCase())) {
+      throw new IllegalArgumentException(message);
     }
   }
 }

@@ -5,6 +5,7 @@
         <span class="soft-pill">部门数：{{ departments.length }}</span>
         <span class="soft-pill">角色模板数：{{ roleRows.length }}</span>
         <span class="selection-pill">推荐模板：{{ presetEntries.length }}</span>
+        <span class="soft-pill">系统超管为系统保留角色，不参与这里的配置</span>
       </a-space>
     </template>
 
@@ -82,6 +83,8 @@ import { getDepartmentOptionPage, getRolePage } from '../../api/rbac'
 import type { DepartmentItem, PageResult, RoleItem } from '../../types'
 import { ROLE_PAGE_PRESETS, getRecommendedPagePermissions, getRolePagePreset, parseRoutePermissionsJson } from '../../utils/pageAccess'
 
+const RESERVED_ROLE_CODES = new Set(['SYS_ADMIN'])
+
 const router = useRouter()
 const roleRows = ref<RoleItem[]>([])
 const allRoles = ref<RoleItem[]>([])
@@ -122,12 +125,16 @@ function getEffectivePagePermissions(role?: Partial<RoleItem>) {
   return getRecommendedPagePermissions(role?.roleCode || role?.roleName)
 }
 
+function isReservedRole(role?: Partial<RoleItem>) {
+  return RESERVED_ROLE_CODES.has(String(role?.roleCode || '').trim().toUpperCase())
+}
+
 async function fetchRoles() {
   roleLoading.value = true
   try {
     const res: PageResult<RoleItem> = await getRolePage({ pageNo: 1, pageSize: 300 })
-    roleRows.value = res.list || []
-    allRoles.value = res.list || []
+    roleRows.value = (res.list || []).filter((item) => !isReservedRole(item))
+    allRoles.value = (res.list || []).filter((item) => !isReservedRole(item))
   } finally {
     roleLoading.value = false
   }

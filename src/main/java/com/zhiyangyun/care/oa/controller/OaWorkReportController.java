@@ -38,6 +38,7 @@ public class OaWorkReportController {
       @RequestParam(required = false) String reportType,
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String keyword,
+      @RequestParam(required = false, defaultValue = "true") boolean mineOnly,
       @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
       @RequestParam(required = false) LocalDate startDate,
       @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
@@ -46,9 +47,10 @@ public class OaWorkReportController {
       throw new IllegalArgumentException("开始日期不能晚于结束日期");
     }
     Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
     String normalizedType = normalizeReportType(reportType);
     String normalizedStatus = normalizeStatus(status);
-    var wrapper = Wrappers.lambdaQuery(OaWorkReport.class)
+    var wrapper = applyReportScope(Wrappers.lambdaQuery(OaWorkReport.class)
         .eq(OaWorkReport::getIsDeleted, 0)
         .eq(orgId != null, OaWorkReport::getOrgId, orgId)
         .eq(normalizedType != null, OaWorkReport::getReportType, normalizedType)
@@ -68,7 +70,7 @@ public class OaWorkReportController {
         .ge(startDate != null, OaWorkReport::getReportDate, startDate)
         .le(endDate != null, OaWorkReport::getReportDate, endDate)
         .orderByDesc(OaWorkReport::getReportDate)
-        .orderByDesc(OaWorkReport::getCreateTime);
+        .orderByDesc(OaWorkReport::getCreateTime), staffId, mineOnly);
     return Result.ok(reportMapper.selectPage(new Page<>(pageNo, pageSize), wrapper));
   }
 
@@ -77,6 +79,7 @@ public class OaWorkReportController {
       @RequestParam(required = false) String reportType,
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String keyword,
+      @RequestParam(required = false, defaultValue = "true") boolean mineOnly,
       @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
       @RequestParam(required = false) LocalDate startDate,
       @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
@@ -85,10 +88,11 @@ public class OaWorkReportController {
       throw new IllegalArgumentException("开始日期不能晚于结束日期");
     }
     Long orgId = AuthContext.getOrgId();
+    Long staffId = AuthContext.getStaffId();
     String normalizedType = normalizeReportType(reportType);
     String normalizedStatus = normalizeStatus(status);
 
-    var baseWrapper = buildSummaryWrapper(orgId, normalizedType, normalizedStatus, keyword, startDate, endDate);
+    var baseWrapper = buildSummaryWrapper(orgId, staffId, normalizedType, normalizedStatus, keyword, startDate, endDate, mineOnly);
 
     LocalDate today = LocalDate.now();
     LocalDate weekStart = today.minusDays(today.getDayOfWeek().getValue() - 1L);
@@ -97,37 +101,37 @@ public class OaWorkReportController {
     OaWorkReportSummaryResponse response = new OaWorkReportSummaryResponse();
     response.setTotalCount(count(reportMapper.selectCount(baseWrapper)));
     response.setDraftCount(count(reportMapper.selectCount(
-        buildSummaryWrapper(orgId, normalizedType, "DRAFT", keyword, startDate, endDate))));
+        buildSummaryWrapper(orgId, staffId, normalizedType, "DRAFT", keyword, startDate, endDate, mineOnly))));
     response.setSubmittedCount(count(reportMapper.selectCount(
-        buildSummaryWrapper(orgId, normalizedType, "SUBMITTED", keyword, startDate, endDate))));
-    response.setTodaySubmittedCount(count(reportMapper.selectCount(Wrappers.lambdaQuery(OaWorkReport.class)
+        buildSummaryWrapper(orgId, staffId, normalizedType, "SUBMITTED", keyword, startDate, endDate, mineOnly))));
+    response.setTodaySubmittedCount(count(reportMapper.selectCount(applyReportScope(Wrappers.lambdaQuery(OaWorkReport.class)
         .eq(OaWorkReport::getIsDeleted, 0)
         .eq(orgId != null, OaWorkReport::getOrgId, orgId)
         .eq(normalizedType != null, OaWorkReport::getReportType, normalizedType)
         .eq(OaWorkReport::getStatus, "SUBMITTED")
-        .eq(OaWorkReport::getReportDate, today))));
-    response.setWeekSubmittedCount(count(reportMapper.selectCount(Wrappers.lambdaQuery(OaWorkReport.class)
+        .eq(OaWorkReport::getReportDate, today), staffId, mineOnly))));
+    response.setWeekSubmittedCount(count(reportMapper.selectCount(applyReportScope(Wrappers.lambdaQuery(OaWorkReport.class)
         .eq(OaWorkReport::getIsDeleted, 0)
         .eq(orgId != null, OaWorkReport::getOrgId, orgId)
         .eq(normalizedType != null, OaWorkReport::getReportType, normalizedType)
         .eq(OaWorkReport::getStatus, "SUBMITTED")
-        .ge(OaWorkReport::getReportDate, weekStart))));
-    response.setMonthSubmittedCount(count(reportMapper.selectCount(Wrappers.lambdaQuery(OaWorkReport.class)
+        .ge(OaWorkReport::getReportDate, weekStart), staffId, mineOnly))));
+    response.setMonthSubmittedCount(count(reportMapper.selectCount(applyReportScope(Wrappers.lambdaQuery(OaWorkReport.class)
         .eq(OaWorkReport::getIsDeleted, 0)
         .eq(orgId != null, OaWorkReport::getOrgId, orgId)
         .eq(normalizedType != null, OaWorkReport::getReportType, normalizedType)
         .eq(OaWorkReport::getStatus, "SUBMITTED")
-        .ge(OaWorkReport::getReportDate, monthStart))));
+        .ge(OaWorkReport::getReportDate, monthStart), staffId, mineOnly))));
     response.setDayTypeCount(count(reportMapper.selectCount(
-        buildSummaryWrapper(orgId, "DAY", normalizedStatus, keyword, startDate, endDate))));
+        buildSummaryWrapper(orgId, staffId, "DAY", normalizedStatus, keyword, startDate, endDate, mineOnly))));
     response.setWeekTypeCount(count(reportMapper.selectCount(
-        buildSummaryWrapper(orgId, "WEEK", normalizedStatus, keyword, startDate, endDate))));
+        buildSummaryWrapper(orgId, staffId, "WEEK", normalizedStatus, keyword, startDate, endDate, mineOnly))));
     response.setMonthTypeCount(count(reportMapper.selectCount(
-        buildSummaryWrapper(orgId, "MONTH", normalizedStatus, keyword, startDate, endDate))));
+        buildSummaryWrapper(orgId, staffId, "MONTH", normalizedStatus, keyword, startDate, endDate, mineOnly))));
     response.setYearTypeCount(count(reportMapper.selectCount(
-        buildSummaryWrapper(orgId, "YEAR", normalizedStatus, keyword, startDate, endDate))));
+        buildSummaryWrapper(orgId, staffId, "YEAR", normalizedStatus, keyword, startDate, endDate, mineOnly))));
     response.setMissingSummaryCount(count(reportMapper.selectCount(
-        buildSummaryWrapper(orgId, normalizedType, normalizedStatus, keyword, startDate, endDate)
+        buildSummaryWrapper(orgId, staffId, normalizedType, normalizedStatus, keyword, startDate, endDate, mineOnly)
             .and(w -> w.isNull(OaWorkReport::getContentSummary).or().eq(OaWorkReport::getContentSummary, "")))));
     return Result.ok(response);
   }
@@ -138,11 +142,12 @@ public class OaWorkReportController {
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String keyword,
+      @RequestParam(required = false, defaultValue = "true") boolean mineOnly,
       @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
       @RequestParam(required = false) LocalDate startDate,
       @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
       @RequestParam(required = false) LocalDate endDate) {
-    return page(pageNo, pageSize, "DAY", status, keyword, startDate, endDate);
+    return page(pageNo, pageSize, "DAY", status, keyword, mineOnly, startDate, endDate);
   }
 
   @GetMapping("/weekly/page")
@@ -151,11 +156,12 @@ public class OaWorkReportController {
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String keyword,
+      @RequestParam(required = false, defaultValue = "true") boolean mineOnly,
       @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
       @RequestParam(required = false) LocalDate startDate,
       @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
       @RequestParam(required = false) LocalDate endDate) {
-    return page(pageNo, pageSize, "WEEK", status, keyword, startDate, endDate);
+    return page(pageNo, pageSize, "WEEK", status, keyword, mineOnly, startDate, endDate);
   }
 
   @GetMapping("/monthly/page")
@@ -164,11 +170,12 @@ public class OaWorkReportController {
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String keyword,
+      @RequestParam(required = false, defaultValue = "true") boolean mineOnly,
       @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
       @RequestParam(required = false) LocalDate startDate,
       @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
       @RequestParam(required = false) LocalDate endDate) {
-    return page(pageNo, pageSize, "MONTH", status, keyword, startDate, endDate);
+    return page(pageNo, pageSize, "MONTH", status, keyword, mineOnly, startDate, endDate);
   }
 
   @GetMapping("/yearly/page")
@@ -177,11 +184,12 @@ public class OaWorkReportController {
       @RequestParam(defaultValue = "20") long pageSize,
       @RequestParam(required = false) String status,
       @RequestParam(required = false) String keyword,
+      @RequestParam(required = false, defaultValue = "true") boolean mineOnly,
       @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
       @RequestParam(required = false) LocalDate startDate,
       @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
       @RequestParam(required = false) LocalDate endDate) {
-    return page(pageNo, pageSize, "YEAR", status, keyword, startDate, endDate);
+    return page(pageNo, pageSize, "YEAR", status, keyword, mineOnly, startDate, endDate);
   }
 
   @PostMapping
@@ -201,7 +209,7 @@ public class OaWorkReportController {
     report.setNextPlan(request.getNextPlan());
     String normalizedStatus = normalizeStatus(request.getStatus());
     report.setStatus(normalizedStatus == null ? "DRAFT" : normalizedStatus);
-    report.setReporterId(request.getReporterId() == null ? AuthContext.getStaffId() : request.getReporterId());
+    report.setReporterId(AuthContext.getStaffId());
     report.setReporterName(
         request.getReporterName() == null || request.getReporterName().isBlank()
             ? AuthContext.getUsername()
@@ -228,7 +236,7 @@ public class OaWorkReportController {
     report.setNextPlan(request.getNextPlan());
     String normalizedStatus = normalizeStatus(request.getStatus());
     report.setStatus(normalizedStatus == null ? report.getStatus() : normalizedStatus);
-    report.setReporterId(request.getReporterId());
+    report.setReporterId(AuthContext.getStaffId());
     report.setReporterName(request.getReporterName());
     reportMapper.updateById(report);
     return Result.ok(report);
@@ -257,11 +265,12 @@ public class OaWorkReportController {
 
   private OaWorkReport findAccessibleReport(Long id) {
     Long orgId = AuthContext.getOrgId();
-    return reportMapper.selectOne(Wrappers.lambdaQuery(OaWorkReport.class)
+    Long staffId = AuthContext.getStaffId();
+    return reportMapper.selectOne(applyReportScope(Wrappers.lambdaQuery(OaWorkReport.class)
         .eq(OaWorkReport::getId, id)
         .eq(OaWorkReport::getIsDeleted, 0)
         .eq(orgId != null, OaWorkReport::getOrgId, orgId)
-        .last("LIMIT 1"));
+        .last("LIMIT 1"), staffId, true));
   }
 
   private String normalizeReportType(String reportType) {
@@ -290,8 +299,8 @@ public class OaWorkReportController {
   }
 
   private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OaWorkReport> buildSummaryWrapper(
-      Long orgId, String reportType, String status, String keyword, LocalDate startDate, LocalDate endDate) {
-    return Wrappers.lambdaQuery(OaWorkReport.class)
+      Long orgId, Long staffId, String reportType, String status, String keyword, LocalDate startDate, LocalDate endDate, boolean mineOnly) {
+    return applyReportScope(Wrappers.lambdaQuery(OaWorkReport.class)
         .eq(OaWorkReport::getIsDeleted, 0)
         .eq(orgId != null, OaWorkReport::getOrgId, orgId)
         .eq(reportType != null, OaWorkReport::getReportType, reportType)
@@ -304,7 +313,20 @@ public class OaWorkReportController {
             .or().like(OaWorkReport::getNextPlan, keyword)
             .or().like(OaWorkReport::getReporterName, keyword))
         .ge(startDate != null, OaWorkReport::getReportDate, startDate)
-        .le(endDate != null, OaWorkReport::getReportDate, endDate);
+        .le(endDate != null, OaWorkReport::getReportDate, endDate), staffId, mineOnly);
+  }
+
+  private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OaWorkReport> applyReportScope(
+      com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<OaWorkReport> wrapper,
+      Long staffId,
+      boolean mineOnly) {
+    if (!mineOnly) {
+      return wrapper;
+    }
+    if (staffId == null) {
+      return wrapper.eq(OaWorkReport::getId, -1L);
+    }
+    return wrapper.and(w -> w.eq(OaWorkReport::getReporterId, staffId).or().eq(OaWorkReport::getCreatedBy, staffId));
   }
 
   private long count(Long value) {

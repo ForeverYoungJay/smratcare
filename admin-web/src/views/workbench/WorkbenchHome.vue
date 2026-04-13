@@ -10,6 +10,8 @@
       <a-space wrap>
         <a-button type="primary" @click="openPath('/workbench/todo')">查看我的待办</a-button>
         <a-button @click="openPath('/workbench/approvals')">处理审批</a-button>
+        <a-button v-if="attendanceActionButtons.includes('IN')" @click="handleAttendanceAction('IN')">上班打卡</a-button>
+        <a-button v-if="attendanceActionButtons.includes('OUT')" @click="handleAttendanceAction('OUT')">下班打卡</a-button>
       </a-space>
     </template>
 
@@ -61,6 +63,38 @@
     </section>
 
     <a-row :gutter="[16, 16]">
+      <a-col :xs="24" :xl="8">
+        <section class="lane-shell card-elevated attendance-panel">
+          <div class="lane-head">
+            <div>
+              <div class="lane-kicker">Attendance Today</div>
+              <h3>今日出勤</h3>
+            </div>
+            <a-tag :color="attendanceTagColor">{{ attendanceOverview.todayStatusLabel || '未打卡' }}</a-tag>
+          </div>
+          <div class="attendance-summary">
+            <div class="attendance-main">
+              <strong>{{ attendanceOverview.todayStatusLabel || '未打卡' }}</strong>
+              <p>{{ attendanceSeasonLabel }} {{ attendanceOverview.expectedWorkStart || '--:--' }} - {{ attendanceOverview.expectedWorkEnd || '--:--' }}</p>
+            </div>
+            <div class="attendance-sub">
+              <span>当月在岗 {{ attendanceOverview.onDutyDays || 0 }} 天</span>
+              <span>请假 {{ attendanceOverview.leaveDays || 0 }} 天</span>
+              <span>异常 {{ attendanceOverview.abnormalCount || 0 }} 次</span>
+            </div>
+            <div class="attendance-actions">
+              <a-button v-if="attendanceActionButtons.includes('IN')" type="primary" :loading="attendanceSubmitting" @click="handleAttendanceAction('IN')">上班打卡</a-button>
+              <a-button v-if="attendanceActionButtons.includes('START_LUNCH')" :loading="attendanceSubmitting" @click="handleAttendanceAction('START_LUNCH')">开始午休</a-button>
+              <a-button v-if="attendanceActionButtons.includes('END_LUNCH')" type="primary" ghost :loading="attendanceSubmitting" @click="handleAttendanceAction('END_LUNCH')">结束午休</a-button>
+              <a-button v-if="attendanceActionButtons.includes('START_OUTING')" :loading="attendanceSubmitting" @click="handleAttendanceAction('START_OUTING')">开始外出</a-button>
+              <a-button v-if="attendanceActionButtons.includes('END_OUTING')" type="primary" ghost :loading="attendanceSubmitting" @click="handleAttendanceAction('END_OUTING')">结束外出</a-button>
+              <a-button v-if="attendanceActionButtons.includes('OUT')" :loading="attendanceSubmitting" @click="handleAttendanceAction('OUT')">下班打卡</a-button>
+              <a-button @click="openPath('/workbench/attendance')">查看考勤与请假</a-button>
+            </div>
+          </div>
+        </section>
+      </a-col>
+
       <a-col :xs="24" :xl="8">
         <section class="lane-shell card-elevated">
           <div class="lane-head">
@@ -136,6 +170,63 @@
         </section>
       </a-col>
     </a-row>
+
+    <a-row :gutter="[16, 16]" style="margin-top: 16px">
+      <a-col :xs="24" :xl="12">
+        <section class="lane-shell card-elevated preview-panel">
+          <div class="lane-head">
+            <div>
+              <div class="lane-kicker">Todo Preview</div>
+              <h3>我的待办预览</h3>
+            </div>
+            <a-button type="link" @click="openPath('/workbench/todo')">查看全部</a-button>
+          </div>
+          <div v-if="portalTodos.length" class="preview-list">
+            <button
+              v-for="item in portalTodos"
+              :key="String(item.id)"
+              type="button"
+              class="preview-item"
+              @click="openPath('/workbench/todo')"
+            >
+              <div>
+                <strong>{{ item.title }}</strong>
+                <p>{{ item.assigneeName || '待处理' }}</p>
+              </div>
+              <span>{{ item.dueTime ? dayjs(item.dueTime).format('MM-DD HH:mm') : '无截止' }}</span>
+            </button>
+          </div>
+          <a-empty v-else description="暂无待办" />
+        </section>
+      </a-col>
+      <a-col :xs="24" :xl="12">
+        <section class="lane-shell card-elevated preview-panel">
+          <div class="lane-head">
+            <div>
+              <div class="lane-kicker">Notice Preview</div>
+              <h3>近期公告</h3>
+            </div>
+            <a-button type="link" @click="openPath('/oa/notice')">查看全部</a-button>
+          </div>
+          <div v-if="portalNotices.length" class="preview-list">
+            <button
+              v-for="item in portalNotices"
+              :key="String(item.id)"
+              type="button"
+              class="preview-item"
+              @click="openPath('/oa/notice')"
+            >
+              <div>
+                <strong>{{ item.title }}</strong>
+                <p>{{ item.publisherName || '系统公告' }}</p>
+              </div>
+              <span>{{ item.publishTime ? dayjs(item.publishTime).format('MM-DD') : '-' }}</span>
+            </button>
+          </div>
+          <a-empty v-else description="暂无公告" />
+        </section>
+      </a-col>
+    </a-row>
   </PageContainer>
 </template>
 
@@ -146,9 +237,11 @@ import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import PageContainer from '../../components/PageContainer.vue'
 import { getPortalSummary } from '../../api/oa'
+import { getAttendanceOverview, punchAttendance } from '../../api/schedule'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { useUserStore } from '../../stores/user'
 import { resolveRouteAccess } from '../../utils/routeAccess'
+import type { AttendanceDashboardOverview, OaNotice, OaTodo } from '../../types'
 
 type ActionItem = {
   label: string
@@ -156,9 +249,15 @@ type ActionItem = {
   tip: string
 }
 
+type AttendanceAction = 'IN' | 'OUT' | 'START_LUNCH' | 'END_LUNCH' | 'START_OUTING' | 'END_OUTING'
+
 const router = useRouter()
 const userStore = useUserStore()
 const refreshedAt = ref('--')
+const attendanceSubmitting = ref(false)
+const attendanceOverview = reactive<AttendanceDashboardOverview>({ days: [] })
+const portalTodos = ref<OaTodo[]>([])
+const portalNotices = ref<OaNotice[]>([])
 const summary = reactive({
   openTodoCount: 0,
   pendingApprovalCount: 0,
@@ -219,6 +318,36 @@ const centerActions = computed<ActionItem[]>(() => filterActions([
   { label: '长者管理', path: '/elder/in-hospital-overview', tip: '长者档案、评估、入住和在院服务' },
   { label: '统计分析', path: '/stats', tip: '指标监控与经营分析' }
 ]))
+const attendanceTodayRecord = computed(() => {
+  const today = dayjs().format('YYYY-MM-DD')
+  return (attendanceOverview.days || []).find((item) => String(item?.date || '') === today)
+})
+const attendanceSeasonLabel = computed(() => attendanceOverview.seasonType === 'WINTER' ? '冬季' : '夏季')
+const attendanceTagColor = computed(() => {
+  const status = String(attendanceOverview.todayStatus || '').toUpperCase()
+  if (status === 'ON_DUTY') return 'green'
+  if (status === 'LUNCH_BREAK') return 'blue'
+  if (status === 'OUTING') return 'orange'
+  if (status === 'OFF_DUTY') return 'purple'
+  if (status === 'ON_LEAVE') return 'cyan'
+  return 'default'
+})
+const attendanceActionButtons = computed<AttendanceAction[]>(() => {
+  const status = String(attendanceOverview.todayStatus || '').toUpperCase()
+  const hasLunchStarted = !!attendanceTodayRecord.value?.lunchBreakStartTime
+  const hasOutingStarted = !!attendanceTodayRecord.value?.outingStartTime
+  if (!status || status === 'NOT_CHECKED_IN') return ['IN']
+  if (status === 'LUNCH_BREAK') return ['END_LUNCH']
+  if (status === 'OUTING') return ['END_OUTING']
+  if (status === 'ON_DUTY') {
+    const actions: AttendanceAction[] = []
+    if (!hasLunchStarted) actions.push('START_LUNCH')
+    if (!hasOutingStarted) actions.push('START_OUTING')
+    actions.push('OUT')
+    return actions
+  }
+  return []
+})
 
 function filterActions(items: ActionItem[]) {
   return items.filter((item) => canAccess(item.path))
@@ -237,14 +366,50 @@ function openPath(path: string) {
 }
 
 async function load() {
-  const res = await getPortalSummary({ params: { scope: 'PERSONAL' }, silent403: true })
-  summary.openTodoCount = Number(res?.openTodoCount || 0)
-  summary.pendingApprovalCount = Number(res?.pendingApprovalCount || 0)
-  summary.ongoingTaskCount = Number(res?.ongoingTaskCount || 0)
-  summary.submittedReportCount = Number(res?.submittedReportCount || 0)
-  summary.birthdayTodoCount = Number(res?.birthdayTodoCount || 0)
-  summary.approvalTimeoutCount = Number(res?.approvalTimeoutCount || 0)
+  const [portalResult, attendanceResult] = await Promise.allSettled([
+    getPortalSummary({ params: { scope: 'PERSONAL' }, silent403: true }),
+    getAttendanceOverview({ month: dayjs().format('YYYY-MM') })
+  ])
+
+  if (portalResult.status === 'fulfilled') {
+    const res = portalResult.value
+    summary.openTodoCount = Number(res?.openTodoCount || 0)
+    summary.pendingApprovalCount = Number(res?.pendingApprovalCount || 0)
+    summary.ongoingTaskCount = Number(res?.ongoingTaskCount || 0)
+    summary.submittedReportCount = Number(res?.submittedReportCount || 0)
+    summary.birthdayTodoCount = Number(res?.birthdayTodoCount || 0)
+    summary.approvalTimeoutCount = Number(res?.approvalTimeoutCount || 0)
+    portalTodos.value = Array.isArray(res?.todos) ? res.todos : []
+    portalNotices.value = Array.isArray(res?.notices) ? res.notices : []
+  }
+
+  if (attendanceResult.status === 'fulfilled') {
+    Object.assign(attendanceOverview, attendanceResult.value || { days: [] })
+  }
+
   refreshedAt.value = dayjs().format('MM-DD HH:mm')
+}
+
+async function handleAttendanceAction(action: AttendanceAction) {
+  attendanceSubmitting.value = true
+  try {
+    await punchAttendance(action)
+    message.success(resolveAttendanceActionText(action))
+    await load()
+  } catch (error: any) {
+    message.error(error?.message || `${resolveAttendanceActionText(action)}失败`)
+  } finally {
+    attendanceSubmitting.value = false
+  }
+}
+
+function resolveAttendanceActionText(action: AttendanceAction) {
+  if (action === 'IN') return '上班打卡成功'
+  if (action === 'OUT') return '下班打卡成功'
+  if (action === 'START_LUNCH') return '开始午休成功'
+  if (action === 'END_LUNCH') return '结束午休成功'
+  if (action === 'START_OUTING') return '开始外出成功'
+  return '结束外出成功'
 }
 
 onMounted(() => {
@@ -417,6 +582,11 @@ useLiveSyncRefresh({
   padding: 20px;
 }
 
+.attendance-panel,
+.preview-panel {
+  height: 100%;
+}
+
 .lane-head {
   display: flex;
   align-items: flex-start;
@@ -496,6 +666,82 @@ useLiveSyncRefresh({
   color: var(--primary);
   font-size: 12px;
   font-weight: 700;
+}
+
+.attendance-summary {
+  display: grid;
+  gap: 14px;
+}
+
+.attendance-main strong {
+  display: block;
+  font-size: 24px;
+  color: var(--ink);
+}
+
+.attendance-main p {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.attendance-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.attendance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.preview-list {
+  display: grid;
+  gap: 10px;
+}
+
+.preview-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid rgba(20, 70, 110, 0.1);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.84);
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.preview-item:hover {
+  transform: translateY(-1px);
+  border-color: rgba(31, 143, 190, 0.28);
+  box-shadow: 0 12px 28px rgba(44, 104, 152, 0.12);
+}
+
+.preview-item strong {
+  display: block;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.preview-item p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.preview-item span {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 @media (max-width: 1400px) {

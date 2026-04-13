@@ -9,7 +9,7 @@
         <a-button @click="printCurrent">打印当前</a-button>
         <a-button @click="go('/finance/bills/rules')">计费规则入口</a-button>
         <a-button @click="go('/finance/accounts/warning-rules')">余额预警规则</a-button>
-        <a-button @click="go('/finance/config/fee-subjects')">费用科目字典</a-button>
+        <a-button @click="go('/finance/allocation/subjects')">费用科目字典</a-button>
         <a-button @click="go('/finance/config/payment-channels')">缴费渠道/收款账户</a-button>
         <a-button @click="go('/finance/config/approval-flow')">权限与审批流配置</a-button>
         <a-button @click="go('/finance/config/change-log')">配置变更记录</a-button>
@@ -28,7 +28,7 @@
         <a-card class="card-elevated" :bordered="false" title="费用科目字典">
           <a-space direction="vertical" style="width: 100%">
             <span style="color: #64748b;">管理房费/护理费/医护费/水电电视网络等科目</span>
-            <a-button type="primary" @click="go('/finance/config/fee-subjects')">进入维护</a-button>
+            <a-button type="primary" @click="go('/finance/allocation/subjects')">进入维护</a-button>
           </a-space>
         </a-card>
       </a-col>

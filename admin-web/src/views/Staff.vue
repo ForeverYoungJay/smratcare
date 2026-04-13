@@ -118,9 +118,28 @@
             </a>
             <a v-permission="credentialViewerRoles" @click="openCredential(record.id)">查看密码</a>
             <a v-permission="credentialViewerRoles" @click="openCredential(record.id, true)">打印账号密码</a>
-            <a v-if="record.status === 1" v-permission="accountManagerRoles" @click="toggleStaffLock(record, true)">一键锁定</a>
-            <a v-else v-permission="accountManagerRoles" @click="toggleStaffLock(record, false)">解除锁定</a>
-            <a v-permission="accountManagerRoles" @click="openRole(record)">分配角色</a>
+            <a
+              v-if="record.status === 1 && !isReservedRoleCodeList(record.roleCodes)"
+              v-permission="accountManagerRoles"
+              @click="toggleStaffLock(record, true)"
+            >
+              一键锁定
+            </a>
+            <a
+              v-else-if="record.status !== 1 && !isReservedRoleCodeList(record.roleCodes)"
+              v-permission="accountManagerRoles"
+              @click="toggleStaffLock(record, false)"
+            >
+              解除锁定
+            </a>
+            <a
+              v-if="!isReservedRoleCodeList(record.roleCodes)"
+              v-permission="accountManagerRoles"
+              @click="openRole(record)"
+            >
+              分配角色
+            </a>
+            <a-tag v-else color="gold">系统保留角色</a-tag>
           </a-space>
         </template>
       </template>
@@ -261,6 +280,7 @@ import { useLiveSyncRefresh } from '../composables/useLiveSyncRefresh'
 import { openPrintTableReport } from '../utils/print'
 import { canBeDirectLeader, canBeIndirectLeader, ensureSupervisorOrder, mergeRoleCodes } from '../utils/supervisor'
 import type { Id, StaffCredentialItem, StaffItem, RoleItem, PageResult } from '../types'
+const RESERVED_ROLE_CODES = new Set(['SYS_ADMIN'])
 
 const props = withDefaults(defineProps<{ title?: string; subTitle?: string }>(), {
   title: '员工管理',
@@ -522,6 +542,14 @@ const displayRows = computed(() => {
   return rows.value.filter((item) => supervisorAnomalyMap.value.has(String(item.id)))
 })
 
+function isReservedRole(role?: Partial<RoleItem>) {
+  return RESERVED_ROLE_CODES.has(String(role?.roleCode || '').trim().toUpperCase())
+}
+
+function isReservedRoleCodeList(roleCodes?: Array<string | null | undefined>) {
+  return (roleCodes || []).some((code) => RESERVED_ROLE_CODES.has(String(code || '').trim().toUpperCase()))
+}
+
 async function fetchData() {
   loading.value = true
   try {
@@ -529,7 +557,7 @@ async function fetchData() {
     rows.value = res.list
     pagination.total = res.total || res.list.length
     const roleRes: PageResult<RoleItem> = await getRolePage({ pageNo: 1, pageSize: 200 })
-    roles.value = roleRes.list
+    roles.value = (roleRes.list || []).filter((item) => !isReservedRole(item))
     if (!departmentOptions.value.length) await searchDepartments('')
     if (!staffOptions.value.length) await searchStaff('')
     rows.value.forEach((item) => {
@@ -550,7 +578,7 @@ async function ensureRolesLoaded() {
     return
   }
   const roleRes: PageResult<RoleItem> = await getRolePage({ pageNo: 1, pageSize: 200 })
-  roles.value = roleRes.list || []
+  roles.value = (roleRes.list || []).filter((item) => !isReservedRole(item))
 }
 
 function handleTableChange(pag: any) {
@@ -758,6 +786,10 @@ async function submit() {
 }
 
 async function toggleStaffLock(record: StaffItem, lock: boolean) {
+  if (isReservedRoleCodeList(record.roleCodes)) {
+    message.warning('系统超管账号为超级保护账号，不支持锁定或解锁')
+    return
+  }
   try {
     if (lock) {
       await lockStaff(record.id)
@@ -828,6 +860,10 @@ async function maybeAutoOpenFromRoute() {
 }
 
 async function openRole(record: StaffItem) {
+  if (isReservedRoleCodeList(record.roleCodes)) {
+    message.warning('系统超管仅限系统保留，不支持在这里分配或修改角色')
+    return
+  }
   await ensureRolesLoaded()
   roleForm.staffId = record.id
   roleForm.roleIds = []
