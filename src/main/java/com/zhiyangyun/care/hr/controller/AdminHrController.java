@@ -111,6 +111,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/hr")
 public class AdminHrController {
+  private static final String HIDDEN_PLATFORM_USERNAME = "sysadmin_root";
   private final StaffProfileMapper staffProfileMapper;
   private final StaffTrainingRecordMapper trainingRecordMapper;
   private final StaffServicePlanMapper staffServicePlanMapper;
@@ -280,6 +281,7 @@ public class AdminHrController {
     var wrapper = Wrappers.lambdaQuery(StaffAccount.class)
         .eq(StaffAccount::getIsDeleted, 0)
         .eq(orgId != null, StaffAccount::getOrgId, orgId)
+        .ne(StaffAccount::getUsername, HIDDEN_PLATFORM_USERNAME)
         .eq(departmentId != null, StaffAccount::getDepartmentId, departmentId)
         .eq(status != null, StaffAccount::getStatus, status);
     if (contractStatus != null && !contractStatus.isBlank()) {
@@ -333,10 +335,12 @@ public class AdminHrController {
     Long onJobCount = count(staffMapper.selectCount(Wrappers.lambdaQuery(StaffAccount.class)
         .eq(StaffAccount::getIsDeleted, 0)
         .eq(orgId != null, StaffAccount::getOrgId, orgId)
+        .ne(StaffAccount::getUsername, HIDDEN_PLATFORM_USERNAME)
         .eq(StaffAccount::getStatus, 1)));
     Long leftCount = count(staffMapper.selectCount(Wrappers.lambdaQuery(StaffAccount.class)
         .eq(StaffAccount::getIsDeleted, 0)
         .eq(orgId != null, StaffAccount::getOrgId, orgId)
+        .ne(StaffAccount::getUsername, HIDDEN_PLATFORM_USERNAME)
         .eq(StaffAccount::getStatus, 0)));
 
     Long todayTrainingCount = count(trainingRecordMapper.selectCount(Wrappers.lambdaQuery(StaffTrainingRecord.class)
@@ -433,6 +437,7 @@ public class AdminHrController {
         .isNotNull(StaffProfile::getBirthday));
     List<Long> staffIds = profiles.stream().map(StaffProfile::getStaffId).distinct().toList();
     Map<Long, StaffAccount> staffMap = staffMapper.selectBatchIdsSafe(staffIds).stream()
+        .filter(staff -> !isHiddenPlatformStaff(staff))
         .collect(Collectors.toMap(StaffAccount::getId, s -> s, (a, b) -> a));
     String scopeCode = scope == null ? "ALL" : scope.trim().toUpperCase(Locale.ROOT);
     int filterMonth = month == null ? 0 : month;
@@ -543,6 +548,7 @@ public class AdminHrController {
       List<Long> staffIds = staffMapper.selectList(Wrappers.lambdaQuery(StaffAccount.class)
               .eq(StaffAccount::getIsDeleted, 0)
               .eq(orgId != null, StaffAccount::getOrgId, orgId)
+              .ne(StaffAccount::getUsername, HIDDEN_PLATFORM_USERNAME)
               .and(w -> w.like(StaffAccount::getRealName, keyword.trim())
                   .or().like(StaffAccount::getStaffNo, keyword.trim())
                   .or().like(StaffAccount::getPhone, keyword.trim())))
@@ -3668,6 +3674,7 @@ public class AdminHrController {
       return Map.of();
     }
     return staffMapper.selectBatchIdsSafe(sanitizedStaffIds).stream()
+        .filter(staff -> !isHiddenPlatformStaff(staff))
         .collect(Collectors.toMap(StaffAccount::getId, s -> s, (a, b) -> a));
   }
 
@@ -3678,6 +3685,7 @@ public class AdminHrController {
     return staffMapper.selectList(Wrappers.lambdaQuery(StaffAccount.class)
             .eq(StaffAccount::getIsDeleted, 0)
             .eq(orgId != null, StaffAccount::getOrgId, orgId)
+            .ne(StaffAccount::getUsername, HIDDEN_PLATFORM_USERNAME)
             .and(w -> w.like(StaffAccount::getRealName, keyword.trim())
                 .or().like(StaffAccount::getStaffNo, keyword.trim())
                 .or().like(StaffAccount::getPhone, keyword.trim())))
@@ -3717,6 +3725,14 @@ public class AdminHrController {
         .filter(id -> id != null && id > 0)
         .distinct()
         .toList();
+  }
+
+  private boolean isHiddenPlatformStaff(StaffAccount staff) {
+    if (staff == null) {
+      return true;
+    }
+    String username = staff.getUsername();
+    return username != null && HIDDEN_PLATFORM_USERNAME.equalsIgnoreCase(username.trim());
   }
 
   private String normalizeBlank(String value) {

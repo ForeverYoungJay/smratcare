@@ -41,6 +41,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminStaffController {
   private static final String DEFAULT_INITIAL_PASSWORD = "123456";
   private static final String RESERVED_SYS_ADMIN_CODE = "SYS_ADMIN";
+  private static final String HIDDEN_PLATFORM_USERNAME = "sysadmin_root";
   private final StaffMapper staffMapper;
   private final DepartmentMapper departmentMapper;
   private final RoleMapper roleMapper;
@@ -208,6 +209,7 @@ public class AdminStaffController {
     var wrapper = Wrappers.lambdaQuery(StaffAccount.class)
         .eq(StaffAccount::getIsDeleted, 0)
         .eq(orgId != null, StaffAccount::getOrgId, orgId)
+        .ne(StaffAccount::getUsername, HIDDEN_PLATFORM_USERNAME)
         .eq(departmentId != null, StaffAccount::getDepartmentId, departmentId);
     if (roleId != null) {
       if (matchedRoleStaffIds.isEmpty()) {
@@ -251,6 +253,7 @@ public class AdminStaffController {
     var wrapper = Wrappers.lambdaQuery(StaffAccount.class)
         .eq(StaffAccount::getIsDeleted, 0)
         .eq(orgId != null, StaffAccount::getOrgId, orgId)
+        .ne(StaffAccount::getUsername, HIDDEN_PLATFORM_USERNAME)
         .eq(activeOnly, StaffAccount::getStatus, 1);
     if (keyword != null && !keyword.isBlank()) {
       wrapper.and(w -> w.like(StaffAccount::getUsername, keyword)
@@ -272,7 +275,8 @@ public class AdminStaffController {
     Long orgId = AuthContext.getOrgId();
     List<StaffAccount> staffs = staffMapper.selectList(Wrappers.lambdaQuery(StaffAccount.class)
         .eq(StaffAccount::getIsDeleted, 0)
-        .eq(orgId != null, StaffAccount::getOrgId, orgId));
+        .eq(orgId != null, StaffAccount::getOrgId, orgId)
+        .ne(StaffAccount::getUsername, HIDDEN_PLATFORM_USERNAME));
     Map<Long, StaffAccount> staffMap = staffs.stream()
         .filter(item -> item != null && item.getId() != null)
         .collect(Collectors.toMap(StaffAccount::getId, item -> item, (a, b) -> a, LinkedHashMap::new));

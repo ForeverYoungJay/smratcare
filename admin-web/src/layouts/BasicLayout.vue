@@ -837,7 +837,7 @@ const quickNotifyItems = computed(() => {
     { title: '会员生日', route: '/oa/life/birthday' }
   ]
 })
-const { departmentOptions, searchDepartments } = useDepartmentOptions({ pageSize: 200, preloadSize: 600 })
+const { departmentOptions, searchDepartments, ensureSelectedDepartment } = useDepartmentOptions({ pageSize: 200, preloadSize: 600 })
 const { staffOptions, staffLoading, searchStaff, ensureSelectedStaff } = useStaffOptions({ pageSize: 120, preloadSize: 500 })
 const leaderOptions = computed(() => {
   const selfId = String(userStore.staffInfo?.id || '')
@@ -1226,7 +1226,7 @@ const quickChatStaffOptions = computed(() =>
       if (!quickChatRoomForm.departmentIds.length) return true
       return item.departmentId ? quickChatRoomForm.departmentIds.includes(String(item.departmentId)) : false
     })
-    .map((item) => ({ label: item.label, value: item.username || item.value }))
+    .map((item) => ({ label: item.label, value: item.value }))
 )
 const presenceStatus = computed(() => {
   void presenceTick.value
@@ -3601,8 +3601,20 @@ function resetQuickChatRoomForm() {
   quickChatRoomForm.applyRemark = ''
 }
 
+function warmQuickChatRoomFormOptions() {
+  searchDepartments('').catch(() => {})
+  searchStaff('').catch(() => {})
+  quickChatRoomForm.departmentIds.forEach((departmentId) => {
+    ensureSelectedDepartment(departmentId, departmentNameById(String(departmentId)))
+  })
+  quickChatRoomForm.memberIds.forEach((memberId) => {
+    ensureSelectedStaff(memberId, memberNameById(String(memberId)))
+  })
+}
+
 function openCreateQuickChatRoom() {
   resetQuickChatRoomForm()
+  warmQuickChatRoomFormOptions()
   quickChatRoomEditorMode.value = 'create'
   quickChatRoomEditorOpen.value = true
 }
@@ -3616,6 +3628,7 @@ function openInviteQuickChat() {
   quickChatRoomForm.departmentIds = [...activeQuickChatRoom.value.departmentIds]
   quickChatRoomForm.memberIds = [...activeQuickChatRoom.value.memberIds]
   quickChatRoomForm.applyRemark = ''
+  warmQuickChatRoomFormOptions()
   quickChatRoomEditorMode.value = 'invite'
   quickChatRoomEditorOpen.value = true
 }
@@ -3629,6 +3642,7 @@ function openRenameQuickChatRoom() {
   quickChatRoomForm.departmentIds = [...activeQuickChatRoom.value.departmentIds]
   quickChatRoomForm.memberIds = [...activeQuickChatRoom.value.memberIds]
   quickChatRoomForm.applyRemark = ''
+  warmQuickChatRoomFormOptions()
   quickChatRoomEditorMode.value = 'rename'
   quickChatRoomEditorOpen.value = true
 }

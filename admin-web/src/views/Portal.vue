@@ -438,22 +438,6 @@
             <a-space size="small" wrap class="calendar-insights">
               <a-tag v-for="item in calendarInsights" :key="item.label" :color="item.color">{{ item.label }} {{ item.value }}</a-tag>
             </a-space>
-            <a-space size="small" wrap class="calendar-loads" v-if="calendarLoadLeaders.length">
-              <a-tag color="geekblue">负责人负载</a-tag>
-              <a-tag v-for="item in calendarLoadLeaders" :key="item.name">{{ item.name }} {{ item.count }}条</a-tag>
-            </a-space>
-            <div class="calendar-week-trend" v-if="calendarWeeklyLoad.length">
-              <span class="hint-text">本周负载：</span>
-              <div
-                v-for="item in calendarWeeklyLoad"
-                :key="item.day"
-                class="calendar-week-bar"
-                :title="`${item.label} ${item.count}条`"
-                :style="{ height: `${Math.max(18, item.height)}px` }"
-              >
-                <span>{{ item.label }}</span>
-              </div>
-            </div>
             <a-space wrap>
               <a-checkable-tag
                 v-for="item in calendarBuckets"
@@ -2200,43 +2184,6 @@ const calendarInsights = computed(() => {
     { label: '节假日', value: portalFestivalEvents.value.length, color: 'orange' },
     { label: '生日提醒', value: portalBirthdayEvents.value.length, color: 'magenta' }
   ]
-})
-
-const calendarLoadLeaders = computed(() => {
-  const bucket = new Map<string, number>()
-  calendarRows.value
-    .filter((task) => task.status !== 'DONE')
-    .forEach((task) => {
-      const name = (task.assigneeName || '未分配').trim()
-      bucket.set(name, Number(bucket.get(name) || 0) + 1)
-    })
-  return Array.from(bucket.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 4)
-    .map(([name, count]) => ({ name, count }))
-})
-
-const calendarWeeklyLoad = computed(() => {
-  const start = dayjs().startOf('week')
-  const list = Array.from({ length: 7 }).map((_, index) => {
-    const day = start.add(index, 'day')
-    const dayText = day.format('YYYY-MM-DD')
-    const count = calendarRows.value.filter((task) => {
-      if (task.status === 'DONE') return false
-      const startTime = normalizeDateTimeValue(task.startTime || task.endTime)
-      return startTime ? dayjs(startTime).format('YYYY-MM-DD') === dayText : false
-    }).length
-    return {
-      day: dayText,
-      label: ['日', '一', '二', '三', '四', '五', '六'][day.day()],
-      count
-    }
-  })
-  const max = list.reduce((acc, item) => Math.max(acc, item.count), 1)
-  return list.map((item) => ({
-    ...item,
-    height: Math.round((item.count / max) * 48)
-  }))
 })
 
 function severityColor(level: string) {
@@ -4945,28 +4892,6 @@ onBeforeUnmount(() => {
 
 .calendar-insights {
   margin-bottom: 2px;
-}
-
-.calendar-loads {
-  margin-bottom: 2px;
-}
-
-.calendar-week-trend {
-  display: flex;
-  align-items: flex-end;
-  gap: 6px;
-}
-
-.calendar-week-bar {
-  min-width: 16px;
-  padding: 2px 4px;
-  border-radius: 6px 6px 2px 2px;
-  background: linear-gradient(180deg, #91caff 0%, #1677ff 100%);
-  color: #fff;
-  font-size: 11px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
 }
 
 .calendar-title-tip {
