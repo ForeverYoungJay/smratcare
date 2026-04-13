@@ -1294,16 +1294,30 @@ function currentApprover(record: OaApproval) {
   const parsed = parseFormData(record.formData)
   if (record.status === 'APPROVED') return '-'
   if (record.status === 'REJECTED') return '-'
-  const approverName = currentApproverNameOnly(record)
+  const approverNames = currentApproverDisplayNames(record)
+  const approverName = approverNames.join(' / ') || currentApproverNameOnly(record)
   const role = parsed?.currentApproverRole ? String(parsed.currentApproverRole).trim() : ''
   if (approverName) {
-    const roleLabel = approverRoleLabel(role)
-    return roleLabel && roleLabel !== '待分配' ? `${approverName} · ${roleLabel}` : approverName
+    return approverName
   }
   return approverRoleLabel(role)
 }
 
+function currentApproverDisplayNames(record: OaApproval) {
+  const parsed = parseFormData(record.formData)
+  const displayNames = Array.isArray(parsed?.currentApproverDisplayNames)
+    ? parsed.currentApproverDisplayNames
+        .map((item: any) => String(item || '').trim())
+        .filter((item: string) => !!item)
+    : []
+  return Array.from(new Set(displayNames))
+}
+
 function currentApproverNameOnly(record: OaApproval) {
+  const displayNames = currentApproverDisplayNames(record)
+  if (displayNames.length) {
+    return displayNames.join(' / ')
+  }
   const parsed = parseFormData(record.formData)
   const value = parsed?.currentApproverName || parsed?.nextApproverName
   return value ? String(value).trim() : ''
@@ -1321,10 +1335,18 @@ function approverStatusText(record: OaApproval) {
   if (record.status === 'APPROVED') return '流程完成'
   if (record.status === 'REJECTED') return '已驳回'
   const approverId = String(parsed?.currentApproverId || '').trim()
+  const approverIds = Array.isArray(parsed?.currentApproverIds)
+    ? parsed.currentApproverIds.map((item: any) => String(item || '').trim()).filter((item: string) => !!item)
+    : []
   const role = String(parsed?.currentApproverRole || '').trim()
-  const approverName = currentApproverNameOnly(record)
+  const approverName = currentApprover(record)
+  const currentStaffId = String(userStore.staffInfo?.id || '')
+  if (approverIds.length > 0) {
+    if (approverIds.includes(currentStaffId)) return '当前轮到我'
+    return approverName ? `可由 ${approverName} 任一处理` : '任一候选人可审批'
+  }
   if (approverId) {
-    if (approverId === String(userStore.staffInfo?.id || '')) return '当前轮到我'
+    if (approverId === currentStaffId) return '当前轮到我'
     return approverName ? `已指派给 ${approverName}` : role ? `已指派给${approverRoleLabel(role)}` : '已指派'
   }
   if (role) {
@@ -1338,6 +1360,7 @@ function approverStatusColor(record: OaApproval) {
   if (text === '流程完成') return 'green'
   if (text === '已驳回') return 'red'
   if (text === '当前轮到我') return 'blue'
+  if (text.startsWith('可由')) return 'cyan'
   if (text.startsWith('已指派')) return 'gold'
   if (text.startsWith('待')) return 'purple'
   return 'default'
@@ -1506,9 +1529,15 @@ async function submit() {
 function isCurrentUserApprover(record: OaApproval) {
   const parsed = parseFormData(record.formData)
   const approverId = String(parsed?.currentApproverId || '').trim()
+  const approverIds = Array.isArray(parsed?.currentApproverIds)
+    ? parsed.currentApproverIds.map((item: any) => String(item || '').trim()).filter((item: string) => !!item)
+    : []
   const approverRole = String(parsed?.currentApproverRole || '').toUpperCase()
   const roles = (userStore.roles || []).map((item) => String(item || '').toUpperCase())
   if (roles.includes('ADMIN') || roles.includes('SYS_ADMIN') || roles.includes('DIRECTOR')) return true
+  if (approverIds.length > 0) {
+    return approverIds.includes(String(userStore.staffInfo?.id || ''))
+  }
   if (approverId) {
     return approverId === String(userStore.staffInfo?.id || '')
   }

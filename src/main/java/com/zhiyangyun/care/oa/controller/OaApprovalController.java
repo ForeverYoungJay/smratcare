@@ -544,8 +544,16 @@ public class OaApprovalController {
           if (staffId != null) {
             String numericIdToken = "\"currentApproverId\":" + staffId;
             String stringIdToken = "\"currentApproverId\":\"" + staffId + "\"";
+            String arrayHeadToken = "\"currentApproverIds\":[" + staffId;
+            String arrayMiddleToken = "," + staffId + ",";
+            String arrayTailToken = "," + staffId + "]";
+            String arraySingleToken = "\"currentApproverIds\":[" + staffId + "]";
             w.and(x -> x.like(OaApproval::getFormData, numericIdToken)
-                .or().like(OaApproval::getFormData, stringIdToken));
+                .or().like(OaApproval::getFormData, stringIdToken)
+                .or().like(OaApproval::getFormData, arrayHeadToken)
+                .or().like(OaApproval::getFormData, arrayMiddleToken)
+                .or().like(OaApproval::getFormData, arrayTailToken)
+                .or().like(OaApproval::getFormData, arraySingleToken));
             first = false;
           }
           for (String role : normalizedRoles) {
@@ -978,6 +986,10 @@ public class OaApprovalController {
     if (approverId != null) {
       return approverId;
     }
+    List<Long> approverIds = parseLongList(formMap == null ? null : formMap.get("currentApproverIds"));
+    if (!approverIds.isEmpty()) {
+      return approverIds.get(0);
+    }
     String normalizedRole = parseString(approverRole);
     if (normalizedRole == null) {
       return null;
@@ -995,18 +1007,28 @@ public class OaApprovalController {
   private ApproverAssignment resolveApproverAssignment(Long orgId, String roleCode, Map<String, Object> map) {
     String normalizedRole = parseString(roleCode);
     if (normalizedRole == null) {
-      return new ApproverAssignment(null, "待分配");
+      return new ApproverAssignment(null, "待分配", List.of(), List.of());
     }
     normalizedRole = normalizedRole.trim().toUpperCase();
     if ("DEPT_MANAGER".equals(normalizedRole)) {
+      Long staffId = parseLong(map == null ? null : map.get("directLeaderId"));
+      String approverName = resolveApproverName(normalizedRole, map);
+      String displayName = formatApproverDisplay(resolveApproverDisplayRoleName(normalizedRole), approverName);
       return new ApproverAssignment(
-          parseLong(map == null ? null : map.get("directLeaderId")),
-          resolveApproverName(normalizedRole, map));
+          staffId,
+          displayName,
+          staffId == null ? List.of() : List.of(staffId),
+          displayName == null ? List.of() : List.of(displayName));
     }
     if ("DEAN".equals(normalizedRole)) {
+      Long staffId = parseLong(map == null ? null : map.get("indirectLeaderId"));
+      String approverName = resolveApproverName(normalizedRole, map);
+      String displayName = formatApproverDisplay(resolveApproverDisplayRoleName(normalizedRole), approverName);
       return new ApproverAssignment(
-          parseLong(map == null ? null : map.get("indirectLeaderId")),
-          resolveApproverName(normalizedRole, map));
+          staffId,
+          displayName,
+          staffId == null ? List.of() : List.of(staffId),
+          displayName == null ? List.of() : List.of(displayName));
     }
     List<String> candidateRoles = switch (normalizedRole) {
       case "HR" -> List.of("HR_MINISTER", "HR_EMPLOYEE", "HR_MANAGER", "PERSONNEL", "HR");
@@ -1016,20 +1038,39 @@ public class OaApprovalController {
       case "PURCHASING" -> List.of("LOGISTICS_MINISTER", "LOGISTICS_EMPLOYEE", "PURCHASE", "PROCUREMENT");
       default -> List.of();
     };
-    StaffAccount approver = findFirstActiveStaffByRoles(orgId, candidateRoles);
-    if (approver != null) {
-      String staffName = parseString(approver.getRealName());
-      if (staffName == null) {
-        staffName = resolveApproverName(normalizedRole, map);
-      }
-      return new ApproverAssignment(approver.getId(), staffName);
+    List<ApproverCandidate> candidates = findActiveApproverCandidatesByRoles(
+        orgId,
+        candidateRoles,
+        resolveApproverDisplayRoleName(normalizedRole));
+    if (!candidates.isEmpty()) {
+      ApproverCandidate primary = candidates.get(0);
+      List<Long> candidateIds = candidates.stream()
+          .map(ApproverCandidate::staffId)
+          .filter(id -> id != null && id > 0)
+          .distinct()
+          .toList();
+      List<String> candidateDisplayNames = candidates.stream()
+          .map(ApproverCandidate::displayName)
+          .filter(name -> name != null && !name.isBlank())
+          .distinct()
+          .toList();
+      String joinedDisplayName = candidateDisplayNames.isEmpty()
+          ? primary.displayName()
+          : String.join(" / ", candidateDisplayNames);
+      return new ApproverAssignment(primary.staffId(), joinedDisplayName, candidateIds, candidateDisplayNames);
     }
-    return new ApproverAssignment(null, resolveApproverName(normalizedRole, map));
+    String fallbackName = resolveApproverName(normalizedRole, map);
+    String fallbackDisplayName = formatApproverDisplay(resolveApproverDisplayRoleName(normalizedRole), fallbackName);
+    return new ApproverAssignment(
+        null,
+        fallbackDisplayName,
+        List.of(),
+        fallbackDisplayName == null ? List.of() : List.of(fallbackDisplayName));
   }
 
-  private StaffAccount findFirstActiveStaffByRoles(Long orgId, List<String> roleCodes) {
+  private List<ApproverCandidate> findActiveApproverCandidatesByRoles(Long orgId, List<String> roleCodes, String fallbackRoleLabel) {
     if (orgId == null || roleCodes == null || roleCodes.isEmpty()) {
-      return null;
+      return List.of();
     }
     List<String> normalizedRoles = roleCodes.stream()
         .map(item -> item == null ? null : item.trim().toUpperCase())
@@ -1037,7 +1078,7 @@ public class OaApprovalController {
         .distinct()
         .toList();
     if (normalizedRoles.isEmpty()) {
-      return null;
+      return List.of();
     }
     Map<String, Integer> priorityMap = new LinkedHashMap<>();
     for (int i = 0; i < normalizedRoles.size(); i++) {
@@ -1049,9 +1090,10 @@ public class OaApprovalController {
         .eq(Role::getStatus, 1)
         .in(Role::getRoleCode, normalizedRoles));
     if (roles.isEmpty()) {
-      return null;
+      return List.of();
     }
     Map<Long, Integer> rolePriority = new LinkedHashMap<>();
+    Map<Long, String> roleLabels = new LinkedHashMap<>();
     for (Role role : roles) {
       if (role == null || role.getId() == null) {
         continue;
@@ -1059,19 +1101,21 @@ public class OaApprovalController {
       Integer priority = priorityMap.get(String.valueOf(role.getRoleCode()).trim().toUpperCase());
       if (priority != null) {
         rolePriority.put(role.getId(), priority);
+        roleLabels.put(role.getId(), parseString(role.getRoleName()));
       }
     }
     if (rolePriority.isEmpty()) {
-      return null;
+      return List.of();
     }
     List<StaffRole> staffRoles = staffRoleMapper.selectList(Wrappers.lambdaQuery(StaffRole.class)
         .eq(StaffRole::getIsDeleted, 0)
         .eq(StaffRole::getOrgId, orgId)
         .in(StaffRole::getRoleId, rolePriority.keySet()));
     if (staffRoles.isEmpty()) {
-      return null;
+      return List.of();
     }
     Map<Long, Integer> bestPriorityByStaff = new LinkedHashMap<>();
+    Map<Long, Long> bestRoleIdByStaff = new LinkedHashMap<>();
     for (StaffRole staffRole : staffRoles) {
       if (staffRole == null || staffRole.getStaffId() == null || staffRole.getRoleId() == null) {
         continue;
@@ -1080,10 +1124,15 @@ public class OaApprovalController {
       if (priority == null) {
         continue;
       }
-      bestPriorityByStaff.merge(staffRole.getStaffId(), priority, Math::min);
+      Long staffId = staffRole.getStaffId();
+      Integer existingPriority = bestPriorityByStaff.get(staffId);
+      if (existingPriority == null || priority < existingPriority) {
+        bestPriorityByStaff.put(staffId, priority);
+        bestRoleIdByStaff.put(staffId, staffRole.getRoleId());
+      }
     }
     if (bestPriorityByStaff.isEmpty()) {
-      return null;
+      return List.of();
     }
     List<StaffAccount> staffs = staffMapper.selectList(Wrappers.lambdaQuery(StaffAccount.class)
         .eq(StaffAccount::getIsDeleted, 0)
@@ -1099,8 +1148,14 @@ public class OaApprovalController {
           }
           return Long.compare(left.getId() == null ? Long.MAX_VALUE : left.getId(), right.getId() == null ? Long.MAX_VALUE : right.getId());
         })
-        .findFirst()
-        .orElse(null);
+        .map(staff -> {
+          Long roleId = bestRoleIdByStaff.get(staff.getId());
+          String roleLabel = parseString(roleLabels.get(roleId));
+          String staffName = resolveStaffDisplayName(staff);
+          String displayName = formatApproverDisplay(roleLabel == null ? fallbackRoleLabel : roleLabel, staffName);
+          return new ApproverCandidate(staff.getId(), staffName, displayName);
+        })
+        .toList();
   }
 
   private void updateLeaveAnnualStats(OaApproval approval) {
@@ -1247,7 +1302,13 @@ public class OaApprovalController {
   private void ensureCurrentApproverPermission(OaApproval approval) {
     Map<String, Object> map = readFormMap(approval == null ? null : approval.getFormData());
     Long requiredApproverId = parseLong(map.get("currentApproverId"));
-    if (requiredApproverId != null && !AuthContext.isAdmin()) {
+    List<Long> requiredApproverIds = parseLongList(map.get("currentApproverIds"));
+    if (!requiredApproverIds.isEmpty() && !AuthContext.isAdmin()) {
+      Long currentStaffId = AuthContext.getStaffId();
+      if (currentStaffId == null || !requiredApproverIds.contains(currentStaffId)) {
+        throw new AccessDeniedException("当前审批环节仅允许指定审批候选人处理");
+      }
+    } else if (requiredApproverId != null && !AuthContext.isAdmin()) {
       Long currentStaffId = AuthContext.getStaffId();
       if (currentStaffId == null || !requiredApproverId.equals(currentStaffId)) {
         throw new AccessDeniedException("当前审批环节已指派给指定审批人");
@@ -1382,7 +1443,9 @@ public class OaApprovalController {
     map.put("currentStep", node);
     map.put("currentApproverRole", role);
     map.put("currentApproverId", assignment.staffId());
+    map.put("currentApproverIds", assignment.candidateIds());
     map.put("currentApproverName", assignment.staffName());
+    map.put("currentApproverDisplayNames", assignment.candidateDisplayNames());
     map.put("currentNodeEnteredAt", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
   }
 
@@ -1438,6 +1501,7 @@ public class OaApprovalController {
     row.put("toRole", parseString(toRole));
     row.put("toName", parseString(toName));
     row.put("toId", parseLong(map.get("currentApproverId")));
+    row.put("toIds", parseLongList(map.get("currentApproverIds")));
     row.put("message", parseString(message));
     row.put("at", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
     row.put("by", resolveCurrentStaffName());
@@ -1501,6 +1565,41 @@ public class OaApprovalController {
     if ("PURCHASING".equals(roleCode)) return "采购执行人";
     if ("ARCHIVE".equals(roleCode)) return "系统归档";
     return "审批负责人";
+  }
+
+  private String resolveApproverDisplayRoleName(String roleCode) {
+    if (roleCode == null) return "审批负责人";
+    return switch (roleCode) {
+      case "DEPT_MANAGER", "MANAGER" -> "部门主管";
+      case "HR" -> "人事部长";
+      case "FINANCE" -> "财务部长";
+      case "DEAN" -> "院长";
+      case "WAREHOUSE" -> "仓库负责人";
+      case "ADMIN_OFFICE" -> "行政负责人";
+      case "PURCHASING" -> "采购负责人";
+      case "ARCHIVE" -> "系统归档";
+      default -> "审批负责人";
+    };
+  }
+
+  private String resolveStaffDisplayName(StaffAccount staff) {
+    if (staff == null) {
+      return null;
+    }
+    String realName = parseString(staff.getRealName());
+    if (realName != null) {
+      return realName;
+    }
+    return parseString(staff.getUsername());
+  }
+
+  private String formatApproverDisplay(String roleLabel, String staffName) {
+    String normalizedRoleLabel = parseString(roleLabel);
+    String normalizedStaffName = parseString(staffName);
+    if (normalizedRoleLabel != null && normalizedStaffName != null) {
+      return normalizedRoleLabel + "（" + normalizedStaffName + "）";
+    }
+    return normalizedStaffName == null ? (normalizedRoleLabel == null ? "待分配" : normalizedRoleLabel) : normalizedStaffName;
   }
 
   private boolean isApprovalTimeout(OaApproval approval, LocalDateTime now) {
@@ -1595,7 +1694,9 @@ public class OaApprovalController {
     return canCurrentUserApprove();
   }
 
-  private record ApproverAssignment(Long staffId, String staffName) {}
+  private record ApproverCandidate(Long staffId, String staffName, String displayName) {}
+
+  private record ApproverAssignment(Long staffId, String staffName, List<Long> candidateIds, List<String> candidateDisplayNames) {}
 
   private String writeFormMap(Map<String, Object> map) {
     try {
@@ -1627,6 +1728,17 @@ public class OaApprovalController {
     } catch (Exception ignore) {
       return null;
     }
+  }
+
+  private List<Long> parseLongList(Object value) {
+    if (!(value instanceof List<?> list) || list.isEmpty()) {
+      return List.of();
+    }
+    return list.stream()
+        .map(this::parseLong)
+        .filter(item -> item != null && item > 0)
+        .distinct()
+        .toList();
   }
 
   private boolean parseBoolean(Object value) {
