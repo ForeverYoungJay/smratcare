@@ -23,6 +23,8 @@ public class ElderProfile {
 
   private Integer status;
 
+  private String lifecycleStatus;
+
   @TableField("create_time")
   private LocalDateTime createTime;
 
