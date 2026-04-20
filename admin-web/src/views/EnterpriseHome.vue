@@ -679,14 +679,12 @@ import type { FormInstance } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { enterpriseProfile, type EnterpriseProfile } from '../constants/enterpriseProfile'
-import { useUserStore } from '../stores/user'
-import { getToken } from '../utils/auth'
+import { getRoles, getStaffInfo, getToken } from '../utils/auth'
 
-const userStore = useUserStore()
 const PROFILE_OVERRIDE_STORAGE_KEY = 'enterprise_profile_override_v1'
 const hasToken = computed(() => Boolean(getToken()))
 const canManageSiteConfig = computed(() =>
-  (userStore.roles || []).some((role) => ['ADMIN', 'SYS_ADMIN', 'DIRECTOR', 'HR_MINISTER'].includes(String(role || '').toUpperCase()))
+  getRoles().some((role) => ['ADMIN', 'SYS_ADMIN', 'DIRECTOR', 'HR_MINISTER'].includes(String(role || '').toUpperCase()))
 )
 const profileConfigOpen = ref(false)
 const profileConfigSaving = ref(false)
@@ -915,9 +913,10 @@ const consultTopDepartment = computed(() => {
 })
 
 const pageMaintainer = computed(() => {
-  const realName = String(userStore.staffInfo?.realName || '').trim()
+  const staffInfo = getStaffInfo<{ realName?: string; username?: string }>()
+  const realName = String(staffInfo?.realName || '').trim()
   if (realName) return realName
-  const username = String(userStore.staffInfo?.username || '').trim()
+  const username = String(staffInfo?.username || '').trim()
   if (username) return username
   return profile.publishMeta.maintainer
 })
