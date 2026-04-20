@@ -6,6 +6,7 @@ import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderLifecycleEventMapper;
 import com.zhiyangyun.care.elder.model.ElderDepartureType;
 import com.zhiyangyun.care.elder.model.ElderLifecycleStatus;
+import com.zhiyangyun.care.elder.service.ElderDepartureSyncService;
 import com.zhiyangyun.care.elder.service.ElderLifecycleStateService;
 import java.time.LocalDateTime;
 import org.springframework.stereotype.Service;
@@ -15,12 +16,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class ElderLifecycleStateServiceImpl implements ElderLifecycleStateService {
   private final ElderMapper elderMapper;
   private final ElderLifecycleEventMapper elderLifecycleEventMapper;
+  private final ElderDepartureSyncService elderDepartureSyncService;
 
   public ElderLifecycleStateServiceImpl(
       ElderMapper elderMapper,
-      ElderLifecycleEventMapper elderLifecycleEventMapper) {
+      ElderLifecycleEventMapper elderLifecycleEventMapper,
+      ElderDepartureSyncService elderDepartureSyncService) {
     this.elderMapper = elderMapper;
     this.elderLifecycleEventMapper = elderLifecycleEventMapper;
+    this.elderDepartureSyncService = elderDepartureSyncService;
   }
 
   @Override
@@ -75,6 +79,7 @@ public class ElderLifecycleStateServiceImpl implements ElderLifecycleStateServic
 
     elder.setLastLifecycleEventId(event.getId());
     elderMapper.updateById(elder);
+    elderDepartureSyncService.syncAfterLifecycleChange(elder, beforeLifecycleStatus, targetLifecycleStatus, operatorId);
   }
 
   @Override

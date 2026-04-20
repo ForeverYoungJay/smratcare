@@ -6,6 +6,7 @@ import com.zhiyangyun.care.elder.entity.ElderFamily;
 import com.zhiyangyun.care.elder.entity.FamilyUser;
 import com.zhiyangyun.care.elder.entity.Room;
 import com.zhiyangyun.care.elder.entity.Bed;
+import com.zhiyangyun.care.elder.model.ElderLifecycleStatus;
 import com.zhiyangyun.care.elder.mapper.BedMapper;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.ElderFamilyMapper;
@@ -32,6 +33,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class VisitServiceImpl implements VisitService {
+  private static final int STATUS_BOOKED = 0;
+  private static final int STATUS_CHECKED_IN = 1;
+  private static final int STATUS_CANCELLED = 2;
+  private static final int MAX_VISITOR_COUNT = 5;
+  private static final int MAX_ADVANCE_DAYS = 30;
   private final VisitBookingMapper bookingMapper;
   private final VisitCheckLogMapper checkLogMapper;
   private final ElderMapper elderMapper;
@@ -62,6 +68,7 @@ public class VisitServiceImpl implements VisitService {
     if (elder == null) {
       throw new IllegalArgumentException("Elder not found");
     }
+    validateBookingRequest(request, elder);
     Long familyUserId = resolveFamilyUserId(request.getOrgId(), request.getElderId(), request.getFamilyUserId());
     FamilyUser familyUser = familyUserMapper.selectById(familyUserId);
     ElderFamily relation = resolveFamilyRelation(request.getOrgId(), request.getElderId(), familyUserId);
@@ -78,7 +85,7 @@ public class VisitServiceImpl implements VisitService {
     booking.setVisitTimeSlot(request.getVisitTimeSlot());
     booking.setVisitorCount(request.getVisitorCount());
     booking.setCarPlate(request.getCarPlate());
-    booking.setStatus(0);
+    booking.setStatus(STATUS_BOOKED);
     booking.setVerifyCode(generateUniqueCode(request.getOrgId()));
     booking.setVisitCode(generateUniqueCode(request.getOrgId()));
     booking.setRemark(request.getRemark());
@@ -131,11 +138,7 @@ public class VisitServiceImpl implements VisitService {
     if (guardStaffId == null) {
       throw new IllegalArgumentException("Guard staff required");
     }
-    VisitBooking booking = null;
-    if (request.getBookingId() != null) {
-      booking = bookingMapper.selectById(request.getBookingId());
-    }
-
+    VisitBooking booking = resolveCheckInBooking(request);
     if (booking == null) {
       throw new IllegalArgumentException("Booking not found");
     }
@@ -143,17 +146,28 @@ public class VisitServiceImpl implements VisitService {
       throw new IllegalArgumentException("Booking not found");
     }
 
+    if (booking.getStatus() == null || booking.getStatus() != STATUS_BOOKED) {
+      throw new IllegalStateException("Booking is not awaiting check-in");
+    }
+    if (booking.getVisitDate() == null || !booking.getVisitDate().equals(LocalDate.now())) {
+      throw new IllegalStateException("Only today's visits can be checked in");
+    }
+    if (request.getVisitCode() != null && !request.getVisitCode().isBlank()
+        && !request.getVisitCode().trim().equalsIgnoreCase(booking.getVisitCode())) {
+      throw new IllegalArgumentException("Visit code mismatch");
+    }
+
     VisitCheckLog log = new VisitCheckLog();
     log.setOrgId(booking.getOrgId());
     log.setBookingId(booking.getId());
     log.setCheckTime(LocalDateTime.now());
     log.setStaffId(guardStaffId);
-    log.setQrcodeToken("DIRECT_CHECKIN");
+    log.setQrcodeToken(booking.getVisitCode());
     log.setResultStatus(1);
     log.setRemark(request.getRemark());
     checkLogMapper.insert(log);
 
-    booking.setStatus(1);
+    booking.setStatus(STATUS_CHECKED_IN);
     bookingMapper.updateById(booking);
 
     VisitCheckInResponse response = new VisitCheckInResponse();
@@ -170,13 +184,14 @@ public class VisitServiceImpl implements VisitService {
     if (booking == null || !Objects.equals(booking.getOrgId(), orgId) || Integer.valueOf(1).equals(booking.getIsDeleted())) {
       throw new IllegalArgumentException("Booking not found");
     }
-    if (booking.getStatus() != null && booking.getStatus() == 1) {
+    if (booking.getStatus() != null && booking.getStatus() == STATUS_CHECKED_IN) {
       throw new IllegalStateException("已登记到访记录不可编辑");
     }
     ElderProfile elder = elderMapper.selectById(request.getElderId());
     if (elder == null) {
       throw new IllegalArgumentException("Elder not found");
     }
+    validateBookingRequest(request, elder, booking.getId());
     Long familyUserId = resolveFamilyUserId(orgId, request.getElderId(), request.getFamilyUserId());
     FamilyUser familyUser = familyUserMapper.selectById(familyUserId);
     ElderFamily relation = resolveFamilyRelation(orgId, request.getElderId(), familyUserId);
@@ -201,10 +216,11 @@ public class VisitServiceImpl implements VisitService {
     if (booking == null || !Objects.equals(booking.getOrgId(), orgId) || Integer.valueOf(1).equals(booking.getIsDeleted())) {
       throw new IllegalArgumentException("Booking not found");
     }
-    if (booking.getStatus() != null && booking.getStatus() == 1) {
+    if (booking.getStatus() != null && booking.getStatus() == STATUS_CHECKED_IN) {
       throw new IllegalStateException("已登记到访记录不可删除");
     }
-    booking.setIsDeleted(1);
+    booking.setStatus(STATUS_CANCELLED);
+    booking.setRemark(appendRemark(booking.getRemark(), "预约已取消"));
     bookingMapper.updateById(booking);
   }
 
@@ -232,7 +248,11 @@ public class VisitServiceImpl implements VisitService {
     response.setVisitTime(source.getVisitTime());
     response.setVisitorCount(source.getVisitorCount());
     response.setCarPlate(source.getCarPlate());
-    response.setStatusText((source.getStatus() != null && source.getStatus() == 1) ? "已登记" : "待登记");
+    response.setStatusText(switch (source.getStatus() == null ? -1 : source.getStatus()) {
+      case STATUS_CHECKED_IN -> "已登记";
+      case STATUS_CANCELLED -> "已取消";
+      default -> "待登记";
+    });
     response.setGeneratedAt(LocalDateTime.now());
     return response;
   }
@@ -348,5 +368,78 @@ public class VisitServiceImpl implements VisitService {
     response.setStatus(booking.getStatus());
     response.setRemark(booking.getRemark());
     return response;
+  }
+
+  private void validateBookingRequest(VisitBookRequest request, ElderProfile elder) {
+    validateBookingRequest(request, elder, null);
+  }
+
+  private void validateBookingRequest(VisitBookRequest request, ElderProfile elder, Long excludeBookingId) {
+    if (request == null || request.getVisitTime() == null) {
+      throw new IllegalArgumentException("Visit time required");
+    }
+    if (!canReceiveVisit(elder)) {
+      throw new IllegalStateException("当前老人状态不支持预约探视");
+    }
+    LocalDateTime now = LocalDateTime.now();
+    if (request.getVisitTime().isBefore(now.plusMinutes(30))) {
+      throw new IllegalArgumentException("预约时间需至少晚于当前30分钟");
+    }
+    if (request.getVisitTime().toLocalDate().isAfter(LocalDate.now().plusDays(MAX_ADVANCE_DAYS))) {
+      throw new IllegalArgumentException("预约时间超出可预约窗口");
+    }
+    int visitorCount = request.getVisitorCount() == null ? 1 : request.getVisitorCount();
+    if (visitorCount < 1 || visitorCount > MAX_VISITOR_COUNT) {
+      throw new IllegalArgumentException("来访人数需在1到" + MAX_VISITOR_COUNT + "之间");
+    }
+    long duplicateCount = bookingMapper.selectCount(Wrappers.lambdaQuery(VisitBooking.class)
+        .eq(VisitBooking::getIsDeleted, 0)
+        .eq(VisitBooking::getOrgId, request.getOrgId())
+        .eq(VisitBooking::getElderId, request.getElderId())
+        .eq(VisitBooking::getVisitDate, request.getVisitTime().toLocalDate())
+        .eq(VisitBooking::getVisitTimeSlot, request.getVisitTimeSlot())
+        .ne(excludeBookingId != null, VisitBooking::getId, excludeBookingId)
+        .in(VisitBooking::getStatus, STATUS_BOOKED, STATUS_CHECKED_IN));
+    if (duplicateCount > 0) {
+      throw new IllegalStateException("该老人当前时段已有有效探视预约");
+    }
+  }
+
+  private VisitBooking resolveCheckInBooking(VisitCheckInRequest request) {
+    if (request == null) {
+      return null;
+    }
+    if (request.getBookingId() != null) {
+      return bookingMapper.selectById(request.getBookingId());
+    }
+    if (request.getVisitCode() == null || request.getVisitCode().isBlank()) {
+      return null;
+    }
+    return bookingMapper.selectOne(Wrappers.lambdaQuery(VisitBooking.class)
+        .eq(VisitBooking::getOrgId, request.getOrgId())
+        .eq(VisitBooking::getVisitCode, request.getVisitCode().trim())
+        .eq(VisitBooking::getIsDeleted, 0)
+        .last("LIMIT 1"));
+  }
+
+  private boolean canReceiveVisit(ElderProfile elder) {
+    if (elder == null) {
+      return false;
+    }
+    String lifecycleStatus = ElderLifecycleStatus.normalize(elder.getLifecycleStatus());
+    if (lifecycleStatus == null) {
+      return elder.getStatus() != null && elder.getStatus() == 1;
+    }
+    return ElderLifecycleStatus.IN_HOSPITAL.equals(lifecycleStatus);
+  }
+
+  private String appendRemark(String remark, String suffix) {
+    if (suffix == null || suffix.isBlank()) {
+      return remark;
+    }
+    if (remark == null || remark.isBlank()) {
+      return suffix;
+    }
+    return remark + "；" + suffix;
   }
 }

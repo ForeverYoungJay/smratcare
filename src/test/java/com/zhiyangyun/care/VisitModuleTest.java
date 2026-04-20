@@ -73,9 +73,46 @@ class VisitModuleTest {
 
     var checkin = visitService.checkIn(new com.zhiyangyun.care.visit.model.VisitCheckInRequest() {{
       setOrgId(1L);
-      setBookingId(booking.getId());
+      setVisitCode(booking.getVisitCode());
     }}, 500L);
 
     assertEquals(1, checkin.getStatus());
+  }
+
+  @Test
+  void duplicate_slot_for_same_elder_is_rejected() {
+    VisitBookRequest first = new VisitBookRequest();
+    first.setOrgId(1L);
+    first.setElderId(200L);
+    first.setFamilyUserId(1L);
+    first.setVisitTime(LocalDateTime.now().plusHours(3));
+    first.setVisitTimeSlot("AM");
+    visitService.book(first);
+
+    VisitBookRequest duplicate = new VisitBookRequest();
+    duplicate.setOrgId(1L);
+    duplicate.setElderId(200L);
+    duplicate.setFamilyUserId(1L);
+    duplicate.setVisitTime(first.getVisitTime().plusMinutes(20));
+    duplicate.setVisitTimeSlot("AM");
+
+    assertThrows(IllegalStateException.class, () -> visitService.book(duplicate));
+  }
+
+  @Test
+  void checkin_requires_valid_visit_code_when_provided() {
+    VisitBookRequest request = new VisitBookRequest();
+    request.setOrgId(1L);
+    request.setElderId(200L);
+    request.setFamilyUserId(1L);
+    request.setVisitTime(LocalDateTime.now().plusHours(4));
+    request.setVisitTimeSlot("PM");
+    var booking = visitService.book(request);
+
+    assertThrows(IllegalArgumentException.class, () -> visitService.checkIn(new com.zhiyangyun.care.visit.model.VisitCheckInRequest() {{
+      setOrgId(1L);
+      setBookingId(booking.getId());
+      setVisitCode("WRONG-CODE");
+    }}, 500L));
   }
 }

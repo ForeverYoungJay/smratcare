@@ -678,12 +678,10 @@ import { message } from 'ant-design-vue'
 import type { FormInstance } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { computed, onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { enterpriseProfile, type EnterpriseProfile } from '../constants/enterpriseProfile'
 import { useUserStore } from '../stores/user'
 import { getToken } from '../utils/auth'
 
-const router = useRouter()
 const userStore = useUserStore()
 const PROFILE_OVERRIDE_STORAGE_KEY = 'enterprise_profile_override_v1'
 const hasToken = computed(() => Boolean(getToken()))
@@ -1128,15 +1126,15 @@ function resetCareMatcher() {
 }
 
 function goLogin() {
-  router.push('/admin')
+  window.location.assign('/admin')
 }
 
 function goAdmin() {
-  router.push(hasToken.value ? '/portal' : '/admin')
+  window.location.assign(hasToken.value ? '/portal' : '/admin')
 }
 
 function goSiteConfig() {
-  router.push('/system/site-config')
+  window.location.assign('/system/site-config')
 }
 
 function openMapNavigation() {
@@ -1356,8 +1354,6 @@ function scrollTo(id: string) {
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
 .enterprise-home {
   min-height: 100vh;
   color: #1a202c;
@@ -1366,7 +1362,7 @@ function scrollTo(id: string) {
     radial-gradient(at 0% 0%, hsla(210,100%,94%,1) 0, transparent 50%), 
     radial-gradient(at 50% 0%, hsla(220,100%,96%,1) 0, transparent 50%), 
     radial-gradient(at 100% 0%, hsla(230,100%,94%,1) 0, transparent 50%);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Helvetica, Arial, sans-serif;
   letter-spacing: -0.01em;
 }
 

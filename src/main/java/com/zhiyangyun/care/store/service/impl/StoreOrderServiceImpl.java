@@ -34,6 +34,7 @@ import com.zhiyangyun.care.finance.entity.PaymentRecord;
 import com.zhiyangyun.care.finance.mapper.PaymentRecordMapper;
 import com.zhiyangyun.care.auth.entity.StaffAccount;
 import com.zhiyangyun.care.auth.mapper.StaffMapper;
+import com.zhiyangyun.care.elder.model.ElderLifecycleStatus;
 import com.zhiyangyun.care.oa.entity.OaTodo;
 import com.zhiyangyun.care.oa.mapper.OaTodoMapper;
 import com.zhiyangyun.care.store.model.ForbiddenReason;
@@ -63,6 +64,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.StoreOrderService {
+  private static final int ORDER_STATUS_CREATED = 1;
+  private static final int ORDER_STATUS_FULFILLED = 3;
+  private static final int ORDER_STATUS_CANCELLED = 4;
+  private static final int ORDER_STATUS_REFUNDED = 5;
+  private static final int PAY_STATUS_PENDING = 0;
+  private static final int PAY_STATUS_SETTLED = 1;
+  private static final int PAY_STATUS_REVERSED = 2;
   private final ElderProfileMapper elderMapper;
   private final ElderDiseaseMapper elderDiseaseMapper;
   private final DiseaseMapper diseaseMapper;
@@ -130,6 +138,12 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
       response.setStatus(OrderStatus.ELDER_NOT_FOUND.name());
       response.setAllowed(false);
       response.setMessage("Elder not found");
+      return response;
+    }
+    if (!canPlaceMallOrder(elder)) {
+      response.setStatus(OrderStatus.ELDER_NOT_FOUND.name());
+      response.setAllowed(false);
+      response.setMessage("Elder lifecycle does not allow mall orders");
       return response;
     }
 
@@ -283,6 +297,12 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
     }
 
     int pointsRequired = preview.getPointsRequired() == null ? 0 : preview.getPointsRequired();
+    BigDecimal cashAmount = product.getPrice() == null
+        ? BigDecimal.ZERO
+        : product.getPrice().multiply(BigDecimal.valueOf(request.getQty()));
+    if (pointsRequired > 0 && cashAmount.compareTo(BigDecimal.ZERO) > 0) {
+      throw new IllegalStateException("当前商城订单仅支持纯积分或纯金额，暂不支持混合结算");
+    }
     if (account.getPointsBalance() == null || account.getPointsBalance() < pointsRequired) {
       response.setStatus(OrderStatus.INSUFFICIENT_POINTS.name());
       response.setAllowed(false);
@@ -300,7 +320,7 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
 
     String orderNo = generateOrderNo();
     BigDecimal unitPrice = product.getPrice() == null ? BigDecimal.ZERO : product.getPrice();
-    BigDecimal totalAmount = unitPrice.multiply(BigDecimal.valueOf(request.getQty()));
+    BigDecimal totalAmount = pointsRequired > 0 ? BigDecimal.ZERO : cashAmount;
 
     StoreOrder order = new StoreOrder();
     order.setOrgId(elder.getOrgId());
@@ -309,8 +329,8 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
     order.setTotalAmount(totalAmount);
     order.setPointsUsed(pointsRequired);
     order.setPayableAmount(totalAmount);
-    order.setPayStatus(0);
-    order.setOrderStatus(1); // 已创建
+    order.setPayStatus(PAY_STATUS_PENDING);
+    order.setOrderStatus(ORDER_STATUS_CREATED);
     orderMapper.insert(order);
 
     OrderItem item = new OrderItem();
@@ -344,17 +364,17 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
     if (order == null) {
       return;
     }
-    if (order.getOrderStatus() != null && order.getOrderStatus() >= 3) {
+    if (isTerminalOrder(order)) {
       return;
     }
-    List<OrderItem> items = orderItemMapper.selectList(
-        Wrappers.lambdaQuery(OrderItem.class).eq(OrderItem::getOrderId, order.getId()));
-    rollbackInventory(items, order);
-    if (order.getPayStatus() != null && order.getPayStatus() == 1) {
+    if (!isCreatedOrder(order)) {
+      throw new IllegalStateException("Only created orders can be cancelled");
+    }
+    if (order.getPayStatus() != null && order.getPayStatus() == PAY_STATUS_SETTLED) {
       rollbackPoints(order);
     }
-    order.setOrderStatus(4); // CANCELLED
-    order.setPayStatus(2);
+    order.setOrderStatus(ORDER_STATUS_CANCELLED);
+    order.setPayStatus(PAY_STATUS_REVERSED);
     orderMapper.updateById(order);
     applyBillRefund(order, "CANCEL");
   }
@@ -366,8 +386,11 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
     if (order == null) {
       return;
     }
-    if (order.getOrderStatus() != null && order.getOrderStatus() == 5) {
+    if (order.getOrderStatus() != null && order.getOrderStatus() == ORDER_STATUS_REFUNDED) {
       return;
+    }
+    if (!isFulfilledOrder(order)) {
+      throw new IllegalStateException("Only fulfilled orders can be refunded");
     }
     List<OrderItem> items = orderItemMapper.selectList(
         Wrappers.lambdaQuery(OrderItem.class).eq(OrderItem::getOrderId, order.getId()));
@@ -414,26 +437,24 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
         inventoryBatchMapper.updateById(batch);
       }
 
-      if (order.getOrderStatus() != null && order.getOrderStatus() >= 3) {
-        InventoryLog log = new InventoryLog();
-        log.setOrgId(order.getOrgId());
-        log.setProductId(productId);
-        log.setBatchId(batch.getId());
-        log.setChangeType("IN");
-        log.setChangeQty(qty);
-        log.setRefOrderId(order.getId());
-        log.setBizType("RETURN");
-        log.setProductCodeSnapshot(codeSnapshotByProduct.get(productId));
-        log.setProductNameSnapshot(nameSnapshotByProduct.get(productId));
-        log.setRemark("Return in");
-        inventoryLogMapper.insert(log);
-      }
+      InventoryLog log = new InventoryLog();
+      log.setOrgId(order.getOrgId());
+      log.setProductId(productId);
+      log.setBatchId(batch.getId());
+      log.setChangeType("IN");
+      log.setChangeQty(qty);
+      log.setRefOrderId(order.getId());
+      log.setBizType("RETURN");
+      log.setProductCodeSnapshot(codeSnapshotByProduct.get(productId));
+      log.setProductNameSnapshot(nameSnapshotByProduct.get(productId));
+      log.setRemark("Return in");
+      inventoryLogMapper.insert(log);
     }
-    if (order.getPayStatus() != null && order.getPayStatus() == 1) {
+    if (order.getPayStatus() != null && order.getPayStatus() == PAY_STATUS_SETTLED) {
       rollbackPoints(order);
     }
-    order.setOrderStatus(5); // REFUNDED
-    order.setPayStatus(2);
+    order.setOrderStatus(ORDER_STATUS_REFUNDED);
+    order.setPayStatus(PAY_STATUS_REVERSED);
     orderMapper.updateById(order);
     applyBillRefund(order, "REFUND");
   }
@@ -445,8 +466,11 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
     if (order == null) {
       return;
     }
-    if (order.getOrderStatus() != null && order.getOrderStatus() >= 3) {
+    if (isTerminalOrder(order)) {
       return;
+    }
+    if (!isCreatedOrder(order)) {
+      throw new IllegalStateException("Only created orders can be fulfilled");
     }
     // 积分扣减（出库时）
     ElderPointsAccount account = pointsAccountMapper.selectOne(
@@ -483,8 +507,8 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
     }
     createFinanceFlow(order);
     createFulfillTodos(order);
-    order.setOrderStatus(3); // FULFILLED
-    order.setPayStatus(1);
+    order.setOrderStatus(ORDER_STATUS_FULFILLED);
+    order.setPayStatus(PAY_STATUS_SETTLED);
     order.setPayTime(LocalDateTime.now());
     order.setUpdateTime(LocalDateTime.now());
     orderMapper.updateById(order);
@@ -749,33 +773,8 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
     pointsLogMapper.insert(log);
   }
 
-  private void rollbackInventory(List<OrderItem> items, StoreOrder order) {
-    for (OrderItem item : items) {
-      InventoryBatch batch = new InventoryBatch();
-      batch.setOrgId(order.getOrgId());
-      batch.setProductId(item.getProductId());
-      batch.setBatchNo("CANCEL-" + order.getOrderNo());
-      batch.setQuantity(item.getQuantity());
-      batch.setCostPrice(item.getUnitPrice());
-      inventoryBatchMapper.insert(batch);
-
-      InventoryLog log = new InventoryLog();
-      log.setOrgId(order.getOrgId());
-      log.setProductId(item.getProductId());
-      log.setBatchId(batch.getId());
-      log.setChangeType("IN");
-      log.setChangeQty(item.getQuantity());
-      log.setRefOrderId(order.getId());
-      log.setBizType("RETURN");
-      log.setProductCodeSnapshot(item.getProductCodeSnapshot());
-      log.setProductNameSnapshot(item.getProductNameSnapshot());
-      log.setRemark("Cancel rollback");
-      inventoryLogMapper.insert(log);
-    }
-  }
-
   private void applyBillRefund(StoreOrder order, String type) {
-    if (order.getPayTime() == null || order.getTotalAmount() == null) {
+    if (order.getPayTime() == null || order.getTotalAmount() == null || order.getTotalAmount().compareTo(BigDecimal.ZERO) <= 0) {
       return;
     }
     YearMonth ym = YearMonth.from(order.getPayTime());
@@ -808,7 +807,7 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
   }
 
   private void createFinanceFlow(StoreOrder order) {
-    if (order.getTotalAmount() == null || order.getTotalAmount().compareTo(BigDecimal.ZERO) <= 0) {
+    if (order.getPayableAmount() == null || order.getPayableAmount().compareTo(BigDecimal.ZERO) <= 0) {
       return;
     }
     LocalDateTime paidAt = LocalDateTime.now();
@@ -819,8 +818,8 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
     PaymentRecord record = new PaymentRecord();
     record.setOrgId(order.getOrgId());
     record.setBillMonthlyId(monthly.getId());
-    record.setAmount(order.getTotalAmount());
-    record.setPayMethod("POINTS");
+    record.setAmount(order.getPayableAmount());
+    record.setPayMethod("CASH");
     record.setPaidAt(paidAt);
     record.setRemark("商城订单出库自动收款: " + order.getOrderNo());
     paymentRecordMapper.insert(record);
@@ -828,7 +827,7 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
     if (monthly.getPaidAmount() == null) {
       monthly.setPaidAmount(BigDecimal.ZERO);
     }
-    monthly.setPaidAmount(monthly.getPaidAmount().add(order.getTotalAmount()));
+    monthly.setPaidAmount(monthly.getPaidAmount().add(order.getPayableAmount()));
     if (monthly.getTotalAmount() != null && monthly.getTotalAmount().compareTo(BigDecimal.ZERO) > 0) {
       BigDecimal outstanding = monthly.getTotalAmount().subtract(monthly.getPaidAmount());
       monthly.setOutstandingAmount(outstanding);
@@ -888,5 +887,33 @@ public class StoreOrderServiceImpl implements com.zhiyangyun.care.store.service.
       todo.setAssigneeName(staff.getRealName());
       oaTodoMapper.insert(todo);
     }
+  }
+
+  private boolean canPlaceMallOrder(ElderProfile elder) {
+    if (elder == null) {
+      return false;
+    }
+    String lifecycleStatus = ElderLifecycleStatus.normalize(elder.getLifecycleStatus());
+    if (lifecycleStatus == null) {
+      return elder.getStatus() != null && elder.getStatus() == 1;
+    }
+    return ElderLifecycleStatus.IN_HOSPITAL.equals(lifecycleStatus)
+        || ElderLifecycleStatus.OUTING.equals(lifecycleStatus)
+        || ElderLifecycleStatus.MEDICAL_OUTING.equals(lifecycleStatus);
+  }
+
+  private boolean isCreatedOrder(StoreOrder order) {
+    return order != null && order.getOrderStatus() != null && order.getOrderStatus() == ORDER_STATUS_CREATED;
+  }
+
+  private boolean isFulfilledOrder(StoreOrder order) {
+    return order != null && order.getOrderStatus() != null && order.getOrderStatus() == ORDER_STATUS_FULFILLED;
+  }
+
+  private boolean isTerminalOrder(StoreOrder order) {
+    if (order == null || order.getOrderStatus() == null) {
+      return false;
+    }
+    return order.getOrderStatus() == ORDER_STATUS_CANCELLED || order.getOrderStatus() == ORDER_STATUS_REFUNDED;
   }
 }
