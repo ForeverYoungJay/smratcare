@@ -108,15 +108,20 @@
                 <div class="tower-floor-content">
                   <div v-for="room in floor.rooms" :key="room.key" class="room-cube" @dblclick="openRoomSceneDetail(room)">
                     <div class="room-head">
-                      <div class="room-title">{{ room.roomNo }}</div>
+                      <div>
+                        <div class="room-title">
+                          <span v-if="room.isFunctionalRoom" class="room-function-icon" aria-hidden="true">{{ resolveFunctionalRoomIcon(room.roomType) }}</span>
+                          <span>{{ room.roomNo }}</span>
+                        </div>
+                        <div v-if="room.isFunctionalRoom" class="room-function-name">{{ resolveRoomTypeLabel(room.roomType) }}</div>
+                      </div>
                       <div class="room-meta" :class="{ functional: room.isFunctionalRoom }">
-                        {{ room.isFunctionalRoom ? `${resolveRoomTypeLabel(room.roomType)} · 功能房` : `${room.occupiedBeds}/${room.totalBeds} 床 · ${room.elderCount} 人` }}
+                        {{ room.isFunctionalRoom ? '功能房' : `${room.occupiedBeds}/${room.totalBeds} 床 · ${room.elderCount} 人` }}
                       </div>
                     </div>
                     <div v-if="resolveVisibleRemark(room.remark)" class="room-remark">{{ resolveVisibleRemark(room.remark) }}</div>
                     <div v-if="room.isFunctionalRoom" class="functional-room-panel">
-                      <div class="functional-room-badge">不计入住率</div>
-                      <div class="functional-room-copy">在房态图展示，不纳入床位占用和入住统计。</div>
+                      <div class="functional-room-badge">{{ resolveRoomTypeLabel(room.roomType) }}</div>
                     </div>
                     <div v-else class="bed-grid">
                       <button
@@ -147,12 +152,14 @@
             <template v-else>
               <button type="button" class="functional-room-card" @click="openRoomSceneDetail(item.room)">
                 <div class="functional-room-card-head">
-                  <div class="functional-room-card-title">{{ item.room.roomNo }}</div>
+                  <div class="functional-room-card-title">
+                    <span class="functional-room-card-icon" aria-hidden="true">{{ resolveFunctionalRoomIcon(item.room.roomType) }}</span>
+                    <span>{{ item.room.roomNo }}</span>
+                  </div>
                   <div class="functional-room-card-chip">功能房</div>
                 </div>
                 <div class="functional-room-card-type">{{ resolveRoomTypeLabel(item.room.roomType) }}</div>
                 <div class="functional-room-card-copy">位置：{{ selectedBuilding || item.building }} / {{ selectedFloor || item.floor }}</div>
-                <div class="functional-room-card-copy">该房间展示在房态图中，但不计入入住率和床位统计。</div>
                 <div v-if="resolveVisibleRemark(item.room.remark)" class="functional-room-card-remark">{{ resolveVisibleRemark(item.room.remark) }}</div>
               </button>
             </template>
@@ -648,6 +655,17 @@ function isFunctionalRoomType(roomType?: string) {
     .some((keyword) => label.includes(keyword.toUpperCase()))
 }
 
+function resolveFunctionalRoomIcon(roomType?: string) {
+  const raw = String(roomType || '').trim()
+  const label = `${raw} ${roomTypeNameMap.value[raw] || ''}`.toUpperCase()
+  if (label.includes('护理站') || label.includes('NURSING') || label.includes('STATION')) return '⚕'
+  if (label.includes('开水房') || label.includes('WATER')) return '♨'
+  if (label.includes('洗衣房') || label.includes('LAUNDRY')) return '◉'
+  if (label.includes('卫生间') || label.includes('厕所') || label.includes('TOILET') || label.includes('WC')) return '⌘'
+  if (label.includes('浴室') || label.includes('沐浴') || label.includes('BATH')) return '◌'
+  return '◆'
+}
+
 function resolveRoomTypeLabel(roomType?: string) {
   const raw = String(roomType || '').trim()
   if (!raw) return '-'
@@ -979,9 +997,32 @@ watch([filteredBeds, functionalRooms], () => {
 }
 
 .room-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 800;
   font-size: 15px;
   color: #0f172a;
+}
+
+.room-function-icon {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(124, 58, 237, 0.12);
+  color: #6d28d9;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.room-function-name {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #7c3aed;
 }
 
 .room-meta {
@@ -1110,9 +1151,25 @@ watch([filteredBeds, functionalRooms], () => {
 }
 
 .functional-room-card-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 18px;
   font-weight: 800;
   color: #581c87;
+}
+
+.functional-room-card-icon {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(124, 58, 237, 0.12);
+  color: #6d28d9;
+  font-size: 16px;
+  line-height: 1;
 }
 
 .functional-room-card-chip {
