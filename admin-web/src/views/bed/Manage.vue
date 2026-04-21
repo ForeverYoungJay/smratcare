@@ -396,6 +396,8 @@
                       <div class="row-actions">
                         <a-button type="link" @click="openRoom(record, 'view')">查看</a-button>
                         <a-button type="link" @click="openRoom(record, 'edit')">编辑</a-button>
+                        <a-button type="link" :disabled="!canMoveRoom(record, 'up')" @click="moveRoom(record, 'up')">上移</a-button>
+                        <a-button type="link" :disabled="!canMoveRoom(record, 'down')" @click="moveRoom(record, 'down')">下移</a-button>
                         <a-dropdown>
                           <a-button type="link">更多</a-button>
                           <template #overlay>
@@ -957,6 +959,7 @@ import {
   createRoom,
   updateRoom,
   deleteRoom,
+  updateRoomSort,
   createBed,
   updateBed,
   deleteBed,
@@ -1364,7 +1367,7 @@ const roomColumns = [
   { title: '容量', dataIndex: 'capacity', key: 'capacity', width: 100, sorter: true },
   { title: '备注', dataIndex: 'remark', key: 'remark', width: 180 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 120, sorter: true },
-  { title: '操作', key: 'action', width: 200, fixed: 'right' as const }
+  { title: '操作', key: 'action', width: 280, fixed: 'right' as const }
 ]
 
 const bedColumns = [
@@ -1613,7 +1616,7 @@ async function searchRooms() {
       sortBy: roomQuery.sortBy,
       sortOrder: roomQuery.sortOrder
     })
-    rooms.value = res.list
+    rooms.value = sortRoomItems(res.list || [])
     roomPage.total = res.total
     selectedRoomRowKeys.value = selectedRoomRowKeys.value.filter((id) => rooms.value.some((item) => item.id === id))
     selectedRooms.value = selectedRooms.value.filter((item) => selectedRoomRowKeys.value.includes(item.id))
@@ -1803,6 +1806,64 @@ function onRoomPageSizeChange(current: number, size: number) {
   roomPage.pageNo = 1
   roomPage.pageSize = size
   searchRooms()
+}
+
+function compareRoomSort(left?: Partial<RoomItem>, right?: Partial<RoomItem>) {
+  const leftSortNo = Number(left?.sortNo || 0)
+  const rightSortNo = Number(right?.sortNo || 0)
+  const leftSorted = leftSortNo > 0
+  const rightSorted = rightSortNo > 0
+  if (leftSorted && rightSorted && leftSortNo !== rightSortNo) return leftSortNo - rightSortNo
+  if (leftSorted !== rightSorted) return leftSorted ? -1 : 1
+  return String(left?.roomNo || '').localeCompare(String(right?.roomNo || ''), 'zh-CN')
+}
+
+function sortRoomItems(list: RoomItem[]) {
+  return [...list].sort(compareRoomSort)
+}
+
+function floorRoomSequence(floorId?: Id) {
+  if (!floorId) return []
+  return sortRoomItems(roomList.value.filter((item) => item.floorId === floorId))
+}
+
+function canMoveRoom(record: RoomItem, direction: 'up' | 'down') {
+  if (!record.floorId) return false
+  const sequence = floorRoomSequence(record.floorId)
+  const index = sequence.findIndex((item) => item.id === record.id)
+  if (index < 0) return false
+  return direction === 'up' ? index > 0 : index < sequence.length - 1
+}
+
+async function moveRoom(record: RoomItem, direction: 'up' | 'down') {
+  if (!record.floorId) {
+    message.warning('当前房间缺少楼层信息，无法调整顺序')
+    return
+  }
+  if (!roomList.value.length) {
+    await loadRoomList()
+  }
+  const sequence = floorRoomSequence(record.floorId)
+  const index = sequence.findIndex((item) => item.id === record.id)
+  if (index < 0) {
+    message.warning('未找到当前房间的排序位置')
+    return
+  }
+  const targetIndex = direction === 'up' ? index - 1 : index + 1
+  if (targetIndex < 0 || targetIndex >= sequence.length) return
+  const ordered = sequence.slice()
+  const [moved] = ordered.splice(index, 1)
+  ordered.splice(targetIndex, 0, moved)
+  try {
+    await updateRoomSort({
+      floorId: record.floorId,
+      roomIds: ordered.map((item) => item.id)
+    })
+    await Promise.all([searchRooms(), loadRoomList(), refreshTree()])
+    message.success(`房间已${direction === 'up' ? '上移' : '下移'}`)
+  } catch (error: any) {
+    message.error(errorMessage(error, '调整房间顺序失败'))
+  }
 }
 
 function onBedPageChange(page: number) {
