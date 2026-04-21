@@ -311,7 +311,9 @@
                 </a-form-item>
                 <a-form-item label="楼层">
                   <a-select v-model:value="roomQuery.floorId" allow-clear style="min-width: 140px">
-                    <a-select-option v-for="f in floorList" :key="f.id" :value="f.id">{{ f.floorNo }}</a-select-option>
+                    <a-select-option v-for="f in roomFilterFloorOptions" :key="f.id" :value="f.id">
+                      {{ buildingNameMap[f.buildingId] || '未命名楼栋' }} / {{ f.floorNo }}
+                    </a-select-option>
                   </a-select>
                 </a-form-item>
                 <a-form-item label="状态">
@@ -400,6 +402,15 @@
                     </template>
                     <template v-else-if="column.key === 'action'">
                       <div class="row-actions">
+                        <span
+                          v-if="canDragRoom(record)"
+                          class="room-drag-handle"
+                          draggable="true"
+                          @dragstart.stop="onRoomHandleDragStart($event, record)"
+                          @dragend.stop="onRoomRowDragEnd"
+                        >
+                          拖动
+                        </span>
                         <a-button type="link" @click="openRoom(record, 'view')">查看</a-button>
                         <a-button type="link" @click="openRoom(record, 'edit')">编辑</a-button>
                         <a-button type="link" :disabled="!canMoveRoom(record, 'up')" @click="moveRoom(record, 'up')">上移</a-button>
@@ -1029,6 +1040,7 @@ const selectedRoomRowKeys = ref<Id[]>([])
 const roomDrag = reactive({
   dragId: undefined as Id | undefined,
   overId: undefined as Id | undefined,
+  overPosition: 'before' as 'before' | 'after',
   saving: false
 })
 const loadingRooms = ref(false)
@@ -1211,6 +1223,20 @@ const roomFloorOptions = computed(() => {
   if (!roomForm.buildingId) return floorList.value
   return floorList.value.filter((item) => item.buildingId === roomForm.buildingId)
 })
+const roomFilterFloorOptions = computed(() => {
+  if (!roomQuery.buildingId) return floorList.value
+  return floorList.value.filter((item) => item.buildingId === roomQuery.buildingId)
+})
+watch(
+  () => roomQuery.buildingId,
+  () => {
+    if (!roomQuery.floorId) return
+    const exists = roomFilterFloorOptions.value.some((item) => item.id === roomQuery.floorId)
+    if (!exists) {
+      roomQuery.floorId = undefined
+    }
+  }
+)
 const treeData = computed<TreeNode[]>(() => buildTreeKey(assetTree.value, 'ROOT'))
 const areaNameByCode = computed(() =>
   areaItems.value.reduce((acc, item) => {
@@ -1893,12 +1919,10 @@ async function moveRoom(record: RoomItem, direction: 'up' | 'down') {
 }
 
 function roomTableRowProps(record: RoomItem) {
-  if (!canDragRoom(record)) {
+  if (!record.floorId) {
     return {}
   }
   return {
-    draggable: true,
-    onDragstart: () => onRoomRowDragStart(record),
     onDragover: (event: DragEvent) => onRoomRowDragOver(event, record),
     onDrop: (event: DragEvent) => onRoomRowDrop(event, record),
     onDragend: onRoomRowDragEnd
@@ -1906,21 +1930,36 @@ function roomTableRowProps(record: RoomItem) {
 }
 
 function roomTableRowClassName(record: RoomItem) {
-  if (!canDragRoom(record)) return ''
+  if (!record.floorId) return ''
   if (roomDrag.dragId === record.id) return 'room-sortable-row is-drag-source'
-  if (roomDrag.overId === record.id) return 'room-sortable-row is-drop-target'
+  if (roomDrag.overId === record.id && roomDrag.overPosition === 'before') return 'room-sortable-row is-drop-before'
+  if (roomDrag.overId === record.id && roomDrag.overPosition === 'after') return 'room-sortable-row is-drop-after'
   return 'room-sortable-row'
 }
 
-function onRoomRowDragStart(record: RoomItem) {
+function onRoomHandleDragStart(event: DragEvent, record: RoomItem) {
   if (!canDragRoom(record)) return
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.dropEffect = 'move'
+    event.dataTransfer.setData('text/plain', String(record.id))
+  }
   roomDrag.dragId = record.id
   roomDrag.overId = record.id
+  roomDrag.overPosition = 'before'
 }
 
 function onRoomRowDragOver(event: DragEvent, record: RoomItem) {
-  if (!roomDrag.dragId || roomDrag.dragId === record.id) return
+  if (!roomDrag.dragId || roomDrag.dragId === record.id || record.floorId !== roomQuery.floorId) return
   event.preventDefault()
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'move'
+  }
+  const currentTarget = event.currentTarget as HTMLElement | null
+  if (currentTarget) {
+    const rect = currentTarget.getBoundingClientRect()
+    roomDrag.overPosition = event.clientY > rect.top + rect.height / 2 ? 'after' : 'before'
+  }
   roomDrag.overId = record.id
 }
 
@@ -1943,7 +1982,13 @@ async function onRoomRowDrop(event: DragEvent, target: RoomItem) {
   }
   const ordered = sequence.slice()
   const [moved] = ordered.splice(from, 1)
-  ordered.splice(to, 0, moved)
+  let insertIndex = to
+  if (roomDrag.overPosition === 'after') {
+    insertIndex = from < to ? to : to + 1
+  } else if (from < to) {
+    insertIndex = to - 1
+  }
+  ordered.splice(insertIndex, 0, moved)
   onRoomRowDragEnd()
   await saveRoomSequence(target.floorId, ordered, '房间顺序已更新')
 }
@@ -1951,6 +1996,7 @@ async function onRoomRowDrop(event: DragEvent, target: RoomItem) {
 function onRoomRowDragEnd() {
   roomDrag.dragId = undefined
   roomDrag.overId = undefined
+  roomDrag.overPosition = 'before'
 }
 
 function onBedPageChange(page: number) {
@@ -3229,16 +3275,32 @@ onMounted(async () => {
 .row-actions :deep(.ant-btn-link) {
   padding-inline: 4px;
 }
-.table-card :deep(.room-sortable-row) {
+.room-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #eef6ff;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 700;
   cursor: grab;
+  user-select: none;
+}
+.table-card :deep(.room-sortable-row) {
   transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
 .table-card :deep(.room-sortable-row.is-drag-source > td) {
   background: #f5f3ff;
 }
-.table-card :deep(.room-sortable-row.is-drop-target > td) {
+.table-card :deep(.room-sortable-row.is-drop-before > td) {
   background: #eef6ff;
-  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.22);
+  box-shadow: inset 0 2px 0 rgba(59, 130, 246, 0.7);
+}
+.table-card :deep(.room-sortable-row.is-drop-after > td) {
+  background: #eef6ff;
+  box-shadow: inset 0 -2px 0 rgba(59, 130, 246, 0.7);
 }
 .pager {
   margin-top: 16px;
