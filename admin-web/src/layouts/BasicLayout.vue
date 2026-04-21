@@ -16,7 +16,9 @@
       @mouseleave="handleSidebarMouseLeave"
     >
       <div class="brand">
-        <div class="logo">智</div>
+        <div class="logo">
+          <img :src="brandLogoUrl" alt="龟峰颐养中心logo" class="logo-image" />
+        </div>
         <div class="brand-text" v-if="!siderCollapsed">
           <div class="title">龟峰颐养</div>
           <div class="subtitle">运营管理中台</div>
@@ -898,6 +900,7 @@ import { canBeDirectLeader, canBeIndirectLeader, ensureSupervisorOrder } from '.
 import { emitLiveSync, subscribeLiveSync, type LiveSyncPayload } from '../utils/liveSync'
 import { getToken } from '../utils/auth'
 import type { AttendanceDashboardOverview } from '../types'
+import brandLogoUrl from '../assets/guifeng-logo.png'
 
 const MAX_RESTORED_ROUTE_TABS = 8
 const MAX_ALIVE_VIEW_CACHE = 3
@@ -5589,15 +5592,22 @@ function onQuickChatStorageChange(event: StorageEvent) {
 }
 
 .logo {
-  width: 42px;
-  height: 42px;
-  border-radius: 15px;
-  background: linear-gradient(135deg, #136cb5 0%, #36a1d9 100%);
-  color: #ffffff;
-  font-weight: 700;
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.9);
   display: grid;
   place-items: center;
-  box-shadow: 0 14px 24px rgba(19, 108, 181, 0.24);
+  box-shadow: 0 10px 22px rgba(18, 49, 77, 0.12);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
 }
 
 .title {

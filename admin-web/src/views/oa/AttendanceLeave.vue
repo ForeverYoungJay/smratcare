@@ -357,10 +357,24 @@ function statusColor(record: any) {
   return 'green'
 }
 
+function parseAttendanceDateTime(value?: string) {
+  if (!value) return null
+  const text = String(value).trim()
+  if (!text) return null
+  // LocalDateTime values from the backend are serialized without timezone.
+  // Parse them as local wall-clock time to keep the UI aligned with attendance rules.
+  if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?$/.test(text)) {
+    const normalized = text.replace(' ', 'T')
+    const parsedLocal = dayjs(normalized)
+    return parsedLocal.isValid() ? parsedLocal : null
+  }
+  const parsed = dayjs(text)
+  return parsed.isValid() ? parsed : null
+}
+
 function formatDateTime(value?: string) {
-  if (!value) return ''
-  const parsed = dayjs(value)
-  if (!parsed.isValid()) return value
+  const parsed = parseAttendanceDateTime(value)
+  if (!parsed) return value || ''
   return parsed.format('HH:mm')
 }
 

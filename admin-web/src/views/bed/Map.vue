@@ -109,10 +109,16 @@
                   <div v-for="room in floor.rooms" :key="room.key" class="room-cube" @dblclick="openRoomSceneDetail(room)">
                     <div class="room-head">
                       <div class="room-title">{{ room.roomNo }}</div>
-                      <div class="room-meta">{{ room.occupiedBeds }}/{{ room.totalBeds }} 床 · {{ room.elderCount }} 人</div>
+                      <div class="room-meta" :class="{ functional: room.isFunctionalRoom }">
+                        {{ room.isFunctionalRoom ? `${resolveRoomTypeLabel(room.roomType)} · 功能房` : `${room.occupiedBeds}/${room.totalBeds} 床 · ${room.elderCount} 人` }}
+                      </div>
                     </div>
                     <div v-if="resolveVisibleRemark(room.remark)" class="room-remark">{{ resolveVisibleRemark(room.remark) }}</div>
-                    <div class="bed-grid">
+                    <div v-if="room.isFunctionalRoom" class="functional-room-panel">
+                      <div class="functional-room-badge">不计入住率</div>
+                      <div class="functional-room-copy">在房态图展示，不纳入床位占用和入住统计。</div>
+                    </div>
+                    <div v-else class="bed-grid">
                       <button
                         v-for="bed in room.beds"
                         :key="bed.id"
@@ -186,6 +192,8 @@
 
     <a-modal v-model:open="roomDetailOpen" :title="`房间详情 · ${roomCurrent?.roomNo || '-'}`" width="760px" :footer="null" destroy-on-close>
       <a-descriptions bordered size="small" :column="2" style="margin-bottom: 12px">
+        <a-descriptions-item label="房型">{{ resolveRoomTypeLabel(roomCurrent?.roomType) }}</a-descriptions-item>
+        <a-descriptions-item label="房间属性">{{ roomCurrent?.isFunctionalRoom ? '功能房（不计入住率）' : '居住房' }}</a-descriptions-item>
         <a-descriptions-item label="总床位">{{ roomCurrent?.totalBeds || 0 }}</a-descriptions-item>
         <a-descriptions-item label="在住人数">{{ roomCurrent?.elderCount || 0 }}</a-descriptions-item>
         <a-descriptions-item label="公开备注" :span="2">{{ resolveVisibleRemark(roomCurrent?.remark) || '-' }}</a-descriptions-item>
@@ -218,15 +226,18 @@ import BedInfoCard from '../../components/bed/BedInfoCard.vue'
 import { getElderDetail } from '../../api/elder'
 import { useBedMapDataset } from '../../composables/useBedMapDataset'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
-import type { BedItem, ElderItem } from '../../types/api'
+import type { BedItem, ElderItem, RoomItem } from '../../types/api'
 
 type RoomScene = {
   key: string
+  roomId?: string | number
   roomNo: string
+  roomType?: string
   beds: BedItem[]
   totalBeds: number
   occupiedBeds: number
   elderCount: number
+  isFunctionalRoom: boolean
   remark?: string
 }
 
@@ -248,7 +259,7 @@ type BuildingScene = {
 
 const router = useRouter()
 const route = useRoute()
-const { plainBeds, roomTypeItems, bedTypeItems, areaItems, ensureBedMapLoaded, ensureResidenceConfigLoaded, refreshBedMapDataset } = useBedMapDataset()
+const { plainBeds, roomList, roomTypeItems, bedTypeItems, areaItems, ensureBedMapLoaded, ensureRoomListLoaded, ensureResidenceConfigLoaded, refreshBedMapDataset } = useBedMapDataset()
 const detailOpen = ref(false)
 const roomDetailOpen = ref(false)
 const current = ref<BedItem | null>(null)
@@ -293,6 +304,12 @@ const bedTypeLabelMap = computed(() =>
 const roomTypeOptions = computed(() => roomTypeItems.value.map((item) => ({ value: item.itemCode, label: item.itemName })))
 const bedTypeOptions = computed(() => bedTypeItems.value.map((item) => ({ value: item.itemCode, label: item.itemName })))
 const areaOptions = computed(() => areaItems.value.map((item) => ({ value: item.itemCode, label: item.itemName })))
+const roomTypeNameMap = computed(() =>
+  roomTypeItems.value.reduce((acc, item) => {
+    acc[item.itemCode] = item.itemName
+    return acc
+  }, {} as Record<string, string>)
+)
 
 const filteredBeds = computed(() =>
   plainBeds.value.filter((bed) => {
@@ -315,6 +332,21 @@ const scopedBeds = computed(() =>
   })
 )
 
+const functionalRooms = computed<RoomItem[]>(() => {
+  const hasBedScopedFilters = Boolean(query.bedNo || query.elderName || query.status || query.areaCode || query.bedType)
+  if (hasBedScopedFilters) return []
+  const roomIdsWithBeds = new Set(scopedBeds.value.map((bed) => String(bed.roomId || '')))
+  return roomList.value.filter((room) => {
+    if (!isFunctionalRoomType(room.roomType)) return false
+    if (roomIdsWithBeds.has(String(room.id))) return false
+    if (selectedBuilding.value && String(room.building || '') !== selectedBuilding.value) return false
+    if (selectedFloor.value && String(room.floorNo || '') !== selectedFloor.value) return false
+    if (query.roomNo && !String(room.roomNo || '').includes(query.roomNo)) return false
+    if (query.roomType && String(room.roomType || '') !== query.roomType) return false
+    return true
+  })
+})
+
 const buildingScenes = computed<BuildingScene[]>(() => {
   const buildingMap = new Map<string, Map<string, Map<string, BedItem[]>>>()
   scopedBeds.value.forEach((bed) => {
@@ -329,6 +361,17 @@ const buildingScenes = computed<BuildingScene[]>(() => {
     roomMap.get(roomNo)!.push(bed)
   })
 
+  functionalRooms.value.forEach((room) => {
+    const building = (room.building || '未分配楼栋').trim() || '未分配楼栋'
+    const floor = (room.floorNo || '未知楼层').trim() || '未知楼层'
+    const roomNo = (room.roomNo || `房间-${room.id || '-'}`).trim() || `房间-${room.id || '-'}`
+    if (!buildingMap.has(building)) buildingMap.set(building, new Map())
+    const floorMap = buildingMap.get(building)!
+    if (!floorMap.has(floor)) floorMap.set(floor, new Map())
+    const roomMap = floorMap.get(floor)!
+    if (!roomMap.has(roomNo)) roomMap.set(roomNo, [])
+  })
+
   return Array.from(buildingMap.entries())
     .map(([buildingName, floorMap]) => {
       const floors = Array.from(floorMap.entries())
@@ -336,14 +379,25 @@ const buildingScenes = computed<BuildingScene[]>(() => {
           const rooms = Array.from(roomMap.entries())
             .map(([roomNo, roomBeds]) => {
               const occupiedBeds = roomBeds.filter((bed) => isOccupiedBed(bed)).length
+              const firstBed = roomBeds[0]
+              const matchedRoom = roomList.value.find((room) =>
+                String(room.building || '') === buildingName
+                && String(room.floorNo || '') === floorNo
+                && String(room.roomNo || '') === roomNo
+              )
+              const roomType = String(firstBed?.roomType || matchedRoom?.roomType || '')
+              const isFunctionalRoom = roomBeds.length === 0 && isFunctionalRoomType(roomType)
               return {
                 key: `${buildingName}-${floorNo}-${roomNo}`,
+                roomId: matchedRoom?.id,
                 roomNo,
+                roomType,
                 beds: [...roomBeds].sort((a, b) => String(a.bedNo || '').localeCompare(String(b.bedNo || ''), 'zh-CN')),
                 totalBeds: roomBeds.length,
                 occupiedBeds,
                 elderCount: roomBeds.filter((bed) => !!bed.elderId).length,
-                remark: roomBeds[0]?.roomRemark
+                isFunctionalRoom,
+                remark: firstBed?.roomRemark || matchedRoom?.remark
               }
             })
             .sort((a, b) => a.roomNo.localeCompare(b.roomNo, 'zh-CN'))
@@ -377,6 +431,7 @@ const displayBuildings = computed<BuildingScene[]>(() =>
           ...floor,
           rooms: floor.rooms
             .map((room) => {
+              if (room.isFunctionalRoom) return matrixQuickFilter.value === 'all' ? room : null
               const nextBeds = room.beds.filter((bed) => matchMatrixFilter(bed))
               if (!nextBeds.length) return null
               return {
@@ -493,7 +548,7 @@ function genderText(gender?: number) {
 
 async function load() {
   try {
-    await Promise.all([ensureBedMapLoaded(false), ensureResidenceConfigLoaded()])
+    await Promise.all([ensureBedMapLoaded(false), ensureRoomListLoaded(), ensureResidenceConfigLoaded()])
   } catch {
     message.warning('房态图数据加载失败')
   }
@@ -546,6 +601,14 @@ function matchMatrixFilter(bed: BedItem) {
   return true
 }
 
+function isFunctionalRoomType(roomType?: string) {
+  const raw = String(roomType || '').trim()
+  if (!raw) return false
+  const label = `${raw} ${roomTypeNameMap.value[raw] || ''}`.toUpperCase()
+  return ['护理站', '开水房', '洗衣房', '卫生间', '厕所', '浴室', '沐浴', 'NURSING', 'WATER', 'LAUNDRY', 'TOILET', 'WC', 'BATH']
+    .some((keyword) => label.includes(keyword.toUpperCase()))
+}
+
 function resolveRoomTypeLabel(roomType?: string) {
   const raw = String(roomType || '').trim()
   if (!raw) return '-'
@@ -566,7 +629,7 @@ function resolveRoomTypeLabel(roomType?: string) {
     VIP: 'VIP房',
     SUITE: '套间'
   }
-  return roomTypeLabelMap.value[raw] || roomTypeLabelMap.value[normalized] || fallbackMap[normalized] || raw
+  return roomTypeLabelMap.value[raw] || roomTypeLabelMap.value[normalized] || roomTypeNameMap.value[raw] || fallbackMap[normalized] || raw
 }
 
 function resolveBedTypeLabel(bedType?: string) {
@@ -668,19 +731,23 @@ function openElderBedPanorama() {
 }
 
 useLiveSyncRefresh({
-  topics: ['bed', 'elder'],
+  topics: ['bed', 'elder', 'room'],
   refresh: async () => {
-    await refreshBedMapDataset({ residenceConfig: true })
+    await refreshBedMapDataset({ rooms: true, residenceConfig: true })
   }
 })
 
 onMounted(load)
 
-watch(filteredBeds, () => {
-  if (selectedBuilding.value && !filteredBeds.value.some((bed) => String(bed.building || '') === selectedBuilding.value)) {
+watch([filteredBeds, functionalRooms], () => {
+  const hasSelectedBuilding = filteredBeds.value.some((bed) => String(bed.building || '') === selectedBuilding.value)
+    || functionalRooms.value.some((room) => String(room.building || '') === selectedBuilding.value)
+  if (selectedBuilding.value && !hasSelectedBuilding) {
     selectedBuilding.value = ''
   }
-  if (selectedFloor.value && !filteredBeds.value.some((bed) => String(bed.floorNo || '') === selectedFloor.value)) {
+  const hasSelectedFloor = filteredBeds.value.some((bed) => String(bed.floorNo || '') === selectedFloor.value)
+    || functionalRooms.value.some((room) => String(room.floorNo || '') === selectedFloor.value)
+  if (selectedFloor.value && !hasSelectedFloor) {
     selectedFloor.value = ''
   }
 })
@@ -886,11 +953,42 @@ watch(filteredBeds, () => {
   border-radius: 12px;
 }
 
+.room-meta.functional {
+  color: #7c3aed;
+  background: #f5f3ff;
+}
+
 .room-remark {
   margin: 8px 0 10px;
   font-size: 11px;
   color: #1d4ed8;
   font-weight: 600;
+}
+
+.functional-room-panel {
+  margin-top: 10px;
+  border: 1px dashed #d8b4fe;
+  border-radius: 14px;
+  padding: 12px;
+  background: linear-gradient(135deg, #faf5ff 0%, #fdf4ff 100%);
+}
+
+.functional-room-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(124, 58, 237, 0.12);
+  color: #6d28d9;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.functional-room-copy {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #6b21a8;
 }
 
 .bed-grid {

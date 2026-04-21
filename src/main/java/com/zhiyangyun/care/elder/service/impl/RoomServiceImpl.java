@@ -38,7 +38,7 @@ public class RoomServiceImpl implements RoomService {
   public RoomResponse create(RoomRequest request) {
     applyBuildingFloorPlaceholders(request);
     if (request.getRoomNo() == null || request.getRoomNo().isBlank()) {
-      request.setRoomNo(resolveNextRoomNo(request.getTenantId(), request.getFloorId(), request.getFloorNo()));
+      request.setRoomNo(resolveNextRoomNo(request.getTenantId(), request.getBuildingId(), request.getFloorId(), request.getFloorNo()));
     }
     ensureRoomNoUnique(null, request.getTenantId(), request.getRoomNo());
     Integer normalizedCapacity = normalizeCapacityByRoomType(request.getRoomType(), request.getCapacity());
@@ -333,12 +333,12 @@ public class RoomServiceImpl implements RoomService {
     }
   }
 
-  private String resolveNextRoomNo(Long tenantId, Long floorId, String floorNo) {
+  private String resolveNextRoomNo(Long tenantId, Long buildingId, Long floorId, String floorNo) {
     String prefixDigits = floorNo == null ? "" : floorNo.replaceAll("[^0-9]", "");
     if (prefixDigits.isBlank()) {
       prefixDigits = "1";
     }
-    final String roomPrefix = prefixDigits;
+    final String roomPrefix = resolveBuildingPrefix(buildingId) + prefixDigits;
     List<Room> rooms = roomMapper.selectList(Wrappers.lambdaQuery(Room.class)
         .eq(Room::getIsDeleted, 0)
         .eq(Room::getTenantId, tenantId)
@@ -346,7 +346,8 @@ public class RoomServiceImpl implements RoomService {
     int nextSeq = rooms.stream()
         .map(Room::getRoomNo)
         .filter(Objects::nonNull)
-        .map(value -> value.replaceAll("[^0-9]", ""))
+        .map(String::trim)
+        .map(String::toUpperCase)
         .filter(value -> value.startsWith(roomPrefix) && value.length() > roomPrefix.length())
         .map(value -> value.substring(roomPrefix.length()))
         .filter(value -> !value.isBlank())
@@ -354,5 +355,38 @@ public class RoomServiceImpl implements RoomService {
         .max()
         .orElse(0) + 1;
     return roomPrefix + String.format("%02d", nextSeq);
+  }
+
+  private String resolveBuildingPrefix(Long buildingId) {
+    if (buildingId == null) {
+      return "A";
+    }
+    Building building = buildingMapper.selectById(buildingId);
+    if (building == null) {
+      return "A";
+    }
+    String seed = firstNonBlank(building.getCode(), building.getName());
+    if (seed == null || seed.isBlank()) {
+      return "A";
+    }
+    for (int i = 0; i < seed.length(); i++) {
+      char current = seed.charAt(i);
+      if (Character.isLetterOrDigit(current)) {
+        return String.valueOf(Character.toUpperCase(current));
+      }
+    }
+    return String.valueOf(Character.toUpperCase(seed.charAt(0)));
+  }
+
+  private String firstNonBlank(String... values) {
+    if (values == null) {
+      return null;
+    }
+    for (String value : values) {
+      if (value != null && !value.isBlank()) {
+        return value.trim();
+      }
+    }
+    return null;
   }
 }
