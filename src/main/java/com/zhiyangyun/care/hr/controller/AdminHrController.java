@@ -16,12 +16,14 @@ import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.finance.entity.CardAccount;
 import com.zhiyangyun.care.finance.mapper.CardAccountMapper;
+import com.zhiyangyun.care.hr.entity.HrDormitoryRoomConfig;
 import com.zhiyangyun.care.hr.model.HrAccessControlRecordResponse;
 import com.zhiyangyun.care.hr.model.HrCardSyncItemResponse;
 import com.zhiyangyun.care.hr.entity.StaffProfile;
 import com.zhiyangyun.care.hr.entity.StaffMonthlyFeeBill;
 import com.zhiyangyun.care.hr.entity.StaffServicePlan;
 import com.zhiyangyun.care.hr.entity.StaffTrainingRecord;
+import com.zhiyangyun.care.hr.mapper.HrDormitoryRoomConfigMapper;
 import com.zhiyangyun.care.hr.mapper.StaffMonthlyFeeBillMapper;
 import com.zhiyangyun.care.hr.model.HrExpenseItemResponse;
 import com.zhiyangyun.care.hr.mapper.StaffServicePlanMapper;
@@ -38,6 +40,10 @@ import com.zhiyangyun.care.hr.model.HrSocialSecurityApplyRequest;
 import com.zhiyangyun.care.hr.model.HrSocialSecurityBillGenerateRequest;
 import com.zhiyangyun.care.hr.model.HrSocialSecurityCompleteRequest;
 import com.zhiyangyun.care.hr.model.HrExpenseApprovalRequest;
+import com.zhiyangyun.care.hr.model.HrDormitoryOverviewResponse;
+import com.zhiyangyun.care.hr.model.HrDormitoryRoomConfigRequest;
+import com.zhiyangyun.care.hr.model.HrDormitoryRoomConfigResponse;
+import com.zhiyangyun.care.hr.model.HrDormitoryStaffResponse;
 import com.zhiyangyun.care.hr.model.HrStaffElectricityImportRequest;
 import com.zhiyangyun.care.hr.model.HrStaffElectricityImportRowRequest;
 import com.zhiyangyun.care.hr.model.HrStaffFeeGenerateRequest;
@@ -96,7 +102,9 @@ import java.util.Map;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import java.util.Comparator;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -115,6 +123,7 @@ public class AdminHrController {
   private final StaffProfileMapper staffProfileMapper;
   private final StaffTrainingRecordMapper trainingRecordMapper;
   private final StaffServicePlanMapper staffServicePlanMapper;
+  private final HrDormitoryRoomConfigMapper dormitoryRoomConfigMapper;
   private final StaffMonthlyFeeBillMapper staffMonthlyFeeBillMapper;
   private final StaffMapper staffMapper;
   private final DepartmentMapper departmentMapper;
@@ -136,6 +145,7 @@ public class AdminHrController {
   public AdminHrController(StaffProfileMapper staffProfileMapper,
       StaffTrainingRecordMapper trainingRecordMapper,
       StaffServicePlanMapper staffServicePlanMapper,
+      HrDormitoryRoomConfigMapper dormitoryRoomConfigMapper,
       StaffMonthlyFeeBillMapper staffMonthlyFeeBillMapper,
       StaffMapper staffMapper,
       DepartmentMapper departmentMapper,
@@ -156,6 +166,7 @@ public class AdminHrController {
     this.staffProfileMapper = staffProfileMapper;
     this.trainingRecordMapper = trainingRecordMapper;
     this.staffServicePlanMapper = staffServicePlanMapper;
+    this.dormitoryRoomConfigMapper = dormitoryRoomConfigMapper;
     this.staffMonthlyFeeBillMapper = staffMonthlyFeeBillMapper;
     this.staffMapper = staffMapper;
     this.departmentMapper = departmentMapper;
@@ -1368,6 +1379,174 @@ public class AdminHrController {
   }
 
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @GetMapping("/dormitory/overview")
+  public Result<HrDormitoryOverviewResponse> dormitoryOverview(
+      @RequestParam(required = false) Integer status) {
+    List<HrDormitoryStaffResponse> rows = buildDormitoryRows(AuthContext.getOrgId(), status);
+    List<HrDormitoryRoomConfigResponse> roomConfigs = listDormitoryRoomConfigs(AuthContext.getOrgId(), null, null, null, null, "ENABLED");
+    HrDormitoryOverviewResponse response = new HrDormitoryOverviewResponse();
+    response.setStaffCount((long) rows.size());
+    response.setLiveInDormitoryCount(rows.stream()
+        .filter(item -> normalizeFlag(item.getLiveInDormitory()) == 1)
+        .count());
+    response.setAssignedBedCount(rows.stream()
+        .filter(this::hasCompleteDormitoryAssignment)
+        .count());
+    response.setPendingAssignCount(rows.stream()
+        .filter(item -> normalizeFlag(item.getLiveInDormitory()) == 1)
+        .filter(item -> !hasCompleteDormitoryAssignment(item))
+        .count());
+    response.setBuildingCount((long) Stream.concat(
+            rows.stream()
+                .map(HrDormitoryStaffResponse::getDormitoryBuilding)
+                .map(this::normalizeBlank)
+                .filter(Objects::nonNull),
+            roomConfigs.stream()
+                .map(HrDormitoryRoomConfigResponse::getBuilding)
+                .map(this::normalizeBlank)
+                .filter(Objects::nonNull))
+        .distinct()
+        .count());
+    response.setRoomCount((long) Stream.concat(
+            rows.stream()
+                .map(this::dormitoryRoomKey)
+                .filter(Objects::nonNull),
+            roomConfigs.stream()
+                .map(this::dormitoryRoomConfigKey)
+                .filter(Objects::nonNull))
+        .distinct()
+        .count());
+    response.setConfiguredRoomCount((long) roomConfigs.size());
+    response.setConfiguredBedCapacity(roomConfigs.stream()
+        .map(HrDormitoryRoomConfigResponse::getBedCapacity)
+        .filter(Objects::nonNull)
+        .mapToLong(Integer::longValue)
+        .sum());
+    response.setMeterBoundCount(rows.stream()
+        .filter(item -> normalizeFlag(item.getLiveInDormitory()) == 1)
+        .filter(item -> normalizeBlank(item.getMeterNo()) != null)
+        .count());
+    response.setConflictCount(rows.stream()
+        .filter(item -> Boolean.TRUE.equals(item.getOccupancyConflict()))
+        .count());
+    return Result.ok(response);
+  }
+
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @GetMapping("/dormitory/page")
+  public Result<IPage<HrDormitoryStaffResponse>> dormitoryPage(
+      @RequestParam(defaultValue = "1") long pageNo,
+      @RequestParam(defaultValue = "20") long pageSize,
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) Integer status,
+      @RequestParam(required = false) Long departmentId,
+      @RequestParam(required = false) String dormitoryState,
+      @RequestParam(required = false) String building,
+      @RequestParam(required = false) String roomNo) {
+    List<HrDormitoryStaffResponse> filtered = buildDormitoryRows(AuthContext.getOrgId(), status).stream()
+        .filter(item -> matchesDormitoryRow(item, keyword, departmentId, dormitoryState, building, roomNo))
+        .toList();
+    long current = pageNo <= 0 ? 1 : pageNo;
+    long size = pageSize <= 0 ? 20 : pageSize;
+    int fromIndex = (int) Math.min(filtered.size(), Math.max(0, (current - 1) * size));
+    int toIndex = (int) Math.min(filtered.size(), fromIndex + size);
+    IPage<HrDormitoryStaffResponse> page = new Page<>(current, size, filtered.size());
+    page.setRecords(filtered.subList(fromIndex, toIndex));
+    return Result.ok(page);
+  }
+
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @GetMapping("/dormitory/map")
+  public Result<List<HrDormitoryStaffResponse>> dormitoryMap(
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) Integer status,
+      @RequestParam(required = false) Long departmentId,
+      @RequestParam(required = false) String dormitoryState,
+      @RequestParam(required = false) String building,
+      @RequestParam(required = false) String roomNo) {
+    return Result.ok(buildDormitoryRows(AuthContext.getOrgId(), status).stream()
+        .filter(item -> matchesDormitoryRow(item, keyword, departmentId, dormitoryState, building, roomNo))
+        .toList());
+  }
+
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @GetMapping("/dormitory/room-config/list")
+  public Result<List<HrDormitoryRoomConfigResponse>> dormitoryRoomConfigList(
+      @RequestParam(required = false) String keyword,
+      @RequestParam(required = false) String building,
+      @RequestParam(required = false) String floorLabel,
+      @RequestParam(required = false) String roomNo,
+      @RequestParam(required = false) String status) {
+    return Result.ok(listDormitoryRoomConfigs(AuthContext.getOrgId(), keyword, building, floorLabel, roomNo, status));
+  }
+
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PostMapping("/dormitory/room-config")
+  public Result<HrDormitoryRoomConfigResponse> upsertDormitoryRoomConfig(@RequestBody HrDormitoryRoomConfigRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    if (request == null) {
+      return Result.error(400, "request required");
+    }
+    String building = normalizeBlank(request.getBuilding());
+    String roomNo = normalizeBlank(request.getRoomNo());
+    if (building == null || roomNo == null) {
+      return Result.error(400, "楼栋和房间号不能为空");
+    }
+    int bedCapacity = request.getBedCapacity() == null ? 0 : Math.max(request.getBedCapacity(), 0);
+    if (bedCapacity <= 0) {
+      return Result.error(400, "标准床位数必须大于 0");
+    }
+    HrDormitoryRoomConfig entity = request.getId() == null ? null : dormitoryRoomConfigMapper.selectOne(
+        Wrappers.lambdaQuery(HrDormitoryRoomConfig.class)
+            .eq(HrDormitoryRoomConfig::getId, request.getId())
+            .eq(HrDormitoryRoomConfig::getOrgId, orgId)
+            .eq(HrDormitoryRoomConfig::getIsDeleted, 0)
+            .last("LIMIT 1"));
+    if (entity == null) {
+      entity = new HrDormitoryRoomConfig();
+      entity.setOrgId(orgId);
+    }
+    HrDormitoryRoomConfig duplicate = dormitoryRoomConfigMapper.selectOne(
+        Wrappers.lambdaQuery(HrDormitoryRoomConfig.class)
+            .eq(HrDormitoryRoomConfig::getOrgId, orgId)
+            .eq(HrDormitoryRoomConfig::getBuilding, building)
+            .eq(HrDormitoryRoomConfig::getRoomNo, roomNo)
+            .eq(HrDormitoryRoomConfig::getIsDeleted, 0)
+            .ne(request.getId() != null, HrDormitoryRoomConfig::getId, request.getId())
+            .last("LIMIT 1"));
+    if (duplicate != null) {
+      return Result.error(400, "该楼栋房间已存在基础配置");
+    }
+    entity.setBuilding(building);
+    entity.setRoomNo(roomNo);
+    entity.setFloorLabel(firstNonBlank(normalizeBlank(request.getFloorLabel()), resolveDormitoryFloorLabel(roomNo)));
+    entity.setBedCapacity(bedCapacity);
+    entity.setSortNo(request.getSortNo() == null ? 0 : request.getSortNo());
+    entity.setStatus(normalizeBlank(request.getStatus()) == null ? "ENABLED" : normalizeBlank(request.getStatus()).toUpperCase(Locale.ROOT));
+    entity.setRemark(normalizeBlank(request.getRemark()));
+    saveDormitoryRoomConfig(entity);
+    return Result.ok(toDormitoryRoomConfigResponse(entity));
+  }
+
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @DeleteMapping("/dormitory/room-config/{id}")
+  public Result<Void> deleteDormitoryRoomConfig(@PathVariable Long id) {
+    Long orgId = AuthContext.getOrgId();
+    HrDormitoryRoomConfig entity = dormitoryRoomConfigMapper.selectOne(
+        Wrappers.lambdaQuery(HrDormitoryRoomConfig.class)
+            .eq(HrDormitoryRoomConfig::getId, id)
+            .eq(HrDormitoryRoomConfig::getOrgId, orgId)
+            .eq(HrDormitoryRoomConfig::getIsDeleted, 0)
+            .last("LIMIT 1"));
+    if (entity == null) {
+      return Result.ok(null);
+    }
+    entity.setIsDeleted(1);
+    dormitoryRoomConfigMapper.updateById(entity);
+    return Result.ok(null);
+  }
+
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
   @PostMapping("/expense/service-plan")
   public Result<HrStaffServicePlanResponse> upsertStaffServicePlan(@RequestBody HrStaffServicePlanRequest request) {
     Long orgId = AuthContext.getOrgId();
@@ -1442,11 +1621,30 @@ public class AdminHrController {
     if (request.getRemark() != null || plan.getId() == null) {
       plan.setRemark(normalizeBlank(request.getRemark()));
     }
-    if (plan.getId() == null) {
-      staffServicePlanMapper.insert(plan);
-    } else {
-      staffServicePlanMapper.updateById(plan);
+    if (normalizeFlag(plan.getLiveInDormitory()) != 1) {
+      plan.setDormitoryBuilding(null);
+      plan.setDormitoryRoomNo(null);
+      plan.setDormitoryBedNo(null);
+      plan.setMeterNo(null);
     }
+    String occupancyKey = dormitoryOccupancyKey(plan);
+    if (occupancyKey != null) {
+      StaffServicePlan occupied = staffServicePlanMapper.selectOne(
+          Wrappers.lambdaQuery(StaffServicePlan.class)
+              .eq(StaffServicePlan::getOrgId, orgId)
+              .eq(StaffServicePlan::getIsDeleted, 0)
+              .eq(StaffServicePlan::getLiveInDormitory, 1)
+              .eq(StaffServicePlan::getDormitoryBuilding, plan.getDormitoryBuilding())
+              .eq(StaffServicePlan::getDormitoryRoomNo, plan.getDormitoryRoomNo())
+              .eq(StaffServicePlan::getDormitoryBedNo, plan.getDormitoryBedNo())
+              .ne(plan.getStaffId() != null, StaffServicePlan::getStaffId, plan.getStaffId())
+              .last("LIMIT 1"));
+      if (occupied != null) {
+        String occupiedBy = defaultText(occupied.getStaffName(), defaultText(occupied.getStaffNo(), "其他员工"));
+        return Result.error(400, "该宿舍床位已分配给" + occupiedBy);
+      }
+    }
+    saveServicePlan(plan);
     return Result.ok(toServicePlanResponse(plan, staff, department));
   }
 
@@ -2789,6 +2987,68 @@ public class AdminHrController {
         .collect(Collectors.toMap(StaffServicePlan::getStaffId, item -> item, (a, b) -> a));
   }
 
+  private List<HrDormitoryStaffResponse> buildDormitoryRows(Long orgId, Integer staffStatus) {
+    List<StaffAccount> staffList = staffMapper.selectList(Wrappers.lambdaQuery(StaffAccount.class)
+        .eq(StaffAccount::getIsDeleted, 0)
+        .eq(orgId != null, StaffAccount::getOrgId, orgId)
+        .ne(StaffAccount::getUsername, HIDDEN_PLATFORM_USERNAME)
+        .eq(staffStatus != null, StaffAccount::getStatus, staffStatus));
+    if (staffList == null || staffList.isEmpty()) {
+      return List.of();
+    }
+    Map<Long, Department> departmentMap = loadDepartmentMap(staffList);
+    Map<Long, StaffServicePlan> planMap = loadServicePlanMap(orgId, staffList.stream().map(StaffAccount::getId).toList());
+    Map<String, Long> occupancyCountMap = planMap.values().stream()
+        .map(this::dormitoryOccupancyKey)
+        .filter(Objects::nonNull)
+        .collect(Collectors.groupingBy(key -> key, Collectors.counting()));
+    return staffList.stream()
+        .map(staff -> {
+          StaffServicePlan plan = planMap.get(staff.getId());
+          String occupancyKey = dormitoryOccupancyKey(plan);
+          boolean occupancyConflict = occupancyKey != null && occupancyCountMap.getOrDefault(occupancyKey, 0L) > 1;
+          return toDormitoryResponse(plan, staff, departmentMap.get(staff.getDepartmentId()), occupancyConflict);
+        })
+        .sorted(Comparator
+            .comparing((HrDormitoryStaffResponse item) -> Boolean.TRUE.equals(item.getOccupancyConflict())).reversed()
+            .thenComparing(item -> normalizeFlag(item.getLiveInDormitory()), Comparator.reverseOrder())
+            .thenComparing(HrDormitoryStaffResponse::getUpdateTime, Comparator.nullsLast(Comparator.reverseOrder()))
+            .thenComparing(item -> defaultText(item.getStaffName(), defaultText(item.getStaffNo(), ""))))
+        .toList();
+  }
+
+  private List<HrDormitoryRoomConfigResponse> listDormitoryRoomConfigs(
+      Long orgId,
+      String keyword,
+      String building,
+      String floorLabel,
+      String roomNo,
+      String status) {
+    String normalizedKeyword = normalizeBlank(keyword);
+    return dormitoryRoomConfigMapper.selectList(
+            Wrappers.lambdaQuery(HrDormitoryRoomConfig.class)
+                .eq(HrDormitoryRoomConfig::getOrgId, orgId)
+                .eq(HrDormitoryRoomConfig::getIsDeleted, 0)
+                .eq(normalizeBlank(building) != null, HrDormitoryRoomConfig::getBuilding, normalizeBlank(building))
+                .eq(normalizeBlank(floorLabel) != null, HrDormitoryRoomConfig::getFloorLabel, normalizeBlank(floorLabel))
+                .eq(normalizeBlank(roomNo) != null, HrDormitoryRoomConfig::getRoomNo, normalizeBlank(roomNo))
+                .eq(normalizeBlank(status) != null, HrDormitoryRoomConfig::getStatus, normalizeBlank(status).toUpperCase(Locale.ROOT))
+                .and(normalizedKeyword != null, wrapper -> wrapper
+                    .like(HrDormitoryRoomConfig::getBuilding, normalizedKeyword)
+                    .or()
+                    .like(HrDormitoryRoomConfig::getFloorLabel, normalizedKeyword)
+                    .or()
+                    .like(HrDormitoryRoomConfig::getRoomNo, normalizedKeyword)
+                    .or()
+                    .like(HrDormitoryRoomConfig::getRemark, normalizedKeyword))
+                .orderByAsc(HrDormitoryRoomConfig::getBuilding)
+                .orderByAsc(HrDormitoryRoomConfig::getSortNo)
+                .orderByAsc(HrDormitoryRoomConfig::getRoomNo))
+        .stream()
+        .map(this::toDormitoryRoomConfigResponse)
+        .toList();
+  }
+
   private StaffMonthlyFeeBill findMonthlyFeeBill(Long orgId, Long staffId, String feeMonth, String feeType) {
     return staffMonthlyFeeBillMapper.selectOne(
         Wrappers.lambdaQuery(StaffMonthlyFeeBill.class)
@@ -2830,11 +3090,55 @@ public class AdminHrController {
     return response;
   }
 
+  private HrDormitoryStaffResponse toDormitoryResponse(
+      StaffServicePlan plan, StaffAccount staff, Department department, boolean occupancyConflict) {
+    HrDormitoryStaffResponse response = new HrDormitoryStaffResponse();
+    response.setStaffId(staff == null ? null : staff.getId());
+    response.setStaffNo(staff == null ? null : staff.getStaffNo());
+    response.setStaffName(staff == null ? null : staff.getRealName());
+    response.setDepartmentId(staff == null ? null : staff.getDepartmentId());
+    response.setDepartmentName(department == null ? (plan == null ? null : plan.getDepartmentName()) : department.getDeptName());
+    response.setStatus(staff == null ? null : staff.getStatus());
+    response.setLiveInDormitory(plan == null ? 0 : normalizeFlag(plan.getLiveInDormitory()));
+    response.setDormitoryBuilding(plan == null ? null : normalizeBlank(plan.getDormitoryBuilding()));
+    response.setDormitoryRoomNo(plan == null ? null : normalizeBlank(plan.getDormitoryRoomNo()));
+    response.setDormitoryBedNo(plan == null ? null : normalizeBlank(plan.getDormitoryBedNo()));
+    response.setDormitoryLabel(buildDormitoryLabel(plan));
+    response.setMeterNo(plan == null ? null : normalizeBlank(plan.getMeterNo()));
+    response.setMealPlanSummary(buildMealPlanSummary(plan));
+    response.setRemark(plan == null ? null : normalizeBlank(plan.getRemark()));
+    response.setOccupancyConflict(occupancyConflict);
+    response.setUpdateTime(plan == null ? null : plan.getUpdateTime());
+    return response;
+  }
+
+  private HrDormitoryRoomConfigResponse toDormitoryRoomConfigResponse(HrDormitoryRoomConfig entity) {
+    HrDormitoryRoomConfigResponse response = new HrDormitoryRoomConfigResponse();
+    response.setId(entity == null ? null : entity.getId());
+    response.setBuilding(entity == null ? null : normalizeBlank(entity.getBuilding()));
+    response.setFloorLabel(entity == null ? null : firstNonBlank(normalizeBlank(entity.getFloorLabel()), resolveDormitoryFloorLabel(entity.getRoomNo())));
+    response.setRoomNo(entity == null ? null : normalizeBlank(entity.getRoomNo()));
+    response.setBedCapacity(entity == null ? null : entity.getBedCapacity());
+    response.setStatus(entity == null ? null : defaultText(normalizeBlank(entity.getStatus()), "ENABLED"));
+    response.setSortNo(entity == null ? null : entity.getSortNo());
+    response.setRemark(entity == null ? null : normalizeBlank(entity.getRemark()));
+    response.setUpdateTime(entity == null ? null : entity.getUpdateTime());
+    return response;
+  }
+
   private void saveServicePlan(StaffServicePlan plan) {
     if (plan.getId() == null) {
       staffServicePlanMapper.insert(plan);
     } else {
       staffServicePlanMapper.updateById(plan);
+    }
+  }
+
+  private void saveDormitoryRoomConfig(HrDormitoryRoomConfig entity) {
+    if (entity.getId() == null) {
+      dormitoryRoomConfigMapper.insert(entity);
+    } else {
+      dormitoryRoomConfigMapper.updateById(entity);
     }
   }
 
@@ -2957,6 +3261,130 @@ public class AdminHrController {
       items.add("晚餐 " + normalizeDays(plan.getDinnerDaysPerMonth()) + "天");
     }
     return items.isEmpty() ? "未启用餐费方案" : String.join(" / ", items);
+  }
+
+  private String buildDormitoryLabel(StaffServicePlan plan) {
+    if (plan == null || normalizeFlag(plan.getLiveInDormitory()) != 1) {
+      return "未住宿";
+    }
+    List<String> parts = new ArrayList<>();
+    if (normalizeBlank(plan.getDormitoryBuilding()) != null) {
+      parts.add(plan.getDormitoryBuilding().trim());
+    }
+    if (normalizeBlank(plan.getDormitoryRoomNo()) != null) {
+      parts.add(plan.getDormitoryRoomNo().trim());
+    }
+    if (normalizeBlank(plan.getDormitoryBedNo()) != null) {
+      parts.add(plan.getDormitoryBedNo().trim());
+    }
+    return parts.isEmpty() ? "待分配宿舍" : String.join(" / ", parts);
+  }
+
+  private boolean hasCompleteDormitoryAssignment(HrDormitoryStaffResponse item) {
+    return item != null
+        && normalizeFlag(item.getLiveInDormitory()) == 1
+        && normalizeBlank(item.getDormitoryBuilding()) != null
+        && normalizeBlank(item.getDormitoryRoomNo()) != null
+        && normalizeBlank(item.getDormitoryBedNo()) != null;
+  }
+
+  private String dormitoryRoomKey(HrDormitoryStaffResponse item) {
+    if (item == null || normalizeFlag(item.getLiveInDormitory()) != 1) {
+      return null;
+    }
+    String building = normalizeBlank(item.getDormitoryBuilding());
+    String roomNo = normalizeBlank(item.getDormitoryRoomNo());
+    if (building == null || roomNo == null) {
+      return null;
+    }
+    return (building + "||" + roomNo).toLowerCase(Locale.ROOT);
+  }
+
+  private String dormitoryRoomConfigKey(HrDormitoryRoomConfigResponse item) {
+    String building = normalizeBlank(item == null ? null : item.getBuilding());
+    String roomNo = normalizeBlank(item == null ? null : item.getRoomNo());
+    if (building == null || roomNo == null) {
+      return null;
+    }
+    return (building + "||" + roomNo).toLowerCase(Locale.ROOT);
+  }
+
+  private String dormitoryOccupancyKey(StaffServicePlan plan) {
+    if (plan == null || normalizeFlag(plan.getLiveInDormitory()) != 1) {
+      return null;
+    }
+    String building = normalizeBlank(plan.getDormitoryBuilding());
+    String roomNo = normalizeBlank(plan.getDormitoryRoomNo());
+    String bedNo = normalizeBlank(plan.getDormitoryBedNo());
+    if (building == null || roomNo == null || bedNo == null) {
+      return null;
+    }
+    return (building + "||" + roomNo + "||" + bedNo).toLowerCase(Locale.ROOT);
+  }
+
+  private String resolveDormitoryFloorLabel(String roomNo) {
+    String normalized = normalizeBlank(roomNo);
+    if (normalized == null) {
+      return null;
+    }
+    java.util.regex.Matcher direct = java.util.regex.Pattern.compile("^([A-Za-z]?\\d+)[-层Ff]").matcher(normalized);
+    if (direct.find()) {
+      return direct.group(1) + "层";
+    }
+    java.util.regex.Matcher simple = java.util.regex.Pattern.compile("^(\\d{1,2})").matcher(normalized);
+    if (simple.find()) {
+      return simple.group(1) + "层";
+    }
+    return null;
+  }
+
+  private boolean matchesDormitoryRow(
+      HrDormitoryStaffResponse item,
+      String keyword,
+      Long departmentId,
+      String dormitoryState,
+      String building,
+      String roomNo) {
+    if (item == null) {
+      return false;
+    }
+    if (departmentId != null && !Objects.equals(departmentId, item.getDepartmentId())) {
+      return false;
+    }
+    String normalizedKeyword = normalizeBlank(keyword);
+    if (normalizedKeyword != null) {
+      String merged = String.join(" ",
+          defaultText(item.getStaffName(), ""),
+          defaultText(item.getStaffNo(), ""),
+          defaultText(item.getDepartmentName(), ""),
+          defaultText(item.getDormitoryLabel(), ""),
+          defaultText(item.getMeterNo(), ""));
+      if (!merged.toLowerCase(Locale.ROOT).contains(normalizedKeyword.toLowerCase(Locale.ROOT))) {
+        return false;
+      }
+    }
+    String normalizedBuilding = normalizeBlank(building);
+    if (normalizedBuilding != null && !defaultText(item.getDormitoryBuilding(), "").toLowerCase(Locale.ROOT)
+        .contains(normalizedBuilding.toLowerCase(Locale.ROOT))) {
+      return false;
+    }
+    String normalizedRoomNo = normalizeBlank(roomNo);
+    if (normalizedRoomNo != null && !defaultText(item.getDormitoryRoomNo(), "").toLowerCase(Locale.ROOT)
+        .contains(normalizedRoomNo.toLowerCase(Locale.ROOT))) {
+      return false;
+    }
+    String state = normalizeBlank(dormitoryState);
+    if (state == null) {
+      return true;
+    }
+    return switch (state.toUpperCase(Locale.ROOT)) {
+      case "LIVE_IN" -> normalizeFlag(item.getLiveInDormitory()) == 1;
+      case "ASSIGNED" -> hasCompleteDormitoryAssignment(item);
+      case "PENDING_ASSIGN" -> normalizeFlag(item.getLiveInDormitory()) == 1 && !hasCompleteDormitoryAssignment(item);
+      case "CONFLICT" -> Boolean.TRUE.equals(item.getOccupancyConflict());
+      case "NO_DORM" -> normalizeFlag(item.getLiveInDormitory()) != 1;
+      default -> true;
+    };
   }
 
   private void markFinancePending(StaffMonthlyFeeBill bill) {

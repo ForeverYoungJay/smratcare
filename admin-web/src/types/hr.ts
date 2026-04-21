@@ -418,6 +418,50 @@ export interface HrStaffServicePlan {
   updateTime?: string
 }
 
+export interface HrDormitoryOverview {
+  staffCount?: number
+  liveInDormitoryCount?: number
+  assignedBedCount?: number
+  pendingAssignCount?: number
+  buildingCount?: number
+  roomCount?: number
+  configuredRoomCount?: number
+  configuredBedCapacity?: number
+  meterBoundCount?: number
+  conflictCount?: number
+}
+
+export interface HrDormitoryStaffItem {
+  staffId?: Id
+  staffNo?: string
+  staffName?: string
+  departmentId?: Id
+  departmentName?: string
+  status?: number
+  liveInDormitory?: number
+  dormitoryBuilding?: string
+  dormitoryRoomNo?: string
+  dormitoryBedNo?: string
+  dormitoryLabel?: string
+  meterNo?: string
+  mealPlanSummary?: string
+  remark?: string
+  occupancyConflict?: boolean
+  updateTime?: string
+}
+
+export interface HrDormitoryRoomConfigItem {
+  id?: Id
+  building?: string
+  floorLabel?: string
+  roomNo?: string
+  bedCapacity?: number
+  status?: string
+  sortNo?: number
+  remark?: string
+  updateTime?: string
+}
+
 export interface HrStaffMonthlyFeeBillItem {
   id?: Id
   staffId?: Id

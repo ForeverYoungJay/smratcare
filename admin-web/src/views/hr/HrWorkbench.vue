@@ -243,6 +243,8 @@ const sectionConfigs: readonly WorkbenchSection[] = [
     actions: [
       { label: '外出培训费用报销', path: '/hr/expense/records?scene=training-reimburse', primary: true },
       { label: '补贴申请', path: '/hr/expense/records?scene=subsidy' },
+      { label: '员工宿舍', path: '/hr/expense/dormitory' },
+      { label: '宿舍房态图', path: '/hr/expense/dormitory-map' },
       { label: '员工餐费', path: '/hr/expense/meal-fee' },
       { label: '员工电费', path: '/hr/expense/electricity-fee' },
       { label: '工资补贴记录', path: '/hr/expense/records?scene=salary-subsidy' },

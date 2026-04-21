@@ -56,6 +56,12 @@ export function getHrProfileAttachmentPage(params) {
 export function createHrProfileAttachment(data) {
     return request.post('/api/admin/hr/profile/attachment', data);
 }
+export function getHrContractAttachmentPage(params) {
+    return fetchPage('/api/admin/hr/profile/contract-attachment/page', params);
+}
+export function createHrContractAttachment(data) {
+    return request.post('/api/admin/hr/profile/contract-attachment', data);
+}
 export function getHrProfileCertificatePage(params) {
     return fetchPage('/api/admin/hr/profile/certificate/page', params);
 }
@@ -76,6 +82,24 @@ export function getHrMealFeePage(params) {
 }
 export function getHrElectricityFeePage(params) {
     return fetchPage('/api/admin/hr/expense/electricity-fee/page', params);
+}
+export function getHrDormitoryOverview(params) {
+    return request.get('/api/admin/hr/dormitory/overview', { params });
+}
+export function getHrDormitoryPage(params) {
+    return fetchPage('/api/admin/hr/dormitory/page', params);
+}
+export function getHrDormitoryMap(params) {
+    return request.get('/api/admin/hr/dormitory/map', { params });
+}
+export function getHrDormitoryRoomConfigList(params) {
+    return request.get('/api/admin/hr/dormitory/room-config/list', { params });
+}
+export function upsertHrDormitoryRoomConfig(data) {
+    return request.post('/api/admin/hr/dormitory/room-config', data);
+}
+export function deleteHrDormitoryRoomConfig(id) {
+    return request.delete(`/api/admin/hr/dormitory/room-config/${id}`);
 }
 export function getHrStaffServicePlan(staffId) {
     return request.get(`/api/admin/hr/expense/service-plan/${staffId}`);
@@ -130,6 +154,20 @@ export function getHrSocialSecuritySummary() {
 }
 export function getHrSocialSecurityReminderPage(params) {
     return fetchPage('/api/admin/hr/social-security/reminder/page', params);
+}
+export function applyHrSocialSecurity(data) {
+    return request.post('/api/admin/hr/social-security/apply', data);
+}
+export function decideHrSocialSecurityByDirector(staffId, approved, remark) {
+    return request.put(`/api/admin/hr/social-security/${staffId}/director-decision`, null, {
+        params: { approved, remark }
+    });
+}
+export function completeHrSocialSecurity(staffId, data) {
+    return request.put(`/api/admin/hr/social-security/${staffId}/complete`, data || {});
+}
+export function generateHrSocialSecurityMonthlyBill(data) {
+    return request.post('/api/admin/hr/social-security/monthly-bill/generate', data || {});
 }
 export function getHrTrainingPage(params) {
     return fetchPage('/api/admin/hr/training/page', params);

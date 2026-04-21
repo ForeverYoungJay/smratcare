@@ -16,6 +16,9 @@ import type {
   HrExpenseApprovalRequest,
   HrGenericApprovalItem,
   HrAttendanceRecordItem,
+  HrDormitoryOverview,
+  HrDormitoryRoomConfigItem,
+  HrDormitoryStaffItem,
   HrStaffBirthdayItem,
   HrStaffCertificateItem,
   HrStaffServicePlan,
@@ -150,6 +153,30 @@ export function getHrMealFeePage(params: any) {
 
 export function getHrElectricityFeePage(params: any) {
   return fetchPage<HrStaffMonthlyFeeBillItem>('/api/admin/hr/expense/electricity-fee/page', params)
+}
+
+export function getHrDormitoryOverview(params?: any) {
+  return request.get<HrDormitoryOverview>('/api/admin/hr/dormitory/overview', { params })
+}
+
+export function getHrDormitoryPage(params: any) {
+  return fetchPage<HrDormitoryStaffItem>('/api/admin/hr/dormitory/page', params)
+}
+
+export function getHrDormitoryMap(params: any) {
+  return request.get<HrDormitoryStaffItem[]>('/api/admin/hr/dormitory/map', { params })
+}
+
+export function getHrDormitoryRoomConfigList(params?: any) {
+  return request.get<HrDormitoryRoomConfigItem[]>('/api/admin/hr/dormitory/room-config/list', { params })
+}
+
+export function upsertHrDormitoryRoomConfig(data: Partial<HrDormitoryRoomConfigItem>) {
+  return request.post<HrDormitoryRoomConfigItem>('/api/admin/hr/dormitory/room-config', data)
+}
+
+export function deleteHrDormitoryRoomConfig(id: string | number) {
+  return request.delete<void>(`/api/admin/hr/dormitory/room-config/${id}`)
 }
 
 export function getHrStaffServicePlan(staffId: string | number) {
