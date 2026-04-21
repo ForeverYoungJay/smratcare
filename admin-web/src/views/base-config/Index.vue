@@ -303,7 +303,11 @@ const residencePresets: Record<string, { itemCode: string; itemName: string; sor
     { itemCode: 'ROOM_SINGLE', itemName: '单人间', sortNo: 10 },
     { itemCode: 'ROOM_DOUBLE', itemName: '双人间', sortNo: 20 },
     { itemCode: 'ROOM_TRIPLE', itemName: '三人间', sortNo: 30 },
-    { itemCode: 'ROOM_CARE', itemName: '护理房', sortNo: 40 }
+    { itemCode: 'ROOM_CARE', itemName: '护理房', sortNo: 40 },
+    { itemCode: 'ROOM_NURSING_STATION', itemName: '护理站', sortNo: 50 },
+    { itemCode: 'ROOM_WATER', itemName: '开水房', sortNo: 60 },
+    { itemCode: 'ROOM_LAUNDRY', itemName: '洗衣房', sortNo: 70 },
+    { itemCode: 'ROOM_TOILET', itemName: '卫生间', sortNo: 80 }
   ],
   ADMISSION_AREA: [
     { itemCode: 'AREA_A', itemName: 'A区', sortNo: 10 },

@@ -258,6 +258,20 @@ public class RoomServiceImpl implements RoomService {
         || roomType.contains("三人")) {
       return 3;
     }
+    if (normalized.contains("NURSING")
+        || normalized.contains("STATION")
+        || normalized.contains("WATER")
+        || normalized.contains("LAUNDRY")
+        || normalized.contains("TOILET")
+        || normalized.contains("WC")
+        || roomType.contains("护理站")
+        || roomType.contains("开水房")
+        || roomType.contains("洗衣房")
+        || roomType.contains("卫生间")
+        || roomType.contains("厕所")
+        || roomType.contains("浴室")) {
+      return 0;
+    }
     return null;
   }
 
@@ -365,7 +379,11 @@ public class RoomServiceImpl implements RoomService {
     if (building == null) {
       return "A";
     }
-    String seed = firstNonBlank(building.getCode(), building.getName());
+    String normalizedCode = normalizeBuildingCode(building.getCode());
+    if (normalizedCode != null) {
+      return normalizedCode;
+    }
+    String seed = firstNonBlank(building.getName());
     if (seed == null || seed.isBlank()) {
       return "A";
     }
@@ -376,6 +394,14 @@ public class RoomServiceImpl implements RoomService {
       }
     }
     return String.valueOf(Character.toUpperCase(seed.charAt(0)));
+  }
+
+  private String normalizeBuildingCode(String code) {
+    if (code == null || code.isBlank()) {
+      return null;
+    }
+    String normalized = code.trim().toUpperCase().replaceAll("[^A-Z0-9]", "");
+    return normalized.isBlank() ? null : normalized;
   }
 
   private String firstNonBlank(String... values) {

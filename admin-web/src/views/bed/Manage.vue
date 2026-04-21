@@ -677,8 +677,13 @@
             <a-select-option v-for="f in roomFloorOptions" :key="f.id" :value="f.id">{{ f.floorNo }}</a-select-option>
           </a-select>
         </a-form-item>
+        <a-form-item label="房型" name="roomType">
+          <a-select v-model:value="roomForm.roomType" :disabled="roomDrawerMode === 'view'" placeholder="请选择房型/功能房" show-search option-filter-prop="label">
+            <a-select-option v-for="item in roomTypeOptions" :key="item.value" :value="item.value" :label="item.label">{{ item.label }}</a-select-option>
+          </a-select>
+        </a-form-item>
         <a-form-item label="床位容量" name="capacity">
-          <a-input-number v-model:value="roomForm.capacity" :disabled="roomDrawerMode === 'view'" style="width: 100%" :min="1" />
+          <a-input-number v-model:value="roomForm.capacity" :disabled="roomDrawerMode === 'view'" style="width: 100%" :min="0" />
         </a-form-item>
         <a-form-item label="状态" name="status">
           <a-select v-model:value="roomForm.status" :disabled="roomDrawerMode === 'view'" placeholder="请选择">
@@ -1092,7 +1097,11 @@ type TreeNode = AssetTreeNode & { treeKey: string; children?: TreeNode[] }
 const fallbackRoomTypes: BaseConfigItem[] = [
   { id: -1, configGroup: 'ADMISSION_ROOM_TYPE', itemCode: 'ROOM_SINGLE', itemName: '单人间', status: 1, sortNo: 10 },
   { id: -2, configGroup: 'ADMISSION_ROOM_TYPE', itemCode: 'ROOM_DOUBLE', itemName: '双人间', status: 1, sortNo: 20 },
-  { id: -3, configGroup: 'ADMISSION_ROOM_TYPE', itemCode: 'ROOM_TRIPLE', itemName: '三人间', status: 1, sortNo: 30 }
+  { id: -3, configGroup: 'ADMISSION_ROOM_TYPE', itemCode: 'ROOM_TRIPLE', itemName: '三人间', status: 1, sortNo: 30 },
+  { id: -4, configGroup: 'ADMISSION_ROOM_TYPE', itemCode: 'ROOM_NURSING_STATION', itemName: '护理站', status: 1, sortNo: 40 },
+  { id: -5, configGroup: 'ADMISSION_ROOM_TYPE', itemCode: 'ROOM_WATER', itemName: '开水房', status: 1, sortNo: 50 },
+  { id: -6, configGroup: 'ADMISSION_ROOM_TYPE', itemCode: 'ROOM_LAUNDRY', itemName: '洗衣房', status: 1, sortNo: 60 },
+  { id: -7, configGroup: 'ADMISSION_ROOM_TYPE', itemCode: 'ROOM_TOILET', itemName: '卫生间', status: 1, sortNo: 70 }
 ]
 const fallbackBedTypes: BaseConfigItem[] = [
   { id: -11, configGroup: 'ADMISSION_BED_TYPE', itemCode: 'BED_STANDARD', itemName: '标准床', status: 1, sortNo: 10 },
@@ -1319,6 +1328,7 @@ const floorRules: FormRules = {
 const roomRules: FormRules = {
   buildingId: [{ required: true, message: '请选择楼栋' }],
   floorId: [{ required: true, message: '请选择楼层' }],
+  roomType: [{ required: true, message: '请选择房型' }],
   status: [{ required: true, message: '请选择状态' }]
 }
 
@@ -1433,27 +1443,37 @@ function inferCapacityByRoomType(roomType?: string) {
   if (normalized === '1' || normalized.includes('SINGLE') || normalized.includes('ROOM_SINGLE') || raw.includes('单人')) return 1
   if (normalized === '2' || normalized.includes('DOUBLE') || normalized.includes('ROOM_DOUBLE') || raw.includes('双人')) return 2
   if (normalized === '3' || normalized.includes('TRIPLE') || normalized.includes('ROOM_TRIPLE') || raw.includes('三人')) return 3
+  if (isFunctionalRoomType(raw)) return 0
   const matched = roomTypeItems.value.find((item) => item.itemCode === raw || item.itemName === raw)
   if (matched) {
     const name = String(matched.itemName || '')
     if (name.includes('单人')) return 1
     if (name.includes('双人')) return 2
     if (name.includes('三人')) return 3
+    if (isFunctionalRoomType(`${matched.itemCode} ${name}`)) return 0
   }
   return undefined
 }
 
+function isFunctionalRoomType(roomType?: string) {
+  const raw = String(roomType || '').trim()
+  if (!raw) return false
+  const normalized = raw.toUpperCase()
+  return ['护理站', '开水房', '洗衣房', '卫生间', '厕所', '浴室', '沐浴', 'NURSING', 'STATION', 'WATER', 'LAUNDRY', 'TOILET', 'WC', 'BATH']
+    .some((keyword) => normalized.includes(keyword.toUpperCase()))
+}
+
 function resolveRoomCapacity(room: RoomItem) {
   const inferred = inferCapacityByRoomType(room.roomType)
-  if (inferred) return inferred
+  if (inferred !== undefined) return inferred
   return Number(room.capacity || 0) || '-'
 }
 
 function resolveCapacityMismatch(room: RoomItem) {
   const inferred = inferCapacityByRoomType(room.roomType)
-  if (!inferred) return false
+  if (inferred === undefined) return false
   const current = Number(room.capacity || 0)
-  return current > 0 && current !== inferred
+  return current !== inferred
 }
 
 function inferRoomTypeByCapacity(capacity?: number) {
@@ -2790,7 +2810,7 @@ watch(
   () => roomForm.roomType,
   (roomType) => {
     const nextCapacity = inferCapacityByRoomType(roomType)
-    if (!nextCapacity) return
+    if (nextCapacity === undefined) return
     if (roomForm.capacity !== nextCapacity) {
       roomForm.capacity = nextCapacity
     }
