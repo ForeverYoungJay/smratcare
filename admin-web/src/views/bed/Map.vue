@@ -658,12 +658,12 @@ function isFunctionalRoomType(roomType?: string) {
 function resolveFunctionalRoomIcon(roomType?: string) {
   const raw = String(roomType || '').trim()
   const label = `${raw} ${roomTypeNameMap.value[raw] || ''}`.toUpperCase()
-  if (label.includes('护理站') || label.includes('NURSING') || label.includes('STATION')) return '⚕'
-  if (label.includes('开水房') || label.includes('WATER')) return '♨'
-  if (label.includes('洗衣房') || label.includes('LAUNDRY')) return '◉'
-  if (label.includes('卫生间') || label.includes('厕所') || label.includes('TOILET') || label.includes('WC')) return '⌘'
-  if (label.includes('浴室') || label.includes('沐浴') || label.includes('BATH')) return '◌'
-  return '◆'
+  if (label.includes('护理站') || label.includes('NURSING') || label.includes('STATION')) return '护'
+  if (label.includes('开水房') || label.includes('WATER')) return '水'
+  if (label.includes('洗衣房') || label.includes('LAUNDRY')) return '洗'
+  if (label.includes('卫生间') || label.includes('厕所') || label.includes('TOILET') || label.includes('WC')) return '卫'
+  if (label.includes('浴室') || label.includes('沐浴') || label.includes('BATH')) return '浴'
+  return '房'
 }
 
 function resolveRoomTypeLabel(roomType?: string) {

@@ -371,8 +371,7 @@ public class ResidenceBatchGenerationServiceImpl implements ResidenceBatchGenera
     ResidenceGenerationFloorRule floorRule = resolveFloorRule(request, floorNoNumeric);
     Set<String> excluded = floorRule == null ? Set.of() : floorRule.getExcludedRoomNos().stream().filter(Objects::nonNull).collect(Collectors.toSet());
     for (int roomSeq = roomStart; roomSeq <= roomEnd; roomSeq++) {
-      String roomNo = buildRoomNo(buildingPlan.code, floorNoNumeric, roomSeq, request.getRoomSeqWidth(),
-          specialRoom == null ? null : specialRoom.getRoomType());
+      String roomNo = buildRoomNo(buildingPlan.code, floorNoNumeric, roomSeq, request.getRoomSeqWidth(), request.getRoomType());
       if (excluded.contains(roomNo)) {
         addSkip(plan, "ROOM", roomNo, floorPlan.floorNo, "该房号已在楼层规则中标记为跳过");
         continue;
