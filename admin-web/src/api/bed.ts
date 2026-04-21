@@ -1,6 +1,7 @@
 import request, { fetchPage } from '../utils/request'
 import type {
   RoomItem,
+  RoomSortPayload,
   BedItem,
   BuildingItem,
   FloorItem,
@@ -99,6 +100,10 @@ export function updateRoom(id: Id, data: Partial<RoomItem>) {
 
 export function deleteRoom(id: Id) {
   return request.delete<void>(`/api/room/${id}`)
+}
+
+export function updateRoomSort(data: RoomSortPayload) {
+  return request.put<void>('/api/room/sort', data)
 }
 
 export function createBed(data: Partial<BedItem>) {

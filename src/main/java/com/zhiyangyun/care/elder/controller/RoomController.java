@@ -6,6 +6,7 @@ import com.zhiyangyun.care.auth.security.AuthContext;
 import com.zhiyangyun.care.audit.service.AuditLogService;
 import com.zhiyangyun.care.elder.model.RoomRequest;
 import com.zhiyangyun.care.elder.model.RoomResponse;
+import com.zhiyangyun.care.elder.model.RoomSortRequest;
 import com.zhiyangyun.care.elder.service.RoomService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -96,6 +97,15 @@ public class RoomController {
   @GetMapping("/list")
   public Result<java.util.List<RoomResponse>> list() {
     return Result.ok(roomService.list(AuthContext.getOrgId()));
+  }
+
+  @PutMapping("/sort")
+  public Result<Void> sort(@Valid @RequestBody RoomSortRequest request) {
+    Long tenantId = AuthContext.getOrgId();
+    roomService.sort(tenantId, request);
+    auditLogService.record(tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "SORT", "ROOM", null, "调整房间排序");
+    return Result.ok(null);
   }
 
   @DeleteMapping("/{id}")

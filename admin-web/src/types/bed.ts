@@ -8,10 +8,16 @@ export interface RoomItem {
   building?: string
   floorNo?: string
   roomType?: string
+  sortNo?: number
   capacity?: number
   status?: number
   roomQrCode?: string
   remark?: string
+}
+
+export interface RoomSortPayload {
+  floorId: Id
+  roomIds: Id[]
 }
 
 export interface BedItem {

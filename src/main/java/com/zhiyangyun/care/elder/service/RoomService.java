@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.zhiyangyun.care.elder.entity.Room;
 import com.zhiyangyun.care.elder.model.RoomRequest;
 import com.zhiyangyun.care.elder.model.RoomResponse;
+import com.zhiyangyun.care.elder.model.RoomSortRequest;
 
 public interface RoomService {
   RoomResponse create(RoomRequest request);
@@ -18,4 +19,6 @@ public interface RoomService {
   java.util.List<RoomResponse> list(Long tenantId);
 
   void delete(Long id, Long tenantId);
+
+  void sort(Long tenantId, RoomSortRequest request);
 }

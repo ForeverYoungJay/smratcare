@@ -13,10 +13,17 @@ import com.zhiyangyun.care.elder.mapper.BedMapper;
 import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import com.zhiyangyun.care.elder.model.RoomRequest;
 import com.zhiyangyun.care.elder.model.RoomResponse;
+import com.zhiyangyun.care.elder.model.RoomSortRequest;
 import com.zhiyangyun.care.elder.service.RoomService;
 import com.zhiyangyun.care.elder.util.QrCodeUtil;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +42,7 @@ public class RoomServiceImpl implements RoomService {
   }
 
   @Override
+  @Transactional(rollbackFor = Exception.class)
   public RoomResponse create(RoomRequest request) {
     applyBuildingFloorPlaceholders(request);
     if (request.getRoomNo() == null || request.getRoomNo().isBlank()) {
@@ -52,6 +60,7 @@ public class RoomServiceImpl implements RoomService {
     room.setFloorNo(request.getFloorNo());
     room.setRoomNo(request.getRoomNo());
     room.setRoomType(normalizedRoomType);
+    room.setSortNo(normalizeSortNo(request.getSortNo(), request.getTenantId(), request.getFloorId()));
     room.setCapacity(normalizedCapacity);
     room.setStatus(request.getStatus());
     room.setRoomQrCode(request.getRoomQrCode());
@@ -63,6 +72,7 @@ public class RoomServiceImpl implements RoomService {
       room.setRoomQrCode(QrCodeUtil.generate());
     }
     roomMapper.insert(room);
+    createBedsForRoom(room, request);
     return toResponse(room);
   }
 
@@ -88,6 +98,7 @@ public class RoomServiceImpl implements RoomService {
     room.setFloorNo(request.getFloorNo());
     room.setRoomNo(request.getRoomNo());
     room.setRoomType(normalizedRoomType);
+    room.setSortNo(normalizeSortNo(request.getSortNo(), room.getTenantId(), request.getFloorId(), room.getSortNo()));
     room.setCapacity(normalizedCapacity);
     room.setStatus(request.getStatus());
     room.setRoomQrCode(request.getRoomQrCode());
@@ -147,9 +158,11 @@ public class RoomServiceImpl implements RoomService {
   public java.util.List<RoomResponse> list(Long tenantId) {
     var wrapper = Wrappers.lambdaQuery(Room.class)
         .eq(Room::getIsDeleted, 0)
-        .eq(tenantId != null, Room::getTenantId, tenantId)
-        .orderByAsc(Room::getRoomNo);
-    return roomMapper.selectList(wrapper).stream().map(this::toResponse).toList();
+        .eq(tenantId != null, Room::getTenantId, tenantId);
+    return roomMapper.selectList(wrapper).stream()
+        .sorted(this::compareRoomOrder)
+        .map(this::toResponse)
+        .toList();
   }
 
   @Override
@@ -175,8 +188,48 @@ public class RoomServiceImpl implements RoomService {
       bed.setIsDeleted(1);
       bedMapper.updateById(bed);
     }
+    room.setRoomNo(buildDeletedRoomNo(room));
     room.setIsDeleted(1);
     roomMapper.updateById(room);
+  }
+
+  @Override
+  @Transactional(rollbackFor = Exception.class)
+  public void sort(Long tenantId, RoomSortRequest request) {
+    if (tenantId == null || request == null || request.getFloorId() == null) {
+      throw new IllegalArgumentException("缺少楼层信息");
+    }
+    List<Long> requestedRoomIds = request.getRoomIds() == null
+        ? List.of()
+        : request.getRoomIds().stream().filter(Objects::nonNull).distinct().toList();
+    if (requestedRoomIds.isEmpty()) {
+      throw new IllegalArgumentException("缺少房间排序数据");
+    }
+    List<Room> floorRooms = roomMapper.selectList(Wrappers.lambdaQuery(Room.class)
+        .eq(Room::getIsDeleted, 0)
+        .eq(Room::getTenantId, tenantId)
+        .eq(Room::getFloorId, request.getFloorId()));
+    if (floorRooms.isEmpty()) {
+      throw new IllegalArgumentException("当前楼层暂无房间");
+    }
+    Map<Long, Room> roomMap = floorRooms.stream().collect(Collectors.toMap(Room::getId, Function.identity()));
+    List<Long> missingRoomIds = requestedRoomIds.stream().filter(id -> !roomMap.containsKey(id)).toList();
+    if (!missingRoomIds.isEmpty()) {
+      throw new IllegalArgumentException("存在无效房间，无法保存排序");
+    }
+    Set<Long> appendedIds = new HashSet<>(requestedRoomIds);
+    List<Room> orderedRooms = new ArrayList<>();
+    requestedRoomIds.forEach(id -> orderedRooms.add(roomMap.get(id)));
+    floorRooms.stream()
+        .filter(room -> !appendedIds.contains(room.getId()))
+        .sorted(this::compareRoomOrder)
+        .forEach(orderedRooms::add);
+    int nextSortNo = 10;
+    for (Room room : orderedRooms) {
+      room.setSortNo(nextSortNo);
+      roomMapper.updateById(room);
+      nextSortNo += 10;
+    }
   }
 
   private RoomResponse toResponse(Room room) {
@@ -190,6 +243,7 @@ public class RoomServiceImpl implements RoomService {
     response.setFloorNo(room.getFloorNo());
     response.setRoomNo(room.getRoomNo());
     response.setRoomType(room.getRoomType());
+    response.setSortNo(room.getSortNo());
     response.setCapacity(room.getCapacity());
     response.setStatus(room.getStatus());
     response.setRoomQrCode(room.getRoomQrCode());
@@ -427,6 +481,101 @@ public class RoomServiceImpl implements RoomService {
     }
     String normalized = code.trim().toUpperCase().replaceAll("[^A-Z0-9]", "");
     return normalized.isBlank() ? null : normalized;
+  }
+
+  private String buildDeletedRoomNo(Room room) {
+    if (room == null || room.getId() == null) {
+      return "DEL";
+    }
+    return "DEL" + room.getId();
+  }
+
+  private void createBedsForRoom(Room room, RoomRequest request) {
+    int capacity = room == null || room.getCapacity() == null ? 0 : room.getCapacity();
+    if (capacity <= 0 || room.getId() == null) {
+      return;
+    }
+    for (int i = 1; i <= capacity; i++) {
+      Bed bed = new Bed();
+      bed.setTenantId(room.getTenantId());
+      bed.setOrgId(room.getOrgId());
+      bed.setRoomId(room.getId());
+      bed.setBedNo(buildInitialBedNo(room.getRoomNo(), i));
+      bed.setBedQrCode(QrCodeUtil.generate());
+      bed.setStatus(1);
+      bed.setCreatedBy(request.getCreatedBy());
+      bedMapper.insert(bed);
+    }
+  }
+
+  private String buildInitialBedNo(String roomNo, int index) {
+    String normalizedRoomNo = firstNonBlank(roomNo, "ROOM");
+    return normalizedRoomNo + "-" + indexToAlpha(index);
+  }
+
+  private String indexToAlpha(int index) {
+    int number = Math.max(index, 1);
+    StringBuilder builder = new StringBuilder();
+    while (number > 0) {
+      int mod = (number - 1) % 26;
+      builder.insert(0, (char) ('A' + mod));
+      number = (number - 1) / 26;
+    }
+    return builder.toString();
+  }
+
+  private Integer normalizeSortNo(Integer requestedSortNo, Long tenantId, Long floorId) {
+    return normalizeSortNo(requestedSortNo, tenantId, floorId, null);
+  }
+
+  private Integer normalizeSortNo(Integer requestedSortNo, Long tenantId, Long floorId, Integer currentSortNo) {
+    if (requestedSortNo != null && requestedSortNo > 0) {
+      return requestedSortNo;
+    }
+    if (currentSortNo != null && currentSortNo > 0) {
+      return currentSortNo;
+    }
+    return resolveNextSortNo(tenantId, floorId);
+  }
+
+  private Integer resolveNextSortNo(Long tenantId, Long floorId) {
+    if (tenantId == null || floorId == null) {
+      return 0;
+    }
+    List<Room> floorRooms = roomMapper.selectList(Wrappers.lambdaQuery(Room.class)
+        .eq(Room::getIsDeleted, 0)
+        .eq(Room::getTenantId, tenantId)
+        .eq(Room::getFloorId, floorId));
+    boolean hasCustomSort = floorRooms.stream()
+        .map(Room::getSortNo)
+        .filter(Objects::nonNull)
+        .anyMatch(sortNo -> sortNo > 0);
+    if (!hasCustomSort) {
+      return 0;
+    }
+    return floorRooms.stream()
+        .map(Room::getSortNo)
+        .filter(Objects::nonNull)
+        .filter(sortNo -> sortNo > 0)
+        .max(Integer::compareTo)
+        .orElse(0) + 10;
+  }
+
+  private int compareRoomOrder(Room left, Room right) {
+    Integer leftSortNo = left == null ? null : left.getSortNo();
+    Integer rightSortNo = right == null ? null : right.getSortNo();
+    boolean leftSorted = leftSortNo != null && leftSortNo > 0;
+    boolean rightSorted = rightSortNo != null && rightSortNo > 0;
+    if (leftSorted && rightSorted) {
+      int sortCompare = Integer.compare(leftSortNo, rightSortNo);
+      if (sortCompare != 0) {
+        return sortCompare;
+      }
+    } else if (leftSorted != rightSorted) {
+      return leftSorted ? -1 : 1;
+    }
+    return String.valueOf(left == null ? "" : left.getRoomNo())
+        .compareToIgnoreCase(String.valueOf(right == null ? "" : right.getRoomNo()));
   }
 
   private String firstNonBlank(String... values) {

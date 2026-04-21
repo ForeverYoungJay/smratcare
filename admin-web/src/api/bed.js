@@ -59,6 +59,9 @@ export function updateRoom(id, data) {
 export function deleteRoom(id) {
     return request.delete(`/api/room/${id}`);
 }
+export function updateRoomSort(data) {
+    return request.put('/api/room/sort', data);
+}
 export function createBed(data) {
     return request.post('/api/bed', data);
 }

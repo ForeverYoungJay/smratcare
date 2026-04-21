@@ -13,6 +13,7 @@ public class RoomResponse {
   private String floorNo;
   private String roomNo;
   private String roomType;
+  private Integer sortNo;
   private Integer capacity;
   private Integer status;
   private String roomQrCode;

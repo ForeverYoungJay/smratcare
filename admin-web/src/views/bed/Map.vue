@@ -106,7 +106,22 @@
                   <small>{{ floor.rooms.length }} 间</small>
                 </button>
                 <div class="tower-floor-content">
-                  <div v-for="room in floor.rooms" :key="room.key" class="room-cube" @dblclick="openRoomSceneDetail(room)">
+                  <div
+                    v-for="room in floor.rooms"
+                    :key="room.key"
+                    class="room-cube"
+                    :class="{
+                      'is-drag-enabled': canDragFunctionalRoom(room),
+                      'is-drag-source': roomDrag.dragKey === room.key,
+                      'is-drop-target': roomDrag.overKey === room.key && roomDrag.dragKey !== room.key
+                    }"
+                    :draggable="canDragFunctionalRoom(room)"
+                    @dragstart="onFunctionalRoomDragStart(room)"
+                    @dragover.prevent="onFunctionalRoomDragOver(room)"
+                    @drop.prevent="onFunctionalRoomDrop(building.name, floor.label, room)"
+                    @dragend="onFunctionalRoomDragEnd"
+                    @dblclick="openRoomSceneDetail(room)"
+                  >
                     <div class="room-head">
                       <div>
                         <div class="room-title">
@@ -122,6 +137,7 @@
                     <div v-if="resolveVisibleRemark(room.remark)" class="room-remark">{{ resolveVisibleRemark(room.remark) }}</div>
                     <div v-if="room.isFunctionalRoom" class="functional-room-panel">
                       <div class="functional-room-badge">{{ resolveRoomTypeLabel(room.roomType) }}</div>
+                      <div v-if="canDragFunctionalRoom(room)" class="functional-room-hint">拖动可调整本层显示顺序</div>
                     </div>
                     <div v-else class="bed-grid">
                       <button
@@ -214,7 +230,7 @@
     <a-modal v-model:open="roomDetailOpen" :title="`房间详情 · ${roomCurrent?.roomNo || '-'}`" width="760px" :footer="null" destroy-on-close>
       <a-descriptions bordered size="small" :column="2" style="margin-bottom: 12px">
         <a-descriptions-item label="房型">{{ resolveRoomTypeLabel(roomCurrent?.roomType) }}</a-descriptions-item>
-        <a-descriptions-item label="房间属性">{{ roomCurrent?.isFunctionalRoom ? '功能房（不计入住率）' : '居住房' }}</a-descriptions-item>
+        <a-descriptions-item label="房间属性">{{ roomCurrent?.isFunctionalRoom ? '功能房' : '居住房' }}</a-descriptions-item>
         <a-descriptions-item label="总床位">{{ roomCurrent?.totalBeds || 0 }}</a-descriptions-item>
         <a-descriptions-item label="在住人数">{{ roomCurrent?.elderCount || 0 }}</a-descriptions-item>
         <a-descriptions-item label="公开备注" :span="2">{{ resolveVisibleRemark(roomCurrent?.remark) || '-' }}</a-descriptions-item>
@@ -244,6 +260,7 @@ import QRCode from 'qrcode'
 import PageContainer from '../../components/PageContainer.vue'
 import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import BedInfoCard from '../../components/bed/BedInfoCard.vue'
+import { updateRoomSort } from '../../api/bed'
 import { getElderDetail } from '../../api/elder'
 import { useBedMapDataset } from '../../composables/useBedMapDataset'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
@@ -252,8 +269,10 @@ import type { BedItem, ElderItem, RoomItem } from '../../types/api'
 type RoomScene = {
   key: string
   roomId?: string | number
+  floorId?: string | number
   roomNo: string
   roomType?: string
+  sortNo?: number
   beds: BedItem[]
   totalBeds: number
   occupiedBeds: number
@@ -294,6 +313,11 @@ const elderLoading = ref(false)
 const elderDetail = ref<ElderItem | null>(null)
 const roomResidentLoading = ref(false)
 const roomResidents = ref<ElderItem[]>([])
+const roomDrag = reactive({
+  dragKey: '',
+  overKey: '',
+  saving: false
+})
 const viewMode = ref<'grid' | 'list'>('grid')
 const matrixQuickFilter = ref<'all' | 'idle' | 'occupied'>('all')
 const selectedBuilding = ref('')
@@ -414,9 +438,11 @@ const buildingScenes = computed<BuildingScene[]>(() => {
               const isFunctionalRoom = roomBeds.length === 0 && isFunctionalRoomType(roomType)
               return {
                 key: `${buildingName}-${floorNo}-${roomNo}`,
-                roomId: matchedRoom?.id,
+                roomId: matchedRoom?.id || firstBed?.roomId,
+                floorId: matchedRoom?.floorId,
                 roomNo,
                 roomType,
+                sortNo: matchedRoom?.sortNo,
                 beds: [...roomBeds].sort((a, b) => String(a.bedNo || '').localeCompare(String(b.bedNo || ''), 'zh-CN')),
                 totalBeds: roomBeds.length,
                 occupiedBeds,
@@ -425,7 +451,7 @@ const buildingScenes = computed<BuildingScene[]>(() => {
                 remark: matchedRoom?.remark || firstBed?.roomRemark
               }
             })
-            .sort((a, b) => a.roomNo.localeCompare(b.roomNo, 'zh-CN'))
+            .sort(compareRoomSceneOrder)
           return {
             key: `${buildingName}-${floorNo}`,
             label: floorNo,
@@ -639,6 +665,106 @@ function clearMatrixSelection() {
   selectedBuilding.value = ''
   selectedFloor.value = ''
   query.pageNo = 1
+}
+
+function canDragFunctionalRoom(room: RoomScene) {
+  return room.isFunctionalRoom && Boolean(room.roomId) && Boolean(room.floorId) && matrixQuickFilter.value === 'all' && !roomDrag.saving
+}
+
+function compareRoomSceneOrder(left: RoomScene, right: RoomScene) {
+  const leftSortNo = Number(left.sortNo || 0)
+  const rightSortNo = Number(right.sortNo || 0)
+  const leftSorted = leftSortNo > 0
+  const rightSorted = rightSortNo > 0
+  if (leftSorted && rightSorted && leftSortNo !== rightSortNo) return leftSortNo - rightSortNo
+  if (leftSorted !== rightSorted) return leftSorted ? -1 : 1
+  return String(left.roomNo || '').localeCompare(String(right.roomNo || ''), 'zh-CN')
+}
+
+function findRoomSceneByKey(roomKey: string) {
+  for (const building of buildingScenes.value) {
+    for (const floor of building.floors) {
+      const room = floor.rooms.find((item) => item.key === roomKey)
+      if (room) {
+        return { building, floor, room }
+      }
+    }
+  }
+  return null
+}
+
+function onFunctionalRoomDragStart(room: RoomScene) {
+  if (!canDragFunctionalRoom(room)) return
+  roomDrag.dragKey = room.key
+  roomDrag.overKey = room.key
+}
+
+function onFunctionalRoomDragOver(room: RoomScene) {
+  if (!roomDrag.dragKey || roomDrag.dragKey === room.key) return
+  roomDrag.overKey = room.key
+}
+
+async function onFunctionalRoomDrop(buildingName: string, floorLabel: string, targetRoom: RoomScene) {
+  const dragKey = roomDrag.dragKey
+  if (!dragKey) {
+    onFunctionalRoomDragEnd()
+    return
+  }
+  const sourceMeta = findRoomSceneByKey(dragKey)
+  const targetMeta = findRoomSceneByKey(targetRoom.key)
+  if (!sourceMeta || !targetMeta) {
+    onFunctionalRoomDragEnd()
+    return
+  }
+  if (String(sourceMeta.room.floorId || '') !== String(targetMeta.room.floorId || '')) {
+    message.warning('功能房顺序目前仅支持在同一楼层内调整')
+    onFunctionalRoomDragEnd()
+    return
+  }
+  const floorRooms = buildingScenes.value
+    .find((item) => item.name === buildingName)
+    ?.floors.find((item) => item.label === floorLabel)
+    ?.rooms.filter((item) => item.roomId)
+  if (!floorRooms?.length) {
+    onFunctionalRoomDragEnd()
+    return
+  }
+  const from = floorRooms.findIndex((item) => item.key === dragKey)
+  const to = floorRooms.findIndex((item) => item.key === targetRoom.key)
+  if (from < 0 || to < 0 || from === to) {
+    onFunctionalRoomDragEnd()
+    return
+  }
+  const orderedRooms = floorRooms.slice()
+  const [moved] = orderedRooms.splice(from, 1)
+  orderedRooms.splice(to, 0, moved)
+  const floorId = targetMeta.room.floorId
+  const roomIds = orderedRooms
+    .map((item) => item.roomId)
+    .filter((id): id is string | number => id !== undefined && id !== null)
+  if (!floorId || !roomIds.length) {
+    onFunctionalRoomDragEnd()
+    return
+  }
+  roomDrag.saving = true
+  try {
+    await updateRoomSort({
+      floorId,
+      roomIds
+    })
+    await refreshBedMapDataset({ rooms: true })
+    message.success('功能房位置已更新')
+  } catch (error: any) {
+    message.error(error?.message || '保存顺序失败')
+  } finally {
+    roomDrag.saving = false
+    onFunctionalRoomDragEnd()
+  }
+}
+
+function onFunctionalRoomDragEnd() {
+  roomDrag.dragKey = ''
+  roomDrag.overKey = ''
 }
 
 function matchMatrixFilter(bed: BedItem) {
@@ -989,6 +1115,21 @@ watch([filteredBeds, functionalRooms], () => {
   box-shadow: 0 12px 24px rgba(14, 165, 233, 0.08);
 }
 
+.room-cube.is-drag-enabled {
+  cursor: grab;
+}
+
+.room-cube.is-drag-source {
+  opacity: 0.72;
+  border-color: #c084fc;
+  box-shadow: 0 12px 28px rgba(109, 40, 217, 0.14);
+}
+
+.room-cube.is-drop-target {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.14);
+}
+
 .room-head {
   display: flex;
   justify-content: space-between;
@@ -1062,6 +1203,12 @@ watch([filteredBeds, functionalRooms], () => {
   color: #6d28d9;
   font-size: 12px;
   font-weight: 700;
+}
+
+.functional-room-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #7c3aed;
 }
 
 .functional-room-copy {

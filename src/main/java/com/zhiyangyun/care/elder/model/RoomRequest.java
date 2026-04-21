@@ -15,6 +15,7 @@ public class RoomRequest {
   private String floorNo;
   private String roomNo;
   private String roomType;
+  private Integer sortNo;
   private Integer capacity = 1;
   private Integer status = 1;
   private String roomQrCode;
