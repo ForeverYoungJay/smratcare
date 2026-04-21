@@ -361,7 +361,11 @@
                 <div class="section-head">
                   <div>
                     <div class="section-title">房间列表</div>
-                    <div class="section-desc">当前共 {{ roomPage.total }} 条记录</div>
+                    <div class="section-desc">
+                      当前共 {{ roomPage.total }} 条记录
+                      <span v-if="roomQuery.floorId">，当前楼层支持直接拖动排序</span>
+                      <span v-else>，先筛选到单个楼层后可拖动排序</span>
+                    </div>
                   </div>
                 </div>
                 <a-table
@@ -372,6 +376,8 @@
                   row-key="id"
                   :scroll="{ y: 420 }"
                   :row-selection="roomRowSelection"
+                  :custom-row="roomTableRowProps"
+                  :row-class-name="roomTableRowClassName"
                   @change="onRoomTableChange"
                 >
                   <template #bodyCell="{ column, record }">
@@ -1020,6 +1026,11 @@ const selectedFloors = ref<FloorItem[]>([])
 const selectedFloorRowKeys = ref<Id[]>([])
 const selectedRooms = ref<RoomItem[]>([])
 const selectedRoomRowKeys = ref<Id[]>([])
+const roomDrag = reactive({
+  dragId: undefined as Id | undefined,
+  overId: undefined as Id | undefined,
+  saving: false
+})
 const loadingRooms = ref(false)
 const loadingBeds = ref(false)
 const loadingBuildings = ref(false)
@@ -1822,9 +1833,17 @@ function sortRoomItems(list: RoomItem[]) {
   return [...list].sort(compareRoomSort)
 }
 
+const roomDragEnabled = computed(() =>
+  Boolean(roomQuery.floorId) && !roomQuery.sortBy && !roomQuery.sortOrder && !roomDrag.saving
+)
+
 function floorRoomSequence(floorId?: Id) {
   if (!floorId) return []
   return sortRoomItems(roomList.value.filter((item) => item.floorId === floorId))
+}
+
+function canDragRoom(record: RoomItem) {
+  return roomDragEnabled.value && !!record.floorId && record.floorId === roomQuery.floorId
 }
 
 function canMoveRoom(record: RoomItem, direction: 'up' | 'down') {
@@ -1833,6 +1852,22 @@ function canMoveRoom(record: RoomItem, direction: 'up' | 'down') {
   const index = sequence.findIndex((item) => item.id === record.id)
   if (index < 0) return false
   return direction === 'up' ? index > 0 : index < sequence.length - 1
+}
+
+async function saveRoomSequence(floorId: Id, ordered: RoomItem[], successText: string) {
+  roomDrag.saving = true
+  try {
+    await updateRoomSort({
+      floorId,
+      roomIds: ordered.map((item) => item.id)
+    })
+    await Promise.all([searchRooms(), loadRoomList(), refreshTree()])
+    message.success(successText)
+  } catch (error: any) {
+    message.error(errorMessage(error, '调整房间顺序失败'))
+  } finally {
+    roomDrag.saving = false
+  }
 }
 
 async function moveRoom(record: RoomItem, direction: 'up' | 'down') {
@@ -1854,16 +1889,68 @@ async function moveRoom(record: RoomItem, direction: 'up' | 'down') {
   const ordered = sequence.slice()
   const [moved] = ordered.splice(index, 1)
   ordered.splice(targetIndex, 0, moved)
-  try {
-    await updateRoomSort({
-      floorId: record.floorId,
-      roomIds: ordered.map((item) => item.id)
-    })
-    await Promise.all([searchRooms(), loadRoomList(), refreshTree()])
-    message.success(`房间已${direction === 'up' ? '上移' : '下移'}`)
-  } catch (error: any) {
-    message.error(errorMessage(error, '调整房间顺序失败'))
+  await saveRoomSequence(record.floorId, ordered, `房间已${direction === 'up' ? '上移' : '下移'}`)
+}
+
+function roomTableRowProps(record: RoomItem) {
+  if (!canDragRoom(record)) {
+    return {}
   }
+  return {
+    draggable: true,
+    onDragstart: () => onRoomRowDragStart(record),
+    onDragover: (event: DragEvent) => onRoomRowDragOver(event, record),
+    onDrop: (event: DragEvent) => onRoomRowDrop(event, record),
+    onDragend: onRoomRowDragEnd
+  }
+}
+
+function roomTableRowClassName(record: RoomItem) {
+  if (!canDragRoom(record)) return ''
+  if (roomDrag.dragId === record.id) return 'room-sortable-row is-drag-source'
+  if (roomDrag.overId === record.id) return 'room-sortable-row is-drop-target'
+  return 'room-sortable-row'
+}
+
+function onRoomRowDragStart(record: RoomItem) {
+  if (!canDragRoom(record)) return
+  roomDrag.dragId = record.id
+  roomDrag.overId = record.id
+}
+
+function onRoomRowDragOver(event: DragEvent, record: RoomItem) {
+  if (!roomDrag.dragId || roomDrag.dragId === record.id) return
+  event.preventDefault()
+  roomDrag.overId = record.id
+}
+
+async function onRoomRowDrop(event: DragEvent, target: RoomItem) {
+  event.preventDefault()
+  const dragId = roomDrag.dragId
+  if (!dragId || dragId === target.id || !target.floorId) {
+    onRoomRowDragEnd()
+    return
+  }
+  if (!roomList.value.length) {
+    await loadRoomList()
+  }
+  const sequence = floorRoomSequence(target.floorId)
+  const from = sequence.findIndex((item) => item.id === dragId)
+  const to = sequence.findIndex((item) => item.id === target.id)
+  if (from < 0 || to < 0 || from === to) {
+    onRoomRowDragEnd()
+    return
+  }
+  const ordered = sequence.slice()
+  const [moved] = ordered.splice(from, 1)
+  ordered.splice(to, 0, moved)
+  onRoomRowDragEnd()
+  await saveRoomSequence(target.floorId, ordered, '房间顺序已更新')
+}
+
+function onRoomRowDragEnd() {
+  roomDrag.dragId = undefined
+  roomDrag.overId = undefined
 }
 
 function onBedPageChange(page: number) {
@@ -3141,6 +3228,17 @@ onMounted(async () => {
 }
 .row-actions :deep(.ant-btn-link) {
   padding-inline: 4px;
+}
+.table-card :deep(.room-sortable-row) {
+  cursor: grab;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+.table-card :deep(.room-sortable-row.is-drag-source > td) {
+  background: #f5f3ff;
+}
+.table-card :deep(.room-sortable-row.is-drop-target > td) {
+  background: #eef6ff;
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.22);
 }
 .pager {
   margin-top: 16px;
