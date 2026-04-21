@@ -665,7 +665,7 @@
     >
       <a-form ref="roomFormRef" :model="roomForm" :rules="roomRules" layout="vertical">
         <a-form-item label="房间号" name="roomNo">
-          <a-input v-model:value="roomForm.roomNo" disabled placeholder="系统自动生成，如 A301 / A302" />
+          <a-input v-model:value="roomForm.roomNo" disabled placeholder="系统自动生成，如 A301 / A3N1" />
         </a-form-item>
         <a-form-item label="楼栋" name="buildingId">
           <a-select v-model:value="roomForm.buildingId" :disabled="roomDrawerMode === 'view'" placeholder="请选择" show-search option-filter-prop="label">

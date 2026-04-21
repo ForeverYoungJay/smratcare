@@ -38,7 +38,7 @@ public class RoomServiceImpl implements RoomService {
   public RoomResponse create(RoomRequest request) {
     applyBuildingFloorPlaceholders(request);
     if (request.getRoomNo() == null || request.getRoomNo().isBlank()) {
-      request.setRoomNo(resolveNextRoomNo(request.getTenantId(), request.getBuildingId(), request.getFloorId(), request.getFloorNo()));
+      request.setRoomNo(resolveNextRoomNo(request.getTenantId(), request.getBuildingId(), request.getFloorId(), request.getFloorNo(), request.getRoomType()));
     }
     ensureRoomNoUnique(null, request.getTenantId(), request.getRoomNo());
     Integer normalizedCapacity = normalizeCapacityByRoomType(request.getRoomType(), request.getCapacity());
@@ -347,12 +347,14 @@ public class RoomServiceImpl implements RoomService {
     }
   }
 
-  private String resolveNextRoomNo(Long tenantId, Long buildingId, Long floorId, String floorNo) {
+  private String resolveNextRoomNo(Long tenantId, Long buildingId, Long floorId, String floorNo, String roomType) {
     String prefixDigits = floorNo == null ? "" : floorNo.replaceAll("[^0-9]", "");
     if (prefixDigits.isBlank()) {
       prefixDigits = "1";
     }
-    final String roomPrefix = resolveBuildingPrefix(buildingId) + prefixDigits;
+    final String buildingPrefix = resolveBuildingPrefix(buildingId);
+    final String functionalCode = resolveFunctionalRoomCode(roomType);
+    final String roomPrefix = buildingPrefix + prefixDigits + (functionalCode == null ? "" : functionalCode);
     List<Room> rooms = roomMapper.selectList(Wrappers.lambdaQuery(Room.class)
         .eq(Room::getIsDeleted, 0)
         .eq(Room::getTenantId, tenantId)
@@ -368,7 +370,30 @@ public class RoomServiceImpl implements RoomService {
         .mapToInt(Integer::parseInt)
         .max()
         .orElse(0) + 1;
-    return roomPrefix + String.format("%02d", nextSeq);
+    return roomPrefix + (functionalCode == null ? String.format("%02d", nextSeq) : nextSeq);
+  }
+
+  private String resolveFunctionalRoomCode(String roomType) {
+    if (roomType == null || roomType.isBlank()) {
+      return null;
+    }
+    String normalized = roomType.trim().toUpperCase();
+    if (normalized.contains("NURSING") || normalized.contains("STATION") || roomType.contains("护理站")) {
+      return "N";
+    }
+    if (normalized.contains("WATER") || roomType.contains("开水房")) {
+      return "W";
+    }
+    if (normalized.contains("LAUNDRY") || roomType.contains("洗衣房")) {
+      return "L";
+    }
+    if (normalized.contains("TOILET") || normalized.contains("WC") || roomType.contains("卫生间") || roomType.contains("厕所")) {
+      return "T";
+    }
+    if (normalized.contains("BATH") || roomType.contains("浴室") || roomType.contains("沐浴")) {
+      return "B";
+    }
+    return null;
   }
 
   private String resolveBuildingPrefix(Long buildingId) {

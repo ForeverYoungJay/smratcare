@@ -140,8 +140,22 @@
 
       <template v-else>
         <a-row :gutter="16">
-          <a-col v-for="bed in pagedBeds" :key="bed.id" :xs="24" :sm="12" :md="8" :lg="6" :xl="4">
-            <BedInfoCard :bed="bed" @click="openBed(bed)" />
+          <a-col v-for="item in pagedListItems" :key="item.key" :xs="24" :sm="12" :md="8" :lg="6" :xl="4">
+            <template v-if="item.kind === 'bed'">
+              <BedInfoCard :bed="item.bed" @click="openBed(item.bed)" />
+            </template>
+            <template v-else>
+              <button type="button" class="functional-room-card" @click="openRoomSceneDetail(item.room)">
+                <div class="functional-room-card-head">
+                  <div class="functional-room-card-title">{{ item.room.roomNo }}</div>
+                  <div class="functional-room-card-chip">功能房</div>
+                </div>
+                <div class="functional-room-card-type">{{ resolveRoomTypeLabel(item.room.roomType) }}</div>
+                <div class="functional-room-card-copy">位置：{{ selectedBuilding || item.building }} / {{ selectedFloor || item.floor }}</div>
+                <div class="functional-room-card-copy">该房间展示在房态图中，但不计入入住率和床位统计。</div>
+                <div v-if="resolveVisibleRemark(item.room.remark)" class="functional-room-card-remark">{{ resolveVisibleRemark(item.room.remark) }}</div>
+              </button>
+            </template>
           </a-col>
         </a-row>
 
@@ -149,7 +163,7 @@
           style="margin-top: 16px; text-align: right;"
           :current="query.pageNo"
           :page-size="query.pageSize"
-          :total="scopedBeds.length"
+          :total="listItems.length"
           show-size-changer
           @change="onPageChange"
           @showSizeChange="onPageSizeChange"
@@ -256,6 +270,10 @@ type BuildingScene = {
   roomCount: number
   bedCount: number
 }
+
+type ListCardItem =
+  | { key: string; kind: 'bed'; bed: BedItem }
+  | { key: string; kind: 'functional-room'; room: RoomScene; building: string; floor: string }
 
 const router = useRouter()
 const route = useRoute()
@@ -385,7 +403,7 @@ const buildingScenes = computed<BuildingScene[]>(() => {
                 && String(room.floorNo || '') === floorNo
                 && String(room.roomNo || '') === roomNo
               )
-              const roomType = String(firstBed?.roomType || matchedRoom?.roomType || '')
+              const roomType = String(matchedRoom?.roomType || firstBed?.roomType || '')
               const isFunctionalRoom = roomBeds.length === 0 && isFunctionalRoomType(roomType)
               return {
                 key: `${buildingName}-${floorNo}-${roomNo}`,
@@ -397,7 +415,7 @@ const buildingScenes = computed<BuildingScene[]>(() => {
                 occupiedBeds,
                 elderCount: roomBeds.filter((bed) => !!bed.elderId).length,
                 isFunctionalRoom,
-                remark: firstBed?.roomRemark || matchedRoom?.remark
+                remark: matchedRoom?.remark || firstBed?.roomRemark
               }
             })
             .sort((a, b) => a.roomNo.localeCompare(b.roomNo, 'zh-CN'))
@@ -454,9 +472,30 @@ const floorCount = computed(() => buildingScenes.value.reduce((sum, building) =>
 const roomCount = computed(() => buildingScenes.value.reduce((sum, building) => sum + building.roomCount, 0))
 const occupiedBedsCount = computed(() => scopedBeds.value.filter((bed) => isOccupiedBed(bed)).length)
 const idleBedsCount = computed(() => scopedBeds.value.filter((bed) => isIdleBed(bed)).length)
-const pagedBeds = computed(() => {
+const listItems = computed<ListCardItem[]>(() => {
+  const bedItems = scopedBeds.value.map((bed) => ({
+    key: `bed-${bed.id}`,
+    kind: 'bed' as const,
+    bed
+  }))
+  const roomItems = buildingScenes.value.flatMap((building) =>
+    building.floors.flatMap((floor) =>
+      floor.rooms
+        .filter((room) => room.isFunctionalRoom)
+        .map((room) => ({
+          key: `room-${room.key}`,
+          kind: 'functional-room' as const,
+          room,
+          building: building.name,
+          floor: floor.label
+        }))
+    )
+  )
+  return [...bedItems, ...roomItems]
+})
+const pagedListItems = computed(() => {
   const start = (query.pageNo - 1) * query.pageSize
-  return scopedBeds.value.slice(start, start + query.pageSize)
+  return listItems.value.slice(start, start + query.pageSize)
 })
 
 function floorSortValue(text: string) {
@@ -1042,6 +1081,69 @@ watch([filteredBeds, functionalRooms], () => {
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.7);
   border: 1px solid rgba(219, 234, 254, 0.9);
+}
+
+.functional-room-card {
+  width: 100%;
+  min-height: 220px;
+  text-align: left;
+  border: 1px solid rgba(216, 180, 254, 0.9);
+  border-radius: 18px;
+  padding: 16px;
+  background: linear-gradient(160deg, #fcfaff 0%, #f5f3ff 55%, #ffffff 100%);
+  box-shadow: 0 14px 26px rgba(109, 40, 217, 0.08);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.functional-room-card:hover {
+  transform: translateY(-3px);
+  border-color: #c084fc;
+  box-shadow: 0 18px 32px rgba(109, 40, 217, 0.16);
+}
+
+.functional-room-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.functional-room-card-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #581c87;
+}
+
+.functional-room-card-chip {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(124, 58, 237, 0.12);
+  color: #6d28d9;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.functional-room-card-type {
+  margin-top: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #7c3aed;
+}
+
+.functional-room-card-copy {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #5b21b6;
+}
+
+.functional-room-card-remark {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(196, 181, 253, 0.8);
+  font-size: 12px;
+  color: #6b21a8;
 }
 
 .bed-title {
