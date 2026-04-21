@@ -366,7 +366,7 @@ public class RoomServiceImpl implements RoomService {
         .map(String::toUpperCase)
         .filter(value -> value.startsWith(roomPrefix) && value.length() > roomPrefix.length())
         .map(value -> value.substring(roomPrefix.length()))
-        .filter(value -> !value.isBlank())
+        .filter(value -> !value.isBlank() && value.chars().allMatch(Character::isDigit))
         .mapToInt(Integer::parseInt)
         .max()
         .orElse(0) + 1;

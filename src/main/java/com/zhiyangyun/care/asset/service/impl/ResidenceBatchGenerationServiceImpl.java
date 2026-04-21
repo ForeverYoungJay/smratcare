@@ -371,7 +371,8 @@ public class ResidenceBatchGenerationServiceImpl implements ResidenceBatchGenera
     ResidenceGenerationFloorRule floorRule = resolveFloorRule(request, floorNoNumeric);
     Set<String> excluded = floorRule == null ? Set.of() : floorRule.getExcludedRoomNos().stream().filter(Objects::nonNull).collect(Collectors.toSet());
     for (int roomSeq = roomStart; roomSeq <= roomEnd; roomSeq++) {
-      String roomNo = buildRoomNo(floorNoNumeric, roomSeq, request.getRoomSeqWidth());
+      String roomNo = buildRoomNo(buildingPlan.code, floorNoNumeric, roomSeq, request.getRoomSeqWidth(),
+          specialRoom == null ? null : specialRoom.getRoomType());
       if (excluded.contains(roomNo)) {
         addSkip(plan, "ROOM", roomNo, floorPlan.floorNo, "该房号已在楼层规则中标记为跳过");
         continue;
@@ -597,9 +598,46 @@ public class ResidenceBatchGenerationServiceImpl implements ResidenceBatchGenera
         .orElse(null);
   }
 
-  private String buildRoomNo(int floorNo, int roomSeq, Integer roomSeqWidth) {
+  private String buildRoomNo(String buildingCode, int floorNo, int roomSeq, Integer roomSeqWidth, String roomType) {
     int width = roomSeqWidth == null ? 2 : roomSeqWidth;
-    return floorNo + String.format("%0" + width + "d", roomSeq);
+    String buildingPrefix = normalizeBuildingCode(buildingCode);
+    String floorPrefix = String.valueOf(floorNo);
+    String functionalCode = resolveFunctionalRoomCode(roomType);
+    if (functionalCode != null) {
+      return buildingPrefix + floorPrefix + functionalCode + roomSeq;
+    }
+    return buildingPrefix + floorPrefix + String.format("%0" + width + "d", roomSeq);
+  }
+
+  private String normalizeBuildingCode(String code) {
+    if (code == null || code.isBlank()) {
+      return "A";
+    }
+    String normalized = code.trim().toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
+    return normalized.isBlank() ? "A" : normalized;
+  }
+
+  private String resolveFunctionalRoomCode(String roomType) {
+    if (roomType == null || roomType.isBlank()) {
+      return null;
+    }
+    String normalized = roomType.trim().toUpperCase(Locale.ROOT);
+    if (normalized.contains("NURSING") || normalized.contains("STATION") || roomType.contains("护理站")) {
+      return "N";
+    }
+    if (normalized.contains("WATER") || roomType.contains("开水房")) {
+      return "W";
+    }
+    if (normalized.contains("LAUNDRY") || roomType.contains("洗衣房")) {
+      return "L";
+    }
+    if (normalized.contains("TOILET") || normalized.contains("WC") || roomType.contains("卫生间") || roomType.contains("厕所")) {
+      return "T";
+    }
+    if (normalized.contains("BATH") || roomType.contains("浴室") || roomType.contains("沐浴")) {
+      return "B";
+    }
+    return null;
   }
 
   private String formatFloorNo(int floorNo, String style) {

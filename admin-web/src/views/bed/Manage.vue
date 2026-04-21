@@ -2525,7 +2525,7 @@ async function quickGenerateRooms() {
     return
   }
   const floorNoNumeric = Number(String(floor.floorNo || '').replace(/[^\d]/g, '') || 1)
-  const head = String(building.name || 'A').slice(0, 1).toUpperCase()
+  const head = String(building.code || building.name || 'A').trim().toUpperCase().replace(/[^A-Z0-9]/g, '') || 'A'
   const existed = new Set(roomList.value.map((item) => item.roomNo))
   const tasks: Promise<void>[] = []
   for (let i = 1; i <= 30; i++) {
