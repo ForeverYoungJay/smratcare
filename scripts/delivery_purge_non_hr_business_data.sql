@@ -1,6 +1,8 @@
 -- 交付清库：
 -- 保留人力资源/系统管理相关基础数据（org/department/role/staff/staff_role/base_data_item/staff_*/attendance_*/hr_*），
 -- 清空其余业务域测试数据，便于交付演示/验收环境。
+-- 用法示例：
+-- docker compose exec -T mysql mysql -uroot -proot zhiyangyun < scripts/delivery_purge_non_hr_business_data.sql
 
 SET FOREIGN_KEY_CHECKS = 0;
 SET SQL_SAFE_UPDATES = 0;
