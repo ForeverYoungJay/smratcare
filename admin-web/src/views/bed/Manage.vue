@@ -1496,11 +1496,15 @@ function inferCapacityByRoomType(roomType?: string) {
   const raw = String(roomType || '')
   const normalized = raw.toUpperCase()
   if (!normalized) return undefined
+  const matched = roomTypeItems.value.find((item) => item.itemCode === raw || item.itemName === raw || item.itemCode === normalized)
+  if (matched) {
+    const metaCapacity = parseRoomTypeDefaultCapacity(matched.remark)
+    if (metaCapacity !== undefined) return metaCapacity
+  }
   if (normalized === '1' || normalized.includes('SINGLE') || normalized.includes('ROOM_SINGLE') || raw.includes('单人')) return 1
   if (normalized === '2' || normalized.includes('DOUBLE') || normalized.includes('ROOM_DOUBLE') || raw.includes('双人')) return 2
   if (normalized === '3' || normalized.includes('TRIPLE') || normalized.includes('ROOM_TRIPLE') || raw.includes('三人')) return 3
   if (isFunctionalRoomType(raw)) return 0
-  const matched = roomTypeItems.value.find((item) => item.itemCode === raw || item.itemName === raw)
   if (matched) {
     const name = String(matched.itemName || '')
     if (name.includes('单人')) return 1
@@ -1509,6 +1513,17 @@ function inferCapacityByRoomType(roomType?: string) {
     if (isFunctionalRoomType(`${matched.itemCode} ${name}`)) return 0
   }
   return undefined
+}
+
+function parseRoomTypeDefaultCapacity(raw?: string) {
+  if (!raw) return undefined
+  try {
+    const parsed = JSON.parse(raw)
+    const capacity = Number(parsed?.defaultCapacity)
+    return Number.isFinite(capacity) ? capacity : undefined
+  } catch {
+    return undefined
+  }
 }
 
 function isFunctionalRoomType(roomType?: string) {

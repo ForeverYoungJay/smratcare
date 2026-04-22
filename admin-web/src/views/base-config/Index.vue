@@ -84,10 +84,13 @@
           <template v-if="column.key === 'configGroup'">
             {{ resolveGroupLabel(record) }}
           </template>
-          <template v-else-if="column.key === 'status'">
-            <a-tag :color="record.status === 1 ? 'green' : 'default'">{{ record.status === 1 ? '启用' : '停用' }}</a-tag>
-          </template>
-          <template v-else-if="column.key === 'action'">
+        <template v-else-if="column.key === 'status'">
+          <a-tag :color="record.status === 1 ? 'green' : 'default'">{{ record.status === 1 ? '启用' : '停用' }}</a-tag>
+        </template>
+        <template v-else-if="column.key === 'remark'">
+          {{ displayRemark(record) }}
+        </template>
+        <template v-else-if="column.key === 'action'">
             <a-space>
               <a-button type="link" @click="toggleStatus(record)">{{ record.status === 1 ? '停用' : '启用' }}</a-button>
               <a-button type="link" @click="openEdit(record)">编辑</a-button>
@@ -124,8 +127,11 @@
         <a-form-item label="配置名称" name="itemName">
           <a-input v-model:value="form.itemName" placeholder="请输入名称" :maxlength="128" />
         </a-form-item>
-        <a-form-item label="配置编码" name="itemCode">
-          <a-input v-model:value="form.itemCode" placeholder="如 CHANNEL_WECHAT" :maxlength="64" @blur="normalizeFormCode" />
+        <a-form-item label="配置编码">
+          <a-input :value="autoItemCodePreview" disabled placeholder="系统自动生成" />
+        </a-form-item>
+        <a-form-item v-if="form.configGroup === 'ADMISSION_ROOM_TYPE'" label="默认床位数">
+          <a-input-number v-model:value="roomTypeMeta.defaultCapacity" :min="0" :max="20" style="width: 100%" />
         </a-form-item>
         <a-form-item label="排序">
           <a-input-number v-model:value="form.sortNo" :min="0" style="width: 100%" />
@@ -263,14 +269,13 @@ const form = reactive<BaseConfigItemPayload>({
   sortNo: 0,
   remark: ''
 })
+const roomTypeMeta = reactive<{ defaultCapacity?: number }>({
+  defaultCapacity: undefined
+})
 
 const rules: FormRules = {
   configGroup: [{ required: true, message: '请选择分组' }],
   itemName: [{ required: true, message: '请输入配置名称' }],
-  itemCode: [
-    { required: true, message: '请输入配置编码' },
-    { pattern: /^[A-Za-z0-9_]+$/, message: '仅支持字母/数字/下划线' }
-  ],
   status: [{ required: true, message: '请选择状态' }]
 }
 
@@ -302,20 +307,20 @@ const residencePresets: Record<string, { itemCode: string; itemName: string; sor
     { itemCode: 'BED_MEDICAL', itemName: '医用床', sortNo: 50 }
   ],
   ADMISSION_ROOM_TYPE: [
-    { itemCode: 'ROOM_SINGLE', itemName: '单人间', sortNo: 10 },
-    { itemCode: 'ROOM_DOUBLE', itemName: '双人间', sortNo: 20 },
-    { itemCode: 'ROOM_TRIPLE', itemName: '三人间', sortNo: 30 },
-    { itemCode: 'ROOM_CARE', itemName: '护理房', sortNo: 40 },
-    { itemCode: 'ROOM_SUITE', itemName: '套间', sortNo: 45 },
-    { itemCode: 'ROOM_NURSING_STATION', itemName: '护理站', sortNo: 50 },
-    { itemCode: 'ROOM_WATER', itemName: '开水房', sortNo: 60 },
-    { itemCode: 'ROOM_LAUNDRY', itemName: '洗衣房', sortNo: 70 },
-    { itemCode: 'ROOM_TOILET', itemName: '卫生间', sortNo: 80 },
-    { itemCode: 'ROOM_BATH', itemName: '浴室', sortNo: 90 },
-    { itemCode: 'ROOM_TREATMENT', itemName: '治疗室', sortNo: 100 },
-    { itemCode: 'ROOM_STORAGE', itemName: '库房', sortNo: 110 },
-    { itemCode: 'ROOM_ACTIVITY', itemName: '活动室', sortNo: 120 },
-    { itemCode: 'ROOM_DINING', itemName: '餐厅', sortNo: 130 }
+    { itemCode: 'ROOM_SINGLE', itemName: '单人间', sortNo: 10, remark: '{"text":"","defaultCapacity":1}' },
+    { itemCode: 'ROOM_DOUBLE', itemName: '双人间', sortNo: 20, remark: '{"text":"","defaultCapacity":2}' },
+    { itemCode: 'ROOM_TRIPLE', itemName: '三人间', sortNo: 30, remark: '{"text":"","defaultCapacity":3}' },
+    { itemCode: 'ROOM_CARE', itemName: '护理房', sortNo: 40, remark: '{"text":"","defaultCapacity":2}' },
+    { itemCode: 'ROOM_SUITE', itemName: '套间', sortNo: 45, remark: '{"text":"","defaultCapacity":2}' },
+    { itemCode: 'ROOM_NURSING_STATION', itemName: '护理站', sortNo: 50, remark: '{"text":"","defaultCapacity":0}' },
+    { itemCode: 'ROOM_WATER', itemName: '开水房', sortNo: 60, remark: '{"text":"","defaultCapacity":0}' },
+    { itemCode: 'ROOM_LAUNDRY', itemName: '洗衣房', sortNo: 70, remark: '{"text":"","defaultCapacity":0}' },
+    { itemCode: 'ROOM_TOILET', itemName: '卫生间', sortNo: 80, remark: '{"text":"","defaultCapacity":0}' },
+    { itemCode: 'ROOM_BATH', itemName: '浴室', sortNo: 90, remark: '{"text":"","defaultCapacity":0}' },
+    { itemCode: 'ROOM_TREATMENT', itemName: '治疗室', sortNo: 100, remark: '{"text":"","defaultCapacity":0}' },
+    { itemCode: 'ROOM_STORAGE', itemName: '库房', sortNo: 110, remark: '{"text":"","defaultCapacity":0}' },
+    { itemCode: 'ROOM_ACTIVITY', itemName: '活动室', sortNo: 120, remark: '{"text":"","defaultCapacity":0}' },
+    { itemCode: 'ROOM_DINING', itemName: '餐厅', sortNo: 130, remark: '{"text":"","defaultCapacity":0}' }
   ],
   ADMISSION_AREA: [
     { itemCode: 'AREA_A', itemName: 'A区', sortNo: 10 },
@@ -354,6 +359,41 @@ const rowSelection = computed(() => ({
 
 const hasImportErrors = computed(() => (importPreviewResult.value?.failCount || 0) > 0)
 const activeGroupLabel = computed(() => groupLabelMap.value[activeGroup.value] || activeGroup.value || '未选择')
+const autoItemCodePreview = computed(() => {
+  if (editingId.value) return form.itemCode || '系统自动生成'
+  const name = String(form.itemName || '').trim()
+  const group = String(form.configGroup || '').trim().toUpperCase()
+  if (!name || !group) return '系统自动生成'
+  const presetMap: Record<string, string> = {
+    'ADMISSION_BED_TYPE::标准床': 'BED_STANDARD',
+    'ADMISSION_BED_TYPE::护理床': 'BED_CARE',
+    'ADMISSION_BED_TYPE::电动床': 'BED_ELECTRIC',
+    'ADMISSION_BED_TYPE::电动护理床': 'BED_ELECTRIC',
+    'ADMISSION_BED_TYPE::防压疮床': 'BED_ANTI_DECUBITUS',
+    'ADMISSION_BED_TYPE::医用床': 'BED_MEDICAL',
+    'ADMISSION_ROOM_TYPE::单人间': 'ROOM_SINGLE',
+    'ADMISSION_ROOM_TYPE::双人间': 'ROOM_DOUBLE',
+    'ADMISSION_ROOM_TYPE::三人间': 'ROOM_TRIPLE',
+    'ADMISSION_ROOM_TYPE::护理房': 'ROOM_CARE',
+    'ADMISSION_ROOM_TYPE::套间': 'ROOM_SUITE',
+    'ADMISSION_ROOM_TYPE::护理站': 'ROOM_NURSING_STATION',
+    'ADMISSION_ROOM_TYPE::开水房': 'ROOM_WATER',
+    'ADMISSION_ROOM_TYPE::洗衣房': 'ROOM_LAUNDRY',
+    'ADMISSION_ROOM_TYPE::卫生间': 'ROOM_TOILET',
+    'ADMISSION_ROOM_TYPE::浴室': 'ROOM_BATH',
+    'ADMISSION_ROOM_TYPE::治疗室': 'ROOM_TREATMENT',
+    'ADMISSION_ROOM_TYPE::库房': 'ROOM_STORAGE',
+    'ADMISSION_ROOM_TYPE::活动室': 'ROOM_ACTIVITY',
+    'ADMISSION_ROOM_TYPE::餐厅': 'ROOM_DINING',
+    'ADMISSION_AREA::A区': 'AREA_A',
+    'ADMISSION_AREA::B区': 'AREA_B',
+    'ADMISSION_AREA::C区': 'AREA_C'
+  }
+  const preset = presetMap[`${group}::${name}`]
+  if (preset) return preset
+  const ascii = name.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').toUpperCase()
+  return ascii || '系统自动生成'
+})
 const currentPageEnabledCount = computed(() => rows.value.filter((item) => Number(item.status) === 1).length)
 const currentPageDisabledCount = computed(() => rows.value.filter((item) => Number(item.status) !== 1).length)
 const filterSummaryTags = computed(() => {
@@ -422,6 +462,7 @@ function openCreate() {
   form.status = 1
   form.sortNo = 0
   form.remark = ''
+  roomTypeMeta.defaultCapacity = undefined
   editorOpen.value = true
 }
 
@@ -432,23 +473,60 @@ function openEdit(row: BaseConfigItem) {
   form.itemCode = row.itemCode
   form.status = row.status
   form.sortNo = row.sortNo
-  form.remark = row.remark || ''
+  const parsedRemark = parseConfigRemark(row.remark)
+  form.remark = parsedRemark.text
+  roomTypeMeta.defaultCapacity = parsedRemark.defaultCapacity
   editorOpen.value = true
-}
-
-function normalizeFormCode() {
-  form.itemCode = (form.itemCode || '').trim().toUpperCase()
 }
 
 function normalizePayload(payload: BaseConfigItemPayload): BaseConfigItemPayload {
   return {
     configGroup: payload.configGroup.trim(),
     itemName: payload.itemName.trim(),
-    itemCode: payload.itemCode.trim().toUpperCase(),
+    itemCode: payload.itemCode?.trim().toUpperCase() || undefined,
     status: payload.status,
     sortNo: payload.sortNo ?? 0,
-    remark: payload.remark?.trim() || undefined
+    remark: buildConfigRemark(payload.configGroup, payload.remark, roomTypeMeta.defaultCapacity)
   }
+}
+
+function parseConfigRemark(raw?: string) {
+  if (!raw) return { text: '', defaultCapacity: undefined as number | undefined }
+  try {
+    const parsed = JSON.parse(raw)
+    const defaultCapacity = Number(parsed?.defaultCapacity)
+    return {
+      text: String(parsed?.text || ''),
+      defaultCapacity: Number.isFinite(defaultCapacity) ? defaultCapacity : undefined
+    }
+  } catch {
+    return { text: raw, defaultCapacity: undefined }
+  }
+}
+
+function buildConfigRemark(configGroup: string, remark?: string, defaultCapacity?: number) {
+  const text = (remark || '').trim()
+  if (configGroup !== 'ADMISSION_ROOM_TYPE') {
+    return text || undefined
+  }
+  if (defaultCapacity == null && !text) {
+    return undefined
+  }
+  return JSON.stringify({
+    text,
+    defaultCapacity: defaultCapacity == null ? null : defaultCapacity
+  })
+}
+
+function displayRemark(record: BaseConfigItem) {
+  const parsed = parseConfigRemark(record.remark)
+  if (record.configGroup === 'ADMISSION_ROOM_TYPE') {
+    const parts = [] as string[]
+    if (parsed.defaultCapacity != null) parts.push(`默认床位数：${parsed.defaultCapacity}`)
+    if (parsed.text) parts.push(parsed.text)
+    return parts.join('；') || '-'
+  }
+  return parsed.text || '-'
 }
 
 function resolveGroupLabel(row: BaseConfigItem) {
@@ -457,7 +535,6 @@ function resolveGroupLabel(row: BaseConfigItem) {
 
 async function submit() {
   if (!formRef.value) return
-  normalizeFormCode()
   await formRef.value.validate()
   submitting.value = true
   try {

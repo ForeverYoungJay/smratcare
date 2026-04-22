@@ -14,13 +14,16 @@ import com.zhiyangyun.care.baseconfig.model.BaseDataItemRequest;
 import com.zhiyangyun.care.baseconfig.model.BaseDataItemResponse;
 import com.zhiyangyun.care.baseconfig.service.BaseDataItemService;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Service;
 
 @Service
 public class BaseDataItemServiceImpl implements BaseDataItemService {
+  private static final Map<String, String> PRESET_CODE_MAP = buildPresetCodeMap();
   private final BaseDataItemMapper baseDataItemMapper;
 
   public BaseDataItemServiceImpl(BaseDataItemMapper baseDataItemMapper) {
@@ -29,7 +32,7 @@ public class BaseDataItemServiceImpl implements BaseDataItemService {
 
   @Override
   public BaseDataItemResponse create(BaseDataItemRequest request) {
-    SanitizedRequest sanitized = sanitizeRequest(request);
+    SanitizedRequest sanitized = sanitizeRequest(request, null, null);
     ensureUnique(null, request.getTenantId(), sanitized.configGroup(), sanitized.itemCode(), sanitized.itemName());
     BaseDataItem item = new BaseDataItem();
     item.setTenantId(request.getTenantId());
@@ -47,7 +50,6 @@ public class BaseDataItemServiceImpl implements BaseDataItemService {
 
   @Override
   public BaseDataItemResponse update(Long id, BaseDataItemRequest request) {
-    SanitizedRequest sanitized = sanitizeRequest(request);
     BaseDataItem item = baseDataItemMapper.selectById(id);
     if (item == null || item.getIsDeleted() != null && item.getIsDeleted() == 1) {
       throw new IllegalArgumentException("配置项不存在");
@@ -55,6 +57,7 @@ public class BaseDataItemServiceImpl implements BaseDataItemService {
     if (!request.getTenantId().equals(item.getTenantId())) {
       throw new IllegalArgumentException("无权限访问该配置项");
     }
+    SanitizedRequest sanitized = sanitizeRequest(request, item.getItemCode(), id);
     ensureUnique(id, request.getTenantId(), sanitized.configGroup(), sanitized.itemCode(), sanitized.itemName());
     item.setConfigGroup(sanitized.configGroup());
     item.setItemCode(sanitized.itemCode());
@@ -170,7 +173,7 @@ public class BaseDataItemServiceImpl implements BaseDataItemService {
         rowRequest.setStatus(row == null || row.getStatus() == null ? 1 : row.getStatus());
         rowRequest.setSortNo(row == null ? null : row.getSortNo());
         rowRequest.setRemark(row == null ? null : row.getRemark());
-        SanitizedRequest sanitized = sanitizeRequest(rowRequest);
+        SanitizedRequest sanitized = sanitizeRequest(rowRequest, null, null);
         if (!inputCodes.add(sanitized.itemCode())) {
           throw new IllegalArgumentException("导入文件中配置编码重复");
         }
@@ -292,19 +295,22 @@ public class BaseDataItemServiceImpl implements BaseDataItemService {
     return response;
   }
 
-  private SanitizedRequest sanitizeRequest(BaseDataItemRequest request) {
+  private SanitizedRequest sanitizeRequest(BaseDataItemRequest request, String fallbackCode, Long excludeId) {
     String configGroup = trimToNull(request.getConfigGroup());
     validateConfigGroup(configGroup);
-    String itemCode = normalizeCode(request.getItemCode());
-    if (itemCode == null) {
-      throw new IllegalArgumentException("配置编码不能为空");
-    }
     String itemName = trimToNull(request.getItemName());
     if (itemName == null) {
       throw new IllegalArgumentException("配置名称不能为空");
     }
     if (itemName.length() > 128) {
       throw new IllegalArgumentException("配置名称长度不能超过128");
+    }
+    String itemCode = normalizeCode(request.getItemCode());
+    if (itemCode == null) {
+      itemCode = normalizeCode(fallbackCode);
+    }
+    if (itemCode == null) {
+      itemCode = generateItemCode(request.getTenantId(), configGroup, itemName, excludeId);
     }
     if (itemCode.length() > 64) {
       throw new IllegalArgumentException("配置编码长度不能超过64");
@@ -322,6 +328,112 @@ public class BaseDataItemServiceImpl implements BaseDataItemService {
       throw new IllegalArgumentException("备注长度不能超过255");
     }
     return new SanitizedRequest(configGroup, itemCode, itemName, status, sortNo, remark);
+  }
+
+  private String generateItemCode(Long tenantId, String configGroup, String itemName, Long excludeId) {
+    String presetCode = PRESET_CODE_MAP.get(buildPresetKey(configGroup, itemName));
+    if (presetCode != null && !itemCodeExists(tenantId, configGroup, presetCode, excludeId)) {
+      return presetCode;
+    }
+    String asciiCode = normalizeCode(itemName.replaceAll("[^A-Za-z0-9]+", "_"));
+    if (asciiCode != null) {
+      return uniqueCandidateCode(tenantId, configGroup, asciiCode, excludeId);
+    }
+    String groupPrefix = buildGroupPrefix(configGroup);
+    return uniqueCandidateCode(tenantId, configGroup, groupPrefix, excludeId);
+  }
+
+  private String uniqueCandidateCode(Long tenantId, String configGroup, String baseCode, Long excludeId) {
+    String normalizedBase = normalizeCode(baseCode);
+    if (normalizedBase == null) {
+      normalizedBase = "ITEM";
+    }
+    normalizedBase = trimCodeLength(normalizedBase, 64);
+    if (!itemCodeExists(tenantId, configGroup, normalizedBase, excludeId)) {
+      return normalizedBase;
+    }
+    int suffix = 2;
+    while (suffix < 10000) {
+      String candidate = trimCodeLength(normalizedBase, 64 - String.valueOf(suffix).length() - 1) + "_" + suffix;
+      if (!itemCodeExists(tenantId, configGroup, candidate, excludeId)) {
+        return candidate;
+      }
+      suffix++;
+    }
+    throw new IllegalArgumentException("自动生成配置编码失败，请稍后重试");
+  }
+
+  private boolean itemCodeExists(Long tenantId, String configGroup, String itemCode, Long excludeId) {
+    if (tenantId == null || configGroup == null || itemCode == null) {
+      return false;
+    }
+    var wrapper = Wrappers.lambdaQuery(BaseDataItem.class)
+        .eq(BaseDataItem::getIsDeleted, 0)
+        .eq(BaseDataItem::getTenantId, tenantId)
+        .eq(BaseDataItem::getConfigGroup, configGroup)
+        .eq(BaseDataItem::getItemCode, itemCode);
+    if (excludeId != null) {
+      wrapper.ne(BaseDataItem::getId, excludeId);
+    }
+    return baseDataItemMapper.selectCount(wrapper) > 0;
+  }
+
+  private String buildGroupPrefix(String configGroup) {
+    String normalized = normalizeCode(configGroup == null ? null : configGroup.replaceAll("[^A-Za-z0-9]+", "_"));
+    if (normalized == null) {
+      return "ITEM";
+    }
+    String[] parts = normalized.split("_+");
+    StringBuilder builder = new StringBuilder();
+    for (String part : parts) {
+      if (!part.isBlank()) {
+        builder.append(part.charAt(0));
+      }
+      if (builder.length() >= 6) {
+        break;
+      }
+    }
+    String prefix = builder.length() > 0 ? builder.toString() : normalized;
+    return trimCodeLength(prefix, 12);
+  }
+
+  private String trimCodeLength(String value, int maxLength) {
+    if (value == null || value.length() <= maxLength) {
+      return value;
+    }
+    return value.substring(0, Math.max(1, maxLength));
+  }
+
+  private static Map<String, String> buildPresetCodeMap() {
+    Map<String, String> map = new LinkedHashMap<>();
+    map.put(buildPresetKey("ADMISSION_BED_TYPE", "标准床"), "BED_STANDARD");
+    map.put(buildPresetKey("ADMISSION_BED_TYPE", "护理床"), "BED_CARE");
+    map.put(buildPresetKey("ADMISSION_BED_TYPE", "电动护理床"), "BED_ELECTRIC");
+    map.put(buildPresetKey("ADMISSION_BED_TYPE", "电动床"), "BED_ELECTRIC");
+    map.put(buildPresetKey("ADMISSION_BED_TYPE", "防压疮床"), "BED_ANTI_DECUBITUS");
+    map.put(buildPresetKey("ADMISSION_BED_TYPE", "医用床"), "BED_MEDICAL");
+    map.put(buildPresetKey("ADMISSION_ROOM_TYPE", "单人间"), "ROOM_SINGLE");
+    map.put(buildPresetKey("ADMISSION_ROOM_TYPE", "双人间"), "ROOM_DOUBLE");
+    map.put(buildPresetKey("ADMISSION_ROOM_TYPE", "三人间"), "ROOM_TRIPLE");
+    map.put(buildPresetKey("ADMISSION_ROOM_TYPE", "护理房"), "ROOM_CARE");
+    map.put(buildPresetKey("ADMISSION_ROOM_TYPE", "套间"), "ROOM_SUITE");
+    map.put(buildPresetKey("ADMISSION_ROOM_TYPE", "护理站"), "ROOM_NURSING_STATION");
+    map.put(buildPresetKey("ADMISSION_ROOM_TYPE", "开水房"), "ROOM_WATER");
+    map.put(buildPresetKey("ADMISSION_ROOM_TYPE", "洗衣房"), "ROOM_LAUNDRY");
+    map.put(buildPresetKey("ADMISSION_ROOM_TYPE", "卫生间"), "ROOM_TOILET");
+    map.put(buildPresetKey("ADMISSION_ROOM_TYPE", "浴室"), "ROOM_BATH");
+    map.put(buildPresetKey("ADMISSION_ROOM_TYPE", "治疗室"), "ROOM_TREATMENT");
+    map.put(buildPresetKey("ADMISSION_ROOM_TYPE", "库房"), "ROOM_STORAGE");
+    map.put(buildPresetKey("ADMISSION_ROOM_TYPE", "活动室"), "ROOM_ACTIVITY");
+    map.put(buildPresetKey("ADMISSION_ROOM_TYPE", "餐厅"), "ROOM_DINING");
+    map.put(buildPresetKey("ADMISSION_AREA", "A区"), "AREA_A");
+    map.put(buildPresetKey("ADMISSION_AREA", "B区"), "AREA_B");
+    map.put(buildPresetKey("ADMISSION_AREA", "C区"), "AREA_C");
+    return map;
+  }
+
+  private static String buildPresetKey(String configGroup, String itemName) {
+    return (configGroup == null ? "" : configGroup.trim().toUpperCase()) + "::" + (itemName == null ? "" : itemName.trim());
   }
 
   private String trimToNull(String value) {

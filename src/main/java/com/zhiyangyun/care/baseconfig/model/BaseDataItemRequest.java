@@ -8,7 +8,6 @@ import lombok.Data;
 public class BaseDataItemRequest {
   @NotBlank
   private String configGroup;
-  @NotBlank
   private String itemCode;
   @NotBlank
   private String itemName;

@@ -16,7 +16,7 @@ export interface BaseConfigItem {
 
 export interface BaseConfigItemPayload {
   configGroup: string
-  itemCode: string
+  itemCode?: string
   itemName: string
   status: number
   sortNo?: number
