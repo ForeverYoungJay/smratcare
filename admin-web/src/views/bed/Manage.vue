@@ -1130,42 +1130,6 @@ const bedTypeItems = ref<BaseConfigItem[]>([])
 const areaItems = ref<BaseConfigItem[]>([])
 type TreeNode = AssetTreeNode & { treeKey: string; children?: TreeNode[] }
 
-const fallbackRoomTypes: BaseConfigItem[] = [
-  { id: -1, configGroup: 'ADMISSION_ROOM_TYPE', itemCode: 'ROOM_SINGLE', itemName: '单人间', status: 1, sortNo: 10 },
-  { id: -2, configGroup: 'ADMISSION_ROOM_TYPE', itemCode: 'ROOM_DOUBLE', itemName: '双人间', status: 1, sortNo: 20 },
-  { id: -3, configGroup: 'ADMISSION_ROOM_TYPE', itemCode: 'ROOM_TRIPLE', itemName: '三人间', status: 1, sortNo: 30 },
-  { id: -4, configGroup: 'ADMISSION_ROOM_TYPE', itemCode: 'ROOM_NURSING_STATION', itemName: '护理站', status: 1, sortNo: 40 },
-  { id: -5, configGroup: 'ADMISSION_ROOM_TYPE', itemCode: 'ROOM_WATER', itemName: '开水房', status: 1, sortNo: 50 },
-  { id: -6, configGroup: 'ADMISSION_ROOM_TYPE', itemCode: 'ROOM_LAUNDRY', itemName: '洗衣房', status: 1, sortNo: 60 },
-  { id: -7, configGroup: 'ADMISSION_ROOM_TYPE', itemCode: 'ROOM_TOILET', itemName: '卫生间', status: 1, sortNo: 70 }
-]
-const fallbackBedTypes: BaseConfigItem[] = [
-  { id: -11, configGroup: 'ADMISSION_BED_TYPE', itemCode: 'BED_STANDARD', itemName: '标准床', status: 1, sortNo: 10 },
-  { id: -12, configGroup: 'ADMISSION_BED_TYPE', itemCode: 'BED_CARE', itemName: '护理床', status: 1, sortNo: 20 }
-]
-const fallbackAreas: BaseConfigItem[] = [
-  { id: -21, configGroup: 'ADMISSION_AREA', itemCode: 'AREA_A', itemName: 'A区', status: 1, sortNo: 10 },
-  { id: -22, configGroup: 'ADMISSION_AREA', itemCode: 'AREA_B', itemName: 'B区', status: 1, sortNo: 20 }
-]
-
-function mergePresetConfigItems(current: BaseConfigItem[], fallback: BaseConfigItem[]) {
-  const merged = [...current]
-  const codeSet = new Set(current.map((item) => String(item.itemCode || '').trim().toUpperCase()))
-  fallback.forEach((item) => {
-    const code = String(item.itemCode || '').trim().toUpperCase()
-    if (!codeSet.has(code)) {
-      merged.push(item)
-      codeSet.add(code)
-    }
-  })
-  return merged.sort((left, right) => {
-    const leftSort = Number(left.sortNo || 0)
-    const rightSort = Number(right.sortNo || 0)
-    if (leftSort !== rightSort) return leftSort - rightSort
-    return String(left.itemName || '').localeCompare(String(right.itemName || ''), 'zh-CN')
-  })
-}
-
 const bootstrapForm = reactive<ResidenceBootstrapRequest>({
   buildingCount: 1,
   floorsPerBuilding: 3,
@@ -1402,6 +1366,7 @@ const roomRules: FormRules = {
 
 const bedRules: FormRules = {
   roomId: [{ required: true, message: '请选择房间' }],
+  bedType: [{ required: true, message: '请选择床位类型' }],
   status: [{ required: true, message: '请选择状态' }]
 }
 
@@ -2216,7 +2181,13 @@ function openBed(row?: BedItem, mode: DrawerMode = row ? 'edit' : 'create') {
   if (row) {
     Object.assign(bedForm, row)
   } else {
-    Object.assign(bedForm, { id: undefined, roomId: defaultRoomIdFromTree(), bedNo: '', bedType: undefined, status: 1 })
+    Object.assign(bedForm, {
+      id: undefined,
+      roomId: defaultRoomIdFromTree(),
+      bedNo: '',
+      bedType: bedTypeOptions.value[0]?.value,
+      status: 1
+    })
   }
   bedOpen.value = true
 }
@@ -3082,14 +3053,22 @@ async function loadResidenceConfigOptions() {
       getBaseConfigItemList({ configGroup: 'ADMISSION_BED_TYPE', status: 1 }),
       getBaseConfigItemList({ configGroup: 'ADMISSION_AREA', status: 1 })
     ])
-    roomTypeItems.value = mergePresetConfigItems(roomTypes, fallbackRoomTypes)
-    bedTypeItems.value = mergePresetConfigItems(bedTypes, fallbackBedTypes)
-    areaItems.value = mergePresetConfigItems(areas, fallbackAreas)
+    roomTypeItems.value = roomTypes || []
+    bedTypeItems.value = bedTypes || []
+    areaItems.value = areas || []
+    const missingGroups = [
+      roomTypeItems.value.length ? '' : '房型',
+      bedTypeItems.value.length ? '' : '床位类型',
+      areaItems.value.length ? '' : '区域'
+    ].filter(Boolean)
+    if (missingGroups.length) {
+      message.warning(`入住基础配置缺少${missingGroups.join('、')}，请先前往基础数据配置维护`)
+    }
   } catch {
-    roomTypeItems.value = fallbackRoomTypes
-    bedTypeItems.value = fallbackBedTypes
-    areaItems.value = fallbackAreas
-    message.warning('加载入住基础配置失败，已使用默认房型/床型/区域')
+    roomTypeItems.value = []
+    bedTypeItems.value = []
+    areaItems.value = []
+    message.warning('加载入住基础配置失败，请先检查基础数据配置')
   }
 }
 
