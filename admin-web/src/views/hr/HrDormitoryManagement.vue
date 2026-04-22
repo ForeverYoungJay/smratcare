@@ -9,7 +9,7 @@
         </div>
         <div class="hero-actions">
           <a-button type="primary" size="large" @click="openDrawer()">新增住宿安排</a-button>
-          <a-button size="large" @click="openRoomConfigDrawer()">新增房间配置</a-button>
+          <a-button size="large" @click="openBatchGenerateDrawer()">批量生成房间</a-button>
           <a-button size="large" @click="router.push('/hr/expense/dormitory-map')">宿舍房态图</a-button>
           <a-button size="large" @click="router.push('/hr/expense/meal-fee')">查看员工餐费</a-button>
           <a-button size="large" @click="router.push('/hr/expense/electricity-fee')">查看员工电费</a-button>
@@ -141,7 +141,7 @@
             <p>维护标准床位容量后，宿舍房态图会自动补齐空床位，未住满房间也能显示完整房态。</p>
           </div>
           <a-space wrap>
-            <a-button type="primary" @click="openRoomConfigDrawer()">新增房间</a-button>
+            <a-button type="primary" @click="openBatchGenerateDrawer()">批量生成房间</a-button>
             <a-button @click="openBatchGenerateDrawer()">批量生成房间</a-button>
             <a-button @click="fetchRoomConfigData">刷新房间配置</a-button>
           </a-space>

@@ -3,7 +3,7 @@
     <header class="topbar">
       <div class="container topbar-inner">
         <div class="brand" @click="scrollTo('top')">
-          <div class="brand-logo">{{ profile.shortName.slice(0, 1) }}</div>
+          <img :src="brandLogoUrl" alt="龟峰颐养中心logo" class="brand-logo" />
           <div class="brand-text">
             <div class="name">{{ profile.name }}</div>
             <div class="desc">{{ profile.slogan }}</div>
@@ -678,6 +678,7 @@ import { message } from 'ant-design-vue'
 import type { FormInstance } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import { computed, onMounted, reactive, ref } from 'vue'
+import brandLogoUrl from '../assets/guifeng-logo.png'
 import { enterpriseProfile, type EnterpriseProfile } from '../constants/enterpriseProfile'
 import { getRoles, getStaffInfo, getToken } from '../utils/auth'
 
@@ -1407,15 +1408,12 @@ function scrollTo(id: string) {
 }
 
 .brand-logo {
-  width: 44px;
-  height: 44px;
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
   border-radius: 14px;
-  display: grid;
-  place-items: center;
-  color: #0b2e75;
-  font-weight: 800;
-  font-size: 20px;
-  background: linear-gradient(135deg, #ffffff, #e2edff);
+  background: rgba(255, 255, 255, 0.94);
+  padding: 6px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
