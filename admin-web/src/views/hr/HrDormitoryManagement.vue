@@ -381,11 +381,6 @@
             </a-form-item>
           </a-col>
           <a-col :span="12">
-            <a-form-item label="房号位数">
-              <a-input-number v-model:value="batchGenerateForm.roomNoWidth" :min="2" :max="4" style="width: 100%" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
             <a-form-item label="房间号分隔符">
               <a-input v-model:value="batchGenerateForm.roomNoSeparator" placeholder="默认 -" />
             </a-form-item>
@@ -401,6 +396,7 @@
         </a-form-item>
         <div class="batch-tip">
           将按“楼栋 x 楼层 x 房间”规则生成。
+          房号位数会按每层房间数自动补零。
           例如选择字母楼栋、起始栋号 `1`、每栋 `3` 层、每层 `8` 间，会生成 `A栋/B栋...` 下的 `1-01、1-02...3-08`。
         </div>
       </a-form>
@@ -537,7 +533,6 @@ const batchGenerateForm = reactive<HrDormitoryRoomBatchGenerateRequest>({
   floorCount: 3,
   roomsPerFloor: 8,
   roomStartNo: 1,
-  roomNoWidth: 2,
   roomNoSeparator: '-',
   bedCapacity: 4,
   status: 'ENABLED',
@@ -723,7 +718,6 @@ function resetBatchGenerateForm() {
     floorCount: 3,
     roomsPerFloor: 8,
     roomStartNo: 1,
-    roomNoWidth: 2,
     roomNoSeparator: '-',
     bedCapacity: 4,
     status: 'ENABLED',

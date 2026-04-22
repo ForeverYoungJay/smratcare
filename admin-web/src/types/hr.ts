@@ -471,7 +471,6 @@ export interface HrDormitoryRoomBatchGenerateRequest {
   floorCount?: number
   roomsPerFloor?: number
   roomStartNo?: number
-  roomNoWidth?: number
   bedCapacity?: number
   roomNoSeparator?: string
   status?: string

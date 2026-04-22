@@ -1561,7 +1561,7 @@ public class AdminHrController {
     int floorCount = positiveOrDefault(request.getFloorCount(), 1);
     int roomsPerFloor = positiveOrDefault(request.getRoomsPerFloor(), 1);
     int roomStartNo = positiveOrDefault(request.getRoomStartNo(), 1);
-    int roomNoWidth = positiveOrDefault(request.getRoomNoWidth(), 2);
+    int roomNoWidth = resolveDormitoryRoomNoWidth(roomStartNo, roomsPerFloor);
     int bedCapacity = positiveOrDefault(request.getBedCapacity(), 4);
     String buildingPrefix = defaultText(normalizeBlank(request.getBuildingPrefix()), "");
     String buildingNamingType = defaultText(normalizeBlank(request.getBuildingNamingType()), "LETTER").toUpperCase(Locale.ROOT);
@@ -3427,6 +3427,11 @@ public class AdminHrController {
 
   private int positiveOrDefault(Integer value, int defaultValue) {
     return value == null || value <= 0 ? defaultValue : value;
+  }
+
+  private int resolveDormitoryRoomNoWidth(int roomStartNo, int roomsPerFloor) {
+    int lastRoomNo = Math.max(roomStartNo, 1) + Math.max(roomsPerFloor, 1) - 1;
+    return Math.max(2, String.valueOf(lastRoomNo).length());
   }
 
   private String generateDormitoryBuildingName(String buildingPrefix, int buildingNo, String namingType) {
