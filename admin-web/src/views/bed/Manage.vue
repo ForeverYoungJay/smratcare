@@ -1148,6 +1148,24 @@ const fallbackAreas: BaseConfigItem[] = [
   { id: -22, configGroup: 'ADMISSION_AREA', itemCode: 'AREA_B', itemName: 'B区', status: 1, sortNo: 20 }
 ]
 
+function mergePresetConfigItems(current: BaseConfigItem[], fallback: BaseConfigItem[]) {
+  const merged = [...current]
+  const codeSet = new Set(current.map((item) => String(item.itemCode || '').trim().toUpperCase()))
+  fallback.forEach((item) => {
+    const code = String(item.itemCode || '').trim().toUpperCase()
+    if (!codeSet.has(code)) {
+      merged.push(item)
+      codeSet.add(code)
+    }
+  })
+  return merged.sort((left, right) => {
+    const leftSort = Number(left.sortNo || 0)
+    const rightSort = Number(right.sortNo || 0)
+    if (leftSort !== rightSort) return leftSort - rightSort
+    return String(left.itemName || '').localeCompare(String(right.itemName || ''), 'zh-CN')
+  })
+}
+
 const bootstrapForm = reactive<ResidenceBootstrapRequest>({
   buildingCount: 1,
   floorsPerBuilding: 3,
@@ -3064,9 +3082,9 @@ async function loadResidenceConfigOptions() {
       getBaseConfigItemList({ configGroup: 'ADMISSION_BED_TYPE', status: 1 }),
       getBaseConfigItemList({ configGroup: 'ADMISSION_AREA', status: 1 })
     ])
-    roomTypeItems.value = roomTypes.length ? roomTypes : fallbackRoomTypes
-    bedTypeItems.value = bedTypes.length ? bedTypes : fallbackBedTypes
-    areaItems.value = areas.length ? areas : fallbackAreas
+    roomTypeItems.value = mergePresetConfigItems(roomTypes, fallbackRoomTypes)
+    bedTypeItems.value = mergePresetConfigItems(bedTypes, fallbackBedTypes)
+    areaItems.value = mergePresetConfigItems(areas, fallbackAreas)
   } catch {
     roomTypeItems.value = fallbackRoomTypes
     bedTypeItems.value = fallbackBedTypes
