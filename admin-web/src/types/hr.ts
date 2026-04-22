@@ -462,6 +462,22 @@ export interface HrDormitoryRoomConfigItem {
   updateTime?: string
 }
 
+export interface HrDormitoryRoomBatchGenerateRequest {
+  buildingPrefix?: string
+  buildingNamingType?: 'LETTER' | 'NUMBER' | string
+  buildingStartNo?: number
+  buildingCount?: number
+  floorStartNo?: number
+  floorCount?: number
+  roomsPerFloor?: number
+  roomStartNo?: number
+  roomNoWidth?: number
+  bedCapacity?: number
+  roomNoSeparator?: string
+  status?: string
+  remark?: string
+}
+
 export interface HrStaffMonthlyFeeBillItem {
   id?: Id
   staffId?: Id

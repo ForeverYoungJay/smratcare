@@ -5,6 +5,15 @@ export { createCrmLead, updateCrmLead, deleteCrmLead };
 export function getLeadPage(params, config) {
     return getCrmLeadPage(params, config);
 }
+export function assignCrmLead(id, data) {
+    return request.post(`/api/crm/leads/${id}/assign`, data);
+}
+export function getLeadAssignLogs(leadId, limit = 20) {
+    return request.get(`/api/crm/leads/${leadId}/assign-logs`, { params: { limit } });
+}
+export function getLeadStageLogs(leadId, limit = 20) {
+    return request.get(`/api/crm/leads/${leadId}/stage-logs`, { params: { limit } });
+}
 export function getContractPage(params, config) {
     return fetchPage('/api/crm/contracts/page', params, config);
 }
@@ -13,6 +22,9 @@ export function getContractStageSummary(params) {
 }
 export function getCrmContract(id) {
     return request.get(`/api/crm/contracts/${id}`);
+}
+export function getContractWorkflowLogs(contractId, limit = 20) {
+    return request.get(`/api/crm/contracts/${contractId}/workflow-logs`, { params: { limit } });
 }
 export function createCrmContract(data) {
     return request.post('/api/crm/contracts', data);
@@ -164,6 +176,12 @@ export function getMarketingCallbackReport(params) {
 }
 export function getMarketingDataQualityReport() {
     return request.get('/api/marketing/report/data-quality');
+}
+export function getMarketingWorkbenchSummary(params) {
+    return request.get('/api/marketing/report/workbench-summary', { params });
+}
+export function getMarketingReportSnapshots(params) {
+    return request.get('/api/marketing/report/snapshots', { params });
 }
 export function getMarketingLeadEntrySummary(params) {
     return request.get('/api/marketing/report/lead-entry-summary', { params });

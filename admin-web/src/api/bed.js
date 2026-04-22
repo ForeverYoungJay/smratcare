@@ -32,6 +32,12 @@ export function deleteBuilding(id) {
 export function bootstrapResidence(data) {
     return request.post('/api/asset/buildings/bootstrap-residence', data);
 }
+export function previewResidenceBatchGeneration(data) {
+    return request.post('/api/asset/buildings/batch-generation/preview', data);
+}
+export function commitResidenceBatchGeneration(previewToken) {
+    return request.post('/api/asset/buildings/batch-generation/commit', { previewToken });
+}
 export function getFloorPage(params) {
     return fetchPage('/api/asset/floors/page', params);
 }

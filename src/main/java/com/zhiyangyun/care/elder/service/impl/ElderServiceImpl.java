@@ -7,10 +7,12 @@ import com.zhiyangyun.care.crm.entity.CrmContract;
 import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
 import com.zhiyangyun.care.elder.entity.Bed;
 import com.zhiyangyun.care.elder.entity.ElderBedRelation;
+import com.zhiyangyun.care.elder.entity.ElderFamily;
 import com.zhiyangyun.care.elder.entity.ElderProfile;
 import com.zhiyangyun.care.elder.entity.lifecycle.ElderAdmission;
 import com.zhiyangyun.care.elder.mapper.BedMapper;
 import com.zhiyangyun.care.elder.mapper.ElderBedRelationMapper;
+import com.zhiyangyun.care.elder.mapper.ElderFamilyMapper;
 import com.zhiyangyun.care.elder.mapper.ElderMapper;
 import com.zhiyangyun.care.elder.mapper.RoomMapper;
 import com.zhiyangyun.care.elder.mapper.lifecycle.ElderChangeLogMapper;
@@ -80,6 +82,7 @@ public class ElderServiceImpl implements ElderService {
   private final ElderMapper elderMapper;
   private final BedMapper bedMapper;
   private final ElderBedRelationMapper relationMapper;
+  private final ElderFamilyMapper elderFamilyMapper;
   private final RoomMapper roomMapper;
   private final ElderChangeLogMapper changeLogMapper;
   private final CrmContractMapper crmContractMapper;
@@ -88,13 +91,15 @@ public class ElderServiceImpl implements ElderService {
   private final ElderOccupancyService elderOccupancyService;
 
   public ElderServiceImpl(ElderMapper elderMapper, BedMapper bedMapper,
-      ElderBedRelationMapper relationMapper, RoomMapper roomMapper, ElderChangeLogMapper changeLogMapper,
+      ElderBedRelationMapper relationMapper, ElderFamilyMapper elderFamilyMapper,
+      RoomMapper roomMapper, ElderChangeLogMapper changeLogMapper,
       CrmContractMapper crmContractMapper, ElderAdmissionMapper admissionMapper,
       ElderLifecycleStateService elderLifecycleStateService,
       ElderOccupancyService elderOccupancyService) {
     this.elderMapper = elderMapper;
     this.bedMapper = bedMapper;
     this.relationMapper = relationMapper;
+    this.elderFamilyMapper = elderFamilyMapper;
     this.roomMapper = roomMapper;
     this.changeLogMapper = changeLogMapper;
     this.crmContractMapper = crmContractMapper;
@@ -178,7 +183,7 @@ public class ElderServiceImpl implements ElderService {
   @Transactional
   public ElderResponse update(Long id, ElderUpdateRequest request) {
     ElderProfile elder = elderMapper.selectById(id);
-    if (elder == null) {
+    if (elder == null || Integer.valueOf(1).equals(elder.getIsDeleted())) {
       return null;
     }
     if (request.getTenantId() != null && !request.getTenantId().equals(elder.getTenantId())) {
@@ -327,7 +332,7 @@ public class ElderServiceImpl implements ElderService {
   @Override
   public ElderResponse get(Long id, Long tenantId) {
     ElderProfile elder = elderMapper.selectById(id);
-    if (elder == null) {
+    if (elder == null || Integer.valueOf(1).equals(elder.getIsDeleted())) {
       return null;
     }
     if (tenantId != null && !tenantId.equals(elder.getTenantId())) {
@@ -403,6 +408,43 @@ public class ElderServiceImpl implements ElderService {
     return toPagedResponse(manualPage, tenantId);
   }
 
+  @Override
+  @Transactional
+  public void delete(Long id, Long tenantId, Long operatorId) {
+    ElderProfile elder = elderMapper.selectById(id);
+    if (elder == null || Integer.valueOf(1).equals(elder.getIsDeleted())) {
+      throw new IllegalArgumentException("长者档案不存在");
+    }
+    if (tenantId != null && !tenantId.equals(elder.getTenantId())) {
+      throw new IllegalArgumentException("无权限删除该长者档案");
+    }
+    if (elder.getBedId() != null || hasActiveBedRelation(id, tenantId)) {
+      throw new IllegalStateException("当前长者仍占用床位，不能删除");
+    }
+    long familyBindingCount = elderFamilyMapper.selectCount(Wrappers.lambdaQuery(ElderFamily.class)
+        .eq(ElderFamily::getElderId, id)
+        .eq(ElderFamily::getIsDeleted, 0));
+    if (familyBindingCount > 0) {
+      throw new IllegalStateException("当前长者已绑定家属，不能删除");
+    }
+    long admissionCount = admissionMapper.selectCount(Wrappers.lambdaQuery(ElderAdmission.class)
+        .eq(ElderAdmission::getTenantId, elder.getTenantId())
+        .eq(ElderAdmission::getElderId, id)
+        .eq(ElderAdmission::getIsDeleted, 0));
+    if (admissionCount > 0) {
+      throw new IllegalStateException("当前长者已有入住记录，不能删除");
+    }
+    long contractCount = crmContractMapper.selectCount(Wrappers.lambdaQuery(CrmContract.class)
+        .eq(CrmContract::getTenantId, elder.getTenantId())
+        .eq(CrmContract::getElderId, id)
+        .eq(CrmContract::getIsDeleted, 0));
+    if (contractCount > 0) {
+      throw new IllegalStateException("当前长者已有关联合同，不能删除");
+    }
+    elder.setIsDeleted(1);
+    elderMapper.updateById(elder);
+  }
+
   private void validateCreateRequest(ElderCreateRequest request) {
     String fullName = normalizeText(request.getFullName());
     if (fullName == null) {
@@ -432,6 +474,17 @@ public class ElderServiceImpl implements ElderService {
         throw new IllegalArgumentException("床位开始日期不能早于入院日期");
       }
     }
+  }
+
+  private boolean hasActiveBedRelation(Long elderId, Long tenantId) {
+    if (elderId == null) {
+      return false;
+    }
+    return relationMapper.selectCount(Wrappers.lambdaQuery(ElderBedRelation.class)
+        .eq(ElderBedRelation::getElderId, elderId)
+        .eq(tenantId != null, ElderBedRelation::getTenantId, tenantId)
+        .eq(ElderBedRelation::getIsDeleted, 0)
+        .eq(ElderBedRelation::getActiveFlag, 1)) > 0;
   }
 
   private String normalizeText(String value) {

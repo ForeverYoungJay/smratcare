@@ -101,6 +101,9 @@ export function upsertHrDormitoryRoomConfig(data) {
 export function deleteHrDormitoryRoomConfig(id) {
     return request.delete(`/api/admin/hr/dormitory/room-config/${id}`);
 }
+export function generateHrDormitoryRoomConfig(data) {
+    return request.post('/api/admin/hr/dormitory/room-config/generate', data);
+}
 export function getHrStaffServicePlan(staffId) {
     return request.get(`/api/admin/hr/expense/service-plan/${staffId}`);
 }

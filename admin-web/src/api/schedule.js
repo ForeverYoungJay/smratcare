@@ -2,6 +2,9 @@ import request, { fetchPage } from '../utils/request';
 export function getSchedulePage(params) {
     return fetchPage('/api/schedule/page', params);
 }
+export function getSwapCandidatePage(params) {
+    return fetchPage('/api/schedule/swap-candidates', params);
+}
 export function createSchedule(data) {
     return request.post('/api/schedule', data);
 }
@@ -10,6 +13,18 @@ export function updateSchedule(id, data) {
 }
 export function deleteSchedule(id) {
     return request.delete(`/api/schedule/${id}`);
+}
+export function getShiftSwapPage(params) {
+    return fetchPage('/api/schedule/shift-swap/page', params);
+}
+export function createShiftSwap(data) {
+    return request.post('/api/schedule/shift-swap', data);
+}
+export function agreeShiftSwap(id, data) {
+    return request.put(`/api/schedule/shift-swap/${id}/target-agree`, data || {});
+}
+export function rejectShiftSwap(id, data) {
+    return request.put(`/api/schedule/shift-swap/${id}/target-reject`, data || {});
 }
 export function getAttendancePage(params) {
     const merged = { ...(params || {}) };

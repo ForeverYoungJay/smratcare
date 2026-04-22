@@ -28,6 +28,10 @@ export function updateElder(id: Id, data: Partial<ElderCreateRequest> & { clearB
   return request.put<void>(`/api/elder/${id}`, data)
 }
 
+export function deleteElder(id: Id) {
+  return request.delete<void>(`/api/elder/${id}`)
+}
+
 export function assignBed(elderId: Id, bedId: Id, startDate: string) {
   const body: ElderAssignBedRequest = { bedId, startDate }
   return request.post<void>(`/api/elder/${elderId}/assignBed`, body)

@@ -81,6 +81,7 @@
           <span class="selection-pill">已勾选 {{ selectedCount }} 位长者</span>
           <a-button :disabled="selectedCount !== 1" @click="openBindFamilySelected">绑定家属</a-button>
           <a-button :disabled="selectedCount !== 1" @click="printElderQrSelected">打印二维码</a-button>
+          <a-button danger :disabled="selectedCount !== 1" @click="deleteSelected">删除档案</a-button>
         </div>
       </div>
 
@@ -130,6 +131,7 @@
               <a-button type="link" size="small" @click="goResidentCenter(record)">长者中心</a-button>
               <a-button type="link" size="small" @click="goAssessmentArchive(record)">评估</a-button>
               <a-button type="link" size="small" @click="goContractsInvoices(record)">合同票据</a-button>
+              <a-button type="link" danger size="small" @click="confirmDelete(record)">删除</a-button>
             </div>
           </template>
         </template>
@@ -198,7 +200,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import type { FormInstance, FormRules } from 'ant-design-vue'
 import QRCode from 'qrcode'
 import PageContainer from '../../components/PageContainer.vue'
@@ -208,7 +210,7 @@ import ElderNameAutocomplete from '../../components/ElderNameAutocomplete.vue'
 import { useLiveSyncRefresh } from '../../composables/useLiveSyncRefresh'
 import { exportCsv } from '../../utils/export'
 import { lifecycleStageColor, lifecycleStageLabel, normalizeLifecycleStage } from '../../utils/lifecycleStage'
-import { getElderPage, assignBed, bindFamily } from '../../api/elder'
+import { getElderPage, assignBed, bindFamily, deleteElder } from '../../api/elder'
 import { getBedList } from '../../api/bed'
 import { getFamilyUserPage } from '../../api/family'
 import type { BedItem, ElderItem, FamilyBindRequest, PageResult, FamilyUserItem, Id } from '../../types/api'
@@ -714,6 +716,29 @@ async function submitBindFamily() {
   } catch {
     message.error('绑定失败')
   }
+}
+
+function confirmDelete(row: ElderItem) {
+  Modal.confirm({
+    title: '确认删除长者档案？',
+    content: `将逻辑删除“${row.fullName || row.id}”档案。仅未占床、未绑定家属、无入住/合同记录的档案允许删除。`,
+    okText: '确认删除',
+    okButtonProps: { danger: true },
+    async onOk() {
+      await deleteElder(row.id)
+      message.success('长者档案已删除')
+      if (selectedRowKeys.value.some((id) => String(id) === String(row.id))) {
+        selectedRowKeys.value = selectedRowKeys.value.filter((id) => String(id) !== String(row.id))
+      }
+      await fetchData()
+    }
+  })
+}
+
+function deleteSelected() {
+  const row = requireSingleSelection('删除档案')
+  if (!row) return
+  confirmDelete(row)
 }
 
 async function printElderQr(row: ElderItem) {

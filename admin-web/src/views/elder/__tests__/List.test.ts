@@ -2,11 +2,21 @@ import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import List from '../List.vue'
 
+vi.mock('vue-router', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('vue-router')>()
+  return {
+    ...actual,
+    useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+    useRoute: () => ({ path: '/elder/list', query: {} })
+  }
+})
+
 vi.mock('../../../api/elder', () => ({
   getElderPage: vi.fn().mockResolvedValue({ list: [], total: 0, pageNo: 1, pageSize: 10 }),
   assignBed: vi.fn().mockResolvedValue(null),
   unbindBed: vi.fn().mockResolvedValue(null),
-  bindFamily: vi.fn().mockResolvedValue(null)
+  bindFamily: vi.fn().mockResolvedValue(null),
+  deleteElder: vi.fn().mockResolvedValue(null)
 }))
 
 vi.mock('../../../api/bed', () => ({
@@ -19,7 +29,7 @@ vi.mock('qrcode', () => ({
 }))
 
 vi.mock('ant-design-vue', () => ({
-  message: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
+  message: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
   Modal: { confirm: vi.fn() }
 }))
 
@@ -31,6 +41,7 @@ const globalStubs = {
   'a-input': { template: '<input />' },
   'a-select': { template: '<select><slot /></select>' },
   'a-select-option': { template: '<option><slot /></option>' },
+  'a-auto-complete': { template: '<div><slot /></div>' },
   'a-space': { template: '<div><slot /></div>' },
   'a-button': { template: '<button><slot /></button>' },
   'a-table': { template: '<table><slot /></table>' },
@@ -39,7 +50,8 @@ const globalStubs = {
   'a-date-picker': { template: '<input />' },
   'a-input-number': { template: '<input />' },
   'a-switch': { template: '<input />' },
-  'a-tag': { template: '<span><slot /></span>' }
+  'a-tag': { template: '<span><slot /></span>' },
+  'a-empty': { template: '<div />' }
 }
 
 describe('Elder List', () => {

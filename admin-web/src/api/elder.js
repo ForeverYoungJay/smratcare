@@ -11,6 +11,9 @@ export function createElder(data) {
 export function updateElder(id, data) {
     return request.put(`/api/elder/${id}`, data);
 }
+export function deleteElder(id) {
+    return request.delete(`/api/elder/${id}`);
+}
 export function assignBed(elderId, bedId, startDate) {
     const body = { bedId, startDate };
     return request.post(`/api/elder/${elderId}/assignBed`, body);

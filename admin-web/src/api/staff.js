@@ -11,6 +11,9 @@ export function updateStaff(id, data) {
 export function getStaff(id) {
     return request.get(`/api/admin/staff/${id}`);
 }
+export function getStaffCredentials(id) {
+    return request.get(`/api/admin/staff/${id}/credentials`);
+}
 export function lockStaff(id) {
     return request.put(`/api/admin/staff/${id}/lock`);
 }

@@ -27,6 +27,9 @@ export function updateStaffRoles(id, roleIds) {
     const body = { staffId: id, roleIds };
     return request.post('/api/admin/staff-roles/assign', body);
 }
+export function getStaffRoleAssignments(staffId) {
+    return request.get('/api/admin/staff-roles', { params: { staffId, orgId: 0 } });
+}
 export function appendStaffRole(id, roleId) {
     return request.post('/api/admin/staff-roles/add', { staffId: id, roleId });
 }

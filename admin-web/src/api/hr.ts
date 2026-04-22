@@ -17,6 +17,7 @@ import type {
   HrGenericApprovalItem,
   HrAttendanceRecordItem,
   HrDormitoryOverview,
+  HrDormitoryRoomBatchGenerateRequest,
   HrDormitoryRoomConfigItem,
   HrDormitoryStaffItem,
   HrStaffBirthdayItem,
@@ -177,6 +178,10 @@ export function upsertHrDormitoryRoomConfig(data: Partial<HrDormitoryRoomConfigI
 
 export function deleteHrDormitoryRoomConfig(id: string | number) {
   return request.delete<void>(`/api/admin/hr/dormitory/room-config/${id}`)
+}
+
+export function generateHrDormitoryRoomConfig(data: HrDormitoryRoomBatchGenerateRequest) {
+  return request.post<HrBatchActionSummary>('/api/admin/hr/dormitory/room-config/generate', data)
 }
 
 export function getHrStaffServicePlan(staffId: string | number) {

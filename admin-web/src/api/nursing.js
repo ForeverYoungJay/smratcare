@@ -23,6 +23,9 @@ export function getShiftTemplateList(params) {
 export function createShiftTemplate(data) {
     return request.post('/api/nursing/shift-templates', data);
 }
+export function saveShiftTemplateBatch(data) {
+    return request.post('/api/nursing/shift-templates/batch-save', data);
+}
 export function updateShiftTemplate(id, data) {
     return request.put(`/api/nursing/shift-templates/${id}`, data);
 }

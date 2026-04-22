@@ -101,6 +101,8 @@
                 <div class="toolbar-row">
                   <div class="toolbar-main">
                     <a-button type="primary" @click="openBuilding()">新增楼栋</a-button>
+                    <a-button :disabled="selectedBuildings.length !== 1" @click="openSelectedBuilding('view')">查看</a-button>
+                    <a-button :disabled="selectedBuildings.length !== 1" @click="openSelectedBuilding('edit')">编辑</a-button>
                     <a-button @click="openGenerateWizard('buildings')">批量生成</a-button>
                     <a-button danger :disabled="!selectedBuildings.length" @click="quickDeleteBuildings">批量删除</a-button>
                   </div>
@@ -215,6 +217,8 @@
                 <div class="toolbar-row">
                   <div class="toolbar-main">
                     <a-button type="primary" @click="openFloor()">新增楼层</a-button>
+                    <a-button :disabled="selectedFloors.length !== 1" @click="openSelectedFloor('view')">查看</a-button>
+                    <a-button :disabled="selectedFloors.length !== 1" @click="openSelectedFloor('edit')">编辑</a-button>
                     <a-button @click="openGenerateWizard('floors')">批量生成</a-button>
                     <a-button danger :disabled="!selectedFloors.length" @click="quickDeleteFloors">批量删除</a-button>
                   </div>
@@ -340,6 +344,10 @@
                 <div class="toolbar-row">
                   <div class="toolbar-main">
                     <a-button type="primary" @click="openRoom()">新增房间</a-button>
+                    <a-button :disabled="selectedRooms.length !== 1" @click="openSelectedRoom('view')">查看</a-button>
+                    <a-button :disabled="selectedRooms.length !== 1" @click="openSelectedRoom('edit')">编辑</a-button>
+                    <a-button :disabled="selectedRooms.length !== 1 || !canMoveRoom(selectedRooms[0], 'up')" @click="moveSelectedRoom('up')">上移</a-button>
+                    <a-button :disabled="selectedRooms.length !== 1 || !canMoveRoom(selectedRooms[0], 'down')" @click="moveSelectedRoom('down')">下移</a-button>
                     <a-button @click="openGenerateWizard('rooms')">批量生成</a-button>
                     <a-button danger :disabled="!selectedRooms.length" @click="quickDeleteRooms">批量删除</a-button>
                   </div>
@@ -493,6 +501,8 @@
                 <div class="toolbar-row">
                   <div class="toolbar-main">
                     <a-button type="primary" @click="openBed()">新增床位</a-button>
+                    <a-button :disabled="selected.length !== 1" @click="openSelectedBed('view')">查看</a-button>
+                    <a-button :disabled="selected.length !== 1" @click="openSelectedBed('edit')">编辑</a-button>
                     <a-button @click="openGenerateWizard('beds')">批量生成</a-button>
                     <a-button danger :disabled="!selected.length" @click="quickDeleteBeds">批量删除</a-button>
                   </div>
@@ -1383,8 +1393,7 @@ const buildingColumns = [
   { title: '区域', dataIndex: 'areaName', key: 'areaName', width: 140 },
   { title: '排序', dataIndex: 'sortNo', key: 'sortNo', width: 100 },
   { title: '状态', dataIndex: 'status', key: 'status', width: 120 },
-  { title: '备注', dataIndex: 'remark', key: 'remark' },
-  { title: '操作', key: 'action', width: 200, fixed: 'right' as const }
+  { title: '备注', dataIndex: 'remark', key: 'remark' }
 ]
 
 const floorColumns = [
@@ -1392,8 +1401,7 @@ const floorColumns = [
   { title: '楼栋', dataIndex: 'buildingId', key: 'buildingId', width: 160 },
   { title: '名称', dataIndex: 'name', key: 'name', width: 160 },
   { title: '排序', dataIndex: 'sortNo', key: 'sortNo', width: 100 },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 120 },
-  { title: '操作', key: 'action', width: 200, fixed: 'right' as const }
+  { title: '状态', dataIndex: 'status', key: 'status', width: 120 }
 ]
 
 const roomColumns = [
@@ -1403,8 +1411,7 @@ const roomColumns = [
   { title: '房型', dataIndex: 'roomType', key: 'roomType', width: 120 },
   { title: '容量', dataIndex: 'capacity', key: 'capacity', width: 100, sorter: true },
   { title: '备注', dataIndex: 'remark', key: 'remark', width: 180 },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 120, sorter: true },
-  { title: '操作', key: 'action', width: 280, fixed: 'right' as const }
+  { title: '状态', dataIndex: 'status', key: 'status', width: 120, sorter: true }
 ]
 
 const bedColumns = [
@@ -1415,8 +1422,7 @@ const bedColumns = [
   { title: '楼层', dataIndex: 'floorNo', key: 'floorNo', width: 100 },
   { title: '老人', dataIndex: 'elderName', key: 'elderName', width: 140, sorter: true },
   { title: '护理等级', dataIndex: 'careLevel', key: 'careLevel', width: 120, sorter: true },
-  { title: '状态', dataIndex: 'status', key: 'status', width: 120, sorter: true },
-  { title: '操作', key: 'action', width: 220, fixed: 'right' as const }
+  { title: '状态', dataIndex: 'status', key: 'status', width: 120, sorter: true }
 ]
 
 const bedRowSelection = computed(() => ({
@@ -1534,6 +1540,75 @@ function treeTypeLabel(type?: string) {
   if (type === 'ROOM') return '房间'
   if (type === 'BED') return '床位'
   return '-'
+}
+
+function selectedTreeRecord() {
+  return selectedTreeNode.value
+}
+
+function defaultBuildingIdFromTree() {
+  const node = selectedTreeRecord()
+  if (!node) return undefined
+  if (node.type === 'BUILDING') return node.id
+  return node.buildingId
+}
+
+function defaultFloorIdFromTree() {
+  const node = selectedTreeRecord()
+  if (!node) return undefined
+  if (node.type === 'FLOOR') return node.id
+  return node.floorId
+}
+
+function defaultRoomIdFromTree() {
+  const node = selectedTreeRecord()
+  if (!node) return undefined
+  if (node.type === 'ROOM') return node.id
+  if (node.type === 'BED') {
+    const roomNode = [...selectedTreePath.value].reverse().find((item) => item.type === 'ROOM')
+    return roomNode?.id
+  }
+  return undefined
+}
+
+function openSelectedBuilding(mode: DrawerMode) {
+  if (selectedBuildings.value.length !== 1) {
+    message.warning('请先勾选 1 个楼栋')
+    return
+  }
+  openBuilding(selectedBuildings.value[0], mode)
+}
+
+function openSelectedFloor(mode: DrawerMode) {
+  if (selectedFloors.value.length !== 1) {
+    message.warning('请先勾选 1 个楼层')
+    return
+  }
+  openFloor(selectedFloors.value[0], mode)
+}
+
+function openSelectedRoom(mode: DrawerMode) {
+  if (selectedRooms.value.length !== 1) {
+    message.warning('请先勾选 1 个房间')
+    return
+  }
+  openRoom(selectedRooms.value[0], mode)
+}
+
+async function moveSelectedRoom(direction: 'up' | 'down') {
+  if (selectedRooms.value.length !== 1) {
+    message.warning('请先勾选 1 个房间')
+    return
+  }
+  await moveRoom(selectedRooms.value[0], direction)
+}
+
+function openSelectedBed(mode: DrawerMode) {
+  if (selected.value.length !== 1) {
+    message.warning('请先勾选 1 个床位')
+    return
+  }
+  openBed(selected.value[0], mode)
 }
 
 function drawerTitle(label: string, mode: DrawerMode) {
@@ -2041,7 +2116,7 @@ function openFloor(row?: FloorItem, mode: DrawerMode = row ? 'edit' : 'create') 
   if (row) {
     Object.assign(floorForm, row)
   } else {
-    Object.assign(floorForm, { id: undefined, buildingId: undefined, floorNo: '', name: '', status: 1, sortNo: 0 })
+    Object.assign(floorForm, { id: undefined, buildingId: defaultBuildingIdFromTree(), floorNo: '', name: '', status: 1, sortNo: 0 })
   }
   floorOpen.value = true
 }
@@ -2077,7 +2152,16 @@ function openRoom(row?: RoomItem, mode: DrawerMode = row ? 'edit' : 'create') {
       roomForm.capacity = inferred
     }
   } else {
-    Object.assign(roomForm, { id: undefined, roomNo: '', buildingId: undefined, floorId: undefined, roomType: undefined, capacity: 1, status: 1, remark: '' })
+    Object.assign(roomForm, {
+      id: undefined,
+      roomNo: '',
+      buildingId: defaultBuildingIdFromTree(),
+      floorId: defaultFloorIdFromTree(),
+      roomType: undefined,
+      capacity: 1,
+      status: 1,
+      remark: ''
+    })
     hydrateRemarkSlots(roomRemarkSlots, '')
   }
   roomOpen.value = true
@@ -2114,7 +2198,7 @@ function openBed(row?: BedItem, mode: DrawerMode = row ? 'edit' : 'create') {
   if (row) {
     Object.assign(bedForm, row)
   } else {
-    Object.assign(bedForm, { id: undefined, roomId: undefined, bedNo: '', bedType: undefined, status: 1 })
+    Object.assign(bedForm, { id: undefined, roomId: defaultRoomIdFromTree(), bedNo: '', bedType: undefined, status: 1 })
   }
   bedOpen.value = true
 }
@@ -2283,8 +2367,8 @@ function openGenerateWizard(target: TabKey = activeTab.value) {
   generateTarget.value = target
   generateForm.buildingCount = 1
   generateForm.buildingPrefix = '楼栋'
-  generateForm.buildingId = floorQuery.buildingId || roomQuery.buildingId || buildingList.value[0]?.id
-  generateForm.floorId = roomQuery.floorId || floorList.value[0]?.id
+  generateForm.buildingId = defaultBuildingIdFromTree() || floorQuery.buildingId || roomQuery.buildingId || buildingList.value[0]?.id
+  generateForm.floorId = defaultFloorIdFromTree() || roomQuery.floorId || floorList.value[0]?.id
   generateForm.floorStart = 1
   generateForm.floorEnd = 6
   generateForm.roomStart = 1

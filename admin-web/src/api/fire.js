@@ -4,9 +4,7 @@ export function uploadFireSafetyFile(file, bizType = 'fire-safety-record') {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('bizType', bizType);
-    return request.post('/api/files/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    return request.post('/api/files/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
 }
 export const uploadFireSafetyImage = uploadFireSafetyFile;
 export function getFireSafetyRecordPage(params) {
@@ -20,6 +18,9 @@ export function updateFireSafetyRecord(id, data) {
 }
 export function closeFireSafetyRecord(id) {
     return request.put(`/api/fire/records/${id}/close`);
+}
+export function recheckFireSafetyRecord(id) {
+    return request.post(`/api/fire/records/${id}/recheck`);
 }
 export function deleteFireSafetyRecord(id) {
     return request.delete(`/api/fire/records/${id}`);

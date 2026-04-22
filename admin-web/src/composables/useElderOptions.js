@@ -87,7 +87,8 @@ function normalizeSignedOnly(config) {
 function buildCacheKey(config) {
     const status = normalizeElderStatus(config);
     const signedOnly = normalizeSignedOnly(config);
-    return `status:${status == null ? 'all' : status}|signedOnly:${signedOnly ? 1 : 0}`;
+    const loadAll = config.loadAll === true ? 1 : 0;
+    return `status:${status == null ? 'all' : status}|signedOnly:${signedOnly ? 1 : 0}|loadAll:${loadAll}`;
 }
 function elderSearchText(item) {
     const full = `${item.fullName || ''} ${item.elderCode || ''} ${item.phone || ''} ${item.bedNo || ''} ${item.roomNo || ''}`.trim();
@@ -103,6 +104,18 @@ function dedupeElders(rows) {
             map.set(id, row);
     });
     return Array.from(map.values());
+}
+function normalizeResultLimit(config, fallback) {
+    if (config.resultLimit == null)
+        return fallback;
+    if (config.resultLimit <= 0)
+        return Number.POSITIVE_INFINITY;
+    return config.resultLimit;
+}
+function applyResultLimit(rows, limit) {
+    if (!Number.isFinite(limit))
+        return rows;
+    return rows.slice(0, limit);
 }
 function upgradeOptionWithName(option, elderName) {
     const nextName = String(elderName || '').trim();
@@ -121,6 +134,7 @@ function upgradeOptionWithName(option, elderName) {
 export function useElderOptions(config = {}) {
     const pageSize = config.pageSize || 80;
     const preloadSize = config.preloadSize || Math.max(pageSize * 4, 300);
+    const resultLimit = normalizeResultLimit(config, pageSize);
     const elderOptions = ref([]);
     const elderLoading = ref(false);
     const lastKeyword = ref('');
@@ -152,14 +166,43 @@ export function useElderOptions(config = {}) {
         }
         const status = normalizeElderStatus(config);
         const signedOnly = normalizeSignedOnly(config);
-        const page = await getElderPage({
-            pageNo: 1,
-            pageSize: preloadSize,
-            status,
-            elderStatus: status,
-            signedOnly
-        });
-        const rows = page.list || [];
+        let rows = [];
+        if (config.loadAll === true) {
+            const batchSize = Math.max(preloadSize, pageSize, 200);
+            let pageNo = 1;
+            let total = 0;
+            while (pageNo <= 200) {
+                const page = await getElderPage({
+                    pageNo,
+                    pageSize: batchSize,
+                    status,
+                    elderStatus: status,
+                    signedOnly
+                });
+                const currentRows = page.list || [];
+                if (pageNo === 1)
+                    total = Number(page.total || 0);
+                rows.push(...currentRows);
+                if (!currentRows.length)
+                    break;
+                if (total > 0 && rows.length >= total)
+                    break;
+                if (currentRows.length < batchSize)
+                    break;
+                pageNo += 1;
+            }
+            rows = dedupeElders(rows);
+        }
+        else {
+            const page = await getElderPage({
+                pageNo: 1,
+                pageSize: preloadSize,
+                status,
+                elderStatus: status,
+                signedOnly
+            });
+            rows = page.list || [];
+        }
         upgradeExistingOptionsWithRows(rows);
         elderPoolCache.set(cacheKey, rows);
         elderPoolFetchedAt.set(cacheKey, Date.now());
@@ -190,10 +233,10 @@ export function useElderOptions(config = {}) {
                     .map((item) => ({ item, score: fuzzyScore(elderSearchText(item), text) }))
                     .filter((row) => row.score >= 0)
                     .sort((a, b) => b.score - a.score || String(a.item.fullName || '').localeCompare(String(b.item.fullName || ''), 'zh-CN'))
-                    .slice(0, pageSize)
+                    .slice(0, Number.isFinite(resultLimit) ? Math.max(resultLimit, pageSize) : undefined)
                     .map((row) => row.item)
-                : mergedRows.slice(0, pageSize);
-            elderOptions.value = finalRows.map(toElderOption);
+                : applyResultLimit(mergedRows, resultLimit);
+            elderOptions.value = applyResultLimit(finalRows, resultLimit).map(toElderOption);
         }
         finally {
             elderLoading.value = false;

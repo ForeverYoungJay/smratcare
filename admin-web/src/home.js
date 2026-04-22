@@ -1,0 +1,11 @@
+import { createApp } from 'vue';
+import dayjs from 'dayjs';
+import 'dayjs/locale/zh-cn';
+import 'ant-design-vue/dist/reset.css';
+import './styles/home.less';
+import EnterpriseHome from './views/EnterpriseHome.vue';
+import { setupHomeAntd } from './plugins/homeAntd';
+dayjs.locale('zh-cn');
+const app = createApp(EnterpriseHome);
+setupHomeAntd(app);
+app.mount('#home-app');

@@ -32,4 +32,6 @@ public interface ElderService {
   ElderResponse assignBed(Long elderId, AssignBedRequest request);
 
   ElderResponse unbindBed(Long elderId, LocalDate endDate, String reason, Long tenantId, Long createdBy);
+
+  void delete(Long id, Long tenantId, Long operatorId);
 }

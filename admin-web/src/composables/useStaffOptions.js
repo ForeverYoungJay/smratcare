@@ -118,7 +118,7 @@ export function useStaffOptions(config = {}) {
             departmentId: cached?.departmentId == null ? undefined : String(cached.departmentId),
             roleCodes: Array.isArray(cached?.roleCodes)
                 ? cached.roleCodes.map((code) => String(code || '').trim().toUpperCase()).filter(Boolean)
-                : []
+                : [],
         });
     }
     function findStaffName(staffId) {

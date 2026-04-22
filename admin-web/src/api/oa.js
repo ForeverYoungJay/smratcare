@@ -2,6 +2,9 @@ import request, { fetchPage } from '../utils/request';
 export function getPortalSummary(config) {
     return request.get('/api/oa/portal/summary', config);
 }
+export function getMyInfoSummary(params) {
+    return request.get('/api/oa/my-info/summary', { params });
+}
 export function uploadOaFile(file, bizType = 'oa-approval-proof') {
     const formData = new FormData();
     formData.append('file', file);
@@ -114,10 +117,10 @@ export function exportApproval(params) {
     return request.get('/api/oa/approval/export', { params, responseType: 'blob' });
 }
 export function getDocumentPage(params) {
-    return fetchPage('/api/oa/document/page', params);
+    return fetchPage('/api/oa/document/page', normalizeDocumentParams(params));
 }
 export function createDocument(data) {
-    return request.post('/api/oa/document', data);
+    return request.post('/api/oa/document', normalizeDocumentPayload(data));
 }
 export function getDocumentFolderTree() {
     return request.get('/api/oa/document/folder/tree');
@@ -132,7 +135,7 @@ export function deleteDocumentFolder(id) {
     return request.delete(`/api/oa/document/folder/${id}`);
 }
 export function updateDocument(id, data) {
-    return request.put(`/api/oa/document/${id}`, data);
+    return request.put(`/api/oa/document/${id}`, normalizeDocumentPayload(data));
 }
 export function deleteDocument(id) {
     return request.delete(`/api/oa/document/${id}`);
@@ -141,7 +144,32 @@ export function batchDeleteDocument(ids) {
     return request.delete('/api/oa/document/batch', { data: { ids } });
 }
 export function exportDocument(params) {
-    return request.get('/api/oa/document/export', { params, responseType: 'blob' });
+    return request.get('/api/oa/document/export', { params: normalizeDocumentParams(params), responseType: 'blob' });
+}
+function normalizeDocumentPayload(data) {
+    const folderId = normalizePositiveId(data.folderId);
+    const folder = typeof data.folder === 'string' ? data.folder.trim() : data.folder;
+    return {
+        ...data,
+        folderId,
+        folder: folderId ? folder : (folder || undefined)
+    };
+}
+function normalizeDocumentParams(params) {
+    if (!params || typeof params !== 'object')
+        return params;
+    return {
+        ...params,
+        folderId: normalizePositiveId(params.folderId)
+    };
+}
+function normalizePositiveId(value) {
+    if (value == null || value === '')
+        return undefined;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed <= 0)
+        return undefined;
+    return parsed;
 }
 export function getAlbumPage(params) {
     return fetchPage('/api/oa/album/page', params);
@@ -227,17 +255,35 @@ export function exportGroupSetting(params) {
 export function getActivityPlanPage(params) {
     return fetchPage('/api/oa/activity-plan/page', params);
 }
+export function getActivityPlan(id) {
+    return request.get(`/api/oa/activity-plan/${id}`);
+}
 export function createActivityPlan(data) {
     return request.post('/api/oa/activity-plan', data);
 }
 export function updateActivityPlan(id, data) {
     return request.put(`/api/oa/activity-plan/${id}`, data);
 }
+export function submitActivityPlanScheme(id) {
+    return request.put(`/api/oa/activity-plan/${id}/submit-scheme`);
+}
+export function approveActivityPlan(id, opinion) {
+    return request.put(`/api/oa/activity-plan/${id}/approve`, { opinion });
+}
+export function rejectActivityPlan(id, opinion) {
+    return request.put(`/api/oa/activity-plan/${id}/reject`, { opinion });
+}
 export function startActivityPlan(id) {
     return request.put(`/api/oa/activity-plan/${id}/start`);
 }
 export function completeActivityPlan(id) {
     return request.put(`/api/oa/activity-plan/${id}/done`);
+}
+export function saveActivityPlanExecution(id, data) {
+    return request.put(`/api/oa/activity-plan/${id}/execution`, data);
+}
+export function saveActivityPlanReview(id, data) {
+    return request.put(`/api/oa/activity-plan/${id}/review`, data);
 }
 export function cancelActivityPlan(id) {
     return request.put(`/api/oa/activity-plan/${id}/cancel`);

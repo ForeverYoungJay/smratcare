@@ -21,6 +21,7 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -189,6 +190,19 @@ public class ElderController {
         "BED_UNBIND", "ELDER", id, "床位解绑",
         beforeSnapshot, response, context);
     return Result.ok(response);
+  }
+
+  @PreAuthorize("@elderAuthz.canWriteElder()")
+  @DeleteMapping("/{id}")
+  public Result<Void> delete(@PathVariable Long id) {
+    Long tenantId = AuthContext.getOrgId();
+    ElderResponse beforeSnapshot = elderService.get(id, tenantId);
+    elderService.delete(id, tenantId, AuthContext.getStaffId());
+    auditLogService.recordStructured(
+        tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
+        "DELETE", "ELDER", id, "删除老人档案",
+        beforeSnapshot, null, null);
+    return Result.ok(null);
   }
 
   private String escapeJson(String raw) {

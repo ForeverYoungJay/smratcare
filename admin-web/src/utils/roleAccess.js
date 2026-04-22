@@ -19,7 +19,7 @@ export const DEPARTMENT_MINISTER_ROLES = [
 export const DEPARTMENT_ALL_ROLES = [...DEPARTMENT_EMPLOYEE_ROLES, ...DEPARTMENT_MINISTER_ROLES];
 const moduleRoleMap = [
     {
-        prefixes: ['/medical-care', '/health'],
+        prefixes: ['/medical-care', '/health', '/medical'],
         employeeRoles: ['MEDICAL_EMPLOYEE', 'NURSING_EMPLOYEE'],
         ministerRoles: ['MEDICAL_MINISTER', 'NURSING_MINISTER']
     },
@@ -30,8 +30,13 @@ const moduleRoleMap = [
         employeeRoles: ['LOGISTICS_EMPLOYEE'],
         ministerRoles: ['LOGISTICS_MINISTER']
     },
-    { prefixes: ['/marketing'], employeeRoles: ['MARKETING_EMPLOYEE'], ministerRoles: ['MARKETING_MINISTER'] },
+    { prefixes: ['/marketing', '/crm'], employeeRoles: ['MARKETING_EMPLOYEE'], ministerRoles: ['MARKETING_MINISTER'] },
     { prefixes: ['/hr', '/oa', '/schedule', '/attendance'], employeeRoles: ['HR_EMPLOYEE'], ministerRoles: ['HR_MINISTER'] },
+    {
+        prefixes: ['/fire'],
+        employeeRoles: ['GUARD', 'LOGISTICS_EMPLOYEE'],
+        ministerRoles: ['LOGISTICS_MINISTER']
+    },
     {
         prefixes: ['/stats'],
         employeeRoles: ['HR_EMPLOYEE', 'FINANCE_EMPLOYEE', 'LOGISTICS_EMPLOYEE', 'MARKETING_EMPLOYEE'],

@@ -1,6 +1,7 @@
 const TOKEN_KEY = 'zhiyangyun_token';
 const ROLES_KEY = 'zhiyangyun_roles';
 const PERMISSIONS_KEY = 'zhiyangyun_permissions';
+const PAGE_PERMISSIONS_KEY = 'zhiyangyun_page_permissions';
 const STAFF_INFO_KEY = 'zhiyangyun_staff_info';
 export function normalizeRoles(roles) {
     const normalized = new Set();
@@ -53,6 +54,16 @@ export function setPermissions(permissions) {
 }
 export function clearPermissions() {
     localStorage.removeItem(PERMISSIONS_KEY);
+}
+export function getPagePermissions() {
+    const raw = localStorage.getItem(PAGE_PERMISSIONS_KEY);
+    return raw ? JSON.parse(raw) : [];
+}
+export function setPagePermissions(pagePermissions) {
+    localStorage.setItem(PAGE_PERMISSIONS_KEY, JSON.stringify(pagePermissions || []));
+}
+export function clearPagePermissions() {
+    localStorage.removeItem(PAGE_PERMISSIONS_KEY);
 }
 export function getStaffInfo() {
     const raw = localStorage.getItem(STAFF_INFO_KEY);

@@ -27,6 +27,10 @@ const reportRouteMap = {
         path: '/marketing/reports/channel-rank',
         cacheKey: 'channel-rank'
     },
+    snapshots: {
+        path: '/marketing/reports/snapshots',
+        cacheKey: 'snapshots'
+    },
     'sales-performance': {
         path: '/marketing/reports/sales-performance',
         cacheKey: 'sales-performance'

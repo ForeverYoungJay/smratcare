@@ -142,6 +142,7 @@
           </div>
           <a-space wrap>
             <a-button type="primary" @click="openRoomConfigDrawer()">新增房间</a-button>
+            <a-button @click="openBatchGenerateDrawer()">批量生成房间</a-button>
             <a-button @click="fetchRoomConfigData">刷新房间配置</a-button>
           </a-space>
         </div>
@@ -335,6 +336,81 @@
         </a-space>
       </template>
     </a-drawer>
+
+    <a-drawer v-model:open="batchGenerateDrawerOpen" title="批量生成宿舍房间" width="560">
+      <a-form :model="batchGenerateForm" layout="vertical">
+        <a-row :gutter="12">
+          <a-col :span="12">
+            <a-form-item label="楼栋命名">
+              <a-select v-model:value="batchGenerateForm.buildingNamingType" :options="buildingNamingOptions" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="楼栋前缀">
+              <a-input v-model:value="batchGenerateForm.buildingPrefix" placeholder="可选，如 员工宿舍" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="起始栋号">
+              <a-input-number v-model:value="batchGenerateForm.buildingStartNo" :min="1" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="生成几栋" required>
+              <a-input-number v-model:value="batchGenerateForm.buildingCount" :min="1" :max="26" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="起始楼层">
+              <a-input-number v-model:value="batchGenerateForm.floorStartNo" :min="1" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="每栋几层" required>
+              <a-input-number v-model:value="batchGenerateForm.floorCount" :min="1" :max="99" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="每层几间" required>
+              <a-input-number v-model:value="batchGenerateForm.roomsPerFloor" :min="1" :max="99" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="起始房号">
+              <a-input-number v-model:value="batchGenerateForm.roomStartNo" :min="1" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="房号位数">
+              <a-input-number v-model:value="batchGenerateForm.roomNoWidth" :min="2" :max="4" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="房间号分隔符">
+              <a-input v-model:value="batchGenerateForm.roomNoSeparator" placeholder="默认 -" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="标准床位数" required>
+              <a-input-number v-model:value="batchGenerateForm.bedCapacity" :min="1" :max="32" style="width: 100%" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-form-item label="备注">
+          <a-textarea v-model:value="batchGenerateForm.remark" :rows="3" placeholder="批量生成后会自动形成楼栋、楼层、房间号和排序号" />
+        </a-form-item>
+        <div class="batch-tip">
+          将按“楼栋 x 楼层 x 房间”规则生成。
+          例如选择字母楼栋、起始栋号 `1`、每栋 `3` 层、每层 `8` 间，会生成 `A栋/B栋...` 下的 `1-01、1-02...3-08`。
+        </div>
+      </a-form>
+      <template #footer>
+        <a-space>
+          <a-button @click="batchGenerateDrawerOpen = false">取消</a-button>
+          <a-button type="primary" :loading="batchGenerating" @click="submitBatchGenerate">开始生成</a-button>
+        </a-space>
+      </template>
+    </a-drawer>
   </PageContainer>
 </template>
 
@@ -347,6 +423,7 @@ import SearchForm from '../../components/SearchForm.vue'
 import DataTable from '../../components/DataTable.vue'
 import {
   deleteHrDormitoryRoomConfig,
+  generateHrDormitoryRoomConfig,
   getHrDormitoryMap,
   getHrDormitoryOverview,
   getHrDormitoryPage,
@@ -355,7 +432,7 @@ import {
   upsertHrDormitoryRoomConfig,
   upsertHrStaffServicePlan
 } from '../../api/hr'
-import type { HrDormitoryOverview, HrDormitoryRoomConfigItem, HrDormitoryStaffItem, HrStaffServicePlan, PageResult } from '../../types'
+import type { HrBatchActionSummary, HrDormitoryOverview, HrDormitoryRoomBatchGenerateRequest, HrDormitoryRoomConfigItem, HrDormitoryStaffItem, HrStaffServicePlan, PageResult } from '../../types'
 import { useDepartmentOptions } from '../../composables/useDepartmentOptions'
 import { useStaffOptions } from '../../composables/useStaffOptions'
 
@@ -397,6 +474,11 @@ const planStatusOptions = [
   { label: '停用', value: 'DISABLED' }
 ]
 
+const buildingNamingOptions = [
+  { label: '字母楼栋（A栋/B栋）', value: 'LETTER' },
+  { label: '数字楼栋（1栋/2栋）', value: 'NUMBER' }
+]
+
 const columns = [
   { title: '员工', key: 'staff', width: 160 },
   { title: '部门', dataIndex: 'departmentName', key: 'departmentName', width: 140 },
@@ -426,10 +508,12 @@ const loading = ref(false)
 const saving = ref(false)
 const roomConfigLoading = ref(false)
 const roomConfigSaving = ref(false)
+const batchGenerating = ref(false)
 const pagination = reactive({ current: 1, pageSize: 10, total: 0, showSizeChanger: true })
 
 const drawerOpen = ref(false)
 const roomConfigDrawerOpen = ref(false)
+const batchGenerateDrawerOpen = ref(false)
 
 const form = reactive<HrStaffServicePlan>({
   staffId: undefined,
@@ -442,6 +526,22 @@ const roomConfigForm = reactive<HrDormitoryRoomConfigItem>({
   bedCapacity: 4,
   sortNo: 0,
   status: 'ENABLED'
+})
+
+const batchGenerateForm = reactive<HrDormitoryRoomBatchGenerateRequest>({
+  buildingNamingType: 'LETTER',
+  buildingPrefix: undefined,
+  buildingStartNo: 1,
+  buildingCount: 1,
+  floorStartNo: 1,
+  floorCount: 3,
+  roomsPerFloor: 8,
+  roomStartNo: 1,
+  roomNoWidth: 2,
+  roomNoSeparator: '-',
+  bedCapacity: 4,
+  status: 'ENABLED',
+  remark: undefined
 })
 
 const { departmentOptions, departmentLoading, searchDepartments } = useDepartmentOptions({ pageSize: 120, preloadSize: 400 })
@@ -613,6 +713,24 @@ function resetRoomConfigForm() {
   })
 }
 
+function resetBatchGenerateForm() {
+  Object.assign(batchGenerateForm, {
+    buildingNamingType: 'LETTER',
+    buildingPrefix: undefined,
+    buildingStartNo: 1,
+    buildingCount: 1,
+    floorStartNo: 1,
+    floorCount: 3,
+    roomsPerFloor: 8,
+    roomStartNo: 1,
+    roomNoWidth: 2,
+    roomNoSeparator: '-',
+    bedCapacity: 4,
+    status: 'ENABLED',
+    remark: undefined
+  })
+}
+
 async function hydratePlan(staffId: string | number, staffName?: string) {
   ensureSelectedStaff(staffId, staffName)
   const detail = await getHrStaffServicePlan(staffId)
@@ -678,6 +796,11 @@ function openRoomConfigDrawer(record?: HrDormitoryRoomConfigItem) {
   }
 }
 
+function openBatchGenerateDrawer() {
+  resetBatchGenerateForm()
+  batchGenerateDrawerOpen.value = true
+}
+
 async function submitRoomConfig() {
   if (!normalizeText(roomConfigForm.building) || !normalizeText(roomConfigForm.roomNo)) {
     message.warning('请填写楼栋和房间号')
@@ -708,6 +831,22 @@ async function deleteRoomConfig(record: HrDormitoryRoomConfigItem) {
   await deleteHrDormitoryRoomConfig(record.id)
   message.success('房间配置已删除')
   await Promise.all([fetchRoomConfigData(), fetchSummary()])
+}
+
+async function submitBatchGenerate() {
+  if (Number(batchGenerateForm.buildingCount || 0) <= 0 || Number(batchGenerateForm.floorCount || 0) <= 0 || Number(batchGenerateForm.roomsPerFloor || 0) <= 0) {
+    message.warning('请填写有效的栋数、楼层数和每层房间数')
+    return
+  }
+  batchGenerating.value = true
+  try {
+    const result = (await generateHrDormitoryRoomConfig({ ...batchGenerateForm })) as HrBatchActionSummary
+    message.success(result?.message || '宿舍房间已批量生成')
+    batchGenerateDrawerOpen.value = false
+    await Promise.all([fetchRoomConfigData(), fetchSummary()])
+  } finally {
+    batchGenerating.value = false
+  }
 }
 
 onMounted(() => {
@@ -843,6 +982,14 @@ onMounted(() => {
   padding: 14px;
   border-radius: 18px;
   background: #f8fafc;
+}
+
+.batch-tip {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #f8fafc;
+  color: #64748b;
+  line-height: 1.6;
 }
 
 .dorm-head {

@@ -1,10 +1,12 @@
 import { defineStore } from 'pinia';
-import { getPermissions, getRoles, getStaffInfo, getToken, setPermissions, setRoles, setStaffInfo, setToken, clearPermissions, clearRoles, clearStaffInfo, clearToken, normalizeRoles } from '../utils/auth';
+import { getPagePermissions, getPermissions, getRoles, getStaffInfo, getToken, setPagePermissions, setPermissions, setRoles, setStaffInfo, setToken, clearPagePermissions, clearPermissions, clearRoles, clearStaffInfo, clearToken, normalizeRoles } from '../utils/auth';
+import { getRecommendedPagePermissions, normalizePagePermissions } from '../utils/pageAccess';
 export const useUserStore = defineStore('user', {
     state: () => ({
         token: getToken(),
         roles: getRoles(),
         permissions: getPermissions(),
+        pagePermissions: getPagePermissions(),
         staffInfo: getStaffInfo()
     }),
     actions: {
@@ -19,22 +21,31 @@ export const useUserStore = defineStore('user', {
         },
         setAuth(payload) {
             const roles = normalizeRoles(payload.roles || []);
+            const inheritedPagePermissions = roles.flatMap((role) => getRecommendedPagePermissions(role));
+            const pagePermissions = normalizePagePermissions([
+                ...(payload.pagePermissions || []),
+                ...inheritedPagePermissions
+            ]);
             this.token = payload.token;
             this.roles = roles;
             this.permissions = payload.permissions || [];
+            this.pagePermissions = pagePermissions;
             this.setStaffProfile(payload.staffInfo);
             setToken(payload.token);
             setRoles(roles);
             setPermissions(payload.permissions || []);
+            setPagePermissions(pagePermissions);
         },
         clear() {
             this.token = '';
             this.roles = [];
             this.permissions = [];
+            this.pagePermissions = [];
             this.setStaffProfile(null);
             clearToken();
             clearRoles();
             clearPermissions();
+            clearPagePermissions();
         }
     }
 });

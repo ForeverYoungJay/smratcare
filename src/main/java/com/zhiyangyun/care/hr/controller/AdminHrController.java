@@ -41,6 +41,7 @@ import com.zhiyangyun.care.hr.model.HrSocialSecurityBillGenerateRequest;
 import com.zhiyangyun.care.hr.model.HrSocialSecurityCompleteRequest;
 import com.zhiyangyun.care.hr.model.HrExpenseApprovalRequest;
 import com.zhiyangyun.care.hr.model.HrDormitoryOverviewResponse;
+import com.zhiyangyun.care.hr.model.HrDormitoryRoomBatchGenerateRequest;
 import com.zhiyangyun.care.hr.model.HrDormitoryRoomConfigRequest;
 import com.zhiyangyun.care.hr.model.HrDormitoryRoomConfigResponse;
 import com.zhiyangyun.care.hr.model.HrDormitoryStaffResponse;
@@ -1544,6 +1545,83 @@ public class AdminHrController {
     entity.setIsDeleted(1);
     dormitoryRoomConfigMapper.updateById(entity);
     return Result.ok(null);
+  }
+
+  @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
+  @PostMapping("/dormitory/room-config/generate")
+  public Result<HrBatchActionSummaryResponse> generateDormitoryRoomConfig(
+      @RequestBody HrDormitoryRoomBatchGenerateRequest request) {
+    Long orgId = AuthContext.getOrgId();
+    if (request == null) {
+      return Result.error(400, "request required");
+    }
+    int buildingStartNo = positiveOrDefault(request.getBuildingStartNo(), 1);
+    int buildingCount = positiveOrDefault(request.getBuildingCount(), 1);
+    int floorStartNo = positiveOrDefault(request.getFloorStartNo(), 1);
+    int floorCount = positiveOrDefault(request.getFloorCount(), 1);
+    int roomsPerFloor = positiveOrDefault(request.getRoomsPerFloor(), 1);
+    int roomStartNo = positiveOrDefault(request.getRoomStartNo(), 1);
+    int roomNoWidth = positiveOrDefault(request.getRoomNoWidth(), 2);
+    int bedCapacity = positiveOrDefault(request.getBedCapacity(), 4);
+    String buildingPrefix = defaultText(normalizeBlank(request.getBuildingPrefix()), "");
+    String buildingNamingType = defaultText(normalizeBlank(request.getBuildingNamingType()), "LETTER").toUpperCase(Locale.ROOT);
+    String roomNoSeparator = normalizeBlank(request.getRoomNoSeparator());
+    String status = normalizeBlank(request.getStatus()) == null ? "ENABLED" : normalizeBlank(request.getStatus()).toUpperCase(Locale.ROOT);
+    String remark = normalizeBlank(request.getRemark());
+
+    if (buildingCount <= 0 || floorCount <= 0 || roomsPerFloor <= 0 || bedCapacity <= 0) {
+      return Result.error(400, "栋数、楼层数、每层房间数、标准床位数必须大于 0");
+    }
+
+    List<HrDormitoryRoomConfig> existingRooms = dormitoryRoomConfigMapper.selectList(
+        Wrappers.lambdaQuery(HrDormitoryRoomConfig.class)
+            .eq(HrDormitoryRoomConfig::getOrgId, orgId)
+            .eq(HrDormitoryRoomConfig::getIsDeleted, 0));
+    Map<String, HrDormitoryRoomConfig> existingRoomMap = existingRooms.stream()
+        .filter(item -> normalizeBlank(item.getBuilding()) != null && normalizeBlank(item.getRoomNo()) != null)
+        .collect(Collectors.toMap(
+            item -> dormitoryRoomKey(normalizeBlank(item.getBuilding()), normalizeBlank(item.getRoomNo())),
+            item -> item,
+            (a, b) -> a));
+
+    int successCount = 0;
+    int skippedCount = 0;
+    int totalCount = buildingCount * floorCount * roomsPerFloor;
+    for (int buildingOffset = 0; buildingOffset < buildingCount; buildingOffset++) {
+      int buildingNo = buildingStartNo + buildingOffset;
+      String buildingName = generateDormitoryBuildingName(buildingPrefix, buildingNo, buildingNamingType);
+      for (int floorOffset = 0; floorOffset < floorCount; floorOffset++) {
+        int floorNo = floorStartNo + floorOffset;
+        String floorLabel = floorNo + "层";
+        for (int roomOffset = 0; roomOffset < roomsPerFloor; roomOffset++) {
+          int roomIndex = roomStartNo + roomOffset;
+          String roomNo = generateDormitoryRoomNo(floorNo, roomIndex, roomNoWidth, roomNoSeparator);
+          String roomKey = dormitoryRoomKey(buildingName, roomNo);
+          if (roomKey == null || existingRoomMap.containsKey(roomKey)) {
+            skippedCount++;
+            continue;
+          }
+          HrDormitoryRoomConfig entity = new HrDormitoryRoomConfig();
+          entity.setOrgId(orgId);
+          entity.setBuilding(buildingName);
+          entity.setFloorLabel(floorLabel);
+          entity.setRoomNo(roomNo);
+          entity.setBedCapacity(bedCapacity);
+          entity.setStatus(status);
+          entity.setSortNo(buildDormitoryRoomSortNo(buildingNo, floorNo, roomIndex));
+          entity.setRemark(remark);
+          saveDormitoryRoomConfig(entity);
+          existingRoomMap.put(roomKey, entity);
+          successCount++;
+        }
+      }
+    }
+    HrBatchActionSummaryResponse response = new HrBatchActionSummaryResponse();
+    response.setTotalCount(totalCount);
+    response.setSuccessCount(successCount);
+    response.setSkippedCount(skippedCount);
+    response.setMessage("已生成 " + successCount + " 个宿舍房间" + (skippedCount > 0 ? "，跳过 " + skippedCount + " 个已存在房间" : ""));
+    return Result.ok(response);
   }
 
   @PreAuthorize("hasAnyRole('HR_MINISTER','DIRECTOR','SYS_ADMIN','ADMIN')")
@@ -3309,6 +3387,15 @@ public class AdminHrController {
     return (building + "||" + roomNo).toLowerCase(Locale.ROOT);
   }
 
+  private String dormitoryRoomKey(String building, String roomNo) {
+    String normalizedBuilding = normalizeBlank(building);
+    String normalizedRoomNo = normalizeBlank(roomNo);
+    if (normalizedBuilding == null || normalizedRoomNo == null) {
+      return null;
+    }
+    return (normalizedBuilding + "||" + normalizedRoomNo).toLowerCase(Locale.ROOT);
+  }
+
   private String dormitoryOccupancyKey(StaffServicePlan plan) {
     if (plan == null || normalizeFlag(plan.getLiveInDormitory()) != 1) {
       return null;
@@ -3336,6 +3423,38 @@ public class AdminHrController {
       return simple.group(1) + "层";
     }
     return null;
+  }
+
+  private int positiveOrDefault(Integer value, int defaultValue) {
+    return value == null || value <= 0 ? defaultValue : value;
+  }
+
+  private String generateDormitoryBuildingName(String buildingPrefix, int buildingNo, String namingType) {
+    String prefix = defaultText(buildingPrefix, "");
+    if ("NUMBER".equalsIgnoreCase(namingType)) {
+      return prefix + buildingNo + "栋";
+    }
+    return prefix + toAlphabetIndex(buildingNo) + "栋";
+  }
+
+  private String generateDormitoryRoomNo(int floorNo, int roomIndex, int roomNoWidth, String separator) {
+    String joiner = separator == null ? "-" : separator;
+    return floorNo + joiner + String.format(Locale.ROOT, "%0" + Math.max(roomNoWidth, 2) + "d", roomIndex);
+  }
+
+  private int buildDormitoryRoomSortNo(int buildingNo, int floorNo, int roomIndex) {
+    return buildingNo * 100000 + floorNo * 1000 + roomIndex;
+  }
+
+  private String toAlphabetIndex(int value) {
+    int current = Math.max(value, 1);
+    StringBuilder builder = new StringBuilder();
+    while (current > 0) {
+      current--;
+      builder.insert(0, (char) ('A' + (current % 26)));
+      current /= 26;
+    }
+    return builder.toString();
   }
 
   private boolean matchesDormitoryRow(
