@@ -297,17 +297,25 @@ const residencePresets: Record<string, { itemCode: string; itemName: string; sor
   ADMISSION_BED_TYPE: [
     { itemCode: 'BED_STANDARD', itemName: '标准床', sortNo: 10 },
     { itemCode: 'BED_CARE', itemName: '护理床', sortNo: 20 },
-    { itemCode: 'BED_ELECTRIC', itemName: '电动床', sortNo: 30 }
+    { itemCode: 'BED_ELECTRIC', itemName: '电动护理床', sortNo: 30 },
+    { itemCode: 'BED_ANTI_DECUBITUS', itemName: '防压疮床', sortNo: 40 },
+    { itemCode: 'BED_MEDICAL', itemName: '医用床', sortNo: 50 }
   ],
   ADMISSION_ROOM_TYPE: [
     { itemCode: 'ROOM_SINGLE', itemName: '单人间', sortNo: 10 },
     { itemCode: 'ROOM_DOUBLE', itemName: '双人间', sortNo: 20 },
     { itemCode: 'ROOM_TRIPLE', itemName: '三人间', sortNo: 30 },
     { itemCode: 'ROOM_CARE', itemName: '护理房', sortNo: 40 },
+    { itemCode: 'ROOM_SUITE', itemName: '套间', sortNo: 45 },
     { itemCode: 'ROOM_NURSING_STATION', itemName: '护理站', sortNo: 50 },
     { itemCode: 'ROOM_WATER', itemName: '开水房', sortNo: 60 },
     { itemCode: 'ROOM_LAUNDRY', itemName: '洗衣房', sortNo: 70 },
-    { itemCode: 'ROOM_TOILET', itemName: '卫生间', sortNo: 80 }
+    { itemCode: 'ROOM_TOILET', itemName: '卫生间', sortNo: 80 },
+    { itemCode: 'ROOM_BATH', itemName: '浴室', sortNo: 90 },
+    { itemCode: 'ROOM_TREATMENT', itemName: '治疗室', sortNo: 100 },
+    { itemCode: 'ROOM_STORAGE', itemName: '库房', sortNo: 110 },
+    { itemCode: 'ROOM_ACTIVITY', itemName: '活动室', sortNo: 120 },
+    { itemCode: 'ROOM_DINING', itemName: '餐厅', sortNo: 130 }
   ],
   ADMISSION_AREA: [
     { itemCode: 'AREA_A', itemName: 'A区', sortNo: 10 },

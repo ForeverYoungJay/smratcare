@@ -1456,13 +1456,40 @@ function statusTag(status?: number) {
 }
 
 function resolveRoomTypeLabel(roomType?: string) {
-  if (!roomType) return '-'
-  return roomTypeLabelMap.value[roomType] || roomType
+  const raw = String(roomType || '').trim()
+  if (!raw) return '-'
+  const normalized = raw.toUpperCase()
+  const fallbackMap: Record<string, string> = {
+    ROOM_SINGLE: '单人间',
+    ROOM_DOUBLE: '双人间',
+    ROOM_TRIPLE: '三人间',
+    ROOM_CARE: '护理房',
+    ROOM_SUITE: '套间',
+    ROOM_NURSING_STATION: '护理站',
+    ROOM_WATER: '开水房',
+    ROOM_LAUNDRY: '洗衣房',
+    ROOM_TOILET: '卫生间',
+    ROOM_BATH: '浴室',
+    ROOM_TREATMENT: '治疗室',
+    ROOM_STORAGE: '库房',
+    ROOM_ACTIVITY: '活动室',
+    ROOM_DINING: '餐厅'
+  }
+  return roomTypeLabelMap.value[raw] || roomTypeLabelMap.value[normalized] || fallbackMap[normalized] || raw
 }
 
 function resolveBedTypeLabel(bedType?: string) {
-  if (!bedType) return '-'
-  return bedTypeLabelMap.value[bedType] || bedType
+  const raw = String(bedType || '').trim()
+  if (!raw) return '-'
+  const normalized = raw.toUpperCase()
+  const fallbackMap: Record<string, string> = {
+    BED_STANDARD: '标准床',
+    BED_CARE: '护理床',
+    BED_ELECTRIC: '电动护理床',
+    BED_ANTI_DECUBITUS: '防压疮床',
+    BED_MEDICAL: '医用床'
+  }
+  return bedTypeLabelMap.value[raw] || bedTypeLabelMap.value[normalized] || fallbackMap[normalized] || raw
 }
 
 function inferCapacityByRoomType(roomType?: string) {
@@ -1488,7 +1515,10 @@ function isFunctionalRoomType(roomType?: string) {
   const raw = String(roomType || '').trim()
   if (!raw) return false
   const normalized = raw.toUpperCase()
-  return ['护理站', '开水房', '洗衣房', '卫生间', '厕所', '浴室', '沐浴', 'NURSING', 'STATION', 'WATER', 'LAUNDRY', 'TOILET', 'WC', 'BATH']
+  return [
+    '护理站', '开水房', '洗衣房', '卫生间', '厕所', '浴室', '沐浴', '治疗室', '库房', '活动室', '餐厅',
+    'NURSING', 'STATION', 'WATER', 'LAUNDRY', 'TOILET', 'WC', 'BATH', 'TREATMENT', 'STORAGE', 'ACTIVITY', 'DINING'
+  ]
     .some((keyword) => normalized.includes(keyword.toUpperCase()))
 }
 
