@@ -559,12 +559,12 @@ DELETE FROM crm_marketing_plan_performance
 WHERE org_id = @target_org_id
   AND staff_id IN (SELECT staff_id FROM tmp_terminated_staff);
 
-DELETE FROM shift_swap_request
-WHERE org_id = @target_org_id
-  AND (
-    applicant_staff_id IN (SELECT staff_id FROM tmp_terminated_staff)
-    OR target_staff_id IN (SELECT staff_id FROM tmp_terminated_staff)
-  );
+DELETE ssr
+FROM shift_swap_request ssr
+JOIN tmp_terminated_staff t
+  ON ssr.applicant_staff_id = t.staff_id
+  OR ssr.target_staff_id = t.staff_id
+WHERE ssr.org_id = @target_org_id;
 
 DELETE FROM staff
 WHERE org_id = @target_org_id
