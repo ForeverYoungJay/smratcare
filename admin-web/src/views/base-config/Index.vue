@@ -130,6 +130,12 @@
         <a-form-item label="配置编码">
           <a-input :value="autoItemCodePreview" disabled placeholder="系统自动生成" />
         </a-form-item>
+        <a-form-item v-if="form.configGroup === 'ADMISSION_ROOM_TYPE'" label="房间属性">
+          <a-radio-group v-model:value="roomTypeMeta.roomKind">
+            <a-radio value="NORMAL">普通房</a-radio>
+            <a-radio value="FUNCTIONAL">功能房</a-radio>
+          </a-radio-group>
+        </a-form-item>
         <a-form-item v-if="form.configGroup === 'ADMISSION_ROOM_TYPE'" label="默认床位数">
           <a-input-number v-model:value="roomTypeMeta.defaultCapacity" :min="0" :max="20" style="width: 100%" />
         </a-form-item>
@@ -269,8 +275,9 @@ const form = reactive<BaseConfigItemPayload>({
   sortNo: 0,
   remark: ''
 })
-const roomTypeMeta = reactive<{ defaultCapacity?: number }>({
-  defaultCapacity: undefined
+const roomTypeMeta = reactive<{ defaultCapacity?: number; roomKind: 'NORMAL' | 'FUNCTIONAL' }>({
+  defaultCapacity: undefined,
+  roomKind: 'NORMAL'
 })
 
 const rules: FormRules = {
@@ -307,20 +314,20 @@ const residencePresets: Record<string, { itemCode: string; itemName: string; sor
     { itemCode: 'BED_MEDICAL', itemName: '医用床', sortNo: 50 }
   ],
   ADMISSION_ROOM_TYPE: [
-    { itemCode: 'ROOM_SINGLE', itemName: '单人间', sortNo: 10, remark: '{"text":"","defaultCapacity":1}' },
-    { itemCode: 'ROOM_DOUBLE', itemName: '双人间', sortNo: 20, remark: '{"text":"","defaultCapacity":2}' },
-    { itemCode: 'ROOM_TRIPLE', itemName: '三人间', sortNo: 30, remark: '{"text":"","defaultCapacity":3}' },
-    { itemCode: 'ROOM_CARE', itemName: '护理房', sortNo: 40, remark: '{"text":"","defaultCapacity":2}' },
-    { itemCode: 'ROOM_SUITE', itemName: '套间', sortNo: 45, remark: '{"text":"","defaultCapacity":2}' },
-    { itemCode: 'ROOM_NURSING_STATION', itemName: '护理站', sortNo: 50, remark: '{"text":"","defaultCapacity":0}' },
-    { itemCode: 'ROOM_WATER', itemName: '开水房', sortNo: 60, remark: '{"text":"","defaultCapacity":0}' },
-    { itemCode: 'ROOM_LAUNDRY', itemName: '洗衣房', sortNo: 70, remark: '{"text":"","defaultCapacity":0}' },
-    { itemCode: 'ROOM_TOILET', itemName: '卫生间', sortNo: 80, remark: '{"text":"","defaultCapacity":0}' },
-    { itemCode: 'ROOM_BATH', itemName: '浴室', sortNo: 90, remark: '{"text":"","defaultCapacity":0}' },
-    { itemCode: 'ROOM_TREATMENT', itemName: '治疗室', sortNo: 100, remark: '{"text":"","defaultCapacity":0}' },
-    { itemCode: 'ROOM_STORAGE', itemName: '库房', sortNo: 110, remark: '{"text":"","defaultCapacity":0}' },
-    { itemCode: 'ROOM_ACTIVITY', itemName: '活动室', sortNo: 120, remark: '{"text":"","defaultCapacity":0}' },
-    { itemCode: 'ROOM_DINING', itemName: '餐厅', sortNo: 130, remark: '{"text":"","defaultCapacity":0}' }
+    { itemCode: 'ROOM_SINGLE', itemName: '单人间', sortNo: 10, remark: '{"text":"","defaultCapacity":1,"roomKind":"NORMAL"}' },
+    { itemCode: 'ROOM_DOUBLE', itemName: '双人间', sortNo: 20, remark: '{"text":"","defaultCapacity":2,"roomKind":"NORMAL"}' },
+    { itemCode: 'ROOM_TRIPLE', itemName: '三人间', sortNo: 30, remark: '{"text":"","defaultCapacity":3,"roomKind":"NORMAL"}' },
+    { itemCode: 'ROOM_CARE', itemName: '护理房', sortNo: 40, remark: '{"text":"","defaultCapacity":2,"roomKind":"NORMAL"}' },
+    { itemCode: 'ROOM_SUITE', itemName: '套间', sortNo: 45, remark: '{"text":"","defaultCapacity":2,"roomKind":"NORMAL"}' },
+    { itemCode: 'ROOM_NURSING_STATION', itemName: '护理站', sortNo: 50, remark: '{"text":"","defaultCapacity":0,"roomKind":"FUNCTIONAL"}' },
+    { itemCode: 'ROOM_WATER', itemName: '开水房', sortNo: 60, remark: '{"text":"","defaultCapacity":0,"roomKind":"FUNCTIONAL"}' },
+    { itemCode: 'ROOM_LAUNDRY', itemName: '洗衣房', sortNo: 70, remark: '{"text":"","defaultCapacity":0,"roomKind":"FUNCTIONAL"}' },
+    { itemCode: 'ROOM_TOILET', itemName: '卫生间', sortNo: 80, remark: '{"text":"","defaultCapacity":0,"roomKind":"FUNCTIONAL"}' },
+    { itemCode: 'ROOM_BATH', itemName: '浴室', sortNo: 90, remark: '{"text":"","defaultCapacity":0,"roomKind":"FUNCTIONAL"}' },
+    { itemCode: 'ROOM_TREATMENT', itemName: '治疗室', sortNo: 100, remark: '{"text":"","defaultCapacity":0,"roomKind":"FUNCTIONAL"}' },
+    { itemCode: 'ROOM_STORAGE', itemName: '库房', sortNo: 110, remark: '{"text":"","defaultCapacity":0,"roomKind":"FUNCTIONAL"}' },
+    { itemCode: 'ROOM_ACTIVITY', itemName: '活动室', sortNo: 120, remark: '{"text":"","defaultCapacity":0,"roomKind":"FUNCTIONAL"}' },
+    { itemCode: 'ROOM_DINING', itemName: '餐厅', sortNo: 130, remark: '{"text":"","defaultCapacity":0,"roomKind":"FUNCTIONAL"}' }
   ],
   ADMISSION_AREA: [
     { itemCode: 'AREA_A', itemName: 'A区', sortNo: 10 },
@@ -463,6 +470,7 @@ function openCreate() {
   form.sortNo = 0
   form.remark = ''
   roomTypeMeta.defaultCapacity = undefined
+  roomTypeMeta.roomKind = 'NORMAL'
   editorOpen.value = true
 }
 
@@ -476,6 +484,7 @@ function openEdit(row: BaseConfigItem) {
   const parsedRemark = parseConfigRemark(row.remark)
   form.remark = parsedRemark.text
   roomTypeMeta.defaultCapacity = parsedRemark.defaultCapacity
+  roomTypeMeta.roomKind = parsedRemark.roomKind
   editorOpen.value = true
 }
 
@@ -486,25 +495,27 @@ function normalizePayload(payload: BaseConfigItemPayload): BaseConfigItemPayload
     itemCode: payload.itemCode?.trim().toUpperCase() || undefined,
     status: payload.status,
     sortNo: payload.sortNo ?? 0,
-    remark: buildConfigRemark(payload.configGroup, payload.remark, roomTypeMeta.defaultCapacity)
+    remark: buildConfigRemark(payload.configGroup, payload.remark, roomTypeMeta.defaultCapacity, roomTypeMeta.roomKind)
   }
 }
 
 function parseConfigRemark(raw?: string) {
-  if (!raw) return { text: '', defaultCapacity: undefined as number | undefined }
+  if (!raw) return { text: '', defaultCapacity: undefined as number | undefined, roomKind: 'NORMAL' as 'NORMAL' | 'FUNCTIONAL' }
   try {
     const parsed = JSON.parse(raw)
     const defaultCapacity = Number(parsed?.defaultCapacity)
+    const roomKind = String(parsed?.roomKind || '').toUpperCase() === 'FUNCTIONAL' || defaultCapacity === 0 ? 'FUNCTIONAL' : 'NORMAL'
     return {
       text: String(parsed?.text || ''),
-      defaultCapacity: Number.isFinite(defaultCapacity) ? defaultCapacity : undefined
+      defaultCapacity: Number.isFinite(defaultCapacity) ? defaultCapacity : undefined,
+      roomKind
     }
   } catch {
-    return { text: raw, defaultCapacity: undefined }
+    return { text: raw, defaultCapacity: undefined, roomKind: 'NORMAL' as 'NORMAL' | 'FUNCTIONAL' }
   }
 }
 
-function buildConfigRemark(configGroup: string, remark?: string, defaultCapacity?: number) {
+function buildConfigRemark(configGroup: string, remark?: string, defaultCapacity?: number, roomKind: 'NORMAL' | 'FUNCTIONAL' = 'NORMAL') {
   const text = (remark || '').trim()
   if (configGroup !== 'ADMISSION_ROOM_TYPE') {
     return text || undefined
@@ -514,7 +525,8 @@ function buildConfigRemark(configGroup: string, remark?: string, defaultCapacity
   }
   return JSON.stringify({
     text,
-    defaultCapacity: defaultCapacity == null ? null : defaultCapacity
+    defaultCapacity: defaultCapacity == null ? null : defaultCapacity,
+    roomKind
   })
 }
 
@@ -522,12 +534,23 @@ function displayRemark(record: BaseConfigItem) {
   const parsed = parseConfigRemark(record.remark)
   if (record.configGroup === 'ADMISSION_ROOM_TYPE') {
     const parts = [] as string[]
+    parts.push(parsed.roomKind === 'FUNCTIONAL' ? '功能房' : '普通房')
     if (parsed.defaultCapacity != null) parts.push(`默认床位数：${parsed.defaultCapacity}`)
     if (parsed.text) parts.push(parsed.text)
     return parts.join('；') || '-'
   }
   return parsed.text || '-'
 }
+
+watch(
+  () => roomTypeMeta.roomKind,
+  (roomKind) => {
+    if (form.configGroup !== 'ADMISSION_ROOM_TYPE') return
+    if (roomKind === 'FUNCTIONAL' && roomTypeMeta.defaultCapacity == null) {
+      roomTypeMeta.defaultCapacity = 0
+    }
+  }
+)
 
 function resolveGroupLabel(row: BaseConfigItem) {
   return row.configGroupLabel || groupLabelMap.value[row.configGroup] || row.configGroup

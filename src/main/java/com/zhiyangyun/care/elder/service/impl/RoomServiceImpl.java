@@ -3,10 +3,14 @@ package com.zhiyangyun.care.elder.service.impl;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zhiyangyun.care.asset.entity.Building;
 import com.zhiyangyun.care.asset.entity.Floor;
 import com.zhiyangyun.care.asset.mapper.BuildingMapper;
 import com.zhiyangyun.care.asset.mapper.FloorMapper;
+import com.zhiyangyun.care.baseconfig.entity.BaseDataItem;
+import com.zhiyangyun.care.baseconfig.mapper.BaseDataItemMapper;
 import com.zhiyangyun.care.elder.entity.Room;
 import com.zhiyangyun.care.elder.entity.Bed;
 import com.zhiyangyun.care.elder.mapper.BedMapper;
@@ -29,16 +33,24 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class RoomServiceImpl implements RoomService {
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private final RoomMapper roomMapper;
   private final BedMapper bedMapper;
   private final BuildingMapper buildingMapper;
   private final FloorMapper floorMapper;
+  private final BaseDataItemMapper baseDataItemMapper;
 
-  public RoomServiceImpl(RoomMapper roomMapper, BedMapper bedMapper, BuildingMapper buildingMapper, FloorMapper floorMapper) {
+  public RoomServiceImpl(
+      RoomMapper roomMapper,
+      BedMapper bedMapper,
+      BuildingMapper buildingMapper,
+      FloorMapper floorMapper,
+      BaseDataItemMapper baseDataItemMapper) {
     this.roomMapper = roomMapper;
     this.bedMapper = bedMapper;
     this.buildingMapper = buildingMapper;
     this.floorMapper = floorMapper;
+    this.baseDataItemMapper = baseDataItemMapper;
   }
 
   @Override
@@ -49,7 +61,7 @@ public class RoomServiceImpl implements RoomService {
       request.setRoomNo(resolveNextRoomNo(request.getTenantId(), request.getBuildingId(), request.getFloorId(), request.getFloorNo(), request.getRoomType()));
     }
     ensureRoomNoUnique(null, request.getTenantId(), request.getRoomNo());
-    Integer normalizedCapacity = normalizeCapacityByRoomType(request.getRoomType(), request.getCapacity());
+    Integer normalizedCapacity = normalizeCapacityByRoomType(request.getTenantId(), request.getRoomType(), request.getCapacity());
     String normalizedRoomType = normalizeRoomTypeByCapacity(request.getRoomType(), normalizedCapacity);
     Room room = new Room();
     room.setTenantId(request.getTenantId());
@@ -87,7 +99,7 @@ public class RoomServiceImpl implements RoomService {
       request.setRoomNo(room.getRoomNo());
     }
     ensureRoomNoUnique(id, request.getTenantId(), request.getRoomNo());
-    Integer normalizedCapacity = normalizeCapacityByRoomType(request.getRoomType(), request.getCapacity());
+    Integer normalizedCapacity = normalizeCapacityByRoomType(request.getTenantId(), request.getRoomType(), request.getCapacity());
     String normalizedRoomType = normalizeRoomTypeByCapacity(request.getRoomType(), normalizedCapacity);
     ensureCapacityNotLessThanOccupied(id, request.getTenantId(), normalizedCapacity);
     room.setTenantId(request.getTenantId());
@@ -281,17 +293,24 @@ public class RoomServiceImpl implements RoomService {
     }
   }
 
-  private Integer normalizeCapacityByRoomType(String roomType, Integer fallbackCapacity) {
-    Integer inferred = inferCapacityByRoomType(roomType);
+  private Integer normalizeCapacityByRoomType(Long tenantId, String roomType, Integer fallbackCapacity) {
+    Integer inferred = inferCapacityByRoomType(tenantId, roomType);
     if (inferred != null) {
       return inferred;
     }
-    return fallbackCapacity == null || fallbackCapacity <= 0 ? 1 : fallbackCapacity;
+    return fallbackCapacity == null ? 1 : fallbackCapacity;
   }
 
-  private Integer inferCapacityByRoomType(String roomType) {
+  private Integer inferCapacityByRoomType(Long tenantId, String roomType) {
     if (roomType == null || roomType.isBlank()) {
       return null;
+    }
+    RoomTypeMeta roomTypeMeta = resolveRoomTypeMeta(tenantId, roomType);
+    if (roomTypeMeta.defaultCapacity() != null) {
+      return roomTypeMeta.defaultCapacity();
+    }
+    if (roomTypeMeta.functional()) {
+      return 0;
     }
     String normalized = roomType.trim().toUpperCase();
     if ("1".equals(normalized)
@@ -323,10 +342,49 @@ public class RoomServiceImpl implements RoomService {
         || roomType.contains("洗衣房")
         || roomType.contains("卫生间")
         || roomType.contains("厕所")
-        || roomType.contains("浴室")) {
+        || roomType.contains("浴室")
+        || roomType.contains("治疗室")
+        || roomType.contains("库房")
+        || roomType.contains("活动室")
+        || roomType.contains("餐厅")
+        || normalized.contains("BATH")
+        || normalized.contains("TREATMENT")
+        || normalized.contains("STORAGE")
+        || normalized.contains("ACTIVITY")
+        || normalized.contains("DINING")) {
       return 0;
     }
     return null;
+  }
+
+  private RoomTypeMeta resolveRoomTypeMeta(Long tenantId, String roomType) {
+    if (tenantId == null || roomType == null || roomType.isBlank()) {
+      return RoomTypeMeta.EMPTY;
+    }
+    String raw = roomType.trim();
+    String normalized = raw.toUpperCase();
+    BaseDataItem item = baseDataItemMapper.selectOne(Wrappers.lambdaQuery(BaseDataItem.class)
+        .eq(BaseDataItem::getIsDeleted, 0)
+        .eq(BaseDataItem::getTenantId, tenantId)
+        .eq(BaseDataItem::getConfigGroup, "ADMISSION_ROOM_TYPE")
+        .and(wrapper -> wrapper.eq(BaseDataItem::getItemCode, raw)
+            .or()
+            .eq(BaseDataItem::getItemCode, normalized)
+            .or()
+            .eq(BaseDataItem::getItemName, raw))
+        .last("LIMIT 1"));
+    if (item == null || item.getRemark() == null || item.getRemark().isBlank()) {
+      return RoomTypeMeta.EMPTY;
+    }
+    try {
+      JsonNode node = OBJECT_MAPPER.readTree(item.getRemark());
+      Integer defaultCapacity = node.hasNonNull("defaultCapacity") ? node.get("defaultCapacity").asInt() : null;
+      String roomKind = node.path("roomKind").asText("");
+      boolean functional = "FUNCTIONAL".equalsIgnoreCase(roomKind) || Integer.valueOf(0).equals(defaultCapacity);
+      return new RoomTypeMeta(defaultCapacity, functional);
+    } catch (Exception ex) {
+      return RoomTypeMeta.EMPTY;
+    }
   }
 
   private String normalizeRoomTypeByCapacity(String roomType, Integer capacity) {
@@ -588,5 +646,9 @@ public class RoomServiceImpl implements RoomService {
       }
     }
     return null;
+  }
+
+  private record RoomTypeMeta(Integer defaultCapacity, boolean functional) {
+    private static final RoomTypeMeta EMPTY = new RoomTypeMeta(null, false);
   }
 }

@@ -776,12 +776,35 @@ function matchMatrixFilter(bed: BedItem) {
 function isFunctionalRoomType(roomType?: string) {
   const raw = String(roomType || '').trim()
   if (!raw) return false
+  const normalized = raw.toUpperCase()
+  const matched = roomTypeItems.value.find((item) => item.itemCode === raw || item.itemName === raw || item.itemCode === normalized)
+  if (matched) {
+    const meta = parseRoomTypeMeta(matched.remark)
+    if (meta.roomKind === 'FUNCTIONAL') return true
+    if (meta.roomKind === 'NORMAL') return false
+    if (meta.defaultCapacity === 0) return true
+  }
   const label = `${raw} ${roomTypeNameMap.value[raw] || ''}`.toUpperCase()
   return [
     '护理站', '开水房', '洗衣房', '卫生间', '厕所', '浴室', '沐浴', '治疗室', '库房', '活动室', '餐厅',
     'NURSING', 'WATER', 'LAUNDRY', 'TOILET', 'WC', 'BATH', 'TREATMENT', 'STORAGE', 'ACTIVITY', 'DINING'
   ]
     .some((keyword) => label.includes(keyword.toUpperCase()))
+}
+
+function parseRoomTypeMeta(raw?: string) {
+  if (!raw) return { defaultCapacity: undefined as number | undefined, roomKind: undefined as 'NORMAL' | 'FUNCTIONAL' | undefined }
+  try {
+    const parsed = JSON.parse(raw)
+    const capacity = Number(parsed?.defaultCapacity)
+    const roomKind = String(parsed?.roomKind || '').toUpperCase()
+    return {
+      defaultCapacity: Number.isFinite(capacity) ? capacity : undefined,
+      roomKind: roomKind === 'FUNCTIONAL' || roomKind === 'NORMAL' ? roomKind : undefined
+    }
+  } catch {
+    return { defaultCapacity: undefined as number | undefined, roomKind: undefined as 'NORMAL' | 'FUNCTIONAL' | undefined }
+  }
 }
 
 function resolveFunctionalRoomIcon(roomType?: string) {
