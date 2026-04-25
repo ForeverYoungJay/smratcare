@@ -136,6 +136,9 @@
             <a-radio value="FUNCTIONAL">功能房</a-radio>
           </a-radio-group>
         </a-form-item>
+        <a-form-item v-if="form.configGroup === 'ADMISSION_ROOM_TYPE' && roomTypeMeta.roomKind === 'FUNCTIONAL'" label="功能码">
+          <a-input :value="autoFunctionalRoomCodePreview" disabled placeholder="系统自动生成" />
+        </a-form-item>
         <a-form-item v-if="form.configGroup === 'ADMISSION_ROOM_TYPE'" label="默认床位数">
           <a-input-number v-model:value="roomTypeMeta.defaultCapacity" :min="0" :max="20" style="width: 100%" />
         </a-form-item>
@@ -275,9 +278,10 @@ const form = reactive<BaseConfigItemPayload>({
   sortNo: 0,
   remark: ''
 })
-const roomTypeMeta = reactive<{ defaultCapacity?: number; roomKind: 'NORMAL' | 'FUNCTIONAL' }>({
+const roomTypeMeta = reactive<{ defaultCapacity?: number; roomKind: 'NORMAL' | 'FUNCTIONAL'; roomCode?: string }>({
   defaultCapacity: undefined,
-  roomKind: 'NORMAL'
+  roomKind: 'NORMAL',
+  roomCode: undefined
 })
 
 const rules: FormRules = {
@@ -401,6 +405,10 @@ const autoItemCodePreview = computed(() => {
   const ascii = name.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').toUpperCase()
   return ascii || '系统自动生成'
 })
+const autoFunctionalRoomCodePreview = computed(() => {
+  if (roomTypeMeta.roomKind !== 'FUNCTIONAL') return '-'
+  return roomTypeMeta.roomCode || presetFunctionalRoomCode(String(form.itemName || '').trim()) || '系统自动生成'
+})
 const currentPageEnabledCount = computed(() => rows.value.filter((item) => Number(item.status) === 1).length)
 const currentPageDisabledCount = computed(() => rows.value.filter((item) => Number(item.status) !== 1).length)
 const filterSummaryTags = computed(() => {
@@ -471,6 +479,7 @@ function openCreate() {
   form.remark = ''
   roomTypeMeta.defaultCapacity = undefined
   roomTypeMeta.roomKind = 'NORMAL'
+  roomTypeMeta.roomCode = undefined
   editorOpen.value = true
 }
 
@@ -485,6 +494,7 @@ function openEdit(row: BaseConfigItem) {
   form.remark = parsedRemark.text
   roomTypeMeta.defaultCapacity = parsedRemark.defaultCapacity
   roomTypeMeta.roomKind = parsedRemark.roomKind
+  roomTypeMeta.roomCode = parsedRemark.roomCode
   editorOpen.value = true
 }
 
@@ -500,7 +510,7 @@ function normalizePayload(payload: BaseConfigItemPayload): BaseConfigItemPayload
 }
 
 function parseConfigRemark(raw?: string) {
-  if (!raw) return { text: '', defaultCapacity: undefined as number | undefined, roomKind: 'NORMAL' as 'NORMAL' | 'FUNCTIONAL' }
+  if (!raw) return { text: '', defaultCapacity: undefined as number | undefined, roomKind: 'NORMAL' as 'NORMAL' | 'FUNCTIONAL', roomCode: undefined as string | undefined }
   try {
     const parsed = JSON.parse(raw)
     const defaultCapacity = Number(parsed?.defaultCapacity)
@@ -508,10 +518,11 @@ function parseConfigRemark(raw?: string) {
     return {
       text: String(parsed?.text || ''),
       defaultCapacity: Number.isFinite(defaultCapacity) ? defaultCapacity : undefined,
-      roomKind
+      roomKind,
+      roomCode: String(parsed?.roomCode || '').trim() || undefined
     }
   } catch {
-    return { text: raw, defaultCapacity: undefined, roomKind: 'NORMAL' as 'NORMAL' | 'FUNCTIONAL' }
+    return { text: raw, defaultCapacity: undefined, roomKind: 'NORMAL' as 'NORMAL' | 'FUNCTIONAL', roomCode: undefined as string | undefined }
   }
 }
 
@@ -535,11 +546,27 @@ function displayRemark(record: BaseConfigItem) {
   if (record.configGroup === 'ADMISSION_ROOM_TYPE') {
     const parts = [] as string[]
     parts.push(parsed.roomKind === 'FUNCTIONAL' ? '功能房' : '普通房')
+    if (parsed.roomCode) parts.push(`功能码：${parsed.roomCode}`)
     if (parsed.defaultCapacity != null) parts.push(`默认床位数：${parsed.defaultCapacity}`)
     if (parsed.text) parts.push(parsed.text)
     return parts.join('；') || '-'
   }
   return parsed.text || '-'
+}
+
+function presetFunctionalRoomCode(name: string) {
+  const map: Record<string, string> = {
+    护理站: 'N',
+    开水房: 'W',
+    洗衣房: 'L',
+    卫生间: 'T',
+    浴室: 'B',
+    治疗室: 'Z',
+    库房: 'K',
+    活动室: 'H',
+    餐厅: 'C'
+  }
+  return map[name]
 }
 
 watch(
@@ -548,6 +575,9 @@ watch(
     if (form.configGroup !== 'ADMISSION_ROOM_TYPE') return
     if (roomKind === 'FUNCTIONAL' && roomTypeMeta.defaultCapacity == null) {
       roomTypeMeta.defaultCapacity = 0
+    }
+    if (roomKind !== 'FUNCTIONAL') {
+      roomTypeMeta.roomCode = undefined
     }
   }
 )

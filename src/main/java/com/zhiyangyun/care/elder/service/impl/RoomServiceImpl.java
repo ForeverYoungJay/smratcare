@@ -380,11 +380,20 @@ public class RoomServiceImpl implements RoomService {
       JsonNode node = OBJECT_MAPPER.readTree(item.getRemark());
       Integer defaultCapacity = node.hasNonNull("defaultCapacity") ? node.get("defaultCapacity").asInt() : null;
       String roomKind = node.path("roomKind").asText("");
+      String roomCode = normalizeFunctionalRoomCode(node.path("roomCode").asText(""));
       boolean functional = "FUNCTIONAL".equalsIgnoreCase(roomKind) || Integer.valueOf(0).equals(defaultCapacity);
-      return new RoomTypeMeta(defaultCapacity, functional);
+      return new RoomTypeMeta(defaultCapacity, functional, roomCode);
     } catch (Exception ex) {
       return RoomTypeMeta.EMPTY;
     }
+  }
+
+  private String normalizeFunctionalRoomCode(String roomCode) {
+    if (roomCode == null || roomCode.isBlank()) {
+      return null;
+    }
+    String normalized = roomCode.trim().toUpperCase().replaceAll("[^A-Z]", "");
+    return normalized.isBlank() ? null : normalized;
   }
 
   private String normalizeRoomTypeByCapacity(String roomType, Integer capacity) {
@@ -465,7 +474,7 @@ public class RoomServiceImpl implements RoomService {
       prefixDigits = "1";
     }
     final String buildingPrefix = resolveBuildingPrefix(buildingId);
-    final String functionalCode = resolveFunctionalRoomCode(roomType);
+    final String functionalCode = resolveFunctionalRoomCode(tenantId, roomType);
     final String roomPrefix = buildingPrefix + prefixDigits + (functionalCode == null ? "" : functionalCode);
     List<Room> rooms = roomMapper.selectList(Wrappers.lambdaQuery(Room.class)
         .eq(Room::getIsDeleted, 0)
@@ -485,9 +494,13 @@ public class RoomServiceImpl implements RoomService {
     return roomPrefix + (functionalCode == null ? String.format("%02d", nextSeq) : nextSeq);
   }
 
-  private String resolveFunctionalRoomCode(String roomType) {
+  private String resolveFunctionalRoomCode(Long tenantId, String roomType) {
     if (roomType == null || roomType.isBlank()) {
       return null;
+    }
+    RoomTypeMeta roomTypeMeta = resolveRoomTypeMeta(tenantId, roomType);
+    if (roomTypeMeta.roomCode() != null) {
+      return roomTypeMeta.roomCode();
     }
     String normalized = roomType.trim().toUpperCase();
     if (normalized.contains("NURSING") || normalized.contains("STATION") || roomType.contains("护理站")) {
@@ -504,6 +517,18 @@ public class RoomServiceImpl implements RoomService {
     }
     if (normalized.contains("BATH") || roomType.contains("浴室") || roomType.contains("沐浴")) {
       return "B";
+    }
+    if (normalized.contains("TREATMENT") || roomType.contains("治疗室")) {
+      return "Z";
+    }
+    if (normalized.contains("STORAGE") || roomType.contains("库房") || roomType.contains("储物")) {
+      return "K";
+    }
+    if (normalized.contains("ACTIVITY") || roomType.contains("活动室")) {
+      return "H";
+    }
+    if (normalized.contains("DINING") || roomType.contains("餐厅") || roomType.contains("餐饮")) {
+      return "C";
     }
     return null;
   }
@@ -648,7 +673,7 @@ public class RoomServiceImpl implements RoomService {
     return null;
   }
 
-  private record RoomTypeMeta(Integer defaultCapacity, boolean functional) {
-    private static final RoomTypeMeta EMPTY = new RoomTypeMeta(null, false);
+  private record RoomTypeMeta(Integer defaultCapacity, boolean functional, String roomCode) {
+    private static final RoomTypeMeta EMPTY = new RoomTypeMeta(null, false, null);
   }
 }

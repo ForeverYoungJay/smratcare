@@ -137,7 +137,6 @@
                     <div v-if="resolveVisibleRemark(room.remark)" class="room-remark">{{ resolveVisibleRemark(room.remark) }}</div>
                     <div v-if="room.isFunctionalRoom" class="functional-room-panel">
                       <div class="functional-room-badge">{{ resolveRoomTypeLabel(room.roomType) }}</div>
-                      <div v-if="canDragFunctionalRoom(room)" class="functional-room-hint">拖动可调整本层显示顺序</div>
                     </div>
                     <div v-else class="bed-grid">
                       <button
@@ -815,6 +814,10 @@ function resolveFunctionalRoomIcon(roomType?: string) {
   if (label.includes('洗衣房') || label.includes('LAUNDRY')) return '洗'
   if (label.includes('卫生间') || label.includes('厕所') || label.includes('TOILET') || label.includes('WC')) return '卫'
   if (label.includes('浴室') || label.includes('沐浴') || label.includes('BATH')) return '浴'
+  if (label.includes('治疗室') || label.includes('TREATMENT')) return '治'
+  if (label.includes('库房') || label.includes('储物') || label.includes('STORAGE')) return '库'
+  if (label.includes('活动室') || label.includes('ACTIVITY')) return '活'
+  if (label.includes('餐厅') || label.includes('餐饮') || label.includes('DINING')) return '餐'
   return '房'
 }
 

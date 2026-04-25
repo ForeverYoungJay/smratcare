@@ -3,6 +3,8 @@ package com.zhiyangyun.care.baseconfig.service.impl;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zhiyangyun.care.baseconfig.entity.BaseDataItem;
 import com.zhiyangyun.care.baseconfig.mapper.BaseDataItemMapper;
 import com.zhiyangyun.care.baseconfig.model.BaseConfigGroup;
@@ -19,11 +21,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Locale;
 import org.springframework.stereotype.Service;
 
 @Service
 public class BaseDataItemServiceImpl implements BaseDataItemService {
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final Map<String, String> PRESET_CODE_MAP = buildPresetCodeMap();
+  private static final Map<String, String> PRESET_FUNCTION_CODE_MAP = buildPresetFunctionCodeMap();
   private final BaseDataItemMapper baseDataItemMapper;
 
   public BaseDataItemServiceImpl(BaseDataItemMapper baseDataItemMapper) {
@@ -57,7 +62,7 @@ public class BaseDataItemServiceImpl implements BaseDataItemService {
     if (!request.getTenantId().equals(item.getTenantId())) {
       throw new IllegalArgumentException("无权限访问该配置项");
     }
-    SanitizedRequest sanitized = sanitizeRequest(request, item.getItemCode(), id);
+    SanitizedRequest sanitized = sanitizeRequest(request, item.getItemCode(), id, item.getRemark());
     ensureUnique(id, request.getTenantId(), sanitized.configGroup(), sanitized.itemCode(), sanitized.itemName());
     item.setConfigGroup(sanitized.configGroup());
     item.setItemCode(sanitized.itemCode());
@@ -296,6 +301,10 @@ public class BaseDataItemServiceImpl implements BaseDataItemService {
   }
 
   private SanitizedRequest sanitizeRequest(BaseDataItemRequest request, String fallbackCode, Long excludeId) {
+    return sanitizeRequest(request, fallbackCode, excludeId, null);
+  }
+
+  private SanitizedRequest sanitizeRequest(BaseDataItemRequest request, String fallbackCode, Long excludeId, String existingRemark) {
     String configGroup = trimToNull(request.getConfigGroup());
     validateConfigGroup(configGroup);
     String itemName = trimToNull(request.getItemName());
@@ -327,7 +336,35 @@ public class BaseDataItemServiceImpl implements BaseDataItemService {
     if (remark != null && remark.length() > 255) {
       throw new IllegalArgumentException("备注长度不能超过255");
     }
+    remark = normalizeRemark(configGroup, request.getTenantId(), itemName, itemCode, remark, excludeId, existingRemark);
     return new SanitizedRequest(configGroup, itemCode, itemName, status, sortNo, remark);
+  }
+
+  private String normalizeRemark(
+      String configGroup,
+      Long tenantId,
+      String itemName,
+      String itemCode,
+      String remark,
+      Long excludeId,
+      String existingRemark) {
+    if (!"ADMISSION_ROOM_TYPE".equals(configGroup)) {
+      return remark;
+    }
+    RoomTypeRemark parsed = parseRoomTypeRemark(remark);
+    RoomTypeRemark existing = parseRoomTypeRemark(existingRemark);
+    String roomKind = parsed.roomKind() != null ? parsed.roomKind() : existing.roomKind();
+    Integer defaultCapacity = parsed.defaultCapacity() != null ? parsed.defaultCapacity() : existing.defaultCapacity();
+    if ("FUNCTIONAL".equals(roomKind)) {
+      String roomCode = firstNonBlank(parsed.roomCode(), existing.roomCode());
+      if (roomCode == null) {
+        roomCode = generateFunctionalRoomCode(tenantId, itemName, itemCode, excludeId);
+      } else {
+        roomCode = normalizeFunctionalRoomCode(roomCode);
+      }
+      return buildRoomTypeRemarkJson(parsed.text(), defaultCapacity, roomKind, roomCode);
+    }
+    return buildRoomTypeRemarkJson(parsed.text(), defaultCapacity, roomKind, null);
   }
 
   private String generateItemCode(Long tenantId, String configGroup, String itemName, Long excludeId) {
@@ -341,6 +378,135 @@ public class BaseDataItemServiceImpl implements BaseDataItemService {
     }
     String groupPrefix = buildGroupPrefix(configGroup);
     return uniqueCandidateCode(tenantId, configGroup, groupPrefix, excludeId);
+  }
+
+  private String generateFunctionalRoomCode(Long tenantId, String itemName, String itemCode, Long excludeId) {
+    String presetCode = PRESET_FUNCTION_CODE_MAP.get(buildPresetKey("ADMISSION_ROOM_TYPE", itemName));
+    if (presetCode != null && !functionalRoomCodeExists(tenantId, presetCode, excludeId)) {
+      return presetCode;
+    }
+    List<String> candidates = new ArrayList<>();
+    String itemCodeCandidate = deriveFunctionalCodeFromText(itemCode);
+    if (itemCodeCandidate != null) {
+      candidates.add(itemCodeCandidate);
+    }
+    String itemNameCandidate = deriveFunctionalCodeFromText(itemName);
+    if (itemNameCandidate != null) {
+      candidates.add(itemNameCandidate);
+    }
+    for (String candidate : candidates) {
+      String normalized = normalizeFunctionalRoomCode(candidate);
+      if (normalized != null && !functionalRoomCodeExists(tenantId, normalized, excludeId)) {
+        return normalized;
+      }
+    }
+    for (char first = 'X'; first <= 'Z'; first++) {
+      for (char second = 'A'; second <= 'Z'; second++) {
+        String candidate = "" + first + second;
+        if (!functionalRoomCodeExists(tenantId, candidate, excludeId)) {
+          return candidate;
+        }
+      }
+    }
+    throw new IllegalArgumentException("自动生成功能房编码失败，请稍后重试");
+  }
+
+  private boolean functionalRoomCodeExists(Long tenantId, String roomCode, Long excludeId) {
+    if (tenantId == null || roomCode == null) {
+      return false;
+    }
+    List<BaseDataItem> items = baseDataItemMapper.selectList(Wrappers.lambdaQuery(BaseDataItem.class)
+        .eq(BaseDataItem::getIsDeleted, 0)
+        .eq(BaseDataItem::getTenantId, tenantId)
+        .eq(BaseDataItem::getConfigGroup, "ADMISSION_ROOM_TYPE"));
+    for (BaseDataItem item : items) {
+      if (excludeId != null && excludeId.equals(item.getId())) {
+        continue;
+      }
+      RoomTypeRemark parsed = parseRoomTypeRemark(item.getRemark());
+      if ("FUNCTIONAL".equals(parsed.roomKind()) && roomCode.equals(parsed.roomCode())) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private String normalizeFunctionalRoomCode(String roomCode) {
+    String normalized = trimToNull(roomCode);
+    if (normalized == null) {
+      return null;
+    }
+    normalized = normalized.toUpperCase(Locale.ROOT).replaceAll("[^A-Z]", "");
+    if (normalized.isBlank()) {
+      return null;
+    }
+    return normalized.length() <= 3 ? normalized : normalized.substring(0, 3);
+  }
+
+  private String deriveFunctionalCodeFromText(String text) {
+    String normalized = trimToNull(text);
+    if (normalized == null) {
+      return null;
+    }
+    normalized = normalized.toUpperCase(Locale.ROOT)
+        .replace("ROOM_", "")
+        .replace("ROOM", "")
+        .replace("TYPE", "")
+        .replaceAll("[^A-Z]+", " ")
+        .trim();
+    if (normalized.isBlank()) {
+      return null;
+    }
+    String[] parts = normalized.split("\\s+");
+    StringBuilder builder = new StringBuilder();
+    for (String part : parts) {
+      if (!part.isBlank()) {
+        builder.append(part.charAt(0));
+      }
+      if (builder.length() >= 3) {
+        break;
+      }
+    }
+    if (builder.length() == 0 && !parts[0].isBlank()) {
+      builder.append(parts[0], 0, Math.min(parts[0].length(), 3));
+    }
+    return builder.toString();
+  }
+
+  private RoomTypeRemark parseRoomTypeRemark(String remark) {
+    String raw = trimToNull(remark);
+    if (raw == null) {
+      return new RoomTypeRemark("", null, null, null);
+    }
+    try {
+      JsonNode node = OBJECT_MAPPER.readTree(raw);
+      Integer defaultCapacity = node.hasNonNull("defaultCapacity") ? node.get("defaultCapacity").asInt() : null;
+      String roomKind = trimToNull(node.path("roomKind").asText(null));
+      if (roomKind != null) {
+        roomKind = roomKind.toUpperCase(Locale.ROOT);
+      } else if (Integer.valueOf(0).equals(defaultCapacity)) {
+        roomKind = "FUNCTIONAL";
+      }
+      String roomCode = normalizeFunctionalRoomCode(node.path("roomCode").asText(null));
+      return new RoomTypeRemark(trimToNull(node.path("text").asText("")), defaultCapacity, roomKind, roomCode);
+    } catch (Exception ex) {
+      return new RoomTypeRemark(raw, null, null, null);
+    }
+  }
+
+  private String buildRoomTypeRemarkJson(String text, Integer defaultCapacity, String roomKind, String roomCode) {
+    try {
+      Map<String, Object> payload = new LinkedHashMap<>();
+      payload.put("text", text == null ? "" : text);
+      payload.put("defaultCapacity", defaultCapacity);
+      payload.put("roomKind", roomKind);
+      if (roomCode != null) {
+        payload.put("roomCode", roomCode);
+      }
+      return OBJECT_MAPPER.writeValueAsString(payload);
+    } catch (Exception ex) {
+      throw new IllegalArgumentException("房间类型备注格式无效");
+    }
   }
 
   private String uniqueCandidateCode(Long tenantId, String configGroup, String baseCode, Long excludeId) {
@@ -432,6 +598,20 @@ public class BaseDataItemServiceImpl implements BaseDataItemService {
     return map;
   }
 
+  private static Map<String, String> buildPresetFunctionCodeMap() {
+    Map<String, String> map = new LinkedHashMap<>();
+    map.put(buildPresetKey("ADMISSION_ROOM_TYPE", "护理站"), "N");
+    map.put(buildPresetKey("ADMISSION_ROOM_TYPE", "开水房"), "W");
+    map.put(buildPresetKey("ADMISSION_ROOM_TYPE", "洗衣房"), "L");
+    map.put(buildPresetKey("ADMISSION_ROOM_TYPE", "卫生间"), "T");
+    map.put(buildPresetKey("ADMISSION_ROOM_TYPE", "浴室"), "B");
+    map.put(buildPresetKey("ADMISSION_ROOM_TYPE", "治疗室"), "Z");
+    map.put(buildPresetKey("ADMISSION_ROOM_TYPE", "库房"), "K");
+    map.put(buildPresetKey("ADMISSION_ROOM_TYPE", "活动室"), "H");
+    map.put(buildPresetKey("ADMISSION_ROOM_TYPE", "餐厅"), "C");
+    return map;
+  }
+
   private static String buildPresetKey(String configGroup, String itemName) {
     return (configGroup == null ? "" : configGroup.trim().toUpperCase()) + "::" + (itemName == null ? "" : itemName.trim());
   }
@@ -458,4 +638,23 @@ public class BaseDataItemServiceImpl implements BaseDataItemService {
       Integer status,
       Integer sortNo,
       String remark) {}
+
+  private record RoomTypeRemark(
+      String text,
+      Integer defaultCapacity,
+      String roomKind,
+      String roomCode) {}
+
+  private String firstNonBlank(String... values) {
+    if (values == null) {
+      return null;
+    }
+    for (String value : values) {
+      String trimmed = trimToNull(value);
+      if (trimmed != null) {
+        return trimmed;
+      }
+    }
+    return null;
+  }
 }
