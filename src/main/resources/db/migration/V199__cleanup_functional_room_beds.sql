@@ -11,12 +11,11 @@ WHERE r.is_deleted = 0
       AND item.tenant_id = r.tenant_id
       AND item.config_group = 'ADMISSION_ROOM_TYPE'
       AND (
-        item.item_code = r.room_type
-        OR UPPER(item.item_code) = UPPER(r.room_type)
-        OR item.item_name = r.room_type
+        CONVERT(item.item_code USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(r.room_type USING utf8mb4) COLLATE utf8mb4_unicode_ci
+        OR CONVERT(item.item_name USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(r.room_type USING utf8mb4) COLLATE utf8mb4_unicode_ci
       )
       AND (
-        (JSON_VALID(item.remark) = 1 AND UPPER(JSON_UNQUOTE(JSON_EXTRACT(item.remark, '$.roomKind'))) = 'FUNCTIONAL')
+        (JSON_VALID(item.remark) = 1 AND CONVERT(JSON_UNQUOTE(JSON_EXTRACT(item.remark, '$.roomKind')) USING utf8mb4) COLLATE utf8mb4_unicode_ci = 'FUNCTIONAL')
         OR (JSON_VALID(item.remark) = 1 AND JSON_EXTRACT(item.remark, '$.defaultCapacity') = 0)
       )
   );
@@ -43,12 +42,11 @@ WHERE b.is_deleted = 0
       AND item.tenant_id = r.tenant_id
       AND item.config_group = 'ADMISSION_ROOM_TYPE'
       AND (
-        item.item_code = r.room_type
-        OR UPPER(item.item_code) = UPPER(r.room_type)
-        OR item.item_name = r.room_type
+        CONVERT(item.item_code USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(r.room_type USING utf8mb4) COLLATE utf8mb4_unicode_ci
+        OR CONVERT(item.item_name USING utf8mb4) COLLATE utf8mb4_unicode_ci = CONVERT(r.room_type USING utf8mb4) COLLATE utf8mb4_unicode_ci
       )
       AND (
-        (JSON_VALID(item.remark) = 1 AND UPPER(JSON_UNQUOTE(JSON_EXTRACT(item.remark, '$.roomKind'))) = 'FUNCTIONAL')
+        (JSON_VALID(item.remark) = 1 AND CONVERT(JSON_UNQUOTE(JSON_EXTRACT(item.remark, '$.roomKind')) USING utf8mb4) COLLATE utf8mb4_unicode_ci = 'FUNCTIONAL')
         OR (JSON_VALID(item.remark) = 1 AND JSON_EXTRACT(item.remark, '$.defaultCapacity') = 0)
       )
   );
