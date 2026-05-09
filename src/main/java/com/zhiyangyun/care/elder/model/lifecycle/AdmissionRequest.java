@@ -17,6 +17,7 @@ public class AdmissionRequest {
   private BigDecimal depositAmount;
   private Long bedId;
   private LocalDate bedStartDate;
+  private String occupancyMode;
   private String remark;
   private Boolean allowMissingContractRecord;
   private Long createdBy;

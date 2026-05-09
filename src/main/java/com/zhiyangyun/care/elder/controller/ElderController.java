@@ -164,6 +164,7 @@ public class ElderController {
     Map<String, Object> context = new LinkedHashMap<>();
     context.put("bedId", request.getBedId());
     context.put("startDate", request.getStartDate());
+    context.put("occupancyMode", request.getOccupancyMode());
     auditLogService.recordStructured(
         tenantId, tenantId, AuthContext.getStaffId(), AuthContext.getUsername(),
         "BED_ASSIGN", "ELDER", id, "床位分配",

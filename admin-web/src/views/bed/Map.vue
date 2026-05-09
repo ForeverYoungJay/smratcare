@@ -131,7 +131,7 @@
                         <div v-if="room.isFunctionalRoom" class="room-function-name">{{ resolveRoomTypeLabel(room.roomType) }}</div>
                       </div>
                       <div class="room-meta" :class="{ functional: room.isFunctionalRoom }">
-                        {{ room.isFunctionalRoom ? '功能房' : `${room.occupiedBeds}/${room.totalBeds} 床 · ${room.elderCount} 人` }}
+                        {{ room.isFunctionalRoom ? '功能房' : room.wholeRoomRented ? `${room.occupiedBeds}/${room.totalBeds} 床 · 整租` : `${room.occupiedBeds}/${room.totalBeds} 床 · ${room.elderCount} 人` }}
                       </div>
                     </div>
                     <div v-if="resolveVisibleRemark(room.remark)" class="room-remark">{{ resolveVisibleRemark(room.remark) }}</div>
@@ -276,6 +276,7 @@ type RoomScene = {
   totalBeds: number
   occupiedBeds: number
   elderCount: number
+  wholeRoomRented: boolean
   isFunctionalRoom: boolean
   remark?: string
 }
@@ -427,6 +428,7 @@ const buildingScenes = computed<BuildingScene[]>(() => {
           const rooms = Array.from(roomMap.entries())
             .map(([roomNo, roomBeds]) => {
               const occupiedBeds = roomBeds.filter((bed) => isOccupiedBed(bed)).length
+              const wholeRoomRented = roomBeds.some((bed) => bed.occupancySource === 'WHOLE_ROOM')
               const firstBed = roomBeds[0]
               const matchedRoom = roomList.value.find((room) =>
                 String(room.building || '') === buildingName
@@ -446,6 +448,7 @@ const buildingScenes = computed<BuildingScene[]>(() => {
                 totalBeds: roomBeds.length,
                 occupiedBeds,
                 elderCount: roomBeds.filter((bed) => !!bed.elderId).length,
+                wholeRoomRented,
                 isFunctionalRoom,
                 remark: matchedRoom?.remark || firstBed?.roomRemark
               }
@@ -489,7 +492,8 @@ const displayBuildings = computed<BuildingScene[]>(() =>
                 beds: nextBeds,
                 totalBeds: nextBeds.length,
                 occupiedBeds: nextBeds.filter((bed) => isOccupiedBed(bed)).length,
-                elderCount: nextBeds.filter((bed) => !!bed.elderId).length
+                elderCount: nextBeds.filter((bed) => !!bed.elderId).length,
+                wholeRoomRented: nextBeds.some((bed) => bed.occupancySource === 'WHOLE_ROOM')
               }
             })
             .filter((room): room is RoomScene => room !== null)
@@ -589,6 +593,7 @@ function isIdleBed(bed: BedItem) {
 }
 
 function statusText(status?: number, elderId?: string, occupancySource?: string) {
+  if (occupancySource === 'WHOLE_ROOM') return '整租'
   if (status === 2) return '占用'
   if (status === 3) return '维修'
   if (occupancySource === 'RESERVATION') return '预定'
@@ -597,6 +602,7 @@ function statusText(status?: number, elderId?: string, occupancySource?: string)
 }
 
 function statusTag(status?: number, elderId?: string, occupancySource?: string) {
+  if (occupancySource === 'WHOLE_ROOM') return 'purple'
   if (status === 2) return 'orange'
   if (status === 3) return 'red'
   if (occupancySource === 'RESERVATION') return 'cyan'
@@ -606,6 +612,7 @@ function statusTag(status?: number, elderId?: string, occupancySource?: string) 
 
 function statusClass(status?: number, elderId?: string, occupancySource?: string) {
   if (status === 3) return 'is-maintain'
+  if (occupancySource === 'WHOLE_ROOM') return 'is-occupied'
   if (occupancySource === 'RESERVATION') return 'is-occupied'
   if (status === 2 || elderId) return 'is-occupied'
   return 'is-idle'
@@ -929,10 +936,11 @@ async function openBed(bed: BedItem) {
   elderDetail.value = null
   elderLoading.value = false
   qrDataUrl.value = await QRCode.toDataURL(bed.bedQrCode || `BED:${bed.id}`)
-  if (!bed.elderId) return
+  const occupantElderId = bed.elderId || (bed.occupancySource === 'WHOLE_ROOM' && bed.occupancyRefType === 'ELDER' ? bed.occupancyRefId : undefined)
+  if (!occupantElderId) return
   elderLoading.value = true
   try {
-    elderDetail.value = await getElderDetail(bed.elderId)
+    elderDetail.value = await getElderDetail(occupantElderId)
   } catch {
     elderDetail.value = null
     message.warning('加载老人详情失败')

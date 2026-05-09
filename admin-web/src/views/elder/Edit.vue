@@ -77,11 +77,16 @@
           </a-select>
         </a-form-item>
         <a-form-item label="床位" name="bedId">
-          <a-select v-model:value="form.bedId" allow-clear placeholder="选择床位" :disabled="form.status !== 1">
-            <a-select-option v-for="item in bedOptions" :key="item.value" :value="item.value">
-              {{ item.label }}
-            </a-select-option>
-          </a-select>
+          <a-space direction="vertical" style="width: 100%">
+            <a-select v-model:value="form.bedId" allow-clear placeholder="选择床位" :disabled="form.status !== 1">
+              <a-select-option v-for="item in bedOptions" :key="item.value" :value="item.value">
+                {{ item.label }}
+              </a-select-option>
+            </a-select>
+            <a-button v-if="hasAssignedBed" type="link" style="padding-left: 0" :disabled="form.status !== 1" @click="clearBedSelection">
+              清空当前床位
+            </a-button>
+          </a-space>
         </a-form-item>
         <a-form-item label="状态" name="status">
           <a-select v-model:value="form.status" placeholder="请选择">
@@ -170,6 +175,7 @@ const bedOptions = computed(() =>
     .filter((b) => (!b.elderId && (b.status === 1 || b.status === undefined)) || String(b.elderId || '') === currentElderId.value)
     .map((b) => ({ label: b.bedNo, value: b.id }))
 )
+const hasAssignedBed = computed(() => Boolean(form.bedId || originalBedId.value))
 
 const rules: FormRules = {
   fullName: [{ required: true, message: '请输入姓名' }],
@@ -185,6 +191,11 @@ function sourceTypeText(value?: string) {
 
 function back() {
   router.push('/elder/list')
+}
+
+function clearBedSelection() {
+  form.bedId = undefined
+  form.bedStartDate = undefined
 }
 
 async function load() {

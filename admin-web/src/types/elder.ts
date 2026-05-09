@@ -28,6 +28,8 @@ export interface ElderItem {
   bedStartDate?: string
   bedNo?: string
   roomNo?: string
+  caregiverName?: string
+  caregiverNames?: string[]
   currentBed?: BedItem
   checkInDate?: string
   diseases?: ElderDiseaseItem[]
@@ -61,6 +63,7 @@ export interface ElderCreateRequest {
 export interface ElderAssignBedRequest {
   bedId: Id
   startDate: string
+  occupancyMode?: 'BED' | 'WHOLE_ROOM' | string
 }
 
 export interface ElderUnbindRequest {
@@ -169,6 +172,7 @@ export interface AdmissionRequest {
   depositAmount?: number
   bedId?: Id
   bedStartDate?: string
+  occupancyMode?: 'BED' | 'WHOLE_ROOM' | string
   allowMissingContractRecord?: boolean
   remark?: string
 }
@@ -283,6 +287,7 @@ export interface AdmissionRecordItem {
   contractNo?: string
   admissionDate?: string
   depositAmount?: number
+  occupancyMode?: 'BED' | 'WHOLE_ROOM' | string
   remark?: string
   elderStatus?: number
   operatorName?: string

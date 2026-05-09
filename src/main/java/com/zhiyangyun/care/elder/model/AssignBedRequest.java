@@ -12,4 +12,5 @@ public class AssignBedRequest {
   private Long bedId;
   @NotNull
   private LocalDate startDate;
+  private String occupancyMode;
 }

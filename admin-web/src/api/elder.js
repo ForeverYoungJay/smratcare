@@ -14,8 +14,8 @@ export function updateElder(id, data) {
 export function deleteElder(id) {
     return request.delete(`/api/elder/${id}`);
 }
-export function assignBed(elderId, bedId, startDate) {
-    const body = { bedId, startDate };
+export function assignBed(elderId, bedId, startDate, occupancyMode) {
+    const body = { bedId, startDate, occupancyMode };
     return request.post(`/api/elder/${elderId}/assignBed`, body);
 }
 export function unbindBed(elderId, endDate, reason) {

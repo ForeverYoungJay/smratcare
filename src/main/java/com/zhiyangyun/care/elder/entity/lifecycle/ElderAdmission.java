@@ -21,6 +21,7 @@ public class ElderAdmission {
   private LocalDate admissionDate;
   private String contractNo;
   private BigDecimal depositAmount;
+  private String occupancyMode;
   private String remark;
   private String sourceType;
   private Long createdBy;

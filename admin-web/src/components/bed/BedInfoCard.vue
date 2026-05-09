@@ -3,7 +3,7 @@
     <div class="bed-card-top">
       <div>
         <div class="bed-code">{{ bed.roomNo || '-' }} / {{ bed.bedNo || '-' }}</div>
-        <div class="bed-name">{{ bed.elderName || '空床待命' }}</div>
+        <div class="bed-name">{{ displayName }}</div>
       </div>
       <div class="bed-status-chip">{{ statusMeta.label }}</div>
     </div>
@@ -52,12 +52,19 @@ const isAlert = computed(() => {
 
 const isOccupied = computed(() => props.bed.status === 2 || Boolean(props.bed.elderId))
 const isReserved = computed(() => props.bed.occupancySource === 'RESERVATION')
+const isWholeRoom = computed(() => props.bed.occupancySource === 'WHOLE_ROOM')
 const isCleaning = computed(() => props.bed.occupancySource === 'CLEANING')
 const isMaintenance = computed(() => props.bed.status === 3 || props.bed.occupancySource === 'MAINTENANCE')
+const displayName = computed(() => {
+  if (props.bed.elderName) return props.bed.elderName
+  if (isWholeRoom.value) return '整租锁定'
+  return '空床待命'
+})
 
 const statusMeta = computed(() => {
   if (isMaintenance.value) return { key: 'maintenance', label: '维修' }
   if (isCleaning.value) return { key: 'warning', label: '清洁中' }
+  if (isWholeRoom.value) return { key: 'occupied', label: '整租' }
   if (isOccupied.value) return { key: 'occupied', label: '在住' }
   if (!props.bed.elderId && isReserved.value) return { key: 'reserved', label: '预定' }
   if (!props.bed.elderId) return { key: 'idle', label: '空闲' }
@@ -70,6 +77,7 @@ const statusMeta = computed(() => {
 const stateText = computed(() => {
   if (isMaintenance.value) return '设备维护中'
   if (isCleaning.value) return '清洁与消杀执行中'
+  if (isWholeRoom.value) return '多人房整租锁定中'
   if (isReserved.value) return '床位已预留，待转入住'
   if (!isOccupied.value) return '床位空闲，可执行分配'
   if (isAlert.value) return props.bed.riskLabel || '异常监测触发'

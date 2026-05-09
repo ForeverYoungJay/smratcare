@@ -13,6 +13,7 @@ public class AdmissionRecordResponse {
   private String contractNo;
   private LocalDate admissionDate;
   private BigDecimal depositAmount;
+  private String occupancyMode;
   private String remark;
   private Integer elderStatus;
   private String elderLifecycleStatus;

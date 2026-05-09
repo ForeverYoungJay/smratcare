@@ -6,6 +6,7 @@
         <a-descriptions-item label="身份证">{{ elder?.idCardNo || '-' }}</a-descriptions-item>
         <a-descriptions-item label="床位">{{ elder?.bedNo || elder?.currentBed?.bedNo || '-' }}</a-descriptions-item>
         <a-descriptions-item label="护理等级">{{ elder?.careLevel || '-' }}</a-descriptions-item>
+        <a-descriptions-item label="护理员">{{ elder?.caregiverNames?.join('、') || elder?.caregiverName || '-' }}</a-descriptions-item>
         <a-descriptions-item label="状态">{{ statusText(elder?.status) }}</a-descriptions-item>
         <a-descriptions-item label="档案来源">{{ sourceTypeText(elder?.sourceType) }}</a-descriptions-item>
         <a-descriptions-item label="生日">{{ elder?.birthDate || '-' }}</a-descriptions-item>

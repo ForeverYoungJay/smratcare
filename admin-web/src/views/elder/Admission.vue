@@ -90,6 +90,14 @@
             </a-form-item>
           </a-col>
           <a-col :xs="24" :md="12" :xl="6">
+            <a-form-item label="入住方式" name="occupancyMode" class="compact-form-item">
+          <a-radio-group v-model:value="form.occupancyMode" button-style="solid">
+            <a-radio-button value="BED">按床位入住</a-radio-button>
+            <a-radio-button value="WHOLE_ROOM">多人房整租</a-radio-button>
+          </a-radio-group>
+            </a-form-item>
+          </a-col>
+          <a-col :xs="24" :md="12" :xl="6">
             <a-form-item label="床位" name="bedId" class="compact-form-item">
           <a-select
             v-model:value="form.bedId"
@@ -103,6 +111,7 @@
               {{ item.label }}
             </a-select-option>
           </a-select>
+          <div v-if="form.occupancyMode === 'WHOLE_ROOM'" class="compact-inline-tip">整租会保留当前房型，并自动锁定同房其他床位。</div>
             </a-form-item>
           </a-col>
           <a-col :xs="24" :xl="18">
@@ -308,7 +317,7 @@ const currentStaffDisplayName = computed(() => {
   return String(userStore.staffInfo?.username || '').trim()
 })
 const formRef = ref<FormInstance>()
-const form = reactive<AdmissionRequest>({ elderId: '' as Id, admissionDate: '', bedId: undefined, bedStartDate: undefined })
+const form = reactive<AdmissionRequest>({ elderId: '' as Id, admissionDate: '', bedId: undefined, bedStartDate: undefined, occupancyMode: 'BED' })
 const submitting = ref(false)
 const submitChecklistLoading = ref(false)
 const submitConfirmOpen = ref(false)
@@ -392,6 +401,7 @@ const bedOptions = computed(() =>
 const rules: FormRules = {
   elderId: [{ required: true, message: '请选择老人姓名' }],
   admissionDate: [{ required: true, message: '请选择收费开始日期' }],
+  occupancyMode: [{ required: true, message: '请选择入住方式' }],
   contractNo: [{ required: true, message: '请输入合同号' }]
 }
 
@@ -630,6 +640,10 @@ async function submit() {
   if (!formRef.value) return
   try {
     await formRef.value.validate()
+    if (form.occupancyMode === 'WHOLE_ROOM' && !form.bedId) {
+      message.warning('整租入住需要先选择一个主床位')
+      return
+    }
     submitting.value = true
     if (form.bedId && !form.bedStartDate) {
       form.bedStartDate = form.admissionDate || new Date().toISOString().slice(0, 10)
@@ -1161,6 +1175,13 @@ onMounted(async () => {
 
 .compact-form-item :deep(.ant-form-item-label) {
   padding-bottom: 4px;
+}
+
+.compact-inline-tip {
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .admission-summary-card {

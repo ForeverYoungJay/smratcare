@@ -20,7 +20,9 @@ import com.zhiyangyun.care.elder.model.RoomResponse;
 import com.zhiyangyun.care.elder.model.RoomSortRequest;
 import com.zhiyangyun.care.elder.service.RoomService;
 import com.zhiyangyun.care.elder.util.QrCodeUtil;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -89,6 +91,7 @@ public class RoomServiceImpl implements RoomService {
   }
 
   @Override
+  @Transactional(rollbackFor = Exception.class)
   public RoomResponse update(Long id, RoomRequest request) {
     Room room = roomMapper.selectById(id);
     if (room == null) {
@@ -118,6 +121,7 @@ public class RoomServiceImpl implements RoomService {
     applyBuildingFloor(room, request.getTenantId(), request.getBuildingId(), request.getFloorId(),
         request.getBuilding(), request.getFloorNo());
     roomMapper.updateById(room);
+    syncBedsForRoom(room, request);
     return toResponse(room);
   }
 
@@ -589,6 +593,84 @@ public class RoomServiceImpl implements RoomService {
       bed.setCreatedBy(request.getCreatedBy());
       bedMapper.insert(bed);
     }
+  }
+
+  private void syncBedsForRoom(Room room, RoomRequest request) {
+    if (room == null || room.getId() == null) {
+      return;
+    }
+    List<Bed> currentBeds = bedMapper.selectList(Wrappers.lambdaQuery(Bed.class)
+        .eq(Bed::getIsDeleted, 0)
+        .eq(Bed::getTenantId, room.getTenantId())
+        .eq(Bed::getRoomId, room.getId()))
+        .stream()
+        .sorted(Comparator
+            .comparing((Bed bed) -> bed.getCreateTime() == null ? LocalDateTime.MIN : bed.getCreateTime())
+            .thenComparing(Bed::getId, Comparator.nullsLast(Long::compareTo)))
+        .toList();
+    int targetCapacity = room.getCapacity() == null ? 0 : Math.max(room.getCapacity(), 0);
+    List<Bed> retainedBeds = new ArrayList<>(currentBeds);
+    int removableCount = retainedBeds.size() - targetCapacity;
+    if (removableCount > 0) {
+      List<Bed> removableBeds = retainedBeds.stream()
+          .filter(this::canRemoveBedForRoomSync)
+          .sorted(Comparator
+              .comparing((Bed bed) -> bed.getCreateTime() == null ? LocalDateTime.MIN : bed.getCreateTime())
+              .thenComparing(Bed::getId, Comparator.nullsLast(Long::compareTo))
+              .reversed())
+          .limit(removableCount)
+          .toList();
+      if (removableBeds.size() < removableCount) {
+        throw new IllegalArgumentException("当前房间仍有已占用床位，无法调整到目标床位数");
+      }
+      LocalDateTime releasedAt = LocalDateTime.now();
+      for (Bed bed : removableBeds) {
+        bed.setIsDeleted(1);
+        bed.setElderId(null);
+        bed.setStatus(1);
+        bed.setOccupancySource(null);
+        bed.setOccupancyRefType(null);
+        bed.setOccupancyRefId(null);
+        bed.setLockExpiresAt(null);
+        bed.setOccupancyNote(null);
+        bed.setLastReleaseReason("房间容量调整");
+        bed.setLastReleasedAt(releasedAt);
+        bedMapper.updateById(bed);
+      }
+      retainedBeds.removeIf(bed -> removableBeds.stream().anyMatch(item -> Objects.equals(item.getId(), bed.getId())));
+    }
+
+    for (int i = 0; i < retainedBeds.size(); i++) {
+      Bed bed = retainedBeds.get(i);
+      String expectedBedNo = buildInitialBedNo(room.getRoomNo(), i + 1);
+      if (!Objects.equals(expectedBedNo, bed.getBedNo())) {
+        bed.setBedNo(expectedBedNo);
+        bedMapper.updateById(bed);
+      }
+    }
+
+    for (int i = retainedBeds.size() + 1; i <= targetCapacity; i++) {
+      Bed bed = new Bed();
+      bed.setTenantId(room.getTenantId());
+      bed.setOrgId(room.getOrgId());
+      bed.setRoomId(room.getId());
+      bed.setBedNo(buildInitialBedNo(room.getRoomNo(), i));
+      bed.setBedQrCode(QrCodeUtil.generate());
+      bed.setStatus(1);
+      bed.setCreatedBy(request.getCreatedBy() != null ? request.getCreatedBy() : room.getCreatedBy());
+      bedMapper.insert(bed);
+    }
+  }
+
+  private boolean canRemoveBedForRoomSync(Bed bed) {
+    if (bed == null) {
+      return false;
+    }
+    if (bed.getElderId() != null) {
+      return false;
+    }
+    Integer status = bed.getStatus();
+    return status == null || status == 1 || status == 0;
   }
 
   private String buildInitialBedNo(String roomNo, int index) {

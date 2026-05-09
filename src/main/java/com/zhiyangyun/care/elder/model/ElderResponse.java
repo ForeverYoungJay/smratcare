@@ -33,5 +33,7 @@ public class ElderResponse {
   private String historicalContractFileUrl;
   private String lifecycleStage;
   private String lifecycleContractStatus;
+  private String caregiverName;
+  private java.util.List<String> caregiverNames;
   private BedResponse currentBed;
 }

@@ -58,6 +58,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class ElderLifecycleServiceImpl implements ElderLifecycleService {
   private static final String SOURCE_TYPE_MARKETING_CONTRACT = "MARKETING_CONTRACT";
   private static final String SOURCE_TYPE_HISTORICAL_IMPORT = "HISTORICAL_IMPORT";
+  private static final String OCCUPANCY_MODE_BED = "BED";
+  private static final String OCCUPANCY_MODE_WHOLE_ROOM = "WHOLE_ROOM";
   private final ElderAdmissionMapper admissionMapper;
   private final ElderDischargeMapper dischargeMapper;
   private final ElderChangeLogMapper changeLogMapper;
@@ -116,6 +118,10 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
     backfillElderTenantScope(elder, request.getTenantId(), request.getOrgId());
     String normalizedContractNo = request.getContractNo() == null ? null : request.getContractNo().trim();
     request.setContractNo(normalizedContractNo);
+    String occupancyMode = normalizeOccupancyMode(request.getOccupancyMode());
+    if (OCCUPANCY_MODE_WHOLE_ROOM.equals(occupancyMode) && request.getBedId() == null) {
+      throw new IllegalStateException("整租入住必须选择主床位");
+    }
     CrmContract contract = validateAdmissionContractGuard(request, elder);
     ElderAdmission admission = new ElderAdmission();
     admission.setTenantId(request.getTenantId());
@@ -124,6 +130,7 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
     admission.setAdmissionDate(request.getAdmissionDate());
     admission.setContractNo(normalizedContractNo);
     admission.setDepositAmount(request.getDepositAmount());
+    admission.setOccupancyMode(occupancyMode);
     admission.setRemark(request.getRemark());
     admission.setSourceType(Boolean.TRUE.equals(request.getAllowMissingContractRecord())
         ? SOURCE_TYPE_HISTORICAL_IMPORT
@@ -176,6 +183,7 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
       assign.setTenantId(request.getTenantId());
       assign.setCreatedBy(request.getCreatedBy());
       assign.setBedId(request.getBedId());
+      assign.setOccupancyMode(admission.getOccupancyMode());
       LocalDate startDate = request.getBedStartDate();
       if (startDate == null) {
         startDate = request.getAdmissionDate() == null ? LocalDate.now() : request.getAdmissionDate();
@@ -205,8 +213,20 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
     response.setAdmissionDate(admission.getAdmissionDate());
     response.setContractNo(admission.getContractNo());
     response.setDepositAmount(admission.getDepositAmount());
+    response.setOccupancyMode(admission.getOccupancyMode());
     response.setRemark(admission.getRemark());
     return response;
+  }
+
+  private String normalizeOccupancyMode(String occupancyMode) {
+    if (occupancyMode == null || occupancyMode.isBlank()) {
+      return OCCUPANCY_MODE_BED;
+    }
+    String normalized = occupancyMode.trim().toUpperCase();
+    if (OCCUPANCY_MODE_WHOLE_ROOM.equals(normalized)) {
+      return OCCUPANCY_MODE_WHOLE_ROOM;
+    }
+    return OCCUPANCY_MODE_BED;
   }
 
   private CrmContract validateAdmissionContractGuard(AdmissionRequest request, ElderProfile elder) {
@@ -664,6 +684,7 @@ public class ElderLifecycleServiceImpl implements ElderLifecycleService {
       response.setContractNo(item.getContractNo());
       response.setAdmissionDate(item.getAdmissionDate());
       response.setDepositAmount(item.getDepositAmount());
+      response.setOccupancyMode(item.getOccupancyMode());
       response.setRemark(item.getRemark());
       response.setCreateTime(item.getCreateTime());
       ElderProfile elder = elderMap.get(item.getElderId());

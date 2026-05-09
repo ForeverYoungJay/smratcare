@@ -3,6 +3,8 @@ package com.zhiyangyun.care.elder.service.impl;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.zhiyangyun.care.auth.entity.StaffAccount;
+import com.zhiyangyun.care.auth.mapper.StaffMapper;
 import com.zhiyangyun.care.crm.entity.CrmContract;
 import com.zhiyangyun.care.crm.mapper.CrmContractMapper;
 import com.zhiyangyun.care.elder.entity.Bed;
@@ -31,11 +33,14 @@ import com.zhiyangyun.care.elder.service.ElderLifecycleStateService;
 import com.zhiyangyun.care.elder.service.ElderOccupancyService;
 import com.zhiyangyun.care.elder.service.ElderService;
 import com.zhiyangyun.care.elder.util.QrCodeUtil;
+import com.zhiyangyun.care.nursing.entity.ServicePlan;
+import com.zhiyangyun.care.nursing.mapper.ServicePlanMapper;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -56,6 +61,10 @@ public class ElderServiceImpl implements ElderService {
   private static final String ELDER_NAME_PINYIN_INITIAL = "ABCDEFGHJKLMNOPQRSTWXYZ";
   private static final String SOURCE_TYPE_MARKETING_CONTRACT = "MARKETING_CONTRACT";
   private static final String SOURCE_TYPE_HISTORICAL_IMPORT = "HISTORICAL_IMPORT";
+  private static final String OCCUPANCY_MODE_BED = "BED";
+  private static final String OCCUPANCY_MODE_WHOLE_ROOM = "WHOLE_ROOM";
+  private static final String OCCUPANCY_SOURCE_WHOLE_ROOM = "WHOLE_ROOM";
+  private static final String OCCUPANCY_REF_TYPE_ELDER = "ELDER";
   private static final String[] ELDER_PAGE_COLUMNS = {
       "id", "tenant_id", "org_id", "elder_code", "elder_qr_code", "full_name", "id_card_no",
       "gender", "birth_date", "phone", "home_address", "medical_insurance_copy_url",
@@ -87,6 +96,8 @@ public class ElderServiceImpl implements ElderService {
   private final ElderChangeLogMapper changeLogMapper;
   private final CrmContractMapper crmContractMapper;
   private final ElderAdmissionMapper admissionMapper;
+  private final ServicePlanMapper servicePlanMapper;
+  private final StaffMapper staffMapper;
   private final ElderLifecycleStateService elderLifecycleStateService;
   private final ElderOccupancyService elderOccupancyService;
 
@@ -94,6 +105,7 @@ public class ElderServiceImpl implements ElderService {
       ElderBedRelationMapper relationMapper, ElderFamilyMapper elderFamilyMapper,
       RoomMapper roomMapper, ElderChangeLogMapper changeLogMapper,
       CrmContractMapper crmContractMapper, ElderAdmissionMapper admissionMapper,
+      ServicePlanMapper servicePlanMapper, StaffMapper staffMapper,
       ElderLifecycleStateService elderLifecycleStateService,
       ElderOccupancyService elderOccupancyService) {
     this.elderMapper = elderMapper;
@@ -104,6 +116,8 @@ public class ElderServiceImpl implements ElderService {
     this.changeLogMapper = changeLogMapper;
     this.crmContractMapper = crmContractMapper;
     this.admissionMapper = admissionMapper;
+    this.servicePlanMapper = servicePlanMapper;
+    this.staffMapper = staffMapper;
     this.elderLifecycleStateService = elderLifecycleStateService;
     this.elderOccupancyService = elderOccupancyService;
   }
@@ -345,6 +359,7 @@ public class ElderServiceImpl implements ElderService {
     applyLifecycleFromContract(response, contract);
     applyLifecycleFromAdmission(response, admission, contract);
     applySourceType(response, contract, admission);
+    applyCaregiverInfo(response, elder);
     return response;
   }
 
@@ -972,6 +987,7 @@ public class ElderServiceImpl implements ElderService {
         .eq(Bed::getIsDeleted, 0));
     com.zhiyangyun.care.elder.entity.Room room = roomMapper.selectById(bed.getRoomId());
     ElderBedRelation elderActive = findActiveRelationByElderForUpdate(elder.getTenantId(), elder.getOrgId(), elder.getId());
+    String effectiveOccupancyMode = resolveEffectiveOccupancyMode(elder, request, elderActive);
     boolean sameRoomTransfer = false;
     if (elderActive != null && elderActive.getBedId() != null) {
       Bed currentBed = elder.getBedId() != null && elder.getBedId().equals(elderActive.getBedId())
@@ -987,8 +1003,12 @@ public class ElderServiceImpl implements ElderService {
     if (room != null && room.getCapacity() != null && occupied >= room.getCapacity()) {
       throw new IllegalStateException("Room capacity exceeded");
     }
+    if (OCCUPANCY_MODE_WHOLE_ROOM.equals(effectiveOccupancyMode)) {
+      ensureWholeRoomAvailable(elder, room, bed);
+    }
     LocalDate relationStartDate = request.getStartDate() == null ? LocalDate.now() : request.getStartDate();
     ElderBedRelation bedActive = findActiveRelationByBedForUpdate(elder.getTenantId(), elder.getOrgId(), bed.getId());
+    boolean targetLockedBySameWholeRoom = isWholeRoomLockForElder(bed, elder.getId());
     if (bedActive != null && bedActive.getElderId() != null && bedActive.getElderId().equals(elder.getId())
         && Objects.equals(elder.getBedId(), bed.getId())
         && Objects.equals(bed.getElderId(), elder.getId())) {
@@ -1004,7 +1024,10 @@ public class ElderServiceImpl implements ElderService {
     if (bed.getElderId() != null && !bed.getElderId().equals(elder.getId())) {
       throw new IllegalStateException("Bed already assigned");
     }
-    if (bed.getStatus() != null && bed.getStatus() != BedStatus.AVAILABLE && !Objects.equals(bed.getElderId(), elder.getId())) {
+    if (bed.getStatus() != null
+        && bed.getStatus() != BedStatus.AVAILABLE
+        && !Objects.equals(bed.getElderId(), elder.getId())
+        && !targetLockedBySameWholeRoom) {
       throw new IllegalStateException("Bed is not available");
     }
     if (elderActive != null) {
@@ -1022,7 +1045,11 @@ public class ElderServiceImpl implements ElderService {
       relationMapper.updateById(elderActive);
 
       Bed oldBed = findBedForUpdate(elderActive.getBedId());
-      if (oldBed != null && Objects.equals(oldBed.getElderId(), elder.getId())) {
+      if (oldBed != null
+          && !Objects.equals(oldBed.getId(), bed.getId())
+          && (Objects.equals(oldBed.getElderId(), elder.getId())
+              || oldBed.getElderId() == null
+              || Objects.equals(oldBed.getOccupancyRefId(), elderActive.getId()))) {
         oldBed.setElderId(null);
         oldBed.setStatus(BedStatus.AVAILABLE);
         oldBed.setOccupancySource(null);
@@ -1034,6 +1061,7 @@ public class ElderServiceImpl implements ElderService {
         oldBed.setLastReleasedAt(LocalDateTime.now());
         bedMapper.updateById(oldBed);
       }
+      releaseWholeRoomLocks(elder.getTenantId(), elder.getOrgId(), elder.getId(), oldBed == null ? null : oldBed.getRoomId(), bed.getId(), "调床释放");
     }
 
     ElderBedRelation relation = new ElderBedRelation();
@@ -1056,8 +1084,11 @@ public class ElderServiceImpl implements ElderService {
     bed.setOccupancyRefType("ELDER_BED_RELATION");
     bed.setOccupancyRefId(relation.getId());
     bed.setLockExpiresAt(null);
-    bed.setOccupancyNote(elder.getFullName() == null ? "长者在住" : "长者在住：" + elder.getFullName());
+    bed.setOccupancyNote(buildPrimaryBedOccupancyNote(elder.getFullName(), effectiveOccupancyMode));
     bedMapper.updateById(bed);
+    if (OCCUPANCY_MODE_WHOLE_ROOM.equals(effectiveOccupancyMode)) {
+      lockWholeRoomBeds(elder, room, bed.getId());
+    }
 
     elder.setBedId(bed.getId());
     if (elder.getStatus() == null || elder.getStatus() == ElderStatus.DISCHARGED) {
@@ -1078,6 +1109,160 @@ public class ElderServiceImpl implements ElderService {
         "BED_CHANGE", elderActive == null || Objects.equals(elderActive.getBedId(), bed.getId()) ? null : String.valueOf(elderActive.getBedId()),
         String.valueOf(bed.getId()), elderActive == null ? "床位分配" : "调床");
     return toResponse(elder, bed);
+  }
+
+  private String resolveEffectiveOccupancyMode(ElderProfile elder, AssignBedRequest request, ElderBedRelation elderActive) {
+    String requested = normalizeOccupancyMode(request == null ? null : request.getOccupancyMode());
+    if (requested != null) {
+      return requested;
+    }
+    if (elder == null || elder.getId() == null) {
+      return OCCUPANCY_MODE_BED;
+    }
+    Long roomId = null;
+    if (elderActive != null && elderActive.getBedId() != null) {
+      Bed activeBed = findBedForUpdate(elderActive.getBedId());
+      roomId = activeBed == null ? null : activeBed.getRoomId();
+    }
+    if (hasWholeRoomLocks(elder.getTenantId(), elder.getOrgId(), elder.getId(), roomId)) {
+      return OCCUPANCY_MODE_WHOLE_ROOM;
+    }
+    return OCCUPANCY_MODE_BED;
+  }
+
+  private String normalizeOccupancyMode(String occupancyMode) {
+    if (occupancyMode == null || occupancyMode.isBlank()) {
+      return null;
+    }
+    String normalized = occupancyMode.trim().toUpperCase();
+    if (OCCUPANCY_MODE_WHOLE_ROOM.equals(normalized)) {
+      return OCCUPANCY_MODE_WHOLE_ROOM;
+    }
+    return OCCUPANCY_MODE_BED;
+  }
+
+  private boolean hasWholeRoomLocks(Long tenantId, Long orgId, Long elderId, Long roomId) {
+    return bedMapper.selectCount(Wrappers.lambdaQuery(Bed.class)
+        .eq(Bed::getIsDeleted, 0)
+        .eq(tenantId != null, Bed::getTenantId, tenantId)
+        .eq(orgId != null, Bed::getOrgId, orgId)
+        .eq(roomId != null, Bed::getRoomId, roomId)
+        .eq(Bed::getOccupancySource, OCCUPANCY_SOURCE_WHOLE_ROOM)
+        .eq(Bed::getOccupancyRefType, OCCUPANCY_REF_TYPE_ELDER)
+        .eq(Bed::getOccupancyRefId, elderId)) > 0;
+  }
+
+  private boolean isWholeRoomLockForElder(Bed bed, Long elderId) {
+    return bed != null
+        && elderId != null
+        && OCCUPANCY_SOURCE_WHOLE_ROOM.equalsIgnoreCase(String.valueOf(bed.getOccupancySource()))
+        && OCCUPANCY_REF_TYPE_ELDER.equalsIgnoreCase(String.valueOf(bed.getOccupancyRefType()))
+        && Objects.equals(bed.getOccupancyRefId(), elderId);
+  }
+
+  private void ensureWholeRoomAvailable(ElderProfile elder, com.zhiyangyun.care.elder.entity.Room room, Bed targetBed) {
+    if (elder == null || room == null || room.getId() == null || targetBed == null) {
+      return;
+    }
+    List<Bed> roomBeds = bedMapper.selectList(Wrappers.lambdaQuery(Bed.class)
+        .eq(Bed::getIsDeleted, 0)
+        .eq(Bed::getTenantId, elder.getTenantId())
+        .eq(Bed::getRoomId, room.getId()));
+    for (Bed roomBed : roomBeds) {
+      if (roomBed == null || Objects.equals(roomBed.getId(), targetBed.getId())) {
+        continue;
+      }
+      ElderBedRelation activeRelation = findActiveRelationByBedForUpdate(elder.getTenantId(), elder.getOrgId(), roomBed.getId());
+      Long occupiedElderId = activeRelation == null ? roomBed.getElderId() : activeRelation.getElderId();
+      if (occupiedElderId != null && !Objects.equals(occupiedElderId, elder.getId())) {
+        throw new IllegalStateException("当前房间已有其他老人入住，不能整租");
+      }
+      if (!isWholeRoomLockForElder(roomBed, elder.getId())
+          && roomBed.getOccupancySource() != null
+          && ("RESERVATION".equalsIgnoreCase(roomBed.getOccupancySource())
+              || "CLEANING".equalsIgnoreCase(roomBed.getOccupancySource())
+              || "MAINTENANCE".equalsIgnoreCase(roomBed.getOccupancySource()))) {
+        throw new IllegalStateException("当前房间存在被占用或锁定的床位，不能整租");
+      }
+      if (roomBed.getStatus() != null
+          && roomBed.getStatus() != BedStatus.AVAILABLE
+          && !isWholeRoomLockForElder(roomBed, elder.getId())
+          && occupiedElderId == null) {
+        throw new IllegalStateException("当前房间存在不可用床位，不能整租");
+      }
+    }
+  }
+
+  private void lockWholeRoomBeds(ElderProfile elder, com.zhiyangyun.care.elder.entity.Room room, Long primaryBedId) {
+    if (elder == null || elder.getId() == null || room == null || room.getId() == null) {
+      return;
+    }
+    List<Bed> roomBeds = bedMapper.selectList(Wrappers.lambdaQuery(Bed.class)
+        .eq(Bed::getIsDeleted, 0)
+        .eq(Bed::getTenantId, elder.getTenantId())
+        .eq(Bed::getRoomId, room.getId()));
+    for (Bed roomBed : roomBeds) {
+      if (roomBed == null || Objects.equals(roomBed.getId(), primaryBedId)) {
+        continue;
+      }
+      roomBed.setElderId(null);
+      roomBed.setStatus(BedStatus.OCCUPIED);
+      roomBed.setOccupancySource(OCCUPANCY_SOURCE_WHOLE_ROOM);
+      roomBed.setOccupancyRefType(OCCUPANCY_REF_TYPE_ELDER);
+      roomBed.setOccupancyRefId(elder.getId());
+      roomBed.setLockExpiresAt(null);
+      roomBed.setOccupancyNote(buildWholeRoomOccupancyNote(elder.getFullName(), room.getRoomNo()));
+      roomBed.setLastReleaseReason(null);
+      roomBed.setLastReleasedAt(null);
+      bedMapper.updateById(roomBed);
+    }
+  }
+
+  private void releaseWholeRoomLocks(Long tenantId, Long orgId, Long elderId, Long roomId, Long excludeBedId, String reason) {
+    if (elderId == null) {
+      return;
+    }
+    List<Bed> lockedBeds = bedMapper.selectList(Wrappers.lambdaQuery(Bed.class)
+        .eq(Bed::getIsDeleted, 0)
+        .eq(tenantId != null, Bed::getTenantId, tenantId)
+        .eq(orgId != null, Bed::getOrgId, orgId)
+        .eq(roomId != null, Bed::getRoomId, roomId)
+        .eq(Bed::getOccupancySource, OCCUPANCY_SOURCE_WHOLE_ROOM)
+        .eq(Bed::getOccupancyRefType, OCCUPANCY_REF_TYPE_ELDER)
+        .eq(Bed::getOccupancyRefId, elderId));
+    if (lockedBeds.isEmpty()) {
+      return;
+    }
+    LocalDateTime releasedAt = LocalDateTime.now();
+    for (Bed lockedBed : lockedBeds) {
+      if (excludeBedId != null && Objects.equals(lockedBed.getId(), excludeBedId)) {
+        continue;
+      }
+      lockedBed.setElderId(null);
+      lockedBed.setStatus(BedStatus.AVAILABLE);
+      lockedBed.setOccupancySource(null);
+      lockedBed.setOccupancyRefType(null);
+      lockedBed.setOccupancyRefId(null);
+      lockedBed.setLockExpiresAt(null);
+      lockedBed.setOccupancyNote(null);
+      lockedBed.setLastReleaseReason(reason);
+      lockedBed.setLastReleasedAt(releasedAt);
+      bedMapper.updateById(lockedBed);
+    }
+  }
+
+  private String buildPrimaryBedOccupancyNote(String elderName, String occupancyMode) {
+    String normalizedName = elderName == null || elderName.isBlank() ? "长者" : elderName.trim();
+    if (OCCUPANCY_MODE_WHOLE_ROOM.equals(occupancyMode)) {
+      return "整租主床：" + normalizedName;
+    }
+    return "长者在住：" + normalizedName;
+  }
+
+  private String buildWholeRoomOccupancyNote(String elderName, String roomNo) {
+    String normalizedName = elderName == null || elderName.isBlank() ? "长者" : elderName.trim();
+    String normalizedRoomNo = roomNo == null || roomNo.isBlank() ? "该房间" : roomNo.trim();
+    return "整租锁定：" + normalizedName + "（" + normalizedRoomNo + "）";
   }
 
   private void ensureNoDuplicateNameOccupied(ElderProfile elder) {
@@ -1219,6 +1404,47 @@ public class ElderServiceImpl implements ElderService {
       response.setCurrentBed(bedResponse);
     }
     return response;
+  }
+
+  private void applyCaregiverInfo(ElderResponse response, ElderProfile elder) {
+    if (response == null || elder == null || elder.getId() == null) {
+      return;
+    }
+    List<ServicePlan> plans = servicePlanMapper.selectList(
+        Wrappers.lambdaQuery(ServicePlan.class)
+            .eq(ServicePlan::getIsDeleted, 0)
+            .eq(elder.getTenantId() != null, ServicePlan::getTenantId, elder.getTenantId())
+            .eq(elder.getOrgId() != null, ServicePlan::getOrgId, elder.getOrgId())
+            .eq(ServicePlan::getElderId, elder.getId())
+            .eq(ServicePlan::getStatus, "ACTIVE")
+            .isNotNull(ServicePlan::getDefaultStaffId)
+            .orderByAsc(ServicePlan::getCreateTime));
+    if (plans.isEmpty()) {
+      response.setCaregiverName(null);
+      response.setCaregiverNames(List.of());
+      return;
+    }
+    LinkedHashSet<Long> staffIds = plans.stream()
+        .map(ServicePlan::getDefaultStaffId)
+        .filter(Objects::nonNull)
+        .collect(Collectors.toCollection(LinkedHashSet::new));
+    if (staffIds.isEmpty()) {
+      response.setCaregiverName(null);
+      response.setCaregiverNames(List.of());
+      return;
+    }
+    Map<Long, StaffAccount> staffMap = staffMapper.selectBatchIdsSafe(staffIds).stream()
+        .filter(item -> !Integer.valueOf(1).equals(item.getIsDeleted()))
+        .collect(Collectors.toMap(StaffAccount::getId, item -> item, (left, right) -> left));
+    List<String> caregiverNames = staffIds.stream()
+        .map(staffMap::get)
+        .filter(Objects::nonNull)
+        .map(item -> normalizeText(item.getRealName()) == null ? normalizeText(item.getUsername()) : normalizeText(item.getRealName()))
+        .filter(Objects::nonNull)
+        .distinct()
+        .toList();
+    response.setCaregiverNames(caregiverNames);
+    response.setCaregiverName(caregiverNames.isEmpty() ? null : caregiverNames.get(0));
   }
 
   private String resolveLifecycleStageByElder(ElderProfile elder) {

@@ -12,12 +12,17 @@ import com.zhiyangyun.care.elder.model.BedStatus;
 import com.zhiyangyun.care.elder.service.ElderOccupancyService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ElderOccupancyServiceImpl implements ElderOccupancyService {
+  private static final String OCCUPANCY_SOURCE_WHOLE_ROOM = "WHOLE_ROOM";
+  private static final String OCCUPANCY_REF_TYPE_ELDER = "ELDER";
   private final ElderMapper elderMapper;
   private final BedMapper bedMapper;
   private final ElderBedRelationMapper relationMapper;
@@ -55,6 +60,35 @@ public class ElderOccupancyServiceImpl implements ElderOccupancyService {
       return result;
     }
 
+    List<ElderBedRelation> activeRelations = relationMapper.selectList(
+        Wrappers.lambdaQuery(ElderBedRelation.class)
+            .eq(ElderBedRelation::getIsDeleted, 0)
+            .eq(tenantId != null, ElderBedRelation::getTenantId, tenantId)
+            .eq(orgId != null, ElderBedRelation::getOrgId, orgId)
+            .eq(ElderBedRelation::getElderId, elderId)
+            .eq(ElderBedRelation::getActiveFlag, 1)
+            .last("FOR UPDATE"));
+    Set<Long> bedIdsToRelease = new LinkedHashSet<>();
+    if (elder.getBedId() != null) {
+      bedIdsToRelease.add(elder.getBedId());
+    }
+    activeRelations.stream()
+        .map(ElderBedRelation::getBedId)
+        .filter(Objects::nonNull)
+        .forEach(bedIdsToRelease::add);
+    bedMapper.selectList(
+            Wrappers.lambdaQuery(Bed.class)
+                .eq(Bed::getIsDeleted, 0)
+                .eq(tenantId != null, Bed::getTenantId, tenantId)
+                .eq(orgId != null, Bed::getOrgId, orgId)
+                .eq(Bed::getOccupancySource, OCCUPANCY_SOURCE_WHOLE_ROOM)
+                .eq(Bed::getOccupancyRefType, OCCUPANCY_REF_TYPE_ELDER)
+                .eq(Bed::getOccupancyRefId, elderId))
+        .stream()
+        .map(Bed::getId)
+        .filter(Objects::nonNull)
+        .forEach(bedIdsToRelease::add);
+
     int closedRelations = relationMapper.update(
         null,
         Wrappers.lambdaUpdate(ElderBedRelation.class)
@@ -69,8 +103,44 @@ public class ElderOccupancyServiceImpl implements ElderOccupancyService {
     result.setClosedRelationCount(closedRelations);
 
     Long previousBedId = elder.getBedId();
+    if (previousBedId == null && !bedIdsToRelease.isEmpty()) {
+      previousBedId = bedIdsToRelease.iterator().next();
+    }
     result.setPreviousBedId(previousBedId);
-    if (previousBedId != null) {
+    if (!bedIdsToRelease.isEmpty()) {
+      Long releasedBedId = null;
+      LocalDateTime releasedAt = LocalDateTime.now();
+      for (Long bedId : bedIdsToRelease) {
+        if (bedId == null) {
+          continue;
+        }
+        Bed bed = bedMapper.selectOne(
+            Wrappers.lambdaQuery(Bed.class)
+                .eq(Bed::getId, bedId)
+                .eq(Bed::getIsDeleted, 0)
+                .eq(tenantId != null, Bed::getTenantId, tenantId)
+                .eq(orgId != null, Bed::getOrgId, orgId)
+                .last("LIMIT 1 FOR UPDATE"));
+        if (bed != null && (Objects.equals(bed.getElderId(), elderId) || bed.getElderId() == null)) {
+          bed.setElderId(null);
+          bed.setStatus(BedStatus.AVAILABLE);
+          bed.setOccupancySource(null);
+          bed.setOccupancyRefType(null);
+          bed.setOccupancyRefId(null);
+          bed.setLockExpiresAt(null);
+          bed.setOccupancyNote(null);
+          bed.setLastReleaseReason(reason);
+          bed.setLastReleasedAt(releasedAt);
+          bedMapper.updateById(bed);
+          if (releasedBedId == null) {
+            releasedBedId = bed.getId();
+          }
+        }
+      }
+      result.setReleasedBedId(releasedBedId);
+      elder.setBedId(null);
+      elderMapper.updateById(elder);
+    } else if (previousBedId != null) {
       Bed bed = bedMapper.selectOne(
           Wrappers.lambdaQuery(Bed.class)
               .eq(Bed::getId, previousBedId)

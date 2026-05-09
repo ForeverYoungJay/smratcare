@@ -781,6 +781,7 @@ public class CrmLeadServiceImpl implements CrmLeadService {
       admission.setAdmissionDate(admissionDate == null ? LocalDate.now() : admissionDate);
       admission.setContractNo(contractNo);
       admission.setDepositAmount(lead.getReservationAmount());
+      admission.setOccupancyMode("BED");
       admission.setRemark("营销签约自动同步");
       admission.setCreatedBy(lead.getCreatedBy());
       admissionMapper.insert(admission);

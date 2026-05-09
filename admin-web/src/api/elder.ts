@@ -32,8 +32,8 @@ export function deleteElder(id: Id) {
   return request.delete<void>(`/api/elder/${id}`)
 }
 
-export function assignBed(elderId: Id, bedId: Id, startDate: string) {
-  const body: ElderAssignBedRequest = { bedId, startDate }
+export function assignBed(elderId: Id, bedId: Id, startDate: string, occupancyMode?: string) {
+  const body: ElderAssignBedRequest = { bedId, startDate, occupancyMode }
   return request.post<void>(`/api/elder/${elderId}/assignBed`, body)
 }
 

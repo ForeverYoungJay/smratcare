@@ -13,5 +13,6 @@ public class AdmissionResponse {
   private LocalDate admissionDate;
   private String contractNo;
   private BigDecimal depositAmount;
+  private String occupancyMode;
   private String remark;
 }
