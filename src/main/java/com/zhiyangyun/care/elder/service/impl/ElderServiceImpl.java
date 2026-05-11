@@ -65,6 +65,7 @@ public class ElderServiceImpl implements ElderService {
   private static final String OCCUPANCY_MODE_WHOLE_ROOM = "WHOLE_ROOM";
   private static final String OCCUPANCY_SOURCE_WHOLE_ROOM = "WHOLE_ROOM";
   private static final String OCCUPANCY_REF_TYPE_ELDER = "ELDER";
+  private static final String OCCUPANCY_REF_TYPE_RELATION = "ELDER_BED_RELATION";
   private static final String[] ELDER_PAGE_COLUMNS = {
       "id", "tenant_id", "org_id", "elder_code", "elder_qr_code", "full_name", "id_card_no",
       "gender", "birth_date", "phone", "home_address", "medical_insurance_copy_url",
@@ -187,6 +188,7 @@ public class ElderServiceImpl implements ElderService {
       assign.setCreatedBy(request.getCreatedBy());
       assign.setBedId(request.getBedId());
       assign.setStartDate(request.getBedStartDate());
+      assign.setOccupancyMode(request.getOccupancyMode());
       ElderResponse assigned = assignBed(elder.getId(), assign);
       return assigned == null ? toResponse(elder, null) : assigned;
     }
@@ -986,7 +988,12 @@ public class ElderServiceImpl implements ElderService {
         .eq(Bed::getStatus, BedStatus.OCCUPIED)
         .eq(Bed::getIsDeleted, 0));
     com.zhiyangyun.care.elder.entity.Room room = roomMapper.selectById(bed.getRoomId());
-    ElderBedRelation elderActive = findActiveRelationByElderForUpdate(elder.getTenantId(), elder.getOrgId(), elder.getId());
+    List<ElderBedRelation> elderActiveRelations =
+        findActiveRelationsByElderForUpdate(elder.getTenantId(), elder.getOrgId(), elder.getId());
+    ElderBedRelation elderActive = elderActiveRelations.stream()
+        .filter(item -> Objects.equals(item.getBedId(), elder.getBedId()))
+        .findFirst()
+        .orElse(elderActiveRelations.isEmpty() ? null : elderActiveRelations.get(0));
     String effectiveOccupancyMode = resolveEffectiveOccupancyMode(elder, request, elderActive);
     boolean sameRoomTransfer = false;
     if (elderActive != null && elderActive.getBedId() != null) {
@@ -1018,6 +1025,15 @@ public class ElderServiceImpl implements ElderService {
       }
       return toResponse(elder, bed);
     }
+    if (bedActive == null
+        && Objects.equals(elder.getBedId(), bed.getId())
+        && Objects.equals(bed.getElderId(), elder.getId())) {
+      if (bed.getStatus() == null || bed.getStatus() != BedStatus.OCCUPIED) {
+        bed.setStatus(BedStatus.OCCUPIED);
+        bedMapper.updateById(bed);
+      }
+      return toResponse(elder, bed);
+    }
     if (bedActive != null && !bedActive.getElderId().equals(elder.getId())) {
       throw new IllegalStateException("Bed already assigned");
     }
@@ -1030,8 +1046,11 @@ public class ElderServiceImpl implements ElderService {
         && !targetLockedBySameWholeRoom) {
       throw new IllegalStateException("Bed is not available");
     }
-    if (elderActive != null) {
-      if (Objects.equals(elderActive.getBedId(), bed.getId())
+    if (elderActive != null
+        || elder.getBedId() != null
+        || hasWholeRoomLocks(elder.getTenantId(), elder.getOrgId(), elder.getId(), null)) {
+      if (elderActive != null
+          && Objects.equals(elderActive.getBedId(), bed.getId())
           && Objects.equals(elder.getBedId(), bed.getId())
           && Objects.equals(bed.getElderId(), elder.getId())) {
         if (bed.getStatus() == null || bed.getStatus() != BedStatus.OCCUPIED) {
@@ -1040,28 +1059,12 @@ public class ElderServiceImpl implements ElderService {
         }
         return toResponse(elder, bed);
       }
-      elderActive.setActiveFlag(0);
-      elderActive.setEndDate(relationStartDate.minusDays(1));
-      relationMapper.updateById(elderActive);
-
-      Bed oldBed = findBedForUpdate(elderActive.getBedId());
-      if (oldBed != null
-          && !Objects.equals(oldBed.getId(), bed.getId())
-          && (Objects.equals(oldBed.getElderId(), elder.getId())
-              || oldBed.getElderId() == null
-              || Objects.equals(oldBed.getOccupancyRefId(), elderActive.getId()))) {
-        oldBed.setElderId(null);
-        oldBed.setStatus(BedStatus.AVAILABLE);
-        oldBed.setOccupancySource(null);
-        oldBed.setOccupancyRefType(null);
-        oldBed.setOccupancyRefId(null);
-        oldBed.setLockExpiresAt(null);
-        oldBed.setOccupancyNote(null);
-        oldBed.setLastReleaseReason("调床释放");
-        oldBed.setLastReleasedAt(LocalDateTime.now());
-        bedMapper.updateById(oldBed);
-      }
-      releaseWholeRoomLocks(elder.getTenantId(), elder.getOrgId(), elder.getId(), oldBed == null ? null : oldBed.getRoomId(), bed.getId(), "调床释放");
+      closeOtherActiveRelationsAndReleaseBeds(
+          elder,
+          elderActiveRelations,
+          bed.getId(),
+          relationStartDate.minusDays(1),
+          "调床释放");
     }
 
     ElderBedRelation relation = new ElderBedRelation();
@@ -1322,6 +1325,93 @@ public class ElderServiceImpl implements ElderService {
             .eq(ElderBedRelation::getActiveFlag, 1)
             .eq(ElderBedRelation::getIsDeleted, 0)
             .last("LIMIT 1 FOR UPDATE"));
+  }
+
+  private List<ElderBedRelation> findActiveRelationsByElderForUpdate(Long tenantId, Long orgId, Long elderId) {
+    if (elderId == null) {
+      return List.of();
+    }
+    return relationMapper.selectList(
+        Wrappers.lambdaQuery(ElderBedRelation.class)
+            .eq(orgId != null, ElderBedRelation::getOrgId, orgId)
+            .eq(tenantId != null, ElderBedRelation::getTenantId, tenantId)
+            .eq(ElderBedRelation::getElderId, elderId)
+            .eq(ElderBedRelation::getActiveFlag, 1)
+            .eq(ElderBedRelation::getIsDeleted, 0)
+            .last("FOR UPDATE"));
+  }
+
+  private void closeOtherActiveRelationsAndReleaseBeds(
+      ElderProfile elder,
+      List<ElderBedRelation> activeRelations,
+      Long targetBedId,
+      LocalDate relationEndDate,
+      String reason) {
+    if (elder == null || elder.getId() == null) {
+      return;
+    }
+    Set<Long> relationIds = activeRelations.stream()
+        .map(ElderBedRelation::getId)
+        .filter(Objects::nonNull)
+        .collect(Collectors.toCollection(LinkedHashSet::new));
+    for (ElderBedRelation activeRelation : activeRelations) {
+      if (activeRelation == null || !Objects.equals(activeRelation.getActiveFlag(), 1)) {
+        continue;
+      }
+      activeRelation.setActiveFlag(0);
+      activeRelation.setEndDate(relationEndDate == null ? LocalDate.now() : relationEndDate);
+      relationMapper.updateById(activeRelation);
+    }
+
+    Set<Long> bedIdsToRelease = new LinkedHashSet<>();
+    if (elder.getBedId() != null) {
+      bedIdsToRelease.add(elder.getBedId());
+    }
+    activeRelations.stream()
+        .map(ElderBedRelation::getBedId)
+        .filter(Objects::nonNull)
+        .forEach(bedIdsToRelease::add);
+    bedMapper.selectList(
+            Wrappers.lambdaQuery(Bed.class)
+                .eq(Bed::getIsDeleted, 0)
+                .eq(elder.getTenantId() != null, Bed::getTenantId, elder.getTenantId())
+                .eq(elder.getOrgId() != null, Bed::getOrgId, elder.getOrgId())
+                .eq(Bed::getOccupancySource, OCCUPANCY_SOURCE_WHOLE_ROOM)
+                .eq(Bed::getOccupancyRefType, OCCUPANCY_REF_TYPE_ELDER)
+                .eq(Bed::getOccupancyRefId, elder.getId()))
+        .stream()
+        .map(Bed::getId)
+        .filter(Objects::nonNull)
+        .forEach(bedIdsToRelease::add);
+
+    LocalDateTime releasedAt = LocalDateTime.now();
+    for (Long bedId : bedIdsToRelease) {
+      if (bedId == null || Objects.equals(bedId, targetBedId)) {
+        continue;
+      }
+      Bed existingBed = findBedForUpdate(bedId);
+      if (existingBed == null) {
+        continue;
+      }
+      boolean releasable = Objects.equals(existingBed.getElderId(), elder.getId())
+          || isWholeRoomLockForElder(existingBed, elder.getId())
+          || (existingBed.getElderId() == null
+              && OCCUPANCY_REF_TYPE_RELATION.equalsIgnoreCase(String.valueOf(existingBed.getOccupancyRefType()))
+              && relationIds.contains(existingBed.getOccupancyRefId()));
+      if (!releasable) {
+        continue;
+      }
+      existingBed.setElderId(null);
+      existingBed.setStatus(BedStatus.AVAILABLE);
+      existingBed.setOccupancySource(null);
+      existingBed.setOccupancyRefType(null);
+      existingBed.setOccupancyRefId(null);
+      existingBed.setLockExpiresAt(null);
+      existingBed.setOccupancyNote(null);
+      existingBed.setLastReleaseReason(reason);
+      existingBed.setLastReleasedAt(releasedAt);
+      bedMapper.updateById(existingBed);
+    }
   }
 
   private ElderBedRelation findActiveRelationByBedForUpdate(Long tenantId, Long orgId, Long bedId) {

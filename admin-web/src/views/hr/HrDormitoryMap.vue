@@ -171,20 +171,50 @@
           <span>是否住宿舍</span>
           <a-switch :checked="Number(form.liveInDormitory) === 1" @change="(checked) => (form.liveInDormitory = checked ? 1 : 0)" />
         </div>
+        <a-alert
+          v-if="Number(form.liveInDormitory) === 1 && !dormitoryBuildingOptions.length"
+          type="warning"
+          show-icon
+          message="暂无员工宿舍房间配置，请先到宿舍台账里批量生成房间后再安排住宿。"
+          style="margin-bottom: 12px"
+        />
         <a-row :gutter="12">
           <a-col :span="12">
             <a-form-item label="宿舍楼栋">
-              <a-input v-model:value="form.dormitoryBuilding" placeholder="如 A栋" :disabled="Number(form.liveInDormitory) !== 1" />
+              <a-select
+                v-model:value="form.dormitoryBuilding"
+                :options="dormitoryBuildingOptions"
+                placeholder="选择宿舍楼栋"
+                allow-clear
+                show-search
+                :disabled="Number(form.liveInDormitory) !== 1"
+                @change="onDormitoryBuildingChange"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="12">
             <a-form-item label="宿舍房间">
-              <a-input v-model:value="form.dormitoryRoomNo" placeholder="如 3-201" :disabled="Number(form.liveInDormitory) !== 1" />
+              <a-select
+                v-model:value="form.dormitoryRoomNo"
+                :options="dormitoryRoomOptions"
+                placeholder="选择宿舍房间"
+                allow-clear
+                show-search
+                :disabled="Number(form.liveInDormitory) !== 1 || !form.dormitoryBuilding"
+                @change="onDormitoryRoomChange"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="12">
             <a-form-item label="床位号">
-              <a-input v-model:value="form.dormitoryBedNo" placeholder="如 B02" :disabled="Number(form.liveInDormitory) !== 1" />
+              <a-select
+                v-model:value="form.dormitoryBedNo"
+                :options="dormitoryBedOptions"
+                placeholder="选择床位号"
+                allow-clear
+                show-search
+                :disabled="Number(form.liveInDormitory) !== 1 || !form.dormitoryRoomNo"
+              />
             </a-form-item>
           </a-col>
           <a-col :span="12">
@@ -300,6 +330,8 @@ const planStatusOptions = [
 
 const rows = ref<HrDormitoryStaffItem[]>([])
 const roomConfigs = ref<HrDormitoryRoomConfigItem[]>([])
+const roomConfigCatalog = ref<HrDormitoryRoomConfigItem[]>([])
+const occupancyCatalog = ref<HrDormitoryStaffItem[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const drawerOpen = ref(false)
@@ -446,6 +478,39 @@ const floorCount = computed(() => buildingScenes.value.reduce((sum, building) =>
 const roomCount = computed(() => buildingScenes.value.reduce((sum, building) => sum + building.roomCount, 0))
 const bedCount = computed(() => buildingScenes.value.reduce((sum, building) => sum + building.bedCount, 0))
 
+const dormitoryBuildingOptions = computed(() =>
+  Array.from(new Set(roomConfigCatalog.value.map((item) => normalizeText(item.building)).filter(Boolean)))
+    .sort((a, b) => a.localeCompare(b, 'zh-CN'))
+    .map((value) => ({ label: value, value }))
+)
+
+const hasDormitoryRoomConfig = computed(() => dormitoryBuildingOptions.value.length > 0)
+
+const dormitoryRoomOptions = computed(() =>
+  roomConfigCatalog.value
+    .filter((item) => normalizeText(item.building) === normalizeText(form.dormitoryBuilding))
+    .sort((a, b) => Number(a.sortNo || 0) - Number(b.sortNo || 0) || normalizeText(a.roomNo).localeCompare(normalizeText(b.roomNo), 'zh-CN'))
+    .map((item) => ({
+      label: `${item.roomNo}${item.floorLabel ? ` · ${item.floorLabel}` : ''}`,
+      value: item.roomNo
+    }))
+)
+
+const dormitoryBedOptions = computed(() => {
+  const room = roomConfigCatalog.value.find((item) => normalizeText(item.building) === normalizeText(form.dormitoryBuilding) && normalizeText(item.roomNo) === normalizeText(form.dormitoryRoomNo))
+  const capacity = Number(room?.bedCapacity || 0)
+  const options = Array.from({ length: capacity }, (_, index) => {
+    const bedNo = `B${String(index + 1).padStart(2, '0')}`
+    const occupiedBy = findBedOccupiedBy(normalizeText(form.dormitoryBuilding), normalizeText(form.dormitoryRoomNo), bedNo, form.staffId)
+    return { label: occupiedBy ? `${bedNo}（已占用：${occupiedBy}）` : bedNo, value: bedNo }
+  })
+  const currentValue = normalizeText(form.dormitoryBedNo)
+  if (currentValue && !options.some((item) => item.value === currentValue)) {
+    options.unshift({ label: `${currentValue}（当前值）`, value: currentValue })
+  }
+  return options
+})
+
 function normalizeText(value?: string, fallback = '') {
   const text = String(value || '').trim()
   return text || fallback
@@ -490,6 +555,16 @@ function bedStatusClass(bed: DormBedScene) {
   return 'is-occupied'
 }
 
+function findBedOccupiedBy(building: string, roomNo: string, bedNo: string, currentStaffId?: string | number) {
+  const matched = occupancyCatalog.value.find((item) =>
+    String(item.staffId || '') !== String(currentStaffId || '') &&
+    normalizeText(item.dormitoryBuilding) === building &&
+    normalizeText(item.dormitoryRoomNo) === roomNo &&
+    normalizeText(item.dormitoryBedNo) === bedNo
+  )
+  return matched?.staffName || matched?.staffNo || ''
+}
+
 function toggleBuilding(name: string) {
   selectedBuilding.value = selectedBuilding.value === name ? '' : name
   if (!selectedBuilding.value) {
@@ -506,23 +581,48 @@ function clearSelection() {
   selectedFloor.value = ''
 }
 
+function onDormitoryBuildingChange() {
+  form.dormitoryRoomNo = undefined
+  form.dormitoryBedNo = undefined
+  form.meterNo = undefined
+}
+
+function onDormitoryRoomChange() {
+  form.dormitoryBedNo = undefined
+  const room = roomConfigCatalog.value.find((item) => normalizeText(item.building) === normalizeText(form.dormitoryBuilding) && normalizeText(item.roomNo) === normalizeText(form.dormitoryRoomNo))
+  if (!normalizeText(form.meterNo) && room) {
+    const occupancy = occupancyCatalog.value.find((item) =>
+      normalizeText(item.dormitoryBuilding) === normalizeText(room.building) &&
+      normalizeText(item.dormitoryRoomNo) === normalizeText(room.roomNo) &&
+      normalizeText(item.meterNo)
+    )
+    form.meterNo = occupancy?.meterNo
+  }
+}
+
 async function fetchData() {
   loading.value = true
   try {
-    const [staffRows, configRows] = await Promise.all([
+    const [staffRows, configRows, configCatalogRows, occupancyRows] = await Promise.all([
       getHrDormitoryMap({ ...query }),
       getHrDormitoryRoomConfigList({
         keyword: query.keyword,
         building: query.building,
         roomNo: query.roomNo,
         status: 'ENABLED'
-      })
+      }),
+      getHrDormitoryRoomConfigList({ status: 'ENABLED' }),
+      getHrDormitoryMap({ status: query.status })
     ])
     rows.value = staffRows || []
     roomConfigs.value = configRows || []
+    roomConfigCatalog.value = configCatalogRows || []
+    occupancyCatalog.value = occupancyRows || []
   } catch {
     rows.value = []
     roomConfigs.value = []
+    roomConfigCatalog.value = []
+    occupancyCatalog.value = []
   } finally {
     loading.value = false
   }
@@ -622,6 +722,16 @@ async function submitForm() {
   if (!form.staffId) {
     message.warning('请选择员工')
     return
+  }
+  if (Number(form.liveInDormitory) === 1) {
+    if (!hasDormitoryRoomConfig.value) {
+      message.warning('请先到宿舍台账中批量生成宿舍房间，再安排住宿')
+      return
+    }
+    if (!normalizeText(form.dormitoryBuilding) || !normalizeText(form.dormitoryRoomNo) || !normalizeText(form.dormitoryBedNo)) {
+      message.warning('请选择宿舍楼栋、房间和床位')
+      return
+    }
   }
   saving.value = true
   try {

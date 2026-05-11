@@ -36,4 +36,5 @@ public class ElderCreateRequest {
   private String historicalContractFileUrl;
   private Long bedId;
   private LocalDate bedStartDate;
+  private String occupancyMode;
 }

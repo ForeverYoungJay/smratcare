@@ -53,6 +53,19 @@
               </div>
             </div>
           </div>
+
+          <div class="scope-snapshot">
+            <div class="scope-snapshot-card">
+              <span>当前范围</span>
+              <strong>{{ bedGuardSubject }}</strong>
+              <small>{{ roomCount }} 间房 / {{ sourceBeds.length }} 张床位纳入分析</small>
+            </div>
+            <div class="scope-snapshot-card accent">
+              <span>当前阶段</span>
+              <strong>{{ bedGuardStageText }}</strong>
+              <small>{{ bedGuardHint }}</small>
+            </div>
+          </div>
         </section>
 
         <section class="tech-panel">
@@ -93,6 +106,50 @@
                 <a-tag color="blue" v-if="selectedBuilding">楼栋：{{ selectedBuilding }}</a-tag>
                 <a-tag color="cyan" v-if="selectedFloor">楼层：{{ selectedFloor }}</a-tag>
                 <span v-if="!selectedBuilding && !selectedFloor" class="field-tip">点击场景中的楼栋、楼层可快速聚焦</span>
+              </div>
+            </div>
+
+            <div class="field-block">
+              <span class="field-label">楼栋快捷切换</span>
+              <div class="scope-chip-list">
+                <button
+                  v-for="item in buildingScopeOptions"
+                  :key="item"
+                  class="scope-chip"
+                  :class="{ active: item === selectedBuilding }"
+                  @click="setBuildingScope(item)"
+                >
+                  {{ item }}
+                </button>
+                <button
+                  v-if="selectedBuilding"
+                  class="scope-chip muted"
+                  @click="setBuildingScope('')"
+                >
+                  查看全部
+                </button>
+              </div>
+            </div>
+
+            <div class="field-block" v-if="floorScopeOptions.length">
+              <span class="field-label">楼层快捷切换</span>
+              <div class="scope-chip-list compact">
+                <button
+                  v-for="item in floorScopeOptions"
+                  :key="item"
+                  class="scope-chip"
+                  :class="{ active: item === selectedFloor }"
+                  @click="setFloorScope(item)"
+                >
+                  {{ item }}
+                </button>
+                <button
+                  v-if="selectedFloor"
+                  class="scope-chip muted"
+                  @click="setFloorScope('')"
+                >
+                  全部楼层
+                </button>
               </div>
             </div>
 
@@ -142,6 +199,26 @@
             </div>
           </div>
 
+          <div class="stage-command-bar">
+            <div class="stage-command-main">
+              <div class="stage-command-title">当前聚焦</div>
+              <strong>{{ focusHeadline.title }}</strong>
+              <span>{{ focusHeadline.meta }}</span>
+            </div>
+            <div class="stage-command-actions">
+              <button
+                v-for="item in stageQuickActions"
+                :key="item.key"
+                class="stage-action-pill"
+                :class="item.tone"
+                @click="handleCommandAction(item.key)"
+              >
+                <strong>{{ item.label }}</strong>
+                <span>{{ item.description }}</span>
+              </button>
+            </div>
+          </div>
+
           <a-alert
             v-if="lifecycleContext.active"
             type="info"
@@ -177,6 +254,17 @@
                 <span class="overlay-chip">{{ resolveStatus(selectedBed) }}</span>
                 <span class="overlay-chip" v-if="selectedBed.riskLabel">{{ selectedBed.riskLabel }}</span>
                 <span class="overlay-chip">异常 {{ selectedBed.abnormalVital24hCount || 0 }}</span>
+              </div>
+              <div class="overlay-progress">
+                <div
+                  v-for="(step, index) in bedGuardSteps"
+                  :key="step"
+                  class="overlay-step"
+                  :class="{ active: index <= bedGuardCurrentIndex, current: index === bedGuardCurrentIndex }"
+                >
+                  <span>{{ index + 1 }}</span>
+                  <small>{{ step }}</small>
+                </div>
               </div>
             </div>
           </div>
@@ -283,13 +371,53 @@
           </div>
           <a-empty v-else description="点击床位后显示详情与快捷操作" />
 
+          <div class="guard-panel">
+            <div class="guard-stage">
+              <span class="guard-label">当前阶段</span>
+              <strong>{{ bedGuardStageText }}</strong>
+              <small>{{ bedGuardHint }}</small>
+            </div>
+            <div class="guard-steps">
+              <div
+                v-for="(step, index) in bedGuardSteps"
+                :key="step"
+                class="guard-step"
+                :class="{ active: index <= bedGuardCurrentIndex, current: index === bedGuardCurrentIndex }"
+              >
+                <span>{{ index + 1 }}</span>
+                <div>{{ step }}</div>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="bedGuardBlockers.length" class="blocker-list">
+            <div v-for="item in bedGuardBlockers" :key="item.code" class="blocker-card">
+              <div>
+                <strong>{{ item.code }}</strong>
+                <p>{{ item.text }}</p>
+              </div>
+              <a-button
+                v-if="item.actionKey && item.actionLabel"
+                size="small"
+                type="link"
+                @click="handleBedGuardAction(item)"
+              >
+                {{ item.actionLabel }}
+              </a-button>
+            </div>
+          </div>
+
           <div class="action-grid">
-            <a-button block type="primary" @click="openProfile">长者档案</a-button>
-            <a-button block @click="allocateBed">床位分配</a-button>
-            <a-button block @click="openAssessmentArchive">评估档案</a-button>
-            <a-button block @click="openContractsInvoices">合同票据</a-button>
-            <a-button block @click="openStatusChangeCenter">状态中心</a-button>
-            <a-button block danger ghost @click="createAlert">生成提醒</a-button>
+            <button
+              v-for="item in commandDeck"
+              :key="item.key"
+              class="action-card"
+              :class="item.tone"
+              @click="handleCommandAction(item.key)"
+            >
+              <strong>{{ item.label }}</strong>
+              <span>{{ item.description }}</span>
+            </button>
           </div>
         </section>
       </aside>
@@ -482,6 +610,7 @@ const floorList = computed(() => {
 })
 
 const matrixFloors = computed(() => floorList.value)
+const roomCount = computed(() => Array.from(roomSceneLookup.value.values()).reduce((sum, rooms) => sum + rooms.length, 0))
 
 const stats = computed(() => {
   const s = { idle: 0, reserved: 0, occupied: 0, maintenance: 0, cleaning: 0, locked: 0 }
@@ -579,6 +708,15 @@ const leftStatCards = computed(() => ([
   { label: '睡眠稳定', value: sleepStableCount.value, meta: '低异常波动', tone: 'tone-purple' }
 ]))
 
+const buildingScopeOptions = computed(() => matrixBuildings.value.slice(0, 6))
+
+const floorScopeOptions = computed(() => {
+  if (selectedBuilding.value) {
+    return floorList.value.slice(0, 8)
+  }
+  return matrixFloors.value.slice(0, 8)
+})
+
 const statusDistributionRows = computed(() => {
   const total = Math.max(1, beds.value.length)
   return [
@@ -671,6 +809,42 @@ const bedGuardHint = computed(() => {
   return '建议点击床位查看详情，执行分配或风险干预动作'
 })
 
+const focusHeadline = computed(() => {
+  if (selectedBed.value) {
+    return {
+      title: `${selectedBed.value.roomNo || '-'} / ${selectedBed.value.bedNo || '-'}`,
+      meta: `${selectedBed.value.elderName || '空床'} · ${resolveStatus(selectedBed.value)} · ${selectedBed.value.riskLabel || '实时监测中'}`
+    }
+  }
+  if (selectedRoom.value) {
+    return {
+      title: `${selectedRoom.value.roomNo || '-'} 房间`,
+      meta: `${selectedRoom.value.roomType} · 容量 ${selectedRoom.value.capacity || 0} 床 · 空床 ${selectedRoom.value.emptyBeds || 0}`
+    }
+  }
+  return {
+    title: selectedBuilding.value || selectedFloor.value ? `${selectedBuilding.value || '全部楼栋'} ${selectedFloor.value || ''}`.trim() : '园区总览',
+    meta: selectedBuilding.value || selectedFloor.value
+      ? `当前范围 ${roomCount.value} 间房 / ${sourceBeds.value.length} 张床位`
+      : '点击楼栋、楼层、房间或床位，快速进入对应视角'
+  }
+})
+
+const stageQuickActions = computed(() => ([
+  { key: 'reset-filters', label: '重置筛选', description: '回到总览范围', tone: 'tone-cyan' },
+  { key: 'open-map', label: '房态视图', description: '切到平面房态图', tone: 'tone-blue' },
+  { key: 'open-manage', label: '床位管理', description: '执行基础维护', tone: 'tone-green' }
+]))
+
+const commandDeck = computed(() => ([
+  { key: 'open-profile', label: '长者档案', description: '查看在住档案与照护信息', tone: 'tone-blue' },
+  { key: 'allocate-bed', label: '床位分配', description: '为空床发起入住分配', tone: 'tone-cyan' },
+  { key: 'open-assessment', label: '评估档案', description: '进入能力评估归档', tone: 'tone-purple' },
+  { key: 'open-contracts', label: '合同票据', description: '处理合同与账单联动', tone: 'tone-green' },
+  { key: 'open-status-center', label: '状态中心', description: '发起状态变更闭环', tone: 'tone-orange' },
+  { key: 'create-alert', label: '生成提醒', description: '同步推送提醒与任务', tone: 'tone-red' }
+]))
+
 const trendLabels = computed(() => Array.from({ length: 7 }, (_, index) => dayjs().subtract(6 - index, 'day').format('MM/DD')))
 
 function buildTrend(base: number, multipliers: number[]) {
@@ -758,6 +932,53 @@ function handleBedGuardAction(item: { actionKey?: string }) {
   if (item.actionKey === 'create-alert') {
     createAlert()
   }
+}
+
+function handleCommandAction(action: string) {
+  if (action === 'reset-filters') {
+    resetFilters()
+    return
+  }
+  if (action === 'open-map') {
+    openBedMap()
+    return
+  }
+  if (action === 'open-manage') {
+    openBedManage()
+    return
+  }
+  if (action === 'open-profile') {
+    openProfile()
+    return
+  }
+  if (action === 'allocate-bed') {
+    allocateBed()
+    return
+  }
+  if (action === 'open-assessment') {
+    openAssessmentArchive()
+    return
+  }
+  if (action === 'open-contracts') {
+    openContractsInvoices()
+    return
+  }
+  if (action === 'open-status-center') {
+    openStatusChangeCenter()
+    return
+  }
+  if (action === 'create-alert') {
+    createAlert()
+  }
+}
+
+function setBuildingScope(building: string) {
+  selectedBuilding.value = building
+  selectedFloor.value = ''
+}
+
+function setFloorScope(floor: string) {
+  selectedFloor.value = floor
 }
 
 function roomsAt(building: string, floor: string) {
@@ -1211,6 +1432,50 @@ watch(
   color: #8db2cf;
 }
 
+.scope-snapshot {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.scope-snapshot-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(87, 215, 255, 0.14);
+  background: linear-gradient(180deg, rgba(8, 22, 40, 0.78), rgba(6, 16, 29, 0.94));
+}
+
+.scope-snapshot-card.accent {
+  border-color: rgba(143, 116, 255, 0.24);
+  background: linear-gradient(180deg, rgba(24, 20, 53, 0.82), rgba(9, 15, 31, 0.96));
+}
+
+.scope-snapshot-card span,
+.stage-command-title,
+.guard-label {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #7ea5c3;
+}
+
+.scope-snapshot-card strong,
+.guard-stage strong,
+.stage-command-main strong {
+  color: #eefcff;
+  font-size: 15px;
+}
+
+.scope-snapshot-card small,
+.guard-stage small,
+.stage-command-main span {
+  color: #8db2cf;
+  line-height: 1.6;
+}
+
 .cockpit-topbar,
 .topbar-status,
 .hero-metrics,
@@ -1218,6 +1483,7 @@ watch(
 .distribution-top,
 .section-head,
 .stage-heading,
+.stage-command-bar,
 .stage-kpis,
 .command-buttons,
 .event-top,
@@ -1317,6 +1583,14 @@ watch(
 
 .tone-orange {
   box-shadow: inset 0 0 0 1px rgba(255, 174, 87, 0.08), 0 0 24px rgba(255, 174, 87, 0.08);
+}
+
+.tone-purple {
+  box-shadow: inset 0 0 0 1px rgba(143, 116, 255, 0.1), 0 0 24px rgba(143, 116, 255, 0.1);
+}
+
+.tone-gray {
+  box-shadow: inset 0 0 0 1px rgba(140, 160, 181, 0.08), 0 0 24px rgba(140, 160, 181, 0.08);
 }
 
 .tone-red {
@@ -1482,6 +1756,34 @@ watch(
   flex-wrap: wrap;
 }
 
+.scope-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.scope-chip {
+  border: 1px solid rgba(87, 215, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(8, 24, 44, 0.82);
+  color: #cdefff;
+  padding: 7px 12px;
+  font-size: 12px;
+  transition: all 0.22s ease;
+}
+
+.scope-chip:hover,
+.scope-chip.active {
+  border-color: rgba(87, 215, 255, 0.44);
+  color: #ffffff;
+  box-shadow: 0 0 18px rgba(87, 215, 255, 0.14);
+}
+
+.scope-chip.muted {
+  border-style: dashed;
+  color: #8db2cf;
+}
+
 .flow-panel {
   padding: 12px 16px;
 }
@@ -1489,6 +1791,63 @@ watch(
 .stage-panel {
   display: grid;
   gap: 14px;
+}
+
+.stage-command-bar {
+  align-items: stretch;
+  gap: 14px;
+  margin: 2px 0 0;
+}
+
+.stage-command-main,
+.stage-action-pill,
+.guard-panel,
+.blocker-card,
+.action-card {
+  border-radius: 20px;
+  border: 1px solid rgba(87, 215, 255, 0.14);
+  background: linear-gradient(180deg, rgba(8, 24, 44, 0.82), rgba(5, 14, 28, 0.96));
+  box-shadow: inset 0 1px 0 rgba(112, 219, 255, 0.08);
+}
+
+.stage-command-main {
+  min-width: 220px;
+  max-width: 280px;
+  padding: 16px 18px;
+  display: grid;
+  gap: 8px;
+}
+
+.stage-command-actions {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.stage-action-pill,
+.action-card {
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  display: grid;
+  gap: 6px;
+  color: #e9fbff;
+  transition: transform 0.22s ease, border-color 0.22s ease, box-shadow 0.22s ease;
+}
+
+.stage-action-pill:hover,
+.action-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(87, 215, 255, 0.3);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24), 0 0 18px rgba(87, 215, 255, 0.12);
+}
+
+.stage-action-pill span,
+.action-card span {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #8db2cf;
 }
 
 .stage-heading {
@@ -1582,6 +1941,56 @@ watch(
   margin-top: 12px;
 }
 
+.overlay-progress {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.overlay-step,
+.guard-step {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  color: #7ea5c3;
+}
+
+.overlay-step span,
+.guard-step span {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(87, 215, 255, 0.16);
+  background: rgba(7, 19, 34, 0.86);
+  font-size: 12px;
+}
+
+.overlay-step.active,
+.guard-step.active {
+  color: #def6ff;
+}
+
+.overlay-step.active span,
+.guard-step.active span {
+  border-color: rgba(87, 215, 255, 0.42);
+  background: rgba(29, 103, 150, 0.42);
+}
+
+.overlay-step.current small,
+.guard-step.current div {
+  color: #ffffff;
+}
+
+.overlay-step small,
+.guard-step div {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .overlay-chip {
   padding: 5px 10px;
   border-radius: 999px;
@@ -1662,6 +2071,43 @@ watch(
   align-content: start;
 }
 
+.guard-panel {
+  padding: 14px;
+  margin: 14px 0;
+  display: grid;
+  gap: 14px;
+}
+
+.guard-steps {
+  display: grid;
+  gap: 10px;
+}
+
+.blocker-list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.blocker-card {
+  padding: 12px 14px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.blocker-card strong {
+  color: #ffb86f;
+}
+
+.blocker-card p {
+  margin: 4px 0 0;
+  color: #9bbbd4;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .action-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1713,6 +2159,8 @@ watch(
     grid-template-columns: 1fr;
   }
 
+  .scope-snapshot,
+  .stage-command-actions,
   .chart-grid {
     grid-template-columns: 1fr;
   }
@@ -1727,12 +2175,15 @@ watch(
 @media (max-width: 768px) {
   .hero-metrics,
   .metric-grid,
+  .scope-snapshot,
+  .stage-command-actions,
   .action-grid {
     grid-template-columns: 1fr;
   }
 
   .cockpit-topbar,
-  .stage-heading {
+  .stage-heading,
+  .stage-command-bar {
     flex-direction: column;
     align-items: flex-start;
   }

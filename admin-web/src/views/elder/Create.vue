@@ -200,6 +200,15 @@
             </a-select-option>
           </a-select>
         </a-form-item>
+        <a-form-item label="入住方式" name="occupancyMode">
+          <a-radio-group v-model:value="form.occupancyMode" :disabled="form.status !== 1">
+            <a-radio-button value="BED">按床位入住</a-radio-button>
+            <a-radio-button value="WHOLE_ROOM">多人房整租</a-radio-button>
+          </a-radio-group>
+          <div v-if="form.occupancyMode === 'WHOLE_ROOM'" class="compact-inline-tip">
+            整租会保留当前房型，并自动锁定同房其他床位。
+          </div>
+        </a-form-item>
         <a-form-item label="床位开始日期" name="bedStartDate">
           <a-date-picker v-model:value="form.bedStartDate" value-format="YYYY-MM-DD" style="width: 100%" :disabled="form.status !== 1" />
         </a-form-item>
@@ -261,7 +270,8 @@ const form = reactive<ElderCreateRequest & { contractNo?: string; depositAmount?
   status: 1,
   remark: '',
   bedId: undefined,
-  bedStartDate: undefined
+  bedStartDate: undefined,
+  occupancyMode: 'BED'
 })
 const uploading = reactive({
   medicalInsurance: false,
@@ -393,6 +403,9 @@ async function validateContractNo(_rule: unknown, value?: string) {
 }
 
 async function validateBedId(_rule: unknown, value?: Id) {
+  if (form.occupancyMode === 'WHOLE_ROOM' && !value) {
+    return Promise.reject(new Error('整租入住必须选择主床位'))
+  }
   if (!value) {
     return Promise.resolve()
   }
@@ -449,6 +462,7 @@ const rules: FormRules = {
   birthDate: [{ validator: validateBirthDate, trigger: 'change' }],
   admissionDate: [{ validator: validateAdmissionDate, trigger: 'change' }],
   contractNo: [{ validator: validateContractNo, trigger: 'blur' }],
+  occupancyMode: [{ required: true, message: '请选择入住方式', trigger: 'change' }],
   bedId: [{ validator: validateBedId, trigger: 'change' }],
   bedStartDate: [{ validator: validateBedStartDate, trigger: 'change' }],
   status: [{ required: true, message: '请选择状态' }]
@@ -467,6 +481,9 @@ async function submit() {
     saving.value = true
     const normalizedContractNo = String(form.contractNo || '').trim()
     const shouldAdmit = !!form.admissionDate && !!normalizedContractNo
+    if (form.occupancyMode === 'WHOLE_ROOM' && !form.bedId) {
+      throw new Error('整租入住必须选择主床位')
+    }
     let successMessage = '保存成功'
     const payload: ElderCreateRequest = {
       fullName: trimText(form.fullName),
@@ -484,10 +501,13 @@ async function submit() {
       careLevel: form.careLevel,
       riskPrecommit: form.riskPrecommit,
       status: form.status,
-      remark: trimText(form.remark) || undefined
+      remark: trimText(form.remark) || undefined,
+      occupancyMode: form.occupancyMode
     }
-    payload.bedId = form.bedId
-    payload.bedStartDate = form.bedStartDate
+    if (!shouldAdmit) {
+      payload.bedId = form.bedId
+      payload.bedStartDate = form.bedStartDate
+    }
     const created: ElderItem = await createElder(payload)
     if (created?.id && selectedDiseaseIds.value.length > 0) {
       await updateElderDiseases(created.id, selectedDiseaseIds.value)
@@ -519,6 +539,7 @@ async function submit() {
         depositAmount: form.depositAmount,
         bedId: form.bedId,
         bedStartDate: form.bedStartDate,
+        occupancyMode: form.occupancyMode,
         allowMissingContractRecord: true
       }
       try {
@@ -757,6 +778,7 @@ watch(
     if (status === 1) {
       return
     }
+    form.occupancyMode = 'BED'
     assetSelect.buildingId = undefined
     assetSelect.floorId = undefined
     assetSelect.roomId = undefined
@@ -791,6 +813,12 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 4px;
+}
+
+.compact-inline-tip {
+  margin-top: 8px;
+  color: rgba(0, 0, 0, 0.45);
+  font-size: 12px;
 }
 
 .compact-form-item {

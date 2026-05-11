@@ -1704,6 +1704,19 @@ public class AdminHrController {
       plan.setDormitoryRoomNo(null);
       plan.setDormitoryBedNo(null);
       plan.setMeterNo(null);
+    } else {
+      if (normalizeBlank(plan.getDormitoryBuilding()) == null
+          || normalizeBlank(plan.getDormitoryRoomNo()) == null
+          || normalizeBlank(plan.getDormitoryBedNo()) == null) {
+        return Result.error(400, "请选择已配置的宿舍楼栋、房间和床位");
+      }
+      HrDormitoryRoomConfig configuredRoom = findDormitoryRoomConfig(orgId, plan.getDormitoryBuilding(), plan.getDormitoryRoomNo());
+      if (configuredRoom == null) {
+        return Result.error(400, "请先配置该员工宿舍房间，再安排住宿");
+      }
+      if (!isDormitoryBedWithinCapacity(plan.getDormitoryBedNo(), configuredRoom.getBedCapacity())) {
+        return Result.error(400, "床位号不在该宿舍房间的标准床位范围内");
+      }
     }
     String occupancyKey = dormitoryOccupancyKey(plan);
     if (occupancyKey != null) {
@@ -3407,6 +3420,40 @@ public class AdminHrController {
       return null;
     }
     return (building + "||" + roomNo + "||" + bedNo).toLowerCase(Locale.ROOT);
+  }
+
+  private HrDormitoryRoomConfig findDormitoryRoomConfig(Long orgId, String building, String roomNo) {
+    String normalizedBuilding = normalizeBlank(building);
+    String normalizedRoomNo = normalizeBlank(roomNo);
+    if (orgId == null || normalizedBuilding == null || normalizedRoomNo == null) {
+      return null;
+    }
+    return dormitoryRoomConfigMapper.selectOne(
+        Wrappers.lambdaQuery(HrDormitoryRoomConfig.class)
+            .eq(HrDormitoryRoomConfig::getOrgId, orgId)
+            .eq(HrDormitoryRoomConfig::getBuilding, normalizedBuilding)
+            .eq(HrDormitoryRoomConfig::getRoomNo, normalizedRoomNo)
+            .eq(HrDormitoryRoomConfig::getStatus, "ENABLED")
+            .eq(HrDormitoryRoomConfig::getIsDeleted, 0)
+            .last("LIMIT 1"));
+  }
+
+  private boolean isDormitoryBedWithinCapacity(String bedNo, Integer bedCapacity) {
+    String normalizedBedNo = normalizeBlank(bedNo);
+    int capacity = bedCapacity == null ? 0 : bedCapacity;
+    if (normalizedBedNo == null || capacity <= 0) {
+      return false;
+    }
+    java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("(\\d+)$").matcher(normalizedBedNo);
+    if (!matcher.find()) {
+      return false;
+    }
+    try {
+      int bedIndex = Integer.parseInt(matcher.group(1));
+      return bedIndex >= 1 && bedIndex <= capacity;
+    } catch (NumberFormatException ignore) {
+      return false;
+    }
   }
 
   private String resolveDormitoryFloorLabel(String roomNo) {

@@ -57,6 +57,7 @@ export interface ElderCreateRequest {
   remark?: string
   bedId?: Id
   bedStartDate?: string
+  occupancyMode?: 'BED' | 'WHOLE_ROOM' | string
   clearBed?: boolean
 }
 
